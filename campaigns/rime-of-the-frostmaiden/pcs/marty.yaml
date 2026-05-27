@@ -4,7 +4,8 @@
 
 id: marty
 name: "Marty the Merry Mushroom"
-portrait_ref: portraits/marty.png   # to be created (issue #23)
+portrait_ref: portraits/marty.png       # GBA-ready sprite pending (issue #23)
+portrait_source: data/portraits/marty.jpeg
 # Portrait source: https://www.dndbeyond.com/avatars/25824/431/1581111423-70515811.jpeg
 
 # ── D&D 5e Identity ────────────────────────────────────────────────────────────

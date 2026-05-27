@@ -1,17 +1,33 @@
-# pcs/braulo.yaml — Braulo the Hermit Crab Barbarian
-# Source: data/pc-sheets/braulo.json (D&D Beyond sheet, level 20 end-state)
+# pcs/braulo.yaml — Braulo, Barbarian (Path of the Berserker)
+# Source: data/pc-sheets/braulo.json + References/PCs/Braulo Character Sheet.pdf
 # See docs/class-mapping.md and docs/PRD.md §6.7 for class mapping rationale.
 
 id: braulo
 name: Braulo
-portrait_ref: portraits/braulo.png   # to be created (issue #23)
+portrait_ref: portraits/braulo.png       # GBA-ready sprite pending (issue #23)
+portrait_source: data/portraits/braulo.jpeg
+# Portrait source: https://www.dndbeyond.com/avatars/25784/526/1581111423-73827256.jpeg
 
 # ── D&D 5e Identity ────────────────────────────────────────────────────────────
 dnd:
-  race: Hermit Crab          # homebrew Tortle variant
+  race: "Hermit Crab"               # homebrew Pagurian
   class: Barbarian
-  subclass: Path of the Berserker
-  level_end_state: 20        # D&D Beyond sheet is level 20 (campaign end)
+  subclass: "Path of the Berserker"
+  level_end_state: 20
+  alignment: neutral
+  size: medium                      # 7 ft tall, 500 lbs
+  age: 40
+  height: "7 ft"
+  weight: "500 lbs"
+  background: Merchant
+  personality: "Thrifty and driven — always looking for the better deal, the better shell."
+  ideal: "The Next Shell. The best one is always just over the horizon."
+  bond: "Dosh — wealth and profit above all else."
+  flaw: Greed
+  backstory: >
+    A travelling merchant from the ocean floor, searching the world for his next shell.
+    Believes the perfect shell is always just over the horizon.
+  languages: [Common, Aquan, "Deep Speech"]
   ability_scores:
     STR: 23
     DEX: 8
@@ -20,30 +36,45 @@ dnd:
     WIS: 12
     CHA: 13
   saving_throw_proficiencies: [STR, CON]
-  hp_max: 285                # level 20 end-state — NOT used directly in FE
-  ac: 17                     # end-state — used to derive FE DEF scaling target
+  hp_max: 285
+  ac: 17                            # Natural Armor: shell provides flat AC 17 (DEX not applied)
+  speed_ft: 40                      # 30 base + 10 Fast Movement (no heavy armor)
+  racial_traits:
+    # Hermit Crab (homebrew Pagurian) — from PDF page 3
+    natural_armor:
+      ac: 17
+      dex_applied: false            # Shell AC is flat — DEX modifier does NOT apply
+    claws:
+      damage_dice: "1d4"
+      damage_type: slashing
+      ability_mod: STR              # +6 STR at end-state (= +7 at end-state total with STR 23)
+    amphibious: true                # can breathe air and water
+    pagurian_telepathy:
+      # Can communicate telepathically with other Pagurians within 60 ft.
+      range_ft: 60
+    fast_movement:
+      # +10 ft speed while not wearing heavy armor (Barbarian level 5 class feature).
+      bonus_ft: 10
+    shell_defense:                  # full mechanics in unique_abilities
+      note: "see unique_abilities.shell-defense"
 
 # ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
-# These are hand-tuned starting values. They should feel weak relative to the
-# D&D end-state — the growth rates close the gap over the full campaign.
-# Adjust during Phase 1 playtesting (issue #18, #48, #49).
+# Hand-tuned starting values. Adjust during Phase 1 playtesting.
 fe_stats:
-  class: Pirate              # FE base class (promoted: Berserker)
+  class: Pirate
   promoted_class: Berserker
   level: 1
   HP: 22
-  STR: 7                     # high — Braulo's defining stat
-  SKL: 4                     # d20 hits on range — moderate
+  STR: 7                            # high — Braulo's defining stat
+  SKL: 4
   SPD: 5
   DEF: 6
   RES: 2
   LCK: 3
-  MOV: 5
-  CON: 12                    # large unit, heavy weapons
+  MOV: 6                            # speed_ft: 40 → 6 tiles (standard 30 ft = 5 tiles)
+  CON: 12                           # large unit, heavy weapons
 
-# ── Growth Rates (% per level, FE standard) ─────────────────────────────────
-# Designed so a complete campaign playthrough approaches the D&D end-state stats
-# at FE level 20 promoted. Braulo is a tank/DPS — high HP, STR, DEF growths.
+# ── Growth Rates (% per level, FE standard) ──────────────────────────────────
 growth_rates:
   HP: 75
   STR: 60
@@ -55,66 +86,91 @@ growth_rates:
 
 # ── Inventory (Chapter 1 starting equipment) ───────────────────────────────────
 inventory:
-  - id: nu-shipwrecker        # personal weapon — Slashing, 1d8/1d10, 10 ft reach
+  - id: nu-shipwrecker
     name: "Nu' Shipwrecker"
-    damage_type: slashing
-    weapon_dice: "1d10"
+    damage_type: piercing           # CORRECTED: Piercing (not Slashing — PDF confirmed)
+    weapon_dice: "1d8"              # CORRECTED: 1d8 (not 1d10 — PDF confirmed); +7 STR at end-state
     ability_mod: STR
-    range: melee              # reach: 1–2 tiles
-    uses: null                # mundane — not a spell-slot tome
-    locked: true              # personal weapon, cannot be traded
+    range: melee
+    uses: null
+    locked: true                    # personal weapon, cannot be traded
+  - id: trident
+    name: Trident
+    damage_type: piercing
+    weapon_dice: "1d8"
+    ability_mod: STR                # +6 STR at end-state; silvered
+    range: 2                        # thrown: range 20/60 ft → ~2 FE tiles
+    uses: null
+    notes: "Silvered. Thrown (range 20/60 ft). +6 STR mod at end-state."
   - id: vulnerary
     name: "Healing Potion"
     uses: 3
 
 # ── D&D-Derived Stat Overrides ─────────────────────────────────────────────────
-# These fields feed the AC sidecar table and are NOT part of the vanilla FE unit struct.
-# See docs/PRD.md §11 (save budget) and engine/d20-combat/ for implementation.
 d20_fields:
-  AC: 14                     # Chapter 1 starting AC (scales with DEF growth)
-                             # End-state target: 17 (PRD §6.7). Tune per chapter.
-  ability_mod_atk: STR       # STR-based melee attacker
-  prof_bonus: 2              # FE level 1 equivalent (~D&D level 1)
-  spell_slots: null          # Barbarian: no spell slots
+  AC: 14                            # Chapter 1 starting AC
+                                    # End-state target: 17 (flat from shell, DEX not applied).
+  ability_mod_atk: STR
+  prof_bonus: 2
+  spell_slots: null                 # Barbarian: no spell slots
 
 # ── Unique Abilities ────────────────────────────────────────────────────────────
 unique_abilities:
   - id: rage
     name: Rage
-    # Consumable item (Berserk-status item) in inventory.
     # Effect: +4 melee damage, resistance to B/P/S damage (×0.5 incoming),
     #         advantage on STR checks/saves. Lasts the combat phase.
-    # FE implementation: consumable item that grants a custom status.
-    # Number of uses: 3/chapter (Barbarian rage count at level 1).
-    # Issues #27 (implementation).
+    # FE implementation: consumable item that grants rage_status.
     type: consumable_item
     uses_per_chapter: 3
     status_effect: rage_status
 
   - id: shell-defense
     name: "Shell Defense"
-    # FE command: spend action to enter shell. +4 DEF, advantage on STR/CON saves,
-    # speed 0, prone. Exit next turn (costs movement).
-    # FE implementation: unit command (like "Wait" but applies a status).
+    # Command: spend action to retract into shell.
+    # Effect: +4 AC, advantage on STR/CON saves, speed 0, prone,
+    #         disadvantage on DEX saves, cannot take reactions.
+    # Exit: costs bonus action to emerge next turn; then normal turn resumes.
+    # Cannot be used while raging.
+    # FE implementation: unit command applying shell_defense_status.
     type: unit_command
     effect:
-      DEF_bonus: 4
+      AC_bonus: 4
+      STR_save_advantage: true
+      CON_save_advantage: true
+      DEX_save_disadvantage: true
       MOV_override: 0
       prone: true
+      reactions_blocked: true
+    exit: bonus_action_next_turn
+
+  - id: relentless-rage
+    name: "Relentless Rage"
+    # Passive: when Braulo drops to 0 HP while raging, make a CON save (DC 10,
+    # +5 per each prior use this rage). On success, drop to 1 HP instead.
+    # FE implementation: passive — when reduced to 0 in rage_status, trigger CON save.
+    type: passive
+    trigger: zero_hp_while_raging
+    save: CON
+    save_dc_base: 10
+    save_dc_escalation: 5           # DC increases by 5 for each successive use in same rage
 
   - id: brutal-critical
     name: "Brutal Critical"
     # Nat 20 → roll weapon dice THREE times instead of two.
-    # (Braulo's Barbarian level 9+ feature — 3 extra crit dice.)
-    # Standard crits roll twice; this makes it three.
     type: passive
-    crit_extra_dice: 1       # 1 extra die on top of the standard 2× crit
+    crit_extra_dice: 1              # 1 extra die on top of standard 2× crit
+
+  - id: primal-champion
+    name: "Primal Champion"
+    # Level 20: STR and CON each +4 permanently (already reflected in ability_scores above).
+    type: passive
+    note: "Already reflected in ability_scores (STR 23 includes +4; CON 24 includes +4)."
 
   - id: retaliation
     name: Retaliation
     # Reaction: melee attack when hit by an adjacent creature.
-    # FE implementation: counter-attack before the standard FE counterattack window.
-    # (Could model as a free extra counter, or as a separate reaction phase.)
+    # FE implementation: free counter before the standard FE counterattack window.
     type: reaction
 
 # ── Signature Moment ────────────────────────────────────────────────────────────
@@ -126,9 +182,8 @@ signature_moment:
   dialogue_trigger: braulo_shackle_break
 
 # ── Support Affinities ──────────────────────────────────────────────────────────
-# (Vanilla FE8 support system — defined here, implemented in events/)
 supports:
-  - partner: wolfram     # tank duo
+  - partner: wolfram
     affinity: fire
   - partner: marty
     affinity: wind

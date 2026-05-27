@@ -4,7 +4,8 @@
 
 id: meesmickle
 name: Meesmickle
-portrait_ref: portraits/meesmickle.png   # to be created (issue #23)
+portrait_ref: portraits/meesmickle.png   # GBA-ready sprite pending (issue #23)
+portrait_source: data/portraits/meesmickle.jpeg
 # Portrait source: https://www.dndbeyond.com/avatars/25348/435/1581111423-72613637.jpeg
 
 # ── D&D 5e Identity ────────────────────────────────────────────────────────────

@@ -4,7 +4,8 @@
 
 id: prof-rbg
 name: "Prof. R.B. Geenius"
-portrait_ref: portraits/prof-rbg.png   # to be created (issue #23)
+portrait_ref: portraits/prof-rbg.png     # GBA-ready sprite pending (issue #23)
+portrait_source: data/portraits/prof-rbg.jpg
 # Portrait source: https://www.dndbeyond.com/avatars/34221/708/1581111423-57759993.jpeg
 
 # ── D&D 5e Identity ────────────────────────────────────────────────────────────
