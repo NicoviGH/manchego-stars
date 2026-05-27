@@ -1,0 +1,37 @@
+{
+  "source": "https://www.dndbeyond.com/characters/70515811",
+  "ddb_id": 70515811,
+  "name": "Marty the Merry Mushroom",
+  "race": "Sporemaster",
+  "race_base": "Myconid",
+  "race_homebrew": true,
+  "class": "Druid",
+  "subclass": "Circle of Spores",
+  "level": 20,
+  "xp": 355000,
+  "campaign": "Icewind Dale: RotFM",
+  "ability_scores": { "STR": 10, "DEX": 18, "CON": 17, "INT": 12, "WIS": 20, "CHA": 8 },
+  "saving_throw_proficiencies": ["INT", "WIS"],
+  "hp_max": 163,
+  "ac": 17,
+  "speed_ft": 20,
+  "proficiency_bonus": 6,
+  "skill_proficiencies": ["Arcana", "History", "Medicine", "Nature"],
+  "languages": ["Common", "Deep Speech", "Druidic"],
+  "armor_proficiencies": ["Light Armor", "Medium Armor", "Shields"],
+  "tool_proficiencies": ["Alchemist's Supplies", "Herbalism Kit"],
+  "key_features": [
+    "Symbiotic Entity (Wild Shape: +80 temp HP, doubled Halo damage dice, +1d6 necrotic on melee)",
+    "Halo of Spores (reaction: 1d10 necrotic to creature within 10 ft, CON DC 19)",
+    "Spreading Spores (bonus action: 10-ft cube of Halo damage within 30 ft while Symbiotic active)",
+    "Fungal Infestation (reaction: animate dead beast/humanoid as zombie within 10 ft)",
+    "Wild Shape (unlimited uses at level 20 - Archdruid)",
+    "Archdruid"
+  ],
+  "notable_equipment": [
+    "Marty's Staff (melee, 1d6/1d8)"
+  ],
+  "notable_spells": ["Chill Touch", "Shillelagh", "Contagion", "Animate Dead", "Awaken", "Commune with Nature", "Scrying", "Heroes' Feast", "Wind Walk"],
+  "defenses": ["Poison resistance", "Immune to: Blinded, Critical Hits, Deafened, Frightened, Poisoned"],
+  "party_role_guess": "Healer / Debuffer / Summoner (spore AoE, fungal minions, druid full caster)"
+}

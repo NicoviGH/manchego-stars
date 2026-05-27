@@ -1,0 +1,54 @@
+{
+  "_note": "D&D Beyond character portrait URLs — public, no auth required. Download these for sprite reference art.",
+  "portraits": [
+    {
+      "name": "Prof. R.B. Geenius",
+      "ddb_id": 57759993,
+      "url": "https://www.dndbeyond.com/avatars/34221/708/1581111423-57759993.jpeg",
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "name": "Braulo",
+      "ddb_id": 73827256,
+      "url": "https://www.dndbeyond.com/avatars/25784/526/1581111423-73827256.jpeg",
+      "width": 516,
+      "height": 488
+    },
+    {
+      "name": "Marty the Merry Mushroom",
+      "ddb_id": 70515811,
+      "url": "https://www.dndbeyond.com/avatars/25824/431/1581111423-70515811.jpeg",
+      "width": 348,
+      "height": 539
+    },
+    {
+      "name": "Meesmickle",
+      "ddb_id": 72613637,
+      "url": "https://www.dndbeyond.com/avatars/25348/435/1581111423-72613637.jpeg",
+      "width": 750,
+      "height": 947
+    },
+    {
+      "name": "Rootis",
+      "ddb_id": 72613710,
+      "url": "https://www.dndbeyond.com/avatars/25348/565/1581111423-72613710.jpeg",
+      "width": 184,
+      "height": 209
+    },
+    {
+      "name": "Sclorbo",
+      "ddb_id": 72588721,
+      "url": "https://www.dndbeyond.com/avatars/25339/252/1581111423-72588721.jpeg",
+      "width": 751,
+      "height": 727
+    },
+    {
+      "name": "Wolfram",
+      "ddb_id": 74374750,
+      "url": "https://www.dndbeyond.com/avatars/25957/254/1581111423-74374750.jpeg",
+      "width": 278,
+      "height": 302
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+# ROM files — never commit the base ROM
+*.gba
+*.sav
+*.srm
+
+# PDF reference books
+*.pdf
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Build artifacts
+build/
+*.o
+*.elf
+*.map
+
+# Node / tools
+node_modules/
+dist/
+*.js.map
+
+# Editor
+.vscode/
+*.swp
+*~
+
+# Secrets
+.env
+.env.*

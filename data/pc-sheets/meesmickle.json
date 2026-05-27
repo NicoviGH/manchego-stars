@@ -1,0 +1,38 @@
+{
+  "source": "https://www.dndbeyond.com/characters/72613637",
+  "ddb_id": 72613637,
+  "name": "Meesmickle",
+  "race": "Vampire Tabaxi",
+  "race_base": "Vampire Tabaxi",
+  "race_homebrew": true,
+  "class": "Warlock",
+  "subclass": "The Fiend",
+  "level": 20,
+  "xp": 355000,
+  "ability_scores": { "STR": 10, "DEX": 20, "CON": 19, "INT": 12, "WIS": 8, "CHA": 16 },
+  "saving_throw_proficiencies": ["WIS", "CHA"],
+  "hp_max": 183,
+  "ac": 15,
+  "speed_ft": 30,
+  "proficiency_bonus": 6,
+  "skill_proficiencies": ["Arcana", "History", "Intimidation", "Persuasion"],
+  "languages": ["Abyssal"],
+  "armor_proficiencies": ["Light Armor"],
+  "weapon_proficiencies": ["Simple Weapons"],
+  "tool_proficiencies": [],
+  "key_features": [
+    "Dark One's Blessing (gain 23 temp HP when reducing hostile creature to 0 HP)",
+    "Dark One's Own Luck (add d10 to ability check or saving throw, 1/short rest)",
+    "Fiendish Resilience (choose one damage type resistance on short/long rest)",
+    "Hurl Through Hell (attack hit transports target through lower planes, 10d10 psychic, 1/long rest)",
+    "One with Shadows (invisible in dim light/darkness until moving/acting)",
+    "Eldritch Master (regain all Pact Magic slots, 1/long rest)",
+    "Mystic Arcanum"
+  ],
+  "notable_equipment": [
+    "Javelin of Lightning (1d6+4d6, thrown 30/120)"
+  ],
+  "notable_spells": ["Eldritch Blast (4 beams, +3 CHA)", "Vampiric Touch", "Magic Stone", "Hellish Rebuke"],
+  "defenses": ["Fiendish Resilience (chosen damage type)"],
+  "party_role_guess": "Striker / Blaster (Eldritch Blast, Fiend patron, temp HP sustain)"
+}

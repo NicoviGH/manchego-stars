@@ -1,0 +1,42 @@
+{
+  "source": "https://www.dndbeyond.com/characters/73827256",
+  "ddb_id": 73827256,
+  "name": "Braulo",
+  "race": "Hermit Crab",
+  "race_base": "Tortle",
+  "race_homebrew": true,
+  "class": "Barbarian",
+  "subclass": "Path of the Berserker",
+  "level": 20,
+  "xp": null,
+  "background": "Erm...",
+  "ability_scores": { "STR": 23, "DEX": 8, "CON": 24, "INT": 10, "WIS": 12, "CHA": 13 },
+  "saving_throw_proficiencies": ["STR", "CON"],
+  "hp_max": 285,
+  "ac": 17,
+  "speed_ft": 40,
+  "proficiency_bonus": 6,
+  "skill_proficiencies": ["Insight", "Intimidation", "Persuasion", "Survival"],
+  "languages": ["Aquan", "Deep Speech"],
+  "armor_proficiencies": ["Light Armor", "Medium Armor", "Shields"],
+  "weapon_proficiencies": ["Martial Weapons", "Simple Weapons"],
+  "tool_proficiencies": ["Cartographer's Tools"],
+  "key_features": [
+    "Rage (+4 melee damage, resistance to B/P/S, advantage on STR checks/saves)",
+    "Frenzy (bonus action melee attack while raging)",
+    "Retaliation (reaction: melee attack when damaged by adjacent creature)",
+    "Intimidating Presence (frighten creature within 30 ft, WIS DC 15)",
+    "Shell Defense (action: +4 AC, advantage on STR/CON saves, prone, speed 0)",
+    "Extra Attack (2 attacks per action)",
+    "Brutal Critical (3 extra damage dice on crit)",
+    "Persistent Rage (rage only ends early if unconscious or you choose to)",
+    "Primal Champion (+4 STR and CON)"
+  ],
+  "notable_equipment": [
+    "Nu' Shipwrecker (melee, 1d8/1d10+7, reach extended to 10 ft)",
+    "Trident (silvered, thrown 20/60, 1d8/1d10+6)"
+  ],
+  "notable_spells": [],
+  "defenses": ["Resistance to B/P/S while raging"],
+  "party_role_guess": "Tank / Melee DPS (highest HP in party, massive STR/CON, berserker)"
+}

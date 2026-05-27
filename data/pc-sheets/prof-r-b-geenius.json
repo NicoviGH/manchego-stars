@@ -1,0 +1,41 @@
+{
+  "source": "https://www.dndbeyond.com/characters/57759993",
+  "ddb_id": 57759993,
+  "name": "Prof. R.B. Geenius",
+  "race": "Underfolk",
+  "race_base": "Ratfolk",
+  "race_homebrew": true,
+  "class": "Artificer",
+  "subclass": "Artillerist",
+  "level": 20,
+  "xp": 355000,
+  "background": "Criminal / Spy",
+  "ability_scores": { "STR": 8, "DEX": 19, "CON": 16, "INT": 20, "WIS": 10, "CHA": 12 },
+  "saving_throw_proficiencies": ["CON", "INT"],
+  "hp_max": 163,
+  "ac": 16,
+  "speed_ft": 35,
+  "proficiency_bonus": 6,
+  "skill_proficiencies": ["Deception", "History", "Sleight of Hand", "Stealth"],
+  "languages": ["Common", "Undercommon"],
+  "armor_proficiencies": ["Light Armor", "Medium Armor", "Shields"],
+  "weapon_proficiencies": ["Firearms", "Simple Weapons"],
+  "tool_proficiencies": ["Carpenter's Tools", "Dragonchess Set", "Smith's Tools", "Thieves' Tools", "Tinker's Tools", "Woodcarver's Tools"],
+  "key_features": [
+    "Eldritch Cannon (Flamethrower / Force Ballista / Protector, 2 at a time, AC 18, 100 HP each)",
+    "Arcane Firearm (+1d8 to one damage roll of artificer spells)",
+    "Infuse Item (up to 6 nonmagical objects)",
+    "Flash of Genius (reaction: +5 to ally ability check or save within 30 ft)",
+    "Soul of Artifice (reaction: end infusion to drop to 1 HP instead of 0)",
+    "Spell-Storing Item (10 uses of a stored 1st/2nd-level spell)",
+    "Magical Tinkering",
+    "Tool Expertise (double proficiency with tools)"
+  ],
+  "notable_equipment": [
+    "Fonduedler (ranged, 1d10+4, range 30/90)",
+    "Luck E. Cheese (melee, 1d6+5, finesse, light, 2 wish charges)"
+  ],
+  "notable_spells": ["Shocking Grasp", "Scorching Ray", "Shield", "Mending", "Glyph of Warding"],
+  "defenses": [],
+  "party_role_guess": "Controller / Support / Ranged DPS (turrets, utility, crafting)"
+}

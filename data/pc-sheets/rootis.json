@@ -1,0 +1,38 @@
+{
+  "source": "https://www.dndbeyond.com/characters/72613710",
+  "ddb_id": 72613710,
+  "name": "Rootis",
+  "race": "Snowperson",
+  "race_base": "Snowperson",
+  "race_homebrew": true,
+  "class": "Sorcerer",
+  "subclass": "Draconic Bloodline",
+  "level": 20,
+  "xp": 355000,
+  "ability_scores": { "STR": 8, "DEX": 18, "CON": 20, "INT": 12, "WIS": 11, "CHA": 17 },
+  "saving_throw_proficiencies": ["CON", "CHA"],
+  "hp_max": 202,
+  "ac": 17,
+  "speed_ft": 25,
+  "proficiency_bonus": 6,
+  "skill_proficiencies": ["Arcana", "Deception", "Nature", "Stealth"],
+  "languages": ["Celestial", "Common", "Draconic", "Primordial"],
+  "armor_proficiencies": [],
+  "weapon_proficiencies": ["Crossbow Light", "Dagger", "Dart", "Quarterstaff", "Sling"],
+  "tool_proficiencies": ["Cook's Utensils"],
+  "key_features": [
+    "Draconic Resilience (bonus HP, natural AC 13 + DEX)",
+    "Elemental Affinity (+3 damage to spells of draconic ancestry type, spend 1 SP for resistance 1 hour)",
+    "Dragon Wings (bonus action: fly speed = walking speed)",
+    "Draconic Presence (5 SP: 60-ft aura of fear/charm, WIS DC 17, 1 minute)",
+    "Sorcery Points (20, regain on long rest)",
+    "Metamagic: Distant Spell, Empowered Spell, Extended Spell, Twinned Spell",
+    "Font of Magic (convert spell slots to/from sorcery points)"
+  ],
+  "notable_equipment": [
+    "Staff of Power (melee 1d6/1d8-1 +1d6, 20 charges)"
+  ],
+  "notable_spells": ["Chill Touch", "Ray of Frost", "Feather Fall", "Teleportation Circle"],
+  "defenses": ["Elemental Affinity resistance (chosen type, costs SP)"],
+  "party_role_guess": "Blaster / Utility Caster (Draconic Sorcerer, metamagic, flying, Staff of Power)"
+}
