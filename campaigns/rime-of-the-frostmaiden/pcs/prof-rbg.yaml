@@ -1,5 +1,5 @@
 # pcs/prof-rbg.yaml — Prof. R.B. Geenius, Artificer (Artillerist)
-# Source: data/pc-sheets/prof-r-b-geenius.json (D&D Beyond sheet, level 20 end-state)
+# Source: data/pc-sheets/prof-r-b-geenius.json + References/PCs/RBG Character Sheet.pdf
 # See docs/class-mapping.md and docs/PRD.md §6.7 for class mapping rationale.
 
 id: prof-rbg
@@ -13,6 +13,14 @@ dnd:
   class: Artificer
   subclass: Artillerist
   level_end_state: 20
+  alignment: lawful_evil
+  size: small                # 3 ft tall, 40 lbs, green fur
+  background: "Criminal / Spy"
+  personality: "Always uses cheese in his phrases — e.g. 'You have left me quite discheesed'"
+  backstory: >
+    Grew up as a slave in a wealthy aristocrat's mansion. Lived by thieving until his genius
+    was recognized. Conned his patron into surrendering his entire fortune and status, then
+    studied Artificery to enact evil while maintaining a spotless public record.
   ability_scores:
     STR: 8
     DEX: 19
@@ -23,6 +31,14 @@ dnd:
   saving_throw_proficiencies: [CON, INT]
   hp_max: 163
   ac: 16
+  speed_ft: 35               # Underfolk base speed (35 ft, above standard 30 ft)
+  racial_traits:
+    # Underfolk (Ratfolk) — from PDF page 3
+    nimble_escape: true      # can Disengage or Hide as a bonus action every turn
+    claws: true              # proficient with claws (1d4-1 slashing unarmed strike)
+    climber: true            # climbing does not halve speed
+    darkvision: 60
+    underfoot: true          # can move through spaces of larger creatures
 
 # ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
 # Adjust during Phase 1 playtesting.
@@ -38,7 +54,7 @@ fe_stats:
   DEF: 3
   RES: 3
   LCK: 4
-  MOV: 5
+  MOV: 6                     # speed_ft: 35 → above standard (standard = 5, 35 ft = 6 tiles)
   CON: 7
 
 # ── Growth Rates (% per level, FE standard) ──────────────────────────────────
@@ -56,7 +72,7 @@ growth_rates:
 inventory:
   - id: fonduedler
     name: Fonduedler
-    damage_type: piercing     # ranged weapon — custom Artificer crossbow/pistol
+    damage_type: piercing     # ranged weapon — custom Artificer firearm/crossbow
     weapon_dice: "1d10"
     ability_mod: DEX
     range: 3                  # range 30/90 ft → ~3 FE tiles
@@ -64,19 +80,19 @@ inventory:
     locked: true              # personal weapon
   - id: luck-e-cheese
     name: "Luck E. Cheese"
-    damage_type: slashing
+    damage_type: piercing     # PDF confirms Piercing (not Slashing — corrected from JSON)
     weapon_dice: "1d6"
     ability_mod: DEX
     range: melee
     uses: null
-    locked: true              # personal weapon (wish charges — implement in Phase 1)
+    locked: true              # personal weapon; has 2 Wish spell charges (Phase 1)
   - id: vulnerary
     name: "Healing Potion"
     uses: 2
 
 # ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
 d20_fields:
-  AC: 14                     # Chapter 1: medium armor (scale mail)
+  AC: 14                     # Chapter 1: medium armor (Enhanced Scale Mail end-state)
                              # End-state target: 16. Tune per chapter.
   ability_mod_atk: INT       # INT for cannon/spell attacks; DEX for Fonduedler physical
   prof_bonus: 2
@@ -86,9 +102,11 @@ d20_fields:
 unique_abilities:
   - id: eldritch-cannon
     name: "Eldritch Cannon"
-    # 1/chapter: deploy a Force Ballista at an adjacent empty tile.
-    # The Ballista acts as an allied NPC unit with its own action (1d8 force, ranged 3).
+    # 1/chapter (or spend a 1st-level spell slot): deploy a Force Ballista at an adjacent
+    # empty tile. The Ballista acts as an allied NPC unit with its own action (1d8 force, ranged 3).
     # Ballista: HP 20, DEF 8, RES 0, cannot move, auto-removed at chapter end.
+    # Explosive Cannon: can detonate for 3d8 force AoE (2-tile radius) as an action if within 4 tiles.
+    # Fortified Position: allies within 2 tiles of the cannon have half cover (+2 DEF/RES).
     # FE implementation: activated command that spawns a temporary allied unit.
     type: activated
     uses_per_chapter: 1
@@ -99,7 +117,9 @@ unique_abilities:
     # Reaction: when an ally within 2 tiles makes a save or check, add INT mod (+5)
     # to their roll. Can flip a failed save to a success.
     # FE implementation: reaction skill — adds +5 to adjacent ally's avoid or save.
+    # 5 USES per chapter (confirmed from PDF — regain all on long rest).
     type: reaction
+    uses_per_chapter: 5       # confirmed from PDF (not 1 — was wrong in first pass)
     range: 2
     bonus: 5                  # INT mod at level 1 equivalent; scales with level
 
@@ -112,12 +132,22 @@ unique_abilities:
 
   - id: infuse-item
     name: "Infuse Item"
-    # Between-chapter command: apply one infusion to an ally's weapon or armor.
-    # Effect: +1 to ATK damage or +1 AC on the target item for the next chapter.
-    # FE implementation: Preparation screen command.
+    # Between-chapter: infuse up to 6 nonmagical objects simultaneously with magical properties.
+    # Each infusion persists until end of next chapter (or RBG dies or exceeds 6 infusions).
+    # FE implementation: Preparation screen — select up to 6 allied items to buff (+1 ATK or +1 AC).
+    # This is persistent across the chapter, not a single-use per chapter.
     type: between_chapter
-    uses_per_chapter: 1
+    simultaneous_infusions: 6
     effect: infuse_ally_gear
+
+  - id: nimble-escape
+    name: "Nimble Escape"
+    # Underfolk racial: can Disengage or Hide as a bonus action on each turn.
+    # In FE: after attacking or using an item, RBG may immediately reposition without
+    #   provoking enemy reactions (models the Disengage bonus action).
+    # FE implementation: passive — RBG can always move away from enemies after acting.
+    type: passive
+    effect: bonus_action_disengage_or_hide
 
 # ── Companion ────────────────────────────────────────────────────────────────
 companion:

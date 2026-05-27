@@ -1,5 +1,6 @@
-# pcs/rootis.yaml — Rootis, Sorcerer (Draconic Bloodline)
-# Source: data/pc-sheets/rootis.json (D&D Beyond sheet, level 20 end-state)
+# pcs/rootis.yaml — Rootis, Sorcerer (Draconic Bloodline — White Dragon)
+# Source: data/pc-sheets/rootis.json + References/PCs/Rootis Character Sheet.pdf
+# IMPORTANT: Dragon Ancestry is WHITE (Cold), NOT fire. JSON did not specify this.
 # See docs/class-mapping.md and docs/PRD.md §6.7 for class mapping rationale.
 
 id: rootis
@@ -12,7 +13,13 @@ dnd:
   race: Snowperson           # homebrew — literally made of snow
   class: Sorcerer
   subclass: "Draconic Bloodline"
+  dragon_ancestor: "White Dragon"  # COLD ancestry — Elemental Affinity is cold, not fire
   level_end_state: 20
+  alignment: neutral_good
+  size: medium               # 4 ft tall, gender: snowman
+  personality: "There's nothing I like more than a good mystery."
+  ideal: "No Limits. Nothing should fetter the infinite possibility inherent in all existence. (Chaotic)"
+  flaw: "I overlook obvious solutions in favor of complicated ones."
   ability_scores:
     STR: 8
     DEX: 18
@@ -22,22 +29,57 @@ dnd:
     CHA: 17
   saving_throw_proficiencies: [CON, CHA]
   hp_max: 202
-  ac: 17
+  ac: 17                     # Draconic Resilience: flat AC 17 (not 13+DEX — PDF confirmed)
+  speed_ft:
+    walking: 25
+    flying: 25               # Dragon Wings always available (bonus action, level 14)
+    climbing: 20
+    swimming: 35
+  racial_traits:
+    # Snowperson — from PDF page 3
+    frosty_form:
+      cold_immunity: true    # full Cold damage immunity
+      cold_terrain_immune: true  # unaffected by difficult terrain from ice/cold
+    heat_vulnerability: true # vulnerable to fire damage (×2 incoming fire)
+    snow_body:
+      resistance: [bludgeoning, piercing, slashing]  # resistant to ALL physical damage
+    crystallize:
+      # Action: freeze body — become IMMUNE to slashing and piercing,
+      # but LOSE bludgeoning resistance. 1/long rest (= 1/chapter).
+      # FE implementation: activated command — player chooses when to crystallize.
+      uses_per_chapter: 1
+      grants_immunity: [slashing, piercing]
+      removes_resistance: [bludgeoning]
+    elemental_properties:
+      # If hit by an ice-based attack, recover HP instead of taking damage.
+      # FE implementation: passive — cold-type incoming attacks trigger a heal flag.
+      heals_from_cold: true
+    body_building:
+      # If surrounded by snow tiles, can spend an action to absorb snow and recover 2d4 HP.
+      # 1/short or long rest (= once per map phase).
+      uses_per_map: 1
+      heal_dice: "2d4"
+      requires_snow_terrain: true
+    snow_ski:
+      # Double movement speed on ice/snow terrain tiles.
+      # Very relevant — most maps in this campaign are arctic.
+      # FE implementation: passive — on snow/ice tiles, MOV doubles.
+      effect: double_mov_on_ice_snow
 
 # ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
-# CON 20 + Draconic Resilience (+1 HP/level) makes Rootis unusually tanky for a mage.
-# Snowperson race → consider fire vulnerability and cold immunity in Phase 1.
+# Rootis is an ice/cold sorcerer, NOT fire. Class corrected from "Mage (Fire)" to "Mage (Ice)".
+# Snow Body (resistant to B/P/S) makes Rootis surprisingly durable for a mage.
 # Adjust during Phase 1 playtesting.
 fe_stats:
-  class: "Mage (Fire)"       # FE base class — fire-type tome caster
+  class: "Mage (Ice)"        # FE base class — cold-type tome caster (corrected from Fire)
   promoted_class: Sage
   level: 1
-  HP: 20
+  HP: 20                     # CON 20 + Draconic Resilience → unusually tanky mage
   STR: 2
   MAG: 7                     # CHA 17 → MAG
   SKL: 5
   SPD: 7                     # DEX 18 → fast for a mage
-  DEF: 3
+  DEF: 3                     # Snow Body grants B/P/S resistance in d20 layer, not raw DEF
   RES: 6                     # CHA 17 → decent RES
   LCK: 5
   MOV: 5
@@ -55,22 +97,24 @@ growth_rates:
   LCK: 30
 
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
+# Primary cantrip is Ray of Frost (cold), not fire. Corrected from first pass.
 inventory:
-  - id: fire-tome
-    name: Fire
-    damage_type: fire
+  - id: ray-of-frost
+    name: "Ray of Frost"
+    damage_type: cold
     weapon_dice: "1d8"
     ability_mod: CHA
-    range: 2
-    uses: 20
+    range: 2                  # 60 ft cantrip → ~2-3 FE tiles
+    uses: null                # cantrip — infinite uses
+    notes: "Also applies -10 ft move penalty (= -1 MOV in FE) on hit"
   - id: vulnerary
     name: "Healing Potion"
     uses: 2
 
 # ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
 d20_fields:
-  AC: 13                     # Chapter 1: Draconic Resilience (13 + DEX mod, no armor)
-                             # End-state target: 17. Tune per chapter.
+  AC: 17                     # Draconic Resilience: flat AC 17 confirmed from PDF
+                             # End-state target: 17 (already reached — AC stays flat, not scaling).
   ability_mod_atk: CHA
   prof_bonus: 2
   spell_slots: "3/1"         # 3×1st-level, 1×2nd-level (Sorcerer level 2)
@@ -79,35 +123,70 @@ d20_fields:
 unique_abilities:
   - id: metamagic-twinned
     name: "Metamagic: Twinned Spell"
-    # Spend 2 Sorcery Points: duplicate a single-target tome attack to hit a second
-    # enemy in range at no extra action cost.
-    # FE implementation: activated modifier used before casting — hits two enemies.
+    # Spend sorcery points equal to spell level: duplicate a single-target spell to
+    # hit a second enemy in range at no extra action cost.
+    # FE implementation: activated modifier — hit two enemies with one cast.
     type: activated
     uses_per_chapter: 2       # approximate SP cost at level 1 SP pool
     effect: twin_single_target_spell
 
   - id: metamagic-empowered
     name: "Metamagic: Empowered Spell"
-    # Spend 1 SP: reroll all damage dice after rolling; keep the new results.
-    # FE implementation: after rolling spell damage, player may choose to reroll once.
+    # Spend 1 SP: reroll up to 3 damage dice; keep the new results.
+    # FE implementation: after rolling spell damage, player may reroll once.
     type: activated
     uses_per_chapter: 3
 
   - id: dragon-wings
     name: "Dragon Wings"
-    # Unlocked at promotion (Sage): Rootis gains Flier movement type.
-    # FE implementation: on promotion, Rootis's movement class changes to Flier
-    #   (ignores terrain penalties, can cross water/mountains).
-    type: passive
-    unlocks_at_promotion: true
-    effect: flier_movement
+    # ALREADY AVAILABLE (not promotion-locked — PDF confirms this is a level 14 class feature,
+    # and Rootis is level 20). Bonus action to sprout/dismiss wings; fly speed = walking speed.
+    # In FE: Rootis has Flier movement type available as a toggle from Chapter 1.
+    #   Toggle on: ignores terrain penalties, can cross water/mountains.
+    #   Toggle off: normal movement.
+    # FE implementation: activated toggle command (bonus action equivalent).
+    type: activated
+    unlocks_at_promotion: false  # already available
+    effect: flier_movement_toggle
 
-  - id: elemental-affinity
-    name: "Elemental Affinity"
-    # Passive: Rootis adds CHA mod (+3 at ch1, scaling) to all fire-type tome damage.
-    # FE implementation: passive bonus applied exclusively to fire-type tomes.
+  - id: elemental-affinity-cold
+    name: "Elemental Affinity (Cold)"
+    # Passive: Rootis adds CHA mod (+3 at ch1, scaling) to damage rolls with cold-type tomes.
+    # Can spend 1 SP to gain cold resistance for 1 hour (= rest of the map).
+    # FE implementation: passive bonus applied to cold-type tomes only.
+    # NOTE: This is COLD affinity, not fire — White Dragon ancestry.
     type: passive
-    effect: plus_cha_mod_fire_damage
+    effect: plus_cha_mod_cold_damage
+
+  - id: crystallize
+    name: Crystallize
+    # Snowperson racial: action to freeze body into an icy form.
+    # Grants: immunity to slashing and piercing damage.
+    # Removes: bludgeoning resistance (Snow Body).
+    # Duration: until Rootis takes a long rest (= until chapter end).
+    # 1/long rest (= 1/chapter).
+    # FE implementation: activated command — toggle defensive mode.
+    type: activated
+    uses_per_chapter: 1
+    grants_immunity: [slashing, piercing]
+    removes_resistance: [bludgeoning]
+
+  - id: elemental-properties
+    name: "Elemental Properties"
+    # Snowperson racial: when hit by a cold/ice-based attack, Rootis RECOVERS HP
+    # equal to the damage roll instead of taking damage.
+    # FE implementation: passive flag — cold-type incoming damage becomes healing.
+    # Synergizes with enemy ice mages or cold terrain effects.
+    type: passive
+    effect: cold_attacks_heal
+
+  - id: snow-ski
+    name: "Snow Ski"
+    # Snowperson racial: on ice or snow terrain tiles, Rootis travels double distance.
+    # FE implementation: passive — on snow/ice tiles, effective MOV is doubled.
+    # Very relevant for this campaign's arctic maps.
+    type: passive
+    effect: double_mov_on_ice_snow
 
 # ── Signature Moment ─────────────────────────────────────────────────────────
 signature_moment:

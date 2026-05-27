@@ -1,5 +1,5 @@
 # pcs/meesmickle.yaml — Meesmickle, Warlock (The Fiend)
-# Source: data/pc-sheets/meesmickle.json (D&D Beyond sheet, level 20 end-state)
+# Source: data/pc-sheets/meesmickle.json + References/PCs/Meesmickle Character Sheet.pdf
 # See docs/class-mapping.md and docs/PRD.md §6.7 for class mapping rationale.
 
 id: meesmickle
@@ -13,6 +13,9 @@ dnd:
   class: Warlock
   subclass: "The Fiend"
   level_end_state: 20
+  alignment: chaotic_neutral
+  size: small                # Vampire Tabaxi — "I am a cat"
+  background: Noble
   ability_scores:
     STR: 10
     DEX: 20
@@ -23,6 +26,13 @@ dnd:
   saving_throw_proficiencies: [WIS, CHA]
   hp_max: 183
   ac: 15
+  racial_traits:
+    # Vampire Tabaxi — from PDF page 3
+    feline_agility: true        # double movement speed once per round of combat
+    unholy_body: true           # healing potions deal poison damage; must drink blood/hit dice/rest to heal
+    cats_claws: true            # unarmed: 1d4 slashing, climbing speed 20 ft
+    darkvision: 60
+    fur_coat: true              # unaffected by cold; protected from direct sunlight
 
 # ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
 # Adjust during Phase 1 playtesting.
@@ -53,18 +63,23 @@ growth_rates:
   LCK: 20
 
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
+# NOTE: Meesmickle CANNOT use healing potions — Unholy Body turns them into poison.
+# Her healing items are Blood Vials (consumed to recover HP via hit dice).
 inventory:
   - id: eldritch-blast-tome
     name: "Eldritch Blast"
     damage_type: force
-    weapon_dice: "1d10"
+    weapon_dice: "1d10+3"     # +3 from Agonizing Blast invocation
     ability_mod: CHA
-    range: 4                  # 60 ft → ~4 FE tiles
+    range: 4                  # standard 60 ft → ~4 FE tiles (Eldritch Spear extends to 20 tiles end-state)
     uses: null                # cantrip — infinite uses
     locked: true              # Warlock cantrip, cannot be traded
-  - id: vulnerary
-    name: "Healing Potion"
-    uses: 2
+    notes: "Agonizing Blast: +3 dmg on hit. Repelling Blast: push target 1 tile on hit."
+  - id: blood-vial
+    name: "Blood Vial"
+    is_healing: true
+    effect: spend_hit_dice    # triggers a hit die roll to recover HP — Meesmickle's only healing
+    uses: 3
 
 # ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
 d20_fields:
@@ -81,6 +96,7 @@ unique_abilities:
     # Passive: when Meesmickle reduces an enemy to 0 HP, gain temp HP equal to
     # CHA mod + FE level (~7 at ch1). Stacks across kills in the same map.
     # FE implementation: passive — on kill, apply a temp HP buff token.
+    # Note: these temp HP bypass Unholy Body (not a healing potion).
     type: passive
     effect: temp_hp_on_kill
     temp_hp_value: 7          # tune in Phase 1 playtesting
@@ -99,12 +115,36 @@ unique_abilities:
 
   - id: one-with-shadows
     name: "One with Shadows"
-    # Passive: while Meesmickle does not move and is not adjacent to an enemy,
-    # becomes invisible (cannot be targeted by ranged attacks, -3 to adjacent
-    # enemy accuracy). Invisibility breaks when moving or attacking.
-    # FE implementation: passive status applied/removed based on movement flag.
+    # Activated action: spend Meesmickle's turn action to become invisible.
+    # Stays invisible until she moves OR takes any action/reaction.
+    # Cannot be targeted by ranged attacks while invisible; -3 to adjacent hit rates.
+    # FE implementation: activated command (costs turn action, like a Guard stance).
+    #   Moving from the tile breaks invisibility.
+    type: activated           # costs action — NOT a passive
+    effect: invisible_until_move_or_act
+
+  - id: feline-agility
+    name: "Feline Agility"
+    # Vampire Tabaxi racial: once per round, can double movement speed.
+    # In FE: once per turn, after using her action, may move again (full MOV).
+    # Models the burst-of-speed that resets each round.
+    # FE implementation: passive — after attacking, Meesmickle may move a second time.
     type: passive
-    effect: invisible_when_stationary
+    effect: bonus_movement_after_action
+    uses_per_turn: 1
+
+  - id: unholy-body
+    name: "Unholy Body"
+    # Vampire Tabaxi racial: Meesmickle is undead. Dark magic sustains her.
+    # CRITICAL GAMEPLAY RULE: healing potions (vulneraries) deal POISON damage
+    # to Meesmickle instead of restoring HP. Cannot accept healing items from allies.
+    # To recover HP: she must drink blood (Blood Vial item), spend hit dice after
+    # battle, or finish a long rest (= chapter end).
+    # Separate note: she is resistant to necrotic damage.
+    # FE implementation: passive flag checked during item use; potions redirect to poison.
+    type: passive
+    effect: healing_items_deal_poison
+    resistance: necrotic
 
   - id: fiendish-resilience
     name: "Fiendish Resilience"

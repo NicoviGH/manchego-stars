@@ -10,7 +10,7 @@
 | Marty | Druid (Circle of Spores) | Shaman (custom Druid) | Summoner | WIS | Halo of Spores (AoE), Fungal Infestation (summon) |
 | Meesmickle | Warlock (The Fiend) | Shaman (Dark) | Dark Sage | CHA | Eldritch Blast (∞ dark tome), Hurl Through Hell (1/chapter nuke) |
 | Prof. RBG | Artificer (Artillerist) | Archer | Artillerist (custom) | INT | Eldritch Cannon (deployable ballista), Flash of Genius (ally save reaction) |
-| Rootis | Sorcerer (Draconic) | Mage (Fire) | Sage | CHA→MAG | Metamagic (Twinned/Empowered), Dragon Wings (flight at promotion) |
+| Rootis | Sorcerer (Draconic — White Dragon) | Mage (Ice) | Sage | CHA→MAG | Metamagic (Twinned/Empowered), Dragon Wings (already available, toggle), Cold immunity, heals from cold |
 | Sclorbo | Bard (College of Lore) | Dancer (custom Bard) | Custom Lore Bard | CHA | Bardic Inspiration (d12 ally buff), Cutting Words (debuff reaction) |
 | Wolfram | Metallurgist (Smith) | Knight | General | STR+INT | Forge (upgrade ally gear between chapters), AC 26 equivalent |
 
