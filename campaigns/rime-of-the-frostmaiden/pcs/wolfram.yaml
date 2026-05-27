@@ -38,6 +38,7 @@ dnd:
     WIS: 9
     CHA: 10
   saving_throw_proficiencies: [DEX, INT]
+  languages: [Common, Draconic]   # per PDF p1
   hp_max: 143
   ac: 26                          # highest in party — heavy armor + shield + stacked Upgrade Armor
   speed_ft: 30
@@ -49,14 +50,15 @@ dnd:
       # Living metal scales. Natural armor contribution baked into AC 26 total.
       note: "Scales of actual metal. AC 26 = heavy armor + shield + stacked Upgrade Armor upgrades."
     breath_weapon:
-      # ACTION — Wolfram can use his breath weapon EVERY TURN (not 1/long rest).
-      # 30-ft cone, DEX save DC 16, fire damage.
+      # ACTION — 1/short rest per PDF p3 ("Once per short rest as an action").
+      # Each creature in area: DEX save DC 16, fire damage on fail (half on success).
       # Damage scales: 2d6 (levels 1–5) → 3d6 (6–10) → 4d6 (11–15) → 5d6 (16–20).
-      # FE implementation: activated command costing Wolfram's action, unlimited per chapter.
+      # FE implementation: activated command, refreshes once per chapter (= one short rest).
+      # CORRECTED 2026-05-27: previously listed unlimited; PDF confirms 1/SR.
       action_cost: action
-      uses_per_chapter: null      # unlimited — can use every turn
-      shape: cone
-      range_ft: 30
+      uses_per_chapter: 1         # 1 per short rest; FE = 1 per chapter
+      shape: cone                 # PDF doesn't restate area; default standard Dragonborn cone
+      range_ft: 30                # PDF doesn't specify; default Dragonborn 30 ft
       save: DEX
       save_dc: 16
       damage_type: fire
@@ -116,7 +118,7 @@ inventory:
     uses: null
   - id: magic-stone
     name: "Magic Stone"
-    # Wolfram's only ranged option — useful for flying enemies or distant threats.
+    # One of Wolfram's ranged options. Pact of the Tome cantrip.
     # INT-based: +11 to hit at end-state (+5 INT mod + 6 prof); 1d6+5 bludgeoning.
     damage_type: bludgeoning
     weapon_dice: "1d6"
@@ -124,6 +126,16 @@ inventory:
     range: 2                      # 60 ft → ~2-3 FE tiles
     uses: null                    # cantrip — infinite uses
     notes: "+11 to hit at end-state (INT 20 + prof 6). Deals +5 bludgeoning on hit."
+  - id: fire-bolt
+    name: "Fire Bolt"
+    # Pact of the Tome cantrip — Wolfram's main ranged fire option for flyers and
+    # distant enemies. Scales: 1d10 (lv1) → 2d10 (5) → 3d10 (11) → 4d10 (17).
+    # Pairs with breath weapon's Fire identity. INT-based per PDF (+6 to hit, 4d10 at 20).
+    damage_type: fire
+    weapon_dice: "1d10"           # ch1 equivalent; scales to 4d10 at end-state
+    ability_mod: INT
+    range: 3                      # 120 ft → ~3 FE tiles
+    uses: null                    # cantrip — infinite uses
   - id: vulnerary
     name: "Healing Potion"
     uses: 2
@@ -149,12 +161,12 @@ unique_abilities:
 
   - id: breath-weapon
     name: "Breath Weapon"
-    # ACTION (unlimited per chapter): 30-ft cone, DEX save DC 16, fire damage.
-    # Wolfram uses this EVERY TURN if desired — not restricted per rest.
-    # Damage scales by chapter; starts at 2d6 (ch1 equivalent).
-    # FE implementation: activated command costing Wolfram's action each turn.
+    # ACTION, 1/short rest per Mineralscale Drakeborn (PDF p3). FE = 1/chapter.
+    # CORRECTED 2026-05-27: was incorrectly listed as unlimited.
+    # 30-ft cone, DEX save DC 16, fire damage.
+    # Damage scales by chapter; starts at 2d6 (ch1 equivalent), tops 5d6 (16+).
     type: activated
-    uses_per_chapter: null        # unlimited
+    uses_per_chapter: 1
     action_cost: action
     shape: cone
     range: 2                      # 30 ft → ~2 FE tiles
@@ -202,6 +214,27 @@ unique_abilities:
     uses_per_chapter: 1           # 1/long rest (Mystic Arcanum)
     effect: remove_from_map_permanent
 
+  - id: investiture-of-stone
+    name: "Investiture of Stone"
+    # 6th-level Mystic Arcanum: transform Wolfram into a stone form for the map phase.
+    # Resistance to nonmagical bludgeoning/piercing/slashing; can move through stone;
+    # action to shape stone into a difficult-terrain rumble.
+    # FE implementation: activated buff status with B/P/S resistance for the map.
+    type: activated
+    uses_per_chapter: 1           # 1/long rest
+    effect: stone_form_status
+
+  - id: forcecage
+    name: Forcecage
+    # 7th-level Mystic Arcanum: trap a target in a 20-ft force cage for 1 hour.
+    # Targets fail a CHA save are imprisoned; cannot leave the cage by any means.
+    # FE implementation: activated command that locks an enemy in place for the chapter.
+    type: activated
+    uses_per_chapter: 1           # 1/long rest
+    save: CHA
+    save_dc: 19
+    effect: lock_target_in_place
+
   - id: feral-strike-bite
     name: "Feral Strike: Bite"
     # Drakeborn racial bonus action: after landing a melee hit, deal 1d8 bludgeoning.
@@ -209,6 +242,16 @@ unique_abilities:
     type: passive
     follow_up_dice: "1d8"
     damage_type: bludgeoning
+
+  - id: feral-strike-claws
+    name: "Feral Strike: Claws"
+    # Drakeborn racial bonus action — slashing claw strike against an adjacent target.
+    # 1d6 + STR slashing. Alternative to Bite when Wolfram needs slashing damage type.
+    # FE implementation: bonus action — adjacent attack at 1d6 + STR slashing.
+    type: bonus_action
+    weapon_dice: "1d6"
+    damage_type: slashing
+    ability_mod: STR
 
   - id: shield-spell
     name: "Shield (spell)"

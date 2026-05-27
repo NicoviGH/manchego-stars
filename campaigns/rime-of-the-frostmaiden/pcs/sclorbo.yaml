@@ -18,8 +18,8 @@ dnd:
   alignment: chaotic_good         # CORRECTED: Chaotic Good (not Chaotic Neutral — PDF confirmed)
   size: small                     # Chwinga — tiny nature elemental
   background: "Folk Hero"
-  personality: "If someone is in trouble, I'm always ready to lend help."
-  ideal: "People deserve to be treated with dignity and respect."
+  personality: "If someone is in trouble, I'm always ready to lend help. I'm confident in my own abilities and do what I can to instill confidence in others."
+  ideal: "Sincerity. There's no good in pretending to be something I'm not. (Neutral)"   # CORRECTED 2026-05-27 — PDF p4
   bond: "I protect those who cannot protect themselves."
   flaw: "The people who knew me when I was young know my shameful secret, so I can never go home."
   speech: none                    # Sclorbo CANNOT SPEAK — communicates via telepathy within 20 ft.
@@ -32,6 +32,7 @@ dnd:
     WIS: 18
     CHA: 17
   saving_throw_proficiencies: [DEX, CHA]
+  languages: [Common]                # PDF doesn't list extras; Common assumed (Chwinga base)
   hp_max: 99
   ac: 12
   speed_ft:
@@ -119,6 +120,14 @@ inventory:
     range: 3                      # 60 ft
     uses: null                    # cantrip — infinite uses
     notes: "On hit: target has disadvantage on its next attack roll (WIS save DC negates damage only)."
+  - id: heal-staff
+    name: "Heal Staff"
+    # Sclorbo's Cure Wounds spell (Bard 1st). FE staff with single-target restore.
+    # Per PDF p5 — Cure Wounds is on Sclorbo's prepared spell list.
+    is_staff: true
+    effect: restore_hp
+    staff_dice: "1d8+MAG"
+    uses: 8                       # 8 staff charges per chapter (= 1st-level slot count)
   - id: vulnerary
     name: "Healing Potion"
     uses: 2
@@ -190,6 +199,28 @@ unique_abilities:
     # Passive: Sclorbo never counts as untrained — minor universal accuracy bonus.
     type: passive
     effect: never_untrained
+
+  - id: bard-healing-suite
+    name: "Bard Healing Suite"
+    # Per PDF p5 — Sclorbo has prepared: Cure Wounds (1st), Revivify (3rd),
+    # Mass Cure Wounds (5th), Raise Dead (5th). At Bard 16 Sclorbo is the party's
+    # most capable revival caster. (Bard's high-tier spells via Magical Secrets.)
+    # FE implementation: Sclorbo gains Heal, Mend, Recover, and a 1/chapter Revive
+    # staff item progressively across chapters.
+    # CORRECTED 2026-05-27: previously YAML didn't acknowledge healing role.
+    type: progression_note
+    spells:
+      - { name: "Cure Wounds", level: 1, staff_id: heal-staff }
+      - { name: "Revivify", level: 3, staff_id: revive-staff, unlock_chapter: 4 }
+      - { name: "Mass Cure Wounds", level: 5, staff_id: physic-staff, unlock_chapter: 6 }
+      - { name: "Raise Dead", level: 5, staff_id: rescue-revive-staff, unlock_chapter: 7 }
+
+  - id: song-of-rest
+    name: "Song of Rest"
+    # Between-chapter feature: allies regain extra 1d10 HP when spending Hit Dice on
+    # short rest. FE implementation: between-chapter HP recovery bonus while Sclorbo is alive.
+    type: between_chapter
+    effect: ally_extra_recovery
 
 # ── Signature Moment ─────────────────────────────────────────────────────────
 signature_moment:

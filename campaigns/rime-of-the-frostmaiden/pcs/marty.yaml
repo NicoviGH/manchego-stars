@@ -30,6 +30,7 @@ dnd:
     WIS: 20
     CHA: 8
   saving_throw_proficiencies: [INT, WIS]
+  languages: [Common, "Deep Speech", Druidic]   # per PDF p1 (Common readable only, see speech: none)
   hp_max: 163
   ac: 17
   speech: none               # Marty CANNOT SPEAK — communicates via hum/whistle/grumble.

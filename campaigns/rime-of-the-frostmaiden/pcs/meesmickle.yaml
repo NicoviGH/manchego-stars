@@ -25,6 +25,7 @@ dnd:
     WIS: 8
     CHA: 16
   saving_throw_proficiencies: [WIS, CHA]
+  languages: [Common, Abyssal]   # per PDF p3
   hp_max: 183
   ac: 15
   racial_traits:
@@ -73,9 +74,10 @@ inventory:
     weapon_dice: "1d10+3"     # +3 from Agonizing Blast invocation
     ability_mod: CHA
     range: 4                  # standard 60 ft → ~4 FE tiles (Eldritch Spear extends to 20 tiles end-state)
+    beams_at_endstate: 4      # 4 beams at level 20 (PDF p1: "Count: 4")
     uses: null                # cantrip — infinite uses
     locked: true              # Warlock cantrip, cannot be traded
-    notes: "Agonizing Blast: +3 dmg on hit. Repelling Blast: push target 1 tile on hit."
+    notes: "Agonizing Blast: +3 dmg on hit. Repelling Blast: push target 1 tile on hit. 4 beams at level 20 — each rolls separately."
   - id: blood-vial
     name: "Blood Vial"
     is_healing: true
@@ -88,7 +90,8 @@ d20_fields:
                              # End-state target: 15. Tune per chapter.
   ability_mod_atk: CHA
   prof_bonus: 2
-  spell_slots: "2"           # 2 Pact Magic slots (short rest recovery, any level)
+  spell_slots: "2"           # ch1: 2 Pact Magic slots (1st-level). End-state: 4 slots at 5th level
+                             # (Warlock 20 standard; PDF spell page shows 4 slots at 5th)
 
 # ── Unique Abilities ─────────────────────────────────────────────────────────
 unique_abilities:
@@ -155,6 +158,25 @@ unique_abilities:
     type: activated
     uses_per_chapter: 1
     effect: choose_damage_resistance
+
+  - id: power-word-kill
+    name: "Power Word Kill"
+    # 9th-level Mystic Arcanum (PDF spell page). 1/long rest.
+    # Speak a word of power: target with ≤100 HP dies instantly. No save.
+    # FE implementation: activated command. Target must have current HP ≤ threshold or it fails.
+    # Devastating endgame finisher; pairs with Hurl Through Hell as nuke combo.
+    type: activated
+    uses_per_chapter: 1
+    target_max_hp: 100
+    effect: instant_kill_if_under_threshold
+
+  - id: demiplane
+    name: Demiplane
+    # 8th-level Mystic Arcanum. 1/long rest. Creates a 30x30 stone demiplane room.
+    # FE implementation: rarely useful in tactical combat; reserved for narrative/utility.
+    type: activated
+    uses_per_chapter: 1
+    effect: utility_demiplane_room
 
 # ── Signature Moment ─────────────────────────────────────────────────────────
 signature_moment:
