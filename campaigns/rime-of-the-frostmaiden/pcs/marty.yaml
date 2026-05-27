@@ -1,5 +1,5 @@
 # pcs/marty.yaml — Marty the Merry Mushroom, Druid (Circle of Spores)
-# Source: data/pc-sheets/marty-the-merry-mushroom.json (D&D Beyond sheet, level 20 end-state)
+# Source: data/pc-sheets/marty-the-merry-mushroom.json + References/PCs/MMM Character Sheet.pdf
 # See docs/class-mapping.md and docs/PRD.md §6.7 for class mapping rationale.
 
 id: marty
@@ -13,6 +13,14 @@ dnd:
   class: Druid
   subclass: "Circle of Spores"
   level_end_state: 20
+  alignment: chaotic_neutral
+  size: small                # 2–4 ft tall (Sporemaster)
+  background: Sage
+  backstory: >
+    Part of a myconid circle in the coffee axis of Colombia. Left his community
+    to become a traveling Barista and share the wonderful properties of the
+    Chagaccino with the world. Takes every opportunity to brew and share it with
+    anyone he can.
   ability_scores:
     STR: 10
     DEX: 18
@@ -23,12 +31,53 @@ dnd:
   saving_throw_proficiencies: [INT, WIS]
   hp_max: 163
   ac: 17
+  speech: none               # Marty CANNOT SPEAK — communicates via hum/whistle/grumble.
+                             # Rapport Spores provide telepathy for anyone sharing a language.
   defenses:
     resistance: [poison]
+    # Condition immunities from Fungal Body (Druid level 14 class feature, NOT racial):
     immunity_conditions: [blinded, critical_hits, deafened, frightened, poisoned]
+  racial_traits:
+    # Sporemaster (homebrew Myconid) — from PDF page 3
+    darkvision: 60
+    fungal_form:
+      poison_save_advantage: true
+      poison_resistance: true   # same as defenses.resistance above — listed here for clarity
+    hallucination_spores:
+      # Action: creature within 5 ft, CON save DC 19 — Poisoned + Incapacitated for 1 minute.
+      # 1/long rest (= 1/chapter).
+      uses_per_chapter: 1
+      save: CON
+      save_dc: 19
+      effect: [poisoned, incapacitated]
+    pacifying_spores:
+      # Action: creature within 5 ft, CON save DC 19 — Stunned for 1 minute.
+      # 1/long rest (= 1/chapter). Extremely powerful CC.
+      uses_per_chapter: 1
+      save: CON
+      save_dc: 19
+      effect: stunned
+    pheromone_spores:
+      # Action: mark one creature within 60 ft. For 1 minute, Marty + all spore servants
+      # have advantage on attacks against that creature.
+      # Uses = CON modifier (minimum 1) per long rest. CON 17 → mod +3 = 3 uses.
+      uses_per_chapter: 3
+      range: 4                  # 60 ft → ~4 FE tiles
+    rapport_spores:
+      # Telepathic communication within 30 ft with creatures sharing a language.
+      # If silenced, can still communicate telepathically but cannot cast V-component spells.
+      # FE implementation: Marty's dialogue uses hum/whistle flavor; no verbal speech.
+      range: 2                  # ~30 ft
+    distress_spores:
+      # Passive: when Marty takes damage, all creatures within 240 ft are alerted.
+      # FE implementation: flavor/passive — enemies in range are notified on Marty's injury.
+      alert_radius: 16          # 240 ft → ~16 FE tiles
+    sunlight_sensitivity:
+      # Disadvantage on attack rolls and WIS (Perception) checks in direct sunlight.
+      # Minor concern for an arctic campaign (little direct sun), but worth noting.
+      effect: disadvantage_attacks_perception_in_sunlight
 
 # ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
-# Low stats relative to D&D end-state — growth rates close the gap.
 # Adjust during Phase 1 playtesting.
 fe_stats:
   class: "Shaman (Druid)"    # FE base class — custom Druid variant of Shaman
@@ -57,38 +106,41 @@ growth_rates:
   LCK: 30
 
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
+# Primary attack is Shillelagh (cantrip), not a basic staff swing.
+# Shillelagh transforms Marty's Staff into a WIS-based weapon.
 inventory:
-  - id: spore-burst
-    name: "Spore Burst"
-    damage_type: necrotic
-    weapon_dice: "1d6"
-    ability_mod: WIS
-    range: 1                  # adjacent — Halo of Spores is a cantrip-tier reaction
-    uses: null                # cantrip — infinite uses
-    locked: false
-  - id: martys-staff
-    name: "Marty's Staff"
+  - id: shillelagh
+    name: "Shillelagh (Staff)"
     damage_type: bludgeoning
-    weapon_dice: "1d6"
-    ability_mod: STR
+    weapon_dice: "1d8"
+    ability_mod: WIS           # Shillelagh cantrip — WIS replaces STR for staff attacks
     range: melee
-    uses: null
-    locked: true              # personal weapon
+    uses: null                 # cantrip — infinite uses
+    locked: true               # Marty's Staff + Shillelagh cantrip, personal
+    notes: "+WIS mod to damage (= +5 at ch1 equivalent). Replaces staff's STR-based attack."
+  - id: chill-touch
+    name: "Chill Touch"
+    damage_type: necrotic
+    weapon_dice: "1d6"        # scales to 4d8 at level 20; start ch1 at 1d6
+    ability_mod: WIS
+    range: 3                  # 120 ft → ~3 FE tiles
+    uses: null                # cantrip — infinite uses
   - id: heal-staff
     name: "Heal Staff"
     is_staff: true
     effect: restore_hp
     staff_dice: "1d8+MAG"
     uses: 15
-  - id: vulnerary
-    name: "Healing Potion"
-    uses: 2
+  - id: goodberry
+    name: "Goodberry"         # Marty carries Goodberries as field rations/heals
+    effect: restore_1hp
+    uses: 10                  # 10 berries per casting; restocked between chapters
 
 # ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
 d20_fields:
   AC: 12                     # Chapter 1: leather armor, no shield
                              # End-state target: 17. Tune per chapter.
-  ability_mod_atk: WIS       # WIS-based caster
+  ability_mod_atk: WIS
   prof_bonus: 2
   spell_slots: "3/2"         # 3×1st-level, 2×2nd-level (Druid level 2 equivalent)
 
@@ -96,40 +148,83 @@ d20_fields:
 unique_abilities:
   - id: symbiotic-entity
     name: "Symbiotic Entity"
-    # Consumable item: activate Wild Shape as Symbiotic Entity.
-    # Effect: +20 temp HP, Halo of Spores damage doubled, +1d6 necrotic on melee.
-    # Lasts the combat phase.
-    # FE implementation: consumable item granting a custom status.
+    # Activated (costs Wild Shape use): awaken the spores.
+    # Effect: +80 temp HP (4 × druid level), Halo of Spores damage doubled,
+    #         +1d6 necrotic on all melee attacks.
+    # Lasts 10 minutes (= the map phase) or until temp HP depleted.
+    # NOTE: +80 temp HP was wrong in first pass (+20) — corrected from PDF.
+    # FE implementation: consumable item granting symbiotic_entity_status.
     type: consumable_item
     uses_per_chapter: 2
+    temp_hp: 80               # CORRECTED: 4 × level 20 = 80 (not 20)
     status_effect: symbiotic_entity_status
 
   - id: halo-of-spores
     name: "Halo of Spores"
-    # Reaction: when an enemy moves adjacent, deal 1d6 necrotic (CON save DC 14).
-    # In Symbiotic Entity mode: 2d6.
-    # FE implementation: innate reaction skill, triggers on enemy adjacency.
+    # Reaction: when a creature moves into a space within 10 ft of Marty or starts
+    # its turn there, deal 1d10 necrotic (CON save DC 19 to negate).
+    # Creature can take this damage only once per turn.
+    # In Symbiotic Entity mode: damage dice doubled.
+    # FE implementation: reaction skill triggering on enemy adjacency or movement.
     type: reaction
-    damage_dice: "1d6"
+    damage_dice: "1d10"       # 1d10 at end-state; scale from 1d4 at ch1
     damage_type: necrotic
     save: CON
-    save_dc: 14
+    save_dc: 19               # CORRECTED: DC 19 (8 + prof6 + WIS5), not 14
+
+  - id: spreading-spores
+    name: "Spreading Spores"
+    # Bonus action while Symbiotic Entity is active: hurl a 10-ft spore cube up to
+    # 30 ft away. Any creature moving into or starting its turn in the cube takes
+    # Halo of Spores damage (CON save DC 19). Cube lasts 1 minute.
+    # FE implementation: bonus action placing a hazard zone on the map (2×2 tile area).
+    type: activated
+    requires_status: symbiotic_entity_status
+    effect: place_spore_hazard_zone
 
   - id: fungal-infestation
     name: "Fungal Infestation"
-    # Reaction: when a humanoid enemy dies within 1 tile, animate it as a Zombie
-    # summon under Marty's control. Max 1 active zombie at a time.
-    # FE implementation: reaction skill that spawns a temporary allied Zombie unit.
+    # Reaction: when a beast or Small/Medium humanoid dies within 10 ft,
+    # animate it as a zombie under Marty's control (1 HP, melee attack only).
+    # Zombie acts on Marty's turn immediately after.
+    # 5 USES per chapter (confirmed from PDF — was wrong at 2).
+    # FE implementation: reaction skill spawning a temporary allied Zombie unit.
     type: reaction
-    uses_per_chapter: 2
+    uses_per_chapter: 5       # CORRECTED: 5 (not 2)
     spawn_unit: zombie-fungal
 
   - id: crit-immunity
     name: "Crit Immunity"
-    # Myconid racial: Marty cannot receive critical hits.
+    # From Fungal Body (Druid level 14 class feature, not racial):
+    # Critical hits against Marty count as normal hits, unless incapacitated.
     # FE implementation: passive — nat 20s against Marty are treated as normal hits.
     type: passive
     effect: no_critical_hits_received
+    source: fungal_body_class_feature
+
+  - id: pacifying-spores
+    name: "Pacifying Spores"
+    # Sporemaster racial: action, creature within 5 ft, CON save DC 19 — Stunned 1 minute.
+    # 1/long rest (= 1/chapter). Extremely powerful melee CC.
+    # FE implementation: activated command — adjacent enemy must save or be stunned
+    #   (cannot act or counterattack for the turn).
+    type: activated
+    uses_per_chapter: 1
+    range: 1
+    save: CON
+    save_dc: 19
+    effect: stunned
+
+  - id: pheromone-spores
+    name: "Pheromone Spores"
+    # Sporemaster racial: action, mark one creature within 60 ft (4 FE tiles).
+    # For 1 minute, Marty and all zombies/summons have advantage on attacks vs. that creature.
+    # Uses = CON mod (3) per chapter.
+    # FE implementation: activated mark — grants +hit bonus to Marty and all allies vs. target.
+    type: activated
+    uses_per_chapter: 3
+    range: 4
+    effect: mark_target_for_advantage
 
 # ── Signature Moment ─────────────────────────────────────────────────────────
 signature_moment:
