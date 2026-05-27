@@ -19,7 +19,7 @@ Read these at the top of every session before touching code:
 | What | Where |
 |---|---|
 | Base ROM | `/Users/Yonick/Documents/Claude/Projects/Manchego Stars / Fire Emblem Game/Fire Emblem - The Sacred Stones (USA, Australia).gba` |
-| Reference PDFs (Tasha's, Metallurgist, etc.) | `/Users/Yonick/Documents/Claude/Projects/Manchego Stars / Fire Emblem Game/References/` |
+| Reference PDFs (Tasha's, Metallurgist, etc.) | `/Users/Yonick/Documents/Claude/Projects/Manchego Stars / Fire Emblem Game/References/` (PDFs + frostmaiden-resources.md live here in the source folder; frostmaiden-resources.md is also copied to `docs/`) |
 | PC D&D Beyond JSON sheets | `data/pc-sheets/*.json` |
 | PC portrait URLs | `data/pc-sheets/portraits.json` |
 | FE8 decomp | `fireemblem8u/` (git submodule) |

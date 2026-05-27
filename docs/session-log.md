@@ -17,7 +17,7 @@
 - Scaffolded campaign YAML templates: `campaign.yaml`, `pcs/braulo.yaml`, `chapters/ch01-the-iron-trail.yaml`
 
 **Notes:**
-- `frostmaiden-resources.md` not found in source folder — file may not have been created yet; create and add when ready
+- `frostmaiden-resources.md` copied to `docs/` (was in `References/` in the source folder, not the root — caused a false "missing" report in Session 1)
 - Decomp build verification depends on having `agbcc`/`devkitARM` installed — see next steps
 
 **Next session:** Phase 0 wrap-up — verify `fireemblem8u` quickstart builds clean. Then Phase 1: implement `engine/d20-combat/dice_rng.c`.
