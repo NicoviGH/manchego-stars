@@ -1,0 +1,69 @@
+# campaign.yaml — Manchego Stars: Rime of the Frostmaiden
+# Read by tools/build-campaign.ts at build time.
+# See docs/PRD.md §6.4 for the engine/content contract.
+
+title: "Manchego Stars: Rime of the Frostmaiden"
+id: rime-of-the-frostmaiden
+
+chapters:
+  count: 7
+  list:
+    - ch01-the-iron-trail
+    - ch02-cold-welcome
+    - ch03-the-termalaine-mine
+    - ch04-the-elven-tomb
+    - ch05-the-maer-monster
+    - ch06-blood-in-bremen
+    - ch07-the-eastway-ambush
+
+progression:
+  # FE level all PCs begin at (equivalent to D&D level 1–3)
+  starting_fe_level: 1
+  # FE level expected at end of chapter 7 (equivalent to D&D level 5–7)
+  target_end_level: 12
+  # All PCs promote at this FE level (not required within MVP scope)
+  promotion_threshold: 20
+  # Level cap for this campaign (unpromoted)
+  level_cap_unpromoted: 20
+  # Promoted level cap
+  level_cap_promoted: 20
+
+# Starting equipment GP (between-chapter shop budget estimate)
+starting_gold: 500
+
+permadeath:
+  # "classic" or "casual" — player chooses via FE8's built-in toggle
+  default_mode: classic
+  casual_flavor: "retreated to the sled / carried to safety by Baxby"
+
+# World map: Ten-Towns locations (FE8's world map system, sequential unlock)
+world_map:
+  - id: bryn-shander
+    name: "Bryn Shander"
+    unlocks_at_start: true
+    shop: general   # weapons, basic armor, standard consumables
+  - id: targos
+    name: "Targos"
+    unlocks_after: ch01
+    shop: armory    # better weapons, cold-weather gear
+  - id: termalaine
+    name: "Termalaine"
+    unlocks_after: ch02
+    shop: specialty # gems, mining equipment, unusual items
+  - id: lonelywood
+    name: "Lonelywood"
+    unlocks_after: ch03
+    shop: vendor    # potions, basic consumables
+  - id: bremen
+    name: "Bremen"
+    unlocks_after: ch06
+    shop: harbor    # water-themed items, potions — run by Messie after ch06
+  - id: easthaven
+    name: "Easthaven"
+    unlocks_after: null  # never a friendly visit in MVP
+
+# D&D content sources (frozen snapshots committed at data/)
+data_sources:
+  srd: data/srd/srd-snapshot.json
+  open5e: data/srd/open5e-snapshot.json
+  homebrew: data/homebrew/

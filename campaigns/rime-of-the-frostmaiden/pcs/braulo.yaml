@@ -1,0 +1,134 @@
+# pcs/braulo.yaml — Braulo the Hermit Crab Barbarian
+# Source: data/pc-sheets/braulo.json (D&D Beyond sheet, level 20 end-state)
+# See docs/class-mapping.md and docs/PRD.md §6.7 for class mapping rationale.
+
+id: braulo
+name: Braulo
+portrait_ref: portraits/braulo.png   # to be created (issue #23)
+
+# ── D&D 5e Identity ────────────────────────────────────────────────────────────
+dnd:
+  race: Hermit Crab          # homebrew Tortle variant
+  class: Barbarian
+  subclass: Path of the Berserker
+  level_end_state: 20        # D&D Beyond sheet is level 20 (campaign end)
+  ability_scores:
+    STR: 23
+    DEX: 8
+    CON: 24
+    INT: 10
+    WIS: 12
+    CHA: 13
+  saving_throw_proficiencies: [STR, CON]
+  hp_max: 285                # level 20 end-state — NOT used directly in FE
+  ac: 17                     # end-state — used to derive FE DEF scaling target
+
+# ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
+# These are hand-tuned starting values. They should feel weak relative to the
+# D&D end-state — the growth rates close the gap over the full campaign.
+# Adjust during Phase 1 playtesting (issue #18, #48, #49).
+fe_stats:
+  class: Pirate              # FE base class (promoted: Berserker)
+  promoted_class: Berserker
+  level: 1
+  HP: 22
+  STR: 7                     # high — Braulo's defining stat
+  SKL: 4                     # d20 hits on range — moderate
+  SPD: 5
+  DEF: 6
+  RES: 2
+  LCK: 3
+  MOV: 5
+  CON: 12                    # large unit, heavy weapons
+
+# ── Growth Rates (% per level, FE standard) ─────────────────────────────────
+# Designed so a complete campaign playthrough approaches the D&D end-state stats
+# at FE level 20 promoted. Braulo is a tank/DPS — high HP, STR, DEF growths.
+growth_rates:
+  HP: 75
+  STR: 60
+  SKL: 35
+  SPD: 40
+  DEF: 50
+  RES: 15
+  LCK: 25
+
+# ── Inventory (Chapter 1 starting equipment) ───────────────────────────────────
+inventory:
+  - id: nu-shipwrecker        # personal weapon — Slashing, 1d8/1d10, 10 ft reach
+    name: "Nu' Shipwrecker"
+    damage_type: slashing
+    weapon_dice: "1d10"
+    ability_mod: STR
+    range: melee              # reach: 1–2 tiles
+    uses: null                # mundane — not a spell-slot tome
+    locked: true              # personal weapon, cannot be traded
+  - id: vulnerary
+    name: "Healing Potion"
+    uses: 3
+
+# ── D&D-Derived Stat Overrides ─────────────────────────────────────────────────
+# These fields feed the AC sidecar table and are NOT part of the vanilla FE unit struct.
+# See docs/PRD.md §11 (save budget) and engine/d20-combat/ for implementation.
+d20_fields:
+  AC: 14                     # Chapter 1 starting AC (scales with DEF growth)
+                             # End-state target: 17 (PRD §6.7). Tune per chapter.
+  ability_mod_atk: STR       # STR-based melee attacker
+  prof_bonus: 2              # FE level 1 equivalent (~D&D level 1)
+  spell_slots: null          # Barbarian: no spell slots
+
+# ── Unique Abilities ────────────────────────────────────────────────────────────
+unique_abilities:
+  - id: rage
+    name: Rage
+    # Consumable item (Berserk-status item) in inventory.
+    # Effect: +4 melee damage, resistance to B/P/S damage (×0.5 incoming),
+    #         advantage on STR checks/saves. Lasts the combat phase.
+    # FE implementation: consumable item that grants a custom status.
+    # Number of uses: 3/chapter (Barbarian rage count at level 1).
+    # Issues #27 (implementation).
+    type: consumable_item
+    uses_per_chapter: 3
+    status_effect: rage_status
+
+  - id: shell-defense
+    name: "Shell Defense"
+    # FE command: spend action to enter shell. +4 DEF, advantage on STR/CON saves,
+    # speed 0, prone. Exit next turn (costs movement).
+    # FE implementation: unit command (like "Wait" but applies a status).
+    type: unit_command
+    effect:
+      DEF_bonus: 4
+      MOV_override: 0
+      prone: true
+
+  - id: brutal-critical
+    name: "Brutal Critical"
+    # Nat 20 → roll weapon dice THREE times instead of two.
+    # (Braulo's Barbarian level 9+ feature — 3 extra crit dice.)
+    # Standard crits roll twice; this makes it three.
+    type: passive
+    crit_extra_dice: 1       # 1 extra die on top of the standard 2× crit
+
+  - id: retaliation
+    name: Retaliation
+    # Reaction: melee attack when hit by an adjacent creature.
+    # FE implementation: counter-attack before the standard FE counterattack window.
+    # (Could model as a free extra counter, or as a separate reaction phase.)
+    type: reaction
+
+# ── Signature Moment ────────────────────────────────────────────────────────────
+signature_moment:
+  chapter: ch07-the-eastway-ambush
+  description: >
+    Turn 1 scripted event — Braulo bursts his shackles, starting the fight
+    that gets the whole party captured. Triggers unique dialogue.
+  dialogue_trigger: braulo_shackle_break
+
+# ── Support Affinities ──────────────────────────────────────────────────────────
+# (Vanilla FE8 support system — defined here, implemented in events/)
+supports:
+  - partner: wolfram     # tank duo
+    affinity: fire
+  - partner: marty
+    affinity: wind

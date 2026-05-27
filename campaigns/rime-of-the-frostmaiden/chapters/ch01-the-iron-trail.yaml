@@ -1,0 +1,185 @@
+# chapters/ch01-the-iron-trail.yaml
+# See docs/PRD.md §7 for the full chapter narrative breakdown.
+# See docs/combat-formulas.md for the d20 system used in combat resolution.
+
+id: ch01-the-iron-trail
+title: "The Iron Trail"
+chapter_number: 1
+milestone: M3
+
+# ── Narrative ──────────────────────────────────────────────────────────────────
+narrative: >
+  The party meets at The Northlook tavern in Bryn Shander. Three dwarves hire
+  them to track a missing shipment of iron ingots. They follow the trail past a
+  dismembered body and find the goblin thieves encamped in the snow.
+
+# ── Map ────────────────────────────────────────────────────────────────────────
+map:
+  file: maps/ch01-the-iron-trail.tmx     # hand-drawn in Tiled (issue #31)
+  tileset: snow-trail                    # vanilla FE8 snow tileset (Tower of Valni)
+  size: "24×16"                          # approximate — finalize in Tiled
+  description: >
+    Linear snowy trail, Bryn Shander outskirts at the left edge, goblin camp
+    at the right edge. Trees and boulders for cover. Slight elevation at the
+    camp perimeter (advantage on attacks for units on the ridge).
+
+# ── Objective ──────────────────────────────────────────────────────────────────
+objective:
+  type: rout                             # defeat all enemy units
+  description: "Defeat all goblins and recover the iron ingots"
+  # Secondary objective (optional, no penalty if missed):
+  secondary:
+    - type: seize_item
+      item: iron-ingots
+      description: "Recover the iron ingot cache from the chest in the goblin camp"
+
+# ── Win / Lose Conditions ──────────────────────────────────────────────────────
+win_condition: all_enemies_defeated
+lose_condition: all_player_units_defeated
+
+# ── Difficulty ─────────────────────────────────────────────────────────────────
+difficulty_note: >
+  Introductory chapter. Keep enemy count low (8–12 goblins). Enemy ACs should
+  be low (AC 11–12) so players learn the d20 system with comfortable hit rates
+  (~75%). No reinforcements. No boss unit.
+
+# ── Player Units ──────────────────────────────────────────────────────────────
+# All 7 PCs are available from the start (they met at The Northlook together).
+player_units:
+  - id: braulo
+    position: [3, 8]       # [col, row] — left side of map
+    required: true
+  - id: marty
+    position: [3, 9]
+    required: true
+  - id: meesmickle
+    position: [4, 8]
+    required: true
+  - id: prof-rbg
+    position: [4, 9]
+    required: true
+  - id: rootis
+    position: [2, 8]
+    required: true
+  - id: sclorbo
+    position: [2, 9]
+    required: true
+  - id: wolfram
+    position: [3, 7]
+    required: true
+  - id: pinky                            # RBG's homunculus, available from ch01
+    position: [4, 7]
+    required: false
+
+# ── Enemy Units ────────────────────────────────────────────────────────────────
+enemy_units:
+  - id: goblin
+    name: "Goblin Scout"
+    count: 6
+    positions: [[14,6],[14,8],[14,10],[15,7],[15,9],[16,8]]
+    class: brigand
+    level: 2
+    d20_fields:
+      AC: 11
+      ability_mod_atk: STR
+      prof_bonus: 2
+    inventory:
+      - id: shortsword
+        damage_type: piercing
+        weapon_dice: "1d6"
+    ai_pattern: aggressive   # move toward nearest player unit and attack
+
+  - id: goblin-archer
+    name: "Goblin Archer"
+    count: 3
+    positions: [[17,5],[17,11],[19,8]]
+    class: fighter             # archer variant
+    level: 2
+    d20_fields:
+      AC: 11
+      ability_mod_atk: DEX
+      prof_bonus: 2
+    inventory:
+      - id: shortbow
+        damage_type: piercing
+        weapon_dice: "1d6"
+        range: 2               # FE tile range
+    ai_pattern: defensive      # stay in place, attack from range
+
+  - id: goblin-chief
+    name: "Goblin Chief"
+    is_boss: true
+    count: 1
+    position: [21, 8]          # goblin camp center
+    class: brigand
+    level: 4
+    d20_fields:
+      AC: 13
+      ability_mod_atk: STR
+      prof_bonus: 2
+    inventory:
+      - id: greatclub
+        damage_type: bludgeoning
+        weapon_dice: "1d8"
+      - id: iron-ingots         # drops on death → chapter item objective
+        is_key_item: true
+    ai_pattern: hold_position   # stays at camp, guards the ingots
+    death_quote: "Gah! The ironses were ours!"
+
+# ── Chest / Village Loot ───────────────────────────────────────────────────────
+chests:
+  - position: [20, 8]
+    contents:
+      - id: healing-potion
+        count: 2
+      - id: iron-ingots
+        is_key_item: true      # triggers secondary objective if seized
+
+# ── Events ────────────────────────────────────────────────────────────────────
+events:
+  # Opening cutscene (before player control)
+  - trigger: chapter_start
+    type: cutscene
+    ea_file: events/ch01-opening.ea
+    description: >
+      The Northlook tavern. Three dwarves approach the party and explain the
+      missing ingot shipment. They offer 200 GP for recovery. Cut to: the trail.
+      A dismembered body in the snow. Braulo crouches to examine it.
+
+  # Post-map cutscene (after all enemies defeated)
+  - trigger: chapter_end
+    type: cutscene
+    ea_file: events/ch01-ending.ea
+    description: >
+      The party recovers the iron ingots. Duvessa Shane arrives with a pair of
+      town guards. She thanks the party and offers them a retainer for ongoing
+      Ten-Towns security work. She mentions other towns having trouble.
+      Braulo asks about the sled dog situation. Baxby (an axe-beak) is for sale.
+
+  # Optional: Duvessa Shane introduces herself mid-map if Braulo moves to
+  # a specific trigger tile near the road sign (flavor dialogue only)
+  - trigger: unit_on_tile
+    unit: braulo
+    tile: [8, 8]
+    type: dialogue
+    ea_file: events/ch01-road-sign.ea
+    description: >
+      Braulo reads a battered sign: "BRYN SHANDER — 2 MILES. WATCH FOR WOLVES."
+
+# ── Post-Chapter ──────────────────────────────────────────────────────────────
+post_chapter:
+  gold_reward: 300              # base reward (+ enemy drops)
+  available_shops: [bryn-shander]
+  units_available_to_recruit:
+    - id: baxby
+      cost_gp: 200
+      description: "Purchase Baxby the axe-beak at the Bryn Shander market"
+  unlocks_chapter: ch02-cold-welcome
+
+# ── Design Notes ───────────────────────────────────────────────────────────────
+design_notes: >
+  Introductory chapter. Teaches: basic movement, attack, the d20 roll display,
+  the weapon-type system (goblin uses piercing — demo that slashing swords beat
+  it), and the Rage consumable (Braulo should use it at least once naturally).
+  Keep it short — 8–10 turns to clear. No complex events. Big focus on the
+  combat UI tutorial feeling natural and legible.
