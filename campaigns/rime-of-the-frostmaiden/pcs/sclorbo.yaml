@@ -1,0 +1,131 @@
+# pcs/sclorbo.yaml — Sclorbo, Bard (College of Lore)
+# Source: data/pc-sheets/sclorbo.json (D&D Beyond sheet, level 16 end-state)
+# NOTE: Level 16 vs. 20 for the rest of the party — player left before campaign end.
+# In-game, Sclorbo starts at the same level as everyone; slightly lower growth ceilings
+# reflect the level 16 cap if the full campaign is ever extended.
+# See docs/class-mapping.md and docs/PRD.md §6.7 for class mapping rationale.
+
+id: sclorbo
+name: Sclorbo
+portrait_ref: portraits/sclorbo.png   # to be created (issue #23)
+# Portrait source: https://www.dndbeyond.com/avatars/25339/252/1581111423-72588721.jpeg
+
+# ── D&D 5e Identity ────────────────────────────────────────────────────────────
+dnd:
+  race: Chwinga               # homebrew nature elemental
+  class: Bard
+  subclass: "College of Lore"
+  level_end_state: 16         # lowest in party (player left before campaign end)
+  ability_scores:
+    STR: 13
+    DEX: 15
+    CON: 12
+    INT: 8
+    WIS: 18
+    CHA: 17
+  saving_throw_proficiencies: [DEX, CHA]
+  hp_max: 99
+  ac: 12
+
+# ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
+# Sclorbo is a Dancer — Dance replaces Attack. Offensive stats are secondary to
+# mobility and support. Adjust during Phase 1 playtesting.
+fe_stats:
+  class: "Dancer (Bard)"     # FE base class — Dancer with Bard flavor
+  promoted_class: "Lore Bard"  # custom promoted class
+  level: 1
+  HP: 16
+  STR: 3                     # STR 13 — slightly stronger than other casters
+  MAG: 5                     # CHA 17 → buff/debuff spell potency
+  SKL: 5
+  SPD: 8                     # DEX 15 + Dancer mobility → fast
+  DEF: 2                     # lightest armor in the party
+  RES: 7                     # WIS 18 → high RES, second only to Marty
+  LCK: 6                     # CHA 17 + Dancer archetype → high luck
+  MOV: 6
+  CON: 7
+
+# ── Growth Rates (% per level, FE standard) ──────────────────────────────────
+# Slightly lower ceilings than most PCs, reflecting level 16 end-state.
+growth_rates:
+  HP: 45
+  STR: 15
+  MAG: 40
+  SKL: 40
+  SPD: 60
+  DEF: 15
+  RES: 55
+  LCK: 50
+
+# ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
+inventory:
+  - id: rapier
+    name: Rapier
+    damage_type: piercing
+    weapon_dice: "1d6"
+    ability_mod: DEX
+    range: melee
+    uses: null
+  - id: vulnerary
+    name: "Healing Potion"
+    uses: 2
+
+# ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
+d20_fields:
+  AC: 12                     # Chapter 1: no armor (Chwinga nimbleness)
+  ability_mod_atk: CHA
+  prof_bonus: 2
+  spell_slots: "3"           # 3×1st-level (Bard level 2)
+
+# ── Unique Abilities ─────────────────────────────────────────────────────────
+unique_abilities:
+  - id: dance
+    name: Dance
+    # FE Dancer core: spend Sclorbo's action to refresh an adjacent ally's movement
+    # and action for the turn. Standard FE Dancer mechanic.
+    # FE implementation: replaces the Attack command.
+    type: dancer_refresh
+    range: 1
+
+  - id: bardic-inspiration
+    name: "Bardic Inspiration"
+    # Bonus: grant an adjacent ally a d6 inspiration die. On their next attack or
+    # saving throw, they add the die to their roll. Uses = CHA mod (3/chapter).
+    # Scales to d12 at higher chapters — tune per chapter.
+    # FE implementation: support-phase command.
+    type: activated
+    uses_per_chapter: 3       # CHA mod at level 1 equivalent
+    die: "1d6"
+    effect: grant_inspiration_die
+
+  - id: cutting-words
+    name: "Cutting Words"
+    # Reaction: when an enemy within 3 tiles makes an attack, subtract 1d6 from
+    # their roll (CHA save DC 14 to resist).
+    # FE implementation: reaction skill — triggers on enemy attack, reduces their
+    #   effective ATK or hit roll by 1d6.
+    type: reaction
+    range: 3
+    die: "1d6"
+    save: CHA
+    save_dc: 14
+
+  - id: jack-of-all-trades
+    name: "Jack of All Trades"
+    # Passive: Sclorbo never counts as untrained — minor universal accuracy bonus.
+    # Low implementation priority; flavor/minor mechanical benefit.
+    type: passive
+    effect: never_untrained
+
+# ── Signature Moment ─────────────────────────────────────────────────────────
+signature_moment:
+  chapter: tbd               # Nicolas to recall
+  description: "TBD — Nicolas will recall Sclorbo's signature campaign moment"
+  dialogue_trigger: null
+
+# ── Support Affinities ────────────────────────────────────────────────────────
+supports:
+  - partner: marty
+    affinity: wind
+  - partner: rootis
+    affinity: ice

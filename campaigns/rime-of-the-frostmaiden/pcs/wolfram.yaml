@@ -1,0 +1,137 @@
+# pcs/wolfram.yaml — Wolfram, Metallurgist (School of the Smith)
+# Source: data/pc-sheets/wolfram.json (D&D Beyond sheet, level 20 end-state)
+# Class is fully homebrew — see References/Class_The_Metallurgist.pdf for full details.
+# D&D Beyond approximated Wolfram as a Warlock (no official Metallurgist sheet support).
+# See docs/class-mapping.md and docs/PRD.md §6.7 for class mapping rationale.
+
+id: wolfram
+name: Wolfram
+portrait_ref: portraits/wolfram.png   # to be created (issue #23)
+# Portrait source: https://www.dndbeyond.com/avatars/25957/254/1581111423-74374750.jpeg
+
+# ── D&D 5e Identity ────────────────────────────────────────────────────────────
+dnd:
+  race: "Mineralscale Drakeborn"  # homebrew Dragonborn variant
+  class: Metallurgist             # fully homebrew; approximated as Warlock on D&D Beyond
+  subclass: "School of the Smith"
+  level_end_state: 20
+  ability_scores:
+    STR: 20
+    DEX: 12
+    CON: 14
+    INT: 20
+    WIS: 9
+    CHA: 10
+  saving_throw_proficiencies: [DEX, INT]
+  hp_max: 143
+  ac: 26                          # highest in party — stacked Upgrade Armor + heavy armor + shield + magic
+
+# ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
+# Wolfram is the party wall. Highest DEF, lowest SPD. Adjust during Phase 1 playtesting.
+fe_stats:
+  class: Knight              # FE base class — heavy armor, low movement
+  promoted_class: General
+  level: 1
+  HP: 20
+  STR: 8                     # STR 20 → strong; second only to Braulo
+  MAG: 3                     # INT 20 → limited Metallurgist spell access
+  SKL: 5
+  SPD: 3                     # heavy armor — defining Knight limitation
+  DEF: 10                    # highest base DEF in the party; AC 26 end-state target
+  RES: 2                     # WIS 9 → lowest RES in the party
+  LCK: 2
+  MOV: 4                     # Knight base movement
+  CON: 14                    # heaviest unit — can wield heavy weapons without penalty
+
+# ── Growth Rates (% per level, FE standard) ──────────────────────────────────
+growth_rates:
+  HP: 60
+  STR: 55
+  MAG: 20
+  SKL: 35
+  SPD: 15                    # lowest SPD growth by design — Knight archetype
+  DEF: 75                    # highest DEF growth in the party — endgame fortress
+  RES: 10
+  LCK: 20
+
+# ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
+inventory:
+  - id: warhammer
+    name: Warhammer
+    damage_type: bludgeoning
+    weapon_dice: "1d8"
+    ability_mod: STR
+    range: melee
+    uses: null
+  - id: iron-lance
+    name: "Iron Lance"
+    damage_type: piercing
+    weapon_dice: "1d6"
+    ability_mod: STR
+    range: melee
+    uses: null
+  - id: vulnerary
+    name: "Healing Potion"
+    uses: 2
+
+# ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
+d20_fields:
+  AC: 18                     # Chapter 1: heavy armor + shield + level 1 Upgrade Armor
+                             # End-state target: 26. Scales via Upgrade Armor + Improved
+                             # Upgrade each chapter (Smith subclass: +2 AC per upgrade).
+  ability_mod_atk: STR       # STR for melee; INT for Metallurgist spells
+  prof_bonus: 2
+  spell_slots: null          # Metallurgist is a half-caster; no slots until level 3
+
+# ── Unique Abilities ─────────────────────────────────────────────────────────
+unique_abilities:
+  - id: forge
+    name: Forge
+    # Between-chapter command: upgrade one ally's weapon (e.g., Iron→Steel, +1 damage die)
+    # or armor (+2 AC, School of the Smith: Improved Upgrade).
+    # FE implementation: Preparation screen command — player selects ally and item.
+    # Smith's Tools are always in Wolfram's possession (passive).
+    type: between_chapter
+    uses_per_chapter: 1
+    effect: upgrade_ally_gear
+
+  - id: feral-strike-bite
+    name: "Feral Strike: Bite"
+    # Drakeborn racial bonus action: after landing a melee hit, deal an additional
+    # 1d8 bludgeoning damage (natural bite attack).
+    # FE implementation: passive — Wolfram's melee attacks always deal +1d8 follow-up.
+    type: passive
+    follow_up_dice: "1d8"
+    damage_type: bludgeoning
+
+  - id: shield-spell
+    name: "Shield (spell)"
+    # Reaction: +5 AC until the start of Wolfram's next turn.
+    # Uses INT as spellcasting mod (Metallurgist is INT-based).
+    # FE implementation: reaction skill — when hit, +5 to effective DEF for that attack.
+    type: reaction
+    uses_per_chapter: 3       # approximate spell slot equivalent at level 1
+    ac_bonus: 5
+
+  - id: fire-resistance
+    name: "Fire Resistance"
+    # Mineralscale Drakeborn racial: half damage from fire-type sources.
+    # FE implementation: passive — fire-type tome attacks deal ×0.5 damage to Wolfram.
+    type: passive
+    damage_resistance: fire
+
+# ── Signature Moment ─────────────────────────────────────────────────────────
+signature_moment:
+  chapter: ch03-the-termalaine-mine
+  description: >
+    Snacked on ore samples in the Termalaine mine while the party cleared out the Grells.
+    Also used the recovered iron ingots after Chapter 1 to forge armored siding for
+    the party's sled while camping in the snow.
+  dialogue_trigger: wolfram_ore_snacking
+
+# ── Support Affinities ────────────────────────────────────────────────────────
+supports:
+  - partner: braulo
+    affinity: fire
+  - partner: prof-rbg
+    affinity: thunder

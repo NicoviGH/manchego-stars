@@ -1,0 +1,123 @@
+# pcs/rootis.yaml — Rootis, Sorcerer (Draconic Bloodline)
+# Source: data/pc-sheets/rootis.json (D&D Beyond sheet, level 20 end-state)
+# See docs/class-mapping.md and docs/PRD.md §6.7 for class mapping rationale.
+
+id: rootis
+name: Rootis
+portrait_ref: portraits/rootis.png   # to be created (issue #23)
+# Portrait source: https://www.dndbeyond.com/avatars/25348/565/1581111423-72613710.jpeg
+
+# ── D&D 5e Identity ────────────────────────────────────────────────────────────
+dnd:
+  race: Snowperson           # homebrew — literally made of snow
+  class: Sorcerer
+  subclass: "Draconic Bloodline"
+  level_end_state: 20
+  ability_scores:
+    STR: 8
+    DEX: 18
+    CON: 20
+    INT: 12
+    WIS: 11
+    CHA: 17
+  saving_throw_proficiencies: [CON, CHA]
+  hp_max: 202
+  ac: 17
+
+# ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
+# CON 20 + Draconic Resilience (+1 HP/level) makes Rootis unusually tanky for a mage.
+# Snowperson race → consider fire vulnerability and cold immunity in Phase 1.
+# Adjust during Phase 1 playtesting.
+fe_stats:
+  class: "Mage (Fire)"       # FE base class — fire-type tome caster
+  promoted_class: Sage
+  level: 1
+  HP: 20
+  STR: 2
+  MAG: 7                     # CHA 17 → MAG
+  SKL: 5
+  SPD: 7                     # DEX 18 → fast for a mage
+  DEF: 3
+  RES: 6                     # CHA 17 → decent RES
+  LCK: 5
+  MOV: 5
+  CON: 8
+
+# ── Growth Rates (% per level, FE standard) ──────────────────────────────────
+growth_rates:
+  HP: 65                     # Draconic Resilience → highest HP growth of the mages
+  STR: 10
+  MAG: 60
+  SKL: 40
+  SPD: 50
+  DEF: 20
+  RES: 50
+  LCK: 30
+
+# ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
+inventory:
+  - id: fire-tome
+    name: Fire
+    damage_type: fire
+    weapon_dice: "1d8"
+    ability_mod: CHA
+    range: 2
+    uses: 20
+  - id: vulnerary
+    name: "Healing Potion"
+    uses: 2
+
+# ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
+d20_fields:
+  AC: 13                     # Chapter 1: Draconic Resilience (13 + DEX mod, no armor)
+                             # End-state target: 17. Tune per chapter.
+  ability_mod_atk: CHA
+  prof_bonus: 2
+  spell_slots: "3/1"         # 3×1st-level, 1×2nd-level (Sorcerer level 2)
+
+# ── Unique Abilities ─────────────────────────────────────────────────────────
+unique_abilities:
+  - id: metamagic-twinned
+    name: "Metamagic: Twinned Spell"
+    # Spend 2 Sorcery Points: duplicate a single-target tome attack to hit a second
+    # enemy in range at no extra action cost.
+    # FE implementation: activated modifier used before casting — hits two enemies.
+    type: activated
+    uses_per_chapter: 2       # approximate SP cost at level 1 SP pool
+    effect: twin_single_target_spell
+
+  - id: metamagic-empowered
+    name: "Metamagic: Empowered Spell"
+    # Spend 1 SP: reroll all damage dice after rolling; keep the new results.
+    # FE implementation: after rolling spell damage, player may choose to reroll once.
+    type: activated
+    uses_per_chapter: 3
+
+  - id: dragon-wings
+    name: "Dragon Wings"
+    # Unlocked at promotion (Sage): Rootis gains Flier movement type.
+    # FE implementation: on promotion, Rootis's movement class changes to Flier
+    #   (ignores terrain penalties, can cross water/mountains).
+    type: passive
+    unlocks_at_promotion: true
+    effect: flier_movement
+
+  - id: elemental-affinity
+    name: "Elemental Affinity"
+    # Passive: Rootis adds CHA mod (+3 at ch1, scaling) to all fire-type tome damage.
+    # FE implementation: passive bonus applied exclusively to fire-type tomes.
+    type: passive
+    effect: plus_cha_mod_fire_damage
+
+# ── Signature Moment ─────────────────────────────────────────────────────────
+signature_moment:
+  chapter: tbd               # Nicolas to recall
+  description: "TBD — Nicolas will recall Rootis's signature campaign moment"
+  dialogue_trigger: null
+
+# ── Support Affinities ────────────────────────────────────────────────────────
+supports:
+  - partner: meesmickle
+    affinity: dark
+  - partner: sclorbo
+    affinity: water

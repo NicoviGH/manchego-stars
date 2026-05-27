@@ -1,0 +1,129 @@
+# pcs/meesmickle.yaml — Meesmickle, Warlock (The Fiend)
+# Source: data/pc-sheets/meesmickle.json (D&D Beyond sheet, level 20 end-state)
+# See docs/class-mapping.md and docs/PRD.md §6.7 for class mapping rationale.
+
+id: meesmickle
+name: Meesmickle
+portrait_ref: portraits/meesmickle.png   # to be created (issue #23)
+# Portrait source: https://www.dndbeyond.com/avatars/25348/435/1581111423-72613637.jpeg
+
+# ── D&D 5e Identity ────────────────────────────────────────────────────────────
+dnd:
+  race: "Vampire Tabaxi"     # homebrew
+  class: Warlock
+  subclass: "The Fiend"
+  level_end_state: 20
+  ability_scores:
+    STR: 10
+    DEX: 20
+    CON: 19
+    INT: 12
+    WIS: 8
+    CHA: 16
+  saving_throw_proficiencies: [WIS, CHA]
+  hp_max: 183
+  ac: 15
+
+# ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
+# Adjust during Phase 1 playtesting.
+fe_stats:
+  class: "Shaman (Dark)"     # FE base class — dark magic user
+  promoted_class: "Dark Sage"
+  level: 1
+  HP: 18                     # CON 19 → tankier than most casters
+  STR: 2
+  MAG: 6                     # CHA 16 → MAG, moderate start
+  SKL: 5
+  SPD: 9                     # DEX 20 → fastest caster in the party
+  DEF: 3
+  RES: 4
+  LCK: 2                     # WIS 8 → low luck
+  MOV: 5
+  CON: 8
+
+# ── Growth Rates (% per level, FE standard) ──────────────────────────────────
+growth_rates:
+  HP: 55
+  STR: 10
+  MAG: 50
+  SKL: 45
+  SPD: 60                    # highest SPD growth — fastest unit at endgame
+  DEF: 20
+  RES: 35
+  LCK: 20
+
+# ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
+inventory:
+  - id: eldritch-blast-tome
+    name: "Eldritch Blast"
+    damage_type: force
+    weapon_dice: "1d10"
+    ability_mod: CHA
+    range: 4                  # 60 ft → ~4 FE tiles
+    uses: null                # cantrip — infinite uses
+    locked: true              # Warlock cantrip, cannot be traded
+  - id: vulnerary
+    name: "Healing Potion"
+    uses: 2
+
+# ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
+d20_fields:
+  AC: 13                     # Chapter 1: light armor
+                             # End-state target: 15. Tune per chapter.
+  ability_mod_atk: CHA
+  prof_bonus: 2
+  spell_slots: "2"           # 2 Pact Magic slots (short rest recovery, any level)
+
+# ── Unique Abilities ─────────────────────────────────────────────────────────
+unique_abilities:
+  - id: dark-ones-blessing
+    name: "Dark One's Blessing"
+    # Passive: when Meesmickle reduces an enemy to 0 HP, gain temp HP equal to
+    # CHA mod + FE level (~7 at ch1). Stacks across kills in the same map.
+    # FE implementation: passive — on kill, apply a temp HP buff token.
+    type: passive
+    effect: temp_hp_on_kill
+    temp_hp_value: 7          # tune in Phase 1 playtesting
+
+  - id: hurl-through-hell
+    name: "Hurl Through Hell"
+    # 1/chapter nuke: after landing a hit with Eldritch Blast, the target is
+    # briefly banished and takes 10d10 psychic damage on return.
+    # FE implementation: activated skill usable immediately after a successful
+    #   Eldritch Blast hit; adds 10d10 psychic to that attack's result.
+    type: activated
+    uses_per_chapter: 1
+    damage_dice: "10d10"
+    damage_type: psychic
+    trigger: after_hit
+
+  - id: one-with-shadows
+    name: "One with Shadows"
+    # Passive: while Meesmickle does not move and is not adjacent to an enemy,
+    # becomes invisible (cannot be targeted by ranged attacks, -3 to adjacent
+    # enemy accuracy). Invisibility breaks when moving or attacking.
+    # FE implementation: passive status applied/removed based on movement flag.
+    type: passive
+    effect: invisible_when_stationary
+
+  - id: fiendish-resilience
+    name: "Fiendish Resilience"
+    # 1/chapter: choose a damage type — gain resistance (×0.5 incoming) for the rest
+    # of the map. Models the short-rest refreshing resistance.
+    # FE implementation: activated command that prompts a damage type selection menu.
+    type: activated
+    uses_per_chapter: 1
+    effect: choose_damage_resistance
+
+# ── Signature Moment ─────────────────────────────────────────────────────────
+signature_moment:
+  chapter: tbd               # Nicolas to recall
+  description: "TBD — Nicolas will recall Meesmickle's signature campaign moment"
+  dialogue_trigger: null
+
+# ── Support Affinities ────────────────────────────────────────────────────────
+supports:
+  - partner: rootis
+    affinity: ice
+  - partner: sclorbo
+    affinity: water

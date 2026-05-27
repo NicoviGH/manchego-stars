@@ -1,0 +1,145 @@
+# pcs/marty.yaml — Marty the Merry Mushroom, Druid (Circle of Spores)
+# Source: data/pc-sheets/marty-the-merry-mushroom.json (D&D Beyond sheet, level 20 end-state)
+# See docs/class-mapping.md and docs/PRD.md §6.7 for class mapping rationale.
+
+id: marty
+name: "Marty the Merry Mushroom"
+portrait_ref: portraits/marty.png   # to be created (issue #23)
+# Portrait source: https://www.dndbeyond.com/avatars/25824/431/1581111423-70515811.jpeg
+
+# ── D&D 5e Identity ────────────────────────────────────────────────────────────
+dnd:
+  race: Sporemaster          # homebrew Myconid
+  class: Druid
+  subclass: "Circle of Spores"
+  level_end_state: 20
+  ability_scores:
+    STR: 10
+    DEX: 18
+    CON: 17
+    INT: 12
+    WIS: 20
+    CHA: 8
+  saving_throw_proficiencies: [INT, WIS]
+  hp_max: 163
+  ac: 17
+  defenses:
+    resistance: [poison]
+    immunity_conditions: [blinded, critical_hits, deafened, frightened, poisoned]
+
+# ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
+# Low stats relative to D&D end-state — growth rates close the gap.
+# Adjust during Phase 1 playtesting.
+fe_stats:
+  class: "Shaman (Druid)"    # FE base class — custom Druid variant of Shaman
+  promoted_class: Summoner
+  level: 1
+  HP: 16
+  STR: 2                     # not a melee fighter
+  MAG: 8                     # WIS 20 → MAG is Marty's defining stat
+  SKL: 5
+  SPD: 6                     # DEX 18 but spore myconid moves methodically
+  DEF: 3                     # fragile caster
+  RES: 7                     # WIS 20 → high RES
+  LCK: 4
+  MOV: 4                     # speed_ft: 20 — very slow, myconid creep
+  CON: 7
+
+# ── Growth Rates (% per level, FE standard) ──────────────────────────────────
+growth_rates:
+  HP: 45
+  STR: 10
+  MAG: 65
+  SKL: 40
+  SPD: 45
+  DEF: 20
+  RES: 60
+  LCK: 30
+
+# ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
+inventory:
+  - id: spore-burst
+    name: "Spore Burst"
+    damage_type: necrotic
+    weapon_dice: "1d6"
+    ability_mod: WIS
+    range: 1                  # adjacent — Halo of Spores is a cantrip-tier reaction
+    uses: null                # cantrip — infinite uses
+    locked: false
+  - id: martys-staff
+    name: "Marty's Staff"
+    damage_type: bludgeoning
+    weapon_dice: "1d6"
+    ability_mod: STR
+    range: melee
+    uses: null
+    locked: true              # personal weapon
+  - id: heal-staff
+    name: "Heal Staff"
+    is_staff: true
+    effect: restore_hp
+    staff_dice: "1d8+MAG"
+    uses: 15
+  - id: vulnerary
+    name: "Healing Potion"
+    uses: 2
+
+# ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
+d20_fields:
+  AC: 12                     # Chapter 1: leather armor, no shield
+                             # End-state target: 17. Tune per chapter.
+  ability_mod_atk: WIS       # WIS-based caster
+  prof_bonus: 2
+  spell_slots: "3/2"         # 3×1st-level, 2×2nd-level (Druid level 2 equivalent)
+
+# ── Unique Abilities ─────────────────────────────────────────────────────────
+unique_abilities:
+  - id: symbiotic-entity
+    name: "Symbiotic Entity"
+    # Consumable item: activate Wild Shape as Symbiotic Entity.
+    # Effect: +20 temp HP, Halo of Spores damage doubled, +1d6 necrotic on melee.
+    # Lasts the combat phase.
+    # FE implementation: consumable item granting a custom status.
+    type: consumable_item
+    uses_per_chapter: 2
+    status_effect: symbiotic_entity_status
+
+  - id: halo-of-spores
+    name: "Halo of Spores"
+    # Reaction: when an enemy moves adjacent, deal 1d6 necrotic (CON save DC 14).
+    # In Symbiotic Entity mode: 2d6.
+    # FE implementation: innate reaction skill, triggers on enemy adjacency.
+    type: reaction
+    damage_dice: "1d6"
+    damage_type: necrotic
+    save: CON
+    save_dc: 14
+
+  - id: fungal-infestation
+    name: "Fungal Infestation"
+    # Reaction: when a humanoid enemy dies within 1 tile, animate it as a Zombie
+    # summon under Marty's control. Max 1 active zombie at a time.
+    # FE implementation: reaction skill that spawns a temporary allied Zombie unit.
+    type: reaction
+    uses_per_chapter: 2
+    spawn_unit: zombie-fungal
+
+  - id: crit-immunity
+    name: "Crit Immunity"
+    # Myconid racial: Marty cannot receive critical hits.
+    # FE implementation: passive — nat 20s against Marty are treated as normal hits.
+    type: passive
+    effect: no_critical_hits_received
+
+# ── Signature Moment ─────────────────────────────────────────────────────────
+signature_moment:
+  chapter: tbd               # Nicolas to recall
+  description: "TBD — Nicolas will recall Marty's signature campaign moment"
+  dialogue_trigger: null
+
+# ── Support Affinities ────────────────────────────────────────────────────────
+supports:
+  - partner: braulo
+    affinity: fire
+  - partner: sclorbo
+    affinity: water

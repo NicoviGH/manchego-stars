@@ -1,0 +1,142 @@
+# pcs/prof-rbg.yaml — Prof. R.B. Geenius, Artificer (Artillerist)
+# Source: data/pc-sheets/prof-r-b-geenius.json (D&D Beyond sheet, level 20 end-state)
+# See docs/class-mapping.md and docs/PRD.md §6.7 for class mapping rationale.
+
+id: prof-rbg
+name: "Prof. R.B. Geenius"
+portrait_ref: portraits/prof-rbg.png   # to be created (issue #23)
+# Portrait source: https://www.dndbeyond.com/avatars/34221/708/1581111423-57759993.jpeg
+
+# ── D&D 5e Identity ────────────────────────────────────────────────────────────
+dnd:
+  race: Underfolk            # homebrew Ratfolk
+  class: Artificer
+  subclass: Artillerist
+  level_end_state: 20
+  ability_scores:
+    STR: 8
+    DEX: 19
+    CON: 16
+    INT: 20
+    WIS: 10
+    CHA: 12
+  saving_throw_proficiencies: [CON, INT]
+  hp_max: 163
+  ac: 16
+
+# ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
+# Adjust during Phase 1 playtesting.
+fe_stats:
+  class: Archer              # FE base class — custom Artillerist at promotion
+  promoted_class: Artillerist  # custom class: deployable cannon, INT-based
+  level: 1
+  HP: 16
+  STR: 2                     # weak melee
+  MAG: 5                     # INT 20 → cannon and infusion damage
+  SKL: 8                     # INT 20 → highest base SKL in party (accuracy is his identity)
+  SPD: 5
+  DEF: 3
+  RES: 3
+  LCK: 4
+  MOV: 5
+  CON: 7
+
+# ── Growth Rates (% per level, FE standard) ──────────────────────────────────
+growth_rates:
+  HP: 50
+  STR: 10
+  MAG: 45
+  SKL: 65                    # highest SKL growth in party — defining stat
+  SPD: 40
+  DEF: 25
+  RES: 30
+  LCK: 35
+
+# ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
+inventory:
+  - id: fonduedler
+    name: Fonduedler
+    damage_type: piercing     # ranged weapon — custom Artificer crossbow/pistol
+    weapon_dice: "1d10"
+    ability_mod: DEX
+    range: 3                  # range 30/90 ft → ~3 FE tiles
+    uses: null
+    locked: true              # personal weapon
+  - id: luck-e-cheese
+    name: "Luck E. Cheese"
+    damage_type: slashing
+    weapon_dice: "1d6"
+    ability_mod: DEX
+    range: melee
+    uses: null
+    locked: true              # personal weapon (wish charges — implement in Phase 1)
+  - id: vulnerary
+    name: "Healing Potion"
+    uses: 2
+
+# ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
+d20_fields:
+  AC: 14                     # Chapter 1: medium armor (scale mail)
+                             # End-state target: 16. Tune per chapter.
+  ability_mod_atk: INT       # INT for cannon/spell attacks; DEX for Fonduedler physical
+  prof_bonus: 2
+  spell_slots: "2"           # 2×1st-level (Artificer half-caster, level 2)
+
+# ── Unique Abilities ─────────────────────────────────────────────────────────
+unique_abilities:
+  - id: eldritch-cannon
+    name: "Eldritch Cannon"
+    # 1/chapter: deploy a Force Ballista at an adjacent empty tile.
+    # The Ballista acts as an allied NPC unit with its own action (1d8 force, ranged 3).
+    # Ballista: HP 20, DEF 8, RES 0, cannot move, auto-removed at chapter end.
+    # FE implementation: activated command that spawns a temporary allied unit.
+    type: activated
+    uses_per_chapter: 1
+    spawn_unit: eldritch-cannon-ballista
+
+  - id: flash-of-genius
+    name: "Flash of Genius"
+    # Reaction: when an ally within 2 tiles makes a save or check, add INT mod (+5)
+    # to their roll. Can flip a failed save to a success.
+    # FE implementation: reaction skill — adds +5 to adjacent ally's avoid or save.
+    type: reaction
+    range: 2
+    bonus: 5                  # INT mod at level 1 equivalent; scales with level
+
+  - id: arcane-firearm
+    name: "Arcane Firearm"
+    # Passive: the first spell-type attack each turn deals +1d8 bonus damage.
+    # FE implementation: passive — first tome/cannon attack per turn adds +1d8.
+    type: passive
+    effect: plus_1d8_first_spell_attack
+
+  - id: infuse-item
+    name: "Infuse Item"
+    # Between-chapter command: apply one infusion to an ally's weapon or armor.
+    # Effect: +1 to ATK damage or +1 AC on the target item for the next chapter.
+    # FE implementation: Preparation screen command.
+    type: between_chapter
+    uses_per_chapter: 1
+    effect: infuse_ally_gear
+
+# ── Companion ────────────────────────────────────────────────────────────────
+companion:
+  id: pinky
+  description: >
+    RBG's homunculus 'son' — available as a Pegasus Knight unit from Chapter 1.
+    Pinky is a separate unit entry (see npcs/ when created).
+
+# ── Signature Moment ─────────────────────────────────────────────────────────
+signature_moment:
+  chapter: ch03-the-termalaine-mine
+  description: >
+    Executed a kobold at gunpoint during the "good cop, bad cop" interrogation
+    inside the Termalaine mine.
+  dialogue_trigger: rbg_kobold_execution
+
+# ── Support Affinities ────────────────────────────────────────────────────────
+supports:
+  - partner: wolfram
+    affinity: fire
+  - partner: meesmickle
+    affinity: dark
