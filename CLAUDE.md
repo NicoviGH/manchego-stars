@@ -10,9 +10,10 @@ Manchego Stars is a GBA tactics ROM hack of *Fire Emblem: The Sacred Stones* (FE
 
 Read these at the top of every session before touching code:
 1. `CLAUDE.md` (this file)
-2. `docs/decisions.md` — settled design decisions, do not re-litigate
-3. The current chapter or feature YAML/source file being worked on
-4. `git status` + `git log --oneline -10`
+2. `HANDOFF.md` (project root, if it exists) — most recent session's state, blockers, and next steps
+3. `docs/decisions.md` — settled design decisions, do not re-litigate
+4. The current chapter or feature YAML/source file being worked on
+5. `git status` + `git log --oneline -10`
 
 ## Key File Locations
 
