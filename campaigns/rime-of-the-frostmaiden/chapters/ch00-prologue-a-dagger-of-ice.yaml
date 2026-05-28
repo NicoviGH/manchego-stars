@@ -1,0 +1,124 @@
+# chapters/ch00-prologue-a-dagger-of-ice.yaml
+# Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
+# COLD OPEN — an NPC-led tutorial prologue mirroring FE8's Prologue (DefeatBoss, ~1 unit).
+# Source: Rime of the Frostmaiden "Cold Open" + starting quest "Cold-Hearted Killer" (book pp. 21-23).
+
+id: ch00-prologue-a-dagger-of-ice
+title: "A Dagger of Ice"
+chapter_number: 0
+milestone: M3
+cadence: tutorial               # docs/chapter-outline.md — DefeatBoss, basics only
+is_prologue: true
+
+# ── Narrative ──────────────────────────────────────────────────────────────────
+narrative: >
+  Cold open, before our seven ever meet. Ten-Towns has gone two years without a
+  sunrise — Auril the Frostmaiden's Everlasting Rime. The towns appease her with
+  sacrifice lotteries, and no fire may be lit between dusk and dawn. Lately a
+  killer has been leaving Ten-Towners dead with a dagger of ice through the heart.
+  Hlin Trollbane, a retired dwarf bounty hunter, has tracked the suspect — Sephek
+  Kaltro — to a snowbound Bryn Shander street at night. She means to end it.
+
+# ── Map ────────────────────────────────────────────────────────────────────────
+map:
+  file: maps/ch00-prologue.tmx
+  tileset: town-night-snow       # tiny Bryn Shander street, night palette
+  size: "14×10"                  # deliberately small — finalize in Tiled
+  description: >
+    A short, enclosed night street: lantern-less houses (no fires lit), snowdrifts,
+    a few barrels for cover. Hlin starts at one end; Sephek waits near the far end.
+    Small and legible — the player should never feel lost.
+
+# ── Objective ──────────────────────────────────────────────────────────────────
+objective:
+  type: defeat_boss              # mirrors FE8 Prologue = DefeatBoss
+  description: "Defeat Sephek Kaltro"
+
+win_condition: boss_defeated
+lose_condition: hlin_defeated    # single-unit map; a loss just retries the tutorial
+
+# ── Difficulty ─────────────────────────────────────────────────────────────────
+difficulty_note: >
+  The basics tutorial — teaches ONLY move, attack, and end-turn, FE8-Prologue style.
+  Hlin is a strong self-sufficient veteran (our "Jeigan"). Give her 1-2 trivial
+  practice targets before the boss. Sephek is a sturdy boss but beatable with basic
+  attacks — his Cold Regeneration and cold-immunity are FLAVOR ONLY here (shown in
+  dialogue), NOT a mechanical gate. ~4-6 turns. Comfortable hit rates.
+
+# ── Player Units ────────────────────────────────────────────────────────────────
+player_units:
+  - id: hlin-trollbane
+    name: "Hlin Trollbane"
+    class: warrior               # unarmored veteran with a battleaxe (book: "veteran")
+    is_npc: true                 # not one of the 7 PCs; a cold-open guest unit
+    required: true
+    inventory:
+      - id: steel-axe
+        damage_type: slashing    # cosmetic flavor label
+
+# ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
+enemy_units:
+  - id: sephek-kaltro
+    name: "Sephek Kaltro"
+    is_boss: true
+    count: 1
+    position: tbd                # far end of the street
+    class: myrmidon              # lithe ice-swordsman (book: Ice Longsword)
+    level: 5
+    inventory:
+      - id: ice-longsword
+        damage_type: cold        # cosmetic flavor label
+    flavor_traits:               # narrative only — NOT mechanical in the prologue
+      - "Kiss of the Frostmaiden: the cold does not touch him (undead servant of Auril)"
+      - "Cold Regeneration / fire weakness — reserved as a LATER mechanical theme (Ch7 ice trolls), flavor here"
+    ai_pattern: hold_position
+    death_quote: "The Frostmaiden… sees all who cheat her…"
+  - id: caravan-guard
+    name: "Torg's Caravan Guard"
+    count: 2                     # trivial practice mooks (Torrga Icevein's hirelings)
+    class: fighter
+    level: 2
+    inventory:
+      - id: iron-axe
+        damage_type: slashing
+    ai_pattern: aggressive
+
+# ── Events (pacing / cutscene placement) ─────────────────────────────────────────
+events:
+  - trigger: chapter_start
+    type: cutscene
+    ea_file: events/ch00-cold-open.ea
+    description: >
+      The cold-open narration (paraphrased from the book's Cold Open boxed text):
+      the sunless Rime, the sacrifices, the no-fire-at-night law. Hlin confronts
+      Sephek — he's been killing those who cheated the sacrifice lottery, "doing
+      the Frostmaiden's work." She notes the cold doesn't touch him. Fight begins.
+  - trigger: boss_low_hp
+    type: dialogue
+    ea_file: events/ch00-sephek-cold.ea
+    description: "Sephek bleeds frost, unbothered by the cold — a first glimpse of Auril's reach."
+  - trigger: chapter_end
+    type: cutscene
+    ea_file: events/ch00-ending.ea
+    description: >
+      Sephek falls (his body rimes over). Hlin realizes the killings are a symptom
+      of something far larger than one murderer — Auril's grip is tightening, and
+      Ten-Towns will need more hands than hers. Hard cut to The Northlook, Bryn
+      Shander — and our seven. (Leads into ch01.)
+
+# ── Post-Chapter ─────────────────────────────────────────────────────────────────
+post_chapter:
+  gold_reward: 0                 # standalone cold-open; rewards begin in ch01
+  unlocks_chapter: ch01-the-iron-trail
+  hooks:
+    - "Hlin Trollbane may recur later (reusable NPC) — TBD with Nicolas."
+    - "Diegetic reason Ten-Towns is hiring adventurers in ch01 (the party) — TBD with Nicolas."
+
+# ── Design Notes ──────────────────────────────────────────────────────────────────
+design_notes: >
+  NPC cold-open. Its jobs: (1) teach the absolute basics with one strong unit;
+  (2) establish the world (Rime, sacrifices, no-fire law) by SHOWING it; (3) make
+  the player's first fight be against Auril's servant, seeding the true villain
+  before the heroes arrive. The fire-vs-cold effectiveness Sephek embodies is held
+  back as flavor here and paid off mechanically at Ch7 (ice trolls) and across the
+  frost-druid/Auril arc. Keep it tiny — this is the front porch, not a room.

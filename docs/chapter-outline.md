@@ -27,7 +27,8 @@
 
 | Ch | Title | Cadence | Beat (✅ sourced) | Reward / placement |
 |---|---|---|---|---|
-| 1 | The Iron Trail | 🟦 tutorial | Northlook tavern; dwarves hire party; track iron-ingot thieves to a goblin camp. | Gold (≈300) + 2 potions; iron ingots (key item). Baxby purchasable post-map. **No promo items.** |
+| **P** | A Dagger of Ice | 🟦 cold-open tutorial (DefeatBoss) | **NPC-led**: Hlin Trollbane hunts Sephek Kaltro — Auril's undead servant — through night-time Bryn Shander. Shows the Rime, the sacrifice lotteries, the no-fire law; seeds Auril as the true villain. (1 unit; basics only.) Source: book "Cold Open" + "Cold-Hearted Killer." | None (front porch). |
+| 1 | The Iron Trail | 🟦 full-party intro (Seize) | Northlook tavern; dwarves hire party; track iron-ingot thieves to a goblin camp. | Gold (≈300) + 2 potions; iron ingots (key item). Baxby purchasable post-map. **No promo items.** |
 | 2 | Cold Welcome | 🟦 escort | Road to Targos, sled ambush; frozen Auril sacrifice; Maer Monster rumor. | Teach escort (protect the Rolling Cheddar); gold + a consumable. |
 | 3 | The Termalaine Mine | 🟨 gimmick (multi-level) | Kobolds + Grells in the mine; RBG executes a kobold; meet Trex; Wolfram snacks ore. | First stat-booster reward chest (mine gems → 1 booster). Trex recruited post-map. |
 | 4 | The Elven Tomb | 🟥 first boss | Lonelywood; Marty tames the direwolves; frost druid fights to the death; moonlight puzzle; awaken the Mummy; find Basil. | Boss drop (druid relic — *flavored, locked*: foreshadows promotion, unusable in MVP). Basil + Mummy recruited. |
