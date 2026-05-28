@@ -14,6 +14,58 @@
 
 ---
 
+## ✅ CONFIRMED SIGNATURE KITS (locked 2026-05-28)
+
+Nicolas's picks, FE-converted per [rules-mapping.md](rules-mapping.md) and gated by the 1:1
+chapter curve (MVP = Ch 1–7 = 5e L1–7). **The gated, machine-readable output lives in the PC
+YAMLs** (`campaigns/rime-of-the-frostmaiden/pcs/*.yaml`); this section is the human index.
+
+**PREPARED-SPELL FINDING (2026-05-28):** The D&D Beyond PDFs preserve a `PREP` column —
+`P` = prepared, `O` = known-but-unprepared. This only matters for *prepared-casters*:
+- **Marty (Druid)** and **RBG (Artificer)** prepare from a list; their `P`-marked spells are
+  authoritative. Both players' prepared lists turned out to be entirely their **subclass
+  "Always Prepared" spells** — so the subclass list IS the real, on-theme signature kit.
+  Marty's = the Circle of Spores list (his spore identity); RBG's = the Artillerist list
+  (a pure artillery blaster, NOT a healer — corrects the earlier guess).
+- **Rootis (Sorcerer), Meesmickle (Warlock), Sclorbo (Bard)** are *known*-casters with no
+  PREP column — their full known list already is their kit.
+- Re-extract: `pdftotext -layout "<PC> Character Sheet.pdf" - | grep -E "^P[[:space:]]"`
+
+**DUAL STRUCTURE (2026-05-28):** every YAML spell/ability now carries two fields — `fe_mechanic`
+(the vanilla FE8 anchor that makes it play cleanly) and `flavor` (the character-specific reskin
+name + in-world text, so the D&D flavor is *visible in-game*). Spine = FE; overlay = D&D flavor.
+Known AoE tension: D&D AoE (Fireball, Cone of Cold) has no clean FE tome analogue (FE tomes are
+single-target; AoE only via siege tomes), so those compromise to siege-range single-target.
+
+**Three design forks resolved this session:**
+1. **Rootis fire spells — KEEP AS-IS.** Immolation + Incendiary Cloud stay as *fire* spells
+   despite his White-Dragon cold identity and fire vulnerability. Honors the player's actual
+   sheet; the irony is intentional flavor. (Both are post-MVP: Immolation 5th→Ch9, Incendiary
+   Cloud 8th→Ch15.)
+2. **Sclorbo reviver — POST-MVP.** Even though Revivify (3rd-level, reachable Ch6 via Lore's
+   Additional Magical Secrets) is *mechanically* eligible mid-MVP, we gate all raise-dead-type
+   healing to Ch9+ to preserve FE Classic-mode permadeath tension. MVP heal = **Cure Wounds only.**
+   (Corrects the docs' earlier "Revivify is 5th-level" reasoning — it's 3rd; the *conclusion*
+   post-MVP stands, for pacing not spell-level reasons.)
+3. **RBG's Wish (Luck E. Cheese) — STORY-ONLY, NO PLAY MECHANIC.** Wish is not a usable
+   ability. It fires once as a scripted endgame beat: RBG spends it to turn **Pinky** (his
+   homunculus "son," already a deployable unit) into a true living being at the campaign's end.
+
+| PC | MVP signature kit (Ch 1–7) | Post-MVP headliners |
+|---|---|---|
+| **Marty** (Druid/Spores) — *prepared spore kit* | Chill Touch=*Witherspore* (cantrip), Goodberry=*Chagaccino Berries* (Ch1), Blindness/Deafness=*Blinding Bloom* (Ch3), Animate Dead=*Corpse Bloom* summon (Ch5), Gaseous Form=*Spore Drift* (Ch5), Blight=*Rot* (Ch7), Confusion=*Maddening Spores* (Ch7) | Cloudkill=*Killing Cloud* (Ch9), Contagion=*Plague Spores* (Ch9). Class: Halo of Spores / Symbiotic Entity / Fungal Infestation |
+| **Meesmickle** (Warlock/Fiend) | Eldritch Blast (primary, 1→2 beams ✓), Toll the Dead (2nd cantrip ✓), Hellish Rebuke (Ch1→counter proc), Burning Hands (Ch1), Suggestion (Ch3), Fireball (Ch5), Vampiric Touch (Ch5) | Hurl Through Hell (Ch13), Eyebite (Ch10), Finger of Death (Ch13), Power Word Kill (Ch17). **Demiplane DROPPED** (no FE analogue) |
+| **Prof. RBG** (Artificer/Artillerist) — *prepared blaster kit* | Shocking Grasp (cantrip primary), Shield (Ch3, +AC reaction), Thunderwave (Ch3), Scorching Ray (Ch5), Shatter (Ch5) | Fireball (Ch9), Wind Wall (Ch9), Ice Storm (Ch13), Wall of Fire (Ch13), Cone of Cold (Ch17), Wall of Force (Ch17). Cannons: Pepperjack (Ch3) / Brie (Ch14). **Wish = story-only (Pinky)** |
+| **Rootis** (Sorcerer/Draconic White) | Ray of Frost (primary ✓), Chill Touch (2nd cantrip ✓), Earth Tremor (Ch1), Hypnotic Pattern (Ch5), Fly (Ch5) | Cone of Cold (Ch9), **Immolation (Ch9, kept-fire)**, Globe of Invulnerability (Ch11), **Incendiary Cloud (Ch15, kept-fire)**, Abi-Dalzim's Horrid Wilting (Ch15), Meteor Swarm (Ch17), Dragon Wings transform (Ch13) |
+| **Sclorbo** (Bard/Lore) | Vicious Mockery (primary ✓), Ray of Frost (2nd cantrip ✓), Cure Wounds (Ch1, **only MVP heal**), Heroism (Ch1), Magic Missile (Ch1), Hideous Laughter (Ch3), Call Lightning (Ch5) | Revivify (Ch9), Mass Cure Wounds (Ch9), Raise Dead (Ch11), Otto's Irresistible Dance (Ch11), Mordenkainen's Sword (Ch13) |
+| **Wolfram** (Metallurgist/Smith) | *Armor abilities, not tomes:* Flamethrower=Breath Weapon (Ch5), Armor Lock/Shield (Ch5), Recharge self-heal (Ch5), Explosive Burst (Ch7). Forge line: Upgrade Armor (Ch1)→Forge (Ch3)→Forge Expert resist (Ch7) | Blade Forge (Ch11), Master of the Forge (Ch15); sheet spells Conjure Elemental (Ch9), Creation (Ch9), Imprisonment (Ch17) |
+
+> **Braulo** (Barbarian) has no spell list — his Berserker feature line is fixed, not picked;
+> it's gated in `braulo.yaml` (Rage Ch1 → Frenzy Ch3 → Extra Attack Ch5 → Feral Instinct Ch7;
+> post-MVP Brutal Critical Ch9 / Relentless Rage Ch11 / Retaliation Ch13 / Primal Champion Ch20).
+
+---
+
 ## Marty — Druid (Circle of Spores), L20 — prepares from the full Druid list
 **Cantrips:** Shillelagh, Poison Spray, Shape Water, Mold Earth, Chill Touch
 **1st:** Entangle, Cure Wounds, Speak with Animals[R], Goodberry, Animal Friendship, Charm Person, Create or Destroy Water, Detect Magic[R], Detect Poison & Disease[R], Faerie Fire, Fog Cloud, Healing Word, Jump, Longstrider, Purify Food & Drink[R], Thunderwave, Absorb Elements, Beast Bond, Earth Tremor, Ice Knife, Protection from Evil & Good

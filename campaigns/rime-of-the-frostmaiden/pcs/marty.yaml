@@ -124,11 +124,14 @@ inventory:
     notes: "+WIS mod to damage (= +5 at ch1 equivalent). Replaces staff's STR-based attack."
   - id: chill-touch
     name: "Chill Touch"
+    flavor: "Witherspore — a puff of grave-mold settles on the target; its wounds won't close."
+    fe_mechanic: "Flux-tier dark tome; on hit, target can't recover HP until its next turn"
     damage_type: necrotic
     weapon_dice: "1d6"        # scales to 4d8 at level 20; start ch1 at 1d6
     ability_mod: WIS
     range: 3                  # 120 ft → ~3 FE tiles
     uses: null                # cantrip — infinite uses
+    notes: "Anti-heal proc (Chill Touch's signature). Marty's primary spore cantrip."
   - id: heal-staff
     name: "Heal Staff"
     is_staff: true
@@ -136,7 +139,9 @@ inventory:
     staff_dice: "1d8+MAG"
     uses: 15
   - id: goodberry
-    name: "Goodberry"         # Marty carries Goodberries as field rations/heals
+    name: "Goodberry"
+    flavor: "Chagaccino Berries — Marty's signature mushroom brew, pressed into restorative berries."
+    fe_mechanic: "Vulnerary-style consumable; small HP restore, multiple charges per chapter"
     effect: restore_1hp
     uses: 10                  # 10 berries per casting; restocked between chapters
 
@@ -152,67 +157,74 @@ d20_fields:
 unique_abilities:
   - id: symbiotic-entity
     name: "Symbiotic Entity"
+    flavor: "Bloom — Marty's cap flares open and a lethal halo of killing spores wreathes his body."
+    fe_mechanic: "Barrier/Dracoshield-style temp-HP buff item + an on-hit bonus-damage aura while active"
     # Activated (costs Wild Shape use): awaken the spores.
-    # Effect: +80 temp HP (4 × druid level), Halo of Spores damage doubled,
-    #         +1d6 necrotic on all melee attacks.
-    # Lasts 10 minutes (= the map phase) or until temp HP depleted.
-    # NOTE: +80 temp HP was wrong in first pass (+20) — corrected from PDF.
-    # FE implementation: consumable item granting symbiotic_entity_status.
+    # Effect: temp HP = 4 × druid level (chapter-scaled), Halo of Spores damage doubled,
+    #         +1d6 necrotic on all melee attacks. Lasts the map phase or until temp HP depleted.
     type: consumable_item
+    unlock_chapter: 2         # Circle of Spores L2 → Ch2 (MVP)
     uses_per_chapter: 2
-    temp_hp: 80               # CORRECTED: 4 × level 20 = 80 (not 20)
+    temp_hp_formula: "4 * chapter"   # 4×level on the 1:1 curve
+    temp_hp_mvp_end: 28       # +28 at Ch7 (MVP cliffhanger); +80 only at Ch20 endgame
+                              # (was hard-coded 80 = endgame value before this retier)
     status_effect: symbiotic_entity_status
 
   - id: halo-of-spores
     name: "Halo of Spores"
-    # Reaction: when a creature moves into a space within 10 ft of Marty or starts
-    # its turn there, deal 1d10 necrotic (CON save DC 19 to negate).
-    # Creature can take this damage only once per turn.
-    # In Symbiotic Entity mode: damage dice doubled.
-    # FE implementation: reaction skill triggering on enemy adjacency or movement.
+    flavor: "The killing haze hangs thick around Marty — anything that drifts too close just rots."
+    fe_mechanic: "passive retaliation aura: adjacent enemies auto-take necrotic chip on approach"
+    # Reaction: when a creature moves within 10 ft of Marty or starts its turn there, deal
+    # necrotic (CON save DC 19 to negate). Once per creature per turn. Doubled under Symbiotic.
     type: reaction
-    damage_dice: "1d10"       # 1d10 at end-state; scale from 1d4 at ch1
+    unlock_chapter: 2         # Circle of Spores L2 → Ch2 (MVP)
+    damage_dice_scaling:      # Halo dice grow with druid level on the 1:1 curve
+      - { chapters: "2-5", dice: "1d4" }
+      - { chapters: "6-8", dice: "1d6" }
+      - { chapters: "9-12", dice: "1d8" }
+      - { chapters: "13-20", dice: "1d10" }
     damage_type: necrotic
     save: CON
-    save_dc: 19               # CORRECTED: DC 19 (8 + prof6 + WIS5), not 14
+    save_dc: 19               # 8 + prof6 + WIS5 at end-state
 
   - id: spreading-spores
     name: "Spreading Spores"
-    # Bonus action while Symbiotic Entity is active: hurl a 10-ft spore cube up to
-    # 30 ft away. Any creature moving into or starting its turn in the cube takes
-    # Halo of Spores damage (CON save DC 19). Cube lasts 1 minute.
-    # FE implementation: bonus action placing a hazard zone on the map (2×2 tile area).
+    flavor: "Marty flings a fistful of cap-dust; it billows into a creeping, devouring patch."
+    fe_mechanic: "places a persistent hazard tile (2×2) that chips anything standing in it"
+    # Bonus action (folded into the main action per rules-mapping §B) while Symbiotic is active.
     type: activated
+    unlock_chapter: 9         # Circle of Spores L10 → Ch9 (POST-MVP)
     requires_status: symbiotic_entity_status
     effect: place_spore_hazard_zone
 
   - id: fungal-infestation
     name: "Fungal Infestation"
-    # Reaction: when a beast or Small/Medium humanoid dies within 10 ft,
-    # animate it as a zombie under Marty's control (1 HP, melee attack only).
-    # Zombie acts on Marty's turn immediately after.
-    # 5 USES per chapter (confirmed from PDF — was wrong at 2).
-    # FE implementation: reaction skill spawning a temporary allied Zombie unit.
+    flavor: "Corpse Bloom — Marty seeds a fresh kill with spores; it lurches up as a fungal thrall."
+    fe_mechanic: "Summoner phantom (FE8 Summon), but spawned from a slain enemy's body"
+    # Reaction: when a beast or Small/Medium humanoid dies within 10 ft, animate it as a
+    # zombie thrall (1 HP, melee only) that acts on Marty's turn.
     type: reaction
-    uses_per_chapter: 5       # CORRECTED: 5 (not 2)
+    unlock_chapter: 6         # Circle of Spores L6 → Ch6 (MVP)
+    uses_per_chapter: 5
     spawn_unit: zombie-fungal
 
   - id: crit-immunity
     name: "Crit Immunity"
-    # From Fungal Body (Druid level 14 class feature, not racial):
-    # Critical hits against Marty count as normal hits, unless incapacitated.
-    # FE implementation: passive — nat 20s against Marty are treated as normal hits.
+    flavor: "There's nothing vital to hit — a 'killing blow' just punches through fruiting body."
+    fe_mechanic: "passive: enemy crits against Marty are downgraded to normal hits"
+    # From Fungal Body (Circle of Spores L14): crits count as normal hits unless incapacitated.
     type: passive
+    unlock_chapter: 13        # Circle of Spores L14 → Ch13 (POST-MVP)
     effect: no_critical_hits_received
     source: fungal_body_class_feature
 
   - id: pacifying-spores
     name: "Pacifying Spores"
-    # Sporemaster racial: action, creature within 5 ft, CON save DC 19 — Stunned 1 minute.
-    # 1/long rest (= 1/chapter). Extremely powerful melee CC.
-    # FE implementation: activated command — adjacent enemy must save or be stunned
-    #   (cannot act or counterattack for the turn).
+    flavor: "A breath of soporific spores; the target goes glassy-eyed and still."
+    fe_mechanic: "Sleep staff (single target): enemy can't act or counter this turn"
+    # Sporemaster racial: action, creature within 5 ft, CON save DC 19 — Stunned. 1/chapter.
     type: activated
+    unlock_chapter: 1         # racial — available from start
     uses_per_chapter: 1
     range: 1
     save: CON
@@ -221,14 +233,115 @@ unique_abilities:
 
   - id: pheromone-spores
     name: "Pheromone Spores"
-    # Sporemaster racial: action, mark one creature within 60 ft (4 FE tiles).
-    # For 1 minute, Marty and all zombies/summons have advantage on attacks vs. that creature.
-    # Uses = CON mod (3) per chapter.
-    # FE implementation: activated mark — grants +hit bonus to Marty and all allies vs. target.
+    flavor: "Marty tags a foe with a scent-marker only his spores and thralls can track."
+    fe_mechanic: "mark/target-buff: Marty and all his summons gain +hit (advantage) vs the marked foe"
+    # Sporemaster racial: action, mark one creature within 60 ft. Uses = CON mod (3)/chapter.
     type: activated
+    unlock_chapter: 1         # racial — available from start
     uses_per_chapter: 3
     range: 4
     effect: mark_target_for_advantage
+
+  # ── Prepared Spore Spells (PREPARED list from PDF = Circle of Spores "Always Prepared") ──
+  # These are the spells Marty actually walked around with prepared — entirely his subclass's
+  # spore-themed list. DUAL STRUCTURE: fe_mechanic = vanilla FE8 anchor; flavor = spore reskin.
+  # Spell-level → chapter: 2nd→Ch3, 3rd→Ch5, 4th→Ch7 (MVP cap), 5th→Ch9 (post-MVP).
+  # This is the "spore abilities visible in-game" kit (Nicolas's ask, 2026-05-28).
+
+  - id: blindness-deafness
+    name: "Blindness/Deafness"
+    flavor: "Blinding Bloom — a faceful of stinging spores; the target can't see past the cloud."
+    fe_mechanic: "status proc: target attacks at heavy −hit (blinded) for a turn"
+    type: spell_tome
+    spell_level: 2
+    unlock_chapter: 3
+    uses_per_chapter: 3
+    save: CON
+    range: 2
+    effect: blind_status
+
+  - id: animate-dead
+    name: "Animate Dead"
+    flavor: "Grave Garden — Marty seeds buried corpses; they claw up sprouting with fungus."
+    fe_mechanic: "Summoner phantom (FE8 Summon) — a deliberate, pre-deployed thrall (vs Fungal Infestation's reactive one)"
+    type: summon
+    spell_level: 3
+    unlock_chapter: 5
+    uses_per_chapter: 2
+    spawn_unit: zombie-fungal
+    max_active: 2
+
+  - id: gaseous-form
+    name: "Gaseous Form"
+    flavor: "Spore Drift — Marty disperses into a low-hanging haze and seeps out of reach."
+    fe_mechanic: "self untargetable for a turn (like Sclorbo's Natural Shelter) — escape/reposition utility"
+    type: activated
+    spell_level: 3
+    unlock_chapter: 5
+    uses_per_chapter: 1
+    effect: self_untargetable_timed
+
+  - id: blight
+    name: "Blight"
+    flavor: "Rot — Marty points, and killing spores erupt inside the target, draining it to feed him."
+    fe_mechanic: "Nosferatu (dark anima nuke that heals the caster for a share of damage)"
+    type: spell_tome
+    spell_level: 4
+    unlock_chapter: 7         # 4th-level → Ch7 (MVP cap)
+    uses_per_chapter: 2
+    damage_type: necrotic
+    weapon_dice: "8d8"
+    save: CON
+    range: 2
+    effect: damage_and_self_heal
+
+  - id: confusion
+    name: "Confusion"
+    flavor: "Maddening Spores — hallucinogenic dust scrambles a cluster of foes into lashing out wildly."
+    fe_mechanic: "Berserk staff (AoE): affected enemies attack whoever's nearest, friend or foe"
+    type: spell_tome
+    spell_level: 4
+    unlock_chapter: 7         # 4th-level → Ch7 (MVP cap)
+    uses_per_chapter: 1
+    save: WIS
+    range: 4
+    aoe: "2x2"
+    effect: berserk_status_aoe
+
+  - id: cloudkill
+    name: "Cloudkill"
+    flavor: "Killing Cloud — a rolling bank of toxic green spores that smothers everything in its path."
+    fe_mechanic: "drifting poison hazard zone — heavy chip damage to anything inside, moves each turn"
+    type: spell_tome
+    spell_level: 5
+    unlock_chapter: 9         # 5th-level → Ch9 (POST-MVP)
+    uses_per_chapter: 1
+    damage_type: poison
+    weapon_dice: "5d8"
+    save: CON
+    range: 4
+    effect: drifting_poison_hazard
+
+  - id: contagion
+    name: "Contagion"
+    flavor: "Plague Spores — Marty infects a single foe with a wasting fungal sickness."
+    fe_mechanic: "Poison status (strong): lingering chip + a stat penalty until cured/chapter end"
+    type: spell_tome
+    spell_level: 5
+    unlock_chapter: 9         # 5th-level → Ch9 (POST-MVP)
+    uses_per_chapter: 1
+    save: CON
+    range: 1
+    effect: heavy_poison_debuff
+
+  - id: gentle-repose
+    name: "Gentle Repose [R]"
+    flavor: "Marty preserves a fallen ally's body in stasis spores — keeping them whole for revival."
+    fe_mechanic: "no combat effect; narrative/utility — extends the window for Sclorbo's revival staves"
+    type: narrative_utility
+    spell_level: 2
+    unlock_chapter: 3
+    effect: preserve_fallen_for_revive   # ties into sclorbo's reviver kit (post-MVP)
 
 # ── Signature Moment ─────────────────────────────────────────────────────────
 signature_moment:

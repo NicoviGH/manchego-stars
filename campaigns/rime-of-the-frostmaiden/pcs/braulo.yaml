@@ -118,15 +118,38 @@ d20_fields:
 unique_abilities:
   - id: rage
     name: Rage
-    # Effect: +4 melee damage, resistance to B/P/S damage (×0.5 incoming),
-    #         advantage on STR checks/saves. Lasts the combat phase.
-    # FE implementation: consumable item that grants rage_status.
+    flavor: "Market Rage — someone undercut his price and now Braulo is a frothing, claw-snapping wall of fury."
+    fe_mechanic: "Rage status (consumable/command): +damage, ×0.5 physical taken, for the combat phase"
+    # Effect: +4 melee damage, resistance to B/P/S damage, advantage on STR checks/saves.
     type: consumable_item
+    unlock_chapter: 1         # Barbarian L1 → Ch1 (MVP)
     uses_per_chapter: 3
     status_effect: rage_status
 
+  - id: frenzy
+    name: Frenzy
+    flavor: "Bargaining Frenzy — Braulo presses the deal so hard he gets a second swing in."
+    fe_mechanic: "while Rage is active, brave-weapon-style extra attack (exhaustion cost dropped per rules-mapping §F)"
+    # Berserker L3 feature. CORRECTED 2026-05-28: was missing from the YAML; added in retier.
+    type: passive
+    unlock_chapter: 3         # Berserker L3 → Ch3 (MVP)
+    requires_status: rage_status
+    effect: extra_attack_while_raging
+
+  - id: extra-attack
+    name: "Extra Attack"
+    flavor: "Double Deal — one motion, two strikes; Braulo never sells a single when he can sell a pair."
+    fe_mechanic: "brave-weapon-style second hit on every attack (vanilla FE doubling is separate)"
+    # Barbarian L5 feature. CORRECTED 2026-05-28: was missing from the YAML; added in retier.
+    type: passive
+    unlock_chapter: 5         # Barbarian L5 → Ch5 (MVP)
+    effect: second_attack_per_action
+
   - id: shell-defense
     name: "Shell Defense"
+    flavor: "Into the Shell — Braulo yanks himself inside his prize shell and waits out the storm."
+    fe_mechanic: "Guard-stance command: big +AC and save advantage, but MOV 0 and no counter until he emerges"
+    unlock_chapter: 1         # Hermit Crab racial — available from start
     # Command: spend action to retract into shell.
     # Effect: +4 AC, advantage on STR/CON saves, speed 0, prone,
     #         disadvantage on DEX saves, cannot take reactions.
@@ -149,7 +172,10 @@ unique_abilities:
     # Passive: when Braulo drops to 0 HP while raging, make a CON save (DC 10,
     # +5 per each prior use this rage). On success, drop to 1 HP instead.
     # FE implementation: passive — when reduced to 0 in rage_status, trigger CON save.
+    flavor: "Won't Die Broke — Braulo refuses to fall while there's still a deal on the table."
+    fe_mechanic: "survive-at-1-HP proc while raging (Classic-mode safety net)"
     type: passive
+    unlock_chapter: 11             # Barbarian L11 → Ch11 (POST-MVP)
     trigger: zero_hp_while_raging
     save: CON
     save_dc_base: 10
@@ -157,52 +183,65 @@ unique_abilities:
 
   - id: brutal-critical
     name: "Brutal Critical"
+    flavor: "Shell-Cracker — when Braulo connects clean, he splits the target like an oyster."
+    fe_mechanic: "passive: critical hits roll extra weapon dice"
     # Nat 20 → roll weapon dice THREE times instead of two.
     type: passive
+    unlock_chapter: 9              # Barbarian L9 → Ch9 (POST-MVP)
     crit_extra_dice: 1              # 1 extra die on top of standard 2× crit
 
   - id: primal-champion
     name: "Primal Champion"
+    flavor: "Apex Pagurian — the biggest crab in any sea, by sheer stubborn growth."
+    fe_mechanic: "capstone stat cap bump (STR/CON), already baked into his end-state scores"
     # Level 20: STR and CON each +4 permanently (already reflected in ability_scores above).
     type: passive
+    unlock_chapter: 20             # Barbarian L20 capstone → Ch20 (endgame)
     note: "Already reflected in ability_scores (STR 23 includes +4; CON 24 includes +4)."
 
   - id: retaliation
     name: Retaliation
+    flavor: "Snapback — touch the crab, lose a finger; he counters the instant he's struck."
+    fe_mechanic: "extra counterattack proc when hit in melee (fires before the normal counter)"
     # Reaction: melee attack when hit by an adjacent creature.
-    # FE implementation: free counter before the standard FE counterattack window.
     type: reaction
+    unlock_chapter: 13             # Berserker L14 → Ch13 (POST-MVP)
 
   - id: reckless-attack
     name: "Reckless Attack"
-    # Barbarian PHB 48: on first STR melee attack of the turn, gain advantage —
-    # but enemies have advantage attacking Braulo until his next turn.
-    # FE implementation: activated toggle each turn — Braulo's attacks get +5 hit,
-    # enemies get +5 hit vs Braulo for that round.
+    flavor: "All-In — Braulo swings for everything and doesn't care what hits back."
+    fe_mechanic: "toggle: +hit on his attacks this turn, but enemies get +hit vs him until his next turn"
+    # Barbarian PHB 48: trade advantage for being easier to hit.
     type: activated
+    unlock_chapter: 2              # Barbarian L2 → Ch2 (MVP)
     effect: advantage_offense_and_taken
 
   - id: mindless-rage
     name: "Mindless Rage"
+    flavor: "Tunnel Vision — far too angry about the markup to be scared or charmed."
+    fe_mechanic: "while raging, immune to charm/fear status"
     # Barbarian PHB 49: while raging, immune to charmed and frightened.
-    # FE implementation: rage_status grants immunity to charm/fear flags.
     type: passive
+    unlock_chapter: 6              # Berserker L6 → Ch6 (MVP)
     requires_status: rage_status
     immunities: [charmed, frightened]
 
   - id: danger-sense
     name: "Danger Sense"
-    # Barbarian PHB 48: advantage on DEX saves vs effects Braulo can see
-    # (not blinded/deafened/incapacitated). Helps vs AoE breath weapons / spells.
+    flavor: "Crab Instinct — a lifetime of dodging predators on the seafloor; he feels the blow coming."
+    fe_mechanic: "+avoid / advantage on DEX saves vs AoE he can see (breath weapons, spells)"
+    # Barbarian PHB 48: advantage on DEX saves vs effects Braulo can see.
     type: passive
+    unlock_chapter: 2              # Barbarian L2 → Ch2 (MVP)
     effect: advantage_dex_saves_visible
 
   - id: feral-instinct
     name: "Feral Instinct"
-    # Barbarian PHB 49: advantage on initiative. If surprised, can act on first turn
-    # if he enters rage before acting.
-    # FE implementation: Braulo deploys with initiative bonus (+5 to turn order roll).
+    flavor: "First to the Bargain — Braulo's never caught flat-footed when there's profit to grab."
+    fe_mechanic: "deploys with an initiative/turn-order bonus; can't be surprised"
+    # Barbarian PHB 49: advantage on initiative.
     type: passive
+    unlock_chapter: 7              # Barbarian L7 → Ch7 (MVP cap)
     effect: initiative_advantage
 
 # ── Signature Moment ────────────────────────────────────────────────────────────

@@ -82,17 +82,27 @@ inventory:
     locked: true              # personal weapon
   - id: luck-e-cheese
     name: "Luck E. Cheese"
+    flavor: "Luck Blade shortsword — a wedge-shaped blade humming with two charges of raw Wish."
+    fe_mechanic: "ordinary personal shortsword in combat; the Wish is NOT a usable ability (see story_only)"
     damage_type: piercing     # PDF confirms Piercing (not Slashing — corrected from JSON)
     weapon_dice: "1d6"
     ability_mod: DEX
     range: melee
     uses: null
-    locked: true              # personal weapon; has 2 Wish spell charges (Phase 1)
-    notes: "Luck Blade Shortsword reskin: 2 Wish charges (PDF spell page p8). Hold to invoke 9th-level Wish."
+    locked: true              # personal weapon
+    # WISH = STORY-ONLY, NO PLAY MECHANIC (Nicolas's call, 2026-05-28). Wish has no clean FE
+    # analogue and is deliberately NOT a castable ability. It fires once, as a scripted endgame
+    # beat: at the campaign's end RBG spends a Wish charge to turn PINKY (his homunculus "son",
+    # the Pegasus Knight companion — see `companion` block) into a true living being.
+    story_only:
+      wish_charges: 2
+      endgame_event: "RBG wishes Pinky into a living being (campaign finale)"
+    notes: "Functions as a plain shortsword in gameplay. The Wish is narrative payoff, not a tool."
   - id: shocking-grasp
     name: "Shocking Grasp"
+    flavor: "Live Wire — RBG's gauntlet arcs a fat current into anything he can lay a paw on."
+    fe_mechanic: "Thunder tome at melee range; on hit, target loses its counterattack (no reaction)"
     # Artificer cantrip (PDF p1 weapons). 4d8 Lightning at level 20, +12 to hit (INT-based).
-    # Touch range — RBG's melee/adjacency cantrip option. Negates target's reactions on hit.
     damage_type: lightning
     weapon_dice: "1d8"        # ch1; scales to 4d8 at level 20
     ability_mod: INT
@@ -133,7 +143,10 @@ unique_abilities:
     # Stats at ch1: HP 20, DEF 8, RES 0, cannot move, auto-removed at chapter end.
     # End-state (Artificer 15+): paired with Brie for 2 simultaneous cannons, AC 18, 100 HP each.
     # Explosive Cannon: detonate for 3d8 force AoE (2-tile radius) as an action if within 4 tiles.
+    fe_mechanic: "FE8 Summoner phantom — a stationary allied turret unit with its own action"
     type: activated
+    unlock_chapter: 3         # Artillerist Eldritch Cannon = Artificer L3 → Ch3 (MVP)
+    explosive_cannon_unlock_chapter: 9   # Explosive Cannon detonation = L9 → Ch9 (post-MVP)
     uses_per_chapter: 1
     spawn_unit: pepperjack-cannon
     canonical_name: Pepperjack
@@ -157,9 +170,9 @@ unique_abilities:
     # Same mechanical kit as Pepperjack (Flamethrower / Force Ballista / Protector modes).
     # When both deployed: RBG fields TWO simultaneous cannons, fulfilling the Artificer
     # Artillerist endgame fantasy (level 15+ feature in 5e).
+    fe_mechanic: "second FE8 Summoner phantom — a 2nd simultaneous turret (Artillerist endgame fantasy)"
     type: activated
-    uses_per_chapter: 1
-    unlock_chapter: tbd                  # Nicolas to confirm; placeholder Ch 4
+    unlock_chapter: 14                   # Artificer L15 second-cannon feature → Ch14 (POST-MVP)
     requires_unlock: pepperjack-already-known
     spawn_unit: brie-cannon
     canonical_name: Brie
@@ -174,7 +187,10 @@ unique_abilities:
     # to their roll. Can flip a failed save to a success.
     # FE implementation: reaction skill — adds +5 to adjacent ally's avoid or save.
     # 5 USES per chapter (confirmed from PDF — regain all on long rest).
+    flavor: "RBG barks a mid-fight correction — 'No no no, hold it like THIS, you fool of brie!'"
+    fe_mechanic: "auto-proc support: +INT to a nearby ally's avoid/save (can flip a failed save)"
     type: reaction
+    unlock_chapter: 7         # Artificer L7 → Ch7 (MVP cap)
     uses_per_chapter: 5       # confirmed from PDF (not 1 — was wrong in first pass)
     range: 2
     bonus: 5                  # INT mod at level 1 equivalent; scales with level
@@ -186,6 +202,7 @@ unique_abilities:
     # of that spell. Once per spell cast, not "once per turn".
     # FE implementation: passive — any artificer-tome attack rolls +1d8 bonus once per cast.
     type: passive
+    unlock_chapter: 5         # Artillerist Arcane Firearm = Artificer L5 → Ch5 (MVP)
     effect: plus_1d8_per_spell_cast_via_firearm
 
   - id: infuse-item
@@ -195,6 +212,7 @@ unique_abilities:
     # FE implementation: Preparation screen — select up to 6 allied items to buff (+1 ATK or +1 AC).
     # This is persistent across the chapter, not a single-use per chapter.
     type: between_chapter
+    unlock_chapter: 2         # Artificer L2 → Ch2 (MVP). Infusion count grows with level.
     simultaneous_infusions: 6
     effect: infuse_ally_gear
 
@@ -205,7 +223,141 @@ unique_abilities:
     #   provoking enemy reactions (models the Disengage bonus action).
     # FE implementation: passive — RBG can always move away from enemies after acting.
     type: passive
+    unlock_chapter: 1         # racial — available from start
     effect: bonus_action_disengage_or_hide
+
+  # ── Prepared Artillery Kit (PREPARED list from PDF = Artillerist "Always Prepared") ──
+  # RBG's prepared spells are entirely his subclass's bonus list — a pure ARTILLERY BLASTER,
+  # not a healer (corrects the earlier Cure Wounds guess). DUAL STRUCTURE: fe_mechanic =
+  # vanilla FE8 anchor; flavor = RBG's mad-inventor gadget reskin. All cast through the
+  # Fonduedler (his Arcane Firearm focus → +1d8, Ch5+). Gated by Artillerist grant level:
+  #   Shield/Thunderwave (L3→Ch3), Scorching Ray/Shatter (L5→Ch5), Fireball/Wind Wall (L9→Ch9),
+  #   Ice Storm/Wall of Fire (L13→Ch13), Cone of Cold/Wall of Force (L17→Ch17).
+  # AoE NOTE: FE tomes are single-target; D&D AoE compromises to siege-range single-target.
+
+  - id: shield-spell
+    name: "Shield"
+    flavor: "Reactive Plating — panels snap up off RBG's coat the instant something swings at him."
+    fe_mechanic: "Barrier-style +AC reaction proc on self for one incoming attack"
+    type: reaction
+    spell_level: 1
+    unlock_chapter: 3
+    uses_per_chapter: 3
+    ac_bonus: 5
+
+  - id: thunderwave
+    name: "Thunderwave"
+    flavor: "Concussion Charge — a short, flat WHUMP of pressure that bowls foes back."
+    fe_mechanic: "short-range thunder burst that damages + shoves adjacent enemies 1 tile"
+    type: spell_tome
+    spell_level: 1
+    unlock_chapter: 3
+    uses_per_chapter: 2
+    damage_type: thunder
+    weapon_dice: "2d8"
+    save: CON
+    range: 1
+    effect: damage_and_push
+
+  - id: scorching-ray
+    name: "Scorching Ray"
+    flavor: "Triple-Barrel Burn — three fat darts of fire spit out of the Fonduedler in sequence."
+    fe_mechanic: "brave-weapon-style multi-bolt fire tome: 3 separate fire hits, each rolled"
+    type: spell_tome
+    spell_level: 2
+    unlock_chapter: 5
+    uses_per_chapter: 2
+    damage_type: fire
+    weapon_dice: "2d6"        # per bolt, ×3 bolts
+    bolts: 3
+    range: 4
+
+  - id: shatter
+    name: "Shatter"
+    flavor: "Resonance Bomb — a marble-sized charge that detonates into a skull-rattling chord."
+    fe_mechanic: "thunder siege tome (AoE compromised to siege-range single-target)"
+    type: spell_tome
+    spell_level: 2
+    unlock_chapter: 5
+    uses_per_chapter: 1
+    damage_type: thunder
+    weapon_dice: "3d8"
+    save: CON
+    range: 4
+
+  - id: fireball
+    name: "Fireball"
+    flavor: "Big Boom™ (patent pending) — RBG's pride and joy. 'Say cheese.'"
+    fe_mechanic: "Bolganone/fire siege tome (AoE compromised to siege-range single-target)"
+    type: spell_tome
+    spell_level: 3
+    unlock_chapter: 9         # POST-MVP
+    uses_per_chapter: 2
+    damage_type: fire
+    weapon_dice: "8d6"
+    save: DEX
+    range: 5
+
+  - id: wind-wall
+    name: "Wind Wall"
+    flavor: "Turbine Fence — a roaring updraft that swats arrows and bolts out of the air."
+    fe_mechanic: "places a temporary impassable line that also blocks ranged attacks"
+    type: spell_tome
+    spell_level: 3
+    unlock_chapter: 9         # POST-MVP
+    uses_per_chapter: 1
+    effect: blocking_wall_line
+    duration_turns: 3
+
+  - id: ice-storm
+    name: "Ice Storm"
+    flavor: "Cryo Shells — a volley of supercooled rounds that burst into a hail of shrapnel-ice."
+    fe_mechanic: "cold siege tome (AoE compromised to siege-range single-target)"
+    type: spell_tome
+    spell_level: 4
+    unlock_chapter: 13        # POST-MVP
+    uses_per_chapter: 1
+    damage_type: [cold, bludgeoning]
+    weapon_dice: "4d6"
+    save: DEX
+    range: 5
+
+  - id: wall-of-fire
+    name: "Wall of Fire"
+    flavor: "Napalm Line — RBG lays down a strip of accelerant and lights it with a grin."
+    fe_mechanic: "line of fire hazard tiles that chip anything ending its turn adjacent"
+    type: spell_tome
+    spell_level: 4
+    unlock_chapter: 13        # POST-MVP
+    uses_per_chapter: 1
+    damage_type: fire
+    weapon_dice: "5d8"
+    effect: fire_hazard_wall
+    duration_turns: 3
+
+  - id: cone-of-cold
+    name: "Cone of Cold"
+    flavor: "Liquid-Nitrogen Sprayer — a wide-mouthed nozzle that flash-freezes a whole arc."
+    fe_mechanic: "Fimbulvetr-tier cold siege tome (AoE compromised to siege-range single-target)"
+    type: spell_tome
+    spell_level: 5
+    unlock_chapter: 17        # POST-MVP / endgame
+    uses_per_chapter: 1
+    damage_type: cold
+    weapon_dice: "8d8"
+    save: CON
+    range: 4
+
+  - id: wall-of-force
+    name: "Wall of Force"
+    flavor: "Forcefield Emitter — a humming pane of pure force; nothing gets through it."
+    fe_mechanic: "places a fully impassable barrier (blocks movement AND attacks) for a few turns"
+    type: spell_tome
+    spell_level: 5
+    unlock_chapter: 17        # POST-MVP / endgame
+    uses_per_chapter: 1
+    effect: impassable_force_barrier
+    duration_turns: 3
 
 # ── Companion ────────────────────────────────────────────────────────────────
 companion:
@@ -213,6 +365,10 @@ companion:
   description: >
     RBG's homunculus 'son' — available as a Pegasus Knight unit from Chapter 1.
     Pinky is a separate unit entry (see npcs/ when created).
+  endgame_beat: >
+    At the campaign's finale, RBG spends a Wish charge from Luck E. Cheese (see inventory
+    `story_only`) to turn Pinky from a homunculus into a true living being. Scripted story
+    event, not a gameplay mechanic.
 
 # ── Signature Moment ─────────────────────────────────────────────────────────
 signature_moment:

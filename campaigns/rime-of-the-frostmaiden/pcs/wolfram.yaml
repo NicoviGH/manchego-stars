@@ -152,20 +152,23 @@ d20_fields:
 unique_abilities:
   - id: forge
     name: Forge
+    flavor: "The First Forge — Wolfram reshapes living metal between battles, gifting his allies armor of his own scales."
+    fe_mechanic: "Preparation-screen command (like a portable armory): permanently buff one ally's gear"
     # Between-chapter command: upgrade one ally's weapon (+1 damage die) or armor (+2 AC).
-    # School of the Smith: Improved Upgrade — +2 AC per upgrade application (not +1).
-    # FE implementation: Preparation screen command — player selects ally and item to upgrade.
     type: between_chapter
+    unlock_chapter: 1         # Upgrade Armor = Metallurgist L1 → Ch1 (MVP)
+    improved_at_chapter: 3    # Improved Upgrade (Smith L3): +2 AC per application instead of +1
     uses_per_chapter: 1
     effect: upgrade_ally_gear
 
   - id: breath-weapon
     name: "Breath Weapon"
+    flavor: "Flamethrower — Wolfram's chest-vents flare and he gouts a cone of forge-fire (his Drakeborn breath + armor's Flamethrower function)."
+    fe_mechanic: "vanilla FE breath/cone attack: fire AoE on a cone of tiles, DEX save for half"
     # ACTION, 1/short rest per Mineralscale Drakeborn (PDF p3). FE = 1/chapter.
-    # CORRECTED 2026-05-27: was incorrectly listed as unlimited.
-    # 30-ft cone, DEX save DC 16, fire damage.
-    # Damage scales by chapter; starts at 2d6 (ch1 equivalent), tops 5d6 (16+).
+    # 30-ft cone, DEX save DC 16, fire damage. (= the Metallurgist 'Flamethrower' armor ability.)
     type: activated
+    unlock_chapter: 1         # racial Drakeborn breath — available from start
     uses_per_chapter: 1
     action_cost: action
     shape: cone
@@ -225,37 +228,97 @@ unique_abilities:
 
   - id: feral-strike-bite
     name: "Feral Strike: Bite"
-    # Drakeborn racial bonus action: after landing a melee hit, deal 1d8 bludgeoning.
-    # FE implementation: passive — Wolfram's melee attacks always deal +1d8 follow-up bite.
+    flavor: "Wolfram's iron jaws snap shut on a foe right after his weapon lands."
+    fe_mechanic: "passive follow-up: melee hits tack on a small bonus bludgeoning bite"
+    # Drakeborn racial: after landing a melee hit, deal 1d8 bludgeoning.
     type: passive
+    unlock_chapter: 1         # racial — available from start
     follow_up_dice: "1d8"
     damage_type: bludgeoning
 
   - id: feral-strike-claws
     name: "Feral Strike: Claws"
-    # Drakeborn racial bonus action — slashing claw strike against an adjacent target.
-    # 1d6 + STR slashing. Alternative to Bite when Wolfram needs slashing damage type.
-    # FE implementation: bonus action — adjacent attack at 1d6 + STR slashing.
-    type: bonus_action
+    flavor: "A raking swipe of metal claws when he needs to tear rather than crush."
+    fe_mechanic: "adjacent claw attack option (slashing) — folds into his action per rules-mapping §B"
+    # Drakeborn racial: 1d6 + STR slashing. Alternative damage type to Bite.
+    type: activated
+    unlock_chapter: 1         # racial — available from start
     weapon_dice: "1d6"
     damage_type: slashing
     ability_mod: STR
 
   - id: shield-spell
-    name: "Shield (spell)"
-    # Reaction: +5 AC until the start of Wolfram's next turn.
-    # INT-based (Metallurgist spellcasting modifier).
-    # FE implementation: reaction skill — adds +5 to effective DEF for that attack.
+    name: "Armor Lock (Shield)"
+    flavor: "Armor Lock — Wolfram's plates slam together into a seamless shell the instant a blow lands."
+    fe_mechanic: "+AC reaction proc (Barrier-style) — powered by Arcane Charges"
+    # Metallurgist armor ability (1 Arcane Charge → shield). Reaction: +5 AC until his next turn.
     type: reaction
+    unlock_chapter: 5         # Arcane Charges come online at Metallurgist L5 → Ch5 (MVP)
     uses_per_chapter: 3
     ac_bonus: 5
 
   - id: fire-resistance
     name: "Fire Resistance"
-    # Mineralscale Drakeborn racial: half damage from fire-type sources.
-    # FE implementation: passive — fire-type attacks deal ×0.5 damage to Wolfram.
+    flavor: "Forged in fire — Wolfram's metal scales shrug off heat that would melt anyone else."
+    fe_mechanic: "passive: ×0.5 damage from fire-type attacks"
+    # Mineralscale Drakeborn racial.
     type: passive
+    unlock_chapter: 1         # racial — available from start
     damage_resistance: fire
+
+  # ── Armor Abilities (cast via Arcane Charges = 2×prof; Wolfram picks 4, +1 at L7/11/16) ──
+  # His "spells" are armor functions, not tomes. DUAL STRUCTURE: fe_mechanic + flavor.
+  # Flamethrower (= Breath Weapon, above) and Armor Lock (= Shield, above) are his first picks.
+  # Recharge + Explosive Burst added here in the retier. Arcane Charges online at L5 → Ch5.
+
+  - id: recharge
+    name: Recharge
+    flavor: "Recharge — Wolfram channels Arcane Charges inward, re-forging his own dented plating and flesh."
+    fe_mechanic: "self-heal (Heal-staff effect on himself), powered by Arcane Charges"
+    # Metallurgist armor ability (2 Arcane Charges → cure wounds).
+    type: activated
+    unlock_chapter: 5         # Arcane Charges at Metallurgist L5 → Ch5 (MVP)
+    uses_per_chapter: 2
+    effect: self_restore_hp
+    heal_dice: "1d8+MAG"
+
+  - id: explosive-burst
+    name: "Explosive Burst"
+    flavor: "Explosive Burst — Wolfram overloads his charge vents and detonates a sphere of forge-fire."
+    fe_mechanic: "fire siege tome (AoE compromised to siege-range single-target), powered by Arcane Charges"
+    # Metallurgist L7 armor ability (2 Arcane Charges → fireball). His Ch7 armor-ability pick.
+    type: activated
+    unlock_chapter: 7         # Metallurgist L7 armor-ability slot → Ch7 (MVP cap)
+    uses_per_chapter: 1
+    damage_type: fire
+    weapon_dice: "8d6"
+    save: DEX
+    range: 4
+
+  # ── Forge Line (the smithing progression; Forge command above is the base) ──
+  - id: forge-expert
+    name: "Forge Expert"
+    flavor: "Forge Expert — Wolfram learns to smith bludgeoning/piercing/slashing resistance straight into armor."
+    fe_mechanic: "Forge upgrade tier: armor he forges also grants a physical damage resistance"
+    type: between_chapter
+    unlock_chapter: 7         # School of the Smith L7 → Ch7 (MVP cap)
+    effect: forge_grants_physical_resistance
+
+  - id: blade-forge
+    name: "Blade Forge"
+    flavor: "Blade Forge — METALLO's craft extends to weapons; Wolfram tempers an ally's blade to bite deeper."
+    fe_mechanic: "Forge upgrade tier: can now upgrade weapons (+1 damage die), not just armor"
+    type: between_chapter
+    unlock_chapter: 11        # Metallurgist L11 → Ch11 (POST-MVP)
+    effect: forge_upgrade_weapons
+
+  - id: master-of-the-forge
+    name: "Master of the Forge"
+    flavor: "Master of the Forge — Wolfram forges adamantine and mithral, the metals of legend."
+    fe_mechanic: "top-tier Forge: adamantine (crit-immunity) / mithral (no SPD penalty) / resist armor"
+    type: between_chapter
+    unlock_chapter: 15        # School of the Smith L16 → Ch15 (POST-MVP / endgame)
+    effect: forge_legendary_armor
 
 # ── Signature Moment ─────────────────────────────────────────────────────────
 signature_moment:

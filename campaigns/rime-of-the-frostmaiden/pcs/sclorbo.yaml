@@ -74,7 +74,9 @@ fe_stats:
                                           # Dance retained as a unique skill.
                                           # Changed 2026-05-27 to reflect Cure Wounds / Revivify /
                                           # Mass Cure Wounds / Raise Dead prepared list (PDF p5).
-                                          # See docs/decisions.md.
+                                          # NOTE: reviver kit (Revivify/Mass Cure/Raise Dead) is
+                                          # gated POST-MVP — in MVP he only has Cure Wounds.
+                                          # See docs/decisions.md + unique_abilities.bard-healing-suite.
   level: 1
   HP: 16
   STR: 3                          # STR 13 — slightly stronger than other casters
@@ -110,6 +112,8 @@ inventory:
     uses: null
   - id: ray-of-frost
     name: "Ray of Frost"
+    flavor: "Frostsong — a shivering note of cold that crackles across the target and slows it."
+    fe_mechanic: "ice tome cantrip; on hit, target loses MOV/SPD (slow proc)"
     damage_type: cold
     weapon_dice: "1d8"            # ch1 equivalent; end-state 3d8 via Additional Magical Secrets
     ability_mod: CHA              # +8 to hit at end-state (CHA + prof)
@@ -118,6 +122,8 @@ inventory:
     notes: "Acquired via Additional Magical Secrets (College of Lore). Also applies -10 ft MOV on hit."
   - id: vicious-mockery
     name: "Vicious Mockery"
+    flavor: "Withering Impression — a telepathic jab of pure derision that rattles a foe's nerve."
+    fe_mechanic: "psychic tome cantrip; on hit, target attacks at −hit next turn (his primary attack)"
     damage_type: psychic
     weapon_dice: "1d4"            # cantrip — scales at higher chapters
     ability_mod: CHA
@@ -126,8 +132,10 @@ inventory:
     notes: "On hit: target has disadvantage on its next attack roll (WIS save DC negates damage only)."
   - id: heal-staff
     name: "Heal Staff"
-    # Sclorbo's Cure Wounds spell (Bard 1st). FE staff with single-target restore.
-    # Per PDF p5 — Cure Wounds is on Sclorbo's prepared spell list.
+    flavor: "Mending Hum — a soothing telepathic resonance that knits flesh back together."
+    fe_mechanic: "vanilla FE Heal staff, single-target restore"
+    # Sclorbo's Cure Wounds spell (Bard 1st). THE ONLY HEAL HE HAS IN MVP (Ch1–7) —
+    # all raise-dead-type healing is gated POST-MVP per Nicolas's call (2026-05-28).
     is_staff: true
     effect: restore_hp
     staff_dice: "1d8+MAG"
@@ -152,24 +160,36 @@ unique_abilities:
     # BALANCE LEVER (2026-05-27): Dance and Cast are mutually exclusive per turn.
     # On any given turn Sclorbo picks ONE: Dance/Refresh OR spell-cast/heal/buff.
     # This prevents Lore Bishop from being a one-man support engine.
+    flavor: "An encouraging telepathic nudge that spurs an ally to move and strike again."
+    fe_mechanic: "vanilla FE Dancer refresh — grants an ally another turn"
     type: dancer_refresh
+    unlock_chapter: 1
     range: 1
     mutually_exclusive_with: [spell_cast, heal_staff, bardic_inspiration]
 
   - id: bardic-inspiration
     name: "Bardic Inspiration"
-    # Grant an adjacent ally a d6 inspiration die added to their next attack or save.
-    # Uses = CHA mod (3/chapter). Scales to d12 at higher chapters.
+    flavor: "Inspiring Impression — Sclorbo beams a wave of confidence into an ally's mind."
+    fe_mechanic: "ally buff: grants a bonus die added to their next attack or save"
+    # Grant an adjacent ally an inspiration die added to their next attack or save.
+    # Uses = CHA mod (3/chapter). Die grows with bard level on the 1:1 curve.
     type: activated
+    unlock_chapter: 1
     uses_per_chapter: 3
-    die: "1d6"
+    die_scaling:
+      - { chapters: "1-4", die: "1d6" }
+      - { chapters: "5-8", die: "1d8" }
+      - { chapters: "9-13", die: "1d10" }
+      - { chapters: "14-20", die: "1d12" }
     effect: grant_inspiration_die
 
   - id: cutting-words
     name: "Cutting Words"
-    # Reaction: when an enemy within 3 tiles attacks, subtract 1d6 from their roll.
-    # CHA save DC 14 to resist.
+    flavor: "Cutting Impression — a perfectly-timed mental jeer that throws a foe off mid-swing."
+    fe_mechanic: "auto-proc debuff: subtracts from a nearby enemy's attack/save roll (no player input)"
+    # Reaction: when an enemy within 3 tiles attacks, subtract 1d6 from their roll. CHA save DC 14.
     type: reaction
+    unlock_chapter: 3         # College of Lore L3 → Ch3 (MVP)
     range: 3
     die: "1d6"
     save: CHA
@@ -180,6 +200,7 @@ unique_abilities:
     # Chwinga racial: charm adjacent humanoid (WIS save DC 16). 1/chapter.
     # FE implementation: activated command — target cannot counterattack Sclorbo this turn.
     type: activated
+    unlock_chapter: 1         # racial — available from start
     uses_per_chapter: 1
     range: 1
     save: WIS
@@ -192,6 +213,7 @@ unique_abilities:
     # While inside: untargetable by all attacks and effects.
     # FE implementation: activated command — sink into terrain, become untargetable.
     type: activated
+    unlock_chapter: 1         # racial — available from start
     effect: untargetable_in_terrain
     exit: bonus_action_emerge
 
@@ -200,35 +222,124 @@ unique_abilities:
     # Chwinga racial: on DEX save for half damage — no damage on success, half on failure.
     # FE implementation: passive flag on all DEX saves.
     type: passive
+    unlock_chapter: 1         # racial — available from start
     effect: evasion_on_dex_saves
 
   - id: jack-of-all-trades
     name: "Jack of All Trades"
     # Passive: Sclorbo never counts as untrained — minor universal accuracy bonus.
     type: passive
+    unlock_chapter: 2         # Bard L2 → Ch2 (MVP)
     effect: never_untrained
 
   - id: bard-healing-suite
     name: "Bard Healing Suite"
-    # Per PDF p5 — Sclorbo has prepared: Cure Wounds (1st), Revivify (3rd),
-    # Mass Cure Wounds (5th), Raise Dead (5th). At Bard 16 Sclorbo is the party's
-    # most capable revival caster. (Bard's high-tier spells via Magical Secrets.)
-    # FE implementation: Sclorbo gains Heal, Mend, Recover, and a 1/chapter Revive
-    # staff item progressively across chapters.
-    # CORRECTED 2026-05-27: previously YAML didn't acknowledge healing role.
+    flavor: "Sclorbo's restorative repertoire — humming, chiming impressions that mend and revive."
+    fe_mechanic: "a progression of vanilla FE staves (Heal → Physic/Recover → Revive)"
+    # Per PDF p5 — Sclorbo's reviver kit: Cure Wounds (1st), Revivify (3rd, via Lore's Additional
+    # Magical Secrets), Mass Cure Wounds (5th), Raise Dead (5th). He's the party's revival caster.
+    #
+    # GATING CORRECTED 2026-05-28 (Nicolas's fork): the reviver role is POST-MVP. Even though
+    # Revivify (3rd-level) is *mechanically* reachable by Ch6 via Additional Magical Secrets, we
+    # deliberately gate ALL raise-dead-type healing to Ch9+ to preserve FE Classic-mode permadeath
+    # tension in the first third. MVP heal = Cure Wounds ONLY.
+    # (The earlier "Revivify is 5th-level" note was wrong — it's 3rd — but the post-MVP
+    #  conclusion stands, for pacing reasons rather than spell-level reasons.)
     type: progression_note
     spells:
-      - { name: "Cure Wounds", level: 1, staff_id: heal-staff }
-      - { name: "Revivify", level: 3, staff_id: revive-staff, unlock_chapter: 4 }
-      - { name: "Mass Cure Wounds", level: 5, staff_id: physic-staff, unlock_chapter: 6 }
-      - { name: "Raise Dead", level: 5, staff_id: rescue-revive-staff, unlock_chapter: 7 }
+      - { name: "Cure Wounds", level: 1, staff_id: heal-staff, unlock_chapter: 1, mvp: true }
+      - { name: "Revivify", level: 3, staff_id: revive-staff, unlock_chapter: 9, mvp: false,
+          flavor: "Spark of Return — a jolt of vital resonance pulls the just-fallen back." }
+      - { name: "Mass Cure Wounds", level: 5, staff_id: physic-staff, unlock_chapter: 9, mvp: false,
+          flavor: "Renewing Chorus — a swelling harmony that mends the whole party at once." }
+      - { name: "Raise Dead", level: 5, staff_id: rescue-revive-staff, unlock_chapter: 11, mvp: false,
+          flavor: "Soul Recall — Sclorbo coaxes a departed soul back into its body." }
 
   - id: song-of-rest
     name: "Song of Rest"
     # Between-chapter feature: allies regain extra 1d10 HP when spending Hit Dice on
     # short rest. FE implementation: between-chapter HP recovery bonus while Sclorbo is alive.
     type: between_chapter
+    unlock_chapter: 2         # Bard L2 → Ch2 (MVP)
     effect: ally_extra_recovery
+
+  # ── Known Spell Kit (Bard = KNOWN-caster; this is his curated signature set) ──
+  # DUAL STRUCTURE: fe_mechanic = vanilla FE8 anchor; flavor = mute Chwinga reskin (he 'casts'
+  # via telepathic impressions, hums, and chimes — no spoken words). Spell-level → chapter:
+  #   1st→Ch1, 3rd→Ch5, 6th→Ch11, 7th→Ch13. Cure Wounds (heal-staff) is his ONLY MVP heal.
+
+  - id: heroism
+    name: "Heroism"
+    flavor: "Heartening Presence — Sclorbo floods an ally with fearless, buoyant resolve."
+    fe_mechanic: "ally buff item: grants temp HP each turn + immunity to fear for the duration"
+    type: spell_tome
+    spell_level: 1
+    unlock_chapter: 1
+    uses_per_chapter: 2
+    range: 1
+    effect: temp_hp_and_fearless
+
+  - id: magic-missile
+    name: "Magic Missile"
+    flavor: "Unerring Motes — three darts of pale force-light that bend through the air to strike."
+    fe_mechanic: "force tome that AUTO-HITS (skips the d20 roll); splits into multiple darts"
+    type: spell_tome
+    spell_level: 1
+    unlock_chapter: 1
+    uses_per_chapter: 2
+    damage_type: force
+    weapon_dice: "1d4+1"      # per dart
+    darts: 3
+    auto_hit: true            # no attack roll — reliable chip
+    range: 4
+
+  - id: hideous-laughter
+    name: "Tasha's Hideous Laughter"
+    flavor: "Fit of Giggles — Sclorbo plants an absurd impression; the target collapses cackling."
+    fe_mechanic: "single-target can't-act (Sleep-style): incapacitated, can't move/act/counter"
+    type: spell_tome
+    spell_level: 1
+    unlock_chapter: 1
+    uses_per_chapter: 1
+    save: WIS
+    range: 3
+    effect: incapacitate_single
+
+  - id: call-lightning
+    name: "Call Lightning"
+    flavor: "Storm Crash — Sclorbo summons a roiling cloud overhead and calls bolts down at will."
+    fe_mechanic: "thunder siege tome (long-range single-target), reusable across the map"
+    type: spell_tome
+    spell_level: 3
+    unlock_chapter: 5
+    uses_per_chapter: 2
+    damage_type: thunder
+    weapon_dice: "3d10"
+    save: DEX
+    range: 5
+
+  - id: ottos-irresistible-dance
+    name: "Otto's Irresistible Dance"
+    flavor: "Puppet Jig — Sclorbo's silent rhythm hijacks a foe's body into a helpless dance."
+    fe_mechanic: "hard CC: target is forced to caper — can't attack and shuffles uncontrollably"
+    type: spell_tome
+    spell_level: 6
+    unlock_chapter: 11        # POST-MVP (Magical Secrets territory)
+    uses_per_chapter: 1
+    save: WIS
+    range: 3
+    effect: forced_dance_incapacitate
+
+  - id: mordenkainens-sword
+    name: "Mordenkainen's Sword"
+    flavor: "Spirit Blade — a shimmering sword of force winks into being and fights at his command."
+    fe_mechanic: "summons a temporary allied 'blade' unit that attacks on Sclorbo's turn"
+    type: summon
+    spell_level: 7
+    unlock_chapter: 13        # POST-MVP
+    uses_per_chapter: 1
+    spawn_unit: force-blade
+    max_active: 1
 
 # ── Signature Moment ─────────────────────────────────────────────────────────
 signature_moment:

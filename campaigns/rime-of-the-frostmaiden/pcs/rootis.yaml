@@ -37,7 +37,8 @@ dnd:
                              # (PDF p2). DEX 18 → AC 17. Scales with DEX, not flat.
   speed_ft:
     walking: 25
-    flying: 25               # Dragon Wings always available (bonus action, level 14)
+    flying: 25               # Dragon Wings = POST-MVP transform (5e L14 → Ch13). Through MVP
+                             # Rootis is a foot Mage (Ice); flying unlocks only at Ch13.
     climbing: 20
     swimming: 35
   racial_traits:
@@ -143,6 +144,7 @@ unique_abilities:
     # hit a second enemy in range at no extra action cost.
     # FE implementation: activated modifier — hit two enemies with one cast.
     type: activated
+    unlock_chapter: 3         # Metamagic = Sorcerer L3 → Ch3 (MVP)
     uses_per_chapter: 2       # approximate SP cost at level 1 SP pool
     effect: twin_single_target_spell
 
@@ -151,6 +153,7 @@ unique_abilities:
     # Spend 1 SP: reroll up to 3 damage dice; keep the new results.
     # FE implementation: after rolling spell damage, player may reroll once.
     type: activated
+    unlock_chapter: 3         # Metamagic = Sorcerer L3 → Ch3 (MVP)
     uses_per_chapter: 3
 
   - id: metamagic-distant
@@ -159,6 +162,7 @@ unique_abilities:
     # FE implementation: spell range doubled for that cast (e.g. Ray of Frost 2 → 4 tiles).
     # Per PDF p1 — confirms Rootis has Distant Spell, not just Twinned + Empowered.
     type: activated
+    unlock_chapter: 3         # Metamagic = Sorcerer L3 → Ch3 (MVP)
     uses_per_chapter: 3
 
   - id: metamagic-extended
@@ -167,6 +171,7 @@ unique_abilities:
     # FE relevance: extends concentration buffs (e.g. Mage Armor) across multiple maps.
     # Per PDF p2 — confirms Rootis has Extended Spell.
     type: activated
+    unlock_chapter: 3         # Metamagic = Sorcerer L3 → Ch3 (MVP)
     uses_per_chapter: 3
 
   - id: sorcerous-restoration
@@ -174,6 +179,7 @@ unique_abilities:
     # Level 20 capstone: regain 4 sorcery points after a short rest.
     # FE implementation: between-chapter refill, +4 SP if short rest taken mid-chapter.
     type: passive
+    unlock_chapter: 19        # Sorcerer L20 capstone → Ch19+ (deep endgame)
     sp_per_short_rest: 4
 
   - id: draconic-presence
@@ -185,6 +191,7 @@ unique_abilities:
     # FE implementation: activated command, costs SP, applies frightened/charmed status
     # to enemies within 4 tiles for the rest of the player's turn.
     type: activated
+    unlock_chapter: 17        # Draconic Bloodline L18 → Ch17 (post-MVP)
     uses_per_chapter: 1       # 5 SP cost; limited by SP pool
     sp_cost: 5
     range: 4                  # 60 ft → ~4 FE tiles
@@ -194,8 +201,11 @@ unique_abilities:
 
   - id: dragon-wings
     name: "Dragon Wings"
-    # ALREADY AVAILABLE (not promotion-locked — PDF confirms this is a level 14 class feature,
-    # and Rootis is level 20). Bonus action to sprout/dismiss wings; fly speed = walking speed.
+    # POST-MVP. Sorcerer/Draconic L14 feature → Ch13 on the 1:1 curve. Through all of MVP
+    # (Ch1–7) Rootis is a FOOT Mage (Ice); he does NOT have flight or the transform yet.
+    # CORRECTED 2026-05-28: earlier YAML marked this "ALREADY AVAILABLE / always-on", which
+    # was based on the level-20 end-state sheet and is wrong for gameplay pacing.
+    # Bonus action to sprout/dismiss wings; fly speed = walking speed.
     #
     # FE implementation (decided 2026-05-27): MANAKETE-STYLE CLASS TRANSFORM.
     # Reuses the FE8 Manakete/Myrrh transform code path (Dragonstone mechanic).
@@ -206,7 +216,8 @@ unique_abilities:
     # into whichever form he's currently in until chapter end.
     # See docs/decisions.md and docs/class-mapping.md.
     type: class_transform
-    unlocks_at_promotion: false  # already available — Sorcerer 14 feature, end-state
+    unlock_chapter: 13           # Sorcerer/Draconic L14 → Ch13 (post-MVP)
+    unlocks_at_promotion: false  # unlocked by chapter gate, not by FE promotion
     transform_to: "Sage (Dragon Form)"
     transform_from: "Mage (Ice)"
     cost_per_toggle:
@@ -221,6 +232,7 @@ unique_abilities:
     # FE implementation: passive bonus applied to cold-type tomes only.
     # NOTE: This is COLD affinity, not fire — White Dragon ancestry.
     type: passive
+    unlock_chapter: 6         # Draconic Bloodline L6 → Ch6 (MVP)
     effect: plus_cha_mod_cold_damage
 
   - id: crystallize
@@ -232,6 +244,7 @@ unique_abilities:
     # 1/long rest (= 1/chapter).
     # FE implementation: activated command — toggle defensive mode.
     type: activated
+    unlock_chapter: 1         # racial — available from start
     uses_per_chapter: 1
     grants_immunity: [slashing, piercing]
     removes_resistance: [bludgeoning]
@@ -243,6 +256,7 @@ unique_abilities:
     # FE implementation: passive flag — cold-type incoming damage becomes healing.
     # Synergizes with enemy ice mages or cold terrain effects.
     type: passive
+    unlock_chapter: 1         # racial — available from start
     effect: cold_attacks_heal
 
   - id: snow-ski
@@ -251,7 +265,137 @@ unique_abilities:
     # FE implementation: passive — on snow/ice tiles, effective MOV is doubled.
     # Very relevant for this campaign's arctic maps.
     type: passive
+    unlock_chapter: 1         # racial — available from start
     effect: double_mov_on_ice_snow
+
+  # ── Signature Spell Kit (curated 2026-05-28; KNOWN-caster, so this is his full known list) ──
+  # Cantrips (Ray of Frost primary, Chill Touch secondary) live in `inventory`.
+  # DUAL STRUCTURE: fe_mechanic = the vanilla FE8 anchor (playability spine);
+  #   flavor = Rootis's reskin (a curious snowman who treats magic as a mystery to solve).
+  # Spell-level → chapter: 1st→Ch1, 3rd→Ch5, 5th→Ch9, 6th→Ch11, 8th→Ch15, 9th→Ch17.
+  # KEPT FIRE (Immolation, Incendiary Cloud): intentional irony — Rootis casts fire despite
+  # his ×2 fire vulnerability (Nicolas's call, 2026-05-28). Both post-MVP.
+  # AoE NOTE: FE tomes are single-target; D&D AoE compromises to siege-range single-target.
+
+  - id: earth-tremor
+    name: "Earth Tremor"
+    flavor: "Frostquake — the packed snow underfoot bucks and splinters into shards."
+    fe_mechanic: "short-range anima tome; small burst that knocks targets prone (−avoid)"
+    type: spell_tome
+    spell_level: 1
+    unlock_chapter: 1
+    damage_type: bludgeoning
+    weapon_dice: "1d6"
+    save: DEX
+    range: 1                  # centered on Rootis → adjacent ring
+    effect: aoe_damage_and_prone
+
+  - id: hypnotic-pattern
+    name: "Hypnotic Pattern"
+    flavor: "Snowblind — a slow shimmer of suspended ice crystals that empties the mind."
+    fe_mechanic: "Sleep staff (AoE variant): targets skip their turn, can't act or counter"
+    type: spell_tome
+    spell_level: 3
+    unlock_chapter: 5
+    uses_per_chapter: 2
+    save: WIS
+    range: 4                  # 120 ft cast → cube placed within ~4 tiles
+    aoe: "2x2"
+    effect: sleep_status_aoe
+
+  - id: fly
+    name: "Fly"
+    flavor: "Flurry Step — Rootis loosens into drifting powder and rides the wind."
+    fe_mechanic: "temporary flier-movement buff on self or one ally (fixed duration)"
+    type: spell_tome
+    spell_level: 3
+    unlock_chapter: 5
+    uses_per_chapter: 2
+    effect: grant_flier_movement_timed
+    duration_turns: 3
+
+  - id: cone-of-cold
+    name: "Cone of Cold"
+    flavor: "Glacier Breath — a roaring fan of sub-zero air that flash-freezes everything."
+    fe_mechanic: "Fimbulvetr (top ice tome); AoE compromised to siege-range single-target"
+    type: spell_tome
+    spell_level: 5
+    unlock_chapter: 9
+    uses_per_chapter: 2
+    damage_type: cold
+    weapon_dice: "8d8"
+    save: CON
+    range: 3
+    aoe: cone
+
+  - id: immolation
+    name: "Immolation"
+    flavor: "Paradox Flame — the snowman wills fire into being; it scorches him too."
+    fe_mechanic: "Elfire/Bolganone (fire tome), single-target with a burn DoT"
+    type: spell_tome
+    spell_level: 5
+    unlock_chapter: 9
+    uses_per_chapter: 1
+    damage_type: fire
+    weapon_dice: "8d6"
+    save: DEX
+    range: 3
+    effect: damage_plus_burn_dot
+    flavor_note: "Off-theme on purpose — ironic given Rootis's ×2 fire vulnerability."
+
+  - id: globe-of-invulnerability
+    name: "Globe of Invulnerability"
+    flavor: "Hoarfrost Dome — a crackling shell of rime that swallows incoming magic."
+    fe_mechanic: "Barrier staff (anti-magic / +RES shield) on self + adjacent allies"
+    type: spell_tome
+    spell_level: 6
+    unlock_chapter: 11
+    uses_per_chapter: 1
+    effect: anti_magic_bubble_timed
+    duration_turns: 3
+
+  - id: abi-dalzims-horrid-wilting
+    name: "Abi-Dalzim's Horrid Wilting"
+    flavor: "Deep Freeze — Rootis rips every drop of moisture from flesh and air alike."
+    fe_mechanic: "Eclipse/Luna-tier dark anima nuke (huge single-target); siege range"
+    type: spell_tome
+    spell_level: 8
+    unlock_chapter: 15
+    uses_per_chapter: 1
+    damage_type: necrotic
+    weapon_dice: "12d8"
+    save: CON
+    range: 4
+    aoe: "2x2"
+
+  - id: incendiary-cloud
+    name: "Incendiary Cloud"
+    flavor: "Smoldering Whiteout — a drifting bank of burning ash he can barely stand near."
+    fe_mechanic: "fire siege tome reflavored as a drifting hazard tile"
+    type: spell_tome
+    spell_level: 8
+    unlock_chapter: 15
+    uses_per_chapter: 1
+    damage_type: fire
+    weapon_dice: "10d8"
+    save: DEX
+    range: 4
+    effect: drifting_hazard_zone
+    flavor_note: "Off-theme on purpose — see immolation."
+
+  - id: meteor-swarm
+    name: "Meteor Swarm"
+    flavor: "Hailfall — the sky splits and boulders of ice and fire rain from the clouds."
+    fe_mechanic: "ultimate siege bombardment (Purge/Bolting-tier), multi-point"
+    type: spell_tome
+    spell_level: 9
+    unlock_chapter: 17
+    uses_per_chapter: 1
+    damage_type: [fire, bludgeoning]
+    weapon_dice: "20d6"
+    save: DEX
+    range: 8
+    aoe: multi_blast
 
 # ── Signature Moment ─────────────────────────────────────────────────────────
 signature_moment:

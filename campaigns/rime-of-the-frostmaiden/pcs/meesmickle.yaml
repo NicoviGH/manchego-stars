@@ -70,14 +70,23 @@ growth_rates:
 inventory:
   - id: eldritch-blast-tome
     name: "Eldritch Blast"
+    flavor: "Hexbolt — crackling beams of raw eldritch force lance out from her claws."
+    fe_mechanic: "locked personal force tome (her basic weapon); beam count = brave-style extra hits"
     damage_type: force
-    weapon_dice: "1d10+3"     # +3 from Agonizing Blast invocation
+    weapon_dice: "1d10"       # base; +CHA per beam once Agonizing Blast is online (Ch2)
     ability_mod: CHA
     range: 4                  # standard 60 ft → ~4 FE tiles (Eldritch Spear extends to 20 tiles end-state)
-    beams_at_endstate: 4      # 4 beams at level 20 (PDF p1: "Count: 4")
     uses: null                # cantrip — infinite uses
     locked: true              # Warlock cantrip, cannot be traded
-    notes: "Agonizing Blast: +3 dmg on hit. Repelling Blast: push target 1 tile on hit. 4 beams at level 20 — each rolls separately."
+    # BEAM COUNT scales with character level (each beam rolls + targets separately):
+    #   1 beam (Ch1–4) → 2 beams (Ch5, L5) → 3 beams (Ch10, L11) → 4 beams (Ch17, L17).
+    # MVP = 1–2 beams; 4 beams is endgame only.
+    beam_scaling:
+      - { chapters: "1-4", beams: 1 }
+      - { chapters: "5-9", beams: 2 }
+      - { chapters: "10-16", beams: 3 }
+      - { chapters: "17-20", beams: 4 }
+    notes: "Agonizing Blast (invocation, Ch2): +CHA to each beam's damage. Repelling Blast: push target 1 tile on hit."
   - id: blood-vial
     name: "Blood Vial"
     is_healing: true
@@ -101,7 +110,10 @@ unique_abilities:
     # CHA mod + FE level (~7 at ch1). Stacks across kills in the same map.
     # FE implementation: passive — on kill, apply a temp HP buff token.
     # Note: these temp HP bypass Unholy Body (not a healing potion).
+    flavor: "Soul Tithe — the Fiend rewards each kill with a sliver of the victim's stolen vitality."
+    fe_mechanic: "on-kill passive: gain temp HP (bypasses her healing restriction)"
     type: passive
+    unlock_chapter: 1         # Fiend L1 → Ch1 (MVP)
     effect: temp_hp_on_kill
     temp_hp_value: 7          # tune in Phase 1 playtesting
 
@@ -111,7 +123,10 @@ unique_abilities:
     # briefly banished and takes 10d10 psychic damage on return.
     # FE implementation: activated skill usable immediately after a successful
     #   Eldritch Blast hit; adds 10d10 psychic to that attack's result.
+    flavor: "Damnation — she banishes a foe screaming through the Nine Hells; it returns broken."
+    fe_mechanic: "1/chapter finisher proc: after an Eldritch Blast hit, adds a massive psychic burst"
     type: activated
+    unlock_chapter: 13        # The Fiend L14 → Ch13 (POST-MVP)
     uses_per_chapter: 1
     damage_dice: "10d10"
     damage_type: psychic
@@ -124,7 +139,10 @@ unique_abilities:
     # Cannot be targeted by ranged attacks while invisible; -3 to adjacent hit rates.
     # FE implementation: activated command (costs turn action, like a Guard stance).
     #   Moving from the tile breaks invisibility.
+    flavor: "Shadowmeld — the cat melts into the dark and simply isn't there anymore."
+    fe_mechanic: "activated stance: untargetable by ranged until she moves or acts (Invocation, Ch2)"
     type: activated           # costs action — NOT a passive
+    unlock_chapter: 2         # Eldritch Invocation tier → Ch2 (MVP)
     effect: invisible_until_move_or_act
 
   - id: feline-agility
@@ -134,6 +152,7 @@ unique_abilities:
     # Models the burst-of-speed that resets each round.
     # FE implementation: passive — after attacking, Meesmickle may move a second time.
     type: passive
+    unlock_chapter: 1         # racial — available from start
     effect: bonus_movement_after_action
     uses_per_turn: 1
 
@@ -147,6 +166,7 @@ unique_abilities:
     # Separate note: she is resistant to necrotic damage.
     # FE implementation: passive flag checked during item use; potions redirect to poison.
     type: passive
+    unlock_chapter: 1         # racial — available from start
     effect: healing_items_deal_poison
     resistance: necrotic
 
@@ -155,7 +175,10 @@ unique_abilities:
     # 1/chapter: choose a damage type — gain resistance (×0.5 incoming) for the rest
     # of the map. Models the short-rest refreshing resistance.
     # FE implementation: activated command that prompts a damage type selection menu.
+    flavor: "Infernal Hide — her fur hardens against whatever's hurting her most today."
+    fe_mechanic: "1/chapter: pick a damage type, gain ×0.5 resistance to it for the rest of the map"
     type: activated
+    unlock_chapter: 9         # The Fiend L10 → Ch9 (POST-MVP)
     uses_per_chapter: 1
     effect: choose_damage_resistance
 
@@ -165,18 +188,142 @@ unique_abilities:
     # Speak a word of power: target with ≤100 HP dies instantly. No save.
     # FE implementation: activated command. Target must have current HP ≤ threshold or it fails.
     # Devastating endgame finisher; pairs with Hurl Through Hell as nuke combo.
+    flavor: "Word of Ending — she speaks a single syllable of the Abyss and a weakened foe simply stops."
+    fe_mechanic: "1/chapter: instakill a target already below the HP threshold (no save)"
     type: activated
+    unlock_chapter: 17        # 9th-level Mystic Arcanum (Warlock L17) → Ch17 (deep endgame)
     uses_per_chapter: 1
     target_max_hp: 100
     effect: instant_kill_if_under_threshold
 
   - id: demiplane
     name: Demiplane
-    # 8th-level Mystic Arcanum. 1/long rest. Creates a 30x30 stone demiplane room.
-    # FE implementation: rarely useful in tactical combat; reserved for narrative/utility.
-    type: activated
+    flavor: "She folds open a pocket of stone-walled nowhere — handy for stashing loot or hiding."
+    fe_mechanic: "NONE — dropped as a combat ability (no FE analogue). Narrative/utility only."
+    # 8th-level Mystic Arcanum. DROPPED as a usable mechanic per rules-mapping §C (no clean FE
+    # analogue for a tactical map). Kept only as a narrative beat she can invoke between battles.
+    type: narrative_utility
+    unlock_chapter: 15        # would arrive at Warlock L15 → Ch15, but non-combat
+    effect: narrative_only
+
+  # ── Known Spell Kit (Warlock = KNOWN-caster; this is her short Pact list) ──
+  # DUAL STRUCTURE: fe_mechanic = vanilla FE8 anchor; flavor = fiend-pact vampire-cat reskin.
+  # Pact slot level → chapter: 1st→Ch1, 2nd→Ch3, 3rd→Ch5, 4th→Ch7. Mystic Arcanums separate
+  # (6th→Ch10, 7th→Ch13, 9th→Ch17 — the big 1/chapter spells).
+
+  - id: toll-the-dead
+    name: "Toll the Dead"
+    flavor: "Death Knell — a mournful bell that tolls louder for the already-wounded."
+    fe_mechanic: "dark tome cantrip; deals extra damage to targets below full HP"
+    type: spell_tome
+    spell_level: 0            # cantrip
+    unlock_chapter: 1
+    damage_type: necrotic
+    weapon_dice: "1d8"        # 1d12 vs wounded
+    save: WIS
+    range: 4
+    uses: null
+    effect: bonus_damage_vs_wounded
+
+  - id: hellish-rebuke
+    name: "Hellish Rebuke"
+    flavor: "Spite — strike the cat and hellfire lashes back up your arm."
+    fe_mechanic: "counterattack proc: when hit in melee, auto-deal fire damage to the attacker"
+    type: reaction
+    spell_level: 1
+    unlock_chapter: 1
+    uses_per_chapter: 3
+    damage_type: fire
+    weapon_dice: "2d10"
+    save: DEX
+    trigger: when_hit
+
+  - id: burning-hands
+    name: "Burning Hands"
+    flavor: "Brimstone Breath — a fan of sulfurous hellfire from her spread claws."
+    fe_mechanic: "fire tome, short cone (a few adjacent tiles)"
+    type: spell_tome
+    spell_level: 1
+    unlock_chapter: 1
+    uses_per_chapter: 2
+    damage_type: fire
+    weapon_dice: "3d6"
+    save: DEX
+    range: 1
+    aoe: cone
+
+  - id: suggestion
+    name: "Suggestion"
+    flavor: "Honeyed Whisper — a purring command the target's body obeys before the mind objects."
+    fe_mechanic: "charm flag: target can't act against Meesmickle this turn (treats her as ally)"
+    type: spell_tome
+    spell_level: 2
+    unlock_chapter: 3
     uses_per_chapter: 1
-    effect: utility_demiplane_room
+    save: WIS
+    range: 3
+    effect: charm_cant_act_vs_caster
+
+  - id: fireball
+    name: "Fireball"
+    flavor: "Hellfire Burst — a bead of fiend-fire that blooms into an inferno."
+    fe_mechanic: "fire siege tome (AoE compromised to siege-range single-target)"
+    type: spell_tome
+    spell_level: 3
+    unlock_chapter: 5
+    uses_per_chapter: 1
+    damage_type: fire
+    weapon_dice: "8d6"
+    save: DEX
+    range: 5
+
+  - id: vampiric-touch
+    name: "Vampiric Touch"
+    flavor: "Bloodletting — she drinks the life out of a foe; perfect for a vampire who can't sip potions."
+    fe_mechanic: "Nosferatu (dark drain): damages the target and heals Meesmickle for a share"
+    type: spell_tome
+    spell_level: 3
+    unlock_chapter: 5
+    uses_per_chapter: 2
+    damage_type: necrotic
+    weapon_dice: "3d6"
+    range: 1
+    effect: damage_and_self_heal   # bypasses Unholy Body's potion restriction
+
+  - id: dark-ones-own-luck
+    name: "Dark One's Own Luck"
+    flavor: "Devil's Favor — the Fiend tips a roll her way, just this once."
+    fe_mechanic: "1/chapter: reroll one of her own failed attacks or saves"
+    type: activated
+    unlock_chapter: 6         # The Fiend L6 → Ch6 (MVP)
+    uses_per_chapter: 1
+    effect: reroll_self
+
+  - id: eyebite
+    name: "Eyebite"
+    flavor: "Evil Eye — a baleful stare that sickens, panics, or simply drops a foe where it stands."
+    fe_mechanic: "1/chapter status proc: inflict one of poison / fear-debuff / sleep on a target"
+    type: activated
+    spell_level: 6            # 6th Mystic Arcanum
+    unlock_chapter: 10        # Warlock L11 → Ch10 (POST-MVP)
+    uses_per_chapter: 1
+    save: WIS
+    range: 4
+    effect: choose_status_sicken_panic_sleep
+
+  - id: finger-of-death
+    name: "Finger of Death"
+    flavor: "Reaper's Touch — a word of unmaking; the slain rise to serve her."
+    fe_mechanic: "dark nuke; if it kills a target, that target rises as a temporary thrall (summon-on-kill)"
+    type: activated
+    spell_level: 7            # 7th Mystic Arcanum
+    unlock_chapter: 13        # Warlock L13 → Ch13 (POST-MVP)
+    uses_per_chapter: 1
+    damage_type: necrotic
+    weapon_dice: "7d8+30"
+    save: CON
+    range: 4
+    effect: damage_and_raise_thrall_on_kill
 
 # ── Signature Moment ─────────────────────────────────────────────────────────
 signature_moment:
