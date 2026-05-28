@@ -353,9 +353,16 @@ unique_abilities:
 
 # ── Signature Moment ─────────────────────────────────────────────────────────
 signature_moment:
-  chapter: tbd               # Nicolas to recall
-  description: "TBD — Nicolas will recall Marty's signature campaign moment"
-  dialogue_trigger: null
+  chapter: ch05-the-maer-monster
+  description: >
+    The Messie Talk. Marty uses Talk with Animals on the plesiosaur Messie mid-fight,
+    learns she was "awakened" by the frost druids and fears losing her intelligence,
+    and resolves the boss peacefully — the moment that "changed everything" in the
+    real campaign (PRD §7, Ch 5). Mechanically the chapter's hidden Talk
+    resolution: get Marty adjacent to Messie and the Talk command appears.
+  dialogue_trigger: marty_messie_talk
+  # Sourced from the DM notes + PRD §7. (His earlier Lonelywood direwolf-taming,
+  # Ch 4 area, is a secondary beat — see ch04 YAML.)
 
 # ── Support Affinities ────────────────────────────────────────────────────────
 supports:

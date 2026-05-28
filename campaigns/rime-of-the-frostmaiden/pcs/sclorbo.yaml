@@ -347,8 +347,12 @@ unique_abilities:
 
 # ── Signature Moment ─────────────────────────────────────────────────────────
 signature_moment:
-  chapter: tbd
-  description: "TBD — Nicolas will recall Sclorbo's signature campaign moment"
+  chapter: tbd               # NICOLAS TO RECALL — not in the DM notes
+  description: >
+    TBD — Nicolas to recall Sclorbo's standout campaign beat. The current DM
+    notes don't single one out (only that he weathered the Targos night out in
+    the snow with Rootis in Ch 2). Candidate hooks once recalled: a clutch
+    Cure-Wounds heal that saves a downed ally in a big-battle chapter.
   dialogue_trigger: null
 
 # ── Support Affinities ────────────────────────────────────────────────────────

@@ -1,0 +1,113 @@
+# chapters/ch06-blood-in-bremen.yaml
+# See docs/PRD.md §7 and docs/chapter-outline.md for the narrative + cadence.
+# Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
+
+id: ch06-blood-in-bremen
+title: "Blood in Bremen"
+chapter_number: 6
+milestone: M3
+cadence: big_battle_gray        # docs/chapter-outline.md — 🟥 (morally gray)
+
+# ── Narrative ──────────────────────────────────────────────────────────────────
+narrative: >
+  The party reports to Dorbulgruf Shalescar, the cantankerous old Speaker, who
+  refuses to pay — claiming nothing was ever promised. Tensions boil over and
+  Braulo swings first. After a bloody battle through the Speaker's hall, the party
+  installs Messie as the new Speaker of Bremen and leaves town in a trail of blood
+  to mixed reception.
+
+# ── Map ────────────────────────────────────────────────────────────────────────
+map:
+  file: maps/ch06-blood-in-bremen.tmx
+  tileset: town-interior        # Speaker's hall + streets
+  size: "22×18"
+  description: >
+    Town interior / Speaker's hall. Civilian NPC units mill in the streets and
+    hall. Guards defend Dorbulgruf at the dais. Doorways and furniture as cover.
+
+# ── Objective ──────────────────────────────────────────────────────────────────
+objective:
+  type: defeat_boss                      # mirrors FE8 Ch6 "Victims of War" = DefeatBoss
+  description: "Defeat Dorbulgruf (his guards needn't all fall)"
+  constraint:
+    type: protect_civilians
+    description: "Civilians are 'don't-kill' NPC units — killing them incurs a penalty (gold/reputation)"
+
+win_condition: boss_defeated
+lose_condition: all_player_units_defeated
+
+difficulty_note: >
+  Morally gray chapter — the party is the aggressor. The civilian no-kill
+  constraint adds spatial care to an otherwise straightforward rout. Dorbulgruf
+  is a sturdy Warrior-class boss but not a puzzle. Dialogue should sit in the
+  ambiguity, not celebrate.
+
+# ── Deployment ──────────────────────────────────────────────────────────────────
+deployment:
+  note: "All 7 PCs + Baxby + Trex + Basil + Mummy. Positions set in Tiled."
+
+# ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
+enemy_units:
+  - id: bremen-guard
+    name: "Bremen Guard"
+    count: 6
+    class: soldier
+    level: 7
+    weapon: iron-lance
+    damage_type: piercing       # flavor label only
+    ai_pattern: defensive
+  - id: bremen-knight
+    name: "Hall Knight"
+    count: 2
+    class: knight
+    level: 8
+    weapon: steel-lance
+    damage_type: piercing
+    ai_pattern: hold_position
+  - id: dorbulgruf
+    name: "Dorbulgruf Shalescar"
+    is_boss: true
+    count: 1
+    class: warrior
+    level: 9
+    weapon: steel-axe
+    damage_type: slashing
+    ai_pattern: hold_position
+    death_quote: "Bah… you were never… worth the coin…"
+
+# ── Civilian NPCs (don't-kill) ────────────────────────────────────────────────────
+npc_units:
+  - id: bremen-civilian
+    count: 4
+    behavior: flee_from_combat
+    must_not_be_killed: true
+    penalty_if_killed: { gold: -100, reputation: -1 }
+
+# ── Events (pacing / cutscene placement) ─────────────────────────────────────────
+events:
+  - trigger: chapter_start
+    type: cutscene
+    ea_file: events/ch06-opening.ea
+    description: >
+      Dorbulgruf refuses payment. Tensions rise. Braulo swings first
+      (braulo_first_swing) — combat begins. Branches on the ch05 messie_spared flag.
+  - trigger: chapter_end
+    type: cutscene
+    ea_file: events/ch06-ending.ea
+    description: >
+      If messie_spared: Messie installed as Speaker; uneasy but hopeful town.
+      If Messie was slain in ch05: a colder installation scene / different
+      Speaker outcome. Either way the party leaves in a trail of blood, mixed
+      reception. Foreshadow: a town crier mentions Easthaven heard of Bremen.
+
+# ── Post-Chapter ─────────────────────────────────────────────────────────────────
+post_chapter:
+  gold_reward: 450
+  available_shops: [bremen]
+  units_available_to_recruit: []
+  unlocks_chapter: ch07-the-eastway-ambush
+
+design_notes: >
+  The party's darkest MVP choice. Lean dialogue into ambiguity. Civilian no-kill
+  constraint is the design hook. Ending branches on messie_spared. The town
+  crier's Easthaven line seeds the ch07 ambush (word of Bremen traveled).

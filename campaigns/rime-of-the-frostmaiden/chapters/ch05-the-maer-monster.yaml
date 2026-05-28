@@ -1,0 +1,117 @@
+# chapters/ch05-the-maer-monster.yaml
+# See docs/PRD.md §7 (esp. the Ch5 design note) and docs/chapter-outline.md.
+# Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
+
+id: ch05-the-maer-monster
+title: "The Maer Monster"
+chapter_number: 5
+milestone: M3
+cadence: marquee_setpiece       # docs/chapter-outline.md — 🎬 (the Navarre/Joshua moment)
+
+# ── Narrative ──────────────────────────────────────────────────────────────────
+narrative: >
+  In Bremen, a drunken captain drafts the party into a fishing crew. They catch
+  knucklehead trout, meet an elven wildlife researcher, then see a vast shadow
+  beneath the ice: Messie, a plesiosaur capsizing boats. Messie separates the
+  party's two boats and attacks. Marty's Talk with Animals reveals she was
+  "awakened" by the frost druids, fears losing her intelligence, and was ordered
+  to terrorize the town. The party can fight her down — or talk her down.
+
+# ── Map ────────────────────────────────────────────────────────────────────────
+map:
+  file: maps/ch05-maer-monster.tmx
+  tileset: water-boats          # water map, 2 boat platforms; custom/community tileset
+  size: "22×16"
+  description: >
+    Tight water map with 2 boats (one for small creatures, one for Braulo/Wolfram).
+    Open water restricts movement; Messie roams; harassing fish flank the boats.
+
+# ── Objective ──────────────────────────────────────────────────────────────────
+objective:
+  type: defeat_boss_or_talk              # mirrors FE8 Ch5 = DefeatBoss; Talk is our hidden alt-resolution
+  description: "Defeat Messie OR have Marty Talk to her while adjacent"
+  hidden_resolution:
+    unit: marty
+    target: messie
+    condition: adjacent
+    command: talk
+    result: peaceful_resolution
+
+win_condition: messie_defeated_OR_messie_talked
+lose_condition: all_player_units_defeated
+
+difficulty_note: >
+  A REAL boss fight (≈FE8 Ch5 difficulty) — Messie is tough but beatable in 8–12
+  turns through combat. The Talk option is discoverable, never forced: pre-chapter
+  dialogue hints Marty can speak with beasts; the Talk command appears only when
+  Marty is adjacent. The long combat window gives players time to notice Talk
+  organically. Two outcomes (see events).
+
+# ── Deployment ──────────────────────────────────────────────────────────────────
+deployment:
+  note: "All 7 PCs + Baxby + Trex + Basil + Mummy, split across the 2 boats. Marty MUST be deployable (his Talk is the hidden resolution). Positions set in Tiled."
+
+# ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
+enemy_units:
+  - id: messie
+    name: "Messie"
+    is_boss: true
+    count: 1
+    class: custom-plesiosaur    # massive boss unit, ≈ early-game FE dragon boss
+    level: 9
+    damage_type: bludgeoning    # flavor label only
+    ai_pattern: boss_roam
+    recruitable_via_talk: marty  # not a playable recruit — becomes a Bremen NPC
+    death_quote: "*a mournful, fading cry beneath the ice*"
+  - id: harrier-fish
+    name: "Knucklehead Swarm"
+    count: 5
+    class: custom-fish
+    level: 5
+    damage_type: piercing
+    ai_pattern: harass          # flank the boats, split player attention
+
+# ── Events (pacing / cutscene placement) ─────────────────────────────────────────
+events:
+  - trigger: chapter_start
+    type: cutscene
+    ea_file: events/ch05-opening.ea
+    description: >
+      Bremen docks; drunken captain drafts the crew; the elven researcher's
+      warning; Marty's pre-chapter beast-speech hint ('I can talk to animals,
+      remember?'). Boats set out.
+  - trigger: unit_adjacent
+    unit: marty
+    target: messie
+    type: command_unlock
+    ea_file: events/ch05-messie-talk.ea
+    description: >
+      The Talk command appears. If used: marty_messie_talk — Messie's story, her
+      fear, the peaceful resolution (the campaign-defining beat). Suggest she run
+      for Speaker of Bremen.
+  - trigger: chapter_end_talk
+    type: cutscene
+    ea_file: events/ch05-ending-peace.ea
+    description: "Peaceful payoff: Messie spared, joins Bremen, set up to become Speaker (pays off in ch06)."
+  - trigger: chapter_end_kill
+    type: cutscene
+    ea_file: events/ch05-ending-kill.ea
+    description: "Brute-force ending: Messie slain; a sadder, quieter scene. Bremen Speaker plot in ch06 differs."
+
+# ── Post-Chapter ─────────────────────────────────────────────────────────────────
+post_chapter:
+  gold_reward: 400
+  available_shops: [bremen]
+  units_available_to_recruit: []   # Messie is an NPC, not a playable unit
+  branch_flag: messie_spared       # consumed by ch06 dialogue
+  unlocks_chapter: ch06-blood-in-bremen
+
+# ── Signature Moment anchored here ───────────────────────────────────────────────
+signature_moments:
+  - pc: marty
+    trigger: marty_messie_talk     # PRIMARY — see pcs/marty.yaml
+
+design_notes: >
+  The emotional centerpiece of the MVP and Marty's primary signature beat. Keep
+  the fight genuinely hard so the Talk feels earned, not handed out. Track the
+  messie_spared flag — ch06's Speaker-installation scene branches on it.

@@ -1,0 +1,116 @@
+# chapters/ch03-the-termalaine-mine.yaml
+# See docs/PRD.md §7 and docs/chapter-outline.md for the narrative + cadence.
+# Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
+
+id: ch03-the-termalaine-mine
+title: "The Termalaine Mine"
+chapter_number: 3
+milestone: M3
+cadence: gimmick_multilevel     # docs/chapter-outline.md — 🟨
+
+# ── Narrative ──────────────────────────────────────────────────────────────────
+narrative: >
+  Kobolds have taken over Termalaine's gemstone mine and miners are vanishing.
+  Inside, the party finds kobolds on the upper levels and Grells lurking in the
+  deep shaft. Wolfram digs out gem samples and snacks on ore; RBG executes a
+  kobold at gunpoint during a "good cop, bad cop" interrogation; the party meets
+  Trex, a clever kobold who fashioned cosmetic wings. They send Pinky to scout
+  the shaft, then slay the Grells.
+
+# ── Map ────────────────────────────────────────────────────────────────────────
+map:
+  file: maps/ch03-termalaine-mine.tmx
+  tileset: cave-interior        # FEUniverse cave tileset, arctic palette swap
+  size: "24×24"                 # multi-level — finalize in Tiled
+  description: >
+    First multi-level interior. Kobolds occupy the upper galleries; a vertical
+    shaft drops to the lower workings where the Grells ambush. Stairs/ladders as
+    chokepoints. Teaches vertical navigation.
+
+# ── Objective ──────────────────────────────────────────────────────────────────
+objective:
+  type: seize
+  description: "Clear the Grells from the lower shaft and seize the mine head"
+  secondary:
+    - type: optional_fight
+      description: "Kobolds can be bypassed (sneak past) or fought — player's choice"
+
+win_condition: seize_point_held
+lose_condition: all_player_units_defeated
+
+difficulty_note: >
+  First map with verticality and optional combat. Kobolds are weak and skippable;
+  the Grells (mini-bosses, CR3-ish) are the real threat in the cramped lower shaft.
+  Reward exploration without forcing the optional kobold fights.
+
+# ── Deployment ──────────────────────────────────────────────────────────────────
+deployment:
+  note: "All 7 PCs + Baxby. Pinky (RBG's homunculus) used as a scripted scout. Positions set in Tiled."
+
+# ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
+enemy_units:
+  - id: kobold
+    name: "Mine Kobold"
+    count: 8
+    class: brigand
+    level: 3
+    weapon: iron-axe
+    damage_type: slashing
+    ai_pattern: defensive       # hold galleries; bypassable
+  - id: grell
+    name: "Grell"
+    is_boss: true               # mini-boss tier
+    count: 2
+    class: custom-grell         # see enemies/ (tbd custom class)
+    level: 5
+    damage_type: lightning      # flavor label only
+    ai_pattern: aggressive
+    death_quote: "*a wet, clicking shriek*"
+
+# ── Chests / Mine Loot ───────────────────────────────────────────────────────────
+chests:
+  - position: tbd               # deep-shaft reward, behind the Grells (risk/reward)
+    contents:
+      - id: gem-cache
+        amount: 300             # gold value
+      - id: stat-booster        # FIRST stat-booster of the game (docs/fe8-pacing-reference.md §3)
+        which: tbd              # e.g. an Energy Ring equivalent — finalize in balance pass
+
+# ── Events (pacing / cutscene placement) ─────────────────────────────────────────
+events:
+  - trigger: chapter_start
+    type: cutscene
+    ea_file: events/ch03-opening.ea
+    description: "Termalaine; the missing miners; party enters the mine. Wolfram eyes the ore."
+  - trigger: midmap
+    type: cutscene
+    ea_file: events/ch03-rbg-execution.ea
+    description: >
+      Mid-map scripted beat: the kobold interrogation. RBG executes the kobold at
+      gunpoint (rbg_kobold_execution). Wolfram's ore-snacking gag plays here too
+      (wolfram_ore_snacking). Then Trex appears and the shaft to the Grells opens.
+  - trigger: chapter_end
+    type: cutscene
+    ea_file: events/ch03-ending.ea
+    description: "Grells slain; party returns to Termalaine for the reward. Trex asks to come along."
+
+# ── Post-Chapter ─────────────────────────────────────────────────────────────────
+post_chapter:
+  gold_reward: 300
+  available_shops: [termalaine]
+  units_available_to_recruit:
+    - id: trex
+      description: "Trex the winged kobold joins post-chapter"
+  unlocks_chapter: ch04-the-elven-tomb
+
+# ── Signature Moments anchored here ──────────────────────────────────────────────
+signature_moments:
+  - pc: prof-rbg
+    trigger: rbg_kobold_execution
+  - pc: wolfram
+    trigger: wolfram_ore_snacking
+
+design_notes: >
+  Two PC signature beats land in the mid-map cutscene (RBG + Wolfram). First
+  stat-booster reward is hidden behind the Grells to teach risk/reward looting.
+  Recruit Trex post-chapter. Verticality is the teaching goal.

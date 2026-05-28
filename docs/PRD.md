@@ -408,7 +408,7 @@ Fire Emblem's gold-and-shop loop is a core part of the game feel — earning gol
 - **Narrative beat:** Party meets at The Northlook tavern in Bryn Shander. Three dwarves hire them to recover a stolen iron ingot shipment. They follow the trail to a goblin camp.
 - **Introduced:** All 7 PCs (available from start), Duvessa Shane (cutscene), Velynne Harpell (brief appearance).
 - **Map type:** Linear snowy trail — Bryn Shander outskirts to goblin camp.
-- **Objective:** Rout (defeat all goblins, recover iron ingots).
+- **Objective:** Seize the goblin camp (mirrors FE8 Ch1); recover the iron ingots.
 - **Enemies:** Goblins (Brigand class, CR 1/4, level 2).
 - **Post-map:** Cutscene — Duvessa Shane hires party for ongoing Ten-Towns work. Baxby purchasable.
 - **Design note:** Introductory chapter. Teaches basic movement, FE combat, and the D&D reskin (damage types, the crit flourish). Keep enemy count low (8–12 goblins).
@@ -417,7 +417,7 @@ Fire Emblem's gold-and-shop loop is a core part of the game feel — earning gol
 - **Narrative beat:** Party travels west to Targos. Ambushed on the road. In Targos they find a frozen body (human sacrifice to Auril) and hear rumors of the Maer Monster.
 - **Introduced:** Baxby joins (if not Ch 1). Frost druids foreshadowed.
 - **Map type:** Open snowy road with sled escort. Enemies from tree lines/snowdrifts.
-- **Objective:** Survive / Rout — wilderness ambush (wolves, bandits, or frost druid scouts).
+- **Objective:** DefeatAll — clear the wilderness ambush (wolves, bandits, frost druid scout), keeping the sled alive (escort constraint).
 - **Enemies:** Wolves (beast class), bandits or frost druid scouts.
 - **Post-map:** Cutscene — Targos arrival, sacrifice discovery, inn scene, overheard rumors about Bremen.
 - **Design note:** Introduces escort mechanic (protect the sled / Rolling Cheddar). Wider map than Ch 1.
@@ -435,7 +435,7 @@ Fire Emblem's gold-and-shop loop is a core part of the game feel — earning gol
 - **Narrative beat:** Through Lonelywood (brief inn stay) to an elven tomb. Frost druid fights to the death. Party finds Basil, solves a moonlight puzzle, awakens a mummy ally.
 - **Introduced:** Basil (recruit), The Mummy (recruit).
 - **Map type:** Forest path leading to tomb interior. Boss arena.
-- **Objective:** Boss Kill — defeat the frost druid. Moonlight puzzle = move units to specific tiles mid-map.
+- **Objective:** DefeatAll — clear the tomb (the frost druid is the last/toughest to fall; mirrors FE8 Ch4's monster-debut). Moonlight puzzle = move units to specific tiles mid-map.
 - **Enemies:** Frost Druid (boss, Druid class), nature-themed minions (wolves, vine blights).
 - **Recruitment:** Basil and The Mummy join post-chapter.
 - **Design note:** First real boss fight. The moonlight puzzle is a mid-map event: move 3 units to glowing tiles simultaneously to open the sarcophagus chamber. Tests positioning awareness.
@@ -444,7 +444,7 @@ Fire Emblem's gold-and-shop loop is a core part of the game feel — earning gol
 - **Narrative beat:** In Bremen, Messie the plesiosaur capsizes fishing boats. Party boards a boat and confronts Messie. This is a genuine boss fight — Messie hits hard and the boats limit movement. But Marty's Talk with Animals ability opens an alternative: get Marty adjacent to Messie and use Talk to learn she was awakened by the frost druid and is afraid of losing her intelligence. Resolve peacefully or keep fighting.
 - **Introduced:** Messie (non-recruitable, becomes Bremen NPC).
 - **Map type:** Water map with 2 boats. Tight space, high tension.
-- **Objective:** Rout OR Talk — this is a real boss fight with a hidden peaceful resolution. Messie is beatable through combat (hard but doable — think FE8 Chapter 5 difficulty), but Marty can Talk to Messie if adjacent, resolving the chapter instantly.
+- **Objective:** DefeatBoss OR Talk — this is a real boss fight with a hidden peaceful resolution. Messie is beatable through combat (hard but doable — think FE8 Chapter 5 difficulty), but Marty can Talk to Messie if adjacent, resolving the chapter instantly.
 - **Enemies:** Messie (massive boss unit, very strong but not invincible — roughly equivalent to an early-game FE dragon boss). Supporting enemies: aggressive fish/water creatures that harass the boats and force the player to split attention.
 - **Design note:** **This is the Navarre/Guy/Joshua moment.** The player is in a real fight — Messie is tough, the boats are cramped, supporting enemies are flanking. It should feel desperate but winnable. The Talk option is discoverable the way classic FE recruitment works: pre-chapter dialogue hints that Marty can speak with beasts ("I can talk to animals, remember?"), and when Marty is adjacent to Messie the Talk command appears in the menu — but the game never forces it. Players who brute-force Messie down get a different (sadder) post-chapter scene. Players who use Talk get the full payoff: Messie joins Bremen peacefully, becoming Speaker later. This mirrors the actual campaign — Marty used Talk with Animals and it changed everything. The fight itself should take 8–12 turns to win through combat, giving the player plenty of time to notice the Talk option organically.
 
@@ -452,7 +452,7 @@ Fire Emblem's gold-and-shop loop is a core part of the game feel — earning gol
 - **Narrative beat:** Party reports to Dorbulgruf Shalescar, who refuses to pay. Braulo swings first. After a bloody battle, the party installs Messie as Speaker.
 - **Introduced:** No new recruits.
 - **Map type:** Town interior / Speaker's hall. Could have civilians as "don't kill" NPC units.
-- **Objective:** Rout — defeat Dorbulgruf and his guards.
+- **Objective:** DefeatBoss — defeat Dorbulgruf (mirrors FE8 Ch6); civilians are don't-kill NPCs.
 - **Enemies:** Dorbulgruf (boss, Warrior class — cantankerous old dwarf), Bremen guards (Soldier/Knight class).
 - **Post-map:** Cutscene — Messie installed as Speaker. Mixed reception from townsfolk.
 - **Design note:** Morally gray chapter — the party attacked the Speaker. Dialogue should reflect this ambiguity. Civilian NPCs on the map add complexity (ally units that can't die, or a penalty for killing them).

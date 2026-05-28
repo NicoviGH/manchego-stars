@@ -1,6 +1,6 @@
 # chapters/ch01-the-iron-trail.yaml
 # See docs/PRD.md §7 for the full chapter narrative breakdown.
-# Combat is vanilla FE (reverted 2026-05-28) — see docs/combat-formulas.md / decisions.md §Combat.
+# Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
 
 id: ch01-the-iron-trail
 title: "The Iron Trail"
@@ -25,8 +25,9 @@ map:
 
 # ── Objective ──────────────────────────────────────────────────────────────────
 objective:
-  type: rout                             # defeat all enemy units
-  description: "Defeat all goblins and recover the iron ingots"
+  type: seize                            # mirrors FE8 Ch1 "Escape!" = Seize
+  description: "Seize the goblin camp — the chief holds it and the ingots are there"
+  seize_tile: [21, 8]                    # goblin camp center (the chief's tile)
   # Secondary objective (optional, no penalty if missed):
   secondary:
     - type: seize_item
@@ -34,7 +35,7 @@ objective:
       description: "Recover the iron ingot cache from the chest in the goblin camp"
 
 # ── Win / Lose Conditions ──────────────────────────────────────────────────────
-win_condition: all_enemies_defeated
+win_condition: seize_point_held
 lose_condition: all_player_units_defeated
 
 # ── Difficulty ─────────────────────────────────────────────────────────────────
@@ -79,31 +80,21 @@ enemy_units:
     positions: [[14,6],[14,8],[14,10],[15,7],[15,9],[16,8]]
     class: brigand
     level: 2
-    d20_fields:
-      AC: 11
-      ability_mod_atk: STR
-      prof_bonus: 2
     inventory:
-      - id: shortsword
-        damage_type: piercing
-        weapon_dice: "1d6"
+      - id: iron-axe
+        damage_type: slashing   # cosmetic flavor label
     ai_pattern: aggressive   # move toward nearest player unit and attack
 
   - id: goblin-archer
     name: "Goblin Archer"
     count: 3
     positions: [[17,5],[17,11],[19,8]]
-    class: fighter             # archer variant
+    class: archer
     level: 2
-    d20_fields:
-      AC: 11
-      ability_mod_atk: DEX
-      prof_bonus: 2
     inventory:
-      - id: shortbow
-        damage_type: piercing
-        weapon_dice: "1d6"
-        range: 2               # FE tile range
+      - id: iron-bow
+        damage_type: piercing   # cosmetic flavor label
+        range: 2                # FE tile range (bows hit at range 2; no melee counter)
     ai_pattern: defensive      # stay in place, attack from range
 
   - id: goblin-chief
@@ -113,14 +104,9 @@ enemy_units:
     position: [21, 8]          # goblin camp center
     class: brigand
     level: 4
-    d20_fields:
-      AC: 13
-      ability_mod_atk: STR
-      prof_bonus: 2
     inventory:
-      - id: greatclub
-        damage_type: bludgeoning
-        weapon_dice: "1d8"
+      - id: greatclub           # maps to an FE axe under the hood
+        damage_type: bludgeoning # cosmetic flavor label
       - id: iron-ingots         # drops on death → chapter item objective
         is_key_item: true
     ai_pattern: hold_position   # stays at camp, guards the ingots
@@ -179,8 +165,8 @@ post_chapter:
 # ── Design Notes ───────────────────────────────────────────────────────────────
 design_notes: >
   Introductory chapter. Teaches: basic movement, attack (vanilla FE combat with
-  the D&D reskin + crit flourish), the weapon-type system (goblin uses piercing —
-  demo that slashing swords beat it), and the Rage consumable (Braulo should use
-  it at least once naturally).
+  the cosmetic D&D damage-type reskin + crit flourish), the weapon triangle (the
+  goblins wield axes — demo that the party's swords beat them), and the Rage
+  consumable (Braulo should use it at least once naturally).
   Keep it short — 8–10 turns to clear. No complex events. Big focus on the
   combat UI tutorial feeling natural and legible.

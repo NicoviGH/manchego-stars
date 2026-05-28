@@ -1,0 +1,124 @@
+# chapters/ch02-cold-welcome.yaml
+# See docs/PRD.md §7 and docs/chapter-outline.md for the narrative + cadence.
+# Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
+
+id: ch02-cold-welcome
+title: "Cold Welcome"
+chapter_number: 2
+milestone: M3
+cadence: breather_escort        # docs/chapter-outline.md — 🟦
+
+# ── Narrative ──────────────────────────────────────────────────────────────────
+narrative: >
+  The party escorts the sled west toward Targos and is ambushed on the open road.
+  In Targos they find a frozen body — a human sacrifice to Auril — and overhear
+  that frost druids have been spreading word that Ten-Towners must appease the
+  Frostmaiden. Rumor of the Maer Monster off Bremen surfaces at the inn.
+
+# ── Map ────────────────────────────────────────────────────────────────────────
+map:
+  file: maps/ch02-cold-welcome.tmx
+  tileset: snow-road
+  size: "28×18"                 # wider than ch01 — finalize in Tiled
+  description: >
+    Open snowy road with the Rolling Cheddar sled escorted along it. Enemies
+    emerge from tree lines and snowdrifts on both flanks. Targos gate at the far edge.
+
+# ── Objective ──────────────────────────────────────────────────────────────────
+objective:
+  type: defeat_all                       # mirrors FE8 Ch2 "The Protected" = DefeatAll
+  description: "Defeat all the road ambushers"
+  constraint:
+    type: protect_escort                 # the escort-teaching layer rides on top
+    unit: rolling-cheddar
+    description: "Keep the Rolling Cheddar sled alive while clearing the ambush"
+
+win_condition: all_enemies_defeated
+lose_condition: all_player_units_defeated_OR_sled_destroyed
+
+# ── Difficulty ─────────────────────────────────────────────────────────────────
+difficulty_note: >
+  Teaches the escort mechanic — the sled is a slow ally unit that must be
+  protected. Wider map than ch01; enemies attack from flanks to pressure
+  formation. Comfortable vanilla-FE hit rates (~75%). One small reinforcement
+  wave from the rear at turn 3 to teach rear-guard awareness.
+
+# ── Deployment ──────────────────────────────────────────────────────────────────
+deployment:
+  note: "All 7 PCs + Baxby (if purchased in ch01) + the Rolling Cheddar sled (escort NPC). Positions set in Tiled."
+  escort_unit:
+    id: rolling-cheddar
+    type: sled
+    behavior: follows_road_toward_gate
+    must_survive: true
+
+# ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
+enemy_units:
+  - id: ambush-wolf
+    name: "Snow Wolf"
+    count: 5
+    class: wolf            # beast — see class-mapping.md
+    level: 3
+    damage_type: piercing  # flavor label only
+    ai_pattern: aggressive
+  - id: bandit
+    name: "Road Bandit"
+    count: 4
+    class: brigand
+    level: 3
+    weapon: iron-axe
+    damage_type: slashing
+    ai_pattern: aggressive
+  - id: frost-druid-scout
+    name: "Frost Druid Scout"
+    is_boss: true
+    count: 1
+    class: shaman          # caster — flees rather than dies if possible
+    level: 4
+    weapon: flux-tome
+    damage_type: necrotic  # flavor label only
+    ai_pattern: hold_position
+    death_quote: "Auril sees you… the cold will have you yet."
+
+# ── Chests / Village ─────────────────────────────────────────────────────────────
+chests:
+  - position: tbd
+    contents:
+      - id: vulnerary
+        count: 1
+      - id: gold
+        amount: 120
+
+# ── Events (pacing / cutscene placement) ─────────────────────────────────────────
+events:
+  - trigger: chapter_start
+    type: cutscene
+    ea_file: events/ch02-opening.ea
+    description: "Setting off from Bryn Shander with the sled. Velynne Harpell's warning about the missing orb echoes (foreshadow)."
+  - trigger: turn_start
+    turn: 3
+    type: reinforcement
+    ea_file: events/ch02-rear-ambush.ea
+    description: "Wolves emerge from the rear tree line — teach rear-guard."
+  - trigger: chapter_end
+    type: cutscene
+    ea_file: events/ch02-targos-inn.ea
+    description: >
+      Targos arrival. The frozen-sacrifice discovery. Inn scene: only RBG, Marty,
+      and Meesmickle take rooms; Braulo holes up in his shell, Rootis and Sclorbo
+      camp in the snow, Wolfram forges armored siding onto the sled from the ch01
+      iron ingots. Overheard rumors: Messie the Maer Monster off Bremen; frost
+      druids north near Lonelywood. Party decides to head north first.
+
+# ── Post-Chapter ─────────────────────────────────────────────────────────────────
+post_chapter:
+  gold_reward: 250
+  available_shops: [targos]
+  units_available_to_recruit: []   # Baxby is ch01; no new recruit here
+  unlocks_chapter: ch03-the-termalaine-mine
+
+# ── Design Notes ─────────────────────────────────────────────────────────────────
+design_notes: >
+  Wolfram's sled-armoring (iron ingots → sled siding) is his secondary signature
+  beat — show it in the inn cutscene. The frost-druid scout is the first caster
+  enemy: demonstrate vanilla FE magic combat (MAG vs RES), no saving throws.

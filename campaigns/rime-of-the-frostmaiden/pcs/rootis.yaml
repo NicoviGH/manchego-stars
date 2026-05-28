@@ -411,8 +411,12 @@ unique_abilities:
 
 # ── Signature Moment ─────────────────────────────────────────────────────────
 signature_moment:
-  chapter: tbd               # Nicolas to recall
-  description: "TBD — Nicolas will recall Rootis's signature campaign moment"
+  chapter: tbd               # NICOLAS TO RECALL — not in the DM notes
+  description: >
+    TBD — Nicolas to recall Rootis's standout campaign beat. The current DM notes
+    don't single one out (only that he weathered the Targos night out in the snow
+    with Sclorbo in Ch 2). Candidate hooks once recalled: a tank/Snow-Body
+    "wall" moment holding a chokepoint in a big-battle chapter.
   dialogue_trigger: null
 
 # ── Support Affinities ────────────────────────────────────────────────────────

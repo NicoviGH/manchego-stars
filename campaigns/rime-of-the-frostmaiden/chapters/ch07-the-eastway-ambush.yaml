@@ -1,0 +1,123 @@
+# chapters/ch07-the-eastway-ambush.yaml
+# See docs/PRD.md §7 and docs/chapter-outline.md for the narrative + cadence.
+# Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
+# THIS IS THE MVP FINALE — an unwinnable battle by design, ending on a cliffhanger.
+
+id: ch07-the-eastway-ambush
+title: "The Eastway Ambush"
+chapter_number: 7
+milestone: M3
+cadence: scripted_defeat        # docs/chapter-outline.md — 🎬 (the MVP wall)
+is_mvp_finale: true
+
+# ── Narrative ──────────────────────────────────────────────────────────────────
+narrative: >
+  Feeling like proper local heroes, the party treks the Eastway toward Easthaven
+  and enters an ice canyon. Easthaven guards ambush from both walls, demanding
+  surrender for the Bremen bloodshed. The party begins to allow arrest — until
+  Braulo bursts his shackles and attacks. They fend off the guards and even get
+  the Rolling Cheddar rolling, but ice trolls in Easthaven garb swarm with
+  boulders. The party is overwhelmed and goes down. They wake on the road to
+  Revel's End, the most secure prison in Faerûn.
+
+# ── Map ────────────────────────────────────────────────────────────────────────
+map:
+  file: maps/ch07-eastway-ambush.tmx
+  tileset: ice-canyon
+  size: "30×14"
+  description: >
+    Narrow ice canyon, high walls. Guards pour in from both ends. The Rolling
+    Cheddar sits mid-canyon (the party tries to reach it). Ice-troll reinforcements
+    arrive at turns 4–5; boulders block the exit at turn 6.
+
+# ── Objective ──────────────────────────────────────────────────────────────────
+objective:
+  type: survive
+  description: "Survive 8–10 turns — the outcome is scripted (unwinnable by design)"
+  turns: 10
+
+win_condition: none             # there is no victory — scripted defeat at the timer
+lose_condition: timer_expires_scripted_defeat
+
+difficulty_note: >
+  UNWINNABLE BY DESIGN. The player should feel heroic for lasting the full timer,
+  but the loss is fixed. Fire weapons are EFFECTIVE vs ice trolls (vanilla FE
+  weapon effectiveness) — the party can exploit it but lacks the firepower to clear
+  them. Tune so a skilled party survives to the timer without a premature wipe;
+  the scripted defeat cutscene then plays regardless.
+
+# ── Deployment ──────────────────────────────────────────────────────────────────
+deployment:
+  note: "All 7 PCs + Baxby + Trex + Basil + Mummy. Positions set in Tiled. (Casual/Classic permadeath toggle still applies up to the scripted end.)"
+
+# ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
+enemy_units:
+  - id: easthaven-guard
+    name: "Easthaven Guard"
+    count: 20
+    class: soldier            # mix soldier/knight
+    level: 8
+    weapon: iron-lance
+    damage_type: piercing     # flavor label only
+    ai_pattern: aggressive
+  - id: ice-troll
+    name: "Ice Troll"
+    is_boss: true             # boss-tier reinforcements
+    count: 4
+    class: custom-ice-troll
+    level: 11
+    weapon: boulder-throw     # thrown bludgeoning; effective-weakness: fire
+    damage_type: bludgeoning
+    weakness: fire            # vanilla FE weapon effectiveness (fire is effective)
+    ai_pattern: aggressive
+    arrives: { turn: 4 }
+
+# ── Events (pacing / cutscene placement) ─────────────────────────────────────────
+events:
+  - trigger: chapter_start
+    type: cutscene
+    ea_file: events/ch07-opening.ea
+    description: "Heroes' high spirits → the canyon ambush. Guards demand surrender for Bremen."
+  - trigger: turn_start
+    turn: 1
+    type: scripted_event
+    ea_file: events/ch07-braulo-shackles.ea
+    description: "Braulo bursts his shackles (braulo_shackle_break — his signature beat). Fight begins."
+  - trigger: turn_start
+    turn: 4
+    type: reinforcement
+    ea_file: events/ch07-ice-trolls.ea
+    description: "Ice trolls in Easthaven garb arrive throwing boulders."
+  - trigger: turn_start
+    turn: 6
+    type: scripted_event
+    ea_file: events/ch07-boulders-block.ea
+    description: "Boulders block the canyon exit — the Rolling Cheddar can't get through."
+  - trigger: timer_expires
+    type: cutscene
+    ea_file: events/ch07-defeat.ea
+    description: >
+      Scripted defeat. Party goes unconscious, fade to black. Text: 'You wake up
+      on the road to Revel's End...' Cliffhanger. Credits roll. (MVP ends here.)
+
+# ── Signature Moment anchored here ───────────────────────────────────────────────
+signature_moments:
+  - pc: braulo
+    trigger: braulo_shackle_break   # see pcs/braulo.yaml
+
+# ── Post-Chapter (MVP boundary) ──────────────────────────────────────────────────
+post_chapter:
+  gold_reward: 0                # captured — no reward
+  promotion_seam:               # docs/chapter-outline.md — Ch7→8 seam
+    note: >
+      The locked 'crest of cold iron' (dropped by the ch04 frost druid) and the
+      FIRST Master-Seal-equivalent pay off in the post-MVP prison-break chapter
+      (ch08, not yet authored — pending DM notes). Promotions go live ch09–11.
+  unlocks_chapter: ch08-revels-end   # POST-MVP — not yet authored (see chapter-outline.md Act II)
+  ends_mvp: true
+
+design_notes: >
+  The MVP wall. An unwinnable, heroic last stand → Revel's End cliffhanger +
+  credits (PRD §20 DoD #9). Braulo's shackle-break is the turn-1 signature beat.
+  Fire-vs-ice-troll effectiveness is the one bit of vanilla-FE tactics the player
+  can exploit. Everything after this chapter is gated on the rest of the DM notes.
