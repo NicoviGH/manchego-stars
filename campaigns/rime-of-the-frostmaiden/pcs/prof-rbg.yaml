@@ -113,17 +113,60 @@ d20_fields:
 
 # ── Unique Abilities ─────────────────────────────────────────────────────────
 unique_abilities:
-  - id: eldritch-cannon
-    name: "Eldritch Cannon"
-    # 1/chapter (or spend a 1st-level spell slot): deploy a Force Ballista at an adjacent
-    # empty tile. The Ballista acts as an allied NPC unit with its own action (1d8 force, ranged 3).
-    # Ballista: HP 20, DEF 8, RES 0, cannot move, auto-removed at chapter end.
-    # Explosive Cannon: can detonate for 3d8 force AoE (2-tile radius) as an action if within 4 tiles.
-    # Fortified Position: allies within 2 tiles of the cannon have half cover (+2 DEF/RES).
-    # FE implementation: activated command that spawns a temporary allied unit.
+  - id: pepperjack
+    name: "Pepperjack"
+    # RBG's canonical first Eldritch Cannon — sentient automaton with a chili-pepper
+    # mustache, red star, and fierce single eye (grey chassis).
+    # Renamed from "Eldritch Cannon" → "Pepperjack" on 2026-05-27 to reflect canon.
+    #
+    # SPEECH: Pokemon-style — Pepperjack can only say his own name ("Pepperjack!").
+    # All combat barks, deployment dialogue, and death lines render as variants of
+    # "Pepperjack!" in the UI.
+    #
+    # RELATIONSHIP: Pepperjack is dating Brie (the second cannon). Adjacency dialogue
+    # / support triggers between the two should reflect this.
+    #
+    # 1/chapter (or spend a 1st-level spell slot): deploy Pepperjack at an adjacent
+    # empty tile. Pepperjack acts as an allied NPC unit with its own action.
+    # Modes (Artificer Artillerist): Flamethrower (fire AoE), Force Ballista (1d8 force ranged 3),
+    # Protector (defensive aura — half cover for allies within 2 tiles).
+    # Stats at ch1: HP 20, DEF 8, RES 0, cannot move, auto-removed at chapter end.
+    # End-state (Artificer 15+): paired with Brie for 2 simultaneous cannons, AC 18, 100 HP each.
+    # Explosive Cannon: detonate for 3d8 force AoE (2-tile radius) as an action if within 4 tiles.
     type: activated
     uses_per_chapter: 1
-    spawn_unit: eldritch-cannon-ballista
+    spawn_unit: pepperjack-cannon
+    canonical_name: Pepperjack
+    speech_mode: pokemon_self_name      # only says "Pepperjack!"
+    paired_with: brie
+    portrait_ref: data/portraits/pepperjack-and-brie.jpeg
+    portrait_source_ref: "References/PCs/Pepperjack and Brie Portrait.jpeg"
+
+  - id: brie
+    name: "Brie"
+    # RBG's second Eldritch Cannon, unlocked at a later chapter (TBD — likely Ch 4-5
+    # when Artificer 9+ "Arcane Jolt" / second-cannon feature would trigger).
+    # Sentient automaton: pink chassis, cyan star, glamorous purple eye with eyeshadow,
+    # ribbon-curled horn. Pepperjack's girlfriend.
+    #
+    # SPEECH: Pokemon-style — Brie can only say her own name ("Brie!").
+    #
+    # RELATIONSHIP: dating Pepperjack. Cute adjacency dialogue between the two when both
+    # are deployed (e.g., they say each other's names back and forth).
+    #
+    # Same mechanical kit as Pepperjack (Flamethrower / Force Ballista / Protector modes).
+    # When both deployed: RBG fields TWO simultaneous cannons, fulfilling the Artificer
+    # Artillerist endgame fantasy (level 15+ feature in 5e).
+    type: activated
+    uses_per_chapter: 1
+    unlock_chapter: tbd                  # Nicolas to confirm; placeholder Ch 4
+    requires_unlock: pepperjack-already-known
+    spawn_unit: brie-cannon
+    canonical_name: Brie
+    speech_mode: pokemon_self_name      # only says "Brie!"
+    paired_with: pepperjack
+    portrait_ref: data/portraits/pepperjack-and-brie.jpeg
+    portrait_source_ref: "References/PCs/Pepperjack and Brie Portrait.jpeg"
 
   - id: flash-of-genius
     name: "Flash of Genius"

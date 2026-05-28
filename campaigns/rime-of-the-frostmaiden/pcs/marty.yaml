@@ -82,8 +82,10 @@ dnd:
 # ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
 # Adjust during Phase 1 playtesting.
 fe_stats:
-  class: "Shaman (Druid)"    # FE base class — custom Druid variant of Shaman
-  promoted_class: Summoner
+  class: "Monk (Druid)"      # FE base class — Monk chassis reflavored as Druid.
+                             # Moved off Shaman in 2026-05-27 audit to differentiate from Meesmickle.
+                             # See docs/class-mapping.md and docs/decisions.md.
+  promoted_class: Summoner   # custom promotion; standard FE8 Summoner sprite
   level: 1
   HP: 16
   STR: 2                     # not a melee fighter

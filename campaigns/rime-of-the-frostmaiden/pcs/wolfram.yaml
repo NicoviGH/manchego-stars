@@ -175,65 +175,53 @@ unique_abilities:
     damage_type: fire
     ch1_damage_dice: "2d6"        # scales to 3d6 / 4d6 / 5d6 in later chapters
 
-  - id: devils-sight
-    name: "Devil's Sight"
-    # Metallurgist invocation: see normally (not just darkvision) in all darkness up to 120 ft,
-    # including magical darkness. Wolfram never has visibility penalties.
+  - id: enhanced-darkvision
+    name: "Enhanced Darkvision"
+    # Mineralscale Drakeborn racial: darkvision to 120 ft (JSON key feature), seeing normally
+    # even in magical darkness. (Was mislabeled "Devil's Sight / Metallurgist invocation" —
+    # Metallurgist has no invocations; that leaked from the D&D Beyond Warlock approximation.)
     # FE implementation: passive — ignores all darkness visibility modifiers.
     type: passive
+    unlock_chapter: 1
     effect: see_normally_in_darkness
     range_ft: 120
 
-  - id: minions-of-chaos
-    name: "Minions of Chaos"
-    # Metallurgist: 1/chapter — conjure an elemental (CR ≤ level/3).
-    # Element chosen at time of use: fire, earth, water, or air.
+  # ── High-tier spells from Wolfram's character sheet ──
+  # NOTE (2026-05-28): D&D Beyond approximated the homebrew Metallurgist as a Warlock, so
+  # these appeared on his sheet via the Mystic Arcanum slots / METALLO patron grants. They
+  # are REAL (listed in data/pc-sheets/wolfram.json notable_spells), so we respect them.
+  # The previously-listed "Investiture of Stone", "Forcecage", and "Power Word Stun" were
+  # NOT on his sheet (invented in an earlier pass) and have been removed.
+  # Gated by spell level on the 1:1 chapter curve (see docs/class-progression-tables.md).
+
+  - id: conjure-elemental
+    name: "Conjure Elemental"
+    # On sheet (5th-level conjuration). Was mislabeled "Minions of Chaos".
+    # Summon an elemental (fire/earth/water/air) as a temporary allied unit.
     # FE implementation: activated command — spawns an elemental allied unit on the map.
     type: activated
+    unlock_chapter: 9             # 5th-level spell → 5e L9 on the 1:1 curve (post-MVP)
     uses_per_chapter: 1
     effect: conjure_elemental_unit
 
-  - id: power-word-stun
-    name: "Power Word Stun"
-    # 8th-level Mystic Arcanum: target with ≤150 HP is Stunned.
-    # Stunned: cannot move, act, or react. Repeats CON save at end of each turn to end.
-    # FE implementation: activated command — enemy cannot act, and rolls CON save each turn.
+  - id: creation
+    name: "Creation"
+    # On sheet (5th-level conjuration) — was missing from the YAML entirely. Added 2026-05-28.
+    # Create nonliving matter (stone/metal) — terrain/cover or a temporary barrier.
+    # FE implementation: activated command — place a destructible terrain/cover tile.
     type: activated
-    uses_per_chapter: 1           # 1/long rest (Mystic Arcanum)
-    target_max_hp: 150            # only works on targets with ≤150 HP
-    effect: stunned_until_save
-    save: CON
-    save_dc: 18                   # 8 + INT mod + prof bonus at end-state
+    unlock_chapter: 9             # 5th-level spell → post-MVP
+    uses_per_chapter: 1
+    effect: create_terrain_or_cover
 
   - id: imprisonment
     name: Imprisonment
-    # 9th-level Mystic Arcanum: permanently trap one creature.
-    # Incapacitated and immune to all damage until a specific condition is met.
-    # FE implementation: activated command — removes enemy from the map until chapter end.
+    # On sheet (9th-level abjuration). Permanently trap one creature until a condition is met.
+    # FE implementation: activated command — removes an enemy from the map until chapter end.
     type: activated
-    uses_per_chapter: 1           # 1/long rest (Mystic Arcanum)
-    effect: remove_from_map_permanent
-
-  - id: investiture-of-stone
-    name: "Investiture of Stone"
-    # 6th-level Mystic Arcanum: transform Wolfram into a stone form for the map phase.
-    # Resistance to nonmagical bludgeoning/piercing/slashing; can move through stone;
-    # action to shape stone into a difficult-terrain rumble.
-    # FE implementation: activated buff status with B/P/S resistance for the map.
-    type: activated
-    uses_per_chapter: 1           # 1/long rest
-    effect: stone_form_status
-
-  - id: forcecage
-    name: Forcecage
-    # 7th-level Mystic Arcanum: trap a target in a 20-ft force cage for 1 hour.
-    # Targets fail a CHA save are imprisoned; cannot leave the cage by any means.
-    # FE implementation: activated command that locks an enemy in place for the chapter.
-    type: activated
-    uses_per_chapter: 1           # 1/long rest
-    save: CHA
-    save_dc: 19
-    effect: lock_target_in_place
+    unlock_chapter: 17            # 9th-level spell → 5e L17 on the 1:1 curve (deep endgame)
+    uses_per_chapter: 1
+    effect: remove_from_map_until_chapter_end
 
   - id: feral-strike-bite
     name: "Feral Strike: Bite"

@@ -196,12 +196,22 @@ unique_abilities:
     name: "Dragon Wings"
     # ALREADY AVAILABLE (not promotion-locked — PDF confirms this is a level 14 class feature,
     # and Rootis is level 20). Bonus action to sprout/dismiss wings; fly speed = walking speed.
-    # In FE: Rootis has Flier movement type available as a toggle from Chapter 1.
-    #   Toggle on: ignores terrain penalties, can cross water/mountains.
-    #   Toggle off: normal movement.
-    # FE implementation: activated toggle command (bonus action equivalent).
-    type: activated
-    unlocks_at_promotion: false  # already available
+    #
+    # FE implementation (decided 2026-05-27): MANAKETE-STYLE CLASS TRANSFORM.
+    # Reuses the FE8 Manakete/Myrrh transform code path (Dragonstone mechanic).
+    #   Foot form  = Mage (Ice) — base movement, ~5 MOV, normal terrain rules
+    #   Dragon form = custom flier Sage variant — flier MOV, ignores terrain
+    # Toggle is an in-combat command. Each toggle CONSUMES 1 Sorcery Point to gate spam
+    # (mirrors the 5e bonus-action cost model). When SP pool is empty, Rootis is locked
+    # into whichever form he's currently in until chapter end.
+    # See docs/decisions.md and docs/class-mapping.md.
+    type: class_transform
+    unlocks_at_promotion: false  # already available — Sorcerer 14 feature, end-state
+    transform_to: "Sage (Dragon Form)"
+    transform_from: "Mage (Ice)"
+    cost_per_toggle:
+      resource: sorcery_points
+      amount: 1
     effect: flier_movement_toggle
 
   - id: elemental-affinity-cold

@@ -10,7 +10,7 @@
 ## TL;DR
 
 - **Heavily caster-skewed:** 5 of 7 PCs cast spells (Marty WIS, Meesmickle CHA, RBG INT, Rootis CHA, Sclorbo CHA).
-- **Only 2 frontliners:** Braulo (Berserker) and Wolfram (General). One glass cannon, one wall.
+- **Only 2 frontliners:** Braulo (Berserker) and Wolfram (General). Both are walls — Braulo has Hermit Crab natural armor (flat AC 17, 285 HP, 75% HP growth + 50% DEF growth) and Shell Defense; Wolfram has AC 26 General-tier defenses. The party has no glass-cannon frontliner.
 - **No dedicated healer in the PC roster.** Sclorbo (Bard 16) is the de-facto primary healer — Cure Wounds, Revivify, Mass Cure Wounds, Raise Dead all on his prepared list.
 - **No flier in the PCs at base** — Pinky NPC fills from Ch1; Rootis has Dragon Wings as a toggle from level 1 (Sorcerer 14 feature, end-state already reached).
 - **No thief / no cavalry in the PCs.** Trex (Ch3) and Baxby (Ch1–2) NPCs fill those slots.

@@ -121,6 +121,41 @@ _Decided: May 2026_
 
 ---
 
+## Class Mapping Refinements (2026-05-27 audit)
+
+**Marty: base class is Monk, not Shaman**
+Original mapping had both Marty (Druid/Spores) and Meesmickle (Warlock/Fiend) on the FE8 Shaman chassis — identical sprites. Moved Marty to Monk (FE8 Light-magic male caster, Saleh-line) for visual differentiation. Promoted form remains Summoner. Some palette reflavor needed for the Light→Necrotic visual transition.
+_Decided: 2026-05-27_
+
+**Sclorbo: promoted class is Lore Bishop, not Lore Bard**
+PDF audit (2026-05-27) confirmed Cure Wounds, Revivify, Mass Cure Wounds, and Raise Dead all prepared on Sclorbo's Bard 16 list. He is the party's primary healer/reviver. Lore Bishop is a custom hybrid: Dancer chassis at base, Bishop-tier healing at promotion, Dance retained as a unique skill. **Balance lever:** per turn, Sclorbo can either Dance/Refresh OR Cast, not both. Combined with chapter-gated heal tiers and finite spell slots, prevents one-man support engine.
+_Decided: 2026-05-27_
+
+**Rootis: Dragon Wings is a Manakete-style class transform**
+Dragon Wings (Sorcerer 14 feature, end-state) is implemented as a toggleable class transform reusing FE8's Manakete/Myrrh code path. Foot form = Mage (Ice), Dragon form = custom flier Sage with terrain-ignoring movement. Each toggle consumes 1 Sorcery Point to prevent spam.
+_Decided: 2026-05-27_
+
+**RBG fields two sentient cannons: Pepperjack (Ch 1) and Brie (later)**
+RBG's deployable summons are two named automatons:
+- **Pepperjack** — first cannon, available from Ch 1
+- **Brie** — second cannon, unlocked at a later chapter (TBD). Pepperjack's girlfriend.
+
+Both speak Pokemon-style — they can only say their own names ("Pepperjack!" / "Brie!"). Adjacency / support dialogue between them uses this convention. Combined portrait at `data/portraits/pepperjack-and-brie.jpeg`. Source: `References/PCs/Pepperjack and Brie Portrait.jpeg`.
+_Decided: 2026-05-27_
+
+**FE stat column folds 5e stats to FE stats**
+Class-mapping docs surface FE engine stats (STR/DEX/MAG/etc.) instead of 5e stats (WIS/INT/CHA). All magic-stat 5e classes (WIS Druid, INT Artificer, CHA Warlock/Sorcerer/Bard) use MAG in engine. Flavor distinctions stay in YAML metadata, not class mapping.
+_Decided: 2026-05-27_
+
+**Wolfram & RBG hybrid casters: physical chassis primary, spells secondary**
+Both PCs keep their physical-class chassis (Knight, Archer). Spell access is a layered overlay tuned by:
+- Tight spell-slot economy (chapter-refresh, no purchasing)
+- Cantrips are infinite but lower damage tier than dedicated casters
+- Primary identity stat is physical (STR Wolfram, DEX RBG); MAG is secondary
+_Decided: 2026-05-27_
+
+---
+
 ## Open Questions (not yet decided)
 
 See `docs/PRD.md §13` for the full list. Key unresolved items:

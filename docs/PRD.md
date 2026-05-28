@@ -346,13 +346,13 @@ Radiant (Light) > Necrotic (Dark) > Elemental (Anima) > Radiant
 
 | PC | 5e Class | FE Base Class | FE Promoted Class | Primary Stat | Unique Mechanic |
 |---|---|---|---|---|---|
-| Braulo | Barbarian (Berserker) | Pirate | Berserker | STR | Rage (consumable item: +4 dmg, B/P/S resistance). Shell Defense (command: +4 DEF, can't move). |
-| Marty | Druid (Circle of Spores) | Shaman (custom Druid) | Summoner | WIS | Halo of Spores (innate AoE reaction: 1d10 necrotic). Symbiotic Entity (+temp HP). Fungal Infestation (summon). |
-| Meesmickle | Warlock (The Fiend) | Shaman (Dark) | Dark Sage | CHA | Eldritch Blast (∞-use dark tome, 4 beams at cap). Dark One's Blessing (temp HP on kill). Hurl Through Hell (1/chapter nuke). |
-| Prof. RBG | Artificer (Artillerist) | Archer | Artillerist (custom promotion) | INT | Fonduedler (personal ranged weapon, 1d10). Eldritch Cannon (deployable ballista unit). Flash of Genius (reaction: +5 ally save). Infusions (item crafting between chapters). Archer base class fills the party's ranged physical gap; promotion to Artillerist adds cannon deployment. |
-| Rootis | Sorcerer (Draconic) | Mage (Fire) | Sage | CHA→MAG | Metamagic (Twinned = attack twice, Empowered = reroll damage). Dragon Wings (flight at promotion). Sorcery Points resource. |
-| Sclorbo | Bard (College of Lore) | Dancer (custom Bard) | Custom Lore Bard | CHA | Bardic Inspiration (d12 buff to adjacent ally). Cutting Words (debuff reaction: subtract die from enemy roll). Dance/Refresh action. |
-| Wolfram | Metallurgist (Smith) | Knight | General | STR+INT | Forge ability (upgrade ally armor/weapons between chapters). AC 26 equivalent (highest DEF in party). Feral Strike (Bite + Claws bonus attacks). Shield spell (reaction). |
+| Braulo | Barbarian (Berserker) | Pirate | Berserker | STR | Rage (consumable item: +4 dmg, B/P/S resistance). Shell Defense (command: +4 DEF, can't move). Hermit Crab natural armor → flat AC 17. |
+| Marty | Druid (Circle of Spores) | Monk (custom Druid) | Summoner (custom) | MAG | Halo of Spores (innate AoE reaction: 1d10 necrotic). Symbiotic Entity (+temp HP). Fungal Infestation (summon). Moved off Shaman in 2026-05-27 audit to differentiate from Meesmickle. |
+| Meesmickle | Warlock (The Fiend) | Shaman (Dark) | Dark Sage | MAG | Eldritch Blast (∞-use dark tome, 4 beams at cap). Dark One's Blessing (temp HP on kill). Hurl Through Hell (1/chapter nuke). |
+| Prof. RBG | Artificer (Artillerist) | Archer | Artillerist (custom promotion) | DEX / MAG | Fonduedler (personal ranged firearm, 1d10, DEX). **Pepperjack** (deployable Eldritch Cannon — Flamethrower / Force Ballista / Protector modes; 2 simultaneous at endgame, AC 18, 100 HP each). Flash of Genius (reaction: +5 ally save). Infusions (between-chapter item crafting). |
+| Rootis | Sorcerer (Draconic — White Dragon) | Mage (Ice) | Sage | MAG | Metamagic (Twinned = attack twice, Empowered = reroll damage). **Dragon Wings = Manakete-style class transform** (toggle on promotion: flier MOV, ignores terrain; consumes 1 Sorcery Point per toggle). Cold immunity, fire vulnerability, heals from cold. |
+| Sclorbo | Bard (College of Lore) | Dancer (custom Bard) | Lore Bishop (custom) | MAG | Bardic Inspiration (d12 buff to adjacent ally). Cutting Words (debuff reaction). Dance/Refresh action. Cleric-tier heal kit (Cure Wounds Ch1 → Revivify Ch4 → Mass Cure Ch6 → Raise Dead Ch7). **Balance: Dance and Cast are mutually exclusive per turn.** |
+| Wolfram | Metallurgist (Smith) | Knight | General | STR + MAG | Forge ability (upgrade ally armor/weapons between chapters). AC 26 equivalent (highest DEF in party). Feral Strike (Bite + Claws bonus attacks). Shield spell (reaction). Mystic Arcanums (Investiture of Stone, Forcecage). Spell access is a secondary role; STR-physical is primary. |
 
 **NPC Unit Mappings:**
 
