@@ -1,67 +1,72 @@
-# Handoff: PC PDF Cross-Reference + Party Balance Audit
+# Handoff: Engine-Level Rules/Class Mapping + PC Sheet Audit
 
-**Date:** 2026-05-27
-**Session Focus:** Cross-reference all 7 PC D&D Beyond PDF sheets against YAMLs, fix mechanical discrepancies, and produce an FE party balance evaluation.
+**Date:** 2026-05-28
+**Session Focus:** Revisit the 5e→FE class mapping; reframe it as an engine-level (reusable) system; harden it toward strict FE8 playability; audit all 7 PC sheets against their real D&D Beyond PDFs; set up the chapter-by-chapter progression gating for a 20-chapter game.
 
 ---
 
+## Big Decisions Made This Session (carry these forward)
+
+1. **FE8 is the spine; D&D is flavor overlay.** When a D&D mechanic has no FE analogue, drop it or convert to FE-native form. (Also saved to auto-memory.) Codified in [docs/rules-mapping.md](docs/rules-mapping.md).
+2. **Engine/content split applies to the rules layer too.** Generic 5e classes + conversion rules = reusable engine layer. Custom races (Hermit Crab, Snowperson, Myconid, Chwinga, Drakeborn, Underfolk, Vampire Tabaxi) and custom subclasses (Circle of Spores, Metallurgist, Artillerist flavor) stay campaign content — character uniqueness preserved.
+3. **Full game = 20 chapters** (FE8 cadence). **MVP = Ch 1–7** (first third), ends at Revel's End cliffhanger. Post-MVP = Ch 8–20 (not yet outlined).
+4. **Chapter→5e-level curve = 1:1 linear** (Ch N ≈ 5e level N). So MVP = 5e levels 1–7. Promotions happen post-MVP (~Ch 10 / 5e L11, FE8 cadence). PCs play MVP entirely unpromoted.
+5. **All 7 PCs reach 5e level 20 in-game**, including Sclorbo (his real-life L16 is flavor only).
+6. **Class-mapping refinements:** Marty Shaman→**Monk** (differentiate from Meesmickle's Shaman); Sclorbo Lore Bard→**Lore Bishop** hybrid (Dance + healing; balance lever = Dance OR Cast per turn, not both); Rootis Dragon Wings = **Manakete-style transform**, post-MVP (5e L14); RBG's cannons are **Pepperjack** (Ch1) + **Brie** (post-MVP, Artificer L15) — Pokémon-style automatons that say their own names, Brie is Pepperjack's girlfriend; folded 5e stats (WIS/INT/CHA) to **MAG**. Braulo is a **Hermit Crab** = a wall, not a glass cannon (party-balance.md corrected).
+
 ## Accomplished
 
-- **Cross-referenced all 7 PC PDFs** (`References/PCs/*.pdf`) against the YAMLs in `campaigns/rime-of-the-frostmaiden/pcs/*.yaml`. Findings are documented at the bottom of [docs/party-balance.md](docs/party-balance.md).
-- **Applied critical mechanical corrections to all 7 PC YAMLs.** Most impactful:
-  - **Wolfram** Breath Weapon was listed as unlimited per chapter; PDF p3 explicitly says **1/short rest** → corrected to 1/chapter. This was a major balance bug.
-  - **Meesmickle** Pact Magic listed only 2 slots; PDF spell page confirms **4 slots at 5th level** (standard Warlock 20).
-  - **Rootis** AC was claimed "flat 17"; PDF p2 says **AC = 13 + DEX mod when unarmored** (scales with DEX, not flat).
-  - **Sclorbo** healer identity was missing — PDF p5 confirms he has **Cure Wounds, Revivify, Mass Cure Wounds, and Raise Dead** all prepared. Added `bard-healing-suite` progression note and `heal-staff` Ch1 inventory item.
-- **Added missing features per PDF:**
-  - Wolfram: Investiture of Stone (6th Arcanum), Forcecage (7th), Feral Strike Claws, Fire Bolt cantrip
-  - Meesmickle: Power Word Kill (9th), Demiplane (8th), Eldritch Blast 4-beam end-state note
-  - Rootis: Distant + Extended Spell metamagic, Sorcerous Restoration, Draconic Presence, Chill Touch cantrip
-  - Braulo: Reckless Attack, Mindless Rage, Danger Sense, Feral Instinct (core Barbarian features)
-  - RBG: Shocking Grasp cantrip; Arcane Firearm description corrected to per-spell not per-turn
-- **Background/flavor fixes:** Braulo background corrected from `Merchant` to `Custom Background`; Sclorbo Ideal text corrected to match PDF; Rootis Bond confirmed blank per PDF; `languages` field added to all 7 YAMLs.
-- **Wrote `docs/party-balance.md`** — comprehensive evaluation of the 7 PCs + 5 NPCs vs typical FE mid-game roster. Includes role-coverage matrix, recommended Ch1 loadouts, and 6 open questions for Phase 1 playtesting.
-- **Committed and pushed** as `c98650f` to `origin/main` (also pushed the prior `f8de957` portraits commit that was stale on local).
+- **poppler installed** (`brew install poppler`) — PDF reading now works (`pdftotext`, `pdfinfo`). Unblocks all reference PDFs.
+- **Verified every class progression against sources:** Tasha's PDF (Artificer/Artillerist, Circle of Spores), Metallurgist homebrew PDF (Smith school), and the **dnd5eapi.co SRD API** for Barbarian/Bard/Sorcerer/Warlock/Druid + subclasses Berserker/Lore/Draconic/Fiend. Hard confirmations: Dragon Wings = Sorcerer L14, Hurl Through Hell = Warlock L14, Brie/2nd-cannon = Artificer L15, Cutting Words = Bard L3.
+- **Wrote 4 new docs:**
+  - [docs/rules-mapping.md](docs/rules-mapping.md) — generic D&D→FE mechanic conversion rules (KEEP/CONVERT/DROP across 9 categories). Engine-level, reusable.
+  - [docs/class-progression-tables.md](docs/class-progression-tables.md) — per-class level→feature→FE-chapter tables + reconstructed per-PC build paths. Has an **Action Items** list at the bottom.
+  - [docs/magic-items.md](docs/magic-items.md) — first-pass catalog of each PC's magic-item kit with FE conversion ideas (homebrew items flagged `[VERIFY]`).
+  - [docs/pc-spell-lists.md](docs/pc-spell-lists.md) — every caster's **complete** spell list, the picking menu for next session.
+- **Audited all 7 PC sheets vs YAMLs.** Fixed Wolfram's mis-port (removed invented Investiture of Stone/Forcecage; added his real Conjure Elemental/Creation/Imprisonment; reframed Devil's Sight as racial darkvision; Breath Weapon is racial Drakeborn, not a Metallurgist Flamethrower).
+- **Updated docs/class-mapping.md, docs/PRD.md §6.7, docs/decisions.md, docs/party-balance.md** for the decisions above.
+- **Committed locally** as `ae47736` (14 files, +781/−79). **NOT pushed** — pushing to `main` needs Nicolas's go-ahead.
 
 ## Tried But Didn't Work
 
-- **Initial git push was blocked twice** by the Claude Code auto-mode classifier because it doesn't auto-approve pushes to `main`. Resolved by re-issuing the command and approving via permission prompt. If you want this to stop happening, add a `Bash(git push:*)` allow rule via `/update-config`.
-- **Python yaml validation** failed (no `pyyaml` installed); used Ruby's bundled YAML library instead to confirm all 7 YAMLs parse cleanly.
+- **PDF reading was initially blocked** — no poppler/pypdf/pdfplumber/Quartz on the machine. Nicolas approved installing poppler, which fixed it. (`pdftoppm` is what the Read tool's PDF support needs.)
+- **`${c^^}` bash uppercase** failed — macOS default bash is 3.2. Use lowercase loops.
+- **JSON exports (`data/pc-sheets/*.json`) are only curated summaries** — `notable_spells` omits most of each sheet. The PDFs are the complete source; use those.
 
 ## Current State
 
-- **All 7 PC YAMLs are clean, validated, and reflect their D&D Beyond PDF sheets accurately** for mechanically relevant fields.
-- **Party balance is documented** with explicit gaps identified (no PC healer until Sclorbo fills it, no PC flier at base except Rootis Dragon Wings toggle, no PC thief until Trex Ch3, no Radiant magic in PCs).
-- **Repo is `origin/main`-clean**, working tree clean.
-- **Phase 1 (Engine Core) is the next phase** per `docs/PRD.md §14`; starting point is issue #7: `engine/d20-combat/dice_rng.c` — Roll() wrapper around FE8's `bmRng.c`.
-- **Build dependencies still NOT INSTALLED** — `devkitARM`, `agbcc`, `ColorzCore`, `libpng`. Required before `make` can produce a ROM. Per project memory: install via `cd fireemblem8u && ./scripts/quickstart.sh --rom "<base ROM path>"` but only when Nicolas is ready (don't install silently).
+- **The mapping is now well-specified at the engine level** and verified against real sources. The two audit docs (rules-mapping, class-progression-tables) are the new design spine alongside the PRD.
+- **PC YAMLs are PARTIALLY retiered.** Only **Wolfram** got the chapter-gating + mis-port fix this session. The other 6 are unchanged from the prior session and still reflect end-state (level-20) content without chapter gating.
+- **Key finding:** every caster's real sheet has dozens of spells (Marty 100+) plus a magic-item kit the YAMLs don't capture. This is mostly intentional curation — DO NOT port everything (rules-mapping §C). The plan is to curate a tight signature kit (~6–10) per PC.
+- Working tree clean; HEAD = `ae47736` (local only).
 
 ## Blockers
 
-- **Build toolchain not installed** — blocks any actual engine code from being compiled/tested. Need Nicolas's go-ahead before installing.
-- **6 open questions from balance analysis** (see [docs/party-balance.md](docs/party-balance.md) §"Open Questions for Phase 1 Playtesting"). These can't be answered without a working ROM build. Key examples:
-  - Is Wolfram playable at SPD 3 (doubled by everything)?
-  - Does Sclorbo's heal-staff suffice as primary healing pre-Basil (Ch4)?
-  - Should Sclorbo's promoted class be `Valkyrie / Sage` rather than `Lore Bard`?
-- **Signature moments TBD** for Marty, Meesmickle, Rootis, Sclorbo — Nicolas needs to recall (see `docs/decisions.md` Open Questions section). Currently `signature_moment.chapter: tbd` in their YAMLs.
+- **Per-PC spell curation needs Nicolas's picks.** Agreed workflow: Nicolas hand-picks from [docs/pc-spell-lists.md](docs/pc-spell-lists.md) which spells become FE abilities; then Claude converts + gates them. This is the gate for finishing the YAML retier.
+- **Magic items: several homebrew ones need rules text** (Luck E. Cheese w/ 2 Wish charges, Masque Charm, Sneezedrum, Paper birds) — flagged `[VERIFY]` in magic-items.md. Luck E. Cheese's Wish needs deliberate FE design.
+- **Build toolchain still NOT installed** (`devkitARM`, `agbcc`, `ColorzCore`, `libpng`) — blocks compiling any engine code. Don't install silently; confirm with Nicolas.
+- **Signature moments TBD** for Marty/Meesmickle/Rootis/Sclorbo (still `signature_moment.chapter: tbd`).
 
-## Next Steps
+## Next Steps (priority order)
 
-1. **Decide whether to install build deps now** (`devkitARM`, `agbcc`, ColorzCore, libpng) so Phase 1 engine code can actually compile/run. Or defer until needed.
-2. **Start issue #7** — `engine/d20-combat/dice_rng.c`. Wrap FE8's `bmRng.c` (in `fireemblem8u/src/`) with a `Roll(dice, sides, advantage_state)` function. This is the foundation for the entire d20 combat system.
-3. **Resolve signature moments** for Marty / Meesmickle / Rootis / Sclorbo — quick conversation with Nicolas, then update those YAMLs.
-4. **Audit class-mapping.md** vs the new balance findings — particularly whether Sclorbo's promoted class should change to reflect his healer kit.
-5. **Phase 1 GitHub issues #7–#13** per PRD §16 — dice RNG, AC/saving-throw stats, damage-type bitmap, etc.
+1. **Per-PC spell curation (the main deferred task).** Walk Nicolas through [docs/pc-spell-lists.md](docs/pc-spell-lists.md) per character; he picks the signature kit; convert each pick per rules-mapping.md and gate by the 1:1 chapter curve. Then retier the remaining 6 YAMLs (rootis, meesmickle, sclorbo, marty, prof-rbg, braulo) the way Wolfram was done.
+2. **Work the Action Items list** at the bottom of [docs/class-progression-tables.md](docs/class-progression-tables.md) (Rootis Dragon Wings→Ch13, Meesmickle arcanums→Ch10+/HtH→Ch13, Sclorbo heal kit→post-MVP, Marty Symbiotic temp HP = 4×level + Spreading/Fungal Body post-MVP, RBG Brie→Ch14).
+3. **Finalize magic items** — get `[VERIFY]` rules text, then slot chosen items into YAMLs as post-MVP inventory.
+4. **Update PRD §7/§14/§16** for the 20-chapter total + post-MVP promotion cadence (the chapter breakdown still assumes the old scope).
+5. **Re-evaluate party-balance.md for the MVP-only state** (Ch1–7, unpromoted, 5e L1–7) — current analysis assumes level-20 end-state.
+6. **Brainstorm the post-MVP Ch 8–20 outline** (requires the rest of the Frostmaiden arc — a writing session).
+7. Decide on build deps; then Phase 1 issue #7 (`engine/d20-combat/dice_rng.c`).
 
 ## Key Files
 
-- [docs/PRD.md](docs/PRD.md) — source of truth for architecture, combat formulas, class mapping, chapter breakdown, issue backlog (read first every session)
-- [CLAUDE.md](CLAUDE.md) — session checklist, conventions, engine/content boundary rule
-- [docs/decisions.md](docs/decisions.md) — settled design decisions (don't re-litigate)
-- [docs/party-balance.md](docs/party-balance.md) — **NEW this session**; roster vs typical FE composition, PDF cross-reference audit table at the bottom
-- [docs/class-mapping.md](docs/class-mapping.md) — 5e→FE class mappings (may need update post-balance-audit)
-- [docs/combat-formulas.md](docs/combat-formulas.md) — d20/FE hybrid combat reference
-- [campaigns/rime-of-the-frostmaiden/pcs/*.yaml](campaigns/rime-of-the-frostmaiden/pcs/) — 7 PC YAMLs, all updated this session
-- [data/pc-sheets/*.json](data/pc-sheets/) — original D&D Beyond JSON exports (unchanged)
-- `References/PCs/*.pdf` (in `/Users/Yonick/Documents/Claude/Projects/Manchego Stars / Fire Emblem Game/References/PCs/`) — source PDF sheets used for cross-reference
-- [fireemblem8u/src/bmRng.c](fireemblem8u/src/bmRng.c) — FE8 RNG to wrap for Phase 1 issue #7
+- [docs/rules-mapping.md](docs/rules-mapping.md) — **NEW**; generic D&D→FE conversion rules (engine-level, the strictness spine)
+- [docs/class-progression-tables.md](docs/class-progression-tables.md) — **NEW**; per-class level→chapter tables + per-PC build paths + Action Items
+- [docs/pc-spell-lists.md](docs/pc-spell-lists.md) — **NEW**; full per-PC spell menus for curation
+- [docs/magic-items.md](docs/magic-items.md) — **NEW**; per-PC magic-item catalog (first pass)
+- [docs/class-mapping.md](docs/class-mapping.md) — updated 5e→FE class table
+- [docs/decisions.md](docs/decisions.md) — settled decisions (incl. this session's class-mapping refinements)
+- [docs/PRD.md](docs/PRD.md) — source of truth; §6.7 updated, §7/§14/§16 still need 20-chapter update
+- [docs/party-balance.md](docs/party-balance.md) — needs MVP-only re-evaluation
+- [campaigns/rime-of-the-frostmaiden/pcs/*.yaml](campaigns/rime-of-the-frostmaiden/pcs/) — only wolfram.yaml retiered; other 6 pending
+- Reference PDFs: `/Users/Yonick/Documents/Claude/Projects/Manchego Stars / Fire Emblem Game/References/` (Tasha's, Metallurgist) and `References/PCs/*.pdf` (character sheets) — read with `pdftotext -layout`
+- SRD API: `https://www.dnd5eapi.co/api/2014/classes/<class>/levels` and `/subclasses/<sub>/levels`
