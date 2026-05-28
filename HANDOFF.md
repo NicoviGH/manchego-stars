@@ -64,8 +64,8 @@ PDFs preserve prepared-spell data.
 ## Current State
 
 - The full PC roster is now MVP-gated and dual-structured. The YAMLs are the gated, machine-readable
-  output that `tools/build-campaign.ts` will consume. Working tree has uncommitted changes (8 files:
-  7 YAMLs + pc-spell-lists.md + this HANDOFF).
+  output that `tools/build-campaign.ts` will consume. **Committed + pushed** as `8fe5a87` on
+  `origin/main`; working tree clean.
 - `fe_mechanic` strings are human-readable anchors (e.g. "Nosferatu", "Sleep staff", "Summoner
   phantom"), not yet mapped to concrete FE8 item/skill IDs — that mapping is a later pipeline task.
 
