@@ -25,7 +25,7 @@
   - [docs/pc-spell-lists.md](docs/pc-spell-lists.md) — every caster's **complete** spell list, the picking menu for next session.
 - **Audited all 7 PC sheets vs YAMLs.** Fixed Wolfram's mis-port (removed invented Investiture of Stone/Forcecage; added his real Conjure Elemental/Creation/Imprisonment; reframed Devil's Sight as racial darkvision; Breath Weapon is racial Drakeborn, not a Metallurgist Flamethrower).
 - **Updated docs/class-mapping.md, docs/PRD.md §6.7, docs/decisions.md, docs/party-balance.md** for the decisions above.
-- **Committed locally** as `ae47736` (14 files, +781/−79). **NOT pushed** — pushing to `main` needs Nicolas's go-ahead.
+- **Committed and pushed** to `origin/main`: `ae47736` (rules/mapping + audit, 14 files +781/−79) and `9d2481c` (this HANDOFF.md). `origin/main` is up to date.
 
 ## Tried But Didn't Work
 
@@ -38,7 +38,7 @@
 - **The mapping is now well-specified at the engine level** and verified against real sources. The two audit docs (rules-mapping, class-progression-tables) are the new design spine alongside the PRD.
 - **PC YAMLs are PARTIALLY retiered.** Only **Wolfram** got the chapter-gating + mis-port fix this session. The other 6 are unchanged from the prior session and still reflect end-state (level-20) content without chapter gating.
 - **Key finding:** every caster's real sheet has dozens of spells (Marty 100+) plus a magic-item kit the YAMLs don't capture. This is mostly intentional curation — DO NOT port everything (rules-mapping §C). The plan is to curate a tight signature kit (~6–10) per PC.
-- Working tree clean; HEAD = `ae47736` (local only).
+- Working tree clean; `origin/main` HEAD = `9d2481c` (pushed).
 
 ## Blockers
 
