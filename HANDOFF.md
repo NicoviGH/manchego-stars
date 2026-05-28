@@ -25,9 +25,13 @@ docs natively — no band-aid banners / "reverted on DATE" scar tissue** (memory
   Prologue=DefeatBoss · Ch1 Seize · Ch2 DefeatAll(+escort constraint) · Ch3 Seize ·
   Ch4 DefeatAll · Ch5 DefeatBoss-or-Talk · Ch6 DefeatBoss · Ch7 Survive→scripted loss.
   Applied to all 7 chapter YAMLs **and** PRD §7 objective lines.
-- **A tiny Prologue is being added** before Ch1 (2–3 units, DefeatBoss tutorial,
-  mirrors FE8 Prologue). Ch1 graduates to the full-party Seize. **Prologue not yet
-  designed** — that's the next collaborative step.
+- **Prologue is DESIGNED & committed** (`ch00-prologue-a-dagger-of-ice.yaml`): an
+  NPC cold-open — **Hlin Trollbane solo** hunts **Sephek Kaltro** (Auril's undead
+  servant) in night-time Bryn Shander. DefeatBoss, **basics only**; Sephek's
+  cold-regen/fire-weakness is flavor here (pays off mechanically at Ch7). Grounded
+  in the book's "Cold Open" + "Cold-Hearted Killer" (pp. 21-23). Ch1 is now the
+  full-party Seize. Two soft hooks left for Nicolas: Hlin recurring; her quest as
+  the diegetic reason Ten-Towns hires adventurers in Ch1.
 - **"20 chapters" is now a SOFT target** (content-driven, 18–22 OK). Add chapters by
   *splitting dense beats* (likely Xardorok's fortress + Ythryn), not padding. (Memory
   `manchego-stars-campaign-structure` updated.)
@@ -57,9 +61,10 @@ docs natively — no band-aid banners / "reverted on DATE" scar tissue** (memory
 
 ## Next Steps (priority order)
 
-1. **Design the new Prologue collaboratively** (which 2–3 PCs, the boss, the map),
-   then revisit Ch1/Ch2 framing now that the Prologue carries the basics tutorial.
-2. Continue the chapter-by-chapter walkthrough (Ch2 onward).
+1. **Continue the chapter-by-chapter walkthrough at Ch2** (Cold Welcome). FE8 Ch2
+   "The Protected" = DefeatAll with an escort flavor → design the escort-as-constraint
+   + rear-ambush pacing. (Paused here at Nicolas's call.) Optionally first revisit
+   Ch1's Northlook framing now that the Prologue exists (does it reference Hlin/Sephek?).
 3. Get + integrate the rest of the DM notes → replace Act II placeholders → author ch08+.
 4. (Optional) dedicated cleanup pass on the leftover combat-sweep band-aid language.
 5. Later: map remaining `fe_mechanic`-less abilities; scaffold `tools/build-campaign.ts`;
