@@ -141,6 +141,14 @@ inventory:
     uses: 2
 
 # ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
+# FLAVOR ONLY (combat revert 2026-05-28): combat is vanilla FE. `AC`, `prof_bonus`, `ability_mod_atk`
+# here — and every `save:`/`save_dc:`/`advantage*` field in this file — are source-of-record/flavor,
+# NOT read by resolution (defense = FE DEF/RES + avoid; no saves; no advantage). Wolfram's high "AC 26"
+# maps to high FE DEF. NOTE: `spell_slots` below IS still used by engine/spell-slots. See docs/decisions.md.
+# DAMAGE-TYPE RESISTANCE DROPPED (2026-05-28): `fire_resistance`, `damage_resistance: fire`, and
+# the Forge `forge_grants_physical_resistance` tier are FLAVOR ONLY now — no ×0.5 multiplier.
+# Wolfram's fire affinity is narrative; Forge upgrades give FE-native +DEF / weapon +might /
+# adamantine crit-immunity instead. Iconic matchups use vanilla FE weapon effectiveness.
 d20_fields:
   AC: 18                          # Chapter 1: heavy armor + shield + level 1 Upgrade Armor
                                   # End-state target: 26. Scales via Upgrade Armor each chapter.
@@ -260,7 +268,7 @@ unique_abilities:
   - id: fire-resistance
     name: "Fire Resistance"
     flavor: "Forged in fire — Wolfram's metal scales shrug off heat that would melt anyone else."
-    fe_mechanic: "passive: ×0.5 damage from fire-type attacks"
+    fe_mechanic: "flavor only (no ×0.5 resistance mechanic; fire affinity is narrative — reverted 2026-05-28)"
     # Mineralscale Drakeborn racial.
     type: passive
     unlock_chapter: 1         # racial — available from start

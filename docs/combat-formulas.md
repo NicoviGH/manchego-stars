@@ -1,77 +1,83 @@
 # Combat Formulas — Manchego Stars
 
-> Reference for the hybrid d20/FE combat system. See PRD §6.5 for the authoritative spec.
-> Implementation lives in `engine/d20-combat/`.
+> **Combat resolution is vanilla FE8.** (Reverted from the earlier hybrid d20 design
+> on 2026-05-28 — see `decisions.md` §Combat System.) The rules stay FE so the game
+> plays like FE; D&D is flavor. This doc is now a short reference for *what survives*
+> and *what the d20 reskin is allowed to touch* (UI/flavor only).
+>
+> Authoritative engine behaviour is whatever vanilla `fireemblem8u/src/bmbattle.c`
+> already does — we are **not replacing it**, and nothing is layered under it. Damage
+> types are flavor labels only; iconic matchups use vanilla FE weapon effectiveness
+> (resistance multiplier dropped 2026-05-28 — see `decisions.md`).
 
-## Attack Roll
-
-```
-d20Roll         = Roll(1d20, advantageState)
-AttackRoll      = d20Roll + AbilityMod + ProfBonus + TriangleBonus + HighGroundBonus
-Hit             if AttackRoll ≥ Defender.AC
-Auto-hit        if d20Roll == 20  (crit)
-Auto-miss       if d20Roll == 1
-```
-
-## Damage
+## Attack Resolution — VANILLA FE (unchanged)
 
 ```
-DamageRoll      = Roll(WeaponDamageDice) + AbilityMod + TriangleDmgBonus
-Damage          = max(0, DamageRoll − Defender.DamageReduction)
-
-Resistant       → Damage × 0.5 (round down)
-Immune          → Damage = 0
-Vulnerable      → Damage × 2
+Hit%      = WeaponHit + (SKL × a) + (LCK × b) + TriangleHit + SupportHit + TerrainHit
+Avoid     = (SPD × c) + LCK + TerrainAvoid
+DisplayHit = clamp(Hit% − Defender.Avoid, 0, 100)
 ```
 
-## Critical Hits
+No d20 roll. No Armor Class. No advantage/disadvantage. This is FE8's native two-RN
+hit system, left intact.
+
+## Damage — VANILLA FE armor-subtraction (no D&D multiplier)
 
 ```
-Crit            if d20Roll == 20  (or 19 with Improved Critical)
-Crit damage     = roll WeaponDamageDice TWICE (not FE's 3×)
+Might     = WeaponMight + (STR if physical | MAG if magic) + TriangleAtk
+Damage    = max(0, Might − Defender.DEF | Defender.RES)
 ```
 
-## Doubling (vanilla FE, unchanged)
+**No resistance/vulnerability/immunity multiplier** — that ×0.5/×2/×0 system was dropped
+(2026-05-28); it has no vanilla FE analogue. Damage types are flavor labels only. Where a
+matchup genuinely matters (e.g. fire vs ice trolls), use **vanilla FE weapon effectiveness**
+(an `effective`-flag on the weapon, FE-native), not a damage multiplier.
+
+Weapon damage is **fixed FE might**, not a rolled die. When porting a 5e weapon/spell,
+set its Might from the 5e die's average (e.g. 1d8 → ~5) and tune to FE magnitudes.
+Never import raw 5e HP/damage numbers.
+
+## Critical Hits — VANILLA FE (skill-based)
+
+```
+Crit%     = WeaponCrit + (SKL × d) + CritBonus(class/skill) + SupportCrit
+Crit dmg  = Damage × 3        (FE's native triple, NOT roll-dice-twice)
+```
+
+**d20 flourish (flavor only):** when an FE crit fires, the battle UI *may* play a brief
+"d20 lands on 20" animation for D&D feel. It is cosmetic — it never gates or changes
+the crit, which is decided entirely by FE's crit rate.
+
+## Doubling — VANILLA FE (unchanged)
 
 ```
 If AttackSpeed_attacker − AttackSpeed_defender ≥ 4 → attacker attacks twice
 ```
 
-## Saving Throws (spells and staves)
+## Magic, Staves & "Saves" — VANILLA FE
 
-```
-SaveDC          = 8 + ProfBonus + SpellAbilityMod (caster)
-DefenderSave    = 1d20 + SaveAbilityMod + SaveProf (defender)
-Save ≥ DC       → half damage or no effect (per spell)
-Save < DC       → full effect
-No auto-pass/fail on nat 1/20 for saves (5e rule)
-```
+There are **no saving throws / DCs**. Magic resolves through FE combat:
 
-## Advantage / Disadvantage Sources
+- **Offensive spells (tomes):** FE magic combat — Might (MAG) vs RES, normal FE
+  hit/avoid. Anima/Light/Dark behave as their vanilla item analogues.
+- **Status staves (Sleep / Silence / Berserk / Poison):** vanilla FE staves —
+  **always hit** when in range (no save). Effect/duration per the staff.
+- **Healing staves (Heal / Physic / Recover):** vanilla FE staves, always succeed.
 
-| Source | Effect |
-|---|---|
-| High ground (≥1 tile elevation) | Advantage on attacks |
-| Low ground | Disadvantage on attacks |
-| Flanking (ally on opposite side of target) | Advantage |
-| Blizzard / dark terrain tiles | Disadvantage |
-| Class abilities (Reckless Attack, Feral Strike) | As specified per class |
-| Status: Blinded, Restrained, Frightened | Per 5e rules |
-| Advantage + Disadvantage | Cancel → flat roll |
+The `save:` / `save_dc:` fields in the PC YAMLs are flavor metadata only.
 
-## Triangle Bonuses
+## Triangle Bonuses — VANILLA FE (reskinned labels)
 
-**Physical:** Slashing > Bludgeoning > Piercing > Slashing
-- Advantage side: +1 ATK, +15 to-hit modifier
+**Physical:** Slashing > Bludgeoning > Piercing (+1 ATK, +15 hit — vanilla values).
+**Magic:** Radiant > Necrotic > Elemental (same vanilla bonuses).
 
-**Magic:** Radiant > Necrotic > Elemental > Radiant
-- Same bonuses
+Mechanics identical to vanilla FE8; only the labels change.
 
-## Spell-Slot Tome Uses
+## Spell-Slot Tome Uses (unchanged by the combat revert)
 
 | 5e Slot Level | Tome Uses |
 |---|---|
-| Cantrip (0) | ∞ |
+| Cantrip (0) | ∞ (high finite per rules-mapping) |
 | 1st | 8 |
 | 2nd | 6 |
 | 3rd | 4 |
@@ -80,3 +86,11 @@ No auto-pass/fail on nat 1/20 for saves (5e rule)
 | 6th+ | 1 |
 
 All spell-slot tomes refill to max at chapter start (= long rest).
+
+## What the d20 reskin is allowed to touch (flavor/UI only)
+
+- A cosmetic d20 flourish on crits.
+- D&D **labels** on the weapon triangle and damage types.
+- Flavor text in dialogue, item descriptions, and the stat/preview screens.
+
+It must **not** touch hit, avoid, might, crit rate, or doubling — those are FE's.

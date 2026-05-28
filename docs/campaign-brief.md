@@ -2,6 +2,12 @@
 
 > Produced via interview with Nicolas (May 2026).
 > Companion to `research.md`. Together these two documents feed the PRD.
+>
+> **Note (2026-05-28):** this brief describes the PCs in **5e terms** (their D&D abilities, AC, saves,
+> resistances). The FE adaptation reverted to **vanilla FE combat** — AC, saving throws, advantage, and
+> damage-type resistance are **flavor only** in-game (defense = FE DEF/RES + avoid; iconic matchups use
+> vanilla FE weapon effectiveness). This doc is kept as the D&D-source record; see `decisions.md` §Combat
+> System for what's actually mechanical.
 
 ---
 

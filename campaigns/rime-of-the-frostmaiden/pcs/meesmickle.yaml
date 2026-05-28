@@ -94,6 +94,14 @@ inventory:
     uses: 3
 
 # ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
+# FLAVOR ONLY (combat revert 2026-05-28): combat is vanilla FE. `AC`, `prof_bonus`, `ability_mod_atk`
+# here — and every `save:`/`save_dc:`/`advantage*` field in this file — are source-of-record/flavor,
+# NOT read by resolution (defense = FE DEF/RES + avoid; no saves; no advantage). NOTE: `spell_slots`
+# below IS still used by engine/spell-slots. See docs/decisions.md §Combat System.
+# DAMAGE-TYPE RESISTANCE DROPPED (2026-05-28): `resistance: necrotic` and the Fiendish-Resilience
+# `choose_damage_resistance` (×0.5) are no longer multipliers. Necrotic affinity = flavor; Fiendish
+# Resilience reflavors to an FE-native timed +DEF/RES self-buff (see fe-mechanic-map.yaml). Iconic
+# matchups use vanilla FE weapon effectiveness. Status/condition immunities remain mechanical.
 d20_fields:
   AC: 13                     # Chapter 1: light armor
                              # End-state target: 15. Tune per chapter.
@@ -172,11 +180,11 @@ unique_abilities:
 
   - id: fiendish-resilience
     name: "Fiendish Resilience"
-    # 1/chapter: choose a damage type — gain resistance (×0.5 incoming) for the rest
-    # of the map. Models the short-rest refreshing resistance.
+    # 5e: 1/chapter choose a damage type, gain resistance for the map. FE revert (2026-05-28):
+    # no ×0.5 multiplier — reflavored to a timed +DEF/RES self-buff (engine/status def_buff_timed).
     # FE implementation: activated command that prompts a damage type selection menu.
     flavor: "Infernal Hide — her fur hardens against whatever's hurting her most today."
-    fe_mechanic: "1/chapter: pick a damage type, gain ×0.5 resistance to it for the rest of the map"
+    fe_mechanic: "1/chapter: timed +DEF/RES self-buff (FE-native; no ×0.5 damage-type resistance)"
     type: activated
     unlock_chapter: 9         # The Fiend L10 → Ch9 (POST-MVP)
     uses_per_chapter: 1

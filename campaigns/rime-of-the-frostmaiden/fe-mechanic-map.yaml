@@ -11,6 +11,11 @@
 # `fe_mechanic:` string are mapped here (93 total, 2026-05-28). Abilities without an
 # fe_mechanic anchor are listed as a gap in docs/fe-mechanic-map.md §Unmapped.
 #
+# COMBAT REVERT (2026-05-28): combat resolution is vanilla FE (no d20/AC/saves/advantage).
+# Former d20-dependent features reflavor to FE-native stat swings / always-hit effects — see the
+# resolution table in docs/fe-mechanic-map.md. `base: advantage_state` was removed (no such base);
+# `ac_buff_reaction` was renamed `def_buff_reaction`.
+#
 # fe_ref SCHEMA (see docs for full definitions):
 #   kind:         item | class_ability | custom_engine | none   (required)
 #   fe8_item:     ITEM_* enum (or [list]) — when kind: item
@@ -20,11 +25,13 @@
 #   base:         ITEM_*/CA_*/concept (or [list]) the custom feature reuses or extends (optional)
 #
 # ENGINE MODULES referenced (5 exist as scaffold dirs; 2 are PROPOSED-NEW, flagged in docs):
-#   engine/d20-combat   (exists)  — attack/save/crit/advantage resolution, combat procs
-#   engine/damage-types (exists)  — resistance / vulnerability / immunity bitmap
+#   engine/d20-combat   (exists)  — combat-adjacent custom skill procs + cosmetic crit flourish
+#                                    (resolution stays vanilla FE; no d20/AC/save/advantage)
+#   engine/damage-types (exists)  — flavor damage-type label tag (UI/descriptions only; NO
+#                                    resistance/vuln/immunity — reverted 2026-05-28)
 #   engine/spell-slots  (exists)  — tome charges / uses_per_chapter
 #   engine/class-defs   (exists)  — class data: summons, dance, flier grants, transforms, commands
-#   engine/ui           (exists)  — visible dice (no mechanic mapped here)
+#   engine/ui           (exists)  — combat-preview reskin + crit flourish (no mechanic mapped here)
 #   engine/status       (NEW)     — status flags beyond vanilla staves (blind, slow, charm-flag, …)
 #   engine/hazards      (NEW)     — persistent / drifting hazard tiles + barrier walls
 
@@ -41,9 +48,9 @@ map:
   braulo.brutal-critical: { kind: custom_engine, module: engine/d20-combat,  feature: crit_extra_dice }
   braulo.primal-champion: { kind: none }                                                                                                  # capstone baked into stat caps / ability_scores
   braulo.retaliation:     { kind: custom_engine, module: engine/d20-combat,  base: counterattack, feature: extra_counter }
-  braulo.reckless-attack: { kind: custom_engine, module: engine/d20-combat,  base: advantage_state, feature: reckless_toggle }
+  braulo.reckless-attack: { kind: custom_engine, module: engine/d20-combat,  feature: reckless_toggle }   # FE: +hit/+might, -avoid/-DEF toggle
   braulo.mindless-rage:   { kind: custom_engine, module: engine/status,      feature: status_immunity }                                   # immune to charm/fear while raging
-  braulo.danger-sense:    { kind: custom_engine, module: engine/d20-combat,  base: advantage_state, feature: dex_save_advantage }
+  braulo.danger-sense:    { kind: custom_engine, module: engine/d20-combat,  feature: dex_save_advantage }   # FE: +avoid vs ranged/magic (or drop)
   braulo.feral-instinct:  { kind: none }                                                                                                  # initiative dropped per rules-mapping §E
 
   # ── Marty the Merry Mushroom — Druid (Circle of Spores) ─────────────────────
@@ -55,7 +62,7 @@ map:
   marty.fungal-infestation: { kind: custom_engine, module: engine/class-defs, base: CA_SUMMON, feature: summon_on_kill }
   marty.crit-immunity:      { kind: custom_engine, module: engine/d20-combat, base: ITEM_HOPLON_SHIELD, feature: negate_incoming_crit }
   marty.pacifying-spores:   { kind: item, fe8_item: ITEM_STAFF_SLEEP }
-  marty.pheromone-spores:   { kind: custom_engine, module: engine/d20-combat, base: advantage_state, feature: mark_grants_advantage }
+  marty.pheromone-spores:   { kind: custom_engine, module: engine/d20-combat, feature: mark_grants_advantage }   # FE: marked foe gets -avoid
   marty.blindness-deafness: { kind: custom_engine, module: engine/status,     feature: blind }
   marty.animate-dead:       { kind: class_ability, fe8_ability: CA_SUMMON }
   marty.gaseous-form:       { kind: custom_engine, module: engine/status,     feature: untargetable_self_timed }
@@ -70,7 +77,7 @@ map:
   meesmickle.dark-ones-blessing:  { kind: custom_engine, module: engine/d20-combat, feature: temp_hp_on_kill }
   meesmickle.hurl-through-hell:   { kind: custom_engine, module: engine/d20-combat, feature: bonus_damage_finisher }
   meesmickle.one-with-shadows:    { kind: custom_engine, module: engine/status,     feature: untargetable_until_act }
-  meesmickle.fiendish-resilience: { kind: custom_engine, module: engine/damage-types, feature: grant_resistance_choice }
+  meesmickle.fiendish-resilience: { kind: custom_engine, module: engine/status, feature: def_buff_timed }   # FE: timed +DEF/RES self-buff (no type-resistance)
   meesmickle.power-word-kill:     { kind: custom_engine, module: engine/d20-combat, base: CA_ASSASSIN, feature: instakill_below_threshold }
   meesmickle.demiplane:           { kind: none }                                                                                          # dropped as combat ability (no FE analogue)
   meesmickle.toll-the-dead:       { kind: custom_engine, module: engine/d20-combat, base: ITEM_DARK_FLUX, feature: bonus_damage_vs_wounded }
@@ -89,7 +96,7 @@ map:
   prof-rbg.pepperjack:       { kind: class_ability, fe8_ability: CA_SUMMON }                                                              # stationary turret variant of the phantom
   prof-rbg.brie:             { kind: class_ability, fe8_ability: CA_SUMMON }                                                              # 2nd simultaneous summon (raise cap to 2)
   prof-rbg.flash-of-genius:  { kind: custom_engine, module: engine/d20-combat, feature: ally_save_bonus_proc }
-  prof-rbg.shield-spell:     { kind: custom_engine, module: engine/d20-combat, feature: ac_buff_reaction }
+  prof-rbg.shield-spell:     { kind: custom_engine, module: engine/d20-combat, feature: def_buff_reaction }   # FE: +DEF/RES reaction for one hit
   prof-rbg.thunderwave:      { kind: custom_engine, module: engine/d20-combat, base: ITEM_ANIMA_THUNDER, feature: damage_and_shove }
   prof-rbg.scorching-ray:    { kind: custom_engine, module: engine/d20-combat, base: [ITEM_ANIMA_FIRE, brave_weapon_effect], feature: multibolt_tome }
   prof-rbg.shatter:          { kind: item, fe8_item: ITEM_ANIMA_BOLTING }                                                                 # thunder siege exists in vanilla
@@ -131,8 +138,8 @@ map:
   wolfram.breath-weapon:       { kind: custom_engine, module: engine/d20-combat, base: ITEM_DIVINESTONE, feature: cone_attack }           # dragon breath cone
   wolfram.feral-strike-bite:   { kind: custom_engine, module: engine/d20-combat, feature: bonus_damage_follow_up }
   wolfram.feral-strike-claws:  { kind: item, fe8_item: ITEM_MONSTER_SHARPCLAW }                                                           # slashing claw weapon
-  wolfram.shield-spell:        { kind: custom_engine, module: engine/d20-combat, feature: ac_buff_reaction }
-  wolfram.fire-resistance:     { kind: custom_engine, module: engine/damage-types, feature: damage_resistance }                           # fire ×0.5 (resistance bitmap)
+  wolfram.shield-spell:        { kind: custom_engine, module: engine/d20-combat, feature: def_buff_reaction }   # FE: +DEF/RES reaction for one hit
+  wolfram.fire-resistance:     { kind: none }                           # fire affinity = flavor only (no resistance mechanic; reverted 2026-05-28)
   wolfram.recharge:            { kind: item, fe8_item: ITEM_STAFF_HEAL }                                                                  # self-target
   wolfram.explosive-burst:     { kind: custom_engine, module: engine/d20-combat, base: ITEM_ANIMA_BOLTING, feature: siege_single_target }
   wolfram.forge-expert:        { kind: custom_engine, module: engine/class-defs, feature: forge_command }                                 # tier: armor grants phys resist

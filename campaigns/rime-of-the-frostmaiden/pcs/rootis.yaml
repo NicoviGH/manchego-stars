@@ -85,7 +85,8 @@ fe_stats:
   MAG: 7                     # CHA 17 → MAG
   SKL: 5
   SPD: 7                     # DEX 18 → fast for a mage
-  DEF: 3                     # Snow Body grants B/P/S resistance in d20 layer, not raw DEF
+  DEF: 3                     # NOTE: Snow Body's B/P/S "resistance" is flavor now (dropped 2026-05-28),
+                             # so it no longer adds bulk. Raise this DEF if Rootis should stay tanky.
   RES: 6                     # CHA 17 → decent RES
   LCK: 5
   MOV: 5
@@ -128,6 +129,17 @@ inventory:
     uses: 2
 
 # ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
+# FLAVOR ONLY (combat revert 2026-05-28): combat is vanilla FE. `AC`, `prof_bonus`, `ability_mod_atk`
+# here — and every `save:`/`save_dc:`/`advantage*` field in this file — are source-of-record/flavor,
+# NOT read by resolution (defense = FE DEF/RES + avoid; no saves; no advantage). NOTE: `spell_slots`
+# below IS still used by engine/spell-slots. See docs/decisions.md §Combat System.
+# DAMAGE-TYPE RESISTANCE DROPPED (2026-05-28): Snow Body's `resistance: [B/P/S]`, `cold_immunity`,
+# `heat_vulnerability` (×2 fire), and the Crystallize `grants_immunity`/`removes_resistance` toggle
+# are FLAVOR ONLY — no multipliers. Iconic matchups use vanilla FE weapon effectiveness (so "fire vs
+# Rootis" = a fire weapon flagged effective, if we want it).
+# ROOTIS BULK NOTE: his durability used to come from B/P/S resistance, which is now gone as a
+# mechanic — so it must come from raw FE DEF instead. Tune DEF upward if he should stay tanky
+# (the "DEF: 3, Snow Body covers it" assumption below no longer holds).
 d20_fields:
   AC: 17                     # Draconic Resilience: AC = 13 + DEX mod when unarmored.
                              # CORRECTED 2026-05-27: not flat AC; scales with DEX.

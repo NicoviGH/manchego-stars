@@ -1,6 +1,11 @@
 # Class Mapping — 5e → Fire Emblem
 
 > See PRD §6.7 for the authoritative table. Updated 2026-05-27 after class-mapping audit (see decisions.md).
+>
+> **Combat revert (2026-05-28):** combat is vanilla FE. **AC**, **saves/+ally-save**, **advantage**, and
+> **damage-type resistance/vulnerability/immunity** in the cells below are **flavor/source-of-record only** —
+> defense is FE DEF/RES + avoid, and iconic matchups use vanilla FE weapon effectiveness. See decisions.md
+> §Combat System. (Status/condition immunities + crit-immunity remain FE-native via engine/status / Hoplon.)
 
 ## Approach
 
@@ -10,11 +15,11 @@ Map each PC to a vanilla FE8 chassis (sprite + animations) and layer 5e mechanic
 
 | PC | 5e Class | FE Base Class | FE Promoted Class | FE Stat | Unique Mechanic |
 |---|---|---|---|---|---|
-| Braulo | Barbarian (Berserker) | Pirate | Berserker | STR | Rage (consumable item: +4 dmg, B/P/S resistance). Shell Defense (command: +4 DEF, can't move). Hermit Crab natural armor → flat AC 17. |
+| Braulo | Barbarian (Berserker) | Pirate | Berserker | STR | Rage (consumable item: +might and +DEF while active — 5e B/P/S "resistance" → FE-native +DEF buff). Shell Defense (command: +DEF, can't move). Hermit Crab natural armor → high FE DEF (flavor "AC 17"). |
 | Marty | Druid (Circle of Spores) | **Monk** (custom Druid) | Summoner (custom) | MAG | Halo of Spores (AoE reaction, necrotic). Symbiotic Entity (+temp HP). Fungal Infestation (summon zombie from corpse). |
 | Meesmickle | Warlock (The Fiend) | Shaman (Dark) | Dark Sage | MAG | Eldritch Blast (∞-use dark tome, 4 beams at cap). Dark One's Blessing (temp HP on kill). Hurl Through Hell (1/chapter nuke). |
 | Prof. RBG | Artificer (Artillerist) | Archer | Artillerist (custom) | DEX (Fonduedler) / MAG (cannon, spells) | Fonduedler (1d10 firearm). **Pepperjack** (Ch1, first Eldritch Cannon) and **Brie** (later chapter, second cannon — Pepperjack's girlfriend). Both are Pokemon-style automatons that only say their own names. Modes: Flamethrower / Force Ballista / Protector; AC 18, 100 HP each. Flash of Genius (reaction: +5 ally save). Infusions (between-chapter item crafting). |
-| Rootis | Sorcerer (Draconic — White Dragon) | Mage (Ice) | Sage | MAG | Metamagic (Twinned = attack twice, Empowered = reroll damage). **Dragon Wings = Manakete-style transform** (toggle on promotion: flier MOV, ignores terrain; toggles back to foot Mage form). Cold immunity, fire vulnerability, heals from cold attacks. |
+| Rootis | Sorcerer (Draconic — White Dragon) | Mage (Ice) | Sage | MAG | Metamagic (Twinned = attack twice, Empowered = reroll damage). **Dragon Wings = Manakete-style transform** (toggle on promotion: flier MOV, ignores terrain; toggles back to foot Mage form). Cold/fire affinity is flavor (no resistance mechanic); "heals from cold" maps to FE-native healing terrain (snow/ice tiles). |
 | Sclorbo | Bard (College of Lore) | Dancer (custom Bard) | **Lore Bishop** (custom) | MAG | Bardic Inspiration (d12 ally buff). Cutting Words (debuff reaction). Dance/Refresh. Cleric-tier heal kit (Cure Wounds Ch1 → Revivify Ch4 → Mass Cure Wounds Ch6 → Raise Dead Ch7). **Balance: Dance and Cast are mutually exclusive per turn** — Sclorbo picks one role each round. |
 | Wolfram | Metallurgist (Smith) | Knight | General | STR + MAG | Forge (between-chapter ally gear upgrades). AC 26 equivalent (highest DEF in party). Feral Strike (Bite + Claws bonus attacks). Breath Weapon (1/chapter fire AoE). Shield spell (reaction). Mystic Arcanums (Investiture of Stone, Forcecage). |
 

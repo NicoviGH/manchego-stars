@@ -1,6 +1,6 @@
 # chapters/ch01-the-iron-trail.yaml
 # See docs/PRD.md §7 for the full chapter narrative breakdown.
-# See docs/combat-formulas.md for the d20 system used in combat resolution.
+# Combat is vanilla FE (reverted 2026-05-28) — see docs/combat-formulas.md / decisions.md §Combat.
 
 id: ch01-the-iron-trail
 title: "The Iron Trail"
@@ -21,7 +21,7 @@ map:
   description: >
     Linear snowy trail, Bryn Shander outskirts at the left edge, goblin camp
     at the right edge. Trees and boulders for cover. Slight elevation at the
-    camp perimeter (advantage on attacks for units on the ridge).
+    camp perimeter (FE terrain hit/avoid bonus for units on the ridge).
 
 # ── Objective ──────────────────────────────────────────────────────────────────
 objective:
@@ -39,9 +39,9 @@ lose_condition: all_player_units_defeated
 
 # ── Difficulty ─────────────────────────────────────────────────────────────────
 difficulty_note: >
-  Introductory chapter. Keep enemy count low (8–12 goblins). Enemy ACs should
-  be low (AC 11–12) so players learn the d20 system with comfortable hit rates
-  (~75%). No reinforcements. No boss unit.
+  Introductory chapter. Keep enemy count low (8–12 goblins). Tune enemy
+  stats/terrain for comfortable vanilla-FE hit rates (~75%) so players learn the
+  systems gently. No reinforcements. No boss unit.
 
 # ── Player Units ──────────────────────────────────────────────────────────────
 # All 7 PCs are available from the start (they met at The Northlook together).
@@ -178,8 +178,9 @@ post_chapter:
 
 # ── Design Notes ───────────────────────────────────────────────────────────────
 design_notes: >
-  Introductory chapter. Teaches: basic movement, attack, the d20 roll display,
-  the weapon-type system (goblin uses piercing — demo that slashing swords beat
-  it), and the Rage consumable (Braulo should use it at least once naturally).
+  Introductory chapter. Teaches: basic movement, attack (vanilla FE combat with
+  the D&D reskin + crit flourish), the weapon-type system (goblin uses piercing —
+  demo that slashing swords beat it), and the Rage consumable (Braulo should use
+  it at least once naturally).
   Keep it short — 8–10 turns to clear. No complex events. Big focus on the
   combat UI tutorial feeling natural and legible.

@@ -107,6 +107,14 @@ inventory:
     uses: 3
 
 # ── D&D-Derived Stat Overrides ─────────────────────────────────────────────────
+# FLAVOR ONLY (combat revert 2026-05-28): combat is vanilla FE. `AC`, `prof_bonus`, `ability_mod_atk`
+# here — and every `save:`/`save_dc:`/`save_dc_*`/`advantage*` field in this file — are
+# source-of-record/flavor, NOT read by resolution (defense = FE DEF/RES + avoid; no saves; no
+# advantage). NOTE: `spell_slots` below IS still used by engine/spell-slots. See docs/decisions.md.
+# DAMAGE-TYPE RESISTANCE DROPPED (2026-05-28): any damage-type resistance/vulnerability/immunity
+# (×0.5/×2/×0) field below is FLAVOR ONLY — no multiplier; iconic matchups use vanilla FE weapon
+# effectiveness. (Rage's 5e B/P/S "resistance" → an FE-native +DEF buff.) Status/condition
+# immunities (charm/fear/sleep) and crit-immunity DO remain mechanical (engine/status / Hoplon).
 d20_fields:
   AC: 14                            # Chapter 1 starting AC
                                     # End-state target: 17 (flat from shell, DEX not applied).
@@ -119,7 +127,7 @@ unique_abilities:
   - id: rage
     name: Rage
     flavor: "Market Rage — someone undercut his price and now Braulo is a frothing, claw-snapping wall of fury."
-    fe_mechanic: "Rage status (consumable/command): +damage, ×0.5 physical taken, for the combat phase"
+    fe_mechanic: "Rage status (consumable/command): +might and +DEF (FE-native; no ×0.5 multiplier), for the combat phase"
     # Effect: +4 melee damage, resistance to B/P/S damage, advantage on STR checks/saves.
     type: consumable_item
     unlock_chapter: 1         # Barbarian L1 → Ch1 (MVP)

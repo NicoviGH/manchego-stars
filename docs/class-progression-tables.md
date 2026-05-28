@@ -17,6 +17,12 @@
 >
 > **See also:** [rules-mapping.md](rules-mapping.md) (how each mechanic converts to FE),
 > [class-mapping.md](class-mapping.md) (which 5e class → which FE class).
+>
+> **Combat revert (2026-05-28):** combat is vanilla FE. Where a feature's FE-conversion column below
+> says "resist" / "damage resistance" / "phys resist" / "cold resist", that **×0.5 resistance mechanic
+> is dropped** — reflavor those to an **FE-native +DEF/RES buff** or flavor, and use vanilla FE weapon
+> **effectiveness** for iconic vulnerabilities. AC/saves/advantage are likewise flavor (see decisions.md
+> §Combat System). *Status/condition* immunities (charm/fear/sleep) and crit-immunity remain FE-native.
 
 ---
 
@@ -63,7 +69,7 @@ feats. "MVP?" = available by Ch 7 under the 1:1 curve.
 ## Barbarian (Braulo)
 | 5e Lvl | Feature | FE form | Ch | MVP? |
 |---|---|---|---|---|
-| 1 | **Rage**, **Unarmored Defense** | Rage = consumable/command (+dmg, phys resist); UD = AC formula | 1 | ✓ |
+| 1 | **Rage**, **Unarmored Defense** | Rage = consumable/command (+might, +DEF — phys "resist" → FE +DEF); UD → high FE DEF (flavor, no AC) | 1 | ✓ |
 | 2 | Reckless Attack, Danger Sense | Reckless = advantage-for-advantage toggle; Danger Sense = +avoid vs AoE | 2 | ✓ |
 | 3 | Primal Path (→ Berserker) | Subclass unlock | 3 | ✓ |
 | 5 | **Extra Attack**, Fast Movement | Extra Attack = brave-weapon-style 2nd hit; +MOV | 5 | ✓ |
@@ -162,7 +168,7 @@ feats. "MVP?" = available by Ch 7 under the 1:1 curve.
 | 5e Lvl | Feature | FE form | Ch | MVP? |
 |---|---|---|---|---|
 | 1 | **Dragon Ancestor**, **Draconic Resilience** | cold affinity; +HP & AC=13+DEX (unarmored) | 1 | ✓ |
-| 6 | **Elemental Affinity** | +CHA to cold damage; spend SP for cold resist | 6 | ✓ |
+| 6 | **Elemental Affinity** | +MAG to cold damage; spend SP for a timed +RES buff (cold "resist" = flavor, no multiplier) | 6 | ✓ |
 | 14 | **Dragon Wings** | **Manakete-style transform** (see decisions.md) | 13 | — |
 | 18 | Draconic Presence | fear/charm aura (SP cost) | 17 | — |
 > Confirms: the Manakete transform is **post-MVP** (Ch 13). Through MVP, Rootis is a foot
@@ -174,7 +180,7 @@ feats. "MVP?" = available by Ch 7 under the 1:1 curve.
 |---|---|---|---|---|
 | 1 | **Dark One's Blessing** | temp HP on kill | 1 | ✓ |
 | 6 | Dark One's Own Luck | 1/chapter reroll save/check | 6 | ✓ |
-| 10 | Fiendish Resilience | pick a damage resistance per chapter | 9 | — |
+| 10 | Fiendish Resilience | timed +DEF/RES self-buff, 1/chapter (was "pick a damage resistance"; no multiplier) | 9 | — |
 | 14 | **Hurl Through Hell** | 1/chapter nuke (the signature) | 13 | — |
 > Confirms: **Hurl Through Hell is post-MVP** (Ch 13). Eldritch Blast beam count scales with
 > *character* level (1 beam <L5, 2 @L5, 3 @L11, 4 @L17): MVP = 1–2 beams; 4 beams is endgame.
@@ -197,7 +203,7 @@ Base Metallurgist + Smith school. Wolfram's "Forge" mechanic = the smithing line
 | 2 | Alloy Mending | repair/+AC buff | 2 | ✓ |
 | 3 | **Improved Upgrade** (Smith: +1 more AC, half time) | **Forge** ability core | 3 | ✓ |
 | 5 | Metal Sense, Magnetism, **Arcane Charges** (=2×prof) | charges power armor "spells" | 5 | ✓ |
-| 7 | **Forge Expert** (smith armor w/ B/P/S resistance), Mobile Metal | resist-granting forge | 7 | ✓ |
+| 7 | **Forge Expert** (smith armor for +DEF), Mobile Metal | +DEF-granting forge (B/P/S "resistance" → FE +DEF) | 7 | ✓ |
 | 11 | **Blade Forge** (upgrade weapons +1 die) | weapon-forge | 11 | — |
 | 13 | Armor Summon | conjure armor (flavor) | 12 | — |
 | 15 | Armor Master (fly 2× in upgraded armor, +3 AC) | flight (note: ≠ FE flier class) | 14 | — |
@@ -247,7 +253,7 @@ them on the chapter timeline. Below: the MVP-relevant choices + the headline pos
 - **Post-MVP headline:** Explosive Cannon (Ch9), Spell-Storing Item (Ch11), **Brie 2nd cannon (Ch14)**.
 
 ### Wolfram — Metallurgist (Smith), homebrew race
-- **MVP arc:** Upgrade Armor (Ch1) → Improved Upgrade [Forge] (Ch3) → Arcane Charges + Flamethrower **Breath Weapon** (Ch5) → Forge Expert resist-smithing (Ch7). AC climbs via Upgrade Armor stacking.
+- **MVP arc:** Upgrade Armor (Ch1) → Improved Upgrade [Forge] (Ch3) → Arcane Charges + Flamethrower **Breath Weapon** (Ch5) → Forge Expert +DEF-smithing (Ch7). FE DEF climbs via Upgrade Armor stacking.
 - **Post-MVP headline:** **Blade Forge** weapon-upgrades (Ch11), Master of the Forge (Ch15), Mobile Fortress (endgame).
 
 ---

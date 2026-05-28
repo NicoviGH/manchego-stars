@@ -114,6 +114,10 @@ inventory:
     uses: 2
 
 # ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
+# FLAVOR ONLY (combat revert 2026-05-28): combat is vanilla FE. `AC`, `prof_bonus`, `ability_mod_atk`
+# here — and every `save:`/`save_dc:`/`advantage*` field in this file — are source-of-record/flavor,
+# NOT read by resolution (defense = FE DEF/RES + avoid; no saves; no advantage). NOTE: `spell_slots`
+# below IS still used by engine/spell-slots. See docs/decisions.md §Combat System.
 d20_fields:
   AC: 14                     # Chapter 1: medium armor (Enhanced Scale Mail end-state)
                              # End-state target: 16. Tune per chapter.

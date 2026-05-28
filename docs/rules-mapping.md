@@ -21,7 +21,7 @@
 
 Three tiers for any 5e mechanic:
 
-1. **KEEP** — has a clean FE analogue or was already ratified in `decisions.md` (d20 attack rolls, damage types, doubling, summons). Port directly.
+1. **KEEP** — has a clean FE analogue or was already ratified in `decisions.md` (damage types, weapon/magic triangle, doubling, summons). Port directly. *(Note: combat resolution itself is vanilla FE — there is no d20 attack roll to "keep"; see §A.)*
 2. **CONVERT** — no direct analogue, but the *intent* maps onto an FE-native pattern. Reshape it (bonus actions → fold into the action; cantrips → finite high-use tomes).
 3. **DROP** — purely a tabletop bookkeeping artifact or a system that would bloat FE combat (skill checks, concentration tracking, the short-rest/long-rest economy as literal rests). Remove; capture intent elsewhere if it matters.
 
@@ -29,16 +29,21 @@ Three tiers for any 5e mechanic:
 
 ## A. Combat Resolution
 
+> **Resolution is vanilla FE8** (reverted from hybrid d20 on 2026-05-28 — see
+> `decisions.md` §Combat System and `combat-formulas.md`). The d20, AC, advantage,
+> and saving throws are **dropped as mechanics**. The table below records what each
+> 5e mechanic becomes now that FE owns resolution.
+
 | 5e mechanic | Tier | FE8 conversion |
 |---|---|---|
-| **Attack roll** `1d20 + AbilityMod + ProfBonus ≥ AC` | KEEP | Replaces FE hit%/avoid entirely (decisions.md). Triangle bonus folds in as a flat to-hit modifier. Nat 1 = auto-miss, nat 20 = auto-hit + crit. |
-| **Armor Class (AC)** | KEEP (as to-hit target) | AC is the number the attacker's d20 must beat. It is **separate** from damage reduction (below). A unit has one AC for being *hit*. |
-| **Damage** `WeaponDice + AbilityMod` | CONVERT | FE armor-subtraction model: `Damage = roll(WeaponDice) + AbilityMod − DR`, then resistance/vulnerability multiplier. Never import 5e flat HP-vs-damage; always subtract DR (decisions.md). |
-| **Damage Reduction (DR)** | CONVERT | FE's `DEF` (vs physical) and `RES` (vs magic) ARE the DR. AC handles to-hit; DEF/RES handle damage taken. This split is the key FE-ification: a 5e creature has only AC; an FE unit has AC **and** DEF/RES. |
-| **Critical hit** (nat 20) | KEEP | Roll weapon dice twice (decisions.md), not FE's ×3. Improved Critical = crit on 19+. |
-| **Advantage / Disadvantage** | KEEP | Roll 2d20 take higher/lower. Stored as an `advantage_state` on the attack. Cheap, no UI bloat. |
-| **Doubling** (attack speed) | KEEP (FE-native) | `AS_attacker − AS_defender ≥ 4 → two attacks` (decisions.md). Pure FE8; D&D has no equivalent and we don't add one. |
-| **Saving throws** `DC = 8 + Prof + Mod` vs `d20 + SaveMod` | KEEP (bounded) | Only fires for spells/staves/special effects — **never** on basic attacks. No nat-1/20 auto on saves. Success = half/no effect per effect def. Audit budget: a turn should rarely require >1 save roll to keep pace FE-fast. |
+| **Attack roll** `1d20 + … ≥ AC` | DROP → FE | **No d20.** Vanilla FE hit% vs avoid decides hits. The triangle is FE's native triangle bonus. |
+| **Armor Class (AC)** | DROP | No to-hit target. Defense is FE `DEF` / `RES` (damage) + speed/luck/terrain avoid (chance to be hit). `ac:` in sheets/YAMLs is flavor/source-of-record only. |
+| **Damage** `WeaponDice + AbilityMod` | CONVERT → FE might | FE fixed-might model: `Damage = Might − DEF/RES`. **No resistance/vuln multiplier** (dropped — see §G). Weapon Might tuned from the 5e die's average; no rolled damage dice. Never import raw 5e HP-vs-damage. |
+| **Damage Reduction (DR)** | KEEP (FE-native) | FE's `DEF` (vs physical) and `RES` (vs magic) ARE the DR, subtracted from Might. |
+| **Critical hit** | CONVERT → FE crit | Vanilla FE crit: rate from SKL/weapon/skill, ×3 damage. *Not* roll-dice-twice. A cosmetic d20-lands-on-20 flourish may play when a crit fires (flavor only). |
+| **Advantage / Disadvantage** | DROP | No advantage concept. Positioning matters via FE terrain bonuses and the triangle. Abilities that read as "advantage" reflavor to an FE effect or drop. |
+| **Doubling** (attack speed) | KEEP (FE-native) | `AS_attacker − AS_defender ≥ 4 → two attacks` (decisions.md). Pure FE8. |
+| **Saving throws** | DROP → FE magic | No DCs/save rolls. Status staves always-hit (vanilla FE); offensive spells use FE magic combat (MAG vs RES, FE hit/avoid). `save:` / `save_dc:` in YAMLs is flavor only. |
 | **Hit points** | CONVERT | NEVER import 5e HP (200+). FE caps ~60–80 via growth tables. The 5e `hp_max` in a sheet is *source data only*; the in-engine value is `fe_stats.HP` + growths. |
 
 ---
@@ -69,7 +74,7 @@ Three tiers for any 5e mechanic:
 | **Concentration** | DROP (mostly) | FE has no concentration tracking. Convert concentration buffs/debuffs to **fixed-duration timed effects** (N turns) or instant effects. Drop the "lose it if you take damage / cast another" bookkeeping. |
 | **Ritual casting** | DROP | Out-of-combat utility; no FE combat analogue. |
 | **Spell components (V/S/M)** | DROP | Flavor only. Exception: a "silenced" status can disable casting (maps to FE's Silence staff). |
-| **Spell save vs spell attack** | KEEP | Save-based spells use §A saving throws; attack-roll spells use §A attack rolls. |
+| **Spell save vs spell attack** | DROP → FE magic | No saves, no spell-attack d20. All offensive spells resolve as FE magic combat (MAG vs RES, FE hit/avoid). Former save-or-suck effects become always-hit status staves (Sleep/Silence/Berserk). |
 | **Spell range (feet)** | CONVERT | `tiles ≈ feet / 15`, then clamp to FE-sane ranges (melee 1, short 2–3, long 3–10). Tune per spell; don't let a 120ft cantrip become an 8-tile sniper unless intended. |
 
 ---
@@ -93,8 +98,8 @@ Three tiers for any 5e mechanic:
 | **DEX** | SKL + SPD (split) | Accuracy/crit (SKL) and doubling/avoid (SPD). One 5e stat → two FE stats; split per character concept. |
 | **CON** | HP + DEF (partial) | Drives HP growth; minor DEF contribution. |
 | **INT / WIS / CHA** | **MAG** (all fold here) | The single FE magic stat. Which 5e stat a class "really" uses is flavor metadata only (decisions.md). |
-| **Proficiency bonus** | (folds into to-hit) | Part of the d20 attack/save formula; not a standalone FE stat. |
-| **Ability modifier** | (folds into to-hit/damage) | Added per the §A formulas. |
+| **Proficiency bonus** | DROP → flavor | No d20/save formula to feed. Not an FE stat; survives only as source-of-record / flavor on sheets. |
+| **Ability modifier** | CONVERT → FE might | Folds into FE Might for *damage* (STR for physical, MAG for magic). Not a to-hit term (FE hit is SKL/LCK-based). |
 | **Movement (speed ft)** | MOV | `MOV ≈ speed / 5`, then clamp to FE ranges (foot 4–6, mounted/flier 6–8). |
 | **Skills / ability checks** | DROP | No Investigation/Persuasion rolls in FE combat. Capture as flavor in dialogue if it matters. |
 | **Initiative** | DROP | FE uses fixed phase order (player → enemy → other), not rolled initiative. |
@@ -127,8 +132,8 @@ Rule: never introduce a brand-new status UI for a 5e condition that maps onto an
 
 | 5e mechanic | Tier | FE8 conversion |
 |---|---|---|
-| **13 damage types** | KEEP | Per-class resistance/vuln/immunity bitmap (decisions.md, `engine/damage-types/`). |
-| **Resistance (½) / Vulnerability (×2) / Immunity (0)** | KEEP | Applied as a multiplier *after* DR subtraction. |
+| **13 damage types** | CONVERT → flavor labels | A flavor-only damage-type tag on weapons/tomes (name + icon for UI/descriptions). **No resistance bitmap, no mechanic** (reverted 2026-05-28 — no vanilla FE analogue). |
+| **Resistance (½) / Vulnerability (×2) / Immunity (0)** | DROP → FE effectiveness | The multiplier is dropped (it modifies FE damage under the hood). Iconic vulnerabilities map onto **vanilla FE weapon effectiveness** (an `effective`-flag, FE-native); resistance/immunity have no FE analogue → flavor only. |
 | **Physical weapon triangle** | KEEP (reskinned) | Slashing > Bludgeoning > Piercing; vanilla +1 ATK / +15 hit (decisions.md). |
 | **Magic triangle** | KEEP (reskinned) | Radiant > Necrotic > Elemental (decisions.md). |
 
@@ -163,6 +168,6 @@ The per-class application of these rules lives in `class-progression-tables.md`;
 ## Open Items (to confirm with playtesting / Nicolas)
 
 - **Primary-cantrip use count** — proposed 40–50/chapter (effectively infinite within a map but FE-legal). Confirm the number feels right, or make signature cantrips truly unbreakable like a prf weapon.
-- **Saving-throw frequency budget** — how many save rolls per turn is "still FE-fast"? Proposed: design so a typical turn needs ≤1.
+- ~~**Saving-throw frequency budget**~~ — moot: saves were dropped on 2026-05-28 (vanilla FE magic, no save rolls).
 - **Reaction procs** — confirm we want auto-procs (no player input) vs. dropping reactions entirely. Auto-procs preserve flavor but add enemy-phase animations.
 - **DEX → SKL/SPD split ratio** — per-character judgment, or a fixed formula?

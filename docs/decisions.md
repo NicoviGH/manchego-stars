@@ -23,29 +23,85 @@ _Decided: May 2026_
 
 ## Combat System
 
-**Hybrid d20/FE combat replaces vanilla FE hit-rate math**
-Attack rolls: `1d20 + AbilityMod + ProfBonus + TriangleBonus ≥ Defender.AC`. Nat 1 = auto-miss, nat 20 = auto-hit + crit. Vanilla FE hit% and avoid stats are retired.
-_Decided: May 2026_
+> **2026-05-28 — Combat resolution reverted to vanilla FE.** The earlier "Hybrid
+> d20/FE" decision (May 2026) is **superseded**. For playability the combat *rules*
+> stay vanilla FE8 (hit%/avoid/might, FE crit, FE doubling); **D&D is flavor only**.
+> The d20 survives at most as a **cosmetic flourish on a crit**, never as the
+> resolution system. **AC, saving throws, and advantage/disadvantage are dropped**
+> as mechanics (see below). Rationale (Nicolas): "the rules need to stay FE or the
+> game won't play the same" — the FE-strictness spine. The four implementation
+> sub-questions were ratified by Nicolas on 2026-05-28: d20 = cosmetic-crit-only,
+> saves dropped, AC dropped, advantage dropped.
 
-**Damage keeps FE's armor-subtraction model**
-`Damage = roll(WeaponDice) + AbilityMod − Defender.DamageReduction`, then apply resistance/vulnerability. Do NOT import 5e HP values directly — scale through FE weapon dice.
-_Decided: May 2026_
+**Combat resolution: vanilla FE8 hit / avoid / might**
+Hit, avoid, might, and crit are computed exactly as vanilla FE8 (`bmbattle.c`,
+left intact). No d20 attack roll; no Armor Class. The D&D reskins below are
+flavor/UI only and never change the math.
+_Decided: 2026-05-28 (supersedes the May 2026 hybrid-d20 decision)_
 
-**Critical hits: roll weapon dice twice on natural 20**
-Replaces FE's triple-damage crit. Configurable per weapon (Improved Critical = crits on 19+).
-_Decided: May 2026_
+**d20: cosmetic crit flourish only**
+When an FE crit fires, the battle UI may play a brief "d20 lands on 20" flourish
+for D&D feel. It does not gate or alter the hit — resolution is pure FE. This is
+the only place the die appears.
+_Decided: 2026-05-28_
 
-**Doubling: kept from vanilla FE**
+**AC (Armor Class): dropped as a mechanic**
+Defense is FE's `DEF` (vs physical) and `RES` (vs magic), plus speed/luck/terrain
+avoid — exactly as vanilla FE. There is no separate to-hit target. The `ac:` source
+values and `d20_fields` blocks in the PC YAMLs are retained only as
+flavor/source-of-record; nothing in resolution reads them.
+_Decided: 2026-05-28_
+
+**Saving throws: dropped → vanilla FE magic**
+No DCs, no save rolls. Status staves (Sleep/Silence/Berserk/Poison) always-hit per
+vanilla FE; offensive spells resolve through FE magic combat (MAG vs RES, FE
+hit/avoid). The `save:` / `save_dc:` fields throughout the PC YAMLs are flavor only.
+_Decided: 2026-05-28_
+
+**Advantage / disadvantage: dropped**
+No advantage concept. Positioning matters through standard FE terrain bonuses and
+the weapon triangle only. Abilities previously written as granting "advantage"
+either reflavor onto an FE-native effect or drop (see `fe-mechanic-map.md` ⚠ section).
+_Decided: 2026-05-28_
+
+**Damage: vanilla FE armor-subtraction model (nothing layered under it)**
+`Damage = Might − Defender.DEF/RES`. With the d20 layer gone, weapon damage uses
+**FE fixed might** (not rolled `WeaponDice`); tune might from the 5e die's average.
+No D&D multiplier is applied — see the damage-type decision below. Do NOT import 5e
+HP values — FE growth tables cap HP ~60–80.
+_Decided: 2026-05-28 (supersedes the May 2026 rolled-dice damage)_
+
+**Critical hits: vanilla FE (skill-based rate, ×3 damage)**
+FE's native crit — crit rate from SKL/weapon, triple damage. The earlier "roll
+weapon dice twice on nat 20" is dropped with the d20 resolution. Killer/high-crit
+units use vanilla FE crit-rate bonuses.
+_Decided: 2026-05-28 (supersedes the May 2026 roll-twice crit)_
+
+**Doubling: vanilla FE (unchanged)**
 `AttackSpeed_attacker − AttackSpeed_defender ≥ 4` → attacker attacks twice.
-_Decided: May 2026_
+_Decided: May 2026 (still current)_
 
-**Saving throws for spells and staves**
-`DC = 8 + ProfBonus + SpellAbilityMod`. Defender rolls `1d20 + SaveMod`. No auto-pass/fail on nat 1/20 for saves (5e rules apply). Success = half damage or no effect per spell definition.
-_Decided: May 2026_
+**Damage-type resistance/vulnerability/immunity: DROPPED as a mechanic**
+The 13-damage-type resistance multiplier (×0.5 / ×2 / ×0) has **no vanilla FE analogue**
+and would modify FE damage under the hood — exactly the kind of D&D bolt-on we're avoiding
+(Nicolas, 2026-05-28: "that's not part of the FE combat system… it should not conflict with
+vanilla FE under the hood"). So:
+- **Damage types are flavor labels only** — a weapon/tome carries a D&D damage-type name + icon
+  for descriptions and UI. No resistance/vuln/immunity computation runs in damage resolution.
+- **Iconic matchups use vanilla FE weapon effectiveness.** FE8 already has effective weapons
+  (Hammer vs armor, Wyrmslayer vs dragons, etc.). When a vulnerability genuinely matters to
+  play — e.g. "fire melts ice trolls" — flag the relevant weapon **effective** vs that enemy
+  class. That's vanilla-FE-native, not a new multiplier. Use sparingly; most damage types stay
+  pure flavor.
+- **No `resistance_table.c` / resistance bitmap.** The `engine/damage-types/` module reduces to
+  a flavor-label tag (for UI) — no resistance engine.
+_Decided: 2026-05-28 (supersedes the May 2026 "13 damage types with resistance per class")_
 
-**Hit-rate tuning starting point: high prof bonuses, low enemy ACs (Option A)**
-Target base hit rates of 65–80% for advantaged attacks. Adjust per-chapter after playtesting. Implement a "skill floor" preventing hit rates below 30% if needed.
-_Decided: May 2026 — revisit in Phase 1 playtesting (#18)_
+**Hit-rate tuning: vanilla FE, no special floor needed**
+With vanilla FE hit/avoid restored, FE8's native 70–95% hit norms apply directly —
+the old d20-variance problem and the "skill floor" mitigation are moot. Tune
+per-chapter via enemy stats/terrain as in any FE hack.
+_Decided: 2026-05-28 (supersedes Option A d20 hit-rate tuning)_
 
 ---
 
@@ -59,9 +115,9 @@ _Decided: May 2026_
 Replaces Light > Dark > Anima. Same triangle mechanics, new labels.
 _Decided: May 2026_
 
-**13 damage types with resistance/vulnerability/immunity per class**
-Types: slashing, piercing, bludgeoning, fire, cold, lightning, thunder, poison, acid, necrotic, radiant, force, psychic. Per-class resistance bitmap in `engine/damage-types/resistance_table.c`.
-_Decided: May 2026_
+**13 damage-type labels (flavor only — no resistance mechanic)**
+Types: slashing, piercing, bludgeoning, fire, cold, lightning, thunder, poison, acid, necrotic, radiant, force, psychic. These are **flavor tags** on weapons/tomes for descriptions + UI. **No per-class resistance bitmap, no ×0.5/×2/×0 multiplier** (reverted 2026-05-28 — see Combat System §). Iconic vulnerabilities use vanilla FE weapon **effectiveness** instead.
+_Decided: 2026-05-28 (supersedes the May 2026 resistance-bitmap decision)_
 
 **Spell-slot tomes: not buyable, refill at chapter start (= long rest)**
 Casters receive tomes at recruitment or through story events. Cannot purchase more. Cantrip tomes (0th level) are infinite-use and cannot be bought either. Mundane tomes are buyable.

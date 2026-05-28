@@ -4,6 +4,16 @@
 **Date:** 2026-05-26
 **Purpose:** Background research to hand to the PRD agent. Covers (1) how to ship a `.gba` Fire Emblem ROM hack, (2) what Claude / agent harnesses can plausibly accelerate the work, (3) what's in the D&D 5e API and how it's shaped, and (4) a concrete plan for translating 5e characters and combat into Fire Emblem.
 
+> **⚠ HISTORICAL — combat approach NOT ADOPTED (superseded 2026-05-28).** This doc's
+> recurring proposal of a **hybrid d20 combat system** (visible d20 vs Armor Class,
+> advantage/disadvantage, spell saving throws vs DC) was **rejected**. Combat resolution
+> stays **vanilla FE8** (hit/avoid/might/crit); D&D is flavor; the d20 survives only as a
+> cosmetic crit flourish. This affects every combat-system passage below (§1 exec summary,
+> §6.1–§6.3, the implementation roadmap, the save-or-suck table). Kept as the historical
+> research record only — the authoritative spec is `decisions.md` §Combat System +
+> `combat-formulas.md`. The non-combat research (tooling, decomp, 5e API, class mapping) is
+> still valid.
+
 ---
 
 ## 1. Executive summary
@@ -427,6 +437,12 @@ From the bg3.wiki "Dice rolls" page and direct observation of BG3:
 - **Visibility on screen:** BG3 shows the actual rolled number, modifiers, and pass/fail state. This is *the* thing that makes BG3 feel like D&D. Replicating it on GBA is the single most impactful UI decision.
 
 ### 6.3 Combat formula — proposed hybrid
+
+> **⚠ NOT ADOPTED (superseded 2026-05-28).** This section — and the d20/AC/saving-throw/advantage
+> proposals in §6.1–§6.2 above — was an *exploration*. It was **rejected**: combat resolution
+> stays **vanilla FE8** (hit/avoid/might/crit), D&D is flavor, and the d20 survives only as a
+> cosmetic crit flourish. This doc is kept as the historical research record; the authoritative
+> spec is `decisions.md` §Combat System + `combat-formulas.md`. Do not implement the hybrid below.
 
 **Vanilla FE GBA combat math** (from the Fire Emblem Wiki "Battle Formulas" page):
 

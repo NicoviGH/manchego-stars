@@ -115,6 +115,11 @@ Previous YAML listed `uses_per_chapter: null` (unlimited). The PDF p3 explicitly
 
 ### 4. Damage-type & magic-triangle coverage
 
+> **Note (2026-05-28):** damage types are now **flavor labels** (no resistance/vuln/immunity mechanic).
+> The **magic/weapon triangles still matter mechanically** (vanilla FE triangle bonus). So "coverage"
+> below is about triangle spread + flavor identity, not a resistance meta. Iconic vulnerabilities use
+> vanilla FE weapon effectiveness. (Full MVP re-eval of this doc is still a pending next-step.)
+
 **Physical triangle:**
 - Slashing: light (Braulo claws 1d4, Wolfram Feral Strike Claws 1d6 bonus action)
 - Piercing: strong (Nu', Trident, Rapier, Fonduedler)

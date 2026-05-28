@@ -146,6 +146,14 @@ inventory:
     uses: 10                  # 10 berries per casting; restocked between chapters
 
 # ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
+# FLAVOR ONLY (combat revert 2026-05-28): combat is vanilla FE. `AC`, `prof_bonus`, `ability_mod_atk`
+# here — and every `save:`/`save_dc:`/`advantage*` field in this file — are source-of-record/flavor,
+# NOT read by resolution (defense = FE DEF/RES + avoid; no saves; no advantage). NOTE: `spell_slots`
+# below IS still used by engine/spell-slots. See docs/decisions.md §Combat System.
+# DAMAGE-TYPE RESISTANCE DROPPED (2026-05-28): the `resistance: [poison]` / `poison_resistance`
+# damage-type fields are FLAVOR ONLY — no ×0.5 multiplier; iconic matchups use vanilla FE weapon
+# effectiveness. Status/condition immunities (blinded/deafened/frightened/poisoned condition) and
+# crit-immunity in `immunity_conditions` DO remain mechanical (engine/status / Hoplon).
 d20_fields:
   AC: 12                     # Chapter 1: leather armor, no shield
                              # End-state target: 17. Tune per chapter.

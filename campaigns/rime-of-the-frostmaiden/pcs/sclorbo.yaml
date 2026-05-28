@@ -145,6 +145,10 @@ inventory:
     uses: 2
 
 # ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
+# FLAVOR ONLY (combat revert 2026-05-28): combat is vanilla FE. `AC`, `prof_bonus`, `ability_mod_atk`
+# here — and every `save:`/`save_dc:`/`advantage*` field in this file — are source-of-record/flavor,
+# NOT read by resolution (defense = FE DEF/RES + avoid; no saves; no advantage). NOTE: `spell_slots`
+# below IS still used by engine/spell-slots. See docs/decisions.md §Combat System.
 d20_fields:
   AC: 12
   ability_mod_atk: CHA
@@ -282,7 +286,7 @@ unique_abilities:
   - id: magic-missile
     name: "Magic Missile"
     flavor: "Unerring Motes — three darts of pale force-light that bend through the air to strike."
-    fe_mechanic: "force tome that AUTO-HITS (skips the d20 roll); splits into multiple darts"
+    fe_mechanic: "force tome that ALWAYS HITS (FE always-hit targeting); splits into multiple darts"
     type: spell_tome
     spell_level: 1
     unlock_chapter: 1

@@ -113,13 +113,13 @@ key is shared — implement it once, every PC that references it gets it. **Bold
 - **`extra_attack`** — brave-weapon-style second hit (base: brave weapon effect). *braulo.extra-attack (Ch5), braulo.frenzy (Ch3, gated on rage)*
 - **`crit_extra_dice`** — extra weapon die on crit. *braulo.brutal-critical (Ch9)* — post-MVP
 - **`extra_counter`** — second counterattack proc on melee hit (base: counterattack). *braulo.retaliation (Ch13)* — post-MVP
-- **`reckless_toggle`** — advantage on offense + enemies advantage vs self (base: advantage_state). *braulo.reckless-attack (Ch2)*
-- **`dex_save_advantage`** — advantage on DEX saves vs visible AoE (base: advantage_state). *braulo.danger-sense (Ch2)*
+- **`reckless_toggle`** — toggle: +hit/+might, −avoid/−DEF while active (FE stat swing). *braulo.reckless-attack (Ch2)*
+- **`dex_save_advantage`** — +avoid vs ranged/magic for a turn (or drop; no saves). *braulo.danger-sense (Ch2)*
 - **`survive_at_1hp`** — drop to 1 HP instead of 0, escalating save. *braulo.relentless-rage (Ch11)* — post-MVP
 - **`temp_hp_and_damage_aura`** — temp-HP buff + on-hit bonus damage while active. *marty.symbiotic-entity (Ch2)*
 - **`damage_aura_on_approach`** — adjacent enemies auto-take chip. *marty.halo-of-spores (Ch2)*
 - **`negate_incoming_crit`** — downgrade enemy crits to normal hits (base: ITEM_HOPLON_SHIELD). *marty.crit-immunity (Ch13)* — post-MVP
-- **`mark_grants_advantage`** — marked foe; caster + summons get advantage (base: advantage_state). *marty.pheromone-spores (Ch1)*
+- **`mark_grants_advantage`** — marked foe gets −avoid (caster + summons hit it more). *marty.pheromone-spores (Ch1)*
 - **`prf_tome_multibeam`** — locked personal tome, beam count scales (base: brave weapon effect; force type via damage-types). *meesmickle.eldritch-blast-tome (Ch1)*
 - **`temp_hp_on_kill`** — gain temp HP on kill. *meesmickle.dark-ones-blessing (Ch1)*
 - **`bonus_damage_finisher`** — add a big burst after a hit, 1/chapter. *meesmickle.hurl-through-hell (Ch13)* — post-MVP
@@ -128,9 +128,9 @@ key is shared — implement it once, every PC that references it gets it. **Bold
 - **`retaliate_fire_when_hit`** — auto fire damage to melee attacker (base: counterattack). *meesmickle.hellish-rebuke (Ch1)*
 - **`cone_attack`** — fire/breath cone over a few adjacent tiles. *meesmickle.burning-hands (Ch1), wolfram.breath-weapon (Ch1, base: ITEM_DIVINESTONE)*
 - **`siege_single_target`** — long-range single-target tome where no vanilla element-siege exists (base: ITEM_ANIMA_BOLTING for range). *meesmickle.fireball (Ch5), prof-rbg.fireball (Ch9), prof-rbg.ice-storm (Ch13), prof-rbg.cone-of-cold (Ch17), rootis.cone-of-cold (Ch9), wolfram.explosive-burst (Ch7)*
-- **`reroll_self`** — reroll one own failed attack/save, 1/chapter. *meesmickle.dark-ones-own-luck (Ch6)*
-- **`ally_save_bonus_proc`** — auto +INT to nearby ally's save/avoid. *prof-rbg.flash-of-genius (Ch7)*
-- **`ac_buff_reaction`** — +AC reaction proc on self for one hit. *prof-rbg.shield-spell (Ch3), wolfram.shield-spell (Ch5)*
+- **`reroll_self`** — 1/chapter: next attack auto-hits (FE has no roll to reroll). *meesmickle.dark-ones-own-luck (Ch6)*
+- **`ally_save_bonus_proc`** — passive +avoid aura proc on a nearby ally. *prof-rbg.flash-of-genius (Ch7)*
+- **`def_buff_reaction`** — +DEF/RES (or +avoid) reaction proc on self for one incoming hit. *prof-rbg.shield-spell (Ch3), wolfram.shield-spell (Ch5)*
 - **`damage_and_shove`** — damage + push 1 tile (base: ITEM_ANIMA_THUNDER). *prof-rbg.thunderwave (Ch3)*
 - **`multibolt_tome`** — N separate rolled hits, one cast (base: ITEM_ANIMA_FIRE + brave effect). *prof-rbg.scorching-ray (Ch5)*
 - **`melee_tome_suppress_counter`** — melee tome; target loses its counter (base: ITEM_ANIMA_THUNDER). *prof-rbg.shocking-grasp (Ch1)*
@@ -143,7 +143,8 @@ key is shared — implement it once, every PC that references it gets it. **Bold
 - **`bonus_damage_follow_up`** — melee hits add a small bonus bite. *wolfram.feral-strike-bite (Ch1)*
 
 ### `engine/status` *(PROPOSED NEW — status flags beyond the vanilla Sleep/Berserk/Silence/Poison staves)*
-- **`rage_self_buff`** — +damage, ×0.5 physical taken, timed. *braulo.rage (Ch1)*
+- `def_buff_timed` — timed +DEF/RES self-buff (FE-native; replaces the dropped pick-a-resistance). *meesmickle.fiendish-resilience (Ch9)* — post-MVP
+- **`rage_self_buff`** — +might and +DEF (FE-native bulk; the 5e ×0.5-physical becomes +DEF, no multiplier), timed. *braulo.rage (Ch1)*
 - **`status_immunity`** — immune to charm/fear (while raging). *braulo.mindless-rage (Ch6)*
 - **`anti_heal_on_hit`** — target can't recover HP (base: ITEM_DARK_FLUX). *marty.chill-touch (Ch1)*
 - **`blind`** — to-hit debuff for a turn. *marty.blindness-deafness (Ch3)*
@@ -168,37 +169,47 @@ key is shared — implement it once, every PC that references it gets it. **Bold
 - `barrier_line_blocks_ranged` — impassable line that also stops ranged (base: ITEM_LIGHTRUNE). *prof-rbg.wind-wall (Ch9)* — post-MVP
 - `barrier_impassable` — fully impassable barrier, movement + attacks (base: ITEM_LIGHTRUNE). *prof-rbg.wall-of-force (Ch17)* — post-MVP
 
-### `engine/damage-types` *(exists — scaffold)*
-- `grant_resistance_choice` — pick a damage type, gain ×0.5 for the map. *meesmickle.fiendish-resilience (Ch9)* — post-MVP
-- **`damage_resistance`** — passive ×0.5 vs a fixed type (resistance bitmap per rules-mapping §G). *wolfram.fire-resistance (Ch1)*
+### `engine/damage-types` *(exists — now a flavor label tag only)*
+The ×0.5/×0/×2 resistance system was **dropped 2026-05-28** (no vanilla FE analogue). This module is
+just a flavor damage-type label on weapons (for UI/descriptions). No custom resistance features:
+- ~~`grant_resistance_choice`~~ → reflavored to **`def_buff_timed`** in `engine/status` (timed +DEF/RES self-buff). *meesmickle.fiendish-resilience (Ch9)* — post-MVP
+- ~~`damage_resistance`~~ → **dropped to flavor** (`kind: none`). *wolfram.fire-resistance* is now narrative only; iconic vulnerabilities use vanilla FE weapon **effectiveness** instead.
 
 ### `engine/class-defs` *(exists — scaffold)*
-- **`guard_stance`** — +AC + save advantage, MOV 0, no counter until emerge. *braulo.shell-defense (Ch1)*
+- **`guard_stance`** — +DEF/RES, MOV 0, no counter until he emerges. *braulo.shell-defense (Ch1)*
 - **`summon_on_kill`** — spawn a phantom from a slain enemy (base: CA_SUMMON). *marty.fungal-infestation (Ch6)*
 - **`nuke_summon_on_kill`** — dark nuke; killed target rises as a thrall (base: ITEM_DARK_FENRIR + CA_SUMMON). *meesmickle.finger-of-death (Ch13)* — post-MVP
 - **`grant_flier_movement_timed`** — temporary flier movement on self/ally (base: CA_FLYER). *rootis.fly (Ch5)*
-- **`forge_command`** — prep-screen meta command: permanently buff an ally's gear; tiers add weapon upgrades / physical resistance / adamantine crit-immunity (base: ITEM_HOPLON_SHIELD for adamantine). *wolfram.forge (Ch1), wolfram.forge-expert (Ch7), wolfram.blade-forge (Ch11), wolfram.master-of-the-forge (Ch15)*
+- **`forge_command`** — prep-screen meta command: permanently buff an ally's gear; tiers add weapon upgrades / +DEF / adamantine crit-immunity (base: ITEM_HOPLON_SHIELD for adamantine; all FE-native — no damage-type resistance). *wolfram.forge (Ch1), wolfram.forge-expert (Ch7), wolfram.blade-forge (Ch11), wolfram.master-of-the-forge (Ch15)*
 
 ---
 
-## ⚠ Dependency on the combat-resolution decision (OPEN)
+## Combat-resolution decision — RESOLVED 2026-05-28 (vanilla FE)
 
-Several `custom_engine` features and the PC YAMLs' `save:` / `save_dc:` / advantage fields assume
-the **d20 attack/save resolution** described in rules-mapping.md §A. That assumption is **under
-review** — the current direction (see HANDOFF / decisions.md follow-up) is that **combat *rules*
-stay vanilla FE** (FE hit%/avoid/might), with D&D as flavor and the d20 at most a *cosmetic crit
-animation*. If that lands, the following map references reduce to no-ops or reflavor rather than
-real rolls:
+Combat *rules* are vanilla FE8 (hit%/avoid/might/crit); D&D is flavor; the d20 survives only as a
+cosmetic crit flourish. **AC, saving throws, and advantage/disadvantage are dropped as mechanics**
+(see `decisions.md` §Combat System). The `item` / `class_ability` / hazard / summon / status
+mappings are **unaffected** — they were always vanilla-FE-native. The features and YAML fields that
+assumed d20/AC/save/advantage **reflavor onto FE-native effects (hit/avoid/DEF/RES stat swings,
+always-hit targeting) or drop**, per this table:
 
-- `base: advantage_state` (reckless_toggle, dex_save_advantage, mark_grants_advantage)
-- `auto_hit_multi_dart` ("skips the d20 roll" is meaningless if there's no d20 to begin with)
-- `reroll_self`, `ally_save_bonus_proc`, `enemy_roll_debuff_proc`, `dex_save_advantage`
-  (these manipulate d20 rolls / saves)
-- every `save:` / `save_dc:` in the PC YAMLs
+| feature / field | was (d20 assumption) | now (FE-native) |
+|---|---|---|
+| `reckless_toggle` *(braulo.reckless-attack)* | advantage on offense, enemies advantage vs self | toggle: **+hit/+might, −avoid/−DEF** while active (FE stat swing) |
+| `dex_save_advantage` *(braulo.danger-sense)* | advantage on DEX saves vs visible AoE | **+avoid vs ranged/magic** for a turn, or drop (no saves) |
+| `mark_grants_advantage` *(marty.pheromone-spores)* | marked foe → caster+summons get advantage | marked foe gets **−avoid** (everyone hits it more) |
+| `auto_hit_multi_dart` *(sclorbo.magic-missile)* | auto-hit "skips the d20" | **always-hit multi-hit tome** — reuses staff always-hit targeting + brave multi-strike (fully FE-native; nothing to skip) |
+| `reroll_self` *(meesmickle.dark-ones-own-luck)* | reroll a failed attack/save | 1/chapter: **next attack auto-hits** (or big +hit), no save half |
+| `ally_save_bonus_proc` *(prof-rbg.flash-of-genius)* | auto +INT to ally's save/avoid | passive **+avoid aura** proc on nearby ally |
+| `enemy_roll_debuff_proc` *(sclorbo.cutting-words)* | subtract a die from enemy's roll | auto **−hit/−avoid debuff** on a nearby enemy |
+| `def_buff_reaction` *(prof-rbg/wolfram shield-spell; was `ac_buff_reaction`)* | +AC reaction for one hit | **+DEF/RES (or +avoid) reaction** proc for one incoming hit |
+| `grant_bonus_die` *(sclorbo.bardic-inspiration)* | give ally a die for next roll | **+hit/+avoid/+might buff** to an ally (timed) |
+| `guard_stance` *(braulo.shell-defense)* | +AC + save advantage, MOV 0, no counter | **+DEF/RES**, MOV 0, no counter until he emerges |
+| all `save:` / `save_dc:` in PC YAMLs | DC vs d20 save | **flavor only** — status staves always-hit; offensive spells use FE magic combat |
 
-**Do not implement these until the combat-resolution question is settled.** The `item` /
-`class_ability` / hazard / summon / status mappings are unaffected — they're vanilla-FE-native
-regardless.
+These are now all `engine`-implementable as FE stat modifiers / always-hit effects — **no d20
+substrate required**. The old `base: advantage_state` references have been removed from the backlog
+and the `.yaml`; the FE-native forms in this table are authoritative.
 
 ---
 

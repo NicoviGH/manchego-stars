@@ -26,7 +26,7 @@
 | Item | What it is (5e) | FE conversion idea | Gate |
 |---|---|---|---|
 | Javelin of Lightning | Thrown; 4d6 lightning line, 1/day recharge | Thrown weapon, 1/chapter 4d6 lightning AoE line | mid-MVP ok (iconic) |
-| Rod of the Pact Keeper | +1/+2 spell atk & save DC; regain a Pact slot 1/long rest | +hit/+DC to tomes; refill 1 Pact use/chapter | post-MVP |
+| Rod of the Pact Keeper | +1/+2 spell atk & save DC; regain a Pact slot 1/long rest | +hit/+might to tomes (no save DCs in vanilla FE); refill 1 Pact use/chapter | post-MVP |
 | Periapt of Wound Closure | Auto-stabilize; double HP from healing | Classic-mode safety + heal-received bonus | post-MVP |
 
 ## Prof. RBG — Artificer (Artillerist), Underfolk
