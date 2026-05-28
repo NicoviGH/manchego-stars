@@ -1,0 +1,140 @@
+# fe-mechanic-map.yaml — concrete FE8 references for every PC ability's `fe_mechanic` anchor.
+#
+# WHAT THIS IS: the layer that turns the human-readable `fe_mechanic` strings in pcs/*.yaml
+# ("Nosferatu", "Sleep staff", "Summoner phantom", …) into machine-resolvable FE8 references
+# (real ITEM_* / CA_* enums from the decomp, or a named custom engine feature). This is the
+# spec `tools/build-campaign.ts` joins against to emit engine data. Human-readable rationale,
+# the full FE8 ID legend, and the custom-engine backlog live in docs/fe-mechanic-map.md.
+#
+# JOIN KEY: "<pc_id>.<ability_id>" — matches the `id:` of an inventory item or unique_ability
+# in campaigns/rime-of-the-frostmaiden/pcs/<pc_id>.yaml. Only abilities that carry an
+# `fe_mechanic:` string are mapped here (93 total, 2026-05-28). Abilities without an
+# fe_mechanic anchor are listed as a gap in docs/fe-mechanic-map.md §Unmapped.
+#
+# fe_ref SCHEMA (see docs for full definitions):
+#   kind:         item | class_ability | custom_engine | none   (required)
+#   fe8_item:     ITEM_* enum (or [list]) — when kind: item
+#   fe8_ability:  CA_*  enum (or [list]) — when kind: class_ability
+#   module:       engine/<dir> that implements it — when kind: custom_engine
+#   feature:      stable snake_case key for the custom feature — when kind: custom_engine
+#   base:         ITEM_*/CA_*/concept (or [list]) the custom feature reuses or extends (optional)
+#
+# ENGINE MODULES referenced (5 exist as scaffold dirs; 2 are PROPOSED-NEW, flagged in docs):
+#   engine/d20-combat   (exists)  — attack/save/crit/advantage resolution, combat procs
+#   engine/damage-types (exists)  — resistance / vulnerability / immunity bitmap
+#   engine/spell-slots  (exists)  — tome charges / uses_per_chapter
+#   engine/class-defs   (exists)  — class data: summons, dance, flier grants, transforms, commands
+#   engine/ui           (exists)  — visible dice (no mechanic mapped here)
+#   engine/status       (NEW)     — status flags beyond vanilla staves (blind, slow, charm-flag, …)
+#   engine/hazards      (NEW)     — persistent / drifting hazard tiles + barrier walls
+
+version: 1
+
+map:
+
+  # ── Braulo — Barbarian (Path of the Berserker) ──────────────────────────────
+  braulo.rage:            { kind: custom_engine, module: engine/status,     feature: rage_self_buff }
+  braulo.frenzy:          { kind: custom_engine, module: engine/d20-combat,  base: brave_weapon_effect, feature: extra_attack }          # conditional on rage_self_buff
+  braulo.extra-attack:    { kind: custom_engine, module: engine/d20-combat,  base: brave_weapon_effect, feature: extra_attack }
+  braulo.shell-defense:   { kind: custom_engine, module: engine/class-defs,  feature: guard_stance }
+  braulo.relentless-rage: { kind: custom_engine, module: engine/d20-combat,  feature: survive_at_1hp }                                   # gated on rage_self_buff
+  braulo.brutal-critical: { kind: custom_engine, module: engine/d20-combat,  feature: crit_extra_dice }
+  braulo.primal-champion: { kind: none }                                                                                                  # capstone baked into stat caps / ability_scores
+  braulo.retaliation:     { kind: custom_engine, module: engine/d20-combat,  base: counterattack, feature: extra_counter }
+  braulo.reckless-attack: { kind: custom_engine, module: engine/d20-combat,  base: advantage_state, feature: reckless_toggle }
+  braulo.mindless-rage:   { kind: custom_engine, module: engine/status,      feature: status_immunity }                                   # immune to charm/fear while raging
+  braulo.danger-sense:    { kind: custom_engine, module: engine/d20-combat,  base: advantage_state, feature: dex_save_advantage }
+  braulo.feral-instinct:  { kind: none }                                                                                                  # initiative dropped per rules-mapping §E
+
+  # ── Marty the Merry Mushroom — Druid (Circle of Spores) ─────────────────────
+  marty.chill-touch:        { kind: custom_engine, module: engine/status,     base: ITEM_DARK_FLUX, feature: anti_heal_on_hit }
+  marty.goodberry:          { kind: item, fe8_item: ITEM_VULNERARY }
+  marty.symbiotic-entity:   { kind: custom_engine, module: engine/d20-combat, feature: temp_hp_and_damage_aura }
+  marty.halo-of-spores:     { kind: custom_engine, module: engine/d20-combat, feature: damage_aura_on_approach }
+  marty.spreading-spores:   { kind: custom_engine, module: engine/hazards,    base: ITEM_MINE, feature: hazard_zone_persistent }
+  marty.fungal-infestation: { kind: custom_engine, module: engine/class-defs, base: CA_SUMMON, feature: summon_on_kill }
+  marty.crit-immunity:      { kind: custom_engine, module: engine/d20-combat, base: ITEM_HOPLON_SHIELD, feature: negate_incoming_crit }
+  marty.pacifying-spores:   { kind: item, fe8_item: ITEM_STAFF_SLEEP }
+  marty.pheromone-spores:   { kind: custom_engine, module: engine/d20-combat, base: advantage_state, feature: mark_grants_advantage }
+  marty.blindness-deafness: { kind: custom_engine, module: engine/status,     feature: blind }
+  marty.animate-dead:       { kind: class_ability, fe8_ability: CA_SUMMON }
+  marty.gaseous-form:       { kind: custom_engine, module: engine/status,     feature: untargetable_self_timed }
+  marty.blight:             { kind: item, fe8_item: ITEM_DARK_NOSFERATU }
+  marty.confusion:          { kind: custom_engine, module: engine/status,     base: ITEM_STAFF_BERSERK, feature: berserk_aoe }
+  marty.cloudkill:          { kind: custom_engine, module: engine/hazards,    base: ITEM_MINE, feature: hazard_zone_drifting }
+  marty.contagion:          { kind: custom_engine, module: engine/status,     base: ITEM_SWORD_VENIN, feature: poison_strong }
+  marty.gentle-repose:      { kind: none }                                                                                                # narrative/utility only
+
+  # ── Meesmickle — Warlock (The Fiend) ────────────────────────────────────────
+  meesmickle.eldritch-blast-tome: { kind: custom_engine, module: engine/d20-combat, base: brave_weapon_effect, feature: prf_tome_multibeam }  # force type via engine/damage-types
+  meesmickle.dark-ones-blessing:  { kind: custom_engine, module: engine/d20-combat, feature: temp_hp_on_kill }
+  meesmickle.hurl-through-hell:   { kind: custom_engine, module: engine/d20-combat, feature: bonus_damage_finisher }
+  meesmickle.one-with-shadows:    { kind: custom_engine, module: engine/status,     feature: untargetable_until_act }
+  meesmickle.fiendish-resilience: { kind: custom_engine, module: engine/damage-types, feature: grant_resistance_choice }
+  meesmickle.power-word-kill:     { kind: custom_engine, module: engine/d20-combat, base: CA_ASSASSIN, feature: instakill_below_threshold }
+  meesmickle.demiplane:           { kind: none }                                                                                          # dropped as combat ability (no FE analogue)
+  meesmickle.toll-the-dead:       { kind: custom_engine, module: engine/d20-combat, base: ITEM_DARK_FLUX, feature: bonus_damage_vs_wounded }
+  meesmickle.hellish-rebuke:      { kind: custom_engine, module: engine/d20-combat, base: counterattack, feature: retaliate_fire_when_hit }
+  meesmickle.burning-hands:       { kind: custom_engine, module: engine/d20-combat, base: ITEM_ANIMA_FIRE, feature: cone_attack }
+  meesmickle.suggestion:          { kind: custom_engine, module: engine/status,     feature: charm_cant_act }
+  meesmickle.fireball:            { kind: custom_engine, module: engine/d20-combat, base: ITEM_ANIMA_BOLTING, feature: siege_single_target }  # no vanilla FIRE siege tome
+  meesmickle.vampiric-touch:      { kind: item, fe8_item: ITEM_DARK_NOSFERATU }
+  meesmickle.dark-ones-own-luck:  { kind: custom_engine, module: engine/d20-combat, feature: reroll_self }
+  meesmickle.eyebite:             { kind: custom_engine, module: engine/status,     base: ITEM_STAFF_SLEEP, feature: inflict_status_choice }
+  meesmickle.finger-of-death:     { kind: custom_engine, module: engine/class-defs, base: [ITEM_DARK_FENRIR, CA_SUMMON], feature: nuke_summon_on_kill }
+
+  # ── Prof. R.B. Geenius — Artificer (Artillerist) ────────────────────────────
+  prof-rbg.luck-e-cheese:    { kind: item, fe8_item: ITEM_SWORD_IRON }                                                                    # plain shortsword; Wish is story_only (no mechanic)
+  prof-rbg.shocking-grasp:   { kind: custom_engine, module: engine/d20-combat, base: ITEM_ANIMA_THUNDER, feature: melee_tome_suppress_counter }
+  prof-rbg.pepperjack:       { kind: class_ability, fe8_ability: CA_SUMMON }                                                              # stationary turret variant of the phantom
+  prof-rbg.brie:             { kind: class_ability, fe8_ability: CA_SUMMON }                                                              # 2nd simultaneous summon (raise cap to 2)
+  prof-rbg.flash-of-genius:  { kind: custom_engine, module: engine/d20-combat, feature: ally_save_bonus_proc }
+  prof-rbg.shield-spell:     { kind: custom_engine, module: engine/d20-combat, feature: ac_buff_reaction }
+  prof-rbg.thunderwave:      { kind: custom_engine, module: engine/d20-combat, base: ITEM_ANIMA_THUNDER, feature: damage_and_shove }
+  prof-rbg.scorching-ray:    { kind: custom_engine, module: engine/d20-combat, base: [ITEM_ANIMA_FIRE, brave_weapon_effect], feature: multibolt_tome }
+  prof-rbg.shatter:          { kind: item, fe8_item: ITEM_ANIMA_BOLTING }                                                                 # thunder siege exists in vanilla
+  prof-rbg.fireball:         { kind: custom_engine, module: engine/d20-combat, base: ITEM_ANIMA_BOLTING, feature: siege_single_target }
+  prof-rbg.wind-wall:        { kind: custom_engine, module: engine/hazards,    base: ITEM_LIGHTRUNE, feature: barrier_line_blocks_ranged }
+  prof-rbg.ice-storm:        { kind: custom_engine, module: engine/d20-combat, base: ITEM_ANIMA_BOLTING, feature: siege_single_target }   # no vanilla COLD siege tome
+  prof-rbg.wall-of-fire:     { kind: custom_engine, module: engine/hazards,    base: ITEM_MINE, feature: hazard_wall }
+  prof-rbg.cone-of-cold:     { kind: custom_engine, module: engine/d20-combat, base: [ITEM_ANIMA_FIMBULVETR, ITEM_ANIMA_BOLTING], feature: siege_single_target }
+  prof-rbg.wall-of-force:    { kind: custom_engine, module: engine/hazards,    base: ITEM_LIGHTRUNE, feature: barrier_impassable }
+
+  # ── Rootis — Sorcerer (Draconic Bloodline, White/Cold) ──────────────────────
+  rootis.earth-tremor:               { kind: custom_engine, module: engine/d20-combat, feature: aoe_damage_and_prone }                    # short-range anima burst
+  rootis.hypnotic-pattern:           { kind: custom_engine, module: engine/status,     base: ITEM_STAFF_SLEEP, feature: sleep_aoe }
+  rootis.fly:                        { kind: custom_engine, module: engine/class-defs, base: CA_FLYER, feature: grant_flier_movement_timed }
+  rootis.cone-of-cold:               { kind: custom_engine, module: engine/d20-combat, base: [ITEM_ANIMA_FIMBULVETR, ITEM_ANIMA_BOLTING], feature: siege_single_target }
+  rootis.immolation:                 { kind: custom_engine, module: engine/status,     base: ITEM_ANIMA_ELFIRE, feature: burn_dot }
+  rootis.globe-of-invulnerability:   { kind: custom_engine, module: engine/status,     base: ITEM_STAFF_BARRIER, feature: barrier_aoe }
+  rootis.abi-dalzims-horrid-wilting: { kind: item, fe8_item: ITEM_DARK_FENRIR }                                                           # Eclipse/Luna-tier nuke; Fenrir = dark siege
+  rootis.incendiary-cloud:           { kind: custom_engine, module: engine/hazards,    base: ITEM_MINE, feature: hazard_zone_drifting }
+  rootis.meteor-swarm:               { kind: custom_engine, module: engine/d20-combat, base: [ITEM_ANIMA_BOLTING, ITEM_LIGHT_PURGE], feature: siege_multi_blast }
+
+  # ── Sclorbo — Bard (College of Lore) ────────────────────────────────────────
+  sclorbo.ray-of-frost:          { kind: custom_engine, module: engine/status,     feature: slow_on_hit }                                 # cold cantrip; element via engine/damage-types
+  sclorbo.vicious-mockery:       { kind: custom_engine, module: engine/status,     feature: to_hit_debuff_on_hit }                        # psychic cantrip; primary attack
+  sclorbo.heal-staff:            { kind: item, fe8_item: ITEM_STAFF_HEAL }
+  sclorbo.dance:                 { kind: class_ability, fe8_ability: CA_REFRESHER }                                                        # Dance command (ITEM_DANCE)
+  sclorbo.bardic-inspiration:    { kind: custom_engine, module: engine/d20-combat, feature: grant_bonus_die }
+  sclorbo.cutting-words:         { kind: custom_engine, module: engine/d20-combat, feature: enemy_roll_debuff_proc }
+  sclorbo.bard-healing-suite:    { kind: custom_engine, module: engine/status,     base: [ITEM_STAFF_HEAL, ITEM_STAFF_PHYSIC, ITEM_STAFF_RECOVER], feature: revive_staff }  # Revive/Raise Dead has NO vanilla staff
+  sclorbo.heroism:               { kind: custom_engine, module: engine/d20-combat, feature: temp_hp_and_fear_immunity }
+  sclorbo.magic-missile:         { kind: custom_engine, module: engine/d20-combat, feature: auto_hit_multi_dart }                         # reuses staff always-hit targeting
+  sclorbo.hideous-laughter:      { kind: item, fe8_item: ITEM_STAFF_SLEEP }
+  sclorbo.call-lightning:        { kind: item, fe8_item: ITEM_ANIMA_BOLTING }                                                             # thunder siege, reusable across map
+  sclorbo.ottos-irresistible-dance: { kind: custom_engine, module: engine/status,  base: ITEM_STAFF_BERSERK, feature: forced_dance_cc }
+  sclorbo.mordenkainens-sword:   { kind: class_ability, fe8_ability: CA_SUMMON }
+
+  # ── Wolfram — Metallurgist (School of the Smith) ────────────────────────────
+  wolfram.forge:               { kind: custom_engine, module: engine/class-defs, feature: forge_command }                                 # prep-screen meta command (new)
+  wolfram.breath-weapon:       { kind: custom_engine, module: engine/d20-combat, base: ITEM_DIVINESTONE, feature: cone_attack }           # dragon breath cone
+  wolfram.feral-strike-bite:   { kind: custom_engine, module: engine/d20-combat, feature: bonus_damage_follow_up }
+  wolfram.feral-strike-claws:  { kind: item, fe8_item: ITEM_MONSTER_SHARPCLAW }                                                           # slashing claw weapon
+  wolfram.shield-spell:        { kind: custom_engine, module: engine/d20-combat, feature: ac_buff_reaction }
+  wolfram.fire-resistance:     { kind: custom_engine, module: engine/damage-types, feature: damage_resistance }                           # fire ×0.5 (resistance bitmap)
+  wolfram.recharge:            { kind: item, fe8_item: ITEM_STAFF_HEAL }                                                                  # self-target
+  wolfram.explosive-burst:     { kind: custom_engine, module: engine/d20-combat, base: ITEM_ANIMA_BOLTING, feature: siege_single_target }
+  wolfram.forge-expert:        { kind: custom_engine, module: engine/class-defs, feature: forge_command }                                 # tier: armor grants phys resist
+  wolfram.blade-forge:         { kind: custom_engine, module: engine/class-defs, feature: forge_command }                                 # tier: upgrade weapons
+  wolfram.master-of-the-forge: { kind: custom_engine, module: engine/class-defs, base: ITEM_HOPLON_SHIELD, feature: forge_command }       # tier: adamantine crit-immunity / mithral
