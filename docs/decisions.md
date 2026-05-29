@@ -65,11 +65,12 @@ either reflavor onto an FE-native effect or drop (see `fe-mechanic-map.md` ⚠ s
 _Decided: 2026-05-28_
 
 **Damage: vanilla FE armor-subtraction model (nothing layered under it)**
-`Damage = Might − Defender.DEF/RES`. With the d20 layer gone, weapon damage uses
-**FE fixed might** (not rolled `WeaponDice`); tune might from the 5e die's average.
-No D&D multiplier is applied — see the damage-type decision below. Do NOT import 5e
-HP values — FE growth tables cap HP ~60–80.
-_Decided: 2026-05-28 (supersedes the May 2026 rolled-dice damage)_
+`Damage = Might − Defender.DEF/RES`, where Might = the FE weapon/tome's Might + the unit's STR
+(physical) or MAG (magic) — all FE-native. Weapons are FE items; their Might comes from the FE
+weapon tier (Iron/Steel/Silver…), **not** from a 5e die or any conversion. No weapon dice, no
+ability modifier, no D&D multiplier (see the damage-type decision below). Do NOT import 5e HP/damage
+values — FE stats and growth tables (HP caps ~60–80) are authored directly.
+_Decided: 2026-05-28; sharpened 2026-05-29 (FE stats/Might only — no 5e die-to-might conversion)_
 
 **Critical hits: vanilla FE (skill-based rate, ×3 damage)**
 FE's native crit — crit rate from SKL/weapon, triple damage. The earlier "roll

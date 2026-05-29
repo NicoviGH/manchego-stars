@@ -586,8 +586,8 @@ label), no resistance bitmap.
 | Dagger | Sword (or Lance for thrown — pick by use) |
 | Shortbow, longbow, crossbow, sling | Bow (outside the triangle, as in vanilla FE) |
 
-**Weapon tiers** map onto FE's Iron/Steel/Silver ladder; damage is **fixed FE might** (tuned from the
-5e die's average), never a rolled die:
+**Weapon tiers** map onto FE's Iron/Steel/Silver ladder; damage is **fixed FE might** authored per FE
+tier (no 5e-die conversion), never a rolled die:
 
 | FE tier | 5e equivalent |
 |---|---|

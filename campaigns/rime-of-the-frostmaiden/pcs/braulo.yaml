@@ -47,7 +47,6 @@ dnd:
     claws:
       damage_dice: "1d4"
       damage_type: slashing
-      ability_mod: STR              # +6 STR at end-state (= +7 at end-state total with STR 23)
     amphibious: true                # can breathe air and water
     pagurian_telepathy:
       # Can communicate telepathically with other Pagurians within 60 ft.
@@ -89,38 +88,18 @@ inventory:
   - id: nu-shipwrecker
     name: "Nu' Shipwrecker"
     damage_type: piercing           # CORRECTED: Piercing (not Slashing — PDF confirmed)
-    weapon_dice: "1d8"              # CORRECTED: 1d8 (not 1d10 — PDF confirmed); +7 STR at end-state
-    ability_mod: STR
     range: melee
-    uses: null
+    uses: null    # FE tome — finite uses TBD (no infinite weapons)
     locked: true                    # personal weapon, cannot be traded
   - id: trident
     name: Trident
     damage_type: piercing
-    weapon_dice: "1d8"
-    ability_mod: STR                # +6 STR at end-state; silvered
     range: 2                        # thrown: range 20/60 ft → ~2 FE tiles
-    uses: null
+    uses: null    # FE tome — finite uses TBD (no infinite weapons)
     notes: "Silvered. Thrown (range 20/60 ft). +6 STR mod at end-state."
   - id: vulnerary
     name: "Healing Potion"
     uses: 3
-
-# ── D&D-Derived Stat Overrides ─────────────────────────────────────────────────
-# FLAVOR ONLY (combat revert 2026-05-28): combat is vanilla FE. `AC`, `prof_bonus`, `ability_mod_atk`
-# here — and every `save:`/`save_dc:`/`save_dc_*`/`advantage*` field in this file — are
-# source-of-record/flavor, NOT read by resolution (defense = FE DEF/RES + avoid; no saves; no
-# advantage). NOTE: `spell_slots` below IS still used by engine/spell-slots. See docs/decisions.md.
-# DAMAGE-TYPE RESISTANCE DROPPED (2026-05-28): any damage-type resistance/vulnerability/immunity
-# (×0.5/×2/×0) field below is FLAVOR ONLY — no multiplier; iconic matchups use vanilla FE weapon
-# effectiveness. (Rage's 5e B/P/S "resistance" → an FE-native +DEF buff.) Status/condition
-# immunities (charm/fear/sleep) and crit-immunity DO remain mechanical (engine/status / Hoplon).
-d20_fields:
-  AC: 14                            # Chapter 1 starting AC
-                                    # End-state target: 17 (flat from shell, DEX not applied).
-  ability_mod_atk: STR
-  prof_bonus: 2
-  spell_slots: null                 # Barbarian: no spell slots
 
 # ── Unique Abilities ────────────────────────────────────────────────────────────
 unique_abilities:

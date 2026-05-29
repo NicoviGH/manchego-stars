@@ -506,9 +506,9 @@ Fire Emblem's gold-and-shop loop is a core part of the game feel — earning gol
 ## 10. Leveling & Progression
 
 - **Starting state:** All 7 PCs begin at low FE levels (equivalent to D&D level 1–3). They met at The Northlook tavern together — no staggered recruitment for PCs.
-- **End state:** D&D Beyond sheets represent level 20 (except Sclorbo at 16). These are the *target* stats for endgame, not starting stats.
-- **MVP scope (7 chapters):** PCs should reach roughly FE level 10–12 unpromoted by end of Chapter 7 (equivalent to D&D level 5–7). Promotion should be possible but not expected within MVP.
-- **Growth rates:** Designed so that a full-campaign playthrough (if built) would bring PCs to their D&D sheet stats at the equivalent of FE level 20 promoted.
+- **End state:** the D&D Beyond sheets (level 20, except Sclorbo at 16) are **character flavor reference** — they tell us each PC's relative strengths (who's the tank, who's the glass cannon), not literal target numbers. FE stats are authored in FE terms (caps ~30), not converted from 5e scores.
+- **MVP scope (7 chapters):** PCs should reach roughly FE level 10–12 unpromoted by end of Chapter 7. Promotion should be possible but not expected within MVP.
+- **Growth rates:** authored in FE terms so a full-campaign playthrough lands each PC at a strong, class-appropriate FE endgame stat line — informed by the sheet's relative strengths, not tuned to match 5e numbers.
 - **Sclorbo exception:** Sclorbo's player left the campaign at D&D level 16. In the hack, Sclorbo starts at the same level as everyone else but has slightly lower endgame growth caps (reflecting level 16 vs 20 ceiling). No in-story explanation — just a balance lever.
 - **NPC recruits:** Join at lower levels than PCs (Trex is a "trainee" style low-level unit with high growths; Basil and The Mummy join at moderate levels).
 

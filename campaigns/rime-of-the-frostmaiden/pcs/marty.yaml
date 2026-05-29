@@ -116,10 +116,8 @@ inventory:
   - id: shillelagh
     name: "Shillelagh (Staff)"
     damage_type: bludgeoning
-    weapon_dice: "1d8"
-    ability_mod: WIS           # Shillelagh cantrip — WIS replaces STR for staff attacks
     range: melee
-    uses: null                 # cantrip — infinite uses
+    uses: null    # FE tome — finite uses TBD (no infinite weapons)
     locked: true               # Marty's Staff + Shillelagh cantrip, personal
     notes: "+WIS mod to damage (= +5 at ch1 equivalent). Replaces staff's STR-based attack."
   - id: chill-touch
@@ -127,10 +125,8 @@ inventory:
     flavor: "Witherspore — a puff of grave-mold settles on the target; its wounds won't close."
     fe_mechanic: "Flux-tier dark tome; on hit, target can't recover HP until its next turn"
     damage_type: necrotic
-    weapon_dice: "1d6"        # scales to 4d8 at level 20; start ch1 at 1d6
-    ability_mod: WIS
     range: 3                  # 120 ft → ~3 FE tiles
-    uses: null                # cantrip — infinite uses
+    uses: null    # FE tome — finite uses TBD (no infinite weapons)
     notes: "Anti-heal proc (Chill Touch's signature). Marty's primary spore cantrip."
   - id: heal-staff
     name: "Heal Staff"
@@ -144,22 +140,6 @@ inventory:
     fe_mechanic: "Vulnerary-style consumable; small HP restore, multiple charges per chapter"
     effect: restore_1hp
     uses: 10                  # 10 berries per casting; restocked between chapters
-
-# ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
-# FLAVOR ONLY (combat revert 2026-05-28): combat is vanilla FE. `AC`, `prof_bonus`, `ability_mod_atk`
-# here — and every `save:`/`save_dc:`/`advantage*` field in this file — are source-of-record/flavor,
-# NOT read by resolution (defense = FE DEF/RES + avoid; no saves; no advantage). NOTE: `spell_slots`
-# below IS still used by engine/spell-slots. See docs/decisions.md §Combat System.
-# DAMAGE-TYPE RESISTANCE DROPPED (2026-05-28): the `resistance: [poison]` / `poison_resistance`
-# damage-type fields are FLAVOR ONLY — no ×0.5 multiplier; iconic matchups use vanilla FE weapon
-# effectiveness. Status/condition immunities (blinded/deafened/frightened/poisoned condition) and
-# crit-immunity in `immunity_conditions` DO remain mechanical (engine/status / Hoplon).
-d20_fields:
-  AC: 12                     # Chapter 1: leather armor, no shield
-                             # End-state target: 17. Tune per chapter.
-  ability_mod_atk: WIS
-  prof_bonus: 2
-  spell_slots: "3/2"         # 3×1st-level, 2×2nd-level (Druid level 2 equivalent)
 
 # ── Unique Abilities ─────────────────────────────────────────────────────────
 unique_abilities:
@@ -298,7 +278,6 @@ unique_abilities:
     unlock_chapter: 7         # 4th-level → Ch7 (MVP cap)
     uses_per_chapter: 2
     damage_type: necrotic
-    weapon_dice: "8d8"
     save: CON
     range: 2
     effect: damage_and_self_heal
@@ -325,7 +304,6 @@ unique_abilities:
     unlock_chapter: 9         # 5th-level → Ch9 (POST-MVP)
     uses_per_chapter: 1
     damage_type: poison
-    weapon_dice: "5d8"
     save: CON
     range: 4
     effect: drifting_poison_hazard

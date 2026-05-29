@@ -106,29 +106,23 @@ inventory:
   - id: rapier
     name: Rapier
     damage_type: piercing
-    weapon_dice: "1d6"
-    ability_mod: DEX
     range: melee
-    uses: null
+    uses: null    # FE tome — finite uses TBD (no infinite weapons)
   - id: ray-of-frost
     name: "Ray of Frost"
     flavor: "Frostsong — a shivering note of cold that crackles across the target and slows it."
     fe_mechanic: "ice tome cantrip; on hit, target loses MOV/SPD (slow proc)"
     damage_type: cold
-    weapon_dice: "1d8"            # ch1 equivalent; end-state 3d8 via Additional Magical Secrets
-    ability_mod: CHA              # +8 to hit at end-state (CHA + prof)
     range: 3                      # 60 ft → ~3 FE tiles
-    uses: null                    # cantrip — infinite uses
+    uses: null    # FE tome — finite uses TBD (no infinite weapons)
     notes: "Acquired via Additional Magical Secrets (College of Lore). Also applies -10 ft MOV on hit."
   - id: vicious-mockery
     name: "Vicious Mockery"
     flavor: "Withering Impression — a telepathic jab of pure derision that rattles a foe's nerve."
     fe_mechanic: "psychic tome cantrip; on hit, target attacks at −hit next turn (his primary attack)"
     damage_type: psychic
-    weapon_dice: "1d4"            # cantrip — scales at higher chapters
-    ability_mod: CHA
     range: 3                      # 60 ft
-    uses: null                    # cantrip — infinite uses
+    uses: null    # FE tome — finite uses TBD (no infinite weapons)
     notes: "On hit: target has disadvantage on its next attack roll (WIS save DC negates damage only)."
   - id: heal-staff
     name: "Heal Staff"
@@ -143,17 +137,6 @@ inventory:
   - id: vulnerary
     name: "Healing Potion"
     uses: 2
-
-# ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
-# FLAVOR ONLY (combat revert 2026-05-28): combat is vanilla FE. `AC`, `prof_bonus`, `ability_mod_atk`
-# here — and every `save:`/`save_dc:`/`advantage*` field in this file — are source-of-record/flavor,
-# NOT read by resolution (defense = FE DEF/RES + avoid; no saves; no advantage). NOTE: `spell_slots`
-# below IS still used by engine/spell-slots. See docs/decisions.md §Combat System.
-d20_fields:
-  AC: 12
-  ability_mod_atk: CHA
-  prof_bonus: 2
-  spell_slots: "3"                # 3×1st-level (Bard level 2)
 
 # ── Unique Abilities ─────────────────────────────────────────────────────────
 unique_abilities:
@@ -292,7 +275,6 @@ unique_abilities:
     unlock_chapter: 1
     uses_per_chapter: 2
     damage_type: force
-    weapon_dice: "1d4+1"      # per dart
     darts: 3
     auto_hit: true            # no attack roll — reliable chip
     range: 4
@@ -318,7 +300,6 @@ unique_abilities:
     unlock_chapter: 5
     uses_per_chapter: 2
     damage_type: thunder
-    weapon_dice: "3d10"
     save: DEX
     range: 5
 

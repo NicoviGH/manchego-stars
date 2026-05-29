@@ -109,44 +109,20 @@ inventory:
   - id: ray-of-frost
     name: "Ray of Frost"
     damage_type: cold
-    weapon_dice: "1d8"        # ch1; scales to 4d8 at level 20 (PDF p1)
-    ability_mod: CHA
     range: 2                  # 60 ft cantrip → ~2-3 FE tiles
-    uses: null                # cantrip — infinite uses
+    uses: null    # FE tome — finite uses TBD (no infinite weapons)
     notes: "Also applies -10 ft move penalty (= -1 MOV in FE) on hit"
   - id: chill-touch
     name: "Chill Touch"
     # Secondary cantrip per PDF p1 (4d8 necrotic at level 20). Non-elemental, useful
     # vs cold-immune enemies. Ranged spell attack (despite name).
     damage_type: necrotic
-    weapon_dice: "1d8"        # ch1; scales to 4d8 at level 20
-    ability_mod: CHA
     range: 3                  # 120 ft → ~3 FE tiles
-    uses: null
+    uses: null    # FE tome — finite uses TBD (no infinite weapons)
     notes: "Target cannot regain HP until end of next turn (anti-heal). Undead also get disadvantage on attacks vs Rootis until then."
   - id: vulnerary
     name: "Healing Potion"
     uses: 2
-
-# ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
-# FLAVOR ONLY (combat revert 2026-05-28): combat is vanilla FE. `AC`, `prof_bonus`, `ability_mod_atk`
-# here — and every `save:`/`save_dc:`/`advantage*` field in this file — are source-of-record/flavor,
-# NOT read by resolution (defense = FE DEF/RES + avoid; no saves; no advantage). NOTE: `spell_slots`
-# below IS still used by engine/spell-slots. See docs/decisions.md §Combat System.
-# DAMAGE-TYPE RESISTANCE DROPPED (2026-05-28): Snow Body's `resistance: [B/P/S]`, `cold_immunity`,
-# `heat_vulnerability` (×2 fire), and the Crystallize `grants_immunity`/`removes_resistance` toggle
-# are FLAVOR ONLY — no multipliers. Iconic matchups use vanilla FE weapon effectiveness (so "fire vs
-# Rootis" = a fire weapon flagged effective, if we want it).
-# ROOTIS BULK NOTE: his durability used to come from B/P/S resistance, which is now gone as a
-# mechanic — so it must come from raw FE DEF instead. Tune DEF upward if he should stay tanky
-# (the "DEF: 3, Snow Body covers it" assumption below no longer holds).
-d20_fields:
-  AC: 17                     # Draconic Resilience: AC = 13 + DEX mod when unarmored.
-                             # CORRECTED 2026-05-27: not flat AC; scales with DEX.
-                             # At DEX 18 (+4) → AC 17 (current). If DEX climbs at level-up, AC follows.
-  ability_mod_atk: CHA
-  prof_bonus: 2
-  spell_slots: "3/1"         # 3×1st-level, 1×2nd-level (Sorcerer level 2)
 
 # ── Unique Abilities ─────────────────────────────────────────────────────────
 unique_abilities:
@@ -297,7 +273,6 @@ unique_abilities:
     spell_level: 1
     unlock_chapter: 1
     damage_type: bludgeoning
-    weapon_dice: "1d6"
     save: DEX
     range: 1                  # centered on Rootis → adjacent ring
     effect: aoe_damage_and_prone
@@ -335,7 +310,6 @@ unique_abilities:
     unlock_chapter: 9
     uses_per_chapter: 2
     damage_type: cold
-    weapon_dice: "8d8"
     save: CON
     range: 3
     aoe: cone
@@ -349,7 +323,6 @@ unique_abilities:
     unlock_chapter: 9
     uses_per_chapter: 1
     damage_type: fire
-    weapon_dice: "8d6"
     save: DEX
     range: 3
     effect: damage_plus_burn_dot
@@ -375,7 +348,6 @@ unique_abilities:
     unlock_chapter: 15
     uses_per_chapter: 1
     damage_type: necrotic
-    weapon_dice: "12d8"
     save: CON
     range: 4
     aoe: "2x2"
@@ -389,7 +361,6 @@ unique_abilities:
     unlock_chapter: 15
     uses_per_chapter: 1
     damage_type: fire
-    weapon_dice: "10d8"
     save: DEX
     range: 4
     effect: drifting_hazard_zone
@@ -404,7 +375,6 @@ unique_abilities:
     unlock_chapter: 17
     uses_per_chapter: 1
     damage_type: [fire, bludgeoning]
-    weapon_dice: "20d6"
     save: DEX
     range: 8
     aoe: multi_blast

@@ -39,7 +39,7 @@ Three tiers for any 5e mechanic:
 |---|---|---|
 | **Attack roll** `1d20 + … ≥ AC` | DROP → FE | **No d20.** Vanilla FE hit% vs avoid decides hits. The triangle is FE's native triangle bonus. |
 | **Armor Class (AC)** | DROP | No to-hit target. Defense is FE `DEF` / `RES` (damage) + speed/luck/terrain avoid (chance to be hit). `ac:` in sheets/YAMLs is flavor/source-of-record only. |
-| **Damage** `WeaponDice + AbilityMod` | CONVERT → FE might | FE fixed-might model: `Damage = Might − DEF/RES`. **No resistance/vuln multiplier** (dropped — see §G). Weapon Might tuned from the 5e die's average; no rolled damage dice. Never import raw 5e HP-vs-damage. |
+| **Damage** | FE-native | `Damage = Might − DEF/RES`, where Might = the FE weapon/tome's Might + the unit's STR (physical) or MAG (magic). **No weapon dice, no ability modifier, no 5e derivation.** No resistance/vuln multiplier (see §G). Never import raw 5e HP-vs-damage. |
 | **Damage Reduction (DR)** | KEEP (FE-native) | FE's `DEF` (vs physical) and `RES` (vs magic) ARE the DR, subtracted from Might. |
 | **Critical hit** | CONVERT → FE crit | Vanilla FE crit: rate from SKL/weapon/skill, ×3 damage. *Not* roll-dice-twice. A cosmetic d20-lands-on-20 flourish may play when a crit fires (flavor only). |
 | **Advantage / Disadvantage** | DROP | No advantage concept. Positioning matters via FE terrain bonuses and the triangle. Abilities that read as "advantage" reflavor to an FE effect or drop. |
@@ -71,7 +71,7 @@ Three tiers for any 5e mechanic:
 |---|---|---|
 | **Cantrips** (at-will, infinite) | CONVERT | FE has no truly infinite weapons. Cantrips become **high-count tomes** — primary cantrip ~30–50 uses, secondary ~15–25 — that DEPLETE and are **restocked with gold** between chapters (decision B). Generous enough that "casters can always do something" within a map, but still on the gold/durability economy. |
 | **Spell slots** (by level, regain on long rest) | CONVERT | Finite-use tomes; slot count per level → tome use count. Charges DEPLETE and are **restocked with gold between chapters — no free refill** (decision B, decisions.md). Audit per-PC counts so totals feel FE (a handful of big spells/chapter, not a D&D nova). |
-| **Spell level scaling** (upcasting) | CONVERT | Higher-level slot = stronger tier of the same tome (more dice/range), gated by chapter. No free-form upcast picker; the build pipeline emits the tier available at that chapter. |
+| **Spell level scaling** (upcasting) | CONVERT | Higher-level access = a stronger **FE tome tier** (more Might / range), gated by chapter. No dice; no free-form upcast picker — the build pipeline emits the tome tier available at that chapter. |
 | **Concentration** | DROP (mostly) | FE has no concentration tracking. Convert concentration buffs/debuffs to **fixed-duration timed effects** (N turns) or instant effects. Drop the "lose it if you take damage / cast another" bookkeeping. |
 | **Ritual casting** | DROP | Out-of-combat utility; no FE combat analogue. |
 | **Spell components (V/S/M)** | DROP | Flavor only. Exception: a "silenced" status can disable casting (maps to FE's Silence staff). |
@@ -93,17 +93,21 @@ Three tiers for any 5e mechanic:
 
 ## E. Stats & Character Math
 
-| 5e stat | FE8 stat | Notes |
+**Units are authored with FE8 stats directly.** A PC/NPC gets an FE8 class, and its FE stats
+(HP, STR, MAG, SKL, SPD, LCK, DEF, RES, MOV, CON) + growth rates are set in FE terms using that
+class as the template — **the same way any FE8 romhack character is built.** The 5e ability scores are
+**character source/flavor** (they tell you *who* the unit is — strong, agile, clever — and inform the
+FE stat spread by feel), NOT inputs to a conversion formula. There is **no STR→might, no DEX→SKL/SPD
+split, no ability-modifier-to-damage** step.
+
+| 5e concept | In FE | Notes |
 |---|---|---|
-| **STR** | STR / POW | Physical attack + some weapon viability. |
-| **DEX** | SKL + SPD (split) | Accuracy/crit (SKL) and doubling/avoid (SPD). One 5e stat → two FE stats; split per character concept. |
-| **CON** | HP + DEF (partial) | Drives HP growth; minor DEF contribution. |
-| **INT / WIS / CHA** | **MAG** (all fold here) | The single FE magic stat. Which 5e stat a class "really" uses is flavor metadata only (decisions.md). |
-| **Proficiency bonus** | DROP → flavor | No d20/save formula to feed. Not an FE stat; survives only as source-of-record / flavor on sheets. |
-| **Ability modifier** | CONVERT → FE might | Folds into FE Might for *damage* (STR for physical, MAG for magic). Not a to-hit term (FE hit is SKL/LCK-based). |
-| **Movement (speed ft)** | MOV | `MOV ≈ speed / 5`, then clamp to FE ranges (foot 4–6, mounted/flier 6–8). |
-| **Skills / ability checks** | DROP | No Investigation/Persuasion rolls in FE combat. Capture as flavor in dialogue if it matters. |
-| **Initiative** | DROP | FE uses fixed phase order (player → enemy → other), not rolled initiative. |
+| Ability scores (STR/DEX/CON/INT/WIS/CHA) | Source / flavor only | Inform the authored FE stat spread by feel; never run through a formula. |
+| Physical vs. magic identity | STR class vs. MAG class | Martials use STR, casters use MAG — that's just the FE class. All caster flavor stats (INT/WIS/CHA) are simply MAG. |
+| Damage | FE Might − DEF/RES | Might = the **FE weapon/tome** (its FE Might) + the unit's STR (physical) or MAG (magic). No weapon dice, no ability modifier. |
+| Proficiency bonus / AC / saves | DROP → flavor | Not FE stats; combat is FE hit/avoid/might. Survive only as source-of-record on the 5e sheet. |
+| Movement | MOV | Author an FE MOV for the class (foot 4–6, mounted/flier 6–8), informed by the character's mobility — not a feet/5 formula. |
+| Skills / ability checks / initiative | DROP | No FE combat analogue; capture as dialogue flavor if it matters. |
 
 ---
 
@@ -170,4 +174,3 @@ The per-class application of these rules lives in `class-progression-tables.md`;
 
 - **Primary-cantrip use count** — proposed 30–50/chapter, depleting + gold-restocked (decision B). Confirm the number is generous enough within a map without breaking the economy.
 - **Reaction procs** — confirm we want auto-procs (no player input) vs. dropping reactions entirely. Auto-procs preserve flavor but add enemy-phase animations.
-- **DEX → SKL/SPD split ratio** — per-character judgment, or a fixed formula?

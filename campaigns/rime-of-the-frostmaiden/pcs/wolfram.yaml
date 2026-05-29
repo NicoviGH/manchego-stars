@@ -104,24 +104,18 @@ inventory:
   - id: warhammer
     name: Warhammer
     damage_type: bludgeoning
-    weapon_dice: "1d8"            # PDF confirmed 1d8 (not 1d10)
-    ability_mod: STR
     range: melee
-    uses: null
+    uses: null    # FE tome — finite uses TBD (no infinite weapons)
   - id: iron-lance
     name: "Iron Lance"
     damage_type: piercing
-    weapon_dice: "1d6"
-    ability_mod: STR
     range: melee
-    uses: null
+    uses: null    # FE tome — finite uses TBD (no infinite weapons)
   - id: magic-stone
     name: "Magic Stone"
     # One of Wolfram's ranged options. Pact of the Tome cantrip.
     # INT-based: +11 to hit at end-state (+5 INT mod + 6 prof); 1d6+5 bludgeoning.
     damage_type: bludgeoning
-    weapon_dice: "1d6"
-    ability_mod: INT              # INT-based (Metallurgist spellcasting modifier)
     range: 2                      # 60 ft → ~2-3 FE tiles
     uses: 25                      # high-count cantrip tome (decision B): depletes, gold-restock; tune per chapter
     notes: "+11 to hit at end-state (INT 20 + prof 6). Deals +5 bludgeoning on hit."
@@ -131,29 +125,11 @@ inventory:
     # distant enemies. Scales: 1d10 (lv1) → 2d10 (5) → 3d10 (11) → 4d10 (17).
     # Pairs with breath weapon's Fire identity. INT-based per PDF (+6 to hit, 4d10 at 20).
     damage_type: fire
-    weapon_dice: "1d10"           # ch1 equivalent; scales to 4d10 at end-state
-    ability_mod: INT
     range: 3                      # 120 ft → ~3 FE tiles
     uses: 30                      # high-count cantrip tome (decision B): depletes, gold-restock; tune per chapter
   - id: vulnerary
     name: "Healing Potion"
     uses: 2
-
-# ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
-# FLAVOR ONLY (combat revert 2026-05-28): combat is vanilla FE. `AC`, `prof_bonus`, `ability_mod_atk`
-# here — and every `save:`/`save_dc:`/`advantage*` field in this file — are source-of-record/flavor,
-# NOT read by resolution (defense = FE DEF/RES + avoid; no saves; no advantage). Wolfram's high "AC 26"
-# maps to high FE DEF. NOTE: `spell_slots` below IS still used by engine/spell-slots. See docs/decisions.md.
-# DAMAGE-TYPE RESISTANCE DROPPED (2026-05-28): `fire_resistance`, `damage_resistance: fire`, and
-# the Forge `forge_grants_physical_resistance` tier are FLAVOR ONLY now — no ×0.5 multiplier.
-# Wolfram's fire affinity is narrative; Forge upgrades give FE-native +DEF / weapon +might /
-# adamantine crit-immunity instead. Iconic matchups use vanilla FE weapon effectiveness.
-d20_fields:
-  AC: 18                          # Chapter 1: heavy armor + shield + level 1 Upgrade Armor
-                                  # End-state target: 26. Scales via Upgrade Armor each chapter.
-  ability_mod_atk: STR            # STR for melee; INT for Metallurgist spells and Magic Stone
-  prof_bonus: 2
-  spell_slots: null               # Metallurgist is a half-caster; no slots until level 3
 
 # ── Unique Abilities ─────────────────────────────────────────────────────────
 unique_abilities:
@@ -250,9 +226,7 @@ unique_abilities:
     # Drakeborn racial: 1d6 + STR slashing. Alternative damage type to Bite.
     type: activated
     unlock_chapter: 1         # racial — available from start
-    weapon_dice: "1d6"
     damage_type: slashing
-    ability_mod: STR
 
   - id: shield-spell
     name: "Armor Lock (Shield)"
@@ -298,7 +272,6 @@ unique_abilities:
     unlock_chapter: 7         # Metallurgist L7 armor-ability slot → Ch7 (MVP cap)
     uses_per_chapter: 1
     damage_type: fire
-    weapon_dice: "8d6"
     save: DEX
     range: 4
 

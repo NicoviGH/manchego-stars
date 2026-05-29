@@ -1,6 +1,6 @@
 # CLAUDE.md — Manchego Stars
 
-Manchego Stars is a GBA tactics ROM hack of *Fire Emblem: The Sacred Stones* (FE8), built from the `fireemblem8u` C decompilation. It turns a completed D&D 5e *Rime of the Frostmaiden* campaign into a playable tactics game: 7 player characters become FE units, D&D's d20 dice replace FE's hit-rate math, and the campaign's 7 narrative chapters become FE maps. Distribution is private — pre-patched ROM sent to the 7 campaign players.
+Manchego Stars is a GBA tactics ROM hack of *Fire Emblem: The Sacred Stones* (FE8), built from the `fireemblem8u` C decompilation. It turns a completed D&D 5e *Rime of the Frostmaiden* campaign into a playable tactics game: 7 player characters become FE units (FE8 classes, FE8 stats), and the campaign's narrative chapters become FE maps. **Combat is vanilla FE8 — FE hit/avoid/might/crit, FE stats, no conversion.** D&D is flavor layered on top; the d20 survives only as a cosmetic nat-20 animation triggered by FE's own crit math. Distribution is private — pre-patched ROM sent to the campaign players.
 
 ## Source of Truth
 
@@ -62,7 +62,7 @@ cd fireemblem8u
 ## Phase Status
 
 - **Phase 0: Foundation** — current phase (repo scaffold, decomp builds clean)
-- **Phase 1: Engine Core** — d20 combat, damage types, spell slots, visible dice UI
+- **Phase 1: Engine Core** — D&D flavor layer on vanilla FE combat: damage-type labels, the spell-tome/gold economy, a cosmetic nat-20 crit flourish (no d20 resolution engine, no AC, no saves)
 - **Phase 2: Content Pipeline** — build-campaign.ts, Braulo end-to-end
 - **Phase 3: MVP Content** — all 7 chapters playable
 - **Phase 4: Polish & Ship** — distribute to the group

@@ -32,9 +32,9 @@ Damage    = max(0, Might − Defender.DEF | Defender.RES)
 matchup genuinely matters (e.g. fire vs ice trolls), use **vanilla FE weapon effectiveness**
 (an `effective`-flag on the weapon, FE-native), not a damage multiplier.
 
-Weapon damage is **fixed FE might**, not a rolled die. When porting a 5e weapon/spell,
-set its Might from the 5e die's average (e.g. 1d8 → ~5) and tune to FE magnitudes.
-Never import raw 5e HP/damage numbers.
+Weapon damage is **fixed FE might**, not a rolled die. A weapon/tome is an FE item; its Might comes
+from the FE weapon tier (Iron/Steel/Silver…), authored directly in FE terms. There is no weapon dice,
+no ability modifier, and no 5e-die-to-might conversion. Never import raw 5e HP/damage numbers.
 
 ## Critical Hits — VANILLA FE (skill-based)
 

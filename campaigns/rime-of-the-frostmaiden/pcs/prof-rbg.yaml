@@ -75,20 +75,16 @@ inventory:
   - id: fonduedler
     name: Fonduedler
     damage_type: piercing     # ranged weapon — custom Artificer firearm/crossbow
-    weapon_dice: "1d10"
-    ability_mod: DEX
     range: 3                  # range 30/90 ft → ~3 FE tiles
-    uses: null
+    uses: null    # FE tome — finite uses TBD (no infinite weapons)
     locked: true              # personal weapon
   - id: luck-e-cheese
     name: "Luck E. Cheese"
     flavor: "Luck Blade shortsword — a wedge-shaped blade humming with two charges of raw Wish."
     fe_mechanic: "ordinary personal shortsword in combat; the Wish is NOT a usable ability (see story_only)"
     damage_type: piercing     # PDF confirms Piercing (not Slashing — corrected from JSON)
-    weapon_dice: "1d6"
-    ability_mod: DEX
     range: melee
-    uses: null
+    uses: null    # FE tome — finite uses TBD (no infinite weapons)
     locked: true              # personal weapon
     # WISH = STORY-ONLY, NO PLAY MECHANIC (Nicolas's call, 2026-05-28). Wish has no clean FE
     # analogue and is deliberately NOT a castable ability. It fires once, as a scripted endgame
@@ -104,26 +100,12 @@ inventory:
     fe_mechanic: "Thunder tome at melee range; on hit, target loses its counterattack (no reaction)"
     # Artificer cantrip (PDF p1 weapons). 4d8 Lightning at level 20, +12 to hit (INT-based).
     damage_type: lightning
-    weapon_dice: "1d8"        # ch1; scales to 4d8 at level 20
-    ability_mod: INT
     range: melee              # touch range
     uses: 25                  # high-count cantrip tome (decision B): depletes, gold-restock; tune per chapter
     notes: "+hit vs armored (metal) targets (FE-native, was 5e advantage). On hit: target loses its counterattack until its next turn."
   - id: vulnerary
     name: "Healing Potion"
     uses: 2
-
-# ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
-# FLAVOR ONLY (combat revert 2026-05-28): combat is vanilla FE. `AC`, `prof_bonus`, `ability_mod_atk`
-# here — and every `save:`/`save_dc:`/`advantage*` field in this file — are source-of-record/flavor,
-# NOT read by resolution (defense = FE DEF/RES + avoid; no saves; no advantage). NOTE: `spell_slots`
-# below IS still used by engine/spell-slots. See docs/decisions.md §Combat System.
-d20_fields:
-  AC: 14                     # Chapter 1: medium armor (Enhanced Scale Mail end-state)
-                             # End-state target: 16. Tune per chapter.
-  ability_mod_atk: INT       # INT for cannon/spell attacks; DEX for Fonduedler physical
-  prof_bonus: 2
-  spell_slots: "2"           # 2×1st-level (Artificer half-caster, level 2)
 
 # ── Unique Abilities ─────────────────────────────────────────────────────────
 unique_abilities:
@@ -258,7 +240,6 @@ unique_abilities:
     unlock_chapter: 3
     uses_per_chapter: 2
     damage_type: thunder
-    weapon_dice: "2d8"
     save: CON
     range: 1
     effect: damage_and_push
@@ -272,7 +253,6 @@ unique_abilities:
     unlock_chapter: 5
     uses_per_chapter: 2
     damage_type: fire
-    weapon_dice: "2d6"        # per bolt, ×3 bolts
     bolts: 3
     range: 4
 
@@ -285,7 +265,6 @@ unique_abilities:
     unlock_chapter: 5
     uses_per_chapter: 1
     damage_type: thunder
-    weapon_dice: "3d8"
     save: CON
     range: 4
 
@@ -298,7 +277,6 @@ unique_abilities:
     unlock_chapter: 9         # POST-MVP
     uses_per_chapter: 2
     damage_type: fire
-    weapon_dice: "8d6"
     save: DEX
     range: 5
 
@@ -322,7 +300,6 @@ unique_abilities:
     unlock_chapter: 13        # POST-MVP
     uses_per_chapter: 1
     damage_type: [cold, bludgeoning]
-    weapon_dice: "4d6"
     save: DEX
     range: 5
 
@@ -335,7 +312,6 @@ unique_abilities:
     unlock_chapter: 13        # POST-MVP
     uses_per_chapter: 1
     damage_type: fire
-    weapon_dice: "5d8"
     effect: fire_hazard_wall
     duration_turns: 3
 
@@ -348,7 +324,6 @@ unique_abilities:
     unlock_chapter: 17        # POST-MVP / endgame
     uses_per_chapter: 1
     damage_type: cold
-    weapon_dice: "8d8"
     save: CON
     range: 4
 

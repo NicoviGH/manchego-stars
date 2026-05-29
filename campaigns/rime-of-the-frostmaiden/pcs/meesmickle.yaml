@@ -73,10 +73,8 @@ inventory:
     flavor: "Hexbolt — crackling beams of raw eldritch force lance out from her claws."
     fe_mechanic: "locked personal force tome (her basic weapon); beam count = brave-style extra hits"
     damage_type: force
-    weapon_dice: "1d10"       # base; +CHA per beam once Agonizing Blast is online (Ch2)
-    ability_mod: CHA
     range: 4                  # standard 60 ft → ~4 FE tiles (Eldritch Spear extends to 20 tiles end-state)
-    uses: null                # cantrip — infinite uses
+    uses: null    # FE tome — finite uses TBD (no infinite weapons)
     locked: true              # Warlock cantrip, cannot be traded
     # BEAM COUNT scales with character level (each beam rolls + targets separately):
     #   1 beam (Ch1–4) → 2 beams (Ch5, L5) → 3 beams (Ch10, L11) → 4 beams (Ch17, L17).
@@ -92,23 +90,6 @@ inventory:
     is_healing: true
     effect: spend_hit_dice    # triggers a hit die roll to recover HP — Meesmickle's only healing
     uses: 3
-
-# ── D&D-Derived Stat Overrides ───────────────────────────────────────────────
-# FLAVOR ONLY (combat revert 2026-05-28): combat is vanilla FE. `AC`, `prof_bonus`, `ability_mod_atk`
-# here — and every `save:`/`save_dc:`/`advantage*` field in this file — are source-of-record/flavor,
-# NOT read by resolution (defense = FE DEF/RES + avoid; no saves; no advantage). NOTE: `spell_slots`
-# below IS still used by engine/spell-slots. See docs/decisions.md §Combat System.
-# DAMAGE-TYPE RESISTANCE DROPPED (2026-05-28): `resistance: necrotic` and the Fiendish-Resilience
-# `choose_damage_resistance` (×0.5) are no longer multipliers. Necrotic affinity = flavor; Fiendish
-# Resilience reflavors to an FE-native timed +DEF/RES self-buff (see fe-mechanic-map.yaml). Iconic
-# matchups use vanilla FE weapon effectiveness. Status/condition immunities remain mechanical.
-d20_fields:
-  AC: 13                     # Chapter 1: light armor
-                             # End-state target: 15. Tune per chapter.
-  ability_mod_atk: CHA
-  prof_bonus: 2
-  spell_slots: "2"           # ch1: 2 Pact Magic slots (1st-level). End-state: 4 slots at 5th level
-                             # (Warlock 20 standard; PDF spell page shows 4 slots at 5th)
 
 # ── Unique Abilities ─────────────────────────────────────────────────────────
 unique_abilities:
@@ -227,10 +208,9 @@ unique_abilities:
     spell_level: 0            # cantrip
     unlock_chapter: 1
     damage_type: necrotic
-    weapon_dice: "1d8"        # 1d12 vs wounded
     save: WIS
     range: 4
-    uses: null
+    uses: null    # FE tome — finite uses TBD (no infinite weapons)
     effect: bonus_damage_vs_wounded
 
   - id: hellish-rebuke
@@ -242,7 +222,6 @@ unique_abilities:
     unlock_chapter: 1
     uses_per_chapter: 3
     damage_type: fire
-    weapon_dice: "2d10"
     save: DEX
     trigger: when_hit
 
@@ -255,7 +234,6 @@ unique_abilities:
     unlock_chapter: 1
     uses_per_chapter: 2
     damage_type: fire
-    weapon_dice: "3d6"
     save: DEX
     range: 1
     aoe: cone
@@ -281,7 +259,6 @@ unique_abilities:
     unlock_chapter: 5
     uses_per_chapter: 1
     damage_type: fire
-    weapon_dice: "8d6"
     save: DEX
     range: 5
 
@@ -294,7 +271,6 @@ unique_abilities:
     unlock_chapter: 5
     uses_per_chapter: 2
     damage_type: necrotic
-    weapon_dice: "3d6"
     range: 1
     effect: damage_and_self_heal   # bypasses Unholy Body's potion restriction
 
@@ -328,7 +304,6 @@ unique_abilities:
     unlock_chapter: 13        # Warlock L13 → Ch13 (POST-MVP)
     uses_per_chapter: 1
     damage_type: necrotic
-    weapon_dice: "7d8+30"
     save: CON
     range: 4
     effect: damage_and_raise_thrall_on_kill
