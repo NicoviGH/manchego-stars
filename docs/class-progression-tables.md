@@ -18,11 +18,12 @@
 > **See also:** [rules-mapping.md](rules-mapping.md) (how each mechanic converts to FE),
 > [class-mapping.md](class-mapping.md) (which 5e class → which FE class).
 >
-> **Combat revert (2026-05-28):** combat is vanilla FE. Where a feature's FE-conversion column below
-> says "resist" / "damage resistance" / "phys resist" / "cold resist", that **×0.5 resistance mechanic
-> is dropped** — reflavor those to an **FE-native +DEF/RES buff** or flavor, and use vanilla FE weapon
-> **effectiveness** for iconic vulnerabilities. AC/saves/advantage are likewise flavor (see decisions.md
-> §Combat System). *Status/condition* immunities (charm/fear/sleep) and crit-immunity remain FE-native.
+> **Reading the FE-conversion column:** combat is vanilla FE (decisions.md §Combat System). Where a
+> cell mentions "resist" / "damage resistance," there is **no ×0.5 multiplier** — it resolves to an
+> **FE-native +DEF/RES buff** (or pure flavor), with iconic vulnerabilities handled by vanilla FE weapon
+> **effectiveness**. AC, saves, and advantage are flavor only. *Status/condition* immunities
+> (charm/fear/sleep) and crit-immunity are real and FE-native. Spell tomes/slots follow the decision-B
+> gold economy (deplete + restock, no free refill); innate per-rest pools refill free at chapter start.
 
 ---
 
@@ -70,7 +71,7 @@ feats. "MVP?" = available by Ch 7 under the 1:1 curve.
 | 5e Lvl | Feature | FE form | Ch | MVP? |
 |---|---|---|---|---|
 | 1 | **Rage**, **Unarmored Defense** | Rage = consumable/command (+might, +DEF — phys "resist" → FE +DEF); UD → high FE DEF (flavor, no AC) | 1 | ✓ |
-| 2 | Reckless Attack, Danger Sense | Reckless = advantage-for-advantage toggle; Danger Sense = +avoid vs AoE | 2 | ✓ |
+| 2 | Reckless Attack, Danger Sense | Reckless = toggle: +hit/+crit this turn, −avoid until your next turn (FE-native risk trade, no advantage); Danger Sense = +avoid vs AoE | 2 | ✓ |
 | 3 | Primal Path (→ Berserker) | Subclass unlock | 3 | ✓ |
 | 5 | **Extra Attack**, Fast Movement | Extra Attack = brave-weapon-style 2nd hit; +MOV | 5 | ✓ |
 | 7 | Feral Instinct | +initiative flavor / can't be surprised | 7 | ✓ |
@@ -111,7 +112,7 @@ feats. "MVP?" = available by Ch 7 under the 1:1 curve.
 ## Warlock (Meesmickle)
 | 5e Lvl | Feature | FE form | Ch | MVP? |
 |---|---|---|---|---|
-| 1 | **Pact Magic**, Patron (→ Fiend) | short-rest slots → chapter-refresh tome; subclass | 1 | ✓ |
+| 1 | **Pact Magic**, Patron (→ Fiend) | Pact slots = finite-use tomes (deplete + gold-restock, decision B); subclass | 1 | ✓ |
 | 2 | **Eldritch Invocations** | passive/utility upgrades (e.g. Agonizing Blast = +CHA to EB) | 2 | ✓ |
 | 3 | **Pact Boon** (→ Tome) | grants extra cantrips / ritual book | 3 | ✓ |
 | 11 | **Mystic Arcanum (6th)** | 1/chapter big spell | 10 | — |

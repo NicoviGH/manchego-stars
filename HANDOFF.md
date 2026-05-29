@@ -1,82 +1,48 @@
-# Handoff: Story/pacing pass — MVP objectives now FE8-mirrored & decomp-grounded
+# Handoff: Ch2 reworked to FE8 model + full doc-cleanup sweep
 
-**Date:** 2026-05-28
-**Session Focus:** Collaborative story/pacing pass. Built the FE8 pacing reference
-+ 20-ch skeleton + the six missing MVP chapter YAMLs, then (with Nicolas, chapter
-by chapter) reworked the MVP objectives to mirror FE8's actual win conditions.
+**Date:** 2026-05-29
+**Session focus:** Continued the collaborative story/pacing walkthrough at **Ch2 "Cold Welcome"**, grounding the design in the **actual FE8 Ch2 "The Protected"** structure read from the decomp. Then made two cross-cutting decisions (the spell economy; the weapon triangle) and ran a **full docs/YAML cleanup** to remove every stale combat-system reference and band-aid scar.
 
-## How Nicolas wants story/pacing work done (IMPORTANT)
+## How Nicolas wants this work done (unchanged, important)
 
-**Collaboratively, chapter by chapter** — lead with what FE8 does in that slot,
-then our take, then discuss. Don't go solo-produce docs. (Memory:
-`feedback-collaborative-story-planning`.) Also: when a decision changes, **rewrite
-docs natively — no band-aid banners / "reverted on DATE" scar tissue** (memory:
-`feedback-clean-doc-rewrites`).
+- **Story/pacing = collaborative, chapter by chapter** — lead with what FE8 does in that slot (read from the decomp, not memory), then our take, then discuss. (Memory: `feedback_collaborative_story_planning`.)
+- **Always ground FE8 claims in the `fireemblem8u/` decomp**, never memory/community lore. (Memory: `manchego-stars-use-decomp`, new this session.)
+- **Clean doc rewrites — no banners / "reverted on DATE" / strikethrough scar tissue.** Rewrite natively. (Memory: `feedback_clean_doc_rewrites`.)
+- **Auto-push to main**; no need to ask. (Memory: `feedback_proactive-push`.)
 
 ## Settled this session (do NOT re-litigate)
 
-- **DM notes are PARTIAL** — they cover Ch 1–7 only *so far*; the campaign played
-  past Revel's End. Do NOT invent Ch 8–20 plot from the published book (it diverged,
-  e.g. Messie-as-Speaker). (Memory: `manchego-stars-dm-notes`.)
-- **FE8 objectives are decomp-verified** (read from `src/events/<ch>-eventinfo.h`
-  win-condition macros). FE8 has no "Rout" verb — it's `DefeatAll`. Full table is
-  in `docs/fe8-pacing-reference.md §1`.
-- **MVP objectives now mirror FE8** (agreed chapter-by-chapter):
-  Prologue=DefeatBoss · Ch1 Seize · Ch2 DefeatAll(+escort constraint) · Ch3 Seize ·
-  Ch4 DefeatAll · Ch5 DefeatBoss-or-Talk · Ch6 DefeatBoss · Ch7 Survive→scripted loss.
-  Applied to all 7 chapter YAMLs **and** PRD §7 objective lines.
-- **Prologue is DESIGNED & committed** (`ch00-prologue-a-dagger-of-ice.yaml`): an
-  NPC cold-open — **Hlin Trollbane solo** hunts **Sephek Kaltro** (Auril's undead
-  servant) in night-time Bryn Shander. DefeatBoss, **basics only**; Sephek's
-  cold-regen/fire-weakness is flavor here (pays off mechanically at Ch7). Grounded
-  in the book's "Cold Open" + "Cold-Hearted Killer" (pp. 21-23). Ch1 is now the
-  full-party Seize. Two soft hooks left for Nicolas: Hlin recurring; her quest as
-  the diegetic reason Ten-Towns hires adventurers in Ch1.
-- **"20 chapters" is now a SOFT target** (content-driven, 18–22 OK). Add chapters by
-  *splitting dense beats* (likely Xardorok's fortress + Ythryn), not padding. (Memory
-  `manchego-stars-campaign-structure` updated.)
+- **Ch2 = FE8 "The Protected" model.** DefeatAll + **defend-in-place** (parked Rolling Cheddar sled = the protected objective the raid converges on; sled loss is a SOFT fail — forfeits the reward, not the chapter). Roster mirrors FE8's: ~6 trash + 1 named miniboss (Grukk) + 1 Steel-Axe boss (Halvar) + a turn-3 reinforcement pair from the **edge opposite the boss** (flank). The frost druid is a **cutscene seed only** (FE8 fields no enemy casters until ~Ch5–6; our first enemy caster is the Ch4 boss). `ch02-cold-welcome.yaml` fully rewritten.
+- **Wolves = bandits = axe-brigand chassis** (same under the hood; sprite + flavor differ). Confirmed via decomp that the triangle is driven by weapon TYPE (`bmbattle.c sWeaponTriangleRules`) and monster claw/fang weapons are triangle-EXEMPT — so to keep the triangle arrow working, reskinned enemies use real FE weapon types (claws = axe), not monster weapons.
+- **Decision B — the spell economy.** Every spell/cantrip is a finite-use FE tome that **depletes and is restocked with gold between chapters** (no free refill); cantrips are high-count (~30–50), not infinite. Casters share the FE gold/durability economy with martials → preserves FE's resource-management pillar. Innate per-rest pools (Rage, breath, Channel Divinity) still refill free; Pact slots = spell slots → decision B.
+- **Weapon triangle stays FE-native** (Sword>Axe>Lance, Anima>Light>Dark). D&D damage-type names are **cosmetic per-weapon labels**, NOT a relabel of the triangle. The old "Slashing>Bludgeoning>Piercing / Radiant>Necrotic>Elemental" reskin is dropped.
+- **Army composition is already FE-shaped** — don't reclass PCs; **tune enemies.** Cross-ref table + the **DEF/RES-mix rule** (every map mixes DEF-targets and RES-targets so our 3 offensive casters aren't a turkey-shoot vs low-RES mobs) are now in `party-balance.md §4`. Marty is the army's **Light** caster (corrected from an earlier "melee" error); Braulo=Axe, Wolfram=Lance, RBG=Bow, Meesmickle=Dark, Rootis=Anima, Sclorbo=support; Sword gap filled by NPCs (Trex/Baxby).
+- **`fe8_base_map` field added to all 8 chapter YAMLs** — the FE8 map each chapter reskins (keep FE8's tuned layout/terrain/spawns, repaint to arctic). Ch1–6 align 1:1 with FE8 Ch1–6; **Ch7 uses FE8 Ch13 "Hamill Canyon"** (the FE8 Survive/terrain map) since our Ch7 is a Survive→scripted-loss — flag for Nicolas if he'd prefer a different Survive base.
 
-## Accomplished (NOT yet committed when this was written — committing now)
+## Doc cleanup done this session (the "no stale docs" pass)
 
-- **NEW `docs/fe8-pacing-reference.md`** — FE8 cadence + reward schedule + promotion-item
-  →class mappings. Decomp-grounded: item names (`texts/texts.txt`), promotion classes
-  (`data_itemuse.c`), **per-chapter objectives (`<ch>-eventinfo.h`)**.
-- **NEW `docs/chapter-outline.md`** — 20-ch skeleton. Act I (Ch1–7) sourced; Act II
-  (Ch8–20) explicitly a 🧩 structural placeholder pending DM notes. Promotion seam at Ch7→8.
-- **NEW `chapters/ch02`–`ch07` YAMLs** — vanilla-FE style, FE8-mirrored objectives,
-  cutscene/recruitment/reward beats. All 7 chapter YAMLs validate clean.
-- **ch01 retrofitted to vanilla FE** — removed d20_fields/AC/weapon_dice; goblins now
-  wield axes so the weapon-triangle teaching is FE-native (no band-aid banner).
-- **Signature moments**: Marty filled (Ch5 Messie Talk, sourced); Meesmickle/Rootis/
-  Sclorbo flagged "NICOLAS TO RECALL" with hooks. RBG+Wolfram anchored at Ch3.
+Swept clean across `docs/` + `campaigns/`:
+- **Decision B propagated** (decisions.md, rules-mapping.md, class-progression-tables.md, PRD, combat-formulas.md, class-mapping.md, party-balance.md, PC YAMLs).
+- **All hybrid-d20 language removed**, incl. `research.md` **fully de-d20'd** (§1, §2, §6.1–6.3, §6.8, §6.9, risks, next-steps) — it now presents vanilla FE as the approach.
+- **Band-aid scar tissue removed** (dated "reverted/dropped 2026-05-28", strikethroughs, "(reverted)" parentheticals) — native rewrites everywhere. decisions.md keeps its dated `_Decided:` changelog footers (that's the doc's format, not scar tissue).
+- **Engine module renamed** `engine/d20-combat/` → `engine/combat-fx/` everywhere (docs, fe-mechanic-map.yaml's ~30 refs, memory). No engine dir exists yet — doc-only.
+- **"Rout" → correct FE8 objective** (FE8 has no Rout verb): campaign-brief Ch1/2/6 objectives + a ch06 prose comment.
+- All 8 chapter YAMLs + edited PC YAMLs validate clean.
 
 ## Blockers / open
 
-- **Ch 8–20 plot blocked on the rest of the DM notes** (the #1 unblock).
-- **Open design Qs** (`docs/chapter-outline.md`): main-lord PC? (Braulo is the pick) ·
-  finale tone (Ch20) · Act II chapter budget · post-MVP Tower-of-Valni equivalent.
-- **Leftover band-aid language** still exists across the ~21-file combat sweep from the
-  prior session (banners/notes). Offered a dedicated cleanup pass — not yet done.
+- **Ch3 is next** in the walkthrough (FE8 Ch3 "The Bandits of Borgo" = Seize big-battle; our Termalaine Mine multi-level gimmick).
+- **Ch 8–20 plot still blocked on the rest of the DM notes** (the #1 unblock).
+- **Remaining stale-ish item, NOT done (needs tuning judgment, not mechanical):** PC-YAML `weapon_dice` fields are kept as source-of-record, but per decisions.md damage is **fixed FE might**. Converting each weapon's `weapon_dice` → a tuned FE might value is a separate balance pass.
+- **GitHub is already clean** — milestone M1 is "D&D Combat Layer Works"; issues #7–#13 referenced in the PRD were never created (only #1–#6 exist). No GitHub action needed.
 - Build toolchain still NOT installed (devkitARM/agbcc/ColorzCore/libpng).
+- Open design Qs (chapter-outline.md §Open questions): main-lord PC (Braulo the pick), finale tone, Act II chapter budget, post-MVP Tower-of-Valni equivalent.
 
-## Next Steps (priority order)
+## Key files
 
-1. **Continue the chapter-by-chapter walkthrough at Ch2** (Cold Welcome). FE8 Ch2
-   "The Protected" = DefeatAll with an escort flavor → design the escort-as-constraint
-   + rear-ambush pacing. (Paused here at Nicolas's call.) Optionally first revisit
-   Ch1's Northlook framing now that the Prologue exists (does it reference Hlin/Sephek?).
-3. Get + integrate the rest of the DM notes → replace Act II placeholders → author ch08+.
-4. (Optional) dedicated cleanup pass on the leftover combat-sweep band-aid language.
-5. Later: map remaining `fe_mechanic`-less abilities; scaffold `tools/build-campaign.ts`;
-   re-eval `party-balance.md`; finalize `magic-items.md`; decide build deps → Phase 1.
-
-## Key Files
-
-- [docs/fe8-pacing-reference.md](docs/fe8-pacing-reference.md) — cadence + reward + decomp objective table.
-- [docs/chapter-outline.md](docs/chapter-outline.md) — 20-ch skeleton (Act II = placeholder).
-- [campaigns/rime-of-the-frostmaiden/chapters/](campaigns/rime-of-the-frostmaiden/chapters/) — ch01–ch07.
-- [docs/PRD.md](docs/PRD.md) §7 — narrative breakdown (objective lines now FE8-mirrored).
-- Source PDFs: `…/References/DungeonMasterNotesIcewindDale.pdf` (**partial**, Ch1–7),
-  `…/References/icewind-dale-rime-of-the-frostmaidenpdf_compress.pdf` (book, reference only).
-- FE8 objectives: `fireemblem8u/src/events/<ch>-eventinfo.h`.
+- [campaigns/.../chapters/ch02-cold-welcome.yaml](campaigns/rime-of-the-frostmaiden/chapters/ch02-cold-welcome.yaml) — reworked to FE8 "The Protected".
+- [docs/decisions.md](docs/decisions.md) §Combat / §Weapon & Magic — decision B + FE-native triangle.
+- [docs/party-balance.md](docs/party-balance.md) §4 — army cross-ref + DEF/RES-mix rule.
+- [docs/fe8-pacing-reference.md](docs/fe8-pacing-reference.md), [docs/chapter-outline.md](docs/chapter-outline.md) — cadence + 20-ch skeleton.
+- FE8 ground truth: `fireemblem8u/src/events/<ch>-eventinfo.h` (objectives/villages), `src/events_udefs.c` (rosters), `src/bmbattle.c` (triangle), `include/bmitem.h` (`maxUses`).
 - Validate campaign YAML: `ruby -ryaml -e 'YAML.load_file("<path>")'`

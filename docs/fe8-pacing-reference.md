@@ -73,11 +73,11 @@ Mapped to our D&D classes via `docs/class-mapping.md`.
 
 | FE8 item | Promotes (FE8 classes) | Our PCs it would gate |
 |---|---|---|
-| **Hero Crest** | Mercenary, Myrmidon, Fighter | melee martials — Braulo (Barbarian), Marty (melee) |
+| **Hero Crest** | Mercenary, Myrmidon, Fighter | melee martials — Braulo (Barbarian) |
 | **Knight Crest** | Cavalier, Knight (Armor) | armored/mounted — Rootis (tank) |
 | **Orion's Bolt** | Archer | ranged martials (if any reclass) |
 | **Elysian Whip** | Pegasus Knight, Wyvern Rider | flyers (none core; NPC use) |
-| **Guiding Ring** | Mage, Monk, Cleric, Shaman, Troubadour | casters — Meesmickle, Wolfram, Prof. RBG, Sclorbo |
+| **Guiding Ring** | Mage, Monk, Cleric, Shaman, Troubadour | casters — Marty (Druid), Meesmickle, Wolfram, Prof. RBG, Sclorbo |
 | **Master Seal** | **any** promotable class [FE8] | universal fallback for all 7 |
 | **Ocean Seal** | Pirate, (Thief) | n/a unless a PC reclasses |
 | **Hammerne** | *(staff, not a seal — repairs items)* | utility; see §3 treasure |

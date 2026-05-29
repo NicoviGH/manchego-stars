@@ -3,11 +3,11 @@
 > Produced via interview with Nicolas (May 2026).
 > Companion to `research.md`. Together these two documents feed the PRD.
 >
-> **Note (2026-05-28):** this brief describes the PCs in **5e terms** (their D&D abilities, AC, saves,
-> resistances). The FE adaptation reverted to **vanilla FE combat** — AC, saving throws, advantage, and
-> damage-type resistance are **flavor only** in-game (defense = FE DEF/RES + avoid; iconic matchups use
-> vanilla FE weapon effectiveness). This doc is kept as the D&D-source record; see `decisions.md` §Combat
-> System for what's actually mechanical.
+> **Note:** this brief describes the PCs in **5e terms** (their D&D abilities, AC, saves, resistances) —
+> it is the D&D-source record. In the FE adaptation, combat is **vanilla FE**: AC, saving throws,
+> advantage, and damage-type resistance are flavor only (defense = FE DEF/RES + avoid; iconic matchups
+> use vanilla FE weapon effectiveness). See `decisions.md` §Combat System for what's actually mechanical,
+> and the chapter YAMLs / PRD §7 for the authoritative per-chapter objectives.
 
 ---
 
@@ -161,13 +161,13 @@
 ### Chapter 1: The Iron Trail
 **Beat:** The party meets at The Northlook tavern in Bryn Shander. Three dwarves hire them to track a missing shipment of iron ingots. They follow the trail to a dismembered body, then find the goblin thieves.
 **Who's introduced:** All 7 PCs, Baxby (purchased after this chapter or early Ch 2), Duvessa Shane (cutscene — hires them for ongoing Ten-Towns work), Velynne Harpell (brief appearance, asks about stolen orb).
-**Map objective:** Rout — defeat all goblins and recover the iron ingots.
+**Map objective:** Seize — defeat the goblins, recover the iron ingots, and seize the camp (mirrors FE8 Ch1 "Escape!").
 **Map concept:** Snowy trail leading from Bryn Shander to the goblin camp. Linear introductory map.
 
 ### Chapter 2: Cold Welcome
 **Beat:** The party travels west to Targos, encountering dangers on the road. In Targos, they find a frozen body (human sacrifice to Auril), learn about frost druid activity, and hear rumors of the Maer Monster in Bremen.
 **Who's introduced:** No new recruits. Frost druids foreshadowed. Baxby joins here if not in Ch 1.
-**Map objective:** Survive / Rout — wilderness ambush on the road from Bryn Shander to Targos (wolves, bandits, or frost druid scouts).
+**Map objective:** DefeatAll — defend the parked sled while clearing the road ambush (wolves + bandits + a raider captain; mirrors FE8 Ch2 "The Protected").
 **Map concept:** Open snowy road with sled escort. Enemies attack from tree lines or snowdrifts.
 **Story note:** Targos arrival is post-map cutscene (sacrifice discovery, inn scene, overheard rumors).
 
@@ -195,7 +195,7 @@
 ### Chapter 6: Blood in Bremen
 **Beat:** The party reports to Dorbulgruf Shalescar, the cantankerous old dwarf Speaker of Bremen, who refuses to pay them. Braulo takes the first swing. After a bloody battle, the party installs Messie as the new Speaker. They leave to mixed reception.
 **Who's introduced:** No new recruits. Messie's role shifts to NPC ally / town leader.
-**Map objective:** Rout — defeat Dorbulgruf and his guards/allies inside or around the Speaker's hall.
+**Map objective:** DefeatBoss — defeat Dorbulgruf in or around the Speaker's hall (mirrors FE8 Ch6 "Victims of War").
 **Map concept:** Town interior / hall map. Could have civilians as "don't kill" units to add complexity. Mixed reception aftermath is a post-map cutscene.
 
 ### Chapter 7: The Eastway Ambush
@@ -226,7 +226,7 @@
 ### From the brief interview:
 1. **Signature moments for Marty, Meesmickle, Rootis, Sclorbo** — Nicolas will recall later. Each PC should have at least one moment that gets a special in-game reference (unique dialogue, cutscene, or ability trigger).
 2. **Additional signature moments beyond the DM notes** — Nicolas will think on it. There may be late-campaign moments worth referencing even in early chapters (easter eggs, foreshadowing).
-3. ~~**Wolfram's Metallurgist subclass**~~ — **Resolved:** School of the Smith. See Section 4 for full details. FE class: Knight/General with unique Forge ability.
+3. **Wolfram's Metallurgist subclass** — Resolved: School of the Smith (see Section 4). FE class: Knight/General with unique Forge ability.
 4. **Velynne Harpell's role** — Nicolas doesn't remember if she becomes important later. Check published adventure for her arc; if significant, she should be foreshadowed properly in MVP chapters.
 5. **Homebrew setting overlays** — Nicolas doesn't remember specific DM changes to the Icewind Dale setting. Default assumption: standard Forgotten Realms setting with a very non-standard party.
 6. **Stretch goal / hard cap for total chapters** — Deferred until a writing session covers the rest of the campaign beyond the DM notes.

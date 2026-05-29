@@ -6,6 +6,7 @@ id: ch01-the-iron-trail
 title: "The Iron Trail"
 chapter_number: 1
 milestone: M3
+fe8_base_map: "FE8 Ch1 — Escape!"                   # Seize breather base
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >

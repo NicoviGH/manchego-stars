@@ -20,4 +20,4 @@
 - `frostmaiden-resources.md` copied to `docs/` (was in `References/` in the source folder, not the root — caused a false "missing" report in Session 1)
 - Decomp build verification depends on having `agbcc`/`devkitARM` installed — see next steps
 
-**Next session:** Phase 0 wrap-up — verify `fireemblem8u` quickstart builds clean. Then Phase 1: implement `engine/d20-combat/dice_rng.c`.
+**Next session:** Phase 0 wrap-up — verify `fireemblem8u` quickstart builds clean. Then Phase 1: implement `engine/combat-fx/dice_rng.c` (the cosmetic crit-flourish RNG helper).

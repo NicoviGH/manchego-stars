@@ -109,7 +109,7 @@ These are every `kind: custom_engine` feature, grouped by the module that owns i
 key is shared — implement it once, every PC that references it gets it. **Bold = needed for MVP
 (Ch 1–7)**; the rest are post-MVP gated.
 
-### `engine/d20-combat` *(exists — scaffold)*
+### `engine/combat-fx` *(exists — scaffold)*
 - **`extra_attack`** — brave-weapon-style second hit (base: brave weapon effect). *braulo.extra-attack (Ch5), braulo.frenzy (Ch3, gated on rage)*
 - **`crit_extra_dice`** — extra weapon die on crit. *braulo.brutal-critical (Ch9)* — post-MVP
 - **`extra_counter`** — second counterattack proc on melee hit (base: counterattack). *braulo.retaliation (Ch13)* — post-MVP
@@ -169,11 +169,11 @@ key is shared — implement it once, every PC that references it gets it. **Bold
 - `barrier_line_blocks_ranged` — impassable line that also stops ranged (base: ITEM_LIGHTRUNE). *prof-rbg.wind-wall (Ch9)* — post-MVP
 - `barrier_impassable` — fully impassable barrier, movement + attacks (base: ITEM_LIGHTRUNE). *prof-rbg.wall-of-force (Ch17)* — post-MVP
 
-### `engine/damage-types` *(exists — now a flavor label tag only)*
-The ×0.5/×0/×2 resistance system was **dropped 2026-05-28** (no vanilla FE analogue). This module is
-just a flavor damage-type label on weapons (for UI/descriptions). No custom resistance features:
-- ~~`grant_resistance_choice`~~ → reflavored to **`def_buff_timed`** in `engine/status` (timed +DEF/RES self-buff). *meesmickle.fiendish-resilience (Ch9)* — post-MVP
-- ~~`damage_resistance`~~ → **dropped to flavor** (`kind: none`). *wolfram.fire-resistance* is now narrative only; iconic vulnerabilities use vanilla FE weapon **effectiveness** instead.
+### `engine/damage-types` *(exists — a flavor label tag only)*
+There is no ×0.5/×0/×2 resistance system (no vanilla FE analogue). This module is just a flavor
+damage-type label on weapons (for UI/descriptions). No resistance features:
+- `def_buff_timed` (in `engine/status`) — a timed +DEF/RES self-buff that carries the old "resilience" flavor. *meesmickle.fiendish-resilience (Ch9)* — post-MVP
+- Damage-"resistance" abilities are flavor only (`kind: none`). *wolfram.fire-resistance* is narrative; iconic vulnerabilities use vanilla FE weapon **effectiveness** instead.
 
 ### `engine/class-defs` *(exists — scaffold)*
 - **`guard_stance`** — +DEF/RES, MOV 0, no counter until he emerges. *braulo.shell-defense (Ch1)*

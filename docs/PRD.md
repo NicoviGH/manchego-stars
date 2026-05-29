@@ -13,8 +13,6 @@ Nicolas ran a multi-year D&D 5e campaign (*Rime of the Frostmaiden*) with 6 frie
 
 **This project turns that campaign into a playable GBA tactics game**, built as a ROM hack of *Fire Emblem: The Sacred Stones* (FE8). The 7 PCs become playable units. The DM's narrative beats become chapters. Combat uses **vanilla FE8's tactics rules** (hit/avoid/might/crit) so the game plays like Fire Emblem; the D&D campaign supplies the characters, classes, damage types, spells-as-tomes, and flavor on top. The result is a `.gba` file the group can play on any emulator or flash cart — their adventure, in their pocket.
 
-> **Note (2026-05-28):** an earlier version of this PRD specced a *hybrid d20/FE* combat system (d20 vs AC, advantage, saving throws). That was **reverted** — combat *rules* stay vanilla FE for playability; D&D is flavor only, and the d20 survives at most as a cosmetic crit flourish. See `decisions.md` §Combat System. Sections below have been updated; any lingering "d20 replaces FE hit math" phrasing is superseded by that decision.
-
 **Who is affected:** The 7 players from the campaign (private distribution only).
 
 **Impact of not solving it:** Nothing breaks — this is a passion project. But the window for this kind of thing closes as life moves on. Building it now, while the memories are fresh and the tools are good enough, is the moment.
@@ -24,7 +22,7 @@ Nicolas ran a multi-year D&D 5e campaign (*Rime of the Frostmaiden*) with 6 frie
 ## 2. Goals
 
 1. **Ship a playable `.gba` ROM** covering the full DM-notes arc (7 chapters, from the goblin iron quest through the Eastway ambush / Revel's End cliffhanger) that runs on stock GBA emulators and flash carts.
-2. **Keep Fire Emblem's combat, dress it in D&D** — preserve FE's grid tactics, hit/avoid/might resolution, permadeath toggle, weapon triangle, growth-rate leveling, and FE crit. Layer D&D *flavor* on top: D&D damage-type labels (flavor only — no resistance multiplier), spell slots as chapter-refresh tomes, reskinned triangle labels, and a cosmetic d20 flourish on crits. Iconic matchups use vanilla FE weapon effectiveness. The rules stay FE so it plays like FE.
+2. **Keep Fire Emblem's combat, dress it in D&D** — preserve FE's grid tactics, hit/avoid/might resolution, permadeath toggle, weapon triangle, growth-rate leveling, and FE crit. Layer D&D *flavor* on top: D&D damage-type labels (flavor only — no resistance multiplier; the triangle stays FE-native), spells as finite-use tomes that deplete and restock with gold (decision B), and a cosmetic d20 flourish on crits. Iconic matchups use vanilla FE weapon effectiveness. The rules stay FE so it plays like FE.
 3. **Faithfully represent all 7 PCs** as playable units with correct classes, abilities, progression arcs, and personality (portraits, dialogue, signature moments).
 4. **Build the engine as reusable** — separate engine code (damage types, spell slots, status/hazards, UI reskin) from campaign data (PCs, chapters, maps, dialogue). A second campaign (Curse of Strahd, a homebrew, etc.) should require only a new `campaigns/` folder, zero engine changes.
 5. **Keep the project tractable** — session-driven Claude Code workflow (no autonomous agent loops), one feature per session, `make` green at end of every session. Target cost: ~$60–200 for the full MVP.
@@ -61,8 +59,8 @@ Nicolas ran a multi-year D&D 5e campaign (*Rime of the Frostmaiden*) with 6 frie
 
 - **As a player,** I want to select my PC from the roster in Chapter 1 and see their portrait, stats, and class so that I recognize my character immediately.
 - **As a player,** I want a brief d20 flourish when I land a critical hit so that crits feel like a D&D nat-20 moment — without changing how combat is actually resolved (it stays Fire Emblem hit/avoid).
-- **As a player,** I want the weapon triangle to use D&D damage types (Slashing > Bludgeoning > Piercing) so that weapon choice feels like 5e tactical thinking.
-- **As a player,** I want to use spell slots that deplete per chapter and refill at chapter start so that casters feel distinct from martial characters.
+- **As a player,** I want each weapon/tome to show a D&D damage-type label and icon (the triangle itself staying FE-native: Sword/Axe/Lance, Anima/Light/Dark) so that my gear reads like 5e while the triangle plays like FE.
+- **As a player,** I want spell tomes that deplete in use and are restocked with gold between chapters so that casters share the same resource economy as martials (decision B).
 - **As a player,** I want to recruit NPC allies (Trex, Basil, The Mummy) as the story progresses so that the roster grows like a real Fire Emblem game.
 - **As a player,** I want to choose Casual or Classic mode (FE8's existing toggle) so that permadeath is my choice, not forced.
 - **As a player,** I want to see campaign-specific dialogue and story beats (the kobold execution, Messie becoming Speaker, Braulo smashing shackles) so that the game feels like *our* campaign, not a generic adventure.
@@ -99,7 +97,7 @@ The project is a **patched FE8 ROM** built from the `fireemblem8u` C decompilati
 │    └── events/*.ea           ──┘   data tables               │
 │                                      │                      │
 │  engine/                             │                      │
-│    ├── d20-combat/           ──┐     │                      │
+│    ├── combat-fx/            ──┐     │                      │
 │    ├── damage-types/           │     │                      │
 │    ├── spell-slots/            ├─ C patches applied to      │
 │    ├── class-defs/             │  fireemblem8u/src/          │
@@ -124,19 +122,19 @@ manchego-stars/
 │── ENGINE (reusable) ─────────────────────────────────────────
 ├── fireemblem8u/              # FE8 decomp (git submodule)
 ├── engine/
-│   ├── d20-combat/            # combat-adjacent custom skills + cosmetic crit flourish
-│   │   │                      #   (resolution stays vanilla FE; name kept for the scaffold)
+│   ├── combat-fx/             # combat-adjacent custom skills + cosmetic crit flourish
+│   │   │                      #   (resolution stays vanilla FE)
 │   │   ├── crit_anim.c        # cosmetic "d20 lands on 20" flourish on FE crit
 │   │   └── (custom skill hooks: extra_attack, etc. — see fe-mechanic-map.md backlog)
 │   ├── damage-types/          # flavor damage-type label tag (UI/descriptions only — no resistance)
 │   │   └── damage_type.h      # Enum: slashing, piercing, bludgeoning, fire, cold... (labels)
 │   ├── spell-slots/           # Per-unit spell slot tracker
-│   │   ├── spell_slots.c      # Track usage, refill on chapter start
+│   │   ├── spell_slots.c      # Track tome charges; deplete + gold-restock (decision B)
 │   │   └── spell_slots.h
 │   ├── class-defs/            # D&D-flavored FE class table
 │   │   └── dnd_classes.c      # 12 base + custom (Artificer, Metallurgist)
 │   └── ui/                    # Combat preview reskin (D&D labels over FE forecast)
-│       ├── combat_preview.c   # damage-type icon + reskinned triangle labels
+│       ├── combat_preview.c   # damage-type icon (triangle stays FE-native)
 │       └── crit_flourish.c    # cosmetic d20-on-crit animation
 │
 │── CONTENT DATA (shared reference) ───────────────────────────
@@ -243,10 +241,10 @@ The engine makes the following assumptions about any campaign folder:
 - Damage-type *flavor* labels on weapons (13 types; UI/descriptions only — no resistance mechanic)
 - Vanilla FE weapon effectiveness for iconic matchups (FE-native; e.g. fire vs ice trolls)
 - Status effects beyond vanilla (`engine/status`) and hazard tiles (`engine/hazards`)
-- Spell-slot tracking per unit (refill on chapter start)
-- Combat-preview reskin (D&D damage-type icons + reskinned triangle labels) and a cosmetic d20 flourish on crits
-- D&D weapon triangle (Slashing > Bludgeoning > Piercing)
-- D&D magic trinity (Radiant > Necrotic > Elemental)
+- Spell-tome charge tracking per unit (deplete + gold-restock between chapters)
+- Combat-preview reskin (D&D damage-type icons; triangle stays FE-native) and a cosmetic d20 flourish on crits
+- FE-native weapon triangle (Sword > Axe > Lance) with D&D damage-type labels on weapons
+- FE-native magic triangle (Anima > Light > Dark) with D&D element labels on tomes
 - Growth-rate leveling (vanilla FE, untouched)
 - Permadeath toggle (vanilla FE8 Casual/Classic)
 - Support conversations (vanilla FE8 system)
@@ -265,9 +263,9 @@ The engine makes the following assumptions about any campaign folder:
 
 ### 6.5 Combat System — Vanilla FE8 (D&D flavor on top)
 
-> **Reverted from hybrid d20 on 2026-05-28** (see `decisions.md`). Combat *rules* are
-> vanilla FE8 so it plays like Fire Emblem; D&D supplies flavor (incl. damage-type labels).
-> Full reference: `combat-formulas.md`. The engine **does not** replace `bmbattle.c`.
+> Combat *rules* are vanilla FE8 so it plays like Fire Emblem; D&D supplies flavor
+> (incl. damage-type labels). Full reference: `combat-formulas.md`. The engine **does
+> not** replace `bmbattle.c`.
 
 **Attack Resolution — vanilla FE (unchanged):** FE8's hit% vs avoid (two-RN), with the
 weapon-triangle hit bonus. **No d20, no Armor Class, no advantage/disadvantage.** AC
@@ -279,8 +277,8 @@ values in the PC sheets are flavor/source-of-record only.
 Damage = max(0, Might − Defender.DEF/RES)     # Might = WeaponMight + STR (or MAG)
 ```
 
-**No resistance/vulnerability/immunity multiplier** (dropped 2026-05-28 — it has no vanilla FE
-analogue and would modify FE damage under the hood). Damage types are flavor labels only. Where a
+**No resistance/vulnerability/immunity multiplier** — it has no vanilla FE analogue and would
+modify FE damage under the hood, so it is not a mechanic. Damage types are flavor labels only. Where a
 matchup genuinely matters (fire vs ice trolls), flag the weapon **effective** via vanilla FE's
 existing effectiveness system — FE-native, not a multiplier.
 
@@ -301,22 +299,25 @@ magic combat (MAG vs RES, FE hit/avoid). Status staves (Sleep/Silence/Berserk/Po
 **always hit** in range; healing staves always succeed. There are **no DCs or save
 rolls**; `save:` / `save_dc:` in the PC YAMLs are flavor metadata only.
 
-### 6.6 Weapon Triangle (Reskinned)
+### 6.6 Weapon Triangle — vanilla FE (damage-type names are flavor)
 
 **Physical:**
 ```
-Slashing (swords) > Bludgeoning (axes/hammers) > Piercing (lances/spears) > Slashing
+Sword > Axe > Lance > Sword
 ```
-Bonus: +1 ATK / +15 to-hit-modifier (same as vanilla FE triangle bonus).
+Bonus: +1 ATK / +15 to-hit (vanilla FE triangle, `src/bmbattle.c`). D&D damage-type names
+(slashing/bludgeoning/piercing/…) are cosmetic per-weapon labels, NOT a relabeling of the
+triangle — a claw wolf and an axe bandit are both the **axe type** and read identically.
 
 **Magic:**
 ```
-Radiant (Light) > Necrotic (Dark) > Elemental (Anima) > Radiant
+Anima > Light > Dark > Anima
 ```
+Our casters span it: Rootis = Anima, Marty = Light, Meesmickle = Dark.
 
 **Iconic matchups via vanilla FE weapon effectiveness (no resistance multiplier):**
 
-There is **no resistance/vulnerability/immunity mechanic** (dropped 2026-05-28). The table below is
+There is **no resistance/vulnerability/immunity mechanic**. The table below is
 *flavor* — except the **Vulnerable** column, which is realised through vanilla FE **weapon
 effectiveness** when a matchup matters to play (flag a weapon `effective` vs that enemy class, the
 same way Hammers are effective vs armor). Resistances/immunities are narrative flavor only.
@@ -337,17 +338,17 @@ same way Hammers are effective vs armor). Resistances/immunities are narrative f
 |---|---|---|---|---|---|
 | Braulo | Barbarian (Berserker) | Pirate | Berserker | STR | Rage (consumable item: +might and **+DEF** while active — the 5e B/P/S "resistance" becomes an FE-native defense buff, not a multiplier). Shell Defense (command: +DEF, can't move). Hermit Crab natural armor → high FE DEF (flavor "AC 17"). |
 | Marty | Druid (Circle of Spores) | Monk (custom Druid) | Summoner (custom) | MAG | Halo of Spores (innate AoE reaction: 1d10 necrotic). Symbiotic Entity (+temp HP). Fungal Infestation (summon). Moved off Shaman in 2026-05-27 audit to differentiate from Meesmickle. |
-| Meesmickle | Warlock (The Fiend) | Shaman (Dark) | Dark Sage | MAG | Eldritch Blast (∞-use dark tome, 4 beams at cap). Dark One's Blessing (temp HP on kill). Hurl Through Hell (1/chapter nuke). |
+| Meesmickle | Warlock (The Fiend) | Shaman (Dark) | Dark Sage | MAG | Eldritch Blast (high-count dark tome per decision B; 1–2 beams in MVP, 4 at endgame). Dark One's Blessing (temp HP on kill). Hurl Through Hell (1/chapter nuke, post-MVP). |
 | Prof. RBG | Artificer (Artillerist) | Archer | Artillerist (custom promotion) | DEX / MAG | Fonduedler (personal ranged firearm, 1d10, DEX). **Pepperjack** (deployable Eldritch Cannon — Flamethrower / Force Ballista / Protector modes; 2 simultaneous at endgame, AC 18, 100 HP each). Flash of Genius (reaction: +5 ally save). Infusions (between-chapter item crafting). |
 | Rootis | Sorcerer (Draconic — White Dragon) | Mage (Ice) | Sage | MAG | Metamagic (Twinned = attack twice, Empowered = reroll damage). **Dragon Wings = Manakete-style class transform** (toggle on promotion: flier MOV, ignores terrain; consumes 1 Sorcery Point per toggle). Cold/fire affinity is **flavor** (no resistance mechanic); "heals from cold" maps to an FE-native **healing terrain** (snow/ice tiles heal him). |
-| Sclorbo | Bard (College of Lore) | Dancer (custom Bard) | Lore Bishop (custom) | MAG | Bardic Inspiration (d12 buff to adjacent ally). Cutting Words (debuff reaction). Dance/Refresh action. Cleric-tier heal kit (Cure Wounds Ch1 → Revivify Ch4 → Mass Cure Ch6 → Raise Dead Ch7). **Balance: Dance and Cast are mutually exclusive per turn.** |
+| Sclorbo | Bard (College of Lore) | Dancer (custom Bard) | Lore Bishop (custom) | MAG | Bardic Inspiration (d12 buff to adjacent ally). Cutting Words (debuff reaction). Dance/Refresh action. Cleric-tier heal kit (Cure Wounds in MVP; Revivify / Mass Cure / Raise Dead are post-MVP). **Balance: Dance and Cast are mutually exclusive per turn.** |
 | Wolfram | Metallurgist (Smith) | Knight | General | STR + MAG | Forge ability (upgrade ally armor/weapons between chapters). AC 26 equivalent (highest DEF in party). Feral Strike (Bite + Claws bonus attacks). Shield spell (reaction). Mystic Arcanums (Investiture of Stone, Forcecage). Spell access is a secondary role; STR-physical is primary. |
 
 > **AC / save / "+ally save" values in this table are flavor/source-of-record.** Combat
-> is vanilla FE (reverted 2026-05-28 — see `decisions.md`): defense is FE `DEF`/`RES` +
-> avoid, not Armor Class, and there are no saving throws. e.g. Braulo's "flat AC 17" and
-> Wolfram's "AC 26" map to high FE `DEF`; RBG's "+5 ally save" reflavors to an FE-native
-> support proc (or drops). See `fe-mechanic-map.md` for per-ability resolution.
+> is vanilla FE: defense is FE `DEF`/`RES` + avoid, not Armor Class, and there are no
+> saving throws. Braulo's "AC 17" and Wolfram's "AC 26" map to high FE `DEF`; RBG's "+5
+> ally save" reflavors to an FE-native support proc (or drops). See `fe-mechanic-map.md`
+> for per-ability resolution.
 
 **NPC Unit Mappings:**
 
@@ -387,13 +388,13 @@ Fire Emblem's gold-and-shop loop is a core part of the game feel — earning gol
 **D&D-flavored additions:**
 - **Magic item shops (limited).** Rare shops in later towns sell +1 weapons (Silver equivalent), scrolls (one-use spell tomes), and minor wondrous items. Expensive — rewards good gold management.
 - **Wolfram's Forge.** Between chapters, Wolfram can spend GP + materials to upgrade one ally's weapon or armor (+1 might / +DEF, an `effective`-vs-class flag, etc. — all FE-native). This replaces FE's "arena grinding" as the primary way to power up outside of leveling. Materials are found in chapter chests or bought at specialty shops.
-- **Potion varieties.** Healing Potion (Vulnerary equivalent, 10 HP), Greater Healing Potion (Elixir equivalent, full heal), Potion of Defense (temporary +DEF/RES, 1 chapter — FE-native, replaces the old "damage resistance" idea), Potion of Speed (temporary SPD boost). Priced to make choices meaningful.
+- **Potion varieties.** Healing Potion (Vulnerary equivalent, 10 HP), Greater Healing Potion (Elixir equivalent, full heal), Potion of Defense (temporary +DEF/RES for 1 chapter — FE-native), Potion of Speed (temporary SPD boost). Priced to make choices meaningful.
 
 **What changes from vanilla FE:**
 - **No arena.** The FE8 arena (pay gold, fight for XP/gold) is removed. It doesn't fit the D&D narrative pacing and is a balance headache. Wolfram's Forge fills the "spend gold to get stronger" role.
-- **Spell-slot tomes are NOT buyable.** They represent innate magical ability, not purchased items. They refill for free at chapter start. You can't buy more Fireballs — you prepare them. Casters get their tomes at recruitment and through story events (learning new spells).
-- **Cantrip tomes are NOT buyable either.** Infinite-use, class-locked. You get them when you get the character.
-- **Mundane tomes (non-spell weapons for mages) ARE buyable.** A mage can buy a basic Fire tome (mundane, not spell-slot-based) from a shop, same as a fighter buying a sword.
+- **Spell tomes deplete and are restocked with gold (decision B).** Each spell is a finite-use tome whose charges run down in use; between chapters you restock them with GP at a shop, exactly like buying replacement weapons. There is no free refill — casting is rationed by the convoy budget. Casters first learn a spell at recruitment / via story events, but keeping it stocked costs gold.
+- **Cantrip tomes are high-count, not infinite.** Class-locked high-use tomes (~30–50 uses); they deplete and restock with gold like everything else, just at a generous count so a caster can always act within a map.
+- **Restock is flavored per caster** (forage / scribe / commune) but mechanically it is the FE armory/vendor buy — the whole party shares one gold-and-durability economy.
 
 **Loot design per chapter:**
 - Every chapter should yield enough GP from enemies + chests to buy 2–3 items at the next shop.
@@ -518,9 +519,8 @@ Fire Emblem's gold-and-shop loop is a core part of the game feel — earning gol
 | Risk | Severity | Mitigation |
 |---|---|---|
 | **HP scale mismatch** — 5e spells designed for 50–200 HP; FE units have 20–60 HP | High | Keep FE's `damage − DEF` model. Don't import 5e damage values directly. Scale all damage through the weapon-dice system with FE-appropriate magnitudes. Playtest early. |
-| ~~**d20 variance vs FE norms**~~ — *moot (2026-05-28).* Reverting to vanilla FE means FE8's native 70–95% hit norms apply directly; there is no d20 variance to manage and no "skill floor" needed. | — | Resolved by the combat revert. |
-| **GBA UI real estate** — combat preview is ~96×40 px; want to add a damage-type icon (and a crit flourish) without crowding FE's existing hit%/crit% forecast | Low | The forecast box stays vanilla FE; only add a small damage-type icon and reskinned triangle labels. The d20 flourish reuses the battle-animation crit frames, not the forecast box. |
-| **Save-file size** — adding spell slots per unit may pressure FE8's ~52-byte per-character budget | Low | AC is **no longer stored** and there's **no resistance bitmap** (both dropped — combat is vanilla FE), which frees the biggest planned additions. Spell slots are the main remaining add (plus a 1-byte flavor damage-type label per weapon, in the item table not the unit). Use a sidecar lookup if needed. Audit in Phase 1. |
+| **GBA UI real estate** — combat preview is ~96×40 px; want to add a damage-type icon (and a crit flourish) without crowding FE's existing hit%/crit% forecast | Low | The forecast box stays vanilla FE; only add a small damage-type icon. The d20 flourish reuses the battle-animation crit frames, not the forecast box. |
+| **Save-file size** — adding spell-tome charges per unit may pressure FE8's ~52-byte per-character budget | Low | No AC and no resistance bitmap are stored (combat is vanilla FE), which leaves spell-tome charges as the main add (plus a 1-byte flavor damage-type label per weapon, in the item table not the unit). Use a sidecar lookup if needed. Audit in Phase 1. |
 | **`agbcc` compiler limitations** — GCC 2.95.1, no C99 features | Low | Follow existing decomp code style. No VLAs, no C99 designated initializers. The decomp's own code is the style guide. |
 | **Map design quality** — LLMs are bad at FE maps | Low | Use community Frostmaiden maps (from `frostmaiden-resources.md`) as layout references, then hand-draw FE versions in Tiled. FEUniverse map pool for tileset/format guidance. Agent assists with unit placement, events, and dialogue — never spatial layout. |
 | **Engine/content boundary erosion** — temptation to hardcode Frostmaiden assumptions in C | Medium | `build-campaign.ts` enforces the contract. Code review rule: any C change that references a character by name, a chapter number, or a plot event gets rejected. |
@@ -533,7 +533,7 @@ These are qualitative (audience of 7, no analytics):
 
 1. **"It boots and plays"** — the `.gba` loads on mGBA and a real GBA flash cart, all 7 chapters are completable, no hard crashes.
 2. **"That's my character!"** — each player recognizes their PC from the portrait, stats, and abilities within 30 seconds of seeing them.
-3. **"It plays like Fire Emblem, reads like D&D"** — combat resolves with FE's familiar hit%/avoid forecast, while damage-type labels, reskinned triangle labels, and the crit flourish make it read as *our* D&D campaign. A hammer is effective vs skeletons (vanilla FE effectiveness); a nat-20 flourish punctuates a crit.
+3. **"It plays like Fire Emblem, reads like D&D"** — combat resolves with FE's familiar hit%/avoid forecast, while damage-type labels and the crit flourish make it read as *our* D&D campaign. A hammer is effective vs skeletons (vanilla FE effectiveness); a nat-20 flourish punctuates a crit.
 4. **"I remember this"** — at least 3 campaign-specific moments per chapter that make the players laugh or say "oh yeah, that happened."
 5. **"I want to keep playing"** — the Chapter 7 cliffhanger lands hard enough that at least 2 players ask when the next batch of chapters is coming.
 6. **Build health** — `make` passes at the end of every work session. No sessions end with a broken build.
@@ -553,9 +553,8 @@ These are qualitative (audience of 7, no analytics):
 | 5 | **Permadeath flavor** — in Casual mode, how are "retreats" explained for a party in arctic wilderness? | Design decision | Recommend: "retreated to the sled" / "carried to safety by Baxby." |
 | 6 | **Stretch goal scope** — how many total chapters beyond the 7 MVP? Full campaign = how many? | Nicolas | Requires a future writing session to outline the rest of the Frostmaiden arc. |
 | 7 | **Cutscene art** — portrait-based dialogue only (MVP) or CG illustrations for key moments? | Nicolas | Recommend: MVP ships portrait-only. CG art is a post-ship stretch goal. |
-| 8 | **Sephek Kaltro** — did this Auril cultist appear in Nicolas's campaign? If yes, he should be a Ch 2 mini-boss or foreshadowed NPC | Nicolas | Published Ch 1 villain in Rime of the Frostmaiden. |
-| 9 | ~~**d20 hit-rate tuning**~~ — *closed (2026-05-28).* Combat reverted to vanilla FE; FE8's native hit-rate tuning applies. No d20 variance to mitigate. | Closed | Resolved by the combat revert. |
-| 10 | **Unit struct save budget** — does adding spell slots exceed the ~52-byte per-character save limit? AC and the resistance bitmap are no longer stored (both dropped), easing this a lot. | Engineering (audit in Phase 1) | Sidecar table is the fallback. |
+| 8 | **Sephek Kaltro** — appears in the designed Prologue ("A Dagger of Ice") as Hlin's quarry. Confirm his role beyond the Prologue (recurring? tie to Ch 4 frost druids?) | Nicolas | Published Ch 1 villain in Rime of the Frostmaiden; now the Prologue boss. |
+| 9 | **Unit struct save budget** — does adding spell-tome charges exceed the ~52-byte per-character save limit? No AC or resistance bitmap is stored (combat is vanilla FE), which eases this. | Engineering (audit in Phase 1) | Sidecar table is the fallback. |
 
 ---
 
@@ -567,7 +566,7 @@ These are qualitative (audience of 7, no analytics):
 
 ### Phase 1: Engine Core (Milestone: "D&D Combat Layer Works")
 **Goal:** Combat resolution stays vanilla FE8; the D&D *layer* on top all works — 13 damage-type flavor labels (+ vanilla FE effectiveness for iconic matchups), spell-slot tomes, the `engine/status` + `engine/hazards` modules, the combat-preview reskin, and the cosmetic d20 crit flourish. Vanilla FE8 Chapter 1 is playable with the reskinned combat.
-**Duration estimate:** 6–10 sessions (~12–20 hours) — *lower than the original estimate now that no d20/AC/saving-throw engine is built.*
+**Duration estimate:** 6–10 sessions (~12–20 hours).
 
 ### Phase 2: Content Pipeline (Milestone: "One PC End-to-End")
 **Goal:** The build-campaign tool works. One PC (Braulo recommended — simplest class mapping) is fully translated: YAML → injected into decomp → playable in mGBA with correct stats, portrait, inventory, and class.
@@ -610,7 +609,7 @@ These are qualitative (audience of 7, no analytics):
 ### Milestones
 
 1. **M0: Repo Boots Clean**
-2. **M1: D&D Combat Layer Works** *(renamed 2026-05-28 from "D20 Combat Works" — combat reverted to vanilla FE; the live GitHub milestone needs the matching rename, see issue re-scope list)*
+2. **M1: D&D Combat Layer Works**
 3. **M2: One PC End-to-End**
 4. **M3: 7 Chapters Playable**
 5. **M4: Ship It**
@@ -643,50 +642,33 @@ Create `data/homebrew/classes/artificer.yaml` and `data/homebrew/classes/metallu
 
 ### M1: D&D Combat Layer Works
 
-> **⚠ Re-scoped 2026-05-28 (combat reverted to vanilla FE — see `decisions.md`).**
-> Issues #8, #9, #10, #11 are **DROPPED** (they built the d20/AC/saving-throw/nat-20-crit
-> resolution that no longer exists). #7, #16, #17, #18 are **re-scoped** to the flavor
-> layer. The triangle-relabel / spell-slot issues (#14–#15) are **unaffected**; the
-> damage-type issues (#12–#13) are **re-scoped** (damage types are now flavor labels +
-> vanilla FE effectiveness — no resistance multiplier, reverted 2026-05-28). The live
-> GitHub issues need matching edits — see the re-scope list compiled this session.
+Combat resolution stays vanilla FE8 (`bmbattle.c` left intact). The work in this milestone is
+the D&D *flavor* layer on top — there is no d20/AC/saving-throw/nat-20 engine to build, so issue
+numbers #8–#11 are unused and the list picks up at #12. The weapon triangle stays FE-native
+(Sword/Axe/Lance, Anima/Light/Dark); D&D damage-type names are per-weapon labels, not a relabel
+of the triangle.
 
-**#7 — ~~`dice_rng.c` advantage wrapper~~ → cosmetic crit-flourish RNG only** `engine` *(re-scoped)*
-No advantage/disadvantage to support. If the crit flourish wants a spinning-number
-effect, a tiny RNG helper over `bmRng.c` suffices. Otherwise this issue is largely obsolete.
+**#7 — Cosmetic crit-flourish RNG helper** `engine`
+A tiny RNG helper over `bmRng.c` for the crit flourish's spinning-number effect, if the battle
+animation wants one. No advantage/disadvantage to support. Optional — can fold into #17.
 
-**#8 — ~~Implement d20 attack roll resolution~~** `engine` *(DROPPED 2026-05-28)*
-Combat is vanilla FE — `BattleGenerateHitTriangle` is **left intact**. No d20, no AC field.
-
-**#9 — ~~Implement advantage/disadvantage as status~~** `engine` *(DROPPED 2026-05-28)*
-Advantage/disadvantage dropped entirely. Positioning is FE terrain + triangle.
-
-**#10 — ~~Implement saving throw resolution~~** `engine` *(DROPPED 2026-05-28)*
-No saves/DCs. Status staves always-hit (vanilla `bmstaff.c`); offensive spells use FE magic combat (MAG vs RES).
-
-**#11 — ~~Implement crit on nat 20~~** `engine` *(DROPPED 2026-05-28)*
-Crit stays vanilla FE (`BattleGenerateCrit` intact: SKL-based rate, ×3 damage). The only addition is the cosmetic d20-on-crit flourish (folded into #17).
-
-**#12 — Add damage-type *flavor* enum and weapon tagging** `engine` *(re-scoped 2026-05-28)*
+**#12 — Add damage-type *flavor* enum and weapon tagging** `engine`
 Create `damage_type.h` with enum (13 types: slashing, piercing, bludgeoning, fire, cold, lightning, thunder, poison, acid, necrotic, radiant, force, psychic). Add a 1-byte **flavor** damage-type tag to each weapon (for the UI icon + descriptions). Tag all vanilla FE8 weapons. **No resistance computation** — this is a label only.
 
-**#13 — ~~Implement resistance/vulnerability/immunity system~~ → iconic matchups via FE effectiveness** `engine` *(re-scoped 2026-05-28)*
-The ×0.5/×0/×2 resistance system is **dropped** (no vanilla FE analogue; would modify FE damage under the hood). Instead, for the handful of iconic matchups (fire vs ice trolls/frost druids, bludgeoning vs skeletons), flag the relevant weapons **effective** vs those enemy classes using vanilla FE8's existing effectiveness mechanic. No new damage-multiplier code. Test a fire weapon doing FE-effective bonus damage to an ice troll.
+**#13 — Iconic matchups via vanilla FE weapon effectiveness** `engine`
+There is no resistance/vulnerability/immunity multiplier (no vanilla FE analogue; it would modify FE damage under the hood). For the handful of iconic matchups (fire vs ice trolls/frost druids, bludgeoning vs skeletons), flag the relevant weapons **effective** vs those enemy classes using vanilla FE8's existing effectiveness mechanic. No new damage-multiplier code. Test a fire weapon doing FE-effective bonus damage to an ice troll.
 
-**#14 — Relabel weapon triangle** `engine`
-Change UI text from "Sword/Axe/Lance" to "Slashing/Bludgeoning/Piercing" and "Light/Dark/Anima" to "Radiant/Necrotic/Elemental." Keep the mechanical bonuses (+1 ATK, +15 hit modifier) identical to vanilla. Primarily a text/asset swap.
+**#15 — Implement the spell-economy tracker (decision B)** `engine`
+Each spell/cantrip is a finite-use tome whose charges DEPLETE in use. **No free chapter refill** — between chapters the player restocks charges with gold at the armory/vendor. Decrement on tome use; gray out a depleted tome; show remaining uses on the stat screen. Cantrips are high-count (30–50 uses), spell tomes lower. Wire restock into the prep/shop flow. (Issue #14, a triangle relabel, is dropped — the triangle stays FE-native; D&D damage-type names are per-weapon labels.)
 
-**#15 — Implement spell-slot tracker** `engine`
-Add `spellSlots[6]` array per unit (levels 1–6; cantrips are ∞). Decrement on tome use. Refill to max at chapter start (hook into chapter-init routine). When slots are empty, tome is unusable (grayed out). Display remaining slots on stat screen.
+**#16 — Implement combat preview UI reskin** `engine`
+Keep FE's vanilla hit%/crit% forecast box. Add only a **damage-type icon**. No AC / to-hit / dice line (those mechanics don't exist), and no triangle relabel — the triangle UI stays FE-native. Prototype in mGBA first.
 
-**#16 — Implement combat preview UI reskin** `engine` *(re-scoped 2026-05-28)*
-Keep FE's vanilla hit%/crit% forecast box. Add only: a **damage-type icon** and the **reskinned triangle labels** (Slashing/Bludgeoning/Piercing, Radiant/Necrotic/Elemental). No AC / to-hit / dice line — those mechanics are gone. Prototype in mGBA first.
-
-**#17 — Implement cosmetic d20 crit flourish** `engine` *(re-scoped 2026-05-28)*
+**#17 — Implement cosmetic d20 crit flourish** `engine`
 When an FE crit fires in the battle animation, play a brief "d20 lands on 20" flourish (3–5 frames of spinning numbers settling on 20) for D&D feel. **Cosmetic only** — it does not decide the crit (FE's crit rate does). This is the surviving "BG3 feel" moment.
 
 **#18 — Playtest vanilla FE8 Chapter 1 with the D&D layer** `engine` `balance`
-Play FE8's original Chapter 1 (Eirika's route) with the reskinned combat. Verify: vanilla FE hit/avoid/crit behave normally, the damage-type flavor label/icon shows correctly, an FE-effective weapon does its bonus damage, spell-slot tomes deplete/refill, the crit flourish plays, no crashes, save/load works. Hit-rate tuning is just vanilla FE tuning. Document findings.
+Play FE8's original Chapter 1 (Eirika's route) with the reskinned combat. Verify: vanilla FE hit/avoid/crit behave normally, the damage-type flavor label/icon shows correctly, an FE-effective weapon does its bonus damage, spell tomes deplete and restock with gold, the crit flourish plays, no crashes, save/load works. Hit-rate tuning is just vanilla FE tuning. Document findings.
 
 ---
 
@@ -730,7 +712,7 @@ Baxby, Pinky, Trex, Basil, The Mummy, Messie (non-recruitable), Duvessa Shane (c
 Portraits for Trex, Basil, The Mummy, Dorbulgruf, Messie. Other NPCs can use recolored vanilla FE8 portraits.
 
 **#30 — Write all enemy YAML files** `content`
-Goblins, Kobolds, Grells, Frost Druid, Dorbulgruf, Easthaven Guards, Ice Trolls, wolves, bandits, vine blights. Stats, classes, inventories, AI patterns, and any vanilla-FE `effective`-vs flags (no resistance tables — dropped 2026-05-28).
+Goblins, Kobolds, Grells, Frost Druid, Dorbulgruf, Easthaven Guards, Ice Trolls, wolves, bandits, vine blights. Stats, classes, inventories, AI patterns, and any vanilla-FE `effective`-vs flags (no resistance tables).
 
 **#31 — Design and build Chapter 1 map** `art` `content`
 Hand-draw "The Iron Trail" map in Tiled. Linear snowy trail, goblin camp at the end. Place terrain (snow, trees, rocks, camp structures). Export to FE-compatible format. Place units per chapter YAML.
@@ -889,7 +871,7 @@ For the implementer (or Claude Code), these are the files in `fireemblem8u/src/`
 |---|---|---|
 | Combat resolution | `bmbattle.c`, `bmlib.c`, `include/battle.h` | **Leave fully intact** (vanilla FE). No resistance hook. Iconic matchups use the existing `effective`-weapon path. |
 | Unit struct | `include/unit.h` (`struct Unit`) | Add spell slots (sidecar). **No AC field, no resistance bitmap** (combat is vanilla FE). |
-| Combat preview UI | `bmStatScreen.c`, `bmStatBars.c` | Keep Hit%/Crit% forecast; add damage-type icon + reskinned triangle labels. |
+| Combat preview UI | `bmStatScreen.c`, `bmStatBars.c` | Keep Hit%/Crit% forecast; add a damage-type icon (triangle stays FE-native). |
 | RNG | `bmRng.c` | Untouched for resolution. Optional tiny helper for the cosmetic crit-flourish spin. |
 | Staff resolution | `bmstaff.c` | **Leave intact** (vanilla always-hit staves). No saving-throw repoint. |
 | Crit calculation | `BattleGenerateCrit` function | **Leave intact** (vanilla FE crit). Add only a cosmetic d20-on-crit flourish in the battle animation. |

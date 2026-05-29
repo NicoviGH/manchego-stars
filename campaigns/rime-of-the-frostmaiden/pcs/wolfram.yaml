@@ -54,7 +54,6 @@ dnd:
       # Each creature in area: DEX save DC 16, fire damage on fail (half on success).
       # Damage scales: 2d6 (levels 1–5) → 3d6 (6–10) → 4d6 (11–15) → 5d6 (16–20).
       # FE implementation: activated command, refreshes once per chapter (= one short rest).
-      # CORRECTED 2026-05-27: previously listed unlimited; PDF confirms 1/SR.
       action_cost: action
       uses_per_chapter: 1         # 1 per short rest; FE = 1 per chapter
       shape: cone                 # PDF doesn't restate area; default standard Dragonborn cone
@@ -124,7 +123,7 @@ inventory:
     weapon_dice: "1d6"
     ability_mod: INT              # INT-based (Metallurgist spellcasting modifier)
     range: 2                      # 60 ft → ~2-3 FE tiles
-    uses: null                    # cantrip — infinite uses
+    uses: 25                      # high-count cantrip tome (decision B): depletes, gold-restock; tune per chapter
     notes: "+11 to hit at end-state (INT 20 + prof 6). Deals +5 bludgeoning on hit."
   - id: fire-bolt
     name: "Fire Bolt"
@@ -135,7 +134,7 @@ inventory:
     weapon_dice: "1d10"           # ch1 equivalent; scales to 4d10 at end-state
     ability_mod: INT
     range: 3                      # 120 ft → ~3 FE tiles
-    uses: null                    # cantrip — infinite uses
+    uses: 30                      # high-count cantrip tome (decision B): depletes, gold-restock; tune per chapter
   - id: vulnerary
     name: "Healing Potion"
     uses: 2
@@ -268,7 +267,7 @@ unique_abilities:
   - id: fire-resistance
     name: "Fire Resistance"
     flavor: "Forged in fire — Wolfram's metal scales shrug off heat that would melt anyone else."
-    fe_mechanic: "flavor only (no ×0.5 resistance mechanic; fire affinity is narrative — reverted 2026-05-28)"
+    fe_mechanic: "flavor only (no ×0.5 resistance mechanic; fire affinity is narrative)"
     # Mineralscale Drakeborn racial.
     type: passive
     unlock_chapter: 1         # racial — available from start

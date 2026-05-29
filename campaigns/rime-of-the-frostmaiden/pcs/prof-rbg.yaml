@@ -107,8 +107,8 @@ inventory:
     weapon_dice: "1d8"        # ch1; scales to 4d8 at level 20
     ability_mod: INT
     range: melee              # touch range
-    uses: null                # cantrip — infinite uses
-    notes: "Target with metal armor: advantage on attack. On hit: target loses reactions until end of next turn."
+    uses: 25                  # high-count cantrip tome (decision B): depletes, gold-restock; tune per chapter
+    notes: "+hit vs armored (metal) targets (FE-native, was 5e advantage). On hit: target loses its counterattack until its next turn."
   - id: vulnerary
     name: "Healing Potion"
     uses: 2

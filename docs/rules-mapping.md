@@ -29,10 +29,11 @@ Three tiers for any 5e mechanic:
 
 ## A. Combat Resolution
 
-> **Resolution is vanilla FE8** (reverted from hybrid d20 on 2026-05-28 — see
-> `decisions.md` §Combat System and `combat-formulas.md`). The d20, AC, advantage,
-> and saving throws are **dropped as mechanics**. The table below records what each
-> 5e mechanic becomes now that FE owns resolution.
+> **Resolution is vanilla FE8** (see `decisions.md` §Combat System and
+> `combat-formulas.md`). Combat uses FE hit% / avoid / might / FE crit; the d20, AC,
+> advantage, and saving throws are **not mechanics here** — the d20 survives only as a
+> cosmetic crit flourish. The table below records what each 5e mechanic becomes under
+> FE-owned resolution.
 
 | 5e mechanic | Tier | FE8 conversion |
 |---|---|---|
@@ -68,8 +69,8 @@ Three tiers for any 5e mechanic:
 
 | 5e mechanic | Tier | FE8 conversion |
 |---|---|---|
-| **Cantrips** (at-will, infinite) | CONVERT | FE has no infinite-use weapons except locked legendaries. A caster's **primary cantrip** = their equivalent of an FE unit's basic weapon: a locked personal tome with **generous finite uses** (suggest 40–50/chapter) that restocks free each chapter. **Secondary cantrips** = lower finite uses (15–25/chapter). This keeps "casters can always do something" without true-infinite spam. |
-| **Spell slots** (by level, regain on long rest) | CONVERT | Tomes with **chapter-refresh charges** (long rest = chapter start, decisions.md). Slot count per level → tome use count. Cannot buy more slot-tomes; cantrip tomes restock free. Audit per-PC counts so totals feel FE (a handful of big spells/chapter, not a D&D nova). |
+| **Cantrips** (at-will, infinite) | CONVERT | FE has no truly infinite weapons. Cantrips become **high-count tomes** — primary cantrip ~30–50 uses, secondary ~15–25 — that DEPLETE and are **restocked with gold** between chapters (decision B). Generous enough that "casters can always do something" within a map, but still on the gold/durability economy. |
+| **Spell slots** (by level, regain on long rest) | CONVERT | Finite-use tomes; slot count per level → tome use count. Charges DEPLETE and are **restocked with gold between chapters — no free refill** (decision B, decisions.md). Audit per-PC counts so totals feel FE (a handful of big spells/chapter, not a D&D nova). |
 | **Spell level scaling** (upcasting) | CONVERT | Higher-level slot = stronger tier of the same tome (more dice/range), gated by chapter. No free-form upcast picker; the build pipeline emits the tier available at that chapter. |
 | **Concentration** | DROP (mostly) | FE has no concentration tracking. Convert concentration buffs/debuffs to **fixed-duration timed effects** (N turns) or instant effects. Drop the "lose it if you take damage / cast another" bookkeeping. |
 | **Ritual casting** | DROP | Out-of-combat utility; no FE combat analogue. |
@@ -83,9 +84,9 @@ Three tiers for any 5e mechanic:
 
 | 5e mechanic | Tier | FE8 conversion |
 |---|---|---|
-| **Long rest** (full refill, ~1/day) | CONVERT | = **chapter start.** All slots/tomes/per-rest abilities refill between chapters. |
+| **Long rest** (full refill, ~1/day) | CONVERT | = **chapter boundary.** Innate per-rest class abilities (Rage uses, Channel Divinity, breath weapons…) refill free at chapter start. **Spell tomes/slots do NOT free-refill** — they deplete and are restocked with gold (decision B). Spells are ammunition; innate class features are not. |
 | **Short rest** (~per encounter) | CONVERT | No clean analogue. "X per short rest" abilities become **`uses_per_chapter`** (usually 1–2) or, if very minor, `uses_per_map`. Do not implement an in-map rest action. |
-| **Class resource pools** (Sorcery Points, Ki, Rage uses, Bardic Inspiration, Pact slots, Channel Divinity, Superiority dice…) | CONVERT | Each becomes a **per-chapter use counter** or a **consumable item**, refilled at chapter start. Pick the FE form that reads cleanest: a counter in the unit panel, or an item in the inventory. |
+| **Class resource pools** (Sorcery Points, Ki, Rage uses, Bardic Inspiration, Channel Divinity, Superiority dice…) | CONVERT | Innate pools become a **per-chapter use counter** refilled free at chapter start (a counter in the unit panel). **Pact slots are spell slots** → decision-B gold economy, not free refill. Pick the FE form that reads cleanest. |
 | **Hit Dice** | DROP | Bookkeeping for short-rest healing; no FE analogue. |
 
 ---
@@ -132,10 +133,10 @@ Rule: never introduce a brand-new status UI for a 5e condition that maps onto an
 
 | 5e mechanic | Tier | FE8 conversion |
 |---|---|---|
-| **13 damage types** | CONVERT → flavor labels | A flavor-only damage-type tag on weapons/tomes (name + icon for UI/descriptions). **No resistance bitmap, no mechanic** (reverted 2026-05-28 — no vanilla FE analogue). |
+| **13 damage types** | CONVERT → flavor labels | A flavor-only damage-type tag on weapons/tomes (name + icon for UI/descriptions). No resistance bitmap, no mechanic (no vanilla FE analogue). |
 | **Resistance (½) / Vulnerability (×2) / Immunity (0)** | DROP → FE effectiveness | The multiplier is dropped (it modifies FE damage under the hood). Iconic vulnerabilities map onto **vanilla FE weapon effectiveness** (an `effective`-flag, FE-native); resistance/immunity have no FE analogue → flavor only. |
-| **Physical weapon triangle** | KEEP (reskinned) | Slashing > Bludgeoning > Piercing; vanilla +1 ATK / +15 hit (decisions.md). |
-| **Magic triangle** | KEEP (reskinned) | Radiant > Necrotic > Elemental (decisions.md). |
+| **Physical weapon triangle** | KEEP (FE-native) | Sword > Axe > Lance > Sword; vanilla +1 ATK / +15 hit. Damage-type names are cosmetic per-weapon labels, not a relabeling of the triangle (decisions.md). |
+| **Magic triangle** | KEEP (FE-native) | Anima > Light > Dark > Anima; vanilla +1 ATK / +15 hit (decisions.md). |
 
 ---
 
@@ -167,7 +168,6 @@ The per-class application of these rules lives in `class-progression-tables.md`;
 
 ## Open Items (to confirm with playtesting / Nicolas)
 
-- **Primary-cantrip use count** — proposed 40–50/chapter (effectively infinite within a map but FE-legal). Confirm the number feels right, or make signature cantrips truly unbreakable like a prf weapon.
-- ~~**Saving-throw frequency budget**~~ — moot: saves were dropped on 2026-05-28 (vanilla FE magic, no save rolls).
+- **Primary-cantrip use count** — proposed 30–50/chapter, depleting + gold-restocked (decision B). Confirm the number is generous enough within a map without breaking the economy.
 - **Reaction procs** — confirm we want auto-procs (no player input) vs. dropping reactions entirely. Auto-procs preserve flavor but add enemy-phase animations.
 - **DEX → SKL/SPD split ratio** — per-character judgment, or a fixed formula?

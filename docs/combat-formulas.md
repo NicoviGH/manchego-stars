@@ -1,14 +1,13 @@
 # Combat Formulas — Manchego Stars
 
-> **Combat resolution is vanilla FE8.** (Reverted from the earlier hybrid d20 design
-> on 2026-05-28 — see `decisions.md` §Combat System.) The rules stay FE so the game
-> plays like FE; D&D is flavor. This doc is now a short reference for *what survives*
-> and *what the d20 reskin is allowed to touch* (UI/flavor only).
+> **Combat resolution is vanilla FE8.** The rules stay FE so the game plays like FE;
+> D&D is flavor. This doc is a short reference for what the engine computes and what the
+> D&D layer is allowed to touch (UI / flavor only).
 >
 > Authoritative engine behaviour is whatever vanilla `fireemblem8u/src/bmbattle.c`
 > already does — we are **not replacing it**, and nothing is layered under it. Damage
 > types are flavor labels only; iconic matchups use vanilla FE weapon effectiveness
-> (resistance multiplier dropped 2026-05-28 — see `decisions.md`).
+> (no resistance multiplier).
 
 ## Attack Resolution — VANILLA FE (unchanged)
 
@@ -66,10 +65,11 @@ There are **no saving throws / DCs**. Magic resolves through FE combat:
 
 The `save:` / `save_dc:` fields in the PC YAMLs are flavor metadata only.
 
-## Triangle Bonuses — VANILLA FE (reskinned labels)
+## Triangle Bonuses — VANILLA FE
 
-**Physical:** Slashing > Bludgeoning > Piercing (+1 ATK, +15 hit — vanilla values).
-**Magic:** Radiant > Necrotic > Elemental (same vanilla bonuses).
+**Physical:** Sword > Axe > Lance > Sword (+1 ATK, +15 hit — vanilla values).
+**Magic:** Anima > Light > Dark > Anima (same vanilla bonuses).
+Damage-type names (slashing, fire, …) are cosmetic per-weapon labels, not a relabel of the triangle.
 
 Mechanics identical to vanilla FE8; only the labels change.
 
@@ -85,12 +85,12 @@ Mechanics identical to vanilla FE8; only the labels change.
 | 5th | 2 |
 | 6th+ | 1 |
 
-All spell-slot tomes refill to max at chapter start (= long rest).
+All spell tomes deplete in use and are restocked with gold between chapters (decision B) — no free chapter refill. Innate per-rest class abilities (Rage, breath weapons) do refill free at chapter start.
 
-## What the d20 reskin is allowed to touch (flavor/UI only)
+## What the D&D flavor layer is allowed to touch (flavor/UI only)
 
 - A cosmetic d20 flourish on crits.
-- D&D **labels** on the weapon triangle and damage types.
+- D&D damage-type **labels** on individual weapons/tomes (the triangle stays FE-native: Sword/Axe/Lance, Anima/Light/Dark).
 - Flavor text in dialogue, item descriptions, and the stat/preview screens.
 
 It must **not** touch hit, avoid, might, crit rate, or doubling — those are FE's.

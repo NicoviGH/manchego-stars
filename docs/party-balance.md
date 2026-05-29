@@ -4,15 +4,25 @@
 > roster. Produced 2026-05-27 after cross-referencing all 7 PC PDF sheets vs
 > `data/pc-sheets/*.json` and `campaigns/rime-of-the-frostmaiden/pcs/*.yaml`.
 > See also: [class-mapping.md](class-mapping.md), [combat-formulas.md](combat-formulas.md), PRD §6.7 / §7.
+>
+> **Combat is vanilla FE.** Hits/damage use FE math; AC, saves, advantage, and the
+> damage-type resistance multiplier are dropped (damage-type names are flavor labels).
+> Casting is rationed by the **decision-B economy** — spells are finite-use items
+> restocked with gold between chapters (no free refill); see decisions.md §Combat.
+>
+> **MVP scope = 5e levels 1–7.** Features at 5e level 9+ (Mystic Arcanums, 5th-level+
+> spells such as Revivify / Mass Cure Wounds / Raise Dead, the 4-beam Eldritch Blast,
+> RBG's second cannon Brie) are **post-MVP** and appear below only as end-state
+> reference — ignore them when judging MVP (Ch 1–7) balance.
 
 ---
 
 ## TL;DR
 
-- **Heavily caster-skewed:** 5 of 7 PCs cast spells (Marty WIS, Meesmickle CHA, RBG INT, Rootis CHA, Sclorbo CHA).
-- **Only 2 frontliners:** Braulo (Berserker) and Wolfram (General). Both are walls — Braulo has Hermit Crab natural armor (flat AC 17, 285 HP, 75% HP growth + 50% DEF growth) and Shell Defense; Wolfram has AC 26 General-tier defenses. The party has no glass-cannon frontliner.
+- **Heavily caster-skewed:** 5 of 7 PCs cast spells. Their 5e flavor stats (WIS/INT/CHA) all fold to a single **MAG** stat in engine (class-mapping.md), so they share one magic stat — what keeps them distinct is the **magic triangle** spread + role, not the stat.
+- **Only 2 frontliners:** Braulo (Berserker) and Wolfram (General). Both are walls — Braulo has Hermit Crab natural armor (high FE DEF, big HP pool, 75% HP / 50% DEF growths) and Shell Defense; Wolfram has the party's highest DEF (General-tier). The party has no glass-cannon frontliner.
 - **No dedicated healer in the PC roster.** Sclorbo (Bard 16) is the de-facto primary healer — Cure Wounds, Revivify, Mass Cure Wounds, Raise Dead all on his prepared list.
-- **No flier in the PCs at base** — Pinky NPC fills from Ch1; Rootis has Dragon Wings as a toggle from level 1 (Sorcerer 14 feature, end-state already reached).
+- **No flier in the PCs during MVP** — Pinky NPC fills from Ch1. Rootis's Dragon Wings transform is a **post-MVP** unlock (Sorcerer 14 / promotion); it is NOT available in Ch 1–7.
 - **No thief / no cavalry in the PCs.** Trex (Ch3) and Baxby (Ch1–2) NPCs fill those slots.
 - **Radiant damage is absent from the PC roster.** Basil (Cleric NPC, Ch4) must carry the Radiant identity.
 - **The full roster (7 PCs + 5 NPCs = 12 units by Ch5)** is balanced overall; the PC-only roster is not — Chapters 1–3 are the danger zone.
@@ -72,16 +82,18 @@ Role coverage is the design target: **sword + axe + lance frontliners, ranged vi
 
 ## Role Coverage Matrix
 
+Rows are FE **weapon type / role** (not D&D damage type — damage types are flavor labels).
+
 | Role | PC fill | NPC fill | Status |
 |---|---|---|---|
-| **Sword / Slashing** | Braulo claws (minor), Wolfram Feral Strike Claws (1d6 bonus action) | — | ⚠️ Light coverage |
-| **Axe / Bludgeoning** | Wolfram Warhammer, Marty Shillelagh | — | ✓ |
-| **Lance / Piercing** | Braulo Nu'/Trident, Sclorbo Rapier, RBG Fonduedler | — | ✓ |
-| **Ranged physical** | RBG (Fonduedler 3 tiles) | — | ✓ via RBG only |
-| **Ranged magic** | Marty, Meesmickle, RBG, Rootis, Sclorbo, Wolfram | The Mummy | ✓ Saturated |
+| **Sword (physical)** | — | Trex (Thief), Baxby (Cavalier sword option) | ⚠️ NPC-only — the one triangle gap |
+| **Axe (physical)** | Braulo (Berserker) | — | ✓ |
+| **Lance (physical)** | Wolfram (General) | Baxby (Cavalier lance option) | ✓ |
+| **Bow (ranged physical)** | RBG (Archer) | — | ✓ via RBG only |
+| **Magic — full triangle** | Rootis (Anima), Marty (Light), Meesmickle (Dark); secondary Wolfram + RBG | The Mummy (Sage) | ✓ saturated, all 3 types |
 | **Healer** | Sclorbo (primary), Marty (heal staff), RBG (cure wounds) | Basil (Ch4+) | ⚠️ Pre-Ch4 thin |
 | **Cavalry** | — | Baxby (Ch1–2) | ✓ via NPC |
-| **Flier** | Rootis (Dragon Wings toggle, available Ch1) | Pinky (Ch1) | ✓ |
+| **Flier** | Rootis (Dragon Wings — **post-MVP** unlock only) | Pinky (Ch1) | ✓ via NPC in MVP |
 | **Thief** | RBG Nimble Escape (partial — disengage only, no steal/lockpick) | Trex (Ch3) | ⚠️ Pre-Ch3 no utility |
 | **Knight / Tank** | Wolfram | — | ✓ |
 | **Dancer** | Sclorbo | — | ✓ |
@@ -104,33 +116,50 @@ Previous YAML listed `uses_per_chapter: null` (unlimited). The PDF p3 explicitly
 
 **Action taken (wolfram.yaml):** Breath Weapon corrected to 1/chapter; added Fire Bolt cantrip (4d10 at level 20) to inventory so Wolfram retains a reliable ranged fire option for flyers and distant enemies. Also added the missing Mystic Arcanums (Investiture of Stone 6th, Forcecage 7th).
 
-### 3. Caster overload — but stat diversity saves it
+### 3. Caster overload — managed by triangle spread + the gold/durability economy
 
-5 of 7 PCs cast spells. In FE you'd typically have 1–2 mages. However:
-- **Stat split** prevents item competition: WIS (Marty), INT (RBG, Wolfram), CHA (Meesmickle, Rootis, Sclorbo).
-- **Cantrips are infinite-use** — the spell-slot economy only kicks in for high-level spells.
-- **Marty as Druid** mixes melee (Shillelagh+WIS) with caster identity, taking some pressure off the slot pool.
+5 of 7 PCs cast spells; in FE you'd typically have 1–2 mages. What keeps it from breaking:
+- **Magic-triangle spread, not stat spread.** All caster flavor stats fold to **MAG** (class-mapping.md), so the casters do *not* have independent stats — they compete for the same MAG / magic-boost items. The real differentiator is the triangle: Marty = Light, Meesmickle = Dark, Rootis = Anima.
+- **The decision-B economy is the limiter.** Spells are finite-use items restocked with **gold** between chapters (no free refill); cantrips are high-count (30–50 uses) rather than infinite. Casting is rationed by the convoy budget exactly like every FE weapon.
+- **Marty as Druid** keeps a 1-range melee option (Shillelagh) but doesn't need it to fill a triangle gap — he's the army's Light user.
 
-**Concern:** Three CHA-based casters (Meesmickle, Rootis, Sclorbo) compete for any CHA-boosting items.
+**Concern:** because every caster's stat folds to MAG, all of them compete for the same magic-boosting rewards — schedule MAG boosters/items with that contention in mind.
 
-### 4. Damage-type & magic-triangle coverage
+### 4. Weapon-triangle coverage & the DEF/RES-mix rule
 
-> **Note (2026-05-28):** damage types are now **flavor labels** (no resistance/vuln/immunity mechanic).
-> The **magic/weapon triangles still matter mechanically** (vanilla FE triangle bonus). So "coverage"
-> below is about triangle spread + flavor identity, not a resistance meta. Iconic vulnerabilities use
-> vanilla FE weapon effectiveness. (Full MVP re-eval of this doc is still a pending next-step.)
+Damage types (slashing / necrotic / cold / fire…) are **flavor labels only** — there is no
+resistance/vuln/immunity mechanic. What matters mechanically is the FE **weapon type** each unit
+wields, which drives the vanilla weapon triangle (decomp `src/bmbattle.c sWeaponTriangleRules`):
 
-**Physical triangle:**
-- Slashing: light (Braulo claws 1d4, Wolfram Feral Strike Claws 1d6 bonus action)
-- Piercing: strong (Nu', Trident, Rapier, Fonduedler)
-- Bludgeoning: strong (Warhammer, Magic Stone, Shillelagh)
+- **Physical triangle:** Sword > Axe > Lance > Sword (±15 hit, ±1 atk)
+- **Magic triangle:** Anima > Light > Dark > Anima (±15 hit, ±1 atk)
 
-**Magic triangle (Radiant > Necrotic > Elemental):**
-- Radiant: **NONE in PC roster** — Basil NPC (Ch4) must carry this
-- Necrotic: Marty (signature — Halo of Spores, Chill Touch). Meesmickle has resistance, not damage.
-- Elemental: Wolfram (fire), Rootis (cold), RBG (lightning)
+**How the 7 PCs map onto the triangles (army cross-reference):**
 
-Since most of the party deals Elemental damage, **enemy mix should feature Radiant casters only sparingly** in Ch1–3, or Marty becomes a liability vs them while everyone else gets a triangle bonus. Save Radiant enemy density for Ch5+.
+| PC | FE chassis | Weapon type | Triangle role |
+|---|---|---|---|
+| Braulo | Pirate → Berserker | **Axe** | physical |
+| Wolfram | Knight → General | **Lance** | physical (+ armor) |
+| Prof. RBG | Archer → Artillerist | **Bow** | ranged (triangle-neutral) |
+| Marty | Monk → Summoner | **Light** | magic |
+| Meesmickle | Shaman → Dark Sage | **Dark** | magic |
+| Rootis | Mage → Sage | **Anima** | magic |
+| Sclorbo | Dancer → Lore Bishop | support/heal | — |
+
+Takeaways:
+- The party already spans **both triangles**: Axe (Braulo) + Lance (Wolfram) physical; the **entire
+  magic triangle** — Anima (Rootis) / Light (Marty) / Dark (Meesmickle). The only physical gap is
+  **Sword**, filled by NPCs (Trex the Thief; Baxby the cavalier). **So we tune enemies, not reclass PCs.**
+- Internal magic triangle: Rootis (Anima) beats Marty (Light) beats Meesmickle (Dark) beats Rootis
+  (Anima). Relevant only against enemy casters, which are rare before ~Ch5.
+
+**The DEF/RES-mix rule (enemy design).** The party fields **three offensive casters** (Marty,
+Meesmickle, Rootis), all hitting **RES**. An all-brigand map (low RES) is a turkey-shoot for them; an
+all-armor map starves them while the martials carry. So **every map's enemy roster should mix
+DEF-targets and RES-targets** — physical bruisers/armor so the casters' RES-shred feels earned, plus
+enough sturdier or RES-relevant bodies that the martials (Braulo / Wolfram / RBG) pull their weight.
+This is standard vanilla-FE composition; it matters *more* for us than for FE8 because our player
+roster skews more magical than FE8's early army (which hands you only Moulder the healer).
 
 ### 5. Speed / doubling distribution is healthy
 
@@ -143,12 +172,12 @@ Standard FE design: one slow tank, several fast casters/dancers. Wolfram will be
 PCs MOV: 4 (Marty, Wolfram) — 6 (Braulo, RBG, Sclorbo). No fast cavalry. Maps are mostly arctic (snow / ice = difficult terrain in vanilla FE8).
 
 **Mitigations available:**
-- Rootis **Snow Ski** (passive): double MOV on snow/ice
-- Rootis **Dragon Wings** (toggle): flier movement, ignores terrain
+- Rootis **Snow Ski** (passive): double MOV on snow/ice — the main MVP arctic-mobility tool
 - Baxby NPC: high MOV
 - Marty **Spreading Spores**: places hazard zone (offensive use of slowness)
+- Rootis **Dragon Wings** (flier MOV, ignores terrain): **post-MVP only** — not a Ch 1–7 mitigation
 
-The party can handle arctic maps, but only because Rootis covers movement so heavily. If Rootis dies in classic mode, mobility collapses.
+In MVP the party leans on Rootis's Snow Ski + Baxby for arctic mobility; if Rootis dies in classic mode, mobility tightens (Dragon Wings is not yet online to compensate). This is a real Ch 1–7 pressure to keep in mind.
 
 ### 7. Chapter 1–3 fragility
 

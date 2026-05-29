@@ -7,6 +7,7 @@ title: "Blood in Bremen"
 chapter_number: 6
 milestone: M3
 cadence: big_battle_gray        # docs/chapter-outline.md — 🟥 (morally gray)
+fe8_base_map: "FE8 Ch6 — Victims of War"            # DefeatBoss base
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
@@ -38,7 +39,7 @@ lose_condition: all_player_units_defeated
 
 difficulty_note: >
   Morally gray chapter — the party is the aggressor. The civilian no-kill
-  constraint adds spatial care to an otherwise straightforward rout. Dorbulgruf
+  constraint adds spatial care to an otherwise straightforward fight. Dorbulgruf
   is a sturdy Warrior-class boss but not a puzzle. Dialogue should sit in the
   ambiguity, not celebrate.
 

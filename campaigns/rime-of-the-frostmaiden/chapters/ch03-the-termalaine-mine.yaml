@@ -7,6 +7,7 @@ title: "The Termalaine Mine"
 chapter_number: 3
 milestone: M3
 cadence: gimmick_multilevel     # docs/chapter-outline.md — 🟨
+fe8_base_map: "FE8 Ch3 — The Bandits of Borgo"      # Seize big-battle base
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >

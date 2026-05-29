@@ -7,6 +7,7 @@ title: "The Elven Tomb"
 chapter_number: 4
 milestone: M3
 cadence: first_boss             # docs/chapter-outline.md — 🟥
+fe8_base_map: "FE8 Ch4 — Ancient Horrors"           # DefeatAll, monster/boss-debut base
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >

@@ -107,21 +107,31 @@ _Decided: 2026-05-28 (supersedes Option A d20 hit-rate tuning)_
 
 ## Weapon & Magic Systems
 
-**Weapon triangle: Slashing > Bludgeoning > Piercing (reskinned, same mechanics)**
-Swords → Slashing, Axes/Hammers → Bludgeoning, Lances/Spears → Piercing. Bonus identical to vanilla: +1 ATK, +15 to-hit modifier. Triangle advantage = mechanical bonus, not a new system.
-_Decided: May 2026_
+**Weapon triangle: vanilla FE (Sword > Axe > Lance); damage-type names are flavor**
+The triangle is FE-native and driven by weapon TYPE (`src/bmbattle.c sWeaponTriangleRules`):
+Sword > Axe > Lance > Sword, +1 ATK / +15 hit. D&D damage-type names (slashing,
+bludgeoning, piercing, …) are **cosmetic per-weapon labels** shown in the item info — NOT
+a relabeling of the triangle. A "claw" wolf and an axe bandit are both the **axe type** and
+read identically on the triangle; the difference is sprite + label only.
+_Decided: 2026-05-29 (supersedes the May 2026 "reskin the triangle to Slashing/Bludgeoning/Piercing," which conflicted with FE weapon types)_
 
-**Magic trinity: Radiant > Necrotic > Elemental (reskinned)**
-Replaces Light > Dark > Anima. Same triangle mechanics, new labels.
-_Decided: May 2026_
+**Magic triangle: vanilla FE (Anima > Light > Dark)**
+FE-native: Anima > Light > Dark > Anima, +1 ATK / +15 hit (`sWeaponTriangleRules`). Our
+casters span it — Rootis = Anima, Marty = Light, Meesmickle = Dark.
+_Decided: 2026-05-29 (supersedes the May 2026 "Radiant > Necrotic > Elemental" reskin, which was incoherent against the class mapping)_
 
 **13 damage-type labels (flavor only — no resistance mechanic)**
 Types: slashing, piercing, bludgeoning, fire, cold, lightning, thunder, poison, acid, necrotic, radiant, force, psychic. These are **flavor tags** on weapons/tomes for descriptions + UI. **No per-class resistance bitmap, no ×0.5/×2/×0 multiplier** (reverted 2026-05-28 — see Combat System §). Iconic vulnerabilities use vanilla FE weapon **effectiveness** instead.
 _Decided: 2026-05-28 (supersedes the May 2026 resistance-bitmap decision)_
 
-**Spell-slot tomes: not buyable, refill at chapter start (= long rest)**
-Casters receive tomes at recruitment or through story events. Cannot purchase more. Cantrip tomes (0th level) are infinite-use and cannot be bought either. Mundane tomes are buyable.
-_Decided: May 2026_
+**Spell economy: finite-use tomes that deplete and are restocked with gold (decision B)**
+Every spell is a finite-use item with FE tome/staff durability. Charges DEPLETE in use and
+are **restocked with gold between chapters at a shop** — there is no free per-chapter refill.
+Cantrips are high-count items (30–50 uses) rather than truly infinite. This puts casters in
+the same gold/durability economy as martial weapons, preserving FE's core resource-management
+layer (the whole party shops, scavenges, rations). Flavor the restock per character (forage /
+scribe / pray); mechanically these are vanilla FE tomes/staves.
+_Decided: 2026-05-29 (supersedes the May 2026 "free chapter-refill, cantrips infinite, slots not buyable")_
 
 ---
 
@@ -205,10 +215,10 @@ _Decided: 2026-05-27_
 
 **Wolfram & RBG hybrid casters: physical chassis primary, spells secondary**
 Both PCs keep their physical-class chassis (Knight, Archer). Spell access is a layered overlay tuned by:
-- Tight spell-slot economy (chapter-refresh, no purchasing)
-- Cantrips are infinite but lower damage tier than dedicated casters
+- The decision-B economy: their spells are finite-use tomes restocked with gold (no free refill), same as everyone's
+- Cantrips are high-count (30–50 uses) but lower might tier than dedicated casters
 - Primary identity stat is physical (STR Wolfram, DEX RBG); MAG is secondary
-_Decided: 2026-05-27_
+_Decided: 2026-05-27 (economy line aligned to decision B, 2026-05-29)_
 
 ---
 

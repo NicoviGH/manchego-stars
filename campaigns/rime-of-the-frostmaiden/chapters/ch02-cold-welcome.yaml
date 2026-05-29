@@ -6,79 +6,144 @@ id: ch02-cold-welcome
 title: "Cold Welcome"
 chapter_number: 2
 milestone: M3
-cadence: breather_escort        # docs/chapter-outline.md — 🟦
+cadence: breather_defend          # docs/chapter-outline.md — 🟦
+
+# Tactical base map this chapter reskins. We keep FE8's tuned layout (spawn edges,
+# choke points, terrain bonuses) and repaint it to the arctic/Icewind Dale theme.
+fe8_base_map: "FE8 Ch2 — The Protected"   # DefeatAll + defend-in-place; src/events/ch2-eventinfo.h
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
-  The party escorts the sled west toward Targos and is ambushed on the open road.
-  In Targos they find a frozen body — a human sacrifice to Auril — and overhear
-  that frost druids have been spreading word that Ten-Towners must appease the
-  Frostmaiden. Rumor of the Maer Monster off Bremen surfaces at the inn.
+  The party escorts the sled west toward Targos and is ambushed on the open road
+  by a raider band preying on Ten-Towns traffic. In Targos they find a frozen body
+  — a human sacrifice to Auril — and glimpse a frost druid slipping through the
+  crowd, spreading word that Ten-Towners must appease the Frostmaiden. Rumor of the
+  Maer Monster off Bremen surfaces at the inn.
 
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
   file: maps/ch02-cold-welcome.tmx
   tileset: snow-road
-  size: "28×18"                 # wider than ch01 — finalize in Tiled
+  size: "15×15"                 # compact, mirrors FE8 Ch2 (coords top out ~14×14)
   description: >
-    Open snowy road with the Rolling Cheddar sled escorted along it. Enemies
-    emerge from tree lines and snowdrifts on both flanks. Targos gate at the far edge.
+    Compact snowy road into Targos. Party enters from one corner with the parked
+    Rolling Cheddar sled; the raider band holds the far edges and converges. Tree
+    lines and snowdrifts give terrain-avoid cover on the flanks. Reskin of FE8 Ch2:
+    same choke points and spawn geography, arctic palette. Terrain types map 1:1
+    (FE forest → snowy pines, fort → ice cairn, village → Ten-Towns hut).
 
 # ── Objective ──────────────────────────────────────────────────────────────────
+# Mirrors FE8 Ch2 "The Protected": DefeatAll with a defend-in-place layer. FE8's
+# "protect" is a SOFT fail (you lose the recruit/village if too slow, not a game
+# over). Ours: lose the sled and you forfeit the convoy supplies + reward, but the
+# chapter is not lost. Hard lose = party wiped (lord rule).
 objective:
-  type: defeat_all                       # mirrors FE8 Ch2 "The Protected" = DefeatAll
-  description: "Defeat all the road ambushers"
+  type: defeat_all
+  description: "Defeat the entire raider band"
   constraint:
-    type: protect_escort                 # the escort-teaching layer rides on top
+    type: defend_in_place
     unit: rolling-cheddar
-    description: "Keep the Rolling Cheddar sled alive while clearing the ambush"
+    description: "Keep the parked Rolling Cheddar sled alive through the raid"
+    fail_is_soft: true          # losing the sled forfeits the reward, not the chapter
 
 win_condition: all_enemies_defeated
-lose_condition: all_player_units_defeated_OR_sled_destroyed
+lose_condition: all_player_units_defeated         # FE8 lord rule; sled loss is a soft penalty
+soft_penalty_on_sled_loss:
+  description: "Forfeit the chapter chest + post-chapter gold; Wolfram's armoring beat is cut from the inn cutscene."
 
 # ── Difficulty ─────────────────────────────────────────────────────────────────
 difficulty_note: >
-  Teaches the escort mechanic — the sled is a slow ally unit that must be
-  protected. Wider map than ch01; enemies attack from flanks to pressure
-  formation. Comfortable vanilla-FE hit rates (~75%). One small reinforcement
-  wave from the rear at turn 3 to teach rear-guard awareness.
+  Teaches defend-in-place: the sled is a stationary objective the raid converges on,
+  so the party must hold a perimeter rather than rush forward. All-physical roster
+  (axe + one bow) keeps the weapon triangle readable — no enemy magic yet (FE8 fields
+  no enemy casters until ~Ch5–6; our first enemy caster is the Ch4 frost druid).
+  Comfortable vanilla-FE hit rates (~75%). One reinforcement pair enters turn 3 from
+  the edge OPPOSITE the boss to flank a party that has pushed forward (FE8's pattern).
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
-  note: "All 7 PCs + Baxby (if purchased in ch01) + the Rolling Cheddar sled (escort NPC). Positions set in Tiled."
-  escort_unit:
+  note: "All 7 PCs + Baxby (if purchased in ch01) + the Rolling Cheddar sled. Positions set in Tiled."
+  defend_unit:
     id: rolling-cheddar
     type: sled
-    behavior: follows_road_toward_gate
-    must_survive: true
+    behavior: stationary        # parked; the raid comes to it (FE8 defend-in-place)
+    must_survive: soft          # destruction = soft penalty, not game over
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
+# Mirrors FE8 Ch2 structure: ~6 trash + 1 named miniboss + 1 boss + 2 turn-3
+# reinforcements. Almost mono-chassis (axe-brigand) plus a single ranged unit, all
+# Iron-tier except the boss's Steel weapon — exactly how FE8 keeps a breather clean.
+# Wolves and bandits are the SAME chassis under the hood (axe-brigand); only the
+# sprite + flavor differ. The weapon-triangle arrow shows because the weapon TYPE
+# is axe (src/bmbattle.c sWeaponTriangleRules) — claws are flavor, not a monster weapon.
 enemy_units:
-  - id: ambush-wolf
+  - id: snow-wolf
     name: "Snow Wolf"
-    count: 5
-    class: wolf            # beast — see class-mapping.md
+    count: 3
+    fe_mechanic: axe-brigand    # Brigand class, axe-type weapon → in the weapon triangle
+    flavor: "rends with frost-rimed claws"
+    class: brigand
     level: 3
-    damage_type: piercing  # flavor label only
+    weapon: iron-axe            # mechanically an axe; reskinned as claws in animation
+    damage_type: slashing       # cosmetic label only
     ai_pattern: aggressive
-  - id: bandit
+  - id: road-bandit
     name: "Road Bandit"
-    count: 4
+    count: 2
+    fe_mechanic: axe-brigand
+    flavor: "Ten-Towns road raider"
     class: brigand
     level: 3
     weapon: iron-axe
     damage_type: slashing
     ai_pattern: aggressive
-  - id: frost-druid-scout
-    name: "Frost Druid Scout"
+    item_drop: vulnerary        # one dropper, mirrors FE8's Ch2 vulnerary drop
+  - id: frost-hunter
+    name: "Frost Hunter"
+    count: 1
+    fe_mechanic: archer         # single ranged unit for variety, as FE8 Ch2 does
+    flavor: "looses ice-fletched arrows from the drifts"
+    class: archer
+    level: 2
+    weapon: iron-bow
+    damage_type: piercing
+    ai_pattern: aggressive
+  - id: raider-bruiser
+    name: "Grukk the Bruiser"
+    is_miniboss: true
+    count: 1
+    fe_mechanic: axe-brigand    # named mid-tier, guards near the boss (FE8 "Bone")
+    flavor: "the captain's right hand"
+    class: brigand
+    level: 4
+    weapon: iron-axe
+    damage_type: slashing
+    ai_pattern: hold_position
+  - id: raider-captain
+    name: "Halvar the Raider Captain"
     is_boss: true
     count: 1
-    class: shaman          # caster — flees rather than dies if possible
-    level: 4
-    weapon: flux-tome
-    damage_type: necrotic  # flavor label only
-    ai_pattern: hold_position
-    death_quote: "Auril sees you… the cold will have you yet."
+    fe_mechanic: steel-axe-brigand   # the one real threat = FE8's Steel-Axe Bazba mirror
+    flavor: "leads the band that's been bleeding the Targos road"
+    class: brigand
+    level: 5
+    weapon: steel-axe
+    damage_type: slashing
+    ai_pattern: hold_position        # stationary guard, not a fleeing caster
+    death_quote: "Should've… paid the toll…"
+
+reinforcements:
+  - id: rear-wolves
+    name: "Snow Wolf"
+    count: 2
+    fe_mechanic: axe-brigand
+    class: brigand
+    level: 3
+    weapon: iron-axe
+    damage_type: slashing
+    trigger_turn: 3
+    spawn_edge: opposite_boss        # flanks a party pushed toward the boss (FE8 pattern)
+    ai_pattern: aggressive
 
 # ── Chests / Village ─────────────────────────────────────────────────────────────
 chests:
@@ -94,31 +159,39 @@ events:
   - trigger: chapter_start
     type: cutscene
     ea_file: events/ch02-opening.ea
-    description: "Setting off from Bryn Shander with the sled. Velynne Harpell's warning about the missing orb echoes (foreshadow)."
+    description: "Setting off from Bryn Shander with the parked sled. Velynne Harpell's warning about the missing orb echoes (foreshadow)."
   - trigger: turn_start
     turn: 3
     type: reinforcement
     ea_file: events/ch02-rear-ambush.ea
-    description: "Wolves emerge from the rear tree line — teach rear-guard."
+    description: "Wolves emerge from the rear (edge opposite the captain) — teach defending the back line."
   - trigger: chapter_end
     type: cutscene
     ea_file: events/ch02-targos-inn.ea
     description: >
-      Targos arrival. The frozen-sacrifice discovery. Inn scene: only RBG, Marty,
-      and Meesmickle take rooms; Braulo holes up in his shell, Rootis and Sclorbo
-      camp in the snow, Wolfram forges armored siding onto the sled from the ch01
-      iron ingots. Overheard rumors: Messie the Maer Monster off Bremen; frost
-      druids north near Lonelywood. Party decides to head north first.
+      Targos arrival. The frozen-sacrifice discovery. A frost druid is glimpsed in
+      the crowd spreading Auril's word, then slips away (seeds the Ch4 frost-druid
+      fight — no combat here). Inn scene: only RBG, Marty, and Meesmickle take rooms;
+      Braulo holes up in his shell, Rootis and Sclorbo camp in the snow, Wolfram
+      forges armored siding onto the sled from the ch01 iron ingots (cut if the sled
+      was lost). Overheard rumors: Messie the Maer Monster off Bremen; frost druids
+      north near Lonelywood. Party decides to head north first.
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
-  gold_reward: 250
+  gold_reward: 250                 # forfeited if the sled was destroyed
   available_shops: [targos]
   units_available_to_recruit: []   # Baxby is ch01; no new recruit here
   unlocks_chapter: ch03-the-termalaine-mine
 
 # ── Design Notes ─────────────────────────────────────────────────────────────────
 design_notes: >
-  Wolfram's sled-armoring (iron ingots → sled siding) is his secondary signature
-  beat — show it in the inn cutscene. The frost-druid scout is the first caster
-  enemy: demonstrate vanilla FE magic combat (MAG vs RES), no saving throws.
+  FE8 base: "The Protected" (DefeatAll + defend-in-place). The frost druid is a
+  cutscene seed only — FE8 withholds enemy casters until mid-game, and our first
+  enemy caster is the Ch4 frost-druid boss; introducing one here would break the
+  early physical-triangle teaching ramp. Wolfram's sled-armoring (iron ingots → sled
+  siding) is his secondary signature beat — show it in the inn cutscene (cut if the
+  sled was lost, which also forfeits the reward: that is the chapter's "protect" stake).
+  Snow wolves and road bandits are the same axe-brigand chassis so balance is
+  identical; the variety is sprite + flavor, with the single bow-user adding a ranged
+  threat exactly as FE8 Ch2 does.

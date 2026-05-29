@@ -85,7 +85,7 @@ fe_stats:
   MAG: 7                     # CHA 17 → MAG
   SKL: 5
   SPD: 7                     # DEX 18 → fast for a mage
-  DEF: 3                     # NOTE: Snow Body's B/P/S "resistance" is flavor now (dropped 2026-05-28),
+  DEF: 3                     # NOTE: Snow Body's B/P/S "resistance" is flavor (no resistance mechanic),
                              # so it no longer adds bulk. Raise this DEF if Rootis should stay tanky.
   RES: 6                     # CHA 17 → decent RES
   LCK: 5

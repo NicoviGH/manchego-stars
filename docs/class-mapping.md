@@ -2,9 +2,9 @@
 
 > See PRD §6.7 for the authoritative table. Updated 2026-05-27 after class-mapping audit (see decisions.md).
 >
-> **Combat revert (2026-05-28):** combat is vanilla FE. **AC**, **saves/+ally-save**, **advantage**, and
-> **damage-type resistance/vulnerability/immunity** in the cells below are **flavor/source-of-record only** —
-> defense is FE DEF/RES + avoid, and iconic matchups use vanilla FE weapon effectiveness. See decisions.md
+> **Combat is vanilla FE.** AC, saves/+ally-save, advantage, and damage-type
+> resistance/vulnerability/immunity in the cells below are **flavor/source-of-record only** — defense is
+> FE DEF/RES + avoid, and iconic matchups use vanilla FE weapon effectiveness. See decisions.md
 > §Combat System. (Status/condition immunities + crit-immunity remain FE-native via engine/status / Hoplon.)
 
 ## Approach
@@ -65,6 +65,6 @@ Portrait: `data/portraits/pepperjack-and-brie.jpeg` (combined image with both ca
 
 ### Wolfram and RBG have spell access — design compensates
 Both PCs are class-mapped as physical-chassis units (Knight, Archer) but have caster abilities layered on. Game tuning compensates:
-- Spell slots are tight (chapter-refresh, no purchasing)
-- Cantrips are infinite-use but lower damage tier than dedicated casters
-- Their primary identity stat is physical (STR for Wolfram, DEX for RBG) — magic is a secondary role, not their main DPS path
+- Their spells live in the same FE durability/gold economy as everyone else's: each spell is a finite-use "tome"/charge that depletes and is **restocked with gold between chapters at a shop** (decision B, see decisions.md §Combat). No free per-chapter refill.
+- Cantrips are high-count items (30–50 uses) rather than truly infinite, at a lower might tier than the dedicated casters' spells.
+- Their primary identity stat is physical (STR for Wolfram, DEX for RBG) — magic is a secondary role, not their main DPS path.

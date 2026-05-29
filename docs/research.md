@@ -4,15 +4,12 @@
 **Date:** 2026-05-26
 **Purpose:** Background research to hand to the PRD agent. Covers (1) how to ship a `.gba` Fire Emblem ROM hack, (2) what Claude / agent harnesses can plausibly accelerate the work, (3) what's in the D&D 5e API and how it's shaped, and (4) a concrete plan for translating 5e characters and combat into Fire Emblem.
 
-> **⚠ HISTORICAL — combat approach NOT ADOPTED (superseded 2026-05-28).** This doc's
-> recurring proposal of a **hybrid d20 combat system** (visible d20 vs Armor Class,
-> advantage/disadvantage, spell saving throws vs DC) was **rejected**. Combat resolution
-> stays **vanilla FE8** (hit/avoid/might/crit); D&D is flavor; the d20 survives only as a
-> cosmetic crit flourish. This affects every combat-system passage below (§1 exec summary,
-> §6.1–§6.3, the implementation roadmap, the save-or-suck table). Kept as the historical
-> research record only — the authoritative spec is `decisions.md` §Combat System +
-> `combat-formulas.md`. The non-combat research (tooling, decomp, 5e API, class mapping) is
-> still valid.
+> **Combat approach:** an early version of this research proposed a hybrid d20 combat system
+> (visible d20 vs Armor Class, advantage/disadvantage, spell save DCs). That was **not adopted** —
+> combat resolution stays **vanilla FE8** (hit/avoid/might/crit), D&D is flavor, and the d20 survives
+> only as a cosmetic crit flourish. The combat sections below (§6) reflect the adopted vanilla-FE
+> approach; the authoritative spec is `decisions.md` §Combat System + `combat-formulas.md`. The
+> non-combat research (tooling, decomp, 5e API, class mapping) is original.
 
 ---
 
@@ -21,7 +18,7 @@
 - **Target platform:** Game Boy Advance (`.gba`). Fire Emblem was never released on GBC, so `.gba` is the right pick. The hack will run on any GBA emulator (mGBA recommended) and on flash carts.
 - **Recommended base game:** **Fire Emblem: The Sacred Stones (FE8U)**. It has the most mature tooling, the most active decompilation project (FE8U is "very near completion"), branching promotions and a world map — which map nicely onto D&D-style class choices and party-driven adventuring.
 - **Recommended build path:** Work in the **fireemblem8u decompilation** (C source that recompiles into the original ROM), driven by **Claude Code in interactive sessions** — *not* an autonomous loop. The session-driven model keeps the workflow token-efficient and human-in-the-loop. Look at **Agent Oak** (Claude × `pokeemerald`) and **FE Infinity** (LLM × FE8 buildfiles) for inspiration on *patterns* — CLAUDE.md design, MCP wiring, build-as-gate — but skip the GitHub-Actions overnight cycles unless and until token budget makes it cheap. Fall back to FEBuilder for surgical GUI tweaks the agent shouldn't touch.
-- **Combat translation philosophy (hybrid, BG3-inspired):** Keep Fire Emblem's grid, permadeath, turn flow, and the triangle intact. **Reskin** the weapon triangle as **Slashing > Bludgeoning > Piercing > Slashing** (icons stay, labels and damage types are D&D). Replace the existing hit-rate formula with a **visible d20 roll** against an **Armor Class** value (BG3 pattern), add **advantage/disadvantage** as a first-class status, surface **saving throws** for spells, layer in **monster damage-type resistances**, and keep crits at nat-20 (with FE's 3× damage on crit preserved).
+- **Combat translation philosophy (FE-strict):** Keep Fire Emblem's grid, permadeath, turn flow, triangle, **and its hit/avoid/might/crit resolution** fully intact. D&D rides on top as flavor: damage-type *names* as cosmetic per-weapon labels (the triangle stays FE-native — Sword/Axe/Lance, Anima/Light/Dark), spells reskinned as FE tomes, and a single cosmetic d20 flourish on an FE crit. No d20-vs-AC, no advantage, no saving throws, no resistance multiplier — those break FE's tuned curve (see §6).
 - **5e content:** Two sources cover most needs. [**dnd5eapi.co**](https://www.dnd5eapi.co/) is the clean REST one — 12 SRD classes, 9 races, 319 spells, ~334 monsters. [**Open5e**](https://api.open5e.com/) (v1 + v2) covers the same SRD classes *plus* 17 third-party OGL/CC-BY documents — Tome of Beasts 1/2/3, Creature Codex, Deep Magic, Vault of Magic, Black Flag SRD, Level Up Advanced 5e, Critical Role's Tal'Dorei. Use Open5e for *broader monster/spell/item content*. **Non-SRD classes and subclasses (Artificer, Hexblade, Circle of Spores, Bladesinger, etc.) are not legally available in any public API** — they have to be hand-rolled per character. Strategy: snapshot dnd5eapi + Open5e once into local JSON; hand-write YAML stat blocks for the campaign's specific non-SRD characters.
 
 ---
@@ -32,9 +29,9 @@
 
 - Ship a playable `.gba` ROM that runs on stock GBA emulators and hardware.
 - Inspired by Nicolas's D&D 5e campaign — the PCs and key NPCs from that campaign appear as Fire Emblem units.
-- Combat should *feel* like D&D (visible dice, advantage, saves) while playing like Fire Emblem (grid tactics, permadeath, weapon triangle).
+- Combat should *read* like D&D (themed classes, damage-type labels, a crit flourish) while **playing like Fire Emblem** (grid tactics, permadeath, weapon triangle, FE hit/avoid/might resolution).
 - Be agent-friendly enough that Claude Code (or similar) can do a meaningful share of the implementation work.
-- **Reusable across campaigns.** The engine modifications (d20 combat, damage-type resistances, spell slots, visible dice, advantage/disadvantage, the D&D weapon triangle) are built once. Campaign content (PCs, NPCs, chapters, maps, portraits, dialogue) is data-driven and swappable. Building a second game for a different campaign (Curse of Strahd, a homebrew, etc.) should require only a new `content/campaigns/<name>/` folder — zero engine changes. Think of it as a "D&D-on-GBA engine" that ships with one campaign, not a one-shot hack.
+- **Reusable across campaigns.** The engine modifications (the cosmetic crit flourish, damage-type *labels*, the spell-tome/gold economy, custom FE-native skill procs, the combat-preview icon) are built once. Campaign content (PCs, NPCs, chapters, maps, portraits, dialogue) is data-driven and swappable. Building a second game for a different campaign (Curse of Strahd, a homebrew, etc.) should require only a new `content/campaigns/<name>/` folder — zero engine changes. Think of it as a "D&D-on-GBA engine" that ships with one campaign, not a one-shot hack.
 
 **Constraints**
 
@@ -151,7 +148,7 @@ agentoak/
 - The "AI picks from a curated pool" pattern for things LLMs are bad at (maps, sprites).
 
 **What we'd do differently:**
-- Anchor on the C decomp, not just buildfiles, so the agent can change *systems* (e.g., insert the d20 layer) and not just *content*.
+- Anchor on the C decomp, not just buildfiles, so the agent can change *systems* (e.g., insert the combat-flavor layer + custom skill procs) and not just *content*.
 - Put a human in the loop on map design and pacing.
 
 ### 4.3 Recommended harness — session-driven, token-aware
@@ -169,11 +166,11 @@ fe8-dnd-hack/
 │   ── ENGINE (reusable across all campaigns) ──────────────────────
 ├── fireemblem8u/              # the decomp as a submodule
 ├── engine/                    # our C diffs / new modules layered on the decomp
-│   ├── d20-combat/            # hit-roll, AC, advantage, saving throws, visible dice
-│   ├── damage-types/          # weapon tags + resistance/vulnerability/immunity system
-│   ├── spell-slots/           # per-unit spell slot tracker + refill on chapter start
+│   ├── combat-fx/             # cosmetic crit flourish + custom FE-native skill procs
+│   ├── damage-types/          # weapon damage-type flavor labels (UI/descriptions only)
+│   ├── spell-slots/           # per-tome charge tracker; deplete + gold-restock (decision B)
 │   ├── class-defs/            # the D&D-flavored FE class table (shared across campaigns)
-│   └── ui/                    # combat-preview reskin ("AC 14, +5 to hit, d8+3")
+│   └── ui/                    # combat-preview reskin (vanilla Hit/Crit box + damage-type icon)
 │
 │   ── CONTENT DATA (shared reference, not campaign-specific) ─────
 ├── data/
@@ -418,74 +415,38 @@ Open5e mirrors the SRD class list (same 12 — no Artificer here either) but its
 
 Keep from **Fire Emblem**: grid movement, turn-by-turn unit activation, permadeath, weapon triangle (Sword > Axe > Lance > Sword), magic trinity (Anima > Light > Dark > Anima), growth-rate-based level-ups, support conversations, character permadeath, recruitment.
 
-Keep from **D&D 5e**, surfaced visibly the way BG3 does: rolled d20 attacks against AC, advantage/disadvantage, saving throws against spell DCs, critical hits on natural 20, spell slots, ability score modifiers (STR/DEX/CON/INT/WIS/CHA).
+Keep from **D&D 5e** as **flavor on top** (never as resolution): the characters, classes, and subclasses; damage-type *names* (slashing, fire, necrotic…) as cosmetic labels; spells reskinned as FE tomes/staves; ability-score identity folded to FE stats; and a single **cosmetic d20 flourish** when an FE crit fires, for the nat-20 feel. AC, saving throws, advantage/disadvantage, and the damage-type resistance multiplier are **not** mechanics (see `decisions.md` §Combat System).
 
-Drop or simplify: 5e action economy (action / bonus / reaction) collapses into FE's "one attack per turn unless Speed-doubled." 5e movement-in-feet collapses into FE's "Move stat in tiles." 5e exhaustion, inspiration, and short-rest mechanics drop unless they earn their keep.
+Drop or simplify: 5e action economy (action / bonus / reaction) collapses into FE's "one action per turn unless Speed-doubled." 5e movement-in-feet collapses into FE's "Move stat in tiles." 5e exhaustion, inspiration, and short-rest mechanics drop unless they earn their keep.
 
-### 6.2 BG3 dice mechanics — what to copy
+### 6.2 The D&D *feel* on an FE chassis
 
-From the bg3.wiki "Dice rolls" page and direct observation of BG3:
+The goal is a game that **reads** like D&D while **playing** like Fire Emblem. The D&D flavor surfaces through presentation, not resolution:
 
-- **Attack rolls:** `1d20 + ability mod + proficiency bonus (if proficient) + other mods`, vs target AC. Hit on ≥ AC. Always hit on nat 20, always miss on nat 1.
-- **Saving throws:** `1d20 + ability mod + proficiency bonus (if proficient in that save)`, vs spell save DC. Unlike attacks, nat 1/20 are *not* automatic on saving throws (BG3 follows 5e here).
-- **Ability checks:** Same formula as saves, vs a DC the game sets.
-- **Advantage:** roll 2d20, take the higher. Roughly +4 expected value.
-- **Disadvantage:** roll 2d20, take the lower.
-- **Stacking:** advantage and disadvantage don't stack; any combination just rolls 2d20 with the matching pick. Adv + Disadv cancel out to a flat 1d20.
-- **Critical hit:** nat 20 on attack roll → roll damage dice twice and sum (do not double modifiers). Some features lower crit threshold to 19.
-- **High ground:** +2 to attack from ≥2.5 m above, −2 from below. BG3 invention but useful on a grid game; trivial to map to FE tile elevation.
-- **Visibility on screen:** BG3 shows the actual rolled number, modifiers, and pass/fail state. This is *the* thing that makes BG3 feel like D&D. Replicating it on GBA is the single most impactful UI decision.
+- **Named, themed weapons/tomes** carry a D&D damage-type icon + description; the stat block stays vanilla FE (Mt / Hit / Crit / Rng / Uses).
+- **Reskinned class identities** (a Berserker that's a hermit-crab barbarian; a Summoner that's a spore druid).
+- **A cosmetic d20 crit flourish** — when an FE crit fires, a brief "d20 lands on 20" animation plays. It is the one visible die in the game, and it is purely decorative; FE's SKL-based crit rate decides the crit.
 
-### 6.3 Combat formula — proposed hybrid
+> **Rejected alternative.** An earlier exploration proposed a BG3-style *resolution* layer (visible d20 vs AC, advantage/disadvantage, spell save DCs, damage-type resistance). It was not adopted — that layer changes FE8's tight, readable, well-tuned difficulty curve, and FE-strictness is the project's spine. The die is flavor, not resolution.
 
-> **⚠ NOT ADOPTED (superseded 2026-05-28).** This section — and the d20/AC/saving-throw/advantage
-> proposals in §6.1–§6.2 above — was an *exploration*. It was **rejected**: combat resolution
-> stays **vanilla FE8** (hit/avoid/might/crit), D&D is flavor, and the d20 survives only as a
-> cosmetic crit flourish. This doc is kept as the historical research record; the authoritative
-> spec is `decisions.md` §Combat System + `combat-formulas.md`. Do not implement the hybrid below.
+### 6.3 Combat formula — vanilla FE8
 
-**Vanilla FE GBA combat math** (from the Fire Emblem Wiki "Battle Formulas" page):
+Combat uses FE8's native math unchanged (`fireemblem8u/src/bmbattle.c`; full reference in `combat-formulas.md`):
 
 ```
-Hit% = Attacker_HitRate − Defender_Avoid + TriangleHitBonus       (clamped 0–100)
-Crit% = Attacker_CritRate − Defender_CritEvade                    (clamped 0–100)
-Damage = Attacker_Attack − Defender_Defense                       (floored at 0)
+Hit%   = Attacker_HitRate − Defender_Avoid + TriangleHitBonus       (clamped 0–100)
+Crit%  = Attacker_CritRate − Defender_CritEvade                     (clamped 0–100)
+Damage = Attacker_Attack − Defender_Defense                          (floored at 0)
 AttackSpeed = Speed − max(0, WeaponWeight − Constitution)
 If AttackSpeed_attacker − AttackSpeed_defender ≥ 4, attacker doubles
 Crit damage = Damage × 3
 ```
 
-**Proposed D&D-hybrid combat math:**
-
-```
-# To-hit replaces FE Hit%/Avoid with a visible d20:
-d20Roll = roll(1d20, advantage=hasAdv, disadvantage=hasDisadv)
-AttackRoll = d20Roll + AbilityMod + ProficiencyBonus + TriangleAtkBonus + HighGroundBonus
-Hit if AttackRoll ≥ Defender.AC  OR  d20Roll == 20
-Miss if d20Roll == 1
-
-# Damage uses the weapon's D&D dice but keeps FE armor subtraction:
-DamageRoll = roll(WeaponDamageDice) + AbilityMod + TriangleDmgBonus
-Damage = max(0, DamageRoll − Defender.DamageReduction)
-# (DamageReduction = FE's DEF/RES stat, renamed for D&D vibes)
-
-# Crits stay simple and surface BG3-style:
-If d20Roll == 20 (or 19 with Improved Critical feat): roll WeaponDamageDice TWICE
-
-# Doubling rule kept from FE — Speed difference ≥4 → second attack
-# Speed mapped from 5e DEX with class-based offsets (see §6.4)
-
-# Spells use save DCs (5e) instead of FE's hit% for magic:
-SaveDC = 8 + ProficiencyBonus + SpellAbilityMod   # standard 5e formula
-DefenderSavingThrow = 1d20 + DefSave_AbilityMod + DefSave_Prof + AdvDisadv
-If save < DC → full effect; if save ≥ DC → half damage (or no effect, per spell)
-```
-
-**Why this works:**
-- Replaces the most "spreadsheet-y" FE element (Hit%) with the most iconic D&D element (d20 vs AC).
-- Keeps FE's defensive-DR model (`Damage − DEF`) because doing pure 5e damage-vs-HP at FE's HP scale (~20–60) would mean everything two-shots; 5e damage values were designed for HP totals in the 50–200 range.
-- Preserves all FE concepts the player already understands: weapon triangle, doubling, permadeath, growth rates.
-- Trivially showable in the existing FE combat preview UI: the box currently shows "Hit 78  Crit 5"; change it to "AC 14, +5 to hit  •  d8+3 dmg  •  Crit 20".
+**Why vanilla FE (not a d20 hybrid):**
+- FE's hit/avoid/might is what makes the game readable and well-tuned. A d20-vs-AC layer at FE's HP scale (~20–60) swings far more wildly and breaks the curve.
+- Weapon Might is **fixed FE might** (tuned from the 5e die's average), not a rolled die — pure 5e damage-vs-HP at FE's HP scale would make everything two-shot.
+- The whole party — martials and casters — shares one FE economy (gold, durability, the triangle). D&D supplies identity, not arithmetic.
+- The combat preview box stays vanilla ("Hit 78  Crit 5"), optionally with a small damage-type icon; the only added motion is the crit flourish.
 
 ### 6.4 Class mapping (12 classes → FE base classes)
 
@@ -532,7 +493,7 @@ The 319 5e spells need a coherent home in FE's two magic systems (tomes and stav
 
 | 5e spell type | FE equivalent | Implementation |
 |---|---|---|
-| Cantrip (level 0) attack spell (e.g. Fire Bolt, Eldritch Blast) | **Infinite-use basic tome** | New weapon type with `uses = 0xFF` (FE's convention for unbreakable). |
+| Cantrip (level 0) attack spell (e.g. Fire Bolt, Eldritch Blast) | **High-count tome (decision B)** | A high-use tome (~30–50 uses) that depletes and restocks with gold — generous, not truly infinite. |
 | Cantrip utility (Light, Mage Hand, Guidance) | **Out-of-combat skill** or **support effect** | Most don't need to appear in combat at all. |
 | Leveled damage spell single target (Magic Missile, Witch Bolt) | **Limited-use tome** | Uses = number of spell slots of that level. |
 | Leveled damage spell AoE (Fireball, Lightning Bolt) | **Existing FE AoE tome** (Bolting, Eclipse, Purge) | Or new AoE tome with the spell's exact AoE shape — FE supports "shape data" for AoE attacks. |
@@ -565,128 +526,98 @@ The 319 5e spells need a coherent home in FE's two magic systems (tomes and stav
 | 9 – 12 | Boss + reinforcements | 18–20 | Final-chapter bosses |
 | 13+ | Custom boss class | 20 | Save for the Big Bad |
 
-**Mapping rule of thumb:** CR ≈ FE enemy level / 2. Use the monster's HP and AC verbatim only after dividing HP by ~3 (5e CR-5 has ~85 HP; FE expects ~25–35).
+**Mapping rule of thumb:** CR ≈ FE enemy level / 2. Never import 5e HP verbatim — divide by ~3 (5e CR-5 has ~85 HP; FE expects ~25–35), and set FE DEF/RES from the creature's armor/toughness feel (no AC).
 
 **Worked example — Goblin (CR 1/4):**
 
 ```
-5e:  AC 15, HP 7, STR 8 (-1), DEX 14 (+2), Scimitar +4 (1d6+2), Shortbow +4 (1d6+2)
+5e:  HP 7, STR 8 (-1), DEX 14 (+2), Scimitar +4 (1d6+2), Shortbow +4 (1d6+2)   ← source data only
 FE:  Class = Brigand
      Level = 2
      HP = 18, STR = 5, MAG = 0, SKL = 7, SPD = 8, LCK = 2, DEF = 4, RES = 1
-     AC = 11 (1d6+2 weapon, leather armor +1)  ← under new D&D-hybrid math
-     Inventory = Iron Axe (1d6 weapon dice) or Iron Bow
-     Skill = "Nimble Escape" (can use Disengage as bonus action ≈ FE +1 MOV after attack)
+     Inventory = Iron Axe or Iron Bow (fixed FE might)
+     Skill = "Nimble Escape" (Disengage ≈ FE +1 MOV after attack)
 ```
 
-### 6.8 The triangle, reskinned for D&D
+### 6.8 The weapon triangle and damage-type labels
 
-Keep the triangle's mechanics — it's the soul of FE combat. **Relabel** it with D&D damage types so the player thinks in 5e terms.
-
-**Physical triangle:**
+Keep FE's triangle **mechanically intact and FE-native** — it is the soul of FE combat:
 
 ```
-        Slashing (sword icons)
-            ▲          ╲
-            │           ╲
-            │            ▼
-   Piercing (lance) ◄── Bludgeoning (axe/hammer)
+        Sword
+          ▲     ╲
+          │      ╲
+          │       ▼
+       Lance ◄── Axe
 ```
 
-- **Slashing > Bludgeoning > Piercing > Slashing.** Same loop as Sword > Axe > Lance, just renamed.
-- Keep the existing sword/axe/lance sprites — they're already iconic and the player learns the loop by icon, not label.
-- In flavor: *agile blades cut through heavy-armor bashers; heavy weapons crack the discipline of pikemen; spears outreach the swordsman.*
-- The "+1 ATK / +15 hit" triangle bonus in vanilla FE7/FE8 stays exactly the same.
+- **Physical:** Sword > Axe > Lance > Sword — the "+1 ATK / +15 hit" bonus is exactly vanilla FE8.
+- **Magic:** Anima > Light > Dark > Anima (same bonus).
+- Keep the existing sprites; the player learns the loop by icon.
 
-**Magic trinity, reskinned:**
+D&D **damage-type names** (slashing, bludgeoning, piercing, fire, cold, necrotic, radiant…) ride on top
+as **cosmetic per-weapon labels** — an icon + description for flavor. They are *not* a relabel of the
+triangle: a hermit-crab's claw and a bandit's axe are both the **axe type** and read identically. (An
+earlier exploration renamed the triangle to Slashing/Bludgeoning/Piercing + Radiant/Necrotic/Elemental
+and grouped axes as "bludgeoning"; dropped — it fought FE's weapon types and asset pipeline for no gain.)
 
-```
-       Radiant (Light)
-            ▲          ╲
-            │           ╲
-            │            ▼
-   Elemental (Anima) ◄── Necrotic (Dark)
-```
+**No resistance / vulnerability / immunity multiplier.** A ×0.5 / ×2 / ×0 damage-type multiplier has no
+vanilla FE analogue and would modify FE damage under the hood, so it is not a mechanic. Where a matchup
+genuinely matters to play, use **vanilla FE weapon effectiveness** — flag the weapon `effective` vs that
+enemy class, the same way Hammers are effective vs armor:
 
-- **Radiant > Necrotic > Elemental > Radiant.** Same as Light > Dark > Anima.
-- Flavor: *divine light banishes shadow; necrotic blight extinguishes elemental flame; raw elemental fury overwhelms divine constraint.*
-
-**The mechanical upgrade** — once the labels are D&D damage types, you also get **monster resistance and vulnerability** as a real combat lever. This is the part that makes the relabel feel like more than paint:
-
-| 5e creature trait | FE implementation |
+| Iconic matchup | FE-native handling |
 |---|---|
-| Resistance to a damage type | Half damage when hit by that type (round down). Cheap to implement: one extra check in the damage formula. |
-| Immunity | Damage = 0. Already a concept in FE for some bosses. |
-| Vulnerability | Double damage. Also already a concept (anti-cavalry, anti-armor). |
-| Silvered weapons against fiends/lycanthropes | "Silver Edge" weapon variant; bypasses resistance. |
+| Fire vs ice trolls / frost druids | fire weapon flagged `effective` vs that class |
+| Bludgeoning vs skeletons | a bludgeon-type weapon flagged `effective` vs skeletons |
+| Radiant vs undead | a light-type weapon flagged `effective` vs undead |
 
-**Example resistance table (per 5e):**
+Everything else (a skeleton "resisting" piercing, a fiend "immune" to fire) is **narrative flavor only** —
+the damage-type label sets the vibe; no multiplier runs. One flavor byte per weapon (the damage-type
+label), no resistance bitmap.
 
-| Creature type | Resists | Immune | Vulnerable |
-|---|---|---|---|
-| Skeleton | Piercing, slashing | — | Bludgeoning |
-| Zombie | — | Poison | Bludgeoning, radiant |
-| Vampire (most) | Necrotic | — | Radiant, sunlight |
-| Fiend (lesser) | — | Fire, poison | — |
-| Stone golem | Non-magical phys | Poison, psychic | — |
-| Earth elemental | Bludgeoning, piercing, slashing from non-magical | Poison | Thunder |
-| Most undead | Necrotic | Poison | Radiant |
+**Mapping 5e weapons to FE slots** (the damage-type name rides on top as a label):
 
-This is the layer that makes weapon choice feel like D&D: bringing a mace against skeletons isn't optional flavor, it doubles your damage.
+| 5e weapon | FE slot |
+|---|---|
+| Scimitar, shortsword, longsword, greatsword, rapier, falchion | Sword |
+| Battleaxe, handaxe, greataxe, club, mace, warhammer, maul, flail | Axe |
+| Spear, javelin, trident, pike, lance, halberd, glaive | Lance |
+| Dagger | Sword (or Lance for thrown — pick by use) |
+| Shortbow, longbow, crossbow, sling | Bow (outside the triangle, as in vanilla FE) |
 
-**Implementation cost:** ~80 LOC of C in the combat resolution path, plus a one-byte "damage type" tag per weapon and a small resistance bitmap per enemy class. Tractable in a single session.
-
-**Mapping 5e weapons to the new triangle:**
-
-| 5e weapon | 5e damage type | FE weapon slot (icon) | Triangle label |
-|---|---|---|---|
-| Sickle, scimitar, shortsword | Slashing | Sword | Slashing |
-| Longsword, greatsword, rapier, falchion | Slashing | Sword | Slashing |
-| Battleaxe, handaxe, greataxe | Slashing | Axe icon (recolored as needed) | **Bludgeoning*** |
-| Club, mace, warhammer, maul, flail, morningstar | Bludgeoning | Axe | Bludgeoning |
-| Quarterstaff, light hammer | Bludgeoning | Axe | Bludgeoning |
-| Spear, javelin, trident | Piercing | Lance | Piercing |
-| Pike, lance, halberd, glaive | Piercing | Lance | Piercing |
-| Dagger (melee) | Piercing | Sword (short) or Lance for thrown — pick by use | varies |
-| Shortbow, longbow, crossbow | Piercing | Bow (separate, sits outside the triangle as in vanilla FE) | Piercing |
-| Sling | Bludgeoning | Bow | Bludgeoning |
-
-*Axes are technically Slashing in 5e. Two ways to handle: (a) **classify the FE "Axe" slot as Bludgeoning** for triangle purposes (axes-and-hammers grouped together as "heavy crushing weapons") and use heavier sprites (maul, warhammer) for the iconic art; or (b) keep axes as Slashing and put a *third* slot for Bludgeoning. Option (a) is recommended — it keeps the existing FE triangle and asset pipeline, just relabels what "axe" means. Lore: in this world, the standard "axe" is a heavy crusher with a chunky head, not a fine cutting blade.
-
-Damage dice come from 5e directly: `1d8` longsword → tome data has `weapon.might = roll(1d8)` and a flag that says "rolled damage." For weapons with `+N` magical bonuses, that's a straight +N to the attack roll and damage roll, parallel to FE's existing "Iron / Steel / Silver" tier system but cleaner. Suggested tier mapping:
+**Weapon tiers** map onto FE's Iron/Steel/Silver ladder; damage is **fixed FE might** (tuned from the
+5e die's average), never a rolled die:
 
 | FE tier | 5e equivalent |
 |---|---|
 | Iron | Mundane / no bonus |
-| Steel | Mundane, larger (`1d10` step up) |
+| Steel | Mundane, larger (a die step up) |
 | Silver | +1 magic weapon |
-| Brave (double-attack) | Same dice, two attacks |
-| Killer (high crit) | "Vicious" or "Improved Critical" variant |
-| Reaver (anti-triangle) | Bypasses resistance |
-| Legendary/personal | Named magic items (Vorpal Sword, Holy Avenger) |
+| Brave (double-attack) | Same might, two attacks |
+| Killer (high crit) | "Vicious" / Improved Critical variant |
+| Reaver (anti-triangle) | Reverses the triangle |
+| Legendary / personal | Named magic items (Vorpal Sword, Holy Avenger) |
 
-### 6.9 Hybrid mechanics — where to patch in the decomp
+### 6.9 Where the flavor layer patches into the decomp
 
-For an implementer (or the agent), here's where the relevant code lives in `fireemblem8u`:
+Combat **resolution is left intact** — `bmbattle.c` / `BattleGenerateHitTriangle` / `BattleGenerateCrit`
+are not touched. The work is the flavor layer on top:
 
 | System | Files (in `fireemblem8u/src/`) | What changes |
 |---|---|---|
-| Combat resolution | `bmbattle.c`, `bmlib.c` (and `include/battle.h`) | Replace `BattleGenerateHitTriangle` / hit-rate calculation with d20 roll. Inject the new `AC` and `ProficiencyBonus` fields into the unit struct (or compute on the fly from class + level). |
-| Unit struct | `include/unit.h` (`struct Unit`) | Add fields for the six 5e abilities (or pack two per byte) and AC. Possibly a `spellSlots` array. |
-| Combat preview UI | `bmStatScreen.c`, `bmStatBars.c`, plus battle-forecast text rendering | Show "+5 to hit, AC 14" instead of "Hit 78". Big UI lift; budget 2–3 cycles. |
-| Damage dice rolling | New: `src/dndDice.c` | RNG already exists (`bmRng.c`); wrap it with `Roll(int n, int sides, AdvState adv)`. |
-| Saving throws | `bmstaff.c` for staff-based saves; new for spell saves | Staves already roll target vs hit rate — repoint that to a 1d20+save vs DC. |
-| Advantage/disadvantage | New status: `gActionData.advantageState` | Compute at battle prep based on terrain, conditions, abilities. |
-| Spell slots | New tracker in `Unit` struct | Saved with unit data; refilled on chapter start. |
-| Crit | `BattleGenerateCrit` | Hard-code crit threshold to natural-20 (configurable per weapon for Killer-equivalents). |
-| Class data | `data/classes.s` (assembly tables; the decomp documents these) | Add the 12 D&D classes (or merge into existing FE classes per §6.4). |
-| Damage-type tag on weapons | `data/items.s` (or whichever items table the decomp exposes) | One byte per weapon: damage type enum (slashing/piercing/bludgeoning/fire/cold/…/radiant/necrotic). |
-| Resistance/vulnerability table | New: `data/resistances.s` keyed by enemy class | Bitmap or short array per enemy class indicating which damage types they resist/are immune/vulnerable to. |
-| Resistance check in combat | `bmbattle.c` damage step | After computing damage, multiply by 0.5 / 0 / 2.0 based on defender's resistance bitmap and weapon's damage type. |
+| Combat resolution | `bmbattle.c`, `include/battle.h` | **No change** — vanilla FE hit / avoid / might / crit. |
+| Damage-type label | `data/items.s` + new `damage_type.h` | One flavor byte per weapon (a damage-type enum) for the UI icon + description. No computation. |
+| Iconic matchups | existing FE effectiveness data | Flag a few weapons `effective` vs an enemy class (fire vs ice troll, bludgeoning vs skeleton). Vanilla mechanic, no new code. |
+| Combat preview UI | battle-forecast text rendering | Keep the vanilla "Hit / Crit" box; add only a small damage-type icon. |
+| Crit flourish | new `engine/combat-fx/crit_anim.c` | Cosmetic "d20 lands on 20" animation when an FE crit fires (RNG helper wraps `bmRng.c`). |
+| Spell-tome economy | new tracker (sidecar or `Unit` field) | Per-tome charges that deplete in use and restock with gold between chapters (decision B). |
+| Custom skill procs | `engine/combat-fx`, `engine/class-defs` | FE-native procs/commands for unique abilities (Rage buff, summons, Dance, transforms) — see `fe-mechanic-map.yaml`. |
+| Class data | `data/classes.s` | Custom class entries where no vanilla chassis fits (per §6.4). |
 
 **Caveats**
-- `agbcc` is GCC 2.95.1 — avoid C99 features (variable-length arrays, designated initializers in some forms). The decomp's existing code is the style guide.
-- The `Unit` struct is referenced from hundreds of places. Adding fields requires every save/load path to update; the FE save format has spare bytes in some sections but not many. An "AC sidecar table" (lookup keyed by unit ID) is a safer first pass.
+- `agbcc` is GCC 2.95.1 — avoid C99 features (VLAs, some designated initializers). The decomp's existing code is the style guide.
+- The `Unit` struct is referenced from hundreds of places; adding fields touches every save/load path. A sidecar lookup (keyed by unit ID) for spell-tome charges is the safer first pass. No AC and no resistance bitmap are stored — combat is vanilla FE — so the save budget stays small.
 
 ---
 
@@ -752,9 +683,8 @@ fire_emblem:
 ## 8. Risks and open questions
 
 - **HP scale mismatch.** 5e spells are tuned for 50–200 HP. FE units have 20–60 HP. Direct damage import would one-shot everything. Mitigation in §6.3 (keep FE's `damage − DEF` model), but it needs playtesting; the agent should be told to keep an eye on this.
-- **D20 variance vs FE's high-hit-rate norms.** Vanilla FE often shows 70–95% hit. A 1d20 has ~50% hit at AC = bonus+10 — feels swingier. Counter-options: (a) start everyone with higher proficiency / lower enemy AC, (b) keep 1d20 but raise minimum hit chance with a "skill bonus" floor, (c) use a roll-twice-take-higher as the *default* and treat current FE "disadvantage" as 1d20. Recommend playtesting; lean toward (a).
-- **GBA UI real estate.** Combat preview window is ~96×40 px. Squeezing "AC 14 / +5 to hit / d8+3" + advantage indicator in there is tight. Suggest using existing weapon-icon space for the d20 readout.
-- **Save-file size.** Adding STR/DEX/CON/INT/WIS/CHA + AC + spell slots per unit balloons the unit struct. The FE save format reserves ~52 bytes per character slot. Audit early.
+- **GBA UI real estate.** Combat preview window is ~96×40 px. Keep the vanilla Hit/Crit box and add only a small damage-type icon (reuse weapon-icon space). There's no AC/to-hit/dice line to fit.
+- **Save-file size.** The FE save format reserves ~52 bytes per character slot. Combat is vanilla FE, so no AC or resistance bitmap is stored; the main add is per-tome charge counts. A sidecar lookup (keyed by unit ID) is the safe first pass. Audit early.
 - **5e licensing scope.** SRD covers the basics but most published subclasses, monsters, and adventures are not SRD. If a PC was a Hexblade Warlock, you can call it that but not reproduce the official subclass text. Either rewrite or rename.
 - **Map design.** FE Infinity validated that LLMs are bad at FE maps. Plan to pull from a curated map pool (60+ exist in the FE Repo) or draw maps by hand in Tiled / FEBuilder, then feed coordinates to the agent.
 - **Permadeath vs D&D revival.** D&D PCs come back via Raise Dead. FE PCs do not. Decision: keep permadeath, treat in-fiction revivals as Casual Mode or as plot-mandated revivals between chapters.
@@ -776,10 +706,10 @@ The order below reflects the engine/content split — build the reusable engine 
 **Phase 1 — Engine (reusable; this work benefits every future campaign)**
 4. **Stand up the scaffolding repo** per §4.3. CI green, vanilla FE8 ROM builds clean from the decomp.
 5. **Snapshot the SRD + Open5e** via `tools/pull-srd.ts`. Commit `data/srd-snapshot.json` + `data/open5e-snapshot.json`.
-6. **Implement the d20 combat patch** (`engine/d20-combat/`). This is the single biggest change — attack rolls, AC, advantage/disadvantage, saving throws. Validate by playing vanilla FE8 chapter 1 with the new math.
-7. **Implement damage-type tagging + resistance system** (`engine/damage-types/`). Tag every vanilla weapon with a type, add a small resistance table for a handful of enemy classes, verify skeletons take double from bludgeoning.
-8. **Implement spell-slot tracker** (`engine/spell-slots/`). Limited-use tomes that refill on chapter start.
-9. **Implement visible-dice UI** (`engine/ui/`). Show the d20 roll and modifiers in the combat preview and battle animation.
+6. **Implement the combat-flavor layer** (`engine/combat-fx/`). Combat resolution stays vanilla FE — this is the cosmetic crit flourish + custom FE-native skill procs. Validate by playing vanilla FE8 chapter 1 with the layer on.
+7. **Implement damage-type tagging** (`engine/damage-types/`). Tag every vanilla weapon with a flavor damage-type label (UI/icon only). Flag the few iconic matchups (fire vs ice troll, bludgeoning vs skeleton) via vanilla FE weapon effectiveness — no resistance multiplier.
+8. **Implement the spell-tome economy** (`engine/spell-slots/`). Finite-use tomes that deplete and restock with gold between chapters (decision B) — no free refill.
+9. **Implement the combat-preview reskin** (`engine/ui/`). Keep the vanilla Hit/Crit box; add a damage-type icon and the crit flourish.
 10. **Write `tools/build-campaign.ts`** — the campaign-injector that reads a `campaigns/<name>/` folder and wires it into the decomp.
 
 **Phase 2 — Content: Rime of the Frostmaiden (first campaign)**

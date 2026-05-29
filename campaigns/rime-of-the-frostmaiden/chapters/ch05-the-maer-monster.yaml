@@ -7,6 +7,7 @@ title: "The Maer Monster"
 chapter_number: 5
 milestone: M3
 cadence: marquee_setpiece       # docs/chapter-outline.md — 🎬 (the Navarre/Joshua moment)
+fe8_base_map: "FE8 Ch5 — The Empire's Reach"        # DefeatBoss set-piece base
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
