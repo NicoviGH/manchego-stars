@@ -44,12 +44,13 @@ dnd:
 
 # ── FE Starting Stats (level 1) ────────────────────────────────────────────────
 # Vanilla FE8 Archer stats, verbatim from data_classes.c [CLASS_ARCHER - 1]. No D&D-derived
-# tuning. A real FE8 Archer is a physical Bow unit: single Pow stat (= STR), no MAG. His INT/
-# cannon kit lives in the custom Artillerist promotion (post-MVP), NOT in the base class.
+# tuning. A real FE8 Archer is a physical Bow unit: single Pow stat (= STR), no MAG.
+# RBG follows the vanilla Archer promotion line (-> Sniper). His "Artillerist" cannon fantasy is
+# NOT a custom class — it is Pepperjack, a separately RECRUITABLE unit (flavor: RBG built it).
 # LCK: ClassData has no base luck — set 0 until personal luck is assigned deliberately.
 fe_stats:
-  class: Archer              # FE base class — custom Artillerist at promotion (post-MVP)
-  promoted_class: Artillerist  # custom class: deployable cannon, INT-based
+  class: Archer              # FE base class
+  promoted_class: Sniper     # vanilla FE8 Archer promotion (data_classes.c [CLASS_ARCHER].promotion)
   level: 1
   HP: 18
   STR: 4                     # FE Pow (Archer basePow) — bows compute damage off Pow
@@ -92,78 +93,40 @@ inventory:
     story_only:
       wish_charges: 2
       endgame_event: "RBG wishes Pinky into a living being (campaign finale)"
-  - id: shocking-grasp
-    name: "Shocking Grasp"
-    flavor: "Live Wire — RBG's gauntlet arcs a fat current into anything he can lay a paw on."
-    fe_mechanic: "on hit, target loses its counterattack (no reaction)"
-    # FE-legal via promotion: a base Archer has no tome rank; this lightning attack belongs to the
-    # custom INT-based Artillerist path. Gated to promotion (post-MVP). In MVP RBG is a pure Bow unit.
-    fe_weapon_type: Artillerist-cannon   # custom Artillerist weapon (defined with that class, post-MVP)
-    unlock: promotion         # base Archer cannot use this
-    damage_type: lightning    # D&D flavor only
-    range: 2
-    uses: 25                  # high-count cantrip tome (decision B): depletes, gold-restock; tune per chapter
-    notes: "+hit vs armored (metal) targets (FE-native). On hit: target loses its counterattack until its next turn."
+  # NOTE: the former "Shocking Grasp" lightning tome is removed — Archer/Sniper is a Bow-only line in
+  # FE8 and has no tome rank. The cannon/lightning fantasy lives in Pepperjack (a recruitable unit).
   - id: vulnerary
     name: "Healing Potion"
     uses: 2
 
 # ── Unique Abilities ─────────────────────────────────────────────────────────
 unique_abilities:
+  # Pepperjack & Brie are NOT an RBG ability — they are separate RECRUITABLE units (flavor: RBG
+  # built them). Mechanically they join the army like any FE8 recruit and are authored as their own
+  # FE-legal units (their own class/stats/weapon) in npcs/ — NOT a summon, AoE turret, or custom kit.
+  # The data below is flavor/recruitment metadata only; no combat mechanics live on RBG for them.
   - id: pepperjack
     name: "Pepperjack"
-    # RBG's canonical first Eldritch Cannon — sentient automaton with a chili-pepper
-    # mustache, red star, and fierce single eye (grey chassis).
-    # Renamed from "Eldritch Cannon" → "Pepperjack" on 2026-05-27 to reflect canon.
-    #
-    # SPEECH: Pokemon-style — Pepperjack can only say his own name ("Pepperjack!").
-    # All combat barks, deployment dialogue, and death lines render as variants of
-    # "Pepperjack!" in the UI.
-    #
-    # RELATIONSHIP: Pepperjack is dating Brie (the second cannon). Adjacency dialogue
-    # / support triggers between the two should reflect this.
-    #
-    # 1/chapter (or spend a 1st-level spell slot): deploy Pepperjack at an adjacent
-    # empty tile. Pepperjack acts as an allied NPC unit with its own action.
-    # Modes (Artificer Artillerist): Flamethrower (fire AoE), Force Ballista (1d8 force ranged 3),
-    # Protector (defensive aura — half cover for allies within 2 tiles).
-    # Stats at ch1: HP 20, DEF 8, RES 0, cannot move, auto-removed at chapter end.
-    # End-state (Artificer 15+): paired with Brie for 2 simultaneous cannons, AC 18, 100 HP each.
-    # Explosive Cannon: detonate for 3d8 force AoE (2-tile radius) as an action if within 4 tiles.
-    fe_mechanic: "FE8 Summoner phantom — a stationary allied turret unit with its own action"
-    type: activated
-    unlock_chapter: 3         # Artillerist Eldritch Cannon = Artificer L3 → Ch3 (MVP)
-    explosive_cannon_unlock_chapter: 9   # Explosive Cannon detonation = L9 → Ch9 (post-MVP)
-    uses_per_chapter: 1
-    spawn_unit: pepperjack-cannon
+    type: recruitable_unit_ref
+    unit_ref: pepperjack          # full FE-legal unit defined in npcs/ (post-MVP)
+    recruited_via: "story — RBG builds Pepperjack"
+    # Flavor: sentient automaton, chili-pepper mustache, red star, single fierce eye (grey chassis).
+    # SPEECH: Pokemon-style — only says "Pepperjack!". RELATIONSHIP: dating Brie.
     canonical_name: Pepperjack
-    speech_mode: pokemon_self_name      # only says "Pepperjack!"
+    speech_mode: pokemon_self_name
     paired_with: brie
     portrait_ref: data/portraits/pepperjack-and-brie.jpeg
     portrait_source_ref: "References/PCs/Pepperjack and Brie Portrait.jpeg"
 
   - id: brie
     name: "Brie"
-    # RBG's second Eldritch Cannon, unlocked at a later chapter (TBD — likely Ch 4-5
-    # when Artificer 9+ "Arcane Jolt" / second-cannon feature would trigger).
-    # Sentient automaton: pink chassis, cyan star, glamorous purple eye with eyeshadow,
-    # ribbon-curled horn. Pepperjack's girlfriend.
-    #
-    # SPEECH: Pokemon-style — Brie can only say her own name ("Brie!").
-    #
-    # RELATIONSHIP: dating Pepperjack. Cute adjacency dialogue between the two when both
-    # are deployed (e.g., they say each other's names back and forth).
-    #
-    # Same mechanical kit as Pepperjack (Flamethrower / Force Ballista / Protector modes).
-    # When both deployed: RBG fields TWO simultaneous cannons, fulfilling the Artificer
-    # Artillerist endgame fantasy (level 15+ feature in 5e).
-    fe_mechanic: "second FE8 Summoner phantom — a 2nd simultaneous turret (Artillerist endgame fantasy)"
-    type: activated
-    unlock_chapter: 14                   # Artificer L15 second-cannon feature → Ch14 (POST-MVP)
-    requires_unlock: pepperjack-already-known
-    spawn_unit: brie-cannon
+    type: recruitable_unit_ref
+    unit_ref: brie                # full FE-legal unit defined in npcs/ (post-MVP)
+    recruited_via: "story — RBG builds Brie (a later chapter)"
+    # Flavor: sentient automaton, pink chassis, cyan star, glamorous purple eye, ribbon-curled horn.
+    # SPEECH: Pokemon-style — only says "Brie!". RELATIONSHIP: dating Pepperjack.
     canonical_name: Brie
-    speech_mode: pokemon_self_name      # only says "Brie!"
+    speech_mode: pokemon_self_name
     paired_with: pepperjack
     portrait_ref: data/portraits/pepperjack-and-brie.jpeg
     portrait_source_ref: "References/PCs/Pepperjack and Brie Portrait.jpeg"

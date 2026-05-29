@@ -143,20 +143,15 @@ unique_abilities:
 
   - id: breath-weapon
     name: "Breath Weapon"
-    flavor: "Flamethrower — Wolfram's chest-vents flare and he gouts a cone of forge-fire (his Drakeborn breath + armor's Flamethrower function)."
-    fe_mechanic: "vanilla FE breath/cone attack: fire AoE on a cone of tiles, DEX save for half"
-    # ACTION, 1/short rest per Mineralscale Drakeborn (PDF p3). FE = 1/chapter.
-    # 30-ft cone, DEX save DC 16, fire damage. (= the Metallurgist 'Flamethrower' armor ability.)
-    type: activated
-    unlock_chapter: 1         # racial Drakeborn breath — available from start
-    uses_per_chapter: 1
-    action_cost: action
-    shape: cone
-    range: 2                      # 30 ft → ~2 FE tiles
-    save: DEX
-    save_dc: 16
-    damage_type: fire
-    ch1_damage_dice: "2d6"        # scales to 3d6 / 4d6 / 5d6 in later chapters
+    flavor: "Flamethrower — Wolfram's chest-vents flare and he spits a gout of forge-fire."
+    # FE-legal: mechanically this is just his Javelin (1–2 range Lance). The 'fire breath' is FLAVOR
+    # ONLY — there is NO AoE/cone, NO save, NO weapon dice (those are D&D constructs that FE doesn't
+    # have). It resolves as a standard FE single-target ranged-lance attack (FE Might/hit/crit), and
+    # 'fire' has no mechanical effect. This is a flavor name for his Javelin, not a separate ability.
+    fe_mechanic: "ranged Lance attack (his Javelin), named 'fire breath' — element is flavor only"
+    type: flavor_label
+    weapon_ref: javelin       # it IS the inventory Javelin, reskinned as a fire breath
+    range: 2
 
   - id: enhanced-darkvision
     name: "Enhanced Darkvision"
