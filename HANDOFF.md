@@ -1,48 +1,46 @@
-# Handoff: Ch2 reworked to FE8 model + full doc-cleanup sweep
+# Handoff: FE8-stats-only cleanup done; FE8 compliance audit IN PROGRESS
 
 **Date:** 2026-05-29
-**Session focus:** Continued the collaborative story/pacing walkthrough at **Ch2 "Cold Welcome"**, grounding the design in the **actual FE8 Ch2 "The Protected"** structure read from the decomp. Then made two cross-cutting decisions (the spell economy; the weapon triangle) and ran a **full docs/YAML cleanup** to remove every stale combat-system reference and band-aid scar.
+**Session focus:** (1) Reworked Ch2 to the FE8 "The Protected" model + full docs/YAML cleanup to vanilla-FE + decision B (prior commits). (2) Sharpened to **FE8 stats AND mechanics only** and stripped the 5e combat-math apparatus everywhere. (3) STARTED an FE8 decomp-compliance audit of the PC files — **this is where the next session resumes.**
 
-## How Nicolas wants this work done (unchanged, important)
+## How Nicolas wants this work done (standing rules)
 
-- **Story/pacing = collaborative, chapter by chapter** — lead with what FE8 does in that slot (read from the decomp, not memory), then our take, then discuss. (Memory: `feedback_collaborative_story_planning`.)
-- **Always ground FE8 claims in the `fireemblem8u/` decomp**, never memory/community lore. (Memory: `manchego-stars-use-decomp`, new this session.)
-- **Clean doc rewrites — no banners / "reverted on DATE" / strikethrough scar tissue.** Rewrite natively. (Memory: `feedback_clean_doc_rewrites`.)
-- **Auto-push to main**; no need to ask. (Memory: `feedback_proactive-push`.)
+- **FE8 mechanics AND FE8 stats only.** Combat = FE hit/avoid/might/FE crit. The d20 is **only** a cosmetic nat-20 animation triggered by FE crit math — nothing else. **No weapon dice, no 5e→FE stat conversion** (no STR→might, no DEX→SKL/SPD split, no ability-mod damage, no "tune from the 5e die's average"). PCs use FE8-class stats authored directly; the 5e `dnd:` sheet block is character flavor/source only. (Memory: `manchego-stars-combat-resolution`.)
+- **Always ground FE8 claims in the `fireemblem8u/` decomp** (Memory: `manchego-stars-use-decomp`).
+- **Collaborative, chapter-by-chapter** story work; **clean native doc rewrites** (no banners/strikethrough); **auto-push to main**.
+- **Proactive handoffs / context hygiene** — run `/handoff` at task boundaries and long sessions; suggest `/clear` on task switches (Memory: `proactive-handoff-context-hygiene`, new this session). I can't see a live token counter, so this is best-effort; a `PreCompact` hook is the only true-automation backstop (offered, not yet set up).
 
-## Settled this session (do NOT re-litigate)
+## Accomplished this session (all committed + pushed)
 
-- **Ch2 = FE8 "The Protected" model.** DefeatAll + **defend-in-place** (parked Rolling Cheddar sled = the protected objective the raid converges on; sled loss is a SOFT fail — forfeits the reward, not the chapter). Roster mirrors FE8's: ~6 trash + 1 named miniboss (Grukk) + 1 Steel-Axe boss (Halvar) + a turn-3 reinforcement pair from the **edge opposite the boss** (flank). The frost druid is a **cutscene seed only** (FE8 fields no enemy casters until ~Ch5–6; our first enemy caster is the Ch4 boss). `ch02-cold-welcome.yaml` fully rewritten.
-- **Wolves = bandits = axe-brigand chassis** (same under the hood; sprite + flavor differ). Confirmed via decomp that the triangle is driven by weapon TYPE (`bmbattle.c sWeaponTriangleRules`) and monster claw/fang weapons are triangle-EXEMPT — so to keep the triangle arrow working, reskinned enemies use real FE weapon types (claws = axe), not monster weapons.
-- **Decision B — the spell economy.** Every spell/cantrip is a finite-use FE tome that **depletes and is restocked with gold between chapters** (no free refill); cantrips are high-count (~30–50), not infinite. Casters share the FE gold/durability economy with martials → preserves FE's resource-management pillar. Innate per-rest pools (Rage, breath, Channel Divinity) still refill free; Pact slots = spell slots → decision B.
-- **Weapon triangle stays FE-native** (Sword>Axe>Lance, Anima>Light>Dark). D&D damage-type names are **cosmetic per-weapon labels**, NOT a relabel of the triangle. The old "Slashing>Bludgeoning>Piercing / Radiant>Necrotic>Elemental" reskin is dropped.
-- **Army composition is already FE-shaped** — don't reclass PCs; **tune enemies.** Cross-ref table + the **DEF/RES-mix rule** (every map mixes DEF-targets and RES-targets so our 3 offensive casters aren't a turkey-shoot vs low-RES mobs) are now in `party-balance.md §4`. Marty is the army's **Light** caster (corrected from an earlier "melee" error); Braulo=Axe, Wolfram=Lance, RBG=Bow, Meesmickle=Dark, Rootis=Anima, Sclorbo=support; Sword gap filled by NPCs (Trex/Baxby).
-- **`fe8_base_map` field added to all 8 chapter YAMLs** — the FE8 map each chapter reskins (keep FE8's tuned layout/terrain/spawns, repaint to arctic). Ch1–6 align 1:1 with FE8 Ch1–6; **Ch7 uses FE8 Ch13 "Hamill Canyon"** (the FE8 Survive/terrain map) since our Ch7 is a Survive→scripted-loss. Confirmed by Nicolas (2026-05-29).
+- **`e6d18e3` — FE8 stats/mechanics only.** Stripped from all 7 PC YAMLs: every `weapon_dice`, per-weapon `ability_mod`, and the whole `d20_fields:` block (AC/prof_bonus/ability_mod_atk/spell_slots). The `dnd:` block stays as character source. Infinite-cantrip `uses` normalized (FE has no infinite weapons). Reframed **CLAUDE.md** (combat is vanilla FE8, not "d20 replaces hit-rate"; Phase 1 has no d20 engine), **rules-mapping.md §E** (author FE8 stats directly — no conversion formula), **§A damage** / **decisions.md** / **combat-formulas.md** / **research.md** (Might = FE weapon tier, never a 5e die), **PRD §10** (D&D sheets are flavor reference, not literal FE stat targets). All YAMLs validate.
+- **`3914b05` / `196c0c9` (earlier):** Ch2 reworked to FE8 "The Protected"; `fe8_base_map` added to all 8 chapters; decision B (spell tomes deplete + gold-restock); FE-native triangle; army cross-ref + DEF/RES-mix rule in party-balance.md; all band-aid scar tissue + hybrid-d20 language purged; `engine/d20-combat` → `engine/combat-fx`; "Rout" → correct FE8 verbs.
 
-## Doc cleanup done this session (the "no stale docs" pass)
+## IN PROGRESS — FE8 compliance audit (resume here)
 
-Swept clean across `docs/` + `campaigns/`:
-- **Decision B propagated** (decisions.md, rules-mapping.md, class-progression-tables.md, PRD, combat-formulas.md, class-mapping.md, party-balance.md, PC YAMLs).
-- **All hybrid-d20 language removed**, incl. `research.md` **fully de-d20'd** (§1, §2, §6.1–6.3, §6.8, §6.9, risks, next-steps) — it now presents vanilla FE as the approach.
-- **Band-aid scar tissue removed** (dated "reverted/dropped 2026-05-28", strikethroughs, "(reverted)" parentheticals) — native rewrites everywhere. decisions.md keeps its dated `_Decided:` changelog footers (that's the doc's format, not scar tissue).
-- **Engine module renamed** `engine/d20-combat/` → `engine/combat-fx/` everywhere (docs, fe-mechanic-map.yaml's ~30 refs, memory). No engine dir exists yet — doc-only.
-- **"Rout" → correct FE8 objective** (FE8 has no Rout verb): campaign-brief Ch1/2/6 objectives + a ch06 prose comment.
-- All 8 chapter YAMLs + edited PC YAMLs validate clean.
+**Goal (Nicolas's ask):** use the decomp to compare each PC's FE stats/class to vanilla FE8 units and ensure compliance, so playtest doesn't break later.
+
+**Done so far:** located the decomp data and learned the data layout —
+- **`fireemblem8u/src/data_classes.c`** = class bases/caps/growths/MOV/CON/weapon-ranks, indexed `[CLASS_X - 1]`. Line numbers found: Knight (promotes→General, ~470), General `[CLASS_GENERAL-1]` @590, Archer @1402, Mage @2102, Sage @2214, Shaman @2572, Summoner @2808, Pirate @3780, Berserker @3837, Monk @3896. (Still need Dancer + Knight's own index line.)
+- **`fireemblem8u/include/bmunit.h:61`** = `struct ClassData`. Field order: baseHP/Pow/Skl/Spd/Def/Res/Con/Mov (offsets 0B–12), then maxHP…maxCon (caps, 13–19), then growthHP/Pow/Skl/Spd/Def/Res/Lck (1B–21), promotion gains (22–27), `attributes` (28), `baseRanks[8]` (2C). Note FE uses **Pow** = our STR/MAG split; FE class data has one Pow (physical) — magic classes use the magic anim/rank, MAG is the unit's Pow-equivalent for tomes.
+- **`fireemblem8u/src/data_characters.c`** = per-character bases/growths/affinity (the FE *unit* layer on top of class).
+
+**Next steps for the audit (priority order):**
+1. Read each MVP **base class** block in `data_classes.c` (Pirate, Knight, Archer, Mage, Shaman, Monk, Dancer) — record vanilla baseHP/Pow/Skl/Spd/Def/Res/Con/Mov, caps, growths.
+2. Pull each PC's `fe_stats:` + `growth_rates:` from `campaigns/.../pcs/*.yaml` (Braulo=Pirate, Wolfram=Knight, RBG=Archer, Rootis=Mage(Ice), Meesmickle=Shaman, Marty=Monk, Sclorbo=Dancer).
+3. Compare & flag: base class is a real FE8 class? base stats ≥ class bases and ≤ caps? MOV matches class (Knight 4, Mage/Archer 5, etc.)? CON sane? growths in FE-plausible range? weapon type matches class (Mage=Anima tome, Shaman=Dark, Monk=Light, Archer=Bow, Pirate=Axe, Knight=Lance)?
+4. **MVP plays unpromoted**, so focus on base classes. Note: several *promoted* classes are intentionally CUSTOM (Artillerist for RBG, Lore Bishop for Sclorbo, "Dark Sage" for Meesmickle, custom Druid/Summoner for Marty) — flag them as custom (post-MVP), don't treat as vanilla.
+5. Report findings; fix clear violations; bring judgment calls to Nicolas.
 
 ## Blockers / open
 
-- **Ch3 is next** in the walkthrough (FE8 Ch3 "The Bandits of Borgo" = Seize big-battle; our Termalaine Mine multi-level gimmick).
-- **Ch 8–20 plot still blocked on the rest of the DM notes** (the #1 unblock).
-- **`weapon_dice` in PC YAMLs — intentionally left as source-of-record (reasoning settled 2026-05-29).** It's the 5e source die, treated like the `ac:`/`save_dc:` fields decisions.md keeps as source-of-record; the build pipeline (`build-campaign.ts`, not written) converts it to **fixed FE might** ("tuned from the die's average"). There is NO live contradiction — no doc claims rolled damage, and no `might:` field asserts a value yet. Assigning concrete might values is **downstream balance tuning** (Phase 1/2, needs enemy stat blocks + the build tool), not cleanup. Optional small clarity add still open: a one-line convention note ("weapon_dice = 5e source die → fixed might at build time") so it can't be misread as rolled damage.
-- **GitHub is already clean** — milestone M1 is "D&D Combat Layer Works"; issues #7–#13 referenced in the PRD were never created (only #1–#6 exist). No GitHub action needed.
+- **Ch 8–20 plot blocked on the rest of the DM notes** (the #1 unblock).
+- **Story walkthrough is paused at Ch3** (FE8 Ch3 "The Bandits of Borgo", Seize big-battle / Termalaine Mine) — resume after the compliance audit, or per Nicolas.
+- **`weapon_dice` → FE Might values not yet authored:** weapons need FE Might from FE item tiers (Iron/Steel/Silver) in an item table that doesn't exist yet — downstream authoring, not cleanup.
 - Build toolchain still NOT installed (devkitARM/agbcc/ColorzCore/libpng).
-- Open design Qs (chapter-outline.md §Open questions): main-lord PC (Braulo the pick), finale tone, Act II chapter budget, post-MVP Tower-of-Valni equivalent.
 
 ## Key files
 
-- [campaigns/.../chapters/ch02-cold-welcome.yaml](campaigns/rime-of-the-frostmaiden/chapters/ch02-cold-welcome.yaml) — reworked to FE8 "The Protected".
-- [docs/decisions.md](docs/decisions.md) §Combat / §Weapon & Magic — decision B + FE-native triangle.
-- [docs/party-balance.md](docs/party-balance.md) §4 — army cross-ref + DEF/RES-mix rule.
-- [docs/fe8-pacing-reference.md](docs/fe8-pacing-reference.md), [docs/chapter-outline.md](docs/chapter-outline.md) — cadence + 20-ch skeleton.
-- FE8 ground truth: `fireemblem8u/src/events/<ch>-eventinfo.h` (objectives/villages), `src/events_udefs.c` (rosters), `src/bmbattle.c` (triangle), `include/bmitem.h` (`maxUses`).
+- PC YAMLs: `campaigns/rime-of-the-frostmaiden/pcs/*.yaml` (`fe_stats:` + `growth_rates:` blocks).
+- Vanilla FE8: `fireemblem8u/src/data_classes.c`, `src/data_characters.c`, `include/bmunit.h:61` (ClassData struct).
+- `docs/decisions.md` §Combat/§Weapon&Magic, `docs/rules-mapping.md` §E, `CLAUDE.md` — the FE8-stats-only canon.
 - Validate campaign YAML: `ruby -ryaml -e 'YAML.load_file("<path>")'`
