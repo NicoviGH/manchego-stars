@@ -42,47 +42,52 @@ dnd:
     darkvision: 60
     underfoot: true          # can move through spaces of larger creatures
 
-# ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
-# Adjust during Phase 1 playtesting.
+# ── FE Starting Stats (level 1) ────────────────────────────────────────────────
+# Vanilla FE8 Archer stats, verbatim from data_classes.c [CLASS_ARCHER - 1]. No D&D-derived
+# tuning. A real FE8 Archer is a physical Bow unit: single Pow stat (= STR), no MAG. His INT/
+# cannon kit lives in the custom Artillerist promotion (post-MVP), NOT in the base class.
+# LCK: ClassData has no base luck — set 0 until personal luck is assigned deliberately.
 fe_stats:
-  class: Archer              # FE base class — custom Artillerist at promotion
+  class: Archer              # FE base class — custom Artillerist at promotion (post-MVP)
   promoted_class: Artillerist  # custom class: deployable cannon, INT-based
   level: 1
-  HP: 16
-  STR: 2                     # weak melee
-  MAG: 5                     # INT 20 → cannon and infusion damage
-  SKL: 8                     # INT 20 → highest base SKL in party (accuracy is his identity)
-  SPD: 5
+  HP: 18
+  STR: 4                     # FE Pow (Archer basePow) — bows compute damage off Pow
+  SKL: 3
+  SPD: 3
   DEF: 3
-  RES: 3
-  LCK: 4
-  MOV: 5                     # FE class-fixed: Archer baseMov = 5 (data_classes.c). MOV is class-determined, not per-character.
+  RES: 0
+  LCK: 0                     # ClassData has no base luck
+  MOV: 5                     # Archer baseMov
   CON: 7
 
-# ── Growth Rates (% per level, FE standard) ──────────────────────────────────
+# ── Growth Rates (% per level) — vanilla Archer growths from data_classes.c ──────
 growth_rates:
-  HP: 50
-  STR: 10
-  MAG: 45
-  SKL: 65                    # highest SKL growth in party — defining stat
-  SPD: 40
-  DEF: 25
-  RES: 30
+  HP: 70
+  STR: 35
+  SKL: 40
+  SPD: 32
+  DEF: 15
+  RES: 15
   LCK: 35
 
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
 inventory:
   - id: fonduedler
     name: Fonduedler
-    damage_type: piercing     # ranged weapon — custom Artificer firearm/crossbow
-    range: 3                  # range 30/90 ft → ~3 FE tiles
+    fe_weapon_type: Bow       # FE Archer weapon class (baseRanks ITYPE_BOW)
+    damage_type: piercing     # D&D flavor only; ranged Artificer firearm/crossbow
+    range: 2                  # FE bows are 2-range (no melee counter)
     uses: null    # FE tome — finite uses TBD (no infinite weapons)
     locked: true              # personal weapon
   - id: luck-e-cheese
     name: "Luck E. Cheese"
     flavor: "Luck Blade shortsword — a wedge-shaped blade humming with two charges of raw Wish."
     fe_mechanic: "ordinary personal shortsword in combat; the Wish is NOT a usable ability (see story_only)"
-    damage_type: piercing     # PDF confirms Piercing (not Slashing — corrected from JSON)
+    # FE-COMPLIANCE FLAG: vanilla Archer has no Sword rank and no melee weapon (cannot counter at
+    # range 1). A real FE8 Archer cannot wield this. Pending design review.
+    fe_weapon_type: null      # NON-VANILLA on a base Archer (see flag above)
+    damage_type: piercing     # D&D flavor only
     range: melee
     uses: null    # FE tome — finite uses TBD (no infinite weapons)
     locked: true              # personal weapon
@@ -98,8 +103,10 @@ inventory:
     name: "Shocking Grasp"
     flavor: "Live Wire — RBG's gauntlet arcs a fat current into anything he can lay a paw on."
     fe_mechanic: "Thunder tome at melee range; on hit, target loses its counterattack (no reaction)"
-    # Artificer cantrip (PDF p1 weapons). 4d8 Lightning at level 20, +12 to hit (INT-based).
-    damage_type: lightning
+    # FE-COMPLIANCE FLAG: vanilla Archer has no tome rank — a real FE8 Archer cannot use this.
+    # Belongs to the custom INT-based Artillerist path (post-MVP). Pending design review.
+    fe_weapon_type: null      # NON-VANILLA on a base Archer (see flag above)
+    damage_type: lightning    # D&D flavor only
     range: melee              # touch range
     uses: 25                  # high-count cantrip tome (decision B): depletes, gold-restock; tune per chapter
     notes: "+hit vs armored (metal) targets (FE-native, was 5e advantage). On hit: target loses its counterattack until its next turn."

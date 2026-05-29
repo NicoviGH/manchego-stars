@@ -57,46 +57,50 @@ dnd:
     shell_defense:                  # full mechanics in unique_abilities
       note: "see unique_abilities.shell-defense"
 
-# ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
-# Hand-tuned starting values. Adjust during Phase 1 playtesting.
+# ── FE Starting Stats (level 1) ────────────────────────────────────────────────
+# Vanilla FE8 Pirate stats, verbatim from fireemblem8u/src/data_classes.c [CLASS_PIRATE - 1].
+# No D&D-derived tuning. FE has a single Pow stat (= STR here). LCK: ClassData defines no
+# base luck (it is a character-layer stat) — set 0 until personal luck is assigned deliberately.
 fe_stats:
   class: Pirate
   promoted_class: Berserker
   level: 1
-  HP: 22
-  STR: 7                            # high — Braulo's defining stat
-  SKL: 4
-  SPD: 5
-  DEF: 6
-  RES: 2
-  LCK: 3
-  MOV: 5                            # FE class-fixed: Pirate baseMov = 5 (data_classes.c). MOV is class-determined, not per-character.
-  CON: 12                           # large unit, heavy weapons
+  HP: 19
+  STR: 4                            # FE Pow (Pirate basePow)
+  SKL: 2
+  SPD: 6
+  DEF: 3
+  RES: 0
+  LCK: 0                            # ClassData has no base luck
+  MOV: 5                            # Pirate baseMov
+  CON: 10
 
-# ── Growth Rates (% per level, FE standard) ──────────────────────────────────
+# ── Growth Rates (% per level) — vanilla Pirate growths from data_classes.c ──────
 growth_rates:
   HP: 75
-  STR: 60
+  STR: 50
   SKL: 35
-  SPD: 40
-  DEF: 50
-  RES: 15
-  LCK: 25
+  SPD: 25
+  DEF: 10
+  RES: 13
+  LCK: 15
 
 # ── Inventory (Chapter 1 starting equipment) ───────────────────────────────────
 inventory:
   - id: nu-shipwrecker
     name: "Nu' Shipwrecker"
-    damage_type: piercing           # CORRECTED: Piercing (not Slashing — PDF confirmed)
+    fe_weapon_type: Axe             # FE Pirate weapon class (data_classes.c baseRanks ITYPE_AXE)
+    damage_type: piercing           # D&D flavor only; CORRECTED: Piercing (not Slashing — PDF confirmed)
     range: melee
     uses: null    # FE tome — finite uses TBD (no infinite weapons)
     locked: true                    # personal weapon, cannot be traded
   - id: trident
     name: Trident
-    damage_type: piercing
-    range: 2                        # thrown: range 20/60 ft → ~2 FE tiles
+    fe_weapon_type: Axe             # FE: thrown axe = Hand Axe (Axe class, 1–2 range)
+    damage_type: piercing           # D&D flavor only
+    range: 2                        # thrown: 1–2 tiles (Hand Axe)
     uses: null    # FE tome — finite uses TBD (no infinite weapons)
-    notes: "Silvered. Thrown (range 20/60 ft). +6 STR mod at end-state."
+    notes: "Hand-Axe analogue (1–2 range)."
   - id: vulnerary
     name: "Healing Potion"
     uses: 3

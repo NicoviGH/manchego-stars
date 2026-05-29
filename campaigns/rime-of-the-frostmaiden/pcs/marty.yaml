@@ -87,27 +87,28 @@ fe_stats:
                              # See docs/class-mapping.md and docs/decisions.md.
   promoted_class: Summoner   # custom promotion; standard FE8 Summoner sprite
   level: 1
-  HP: 16
-  STR: 2                     # not a melee fighter
-  MAG: 8                     # WIS 20 → MAG is Marty's defining stat
-  SKL: 5
-  SPD: 6                     # DEX 18 but spore myconid moves methodically
-  DEF: 3                     # fragile caster
-  RES: 7                     # WIS 20 → high RES
-  LCK: 4
-  MOV: 5                     # FE class-fixed: Monk baseMov = 5 (data_classes.c). MOV is class-determined, not per-character.
-  CON: 7
+  # Vanilla FE8 Monk stats, verbatim from data_classes.c [CLASS_MONK - 1]. No D&D-derived tuning.
+  # Monk is a magic (Light) unit: single Pow stat is the magic attack (= MAG), no STR.
+  # LCK: ClassData has no base luck — set 0 until personal luck is assigned deliberately.
+  HP: 18
+  MAG: 1                     # FE Pow (Monk basePow) — magic attack stat
+  SKL: 1
+  SPD: 2
+  DEF: 1
+  RES: 5
+  LCK: 0                     # ClassData has no base luck
+  MOV: 5                     # Monk baseMov
+  CON: 6
 
-# ── Growth Rates (% per level, FE standard) ──────────────────────────────────
+# ── Growth Rates (% per level) — vanilla Monk growths from data_classes.c ────────
 growth_rates:
-  HP: 45
-  STR: 10
-  MAG: 65
-  SKL: 40
-  SPD: 45
-  DEF: 20
-  RES: 60
-  LCK: 30
+  HP: 50
+  MAG: 30
+  SKL: 35
+  SPD: 32
+  DEF: 8
+  RES: 40
+  LCK: 45
 
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
 # Primary attack is Shillelagh (cantrip), not a basic staff swing.
@@ -115,21 +116,27 @@ growth_rates:
 inventory:
   - id: shillelagh
     name: "Shillelagh (Staff)"
-    damage_type: bludgeoning
-    range: melee
+    # FE Monk attacks with a Light tome at range; the melee staff-swing framing is D&D flavor.
+    fe_weapon_type: Light      # FE Monk weapon class (baseRanks ITYPE_LIGHT)
+    damage_type: bludgeoning   # D&D flavor only
+    range: 2                   # FE Light tome range (melee framing is cosmetic)
     uses: null    # FE tome — finite uses TBD (no infinite weapons)
     locked: true               # Marty's Staff + Shillelagh cantrip, personal
-    notes: "+WIS mod to damage (= +5 at ch1 equivalent). Replaces staff's STR-based attack."
+    notes: "Marty's basic attack; modeled as a Light tome in FE."
   - id: chill-touch
     name: "Chill Touch"
     flavor: "Witherspore — a puff of grave-mold settles on the target; its wounds won't close."
-    fe_mechanic: "Flux-tier dark tome; on hit, target can't recover HP until its next turn"
-    damage_type: necrotic
-    range: 3                  # 120 ft → ~3 FE tiles
+    fe_mechanic: "on hit, target can't recover HP until its next turn"
+    fe_weapon_type: Light      # FE Monk weapon class; necrotic flavor reskinned to Light
+    damage_type: necrotic      # D&D flavor only
+    range: 2                  # FE Light tome range
     uses: null    # FE tome — finite uses TBD (no infinite weapons)
     notes: "Anti-heal proc (Chill Touch's signature). Marty's primary spore cantrip."
   - id: heal-staff
     name: "Heal Staff"
+    # FE-COMPLIANCE FLAG: vanilla unpromoted Monk has no Staff rank — staves come at promotion
+    # (Bishop). A real FE8 Monk cannot heal until promoted. Pending design review.
+    fe_weapon_type: null       # NON-VANILLA on a base Monk (see flag above)
     is_staff: true
     effect: restore_hp
     staff_dice: "1d8+MAG"

@@ -78,41 +78,49 @@ fe_stats:
                                           # gated POST-MVP — in MVP he only has Cure Wounds.
                                           # See docs/decisions.md + unique_abilities.bard-healing-suite.
   level: 1
-  HP: 16
-  STR: 3                          # STR 13 — slightly stronger than other casters
-  MAG: 5                          # CHA 17 → buff/debuff spell potency
-  SKL: 5
-  SPD: 8                          # DEX 15 + Dancer mobility → fast
-  DEF: 2                          # lightest armor in the party
-  RES: 7                          # WIS 18 → high RES, second only to Marty
-  LCK: 6                          # CHA 17 + Dancer archetype → high luck
-  MOV: 5                          # FE class-fixed: Dancer baseMov = 5 (data_classes.c). MOV is class-determined, not per-character.
-  CON: 7
+  # Vanilla FE8 Dancer stats, verbatim from data_classes.c [CLASS_DANCER - 1]. No D&D-derived tuning.
+  # Dancer is the physical chassis (single Pow = STR), but NOTE: vanilla Dancer has NO weapon ranks
+  # and CANNOT attack or use staves — its role is Dance (refresh). Sclorbo's healer/attacker kit is
+  # the custom Lore Bishop path (post-MVP); see inventory FE-compliance flags below.
+  # Dancer caps are also special (maxPow/maxSkl = 10) — relevant only post-MVP at promotion.
+  # LCK: ClassData has no base luck — set 0 until personal luck is assigned deliberately.
+  HP: 14
+  STR: 1                          # FE Pow (Dancer basePow) — Dancer cannot actually wield weapons
+  SKL: 2
+  SPD: 7
+  DEF: 0
+  RES: 1
+  LCK: 0                          # ClassData has no base luck
+  MOV: 5                          # Dancer baseMov
+  CON: 4
 
-# ── Growth Rates (% per level, FE standard) ──────────────────────────────────
-# Slightly lower ceilings reflecting level 16 end-state.
+# ── Growth Rates (% per level) — vanilla Dancer growths from data_classes.c ──────
 growth_rates:
   HP: 45
-  STR: 15
-  MAG: 40
-  SKL: 40
+  STR: 45
+  SKL: 30
   SPD: 60
-  DEF: 15
-  RES: 55
-  LCK: 50
+  DEF: 0
+  RES: 13
+  LCK: 70
 
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
+# FE-COMPLIANCE FLAG: vanilla FE8 Dancer has NO weapon ranks and cannot attack or use staves.
+# Every offensive/healing item below is NON-VANILLA on a base Dancer — it belongs to Sclorbo's
+# custom Lore Bishop path (post-MVP). Pending design review (does the base unit only Dance in MVP?).
 inventory:
   - id: rapier
     name: Rapier
-    damage_type: piercing
+    fe_weapon_type: null          # NON-VANILLA: Dancer has no Sword rank (see flag above)
+    damage_type: piercing         # D&D flavor only
     range: melee
     uses: null    # FE tome — finite uses TBD (no infinite weapons)
   - id: ray-of-frost
     name: "Ray of Frost"
     flavor: "Frostsong — a shivering note of cold that crackles across the target and slows it."
     fe_mechanic: "ice tome cantrip; on hit, target loses MOV/SPD (slow proc)"
-    damage_type: cold
+    fe_weapon_type: null          # NON-VANILLA: Dancer has no tome rank (see flag above)
+    damage_type: cold             # D&D flavor only
     range: 3                      # 60 ft → ~3 FE tiles
     uses: null    # FE tome — finite uses TBD (no infinite weapons)
     notes: "Acquired via Additional Magical Secrets (College of Lore). Also applies -10 ft MOV on hit."
@@ -120,16 +128,19 @@ inventory:
     name: "Vicious Mockery"
     flavor: "Withering Impression — a telepathic jab of pure derision that rattles a foe's nerve."
     fe_mechanic: "psychic tome cantrip; on hit, target attacks at −hit next turn (his primary attack)"
-    damage_type: psychic
+    fe_weapon_type: null          # NON-VANILLA: Dancer has no tome rank (see flag above)
+    damage_type: psychic          # D&D flavor only
     range: 3                      # 60 ft
     uses: null    # FE tome — finite uses TBD (no infinite weapons)
     notes: "On hit: target has disadvantage on its next attack roll (WIS save DC negates damage only)."
   - id: heal-staff
     name: "Heal Staff"
     flavor: "Mending Hum — a soothing telepathic resonance that knits flesh back together."
-    fe_mechanic: "vanilla FE Heal staff, single-target restore"
+    fe_mechanic: "Heal staff, single-target restore"
     # Sclorbo's Cure Wounds spell (Bard 1st). THE ONLY HEAL HE HAS IN MVP (Ch1–7) —
     # all raise-dead-type healing is gated POST-MVP per Nicolas's call (2026-05-28).
+    # FE-COMPLIANCE FLAG: vanilla Dancer has no Staff rank — staff use is the custom Lore Bishop path.
+    fe_weapon_type: null          # NON-VANILLA: Dancer cannot use staves (see flag above)
     is_staff: true
     effect: restore_hp
     staff_dice: "1d8+MAG"

@@ -71,60 +71,63 @@ dnd:
         - levels: "16-20"
           dice: "5d6"
 
-# ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
-# Wolfram is the party wall. Highest DEF, lowest SPD. Adjust during Phase 1 playtesting.
+# ── FE Starting Stats (level 1) ────────────────────────────────────────────────
+# Vanilla FE8 Knight (Armor Knight) stats, verbatim from data_classes.c [CLASS_ARMOR_KNIGHT - 1].
+# No D&D-derived tuning. FE Knight is a pure-Lance physical unit: single Pow stat (= STR), no MAG.
+# LCK: ClassData has no base luck — set 0 until personal luck is assigned deliberately.
 fe_stats:
   class: Knight
   promoted_class: General
   level: 1
-  HP: 20
-  STR: 8                          # STR 20 → strong; second only to Braulo
-  MAG: 3                          # INT 20 → Metallurgist spells and Magic Stone
-  SKL: 5
-  SPD: 3                          # heavy armor — defining Knight limitation
-  DEF: 10                         # highest base DEF in the party; AC 26 end-state target
-  RES: 2                          # WIS 9 → lowest RES in the party
-  LCK: 2
-  MOV: 4
-  CON: 14                         # heaviest unit — can wield heavy weapons without penalty
+  HP: 17
+  STR: 5                          # FE Pow (Armor Knight basePow)
+  SKL: 2
+  SPD: 0                          # vanilla Armor Knight base SPD is 0
+  DEF: 9
+  RES: 0
+  LCK: 0                          # ClassData has no base luck
+  MOV: 4                          # Armor Knight baseMov
+  CON: 13
 
-# ── Growth Rates (% per level, FE standard) ──────────────────────────────────
+# ── Growth Rates (% per level) — vanilla Armor Knight growths from data_classes.c ──
 growth_rates:
-  HP: 60
-  STR: 55
-  MAG: 20
-  SKL: 35
-  SPD: 15                         # lowest SPD growth by design — Knight archetype
-  DEF: 75                         # highest DEF growth in the party — endgame fortress
-  RES: 10
-  LCK: 20
+  HP: 80
+  STR: 40
+  SKL: 30
+  SPD: 15
+  DEF: 28
+  RES: 20
+  LCK: 25
 
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
 inventory:
   - id: warhammer
     name: Warhammer
-    damage_type: bludgeoning
+    fe_weapon_type: Lance           # FE Knight weapon class (baseRanks ITYPE_LANCE); blunt is D&D flavor
+    damage_type: bludgeoning        # D&D flavor only
     range: melee
     uses: null    # FE tome — finite uses TBD (no infinite weapons)
   - id: iron-lance
     name: "Iron Lance"
-    damage_type: piercing
+    fe_weapon_type: Lance           # FE Knight weapon class
+    damage_type: piercing           # D&D flavor only
     range: melee
     uses: null    # FE tome — finite uses TBD (no infinite weapons)
   - id: magic-stone
     name: "Magic Stone"
-    # One of Wolfram's ranged options. Pact of the Tome cantrip.
-    # INT-based: +11 to hit at end-state (+5 INT mod + 6 prof); 1d6+5 bludgeoning.
-    damage_type: bludgeoning
+    # FE-COMPLIANCE FLAG: vanilla Knight has no tome rank — a real FE8 Armor Knight cannot use this.
+    # Wolfram's ranged/INT kit belongs to his custom path, not the base class. Pending design review.
+    fe_weapon_type: null            # NON-VANILLA on a base Knight (see flag above)
+    damage_type: bludgeoning        # D&D flavor only
     range: 2                      # 60 ft → ~2-3 FE tiles
     uses: 25                      # high-count cantrip tome (decision B): depletes, gold-restock; tune per chapter
     notes: "+11 to hit at end-state (INT 20 + prof 6). Deals +5 bludgeoning on hit."
   - id: fire-bolt
     name: "Fire Bolt"
-    # Pact of the Tome cantrip — Wolfram's main ranged fire option for flyers and
-    # distant enemies. Scales: 1d10 (lv1) → 2d10 (5) → 3d10 (11) → 4d10 (17).
-    # Pairs with breath weapon's Fire identity. INT-based per PDF (+6 to hit, 4d10 at 20).
-    damage_type: fire
+    # FE-COMPLIANCE FLAG: vanilla Knight has no tome rank — a real FE8 Armor Knight cannot use this.
+    # Pairs with breath weapon's Fire identity. Pending design review.
+    fe_weapon_type: null            # NON-VANILLA on a base Knight (see flag above)
+    damage_type: fire               # D&D flavor only
     range: 3                      # 120 ft → ~3 FE tiles
     uses: 30                      # high-count cantrip tome (decision B): depletes, gold-restock; tune per chapter
   - id: vulnerary

@@ -39,29 +39,30 @@ dnd:
 # ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
 # Adjust during Phase 1 playtesting.
 fe_stats:
-  class: "Shaman (Dark)"     # FE base class — dark magic user
+  class: "Shaman (Dark)"     # FE base class Shaman — dark magic user
   promoted_class: "Dark Sage"
   level: 1
-  HP: 18                     # CON 19 → tankier than most casters
-  STR: 2
-  MAG: 6                     # CHA 16 → MAG, moderate start
-  SKL: 5
-  SPD: 9                     # DEX 20 → fastest caster in the party
-  DEF: 3
+  # Vanilla FE8 Shaman stats, verbatim from data_classes.c [CLASS_SHAMAN - 1]. No D&D-derived tuning.
+  # Shaman is a magic unit: single Pow stat is the magic attack (= MAG), no STR.
+  # LCK: ClassData has no base luck — set 0 until personal luck is assigned deliberately.
+  HP: 16
+  MAG: 2                     # FE Pow (Shaman basePow) — magic attack stat
+  SKL: 1
+  SPD: 2
+  DEF: 2
   RES: 4
-  LCK: 2                     # WIS 8 → low luck
-  MOV: 5
-  CON: 8
+  LCK: 0                     # ClassData has no base luck
+  MOV: 5                     # Shaman baseMov
+  CON: 7
 
-# ── Growth Rates (% per level, FE standard) ──────────────────────────────────
+# ── Growth Rates (% per level) — vanilla Shaman growths from data_classes.c ──────
 growth_rates:
-  HP: 55
-  STR: 10
+  HP: 50
   MAG: 50
-  SKL: 45
-  SPD: 60                    # highest SPD growth — fastest unit at endgame
-  DEF: 20
-  RES: 35
+  SKL: 32
+  SPD: 30
+  DEF: 10
+  RES: 30
   LCK: 20
 
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
@@ -72,8 +73,9 @@ inventory:
     name: "Eldritch Blast"
     flavor: "Hexbolt — crackling beams of raw eldritch force lance out from her claws."
     fe_mechanic: "locked personal force tome (her basic weapon); beam count = brave-style extra hits"
-    damage_type: force
-    range: 4                  # standard 60 ft → ~4 FE tiles (Eldritch Spear extends to 20 tiles end-state)
+    fe_weapon_type: Dark      # FE Shaman weapon class (baseRanks ITYPE_DARK); force is Dark reflavor
+    damage_type: force        # D&D flavor only
+    range: 2                  # FE tome range (Eldritch Spear extension is flavor)
     uses: null    # FE tome — finite uses TBD (no infinite weapons)
     locked: true              # Warlock cantrip, cannot be traded
     # BEAM COUNT scales with character level (each beam rolls + targets separately):
