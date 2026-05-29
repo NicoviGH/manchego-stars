@@ -70,7 +70,7 @@ fe_stats:
   DEF: 6
   RES: 2
   LCK: 3
-  MOV: 6                            # speed_ft: 40 → 6 tiles (standard 30 ft = 5 tiles)
+  MOV: 5                            # FE class-fixed: Pirate baseMov = 5 (data_classes.c). MOV is class-determined, not per-character.
   CON: 12                           # large unit, heavy weapons
 
 # ── Growth Rates (% per level, FE standard) ──────────────────────────────────

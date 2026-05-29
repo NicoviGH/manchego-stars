@@ -95,7 +95,7 @@ fe_stats:
   DEF: 3                     # fragile caster
   RES: 7                     # WIS 20 → high RES
   LCK: 4
-  MOV: 4                     # speed_ft: 20 — very slow, myconid creep
+  MOV: 5                     # FE class-fixed: Monk baseMov = 5 (data_classes.c). MOV is class-determined, not per-character.
   CON: 7
 
 # ── Growth Rates (% per level, FE standard) ──────────────────────────────────

@@ -56,7 +56,7 @@ fe_stats:
   DEF: 3
   RES: 3
   LCK: 4
-  MOV: 6                     # speed_ft: 35 → above standard (standard = 5, 35 ft = 6 tiles)
+  MOV: 5                     # FE class-fixed: Archer baseMov = 5 (data_classes.c). MOV is class-determined, not per-character.
   CON: 7
 
 # ── Growth Rates (% per level, FE standard) ──────────────────────────────────
