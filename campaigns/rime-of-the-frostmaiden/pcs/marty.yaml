@@ -134,9 +134,11 @@ inventory:
     notes: "Anti-heal proc (Chill Touch's signature). Marty's primary spore cantrip."
   - id: heal-staff
     name: "Heal Staff"
-    # FE-COMPLIANCE FLAG: vanilla unpromoted Monk has no Staff rank — staves come at promotion
-    # (Bishop). A real FE8 Monk cannot heal until promoted. Pending design review.
-    fe_weapon_type: null       # NON-VANILLA on a base Monk (see flag above)
+    # FE-legal via promotion: base Monk is Light-only (no staff); FE8 Summoner (Marty's promotion)
+    # uses Dark + STAFF, so his healing comes online when he promotes. In MVP (unpromoted) Marty is
+    # a Light attacker; Sclorbo (Priest) is the MVP healer. Goodberry consumable still covers chip heals.
+    fe_weapon_type: Staff      # usable at the Summoner promotion
+    unlock: promotion          # base Monk cannot use staves
     is_staff: true
     effect: restore_hp
     staff_dice: "1d8+MAG"

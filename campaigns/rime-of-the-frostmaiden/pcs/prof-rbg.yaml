@@ -83,33 +83,27 @@ inventory:
   - id: luck-e-cheese
     name: "Luck E. Cheese"
     flavor: "Luck Blade shortsword — a wedge-shaped blade humming with two charges of raw Wish."
-    fe_mechanic: "ordinary personal shortsword in combat; the Wish is NOT a usable ability (see story_only)"
-    # FE-COMPLIANCE FLAG: vanilla Archer has no Sword rank and no melee weapon (cannot counter at
-    # range 1). A real FE8 Archer cannot wield this. Pending design review.
-    fe_weapon_type: null      # NON-VANILLA on a base Archer (see flag above)
-    damage_type: piercing     # D&D flavor only
-    range: melee
-    uses: null    # FE tome — finite uses TBD (no infinite weapons)
-    locked: true              # personal weapon
-    # WISH = STORY-ONLY, NO PLAY MECHANIC (Nicolas's call, 2026-05-28). Wish has no clean FE
-    # analogue and is deliberately NOT a castable ability. It fires once, as a scripted endgame
-    # beat: at the campaign's end RBG spends a Wish charge to turn PINKY (his homunculus "son",
-    # the Pegasus Knight companion — see `companion` block) into a true living being.
+    # FE-legal resolution: a vanilla Archer has no Sword rank and no melee weapon. This is NOT a
+    # combat weapon — it is a STORY-ONLY item (the Wish). It is never wielded in battle, so there is
+    # no FE weapon type. (Nicolas's call, 2026-05-28: the Wish is narrative payoff, not a tool.)
+    is_combat_weapon: false   # story item only — RBG never attacks with it
+    # The Wish fires once, as a scripted endgame beat: RBG spends a charge to turn PINKY (his
+    # homunculus "son", the Pegasus Knight companion — see `companion` block) into a living being.
     story_only:
       wish_charges: 2
       endgame_event: "RBG wishes Pinky into a living being (campaign finale)"
-    notes: "Functions as a plain shortsword in gameplay. The Wish is narrative payoff, not a tool."
   - id: shocking-grasp
     name: "Shocking Grasp"
     flavor: "Live Wire — RBG's gauntlet arcs a fat current into anything he can lay a paw on."
-    fe_mechanic: "Thunder tome at melee range; on hit, target loses its counterattack (no reaction)"
-    # FE-COMPLIANCE FLAG: vanilla Archer has no tome rank — a real FE8 Archer cannot use this.
-    # Belongs to the custom INT-based Artillerist path (post-MVP). Pending design review.
-    fe_weapon_type: null      # NON-VANILLA on a base Archer (see flag above)
+    fe_mechanic: "on hit, target loses its counterattack (no reaction)"
+    # FE-legal via promotion: a base Archer has no tome rank; this lightning attack belongs to the
+    # custom INT-based Artillerist path. Gated to promotion (post-MVP). In MVP RBG is a pure Bow unit.
+    fe_weapon_type: Artillerist-cannon   # custom Artillerist weapon (defined with that class, post-MVP)
+    unlock: promotion         # base Archer cannot use this
     damage_type: lightning    # D&D flavor only
-    range: melee              # touch range
+    range: 2
     uses: 25                  # high-count cantrip tome (decision B): depletes, gold-restock; tune per chapter
-    notes: "+hit vs armored (metal) targets (FE-native, was 5e advantage). On hit: target loses its counterattack until its next turn."
+    notes: "+hit vs armored (metal) targets (FE-native). On hit: target loses its counterattack until its next turn."
   - id: vulnerary
     name: "Healing Potion"
     uses: 2

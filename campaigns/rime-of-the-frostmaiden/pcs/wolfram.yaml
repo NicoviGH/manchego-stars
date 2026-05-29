@@ -113,23 +113,17 @@ inventory:
     damage_type: piercing           # D&D flavor only
     range: melee
     uses: null    # FE tome — finite uses TBD (no infinite weapons)
-  - id: magic-stone
-    name: "Magic Stone"
-    # FE-COMPLIANCE FLAG: vanilla Knight has no tome rank — a real FE8 Armor Knight cannot use this.
-    # Wolfram's ranged/INT kit belongs to his custom path, not the base class. Pending design review.
-    fe_weapon_type: null            # NON-VANILLA on a base Knight (see flag above)
-    damage_type: bludgeoning        # D&D flavor only
-    range: 2                      # 60 ft → ~2-3 FE tiles
-    uses: 25                      # high-count cantrip tome (decision B): depletes, gold-restock; tune per chapter
-    notes: "+11 to hit at end-state (INT 20 + prof 6). Deals +5 bludgeoning on hit."
-  - id: fire-bolt
-    name: "Fire Bolt"
-    # FE-COMPLIANCE FLAG: vanilla Knight has no tome rank — a real FE8 Armor Knight cannot use this.
-    # Pairs with breath weapon's Fire identity. Pending design review.
-    fe_weapon_type: null            # NON-VANILLA on a base Knight (see flag above)
-    damage_type: fire               # D&D flavor only
-    range: 3                      # 120 ft → ~3 FE tiles
-    uses: 30                      # high-count cantrip tome (decision B): depletes, gold-restock; tune per chapter
+  - id: javelin
+    name: Javelin
+    # FE-legal resolution: a Knight has no tome. The FE way an armored unit attacks at range is a
+    # Javelin (1–2 range Lance). This replaces the former "Magic Stone" ranged tome (no FE analogue).
+    fe_weapon_type: Lance           # Javelin = 1–2 range Lance
+    damage_type: bludgeoning        # D&D flavor (Magic Stone) carried as flavor
+    range: 2                      # 1–2 tiles (thrown lance)
+    uses: null    # FE Might/uses TBD
+    notes: "Replaces Magic Stone — a Knight's ranged option in FE is a thrown lance (Javelin)."
+  # NOTE: the former "Fire Bolt" tome is removed — a Knight cannot use tomes in FE8, and Wolfram's
+  # ranged FIRE identity already lives in his Breath Weapon unique ability (see unique_abilities).
   - id: vulnerary
     name: "Healing Potion"
     uses: 2
