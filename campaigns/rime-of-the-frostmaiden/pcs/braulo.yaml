@@ -54,8 +54,8 @@ dnd:
     fast_movement:
       # +10 ft speed while not wearing heavy armor (Barbarian level 5 class feature).
       bonus_ft: 10
-    shell_defense:                  # full mechanics in unique_abilities
-      note: "see unique_abilities.shell-defense"
+    shell_defense:                  # D&D flavor only — no FE mechanic (stock Pirate class)
+      note: "narrative/flavor; not represented as a gameplay ability"
 
 # ── FE Starting Stats (level 1) ────────────────────────────────────────────────
 # Vanilla FE8 Pirate stats, verbatim from fireemblem8u/src/data_classes.c [CLASS_PIRATE - 1].
@@ -104,138 +104,12 @@ inventory:
   - id: vulnerary
     name: "Healing Potion"
     uses: 3
+# -- Unique Abilities ------------------------------------------------------
+# NONE. Braulo is a stock FE8 Pirate -- no per-character mechanics, even on promotion.
+# Individuality comes from flavor text, portrait/sprite art, and palette -- not special
+# skills (Nicolas's call, 2026-05-29: vanilla classes only, nothing extra: no timed
+# buffs/debuffs, no special movement, no procs).
 
-# ── Unique Abilities ────────────────────────────────────────────────────────────
-unique_abilities:
-  - id: rage
-    name: Rage
-    flavor: "Market Rage — someone undercut his price and now Braulo is a frothing, claw-snapping wall of fury."
-    fe_mechanic: "Rage status (consumable/command): +might and +DEF (FE-native; no ×0.5 multiplier), for the combat phase"
-    # Effect: +4 melee damage, resistance to B/P/S damage, advantage on STR checks/saves.
-    type: consumable_item
-    unlock_chapter: 1         # Barbarian L1 → Ch1 (MVP)
-    uses_per_chapter: 3
-    status_effect: rage_status
-
-  - id: frenzy
-    name: Frenzy
-    flavor: "Bargaining Frenzy — Braulo presses the deal so hard he gets a second swing in."
-    fe_mechanic: "while Rage is active, brave-weapon-style extra attack (exhaustion cost dropped per rules-mapping §F)"
-    # Berserker L3 feature. CORRECTED 2026-05-28: was missing from the YAML; added in retier.
-    type: passive
-    unlock_chapter: 3         # Berserker L3 → Ch3 (MVP)
-    requires_status: rage_status
-    effect: extra_attack_while_raging
-
-  - id: extra-attack
-    name: "Extra Attack"
-    flavor: "Double Deal — one motion, two strikes; Braulo never sells a single when he can sell a pair."
-    fe_mechanic: "brave-weapon-style second hit on every attack (vanilla FE doubling is separate)"
-    # Barbarian L5 feature. CORRECTED 2026-05-28: was missing from the YAML; added in retier.
-    type: passive
-    unlock_chapter: 5         # Barbarian L5 → Ch5 (MVP)
-    effect: second_attack_per_action
-
-  - id: shell-defense
-    name: "Shell Defense"
-    flavor: "Into the Shell — Braulo yanks himself inside his prize shell and waits out the storm."
-    fe_mechanic: "Guard-stance command: big +AC and save advantage, but MOV 0 and no counter until he emerges"
-    unlock_chapter: 1         # Hermit Crab racial — available from start
-    # Command: spend action to retract into shell.
-    # Effect: +4 AC, advantage on STR/CON saves, speed 0, prone,
-    #         disadvantage on DEX saves, cannot take reactions.
-    # Exit: costs bonus action to emerge next turn; then normal turn resumes.
-    # Cannot be used while raging.
-    # FE implementation: unit command applying shell_defense_status.
-    type: unit_command
-    effect:
-      AC_bonus: 4
-      STR_save_advantage: true
-      CON_save_advantage: true
-      DEX_save_disadvantage: true
-      MOV_override: 0
-      prone: true
-      reactions_blocked: true
-    exit: bonus_action_next_turn
-
-  - id: relentless-rage
-    name: "Relentless Rage"
-    # Passive: when Braulo drops to 0 HP while raging, make a CON save (DC 10,
-    # +5 per each prior use this rage). On success, drop to 1 HP instead.
-    # FE implementation: passive — when reduced to 0 in rage_status, trigger CON save.
-    flavor: "Won't Die Broke — Braulo refuses to fall while there's still a deal on the table."
-    fe_mechanic: "survive-at-1-HP proc while raging (Classic-mode safety net)"
-    type: passive
-    unlock_chapter: 11             # Barbarian L11 → Ch11 (POST-MVP)
-    trigger: zero_hp_while_raging
-    save: CON
-    save_dc_base: 10
-    save_dc_escalation: 5           # DC increases by 5 for each successive use in same rage
-
-  - id: brutal-critical
-    name: "Brutal Critical"
-    flavor: "Shell-Cracker — when Braulo connects clean, he splits the target like an oyster."
-    fe_mechanic: "passive: critical hits roll extra weapon dice"
-    # Nat 20 → roll weapon dice THREE times instead of two.
-    type: passive
-    unlock_chapter: 9              # Barbarian L9 → Ch9 (POST-MVP)
-    crit_extra_dice: 1              # 1 extra die on top of standard 2× crit
-
-  - id: primal-champion
-    name: "Primal Champion"
-    flavor: "Apex Pagurian — the biggest crab in any sea, by sheer stubborn growth."
-    fe_mechanic: "capstone stat cap bump (STR/CON), already baked into his end-state scores"
-    # Level 20: STR and CON each +4 permanently (already reflected in ability_scores above).
-    type: passive
-    unlock_chapter: 20             # Barbarian L20 capstone → Ch20 (endgame)
-    note: "Already reflected in ability_scores (STR 23 includes +4; CON 24 includes +4)."
-
-  - id: retaliation
-    name: Retaliation
-    flavor: "Snapback — touch the crab, lose a finger; he counters the instant he's struck."
-    fe_mechanic: "extra counterattack proc when hit in melee (fires before the normal counter)"
-    # Reaction: melee attack when hit by an adjacent creature.
-    type: reaction
-    unlock_chapter: 13             # Berserker L14 → Ch13 (POST-MVP)
-
-  - id: reckless-attack
-    name: "Reckless Attack"
-    flavor: "All-In — Braulo swings for everything and doesn't care what hits back."
-    fe_mechanic: "toggle: +hit on his attacks this turn, but enemies get +hit vs him until his next turn"
-    # Barbarian PHB 48: trade advantage for being easier to hit.
-    type: activated
-    unlock_chapter: 2              # Barbarian L2 → Ch2 (MVP)
-    effect: advantage_offense_and_taken
-
-  - id: mindless-rage
-    name: "Mindless Rage"
-    flavor: "Tunnel Vision — far too angry about the markup to be scared or charmed."
-    fe_mechanic: "while raging, immune to charm/fear status"
-    # Barbarian PHB 49: while raging, immune to charmed and frightened.
-    type: passive
-    unlock_chapter: 6              # Berserker L6 → Ch6 (MVP)
-    requires_status: rage_status
-    immunities: [charmed, frightened]
-
-  - id: danger-sense
-    name: "Danger Sense"
-    flavor: "Crab Instinct — a lifetime of dodging predators on the seafloor; he feels the blow coming."
-    fe_mechanic: "+avoid / advantage on DEX saves vs AoE he can see (breath weapons, spells)"
-    # Barbarian PHB 48: advantage on DEX saves vs effects Braulo can see.
-    type: passive
-    unlock_chapter: 2              # Barbarian L2 → Ch2 (MVP)
-    effect: advantage_dex_saves_visible
-
-  - id: feral-instinct
-    name: "Feral Instinct"
-    flavor: "First to the Bargain — Braulo's never caught flat-footed when there's profit to grab."
-    fe_mechanic: "deploys with an initiative/turn-order bonus; can't be surprised"
-    # Barbarian PHB 49: advantage on initiative.
-    type: passive
-    unlock_chapter: 7              # Barbarian L7 → Ch7 (MVP cap)
-    effect: initiative_advantage
-
-# ── Signature Moment ────────────────────────────────────────────────────────────
 signature_moment:
   chapter: ch07-the-eastway-ambush
   description: >
