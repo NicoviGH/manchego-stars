@@ -217,46 +217,40 @@ unique_abilities:
 
   - id: elemental-affinity-cold
     name: "Elemental Affinity (Cold)"
-    # Passive: Rootis adds CHA mod (+3 at ch1, scaling) to damage rolls with cold-type tomes.
-    # Can spend 1 SP to gain cold resistance for 1 hour (= rest of the map).
-    # FE implementation: passive bonus applied to cold-type tomes only.
-    # NOTE: This is COLD affinity, not fire — White Dragon ancestry.
-    type: passive
-    unlock_chapter: 6         # Draconic Bloodline L6 → Ch6 (MVP)
-    effect: plus_cha_mod_cold_damage
+    # FE8 has no damage-type system and no per-unit damage-bonus skill — a tome's damage is just
+    # Mag + Might. So "adds CHA to cold damage" and "cold resistance" have NO mechanic. This is now
+    # FLAVOR ONLY: Rootis is a cold-themed mage (White Dragon ancestry). No mechanical effect.
+    flavor: "Cold-blooded sorcery — his magic runs to frost."
+    type: flavor_only
+    unlock_chapter: 6
 
   - id: crystallize
     name: Crystallize
-    # Snowperson racial: action to freeze body into an icy form.
-    # Grants: immunity to slashing and piercing damage.
-    # Removes: bludgeoning resistance (Snow Body).
-    # Duration: until Rootis takes a long rest (= until chapter end).
-    # 1/long rest (= 1/chapter).
-    # FE implementation: activated command — toggle defensive mode.
+    # FE8 has no damage-type immunity/resistance. Reframed to an FE-native defensive stance: a timed
+    # flat +DEF self-buff (no element/type keying). Flavor: he freezes his body into an icy shell.
+    flavor: "Ice Shell — Rootis hardens his snow-body into armoring crystal."
+    fe_mechanic: "1/chapter: timed flat +DEF self-buff (FE-native; no damage-type immunity)"
     type: activated
     unlock_chapter: 1         # racial — available from start
     uses_per_chapter: 1
-    grants_immunity: [slashing, piercing]
-    removes_resistance: [bludgeoning]
+    effect: timed_def_buff
 
   - id: elemental-properties
+    # REMOVED as a mechanic: "cold attacks heal him" depends on a damage-type system FE8 doesn't have.
+    # Kept as pure flavor — being made of snow, cold simply doesn't bother him (no in-combat effect).
     name: "Elemental Properties"
-    # Snowperson racial: when hit by a cold/ice-based attack, Rootis RECOVERS HP
-    # equal to the damage roll instead of taking damage.
-    # FE implementation: passive flag — cold-type incoming damage becomes healing.
-    # Synergizes with enemy ice mages or cold terrain effects.
-    type: passive
-    unlock_chapter: 1         # racial — available from start
-    effect: cold_attacks_heal
+    flavor: "Made of snow — the cold is home, not a threat."
+    type: flavor_only
+    unlock_chapter: 1
 
   - id: snow-ski
     name: "Snow Ski"
-    # Snowperson racial: on ice or snow terrain tiles, Rootis travels double distance.
-    # FE implementation: passive — on snow/ice tiles, effective MOV is doubled.
-    # Very relevant for this campaign's arctic maps.
+    # FE has no MOV-doubling; terrain affects move-COST. FE-native version: Rootis ignores the
+    # movement-cost penalty of snow/ice tiles (treats them as plains). Keeps the arctic-map flavor.
+    fe_mechanic: "passive: snow/ice tiles cost 1 MOV to enter (ignores their terrain move penalty)"
     type: passive
     unlock_chapter: 1         # racial — available from start
-    effect: double_mov_on_ice_snow
+    effect: ignore_snow_ice_move_cost
 
   # ── Signature Spell Kit (curated 2026-05-28; KNOWN-caster, so this is his full known list) ──
   # Cantrips (Ray of Frost primary, Chill Touch secondary) live in `inventory`.

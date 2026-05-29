@@ -233,11 +233,10 @@ unique_abilities:
   - id: fire-resistance
     name: "Fire Resistance"
     flavor: "Forged in fire — Wolfram's metal scales shrug off heat that would melt anyone else."
-    fe_mechanic: "flavor only (no ×0.5 resistance mechanic; fire affinity is narrative)"
-    # Mineralscale Drakeborn racial.
-    type: passive
+    # FE8 has no damage-type system, so this is FLAVOR ONLY — no ×0.5, no fire-keyed defense.
+    fe_mechanic: "flavor only — fire affinity is narrative, with no mechanical effect"
+    type: flavor_only
     unlock_chapter: 1         # racial — available from start
-    damage_resistance: fire
 
   # ── Armor Abilities (cast via Arcane Charges = 2×prof; Wolfram picks 4, +1 at L7/11/16) ──
   # His "spells" are armor functions, not tomes. DUAL STRUCTURE: fe_mechanic + flavor.
@@ -257,29 +256,29 @@ unique_abilities:
 
   - id: explosive-burst
     name: "Explosive Burst"
-    flavor: "Explosive Burst — Wolfram overloads his charge vents and detonates a sphere of forge-fire."
-    fe_mechanic: "fire siege tome (AoE compromised to siege-range single-target), powered by Arcane Charges"
-    # Metallurgist L7 armor ability (2 Arcane Charges → fireball). His Ch7 armor-ability pick.
-    type: activated
-    unlock_chapter: 7         # Metallurgist L7 armor-ability slot → Ch7 (MVP cap)
-    uses_per_chapter: 1
-    damage_type: fire
-    save: DEX
-    range: 4
+    flavor: "Explosive Burst — Wolfram overloads his charge vents and hurls a bursting gout of forge-fire."
+    # A Knight/General cannot use tomes, and FE8 has no AoE/save attacks. This is NOT a fireball:
+    # mechanically it is a powered throw of his Javelin (single-target ranged Lance). Fire is flavor.
+    fe_mechanic: "ranged Lance attack (his Javelin), flavored as an explosive forge-fire burst"
+    type: flavor_label
+    weapon_ref: javelin
+    unlock_chapter: 7
+    range: 2
 
   # ── Forge Line (the smithing progression; Forge command above is the base) ──
   - id: forge-expert
     name: "Forge Expert"
-    flavor: "Forge Expert — Wolfram learns to smith bludgeoning/piercing/slashing resistance straight into armor."
-    fe_mechanic: "Forge upgrade tier: armor he forges also grants a physical damage resistance"
+    flavor: "Forge Expert — Wolfram smiths sturdier plate, hardening his allies against harm."
+    # FE8 has no damage-type resistance; the FE-native equivalent of "tougher armor" is flat +DEF.
+    fe_mechanic: "Forge upgrade tier: armor he forges also grants a flat +DEF bonus"
     type: between_chapter
     unlock_chapter: 7         # School of the Smith L7 → Ch7 (MVP cap)
-    effect: forge_grants_physical_resistance
+    effect: forge_grants_def
 
   - id: blade-forge
     name: "Blade Forge"
     flavor: "Blade Forge — METALLO's craft extends to weapons; Wolfram tempers an ally's blade to bite deeper."
-    fe_mechanic: "Forge upgrade tier: can now upgrade weapons (+1 damage die), not just armor"
+    fe_mechanic: "Forge upgrade tier: can now upgrade weapons (+Might), not just armor"
     type: between_chapter
     unlock_chapter: 11        # Metallurgist L11 → Ch11 (POST-MVP)
     effect: forge_upgrade_weapons
@@ -287,7 +286,9 @@ unique_abilities:
   - id: master-of-the-forge
     name: "Master of the Forge"
     flavor: "Master of the Forge — Wolfram forges adamantine and mithral, the metals of legend."
-    fe_mechanic: "top-tier Forge: adamantine (crit-immunity) / mithral (no SPD penalty) / resist armor"
+    # Dropped "resist armor" (damage-type resistance — not an FE concept). Kept the FE-legal pieces:
+    # crit-negation (cf. Hoplon Guard) and no weapon-weight SPD penalty.
+    fe_mechanic: "top-tier Forge: adamantine (negates enemy crits) / mithral (no weapon-weight SPD penalty)"
     type: between_chapter
     unlock_chapter: 15        # School of the Smith L16 → Ch15 (POST-MVP / endgame)
     effect: forge_legendary_armor
