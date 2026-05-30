@@ -1,0 +1,58 @@
+# npcs/pinky.yaml — Pinky, Prof. R.B. Geenius's homunculus 'son'; the army's flier.
+# Lean unit definition (mechanics only). Narrative/flavor lives in ../lore/pinky.md.
+# Pinky is NOT an RBG ability/summon — joins the army as an ordinary FE8 recruit and is a stock
+# vanilla FE8 class (Pegasus Knight). The "homunculus" identity is flavor only, not a mechanic.
+
+id: pinky
+name: Pinky
+portrait_ref: portraits/pinky.png        # GBA-ready sprite pending (issue #23)
+# portrait_source: TBD
+
+# How Pinky enters the army (story recruit; not a gameplay summon).
+recruited_via: "available from Chapter 1"
+built_by: prof-rbg                        # RBG's homunculus 'son'
+
+# ── FE Starting Stats (level 1) ────────────────────────────────────────────────
+# Vanilla FE8 Pegasus Knight stats, verbatim from fireemblem8u/src/data_classes.c
+# [CLASS_PEGASUS_KNIGHT - 1]. No custom tuning. FE has a single Pow stat. LCK base = 0
+# (ClassData defines no base luck — a character-layer stat) until personal luck is assigned.
+# This is the army's flier role (lance flier; promotes to Falcon Knight).
+fe_stats:
+  class: "Pegasus Knight"
+  promoted_class: "Falcon Knight"         # vanilla FE8 promotion (.promotion = CLASS_FALCON_KNIGHT)
+  level: 1
+  HP: 14
+  STR: 4                                  # FE Pow (Pegasus Knight basePow)
+  SKL: 5
+  SPD: 5
+  DEF: 3
+  RES: 2
+  LCK: 0                                  # ClassData has no base luck
+  MOV: 7                                  # Pegasus Knight baseMov (flier)
+  CON: 5
+
+# ── Growth Rates (% per level) — vanilla Pegasus Knight growths from data_classes.c ──
+growth_rates:
+  HP: 65
+  STR: 35
+  SKL: 40
+  SPD: 40
+  DEF: 12
+  RES: 35
+  LCK: 35
+
+# ── Inventory (Chapter 1 starting equipment) ───────────────────────────────────
+inventory:
+  - id: iron-lance
+    name: "Iron Lance"
+    fe_weapon_type: Lance                 # FE Pegasus Knight weapon class (baseRanks ITYPE_LANCE, D)
+    range: melee
+    uses: 45                              # FE Iron Lance durability
+  - id: vulnerary
+    name: "Healing Potion"
+    uses: 3
+
+# ── Endgame beat (scripted story event, not a gameplay mechanic) ───────────────
+# At the campaign finale, RBG spends a Wish charge from Luck E. Cheese (see pcs/prof-rbg.yaml
+# inventory `story_only`) to turn Pinky from a homunculus into a true living being.
+endgame_beat: "RBG wishes Pinky into a living being (campaign finale)"

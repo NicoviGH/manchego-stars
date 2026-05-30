@@ -116,7 +116,7 @@ recruits:
     unit: npcs/brie.yaml
     recruited_via: "story — RBG builds Brie (a later chapter)"
   - id: pinky
-    unit: null                  # npcs/pinky.yaml TBD — RBG's homunculus 'son', a Pegasus Knight
+    unit: npcs/pinky.yaml        # RBG's homunculus 'son' — the army's flier (Pegasus Knight)
     recruited_via: "available from Chapter 1"
     # Scripted finale beat (not a gameplay mechanic): RBG spends a Wish charge from Luck E. Cheese
     # (see inventory `story_only`) to turn Pinky from a homunculus into a true living being.
