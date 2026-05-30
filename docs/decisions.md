@@ -117,9 +117,12 @@ read identically on the triangle; the difference is sprite + label only.
 _Decided: 2026-05-29 (supersedes the May 2026 "reskin the triangle to Slashing/Bludgeoning/Piercing," which conflicted with FE weapon types)_
 
 **Magic triangle: vanilla FE (Anima > Light > Dark)**
-FE-native: Anima > Light > Dark > Anima, +1 ATK / +15 hit (`sWeaponTriangleRules`). Our
-casters span it — Rootis = Anima, Marty = Light, Meesmickle = Dark.
-_Decided: 2026-05-29 (supersedes the May 2026 "Radiant > Necrotic > Elemental" reskin, which was incoherent against the class mapping)_
+FE-native: Anima > Light > Dark > Anima, +1 ATK / +15 hit (`sWeaponTriangleRules`). Caster
+spread after the 2026-05-30 promotion fix: Rootis = Anima; Marty & Meesmickle = Dark (both
+Shaman, differentiated at promotion — Marty→Druid, Meesmickle→Summoner); Light is covered by
+Sclorbo (Priest→Bishop, attack tomes at promotion). Note: reclassing Marty off Light (to honor
+his D&D Druid identity → FE Druid) means two Dark casters rather than one-each across the triangle.
+_Decided: 2026-05-29; caster spread updated 2026-05-30_
 
 **13 damage-type labels (flavor only — no resistance mechanic)**
 Types: slashing, piercing, bludgeoning, fire, cold, lightning, thunder, poison, acid, necrotic, radiant, force, psychic. These are **flavor tags** on weapons/tomes for descriptions + UI. **No per-class resistance bitmap, no ×0.5/×2/×0 multiplier** (reverted 2026-05-28 — see Combat System §). Iconic vulnerabilities use vanilla FE weapon **effectiveness** instead.
@@ -133,6 +136,22 @@ the same gold/durability economy as martial weapons, preserving FE's core resour
 layer (the whole party shops, scavenges, rations). Flavor the restock per character (forage /
 scribe / pray); mechanically these are vanilla FE tomes/staves.
 _Decided: 2026-05-29 (supersedes the May 2026 "free chapter-refill, cantrips infinite, slots not buyable")_
+
+**MVP weapons = stock FE weapons (no custom Might); personal weapons are post-MVP**
+PCs carry plain vanilla FE weapons whose stats (Mt/Hit/Crit/Wt/uses) come verbatim from a stock
+FE8 item, named in each inventory entry's `fe_base` field — there is **no custom Might authoring**.
+Conventions:
+- **Physical weapons use stock names** (Iron Axe, Hand Axe, Iron Bow, Iron Lance, Javelin, Heal).
+  Visual identity rides on the **sprite/portrait art** (an Iron Axe can be drawn as an anchor).
+- **Tomes keep an element-right flavor NAME but are mechanically the basic stock tome** (name-only
+  reskin, stock stats): Rootis "Ray of Frost" = `Fire`; Marty "Shillelagh" / Meesmickle "Eldritch
+  Blast" = `Flux`; Sclorbo "Frostsong"/"Withering Impression" = `Lightning`. This avoids a stock
+  tome name (e.g. "Fire") clashing with an ice/fungal caster's element.
+- **Personal/signature weapons return post-MVP** as story progression, each mapped to an FE
+  equivalent (e.g. Braulo's "Nu' Shipwrecker" → Killer Axe). Their flavor names are parked in
+  `lore/<pc>.md` ("Signature gear").
+This resolves the old "weapon Might TBD" / "uses: null TBD" placeholders.
+_Decided: 2026-05-30_
 
 ---
 
@@ -188,38 +207,72 @@ _Decided: May 2026_
 
 ---
 
-## Class Mapping Refinements (2026-05-27 audit)
+## Class Mapping & Promotions
 
-**Marty: base class is Monk, not Shaman**
-Original mapping had both Marty (Druid/Spores) and Meesmickle (Warlock/Fiend) on the FE8 Shaman chassis — identical sprites. Moved Marty to Monk (FE8 Light-magic male caster, Saleh-line) for visual differentiation. Promoted form remains Summoner. Some palette reflavor needed for the Light→Necrotic visual transition.
-_Decided: 2026-05-27_
+All 7 PCs (and recruits) are **stock vanilla FE8 classes** — bases, growths, caps, MOV, CON, and
+weapon ranks taken verbatim from `fireemblem8u/src/data_classes.c`. **No custom classes, no
+per-character abilities.** Individuality comes from flavor text, sprite/portrait art, and palette.
 
-**Sclorbo: promoted class is Lore Bishop, not Lore Bard**
-PDF audit (2026-05-27) confirmed Cure Wounds, Revivify, Mass Cure Wounds, and Raise Dead all prepared on Sclorbo's Bard 16 list. He is the party's primary healer/reviver. Lore Bishop is a custom hybrid: Dancer chassis at base, Bishop-tier healing at promotion, Dance retained as a unique skill. **Balance lever:** per turn, Sclorbo can either Dance/Refresh OR Cast, not both. Combined with chapter-gated heal tiers and finite spell slots, prevents one-man support engine.
-_Decided: 2026-05-27_
+**This does NOT mean stripping vanilla FE8 *class features*.** A stock class keeps its built-in
+kit — Berserker crit, Bishop's bonus vs monsters, **Summoner's Summon command (CA_SUMMON)**,
+Canto, flight, etc. We dropped the homebrew D&D ability layer, not FE mechanics.
 
-**Rootis: Dragon Wings is a Manakete-style class transform**
-Dragon Wings (Sorcerer 14 feature, end-state) is implemented as a toggleable class transform reusing FE8's Manakete/Myrrh code path. Foot form = Mage (Ice), Dragon form = custom flier Sage with terrain-ignoring movement. Each toggle consumes 1 Sorcery Point to prevent spam.
-_Decided: 2026-05-27_
+**Base classes**
+| PC | FE base | D&D source |
+|---|---|---|
+| Braulo | Pirate | Barbarian (Berserker) |
+| Marty | Shaman | Druid (Circle of Spores) — FE8's Druid class is reachable only via Shaman |
+| Meesmickle | Shaman | Warlock (The Fiend) |
+| Prof. RBG | Archer | Artificer (Artillerist) |
+| Rootis | Mage | Sorcerer (Draconic) |
+| Sclorbo | Priest | Bard (College of Lore) |
+| Wolfram | Knight (Armor Knight) | Metallurgist |
 
-**RBG fields two sentient cannons: Pepperjack (Ch 1) and Brie (later)**
-RBG's deployable summons are two named automatons:
-- **Pepperjack** — first cannon, available from Ch 1
-- **Brie** — second cannon, unlocked at a later chapter (TBD). Pepperjack's girlfriend.
+Marty & Meesmickle share the Shaman chassis but differentiate at **promotion**, not base.
+_Decided: 2026-05-30 (supersedes the 2026-05-27 "Marty→Monk for sprite differentiation," which forced an illegal Monk→Summoner promotion)_
 
-Both speak Pokemon-style — they can only say their own names ("Pepperjack!" / "Brie!"). Adjacency / support dialogue between them uses this convention. Combined portrait at `data/portraits/pepperjack-and-brie.jpeg`. Source: `References/PCs/Pepperjack and Brie Portrait.jpeg`.
-_Decided: 2026-05-27_
+**Promotions are FE8's vanilla BRANCHED choice (the player picks at the Master Seal)**
+Every promoting class has two vanilla options (`fireemblem8u/src/classchg-data.c`); each unit YAML
+lists the `branch` + a thematic `default` (in **bold**):
+- Braulo: Pirate → {Warrior, **Berserker**}
+- Marty: Shaman → {**Druid**, Summoner} — Druid = his D&D class name; Summoner = the Summon command
+- Meesmickle: Shaman → {Druid, **Summoner**}
+- RBG: Archer → {**Sniper**, Ranger}
+- Rootis: Mage → {**Sage**, Mage Knight}
+- Sclorbo: Priest → {**Bishop**, Sage}
+- Wolfram: Armor Knight → {**General**, Great Knight}
+- Pinky (recruit): Pegasus Knight → {**Falcon Knight**, Wyvern Knight}
+_Decided: 2026-05-30 (fixes the illegal Monk→Summoner and the non-existent "Dark Sage")_
+
+**Sclorbo: stock Priest → Bishop (staff healer; attack tomes at promotion)**
+A vanilla Priest — staff-only healer at base, Light attack from the Bishop promotion. He is the
+MVP healer. The earlier "Lore Bishop" custom hybrid (Dancer chassis + retained Dance + per-turn
+Dance-or-Cast lever + custom heal tiers) is gone: no Dancer, no Dance, no Rapier.
+_Decided: 2026-05-29_
+
+**Rootis: stock Mage → Sage / Mage Knight**
+A plain anima caster (ice = flavor only). The earlier "Dragon Wings = Manakete-style class
+transform" and "custom flier Sage" are gone with the ability strip — no transform, no dragon form,
+no Sorcery Points. His draconic identity is sprite art + lore.
+_Decided: 2026-05-29_
+
+**Pepperjack & Brie are separate recruitable units, not RBG summons**
+Two sentient automatons RBG builds; each joins the army as an ordinary FE8 recruit (`npcs/`), not a
+deployable cannon/summon, and is a stock vanilla class (TBD post-MVP). Pokémon-style speech (each
+only says its own name — "Pepperjack!" / "Brie!"); they're dating. Pinky (RBG's homunculus "son")
+is a third recruit — the army's flier (Pegasus Knight). Combined portrait at
+`data/portraits/pepperjack-and-brie.jpeg`. Full flavor in `lore/pepperjack-and-brie.md`, `lore/pinky.md`.
+_Decided: 2026-05-29_
 
 **FE stat column folds 5e stats to FE stats**
 Class-mapping docs surface FE engine stats (STR/DEX/MAG/etc.) instead of 5e stats (WIS/INT/CHA). All magic-stat 5e classes (WIS Druid, INT Artificer, CHA Warlock/Sorcerer/Bard) use MAG in engine. Flavor distinctions stay in YAML metadata, not class mapping.
 _Decided: 2026-05-27_
 
-**Wolfram & RBG hybrid casters: physical chassis primary, spells secondary**
-Both PCs keep their physical-class chassis (Knight, Archer). Spell access is a layered overlay tuned by:
-- The decision-B economy: their spells are finite-use tomes restocked with gold (no free refill), same as everyone's
-- Cantrips are high-count (30–50 uses) but lower might tier than dedicated casters
-- Primary identity stat is physical (STR Wolfram, DEX RBG); MAG is secondary
-_Decided: 2026-05-27 (economy line aligned to decision B, 2026-05-29)_
+**Wolfram & RBG are NOT casters**
+Both are stock physical classes with **no spell access**: Wolfram is a Lance Knight (STR), RBG a
+Bow Archer (SKL/DEX). The earlier "hybrid caster" overlay (secondary MAG, finite-use cantrip
+tomes) is gone. Their fire/forge and firearm/gadget flavor is sprite art + lore only.
+_Decided: 2026-05-29_
 
 ---
 
