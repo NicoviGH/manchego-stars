@@ -20,8 +20,7 @@ dnd:
 # ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
 # Adjust during Phase 1 playtesting.
 fe_stats:
-  class: "Shaman (Dark)"     # FE base class Shaman — dark magic user
-  promoted_class: "Dark Sage"
+  class: Shaman              # FE base class Shaman — dark magic user
   level: 1
   # Vanilla FE8 Shaman stats, verbatim from data_classes.c [CLASS_SHAMAN - 1]. No D&D-derived tuning.
   # Shaman is a magic unit: single Pow stat is the magic attack (= MAG), no STR.
@@ -35,6 +34,12 @@ fe_stats:
   LCK: 0                     # ClassData has no base luck
   MOV: 5                     # Shaman baseMov
   CON: 7
+
+# ── Promotion (FE8 branched — the PLAYER chooses at the Master Seal) ──────────────
+promotion:
+  branch: [Druid, Summoner]  # vanilla Shaman branch (classchg-data.c [CLASS_SHAMAN])
+  default: Summoner          # thematic lean; player may pick either. Summoner grants the vanilla
+                             # FE8 Summon command (CA_SUMMON) — a stock class feature, not custom.
 
 # ── Growth Rates (% per level) — vanilla Shaman growths from data_classes.c ──────
 growth_rates:

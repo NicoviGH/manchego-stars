@@ -23,7 +23,6 @@ dnd:
 # base luck (it is a character-layer stat) — set 0 until personal luck is assigned deliberately.
 fe_stats:
   class: Pirate
-  promoted_class: Berserker
   level: 1
   HP: 19
   STR: 4                            # FE Pow (Pirate basePow)
@@ -34,6 +33,11 @@ fe_stats:
   LCK: 0                            # ClassData has no base luck
   MOV: 5                            # Pirate baseMov
   CON: 10
+
+# ── Promotion (FE8 branched — the PLAYER chooses at the Master Seal) ──────────────
+promotion:
+  branch: [Warrior, Berserker]      # vanilla Pirate branch (classchg-data.c [CLASS_PIRATE])
+  default: Berserker                # thematic lean; player may pick either.
 
 # ── Growth Rates (% per level) — vanilla Pirate growths from data_classes.c ──────
 growth_rates:

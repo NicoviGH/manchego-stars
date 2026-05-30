@@ -25,7 +25,6 @@ dnd:
 # and the "Lore Bishop" promotion is just Bishop. Dropped Dance.
 fe_stats:
   class: Priest                   # FE base class — male staff healer (Cleric's male counterpart)
-  promoted_class: Bishop          # Light magic (attack) + staves; = the former "Lore Bishop" concept
   level: 1
   # Vanilla FE8 Priest stats, verbatim from data_classes.c [CLASS_PRIEST - 1]. No D&D-derived tuning.
   # Priest is a magic (Light/staff) class: single Pow = magic attack (= MAG). At BASE it is staff-only
@@ -40,6 +39,11 @@ fe_stats:
   LCK: 0                          # ClassData has no base luck
   MOV: 5                          # Priest baseMov
   CON: 5
+
+# ── Promotion (FE8 branched — the PLAYER chooses at the Master Seal) ──────────────
+promotion:
+  branch: [Bishop, Sage]          # vanilla Priest branch (classchg-data.c [CLASS_PRIEST])
+  default: Bishop                 # thematic lean (Light attack + staves); player may pick either.
 
 # ── Growth Rates (% per level) — vanilla Priest growths from data_classes.c ──────
 growth_rates:

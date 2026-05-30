@@ -19,7 +19,6 @@ built_by: prof-rbg                        # RBG's homunculus 'son'
 # This is the army's flier role (lance flier; promotes to Falcon Knight).
 fe_stats:
   class: "Pegasus Knight"
-  promoted_class: "Falcon Knight"         # vanilla FE8 promotion (.promotion = CLASS_FALCON_KNIGHT)
   level: 1
   HP: 14
   STR: 4                                  # FE Pow (Pegasus Knight basePow)
@@ -30,6 +29,11 @@ fe_stats:
   LCK: 0                                  # ClassData has no base luck
   MOV: 7                                  # Pegasus Knight baseMov (flier)
   CON: 5
+
+# ── Promotion (FE8 branched — the PLAYER chooses at the Master Seal) ──────────────
+promotion:
+  branch: ["Falcon Knight", "Wyvern Knight"]   # vanilla Pegasus Knight branch (classchg-data.c)
+  default: "Falcon Knight"                      # thematic lean; player may pick either.
 
 # ── Growth Rates (% per level) — vanilla Pegasus Knight growths from data_classes.c ──
 growth_rates:

@@ -25,7 +25,6 @@ dnd:
 # LCK: ClassData has no base luck — set 0 until personal luck is assigned deliberately.
 fe_stats:
   class: Archer              # FE base class
-  promoted_class: Sniper     # vanilla FE8 Archer promotion (data_classes.c [CLASS_ARCHER].promotion)
   level: 1
   HP: 18
   STR: 4                     # FE Pow (Archer basePow) — bows compute damage off Pow
@@ -36,6 +35,11 @@ fe_stats:
   LCK: 0                     # ClassData has no base luck
   MOV: 5                     # Archer baseMov
   CON: 7
+
+# ── Promotion (FE8 branched — the PLAYER chooses at the Master Seal) ──────────────
+promotion:
+  branch: [Sniper, Ranger]   # vanilla Archer branch (classchg-data.c [CLASS_ARCHER])
+  default: Sniper            # thematic lean; player may pick either.
 
 # ── Growth Rates (% per level) — vanilla Archer growths from data_classes.c ──────
 growth_rates:

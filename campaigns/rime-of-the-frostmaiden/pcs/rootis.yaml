@@ -25,7 +25,6 @@ dnd:
 # Adjust during Phase 1 playtesting.
 fe_stats:
   class: "Mage (Ice)"        # FE base class Mage — cold-type tome caster (Anima reflavored)
-  promoted_class: Sage
   level: 1
   # Vanilla FE8 Mage stats, verbatim from data_classes.c [CLASS_MAGE - 1]. No D&D-derived tuning.
   # Mage is a magic unit: single Pow stat is the magic attack (= MAG), no STR.
@@ -39,6 +38,11 @@ fe_stats:
   LCK: 0                     # ClassData has no base luck
   MOV: 5                     # Mage baseMov
   CON: 6
+
+# ── Promotion (FE8 branched — the PLAYER chooses at the Master Seal) ──────────────
+promotion:
+  branch: [Sage, "Mage Knight"]   # vanilla Mage branch (classchg-data.c [CLASS_MAGE])
+  default: Sage                   # thematic lean; player may pick either.
 
 # ── Growth Rates (% per level) — vanilla Mage growths from data_classes.c ────────
 growth_rates:

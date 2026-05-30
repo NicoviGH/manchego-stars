@@ -20,33 +20,40 @@ dnd:
 # ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
 # Adjust during Phase 1 playtesting.
 fe_stats:
-  class: "Monk (Druid)"      # FE base class — Monk chassis reflavored as Druid.
-                             # Moved off Shaman in 2026-05-27 audit to differentiate from Meesmickle.
-                             # See docs/class-mapping.md and docs/decisions.md.
-  promoted_class: Summoner   # custom promotion; standard FE8 Summoner sprite
+  class: Shaman              # FE base class — Dark mage. Marty's D&D Druid maps to Shaman→Druid
+                             # (FE8 has a real Druid class, reachable only via Shaman). Differentiates
+                             # from Meesmickle at PROMOTION (Marty leans Druid; Meesmickle leans Summoner),
+                             # not at base. See docs/class-mapping.md and docs/decisions.md.
   level: 1
-  # Vanilla FE8 Monk stats, verbatim from data_classes.c [CLASS_MONK - 1]. No D&D-derived tuning.
-  # Monk is a magic (Light) unit: single Pow stat is the magic attack (= MAG), no STR.
+  # Vanilla FE8 Shaman stats, verbatim from data_classes.c [CLASS_SHAMAN - 1]. No D&D-derived tuning.
+  # Shaman is a magic (Dark) unit: single Pow stat is the magic attack (= MAG), no STR.
   # LCK: ClassData has no base luck — set 0 until personal luck is assigned deliberately.
-  HP: 18
-  MAG: 1                     # FE Pow (Monk basePow) — magic attack stat
+  HP: 16
+  MAG: 2                     # FE Pow (Shaman basePow) — magic attack stat
   SKL: 1
   SPD: 2
-  DEF: 1
-  RES: 5
+  DEF: 2
+  RES: 4
   LCK: 0                     # ClassData has no base luck
-  MOV: 5                     # Monk baseMov
-  CON: 6
+  MOV: 5                     # Shaman baseMov
+  CON: 7
 
-# ── Growth Rates (% per level) — vanilla Monk growths from data_classes.c ────────
+# ── Promotion (FE8 branched — the PLAYER chooses at the Master Seal) ──────────────
+promotion:
+  branch: [Druid, Summoner]  # vanilla Shaman branch (classchg-data.c [CLASS_SHAMAN])
+  default: Druid             # thematic lean (Marty = D&D Druid); player may pick either.
+  # Summoner grants the vanilla FE8 Summon command (CA_SUMMON) — a stock class feature, not a
+  # custom ability — so the "summon creatures" fantasy is reachable the FE-pure way if chosen.
+
+# ── Growth Rates (% per level) — vanilla Shaman growths from data_classes.c ──────
 growth_rates:
   HP: 50
-  MAG: 30
-  SKL: 35
-  SPD: 32
-  DEF: 8
-  RES: 40
-  LCK: 45
+  MAG: 50
+  SKL: 32
+  SPD: 30
+  DEF: 10
+  RES: 30
+  LCK: 20
 
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
 # Primary attack is Shillelagh (cantrip), not a basic staff swing.
