@@ -67,6 +67,7 @@ enemy_units:
     level: 5
     damage_type: lightning      # flavor label only
     ai_pattern: aggressive
+    revealed_by: pinky_scout    # hidden in the dark until the shaft-mouth scout cutscene
     death_quote: "*a wet, clicking shriek*"
 
 # ── Chests / Mine Loot ───────────────────────────────────────────────────────────
@@ -93,6 +94,18 @@ events:
       Mid-map scripted beat: the kobold interrogation. RBG executes the kobold at
       gunpoint (rbg_kobold_execution). Wolfram's ore-snacking gag plays here too
       (wolfram_ore_snacking). Then Trex appears and the shaft to the Grells opens.
+  - trigger: shaft_mouth_reached
+    type: cutscene
+    ea_file: events/ch03-pinky-scout.ea
+    description: >
+      Scripted scout beat (pinky_scout), fires when the first unit reaches the lip
+      of the shaft. The drop is black — no one can see the bottom. RBG, only half
+      willing to send his boy into the dark, lets Pinky (the army's flier) dive to
+      scout. The camera pans down the shaft with him and the 2 Grells are REVEALED
+      here (vanilla enemy reveal — they are not visible before this). Pinky rockets
+      back up rattled ("Eyes. Big wet ones. Lots of 'em."); RBG, relieved, gives the
+      descend order with a protective line that seeds the finale Wish ("Nothing down
+      there is taking you from me."). The way down opens.
   - trigger: chapter_end
     type: cutscene
     ea_file: events/ch03-ending.ea
