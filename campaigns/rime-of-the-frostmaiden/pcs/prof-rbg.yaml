@@ -104,15 +104,23 @@ inventory:
 # skills (Nicolas's call, 2026-05-29: vanilla classes only, nothing extra: no timed
 # buffs/debuffs, no special movement, no procs).
 
-companion:
-  id: pinky
-  description: >
-    RBG's homunculus 'son' — available as a Pegasus Knight unit from Chapter 1.
-    Pinky is a separate unit entry (see npcs/ when created).
-  endgame_beat: >
-    At the campaign's finale, RBG spends a Wish charge from Luck E. Cheese (see inventory
-    `story_only`) to turn Pinky from a homunculus into a true living being. Scripted story
-    event, not a gameplay mechanic.
+# ── Recruit Pointers ──────────────────────────────────────────────────────────
+# RBG is the in-story builder/parent of three separate recruitable units. They are NOT his
+# abilities, summons, or equipment — each joins the army as an ordinary FE8 recruit with its own
+# unit file. Full mechanics live in npcs/; full flavor lives in lore/. Lean pointers only here.
+recruits:
+  - id: pepperjack
+    unit: npcs/pepperjack.yaml
+    recruited_via: "story — RBG builds Pepperjack"
+  - id: brie
+    unit: npcs/brie.yaml
+    recruited_via: "story — RBG builds Brie (a later chapter)"
+  - id: pinky
+    unit: null                  # npcs/pinky.yaml TBD — RBG's homunculus 'son', a Pegasus Knight
+    recruited_via: "available from Chapter 1"
+    # Scripted finale beat (not a gameplay mechanic): RBG spends a Wish charge from Luck E. Cheese
+    # (see inventory `story_only`) to turn Pinky from a homunculus into a true living being.
+    endgame_beat: "RBG wishes Pinky into a living being (campaign finale)"
 
 # ── Signature Moment ─────────────────────────────────────────────────────────
 signature_moment:

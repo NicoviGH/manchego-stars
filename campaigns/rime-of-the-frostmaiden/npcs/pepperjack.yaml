@@ -1,0 +1,25 @@
+# npcs/pepperjack.yaml — Pepperjack, a recruitable automaton built by Prof. R.B. Geenius.
+# Lean unit definition (mechanics only). Narrative/flavor lives in
+# ../lore/pepperjack-and-brie.md. Pepperjack is NOT an RBG ability/summon — he joins the army
+# as an ordinary FE8 recruit and is a stock vanilla FE8 class (no custom turret/AoE kit).
+
+id: pepperjack
+name: Pepperjack
+portrait_ref: portraits/pepperjack-and-brie.png   # GBA-ready sprite pending (shared w/ Brie)
+portrait_source: data/portraits/pepperjack-and-brie.jpeg
+
+# How he enters the army (story recruit; not a gameplay summon).
+recruited_via: "story — Prof. R.B. Geenius builds Pepperjack"
+built_by: prof-rbg
+paired_with: brie               # dating Brie; deployed as a pair, narratively
+
+# ── FE Starting Stats — TBD (post-MVP) ─────────────────────────────────────────
+# FE-legal class/stats/growths/inventory to be authored post-MVP, verbatim from a vanilla FE8
+# class in fireemblem8u/src/data_classes.c (same rule as the 7 PCs: stock class, no custom tuning,
+# element/identity is flavor only). Stub left intentionally empty until then.
+fe_stats:
+  class: null                   # TBD — pick a vanilla FE8 class post-MVP
+  promoted_class: null
+  level: 1
+
+# inventory: TBD post-MVP (FE-legal weapon for the chosen class).
