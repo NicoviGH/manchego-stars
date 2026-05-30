@@ -65,7 +65,7 @@ enemy_units:
     name: "Ice Troll"
     is_boss: true             # boss-tier reinforcements
     count: 4
-    class: custom-ice-troll
+    class: cyclops              # FE8 monster class (giant brute, throws); reskinned as an Ice Troll
     level: 11
     weapon: boulder-throw     # thrown bludgeoning; effective-weakness: fire
     damage_type: bludgeoning

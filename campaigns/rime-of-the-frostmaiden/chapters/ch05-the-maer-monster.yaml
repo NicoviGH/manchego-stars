@@ -58,7 +58,7 @@ enemy_units:
     name: "Messie"
     is_boss: true
     count: 1
-    class: custom-plesiosaur    # massive boss unit, ≈ early-game FE dragon boss
+    class: draco-zombie         # FE8 monster boss class (dragon-tier); reskinned as Messie the plesiosaur
     level: 9
     damage_type: bludgeoning    # flavor label only
     ai_pattern: boss_roam
@@ -67,7 +67,7 @@ enemy_units:
   - id: harrier-fish
     name: "Knucklehead Swarm"
     count: 5
-    class: custom-fish
+    class: gargoyle             # FE8 monster class (agile flier); reskinned as a leaping fish swarm
     level: 5
     damage_type: piercing
     ai_pattern: harass          # flank the boats, split player attention

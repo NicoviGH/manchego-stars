@@ -52,7 +52,7 @@ enemy_units:
   - id: vine-blight
     name: "Vine Blight"
     count: 4
-    class: custom-blight
+    class: revenant             # FE8 monster class (shambling zombie); reskinned as a Vine Blight
     level: 5
     damage_type: bludgeoning    # flavor label only
     ai_pattern: defensive

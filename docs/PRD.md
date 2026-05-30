@@ -122,10 +122,8 @@ manchego-stars/
 │── ENGINE (reusable) ─────────────────────────────────────────
 ├── fireemblem8u/              # FE8 decomp (git submodule)
 ├── engine/
-│   ├── combat-fx/             # combat-adjacent custom skills + cosmetic crit flourish
-│   │   │                      #   (resolution stays vanilla FE)
-│   │   ├── crit_anim.c        # cosmetic "d20 lands on 20" flourish on FE crit
-│   │   └── (custom skill hooks: extra_attack, etc. — see fe-mechanic-map.md backlog)
+│   ├── combat-fx/             # cosmetic crit flourish only (combat resolution stays vanilla FE)
+│   │   └── crit_anim.c        # cosmetic "d20 lands on 20" flourish on FE crit
 │   ├── damage-types/          # flavor damage-type label tag (UI/descriptions only — no resistance)
 │   │   └── damage_type.h      # Enum: slashing, piercing, bludgeoning, fire, cold... (labels)
 │   ├── spell-slots/           # Per-unit spell slot tracker
@@ -346,9 +344,7 @@ same way Hammers are effective vs armor). Resistances/immunities are narrative f
 
 > **AC / save / "+ally save" values in this table are flavor/source-of-record.** Combat
 > is vanilla FE: defense is FE `DEF`/`RES` + avoid, not Armor Class, and there are no
-> saving throws. Braulo's "AC 17" and Wolfram's "AC 26" map to high FE `DEF`; RBG's "+5
-> ally save" reflavors to an FE-native support proc (or drops). See `fe-mechanic-map.md`
-> for per-ability resolution.
+> saving throws. Braulo's "AC 17" and Wolfram's "AC 26" map to high FE `DEF`.
 
 **NPC Unit Mappings:**
 

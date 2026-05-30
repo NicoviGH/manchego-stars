@@ -62,7 +62,7 @@ enemy_units:
     name: "Grell"
     is_boss: true               # mini-boss tier
     count: 2
-    class: custom-grell         # see enemies/ (tbd custom class)
+    class: mogall               # FE8 monster class (floating eye-aberration); reskinned as a Grell
     level: 5
     damage_type: lightning      # flavor label only
     ai_pattern: aggressive

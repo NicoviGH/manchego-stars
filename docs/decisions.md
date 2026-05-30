@@ -60,8 +60,7 @@ _Decided: 2026-05-28_
 
 **Advantage / disadvantage: dropped**
 No advantage concept. Positioning matters through standard FE terrain bonuses and
-the weapon triangle only. Abilities previously written as granting "advantage"
-either reflavor onto an FE-native effect or drop (see `fe-mechanic-map.md` ⚠ section).
+the weapon triangle only.
 _Decided: 2026-05-28_
 
 **Damage: vanilla FE armor-subtraction model (nothing layered under it)**

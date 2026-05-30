@@ -612,8 +612,7 @@ are not touched. The work is the flavor layer on top:
 | Combat preview UI | battle-forecast text rendering | Keep the vanilla "Hit / Crit" box; add only a small damage-type icon. |
 | Crit flourish | new `engine/combat-fx/crit_anim.c` | Cosmetic "d20 lands on 20" animation when an FE crit fires (RNG helper wraps `bmRng.c`). |
 | Spell-tome economy | new tracker (sidecar or `Unit` field) | Per-tome charges that deplete in use and restock with gold between chapters (decision B). |
-| Custom skill procs | `engine/combat-fx`, `engine/class-defs` | FE-native procs/commands for unique abilities (Rage buff, summons, Dance, transforms) — see `fe-mechanic-map.yaml`. |
-| Class data | `data/classes.s` | Custom class entries where no vanilla chassis fits (per §6.4). |
+| Class data | `data/classes.s` | Stock vanilla FE8 classes only (PCs, recruits, and enemies reuse FE8 chassis incl. monster classes) — no custom class entries. |
 
 **Caveats**
 - `agbcc` is GCC 2.95.1 — avoid C99 features (VLAs, some designated initializers). The decomp's existing code is the style guide.
