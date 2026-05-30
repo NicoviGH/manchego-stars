@@ -50,23 +50,24 @@ growth_rates:
   LCK: 15
 
 # ── Inventory (Chapter 1 starting equipment) ───────────────────────────────────
+# MVP: stock FE weapon economy — stats inherited from the vanilla item named in `fe_base`
+# (no custom Might). Braulo's personal-weapon flavor (Nu' Shipwrecker, Trident) is parked in
+# lore/braulo.md as a POST-MVP story-progression item; visual identity rides on the sprite art.
 inventory:
-  - id: nu-shipwrecker
-    name: "Nu' Shipwrecker"
-    fe_weapon_type: Axe             # FE Pirate weapon class (data_classes.c baseRanks ITYPE_AXE)
-    damage_type: piercing           # D&D flavor only; CORRECTED: Piercing (not Slashing — PDF confirmed)
-    range: melee
-    uses: null    # FE tome — finite uses TBD (no infinite weapons)
-    locked: true                    # personal weapon, cannot be traded
-  - id: trident
-    name: Trident
-    fe_weapon_type: Axe             # FE: thrown axe = Hand Axe (Axe class, 1–2 range)
-    damage_type: piercing           # D&D flavor only
-    range: 2                        # thrown: 1–2 tiles (Hand Axe)
-    uses: null    # FE tome — finite uses TBD (no infinite weapons)
-    notes: "Hand-Axe analogue (1–2 range)."
+  - id: iron-axe
+    name: "Iron Axe"
+    fe_base: iron-axe               # vanilla FE8 stats (Mt/Hit/Crit/Wt/uses); no custom tuning
+    fe_weapon_type: Axe
+    damage_type: slashing           # cosmetic flavor label only
+  - id: hand-axe
+    name: "Hand Axe"
+    fe_base: hand-axe               # 1–2 range throwing axe; vanilla stats
+    fe_weapon_type: Axe
+    range: 2
+    damage_type: slashing
   - id: vulnerary
-    name: "Healing Potion"
+    name: "Healing Potion"          # reflavored Vulnerary (consumable)
+    fe_base: vulnerary
     uses: 3
 # -- Unique Abilities ------------------------------------------------------
 # NONE. Braulo is a stock FE8 Pirate -- no per-character mechanics, even on promotion.

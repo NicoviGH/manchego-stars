@@ -97,3 +97,12 @@ Liquid-Nitrogen Sprayer — a wide-mouthed nozzle that flash-freezes a whole arc
 Forcefield Emitter — a humming pane of pure force; nothing gets through it.
 
 - *Former mechanic concept (now flavor):* places a fully impassable barrier (blocks movement AND attacks) for a few turns
+
+## Signature gear (flavor / post-MVP)
+
+MVP loadout is a stock Iron Bow; his firearm look rides on the sprite art. Named gear:
+
+- **Fonduedler** — his Artificer firearm/crossbow → an FE Bow (tier TBD, post-MVP).
+- **Luck E. Cheese** — a Luck Blade holding two charges of Wish. *Not* a combat weapon — a
+  story-only item. Its single payoff: at the finale RBG spends a charge to turn **Pinky** from a
+  homunculus into a living being.

@@ -99,3 +99,10 @@ Blade Forge — METALLO's craft extends to weapons; Wolfram tempers an ally's bl
 Master of the Forge — Wolfram forges adamantine and mithral, the metals of legend.
 
 - *Former mechanic concept (now flavor):* top-tier Forge: adamantine (negates enemy crits) / mithral (no weapon-weight SPD penalty)
+
+## Signature gear (flavor / post-MVP)
+
+MVP loadout is a stock Iron Lance + Javelin (the Javelin is the armored unit's ranged option).
+His fire/forge identity rides on the sprite art, not the item names. Named gear, post-MVP:
+
+- **Warhammer** — his heavy personal weapon → an FE Lance (tier TBD, post-MVP).

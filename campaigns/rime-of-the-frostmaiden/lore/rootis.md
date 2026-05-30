@@ -110,3 +110,10 @@ Smoldering Whiteout — a drifting bank of burning ash he can barely stand near.
 Hailfall — the sky splits and boulders of ice and fire rain from the clouds.
 
 - *Former mechanic concept (now flavor):* ultimate siege bombardment (Purge/Bolting-tier), multi-point
+
+## Signature gear (flavor / post-MVP)
+
+MVP loadout: **Ray of Frost** (his cold cantrip, mechanically the basic Anima tome) + a Vulnerary.
+Dropped/parked flavor:
+
+- **Chill Touch** — a grave-cold spell attack, folded out for the stock single-tome loadout.

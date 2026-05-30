@@ -59,36 +59,32 @@ growth_rates:
 # FE-LEGAL for Priest→Bishop: Heal Staff is a base-Priest staff; the attack cantrips are Light tomes
 # usable from the Bishop promotion (base Priest is staff-only). Rapier removed — no Sword rank exists
 # anywhere on the Priest/Bishop line (FE-strict: a healer carries no sword).
+# MVP: Sclorbo is an unpromoted Priest — a staff-only healer. The attack tomes are Light, gated to
+# the Bishop promotion (post-MVP). Stats inherited from the vanilla item in `fe_base` (no custom
+# Might). Cold/psychic flavor rides on the reskinned NAME + sprite art.
 inventory:
   - id: heal-staff
-    name: "Heal Staff"
-    flavor: "Mending Hum — a soothing telepathic resonance that knits flesh back together."
-    fe_mechanic: "vanilla FE Heal staff, single-target restore (Mag-based; no D&D dice)"
-    # Sclorbo's Cure Wounds spell (Bard 1st). His MVP heal — reviver kit is gated POST-MVP.
+    name: "Heal Staff"            # flavor: "Mending Hum"
+    fe_base: heal                 # vanilla FE Heal staff (Mag-based restore)
     fe_weapon_type: Staff         # FE Priest weapon class (baseRanks ITYPE_STAFF) — vanilla at base
     is_staff: true
-    effect: restore_hp
-    uses: 8                       # 8 staff charges per chapter (= 1st-level slot count)
-  - id: ray-of-frost
-    name: "Ray of Frost"
-    flavor: "Frostsong — a shivering note of cold that crackles across the target."
-    fe_weapon_type: Light         # FE Bishop attack rank; cold flavor reskinned to Light
-    unlock: promotion             # base Priest is staff-only; usable once promoted to Bishop
-    damage_type: cold             # D&D flavor only
-    range: 2                      # FE Light tome range
-    uses: null    # FE tome — finite uses TBD (no infinite weapons)
-    notes: "Vanilla Light tome — no slow/MOV proc (D&D effect dropped)."
-  - id: vicious-mockery
-    name: "Vicious Mockery"
-    flavor: "Withering Impression — a telepathic jab of pure derision."
-    fe_weapon_type: Light         # FE Bishop attack rank; psychic flavor reskinned to Light
-    unlock: promotion             # base Priest is staff-only; usable once promoted to Bishop
-    damage_type: psychic          # D&D flavor only
-    range: 2                      # FE Light tome range
-    uses: null    # FE tome — finite uses TBD (no infinite weapons)
-    notes: "Vanilla Light tome — no −hit/disadvantage proc (D&D effect dropped)."
+  - id: frostsong
+    name: "Frostsong"             # flavor name; basic Light tome (stock 'Lightning' stats)
+    fe_base: lightning
+    fe_weapon_type: Light         # FE Bishop attack rank
+    unlock: promotion             # base Priest is staff-only; usable once promoted to Bishop (post-MVP)
+    range: 2
+    damage_type: cold             # cosmetic flavor label only
+  - id: withering-impression
+    name: "Withering Impression"  # flavor name; basic Light tome (stock 'Lightning' stats)
+    fe_base: lightning
+    fe_weapon_type: Light         # FE Bishop attack rank
+    unlock: promotion             # base Priest is staff-only; usable once promoted to Bishop (post-MVP)
+    range: 2
+    damage_type: psychic          # cosmetic flavor label only
   - id: vulnerary
-    name: "Healing Potion"
+    name: "Healing Potion"        # reflavored Vulnerary (consumable)
+    fe_base: vulnerary
     uses: 2
 # -- Unique Abilities ------------------------------------------------------
 # NONE. Sclorbo is a stock FE8 Priest -- no per-character mechanics, even on promotion.

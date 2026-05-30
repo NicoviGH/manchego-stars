@@ -46,14 +46,15 @@ growth_rates:
   LCK: 35
 
 # ── Inventory (Chapter 1 starting equipment) ───────────────────────────────────
+# Stock FE weapons — stats inherited from the vanilla item in `fe_base` (no custom Might).
 inventory:
   - id: iron-lance
     name: "Iron Lance"
+    fe_base: iron-lance                   # vanilla FE8 stats (Mt/Hit/Crit/Wt/uses)
     fe_weapon_type: Lance                 # FE Pegasus Knight weapon class (baseRanks ITYPE_LANCE, D)
-    range: melee
-    uses: 45                              # FE Iron Lance durability
   - id: vulnerary
-    name: "Healing Potion"
+    name: "Healing Potion"                # reflavored Vulnerary (consumable)
+    fe_base: vulnerary
     uses: 3
 
 # ── Endgame beat (scripted story event, not a gameplay mechanic) ───────────────

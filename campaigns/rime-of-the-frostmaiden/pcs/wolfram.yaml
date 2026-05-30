@@ -52,32 +52,24 @@ growth_rates:
   LCK: 25
 
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
+# MVP: stock FE weapons — stats inherited from the vanilla item in `fe_base` (no custom Might).
+# Wolfram's personal-weapon flavor (Warhammer) is parked in lore/wolfram.md as a POST-MVP item;
+# his fire/forge identity rides on the sprite art. Javelin gives the armored unit its ranged option.
 inventory:
-  - id: warhammer
-    name: Warhammer
-    fe_weapon_type: Lance           # FE Knight weapon class (baseRanks ITYPE_LANCE); blunt is D&D flavor
-    damage_type: bludgeoning        # D&D flavor only
-    range: melee
-    uses: null    # FE tome — finite uses TBD (no infinite weapons)
   - id: iron-lance
     name: "Iron Lance"
-    fe_weapon_type: Lance           # FE Knight weapon class
-    damage_type: piercing           # D&D flavor only
-    range: melee
-    uses: null    # FE tome — finite uses TBD (no infinite weapons)
+    fe_base: iron-lance             # vanilla FE8 stats (Mt/Hit/Crit/Wt/uses); no custom tuning
+    fe_weapon_type: Lance           # FE Knight weapon class (baseRanks ITYPE_LANCE)
+    damage_type: piercing           # cosmetic flavor label only
   - id: javelin
-    name: Javelin
-    # FE-legal resolution: a Knight has no tome. The FE way an armored unit attacks at range is a
-    # Javelin (1–2 range Lance). This replaces the former "Magic Stone" ranged tome (no FE analogue).
-    fe_weapon_type: Lance           # Javelin = 1–2 range Lance
-    damage_type: bludgeoning        # D&D flavor (Magic Stone) carried as flavor
-    range: 2                      # 1–2 tiles (thrown lance)
-    uses: null    # FE Might/uses TBD
-    notes: "Replaces Magic Stone — a Knight's ranged option in FE is a thrown lance (Javelin)."
-  # NOTE: the former "Fire Bolt" tome is removed — a Knight cannot use tomes in FE8, and Wolfram's
-  # ranged FIRE identity already lives in his Breath Weapon unique ability (see unique_abilities).
+    name: "Javelin"
+    fe_base: javelin                # 1–2 range thrown lance; vanilla stats (the armored unit's ranged option)
+    fe_weapon_type: Lance
+    range: 2
+    damage_type: bludgeoning        # cosmetic flavor label only
   - id: vulnerary
-    name: "Healing Potion"
+    name: "Healing Potion"          # reflavored Vulnerary (consumable)
+    fe_base: vulnerary
     uses: 2
 # -- Unique Abilities ------------------------------------------------------
 # NONE. Wolfram is a stock FE8 Knight -- no per-character mechanics, even on promotion.

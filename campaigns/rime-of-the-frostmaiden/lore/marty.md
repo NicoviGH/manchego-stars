@@ -113,3 +113,13 @@ Plague Spores — Marty infects a single foe with a wasting fungal sickness.
 Marty preserves a fallen ally's body in stasis spores — keeping them whole for revival.
 
 - *Former mechanic concept (now flavor):* no combat effect; narrative/utility — extends the window for Sclorbo's revival staves
+
+## Signature gear (flavor / post-MVP)
+
+MVP loadout: **Shillelagh** (his druid cantrip, mechanically the basic Dark tome) + a **Heal
+Staff** that comes online at promotion (Druid or Summoner) + **Goodberry** (a reflavored
+Vulnerary). Dropped/parked flavor:
+
+- **Witherspore** ("Chill Touch") — a puff of grave-mold; a second cantrip, folded out for the
+  stock single-tome loadout.
+- **Chagaccino Berries** — the in-world flavor for his Goodberry/Vulnerary.

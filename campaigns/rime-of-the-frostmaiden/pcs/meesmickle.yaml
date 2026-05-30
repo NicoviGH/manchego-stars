@@ -52,23 +52,20 @@ growth_rates:
   LCK: 20
 
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
-# NOTE: Meesmickle CANNOT use healing potions — Unholy Body turns them into poison.
-# Her healing items are Blood Vials (consumed to recover HP via hit dice).
+# MVP: stock FE weapons — tome stats inherited from the vanilla item in `fe_base` (no custom
+# Might). Eldritch/force flavor rides on the sprite art + damage_type label. Blood Vial is a
+# reflavored Vulnerary (flavor: she drinks blood instead of quaffing a potion).
 inventory:
-  - id: eldritch-blast-tome
+  - id: eldritch-blast
     name: "Eldritch Blast"
-    flavor: "Hexbolt — crackling beams of raw eldritch force lance out from her claws."
-    fe_weapon_type: Dark      # FE Shaman weapon class (baseRanks ITYPE_DARK); force is Dark reflavor
-    damage_type: force        # D&D flavor only
-    range: 2                  # FE Dark tome range
-    uses: null    # FE tome — finite uses TBD (no infinite weapons)
-    locked: true              # personal tome, cannot be traded
-    notes: "Vanilla single-target Dark tome — no multi-beam, no +CHA, no push (those D&D effects dropped)."
+    # Flavor name (Hexbolt); mechanically the basic Dark tome (stock 'Flux' stats — name-only reskin).
+    fe_base: flux
+    fe_weapon_type: Dark      # FE Shaman weapon class (baseRanks ITYPE_DARK)
+    range: 2
+    damage_type: force        # cosmetic flavor label only
   - id: blood-vial
-    name: "Blood Vial"
-    # Vanilla healing consumable (Vulnerary-style); flavor is that she drinks blood. No hit-dice math.
-    is_healing: true
-    effect: restore_hp
+    name: "Blood Vial"        # reflavored Vulnerary (consumable)
+    fe_base: vulnerary
     uses: 3
 # -- Unique Abilities ------------------------------------------------------
 # NONE. Meesmickle is a stock FE8 Shaman -- no per-character mechanics, even on promotion.

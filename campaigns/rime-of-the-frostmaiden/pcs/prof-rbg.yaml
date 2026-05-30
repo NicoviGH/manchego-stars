@@ -52,14 +52,16 @@ growth_rates:
   LCK: 35
 
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
+# MVP: stock FE weapons — stats inherited from the vanilla item in `fe_base` (no custom Might).
+# RBG's personal-weapon flavor (Fonduedler) is parked in lore/prof-rbg.md as a POST-MVP item;
+# his firearm/cannon look rides on the sprite art. Luck E. Cheese stays as a story-only Wish item.
 inventory:
-  - id: fonduedler
-    name: Fonduedler
+  - id: iron-bow
+    name: "Iron Bow"
+    fe_base: iron-bow         # vanilla FE8 stats (Mt/Hit/Crit/Wt/uses); no custom tuning
     fe_weapon_type: Bow       # FE Archer weapon class (baseRanks ITYPE_BOW)
-    damage_type: piercing     # D&D flavor only; ranged Artificer firearm/crossbow
     range: 2                  # FE bows are 2-range (no melee counter)
-    uses: null    # FE tome — finite uses TBD (no infinite weapons)
-    locked: true              # personal weapon
+    damage_type: piercing     # cosmetic flavor label only
   - id: luck-e-cheese
     name: "Luck E. Cheese"
     flavor: "Luck Blade shortsword — a wedge-shaped blade humming with two charges of raw Wish."
@@ -75,7 +77,8 @@ inventory:
   # NOTE: the former "Shocking Grasp" lightning tome is removed — Archer/Sniper is a Bow-only line in
   # FE8 and has no tome rank. The cannon/lightning fantasy lives in Pepperjack (a recruitable unit).
   - id: vulnerary
-    name: "Healing Potion"
+    name: "Healing Potion"    # reflavored Vulnerary (consumable)
+    fe_base: vulnerary
     uses: 2
 # -- Unique Abilities ------------------------------------------------------
 # NONE. Prof. R.B. Geenius is a stock FE8 Archer -- no per-character mechanics, even on promotion.

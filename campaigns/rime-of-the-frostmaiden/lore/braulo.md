@@ -100,3 +100,12 @@ Crab Instinct — a lifetime of dodging predators on the seafloor; he feels the 
 First to the Bargain — Braulo's never caught flat-footed when there's profit to grab.
 
 - *Former mechanic concept (now flavor):* deploys with an initiative/turn-order bonus; can't be surprised
+
+## Signature gear (flavor / post-MVP)
+
+In the MVP, Braulo carries stock FE weapons (Iron Axe, Hand Axe). His named gear returns
+post-MVP as story-progression items, each mapped to an FE equivalent — the look (anchor/shell)
+rides on the sprite art, not the item name:
+
+- **Nu' Shipwrecker** — his prized personal axe → **Killer Axe** (FE-equivalent, per Nicolas).
+- **Trident** — his thrown weapon → a Hand-Axe-class throwing weapon.

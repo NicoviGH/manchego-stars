@@ -56,42 +56,28 @@ growth_rates:
   LCK: 20
 
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
-# Primary attack is Shillelagh (cantrip), not a basic staff swing.
-# Shillelagh transforms Marty's Staff into a WIS-based weapon.
+# MVP: Marty is an unpromoted Shaman (Dark attacker). Staves come online at his promotion
+# (Druid OR Summoner — both use staves), so his healing is post-MVP; Sclorbo is the MVP healer.
+# Tome stats inherited from the vanilla item named in `fe_base` (no custom Might). Spore/fungal
+# flavor rides on the sprite art + lore/marty.md (incl. the dropped "Witherspore" cantrip).
 inventory:
   - id: shillelagh
-    name: "Shillelagh (Staff)"
-    # FE Monk attacks with a Light tome at range; the melee staff-swing framing is D&D flavor.
-    fe_weapon_type: Light      # FE Monk weapon class (baseRanks ITYPE_LIGHT)
-    damage_type: bludgeoning   # D&D flavor only
-    range: 2                   # FE Light tome range (melee framing is cosmetic)
-    uses: null    # FE tome — finite uses TBD (no infinite weapons)
-    locked: true               # Marty's Staff + Shillelagh cantrip, personal
-    notes: "Marty's basic attack; modeled as a Light tome in FE."
-  - id: chill-touch
-    name: "Chill Touch"
-    flavor: "Witherspore — a puff of grave-mold settles on the target."
-    fe_weapon_type: Light      # FE Monk weapon class; necrotic flavor reskinned to Light
-    damage_type: necrotic      # D&D flavor only
-    range: 2                  # FE Light tome range
-    uses: null    # FE tome — finite uses TBD (no infinite weapons)
-    notes: "Vanilla Light tome — no on-hit proc (the D&D anti-heal effect is dropped)."
+    name: "Shillelagh"
+    # Flavor name (Marty's druid cantrip); mechanically the basic Dark tome (stock 'Flux' stats).
+    fe_base: flux
+    fe_weapon_type: Dark       # FE Shaman weapon class (baseRanks ITYPE_DARK)
+    range: 2
+    damage_type: bludgeoning   # cosmetic flavor label only
   - id: heal-staff
     name: "Heal Staff"
-    # FE-legal via promotion: base Monk is Light-only (no staff); FE8 Summoner (Marty's promotion)
-    # uses Dark + STAFF, so his healing comes online when he promotes. In MVP (unpromoted) Marty is
-    # a Light attacker; Sclorbo (Priest) is the MVP healer. Goodberry consumable still covers chip heals.
-    fe_weapon_type: Staff      # usable at the Summoner promotion
-    unlock: promotion          # base Monk cannot use staves
+    fe_base: heal
+    fe_weapon_type: Staff
+    unlock: promotion          # base Shaman is Dark-only; staves come at the Druid/Summoner promotion
     is_staff: true
-    effect: restore_hp         # vanilla FE Heal staff (Mag-based restore); no D&D dice
-    uses: 15
   - id: goodberry
-    name: "Goodberry"
-    flavor: "Chagaccino Berries — Marty's signature mushroom brew, pressed into restorative berries."
-    fe_mechanic: "Vulnerary-style consumable; small HP restore, multiple charges per chapter"
-    effect: restore_1hp
-    uses: 10                  # 10 berries per casting; restocked between chapters
+    name: "Goodberry"          # reflavored Vulnerary (consumable)
+    fe_base: vulnerary
+    uses: 3
 # -- Unique Abilities ------------------------------------------------------
 # NONE. Marty the Merry Mushroom is a stock FE8 Monk -- no per-character mechanics, even on promotion.
 # Individuality comes from flavor text, portrait/sprite art, and palette -- not special

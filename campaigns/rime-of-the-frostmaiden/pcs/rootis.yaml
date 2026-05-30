@@ -55,25 +55,20 @@ growth_rates:
   LCK: 20
 
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
-# Primary cantrip is Ray of Frost (cold), not fire. Corrected from first pass.
+# MVP: stock FE weapons — tome stats inherited from the vanilla item in `fe_base` (no custom
+# Might). His ice element rides on the flavor NAME + sprite art: "Ray of Frost" is mechanically
+# the basic Anima tome (stock 'Fire' stats). The dropped "Chill Touch" cantrip is parked in lore.
 inventory:
   - id: ray-of-frost
     name: "Ray of Frost"
-    fe_weapon_type: Anima     # FE Mage weapon class (baseRanks ITYPE_ANIMA); cold is Anima reflavor
-    damage_type: cold         # D&D flavor only
-    range: 2                  # FE Anima tome range
-    uses: null    # FE tome — finite uses TBD (no infinite weapons)
-    notes: "Vanilla single-target Anima tome — no slow/MOV-penalty proc (D&D effect dropped)."
-  - id: chill-touch
-    name: "Chill Touch"
-    flavor: "A grave-cold spell attack (despite the name)."
-    fe_weapon_type: Anima     # FE Mage weapon class; necrotic flavor reskinned to Anima
-    damage_type: necrotic     # D&D flavor only
-    range: 3                  # 120 ft → ~3 FE tiles
-    uses: null    # FE tome — finite uses TBD (no infinite weapons)
-    notes: "Vanilla Anima tome — no anti-heal / disadvantage proc (D&D effects dropped)."
+    # Flavor name; mechanically the basic Anima tome (stock 'Fire' stats — name-only reskin).
+    fe_base: fire
+    fe_weapon_type: Anima     # FE Mage weapon class (baseRanks ITYPE_ANIMA)
+    range: 2
+    damage_type: cold         # cosmetic flavor label only
   - id: vulnerary
-    name: "Healing Potion"
+    name: "Healing Potion"    # reflavored Vulnerary (consumable)
+    fe_base: vulnerary
     uses: 2
 # -- Unique Abilities ------------------------------------------------------
 # NONE. Rootis is a stock FE8 Mage -- no per-character mechanics, even on promotion.
