@@ -9,68 +9,15 @@ portrait_ref: portraits/rootis.png      # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/rootis.jpeg   # note: source file was named "Rootis Character Sheet.jpeg" — it's the portrait
 # Portrait source: https://www.dndbeyond.com/avatars/25348/565/1581111423-72613710.jpeg
 
-# ── D&D 5e Identity ────────────────────────────────────────────────────────────
+# ── D&D 5e Source (reference only — does NOT drive FE mechanics) ────────────────
+# FE stats come verbatim from the vanilla class below, not from D&D scores.
+# Raw sheet: data/pc-sheets/rootis.json  ·  Curated flavor: lore/rootis.md
 dnd:
-  race: Snowperson           # homebrew — literally made of snow
-  class: Sorcerer
-  subclass: "Draconic Bloodline"
-  dragon_ancestor: "White Dragon"  # COLD ancestry — Elemental Affinity is cold, not fire
-  level_end_state: 20
-  alignment: neutral_good
-  size: medium               # 4 ft tall, gender: snowman, eyes: coal (PDF p4)
-  background: "Custom Background"
-  personality: "There's nothing I like more than a good mystery."
-  ideal: "No Limits. Nothing should fetter the infinite possibility inherent in all existence. (Chaotic)"
-  bond: null                 # PDF p4: blank
-  flaw: "I overlook obvious solutions in favor of complicated ones."
-  ability_scores:
-    STR: 8
-    DEX: 18
-    CON: 20
-    INT: 12
-    WIS: 11
-    CHA: 17
-  saving_throw_proficiencies: [CON, CHA]
-  languages: [Celestial, Common, Draconic, Primordial]   # per PDF p1
-  hp_max: 202                # CORRECTED: includes Draconic Resilience +20 HP
-  ac: 17                     # Draconic Resilience: AC = 13 + DEX mod when unarmored
-                             # (PDF p2). DEX 18 → AC 17. Scales with DEX, not flat.
-  speed_ft:
-    walking: 25
-    flying: 25               # Dragon Wings = POST-MVP transform (5e L14 → Ch13). Through MVP
-                             # Rootis is a foot Mage (Ice); flying unlocks only at Ch13.
-    climbing: 20
-    swimming: 35
-  racial_traits:
-    # Snowperson — from PDF page 3
-    frosty_form:
-      cold_immunity: true    # full Cold damage immunity
-      cold_terrain_immune: true  # unaffected by difficult terrain from ice/cold
-    heat_vulnerability: true # vulnerable to fire damage (×2 incoming fire)
-    snow_body:
-      resistance: [bludgeoning, piercing, slashing]  # resistant to ALL physical damage
-    crystallize:
-      # Action: freeze body — become IMMUNE to slashing and piercing,
-      # but LOSE bludgeoning resistance. 1/long rest (= 1/chapter).
-      # FE implementation: activated command — player chooses when to crystallize.
-      uses_per_chapter: 1
-      grants_immunity: [slashing, piercing]
-      removes_resistance: [bludgeoning]
-    elemental_properties:
-      # If hit by an ice-based attack, recover HP instead of taking damage.
-      # FE implementation: passive — cold-type incoming attacks trigger a heal flag.
-      heals_from_cold: true
-    body_building:
-      # If surrounded by snow tiles, can spend an action to absorb snow and recover 2d4 HP.
-      # 1/short or long rest (= once per map phase).
-      uses_per_map: 1
-      heal_dice: "2d4"
-      requires_snow_terrain: true
-    snow_ski:
-      # Double movement speed on ice/snow terrain tiles.
-      # Very relevant — most maps in this campaign are arctic.
-      # FE implementation: passive — on snow/ice tiles, MOV doubles.
-      effect: double_mov_on_ice_snow
+  race: Snowperson
+  class: "Sorcerer (Draconic Bloodline)"
+  dragon_ancestor: White Dragon
+  source: data/pc-sheets/rootis.json
+  lore: lore/rootis.md
 
 # ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
 # Rootis is an ice/cold sorcerer, NOT fire. Class corrected from "Mage (Fire)" to "Mage (Ice)".

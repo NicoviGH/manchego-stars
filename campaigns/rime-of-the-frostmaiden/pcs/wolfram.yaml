@@ -10,66 +10,14 @@ portrait_ref: portraits/wolfram.png     # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/wolfram.jpeg
 # Portrait source: https://www.dndbeyond.com/avatars/25957/254/1581111423-74374750.jpeg
 
-# ── D&D 5e Identity ────────────────────────────────────────────────────────────
+# ── D&D 5e Source (reference only — does NOT drive FE mechanics) ────────────────
+# FE stats come verbatim from the vanilla class below, not from D&D scores.
+# Raw sheet: data/pc-sheets/wolfram.json  ·  Curated flavor: lore/wolfram.md
 dnd:
-  race: "Mineralscale Drakeborn"  # homebrew Dragonborn variant — scales are literal metal
-  class: Metallurgist             # fully homebrew; approximated as Warlock on D&D Beyond
-  subclass: "School of the Smith"
-  level_end_state: 20
-  alignment: chaotic_good
-  size: medium                    # 6'4" tall, 1000 lbs — extremely dense from metallic scales
-  age: 40
-  height: "6'4\""
-  weight: "1000 lbs"
-  gender: male
-  physical: "Gray skin, dark eyes, hairless. Scales of living metal."
-  patron: METALLO                 # cosmic being, first to create metal; Wolfram is his Avatar
-  backstory: >
-    A scaleless Drakeborn, shamed by his people for lacking scales. While wandering, he found
-    an alien meteorite ring in the earth. METALLO — a cosmic being trillions of years old, the
-    first entity ever to create metal — spoke to him through it and named him The First
-    Metallurgist. His scales grew back, forged from living metal. He now serves as METALLO's
-    Avatar in the mortal world.
-  ability_scores:
-    STR: 20
-    DEX: 12
-    CON: 14
-    INT: 20
-    WIS: 9
-    CHA: 10
-  saving_throw_proficiencies: [DEX, INT]
-  languages: [Common, Draconic]   # per PDF p1
-  hp_max: 143
-  ac: 26                          # highest in party — heavy armor + shield + stacked Upgrade Armor
-  speed_ft: 30
-  racial_traits:
-    # Mineralscale Drakeborn — from PDF page 3
-    fire_resistance: true         # half damage from fire (passive in unique_abilities too)
-    darkvision_60: true
-    metallic_scales:
-      # Living metal scales. Natural armor contribution baked into AC 26 total.
-      note: "Scales of actual metal. AC 26 = heavy armor + shield + stacked Upgrade Armor upgrades."
-    breath_weapon:
-      # ACTION — 1/short rest per PDF p3 ("Once per short rest as an action").
-      # Each creature in area: DEX save DC 16, fire damage on fail (half on success).
-      # Damage scales: 2d6 (levels 1–5) → 3d6 (6–10) → 4d6 (11–15) → 5d6 (16–20).
-      # FE implementation: activated command, refreshes once per chapter (= one short rest).
-      action_cost: action
-      uses_per_chapter: 1         # 1 per short rest; FE = 1 per chapter
-      shape: cone                 # PDF doesn't restate area; default standard Dragonborn cone
-      range_ft: 30                # PDF doesn't specify; default Dragonborn 30 ft
-      save: DEX
-      save_dc: 16
-      damage_type: fire
-      damage_scaling:
-        - levels: "1-5"
-          dice: "2d6"
-        - levels: "6-10"
-          dice: "3d6"
-        - levels: "11-15"
-          dice: "4d6"
-        - levels: "16-20"
-          dice: "5d6"
+  race: Mineralscale Drakeborn
+  class: "Metallurgist (School of the Smith)"
+  source: data/pc-sheets/wolfram.json
+  lore: lore/wolfram.md
 
 # ── FE Starting Stats (level 1) ────────────────────────────────────────────────
 # Vanilla FE8 Knight (Armor Knight) stats, verbatim from data_classes.c [CLASS_ARMOR_KNIGHT - 1].

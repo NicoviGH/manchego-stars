@@ -9,62 +9,14 @@ portrait_ref: portraits/sclorbo.png     # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/sclorbo.jpeg
 # Portrait source: https://www.dndbeyond.com/avatars/25339/252/1581111423-72588721.jpeg
 
-# ── D&D 5e Identity ────────────────────────────────────────────────────────────
+# ── D&D 5e Source (reference only — does NOT drive FE mechanics) ────────────────
+# FE stats come verbatim from the vanilla class below, not from D&D scores.
+# Raw sheet: data/pc-sheets/sclorbo.json  ·  Curated flavor: lore/sclorbo.md
 dnd:
-  race: Chwinga                   # homebrew nature elemental
-  class: Bard
-  subclass: "College of Lore"
-  level_end_state: 16             # lowest in party (player left before campaign end)
-  alignment: chaotic_good         # CORRECTED: Chaotic Good (not Chaotic Neutral — PDF confirmed)
-  size: small                     # Chwinga — tiny nature elemental
-  background: "Folk Hero"
-  personality: "If someone is in trouble, I'm always ready to lend help. I'm confident in my own abilities and do what I can to instill confidence in others."
-  ideal: "Sincerity. There's no good in pretending to be something I'm not. (Neutral)"   # CORRECTED 2026-05-27 — PDF p4
-  bond: "I protect those who cannot protect themselves."
-  flaw: "The people who knew me when I was young know my shameful secret, so I can never go home."
-  speech: none                    # Sclorbo CANNOT SPEAK — communicates via telepathy within 20 ft.
-                                  # FE implementation: dialogue uses telepathic impression flavor.
-  ability_scores:
-    STR: 13
-    DEX: 15
-    CON: 12
-    INT: 8
-    WIS: 18
-    CHA: 17
-  saving_throw_proficiencies: [DEX, CHA]
-  languages: [Common]                # PDF doesn't list extras; Common assumed (Chwinga base)
-  hp_max: 99
-  ac: 12
-  speed_ft:
-    walking: 30
-    swimming: 20
-  racial_traits:
-    # Chwinga (homebrew nature elemental) — from PDF page 3
-    chwinga_telepathy:
-      # Sclorbo's only form of communication — cannot produce speech.
-      # FE implementation: all dialogue uses telepathic impression flavor (italics, no quotes).
-      range_ft: 20
-    evasion:
-      # When subjected to an effect allowing a DEX save for half damage:
-      # no damage on success, half damage on failure.
-      # FE implementation: passive flag on all DEX saves.
-      no_damage_on_save: true
-      half_damage_on_fail: true
-    magical_gift:
-      # Action: charm one humanoid within 5 ft (WIS save DC 16). 1/long rest (= 1/chapter).
-      # FE implementation: activated command — adjacent humanoid enemy saves or is charmed
-      #   (cannot act against Sclorbo this turn; treated as allied for reactions).
-      uses_per_chapter: 1
-      range_ft: 5
-      save: WIS
-      save_dc: 16
-      effect: charmed
-    natural_shelter:
-      # Can hide inside rocks, plants, or water tiles — invulnerable while inside.
-      # Emerge as a bonus action.
-      # FE implementation: activated command — sink into adjacent terrain, become untargetable.
-      effect: untargetable_while_inside
-      exit: bonus_action
+  race: Chwinga
+  class: "Bard (College of Lore)"
+  source: data/pc-sheets/sclorbo.json
+  lore: lore/sclorbo.md
 
 # ── FE Starting Stats (level 1) ────────────────────────────────────────────────
 # Sclorbo is the party healer: vanilla Priest (staff healer) → Bishop (Light magic + staff).

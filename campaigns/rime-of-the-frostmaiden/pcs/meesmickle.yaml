@@ -8,33 +8,14 @@ portrait_ref: portraits/meesmickle.png   # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/meesmickle.jpeg
 # Portrait source: https://www.dndbeyond.com/avatars/25348/435/1581111423-72613637.jpeg
 
-# ── D&D 5e Identity ────────────────────────────────────────────────────────────
+# ── D&D 5e Source (reference only — does NOT drive FE mechanics) ────────────────
+# FE stats come verbatim from the vanilla class below, not from D&D scores.
+# Raw sheet: data/pc-sheets/meesmickle.json  ·  Curated flavor: lore/meesmickle.md
 dnd:
-  race: "Vampire Tabaxi"     # homebrew
-  class: Warlock
-  subclass: "The Fiend"
-  level_end_state: 20
-  alignment: chaotic_neutral
-  size: small                # Vampire Tabaxi — "I am a cat"
-  background: Noble
-  ability_scores:
-    STR: 10
-    DEX: 20
-    CON: 19
-    INT: 12
-    WIS: 8
-    CHA: 16
-  saving_throw_proficiencies: [WIS, CHA]
-  languages: [Common, Abyssal]   # per PDF p3
-  hp_max: 183
-  ac: 15
-  racial_traits:
-    # Vampire Tabaxi — from PDF page 3
-    feline_agility: true        # double movement speed once per round of combat
-    unholy_body: true           # healing potions deal poison damage; must drink blood/hit dice/rest to heal
-    cats_claws: true            # unarmed: 1d4 slashing, climbing speed 20 ft
-    darkvision: 60
-    fur_coat: true              # unaffected by cold; protected from direct sunlight
+  race: Vampire Tabaxi
+  class: "Warlock (The Fiend)"
+  source: data/pc-sheets/meesmickle.json
+  lore: lore/meesmickle.md
 
 # ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
 # Adjust during Phase 1 playtesting.

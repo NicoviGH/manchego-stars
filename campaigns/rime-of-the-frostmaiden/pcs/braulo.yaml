@@ -8,54 +8,14 @@ portrait_ref: portraits/braulo.png       # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/braulo.jpeg
 # Portrait source: https://www.dndbeyond.com/avatars/25784/526/1581111423-73827256.jpeg
 
-# ── D&D 5e Identity ────────────────────────────────────────────────────────────
+# ── D&D 5e Source (reference only — does NOT drive FE mechanics) ────────────────
+# FE stats come verbatim from the vanilla class below, not from D&D scores.
+# Raw sheet: data/pc-sheets/braulo.json  ·  Curated flavor: lore/braulo.md
 dnd:
-  race: "Hermit Crab"               # homebrew Pagurian
-  class: Barbarian
-  subclass: "Path of the Berserker"
-  level_end_state: 20
-  alignment: neutral
-  size: medium                      # 7 ft tall, 500 lbs
-  age: 40
-  height: "7 ft"
-  weight: "500 lbs"
-  background: "Custom Background"  # PDF p1; merchant flavor in backstory, not a standard background
-  personality: "Thrifty and driven — always looking for the better deal, the better shell."
-  ideal: "The Next Shell. The best one is always just over the horizon."
-  bond: "Dosh — wealth and profit above all else."
-  flaw: Greed
-  backstory: >
-    A travelling merchant from the ocean floor, searching the world for his next shell.
-    Believes the perfect shell is always just over the horizon.
-  languages: [Common, Aquan, "Deep Speech"]
-  ability_scores:
-    STR: 23
-    DEX: 8
-    CON: 24
-    INT: 10
-    WIS: 12
-    CHA: 13
-  saving_throw_proficiencies: [STR, CON]
-  hp_max: 285
-  ac: 17                            # Natural Armor: shell provides flat AC 17 (DEX not applied)
-  speed_ft: 40                      # 30 base + 10 Fast Movement (no heavy armor)
-  racial_traits:
-    # Hermit Crab (homebrew Pagurian) — from PDF page 3
-    natural_armor:
-      ac: 17
-      dex_applied: false            # Shell AC is flat — DEX modifier does NOT apply
-    claws:
-      damage_dice: "1d4"
-      damage_type: slashing
-    amphibious: true                # can breathe air and water
-    pagurian_telepathy:
-      # Can communicate telepathically with other Pagurians within 60 ft.
-      range_ft: 60
-    fast_movement:
-      # +10 ft speed while not wearing heavy armor (Barbarian level 5 class feature).
-      bonus_ft: 10
-    shell_defense:                  # D&D flavor only — no FE mechanic (stock Pirate class)
-      note: "narrative/flavor; not represented as a gameplay ability"
+  race: Hermit Crab
+  class: "Barbarian (Path of the Berserker)"
+  source: data/pc-sheets/braulo.json
+  lore: lore/braulo.md
 
 # ── FE Starting Stats (level 1) ────────────────────────────────────────────────
 # Vanilla FE8 Pirate stats, verbatim from fireemblem8u/src/data_classes.c [CLASS_PIRATE - 1].

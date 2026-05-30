@@ -8,76 +8,14 @@ portrait_ref: portraits/marty.png       # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/marty.jpeg
 # Portrait source: https://www.dndbeyond.com/avatars/25824/431/1581111423-70515811.jpeg
 
-# ── D&D 5e Identity ────────────────────────────────────────────────────────────
+# ── D&D 5e Source (reference only — does NOT drive FE mechanics) ────────────────
+# FE stats come verbatim from the vanilla class below, not from D&D scores.
+# Raw sheet: data/pc-sheets/marty-the-merry-mushroom.json  ·  Curated flavor: lore/marty.md
 dnd:
-  race: Sporemaster          # homebrew Myconid
-  class: Druid
-  subclass: "Circle of Spores"
-  level_end_state: 20
-  alignment: chaotic_neutral
-  size: small                # 2–4 ft tall (Sporemaster)
-  background: Sage
-  backstory: >
-    Part of a myconid circle in the coffee axis of Colombia. Left his community
-    to become a traveling Barista and share the wonderful properties of the
-    Chagaccino with the world. Takes every opportunity to brew and share it with
-    anyone he can.
-  ability_scores:
-    STR: 10
-    DEX: 18
-    CON: 17
-    INT: 12
-    WIS: 20
-    CHA: 8
-  saving_throw_proficiencies: [INT, WIS]
-  languages: [Common, "Deep Speech", Druidic]   # per PDF p1 (Common readable only, see speech: none)
-  hp_max: 163
-  ac: 17
-  speech: none               # Marty CANNOT SPEAK — communicates via hum/whistle/grumble.
-                             # Rapport Spores provide telepathy for anyone sharing a language.
-  defenses:
-    resistance: [poison]
-    # Condition immunities from Fungal Body (Druid level 14 class feature, NOT racial):
-    immunity_conditions: [blinded, critical_hits, deafened, frightened, poisoned]
-  racial_traits:
-    # Sporemaster (homebrew Myconid) — from PDF page 3
-    darkvision: 60
-    fungal_form:
-      poison_save_advantage: true
-      poison_resistance: true   # same as defenses.resistance above — listed here for clarity
-    hallucination_spores:
-      # Action: creature within 5 ft, CON save DC 19 — Poisoned + Incapacitated for 1 minute.
-      # 1/long rest (= 1/chapter).
-      uses_per_chapter: 1
-      save: CON
-      save_dc: 19
-      effect: [poisoned, incapacitated]
-    pacifying_spores:
-      # Action: creature within 5 ft, CON save DC 19 — Stunned for 1 minute.
-      # 1/long rest (= 1/chapter). Extremely powerful CC.
-      uses_per_chapter: 1
-      save: CON
-      save_dc: 19
-      effect: stunned
-    pheromone_spores:
-      # Action: mark one creature within 60 ft. For 1 minute, Marty + all spore servants
-      # have advantage on attacks against that creature.
-      # Uses = CON modifier (minimum 1) per long rest. CON 17 → mod +3 = 3 uses.
-      uses_per_chapter: 3
-      range: 4                  # 60 ft → ~4 FE tiles
-    rapport_spores:
-      # Telepathic communication within 30 ft with creatures sharing a language.
-      # If silenced, can still communicate telepathically but cannot cast V-component spells.
-      # FE implementation: Marty's dialogue uses hum/whistle flavor; no verbal speech.
-      range: 2                  # ~30 ft
-    distress_spores:
-      # Passive: when Marty takes damage, all creatures within 240 ft are alerted.
-      # FE implementation: flavor/passive — enemies in range are notified on Marty's injury.
-      alert_radius: 16          # 240 ft → ~16 FE tiles
-    sunlight_sensitivity:
-      # Disadvantage on attack rolls and WIS (Perception) checks in direct sunlight.
-      # Minor concern for an arctic campaign (little direct sun), but worth noting.
-      effect: disadvantage_attacks_perception_in_sunlight
+  race: Sporemaster
+  class: "Druid (Circle of Spores)"
+  source: data/pc-sheets/marty-the-merry-mushroom.json
+  lore: lore/marty.md
 
 # ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
 # Adjust during Phase 1 playtesting.
