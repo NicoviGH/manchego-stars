@@ -24,25 +24,26 @@ map:
   tileset: cave-interior        # FEUniverse cave tileset, arctic palette swap
   size: "24×24"                 # multi-level — finalize in Tiled
   description: >
-    First multi-level interior. Kobolds occupy the upper galleries; a vertical
-    shaft drops to the lower workings where the Grells ambush. Stairs/ladders as
-    chokepoints. Teaches vertical navigation.
+    First multi-level interior. Kobolds hold the upper galleries and the path
+    down; a vertical shaft drops to the lower workings (the seize tile) where the
+    Grells nest. Stairs/ladders are the chokepoints. Teaches vertical navigation.
 
 # ── Objective ──────────────────────────────────────────────────────────────────
 objective:
   type: seize
-  description: "Clear the Grells from the lower shaft and seize the mine head"
-  secondary:
-    - type: optional_fight
-      description: "Kobolds can be bypassed (sneak past) or fought — player's choice"
+  description: >
+    Descend the shaft and seize the deep workings — the flooded lower gallery
+    where the Grells nest. Reaching it requires the full descent; the win
+    triggers on the seize tile. Slaying the Grells guarding it is incidental.
 
 win_condition: seize_point_held
 lose_condition: all_player_units_defeated
 
 difficulty_note: >
-  First map with verticality and optional combat. Kobolds are weak and skippable;
-  the Grells (mini-bosses, CR3-ish) are the real threat in the cramped lower shaft.
-  Reward exploration without forcing the optional kobold fights.
+  The single teaching goal is verticality — descending the shaft. Kobolds are a
+  normal fight on the path down (not skippable); the 2 Grells (mini-bosses) are
+  the real threat, made scary by the cramped chokepoint of the lower shaft rather
+  than by stat inflation. Lean generous: the chokepoint rewards careful play.
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
@@ -57,7 +58,7 @@ enemy_units:
     level: 3
     weapon: iron-axe
     damage_type: slashing
-    ai_pattern: defensive       # hold galleries; bypassable
+    ai_pattern: defensive       # guard the galleries and the path down the shaft
   - id: grell
     name: "Grell"
     is_boss: true               # mini-boss tier
@@ -70,12 +71,14 @@ enemy_units:
 
 # ── Chests / Mine Loot ───────────────────────────────────────────────────────────
 chests:
-  - position: tbd               # deep-shaft reward, behind the Grells (risk/reward)
+  - position: tbd               # upper side gallery — a short detour off the main descent (NOT gated behind the Grells)
+    contents:
+      - id: stat-booster        # FIRST stat-booster of the game (docs/fe8-pacing-reference.md §3)
+        which: energy-ring      # FE8 Energy Ring (+2 Pow); broadly useful first booster
+  - position: tbd               # deep, near the seize tile — a "while you're here" gold grab
     contents:
       - id: gem-cache
         amount: 300             # gold value
-      - id: stat-booster        # FIRST stat-booster of the game (docs/fe8-pacing-reference.md §3)
-        which: tbd              # e.g. an Energy Ring equivalent — finalize in balance pass
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
 events:
@@ -112,6 +115,7 @@ signature_moments:
     trigger: wolfram_ore_snacking
 
 design_notes: >
-  Two PC signature beats land in the mid-map cutscene (RBG + Wolfram). First
-  stat-booster reward is hidden behind the Grells to teach risk/reward looting.
-  Recruit Trex post-chapter. Verticality is the teaching goal.
+  Verticality is the single teaching goal (descend the shaft to the seize tile).
+  Two PC signature beats land in the mid-map cutscene (RBG + Wolfram). The first
+  stat-booster (Energy Ring) sits in an accessible upper side gallery — an
+  exploration reward, not risk-gated. Recruit Trex post-chapter.
