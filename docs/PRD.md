@@ -20,7 +20,7 @@ Nicolas ran a multi-year D&D 5e campaign (*Rime of the Frostmaiden*) with 6 frie
 
 ## 2. Goals
 
-1. **Ship a playable `.gba` ROM** covering the full DM-notes arc (7 chapters, from the goblin iron quest through the Eastway ambush / Revel's End cliffhanger) that runs on stock GBA emulators and flash carts.
+1. **Ship a playable `.gba` ROM** covering the full DM-notes arc (Prologue + 8 chapters, from the goblin iron quest through the Eastway ambush / Revel's End cliffhanger) that runs on stock GBA emulators and flash carts.
 2. **Keep Fire Emblem's combat, dress it in D&D** — preserve FE's grid tactics, hit/avoid/might resolution, permadeath toggle, weapon triangle, growth-rate leveling, and FE crit. Layer D&D *flavor* on top: D&D damage-type labels (flavor only — no resistance multiplier; the triangle stays FE-native), spells as finite-use tomes that deplete and restock with gold (decision B), and a cosmetic d20 flourish on crits. Iconic matchups use vanilla FE weapon effectiveness. The rules stay FE so it plays like FE.
 3. **Faithfully represent all 7 PCs** as playable units with correct classes, abilities, progression arcs, and personality (portraits, dialogue, signature moments).
 4. **Build the engine as reusable** — separate engine code (damage types, spell slots, status/hazards, UI reskin) from campaign data (PCs, chapters, maps, dialogue). A second campaign (Curse of Strahd, a homebrew, etc.) should require only a new `campaigns/` folder, zero engine changes.
@@ -31,7 +31,7 @@ Nicolas ran a multi-year D&D 5e campaign (*Rime of the Frostmaiden*) with 6 frie
 ## 3. Non-Goals
 
 1. **Public release or distribution.** This is for 7 people. No patch hosting, no RomHack Plaza listing, no OGL/SRD compliance beyond what's needed for the codebase itself. The ROM is sent directly as a pre-patched file.
-2. **Full campaign coverage beyond the DM notes.** The MVP ends at the Revel's End cliffhanger (Chapter 7). Content beyond that requires a future writing session to outline. Don't spec what doesn't exist yet.
+2. **Full campaign coverage beyond the DM notes.** The MVP ends at the Revel's End cliffhanger (Chapter 8). Content beyond that requires a future writing session to outline. Don't spec what doesn't exist yet.
 3. **Custom engine (Lex Talionis, SRPG Studio, etc.).** The deliverable is a `.gba` file, not a standalone executable. The FE8 decomp is the foundation. Period.
 4. **A generic "D&D campaign editor" or campaign DSL.** The engine is *organized* for reuse (YAML data, campaign folders), but we don't build editor tooling, a class-definition language, or a GUI campaign builder. That's scope creep. We build exactly what Frostmaiden needs, structured so a second campaign is easy.
 5. **Original music composition or custom GBA audio conversion** for MVP. Ship with vanilla FE8 soundtrack. Frostmaiden album tracks and community audio are stretch goals explored post-ship.
@@ -63,8 +63,8 @@ Nicolas ran a multi-year D&D 5e campaign (*Rime of the Frostmaiden*) with 6 frie
 - **As a player,** I want to recruit NPC allies (Trex, Basil, The Mummy) as the story progresses so that the roster grows like a real Fire Emblem game.
 - **As a player,** I want to choose Casual or Classic mode (FE8's existing toggle) so that permadeath is my choice, not forced.
 - **As a player,** I want to see campaign-specific dialogue and story beats (the kobold execution, Messie becoming Speaker, Braulo smashing shackles) so that the game feels like *our* campaign, not a generic adventure.
-- **As a player,** I want Chapter 5 (The Maer Monster) to feel like a real boss fight where I discover Marty can Talk to Messie — rewarding me for paying attention to the story, not for following a tutorial prompt.
-- **As a player,** I want Chapter 7 (The Eastway Ambush) to end in a scripted defeat so that the cliffhanger landing at Revel's End hits dramatically.
+- **As a player,** I want Chapter 6 (The Maer Monster) to feel like a real boss fight where I discover Marty can Talk to Messie — rewarding me for paying attention to the story, not for following a tutorial prompt.
+- **As a player,** I want Chapter 8 (The Eastway Ambush) to end in a scripted defeat so that the cliffhanger landing at Revel's End hits dramatically.
 
 ### 5.2 Developer / Builder Experience
 
@@ -435,7 +435,7 @@ Fire Emblem's gold-and-shop loop is a core part of the game feel — earning gol
 
 - **Starting state:** All 7 PCs begin at low FE levels (equivalent to D&D level 1–3). They met at The Northlook tavern together — no staggered recruitment for PCs.
 - **End state:** the D&D Beyond sheets (level 20, except Sclorbo at 16) are **character flavor reference** — they tell us each PC's relative strengths (who's the tank, who's the glass cannon), not literal target numbers. FE stats are authored in FE terms (caps ~30), not converted from 5e scores.
-- **MVP scope (7 chapters):** PCs should reach roughly FE level 10–12 unpromoted by end of Chapter 7. Promotion should be possible but not expected within MVP.
+- **MVP scope (Prologue + 8 chapters):** PCs should reach roughly FE level 10–12 unpromoted by end of Chapter 8. Promotion should be possible but not expected within MVP.
 - **Growth rates:** authored in FE terms so a full-campaign playthrough lands each PC at a strong, class-appropriate FE endgame stat line — informed by the sheet's relative strengths, not tuned to match 5e numbers.
 - **Sclorbo exception:** Sclorbo's player left the campaign at D&D level 16. In the hack, Sclorbo starts at the same level as everyone else but has slightly lower endgame growth caps (reflecting level 16 vs 20 ceiling). No in-story explanation — just a balance lever.
 - **NPC recruits:** Join at lower levels than PCs (Trex is a "trainee" style low-level unit with high growths; Basil and The Mummy join at moderate levels).
@@ -459,11 +459,11 @@ Fire Emblem's gold-and-shop loop is a core part of the game feel — earning gol
 
 These are qualitative (audience of 7, no analytics):
 
-1. **"It boots and plays"** — the `.gba` loads on mGBA and a real GBA flash cart, all 7 chapters are completable, no hard crashes.
+1. **"It boots and plays"** — the `.gba` loads on mGBA and a real GBA flash cart, all 8 chapters are completable, no hard crashes.
 2. **"That's my character!"** — each player recognizes their PC from the portrait, stats, and abilities within 30 seconds of seeing them.
 3. **"It plays like Fire Emblem, reads like D&D"** — combat resolves with FE's familiar hit%/avoid forecast, while damage-type labels and the crit flourish make it read as *our* D&D campaign. A hammer is effective vs skeletons (vanilla FE effectiveness); a nat-20 flourish punctuates a crit.
 4. **"I remember this"** — at least 3 campaign-specific moments per chapter that make the players laugh or say "oh yeah, that happened."
-5. **"I want to keep playing"** — the Chapter 7 cliffhanger lands hard enough that at least 2 players ask when the next batch of chapters is coming.
+5. **"I want to keep playing"** — the Chapter 8 cliffhanger lands hard enough that at least 2 players ask when the next batch of chapters is coming.
 6. **Build health** — `make` passes at the end of every work session. No sessions end with a broken build.
 
 ---
@@ -500,8 +500,8 @@ These are qualitative (audience of 7, no analytics):
 **Goal:** The build-campaign tool works. One PC (Braulo recommended — simplest class mapping) is fully translated: YAML → injected into decomp → playable in mGBA with correct stats, portrait, inventory, and class.
 **Duration estimate:** 3–5 sessions (~5–10 hours)
 
-### Phase 3: MVP Content (Milestone: "7 Chapters Playable")
-**Goal:** All 7 PCs, all NPCs, all 7 chapters, all maps, all dialogue, all events. The `.gba` is playable start to finish.
+### Phase 3: MVP Content (Milestone: "8 Chapters Playable")
+**Goal:** All 7 PCs, all NPCs, all 8 chapters, all maps, all dialogue, all events. The `.gba` is playable start to finish.
 **Duration estimate:** 15–25 sessions (~30–50 hours)
 
 ### Phase 4: Polish & Ship (Milestone: "Ship It")
@@ -539,7 +539,7 @@ These are qualitative (audience of 7, no analytics):
 1. **M0: Repo Boots Clean**
 2. **M1: D&D Combat Layer Works**
 3. **M2: One PC End-to-End**
-4. **M3: 7 Chapters Playable**
+4. **M3: 8 Chapters Playable**
 5. **M4: Ship It**
 
 ---
@@ -619,7 +619,7 @@ Source from D&D Beyond portrait URL (`portraits.json`). AI-generate base portrai
 
 ---
 
-### M3: 7 Chapters Playable
+### M3: 8 Chapters Playable
 
 **#24 — Translate remaining 6 PCs** `content`
 Write YAML files for Marty, Meesmickle, Prof. RBG, Rootis, Sclorbo, Wolfram. Each needs: 5e stats, FE stats, growths, inventory, class, unique abilities, portrait reference.
@@ -694,7 +694,7 @@ Metadata: title "Manchego Stars: Rime of the Frostmaiden," 7 chapters, start lev
 ### M4: Ship It
 
 **#47 — Full playthrough #1 — functionality** `bug`
-Play all 7 chapters start to finish. Log every crash, soft-lock, missing dialogue, broken event, wrong stat, misplaced unit.
+Play all 8 chapters start to finish. Log every crash, soft-lock, missing dialogue, broken event, wrong stat, misplaced unit.
 
 **#48 — Full playthrough #2 — balance** `balance`
 Play again with focus on: hit rates (are they in the 65–80% sweet spot?), damage (does anything one-shot? does anything tickle?), chapter difficulty curve, is Chapter 7 survivable for N turns?, are casters balanced vs martials?
@@ -779,12 +779,12 @@ The MVP is **done** when:
 1. `make CAMPAIGN=rime-of-the-frostmaiden` produces a `.gba` that boots on mGBA without crashes.
 2. All 7 PCs are selectable from Chapter 1 with correct portraits, stats, classes, and inventories.
 3. All 5 NPC allies are recruitable at their designated chapters.
-4. All 7 chapters are playable start to finish with correct objectives, enemies, dialogue, and events.
+4. All 8 chapters are playable start to finish with correct objectives, enemies, dialogue, and events.
 5. Combat plays as vanilla FE (hit/avoid/might/crit), reskinned with D&D damage-type icons and triangle labels, and a cosmetic d20 flourish fires on crits.
 6. Damage-type flavor labels display, and vanilla FE weapon effectiveness works for iconic matchups (a hammer is effective vs skeletons, fire vs ice trolls, etc.).
 7. Spell-slot tomes deplete and refill correctly per chapter.
 8. Chapter 5 (Messie) is resolvable via Talk command.
-9. Chapter 7 ends in a scripted defeat with the Revel's End cliffhanger text.
+9. Chapter 8 ends in a scripted defeat with the Revel's End cliffhanger text.
 10. Casual/Classic mode toggle works for permadeath preference.
 11. The `.gba` has been playtested at least twice end-to-end (once for bugs, once for balance).
 12. The ROM has been successfully sent to and loaded by at least one other player from the group.
