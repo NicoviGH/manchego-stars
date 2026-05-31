@@ -10,10 +10,11 @@
 > Casting is rationed by the **decision-B economy** — spells are finite-use items
 > restocked with gold between chapters (no free refill); see decisions.md §Combat.
 >
-> **MVP scope = 5e levels 1–7.** Features at 5e level 9+ (Mystic Arcanums, 5th-level+
-> spells such as Revivify / Mass Cure Wounds / Raise Dead, the 4-beam Eldritch Blast,
-> RBG's second cannon Brie) are **post-MVP** and appear below only as end-state
-> reference — ignore them when judging MVP (Ch 1–7) balance.
+> **MVP = Prologue + Ch 1–8, played UNPROMOTED** (FE terms — there is no 5e-level scope;
+> progression is FE class levels + FE promotions, and 5e features are flavor only). The big
+> D&D-flavor headliners (Mystic Arcanums, 5th-level+ spells, the 4-beam Eldritch Blast, RBG's
+> second cannon Brie, Dragon Wings) belong to the **post-MVP / promotion** era and appear below
+> only as end-state reference — ignore them when judging MVP balance.
 
 ---
 
@@ -22,7 +23,7 @@
 - **Heavily caster-skewed:** 5 of 7 PCs cast spells. Their 5e flavor stats (WIS/INT/CHA) all fold to a single **MAG** stat in engine (see docs/decisions.md §Class Mapping), so they share one magic stat — what keeps them distinct is the **magic triangle** spread + role, not the stat.
 - **Only 2 frontliners:** Braulo (Berserker) and Wolfram (General). Both are walls — Braulo has Hermit Crab natural armor (high FE DEF, big HP pool, 75% HP / 50% DEF growths) and Shell Defense; Wolfram has the party's highest DEF (General-tier). The party has no glass-cannon frontliner.
 - **No dedicated healer in the PC roster.** Sclorbo (Bard 16) is the de-facto primary healer — Cure Wounds, Revivify, Mass Cure Wounds, Raise Dead all on his prepared list.
-- **No flier in the PCs during MVP** — Pinky NPC fills from Ch1. Rootis's Dragon Wings transform is a **post-MVP** unlock (Sorcerer 14 / promotion); it is NOT available in Ch 1–7.
+- **No flier in the PC roster** — Pinky (NPC) fills the flier slot from Ch1. (Rootis's old "Dragon Wings" flight-transform was **dropped** with the FE-strict ability purge — he's a stock Mage with no flight; his draconic identity is sprite/lore only.)
 - **No thief / no cavalry in the PCs.** Trex (Ch3) and Baxby (Ch1–2) NPCs fill those slots.
 - **Radiant damage is absent from the PC roster.** Basil (Cleric NPC, Ch4) must carry the Radiant identity.
 - **The full roster (7 PCs + 5 NPCs = 12 units by Ch5)** is balanced overall; the PC-only roster is not — Chapters 1–3 are the danger zone.
@@ -171,13 +172,16 @@ Standard FE design: one slow tank, several fast casters/dancers. Wolfram will be
 
 PCs MOV: 4 (Marty, Wolfram) — 6 (Braulo, RBG, Sclorbo). No fast cavalry. Maps are mostly arctic (snow / ice = difficult terrain in vanilla FE8).
 
-**Mitigations available:**
-- Rootis **Snow Ski** (passive): double MOV on snow/ice — the main MVP arctic-mobility tool
-- Baxby NPC: high MOV
-- Marty **Spreading Spores**: places hazard zone (offensive use of slowness)
-- Rootis **Dragon Wings** (flier MOV, ignores terrain): **post-MVP only** — not a Ch 1–7 mitigation
+**Mitigations available (FE-native only — no custom passives):**
+- **Pinky** (NPC Pegasus Knight): flight ignores terrain; can Rescue/ferry a stranded unit.
+- **Baxby** (NPC): high MOV mount.
+- Vanilla FE tools: Restore/terrain play, chokepoint positioning, and the convoy sled framing.
 
-In MVP the party leans on Rootis's Snow Ski + Baxby for arctic mobility; if Rootis dies in classic mode, mobility tightens (Dragon Wings is not yet online to compensate). This is a real Ch 1–7 pressure to keep in mind.
+The party has no fast cavalry and two MOV-4 units (Marty, Wolfram) on snow/ice (difficult
+terrain). With the FE-strict purge there are **no custom mobility abilities** (the old "Snow
+Ski," "Spreading Spores," and Rootis "Dragon Wings" are gone) — so arctic mobility leans on
+Pinky + Baxby and on map/terrain design. Tune this via enemy placement and map openness rather
+than per-unit movement buffs (memory [[manchego-stars-fe-level-design]]).
 
 ### 7. Chapter 1–3 fragility
 

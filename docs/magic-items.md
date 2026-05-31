@@ -5,9 +5,9 @@
 > text, so standard DMG items are described from the SRD/DMG and **homebrew items are flagged
 > `[VERIFY]`** — need rules text from the sheet or DM before finalizing.
 >
-> **Gating:** these are end-state campaign rewards. Per [class-progression-tables.md](class-progression-tables.md)
-> and the campaign-structure memory, almost all are **post-MVP** (Ch 8–20) acquisitions. MVP
-> (Ch 1–7) keeps the simple starting loadouts already in the PC YAMLs.
+> **Gating:** these are end-state campaign rewards, flavored onto vanilla FE items. Almost all
+> are **post-MVP** (Ch 9–20) acquisitions; the **MVP (Prologue + Ch 1–8)** keeps the simple
+> starting loadouts already in the PC YAMLs (see the campaign-structure memory).
 >
 > **Process:** review/confirm these, then slot the chosen ones into the PC YAMLs as
 > chapter-gated inventory. This doc is the holding pen so the YAMLs stay clean meanwhile.

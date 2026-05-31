@@ -1,12 +1,19 @@
-# Class Progression Tables — 5e Level → FE Chapter Unlock
+# Class Progression Tables — D&D-Source Reference (flavor only)
 
-> **Purpose:** Map each 5e class's level-by-level features to the FE chapter where they
-> unlock, so the YAMLs can gate abilities to MVP vs post-MVP. Two layers per the engine/
-> content split:
-> - **Generic base-class tables** (engine, reusable) — Barbarian, Bard, Sorcerer, Warlock,
->   Druid, Artificer. Any campaign inherits these.
-> - **Campaign subclass + PC build paths** (content, this campaign) — the specific
->   subclasses, homebrew races, and reconstructed per-PC builds for Rime of the Frostmaiden.
+> **Status / scope (reframed 2026-05-31): this is a D&D-SOURCE FLAVOR REFERENCE — it does
+> NOT drive FE mechanics.** Manchego Stars is FE-strict: every unit is a **stock vanilla FE8
+> class** with FE levels, FE growths, and FE branched promotions, and **no per-character
+> abilities** (the custom-ability / D&D-progression layer was purged 2026-05-29 — see
+> `docs/decisions.md`). So the 5e features below **do not unlock by chapter and are not gated
+> into the game**; they're a record of what each PC was in the real campaign, used for
+> sprite/tome/portrait flavor and for choosing which FE tomes to author for the casters.
+> There is **no "MVP = 5e levels 1-X" feature scope** — MVP scope is "unpromoted FE units,
+> promotions post-MVP" (memory [[manchego-stars-campaign-structure]]).
+>
+> Two layers (kept for provenance):
+> - **Generic base-class tables** — Barbarian, Bard, Sorcerer, Warlock, Druid, Artificer.
+> - **Campaign subclass + PC build paths** — the subclasses, homebrew races, and reconstructed
+>   per-PC builds for Rime of the Frostmaiden.
 >
 > **Sources (verified 2026-05-28):**
 > - SRD base classes + SRD subclasses (Berserker, Lore, Draconic, Fiend): live pull from
@@ -27,13 +34,17 @@
 
 ---
 
-## Chapter → 5e Level Curve (PROPOSAL — confirm before YAML retier)
+## Chapter ↔ D&D level — narrative parallel (flavor only, NOT a mechanic)
 
-Full game = **20 chapters** (FE8 cadence). All 7 PCs reach **5e level 20** in-game (Sclorbo's
-real-life L16 is flavor only — he levels to 20 with the party). Simplest readable curve is
-**~1 chapter per 5e level**:
+> In-game progression is **FE levels + FE promotions**, never 5e levels (see the status note
+> up top). This table is only a **flavor parallel** — roughly where each PC sits in their
+> canonical D&D arc as the chapters go by — useful for dialogue/lore. It **does not gate
+> anything**; no feature listed is implemented as an in-game unlock.
 
-| Chapter | 5e Level | Milestone |
+Full-game flavor: all 7 PCs are canonically ~**5e level 20** by the end (Sclorbo's real-life
+L16 is flavor too — he "levels with the party"). A readable ~1-chapter-per-level parallel:
+
+| Chapter | D&D level (flavor) | D&D milestone (flavor) |
 |---|---|---|
 | 1 | 1 | Start. Cantrips + 1st-level spells. |
 | 2 | 2 | |
@@ -41,31 +52,29 @@ real-life L16 is flavor only — he levels to 20 with the party). Simplest reada
 | 4 | 4 | First ASI/feat. 2nd-level spells. |
 | 5 | 5 | Extra Attack (martials). 3rd-level spells. Arcane Firearm. |
 | 6 | 6 | Subclass tier-2 (Elemental Affinity, Additional Magical Secrets, Fungal Infestation, Mindless Rage). |
-| **7** | **7** | **MVP CLIFFHANGER.** 4th-level spells. Feral Instinct, Forge Expert, Flash of Genius. |
+| 7 | 7 | 4th-level spells. Feral Instinct, Forge Expert, Flash of Genius. |
+| **8** | **8** | **MVP CLIFFHANGER (Eastway scripted defeat → Revel's End).** |
 | — POST-MVP — | | |
-| 8 | 8 | |
 | 9 | 9–10 | Explosive Cannon, Spreading Spores. 5th-level spells. |
 | 10 | 11 | **FE promotion era** (FE8 first-promo cadence). Mystic Arcanum 6th. |
 | 11 | 12 | Blade Forge. |
-| 12–13 | 13–14 | **Dragon Wings, Hurl Through Hell, Fungal Body, Retaliation.** Mystic Arcanum 7th. |
-| 14 | 15 | **Brie (2nd cannon), Fortified Position.** Mystic Arcanum 8th. |
-| 15–17 | 16–18 | Draconic Presence, Master of the Forge. Mystic Arcanum 9th (L17). |
-| 18–20 | 19–20 | Capstones (Primal Champion, Eldritch Master, Soul of Artifice, Archdruid). Endgame. |
+| 12–14 | 13–14 | **Dragon Wings, Hurl Through Hell, Fungal Body, Retaliation.** Mystic Arcanum 7th. |
+| 15 | 15 | **Brie (2nd cannon), Fortified Position.** Mystic Arcanum 8th. |
+| 16–18 | 16–18 | Draconic Presence, Master of the Forge. Mystic Arcanum 9th (L17). |
+| 19–21 | 19–20 | Capstones (Primal Champion, Eldritch Master, Soul of Artifice, Archdruid). Endgame. |
 
-**MVP scope (Ch 1–7) = 5e levels 1–7.** This is richer than the earlier "levels 1–5"
-estimate — it now includes 4th-level spells and all subclass tier-1/tier-2 features, but
-still **excludes** everything at 5e level 9+: no Mystic Arcanums, no Dragon Wings transform,
-no Spreading Spores, no Fungal Body, no Brie, no Blade Forge, no 5th-level spells.
-
-> ⚠️ **Confirm this curve.** If you want MVP to feel more/less powerful, we shift the
-> chapter↔level mapping (e.g. front-load so Ch 7 = level 9). Everything below assumes 1:1.
+In FE terms the **MVP (Prologue + Ch 1–8) is played UNPROMOTED**; promotions and the bigger
+D&D-flavor spikes (5th-level+ spells, Mystic Arcanums, Dragon Wings, Brie) all belong to the
+post-MVP/promotion era. But MVP power is set by **FE class/level/weapon-tier**, not by this
+column — the column is flavor parallax only.
 
 ---
 
-# PART 1 — Generic Base-Class Tables (engine, reusable)
+# PART 1 — Generic Base-Class Tables (D&D-source reference)
 
-Bold = a feature that becomes an FE-visible mechanic. ASIs become FE stat-ups / personal
-feats. "MVP?" = available by Ch 7 under the 1:1 curve.
+These record each class's 5e feature schedule **as campaign source** — what the PC was in the
+real game. They are **not** an FE-unlock spec (units are stock FE8 classes with no
+per-character abilities). Useful for flavor, sprite/tome naming, and writing lore.
 
 ## Barbarian (Braulo)
 | 5e Lvl | Feature | FE form | Ch | MVP? |
@@ -259,13 +268,13 @@ them on the chapter timeline. Below: the MVP-relevant choices + the headline pos
 
 ---
 
-## Action Items Surfaced by This Audit
+## Obsolete under FE-strict
 
-1. **Confirm the chapter→level curve** (1:1 proposed). Everything else keys off it.
-2. **Wolfram YAML fix:** remove "Investiture of Stone / Forcecage Mystic Arcanums" (not Metallurgist features); replace with the armor-ability list (Flamethrower/Armor Lock/Recharge/Explosive Burst).
-3. **Rootis YAML fix:** Dragon Wings transform → gate to Ch13 (post-MVP), not always-on.
-4. **Meesmickle YAML fix:** Hurl Through Hell → Ch13; Mystic Arcanums → Ch10+; EB beams scale with chapter.
-5. **Sclorbo YAML fix:** only Cure Wounds in MVP; Revivify/Mass Cure/Raise Dead → post-MVP.
-6. **Marty YAML fix:** Symbiotic Entity temp HP = 4×level (Ch-scaled), +80 only at endgame; Halo dice scale 1d4→1d10; Spreading Spores/Fungal Body → post-MVP.
-7. **RBG YAML fix:** Brie → Ch14 (was "tbd"); Explosive Cannon → Ch9.
-8. **party-balance.md fix:** re-evaluate roster for the **MVP-only** (Ch1–7, unpromoted, 5e L1–7) state — the current analysis assumes end-state level 20.
+This doc once carried an "ability-gating" action list (gate Mystic Arcanums to Ch X,
+Dragon Wings transform to Ch Y, scale Eldritch-Blast beams by chapter, give Wolfram an
+armor-ability list, etc.). **All of it is moot:** the custom-ability layer was purged on
+2026-05-29 — every PC is now a **stock vanilla FE8 class with no per-character abilities**
+(`docs/decisions.md` §Class Mapping & Promotions). Nothing in the 5e feature tables above is
+implemented as an in-game unlock; they remain only as D&D-source flavor. The unit
+source-of-truth is the YAML (`campaigns/rime-of-the-frostmaiden/pcs/*.yaml`,
+`npcs/*.yaml`) → generated `docs/CLASSES.md`.

@@ -1,13 +1,15 @@
 # PC Full Spell Lists — Picking Worksheet
 
 > **Purpose:** The complete known/prepared spell list for each caster PC, pulled from their
-> D&D Beyond sheet PDFs (`References/PCs/*.pdf`) on 2026-05-28. This is the **menu Nicolas
-> picks from** — per the agreed workflow, he hand-selects which spells become FE abilities;
-> Claude then converts the chosen ones (per [rules-mapping.md](rules-mapping.md)) and gates
-> them by chapter (per [class-progression-tables.md](class-progression-tables.md), 1:1 curve).
+> D&D Beyond sheet PDFs (`References/PCs/*.pdf`) on 2026-05-28. This is the **flavor menu Nicolas
+> picks from** — he hand-selects which spells become each caster's **FE tomes/staves** (the
+> chosen ones are authored as vanilla FE items per `docs/decisions.md` decision B; see
+> [rules-mapping.md](rules-mapping.md) for the conversion). It is a **flavor source**, not a
+> 5e-level mechanic: spells are NOT gated by a "5e level / chapter curve" — a caster's tomes
+> grow the FE way (buy/find better tomes; staves arrive at promotion).
 >
 > **Do NOT port all of these** — a level-20 Druid prepares 100+ spells; that's not Fire
-> Emblem. Pick a tight signature kit (~6–10 per PC) spanning Ch 1–20. Mark picks with ✓.
+> Emblem. Pick a tight signature kit (~6–10 per PC) across the campaign. Mark picks with ✓.
 >
 > Spell levels below are by the sheet's section order. `[R]` = ritual. Re-extract anytime:
 > `pdftotext -layout "<PC> Character Sheet.pdf" - | grep -A40 "=== CANTRIPS"`
@@ -16,9 +18,10 @@
 
 ## ✅ CONFIRMED SIGNATURE KITS (locked 2026-05-28)
 
-Nicolas's picks, FE-converted per [rules-mapping.md](rules-mapping.md) and gated by the 1:1
-chapter curve (MVP = Ch 1–7 = 5e L1–7). **The gated, machine-readable output lives in the PC
-YAMLs** (`campaigns/rime-of-the-frostmaiden/pcs/*.yaml`); this section is the human index.
+Nicolas's picks, authored as vanilla FE tomes/staves per [rules-mapping.md](rules-mapping.md)
++ `docs/decisions.md` decision B. **The machine-readable output lives in the PC YAMLs**
+(`campaigns/rime-of-the-frostmaiden/pcs/*.yaml`); this section is the human index. (MVP =
+Prologue + Ch 1–8, unpromoted — staves come at promotion, post-MVP.)
 
 **PREPARED-SPELL FINDING (2026-05-28):** The D&D Beyond PDFs preserve a `PREP` column —
 `P` = prepared, `O` = known-but-unprepared. This only matters for *prepared-casters*:
@@ -51,7 +54,7 @@ single-target; AoE only via siege tomes), so those compromise to siege-range sin
    ability. It fires once as a scripted endgame beat: RBG spends it to turn **Pinky** (his
    homunculus "son," already a deployable unit) into a true living being at the campaign's end.
 
-| PC | MVP signature kit (Ch 1–7) | Post-MVP headliners |
+| PC | MVP signature kit (Prologue–Ch 8, unpromoted) | Post-MVP headliners |
 |---|---|---|
 | **Marty** (Druid/Spores) — *prepared spore kit* | Chill Touch=*Witherspore* (cantrip), Goodberry=*Chagaccino Berries* (Ch1), Blindness/Deafness=*Blinding Bloom* (Ch3), Animate Dead=*Corpse Bloom* summon (Ch5), Gaseous Form=*Spore Drift* (Ch5), Blight=*Rot* (Ch7), Confusion=*Maddening Spores* (Ch7) | Cloudkill=*Killing Cloud* (Ch9), Contagion=*Plague Spores* (Ch9). Class: Halo of Spores / Symbiotic Entity / Fungal Infestation |
 | **Meesmickle** (Warlock/Fiend) | Eldritch Blast (primary, 1→2 beams ✓), Toll the Dead (2nd cantrip ✓), Hellish Rebuke (Ch1→counter proc), Burning Hands (Ch1), Suggestion (Ch3), Fireball (Ch5), Vampiric Touch (Ch5) | Hurl Through Hell (Ch13), Eyebite (Ch10), Finger of Death (Ch13), Power Word Kill (Ch17). **Demiplane DROPPED** (no FE analogue) |
