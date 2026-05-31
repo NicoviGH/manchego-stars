@@ -1,70 +1,38 @@
-# Handoff: Full doc-consolidation DONE + the "5e-level scope" framing RETIRED (FE-strict). NEXT = a dedicated FE-strict pass on party-balance.md + the PRD/campaign-brief chapter-count staleness, then resume the Ch6 walkthrough
+# Handoff: Lean-repo cleanup DONE — 8 drift-prone docs deleted, PRD slimmed, backlog moved to GitHub. NEXT = resume the Ch6 walkthrough (or start building from the GitHub backlog)
 
 **Date:** 2026-05-31
-**Session focus:** Executed the whole doc-consolidation pass (chapters AND class/rules docs), then — on Nicolas's insight — **retired the entire "MVP = 5e levels 1-X" framing.** YAML is the single source of truth; two generators produce the indexes (`gen-chapter-index.rb`→CHAPTERS.md, `gen-class-index.rb`→CLASSES.md); durable "why" lives in lean hand docs. All committed + pushed to main (`b590286`).
+**Session focus:** Big lean-repo + doc-consolidation pass. YAML is the single source of truth; two generators produce the indexes; the backlog now lives in **GitHub issues** (the repo reads like a mature ROM-hack repo). All committed + pushed to main (`ace9cd0`).
 
-**KEY RESOLUTION (this is the answer to the old "levels 1-5 vs 1-7" question):** Nicolas pointed out we ship **FE classes/levels/promotions** — so 5e levels never gated anything, and the per-chapter 5e-feature schedule listed *purged* abilities (the custom-ability layer was deleted 2026-05-29). **Resolution: progression is FE-native — MVP plays UNPROMOTED, promotions post-MVP ~Ch 10-12; 5e levels/features are flavor only.** The campaign-structure memory, MEMORY.md index, `class-progression-tables.md`, `pc-spell-lists.md`, `magic-items.md`, and `party-balance.md` (scope/mobility) were reframed to FE terms. Do NOT reintroduce a "5e-level scope."
+**Working principle locked in (memory `feedback_lean_repo_structure`):** match the decomp / experienced-hacker repo structure — **the data IS the doc** — and **delete drift-prone planning-prose** rather than re-patching it. No staleness banners (`feedback_clean_doc_rewrites`).
+
+**Deleted this session (8 docs, all restorable from git):** `chapter-outline.md`, `class-mapping.md` (→ generated CHAPTERS.md/CLASSES.md + decisions.md), `party-balance.md` + `class-progression-tables.md` (pre-purge snapshots / derivable from `data/pc-sheets/*.json`), `combat-formulas.md` (engine self-documents; in decisions.md + rules-mapping), `campaign-brief.md` + `research.md` (pre-PRD scaffolding), `session-log.md` (git history covers it).
+
+**Also resolved:** the old "MVP = 5e levels 1-5 vs 1-7" question — it was the wrong frame. We ship FE classes/levels/promotions; **progression is FE-native (MVP unpromoted, promotions post-MVP ~Ch 10-12); 5e levels/features are flavor only.** Do NOT reintroduce a "5e-level scope." PRD slimmed 847→594 lines (combat/triangle/§7/§6.7 → pointers; §15/§16 backlog → GitHub). CLAUDE.md source-of-truth block rewritten as the data-is-the-doc table.
+
+**Backlog is now GitHub issues** (37 open: 6 scaffold + 31 created this session across milestones M0–M4). Track work there, not in markdown.
 
 ## Standing rules (how Nicolas wants this work done)
 
 - **Stock vanilla FE8 classes only** (verbatim decomp data). Element = flavor, never a mechanic.
 - **Ground FE claims in `fireemblem8u/`**; **ground STORY in the two PDFs** (DM notes Ch1–7 only + the published book, image-only scan, PDF page = printed+1).
 - **Clean native doc rewrites** (no STALE/reverted banners). **Auto-push to main.** **Collaborative, chapter-by-chapter** story work. **Balance: defer to FE, lean generous.**
-- **Doc source-of-truth model (NEW, now settled in `decisions.md`):** (1) per-chapter facts live ONLY in the chapter YAML; (2) `docs/CHAPTERS.md` is GENERATED from it — never hand-edit; (3) hand docs hold only durable rationale + forward planning. **Don't re-introduce chapter/roster tables into hand docs — point to the YAML / generated index.**
+- **Doc source-of-truth model (settled in `decisions.md`):** (1) per-chapter/unit facts live ONLY in the YAML; (2) `docs/CHAPTERS.md` + `CLASSES.md` are GENERATED — never hand-edit; (3) hand docs hold only durable rationale + forward planning. **Don't re-introduce chapter/roster tables into hand docs.**
+- **Lean repo** (memory `feedback_lean_repo_structure`): match the decomp / experienced-hacker structure; the data IS the doc; **delete drift-prone planning-prose rather than re-patch it.** Work backlog lives in **GitHub issues**, not markdown.
 
-## Accomplished this session (committed + pushed — `b8198c9`)
+## Current repo / doc state (post-cleanup)
 
-- **Wrote `tools/gen-chapter-index.rb`** (ruby, stdlib) → generates **`docs/CHAPTERS.md`** (overview table: #, title, cadence, objective, recruits, unlocks). Regenerate with `ruby tools/gen-chapter-index.rb`. Added a `cadence:` token→emoji map; added the missing `cadence:` to ch01.
-- **Retired `docs/chapter-outline.md`:** MVP table → generated `CHAPTERS.md`; the post-MVP **Act II–V scaffold + open questions → new `docs/roadmap.md`** (renumbered +1 for the Ch4 split — its old "promotions Ch9-11" now reads Ch10-12, which reconciles with the campaign-structure memory); the **promotion seam + cadence taxonomy + the 3-tier doc model → `decisions.md`**.
-- **Trimmed `PRD.md §7`** (stale 7-chapter breakdown) → a pointer to `CHAPTERS.md`/the YAML.
-- **Trimmed `fe8-pacing-reference.md`** to FE8-only facts (dropped the OUR-per-chapter mapping rows + §5).
-- **Fixed cross-refs from the Ch4 split:** `ch03` now unlocks `ch04-the-white-moose` (was the stale `ch04-the-elven-tomb`). Redirected all YAML header/cadence/seam comments off the retired outline (→ `CHAPTERS.md` / `decisions.md` / `roadmap.md`).
-- **`decisions.md`:** recount **MVP scope 7→8 chapters** (Prologue–Ch 8); added Documentation Model, cadence taxonomy, promotion-seam (Ch 8→9) decisions.
-- All 9 chapter YAMLs re-validated (`ruby -ryaml`). Generator runs clean.
-- **Memory:** `project_manchego_stars_campaign_structure` already carried MVP=Ch1-8 (the step-7 bump was already in place) — no change needed.
+- **`docs/` now:** `decisions.md` (settled why — doc model, cadence taxonomy, promotion seam, class mapping, combat, economy), `CHAPTERS.md` + `CLASSES.md` (GENERATED — never hand-edit), `roadmap.md` (post-MVP Act II–V scaffold), `fe8-pacing-reference.md` (FE8-only), `rules-mapping.md` (generic 5e→FE engine spec), `PRD.md` (vision/architecture/roadmap, 594 lines), `pc-spell-lists.md` + `magic-items.md` (D&D-source flavor worksheets — consume-then-prune as caster tomes / reward items get authored during the walkthrough), `frostmaiden-resources.md` (external map refs).
+- **Generators:** `ruby tools/gen-chapter-index.rb` → CHAPTERS.md; `ruby tools/gen-class-index.rb` → CLASSES.md. Re-run after editing any chapter/unit YAML. Validate YAML: `ruby -ryaml -e 'YAML.load_file("<path>")'`.
+- **Source of truth:** chapter facts = `campaigns/.../chapters/ch00…ch08-*.yaml`; unit class/promotion = `campaigns/.../{pcs,npcs}/*.yaml`. Backlog = **GitHub issues** (M0–M4).
 
-## ⚠️ Conflict surfaced this session (needs Nicolas) — MVP feature scope: levels 1-5 vs 1-7
+## NEXT TASK
 
-The campaign-structure memory **contradicts itself**: its frontmatter + the MEMORY.md index say **"MVP feature scope = 5e levels 1-5 only,"** but the memory BODY (and `class-progression-tables.md`, `pc-spell-lists.md`, `party-balance.md`, `PRD §goals`) all say **"MVP = Ch 1-7 = 5e levels 1-7."** These can't both be right, and the Ch4 split (MVP is now Ch 1-**8**) means the old 1:1 "Ch N = 5e level N" curve also needs a re-look (the memory body line 12 already flags this). **Do not silently resolve — confirm the intended MVP level ceiling with Nicolas**, then sweep the affected docs/YAML in one pass. This is upstream of the class/rules audit below.
+**Resume the collaborative chapter walkthrough at Ch 6 — The Maer Monster** (memory `feedback_collaborative_story_planning`: interactive, FE8-parallel + our version, not solo doc dumps), now with the lean doc model in place. Alternatively, start building from the GitHub backlog — the first real blocker is **"Install the build toolchain"** (devkitARM/agbcc/ColorzCore/libpng), which gates every ROM build/test.
 
-## Step 6 — class/rules-doc audit: DONE (`95441b3`)
-
-Nicolas delegated ("do whatever is best practice for rom hacking"), so the class-doc
-consolidation was executed (same single-source pattern as the chapters):
-- **Added `tools/gen-class-index.rb` → `docs/CLASSES.md`** (PC+NPC roster from the unit YAMLs).
-- **Deleted `docs/class-mapping.md`** (rationale already in `decisions.md`; table now generated). Redirected all PC-YAML headers + doc refs to `CLASSES.md`/`decisions.md`.
-- **PRD §6.7** class table → pointer; **PRD §6.8** rewritten to decision B (deplete + gold restock; cantrips high-count, not infinite) — it had contradicted §6.9.
-- Fixed split cross-refs: braulo signature ch07→ch08, marty signature ch05→ch06, marty "stock Monk"→"stock Shaman"; party-balance magic-triangle (Marty is Dark, not Light).
-- **Kept** (correctly scoped, not duplicates): `rules-mapping.md` (generic engine 5e→FE spec), `combat-formulas.md` (concise combat quick-ref), `class-progression-tables.md` (D&D-source-of-record for when 5e features unlock), `party-balance.md` (analysis snapshot). These still need the level-range reconciliation below.
-
-## Lean-repo principle (NEW memory `feedback_lean_repo_structure`)
-
-Nicolas: **match the decomp / experienced-hacker repo structure — the data IS the doc — and DELETE drift-prone planning-prose docs rather than re-patching them.** Acted on it: **deleted `docs/party-balance.md`** (a 2026-05-27 pre-purge balance analysis still naming reverted classes — Dark Sage / Lore Bard / Breath Weapon; its durable bits live in `decisions.md` / `CLASSES.md` / memory `feedback_fe-level-design`). Apply this lens going forward.
-
-## NEXT TASK — candidates for the same lean-repo treatment (get Nicolas's nod per-doc)
-
-The same "drift-prone prose / duplicates data" lens flags more `docs/` files. **Surface for delete-or-keep before touching** (some hold unique content):
-- **`campaign-brief.md`** — has its own per-chapter Ch1-7 breakdown that duplicates the generated `CHAPTERS.md` and is stale. Likely **delete or trim to a pointer**.
-- **`combat-formulas.md`** — restates vanilla FE8 combat math (the engine already "documents itself"); overlaps `decisions.md §Combat` + `rules-mapping.md §A`. Candidate to **delete** (or keep as a 1-screen quick-ref).
-- **`class-progression-tables.md`, `pc-spell-lists.md`, `magic-items.md`** — now reframed as D&D-source *flavor reference*. Keep ONLY if Nicolas wants the campaign-source record; otherwise they're prunable too.
-- **`research.md`, `session-log.md`** — check if still load-bearing.
-
-Also still open (count, not the level frame): **`PRD.md`** says "7 chapters" / "Chapter 7" finale in goals/milestones/criteria + the §16 issue backlog (predates the Ch4 split). MVP is **Prologue + Ch 1-8** — fix the counts, and decide if §16 needs a backlog refresh (or if PRD itself should slim toward decomp-style minimalism).
-
-Then: **resume the collaborative chapter walkthrough at Ch 6 — The Maer Monster** (memory `feedback_collaborative_story_planning`).
-
-## Other blockers / open (unchanged)
+## Blockers / open
 
 - **Signature moments TBD** for Meesmickle, Rootis, Sclorbo (Marty done: primary=ch06 Messie Talk, secondary=ch04 wolf parley).
 - **pepperjack/brie `fe_stats.class` = null** (FE-legal class TBD post-MVP).
-- **Ch 9–20 plot** blocked on the rest of the DM notes (cover Ch1–7 only).
-- **Build toolchain still NOT installed** (devkitARM/agbcc/ColorzCore/libpng); `tools/build-campaign.ts` also unbuilt.
-
-## Key files
-
-- Generators: `tools/gen-chapter-index.rb` → `docs/CHAPTERS.md`; `tools/gen-class-index.rb` → `docs/CLASSES.md`. Re-run after editing any chapter/unit YAML.
-- Chapters: `campaigns/rime-of-the-frostmaiden/chapters/ch00…ch08-*.yaml` (source of truth).
-- Units: `campaigns/rime-of-the-frostmaiden/pcs/*.yaml`, `npcs/*.yaml` (source of truth for class/promotion).
-- Durable docs: `docs/decisions.md` (settled why — incl. the doc model, cadence taxonomy, promotion seam, class mapping), `docs/roadmap.md` (post-MVP scaffold), `docs/fe8-pacing-reference.md` (FE8-only).
-- Level-sweep targets (after the cap decision): `docs/{class-progression-tables.md, pc-spell-lists.md, party-balance.md, magic-items.md, campaign-brief.md, PRD.md}` + the campaign-structure memory.
-- Validate YAML: `ruby -ryaml -e 'YAML.load_file("<path>")'`.
+- **Ch 9–20 plot** blocked on the rest of the DM notes (cover Ch1–7 of the playthrough only).
+- **Build toolchain not installed** + `tools/build-campaign.ts`/`build-events.ts` unbuilt (GitHub issues exist for both).
+- **Lingering lean candidates** (low priority): `pc-spell-lists.md` / `magic-items.md` should be consumed into YAML then deleted; `PRD.md` could slim further (§8 art / §9 audio partly overlap decisions.md §Art & Audio) if it stops earning its keep.
