@@ -29,8 +29,8 @@ Three tiers for any 5e mechanic:
 
 ## A. Combat Resolution
 
-> **Resolution is vanilla FE8** (see `decisions.md` §Combat System and
-> `combat-formulas.md`). Combat uses FE hit% / avoid / might / FE crit; the d20, AC,
+> **Resolution is vanilla FE8** (see `decisions.md` §Combat System).
+> Combat uses FE hit% / avoid / might / FE crit; the d20, AC,
 > advantage, and saving throws are **not mechanics here** — the d20 survives only as a
 > cosmetic crit flourish. The table below records what each 5e mechanic becomes under
 > FE-owned resolution.

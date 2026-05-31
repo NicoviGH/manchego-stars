@@ -3,7 +3,6 @@
 > **Version:** 1.0 — May 27, 2026
 > **Author:** Nicolas (via Claude)
 > **Status:** Draft — ready for review
-> **Source documents:** `campaign-brief.md`, `research.md`
 
 ---
 
@@ -209,9 +208,9 @@ manchego-stars/
 │── DOCS ──────────────────────────────────────────────────────
 └── docs/
     ├── decisions.md           # Human-written design decisions (no re-litigation)
-    ├── combat-formulas.md     # vanilla-FE combat reference + D&D flavor layer
+    ├── CHAPTERS.md            # GENERATED chapter index; see gen-chapter-index.rb
     ├── CLASSES.md             # GENERATED roster (5e class → FE class); see gen-class-index.rb
-    └── session-log.md         # What was accomplished each session
+    └── roadmap.md             # Post-MVP Act II–V scaffold (forward planning)
 ```
 
 ### 6.3 Toolchain
@@ -262,8 +261,8 @@ The engine makes the following assumptions about any campaign folder:
 ### 6.5 Combat System — Vanilla FE8 (D&D flavor on top)
 
 > Combat *rules* are vanilla FE8 so it plays like Fire Emblem; D&D supplies flavor
-> (incl. damage-type labels). Full reference: `combat-formulas.md`. The engine **does
-> not** replace `bmbattle.c`.
+> (incl. damage-type labels). Full reference: `decisions.md` §Combat System +
+> `rules-mapping.md` §A. The engine **does not** replace `bmbattle.c`.
 
 **Attack Resolution — vanilla FE (unchanged):** FE8's hit% vs avoid (two-RN), with the
 weapon-triangle hit bonus. **No d20, no Armor Class, no advantage/disadvantage.** AC
