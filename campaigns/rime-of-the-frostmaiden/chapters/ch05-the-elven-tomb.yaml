@@ -1,0 +1,153 @@
+# chapters/ch05-the-elven-tomb.yaml
+# See docs/PRD.md §7 and docs/chapter-outline.md for the narrative + cadence.
+# Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
+# Canon: Rime of the Frostmaiden pp.80-83 (the Elven Tomb, Ravisin, Sahnar the mummy).
+# This is the DefeatBoss half of FE8 Ch4 "Ancient Horrors" — the forest/DefeatAll half is ch04.
+
+id: ch05-the-elven-tomb
+title: "The Elven Tomb"
+chapter_number: 5
+milestone: M3
+cadence: first_boss             # docs/chapter-outline.md — 🟥
+fe8_base_map: "FE8 Ch4 — Ancient Horrors"           # the DefeatBoss half (boss in a contained arena)
+
+# ── Narrative ──────────────────────────────────────────────────────────────────
+narrative: >
+  The white moose's trail ends at an ancient elven tomb on a wooded slope — the
+  refuge of Ravisin, the frost druid who has been awakening beasts to terrorize
+  the loggers in Auril's name (the same druid who awakened Messie out in Maer
+  Dualdon). Cornered at last, the moose makes its stand beside her. Ravisin fights
+  to the death for her goddess. Among the crystal pillars the party finds a
+  sealed sarcophagus, kindles the gazebo brazier to open it, and frees Sahnar — a
+  chaotic-good moon-elf mummy who joins them, eager to learn about modern druids.
+  They also rescue a sentient goodberry shrub, repot it, and name it Basil.
+
+# ── Map ────────────────────────────────────────────────────────────────────────
+map:
+  file: maps/ch05-elven-tomb.tmx
+  tileset: tomb-interior        # elven temple/tomb; FEUniverse temple tileset, arctic palette
+  size: "22×18"
+  description: >
+    The elven tomb (canon map 1.15). A snowy circular depression: the moon dial
+    at center (E5), a marble gazebo with the brazier (E3) to one side, and the
+    sarcophagus ringed by crystal pillars (E4) on the eastern berm. Ravisin holds
+    the depression with the cornered white moose; vine-blight guardians clog the
+    approaches. Crystal pillars and statues are the cover/chokepoints.
+
+# ── Objective ──────────────────────────────────────────────────────────────────
+objective:
+  type: defeat_boss                      # our FIRST clean boss kill (objective rotation — see decisions.md)
+  description: "Defeat Ravisin, the frost druid (her guardians and the moose needn't all fall)"
+  secondary:
+    - type: brazier_puzzle
+      description: >
+        Open the sarcophagus to free Sahnar: gather a twig, a pinecone, and a
+        feather on the map and bring them to the gazebo brazier (E3) to kindle it.
+        Optional but the only way to recruit the mummy.
+
+win_condition: boss_defeated
+lose_condition: all_player_units_defeated
+
+difficulty_note: >
+  Our first real boss. Ravisin is a vanilla FE8 Druid — heavy dark-magic damage
+  (FE MAG vs RES) at 1-2 range — so squishy/low-RES units must respect her threat
+  range. The cornered white moose is a hard-hitting beast that charges; the
+  vine-blights are slow chip damage. Keep it a clean kill-the-boss objective so
+  the druid is the climax. Lean generous: the pillars give cover to bait her out.
+
+# ── Deployment ──────────────────────────────────────────────────────────────────
+deployment:
+  note: >
+    7 PCs + Trex + Pinky deployable. Baxby and Lupin (the sled team) and Basil
+    are non-combat NPCs and are not deployed. Positions set in Tiled.
+
+# ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
+enemy_units:
+  - id: ravisin
+    name: "Ravisin"
+    is_boss: true
+    count: 1
+    class: druid                # vanilla FE8 Druid (baseRanks: Anima D, Dark C, Staff E)
+    level: 7
+    weapon: flux-tome           # FE8 Flux (Dark) — the Druid's class-native tome; flavored "Killing Frost"
+    damage_type: cold           # flavor label only
+    ai_pattern: hold_position
+    death_quote: "Auril… I gave you everything…"
+    drops:
+      - id: crest-of-cold-iron  # FORESHADOW: locked promotion relic (see chapter-outline.md seam)
+        is_key_item: true
+        locked: true            # unusable in MVP; pays off at the Ch8→9 promotion seam
+  - id: white-moose
+    name: "The White Moose"
+    is_boss: true               # awakened beast-boss, cornered here (canon: tomb area E6)
+    count: 1
+    class: wolf                 # FE8 beast monster class; reskinned as the awakened moose (charging brute)
+    level: 6
+    damage_type: bludgeoning    # flavor label only ("antlers/hooves")
+    ai_pattern: aggressive
+    death_quote: "*a final, almost-human bellow*"
+  - id: vine-blight
+    name: "Vine Blight"
+    count: 4
+    class: revenant             # FE8 monster class (shambling zombie); reskinned as Ravisin's awakened plants
+    level: 5
+    damage_type: bludgeoning    # flavor label only
+    ai_pattern: defensive       # clog the approaches to the depression
+
+# ── Brazier Puzzle (FE8-native: gather offerings → light the brazier → door opens) ──
+# Canon RotFM p.82-83 needs a twig, pinecone, feather, AND a severed humanoid hand;
+# we drop the hand for our lighter tone — three offerings is enough to kindle it.
+brazier_puzzle:
+  offerings: [twig, pinecone, feather]   # scattered on the map as pickups (chest/terrain events)
+  brazier_tile: E3              # the marble gazebo; bring all three here to kindle the silver flame
+  result: sarcophagus_opens     # opens E4 → frees Sahnar (recruit). Optional, never gates chapter clear.
+  note: >
+    Implemented with vanilla terrain/events — the offerings are map items and the
+    brazier is a tile that fires the sarcophagus-open event once all three are
+    delivered. No simultaneous-positioning mechanic (FE8 has none).
+
+# ── Events (pacing / cutscene placement) ─────────────────────────────────────────
+events:
+  - trigger: chapter_start
+    type: cutscene
+    ea_file: events/ch05-opening.ea
+    description: >
+      The trail ends at the tomb; Ravisin reveals herself and her awakened beasts,
+      naming Auril. The cornered white moose snorts at her side. Battle begins.
+  - trigger: brazier_kindled
+    type: cutscene
+    ea_file: events/ch05-sarcophagus.ea
+    description: >
+      All three offerings delivered → the brazier's silver flame opens the
+      sarcophagus. Sahnar the moon-elf mummy animates (smells faintly of pumpkin
+      spice) and offers to serve his liberators, curious about modern druids.
+  - trigger: chapter_end
+    type: cutscene
+    ea_file: events/ch05-ending.ea
+    description: >
+      Ravisin falls; her hold on the moose breaks. The party finds the goodberry
+      shrub, repots it, and names it Basil. With Sahnar in tow they turn down the
+      coast toward Bremen — where, Ravisin's dying words hint, another of her
+      awakened beasts still terrorizes a town.
+
+# ── Post-Chapter ─────────────────────────────────────────────────────────────────
+post_chapter:
+  gold_reward: 350
+  available_shops: [lonelywood]
+  units_available_to_recruit:
+    - id: sahnar
+      description: "Sahnar, the reawakened moon-elf mummy (recruited by lighting the brazier). Playable unit."
+  caravan_npcs_added:
+    - id: basil
+      description: >
+        Basil, the sentient goodberry shrub — a non-combat caravan NPC, not a
+        deployable unit. He is the in-fiction source of the party's 'Goodberries'
+        (reflavored Vulneraries) in the supply/shop from here on. No new mechanic.
+  unlocks_chapter: ch06-the-maer-monster
+
+design_notes: >
+  Our first clean boss kill (DefeatBoss). Ravisin is the canonical frost druid and
+  the villain thread tying the white moose (ch04) → this tomb → Messie (ch06): she
+  awakened them all. She drops the LOCKED 'crest of cold iron' (the promotion
+  Chekhov's gun for the Ch8→9 seam). The brazier puzzle is optional and the only
+  way to recruit Sahnar. Basil is folded into the caravan shop, not made a fighter.

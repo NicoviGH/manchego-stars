@@ -1,10 +1,10 @@
-# chapters/ch06-blood-in-bremen.yaml
+# chapters/ch07-blood-in-bremen.yaml
 # See docs/PRD.md §7 and docs/chapter-outline.md for the narrative + cadence.
 # Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
 
-id: ch06-blood-in-bremen
+id: ch07-blood-in-bremen
 title: "Blood in Bremen"
-chapter_number: 6
+chapter_number: 7
 milestone: M3
 cadence: big_battle_gray        # docs/chapter-outline.md — 🟥 (morally gray)
 fe8_base_map: "FE8 Ch6 — Victims of War"            # DefeatBoss base
@@ -19,7 +19,7 @@ narrative: >
 
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
-  file: maps/ch06-blood-in-bremen.tmx
+  file: maps/ch07-blood-in-bremen.tmx
   tileset: town-interior        # Speaker's hall + streets
   size: "22×18"
   description: >
@@ -45,7 +45,7 @@ difficulty_note: >
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
-  note: "All 7 PCs + Baxby + Trex + Basil + Mummy. Positions set in Tiled."
+  note: "7 PCs + Trex + Pinky + Sahnar (the Mummy) deployable. Baxby, Lupin, and Basil are non-combat caravan NPCs. Positions set in Tiled."
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
 enemy_units:
@@ -88,16 +88,16 @@ npc_units:
 events:
   - trigger: chapter_start
     type: cutscene
-    ea_file: events/ch06-opening.ea
+    ea_file: events/ch07-opening.ea
     description: >
       Dorbulgruf refuses payment. Tensions rise. Braulo swings first
-      (braulo_first_swing) — combat begins. Branches on the ch05 messie_spared flag.
+      (braulo_first_swing) — combat begins. Branches on the ch06 messie_spared flag.
   - trigger: chapter_end
     type: cutscene
-    ea_file: events/ch06-ending.ea
+    ea_file: events/ch07-ending.ea
     description: >
       If messie_spared: Messie installed as Speaker; uneasy but hopeful town.
-      If Messie was slain in ch05: a colder installation scene / different
+      If Messie was slain in ch06: a colder installation scene / different
       Speaker outcome. Either way the party leaves in a trail of blood, mixed
       reception. Foreshadow: a town crier mentions Easthaven heard of Bremen.
 
@@ -106,9 +106,9 @@ post_chapter:
   gold_reward: 450
   available_shops: [bremen]
   units_available_to_recruit: []
-  unlocks_chapter: ch07-the-eastway-ambush
+  unlocks_chapter: ch08-the-eastway-ambush
 
 design_notes: >
   The party's darkest MVP choice. Lean dialogue into ambiguity. Civilian no-kill
   constraint is the design hook. Ending branches on messie_spared. The town
-  crier's Easthaven line seeds the ch07 ambush (word of Bremen traveled).
+  crier's Easthaven line seeds the ch08 ambush (word of Bremen traveled).

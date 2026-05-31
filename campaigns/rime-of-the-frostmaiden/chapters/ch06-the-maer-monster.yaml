@@ -1,10 +1,10 @@
-# chapters/ch05-the-maer-monster.yaml
-# See docs/PRD.md §7 (esp. the Ch5 design note) and docs/chapter-outline.md.
+# chapters/ch06-the-maer-monster.yaml
+# See docs/PRD.md §7 (esp. the Ch6 design note) and docs/chapter-outline.md.
 # Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
 
-id: ch05-the-maer-monster
+id: ch06-the-maer-monster
 title: "The Maer Monster"
-chapter_number: 5
+chapter_number: 6
 milestone: M3
 cadence: marquee_setpiece       # docs/chapter-outline.md — 🎬 (the Navarre/Joshua moment)
 fe8_base_map: "FE8 Ch5 — The Empire's Reach"        # DefeatBoss set-piece base
@@ -20,7 +20,7 @@ narrative: >
 
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
-  file: maps/ch05-maer-monster.tmx
+  file: maps/ch06-maer-monster.tmx
   tileset: water-boats          # water map, 2 boat platforms; custom/community tileset
   size: "22×16"
   description: >
@@ -50,7 +50,7 @@ difficulty_note: >
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
-  note: "All 7 PCs + Baxby + Trex + Basil + Mummy, split across the 2 boats. Marty MUST be deployable (his Talk is the hidden resolution). Positions set in Tiled."
+  note: "7 PCs + Trex + Pinky + Sahnar (the Mummy) deployable, split across the 2 boats. Marty MUST be deployable (his Talk is the hidden resolution). Baxby, Lupin, and Basil are non-combat caravan NPCs. Positions set in Tiled."
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
 enemy_units:
@@ -76,7 +76,7 @@ enemy_units:
 events:
   - trigger: chapter_start
     type: cutscene
-    ea_file: events/ch05-opening.ea
+    ea_file: events/ch06-opening.ea
     description: >
       Bremen docks; drunken captain drafts the crew; the elven researcher's
       warning; Marty's pre-chapter beast-speech hint ('I can talk to animals,
@@ -85,27 +85,27 @@ events:
     unit: marty
     target: messie
     type: command_unlock
-    ea_file: events/ch05-messie-talk.ea
+    ea_file: events/ch06-messie-talk.ea
     description: >
       The Talk command appears. If used: marty_messie_talk — Messie's story, her
       fear, the peaceful resolution (the campaign-defining beat). Suggest she run
       for Speaker of Bremen.
   - trigger: chapter_end_talk
     type: cutscene
-    ea_file: events/ch05-ending-peace.ea
-    description: "Peaceful payoff: Messie spared, joins Bremen, set up to become Speaker (pays off in ch06)."
+    ea_file: events/ch06-ending-peace.ea
+    description: "Peaceful payoff: Messie spared, joins Bremen, set up to become Speaker (pays off in ch07)."
   - trigger: chapter_end_kill
     type: cutscene
-    ea_file: events/ch05-ending-kill.ea
-    description: "Brute-force ending: Messie slain; a sadder, quieter scene. Bremen Speaker plot in ch06 differs."
+    ea_file: events/ch06-ending-kill.ea
+    description: "Brute-force ending: Messie slain; a sadder, quieter scene. Bremen Speaker plot in ch07 differs."
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
   gold_reward: 400
   available_shops: [bremen]
   units_available_to_recruit: []   # Messie is an NPC, not a playable unit
-  branch_flag: messie_spared       # consumed by ch06 dialogue
-  unlocks_chapter: ch06-blood-in-bremen
+  branch_flag: messie_spared       # consumed by ch07 dialogue
+  unlocks_chapter: ch07-blood-in-bremen
 
 # ── Signature Moment anchored here ───────────────────────────────────────────────
 signature_moments:
@@ -115,4 +115,4 @@ signature_moments:
 design_notes: >
   The emotional centerpiece of the MVP and Marty's primary signature beat. Keep
   the fight genuinely hard so the Talk feels earned, not handed out. Track the
-  messie_spared flag — ch06's Speaker-installation scene branches on it.
+  messie_spared flag — ch07's Speaker-installation scene branches on it.

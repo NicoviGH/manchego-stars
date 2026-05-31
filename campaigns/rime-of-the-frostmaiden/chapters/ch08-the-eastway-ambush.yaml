@@ -1,11 +1,11 @@
-# chapters/ch07-the-eastway-ambush.yaml
+# chapters/ch08-the-eastway-ambush.yaml
 # See docs/PRD.md §7 and docs/chapter-outline.md for the narrative + cadence.
 # Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
 # THIS IS THE MVP FINALE — an unwinnable battle by design, ending on a cliffhanger.
 
-id: ch07-the-eastway-ambush
+id: ch08-the-eastway-ambush
 title: "The Eastway Ambush"
-chapter_number: 7
+chapter_number: 8
 milestone: M3
 cadence: scripted_defeat        # docs/chapter-outline.md — 🎬 (the MVP wall)
 fe8_base_map: "FE8 Ch13 — Hamill Canyon"            # Survive/terrain base (objective match, not 1:1 ch#)
@@ -23,7 +23,7 @@ narrative: >
 
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
-  file: maps/ch07-eastway-ambush.tmx
+  file: maps/ch08-eastway-ambush.tmx
   tileset: ice-canyon
   size: "30×14"
   description: >
@@ -49,7 +49,7 @@ difficulty_note: >
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
-  note: "All 7 PCs + Baxby + Trex + Basil + Mummy. Positions set in Tiled. (Casual/Classic permadeath toggle still applies up to the scripted end.)"
+  note: "7 PCs + Trex + Pinky + Sahnar (the Mummy) deployable. Baxby, Lupin, and Basil are non-combat caravan NPCs. Positions set in Tiled. (Casual/Classic permadeath toggle still applies up to the scripted end.)"
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
 enemy_units:
@@ -77,26 +77,26 @@ enemy_units:
 events:
   - trigger: chapter_start
     type: cutscene
-    ea_file: events/ch07-opening.ea
+    ea_file: events/ch08-opening.ea
     description: "Heroes' high spirits → the canyon ambush. Guards demand surrender for Bremen."
   - trigger: turn_start
     turn: 1
     type: scripted_event
-    ea_file: events/ch07-braulo-shackles.ea
+    ea_file: events/ch08-braulo-shackles.ea
     description: "Braulo bursts his shackles (braulo_shackle_break — his signature beat). Fight begins."
   - trigger: turn_start
     turn: 4
     type: reinforcement
-    ea_file: events/ch07-ice-trolls.ea
+    ea_file: events/ch08-ice-trolls.ea
     description: "Ice trolls in Easthaven garb arrive throwing boulders."
   - trigger: turn_start
     turn: 6
     type: scripted_event
-    ea_file: events/ch07-boulders-block.ea
+    ea_file: events/ch08-boulders-block.ea
     description: "Boulders block the canyon exit — the Rolling Cheddar can't get through."
   - trigger: timer_expires
     type: cutscene
-    ea_file: events/ch07-defeat.ea
+    ea_file: events/ch08-defeat.ea
     description: >
       Scripted defeat. Party goes unconscious, fade to black. Text: 'You wake up
       on the road to Revel's End...' Cliffhanger. Credits roll. (MVP ends here.)
@@ -109,12 +109,12 @@ signature_moments:
 # ── Post-Chapter (MVP boundary) ──────────────────────────────────────────────────
 post_chapter:
   gold_reward: 0                # captured — no reward
-  promotion_seam:               # docs/chapter-outline.md — Ch7→8 seam
+  promotion_seam:               # docs/chapter-outline.md — Ch8→9 seam
     note: >
-      The locked 'crest of cold iron' (dropped by the ch04 frost druid) and the
-      FIRST Master-Seal-equivalent pay off in the post-MVP prison-break chapter
-      (ch08, not yet authored — pending DM notes). Promotions go live ch09–11.
-  unlocks_chapter: ch08-revels-end   # POST-MVP — not yet authored (see chapter-outline.md Act II)
+      The locked 'crest of cold iron' (dropped by Ravisin, the ch05 frost druid)
+      and the FIRST Master-Seal-equivalent pay off in the post-MVP prison-break
+      chapter (ch09, not yet authored — pending DM notes). Promotions go live ch10–12.
+  unlocks_chapter: ch09-revels-end   # POST-MVP — not yet authored (see chapter-outline.md Act II)
   ends_mvp: true
 
 design_notes: >
