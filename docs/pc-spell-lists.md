@@ -122,4 +122,4 @@ single-target; AoE only via siege tomes), so those compromise to siege-range sin
 > _Signature candidates: Vicious Mockery, Cure Wounds, Cutting Words (class), Call Lightning, Revivify, Mass Cure Wounds, Raise Dead, Mordenkainen's Sword (summon-blade), Otto's Irresistible Dance (CC)._
 
 ---
-**Braulo** (Barbarian) and **Wolfram** (Metallurgist) have no spell list / armor-ability list respectively — Wolfram's "spells" are his armor abilities (see class-progression-tables.md) + the sheet spells already captured (Conjure Elemental, Creation, Imprisonment).
+**Braulo** (stock Pirate) and **Wolfram** (stock Knight) are **not casters** — no in-game spells (see `decisions.md` §Class Mapping). Their D&D sheet spells / forge tricks (Wolfram's Conjure Elemental, Creation, Imprisonment, etc.) are flavor/lore only, never authored as tomes.

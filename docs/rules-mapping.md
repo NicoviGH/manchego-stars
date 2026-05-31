@@ -156,21 +156,26 @@ Rule: never introduce a brand-new status UI for a 5e condition that maps onto an
 
 ## I. What This Means for Class Design (generic)
 
-When mapping ANY 5e class to FE (this campaign or future ones):
+When mapping ANY 5e class to FE (this campaign or future ones), under the FE-strict rule
+(stock vanilla FE8 classes, **no per-character abilities** — see `decisions.md`):
 
-1. **Pick an FE chassis** (sprite + animations) from vanilla FE8 first; only go custom when no chassis fits.
-2. **One FE base class → one FE promoted class.** Promotion happens at FE8 cadence (~Ch 9–11 of a 20-chapter game), NOT tied to a specific 5e level threshold beyond gating which features are *available*.
-3. **Map the primary attack** to a finite-use weapon/tome (no infinite).
-4. **Convert every "bonus action / reaction / per-short-rest" feature** per §B and §D before it reaches a YAML.
-5. **Gate every level-N feature** to the chapter where that 5e level is reached on the campaign's level curve (see `class-progression-tables.md`).
-6. **Collapse 5e stats to FE stats** per §E.
-7. **Drop tabletop bookkeeping** (initiative, skill checks, hit dice, components, concentration tracking).
+1. **Pick a stock vanilla FE8 class** whose role/weapon fits — bases, growths, caps, and class
+   features come verbatim from the decomp (`data_classes.c`). Don't author custom classes.
+2. **Use the vanilla branched promotion** (`classchg-data.c`); the player picks at a Master Seal,
+   at FE8 cadence (~Ch 10–12 of a 20-chapter game). 5e levels do NOT gate anything.
+3. **Map the caster's spells to finite-use FE tomes/staves** (§C) in the gold economy (§D); the
+   5e spell list is just the flavor menu for which tomes to author.
+4. **Collapse 5e stats to FE stats** per §E.
+5. **Drop everything else** — per-character feats / reactions / bonus-actions and tabletop
+   bookkeeping (initiative, skill checks, hit dice, concentration). Individuality comes from
+   flavor / sprite / palette, not mechanics. (Stock FE *class* features — Berserker crit,
+   the Summoner's Summon command, Canto, flight — are kept; they're the class, not a bolt-on.)
 
-The per-class application of these rules lives in `class-progression-tables.md`; the per-character application lives in the campaign's PC YAMLs.
+The per-character application lives in the campaign's PC/NPC YAMLs → generated `docs/CLASSES.md`.
 
 ---
 
 ## Open Items (to confirm with playtesting / Nicolas)
 
 - **Primary-cantrip use count** — proposed 30–50/chapter, depleting + gold-restocked (decision B). Confirm the number is generous enough within a map without breaking the economy.
-- **Reaction procs** — confirm we want auto-procs (no player input) vs. dropping reactions entirely. Auto-procs preserve flavor but add enemy-phase animations.
+- **Reactions** — dropped (FE-strict: no per-character reactions). Positioning/terrain and the weapon triangle carry the tactical depth instead.
