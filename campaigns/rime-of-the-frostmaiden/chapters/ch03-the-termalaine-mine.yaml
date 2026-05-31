@@ -1,12 +1,12 @@
 # chapters/ch03-the-termalaine-mine.yaml
-# See docs/PRD.md §7 and docs/chapter-outline.md for the narrative + cadence.
+# Chapter index: docs/CHAPTERS.md (generated from this file). Rationale: docs/decisions.md.
 # Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
 
 id: ch03-the-termalaine-mine
 title: "The Termalaine Mine"
 chapter_number: 3
 milestone: M3
-cadence: gimmick_multilevel     # docs/chapter-outline.md — 🟨
+cadence: gimmick_multilevel     # see docs/CHAPTERS.md — 🟨
 fe8_base_map: "FE8 Ch3 — The Bandits of Borgo"      # Seize big-battle base
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
@@ -118,7 +118,7 @@ post_chapter:
   units_available_to_recruit:
     - id: trex
       description: "Trex the winged kobold joins post-chapter"
-  unlocks_chapter: ch04-the-elven-tomb
+  unlocks_chapter: ch04-the-white-moose
 
 # ── Signature Moments anchored here ──────────────────────────────────────────────
 signature_moments:

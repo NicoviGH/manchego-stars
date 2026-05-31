@@ -21,6 +21,39 @@ _Decided: May 2026_
 
 ---
 
+## Documentation Model
+
+**Three tiers; a per-chapter fact lives in exactly one place (the YAML)**
+The doc set kept duplicating per-chapter facts across the YAML, `PRD.md §7`, a hand
+table, and the pacing ref — so every story change forced a multi-file resync. The
+settled model:
+- **Tier 1 — Source of truth = the chapter YAML.** `campaigns/rime-of-the-frostmaiden/chapters/ch*.yaml`
+  is authoritative for every per-chapter fact (objective, recruits, enemies, map,
+  rewards, `unlocks_chapter`). Edit the YAML; nothing else.
+- **Tier 2 — Generated index.** `docs/CHAPTERS.md` is **generated** from the YAML by
+  `tools/gen-chapter-index.rb` (ruby, stdlib only). It is never hand-edited;
+  regenerate after any chapter change. "The data is the doc."
+- **Tier 3 — Durable "why" docs, hand-written.** `decisions.md` (settled decisions),
+  `roadmap.md` (provisional post-MVP Act II–V scaffold — chapters with no YAML yet),
+  `fe8-pacing-reference.md` (FE8-only cadence/reward rules), `PRD.md`
+  (vision/scope/architecture/roadmap pointers). These hold rationale and
+  forward-looking planning, **not** per-chapter tables.
+Rule: do not re-introduce a chapter breakdown table into `PRD.md` or any hand doc —
+point to `CHAPTERS.md` / the YAML instead.
+_Decided: 2026-05-31 (retires the hand-maintained `chapter-outline.md`)_
+
+**Chapter cadence taxonomy (the `cadence:` field)**
+Each chapter YAML carries a `cadence:` token; the generator maps it to one of four
+FE8 pacing emoji for `CHAPTERS.md`: 🟥 big-battle/boss · 🟦 breather/intro/escort/travel ·
+🟨 sidequest/gimmick · 🎬 scripted set-piece. Current tokens: `tutorial`,
+`full_party_intro`, `breather_defend` (🟦); `gimmick_multilevel`, `monster_debut`
+(🟨); `first_boss`, `big_battle_gray` (🟥); `marquee_setpiece`, `scripted_defeat`
+(🎬). Add a new token to `CADENCE` in `tools/gen-chapter-index.rb` when a new pacing
+beat appears. The cadence *rules* (why this rhythm) live in `fe8-pacing-reference.md`.
+_Decided: 2026-05-31_
+
+---
+
 ## Combat System
 
 > **2026-05-28 — Combat resolution reverted to vanilla FE.** The earlier "Hybrid
@@ -176,9 +209,12 @@ _Decided: May 2026_
 The toggle ships as-is from vanilla FE8. In-fiction flavor for Casual retreats: "retreated to the sled" / "carried to safety by Baxby."
 _Decided: May 2026_
 
-**MVP scope: 7 chapters, ending at the Revel's End cliffhanger**
-Chapter 7 ends in a scripted defeat. Text: "You wake up on the road to Revel's End..." Credits roll. Chapters beyond the DM notes require a future writing session.
-_Decided: May 2026_
+**MVP scope: 8 chapters (Prologue–Ch 8), ending at the Eastway scripted defeat → Revel's End cliffhanger**
+The MVP runs **Prologue + Ch 1–8** (see `docs/CHAPTERS.md`). The finale, **Ch 8 (The
+Eastway Ambush)**, ends in a scripted defeat — "You wake up on the road to Revel's
+End…" → credits. Revel's End itself is the post-MVP **Ch 9** (`docs/roadmap.md`).
+Chapters beyond the DM notes require a future writing session.
+_Decided: May 2026; recount to 8 on 2026-05-31 after the old Ch 4 was split into Ch 4 (White Moose) + Ch 5 (Elven Tomb)_
 
 ---
 
@@ -272,6 +308,21 @@ Both are stock physical classes with **no spell access**: Wolfram is a Lance Kni
 Bow Archer (SKL/DEX). The earlier "hybrid caster" overlay (secondary MAG, finite-use cantrip
 tomes) is gone. Their fire/forge and firearm/gadget flavor is sprite art + lore only.
 _Decided: 2026-05-29_
+
+**The promotion seam (Ch 8 → 9): foreshadow in the MVP, pay off at Revel's End**
+The MVP plays entirely **unpromoted** (5e levels 1–5); promotions are post-MVP. The seam:
+- **Foreshadow in MVP.** The **Ch 5 (Elven Tomb)** frost-druid boss **Ravisin** drops a
+  *flavored, locked relic* — the **crest of cold iron** ("it hums, but none of you know how
+  to use it yet"). It sits in the convoy, unusable, as a Chekhov's gun for promotion.
+- **Pay off at the seam.** The **first Master-Seal-equivalent** is obtained in/after the
+  Revel's End break (**Ch 9**, post-MVP) — diegetically looted from the prison or earned in
+  the escape. This matches FE8 holding promotions until the route-split era
+  (`fe8-pacing-reference.md §3`).
+- **Promotions go live ~Ch 10–12** (see memory `manchego-stars-campaign-structure`); PCs reach
+  5e ~L11 / first FE promotion there. Specific crests (Knight Crest, Guiding Ring) may
+  *flavor-appear* for an early single promotion, but the **Master Seal is the universal
+  mechanism** (avoids class-matching headaches across 7 PCs).
+_Decided: May 2026; renumbered to Ch 8→9 on 2026-05-31 after the Ch 4 split (was Ch 7→8)_
 
 ---
 

@@ -1,5 +1,5 @@
 # chapters/ch04-the-white-moose.yaml
-# See docs/PRD.md §7 and docs/chapter-outline.md for the narrative + cadence.
+# Chapter index: docs/CHAPTERS.md (generated from this file). Rationale: docs/decisions.md.
 # Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
 # Canon: Rime of the Frostmaiden pp.78-82 (Lonelywood; "The White Moose"; the forest;
 # the wolf pack). This is the DefeatAll/monster-debut half of FE8 Ch4 "Ancient Horrors";
@@ -9,7 +9,7 @@ id: ch04-the-white-moose
 title: "The White Moose"
 chapter_number: 4
 milestone: M3
-cadence: monster_debut          # docs/chapter-outline.md — 🟨 fog-of-war forest hunt (tone shift to monsters)
+cadence: monster_debut          # see docs/CHAPTERS.md — 🟨 fog-of-war forest hunt (tone shift to monsters)
 fe8_base_map: "FE8 Ch4 — Ancient Horrors"           # the DefeatAll/monster-debut half
 
 # ── Narrative ──────────────────────────────────────────────────────────────────

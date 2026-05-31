@@ -1,5 +1,5 @@
 # chapters/ch05-the-elven-tomb.yaml
-# See docs/PRD.md §7 and docs/chapter-outline.md for the narrative + cadence.
+# Chapter index: docs/CHAPTERS.md (generated from this file). Rationale: docs/decisions.md.
 # Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
 # Canon: Rime of the Frostmaiden pp.80-83 (the Elven Tomb, Ravisin, Sahnar the mummy).
 # This is the DefeatBoss half of FE8 Ch4 "Ancient Horrors" — the forest/DefeatAll half is ch04.
@@ -8,7 +8,7 @@ id: ch05-the-elven-tomb
 title: "The Elven Tomb"
 chapter_number: 5
 milestone: M3
-cadence: first_boss             # docs/chapter-outline.md — 🟥
+cadence: first_boss             # see docs/CHAPTERS.md — 🟥
 fe8_base_map: "FE8 Ch4 — Ancient Horrors"           # the DefeatBoss half (boss in a contained arena)
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ enemy_units:
     ai_pattern: hold_position
     death_quote: "Auril… I gave you everything…"
     drops:
-      - id: crest-of-cold-iron  # FORESHADOW: locked promotion relic (see chapter-outline.md seam)
+      - id: crest-of-cold-iron  # FORESHADOW: locked promotion relic (see decisions.md — the promotion seam)
         is_key_item: true
         locked: true            # unusable in MVP; pays off at the Ch8→9 promotion seam
   - id: white-moose

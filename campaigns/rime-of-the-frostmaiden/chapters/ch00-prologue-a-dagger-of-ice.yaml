@@ -7,7 +7,7 @@ id: ch00-prologue-a-dagger-of-ice
 title: "A Dagger of Ice"
 chapter_number: 0
 milestone: M3
-cadence: tutorial               # docs/chapter-outline.md — DefeatBoss, basics only
+cadence: tutorial               # see docs/CHAPTERS.md — DefeatBoss, basics only
 fe8_base_map: "FE8 Prologue — The Fall of Renais"   # DefeatBoss tutorial base
 is_prologue: true
 

@@ -1,11 +1,12 @@
 # chapters/ch01-the-iron-trail.yaml
-# See docs/PRD.md §7 for the full chapter narrative breakdown.
+# Chapter index: docs/CHAPTERS.md (generated from this file). Rationale: docs/decisions.md.
 # Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
 
 id: ch01-the-iron-trail
 title: "The Iron Trail"
 chapter_number: 1
 milestone: M3
+cadence: full_party_intro       # docs/CHAPTERS.md — 🟦 full-party intro (Seize)
 fe8_base_map: "FE8 Ch1 — Escape!"                   # Seize breather base
 
 # ── Narrative ──────────────────────────────────────────────────────────────────

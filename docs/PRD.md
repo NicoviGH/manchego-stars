@@ -401,67 +401,15 @@ Fire Emblem's gold-and-shop loop is a core part of the game feel — earning gol
 
 ## 7. Story Arc — Chapter Breakdown
 
-### Chapter 1: The Iron Trail
-- **Narrative beat:** Party meets at The Northlook tavern in Bryn Shander. Three dwarves hire them to recover a stolen iron ingot shipment. They follow the trail to a goblin camp.
-- **Introduced:** All 7 PCs (available from start), Duvessa Shane (cutscene), Velynne Harpell (brief appearance).
-- **Map type:** Linear snowy trail — Bryn Shander outskirts to goblin camp.
-- **Objective:** Seize the goblin camp (mirrors FE8 Ch1); recover the iron ingots.
-- **Enemies:** Goblins (Brigand class, CR 1/4, level 2).
-- **Post-map:** Cutscene — Duvessa Shane hires party for ongoing Ten-Towns work. Baxby purchasable.
-- **Design note:** Introductory chapter. Teaches basic movement, FE combat, and the D&D reskin (damage types, the crit flourish). Keep enemy count low (8–12 goblins).
-
-### Chapter 2: Cold Welcome
-- **Narrative beat:** Party travels west to Targos. Ambushed on the road. In Targos they find a frozen body (human sacrifice to Auril) and hear rumors of the Maer Monster.
-- **Introduced:** Baxby joins (if not Ch 1). Frost druids foreshadowed.
-- **Map type:** Open snowy road with sled escort. Enemies from tree lines/snowdrifts.
-- **Objective:** DefeatAll — clear the wilderness ambush (wolves, bandits, frost druid scout), keeping the sled alive (escort constraint).
-- **Enemies:** Wolves (beast class), bandits or frost druid scouts.
-- **Post-map:** Cutscene — Targos arrival, sacrifice discovery, inn scene, overheard rumors about Bremen.
-- **Design note:** Introduces escort mechanic (protect the sled / Rolling Cheddar). Wider map than Ch 1.
-
-### Chapter 3: The Termalaine Mine
-- **Narrative beat:** Kobolds have taken over the gemstone mine. Miners are vanishing. Party enters to find kobolds AND Grells in the deep shaft. Prof. RBG executes a kobold during interrogation. They meet Trex.
-- **Introduced:** Trex (recruited after chapter). Pinky involved in gameplay (sent to scout Grells).
-- **Map type:** Multi-level mine interior. Kobolds on upper levels, Grells as bosses below.
-- **Objective:** Seize — clear the mine of Grells. Optional: spare or fight kobolds.
-- **Enemies:** Kobolds (Brigand, low level), Grells (custom monster class, mini-boss, CR 3).
-- **Recruitment:** Trex joins post-chapter.
-- **Design note:** First multi-level map. Teaches vertical navigation. Kobolds can be bypassed (optional fights). The RBG execution is a scripted cutscene mid-map.
-
-### Chapter 4: The Elven Tomb
-- **Narrative beat:** Through Lonelywood (brief inn stay) to an elven tomb. Frost druid fights to the death. Party finds Basil, solves a moonlight puzzle, awakens a mummy ally.
-- **Introduced:** Basil (recruit), The Mummy (recruit).
-- **Map type:** Forest path leading to tomb interior. Boss arena.
-- **Objective:** DefeatAll — clear the tomb (the frost druid is the last/toughest to fall; mirrors FE8 Ch4's monster-debut). Moonlight puzzle = move units to specific tiles mid-map.
-- **Enemies:** Frost Druid (boss, Druid class), nature-themed minions (wolves, vine blights).
-- **Recruitment:** Basil and The Mummy join post-chapter.
-- **Design note:** First real boss fight. The moonlight puzzle is a mid-map event: move 3 units to glowing tiles simultaneously to open the sarcophagus chamber. Tests positioning awareness.
-
-### Chapter 5: The Maer Monster
-- **Narrative beat:** In Bremen, Messie the plesiosaur capsizes fishing boats. Party boards a boat and confronts Messie. This is a genuine boss fight — Messie hits hard and the boats limit movement. But Marty's Talk with Animals ability opens an alternative: get Marty adjacent to Messie and use Talk to learn she was awakened by the frost druid and is afraid of losing her intelligence. Resolve peacefully or keep fighting.
-- **Introduced:** Messie (non-recruitable, becomes Bremen NPC).
-- **Map type:** Water map with 2 boats. Tight space, high tension.
-- **Objective:** DefeatBoss OR Talk — this is a real boss fight with a hidden peaceful resolution. Messie is beatable through combat (hard but doable — think FE8 Chapter 5 difficulty), but Marty can Talk to Messie if adjacent, resolving the chapter instantly.
-- **Enemies:** Messie (massive boss unit, very strong but not invincible — roughly equivalent to an early-game FE dragon boss). Supporting enemies: aggressive fish/water creatures that harass the boats and force the player to split attention.
-- **Design note:** **This is the Navarre/Guy/Joshua moment.** The player is in a real fight — Messie is tough, the boats are cramped, supporting enemies are flanking. It should feel desperate but winnable. The Talk option is discoverable the way classic FE recruitment works: pre-chapter dialogue hints that Marty can speak with beasts ("I can talk to animals, remember?"), and when Marty is adjacent to Messie the Talk command appears in the menu — but the game never forces it. Players who brute-force Messie down get a different (sadder) post-chapter scene. Players who use Talk get the full payoff: Messie joins Bremen peacefully, becoming Speaker later. This mirrors the actual campaign — Marty used Talk with Animals and it changed everything. The fight itself should take 8–12 turns to win through combat, giving the player plenty of time to notice the Talk option organically.
-
-### Chapter 6: Blood in Bremen
-- **Narrative beat:** Party reports to Dorbulgruf Shalescar, who refuses to pay. Braulo swings first. After a bloody battle, the party installs Messie as Speaker.
-- **Introduced:** No new recruits.
-- **Map type:** Town interior / Speaker's hall. Could have civilians as "don't kill" NPC units.
-- **Objective:** DefeatBoss — defeat Dorbulgruf (mirrors FE8 Ch6); civilians are don't-kill NPCs.
-- **Enemies:** Dorbulgruf (boss, Warrior class — cantankerous old dwarf), Bremen guards (Soldier/Knight class).
-- **Post-map:** Cutscene — Messie installed as Speaker. Mixed reception from townsfolk.
-- **Design note:** Morally gray chapter — the party attacked the Speaker. Dialogue should reflect this ambiguity. Civilian NPCs on the map add complexity (ally units that can't die, or a penalty for killing them).
-
-### Chapter 7: The Eastway Ambush
-- **Narrative beat:** Party treks east toward Easthaven. Enters an ice canyon. Ambushed by 20+ guards demanding arrest for Bremen. Braulo breaks his shackles. Ice trolls in Easthaven garb swarm with boulders. Party is overwhelmed.
-- **Introduced:** No new recruits.
-- **Map type:** Narrow ice canyon with high walls. Guards from both sides. Ice troll reinforcements mid-chapter.
-- **Objective:** Survive N turns (8–10). Scripted loss after timer — boulders block escape, reinforcements overwhelm.
-- **Enemies:** Easthaven Guards (Soldier/Knight, 20+), Ice Trolls (Boss-tier, arrive as reinforcements at turn 4–5).
-- **End state:** Scripted defeat cutscene — party goes unconscious, fade to black. Text: *"You wake up on the road to Revel's End..."* Cliffhanger. Credits roll.
-- **Design note:** **This is an unwinnable battle by design.** The player should feel heroic for lasting the full turn count but the outcome is fixed. Fire weapons are **effective** vs ice trolls (vanilla FE effectiveness) — the party can exploit this but won't have enough firepower to clear them all. Braulo's shackle-breaking is a turn-1 scripted event that triggers his unique dialogue. The "Rolling Cheddar" (party sled) is on the map — the party tries to reach it but boulders block the exit at turn 6.
+> **Moved.** The per-chapter breakdown is no longer maintained here. The single
+> source of truth for every chapter (objective, recruits, enemies, map, rewards,
+> cadence, narrative) is the YAML in
+> `campaigns/rime-of-the-frostmaiden/chapters/ch*.yaml`. A generated overview table
+> lives in **`docs/CHAPTERS.md`** (run `ruby tools/gen-chapter-index.rb` to refresh).
+> Forward-looking design — the post-MVP Act II–V scaffold — is in
+> `docs/roadmap.md`; settled rationale (cadence taxonomy, the promotion seam, the
+> doc source-of-truth model) is in `docs/decisions.md`. See `docs/fe8-pacing-reference.md`
+> for the FE8 cadence/reward rules this campaign applies.
 
 ---
 

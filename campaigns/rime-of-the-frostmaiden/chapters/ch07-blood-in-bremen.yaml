@@ -1,12 +1,12 @@
 # chapters/ch07-blood-in-bremen.yaml
-# See docs/PRD.md §7 and docs/chapter-outline.md for the narrative + cadence.
+# Chapter index: docs/CHAPTERS.md (generated from this file). Rationale: docs/decisions.md.
 # Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
 
 id: ch07-blood-in-bremen
 title: "Blood in Bremen"
 chapter_number: 7
 milestone: M3
-cadence: big_battle_gray        # docs/chapter-outline.md — 🟥 (morally gray)
+cadence: big_battle_gray        # see docs/CHAPTERS.md — 🟥 (morally gray)
 fe8_base_map: "FE8 Ch6 — Victims of War"            # DefeatBoss base
 
 # ── Narrative ──────────────────────────────────────────────────────────────────

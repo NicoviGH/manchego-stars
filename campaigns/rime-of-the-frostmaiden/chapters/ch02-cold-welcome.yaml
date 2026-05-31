@@ -1,12 +1,12 @@
 # chapters/ch02-cold-welcome.yaml
-# See docs/PRD.md §7 and docs/chapter-outline.md for the narrative + cadence.
+# Chapter index: docs/CHAPTERS.md (generated from this file). Rationale: docs/decisions.md.
 # Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
 
 id: ch02-cold-welcome
 title: "Cold Welcome"
 chapter_number: 2
 milestone: M3
-cadence: breather_defend          # docs/chapter-outline.md — 🟦
+cadence: breather_defend          # see docs/CHAPTERS.md — 🟦
 
 # Tactical base map this chapter reskins. We keep FE8's tuned layout (spawn edges,
 # choke points, terrain bonuses) and repaint it to the arctic/Icewind Dale theme.

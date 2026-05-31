@@ -1,19 +1,23 @@
 # FE8 Pacing & Reward Reference
 
-> **Purpose.** Ground Manchego Stars' 20-chapter cadence, treasure flow, and
-> promotion-item placement against *Fire Emblem: The Sacred Stones* (FE8) — the
-> spine of this hack (see [[feedback_fe-strictness]] / `docs/decisions.md`).
-> The 20-chapter skeleton (`docs/chapter-outline.md`) is built **against this
-> reference** so our cadence "feels like FE8" instead of like a D&D module cut
-> into arbitrary slices.
+> **Purpose.** A pure **FE8 reference** — the chapter cadence, treasure flow, and
+> promotion-item placement of *Fire Emblem: The Sacred Stones* — so Manchego Stars'
+> pacing "feels like FE8" instead of like a D&D module cut into arbitrary slices
+> (FE8 is the spine; see `docs/decisions.md` / memory `feedback_fe-strictness`).
+>
+> **This doc holds FE8 facts only.** How we *apply* them to our campaign lives
+> elsewhere: the cadence taxonomy + the promotion seam in `docs/decisions.md`, the
+> per-chapter index in `docs/CHAPTERS.md`, and the post-MVP scaffold in
+> `docs/roadmap.md`.
 >
 > **Sourcing honesty.** Two confidence tiers are used below:
-> - **[decomp]** — verified against `fireemblem8u/` this session (item names in
->   `texts/texts.txt`; class→promotion mappings in `src/data_itemuse.c`).
+> - **[decomp]** — verified against `fireemblem8u/` (item names in `texts/texts.txt`;
+>   class→promotion mappings in `src/data_itemuse.c`; win-conditions in each
+>   chapter's `src/events/<ch>-eventinfo.h`).
 > - **[FE8]** — well-established FE8 community knowledge (chapter order, the
->   *chapter* each reward first appears). Pinning each item to an exact chapter
->   via the decomp's event scripts is deferred (see Open Items); treat the
->   chapter numbers as "early-teens, route-split era," not gospel ±1 chapter.
+>   *chapter* each reward first appears). Pinning each item to an exact chapter via
+>   the decomp's event scripts is deferred (see Open Items); treat the chapter
+>   numbers as "early-teens, route-split era," not gospel ±1 chapter.
 
 ---
 
@@ -51,16 +55,14 @@ clear-all-enemies objective is spelled `DefeatAll`.
 | 20 | Darkling Woods | **Seize** (11,11) | final dungeon approach |
 | Final | Sacred Stone | **DefeatBoss** (Formortiis) | final boss |
 
-**Cadence takeaways for us:**
+**Cadence takeaways (the rules to copy):**
 - **Roughly every 3rd map is a "big battle"** (boss or siege); the maps between
   are breathers, escorts, terrain gimmicks, or story pivots. Never two grind-y
   routs back to back.
 - **A tone shift early** (FE8 Ch 4: monsters appear) re-frames the stakes after
-  the human-scale opening. We already have an analogue: Ch 3's Grells / Ch 4's
-  frost druid escalate past goblins-and-bandits.
+  the human-scale opening.
 - **A reversal / low point in the back third** (FE8's gauntlet into Darkling
-  Woods). Our Revel's End cliffhanger at Ch 7 is *exactly* this beat, landed
-  early as the MVP wall.
+  Woods).
 - **Optional dungeons** (Tower of Valni, Lagdou Ruins) exist *outside* the
   chapter count for grinding + reward farming — see §4.
 
@@ -68,27 +70,27 @@ clear-all-enemies objective is spelled `DefeatAll`.
 
 ## 2. Promotion items: what promotes what [decomp]
 
-Verified against `src/data_itemuse.c` (FE8 class IDs) + `texts/texts.txt`.
-Mapped to our D&D classes via `docs/class-mapping.md`.
+Verified against `src/data_itemuse.c` (FE8 class IDs) + `texts/texts.txt`. Our
+PC→FE8-class mapping is in `docs/class-mapping.md`; how we gate promotions (the
+seam) is in `docs/decisions.md`.
 
-| FE8 item | Promotes (FE8 classes) | Our PCs it would gate |
-|---|---|---|
-| **Hero Crest** | Mercenary, Myrmidon, Fighter | melee martials — Braulo (Barbarian) |
-| **Knight Crest** | Cavalier, Knight (Armor) | armored/mounted — Rootis (tank) |
-| **Orion's Bolt** | Archer | ranged martials (if any reclass) |
-| **Elysian Whip** | Pegasus Knight, Wyvern Rider | flyers (none core; NPC use) |
-| **Guiding Ring** | Mage, Monk, Cleric, Shaman, Troubadour | casters — Marty (Druid), Meesmickle, Wolfram, Prof. RBG, Sclorbo |
-| **Master Seal** | **any** promotable class [FE8] | universal fallback for all 7 |
-| **Ocean Seal** | Pirate, (Thief) | n/a unless a PC reclasses |
-| **Hammerne** | *(staff, not a seal — repairs items)* | utility; see §3 treasure |
-| **Lunar/Solar Brace** | story-only lord promotion [FE8] | reserved for a "main" PC if we crown one |
+| FE8 item | Promotes (FE8 classes) |
+|---|---|
+| **Hero Crest** | Mercenary, Myrmidon, Fighter |
+| **Knight Crest** | Cavalier, Knight (Armor) |
+| **Orion's Bolt** | Archer |
+| **Elysian Whip** | Pegasus Knight, Wyvern Rider |
+| **Guiding Ring** | Mage, Monk, Cleric, Shaman, Troubadour |
+| **Master Seal** | **any** promotable class [FE8] |
+| **Ocean Seal** | Pirate, (Thief) |
+| **Hammerne** | *(staff, not a seal — repairs items)* |
+| **Lunar/Solar Brace** | story-only lord promotion [FE8] |
 
-> **Design note.** Since all 7 PCs promote post-MVP (memory:
-> [[manchego-stars-campaign-structure]] — ≈Ch 9–11), the **Master Seal is the
-> clean universal mechanism** and avoids the class-matching headache of the
-> specific crests. Specific crests can still appear as *flavored* early finds
-> (a duergar smith's "Knight Crest", a frost-druid relic "Guiding Ring") for
-> players who want to promote one unit a chapter early.
+> **FE8 design note.** The **Master Seal promotes any promotable class**, while the
+> specific crests each gate a narrow class set. That makes the Master Seal the
+> low-friction universal mechanism; specific crests are most useful as *flavored*
+> early single-unit promotions. (Our application of this is in `decisions.md` — the
+> promotion seam.)
 
 ---
 
@@ -96,21 +98,20 @@ Mapped to our D&D classes via `docs/class-mapping.md`.
 
 The schedule, by era (not exact chapter — see sourcing note):
 
-- **Early (FE8 Pro–7 ≈ our MVP Ch 1–7):** consumables, gold, basic weapons,
-  the occasional stat booster in a chest/village. **No promotion items.** Vulnerary,
-  small gold purses, a Steel/secondary weapon, the first stat-booster (e.g. an
-  Energy Ring) as a "reward chest" payoff. Villages give gold or a single nice item.
-- **Route-split era (FE8 9–13 ≈ our Ch 9–13):** **first promotion items appear**
-  (Knight Crest, Hero Crest, Guiding Ring), more stat boosters, better weapons
-  (Silver tier), first **Master Seal**. Secret Shops begin selling premium goods.
-- **Late (FE8 14–20 ≈ our Ch 14–20):** Master Seals become reliably available
-  (Secret Shops), legendary/Sacred weapons appear as chest/boss drops, big gold.
+- **Early (FE8 Prologue–7):** consumables, gold, basic weapons, the occasional
+  stat booster in a chest/village. **No promotion items.** Vulnerary, small gold
+  purses, a Steel/secondary weapon, the first stat-booster (e.g. an Energy Ring)
+  as a "reward chest" payoff. Villages give gold or a single nice item.
+- **Route-split era (FE8 9–13):** **first promotion items appear** (Knight Crest,
+  Hero Crest, Guiding Ring), more stat boosters, better weapons (Silver tier),
+  first **Master Seal**. Secret Shops begin selling premium goods.
+- **Late (FE8 14–20):** Master Seals become reliably available (Secret Shops),
+  legendary/Sacred weapons appear as chest/boss drops, big gold.
 - **Story-gated:** the lord's Lunar/Solar Brace promotion lands ~FE8 15–16.
 
 **Villages, chests, secret shops, droppers:**
 - **Villages**: visit for gold or one item; a thief/brigand may destroy them
-  (turn pressure). Our "town" maps (Bremen Ch 6, the Ten-Towns) are natural
-  village-equivalents.
+  (turn pressure).
 - **Chests**: need a thief or a Door/Chest Key. Big-battle maps usually hide the
   best treasure behind enemy lines — risk/reward.
 - **Secret Shops**: require a Member Card; sell premium consumables + Master
@@ -123,33 +124,11 @@ The schedule, by era (not exact chapter — see sourcing note):
 ## 4. Optional dungeons (outside the chapter count) [FE8]
 
 - **Tower of Valni** — opens ~after FE8 Ch 8; repeatable; for grinding XP and
-  buying/farming promotion items + boosters. Our arctic theme already borrows the
-  Valni tileset (`docs/PRD.md §8`).
+  buying/farming promotion items + boosters.
 - **Lagdou Ruins** — postgame, deep, high-tier rewards.
 
-> **Our stance:** MVP (Ch 1–7) ships **without** an optional dungeon (scope).
-> A Valni-equivalent "repeatable arctic ruin" is a strong **post-MVP** add when
-> promotions go live (Ch 9–11) — it solves grind-for-promotion without
-> bloating the mainline chapter count. Flag for the Ch 8–20 design pass.
-
----
-
-## 5. How this maps onto Manchego Stars
-
-- **Cadence:** apply the "every-3rd-map is a big battle" rule across all 20
-  chapters; keep the MVP front-loaded with breathers/tutorials (Ch 1–2) and one
-  real boss (Ch 4 frost druid) + a marquee set-piece (Ch 5 Messie) before the
-  Ch 7 reversal. See `docs/chapter-outline.md` for the per-chapter tags.
-- **Promotion seam:** **no promotion items in MVP Ch 1–7.** The **first
-  Master-Seal-equivalent** lands at the **Ch 7→8 seam** (diegetically: looted at
-  Revel's End or earned in the prison-break chapter), and should be **foreshadowed
-  in MVP** (an NPC line, a locked "relic" chest the party can't yet use). This
-  matches FE8 holding promotions until the route-split era and honors
-  [[manchego-stars-campaign-structure]] (promotions ≈ Ch 9–11, PCs play MVP
-  entirely unpromoted).
-- **Reward curve in MVP:** consumables + gold + one stat-booster reward chest;
-  weapons stay Iron/Steel-tier; the "wow" treasure is a flavored relic that
-  *foreshadows* post-MVP power rather than granting it early.
+(Whether Manchego Stars adds a repeatable arctic Valni-equivalent is an open
+post-MVP question — see `docs/roadmap.md`.)
 
 ---
 
@@ -157,9 +136,5 @@ The schedule, by era (not exact chapter — see sourcing note):
 
 - [ ] **Pin exact promotion-item chapters** by reading FE8 event scripts in the
   decomp (`fireemblem8u/` event data) rather than community memory — upgrade the
-  §3 era-buckets to exact chapters. Deferred this session (event-script
-  archaeology); current numbers are [FE8]-tier.
-- [ ] Confirm whether we crown a "main lord" PC (enables the Lunar/Solar Brace
-  story-promotion beat) or keep the party flat (all promote via Master Seal).
-  Affects Ch 15–16 design. Surfaced to Nicolas.
-- [ ] Decide the post-MVP Tower-of-Valni-equivalent (repeatable arctic ruin).
+  §3 era-buckets to exact chapters. Deferred (event-script archaeology); current
+  numbers are [FE8]-tier.

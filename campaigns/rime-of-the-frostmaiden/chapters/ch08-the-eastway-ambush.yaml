@@ -1,5 +1,5 @@
 # chapters/ch08-the-eastway-ambush.yaml
-# See docs/PRD.md §7 and docs/chapter-outline.md for the narrative + cadence.
+# Chapter index: docs/CHAPTERS.md (generated from this file). Rationale: docs/decisions.md.
 # Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
 # THIS IS THE MVP FINALE — an unwinnable battle by design, ending on a cliffhanger.
 
@@ -7,7 +7,7 @@ id: ch08-the-eastway-ambush
 title: "The Eastway Ambush"
 chapter_number: 8
 milestone: M3
-cadence: scripted_defeat        # docs/chapter-outline.md — 🎬 (the MVP wall)
+cadence: scripted_defeat        # see docs/CHAPTERS.md — 🎬 (the MVP wall)
 fe8_base_map: "FE8 Ch13 — Hamill Canyon"            # Survive/terrain base (objective match, not 1:1 ch#)
 is_mvp_finale: true
 
@@ -109,12 +109,12 @@ signature_moments:
 # ── Post-Chapter (MVP boundary) ──────────────────────────────────────────────────
 post_chapter:
   gold_reward: 0                # captured — no reward
-  promotion_seam:               # docs/chapter-outline.md — Ch8→9 seam
+  promotion_seam:               # see docs/decisions.md — the promotion seam (Ch 8→9)
     note: >
       The locked 'crest of cold iron' (dropped by Ravisin, the ch05 frost druid)
       and the FIRST Master-Seal-equivalent pay off in the post-MVP prison-break
       chapter (ch09, not yet authored — pending DM notes). Promotions go live ch10–12.
-  unlocks_chapter: ch09-revels-end   # POST-MVP — not yet authored (see chapter-outline.md Act II)
+  unlocks_chapter: ch09-revels-end   # POST-MVP — not yet authored (see docs/roadmap.md — Act II)
   ends_mvp: true
 
 design_notes: >
