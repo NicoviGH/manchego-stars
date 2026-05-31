@@ -1,7 +1,7 @@
 # Handoff: Lean-repo cleanup DONE — 8 drift-prone docs deleted, PRD slimmed, backlog moved to GitHub. NEXT = resume the Ch6 walkthrough (or start building from the GitHub backlog)
 
 **Date:** 2026-05-31
-**Session focus:** Big lean-repo + doc-consolidation pass. YAML is the single source of truth; two generators produce the indexes; the backlog now lives in **GitHub issues** (the repo reads like a mature ROM-hack repo). All committed + pushed to main (`ace9cd0`).
+**Session focus:** Big lean-repo + doc-consolidation pass. YAML is the single source of truth; two generators produce the indexes; the backlog now lives in **GitHub issues** (the repo reads like a mature ROM-hack repo). All committed + pushed to main (HEAD `b6a96af`; the cleanup spans `2cecb47`→`b6a96af`).
 
 **Working principle locked in (memory `feedback_lean_repo_structure`):** match the decomp / experienced-hacker repo structure — **the data IS the doc** — and **delete drift-prone planning-prose** rather than re-patching it. No staleness banners (`feedback_clean_doc_rewrites`).
 
