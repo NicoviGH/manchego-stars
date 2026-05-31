@@ -1,7 +1,7 @@
-# Handoff: Doc-consolidation pass DONE (steps 1–5,7); NEXT = class/rules-doc audit sign-off (step 6) + the discovered levels 1-5 vs 1-7 conflict
+# Handoff: Full doc-consolidation DONE (steps 1–7, incl. class/rules audit); NEXT = the MVP level-cap decision (levels 1-5 vs 1-7) + its doc/YAML sweep
 
 **Date:** 2026-05-31
-**Session focus:** Executed the decided doc-consolidation pass to stop the doc-sync churn. YAML is now the single source of truth for per-chapter facts; the chapter index is generated; durable "why" lives in lean hand docs. All committed + pushed to main (`b8198c9`). **The remaining task is step 6 — the class/rules-doc audit — which is a PROPOSAL awaiting Nicolas's sign-off (no deletions without it), plus a real contradiction I surfaced (MVP feature scope = levels 1-5 vs 1-7).**
+**Session focus:** Executed the whole doc-consolidation pass (chapters AND class/rules docs) to stop the doc-sync churn. YAML is now the single source of truth; two generators produce the indexes; durable "why" lives in lean hand docs. All committed + pushed to main (`95441b3`). Nicolas signed off on the class-doc consolidation ("do whatever is best practice for rom hacking"). **The one remaining open item is the MVP level-cap question — Nicolas said "I don't understand what broke," so it still needs a plain-language decision from him before the level-range sweep can run.**
 
 ## Standing rules (how Nicolas wants this work done)
 
@@ -25,24 +25,19 @@
 
 The campaign-structure memory **contradicts itself**: its frontmatter + the MEMORY.md index say **"MVP feature scope = 5e levels 1-5 only,"** but the memory BODY (and `class-progression-tables.md`, `pc-spell-lists.md`, `party-balance.md`, `PRD §goals`) all say **"MVP = Ch 1-7 = 5e levels 1-7."** These can't both be right, and the Ch4 split (MVP is now Ch 1-**8**) means the old 1:1 "Ch N = 5e level N" curve also needs a re-look (the memory body line 12 already flags this). **Do not silently resolve — confirm the intended MVP level ceiling with Nicolas**, then sweep the affected docs/YAML in one pass. This is upstream of the class/rules audit below.
 
-## NEXT TASK — Step 6: class/rules-doc audit (PROPOSAL — needs sign-off, no deletions without it)
+## Step 6 — class/rules-doc audit: DONE (`95441b3`)
 
-**Finding:** `class-mapping.md` and `PRD §6.7/§6.8` are the *same* duplicate-stale-table antipattern the chapter pass just fixed. The PC/NPC **YAMLs already are the source of truth** for FE class + promotion (`campaigns/.../pcs/*.yaml`, `npcs/*.yaml` — `fe_base`, `fe_stats.class`, `promotion.branch`, all vanilla, dated 2026-05-29/30), and `decisions.md §Class Mapping & Promotions` already holds the current rationale. The hand tables duplicate it and are badly stale:
+Nicolas delegated ("do whatever is best practice for rom hacking"), so the class-doc
+consolidation was executed (same single-source pattern as the chapters):
+- **Added `tools/gen-class-index.rb` → `docs/CLASSES.md`** (PC+NPC roster from the unit YAMLs).
+- **Deleted `docs/class-mapping.md`** (rationale already in `decisions.md`; table now generated). Redirected all PC-YAML headers + doc refs to `CLASSES.md`/`decisions.md`.
+- **PRD §6.7** class table → pointer; **PRD §6.8** rewritten to decision B (deplete + gold restock; cantrips high-count, not infinite) — it had contradicted §6.9.
+- Fixed split cross-refs: braulo signature ch07→ch08, marty signature ch05→ch06, marty "stock Monk"→"stock Shaman"; party-balance magic-triangle (Marty is Dark, not Light).
+- **Kept** (correctly scoped, not duplicates): `rules-mapping.md` (generic engine 5e→FE spec), `combat-formulas.md` (concise combat quick-ref), `class-progression-tables.md` (D&D-source-of-record for when 5e features unlock), `party-balance.md` (analysis snapshot). These still need the level-range reconciliation below.
 
-- **`class-mapping.md` "Notes on Specific Mappings"** describes only SUPERSEDED designs: Marty=Monk, Sclorbo=Lore Bishop/Dancer, Rootis=Manakete Dragon-Wings transform, Pepperjack/Brie="RBG's cannons," "Wolfram & RBG have spell access." All reverted (see `decisions.md`).
-- **`PRD §6.7`** table repeats the same stale customs (custom Summoner/Artillerist, "Dark Sage" (non-existent), Dragon Wings transform, Dancer/Lore Bishop, Wolfram Mystic Arcanums/Shield, Pepperjack as a deployable AC-18 100-HP cannon, Basil=Ch4 Cleric, Mummy=Sage). NPC join-chapters are pre-split.
-- **`PRD §6.8`** ("all spell tomes refill to max each chapter — long rest") **directly contradicts** `PRD §6.9` and `decisions.md` decision B (deplete + gold restock, NO free refill).
+## ⚠️ THE ONE OPEN ITEM (needs Nicolas) — MVP level cap: levels 1-5 vs 1-7
 
-**Proposed fix (mirrors the chapter consolidation) — for sign-off:**
-1. **Write `tools/gen-class-index.rb`** → generate **`docs/CLASSES.md`** (PC + NPC roster: name, FE base, promotion branch+default, primary stat, D&D source) from the unit YAMLs.
-2. **Retire the hand tables:** delete `class-mapping.md` (rationale already in `decisions.md`; table → generated `CLASSES.md`); replace `PRD §6.7` with a pointer (like §7); **delete the contradictory `PRD §6.8` table** (keep §6.9 + `decisions.md` decision B as canonical) or rewrite §6.8 to match decision B.
-3. **`class-progression-tables.md`: KEEP** — it's the D&D-source-of-record for *when 5e features unlock* (no FE duplicate). But reconcile it to the levels-1-5-vs-1-7 answer + the Ch1-8 renumber.
-4. **`rules-mapping.md`: KEEP** (generic engine 5e→FE spec) but spot-fix any advantage/saves residue; it already headers "resolution is vanilla FE."
-5. **`combat-formulas.md`: KEEP as the concise combat quick-ref** OR fold into `decisions.md §Combat` + `rules-mapping §A` (they overlap). Recommend keep — it's short and useful.
-6. **`party-balance.md`: KEEP** (analysis snapshot) but fix stale bits (Wolfram "Breath Weapon," Dragon Wings post-MVP, Basil/Mummy Ch4 joins) and the level-range.
-7. Update PC-YAML header comments that point at `class-mapping.md`/`PRD §6.7` → point to `CLASSES.md`/`decisions.md`.
-
-**Recommendation:** do (1)+(2) (kills the worst stale duplication), then the level-range sweep (3/6) after Nicolas confirms the ceiling. `campaign-brief.md` also has its own stale Ch1-7 breakdown — fold into the same sweep.
+The campaign-structure memory **contradicts itself**: its frontmatter + the MEMORY.md index say **"MVP feature scope = 5e levels 1-5 only,"** but the memory BODY (and `class-progression-tables.md`, `pc-spell-lists.md`, `party-balance.md`, `PRD §goals`) all say **"MVP = 5e levels 1-7."** Plain version: this number sets how strong the party gets by the MVP finale — which spells/subclass features are in vs. cut. "1-5" = simpler, no 3rd/4th-level spells; "1-7" = richer, up to 4th-level. They can't both be the live spec. The Ch4 split (MVP is now Ch 1-**8**) also broke the old 1:1 "Ch N = 5e level N" curve, so the curve needs a re-look regardless. **Do NOT silently resolve.** Once Nicolas picks the ceiling, sweep in one pass: the memory frontmatter+index, `class-progression-tables.md`, `pc-spell-lists.md`, `party-balance.md`, `magic-items.md`, `PRD §goals/milestones/issues` (still say "7 chapters" / "Chapter 7" finale), and `campaign-brief.md` (its own stale Ch1-7 breakdown).
 
 ## Other blockers / open (unchanged)
 
@@ -53,9 +48,9 @@ The campaign-structure memory **contradicts itself**: its frontmatter + the MEMO
 
 ## Key files
 
-- Generator: `tools/gen-chapter-index.rb` → `docs/CHAPTERS.md`. (To write: `tools/gen-class-index.rb` → `docs/CLASSES.md`.)
+- Generators: `tools/gen-chapter-index.rb` → `docs/CHAPTERS.md`; `tools/gen-class-index.rb` → `docs/CLASSES.md`. Re-run after editing any chapter/unit YAML.
 - Chapters: `campaigns/rime-of-the-frostmaiden/chapters/ch00…ch08-*.yaml` (source of truth).
 - Units: `campaigns/rime-of-the-frostmaiden/pcs/*.yaml`, `npcs/*.yaml` (source of truth for class/promotion).
-- Durable docs: `docs/decisions.md` (settled why), `docs/roadmap.md` (post-MVP scaffold), `docs/fe8-pacing-reference.md` (FE8-only).
-- Audit targets: `docs/{class-mapping.md, PRD.md §6.7/§6.8, class-progression-tables.md, rules-mapping.md, combat-formulas.md, party-balance.md, campaign-brief.md}`.
+- Durable docs: `docs/decisions.md` (settled why — incl. the doc model, cadence taxonomy, promotion seam, class mapping), `docs/roadmap.md` (post-MVP scaffold), `docs/fe8-pacing-reference.md` (FE8-only).
+- Level-sweep targets (after the cap decision): `docs/{class-progression-tables.md, pc-spell-lists.md, party-balance.md, magic-items.md, campaign-brief.md, PRD.md}` + the campaign-structure memory.
 - Validate YAML: `ruby -ryaml -e 'YAML.load_file("<path>")'`.
