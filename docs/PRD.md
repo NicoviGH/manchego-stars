@@ -258,74 +258,18 @@ The engine makes the following assumptions about any campaign folder:
 
 **The boundary rule:** If a feature doesn't work without Frostmaiden-specific data, it belongs in `campaigns/`, not `engine/`. If you're about to hardcode a character name or chapter event in C, stop — it goes in YAML.
 
-### 6.5 Combat System — Vanilla FE8 (D&D flavor on top)
+### 6.5 Combat, Triangle & Spells — vanilla FE8 (D&D flavor on top)
 
-> Combat *rules* are vanilla FE8 so it plays like Fire Emblem; D&D supplies flavor
-> (incl. damage-type labels). Full reference: `decisions.md` §Combat System +
-> `rules-mapping.md` §A. The engine **does not** replace `bmbattle.c`.
+> **Settled elsewhere — do not duplicate here.** Combat resolution, the weapon/magic triangle,
+> crit/doubling, the no-AC/no-saves rules, the damage-type-labels-only model, and the spell-tome
+> economy live in **`decisions.md`** (§Combat System / §Weapon & Magic Systems / §Economy), with
+> the generic 5e→FE conversion in **`rules-mapping.md`**.
 
-**Attack Resolution — vanilla FE (unchanged):** FE8's hit% vs avoid (two-RN), with the
-weapon-triangle hit bonus. **No d20, no Armor Class, no advantage/disadvantage.** AC
-values in the PC sheets are flavor/source-of-record only.
-
-**Damage — vanilla FE armor-subtraction (no D&D multiplier):**
-
-```
-Damage = max(0, Might − Defender.DEF/RES)     # Might = WeaponMight + STR (or MAG)
-```
-
-**No resistance/vulnerability/immunity multiplier** — it has no vanilla FE analogue and would
-modify FE damage under the hood, so it is not a mechanic. Damage types are flavor labels only. Where a
-matchup genuinely matters (fire vs ice trolls), flag the weapon **effective** via vanilla FE's
-existing effectiveness system — FE-native, not a multiplier.
-
-Weapon Might is **fixed FE might** (tuned from the 5e die's average), not a rolled die.
-
-**Critical Hits — vanilla FE:** crit rate from SKL/weapon/skill; crit damage ×3 (FE's
-native triple). When a crit fires, the UI may play a **cosmetic d20-lands-on-20
-flourish** for D&D feel — purely visual, never gating the hit.
-
-**Doubling (vanilla FE):**
-
-```
-If AttackSpeed_attacker − AttackSpeed_defender ≥ 4: attacker attacks twice
-```
-
-**Magic & staves — vanilla FE (no saving throws):** offensive spells resolve as FE
-magic combat (MAG vs RES, FE hit/avoid). Status staves (Sleep/Silence/Berserk/Poison)
-**always hit** in range; healing staves always succeed. There are **no DCs or save
-rolls**; `save:` / `save_dc:` in the PC YAMLs are flavor metadata only.
-
-### 6.6 Weapon Triangle — vanilla FE (damage-type names are flavor)
-
-**Physical:**
-```
-Sword > Axe > Lance > Sword
-```
-Bonus: +1 ATK / +15 to-hit (vanilla FE triangle, `src/bmbattle.c`). D&D damage-type names
-(slashing/bludgeoning/piercing/…) are cosmetic per-weapon labels, NOT a relabeling of the
-triangle — a claw wolf and an axe bandit are both the **axe type** and read identically.
-
-**Magic:**
-```
-Anima > Light > Dark > Anima
-```
-Our casters span it: Rootis = Anima, Marty = Light, Meesmickle = Dark.
-
-**Iconic matchups via vanilla FE weapon effectiveness (no resistance multiplier):**
-
-There is **no resistance/vulnerability/immunity mechanic**. The table below is
-*flavor* — except the **Vulnerable** column, which is realised through vanilla FE **weapon
-effectiveness** when a matchup matters to play (flag a weapon `effective` vs that enemy class, the
-same way Hammers are effective vs armor). Resistances/immunities are narrative flavor only.
-
-| Creature | Flavor (resist/immune) | Plays as: FE effectiveness |
-|---|---|---|
-| Skeleton | resists piercing/slashing | bludgeoning weapons **effective** vs skeletons |
-| Zombie | immune poison (flavor) | bludgeoning / radiant weapons **effective** vs zombies |
-| Frost Druid | resists cold (flavor) | fire weapons **effective** vs frost druids |
-| Ice Troll | resists cold (flavor) | fire weapons **effective** vs ice trolls |
-| Grell | immune lightning (flavor) | — (no effectiveness; pure flavor) |
+Summary: rules are **vanilla FE8** (`bmbattle.c` left intact); D&D damage-type names are
+**cosmetic per-weapon labels** (no resistance multiplier — iconic matchups like fire-vs-ice-troll
+use FE's native weapon `effective` flags); the triangle stays FE-native (Sword/Axe/Lance,
+Anima/Light/Dark); the d20 survives only as a **cosmetic crit flourish**. The engine does **not**
+replace `bmbattle.c`.
 
 ### 6.7 Class System
 
@@ -512,209 +456,12 @@ These are qualitative (audience of 7, no analytics):
 
 ---
 
-## 15. GitHub Project Setup
-
-### Repository
-- **Name:** `manchego-stars`
-- **Visibility:** Private
-- **Default branch:** `main`
-- **Branch strategy:** Feature branches per milestone task. `main` always builds clean.
-
-### Labels
-
-| Label | Color | Usage |
-|---|---|---|
-| `engine` | Blue | Reusable engine code (damage types, spell slots, status/hazards, UI reskin) |
-| `content` | Green | Campaign-specific data (PCs, chapters, dialogue, maps) |
-| `tooling` | Yellow | Build pipeline, SRD pull, campaign injector |
-| `art` | Purple | Sprites, portraits, map tiles |
-| `audio` | Orange | Music, sound effects |
-| `bug` | Red | Defects |
-| `balance` | Gray | Stat tuning, hit-rate adjustments, difficulty |
-| `stretch` | Brown | Post-MVP nice-to-haves |
-| `blocked` | Black | Waiting on external input or decision |
-
-### Milestones
-
-1. **M0: Repo Boots Clean**
-2. **M1: D&D Combat Layer Works**
-3. **M2: One PC End-to-End**
-4. **M3: 8 Chapters Playable**
-5. **M4: Ship It**
-
----
-
-## 16. GitHub Issues — Full Backlog
-
-### M0: Repo Boots Clean
-
-**#1 — Initialize repo with README and CLAUDE.md** `tooling`
-Set up the GitHub repo structure per §6.2. Write `CLAUDE.md` with project conventions, key file pointers, and "what the agent should know." Include `docs/decisions.md` with initial design decisions from this PRD.
-
-**#2 — Add fireemblem8u as git submodule** `engine`
-`git submodule add` the FE8 decomp. Verify `./scripts/quickstart.sh --rom /path/to/baserom.gba` produces `fireemblem8.gba: OK`.
-
-**#3 — Set up CI: `make` green gate** `tooling`
-GitHub Actions workflow that runs `make fireemblem8.gba -j$(nproc)` on push to `main` and PRs. Fail if sha1 doesn't match. This is the build gate that prevents broken builds from landing.
-
-**#4 — Write `tools/pull-srd.ts`** `tooling`
-One-shot script that walks dnd5eapi.co endpoints (classes, races, spells, monsters, equipment, conditions, damage-types, magic-items, features) and dumps to `data/srd-snapshot.json`. Then walks Open5e v2 endpoints (spells, creatures, items, magicitems, weapons, armor) and dumps to `data/open5e-snapshot.json`. Commit both snapshots.
-
-**#5 — Scaffold campaign folder structure** `content`
-Create the `campaigns/rime-of-the-frostmaiden/` directory tree with empty YAML templates for `campaign.yaml`, one PC file, one chapter file. Include comments explaining each field. This is the "hello world" of the content pipeline.
-
-**#6 — Write homebrew class/race YAML stubs** `content`
-Create `data/homebrew/classes/artificer.yaml` and `data/homebrew/classes/metallurgist.yaml`. Create all 7 homebrew race YAMLs. These are hand-written from the D&D Beyond sheets and published PDFs (Tasha's, Metallurgist PDF, Myconid Race PDF). Fill in mechanical stats, not flavor text.
-
----
-
-### M1: D&D Combat Layer Works
-
-Combat resolution stays vanilla FE8 (`bmbattle.c` left intact). The work in this milestone is
-the D&D *flavor* layer on top — there is no d20/AC/saving-throw/nat-20 engine to build, so issue
-numbers #8–#11 are unused and the list picks up at #12. The weapon triangle stays FE-native
-(Sword/Axe/Lance, Anima/Light/Dark); D&D damage-type names are per-weapon labels, not a relabel
-of the triangle.
-
-**#7 — Cosmetic crit-flourish RNG helper** `engine`
-A tiny RNG helper over `bmRng.c` for the crit flourish's spinning-number effect, if the battle
-animation wants one. No advantage/disadvantage to support. Optional — can fold into #17.
-
-**#12 — Add damage-type *flavor* enum and weapon tagging** `engine`
-Create `damage_type.h` with enum (13 types: slashing, piercing, bludgeoning, fire, cold, lightning, thunder, poison, acid, necrotic, radiant, force, psychic). Add a 1-byte **flavor** damage-type tag to each weapon (for the UI icon + descriptions). Tag all vanilla FE8 weapons. **No resistance computation** — this is a label only.
-
-**#13 — Iconic matchups via vanilla FE weapon effectiveness** `engine`
-There is no resistance/vulnerability/immunity multiplier (no vanilla FE analogue; it would modify FE damage under the hood). For the handful of iconic matchups (fire vs ice trolls/frost druids, bludgeoning vs skeletons), flag the relevant weapons **effective** vs those enemy classes using vanilla FE8's existing effectiveness mechanic. No new damage-multiplier code. Test a fire weapon doing FE-effective bonus damage to an ice troll.
-
-**#15 — Implement the spell-economy tracker (decision B)** `engine`
-Each spell/cantrip is a finite-use tome whose charges DEPLETE in use. **No free chapter refill** — between chapters the player restocks charges with gold at the armory/vendor. Decrement on tome use; gray out a depleted tome; show remaining uses on the stat screen. Cantrips are high-count (30–50 uses), spell tomes lower. Wire restock into the prep/shop flow. (Issue #14, a triangle relabel, is dropped — the triangle stays FE-native; D&D damage-type names are per-weapon labels.)
-
-**#16 — Implement combat preview UI reskin** `engine`
-Keep FE's vanilla hit%/crit% forecast box. Add only a **damage-type icon**. No AC / to-hit / dice line (those mechanics don't exist), and no triangle relabel — the triangle UI stays FE-native. Prototype in mGBA first.
-
-**#17 — Implement cosmetic d20 crit flourish** `engine`
-When an FE crit fires in the battle animation, play a brief "d20 lands on 20" flourish (3–5 frames of spinning numbers settling on 20) for D&D feel. **Cosmetic only** — it does not decide the crit (FE's crit rate does). This is the surviving "BG3 feel" moment.
-
-**#18 — Playtest vanilla FE8 Chapter 1 with the D&D layer** `engine` `balance`
-Play FE8's original Chapter 1 (Eirika's route) with the reskinned combat. Verify: vanilla FE hit/avoid/crit behave normally, the damage-type flavor label/icon shows correctly, an FE-effective weapon does its bonus damage, spell tomes deplete and restock with gold, the crit flourish plays, no crashes, save/load works. Hit-rate tuning is just vanilla FE tuning. Document findings.
-
----
-
-### M2: One PC End-to-End
-
-**#19 — Write `tools/map-class.ts`** `tooling`
-5e class → FE class mapper. Reads from SRD snapshot first, Open5e second, homebrew folder last (highest precedence). Outputs the FE class ID, base stats, growth rates, and promotion options. Pure code, no LLM.
-
-**#20 — Write `tools/build-campaign.ts`** `tooling`
-Campaign injector script. Reads `campaign.yaml`, walks `pcs/`, `npcs/`, `enemies/`, `chapters/` folders. Runs the class mapper. Generates EA buildfiles. Injects unit data, item data, class data, and chapter events into the decomp's data tables. Then runs `make`. The single command: `make CAMPAIGN=rime-of-the-frostmaiden`.
-
-**#21 — Write `tools/build-events.ts`** `tooling`
-YAML → Event Assembler buildfile codegen. Reads a chapter YAML (unit placement, dialogue, events, objectives) and emits `.ea` files that ColorzCore can assemble.
-
-**#22 — Translate Braulo end-to-end** `content`
-Write `campaigns/rime-of-the-frostmaiden/pcs/braulo.yaml` with full 5e stats, FE starting stats, growth rates, inventory, class mapping (Pirate → Berserker), and unique abilities (Rage, Shell Defense). Create or source a portrait. Inject via `build-campaign.ts`. Verify Braulo appears in mGBA with correct stats, portrait, class, and inventory. Document rough edges.
-
-**#23 — Create Braulo's portrait** `art`
-Source from D&D Beyond portrait URL (`portraits.json`). AI-generate base portrait → manual cleanup → convert to FE pixel art specs (80×72 main, 32×32 mini, 16-color palette). Insert via `Png2Dmp` + `PortraitFormatter`. Verify in mGBA stat screen.
-
----
-
-### M3: 8 Chapters Playable
-
-**#24 — Translate remaining 6 PCs** `content`
-Write YAML files for Marty, Meesmickle, Prof. RBG, Rootis, Sclorbo, Wolfram. Each needs: 5e stats, FE stats, growths, inventory, class, unique abilities, portrait reference.
-
-**#25 — Create portraits for all PCs** `art`
-6 remaining PC portraits (Marty, Meesmickle, Prof. RBG, Rootis, Sclorbo, Wolfram). Same pipeline as #23.
-
-**#26 — Implement custom classes** `engine` `content`
-Create FE class entries for classes with no vanilla equivalent: Artillerist promotion for RBG (Archer base → custom Artillerist with cannon deployment), Metallurgist (Wolfram), custom Bard (Sclorbo), custom Druid (Marty). Define base stats, caps, promotion gains, weapon types, animations. Reuse vanilla animations where possible (RBG uses Archer/Sniper base animations; note where custom battle animations are needed).
-
-**#27 — Implement unique PC/NPC abilities** `engine` `content`
-Per-unit unique skills: Braulo's Rage (consumable Berserk item with custom stats), Braulo's Shell Defense (command), Marty's Halo of Spores (innate AoE), Meesmickle's Eldritch Blast (∞-use dark tome), Prof. RBG's Eldritch Cannon (deployable ballista unit), Rootis's Metamagic, Sclorbo's Bardic Inspiration (Dance variant), Wolfram's Forge (between-chapter upgrade), **Pinky's Red Ruby respawn** (on defeat → drops Red Ruby item on tile; RBG uses Ruby to re-summon Pinky adjacent; requires custom death handling and item-triggered summon). Each is a separate sub-task.
-
-**#28 — Write all NPC YAML files** `content`
-Baxby, Pinky, Trex, Basil, The Mummy, Messie (non-recruitable), Duvessa Shane (cutscene only), Velynne Harpell (cutscene only). Stats, classes, inventories, join conditions.
-
-**#29 — Create NPC portraits** `art`
-Portraits for Trex, Basil, The Mummy, Dorbulgruf, Messie. Other NPCs can use recolored vanilla FE8 portraits.
-
-**#30 — Write all enemy YAML files** `content`
-Goblins, Kobolds, Grells, Frost Druid, Dorbulgruf, Easthaven Guards, Ice Trolls, wolves, bandits, vine blights. Stats, classes, inventories, AI patterns, and any vanilla-FE `effective`-vs flags (no resistance tables).
-
-**#31 — Design and build Chapter 1 map** `art` `content`
-Hand-draw "The Iron Trail" map in Tiled. Linear snowy trail, goblin camp at the end. Place terrain (snow, trees, rocks, camp structures). Export to FE-compatible format. Place units per chapter YAML.
-
-**#32 — Implement Chapter 1 events and dialogue** `content`
-Write Ch 1 event script: opening cutscene (Northlook tavern, dwarves hire party), mid-map dialogue (if any), post-map cutscene (Duvessa Shane, Baxby purchase). All dialogue in EA buildfile format.
-
-**#33 — Design and build Chapter 2 map** `art` `content`
-"Cold Welcome" — open snowy road, sled escort, tree lines for ambush spawns.
-
-**#34 — Implement Chapter 2 events and dialogue** `content`
-
-**#35 — Design and build Chapter 3 map** `art` `content`
-"The Termalaine Mine" — multi-level mine interior. Upper kobold levels, lower Grell shaft. Vertical navigation.
-
-**#36 — Implement Chapter 3 events and dialogue** `content`
-Include mid-map cutscene: Prof. RBG's kobold execution. Trex recruitment event post-map.
-
-**#37 — Design and build Chapter 4 map** `art` `content`
-"The Elven Tomb" — forest path → tomb interior. Boss arena. Moonlight puzzle tiles.
-
-**#38 — Implement Chapter 4 events and dialogue** `content`
-Moonlight puzzle event (move 3 units to glowing tiles). Basil + Mummy recruitment post-map.
-
-**#39 — Design and build Chapter 5 map** `art` `content`
-"The Maer Monster" — water map, 2 boats, Messie as massive boss unit. Tight space.
-
-**#40 — Implement Chapter 5 events and dialogue** `content`
-Real boss fight with dual resolution: combat victory (hard, different ending) OR Talk (Marty → Messie, peaceful, better ending). Pre-chapter hint dialogue. Supporting water enemies. Two post-chapter branches. Post-map: Messie stays in Bremen.
-
-**#41 — Design and build Chapter 6 map** `art` `content`
-"Blood in Bremen" — town interior, Speaker's hall. Civilian NPC units.
-
-**#42 — Implement Chapter 6 events and dialogue** `content`
-Dorbulgruf boss fight. Civilian NPCs (don't kill). Post-map: Messie installed as Speaker cutscene.
-
-**#43 — Design and build Chapter 7 map** `art` `content`
-"The Eastway Ambush" — narrow ice canyon, high walls, two-sided ambush, boulder blockade.
-
-**#44 — Implement Chapter 7 events and dialogue** `content`
-Turn-1 scripted event: Braulo shackle break. Survive timer (8–10 turns). Turn 4–5: ice troll reinforcements. Turn 6: boulder blockade. End: scripted defeat, fade to black, Revel's End text. Credits.
-
-**#45 — Implement world map** `content`
-FE8's world map showing Ten-Towns locations. Chapters unlock sequentially (no free-roam for MVP). Post-chapter screens show the party traveling between towns.
-
-**#46 — Write campaign.yaml** `content`
-Metadata: title "Manchego Stars: Rime of the Frostmaiden," 7 chapters, start level 1, promotion threshold, level cap for MVP.
-
----
-
-### M4: Ship It
-
-**#47 — Full playthrough #1 — functionality** `bug`
-Play all 8 chapters start to finish. Log every crash, soft-lock, missing dialogue, broken event, wrong stat, misplaced unit.
-
-**#48 — Full playthrough #2 — balance** `balance`
-Play again with focus on: hit rates (are they in the 65–80% sweet spot?), damage (does anything one-shot? does anything tickle?), chapter difficulty curve, is Chapter 7 survivable for N turns?, are casters balanced vs martials?
-
-**#49 — Balance tuning pass** `balance`
-Adjust: enemy ACs, PC base stats, growth rates, weapon dice, proficiency bonuses, chapter enemy counts. Goal: each chapter should be completable without losing units on a first attempt by a competent FE player on Classic mode.
-
-**#50 — Final dialogue pass** `content`
-Review all dialogue for: character voice consistency, campaign callbacks, typos, pacing. Add any missing signature moments from Nicolas's input.
-
-**#51 — Final portrait pass** `art`
-Review all portraits for: palette compliance, dimension compliance, visual consistency across the roster.
-
-**#52 — Title screen and credits** `art` `content`
-Custom title screen: "Manchego Stars" title, party silhouettes, snow particles. Credits: Nicolas (design/dev), player names, "Based on the Icewind Dale campaign." Tool credits (FEUniverse, decomp team, etc.).
-
-**#53 — Build final ROM and distribute** `tooling`
-Run final `make CAMPAIGN=rime-of-the-frostmaiden`. Verify sha1. Test on mGBA, RetroArch, and a GBA flash cart if available. Send pre-patched `.gba` directly to the 7 players.
-
----
+## 15. Work Tracking
+
+Work is tracked as **GitHub issues** (labels: `engine` / `content` / `tooling` / `art` /
+`audio` / `bug` / `balance` / `stretch` / `blocked`; milestones **M0–M4**). The current,
+maintained backlog lives in the issue tracker — not in this doc. `main` always builds clean;
+feature branches per task. See the phased roadmap in §14.
 
 ## 17. MCP Server Configuration
 

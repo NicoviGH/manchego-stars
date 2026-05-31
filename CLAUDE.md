@@ -4,7 +4,19 @@ Manchego Stars is a GBA tactics ROM hack of *Fire Emblem: The Sacred Stones* (FE
 
 ## Source of Truth
 
-**`docs/PRD.md`** — read this before any session. It covers architecture (§6), combat formulas (§6.5–6.8), class mappings (§6.7), the full chapter breakdown (§7), GitHub issues (§16), and the roadmap (§14).
+The data is the doc — facts live in exactly one place, and indexes are generated (see
+`docs/decisions.md` §Documentation Model):
+
+| For… | Look at… |
+|---|---|
+| Per-chapter facts (objective, recruits, enemies, rewards) | `campaigns/rime-of-the-frostmaiden/chapters/ch*.yaml` → generated `docs/CHAPTERS.md` |
+| Unit class / promotion | `campaigns/.../{pcs,npcs}/*.yaml` → generated `docs/CLASSES.md` |
+| Settled design decisions (combat, triangle, economy, class mapping, promotion seam) | `docs/decisions.md` |
+| Generic 5e→FE engine conversion | `docs/rules-mapping.md` |
+| FE8 cadence/reward grounding | `docs/fe8-pacing-reference.md` |
+| Post-MVP (Act II–V) plan | `docs/roadmap.md` |
+| Vision / architecture / phased roadmap | `docs/PRD.md` |
+| Work backlog | **GitHub issues** (milestones M0–M4) |
 
 ## Session Start Checklist
 
@@ -64,10 +76,10 @@ cd fireemblem8u
 - **Phase 0: Foundation** — current phase (repo scaffold, decomp builds clean)
 - **Phase 1: Engine Core** — D&D flavor layer on vanilla FE combat: damage-type labels, the spell-tome/gold economy, a cosmetic nat-20 crit flourish (no d20 resolution engine, no AC, no saves)
 - **Phase 2: Content Pipeline** — build-campaign.ts, Braulo end-to-end
-- **Phase 3: MVP Content** — all 7 chapters playable
+- **Phase 3: MVP Content** — Prologue + all 8 chapters playable
 - **Phase 4: Polish & Ship** — distribute to the group
 
-See `docs/PRD.md §14` for full roadmap and `§16` for the GitHub issue backlog.
+See `docs/PRD.md §14` for the full roadmap; the work backlog is tracked in **GitHub issues** (milestones M0–M4).
 
 ## Model Selection Guide
 
