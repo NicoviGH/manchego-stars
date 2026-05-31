@@ -1,55 +1,63 @@
-# Handoff: Architecture split + weapon/promotion cleanup DONE; resume Ch3 story walkthrough
+# Handoff: Ch3 polished + Ch4 split into two chapters (now 8 MVP chapters); NEXT = doc-consolidation pass
 
-**Date:** 2026-05-30
-**Session focus:** Finished the mechanics-vs-flavor architecture split, then resolved a cascade of FE-strictness cleanups (weapons → stock FE, promotions → vanilla branched, purged the leftover custom-ability/custom-class layer). Agreed an FE-community-driven balance philosophy. **Next session: resume the collaborative story walkthrough at Ch3.**
+**Date:** 2026-05-31
+**Session focus:** Finished the Ch3 walkthrough, then split the over-stuffed Ch4 into two chapters using the actual sources of truth (DM notes + the published Frostmaiden book). Decided a doc-consolidation strategy to stop story changes from rippling across many files. **The doc pass is decided but NOT yet started — that's the next task (todos below).**
 
 ## Standing rules (how Nicolas wants this work done)
 
-- **Stock vanilla FE8 classes, nothing extra.** Verbatim decomp class data (bases, growths, caps, MOV, CON, weapon ranks). No custom stats/abilities/procs/timed-buffs/special-movement.
-- **Element = flavor text, NEVER a mechanic.** No damage-type resistance/immunity/vulnerability/keyed bonuses.
-- **Individuality via flavor text + sprite/portrait art + palette**, not mechanics.
-- **Ground every FE claim in `fireemblem8u/` decomp.** **Clean native doc rewrites** (no "STALE/reverted" banners). **Auto-push to main.** **Collaborative, chapter-by-chapter** story work.
-- **Level design & balance: defer to FE-community convention** (Nicolas is not an FE expert). Balance via enemy/map design + recruits + the vanilla EXP curve — NOT per-unit stat parity. Lean generous (audience = the D&D friend group). See memory `feedback_fe-level-design`.
+- **Stock vanilla FE8 classes only** (verbatim decomp data). Element = flavor, never a mechanic. Individuality via flavor/art/palette, not stats.
+- **Ground FE claims in `fireemblem8u/`** (see memory `feedback_use_decomp`). **Ground STORY in the two source-of-truth PDFs** (NEW memory `feedback_story_sources_of_truth`): the **DM notes** (`…/References/DungeonMasterNotesIcewindDale.pdf`, the party's actual playthrough, Ch1–7 only) AND the **published book** (`…/References/icewind-dale-rime-of-the-frostmaidenpdf_compress.pdf`, canon detail). The book is an **image-only scan** (pdftotext returns nothing — read with Read tool's PDF vision; **PDF page = printed page + 1**; Contents on printed p.3).
+- **Clean native doc rewrites** (no STALE/reverted banners). **Auto-push to main.** **Collaborative, chapter-by-chapter** story work (FE8 parallel + our version). **Level design/balance: defer to FE convention, lean generous** for the friend-group audience.
+- **Objective rotation (NEW, agreed this session):** don't bind each chapter's objective TYPE to FE8's exact slot order; just ensure the full SET of FE8 objective types appears across our campaign, rotated for pacing.
 
 ## Accomplished this session (all committed + pushed to main)
 
-Commits: `39ed17e` → `7170d2c` → `17eb3f8` → `5d86cbb` → `91ccee5` → `9db125e` → `18d0819` → **`2668fc8` (HEAD)**.
-
-- **Architecture split (`39ed17e`).** `lore/README.md` + `lore/<pc>.md` for all 7 PCs (generated from pre-strip `e6cc7a6` so the ability *fantasies* are preserved as flavor, with a "does not drive gameplay" banner). `npcs/pepperjack.yaml` + `npcs/brie.yaml` (recruitable stubs) + `lore/pepperjack-and-brie.md`. Slimmed RBG: `companion` block → lean `recruits:` pointers.
-- **Pinky added (`7170d2c`).** `npcs/pinky.yaml` — RBG's homunculus "son" = the army's **flier**: stock vanilla **Pegasus Knight** (stats from `data_classes.c [CLASS_PEGASUS_KNIGHT]`). Plus `lore/pinky.md` (incl. the finale Wish beat).
-- **`dnd:` block slimmed (`17eb3f8`).** All 7 PCs: the big `dnd:` block → a ~4-line pointer (race/class/subclass + links to the json source and lore file). FE stats don't derive from D&D, so the duplication is gone.
-- **Promotions fixed to vanilla FE8 branched (`5d86cbb`).** The audit never re-checked `promoted_class`. Two were illegal: **Marty Monk→Summoner** (reclassed to **Shaman**, vanilla stats — his D&D Druid maps to FE8's real Druid class) and **Meesmickle Shaman→"Dark Sage"** ("Dark Sage" isn't an FE8 class). Every unit now has a `promotion: { branch: [A, B], default: X }` block (player chooses at the Master Seal), grounded in `classchg-data.c`. **Key clarification recorded:** stripping CUSTOM abilities ≠ dropping vanilla FE mechanics — vanilla class features (Berserker crit, **Summoner's Summon / CA_SUMMON**, Canto, flight) are KEPT.
-- **MVP weapons → stock FE (`91ccee5` + `9db125e`).** Every weapon now has an `fe_base:` pointing at a vanilla FE8 item; **no custom Might anywhere** (resolves the old "Might TBD"). Physical weapons use stock names (Iron Axe, etc.); tomes keep an element-right flavor NAME but are mechanically the basic stock tome (Rootis "Ray of Frost"=Fire; Marty "Shillelagh"/Meesmickle "Eldritch Blast"=Flux; Sclorbo "Frostsong"/"Withering Impression"=Lightning). Personal/signature weapons deferred to post-MVP (e.g. Shipwrecker=Killer Axe), flavor parked in `lore/*.md` "Signature gear". `decisions.md` synced + its stale "Class Mapping" section rewritten natively.
-- **Purged the custom-ability/custom-class layer (`18d0819` + `2668fc8`).** Deleted `fe-mechanic-map.yaml` + `docs/fe-mechanic-map.md` (they mapped the now-stripped abilities to custom_engine features). Remapped all `custom-*` enemy/boss classes to real FE8 monster classes: **Grell→Mogall, Vine Blight→Revenant, Messie→Draco Zombie, harrier fish→Gargoyle, Ice Troll→Cyclops.** Fixed the dangling doc pointers.
+- **Ch3 (The Termalaine Mine) finalized.** Locked verticality-only pacing, seize-only objective (seize the deep workings — the descent IS the lesson), ungated **Energy Ring** (+2 Pow) instead of risk-gated, 2 Grells as the chokepoint threat. Added a **Pinky shaft-scout cutscene** (RBG sends his homunculus "son" to scout; the Grells are revealed via the cutscene; seeds the finale Wish). Committed + pushed.
+- **Split the fused Ch4 → two chapters; renumbered the MVP to 8 chapters.** Nicolas correctly flagged the old Ch4 was doing two DM-note beats at once. The book (pp.78–83) revealed the **white moose, the frost druid (Ravisin), and Messie are ONE villain thread — Ravisin awakened them all.**
+  - **NEW `ch04-the-white-moose.yaml`** — Lonelywood **fog-of-war forest hunt** (the FE8 Ch4 "Ancient Horrors" DefeatAll/monster-debut half). Wolf-pack parley = Marty's SECONDARY signature beat; **Lupin** (talking wolf leader) joins the **sled team as a non-combat NPC** (not playable — canon: he never fights). The white moose is a scripted neutral that flees to the tomb.
+  - **`ch05-the-elven-tomb.yaml`** (was the fused ch04, now boss-only) — **Ravisin** the frost druid as our first clean **DefeatBoss**, wielding **Flux** (the Druid class's native dark tome, flavored cold) — this **fixed an illegal weapon** (the old `elwind-tome` doesn't exist in FE8, and a Druid can't use Anima-wind anyway). **3-offering brazier puzzle** (FE8-native: gather twig/pinecone/feather on the map → kindle the gazebo brazier → sarcophagus opens), which frees **Sahnar** the moon-elf mummy (playable recruit). **Basil** the goodberry shrub is folded into the **caravan shop as a Goodberry/Vulnerary NPC** (Nicolas's idea — not a fighting shrub). Drops the locked **crest of cold iron**.
+  - **Renumbered** Maer→`ch06`, Bremen→`ch07`, Eastway→`ch08`; fixed all internal cross-refs, `unlocks_chapter` chains, the promotion seam (now **Ch8→9**), and the deployment NPC lists (Basil removed from deployables; Baxby/Lupin/Basil = caravan NPCs).
+  - All 9 chapter YAMLs validate (`ruby -ryaml`).
+- **Memory updated:** added `feedback_story_sources_of_truth`. (Still TODO: bump `project_manchego_stars_campaign_structure` from "MVP = Ch1-7" to "Ch1-8".)
 
 ## Current state
 
-- All 7 PC YAMLs + `npcs/` (pepperjack, brie, pinky) are **lean, stock-vanilla, valid YAML**. `dnd:` is a pointer; inventories are stock FE weapons with `fe_base`; promotions are branched.
-- `lore/` holds all narrative/flavor (8 PC/automaton files + README + pinky), each marked flavor-only.
-- Enemies across chapters use FE8 monster classes (no `custom-*` left).
-- `decisions.md` is current (stock-weapon rule, branched promotions, custom-vs-vanilla clarification, magic-triangle caster spread). Balance philosophy saved to memory.
+- Chapters Ch0–Ch8 exist as lean, valid, stock-vanilla YAML. The split is done and pushed (HEAD).
+- **Docs are intentionally OUT OF SYNC with the renumber** — `chapter-outline.md`, `PRD.md §7`, and `fe8-pacing-reference.md` still describe the old 7-chapter numbering. This is deliberate: rather than hand-resync them, we decided to fix the root cause (see next steps).
+
+## Key decision this session: stop the doc-sync churn
+
+Nicolas (a PM, new to game design) noticed every story change forces edits across many docs. Investigation: `docs/` is **15 files / ~3,700 lines**; the entire decomp documents itself in **~458 lines** ("the data is the doc"). Per-chapter facts are duplicated across the YAML + PRD §7 + chapter-outline + pacing-ref. Also **`tools/build-campaign.ts` does not exist yet**, so the YAML is currently just another hand-maintained layer.
+
+**Agreed model:** (1) **YAML is the single source of truth** for per-chapter facts; (2) **generate** the chapter index from YAML; (3) keep only durable "why" docs (decisions.md, a trimmed PRD = vision/scope/roadmap, pacing-ref = FE8-only); (4) audit the overlapping class/rules docs. Toolchain available: **node v22, ruby 2.6, python 3.9** (no pyyaml; no package.json). Recommend the generator be a standalone **Ruby** script (Ruby's YAML is confirmed working).
 
 ## Blockers / open
 
-- **Story walkthrough paused at Ch3** (FE8 "The Bandits of Borgo" / Termalaine Mine) — **THIS IS THE NEXT TASK.** Resume collaboratively (FE8 parallel + our version), now also choosing each map's enemy mix per the FE level-design lens. Ch3 YAML is already richly drafted (kobolds=brigand, Grells=Mogall mini-bosses, RBG+Wolfram signature beats, first stat-booster behind the Grells, recruit Trex post-map).
-- **PRD.md §6.7 class-mapping table is STALE** — still lists removed per-PC abilities (Forge, Feral Strike, Shield spell, Mystic Arcanums, AC values, "spell access secondary"). Needs a native rewrite like the `decisions.md` section got (deferred this session to avoid scope creep; flagged verbally to Nicolas). PRD/research may have other custom-ability remnants worth a sweep.
-- **Signature moments TBD** for Marty, Meesmickle, Rootis, Sclorbo (Nicolas to recall; not in DM notes).
-- **pepperjack/brie `fe_stats.class` = null** (FE-legal class TBD post-MVP). Pinky is fully statted.
-- **Ch 8–20 plot blocked on the rest of the DM notes** (cover Ch1–7 only) — fine, it's post-MVP.
-- **Build toolchain still NOT installed** (devkitARM/agbcc/ColorzCore/libpng) — gates any actual ROM build/test.
+- **Signature moments TBD** for Marty (primary=ch06 Messie Talk; secondary=ch04 wolf parley now set), Meesmickle, Rootis, Sclorbo — Nicolas to recall; not in DM notes.
+- **pepperjack/brie `fe_stats.class` = null** (FE-legal class TBD post-MVP).
+- **Ch 9–20 plot** blocked on the rest of the DM notes (cover Ch1–7 only).
+- **Build toolchain still NOT installed** (devkitARM/agbcc/ColorzCore/libpng) — gates any ROM build/test. `tools/build-campaign.ts` also unbuilt.
+- **Pinky omission:** older chapter deployment notes never listed Pinky (deployable flier from Ch1); fixed in the new ch04/05/06/07/08 notes, but ch00–ch02 may still omit her.
 
-## Next steps (priority order)
+## Next steps (priority order) — THE DOC-CONSOLIDATION PASS (decided, not started)
 
-1. **Resume the Ch3 story walkthrough** (collaborative, FE8 parallel + our version), choosing the enemy mix/objective/pacing through the FE level-design lens. Then continue Ch4→Ch7.
-2. (Opportunistic) Native rewrite of the **PRD.md §6.7** class-mapping table to current stock-vanilla reality.
-3. (When recalled) Fill in **signature moments** for Marty/Meesmickle/Rootis/Sclorbo.
+1. **Write `tools/gen-chapter-index.rb`** — reads `campaigns/rime-of-the-frostmaiden/chapters/ch*.yaml`, emits `docs/CHAPTERS.md` (the overview table: #, title, cadence, objective, recruits, unlocks).
+2. **Generate `docs/CHAPTERS.md`; retire `chapter-outline.md`** — migrate its durable design notes (promotion seam, Act II foreshadow, emoji/cadence legend) into `decisions.md`, then delete the hand-maintained table.
+3. **Trim `PRD.md`** — delete §7 chapter breakdown, replace with a pointer to `CHAPTERS.md` / the YAML.
+4. **Trim `fe8-pacing-reference.md`** to FE8-only (remove OUR per-chapter mapping rows; keep the FE8 facts).
+5. **Record the doc source-of-truth model in `decisions.md`** (the 3-tier model above).
+6. **Audit the class/rules docs** (`class-mapping`, `class-progression-tables`, `rules-mapping`, `combat-formulas`, `party-balance`, + PRD §6.7 — which is ALSO flagged stale from last session) → come back with a consolidation proposal; **no deletions without Nicolas's sign-off**.
+7. **Update memory** (`project_manchego_stars_campaign_structure` → MVP = Ch1-8) and **commit + push**.
+
+(Then, eventually: resume the collaborative walkthrough at **Ch6 — The Maer Monster** onward, now with the leaner doc model in place.)
 
 ## Key files
 
-- PC unit YAMLs: `campaigns/rime-of-the-frostmaiden/pcs/*.yaml` (lean: pointer `dnd:`, `fe_base` inventories, branched `promotion:`).
-- Recruit units: `campaigns/rime-of-the-frostmaiden/npcs/{pepperjack,brie,pinky}.yaml`.
-- Flavor: `campaigns/rime-of-the-frostmaiden/lore/*.md` (8 files + README).
-- Chapters: `campaigns/rime-of-the-frostmaiden/chapters/ch0X-*.yaml` (enemies use FE8 monster classes).
-- Vanilla FE8 reference: `fireemblem8u/src/data_classes.c` (class data, `[CLASS_X - 1]`); `fireemblem8u/src/classchg-data.c` (promotion branches); `fireemblem8u/src/data_items.c` (weapon Mt/Hit/uses); `fireemblem8u/texts/texts.txt` (item/class names).
-- Canon docs: `CLAUDE.md`, `docs/decisions.md`, `docs/chapter-outline.md`, `docs/fe8-pacing-reference.md`, `docs/PRD.md` (§6.7 table stale), `docs/rules-mapping.md`.
-- Validate YAML: `ruby -ryaml -e 'YAML.load_file("<path>")'` (pyyaml not installed; use Ruby).
+- Chapters: `campaigns/rime-of-the-frostmaiden/chapters/ch00…ch08-*.yaml` (Ch0–8; ch04/ch05 are the new split).
+- Recruit/NPC units: `campaigns/rime-of-the-frostmaiden/npcs/{pepperjack,brie,pinky}.yaml`; **Lupin/Sahnar/Basil still need stub YAMLs** if we want them as data (Lupin/Basil = NPC, Sahnar = recruit).
+- Flavor: `campaigns/rime-of-the-frostmaiden/lore/*.md`.
+- Docs to consolidate: `docs/{PRD.md(§6.7,§7),chapter-outline.md,fe8-pacing-reference.md,decisions.md,class-mapping.md,class-progression-tables.md,rules-mapping.md,combat-formulas.md,party-balance.md}`.
+- Sources of truth (story): the two PDFs in `…/Fire Emblem Game/References/` (DM notes + Frostmaiden book).
+- FE8 reference: `fireemblem8u/src/data_classes.c` (e.g. `[CLASS_DRUID]` = Anima D / Dark C / Staff E), `classchg-data.c`, `data_items.c`, `texts/texts.txt`, `include/constants/terrains.h` (DOOR/WALL_DAMAGED/SNAG — FE8's only "puzzle" vocabulary).
+- Validate YAML: `ruby -ryaml -e 'YAML.load_file("<path>")'`.
+- New generator (to write): `tools/gen-chapter-index.rb`.
