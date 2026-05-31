@@ -1,7 +1,9 @@
-# Handoff: Full doc-consolidation DONE (steps 1–7, incl. class/rules audit); NEXT = the MVP level-cap decision (levels 1-5 vs 1-7) + its doc/YAML sweep
+# Handoff: Full doc-consolidation DONE + the "5e-level scope" framing RETIRED (FE-strict). NEXT = a dedicated FE-strict pass on party-balance.md + the PRD/campaign-brief chapter-count staleness, then resume the Ch6 walkthrough
 
 **Date:** 2026-05-31
-**Session focus:** Executed the whole doc-consolidation pass (chapters AND class/rules docs) to stop the doc-sync churn. YAML is now the single source of truth; two generators produce the indexes; durable "why" lives in lean hand docs. All committed + pushed to main (`95441b3`). Nicolas signed off on the class-doc consolidation ("do whatever is best practice for rom hacking"). **The one remaining open item is the MVP level-cap question — Nicolas said "I don't understand what broke," so it still needs a plain-language decision from him before the level-range sweep can run.**
+**Session focus:** Executed the whole doc-consolidation pass (chapters AND class/rules docs), then — on Nicolas's insight — **retired the entire "MVP = 5e levels 1-X" framing.** YAML is the single source of truth; two generators produce the indexes (`gen-chapter-index.rb`→CHAPTERS.md, `gen-class-index.rb`→CLASSES.md); durable "why" lives in lean hand docs. All committed + pushed to main (`b590286`).
+
+**KEY RESOLUTION (this is the answer to the old "levels 1-5 vs 1-7" question):** Nicolas pointed out we ship **FE classes/levels/promotions** — so 5e levels never gated anything, and the per-chapter 5e-feature schedule listed *purged* abilities (the custom-ability layer was deleted 2026-05-29). **Resolution: progression is FE-native — MVP plays UNPROMOTED, promotions post-MVP ~Ch 10-12; 5e levels/features are flavor only.** The campaign-structure memory, MEMORY.md index, `class-progression-tables.md`, `pc-spell-lists.md`, `magic-items.md`, and `party-balance.md` (scope/mobility) were reframed to FE terms. Do NOT reintroduce a "5e-level scope."
 
 ## Standing rules (how Nicolas wants this work done)
 
@@ -35,9 +37,15 @@ consolidation was executed (same single-source pattern as the chapters):
 - Fixed split cross-refs: braulo signature ch07→ch08, marty signature ch05→ch06, marty "stock Monk"→"stock Shaman"; party-balance magic-triangle (Marty is Dark, not Light).
 - **Kept** (correctly scoped, not duplicates): `rules-mapping.md` (generic engine 5e→FE spec), `combat-formulas.md` (concise combat quick-ref), `class-progression-tables.md` (D&D-source-of-record for when 5e features unlock), `party-balance.md` (analysis snapshot). These still need the level-range reconciliation below.
 
-## ⚠️ THE ONE OPEN ITEM (needs Nicolas) — MVP level cap: levels 1-5 vs 1-7
+## NEXT TASK — finish the FE-strict cleanup (2 bounded pieces)
 
-The campaign-structure memory **contradicts itself**: its frontmatter + the MEMORY.md index say **"MVP feature scope = 5e levels 1-5 only,"** but the memory BODY (and `class-progression-tables.md`, `pc-spell-lists.md`, `party-balance.md`, `PRD §goals`) all say **"MVP = 5e levels 1-7."** Plain version: this number sets how strong the party gets by the MVP finale — which spells/subclass features are in vs. cut. "1-5" = simpler, no 3rd/4th-level spells; "1-7" = richer, up to 4th-level. They can't both be the live spec. The Ch4 split (MVP is now Ch 1-**8**) also broke the old 1:1 "Ch N = 5e level N" curve, so the curve needs a re-look regardless. **Do NOT silently resolve.** Once Nicolas picks the ceiling, sweep in one pass: the memory frontmatter+index, `class-progression-tables.md`, `pc-spell-lists.md`, `party-balance.md`, `magic-items.md`, `PRD §goals/milestones/issues` (still say "7 chapters" / "Chapter 7" finale), and `campaign-brief.md` (its own stale Ch1-7 breakdown).
+The "5e-level scope" question is RESOLVED (see headline). Two stale-doc pieces remain, both
+deferred deliberately this session to avoid half-done sweeps:
+
+1. **`party-balance.md` — dedicated FE-strict pass.** It's a **2026-05-27 (pre-purge)** analysis; the scope/mobility/flier bits were fixed, but the body still assumes deleted custom abilities: finding #2 "Wolfram's **Breath Weapon** overscoped" (Wolfram has none), Braulo "**Shell Defense**", Sclorbo's 5e heal list (Revivify/Mass Cure/Raise Dead — he's a stock Priest, Heal staff in MVP), and the role-coverage matrix likely keys off abilities. Rewrite the findings against the stock-FE-class reality (FE stats/growths/weapon-triangle/terrain), keep it as the roster-tuning analysis.
+2. **Chapter-count staleness (count, not the level frame):** `PRD.md` still says "**7 chapters**" / "Chapter 7" finale in its goals, milestones (M3), success criteria, and the §16 issue backlog (which also predates the Ch4 split — it has no ch04-white-moose/ch05-tomb issues). `campaign-brief.md` has its own stale Ch1-7 per-chapter breakdown (duplicates the generated `CHAPTERS.md` — candidate to trim to a pointer). MVP is **Prologue + Ch 1-8**; sweep these to match, and decide whether §16 needs a fuller backlog refresh.
+
+Then: **resume the collaborative chapter walkthrough at Ch 6 — The Maer Monster** (memory `feedback_collaborative_story_planning`), now with the lean doc model in place.
 
 ## Other blockers / open (unchanged)
 
