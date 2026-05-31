@@ -1,6 +1,6 @@
 # pcs/braulo.yaml — Braulo, Barbarian (Path of the Berserker)
 # Source: data/pc-sheets/braulo.json + References/PCs/Braulo Character Sheet.pdf
-# See docs/class-mapping.md and docs/PRD.md §6.7 for class mapping rationale.
+# Class roster: docs/CLASSES.md (generated). Rationale: docs/decisions.md §Class Mapping & Promotions.
 
 id: braulo
 name: Braulo
@@ -76,7 +76,7 @@ inventory:
 # buffs/debuffs, no special movement, no procs).
 
 signature_moment:
-  chapter: ch07-the-eastway-ambush
+  chapter: ch08-the-eastway-ambush
   description: >
     Turn 1 scripted event — Braulo bursts his shackles, starting the fight
     that gets the whole party captured. Triggers unique dialogue.

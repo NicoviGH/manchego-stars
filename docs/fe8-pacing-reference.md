@@ -71,7 +71,7 @@ clear-all-enemies objective is spelled `DefeatAll`.
 ## 2. Promotion items: what promotes what [decomp]
 
 Verified against `src/data_itemuse.c` (FE8 class IDs) + `texts/texts.txt`. Our
-PC→FE8-class mapping is in `docs/class-mapping.md`; how we gate promotions (the
+PC→FE8-class mapping is in `docs/CLASSES.md`; how we gate promotions (the
 seam) is in `docs/decisions.md`.
 
 | FE8 item | Promotes (FE8 classes) |

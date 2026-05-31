@@ -1,6 +1,6 @@
 # pcs/prof-rbg.yaml — Prof. R.B. Geenius, Artificer (Artillerist)
 # Source: data/pc-sheets/prof-r-b-geenius.json + References/PCs/RBG Character Sheet.pdf
-# See docs/class-mapping.md and docs/PRD.md §6.7 for class mapping rationale.
+# Class roster: docs/CLASSES.md (generated). Rationale: docs/decisions.md §Class Mapping & Promotions.
 
 id: prof-rbg
 name: "Prof. R.B. Geenius"

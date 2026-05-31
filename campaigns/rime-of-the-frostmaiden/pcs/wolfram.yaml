@@ -2,7 +2,7 @@
 # Source: data/pc-sheets/wolfram.json + References/PCs/Wolfram Character sheet.pdf
 # Class is fully homebrew — see References/Class_The_Metallurgist.pdf for full details.
 # D&D Beyond approximated Wolfram as a Warlock (no official Metallurgist sheet support).
-# See docs/class-mapping.md and docs/PRD.md §6.7 for class mapping rationale.
+# Class roster: docs/CLASSES.md (generated). Rationale: docs/decisions.md §Class Mapping & Promotions.
 
 id: wolfram
 name: Wolfram

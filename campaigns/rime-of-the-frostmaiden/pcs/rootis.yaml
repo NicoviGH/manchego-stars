@@ -1,7 +1,7 @@
 # pcs/rootis.yaml — Rootis, Sorcerer (Draconic Bloodline — White Dragon)
 # Source: data/pc-sheets/rootis.json + References/PCs/Rootis Character Sheet.pdf
 # IMPORTANT: Dragon Ancestry is WHITE (Cold), NOT fire. JSON did not specify this.
-# See docs/class-mapping.md and docs/PRD.md §6.7 for class mapping rationale.
+# Class roster: docs/CLASSES.md (generated). Rationale: docs/decisions.md §Class Mapping & Promotions.
 
 id: rootis
 name: Rootis

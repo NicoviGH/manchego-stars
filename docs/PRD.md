@@ -210,7 +210,7 @@ manchego-stars/
 └── docs/
     ├── decisions.md           # Human-written design decisions (no re-litigation)
     ├── combat-formulas.md     # vanilla-FE combat reference + D&D flavor layer
-    ├── class-mapping.md       # 5e class → FE class table
+    ├── CLASSES.md             # GENERATED roster (5e class → FE class); see gen-class-index.rb
     └── session-log.md         # What was accomplished each session
 ```
 
@@ -330,37 +330,18 @@ same way Hammers are effective vs armor). Resistances/immunities are narrative f
 
 ### 6.7 Class System
 
-**PC Class Mappings:**
-
-| PC | 5e Class | FE Base Class | FE Promoted Class | Primary Stat | Unique Mechanic |
-|---|---|---|---|---|---|
-| Braulo | Barbarian (Berserker) | Pirate | Berserker | STR | Rage (consumable item: +might and **+DEF** while active — the 5e B/P/S "resistance" becomes an FE-native defense buff, not a multiplier). Shell Defense (command: +DEF, can't move). Hermit Crab natural armor → high FE DEF (flavor "AC 17"). |
-| Marty | Druid (Circle of Spores) | Monk (custom Druid) | Summoner (custom) | MAG | Halo of Spores (innate AoE reaction: 1d10 necrotic). Symbiotic Entity (+temp HP). Fungal Infestation (summon). Moved off Shaman in 2026-05-27 audit to differentiate from Meesmickle. |
-| Meesmickle | Warlock (The Fiend) | Shaman (Dark) | Dark Sage | MAG | Eldritch Blast (high-count dark tome per decision B; 1–2 beams in MVP, 4 at endgame). Dark One's Blessing (temp HP on kill). Hurl Through Hell (1/chapter nuke, post-MVP). |
-| Prof. RBG | Artificer (Artillerist) | Archer | Artillerist (custom promotion) | DEX / MAG | Fonduedler (personal ranged firearm, 1d10, DEX). **Pepperjack** (deployable Eldritch Cannon — Flamethrower / Force Ballista / Protector modes; 2 simultaneous at endgame, AC 18, 100 HP each). Flash of Genius (reaction: +5 ally save). Infusions (between-chapter item crafting). |
-| Rootis | Sorcerer (Draconic — White Dragon) | Mage (Ice) | Sage | MAG | Metamagic (Twinned = attack twice, Empowered = reroll damage). **Dragon Wings = Manakete-style class transform** (toggle on promotion: flier MOV, ignores terrain; consumes 1 Sorcery Point per toggle). Cold/fire affinity is **flavor** (no resistance mechanic); "heals from cold" maps to an FE-native **healing terrain** (snow/ice tiles heal him). |
-| Sclorbo | Bard (College of Lore) | Dancer (custom Bard) | Lore Bishop (custom) | MAG | Bardic Inspiration (d12 buff to adjacent ally). Cutting Words (debuff reaction). Dance/Refresh action. Cleric-tier heal kit (Cure Wounds in MVP; Revivify / Mass Cure / Raise Dead are post-MVP). **Balance: Dance and Cast are mutually exclusive per turn.** |
-| Wolfram | Metallurgist (Smith) | Knight | General | STR + MAG | Forge ability (upgrade ally armor/weapons between chapters). AC 26 equivalent (highest DEF in party). Feral Strike (Bite + Claws bonus attacks). Shield spell (reaction). Mystic Arcanums (Investiture of Stone, Forcecage). Spell access is a secondary role; STR-physical is primary. |
-
-> **AC / save / "+ally save" values in this table are flavor/source-of-record.** Combat
-> is vanilla FE: defense is FE `DEF`/`RES` + avoid, not Armor Class, and there are no
-> saving throws. Braulo's "AC 17" and Wolfram's "AC 26" map to high FE `DEF`.
-
-**NPC Unit Mappings:**
-
-| NPC | Role | FE Class | Join Chapter | Notes |
-|---|---|---|---|---|
-| Baxby | Mount / escort | Cavalier (axe-beak variant) | Ch 1–2 | Rideable. Low combat stats, high MOV. |
-| Pinky | Companion / flyer | Pegasus Knight (homunculus) | Ch 1 (with RBG) | Flying, high MOV, can Rescue. **No permadeath:** when defeated, drops a Red Ruby on his tile. If RBG picks up the Ruby, he can use it to re-summon Pinky adjacent. Unique respawn mechanic — fits homunculus lore. Fills the party's flyer gap. |
-| Trex | Recruit / utility | Thief (kobold) → Rogue | Ch 3 | Lockpick, Steal, high SPD. Low combat stats, high growth. Cosmetic wings on sprite (no flight). Fills the party's thief/utility gap. Promotes to Rogue or Assassin. |
-| Basil | Recruit / healer | Cleric (custom shrub) | Ch 4 | Goodberry staff (unique healing). |
-| The Mummy | Recruit / tank | Sage (undead) | Ch 4 | High DEF, uses both physical and magic. |
+> **Moved.** The PC + NPC class/promotion roster is no longer maintained here. The
+> source of truth is the per-unit YAML (`campaigns/rime-of-the-frostmaiden/pcs/*.yaml`,
+> `npcs/*.yaml` — `fe_stats.class`, `promotion.branch`/`default`). The generated
+> roster table is **`docs/CLASSES.md`** (`ruby tools/gen-class-index.rb`); the mapping
+> *rationale* (why each PC → its FE class, all stock vanilla) and the promotion seam
+> are in **`docs/decisions.md` §Class Mapping & Promotions**.
 
 ### 6.8 Spell Slot → Tome Uses Mapping
 
 | 5e Slot Level | Tome Uses | FE Tier Equivalent |
 |---|---|---|
-| Cantrip (0) | ∞ (0xFF) | Basic tome (Iron equivalent) |
+| Cantrip (0) | ~30–50 (high-count, **not** infinite) | Basic tome (Iron equivalent) |
 | 1st | 8 | Low-tier tome |
 | 2nd | 6 | Mid-tier tome |
 | 3rd | 4 | High-tier tome (Bolting range) |
@@ -368,7 +349,11 @@ same way Hammers are effective vs armor). Resistances/immunities are narrative f
 | 5th | 2 | Brave-tier |
 | 6th+ | 1 | Legendary / personal weapon |
 
-All spell-slot tomes refill to max uses at the start of each chapter (equivalent to a long rest).
+**Tomes deplete in use and are restocked with gold at a shop between chapters** —
+this is the decision-B economy (see §6.9 and `docs/decisions.md` §Weapon & Magic
+Systems). There is **no** free per-chapter refill, and cantrips are high-count
+items, not infinite. (This replaces the earlier "refill to max each chapter / long
+rest" model.)
 
 ### 6.9 Economy & Shop System
 

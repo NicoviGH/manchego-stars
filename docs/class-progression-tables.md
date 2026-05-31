@@ -16,7 +16,7 @@
 > - End-state PC builds: `data/pc-sheets/*.json` + `campaigns/rime-of-the-frostmaiden/pcs/*.yaml`.
 >
 > **See also:** [rules-mapping.md](rules-mapping.md) (how each mechanic converts to FE),
-> [class-mapping.md](class-mapping.md) (which 5e class → which FE class).
+> `docs/CLASSES.md` (the generated roster: which 5e class → which FE class) + `docs/decisions.md` §Class Mapping.
 >
 > **Reading the FE-conversion column:** combat is vanilla FE (decisions.md §Combat System). Where a
 > cell mentions "resist" / "damage resistance," there is **no ×0.5 multiplier** — it resolves to an

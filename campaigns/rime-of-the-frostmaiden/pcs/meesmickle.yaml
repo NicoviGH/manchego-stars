@@ -1,6 +1,6 @@
 # pcs/meesmickle.yaml — Meesmickle, Warlock (The Fiend)
 # Source: data/pc-sheets/meesmickle.json + References/PCs/Meesmickle Character Sheet.pdf
-# See docs/class-mapping.md and docs/PRD.md §6.7 for class mapping rationale.
+# Class roster: docs/CLASSES.md (generated). Rationale: docs/decisions.md §Class Mapping & Promotions.
 
 id: meesmickle
 name: Meesmickle

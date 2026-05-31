@@ -3,7 +3,7 @@
 > Evaluates the 7 PCs (plus 5 NPC recruits) against a typical Fire Emblem mid-game
 > roster. Produced 2026-05-27 after cross-referencing all 7 PC PDF sheets vs
 > `data/pc-sheets/*.json` and `campaigns/rime-of-the-frostmaiden/pcs/*.yaml`.
-> See also: [class-mapping.md](class-mapping.md), [combat-formulas.md](combat-formulas.md), PRD §6.7 / §7.
+> See also: `docs/CLASSES.md` (roster), `docs/decisions.md` (class mapping), [combat-formulas.md](combat-formulas.md), `docs/CHAPTERS.md`.
 >
 > **Combat is vanilla FE.** Hits/damage use FE math; AC, saves, advantage, and the
 > damage-type resistance multiplier are dropped (damage-type names are flavor labels).
@@ -19,7 +19,7 @@
 
 ## TL;DR
 
-- **Heavily caster-skewed:** 5 of 7 PCs cast spells. Their 5e flavor stats (WIS/INT/CHA) all fold to a single **MAG** stat in engine (class-mapping.md), so they share one magic stat — what keeps them distinct is the **magic triangle** spread + role, not the stat.
+- **Heavily caster-skewed:** 5 of 7 PCs cast spells. Their 5e flavor stats (WIS/INT/CHA) all fold to a single **MAG** stat in engine (see docs/decisions.md §Class Mapping), so they share one magic stat — what keeps them distinct is the **magic triangle** spread + role, not the stat.
 - **Only 2 frontliners:** Braulo (Berserker) and Wolfram (General). Both are walls — Braulo has Hermit Crab natural armor (high FE DEF, big HP pool, 75% HP / 50% DEF growths) and Shell Defense; Wolfram has the party's highest DEF (General-tier). The party has no glass-cannon frontliner.
 - **No dedicated healer in the PC roster.** Sclorbo (Bard 16) is the de-facto primary healer — Cure Wounds, Revivify, Mass Cure Wounds, Raise Dead all on his prepared list.
 - **No flier in the PCs during MVP** — Pinky NPC fills from Ch1. Rootis's Dragon Wings transform is a **post-MVP** unlock (Sorcerer 14 / promotion); it is NOT available in Ch 1–7.
@@ -119,9 +119,9 @@ Previous YAML listed `uses_per_chapter: null` (unlimited). The PDF p3 explicitly
 ### 3. Caster overload — managed by triangle spread + the gold/durability economy
 
 5 of 7 PCs cast spells; in FE you'd typically have 1–2 mages. What keeps it from breaking:
-- **Magic-triangle spread, not stat spread.** All caster flavor stats fold to **MAG** (class-mapping.md), so the casters do *not* have independent stats — they compete for the same MAG / magic-boost items. The real differentiator is the triangle: Marty = Light, Meesmickle = Dark, Rootis = Anima.
+- **Magic-triangle spread, not stat spread.** All caster flavor stats fold to **MAG** (see docs/decisions.md §Class Mapping), so the casters do *not* have independent stats — they compete for the same MAG / magic-boost items. The real differentiator is the triangle: Rootis = Anima, Sclorbo = Light, Marty & Meesmickle = Dark (differentiated at promotion — Marty→Druid, Meesmickle→Summoner). See docs/decisions.md §Weapon & Magic Systems.
 - **The decision-B economy is the limiter.** Spells are finite-use items restocked with **gold** between chapters (no free refill); cantrips are high-count (30–50 uses) rather than infinite. Casting is rationed by the convoy budget exactly like every FE weapon.
-- **Marty as Druid** keeps a 1-range melee option (Shillelagh) but doesn't need it to fill a triangle gap — he's the army's Light user.
+- **Marty as Druid** keeps a 1-range melee option (Shillelagh, a Dark tome); two Dark casters (Marty + Meesmickle) share that triangle slot, while Sclorbo covers Light and Rootis covers Anima.
 
 **Concern:** because every caster's stat folds to MAG, all of them compete for the same magic-boosting rewards — schedule MAG boosters/items with that contention in mind.
 

@@ -1,6 +1,6 @@
 # pcs/marty.yaml — Marty the Merry Mushroom, Druid (Circle of Spores)
 # Source: data/pc-sheets/marty-the-merry-mushroom.json + References/PCs/MMM Character Sheet.pdf
-# See docs/class-mapping.md and docs/PRD.md §6.7 for class mapping rationale.
+# Class roster: docs/CLASSES.md (generated). Rationale: docs/decisions.md §Class Mapping & Promotions.
 
 id: marty
 name: "Marty the Merry Mushroom"
@@ -23,7 +23,7 @@ fe_stats:
   class: Shaman              # FE base class — Dark mage. Marty's D&D Druid maps to Shaman→Druid
                              # (FE8 has a real Druid class, reachable only via Shaman). Differentiates
                              # from Meesmickle at PROMOTION (Marty leans Druid; Meesmickle leans Summoner),
-                             # not at base. See docs/class-mapping.md and docs/decisions.md.
+                             # not at base. See docs/decisions.md §Class Mapping & Promotions.
   level: 1
   # Vanilla FE8 Shaman stats, verbatim from data_classes.c [CLASS_SHAMAN - 1]. No D&D-derived tuning.
   # Shaman is a magic (Dark) unit: single Pow stat is the magic attack (= MAG), no STR.
@@ -79,21 +79,21 @@ inventory:
     fe_base: vulnerary
     uses: 3
 # -- Unique Abilities ------------------------------------------------------
-# NONE. Marty the Merry Mushroom is a stock FE8 Monk -- no per-character mechanics, even on promotion.
+# NONE. Marty the Merry Mushroom is a stock FE8 Shaman -- no per-character mechanics, even on promotion.
 # Individuality comes from flavor text, portrait/sprite art, and palette -- not special
 # skills (Nicolas's call, 2026-05-29: vanilla classes only, nothing extra: no timed
 # buffs/debuffs, no special movement, no procs).
 
 signature_moment:
-  chapter: ch05-the-maer-monster
+  chapter: ch06-the-maer-monster
   description: >
     The Messie Talk. Marty uses Talk with Animals on the plesiosaur Messie mid-fight,
     learns she was "awakened" by the frost druids and fears losing her intelligence,
     and resolves the boss peacefully — the moment that "changed everything" in the
-    real campaign (PRD §7, Ch 5). Mechanically the chapter's hidden Talk
+    real campaign (Ch 6 — see docs/CHAPTERS.md). Mechanically the chapter's hidden Talk
     resolution: get Marty adjacent to Messie and the Talk command appears.
   dialogue_trigger: marty_messie_talk
-  # Sourced from the DM notes + PRD §7. (His earlier Lonelywood direwolf-taming,
+  # Sourced from the DM notes. (His earlier Lonelywood direwolf-taming,
   # Ch 4 area, is a secondary beat — see ch04 YAML.)
 
 # ── Support Affinities ────────────────────────────────────────────────────────

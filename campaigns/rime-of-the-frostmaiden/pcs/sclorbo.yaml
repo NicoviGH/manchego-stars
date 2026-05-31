@@ -1,7 +1,7 @@
 # pcs/sclorbo.yaml — Sclorbo, Bard (College of Lore)
 # Source: data/pc-sheets/sclorbo.json + References/PCs/Sclorbo Character Sheet.pdf
 # NOTE: Level 16 vs. 20 for the rest of the party — player left before campaign end.
-# See docs/class-mapping.md and docs/PRD.md §6.7 for class mapping rationale.
+# Class roster: docs/CLASSES.md (generated). Rationale: docs/decisions.md §Class Mapping & Promotions.
 
 id: sclorbo
 name: Sclorbo
