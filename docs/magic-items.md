@@ -58,7 +58,7 @@
 |---|---|---|---|
 | Nu' Shipwrecker | Signature weapon — 1d8/1d10+7, **reach extended to 10 ft** | Locked prf weapon; 2-range melee (reach) | Ch1 (locked) |
 | Trident | Silvered, thrown 20/60, 1d8/1d10+6 | Thrown 2-range piercing | Ch1 |
-| Deck of Many Things | (noted in party-balance.md) chaos artifact | Likely a one-off scripted event item, not combat kit | `[VERIFY]` |
+| Deck of Many Things | chaos artifact (from a PC's sheet) | Likely a one-off scripted event item, not combat kit | `[VERIFY]` |
 
 ## Wolfram — Metallurgist (Smith), Mineralscale Drakeborn
 | Item | What it is (5e) | FE conversion idea | Gate |

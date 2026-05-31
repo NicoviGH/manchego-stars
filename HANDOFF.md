@@ -37,15 +37,21 @@ consolidation was executed (same single-source pattern as the chapters):
 - Fixed split cross-refs: braulo signature ch07→ch08, marty signature ch05→ch06, marty "stock Monk"→"stock Shaman"; party-balance magic-triangle (Marty is Dark, not Light).
 - **Kept** (correctly scoped, not duplicates): `rules-mapping.md` (generic engine 5e→FE spec), `combat-formulas.md` (concise combat quick-ref), `class-progression-tables.md` (D&D-source-of-record for when 5e features unlock), `party-balance.md` (analysis snapshot). These still need the level-range reconciliation below.
 
-## NEXT TASK — finish the FE-strict cleanup (2 bounded pieces)
+## Lean-repo principle (NEW memory `feedback_lean_repo_structure`)
 
-The "5e-level scope" question is RESOLVED (see headline). Two stale-doc pieces remain, both
-deferred deliberately this session to avoid half-done sweeps:
+Nicolas: **match the decomp / experienced-hacker repo structure — the data IS the doc — and DELETE drift-prone planning-prose docs rather than re-patching them.** Acted on it: **deleted `docs/party-balance.md`** (a 2026-05-27 pre-purge balance analysis still naming reverted classes — Dark Sage / Lore Bard / Breath Weapon; its durable bits live in `decisions.md` / `CLASSES.md` / memory `feedback_fe-level-design`). Apply this lens going forward.
 
-1. **`party-balance.md` — dedicated FE-strict pass.** It's a **2026-05-27 (pre-purge)** analysis; the scope/mobility/flier bits were fixed, but the body still assumes deleted custom abilities: finding #2 "Wolfram's **Breath Weapon** overscoped" (Wolfram has none), Braulo "**Shell Defense**", Sclorbo's 5e heal list (Revivify/Mass Cure/Raise Dead — he's a stock Priest, Heal staff in MVP), and the role-coverage matrix likely keys off abilities. Rewrite the findings against the stock-FE-class reality (FE stats/growths/weapon-triangle/terrain), keep it as the roster-tuning analysis.
-2. **Chapter-count staleness (count, not the level frame):** `PRD.md` still says "**7 chapters**" / "Chapter 7" finale in its goals, milestones (M3), success criteria, and the §16 issue backlog (which also predates the Ch4 split — it has no ch04-white-moose/ch05-tomb issues). `campaign-brief.md` has its own stale Ch1-7 per-chapter breakdown (duplicates the generated `CHAPTERS.md` — candidate to trim to a pointer). MVP is **Prologue + Ch 1-8**; sweep these to match, and decide whether §16 needs a fuller backlog refresh.
+## NEXT TASK — candidates for the same lean-repo treatment (get Nicolas's nod per-doc)
 
-Then: **resume the collaborative chapter walkthrough at Ch 6 — The Maer Monster** (memory `feedback_collaborative_story_planning`), now with the lean doc model in place.
+The same "drift-prone prose / duplicates data" lens flags more `docs/` files. **Surface for delete-or-keep before touching** (some hold unique content):
+- **`campaign-brief.md`** — has its own per-chapter Ch1-7 breakdown that duplicates the generated `CHAPTERS.md` and is stale. Likely **delete or trim to a pointer**.
+- **`combat-formulas.md`** — restates vanilla FE8 combat math (the engine already "documents itself"); overlaps `decisions.md §Combat` + `rules-mapping.md §A`. Candidate to **delete** (or keep as a 1-screen quick-ref).
+- **`class-progression-tables.md`, `pc-spell-lists.md`, `magic-items.md`** — now reframed as D&D-source *flavor reference*. Keep ONLY if Nicolas wants the campaign-source record; otherwise they're prunable too.
+- **`research.md`, `session-log.md`** — check if still load-bearing.
+
+Also still open (count, not the level frame): **`PRD.md`** says "7 chapters" / "Chapter 7" finale in goals/milestones/criteria + the §16 issue backlog (predates the Ch4 split). MVP is **Prologue + Ch 1-8** — fix the counts, and decide if §16 needs a backlog refresh (or if PRD itself should slim toward decomp-style minimalism).
+
+Then: **resume the collaborative chapter walkthrough at Ch 6 — The Maer Monster** (memory `feedback_collaborative_story_planning`).
 
 ## Other blockers / open (unchanged)
 

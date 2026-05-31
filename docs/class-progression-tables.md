@@ -181,9 +181,9 @@ per-character abilities). Useful for flavor, sprite/tome naming, and writing lor
 | 6 | **Elemental Affinity** | +MAG to cold damage; spend SP for a timed +RES buff (cold "resist" = flavor, no multiplier) | 6 | ✓ |
 | 14 | **Dragon Wings** | **Manakete-style transform** (see decisions.md) | 13 | — |
 | 18 | Draconic Presence | fear/charm aura (SP cost) | 17 | — |
-> Confirms: the Manakete transform is **post-MVP** (Ch 13). Through MVP, Rootis is a foot
-> Mage (Ice). The party-balance.md claim of "Dragon Wings from level 1" was based on the
-> end-state sheet and is wrong for gameplay — corrected here.
+> Flavor only: there is **no "Dragon Wings" transform in-game** — it was dropped with the
+> FE-strict ability purge (`docs/decisions.md`). Rootis is a stock **Mage (Ice)** start to
+> finish; his draconic identity is sprite/lore. The row above is D&D-source record, not a mechanic.
 
 ## The Fiend — Warlock path (Meesmickle) *(SRD)*
 | 5e Lvl | Feature | FE form | Ch | MVP? |
