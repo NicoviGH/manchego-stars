@@ -6,14 +6,15 @@
 ## Accomplished this session
 
 - **Scope locked + docs corrected.** Custom art (portrait + map sprite + battle animation) for **all 10 named cast** (7 PCs + 3 NPCs: Pinky, Pepperjack, Brie); **enemies keep vanilla FE8 map & battle sprites**. Delivered in **3 waves, in order: (1) all portraits → (2) all map sprites (16×16 chibis) → (3) battle animations.** Rewrote the stale "generative tools = concept-ref only / hand-drawn" language in `docs/decisions.md` and `docs/PRD.md`: the clean Gemini/Nano-Banana bust is the **pre-approved source**, tool-converted (not hand-pixeled) into the final indexed asset. Memory updated (`feedback_custom_art_lever`).
-- **Prof. R.B. Geenius portrait shipped** (`8f6d129`). Converted from `RBG Face Clean.png` — manic toothy grin + fangs, purple top-hat w/ gold band, big ears, yellow collar + gold cravat (all 4 `art:` must-keeps). Crop `206,200,1934,1640`. Verified packs via `portrait_tool.py encode`.
-- **Marty portrait shipped** (`d2318fb`). Converted from `Marty Face Clean.png` — red spotted cap, grey gills, smiley dot-eyed face, red scarf; staff/green-FX excluded via crop `207,102,1931,1539`.
+- **Prof. R.B. Geenius portrait shipped** (`8f6d129`, re-cropped after). Converted from `RBG Face Clean.png` — manic toothy grin + fangs, purple top-hat w/ gold band, big ears, yellow coat shoulders + gold cravat (all 4 `art:` must-keeps). **Final crop `0,120,2068,1843`** (head-and-shoulders framing). Verified packs.
+- **Marty portrait shipped** (`d2318fb`, re-cropped after). Converted from `Marty Face Clean.png` — red spotted cap, grey gills, smiley dot-eyed face, red scarf + robe shoulders. **Final crop `0,216,2068,1938`** (head-and-shoulders framing).
 - **`ref_to_bust.py` generalized** (`d2318fb`). Replaced the hardcoded bright-cream HSV key with: **sample the actual border color (median of top+left+right edges), key pixels within an RGB distance of it** (`--bg-thresh`, default 45), then the same border-connected flood. Now robust to ANY flat backdrop (Braulo/RBG cream *and* Marty's blue-grey). RBG cream-bg regression after the change = 11/7680 px (visually identical).
 
 ## Workflow established this session
 
 - **Per-character cadence (Wave 1):** Nicolas uploads ONE clean frameless **"<Name> Face Clean"** PNG at a time into `…/References/PCs/`; Claude converts → shows `_preview.png` → commits + pushes → waits for the next. One character per round. **Full-body action refs convert poorly — wait for the Face Clean version.**
 - **Refs are large (~2048²).** The Read-tool preview is downscaled — do NOT eyeball crop coords off it. Auto-detect the subject bbox on the full-res image first (sample border color → distance mask → dense row/col spans), then build a ~1.2-aspect crop from that. (RBG's first attempt failed because a 600-scale crop landed in an empty 2048-scale corner.)
+- **Framing = HEAD-AND-SHOULDERS, like Braulo** (head in the top ~40–55%, shoulders/torso filling the rest). Do NOT crop tight to the head/collar — that reads as "zoomed in" (the v1 RBG/Marty mistake). These refs are near-square with the subject filling the frame, so the widest 1.2-aspect crop that fits is ~full-width (≈2068) × ~1723 tall; center that on the subject to pull the shoulders in (accept a tiny hat-crown trim if needed).
 
 ## Tried but didn't work (lessons)
 
