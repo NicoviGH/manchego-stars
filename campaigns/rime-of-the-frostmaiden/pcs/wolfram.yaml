@@ -78,12 +78,15 @@ inventory:
 # buffs/debuffs, no special movement, no procs).
 
 signature_moment:
-  chapter: ch03-the-termalaine-mine
+  chapter: ch03-the-termalaine-mine     # PRIMARY
   description: >
     Snacked on ore samples in the Termalaine mine while the party cleared out the Grells.
     Also used the recovered iron ingots after Chapter 1 to forge armored siding for
     the party's sled while camping in the snow.
   dialogue_trigger: wolfram_ore_snacking
+  # SECONDARY beat — Ch7 (Blood in Bremen): mid-battle, Wolfram bites a chunk out of
+  # Speaker Dorbulgruf's steel axe in defiance (same metal-eating identity as the Ch3
+  # primary). Anchored in ch07-blood-in-bremen.yaml (trigger: wolfram_axe_bite).
 
 # ── Support Affinities ────────────────────────────────────────────────────────
 supports:

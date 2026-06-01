@@ -11,11 +11,14 @@ fe8_base_map: "FE8 Ch6 — Victims of War"            # DefeatBoss base
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
-  The party reports to Dorbulgruf Shalescar, the cantankerous old Speaker, who
-  refuses to pay — claiming nothing was ever promised. Tensions boil over and
-  Braulo swings first. After a bloody battle through the Speaker's hall, the party
-  installs Messie as the new Speaker of Bremen and leaves town in a trail of blood
-  to mixed reception.
+  The party reports to Speaker Dorbulgruf Shalescar — an old shield-dwarf whose
+  failing memory has curdled into paranoid greed. He refuses to pay, snarling that
+  nothing was ever promised (he may not even remember), and all but accuses the
+  party of trying to fleece a confused old man. Tensions boil over and Braulo swings
+  first. Mid-fight, Wolfram bites a chunk clean out of the Speaker's steel axe in
+  open defiance — and the old dwarf, formidable despite his years, keeps swinging the
+  ruined haft. After a bloody battle through the Town Hall, the party installs Messie
+  as the new Speaker of Bremen and leaves town in a trail of blood to mixed reception.
 
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
@@ -23,8 +26,11 @@ map:
   tileset: town-interior        # Speaker's hall + streets
   size: "22×18"
   description: >
-    Town interior / Speaker's hall. Civilian NPC units mill in the streets and
-    hall. Guards defend Dorbulgruf at the dais. Doorways and furniture as cover.
+    Bremen's Town Hall and the surrounding Five-Tavern Center — five taverns in a
+    semicircle around a central yard (book layout, Bremen p.27). The party fights up
+    through the tavern yard to the Town Hall dais where Dorbulgruf holds court.
+    Civilian NPC units mill in the streets and hall; guards defend the dais. Tavern
+    doorways, fences, and furniture as cover.
 
 # ── Objective ──────────────────────────────────────────────────────────────────
 objective:
@@ -48,9 +54,12 @@ deployment:
   note: "7 PCs + Trex + Pinky + Sahnar (the Mummy) deployable. Baxby, Lupin, and Basil are non-combat caravan NPCs. Positions set in Tiled."
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
+# Grounding: Bremen "can muster up to 25 soldiers (tribal warrior stat block) and 2
+# veterans" (book, Bremen p.27). FE-scaled: the 6 guards are that militia; the 2 Hall
+# Knights are the book's 2 veterans.
 enemy_units:
   - id: bremen-guard
-    name: "Bremen Guard"
+    name: "Bremen Guard"        # the town militia (book: tribal warriors, FE-scaled from 25)
     count: 6
     class: soldier
     level: 7
@@ -58,7 +67,7 @@ enemy_units:
     damage_type: piercing       # flavor label only
     ai_pattern: defensive
   - id: bremen-knight
-    name: "Hall Knight"
+    name: "Hall Knight"         # the book's 2 Bremen veterans — the real threat besides the boss
     count: 2
     class: knight
     level: 8
@@ -69,12 +78,12 @@ enemy_units:
     name: "Dorbulgruf Shalescar"
     is_boss: true
     count: 1
-    class: warrior
-    level: 9
+    class: warrior              # a non-combatant commoner in the book, but his old strength
+    level: 9                    # outlasted his mind — still a formidable axe-Warrior boss.
     weapon: steel-axe
     damage_type: slashing
     ai_pattern: hold_position
-    death_quote: "Bah… you were never… worth the coin…"
+    death_quote: "The coin's mine… I never… who are you people…?"   # greed dissolving into confusion
 
 # ── Civilian NPCs (don't-kill) ────────────────────────────────────────────────────
 npc_units:
@@ -90,8 +99,18 @@ events:
     type: cutscene
     ea_file: events/ch07-opening.ea
     description: >
-      Dorbulgruf refuses payment. Tensions rise. Braulo swings first
-      (braulo_first_swing) — combat begins. Branches on the ch06 messie_spared flag.
+      Dorbulgruf refuses payment — paranoid, half-remembering, accusing the party of
+      swindling him. Tensions rise. Braulo swings first (braulo_first_swing) — combat
+      begins. Branches on the ch06 messie_spared flag.
+  - trigger: unit_engages_boss
+    unit: wolfram
+    target: dorbulgruf
+    type: battle_quote
+    ea_file: events/ch07-wolfram-axe-bite.ea
+    description: >
+      Wolfram's secondary signature beat: when he engages Dorbulgruf, he bites a chunk
+      out of the Speaker's steel axe in defiance (he eats ore and metal — see his Ch3
+      primary). Defiant flavor; the formidable old dwarf keeps swinging the ruined haft.
   - trigger: chapter_end
     type: cutscene
     ea_file: events/ch07-ending.ea
@@ -108,7 +127,15 @@ post_chapter:
   units_available_to_recruit: []
   unlocks_chapter: ch08-the-eastway-ambush
 
+# ── Signature Moment anchored here ───────────────────────────────────────────────
+signature_moments:
+  - pc: wolfram
+    trigger: wolfram_axe_bite       # SECONDARY — see pcs/wolfram.yaml (primary = ch03 ore-snacking)
+
 design_notes: >
-  The party's darkest MVP choice. Lean dialogue into ambiguity. Civilian no-kill
-  constraint is the design hook. Ending branches on messie_spared. The town
-  crier's Easthaven line seeds the ch08 ambush (word of Bremen traveled).
+  The party's darkest MVP choice. Lean dialogue into ambiguity: Dorbulgruf is a
+  genuinely greedy old miser AND a sick old man whose dementia has sharpened the
+  bitterness — the party isn't wrong that he's stiffing them, but they still cut down
+  a confused, dying elder. Don't resolve which he is. Civilian no-kill constraint is
+  the design hook. Ending branches on messie_spared. The town crier's Easthaven line
+  seeds the ch08 ambush (word of Bremen traveled).
