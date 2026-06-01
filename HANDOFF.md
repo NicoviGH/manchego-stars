@@ -1,38 +1,42 @@
-# Handoff: Lean-repo cleanup DONE — 8 drift-prone docs deleted, PRD slimmed, backlog moved to GitHub. NEXT = resume the Ch6 walkthrough (or start building from the GitHub backlog)
+# Handoff: Ch6–Ch8 collaborative walkthrough DONE (Bremen arc + MVP finale), plus a repo-wide FE-strictness doc sweep. NEXT = Rootis/Sclorbo signature beats, or start building (toolchain install)
 
-**Date:** 2026-05-31
-**Session focus:** Big lean-repo + doc-consolidation pass. YAML is the single source of truth; two generators produce the indexes; the backlog now lives in **GitHub issues** (the repo reads like a mature ROM-hack repo). All committed + pushed to main (HEAD `b6a96af`; the cleanup spans `2cecb47`→`b6a96af`).
+**Date:** 2026-06-01
+**Session focus:** Collaborative chapter walkthrough of Ch6 → Ch7 → Ch8, grounded directly in the two source PDFs (DM notes + published Frostmaiden book, Bremen pp.27–29) and the FE8 decomp. Folded book canon into the YAML, recorded two recalled signature moments, and — triggered by a bug found in Ch8 — swept a non-vanilla "element = effectiveness" error out of the docs. All committed + pushed to main (HEAD `c24a966`; this session spans `a5a71d0`→`c24a966`).
 
-**Working principle locked in (memory `feedback_lean_repo_structure`):** match the decomp / experienced-hacker repo structure — **the data IS the doc** — and **delete drift-prone planning-prose** rather than re-patching it. No staleness banners (`feedback_clean_doc_rewrites`).
+## What changed this session
 
-**Deleted this session (8 docs, all restorable from git):** `chapter-outline.md`, `class-mapping.md` (→ generated CHAPTERS.md/CLASSES.md + decisions.md), `party-balance.md` + `class-progression-tables.md` (pre-purge snapshots / derivable from `data/pc-sheets/*.json`), `combat-formulas.md` (engine self-documents; in decisions.md + rules-mapping), `campaign-brief.md` + `research.md` (pre-PRD scaffolding), `session-log.md` (git history covers it).
+- **Ch6 — The Maer Monster** (`a5a71d0`): named the canon NPCs from the book — captain **Grynsk Berylbore**, researcher **Tali** (half-elf, they/them), boats **Burly Ram** / **Pronged Goat**. Mapped the book's ice-floe hazard to **vanilla FE8 terrain** (no engine work): open water = `SEA` (why the knucklehead swarm is a flier class), drifting floes = destructible `SNAG`, ice walls = `GLACIER`, decks = `SHIP_FLAT`. Ch6 stays **Marty's** signature showcase.
+- **Ch7 — Blood in Bremen** (`32ac89c`): **Dorbulgruf Shalescar** reframed as *senile AND greedy* (book: addled mind; notes: cantankerous) — the party kills a confused, dying miser; ambiguity left unresolved. Kept him a formidable Warrior boss. **Wolfram's SECONDARY signature** recorded: mid-battle he bites a chunk out of Dorbulgruf's steel axe (new `battle_quote` event; primary stays Ch3 ore-snacking). Militia grounded (6 guards = town militia, 2 Hall Knights = the book's "2 veterans"); map = Town Hall + Five-Tavern Center.
+- **Ch8 — The Eastway Ambush** (`c3cdc71`): faithful to the DM notes already; **removed the non-vanilla `weakness: fire`** on the ice trolls. FE8 has NO fire effectiveness (verified in `src/data_items.c` — 8 class-keyed categories only). Reframed: trolls are monsters, party lacks monster-effective (sacred) weapons → *that's why the wall is unwinnable*.
+- **FE-strictness doc sweep** (`c24a966`): the Ch8 bug was systemic. Fixed PRD.md (goal, engine bullet, "reads like D&D" pillar, **DoD criterion #6** + stale DoD #8 Messie ch#), decisions.md (the effectiveness rule + the damage-type-labels line), and ch00 prologue (Sephek's cold/fire motif → flavor only). **Rule now explicit: effectiveness is keyed to enemy CLASS (armor/cavalry/flier/dragon/monster/sword), never to element; never add an element-keyed effectiveness list.**
 
-**Also resolved:** the old "MVP = 5e levels 1-5 vs 1-7" question — it was the wrong frame. We ship FE classes/levels/promotions; **progression is FE-native (MVP unpromoted, promotions post-MVP ~Ch 10-12); 5e levels/features are flavor only.** Do NOT reintroduce a "5e-level scope." PRD slimmed 847→594 lines (combat/triangle/§7/§6.7 → pointers; §15/§16 backlog → GitHub). CLAUDE.md source-of-truth block rewritten as the data-is-the-doc table.
+## Signature-moment tally (the running open thread)
 
-**Backlog is now GitHub issues** (37 open: 6 scaffold + 31 created this session across milestones M0–M4). Track work there, not in markdown.
+- **Done:** Marty (Ch6 Messie Talk primary + Ch4 wolf parley secondary), Wolfram (Ch3 ore-snacking primary + Ch7 axe-bite secondary), Meesmickle (Ch9 Revel's End toe-bean orc summon — fits his Summoner promotion), Braulo (Ch8 shackle-break).
+- **Still TBD:** **Rootis** and **Sclorbo** — not in the DM notes; need Nicolas's recall. (Candidate framings explored and rejected for Ch6: they'd only be cutscene/battle-quote, and neither earned one in Bremen.)
 
 ## Standing rules (how Nicolas wants this work done)
 
-- **Stock vanilla FE8 classes only** (verbatim decomp data). Element = flavor, never a mechanic.
-- **Ground FE claims in `fireemblem8u/`**; **ground STORY in the two PDFs** (DM notes Ch1–7 only + the published book, image-only scan, PDF page = printed+1).
-- **Clean native doc rewrites** (no STALE/reverted banners). **Auto-push to main.** **Collaborative, chapter-by-chapter** story work. **Balance: defer to FE, lean generous.**
-- **Doc source-of-truth model (settled in `decisions.md`):** (1) per-chapter/unit facts live ONLY in the YAML; (2) `docs/CHAPTERS.md` + `CLASSES.md` are GENERATED — never hand-edit; (3) hand docs hold only durable rationale + forward planning. **Don't re-introduce chapter/roster tables into hand docs.**
-- **Lean repo** (memory `feedback_lean_repo_structure`): match the decomp / experienced-hacker structure; the data IS the doc; **delete drift-prone planning-prose rather than re-patch it.** Work backlog lives in **GitHub issues**, not markdown.
+- **Stock vanilla FE8 classes/weapons only** (verbatim decomp data). **Element = flavor, NEVER a mechanic** — including effectiveness (reaffirmed hard this session).
+- **Ground FE claims in `fireemblem8u/`**; **ground STORY in the two PDFs** (DM notes Ch1–7 only + the published book, image-only scan, PDF page = printed+1). Read them directly when planning story.
+- **Clean native doc rewrites** (no STALE/reverted banners). **Auto-push to main.** **Collaborative, chapter-by-chapter** story work (FE8 parallel + our version). **Balance: defer to FE, lean generous.**
+- **Doc source-of-truth model:** per-chapter/unit facts live ONLY in YAML; `docs/CHAPTERS.md` + `CLASSES.md` are GENERATED (never hand-edit; re-run `ruby tools/gen-chapter-index.rb` + `gen-class-index.rb`); hand docs hold only durable rationale + forward planning. **Lean repo**; backlog lives in **GitHub issues** (M0–M4).
 
-## Current repo / doc state (post-cleanup)
+## Current repo / doc state
 
-- **`docs/` now:** `decisions.md` (settled why — doc model, cadence taxonomy, promotion seam, class mapping, combat, economy), `CHAPTERS.md` + `CLASSES.md` (GENERATED — never hand-edit), `roadmap.md` (post-MVP Act II–V scaffold), `fe8-pacing-reference.md` (FE8-only), `rules-mapping.md` (generic 5e→FE engine spec), `PRD.md` (vision/architecture/roadmap, 594 lines), `pc-spell-lists.md` + `magic-items.md` (D&D-source flavor worksheets — consume-then-prune as caster tomes / reward items get authored during the walkthrough), `frostmaiden-resources.md` (external map refs).
-- **Generators:** `ruby tools/gen-chapter-index.rb` → CHAPTERS.md; `ruby tools/gen-class-index.rb` → CLASSES.md. Re-run after editing any chapter/unit YAML. Validate YAML: `ruby -ryaml -e 'YAML.load_file("<path>")'`.
-- **Source of truth:** chapter facts = `campaigns/.../chapters/ch00…ch08-*.yaml`; unit class/promotion = `campaigns/.../{pcs,npcs}/*.yaml`. Backlog = **GitHub issues** (M0–M4).
+- All 9 MVP chapters (ch00–ch08) authored in YAML and now walked through against the sources. Generators clean. Validate YAML: `ruby -ryaml -e 'YAML.load_file("<path>")'`.
+- **Source of truth:** chapter facts = `campaigns/.../chapters/ch00…ch08-*.yaml`; unit class/promotion/signatures = `campaigns/.../{pcs,npcs}/*.yaml`. Backlog = GitHub issues.
 
-## NEXT TASK
+## NEXT TASK (pick one)
 
-**Resume the collaborative chapter walkthrough at Ch 6 — The Maer Monster** (memory `feedback_collaborative_story_planning`: interactive, FE8-parallel + our version, not solo doc dumps), now with the lean doc model in place. Alternatively, start building from the GitHub backlog — the first real blocker is **"Install the build toolchain"** (devkitARM/agbcc/ColorzCore/libpng), which gates every ROM build/test.
+1. **Resolve Rootis + Sclorbo signature moments** — ask Nicolas to recall their standout beats, then anchor them in the right chapters (manifest as cutscene/battle-quote/conditional-command — NOT custom skills).
+2. **Start building** — the first real blocker is **"Install the build toolchain"** (devkitARM/agbcc/ColorzCore/libpng), which gates every ROM build/test. `tools/build-campaign.ts` / `build-events.ts` still unbuilt (GitHub issues exist).
+3. **Ch9+ story** is blocked on the rest of the DM notes (they end at the Eastway capture → Revel's End). Meesmickle's Ch9 toe-bean beat is the one confirmed Act II anchor so far.
 
 ## Blockers / open
 
-- **Signature moments TBD** for Meesmickle, Rootis, Sclorbo (Marty done: primary=ch06 Messie Talk, secondary=ch04 wolf parley).
+- **Rootis & Sclorbo signature moments** still TBD (need Nicolas's recall).
 - **pepperjack/brie `fe_stats.class` = null** (FE-legal class TBD post-MVP).
-- **Ch 9–20 plot** blocked on the rest of the DM notes (cover Ch1–7 of the playthrough only).
-- **Build toolchain not installed** + `tools/build-campaign.ts`/`build-events.ts` unbuilt (GitHub issues exist for both).
-- **Lingering lean candidates** (low priority): `pc-spell-lists.md` / `magic-items.md` should be consumed into YAML then deleted; `PRD.md` could slim further (§8 art / §9 audio partly overlap decisions.md §Art & Audio) if it stops earning its keep.
+- **Ch 9–20 plot** blocked on the rest of the DM notes.
+- **Build toolchain not installed** + `tools/build-campaign.ts`/`build-events.ts` unbuilt.
+- **Lingering lean candidates** (low priority): `pc-spell-lists.md` / `magic-items.md` → consume into YAML then delete; PRD §8/§9 could slim further.
