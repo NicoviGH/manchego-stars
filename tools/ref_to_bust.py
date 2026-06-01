@@ -21,7 +21,7 @@ for a ~96:80 (1.2) aspect: eyestalk/head tips near the top, shoulders at bottom.
 
 import argparse
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image, ImageFilter, ImageEnhance
 from collections import deque
 
 BUST_W, BUST_H = 96, 80
@@ -105,7 +105,20 @@ def convert(ref_path, crop_box, bg_thresh=45.0):
         if comp.sum() < 30 and not edge:
             m[comp] = True
 
-    q = img.quantize(colors=15, method=Image.MEDIANCUT, dither=Image.NONE)
+    # Boost contrast slightly so distinct regions separate into distinct palette
+    # entries (low-contrast areas like Marty's face otherwise smear across
+    # near-identical greys -> looks blurry). No saturation boost: it tints
+    # neutral features (eyes/face) purple/cyan.
+    img = ImageEnhance.Contrast(img).enhance(1.15)
+    # Quantize only the FOREGROUND: fill the background with the median fg colour
+    # first so the flat bg doesn't consume a palette slot, and use MAXCOVERAGE
+    # (MEDIANCUT wasted ~6 of the 15 slots on near-duplicate greys, the main
+    # cause of the muddy/blurry look).
+    arr = np.asarray(img).astype(np.uint8).copy()
+    fgpx = arr[m]
+    if len(fgpx):
+        arr[~m] = np.median(fgpx, axis=0).astype(np.uint8)
+    q = Image.fromarray(arr).quantize(colors=15, method=Image.MAXCOVERAGE, dither=Image.NONE)
     qi = np.asarray(q).astype(int)
     pal = q.getpalette()[:15 * 3]
     out = np.where(m, qi + 1, 0)
