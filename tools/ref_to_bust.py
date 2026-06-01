@@ -3,8 +3,9 @@
 96x80 indexed FE8 portrait bust.
 
 Pipeline: crop to a head-and-shoulders bust -> segment the flat background
-(bright + desaturated, border-connected flood seeded from top/left/right since
-the subject fills the bottom) -> clean up specks/holes -> sharpen + downscale to
+(sample the border color, key pixels within an RGB distance of it, border-
+connected flood seeded from top/left/right since the subject fills the bottom)
+-> clean up specks/holes -> sharpen + downscale to
 96x80 -> quantize to 15 colors (index 0 reserved transparent) -> erode the
 silhouette edge to transparent for a clean cut.
 
@@ -46,31 +47,40 @@ def _label(mask):
     return lab, n
 
 
-def convert(ref_path, crop_box):
+def convert(ref_path, crop_box, bg_thresh=45.0):
     src = Image.open(ref_path).convert('RGB')
     crop = src.crop(crop_box).resize((480, 400), Image.LANCZOS)
-    hsv = np.asarray(crop.convert('HSV')).astype(np.float32)
-    H, W = hsv.shape[:2]
-    S, V = hsv[..., 1] / 255, hsv[..., 2] / 255
-    cream = (S < 0.30) & (V > 0.72)
+    rgb = np.asarray(crop).astype(np.float32)
+    H, W = rgb.shape[:2]
+
+    # Sample the flat background color from the top + left/right edges (the
+    # subject fills the bottom-center), then key pixels within bg_thresh RGB
+    # distance of it. Works for any flat backdrop (cream, grey, ...), not just
+    # bright cream. The border-connected flood below keeps any same-colored
+    # region enclosed by the subject as foreground.
+    edge = np.concatenate([rgb[0:8].reshape(-1, 3),
+                           rgb[:, 0:8].reshape(-1, 3),
+                           rgb[:, -8:].reshape(-1, 3)])
+    bg_color = np.median(edge, axis=0)
+    bg = np.sqrt(((rgb - bg_color) ** 2).sum(2)) < bg_thresh
 
     # border-connected background flood, seeded from top + left + right only
     conn = np.zeros((H, W), bool)
     dq = deque()
     for x in range(W):
-        if cream[0, x]:
+        if bg[0, x]:
             conn[0, x] = True
             dq.append((0, x))
     for y in range(H):
         for x in (0, W - 1):
-            if cream[y, x]:
+            if bg[y, x]:
                 conn[y, x] = True
                 dq.append((y, x))
     while dq:
         y, x = dq.popleft()
         for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
             ny, nx = y + dy, x + dx
-            if 0 <= ny < H and 0 <= nx < W and cream[ny, nx] and not conn[ny, nx]:
+            if 0 <= ny < H and 0 <= nx < W and bg[ny, nx] and not conn[ny, nx]:
                 conn[ny, nx] = True
                 dq.append((ny, nx))
     fg = ~conn
@@ -116,10 +126,12 @@ def main():
     ap.add_argument('ref')
     ap.add_argument('out')
     ap.add_argument('--crop', required=True, help='x0,y0,x1,y1 in ref pixels (~1.2 aspect)')
+    ap.add_argument('--bg-thresh', type=float, default=45.0,
+                    help='RGB distance from the sampled border color to treat as background (default 45)')
     ap.add_argument('--preview', help='also write a 3x nearest-neighbour preview here')
     a = ap.parse_args()
     box = tuple(int(v) for v in a.crop.split(','))
-    res = convert(a.ref, box)
+    res = convert(a.ref, box, a.bg_thresh)
     res.save(a.out)
     print('%s -> %s (96x80 indexed, %d colors)' % (a.ref, a.out, len(set(res.getdata()))))
     if a.preview:
