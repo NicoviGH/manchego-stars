@@ -343,15 +343,21 @@ Fire Emblem's gold-and-shop loop is a core part of the game feel — earning gol
 
 ## 8. Art Direction
 
+> **Art direction (set 2026-06-01, portrait walkthrough):** the player cast + named recruits get **fully custom**
+> indexed-palette art for **every** sprite part — portrait, map sprite, AND battle animation. Not recolored vanilla,
+> not reused vanilla class animations. Since combat is pure vanilla FE8, the art is the biggest lever for campaign
+> feel, so it's worth doing custom. Each piece is drawn **faithfully from the character's concept reference**;
+> generative tools (Nano Banana) are concept-reference only, never final assets. See `docs/decisions.md` and each
+> unit's YAML `art:` block for the per-character briefs.
+
 ### Sprites (Map Units)
-- **Baseline:** Recolored vanilla FE8 sprites for all units.
-- **Customization:** Use Nanobanana 2 (AI sprite editor) to modify for homebrew races — Tortle shell for Braulo, mushroom cap for Marty, scales for Wolfram, etc.
-- **Enemy sprites:** Vanilla FE8 enemy sprites, recolored. Custom creatures (Grells, Messie, ice trolls) may need community sprites from FEUniverse or Nanobanana 2 edits.
+- **Cast + named recruits:** custom map sprites drawn from each character's concept ref — Braulo's crab claws/shell/basket-hat, Marty's mushroom cap, Wolfram's mineral scales, Meesmickle's caped cat, Rootis's snowman, the cannon-golems Pepperjack & Brie, etc. Custom battle animations too (no vanilla-anim reuse).
+- **Enemy sprites:** vanilla FE8 enemy sprites where the look fits; community (FEUniverse) or custom only for creatures with no vanilla analogue (Grells, Messie, ice trolls).
 
 ### Portraits (Dialogue / Stat Screens)
-- **Source:** D&D Beyond character art (URLs in `References/PCs/portraits.json`).
-- **Process:** AI-generate base portraits using D&D Beyond art as reference → manual cleanup → convert to FE pixel art specs (GBA palette constraints, correct dimensions: 80×72 main portrait, 32×32 mini portrait, 16-color palette).
-- **Enemy/NPC portraits:** Mix of vanilla FE8 portraits (recolored) and custom art for key NPCs (Duvessa Shane, Trex, Messie, Dorbulgruf).
+- **Source:** D&D Beyond character art (`data/pc-sheets/portraits.json`; downloaded refs in `data/portraits/`). Nicolas can supply additional reference art where a single body-shot leaves a gap for a bust.
+- **Process:** hand-drawn **custom** indexed-palette portrait per cast member, faithful to the concept ref. Per-unit briefs (must-keep tells, expression, animation, palette plan) live in each unit's YAML `art:` block. 16-color GBA palette.
+- **Enemy/NPC portraits:** mix of vanilla FE8 portraits and custom art for key NPCs (Duvessa Shane, Trex, Messie, Dorbulgruf).
 
 ### Map Tiles
 - **Primary:** Vanilla FE8 snow/ice tilesets (Tower of Valni area).

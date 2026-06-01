@@ -232,12 +232,17 @@ _Decided: May 2026_
 Investigate Frostmaiden Spotify album + community soundtracks as stretch-goal custom tracks post-ship.
 _Decided: May 2026_
 
-**Portraits: AI-generated base from D&D Beyond art → manual cleanup → FE pixel art conversion**
-Specs: 80×72 main portrait, 32×32 mini portrait, 16-color GBA palette.
-_Decided: May 2026_
+**Art: CUSTOM indexed-palette pixel art for every PC/recruit sprite part — portrait, map sprite, AND battle animation.**
+Not recolored vanilla, and not reused vanilla class animations. Combat is pure vanilla FE8, so the art is the
+single biggest lever for making the game feel like the actual D&D campaign — worth doing custom and taking the time.
+Each piece is drawn **faithfully from the character's concept reference** (`data/portraits/*`); generative tools
+(Nano Banana) are concept-reference only, **never final assets** — final art is hand-drawn indexed-palette.
+Specs: 16-color GBA palette, 8×8 tiles. Per-unit design briefs (must-keep tells, expression, palette plan) live in
+each unit's YAML `art:` block (`campaigns/.../{pcs,npcs}/*.yaml`).
+_Decided: May 2026; art direction set to full-custom 2026-06-01 (portrait walkthrough)._
 
-**Sprites: recolored vanilla FE8 sprites, modified via Nanobanana 2 for homebrew races**
-Custom sprites (Grells, Messie, ice trolls) sourced from FEUniverse community or Nanobanana 2 edits.
+**Enemy/non-cast sprites: vanilla FE8 where the look fits; community (FEUniverse) or custom only where a creature has no vanilla analogue** (Grells, Messie, ice trolls).
+The full-custom rule above is for the player cast + named recruits, where identity matters most.
 _Decided: May 2026_
 
 **Cutscene art: portrait-based dialogue only for MVP**
