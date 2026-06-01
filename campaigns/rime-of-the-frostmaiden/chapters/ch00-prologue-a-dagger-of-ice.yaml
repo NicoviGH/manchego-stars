@@ -71,7 +71,7 @@ enemy_units:
         damage_type: cold        # cosmetic flavor label
     flavor_traits:               # narrative only — NOT mechanical in the prologue
       - "Kiss of the Frostmaiden: the cold does not touch him (undead servant of Auril)"
-      - "Cold regeneration / fire vulnerability — narrative flavor only (no FE mechanic; element is never an effectiveness flag), echoed later by the Ch8 ice trolls"
+      - "Cold regeneration, fire vulnerability — the Frostmaiden's chill knits his wounds; flame unmakes them (echoed later by the Ch8 ice trolls)"
     ai_pattern: hold_position
     death_quote: "The Frostmaiden… sees all who cheat her…"
   - id: caravan-guard
@@ -120,6 +120,5 @@ design_notes: >
   NPC cold-open. Its jobs: (1) teach the absolute basics with one strong unit;
   (2) establish the world (Rime, sacrifices, no-fire law) by SHOWING it; (3) make
   the player's first fight be against Auril's servant, seeding the true villain
-  before the heroes arrive. Sephek's cold/fire motif is pure narrative flavor — there
-  is no element effectiveness in FE (the Ch8 ice trolls are tough because they're
-  monsters, not because of fire). Keep it tiny — this is the front porch, not a room.
+  before the heroes arrive. Sephek's cold/fire motif is pure narrative colour, echoed
+  later by the Ch8 ice trolls. Keep it tiny — this is the front porch, not a room.
