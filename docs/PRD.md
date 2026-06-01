@@ -21,7 +21,7 @@ Nicolas ran a multi-year D&D 5e campaign (*Rime of the Frostmaiden*) with 6 frie
 ## 2. Goals
 
 1. **Ship a playable `.gba` ROM** covering the full DM-notes arc (Prologue + 8 chapters, from the goblin iron quest through the Eastway ambush / Revel's End cliffhanger) that runs on stock GBA emulators and flash carts.
-2. **Keep Fire Emblem's combat, dress it in D&D** — preserve FE's grid tactics, hit/avoid/might resolution, permadeath toggle, weapon triangle, growth-rate leveling, and FE crit. Layer D&D *flavor* on top: D&D damage-type labels (flavor only — no resistance multiplier; the triangle stays FE-native), spells as finite-use tomes that deplete and restock with gold (decision B), and a cosmetic d20 flourish on crits. Iconic matchups use vanilla FE weapon effectiveness. The rules stay FE so it plays like FE.
+2. **Keep Fire Emblem's combat, dress it in D&D** — preserve FE's grid tactics, hit/avoid/might resolution, permadeath toggle, weapon triangle, growth-rate leveling, and FE crit. Layer D&D *flavor* on top: D&D damage-type labels (flavor only — no resistance multiplier; the triangle stays FE-native), spells as finite-use tomes that deplete and restock with gold (decision B), and a cosmetic d20 flourish on crits. Iconic matchups use vanilla FE weapon effectiveness keyed to enemy class (armor/cavalry/flier/dragon/monster), never to element. The rules stay FE so it plays like FE.
 3. **Faithfully represent all 7 PCs** as playable units with correct classes, abilities, progression arcs, and personality (portraits, dialogue, signature moments).
 4. **Build the engine as reusable** — separate engine code (damage types, spell slots, status/hazards, UI reskin) from campaign data (PCs, chapters, maps, dialogue). A second campaign (Curse of Strahd, a homebrew, etc.) should require only a new `campaigns/` folder, zero engine changes.
 5. **Keep the project tractable** — session-driven Claude Code workflow (no autonomous agent loops), one feature per session, `make` green at end of every session. Target cost: ~$60–200 for the full MVP.
@@ -236,7 +236,7 @@ The engine makes the following assumptions about any campaign folder:
 **Engine provides:**
 - Vanilla FE8 combat resolution (hit/avoid/might/crit/doubling — left intact)
 - Damage-type *flavor* labels on weapons (13 types; UI/descriptions only — no resistance mechanic)
-- Vanilla FE weapon effectiveness for iconic matchups (FE-native; e.g. fire vs ice trolls)
+- Vanilla FE weapon effectiveness for iconic matchups, keyed to enemy class (FE-native; e.g. monster-effective weapons vs ice trolls/skeletons, armorslayer vs knights — never element-keyed)
 - Status effects beyond vanilla (`engine/status`) and hazard tiles (`engine/hazards`)
 - Spell-tome charge tracking per unit (deplete + gold-restock between chapters)
 - Combat-preview reskin (D&D damage-type icons; triangle stays FE-native) and a cosmetic d20 flourish on crits
@@ -405,7 +405,7 @@ These are qualitative (audience of 7, no analytics):
 
 1. **"It boots and plays"** — the `.gba` loads on mGBA and a real GBA flash cart, all 8 chapters are completable, no hard crashes.
 2. **"That's my character!"** — each player recognizes their PC from the portrait, stats, and abilities within 30 seconds of seeing them.
-3. **"It plays like Fire Emblem, reads like D&D"** — combat resolves with FE's familiar hit%/avoid forecast, while damage-type labels and the crit flourish make it read as *our* D&D campaign. A hammer is effective vs skeletons (vanilla FE effectiveness); a nat-20 flourish punctuates a crit.
+3. **"It plays like Fire Emblem, reads like D&D"** — combat resolves with FE's familiar hit%/avoid forecast, while damage-type labels and the crit flourish make it read as *our* D&D campaign. A monster-effective weapon tears through skeletons and an armorslayer punches through knights (vanilla FE effectiveness, by class); a nat-20 flourish punctuates a crit.
 4. **"I remember this"** — at least 3 campaign-specific moments per chapter that make the players laugh or say "oh yeah, that happened."
 5. **"I want to keep playing"** — the Chapter 8 cliffhanger lands hard enough that at least 2 players ask when the next batch of chapters is coming.
 6. **Build health** — `make` passes at the end of every work session. No sessions end with a broken build.
@@ -528,9 +528,9 @@ The MVP is **done** when:
 3. All 5 NPC allies are recruitable at their designated chapters.
 4. All 8 chapters are playable start to finish with correct objectives, enemies, dialogue, and events.
 5. Combat plays as vanilla FE (hit/avoid/might/crit), reskinned with D&D damage-type icons and triangle labels, and a cosmetic d20 flourish fires on crits.
-6. Damage-type flavor labels display, and vanilla FE weapon effectiveness works for iconic matchups (a hammer is effective vs skeletons, fire vs ice trolls, etc.).
+6. Damage-type flavor labels display, and vanilla FE weapon effectiveness works for iconic matchups, keyed to enemy class (armorslayer/hammer vs armored knights, monster-effective weapons vs skeletons and ice trolls, etc. — never element-keyed).
 7. Spell-slot tomes deplete and refill correctly per chapter.
-8. Chapter 5 (Messie) is resolvable via Talk command.
+8. Chapter 6 (Messie) is resolvable via Talk command.
 9. Chapter 8 ends in a scripted defeat with the Revel's End cliffhanger text.
 10. Casual/Classic mode toggle works for permadeath preference.
 11. The `.gba` has been playtested at least twice end-to-end (once for bugs, once for balance).

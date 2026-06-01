@@ -121,11 +121,18 @@ and would modify FE damage under the hood — exactly the kind of D&D bolt-on we
 vanilla FE under the hood"). So:
 - **Damage types are flavor labels only** — a weapon/tome carries a D&D damage-type name + icon
   for descriptions and UI. No resistance/vuln/immunity computation runs in damage resolution.
-- **Iconic matchups use vanilla FE weapon effectiveness.** FE8 already has effective weapons
-  (Hammer vs armor, Wyrmslayer vs dragons, etc.). When a vulnerability genuinely matters to
-  play — e.g. "fire melts ice trolls" — flag the relevant weapon **effective** vs that enemy
-  class. That's vanilla-FE-native, not a new multiplier. Use sparingly; most damage types stay
-  pure flavor.
+- **Iconic matchups use vanilla FE weapon effectiveness — by enemy CLASS, never by element.**
+  FE8's effectiveness system has exactly eight target categories, all keyed to a unit's class:
+  Armor, ArmorAndHorse, Horse, Flier, FlierAndMonsters, Monsters, Dragon, Swordsman
+  (`src/data_items.c` `ItemEffectiveness_*`). Use only these. Examples that ARE vanilla:
+  Hammer/Armorslayer vs armored Knights, Wyrmslayer vs dragons, bows vs fliers, and the
+  monster-effective weapons (the Sacred Twins + Audhulma/Shadowkiller/Fiendcleaver/Brightlance/
+  Beacon Bow) vs monster-class enemies (skeletons, gargoyles, ice trolls/cyclops, …).
+  **There is NO fire effectiveness — or any element effectiveness — in FE8.** So a D&D
+  vulnerability like "fire melts ice trolls" does NOT become an effectiveness flag: the ice
+  troll is a *monster*, so monster-effective weapons hit it hard regardless of element, and the
+  "fire" stays a flavor label. Never add a new element-keyed effectiveness list — that would make
+  an element a mechanic (see CLAUDE.md). Most damage types stay pure flavor.
 - **No `resistance_table.c` / resistance bitmap.** The `engine/damage-types/` module reduces to
   a flavor-label tag (for UI) — no resistance engine.
 _Decided: 2026-05-28 (supersedes the May 2026 "13 damage types with resistance per class")_
@@ -157,7 +164,7 @@ his D&D Druid identity → FE Druid) means two Dark casters rather than one-each
 _Decided: 2026-05-29; caster spread updated 2026-05-30_
 
 **13 damage-type labels (flavor only — no resistance mechanic)**
-Types: slashing, piercing, bludgeoning, fire, cold, lightning, thunder, poison, acid, necrotic, radiant, force, psychic. These are **flavor tags** on weapons/tomes for descriptions + UI. **No per-class resistance bitmap, no ×0.5/×2/×0 multiplier** (reverted 2026-05-28 — see Combat System §). Iconic vulnerabilities use vanilla FE weapon **effectiveness** instead.
+Types: slashing, piercing, bludgeoning, fire, cold, lightning, thunder, poison, acid, necrotic, radiant, force, psychic. These are **flavor tags** on weapons/tomes for descriptions + UI. **No per-class resistance bitmap, no ×0.5/×2/×0 multiplier** (reverted 2026-05-28 — see Combat System §). Iconic matchups use vanilla FE weapon **effectiveness keyed to enemy class** (armor/cavalry/flier/dragon/monster/sword), never to element — see the Combat System § rule.
 _Decided: 2026-05-28 (supersedes the May 2026 resistance-bitmap decision)_
 
 **Spell economy: finite-use tomes that deplete and are restocked with gold (decision B)**
