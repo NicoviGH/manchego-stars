@@ -9,6 +9,24 @@ portrait_ref: portraits/sclorbo.png     # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/sclorbo.jpeg
 # Portrait source: https://www.dndbeyond.com/avatars/25339/252/1581111423-72588721.jpeg
 
+# ── Custom Art Brief (decided 2026-06-01 portrait walkthrough) ───────────────────
+# ALL parts custom indexed-palette art. Follow the concept ref faithfully.
+# Chwinga = canonically faceless masked fey, so the rune-mask head STAYS faceless.
+art:
+  approach: custom
+  fidelity: faithful
+  must_keep:                  # tells that make the bust read as "Sclorbo"
+    - glowing icy-blue rune-mask head (triangular sigil + inner swirl, no face)
+    - wispy blue flame-aura rising off the crown
+    - thick fur-ruff collar over tan tribal robe, red-striped tassels
+    - glowing cyan crystalline staff (tip in frame) + dark blue pendant
+  face: faceless              # keep the Chwinga mask — NO eyes/mouth
+  animation: rune-pulse       # face-sigil brightens/flickers = "talk" frames; aura wisps = idle/blink
+  expression: serene-eerie    # no facial expression; mood set by aura intensity + cool palette
+  palette_plan: >             # rough 16-color budget (incl. index-0 transparent)
+    icy-blues ×3 + bright cyan glow + white (head/aura/staff), tans ×3 (robe),
+    fur greys ×2, red stripe accent, dark navy pendant, black outline.
+
 # ── D&D 5e Source (reference only — does NOT drive FE mechanics) ────────────────
 # FE stats come verbatim from the vanilla class below, not from D&D scores.
 # Raw sheet: data/pc-sheets/sclorbo.json  ·  Curated flavor: lore/sclorbo.md

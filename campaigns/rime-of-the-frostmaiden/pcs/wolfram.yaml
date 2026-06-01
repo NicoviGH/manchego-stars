@@ -10,6 +10,23 @@ portrait_ref: portraits/wolfram.png     # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/wolfram.jpeg
 # Portrait source: https://www.dndbeyond.com/avatars/25957/254/1581111423-74374750.jpeg
 
+# ── Custom Art Brief (decided 2026-06-01 portrait walkthrough) ───────────────────
+# ALL parts custom indexed-palette art. Follow the concept ref faithfully.
+art:
+  approach: custom
+  fidelity: faithful
+  must_keep:                  # tells that make the bust read as "Wolfram"
+    - hulking grey MINERAL-SCALED face (metallic/stony texture, not plain skin), beard + topknot
+    - leather harness straps across chest, quiver strap hint
+    - frost-crusted crystalline accents (cold-smith motif) — subtle, e.g. on shoulder/collar
+  face: visible               # eyes blink, mouth moves for talk
+  composition: face-and-straps  # NO weapon/fist crowded in — warhammer rides on map+battle sprites
+  age_note: younger-than-weathered   # looks worn but is actually on the younger side
+  expression: serious-focused        # preoccupied, thinking about his minerals/ores; not a roar
+  palette_plan: >             # rough 16-color budget (incl. index-0 transparent)
+    mineral greys ×4 (cool, slightly metallic) + dark scale shadow, leather browns ×2,
+    beard grey-brown, pale frost-crystal blue-white ×2, eye, black outline.
+
 # ── D&D 5e Source (reference only — does NOT drive FE mechanics) ────────────────
 # FE stats come verbatim from the vanilla class below, not from D&D scores.
 # Raw sheet: data/pc-sheets/wolfram.json  ·  Curated flavor: lore/wolfram.md

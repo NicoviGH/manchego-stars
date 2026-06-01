@@ -8,6 +8,24 @@ portrait_ref: portraits/braulo.png       # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/braulo.jpeg
 # Portrait source: https://www.dndbeyond.com/avatars/25784/526/1581111423-73827256.jpeg
 
+# ── Custom Art Brief (decided 2026-06-01 portrait walkthrough) ───────────────────
+# ALL parts custom indexed-palette art (no recolor, no vanilla-anim reuse). Follow the
+# concept ref faithfully. 96×80 / 16-color portrait + custom map sprite + battle anim.
+art:
+  approach: custom            # not recolor; follow concept art to best ability
+  fidelity: faithful          # keep the crab anatomy, don't humanize
+  must_keep:                  # the tells that make a bust crop read as "Braulo"
+    - red crab claws (one raised into frame)
+    - tan speckled carapace shoulders
+    - grey-white muscle plating
+    - conch shell on back (rim visible)
+    - woven wicker basket-hat
+  face: per-concept           # head as drawn (basket-hat'd carapace), not a human face
+  expression: berserker-fury  # snarling/aggressive — matches Berserker + Ch8 shackle-break
+  palette_plan: >             # rough 16-color budget (incl. index-0 transparent)
+    reds ×3 (claws), tans ×3 + dark speckle (carapace/hat/shell), greys ×3 + white
+    (muscle), black outline, eye + mouth-interior. Tight but fits 16.
+
 # ── D&D 5e Source (reference only — does NOT drive FE mechanics) ────────────────
 # FE stats come verbatim from the vanilla class below, not from D&D scores.
 # Raw sheet: data/pc-sheets/braulo.json  ·  Curated flavor: lore/braulo.md

@@ -9,6 +9,23 @@ portrait_ref: portraits/rootis.png      # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/rootis.jpeg   # note: source file was named "Rootis Character Sheet.jpeg" — it's the portrait
 # Portrait source: https://www.dndbeyond.com/avatars/25348/565/1581111423-72613710.jpeg
 
+# ── Custom Art Brief (decided 2026-06-01 portrait walkthrough) ───────────────────
+# ALL parts custom indexed-palette art. Follow the concept ref faithfully.
+art:
+  approach: custom
+  fidelity: faithful
+  must_keep:                  # tells that make the bust read as "Rootis"
+    - two-segment pale blue-white snowman
+    - dark coal square eyes + coal-dot smile
+    - orange carrot nose
+  face: visible               # coal eyes blink, coal-dot mouth moves for talk
+  arms: none                  # keep the pure armless snowman — magic does the work, no twig arms
+  effects: none               # NO frost aura in the portrait — cold magic rides on the battle/spell anim
+  expression: jolly           # cheerful coal smile
+  palette_plan: >             # rough 16-color budget (incl. index-0 transparent)
+    snow whites/pale-blues ×4 (rounded shading), coal blacks ×2, orange carrot ×2,
+    cool shadow blue, black outline. Small palette — spend it on smooth snow gradients.
+
 # ── D&D 5e Source (reference only — does NOT drive FE mechanics) ────────────────
 # FE stats come verbatim from the vanilla class below, not from D&D scores.
 # Raw sheet: data/pc-sheets/rootis.json  ·  Curated flavor: lore/rootis.md

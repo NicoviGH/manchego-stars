@@ -8,6 +8,23 @@ portrait_ref: portraits/prof-rbg.png     # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/prof-rbg.jpg
 # Portrait source: https://www.dndbeyond.com/avatars/34221/708/1581111423-57759993.jpeg
 
+# ── Custom Art Brief (decided 2026-06-01 portrait walkthrough) ───────────────────
+# ALL parts custom indexed-palette art. Follow the concept ref faithfully.
+art:
+  approach: custom
+  fidelity: faithful
+  must_keep:                  # tells that make the bust read as "Geenius"
+    - green ratfolk face — manic toothy grin, fangs, pink nose
+    - purple top hat with gold buckle band
+    - yellow longcoat collar + purple gold-buttoned waistcoat & gold cravat
+    - big rat ears flanking the hat
+  face: visible               # ref shows the face clearly; render the manic grin straight
+  composition: face-forward   # NO gun in the bust — pistols/magitech ride on map+battle sprites
+  expression: manic-grin      # wild-eyed mad-scientist glee (matches gunpoint signature beat)
+  palette_plan: >             # rough 16-color budget (incl. index-0 transparent)
+    greens ×3 (fur), purples ×3 (hat/vest), yellow ×2 (coat/collar), gold trim
+    (shares yellow), pink (nose/mouth), white (fang/eye highlight), black outline.
+
 # ── D&D 5e Source (reference only — does NOT drive FE mechanics) ────────────────
 # FE stats come verbatim from the vanilla class below, not from D&D scores.
 # Raw sheet: data/pc-sheets/prof-r-b-geenius.json  ·  Curated flavor: lore/prof-rbg.md

@@ -5,8 +5,29 @@
 
 id: pepperjack
 name: Pepperjack
-portrait_ref: portraits/pepperjack-and-brie.png   # GBA-ready sprite pending (shared w/ Brie)
+portrait_ref: portraits/pepperjack-and-brie.png   # shared source ref; gets its OWN portrait (grey)
 portrait_source: data/portraits/pepperjack-and-brie.jpeg
+
+# ── Custom Art Brief (decided 2026-06-01 portrait walkthrough) ───────────────────
+# ALL parts custom indexed-palette art. Follow the concept ref faithfully.
+# Pepperjack & Brie are a COUPLE (Brie built by RBG for Pepperjack, Adam/Eve framing) — NOT
+# twins/siblings. Mirror designs in opposing palettes: Pepperjack = grey+red, Brie = pink+cyan.
+art:
+  approach: custom
+  fidelity: faithful
+  build_when: with-batch      # pixel alongside the 7 PCs (visually simple, fun), though class/recruit is post-MVP
+  must_keep:                  # tells that make the bust read as "Pepperjack"
+    - gunmetal-grey cannon-golem body + barrel snout
+    - one angry ORANGE eye
+    - red star decal
+    - tan rope fuse curling off the top
+    - wide toothy grin with a RED CHILI-PEPPER mustache
+  composition: three-quarter-profile   # as drawn — round body + eye + grin + fuse, barrel angled to the side
+  face: visible               # eye blinks, toothy grin moves for talk
+  expression: aggressive-grin # the brash, scrappy one of the pair
+  palette_plan: >             # rough 16-color budget (incl. index-0 transparent)
+    gunmetal greys ×4, barrel-bore black, orange eye + white, red (star + chili mustache),
+    tan fuse, boot-grey, black outline. Mirror of Brie's palette.
 
 # How he enters the army (story recruit; not a gameplay summon).
 recruited_via: "story — Prof. R.B. Geenius builds Pepperjack"

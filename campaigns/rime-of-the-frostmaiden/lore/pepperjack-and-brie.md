@@ -9,10 +9,11 @@ Shared portrait: [`data/portraits/pepperjack-and-brie.jpeg`](../../../data/portr
 
 ## Concept
 
-Two sentient automatons built by Prof. R.B. Geenius. They are a couple — Pepperjack and Brie are
-dating — and travel together. Originally framed as RBG's "Artillerist" cannon fantasy; that has
-been reframed: they are their own people (well, machines), recruited into the army on their own
-merits rather than deployed as RBG's equipment.
+Two sentient automatons built by Prof. R.B. Geenius. RBG built **Pepperjack** first; later he built
+**Brie for Pepperjack** — an Adam-and-Eve framing (a companion made for him), so the two are a
+*couple*, **not twins or siblings**. They travel together. Originally framed as RBG's "Artillerist"
+cannon fantasy; that has been reframed: they are their own people (well, machines), recruited into
+the army on their own merits rather than deployed as RBG's equipment.
 
 ## Speech
 

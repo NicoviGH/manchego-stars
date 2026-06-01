@@ -5,8 +5,29 @@
 
 id: brie
 name: Brie
-portrait_ref: portraits/pepperjack-and-brie.png   # GBA-ready sprite pending (shared w/ Pepperjack)
+portrait_ref: portraits/pepperjack-and-brie.png   # shared source ref; gets her OWN portrait (pink)
 portrait_source: data/portraits/pepperjack-and-brie.jpeg
+
+# ── Custom Art Brief (decided 2026-06-01 portrait walkthrough) ───────────────────
+# ALL parts custom indexed-palette art. Follow the concept ref faithfully.
+# Brie was built by RBG FOR Pepperjack (Adam/Eve framing) — they are a COUPLE, NOT twins/siblings.
+# Mirror design of Pepperjack in opposing palette: Brie = pink+cyan, Pepperjack = grey+red.
+art:
+  approach: custom
+  fidelity: faithful
+  build_when: with-batch      # pixel alongside the 7 PCs, though class/recruit is post-MVP
+  must_keep:                  # tells that make the bust read as "Brie"
+    - hot-pink cannon-golem body + barrel snout
+    - one big GLAM eye — blue eyeshadow, purple iris, eyelashes
+    - cyan/teal star decal
+    - pink rope fuse curling off the top
+    - toothy grin (glam counterpart to Pepperjack's chili-stache)
+  composition: three-quarter-profile   # as drawn — mirror Pepperjack's framing (face the pair toward each other)
+  face: visible               # glam eye blinks, grin moves for talk
+  expression: glam-confident  # the poised, fabulous one of the pair
+  palette_plan: >             # rough 16-color budget (incl. index-0 transparent)
+    pinks ×4 (hot→deep), barrel-bore dark-magenta, eye (blue shadow + purple iris + white),
+    cyan star, pink fuse, boot-pink, black outline. Mirror of Pepperjack's palette.
 
 # How she enters the army (story recruit; not a gameplay summon). Recruited a later chapter than
 # Pepperjack.

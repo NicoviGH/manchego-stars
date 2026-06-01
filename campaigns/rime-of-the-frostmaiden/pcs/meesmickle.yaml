@@ -8,6 +8,23 @@ portrait_ref: portraits/meesmickle.png   # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/meesmickle.jpeg
 # Portrait source: https://www.dndbeyond.com/avatars/25348/435/1581111423-72613637.jpeg
 
+# ── Custom Art Brief (decided 2026-06-01 portrait walkthrough) ───────────────────
+# ALL parts custom indexed-palette art. Follow the concept ref faithfully.
+# Vampire Tabaxi — must read as totally distinct from Marty (the OTHER Shaman).
+art:
+  approach: custom
+  fidelity: faithful
+  must_keep:                  # tells that make the bust read as "Meesmickle"
+    - sleek black cat face (vampire tabaxi)
+    - red Dracula cape with a high standing collar
+    - sparkly rhinestone/diamond bib necklace
+  face: visible               # cat eyes blink, small mouth for talk
+  composition: clean-field    # NO cosmic background — neutral FE field so the red cape pops
+  expression: regal-diva      # aloof, half-lidded, smug pampered aristocat (comedic charm)
+  palette_plan: >             # rough 16-color budget (incl. index-0 transparent)
+    cat blacks ×3 (cool-blue-tinted) + fur highlight, cape reds ×3, white +
+    pale-grey diamond bling, green cat-eye, pink nose/mouth, black outline.
+
 # ── D&D 5e Source (reference only — does NOT drive FE mechanics) ────────────────
 # FE stats come verbatim from the vanilla class below, not from D&D scores.
 # Raw sheet: data/pc-sheets/meesmickle.json  ·  Curated flavor: lore/meesmickle.md

@@ -8,6 +8,24 @@ portrait_ref: portraits/marty.png       # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/marty.jpeg
 # Portrait source: https://www.dndbeyond.com/avatars/25824/431/1581111423-70515811.jpeg
 
+# ── Custom Art Brief (decided 2026-06-01 portrait walkthrough) ───────────────────
+# ALL parts custom indexed-palette art. Follow the concept ref faithfully.
+art:
+  approach: custom
+  fidelity: faithful
+  must_keep:                  # tells that make the bust read as "Marty"
+    - red toadstool cap with white spots
+    - round grey myconid head, two big round yellow eyes, gentle mouth
+    - stubby crossed arms + wooden staff with a tiny green sprout
+  face: visible               # simple two-dot eyes + small mouth, easy to animate
+  composition: merry          # cozy, content, harmless-looking — the "merry mushroom"
+  spore_hint: true            # a few faint spores/glowing motes drift around the cap —
+                              # quietly signal the Circle-of-Spores dark magic; keep it ELEGANT, not menacing
+  expression: content-smile   # merry default; dark-magic surprise rides on the battle/spell anim
+  palette_plan: >             # rough 16-color budget (incl. index-0 transparent)
+    cap red ×2 + white spots, body greys ×3 + soft shadow, yellow eyes,
+    brown staff, green sprout, pale spore-mote glow (shares white), black outline.
+
 # ── D&D 5e Source (reference only — does NOT drive FE mechanics) ────────────────
 # FE stats come verbatim from the vanilla class below, not from D&D scores.
 # Raw sheet: data/pc-sheets/marty-the-merry-mushroom.json  ·  Curated flavor: lore/marty.md
