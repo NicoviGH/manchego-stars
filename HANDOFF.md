@@ -1,73 +1,69 @@
-# Handoff: Art direction LOCKED to full-custom + all 8 cast/recruit portrait briefs authored. NEXT = start pixeling, Braulo first (gbagfx round-trip with a CUSTOM 96×80 indexed portrait). Toolchain is green & reproducible on macOS (byte-identical vanilla ROM).
+# Handoff: Portrait pipeline PROVEN end-to-end + Braulo (1st portrait) shipped. NEXT = Prof. R.B. Geenius portrait — waiting on Nicolas to provide a clean frameless Gemini bust ref, then it's 2 commands to convert + insert.
 
 **Date:** 2026-06-01
-**Session focus:** Ran a chapter-style portrait *walkthrough* — looked at every reference artwork one-by-one with Nicolas, made the recolor-vs-custom call, and recorded a custom design brief for each of the 7 PCs + the two recruit cannon-golems. All committed + pushed to main (HEAD `672ec0b`).
+**Session focus:** Stood up and proved the entire custom-portrait pipeline (gbagfx round-trip → FE8 OAM tile format → bust↔sheet converter), then converted Nicolas's Nano-Banana/Gemini reference into the first game-ready portrait (Braulo) and committed reusable tooling.
 
 ## Accomplished this session
 
-- **Art direction decided: FULL CUSTOM.** Every cast/recruit sprite part — portrait, map sprite, AND battle animation — is hand-drawn indexed-palette art, drawn *faithfully from each character's concept reference*. **No recolor baseline, no vanilla-anim reuse.** Rationale: combat is pure vanilla FE8, so the art is the single biggest lever for making the game feel like the campaign. Nicolas: "this is our biggest lever… let's take our time." Generative tools (Nano Banana) stay concept-ref only, never final assets.
-  - Superseded the old "recolor-first" lean **and** the old "Phase C map sprites mostly free / Phase D reuse vanilla anims" plan.
-- **Per-character design briefs authored** into each unit's YAML `art:` block (`campaigns/rime-of-the-frostmaiden/{pcs,npcs}/*.yaml`) — must-keep visual tells, face/animation approach, expression, rough 16-color palette plan. Decisions:
-  - **Braulo** (Pirate→Berserker): faithful hermit-crab — red claws, tan carapace shoulders, conch shell, wicker basket-hat; face *per concept* (not humanized); expression = **berserker fury**.
-  - **Prof. R.B. Geenius** (Archer): green-ratfolk manic grin, purple top-hat, yellow coat collar; **face-forward, NO gun in the bust** (pistols/magitech ride map+battle sprites).
-  - **Sclorbo** (Priest): faceless Chwinga rune-mask STAYS; animate via **rune-pulse + aura** (no eyes/mouth); fur ruff, cyan staff.
-  - **Marty** (Shaman): merry grey mushroom, red spotted cap, yellow eyes; **subtle elegant spore-hint** motes for the dark magic.
-  - **Meesmickle** (Shaman): vampire-tabaxi **regal diva**, red cape + diamond bling; **clean neutral field** (drop the cosmic bg). Must read distinct from Marty (the other Shaman).
-  - **Rootis** (Mage/Ice): pure jolly snowman, coal eyes + carrot nose; **armless, no aura** — cold magic on the battle anim.
-  - **Wolfram** (Knight/Armor): mineral-scaled face + leather straps, no weapon in frame; **serious/preoccupied** (thinking about his ores), younger than the weathering suggests.
-  - **Pepperjack & Brie** (recruits, FE class TBD post-MVP — but **art built now with the batch**): cannon-golems, **3/4 profile** as drawn, mirror palettes (Pepperjack grey+red+chili-stache / Brie pink+cyan+glam-eye).
-- **Lore fix:** clarified RBG built **Brie *for* Pepperjack** (Adam/Eve framing) — they're a **couple, not twins/siblings** (`lore/pepperjack-and-brie.md`).
-- **Docs rewritten natively** to the custom direction: `docs/decisions.md` (Art entry) + `docs/PRD.md §8`. Also fixed a stale PRD line that called Braulo a "Tortle" (he's a hermit crab).
-- Commits: `874bf0d` (briefs + lore), `672ec0b` (doc rewrite).
+- **gbagfx round-trip PROVEN.** PNG → 4bpp → PNG is lossless (0/8192 pixel-index diffs; the grayscale you see on a raw decode is just a preview inversion — the ROM uses the separate `.gbapal`). Painted a test block into a vanilla portrait, rebuilt, ROM diverged from vanilla + booted in mGBA, then reverted → `make verify` = `OK` (byte-identical vanilla restored). The macOS shims in the submodule (`fireemblem8u/scripts/*` shebangs) are the known, expected drift — leave them.
+- **FE8 portrait format reverse-engineered + verified.** A talking portrait is NOT a linear bitmap: the tracked `portrait_<Name>_tileset.png` (256×32, indexed 16-color) is a **32-tile-wide VRAM grid**, and **6 OAM sprite objects** (`gSprite_Face96x96` in `fireemblem8u/src/face.c`) composite it into the **96×80** bust. Palette index 0 = transparent chroma key. Confirmed by reconstructing vanilla Eirika pixel-perfect.
+- **`tools/portrait_tool.py`** — `decode` (sheet→bust) / `encode` (bust→sheet) using that OAM layout. Verified byte-identical round-trip on Eirika (0 diffs across all 6144 covered px). Committed `0141a36`.
+- **`tools/ref_to_bust.py`** — translates a clean Gemini reference into the 96×80 indexed bust: crop → flat-bg segmentation (bright+desaturated cream, border-flood seeded from top/left/right since the subject fills the bottom) → speck/hole cleanup → sharpen+downscale → 15-color quantize → clean silhouette. Committed `a35b329`.
+- **Braulo's portrait shipped (v1, APPROVED).** Converted `References/PCs/Broulo Face Clean.png` → `campaigns/rime-of-the-frostmaiden/portraits/braulo.png` (+ `braulo_preview.png`). Verified through `portrait_tool.py encode/decode`. Nicolas approved the look as-is (kept the "curious" face; did NOT enforce the brief's berserker-fury). `portraits/README.md` documents the workflow.
 
-## Tried but didn't work (lessons for next time)
+## Major workflow changes this session (also in memory)
 
-- (No dead ends this session — it was a design/decision walkthrough.) Note from prior session still holds: the 3 macOS build gaps (Linux shebangs, py3.9 match/case, missing `<cstdlib>`) are permanently shimmed in the root `Makefile` Darwin block — won't recur.
+- **Nicolas is not an artist / can't pixel.** Claude generates the art via tooling; never propose "draw it in Aseprite."
+- **Nano-Banana rule RELAXED:** Gemini/Nano-Banana images MAY originate the final art (the old "concept-ref only" rule is lifted for portraits). Nicolas's only worry was in-game fidelity — solved.
+- **Assume the provided Gemini ref is APPROVED:** convert faithfully, don't re-litigate expression/aesthetics or push tweaks. Nicolas drives art by choosing what to generate on his side. Best source = clean **frameless head-and-shoulders bust on a flat background** (the roundel-framed first ref needed heavy segmentation; the frameless "Clean" version converted far better).
+
+## Tried but didn't work (lessons)
+
+- **Regenerating Braulo via the nanobanana MCP** — the MCP server is pinned to the retired model `gemini-2.5-flash-image-preview` (404); the API key only lives in the MCP server's env (not the shell), so direct `curl` regen is also blocked. **Don't try to generate images from here — Nicolas generates them on his side and drops them in `References/PCs/`.**
+- **Background removal dead-ends:** color-distance flood = finicky; dark-frame removal leaked through the crab's own shadows and punched holes; a geometric ellipse mask clipped the eyestalks. **Winning recipe = HSV cream-key (bright+desaturated) + border-flood from top/sides only + connected-component speck/hole cleanup** (now baked into `ref_to_bust.py`).
+- Naive 12-wide row-major tile reassembly = scrambled; the OAM layout is required.
 
 ## Current state
 
-- **Build:** green + reproducible on macOS. `make` → `fireemblem8u/fireemblem8.gba`, `make verify` → `OK` (byte-identical vanilla FE8). Boots vanilla in mGBA; no campaign data injected yet (that's the unbuilt `build-campaign.ts` pipeline, issues #13–#15).
-- **Art:** all 8 cast/recruit **design briefs done**, but **zero pixels drawn yet**. The gbagfx round-trip has NOT been proven.
-- **Story:** all 9 MVP chapters (ch00–ch08) authored in YAML + walked through. Ch9–20 plot still blocked on the rest of the DM notes.
+- **Build:** green + reproducible on macOS. `make` → ROM, `make verify` → `OK`. No campaign data injected yet (build-campaign pipeline, issues #13–15, still unbuilt).
+- **Portraits:** pipeline complete + reproducible. **1 of 8 done** (Braulo). 7 PCs + 2 recruits remain (briefs in each unit YAML `art:` block).
+- **Story:** all 9 MVP chapters (ch00–ch08) authored. Ch9–20 still blocked on the rest of the DM notes.
 
 ## Blockers / open
 
-- **gbagfx round-trip not yet proven** — need to dump a vanilla 96×80 portrait → reinsert → see it in mGBA before drawing final custom art (so we work against real palette/size constraints).
-- **Braulo's face reference is missing** — the current full-body ref hides his face under the carapace/basket-hat. Nicolas can supply more reference art; **ask him for a Braulo face/head ref before drawing his portrait.** (Standing offer: he can provide extra art for any character where a single body-shot leaves a gap.)
-- **#16 (toolchain) needs manual close** on GitHub — done, but the agent close was blocked by the permission classifier.
-- **pepperjack/brie `fe_stats.class = null`** — FE-legal vanilla class TBD post-MVP (art proceeds without it).
-- **Sclorbo signature moment** still TBD (Nicolas to recall). Rootis pairs with Sclorbo (ice support / Targos snow-night).
+- **Next portrait (Prof. R.B. Geenius) needs a clean Gemini bust ref from Nicolas** — frameless, flat background, head-and-shoulders. Then conversion is 2 commands. (Standing pattern: Nicolas generates each character's clean bust; Claude converts.)
+- **#16 (toolchain)** still needs a manual GitHub close (agent close blocked by permission classifier).
+- **pepperjack/brie `fe_stats.class = null`** — FE-legal class TBD post-MVP (art can still proceed).
+- **Rootis & Sclorbo recruitment chapters = TBD** (Nicolas to recall). Sclorbo signature moment also TBD.
 - **Ch 9–20 plot** blocked on the rest of the DM notes.
-- **Lingering lean candidates** (low priority): `docs/pc-spell-lists.md` / `docs/magic-items.md` → consume into YAML then delete.
 
-## Next steps (priority order) — PIXEL ART (full custom)
+## Next steps (priority order) — PORTRAITS (7 remaining)
 
-Golden rules: **indexed-palette only** (16 colors/slot, 8×8 tiles); draw faithfully from the concept ref; Nano Banana = concept-ref only, never final. Draw in **Aseprite** (indexed mode); validate legality in **FEBuilder**; authoritative insertion is PNG → `gbagfx` → decomp.
+Order by story appearance: **Prof. R.B. Geenius (Ch1) → Wolfram (Ch3) → Marty (Ch6) → Meesmickle (Ch9) → Rootis/Sclorbo (TBD)**, then **Pepperjack & Brie** (recruits, build-now). Braulo (Ch8) was done first as the end-to-end test unit.
 
-1. **Prove the gbagfx round-trip (do FIRST, ~throwaway).** Dump one vanilla FE8 portrait → tweak pixels → reinsert → view in mGBA. Confirms the 96×80 / 16-color ceiling before we commit custom art. Scripts: `fireemblem8u/scripts/dump_portrait.py`, `gbagfx` (built at `fireemblem8u/tools/gbagfx`).
-2. **Braulo portrait first** (he's the end-to-end test unit, issue #15). **Get a face reference from Nicolas first.** Then draw the custom 96×80 indexed portrait per the brief in `pcs/braulo.yaml` (`art:` block).
-3. **Remaining 6 PC portraits**, ordered by story appearance, each per its YAML `art:` brief. Then Pepperjack & Brie (build-now).
-4. **Map sprites** (16×16) — custom per cast member.
-5. **Battle animations** (hardest) — custom; likely post-MVP `stretch`.
-
-**Process note:** per-character art briefs now live in the unit YAML `art:` blocks — read those before drawing each character. **Roadmap issues** for this (Phase A round-trip + per-PC portrait issues) were never created; Nicolas to decide whether to file them or keep the roadmap in `docs/` — do not create GitHub issues unprompted (external-write classifier will likely block).
-
-**Also flagged by Nicolas for "later":** an **architecture diagram** of the ROM hack (for his own learning). Not started; bring it up when he's ready.
+1. **Prof. R.B. Geenius portrait.** Ask Nicolas for a clean frameless Gemini bust ref (green-ratfolk manic grin, purple top-hat, yellow coat collar; face-forward, NO gun in the bust — per `pcs/prof-rbg.yaml` `art:`). Then:
+   - `python3 tools/ref_to_bust.py "<ref.png>" campaigns/rime-of-the-frostmaiden/portraits/prof-rbg.png --crop x0,y0,x1,y1 --preview campaigns/.../portraits/prof-rbg_preview.png` (tune `--crop` to ~1.2 aspect, view the preview, iterate the box).
+   - `python3 tools/portrait_tool.py encode <bust> /tmp/sheet.png` to confirm it packs.
+   - Show Nicolas the `_preview.png`; commit + push.
+2. Repeat for the remaining PCs as Nicolas supplies each clean ref.
+3. **Map sprites** (16×16) — custom per cast member (pipeline TBD; chibi format in the same portrait table).
+4. **Battle animations** — custom; hardest; likely post-MVP `stretch`.
 
 ## Key files
 
-- `campaigns/rime-of-the-frostmaiden/pcs/*.yaml` + `npcs/{pepperjack,brie}.yaml` — each has an `art:` block with the per-character custom design brief (the spec for drawing them).
-- `data/portraits/*.jpeg|jpg` — downloaded D&D Beyond concept refs; `data/pc-sheets/portraits.json` — source URLs.
-- `fireemblem8u/scripts/dump_portrait.py`, `fireemblem8u/tools/gbagfx` — the portrait asset pipeline (Phase A round-trip).
-- `Makefile` (root) — macOS build shims in the `ifeq ($(shell uname),Darwin)` block; `make` / `make verify` / `make clean`.
-- `fireemblem8u/fireemblem8.gba` — built ROM (gitignored). View: `open -a /Applications/mGBA.app <path>`.
-- `docs/decisions.md` (Art Direction entry) + `docs/PRD.md §8` — the full-custom art direction.
+- `tools/portrait_tool.py` — bust↔sheet converter (the verified OAM packer). `decode`/`encode`.
+- `tools/ref_to_bust.py` — Gemini ref → 96×80 indexed bust. `--crop x0,y0,x1,y1 [--preview ...]`.
+- `campaigns/rime-of-the-frostmaiden/portraits/` — authored busts (`<unit>.png` 96×80 indexed + `_preview.png`) + `README.md` (workflow). `braulo.png` = done.
+- `campaigns/rime-of-the-frostmaiden/{pcs,npcs}/*.yaml` `art:` block — per-character design brief (read before converting each).
+- Gemini source refs: `/Users/Yonick/Documents/Claude/Projects/Manchego Stars / Fire Emblem Game/References/PCs/` (Nicolas drops clean busts here).
+- `fireemblem8u/src/face.c` (`gSprite_Face96x96`) — the authoritative OAM portrait layout.
+- `Makefile` (root) — macOS build shims; `make` / `make verify` / `make clean`.
 
 ## Standing rules (how Nicolas wants this work done)
 
-- **Art = full custom** for cast/recruits (portrait + map sprite + battle anim), drawn faithfully from concept refs; indexed-palette only; Nano Banana concept-ref only. Nicolas can supply more reference art on request.
-- **Stock vanilla FE8 classes/weapons only**; **element = flavor, NEVER a mechanic** (incl. effectiveness — keyed to enemy CLASS). Combat RULES are vanilla FE; the d20 is cosmetic only.
-- **Ground FE claims in `fireemblem8u/`**; **ground STORY in the two PDFs** (DM notes Ch1–7 only + the published book). Read them directly when planning story.
-- **Clean native doc rewrites** (no STALE/reverted banners). **Auto-push to main.** **Collaborative, one-item-at-a-time** story/art walkthroughs. **Balance: defer to FE, lean generous.**
-- **Doc source-of-truth:** per-chapter/unit facts live ONLY in YAML; `docs/CHAPTERS.md` + `CLASSES.md` are GENERATED (`ruby tools/gen-chapter-index.rb` + `gen-class-index.rb`, never hand-edit). **Lean repo**; backlog = **GitHub issues** (milestones M0–M4).
+- **Art = full custom**, generated by Claude via tooling (Nicolas can't pixel). **Gemini/Nano-Banana refs are the source and are pre-approved** — convert faithfully, don't re-litigate the look. Nicolas supplies a clean frameless bust per character; **Claude cannot generate images from here** (MCP model retired).
+- **Stock vanilla FE8 classes/weapons only**; **element = flavor, NEVER a mechanic**. Combat RULES are vanilla FE; the d20 is cosmetic only.
+- **Ground FE claims in `fireemblem8u/`**; **ground STORY in the two PDFs** (DM notes Ch1–7 only + the published book).
+- **Clean native doc rewrites** (no STALE/reverted banners). **Auto-push to main.** **Collaborative, one-item-at-a-time** walkthroughs.
+- **Doc source-of-truth:** per-chapter/unit facts live ONLY in YAML; `docs/CHAPTERS.md`/`CLASSES.md` are GENERATED (`ruby tools/gen-*.rb`, never hand-edit). **Lean repo**; backlog = GitHub issues (M0–M4).
 - **`make` must be green at the end of every session. Never commit a broken build.**
