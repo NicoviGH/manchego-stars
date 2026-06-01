@@ -16,16 +16,16 @@ Usage:
     # (prints the exact ref_to_bust command to run)
 """
 
-import sys
+import argparse
 import numpy as np
 from PIL import Image
 
-SUBJ_H_FRAC = 0.84   # subject height as fraction of canvas height (-> ~16% headroom)
-SUBJ_W_FRAC = 0.76   # subject width as fraction of canvas width  (-> ~12% each side)
+SUBJ_H_FRAC = 0.90   # subject height as fraction of canvas height (-> ~10% headroom)
+SUBJ_W_FRAC = 0.90   # subject width  as fraction of canvas width  (-> ~5% each side)
 COVER = 0.06         # row/col foreground coverage to count as "subject" (ignores thin wisps)
 
 
-def autoframe(ref_path, out_path):
+def autoframe(ref_path, out_path, subj_h=SUBJ_H_FRAC, subj_w=SUBJ_W_FRAC):
     src = Image.open(ref_path).convert('RGB')
     W, H = src.size
     rgb = np.asarray(src).astype(np.float32)
@@ -38,7 +38,7 @@ def autoframe(ref_path, out_path):
     sx0, sx1, sy0, sy1 = int(xs.min()), int(xs.max()), int(ys.min()), int(ys.max())
     w_s, h_s = sx1 - sx0 + 1, sy1 - sy0 + 1
 
-    canvas_h = int(round(max(h_s / SUBJ_H_FRAC, (w_s / SUBJ_W_FRAC) / 1.2)))
+    canvas_h = int(round(max(h_s / subj_h, (w_s / subj_w) / 1.2)))
     canvas_w = int(round(canvas_h * 1.2))
     canvas = Image.new('RGB', (canvas_w, canvas_h), tuple(int(v) for v in bg))
     canvas.paste(src.crop((sx0, sy0, sx1 + 1, sy1 + 1)),
@@ -48,12 +48,18 @@ def autoframe(ref_path, out_path):
 
 
 def main():
-    if len(sys.argv) != 3:
-        sys.exit("usage: autoframe.py <ref.png> <framed.png>")
-    w, h = autoframe(sys.argv[1], sys.argv[2])
-    print("framed canvas %dx%d -> %s" % (w, h, sys.argv[2]))
+    ap = argparse.ArgumentParser()
+    ap.add_argument('ref')
+    ap.add_argument('framed')
+    ap.add_argument('--subj-h', type=float, default=SUBJ_H_FRAC,
+                    help='subject height as fraction of canvas height (higher = bigger / less headroom)')
+    ap.add_argument('--subj-w', type=float, default=SUBJ_W_FRAC,
+                    help='subject width as fraction of canvas width (higher = bigger / less side margin)')
+    a = ap.parse_args()
+    w, h = autoframe(a.ref, a.framed, a.subj_h, a.subj_w)
+    print("framed canvas %dx%d -> %s" % (w, h, a.framed))
     print("next: python3 tools/ref_to_bust.py %s <bust.png> --crop 0,0,%d,%d --preview <preview.png>"
-          % (sys.argv[2], w, h))
+          % (a.framed, w, h))
 
 
 if __name__ == '__main__':
