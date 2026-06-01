@@ -42,10 +42,12 @@ lose_condition: timer_expires_scripted_defeat
 
 difficulty_note: >
   UNWINNABLE BY DESIGN. The player should feel heroic for lasting the full timer,
-  but the loss is fixed. Fire weapons are EFFECTIVE vs ice trolls (vanilla FE
-  weapon effectiveness) — the party can exploit it but lacks the firepower to clear
-  them. Tune so a skilled party survives to the timer without a premature wipe;
-  the scripted defeat cutscene then plays regardless.
+  but the loss is fixed. The ice trolls are vanilla FE8 monsters (cyclops) — the only
+  things that hit them effectively are monster-effective weapons (sacred/rare: e.g.
+  Fiendcleaver, Audhulma, the Sacred Twins), which the party does NOT have yet
+  pre-promotion. That lack is the point: they simply don't have the tools to beat the
+  trolls, which is why the wall holds. Tune so a skilled party survives to the timer
+  without a premature wipe; the scripted defeat cutscene then plays regardless.
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
@@ -67,9 +69,11 @@ enemy_units:
     count: 4
     class: cyclops              # FE8 monster class (giant brute, throws); reskinned as an Ice Troll
     level: 11
-    weapon: boulder-throw     # thrown bludgeoning; effective-weakness: fire
+    weapon: boulder-throw     # thrown bludgeoning (cosmetic label)
     damage_type: bludgeoning
-    weakness: fire            # vanilla FE weapon effectiveness (fire is effective)
+    # No fire-weakness: vanilla FE8 has no fire effectiveness, and element is flavor only.
+    # As a monster (cyclops), the only effective counters are monster-effective weapons
+    # (sacred/rare) the pre-promotion party lacks — see difficulty_note.
     ai_pattern: aggressive
     arrives: { turn: 4 }
 
@@ -120,5 +124,6 @@ post_chapter:
 design_notes: >
   The MVP wall. An unwinnable, heroic last stand → Revel's End cliffhanger +
   credits (PRD §20 DoD #9). Braulo's shackle-break is the turn-1 signature beat.
-  Fire-vs-ice-troll effectiveness is the one bit of vanilla-FE tactics the player
-  can exploit. Everything after this chapter is gated on the rest of the DM notes.
+  The ice trolls are unbeatable by vanilla-FE logic — they're monsters, and the party
+  has no monster-effective weapons until post-MVP — which is what makes the wall hold.
+  Everything after this chapter is gated on the rest of the DM notes.
