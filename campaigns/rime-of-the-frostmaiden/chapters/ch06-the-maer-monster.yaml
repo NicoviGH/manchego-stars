@@ -11,12 +11,17 @@ fe8_base_map: "FE8 Ch5 — The Empire's Reach"        # DefeatBoss set-piece bas
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
-  In Bremen, a drunken captain drafts the party into a fishing crew. They catch
-  knucklehead trout, meet an elven wildlife researcher, then see a vast shadow
-  beneath the ice: Messie, a plesiosaur capsizing boats. Messie separates the
-  party's two boats and attacks. Marty's Talk with Animals reveals she was
-  "awakened" by the frost druids, fears losing her intelligence, and was ordered
-  to terrorize the town. The party can fight her down — or talk her down.
+  In Bremen, on the frozen west bank of Maer Dualdon, a rude shield-dwarf named
+  Grynsk Berylbore drafts the party onto his two fishing boats — the Burly Ram
+  and the Pronged Goat (the latter still bearing a huge bite-mark). They meet
+  Tali, a half-elf wildlife researcher (they/them) who warns that something has
+  been sinking the boats and hands the party a notebook, asking them to record
+  whatever they find. They haul in knucklehead trout for stingy pay, then see a
+  vast shadow beneath the ice: Messie, an awakened plesiosaur, capsizing boats.
+  Messie separates the party's two boats and attacks. Marty's Talk with Animals
+  reveals she was "awakened" by a frost druid, fears losing her new intelligence,
+  and was ordered to terrorize the town. The party can fight her down — or talk
+  her down.
 
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
@@ -24,8 +29,25 @@ map:
   tileset: water-boats          # water map, 2 boat platforms; custom/community tileset
   size: "22×16"
   description: >
-    Tight water map with 2 boats (one for small creatures, one for Braulo/Wolfram).
-    Open water restricts movement; Messie roams; harassing fish flank the boats.
+    Tight water map over the frozen mouth of Maer Dualdon. Two boat-deck platforms —
+    the Burly Ram (small creatures) and the Pronged Goat (Braulo/Wolfram) — drift
+    apart across open water; Messie roams the deeps; the knucklehead swarm flanks the
+    boats. Drifting ice floes choke the lanes between the two decks.
+  # FE-native terrain mapping of the book's ice-floe hazard (grounded in
+  # fireemblem8u/include/constants/terrains.h — vanilla, no engine work):
+  terrain_mechanic:
+    open_water: TERRAIN_SEA       # 0x15 — impassable to foot/mounted units; this is WHY the
+                                  #        knucklehead swarm is a flier class (gargoyle) and the
+                                  #        PCs are confined to the two boat decks.
+    boat_decks: TERRAIN_SHIP_FLAT # 0x2A — the walkable Burly Ram / Pronged Goat platforms.
+    ice_floes: TERRAIN_SNAG       # 0x33 — DESTRUCTIBLE drifting floes blocking the lanes between
+                                  #        the decks. Attack to break one open (vanilla snag rule),
+                                  #        creating stepping-stones to cross boats or reach Messie.
+    ice_walls: TERRAIN_GLACIER    # 0x2F — a few permanent ice ridges that just shape the lanes.
+  terrain_note: >
+    The two boats start separated by an impassable channel webbed with snag-floes.
+    Clearing floes (or waiting for Messie to smash them) is how foot units bridge the
+    gap — turning the book's "steer around the ice floes" into a vanilla movement puzzle.
 
 # ── Objective ──────────────────────────────────────────────────────────────────
 objective:
@@ -50,7 +72,7 @@ difficulty_note: >
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
-  note: "7 PCs + Trex + Pinky + Sahnar (the Mummy) deployable, split across the 2 boats. Marty MUST be deployable (his Talk is the hidden resolution). Baxby, Lupin, and Basil are non-combat caravan NPCs. Positions set in Tiled."
+  note: "7 PCs + Trex + Pinky + Sahnar (the Mummy) deployable, split across the two boats — small creatures on the Burly Ram, Braulo/Wolfram on the Pronged Goat. Marty MUST be deployable (his Talk is the hidden resolution). Baxby, Lupin, and Basil are non-combat caravan NPCs. Positions set in Tiled."
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
 enemy_units:
@@ -78,8 +100,9 @@ events:
     type: cutscene
     ea_file: events/ch06-opening.ea
     description: >
-      Bremen docks; drunken captain drafts the crew; the elven researcher's
-      warning; Marty's pre-chapter beast-speech hint ('I can talk to animals,
+      Bremen docks; Grynsk Berylbore drafts the crew onto the Burly Ram and Pronged
+      Goat; Tali (half-elf researcher, they/them) warns of the boat-sinkings and hands
+      over a notebook; Marty's pre-chapter beast-speech hint ('I can talk to animals,
       remember?'). Boats set out.
   - trigger: unit_adjacent
     unit: marty
