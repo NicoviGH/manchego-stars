@@ -1,68 +1,73 @@
-# Handoff: Build toolchain INSTALLED & green on macOS (byte-identical vanilla ROM, reproducible `make`). NEXT = pixel-art pipeline, starting with portraits — but first prove the gbagfx round-trip so Nicolas can SEE what we're working with before committing to recolor-vs-custom.
+# Handoff: Art direction LOCKED to full-custom + all 8 cast/recruit portrait briefs authored. NEXT = start pixeling, Braulo first (gbagfx round-trip with a CUSTOM 96×80 indexed portrait). Toolchain is green & reproducible on macOS (byte-identical vanilla ROM).
 
 **Date:** 2026-06-01
-**Session focus:** Installed and verified the full FE8 decomp build toolchain on Apple Silicon macOS, made `make` reproducible with zero manual env, installed mGBA to view ROMs, and scoped a pixel-art backlog. All committed + pushed to main (HEAD `0f122eb`).
+**Session focus:** Ran a chapter-style portrait *walkthrough* — looked at every reference artwork one-by-one with Nicolas, made the recolor-vs-custom call, and recorded a custom design brief for each of the 7 PCs + the two recruit cannon-golems. All committed + pushed to main (HEAD `672ec0b`).
 
 ## Accomplished this session
 
-- **Toolchain green end-to-end** (`0f122eb`): `make` from repo root → `fireemblem8u/fireemblem8.gba`, and `make verify` → **`fireemblem8.gba: OK`** (byte-identical to vanilla FE8). Proven in a *clean shell with no manual env vars*.
-  - Installed via Homebrew: `arm-none-eabi-gcc` (binutils as/ld), `pkg-config`, `libpng`, `coreutils` (for `nproc`), `python@3.12`. Built **agbcc** from pret/agbcc into `fireemblem8u/tools/agbcc`. Installed numpy+pillow into the 3.12 interpreter. Copied `baserom.gba` into the decomp (gitignored).
-  - **Three macOS gaps the decomp's quickstart.sh does NOT handle — now shimmed in the root `Makefile` (Darwin block) so plain `make` just works:**
-    1. Apple **clang 21's** Command Line Tools `c++/v1` is incomplete (only 11 stale files) → `jsonproc` can't find `<cstdlib>`. Fix: Makefile exports `CPLUS_INCLUDE_PATH` from `$(xcrun --show-sdk-path)/usr/include/c++/v1` (the SDK has the full 193-file libc++).
-    2. Several gfx scripts (`tsa2.py` etc.) use `match`/`case` → need **Python ≥3.10**, but system python3 is 3.9. Fix: Makefile prepends `python@3.1x/libexec/bin` to PATH.
-    3. 19 scripts ship `#!/bin/python3` (absent on macOS; `/bin` is SIP-protected, can't symlink) → rewrote to `#!/usr/bin/env python3`. These live in the **submodule working tree**; reproduced by the setup script, so `fireemblem8u` stays on its upstream pin (do NOT commit a submodule pointer move for these).
-  - Also fixed `make verify` target (`sha1.txt` → `checksum.sha1`).
-  - **`tools/setup-toolchain.sh`** (new) codifies the whole one-time install idempotently for any fresh clone.
-- **mGBA installed** (`/Applications/mGBA.app`, via `brew install --cask mgba`). View any build: `open -a /Applications/mGBA.app fireemblem8u/fireemblem8.gba`. Right now it boots **vanilla** FE8 — our campaign data isn't injected yet (that's the `build-campaign.ts` pipeline, issues #13–#15). The build proves the *engine*; content is next.
-- **Pixel-art backlog scoped** (NOT yet created as issues — Nicolas to confirm). See Next Steps.
-- Explained the **FEBuilder vs decomp** paradigm choice (already recorded in `decisions.md`/PRD §10): decomp is our spine (source-controlled, custom C, AI/Mac-friendly); FEBuilder is a side **escape hatch** for portrait validation + inspecting vanilla FE8, not the build system.
+- **Art direction decided: FULL CUSTOM.** Every cast/recruit sprite part — portrait, map sprite, AND battle animation — is hand-drawn indexed-palette art, drawn *faithfully from each character's concept reference*. **No recolor baseline, no vanilla-anim reuse.** Rationale: combat is pure vanilla FE8, so the art is the single biggest lever for making the game feel like the campaign. Nicolas: "this is our biggest lever… let's take our time." Generative tools (Nano Banana) stay concept-ref only, never final assets.
+  - Superseded the old "recolor-first" lean **and** the old "Phase C map sprites mostly free / Phase D reuse vanilla anims" plan.
+- **Per-character design briefs authored** into each unit's YAML `art:` block (`campaigns/rime-of-the-frostmaiden/{pcs,npcs}/*.yaml`) — must-keep visual tells, face/animation approach, expression, rough 16-color palette plan. Decisions:
+  - **Braulo** (Pirate→Berserker): faithful hermit-crab — red claws, tan carapace shoulders, conch shell, wicker basket-hat; face *per concept* (not humanized); expression = **berserker fury**.
+  - **Prof. R.B. Geenius** (Archer): green-ratfolk manic grin, purple top-hat, yellow coat collar; **face-forward, NO gun in the bust** (pistols/magitech ride map+battle sprites).
+  - **Sclorbo** (Priest): faceless Chwinga rune-mask STAYS; animate via **rune-pulse + aura** (no eyes/mouth); fur ruff, cyan staff.
+  - **Marty** (Shaman): merry grey mushroom, red spotted cap, yellow eyes; **subtle elegant spore-hint** motes for the dark magic.
+  - **Meesmickle** (Shaman): vampire-tabaxi **regal diva**, red cape + diamond bling; **clean neutral field** (drop the cosmic bg). Must read distinct from Marty (the other Shaman).
+  - **Rootis** (Mage/Ice): pure jolly snowman, coal eyes + carrot nose; **armless, no aura** — cold magic on the battle anim.
+  - **Wolfram** (Knight/Armor): mineral-scaled face + leather straps, no weapon in frame; **serious/preoccupied** (thinking about his ores), younger than the weathering suggests.
+  - **Pepperjack & Brie** (recruits, FE class TBD post-MVP — but **art built now with the batch**): cannon-golems, **3/4 profile** as drawn, mirror palettes (Pepperjack grey+red+chili-stache / Brie pink+cyan+glam-eye).
+- **Lore fix:** clarified RBG built **Brie *for* Pepperjack** (Adam/Eve framing) — they're a **couple, not twins/siblings** (`lore/pepperjack-and-brie.md`).
+- **Docs rewritten natively** to the custom direction: `docs/decisions.md` (Art entry) + `docs/PRD.md §8`. Also fixed a stale PRD line that called Braulo a "Tortle" (he's a hermit crab).
+- Commits: `874bf0d` (briefs + lore), `672ec0b` (doc rewrite).
 
 ## Tried but didn't work (lessons for next time)
 
-- First `make` died on `/bin/python3: bad interpreter` (Linux shebangs) → then on a 3.9 `match`/`case` SyntaxError → then on missing `<cstdlib>`. Each was a distinct macOS-vs-Linux gap; all three are now permanently shimmed, so this won't recur.
-- **Could not auto-close GitHub issue #16** (toolchain) — the close was blocked by the permission classifier as an external write I didn't open this session. **#16 is DONE; Nicolas should close it manually** (or grant the gh permission).
+- (No dead ends this session — it was a design/decision walkthrough.) Note from prior session still holds: the 3 macOS build gaps (Linux shebangs, py3.9 match/case, missing `<cstdlib>`) are permanently shimmed in the root `Makefile` Darwin block — won't recur.
 
 ## Current state
 
-- **Build:** fully working + reproducible on macOS. `make` green, checksum matches vanilla. This is the Phase-0 "decomp builds clean / toolchain verified" milestone (M0) — effectively complete.
-- **Content pipeline:** NOT started. `tools/build-campaign.ts` / `build-events.ts` still unbuilt (issues #13–#15). No campaign data is injected into the ROM yet.
-- **Story:** all 9 MVP chapters (ch00–ch08) authored in YAML and walked through against the sources (prior sessions). Ch9–20 plot still blocked on the rest of the DM notes.
+- **Build:** green + reproducible on macOS. `make` → `fireemblem8u/fireemblem8.gba`, `make verify` → `OK` (byte-identical vanilla FE8). Boots vanilla in mGBA; no campaign data injected yet (that's the unbuilt `build-campaign.ts` pipeline, issues #13–#15).
+- **Art:** all 8 cast/recruit **design briefs done**, but **zero pixels drawn yet**. The gbagfx round-trip has NOT been proven.
+- **Story:** all 9 MVP chapters (ch00–ch08) authored in YAML + walked through. Ch9–20 plot still blocked on the rest of the DM notes.
 
 ## Blockers / open
 
-- **#16 needs manual close** (done, but classifier blocked the agent close).
-- **Recolor-vs-custom portrait decision is NOT settled.** Nicolas leans recolor-first but is "not 100% sure" — wants to SEE what we're working with first. **Do Phase A (pipeline round-trip) before locking this in.**
-- **Rootis & Sclorbo signature moments** still TBD (need Nicolas's recall) — carried over.
-- **pepperjack/brie `fe_stats.class` = null** (FE-legal class TBD post-MVP).
+- **gbagfx round-trip not yet proven** — need to dump a vanilla 96×80 portrait → reinsert → see it in mGBA before drawing final custom art (so we work against real palette/size constraints).
+- **Braulo's face reference is missing** — the current full-body ref hides his face under the carapace/basket-hat. Nicolas can supply more reference art; **ask him for a Braulo face/head ref before drawing his portrait.** (Standing offer: he can provide extra art for any character where a single body-shot leaves a gap.)
+- **#16 (toolchain) needs manual close** on GitHub — done, but the agent close was blocked by the permission classifier.
+- **pepperjack/brie `fe_stats.class = null`** — FE-legal vanilla class TBD post-MVP (art proceeds without it).
+- **Sclorbo signature moment** still TBD (Nicolas to recall). Rootis pairs with Sclorbo (ice support / Targos snow-night).
 - **Ch 9–20 plot** blocked on the rest of the DM notes.
 - **Lingering lean candidates** (low priority): `docs/pc-spell-lists.md` / `docs/magic-items.md` → consume into YAML then delete.
 
-## Next steps (priority order) — PIXEL ART
+## Next steps (priority order) — PIXEL ART (full custom)
 
-The plan is **recolor-first**, but Nicolas is undecided, so **step 1 is a visibility/proof step, not a commitment.** Golden rule throughout: **indexed-palette art only** (16 colors/slot, 8×8 tiles); generative tools (Nano Banana) are concept-ref only, never final assets. Tools: draw in **Aseprite** (indexed mode); validate/preview legality in **FEBuilder**; authoritative insertion is PNG → `gbagfx` → decomp.
+Golden rules: **indexed-palette only** (16 colors/slot, 8×8 tiles); draw faithfully from the concept ref; Nano Banana = concept-ref only, never final. Draw in **Aseprite** (indexed mode); validate legality in **FEBuilder**; authoritative insertion is PNG → `gbagfx` → decomp.
 
-1. **Phase A — prove the gbagfx round-trip (do this FIRST, ~throwaway).** Dump one vanilla FE8 portrait → tweak a few pixels → reinsert → see it in mGBA. This is what lets Nicolas "see what we're working with" and decide recolor-vs-custom with real constraints in front of him. Relevant scripts: `fireemblem8u/scripts/dump_portrait.py`, `gbagfx` (built at `fireemblem8u/tools/gbagfx`). Portraits are 96×80, one 16-color palette.
-2. **Phase B — Portraits** (highest payoff): 7 PCs + key NPCs, recolor a matching vanilla base, one issue per PC, ordered by story appearance (**Braulo first** — he's the end-to-end test unit, issue #15). Refines existing coarse art issues #19 (PC+NPC portraits) and #35 (final pass). Portrait reference art (DDB avatars) listed in `data/pc-sheets/portraits.json`; some downloaded to `data/portraits/`.
-3. **Phase C — Map sprites** (16×16 grid units): mostly *free* where a PC reuses a vanilla class; custom only where the look demands it.
-4. **Phase D — Battle animations** (hardest): default to **reusing vanilla class anims** (zero art); custom anims = `stretch`/post-MVP.
+1. **Prove the gbagfx round-trip (do FIRST, ~throwaway).** Dump one vanilla FE8 portrait → tweak pixels → reinsert → view in mGBA. Confirms the 96×80 / 16-color ceiling before we commit custom art. Scripts: `fireemblem8u/scripts/dump_portrait.py`, `gbagfx` (built at `fireemblem8u/tools/gbagfx`).
+2. **Braulo portrait first** (he's the end-to-end test unit, issue #15). **Get a face reference from Nicolas first.** Then draw the custom 96×80 indexed portrait per the brief in `pcs/braulo.yaml` (`art:` block).
+3. **Remaining 6 PC portraits**, ordered by story appearance, each per its YAML `art:` brief. Then Pepperjack & Brie (build-now).
+4. **Map sprites** (16×16) — custom per cast member.
+5. **Battle animations** (hardest) — custom; likely post-MVP `stretch`.
 
-**ACTION PENDING NICOLAS:** he was asked whether to (a) create the GitHub issues for this roadmap (Phase A + per-PC portrait issues under #19; C/D as `stretch`), or (b) write it into `docs/roadmap.md` first to edit the sequence. Awaiting his pick — do not create issues unprompted (external-write classifier will likely block anyway).
+**Process note:** per-character art briefs now live in the unit YAML `art:` blocks — read those before drawing each character. **Roadmap issues** for this (Phase A round-trip + per-PC portrait issues) were never created; Nicolas to decide whether to file them or keep the roadmap in `docs/` — do not create GitHub issues unprompted (external-write classifier will likely block).
 
 **Also flagged by Nicolas for "later":** an **architecture diagram** of the ROM hack (for his own learning). Not started; bring it up when he's ready.
 
 ## Key files
 
-- `Makefile` (root) — macOS build shims live in the `ifeq ($(shell uname),Darwin)` block; `make` / `make verify` / `make clean`.
-- `tools/setup-toolchain.sh` — one-time idempotent toolchain install for a fresh clone.
-- `fireemblem8u/fireemblem8.gba` — the built ROM (gitignored). View: `open -a /Applications/mGBA.app <path>`.
-- `fireemblem8u/scripts/dump_portrait.py`, `fireemblem8u/tools/gbagfx` — the portrait asset pipeline for Phase A.
-- `data/pc-sheets/portraits.json` — PC portrait reference-art URLs; `data/portraits/*.jpeg` — downloaded refs.
-- `docs/PRD.md` (§10 toolchain, §6 maps), `docs/decisions.md` — FEBuilder-vs-decomp rationale + settled decisions.
+- `campaigns/rime-of-the-frostmaiden/pcs/*.yaml` + `npcs/{pepperjack,brie}.yaml` — each has an `art:` block with the per-character custom design brief (the spec for drawing them).
+- `data/portraits/*.jpeg|jpg` — downloaded D&D Beyond concept refs; `data/pc-sheets/portraits.json` — source URLs.
+- `fireemblem8u/scripts/dump_portrait.py`, `fireemblem8u/tools/gbagfx` — the portrait asset pipeline (Phase A round-trip).
+- `Makefile` (root) — macOS build shims in the `ifeq ($(shell uname),Darwin)` block; `make` / `make verify` / `make clean`.
+- `fireemblem8u/fireemblem8.gba` — built ROM (gitignored). View: `open -a /Applications/mGBA.app <path>`.
+- `docs/decisions.md` (Art Direction entry) + `docs/PRD.md §8` — the full-custom art direction.
 
 ## Standing rules (how Nicolas wants this work done)
 
-- **Stock vanilla FE8 classes/weapons only**; **element = flavor, NEVER a mechanic** (incl. effectiveness — that's keyed to enemy CLASS).
+- **Art = full custom** for cast/recruits (portrait + map sprite + battle anim), drawn faithfully from concept refs; indexed-palette only; Nano Banana concept-ref only. Nicolas can supply more reference art on request.
+- **Stock vanilla FE8 classes/weapons only**; **element = flavor, NEVER a mechanic** (incl. effectiveness — keyed to enemy CLASS). Combat RULES are vanilla FE; the d20 is cosmetic only.
 - **Ground FE claims in `fireemblem8u/`**; **ground STORY in the two PDFs** (DM notes Ch1–7 only + the published book). Read them directly when planning story.
-- **Clean native doc rewrites** (no STALE/reverted banners). **Auto-push to main.** **Collaborative, chapter-by-chapter** story work. **Balance: defer to FE, lean generous.**
+- **Clean native doc rewrites** (no STALE/reverted banners). **Auto-push to main.** **Collaborative, one-item-at-a-time** story/art walkthroughs. **Balance: defer to FE, lean generous.**
 - **Doc source-of-truth:** per-chapter/unit facts live ONLY in YAML; `docs/CHAPTERS.md` + `CLASSES.md` are GENERATED (`ruby tools/gen-chapter-index.rb` + `gen-class-index.rb`, never hand-edit). **Lean repo**; backlog = **GitHub issues** (milestones M0–M4).
 - **`make` must be green at the end of every session. Never commit a broken build.**
