@@ -85,8 +85,13 @@ def convert(ref_path, crop_box, bg_thresh=45.0):
                 dq.append((ny, nx))
     fg = ~conn
 
-    sharp = crop.filter(ImageFilter.UnsharpMask(radius=2, percent=120, threshold=2))
-    img = sharp.resize((BUST_W, BUST_H), Image.LANCZOS)
+    # Downscale the FULL-RES crop with area-averaging (BOX to 2x target, then
+    # LANCZOS to target), THEN sharpen at the target resolution. Sharpening
+    # before the downscale (the old path) blurred small features like eyes into
+    # muddy grey halos; area-averaging + a target-res unsharp keeps them crisp.
+    hires = src.crop(crop_box)
+    img = hires.resize((BUST_W * 2, BUST_H * 2), Image.BOX).resize((BUST_W, BUST_H), Image.LANCZOS)
+    img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=170, threshold=1))
     m = np.asarray(Image.fromarray((fg * 255).astype('uint8')).resize((BUST_W, BUST_H), Image.LANCZOS)) > 120
 
     lab, n = _label(m)
