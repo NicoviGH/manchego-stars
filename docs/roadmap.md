@@ -38,7 +38,7 @@
 
 | Ch | Working title | Cadence | 🧩 Provisional beat (region from book; plot TBD) | Reward / placement |
 |---|---|---|---|---|
-| 9 | Revel's End | 🎬 prison break | Wake in the most secure prison in Faerûn; break out. Recovery-from-the-low-point opener of Act II. | **First Master Seal** looted here (the promotion seam pays off — see `decisions.md`). |
+| 9 | Revel's End | 🎬 prison break | Wake in the most secure prison in Faerûn; break out — each PC plays a part. **Meesmickle's signature beat** (recalled, real): a fake "toe bean" looses a bound giant orc to spark a covering riot (scripted event-summon; seeds his Summoner promotion — see `pcs/meesmickle.yaml`). | **First Master Seal** looted here (the promotion seam pays off — see `decisions.md`). |
 | 10 | Out of the Cold | 🟦 breather/regroup | Icewind Dale wilderness; regroup, resupply, recruit/reunite. | **Promotions go live.** Secret-shop-style resupply. |
 | 11 | The Long Climb | 🟨 terrain/escort | Approach to the duergar threat; mountain/ice terrain gimmick. | Stat boosters; better (Steel→Silver) weapons appear. |
 | 12 | Sunblight | 🟥 boss (Xardorok) | Assault the duergar fortress; chardalyn forge. | Boss drop + Knight/Guiding crest flavor finds. |

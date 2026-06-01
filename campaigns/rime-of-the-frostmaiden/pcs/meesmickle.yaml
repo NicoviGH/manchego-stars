@@ -74,13 +74,20 @@ inventory:
 # buffs/debuffs, no special movement, no procs).
 
 signature_moment:
-  chapter: tbd               # NICOLAS TO RECALL — not in the DM notes
+  chapter: ch09-revels-end   # post-MVP (Act II opener — roadmap.md Ch 9, the prison break)
   description: >
-    TBD — Nicolas to recall Meesmickle's standout campaign beat. The current DM
-    notes don't single one out (he's only named as one of the three who took an
-    inn room at Targos in Ch 2). Candidate hooks once recalled: a marquee
-    Eldritch Blast / warlock-pact moment in a big-battle chapter.
-  dialogue_trigger: null
+    The Revel's End prison break. As the party each does their part to escape,
+    Meesmickle reveals a fake "toe bean" concealing a bound giant orc and looses it
+    to spark a riot — the distraction that covers the breakout. Mechanically a
+    scripted event-summon (the orc spawns as a hostile NPC that turns the prison
+    against its guards). It also seeds his Summoner promotion: the first Master Seal
+    is looted at Revel's End (roadmap.md / decisions.md promotion seam), and the
+    Summon command (CA_SUMMON) the Summoner branch grants is the vanilla mechanic
+    this beat foreshadows — phantom-summoning becomes his signature going forward.
+  dialogue_trigger: meesmickle_toebean_orc
+  # Sourced from Nicolas's recall — past the DM notes (which end at the Eastway
+  # capture, with the party hauled off to Revel's End). Fits the Summoner branch
+  # (promotion.default = Summoner above).
 
 # ── Support Affinities ────────────────────────────────────────────────────────
 supports:
