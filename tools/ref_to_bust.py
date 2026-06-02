@@ -128,31 +128,28 @@ def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, reserve_extremes=True
         # rather than a muddy navy.
         pal_arr[int(pal_arr.sum(1).argmin())] = (20, 17, 24)
 
-        # Crisp, edge-preserving downscale. The plain area-average path (BOX->
-        # LANCZOS) blends crisp reference pixels into intermediate "mush" colors
-        # at every edge -- worst on thin 1px features (eyes, mouth) that smear to
-        # grey. Instead: quantize a 3x-oversampled crop to the palette, then
-        # collapse each 3x3 block to ONE index with an "ink" preference -- if a
-        # near-black line passes through the block (>=3/9 subpixels) it wins, so
-        # outlines and facial features stay solid 1px instead of blurring. Flat
-        # regions fall through to the block's majority color (no invented blends).
+        # Smooth base + ink overlay. The plain area-average downscale keeps skin/
+        # fur gradients clean (which is what lets eyes read against a textured
+        # face), but blurs thin 1px features (eyes, mouth, outlines) into muddy
+        # "mush". So use the smooth nearest-palette result as the base, and only
+        # OVERRIDE it where a genuine near-black line runs: quantize a 3x crop and
+        # if >=4/9 of a block is a near-black "ink" color, snap that pixel solid.
+        # Thin dark features stay crisp 1px; everything else stays smooth (no
+        # speckle in fur -- an earlier global crisp pass added that and cost the
+        # cats/Wolfram their eye definition).
         lum = pal_arr.sum(1)
-        ink = set(np.where(lum < 170)[0].tolist())
-        osf = 3
-        big = np.asarray(hires.resize((BUST_W * osf, BUST_H * osf), Image.LANCZOS)).astype(int)
+        out = ((arr[:, :, None, :] - pal_arr[None, None, :, :]) ** 2).sum(3).argmin(2)
+        ink = set(np.where(lum < 150)[0].tolist())
+        big = np.asarray(hires.resize((BUST_W * 3, BUST_H * 3), Image.LANCZOS)).astype(int)
         bidx = ((big[:, :, None, :] - pal_arr[None, None, :, :]) ** 2).sum(3).argmin(2)
-        out = np.zeros((BUST_H, BUST_W), int)
         for y in range(BUST_H):
             for x in range(BUST_W):
-                blk = bidx[osf * y:osf * y + osf, osf * x:osf * x + osf].ravel()
-                u, c = np.unique(blk, return_counts=True)
-                ip = [v for v in u if v in ink]
+                blk = bidx[3 * y:3 * y + 3, 3 * x:3 * x + 3].ravel()
+                ip = [v for v in np.unique(blk) if v in ink]
                 if ip:
                     best = min(ip, key=lambda v: lum[v])
-                    out[y, x] = best if (blk == best).sum() >= 3 else u[c.argmax()]
-                else:
-                    dk = u[lum[u].argmin()]
-                    out[y, x] = dk if (blk == dk).sum() >= (osf * osf) // 2 else u[c.argmax()]
+                    if (blk == best).sum() >= 4:
+                        out[y, x] = best
         out = np.where(m, out + 1, 0)
         pal = pal_arr.reshape(-1).astype(int).tolist()
     else:
