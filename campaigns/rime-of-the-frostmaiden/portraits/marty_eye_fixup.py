@@ -33,7 +33,7 @@ for y in range(34, 47):
     for x in range(37, 60):
         if idx[y, x] != LIGHT:
             idx[y, x] = LIGHT
-for y in range(45, 51):
+for y in range(43, 51):
     for x in range(41, 56):
         if idx[y, x] != LIGHT:
             idx[y, x] = LIGHT
@@ -49,10 +49,13 @@ def _eye(x0):                      # 3x4 oval, white catchlight spec inside uppe
 _eye(38)
 _eye(56)
 
-for x in range(44, 53):            # wide flattish smile: long flat bottom...
-    idx[49, x] = DARK
-idx[48, 43] = DARK                 # ...with the ends turned up
-idx[48, 53] = DARK
+# wide curved U smile matching the ref: corners high (just under the eyes),
+# arms curving down-in to a flat bottom at r47-48. Symmetric about face centre x48.
+for (x, y) in [(43, 43), (53, 43), (43, 44), (53, 44), (44, 45), (52, 45),
+               (45, 46), (51, 46),
+               (46, 47), (47, 47), (48, 47), (49, 47), (50, 47),
+               (47, 48), (48, 48), (49, 48)]:
+    idx[y, x] = DARK
 
 out = Image.new('P', im.size)
 out.putpalette(pal.flatten().tolist())
