@@ -39,9 +39,10 @@ for y in range(43, 51):
             idx[y, x] = LIGHT
 
 
-def _eye(x0):                      # 3x4 oval, white catchlight spec inside upper-centre
-    idx[36, x0 + 1] = DARK
-    idx[37, x0] = DARK; idx[37, x0 + 1] = WHITE; idx[37, x0 + 2] = DARK
+def _eye(x0):                      # 3x5 oval; white catchlight spec near the TOP, black below
+    idx[35, x0 + 1] = DARK                                                # top tip (caps the spec)
+    idx[36, x0] = DARK; idx[36, x0 + 1] = WHITE; idx[36, x0 + 2] = DARK   # white spec (upper)
+    idx[37, x0] = DARK; idx[37, x0 + 1] = DARK;  idx[37, x0 + 2] = DARK   # black below
     idx[38, x0] = DARK; idx[38, x0 + 1] = DARK;  idx[38, x0 + 2] = DARK
     idx[39, x0 + 1] = DARK
 
@@ -49,12 +50,10 @@ def _eye(x0):                      # 3x4 oval, white catchlight spec inside uppe
 _eye(38)
 _eye(56)
 
-# wide curved U smile matching the ref: corners high (just under the eyes),
-# arms curving down-in to a flat bottom at r47-48. Symmetric about face centre x48.
-for (x, y) in [(43, 43), (53, 43), (43, 44), (53, 44), (44, 45), (52, 45),
-               (45, 46), (51, 46),
-               (46, 47), (47, 47), (48, 47), (49, 47), (50, 47),
-               (47, 48), (48, 48), (49, 48)]:
+# wide, flat smile: small upturned corners, then a single long flat bottom (r47).
+for (x, y) in [(42, 45), (54, 45), (43, 46), (53, 46),
+               (44, 47), (45, 47), (46, 47), (47, 47), (48, 47), (49, 47),
+               (50, 47), (51, 47), (52, 47)]:
     idx[y, x] = DARK
 
 out = Image.new('P', im.size)
