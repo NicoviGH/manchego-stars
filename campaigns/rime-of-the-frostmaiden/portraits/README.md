@@ -19,3 +19,14 @@ Authored FE8 talking-portrait busts, one `<unit>.png` per cast/recruit.
 
 `braulo.png` is the first converted portrait (from `Broulo Face Clean.png`). Eyes/snarl
 (berserker-fury per the unit's `art:` brief) can be refined with a manual pixel pass.
+
+## Per-portrait hand passes
+
+Small features blur below the bust's downscale, so some units get a deterministic
+companion script (run after `ref_to_bust.py`, reproduce command in each docstring):
+
+- `marty_eye_fixup.py` — hybrid: smooth body + hand-drawn 3×5 eyes and a flat smile
+  (Marty's face is ~20px, below what any downscale renders cleanly).
+- `rootis_cleanup.py` — faithful Bust 1 + pixel touch-ups: clean continuous coal
+  silhouette outline, a faceted carrot nose (highlight ridge / dark facet / maroon
+  tip), and removal of the purple anti-alias halo ringing the coal mouth dots.
