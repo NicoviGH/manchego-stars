@@ -6,7 +6,8 @@
 ## THE BIG DECISIONS THIS SESSION (don't re-litigate)
 
 1. **Reserve palette slots for saturated HUES, not just luminance extremes (`reserve_extremes` path, default ON).** Last session's reserve-extremes only protects the brightest/darkest pixels. Area-based MEDIANCUT still starves a vivid *mid-tone* minority color (Sclorbo's red tassel stripes + tan robe folded to grey while six near-identical dark teals ate the palette). The pipeline now reserves up to **3** extra slots for dominant saturated clusters the area palette would drop: a *distinct-RGB-cluster* pass (catches a vivid shade sharing a hue with a duller dominant region, e.g. a dark sigil-cyan vs the pale mask) **plus** a *warm/red rescue* (red accents fragment across brightness so no single RGB bin clears the gate; reserve the mean of genuinely-red pixels). Gated on chroma + area + dedup → **cool/greyscale busts fire nothing and stay byte-identical** (verified: Marty/Wolfram/RBG unchanged; only Meesmickle's red cape changed → gained fold-shading, re-shipped).
-2. **`--downscale crisp` for refs that are ALREADY clean cel art (Marty).** The smooth area-average downscale (default) is right for *painterly/textured* refs (the cats, Wolfram) — but on clean line art it invents grey anti-alias halos around clean eyes/mouths/edges across the ~23× reduction. Crisp mode = **NEAREST point-sample, skip the ink overlay**. Then two refinements that make it faithful: (a) build the palette from the **source's own most-frequent flat colors** (true hues — Marty's terracotta scarf is `211,44,38`, not the MEDIANCUT centroid `166,72,62` rosy-pink), with a forced neutral-black slot; (b) **despeckle** lone stray pixels point-sampling grabs (a white speck in the mouth, an asymmetric eye). Default stays `smooth`; crisp is opt-in per clean ref.
+2. **`--downscale crisp` for refs that are ALREADY clean cel art (Marty).** The smooth area-average downscale (default) is right for *painterly/textured* refs (the cats, Wolfram) — but on clean line art it invents grey anti-alias halos around clean eyes/mouths/edges across the ~23× reduction. Crisp mode = **NEAREST point-sample, skip the ink overlay**, with the palette built from the **source's own most-frequent flat colors** (true hues — Marty's terracotta scarf is `211,44,38`, not the MEDIANCUT centroid `166,72,62` rosy-pink) + a forced neutral-black slot. Default stays `smooth`; crisp is opt-in per clean ref. **No despeckle** (an earlier despeckle pass filled in eye catchlights → solid rectangular eyes; it can't tell a wanted catchlight from an unwanted speck — removed).
+2b. **Sub-2px features get a documented per-portrait pixel touch-up, not more pipeline knobs.** Marty's eyes are ~2px each — below what *any* downscale renders consistently (one came out oval, one square). Fixed with `portraits/marty_eye_fixup.py`: clears the messy eye-band and stamps two identical rounded eyes (catchlight upper-left, per the ref) symmetric about the mouth. Re-apply after any Marty re-render. This is the accepted pattern for tiny features (cf. the earlier Marty staff pixel-pass).
 3. **Follow the ref's TRUE hues — the fix is always "track the ref better," never embellish.** Both fixes above make the palette represent colors genuinely in the source, not hand-added pop. (Same principle that vetoed eye-catchlight stamping last session.) When Marty looked pink/blurred, Nicolas's steer was "reference the Marty 3 image for true accurate color hues" — and the answer was a source-true frequency palette, not saturation boosting.
 4. **Braulo IS reconvertible now (supersedes the old "leave as-is").** The original crop was never recorded, so it was recovered via **silhouette IoU search** (0.95 match → crop `153,129,1888,1574`) so framing is unchanged but the orange/grey now read vivid (old Braulo was pre-reserve-extremes = muddy). Nicolas: "match the original cropping" — done via the IoU recovery.
 
@@ -23,7 +24,7 @@ Refs live in `…/References/PCs/`. All ship to `campaigns/rime-of-the-frostmaid
 | unit | ref file | --crop | mode |
 |---|---|---|---|
 | braulo | `Broulo Face Clean.png` | `153,129,1888,1574` | smooth |
-| marty | `Marty 3.png` | `0,35,2222,1887` | **crisp** |
+| marty | `Marty 3.png` | `0,35,2222,1887` | **crisp** + run `portraits/marty_eye_fixup.py` after |
 | meesmickle | `Meesmickle Clean.png` | `0,255,1824,1775` | smooth |
 | prof-rbg | `RBG Landscape.png` | `14,17,2258,1887` | smooth |
 | wolfram | `womfram bust 3.png` (typo real) | `280,70,1980,1487` | smooth |
@@ -33,7 +34,7 @@ Refs live in `…/References/PCs/`. All ship to `campaigns/rime-of-the-frostmaid
 
 - **Wave 1 portraits: 6 / 10** — braulo, prof-rbg, marty, wolfram, meesmickle, **sclorbo (this session)**. **NEXT = Rootis**, then Pinky, Pepperjack, Brie.
   - **Sclorbo** = faceless rune-mask Chwinga. Crop is a face-dominant mid-zoom (Nicolas picked framing "D"): mask dominant + sigil legible, vivid flame aura, fur ruff, red/cyan tassels, tan robe, staff tip; drops only the low pendant. The chroma fix is what made the red stripes / tan robe / darker sigil-cyan survive.
-  - **Marty** = crisp mode. Clean black eyes (matched ovals + catchlights), clean smile, true-red scarf. The grey-halo "mush" is gone.
+  - **Marty** = crisp mode + `marty_eye_fixup.py`. Matched rounded eyes (catchlight upper-left), clean smile, true-red scarf. The grey-halo "mush" is gone.
   - **Braulo** = re-rendered vivid at the IoU-recovered original framing.
   - **Meesmickle** = re-shipped; red cape gained fold-shading from the chroma fix.
   - **Wolfram, RBG** = byte-identical to last session (chroma fix didn't fire on them).
@@ -42,7 +43,8 @@ Refs live in `…/References/PCs/`. All ship to `campaigns/rime-of-the-frostmaid
 ## Tried but abandoned
 
 - **Wolfram line-definition bump** (`--ink-cov 3` / `--ink-lum 175`) → crevices crisped up but it **drowned the white in his eyes**; Nicolas didn't want that, so Wolfram stays as-shipped (smooth defaults). The `--ink-*` flags remain available if revisited *with* an eye-white guard (not built).
-- **Pure NEAREST crisp without the source-true palette / despeckle** → kept clean edges but quantized the scarf to rosy pink and left a white mouth speck + asymmetric eye. Superseded by the frequency-palette + despeckle refinement (same commit chain).
+- **Pure NEAREST crisp with MEDIANCUT palette** → kept clean edges but quantized the scarf to rosy pink. Fixed by the source-true frequency palette.
+- **Despeckle pass in crisp mode** → removed lone specks but also filled Marty's eye catchlights → solid rectangular eyes. Removed; tiny features use a per-portrait pixel touch-up instead (decision 2b).
 - (Prior sessions) global crisp downscale, 170% UnsharpMask, etc. — still abandoned.
 
 ## Blockers / open
