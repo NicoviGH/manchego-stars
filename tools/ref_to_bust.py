@@ -5,9 +5,10 @@
 Pipeline: crop to a head-and-shoulders bust -> segment the flat background
 (sample the border color, key pixels within an RGB distance of it, border-
 connected flood seeded from top/left/right since the subject fills the bottom)
--> clean up specks/holes -> sharpen + downscale to
-96x80 -> quantize to 15 colors (index 0 reserved transparent) -> erode the
-silhouette edge to transparent for a clean cut.
+-> clean up specks/holes -> area-average downscale to 96x80 (no sharpening by
+default, to match the flat hand-drawn look of vanilla FE8 portraits) -> quantize
+to 15 colors (index 0 reserved transparent) -> erode the silhouette edge to
+transparent for a clean cut.
 
 The result drops straight into the insert pipeline:
     tools/portrait_tool.py encode <bust.png> <sheet.png>   ->  decomp -> gbagfx
@@ -47,7 +48,7 @@ def _label(mask):
     return lab, n
 
 
-def convert(ref_path, crop_box, bg_thresh=45.0):
+def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0):
     src = Image.open(ref_path).convert('RGB')
     crop = src.crop(crop_box).resize((480, 400), Image.LANCZOS)
     rgb = np.asarray(crop).astype(np.float32)
@@ -91,7 +92,8 @@ def convert(ref_path, crop_box, bg_thresh=45.0):
     # muddy grey halos; area-averaging + a target-res unsharp keeps them crisp.
     hires = src.crop(crop_box)
     img = hires.resize((BUST_W * 2, BUST_H * 2), Image.BOX).resize((BUST_W, BUST_H), Image.LANCZOS)
-    img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=170, threshold=1))
+    if sharpen:
+        img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=sharpen, threshold=1))
     m = np.asarray(Image.fromarray((fg * 255).astype('uint8')).resize((BUST_W, BUST_H), Image.LANCZOS)) > 120
 
     lab, n = _label(m)
@@ -134,9 +136,12 @@ def main():
     ap.add_argument('--bg-thresh', type=float, default=45.0,
                     help='RGB distance from the sampled border color to treat as background (default 45)')
     ap.add_argument('--preview', help='also write a 3x nearest-neighbour preview here')
+    ap.add_argument('--sharpen', type=int, default=0,
+                    help='UnsharpMask percent at target res (default 0 = off, matches the flat hand-drawn '
+                         'look of vanilla FE8 portraits; higher adds crunch).')
     a = ap.parse_args()
     box = tuple(int(v) for v in a.crop.split(','))
-    res = convert(a.ref, box, a.bg_thresh)
+    res = convert(a.ref, box, a.bg_thresh, a.sharpen)
     res.save(a.out)
     print('%s -> %s (96x80 indexed, %d colors)' % (a.ref, a.out, len(set(res.getdata()))))
     if a.preview:
