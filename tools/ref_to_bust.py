@@ -49,7 +49,7 @@ def _label(mask):
 
 
 def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, reserve_extremes=True,
-            ink_lum=150, ink_cov=4):
+            ink_lum=150, ink_cov=4, downscale='smooth'):
     src = Image.open(ref_path).convert('RGB')
     crop = src.crop(crop_box).resize((480, 400), Image.LANCZOS)
     rgb = np.asarray(crop).astype(np.float32)
@@ -87,12 +87,19 @@ def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, reserve_extremes=True
                 dq.append((ny, nx))
     fg = ~conn
 
-    # Downscale the FULL-RES crop with area-averaging (BOX to 2x target, then
-    # LANCZOS to target), THEN sharpen at the target resolution. Sharpening
-    # before the downscale (the old path) blurred small features like eyes into
-    # muddy grey halos; area-averaging + a target-res unsharp keeps them crisp.
+    # Downscale the FULL-RES crop to target. Two modes:
+    #  - 'smooth' (default): area-average (BOX to 2x, then LANCZOS). Right for
+    #    painterly/textured refs (the cats, Wolfram) where averaging keeps fur and
+    #    skin gradients clean so eyes read; the ink overlay below re-crisps lines.
+    #  - 'crisp': NEAREST point-sample. Right for refs that are ALREADY clean cel
+    #    art (e.g. Marty): averaging a clean 23x-downscale edge invents grey halos
+    #    around the eyes/mouth/outlines, so just sample the source pixels and skip
+    #    the ink overlay entirely. Simpler, and matches the source's flat look.
     hires = src.crop(crop_box)
-    img = hires.resize((BUST_W * 2, BUST_H * 2), Image.BOX).resize((BUST_W, BUST_H), Image.LANCZOS)
+    if downscale == 'crisp':
+        img = hires.resize((BUST_W, BUST_H), Image.NEAREST)
+    else:
+        img = hires.resize((BUST_W * 2, BUST_H * 2), Image.BOX).resize((BUST_W, BUST_H), Image.LANCZOS)
     if sharpen:
         img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=sharpen, threshold=1))
     m = np.asarray(Image.fromarray((fg * 255).astype('uint8')).resize((BUST_W, BUST_H), Image.LANCZOS)) > 120
@@ -188,9 +195,11 @@ def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, reserve_extremes=True
         lum = pal_arr.sum(1)
         out = ((arr[:, :, None, :] - pal_arr[None, None, :, :]) ** 2).sum(3).argmin(2)
         ink = set(np.where(lum < ink_lum)[0].tolist())
+        # point-sampled ('crisp') base is already hard-edged; the ink overlay is a
+        # fix for the smooth downscale's blur, so skip it entirely in crisp mode.
         big = np.asarray(hires.resize((BUST_W * 3, BUST_H * 3), Image.LANCZOS)).astype(int)
         bidx = ((big[:, :, None, :] - pal_arr[None, None, :, :]) ** 2).sum(3).argmin(2)
-        for y in range(BUST_H):
+        for y in range(BUST_H if downscale != 'crisp' else 0):
             for x in range(BUST_W):
                 blk = bidx[3 * y:3 * y + 3, 3 * x:3 * x + 3].ravel()
                 ip = [v for v in np.unique(blk) if v in ink]
@@ -241,9 +250,13 @@ def main():
     ap.add_argument('--ink-cov', type=int, default=4,
                     help='how many of a 3x3 block (max 9) must be ink for the pixel to snap to the line '
                          '(default 4). Lower = more aggressive line definition (thinner lines survive).')
+    ap.add_argument('--downscale', choices=('smooth', 'crisp'), default='smooth',
+                    help="'smooth' (default): area-average + ink overlay, for painterly/textured refs. "
+                         "'crisp': NEAREST point-sample (no ink pass), for refs that are already clean cel "
+                         'art -- avoids the grey halos area-averaging invents around clean eyes/mouths/edges.')
     a = ap.parse_args()
     box = tuple(int(v) for v in a.crop.split(','))
-    res = convert(a.ref, box, a.bg_thresh, a.sharpen, a.reserve_extremes, a.ink_lum, a.ink_cov)
+    res = convert(a.ref, box, a.bg_thresh, a.sharpen, a.reserve_extremes, a.ink_lum, a.ink_cov, a.downscale)
     res.save(a.out)
     print('%s -> %s (96x80 indexed, %d colors)' % (a.ref, a.out, len(set(res.getdata()))))
     if a.preview:
