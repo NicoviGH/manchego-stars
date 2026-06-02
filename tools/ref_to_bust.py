@@ -48,7 +48,8 @@ def _label(mask):
     return lab, n
 
 
-def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, reserve_extremes=True):
+def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, reserve_extremes=True,
+            ink_lum=150, ink_cov=4):
     src = Image.open(ref_path).convert('RGB')
     crop = src.crop(crop_box).resize((480, 400), Image.LANCZOS)
     rgb = np.asarray(crop).astype(np.float32)
@@ -115,15 +116,62 @@ def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, reserve_extremes=True
     # (--reserve-extremes, on by default).
     arr = np.asarray(img).astype(int)
     if reserve_extremes:
-        q = img.quantize(colors=13, method=Image.MEDIANCUT, dither=Image.NONE)
-        base = np.array(q.getpalette()[:13 * 3]).reshape(-1, 3)
         fcols = arr[m]
         flum = fcols.sum(1)
         nb = max(1, int(len(flum) * 0.006))
         order = np.argsort(flum)
         bright = fcols[order[-nb:]].mean(0)
         dark = fcols[order[:nb]].mean(0)
-        pal_arr = np.vstack([base, bright, dark])
+
+        # Reserve slots for dominant SATURATED HUES too. reserve-extremes protects
+        # only the luminance extremes (brightest highlight / blackest line); it does
+        # nothing for saturated mid-tones, so a vivid minority color (a red tassel
+        # stripe, a tan robe) on a cool-dominated portrait still gets folded into
+        # grey by area-based MEDIANCUT -- which instead wastes slots splitting one
+        # dark region into near-identical greys. Find the dominant saturated clusters
+        # the area palette would drop and reserve a slot for each (max 2). Gated on
+        # chroma + area, and skipped when the hue is already represented, so cool/
+        # greyscale portraits with no dropped hue fire nothing -> identical palette.
+        chroma = fcols.max(1) - fcols.min(1)
+        sat = fcols[chroma >= 55]
+        provisional = np.array(img.quantize(colors=13, method=Image.MEDIANCUT,
+                                            dither=Image.NONE).getpalette()[:39]).reshape(-1, 3)
+        anchors = np.vstack([provisional, bright, dark])
+        chroma_cols = []
+
+        def _unrepresented(col):
+            ref_set = np.vstack([anchors] + chroma_cols) if chroma_cols else anchors
+            return np.sqrt(((ref_set - col) ** 2).sum(1)).min() > 55
+
+        if len(sat) >= 0.012 * len(fcols):
+            # (a) distinct saturated RGB clusters, each at its own brightness. This
+            #     catches a vivid shade even when it shares a hue with a duller
+            #     dominant region (e.g. a dark sigil-cyan against the pale mask).
+            bins = sat // 40
+            keys, counts = np.unique(bins, axis=0, return_counts=True)
+            for ki in np.argsort(counts)[::-1]:
+                if counts[ki] < 0.012 * len(fcols):
+                    break
+                col = sat[(bins == keys[ki]).all(1)].mean(0)
+                if _unrepresented(col):
+                    chroma_cols.append(col)
+                if len(chroma_cols) >= 2:
+                    break
+            # (b) warm/red rescue. Thin red/orange accents (a tassel stripe) span a
+            #     wide brightness range, so they fragment across RGB bins and no
+            #     single bin clears the area gate -- yet as a hue they are a clear
+            #     minority color the cool palette would lose entirely. Reserve the
+            #     mean of the genuinely red pixels (R well above both G and B, so
+            #     tan/skin warm tones don't dilute it) if it isn't represented.
+            red = sat[(sat[:, 0] > sat[:, 1] + 40) & (sat[:, 0] > sat[:, 2] + 40)]
+            if len(red) >= 0.010 * len(fcols) and len(chroma_cols) < 3 and _unrepresented(red.mean(0)):
+                chroma_cols.append(red.mean(0))
+
+        nbase = 13 - len(chroma_cols)
+        q = img.quantize(colors=nbase, method=Image.MEDIANCUT, dither=Image.NONE)
+        base = np.array(q.getpalette()[:nbase * 3]).reshape(-1, 3)
+        stack = [base] + ([np.array(chroma_cols)] if chroma_cols else []) + [bright[None], dark[None]]
+        pal_arr = np.vstack(stack)
         # read the deepest dark as neutral black, so eyes/outlines land on black
         # rather than a muddy navy.
         pal_arr[int(pal_arr.sum(1).argmin())] = (20, 17, 24)
@@ -139,7 +187,7 @@ def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, reserve_extremes=True
         # cats/Wolfram their eye definition).
         lum = pal_arr.sum(1)
         out = ((arr[:, :, None, :] - pal_arr[None, None, :, :]) ** 2).sum(3).argmin(2)
-        ink = set(np.where(lum < 150)[0].tolist())
+        ink = set(np.where(lum < ink_lum)[0].tolist())
         big = np.asarray(hires.resize((BUST_W * 3, BUST_H * 3), Image.LANCZOS)).astype(int)
         bidx = ((big[:, :, None, :] - pal_arr[None, None, :, :]) ** 2).sum(3).argmin(2)
         for y in range(BUST_H):
@@ -148,7 +196,7 @@ def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, reserve_extremes=True
                 ip = [v for v in np.unique(blk) if v in ink]
                 if ip:
                     best = min(ip, key=lambda v: lum[v])
-                    if (blk == best).sum() >= 4:
+                    if (blk == best).sum() >= ink_cov:
                         out[y, x] = best
         out = np.where(m, out + 1, 0)
         pal = pal_arr.reshape(-1).astype(int).tolist()
@@ -187,9 +235,15 @@ def main():
     ap.add_argument('--no-reserve-extremes', dest='reserve_extremes', action='store_false',
                     help='disable reserving palette slots for the brightest/darkest pixels (default: reserve, '
                          'so small white highlights and black eyes/mouths survive quantization).')
+    ap.add_argument('--ink-lum', type=int, default=150,
+                    help='luminance (R+G+B) below which a color counts as an "ink" line for the crisp-line '
+                         'overlay (default 150). Raise to let darker-but-not-black lines snap crisp.')
+    ap.add_argument('--ink-cov', type=int, default=4,
+                    help='how many of a 3x3 block (max 9) must be ink for the pixel to snap to the line '
+                         '(default 4). Lower = more aggressive line definition (thinner lines survive).')
     a = ap.parse_args()
     box = tuple(int(v) for v in a.crop.split(','))
-    res = convert(a.ref, box, a.bg_thresh, a.sharpen, a.reserve_extremes)
+    res = convert(a.ref, box, a.bg_thresh, a.sharpen, a.reserve_extremes, a.ink_lum, a.ink_cov)
     res.save(a.out)
     print('%s -> %s (96x80 indexed, %d colors)' % (a.ref, a.out, len(set(res.getdata()))))
     if a.preview:
