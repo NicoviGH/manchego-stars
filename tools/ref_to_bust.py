@@ -111,9 +111,8 @@ def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, reserve_extremes=True
     # details (a few near-white gem facets, a few pure-black eye/mouth pixels)
     # on a color-dominated portrait get starved and folded into the nearest big
     # grey region -> muddy, washed-out highlights and darks. Reserve two slots
-    # for the foreground's brightest and darkest pixels so the extremes survive,
-    # quantize the rest to 13, then assign every fg pixel to its nearest palette
-    # color. (--reserve-extremes, on by default.)
+    # for the foreground's brightest and darkest pixels so the extremes survive
+    # (--reserve-extremes, on by default).
     arr = np.asarray(img).astype(int)
     if reserve_extremes:
         q = img.quantize(colors=13, method=Image.MEDIANCUT, dither=Image.NONE)
@@ -125,8 +124,36 @@ def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, reserve_extremes=True
         bright = fcols[order[-nb:]].mean(0)
         dark = fcols[order[:nb]].mean(0)
         pal_arr = np.vstack([base, bright, dark])
-        d = ((arr[:, :, None, :] - pal_arr[None, None, :, :]) ** 2).sum(3)
-        out = np.where(m, d.argmin(2) + 1, 0)
+        # read the deepest dark as neutral black, so eyes/outlines land on black
+        # rather than a muddy navy.
+        pal_arr[int(pal_arr.sum(1).argmin())] = (20, 17, 24)
+
+        # Crisp, edge-preserving downscale. The plain area-average path (BOX->
+        # LANCZOS) blends crisp reference pixels into intermediate "mush" colors
+        # at every edge -- worst on thin 1px features (eyes, mouth) that smear to
+        # grey. Instead: quantize a 3x-oversampled crop to the palette, then
+        # collapse each 3x3 block to ONE index with an "ink" preference -- if a
+        # near-black line passes through the block (>=3/9 subpixels) it wins, so
+        # outlines and facial features stay solid 1px instead of blurring. Flat
+        # regions fall through to the block's majority color (no invented blends).
+        lum = pal_arr.sum(1)
+        ink = set(np.where(lum < 170)[0].tolist())
+        osf = 3
+        big = np.asarray(hires.resize((BUST_W * osf, BUST_H * osf), Image.LANCZOS)).astype(int)
+        bidx = ((big[:, :, None, :] - pal_arr[None, None, :, :]) ** 2).sum(3).argmin(2)
+        out = np.zeros((BUST_H, BUST_W), int)
+        for y in range(BUST_H):
+            for x in range(BUST_W):
+                blk = bidx[osf * y:osf * y + osf, osf * x:osf * x + osf].ravel()
+                u, c = np.unique(blk, return_counts=True)
+                ip = [v for v in u if v in ink]
+                if ip:
+                    best = min(ip, key=lambda v: lum[v])
+                    out[y, x] = best if (blk == best).sum() >= 3 else u[c.argmax()]
+                else:
+                    dk = u[lum[u].argmin()]
+                    out[y, x] = dk if (blk == dk).sum() >= (osf * osf) // 2 else u[c.argmax()]
+        out = np.where(m, out + 1, 0)
         pal = pal_arr.reshape(-1).astype(int).tolist()
     else:
         q = img.quantize(colors=15, method=Image.MEDIANCUT, dither=Image.NONE)
