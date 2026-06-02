@@ -28,6 +28,28 @@ from collections import deque
 BUST_W, BUST_H = 96, 80
 
 
+def _despeckle(out, m):
+    """Replace any foreground pixel whose index differs from ALL its orthogonal
+    foreground neighbors with the most common neighbor. Removes lone stray pixels
+    point-sampling can grab (a white speck inside the mouth, a single off-hue
+    edge pixel) without touching connected 1px features (eyes, mouth, outlines)."""
+    H, W = out.shape
+    res = out.copy()
+    for y in range(H):
+        for x in range(W):
+            if not m[y, x]:
+                continue
+            c = out[y, x]
+            neigh = []
+            for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                ny, nx = y + dy, x + dx
+                if 0 <= ny < H and 0 <= nx < W and m[ny, nx]:
+                    neigh.append(int(out[ny, nx]))
+            if neigh and all(n != c for n in neigh):
+                res[y, x] = max(set(neigh), key=neigh.count)
+    return res
+
+
 def _label(mask):
     H, W = mask.shape
     lab = np.zeros((H, W), int)
@@ -122,7 +144,26 @@ def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, reserve_extremes=True
     # for the foreground's brightest and darkest pixels so the extremes survive
     # (--reserve-extremes, on by default).
     arr = np.asarray(img).astype(int)
-    if reserve_extremes:
+    if downscale == 'crisp':
+        # Clean cel art: the point-sampled image already holds the source's real,
+        # flat pixels -- so build the palette from its OWN dominant colors (true
+        # hues), not MEDIANCUT centroids, which drift the hue (a terracotta scarf
+        # quantizes to a rosy pink). Take the most frequent exact colors, force a
+        # neutral-black slot for clean outlines/eyes, map every pixel to the
+        # nearest, then despeckle the lone stray pixels point-sampling leaves.
+        fcols = arr[m]
+        uniq, cnt = np.unique(fcols, axis=0, return_counts=True)
+        pal_arr = uniq[np.argsort(cnt)[::-1][:14]].astype(int)
+        di = int(pal_arr.sum(1).argmin())
+        if pal_arr[di].sum() > 140:                 # no genuine black present
+            pal_arr = np.vstack([pal_arr, [20, 17, 24]])
+        else:
+            pal_arr[di] = (20, 17, 24)
+        out = ((arr[:, :, None, :] - pal_arr[None, None, :, :]) ** 2).sum(3).argmin(2)
+        out = _despeckle(out, m)
+        out = np.where(m, out + 1, 0)
+        pal = pal_arr.reshape(-1).astype(int).tolist()
+    elif reserve_extremes:
         fcols = arr[m]
         flum = fcols.sum(1)
         nb = max(1, int(len(flum) * 0.006))
