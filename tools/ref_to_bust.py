@@ -48,7 +48,7 @@ def _label(mask):
     return lab, n
 
 
-def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0):
+def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, reserve_extremes=True):
     src = Image.open(ref_path).convert('RGB')
     crop = src.crop(crop_box).resize((480, 400), Image.LANCZOS)
     rgb = np.asarray(crop).astype(np.float32)
@@ -107,10 +107,31 @@ def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0):
         if comp.sum() < 30 and not edge:
             m[comp] = True
 
-    q = img.quantize(colors=15, method=Image.MEDIANCUT, dither=Image.NONE)
-    qi = np.asarray(q).astype(int)
-    pal = q.getpalette()[:15 * 3]
-    out = np.where(m, qi + 1, 0)
+    # MEDIANCUT picks palette colors by pixel *area*, so tiny high-contrast
+    # details (a few near-white gem facets, a few pure-black eye/mouth pixels)
+    # on a color-dominated portrait get starved and folded into the nearest big
+    # grey region -> muddy, washed-out highlights and darks. Reserve two slots
+    # for the foreground's brightest and darkest pixels so the extremes survive,
+    # quantize the rest to 13, then assign every fg pixel to its nearest palette
+    # color. (--reserve-extremes, on by default.)
+    arr = np.asarray(img).astype(int)
+    if reserve_extremes:
+        q = img.quantize(colors=13, method=Image.MEDIANCUT, dither=Image.NONE)
+        base = np.array(q.getpalette()[:13 * 3]).reshape(-1, 3)
+        fcols = arr[m]
+        flum = fcols.sum(1)
+        nb = max(1, int(len(flum) * 0.006))
+        order = np.argsort(flum)
+        bright = fcols[order[-nb:]].mean(0)
+        dark = fcols[order[:nb]].mean(0)
+        pal_arr = np.vstack([base, bright, dark])
+        d = ((arr[:, :, None, :] - pal_arr[None, None, :, :]) ** 2).sum(3)
+        out = np.where(m, d.argmin(2) + 1, 0)
+        pal = pal_arr.reshape(-1).astype(int).tolist()
+    else:
+        q = img.quantize(colors=15, method=Image.MEDIANCUT, dither=Image.NONE)
+        out = np.where(m, np.asarray(q).astype(int) + 1, 0)
+        pal = q.getpalette()[:15 * 3]
     # erode silhouette edge -> transparent for a clean cut
     eroded = out.copy()
     for y in range(BUST_H):
@@ -139,9 +160,12 @@ def main():
     ap.add_argument('--sharpen', type=int, default=0,
                     help='UnsharpMask percent at target res (default 0 = off, matches the flat hand-drawn '
                          'look of vanilla FE8 portraits; higher adds crunch).')
+    ap.add_argument('--no-reserve-extremes', dest='reserve_extremes', action='store_false',
+                    help='disable reserving palette slots for the brightest/darkest pixels (default: reserve, '
+                         'so small white highlights and black eyes/mouths survive quantization).')
     a = ap.parse_args()
     box = tuple(int(v) for v in a.crop.split(','))
-    res = convert(a.ref, box, a.bg_thresh, a.sharpen)
+    res = convert(a.ref, box, a.bg_thresh, a.sharpen, a.reserve_extremes)
     res.save(a.out)
     print('%s -> %s (96x80 indexed, %d colors)' % (a.ref, a.out, len(set(res.getdata()))))
     if a.preview:
