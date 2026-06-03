@@ -17,7 +17,7 @@ art:
     crop: [216, 100, 1704, 1340]   # ref pixels, ~1.2 aspect — shifted +90 right (subject left) to centre the head
     downscale: smooth
     zoom: 0.94                     # headroom so the head clears FE8's dead top corners (0px clipped)
-    hand_pass: portraits/rootis_cleanup.py
+    hand_pass: null                # pngquant renders the carrot/coal/outline clean; old hand pass obsolete
   approach: custom
   fidelity: faithful
   must_keep:                  # tells that make the bust read as "Rootis"
