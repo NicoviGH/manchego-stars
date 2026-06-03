@@ -14,6 +14,7 @@ portrait_source: "References/PCs/Pixel Pepperjack.png"   # own single-bust ref (
 # twins/siblings. Mirror designs in opposing palettes: Pepperjack = grey+red, Brie = pink+cyan.
 art:
   render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
+    flip_h: true               # mirror to FE8-canonical screen-left facing
     ref: "References/PCs/Pixel Pepperjack.png"
     crop: [20, 60, 2130, 1818]     # ref pixels, ~1.2 aspect — whole-cannon framing
     zoom: 0.72                     # headroom so the fuse + barrel bore mostly clear FE8's dead corners (30 px residual)

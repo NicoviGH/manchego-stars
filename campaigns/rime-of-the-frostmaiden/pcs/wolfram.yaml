@@ -14,7 +14,8 @@ portrait_source: data/portraits/wolfram.jpeg
 # ALL parts custom indexed-palette art. Follow the concept ref faithfully.
 art:
   render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
-    ref: "References/PCs/WolframFLAT.png"   # flat, near-frontal ref (downscales crisper; no flip needed)
+    flip_h: true               # mirror to FE8-canonical screen-left facing
+    ref: "References/PCs/WolframFLAT.png"   # flat ref (downscales crisper)
     crop: [360, 80, 1960, 1413]    # ref pixels, ~1.2 aspect — tight head+shoulders for max face detail
     zoom: 0.83                     # pushed right up to the dead zone (0px clipped); bigger face, lowered
     hand_pass: null

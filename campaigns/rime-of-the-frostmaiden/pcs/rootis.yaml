@@ -13,6 +13,7 @@ portrait_source: data/portraits/rootis.jpeg   # note: source file was named "Roo
 # ALL parts custom indexed-palette art. Follow the concept ref faithfully.
 art:
   render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
+    flip_h: true               # mirror to FE8-canonical screen-left facing
     ref: "References/PCs/Rootis Bust 1.png"
     crop: [216, 100, 1704, 1340]   # ref pixels, ~1.2 aspect — shifted +90 right (subject left) to centre the head
     zoom: 0.94                     # headroom so the head clears FE8's dead top corners (0px clipped)

@@ -13,7 +13,8 @@ portrait_source: data/portraits/braulo.jpeg
 # concept ref faithfully. 96×80 / 16-color portrait + custom map sprite + battle anim.
 art:
   render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
-    ref: "References/PCs/BrauloFLAT.png"   # flat, front-facing ref (downscales crisper; no flip needed)
+    flip_h: true               # mirror to FE8-canonical screen-left facing
+    ref: "References/PCs/BrauloFLAT.png"   # flat ref (downscales crisper)
     crop: [20, 120, 2028, 1793]    # ref pixels, ~1.2 aspect — whole subject
     zoom: 0.80                     # headroom so conch shell + basket-hat tops clear FE8's dead corners (0px clipped)
     hand_pass: null
