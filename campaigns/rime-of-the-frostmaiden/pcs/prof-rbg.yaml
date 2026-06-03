@@ -12,9 +12,9 @@ portrait_source: data/portraits/prof-rbg.jpg
 # ALL parts custom indexed-palette art. Follow the concept ref faithfully.
 art:
   render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
-    flip_h: true               # interim: bust faces right. Re-render from the new RBG3/4_Flat 3/4 ref (faces left) to retire this.
-    ref: "References/PCs/RBG Landscape.png"
-    crop: [14, 17, 2258, 1887]     # ref pixels, ~1.2 aspect
+    ref: "References/PCs/RBG3:4_Flat.png"   # flat 3/4 front-facing ref (downscales crisper; retires the interim flip)
+    crop: [60, 40, 2240, 1856]     # ref pixels, ~1.2 aspect — whole top hat + coat
+    zoom: 0.88                     # headroom so the top hat clears FE8's dead corners (0px clipped)
     hand_pass: null
   approach: custom
   fidelity: faithful

@@ -14,10 +14,9 @@ portrait_source: data/portraits/wolfram.jpeg
 # ALL parts custom indexed-palette art. Follow the concept ref faithfully.
 art:
   render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
-    flip_h: true               # bust faces right; flip to FE8's canonical screen-left facing
-    ref: "References/PCs/Wolfram Side.png"     # 3/4 side pose (vanilla-FE convention) — big expressive face
-    crop: [60, 80, 2240, 1840]     # ref pixels, ~1.2 aspect — 3/4 head + both crystals + full armor torso
-    zoom: 0.90                     # headroom so the left shoulder crystal clears the dead corner (8px residual)
+    ref: "References/PCs/WolframFLAT.png"   # flat, near-frontal ref (downscales crisper; no flip needed)
+    crop: [360, 80, 1960, 1413]    # ref pixels, ~1.2 aspect — tight head+shoulders for max face detail
+    zoom: 0.83                     # pushed right up to the dead zone (0px clipped); bigger face, lowered
     hand_pass: null
   approach: custom
   fidelity: faithful
