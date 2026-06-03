@@ -1,7 +1,14 @@
-# Handoff: Pepperjack + Brie shipped → Wave 1 portraits = 10/10 (cast busts COMPLETE). NEXT = chibi/mouth frames + build wiring, then Wave 2 (map sprites).
+# Handoff: Pepperjack + Brie shipped → Wave 1 busts = 10/10. NEXT = unblock toolchain (#16) + prove Braulo end-to-end into a real ROM. ⚠️ Busts overflow FE8's displayable portrait envelope (see KNOWN CONSTRAINT) — fix folded into the build-wiring step.
 
 **Date:** 2026-06-03
-**Session focus:** Converted the final two cast refs to 96×80 busts and shipped them, closing Wave 1. Nicolas supplied the long-blocked **separate single-bust refs** (`References/PCs/Pixel Pepperjack.png` + `Pixel Brie.png`) — clean pixel-art of the two cannon-golems. Both converted, hand-passed, verified byte-identical, YAML/README updated, committed + pushed (`d5d4bff`).
+**Session focus:** Converted the final two cast refs to 96×80 busts and shipped them, closing the Wave 1 *bust art*. Nicolas supplied the long-blocked **separate single-bust refs** (`References/PCs/Pixel Pepperjack.png` + `Pixel Brie.png`) — clean pixel-art of the two cannon-golems. Both converted, hand-passed, verified byte-identical, YAML/README updated, committed + pushed (`d5d4bff`). Then probed the insert pipeline and **found a hard display constraint** affecting Wave 1 (below).
+
+## ⚠️ KNOWN CONSTRAINT discovered this session (read before any portrait/build work)
+
+**FE8's talking-portrait OAM does NOT display the full 96×80 rectangle.** `gSprite_Face96x96` is assembled from 6 objects (see `OBJECTS` in `tools/portrait_tool.py`, mirrored from `fireemblem8u/src/face.c`) that cover a face-shaped envelope; the **top-left and top-right 16px-wide strips above y≈48 are DEAD** — never drawn. Verified: 5 varied vanilla portraits (incl. ones with hair/headgear) all have **exactly 0** content in those zones and round-trip byte-identical through `portrait_tool encode→decode`. **Our busts violate it** — content there is silently clipped in-game. Dead-zone non-transparent px per shipped bust: pinky **873** (the "both ears in frame" ears!), pepperjack **733** (fuse+barrel), brie **719**, braulo 379 (claw+hat), wolfram 312, marty 292, rootis 116, meesmickle 88, prof-rbg 9 ✅, sclorbo 2 ✅.
+
+- **DECISION (Nicolas): DEFER the fix to the build-wiring step** — don't re-frame now; handle it when Braulo is proven end-to-end and the busts can be judged in a real ROM.
+- **Planned fix:** add a **safe-region mask to `ref_to_bust.py`** (blank the two dead corners so the *preview = what ships*), regenerate all 10, then re-frame the heavy offenders so must-keep features sit inside the envelope. NOTE this re-opens the prior "Pinky — both ears fully in frame" decision (the ears are largely in the dead zone). Do NOT extend the face OAM to cover the corners — that edits the shared, campaign-agnostic face sprite; respect the vanilla envelope instead.
 
 ## WHAT SHIPPED THIS SESSION
 
@@ -59,18 +66,22 @@ Canonical home = each unit's YAML `art.render:` block (ref / crop / downscale / 
 
 ## Blockers / open
 
-- **No more PC/cast ref blockers** — the Pepperjack/Brie combined-ref blocker is CLOSED (separate refs delivered + shipped).
-- **32×32 `_chibi` mini-face + mouth frames** not produced for ANY of the 10 units yet (only the 96×80 busts). Frame spec = `fireemblem8u/include/types.h` `struct FaceData`. Study vanilla via `tools/portrait_tool.py decode` before authoring. Part of build-campaign wiring (issues #13–15).
-- **#16 (toolchain)** still needs a manual GitHub close (agent close blocked by permission classifier).
+- **🔴 CRITICAL PATH — toolchain not installed locally (#16).** Base ROM + `agbcc` aren't set up, so NOTHING can build to a ROM yet. This gates every "see it in-game" step below. (#16 also needs a manual GitHub close — agent close blocked by permission classifier.) Use `tools/setup-toolchain.sh`.
+- **Portrait display envelope** — see ⚠️ KNOWN CONSTRAINT above. Fix deferred into the build-wiring step.
+- **No more PC/cast ref blockers** — the Pepperjack/Brie combined-ref blocker is CLOSED.
+- **`build-campaign.ts` does NOT exist yet** (`tools/` has only ref_to_bust / portrait_tool / autoframe / gen-*-index / setup-toolchain). Issue #13 creates it; #14 = build-events.ts; #15 = Braulo end-to-end.
+- **`tools/portrait_tool.py` only does the 96×80 bust↔tileset round-trip** (encode/decode). The **chibi (32×32) + mouth (32×96)** generators are TODO. Per-portrait vanilla asset set = `_tileset.png` (256×32) + `_mouth.png` (32×96) + `_chibi.png` (32×32) + `_palette.agbpal`. Study a vanilla set via `decode` before authoring.
+- **Recruit-NPC portraits = DECIDE LATER** (Nicolas's call). Lupin + the #17 stubs (Baxby/Trex/Sahnar/Basil) have no `art:` block; revisit when their recruitment chapters firm up. Enemies/bosses stay **vanilla** (standing rule) — no custom enemy portraits.
 - **Pepperjack/Brie `fe_stats.class = null`** (FE-legal class TBD post-MVP) and **Rootis & Sclorbo recruitment chapters / Sclorbo signature_moment** = TBD (Nicolas to recall).
-- **Enemy portraits: NOT a Wave-1 gap.** Standing rule = enemies stay vanilla FE8; only the 10 named cast get custom art. A handful of *named* story bosses could optionally get a custom bust later, but that's a deliberate post-MVP decision (see the next-waves discussion), not a missing deliverable.
 
-## Next steps (priority order)
+## Next steps (priority order) — agreed direction: toolchain + Braulo end-to-end first
 
-1. **Chibi + mouth-frame generation** for all 10 busts — extend `tools/portrait_tool.py` (it already does the 96×80 bust↔FE8 sheet round-trip; add the 32×32 chibi mini-face + the mouth/blink frames per `struct FaceData`). Study a vanilla portrait with `portrait_tool.py decode` first. This is the gate to seeing any portrait in a built ROM.
-2. **Build-campaign wiring (issues #13–15)** — get a bust + chibi + mouth frames onto a unit through `tools/build-campaign.ts` → `fireemblem8u/graphics/portrait/` → `gbagfx` → ROM. Prove it end-to-end on ONE unit (braulo) before batching the other 9.
-3. **Wave 2 — map sprites** (full custom, same cast of 10): the standing/walking overworld sprites. New tooling likely needed (map-sprite sheet format differs from portraits).
-4. **Wave 3 — battle animations** (full custom): biggest effort; behind Waves 1–2.
+1. **Unblock the toolchain (#16)** — install base ROM + agbcc locally (`tools/setup-toolchain.sh`); confirm `fireemblem8u` builds clean via its quickstart. **Everything else is blocked on this.**
+2. **Extend `tools/portrait_tool.py`** — add chibi (32×32) + mouth (32×96) generation alongside the existing bust encode. Decode a vanilla portrait first to nail the mouth-frame breakdown + `_palette.agbpal` format.
+3. **`build-campaign.ts` (#13) + Braulo end-to-end (#15)** — wire one unit's tileset+mouth+chibi+palette → `fireemblem8u/graphics/portrait/` → `gbagfx` → ROM; verify Braulo's portrait in mGBA. **This milestone de-risks the whole pipeline.** Fold in the safe-region mask fix here (regenerate + re-frame offenders, judged in-ROM).
+4. **Batch the other 9** (chibi+mouth+inject) once the chain is proven.
+5. **Wave 2 — map sprites** (full custom, same 10): new asset format + tooling; needs map-sprite refs from Nicolas. Same prove-one-then-batch model.
+6. **Wave 3 — battle animations** (full custom): biggest effort — worth a scope conversation (full-custom vs recolored vanilla skeletons) before starting. Behind Waves 1–2.
 
 ## Key files
 
