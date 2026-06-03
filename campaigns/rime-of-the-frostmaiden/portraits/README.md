@@ -30,3 +30,8 @@ companion script (run after `ref_to_bust.py`, reproduce command in each docstrin
 - `rootis_cleanup.py` — faithful Bust 1 + pixel touch-ups: clean continuous coal
   silhouette outline, a faceted carrot nose (highlight ridge / dark facet / maroon
   tip), and removal of the purple anti-alias halo ringing the coal mouth dots.
+- `pinky_cleanup.py` — restores both blue eyes (the ears + ruby nose hog the
+  chroma-reservation slots, desaturating the irises; it frees two grey slots for true
+  blues, repaints the irises, then keeps only the largest connected blob so eyelid/brow
+  flecks drop), lightens the shared ear/hand pinks while repurposing the freed iris-
+  shadow slot as a bright ruby red so the gem nose pops, and despeckles the eye halo.
