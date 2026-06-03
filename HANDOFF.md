@@ -1,92 +1,90 @@
-# Handoff: Sclorbo shipped (Wave 1 = 6/10). Pipeline gained chroma-reservation + crisp mode. Marty hand-finished (hybrid). NEXT = Rootis (chase ref).
+# Handoff: Rootis shipped (Wave 1 = 7/10). Pixel-touch-up template generalized (outline + faceted nose + halo cleanup). NEXT = chase refs for Pinky / Pepperjack / Brie.
 
 **Date:** 2026-06-02
-**Session focus:** (1) Converted Sclorbo (the faceless rune-mask Chwinga), which exposed two color-fidelity gaps in `ref_to_bust.py` (both fixed) + added a crisp clean-cel mode. (2) Re-rendered Braulo (vivid, IoU-recovered framing) and Meesmickle (chroma fold-shading). (3) Long polish pass on **Marty**: settled on a HYBRID (smooth body + scripted hand-drawn face) and iterated the eyes/mouth pixel-by-pixel with Nicolas to a final approved face. (4) Reviewed FE8 portrait resources Nicolas shared → confirmed the face-dominant convention + the `struct FaceData` frame spec for the upcoming chibi/mouth/blink work.
+**Session focus:** Converted **Rootis** (the two-segment snow-golem PC) to a 96×80 bust. Nicolas supplied two fresh refs ("Rootis Bust 1/2"); we picked **Bust 1** (cleaner pale-blue-white snow, characterful 3/4 tilt) and finished it with a deterministic **pixel-by-pixel hand pass** (Marty-style) instead of any recolour. Shipped + pushed (commit `5ac9a4e`).
 
-## THE BIG DECISIONS THIS SESSION (don't re-litigate)
+## THE DECISIONS THIS SESSION (don't re-litigate)
 
-1. **Reserve palette slots for saturated HUES, not just luminance extremes (`reserve_extremes` path, default ON).** Last session's reserve-extremes only protects the brightest/darkest pixels. Area-based MEDIANCUT still starves a vivid *mid-tone* minority color (Sclorbo's red tassel stripes + tan robe folded to grey while six near-identical dark teals ate the palette). The pipeline now reserves up to **3** extra slots for dominant saturated clusters the area palette would drop: a *distinct-RGB-cluster* pass (catches a vivid shade sharing a hue with a duller dominant region, e.g. a dark sigil-cyan vs the pale mask) **plus** a *warm/red rescue* (red accents fragment across brightness so no single RGB bin clears the gate; reserve the mean of genuinely-red pixels). Gated on chroma + area + dedup → **cool/greyscale busts fire nothing and stay byte-identical** (verified: Marty/Wolfram/RBG unchanged; only Meesmickle's red cape changed → gained fold-shading, re-shipped).
-2. **`--downscale crisp` for refs that are ALREADY clean cel art (Marty).** The smooth area-average downscale (default) is right for *painterly/textured* refs (the cats, Wolfram) — but on clean line art it invents grey anti-alias halos around clean eyes/mouths/edges across the ~23× reduction. Crisp mode = **NEAREST point-sample, skip the ink overlay**, with the palette built from the **source's own most-frequent flat colors** (true hues — Marty's terracotta scarf is `211,44,38`, not the MEDIANCUT centroid `166,72,62` rosy-pink) + a forced neutral-black slot. Default stays `smooth`; crisp is opt-in per clean ref. **No despeckle** (an earlier despeckle pass filled in eye catchlights → solid rectangular eyes; it can't tell a wanted catchlight from an unwanted speck — removed).
-2b. **Marty = HYBRID (smooth body + hand-drawn face), not crisp.** FE8 portraits are face-DOMINANT (vanilla Eirika's eyes are 5–6px because the head fills the frame). Marty's framing keeps the whole mushroom (Nicolas won't compromise the framing / cut the cap), so his face is only ~20px and the eyes are ~2–3px — below what *any* downscale renders cleanly. Solution: render the **body** with the smooth downscale (clean gills/cap/scarf/tunic/staff, no crisp speckle) and **hand-draw the face** on top via `portraits/marty_eye_fixup.py`. Final approved face (after many iterations with Nicolas): clears the blurry face band, draws two **3×5 oval eyes** with the **white catchlight spec near the TOP, black extending downward**, and a **wide flat smile** (small upturned corners at the ends + a single long flat bottom row, NO lower lip), positioned/proportioned per the ref (mouth corners start just under the eyes). Palette slots are found by COLOUR so it survives quantizer drift. Re-apply after any Marty re-render. **This hybrid (smooth base + scripted hand-face) is the template for any future small-faced cast member.** Iteration lesson: read the ref's true eye/mouth shape+position at bust scale (downscale the ref, dump the dark-pixel map) before drawing — don't guess.
-3. **Follow the ref's TRUE hues — the fix is always "track the ref better," never embellish.** Both fixes above make the palette represent colors genuinely in the source, not hand-added pop. (Same principle that vetoed eye-catchlight stamping last session.) When Marty looked pink/blurred, Nicolas's steer was "reference the Marty 3 image for true accurate color hues" — and the answer was a source-true frequency palette, not saturation boosting.
-4. **Braulo IS reconvertible now (supersedes the old "leave as-is").** The original crop was never recorded, so it was recovered via **silhouette IoU search** (0.95 match → crop `153,129,1888,1574`) so framing is unchanged but the orange/grey now read vivid (old Braulo was pre-reserve-extremes = muddy). Nicolas: "match the original cropping" — done via the IoU recovery.
+1. **Rootis = faithful Bust 1 + a hand pass, NOT a hybrid recolour.** First attempt blended Bust 2's orange carrot + darkened blacks into Bust 1 → Nicolas: *"you did too much work here that reduced the fidelity."* The rule held: **follow the ref's true colours, don't embellish.** Final keeps Bust 1's own palette (red carrot included) and only *cleans/sharpens* what the downscale degraded.
+2. **`rootis_cleanup.py` is the deterministic touch-up** (run after `ref_to_bust.py`, reproduce cmd in its docstring). Five passes, all colour-keyed so they survive quantizer drift:
+   - **despeckle** — a lone pixel matching none of its 4 neighbours, neighbours agreeing ≥3, AND a *strong* colour outlier (RGB dist > 70) → snap to majority. **The distance gate is load-bearing:** an un-gated despeckle ate form-defining highlights (`14→1`) and facet transitions (`2→3`) and Nicolas said *"it got worse."* Gating to >70 fixes only true intrusions (a blue pixel inside the red carrot, purple flecks) and leaves highlights/shading intact (~18 px changed, not 64).
+   - **faceted carrot** — the flat red blob → a geometric pyramid: detect the red mask (3× hole-fill to absorb trapped light specks), then paint outer-edge + bottom tip = **maroon (92,22,30)**, a bright **pink ridge (236,152,150)** ~40% in from the left, right-of-ridge = **dark facet (138,34,42)**, lit-left keeps the main red. Tones sampled from the ref's own carrot.
+   - **continuous dark outline** — every body pixel touching transparent bg → coal. Gives the **strong unbroken silhouette line the ref has**. NB: an earlier version that only darkened the *purple* fringe (leaving white edge pixels light) looked jaggy/worse — you must darken the **whole** boundary uniformly, not a subset.
+   - **mouth-halo cleanup** — the ragged **purple anti-alias halo** ringing the coal mouth dots is what read as "specks." Scoped to the mouth band (rows 49–66 so eyes/shadow purple are untouched), each purple pixel snaps to its dominant non-purple neighbour, ties breaking toward the **lighter face** colour so dots keep crisp edges instead of blobbing together.
+   - **final despeckle** on the settled geometry.
+3. **Zoom into the headroom.** Nicolas: there's vertical space above the head — use it. Crop tightened from `54,40,1686,1400` → **`126,100,1614,1340`** (~9% zoom), keeping ~2 px headroom so the top isn't cut (he earlier vetoed any top crop). Bigger face = carrot/eyes/mouth render at more pixels = the pixel touch-ups are cleaner. **This "use the headroom" move is reusable for any small-featured cast member.**
+4. **Crisp mode is OUT for Rootis** — it muddied the orange carrot (the source-true freq palette won't reserve a feature that small). Smooth + hand pass wins (same conclusion as Marty).
 
-## NEW PIPELINE KNOBS (all in `tools/ref_to_bust.py`)
+## THE PIXEL-TOUCH-UP TEMPLATE (now two examples — established path for degraded small features)
 
-- `--downscale smooth|crisp` (default smooth). crisp = clean cel art (NEAREST point-sample + source-true frequency palette, no ink pass, no despeckle).
-- `--ink-lum N` (default 150) / `--ink-cov N` (default 4) — line-definition dials for the **smooth** ink overlay. Raise ink-lum to snap darker-but-not-black lines; lower ink-cov so thinner lines survive. (Added when exploring Wolfram's crevice lines; defaults unchanged so nothing regressed.)
-- Existing: `--crop`, `--sharpen` (default 0), `--bg-thresh` (45), `--no-reserve-extremes`, `--preview`.
+`marty_eye_fixup.py` (hand-drawn face on a smooth body) and `rootis_cleanup.py` (outline + faceted nose + halo cleanup) are the two reference scripts. **Pattern:** render faithful with `ref_to_bust.py`, then a deterministic, colour-keyed companion script for the features the ~23× downscale can't hold. Reproduce command lives in each docstring. README ("Per-portrait hand passes") documents both.
 
-## PER-PORTRAIT RENDER SETTINGS (so they're reproducible — re-run verbatim)
+## PIPELINE KNOBS (all in `tools/ref_to_bust.py`)
 
-Refs live in `…/References/PCs/`. All ship to `campaigns/rime-of-the-frostmaiden/portraits/<unit>.png`.
+- `--downscale smooth|crisp` (default smooth). smooth = area-average + ink overlay (painterly/textured refs, incl. Rootis's low-poly gradients). crisp = NEAREST + source-true freq palette (clean flat cel art only; **muddies tiny coloured features like a carrot** — avoid when a small accent must survive).
+- `--ink-lum N` (150) / `--ink-cov N` (4) — smooth ink-overlay line dials.
+- `--crop x0,y0,x1,y1`, `--sharpen` (0), `--bg-thresh` (45), `--no-reserve-extremes`, `--preview`.
+- Reserve logic (default ON): protects luminance extremes **plus** up to 3 saturated-hue clusters (distinct-RGB + warm/red rescue) the area palette would drop. Cool/greyscale busts fire nothing → byte-identical.
 
-| unit | ref file | --crop | mode |
+## PER-PORTRAIT RENDER SETTINGS (re-run verbatim). Refs: `…/References/PCs/`. Ship → `campaigns/rime-of-the-frostmaiden/portraits/<unit>.png`.
+
+| unit | ref file | --crop | mode + hand pass |
 |---|---|---|---|
 | braulo | `Broulo Face Clean.png` | `153,129,1888,1574` | smooth |
-| marty | `Marty 3.png` | `0,35,2222,1887` | **smooth** (default) + run `portraits/marty_eye_fixup.py` after (hybrid: smooth body + hand-drawn face) |
+| marty | `Marty 3.png` | `0,35,2222,1887` | smooth + `marty_eye_fixup.py` (hybrid face) |
 | meesmickle | `Meesmickle Clean.png` | `0,255,1824,1775` | smooth |
 | prof-rbg | `RBG Landscape.png` | `14,17,2258,1887` | smooth |
 | wolfram | `womfram bust 3.png` (typo real) | `280,70,1980,1487` | smooth |
 | sclorbo | `Sclorbo Portrait clean.png` | `342,297,1786,1500` | smooth |
+| **rootis** | `Rootis Bust 1.png` | `126,100,1614,1340` | smooth + `rootis_cleanup.py` |
 
 ## Current state
 
-- **Wave 1 portraits: 6 / 10** — braulo, prof-rbg, marty, wolfram, meesmickle, **sclorbo (this session)**. **NEXT = Rootis**, then Pinky, Pepperjack, Brie.
-  - **Sclorbo** = faceless rune-mask Chwinga. Crop is a face-dominant mid-zoom (Nicolas picked framing "D"): mask dominant + sigil legible, vivid flame aura, fur ruff, red/cyan tassels, tan robe, staff tip; drops only the low pendant. The chroma fix is what made the red stripes / tan robe / darker sigil-cyan survive.
-  - **Marty** = hybrid (smooth body + `marty_eye_fixup.py` hand face). 3×5 oval eyes (white catchlight near top, black below), wide flat smile, smooth gills/staff/tunic. Framing kept (whole mushroom). Approved 2026-06-02 after many face iterations.
-  - **Braulo** = re-rendered vivid at the IoU-recovered original framing.
-  - **Meesmickle** = re-shipped; red cape gained fold-shading from the chroma fix.
-  - **Wolfram, RBG** = byte-identical to last session (chroma fix didn't fire on them).
-- **Build:** green (`make verify` → ROM OK). Portraits are authored assets, not yet wired into a built ROM (build-campaign pipeline, issues #13–15, unbuilt).
+- **Wave 1 portraits: 7 / 10** — braulo, prof-rbg, marty, wolfram, meesmickle, sclorbo, **rootis**. Remaining: Pinky, Pepperjack, Brie (all ref-blocked, see Blockers).
+- **Build:** green last verified (`make verify` → ROM OK). Portraits are authored assets, not yet wired into a built ROM (build-campaign pipeline, issues #13–15, unbuilt).
+- **Rootis bust** = faithful Bust 1 at the zoomed crop: strong coal silhouette outline, faceted carrot (pink ridge / red lit facet / dark right facet / maroon tip), clean coal eye squares + mouth dots, two-segment body, ~2 px headroom. Approved.
+- **`fireemblem8u` submodule** shows local changes in `git status` (pre-existing, not from this work) — left untouched; don't blindly commit the submodule pointer.
 
-## Tried but abandoned
+## Tried but abandoned (this session)
 
-- **Wolfram line-definition bump** (`--ink-cov 3` / `--ink-lum 175`) → crevices crisped up but it **drowned the white in his eyes**; Nicolas didn't want that, so Wolfram stays as-shipped (smooth defaults). The `--ink-*` flags remain available if revisited *with* an eye-white guard (not built).
-- **Pure NEAREST crisp with MEDIANCUT palette** → kept clean edges but quantized the scarf to rosy pink. Fixed by the source-true frequency palette.
-- **Despeckle pass in crisp mode** → removed lone specks but also filled Marty's eye catchlights → solid rectangular eyes. Removed; tiny features use a per-portrait pixel touch-up instead (decision 2b).
-- **Crisp mode for Marty** → clean edges but his ~2px face features came out asymmetric/blocky and the gills/staff speckled. Superseded by the hybrid (smooth body + hand face).
-- **Face-dominant REFRAME of Marty** (zoom in so the face/eyes render at vanilla size) → fixed the eyes organically and the red cap could stay as a "brim", BUT **Nicolas won't compromise the framing** ("Eirika's head isn't cut off") — keep the whole mushroom in-frame and hand-draw the small face instead.
-- **Hand-stamped crude block eyes / wrong mouth shapes** (several tries: rectangular eyes, too-flat mouth, too-deep U, lower-lip) → each rejected on review. What worked: reading the ref's true shape at bust scale, then matching it (decision 2b).
-- (Prior sessions) global crisp downscale, 170% UnsharpMask, etc. — still abandoned.
-
-## FE8 portrait resources & frame spec (gathered this session — for the chibi/mouth/blink TODO)
-
-Nicolas shared FE8 portrait-making resources (saved to memory `reference_fe8_portrait_resources`): a YouTube walkthrough, two Serenes Forest threads, the FE Shrine Ultimate Tutorial. Takeaways:
-- **Convention:** FE8 busts are face-DOMINANT (head fills the frame). Community tools are FEditor Adv / GBAGE / Usenti (its "Palette→Requantize 16" = what `ref_to_bust.py` does) / Nightmare Portrait Editor — all for **raw-ROM** workflows that our **decomp + `portrait_tool.py` + build-campaign** pipeline already replaces. So: no new tools needed; the value was the convention + the canonical frame spec.
-- **Canonical frame spec is in OUR decomp** — `fireemblem8u/include/types.h` `struct FaceData`: `img` (96×80 bust, LZ77), `imgChibi` (≤32×32 mini, LZ77), `pal` (16 colours), `imgMouth` (mouth frames, uncompressed), `imgCard`, `xMouth,yMouth`, `xEyes,yEyes`, `blinkKind` (`FACE_BLINK_NORMAL`/`FACE_BLINK_CLOSED`). Mouth/eye frames are small overlays composited at those x/y. Convention (per FEU): mouth sheet split top=smile / bottom=talk; blink frames = half-closed (top) / closed (bottom); chibi ≤32×32. **Study vanilla via `portrait_tool.py decode portrait_<Name>_tileset.png` + the `_mouth.png`/`_chibi.png` siblings** (e.g. Eirika) before authoring ours.
+- **Hybrid recolour of Rootis** (Bust 2 orange carrot + darker blacks onto Bust 1) → rejected, *reduced fidelity*. Keep the ref's own colours.
+- **Un-gated despeckle** (any lone pixel → neighbour majority, 64 px) → ate highlights/facet transitions, *"got worse."* Fixed with the >70 colour-distance gate (~18 px).
+- **Outline tidy that only darkened the purple fringe** → jagged (white edge pixels stayed light). Fixed by darkening the *entire* bg-adjacent boundary uniformly.
+- **Crisp mode for Rootis** → muddied the carrot. Smooth + hand pass instead.
+- (Carried from before) Marty crisp/reframe, Wolfram ink bump, global crisp downscale, UnsharpMask — still abandoned.
 
 ## Blockers / open
 
-- **Missing/partial refs:** Pinky has NO ref; Rootis only a character sheet; Pepperjack + Brie share ONE combined image (each needs its own bust). **Sclorbo's ref is now consumed.**
-- **32×32 `_chibi` mini-face + mouth frames** NOT produced yet (only the 96×80 bust). Part of build-campaign wiring (issues #13–15).
+- **Missing/partial refs for the last 3 Wave-1 busts:** **Pinky** has NO ref; **Pepperjack + Brie** share ONE combined image (`data/portraits/pepperjack-and-brie.jpeg`) — each needs its own clean single bust. **Chase these from Nicolas before converting.**
+- **32×32 `_chibi` mini-face + mouth frames** not produced for ANY unit yet (only the 96×80 busts). Frame spec = `fireemblem8u/include/types.h` `struct FaceData` (img/imgChibi/pal/imgMouth/xMouth/yMouth/xEyes/yEyes/blinkKind). Study vanilla via `portrait_tool.py decode` before authoring. Part of build-campaign wiring (issues #13–15).
 - **#16 (toolchain)** needs a manual GitHub close (agent close blocked by permission classifier).
-- **pepperjack/brie `fe_stats.class = null`** — FE-legal class TBD post-MVP (art can still proceed).
-- **Rootis & Sclorbo recruitment chapters / Sclorbo signature moment = TBD** (Nicolas to recall; `sclorbo.yaml signature_moment.chapter = tbd`).
+- **pepperjack/brie `fe_stats.class = null`** — FE-legal class TBD post-MVP (art can still proceed once refs exist).
+- **Rootis & Sclorbo recruitment chapters / Sclorbo signature_moment** = TBD (Nicolas to recall; `rootis.yaml`/`sclorbo.yaml` `signature_moment.chapter = tbd`).
 
 ## Next steps (priority order)
 
-1. **Rootis portrait** — only a character-sheet ref exists; chase a clean bust ref from Nicolas first. Read `pcs/rootis.yaml` `art:` block, then autocrop → render 2-3 crops → pick → ship. Decide smooth vs crisp by whether the ref is clean cel art or painterly. (Wave 1 → 7/10.)
-2. Continue Wave 1 one-at-a-time: Pinky, Pepperjack, Brie (chase the missing refs).
-3. After Wave 1 busts: chibi + mouth frame generation, then build-campaign wiring (issues #13–15) to get portraits into a built ROM.
-4. Wave 2 (map sprites) / Wave 3 (battle anims) — behind Wave 1.
+1. **Chase the last 3 Wave-1 refs from Nicolas** (Pinky bust; separate Pepperjack + Brie busts). Then convert one-at-a-time: autocrop → render → pick → hand pass if needed → ship. (Wave 1 → 10/10.)
+2. **After Wave 1 busts:** chibi + mouth-frame generation (extend `portrait_tool.py`), then build-campaign wiring (issues #13–15) to get portraits into a built ROM.
+3. Wave 2 (map sprites) / Wave 3 (battle anims) — behind Wave 1.
 
 ## Key files
 
-- `tools/ref_to_bust.py` — ref → 96×80 indexed bust. Two downscale modes (smooth default / crisp), reserve-extremes + chroma reservation (smooth), source-true freq palette (crisp). See knobs above.
-- `campaigns/rime-of-the-frostmaiden/portraits/marty_eye_fixup.py` — the per-portrait hand-face redraw for Marty (decision 2b). Reproducible, palette slots by colour. The template script if other small-faced cast need the same.
-- `tools/portrait_tool.py` — bust↔FE8 256×32 tile-sheet OAM packer (`encode`/`decode`, byte-identical). **This IS the tile-sheet creator** (chibi/mouth still TODO).
-- `/tmp/autocrop.py` — prints subject bbox + a 1.2-aspect crop for a ref (NOT committed; recreate from the border-median-bg / fg-dist≥45 / >1% coverage snippet). **For a lost crop, recover via silhouette IoU** against the committed bust (this session's Braulo method).
-- `campaigns/rime-of-the-frostmaiden/portraits/` — busts + `_preview.png` + README. Done: braulo, prof-rbg, marty, wolfram, meesmickle, sclorbo.
+- `tools/ref_to_bust.py` — ref → 96×80 indexed bust (smooth default / crisp opt-in; reserve-extremes + chroma reservation). Knobs above.
+- `campaigns/rime-of-the-frostmaiden/portraits/rootis_cleanup.py` — Rootis hand pass (despeckle + faceted carrot + continuous outline + mouth-halo cleanup). Colour-keyed, reproducible.
+- `campaigns/rime-of-the-frostmaiden/portraits/marty_eye_fixup.py` — the other hand-pass example (smooth body + hand-drawn face).
+- `tools/portrait_tool.py` — bust↔FE8 256×32 tile-sheet OAM packer (`encode`/`decode`, byte-identical). Chibi/mouth still TODO.
+- `/tmp/autocrop.py` + `/tmp/grid.py` — NOT committed; recreate. autocrop = border-median-bg / fg-dist≥45 bbox; grid.py overlays a 200-px coordinate grid on a thumbnail (the fastest way to place a face-dominant crop). For a lost crop, recover via silhouette IoU vs the committed bust.
+- `campaigns/rime-of-the-frostmaiden/portraits/` — busts + `_preview.png` + README (incl. "Per-portrait hand passes").
 - `campaigns/.../{pcs,npcs}/*.yaml` `art:` block — per-character must-keep brief (read before each conversion).
-- Vanilla portrait reference: `fireemblem8u/graphics/portrait/portrait_*_tileset.png` (decode with `portrait_tool.py decode`). Gilliam = best heavy-unit framing reference.
+- Vanilla portrait reference: `fireemblem8u/graphics/portrait/portrait_*_tileset.png` (decode with `portrait_tool.py decode`).
 
 ## Standing rules (how Nicolas wants this work done)
 
-- **Reference the DECOMP / the ref** — ground framing/render/colors in `fireemblem8u/` + the character ref. **Follow the ref's colors faithfully; don't embellish** — when a color looks off, make the pipeline track the ref's TRUE hue, don't hand-add pop.
-- **Art = full custom for the 10 named cast** (portrait → map sprite → battle anim, in wave order). **Enemies stay vanilla.** Refs are pre-approved source — convert faithfully.
-- **Collaborative, one-item-at-a-time:** convert → `open` preview → commit/push → wait. Show 2-3 options and let Nicolas pick when there's a real trade-off (framing especially).
+- **Follow the ref's colours faithfully; don't embellish.** When something looks off, make the pipeline/hand-pass track the ref's TRUE hue — never hand-add pop or blend refs. (Re-confirmed hard this session.)
+- **Reference the DECOMP / the ref** for framing/render/colours. **Face-dominant** FE8 convention; use available headroom to zoom small faces.
+- **Art = full custom for the 10 named cast** (portrait → map sprite → battle anim, wave order). **Enemies stay vanilla.**
+- **Collaborative, one item at a time:** render → `open` preview → wait for Nicolas → iterate → commit/push. Show 2–3 options on real trade-offs (framing, ref choice).
 - **Stock vanilla FE8 classes/weapons only**; **element = flavor, NEVER a mechanic**; combat RULES are vanilla FE.
-- **Clean native doc rewrites** (no STALE/reverted banners). **Auto-push to main.**
-- **Doc source-of-truth:** per-chapter/unit facts live ONLY in YAML; `docs/CHAPTERS.md`/`CLASSES.md` are GENERATED. **Lean repo**; backlog = GitHub issues (M0–M4).
+- **Clean native doc rewrites** (no STALE/reverted banners). **Auto-push to main** (no need to ask).
+- **Doc source-of-truth:** per-chapter/unit facts live ONLY in YAML; `docs/*` are GENERATED. **Lean repo**; backlog = GitHub issues (M0–M4).
 - **`make` must be green at the end of every session.**
