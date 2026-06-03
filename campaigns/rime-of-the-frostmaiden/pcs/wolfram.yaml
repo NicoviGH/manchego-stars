@@ -13,6 +13,11 @@ portrait_source: data/portraits/wolfram.jpeg
 # ── Custom Art Brief (decided 2026-06-01 portrait walkthrough) ───────────────────
 # ALL parts custom indexed-palette art. Follow the concept ref faithfully.
 art:
+  render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
+    ref: "References/PCs/womfram bust 3.png"   # filename typo is real (as supplied)
+    crop: [280, 70, 1980, 1487]    # ref pixels, ~1.2 aspect
+    downscale: smooth
+    hand_pass: null
   approach: custom
   fidelity: faithful
   must_keep:                  # tells that make the bust read as "Wolfram"

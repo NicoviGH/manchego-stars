@@ -11,6 +11,11 @@ portrait_source: data/portraits/marty.jpeg
 # ── Custom Art Brief (decided 2026-06-01 portrait walkthrough) ───────────────────
 # ALL parts custom indexed-palette art. Follow the concept ref faithfully.
 art:
+  render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
+    ref: "References/PCs/Marty 3.png"
+    crop: [0, 35, 2222, 1887]      # ref pixels, ~1.2 aspect
+    downscale: smooth
+    hand_pass: portraits/marty_eye_fixup.py
   approach: custom
   fidelity: faithful
   must_keep:                  # tells that make the bust read as "Marty"

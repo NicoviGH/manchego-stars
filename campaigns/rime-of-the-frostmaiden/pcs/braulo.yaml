@@ -12,6 +12,11 @@ portrait_source: data/portraits/braulo.jpeg
 # ALL parts custom indexed-palette art (no recolor, no vanilla-anim reuse). Follow the
 # concept ref faithfully. 96×80 / 16-color portrait + custom map sprite + battle anim.
 art:
+  render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
+    ref: "References/PCs/Broulo Face Clean.png"
+    crop: [153, 129, 1888, 1574]   # ref pixels, ~1.2 aspect
+    downscale: smooth
+    hand_pass: null
   approach: custom            # not recolor; follow concept art to best ability
   fidelity: faithful          # keep the crab anatomy, don't humanize
   must_keep:                  # the tells that make a bust crop read as "Braulo"

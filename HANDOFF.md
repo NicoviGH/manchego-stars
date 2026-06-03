@@ -31,7 +31,9 @@
 - `--ink-lum N` (150) / `--ink-cov N` (4), `--crop x0,y0,x1,y1`, `--sharpen` (0), `--bg-thresh` (45), `--no-reserve-extremes`, `--preview`.
 - Reserve logic (default ON): protects luminance extremes + up to 3 saturated-hue clusters. **Note:** when a ref has BOTH big saturated areas (ears) AND a tiny must-keep accent (ruby/eyes), the big areas win the reservation and the small accent needs a hand pass — Pinky is the worst case yet.
 
-## PER-PORTRAIT RENDER SETTINGS (re-run verbatim). Refs: `…/References/PCs/`. Ship → `campaigns/rime-of-the-frostmaiden/portraits/<unit>.png`.
+## PER-PORTRAIT RENDER SETTINGS
+
+**Canonical home is now each unit's YAML `art.render:` block** (`ref` / `crop` / `downscale` / `hand_pass`) — added this session for all 8 and verified to reproduce every shipped bust **byte-identical**. The crop no longer lives only in this drift-prone handoff. The table below is a convenience mirror. Refs: `…/References/PCs/`. Ship → `campaigns/rime-of-the-frostmaiden/portraits/<unit>.png`.
 
 | unit | ref file | --crop | mode + hand pass |
 |---|---|---|---|

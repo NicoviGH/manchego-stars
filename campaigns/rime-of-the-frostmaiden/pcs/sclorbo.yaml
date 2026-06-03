@@ -13,6 +13,11 @@ portrait_source: data/portraits/sclorbo.jpeg
 # ALL parts custom indexed-palette art. Follow the concept ref faithfully.
 # Chwinga = canonically faceless masked fey, so the rune-mask head STAYS faceless.
 art:
+  render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
+    ref: "References/PCs/Sclorbo Portrait clean.png"
+    crop: [342, 297, 1786, 1500]   # ref pixels, ~1.2 aspect
+    downscale: smooth
+    hand_pass: null
   approach: custom
   fidelity: faithful
   must_keep:                  # tells that make the bust read as "Sclorbo"
