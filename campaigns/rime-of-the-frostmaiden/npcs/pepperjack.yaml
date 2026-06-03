@@ -16,8 +16,8 @@ art:
   render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
     ref: "References/PCs/Pixel Pepperjack.png"
     crop: [20, 60, 2130, 1818]     # ref pixels, ~1.2 aspect — whole-cannon framing
-    downscale: smooth
-    hand_pass: portraits/pepperjack_cleanup.py   # pops the red star (eye left as rendered)
+    zoom: 0.72                     # headroom so the fuse + barrel bore mostly clear FE8's dead corners (30 px residual)
+    # No hand pass: pngquant renders the red star, orange eye + chili-pepper mustache natively.
   approach: custom
   fidelity: faithful
   build_when: with-batch      # pixel alongside the 7 PCs (visually simple, fun), though class/recruit is post-MVP
