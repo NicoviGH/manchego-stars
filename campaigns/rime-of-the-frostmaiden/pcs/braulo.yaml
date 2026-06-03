@@ -14,8 +14,9 @@ portrait_source: data/portraits/braulo.jpeg
 art:
   render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
     ref: "References/PCs/Broulo Face Clean.png"
-    crop: [153, 129, 1888, 1574]   # ref pixels, ~1.2 aspect
+    crop: [120, 180, 1960, 1720]   # ref pixels, ~1.2 aspect — taller "claw-crop" (more lower body)
     downscale: smooth
+    zoom: 0.84                     # headroom so hat+shell shoulders clear FE8's dead top corners (26px residual)
     hand_pass: null
   approach: custom            # not recolor; follow concept art to best ability
   fidelity: faithful          # keep the crab anatomy, don't humanize

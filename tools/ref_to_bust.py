@@ -48,9 +48,43 @@ def _label(mask):
     return lab, n
 
 
+def _zoom_out(src, crop_box, zoom):
+    """Expand crop_box so the current subject occupies `zoom` of the frame.
+
+    The extra width is split evenly (horizontal centering); the extra height is
+    added entirely at the TOP (the shoulders stay pinned to the bottom edge, as in
+    vanilla FE8 busts -- headroom appears above the head, where FE8's dead corners
+    sit). Where the larger box runs off the ref, pad the ref with its border-median
+    color so the new margin reads as flat background and gets keyed transparent.
+    Returns (possibly padded) src and the new crop_box. No-op at zoom == 1.0.
+    """
+    if zoom >= 1.0:
+        return src, crop_box
+    x0, y0, x1, y1 = crop_box
+    w, h = x1 - x0, y1 - y0
+    dx = (w / zoom - w) / 2.0
+    dy = (h / zoom - h)                       # all headroom on top; bottom fixed
+    nx0, ny0, nx1, ny1 = x0 - dx, y0 - dy, x1 + dx, y1
+    pl = max(0, int(np.ceil(-nx0)))
+    pt = max(0, int(np.ceil(-ny0)))
+    pr = max(0, int(np.ceil(nx1 - src.width)))
+    pb = max(0, int(np.ceil(ny1 - src.height)))
+    if pl or pt or pr or pb:
+        a = np.asarray(src)
+        edge = np.concatenate([a[0:8].reshape(-1, 3), a[:, 0:8].reshape(-1, 3),
+                               a[:, -8:].reshape(-1, 3)])
+        fill = tuple(int(v) for v in np.median(edge, axis=0))
+        padded = Image.new('RGB', (src.width + pl + pr, src.height + pt + pb), fill)
+        padded.paste(src, (pl, pt))
+        src = padded
+        nx0, ny0, nx1, ny1 = nx0 + pl, ny0 + pt, nx1 + pl, ny1 + pt
+    return src, (int(round(nx0)), int(round(ny0)), int(round(nx1)), int(round(ny1)))
+
+
 def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, reserve_extremes=True,
-            ink_lum=150, ink_cov=4, downscale='smooth'):
+            ink_lum=150, ink_cov=4, downscale='smooth', zoom=1.0):
     src = Image.open(ref_path).convert('RGB')
+    src, crop_box = _zoom_out(src, crop_box, zoom)
     crop = src.crop(crop_box).resize((480, 400), Image.LANCZOS)
     rgb = np.asarray(crop).astype(np.float32)
     H, W = rgb.shape[:2]
@@ -276,9 +310,14 @@ def main():
                     help="'smooth' (default): area-average + ink overlay, for painterly/textured refs. "
                          "'crisp': NEAREST point-sample (no ink pass), for refs that are already clean cel "
                          'art -- avoids the grey halos area-averaging invents around clean eyes/mouths/edges.')
+    ap.add_argument('--zoom', type=float, default=1.0,
+                    help='shrink the subject to this fraction of the frame to add top headroom (default 1.0 '
+                         '= unchanged). e.g. 0.85 pulls the silhouette inside FE8\'s clipped top corners; '
+                         'shoulders stay pinned to the bottom edge.')
     a = ap.parse_args()
     box = tuple(int(v) for v in a.crop.split(','))
-    res = convert(a.ref, box, a.bg_thresh, a.sharpen, a.reserve_extremes, a.ink_lum, a.ink_cov, a.downscale)
+    res = convert(a.ref, box, a.bg_thresh, a.sharpen, a.reserve_extremes, a.ink_lum, a.ink_cov, a.downscale,
+                  a.zoom)
     res.save(a.out)
     print('%s -> %s (96x80 indexed, %d colors)' % (a.ref, a.out, len(set(res.getdata()))))
     if a.preview:
