@@ -14,8 +14,9 @@ portrait_source: data/portraits/rootis.jpeg   # note: source file was named "Roo
 art:
   render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
     ref: "References/PCs/Rootis Bust 1.png"
-    crop: [126, 100, 1614, 1340]   # ref pixels, ~1.2 aspect
+    crop: [216, 100, 1704, 1340]   # ref pixels, ~1.2 aspect — shifted +90 right (subject left) to centre the head
     downscale: smooth
+    zoom: 0.94                     # headroom so the head clears FE8's dead top corners (0px clipped)
     hand_pass: portraits/rootis_cleanup.py
   approach: custom
   fidelity: faithful

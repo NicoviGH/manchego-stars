@@ -81,10 +81,29 @@ def _zoom_out(src, crop_box, zoom):
     return src, (int(round(nx0)), int(round(ny0)), int(round(nx1)), int(round(ny1)))
 
 
+def _pad_to_box(src, box):
+    """Pad src with its border-median color so an out-of-bounds crop box (e.g. a
+    crop shifted past the ref edge to reposition the subject) reads as flat
+    background. No-op when the box is fully inside the ref (byte-identical)."""
+    x0, y0, x1, y1 = box
+    pl, pt = max(0, -x0), max(0, -y0)
+    pr, pb = max(0, x1 - src.width), max(0, y1 - src.height)
+    if not (pl or pt or pr or pb):
+        return src, box
+    a = np.asarray(src)
+    edge = np.concatenate([a[0:8].reshape(-1, 3), a[:, 0:8].reshape(-1, 3),
+                           a[:, -8:].reshape(-1, 3)])
+    fill = tuple(int(v) for v in np.median(edge, axis=0))
+    padded = Image.new('RGB', (src.width + pl + pr, src.height + pt + pb), fill)
+    padded.paste(src, (pl, pt))
+    return padded, (x0 + pl, y0 + pt, x1 + pl, y1 + pt)
+
+
 def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, reserve_extremes=True,
             ink_lum=150, ink_cov=4, downscale='smooth', zoom=1.0):
     src = Image.open(ref_path).convert('RGB')
     src, crop_box = _zoom_out(src, crop_box, zoom)
+    src, crop_box = _pad_to_box(src, crop_box)
     crop = src.crop(crop_box).resize((480, 400), Image.LANCZOS)
     rgb = np.asarray(crop).astype(np.float32)
     H, W = rgb.shape[:2]
