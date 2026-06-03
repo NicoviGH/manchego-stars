@@ -1,7 +1,7 @@
-# Handoff: Pinky shipped (Wave 1 = 8/10). Three-eye/ruby hand pass added. NEXT = chase separate Pepperjack + Brie refs.
+# Handoff: Pinky shipped (Wave 1 = 8/10) + portrait render params moved into YAML. NEXT = chase separate Pepperjack + Brie refs.
 
 **Date:** 2026-06-03
-**Session focus:** Converted **Pinky** (RBG's homunculus 'son', the army's flier) to a 96×80 bust from the fresh ref `References/PCs/Pinky Art.png`. Pinky is a grey opossum-mouse with big magenta-pink ears, large blue eyes, a faceted **red ruby nose**, pink paws/tail, and silver armour segments + swirl etchings. Smooth downscale + a deterministic `pinky_cleanup.py` hand pass. Shipped + pushed.
+**Session focus:** Two things, both shipped + pushed. (1) Converted **Pinky** (RBG's homunculus 'son', the army's flier) to a 96×80 bust from the fresh ref `References/PCs/Pinky Art.png` — a grey opossum-mouse with big magenta-pink ears, large blue eyes, a faceted **red ruby nose**, pink paws/tail, silver armour + swirl etchings; smooth downscale + a deterministic `pinky_cleanup.py` hand pass. (2) Closed a drift gap Nicolas caught: the per-bust **render params (ref/crop/downscale/hand_pass) now live in each unit's YAML `art.render:` block** (all 8), verified to reproduce every shipped bust byte-identical.
 
 ## THE DECISIONS THIS SESSION (don't re-litigate)
 
@@ -74,7 +74,7 @@
 - `tools/portrait_tool.py` — bust↔FE8 256×32 tile-sheet OAM packer (`encode`/`decode`, byte-identical). Chibi/mouth still TODO.
 - `tools/autoframe.py` — bottom-anchor + pad helper (for full-body refs; the cast uses direct `--crop` face-dominant framing instead).
 - `/tmp/autocrop.py` (border-median-bg fg-dist≥45 bbox) + `/tmp/grid.py` (200-px coord grid on a thumbnail) — NOT committed; recreate. grid.py is the fastest way to place a face-dominant crop.
-- `campaigns/.../{pcs,npcs}/*.yaml` `art:` block — per-character must-keep brief (read before each conversion). Pinky's now added.
+- `campaigns/.../{pcs,npcs}/*.yaml` `art:` block — per-character must-keep brief AND the `render:` sub-block (ref/crop/downscale/hand_pass = the canonical, byte-verified reproduction record). Read before each conversion; all 8 shipped units now have both.
 - Vanilla portrait reference: `fireemblem8u/graphics/portrait/portrait_*_tileset.png` (decode with `portrait_tool.py decode`).
 
 ## Standing rules (how Nicolas wants this work done)
