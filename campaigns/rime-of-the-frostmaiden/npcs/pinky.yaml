@@ -11,13 +11,13 @@ portrait_ref: portraits/pinky.png        # 96×80 bust shipped; GBA tile-sheet w
 recruited_via: "available from Chapter 1"
 built_by: prof-rbg                        # RBG's homunculus 'son'
 
-# ── Portrait art brief (drives tools/ref_to_bust.py + portraits/pinky_cleanup.py) ──
+# ── Portrait art brief (drives tools/ref_to_bust.py) ──
 art:
   render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
     ref: "References/PCs/Pinky Art.png"
     crop: [380, 100, 1675, 1179]   # ref pixels, ~1.2 aspect
-    downscale: smooth
-    hand_pass: portraits/pinky_cleanup.py
+    zoom: 0.65                     # full-body pose; headroom so both tall ears clear FE8's dead corners (0 px clipped)
+    # No hand pass: pngquant renders the blue eye + ruby nose natively (they no longer need rescuing).
   approach: custom
   fidelity: faithful
   must_keep:                  # tells that make the bust read as "Pinky"
@@ -32,8 +32,7 @@ art:
   palette_plan: >             # rough 16-color budget (incl. index-0 transparent)
     greys ×4 (fur + armour shading), magenta/pink ×2 (ears/hands, lightened so the
     nose stands out), ruby reds ×2, true blues ×2 (irises), white highlight, darks ×3.
-    Ears + ruby are saturated enough to crowd the chroma slots — the blue eyes and the
-    ruby need the pinky_cleanup.py hand pass to survive.
+    pngquant holds the blue eye + ruby nose at the 16-colour ceiling natively.
 
 # ── FE Starting Stats (level 1) ────────────────────────────────────────────────
 # Vanilla FE8 Pegasus Knight stats, verbatim from fireemblem8u/src/data_classes.c
