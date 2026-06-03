@@ -96,6 +96,65 @@ def encode(bust):
     return sheet
 
 
+def what_ships(bust):
+    """Return the bust as FE8 ACTUALLY draws it.
+
+    The 6 OAM objects of gSprite_Face96x96 cover a face-shaped envelope; the
+    top-left and top-right 16px strips above y=48 fall outside every object and
+    are never drawn (the "dead corners"). encode() copies only the object
+    rectangles into the sheet and decode() reads them back, so the round-trip
+    drops exactly the undrawn pixels -- making decode(encode(bust)) a pixel-exact
+    model of the on-screen result.
+    """
+    return decode(encode(bust))
+
+
+def clipped_mask(bust, ships=None):
+    """Bool list (row-major, len 96*80): True where the bust paints but FE8 drops it."""
+    if ships is None:
+        ships = what_ships(bust)
+    b, s = list(bust.getdata()), list(ships.getdata())
+    return [bi != 0 and si == 0 for bi, si in zip(b, s)]
+
+
+def _render_panel(im, clipped=None, bg=(64, 64, 64), tint=(255, 0, 255)):
+    """96x80 indexed bust -> RGB panel. index-0 -> bg; clipped px -> tint if given."""
+    rgb = im.convert('RGB')
+    px = list(rgb.getdata())
+    idx = list(im.getdata())
+    out = []
+    for i, (p, k) in enumerate(zip(px, idx)):
+        if clipped is not None and clipped[i]:
+            out.append(tint)
+        elif k == 0:
+            out.append(bg)
+        else:
+            out.append(p)
+    rgb.putdata(out)
+    return rgb
+
+
+def preview(bust, scale=4):
+    """Build a 3-panel RGB comparison: [authored | what-ships | clipped-overlay].
+
+    Returns (composite_rgb, ships_indexed, clipped_count).
+    """
+    ships = what_ships(bust)
+    clipped = clipped_mask(bust, ships)
+    count = sum(clipped)
+
+    authored = _render_panel(bust)
+    drawn = _render_panel(ships)
+    overlay = _render_panel(bust, clipped=clipped)
+
+    gap = 6
+    pw, ph = BUST_W * scale, BUST_H * scale
+    comp = Image.new('RGB', (pw * 3 + gap * 2, ph), (20, 20, 20))
+    for n, panel in enumerate((authored, drawn, overlay)):
+        comp.paste(panel.resize((pw, ph), Image.NEAREST), ((pw + gap) * n, 0))
+    return comp, ships, count
+
+
 def _palette_to_agbpal(pal_rgb):
     """Convert PIL flat palette [R,G,B,...] (16 colors) -> 32-byte GBA RGB555 binary."""
     colors = []
@@ -187,15 +246,29 @@ def _check_indexed(im, path):
 
 def main():
     import argparse
-    if len(sys.argv) < 2 or sys.argv[1] not in ('decode', 'encode', 'generate'):
+    if len(sys.argv) < 2 or sys.argv[1] not in ('decode', 'encode', 'generate', 'preview'):
         sys.exit('usage:\n'
-                 '  portrait_tool.py decode  <sheet.png>  <bust.png>\n'
-                 '  portrait_tool.py encode  <bust.png>   <sheet.png>\n'
-                 '  portrait_tool.py generate <bust.png>  <out_base> [--xmouth N] [--ymouth N]')
+                 '  portrait_tool.py decode   <sheet.png>  <bust.png>\n'
+                 '  portrait_tool.py encode   <bust.png>   <sheet.png>\n'
+                 '  portrait_tool.py generate <bust.png>   <out_base> [--xmouth N] [--ymouth N]\n'
+                 '  portrait_tool.py preview  <bust.png>   <out.png>   (what-FE8-draws + clipped overlay)')
 
     op = sys.argv[1]
 
-    if op in ('decode', 'encode'):
+    if op == 'preview':
+        if len(sys.argv) != 4:
+            sys.exit('usage: portrait_tool.py preview <bust.png> <out.png>')
+        inp, outp = sys.argv[2], sys.argv[3]
+        im = Image.open(inp)
+        _check_indexed(im, inp)
+        if im.size != (BUST_W, BUST_H):
+            sys.exit('ERROR: preview expects a %dx%d bust, got %s' % (BUST_W, BUST_H, im.size))
+        comp, _ships, count = preview(im)
+        comp.save(outp)
+        verdict = 'clean (nothing clipped)' if count == 0 else '%d px fall in the dead zone' % count
+        print('%s -> %s  [%s]' % (inp, outp, verdict))
+
+    elif op in ('decode', 'encode'):
         if len(sys.argv) != 4:
             sys.exit('usage: portrait_tool.py %s <in.png> <out.png>' % op)
         inp, outp = sys.argv[2], sys.argv[3]
