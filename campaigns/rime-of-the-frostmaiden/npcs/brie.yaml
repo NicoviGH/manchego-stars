@@ -16,8 +16,8 @@ art:
   render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
     ref: "References/PCs/Pixel Brie.png"
     crop: [20, 40, 2150, 1800]     # ref pixels, ~1.2 aspect — whole-cannon framing (mirrors Pepperjack)
-    downscale: smooth
-    hand_pass: portraits/brie_cleanup.py   # restores cyan eyeshadow + pops the cyan star
+    zoom: 0.72                     # mirrors Pepperjack; fuse + barrel bore mostly clear FE8's dead corners (30 px residual)
+    # No hand pass: pngquant renders the cyan star + glam eye (blue shadow/purple iris) natively.
   approach: custom
   fidelity: faithful
   build_when: with-batch      # pixel alongside the 7 PCs, though class/recruit is post-MVP
