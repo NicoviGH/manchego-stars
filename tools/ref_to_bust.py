@@ -218,10 +218,15 @@ def main():
                          'the clean-ref + pngquant path is already crisp.')
     ap.add_argument('--bg-thresh', type=float, default=45.0,
                     help='RGB distance from the sampled border colour to treat as background (default 45).')
+    ap.add_argument('--flip-h', action='store_true',
+                    help='mirror horizontally so the bust faces FE8-canonical screen-left '
+                         '(use when the ref faces right); record as art.render.flip_h in YAML.')
     ap.add_argument('--preview', help='also write a 3x nearest-neighbour preview here')
     a = ap.parse_args()
     box = tuple(int(v) for v in a.crop.split(','))
     res = convert(a.ref, box, a.bg_thresh, a.sharpen, a.zoom)
+    if a.flip_h:
+        res = res.transpose(Image.FLIP_LEFT_RIGHT)
     res.save(a.out)
     print('%s -> %s (96x80 indexed, %d colors)' % (a.ref, a.out, len(set(res.getdata()))))
     if a.preview:

@@ -26,7 +26,6 @@ import sys
 # portrait_tool lives next to us in tools/
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import portrait_tool  # noqa: E402
-import yaml  # noqa: E402
 from PIL import Image  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -51,16 +50,6 @@ PORTRAIT_MAP = {
 }
 
 
-def _load_unit_yaml(campaign, unit):
-    """Find <unit>.yaml under pcs/ or npcs/ and return its parsed dict (or {})."""
-    for sub in ('pcs', 'npcs'):
-        p = os.path.join(REPO, 'campaigns', campaign, sub, unit + '.yaml')
-        if os.path.isfile(p):
-            with open(p) as f:
-                return yaml.safe_load(f) or {}
-    return {}
-
-
 def inject_portraits(campaign, verbose=True):
     """Overwrite each mapped vanilla portrait slot with our authored bust."""
     bust_dir = os.path.join(REPO, 'campaigns', campaign, 'portraits')
@@ -78,13 +67,8 @@ def inject_portraits(campaign, verbose=True):
             sys.exit('ERROR: %s is %s, expected %dx%d bust'
                      % (bust_path, im.size, portrait_tool.BUST_W, portrait_tool.BUST_H))
 
-        # Facing: FE8's canonical portrait faces screen-LEFT (the engine HFLIPs
-        # for the right-side speaker). A bust authored facing right reads backwards
-        # in cutscenes, so flip it here. Per-unit fact: art.render.flip_h in YAML.
-        render = (_load_unit_yaml(campaign, unit).get('art') or {}).get('render') or {}
-        if render.get('flip_h'):
-            im = im.transpose(Image.FLIP_LEFT_RIGHT)
-
+        # Busts are already canonical FE8 facing (screen-left) -- facing is baked
+        # at the render stage (ref_to_bust --flip-h, recorded as art.render.flip_h).
         # static_portrait=True: custom busts are non-animated (no mouth flap, no
         # eye-blink) -- aligning per-frame mouth/eye art for custom portraits is
         # infeasible, so we lock them still. See portrait_tool.generate.
