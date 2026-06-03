@@ -1,105 +1,97 @@
-# Handoff: Pepperjack + Brie shipped → Wave 1 busts = 10/10. NEXT = unblock toolchain (#16) + prove Braulo end-to-end into a real ROM. ⚠️ Busts overflow FE8's displayable portrait envelope (see KNOWN CONSTRAINT) — fix folded into the build-wiring step.
+# Handoff: Portrait pipeline overhauled to pngquant + reframing pass. 6/10 busts re-rendered vibrant & committed. NEXT = fitted "clean" refs for the last 4 (marty/pinky/pepperjack/brie), then resume the build pipeline (build-campaign.ts + Braulo end-to-end).
 
 **Date:** 2026-06-03
-**Session focus:** Converted the final two cast refs to 96×80 busts and shipped them, closing the Wave 1 *bust art*. Nicolas supplied the long-blocked **separate single-bust refs** (`References/PCs/Pixel Pepperjack.png` + `Pixel Brie.png`) — clean pixel-art of the two cannon-golems. Both converted, hand-passed, verified byte-identical, YAML/README updated, committed + pushed (`d5d4bff`). Then probed the insert pipeline and **found a hard display constraint** affecting Wave 1 (below).
+**Session focus:** Started toward the build pipeline, pivoted into a deep portrait-quality overhaul. (1) Confirmed the toolchain is already installed & `make` is green. (2) Extended `portrait_tool.py` with chibi/mouth/palette generation + a `preview` (what-FE8-draws) subcommand. (3) Ran a reframing pass to clear FE8's dead corners. (4) Diagnosed that PIL's MEDIANCUT quantizer was washing out colors and **rewrote `ref_to_bust.py` to use pngquant** — a big quality jump. Re-rendered + committed 6 busts; 4 remain.
 
-## ⚠️ KNOWN CONSTRAINT discovered this session (read before any portrait/build work)
+## ⚠️ FE8 DEAD-ZONE CONSTRAINT (still true — read before portrait work)
 
-**FE8's talking-portrait OAM does NOT display the full 96×80 rectangle.** `gSprite_Face96x96` is assembled from 6 objects (see `OBJECTS` in `tools/portrait_tool.py`, mirrored from `fireemblem8u/src/face.c`) that cover a face-shaped envelope; the **top-left and top-right 16px-wide strips above y≈48 are DEAD** — never drawn. Verified: 5 varied vanilla portraits (incl. ones with hair/headgear) all have **exactly 0** content in those zones and round-trip byte-identical through `portrait_tool encode→decode`. **Our busts violate it** — content there is silently clipped in-game. Dead-zone non-transparent px per shipped bust: pinky **873** (the "both ears in frame" ears!), pepperjack **733** (fuse+barrel), brie **719**, braulo 379 (claw+hat), wolfram 312, marty 292, rootis 116, meesmickle 88, prof-rbg 9 ✅, sclorbo 2 ✅.
+FE8's talking-portrait OAM does **not** draw the full 96×80. The **top-left & top-right 16px×48px corners (20% of the frame) are never drawn** (computed from `OBJECTS` in `tools/portrait_tool.py`, mirrored from `fireemblem8u/src/face.c`). Check any bust:
+```
+python3 tools/portrait_tool.py preview <bust.png> <out.png>   # [authored | what-FE8-draws | clipped-overlay] + clip count
+```
+**Fix = reframe** (this session's work, no longer deferred): `--zoom z<1` adds top headroom (shoulders pinned to bottom); shifting the crop box repositions left/right; or a **fitted/narrow ref**. Per Nicolas: **descale/zoom, NEVER crop a must-keep feature** (pinky's ears, the cannons' fuse+bore).
 
-- **DECISION (Nicolas): DEFER the fix to the build-wiring step** — don't re-frame now; handle it when Braulo is proven end-to-end and the busts can be judged in a real ROM.
-- **Planned fix:** add a **safe-region mask to `ref_to_bust.py`** (blank the two dead corners so the *preview = what ships*), regenerate all 10, then re-frame the heavy offenders so must-keep features sit inside the envelope. NOTE this re-opens the prior "Pinky — both ears fully in frame" decision (the ears are largely in the dead zone). Do NOT extend the face OAM to cover the corners — that edits the shared, campaign-agnostic face sprite; respect the vanilla envelope instead.
+## MAJOR CHANGE THIS SESSION: pngquant pipeline (commit `458f3b5`)
 
-## WHAT SHIPPED THIS SESSION
+`tools/ref_to_bust.py` was **rewritten** to a minimal pipeline:
+**crop/zoom → segment background → area-average downscale → pngquant (≤16 colors, index 0 transparent).**
+- **Why:** PIL's MEDIANCUT desaturated clean refs (grey crystals, muddy accents). pngquant keeps saturated accents at the 16-color ceiling. Proven with a diagnostic: downscale-only and +pngquant stayed vibrant; +our old full pipeline washed out.
+- **Removed (no band-aids):** the PIL quantize / ink-overlay / reserve-extremes / crisp-mode / edge-erosion machinery — it existed only to rescue the weak quantizer and *over-edited* clean art.
+- **CLI now:** `--crop`, `--zoom`, `--sharpen` (taste dial, default 0), `--bg-thresh`, `--preview`. (Removed: `--downscale`, `--no-reserve-extremes`, `--ink-*`.)
+- Requires **pngquant** (installed via `brew install pngquant`, v3.0.3).
+- Output is deterministic & byte-reproducible from each unit's YAML `art.render:` (ref/crop/zoom).
 
-- **Pepperjack** (`portraits/pepperjack.png`) — gunmetal cannon-golem. **Whole-cannon framing** (`--crop 20,60,2130,1818`, smooth): tan fuse, orange/maroon angry eye, red star, full barrel + black bore, red chili-pepper grin, tank treads. Hand pass `pepperjack_cleanup.py` **pops the red star only**.
-- **Brie** (`portraits/brie.png`) — hot-pink mirror. Same whole-cannon framing (`--crop 20,40,2150,1800`, smooth): pink fuse, glam eye (teal eyeshadow + purple iris + white catchlight), cyan star, toothy grin, grey treads. Hand pass `brie_cleanup.py` **restores the cyan eyeshadow + pops the cyan star**.
-- Both `art.render:` YAML blocks added (ref/crop/downscale/hand_pass) and verified to reproduce the shipped bust **byte-identical**. `portrait_ref`/`portrait_source` repointed from the dead combined ref to each unit's own bust + single ref. README documents both new hand passes.
+## REF-GENERATION SPEC (give this to Nano Banana / Gemini for the remaining 4)
 
-## THE DECISIONS THIS SESSION (don't re-litigate)
+> flat cel-shaded, bold black outlines, ~16 flat colors, no gradients / no fine texture, 3/4 view, large readable face, plain solid background, top corners empty.
 
-1. **Framing = whole cannon (option A), both units.** These are "face-golems": the round cannon body IS the face (eye + grin + star + fuse), the barrel is an iconic snout, the treads are the "legs/shoulders." A tight face-dominant crop (option B) couldn't hold the fuse-top AND the grin without including the barrel anyway, and clipped the grin — so A (the full recognizable silhouette: fuse → barrel + bore → grin → treads) won. Applied identically to both since they're a mirror pair.
-2. **Smooth, not crisp.** Clean pixel-art refs, but the must-keep accents are tiny coloured features (eye, star, fuse, chili-stache); crisp muddies those (same call as the rest of the cast). Smooth + a hand pass.
-3. **Pepperjack's eye is left AS RENDERED (reads dark maroon, not the ref's orange).** An orange-eye hand pass was tried and **reverted** — see Dead Ends. Nicolas accepted the maroon eye over the speckle artifact.
-4. **Pop the stars** (Nicolas's call): the star decals desaturate badly at this ~22× downscale. Pepperjack's red star gets a dedicated brighter-red slot; Brie's cyan star gets a dedicated brighter-cyan slot.
+**Do NOT ask for "sharpen" / "more detail"** — detail below 96×80 averages to mush; the lever is FLATTER + BOLDER + fewer colors. A fitted clean ref beats fighting a painterly ref's crop (proven on Wolfram: narrow → side → side-clean). Save refs to `…/References/PCs/<Name>.png`.
 
-## DEAD ENDS THIS SESSION (don't retry)
+## WHAT'S DONE — 6/10 busts on pngquant (committed, byte-verified, dead-corners clear)
 
-- **Pepperjack orange eye via box-scoped recolour** (idx13 red + idx10 brown → orange inside an eye box) → the box also contained stray outline/shadow pixels of those same shared indices, which turned into **orange specks that weren't in the ref**. Reverted; eye left as rendered. (If ever retried: needs connectivity/largest-blob gating like Pinky's iris, not a flat box recolour — but Nicolas was fine with the maroon eye, so low priority.)
-- **Brie: re-saturating the shared grey slot (idx6) globally** → idx6 is BOTH the desaturated teal (eyeshadow + star) AND **her grey tread metal**, so the treads turned teal. **Snapping idx6 strays to neighbours** (to protect non-eyeshadow pixels) then **gutted the treads to dark blobs**. Fix that worked: **free a NEW slot** (merge two near-identical cream specks idx2≈idx4, Pinky's trick) and **recolour only the eyeshadow/star boxes**, leaving idx6 = tread grey untouched.
-- First two crop passes were **far too tight** — eyeballed off the 200px grid thumbnail and under-shot badly (chili-grin is at ref-y≈1170, barrel bore out at x≈2124). Lesson: **measure the content bbox + feature positions programmatically** (border-median bg, fg-dist>45 mask, colour-keyed feature hunts) before designing a crop — don't trust the grid thumbnail's scale.
+| unit | ref | crop | zoom | clip px | notes |
+|---|---|---|---|---|---|
+| braulo | `Broulo Face Clean.png` | 120,180,1960,1720 | 0.84 | 47 | taller "claw-crop" (more lower body) |
+| prof-rbg | `RBG Landscape.png` | 14,17,2258,1887 | 1.0 | 18 | unchanged framing |
+| wolfram | `Wolfram Side.png` | 60,80,2240,1840 | 0.90 | 19 | 3/4 side pose; pngquant from painterly "Side" (Nicolas: "keep it", didn't switch to Side Clean) |
+| meesmickle | `Meesmickle Clean.png` | 40,255,1864,1775 | 0.88 | 9 | shifted left + zoom (both cape halves in) |
+| sclorbo | `Sclorbo Portrait clean.png` | 342,297,1786,1500 | 1.0 | 12 | unchanged framing |
+| rootis | `Rootis Bust 1.png` | 216,100,1704,1340 | 0.94 | 0 | shifted +90 (centre head) + zoom; **hand pass deleted** |
 
-## THE PIXEL-TOUCH-UP TEMPLATE (now FIVE examples)
+`rootis_cleanup.py` **deleted** — pngquant renders the carrot/coal/outline clean; the old hand pass (hardcoded to the PIL palette) broke on the new palette (pink garbage). First hand pass to fall.
 
-`marty_eye_fixup.py` (hand-drawn face on smooth body), `rootis_cleanup.py` (outline + faceted nose + halo), `pinky_cleanup.py` (palette-budget rescue), **`pepperjack_cleanup.py`** (single scoped accent pop — free slot → brighter red in a star box), **`brie_cleanup.py`** (chroma rescue where the desat slot is SHARED with a real grey feature → free a slot via cream-merge, recolour only scoped boxes, leave the shared grey alone). **Pattern:** render faithful with `ref_to_bust.py`, then a deterministic colour-keyed companion for what the downscale + 16-colour quantizer can't hold. README "Per-portrait hand passes" documents all five.
+## WHAT'S LEFT — 4 busts pending FITTED REFS (the immediate next task)
 
-**Recurring chroma-budget lesson:** when a ref has big saturated areas (pink body / grey body) plus small must-keep accents (eye / star / eyeshadow), the big areas win the chroma-reservation slots and the small accents desaturate. The hand pass frees slots (merge near-dup colours) and repaints the accent **scoped to a box** — and must check whether the desaturated slot is shared with a *legitimate* feature (Brie's treads) before touching it.
+**marty, pinky, pepperjack, brie** still clip hard at their old wide framing (marty 410, pinky 984, pepperjack 854, brie 843 px). They need **fitted clean refs** (the spec above) → reframe + re-render through pngquant → **their hand passes drop too**:
+- `marty_eye_fixup.py` — hand-DRAWS the face (eyes+smile) at fixed pixels because the face is ~20px. A bigger-face fitted ref may let pngquant render it; otherwise re-derive. (marty clips BOTH corners — wide cap.)
+- `pinky_cleanup.py`, `pepperjack_cleanup.py`, `brie_cleanup.py` — accent-pop / palette-budget rescues. pngquant likely makes them unnecessary (it preserves pinky's blue eye, brie's cyan, pepperjack's star natively). Confirm per-character.
+- pinky/pepperjack/brie YAML live in `campaigns/.../npcs/`; the rest in `pcs/`.
 
-## PIPELINE KNOBS (`tools/ref_to_bust.py`) — unchanged
+**Workflow Nicolas wants (standing rule, reinforced this session):** render → **show the final on-screen look → WAIT for his explicit OK → only then commit.** Do not auto-commit art. (He pushed back when a Wolfram bust was committed without sign-off.)
 
-- `--downscale smooth|crisp` (default smooth). smooth = area-average + ink overlay; crisp = NEAREST + source-true freq palette (clean flat cel art only; **muddies tiny coloured features** — avoid here).
-- `--crop x0,y0,x1,y1` (per-character, ~1.2 aspect), `--sharpen` (0), `--ink-lum` (150) / `--ink-cov` (4), `--bg-thresh` (45), `--no-reserve-extremes`, `--preview`.
-- Reserve logic (default ON): protects luminance extremes + up to 3 saturated-hue clusters; big saturated areas beat small accents (the chroma-budget lesson above).
+## ALSO DONE THIS SESSION (not portrait-quality)
 
-## PER-PORTRAIT RENDER SETTINGS
+- **`tools/portrait_tool.py`** gained: `generate <bust> <base> [--xmouth N --ymouth N]` → produces the 4 decomp assets (`_tileset.png` 256×32, `_mouth.png` 32×96 = 6 static frames, `_chibi.png` 32×32, `_palette.agbpal` 32-byte RGB555). gbagfx accepts all three PNGs (4096/1536/512 bytes). Mouth math mirrors `face.c` OAM: `bust_x=(xmouth-4)*8+32`, `bust_y=ymouth*8`. **Chibi is a naive face-crop placeholder** — revisit for quality. Also added `preview` (dead-zone visualizer, see above).
+- **Toolchain confirmed installed** (agbcc, baserom, arm-none-eabi-gcc 16.1, numpy/pillow) — `make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba` builds the byte-identical vanilla ROM. **#16 is effectively closed** (the prior handoff's "toolchain not installed" was stale).
 
-Canonical home = each unit's YAML `art.render:` block (ref / crop / downscale / hand_pass), byte-verified. Refs in `…/References/PCs/`; ship → `campaigns/rime-of-the-frostmaiden/portraits/<unit>.png`. Convenience mirror:
+## DEAD ENDS / DON'T RETRY
 
-| unit | ref file | --crop | mode + hand pass |
-|---|---|---|---|
-| braulo | `Broulo Face Clean.png` | `153,129,1888,1574` | smooth |
-| marty | `Marty 3.png` | `0,35,2222,1887` | smooth + `marty_eye_fixup.py` |
-| meesmickle | `Meesmickle Clean.png` | `0,255,1824,1775` | smooth |
-| prof-rbg | `RBG Landscape.png` | `14,17,2258,1887` | smooth |
-| wolfram | `womfram bust 3.png` (typo real) | `280,70,1980,1487` | smooth |
-| sclorbo | `Sclorbo Portrait clean.png` | `342,297,1786,1500` | smooth |
-| rootis | `Rootis Bust 1.png` | `126,100,1614,1340` | smooth + `rootis_cleanup.py` |
-| pinky | `Pinky Art.png` | `380,100,1675,1179` | smooth + `pinky_cleanup.py` |
-| **pepperjack** | `Pixel Pepperjack.png` | `20,60,2130,1818` | smooth + `pepperjack_cleanup.py` |
-| **brie** | `Pixel Brie.png` | `20,40,2150,1800` | smooth + `brie_cleanup.py` |
+- **`crisp` downscale mode on painterly refs** → noise/speckle (it's for clean cel art only). Removed from the tool.
+- **`--sharpen` to fix blur** → Gemini "sharpen the image" just ADDED detail (wrong); the blur was the weak PIL quantizer + downscaling a *painterly* ref. Real fix = clean flat ref + pngquant. Sharpen survives only as an optional taste dial.
+- **Applying old hand passes to pngquant output** → they're hardcoded to the old PIL palette/slots → garbage. Delete or re-derive, don't reuse.
+- **Re-rendering the 4 pending busts at their OLD crops** → they clip 400–984 px and (for marty) lose the hand-drawn face. Don't ship them until reframed with fitted refs.
 
-## Current state
+## BLOCKERS / OPEN
 
-- **Wave 1 portraits: 10 / 10 — COMPLETE.** braulo, prof-rbg, marty, wolfram, meesmickle, sclorbo, rootis, pinky, **pepperjack, brie**. All 96×80 indexed busts, ≤16 colours, index-0 transparent, byte-verified reproduction, render params in YAML.
-- **Build:** untouched. This session added only campaign assets/docs/YAML (2 PNGs, 2 preview PNGs, 2 hand-pass scripts, README + 2 YAML edits) — **zero C-build impact.** `make` exercises only the decomp ROM (base ROM + toolchain not installed locally).
-- **`fireemblem8u` submodule** still shows local changes in `git status` (pre-existing) — left untouched; **don't commit the submodule pointer.**
+- 🟡 **4 busts need fitted refs from Nicolas** (marty/pinky/pepperjack/brie) — the immediate next step; everything for those is on hold until the refs land.
+- 🟢 **build pipeline still not started** — `build-campaign.ts` (#13), build-events.ts (#14), Braulo end-to-end (#15) remain. The original plan was to build a self-contained **test ROM / "visual-test" chapter** (reuse a vanilla map, spawn the roster, intro dialogue + a fight) to visualize portraits/sprites/anims without touching the real game. Resume after portraits settle (or in parallel).
+- **fireemblem8u submodule** shows local changes in `git status` (pre-existing) — leave untouched, **don't commit the submodule pointer**.
+- **YAML cleanup pending:** remove the now-vestigial `downscale:` field from all `art.render:` blocks once all 10 are migrated.
+- **Untracked throwaway:** `portrait_clip_check.png` in repo root (a dead-zone contact sheet) — ignore or delete.
 
-## Blockers / open
+## NEXT STEPS (priority order)
 
-- **🔴 CRITICAL PATH — toolchain not installed locally (#16).** Base ROM + `agbcc` aren't set up, so NOTHING can build to a ROM yet. This gates every "see it in-game" step below. (#16 also needs a manual GitHub close — agent close blocked by permission classifier.) Use `tools/setup-toolchain.sh`.
-- **Portrait display envelope** — see ⚠️ KNOWN CONSTRAINT above. Fix deferred into the build-wiring step.
-- **No more PC/cast ref blockers** — the Pepperjack/Brie combined-ref blocker is CLOSED.
-- **`build-campaign.ts` does NOT exist yet** (`tools/` has only ref_to_bust / portrait_tool / autoframe / gen-*-index / setup-toolchain). Issue #13 creates it; #14 = build-events.ts; #15 = Braulo end-to-end.
-- **`tools/portrait_tool.py` only does the 96×80 bust↔tileset round-trip** (encode/decode). The **chibi (32×32) + mouth (32×96)** generators are TODO. Per-portrait vanilla asset set = `_tileset.png` (256×32) + `_mouth.png` (32×96) + `_chibi.png` (32×32) + `_palette.agbpal`. Study a vanilla set via `decode` before authoring.
-- **Recruit-NPC portraits = DECIDE LATER** (Nicolas's call). Lupin + the #17 stubs (Baxby/Trex/Sahnar/Basil) have no `art:` block; revisit when their recruitment chapters firm up. Enemies/bosses stay **vanilla** (standing rule) — no custom enemy portraits.
-- **Pepperjack/Brie `fe_stats.class = null`** (FE-legal class TBD post-MVP) and **Rootis & Sclorbo recruitment chapters / Sclorbo signature_moment** = TBD (Nicolas to recall).
+1. **Reframe the last 4 busts** as Nicolas supplies fitted clean refs (spec above): reframe (`--zoom`/crop) → pngquant → `portrait_tool.py preview` to confirm dead-corners clear → **show final, get OK** → commit. Drop each hand pass.
+2. **YAML sweep:** strip the dead `downscale:` field from all render blocks; update `portraits/README.md` (it still documents the deleted hand passes + old pipeline).
+3. **Revisit chibi generation** in `portrait_tool.py` (current is a placeholder crop) before wiring portraits into the ROM.
+4. **Build pipeline:** `build-campaign.ts` (#13) + the self-contained test chapter to see a bust in mGBA (Braulo end-to-end, #15). De-risks everything downstream.
+5. Wave 2 (map sprites) / Wave 3 (battle anims) — full custom, behind portraits.
 
-## Next steps (priority order) — agreed direction: toolchain + Braulo end-to-end first
+## KEY FILES
 
-1. **Unblock the toolchain (#16)** — install base ROM + agbcc locally (`tools/setup-toolchain.sh`); confirm `fireemblem8u` builds clean via its quickstart. **Everything else is blocked on this.**
-2. **Extend `tools/portrait_tool.py`** — add chibi (32×32) + mouth (32×96) generation alongside the existing bust encode. Decode a vanilla portrait first to nail the mouth-frame breakdown + `_palette.agbpal` format.
-3. **`build-campaign.ts` (#13) + Braulo end-to-end (#15)** — wire one unit's tileset+mouth+chibi+palette → `fireemblem8u/graphics/portrait/` → `gbagfx` → ROM; verify Braulo's portrait in mGBA. **This milestone de-risks the whole pipeline.** Fold in the safe-region mask fix here (regenerate + re-frame offenders, judged in-ROM).
-4. **Batch the other 9** (chibi+mouth+inject) once the chain is proven.
-5. **Wave 2 — map sprites** (full custom, same 10): new asset format + tooling; needs map-sprite refs from Nicolas. Same prove-one-then-batch model.
-6. **Wave 3 — battle animations** (full custom): biggest effort — worth a scope conversation (full-custom vs recolored vanilla skeletons) before starting. Behind Waves 1–2.
+- `tools/ref_to_bust.py` — **rewritten** ref → 96×80 indexed bust (pngquant pipeline). Knobs: `--crop`, `--zoom`, `--sharpen`, `--bg-thresh`, `--preview`.
+- `tools/portrait_tool.py` — bust↔FE8 tilesheet (`encode`/`decode`), `generate` (chibi/mouth/palette), `preview` (dead-zone). 
+- `campaigns/rime-of-the-frostmaiden/{pcs,npcs}/*.yaml` `art.render:` — per-unit ref/crop/zoom (+ `hand_pass`, mostly being nulled). Source of truth; byte-reproduces each bust.
+- `campaigns/rime-of-the-frostmaiden/portraits/<unit>.png` — shipped 96×80 indexed busts. Remaining hand-pass scripts: `marty_eye_fixup.py`, `pinky_cleanup.py`, `pepperjack_cleanup.py`, `brie_cleanup.py` (to be dropped).
+- `…/References/PCs/` — hi-res refs (outside the repo, in the Documents source folder). Fitted refs go here.
+- `tools/build-campaign.ts` — **does not exist yet** (#13); the campaign-data/portrait injector.
 
-## Key files
+## STANDING RULES (how Nicolas wants this work done)
 
-- `tools/ref_to_bust.py` — ref → 96×80 indexed bust (smooth default / crisp opt-in). Knobs above.
-- `campaigns/rime-of-the-frostmaiden/portraits/<unit>_cleanup.py` (+ `marty_eye_fixup.py`) — the five deterministic, byte-identical hand passes. Read the docstring for each before editing a bust.
-- `tools/portrait_tool.py` — bust↔FE8 256×32 tile-sheet OAM packer (`encode`/`decode`, byte-identical). **Chibi/mouth frames still TODO** — extend here for step 1.
-- `tools/build-campaign.ts` — campaign-data injector (step 2; portrait wiring lives here).
-- `tools/autoframe.py` / `/tmp/grid.py` / `/tmp/autocrop.py` — framing helpers (grid/autocrop NOT committed; recreate. **Prefer the programmatic bbox + colour-keyed feature hunt over the grid thumbnail** — see Dead Ends).
-- `campaigns/.../{pcs,npcs}/*.yaml` `art:` block — per-character must-keep brief + the byte-verified `render:` sub-block. All 10 cast now have both.
-- Vanilla portrait reference: `fireemblem8u/graphics/portrait/portrait_*_tileset.png` (decode with `portrait_tool.py decode`).
-
-## Standing rules (how Nicolas wants this work done)
-
-- **Follow the ref's colours faithfully; don't embellish** — exception: when the quantizer DROPS a ref-true feature (Pinky's blue eyes, Brie's cyan eyeshadow/star), the hand pass restores it to match the ref. Popping the stars + lightening (Pinky's ears) were explicit Nicolas asks.
-- **Face-dominant** FE8 convention; use available headroom to zoom small faces (capped by the subject — these face-golems use the full silhouette).
-- **Collaborative, one item at a time:** render → `open` preview → wait for Nicolas → iterate → commit/push. Show 2–3 options on real trade-offs (framing, ref choice). Framing is live back-and-forth.
-- **Art = full custom for the 10 named cast** (portrait → map sprite → battle anim, wave order). **Enemies stay vanilla.**
-- **Stock vanilla FE8 classes/weapons only**; **element = flavor, NEVER a mechanic**; combat RULES are vanilla FE.
-- **Clean native doc rewrites** (no STALE/reverted banners). **Auto-push to main** (no need to ask).
-- **Doc source-of-truth:** per-chapter/unit facts live ONLY in YAML; `docs/*` are GENERATED. **Lean repo**; backlog = GitHub issues (M0–M4).
-- **`make` must be green at the end of every session.**
+- **Art = full custom for the 10 named cast** (portrait → map sprite → battle anim). Enemies stay vanilla.
+- **Collaborative, one item at a time:** render → show final → **WAIT for OK** → commit. Show 2–3 options on real trade-offs (framing/ref choice).
+- **Clean native rewrites, NO band-aids** (no stale fields, no "kept old mode just in case", no reverted-on-DATE banners).
+- **Auto-push to main** once a change is approved.
+- **Doc source-of-truth:** per-unit facts in YAML; `docs/*` generated; lean repo; backlog = GitHub issues.
+- **Stock vanilla FE8 classes/weapons; element = flavor never mechanic; combat RULES are vanilla FE.**
+- **`make` green at the end of every session** (it is — no C/build changes this session).
