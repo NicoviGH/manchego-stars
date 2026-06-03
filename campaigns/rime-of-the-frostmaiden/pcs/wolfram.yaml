@@ -14,10 +14,10 @@ portrait_source: data/portraits/wolfram.jpeg
 # ALL parts custom indexed-palette art. Follow the concept ref faithfully.
 art:
   render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
-    ref: "References/PCs/womfram bust 3.png"   # filename typo is real (as supplied)
-    crop: [150, 30, 2110, 1663]    # ref pixels, ~1.2 aspect — wider+taller: both ice crystals + full armor torso
+    ref: "References/PCs/Wolfram Narrow.png"   # narrower-silhouette ref (compact shoulder crystals) -> bigger face
+    crop: [100, 60, 2240, 1840]    # ref pixels, ~1.2 aspect — head + both crystals + full armor torso
     downscale: smooth
-    zoom: 0.82                     # headroom so the crystal shoulders clear FE8's dead top corners (6px residual)
+    zoom: 0.85                     # headroom so the (asymmetric, higher) left crystal clears the dead corner (8px residual)
     hand_pass: null
   approach: custom
   fidelity: faithful
