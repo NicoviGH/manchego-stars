@@ -15,8 +15,9 @@ portrait_source: data/portraits/wolfram.jpeg
 art:
   render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
     ref: "References/PCs/womfram bust 3.png"   # filename typo is real (as supplied)
-    crop: [280, 70, 1980, 1487]    # ref pixels, ~1.2 aspect
+    crop: [150, 30, 2110, 1663]    # ref pixels, ~1.2 aspect — wider+taller: both ice crystals + full armor torso
     downscale: smooth
+    zoom: 0.82                     # headroom so the crystal shoulders clear FE8's dead top corners (6px residual)
     hand_pass: null
   approach: custom
   fidelity: faithful
