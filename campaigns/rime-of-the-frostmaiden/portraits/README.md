@@ -35,3 +35,11 @@ companion script (run after `ref_to_bust.py`, reproduce command in each docstrin
   blues, repaints the irises, then keeps only the largest connected blob so eyelid/brow
   flecks drop), lightens the shared ear/hand pinks while repurposing the freed iris-
   shadow slot as a bright ruby red so the gem nose pops, and despeckles the eye halo.
+- `pepperjack_cleanup.py` — pops the red star decal: it shares the chili-mustache's red
+  slot but is small on dark gunmetal, so a free slot becomes a brighter red, scoped to the
+  star box (the chili keeps its slot; the eye is left exactly as rendered).
+- `brie_cleanup.py` — restores both of Brie's CYAN features (the hot-pink body floods the
+  chroma slots, desaturating the teal eyeshadow + cyan star to a grey-purple that is ALSO
+  her tread metal). Frees a slot by merging two near-identical cream specks, then recolours
+  only the eyeshadow box to teal and the star box to a brighter cyan — leaving the treads
+  grey (re-saturating the shared slot directly would turn the treads teal).

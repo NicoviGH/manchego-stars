@@ -5,14 +5,19 @@
 
 id: brie
 name: Brie
-portrait_ref: portraits/pepperjack-and-brie.png   # shared source ref; gets her OWN portrait (pink)
-portrait_source: data/portraits/pepperjack-and-brie.jpeg
+portrait_ref: portraits/brie.png                  # shipped 96×80 bust (own portrait, pink)
+portrait_source: "References/PCs/Pixel Brie.png"   # own single-bust ref (split from the combined concept)
 
 # ── Custom Art Brief (decided 2026-06-01 portrait walkthrough) ───────────────────
 # ALL parts custom indexed-palette art. Follow the concept ref faithfully.
 # Brie was built by RBG FOR Pepperjack (Adam/Eve framing) — they are a COUPLE, NOT twins/siblings.
 # Mirror design of Pepperjack in opposing palette: Brie = pink+cyan, Pepperjack = grey+red.
 art:
+  render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
+    ref: "References/PCs/Pixel Brie.png"
+    crop: [20, 40, 2150, 1800]     # ref pixels, ~1.2 aspect — whole-cannon framing (mirrors Pepperjack)
+    downscale: smooth
+    hand_pass: portraits/brie_cleanup.py   # restores cyan eyeshadow + pops the cyan star
   approach: custom
   fidelity: faithful
   build_when: with-batch      # pixel alongside the 7 PCs, though class/recruit is post-MVP
