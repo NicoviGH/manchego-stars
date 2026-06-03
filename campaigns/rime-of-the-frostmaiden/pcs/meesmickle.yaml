@@ -15,7 +15,6 @@ art:
   render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
     ref: "References/PCs/Meesmickle Clean.png"
     crop: [40, 255, 1864, 1775]    # ref pixels, ~1.2 aspect — shifted +40 right (subject left)
-    downscale: smooth
     zoom: 0.88                     # headroom so both cape halves clear FE8's dead top corners (3px residual)
     hand_pass: null
   approach: custom

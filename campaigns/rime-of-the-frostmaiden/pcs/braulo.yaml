@@ -15,7 +15,6 @@ art:
   render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
     ref: "References/PCs/Broulo Face Clean.png"
     crop: [120, 180, 1960, 1720]   # ref pixels, ~1.2 aspect — taller "claw-crop" (more lower body)
-    downscale: smooth
     zoom: 0.84                     # headroom so hat+shell shoulders clear FE8's dead top corners (26px residual)
     hand_pass: null
   approach: custom            # not recolor; follow concept art to best ability
