@@ -1,8 +1,14 @@
 CAMPAIGN ?= rime-of-the-frostmaiden
 
-# Phase 0: placeholder until build-campaign.ts is implemented (Phase 2)
-# For now, delegates straight to the fireemblem8u decomp build to verify
-# the base toolchain is working.
+# Phase 2: content pipeline. `make` first runs the campaign generator
+# (tools/build_campaign.py), which injects our content into the fireemblem8u
+# working tree, then builds the decomp ROM target directly.
+#
+# NOTE: we now intentionally diverge from vanilla, so we build the decomp's
+# `fireemblem8.gba` target (NOT its default `compare` goal, which sha1-checks
+# against the vanilla ROM). "make green" now means THE ROM BUILDS, not
+# byte-identical-to-vanilla. Restore vanilla art with:
+#   git -C fireemblem8u checkout graphics/portrait
 
 NPROC := $(shell nproc 2>/dev/null || sysctl -n hw.ncpu)
 
@@ -28,7 +34,8 @@ endif
 all: fireemblem8.gba
 
 fireemblem8.gba:
-	$(MAKE) -C fireemblem8u -j$(NPROC)
+	python3 tools/build_campaign.py --campaign $(CAMPAIGN)
+	$(MAKE) -C fireemblem8u fireemblem8.gba -j$(NPROC)
 
 verify:
 	@cd fireemblem8u && sha1sum -c checksum.sha1 && echo "ROM OK"

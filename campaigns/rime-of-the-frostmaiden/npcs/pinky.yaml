@@ -14,6 +14,7 @@ built_by: prof-rbg                        # RBG's homunculus 'son'
 # ── Portrait art brief (drives tools/ref_to_bust.py) ──
 art:
   render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
+    flip_h: true               # bust faces right; flip to FE8's canonical screen-left facing
     ref: "References/PCs/Pinky Art.png"
     crop: [380, 100, 1675, 1179]   # ref pixels, ~1.2 aspect
     zoom: 0.65                     # full-body pose; headroom so both tall ears clear FE8's dead corners (0 px clipped)

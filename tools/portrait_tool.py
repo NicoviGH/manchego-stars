@@ -194,14 +194,24 @@ def _make_chibi(bust):
     return chibi
 
 
-def generate(bust, xmouth=2, ymouth=6):
+def generate(bust, xmouth=2, ymouth=6, static_portrait=False):
     """Derive all four decomp portrait assets from a 96x80 indexed bust.
 
     Returns (tileset_png, mouth_png, chibi_png, palette_bytes) where:
-      tileset_png  — 256x32 tile sheet with mouth region blanked (index 0)
-      mouth_png    — 32x96 indexed PNG (6 identical 32x16 frames)
+      tileset_png  — 256x32 tile sheet
+      mouth_png    — 32x96 indexed PNG (the engine's eye+mouth animation frames)
       chibi_png    — 32x32 indexed PNG
       palette_bytes — 32-byte GBA RGB555 blob (.agbpal)
+
+    static_portrait (default for custom art): make a NON-ANIMATED bust. FE8 always
+    runs a talking-mouth proc AND a periodic eye-blink proc, both reading frames
+    from imgMouth (see src/face.c sub_8005FE0). Authoring aligned mouth/eye frames
+    by hand is infeasible for custom art, so instead we defeat the animation:
+      * bake the WHOLE neutral face (eyes + mouth) into the tileset — do NOT blank
+        the mouth window the way animated vanilla portraits do;
+      * emit an all-transparent (index 0) frames file, so every overlay frame the
+        engine paints is empty and the static face underneath always shows through.
+    Net effect: the engine "animates", but nothing ever moves — a locked still.
     """
     mouth_bx = (xmouth - 4) * 8 + 32   # bust x of the 32x16 mouth window
     mouth_by = ymouth * 8               # bust y of the 32x16 mouth window
@@ -210,23 +220,30 @@ def generate(bust, xmouth=2, ymouth=6):
     pal_rgb = bust.getpalette()[:48]    # first 16 colors, 3 bytes each
     palette_bytes = _palette_to_agbpal(pal_rgb)
 
-    # --- mouth: extract 32x16 region from bust, then blank it ---
-    mouth_frame = bust.crop((mouth_bx, mouth_by,
-                             mouth_bx + MOUTH_W, mouth_by + MOUTH_H))
+    if static_portrait:
+        # Full face stays in the tileset; overlay frames are fully transparent.
+        mod_bust = bust
+        mouth_png = Image.new('P', (MOUTH_W, MOUTH_H * MOUTH_FRAMES), 0)
+        mouth_png.putpalette(bust.getpalette())
+    else:
+        # Animated vanilla layout: extract the mouth window, blank it in the
+        # tileset, and repeat it across the 6 frame slots.
+        mouth_frame = bust.crop((mouth_bx, mouth_by,
+                                 mouth_bx + MOUTH_W, mouth_by + MOUTH_H))
 
-    mod_bust = bust.copy()
-    px = list(mod_bust.getdata())
-    for row in range(mouth_by, mouth_by + MOUTH_H):
-        for col in range(mouth_bx, mouth_bx + MOUTH_W):
-            px[row * BUST_W + col] = 0
-    mod_bust.putdata(px)
+        mod_bust = bust.copy()
+        px = list(mod_bust.getdata())
+        for row in range(mouth_by, mouth_by + MOUTH_H):
+            for col in range(mouth_bx, mouth_bx + MOUTH_W):
+                px[row * BUST_W + col] = 0
+        mod_bust.putdata(px)
 
-    mouth_png = Image.new('P', (MOUTH_W, MOUTH_H * MOUTH_FRAMES), 0)
-    mouth_png.putpalette(bust.getpalette())
-    for i in range(MOUTH_FRAMES):
-        mouth_png.paste(mouth_frame, (0, i * MOUTH_H))
+        mouth_png = Image.new('P', (MOUTH_W, MOUTH_H * MOUTH_FRAMES), 0)
+        mouth_png.putpalette(bust.getpalette())
+        for i in range(MOUTH_FRAMES):
+            mouth_png.paste(mouth_frame, (0, i * MOUTH_H))
 
-    # --- tileset: encode the modified bust ---
+    # --- tileset: encode the (possibly unmodified) bust ---
     tileset_png = encode(mod_bust)
 
     # --- chibi ---
@@ -293,6 +310,8 @@ def main():
                             help='mouth tile-column offset (default 2)')
         parser.add_argument('--ymouth', type=int, default=6,
                             help='mouth tile-row offset (default 6)')
+        parser.add_argument('--static', action='store_true',
+                            help='non-animated bust: full face in tileset, transparent frames')
         args = parser.parse_args(sys.argv[2:])
 
         im = Image.open(args.bust)
@@ -300,7 +319,7 @@ def main():
         if im.size != (BUST_W, BUST_H):
             sys.exit('ERROR: generate expects a %dx%d bust, got %s' % (BUST_W, BUST_H, im.size))
 
-        tileset, mouth, chibi, pal_bytes = generate(im, args.xmouth, args.ymouth)
+        tileset, mouth, chibi, pal_bytes = generate(im, args.xmouth, args.ymouth, args.static)
 
         tileset_path = args.out_base + '_tileset.png'
         mouth_path   = args.out_base + '_mouth.png'

@@ -12,6 +12,7 @@ portrait_source: data/portraits/prof-rbg.jpg
 # ALL parts custom indexed-palette art. Follow the concept ref faithfully.
 art:
   render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
+    flip_h: true               # interim: bust faces right. Re-render from the new RBG3/4_Flat 3/4 ref (faces left) to retire this.
     ref: "References/PCs/RBG Landscape.png"
     crop: [14, 17, 2258, 1887]     # ref pixels, ~1.2 aspect
     hand_pass: null
