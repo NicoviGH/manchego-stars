@@ -68,6 +68,14 @@ UNIT_ICON_WAIT_S = os.path.join(DECOMP, 'data', 'const_data_unit_icon_wait.s')
 UNIT_ICON_POINTER_H = os.path.join(DECOMP, 'include', 'unit_icon_pointer.h')
 WAIT_GFX_DIR = os.path.join(DECOMP, 'graphics', 'unit_icon', 'wait')
 CUSTOM_SMS_BASE = 107
+# The hover/selected + walking sprite is the per-class MU sheet (gMuInfoTable ==
+# unit_icon_move_table, a MuInfo{img, anim} view; 32x480 = 15x 32x32). MuProc carries
+# ->unit, so a per-character override of GetUnitMU's .img (reusing the class .anim/motion)
+# gives a custom walk without touching classes/enemies. Asset: map_sprites/<id>_mu.png.
+MU_C = os.path.join(DECOMP, 'src', 'mu.c')
+UNIT_ICON_MOVE_C = os.path.join(DECOMP, 'src', 'unit_icon_move_data.c')
+UNIT_ICON_MOVE_S = os.path.join(DECOMP, 'data', 'const_data_unit_icon_move.s')
+MOVE_GFX_DIR = os.path.join(DECOMP, 'graphics', 'unit_icon', 'move')
 # New-game boots straight into the test chapter (skip the vanilla prologue) so the
 # spawn is one "New Game" away. CHAPTER_L_1 = 0x01 (constants/chapters.h).
 TEST_CHAPTER_INDEX = 1
@@ -82,8 +90,9 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         'src/events/ch1-eventudefs.h', 'src/events/ch1-eventinfo.h',
                         'src/events/ch1-eventscript.h', 'src/events/prologue-wm.h',
                         'src/gamecontrol.c', 'src/bmio.c', 'src/bmunit.c',
-                        'src/unit_icon_wait_data.c',
-                        'data/const_data_unit_icon_wait.s', 'include/unit_icon_pointer.h']
+                        'src/unit_icon_wait_data.c', 'src/unit_icon_move_data.c', 'src/mu.c',
+                        'data/const_data_unit_icon_wait.s', 'data/const_data_unit_icon_move.s',
+                        'include/unit_icon_pointer.h']
 
 
 def restore_vanilla_sources():
@@ -716,25 +725,101 @@ def _inject_sms_override_hook():
         f.write(text.replace(orig, hooked, 1))
 
 
+def _inject_mu_override_hook():
+    """Patch GetMuImg to return a per-character custom MU (hover/walk) sheet before
+    the class default, reusing the class motion script (only the graphics change)."""
+    with open(MU_C, encoding='utf-8') as f:
+        text = f.read()
+    orig = ('const void * GetMuImg(struct MuProc * proc)\n'
+            '{\n'
+            '    return gMuInfoTable[proc->jid - 1].img;\n'
+            '}\n')
+    hooked = (
+        'struct CharMuImg { unsigned short charId; const void * img; };\n'
+        'extern struct CharMuImg gMuImgOverride[];\n\n'
+        'const void * GetMuImg(struct MuProc * proc)\n'
+        '{\n'
+        '    /* Campaign per-character MU (hover/walk) sprite override (build-injected;\n'
+        '     * empty in vanilla). Reuses the class motion script -- graphics only. */\n'
+        '    if (proc->unit) {\n'
+        '        struct CharMuImg * it = gMuImgOverride;\n'
+        '        int charId = UNIT_CHAR_ID(proc->unit);\n'
+        '        while (it->charId != 0) {\n'
+        '            if (it->charId == charId)\n'
+        '                return it->img;\n'
+        '            it++;\n'
+        '        }\n'
+        '    }\n'
+        '    return gMuInfoTable[proc->jid - 1].img;\n'
+        '}\n')
+    if orig not in text:
+        sys.exit('ERROR: GetMuImg not in expected vanilla form in %s' % MU_C)
+    text = text.replace(orig, hooked, 1)
+
+    # StartMu decompresses the MU graphics inside StartMuInternal -- BEFORE it sets
+    # proc->unit. So the GetMuImg override (which keys on proc->unit) sees no unit on
+    # that first load and falls back to the class sheet. Reload the graphics once
+    # proc->unit is set so the per-character override actually applies.
+    su_orig = ('    proc->unit = unit;\n'
+               '    proc->cam_b = true;\n'
+               '    return proc;\n')
+    su_hooked = ('    proc->unit = unit;\n'
+                 '    proc->cam_b = true;\n'
+                 '    /* reload graphics now that proc->unit is set, so a per-character\n'
+                 '     * MU override (GetMuImg) replaces the class sheet loaded above. */\n'
+                 '    Decompress(GetMuImg(proc), GetMuImgBufById(proc->config->slot));\n'
+                 '    return proc;\n')
+    # Both StartMu and StartMuExt share this exact tail (StartMuInternal then set
+    # proc->unit); patch both so any MU spawn honours the override.
+    if su_orig not in text:
+        sys.exit('ERROR: StartMu not in expected vanilla form in %s' % MU_C)
+    text = text.replace(su_orig, su_hooked)
+
+    with open(MU_C, 'w', encoding='utf-8') as f:
+        f.write(text)
+
+
 def inject_map_sprites(campaign, verbose=True):
     """Give cast members a custom overworld sprite distinct from their class.
 
-    For each classed cast member with a map_sprites/<id>.png asset: copy the sheet
-    into the decomp, add a wait-table (idle) slot at its stable custom SMS id, and
-    register a per-character override in GetUnitSMSId. Only the standing sprite is
-    overridden; the walk animation is keyed by class (MU system, gMuInfoTable[jid]),
-    so a unit idles as its custom sprite and walks as its stock class -- bespoke walk
-    frames are a later art pass. Stock classes and vanilla enemies are untouched."""
+    Two sheets per character, both optional and added one at a time (no asset -> the
+    unit keeps its stock-class sprite; stock classes and vanilla enemies untouched):
+      * map_sprites/<id>.png      -> IDLE (wait sheet): a custom SMS slot (id 107+)
+        plus a GetUnitSMSId per-character override.
+      * map_sprites/<id>_mu.png   -> HOVER/WALK (MU sheet, 32x480): a custom move sheet
+        plus a GetMuImg per-character override (reuses the class motion script)."""
     asset_dir = os.path.join(REPO, 'campaigns', campaign, 'map_sprites')
-    todo = [(uid, slot, cls, sms) for (uid, slot, cls, sms) in classed_cast(campaign)
+    cast = classed_cast(campaign)
+    idle = [(uid, slot, cls, sms) for (uid, slot, cls, sms) in cast
             if os.path.isfile(os.path.join(asset_dir, uid + '.png'))]
-    if not todo:
+    mu = [(uid, slot, cls) for (uid, slot, cls, sms) in cast
+          if os.path.isfile(os.path.join(asset_dir, uid + '_mu.png'))]
+    if not idle and not mu:
         if verbose:
             print('  (no map_sprites/*.png assets yet; cast keep their class sprites)')
         return
 
-    wait_rows, incbin, externs, overrides = [], [], [], []
-    for uid, slot, class_enum, sms in todo:
+    pointer_externs = []
+    if idle:
+        _inject_idle_sprites(asset_dir, idle, pointer_externs)
+    if mu:
+        _inject_mu_sprites(asset_dir, mu, pointer_externs)
+    if pointer_externs:
+        with open(UNIT_ICON_POINTER_H, 'a', encoding='utf-8') as f:
+            f.write('\n/* Manchego Stars custom map sprites (#38) */\n'
+                    + '\n'.join(pointer_externs) + '\n')
+
+    if verbose:
+        for uid, slot, class_enum, sms in idle:
+            print('  %-10s -> idle SMS %d (%s)' % (uid, sms, slot))
+        for uid, slot, class_enum in mu:
+            print('  %-10s -> hover/walk MU sheet (%s)' % (uid, slot))
+
+
+def _inject_idle_sprites(asset_dir, idle, pointer_externs):
+    """Wait-table slot + GetUnitSMSId override for each idle (<id>.png) asset."""
+    wait_rows, incbin, overrides = [], [], []
+    for uid, slot, class_enum, sms in idle:
         macro, fw, fh, nframes = map_sprite_tool.sheet_info(
             os.path.join(asset_dir, uid + '.png'))
         sym = 'unit_icon_wait_manchego_%s_sheet' % uid.replace('-', '_')
@@ -744,25 +829,21 @@ def inject_map_sprites(campaign, verbose=True):
         incbin += ['\t.global %s' % sym, '%s:' % sym,
                    '\t.incbin "graphics/unit_icon/wait/%s.4bpp.lz"' % sym,
                    '\t.align 2, 0']
-        externs.append('extern char %s[];' % sym)
+        pointer_externs.append('extern char %s[];' % sym)
         overrides.append('\tCHARACTER_%s, %d,' % (slot.upper(), sms))
 
-    # wait table slot + sheet symbol (.s incbin, .h extern decl).
     _append_table_rows(UNIT_ICON_WAIT_C, 'unit_icon_wait_table[]', wait_rows)
     with open(UNIT_ICON_WAIT_S, 'a', encoding='utf-8') as f:
-        f.write('\n/* Manchego Stars custom map sprites (#38) */\n' + '\n'.join(incbin) + '\n')
-    with open(UNIT_ICON_POINTER_H, 'a', encoding='utf-8') as f:
-        f.write('\n/* Manchego Stars custom map sprites (#38) */\n' + '\n'.join(externs) + '\n')
+        f.write('\n/* Manchego Stars custom idle sprites (#38) */\n' + '\n'.join(incbin) + '\n')
 
-    # Override table (campaign data) -> needs the CHARACTER_ enum.
+    # Override table (campaign data) -> needs the CHARACTER_ enum. Non-const so it
+    # shares unit_icon_wait_table's kept .data section (the ldscript drops its .rodata).
     with open(UNIT_ICON_WAIT_C, encoding='utf-8') as f:
         wait_c = f.read()
     if 'constants/characters.h' not in wait_c:
         wait_c = wait_c.replace('#include "unit_icon_data.h"',
                                 '#include "unit_icon_data.h"\n#include "constants/characters.h"', 1)
-    # Non-const so it shares unit_icon_wait_table's .data section (the ldscript keeps
-    # that for this object but discards its .rodata).
-    wait_c += ('\n/* injected: per-character overworld-sprite overrides\n'
+    wait_c += ('\n/* injected: per-character idle-sprite overrides\n'
                ' * (charId, smsId pairs; 0xFFFF-terminated). Empty == vanilla. */\n'
                'unsigned short gMapSpriteOverride[] = {\n'
                + '\n'.join(overrides) + '\n\t0xFFFF\n};\n')
@@ -771,10 +852,41 @@ def inject_map_sprites(campaign, verbose=True):
 
     _inject_sms_override_hook()
 
-    if verbose:
-        for uid, slot, class_enum, sms in todo:
-            print('  %-10s -> SMS %d (%s, custom idle / %s walk)'
-                  % (uid, sms, slot, class_enum.replace('CLASS_', '')))
+
+def _inject_mu_sprites(asset_dir, mu, pointer_externs):
+    """Custom MU sheet + GetMuImg override for each hover/walk (<id>_mu.png) asset."""
+    incbin, overrides = [], []
+    for uid, slot, class_enum in mu:
+        map_sprite_tool.sheet_info(os.path.join(asset_dir, uid + '_mu.png'))
+        sym = 'unit_icon_move_manchego_%s_sheet' % uid.replace('-', '_')
+        shutil.copyfile(os.path.join(asset_dir, uid + '_mu.png'),
+                        os.path.join(MOVE_GFX_DIR, sym + '.png'))
+        incbin += ['\t.global %s' % sym, '%s:' % sym,
+                   '\t.incbin "graphics/unit_icon/move/%s.4bpp.lz"' % sym,
+                   '\t.align 2, 0']
+        pointer_externs.append('extern char %s[];' % sym)
+        overrides.append('\t{CHARACTER_%s, %s},' % (slot.upper(), sym))
+
+    with open(UNIT_ICON_MOVE_S, 'a', encoding='utf-8') as f:
+        f.write('\n/* Manchego Stars custom hover/walk (MU) sprites (#38) */\n'
+                + '\n'.join(incbin) + '\n')
+
+    # Override table -> needs the CHARACTER_ enum and the sheet externs. Non-const so it
+    # shares unit_icon_move_table's kept .data section.
+    with open(UNIT_ICON_MOVE_C, encoding='utf-8') as f:
+        move_c = f.read()
+    if 'constants/characters.h' not in move_c:
+        move_c = move_c.replace('#include "unit_icon_data.h"',
+                                '#include "unit_icon_data.h"\n#include "constants/characters.h"', 1)
+    move_c += ('\n/* injected: per-character MU (hover/walk) sprite overrides\n'
+               ' * (charId -> custom sheet; charId 0 terminates). Empty == vanilla. */\n'
+               'struct CharMuImg { unsigned short charId; const void * img; };\n'
+               'struct CharMuImg gMuImgOverride[] = {\n'
+               + '\n'.join(overrides) + '\n\t{0, 0}\n};\n')
+    with open(UNIT_ICON_MOVE_C, 'w', encoding='utf-8') as f:
+        f.write(move_c)
+
+    _inject_mu_override_hook()
 
 
 def main():

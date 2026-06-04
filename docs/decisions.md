@@ -348,7 +348,9 @@ palette-bank hacking. **Two sheets per character, grouped as one deliverable** (
   return a per-character custom sheet (reusing the class's motion script, so only the graphics change) before falling
   back to the class sheet. Both in-chapter MU draws route through `GetMuImg`, so one hook covers hover + walk.
 The MU sheet is the bigger art lift (a 15-frame walk cycle), but it stays in the map-sprite group, not battle anims.
-_Decided 2026-06-04; wait-sheet path proven in mGBA (Braulo placeholder); MU path scoped, build pending._
+One gotcha: `StartMu`/`StartMuExt` decompress the sheet *before* setting `proc->unit`, so the override reloads the
+graphics after `proc->unit` is set (else it falls back to the class sheet).
+_Decided 2026-06-04; both override paths (idle + MU) built and proven in mGBA with Braulo placeholders (idle = Dancer, hover/walk = Mogall)._
 
 **Enemy/non-cast sprites: vanilla FE8 where the look fits; community (FEUniverse) or custom only where a creature has no vanilla analogue** (Grells, Messie, ice trolls).
 The full-custom rule above is for the player cast + named recruits, where identity matters most.
