@@ -165,8 +165,9 @@ The 13-damage-type resistance multiplier (×0.5 / ×2 / ×0) has **no vanilla FE
 and would modify FE damage under the hood — exactly the kind of D&D bolt-on we're avoiding
 (Nicolas, 2026-05-28: "that's not part of the FE combat system… it should not conflict with
 vanilla FE under the hood"). So:
-- **Damage types are flavor labels only** — a weapon/tome carries a D&D damage-type name + icon
-  for descriptions and UI. No resistance/vuln/immunity computation runs in damage resolution.
+- **Damage types are not a game feature.** No resistance/vuln/immunity, and (2026-06-04) no
+  damage-type label, enum, or UI icon either — the whole apparatus was a vestige of the old
+  "D&D combat layer." Combat and item data are pure vanilla FE8.
 - **Iconic matchups use vanilla FE weapon effectiveness, keyed to the target's CLASS.**
   FE8's effectiveness system has eight class-keyed categories (`src/data_items.c`
   `ItemEffectiveness_*`): Armor, ArmorAndHorse, Horse, Flier, FlierAndMonsters, Monsters,
@@ -176,9 +177,10 @@ vanilla FE under the hood"). So:
   Beacon Bow) vs monster-class enemies (skeletons, gargoyles, ice trolls/cyclops, …). Damage
   types stay flavor labels; effectiveness keys off class alone. Use sparingly — most weapons
   carry no effectiveness at all.
-- **No `resistance_table.c` / resistance bitmap.** The `engine/damage-types/` module reduces to
-  a flavor-label tag (for UI) — no resistance engine.
-_Decided: 2026-05-28 (supersedes the May 2026 "13 damage types with resistance per class")_
+- **No `engine/damage-types/` module at all** — no resistance table and no flavor-label tag.
+  Elemental/damage flavor is deferred to the **battle-animation art** (a spell's visual can evoke
+  its D&D inspiration); see Weapon & Magic §.
+_Decided: 2026-05-28 (resistance dropped); 2026-06-04 (labels/enum/icon dropped too — vestigial)_
 
 **Hit-rate tuning: vanilla FE, no special floor needed**
 With vanilla FE hit/avoid restored, FE8's native 70–95% hit norms apply directly —
@@ -206,9 +208,15 @@ Sclorbo (Priest→Bishop, attack tomes at promotion). Note: reclassing Marty off
 his D&D Druid identity → FE Druid) means two Dark casters rather than one-each across the triangle.
 _Decided: 2026-05-29; caster spread updated 2026-05-30_
 
-**13 damage-type labels (flavor only — no resistance mechanic)**
-Types: slashing, piercing, bludgeoning, fire, cold, lightning, thunder, poison, acid, necrotic, radiant, force, psychic. These are **flavor tags** on weapons/tomes for descriptions + UI. **No per-class resistance bitmap, no ×0.5/×2/×0 multiplier** (reverted 2026-05-28 — see Combat System §). Iconic matchups use vanilla FE weapon **effectiveness**, keyed to enemy class (armor/cavalry/flier/dragon/monster/sword) — see the Combat System § rule.
-_Decided: 2026-05-28 (supersedes the May 2026 resistance-bitmap decision)_
+**Damage-type / elemental flavor: dropped as a game feature; deferred to battle-anim art**
+There is **no** damage-type label, enum, weapon tag, or combat-preview icon — it was a vestige
+of the abandoned "D&D combat layer" and added nothing once combat went pure-FE. A character's
+elemental identity (Rootis = ice, Marty = spores/poison, …) is carried by **sprite/portrait art,
+item names, and — eventually — custom battle animations** (where the spell visual can reference the
+D&D spell for inspiration), not by any mechanic or UI tag. Iconic matchups still use vanilla FE
+weapon **effectiveness**, keyed to enemy class (see Combat System §). Retires GitHub issues #7
+(damage-type enum) and #10 (combat-preview icon).
+_Decided: 2026-06-04 (supersedes the 13-damage-type-label plan; resistance was already dropped 2026-05-28)_
 
 **Spell economy: finite-use tomes that deplete and are restocked with gold (decision B)**
 Every spell is a finite-use item with FE tome/staff durability. Charges DEPLETE in use and
@@ -323,6 +331,10 @@ Canto, flight, etc. We dropped the homebrew D&D ability layer, not FE mechanics.
 
 Marty & Meesmickle share the Shaman chassis but differentiate at **promotion**, not base.
 _Decided: 2026-05-30 (supersedes the 2026-05-27 "Marty→Monk for sprite differentiation," which forced an illegal Monk→Summoner promotion)_
+
+**Pepperjack & Brie: RBG-crafted constructs that join as regular FE8 units (class + intro TBD at chapter-build time)**
+Lore: they're automatons RBG (Artillerist artificer) builds — D&D "ballistae"/cannon-constructs, not PCs. FE8 has **no playable Ballistician class** (`CLASS_BLST_LONG_*` are inert map objects; ballistae are siege *terrain/items* a unit rides). So they are **not** modeled as ballistae. Instead they enter the army the **normal FE8 way** — introduced via chapter events whenever the story has RBG build them (recruit/reinforcement flow, mirroring how the base game stages unit arrivals). Their stock FE8 class and arrival chapter are chosen **when we build those chapters**, not up front. Until then their YAML carries `class: null` (name-only in the build). Brie is the only female of the 10 (`gender: female`).
+_Decided: 2026-06-04_
 
 **Promotions are FE8's vanilla BRANCHED choice (the player picks at the Master Seal)**
 Every promoting class has two vanilla options (`fireemblem8u/src/classchg-data.c`); each unit YAML

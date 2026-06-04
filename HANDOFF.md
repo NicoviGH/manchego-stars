@@ -16,16 +16,17 @@
 - **Verification without mGBA:** `python3 tools/verify_text.py` (text), and gCharacterData decodes correctly from the ROM (class IDs, affinity=7 Anima, L1, zeroed personal bases).
 
 ### How character injection works
-`patch_character_data` rewrites each cast slot's `gCharacterData[]`:
+`patch_character_data` rewrites each cast slot's `gCharacterData[]` (and `restore_vanilla_sources()` git-restores `texts.txt` + `data_characters.c` to vanilla at the start of every build, so injection is idempotent and stat-donor reads stay vanilla):
 - **defaultClass** ← YAML `fe_stats.class` via `CLASS_MAP` (decisions.md Class Mapping). **affinity** = `UNIT_AFFIN_ANIMA`. **baseLevel** ← YAML.
 - **personal base stats** = YAML stat − class base (from `data_classes.c`). FE8's one Pow stat shows as STR or MAG; both → `basePow`. Luck is character-only. fe_stats == class base for all units → deltas 0 → displayed stats = pure class base = YAML.
-- **baseRanks** ← class weapon type (`CLASS_WEAPON`) at flat `WPN_EXP_E`. **growths** ← zeroed (unit grows at pure class rate, not the slot's).
-- brie + pepperjack have `class: null` → left vanilla, name-only.
+- **growths + weapon ranks** ← copied from a **class-matched vanilla donor** (`STAT_DONOR`: Shaman→Knoll, Mage→Lute, Archer→Neimi, Knight→Gilliam, Priest→Moulder, Pegasus→Vanessa, Pirate→Garcia proxy). "Do what the game does" — they level + fight like a real FE unit of their class. Verified: Franz(wolfram)=Gilliam Knight growths/Lance C; Gilliam(meesmickle)=Knoll Shaman growths/Dark C.
+- **gender** ← `CA_FEMALE` from YAML `gender:` (default male). Cleared the leaked `CA_FEMALE` on the male slots (Braulo/Rootis/Pinky). Brie = the only female.
+- brie + pepperjack have `class: null` → left vanilla, name-only (see below).
 
-## Open / deferred (decisions + follow-ups)
-- **brie + pepperjack classes** — `class: null`, TBD. Name-only until FE8 classes chosen.
-- **Weapon-rank level** — flat `E` for everyone; balance pass needs real ranks (vanilla L1 casters ~C). Likely YAML-driven. *Decision: per-unit vs per-class default.*
-- **Gender / attributes / supports** — still the vanilla slot's. `CA_FEMALE` leaks onto Braulo/Rootis/Pinky slots (no dangerous flags like CA_LORD/CA_SUMMON). Needs a YAML-driven gender pass incl. `_F` class variants; supports still point at the slot's data. Note Pinky is male but rides the Neimi(F)/Pegasus-Knight (female-anim) slot — flavor handwave for now.
+## Open / deferred (follow-ups)
+- **brie + pepperjack** — RBG-crafted **constructs** (D&D ballistae/automatons), NOT a special class. FE8 has no playable Ballistician class, so they join the army the **normal FE8 way** via chapter events; their stock class + arrival chapter are chosen **when we build those chapters**. `class: null` (name-only) until then. (decisions.md Class Mapping.)
+- **Supports** still point at the vanilla slot's data — rework later (inactive unless triggered).
+- **Custom gendered/class battle sprites** — art track (#38/#39), not data.
 
 ## ARTWORK — still mostly undone (parallel track)
 The custom-art lever is portrait **+ map sprite + battle anim** for all 10 cast ([[feedback_custom_art_lever]]). Only the **portraits/busts** exist and are injected. Remaining:
@@ -38,13 +39,13 @@ The custom-art lever is portrait **+ map sprite + battle anim** for all 10 cast 
 1. **Milestone B step 3 — test chapter (code).** COPY a normal chapter's `-event*.h` (NOT the tutorial Prologue), minimally edit unit defs to spawn the 8 classed cast on one map. First real visual confirmation of names + classes + stats + portraits together in mGBA. Event-script authoring is error-prone — copy a known-good chapter, don't hand-write the opening scene.
 2. **Real maps** — Prologue (#20) + Ch1 (#21), once the test chapter proves the spawn pipeline.
 3. **Art track (can run in parallel):** map sprites, then battle anims; final portrait pass. Walkthrough one artwork at a time with Nicolas; render → show → wait for OK → commit ([[feedback_show_before_committing_art]]).
-4. **Cleanup decisions above** (brie/pepperjack classes, weapon ranks, gender).
 
 ## Blockers
 - None hard. Step 3 needs care (event scripting) but no external dependency. Art track is gated on Nicolas's one-at-a-time art walkthroughs.
 
 ## Build Hygiene
-- **Clean-build:** `make clean && make CAMPAIGN=rime-of-the-frostmaiden`. `build_campaign.py` re-injects (idempotent) into the submodule working tree each build; `make clean` does NOT restore vanilla decomp source — reset with `git -C fireemblem8u checkout <path>`.
+- **Clean-build:** `make clean && make CAMPAIGN=rime-of-the-frostmaiden`. `build_campaign.py` now **git-restores** the decomp source files it patches (`texts.txt`, `data_characters.c`) to vanilla at the start of every build, so injection is idempotent — repeated `make`s are safe.
+- **CI make-green gate:** `.github/workflows/checks.yml` runs the real `make` on a MOCK baserom (`/dev/urandom`, mirroring the decomp's own build.yml) — catches build breakage without the copyrighted ROM. Plus a fast lint/YAML/drift job.
 - **Verify text:** `python3 tools/verify_text.py`. **mGBA:** `pkill -9 -i mgba; "/Applications/mGBA.app/Contents/MacOS/mGBA" "$PWD/fireemblem8u/fireemblem8.gba" &` (`open -a mGBA` does NOT reload a running instance). Fresh game: `rm fireemblem8u/fireemblem8.sav`.
 - **Never commit the fireemblem8u submodule pointer.** Build interpreter is brew python@3.12 (needs numpy/pillow/pyyaml via setup-toolchain.sh).
 
@@ -65,4 +66,4 @@ The custom-art lever is portrait **+ map sprite + battle anim** for all 10 cast 
 - [[feedback_show_before_committing_art]] — render→show→OK→commit for art.
 
 ## Standing Rules
-Custom art for the 10 named cast; enemies vanilla. Stock FE8 classes/weapons; combat = vanilla FE; element = flavor. `make` green at session end. Auto-push to main once approved. Don't commit the fireemblem8u submodule pointer.
+Custom art for the 10 named cast; enemies vanilla. Stock FE8 classes/weapons; combat = pure vanilla FE. `make` green at session end. Auto-push to main once approved. Don't commit the fireemblem8u submodule pointer.

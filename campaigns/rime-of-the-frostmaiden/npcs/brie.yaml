@@ -5,6 +5,7 @@
 
 id: brie
 name: Brie
+gender: female                                    # the only female of the 10 cast (drives CA_FEMALE)
 portrait_ref: portraits/brie.png                  # shipped 96×80 bust (own portrait, pink)
 portrait_source: "References/PCs/Pixel Brie.png"   # own single-bust ref (split from the combined concept)
 

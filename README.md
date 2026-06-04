@@ -4,7 +4,7 @@
 
 **Private distribution only — for the 7 campaign players.**
 
-The party's *Icewind Dale* adventure — a hermit crab barbarian, a mushroom druid, a vampire warlock, a ratfolk artificer, a snowperson sorcerer, a chwinga bard, and a drakeborn metallurgist — playable as a GBA tactics game. **Combat stays vanilla Fire Emblem** (hit/avoid/might/crit); D&D is flavor on top — damage-type labels, spells-as-tomes, and a cosmetic d20 flourish on crits. Prologue + 8 chapters, from the goblin iron quest to the Revel's End cliffhanger.
+The party's *Icewind Dale* adventure — a hermit crab barbarian, a mushroom druid, a vampire warlock, a ratfolk artificer, a snowperson sorcerer, a chwinga bard, and a drakeborn metallurgist — playable as a GBA tactics game. **Combat stays vanilla Fire Emblem** (hit/avoid/might/crit); D&D is flavor on top — the characters, their classes, spells-as-tomes, and a cosmetic d20 flourish on crits. Prologue + 8 chapters, from the goblin iron quest to the Revel's End cliffhanger.
 
 ## Prerequisites
 

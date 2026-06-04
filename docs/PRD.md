@@ -18,7 +18,7 @@
 
 Nicolas ran a multi-year D&D 5e campaign (*Rime of the Frostmaiden*) with 6 friends. The campaign is over, but the shared memories — a hermit crab barbarian smashing shackles, a mushroom druid talking down a plesiosaur, a ratfolk artificer executing a kobold at gunpoint — deserve more than a group chat. The group has no way to *replay* their story.
 
-**This project turns that campaign into a playable GBA tactics game**, built as a ROM hack of *Fire Emblem: The Sacred Stones* (FE8). The PCs become playable units; the DM's narrative beats become chapters. Combat uses **vanilla FE8's tactics rules** (hit/avoid/might/crit) so the game plays like Fire Emblem; the D&D campaign supplies the characters, classes, damage-type labels, spells-as-tomes, and flavor on top. The result is a `.gba` file the group can play on any emulator or flash cart — their adventure, in their pocket.
+**This project turns that campaign into a playable GBA tactics game**, built as a ROM hack of *Fire Emblem: The Sacred Stones* (FE8). The PCs become playable units; the DM's narrative beats become chapters. Combat uses **vanilla FE8's tactics rules** (hit/avoid/might/crit) so the game plays like Fire Emblem; the D&D campaign supplies the characters, their classes, spells-as-tomes, and flavor on top. The result is a `.gba` file the group can play on any emulator or flash cart — their adventure, in their pocket.
 
 **Who is affected:** the players from the Icewind Dale campaign (private distribution only).
 
@@ -61,7 +61,7 @@ Nicolas ran a multi-year D&D 5e campaign (*Rime of the Frostmaiden*) with 6 frie
 
 - **Select my PC** from the roster and see their portrait, stats, and class so I recognize my character immediately.
 - **A brief d20 flourish on a critical hit** so crits feel like a nat-20 — without changing how combat resolves (it stays FE hit/avoid).
-- **Each weapon/tome shows a D&D damage-type label/icon** (the triangle staying FE-native) so gear reads like 5e while playing like FE.
+- **Gear reads like D&D** via flavored names + art (Rootis's ice tome, Braulo's anchor-axe) while stats and the triangle stay FE-native — no damage-type mechanic or label.
 - **Spell tomes that deplete and restock with gold** between chapters so casters share the martials' resource economy.
 - **Recruit NPC allies** (Trex, Basil, the Mummy, …) as the story progresses so the roster grows like a real FE game.
 - **Casual or Classic mode** (FE8's toggle) so permadeath is my choice.
@@ -114,7 +114,7 @@ The player cast + named recruits get **fully custom** indexed-palette art for **
 | Risk | Severity | Mitigation |
 |---|---|---|
 | **HP scale mismatch** — 5e spells assume 50–200 HP; FE units have 20–60 | High | Keep FE's `damage − DEF` model; don't import 5e damage values. Scale through FE-magnitude weapon dice. Playtest early. |
-| **GBA UI real estate** — combat preview is tiny | Low | Forecast box stays vanilla; add only a small damage-type icon. The d20 flourish reuses crit animation frames. |
+| **GBA UI real estate** — combat preview is tiny | Low | Forecast box stays vanilla FE — no added icons. The cosmetic d20 flourish reuses crit animation frames, not the forecast box. |
 | **Save-file size** — spell-tome charges per unit pressure FE8's per-character budget | Low | No AC/resistance stored (combat is vanilla FE). Tome charges are the main add; sidecar table if needed. Audit in engine phase. |
 | **agbcc limits** (GCC 2.95.1, no C99) | Low | Follow decomp code style — no VLAs, no designated initializers. |
 | **Map design quality** — LLMs are bad at FE maps | Low | Community Frostmaiden maps as references; hand-draw FE versions. Agent does placement/events/dialogue, never spatial layout. |
@@ -128,7 +128,7 @@ The player cast + named recruits get **fully custom** indexed-palette art for **
 Qualitative (audience of a handful, no analytics):
 1. **"It boots and plays"** — loads on mGBA and a real flash cart; all chapters completable; no hard crashes.
 2. **"That's my character!"** — each player recognizes their PC from portrait/stats/abilities within seconds.
-3. **"Plays like Fire Emblem, reads like D&D"** — FE's hit/avoid forecast, with damage-type labels + crit flourish making it read as *our* campaign.
+3. **"Plays like Fire Emblem, reads like D&D"** — FE's hit/avoid forecast, with D&D-flavored characters/classes/names/art + a crit flourish making it read as *our* campaign.
 4. **"I remember this"** — ≥3 campaign-specific moments per chapter that land.
 5. **"I want to keep playing"** — the Ch 8 cliffhanger makes players ask for the next batch.
 6. **Build health** — `make` green at the end of every session.
@@ -174,7 +174,7 @@ The MVP is **done** when:
 2. The full cast is selectable with correct portraits, stats, classes, inventories.
 3. All recruit NPCs are recruitable at their chapters.
 4. All 8 chapters are playable start-to-finish with correct objectives, enemies, dialogue, events.
-5. Combat plays as vanilla FE, reskinned with damage-type icons + triangle labels + a cosmetic d20 crit flourish.
+5. Combat plays as vanilla FE, reskinned with D&D-flavored names/art + a cosmetic d20 crit flourish (no damage-type mechanic).
 6. Damage-type labels display; vanilla FE weapon effectiveness works for iconic matchups (armorslayer vs knights, monster-effective vs skeletons/ice trolls).
 7. Spell-tome charges deplete and restock correctly.
 8. Ch 6 (Messie) is resolvable via Talk.

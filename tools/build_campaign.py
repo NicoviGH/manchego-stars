@@ -22,6 +22,7 @@ Milestones B+ (characters, chapter, dialogue codegen) hang off the same CLI.
 import argparse
 import os
 import re
+import subprocess
 import sys
 
 # portrait_tool lives next to us in tools/
@@ -39,6 +40,16 @@ TEXTS_TXT = os.path.join(DECOMP, 'texts', 'texts.txt')
 
 # FE8's unit-name buffer; longer names overflow and garble the display.
 FE_NAME_MAX = 12
+
+# Decomp source files we patch in place. We git-restore them to vanilla at the start
+# of every build so injection always runs from a clean base -- idempotent across
+# repeated `make`s, and stat-donor growths/ranks always read vanilla values.
+PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c']
+
+
+def restore_vanilla_sources():
+    subprocess.run(['git', '-C', DECOMP, 'checkout', '--'] + PATCHED_DECOMP_FILES,
+                   check=True)
 
 # Our cast wear stock vanilla FE8 classes (docs/decisions.md Class Mapping). Map
 # each unit YAML's display class -> the decomp CLASS_ enum. Parenthetical flavor
@@ -65,19 +76,24 @@ STAT_FIELD = {
 CLASS_BASE_FIELDS = ('baseHP', 'basePow', 'baseSkl', 'baseSpd', 'baseDef',
                      'baseRes', 'baseCon', 'baseMov')
 
-# The vanilla slot's weapon ranks belong to its old class (e.g. Seth's SWORD), so
-# we replace them with our class's primary weapon type. Rank is a flat starting
-# value for now (tunable later in a balance pass); E covers basic gear/tomes.
-CLASS_WEAPON = {
-    'CLASS_PIRATE':         'ITYPE_AXE',
-    'CLASS_SHAMAN':         'ITYPE_DARK',
-    'CLASS_ARCHER':         'ITYPE_BOW',
-    'CLASS_MAGE':           'ITYPE_ANIMA',
-    'CLASS_PRIEST':         'ITYPE_STAFF',
-    'CLASS_ARMOR_KNIGHT':   'ITYPE_LANCE',
-    'CLASS_PEGASUS_KNIGHT': 'ITYPE_LANCE',
+# "Do what the actual game does": each cast unit takes the GROWTHS and starting
+# WEAPON RANKS of a canonical vanilla FE8 unit of the same class (its stat donor),
+# so it levels and fights like a real FE unit of that class -- not an invented
+# scheme. Donor data is read from VANILLA data_characters.c (a snapshot taken before
+# any patching), so it's correct even when the donor is itself a portrait slot we
+# repurpose. Pirate has no permanent PC in FE8 -> Garcia (axe fighter) is the proxy.
+STAT_DONOR = {
+    'braulo':     'CHARACTER_GARCIA',    # Pirate: no PC pirate in FE8; axe-fighter proxy
+    'marty':      'CHARACTER_KNOLL',     # Shaman
+    'meesmickle': 'CHARACTER_KNOLL',     # Shaman
+    'wolfram':    'CHARACTER_GILLIAM',   # Armor Knight
+    'prof-rbg':   'CHARACTER_NEIMI',     # Archer
+    'rootis':     'CHARACTER_LUTE',      # Mage
+    'sclorbo':    'CHARACTER_MOULDER',   # Priest
+    'pinky':      'CHARACTER_VANESSA',   # Pegasus Knight
 }
-WPN_RANK_START = 'WPN_EXP_E'
+GROWTH_FIELDS = ('growthHP', 'growthPow', 'growthSkl', 'growthSpd',
+                 'growthDef', 'growthRes', 'growthLck')
 
 
 # our cast bust  ->  vanilla portrait slot whose graphic files we overwrite.
@@ -285,10 +301,39 @@ def class_enum_for(unit):
     return CLASS_MAP[base]
 
 
+def donor_growths_and_ranks(vanilla_text, donor_char):
+    """Read a stat-donor unit's growths + baseRanks initializer from VANILLA
+    data_characters.c text (so it's unaffected by patches we apply this run)."""
+    s, e = _find_brace_block(vanilla_text, '[%s - 1]' % donor_char, CHARACTERS_C)
+    block = vanilla_text[s:e]
+    growths = {}
+    for gf in GROWTH_FIELDS:
+        m = re.search(r'\.' + gf + r'\s*=\s*(-?\d+)', block)
+        growths[gf] = int(m.group(1)) if m else 0
+    rm = re.search(r'\.baseRanks\s*=\s*(\{.*?\})', block, re.DOTALL)
+    ranks = re.sub(r'\s+', ' ', rm.group(1)).strip() if rm else '{}'
+    return growths, ranks
+
+
+def _set_gender(block, female):
+    """Set the CA_FEMALE attribute. Replaces .attributes if present; if absent,
+    inserts it only when female (absent already means 0 == male)."""
+    val = 'CA_FEMALE' if female else '0'
+    pat = re.compile(r'(\.attributes\s*=\s*)[^,\n]*(,)')
+    new, n = pat.subn(lambda m: m.group(1) + val + m.group(2), block, count=1)
+    if n:
+        return new
+    if not female:
+        return block  # no attributes field => already 0 => male; nothing to do
+    idx = block.rfind('}')
+    return block[:idx] + '    .attributes = CA_FEMALE,\n    ' + block[idx:]
+
+
 def patch_character_data(campaign, verbose=True):
     """Inject class + base stats into each cast slot's gCharacterData entry."""
     with open(CHARACTERS_C, encoding='utf-8') as f:
         text = f.read()
+    vanilla = text  # snapshot for reading stat-donor growths/ranks (pre-patch)
 
     for unit_id, slot in PORTRAIT_MAP.items():
         unit = load_unit(campaign, unit_id)
@@ -322,20 +367,22 @@ def patch_character_data(campaign, verbose=True):
             deltas[field] = delta
             block = _set_field(block, field, delta, CHARACTERS_C, marker)
 
-        # Swap the slot's inherited weapon ranks for our class's weapon type.
-        itype = CLASS_WEAPON[class_enum]
-        ranks = '{ [%s] = %s, }' % (itype, WPN_RANK_START)
+        # Growths + weapon ranks: take a class-matched vanilla unit's (the donor),
+        # so the unit levels and fights like a real FE unit of its class.
+        donor = STAT_DONOR[unit_id]
+        growths, ranks = donor_growths_and_ranks(vanilla, donor)
+        for gf, gv in growths.items():
+            block = _set_field(block, gf, gv, CHARACTERS_C, marker)
         block, n = re.subn(r'(\.baseRanks\s*=\s*)\{.*?\}',
                            lambda m: m.group(1) + ranks, block, count=1, flags=re.DOTALL)
         if n == 0:
             sys.exit('ERROR: .baseRanks not found in %s %s' % (CHARACTERS_C, marker))
 
-        # Zero the slot's personal growths so the unit grows at its pure class rate
-        # (total growth = class + character). Per-unit growth tuning is a later pass;
-        # we don't want Braulo silently inheriting Eirika's growths.
-        for gf in ('growthHP', 'growthPow', 'growthSkl', 'growthSpd',
-                   'growthDef', 'growthRes', 'growthLck'):
-            block = _set_field(block, gf, 0, CHARACTERS_C, marker)
+        # Gender flag (CA_FEMALE): drive from YAML (default male). Some vanilla entries
+        # omit .attributes (absent == 0 == male), so set tolerantly. Clears CA_FEMALE
+        # leaking from the slot; custom gendered sprites are a separate art pass.
+        female = str(unit.get('gender', 'male')).lower() == 'female'
+        block = _set_gender(block, female)
 
         text = text[:s] + block + text[e:]
         if verbose:
@@ -343,10 +390,11 @@ def patch_character_data(campaign, verbose=True):
                              ('HP', 'STR', 'MAG', 'SKL', 'SPD', 'DEF', 'RES', 'LCK', 'CON')
                              if k in st)
             nz = {k: v for k, v in deltas.items() if v != 0}
-            tag = '' if not nz else '  (personal deltas %s)' % nz
-            print('  %-10s -> %-8s: %s L%s  %s  %s %s%s'
+            tag = '' if not nz else '  (deltas %s)' % nz
+            print('  %-10s -> %-8s: %s L%s  %s  growths+ranks<-%s%s%s'
                   % (unit_id, slot, class_enum, st.get('level', 1), shown,
-                     CLASS_WEAPON[class_enum], WPN_RANK_START, tag))
+                     donor.replace('CHARACTER_', ''),
+                     '  [F]' if female else '', tag))
 
     with open(CHARACTERS_C, 'w', encoding='utf-8') as f:
         f.write(text)
@@ -363,6 +411,7 @@ def main():
     print('portraits:')
     inject_portraits(args.campaign)
     if not args.portraits_only:
+        restore_vanilla_sources()  # clean base each build (idempotent; vanilla donor reads)
         print('names:')
         inject_names(args.campaign)
         print('characters:')

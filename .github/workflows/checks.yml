@@ -60,3 +60,35 @@ jobs:
               print(f"DRIFT: {d} references tools/{m} which does not exist")
           sys.exit(1 if missing else 0)
           PY
+
+  # The real "make green" gate. Mirrors the fireemblem8u decomp's own build.yml: a
+  # MOCK base ROM (random 16MB) lets `make` compile + link the full ROM without the
+  # copyrighted original -- which is what we want (we diverge from vanilla anyway).
+  # This catches real breakage: bad C, missing symbols, malformed data tables, and a
+  # broken build_campaign.py injection.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential binutils-arm-none-eabi libpng-dev
+          python3 -m pip install ttp numpy pillow pyyaml
+
+      - name: Install agbcc into the decomp
+        run: |
+          git clone https://github.com/pret/agbcc.git
+          cd agbcc && ./build.sh && ./install.sh "$GITHUB_WORKSPACE/fireemblem8u"
+
+      - name: Build decomp tools
+        run: cd fireemblem8u && ./build_tools.sh
+
+      - name: Mock base ROM (no copyrighted ROM needed to verify the build links)
+        run: head -c 16M /dev/urandom > fireemblem8u/baserom.gba
+
+      - name: make green (inject campaign + build ROM)
+        run: make CAMPAIGN=rime-of-the-frostmaiden

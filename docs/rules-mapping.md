@@ -139,9 +139,9 @@ Rule: never introduce a brand-new status UI for a 5e condition that maps onto an
 
 | 5e mechanic | Tier | FE8 conversion |
 |---|---|---|
-| **13 damage types** | CONVERT → flavor labels | A flavor-only damage-type tag on weapons/tomes (name + icon for UI/descriptions). No resistance bitmap, no mechanic (no vanilla FE analogue). |
+| **13 damage types** | DROP | No damage-type mechanic, label, enum, or icon (a vestige of the abandoned D&D combat layer; decisions.md 2026-06-04). Elemental flavor lives in art + item names; cosmetic spell visuals are deferred to the battle-animation phase. |
 | **Resistance (½) / Vulnerability (×2) / Immunity (0)** | DROP → FE effectiveness | The multiplier is dropped (it modifies FE damage under the hood). Iconic vulnerabilities map onto **vanilla FE weapon effectiveness** (an `effective`-flag, FE-native); resistance/immunity have no FE analogue → flavor only. |
-| **Physical weapon triangle** | KEEP (FE-native) | Sword > Axe > Lance > Sword; vanilla +1 ATK / +15 hit. Damage-type names are cosmetic per-weapon labels, not a relabeling of the triangle (decisions.md). |
+| **Physical weapon triangle** | KEEP (FE-native) | Sword > Axe > Lance > Sword; vanilla +1 ATK / +15 hit. Driven by weapon TYPE, never relabeled (decisions.md). |
 | **Magic triangle** | KEEP (FE-native) | Anima > Light > Dark > Anima; vanilla +1 ATK / +15 hit (decisions.md). |
 
 ---
