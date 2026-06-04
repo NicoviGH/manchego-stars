@@ -22,12 +22,14 @@ Milestones B+ (characters, chapter, dialogue codegen) hang off the same CLI.
 import argparse
 import os
 import re
+import shutil
 import subprocess
 import sys
 
 # portrait_tool lives next to us in tools/
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import portrait_tool  # noqa: E402
+import map_sprite_tool  # noqa: E402
 from PIL import Image  # noqa: E402
 import yaml  # noqa: E402
 
@@ -54,6 +56,18 @@ CH1_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch1-eventscript.h')
 PROLOGUE_WM_H = os.path.join(DECOMP, 'src', 'events', 'prologue-wm.h')
 GAMECONTROL_C = os.path.join(DECOMP, 'src', 'gamecontrol.c')
 BMIO_C = os.path.join(DECOMP, 'src', 'bmio.c')
+# Map (overworld) sprites (#38). FE8 map sprites are CLASS-driven (GetUnitSMSId ->
+# pClassData->SMSId), so two cast on the same class share one sprite and enemies of
+# that class would inherit a swap. We instead give each cast member a custom SMS slot
+# and a per-CHARACTER override in GetUnitSMSId -- stock classes and vanilla enemies
+# untouched. Classes top out at SMSId 106 (verified), so 107+ is free in both the
+# wait array (extended here) and the move table (dead tail; no class reaches it).
+BMUNIT_C = os.path.join(DECOMP, 'src', 'bmunit.c')
+UNIT_ICON_WAIT_C = os.path.join(DECOMP, 'src', 'unit_icon_wait_data.c')
+UNIT_ICON_WAIT_S = os.path.join(DECOMP, 'data', 'const_data_unit_icon_wait.s')
+UNIT_ICON_POINTER_H = os.path.join(DECOMP, 'include', 'unit_icon_pointer.h')
+WAIT_GFX_DIR = os.path.join(DECOMP, 'graphics', 'unit_icon', 'wait')
+CUSTOM_SMS_BASE = 107
 # New-game boots straight into the test chapter (skip the vanilla prologue) so the
 # spawn is one "New Game" away. CHAPTER_L_1 = 0x01 (constants/chapters.h).
 TEST_CHAPTER_INDEX = 1
@@ -67,7 +81,9 @@ FE_NAME_MAX = 12
 PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrait_data.c',
                         'src/events/ch1-eventudefs.h', 'src/events/ch1-eventinfo.h',
                         'src/events/ch1-eventscript.h', 'src/events/prologue-wm.h',
-                        'src/gamecontrol.c', 'src/bmio.c']
+                        'src/gamecontrol.c', 'src/bmio.c', 'src/bmunit.c',
+                        'src/unit_icon_wait_data.c',
+                        'data/const_data_unit_icon_wait.s', 'include/unit_icon_pointer.h']
 
 
 def restore_vanilla_sources():
@@ -621,6 +637,146 @@ def inject_test_chapter(campaign, verbose=True):
               'New Game boots into Ch1')
 
 
+# --- Map (overworld) sprites (#38) ------------------------------------------------
+# FE8 draws map sprites by class (GetUnitSMSId -> pClassData->SMSId). To give each
+# cast member a distinct overworld sprite without touching stock classes or vanilla
+# enemies, we add a custom SMS slot per cast member (ids CUSTOM_SMS_BASE+) and a
+# per-CHARACTER override in GetUnitSMSId. Colours come from the one shared cast
+# palette (unit_icon_pal_player.agbpal) -- map sprites can't carry their own.
+
+
+def classed_cast(campaign):
+    """Cast (PORTRAIT_MAP order) that carry an FE class, each paired with a stable
+    custom SMS id (CUSTOM_SMS_BASE + position). Name-only units are skipped. Ids are
+    position-based so a unit keeps the same id whether or not its sprite is authored."""
+    out, i = [], 0
+    for unit_id, slot in PORTRAIT_MAP.items():
+        unit = load_unit(campaign, unit_id)
+        unit.setdefault('id', unit_id)
+        if class_enum_for(unit) is None:
+            continue
+        out.append((unit_id, slot, class_enum_for(unit), CUSTOM_SMS_BASE + i))
+        i += 1
+    return out
+
+
+def _table_close_line(lines, decl):
+    """(decl line index, closing `};` line index) for a C array `decl`."""
+    di = next((i for i, ln in enumerate(lines) if decl in ln), None)
+    if di is None:
+        sys.exit('ERROR: %r not found' % decl)
+    ci = next((i for i in range(di + 1, len(lines)) if lines[i].strip() == '};'), None)
+    if ci is None:
+        sys.exit('ERROR: close of %r not found' % decl)
+    return di, ci
+
+
+def _append_table_rows(path, decl, rows):
+    """Append `rows` (source lines) before a C array's closing `};`, giving the
+    previous last entry a separating comma if it lacks one."""
+    with open(path, encoding='utf-8') as f:
+        lines = f.read().splitlines(keepends=True)
+    _, ci = _table_close_line(lines, decl)
+    if '},' not in lines[ci - 1] and '}' in lines[ci - 1]:
+        lines[ci - 1] = re.sub(r'\}(\s*)(/[/*][^\n]*)?\n$', r'},\1\2\n',
+                               lines[ci - 1], count=1)
+    lines[ci:ci] = [r + '\n' for r in rows]
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(''.join(lines))
+
+
+def _inject_sms_override_hook():
+    """Patch GetUnitSMSId to consult the build-injected per-character override table
+    before falling back to the unit's class map sprite."""
+    with open(BMUNIT_C, encoding='utf-8') as f:
+        text = f.read()
+    orig = ('int GetUnitSMSId(struct Unit* unit) {\n'
+            '    if (!(unit->state & US_IN_BALLISTA))\n'
+            '        return unit->pClassData->SMSId;\n')
+    hooked = (
+        'extern unsigned short gMapSpriteOverride[];\n\n'
+        'int GetUnitSMSId(struct Unit* unit) {\n'
+        '    if (!(unit->state & US_IN_BALLISTA)) {\n'
+        '        /* Campaign per-character map-sprite override (build-injected; the\n'
+        '         * table is empty in vanilla). Lets a cast member wear a custom\n'
+        '         * overworld sprite its stock class -- and any enemy of that class\n'
+        '         * -- does not. */\n'
+        '        const unsigned short * mso = gMapSpriteOverride;\n'
+        '        int charId = UNIT_CHAR_ID(unit);\n'
+        '        while (*mso != 0xFFFF) {\n'
+        '            if (mso[0] == charId)\n'
+        '                return mso[1];\n'
+        '            mso += 2;\n'
+        '        }\n'
+        '        return unit->pClassData->SMSId;\n'
+        '    }\n')
+    if orig not in text:
+        sys.exit('ERROR: GetUnitSMSId not in expected vanilla form in %s' % BMUNIT_C)
+    with open(BMUNIT_C, 'w', encoding='utf-8') as f:
+        f.write(text.replace(orig, hooked, 1))
+
+
+def inject_map_sprites(campaign, verbose=True):
+    """Give cast members a custom overworld sprite distinct from their class.
+
+    For each classed cast member with a map_sprites/<id>.png asset: copy the sheet
+    into the decomp, add a wait-table (idle) slot at its stable custom SMS id, and
+    register a per-character override in GetUnitSMSId. Only the standing sprite is
+    overridden; the walk animation is keyed by class (MU system, gMuInfoTable[jid]),
+    so a unit idles as its custom sprite and walks as its stock class -- bespoke walk
+    frames are a later art pass. Stock classes and vanilla enemies are untouched."""
+    asset_dir = os.path.join(REPO, 'campaigns', campaign, 'map_sprites')
+    todo = [(uid, slot, cls, sms) for (uid, slot, cls, sms) in classed_cast(campaign)
+            if os.path.isfile(os.path.join(asset_dir, uid + '.png'))]
+    if not todo:
+        if verbose:
+            print('  (no map_sprites/*.png assets yet; cast keep their class sprites)')
+        return
+
+    wait_rows, incbin, externs, overrides = [], [], [], []
+    for uid, slot, class_enum, sms in todo:
+        macro, fw, fh, nframes = map_sprite_tool.sheet_info(
+            os.path.join(asset_dir, uid + '.png'))
+        sym = 'unit_icon_wait_manchego_%s_sheet' % uid.replace('-', '_')
+        shutil.copyfile(os.path.join(asset_dir, uid + '.png'),
+                        os.path.join(WAIT_GFX_DIR, sym + '.png'))
+        wait_rows.append('\t{0, %s, %s}, /* %d %s */' % (macro, sym, sms, uid))
+        incbin += ['\t.global %s' % sym, '%s:' % sym,
+                   '\t.incbin "graphics/unit_icon/wait/%s.4bpp.lz"' % sym,
+                   '\t.align 2, 0']
+        externs.append('extern char %s[];' % sym)
+        overrides.append('\tCHARACTER_%s, %d,' % (slot.upper(), sms))
+
+    # wait table slot + sheet symbol (.s incbin, .h extern decl).
+    _append_table_rows(UNIT_ICON_WAIT_C, 'unit_icon_wait_table[]', wait_rows)
+    with open(UNIT_ICON_WAIT_S, 'a', encoding='utf-8') as f:
+        f.write('\n/* Manchego Stars custom map sprites (#38) */\n' + '\n'.join(incbin) + '\n')
+    with open(UNIT_ICON_POINTER_H, 'a', encoding='utf-8') as f:
+        f.write('\n/* Manchego Stars custom map sprites (#38) */\n' + '\n'.join(externs) + '\n')
+
+    # Override table (campaign data) -> needs the CHARACTER_ enum.
+    with open(UNIT_ICON_WAIT_C, encoding='utf-8') as f:
+        wait_c = f.read()
+    if 'constants/characters.h' not in wait_c:
+        wait_c = wait_c.replace('#include "unit_icon_data.h"',
+                                '#include "unit_icon_data.h"\n#include "constants/characters.h"', 1)
+    # Non-const so it shares unit_icon_wait_table's .data section (the ldscript keeps
+    # that for this object but discards its .rodata).
+    wait_c += ('\n/* injected: per-character overworld-sprite overrides\n'
+               ' * (charId, smsId pairs; 0xFFFF-terminated). Empty == vanilla. */\n'
+               'unsigned short gMapSpriteOverride[] = {\n'
+               + '\n'.join(overrides) + '\n\t0xFFFF\n};\n')
+    with open(UNIT_ICON_WAIT_C, 'w', encoding='utf-8') as f:
+        f.write(wait_c)
+
+    _inject_sms_override_hook()
+
+    if verbose:
+        for uid, slot, class_enum, sms in todo:
+            print('  %-10s -> SMS %d (%s, custom idle / %s walk)'
+                  % (uid, sms, slot, class_enum.replace('CLASS_', '')))
+
+
 def main():
     ap = argparse.ArgumentParser(description='Inject campaign content into the decomp build.')
     ap.add_argument('--campaign', default='rime-of-the-frostmaiden')
@@ -641,6 +797,8 @@ def main():
         patch_portrait_geometry()
         print('test chapter (Ch1 spawn):')
         inject_test_chapter(args.campaign)
+        print('map sprites:')
+        inject_map_sprites(args.campaign)
     print('done. Run `make` to compile the ROM.')
 
 

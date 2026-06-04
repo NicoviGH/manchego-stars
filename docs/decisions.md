@@ -332,6 +332,20 @@ Per-unit design briefs (must-keep tells, expression, palette plan) live in each 
 **Sequencing — three waves:** (1) all 10 cast portraits, then (2) all map sprites (16×16 chibis), then (3) battle animations.
 _Decided: May 2026; full-custom direction + Gemini-ref-to-asset pipeline proven 2026-06-01 (Braulo, then Prof. R.B. Geenius)._
 
+**Map sprites: per-CHARACTER override, custom colours via the one shared cast palette.**
+FE8 draws overworld sprites by **class** (`GetUnitSMSId → pClassData->SMSId`), so a class swap would hit every unit of
+that class — including enemies — and couldn't distinguish two cast on the same class (Marty & Meesmickle are both Shaman).
+Instead each cast member gets a **custom SMS slot** (ids 107+; classes top out at 106) and a **per-character override** in
+`GetUnitSMSId` (generic table; campaign data injected by `build_campaign.inject_map_sprites`, parallel to portraits).
+Stock classes and vanilla enemies are untouched. **Colour:** every player map sprite shares one 16-colour OBJ palette
+(`unit_icon_pal_player.agbpal`) — sprites can't carry their own — so custom colours come from redesigning that one shared
+ramp to **union-cover the cast's hues** (reds/blacks/whites/greys + Rootis ice-blue, Pinky pink, RBG green). No
+palette-bank hacking. **Scope seam:** the override only swaps the **idle** sprite (the small 16×16 wait sheet). The
+**hover/selected + walking** sprite is a separate, larger per-class MU sheet (`gMuInfoTable[jid]`: standing + 4-dir walk
+frames) — making *that* custom is a bigger asset that overlaps the battle-anim track, deferred. Idle-custom / class-walk
+is the deliberate first cut.
+_Decided 2026-06-04; injection path + per-character override proven in mGBA (Braulo placeholder)._
+
 **Enemy/non-cast sprites: vanilla FE8 where the look fits; community (FEUniverse) or custom only where a creature has no vanilla analogue** (Grells, Messie, ice trolls).
 The full-custom rule above is for the player cast + named recruits, where identity matters most.
 _Decided: May 2026_
