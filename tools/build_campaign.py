@@ -34,10 +34,50 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DECOMP = os.path.join(REPO, 'fireemblem8u')
 PORTRAIT_DIR = os.path.join(DECOMP, 'graphics', 'portrait')
 CHARACTERS_C = os.path.join(DECOMP, 'src', 'data_characters.c')
+CLASSES_C = os.path.join(DECOMP, 'src', 'data_classes.c')
 TEXTS_TXT = os.path.join(DECOMP, 'texts', 'texts.txt')
 
 # FE8's unit-name buffer; longer names overflow and garble the display.
 FE_NAME_MAX = 12
+
+# Our cast wear stock vanilla FE8 classes (docs/decisions.md Class Mapping). Map
+# each unit YAML's display class -> the decomp CLASS_ enum. Parenthetical flavor
+# like "Mage (Ice)" is stripped before lookup.
+CLASS_MAP = {
+    'Pirate':         'CLASS_PIRATE',
+    'Shaman':         'CLASS_SHAMAN',
+    'Archer':         'CLASS_ARCHER',
+    'Mage':           'CLASS_MAGE',
+    'Priest':         'CLASS_PRIEST',
+    'Knight':         'CLASS_ARMOR_KNIGHT',
+    'Pegasus Knight': 'CLASS_PEGASUS_KNIGHT',
+}
+
+# fe_stats key -> the gCharacterData personal-base field it feeds. FE8 unit stats
+# are class base + this personal base. There is one attack stat (basePow), shown as
+# STR for physical classes and MAG for magic ones. MOV is class-only (handled apart).
+STAT_FIELD = {
+    'HP': 'baseHP', 'STR': 'basePow', 'MAG': 'basePow', 'SKL': 'baseSkl',
+    'SPD': 'baseSpd', 'DEF': 'baseDef', 'RES': 'baseRes', 'LCK': 'baseLck',
+    'CON': 'baseCon',
+}
+# class-data base fields we read (classes carry no luck -> baseLck defaults 0).
+CLASS_BASE_FIELDS = ('baseHP', 'basePow', 'baseSkl', 'baseSpd', 'baseDef',
+                     'baseRes', 'baseCon', 'baseMov')
+
+# The vanilla slot's weapon ranks belong to its old class (e.g. Seth's SWORD), so
+# we replace them with our class's primary weapon type. Rank is a flat starting
+# value for now (tunable later in a balance pass); E covers basic gear/tomes.
+CLASS_WEAPON = {
+    'CLASS_PIRATE':         'ITYPE_AXE',
+    'CLASS_SHAMAN':         'ITYPE_DARK',
+    'CLASS_ARCHER':         'ITYPE_BOW',
+    'CLASS_MAGE':           'ITYPE_ANIMA',
+    'CLASS_PRIEST':         'ITYPE_STAFF',
+    'CLASS_ARMOR_KNIGHT':   'ITYPE_LANCE',
+    'CLASS_PEGASUS_KNIGHT': 'ITYPE_LANCE',
+}
+WPN_RANK_START = 'WPN_EXP_E'
 
 
 # our cast bust  ->  vanilla portrait slot whose graphic files we overwrite.
@@ -183,11 +223,140 @@ def inject_names(campaign, verbose=True):
         f.write('\n'.join(lines))
 
 
+# --- Milestone B: character stats / class -----------------------------------------
+# Write each cast unit's vanilla-class identity into its portrait slot's
+# gCharacterData[] entry: defaultClass, affinity (Anima, cosmetic), baseLevel,
+# personal base stats = (YAML fe_stats - class base), the class's weapon-type rank,
+# and zeroed personal growths (so the unit grows at its pure class rate). When
+# fe_stats match the class verbatim (the FE-strict default) the personal bases come
+# out 0; any deliberate YAML divergence is still honored so displayed stats ==
+# fe_stats. portraitId, attributes (gender), and pSupportData are left as the
+# vanilla slot's -- gender/supports are a later YAML-driven pass.
+
+def _find_brace_block(text, marker, path):
+    """Return (start, end) covering the `{...}` (brace-balanced) after `marker`."""
+    at = text.find(marker)
+    if at < 0:
+        sys.exit('ERROR: %r not found in %s' % (marker, path))
+    brace = text.find('{', at)
+    depth = 0
+    i = brace
+    while i < len(text):
+        if text[i] == '{':
+            depth += 1
+        elif text[i] == '}':
+            depth -= 1
+            if depth == 0:
+                return brace, i + 1
+        i += 1
+    sys.exit('ERROR: unbalanced braces for %r in %s' % (marker, path))
+
+
+def _set_field(block, field, value, path, marker):
+    """Replace `.field = ...,` within `block`. Errors if the field isn't present."""
+    pat = re.compile(r'(\.' + field + r'\s*=\s*)[^,\n]*(,)')
+    new, n = pat.subn(lambda m: m.group(1) + str(value) + m.group(2), block, count=1)
+    if n == 0:
+        sys.exit('ERROR: field .%s not found in %s entry %s' % (field, path, marker))
+    return new
+
+
+def class_base_stats(class_enum):
+    """Read a class's base stats from data_classes.c, keyed by CharacterData field
+    name (baseHP, basePow, ...). Luck is character-only, so baseLck defaults to 0."""
+    with open(CLASSES_C, encoding='utf-8') as f:
+        text = f.read()
+    s, e = _find_brace_block(text, '[%s - 1]' % class_enum, CLASSES_C)
+    block = text[s:e]
+    out = {'baseLck': 0}
+    for cf in CLASS_BASE_FIELDS:
+        m = re.search(r'\.' + cf + r'\s*=\s*(-?\d+)', block)
+        out[cf] = int(m.group(1)) if m else 0
+    return out
+
+
+def class_enum_for(unit):
+    raw = unit.get('fe_stats', {}).get('class')
+    if not raw:
+        return None
+    base = re.sub(r'\s*\(.*?\)', '', str(raw)).strip()
+    if base not in CLASS_MAP:
+        sys.exit('ERROR: unit %r class %r not in CLASS_MAP' % (unit.get('id'), base))
+    return CLASS_MAP[base]
+
+
+def patch_character_data(campaign, verbose=True):
+    """Inject class + base stats into each cast slot's gCharacterData entry."""
+    with open(CHARACTERS_C, encoding='utf-8') as f:
+        text = f.read()
+
+    for unit_id, slot in PORTRAIT_MAP.items():
+        unit = load_unit(campaign, unit_id)
+        unit.setdefault('id', unit_id)
+        class_enum = class_enum_for(unit)
+        if class_enum is None:
+            if verbose:
+                print('  %-10s -> %-8s: no class yet (name only)' % (unit_id, slot))
+            continue
+
+        st = unit['fe_stats']
+        cbase = class_base_stats(class_enum)
+        # MOV is class-only; we can't set it per-character -- just sanity-check it.
+        if 'MOV' in st and int(st['MOV']) != cbase['baseMov']:
+            print('  WARN %s: MOV %s != class %s base MOV %d (MOV is class-fixed)'
+                  % (unit_id, st['MOV'], class_enum, cbase['baseMov']))
+
+        marker = '[CHARACTER_%s - 1]' % slot.upper()
+        s, e = _find_brace_block(text, marker, CHARACTERS_C)
+        block = text[s:e]
+        block = _set_field(block, 'defaultClass', class_enum, CHARACTERS_C, marker)
+        block = _set_field(block, 'affinity', 'UNIT_AFFIN_ANIMA', CHARACTERS_C, marker)
+        block = _set_field(block, 'baseLevel', int(st.get('level', 1)), CHARACTERS_C, marker)
+
+        deltas = {}
+        for fe in st:
+            field = STAT_FIELD.get(fe)
+            if field is None:
+                continue
+            delta = int(st[fe]) - cbase.get(field, 0)
+            deltas[field] = delta
+            block = _set_field(block, field, delta, CHARACTERS_C, marker)
+
+        # Swap the slot's inherited weapon ranks for our class's weapon type.
+        itype = CLASS_WEAPON[class_enum]
+        ranks = '{ [%s] = %s, }' % (itype, WPN_RANK_START)
+        block, n = re.subn(r'(\.baseRanks\s*=\s*)\{.*?\}',
+                           lambda m: m.group(1) + ranks, block, count=1, flags=re.DOTALL)
+        if n == 0:
+            sys.exit('ERROR: .baseRanks not found in %s %s' % (CHARACTERS_C, marker))
+
+        # Zero the slot's personal growths so the unit grows at its pure class rate
+        # (total growth = class + character). Per-unit growth tuning is a later pass;
+        # we don't want Braulo silently inheriting Eirika's growths.
+        for gf in ('growthHP', 'growthPow', 'growthSkl', 'growthSpd',
+                   'growthDef', 'growthRes', 'growthLck'):
+            block = _set_field(block, gf, 0, CHARACTERS_C, marker)
+
+        text = text[:s] + block + text[e:]
+        if verbose:
+            shown = ' '.join('%s%d' % (k, int(st[k])) for k in
+                             ('HP', 'STR', 'MAG', 'SKL', 'SPD', 'DEF', 'RES', 'LCK', 'CON')
+                             if k in st)
+            nz = {k: v for k, v in deltas.items() if v != 0}
+            tag = '' if not nz else '  (personal deltas %s)' % nz
+            print('  %-10s -> %-8s: %s L%s  %s  %s %s%s'
+                  % (unit_id, slot, class_enum, st.get('level', 1), shown,
+                     CLASS_WEAPON[class_enum], WPN_RANK_START, tag))
+
+    with open(CHARACTERS_C, 'w', encoding='utf-8') as f:
+        f.write(text)
+
+
 def main():
     ap = argparse.ArgumentParser(description='Inject campaign content into the decomp build.')
     ap.add_argument('--campaign', default='rime-of-the-frostmaiden')
     ap.add_argument('--portraits-only', action='store_true',
-                    help='only inject portrait assets (skip names)')
+                    help='only inject portrait assets (skip names + characters)')
     args = ap.parse_args()
 
     print('build_campaign: injecting "%s" into %s' % (args.campaign, DECOMP))
@@ -196,6 +365,8 @@ def main():
     if not args.portraits_only:
         print('names:')
         inject_names(args.campaign)
+        print('characters:')
+        patch_character_data(args.campaign)
     print('done. Run `make` to compile the ROM.')
 
 

@@ -1,7 +1,7 @@
-# Handoff: Milestone B — NAME INJECTION DONE & verified. All 10 cast names render+terminate in the ROM (sweep 0 runaway). The real text bug was a terminator-parity gotcha (odd-length names need a `[.]` pad), now handled. Next: gCharacterData (stats/class) injection, then a copied test chapter.
+# Handoff: Milestone B — NAMES + CHARACTER DATA (class/stats) both DONE & verified in the ROM. 8 cast units carry the right class, level, Anima affinity, pure-class stats, and class weapon rank; names render+terminate (sweep 0 runaway). Next: a copied test chapter to spawn all 10 and eyeball them in mGBA.
 
 **Date:** 2026-06-04
-**This session:** Proved the text path, then implemented YAML-driven unit-name injection. Found and fixed the actual bug behind the reset's "Huffman corruption" — it was NOT a textprocess/huffman bug, but a **string-terminator parity** issue in how names are formatted. Added `tools/verify_text.py` (ROM text decoder / regression gate) which caught it immediately.
+**This session:** Proved the text path; implemented YAML-driven name injection (fixing the real "Huffman corruption" = a string-terminator parity bug); then implemented gCharacterData class/stat injection. Added `tools/verify_text.py` (ROM text regression gate). Two clean-build + ROM-decode checkpoints, both green.
 
 ## WHAT WORKS — keep (committed)
 - **Milestone A portraits** — 10 busts → vanilla slots, static, facing-correct. `make` builds, faces correct.
@@ -24,14 +24,27 @@ Not Huffman. **String-terminator parity.** FE8 packs printable text two bytes pe
 | Data | File(s) | Status |
 |---|---|---|
 | Unit names | `texts/texts.txt` (msg at slot's `.nameTextId`) → `textprocess.py` → `src/msg_data.c` | **DONE.** Parity-padded. Verify with `verify_text.py`. |
-| Character stats/class/growth/portraitId/affinity | `src/data_characters.c` `gCharacterData[]` | NEXT. portraitId = vanilla value; affinity cosmetic (default Anima). Brace-counting `patch_character_data` was sound last session. |
+| Character class/stats/level/affinity/ranks/growths | `src/data_characters.c` `gCharacterData[]` | **DONE.** `patch_character_data`. See below. |
 | Portrait graphics | `graphics/portrait/portrait_<Slot>_*` | Milestone A, done. |
-| Chapter: units/placement/events | `src/events/<ch>-event{udefs,script,info}.h` → `events_*.c` | LATER. COPY a known-good chapter; don't hand-author the beginning scene. |
+| Chapter: units/placement/events | `src/events/<ch>-event{udefs,script,info}.h` → `events_*.c` | NEXT. COPY a known-good chapter; don't hand-author the beginning scene. |
 
-## NEXT STEPS (in order; clean-build + `verify_text.py`/mGBA each before the next)
-1. **gCharacterData injection.** Add `patch_character_data` to `build_campaign.py`: write each cast unit's `fe_stats` (class/level/HP/STR/SKL/SPD/DEF/RES/LCK/MOV/CON) + portraitId(=vanilla) + affinity(=Anima) into the slot's `gCharacterData[]` entry in `src/data_characters.c`. The YAML already carries `fe_stats` (see `pcs/braulo.yaml`). Verify a stock-prologue unit shows correct class+stats+portrait+NAME together.
-2. **Test chapter.** Use a NORMAL chapter (ch1, NOT the tutorial Prologue). COPY the vanilla `-event*.h` and minimally edit unit defs to spawn all 10 cast; verify placement in mGBA.
-3. After both: the Braulo end-to-end slice (#15) is effectively complete → start real maps (Prologue, Ch1).
+## CHARACTER INJECTION — how it works (this session)
+`build_campaign.py patch_character_data` rewrites each cast slot's `gCharacterData[]` entry:
+- **defaultClass** ← YAML `fe_stats.class` via `CLASS_MAP` (decisions.md Class Mapping; e.g. Pirate→CLASS_PIRATE, Shaman→CLASS_SHAMAN, Knight→CLASS_ARMOR_KNIGHT, "Mage (Ice)"→CLASS_MAGE).
+- **affinity** = `UNIT_AFFIN_ANIMA` (cosmetic). **baseLevel** ← YAML level.
+- **personal base stats** = YAML stat − class base (read from `data_classes.c`). FE8 has one Pow stat shown as STR or MAG; both map to `basePow`. Luck is character-only (class base 0). Since every unit's `fe_stats` == its class base, deltas come out 0 → displayed stats = pure class base = YAML.
+- **baseRanks** ← replaced with the class's weapon type (`CLASS_WEAPON`) at `WPN_EXP_E` (the slot's old SWORD/etc rank is wrong for the new class).
+- **personal growths** ← zeroed, so the unit grows at its pure **class** rate (total growth = class + character; we don't want Braulo inheriting Eirika's growths).
+- Verified in the ROM: 8 classed slots show correct class/affinity=7/L1/bases=0; brie+pepperjack (no class yet) left vanilla.
+
+**Deliberately NOT yet handled (follow-ups):**
+- **Weapon-rank level** is a flat E for everyone — a balance pass should set real ranks (vanilla L1 casters start ~C). Likely belongs in YAML.
+- **Gender / `attributes` / `pSupportData`** are still the vanilla slot's (CA_FEMALE leaks onto Braulo/Rootis/Pinky slots; no dangerous flags like CA_LORD/CA_SUMMON though). Needs a YAML-driven gender pass (incl. `_F` class variants where they exist) + supports rework. Note Pinky is male but rides the Neimi(F) slot + Pegasus Knight (female-anim class) — pure flavor handwave for now.
+- **brie + pepperjack** have `class: null` (TBD post-MVP) → name-only until classes are chosen.
+
+## NEXT STEPS (clean-build + `verify_text.py`/mGBA each before the next)
+1. **Test chapter.** Use a NORMAL chapter (ch1, NOT the tutorial Prologue). COPY the vanilla `-event*.h` and minimally edit unit defs to spawn the 8 classed cast; verify placement + that each shows correct name/class/stats/portrait in mGBA. This is the first real end-to-end visual confirmation of names+stats+portraits together.
+2. After that: the Braulo end-to-end slice (#15) is effectively complete → start real maps (Prologue, Ch1), and pick up the gender/ranks/growths follow-ups above.
 
 ## BUILD HYGIENE
 - **Clean-build:** `make clean && make CAMPAIGN=rime-of-the-frostmaiden`. `build_campaign.py` re-injects (idempotent) into the submodule working tree each build; `make clean` does NOT restore vanilla texts.txt — to reset decomp source: `git -C fireemblem8u checkout <path>`.
@@ -40,7 +53,7 @@ Not Huffman. **String-terminator parity.** FE8 packs printable text two bytes pe
 - **`make` no longer matches vanilla sha1** (we diverge on purpose). Don't commit the fireemblem8u submodule pointer.
 
 ## KEY FILES
-- `tools/build_campaign.py` — portraits + names. Add `patch_character_data` next.
+- `tools/build_campaign.py` — portraits + names + character class/stats (`patch_character_data`). Chapter/event injection next.
 - `tools/verify_text.py` — ROM text decoder / regression gate.
 - `tools/portrait_tool.py`, `tools/ref_to_bust.py` — portrait pipeline.
 - `campaigns/.../{pcs,npcs}/*.yaml` — unit data. Long names carry `fe_name` (≤12); marty + prof-rbg now do.
