@@ -1,47 +1,50 @@
-# Handoff: Build pipeline STARTED (Phase 2). Portrait injection is live in-ROM — all 10 custom busts now appear in mGBA on the early vanilla cast, STATIC (no mouth/eye animation) and facing the correct way. 3 open refinements from Nicolas's first in-game look: (1) menu mouth-hole, (2) chibi quality, (3) broader in-game test. Committed + pushed `95d46c9`.
+# Handoff: RESET POINT — Milestone B (content pipeline) to be REDONE from scratch. Milestone A (portrait injection) is committed and good. This session attempted B (names/stats/test-chapter), hit two real bugs (Huffman text corruption + malformed event script), and is being rolled back to a clean Milestone-A baseline. Below: what works, what broke + root causes, the validated decomp injection points, and the careful fresh-start plan.
 
-**Date:** 2026-06-03 (session 2 of the day)
-**Session focus:** Kicked off `build_campaign.py` (the generator — Python, not .ts; see below). Milestone A = inject all 10 busts onto vanilla portrait slots so we can SEE them in mGBA. Done end-to-end: build green, ROM boots, Nicolas confirmed busts show in conversations. Then two fixes from his feedback (static portraits, facing) landed; three refinements remain.
+**Date:** 2026-06-04
+**Decision (Nicolas):** undo the Milestone B work done while on Sonnet; re-scope against the plan + decomp; start fresh, incrementally, verifying each step in mGBA before adding the next.
 
-## DECISIONS THIS SESSION (settled — don't re-litigate)
-- **Generator language = Python (`tools/build_campaign.py`), NOT TypeScript.** The decomp output (C/asm/text/graphics) is fixed regardless of generator language; Python reuses `portrait_tool.py`/`ref_to_bust.py` directly and pyyaml is already there. The old "build-campaign.ts" backlog name is retired.
-- **Injection strategy = overwrite vanilla slots** (not extend FE8 tables). Byte-stable, minimal engine surface, satisfies the Engine/Content boundary (the GENERATOR knows names; emitted C is just data).
-- **Custom portraits are STATIC** (no talking-mouth, no eye-blink). FE8 always runs both animations from the `imgMouth` frame strip; aligning custom per-frame art is infeasible. We defeat it: bake the whole neutral face into the tileset + emit transparent overlay frames (`portrait_tool.generate(static_portrait=True)`). Confirmed good in-game.
-- **"make green" no longer means byte-identical-to-vanilla** — it means the ROM builds. We build the decomp's `fireemblem8.gba` target directly, skipping its vanilla-sha1 `compare` goal. Restore vanilla art: `git -C fireemblem8u checkout graphics/portrait`.
-- **FE8 portraits face screen-LEFT** (engine HFLIPs for the right speaker). Busts are stored CANONICAL (left-facing): a right-facing ref is flipped at the RENDER stage (`ref_to_bust --flip-h`, recorded as `art.render.flip_h: true`), NOT at injection. So the bust `.png`, its `_preview.png`, and the in-game face all agree.
-- **`_preview.png` (3× NN review aid) must stay fresh** — Nicolas reviews busts on GitHub; regenerate whenever a bust changes (they had gone stale; refreshed all 10 this session).
+## WHAT WORKS — keep (committed)
+- **Milestone A portrait injection** (`tools/build_campaign.py` portrait path) — 10 busts → vanilla portrait slots, STATIC, facing-correct, flat refs. Committed (`95d46c9`, `8fc46cb`, `d50fa35`, `b5b48e6`). `make` shows the right faces in mGBA. **This is the baseline to build on.**
+- **portraitId mapping (validated this session):** the engine resolves `portrait_data[portraitId-1]`, and the table has DUPLICATE blink entries, so `portraitId` in `gCharacterData` must be the VANILLA character's value, NOT the raw `portrait_data` index. Vanilla values for our slots: Eirika 0x2, Seth 0x4, Gilliam 0x5, Franz 0x6, Moulder 0x7, Vanessa 0x8, Ross 0x9, Neimi 0xa, Colm 0xc, Garcia 0xe. With these, portraits line up perfectly in-game (verified at ROM level AND on screen).
+- **gCharacterData patching (stats/class) worked in-game** — units showed correct class + stats. Only the NAME (text) was broken (see below). The `[CHARACTER_X - 1] = {…}` brace-counting replacement in `patch_character_data` is sound.
 
-## WHAT WORKS NOW (committed 95d46c9, pushed)
-- `make` → runs `build_campaign.py` → injects 10 busts → builds ROM. Green.
-- Portrait map (our bust → vanilla slot it rides on): braulo→Eirika, marty→Seth, wolfram→Franz, meesmickle→Gilliam, prof-rbg→Moulder, rootis→Vanessa, sclorbo→Ross, pinky→Neimi, pepperjack→Garcia, brie→Colm. (Hardcoded in `build_campaign.py PORTRAIT_MAP`; class/stat/name mapping is Milestone B.)
-- `flip_h: true` set on braulo, wolfram, meesmickle, prof-rbg, pinky, brie (the 6 right-facers); their bust PNGs are flipped in-place to canonical left-facing and previews regenerated. marty/rootis/sclorbo/pepperjack already faced left.
-- **fireemblem8u/graphics/portrait/** holds the injected build artifacts (NOT committed — reproducible from YAML; submodule pointer left untouched).
+## WHAT BROKE — root causes (the reason for the reset)
+1. **Huffman TEXT corruption (the big one).** Injecting unit names by editing `texts/texts.txt` and letting the decomp recompress is producing a **Huffman tree ↔ compressed-data mismatch**: every custom message decodes to runaway garbage in-game ("Wolfram as e", "oi. ee?", black boxes). Confirmed by decoding the ROM's `gMsgTable`/`gMsgHuffmanTable` directly — messages never hit their terminator. `scripts/texttools/textprocess.py` rebuilds the tree from `GenerateFreqTable` every run and writes BOTH tree + data into `src/msg_data.c`; in principle consistent, but in practice our edit+rebuild path yields a mismatch **even on a full `make clean` build**. `texts.txt` itself is structurally perfect (verified: each `## MSG_xxx` → `Name[X]` 1:1), so the corruption is in the recompression/build, not the source. **THIS MUST BE SOLVED FIRST in the redo — in isolation, before any chapter work.**
+2. **Malformed test-chapter event script (B3).** The hand-written prologue beginning-scene (`generate_test_chapter`) used event opcodes (TEXTSHOW/FlashCursor/FADU/etc.) that misbehaved — gibberish cutscene text + black text windows — and may have compounded the text corruption. Hand-authoring FE8 event bytecode from scratch is error-prone. Also: **the Prologue is a bad test bed** (heavy tutorial special-casing, forced lord, auto-suspend to `.sav`).
+3. **Process pain (not code bugs, but cost hours):** (a) incremental builds desync the decomp's dep tracking when `build_campaign.py` rewrites source each build — stale `.o`/`.dep`/text; (b) `open -a mGBA <rom>` does NOT swap the ROM on a running instance — you keep seeing the OLD build. See Build Hygiene below.
 
-## OPEN REFINEMENTS (Nicolas's first in-game look — priority order)
-1. **Menu mouth-hole → fold into Milestone B (portrait_data ownership).** Status/menu face shows a missing mouth rectangle. Traced fully: `PutFace80x72_Standard`/`_Raised` ([fireemblem8u/src/face.c:660](fireemblem8u/src/face.c)) fill the face from TSA `gUnknown_085A0838` (header-less u16 tile-entry array, 10-wide), then **stamp the mouth at the slot's `xMouth`/`yMouth`** (FaceData) using sheet tiles `0x1C-0x1F`/`0x3C-0x3F` (px (224,0)-(256,16)) — tiles our `encode` leaves empty. Deeper issue: the stamp draws at the *vanilla slot's* `xMouth`/`yMouth`, and **our busts (riding Eirika/Seth/… slots) don't have their mouths at those coords** — verified the vanilla stamp tiles are SEPARATELY authored (NOT a crop of the decoded bust: tested 8 slots, none match `bust(xMouth*8,yMouth*8)`), and per-slot coords vary (Eirika 2,6; Seth 2,5; …). So a pixel-copy alone still misplaces the mouth. **Proper fix = own `portrait_data[]`** (Milestone B): emit our rows with `xMouth`/`yMouth` matching our art + bake the matching stamp tiles in one place. Do NOT build per-vanilla-slot TSA-parsing for Milestone A — it gets thrown away. Engine stays vanilla; the fix is data.
-2. **Chibi quality varies.** Marty's chibi looks great; Braulo's is rough (non-human/crab face crops poorly). `_make_chibi` is a naive center-crop + nearest-neighbor ([tools/portrait_tool.py:180](tools/portrait_tool.py)). Improve face-region detection or add a per-unit chibi crop knob. (This was already the deferred "chibi placeholder" item.)
-3. **Broader in-game test.** Nicolas saw only braulo/wolfram/marty (the prologue cast). He wants to see the rest faster — options: pick a talky chapter, or also map our busts onto early ENEMY portraits so one fight shows more. Natural fit with Milestone B's visual-test chapter.
+## VALIDATED DECOMP INJECTION POINTS (re-confirmed this session)
+| Data | File(s) | Notes |
+|---|---|---|
+| Character stats/class/growth/portraitId/affinity | `src/data_characters.c` `gCharacterData[]` | Works. portraitId = vanilla value (see above). affinity is cosmetic; default Anima. |
+| Portrait graphics | `graphics/portrait/portrait_<Slot>_*` (+ `src/portrait_data.c`, `data/data_portrait.s`) | Milestone A. Works. `portrait_tool.generate(static_portrait=True)`. |
+| **Unit names / dialogue text** | `texts/texts.txt` → `scripts/texttools/textprocess.py` → `src/msg_data.c` (gMsgTable + gMsgHuffmanTable) | **FRAGILE — current corruption source.** |
+| Chapter: units/placement/events | `src/events/<ch>-event{udefs,script,info}.h` (`ChapterEventGroup`, `REDA`/`UnitDefinition`, `EventListScr`) → included by `events_script.c`/`events_info.c`/`events_udefs.c` | Hand-writing scripts = error-prone. Prefer copying a known-good chapter and minimally editing. |
 
-## FACING — needs Nicolas's eyes to finish
-Set from the bust montage (I can view images): flipped the 6 above; left marty/rootis/sclorbo/pepperjack. **rootis (snowman) and sclorbo (flame) are near-symmetric — unconfirmed.** pepperjack faces left (barrel left). If any read backwards in-game, flip that bust PNG (`ref_to_bust --flip-h` from its ref, or mirror the PNG) and toggle `art.render.flip_h` to match — the PNG is the canonical artifact now, not the injection step. prof-rbg flip is INTERIM — Nicolas made new 3/4 refs (`RBG3/4`, `RBG3/4_Flat`, the Flat one downscales better per the standing ref-spec lesson); re-render prof-rbg from RBG3/4_Flat and drop its flip_h.
+## FRESH-START PLAN (do in this order; verify EACH in mGBA before the next)
+0. **Clean baseline:** repo is rolled back to Milestone-A-only (this handoff commit). `make` builds the portraits-only ROM, faces correct, vanilla everything else. Confirm that still works first.
+1. **SOLVE TEXT IN ISOLATION.** Change ONE vanilla name (e.g. Eirika→"Braulo") via the smallest possible mechanism, `make clean`, launch, and confirm it renders cleanly on the **stock prologue**. Do not move on until a single name is reliably clean across rebuilds. Investigate `textprocess.py` determinism / whether the tree+data in `msg_data.c` actually match (decode `gMsgTable[id]` with `gMsgHuffmanTable`). If the standard path can't be made reliable, consider alternatives (shorter custom text, or a different name-storage hook). Names must be ≤12 chars — use the `fe_name` concept (see memory).
+2. **Characters:** re-apply `gCharacterData` patching (stats/class/portraitId-vanilla/affinity-Anima). Verify class+stats+portrait+NAME all correct for a stock-prologue unit.
+3. **Test chapter:** use a NORMAL chapter (ch1), and build its event data by COPYING the vanilla chapter's `-event*.h` and minimally editing unit defs — do not hand-write the beginning scene from scratch. Spawn the cast, verify all 10 line up.
 
-## NEXT STEPS (priority)
-1. **Milestone B** — own `portrait_data[]`/`gCharacterData[]`, which also fixes the menu mouth-hole properly (#1) and enables the visual-test chapter (#3).
-2. **Chibi pass** (#2).
-3. **Milestone B:** the real generator — character names/stats from YAML + a spawn-them-all visual-test chapter (covers #3). This is where build_campaign starts emitting `gCharacterData[]` rows, `portrait_data[]`, event files, and text. Injection points already mapped:
-   - characters → `fireemblem8u/src/data_characters.c` `gCharacterData[]`
-   - portraits → `src/portrait_data.c` + `data/data_portrait.s`
-   - chapter/units/dialogue → `src/events/chN-*.h` (`ChapterEventGroup`, REDA/UnitDef, EventListScr, FIGHT/Text_BG); included via `src/events_script.c`/`events_info.c`
-   - text → `texts/texts.txt` (`## MSG_*` → numeric IDs)
-   - chapter table → `src/chapterdata.c` + `src/data/chapter_settings.json`
+## BUILD HYGIENE (learned the hard way)
+- **Always clean-build the campaign** until deps are made robust: `make clean && make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba`. Incremental builds desync (stale `.dep` referencing deleted generated files; text not recompressing in step). A future improvement: have the Makefile/`build_campaign.py` force-remove the objects it regenerates.
+- **Load the ROM properly:** `pkill -9 -i mgba; "/Applications/mGBA.app/Contents/MacOS/mGBA" "$PWD/fireemblem8u/fireemblem8.gba" &`. `open -a mGBA` refocuses the old instance without reloading.
+- **Fresh New Game:** `rm fireemblem8u/fireemblem8.sav` (FE8 auto-suspends; stale saves load old unit data).
+- **Verify which build is running:** decode `gCharacterData`/`gMsgTable` from the ROM via the `.map`, or drop a marker via a YAML field (NOT a manual `texts.txt` edit — `make` runs `build_campaign.py` first and overwrites manual decomp edits).
+- **`make` no longer matches vanilla sha1** (we diverge on purpose) — build the decomp `fireemblem8.gba` target, not its `compare` goal. Restore vanilla: `git -C fireemblem8u checkout <path>`.
 
-## KEY FILES (this session)
-- `tools/build_campaign.py` — the generator. `PORTRAIT_MAP`, `inject_portraits()`, `_load_unit_yaml()` (reads `art.render.flip_h`). Milestone B hangs off here.
-- `tools/portrait_tool.py` — added `generate(..., static_portrait=True)` + `--static`. The `encode` packing is what needs extending for the menu mouth-stamp (#1).
-- `Makefile` (project root) — generator step + builds decomp ROM target directly.
-- `campaigns/.../{pcs,npcs}/*.yaml` `art.render.flip_h` — facing.
+## KEY FILES
+- `tools/build_campaign.py` — rolled back to Milestone A (portrait injection only) at this reset. Milestone B logic to be re-added per the plan.
+- `tools/portrait_tool.py` — `generate(static_portrait=True)`, `--static`. Unchanged, good.
+- `tools/ref_to_bust.py` — `--flip-h` for facing. Good.
+- `campaigns/.../{pcs,npcs}/*.yaml` — unit data (stats, class, `art.render`, facing). Long names need an `fe_name` (≤12).
+- decomp (`fireemblem8u/`) — submodule; our edits are uncommitted build artifacts. Don't commit the submodule pointer.
 
-## STANDING (unchanged)
-- Custom art for the 10 named cast (portrait→sprite→anim); enemies vanilla. Stock FE8 classes/weapons; combat RULES vanilla FE; element = flavor.
-- Show art before committing; auto-push to main once approved; clean native rewrites.
-- Don't commit the fireemblem8u submodule pointer (pre-existing local changes + our build artifacts live there).
+## MEMORY (read these — they encode this session's hard-won lessons)
+- [[feedback_fe_name_truncation]] — proactively short `fe_name` for long names.
+- [[project_manchego_stars_portrait_pipeline]] — portraitId-1 gotcha, mGBA loading gotcha, static portraits, facing.
+- [[feedback_portrait_static_no_animation]] — static busts.
+
+## STANDING RULES (unchanged)
+Custom art for the 10 named cast; enemies vanilla. Stock FE8 classes/weapons; combat = vanilla FE; element = flavor. `make` green at session end. Auto-push to main once approved. Don't commit the fireemblem8u submodule pointer.
