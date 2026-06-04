@@ -340,11 +340,15 @@ Instead each cast member gets a **custom SMS slot** (ids 107+; classes top out a
 Stock classes and vanilla enemies are untouched. **Colour:** every player map sprite shares one 16-colour OBJ palette
 (`unit_icon_pal_player.agbpal`) — sprites can't carry their own — so custom colours come from redesigning that one shared
 ramp to **union-cover the cast's hues** (reds/blacks/whites/greys + Rootis ice-blue, Pinky pink, RBG green). No
-palette-bank hacking. **Scope seam:** the override only swaps the **idle** sprite (the small 16×16 wait sheet). The
-**hover/selected + walking** sprite is a separate, larger per-class MU sheet (`gMuInfoTable[jid]`: standing + 4-dir walk
-frames) — making *that* custom is a bigger asset that overlaps the battle-anim track, deferred. Idle-custom / class-walk
-is the deliberate first cut.
-_Decided 2026-06-04; injection path + per-character override proven in mGBA (Braulo placeholder)._
+palette-bank hacking. **Two sheets per character, grouped as one deliverable** (battle anims #39 are a separate track):
+- **Idle** = the small **wait** sheet (16×16 frame strip), `unit_icon_wait_table[SMSId]`, swapped via the `GetUnitSMSId`
+  per-character override above. *(Proven in mGBA, Braulo placeholder.)*
+- **Hover/selected + walking** = the larger per-class **MU** sheet (`gMuInfoTable` = `unit_icon_move_table[classId-1]`;
+  a **32×480 strip = 15 frames of 32×32**). Override the same way: `MuProc` carries `->unit`, so patch `GetMuImg` to
+  return a per-character custom sheet (reusing the class's motion script, so only the graphics change) before falling
+  back to the class sheet. Both in-chapter MU draws route through `GetMuImg`, so one hook covers hover + walk.
+The MU sheet is the bigger art lift (a 15-frame walk cycle), but it stays in the map-sprite group, not battle anims.
+_Decided 2026-06-04; wait-sheet path proven in mGBA (Braulo placeholder); MU path scoped, build pending._
 
 **Enemy/non-cast sprites: vanilla FE8 where the look fits; community (FEUniverse) or custom only where a creature has no vanilla analogue** (Grells, Messie, ice trolls).
 The full-custom rule above is for the player cast + named recruits, where identity matters most.
