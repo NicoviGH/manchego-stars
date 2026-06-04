@@ -221,10 +221,16 @@ def generate(bust, xmouth=2, ymouth=6, static_portrait=False):
     palette_bytes = _palette_to_agbpal(pal_rgb)
 
     if static_portrait:
-        # Full face stays in the tileset; overlay frames are fully transparent.
+        # Full face stays in the tileset. Fill the mouth sprite frames with the
+        # NEUTRAL mouth (not transparent) so the dialogue mouth shows; all frames are
+        # identical, so the talking proc animates nothing -- a locked still.
         mod_bust = bust
+        neutral_mouth = bust.crop((mouth_bx, mouth_by,
+                                   mouth_bx + MOUTH_W, mouth_by + MOUTH_H))
         mouth_png = Image.new('P', (MOUTH_W, MOUTH_H * MOUTH_FRAMES), 0)
         mouth_png.putpalette(bust.getpalette())
+        for i in range(MOUTH_FRAMES):
+            mouth_png.paste(neutral_mouth, (0, i * MOUTH_H))
     else:
         # Animated vanilla layout: extract the mouth window, blank it in the
         # tileset, and repeat it across the 6 frame slots.
@@ -245,6 +251,15 @@ def generate(bust, xmouth=2, ymouth=6, static_portrait=False):
 
     # --- tileset: encode the (possibly unmodified) bust ---
     tileset_png = encode(mod_bust)
+
+    if static_portrait:
+        # encode()'s OBJECTS never cover sheet tiles 0x1C-0x1F / 0x3C-0x3F (columns
+        # 28-31), but the status-screen face reader (face.c PutFace80x72_Standard)
+        # draws the 32x16 mouth window from exactly those tiles. Left blank they render
+        # as a transparent hole over the mouth -- the "mouth cutout". Paste the neutral
+        # mouth there. Sheet tile 0x1C = col 28, row 0 -> px (224, 0); the 32x16 paste
+        # fills 0x1C-0x1F (top row) and 0x3C-0x3F (bottom row).
+        tileset_png.paste(neutral_mouth, (28 * 8, 0))
 
     # --- chibi ---
     chibi_png = _make_chibi(bust)

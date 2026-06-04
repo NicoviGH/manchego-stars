@@ -37,6 +37,26 @@ PORTRAIT_DIR = os.path.join(DECOMP, 'graphics', 'portrait')
 CHARACTERS_C = os.path.join(DECOMP, 'src', 'data_characters.c')
 CLASSES_C = os.path.join(DECOMP, 'src', 'data_classes.c')
 TEXTS_TXT = os.path.join(DECOMP, 'texts', 'texts.txt')
+PORTRAIT_DATA_C = os.path.join(DECOMP, 'src', 'portrait_data.c')
+# Our busts are all framed identically: the mouth window sits at tile (col 2, row 6)
+# and eyes at (col 3, row 4) -- the geometry portrait_tool extracts the mouth from, and
+# the same xMouth/yMouth/xEyes/yEyes the Eirika/Franz/Vanessa/Neimi slots already carry
+# (those render our busts cleanly). Slots whose FaceData uses different coords (Seth,
+# Gilliam, Moulder = 2,5; Ross = 3,6; Garcia = 2,5; Colm = 3,5) make the engine overwrite
+# the mouth window one tile off -> a second, offset mouth. Normalize every dressed slot.
+PORTRAIT_GEOMETRY = '2, 6, 3, 4'   # xMouth, yMouth, xEyes, yEyes
+# Test-chapter spawn (Milestone B step 3): we hijack the vanilla Ch1 ally roster to
+# stand up our classed cast on one real map -- the first in-engine confirmation of
+# names + portraits + classes + stats together. These are the only two files it touches.
+CH1_UDEFS_H = os.path.join(DECOMP, 'src', 'events', 'ch1-eventudefs.h')
+CH1_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch1-eventinfo.h')
+CH1_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch1-eventscript.h')
+PROLOGUE_WM_H = os.path.join(DECOMP, 'src', 'events', 'prologue-wm.h')
+GAMECONTROL_C = os.path.join(DECOMP, 'src', 'gamecontrol.c')
+BMIO_C = os.path.join(DECOMP, 'src', 'bmio.c')
+# New-game boots straight into the test chapter (skip the vanilla prologue) so the
+# spawn is one "New Game" away. CHAPTER_L_1 = 0x01 (constants/chapters.h).
+TEST_CHAPTER_INDEX = 1
 
 # FE8's unit-name buffer; longer names overflow and garble the display.
 FE_NAME_MAX = 12
@@ -44,7 +64,10 @@ FE_NAME_MAX = 12
 # Decomp source files we patch in place. We git-restore them to vanilla at the start
 # of every build so injection always runs from a clean base -- idempotent across
 # repeated `make`s, and stat-donor growths/ranks always read vanilla values.
-PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c']
+PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrait_data.c',
+                        'src/events/ch1-eventudefs.h', 'src/events/ch1-eventinfo.h',
+                        'src/events/ch1-eventscript.h', 'src/events/prologue-wm.h',
+                        'src/gamecontrol.c', 'src/bmio.c']
 
 
 def restore_vanilla_sources():
@@ -146,6 +169,31 @@ def inject_portraits(campaign, verbose=True):
 
         if verbose:
             print('  %-10s -> portrait_%s (tileset/mouth/chibi/palette)' % (unit, vanilla))
+
+
+def patch_portrait_geometry(verbose=True):
+    """Normalize the mouth/eye window coords of every dressed portrait slot to our
+    bust framing, so the engine's mouth-window overwrite lands on our baked mouth
+    (not one tile off, which doubles it). See PORTRAIT_GEOMETRY."""
+    slots = sorted(set(PORTRAIT_MAP.values()))
+    with open(PORTRAIT_DATA_C, encoding='utf-8') as f:
+        lines = f.read().split('\n')
+    # FaceData tail: `, 0, xMouth, yMouth, xEyes, yEyes, FACE_BLINK_*`. The `, 0,`
+    # constant anchors the four geometry fields uniquely on each entry line.
+    geom = re.compile(r'(,\s*0,\s*)\d+,\s*\d+,\s*\d+,\s*\d+(,\s*FACE_BLINK)')
+    n = 0
+    for i, line in enumerate(lines):
+        if any('portrait_%s_tileset' % s in line for s in slots):
+            new = geom.sub(r'\g<1>%s\2' % PORTRAIT_GEOMETRY, line)
+            if new != line:
+                lines[i] = new
+                n += 1
+    if n == 0:
+        sys.exit('ERROR: no portrait_data.c entries matched for geometry patch')
+    with open(PORTRAIT_DATA_C, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines))
+    if verbose:
+        print('  normalized %d slot entries to mouth/eye (%s)' % (n, PORTRAIT_GEOMETRY))
 
 
 # --- Milestone B: unit names ------------------------------------------------------
@@ -400,6 +448,179 @@ def patch_character_data(campaign, verbose=True):
         f.write(text)
 
 
+# --- Milestone B step 3: test-chapter spawn ---------------------------------------
+# First in-engine confirmation that names + portraits + classes + stats land together.
+# We keep vanilla Ch1's MAP but strip its scripting to a bare sandbox: the original
+# beginning scene choreographs specific vanilla units (scripted Breguet fight, forced
+# moves, MoveUnitS2ToLeader) and was deleting our cast mid-cutscene -> instant lord-
+# death game over. Instead we:
+#   * rewrite the player roster (UnitDef_Event_Ch1Ally) to our classed cast,
+#   * replace the beginning scene with a minimal "load the cast, hand over control",
+#   * empty every per-chapter event list (turn/character/location/misc/tutorial) so
+#     nothing references removed units or fires a win/lose condition,
+#   * cut the boot attract reel + redirect prologue->Ch1 so a fresh boot lands on the
+#     title and New Game drops straight onto the map (dev loop).
+# Result: New Game -> Ch1 map with the 8 cast, no cutscene, no game over -- a pure
+# look-test (no enemies, no objective; reset when done). Each cast unit rides its
+# PORTRAIT_MAP slot's CHARACTER_ id, so its injected name/portrait/class/stats show.
+# redaCount=0 places a unit statically at xPosition/yPosition (eventscr.c sub_800F8A8).
+# All edits are restorable build artifacts (PATCHED_DECOMP_FILES). Authored chapters
+# (real maps/events/objectives from YAML) supersede this whole step.
+
+# Stock starting loadout per class enum (vanilla ITEM_ ids; see constants/items.h).
+CLASS_LOADOUT = {
+    'CLASS_PIRATE':         ['ITEM_AXE_IRON', 'ITEM_AXE_HANDAXE', 'ITEM_VULNERARY'],
+    'CLASS_SHAMAN':         ['ITEM_DARK_FLUX', 'ITEM_VULNERARY'],
+    'CLASS_ARCHER':         ['ITEM_BOW_IRON', 'ITEM_VULNERARY'],
+    'CLASS_MAGE':           ['ITEM_ANIMA_FIRE', 'ITEM_VULNERARY'],
+    'CLASS_PRIEST':         ['ITEM_STAFF_HEAL', 'ITEM_VULNERARY'],
+    'CLASS_ARMOR_KNIGHT':   ['ITEM_LANCE_IRON', 'ITEM_VULNERARY'],
+    'CLASS_PEGASUS_KNIGHT': ['ITEM_LANCE_SLIM', 'ITEM_LANCE_JAVELIN', 'ITEM_VULNERARY'],
+}
+# East-side cluster on the Ch1 map, clear of the houses (13,6)/(10,4) and seize (2,2).
+# First slot (14,9) is the canonical lord start; the cast fills the rest in roster order.
+TEST_SPAWN_POSITIONS = [(14, 9), (13, 9), (12, 9), (14, 8),
+                        (13, 8), (12, 8), (14, 7), (13, 7)]
+
+
+def _replace_brace_block(text, marker, new_body, path):
+    """Replace the `{...}` after `marker` with `new_body` (a `{...}` string)."""
+    s, e = _find_brace_block(text, marker, path)
+    return text[:s] + new_body + text[e:]
+
+
+def inject_test_chapter(campaign, verbose=True):
+    """Rewrite Ch1's ally roster to our classed cast and disable Ch1 tutorials."""
+    # Build the cast roster in PORTRAIT_MAP order, skipping name-only units (no class).
+    units = []
+    for unit_id, slot in PORTRAIT_MAP.items():
+        unit = load_unit(campaign, unit_id)
+        unit.setdefault('id', unit_id)
+        class_enum = class_enum_for(unit)
+        if class_enum is None:
+            continue
+        if class_enum not in CLASS_LOADOUT:
+            sys.exit('ERROR: no test loadout for %s (unit %s)' % (class_enum, unit_id))
+        units.append((unit_id, slot, class_enum, unit))
+    if len(units) > len(TEST_SPAWN_POSITIONS):
+        sys.exit('ERROR: %d classed cast > %d test spawn positions'
+                 % (len(units), len(TEST_SPAWN_POSITIONS)))
+
+    leader = 'CHARACTER_%s' % units[0][1].upper()  # the lord slot anchors the roster
+    entries = []
+    for (unit_id, slot, class_enum, unit), (x, y) in zip(units, TEST_SPAWN_POSITIONS):
+        items = ', '.join(CLASS_LOADOUT[class_enum])
+        entries.append(
+            '    {\n'
+            '        .charIndex = CHARACTER_%s,\n'
+            '        .classIndex = %s,\n'
+            '        .leaderCharIndex = %s,\n'
+            '        .allegiance = FACTION_ID_BLUE,\n'
+            '        .level = %d,\n'
+            '        .xPosition = %d,\n'
+            '        .yPosition = %d,\n'
+            '        .redaCount = 0,\n'
+            '        .items = { %s },\n'
+            '    },' % (slot.upper(), class_enum, leader,
+                        int(unit.get('fe_stats', {}).get('level', 1)),
+                        x, y, items))
+    roster = '{\n' + '\n'.join(entries) + '\n    { 0 },\n}'
+
+    with open(CH1_UDEFS_H, encoding='utf-8') as f:
+        udefs = f.read()
+    udefs = _replace_brace_block(
+        udefs, 'UnitDef_Event_Ch1Ally[] =', roster, CH1_UDEFS_H)
+    with open(CH1_UDEFS_H, 'w', encoding='utf-8') as f:
+        f.write(udefs)
+
+    # Empty every per-chapter event list so nothing references the removed cutscene
+    # units or triggers a win/lose condition. Each is an EventListScr[] terminated by
+    # END_MAIN; the tutorial list is a pointer array terminated by NULL.
+    with open(CH1_EVENTINFO_H, encoding='utf-8') as f:
+        info = f.read()
+    for name in ('EventListScr_Ch1_Turn', 'EventListScr_Ch1_Character',
+                 'EventListScr_Ch1_Location', 'EventListScr_Ch1_Misc'):
+        info = _replace_brace_block(info, name + '[] =', '{\n    END_MAIN\n}',
+                                    CH1_EVENTINFO_H)
+    info = _replace_brace_block(
+        info, 'EventListScr_Ch1_Tutorial[] =', '{\n    NULL\n}', CH1_EVENTINFO_H)
+    with open(CH1_EVENTINFO_H, 'w', encoding='utf-8') as f:
+        f.write(info)
+
+    # Minimal beginning scene: deploy the cast and hand over control. (Vanilla's scene
+    # ran a scripted fight + forced moves that wiped our units.) LOAD1 deploys the
+    # chapter's player UnitDefinition; ENUN waits for the placement; ENDA ends.
+    with open(CH1_EVENTSCRIPT_H, encoding='utf-8') as f:
+        script = f.read()
+    minimal_begin = ('{\n'
+                     '    LOAD1(1, UnitDef_Event_Ch1Ally)\n'
+                     '    ENUN\n'
+                     '    ENDA\n'
+                     '}')
+    script = _replace_brace_block(
+        script, 'EventScr_Ch1_BeginningScene[] =', minimal_begin, CH1_EVENTSCRIPT_H)
+    with open(CH1_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
+        f.write(script)
+
+    # Dev loop: cut every pre-map sequence so a fresh boot lands on the title and New
+    # Game drops straight onto the map. Four cuts, each at the source that actually
+    # plays the thing (a previous single-hook attempt at GameControl_RememberChapterId
+    # was reset before the world-map wrapper, so the Magvel tour still ran):
+    #   (a) gamecontrol.c: drop the boot OP anim (ProcScr_OpAnim, the character-flash +
+    #       attract reel) so boot falls through to the title;
+    #   (b) gamecontrol.c: skip the post-New-Game intro monologue (the "long ago..."
+    #       lore crawl) -- GameCtrlStartIntroMonologue runs it only while chapterIndex
+    #       == 0; force it to bail;
+    #   (c) bmio.c: redirect prologue -> Ch1 at the authoritative map-load point,
+    #       StartBattleMap (feeds gPlaySt.chapterIndex into InitChapterMap/fog/weather):
+    #       if (chapterIndex == 0) chapterIndex = 1. chapterIndex == 0 there can only be
+    #       a fresh game's prologue (skirmishes use PLAY_FLAGs; later chapters nonzero);
+    #   (d) prologue-wm.h: gut the prologue's world-map intro (EventScrWM_Prologue_
+    #       Beginning runs WM_TEXT(0x8DB) -- the "continent of Magvel" nation-by-nation
+    #       tour). The WM wrapper runs it BEFORE StartBattleMap's redirect, so (c) alone
+    #       doesn't stop it; replace its body with Ch1's no-op (EVBIT_MODIFY/SKIPWN/ENDA).
+    with open(GAMECONTROL_C, encoding='utf-8') as f:
+        gc = f.read()
+    gc, n1 = re.subn(r'[ \t]*PROC_START_CHILD_BLOCKING\(ProcScr_OpAnim\),\n',
+                     '', gc, count=1)
+    if n1 == 0:
+        sys.exit('ERROR: ProcScr_OpAnim start not found in %s' % GAMECONTROL_C)
+    gc, n2 = re.subn(r'\n(\s*)StartIntroMonologue\(proc\);',
+                     r'\n\1return; /* test-chapter: skip intro monologue */',
+                     gc, count=1)
+    if n2 == 0:
+        sys.exit('ERROR: StartIntroMonologue call not found in %s' % GAMECONTROL_C)
+    with open(GAMECONTROL_C, 'w', encoding='utf-8') as f:
+        f.write(gc)
+
+    with open(BMIO_C, encoding='utf-8') as f:
+        bmio = f.read()
+    bmio, n3 = re.subn(
+        r'(void StartBattleMap\(struct GameCtrlProc\* gameCtrl\) \{\n    int i;\n)',
+        r'\1\n    if (gPlaySt.chapterIndex == 0) /* test-chapter spawn: prologue -> Ch1 */\n'
+        r'        gPlaySt.chapterIndex = %d;\n' % TEST_CHAPTER_INDEX,
+        bmio, count=1)
+    if n3 == 0:
+        sys.exit('ERROR: StartBattleMap signature not found in %s' % BMIO_C)
+    with open(BMIO_C, 'w', encoding='utf-8') as f:
+        f.write(bmio)
+
+    with open(PROLOGUE_WM_H, encoding='utf-8') as f:
+        wm = f.read()
+    wm = _replace_brace_block(
+        wm, 'EventScrWM_Prologue_Beginning[] =',
+        '{\n    EVBIT_MODIFY(0x1)\n    SKIPWN\n    ENDA\n}', PROLOGUE_WM_H)
+    with open(PROLOGUE_WM_H, 'w', encoding='utf-8') as f:
+        f.write(wm)
+
+    if verbose:
+        for unit_id, slot, class_enum, _ in units:
+            print('  %-10s -> Ch1 ally (%s as %s)'
+                  % (unit_id, slot, class_enum.replace('CLASS_', '')))
+        print('  Ch1 stripped to sandbox; boot attract + Magvel intro cut; '
+              'New Game boots into Ch1')
+
+
 def main():
     ap = argparse.ArgumentParser(description='Inject campaign content into the decomp build.')
     ap.add_argument('--campaign', default='rime-of-the-frostmaiden')
@@ -416,6 +637,10 @@ def main():
         inject_names(args.campaign)
         print('characters:')
         patch_character_data(args.campaign)
+        print('portrait geometry:')
+        patch_portrait_geometry()
+        print('test chapter (Ch1 spawn):')
+        inject_test_chapter(args.campaign)
     print('done. Run `make` to compile the ROM.')
 
 
