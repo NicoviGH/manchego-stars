@@ -67,19 +67,36 @@ cd fireemblem8u
 > **If it references a character name, chapter number, or plot event, it goes in YAML, not C.**
 
 - Engine code (`engine/`, `fireemblem8u/src/`) must be campaign-agnostic
-- Campaign data (`campaigns/rime-of-the-frostmaiden/`) is injected at build time by `tools/build-campaign.ts`
+- Campaign data (`campaigns/rime-of-the-frostmaiden/`) is injected at build time by `tools/build_campaign.py`
 - If you're about to hardcode "braulo" or "ch03" in a `.c` file — stop. It belongs in YAML.
 - Code review rule: any C change that references a character by name, a chapter number, or a plot event is rejected
 
-## Phase Status
+## Working Conventions (Definition of Done)
 
-- **Phase 0: Foundation** — current phase (repo scaffold, decomp builds clean)
-- **Phase 1: Engine Core** — D&D flavor layer on vanilla FE combat: damage-type labels, the spell-tome/gold economy, a cosmetic nat-20 crit flourish (no d20 resolution engine, no AC, no saves)
-- **Phase 2: Content Pipeline** — build-campaign.ts, Braulo end-to-end
-- **Phase 3: MVP Content** — Prologue + all 8 chapters playable
-- **Phase 4: Polish & Ship** — distribute to the group
+Rationale and the long form: `docs/decisions.md` → Working Conventions. Every change:
+- ships its **doc + YAML updates in the same commit** (no "update docs later");
+- says `Closes #N` if it completes tracked work; open/retitle the issue if scope changes;
+- builds `make` green, and passes `python3 tools/verify_text.py` after any text change;
+- records a new non-obvious decision in `docs/decisions.md` (dated) — not only in chat/memory;
+- never commits the `fireemblem8u` submodule pointer (our decomp edits are build artifacts).
 
-See `docs/PRD.md §14` for the full roadmap; the work backlog is tracked in **GitHub issues** (milestones M0–M4).
+Single source of truth: don't restate a fact that lives elsewhere — link to it. Keep this
+file lean (operating instructions + pointers, not a fact store).
+
+## Current State & Backlog
+
+- **Where things stand right now** → `HANDOFF.md` (read at session start).
+- **Work backlog & milestones (M0–M4)** → GitHub issues.
+- **Phased roadmap & vision** → `docs/PRD.md §13`.
+
+## Build / Inject / Verify Tools
+
+| Tool | Role |
+|---|---|
+| `tools/build_campaign.py` | Inject campaign content (portraits, names, character class/stats) into the decomp before `make`. |
+| `tools/verify_text.py` | Decode message text from the built ROM (regression gate; no mGBA). |
+| `tools/portrait_tool.py`, `tools/ref_to_bust.py` | Bust art pipeline (ref → indexed FE8 portrait). |
+| `tools/setup-toolchain.sh` | One-time macOS toolchain setup (brew deps, agbcc, python numpy/pillow/pyyaml). |
 
 ## Model Selection Guide
 

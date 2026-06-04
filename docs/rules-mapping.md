@@ -11,9 +11,11 @@
 > FE8 is praised for tight, readable, well-tuned tactics; preserving that beats fidelity
 > to 5e.
 >
-> **Eventual machine-readable home:** the conversions here are the spec that
-> `tools/build-campaign.ts` + `data/srd-snapshot.json` + `data/homebrew/` implement.
-> This markdown is the human-readable source of truth for that logic.
+> **Machine-readable home:** these conversions are the spec that the unit YAML
+> (`campaigns/<name>/{pcs,npcs}/*.yaml`) encodes and `tools/build_campaign.py` injects
+> into the decomp. (There is no SRD snapshot or homebrew-class table — D&D is flavor-only;
+> see `decisions.md` Engine & Tech Stack.) This markdown is the human-readable source of
+> truth for the conversion logic.
 
 ---
 

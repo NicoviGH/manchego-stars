@@ -1,0 +1,62 @@
+name: checks
+
+# Lightweight drift guard. A full `make` is intentionally NOT run here: it needs the
+# copyrighted base ROM (gitignored) and the agbcc toolchain. Instead we catch the cheap,
+# high-value failures -- broken tooling, unparseable campaign data, and docs that point at
+# files which no longer exist (the kind of drift this repo has bitten on before).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        # no submodules: we don't build the ROM here, and fireemblem8u is huge.
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install pyyaml
+
+      - name: Python tooling compiles
+        run: python -m compileall -q tools
+
+      - name: Campaign YAML parses
+        run: |
+          python - <<'PY'
+          import glob, sys, yaml
+          bad = 0
+          for f in glob.glob("campaigns/**/*.yaml", recursive=True):
+              try:
+                  yaml.safe_load(open(f, encoding="utf-8"))
+              except Exception as e:
+                  print(f"YAML PARSE FAIL: {f}: {e}"); bad += 1
+          print("ok" if not bad else f"{bad} bad file(s)")
+          sys.exit(1 if bad else 0)
+          PY
+
+      - name: Docs don't reference missing tools (drift guard)
+        run: |
+          python - <<'PY'
+          import glob, re, os, sys
+          # Any tools/<name>.py or tools/<name>.rb referenced in a tracked doc must exist.
+          # (.ts refs are allowed: decisions.md documents the abandoned TS plan on purpose.)
+          pat = re.compile(r'tools/([\w-]+\.(?:py|rb))')
+          docs = glob.glob("docs/**/*.md", recursive=True) + ["CLAUDE.md", "README.md", "HANDOFF.md"]
+          missing = []
+          for d in docs:
+              if not os.path.isfile(d):
+                  continue
+              for m in pat.findall(open(d, encoding="utf-8").read()):
+                  if not os.path.isfile(os.path.join("tools", m)):
+                      missing.append((d, m))
+          for d, m in missing:
+              print(f"DRIFT: {d} references tools/{m} which does not exist")
+          sys.exit(1 if missing else 0)
+          PY

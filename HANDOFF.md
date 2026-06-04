@@ -9,6 +9,7 @@
 - **Name injection** — `build_campaign.py inject_names`: each cast `fe_name`/`name` (YAML) → the vanilla slot's `.nameTextId` message in `texts/texts.txt`, parity-padded. All 10 names render+terminate; full sweep 0 runaway.
 - **Character injection** — `build_campaign.py patch_character_data`: rewrites each slot's `gCharacterData[]` entry (class/affinity/level/base stats/weapon ranks/growths). Verified in ROM: 8 classed slots correct.
 - **fe_name** added to marty + prof-rbg (overflowed FE8's 12-char buffer). **PyYAML** added to the build interpreter + `setup-toolchain.sh`.
+- **Docs/issues drift cleanup + drift-prevention harness.** Closed the done/obsolete issues (M0 + M2; #4/#6 obsolete), retitled #14 (decomp-native events), opened #38 (map sprites) + #39 (battle anims). Recorded the real toolchain in `decisions.md` (Python not TS; decomp-native not Event Assembler; no SRD pull) as dated ADRs, added a **Working Conventions / Definition of Done** section, pruned `PRD.md` to vision-only, made `CLAUDE.md` lean (pointers + DoD), fixed README/rules-mapping, and added a lightweight CI drift guard (`.github/workflows/checks.yml`).
 
 ## Current State — what works
 - `make CAMPAIGN=rime-of-the-frostmaiden` builds a ROM carrying: 10 custom busts, 10 cast names, and 8 cast units' class+stats. `make green` = ROM builds (we diverge from vanilla sha1 on purpose; build the `fireemblem8.gba` target, not `compare`).

@@ -19,6 +19,21 @@ _Decided: May 2026_
 All campaign-specific data (character names, chapter events, unit stats, maps, dialogue) lives in `campaigns/rime-of-the-frostmaiden/` and is injected at build time. Engine C code must be campaign-agnostic. A second campaign requires only a new `campaigns/` folder.
 _Decided: May 2026_
 
+**Tooling language: Python (build) + Ruby (index gen). NOT TypeScript.**
+The original plan named a Node/TypeScript toolchain (`build-campaign.ts`, `build-events.ts`, `pull-srd.ts`, `map-class.ts`). Reality: the injector is `tools/build_campaign.py`, with `tools/portrait_tool.py`, `tools/ref_to_bust.py`, `tools/verify_text.py`, and the chapter index generator `tools/gen-chapter-index.rb`. No Node, no `.ts`. The build interpreter is Homebrew `python@3.12` (numpy/pillow/pyyaml; see `tools/setup-toolchain.sh`).
+_Decided: 2026-06-04 (supersedes the PRD's TS toolchain plan)_
+
+**Content injection is decomp-native — edit the decomp's own source, NOT Event Assembler.**
+`build_campaign.py` writes our content directly into the `fireemblem8u` working tree at build time — `graphics/portrait/` (busts), `texts/texts.txt` (names/dialogue), `src/data_characters.c` (class/stats), and `src/events/<ch>-event*.h` (chapters) — then `make` compiles it. No Event Assembler / ColorzCore / `.ea` buildfiles. This is the "make a hack directly from the fireemblem8u decomp" path (FEU thread 17428). Generated files are reproducible artifacts: restore vanilla with `git -C fireemblem8u checkout <path>`.
+_Decided: 2026-06-04 (supersedes the PRD's Event Assembler plan; retires the `tools/build-events.ts` idea)_
+
+**No SRD/Open5e pull.** PC data is authored from the players' D&D Beyond JSON (`data/pc-sheets/`); D&D is flavor-only over vanilla FE combat (see FE-strictness below). No SRD downloader, no `srd-snapshot.json`, no homebrew engine classes — the cast use stock FE8 classes (see Class Mapping).
+_Decided: 2026-06-04_
+
+**Text injection has a terminator-parity gotcha (the reset's "Huffman corruption").**
+FE8 packs text two bytes per u16; `[X]` = the 0x00 string terminator. An odd number of name bytes pairs the 0x00 into the last glyph, so the decoder runs away. Vanilla pads odd names with `[.]` (`Franz[.][X]` vs `Seth[X]`); `build_campaign.py` does the same. Always confirm text with `tools/verify_text.py` (decodes messages straight from the built ROM — no mGBA), not by eye.
+_Decided: 2026-06-04_
+
 ---
 
 ## Documentation Model
@@ -51,6 +66,37 @@ FE8 pacing emoji for `CHAPTERS.md`: 🟥 big-battle/boss · 🟦 breather/intro/
 (🎬). Add a new token to `CADENCE` in `tools/gen-chapter-index.rb` when a new pacing
 beat appears. The cadence *rules* (why this rhythm) live in `fe8-pacing-reference.md`.
 _Decided: 2026-05-31_
+
+---
+
+## Working Conventions (Definition of Done)
+
+**Why this section exists:** the project drifted because the plan was written up front,
+then implementation pivoted (Python not TS, decomp-native not Event Assembler, stock
+classes not homebrew) and the canonical docs/issues were never reconciled. The same
+fact lived in CLAUDE.md, PRD.md, README, rules-mapping, decisions.md, and GitHub, so
+no update ever propagated. These conventions keep a single source of truth.
+
+**Single source of truth — link, don't restate.** Each fact lives in exactly one place:
+- *Settled decisions & rationale* → this file (`decisions.md`).
+- *Per-chapter facts* → chapter YAML → generated `CHAPTERS.md`. *Unit facts* → unit YAML → `CLASSES.md`.
+- *Work backlog* → GitHub issues (milestones M0–M4).
+- *Current session state* → `HANDOFF.md`. *Vision/pitch* → `PRD.md` (no specifics that live elsewhere).
+- `CLAUDE.md` is lean **operating instructions + pointers**, not a fact store (a bloated CLAUDE.md gets ignored). If a fact belongs in two docs, one of them should link instead.
+
+**Record decisions when made.** Any change that alters architecture, scope, tooling, or a
+settled rule gets a dated entry here in the same session — ADR-style, while context is
+fresh. Don't leave it in chat or agent memory only.
+
+**Definition of Done for a change:**
+1. Code/data change ships with its doc + YAML updates **in the same commit** (no "update docs later").
+2. If it completes tracked work, the commit/PR says `Closes #N`; if it changes scope, open/retitle the issue.
+3. `make` builds green; `tools/verify_text.py` is clean after any text change.
+4. New non-obvious decision → an entry in this file.
+5. Don't commit the `fireemblem8u` submodule pointer (our decomp edits are build artifacts).
+
+**Commits:** imperative subject; reference issues (`Closes #N` / `Refs #N`). Co-author trailer per repo norm.
+_Decided: 2026-06-04_
 
 ---
 
