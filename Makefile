@@ -29,7 +29,7 @@ export PATH := $(BREW_PY):$(PATH)
 endif
 endif
 
-.PHONY: all clean verify
+.PHONY: all clean verify check
 
 all: fireemblem8.gba
 
@@ -37,8 +37,14 @@ fireemblem8.gba:
 	python3 tools/build_campaign.py --campaign $(CAMPAIGN)
 	$(MAKE) -C fireemblem8u fireemblem8.gba -j$(NPROC)
 
+# Drift guard: docs/tooling consistency. Same logic CI and the git pre-commit hook run.
+check:
+	@python3 tools/check.py
+
+# Verify the built ROM's text decodes cleanly. (We diverge from vanilla on purpose,
+# so there is no sha1 match to check.)
 verify:
-	@cd fireemblem8u && sha1sum -c checksum.sha1 && echo "ROM OK"
+	@python3 tools/verify_text.py
 
 clean:
 	$(MAKE) -C fireemblem8u clean

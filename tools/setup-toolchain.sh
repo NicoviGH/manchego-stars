@@ -67,4 +67,8 @@ if [[ ! -f "${DECOMP_DIR}/baserom.gba" ]]; then
   fi
 fi
 
-say "Done. Build with:  make   (then  make verify  to confirm the checksum)"
+# 6. Enable the repo's git hooks (pre-commit drift guard -- see tools/hooks/).
+say "Enabling git hooks (core.hooksPath -> tools/hooks)"
+git -C "${REPO_DIR:-.}" config core.hooksPath tools/hooks
+
+say "Done. Build with:  make   ·  drift guard:  make check   ·  verify text:  make verify"

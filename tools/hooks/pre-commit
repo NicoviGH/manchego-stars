@@ -1,0 +1,9 @@
+#!/bin/sh
+# Drift guard -- runs the repo check before every commit so doc/plan drift can't land.
+# Enabled via `git config core.hooksPath tools/hooks` (done by tools/setup-toolchain.sh).
+# Bypass for a genuine exception with: git commit --no-verify
+python3 tools/check.py || {
+    echo "" >&2
+    echo "pre-commit: drift check failed (above). Fix it, or bypass with --no-verify." >&2
+    exit 1
+}
