@@ -31,10 +31,10 @@ Custom-art lever = portrait **+ map sprite + battle anim** ([[feedback_custom_ar
 - **Final portrait pass** (#35) — busts are 10/10 on framing + mouths; chibi (menu mini-face) still a naive crop (`_make_chibi`), rough for non-human faces.
 
 ## Next Steps (priority)
-1. **Real maps from YAML.** Author the Prologue (#20) and Ch1 (#21) — real tilemap, unit placements, objective, dialogue — driven by the chapter YAML. This replaces the `inject_test_chapter` sandbox. Event scripting is error-prone; build incrementally and verify each beat in mGBA.
-2. **Char-data follow-ups:** real weapon-rank levels, gender/supports from YAML.
-3. **Pepperjack/Brie:** pick class + intro when their chapters are built (RBG-construct).
-4. **Art track (parallel):** map sprites → battle anims; one artwork at a time, render → show Nicolas → wait for OK → commit ([[feedback_show_before_committing_art]]).
+1. **ART PATH — current focus (Nicolas's call 2026-06-04).** Resume the custom-art track, leveraging the new fast in-game feedback loop (the test-chapter sandbox: New Game → see the cast on the Ch1 map in mGBA in seconds). Busts are done; open art is **map (overworld) sprites (#38)** then **battle animations (#39)** — neither started, no tooling yet (units use the vanilla slot's sprite/anim). One artwork at a time: render → show Nicolas → wait for OK → commit ([[feedback_show_before_committing_art]], [[feedback_custom_art_lever]]).
+2. **Real maps from YAML** (queued, not current). Author Prologue (#20) and Ch1 (#21) — real tilemap, unit placements, objective, dialogue — from the chapter YAML; replaces the `inject_test_chapter` sandbox. Event scripting is error-prone; build incrementally and verify each beat in mGBA.
+3. **Char-data follow-ups:** real weapon-rank levels, gender/supports from YAML.
+4. **Pepperjack/Brie:** pick class + intro when their chapters are built (RBG-construct).
 
 ## Blockers
 None hard. Real-map authoring needs care (event scripting).
