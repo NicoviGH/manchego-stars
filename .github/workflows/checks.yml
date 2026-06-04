@@ -14,10 +14,10 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         # no submodules: we don't build the ROM here, and fireemblem8u is huge.
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -61,6 +61,28 @@ jobs:
           sys.exit(1 if missing else 0)
           PY
 
+      - name: No resurrected dead concepts in docs (denylist)
+        run: |
+          python - <<'PY'
+          import glob, re, os, sys
+          # Terms that are NEVER legitimate in vision/ops docs -- abandoned tools, dead
+          # code symbols, retired implementation phrases. decisions.md is EXEMPT: it's the
+          # ADR log that records what we abandoned (e.g. "supersedes the flat-E placeholder").
+          # Context-dependent terms (Event Assembler / devkitARM / "damage-type") are NOT
+          # here because they appear legitimately in negation ("no Event Assembler").
+          BANNED = [r'build-campaign\.ts', r'build-events\.ts', r'pull-srd', r'map-class\.ts',
+                    r'srd-snapshot', r'open5e-snapshot', r'CLASS_WEAPON', r'WPN_EXP_E',
+                    r'zeroed.{0,3}growth', r'flat-?E rank', r'pure[- ]class growth']
+          files = [f for f in glob.glob("**/*.md", recursive=True)
+                   if os.path.basename(f) != "decisions.md" and not f.startswith("fireemblem8u/")]
+          pat = re.compile("|".join(BANNED), re.I)
+          hits = [f"{f}:{i}: {pat.search(l).group(0)}" for f in files
+                  for i, l in enumerate(open(f, encoding='utf-8'), 1) if pat.search(l)]
+          for h in hits:
+              print("DEAD CONCEPT:", h)
+          sys.exit(1 if hits else 0)
+          PY
+
   # The real "make green" gate. Mirrors the fireemblem8u decomp's own build.yml: a
   # MOCK base ROM (random 16MB) lets `make` compile + link the full ROM without the
   # copyrighted original -- which is what we want (we diverge from vanilla anyway).
@@ -69,7 +91,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 

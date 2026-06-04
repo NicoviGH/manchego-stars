@@ -29,7 +29,7 @@ Nicolas ran a multi-year D&D 5e campaign (*Rime of the Frostmaiden*) with 6 frie
 ## 2. Goals
 
 1. **Ship a playable `.gba` ROM** covering the DM-notes arc (Prologue + 8 chapters, from the goblin iron quest through the Eastway ambush / Revel's End cliffhanger) that runs on stock GBA emulators and flash carts.
-2. **Keep Fire Emblem's combat, dress it in D&D.** Preserve FE's grid tactics, hit/avoid/might resolution, permadeath toggle, weapon triangle, growth-rate leveling, and FE crit. Layer D&D *flavor* on top: damage-type labels (no resistance multiplier — the triangle stays FE-native), spells as finite-use tomes that deplete and restock with gold, and a cosmetic d20 flourish on crits. Iconic matchups reuse vanilla FE weapon effectiveness, keyed to enemy class. The rules stay FE so it plays like FE. *(Settled mechanics: `decisions.md` §Combat / §Weapon & Magic / §Economy.)*
+2. **Keep Fire Emblem's combat, dress it in D&D.** Preserve FE's grid tactics, hit/avoid/might resolution, permadeath toggle, weapon triangle, growth-rate leveling, and FE crit. Layer D&D *flavor* on top: characters and classes, spells as finite-use tomes that deplete and restock with gold, and a cosmetic d20 flourish on crits — no damage-type mechanic, the triangle stays FE-native. Iconic matchups reuse vanilla FE weapon effectiveness, keyed to enemy class. The rules stay FE so it plays like FE. *(Settled mechanics: `decisions.md` §Combat / §Weapon & Magic / §Economy.)*
 3. **Faithfully represent the cast** as playable units with correct classes, stats, progression, and personality — custom portraits, map sprites, battle anims, dialogue, and signature moments.
 4. **Build the engine as reusable.** Campaign-specific data lives in `campaigns/`; engine C stays campaign-agnostic. A second campaign should need only a new `campaigns/` folder. *(See `decisions.md` Engine & Tech Stack.)*
 5. **Keep the project tractable** — session-driven Claude Code workflow, one feature per session, `make` green at the end of every session.
@@ -103,7 +103,7 @@ The player cast + named recruits get **fully custom** indexed-palette art for **
 - **Start:** the cast begins at low FE levels (≈ D&D level 1–3); they met at The Northlook together — no staggered PC recruitment.
 - **Flavor reference, not targets:** the D&D Beyond sheets (level ~20) tell us relative strengths (tank vs glass cannon), not literal numbers. FE stats are authored in FE terms (caps ~30), not converted from 5e.
 - **MVP scope (Prologue + 8 chapters):** plays entirely **unpromoted**; promotions are post-MVP. Cast should reach ≈ FE level 10–12 by Ch 8.
-- **Growths** are authored in FE terms toward a strong, class-appropriate endgame line. *(Current injection sets pure-class growths as a neutral baseline; per-unit growth tuning is a tracked follow-up — see `decisions.md`/`HANDOFF.md`.)*
+- **Growths + weapon ranks** are class-appropriate — each cast member levels and fights like a real FE unit of its class (mechanism in `decisions.md` Class Mapping; not restated here).
 - **Sclorbo exception:** his player left at D&D level 16 — slightly lower endgame caps, no in-story explanation (a balance lever).
 - **NPC recruits** join at lower levels than PCs.
 
@@ -158,7 +158,7 @@ Qualitative (audience of a handful, no analytics):
 Tracked as GitHub issues (milestones **M0–M4**); the live backlog is the issue tracker, not this doc.
 
 - **M0 — Repo Boots Clean:** scaffold + decomp builds clean + toolchain verified. *(done)*
-- **M1 — D&D Combat Layer Works:** the D&D flavor layer on vanilla FE combat — damage-type labels, weapon-effectiveness matchups, spell-tome economy, combat-preview icon, cosmetic d20 crit flourish. *(not started)*
+- **M1 — D&D Combat Layer Works:** the D&D flavor layer on vanilla FE combat — weapon-effectiveness matchups (#8), spell-tome economy (#9), cosmetic d20 crit flourish (#11). *(not started; the damage-type label/icon items #7/#10 were dropped as vestigial — see decisions.md)*
 - **M2 — One PC End-to-End:** the injector + Braulo fully translated (portrait + name + class/stats + verify). *(done — the pipeline now covers all 10 cast)*
 - **M3 — 8 Chapters Playable:** all cast, NPCs, enemies, 8 chapters, maps, dialogue, events; map sprites; world map. *(in progress)*
 - **M4 — Ship It:** playtest, balance, final art/dialogue, battle anims, title/credits, distribute.
@@ -175,7 +175,7 @@ The MVP is **done** when:
 3. All recruit NPCs are recruitable at their chapters.
 4. All 8 chapters are playable start-to-finish with correct objectives, enemies, dialogue, events.
 5. Combat plays as vanilla FE, reskinned with D&D-flavored names/art + a cosmetic d20 crit flourish (no damage-type mechanic).
-6. Damage-type labels display; vanilla FE weapon effectiveness works for iconic matchups (armorslayer vs knights, monster-effective vs skeletons/ice trolls).
+6. Vanilla FE weapon effectiveness works for iconic matchups (armorslayer vs knights, monster-effective vs skeletons/ice trolls).
 7. Spell-tome charges deplete and restock correctly.
 8. Ch 6 (Messie) is resolvable via Talk.
 9. Ch 8 ends in a scripted defeat with the Revel's End cliffhanger text.
