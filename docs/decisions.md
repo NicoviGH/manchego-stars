@@ -352,6 +352,19 @@ One gotcha: `StartMu`/`StartMuExt` decompress the sheet *before* setting `proc->
 graphics after `proc->unit` is set (else it falls back to the class sheet).
 _Decided 2026-06-04; both override paths (idle + MU) built and proven in mGBA with Braulo placeholders (idle = Dancer, hover/walk = Mogall)._
 
+**Map-sprite ART process: reskin a vanilla FE base, NOT downscale generated art.**
+The portrait pipeline (Gemini bust → downscale → indexed) does **not** transfer to map sprites: at 16×16 / 32×32,
+downscaling detailed or AI-generated art yields irregular colours + mush (researched; AI tools make high-res
+"pixel-*styled*" images that always need pixel-by-pixel cleanup). The FE-community standard is to **edit an existing
+map-sprite base** (FEU Map Sprite Repository, Klokinator FE-Repo) — it bakes in the chibi proportions and, crucially,
+the **already-animated walk cycle** (you re-skin the motion instead of animating 15 frames from scratch). At 16px a
+heavily-reskinned base *is* effectively custom. **Process (decided 2026-06-04):** (1) pick the vanilla base of the
+class closest to each character's build; (2) **programmatic recolour first** — remap the base to the shared cast
+palette + light edits, render in mGBA, Nicolas judges; (3) **fallback = hand-edit in LibreSprite** (free Aseprite fork)
+where the recolour isn't good enough (Nicolas will do the pixel pass). Idle (16×16, 3f) first, then the walk MU
+(32×32, 15f). I handle palette-enforce / sheet-assembly / injection; the creative pixel judgement is the split point.
+_Decided 2026-06-04 (Nicolas: recolour-first, hands-on fallback, free tool). See FEU "Map Sprite Insertion Mania" thread._
+
 **Enemy/non-cast sprites: vanilla FE8 where the look fits; community (FEUniverse) or custom only where a creature has no vanilla analogue** (Grells, Messie, ice trolls).
 The full-custom rule above is for the player cast + named recruits, where identity matters most.
 _Decided: May 2026_

@@ -24,19 +24,25 @@ All overworld sprite art is one deliverable per character; battle anims (#39) ar
 - **Hover/selected + walking** = larger **MU** sheet (`gMuInfoTable` = `unit_icon_move_table[classId-1]`; **32×480 = 15× 32×32**). `GetMuImg` per-character override (proc->unit → custom sheet, reusing the class motion script → graphics-only). Gotcha handled: `StartMu`/`StartMuExt` decompress the sheet *before* setting `proc->unit`, so the patch **reloads the graphics after `proc->unit` is set** (else the override sees no unit and falls back to the class sheet — the "still shows Pirate" bug).
 - **Injection:** drop `map_sprites/<id>.png` (idle) and/or `map_sprites/<id>_mu.png` (32×480 walk); `inject_map_sprites` wires each independently, one character at a time. Patched files now also include `src/mu.c`, `src/unit_icon_move_data.c`, `data/const_data_unit_icon_move.s`.
 
-## Next Steps (priority) — only ART left for #38
-1. **The ART loop** (one character at a time, `[[feedback_custom_art_lever]]`, `[[feedback_show_before_committing_art]]`):
-   a. **Shared 16-colour cast palette** — union of the cast's key hues into 15 slots (index 0 transparent); becomes the new `unit_icon_pal_player.agbpal` (data swap, no code). Show Nicolas.
-   b. **Braulo first:** his **idle** (16×16) + **MU walk** (15× 32×32) sheets, both in the shared ramp → `map_sprites/braulo.png` + `braulo_mu.png` → build → **show → OK → commit**. Then the rest.
-   - **No art-gen tooling yet.** `map_sprite_tool.py` only validates. The portrait pipeline is 96×80 stills; a 15-frame 32×32 **walk cycle** is real animation (hard to auto-gen from a static bust) — the MU art approach itself needs a decision (hand-anim vs adapt a community walk template vs AI-gen frames). Raise with Nicolas before generating.
-2. **(Queued, not current) Real maps from YAML** — Prologue (#20), Ch1 (#21); replaces the `inject_test_chapter` sandbox.
+## Next Steps (priority) — only ART left for #38 (process decided; see decisions.md → Art & Audio)
+**Approach (Nicolas 2026-06-04):** reskin a **vanilla FE map-sprite base** (NOT downscale generated art — that's mush at 16px). **Programmatic recolour first** (remap base → shared cast palette + light edits → mGBA → Nicolas judges); **fallback = Nicolas hand-edits in LibreSprite** (free). Idle (16×16, 3f) before walk MU (32×32, 15f). I do palette/assembly/injection; the creative pixel pass is the split.
+
+1. **Step 0 — design the shared 16-colour cast palette** (must be fixed UP FRONT — see gotcha below). Union the 8 busts' key hues into 15 slots (index 0 transparent). Draft budget from the bust analysis already run (chroma-key `#00ff00` bg ignored):
+   - braulo: orange/red `#e15a2e #c44729 #982724` + grey/white · marty: grey/white + red `#c72624 #891f2b` · meesmickle: black `#1c1b29` + red `#a20f1b #d5101f` · prof-rbg: gold `#cb9d02` + purple `#692977` + green `#4a7c49` · rootis: ice white/blue `#c9d0dc #617292 #1f1743` + cyan · sclorbo: cyan `#60d3db` + cream `#bfb198` · wolfram: brown `#593c2b` + slate greys · pinky: pink `#c25094` + grey.
+   - **Fits 15 ≈** 4 neutrals (black, dk-grey, mid-grey, white) shared by all + 3 reds + 3 cool-blues + 1 pink + 1 gold + 1 purple + 1 green + 1 tan/brown. **Tight:** each character gets ~1–2 accent hues; most *shading* rides the shared neutral ramp (normal for FE micro-sprites). Show Nicolas the proposed ramp before building.
+2. **Build the recolour tool** — pick Braulo's base (Pirate/Brigand map sprite: axe infantry build), remap its palette → cast palette, emit `map_sprites/braulo.png` (idle) + `braulo_mu.png` (walk) → build → show in mGBA. Iterate; hand off to LibreSprite if recolour alone reads poorly.
+3. **Braulo proof, then scale** to the other 7 (marty, meesmickle, prof-rbg, rootis, sclorbo, wolfram, pinky), one at a time, show→OK→commit.
+4. **(Queued, not current) Real maps from YAML** — Prologue (#20), Ch1 (#21).
+
+### ⚠️ Palette-sequencing gotcha (decide next session)
+The engine swaps ONE shared player palette (`unit_icon_pal_player.agbpal`) for **every** player map sprite. The moment we install the cast palette, the **not-yet-custom** cast (still on vanilla *class* wait sprites) render **off-colour** until their custom sprite exists. Options: (a) design the full palette up front + accept the other 7 look mis-tinted in the test chapter during rollout (fine for a Braulo *proof*); (b) hold the palette swap until enough sprites are done; (c) for the very first proof, recolour Braulo within the *existing* vanilla map palette (limits his colours). Lean (a) for the proof.
 
 ## Open / deferred
 - **brie + pepperjack** — `class: null` (name-only) until their RBG-construct chapters are built; no map sprite until they have a class.
 - Char-data follow-ups (weapon-rank LEVEL, gender/supports from YAML) — unchanged from last session.
 
 ## Blockers
-None hard. Next is art generation (needs a small idle-sprite tool + Nicolas's per-character sign-off).
+None hard. Next is the art loop: design the shared cast palette, build the recolour-from-base tool, prove on Braulo. `map_sprite_tool.py` currently only validates (no recolour/assembly yet).
 
 ## Build Hygiene
 - **Build:** `make clean && make CAMPAIGN=rime-of-the-frostmaiden`. Injection idempotent (auto-restores patched decomp files).
