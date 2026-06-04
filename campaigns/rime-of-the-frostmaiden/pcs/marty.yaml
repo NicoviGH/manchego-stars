@@ -4,6 +4,7 @@
 
 id: marty
 name: "Marty the Merry Mushroom"
+fe_name: Marty                            # FE8 name buffer is <=12 chars; full name overflows it
 portrait_ref: portraits/marty.png       # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/marty.jpeg
 # Portrait source: https://www.dndbeyond.com/avatars/25824/431/1581111423-70515811.jpeg

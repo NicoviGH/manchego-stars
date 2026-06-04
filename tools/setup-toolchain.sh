@@ -29,12 +29,13 @@ command -v brew >/dev/null || { echo "Homebrew required: https://brew.sh"; exit 
 say "Installing Homebrew deps (arm-none-eabi-gcc, pkg-config, libpng, coreutils, python@3.12)"
 brew install arm-none-eabi-gcc pkg-config libpng coreutils python@3.12
 
-# 2. numpy + pillow for the python the build will actually invoke (>= 3.10,
+# 2. numpy + pillow + pyyaml for the python the build will actually invoke (>= 3.10,
 #    because some gfx scripts use match/case). The Makefile puts python@3.1x's
-#    libexec ahead on PATH, so install into that interpreter.
+#    libexec ahead on PATH, so install into that interpreter. pyyaml: build_campaign.py
+#    reads campaign unit YAML (names, stats) to inject content.
 PY="$(ls -d /opt/homebrew/opt/python@3.1*/libexec/bin/python3 2>/dev/null | sort | tail -1)"
-say "Installing numpy + pillow into ${PY}"
-"${PY}" -m pip install --break-system-packages --upgrade numpy pillow
+say "Installing numpy + pillow + pyyaml into ${PY}"
+"${PY}" -m pip install --break-system-packages --upgrade numpy pillow pyyaml
 
 # 3. agbcc — the GBA C compiler. Built from source, installed into the decomp.
 if [[ ! -x "${DECOMP_DIR}/tools/agbcc/bin/agbcc" ]]; then
