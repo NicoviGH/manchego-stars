@@ -53,19 +53,27 @@ class Doc:
     """The single sheet being edited + (optional) the donor reference behind it."""
 
     def __init__(self, sheet_path, palette_path, reference_path=None, donor=None,
-                 uid=None, base_path=None):
+                 uid=None, base_path=None, geom=None):
         self.sheet_path = sheet_path
         self.id = uid or os.path.splitext(os.path.basename(sheet_path))[0]
         self.base_path = base_path  # pristine clean-recolor snapshot, for reset
-        # Frame geometry is read from the decomp wait table for the donor (authoritative),
-        # never guessed from the PNG -- a 16x96 sheet is ambiguous (6x16x16 vs 3x16x32).
-        # The donor name comes from --donor or, failing that, the reference sheet's name.
-        src = donor or reference_path
-        if not src:
-            sys.exit('ERROR: pass --donor <ClassName> (or --reference its vanilla sheet) '
-                     'so the frame size can be read from the decomp, not guessed')
-        self.donor_name = donor or os.path.basename(src)
-        macro, self.fw, self.fh = map_sprite_tool.donor_sms_geometry(src)
+        # "finished/approved" marker (gitignored, lives by the base snapshot); Save is a
+        # local checkpoint, Finish flags the sheet approved-to-commit.
+        self.done_path = (base_path + '.done') if base_path else None
+        # Idle frame geometry is read from the decomp wait table for the donor
+        # (authoritative), never guessed -- a 16x96 sheet is ambiguous (6x16x16 vs
+        # 3x16x32). MU/walk sheets pass an explicit geom=(32,32) (the fixed move-sprite
+        # OBJ size; the motion script frames it, the sheet is a 15-frame 32x480 strip).
+        if geom is not None:
+            self.fw, self.fh = geom
+            self.donor_name = donor or (os.path.basename(reference_path) if reference_path else 'MU')
+        else:
+            src = donor or reference_path
+            if not src:
+                sys.exit('ERROR: pass --donor <ClassName> (or --reference its vanilla '
+                         'sheet) so the frame size can be read from the decomp, not guessed')
+            self.donor_name = donor or os.path.basename(src)
+            _, self.fw, self.fh = map_sprite_tool.donor_sms_geometry(src)
         im = Image.open(sheet_path)
         w, h = im.size
         if w != self.fw or h % self.fh:
@@ -78,7 +86,13 @@ class Doc:
         self.frames = [data[f * self.fw * self.fh:(f + 1) * self.fw * self.fh]
                        for f in range(self.n)]
         self.reference = self._load_reference(reference_path)
-        self.motion = self._compute_motion(reference_path)
+        self._motion = None              # computed lazily on first /data (see get_motion)
+        self._motion_src = reference_path
+
+    def get_motion(self):
+        if self._motion is None:
+            self._motion = self._compute_motion(self._motion_src)
+        return self._motion
 
     def _compute_motion(self, reference_path):
         """Per-row 2D offset (dx, dy) between every pair of frames -- so an edit can FOLLOW
@@ -101,17 +115,20 @@ class Doc:
         mask = [[1 if v else 0 for v in fr] for fr in src]
 
         def band_mismatch(a, b, y, dx, dy):
+            # single-row silhouette match (cheap); enough for the per-row offset
+            ty = y + dy
+            if not (0 <= ty < fh):
+                return fw
+            ra, rb = mask[a], mask[b]
             tot = 0
-            for yy in range(max(0, y - 1), min(fh, y + 2)):
-                ty = yy + dy
-                for x in range(fw):
-                    bx = x + dx
-                    bv = mask[b][ty * fw + bx] if (0 <= ty < fh and 0 <= bx < fw) else 0
-                    if mask[a][yy * fw + x] != bv:
-                        tot += 1
+            for x in range(fw):
+                bx = x + dx
+                bv = rb[ty * fw + bx] if 0 <= bx < fw else 0
+                if ra[y * fw + x] != bv:
+                    tot += 1
             return tot
 
-        maxx, maxy = 3, 4
+        maxx, maxy = 2, 3
         motion = [[[[0, 0] for _ in range(fh)] for _ in range(n)] for _ in range(n)]
         for a in range(n):
             for b in range(n):
@@ -120,11 +137,10 @@ class Doc:
                 for y in range(fh):
                     if not any(mask[a][y * fw:y * fw + fw]):
                         continue  # empty row -> no motion
-                    best, bd = None, None
+                    best, bd = [0, 0], None
                     for dy in range(-maxy, maxy + 1):
                         for dx in range(-maxx, maxx + 1):
-                            mm = band_mismatch(a, b, y, dx, dy)
-                            key = (mm, abs(dx) + abs(dy))
+                            key = (band_mismatch(a, b, y, dx, dy), abs(dx) + abs(dy))
                             if bd is None or key < bd:
                                 bd, best = key, [dx, dy]
                     motion[a][b][y] = best
@@ -137,10 +153,13 @@ class Doc:
             return None
         rim = Image.open(path).convert('P') if Image.open(path).mode != 'P' \
             else Image.open(path)
-        if rim.size != (self.fw, self.n * self.fh):
+        need = self.n * self.fh
+        if rim.size[0] != self.fw or rim.size[1] < need:
             print('  (reference %s is %s, sheet frame is %dx%d x %d -- skipping overlay)'
                   % (path, rim.size, self.fw, self.fh, self.n))
             return None
+        if rim.size[1] > need:  # donor sheet has trailing padding (e.g. MU 488 vs 480)
+            rim = rim.crop((0, 0, self.fw, need))
         rpal = rim.getpalette() or []
         rgba = []
         for px in rim.getdata():
@@ -158,7 +177,8 @@ class Doc:
             'id': self.id, 'idleSeq': IDLE_SEQ, 'tickMs': TICK_MS,
             'hasReference': self.reference is not None,
             'canReset': bool(self.base_path and os.path.isfile(self.base_path)),
-            'motion': self.motion,
+            'done': self.is_done(),
+            'motion': self.get_motion(),
         })
 
     def reference_json(self):
@@ -187,6 +207,18 @@ class Doc:
         data = list(Image.open(self.base_path).getdata())
         per = self.fw * self.fh
         self.save([data[f * per:(f + 1) * per] for f in range(self.n)])
+        self.set_done(False)
+
+    def is_done(self):
+        return bool(self.done_path and os.path.exists(self.done_path))
+
+    def set_done(self, value):
+        if not self.done_path:
+            return
+        if value:
+            open(self.done_path, 'w').close()
+        elif os.path.exists(self.done_path):
+            os.remove(self.done_path)
 
 
 # uid -> Doc for every editable cast member (campaign mode); single entry in file mode.
@@ -261,8 +293,11 @@ HTML = r"""<!doctype html><html><head><meta charset="utf-8"><title>map sprite ed
   #status{grid-area:status;background:var(--line);display:flex;align-items:center;gap:16px;
     padding:0 12px;font-size:11px;color:var(--muted)}
   #status b{color:var(--txt)} #saveStat{margin-left:auto}
-  button.save{background:#2a9d54;border:1px solid #2a9d54;color:#fff;border-radius:5px;
+  button.save{background:#3a6db5;border:1px solid #3a6db5;color:#fff;border-radius:5px;
+    padding:4px 10px;cursor:pointer;font-weight:600;margin-right:4px}
+  button.finish{background:#2a9d54;border:1px solid #2a9d54;color:#fff;border-radius:5px;
     padding:4px 10px;cursor:pointer;font-weight:600}
+  button.finish.done{background:#1d6b3a;border-color:#7ac77a}
   button.ub{background:var(--panel2);border:1px solid #555;color:var(--txt);border-radius:5px;
     padding:4px 8px;cursor:pointer;margin-right:4px}
   button.ub:hover:not(:disabled){background:#41424c}
@@ -297,8 +332,12 @@ HTML = r"""<!doctype html><html><head><meta charset="utf-8"><title>map sprite ed
   <div id="right">
     <div class="sect"><h4>Character</h4>
       <select id="charSel" title="Pick which cast member to edit — each loads its own sheet, donor reference, and motion."></select>
+      <div class="seg" id="modeSeg" style="display:flex;gap:4px;margin-top:6px">
+        <button data-mode="idle" class="on" style="flex:1" title="Edit the idle (standing) sheet.">Idle</button>
+        <button data-mode="walk" style="flex:1" title="Edit the walk / hover (MU) sheet — 32×32, 15 frames.">Walk</button>
+      </div>
       <button id="resetBtn" class="ub" style="width:100%;margin-top:6px"
-        title="Revert THIS character to its clean recolour, discarding all edits (saved and unsaved).">↺ Reset to clean recolor</button></div>
+        title="Revert THIS sheet (idle or walk) to its clean recolour, discarding all edits.">↺ Reset to clean recolor</button></div>
     <div class="sect"><h4>Preview <span id="bgCycle" style="cursor:pointer"
         title="Click to cycle the preview background (grass / snow / grey / black) to check contrast on different map terrain.">grass ▸</span></h4>
       <canvas id="prevCv" title="Live idle animation at the real FE8 cadence (frames 0,1,2 held 533/67/533/67 ms)."></canvas></div>
@@ -321,14 +360,17 @@ HTML = r"""<!doctype html><html><head><meta charset="utf-8"><title>map sprite ed
       <button class="ub" id="undoBtn" disabled title="Undo (Ctrl/⌘+Z)">↶ undo</button>
       <button class="ub" id="redoBtn" disabled title="Redo (Ctrl/⌘+Shift+Z or Ctrl/⌘+Y)">↷ redo</button>
       <button class="save" id="save"
-      title="Write the edited sprite back to its PNG with exact cast-palette indices (Ctrl/⌘+S). Build-ready.">💾 Save</button></span>
+      title="Save a local work-in-progress checkpoint to <id>.png (Ctrl/⌘+S). NOT committed.">💾 Save</button>
+      <button class="finish" id="finishBtn"
+      title="Mark this character DONE — saves and flags it approved-to-commit (Claude commits finished characters after a build check). Click again to un-finish.">✓ Finish</button></span>
   </div>
 </div>
 <script>
 let S=null, REF=null, frame=0, tool='pencil', active=6, zoom=12;
 let origin={x:40,y:30}, showGrid=true, onion=false, showRef=false, showDonor=false, showMotion=false;
 let painting=false, panning=false, panStart=null, playing=true, allFrames=false, followMotion=false;
-let MOTION=null, CUR=null;
+let MOTION=null, CUR=null, MODE='idle';
+const docId=()=> MODE==='walk' ? CUR+':mu' : CUR;
 let undo=[], redo=[], playT=0, playStart=0;
 const BGS=[['grass',[104,152,56]],['snow',[224,232,240]],['grey',[96,96,96]],['black',[20,20,20]]];
 let bgIdx=0;
@@ -337,25 +379,46 @@ const css=i=>{const c=S.palette[i];return `rgb(${c[0]},${c[1]},${c[2]})`;};
 const lum=i=>{const c=S.palette[i];return c[0]+c[1]+c[2];};
 const rowLabel=i=> i<26?String.fromCharCode(65+i):String.fromCharCode(97+i-26);
 
+let CHARS=[];
+async function buildCharOptions(){
+  CHARS=(await (await fetch('chars')).json()).chars;
+  const sel=$('charSel'); const keep=sel.value; sel.innerHTML='';
+  CHARS.forEach(c=>{const o=document.createElement('option');
+    const mk=(c.idleDone?'✓':'')+(c.walkDone?'✓':''); o.value=c.id;
+    o.textContent=(mk?mk+' ':'')+c.id+(c.donor?(' ('+c.donor+')'):''); sel.appendChild(o);});
+  if(keep)sel.value=keep;
+  return CHARS;
+}
+function curChar(){return CHARS.find(c=>c.id===CUR)||{};}
+function syncModeSeg(){const c=curChar();
+  [...$('modeSeg').children].forEach(btn=>{const m=btn.dataset.mode;
+    const done = m==='idle'?c.idleDone:c.walkDone;
+    btn.classList.toggle('on', m===MODE);
+    btn.disabled = (m==='walk' && !c.hasWalk);
+    btn.textContent = (m==='idle'?'Idle':'Walk')+(done?' ✓':'');});}
 async function init(){
-  const cs=await (await fetch('chars')).json();
-  const sel=$('charSel'); sel.innerHTML='';
-  cs.chars.forEach(c=>{const o=document.createElement('option');
-    o.value=c.id; o.textContent=c.id+(c.donor?(' ('+c.donor+')'):''); sel.appendChild(o);});
-  sel.onchange=()=>loadChar(sel.value);
-  await loadChar(cs.chars[0].id);
+  const chars=await buildCharOptions();
+  $('charSel').onchange=()=>loadChar($('charSel').value, MODE);
+  $('modeSeg').addEventListener('click',ev=>{const b=ev.target.closest('button');
+    if(!b||b.disabled)return; loadChar(CUR, b.dataset.mode);});
+  await loadChar(chars[0].id, 'idle');
   requestAnimationFrame(loop);
 }
-async function loadChar(uid){
-  CUR=uid; $('charSel').value=uid;
-  S=await (await fetch('data?char='+encodeURIComponent(uid))).json();
+function updateDoneUI(){const b=$('finishBtn');
+  b.textContent = S.done ? '✓ Finished' : '✓ Finish';
+  b.classList.toggle('done', !!S.done);}
+async function loadChar(uid, mode){
+  CUR=uid; MODE=mode||'idle'; $('charSel').value=uid;
+  const id=docId();
+  S=await (await fetch('data?char='+encodeURIComponent(id))).json();
   MOTION=S.motion||null;
-  REF = S.hasReference ? (await (await fetch('reference?char='+encodeURIComponent(uid))).json()).frames : null;
+  REF = S.hasReference ? (await (await fetch('reference?char='+encodeURIComponent(id))).json()).frames : null;
   undo=[]; redo=[]; syncUndoBtns();
   $('stSize').textContent=`${S.fw}×${S.fh}`;
   $('refSect').style.display = REF ? '' : 'none';
   $('resetBtn').disabled = !S.canReset;
   if(!MOTION&&followMotion){followMotion=false;} syncModeBtns();
+  updateDoneUI(); syncModeSeg();
   buildPalette(); buildFrames(); fit(); selectFrame(0); setFg(active||6);
 }
 
@@ -543,11 +606,16 @@ window.addEventListener('load',()=>{
   $('play').onclick=e=>{playing=!playing;e.target.textContent=playing?'⏸':'▶';if(playing)playStart=performance.now();};
   $('bgCycle').onclick=e=>{bgIdx=(bgIdx+1)%BGS.length;e.target.textContent=BGS[bgIdx][0]+' ▸';};
   $('save').onclick=save;
+  $('finishBtn').onclick=async()=>{
+    const url = S.done ? 'unfinish' : 'finish';
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({char:docId(),frames:S.frames})});
+    if(r.ok){S=await r.json(); updateDoneUI(); await buildCharOptions(); syncModeSeg();}};
   $('resetBtn').onclick=async()=>{
     if($('resetBtn').disabled)return;
-    if(!confirm('Reset '+CUR+' to the clean recolour? All edits to this character (including saved) will be lost.'))return;
-    const r=await fetch('reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({char:CUR})});
-    if(r.ok){await loadChar(CUR);}};
+    if(!confirm('Reset '+CUR+' ('+MODE+') to the clean recolour? All edits to this sheet (including saved) will be lost.'))return;
+    const r=await fetch('reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({char:docId()})});
+    if(r.ok){await buildCharOptions(); await loadChar(CUR, MODE);}};
   window.addEventListener('keydown',ev=>{
     if(ev.metaKey||ev.ctrlKey){if(ev.key==='z'&&!ev.shiftKey){doUndo();ev.preventDefault();}
       else if((ev.key==='z'&&ev.shiftKey)||ev.key==='y'){doRedo();ev.preventDefault();}
@@ -567,7 +635,7 @@ function doUndo(){if(!undo.length)return;redo.push(snap());S.frames=undo.pop();d
 function doRedo(){if(!redo.length)return;undo.push(snap());S.frames=redo.pop();drawStage();rebuildThumbs();syncUndoBtns();}
 async function save(){$('saveStat').querySelector('button')&&($('save').textContent='saving…');
   const r=await fetch('save',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({frames:S.frames})});
+    body:JSON.stringify({char:docId(),frames:S.frames})});
   $('save').textContent = r.ok?('💾 Saved '+new Date().toLocaleTimeString()):'❌ FAILED';
   setTimeout(()=>$('save').textContent='💾 Save',2500);}
 </script></body></html>"""
@@ -594,7 +662,11 @@ class Handler(BaseHTTPRequestHandler):
         if path in ('/', '/index.html'):
             self._send(200, HTML)
         elif path == '/chars':
-            chars = [{'id': DOCS[u].id, 'donor': DOCS[u].donor_name} for u in ORDER]
+            chars = [{'id': u, 'donor': DOCS[u].donor_name,
+                      'idleDone': DOCS[u].is_done(),
+                      'hasWalk': (u + ':mu') in DOCS,
+                      'walkDone': (u + ':mu') in DOCS and DOCS[u + ':mu'].is_done()}
+                     for u in ORDER]
             self._send(200, json.dumps({'chars': chars}), 'application/json')
         elif path == '/data':
             self._send(200, _doc(self._char()).as_json(), 'application/json')
@@ -618,6 +690,18 @@ class Handler(BaseHTTPRequestHandler):
                 d.reset()
                 print('  reset %s to clean recolour' % d.sheet_path)
                 self._send(200, d.as_json(), 'application/json')
+            elif path == '/finish':
+                d = _doc(payload.get('char'))
+                if 'frames' in payload:
+                    d.save(payload['frames'])
+                d.set_done(True)
+                print('  FINISHED %s (approved-to-commit)' % d.id)
+                self._send(200, d.as_json(), 'application/json')
+            elif path == '/unfinish':
+                d = _doc(payload.get('char'))
+                d.set_done(False)
+                print('  un-finished %s' % d.id)
+                self._send(200, d.as_json(), 'application/json')
             else:
                 self._send(404, 'not found')
         except Exception as exc:  # noqa: BLE001
@@ -625,28 +709,65 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def _build_campaign_docs(campaign):
-    """Build a Doc per classed cast member that has a sheet -- geometry/reference/motion
-    from each one's donor (YAML art.map_sprite.base), reset snapshot from map_sprites/.base/."""
+    """Per classed cast member, build an IDLE doc (<id>.png, key uid) and -- if a walk
+    sheet exists -- a WALK/MU doc (<id>_mu.png, key uid+':mu', 32x32 frames). Geometry/
+    reference/motion come from each one's donor (YAML art.map_sprite.base); reset snapshots
+    live in map_sprites/.base/. ORDER lists the characters (for the picker)."""
     import build_campaign as bc
     adir = os.path.join(bc.REPO, 'campaigns', campaign, 'map_sprites')
     palette = os.path.join(adir, 'cast_palette.png')
     if not os.path.isfile(palette):
         sys.exit('ERROR: no %s' % palette)
     basedir = os.path.join(adir, '.base')
+    gfx = os.path.join(bc.REPO, 'fireemblem8u', 'graphics', 'unit_icon')
     docs, order = {}, []
     for uid, slot, cls, sms in bc.classed_cast(campaign):
         sheet = os.path.join(adir, uid + '.png')
         if not os.path.isfile(sheet):
             continue
         base = bc.load_unit(campaign, uid).get('art', {}).get('map_sprite', {}).get('base')
-        donor = os.path.join(bc.REPO, 'fireemblem8u', 'graphics', 'unit_icon', 'wait',
-                             'unit_icon_wait_%s_sheet.png' % base) if base else None
-        docs[uid] = Doc(sheet, palette, donor if donor and os.path.isfile(donor) else None,
+        wait_donor = os.path.join(gfx, 'wait', 'unit_icon_wait_%s_sheet.png' % base) if base else None
+        docs[uid] = Doc(sheet, palette,
+                        wait_donor if wait_donor and os.path.isfile(wait_donor) else None,
                         base, uid, os.path.join(basedir, uid + '.png'))
         order.append(uid)
+        mu_sheet = os.path.join(adir, uid + '_mu.png')
+        if os.path.isfile(mu_sheet):
+            move_donor = os.path.join(gfx, 'move', 'unit_icon_move_%s_sheet.png' % base) if base else None
+            docs[uid + ':mu'] = Doc(
+                mu_sheet, palette,
+                move_donor if move_donor and os.path.isfile(move_donor) else None,
+                base, uid + ':mu', os.path.join(basedir, uid + '_mu.png'), geom=(32, 32))
     if not docs:
         sys.exit('ERROR: no map_sprites/<id>.png sheets found for %s' % campaign)
     return docs, order
+
+
+def _add_extra(docs, order, campaign, uid, base):
+    """Add an experimental/scratch character (not a real campaign unit) to the editor:
+    map_sprites/<uid>.png on donor `base`, plus its walk if <uid>_mu.png exists. Lets you
+    play with an alternate donor (e.g. a second marty on Civilian_M1) without touching the
+    real cast. Not injected by the build (it only iterates classed_cast)."""
+    import build_campaign as bc
+    adir = os.path.join(bc.REPO, 'campaigns', campaign, 'map_sprites')
+    palette = os.path.join(adir, 'cast_palette.png')
+    basedir = os.path.join(adir, '.base')
+    gfx = os.path.join(bc.REPO, 'fireemblem8u', 'graphics', 'unit_icon')
+    sheet = os.path.join(adir, uid + '.png')
+    if not os.path.isfile(sheet):
+        sys.exit('ERROR: --extra %s: no %s' % (uid, sheet))
+    wait_donor = os.path.join(gfx, 'wait', 'unit_icon_wait_%s_sheet.png' % base)
+    docs[uid] = Doc(sheet, palette, wait_donor if os.path.isfile(wait_donor) else None,
+                    base, uid, os.path.join(basedir, uid + '.png'))
+    if uid not in order:
+        order.append(uid)
+    mu_sheet = os.path.join(adir, uid + '_mu.png')
+    if os.path.isfile(mu_sheet):
+        move_donor = os.path.join(gfx, 'move', 'unit_icon_move_%s_sheet.png' % base)
+        docs[uid + ':mu'] = Doc(mu_sheet, palette,
+                                move_donor if os.path.isfile(move_donor) else None,
+                                base, uid + ':mu', os.path.join(basedir, uid + '_mu.png'),
+                                geom=(32, 32))
 
 
 def main():
@@ -656,20 +777,40 @@ def main():
     ap.add_argument('palette', nargs='?')
     ap.add_argument('--campaign', default=None,
                     help='edit every cast sheet in this campaign (multi-character)')
+    ap.add_argument('--extra', action='append', default=[], metavar='uid=Donor',
+                    help='add an experimental scratch character (campaign mode), e.g. '
+                         '--extra marty-boy=Civilian_M1')
     ap.add_argument('--donor', default=None,
                     help='donor class name (YAML art.map_sprite.base) -- frame size is '
                          'read from the decomp for it')
     ap.add_argument('--reference', default=None, help='donor sheet to show behind the work')
+    ap.add_argument('--mu', action='store_true',
+                    help='edit a MU/walk sheet (32x32 frames); reference defaults to the '
+                         'donor MOVE sheet')
     ap.add_argument('--port', type=int, default=8765)
     ap.add_argument('--no-browser', action='store_true')
     args = ap.parse_args()
     if args.campaign:
         DOCS, ORDER = _build_campaign_docs(args.campaign)
+        for spec in args.extra:
+            uid, _, base = spec.partition('=')
+            if not base:
+                sys.exit('ERROR: --extra expects uid=Donor, got %r' % spec)
+            _add_extra(DOCS, ORDER, args.campaign, uid, base)
     else:
         if not (args.sheet and args.palette):
             sys.exit('usage: map_sprite_editor.py <sheet.png> <cast_palette.png> --donor X\n'
+                     '       map_sprite_editor.py <walk.png> <pal> --mu --donor X\n'
                      '       map_sprite_editor.py --campaign <name>')
-        d = Doc(args.sheet, args.palette, args.reference, args.donor)
+        ref, geom = args.reference, None
+        if args.mu:
+            geom = (32, 32)  # MU/walk frame is the fixed 32x32 move-sprite OBJ size
+            if not ref and args.donor:
+                cand = os.path.join(map_sprite_tool.REPO, 'fireemblem8u', 'graphics',
+                                    'unit_icon', 'move',
+                                    'unit_icon_move_%s_sheet.png' % args.donor)
+                ref = cand if os.path.isfile(cand) else None
+        d = Doc(args.sheet, args.palette, ref, args.donor, geom=geom)
         DOCS, ORDER = {d.id: d}, [d.id]
     url = 'http://127.0.0.1:%d/' % args.port
     httpd = HTTPServer(('127.0.0.1', args.port), Handler)
