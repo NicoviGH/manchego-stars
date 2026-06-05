@@ -898,7 +898,7 @@ def inject_map_sprites(campaign, verbose=True):
 
     pointer_externs = []
     if idle:
-        _inject_idle_sprites(asset_dir, idle, pointer_externs)
+        _inject_idle_sprites(campaign, asset_dir, idle, pointer_externs)
     if mu:
         _inject_mu_sprites(asset_dir, mu, pointer_externs)
     if pointer_externs:
@@ -927,12 +927,25 @@ def inject_map_sprites(campaign, verbose=True):
             print('  cast palette -> purple OBJ bank for: %s' % ', '.join(custom_slots))
 
 
-def _inject_idle_sprites(asset_dir, idle, pointer_externs):
+def _donor_base(campaign, uid):
+    """The vanilla class/monster a cast member reskins (YAML art.map_sprite.base) -- the
+    key that lets us read the sprite's SMS size from the decomp instead of guessing it."""
+    unit = load_unit(campaign, uid)
+    try:
+        return unit['art']['map_sprite']['base']
+    except (KeyError, TypeError):
+        sys.exit('ERROR: %s has map_sprites/%s.png but no art.map_sprite.base in its YAML '
+                 '(needed to read the SMS size from the decomp)' % (uid, uid))
+
+
+def _inject_idle_sprites(campaign, asset_dir, idle, pointer_externs):
     """Wait-table slot + GetUnitSMSId override for each idle (<id>.png) asset."""
     wait_rows, incbin, overrides = [], [], []
     for uid, slot, class_enum, sms in idle:
+        # Frame size from the decomp wait table for the donor base -- not guessed.
+        _, dfw, dfh = map_sprite_tool.donor_sms_geometry(_donor_base(campaign, uid))
         macro, fw, fh, nframes = map_sprite_tool.sheet_info(
-            os.path.join(asset_dir, uid + '.png'))
+            os.path.join(asset_dir, uid + '.png'), (dfw, dfh))
         sym = 'unit_icon_wait_manchego_%s_sheet' % uid.replace('-', '_')
         shutil.copyfile(os.path.join(asset_dir, uid + '.png'),
                         os.path.join(WAIT_GFX_DIR, sym + '.png'))

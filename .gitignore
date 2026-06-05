@@ -31,3 +31,6 @@ __pycache__/
 # Secrets
 .env
 .env.*
+
+# map-sprite editor reset snapshots (derived from recolour)
+campaigns/*/map_sprites/.base/
