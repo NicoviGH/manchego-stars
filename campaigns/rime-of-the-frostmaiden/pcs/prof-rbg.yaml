@@ -31,6 +31,14 @@ art:
   palette_plan: >             # rough 16-color budget (incl. index-0 transparent)
     greens ×3 (fur), purples ×3 (hat/vest), yellow ×2 (coat/collar), gold trim
     (shares yellow), pink (nose/mouth), white (fang/eye highlight), black outline.
+  map_sprite:                 # overworld idle/walk base (issue #38 art loop; Nicolas's pick 2026-06-05)
+    base: Peer                # dignified robed-noble body = the "professor" vibe; empty hands + full walk sheet
+    footprint: 16x16
+    weapon: drawn pistol      # gunslinger flavor; draw a small pistol into one hand (empty-handed base, easier than editing the Archer's drawn-bow). Mechanically still an Archer using the bow's stats
+    adds:
+      - purple top hat
+      - green rat face + big rat ears
+      - recolour robe -> gold/yellow coat (+ purple vest)
 
 # ── D&D 5e Source (reference only — does NOT drive FE mechanics) ────────────────
 # FE stats come verbatim from the vanilla class below, not from D&D scores.

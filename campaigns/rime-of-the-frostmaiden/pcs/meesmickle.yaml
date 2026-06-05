@@ -30,6 +30,15 @@ art:
   palette_plan: >             # rough 16-color budget (incl. index-0 transparent)
     cat blacks ×3 (cool-blue-tinted) + fur highlight, cape reds ×3, white +
     pale-grey diamond bling, green cat-eye, pink nose/mouth, black outline.
+  map_sprite:                 # overworld idle/walk base (issue #38 art loop; Nicolas's pick 2026-06-05)
+    base: Mauthedoog          # quadruped hound body — reads as a four-legged cat (party-scale)
+    footprint: 16x16          # cat-sized; consistent with the rest of the party
+    weapon: none              # quadruped holds nothing; mechanically still a Shaman (dark tome), cast not shown
+    adds:
+      - round the snout into a cat face + pointy cat ears
+      - restyle the flame-mane; recolour fur black (cool-blue-tinted)
+      - red cape draped over the back
+      - green cat-eye
 
 # ── D&D 5e Source (reference only — does NOT drive FE mechanics) ────────────────
 # FE stats come verbatim from the vanilla class below, not from D&D scores.

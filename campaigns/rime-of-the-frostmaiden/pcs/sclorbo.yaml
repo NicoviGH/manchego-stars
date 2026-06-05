@@ -30,6 +30,14 @@ art:
   palette_plan: >             # rough 16-color budget (incl. index-0 transparent)
     icy-blues ×3 + bright cyan glow + white (head/aura/staff), tans ×3 (robe),
     fur greys ×2, red stripe accent, dark navy pendant, black outline.
+  map_sprite:                 # overworld idle/walk base (issue #38 art loop; Nicolas's pick 2026-06-05)
+    base: Civilian_F1         # the SMALLER girl civilian (12px); her up-hair/ponytail restyles into the flame head
+    footprint: 16x16
+    weapon: add ice staff     # civilian is empty-handed; draw his tall ice staff (he's a Priest -- staff matches)
+    adds:
+      - restyle the ponytail into the upward cyan flame head
+      - fur ruff at the collar
+      - recolour robe cream/tan; cyan staff
 
 # ── D&D 5e Source (reference only — does NOT drive FE mechanics) ────────────────
 # FE stats come verbatim from the vanilla class below, not from D&D scores.

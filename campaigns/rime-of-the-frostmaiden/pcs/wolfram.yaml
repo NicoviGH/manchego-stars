@@ -32,6 +32,15 @@ art:
   palette_plan: >             # rough 16-color budget (incl. index-0 transparent)
     mineral greys ×4 (cool, slightly metallic) + dark scale shadow, leather browns ×2,
     beard grey-brown, pale frost-crystal blue-white ×2, eye, black outline.
+  map_sprite:                 # overworld idle/walk base (issue #38 art loop; Nicolas's pick 2026-06-05)
+    base: Berserker           # bare-torso brute with asymmetric one-bare-arm/one-pauldron look = his lopsided crystal arm
+    footprint: 16x16
+    weapon: stock (axe)       # keep the base axe (cosmetic) -- closest to his canon hammer; mechanically a lance Armor Knight
+    adds:
+      - grey stone-skin recolour over the bare muscular torso
+      - lavender crystal clusters on shoulders + the crystal-arm
+      - wild hair restyled into the crystal crown
+      - brown wraps
 
 # ── D&D 5e Source (reference only — does NOT drive FE mechanics) ────────────────
 # FE stats come verbatim from the vanilla class below, not from D&D scores.

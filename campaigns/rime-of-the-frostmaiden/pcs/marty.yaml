@@ -31,6 +31,14 @@ art:
   palette_plan: >             # rough 16-color budget (incl. index-0 transparent)
     cap red ×2 + white spots, body greys ×3 + soft shadow, yellow eyes,
     brown staff, green sprout, pale spore-mote glow (shares white), black outline.
+  map_sprite:                 # overworld idle/walk base (issue #38 art loop; Nicolas's pick 2026-06-05)
+    base: Priest              # robed staff-holder — matches his twig-staff; staff is cosmetic only
+    footprint: 16x16
+    weapon: stock (staff)     # the SPRITE shows a staff; mechanically Marty is still a Shaman (dark tome)
+    adds:
+      - red white-spotted toadstool cap as the head/hood dome
+      - red scarf at the neck
+      - cream/grey robe recolour into the shared cast palette
 
 # ── D&D 5e Source (reference only — does NOT drive FE mechanics) ────────────────
 # FE stats come verbatim from the vanilla class below, not from D&D scores.

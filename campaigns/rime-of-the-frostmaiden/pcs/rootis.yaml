@@ -31,6 +31,14 @@ art:
   palette_plan: >             # rough 16-color budget (incl. index-0 transparent)
     snow whites/pale-blues ×4 (rounded shading), coal blacks ×2, orange carrot ×2,
     cool shadow blue, black outline. Small palette — spend it on smooth snow gradients.
+  map_sprite:                 # overworld idle/walk base (issue #38 art loop; Nicolas's pick 2026-06-05)
+    base: Gorgonegg           # smooth blank ovoid = easiest clean sculpt into a stacked-snowball body
+    footprint: 16x16          # party-scale at idle (the 32x32 is just the universal walk-frame canvas)
+    weapon: none              # snowman has no hands; mechanically still a Mage (ice tome), cast not shown
+    adds:
+      - pinch the ovoid into two stacked snowballs (small head + larger body)
+      - recolour white/pale-blue; coal-dot eyes + buttons; orange carrot nose
+      - reuse the nest base as snow at his feet
 
 # ── D&D 5e Source (reference only — does NOT drive FE mechanics) ────────────────
 # FE stats come verbatim from the vanilla class below, not from D&D scores.

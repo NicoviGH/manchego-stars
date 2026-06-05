@@ -34,6 +34,15 @@ art:
     greys ×4 (fur + armour shading), magenta/pink ×2 (ears/hands, lightened so the
     nose stands out), ruby reds ×2, true blues ×2 (irises), white highlight, darks ×3.
     pngquant holds the blue eye + ruby nose at the 16-colour ceiling natively.
+  map_sprite:                 # overworld idle/walk base (issue #38 art loop; Nicolas's pick 2026-06-05)
+    base: Manakete_Myrrh      # small dragon: 16x16 idle (little, party-scale) AND flies -> matches his Pegasus class
+    footprint: 16x16          # idle is party-sized; the 32x32 walk/hover shows the wings spread
+    weapon: none              # mechanically a lance Pegasus Knight; not shown on the little automaton
+    adds:
+      - recolour to grey clockwork metal
+      - the two wings -> big pink rat ears (they spread into an ear shape in the hover frames)
+      - the dragon tail -> his long curly pink tail
+      - pink nose/hands, mismatched eyes (one blue iris, one mechanical)
 
 # ── FE Starting Stats (level 1) ────────────────────────────────────────────────
 # Vanilla FE8 Pegasus Knight stats, verbatim from fireemblem8u/src/data_classes.c
