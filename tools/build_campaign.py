@@ -76,6 +76,7 @@ MU_C = os.path.join(DECOMP, 'src', 'mu.c')
 UNIT_ICON_MOVE_C = os.path.join(DECOMP, 'src', 'unit_icon_move_data.c')
 UNIT_ICON_MOVE_S = os.path.join(DECOMP, 'data', 'const_data_unit_icon_move.s')
 MOVE_GFX_DIR = os.path.join(DECOMP, 'graphics', 'unit_icon', 'move')
+BMUDISP_C = os.path.join(DECOMP, 'src', 'bmudisp.c')
 # New-game boots straight into the test chapter (skip the vanilla prologue) so the
 # spawn is one "New Game" away. CHAPTER_L_1 = 0x01 (constants/chapters.h).
 TEST_CHAPTER_INDEX = 1
@@ -91,6 +92,7 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         'src/events/ch1-eventscript.h', 'src/events/prologue-wm.h',
                         'src/gamecontrol.c', 'src/bmio.c', 'src/bmunit.c',
                         'src/unit_icon_wait_data.c', 'src/unit_icon_move_data.c', 'src/mu.c',
+                        'src/bmudisp.c',
                         'data/const_data_unit_icon_wait.s', 'data/const_data_unit_icon_move.s',
                         'include/unit_icon_pointer.h']
 
@@ -779,6 +781,101 @@ def _inject_mu_override_hook():
         f.write(text)
 
 
+def _read_cast_palette(path):
+    """Read cast_palette.png (indexed) -> 16 GBA15 u16 colours (index 0 transparent).
+    Pads short palettes with black; errors if it carries more than 16 entries."""
+    im = Image.open(path)
+    if im.mode != 'P':
+        sys.exit('ERROR: %s must be indexed (mode P) so it defines the cast palette' % path)
+    raw = im.getpalette() or []
+    n = min(len(raw) // 3, 256)
+    used = max((px for px in im.getdata()), default=0) + 1
+    if used > 16:
+        sys.exit('ERROR: %s uses %d palette indices; the cast bank holds 16' % (path, used))
+    out = []
+    for i in range(16):
+        r, g, b = (raw[3 * i], raw[3 * i + 1], raw[3 * i + 2]) if i < n else (0, 0, 0)
+        out.append((r >> 3) | ((g >> 3) << 5) | ((b >> 3) << 10))
+    return out
+
+
+def _inject_palette_bank_hook():
+    """Patch bmudisp.c so the custom cast share a bespoke palette in the campaign-unused
+    purple OBJ bank (0xB / OBJPAL_UNITSPRITE_PURPLE), leaving the shared player palette
+    (blue bank) untouched -- so the not-yet-custom cast still render correctly:
+      * GetUnitSpritePalette -- per-character override returning the purple bank before
+        the faction switch. StartMu uses this too, so it covers idle + hover/walk; the
+        grey "acted" tint is handled upstream in GetUnitDisplayedSpritePalette.
+      * ApplyUnitSpritePalettes -- load gCastMapPalette into the purple bank (replacing
+        the single-player Light-Rune load; Light Rune is an unused DUMMY item)."""
+    with open(BMUDISP_C, encoding='utf-8') as f:
+        text = f.read()
+
+    gsp_orig = ('int GetUnitSpritePalette(const struct Unit * unit)\n'
+                '{\n'
+                '    switch (UNIT_FACTION(unit)) {\n')
+    gsp_hooked = (
+        'extern unsigned short gMapPaletteOverride[];\n\n'
+        'int GetUnitSpritePalette(const struct Unit * unit)\n'
+        '{\n'
+        '    /* Campaign per-character map-palette override (build-injected; empty in\n'
+        '     * vanilla). Custom cast wear a bespoke palette in the purple bank so the\n'
+        '     * shared player (blue) palette stays untouched. */\n'
+        '    const unsigned short * mp = gMapPaletteOverride;\n'
+        '    int charId = UNIT_CHAR_ID(unit);\n'
+        '    while (*mp != 0xFFFF) {\n'
+        '        if (*mp == charId)\n'
+        '            return OBJPAL_UNITSPRITE_PURPLE;\n'
+        '        mp++;\n'
+        '    }\n'
+        '    switch (UNIT_FACTION(unit)) {\n')
+    if gsp_orig not in text:
+        sys.exit('ERROR: GetUnitSpritePalette not in expected vanilla form in %s' % BMUDISP_C)
+    text = text.replace(gsp_orig, gsp_hooked, 1)
+
+    au_sig_orig = 'void ApplyUnitSpritePalettes(void)\n{\n'
+    au_sig_hooked = ('extern unsigned short gCastMapPalette[];\n\n'
+                     'void ApplyUnitSpritePalettes(void)\n{\n')
+    if au_sig_orig not in text:
+        sys.exit('ERROR: ApplyUnitSpritePalettes not in expected vanilla form in %s' % BMUDISP_C)
+    text = text.replace(au_sig_orig, au_sig_hooked, 1)
+
+    au_orig = ('    else\n'
+               '        ApplyPalette(gPal_LightRune, 0x10 + OBJPAL_UNITSPRITE_PURPLE);\n')
+    au_hooked = ('    else\n'
+                 '        /* Manchego Stars: custom cast share a bespoke 16-colour palette\n'
+                 '         * in the (campaign-unused) purple bank; vanilla loads the unused\n'
+                 '         * Light Rune palette here. */\n'
+                 '        ApplyPalette(gCastMapPalette, 0x10 + OBJPAL_UNITSPRITE_PURPLE);\n')
+    if au_orig not in text:
+        sys.exit('ERROR: ApplyUnitSpritePalettes Light-Rune load not found in %s' % BMUDISP_C)
+    text = text.replace(au_orig, au_hooked, 1)
+
+    with open(BMUDISP_C, 'w', encoding='utf-8') as f:
+        f.write(text)
+
+
+def _inject_cast_palette(palette_u16, char_slots):
+    """Emit gCastMapPalette (the bespoke 16-colour bank) + gMapPaletteOverride (the
+    charIds that wear it, 0xFFFF-terminated) into the kept .data file, then patch the
+    bmudisp palette hooks. char_slots = portrait-slot names (-> CHARACTER_<SLOT>)."""
+    with open(UNIT_ICON_WAIT_C, encoding='utf-8') as f:
+        wait_c = f.read()
+    if 'constants/characters.h' not in wait_c:
+        wait_c = wait_c.replace('#include "unit_icon_data.h"',
+                                '#include "unit_icon_data.h"\n#include "constants/characters.h"', 1)
+    pal = ', '.join('0x%04X' % c for c in palette_u16)
+    ov = '\n'.join('\tCHARACTER_%s,' % s.upper() for s in char_slots)
+    wait_c += ('\n/* injected: bespoke cast map-sprite palette (loaded into the purple OBJ\n'
+               ' * bank) + the charIds that wear it (0xFFFF-terminated). Non-const so they\n'
+               ' * share unit_icon_wait_table\'s kept .data section. */\n'
+               'unsigned short gCastMapPalette[16] = { %s };\n' % pal
+               + 'unsigned short gMapPaletteOverride[] = {\n' + ov + '\n\t0xFFFF\n};\n')
+    with open(UNIT_ICON_WAIT_C, 'w', encoding='utf-8') as f:
+        f.write(wait_c)
+    _inject_palette_bank_hook()
+
+
 def inject_map_sprites(campaign, verbose=True):
     """Give cast members a custom overworld sprite distinct from their class.
 
@@ -809,11 +906,25 @@ def inject_map_sprites(campaign, verbose=True):
             f.write('\n/* Manchego Stars custom map sprites (#38) */\n'
                     + '\n'.join(pointer_externs) + '\n')
 
+    # Any cast with a custom sprite (idle and/or MU) wears the bespoke cast palette in
+    # its own OBJ bank -- its sheet is drawn to the cast-palette indices, so it must be
+    # viewed through that palette (decisions.md Art & Audio).
+    custom_slots = [slot for _, slot, _, _ in idle]
+    custom_slots += [slot for _, slot, _ in mu if slot not in custom_slots]
+    if custom_slots:
+        pal_png = os.path.join(asset_dir, 'cast_palette.png')
+        if not os.path.isfile(pal_png):
+            sys.exit('ERROR: custom map sprites need campaigns/%s/map_sprites/cast_palette.png'
+                     % campaign)
+        _inject_cast_palette(_read_cast_palette(pal_png), custom_slots)
+
     if verbose:
         for uid, slot, class_enum, sms in idle:
             print('  %-10s -> idle SMS %d (%s)' % (uid, sms, slot))
         for uid, slot, class_enum in mu:
             print('  %-10s -> hover/walk MU sheet (%s)' % (uid, slot))
+        if custom_slots:
+            print('  cast palette -> purple OBJ bank for: %s' % ', '.join(custom_slots))
 
 
 def _inject_idle_sprites(asset_dir, idle, pointer_externs):

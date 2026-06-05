@@ -8,10 +8,11 @@ only have to hand the build a correctly-laid-out PNG.
 
 Two hard engine constraints shape the art (see HANDOFF / issue #38):
 
-  * One shared palette. Every PLAYER map sprite draws from a single 16-colour OBJ
-    palette (the others are the enemy/NPC team tints). So a cast sprite cannot
-    carry its own palette -- it must be drawn in the shared cast ramp
-    (graphics/unit_icon/palette/unit_icon_pal_player.agbpal). Index 0 = transparent.
+  * One shared palette per OBJ bank. A map sprite can't carry its own palette; it
+    picks one of the resident faction banks. The custom cast share a bespoke 16-colour
+    cast palette loaded into their own (campaign-unused) bank, so every cast sheet must
+    be drawn in that one ramp -- the cast palette, campaigns/<id>/map_sprites/
+    cast_palette.png (decisions.md Art & Audio). Index 0 = transparent.
 
   * Fixed frame geometry. Wait sheets are a vertical strip of 16x16 (most classes),
     16x32 (mounted/tall) or 32x32 (monsters) frames. Width fixes the size class;

@@ -332,15 +332,24 @@ Per-unit design briefs (must-keep tells, expression, palette plan) live in each 
 **Sequencing — three waves:** (1) all 10 cast portraits, then (2) all map sprites (16×16 chibis), then (3) battle animations.
 _Decided: May 2026; full-custom direction + Gemini-ref-to-asset pipeline proven 2026-06-01 (Braulo, then Prof. R.B. Geenius)._
 
-**Map sprites: per-CHARACTER override, custom colours via the one shared cast palette.**
+**Map sprites: per-CHARACTER sprite + palette override; custom cast share a bespoke palette in their own OBJ bank.**
 FE8 draws overworld sprites by **class** (`GetUnitSMSId → pClassData->SMSId`), so a class swap would hit every unit of
 that class — including enemies — and couldn't distinguish two cast on the same class (Marty & Meesmickle are both Shaman).
 Instead each cast member gets a **custom SMS slot** (ids 107+; classes top out at 106) and a **per-character override** in
 `GetUnitSMSId` (generic table; campaign data injected by `build_campaign.inject_map_sprites`, parallel to portraits).
-Stock classes and vanilla enemies are untouched. **Colour:** every player map sprite shares one 16-colour OBJ palette
-(`unit_icon_pal_player.agbpal`) — sprites can't carry their own — so custom colours come from redesigning that one shared
-ramp to **union-cover the cast's hues** (reds/blacks/whites/greys + Rootis ice-blue, Pinky pink, RBG green). No
-palette-bank hacking. **Two sheets per character, grouped as one deliverable** (battle anims #39 are a separate track):
+Stock classes and vanilla enemies are untouched. **Colour: the custom cast share one bespoke 16-colour palette in their
+own OBJ palette bank** — map sprites can't carry their own palette; a sprite picks one of the resident faction banks by
+allegiance (`GetUnitSpritePalette → bank` per `UNIT_FACTION`). We add a **per-character override there** (sibling to the
+`GetUnitSMSId` hook) that points custom cast at the **campaign-unused purple bank (`0xB` / `OBJPAL_UNITSPRITE_PURPLE`)**,
+into which `ApplyUnitSpritePalettes` loads a bespoke cast palette (`campaigns/.../map_sprites/cast_palette.png`). Bank
+`0xB` is free in single-player play: its only consumers are the **Light Rune** (an unused DUMMY item, never placed in any
+chapter) and the **link-arena 4th-player colour** (multiplayer only — our ROM is single-player). This leaves the shared
+player palette (bank `0xC`, blue) untouched, so the **not-yet-custom cast always render correctly during rollout** (no
+mis-tint, no palette-sequencing gotcha) while the custom cast get the full 16 colours free of the "team-blue"
+constraint. Greying still works: `GetUnitDisplayedSpritePalette` short-circuits acted units to the grey bank `0xF`
+*before* reaching our hook. The palette is designed once to union-cover the cast's signature hues (reds/blacks/whites/
+greys + Rootis ice-blue, Sclorbo cyan, Pinky pink, RBG gold/purple/green), and the same `cast_palette.png` is the
+recolour target for every base sprite. **Two sheets per character, grouped as one deliverable** (battle anims #39 are a separate track):
 - **Idle** = the small **wait** sheet (16×16 frame strip), `unit_icon_wait_table[SMSId]`, swapped via the `GetUnitSMSId`
   per-character override above. *(Proven in mGBA, Braulo placeholder.)*
 - **Hover/selected + walking** = the larger per-class **MU** sheet (`gMuInfoTable` = `unit_icon_move_table[classId-1]`;
@@ -350,7 +359,7 @@ palette-bank hacking. **Two sheets per character, grouped as one deliverable** (
 The MU sheet is the bigger art lift (a 15-frame walk cycle), but it stays in the map-sprite group, not battle anims.
 One gotcha: `StartMu`/`StartMuExt` decompress the sheet *before* setting `proc->unit`, so the override reloads the
 graphics after `proc->unit` is set (else it falls back to the class sheet).
-_Decided 2026-06-04; both override paths (idle + MU) built and proven in mGBA with Braulo placeholders (idle = Dancer, hover/walk = Mogall)._
+_Decided 2026-06-04; both override paths (idle + MU) built and proven in mGBA with Braulo placeholders (idle = Dancer, hover/walk = Mogall). Colour mechanism revised 2026-06-05 to the dedicated-bank approach (bank 0xB) after confirming the bank is free in single-player play — supersedes the earlier "modify the shared player palette" plan, which carried a rollout mis-tint gotcha._
 
 **Map-sprite ART process: reskin a vanilla FE base, NOT downscale generated art.**
 The portrait pipeline (Gemini bust → downscale → indexed) does **not** transfer to map sprites: at 16×16 / 32×32,
