@@ -69,7 +69,7 @@ enemy_units:
   - id: bremen-knight
     name: "Hall Knight"         # the book's 2 Bremen veterans — the real threat besides the boss
     count: 2
-    class: knight
+    class: armor-knight         # CLASS_ARMOR_KNIGHT (no plain CLASS_KNIGHT in FE8)
     level: 8
     weapon: steel-lance
     damage_type: piercing

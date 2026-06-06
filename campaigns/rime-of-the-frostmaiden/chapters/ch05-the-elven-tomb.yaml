@@ -81,18 +81,26 @@ enemy_units:
     name: "The White Moose"
     is_boss: true               # awakened beast-boss, cornered here (canon: tomb area E6)
     count: 1
-    class: wolf                 # FE8 beast monster class; reskinned as the awakened moose (charging brute)
+    class: gwyllgi              # CLASS_GWYLLGI (FE8 beast) stand-in quadruped; TODO custom "moose" art (#38/#39) so it reads as an elk, not a wolf
     level: 6
     damage_type: bludgeoning    # flavor label only ("antlers/hooves")
     ai_pattern: aggressive
     death_quote: "*a final, almost-human bellow*"
   - id: vine-blight
     name: "Vine Blight"
-    count: 4
+    count: 5
     class: revenant             # FE8 monster class (shambling zombie); reskinned as Ravisin's awakened plants
     level: 5
     damage_type: bludgeoning    # flavor label only
     ai_pattern: defensive       # clog the approaches to the depression
+  - id: frost-wolf
+    name: "Frostbitten Wolf"    # a remnant of Ravisin's pack that followed her to the tomb
+    count: 2
+    class: mauthedoog           # CLASS_MAUTHEDOOG (FE8 beast)
+    level: 5
+    damage_type: piercing       # flavor label only
+    ai_pattern: aggressive
+    # boss-chapter pacing bump (6 -> 9 enemies; decisions 2026-06-06)
 
 # ── Brazier Puzzle (FE8-native: gather offerings → light the brazier → door opens) ──
 # Canon RotFM p.82-83 needs a twig, pinecone, feather, AND a severed humanoid hand;

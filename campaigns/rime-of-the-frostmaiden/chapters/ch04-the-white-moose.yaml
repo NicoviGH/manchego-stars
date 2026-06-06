@@ -71,7 +71,7 @@ enemy_units:
   - id: dire-wolf
     name: "Awakened Wolf"
     count: 5                    # canon wolf pack = 1d4+4
-    class: wolf                 # FE8 beast monster class; reskinned as Ravisin's awakened wolves
+    class: mauthedoog           # CLASS_MAUTHEDOOG (FE8 beast); reskinned as Ravisin's awakened wolves
     level: 4
     damage_type: piercing       # flavor label only
     ai_pattern: aggressive

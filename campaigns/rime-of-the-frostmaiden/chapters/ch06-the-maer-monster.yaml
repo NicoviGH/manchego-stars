@@ -88,7 +88,7 @@ enemy_units:
     death_quote: "*a mournful, fading cry beneath the ice*"
   - id: harrier-fish
     name: "Knucklehead Swarm"
-    count: 5
+    count: 8                     # boss-chapter pacing bump (6 -> 9 enemies; decisions 2026-06-06)
     class: gargoyle             # FE8 monster class (agile flier); reskinned as a leaping fish swarm
     level: 5
     damage_type: piercing
