@@ -369,8 +369,13 @@ HTML = r"""<!doctype html><html><head><meta charset="utf-8"><title>map sprite ed
 let S=null, REF=null, frame=0, tool='pencil', active=6, zoom=12;
 let origin={x:40,y:30}, showGrid=true, onion=false, showRef=false, showDonor=false, showMotion=false;
 let painting=false, panning=false, panStart=null, playing=true, allFrames=false, followMotion=false;
-let MOTION=null, CUR=null, MODE='idle';
+let MOTION=null, CUR=null, MODE='idle', dirty=false;
 const docId=()=> MODE==='walk' ? CUR+':mu' : CUR;
+// switch sheets WITHOUT losing unsaved work: auto-save the current sheet first
+async function switchTo(uid, mode){
+  if(dirty){await save();}
+  await loadChar(uid, mode);
+}
 let undo=[], redo=[], playT=0, playStart=0;
 const BGS=[['grass',[104,152,56]],['snow',[224,232,240]],['grey',[96,96,96]],['black',[20,20,20]]];
 let bgIdx=0;
@@ -398,9 +403,9 @@ function syncModeSeg(){const c=curChar();
     btn.textContent = (m==='idle'?'Idle':'Walk')+(done?' ✓':'');});}
 async function init(){
   const chars=await buildCharOptions();
-  $('charSel').onchange=()=>loadChar($('charSel').value, MODE);
+  $('charSel').onchange=()=>switchTo($('charSel').value, MODE);
   $('modeSeg').addEventListener('click',ev=>{const b=ev.target.closest('button');
-    if(!b||b.disabled)return; loadChar(CUR, b.dataset.mode);});
+    if(!b||b.disabled||b.dataset.mode===MODE)return; switchTo(CUR, b.dataset.mode);});
   await loadChar(chars[0].id, 'idle');
   requestAnimationFrame(loop);
 }
@@ -420,6 +425,7 @@ async function loadChar(uid, mode){
   if(!MOTION&&followMotion){followMotion=false;} syncModeBtns();
   updateDoneUI(); syncModeSeg();
   buildPalette(); buildFrames(); fit(); selectFrame(0); setFg(active||6);
+  dirty=false; $('save').textContent='💾 Save';   // fresh load is clean
 }
 
 /* ---- palette ---- */
@@ -560,12 +566,12 @@ function applyPaint(x,y,first){
   if(tool==='pick'){setFg(S.frames[frame][y*S.fw+x]);return;}
   const cells=paintCells(x,y);
   if(tool==='bucket'){if(first){pushUndo();
-    for(const [f,cx,cy] of cells)flood(f,cx,cy,active);drawStage();rebuildThumbs();}return;}
+    for(const [f,cx,cy] of cells)flood(f,cx,cy,active);drawStage();rebuildThumbs();markDirty();}return;}
   const v=tool==='eraser'?0:active;
   if(first)pushUndo();
   let changed=false;
   for(const [f,cx,cy] of cells){const i=cy*S.fw+cx;if(S.frames[f][i]!==v){S.frames[f][i]=v;changed=true;}}
-  if(changed){drawStage();rebuildThumbs();}
+  if(changed){drawStage();rebuildThumbs();markDirty();}
 }
 function flood(f,x,y,to){const fr=S.frames[f];const from=fr[y*S.fw+x];if(from===to)return;
   const st=[[x,y]];while(st.length){const [cx,cy]=st.pop();if(!inb(cx,cy))continue;
@@ -623,6 +629,7 @@ window.addEventListener('load',()=>{
     const k=ev.key.toLowerCase();const map={b:'pencil',e:'eraser',g:'bucket',i:'pick',h:'pan'};
     if(map[k]){tool=map[k];[...document.querySelectorAll('.tool')].forEach(x=>x.classList.toggle('on',x.dataset.tool===tool));}});
   window.addEventListener('resize',()=>drawStage());
+  window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
   playStart=performance.now();
 });
 function rebuildThumbs(){const cells=$('frames').children;
@@ -631,13 +638,15 @@ function syncModeBtns(){$('allTgl').classList.toggle('on',allFrames);
   $('followTgl').classList.toggle('on',followMotion);}
 function syncUndoBtns(){const u=$('undoBtn'),r=$('redoBtn');
   if(u)u.disabled=!undo.length; if(r)r.disabled=!redo.length;}
-function doUndo(){if(!undo.length)return;redo.push(snap());S.frames=undo.pop();drawStage();rebuildThumbs();syncUndoBtns();}
-function doRedo(){if(!redo.length)return;undo.push(snap());S.frames=redo.pop();drawStage();rebuildThumbs();syncUndoBtns();}
+function markDirty(){dirty=true; const b=$('save'); if(b&&!b.textContent.startsWith('● '))b.textContent='● '+b.textContent.replace(/^● /,'');}
+function doUndo(){if(!undo.length)return;redo.push(snap());S.frames=undo.pop();drawStage();rebuildThumbs();syncUndoBtns();markDirty();}
+function doRedo(){if(!redo.length)return;undo.push(snap());S.frames=redo.pop();drawStage();rebuildThumbs();syncUndoBtns();markDirty();}
 async function save(){$('saveStat').querySelector('button')&&($('save').textContent='saving…');
   const r=await fetch('save',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({char:docId(),frames:S.frames})});
+  if(r.ok)dirty=false;
   $('save').textContent = r.ok?('💾 Saved '+new Date().toLocaleTimeString()):'❌ FAILED';
-  setTimeout(()=>$('save').textContent='💾 Save',2500);}
+  setTimeout(()=>{if(!dirty)$('save').textContent='💾 Save';},2500);}
 </script></body></html>"""
 
 
@@ -743,11 +752,13 @@ def _build_campaign_docs(campaign):
     return docs, order
 
 
-def _add_extra(docs, order, campaign, uid, base):
+def _add_extra(docs, order, campaign, uid, base, geom=None):
     """Add an experimental/scratch character (not a real campaign unit) to the editor:
     map_sprites/<uid>.png on donor `base`, plus its walk if <uid>_mu.png exists. Lets you
-    play with an alternate donor (e.g. a second marty on Civilian_M1) without touching the
-    real cast. Not injected by the build (it only iterates classed_cast)."""
+    play with an alternate donor (e.g. a second marty on Civilian_M1, or a flapping pinky
+    whose idle is the 32x32 flight) without touching the real cast. `geom` forces the idle
+    frame size (e.g. (32,32) for a flight-as-idle); then the donor MOVE sheet is the
+    reference. Not injected by the build (it only iterates classed_cast)."""
     import build_campaign as bc
     adir = os.path.join(bc.REPO, 'campaigns', campaign, 'map_sprites')
     palette = os.path.join(adir, 'cast_palette.png')
@@ -756,9 +767,19 @@ def _add_extra(docs, order, campaign, uid, base):
     sheet = os.path.join(adir, uid + '.png')
     if not os.path.isfile(sheet):
         sys.exit('ERROR: --extra %s: no %s' % (uid, sheet))
-    wait_donor = os.path.join(gfx, 'wait', 'unit_icon_wait_%s_sheet.png' % base)
-    docs[uid] = Doc(sheet, palette, wait_donor if os.path.isfile(wait_donor) else None,
-                    base, uid, os.path.join(basedir, uid + '.png'))
+    # geom => idle is a 32x32 (flight-style) sheet; reference is the move donor. If a
+    # matching reference override exists (.base/<uid>.ref.png -- original-colour frames
+    # that line up with this sandbox's frames, e.g. action frames 12-14), use it so the
+    # `donor`/`ref` underlay matches frame-for-frame.
+    sub = 'move' if geom else 'wait'
+    ref_override = os.path.join(basedir, uid + '.ref.png')
+    if os.path.isfile(ref_override):
+        ref = ref_override
+    else:
+        ref = os.path.join(gfx, sub, 'unit_icon_%s_%s_sheet.png' % (sub, base))
+        ref = ref if os.path.isfile(ref) else None
+    docs[uid] = Doc(sheet, palette, ref, base, uid,
+                    os.path.join(basedir, uid + '.png'), geom=geom)
     if uid not in order:
         order.append(uid)
     mu_sheet = os.path.join(adir, uid + '_mu.png')
@@ -795,8 +816,13 @@ def main():
         for spec in args.extra:
             uid, _, base = spec.partition('=')
             if not base:
-                sys.exit('ERROR: --extra expects uid=Donor, got %r' % spec)
-            _add_extra(DOCS, ORDER, args.campaign, uid, base)
+                sys.exit('ERROR: --extra expects uid=Donor[@WxH], got %r' % spec)
+            geom = None
+            if '@' in base:
+                base, _, gs = base.partition('@')
+                gw, _, gh = gs.partition('x')
+                geom = (int(gw), int(gh))
+            _add_extra(DOCS, ORDER, args.campaign, uid, base, geom)
     else:
         if not (args.sheet and args.palette):
             sys.exit('usage: map_sprite_editor.py <sheet.png> <cast_palette.png> --donor X\n'
