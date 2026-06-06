@@ -1,56 +1,54 @@
-# Handoff: Map-sprite ART loop — colour path + every cast member's base sprite are now LOCKED. The custom cast share a bespoke 16-colour palette in their own (campaign-unused) OBJ bank (0xB) so nothing else retints (the old palette-sequencing "gotcha" is gone), and the per-character `GetUnitSpritePalette` hook is built + compile-proven. All 8 classed cast have a chosen vanilla base to reskin (recorded in each unit's YAML `art.map_sprite`). **No real sprite art exists yet** — next = build the recolour tool and produce Braulo's idle (Cyclops → cast palette) as the first in-mGBA proof.
+# Handoff: Map-sprite ART loop now runs in a custom offline pixel editor; the cast donors/recolours are staged and Nicolas is hand-recolouring idles. Big scope cut locked: **idle-only** map sprites (movement auto-derives from the idle — option b), so no hand-authored walk cycles. #18 enemy audit done. Battle-anim (#39) tooling plan settled (decomp-native inserter + FE-Repo reskin bases); not built yet. **Immediate next: mine prof-rbg's gunner base from FE-Repo.**
 
-**Date:** 2026-06-05
-**Session Focus:** Decided + built the map-sprite COLOUR mechanism (dedicated OBJ bank, not the shared player palette), designed the bespoke cast palette, and ran a full walkthrough with Nicolas to pick each cast member's base sprite.
+**Date:** 2026-06-06
+**Session Focus:** Built the in-browser map-sprite editor + the recolour/geometry tooling; locked the idle-only scope decision; completed the #18 enemy-roster audit; evaluated battle-animation tooling (FEBuilder vs decomp-native) and FE-Repo as the reskin-base source.
 
-**Scope of this file:** HANDOFF = the NOW (current state, next steps, blockers), rewritten each session. Broader/long-term plan = GitHub issues (M0–M4) + `docs/PRD.md` + `docs/roadmap.md`. Settled decisions = `docs/decisions.md`.
+**Scope of this file:** HANDOFF = the NOW. Long-term plan = GitHub issues (M0–M4) + `docs/PRD.md` + `docs/roadmap.md`. Settled decisions = `docs/decisions.md`. Durable facts = memory (e.g. [[manchego-stars-fe-repo]], [[manchego-stars-use-decomp]]).
 
-## Accomplished
-- **Colour mechanism = dedicated OBJ bank (Option B), built + compile-proven** (commit `21b1a6c`). A map sprite picks its palette by faction (`GetUnitSpritePalette → bank`); we add a per-character override there (sibling to `GetUnitSMSId`) pointing custom cast at the **purple bank `0xB` / `OBJPAL_UNITSPRITE_PURPLE`**, into which `ApplyUnitSpritePalettes` loads `cast_palette.png`. **Bank 0xB is free in single-player play** — its only consumers are the Light Rune (unused DUMMY item) and the link-arena 4th-player colour (multiplayer only; our ROM is single-player); verified in decomp + web. The shared player palette (blue, 0xC) is untouched → not-yet-custom cast always render correctly (no rollout gotcha). Greying still works (`GetUnitDisplayedSpritePalette` short-circuits acted units to 0xF before our hook). `StartMu` also routes through `GetUnitSpritePalette`, so **one hook covers idle + hover/walk**.
-  - `tools/build_campaign.py`: `_read_cast_palette` / `_inject_cast_palette` / `_inject_palette_bank_hook`; emits `gCastMapPalette` + `gMapPaletteOverride` into the kept `.data` file; patches `src/bmudisp.c` (added to `PATCHED_DECOMP_FILES`, git-restored each build). No-op when no sprite assets exist.
-  - `docs/decisions.md` → Art & Audio rewritten to the dedicated-bank approach (supersedes the old "modify the shared player palette" plan); `map_sprite_tool.py` docstring updated.
-- **Bespoke cast palette designed + approved** (commit `bfe3561`): `campaigns/.../map_sprites/cast_palette.png` (16-colour union of the 8 busts' hues; Nicolas OK'd the swatch). It is BOTH the injected bank palette AND the recolour target for every base.
-- **All 8 base sprites picked** (walkthrough w/ Nicolas), recorded in each unit's YAML `art.map_sprite` (per-unit source of truth). Bases chosen for silhouette, decoupled from FE class; depicted weapons are cosmetic (FE weapon economy untouched):
+## Accomplished (this session)
+- **`tools/map_sprite_editor.py` — a local, offline, stdlib-only browser pixel editor** (Aseprite-style), the surface Nicolas now uses for all cast map sprites. Multi-character picker; **Idle/Walk toggle** (wait sheet + 32×32 MU sheet in one page); pencil/eraser/fill/eyedropper/pan, zoom, **onion skin**, **donor reference / A-B overlay**, **motion map**, live idle preview, frame timeline, undo/redo, palette locked to `cast_palette.png`. **Save** = local WIP; **Finish** = approved-to-commit (gitignored `.done` marker); **Reset** = revert to the clean-recolour `.base/` snapshot. **Follow-motion** = an edit rides a pixel's movement across frames (offsets measured per-row from each donor; lazy+cached). **Auto-saves before any character/mode switch** (fixed a real data-loss bug), `●` unsaved dot, beforeunload guard. `--extra uid=Donor[@WxH]` adds scratch variants without touching the real cast (currently: `marty-boy`=Civilian_M1, `prof-rbg-man`=Civilian_M2, `pinky-fly`=Manakete_Myrrh@32x32, and `cyclops/berserker/brigand/warrior-action` sandboxes).
+- **`tools/map_sprite_tool.py`** gained `recolour` (donor→cast palette, nearest + `d:c` overrides), `preview`, `grid`, `palette`, `setpx`, and **`donor_sms_geometry()` — frame size READ FROM THE DECOMP wait table per donor, never guessed** (a 16×96 sheet is ambiguous; Cyclops/Berserker/Mauthedoog/Manakete_Myrrh are 16×32). `build_campaign.inject_map_sprites` uses it too.
+- **Cast palette finalised** (`cast_palette.png`, committed): added a light grey + light tan (repurposed navy + dark-red slots), kept near-black (outlines + Meesmickle). Idle timing/geometry grounded in the decomp (`bmudisp.c` `GetGameClock()%72`).
+- **All 8 cast donors recoloured** into neutral starting sheets (idle + walk) with `.base/` reset snapshots (local, uncommitted — in-progress art).
+- **#18 enemy-roster audit — done & pushed.** Every enemy `class` across all 9 chapters now maps deterministically to a real `CLASS_*` (rule: `CLASS_`+UPPER, `-`/space→`_`); fixed `wolf`→`mauthedoog`/`gwyllgi` (White Moose flagged for custom art), `knight`→`armor-knight`; bumped boss chapters ch05/ch06 to 9. Counts: `3/10/8/10/8/9/9/9/24`.
+- **Battle-anim (#39) tooling evaluated** + **FE-Repo** catalogued as our reskin-base source (see Decisions + memory).
 
-  | Unit | Base | Notes / reskin adds |
-  |---|---|---|
-  | braulo | **Cyclops** (16×16) | hermit-crab-man: eyestalks, shoulder shell, segmented belly, red; stock axe |
-  | marty | **Priest** | mushroom: toadstool cap + scarf; staff matches his twig (mechanically Shaman) |
-  | meesmickle | **Mauthedoog** (16×16 quadruped) | cat: ears, red cape, restyle flame-mane, black fur |
-  | wolfram | **Berserker** | crystal golem: asymmetric arm = crystal arm, crystal crown, grey stone; stock axe (canon hammer) |
-  | prof-rbg | **Peer** | dapper rat: top hat, green rat face/ears, gold coat, **drawn pistol** (gunslinger) |
-  | rootis | **Gorgonegg** (egg) | snowman: pinch ovoid into 2 snowballs, coal eyes/buttons, carrot nose |
-  | sclorbo | **Civilian_F1** (smaller girl) | frost wraith: ponytail → cyan flame head, fur ruff, add ice staff |
-  | pinky | **Manakete_Myrrh** (small dragon) | clockwork rat: **flies (matches Pegasus)**, wings → big pink ears, dragon tail → curly tail, grey metal |
+## Decisions locked this session
+- **Map sprites are IDLE-ONLY (option b):** Nicolas authors only idle sheets; the movement/MU sheet is **auto-generated from the idle** at build time (units glide in their idle pose). No hand-authored walk cycles. Wire-up deferred until idles are finalised. **Pinky** is the built-in exception — her "idle" is the 32×32 wing-flapping flight (she flaps standing + moving).
+- **Battle animations (#39, post-MVP / M4):** author in the standard GBAFE **sheet+script** format and write a **decomp-native build-time inserter** (same pattern as map sprites) — NOT FEBuilder (Windows-only, GUI, edits a built ROM → breaks the reproducible decomp build; keep it only as a reference/preview/validation tool). **Reskin F2E community animations from FE-Repo**, don't draw from scratch. De-risk by proving the pipeline on ONE reskinned anim before mass production.
+- **White Moose** (ch05 boss): `gwyllgi` now, custom "moose" art later.
 
 ## Current State — what works
-- `make CAMPAIGN=rime-of-the-frostmaiden` green; `make check` clean. With no `map_sprites/*.png` sprite assets, the whole map-sprite injection (idle + MU + palette bank) is a clean no-op (cast keep class sprites) — the committed state. Idle (#38), MU (hover/walk), and the palette-bank path are all built + proven in mGBA / compile-proven.
-- Portraits/names/classes/stats unchanged.
-
-## Next Steps (priority) — START THE ART-PRODUCTION LOOP
-1. **Build the recolour tool** (`map_sprite_tool.py` currently only validates). It should: take a vanilla base wait/MU sheet + `cast_palette.png`, remap the base's palette → the cast palette (nearest-colour), and emit an indexed sheet drawn in the cast ramp. Programmatic recolour first; hand-edit (LibreSprite) is the fallback for the shape adds (eyestalks, ears, etc.) — Nicolas does the creative pixel pass, I do palette/assembly/injection (see decisions.md → Art & Audio process).
-2. **Braulo first proof:** recolour the Cyclops idle (16×16) to the cast palette → drop as `map_sprites/braulo.png` → `make` → mGBA → Nicolas judges. Then the shape adds (eyestalks/shell/belly). **Show → wait for OK → commit** (don't auto-commit art).
-3. Idle (16×16, 3f) before the walk MU (32×480, 15f) for each character. Then scale to the other 7, one at a time, show→OK→commit.
-4. **(Queued, not current)** Real maps from YAML — Prologue (#20), Ch1 (#21).
+- Editor running at **http://127.0.0.1:8765/** (launched `--campaign rime-of-the-frostmaiden` + the four `--extra` sandboxes). All 8 cast + sandboxes load; idle + walk per character.
+- `make CAMPAIGN=rime-of-the-frostmaiden` is a clean no-op for map sprites (no `<id>.png` is committed yet), so the build stays green. #18 YAML changes are committed; `make check` clean.
+- Recoloured cast sheets + `.base/` + scratch variants are **local/uncommitted by design** (in-progress art; committed per-character when Nicolas hits **Finish**).
 
 ## Blockers
-None hard. The mechanism + palette + base picks are done; next is purely the art-production loop (build recolour tool, prove on Braulo).
+None hard. The one real unknown is the **decomp-native battle-anim inserter** (#39) — feasible (format documented, mirrors the map-sprite injector) but net-new tooling; it's post-MVP.
 
-## Build Hygiene
-- **Build:** `make clean && make CAMPAIGN=rime-of-the-frostmaiden`. Injection idempotent (auto-restores `PATCHED_DECOMP_FILES`, now incl. `src/bmudisp.c`).
-- **Checks:** `make check` (drift) · `make verify` (ROM text). Never commit the `fireemblem8u` submodule pointer.
-- **mGBA:** `pkill -9 -i mgba; "/Applications/mGBA.app/Contents/MacOS/mGBA" "$PWD/fireemblem8u/fireemblem8.gba" &`. Fresh New Game: `rm fireemblem8u/fireemblem8.sav`.
-- **Map-sprite assets:** drop `campaigns/.../map_sprites/<id>.png` (idle) and/or `<id>_mu.png` (32×480 walk), drawn to `cast_palette.png`; validate with `python3 tools/map_sprite_tool.py <file>`. Cleanup: the build copies sheets into `fireemblem8u/graphics/unit_icon/{wait,move}/` as `*manchego*` — remove leftovers there if a placeholder is abandoned.
+## Next Steps (priority)
+1. **(IMMEDIATE — where we're picking up) Mine prof-rbg's gunner base from FE-Repo.** Pull the `[Gunner-Custom] Flintlocker` / `Bowgunner` / `Ammo Soldier` **map-sprite + anim previews** (raw.githubusercontent GIF/PNG), open them, Nicolas picks → record base + author in `pcs/prof-rbg.yaml` `art` block + a `CREDITS.md` → reskin. (Vanilla FE8 has no gun; this is the biggest unlock.) Then mine the other hard cases: rootis→Yetizerker, pinky→Mech/flier, braulo→Oni Chieftain.
+2. **Finish the idle recolours** (Nicolas, in the editor) → **Finish** each → I commit per-character (after a `make` check).
+3. **Wire auto-MU-from-idle into `build_campaign`** (the idle-only scope cut) once idles are finalised.
+4. **Battle-anim pipeline spike (#39):** build the decomp-native inserter, prove it on one reskinned FE-Repo anim in mGBA.
+5. (Queued) Real maps/events from YAML — Prologue (#20), Ch1 (#21); enemy *injection* (the #14/#18 second half) using the now-validated classes.
+
+## Build / Run Hygiene
+- **Editor:** `pkill -f map_sprite_editor.py; python3 tools/map_sprite_editor.py --campaign rime-of-the-frostmaiden --extra marty-boy=Civilian_M1 --extra prof-rbg-man=Civilian_M2 --extra "pinky-fly=Manakete_Myrrh@32x32" --extra "cyclops-action=Cyclops@32x32" --extra "berserker-action=Berserker@32x32" --extra "brigand-action=Brigand@32x32" --extra "warrior-action=Warrior@32x32" --port 8765 --no-browser` (then open the URL; `--no-browser` avoids spawning tabs).
+- **Build:** `make clean && make CAMPAIGN=rime-of-the-frostmaiden`. **Checks:** `make check` (drift) · `make verify` (ROM text). Never commit the `fireemblem8u` submodule pointer.
+- **mGBA:** `pkill -9 -i mgba; "/Applications/mGBA.app/Contents/MacOS/mGBA" "$PWD/fireemblem8u/fireemblem8.gba" &`.
+- **Committing art:** recolour sheets stay uncommitted until Finished; `.base/` is gitignored.
 
 ## Key Files
-- `tools/build_campaign.py` — `inject_map_sprites` (idle + MU + cast-palette bank). Patched decomp files: `src/bmunit.c`, `src/mu.c`, `src/bmudisp.c`, `src/unit_icon_wait_data.c`, `src/unit_icon_move_data.c`, `data/const_data_unit_icon_{wait,move}.s`, `include/unit_icon_pointer.h`.
-- `tools/map_sprite_tool.py` — sheet validator (recolour helper = TODO, next step).
-- `campaigns/rime-of-the-frostmaiden/map_sprites/` — `cast_palette.png` (the ramp + recolour target) + README (spec). Drop sprite assets here.
-- Each cast YAML `art.map_sprite` block — per-character base + reskin brief (`pcs/*.yaml`, `npcs/pinky.yaml`).
-- `docs/decisions.md` → Art & Audio — map-sprite mechanism + cast-palette/bank + ART process.
+- `tools/map_sprite_editor.py` — the browser pixel editor (campaign + `--extra` + `--mu`).
+- `tools/map_sprite_tool.py` — recolour/preview/grid/setpx + `donor_sms_geometry` (decomp-grounded).
+- `tools/build_campaign.py` — `inject_map_sprites` (idle + MU + cast-palette bank), now donor-geometry-grounded.
+- `campaigns/rime-of-the-frostmaiden/map_sprites/` — `cast_palette.png` + per-cast `<id>.png`/`<id>_mu.png` (+ `.base/` snapshots, gitignored).
+- `campaigns/rime-of-the-frostmaiden/chapters/ch*.yaml` — enemy rosters (post-#18 audit).
+- `docs/decisions.md` → Art & Audio — map-sprite mechanism, editor, decomp-grounded geometry/timing, battle-anim plan.
 
 ## Memory
-- [[project_manchego_stars]] · [[feedback_custom_art_lever]] · [[feedback_show_before_committing_art]] · [[feedback_nicolas_not_an_artist]] · [[feedback_collaborative_story_planning]] · [[feedback_handoff_vs_memory]]
+- [[manchego-stars-project]] · [[manchego-stars-fe-repo]] · [[manchego-stars-use-decomp]] · [[feedback_custom_art_lever]] · [[feedback_show_before_committing_art]] · [[feedback_nicolas_not_an_artist]] · [[feedback_handoff_vs_memory]]
 
 ## Standing Rules
-Custom art for the 10 named cast; enemies vanilla. Stock FE8 classes/weapons; combat = pure vanilla FE. Map-sprite *depicted* weapon is cosmetic (decoupled from class). `make check` + `make` green at session end. Show art → wait for OK → then commit. Auto-push to main once approved. Don't commit the fireemblem8u submodule pointer.
+Custom art for the 10 named cast; enemies vanilla (FE8 classes, #18-validated). Stock FE8 classes/weapons; combat = pure vanilla FE. Map sprites are **idle-only** (movement auto-derived). Show art → wait for OK → then commit; recolour sheets uncommitted until **Finish**ed. Auto-push to main once approved. Don't commit the `fireemblem8u` submodule pointer. Read SMS geometry + anim timing from the decomp, never guess.
