@@ -39,6 +39,14 @@ SMS_SIZES = {
 MAX_COLORS = 16  # 4bpp: index 0 transparent + 15 usable.
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WAIT_DATA_C = os.path.join(REPO, 'fireemblem8u', 'src', 'unit_icon_wait_data.c')
+MOVE_GFX_DECOMP = os.path.join(REPO, 'fireemblem8u', 'graphics', 'unit_icon', 'move')
+
+# FE8 MU (moving) sheets are a vertical stack of 32x32 blocks. The class motion
+# script shows one block per frame via a single 32x32 OAM at a constant offset (some
+# frames H-flip the block). 480/32 = 15 blocks is the common length; see
+# data/const_data_unit_icon_move.s (every donor frame_0 we use is `1 oam, 0xE0,
+# 0x81F0, tile 0x0` -> the same single 32x32 block).
+MU_CELL = 32
 
 
 def donor_sms_geometry(donor):
@@ -195,6 +203,60 @@ def recolour(base_path, palette_path, out_path, overrides=None):
     # Validate against the donor's authoritative SMS geometry (decomp), not a guess.
     _, dfw, dfh = donor_sms_geometry(base_path)
     sheet_info(out_path, (dfw, dfh))
+
+
+def synth_mu_sheet(idle_path, donor, out_path, y_nudge=0, verbose=True):
+    """Synthesize a static-"glide" MU (hover/walk) sheet from a finished idle sheet.
+
+    A moving unit draws its MU sheet, not its idle SMS, so with no MU asset it reverts
+    to the stock class sprite. The idle-only decision (HANDOFF / decisions.md) is honoured
+    by NOT animating a walk: instead the idle pose is anchored to the donor's standing MU
+    frame (feet-aligned) and tiled into EVERY 32x32 block of a sheet matching the donor's
+    MU height. Because every block holds the same pose, whichever block (or H-flip) the
+    reused class motion script selects, the unit shows its idle pose -- it glides.
+
+    The pose's feet are aligned to the donor's block-0 MU content so standing<->moving is
+    seamless; `y_nudge` (px, + = down) trims any residual drift. Output is an indexed PNG
+    in the idle sheet's (cast) palette, ready for the move-sheet incbin.
+    """
+    _, ifw, ifh = donor_sms_geometry(donor)
+    sheet_info(idle_path, (ifw, ifh))          # idle must match the donor SMS geometry
+    idle = Image.open(idle_path)
+
+    donor_mu_path = os.path.join(MOVE_GFX_DECOMP, 'unit_icon_move_%s_sheet.png' % donor)
+    if not os.path.isfile(donor_mu_path):
+        sys.exit('ERROR: donor MU sheet not found: %s (needed to anchor the glide)'
+                 % donor_mu_path)
+    donor_mu = Image.open(donor_mu_path)
+    dw, dh = donor_mu.size
+    if dw != MU_CELL or dh % MU_CELL:
+        sys.exit('ERROR: donor MU %s is %dx%d -- expected a %d-wide stack of %dx%d blocks'
+                 % (donor_mu_path, dw, dh, MU_CELL, MU_CELL, MU_CELL))
+    nblocks = dh // MU_CELL
+
+    # Feet anchor: our idle content's bottom-centre -> the donor's block-0 content
+    # bottom-centre. getbbox() ignores index 0 (transparent), so it finds the pose.
+    idle_f0 = idle.crop((0, 0, ifw, ifh))
+    ib = idle_f0.getbbox()
+    db = donor_mu.crop((0, 0, MU_CELL, MU_CELL)).getbbox()
+    if ib and db:
+        paste_x = int(round((db[0] + db[2]) / 2.0 - (ib[2] - ib[0]) / 2.0)) - ib[0]
+        paste_y = (db[3] - (ib[3] - ib[1])) - ib[1] + y_nudge
+    else:                                       # empty frame: fall back to cell bottom-centre
+        paste_x, paste_y = (MU_CELL - ifw) // 2, MU_CELL - ifh + y_nudge
+
+    cell = Image.new('P', (MU_CELL, MU_CELL), 0)
+    cell.paste(idle_f0, (paste_x, paste_y))     # bg is index 0, so the pose's transparency is kept
+    out = Image.new('P', (MU_CELL, nblocks * MU_CELL), 0)
+    out.putpalette(idle.getpalette())
+    for b in range(nblocks):
+        out.paste(cell, (0, b * MU_CELL))
+    out.save(out_path)
+    if verbose:
+        print('synth MU glide %s -> %s (%dx%d, %d blocks; anchor x=%d y=%d off donor %s)'
+              % (os.path.basename(idle_path), out_path, MU_CELL, nblocks * MU_CELL,
+                 nblocks, paste_x, paste_y, donor))
+    return out_path
 
 
 # Backgrounds the preview composites onto, to judge contrast the way the map will show

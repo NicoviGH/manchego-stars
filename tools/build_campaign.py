@@ -25,6 +25,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 
 # portrait_tool lives next to us in tools/
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -893,18 +894,35 @@ def inject_map_sprites(campaign, verbose=True):
     cast = classed_cast(campaign)
     idle = [(uid, slot, cls, sms) for (uid, slot, cls, sms) in cast
             if os.path.isfile(os.path.join(asset_dir, uid + '.png'))]
-    mu = [(uid, slot, cls) for (uid, slot, cls, sms) in cast
-          if os.path.isfile(os.path.join(asset_dir, uid + '_mu.png'))]
-    if not idle and not mu:
+    if not idle:
         if verbose:
             print('  (no map_sprites/*.png assets yet; cast keep their class sprites)')
         return
 
+    # MU (hover/walk) sheet per idle character: a committed <id>_mu.png if hand-authored,
+    # else a static "glide" sheet synthesized from the finished idle frame so a MOVING
+    # unit keeps its custom sprite instead of reverting to the stock class one (idle-only
+    # decision -- map_sprite_tool.synth_mu_sheet). Synthesized sheets go to a temp dir so
+    # no derived asset lands in the working tree; the single source of truth is the idle.
+    mu, mu_tmp = [], None
+    for uid, slot, cls, sms in idle:
+        committed = os.path.join(asset_dir, uid + '_mu.png')
+        if os.path.isfile(committed):
+            mu.append((uid, slot, cls, committed))
+            continue
+        if mu_tmp is None:
+            mu_tmp = tempfile.mkdtemp(prefix='manchego_mu_')
+        src = os.path.join(mu_tmp, uid + '_mu.png')
+        nudge = ((load_unit(campaign, uid).get('art') or {}).get('map_sprite') or {}).get(
+            'glide_nudge', 0)
+        map_sprite_tool.synth_mu_sheet(os.path.join(asset_dir, uid + '.png'),
+                                       _donor_base(campaign, uid), src,
+                                       y_nudge=nudge, verbose=verbose)
+        mu.append((uid, slot, cls, src))
+
     pointer_externs = []
-    if idle:
-        _inject_idle_sprites(campaign, asset_dir, idle, pointer_externs)
-    if mu:
-        _inject_mu_sprites(asset_dir, mu, pointer_externs)
+    _inject_idle_sprites(campaign, asset_dir, idle, pointer_externs)
+    _inject_mu_sprites(mu, pointer_externs)
     if pointer_externs:
         with open(UNIT_ICON_POINTER_H, 'a', encoding='utf-8') as f:
             f.write('\n/* Manchego Stars custom map sprites (#38) */\n'
@@ -914,7 +932,7 @@ def inject_map_sprites(campaign, verbose=True):
     # its own OBJ bank -- its sheet is drawn to the cast-palette indices, so it must be
     # viewed through that palette (decisions.md Art & Audio).
     custom_slots = [slot for _, slot, _, _ in idle]
-    custom_slots += [slot for _, slot, _ in mu if slot not in custom_slots]
+    custom_slots += [slot for _, slot, _, _ in mu if slot not in custom_slots]
     if custom_slots:
         pal_png = os.path.join(asset_dir, 'cast_palette.png')
         if not os.path.isfile(pal_png):
@@ -925,8 +943,9 @@ def inject_map_sprites(campaign, verbose=True):
     if verbose:
         for uid, slot, class_enum, sms in idle:
             print('  %-10s -> idle SMS %d (%s)' % (uid, sms, slot))
-        for uid, slot, class_enum in mu:
-            print('  %-10s -> hover/walk MU sheet (%s)' % (uid, slot))
+        for uid, slot, class_enum, src in mu:
+            kind = 'committed' if os.path.dirname(src) == asset_dir else 'glide'
+            print('  %-10s -> hover/walk MU sheet (%s, %s)' % (uid, slot, kind))
         if custom_slots:
             print('  cast palette -> purple OBJ bank for: %s' % ', '.join(custom_slots))
 
@@ -981,14 +1000,15 @@ def _inject_idle_sprites(campaign, asset_dir, idle, pointer_externs):
     _inject_sms_override_hook()
 
 
-def _inject_mu_sprites(asset_dir, mu, pointer_externs):
-    """Custom MU sheet + GetMuImg override for each hover/walk (<id>_mu.png) asset."""
+def _inject_mu_sprites(mu, pointer_externs):
+    """Custom MU sheet + GetMuImg override for each hover/walk asset. `mu` items are
+    (uid, slot, class_enum, src_path); src is a committed <id>_mu.png or a synthesized
+    glide sheet (see inject_map_sprites)."""
     incbin, overrides = [], []
-    for uid, slot, class_enum in mu:
-        map_sprite_tool.sheet_info(os.path.join(asset_dir, uid + '_mu.png'))
+    for uid, slot, class_enum, src in mu:
+        map_sprite_tool.sheet_info(src)
         sym = 'unit_icon_move_manchego_%s_sheet' % uid.replace('-', '_')
-        shutil.copyfile(os.path.join(asset_dir, uid + '_mu.png'),
-                        os.path.join(MOVE_GFX_DIR, sym + '.png'))
+        shutil.copyfile(src, os.path.join(MOVE_GFX_DIR, sym + '.png'))
         incbin += ['\t.global %s' % sym, '%s:' % sym,
                    '\t.incbin "graphics/unit_icon/move/%s.4bpp.lz"' % sym,
                    '\t.align 2, 0']
