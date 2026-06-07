@@ -32,8 +32,8 @@ art:
     reds ×3 (claws), tans ×3 + dark speckle (carapace/hat/shell), greys ×3 + white
     (muscle), black outline, eye + mouth-interior. Tight but fits 16.
   map_sprite:                 # overworld idle/walk base (issue #38 art loop; Nicolas's pick 2026-06-05)
-    base: Cyclops             # bulky hunched brute torso — fits the hermit-crab-man build
-    footprint: 16x16          # PC-sized idle (Cyclops only looks giant in battle); stay party-scale, not boss-scale
+    base: Gargoyle            # geometry token only (32x32, 3-frame). ART = reskinned Warrior move/action frames (decomp/IS) into the red hermit-crab brute; see CREDITS.md.
+    footprint: 16x16          # PC-sized (sprite frame is 32x32 but the unit reads party-scale)
     weapon: stock             # keep the base's cleaver/axe — vanilla FE weapon economy
     adds:                     # reskin edits layered on the base (beyond recolour)
       - eyestalks on the head

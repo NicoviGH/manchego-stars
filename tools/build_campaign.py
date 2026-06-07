@@ -504,10 +504,11 @@ CLASS_LOADOUT = {
     'CLASS_ARMOR_KNIGHT':   ['ITEM_LANCE_IRON', 'ITEM_VULNERARY'],
     'CLASS_PEGASUS_KNIGHT': ['ITEM_LANCE_SLIM', 'ITEM_LANCE_JAVELIN', 'ITEM_VULNERARY'],
 }
-# East-side cluster on the Ch1 map, clear of the houses (13,6)/(10,4) and seize (2,2).
-# First slot (14,9) is the canonical lord start; the cast fills the rest in roster order.
-TEST_SPAWN_POSITIONS = [(14, 9), (13, 9), (12, 9), (14, 8),
-                        (13, 8), (12, 8), (14, 7), (13, 7)]
+# Centered, spread-out formation on the Ch1 map (a 4x2 grid, 2-tile gaps), clear of the
+# houses (13,6)/(10,4) and seize (2,2). Pulled in from the old bottom-right cluster so the
+# cast reads spaced out toward the middle for the look-test. Roster fills in order.
+TEST_SPAWN_POSITIONS = [(5, 4), (7, 4), (9, 4), (11, 4),
+                        (5, 6), (7, 6), (9, 6), (11, 6)]
 
 
 def _replace_brace_block(text, marker, new_body, path):
@@ -796,7 +797,10 @@ def _read_cast_palette(path):
     for i in range(16):
         r, g, b = (raw[3 * i], raw[3 * i + 1], raw[3 * i + 2]) if i < n else (0, 0, 0)
         out.append((r >> 3) | ((g >> 3) << 5) | ((b >> 3) << 10))
-    return out
+    # The engine loads this 16-colour block into the OBJ palette bank shifted one slot high:
+    # empirically (rainbow test), every sprite index k displayed cast colour k-1. Pre-rotate
+    # the palette up by one so each colour lands on its intended index (k -> cast[k]).
+    return out[1:] + out[:1]
 
 
 def _inject_palette_bank_hook():

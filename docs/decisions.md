@@ -349,7 +349,24 @@ mis-tint, no palette-sequencing gotcha) while the custom cast get the full 16 co
 constraint. Greying still works: `GetUnitDisplayedSpritePalette` short-circuits acted units to the grey bank `0xF`
 *before* reaching our hook. The palette is designed once to union-cover the cast's signature hues (reds/blacks/whites/
 greys + Rootis ice-blue, Sclorbo cyan, Pinky pink, RBG gold/purple/green), and the same `cast_palette.png` is the
-recolour target for every base sprite. **Two sheets per character, grouped as one deliverable** (battle anims #39 are a separate track):
+recolour target for every base sprite.
+
+**Palette off-by-one (2026-06-06, found on the first in-game cast test).** The cast bank loads one slot high: a
+rainbow-palette test (each index a distinct hue) showed every sprite index `k` rendering cast colour `k-1`
+(snowman-white→yellow, meesmickle's red cape→cyan, etc.). `gMapSpriteOverride`/`gCastMapPalette` data and the 4bpp
+indices were all verified byte-correct, so the shift is in the engine's OBJ-bank load, not the injection.
+**Fix:** `build_campaign._read_cast_palette` pre-rotates the 16-colour block up by one (`out[1:] + out[:1]`) so each
+colour lands on its intended index. Don't "correct" `gCastMapPalette` to match `cast_palette.png` order — it is
+intentionally rotated.
+
+**Map sprites are IDLE-ONLY for now (movement auto-derive deferred).** The finished cast idle (`<id>.png`) is folded
+onto the real cast id and injected; the stale per-class `<id>_mu.png` walk sheets were removed, so a *moving* unit
+currently falls back to its stock class sprite (standing shows the custom sprite). The 32×32 action/side sheets explored
+in the editor are exploratory and not injected. **Geometry base is a token:** for non-decomp FE-Repo donors the YAML
+`art.map_sprite.base` is set to any decomp class of matching frame size (16×16 or 32×32) purely to read the SMS size;
+the real art donor is named in a comment + `CREDITS.md`.
+
+**Two sheets per character, grouped as one deliverable** (battle anims #39 are a separate track):
 - **Idle** = the small **wait** sheet (16×16 frame strip), `unit_icon_wait_table[SMSId]`, swapped via the `GetUnitSMSId`
   per-character override above. *(Proven in mGBA, Braulo placeholder.)*
 - **Hover/selected + walking** = the larger per-class **MU** sheet (`gMuInfoTable` = `unit_icon_move_table[classId-1]`;

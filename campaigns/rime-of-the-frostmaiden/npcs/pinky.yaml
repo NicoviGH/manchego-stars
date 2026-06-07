@@ -35,8 +35,8 @@ art:
     nose stands out), ruby reds ×2, true blues ×2 (irises), white highlight, darks ×3.
     pngquant holds the blue eye + ruby nose at the 16-colour ceiling natively.
   map_sprite:                 # overworld idle/walk base (issue #38 art loop; Nicolas's pick 2026-06-05)
-    base: Manakete_Myrrh      # small dragon: 16x16 idle (little, party-scale) AND flies -> matches his Pegasus class
-    footprint: 16x16          # idle is party-sized; the 32x32 walk/hover shows the wings spread
+    base: Gorgonegg           # geometry token only (16x16, 3-frame). ART = FE-Repo "Rat" (Squaresoft, RandomWizard) reskinned to the clockwork rat; see CREDITS.md. Flight is the Pegasus class (fe_stats), independent of this sprite.
+    footprint: 16x16          # party-sized rat
     weapon: none              # mechanically a lance Pegasus Knight; not shown on the little automaton
     adds:
       - recolour to grey clockwork metal

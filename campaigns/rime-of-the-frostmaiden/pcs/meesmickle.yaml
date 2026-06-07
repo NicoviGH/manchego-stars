@@ -31,8 +31,8 @@ art:
     cat blacks ×3 (cool-blue-tinted) + fur highlight, cape reds ×3, white +
     pale-grey diamond bling, green cat-eye, pink nose/mouth, black outline.
   map_sprite:                 # overworld idle/walk base (issue #38 art loop; Nicolas's pick 2026-06-05)
-    base: Mauthedoog          # quadruped hound body — reads as a four-legged cat (party-scale)
-    footprint: 16x16          # cat-sized; consistent with the rest of the party
+    base: Gargoyle            # geometry token only (32x32, 3-frame). ART = FE-Repo "Tiger" side frames (RandomWizard, Squaresoft) reskinned to the black aristocat; see CREDITS.md.
+    footprint: 16x16          # cat-sized (sprite frame is 32x32; reads party-scale)
     weapon: none              # quadruped holds nothing; mechanically still a Shaman (dark tome), cast not shown
     adds:
       - round the snout into a cat face + pointy cat ears
