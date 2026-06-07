@@ -1006,7 +1006,7 @@ def _inject_mu_sprites(mu, pointer_externs):
     glide sheet (see inject_map_sprites)."""
     incbin, overrides = [], []
     for uid, slot, class_enum, src in mu:
-        map_sprite_tool.sheet_info(src)
+        map_sprite_tool.validate_mu_sheet(src)
         sym = 'unit_icon_move_manchego_%s_sheet' % uid.replace('-', '_')
         shutil.copyfile(src, os.path.join(MOVE_GFX_DIR, sym + '.png'))
         incbin += ['\t.global %s' % sym, '%s:' % sym,

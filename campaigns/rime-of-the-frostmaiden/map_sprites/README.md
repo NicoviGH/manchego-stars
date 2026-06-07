@@ -6,11 +6,33 @@ a cast member with no file here keeps its stock-class sprite, and stock classes 
 enemies stay untouched.
 
 - `<unit-id>.png`      → **idle** (wait sheet): custom SMS slot + a `GetUnitSMSId` override.
-- `<unit-id>_mu.png`   → **hover/selected + walk** (MU sheet, 32×480): a `GetMuImg` override.
+  **This is the only file you need to draw** — the moving sprite is derived from it (below).
+- `<unit-id>_mu.png`   → *optional* hand-authored **walk** (MU sheet): a `GetMuImg` override. Omit
+  it and the build auto-synthesizes a static "glide" from the idle; commit one only if you want a
+  real walk-cycle (it takes precedence over the glide).
 
 Named by YAML id (`braulo.png`, `rootis.png`, …). Each character's chosen **base sprite**
 (which vanilla class/monster we reskin) + the edits live in that unit's YAML `art.map_sprite`
 block — the per-unit source of truth.
+
+## Moving sprite — the auto-glide
+A moving unit draws its MU (hover/walk) sheet, not the idle SMS, so without an MU asset it
+reverts to the stock class sprite. The build closes that gap: `map_sprite_tool.synth_mu_sheet`
+builds an MU sheet from the finished idle frame — the idle pose, feet-anchored to the donor's
+standing MU frame, tiled into every 32×32 block — so movement keeps the custom sprite. It's a
+**static glide** (idle pose slides; no walk-cycle), per the idle-only decision.
+
+- **Automatic.** Any character with an idle `<id>.png` gets a glide at build time (synthesized to
+  a temp dir — nothing derived is committed; the idle stays the single source of truth).
+- **Any donor works** — the synth matches the donor's exact MU dimensions, including the sub-32
+  remainder some classes carry (heights 480/488/504/512).
+- **Feet tuning:** `art.map_sprite.glide_nudge` (px, + = down) in the unit YAML, if a unit ever
+  sits a hair high/low when moving vs standing.
+
+## Adding a new map sprite later
+1. Reskin a donor in the editor → save `map_sprites/<id>.png` (indexed to `cast_palette.png`).
+2. Set `art.map_sprite.base: <Donor>` in the unit's YAML (the donor whose SMS geometry + MU we read).
+3. Build — the idle SMS injects and the glide auto-generates. No MU art needed.
 
 ## `cast_palette.png` — the shared cast palette
 The custom cast share one bespoke 16-colour palette loaded into their own (campaign-unused)
@@ -23,7 +45,9 @@ correctly (see `docs/decisions.md` → Art & Audio). **Draw every cast sheet to 
 - **Idle:** a vertical strip of frames — width 16 → 16×16, width 16 / height mult of 32 →
   16×32, width 32 → 32×32. Mirror the donor class's vanilla wait sheet
   (`fireemblem8u/graphics/unit_icon/wait/`).
-- **Walk (MU):** 32×480 (15 frames of 32×32), mirroring the donor's vanilla move sheet.
+- **Walk (MU), only if hand-authoring one:** match the donor's vanilla move sheet dimensions
+  (32 wide; a vertical stack of 32×32 blocks, heights 480/488/504/512). Otherwise skip it — the
+  glide is synthesized from the idle.
 - Validate with `python3 tools/map_sprite_tool.py <file>.png`.
 
 ## Editing

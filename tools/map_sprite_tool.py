@@ -229,9 +229,13 @@ def synth_mu_sheet(idle_path, donor, out_path, y_nudge=0, verbose=True):
                  % donor_mu_path)
     donor_mu = Image.open(donor_mu_path)
     dw, dh = donor_mu.size
-    if dw != MU_CELL or dh % MU_CELL:
+    if dw != MU_CELL or dh < MU_CELL:
         sys.exit('ERROR: donor MU %s is %dx%d -- expected a %d-wide stack of %dx%d blocks'
                  % (donor_mu_path, dw, dh, MU_CELL, MU_CELL, MU_CELL))
+    # Many vanilla MU sheets carry a sub-32 remainder strip (heights 488/504, not a clean
+    # multiple of 32). The motion script only references full 32x32 blocks, so we fill those
+    # and leave any remainder transparent -- but keep the donor's EXACT dimensions so the
+    # decompressed sheet matches the size the engine's MU buffer expects.
     nblocks = dh // MU_CELL
 
     # Feet anchor: our idle content's bottom-centre -> the donor's block-0 content
@@ -247,16 +251,36 @@ def synth_mu_sheet(idle_path, donor, out_path, y_nudge=0, verbose=True):
 
     cell = Image.new('P', (MU_CELL, MU_CELL), 0)
     cell.paste(idle_f0, (paste_x, paste_y))     # bg is index 0, so the pose's transparency is kept
-    out = Image.new('P', (MU_CELL, nblocks * MU_CELL), 0)
+    out = Image.new('P', (dw, dh), 0)           # exact donor dims; remainder strip stays index 0
     out.putpalette(idle.getpalette())
     for b in range(nblocks):
         out.paste(cell, (0, b * MU_CELL))
     out.save(out_path)
     if verbose:
         print('synth MU glide %s -> %s (%dx%d, %d blocks; anchor x=%d y=%d off donor %s)'
-              % (os.path.basename(idle_path), out_path, MU_CELL, nblocks * MU_CELL,
-                 nblocks, paste_x, paste_y, donor))
+              % (os.path.basename(idle_path), out_path, dw, dh, nblocks, paste_x, paste_y, donor))
     return out_path
+
+
+def validate_mu_sheet(path):
+    """Validate a MU (move) sheet PNG and return its full-32x32-block count. MU sheets are
+    indexed (<=16 colours), 32px wide, and a vertical stack of 32x32 blocks; vanilla ones
+    may carry a small sub-32 remainder strip (heights like 488/504), which is allowed --
+    so height need NOT be an exact multiple of 32 (unlike a wait/SMS sheet)."""
+    if not os.path.isfile(path):
+        sys.exit('ERROR: MU sheet not found: %s' % path)
+    im = Image.open(path)
+    if im.mode != 'P':
+        sys.exit('ERROR: %s is mode %s; MU sheets must be indexed (mode P)' % (path, im.mode))
+    nc = len(im.getcolors() or range(MAX_COLORS + 1))
+    if nc > MAX_COLORS:
+        sys.exit('ERROR: %s uses %d colours; the 4bpp map-sprite palette allows %d '
+                 '(index 0 transparent + 15)' % (path, nc, MAX_COLORS))
+    w, h = im.size
+    if w != MU_CELL or h < MU_CELL:
+        sys.exit('ERROR: %s is %dx%d -- a MU sheet must be %d wide and at least %d tall'
+                 % (path, w, h, MU_CELL, MU_CELL))
+    return h // MU_CELL
 
 
 # Backgrounds the preview composites onto, to judge contrast the way the map will show
