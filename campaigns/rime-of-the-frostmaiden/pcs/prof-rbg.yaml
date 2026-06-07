@@ -150,9 +150,11 @@ signature_moment:
       construct (cf. the recruits block: RBG builds semi-sentient helpers). Here
       String Cheese is NOT a permanent recruit but a one-chapter GREEN ALLY
       (modeled like an FE8 house-visit unit). RBG escorts String Cheese to the
-      sleeping frozen dragon, which sacrifices itself to bind the wreck down and
-      cover the party's escape — functionally the chapter's Seize win (reach the
-      dragon's tile). See roadmap.md Ch 10.
+      sleeping frozen dragon; String Cheese then ties the dragon down and
+      SACRIFICES ITSELF (giving its "life" as one of RBG's constructs) so the
+      party can escape — the dragon is left bound, not killed. Functionally the
+      chapter's Seize win (reach the dragon's tile to deploy String Cheese).
+      See roadmap.md Ch 10.
     dialogue_trigger: rbg_string_cheese
     # Sourced from Nicolas's recall — past the DM notes (which end at the Eastway
     # capture). Verify the shipwreck/dragon setup vs the Frostmaiden book when built.
