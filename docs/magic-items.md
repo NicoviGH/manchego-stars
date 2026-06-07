@@ -56,7 +56,7 @@
 ## Braulo — Barbarian (Berserker), Hermit Crab
 | Item | What it is (5e) | FE conversion idea | Gate |
 |---|---|---|---|
-| Nu' Shipwrecker | Signature weapon — 1d8/1d10+7, **reach extended to 10 ft** | Locked prf weapon; 2-range melee (reach) | Ch1 (locked) |
+| Ole Shipwrecker | Signature anchor-axe — 1d8/1d10+7 (sheet adds 10-ft reach) | Braulo's **prf Killer Axe** (high-crit; per `decisions.md` + `lore/braulo.md`). Same weapon as the D&D **"Nu' Shipwrecker"** — Ole is the original anchor he reclaims at the frozen wreck; "Nu'" was its in-campaign replacement. | **Ch 10** (looted at the frozen wreck — `roadmap.md` Act II) |
 | Trident | Silvered, thrown 20/60, 1d8/1d10+6 | Thrown 2-range piercing | Ch1 |
 | Deck of Many Things | chaos artifact (from a PC's sheet) | Likely a one-off scripted event item, not combat kit | `[VERIFY]` |
 

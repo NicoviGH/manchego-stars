@@ -272,7 +272,7 @@ Conventions:
   Blast" = `Flux`; Sclorbo "Frostsong"/"Withering Impression" = `Lightning`. This avoids a stock
   tome name (e.g. "Fire") clashing with an ice/fungal caster's element.
 - **Personal/signature weapons return post-MVP** as story progression, each mapped to an FE
-  equivalent (e.g. Braulo's "Nu' Shipwrecker" → Killer Axe). Their flavor names are parked in
+  equivalent (e.g. Braulo's "Ole Shipwrecker" → Killer Axe, looted at the Ch 10 frozen wreck). Their flavor names are parked in
   `lore/<pc>.md` ("Signature gear").
 This resolves the old "weapon Might TBD" / "uses: null TBD" placeholders.
 _Decided: 2026-05-30_

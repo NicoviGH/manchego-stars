@@ -84,7 +84,7 @@ growth_rates:
 
 # ── Inventory (Chapter 1 starting equipment) ───────────────────────────────────
 # MVP: stock FE weapon economy — stats inherited from the vanilla item named in `fe_base`
-# (no custom Might). Braulo's personal-weapon flavor (Nu' Shipwrecker, Trident) is parked in
+# (no custom Might). Braulo's personal-weapon flavor (Ole Shipwrecker, Trident) is parked in
 # lore/braulo.md as a POST-MVP story-progression item; visual identity rides on the sprite art.
 inventory:
   - id: iron-axe

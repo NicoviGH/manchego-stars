@@ -136,13 +136,26 @@ recruits:
     # (see inventory `story_only`) to turn Pinky from a homunculus into a true living being.
     endgame_beat: "RBG wishes Pinky into a living being (campaign finale)"
 
-# ── Signature Moment ─────────────────────────────────────────────────────────
+# ── Signature Moments ────────────────────────────────────────────────────────
 signature_moment:
-  chapter: ch03-the-termalaine-mine
-  description: >
-    Executed a kobold at gunpoint during the "good cop, bad cop" interrogation
-    inside the Termalaine mine.
-  dialogue_trigger: rbg_kobold_execution
+  - chapter: ch03-the-termalaine-mine
+    description: >
+      Executed a kobold at gunpoint during the "good cop, bad cop" interrogation
+      inside the Termalaine mine.
+    dialogue_trigger: rbg_kobold_execution
+  - chapter: ch10-the-frozen-wreck   # post-MVP (Act II — roadmap.md Ch 10, the frozen shipwreck)
+    description: >
+      The frozen-shipwreck escape. RBG's artificer infusion (rope of climbing)
+      manifests as a semi-sentient rope, "String Cheese" — a Pepperjack-style
+      construct (cf. the recruits block: RBG builds semi-sentient helpers). Here
+      String Cheese is NOT a permanent recruit but a one-chapter GREEN ALLY
+      (modeled like an FE8 house-visit unit). RBG escorts String Cheese to the
+      sleeping frozen dragon, which sacrifices itself to bind the wreck down and
+      cover the party's escape — functionally the chapter's Seize win (reach the
+      dragon's tile). See roadmap.md Ch 10.
+    dialogue_trigger: rbg_string_cheese
+    # Sourced from Nicolas's recall — past the DM notes (which end at the Eastway
+    # capture). Verify the shipwreck/dragon setup vs the Frostmaiden book when built.
 
 # ── Support Affinities ────────────────────────────────────────────────────────
 supports:

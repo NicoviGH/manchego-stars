@@ -107,5 +107,5 @@ In the MVP, Braulo carries stock FE weapons (Iron Axe, Hand Axe). His named gear
 post-MVP as story-progression items, each mapped to an FE equivalent — the look (anchor/shell)
 rides on the sprite art, not the item name:
 
-- **Nu' Shipwrecker** — his prized personal axe → **Killer Axe** (FE-equivalent, per Nicolas).
+- **Ole Shipwrecker** — his prized personal anchor-axe → **Killer Axe** (FE-equivalent, per Nicolas). The original; in-campaign he lost it and got a replacement ("Nu' Shipwrecker") — same weapon. Reclaimed at the Ch 10 frozen wreck (see `docs/roadmap.md`).
 - **Trident** — his thrown weapon → a Hand-Axe-class throwing weapon.
