@@ -9,9 +9,8 @@
 Goal: turn ch00 ("A Dagger of Ice") into a real, playable chapter (real map + units + cutscene/dialogue + DefeatBoss), then repeat for Ch1+.
 
 ### Where the Prologue MAP stands (live — pick up here)
-- **Drafting loop is open.** `map-review/` (gitignored) holds the renders + `REVIEW.md`. **Draft 2 = `map-review/prologue-draft2.png`** is the current proposal, **awaiting Nicolas's feedback**.
-- **Draft 2 design:** a slice of Bryn Shander's **gate** — gate (top) = the chokepoint with **Sephek** holding it; **cliffs frame the right** (the hill); a **house block + plaza with a frozen well**; a **winding street** down to the **south deploy zone**; forest cover. 15×10.
-- **Open questions for Nicolas** (in `REVIEW.md`): (1) do the stacked house tiles read as real buildings or broken? (2) cliffs+wall frame vs. fully-enclosed town? (3) Sephek at the gate vs. deeper in the plaza? (4) keep 15×10 or go ~18×12? (5) ~3–4 caravan guards + Sephek — OK?
+- **RESTART AT THE CONCEPT LEVEL — collaboratively** ([[feedback_collaborative_map_design]]). I over-ran solo last session and produced a near-finished draft 2 before aligning on intent; Nicolas wants in on the design. **Agreed split: he drives what/where/why; I drive how it's built.** So next session: **bring 2–3 rough concept options** (e.g. SW-gate chokepoint vs. market-square ambush vs. Sephek fleeing with Torg's caravan), align on the tactical idea + difficulty + story tie-in, THEN execute and iterate on renders in `map-review/`.
+- **Draft 2 = `map-review/prologue-draft2.png`** exists (one option: a Bryn Shander gate-slice — gate chokepoint, Sephek holding it, cliff-framed hill, plaza + frozen well, winding street to a south deploy, 15×10). Treat it as **one concept to react to, not the plan.**
 - **Grounding (do NOT re-derive):**
   - **Complexity/difficulty yardstick = the vanilla FE8 Prologue** (`map-review/vanilla-prologue-map.png`): **15×10**, ONE chokepoint (bridge), framing terrain (mountains), open center, **~3 enemies + 1 boss**. Keep ch00 gentle and terrain-driven.
   - **Look = Bryn Shander** (circular walled hill-town, N/E/SW gates, central plaza): book map (`map-review/bryn-shander-reference.png`) + **community top-down** `references/References/Ten-Towns-Maps/Bryn-Shander-Large.jpg` (the **Light-Versions** one; crop to the town — it's a small circle in a big snowfield).
@@ -32,7 +31,7 @@ Goal: turn ch00 ("A Dagger of Ice") into a real, playable chapter (real map + un
 - **`inject_test_chapter`** is the plumbing template (strip cutscenes, redirect to a chapter). Real-chapter injection (#14) reuses it on the **Prologue** slot. Map **Sephek → boss-flagged enemy slot** (e.g. `CHARACTER_ONEILL`); **Hlin → a spare slot**, name-injected.
 
 ## Next Steps (priority)
-1. **Get Nicolas's draft-2 feedback → re-render in `map-review/`** until he signs off (answer the 5 open questions above).
+1. **Align on the Prologue map CONCEPT with Nicolas first** ([[feedback_collaborative_map_design]]): bring 2–3 rough options (location/tactical hook/difficulty/story tie-in), agree on one, THEN render passes in `map-review/`. Don't re-open with a finished draft.
 2. **Finalize the map:** `compile_layout()` → register the layout (like `inject_winter_tileset` does the test layout) → point the **Prologue** chapter at it → `make` green → load-test in mGBA.
 3. **#20 Prologue content:** `npcs/hlin-trollbane.yaml` + `npcs/sephek-kaltro.yaml`; place units (Hlin ally, Sephek boss, ~3–4 guards); beginning/ending cutscene + dialogue (co-written, book p.21–23); DefeatBoss + lose-if-Hlin-dies.
 4. Then Ch1+ (#21–#28) repeat. Battle-anim spike (#39) post-MVP.
