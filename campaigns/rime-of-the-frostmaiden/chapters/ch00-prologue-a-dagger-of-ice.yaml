@@ -1,9 +1,9 @@
 # chapters/ch00-prologue-a-dagger-of-ice.yaml
 # Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
 # COLD OPEN — an NPC-led tutorial prologue mirroring FE8's Prologue (DefeatBoss, 2 units).
-# Two named book veterans (Hlin + Scramsax) cut Sephek down on the field, but the ending
-# cutscene reveals he escapes (undead — misty-steps away). That gut-punch motivates Hlin
-# hiring the party at The Northlook, leading into ch01 ("Foaming Mugs" / The Iron Trail).
+# Scramsax (strong Jagen) protects a frail Hlin (our Eirika-analog "lord") as they cut
+# Sephek down — but the ending cutscene reveals he escapes (undead, misty-steps away).
+# That gut-punch motivates Hlin hiring the party at The Northlook -> ch01 ("Foaming Mugs").
 # Source: Rime of the Frostmaiden "Cold Open" (book p.20) + starting quest "Cold-Hearted
 #   Killer" (book pp. 21-24, incl. Torrga Icevein's caravan); Scramsax = The Northlook's
 #   proprietor (book p.33). Sephek's escape seeds a recurring villain (payoff TBD by story).
@@ -21,24 +21,25 @@ narrative: >
   Cold open, before our seven ever meet. Ten-Towns has gone two years without a
   sunrise — Auril the Frostmaiden's Everlasting Rime. The towns appease her with
   sacrifice lotteries, and lately a killer has been leaving Ten-Towners dead with a
-  dagger of ice through the heart. Hlin Trollbane, a retired dwarf bounty hunter, has
-  tracked the suspect — Sephek Kaltro — to a snowbound Bryn Shander street at night,
-  and ropes in Scramsax, the old sellsword who runs The Northlook, to help her end
-  it. They corner him and cut him down… and his body rimes over and is gone. The
-  Frostmaiden's servant cannot be killed by two tired veterans. Shaken, Hlin realizes
-  this is bigger than one bounty — Ten-Towns will need more hands than hers.
+  dagger of ice through the heart. Hlin Trollbane — a dwarf bounty hunter, old and
+  frail now — has tracked the suspect, Sephek Kaltro, to a frozen-river crossing on
+  the snowbound caravan road. Too worn to take him alone, she's brought Scramsax, the
+  veteran sellsword who runs The Northlook, to do the fighting. They corner Sephek and
+  cut him down… and his body rimes over and is gone. The Frostmaiden's servant cannot
+  be killed by two tired mortals. Shaken, Hlin realizes this is bigger than one bounty
+  — Ten-Towns will need more hands than hers.
 
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
-  file: maps/ch00-prologue.tmx
-  tileset: town-night-snow       # tiny Bryn Shander street, night palette
-  size: "14×10"                  # deliberately small — finalize in Tiled
+  file: maps/ch00-prologue.mar     # compiled winter layout (authored in map-review/editor.html)
+  tileset: snowy-bern              # community winter tileset (#41)
+  size: "15×10"                    # vanilla Prologue scale
   description: >
-    A short, enclosed night street: shuttered houses, snowdrifts, a few barrels for
-    cover, lanterns guttering in the wind (the book's "bright lanterns over narrow
-    streets"). Hlin and Scramsax start together at one end; Sephek waits near the far
-    end (mid-stalk). Small and legible — the player should never feel lost. (Map look
-    still in collaborative design — see map-review/.)
+    A snowbound mountain pass: a frozen river crossed by a single ice bridge (the one
+    chokepoint), framed by impassable peaks, opening to a snow basin in the SE where the
+    fight plays out. Built as a winter RESKIN of the vanilla FE8 Prologue layout ("The
+    Fall of Renais") — same proven shape, snow-graphiced — then hand-tuned in the browser
+    tile editor (map-review/editor.html). See [[manchego-stars-winter-reskin]].
 
 # ── Objective ──────────────────────────────────────────────────────────────────
 objective:
@@ -46,39 +47,53 @@ objective:
   description: "Defeat Sephek Kaltro"
 
 win_condition: boss_defeated     # you WIN the fight on the field…
-lose_condition: all_player_units_defeated   # gentle tutorial; a loss just retries
-# NOTE: defeating Sephek triggers the ending cutscene, which reveals he ESCAPES (undead,
-# misty-steps away). Mechanically a clean DefeatBoss win; narratively he survives to
-# become a recurring threat. Standard FE "beat-the-boss-then-he-flees-in-cutscene" beat.
+lose_condition: hlin_defeated    # Hlin is our "lord": the frail must-survive lead (see Difficulty)
+# NOTE 1: defeating Sephek triggers the ending cutscene, which reveals he ESCAPES (undead,
+#   misty-steps away). Mechanically a clean DefeatBoss win; narratively he survives to become
+#   a recurring threat. Standard FE "beat-the-boss-then-he-flees-in-cutscene" beat.
+# NOTE 2: "lord dies = game over" — Ch0's lead is Hlin (the party doesn't exist yet). From Ch1
+#   on, the player CHOOSES which PC is their lord (their D&D character) via a pre-Ch1 menu, and
+#   that choice drives the lose condition. Generic engine feature (FE8 sets EVFLAG_GAMEOVER on
+#   the lead's death) — tracked as its own engine task.
 
 # ── Difficulty ─────────────────────────────────────────────────────────────────
 difficulty_note: >
-  The basics tutorial — teaches move, attack, end-turn, and switching between units
-  (two allies), FE8-Prologue style (mirrors Seth + Eirika). Hlin and Scramsax are both
-  strong self-sufficient veterans (our two "Jeigans") — the player can't really lose.
-  Give them 1-2 trivial practice targets before the boss. Sephek is a sturdy boss but
-  beatable with basic attacks — his Cold Regeneration and cold-immunity are FLAVOR ONLY
-  here (shown in dialogue), NOT a mechanical gate. ~4-6 turns. Comfortable hit rates.
+  The basics tutorial — move, attack, end-turn, switching units — FE8-Prologue style,
+  and tuned to vanilla's difficulty by mirroring its strong-protects-weak shape:
+  Scramsax is the strong self-sufficient veteran (our "Jeigan" = Seth) who does the
+  killing; Hlin is the FRAIL must-survive lead (our Eirika — old, low stats; can chip
+  but dies if exposed). Stage them like vanilla: Scramsax forward by the enemies, Hlin
+  kept back. Sephek is a sturdy boss beatable with basic attacks; his Cold Regeneration
+  and cold-immunity are FLAVOR ONLY here (shown in dialogue), NOT a mechanical gate.
+  ~4-6 turns, comfortable hit rates. The tension is "don't let frail Hlin get swarmed."
 
 # ── Player Units ────────────────────────────────────────────────────────────────
 player_units:
+  # Hlin = the FRAIL must-survive lead (our "lord" / Eirika-analog). Book p.22: old & frail.
   - id: hlin-trollbane
     name: "Hlin Trollbane"
-    class: warrior               # unarmored veteran with a battleaxe/handaxe (book: "veteran")
+    class: warrior               # a dwarf veteran with a battleaxe/handaxe — but past her prime
     is_npc: true                 # not one of the 7 PCs; a cold-open guest unit
-    required: true
+    required: true               # lose if she dies (our lord-death condition)
+    level: 3                     # low / frail — the weak lead (cf. Eirika Lv1)
+    position: [8, 5]             # I6 — central & back (Eirika's vanilla spot)
     inventory:
-      - id: steel-axe
+      - id: hand-axe             # weak, throwable (range 1-2) so she can chip safely
         damage_type: slashing    # cosmetic flavor label
       - id: vulnerary
+  # Scramsax = the STRONG Jagen (our Seth-analog) who protects Hlin and does the killing.
   - id: scramsax
     name: "Scramsax"
-    class: hero                  # retired sellsword, "still knows how to handle a blade" (book p.33: veteran)
-    is_npc: true                 # The Northlook's proprietor; second cold-open guest
+    class: hero                  # retired sellsword, a real veteran (book p.33); promoted, strong
+    is_npc: true                 # The Northlook's proprietor; the cold-open's "Jeigan"
     required: true
+    level: 1                     # promoted prepromote — high stats despite low internal level (cf. Seth)
+    position: [13, 9]            # N10 — forward, beside the enemies (Seth's vanilla spot)
     inventory:
       - id: steel-sword
-        damage_type: slashing    # cosmetic flavor label; sword pairs vs Hlin's axe (teaches variety)
+        damage_type: slashing    # cosmetic flavor label
+      - id: hand-axe             # a throwing option for reach/variety
+        damage_type: slashing
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
 enemy_units:
@@ -86,7 +101,7 @@ enemy_units:
     name: "Sephek Kaltro"
     is_boss: true
     count: 1
-    position: tbd                # far end of the street
+    position: [14, 8]            # O9 — cornered against the SE peaks (O'Neill's vanilla spot)
     class: myrmidon              # lithe ice-swordsman (book: Ice Longsword)
     level: 5
     inventory:
@@ -103,6 +118,7 @@ enemy_units:
   - id: caravan-guard
     name: "Torg's Caravan Guard"
     count: 2                     # trivial practice mooks (Torrga Icevein's hirelings)
+    positions: [[14, 7], [13, 7]]  # O8 / N8 — screening the boss (vanilla bandits' spots)
     class: fighter
     level: 2
     inventory:
@@ -149,11 +165,13 @@ post_chapter:
 
 # ── Design Notes ──────────────────────────────────────────────────────────────────
 design_notes: >
-  NPC cold-open (mirrors FE8's two-unit Prologue: Seth + Eirika → Hlin + Scramsax). Its
-  jobs: (1) teach the basics with two strong veterans (move/attack/end-turn + switching
-  units); (2) establish the world (Rime, sacrifices, the dagger-of-ice killings) by SHOWING
-  it; (3) make the player's first fight be against Auril's servant, seeding the true villain
-  before the heroes arrive; (4) the "win the boss fight but he escapes in the cutscene" beat
-  plants Sephek as a recurring villain AND gives Hlin her reason to hire the party. Sephek's
-  cold/fire motif is pure narrative colour, echoed later by the Ch8 ice trolls. Keep it tiny
+  NPC cold-open (mirrors FE8's two-unit Prologue Seth + Eirika → Scramsax + Hlin). Its
+  jobs: (1) teach the basics, tuned to vanilla difficulty via the strong-protects-weak
+  shape — Scramsax the strong Jagen does the killing, frail Hlin is the must-survive lead;
+  (2) establish the world (Rime, sacrifices, the dagger-of-ice killings) by SHOWING it;
+  (3) make the player's first fight be against Auril's servant, seeding the true villain
+  before the heroes arrive; (4) the "win the boss fight but he escapes in the cutscene"
+  beat plants Sephek as a recurring villain AND gives Hlin her reason to hire the party.
+  Sephek's cold/fire motif is pure narrative colour, echoed later by the Ch8 ice trolls.
+  From Ch1 the must-survive lead becomes PLAYER-CHOSEN (their D&D character). Keep it tiny
   — this is the front porch, not a room.
