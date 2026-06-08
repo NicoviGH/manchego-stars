@@ -51,10 +51,12 @@ lose_condition: hlin_defeated    # Hlin is our "lord": the frail must-survive le
 # NOTE 1: defeating Sephek triggers the ending cutscene, which reveals he ESCAPES (undead,
 #   misty-steps away). Mechanically a clean DefeatBoss win; narratively he survives to become
 #   a recurring threat. Standard FE "beat-the-boss-then-he-flees-in-cutscene" beat.
-# NOTE 2: "lord dies = game over" — Ch0's lead is Hlin (the party doesn't exist yet). From Ch1
-#   on, the player CHOOSES which PC is their lord (their D&D character) via a pre-Ch1 menu, and
-#   that choice drives the lose condition. Generic engine feature (FE8 sets EVFLAG_GAMEOVER on
-#   the lead's death) — tracked as its own engine task.
+# NOTE 2: "lord dies = game over" is per-character — a battle-quote entry flagged
+#   EVFLAG_GAMEOVER (src/data_battlequotes.c; vanilla's Eirika/Duessel mechanism) which the
+#   CauseGameOverIfLordDies watcher in _Misc fires on. Ch0: add that entry for HLIN's slot
+#   (+ a death quote) -> her death = game over. No class-lord attribute needed. From Ch1 the
+#   player CHOOSES their lord; that just applies the same flag to the chosen unit dynamically
+#   (engine feature #42).
 
 # ── Difficulty ─────────────────────────────────────────────────────────────────
 difficulty_note: >
