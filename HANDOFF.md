@@ -1,53 +1,54 @@
-# Handoff: All 8 cast map sprites are reskinned, folded onto their real cast IDs, and **rendering correctly in-game** both **standing AND moving** (test chapter). The cast-palette off-by-one is fixed (pre-rotate). The auto-MU "glide" is now **wired & verified in-game**: a moving unit keeps its custom sprite instead of reverting to the stock class one. Map sprites stay **idle-only by design** (static glide, no walk-cycle). Battle anims (#39) still deferred; Kitsune fox-laguz anim parked for Meesmickle.
+# Handoff: Map sprites (#38) are DONE — all 8 cast render correctly **standing and moving** (idle SMS + auto-synthesized "glide" MU; palette off-by-one fixed). **NOW: building real chapters.** First target is the **Prologue (ch00, "A Dagger of Ice")**, which needs a real map. The map path is scoped & tracked: a custom-map/**tileset insertion pipeline (#40)** + a shared **winter tileset (#41)**, both decomp-native. Battle anims (#39) still deferred (parked Kitsune for Meesmickle).
 
 **Date:** 2026-06-07
-**Session Focus:** Wired **auto-MU-from-idle (the "glide")** — `map_sprite_tool.synth_mu_sheet` builds a 32×480 MU sheet from the finished idle frame (idle pose anchored to the donor's standing MU frame, tiled into all 15 blocks); `build_campaign.inject_map_sprites` auto-synthesizes one per idle cast member at build time (into a temp dir — no derived asset in git; a committed `<id>_mu.png` still wins). Built green, verified all 8 move correctly in mGBA. Also recorded the Act II Ch 10 frozen-wreck beat + reconciled Braulo's "Ole Shipwrecker" (earlier this session).
+**Session Focus:** (1) Hardened + verified the auto-MU "glide" (works for any donor incl. 488/504/512 MU sheets). (2) Recorded the Act II Ch 10 frozen-wreck beat + reconciled Braulo's "Ole Shipwrecker" + locked the dragon as Arveiaturace. (3) **Scoped the chapter+map build**: chose the map approach, created issues **#40/#41**, and added the maps decision to `docs/decisions.md`. Ready to execute the map pipeline on a fresh instance.
 
-**Scope of this file:** HANDOFF = the NOW. Long-term plan = GitHub issues (M0–M4) + `docs/PRD.md` + `docs/roadmap.md`. Settled decisions = `docs/decisions.md`. Durable facts = memory (e.g. [[manchego-stars-fe-repo]], [[manchego-stars-use-decomp]]).
+**Scope of this file:** HANDOFF = the NOW. Long-term plan = GitHub issues (M0–M4) + `docs/PRD.md` + `docs/roadmap.md`. Settled decisions = `docs/decisions.md`. Durable facts = memory.
 
-## Accomplished (this session)
-- **All 8 cast map sprites finished & live in-game** (test chapter, New Game drops straight onto the map). Reskins: marty (mushroom mage), braulo (red hermit-crab brute), wolfram (grey crystal brute), meesmickle (black aristocat + red cape), prof-rbg (purple-hat gunslinger), rootis (snowman), sclorbo (icy flame-spirit), pinky (clockwork rat). Verified visually in mGBA.
-- **Palette off-by-one FIXED.** First in-game test showed cast colours shifted by one index (snowman white→yellow, meesmickle cape red→cyan, …). A **rainbow-palette test** + Nicolas's colour-by-colour readout proved it: the engine loads the 16-colour OBJ bank **one slot high** (sprite index `k` rendered cast colour `k-1`). Data (4bpp indices, `gCastMapPalette`, override tables) was all byte-correct — the shift is in the engine load. **Fix:** `build_campaign._read_cast_palette` pre-rotates the palette up by one (`out[1:]+out[:1]`). Recorded in `docs/decisions.md` (don't "un-rotate" `gCastMapPalette`).
-- **Folded Finished sandboxes → real cast IDs** + set **geometry-token bases**: braulo/wolfram/meesmickle → `Gargoyle` (32×32), pinky → `Gorgonegg` (16×16); marty (`Civilian_M1`/`Priest`), prof-rbg (`Peer`), rootis (`Gorgonegg`), sclorbo (`Civilian_F1`) unchanged. Each YAML names the real FE-Repo art donor in a comment → `CREDITS.md`.
-- **FE-Repo donor mining** (this session's picks, all F2E, credited): wolfram→**Lizardzerker** (Seliost1), meesmickle→**Tiger** (RandomWizard, Squaresoft), pinky→**Rat** (Squaresoft, RandomWizard), prof-rbg→**Cowboy Gun** (MeatofJustice). sclorbo & rootis were reskinned directly on their decomp donors.
-- **Auto-MU "glide" wired & verified** — the build now synthesizes a 32×480 MU sheet per cast member from the finished idle frame (`map_sprite_tool.synth_mu_sheet`; idle pose anchored to the donor's standing MU frame, tiled into all 15 blocks), so a moving unit keeps its custom sprite. The idle stays the single source of truth (synth goes to a temp dir, nothing derived in git; a hand-authored `<id>_mu.png` overrides). All 8 verified moving in mGBA.
-- **Spawn formation spread** to a centered 4×2 grid (`TEST_SPAWN_POSITIONS` in `build_campaign.py`), was a bottom-right cluster.
-- **Kitsune (fox-laguz) battle anim parked** for Meesmickle at `campaigns/.../battle_anims/_parked/meesmickle-kitsune-fox/` (sheets+script+gif+credits) — the closest sleek-quadruped reskin base; no cat/tiger anim exists in the GBAFE community. For #39, deferred.
-- **Committed + pushed to main** (`62239bd`); drift check clean; submodule pointer untouched.
+## ACTIVE WORKSTREAM — Prologue chapter + the map pipeline
+Goal: turn ch00 into a real, playable chapter (real map + units + cutscene/dialogue + DefeatBoss objective), then repeat for Ch1+.
 
-## Current State — what works
-- `make CAMPAIGN=rime-of-the-frostmaiden` builds green; New Game → test map with all 8 cast in their **correct custom colours**, spread toward centre, keeping their custom sprite both **standing and moving**.
-- The map-sprite injection pipeline (`inject_map_sprites` + the SMS/palette overrides in `bmunit.c`/`bmudisp.c`) is **proven end-to-end** for the first time.
-- Committed: the 8 cast `<id>.png`, YAML base/donor notes, the off-by-one fix, spread formation, CREDITS, decisions, parked anim. The editor sandboxes (`*-drake`, `*-tiger`, `*-rat`, `*-action`, …) remain **uncommitted scratch** by design.
+**Map approach (decided — see `docs/decisions.md` → Art & Audio "Maps"):** ~8 of 9 MVP maps are snow, so bring in **one community winter tileset** (candidate **Snowy Bern/Peaks**, FEU) and author each layout in **Tiled**. Insertion is **decomp-native** — a GBAFE map = 4 pieces the decomp already wires in `data/const_data_chapter_maps.s` (tile graphics, `.gbapal` palette, `TileConfigurationN.bin.lz` config, `graphics/map/layout/*.bin.lz` layout), and the decomp already ships a Tiled pipeline (`.json/.mar/.bin` in `graphics/map/layout/`). Reuse that for layouts; use grit / the GBAFE Map Hacking Suite only to compile the tileset once. **No ROM hex / FEBuilder.** (We rejected palette-swapping a temperate tileset; ready-made snow town maps don't exist in the FE-Repo or FEU.)
 
-## Known issues / partial
-- The editor's `--extra` action/side sandboxes (32×32) are exploratory; the current engine has no slot for them (only the idle SMS + the synthesized glide MU).
-- The glide is a **static** pose (idle-only decision), so movement reads as a slide, not a walk. A real walk-cycle would need hand-authored `<id>_mu.png` sheets (the build already honors a committed one over the synthesized glide). Per-character feet alignment is tunable via `art.map_sprite.glide_nudge` (px, +down) if any unit ever sits high/low.
+**The chapter machinery is already understood** (no need to re-derive):
+- The Prologue has a **native slot** `src/events/prologue-event*.h`. Its objective list `EventListScr_Prologue_Misc` is already `DefeatBoss(EndingScene)` + `CauseGameOverIfLordDies` — i.e. ch00's win/lose for free. `struct ChapterEventGroup PrologueEvents` wires units → beginning/ending scenes → map.
+- **Dialogue** = `Text(msgId)` / `Text_BG(...)` macros pointing at `## MSG_<id>` in `texts/texts.txt`. Text injection is proven: `build_campaign.set_message_body` / `inject_names` already overwrite vanilla message slots (that's how cast names work).
+- The **test-hijack** `build_campaign.inject_test_chapter` already proves the plumbing (strip cutscenes, empty event lists, minimal beginning scene, skip boot attract / WM intro, redirect to a chapter). Real-chapter injection (#14) reuses these patterns on the Prologue slot instead of Ch1.
+- **Hlin = Warrior** (axe; "unarmored veteran, battleaxe/handaxe", book p.23). **Sephek = Myrmidon** (Ice Longsword; undead/cold-regen/fire-vuln are FLAVOR only). Give each an `npcs/` YAML with real class + identity (vanilla portraits for now). Map **Sephek → a boss-flagged enemy slot** (e.g. `CHARACTER_ONEILL`) so `DefeatBoss` just fires; **Hlin → a spare slot**, name injected like the cast.
+
+## Next Steps (priority) — execution order
+1. **#41 → start: source/register the winter tileset.** Pull Snowy Bern/Peaks, confirm F2U + credit (→ `CREDITS.md`), compile to the decomp's 4 pieces, confirm it renders.
+2. **#40: build the map/tileset insertion pipeline.** Task 1 first = **confirm the decomp's native map build** (`graphics/map/layout/` `.json/.mar/.bin`; how `const_data_chapter_maps.s` + `src/chapterdata.c` pick tileset/palette/config/layout per chapter). Then the `build_campaign` register-tileset + `.tmx`→layout + wire-chapter step; prove with one snow map load-test.
+3. **#20 Prologue content** (uses #14 injection on the Prologue slot): `npcs/hlin-trollbane.yaml` + `npcs/sephek-kaltro.yaml`; author `maps/ch00-prologue.tmx` (Bryn Shander street) on the tileset; beginning/ending cutscene + dialogue; turn on DefeatBoss + lose-if-Hlin-dies.
+4. Then Ch1+ (#21–#28) repeat. Battle-anim spike (#39) remains post-MVP.
+
+**Dialogue is collaborative** ([[feedback_collaborative_story_planning]]): draft the cold-open from the book (p.21–23) + the ch00 YAML narrative and get Nicolas's line-by-line OK; don't commit final script solo.
+
+## Sources (story) — how to read them
+- **DM notes** `References/DungeonMasterNotesIcewindDale.pdf` = **real text** → use `pdftotext` (NOT page-vision). Authority on what the party did; covers our Ch1–7 only.
+- **Published Frostmaiden book** `References/icewind-dale-rime-of-the-frostmaidenpdf_compress.pdf` = **image-only scan** → Read-tool PDF vision by page range; **PDF page = printed + 1**. Canonical detail. (See [[feedback_story_sources_of_truth]].)
+
+## Done / what works
+- `make CAMPAIGN=rime-of-the-frostmaiden` builds green; New Game → test map with all 8 cast in correct custom colours, custom sprite both standing and moving.
+- Map-sprite pipeline (idle SMS + glide MU + palette overrides) proven end-to-end (#38 done).
+- Recent commits pushed to main; drift clean; submodule pointer untouched. Editor scratch (`*-action`, `*-tiger`, …) left uncommitted by design.
 
 ## Blockers
-None hard. Battle anims (#39) need the net-new decomp-native inserter (still unbuilt) — post-MVP/M4.
-
-## Next Steps (priority)
-1. **Commit/clean the editor scratch** if desired, or leave as-is (it's gitignored-by-convention working state).
-2. (Queued) Real maps/events from YAML — Prologue (#20), Ch1 (#21) — and enemy *injection* (#14/#18 second half) using the #18-validated classes.
-3. **Battle-anim pipeline spike (#39):** build the decomp-native inserter, prove it on one reskinned FE-Repo anim (start with the parked Kitsune for meesmickle).
+None hard. #40/#41 are net-new but scoped. Battle anims (#39) need the unbuilt decomp-native anim inserter — post-MVP/M4.
 
 ## Build / Run Hygiene
 - **Build:** `make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba -j$(sysctl -n hw.ncpu)`. **Checks:** `make check` (drift) · `make verify` (ROM text). Never commit the `fireemblem8u` submodule pointer (decomp edits are build artifacts).
-- **mGBA:** `pkill -9 -i mgba; rm -f fireemblem8u/fireemblem8.sav; "/Applications/mGBA.app/Contents/MacOS/mGBA" "$PWD/fireemblem8u/fireemblem8.gba" &` then New Game. (Delete the `.sav` for a clean boot.)
-- **Editor (still available for tweaks):** `pkill -f map_sprite_editor.py; python3 tools/map_sprite_editor.py --campaign rime-of-the-frostmaiden [--extra uid=Donor[@WxH] ...] --port 8765 --no-browser` then open http://127.0.0.1:8765/.
-- **Debugging palettes:** rebuilds shift symbol addresses — re-query `arm-none-eabi-nm fireemblem8.elf | grep gCastMapPalette` before dumping ROM bytes. The rainbow-palette test (distinct hue per index) is the way to read any index/order issue off-screen.
+- **mGBA:** `pkill -9 -i mgba; rm -f fireemblem8u/fireemblem8.sav; "/Applications/mGBA.app/Contents/MacOS/mGBA" "$PWD/fireemblem8u/fireemblem8.gba" &` then New Game.
+- **Commit msgs with body:** write to a temp file + `git commit -F` (heredocs in the Bash tool mangle multi-line `-m`).
 
 ## Key Files
-- `campaigns/rime-of-the-frostmaiden/map_sprites/<id>.png` — the 8 finished cast idle sheets (committed). `cast_palette.png` = the shared 16-colour cast palette. `.base/` = gitignored snapshots + `.done` markers.
-- `tools/build_campaign.py` — `inject_map_sprites`, `_read_cast_palette` (**off-by-one rotate lives here**), `inject_test_chapter` + `TEST_SPAWN_POSITIONS`.
-- `tools/map_sprite_editor.py` / `tools/map_sprite_tool.py` — the editor + recolour/geometry tooling.
-- `fireemblem8u/src/bmudisp.c` (`GetUnitSpritePalette` override, `ApplyUnitSpritePalettes` cast-bank load) · `fireemblem8u/src/bmunit.c` (`GetUnitSMSId` override). Build-injected; restored+re-patched each build.
-- `docs/decisions.md` → Art & Audio (map-sprite mechanism, **palette off-by-one**, idle-only fold, geometry-token bases).
-- `CREDITS.md` — FE-Repo asset authors (per-donor). `campaigns/.../battle_anims/_parked/` — deferred #39 anims.
+- **Maps/chapters:** `data/const_data_chapter_maps.s` (map↔tileset↔palette↔config↔layout wiring) · `graphics/map/layout/` (`.json/.mar/.bin.lz`) · `src/chapterdata.c` (chapter→data) · `src/events/prologue-event{info,script,udefs}.h` (Prologue native slot) · `texts/texts.txt` (dialogue `## MSG_`).
+- **Injection tooling:** `tools/build_campaign.py` — `inject_test_chapter` (plumbing template), `set_message_body`/`inject_names` (text), `inject_map_sprites` + `_read_cast_palette` (palette +1 rotate). `tools/map_sprite_tool.py` (`synth_mu_sheet`, `validate_mu_sheet`).
+- **Issues:** #40 (map/tileset pipeline) · #41 (winter tileset) · #14 (decomp-native event injection) · #20 (Prologue map+events) · #21–#28 (Ch1–8).
+- **Docs:** `docs/decisions.md` → Art & Audio (maps decision, map-sprite mechanism, palette off-by-one) · `CREDITS.md` (asset authors).
 
 ## Memory
-- [[manchego-stars-project]] · [[manchego-stars-fe-repo]] · [[manchego-stars-use-decomp]] · [[feedback_custom_art_lever]] · [[feedback_show_before_committing_art]] · [[feedback_nicolas_not_an_artist]] · [[feedback_handoff_vs_memory]]
+- [[manchego-stars-project]] · [[manchego-stars-fe-repo]] · [[manchego-stars-use-decomp]] · [[feedback_story_sources_of_truth]] · [[feedback_collaborative_story_planning]] · [[feedback_show_before_committing_art]] · [[feedback_handoff_vs_memory]] · [[project_manchego_stars_shipwreck_encounter]]
 
 ## Standing Rules
-Custom art for the named cast; enemies vanilla (FE8 classes, #18-validated). Stock FE8 classes/weapons; combat = pure vanilla FE. Map sprites are **idle-only** (static glide synthesized for movement — no walk-cycle). Show art → wait for OK → then commit; editor scratch stays uncommitted until **Finish**ed. Auto-push to main once approved. Don't commit the `fireemblem8u` submodule pointer. Read SMS geometry + anim timing from the decomp, never guess. **`gCastMapPalette` is intentionally rotated +1 — don't "fix" it to match `cast_palette.png` order.**
+Custom art for the named cast; enemies vanilla (FE8 classes, #18-validated). Stock FE8 classes/weapons; combat = pure vanilla FE. **Maps = community winter tileset + Tiled, decomp-native (#40/#41); no ROM hex.** Ground FE/map/event mechanics in the decomp, never guess. Story from the DM notes (text) + book (scan), reconciled; dialogue co-written with Nicolas. Show art → wait for OK → then commit. Auto-push to main once approved. Don't commit the `fireemblem8u` submodule pointer. **`gCastMapPalette` is intentionally rotated +1 — don't "fix" it.**

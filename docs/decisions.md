@@ -414,6 +414,10 @@ _Decided: May 2026_
 CG-style illustrations (Braulo shackle break, Messie rising, Revel's End fade) are post-ship stretch goals.
 _Decided: May 2026_
 
+**Maps: one community winter tileset + Tiled layouts, inserted decomp-native**
+~8 of the 9 MVP maps are snow/ice, so we bring in **one shared winter tileset** (candidate: Snowy Bern / Snowy Peaks, FEU — snow ground, frozen buildings, walls, ice/water, forest, temple, mountains) and author each chapter's layout in **Tiled**. Insertion is **decomp-native**: a GBAFE map is 4 pieces the decomp already wires in `data/const_data_chapter_maps.s` — tile graphics, palette (`.gbapal`), tile config/terrain (`TileConfigurationN.bin.lz`), layout (`graphics/map/layout/*.bin.lz`) — and the decomp already ships a Tiled pipeline (`.json/.mar/.bin` in `graphics/map/layout/`). We reuse that for layouts and use grit / the GBAFE Map Hacking Suite only to **compile the tileset once**, feeding the decomp via `.incbin`. **No raw-ROM hex-patching / FEBuilder.** We did NOT palette-swap a temperate tileset (too error-prone) and did NOT find ready-made snow town maps (community has tilesets, not finished snow maps). Pipeline = #40; tileset asset = #41; both block the per-chapter map issues #20–#28. Credit tileset authors in `CREDITS.md`.
+_Decided: 2026-06-07_
+
 ---
 
 ## Class Mapping & Promotions
