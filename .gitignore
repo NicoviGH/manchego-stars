@@ -34,3 +34,9 @@ __pycache__/
 
 # map-sprite editor reset snapshots (derived from recolour)
 campaigns/*/map_sprites/.base/
+
+# local map-review scratch (copyrighted book scans; never commit)
+map-review/
+
+# convenience shortcut to the (copyrighted, uncommitted) source assets
+/references
