@@ -20,6 +20,7 @@ Milestones B+ (characters, chapter, dialogue codegen) hang off the same CLI.
 """
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -95,7 +96,9 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         'src/unit_icon_wait_data.c', 'src/unit_icon_move_data.c', 'src/mu.c',
                         'src/bmudisp.c',
                         'data/const_data_unit_icon_wait.s', 'data/const_data_unit_icon_move.s',
-                        'include/unit_icon_pointer.h']
+                        'include/unit_icon_pointer.h',
+                        'data/const_data_chapter_maps.s', 'data/data_8B363C.s',
+                        'src/data/chapter_settings.json']
 
 
 def restore_vanilla_sources():
@@ -1037,6 +1040,111 @@ def _inject_mu_sprites(mu, pointer_externs):
     _inject_mu_override_hook()
 
 
+# --- Map tileset + layout (#40/#41) ----------------------------------------------
+# A GBAFE map = 4 data pieces the decomp wires through gChapterDataAssetTable
+# (data/data_8B363C.s) and incbins in data/const_data_chapter_maps.s: tile GRAPHICS
+# (.4bpp.lz), PALETTE (.gbapal), tile CONFIG (.bin.lz = 8192B TSA + 1024B terrain),
+# and a per-map LAYOUT (.bin.lz). A chapter's struct (chapter_settings.json -> jsonproc
+# -> chapter_settings.h) holds u8 *indices* into the asset table for each piece.
+#
+# The Snowy Bern community tileset (FEU t/7204; see CREDITS.md) ships these pieces in
+# FEBuilder's format, which is byte-identical to the decomp's, so registering it is a
+# straight drop-in -- no grit/Map Hacking Suite recompile. We append its gfx/palette/
+# config plus a test LAYOUT to the asset table and repoint the TEST chapter at them, so
+# `make` + New Game load-tests the tileset in-engine (the same hijack inject_test_chapter
+# uses). Authoring real Tiled layouts (.tmx -> .bin) is the next step (#40 task 2 / #20).
+
+MAP_GFX_DIR = os.path.join(DECOMP, 'graphics', 'map')
+MAP_LAYOUT_DIR = os.path.join(MAP_GFX_DIR, 'layout')
+CONST_MAPS_S = os.path.join(DECOMP, 'data', 'const_data_chapter_maps.s')
+ASSET_TABLE_S = os.path.join(DECOMP, 'data', 'data_8B363C.s')
+CHAPTER_SETTINGS_JSON = os.path.join(DECOMP, 'src', 'data', 'chapter_settings.json')
+
+# Registered as asset-table entries (label -> decomp incbin source we copy in).
+WINTER_TILESET = 'snowy-bern'
+WINTER_ASSETS = [  # (asset-table label, decomp filename, incbin path)
+    ('ObjectTypeSnow',        'ObjectTypeSnow.4bpp',         'graphics/map/ObjectTypeSnow.4bpp.lz'),
+    ('MapPaletteSnow',        'MapPaletteSnow.gbapal',       'graphics/map/MapPaletteSnow.gbapal'),
+    ('TileConfigurationSnow', 'TileConfigurationSnow.bin',   'graphics/map/TileConfigurationSnow.bin.lz'),
+]
+WINTER_TEST_LAYOUT = ('ChTestSnowMap', 'ch-test-snowfield')  # (asset label, campaign source stem)
+
+
+def _append_asm_table_words(path, table_label, words):
+    """Append `.word <w>` lines after the last consecutive `.word` of an asm array
+    (`table_label:`). Returns the 0-based index the first appended word lands at."""
+    with open(path, encoding='utf-8') as f:
+        lines = f.read().splitlines(keepends=True)
+    start = next((i for i, ln in enumerate(lines) if ln.lstrip().startswith(table_label + ':')), None)
+    if start is None:
+        sys.exit('ERROR: table %r not found in %s' % (table_label, path))
+    last, count = None, 0
+    for i in range(start + 1, len(lines)):
+        s = lines[i].strip()
+        if s.startswith('.word'):
+            last, count = i, count + 1
+        elif s and not s.startswith('@'):
+            break
+    if last is None:
+        sys.exit('ERROR: no .word entries under %r' % table_label)
+    lines[last + 1:last + 1] = ['\t.word %s\n' % w for w in words]
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(''.join(lines))
+    return count  # next free index == prior entry count
+
+
+def inject_winter_tileset(campaign, verbose=True):
+    """Register the winter tileset (#41) + a flat test layout and repoint the test
+    chapter at them, so a build load-tests the tileset in-engine (#40)."""
+    maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
+    ts_dir = os.path.join(maps_dir, 'tilesets', WINTER_TILESET)
+
+    # 1. Copy the tileset pieces into the decomp (raw; the Makefile %.lz rule compresses
+    #    gfx + config, palette stays raw like vanilla MapPaletteN.gbapal).
+    for label, fname, _ in WINTER_ASSETS:
+        src = os.path.join(ts_dir, {'ObjectTypeSnow': '%s.4bpp' % WINTER_TILESET,
+                                    'MapPaletteSnow': '%s.gbapal' % WINTER_TILESET,
+                                    'TileConfigurationSnow': '%s.bin' % WINTER_TILESET}[label])
+        shutil.copyfile(src, os.path.join(MAP_GFX_DIR, fname))
+
+    # 2. Copy the test layout source (.mar + .json -> Makefile mar_to_map -> .bin -> .lz).
+    layout_label, stem = WINTER_TEST_LAYOUT
+    for ext in ('mar', 'json'):
+        shutil.copyfile(os.path.join(maps_dir, '%s.%s' % (stem, ext)),
+                        os.path.join(MAP_LAYOUT_DIR, '%s.%s' % (layout_label, ext)))
+
+    # 3. Define the asset symbols (incbin) at the end of const_data_chapter_maps.s.
+    incbin = ['\n/* Manchego Stars winter tileset + test layout (#40/#41) */']
+    for label, _, path in WINTER_ASSETS:
+        incbin += ['\t.align 2, 0', '\t.global %s' % label, '%s:' % label,
+                   '\t.incbin "%s"' % path]
+    incbin += ['\t.align 2, 0', '\t.global %s' % layout_label, '%s:' % layout_label,
+               '\t.incbin "graphics/map/layout/%s.bin.lz"' % layout_label]
+    with open(CONST_MAPS_S, 'a', encoding='utf-8') as f:
+        f.write('\n'.join(incbin) + '\n')
+
+    # 4. Append them to gChapterDataAssetTable; the first lands at the prior entry count.
+    labels = [a[0] for a in WINTER_ASSETS] + [layout_label]
+    base = _append_asm_table_words(ASSET_TABLE_S, 'gChapterDataAssetTable', labels)
+    idx = {label: base + i for i, label in enumerate(labels)}
+
+    # 5. Repoint the TEST chapter (the inject_test_chapter target) at the winter tileset
+    #    + flat layout. obj2/anim/changes off -> the flat field needs none.
+    with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
+        settings = json.load(f)
+    cmap = settings['chapters'][TEST_CHAPTER_INDEX]['map']
+    cmap.update({'obj1Id': idx['ObjectTypeSnow'], 'obj2Id': 0,
+                 'paletteId': idx['MapPaletteSnow'], 'tileConfigId': idx['TileConfigurationSnow'],
+                 'mainLayerId': idx[layout_label], 'objAnimId': 0, 'paletteAnimId': 0,
+                 'changeLayerId': 0})
+    with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
+        json.dump(settings, f, indent=2)
+
+    if verbose:
+        print('  %s tileset -> asset table [%d..%d]; test chapter (idx %d) repointed'
+              % (WINTER_TILESET, base, base + len(labels) - 1, TEST_CHAPTER_INDEX))
+
+
 def main():
     ap = argparse.ArgumentParser(description='Inject campaign content into the decomp build.')
     ap.add_argument('--campaign', default='rime-of-the-frostmaiden')
@@ -1059,6 +1167,8 @@ def main():
         inject_test_chapter(args.campaign)
         print('map sprites:')
         inject_map_sprites(args.campaign)
+        print('winter tileset:')
+        inject_winter_tileset(args.campaign)
     print('done. Run `make` to compile the ROM.')
 
 

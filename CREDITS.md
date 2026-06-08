@@ -26,6 +26,11 @@ Source: **[Klokinator/FE-Repo](https://github.com/Klokinator/FE-Repo)** (communi
 
 (Each FE-Repo asset folder ships a `CREDITS.txt` — copy its exact line here when we lock the asset.)
 
+### Map tilesets (used as-is; the shared snow tileset for the MVP)
+| Asset | Used for | Authors | Source | License |
+|---|---|---|---|---|
+| **Snowy Bern / Snowy Peaks** tileset (graphics + palette + tile config) | the campaign's shared winter tileset (Prologue town → Ch8 ice canyon) | **ZoramineFae** (assembled the insertable version), **Vennobennu** ("Snowy Peaks Revised" updates), **FEAW** (2015 original), **Sme** (original Discord source) | [FEUniverse t/7204](https://feuniverse.us/t/snowy-bern-snowy-peaks-tileset/7204) | F2U (community free-to-use with credit) |
+
 ## AI-generated art (disclose)
 - **PC/cast portraits** are AI-generated (Google **Gemini / "Nano Banana"**) from reference art, then hand-fitted and indexed into FE8 portraits via our bust pipeline (`tools/ref_to_bust.py`, `tools/portrait_tool.py`). To be disclosed as AI-assisted per community norms.
 
