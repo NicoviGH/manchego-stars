@@ -67,3 +67,11 @@ data_sources:
   srd: data/srd/srd-snapshot.json
   open5e: data/srd/open5e-snapshot.json
   homebrew: data/homebrew/
+
+# Chapter-title banner theme — option A "glacial blue" (picked 2026-06-09; see
+# docs/decisions.md "Chapter title cards are IMAGES"). The six colors replace
+# vanilla's letter greens 1:1 (lightest fill -> darkest outline); every OTHER
+# green in the title palettes (banner plaque leaf ramp, dim shimmer variant) is
+# hue-mapped into the same ice family by build_campaign.py:inject_title_theme.
+title_theme:
+  letter_colors: ["#F0FAFF", "#BEE4FA", "#8CC4EC", "#5494D0", "#285CA0", "#0C2048"]

@@ -331,6 +331,16 @@ scenarios.titlecard = function()
     end, 120)
     wait(90) -- let the banner/turn/funds panes finish drawing
     shot("chapter-status")
+    -- dump palette RAM (BG + OBJ banks): traces which palette row owns an
+    -- on-screen color (used to find what ApplyPalette call feeds the banner art)
+    for row = 0, 31 do
+        local bank = row < 16 and "BGPAL" or "OBJPAL"
+        local t = {}
+        for c = 0, 15 do
+            t[#t + 1] = string.format("%04X", ru16(0x05000000 + row * 32 + c * 2))
+        end
+        log(string.format("%s %02d: %s", bank, row % 16, table.concat(t, " ")))
+    end
     if ok then
         result("PASS", "Status screen open; title card screenshot taken")
     else
