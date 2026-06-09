@@ -363,6 +363,16 @@ constraint. Greying still works: `GetUnitDisplayedSpritePalette` short-circuits 
 greys + Rootis ice-blue, Sclorbo cyan, Pinky pink, RBG gold/purple/green), and the same `cast_palette.png` is the
 recolour target for every base sprite.
 
+**Guests reuse the STANDARD player palette — no cast bank (2026-06-09).** A custom sprite only needs the bespoke
+purple-bank palette if its colours fall outside FE8's stock palettes. Cold-open guests (`PROLOGUE_GUEST_SPRITES`,
+e.g. Hlin's female-Fighter sheet from the FE-Repo) are vendored already drawn to `unit_icon_pal_player.agbpal` (the
+blue player bank `0xC`), so they get the SMS + MU overrides like the cast but are **kept out of `gMapPaletteOverride`**
+— they render through the resident faction bank, no extra palette plumbing. This matters because bank `0xB` is the only
+free OBJ bank (the cast already claim it for their shared palette); a second distinct sprite palette has nowhere to go,
+so a standard-palette sheet is the only way to add a custom sprite alongside the cast. To check a vendored sheet:
+compare its 16-colour palette to `unit_icon_pal_player.agbpal` — exact match ⇒ guest path (no override); custom colours
+⇒ it must be re-indexed to `cast_palette.png` and join the cast bank.
+
 **Palette off-by-one (2026-06-06, found on the first in-game cast test).** The cast bank loads one slot high: a
 rainbow-palette test (each index a distinct hue) showed every sprite index `k` rendering cast colour `k-1`
 (snowman-white→yellow, meesmickle's red cape→cyan, etc.). `gMapSpriteOverride`/`gCastMapPalette` data and the 4bpp

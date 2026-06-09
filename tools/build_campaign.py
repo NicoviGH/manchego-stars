@@ -110,6 +110,19 @@ PROLOGUE_SEPHEK_SLOT = 'ONEILL'     # boss (recurring villain; escapes in the en
 PROLOGUE_LAYOUT = ('Ch00PrologueMap', 'ch00-prologue')  # (asset label, maps/ source stem)
 PROLOGUE_CHAPTER_YAML = 'ch00-prologue-a-dagger-of-ice.yaml'
 
+# Cold-open guests can also wear a custom overworld sprite via the same SMS/MU machinery as
+# the cast (inject_map_sprites) -- but their sheets are drawn to FE8's STANDARD player
+# map-sprite palette (unit_icon_pal_player), so they render through the normal blue faction
+# bank and take NO bespoke cast palette (unlike the cast's purple-bank override). Guests
+# have no pcs/npcs YAML, so each sprite's metadata lives here:
+#   (uid, slot, class_enum, donor_base)
+# donor_base names the vanilla class whose SMS frame geometry the IDLE sheet matches, read
+# from the decomp (Pirate = 16x16 axe infantry, matching Hlin's 3-frame 16x16 idle); like
+# braulo's base it is a geometry token only, decoupled from the unit's actual class.
+PROLOGUE_GUEST_SPRITES = [
+    ('hlin-trollbane', PROLOGUE_HLIN_SLOT, 'CLASS_FIGHTER', 'Pirate'),
+]
+
 # FE8's unit-name buffer; longer names overflow and garble the display.
 FE_NAME_MAX = 12
 
@@ -1039,7 +1052,18 @@ def inject_map_sprites(campaign, verbose=True):
     cast = classed_cast(campaign)
     idle = [(uid, slot, cls, sms) for (uid, slot, cls, sms) in cast
             if os.path.isfile(os.path.join(asset_dir, uid + '.png'))]
-    if not idle:
+
+    # Cold-open guests (PROLOGUE_GUEST_SPRITES) get the same SMS/MU overrides but render
+    # through FE8's standard player palette -- so they are kept out of custom_slots (no
+    # cast-palette override) below. Their SMS ids continue past the cast's so each guest's
+    # wait-table row lands at the index its id names (rows append after the cast's).
+    guest_idle, guest_bases = [], {}
+    for uid, slot, cls, base in PROLOGUE_GUEST_SPRITES:
+        if os.path.isfile(os.path.join(asset_dir, uid + '.png')):
+            guest_idle.append((uid, slot, cls, CUSTOM_SMS_BASE + len(idle) + len(guest_idle)))
+            guest_bases[uid] = base
+
+    if not idle and not guest_idle:
         if verbose:
             print('  (no map_sprites/*.png assets yet; cast keep their class sprites)')
         return
@@ -1065,9 +1089,19 @@ def inject_map_sprites(campaign, verbose=True):
                                        y_nudge=nudge, verbose=verbose)
         mu.append((uid, slot, cls, src))
 
+    # Guests must ship a committed hover/walk sheet (no synth path -- that machinery reads
+    # the cast palette / unit YAML, neither of which a standard-palette guest carries).
+    guest_mu = []
+    for uid, slot, cls, sms in guest_idle:
+        committed = os.path.join(asset_dir, uid + '_mu.png')
+        if not os.path.isfile(committed):
+            sys.exit('ERROR: guest sprite %s needs a committed map_sprites/%s_mu.png '
+                     '(hover/walk sheet; guests have no synth path)' % (uid, uid))
+        guest_mu.append((uid, slot, cls, committed))
+
     pointer_externs = []
-    _inject_idle_sprites(campaign, asset_dir, idle, pointer_externs)
-    _inject_mu_sprites(mu, pointer_externs)
+    _inject_idle_sprites(campaign, asset_dir, idle + guest_idle, pointer_externs, guest_bases)
+    _inject_mu_sprites(mu + guest_mu, pointer_externs)
     if pointer_externs:
         with open(UNIT_ICON_POINTER_H, 'a', encoding='utf-8') as f:
             f.write('\n/* Manchego Stars custom map sprites (#38) */\n'
@@ -1086,18 +1120,24 @@ def inject_map_sprites(campaign, verbose=True):
         _inject_cast_palette(_read_cast_palette(pal_png), custom_slots)
 
     if verbose:
-        for uid, slot, class_enum, sms in idle:
-            print('  %-10s -> idle SMS %d (%s)' % (uid, sms, slot))
-        for uid, slot, class_enum, src in mu:
+        guest_uids = {uid for uid, _, _, _ in guest_idle}
+        for uid, slot, class_enum, sms in idle + guest_idle:
+            tag = ' [guest, std palette]' if uid in guest_uids else ''
+            print('  %-14s -> idle SMS %d (%s)%s' % (uid, sms, slot, tag))
+        for uid, slot, class_enum, src in mu + guest_mu:
             kind = 'committed' if os.path.dirname(src) == asset_dir else 'glide'
-            print('  %-10s -> hover/walk MU sheet (%s, %s)' % (uid, slot, kind))
+            print('  %-14s -> hover/walk MU sheet (%s, %s)' % (uid, slot, kind))
         if custom_slots:
             print('  cast palette -> purple OBJ bank for: %s' % ', '.join(custom_slots))
 
 
-def _donor_base(campaign, uid):
+def _donor_base(campaign, uid, guest_bases=None):
     """The vanilla class/monster a cast member reskins (YAML art.map_sprite.base) -- the
-    key that lets us read the sprite's SMS size from the decomp instead of guessing it."""
+    key that lets us read the sprite's SMS size from the decomp instead of guessing it.
+    Cold-open guests have no pcs/npcs YAML, so their base comes from guest_bases
+    (PROLOGUE_GUEST_SPRITES) instead of a unit YAML."""
+    if guest_bases and uid in guest_bases:
+        return guest_bases[uid]
     unit = load_unit(campaign, uid)
     try:
         return unit['art']['map_sprite']['base']
@@ -1106,12 +1146,13 @@ def _donor_base(campaign, uid):
                  '(needed to read the SMS size from the decomp)' % (uid, uid))
 
 
-def _inject_idle_sprites(campaign, asset_dir, idle, pointer_externs):
+def _inject_idle_sprites(campaign, asset_dir, idle, pointer_externs, guest_bases=None):
     """Wait-table slot + GetUnitSMSId override for each idle (<id>.png) asset."""
     wait_rows, incbin, overrides = [], [], []
     for uid, slot, class_enum, sms in idle:
         # Frame size from the decomp wait table for the donor base -- not guessed.
-        _, dfw, dfh = map_sprite_tool.donor_sms_geometry(_donor_base(campaign, uid))
+        _, dfw, dfh = map_sprite_tool.donor_sms_geometry(
+            _donor_base(campaign, uid, guest_bases))
         macro, fw, fh, nframes = map_sprite_tool.sheet_info(
             os.path.join(asset_dir, uid + '.png'), (dfw, dfh))
         sym = 'unit_icon_wait_manchego_%s_sheet' % uid.replace('-', '_')

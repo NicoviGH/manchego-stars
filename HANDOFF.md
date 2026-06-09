@@ -3,7 +3,7 @@
 **Date:** 2026-06-09
 **Focus:** ch00 "A Dagger of Ice" as a playable vertical slice. The deploy-time crash is fixed;
 New Game boots straight onto the winter map and plays cleanly. Difficulty tuned to vanilla.
-Currently mid-task on Hlin's custom map sprite (asset vendored, **not yet wired**).
+Hlin's custom map sprite is now wired + Nicolas-approved; next = the lose-condition decision.
 
 **Live checklist = GitHub issue #20.** HANDOFF = current state + next steps; sub-steps -> TodoWrite.
 
@@ -16,30 +16,26 @@ Currently mid-task on Hlin's custom map sprite (asset vendored, **not yet wired*
 - ✅ Difficulty tuned to vanilla: **Hlin = unpromoted Fighter** (frail Eirika-analog lead),
   **Scramsax = Hero + Steel Sword** (dominant Seth-analog Jeigan), Sephek = Myrmidon L5 boss + 2
   Fighter guards. Diagnostics (`PROLOGUE_*` env flags) removed.
-- ⏳ **Hlin female-Fighter map sprite — vendored, NOT wired** (she currently shares the male
-  Fighter guards' sprite). Assets: `map_sprites/hlin-trollbane.png` (idle 16x48) +
-  `hlin-trollbane_mu.png` (walk 32x480) — Alusq, from FE-Repo, RAW FE8 palette/format. Inert
-  until wired (Hlin isn't in the cast `PORTRAIT_MAP` that `inject_map_sprites` processes).
+- ✅ **Hlin female-Fighter map sprite — WIRED + approved** (2026-06-09). Renders as the woman
+  Fighter, distinct from the male guards. Via the new `PROLOGUE_GUEST_SPRITES` guest path in
+  `inject_map_sprites`: custom SMS 115 (`gMapSpriteOverride[NATASHA]=115`) + MU override
+  (`gMuImgOverride[NATASHA]`), geometry token `Pirate` (16x16). KEY: her sheet is already drawn to
+  FE8's **standard player palette** (== `unit_icon_pal_player.agbpal`), so she's kept OUT of
+  `gMapPaletteOverride` and renders through the blue ally bank — no cast-palette work. The "re-index
+  vs own bank" dilemma was moot (bank 0xB is the only free OBJ bank, already taken by the cast).
+  Recorded in `docs/decisions.md` → "Guests reuse the STANDARD player palette" +
+  memory [[manchego_stars_guest_map_sprite_wiring]]. **Re-run this recipe for future guest sprites.**
 
 ## NEXT STEPS (priority order)
-1. **Wire Hlin's custom map sprite** (the in-progress task):
-   - `inject_map_sprites` only builds its idle/MU lists from `classed_cast()` (the 8 PORTRAIT_MAP
-     PCs). Hlin is a guest on `CHARACTER_NATASHA`. **Extend it to include the prologue guest(s)**:
-     add `(uid='hlin-trollbane', slot='NATASHA', class=FIGHTER)` so it emits a custom SMS (id 107+)
-     + a `gMapSpriteOverride` entry keyed to `CHARACTER_NATASHA`, plus the MU (walk) override.
-   - **Palette:** cast sprites share `cast_palette.png` in a purple OBJ bank (`gMapPaletteOverride`,
-     `_inject_cast_palette`). The Alusq sheet has its own palette → either re-index it to the cast
-     palette OR give Hlin her own bank. Inspect `map_sprite_tool` + `_read_cast_palette`.
-   - Build → mGBA New Game → confirm Hlin renders as the woman Fighter, distinct from the guards.
-2. **Lose condition** (decision needed): just Hlin = game over (vanilla lord-only), or Scramsax too?
+1. **Lose condition** (decision needed): just Hlin = game over (vanilla lord-only), or Scramsax too?
    ch00 YAML marks both `required: true`; only Hlin's `EVFLAG_GAMEOVER` quote is wired today.
-3. **In-engine win/lose verification** (playtest w/ Nicolas): DefeatBoss fires on Sephek? Hlin
+2. **In-engine win/lose verification** (playtest w/ Nicolas): DefeatBoss fires on Sephek? Hlin
    death = game over? Guard AI sane? (Crash is gone; gameplay untested.)
-4. **Title card** "A Dagger of Ice".
-5. **Cutscenes + dialogue** — opening (cold open / corner Sephek), mid-fight frost line, ending
+3. **Title card** "A Dagger of Ice".
+4. **Cutscenes + dialogue** — opening (cold open / corner Sephek), mid-fight frost line, ending
    (Sephek escapes → hard cut to The Northlook). Co-written w/ Nicolas ([[feedback_collaborative_story_planning]]),
    not committed solo. `.ea` + MSG lines.
-6. **Portraits** for Hlin / Scramsax / Sephek — placeholder or vendored from FE-Repo (#19).
+5. **Portraits** for Hlin / Scramsax / Sephek — placeholder or vendored from FE-Repo (#19).
 
 ## Asset access (IMPORTANT — established pattern)
 Pull a specific file from the **Klokinator FE-Repo** by **vendoring** it (same as the snowy-bern
