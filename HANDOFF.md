@@ -4,8 +4,9 @@
 **Session focus:** (a) Built the chapter title-card pipeline — FE8 titles are 4bpp IMAGES,
 so `tools/gen_chapter_title.py` recomposes them from vanilla glyphs — and landed the real
 "Prologue: A Dagger of Ice" card (commit 0f2b1ff, pushed); (b) added a `titlecard` playtest
-scenario that machine-verifies it via the Status screen; (c) Nicolas asked for an Icewind
-Dale-themed look — three recolor mockups are in `map-review/` awaiting his pick.
+scenario that machine-verifies it via the Status screen; (c) Nicolas picked GLACIAL BLUE
+from 4 in-game mockups — landed as a campaign-driven palette recolor (letters + plaque);
+(d) opening montage filed as #43, the next vertical slice after the Prologue.
 
 **Live checklist = GitHub issue #20.** HANDOFF = current state + next steps; sub-steps -> TodoWrite.
 
@@ -50,7 +51,7 @@ Dale-themed look — three recolor mockups are in `map-review/` awaiting his pic
 - (Carried) March via `gBmMapMovement` reachable tiles, not naive closest-tile.
 
 ## Blockers
-- Icy style pick = Nicolas's call (art). Everything else can proceed.
+- None. (Dialogue/cutscene WRITING is collaborative with Nicolas, but prep can proceed.)
 
 ## NEXT STEPS (priority order)
 1. **Cutscenes + dialogue** — opening (cold open / corner Sephek), mid-fight frost line,
