@@ -1,9 +1,9 @@
-# Handoff: **Refining the Prologue (#20) — crash fixed, now building out the vertical slice.**
+# Handoff: **Refining the Prologue (#20) — crash + sprite done, now win/lose logic.**
 
 **Date:** 2026-06-09
-**Focus:** ch00 "A Dagger of Ice" as a playable vertical slice. The deploy-time crash is fixed;
-New Game boots straight onto the winter map and plays cleanly. Difficulty tuned to vanilla.
-Hlin's custom map sprite is now wired + Nicolas-approved; next = the lose-condition decision.
+**Focus:** ch00 "A Dagger of Ice" as a playable vertical slice. Crash fixed, map plays clean,
+difficulty vanilla-tuned, Hlin's custom sprite wired + approved. **Active task = the lose-condition
+decision + wiring** (step 1 below), then in-engine win/lose verification with Nicolas.
 
 **Live checklist = GitHub issue #20.** HANDOFF = current state + next steps; sub-steps -> TodoWrite.
 
@@ -16,19 +16,19 @@ Hlin's custom map sprite is now wired + Nicolas-approved; next = the lose-condit
 - ✅ Difficulty tuned to vanilla: **Hlin = unpromoted Fighter** (frail Eirika-analog lead),
   **Scramsax = Hero + Steel Sword** (dominant Seth-analog Jeigan), Sephek = Myrmidon L5 boss + 2
   Fighter guards. Diagnostics (`PROLOGUE_*` env flags) removed.
-- ✅ **Hlin female-Fighter map sprite — WIRED + approved** (2026-06-09). Renders as the woman
-  Fighter, distinct from the male guards. Via the new `PROLOGUE_GUEST_SPRITES` guest path in
-  `inject_map_sprites`: custom SMS 115 (`gMapSpriteOverride[NATASHA]=115`) + MU override
-  (`gMuImgOverride[NATASHA]`), geometry token `Pirate` (16x16). KEY: her sheet is already drawn to
-  FE8's **standard player palette** (== `unit_icon_pal_player.agbpal`), so she's kept OUT of
-  `gMapPaletteOverride` and renders through the blue ally bank — no cast-palette work. The "re-index
-  vs own bank" dilemma was moot (bank 0xB is the only free OBJ bank, already taken by the cast).
-  Recorded in `docs/decisions.md` → "Guests reuse the STANDARD player palette" +
-  memory [[manchego_stars_guest_map_sprite_wiring]]. **Re-run this recipe for future guest sprites.**
+- ✅ **Hlin female-Fighter map sprite — WIRED + approved** (2026-06-09, commit 2b0084f). Renders as
+  the woman Fighter, distinct from the male guards, via a new `PROLOGUE_GUEST_SPRITES` guest path in
+  `inject_map_sprites` (custom SMS + MU override keyed to `CHARACTER_NATASHA`). Her sheet uses FE8's
+  standard player palette, so she's kept out of the cast-palette override — no palette work needed.
+  **Full repeatable recipe** (the next guest sprite will reuse it): `docs/decisions.md` → "Guests
+  reuse the STANDARD player palette" + memory [[manchego_stars_guest_map_sprite_wiring]].
 
 ## NEXT STEPS (priority order)
-1. **Lose condition** (decision needed): just Hlin = game over (vanilla lord-only), or Scramsax too?
-   ch00 YAML marks both `required: true`; only Hlin's `EVFLAG_GAMEOVER` quote is wired today.
+1. **Lose condition — DECIDE w/ Nicolas, then wire** (active task). Question: just Hlin = game over
+   (vanilla lord-only feel), or Hlin AND Scramsax (both `required: true` in ch00 YAML)? Today only
+   Hlin's death→game-over quote is wired. Wiring lives in `inject_prologue` (the Ch1 event group:
+   `EventListScr_Ch1_Character` / the begin-scene script) — add the death/game-over event(s) for the
+   chosen unit(s). Vanilla FE8 reference: a `CauseGameOverIfLordDies`-style check on unit death.
 2. **In-engine win/lose verification** (playtest w/ Nicolas): DefeatBoss fires on Sephek? Hlin
    death = game over? Guard AI sane? (Crash is gone; gameplay untested.)
 3. **Title card** "A Dagger of Ice".
@@ -67,7 +67,7 @@ Credit the `{Artist}` from the filename in the asset dir's README.
 - `campaigns/rime-of-the-frostmaiden/map_sprites/hlin-trollbane*.png` — the vendored sprite.
 
 ## Memory
-- [[manchego-stars-project]] · [[manchego_stars_non_lord_cursor_crash]] · [[feedback_vendor_community_assets]] · [[feedback_chapter_vertical_slice]] · [[feedback_collaborative_story_planning]] · [[reference_fe_repo]]
+- [[manchego-stars-project]] · [[manchego_stars_non_lord_cursor_crash]] · [[manchego_stars_guest_map_sprite_wiring]] · [[feedback_vendor_community_assets]] · [[feedback_chapter_vertical_slice]] · [[feedback_collaborative_story_planning]] · [[reference_fe_repo]]
 
 ## Standing rules
 Combat = pure vanilla FE. Maps/sprites = vendor + reskin community/vanilla assets (not submodule).
