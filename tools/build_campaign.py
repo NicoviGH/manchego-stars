@@ -215,14 +215,36 @@ PORTRAIT_MAP = {
     'brie':       'Colm',
 }
 
+# Prologue cold-open guests ride vanilla character slots outside PORTRAIT_MAP
+# (PROLOGUE_*_SLOT below); these are the portrait files those slots display.
+# Guest busts are OPTIONAL: a missing PNG keeps the vanilla face, so this wiring
+# works before (and independent of) the art landing.
+GUEST_PORTRAIT_MAP = {
+    'hlin-trollbane': 'Natasha',
+    'scramsax':       'Kyle',
+    'sephek-kaltro':  'O_Neill',
+}
+
+
+def _bust_dir(campaign):
+    return os.path.join(REPO, 'campaigns', campaign, 'portraits')
+
+
+def dressed_guest_slots(campaign):
+    """Portrait slots of guests whose bust PNG exists (and so get dressed)."""
+    return [slot for unit, slot in GUEST_PORTRAIT_MAP.items()
+            if os.path.isfile(os.path.join(_bust_dir(campaign), unit + '.png'))]
+
 
 def inject_portraits(campaign, verbose=True):
     """Overwrite each mapped vanilla portrait slot with our authored bust."""
-    bust_dir = os.path.join(REPO, 'campaigns', campaign, 'portraits')
+    bust_dir = _bust_dir(campaign)
     if not os.path.isdir(PORTRAIT_DIR):
         sys.exit('ERROR: decomp portrait dir not found: %s' % PORTRAIT_DIR)
 
-    for unit, vanilla in PORTRAIT_MAP.items():
+    guests = {u: s for u, s in GUEST_PORTRAIT_MAP.items()
+              if s in dressed_guest_slots(campaign)}
+    for unit, vanilla in list(PORTRAIT_MAP.items()) + list(guests.items()):
         bust_path = os.path.join(bust_dir, unit + '.png')
         if not os.path.isfile(bust_path):
             sys.exit('ERROR: missing bust for %s: %s' % (unit, bust_path))
@@ -251,11 +273,11 @@ def inject_portraits(campaign, verbose=True):
             print('  %-10s -> portrait_%s (tileset/mouth/chibi/palette)' % (unit, vanilla))
 
 
-def patch_portrait_geometry(verbose=True):
+def patch_portrait_geometry(campaign, verbose=True):
     """Normalize the mouth/eye window coords of every dressed portrait slot to our
     bust framing, so the engine's mouth-window overwrite lands on our baked mouth
     (not one tile off, which doubles it). See PORTRAIT_GEOMETRY."""
-    slots = sorted(set(PORTRAIT_MAP.values()))
+    slots = sorted(set(PORTRAIT_MAP.values()) | set(dressed_guest_slots(campaign)))
     with open(PORTRAIT_DATA_C, encoding='utf-8') as f:
         lines = f.read().split('\n')
     # FaceData tail: `, 0, xMouth, yMouth, xEyes, yEyes, FACE_BLINK_*`. The `, 0,`
@@ -1800,7 +1822,7 @@ def main():
         print('characters:')
         patch_character_data(args.campaign)
         print('portrait geometry:')
-        patch_portrait_geometry()
+        patch_portrait_geometry(args.campaign)
         print('map sprites:')
         inject_map_sprites(args.campaign)
         print('winter tileset:')
