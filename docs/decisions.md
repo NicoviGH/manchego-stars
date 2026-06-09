@@ -19,9 +19,9 @@ _Decided: May 2026_
 All campaign-specific data (character names, chapter events, unit stats, maps, dialogue) lives in `campaigns/rime-of-the-frostmaiden/` and is injected at build time. Engine C code must be campaign-agnostic. A second campaign requires only a new `campaigns/` folder.
 _Decided: May 2026_
 
-**Tooling language: Python (build) + Ruby (index gen). NOT TypeScript.**
-The original plan named a Node/TypeScript toolchain (`build-campaign.ts`, `build-events.ts`, `pull-srd.ts`, `map-class.ts`). Reality: the injector is `tools/build_campaign.py`, with `tools/portrait_tool.py`, `tools/ref_to_bust.py`, `tools/verify_text.py`, and the chapter index generator `tools/gen-chapter-index.rb`. No Node, no `.ts`. The build interpreter is Homebrew `python@3.12` (numpy/pillow/pyyaml; see `tools/setup-toolchain.sh`).
-_Decided: 2026-06-04 (supersedes the PRD's TS toolchain plan)_
+**Tooling language: Python everywhere. NOT TypeScript.**
+The original plan named a Node/TypeScript toolchain (`build-campaign.ts`, `build-events.ts`, `pull-srd.ts`, `map-class.ts`). Reality: the injector is `tools/build_campaign.py`, with `tools/portrait_tool.py`, `tools/ref_to_bust.py`, `tools/verify_text.py`, and the index generators `tools/gen_chapter_index.py` / `tools/gen_class_index.py`. No Node, no `.ts`, and (since 2026-06-09) no Ruby — the index generators were ported to Python so `tools/check.py` can import them for the freshness gate and CI needs one runtime. The build interpreter is Homebrew `python@3.12` (numpy/pillow/pyyaml; see `tools/setup-toolchain.sh`).
+_Decided: 2026-06-04 (supersedes the PRD's TS toolchain plan); 2026-06-09 (Ruby index generators ported to Python)_
 
 **Content injection is decomp-native — edit the decomp's own source, NOT Event Assembler.**
 `build_campaign.py` writes our content directly into the `fireemblem8u` working tree at build time — `graphics/portrait/` (busts), `texts/texts.txt` (names/dialogue), `src/data_characters.c` (class/stats), and `src/events/<ch>-event*.h` (chapters) — then `make` compiles it. No Event Assembler / ColorzCore / `.ea` buildfiles. This is the "make a hack directly from the fireemblem8u decomp" path (FEU thread 17428). Generated files are reproducible artifacts: restore vanilla with `git -C fireemblem8u checkout <path>`.
@@ -76,8 +76,9 @@ settled model:
   is authoritative for every per-chapter fact (objective, recruits, enemies, map,
   rewards, `unlocks_chapter`). Edit the YAML; nothing else.
 - **Tier 2 — Generated index.** `docs/CHAPTERS.md` is **generated** from the YAML by
-  `tools/gen-chapter-index.rb` (ruby, stdlib only). It is never hand-edited;
-  regenerate after any chapter change. "The data is the doc."
+  `tools/gen_chapter_index.py`. It is never hand-edited; regenerate after any chapter
+  change — `tools/check.py` fails (pre-commit + CI) if the committed index is stale.
+  "The data is the doc."
 - **Tier 3 — Durable "why" docs, hand-written.** `decisions.md` (settled decisions),
   `roadmap.md` (provisional post-MVP Act II–V scaffold — chapters with no YAML yet),
   `fe8-pacing-reference.md` (FE8-only cadence/reward rules), `PRD.md`
@@ -93,7 +94,7 @@ FE8 pacing emoji for `CHAPTERS.md`: 🟥 big-battle/boss · 🟦 breather/intro/
 🟨 sidequest/gimmick · 🎬 scripted set-piece. Current tokens: `tutorial`,
 `full_party_intro`, `breather_defend` (🟦); `gimmick_multilevel`, `monster_debut`
 (🟨); `first_boss`, `big_battle_gray` (🟥); `marquee_setpiece`, `scripted_defeat`
-(🎬). Add a new token to `CADENCE` in `tools/gen-chapter-index.rb` when a new pacing
+(🎬). Add a new token to `CADENCE` in `tools/gen_chapter_index.py` when a new pacing
 beat appears. The cadence *rules* (why this rhythm) live in `fe8-pacing-reference.md`.
 _Decided: 2026-05-31_
 

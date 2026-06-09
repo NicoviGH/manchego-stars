@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE — do not edit by hand.
      Source:     campaigns/rime-of-the-frostmaiden/{pcs,npcs}/*.yaml
-     Regenerate: ruby tools/gen-class-index.rb
+     Regenerate: python3 tools/gen_class_index.py
      Class/promotion facts live in the unit YAML; this table is derived from it. -->
 
 Every unit is a **stock vanilla FE8 class** (bases/growths/caps verbatim from

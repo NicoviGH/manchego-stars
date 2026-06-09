@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE — do not edit by hand.
      Source:     campaigns/rime-of-the-frostmaiden/chapters/ch*.yaml
-     Regenerate: ruby tools/gen-chapter-index.rb
+     Regenerate: python3 tools/gen_chapter_index.py
      Per-chapter facts live in the YAML; this table is derived from it. -->
 
 The per-chapter source of truth is the YAML in

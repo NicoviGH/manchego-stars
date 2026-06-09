@@ -36,6 +36,7 @@ DEAD_CONCEPTS = [
     r'build-campaign\.ts', r'build-events\.ts', r'pull-srd', r'map-class\.ts',
     r'srd-snapshot', r'open5e-snapshot', r'CLASS_WEAPON', r'WPN_EXP_E',
     r'zeroed.{0,3}growth', r'flat-?E rank', r'pure[- ]class growth',
+    r'gen-chapter-index\.rb', r'gen-class-index\.rb',  # ported to Python 2026-06-09
 ]
 
 
@@ -82,6 +83,23 @@ def check_no_dead_concepts(fail):
                             % (m.group(0), os.path.relpath(d, REPO), i))
 
 
+def check_generated_indexes_fresh(fail):
+    """docs/CHAPTERS.md + docs/CLASSES.md are GENERATED from campaign YAML; a
+    hand edit or a YAML change without a regen is silent drift. Regenerate in
+    memory and diff against the committed file."""
+    sys.path.insert(0, os.path.join(REPO, 'tools'))
+    import gen_chapter_index
+    import gen_class_index
+    for mod, rel in ((gen_chapter_index, 'docs/CHAPTERS.md'),
+                     (gen_class_index, 'docs/CLASSES.md')):
+        path = os.path.join(REPO, rel)
+        want = mod.generate()[0]
+        have = open(path, encoding='utf-8').read() if os.path.isfile(path) else None
+        if have != want:
+            fail.append('%s is stale vs the YAML -- regenerate: python3 tools/%s.py'
+                        % (rel, mod.__name__))
+
+
 def check_engine_guards_present(fail):
     """Engine-hardening guards must stay wired into the build.
 
@@ -106,7 +124,7 @@ def main():
     fail = []
     for check in (check_python_compiles, check_yaml_parses,
                   check_tool_refs_exist, check_no_dead_concepts,
-                  check_engine_guards_present):
+                  check_generated_indexes_fresh, check_engine_guards_present):
         check(fail)
     if fail:
         print('DRIFT (%d):' % len(fail))

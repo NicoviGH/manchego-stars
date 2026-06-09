@@ -61,3 +61,9 @@ jobs:
 
       - name: make green (inject campaign + build ROM)
         run: make CAMPAIGN=rime-of-the-frostmaiden
+
+      # Text is compiled from source, so the mock base ROM doesn't affect it. This is
+      # the regression gate for the text-table corruption class (terminator parity,
+      # runaway decodes) that has bitten twice before.
+      - name: Verify ROM text decodes cleanly
+        run: python3 tools/verify_text.py
