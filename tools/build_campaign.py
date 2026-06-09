@@ -1332,10 +1332,11 @@ def inject_prologue(campaign, verbose=True):
     # roster levels/items below + the guest stat patch in step 4b.)
     hlin_slot, scram_slot, sephek_slot = (
         PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT)
-    # Hlin = frail must-survive lead -> UNPROMOTED axe (Brigand; reads frail like vanilla Eirika,
-    # and its sprite differs from the Fighter guards). Scramsax = dominant promoted "Jeigan" (Hero,
-    # the Seth analog) -> a real Steel Sword so he can carry the map. (cf. ch00 YAML inventories.)
-    hlin_class, scram_class = 'CLASS_BRIGAND', 'CLASS_HERO'
+    # Hlin = frail must-survive lead -> UNPROMOTED Fighter (frail like vanilla Eirika next to a
+    # promoted unit; a custom FEMALE Fighter map sprite distinguishes her from the male Fighter
+    # guards -- see inject_map_sprites). Scramsax = dominant promoted "Jeigan" (Hero, the Seth
+    # analog) -> a real Steel Sword so he can carry the map. (cf. ch00 YAML inventories.)
+    hlin_class, scram_class = 'CLASS_FIGHTER', 'CLASS_HERO'
     hlin_items = 'ITEM_AXE_HANDAXE, ITEM_VULNERARY'
     scram_items = 'ITEM_SWORD_STEEL, ITEM_AXE_HANDAXE'
 
