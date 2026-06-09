@@ -65,6 +65,8 @@ BMIO_C = os.path.join(DECOMP, 'src', 'bmio.c')
 # untouched. Classes top out at SMSId 106 (verified), so 107+ is free in both the
 # wait array (extended here) and the move table (dead tail; no class reaches it).
 BMUNIT_C = os.path.join(DECOMP, 'src', 'bmunit.c')
+BMMAP_C = os.path.join(DECOMP, 'src', 'bmmap.c')
+BMCAMADJUST_C = os.path.join(DECOMP, 'src', 'bmcamadjust.c')
 UNIT_ICON_WAIT_C = os.path.join(DECOMP, 'src', 'unit_icon_wait_data.c')
 UNIT_ICON_WAIT_S = os.path.join(DECOMP, 'data', 'const_data_unit_icon_wait.s')
 UNIT_ICON_POINTER_H = os.path.join(DECOMP, 'include', 'unit_icon_pointer.h')
@@ -83,6 +85,31 @@ BMUDISP_C = os.path.join(DECOMP, 'src', 'bmudisp.c')
 # spawn is one "New Game" away. CHAPTER_L_1 = 0x01 (constants/chapters.h).
 TEST_CHAPTER_INDEX = 1
 
+# --- Prologue chapter (#20) -------------------------------------------------------
+# The real New Game target: our designed ch00 ("A Dagger of Ice") on a winter map --
+# Scramsax (strong Jagen) + frail Hlin vs Sephek (boss, escapes) + 2 guards. Replaces
+# the test-chapter spawn as main()'s in-engine entry. Design SoT:
+# campaigns/.../chapters/ch00-prologue-a-dagger-of-ice.yaml.
+PROLOGUE_UDEFS_H = os.path.join(DECOMP, 'src', 'events', 'prologue-eventudefs.h')
+PROLOGUE_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'prologue-eventinfo.h')
+PROLOGUE_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'prologue-eventscript.h')
+BATTLEQUOTES_C = os.path.join(DECOMP, 'src', 'data_battlequotes.c')
+PROLOGUE_CHAPTER_INDEX = 0   # CHAPTER_L_PROLOGUE -- the vanilla slot we configure then clone
+PROLOGUE_HOST_INDEX = 1      # CHAPTER_L_1 -- normal chapter slot we actually load (New Game
+                             # redirects 0 -> 1). The prologue slot has special engine paths
+                             # that break our stripped chapter; a normal slot does not.
+# Cold-open guests ride vanilla character slots that are NOT in PORTRAIT_MAP, so their
+# names/portraits are free placeholders until custom art (see [[feedback_nicolas_not_an_artist]]).
+# Sephek rides the vanilla prologue boss slot (ONEILL) so he inherits its CA_BOSS
+# attribute -> DefeatBoss fires on his death with no extra flagging. Guards stay
+# generics (0x80/0x82) like vanilla. These are display-name/lord-quote slots only;
+# class/level/stats come from the UnitDefinition below, not the slot's character data.
+PROLOGUE_HLIN_SLOT = 'NATASHA'      # frail must-survive lead (our "lord")
+PROLOGUE_SCRAMSAX_SLOT = 'KYLE'     # strong veteran (our "Jeigan")
+PROLOGUE_SEPHEK_SLOT = 'ONEILL'     # boss (recurring villain; escapes in the ending)
+PROLOGUE_LAYOUT = ('Ch00PrologueMap', 'ch00-prologue')  # (asset label, maps/ source stem)
+PROLOGUE_CHAPTER_YAML = 'ch00-prologue-a-dagger-of-ice.yaml'
+
 # FE8's unit-name buffer; longer names overflow and garble the display.
 FE_NAME_MAX = 12
 
@@ -92,13 +119,16 @@ FE_NAME_MAX = 12
 PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrait_data.c',
                         'src/events/ch1-eventudefs.h', 'src/events/ch1-eventinfo.h',
                         'src/events/ch1-eventscript.h', 'src/events/prologue-wm.h',
-                        'src/gamecontrol.c', 'src/bmio.c', 'src/bmunit.c',
+                        'src/gamecontrol.c', 'src/bmio.c', 'src/bmunit.c', 'src/bmmap.c',
+                        'src/bmcamadjust.c',
                         'src/unit_icon_wait_data.c', 'src/unit_icon_move_data.c', 'src/mu.c',
                         'src/bmudisp.c',
                         'data/const_data_unit_icon_wait.s', 'data/const_data_unit_icon_move.s',
                         'include/unit_icon_pointer.h',
                         'data/const_data_chapter_maps.s', 'data/data_8B363C.s',
-                        'src/data/chapter_settings.json']
+                        'src/data/chapter_settings.json',
+                        'src/events/prologue-eventudefs.h', 'src/events/prologue-eventinfo.h',
+                        'src/events/prologue-eventscript.h', 'src/data_battlequotes.c']
 
 
 def restore_vanilla_sources():
@@ -521,6 +551,61 @@ def _replace_brace_block(text, marker, new_body, path):
     return text[:s] + new_body + text[e:]
 
 
+def _cut_boot_intro():
+    """Cut the pre-map boot sequences so a fresh boot lands on the title and New Game
+    drops straight onto the map. Three cuts, each at the source that actually plays the
+    thing (a previous single-hook attempt at GameControl_RememberChapterId was reset
+    before the world-map wrapper, so the Magvel tour still ran):
+      (a) gamecontrol.c: drop the boot OP anim (ProcScr_OpAnim, the character-flash +
+          attract reel) so boot falls through to the title;
+      (b) gamecontrol.c: skip the post-New-Game intro monologue (the "long ago..." lore
+          crawl) -- GameCtrlStartIntroMonologue runs it only while chapterIndex == 0;
+          force it to bail;
+      (c) prologue-wm.h: gut the prologue's world-map intro (EventScrWM_Prologue_
+          Beginning runs WM_TEXT(0x8DB) -- the "continent of Magvel" nation tour). The WM
+          wrapper runs BEFORE the map load, so replace its body with a no-op."""
+    with open(GAMECONTROL_C, encoding='utf-8') as f:
+        gc = f.read()
+    gc, n1 = re.subn(r'[ \t]*PROC_START_CHILD_BLOCKING\(ProcScr_OpAnim\),\n',
+                     '', gc, count=1)
+    if n1 == 0:
+        sys.exit('ERROR: ProcScr_OpAnim start not found in %s' % GAMECONTROL_C)
+    gc, n2 = re.subn(r'\n(\s*)StartIntroMonologue\(proc\);',
+                     r'\n\1return; /* manchego: skip intro monologue */',
+                     gc, count=1)
+    if n2 == 0:
+        sys.exit('ERROR: StartIntroMonologue call not found in %s' % GAMECONTROL_C)
+    with open(GAMECONTROL_C, 'w', encoding='utf-8') as f:
+        f.write(gc)
+
+    with open(PROLOGUE_WM_H, encoding='utf-8') as f:
+        wm = f.read()
+    wm = _replace_brace_block(
+        wm, 'EventScrWM_Prologue_Beginning[] =',
+        '{\n    EVBIT_MODIFY(0x1)\n    SKIPWN\n    ENDA\n}', PROLOGUE_WM_H)
+    with open(PROLOGUE_WM_H, 'w', encoding='utf-8') as f:
+        f.write(wm)
+
+
+def _redirect_new_game(chapter_index):
+    """Redirect the prologue slot -> `chapter_index` at the authoritative map-load point,
+    StartBattleMap (feeds gPlaySt.chapterIndex into InitChapterMap/fog/weather): if
+    (chapterIndex == 0) chapterIndex = N. chapterIndex == 0 there can only be a fresh
+    game's prologue (skirmishes use PLAY_FLAGs; later chapters nonzero). Only the test
+    sandbox needs this; the real prologue IS chapter 0, so it doesn't redirect."""
+    with open(BMIO_C, encoding='utf-8') as f:
+        bmio = f.read()
+    bmio, n = re.subn(
+        r'(void StartBattleMap\(struct GameCtrlProc\* gameCtrl\) \{\n    int i;\n)',
+        r'\1\n    if (gPlaySt.chapterIndex == 0) /* test-chapter spawn: prologue -> Ch%d */\n'
+        r'        gPlaySt.chapterIndex = %d;\n' % (chapter_index, chapter_index),
+        bmio, count=1)
+    if n == 0:
+        sys.exit('ERROR: StartBattleMap signature not found in %s' % BMIO_C)
+    with open(BMIO_C, 'w', encoding='utf-8') as f:
+        f.write(bmio)
+
+
 def inject_test_chapter(campaign, verbose=True):
     """Rewrite Ch1's ally roster to our classed cast and disable Ch1 tutorials."""
     # Build the cast roster in PORTRAIT_MAP order, skipping name-only units (no class).
@@ -595,55 +680,10 @@ def inject_test_chapter(campaign, verbose=True):
         f.write(script)
 
     # Dev loop: cut every pre-map sequence so a fresh boot lands on the title and New
-    # Game drops straight onto the map. Four cuts, each at the source that actually
-    # plays the thing (a previous single-hook attempt at GameControl_RememberChapterId
-    # was reset before the world-map wrapper, so the Magvel tour still ran):
-    #   (a) gamecontrol.c: drop the boot OP anim (ProcScr_OpAnim, the character-flash +
-    #       attract reel) so boot falls through to the title;
-    #   (b) gamecontrol.c: skip the post-New-Game intro monologue (the "long ago..."
-    #       lore crawl) -- GameCtrlStartIntroMonologue runs it only while chapterIndex
-    #       == 0; force it to bail;
-    #   (c) bmio.c: redirect prologue -> Ch1 at the authoritative map-load point,
-    #       StartBattleMap (feeds gPlaySt.chapterIndex into InitChapterMap/fog/weather):
-    #       if (chapterIndex == 0) chapterIndex = 1. chapterIndex == 0 there can only be
-    #       a fresh game's prologue (skirmishes use PLAY_FLAGs; later chapters nonzero);
-    #   (d) prologue-wm.h: gut the prologue's world-map intro (EventScrWM_Prologue_
-    #       Beginning runs WM_TEXT(0x8DB) -- the "continent of Magvel" nation-by-nation
-    #       tour). The WM wrapper runs it BEFORE StartBattleMap's redirect, so (c) alone
-    #       doesn't stop it; replace its body with Ch1's no-op (EVBIT_MODIFY/SKIPWN/ENDA).
-    with open(GAMECONTROL_C, encoding='utf-8') as f:
-        gc = f.read()
-    gc, n1 = re.subn(r'[ \t]*PROC_START_CHILD_BLOCKING\(ProcScr_OpAnim\),\n',
-                     '', gc, count=1)
-    if n1 == 0:
-        sys.exit('ERROR: ProcScr_OpAnim start not found in %s' % GAMECONTROL_C)
-    gc, n2 = re.subn(r'\n(\s*)StartIntroMonologue\(proc\);',
-                     r'\n\1return; /* test-chapter: skip intro monologue */',
-                     gc, count=1)
-    if n2 == 0:
-        sys.exit('ERROR: StartIntroMonologue call not found in %s' % GAMECONTROL_C)
-    with open(GAMECONTROL_C, 'w', encoding='utf-8') as f:
-        f.write(gc)
-
-    with open(BMIO_C, encoding='utf-8') as f:
-        bmio = f.read()
-    bmio, n3 = re.subn(
-        r'(void StartBattleMap\(struct GameCtrlProc\* gameCtrl\) \{\n    int i;\n)',
-        r'\1\n    if (gPlaySt.chapterIndex == 0) /* test-chapter spawn: prologue -> Ch1 */\n'
-        r'        gPlaySt.chapterIndex = %d;\n' % TEST_CHAPTER_INDEX,
-        bmio, count=1)
-    if n3 == 0:
-        sys.exit('ERROR: StartBattleMap signature not found in %s' % BMIO_C)
-    with open(BMIO_C, 'w', encoding='utf-8') as f:
-        f.write(bmio)
-
-    with open(PROLOGUE_WM_H, encoding='utf-8') as f:
-        wm = f.read()
-    wm = _replace_brace_block(
-        wm, 'EventScrWM_Prologue_Beginning[] =',
-        '{\n    EVBIT_MODIFY(0x1)\n    SKIPWN\n    ENDA\n}', PROLOGUE_WM_H)
-    with open(PROLOGUE_WM_H, 'w', encoding='utf-8') as f:
-        f.write(wm)
+    # Game drops straight onto the map, then redirect the prologue slot -> Ch1 so the
+    # New Game target is this sandbox chapter.
+    _cut_boot_intro()
+    _redirect_new_game(TEST_CHAPTER_INDEX)
 
     if verbose:
         for unit_id, slot, class_enum, _ in units:
@@ -730,6 +770,108 @@ def _inject_sms_override_hook():
         sys.exit('ERROR: GetUnitSMSId not in expected vanilla form in %s' % BMUNIT_C)
     with open(BMUNIT_C, 'w', encoding='utf-8') as f:
         f.write(text.replace(orig, hooked, 1))
+
+
+def _patch_player_start_cursor_guard():
+    """Guard GetPlayerStartCursorPosition against a non-deployed player leader.
+
+    At chapter start ProcFun_ResetCursorPosition centers the cursor on the player leader:
+    GetUnitFromCharId(GetPlayerLeaderPid()). FE8 assumes the leader (a LORD-class unit) is
+    always deployed -- but our campaign's lords ride ordinary slots, so that lookup returns
+    NULL and the original code dereferences it (`unit->xPos`), reading BIOS garbage and
+    parking the cursor OFF-MAP. The off-map cursor then drives out-of-bounds map/terrain
+    reads -> a runaway text decode -> gBmSt corruption (garbage band) -> crash. Watchpoint-
+    confirmed root cause. Fix: if the leader isn't deployed, fall back to the first valid
+    player unit, and never dereference NULL. Campaign-agnostic engine hardening.
+    """
+    with open(BMCAMADJUST_C, encoding='utf-8') as f:
+        text = f.read()
+    orig = (
+        'void GetPlayerStartCursorPosition(int *px, int *py)\n'
+        '{\n'
+        '    struct Unit *unit;\n'
+        '    if (1 == gPlaySt.chapterTurnNumber) {\n'
+        '        unit = GetUnitFromCharId(GetPlayerLeaderPid());\n'
+        '        gPlaySt.xCursor = unit->xPos;\n'
+        '        gPlaySt.yCursor = unit->yPos;\n'
+        '    }\n'
+        '\n'
+        '    if (1 != gPlaySt.config.autoCursor) {\n'
+        '        unit = GetUnitFromCharId(GetPlayerLeaderPid());\n'
+        '        *px = unit->xPos;\n'
+        '        *py = unit->yPos;\n'
+        '    } else {\n'
+        '        *px = gPlaySt.xCursor;\n'
+        '        *py = gPlaySt.yCursor;\n'
+        '    }\n'
+        '}')
+    fixed = (
+        'void GetPlayerStartCursorPosition(int *px, int *py)\n'
+        '{\n'
+        '    struct Unit *unit;\n'
+        '    int i;\n'
+        '\n'
+        '    /* Leader may ride a non-LORD slot (campaign): if not deployed, fall back to\n'
+        '     * the first valid player unit so the cursor never lands off-map. */\n'
+        '    unit = GetUnitFromCharId(GetPlayerLeaderPid());\n'
+        '    if (unit == NULL) {\n'
+        '        for (i = 1; i < 0x40; ++i) {\n'
+        '            struct Unit *u = GetUnit(i);\n'
+        '            if (UNIT_IS_VALID(u)) {\n'
+        '                unit = u;\n'
+        '                break;\n'
+        '            }\n'
+        '        }\n'
+        '    }\n'
+        '    if (unit == NULL)\n'
+        '        return;\n'
+        '\n'
+        '    if (1 == gPlaySt.chapterTurnNumber) {\n'
+        '        gPlaySt.xCursor = unit->xPos;\n'
+        '        gPlaySt.yCursor = unit->yPos;\n'
+        '    }\n'
+        '\n'
+        '    if (1 != gPlaySt.config.autoCursor) {\n'
+        '        *px = unit->xPos;\n'
+        '        *py = unit->yPos;\n'
+        '    } else {\n'
+        '        *px = gPlaySt.xCursor;\n'
+        '        *py = gPlaySt.yCursor;\n'
+        '    }\n'
+        '}')
+    if orig not in text:
+        sys.exit('ERROR: GetPlayerStartCursorPosition not in expected form in %s' % BMCAMADJUST_C)
+    with open(BMCAMADJUST_C, 'w', encoding='utf-8') as f:
+        f.write(text.replace(orig, fixed, 1))
+
+
+def _patch_terrain_name_guard():
+    """Bounds-guard GetTerrainName against out-of-range terrain ids.
+
+    gUnknown_0880D374 (the terrain -> name-message-id table) has only 65 entries.
+    An out-of-range id -- e.g. the terrain-display window reading gBmMapTerrain at an
+    OFF-MAP cursor position (which happens at chapter start when the lord rides a
+    non-LORD-class slot, so the auto-cursor never centers it) -- indexes past the table,
+    yielding a garbage gMsgTable[] pointer. The text decompressor then runs away and
+    overruns gBmSt (camera/cursor), corrupting the screen and soft-locking. Vanilla never
+    hit this because its lords are LORD-class; our campaign's aren't. Campaign-agnostic
+    engine hardening: an invalid terrain id renders as terrain 0 instead of crashing.
+    """
+    with open(BMMAP_C, encoding='utf-8') as f:
+        text = f.read()
+    orig = ('char* GetTerrainName(int terrainId) {\n'
+            '    return GetStringFromIndex(gUnknown_0880D374[terrainId]);\n'
+            '}')
+    guarded = ('char* GetTerrainName(int terrainId) {\n'
+               '    /* Guard OOB ids (e.g. off-map cursor); table has 65 entries. */\n'
+               '    if ((unsigned int)terrainId >= 65)\n'
+               '        terrainId = 0;\n'
+               '    return GetStringFromIndex(gUnknown_0880D374[terrainId]);\n'
+               '}')
+    if orig not in text:
+        sys.exit('ERROR: GetTerrainName not in expected vanilla form in %s' % BMMAP_C)
+    with open(BMMAP_C, 'w', encoding='utf-8') as f:
+        f.write(text.replace(orig, guarded, 1))
 
 
 def _inject_mu_override_hook():
@@ -1093,6 +1235,26 @@ def _append_asm_table_words(path, table_label, words):
     return count  # next free index == prior entry count
 
 
+def _asm_table_word_index(path, table_label, word_label):
+    """0-based index of `.word <word_label>` within the asm array `table_label:`. Used
+    to look up an asset registered by an earlier injector (e.g. the winter tileset)."""
+    with open(path, encoding='utf-8') as f:
+        lines = f.read().splitlines()
+    start = next((i for i, ln in enumerate(lines) if ln.lstrip().startswith(table_label + ':')), None)
+    if start is None:
+        sys.exit('ERROR: table %r not found in %s' % (table_label, path))
+    idx = 0
+    for i in range(start + 1, len(lines)):
+        s = lines[i].strip()
+        if s.startswith('.word'):
+            if s.split(None, 1)[1].strip() == word_label:
+                return idx
+            idx += 1
+        elif s and not s.startswith('@'):
+            break
+    sys.exit('ERROR: .word %r not found under %r in %s' % (word_label, table_label, path))
+
+
 def inject_winter_tileset(campaign, verbose=True):
     """Register the winter tileset (#41) + a flat test layout and repoint the test
     chapter at them, so a build load-tests the tileset in-engine (#40)."""
@@ -1145,6 +1307,288 @@ def inject_winter_tileset(campaign, verbose=True):
               % (WINTER_TILESET, base, base + len(labels) - 1, TEST_CHAPTER_INDEX))
 
 
+# --- Prologue chapter wire-up (#20) -----------------------------------------------
+# Stand up the designed ch00 ("A Dagger of Ice") as the New Game target: register its
+# winter layout onto chapter 0, rewrite the prologue rosters to Scramsax+Hlin vs
+# Sephek+guards, strip the vanilla Eirika/Seth/Valter cutscene down to a deploy +
+# DefeatBoss, name the three guests, and flag Hlin's death as game over. Runs AFTER
+# inject_winter_tileset (reuses its registered snow tileset assets). Replaces
+# inject_test_chapter as main()'s in-engine entry. Structural unit data (class/level/
+# position/items/ai) tracks campaigns/.../chapters/ch00-prologue-a-dagger-of-ice.yaml;
+# names are read from that YAML so they live in one place.
+
+def _load_prologue_chapter(campaign):
+    path = os.path.join(REPO, 'campaigns', campaign, 'chapters', PROLOGUE_CHAPTER_YAML)
+    with open(path, encoding='utf-8') as f:
+        return yaml.safe_load(f)
+
+
+def inject_prologue(campaign, verbose=True):
+    """Wire the designed Prologue (#20) onto chapter 0 as the New Game target."""
+    maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
+    # Guest classes (env-overridable for diagnostics).
+    hlin_class = os.environ.get('PROLOGUE_HLIN_CLASS', 'CLASS_WARRIOR')
+    scram_class = os.environ.get('PROLOGUE_SCRAM_CLASS', 'CLASS_HERO')
+
+    # DIAGNOSTIC (PROLOGUE_CAST_SLOTS): deploy two KNOWN-GOOD cast units on their own
+    # fully-patched cast slots (Eirika/Franz) -- with their real classes/items -- instead
+    # of the guest slots, through the *exact same* prologue pipeline (winter tileset, host
+    # Ch1, boot cuts, gDefeatTalkList edit). This isolates the two live hypotheses:
+    #   * if CAST_SLOTS renders clean -> the prologue pipeline is fine and the bug is the
+    #     guest-slot DATA (Natasha/Kyle/O'Neill) -- narrow which field next;
+    #   * if CAST_SLOTS still breaks -> the bug is in the pipeline itself (the old
+    #     "test chapter clean" result predates this code path) -- bisect the steps.
+    # Skips step-4b (cast slots are already patched by patch_character_data).
+    cast_slots = bool(os.environ.get('PROLOGUE_CAST_SLOTS'))
+    if cast_slots:
+        hlin_slot, scram_slot, sephek_slot = 'EIRIKA', 'FRANZ', 'ONEILL'
+        hlin_class, scram_class = 'CLASS_PIRATE', 'CLASS_ARMOR_KNIGHT'
+        hlin_items = 'ITEM_AXE_IRON, ITEM_AXE_HANDAXE'
+        scram_items = 'ITEM_LANCE_IRON, ITEM_VULNERARY'
+    else:
+        hlin_slot, scram_slot, sephek_slot = (
+            PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT)
+        hlin_items = scram_items = 'ITEM_AXE_HANDAXE, ITEM_VULNERARY'
+
+    # 1. Register the prologue layout (.mar + .json -> Makefile mar_to_map -> .bin -> .lz) and
+    #    point the HOST chapter (Ch1) at it + the winter tileset. We host the prologue in the
+    #    Ch1 chapter + event group, NOT the vanilla prologue slot (0): the prologue slot's
+    #    event group (asset[7]) garbles the gameplay HUD/terrain display when loaded with our
+    #    stripped chapter (garbage band, bad string-pointer loads), while a normal chapter's
+    #    group (Ch1Events, asset[10]) loads cleanly -- proven by inject_test_chapter. New Game
+    #    redirects 0 -> 1 (step 6). The prologue slot is left vanilla and never loaded.
+    label, stem = PROLOGUE_LAYOUT
+    for ext in ('mar', 'json'):
+        shutil.copyfile(os.path.join(maps_dir, '%s.%s' % (stem, ext)),
+                        os.path.join(MAP_LAYOUT_DIR, '%s.%s' % (label, ext)))
+    with open(CONST_MAPS_S, 'a', encoding='utf-8') as f:
+        f.write('\n'.join([
+            '', '/* Manchego Stars prologue layout (#20) */',
+            '\t.align 2, 0', '\t.global %s' % label, '%s:' % label,
+            '\t.incbin "graphics/map/layout/%s.bin.lz"' % label]) + '\n')
+    layout_idx = _append_asm_table_words(ASSET_TABLE_S, 'gChapterDataAssetTable', [label])
+    obj_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'ObjectTypeSnow')
+    pal_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'MapPaletteSnow')
+    cfg_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'TileConfigurationSnow')
+    with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
+        settings = json.load(f)
+    if os.environ.get('PROLOGUE_FLAT_MAP'):  # diagnostic: use the flat test layout (known good)
+        layout_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'ChTestSnowMap')
+    host = settings['chapters'][PROLOGUE_HOST_INDEX]
+    host['map'].update({'obj1Id': obj_idx, 'obj2Id': 0, 'paletteId': pal_idx,
+                        'tileConfigId': cfg_idx, 'mainLayerId': layout_idx,
+                        'objAnimId': 0, 'paletteAnimId': 0, 'changeLayerId': 0})
+    with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
+        json.dump(settings, f, indent=2)
+
+    # 2. Rewrite the two prologue rosters. redaCount=0 places units statically at
+    #    xPosition/yPosition (like inject_test_chapter); the boss rides the ONEILL slot so
+    #    its CA_BOSS attribute makes DefeatBoss fire on death. Positions/levels/items from
+    #    the chapter YAML (0-indexed x,y). AI mirrors vanilla: boss holds, guards attack.
+    ally = (
+        '{\n'
+        '    {\n'
+        '        .charIndex = CHARACTER_%s, /* Hlin -- frail must-survive lead */\n'
+        '        .classIndex = %s,\n'
+        '        .leaderCharIndex = CHARACTER_%s,\n'
+        '        .allegiance = FACTION_ID_BLUE,\n'
+        '        .level = 3,\n'
+        '        .xPosition = 8,\n'
+        '        .yPosition = 5,\n'
+        '        .redaCount = 0,\n'
+        '        .items = { %s },\n'
+        '    },\n'
+        '    {\n'
+        '        .charIndex = CHARACTER_%s, /* Scramsax -- strong veteran (our Jeigan) */\n'
+        '        .classIndex = %s,\n'
+        '        .leaderCharIndex = CHARACTER_%s,\n'
+        '        .allegiance = FACTION_ID_BLUE,\n'
+        '        .level = 1,\n'
+        '        .xPosition = 13,\n'
+        '        .yPosition = 9,\n'
+        '        .redaCount = 0,\n'
+        '        .items = { %s },\n'
+        '    },\n'
+        '    { 0 },\n'
+        '}' % (hlin_slot, hlin_class, hlin_slot, hlin_items,
+               scram_slot, scram_class, hlin_slot, scram_items))
+    enemy = (
+        '{\n'
+        '    {\n'
+        '        .charIndex = CHARACTER_%s, /* Sephek -- boss; escapes in the ending */\n'
+        '        .classIndex = CLASS_MYRMIDON,\n'
+        '        .allegiance = FACTION_ID_RED,\n'
+        '        .level = 5,\n'
+        '        .xPosition = 14,\n'
+        '        .yPosition = 8,\n'
+        '        .redaCount = 0,\n'
+        '        .items = { ITEM_SWORD_STEEL },\n'
+        '        .ai = {0x6, 0x3, 0x0, 0x0},\n'
+        '    },\n'
+        '    {\n'
+        '        .charIndex = 0x80, /* Torg\'s caravan guard */\n'
+        '        .classIndex = CLASS_FIGHTER,\n'
+        '        .allegiance = FACTION_ID_RED,\n'
+        '        .level = 2,\n'
+        '        .xPosition = 14,\n'
+        '        .yPosition = 7,\n'
+        '        .redaCount = 0,\n'
+        '        .items = { ITEM_AXE_IRON },\n'
+        '        .ai = {0x0, 0xa, 0x0, 0x0},\n'
+        '    },\n'
+        '    {\n'
+        '        .charIndex = 0x82, /* Torg\'s caravan guard */\n'
+        '        .classIndex = CLASS_FIGHTER,\n'
+        '        .allegiance = FACTION_ID_RED,\n'
+        '        .level = 2,\n'
+        '        .xPosition = 13,\n'
+        '        .yPosition = 7,\n'
+        '        .redaCount = 0,\n'
+        '        .items = { ITEM_AXE_IRON },\n'
+        '        .ai = {0x0, 0xa, 0x0, 0x0},\n'
+        '    },\n'
+        '    { 0 },\n'
+        '}' % sephek_slot)
+    with open(CH1_UDEFS_H, encoding='utf-8') as f:
+        udefs = f.read()
+    udefs = _replace_brace_block(udefs, 'UnitDef_Event_Ch1Ally[] =', ally, CH1_UDEFS_H)
+    udefs = _replace_brace_block(udefs, 'UnitDef_Event_Ch1Enemy[] =', enemy, CH1_UDEFS_H)
+    with open(CH1_UDEFS_H, 'w', encoding='utf-8') as f:
+        f.write(udefs)
+
+    # 3. Strip the Ch1 cutscene scripting to a clean sandbox (exactly like inject_test_chapter,
+    #    which renders cleanly): empty every per-chapter event list and null the tutorial list,
+    #    then replace the beginning scene with a bare deploy of both rosters. (DefeatBoss win +
+    #    lord-death go in a follow-up once this baseline is confirmed clean.)
+    with open(CH1_EVENTINFO_H, encoding='utf-8') as f:
+        info = f.read()
+    for name in ('EventListScr_Ch1_Turn', 'EventListScr_Ch1_Character',
+                 'EventListScr_Ch1_Location', 'EventListScr_Ch1_Misc'):
+        info = _replace_brace_block(info, name + '[] =', '{\n    END_MAIN\n}', CH1_EVENTINFO_H)
+    info = _replace_brace_block(info, 'EventListScr_Ch1_Tutorial[] =',
+                                '{\n    NULL\n}', CH1_EVENTINFO_H)
+    with open(CH1_EVENTINFO_H, 'w', encoding='utf-8') as f:
+        f.write(info)
+
+    with open(CH1_EVENTSCRIPT_H, encoding='utf-8') as f:
+        script = f.read()
+    # The chapter-start auto-cursor (ProcFun_ResetCursorPosition) now centers the camera +
+    # cursor on the first player unit even when the lord rides a non-LORD slot (engine fix in
+    # _patch_player_start_cursor_guard), so the begin scene just deploys and hands over control.
+    begin = ('{\n    LOAD1(1, UnitDef_Event_Ch1Ally)\n    ENUN\n    ENDA\n}'
+             if os.environ.get('PROLOGUE_ALLIES_ONLY') else
+             '{\n    LOAD1(1, UnitDef_Event_Ch1Ally)\n    ENUN\n'
+             '    LOAD1(1, UnitDef_Event_Ch1Enemy)\n    ENUN\n    ENDA\n}')
+    script = _replace_brace_block(
+        script, 'EventScr_Ch1_BeginningScene[] =', begin, CH1_EVENTSCRIPT_H)
+    with open(CH1_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
+        f.write(script)
+
+    # 4. Names (read from the chapter YAML so they live in one place; fe_name handles
+    #    FE8's 12-char buffer -- see [[manchego-stars-fe-name-truncation]]).
+    chap = _load_prologue_chapter(campaign)
+    by_id = {u['id']: u for u in chap['player_units'] + chap['enemy_units']}
+    name_slots = [(PROLOGUE_HLIN_SLOT, 'hlin-trollbane'),
+                  (PROLOGUE_SCRAMSAX_SLOT, 'scramsax'),
+                  (PROLOGUE_SEPHEK_SLOT, 'sephek-kaltro')]
+    with open(TEXTS_TXT, encoding='utf-8') as f:
+        lines = f.read().split('\n')
+    for slot, uid in name_slots:
+        unit = by_id[uid]
+        unit.setdefault('id', uid)
+        set_message_body(lines, vanilla_name_text_id(slot),
+                         name_message_body(display_name(unit)))
+    with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines))
+
+    # 4b. Give the guest slots a consistent character identity for their deployed class --
+    #     just like patch_character_data does for the cast. A NAMED character deployed with a
+    #     class that disagrees with its gCharacterData (defaultClass + weapon ranks) freezes
+    #     the chapter shortly after deploy: the engine's class-driven paths (map sprite, and
+    #     the weapon-rank check for the unit's items) read inconsistent data. We align
+    #     defaultClass + baseLevel, zero the personal base stats (so stats == class base), and
+    #     copy growths + weapon ranks from a class-matched, unpatched vanilla donor so each
+    #     guest can actually wield its items. (Guests aren't in PORTRAIT_MAP, so do it here.)
+    _axe = ('PIRATE', 'WARRIOR', 'FIGHTER', 'BRIGAND', 'BERSERKER')
+    _hlin_donor = 'CHARACTER_GARCIA' if any(c in hlin_class for c in _axe) else 'CHARACTER_GERIK'
+    _scram_donor = 'CHARACTER_GARCIA' if any(c in scram_class for c in _axe) else 'CHARACTER_GERIK'
+    # (slot, class, level, donor, female) -- female None means "leave attributes alone"
+    # (the boss keeps CA_BOSS; _set_gender would clobber it). affinity is forced to ANIMA
+    # for every guest, mirroring patch_character_data: this is the field that diverged from
+    # the proven-clean cast slots (cast=ANIMA via patch; guests kept vanilla ICE), and the
+    # leading suspect for the post-deploy freeze.
+    guest_patch = [] if cast_slots else [
+                   (PROLOGUE_HLIN_SLOT, hlin_class, 3, _hlin_donor, True),
+                   (PROLOGUE_SCRAMSAX_SLOT, scram_class, 1, _scram_donor, False),
+                   (PROLOGUE_SEPHEK_SLOT, 'CLASS_MYRMIDON', 5, 'CHARACTER_JOSHUA', None)]
+    with open(CHARACTERS_C, encoding='utf-8') as f:
+        chars = f.read()
+    for slot, cls, level, donor, female in guest_patch:
+        growths, ranks = donor_growths_and_ranks(chars, donor)  # donors are unpatched slots
+        marker = '[CHARACTER_%s - 1]' % slot
+        s, e = _find_brace_block(chars, marker, CHARACTERS_C)
+        block = chars[s:e]
+        block = _set_field(block, 'defaultClass', cls, CHARACTERS_C, marker)
+        block = _set_field(block, 'affinity', 'UNIT_AFFIN_ANIMA', CHARACTERS_C, marker)
+        block = _set_field(block, 'baseLevel', level, CHARACTERS_C, marker)
+        if female is not None:
+            block = _set_gender(block, female)
+        for bf in ('baseHP', 'basePow', 'baseSkl', 'baseSpd', 'baseDef',
+                   'baseRes', 'baseLck', 'baseCon'):
+            block = _set_field(block, bf, 0, CHARACTERS_C, marker)
+        for gf, gv in growths.items():
+            block = _set_field(block, gf, gv, CHARACTERS_C, marker)
+        block, n = re.subn(r'(\.baseRanks\s*=\s*)\{.*?\}',
+                           lambda m: m.group(1) + ranks, block, count=1, flags=re.DOTALL)
+        if n == 0:
+            sys.exit('ERROR: .baseRanks not found for %s' % marker)
+        chars = chars[:s] + block + chars[e:]
+    with open(CHARACTERS_C, 'w', encoding='utf-8') as f:
+        f.write(chars)
+
+    # 5. Lord-death = game over for Hlin. Per-character death quote flagged
+    #    EVFLAG_GAMEOVER in gDefeatTalkList; CauseGameOverIfLordDies (step 3) fires on it.
+    #    This is vanilla's Eirika/Duessel mechanism. msg is a placeholder until the
+    #    dialogue pass (#2) writes Hlin's death line; #42 generalizes to the chosen lord.
+    quote = (
+        '    {\n'
+        '        .pid     = CHARACTER_%s, /* Hlin -- lord-death = game over */\n'
+        '        .route   = CHAPTER_MODE_ANY,\n'
+        '        .chapter = CHAPTER_L_1, /* prologue is hosted on chapter slot 1 */\n'
+        '        .flag    = EVFLAG_GAMEOVER,\n'
+        '        .msg     = 0x0917, /* placeholder; real death line in the dialogue pass */\n'
+        '    },' % hlin_slot)
+    _append_table_rows(BATTLEQUOTES_C, 'gDefeatTalkList[] =', [quote])
+
+    # 6. Boot flow: cut the attract/intro/world-map sequences, and redirect New Game from
+    #    the prologue slot (0) to the host chapter (1) at StartBattleMap -- so the game
+    #    loads our prologue through the normal-chapter path, dodging the prologue slot's
+    #    special-cased HUD/terrain handling that garbled the screen.
+    _cut_boot_intro()
+    _redirect_new_game(PROLOGUE_HOST_INDEX)
+
+    # 7. Don't start in tutorial mode. New Game sets PLAY_FLAG_TUTORIAL (gamecontrol.c
+    #    sub_8009C5C), which drives the vanilla guide/tutorial system; our beginning scene
+    #    is a plain deploy with none of that setup, so clear the flag.
+    with open(GAMECONTROL_C, encoding='utf-8') as f:
+        gc = f.read()
+    gc, n = re.subn(r'[ \t]*gPlaySt\.chapterStateBits \|= PLAY_FLAG_TUTORIAL;\n',
+                    '', gc, count=1)
+    if n == 0:
+        sys.exit('ERROR: PLAY_FLAG_TUTORIAL set not found in %s' % GAMECONTROL_C)
+    with open(GAMECONTROL_C, 'w', encoding='utf-8') as f:
+        f.write(gc)
+
+    if verbose:
+        print('  prologue map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d '
+              '(Ch1 group); New Game redirects %d -> %d'
+              % (obj_idx, pal_idx, cfg_idx, layout_idx, PROLOGUE_HOST_INDEX,
+                 PROLOGUE_CHAPTER_INDEX, PROLOGUE_HOST_INDEX))
+        print('  units: Hlin(%s)+Scramsax(%s) vs Sephek(%s)+2 guards%s'
+              % (hlin_slot, scram_slot, sephek_slot,
+                 '  [DIAG: CAST_SLOTS]' if cast_slots else ''))
+
+
 def main():
     ap = argparse.ArgumentParser(description='Inject campaign content into the decomp build.')
     ap.add_argument('--campaign', default='rime-of-the-frostmaiden')
@@ -1157,18 +1601,26 @@ def main():
     inject_portraits(args.campaign)
     if not args.portraits_only:
         restore_vanilla_sources()  # clean base each build (idempotent; vanilla donor reads)
+        print('engine hardening:')
+        _patch_player_start_cursor_guard()
+        print('  GetPlayerStartCursorPosition: fall back to first player unit if leader undeployed')
+        _patch_terrain_name_guard()
+        print('  GetTerrainName: bounds-guarded against OOB terrain ids (defensive)')
         print('names:')
         inject_names(args.campaign)
         print('characters:')
         patch_character_data(args.campaign)
         print('portrait geometry:')
         patch_portrait_geometry()
-        print('test chapter (Ch1 spawn):')
-        inject_test_chapter(args.campaign)
-        print('map sprites:')
-        inject_map_sprites(args.campaign)
+        if not os.environ.get('PROLOGUE_NO_SPRITES'):
+            print('map sprites:')
+            inject_map_sprites(args.campaign)
+        else:
+            print('map sprites: [DIAG] SKIPPED')
         print('winter tileset:')
         inject_winter_tileset(args.campaign)
+        print('prologue (New Game target):')
+        inject_prologue(args.campaign)
     print('done. Run `make` to compile the ROM.')
 
 

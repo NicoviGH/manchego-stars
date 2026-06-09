@@ -82,10 +82,31 @@ def check_no_dead_concepts(fail):
                             % (m.group(0), os.path.relpath(d, REPO), i))
 
 
+def check_engine_guards_present(fail):
+    """Engine-hardening guards must stay wired into the build.
+
+    The prologue garbage-band crash (debrief in docs/decisions.md) was a chapter whose
+    "lord" rides a non-LORD-class slot: FE8's chapter-start cursor centering derefs a NULL
+    leader unit, parks the cursor off-map, and an out-of-bounds terrain read runs the text
+    decoder away into gBmSt. Our whole cast uses non-lord slots, so EVERY chapter needs
+    these two campaign-agnostic guards in build_campaign.py. Removing either silently
+    re-introduces the crash, so guard their presence here. (The patches themselves also
+    fail the build if the decomp source form changes -- see their `if orig not in text`.)
+    """
+    bc = open(os.path.join(REPO, 'tools', 'build_campaign.py'), encoding='utf-8').read()
+    for fn in ('_patch_player_start_cursor_guard', '_patch_terrain_name_guard'):
+        # definition (def fn(...)) + at least one call site -> name appears >= 2x.
+        if bc.count(fn) < 2:
+            fail.append('engine guard %s() missing or never called in '
+                        'tools/build_campaign.py -- would re-introduce the prologue '
+                        'garbage-band/off-map-cursor crash (see docs/decisions.md)' % fn)
+
+
 def main():
     fail = []
     for check in (check_python_compiles, check_yaml_parses,
-                  check_tool_refs_exist, check_no_dead_concepts):
+                  check_tool_refs_exist, check_no_dead_concepts,
+                  check_engine_guards_present):
         check(fail)
     if fail:
         print('DRIFT (%d):' % len(fail))

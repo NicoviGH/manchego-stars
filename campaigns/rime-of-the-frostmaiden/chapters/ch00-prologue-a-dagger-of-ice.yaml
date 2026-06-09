@@ -74,6 +74,7 @@ player_units:
   # Hlin = the FRAIL must-survive lead (our "lord" / Eirika-analog). Book p.22: old & frail.
   - id: hlin-trollbane
     name: "Hlin Trollbane"
+    fe_name: "Hlin"              # FE8 name buffer is 12 chars; "Hlin Trollbane" (14) overflows
     class: warrior               # a dwarf veteran with a battleaxe/handaxe — but past her prime
     is_npc: true                 # not one of the 7 PCs; a cold-open guest unit
     required: true               # lose if she dies (our lord-death condition)
@@ -101,6 +102,7 @@ player_units:
 enemy_units:
   - id: sephek-kaltro
     name: "Sephek Kaltro"
+    fe_name: "Sephek"           # FE8 name buffer is 12 chars; "Sephek Kaltro" (13) overflows
     is_boss: true
     count: 1
     position: [14, 8]            # O9 — cornered against the SE peaks (O'Neill's vanilla spot)

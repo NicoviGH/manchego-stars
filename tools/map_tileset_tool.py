@@ -110,18 +110,25 @@ class Tileset:
 
 
 def compile_layout(grid, out_bin, map_id):
-    """grid = list of rows of metatile indices -> decomp layout .bin + .json.
-    Writes value = metatile_index*4 (LE u16), prefixed by width,height bytes."""
+    """grid = list of rows of metatile indices -> decomp FEBuilder .mar + .json.
+
+    The build runs this .mar through scripts/mar_to_map.py (Makefile %.bin: %.mar),
+    which prepends width/height from the .json and emits each tile value >> 3. FE8
+    then reads a .bin tile as metatile = value >> 2 (bmmap.c GetTrueTerrainAt). So the
+    .mar must carry NO header (mar_to_map adds it) and store each tile as
+    metatile_index << 5, so >>3 yields the engine's index<<2. (Writing index*4 + a
+    header here scrambles the map: mar_to_map eats the header as a tile and halves the
+    magnitudes.)"""
     h = len(grid)
     w = len(grid[0])
     if any(len(row) != w for row in grid):
         sys.exit('ERROR: ragged grid (rows differ in width)')
     if w > 255 or h > 255:
         sys.exit('ERROR: map %dx%d exceeds 255' % (w, h))
-    data = bytearray([w, h])
+    data = bytearray()
     for row in grid:
         for m in row:
-            data += struct.pack('<H', m * 4)
+            data += struct.pack('<H', m << 5)
     with open(out_bin, 'wb') as f:
         f.write(data)
     with open(os.path.splitext(out_bin)[0] + '.json', 'w') as f:
