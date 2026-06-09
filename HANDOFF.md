@@ -1,68 +1,79 @@
 # Handoff: **Refining the Prologue (#20) — crash fixed, now building out the vertical slice.**
 
 **Date:** 2026-06-09
-**Focus:** ch00 "A Dagger of Ice" as a playable vertical slice. The deploy-time crash that
-blocked everything is **fixed**; New Game boots straight onto the winter map and plays cleanly.
-Now working down the slice checklist (objective → cutscenes → dialogue → end-to-end load-test).
+**Focus:** ch00 "A Dagger of Ice" as a playable vertical slice. The deploy-time crash is fixed;
+New Game boots straight onto the winter map and plays cleanly. Difficulty tuned to vanilla.
+Currently mid-task on Hlin's custom map sprite (asset vendored, **not yet wired**).
 
-**Live checklist = GitHub issue #20** (don't mirror it here). HANDOFF = current state + next steps;
-active sub-steps go in TodoWrite ([[feedback_chapter_vertical_slice]]).
+**Live checklist = GitHub issue #20.** HANDOFF = current state + next steps; sub-steps -> TodoWrite.
 
 ---
 
-## Current state (where the slice stands)
-- ✅ **Design locked** (ch00 YAML), **map concept** (dead-end alley).
-- ✅ **Map built** — `Ch00PrologueMap` (15×10) compiled/registered, Prologue points at it, renders
-  clean in-engine (winter reskin via snowy-bern).
-- ✅ **Units placed** — Hlin→Natasha, Scramsax→Kyle, Sephek(boss)→O'Neill + 2 guards; classes/
-  stats/items/positions + short `fe_name`s; all deploy correctly.
-- ✅ **Deploy crash fixed** — non-LORD-class lord → off-map cursor → text-decoder runaway. Engine
-  guards in `build_campaign.py` (`_patch_player_start_cursor_guard`, `_patch_terrain_name_guard`),
-  regression-guarded by `tools/check.py`. Debrief: `docs/decisions.md` → "Non-LORD-class lords
-  need engine guards"; durable note [[manchego_stars_non_lord_cursor_crash]]. Committed (b98290a).
-- ⏳ **Objective / cutscenes / dialogue / load-test** — not done (see Next Steps + issue #20).
+## Current state
+- ✅ Deploy crash fixed + regression-guarded + documented (`docs/decisions.md` → "Non-LORD-class
+  lords need engine guards"; memory [[manchego_stars_non_lord_cursor_crash]]). Plays clean.
+- ✅ Map built/rendering; units deploy correctly.
+- ✅ Difficulty tuned to vanilla: **Hlin = unpromoted Fighter** (frail Eirika-analog lead),
+  **Scramsax = Hero + Steel Sword** (dominant Seth-analog Jeigan), Sephek = Myrmidon L5 boss + 2
+  Fighter guards. Diagnostics (`PROLOGUE_*` env flags) removed.
+- ⏳ **Hlin female-Fighter map sprite — vendored, NOT wired** (she currently shares the male
+  Fighter guards' sprite). Assets: `map_sprites/hlin-trollbane.png` (idle 16x48) +
+  `hlin-trollbane_mu.png` (walk 32x480) — Alusq, from FE-Repo, RAW FE8 palette/format. Inert
+  until wired (Hlin isn't in the cast `PORTRAIT_MAP` that `inject_map_sprites` processes).
 
-## Next steps (priority order — the remaining #20 items)
-1. **Verify objective + lose condition in-engine** (crash is gone, gameplay untested): does
-   DefeatBoss fire when Sephek(O'Neill) dies? Does Hlin's death = game over? Guard AI sane?
-   Play it in mGBA. (Quickest path to "is the slice actually winnable".)
-2. **Title card** — "A Dagger of Ice".
-3. **Cutscenes + dialogue** — opening (cold open / corner Sephek), mid-fight frost line, ending
-   (Sephek escapes → hard cut to The Northlook). Dialogue is **co-written with Nicolas**
-   ([[feedback_collaborative_story_planning]]), not committed solo. `.ea` + MSG lines.
-4. **End-to-end load-test** — New Game → play → win → ending → (ideally) hand to ch01.
-5. **Housekeeping**: delete the now-obsolete `PROLOGUE_*` diagnostic env flags in `inject_prologue`
-   (kept through debugging; `FLAT_MAP`/`NO_SPRITES` are arguably worth keeping as map diagnostics).
-6. _(deferred)_ Placeholder busts for Hlin/Scramsax/Sephek (#19).
+## NEXT STEPS (priority order)
+1. **Wire Hlin's custom map sprite** (the in-progress task):
+   - `inject_map_sprites` only builds its idle/MU lists from `classed_cast()` (the 8 PORTRAIT_MAP
+     PCs). Hlin is a guest on `CHARACTER_NATASHA`. **Extend it to include the prologue guest(s)**:
+     add `(uid='hlin-trollbane', slot='NATASHA', class=FIGHTER)` so it emits a custom SMS (id 107+)
+     + a `gMapSpriteOverride` entry keyed to `CHARACTER_NATASHA`, plus the MU (walk) override.
+   - **Palette:** cast sprites share `cast_palette.png` in a purple OBJ bank (`gMapPaletteOverride`,
+     `_inject_cast_palette`). The Alusq sheet has its own palette → either re-index it to the cast
+     palette OR give Hlin her own bank. Inspect `map_sprite_tool` + `_read_cast_palette`.
+   - Build → mGBA New Game → confirm Hlin renders as the woman Fighter, distinct from the guards.
+2. **Lose condition** (decision needed): just Hlin = game over (vanilla lord-only), or Scramsax too?
+   ch00 YAML marks both `required: true`; only Hlin's `EVFLAG_GAMEOVER` quote is wired today.
+3. **In-engine win/lose verification** (playtest w/ Nicolas): DefeatBoss fires on Sephek? Hlin
+   death = game over? Guard AI sane? (Crash is gone; gameplay untested.)
+4. **Title card** "A Dagger of Ice".
+5. **Cutscenes + dialogue** — opening (cold open / corner Sephek), mid-fight frost line, ending
+   (Sephek escapes → hard cut to The Northlook). Co-written w/ Nicolas ([[feedback_collaborative_story_planning]]),
+   not committed solo. `.ea` + MSG lines.
+6. **Portraits** for Hlin / Scramsax / Sephek — placeholder or vendored from FE-Repo (#19).
 
-## Architecture (in `build_campaign.py:inject_prologue`)
-Hosts on **chapter 1 / Ch1 event group** (NOT vanilla prologue slot 0); New Game redirects 0→1 in
-`StartBattleMap`. Beginning scene is a bare `LOAD1`/`ENUN`/`ENDA` — the engine cursor guard handles
-camera/cursor centering, so cutscene scripting can layer on top. Lord-death game-over quote wired on
-Hlin (placeholder `msg 0x0917`). Proven-clean reference to diff against: `inject_test_chapter`.
+## Asset access (IMPORTANT — established pattern)
+Pull a specific file from the **Klokinator FE-Repo** by **vendoring** it (same as the snowy-bern
+winter tileset) — the repo is **2.3 GB, do NOT submodule it**, and don't claim it's inaccessible
+([[feedback_vendor_community_assets]]):
+```
+gh api "repos/Klokinator/FE-Repo/contents/<url-encoded path>?ref=main" \
+  --jq '.[] | select(.name=="<exact filename>") | .download_url'
+curl -fsSL "<download_url>" -o campaigns/rime-of-the-frostmaiden/<dir>/<dest>.png
+```
+Credit the `{Artist}` from the filename in the asset dir's README.
 
 ## Build / run / debug
-- Build: `make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba` (runs `build_campaign` + decomp make).
-  Must end green; `make check` runs the drift guard (incl. the engine-guard presence check).
+- Build: `make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba` (must end green; `make check`
+  runs the drift guard incl. `check_engine_guards_present`).
 - Run: `pkill -9 -i mgba; rm -f fireemblem8u/fireemblem8.sav; "/Applications/mGBA.app/Contents/MacOS/mGBA" "$PWD/fireemblem8u/fireemblem8.gba" &` then New Game.
+- **macOS automation:** synthetic keypresses (osascript) do NOT reach mGBA — Nicolas must drive
+  input. Screen-capture works: `screencapture -x -o out.png` (needs Screen Recording perm).
 - Debug a map/render crash: `mGBA -g <rom>` + `arm-none-eabi-gdb -q fireemblem8u/fireemblem8.elf`,
   `target remote :2345`, hardware watchpoint on the suspect global (e.g. `watch gBmSt.playerCursor.y`).
-  Screen-capture the emulator on macOS: `screencapture -x -o out.png` (needs Screen Recording perm).
-- **Env note:** the gdb install bumped Homebrew `python3` to 3.14 (no numpy/pillow/pyyaml), which
-  breaks `make` (`No module named 'PIL'`). A working `python3` is restored; if it resurfaces, point
-  `python3` at a Homebrew interpreter with the build deps (see `tools/setup-toolchain.sh`).
+- **Env note:** the gdb install bumped Homebrew `python3` to 3.14 (no PIL); restored a working
+  `python3`. If `make` dies on a missing module, point `python3` at one with numpy/pillow/pyyaml.
 
 ## Key files
-- `tools/build_campaign.py` — `inject_prologue`, the two engine guards, `patch_character_data`.
-- `fireemblem8u/src/bmcamadjust.c` (`GetPlayerStartCursorPosition`), `src/bmmap.c` (`GetTerrainName`).
+- `tools/build_campaign.py` — `inject_prologue`, `inject_map_sprites` (+ `_inject_idle_sprites`,
+  `_inject_mu_sprites`, `_inject_cast_palette`), the two engine guards, `patch_character_data`.
+- `tools/map_sprite_tool.py` — map-sprite conversion (`synth_mu_sheet`, palette handling).
 - `campaigns/rime-of-the-frostmaiden/chapters/ch00-prologue-a-dagger-of-ice.yaml` — design SoT.
-- `campaigns/rime-of-the-frostmaiden/maps/ch00-prologue.{mar,json}` — the map layout.
+- `campaigns/rime-of-the-frostmaiden/map_sprites/hlin-trollbane*.png` — the vendored sprite.
 
 ## Memory
-- [[manchego-stars-project]] · [[manchego_stars_non_lord_cursor_crash]] · [[manchego_stars_text_terminator_parity]] · [[feedback_chapter_vertical_slice]] · [[feedback_collaborative_story_planning]] · [[feedback_use_decomp]]
+- [[manchego-stars-project]] · [[manchego_stars_non_lord_cursor_crash]] · [[feedback_vendor_community_assets]] · [[feedback_chapter_vertical_slice]] · [[feedback_collaborative_story_planning]] · [[reference_fe_repo]]
 
 ## Standing rules
-Combat = pure vanilla FE. Maps = winter reskin of vanilla layouts via snowy-bern. Story/dialogue =
-collaborative with Nicolas (read DM notes + Frostmaiden book). Ground engine claims in the decomp.
-Engine guards stay campaign-agnostic. Auto-push to main once green; don't commit the `fireemblem8u`
-submodule pointer.
+Combat = pure vanilla FE. Maps/sprites = vendor + reskin community/vanilla assets (not submodule).
+Story/dialogue = collaborative with Nicolas. Engine guards stay campaign-agnostic. Auto-push to
+main once green; don't commit the `fireemblem8u` submodule pointer.
