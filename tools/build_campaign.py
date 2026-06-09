@@ -1326,29 +1326,14 @@ def _load_prologue_chapter(campaign):
 def inject_prologue(campaign, verbose=True):
     """Wire the designed Prologue (#20) onto chapter 0 as the New Game target."""
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
-    # Guest classes (env-overridable for diagnostics).
-    hlin_class = os.environ.get('PROLOGUE_HLIN_CLASS', 'CLASS_WARRIOR')
-    scram_class = os.environ.get('PROLOGUE_SCRAM_CLASS', 'CLASS_HERO')
-
-    # DIAGNOSTIC (PROLOGUE_CAST_SLOTS): deploy two KNOWN-GOOD cast units on their own
-    # fully-patched cast slots (Eirika/Franz) -- with their real classes/items -- instead
-    # of the guest slots, through the *exact same* prologue pipeline (winter tileset, host
-    # Ch1, boot cuts, gDefeatTalkList edit). This isolates the two live hypotheses:
-    #   * if CAST_SLOTS renders clean -> the prologue pipeline is fine and the bug is the
-    #     guest-slot DATA (Natasha/Kyle/O'Neill) -- narrow which field next;
-    #   * if CAST_SLOTS still breaks -> the bug is in the pipeline itself (the old
-    #     "test chapter clean" result predates this code path) -- bisect the steps.
-    # Skips step-4b (cast slots are already patched by patch_character_data).
-    cast_slots = bool(os.environ.get('PROLOGUE_CAST_SLOTS'))
-    if cast_slots:
-        hlin_slot, scram_slot, sephek_slot = 'EIRIKA', 'FRANZ', 'ONEILL'
-        hlin_class, scram_class = 'CLASS_PIRATE', 'CLASS_ARMOR_KNIGHT'
-        hlin_items = 'ITEM_AXE_IRON, ITEM_AXE_HANDAXE'
-        scram_items = 'ITEM_LANCE_IRON, ITEM_VULNERARY'
-    else:
-        hlin_slot, scram_slot, sephek_slot = (
-            PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT)
-        hlin_items = scram_items = 'ITEM_AXE_HANDAXE, ITEM_VULNERARY'
+    # Cold-open guests ride non-PORTRAIT_MAP vanilla slots (PROLOGUE_*_SLOT). Classes mirror
+    # the ch00 YAML: a strong promoted "Jeigan" (Scramsax/Hero) + the frail must-survive lead
+    # (Hlin/Warrior) -- the vanilla Prologue Seth+Eirika dynamic. (Difficulty lives in the
+    # roster levels/items below + the guest stat patch in step 4b.)
+    hlin_slot, scram_slot, sephek_slot = (
+        PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT)
+    hlin_class, scram_class = 'CLASS_WARRIOR', 'CLASS_HERO'
+    hlin_items = scram_items = 'ITEM_AXE_HANDAXE, ITEM_VULNERARY'
 
     # 1. Register the prologue layout (.mar + .json -> Makefile mar_to_map -> .bin -> .lz) and
     #    point the HOST chapter (Ch1) at it + the winter tileset. We host the prologue in the
@@ -1372,8 +1357,6 @@ def inject_prologue(campaign, verbose=True):
     cfg_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'TileConfigurationSnow')
     with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
         settings = json.load(f)
-    if os.environ.get('PROLOGUE_FLAT_MAP'):  # diagnostic: use the flat test layout (known good)
-        layout_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'ChTestSnowMap')
     host = settings['chapters'][PROLOGUE_HOST_INDEX]
     host['map'].update({'obj1Id': obj_idx, 'obj2Id': 0, 'paletteId': pal_idx,
                         'tileConfigId': cfg_idx, 'mainLayerId': layout_idx,
@@ -1475,9 +1458,7 @@ def inject_prologue(campaign, verbose=True):
     # The chapter-start auto-cursor (ProcFun_ResetCursorPosition) now centers the camera +
     # cursor on the first player unit even when the lord rides a non-LORD slot (engine fix in
     # _patch_player_start_cursor_guard), so the begin scene just deploys and hands over control.
-    begin = ('{\n    LOAD1(1, UnitDef_Event_Ch1Ally)\n    ENUN\n    ENDA\n}'
-             if os.environ.get('PROLOGUE_ALLIES_ONLY') else
-             '{\n    LOAD1(1, UnitDef_Event_Ch1Ally)\n    ENUN\n'
+    begin = ('{\n    LOAD1(1, UnitDef_Event_Ch1Ally)\n    ENUN\n'
              '    LOAD1(1, UnitDef_Event_Ch1Enemy)\n    ENUN\n    ENDA\n}')
     script = _replace_brace_block(
         script, 'EventScr_Ch1_BeginningScene[] =', begin, CH1_EVENTSCRIPT_H)
@@ -1502,23 +1483,17 @@ def inject_prologue(campaign, verbose=True):
         f.write('\n'.join(lines))
 
     # 4b. Give the guest slots a consistent character identity for their deployed class --
-    #     just like patch_character_data does for the cast. A NAMED character deployed with a
-    #     class that disagrees with its gCharacterData (defaultClass + weapon ranks) freezes
-    #     the chapter shortly after deploy: the engine's class-driven paths (map sprite, and
-    #     the weapon-rank check for the unit's items) read inconsistent data. We align
-    #     defaultClass + baseLevel, zero the personal base stats (so stats == class base), and
-    #     copy growths + weapon ranks from a class-matched, unpatched vanilla donor so each
-    #     guest can actually wield its items. (Guests aren't in PORTRAIT_MAP, so do it here.)
+    #     just like patch_character_data does for the cast. Guests aren't in PORTRAIT_MAP, so
+    #     we align defaultClass + baseLevel + affinity, zero the personal base stats (so stats
+    #     == class base), and copy growths + weapon ranks from a class-matched vanilla donor so
+    #     each guest fights/levels like a real FE unit of its class and can wield its items.
+    #     (Mirrors patch_character_data; keeps the cast and guests on equal footing.)
     _axe = ('PIRATE', 'WARRIOR', 'FIGHTER', 'BRIGAND', 'BERSERKER')
     _hlin_donor = 'CHARACTER_GARCIA' if any(c in hlin_class for c in _axe) else 'CHARACTER_GERIK'
     _scram_donor = 'CHARACTER_GARCIA' if any(c in scram_class for c in _axe) else 'CHARACTER_GERIK'
     # (slot, class, level, donor, female) -- female None means "leave attributes alone"
-    # (the boss keeps CA_BOSS; _set_gender would clobber it). affinity is forced to ANIMA
-    # for every guest, mirroring patch_character_data: this is the field that diverged from
-    # the proven-clean cast slots (cast=ANIMA via patch; guests kept vanilla ICE), and the
-    # leading suspect for the post-deploy freeze.
-    guest_patch = [] if cast_slots else [
-                   (PROLOGUE_HLIN_SLOT, hlin_class, 3, _hlin_donor, True),
+    # (the boss keeps CA_BOSS; _set_gender would clobber it).
+    guest_patch = [(PROLOGUE_HLIN_SLOT, hlin_class, 3, _hlin_donor, True),
                    (PROLOGUE_SCRAMSAX_SLOT, scram_class, 1, _scram_donor, False),
                    (PROLOGUE_SEPHEK_SLOT, 'CLASS_MYRMIDON', 5, 'CHARACTER_JOSHUA', None)]
     with open(CHARACTERS_C, encoding='utf-8') as f:
@@ -1584,9 +1559,8 @@ def inject_prologue(campaign, verbose=True):
               '(Ch1 group); New Game redirects %d -> %d'
               % (obj_idx, pal_idx, cfg_idx, layout_idx, PROLOGUE_HOST_INDEX,
                  PROLOGUE_CHAPTER_INDEX, PROLOGUE_HOST_INDEX))
-        print('  units: Hlin(%s)+Scramsax(%s) vs Sephek(%s)+2 guards%s'
-              % (hlin_slot, scram_slot, sephek_slot,
-                 '  [DIAG: CAST_SLOTS]' if cast_slots else ''))
+        print('  units: Hlin(%s)+Scramsax(%s) vs Sephek(%s)+2 guards'
+              % (hlin_slot, scram_slot, sephek_slot))
 
 
 def main():
@@ -1612,11 +1586,8 @@ def main():
         patch_character_data(args.campaign)
         print('portrait geometry:')
         patch_portrait_geometry()
-        if not os.environ.get('PROLOGUE_NO_SPRITES'):
-            print('map sprites:')
-            inject_map_sprites(args.campaign)
-        else:
-            print('map sprites: [DIAG] SKIPPED')
+        print('map sprites:')
+        inject_map_sprites(args.campaign)
         print('winter tileset:')
         inject_winter_tileset(args.campaign)
         print('prologue (New Game target):')
