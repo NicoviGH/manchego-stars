@@ -75,7 +75,7 @@ player_units:
   - id: hlin-trollbane
     name: "Hlin Trollbane"
     fe_name: "Hlin"              # FE8 name buffer is 12 chars; "Hlin Trollbane" (14) overflows
-    class: warrior               # a dwarf veteran with a battleaxe/handaxe — but past her prime
+    class: brigand               # old dwarf bounty hunter, handaxe, past her prime — UNPROMOTED & frail (Eirika-analog lead; only Scramsax the "Jeigan" is a Seth-justified prepromote)
     is_npc: true                 # not one of the 7 PCs; a cold-open guest unit
     required: true               # lose if she dies (our lord-death condition)
     level: 3                     # low / frail — the weak lead (cf. Eirika Lv1)
