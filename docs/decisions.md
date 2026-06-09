@@ -271,7 +271,7 @@ tutorial event-scripts it. For unscripted stationary-aggressive bosses copy Breg
 _Decided: 2026-06-09 (found via the automated ch00 playtests; see Automated playtests)_
 
 **Automated playtests: mGBA Lua scripting drives deterministic win/lose checks.**
-`tools/playtest/run.sh win|gameover|retreat` runs a scripted ch00 playtest in the mGBA
+`tools/playtest/run.sh win|gameover|retreat|titlecard` runs a scripted ch00 playtest in the mGBA
 0.11 nightly (`--script`; auto-downloaded to `tools/emulator/`, gitignored): a Lua
 coroutine injects buttons closed-loop against real memory (cursor `gBmSt`, phase/turn
 `gPlaySt`, units `gUnitArray*`, menus + game-over via `sProcArray` proc scans, pathing
@@ -282,6 +282,22 @@ asserts (chapter index change / game-over proc), not pixels. Exit 0 = PASS; arti
 (log + milestone screenshots) in `/tmp/playtest-<scenario>/`. Synthetic macOS
 keypresses still don't reach mGBA — in-emulator scripting is the supported path.
 Art/feel checks stay human (Nicolas).
+_Decided: 2026-06-09 (titlecard scenario added 2026-06-09: opens the map-menu Status
+screen — which decompresses the title card — and screenshots it, so recomposed titles
+get eyeballed without a manual run)_
+
+**Chapter title cards are IMAGES, recomposed from vanilla glyphs.**
+FE8's intro/Status title banner is a 4bpp graphic (`chap_title_data[chapTitleId]`,
+`src/chapter_title.c`), not text — text ids (`chapTitleTextId`, 0x160+) only feed the
+save-select/Status *strings*. `tools/gen_chapter_title.py` rebuilds the card for a
+custom chapter by cutting verified glyphs out of the vanilla cards (atlas of hand-read
+cut columns; unknown glyph = hard error) and recomposing at vanilla's optical center
+(x≈99), so letterforms, outline, shadow, and palette indices stay pixel-identical to
+the runtime palette. `inject_prologue` writes it over the host slot's PNG (a restored
+build artifact; stale `.4bpp`/`.lz` removed so make re-converts) and sets both
+`chapTitleTextId` and the copied goal block's `statusObjectiveTextId` (else the Status
+screen keeps vanilla's "Defeat O'Neill") from the chapter YAML. Extend the glyph atlas
+per new chapter title.
 _Decided: 2026-06-09_
 
 ---

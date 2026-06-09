@@ -2,7 +2,7 @@
 --
 -- Launched by run.sh via a generated wrapper that sets:
 --   PLAYTEST_DIR      -- this directory (for dofile of symbols.lua)
---   PLAYTEST_SCENARIO -- "win" | "gameover" | "retreat"
+--   PLAYTEST_SCENARIO -- "win" | "gameover" | "retreat" | "titlecard"
 --   PLAYTEST_LOG      -- log file path (runner polls it for "RESULT:")
 --   PLAYTEST_SHOTDIR  -- screenshot directory for milestone/debug captures
 --
@@ -310,6 +310,32 @@ scenarios.win = function()
     end
     shot("win-timeout")
     result("FAIL", "could not kill Sephek in 6 turns")
+end
+
+-- TITLECARD: open the map menu -> Status screen, which decompresses the
+-- chapter title card (chap_title_data[chapTitleId]) -- the artifact screenshot
+-- is how a recomposed title gets eyeballed without a manual run.
+scenarios.titlecard = function()
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    for try = 1, 5 do
+        press(K.A)
+        if waitFor(menuOpen, 40) then break end
+        press(K.B); press(K.B) -- cursor was on a unit; nudge off and retry
+        press(K.DOWN, 3)
+        if try == 5 then return result("FAIL", "map menu never opened") end
+    end
+    press(K.DOWN) -- map menu: Unit, [Status], Options, Suspend, End
+    press(K.A)
+    local ok = waitFor(function()
+        return procActive(SYM.gProcScr_ChapterStatusScreen)
+    end, 120)
+    wait(90) -- let the banner/turn/funds panes finish drawing
+    shot("chapter-status")
+    if ok then
+        result("PASS", "Status screen open; title card screenshot taken")
+    else
+        result("FAIL", "Status screen proc never appeared")
+    end
 end
 
 -- GAMEOVER: Hlin (the lord-analog) dies -> EVFLAG_GAMEOVER quote -> game over.

@@ -95,7 +95,7 @@ file lean (operating instructions + pointers, not a fact store).
 |---|---|
 | `tools/build_campaign.py` | Inject campaign content (portraits, names, character class/stats) into the decomp before `make`. |
 | `tools/verify_text.py` | Decode message text from the built ROM (regression gate; no mGBA). |
-| `tools/playtest/run.sh win\|gameover\|retreat` | Automated in-emulator playtest of ch00 win/lose conditions (mGBA Lua scripting; memory-asserted PASS/FAIL). |
+| `tools/playtest/run.sh win\|gameover\|retreat\|titlecard` | Automated in-emulator playtest of ch00 win/lose conditions + title-card capture (mGBA Lua scripting; memory-asserted PASS/FAIL). |
 | `tools/portrait_tool.py`, `tools/ref_to_bust.py` | Bust art pipeline (ref → indexed FE8 portrait). |
 | `tools/setup-toolchain.sh` | One-time macOS toolchain setup (brew deps, agbcc, python numpy/pillow/pyyaml). |
 

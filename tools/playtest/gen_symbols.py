@@ -26,6 +26,8 @@ WANTED = [
     'gPermanentFlagBits',       # event flags > 100, bit (flag-101)
     'ProcScr_GameOverScreen',   # proc script: game-over screen active
     'sProc_Menu',               # proc script: a menu is open
+    'gProcScr_ChapterStatusScreen',  # proc script: map-menu Status screen, which
+                                # draws the chapter title card (src/uichapterstatus.c)
 ]
 
 
