@@ -1567,19 +1567,37 @@ def inject_prologue(campaign, verbose=True):
     with open(CHARACTERS_C, 'w', encoding='utf-8') as f:
         f.write(chars)
 
-    # 5. Lord-death = game over for Hlin. Per-character death quote flagged
-    #    EVFLAG_GAMEOVER in gDefeatTalkList; CauseGameOverIfLordDies (step 3) fires on it.
-    #    This is vanilla's Eirika/Duessel mechanism. msg is a placeholder until the
-    #    dialogue pass (#2) writes Hlin's death line; #42 generalizes to the chosen lord.
-    quote = (
+    # 5. Lord-death = game over for Hlin ONLY (decided 2026-06-09; YAML NOTE 3). Per-character
+    #    death quote flagged EVFLAG_GAMEOVER in gDefeatTalkList; CauseGameOverIfLordDies
+    #    (step 3) fires on it. This is vanilla's Eirika/Duessel mechanism. Scramsax instead
+    #    gets a FLAG-LESS defeat quote (vanilla Seth precedent): the quote plays, the battle
+    #    continues, and the line frames it as a retreat -- he's alive for Ch1. msgs are
+    #    placeholders until the dialogue pass (#2); #42 generalizes to the chosen lord.
+    quotes = [(
         '    {\n'
         '        .pid     = CHARACTER_%s, /* Hlin -- lord-death = game over */\n'
         '        .route   = CHAPTER_MODE_ANY,\n'
         '        .chapter = CHAPTER_L_1, /* prologue is hosted on chapter slot 1 */\n'
         '        .flag    = EVFLAG_GAMEOVER,\n'
         '        .msg     = 0x0917, /* placeholder; real death line in the dialogue pass */\n'
-        '    },' % hlin_slot)
-    _append_table_rows(BATTLEQUOTES_C, 'gDefeatTalkList[] =', [quote])
+        '    },' % hlin_slot), (
+        '    {\n'
+        '        .pid     = CHARACTER_%s, /* Scramsax -- defeat quote only, NO game over */\n'
+        '        .route   = CHAPTER_MODE_ANY,\n'
+        '        .chapter = CHAPTER_L_1, /* prologue is hosted on chapter slot 1 */\n'
+        '        .msg     = 0x0C25, /* placeholder (vanilla Seth line); retreat line in the dialogue pass */\n'
+        '    },' % scram_slot)]
+    #    The entries must land BEFORE the list's {.pid = -1} terminator -- the reader
+    #    (eventinfo.c GetDefeatTalkEntry) scans until pid == 0xFFFF, so anything
+    #    appended after it is unreachable (appending after `};` was a real, silent bug).
+    with open(BATTLEQUOTES_C, encoding='utf-8') as f:
+        bq = f.read()
+    term = '    {\n        .pid = -1\n    }\n};'
+    if bq.count(term) != 1:
+        sys.exit('ERROR: gDefeatTalkList terminator not in expected vanilla form in %s'
+                 % BATTLEQUOTES_C)
+    with open(BATTLEQUOTES_C, 'w', encoding='utf-8') as f:
+        f.write(bq.replace(term, '\n'.join(quotes) + '\n' + term))
 
     # 6. Boot flow: cut the attract/intro/world-map sequences, and redirect New Game from
     #    the prologue slot (0) to the host chapter (1) at StartBattleMap -- so the game

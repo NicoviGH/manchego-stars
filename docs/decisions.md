@@ -234,6 +234,21 @@ the old d20-variance problem and the "skill floor" mitigation are moot. Tune
 per-chapter via enemy stats/terrain as in any FE hack.
 _Decided: 2026-05-28 (supersedes Option A d20 hit-rate tuning)_
 
+**Game over = the lord-analog only; story-required allies "retreat" instead.**
+A chapter's game-over trigger is the must-survive lead alone (ch00: Hlin; from Ch1
+the player-chosen lord, #42) — vanilla's exact shape: only Eirika/Ephraim carry
+`EVFLAG_GAMEOVER` quotes everywhere, Seth's death quote has no flag. A story-required
+non-lord ally (ch00: Scramsax) gets a **flag-less defeat quote** framed as a retreat
+("too weak to continue the fight"): the battle continues, and the character is out of
+the fight, not dead, so later chapters can use them freely. Vanilla also supports
+per-chapter `EVFLAG_GAMEOVER` for guests (Duessel Ch10, Mansel Ch19) — available if a
+future chapter truly needs it, but the default is lord-only.
+Mechanism note: `gDefeatTalkList` is scanned until its `{.pid = -1}` terminator
+(`eventinfo.c GetDefeatTalkEntry`), so injected entries must be inserted **before** the
+terminator — appending after `};` compiled fine but was unreachable (a silent bug,
+fixed 2026-06-09 in `inject_prologue` step 5).
+_Decided: 2026-06-09 (Nicolas; retreat framing is his)_
+
 ---
 
 ## Weapon & Magic Systems

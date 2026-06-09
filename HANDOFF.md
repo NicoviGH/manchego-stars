@@ -1,9 +1,9 @@
-# Handoff: **Refining the Prologue (#20) — crash + sprite done, now win/lose logic.**
+# Handoff: **Refining the Prologue (#20) — win/lose wired, now in-engine verification.**
 
 **Date:** 2026-06-09
 **Focus:** ch00 "A Dagger of Ice" as a playable vertical slice. Crash fixed, map plays clean,
-difficulty vanilla-tuned, Hlin's custom sprite wired + approved. **Active task = the lose-condition
-decision + wiring** (step 1 below), then in-engine win/lose verification with Nicolas.
+difficulty vanilla-tuned, Hlin's custom sprite wired, lose condition decided + wired. **Active
+task = in-engine win/lose verification with Nicolas** (step 1 below), then title card + cutscenes.
 
 **Live checklist = GitHub issue #20.** HANDOFF = current state + next steps; sub-steps -> TodoWrite.
 
@@ -16,26 +16,31 @@ decision + wiring** (step 1 below), then in-engine win/lose verification with Ni
 - ✅ Difficulty tuned to vanilla: **Hlin = unpromoted Fighter** (frail Eirika-analog lead),
   **Scramsax = Hero + Steel Sword** (dominant Seth-analog Jeigan), Sephek = Myrmidon L5 boss + 2
   Fighter guards. Diagnostics (`PROLOGUE_*` env flags) removed.
-- ✅ **Hlin female-Fighter map sprite — WIRED + approved** (2026-06-09, commit 2b0084f). Renders as
-  the woman Fighter, distinct from the male guards, via a new `PROLOGUE_GUEST_SPRITES` guest path in
-  `inject_map_sprites` (custom SMS + MU override keyed to `CHARACTER_NATASHA`). Her sheet uses FE8's
-  standard player palette, so she's kept out of the cast-palette override — no palette work needed.
-  **Full repeatable recipe** (the next guest sprite will reuse it): `docs/decisions.md` → "Guests
-  reuse the STANDARD player palette" + memory [[manchego_stars_guest_map_sprite_wiring]].
+- ✅ **Hlin female-Fighter map sprite — WIRED + approved** (2026-06-09, commit 2b0084f), via the
+  `PROLOGUE_GUEST_SPRITES` guest path. Repeatable recipe: `docs/decisions.md` → "Guests reuse the
+  STANDARD player palette" + memory [[manchego_stars_guest_map_sprite_wiring]].
+- ✅ **Lose condition DECIDED (Nicolas, 2026-06-09) + WIRED: game over on Hlin ONLY.** Scramsax's
+  defeat = a **flag-less retreat quote** ("too weak to continue the fight") — battle continues,
+  and he's out of the fight, not dead, so he tends The Northlook in Ch1 regardless. Vanilla Seth
+  shape (his death quote carries no `EVFLAG_GAMEOVER`). Recorded: ch00 YAML NOTE 3 +
+  `docs/decisions.md` → "Game over = the lord-analog only".
+- ✅ **Silent quote-table bug found + fixed:** `_append_table_rows` put injected quotes AFTER
+  `gDefeatTalkList`'s `{.pid = -1}` terminator — `GetDefeatTalkEntry` (eventinfo.c) stops there,
+  so **Hlin's game-over entry had never actually been live**. `inject_prologue` step 5 now
+  inserts before the terminator (exact-match guarded). Both quote msgs are placeholders until
+  the dialogue pass.
 
 ## NEXT STEPS (priority order)
-1. **Lose condition — DECIDE w/ Nicolas, then wire** (active task). Question: just Hlin = game over
-   (vanilla lord-only feel), or Hlin AND Scramsax (both `required: true` in ch00 YAML)? Today only
-   Hlin's death→game-over quote is wired. Wiring lives in `inject_prologue` (the Ch1 event group:
-   `EventListScr_Ch1_Character` / the begin-scene script) — add the death/game-over event(s) for the
-   chosen unit(s). Vanilla FE8 reference: a `CauseGameOverIfLordDies`-style check on unit death.
-2. **In-engine win/lose verification** (playtest w/ Nicolas): DefeatBoss fires on Sephek? Hlin
-   death = game over? Guard AI sane? (Crash is gone; gameplay untested.)
-3. **Title card** "A Dagger of Ice".
-4. **Cutscenes + dialogue** — opening (cold open / corner Sephek), mid-fight frost line, ending
+1. **In-engine win/lose verification** (playtest w/ Nicolas — active task): DefeatBoss fires on
+   Sephek? Hlin death = game over (first time it can actually fire — see bug above)? Scramsax
+   death = quote plays, battle continues? Guard AI sane? Nicolas must drive input (synthetic
+   keypresses don't reach mGBA).
+2. **Title card** "A Dagger of Ice".
+3. **Cutscenes + dialogue** — opening (cold open / corner Sephek), mid-fight frost line, ending
    (Sephek escapes → hard cut to The Northlook). Co-written w/ Nicolas ([[feedback_collaborative_story_planning]]),
-   not committed solo. `.ea` + MSG lines.
-5. **Portraits** for Hlin / Scramsax / Sephek — placeholder or vendored from FE-Repo (#19).
+   not committed solo. `.ea` + MSG lines. Includes the real Hlin death line + Scramsax retreat
+   line (placeholder msgs 0x0917 / 0x0C25 today; draft retreat line in ch00 YAML `defeat_quote`).
+4. **Portraits** for Hlin / Scramsax / Sephek — placeholder or vendored from FE-Repo (#19).
 
 ## Asset access (IMPORTANT — established pattern)
 Pull a specific file from the **Klokinator FE-Repo** by **vendoring** it (same as the snowy-bern
@@ -60,11 +65,12 @@ Credit the `{Artist}` from the filename in the asset dir's README.
   `python3`. If `make` dies on a missing module, point `python3` at one with numpy/pillow/pyyaml.
 
 ## Key files
-- `tools/build_campaign.py` — `inject_prologue`, `inject_map_sprites` (+ `_inject_idle_sprites`,
-  `_inject_mu_sprites`, `_inject_cast_palette`), the two engine guards, `patch_character_data`.
-- `tools/map_sprite_tool.py` — map-sprite conversion (`synth_mu_sheet`, palette handling).
-- `campaigns/rime-of-the-frostmaiden/chapters/ch00-prologue-a-dagger-of-ice.yaml` — design SoT.
-- `campaigns/rime-of-the-frostmaiden/map_sprites/hlin-trollbane*.png` — the vendored sprite.
+- `tools/build_campaign.py` — `inject_prologue` (step 5 = the two defeat quotes),
+  `inject_map_sprites`, the two engine guards, `patch_character_data`.
+- `campaigns/rime-of-the-frostmaiden/chapters/ch00-prologue-a-dagger-of-ice.yaml` — design SoT
+  (NOTE 2/3 = the game-over mechanism + decision).
+- `fireemblem8u/src/data_battlequotes.c` (build artifact) + `src/eventinfo.c GetDefeatTalkEntry`
+  — the quote table + its terminator-scanning reader.
 
 ## Memory
 - [[manchego-stars-project]] · [[manchego_stars_non_lord_cursor_crash]] · [[manchego_stars_guest_map_sprite_wiring]] · [[feedback_vendor_community_assets]] · [[feedback_chapter_vertical_slice]] · [[feedback_collaborative_story_planning]] · [[reference_fe_repo]]
