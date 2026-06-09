@@ -40,3 +40,5 @@ map-review/
 
 # convenience shortcut to the (copyrighted, uncommitted) source assets
 /references
+tools/emulator/
+tools/playtest/symbols.lua

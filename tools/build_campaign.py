@@ -1407,6 +1407,9 @@ def inject_prologue(campaign, verbose=True):
     host['map'].update({'obj1Id': obj_idx, 'obj2Id': 0, 'paletteId': pal_idx,
                         'tileConfigId': cfg_idx, 'mainLayerId': layout_idx,
                         'objAnimId': 0, 'paletteAnimId': 0, 'changeLayerId': 0})
+    # The goal banner/objective display is chapter data, not events -- the host (vanilla
+    # Ch1) says "Seize gate". Copy the vanilla Prologue's defeat_boss goal block.
+    host['goal'] = settings['chapters'][PROLOGUE_CHAPTER_INDEX]['goal']
     with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=2)
 
@@ -1584,13 +1587,27 @@ def inject_prologue(campaign, verbose=True):
     with open(CHARACTERS_C, 'w', encoding='utf-8') as f:
         f.write(chars)
 
-    # 5. Lord-death = game over for Hlin ONLY (decided 2026-06-09; YAML NOTE 3). Per-character
-    #    death quote flagged EVFLAG_GAMEOVER in gDefeatTalkList; CauseGameOverIfLordDies
-    #    (step 3) fires on it. This is vanilla's Eirika/Duessel mechanism. Scramsax instead
-    #    gets a FLAG-LESS defeat quote (vanilla Seth precedent): the quote plays, the battle
-    #    continues, and the line frames it as a retreat -- he's alive for Ch1. msgs are
-    #    placeholders until the dialogue pass (#2); #42 generalizes to the chosen lord.
+    # 5. All three chapter outcomes ride gDefeatTalkList (vanilla's mechanism -- the flags
+    #    on defeat quotes are what set the event flags the Misc AFEVs watch; CA_BOSS alone
+    #    sets nothing):
+    #    - Sephek: .flag = EVFLAG_DEFEAT_BOSS, exactly like every vanilla boss's entry
+    #      (O'Neill/Breguet/...). Without it the DefeatBoss AFEV never fires -- O'Neill's
+    #      own entry is keyed to CHAPTER_L_PROLOGUE, not our host slot (caught by the
+    #      automated win playtest, 2026-06-09).
+    #    - Hlin: .flag = EVFLAG_GAMEOVER (lord-death = game over, decided 2026-06-09;
+    #      YAML NOTE 3); CauseGameOverIfLordDies (step 3) fires on it -- vanilla's
+    #      Eirika/Duessel mechanism.
+    #    - Scramsax: FLAG-LESS quote (vanilla Seth precedent): quote plays, battle
+    #      continues, framed as a retreat -- he's alive for Ch1.
+    #    msgs are placeholders until the dialogue pass (#2); #42 generalizes the lord.
     quotes = [(
+        '    {\n'
+        '        .pid     = CHARACTER_%s, /* Sephek -- boss kill sets the DefeatBoss flag */\n'
+        '        .route   = CHAPTER_MODE_ANY,\n'
+        '        .chapter = CHAPTER_L_1, /* prologue is hosted on chapter slot 1 */\n'
+        '        .flag    = EVFLAG_DEFEAT_BOSS,\n'
+        '        .msg     = 0x0936, /* placeholder (vanilla Breguet line); real line in the dialogue pass */\n'
+        '    },' % sephek_slot), (
         '    {\n'
         '        .pid     = CHARACTER_%s, /* Hlin -- lord-death = game over */\n'
         '        .route   = CHAPTER_MODE_ANY,\n'
@@ -1604,17 +1621,22 @@ def inject_prologue(campaign, verbose=True):
         '        .chapter = CHAPTER_L_1, /* prologue is hosted on chapter slot 1 */\n'
         '        .msg     = 0x0C25, /* placeholder (vanilla Seth line); retreat line in the dialogue pass */\n'
         '    },' % scram_slot)]
-    #    The entries must land BEFORE the list's {.pid = -1} terminator -- the reader
-    #    (eventinfo.c GetDefeatTalkEntry) scans until pid == 0xFFFF, so anything
-    #    appended after it is unreachable (appending after `};` was a real, silent bug).
+    #    The entries must land at the HEAD of the list: GetDefeatTalkEntry (eventinfo.c)
+    #    returns the FIRST match, and vanilla gives every playable slot a generic
+    #    chapter=0xFF death quote further down -- NATASHA's/KYLE's would shadow our
+    #    flagged entries (quote plays, flag never set, no game over; caught by the
+    #    automated gameover playtest, 2026-06-09). Vanilla orders the table the same
+    #    way: chapter-keyed boss entries first, generic quotes after. (And never append
+    #    after the {.pid = -1} terminator: the scan stops there -- that one was a real,
+    #    silent bug too.)
     with open(BATTLEQUOTES_C, encoding='utf-8') as f:
         bq = f.read()
-    term = '    {\n        .pid = -1\n    }\n};'
-    if bq.count(term) != 1:
-        sys.exit('ERROR: gDefeatTalkList terminator not in expected vanilla form in %s'
+    head = 'CONST_DATA struct DefeatTalkEnt gDefeatTalkList[] = {\n'
+    if bq.count(head) != 1:
+        sys.exit('ERROR: gDefeatTalkList head not in expected vanilla form in %s'
                  % BATTLEQUOTES_C)
     with open(BATTLEQUOTES_C, 'w', encoding='utf-8') as f:
-        f.write(bq.replace(term, '\n'.join(quotes) + '\n' + term))
+        f.write(bq.replace(head, head + '\n'.join(quotes) + '\n'))
 
     # 6. Boot flow: cut the attract/intro/world-map sequences, and redirect New Game from
     #    the prologue slot (0) to the host chapter (1) at StartBattleMap -- so the game

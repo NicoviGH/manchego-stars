@@ -244,24 +244,45 @@ non-lord ally (ch00: Scramsax) gets a **flag-less defeat quote** framed as a ret
 the fight, not dead, so later chapters can use them freely. Vanilla also supports
 per-chapter `EVFLAG_GAMEOVER` for guests (Duessel Ch10, Mansel Ch19) — available if a
 future chapter truly needs it, but the default is lord-only.
-Mechanism note: `gDefeatTalkList` is scanned until its `{.pid = -1}` terminator
-(`eventinfo.c GetDefeatTalkEntry`), so injected entries must be inserted **before** the
-terminator — appending after `};` compiled fine but was unreachable (a silent bug,
-fixed 2026-06-09 in `inject_prologue` step 5).
+Mechanism note: injected `gDefeatTalkList` entries go at the **head** of the list —
+see "Chapter outcomes ride gDefeatTalkList" below for why.
 _Decided: 2026-06-09 (Nicolas; retreat framing is his)_
 
-**Win/lose conditions live in the chapter's Misc event list; boss AI ≠ O'Neill's.**
-Both halves of a chapter's outcome are AFEV watchers in `EventListScr_<Ch>_Misc`
+**Chapter outcomes ride gDefeatTalkList; entries go at the HEAD of the table.**
+A chapter's win and lose are both event-flag watchers in `EventListScr_<Ch>_Misc`
 (vanilla Prologue shape, `prologue-eventinfo.h`): `DefeatBoss(<ending scene>)` fires on
-`EVFLAG_DEFEAT_BOSS`, which the engine sets when a `CA_BOSS` unit dies, and
-`CauseGameOverIfLordDies` fires on `EVFLAG_GAMEOVER`, which the lord's flagged defeat
-quote sets. Emptying the Misc list silently removes BOTH the win and the lose condition
-(found in the 2026-06-09 playtest: boss kill didn't end ch00).
+`EVFLAG_DEFEAT_BOSS` and `CauseGameOverIfLordDies` fires on `EVFLAG_GAMEOVER`. Neither
+flag is set by the engine directly — **both are set by the dying unit's `gDefeatTalkList`
+entry** (`.flag` on the defeat quote; `CA_BOSS` alone sets nothing — every vanilla boss
+has a chapter-keyed entry with `EVFLAG_DEFEAT_BOSS`). Three traps, all hit on 2026-06-09:
+- Emptying the Misc list silently removes BOTH the win and the lose condition.
+- `GetDefeatTalkEntry` (eventinfo.c) returns the FIRST match, and vanilla gives every
+  playable slot a generic `chapter = 0xFF` death quote mid-table — so injected
+  chapter-keyed entries must go at the **head** of the list (vanilla's own ordering:
+  boss entries first, generics after), or e.g. NATASHA's generic quote shadows the
+  flagged one and game over never fires. Never append after the `{.pid = -1}`
+  terminator either: the scan stops there.
+- The goal banner ("Defeat boss" vs the host chapter's "Seize gate") is chapter DATA
+  (`chapter_settings.json` `goal`), not events — copy the vanilla Prologue's block.
 Boss AI gotcha: O'Neill's `.ai = {0x6, 0x3, …}` decodes to **DoNothing + NeverMove**
 (`cp_data.c gAi1ScriptTable`/`gAi2ScriptTable`) — he only attacks because the vanilla
 tutorial event-scripts it. For unscripted stationary-aggressive bosses copy Breguet:
 `{0x3, 0x3, 0x9, 0x20}` (ActionStanding 100% + NeverMove).
-_Decided: 2026-06-09 (first ch00 playtest)_
+_Decided: 2026-06-09 (found via the automated ch00 playtests; see Automated playtests)_
+
+**Automated playtests: mGBA Lua scripting drives deterministic win/lose checks.**
+`tools/playtest/run.sh win|gameover|retreat` runs a scripted ch00 playtest in the mGBA
+0.11 nightly (`--script`; auto-downloaded to `tools/emulator/`, gitignored): a Lua
+coroutine injects buttons closed-loop against real memory (cursor `gBmSt`, phase/turn
+`gPlaySt`, units `gUnitArray*`, menus + game-over via `sProcArray` proc scans, pathing
+via the game's own `gBmMapMovement`), with symbol addresses regenerated from the ELF
+each run (`gen_symbols.py`). Deaths are engineered by HP-poking units then letting real
+combat resolve, so the event engine is exercised end-to-end; verdicts are memory
+asserts (chapter index change / game-over proc), not pixels. Exit 0 = PASS; artifacts
+(log + milestone screenshots) in `/tmp/playtest-<scenario>/`. Synthetic macOS
+keypresses still don't reach mGBA — in-emulator scripting is the supported path.
+Art/feel checks stay human (Nicolas).
+_Decided: 2026-06-09_
 
 ---
 
