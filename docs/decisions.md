@@ -250,6 +250,19 @@ terminator — appending after `};` compiled fine but was unreachable (a silent 
 fixed 2026-06-09 in `inject_prologue` step 5).
 _Decided: 2026-06-09 (Nicolas; retreat framing is his)_
 
+**Win/lose conditions live in the chapter's Misc event list; boss AI ≠ O'Neill's.**
+Both halves of a chapter's outcome are AFEV watchers in `EventListScr_<Ch>_Misc`
+(vanilla Prologue shape, `prologue-eventinfo.h`): `DefeatBoss(<ending scene>)` fires on
+`EVFLAG_DEFEAT_BOSS`, which the engine sets when a `CA_BOSS` unit dies, and
+`CauseGameOverIfLordDies` fires on `EVFLAG_GAMEOVER`, which the lord's flagged defeat
+quote sets. Emptying the Misc list silently removes BOTH the win and the lose condition
+(found in the 2026-06-09 playtest: boss kill didn't end ch00).
+Boss AI gotcha: O'Neill's `.ai = {0x6, 0x3, …}` decodes to **DoNothing + NeverMove**
+(`cp_data.c gAi1ScriptTable`/`gAi2ScriptTable`) — he only attacks because the vanilla
+tutorial event-scripts it. For unscripted stationary-aggressive bosses copy Breguet:
+`{0x3, 0x3, 0x9, 0x20}` (ActionStanding 100% + NeverMove).
+_Decided: 2026-06-09 (first ch00 playtest)_
+
 ---
 
 ## Weapon & Magic Systems

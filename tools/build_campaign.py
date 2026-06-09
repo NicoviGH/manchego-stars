@@ -1413,7 +1413,10 @@ def inject_prologue(campaign, verbose=True):
     # 2. Rewrite the two prologue rosters. redaCount=0 places units statically at
     #    xPosition/yPosition (like inject_test_chapter); the boss rides the ONEILL slot so
     #    its CA_BOSS attribute makes DefeatBoss fire on death. Positions/levels/items from
-    #    the chapter YAML (0-indexed x,y). AI mirrors vanilla: boss holds, guards attack.
+    #    the chapter YAML (0-indexed x,y). AI: boss = Breguet's stationary-aggressive bytes
+    #    {AI_A_03 ActionStanding, AI_B_03 NeverMove, config} (cp_data.c gAi1/2ScriptTable) --
+    #    NOT O'Neill's {0x6,0x3} "DoNothing", which only works because the vanilla tutorial
+    #    event-scripts his attack. Guards attack in range (AI_A_00).
     ally = (
         '{\n'
         '    {\n'
@@ -1452,7 +1455,7 @@ def inject_prologue(campaign, verbose=True):
         '        .yPosition = 8,\n'
         '        .redaCount = 0,\n'
         '        .items = { ITEM_SWORD_STEEL },\n'
-        '        .ai = {0x6, 0x3, 0x0, 0x0},\n'
+        '        .ai = {0x3, 0x3, 0x9, 0x20}, /* attack in place, never move (Breguet) */\n'
         '    },\n'
         '    {\n'
         '        .charIndex = 0x80, /* Torg\'s caravan guard */\n'
@@ -1485,15 +1488,22 @@ def inject_prologue(campaign, verbose=True):
     with open(CH1_UDEFS_H, 'w', encoding='utf-8') as f:
         f.write(udefs)
 
-    # 3. Strip the Ch1 cutscene scripting to a clean sandbox (exactly like inject_test_chapter,
-    #    which renders cleanly): empty every per-chapter event list and null the tutorial list,
-    #    then replace the beginning scene with a bare deploy of both rosters. (DefeatBoss win +
-    #    lord-death go in a follow-up once this baseline is confirmed clean.)
+    # 3. Strip the Ch1 cutscene scripting (like inject_test_chapter, which renders cleanly):
+    #    empty the Turn/Character/Location lists and null the tutorial list, then replace the
+    #    beginning scene with a bare deploy of both rosters. The Misc list keeps the win/lose
+    #    machinery in the vanilla Prologue's shape (prologue-eventinfo.h): DefeatBoss = AFEV
+    #    on EVFLAG_DEFEAT_BOSS, which the engine sets when a CA_BOSS unit (Sephek, on the
+    #    ONEILL slot) dies -> runs the ending scene; CauseGameOverIfLordDies = AFEV on
+    #    EVFLAG_GAMEOVER, which Hlin's flagged defeat quote sets (step 5).
     with open(CH1_EVENTINFO_H, encoding='utf-8') as f:
         info = f.read()
     for name in ('EventListScr_Ch1_Turn', 'EventListScr_Ch1_Character',
-                 'EventListScr_Ch1_Location', 'EventListScr_Ch1_Misc'):
+                 'EventListScr_Ch1_Location'):
         info = _replace_brace_block(info, name + '[] =', '{\n    END_MAIN\n}', CH1_EVENTINFO_H)
+    misc = ('{\n    DefeatBoss(EventScr_Ch1_EndingScene)\n'
+            '    CauseGameOverIfLordDies\n'
+            '    END_MAIN\n}')
+    info = _replace_brace_block(info, 'EventListScr_Ch1_Misc[] =', misc, CH1_EVENTINFO_H)
     info = _replace_brace_block(info, 'EventListScr_Ch1_Tutorial[] =',
                                 '{\n    NULL\n}', CH1_EVENTINFO_H)
     with open(CH1_EVENTINFO_H, 'w', encoding='utf-8') as f:
@@ -1508,6 +1518,13 @@ def inject_prologue(campaign, verbose=True):
              '    LOAD1(1, UnitDef_Event_Ch1Enemy)\n    ENUN\n    ENDA\n}')
     script = _replace_brace_block(
         script, 'EventScr_Ch1_BeginningScene[] =', begin, CH1_EVENTSCRIPT_H)
+    # Minimal DefeatBoss ending (vanilla Prologue's EndingScene minus text/flags): victory
+    # sting, then advance off the chapter. MNC2(0x2) is a placeholder hop to the next
+    # chapter slot until the real ending cutscene (Sephek escapes -> The Northlook) lands
+    # in the dialogue pass.
+    ending = '{\n    MUSC(SONG_VICTORY)\n    MNC2(0x2)\n    ENDA\n}'
+    script = _replace_brace_block(
+        script, 'EventScr_Ch1_EndingScene[] =', ending, CH1_EVENTSCRIPT_H)
     with open(CH1_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
         f.write(script)
 
