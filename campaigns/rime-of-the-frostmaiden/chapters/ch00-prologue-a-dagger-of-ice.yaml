@@ -89,6 +89,10 @@ player_units:
       - id: hand-axe             # weak, throwable (range 1-2) so she can chip safely
         damage_type: slashing    # cosmetic flavor label
       - id: vulnerary
+    art:
+      portrait: vendor           # FE-Repo mug, not the ref pipeline (look picked 2026-06-09)
+      source: "portraits/vendor/Pirate Lady (Version 3) {Cygnus} [F2E].png"
+      hand_pass: "portraits/guest_vendor_busts.py — silver-hair age recolor + 18->16 color merge"
   # Scramsax = the STRONG Jagen (our Seth-analog) who protects Hlin and does the killing.
   - id: scramsax
     name: "Scramsax"
@@ -104,6 +108,10 @@ player_units:
         damage_type: slashing    # cosmetic flavor label
       - id: hand-axe             # a throwing option for reach/variety
         damage_type: slashing
+    art:
+      portrait: vendor           # FE-Repo mug used as-is (look picked 2026-06-09)
+      source: "portraits/vendor/Hero {LaurentLacroix, UltraFenix, monk-han}.png"
+      hand_pass: "portraits/guest_vendor_busts.py — 96x80 crop only"
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
 enemy_units:
@@ -126,6 +134,13 @@ enemy_units:
     ai_pattern: hold_position
     # Defeated on the field, but he does NOT die here — see the chapter_end cutscene (escape).
     death_quote: "You cut the ice… not the cold that made it…"
+    art:
+      render:                    # exact reproduction of the shipped bust (tools/ref_to_bust.py)
+        ref: "References/NPCs/Sephak Bust Dagger.png"   # Nicolas's cel-shaded ref (dagger version — the longsword hit the dead corner)
+        crop: [260, 610, 1280, 1460]   # wide enough left/down to keep the white shirt sleeve
+        zoom: 0.94                     # 0 px clipped; shoulder + dagger pinned to the bottom corners
+        bg_thresh: 25                  # flat gray bg sits close to the cream sleeve; keep the threshold tight
+        hand_pass: "portraits/sephek-kaltro_dagger_trim.py — dead-corner clear + dagger glow-halo trim"
   - id: caravan-guard
     name: "Torg's Caravan Guard"
     count: 2                     # trivial practice mooks (Torrga Icevein's hirelings)
