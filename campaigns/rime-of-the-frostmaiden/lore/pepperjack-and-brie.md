@@ -24,6 +24,18 @@ Both speak Pokémon-style — each only ever says its own name:
 
 Tone and meaning come through entirely in delivery, timing, and context (à la a Pokémon).
 
+Writing rules for the dialogue pass (confirmed at the 2026-06-10 voice interview —
+this section IS their voice bible):
+
+- Punctuation and repetition carry the meaning: "Pepperjack." / "Pepperjack…?" /
+  "PEPPERJACK!" / "Brie. Brie brie." are all different lines.
+- Scene directions and other characters' reactions do the translating when the plot
+  needs words ("He says the bridge is out." — "…Pepperjack." — "FINE. He says he
+  TOLD you the bridge was out.").
+- They understand everything said to them; comprehension is never the joke.
+- **Banned:** any word other than their own name, subtitles/parenthetical
+  translations in their own text boxes, either one saying the other's name.
+
 ## Pepperjack
 
 - **Chassis:** grey
