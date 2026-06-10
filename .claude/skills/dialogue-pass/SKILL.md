@@ -33,6 +33,27 @@ beats → lines, human curates every level). Decided 2026-06-09 (docs/decisions.
 4. Lock a beat before moving to the next; record locked text in the chapter YAML
    (or issue #43 for montage slots that lack wiring).
 
+## Craft check (run on every draft AND every review pass)
+
+Compliance isn't quality — a line can pass every budget and banned list and still be
+flat. Judge the writing itself, and grade honestly: "functional" is a finding, not a
+pass. Checks, in order of weight:
+
+1. **Cover-the-name test** — could only THIS speaker say it this way? A line any
+   soldier/narrator could deliver is a flag, even if it breaks no rule.
+2. **Job test** — every line advances, reveals, or lands. A box that only restates
+   gets cut, not polished.
+3. **Box button** — each A-press ends on a hook, a turn, or a punch; never on
+   mid-thought filler. The scene's LAST line before gameplay should be quotable.
+4. **Concrete over abstract** — trades, tools, weather. "A glassblower" beats
+   "a victim"; "seems forthcoming" is the kind of limp abstraction to hunt.
+5. **Device budget** — one rhetorical device (tricolon, anaphora, echo) per speaker
+   per scene reads as voice; the same device twice reads as a tic. Spot repeats.
+6. **Read-aloud test** — speech rhythm; contractions wherever the character allows.
+
+Craft findings on LOCKED text don't silently reopen it: bring the flag + 2–3
+alternative lines, Nicolas decides whether the lock reopens.
+
 ## Insertion & gates (after lines are locked)
 
 - Text goes in `texts/texts.txt` via `set_message_body` in `tools/build_campaign.py`;
