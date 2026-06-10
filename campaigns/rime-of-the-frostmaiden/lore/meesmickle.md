@@ -13,6 +13,34 @@
 - **Alignment:** chaotic_neutral
 - **Size/age:** small
 
+## Voice
+
+Speaks rarely — and when she does, it's a dry, sarcastic one-liner (register: Salem
+from *Sabrina the Teenage Witch*). A quiet menace: terrifying in a fight, deadpan
+about it afterward. **Low line-count by design** — her player was one of the table's
+introverts, and the FE script should honor that: a few perfect quips beat a speaking
+role. (Interview with Nicolas, 2026-06-10.)
+
+**Diction rules**
+- Short sardonic quips, delivered flat. One sentence is her natural unit; two is a
+  speech.
+- World-weary cat superiority: unimpressed by danger, weather, and other people's
+  plans.
+- Her fiendish powers are treated as mundane — no cackling, no theatrics. Hurling
+  someone through Hell is just Tuesday.
+- Sarcasm is dry, never cruel slapstick; she's a wit, not a bully.
+- Not actually bloodthirsty: she was among the PCs who refused to fight the Bremen
+  government over the maer-speaker payment and abstained from that battle.
+
+**Calibration (thin — persona-derived; add real table lines if any surface)**
+- The Bremen abstention: the party turns on the town over unpaid wages; Meesmickle
+  sits it out. Voice target: "You're storming the town hall over an invoice. I'll be
+  over here. Not doing that."
+- General register target: "Oh good. More snow. I was worried we'd run out."
+
+**Banned:** chattiness, monologues, earnest sentimentality, theatrical evil (cackling,
+"foolish mortals"), cat-pun overload, enthusiasm.
+
 ## Ability Fantasies (flavor only — not game mechanics)
 
 These are the D&D abilities Meesmickle had on paper, kept as flavor names and story beats.
