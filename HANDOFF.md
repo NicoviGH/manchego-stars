@@ -1,111 +1,104 @@
-# Handoff: **NEXT = the ch00 dialogue pass — opening / mid-fight / ending cutscenes + real quote lines, co-written with Nicolas (walk it beat by beat, do NOT draft solo).**
+# Handoff: **NEXT = invoke `/dialogue-pass`, REVIEW all locked ch00 text (montage cards + opening scene — Nicolas wants a thoroughness pass), then continue at slot 4 (mid-fight line).**
 
-**Date:** 2026-06-09
-**Last session:** Shipped all three ch00 guest portraits (Sephek custom from Nicolas's
-"Sephak Bust Dagger" ref; Hlin = FE-Repo Pirate Lady v3 silver-hair recolor; Scramsax =
-FE-Repo Hero mug) + the `GUEST_PORTRAIT_MAP` wiring, credits, decision record, and
-issue #20 ticks. Pushed through de0d795. Portraits are now DONE for the whole prologue;
-the only ch00 work left is story/dialogue, then the end-to-end load-test.
+**Date:** 2026-06-10
+**Last session:** Built the dialogue-writing system and co-wrote the first half of the
+ch00 dialogue pass with Nicolas: voice bibles (`lore/*.md` §Voice), the
+`.claude/skills/dialogue-pass` skill, the opening-sequence content plan (3 exclusive
+layers, decisions.md §Story & Dialogue), and LOCKED text for the #43 lore crawl (7
+cards), the #43 town tour (6 cards, all ten towns), and the full ch00 opening scene
+(briefing-with-interrupt staging). All pushed through `ch00 opening scene script locked`.
 
-**Live checklist = GitHub issue #20** (objective wiring / title card / guest portraits all
-ticked 2026-06-09). HANDOFF = current state + next steps; sub-steps -> TodoWrite.
+**Live checklist = GitHub issue #20.** HANDOFF = current state + next steps.
 
 ---
 
-## NEXT SESSION: ch00 cutscenes + dialogue (collaborative mode)
-Co-written with Nicolas ([[feedback_collaborative_story_planning]]) — bring beat options,
-iterate line by line; he OKs voice. Read the book pages FIRST ([[feedback_story_sources_of_truth]]).
-1. **Opening cutscene** — cold open / Hlin+Scramsax corner Sephek (`.ea` + dialogue).
-   Voice sources: book printed pp.22-23 (Hlin: "elderly shield dwarf with a nasty scar
-   across her nose… smoking her pipe"; her hired-killer quest monologue is verbatim
-   there). Sephek: undead charmer, "kiss of the Frostmaiden". PDF page = printed+1.
-2. **Mid-fight frost line** — Sephek bleeds frost at low HP.
-3. **Ending cutscene** — Sephek "defeated" → misty-step escape → hard cut to The
-   Northlook + the seven. Replaces the placeholder `MUSC(SONG_VICTORY)` + `MNC2(0x2)`
-   hop in `EventScr_Ch1_EndingScene` (`inject_prologue` step 3 area patches it).
-4. **Real lines for the three placeholder quote msgs** — Sephek 0x0936 / Hlin 0x0917 /
-   Scramsax 0x0C25 (Scramsax has a draft retreat line in the chapter YAML already;
-   Sephek has a draft `death_quote` there too — start from those).
-5. After any text change: `python3 tools/verify_text.py`. Dialogue scenes are the first
-   real in-game showing of the guest portraits — have Nicolas eyeball one scene.
+## NEXT SESSION (in order)
+1. **Invoke the `Skill` tool: `dialogue-pass`** — it was created mid-session so this
+   session couldn't invoke it; next session it registers. It encodes the whole workflow
+   (sources → voice bibles → beats → 2-3 variants, Nicolas picks → budgets → gates).
+   This session was its hand-run dry run; next session runs it for real.
+2. **Review pass over everything locked so far** (Nicolas: "I'm sure they are fine, I
+   just want to be thorough") — read each against its voice bible + register budgets:
+   - Lore crawl 7 cards + town tour 6 cards: `campaigns/.../events/opening-montage.yaml`
+   - Opening scene script: ch00 YAML `events:` → `script:` block
+   Check: banned-list violations, card word budgets (lore/narration.md), box line
+   lengths vs GBA ~2-line boxes, book-quote fidelity (PDF page = printed+1).
+3. **Slot 4 — mid-fight frost line** (boss_low_hp, one screen; vanilla analog 0x914).
+   Drafted-but-not-shown variants exist in last session's transcript spirit: wound
+   rimes over (recommended) / pity for the old hunters / first crack of doubt.
+   Bring 2-3 via AskUserQuestion picker.
+4. **Slot 5 — the three quote msgs** (Sephek 0x0936 / Hlin 0x0917 / Scramsax 0x0C25
+   placeholders in `inject_prologue` step 5; YAML drafts exist for Sephek + Scramsax).
+5. **Slot 6 — ending cutscene** (beats locked in ch00 YAML event description: shards →
+   rime-over → gone, NO corpse; Hlin's quiet "bigger than one bounty" beat ≤ ~10 lines;
+   cut to black on a Northlook location card. Northlook hiring scene = ch01 opening now).
+6. **Wire slots 3-6 into the ROM** (`inject_prologue`: real `EventScr_Ch1_BeginningScene`
+   cutscene + ending block + quote msgs via `set_message_body`) → `make` green →
+   `verify_text.py` → playtests → in-game eyeball WITH Nicolas (first real showing of
+   guest portraits) → only then commit art-visible text. Slots 1-2 stay parked in
+   `events/opening-montage.yaml` until #43.
 
-## Then (priority order)
-1. **#20 load-test** — full manual New Game → win → cutscene playthrough (last open box
-   besides dialogue on #20).
-2. **Prologue done ⇒ #43 opening montage** — next vertical slice (replaces boot cuts 2+4;
-   coordinate with #29; blocker for #37). Then ch01 (#21).
-3. (When ch01 starts) playtest scenario per chapter objective; `make playtest` target.
-   New chapter titles = extend the glyph atlas in `gen_chapter_title.py` (needs C/h/digits
-   for "Ch.N:" prefixes).
+## Working agreements discovered this session (now also in memory/skill)
+- **Answer questions as turn-ending text; NEVER stack an answer right before an
+  AskUserQuestion** — pre-tool text doesn't render for Nicolas; he only sees the picker
+  (burned twice; memory `feedback_answer_before_picker`).
+- Pickers (AskUserQuestion with full-text previews) are GOOD for variant choices —
+  Nicolas asked for them ("can you prompt me the options to choose").
+- He challenges staging logic, productively — the briefing-with-interrupt restructure
+  ("why would she describe his crimes to HIM?") and "write montage + prologue in
+  sequence so we don't rewrite" were both his calls. Bring him dramaturgy, not just lines.
 
-## Current state (all machine-verified, pushed)
-- ✅ ch00 playable end-to-end with full art: map, units, win/lose wiring, title card,
-  glacial banner theme, cast + guest portraits. `make` green, `make check` clean,
-  verify_text 0 runaway, playtest win/gameover PASS.
-- ✅ Guest-portrait machinery: `GUEST_PORTRAIT_MAP` (optional-by-file) + geometry patch;
-  vendor originals/credits in `campaigns/.../portraits/vendor/`; regen scripts
-  (`guest_vendor_busts.py`, `sephek-kaltro_dagger_trim.py`); render params in the chapter
-  YAML `art:` blocks. Policy + lessons: decisions.md → "Guest portraits" and
-  [[project_manchego_stars_portrait_pipeline]].
-- ⚠️ Quote msgs + win ending are placeholders — THE next task (above).
-- ⚠️ Scramsax's Hero mug has **no [F2E] tag in its filename** — license recheck before
-  distribution (flagged in CREDITS.md + vendor/README.md).
+## Current state
+- ✅ ch00 playable end-to-end with full art (map/units/win-lose/title/portraits);
+  `make` green, `make check` clean, playtest win/gameover PASS (carried from 06-09).
+- ✅ Dialogue system: voice bibles `lore/{hlin-trollbane,scramsax,sephek-kaltro,narration}.md`;
+  skill `.claude/skills/dialogue-pass/SKILL.md`; decisions.md §Story & Dialogue (3-layer
+  content allocation; Northlook→ch01; Sephek corpse imagery reserved for his true death).
+- ✅ LOCKED + pushed: lore crawl (7 cards) + town tour (6 cards) in
+  `events/opening-montage.yaml`; opening scene script in ch00 YAML (location card "The
+  Eastway"; Hlin-briefs-Scramsax V1; "It cannot." interrupt; confession V-A; button V3
+  with Hlin's last word). ch01 opening description now owns the Northlook hiring.
+- ⚠️ NOTHING is wired into the ROM yet — all locked text is YAML-parked. Quote msgs +
+  ending scene in `inject_prologue` are still vanilla placeholders.
+- ⚠️ Could not comment the content plan onto issue #43 (permission classifier blocks gh
+  issue comments) — decisions.md carries it; Nicolas can paste a pointer if wanted.
+- ⚠️ Scramsax Hero mug still needs the [F2E] license recheck before distribution.
 
 ## Gotchas (carried)
-- Story text lives in `texts/texts.txt` via `set_message_body` + msg ids read from the
-  decomp (never hardcode); `make` reruns build_campaign and overwrites manual decomp edits.
-- Synthetic macOS keypresses don't reach mGBA; in-emulator Lua is the path (0.11 nightly).
-- Unit marching: read `gBmMapMovement` reachable tiles, not naive closest-tile.
-- Glyph extraction (for future title cards): hand-read cut columns from ASCII pixel dumps;
-  kerned neighbors bleed; "It's a Trap!" has a standalone clean 'a'.
-- Status plaque palette = `Pal_PlayStatusSprites` pal 0 (OBJ rows 8-9), not title palettes.
+- Story text: `texts/texts.txt` via `set_message_body`, msg ids from the decomp; `make`
+  reruns build_campaign and overwrites manual decomp edits. Odd-length strings: pad with
+  [.] (terminator parity). Gate: `python3 tools/verify_text.py`.
+- Synthetic macOS keypresses don't reach mGBA; in-emulator Lua is the path.
+- The Frostmaiden book is at `References/icewind-dale-...pdf` **inside the repo's
+  `references/` symlink target** = `/Users/Yonick/Documents/D&D/5E/...` (HANDOFF's old
+  path was stale); DM notes PDF: `/Users/Yonick/Documents/Claude/Projects/Manchego
+  Stars / Fire Emblem Game/References/DungeonMasterNotesIcewindDale.pdf`.
+- PDF page = printed page + 1 (Hlin/Sephek brief: printed pp.22-23 → PDF 23-24).
 
 ## Blockers
-- None. (Dialogue is collaborative — that IS the next session's working mode.)
-
-## Asset access (IMPORTANT — established pattern)
-Pull a specific file from the **Klokinator FE-Repo** by **vendoring** it (2.3 GB — do NOT
-submodule; never claim inaccessible) ([[feedback_vendor_community_assets]]):
-```
-gh api "repos/Klokinator/FE-Repo/contents/<url-encoded path>?ref=main" \
-  --jq '.[] | select(.name=="<exact filename>") | .download_url'
-curl -fsSL "<download_url>" -o campaigns/rime-of-the-frostmaiden/<dir>/<dest>.png
-```
-For browsing, `--jq '.[] | [.name, .download_url] | @tsv'` on a directory gives a
-greppable candidate list. Credit the `{Artist}` in the asset dir README + CREDITS.md.
-
-## Build / run / playtest / debug
-- Build: `make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba` (green at session end;
-  `make check` = drift guard). Regenerate indexes after YAML edits (`tools/gen_*_index.py`).
-- Text gate after any text change: `python3 tools/verify_text.py`.
-- **Automated playtest:** `tools/playtest/run.sh win|gameover|retreat|titlecard` (exit 0 =
-  PASS; artifacts in `/tmp/playtest-<scenario>/`; wipes the .sav; kills running mGBA).
-- Manual run (art/feel): `pkill -9 -i mgba; rm -f fireemblem8u/fireemblem8.sav; "/Applications/mGBA.app/Contents/MacOS/mGBA" "$PWD/fireemblem8u/fireemblem8.gba" &` then New Game.
-- Visual drafts for Nicolas: save PNGs to `map-review/` and `open` them — he can't see
-  inline renders ([[feedback_sharing_visual_drafts]]).
-- Debug a crash: `mGBA -g <rom>` + `arm-none-eabi-gdb -q fireemblem8u/fireemblem8.elf`,
-  `target remote :2345`, hardware watchpoint on the suspect global.
-- **Env note:** if `make` dies on a missing module, point `python3` at one with
-  numpy/pillow/pyyaml.
+- None. (Dialogue review + slots 4-6 are collaborative — that IS the working mode.)
 
 ## Key files
-- `tools/build_campaign.py` — `inject_prologue` (quote msgs step 5, `EventScr_Ch1_EndingScene`
-  ending block, name/title text via `set_message_body`); portrait machinery
-  (`PORTRAIT_MAP`/`GUEST_PORTRAIT_MAP`, `inject_portraits`, `patch_portrait_geometry`).
-- `campaigns/rime-of-the-frostmaiden/chapters/ch00-prologue-a-dagger-of-ice.yaml` — design
-  SoT: narrative beats, draft quote lines, guest `art:` blocks.
-- `fireemblem8u/` decomp: event-script reference for cutscenes (vanilla prologue scenes =
-  the shape to copy; ground every claim in source per [[feedback_use_decomp]]).
-- Frostmaiden book PDF (voice): `References/icewind-dale-rime-of-the-frostmaidenpdf_compress.pdf`
-  (PDF page = printed+1; Hlin/Sephek brief at printed pp.22-23). DM notes PDF beside it.
-- `tools/playtest/{run.sh,harness.lua,gen_symbols.py}` — playtest harness.
-- `docs/decisions.md` — settled decisions; record any new dialogue/cutscene mechanism choice.
+- `campaigns/rime-of-the-frostmaiden/events/opening-montage.yaml` — LOCKED #43 text
+  (crawl + tour), parked until the #43 slice wires it.
+- `campaigns/.../chapters/ch00-prologue-a-dagger-of-ice.yaml` — opening-scene `script:`
+  block (locked), ending-scene beat description, draft quote lines.
+- `campaigns/.../lore/{hlin-trollbane,scramsax,sephek-kaltro,narration}.md` — voice
+  bibles + register budgets (the review pass's rubric).
+- `.claude/skills/dialogue-pass/SKILL.md` — the workflow to invoke.
+- `docs/decisions.md` §Story & Dialogue — content allocation + workflow decision record.
+- `tools/build_campaign.py` — `inject_prologue` (begin scene step 3, ending block,
+  quote msgs step 5) — where slots 3-6 get wired.
+- `fireemblem8u/src/events/prologue-eventscript.h` — vanilla scene shapes (0x90D
+  briefing / 0x910 spawn / 0x914 mid-fight / 0x918 quiet ending beat).
 
 ## Memory
-- [[manchego-stars-project]] · [[feedback_collaborative_story_planning]] · [[feedback_story_sources_of_truth]] · [[feedback_use_decomp]] · [[project_manchego_stars_dm_notes]] · [[feedback_fe_name_truncation]] · [[manchego_stars_text_terminator_parity]] · [[project_manchego_stars_portrait_pipeline]] · [[manchego-stars-automated-playtests]] · [[feedback_chapter_vertical_slice]]
+- [[manchego-stars-project]] · [[feedback_collaborative_story_planning]] ·
+  [[feedback_answer_before_picker]] · [[feedback_story_sources_of_truth]] ·
+  [[feedback_use_decomp]] · [[manchego_stars_text_terminator_parity]] ·
+  [[feedback_show_before_committing_art]] · [[manchego-stars-automated-playtests]]
 
 ## Standing rules
-Combat = pure vanilla FE. Maps/sprites = vendor + reskin community/vanilla assets (not
-submodule). Story/dialogue = collaborative with Nicolas; art look-picks wait for his OK.
-Engine guards stay campaign-agnostic. Auto-push to main once green; don't commit the
-`fireemblem8u` submodule pointer. Playtests: machine-run for logic, Nicolas for art/feel.
+Combat = pure vanilla FE. Story/dialogue = collaborative (variants → Nicolas picks);
+art look-picks wait for his OK. Auto-push to main once green; never commit the
+`fireemblem8u` submodule pointer. Playtests machine-run for logic, Nicolas for feel.
