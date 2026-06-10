@@ -21,6 +21,38 @@
 
 A scaleless Drakeborn, shamed by his people for lacking scales. While wandering, he found an alien meteorite ring in the earth. METALLO — a cosmic being trillions of years old, the first entity ever to create metal — spoke to him through it and named him The First Metallurgist. His scales grew back, forged from living metal. He now serves as METALLO's Avatar in the mortal world.
 
+## Voice
+
+At his core, a materials-science nerd: he can smell and taste the metals and ores
+around him, and nothing lights him up like a new or rare one. Friendly, works well
+with the whole party — but strong-willed, and he NEVER backs down from a fight.
+METALLO is backstory, not a speech pattern. (Interview with Nicolas, 2026-06-10.)
+
+**Diction rules**
+- Geeks out about metal: identifies what's in the walls/weapons/ground unprompted
+  ("Iron, mostly. A vein of silver behind it."), and gets visibly excited about
+  anything rare. This is his curiosity hook in any new location.
+- The senses come first: he smells or tastes metal before naming it. He also EATS
+  metal, casually.
+- METALLO is rarely invoked — no prophet-speak, no "METALLO wills it" tic. The avatar
+  business is something he carries, not something he preaches.
+- Friendly and cooperative in party scenes; no lone-wolf brooding despite the shame
+  backstory.
+- Strong-willed: intimidation gets answered with calm escalation, not words — see the
+  calibration moment. When Braulo calls for a fight over a broken deal, Wolfram is
+  already stepping forward (he fought at Bremen; he was not among the abstainers).
+
+**Calibration moment (table-derived, paraphrased)**
+- Bremen: Braulo starts the fight with the speaker, who tries to intimidate the
+  party. Wolfram's whole response: he steps forward and takes a bite out of his axe.
+  No line needed — write the moment, not a speech.
+- Register target (new location): "Wait. *(sniffs)* That's not iron ore. I've never
+  smelled this before. We're digging."
+
+**Banned:** cult zealotry or constant METALLO invocations, backing down, brooding
+loner behavior, hostility toward party members, cowardice, big intimidation speeches
+(he demonstrates instead).
+
 ## Ability Fantasies (flavor only — not game mechanics)
 
 These are the D&D abilities Wolfram had on paper, kept as flavor names and story beats.
