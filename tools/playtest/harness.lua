@@ -312,6 +312,92 @@ scenarios.win = function()
     result("FAIL", "could not kill Sephek in 6 turns")
 end
 
+-- SCENES: contact-sheet capture of every dialogue page (opening card + briefing,
+-- boss battle quote, death quote, ending scene). A-only boot -- START would SKIP
+-- the Text_BG cutscene wholesale; A merely advances pages -- and a screenshot
+-- lands before every advance press so each text page is on at least one frame.
+scenarios.scenes = function()
+    log("scene capture: A-only boot, shot before every advance")
+    local booted = false
+    for i = 1, 160 do
+        if inChapter() then booted = true; break end
+        wait(60) -- let the current page finish typing before the shot
+        shot("boot")
+        press(K.A, 4)
+    end
+    if not booted then return result("FAIL", "never reached the map (A-only boot)") end
+    wait(120); press(K.B); press(K.B)
+    shot("map-loaded")
+    local sephek = red(CHAR_SEPHEK)
+    if not sephek then return result("FAIL", "Sephek not found in red array") end
+    pokeFrail(sephek)
+    local scram = blue(CHAR_SCRAMSAX)
+    if not scram then return result("FAIL", "Scramsax not found") end
+    local tx, ty = sephek.x, sephek.y + 1
+    if tileOccupied(tx, ty) then tx, ty = sephek.x - 1, sephek.y end
+    if not moveUnit(scram.x, scram.y, tx, ty) then
+        return result("FAIL", "could not move Scramsax to the boss")
+    end
+    press(K.A); wait(20)  -- Attack
+    press(K.A); wait(20)  -- target
+    press(K.A)            -- confirm -> battle quote -> combat -> death quote -> ending
+    for f = 1, 3600 do
+        if f % 80 == 0 then shot("fight") end
+        if f % 85 == 0 then press(K.A, 3) end
+        if chapter() ~= HOST_CHAPTER then
+            shot("chapter-advanced")
+            return result("PASS", "scene contact sheet captured through the ending")
+        end
+        yield()
+    end
+    shot("scenes-timeout")
+    result("FAIL", "chapter never ended during scene capture")
+end
+
+-- RECORD: continuous frame capture (every 5th emulated frame) through the
+-- opening scene ("op" frames), then the boss fight + ending ("bt" frames) --
+-- assembled into GIFs offline so dialogue pacing can be reviewed as motion,
+-- not single mid-typewriter screenshots. A-only boot like `scenes`.
+scenarios.record = function()
+    log("recording continuous video frames")
+    local function recwait(n, tag)
+        for f = 1, n do
+            if f % 5 == 0 then shot(tag) end
+            yield()
+        end
+    end
+    local booted = false
+    for i = 1, 200 do
+        if inChapter() then booted = true; break end
+        recwait(60, "op")
+        press(K.A, 4)
+    end
+    if not booted then return result("FAIL", "never reached the map (record)") end
+    recwait(150, "op")
+    press(K.B); press(K.B)
+    local sephek = red(CHAR_SEPHEK)
+    if not sephek then return result("FAIL", "Sephek not found in red array") end
+    pokeFrail(sephek)
+    local scram = blue(CHAR_SCRAMSAX)
+    if not scram then return result("FAIL", "Scramsax not found") end
+    local tx, ty = sephek.x, sephek.y + 1
+    if tileOccupied(tx, ty) then tx, ty = sephek.x - 1, sephek.y end
+    if not moveUnit(scram.x, scram.y, tx, ty) then
+        return result("FAIL", "could not move Scramsax to the boss")
+    end
+    press(K.A); wait(20)  -- Attack
+    press(K.A); wait(20)  -- target
+    press(K.A)            -- confirm -> battle quote -> combat -> quotes -> ending
+    for f = 1, 4500 do
+        if f % 5 == 0 then shot("bt") end
+        if f % 110 == 0 then press(K.A, 3) end
+        if chapter() ~= HOST_CHAPTER then break end
+        yield()
+    end
+    recwait(40, "bt")
+    return result("PASS", "video frames recorded (op + bt)")
+end
+
 -- TITLECARD: open the map menu -> Status screen, which decompresses the
 -- chapter title card (chap_title_data[chapTitleId]) -- the artifact screenshot
 -- is how a recomposed title gets eyeballed without a manual run.

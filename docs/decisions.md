@@ -648,6 +648,10 @@ curation at every level, never accepted wholesale). Voice bibles live as **§Voi
 rules, calibration lines, banned list; `lore/narration.md` holds the card/crawl/tour register + vanilla pacing
 budgets measured from the decomp). Workflow + budgets + insertion gates: `.claude/skills/dialogue-pass/SKILL.md`.
 _Decided: 2026-06-09 (community research: FEU writing threads, DM voice guides, Dramatron CHI'23)._
+**In-engine dialogue review is motion, not stills:** `tools/playtest/run.sh record` captures every 5th frame
+through both scenes; deduped GIFs (opened in Safari) are what Nicolas signs off before art-visible text commits —
+static screenshots catch the typewriter mid-stroke and false-alarm as cut-off text. _Decided: 2026-06-10 with
+Nicolas ("use this format going forward")._
 
 **New-game opening sequence: three exclusive content layers, written in story order.**
 Mirrors vanilla FE8's structure (decomp-grounded): (1) **lore crawl** (#43, replaces `StartIntroMonologue`'s 7

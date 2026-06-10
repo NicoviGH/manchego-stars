@@ -62,5 +62,15 @@ alternative lines, Nicolas decides whether the lock reopens.
   (terminator-parity bug).
 - `make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba` green, then
   `python3 tools/verify_text.py` (0 runaway).
-- In-game eyeball of at least one scene with Nicolas (portraits + pacing read
-  differently in-engine). Show before committing; wait for his OK.
+- In-game review with Nicolas as MOTION, not stills (decided 2026-06-10): run
+  `tools/playtest/run.sh record`, assemble the captured frames into GIFs
+  (dedupe identical frames, ~83ms/frame, 2x nearest-neighbor), drop them in
+  `map-review/`, and `open -a Safari` them (Preview paginates GIFs). Static
+  screenshots mislead -- they catch the typewriter mid-stroke. Show before
+  committing; wait for his OK.
+- Message-encoding gotchas (the hard-won ones, full trace in
+  `tools/build_campaign.py` `_script_to_message`): on-map bubble lines wrap at
+  29 chars, NOT Text_BG's ~42; every non-terminal [A] must be [LF]-followed
+  (the width measure doesn't stop at [A], and right-side bubbles have no
+  position clamp -- merged turns = offscreen bubble); a boss "steps out" via a
+  message SPLIT + LOAD1 between, never a lazy right-face load mid-message.

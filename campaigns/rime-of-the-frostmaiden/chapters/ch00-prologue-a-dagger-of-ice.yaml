@@ -191,7 +191,9 @@ events:
           you're not worth the words.
       - hlin: >-
           I'm too old to wrestle you, Kaltro. Lucky for me… I brought an axe.
-  - trigger: boss_low_hp
+  - trigger: boss_battle         # first engagement with the boss — FE8's native mid-fight-line
+                                 # mechanism (gBattleTalkList, vanilla O'Neill's 0x916 pattern;
+                                 # plays once). FE has no low-HP trigger; this is the analog.
     type: dialogue
     ea_file: events/ch00-sephek-cold.ea
     description: "Sephek bleeds frost, unbothered by the cold — a first glimpse of Auril's reach."

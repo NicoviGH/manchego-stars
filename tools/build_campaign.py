@@ -373,6 +373,85 @@ def set_message_body(lines, msg_id, body):
     sys.exit('ERROR: message header %r not found in %s' % (header, TEXTS_TXT))
 
 
+def _fe_dialogue_text(s):
+    """Normalize locked YAML dialogue to the FE8 charset (ASCII punctuation only)."""
+    for a, b in (('—', '--'), ('–', '--'), ('…', '...'),
+                 ('‘', "'"), ('’', "'"), ('“', '"'), ('”', '"')):
+        s = s.replace(a, b)
+    return ' '.join(s.split())
+
+
+def _wrap_fe_lines(text, width=29):
+    """Word-wrap dialogue to GBA text lines. Default width matches vanilla's ON-MAP
+    messages (MSG_910/911 top out at 29 chars): map speech bubbles auto-size to the
+    text, and longer lines overflow the bubble's max width and clip (caught on the
+    2026-06-10 scenes capture -- full-screen Text_BG tolerates ~42, bubbles do not).
+    A bare '--' never opens a line: the dash glues to the word before it."""
+    out, cur = [], ''
+    for w in text.split():
+        if w == '--' and cur:
+            cur += ' --'
+            continue
+        cand = (cur + ' ' + w) if cur else w
+        if len(cand) > width and cur:
+            out.append(cur)
+            cur = w
+        else:
+            cur = cand
+    if cur:
+        out.append(cur)
+    return out
+
+
+def _script_to_message(script, staging):
+    """Render a chapter-YAML cutscene `script:` block as an FE8 message body.
+
+    Mirrors the vanilla shape (cf. MSG_910/911): faces are loaded lazily at a
+    speaker's first turn (so a boss can "step out" mid-scene), [LF] joins the two
+    lines of a page, [A][LF] breaks pages (2 visible lines per A-press).
+
+    Consecutive turns by the SAME speaker are coalesced into one [OpenX] block
+    with the turn boundary as a page break. This is load-bearing, not cosmetic:
+    the map-bubble width measure (GetStrTalkLen, scene.c) does NOT stop at [A] --
+    it adds 12px and keeps measuring until the next speaker's printable text, and
+    only [LF]/[CR] reset the line accumulator. An [A][OpenX-same-face] boundary
+    without [LF] therefore merges both turns into one measured "line"; widths
+    over 29 tiles make PutTalkBubble's right-side branch compute x = 29 - width
+    < 0 (no clamp, unlike the left branch) and the bubble wraps the tilemap --
+    the offscreen/empty-bubble bug of the 2026-06-10 scenes captures. Vanilla
+    never ships an [A] that isn't terminal or [LF]-followed; now neither do we.
+
+    `location_card` / `fade_to_black` entries are staged by the event script, not
+    the message, and are skipped here. `staging` maps speaker key ->
+    ([OpenX] tag, [FID_x] tag).
+    """
+    blocks = []   # (speaker, [page, ...]); page = 'line1[LF]\nline2'
+    for entry in script:
+        (speaker, text), = entry.items()
+        if speaker in ('location_card', 'fade_to_black'):
+            continue
+        lines = _wrap_fe_lines(_fe_dialogue_text(text))
+        pages = ['[LF]\n'.join(lines[p:p + 2]) for p in range(0, len(lines), 2)]
+        if blocks and blocks[-1][0] == speaker:
+            blocks[-1][1].extend(pages)
+        else:
+            blocks.append((speaker, pages))
+    parts, loaded = [], set()
+    for speaker, pages in blocks:
+        open_tag, fid_tag = staging[speaker]
+        if speaker not in loaded:
+            parts.append('%s[LoadFace]%s' % (open_tag, fid_tag))
+            loaded.add(speaker)
+        parts.append(open_tag + '[A][LF]\n'.join(pages) + '[A]')
+    return '\n'.join(parts) + '[X]'
+
+
+def _fid_tag(slot):
+    """textdefs.txt face-tag for a vanilla character slot (CamelCase, irregulars mapped)."""
+    special = {'ONEILL': 'ONeill'}
+    return '[FID_%s]' % special.get(slot, slot.title())
+
+
 def inject_names(campaign, verbose=True):
     """Write each cast member's display name into its vanilla slot's name message."""
     with open(TEXTS_TXT, encoding='utf-8') as f:
@@ -1526,6 +1605,11 @@ def inject_prologue(campaign, verbose=True):
     # The goal banner/objective display is chapter data, not events -- the host (vanilla
     # Ch1) says "Seize gate". Copy the vanilla Prologue's defeat_boss goal block.
     host['goal'] = settings['chapters'][PROLOGUE_CHAPTER_INDEX]['goal']
+    # The New Game save-slot select draws the VANILLA prologue slot's title-card
+    # IMAGE ("Prologue: The Fall of Renais") -- it reads chapter 0's chapTitleId,
+    # not the host's. Point slot 0 at the host's card (recomposed in step 4a);
+    # slot 0 is never loaded as a chapter, so only this menu metadata matters.
+    settings['chapters'][PROLOGUE_CHAPTER_INDEX]['chapTitleId'] = host['chapTitleId']
     with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=2)
 
@@ -1632,16 +1716,34 @@ def inject_prologue(campaign, verbose=True):
         script = f.read()
     # The chapter-start auto-cursor (ProcFun_ResetCursorPosition) now centers the camera +
     # cursor on the first player unit even when the lord rides a non-LORD slot (engine fix in
-    # _patch_player_start_cursor_guard), so the begin scene just deploys and hands over control.
+    # _patch_player_start_cursor_guard). Begin scene = the ch00 YAML's locked chapter_start
+    # script, staged vanilla-Prologue-style: deploy the allies, brown-box location card
+    # ("The Eastway", msg 0x664 -- step 4c), the opening dialogue ON the map (msg 0x90D;
+    # vanilla 0x910's convention -- FE8 ships no snow background, and a green BG_PLAIN_*
+    # reads wrong in a two-year winter, so the snowy map IS the backdrop), THEN deploy the
+    # enemies -- Sephek "steps out" exactly when his interrupt lands in the text -- and
+    # flash him to mark the boss before handing over control.
     begin = ('{\n    LOAD1(1, UnitDef_Event_Ch1Ally)\n    ENUN\n'
-             '    LOAD1(1, UnitDef_Event_Ch1Enemy)\n    ENUN\n    ENDA\n}')
+             '    BROWNBOXTEXT(0x664, 8, 8)\n'
+             '    STAL(30)\n'
+             '    FlashCursor(CHARACTER_%s, 60)\n'
+             '    MUSI\n'
+             '    Text(0x90D)\n'
+             '    LOAD1(1, UnitDef_Event_Ch1Enemy)\n    ENUN\n'
+             '    FlashCursor(CHARACTER_%s, 60)\n'
+             '    Text(0x90E)\n'
+             '    MUNO\n'
+             '    NoFade\n    ENDA\n}' % (hlin_slot, sephek_slot))
     script = _replace_brace_block(
         script, 'EventScr_Ch1_BeginningScene[] =', begin, CH1_EVENTSCRIPT_H)
-    # Minimal DefeatBoss ending (vanilla Prologue's EndingScene minus text/flags): victory
-    # sting, then advance off the chapter. MNC2(0x2) is a placeholder hop to the next
-    # chapter slot until the real ending cutscene (Sephek escapes -> The Northlook) lands
-    # in the dialogue pass.
-    ending = '{\n    MUSC(SONG_VICTORY)\n    MNC2(0x2)\n    ENDA\n}'
+    # DefeatBoss ending = the YAML's locked chapter_end script (msg 0x918), vanilla
+    # Prologue EndingScene shape minus its worldmap/supply ENUT flags: victory sting,
+    # dialogue ON the map (over the spot where Sephek vanished -- same no-snow-BG
+    # rationale as the opening), fade to black (the locked script ends on
+    # fade_to_black -- no location-card tease, decided 2026-06-10), then advance.
+    ending = ('{\n    MUSC(SONG_VICTORY)\n'
+              '    Text(0x918)\n    FADI(16)\n'
+              '    MNC2(0x2)\n    ENDA\n}')
     script = _replace_brace_block(
         script, 'EventScr_Ch1_EndingScene[] =', ending, CH1_EVENTSCRIPT_H)
     with open(CH1_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
@@ -1668,6 +1770,12 @@ def inject_prologue(campaign, verbose=True):
     #     intermediates are removed so make re-converts the new PNG.
     set_message_body(lines, host['chapTitleTextId'],
                      name_message_body(chap['title']))
+    # The New Game save-slot select shows the VANILLA prologue slot's title text
+    # ("Prologue: <title>" with the prefix screen-composed) -- it reads chapter 0,
+    # not the host, so retitle that slot's text too.
+    set_message_body(lines,
+                     settings['chapters'][PROLOGUE_CHAPTER_INDEX]['chapTitleTextId'],
+                     name_message_body(chap['title']))
     # The copied goal block still points its Status-screen objective at vanilla's
     # "Defeat O'Neill" -- rewrite it as "Defeat <boss fe_name>" (vanilla keeps this
     # short; the YAML's full objective.description is for docs/banners).
@@ -1679,6 +1787,54 @@ def inject_prologue(campaign, verbose=True):
     for stale in (title_png[:-4] + '.4bpp', title_png[:-4] + '.4bpp.lz'):
         if os.path.exists(stale):
             os.remove(stale)
+
+    # 4c. Dialogue (ch00 dialogue pass, 2026-06-10): message bodies are GENERATED from
+    #     the chapter YAML's locked `script:` blocks + quote fields -- the YAML stays
+    #     the single source of truth. Overwritten ids are vanilla messages that can
+    #     never display in our ROM (the prologue slot is never loaded; vanilla Ch1's
+    #     scenes are stripped): 0x664 "Renais Castle" location card, 0x90D prologue
+    #     opening, 0x914 boss mid-fight line, 0x918 prologue ending. The three quote
+    #     msgs (0x936/0x917/0xC25) are the ids the gDefeatTalkList entries in step 5
+    #     already reference. Staging mirrors vanilla: protectors left, lead right in
+    #     the ending (0x918's Seth/Eirika layout); boss MidRight (0x910's O'Neill).
+    fid = {s: _fid_tag(s) for s in (hlin_slot, scram_slot, sephek_slot)}
+    # On-map bubbles want vanilla 0x911's Mid pair: with Hlin on plain [OpenLeft],
+    # Sephek's MidRight turns AFTER a left turn rendered as empty bubbles (2026-06-10
+    # scenes capture); [OpenMidLeft] <-> [OpenMidRight] round-trips are the shape
+    # vanilla actually ships on-map.
+    opening_staging = {'hlin': ('[OpenMidLeft]', fid[hlin_slot]),
+                       'scramsax': ('[OpenFarLeft]', fid[scram_slot]),
+                       'sephek': ('[OpenMidRight]', fid[sephek_slot])}
+    ending_staging = {'scramsax': ('[OpenMidLeft]', fid[scram_slot]),
+                      'hlin': ('[OpenMidRight]', fid[hlin_slot])}
+    events = {e['trigger']: e for e in chap.get('events', [])}
+    opening_script = events['chapter_start']['script']
+    card = next(v for e in opening_script for k, v in e.items()
+                if k == 'location_card')
+    set_message_body(lines, 0x664, name_message_body(card))
+    # The opening splits at Sephek's interrupt into TWO messages (0x90D briefing /
+    # 0x90E confrontation), mirroring vanilla's own boss reveal (0x910 is its own
+    # message, boss face loaded at message START). A right-side face lazy-loaded
+    # MID-message gets empty/offscreen bubbles for its later multi-page turns
+    # (2026-06-10 scenes capture) -- vanilla never ships that shape. The event
+    # script deploys the enemies between the two, so Sephek's unit appears on the
+    # map exactly when he finishes Hlin's sentence.
+    i_reveal = next(i for i, e in enumerate(opening_script) if 'sephek' in e)
+    set_message_body(lines, 0x90D, _script_to_message(
+        opening_script[:i_reveal], opening_staging))
+    set_message_body(lines, 0x90E, _script_to_message(
+        opening_script[i_reveal:], opening_staging))
+    set_message_body(lines, 0x914, _script_to_message(
+        events['boss_battle']['script'], opening_staging))
+    set_message_body(lines, 0x918, _script_to_message(
+        events['chapter_end']['script'], ending_staging))
+    set_message_body(lines, 0x936, _script_to_message(
+        [{'sephek': by_id['sephek-kaltro']['death_quote']}], opening_staging))
+    set_message_body(lines, 0x917, _script_to_message(
+        [{'hlin': by_id['hlin-trollbane']['death_quote']}], ending_staging))
+    set_message_body(lines, 0xC25, _script_to_message(
+        [{'scramsax': by_id['scramsax']['defeat_quote']}], ending_staging))
+
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 
@@ -1733,27 +1889,27 @@ def inject_prologue(campaign, verbose=True):
     #      Eirika/Duessel mechanism.
     #    - Scramsax: FLAG-LESS quote (vanilla Seth precedent): quote plays, battle
     #      continues, framed as a retreat -- he's alive for Ch1.
-    #    msgs are placeholders until the dialogue pass (#2); #42 generalizes the lord.
+    #    msg bodies are written from the chapter YAML in step 4c; #42 generalizes the lord.
     quotes = [(
         '    {\n'
         '        .pid     = CHARACTER_%s, /* Sephek -- boss kill sets the DefeatBoss flag */\n'
         '        .route   = CHAPTER_MODE_ANY,\n'
         '        .chapter = CHAPTER_L_1, /* prologue is hosted on chapter slot 1 */\n'
         '        .flag    = EVFLAG_DEFEAT_BOSS,\n'
-        '        .msg     = 0x0936, /* placeholder (vanilla Breguet line); real line in the dialogue pass */\n'
+        '        .msg     = 0x0936, /* Sephek death quote (YAML death_quote, step 4c) */\n'
         '    },' % sephek_slot), (
         '    {\n'
         '        .pid     = CHARACTER_%s, /* Hlin -- lord-death = game over */\n'
         '        .route   = CHAPTER_MODE_ANY,\n'
         '        .chapter = CHAPTER_L_1, /* prologue is hosted on chapter slot 1 */\n'
         '        .flag    = EVFLAG_GAMEOVER,\n'
-        '        .msg     = 0x0917, /* placeholder; real death line in the dialogue pass */\n'
+        '        .msg     = 0x0917, /* Hlin death quote (YAML death_quote, step 4c) */\n'
         '    },' % hlin_slot), (
         '    {\n'
         '        .pid     = CHARACTER_%s, /* Scramsax -- defeat quote only, NO game over */\n'
         '        .route   = CHAPTER_MODE_ANY,\n'
         '        .chapter = CHAPTER_L_1, /* prologue is hosted on chapter slot 1 */\n'
-        '        .msg     = 0x0C25, /* placeholder (vanilla Seth line); retreat line in the dialogue pass */\n'
+        '        .msg     = 0x0C25, /* Scramsax retreat quote (YAML defeat_quote, step 4c) */\n'
         '    },' % scram_slot)]
     #    The entries must land at the HEAD of the list: GetDefeatTalkEntry (eventinfo.c)
     #    returns the FIRST match, and vanilla gives every playable slot a generic
@@ -1763,14 +1919,37 @@ def inject_prologue(campaign, verbose=True):
     #    way: chapter-keyed boss entries first, generic quotes after. (And never append
     #    after the {.pid = -1} terminator: the scan stops there -- that one was a real,
     #    silent bug too.)
+    # 5b. Sephek's mid-fight frost line (slot 4) = a first-engagement boss battle
+    #     quote on gBattleTalkList -- FE8's native "mid-fight boss line" mechanism
+    #     (vanilla wires O'Neill's 0x916 with this exact two-entry pattern: one for
+    #     the player engaging the boss, one for the boss engaging the player; the
+    #     EVFLAG_BATTLE_QUOTES flag makes it play exactly once). Same head-insertion
+    #     rule as the defeat quotes: GetBattleTalkEntry returns the first match.
+    fight_quotes = [(
+        '    {\n'
+        '        .pidA     = CHAR_EVT_PLAYER_LEADER,\n'
+        '        .pidB     = CHARACTER_%s, /* Sephek mid-fight frost line (step 4c) */\n'
+        '        .chapter = CHAPTER_L_1,\n'
+        '        .flag    = EVFLAG_BATTLE_QUOTES,\n'
+        '        .msg     = 0x0914,\n'
+        '    },' % sephek_slot), (
+        '    {\n'
+        '        .pidA     = CHARACTER_%s,\n'
+        '        .chapter = CHAPTER_L_1,\n'
+        '        .flag    = EVFLAG_BATTLE_QUOTES,\n'
+        '        .msg     = 0x0914,\n'
+        '    },' % sephek_slot)]
     with open(BATTLEQUOTES_C, encoding='utf-8') as f:
         bq = f.read()
     head = 'CONST_DATA struct DefeatTalkEnt gDefeatTalkList[] = {\n'
-    if bq.count(head) != 1:
-        sys.exit('ERROR: gDefeatTalkList head not in expected vanilla form in %s'
+    fight_head = 'CONST_DATA struct BattleTalkExtEnt gBattleTalkList[] = {\n'
+    if bq.count(head) != 1 or bq.count(fight_head) != 1:
+        sys.exit('ERROR: talk-list heads not in expected vanilla form in %s'
                  % BATTLEQUOTES_C)
+    bq = bq.replace(head, head + '\n'.join(quotes) + '\n')
+    bq = bq.replace(fight_head, fight_head + '\n'.join(fight_quotes) + '\n')
     with open(BATTLEQUOTES_C, 'w', encoding='utf-8') as f:
-        f.write(bq.replace(head, head + '\n'.join(quotes) + '\n'))
+        f.write(bq)
 
     # 6. Boot flow: cut the attract/intro/world-map sequences, and redirect New Game from
     #    the prologue slot (0) to the host chapter (1) at StartBattleMap -- so the game

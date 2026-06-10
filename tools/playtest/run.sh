@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run an automated ch00 playtest scenario in mGBA (headed, but fully scripted).
 #
-#   tools/playtest/run.sh win|gameover|retreat|titlecard [--keep-open]
+#   tools/playtest/run.sh win|gameover|retreat|titlecard|scenes [--keep-open]
 #
 # Requires the mGBA 0.11+ nightly (has --script); auto-downloads it into
 # tools/emulator/mGBA-dev.app on first run. Results land in
@@ -12,7 +12,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 APP="$REPO/tools/emulator/mGBA-dev.app/Contents/MacOS/mGBA"
 ROM="$REPO/fireemblem8u/fireemblem8.gba"
-SCENARIO="${1:?usage: run.sh win|gameover|retreat|titlecard}"
+SCENARIO="${1:?usage: run.sh win|gameover|retreat|titlecard|scenes|record}"
 KEEP_OPEN="${2:-}"
 
 OUT="/tmp/playtest-$SCENARIO"
