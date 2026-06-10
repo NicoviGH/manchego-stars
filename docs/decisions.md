@@ -680,10 +680,14 @@ clamped 240-360 frames). Index 0 is GBA-transparent → in-engine the cards read
 slate PNG background is a converter placeholder only. **Build modes:** default `make` keeps the straight-to-map dev
 boot; `MONTAGE=1 make` keeps `StartIntroMonologue` wired and re-renders the slides (distribution #37 must set it).
 Playtests pass under both: `bootToMap` alternates A/START so the crawl self-skips; `record` A-only boot captures it
-for GIF review. The WM town-tour half of #43 stays SKIPWN'd until its Icewind Dale drawn-map backdrop lands
-(Nicolas 2026-06-10: build it from the book's regional map in `References/Ten-Towns-Maps`, bootstrapping #29).
-_Decided: 2026-06-10; crawl GIF-reviewed and approved by Nicolas (backdrop swap of the rune mural requested —
-opsubtitle-local symbol swap, not a global `Img_CommGameBgScreen` overwrite: shops/chapter-intro/endings share it)._
+for GIF review. **Backdrop mural:** vanilla composites the slides over `Img_CommGameBgScreen` (the brown rune wall)
+— a SHARED asset (shops, chapter-intro fx, ending details, mural_background), so it is never overwritten; instead
+opsubtitle.c is patched to montage-local `Img/Pal_MontageMural` symbols incbin'd in `data_opsubtitle.s`, fed by the
+book's ch1 opener painting (aurora over a snow-buried township, `campaigns/.../events/opening-mural.png`; build
+derives the 256×160 16-color mural: brightness 0.75, 15 colors + black at GBA-transparent index 0). The WM
+town-tour half of #43 stays SKIPWN'd until its Icewind Dale drawn-map backdrop lands (Nicolas 2026-06-10: build it
+from the book's regional map in `References/Ten-Towns-Maps`, bootstrapping #29).
+_Decided: 2026-06-10; crawl and aurora mural both GIF-reviewed and approved by Nicolas._
 
 ---
 

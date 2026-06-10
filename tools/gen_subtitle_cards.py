@@ -25,7 +25,7 @@ import sys
 
 import numpy as np
 import yaml
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageEnhance, ImageFont
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OP_SUBTITLE_DIR = os.path.join(REPO, 'fireemblem8u', 'graphics', 'op_subtitle')
@@ -40,6 +40,7 @@ CENTER = (120, 80)    # vanilla text blocks center on x=120, y~80
 BG_RGB = (80, 96, 112)
 FG_RGB = (248, 248, 240)
 CARD_COUNT = 7        # gOpSubtitleGfxLut is walked with hardcoded thresholds
+MURAL_BRIGHTNESS = 0.75  # mural darkness so the cream text stays readable
 
 _pal = None
 
@@ -104,6 +105,34 @@ def compose_card(text):
     out = Image.fromarray(q.argmin(-1).astype(np.uint8))
     out.putpalette(pal)
     return out
+
+
+def compose_mural(src_png):
+    """Render the crawl's backdrop mural (256x160 P-mode) from the campaign's
+    source painting. Replaces vanilla's shared rune wall (Img_CommGameBgScreen)
+    via opsubtitle-local symbols -- shops/chapter-intro/endings keep theirs.
+    The engine draws it as 640 sequential 4bpp tiles on palette row 15
+    (opsubtitle.c sub_80C48F0), faded in to its real palette during the flare
+    slide; tile color 0 is GBA-transparent (black backdrop), so all art pixels
+    are kept off index 0 and palette[0] is black."""
+    im = Image.open(src_png).convert('RGB').resize((256, 160), Image.LANCZOS)
+    im = ImageEnhance.Brightness(im).enhance(MURAL_BRIGHTNESS)
+    q = im.quantize(colors=15)
+    pal = q.getpalette()[:45]
+    out = q.point(lambda i: i + 1)
+    out.putpalette([0, 0, 0] + pal)
+    return out
+
+
+def mural_gbapal(mural):
+    """The mural's 16 colors as GBA BGR555 palette bytes (for the .gbapal incbin)."""
+    pal = mural.getpalette()[:48]
+    data = bytearray()
+    for i in range(16):
+        r, g, b = (c >> 3 for c in pal[3 * i:3 * i + 3])
+        v = r | (g << 5) | (b << 10)
+        data += bytes((v & 0xFF, v >> 8))
+    return bytes(data)
 
 
 def crawl_cards(montage_yaml):
