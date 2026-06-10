@@ -31,6 +31,11 @@ flavor isn't lost to git history. **None of them drive gameplay** — every lore
 - [`pepperjack-and-brie.md`](pepperjack-and-brie.md) — the two recruitable automatons RBG builds
   (units: [`../npcs/pepperjack.yaml`](../npcs/pepperjack.yaml),
   [`../npcs/brie.yaml`](../npcs/brie.yaml)).
+- [`hlin-trollbane.md`](hlin-trollbane.md), [`scramsax.md`](scramsax.md),
+  [`sephek-kaltro.md`](sephek-kaltro.md) — prologue guests/boss, each with a **§Voice**
+  (diction rules, calibration lines, banned list) consumed by the `dialogue-pass` skill.
+- [`narration.md`](narration.md) — the narration register (lore crawl, town tour,
+  location cards) + vanilla pacing budgets.
 
 ## Regenerating PC lore
 

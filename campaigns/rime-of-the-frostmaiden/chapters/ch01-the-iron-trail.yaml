@@ -130,9 +130,12 @@ events:
     type: cutscene
     ea_file: events/ch01-opening.ea
     description: >
-      The Northlook tavern. Three dwarves approach the party and explain the
-      missing ingot shipment. They offer 200 GP for recovery. Cut to: the trail.
-      A dismembered body in the snow. Braulo crouches to examine it.
+      The Northlook tavern — opens on the ch00 hand-off (moved here from the prologue
+      ending, 2026-06-09, vanilla-style): Hlin and Scramsax, fresh off Sephek's
+      escape, and Hlin retains the seven — Ten-Towns needs more hands than hers.
+      Then the three dwarves approach and explain the missing ingot shipment; they
+      offer 200 GP for recovery. Cut to: the trail. A dismembered body in the snow.
+      Braulo crouches to examine it.
 
   # Post-map cutscene (after all enemies defeated)
   - trigger: chapter_end

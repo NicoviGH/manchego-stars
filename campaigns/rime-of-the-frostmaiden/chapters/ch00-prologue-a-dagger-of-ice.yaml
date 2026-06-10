@@ -158,11 +158,14 @@ events:
     type: cutscene
     ea_file: events/ch00-cold-open.ea
     description: >
-      The cold-open narration (paraphrased from the book's Cold Open boxed text):
-      the sunless Rime, the sacrifices, the killings by a dagger of ice. Hlin and
-      Scramsax corner Sephek mid-stalk — he's been killing those who cheated the
-      sacrifice lottery, "doing the Frostmaiden's work." They note the cold doesn't
-      touch him: no coat, no breath fog. Fight begins.
+      DIALOGUE ONLY — no narration cards here (decided 2026-06-09): the world lore
+      (Rime/Auril) and geography live in the #43 opening montage (lore crawl + town
+      tour); this scene owns only the local plot, vanilla-Prologue style. Shape: a
+      brown-box location card ("the caravan road" — the "Renais Castle" analog), then
+      Hlin and Scramsax corner Sephek mid-stalk. Hlin's compressed book-p.23 accusation
+      (the three sacrifice towns, the new moons, "no coat, no scarf, no gloves"),
+      Sephek's serene executioner reply ("her work"), Scramsax's button. Fight begins.
+      Voices: lore/{hlin-trollbane,scramsax,sephek-kaltro}.md.
   - trigger: boss_low_hp
     type: dialogue
     ea_file: events/ch00-sephek-cold.ea
@@ -171,14 +174,17 @@ events:
     type: cutscene
     ea_file: events/ch00-ending.ea
     description: >
-      They cut Sephek down — but his body rimes over, fractures like an icicle, and
-      in a breath of frost he is simply GONE (misty step). They won the fight and it
-      wasn't enough. Hlin, wounded and shaken, realizes the killings are a symptom of
-      something far larger than one murderer — Auril's grip is tightening, and Ten-Towns
-      will need more hands than two tired veterans'. Hard cut to The Northlook, Bryn
-      Shander — and our seven, about to be hired. (Leads into ch01.) Sephek lives: a
-      recurring threat whose reckoning is left for the story to place (the book's Torrga
-      Icevein caravan is the natural payoff — held in reserve, not yet committed).
+      They cut Sephek down — but his blade crumbles to shards, his body rimes over,
+      and in a breath of frost he is simply GONE (misty step; NO corpse — the
+      withered-corpse reveal is reserved for his true death, see lore/sephek-kaltro.md
+      "Imagery budget"). They won the fight and it wasn't enough. Then the quiet
+      character beat (vanilla 0x918's shape — Eirika's "This is war, isn't it?"
+      analog): Hlin, shaken, processes in facts — this is bigger than one bounty;
+      Ten-Towns will need more hands than two tired veterans'. Cut to black on a
+      Northlook location-card tease (decided 2026-06-09: the actual Northlook hiring
+      scene opens ch01, vanilla-style — not here). Sephek lives: a recurring threat
+      whose reckoning is left for the story to place (the book's Torrga Icevein
+      caravan is the natural payoff — held in reserve, not yet committed).
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:

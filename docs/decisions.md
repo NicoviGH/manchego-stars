@@ -638,6 +638,33 @@ _Decided: May 2026; renumbered to Ch 8→9 on 2026-05-31 after the Ch 4 split (w
 
 ---
 
+## Story & Dialogue
+
+**Dialogue is co-written via the `dialogue-pass` skill: voice bibles → beats → 2–3 variants per beat, Nicolas picks.**
+Neither of us is a creative writer, so the workflow encodes what three expert communities converge on — FE hack
+writing ("every sentence spoken should have a purpose"; pace in A-presses, 2 visible lines/box), DM practice (voice
+flows from a character document), and evaluated human-AI co-writing (hierarchical bible→beats→lines with human
+curation at every level, never accepted wholesale). Voice bibles live as **§Voice sections in `lore/*.md`** (diction
+rules, calibration lines, banned list; `lore/narration.md` holds the card/crawl/tour register + vanilla pacing
+budgets measured from the decomp). Workflow + budgets + insertion gates: `.claude/skills/dialogue-pass/SKILL.md`.
+_Decided: 2026-06-09 (community research: FEU writing threads, DM voice guides, Dramatron CHI'23)._
+
+**New-game opening sequence: three exclusive content layers, written in story order.**
+Mirrors vanilla FE8's structure (decomp-grounded): (1) **lore crawl** (#43, replaces `StartIntroMonologue`'s 7
+subtitle cards) = the COSMIC layer — Auril, the two-year Rime, the sacrifice lotteries (adapted from the book's Cold
+Open boxed text, printed p.22); (2) **world-map tour** (#43, replaces `WM_TEXT(0x8DB)`'s Magvel nation tour) = the
+GEOGRAPHIC layer — all ten towns in 4 cards, grouped Bryn Shander / Maer Dualdon / Lac Dinneshere / Redwaters
+(one fewer A-press than vanilla's 5 nations); (3) **chapter scenes** = LOCAL plot only, dialogue-driven like
+vanilla's prologue (zero world exposition — vanilla puts none there either), plus brown-box location cards
+(`BROWNBOXTEXT`, the "Renais Castle" analog). No layer repeats another's facts, so #43 can land later without
+rewriting prologue text. Corollaries: the **Northlook hiring scene opens ch01** (not the ch00 ending, which cuts to
+black on a location-card tease — vanilla puts the post-battle scene in the next chapter); Sephek's prologue escape
+leaves **no corpse** (blade to shards, body rimes over, gone) — the withered-corpse reveal is **reserved for his
+true death** in his payoff chapter (`lore/sephek-kaltro.md` §Imagery budget).
+_Decided: 2026-06-09 with Nicolas (towns: all ten, lake-grouped; location card: yes; Northlook → ch01)._
+
+---
+
 ## Open Questions (not yet decided)
 
 See `docs/PRD.md §13` for the full list. Key unresolved items:
