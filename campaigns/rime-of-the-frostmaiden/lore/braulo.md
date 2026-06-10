@@ -24,6 +24,37 @@
 
 A travelling merchant from the ocean floor, searching the world for his next shell. Believes the perfect shell is always just over the horizon.
 
+## Voice
+
+Quiet and reserved; speaks in plain, complete sentences, and mostly when a decision
+has to be made — then he commits, and the party follows. His greed and his justice are
+the same instinct: a deal honored is sacred, a deal broken is grounds for violence.
+(Interview with Nicolas, 2026-06-10.)
+
+**Diction rules**
+- Normal full sentences, even-toned. Not clipped caveman-speak, not salesman patter.
+- Says little in banter. When the party is wavering, he lands one blunt line that
+  settles it.
+- Strong sense of justice, framed as fair dealing: "we did the work," "that was the
+  deal," "what we're owed."
+- Quick to escalate — once a deal is broken, his next line proposes force, without
+  apology or hand-wringing.
+- Money words are plain and moral, never greedy-comic: owed, fair, agreed, price.
+- Shell/sea vocabulary stays in the backstory register — an occasional reference at
+  most, never a verbal tic.
+- Scene-direction gag: a small isopod lives in his shell and occasionally peeks out,
+  often staring at Marty (isopods eat fungus). It does nothing else, and Braulo never
+  acknowledges it.
+
+**Calibration moment (table-derived, paraphrased)**
+- The maer-speaker job: the party installs the maer monster as speaker of the town,
+  and the town refuses to pay. Braulo is the one who gets angry and convinces the
+  party to attack. Voice target: "We installed your speaker. That was the deal. Now
+  pay us — or we'll settle the account another way."
+
+**Banned:** jokes, sarcasm, chattiness, clipped grammar, haggling shtick, flowery
+speech, cowardice, backing down from a fair claim, acknowledging the isopod.
+
 ## Ability Fantasies (flavor only — not game mechanics)
 
 These are the D&D abilities Braulo had on paper, kept as flavor names and story beats.
