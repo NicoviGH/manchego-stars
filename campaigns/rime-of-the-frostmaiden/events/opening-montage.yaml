@@ -1,0 +1,36 @@
+# events/opening-montage.yaml — locked text for the #43 opening montage (design SoT).
+# Wiring lands in the #43 vertical slice (replaces boot cuts 2+4: StartIntroMonologue
+# subtitle cards + the EventScrWM_Prologue_Beginning world-map tour). Register, budgets,
+# and content allocation: lore/narration.md + docs/decisions.md §Story & Dialogue.
+# Co-written with Nicolas 2026-06-09 (ch00 dialogue pass) — near-verbatim from the
+# book's Cold Open boxed text (printed p.22); 7 cards = vanilla's op_subtitle count.
+
+lore_crawl:
+  status: locked            # text final; awaiting #43 wiring
+  cards:
+    - >
+      Far north, beyond the Spine of the World, lies Icewind Dale —
+      a frozen land at the edge of the known realms.
+    - >
+      This land has not felt the warmth of the sun in over two years.
+      Not even in what should be the height of summer.
+    - >
+      In this frozen tundra, darkness and bitter cold reign
+      as king and queen.
+    - >
+      Most dale residents blame Auril the Frostmaiden,
+      the god of winter's wrath.
+    - >
+      The shimmering aurora that weaves across the sky each night
+      is said to be her doing — a potent spell that keeps the sun at bay.
+    - >
+      Each town has resolved to appease the Frostmaiden with sacrifices
+      of one kind or another. No respite from winter's fury seems forthcoming.
+    - >
+      For adventurers, Ten-Towns is a place to test one's mettle — and,
+      in the spirit of heroes who have come before, leave one's mark
+      on this frigid, blighted land.
+
+town_tour:
+  status: drafting          # being co-written; structure in lore/narration.md
+  cards: []
