@@ -29,7 +29,6 @@ counterweight to Hlin's deductions and Sephek's serenity.
 
 **Calibration lines**
 - "Ngh… too old for this. Hlin — I can't swing another. Finish it without me…"
-  (draft retreat quote, chapter YAML)
 - "You buy the drinks after, Trollbane. Both rounds."
 
 **Banned:** exposition (he never explains lore), eloquence, fear, more than two

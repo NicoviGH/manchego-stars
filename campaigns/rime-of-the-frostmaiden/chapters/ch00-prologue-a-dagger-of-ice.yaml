@@ -83,6 +83,7 @@ player_units:
     class: fighter               # old dwarf bounty hunter, handaxe, past her prime — UNPROMOTED & frail (Eirika-analog lead; only Scramsax the "Jeigan" is a Seth-justified prepromote). Female Fighter map sprite (community repo) so she reads as a woman, distinct from the male Fighter guards
     is_npc: true                 # not one of the 7 PCs; a cold-open guest unit
     required: true               # lose if she dies (our lord-death condition)
+    death_quote: "Scramsax… finish the job. The towns need to know…"   # LOCKED 2026-06-10 — game-over line (EVFLAG_GAMEOVER)
     level: 3                     # low / frail — the weak lead (cf. Eirika Lv1)
     position: [8, 5]             # I6 — central & back (Eirika's vanilla spot)
     inventory:
@@ -100,8 +101,8 @@ player_units:
     is_npc: true                 # The Northlook's proprietor; the cold-open's "Jeigan"
     required: false              # defeat != game over (Seth precedent; see NOTE 3) — he retreats, alive for Ch1
     level: 1                     # promoted prepromote — high stats despite low internal level (cf. Seth)
-    # Placeholder retreat line (real line in the dialogue pass, co-written): defeat = retreat, not death.
-    defeat_quote: "Ngh… too old for this. Hlin — I can't swing another. Finish it without me…"
+    # Retreat, not death — he tends The Northlook in ch01 regardless.
+    defeat_quote: "Ngh… arm's done. You owe me three rounds now, Trollbane…"   # LOCKED 2026-06-10 (dialogue pass)
     position: [13, 9]            # N10 — forward, beside the enemies (Seth's vanilla spot)
     inventory:
       - id: steel-sword
@@ -133,7 +134,7 @@ enemy_units:
       - "Misty step: vanishes in a breath of frost — the diegetic reason he escapes the prologue despite being 'defeated'"
     ai_pattern: hold_position
     # Defeated on the field, but he does NOT die here — see the chapter_end cutscene (escape).
-    death_quote: "You cut the ice… not the cold that made it…"
+    death_quote: "Her work… does not end with me…"   # LOCKED 2026-06-10 (dialogue pass)
     art:
       render:                    # exact reproduction of the shipped bust (tools/ref_to_bust.py)
         ref: "References/NPCs/Sephak Bust Dagger.png"   # Nicolas's cel-shaded ref (dagger version — the longsword hit the dead corner)

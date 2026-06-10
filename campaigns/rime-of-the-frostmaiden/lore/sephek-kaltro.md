@@ -32,7 +32,7 @@ warmth of his manner, not threats.
 - Pity for his enemies, amusement at their effort.
 
 **Calibration lines**
-- "You cut the ice… not the cold that made it…" (draft death quote, chapter YAML)
+- "You cut the ice… not the cold that made it…"
 - "I was born on the winter solstice. Her blessing has been on me ever since."
   (adapted from Torrga's account of him)
 - "They cheated her of what was owed. I only balanced the scales."
