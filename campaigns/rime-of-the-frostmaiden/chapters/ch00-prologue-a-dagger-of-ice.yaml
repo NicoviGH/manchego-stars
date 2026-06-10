@@ -162,10 +162,32 @@ events:
       (Rime/Auril) and geography live in the #43 opening montage (lore crawl + town
       tour); this scene owns only the local plot, vanilla-Prologue style. Shape: a
       brown-box location card ("the caravan road" — the "Renais Castle" analog), then
-      Hlin and Scramsax corner Sephek mid-stalk. Hlin's compressed book-p.23 accusation
-      (the three sacrifice towns, the new moons, "no coat, no scarf, no gloves"),
-      Sephek's serene executioner reply ("her work"), Scramsax's button. Fight begins.
+      Hlin briefs Scramsax as they close in (the book-p.23 monologue, retargeted at the
+      muscle so it isn't exposition-to-the-killer); Sephek steps out and finishes her
+      sentence; serene confession; Hlin gets the last word before steel. Fight begins.
       Voices: lore/{hlin-trollbane,scramsax,sephek-kaltro}.md.
+    script:                      # LOCKED 2026-06-10 (dialogue pass, co-written)
+      - location_card: "The Eastway"
+      - hlin: >-
+          A trapper. A shipbuilder. A glassblower. All dead this month —
+          a dagger of ice through the heart.
+      - hlin: >-
+          Every one from a town that holds her lotteries. Every one a cheat
+          who kept his name out of the drawings.
+      - hlin: >-
+          I watched our man walk this road for a tenday, Scramsax. No coat.
+          No scarf. No gloves. It was like the cold couldn't touch him—
+      - sephek: "It cannot."           # steps out mid-sentence (boss reveal)
+      - hlin: "…Kiss of the Frostmaiden, indeed."
+      - sephek: >-
+          You say it like a curse. I was born on the winter solstice.
+          Her blessing has been on me ever since.
+      - sephek: >-
+          The dead you count cheated Auril of what was owed.
+          I only balanced the scales.
+      - scramsax: "Enough. Draw steel, killer."
+      - hlin: >-
+          I'm too old to wrestle you, Kaltro. Lucky for me… I brought an axe.
   - trigger: boss_low_hp
     type: dialogue
     ea_file: events/ch00-sephek-cold.ea
