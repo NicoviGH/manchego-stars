@@ -1,85 +1,82 @@
-# Handoff: **ch00 dialogue pass COMPLETE & WIRED (GIF-review approved). NEXT = pick with Nicolas: ch01 dialogue pass (`/dialogue-pass`, Northlook hiring scene) or the #43 opening-montage wiring (crawl + tour text is locked and parked).**
+# Handoff: **#43 lore crawl SHIPPED (GIF-approved twice: cards + aurora mural). NEXT = the #43 world-map TOUR half: convert the book's regional Icewind Dale map into the WM drawn-map backdrop (bootstraps #29), then rewrite `EventScrWM_Prologue_Beginning` with the 6 locked tour cards.**
 
 **Date:** 2026-06-10
-**Last session:** Ran the dialogue-pass skill for real (first invocation): review pass over
-all locked ch00 text (added a §Craft check to the skill — quality, not just compliance),
-two craft fixes Nicolas picked (Scramsax "Save your sermon", crawl card 6 "Winter has not
-relented"), locked slots 4-6 via pickers (boss line / 3 battle quotes / ending scene), then
-WIRED everything into the ROM and got it GIF-reviewed and approved. All pushed through
-`c119fcc`.
+**Last session:** Wired the #43 opening-montage lore crawl end-to-end: the 7 locked YAML
+cards re-rendered as vanilla's 7 opening slides (`tools/gen_subtitle_cards.py`, Georgia 13
++1px tracking quantized into the vanilla ramp), display LUT retimed, and vanilla's brown
+rune-wall backdrop replaced with the book's aurora-township painting via montage-LOCAL
+symbols (the rune wall is shared by shops/chapter-intro/endings — never overwrite it).
+Both rounds GIF-reviewed and approved by Nicolas. Pushed through `12b7756`.
 
-**Live checklist = GitHub issue #20.** HANDOFF = current state + next steps.
+**Live checklist = GitHub issue #43 (montage) / #20 (ch00).** HANDOFF = state + next steps.
 
 ---
 
 ## NEXT SESSION (in order)
-1. **Pick with Nicolas:** ch01 dialogue pass (the Northlook hiring scene now OWNS the
-   location card + the hiring beat — ch00 ends on a fade-out, no tease) **or** wire the
-   #43 opening montage (lore crawl + town tour text locked in
-   `events/opening-montage.yaml`, awaiting the boot-sequence slice).
-2. Whichever runs: invoke the **`dialogue-pass` skill** — it now carries the full recipe
-   (sources → voice bibles → variants with FULL QUOTES in AskUserQuestion *descriptions*,
-   never previews — they don't render for him → craft check → insertion gates → GIF
-   review via `run.sh record` → his OK → commit).
+1. **#43 tour half** — Nicolas picked the backdrop: the book's regional Icewind Dale map
+   (`References/Ten-Towns-Maps/icewind-dale-rime-of-the-frostmaiden-maps_compress.pdf`
+   p.1, render with `pdftoppm -r 200`; all ten towns + three lakes labeled, engraving
+   style ≈ FE8's drawn map). Steps: study FE8's WM drawn-map format
+   (`WM_SHOWDRAWNMAP`, worldmap.c / graphics/world_map) → convert the map (show Nicolas
+   conversion drafts BEFORE wiring) → rewrite `EventScrWM_Prologue_Beginning` with the 6
+   locked `town_tour` cards (msg 0x8DB body + camera pans per card; skip vanilla's
+   nation-highlight overlays — they're Magvel-shaped polygons). This bootstraps #29.
+2. ch01 dialogue pass (`/dialogue-pass`, Northlook hiring scene owns the location card +
+   hiring beat) — the other parked track.
 3. Scramsax Hero mug still needs the [F2E] license recheck before distribution (carried).
 
-## Working agreements discovered this session
-- **Review in-engine text as GIFs, not stills** ("use this format going forward"):
-  `tools/playtest/run.sh record` → dedupe → GIF → `open -a Safari`. Static shots catch
-  the typewriter mid-stroke and false-alarm as cut-off text. (decisions.md §Story &
-  Dialogue; memory `feedback_sharing_visual_drafts`.)
-- **AskUserQuestion previews don't render for Nicolas** — full quote text goes in each
-  option's `description`. (memory `feedback_answer_before_picker`.)
-- The craft check (cover-the-name test, box buttons, device budget…) is now a standing
-  section of the skill — "functional is a finding, not a pass."
-
 ## Current state
-- ✅ **ch00 is DONE end-to-end**: map, units, win/lose, title, portraits, AND all
-  dialogue wired + in-engine approved. `make` green, `verify_text` 0 runaway,
-  win/gameover playtests PASS, GIF review OK'd.
-- ✅ Dialogue wiring is GENERATED from the chapter YAML's locked `script:` blocks
-  (`_script_to_message` in `tools/build_campaign.py`) — YAML stays the SoT; msg ids ride
-  never-loaded vanilla slots (0x664 card / 0x90D briefing / 0x90E confrontation /
-  0x914 battle quote / 0x918 ending / 0x936-0x917-0xC25 quotes).
-- ✅ New Game select + save screen now show "Prologue: A Dagger of Ice" (slot 0's
-  chapTitleId/text pointed at the host's).
-- ✅ Playtest harness grew `scenes` (per-page contact sheet) and `record` (continuous
-  frames → review GIFs) scenarios.
-- ⚠️ Slots 1-2 (lore crawl + town tour) stay YAML-parked until the #43 slice.
+- ✅ **#43 crawl half SHIPPED** (`d05384c` wiring, `12b7756` mural): New Game plays the
+  7-card crawl over the aurora township, then (tour still SKIPWN'd) loads the ch00 map.
+- ✅ **Build modes:** default `make` = dev straight-to-map boot (unchanged playtests);
+  `MONTAGE=1 make` = crawl wired. **Distribution (#37) must set MONTAGE=1.** Both modes
+  build green; win playtest passes both (bootToMap's START self-skips the crawl).
+- ✅ ch00 remains DONE end-to-end (see #20); `verify_text` 0 runaway.
+- ⚠️ Tour text (`town_tour:` in `events/opening-montage.yaml`) stays YAML-parked until
+  the drawn-map backdrop lands.
 - ⚠️ ch01+ chapter YAMLs still carry aspirational `ea_file:` fields (schema cleanup
-  candidate — wiring actually goes through build_campaign decomp patches).
+  candidate).
+- ℹ️ nanobanana MCP image-gen is broken (retired Gemini model id) — book art extraction
+  via pdftoppm worked better anyway.
 
-## Tried but didn't work (text-engine lessons — now encoded in the skill + code comments)
-- **Text_BG(BG_PLAIN_2)** for scenes: vanilla's GREEN summer plains in a two-year
-  winter. FE8 ships no snow background → on-map text (vanilla 0x910/0x911 convention).
-- **40-char lines on-map**: bubbles clip at ~29 chars (Text_BG tolerates ~42).
-- **Lazy right-face load mid-message + later multi-page turns**: empty offscreen
-  bubbles. Root cause (decomp-traced, scene.c): `GetStrTalkLen` does NOT stop at [A]
-  (+12px and keeps measuring to the next speaker's printable), and `PutTalkBubble`'s
-  right-side branch has NO x clamp (`x = 29 - width`, left side clamps) → merged
-  same-speaker turns overflow → tilemap wrap. Fix: coalesce consecutive same-speaker
-  turns into one block, every non-terminal [A] is [LF]-followed; boss "steps out" via a
-  message SPLIT with the enemy LOAD1 between (vanilla 0x910 shape).
+## Key facts for the tour (decomp-traced this session)
+- The crawl is 7 PRERENDERED slides (`gOpSubtitleGfxLut`, opsubtitle.c) with hardcoded
+  transitions (fades 0-1, flare on 2, cross-blends 3-4, mural close 5-6; START skips) —
+  our 7-card budget rides it with ZERO proc changes. The TOUR is real message text:
+  `WM_TEXT(0x8DB)` inside `EventScrWM_Prologue_Beginning` (src/events/prologue-wm.h),
+  TEXTCONT segments interleaved with `WM_MOVECAM2` pans + portrait/highlight calls.
+- Slide gfx pipeline: PNG → FETSATOOL (`%.feimg2.bin %.fetsa2.bin: %.png`) → `%.lz` —
+  drop PNGs in `fireemblem8u/graphics/op_subtitle/`, delete stale intermediates, make
+  reconverts. Slide PNG index 0 is GBA-transparent (black backdrop) — slate bg in the
+  PNG is a converter placeholder only.
+- Mural shape: 640 sequential 4bpp tiles (256×160) on palette row 15
+  (`sub_80C48F0`), palette faded to `Pal_MontageMural` during the flare slide.
+
+## Working agreements (this session)
+- Backdrop/mural swaps for shared vanilla assets = patch the CONSUMER to local symbols,
+  never overwrite the shared gfx (decisions.md §Story & Dialogue, lore-crawl entry).
+- Montage builds are flag-gated, not default — keeps playtest/dev loop byte-identical.
 
 ## Blockers
 - None.
 
 ## Key files
-- `campaigns/.../chapters/ch00-prologue-a-dagger-of-ice.yaml` — all locked scripts +
-  quotes (the dialogue SoT; trigger `boss_battle` = first-engagement quote, FE-native).
-- `campaigns/.../events/opening-montage.yaml` — LOCKED #43 text, parked.
-- `campaigns/.../lore/{hlin-trollbane,scramsax,sephek-kaltro,narration}.md` — voice bibles.
-- `.claude/skills/dialogue-pass/SKILL.md` — workflow incl. craft check + encoding gotchas.
-- `tools/build_campaign.py` — `_script_to_message` / `_wrap_fe_lines` (encoding rules,
-  decomp-traced rationale) + `inject_prologue` steps 3/4c/5b.
-- `tools/playtest/run.sh scenes|record` + `harness.lua` — contact-sheet & GIF capture.
-- `docs/decisions.md` §Story & Dialogue — content allocation, GIF-review convention.
+- `tools/gen_subtitle_cards.py` — card renderer + mural treatment (vanilla metrics in
+  constants; extend here for any future slide-style screens).
+- `tools/build_campaign.py` — `inject_opening_montage` (+ `_cut_boot_intro(montage=)`),
+  PATCHED_DECOMP_FILES now covers opsubtitle.c, data_opsubtitle.s, slide PNGs.
+- `campaigns/.../events/opening-montage.yaml` — locked crawl + tour text (SoT).
+- `campaigns/.../events/opening-mural.png` — mural source art (book ch1 opener).
+- `docs/decisions.md` §Story & Dialogue — lore-crawl entry (build modes, mural rule).
+- `map-review/43-*` — review GIFs/mockups from this session (gitignored).
 
 ## Gotchas (carried)
 - Story text: YAML `script:` → build_campaign generates bodies; `make` reruns
   build_campaign and overwrites manual decomp edits. Gate: `python3 tools/verify_text.py`.
 - Odd-length NAME strings: pad with [.] (terminator parity; `name_message_body` does it).
 - Synthetic macOS keypresses don't reach mGBA; in-emulator Lua is the path.
+- Bash cwd drifts between tool calls — `git commit` once landed in the fireemblem8u
+  submodule; always `cd` to repo root in git commands.
 - Frostmaiden book: `references/References/icewind-dale-...pdf` (symlink →
   `/Users/Yonick/Documents/D&D/5E/`); DM notes:
   `/Users/Yonick/Documents/Claude/Projects/Manchego Stars / Fire Emblem Game/References/DungeonMasterNotesIcewindDale.pdf`.
@@ -89,10 +86,10 @@ WIRED everything into the ROM and got it GIF-reviewed and approved. All pushed t
 - [[manchego-stars-project]] · [[feedback_collaborative_story_planning]] ·
   [[feedback_answer_before_picker]] · [[feedback_sharing_visual_drafts]] ·
   [[feedback_use_decomp]] · [[feedback_show_before_committing_art]] ·
-  [[manchego-stars-automated-playtests]] · [[manchego_stars_text_terminator_parity]]
+  [[manchego-stars-automated-playtests]] · [[feedback_vendor_community_assets]]
 
 ## Standing rules
 Combat = pure vanilla FE. Story/dialogue = collaborative (variants → Nicolas picks; full
-quotes in picker descriptions); in-engine text review = GIFs via `record`, wait for his
-OK before committing art-visible text. Auto-push to main once green; never commit the
+quotes in picker descriptions); in-engine review = GIFs via `record`, wait for his OK
+before committing art-visible content. Auto-push to main once green; never commit the
 `fireemblem8u` submodule pointer. Playtests machine-run for logic, Nicolas for feel.
