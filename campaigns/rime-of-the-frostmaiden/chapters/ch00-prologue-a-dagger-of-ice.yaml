@@ -194,6 +194,10 @@ events:
     type: dialogue
     ea_file: events/ch00-sephek-cold.ea
     description: "Sephek bleeds frost, unbothered by the cold — a first glimpse of Auril's reach."
+    script:                      # LOCKED 2026-06-10 (dialogue pass, co-written; ≤4 lines per vanilla 0x914)
+      - sephek: >-
+          Well struck. Look — the wound rimes over, even now.
+          Her cold knits what you cut. It does not tire. Do you?
   - trigger: chapter_end
     type: cutscene
     ea_file: events/ch00-ending.ea
