@@ -33,8 +33,17 @@ Source: **[Klokinator/FE-Repo](https://github.com/Klokinator/FE-Repo)** (communi
 |---|---|---|---|---|
 | **Snowy Bern / Snowy Peaks** tileset (graphics + palette + tile config) | the campaign's shared winter tileset (Prologue town → Ch8 ice canyon) | **ZoramineFae** (assembled the insertable version), **Vennobennu** ("Snowy Peaks Revised" updates), **FEAW** (2015 original), **Sme** (original Discord source) | [FEUniverse t/7204](https://feuniverse.us/t/snowy-bern-snowy-peaks-tileset/7204) | F2U (community free-to-use with credit) |
 
+## Purchased assets
+| Asset | Used for | Author | Source / License |
+|---|---|---|---|
+| **Icewind Dale: Ten-Towns Hand Drawn Maps and NPC Builder** (2021) — the ten-towns hand-drawn map (weathered + clean variants) + NPC builder tables | tour drawn-map B (`events/tour-map-b-towns.*`, icy duotone + re-lettering via `tools/gen_drawnmap.py`); NPC builder informs story/NPC work | **Joel Kleine** (@midlifedices) | purchased: [DriveThru product 353776](https://www.drivethrucomics.com/en/product/353776/icewind-dale-ten-towns-hand-drawn-maps-and-npc-builder); published under the DMs Guild Community Content Agreement |
+
+## Campaign source material (Wizards of the Coast)
+- ***Icewind Dale: Rime of the Frostmaiden*** © Wizards of the Coast — the campaign this hack adapts (privately, for its own players). Book art reused in-ROM: the ch1 opener aurora-township painting (lore-crawl mural) and the regional Icewind Dale map (basis/reference for the world-tour backdrops).
+
 ## AI-generated art (disclose)
 - **PC/cast portraits** are AI-generated (Google **Gemini / "Nano Banana"**) from reference art, then hand-fitted and indexed into FE8 portraits via our bust pipeline (`tools/ref_to_bust.py`, `tools/portrait_tool.py`). To be disclosed as AI-assisted per community norms.
+- **Tour drawn-map A** (`events/tour-map-a-dale.*`) is a Gemini repaint of the book's regional Icewind Dale map (Magvel-style restyle, prompt-run by Nicolas), then converted/re-lettered by `tools/gen_drawnmap.py`.
 
 ## Our work
 - Campaign design, YAML/data, build tooling (`tools/`), and custom pixel edits — Nicolas + Claude.
