@@ -684,10 +684,34 @@ for GIF review. **Backdrop mural:** vanilla composites the slides over `Img_Comm
 — a SHARED asset (shops, chapter-intro fx, ending details, mural_background), so it is never overwritten; instead
 opsubtitle.c is patched to montage-local `Img/Pal_MontageMural` symbols incbin'd in `data_opsubtitle.s`, fed by the
 book's ch1 opener painting (aurora over a snow-buried township, `campaigns/.../events/opening-mural.png`; build
-derives the 256×160 16-color mural: brightness 0.75, 15 colors + black at GBA-transparent index 0). The WM
-town-tour half of #43 stays SKIPWN'd until its Icewind Dale drawn-map backdrop lands (Nicolas 2026-06-10: build it
-from the book's regional map in `References/Ten-Towns-Maps`, bootstrapping #29).
+derives the 256×160 16-color mural: brightness 0.75, 15 colors + black at GBA-transparent index 0).
 _Decided: 2026-06-10; crawl and aurora mural both GIF-reviewed and approved by Nicolas._
+
+**World-map tour rides vanilla's drawn-map slot with two Icewind Dale backdrops, selected by a free mask bit.**
+The drawn map (`WM_SHOWDRAWNMAP` → `StartGmapRm`, `worldmap_rm.c`) is one 240×160 prerendered screen: a 30×20 TSA
+over ≤640 unique 4bpp tiles at BG VRAM 0, palette rows 5-8 (raw TSA entries get +0x5000). `tools/gen_drawnmap.py`
+converts source art into that format (crop 3:2 → 240×160 → erase source lettering with rect median filters — it
+never survives the downscale — → re-letter in a 3×5 micro-caps font + Georgia titles → per-tile 4-row palette
+quantization; `--emit` writes the ROM trio into `campaigns/.../events/`). **Format gotchas (cost a debug session
+each):** tile 0 must be fully transparent — during the blocking display `GmapRm_80C2320` parks BG1 behind a
+cleared-to-tile-0 BG2, so a non-blank tile 0 paints the whole screen through the wrong palette; and TSA rows are
+stored bottom-up (`TmApplyTsa` walks the dest upward). **Backdrop pair (Nicolas, 2026-06-10):** map A = the Gemini
+Magvel-style repaint of the whole dale (establishing shot, card 1), map B = the purchased hand-drawn ten-towns map,
+icy duotone, all ten towns + three lakes re-lettered (cards 2-6). Vanilla's `Img/Pal/Tsa_EventGmap` are shared with
+ch2/ch5 WM events, so the consumer is patched to montage-local `*_MontageDrawnMap{A,B}` symbols (mural rule);
+`GMAPRM_FLAG_4` (0x10, never read by engine code) on the `WM_SHOWDRAWNMAP` mask picks map B. **Event**
+(`inject_world_tour`, MONTAGE=1): `EventScrWM_Prologue_Beginning` rewritten on vanilla's own rhythm — spawn lord,
+SILENT → THE BEGINNING, map revealed by `WM_FADEOUT`; the A→B swap hides under a `FADI`/`FADU` pair (masks leave
+the GmapRm blend flags clear, vanilla's prologue shape). The WM text window covers the bottom ~50 rows, so map B
+shows at scroll y=24 and rides vanilla's pan trick (`WM_MOVECAM2` scrolls BG1 here, not the camera) down to y=48
+for the Redwaters card and back for the closer; both maps are lettered for those scrolls. The 6 locked `town_tour`
+cards become msg 0x8DB (vanilla's WM narration, referenced only here) as `[BreakTalk]` segments ↔ `TEXTCONT`
+boundaries, 42-char lines, 2-line pages. **Save-slot banners:** `sub_80895B4`'s `config&1` palette table continues
+past the 9-color `gPal_08A07AD8` label — the save-slot select reads pair 0's tail + the +0x10 dim row through
+`gUnknown_08A07AEA`/`gUnknown_08A07B0A`, so `inject_title_theme` recolors those too (16 + first 7 colors) or the
+unselected slots stay vanilla green; the per-difficulty pairs stay vanilla (semantic colors).
+_Decided: 2026-06-10; full New-Game-to-map GIF reviewed and approved by Nicolas ("perfect"), save-slot fix verified
+in-emulator. Closes the tour half of #43 and bootstraps #29._
 
 ---
 

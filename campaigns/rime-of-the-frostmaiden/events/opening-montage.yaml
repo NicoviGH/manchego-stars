@@ -1,12 +1,14 @@
 # events/opening-montage.yaml — locked text for the #43 opening montage (design SoT).
-# Wiring lands in the #43 vertical slice (replaces boot cuts 2+4: StartIntroMonologue
-# subtitle cards + the EventScrWM_Prologue_Beginning world-map tour). Register, budgets,
-# and content allocation: lore/narration.md + docs/decisions.md §Story & Dialogue.
+# Fully wired on MONTAGE=1 builds (boot cuts 2+4 replaced: lore_crawl rides the
+# StartIntroMonologue subtitle slides, town_tour rides EventScrWM_Prologue_Beginning
+# over the two events/tour-map-* drawn maps; build_campaign inject_opening_montage +
+# inject_world_tour). Register, budgets, and content allocation: lore/narration.md +
+# docs/decisions.md §Story & Dialogue.
 # Co-written with Nicolas 2026-06-09 (ch00 dialogue pass) — near-verbatim from the
 # book's Cold Open boxed text (printed p.22); 7 cards = vanilla's op_subtitle count.
 
 lore_crawl:
-  status: locked            # text final; awaiting #43 wiring
+  status: locked            # wired 2026-06-10 (7 op_subtitle slides)
   cards:
     - >
       Far north, beyond the Spine of the World, lies Icewind Dale —
@@ -32,7 +34,7 @@ lore_crawl:
       on this frigid, blighted land.
 
 town_tour:
-  status: locked            # text final; awaiting #43 wiring (pans per card, see lore/narration.md)
+  status: locked            # wired 2026-06-10 (msg 0x8DB over tour-map-a/b, pan for the Redwaters card)
   cards:
     - >
       Dalefolk live in a scattering of settlements known as Ten-Towns —
