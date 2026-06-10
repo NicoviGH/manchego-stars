@@ -20,7 +20,41 @@
 - **Bond:** I protect those who cannot protect themselves.
 - **Flaw:** The people who knew me when I was young know my shameful secret, so I can never go home.
 
-**Speech:** none
+**Speech:** none — and unlike Marty, he stays that way in-game (see §Voice).
+
+## Voice
+
+Sclorbo never speaks. All of his "dialogue" is **impression/gesture text**: short
+third-person stage directions describing what he does or radiates — distinct on
+purpose from Marty, whose rapport spores read as normal dialogue. He's the party's
+quiet encourager: confident, sincere, first to help, protector of the helpless.
+**Low line-count by design** — an introverted player's PC. (Interview with Nicolas,
+2026-06-10; impression-text mode is his pick.)
+
+**Diction rules**
+- NO quoted speech, ever. No dialogue boxes of words from Sclorbo.
+- His lines are stage directions: present tense, third person, one short sentence.
+  Drafts use italics; in-ROM (no italic font) render them in parentheses, e.g.
+  `(Sclorbo radiates warm encouragement.)`
+- The content is emotional, not verbal: encouragement, alarm, comfort, a pointed
+  mental jeer at an enemy (his Cutting Impression). Other PCs may paraphrase his
+  meaning aloud when the scene needs words.
+- Helper first: if someone is in trouble, Sclorbo is already moving toward them.
+- Sincerity ideal — his impressions never deceive; he can't pretend to feel what he
+  doesn't.
+- He was among the PCs who abstained from the Bremen government fight over the
+  maer-speaker payment.
+- The shameful secret ("can never go home") stays buried — an unplayed hook; don't
+  reveal or explain it in MVP dialogue, at most let other PCs notice he deflects
+  questions about home.
+
+**Calibration (register targets)**
+- `(Sclorbo pats Braulo's claw, radiating calm.)`
+- `(Sclorbo beams confidence at the party — chins lift, grips tighten.)`
+- `(A withering impression lands on the bandit: somewhere, his mother is disappointed.)`
+
+**Banned:** quoted speech, long descriptions, mime slapstick, insincerity,
+showmanship, explaining the secret.
 
 ## Ability Fantasies (flavor only — not game mechanics)
 

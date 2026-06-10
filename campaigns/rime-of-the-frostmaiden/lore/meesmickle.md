@@ -15,21 +15,21 @@
 
 ## Voice
 
-Speaks rarely — and when she does, it's a dry, sarcastic one-liner (register: Salem
+Speaks rarely — and when he does, it's a dry, sarcastic one-liner (register: Salem
 from *Sabrina the Teenage Witch*). A quiet menace: terrifying in a fight, deadpan
-about it afterward. **Low line-count by design** — her player was one of the table's
+about it afterward. **Low line-count by design** — his player was one of the table's
 introverts, and the FE script should honor that: a few perfect quips beat a speaking
 role. (Interview with Nicolas, 2026-06-10.)
 
 **Diction rules**
-- Short sardonic quips, delivered flat. One sentence is her natural unit; two is a
+- Short sardonic quips, delivered flat. One sentence is his natural unit; two is a
   speech.
 - World-weary cat superiority: unimpressed by danger, weather, and other people's
   plans.
-- Her fiendish powers are treated as mundane — no cackling, no theatrics. Hurling
+- His fiendish powers are treated as mundane — no cackling, no theatrics. Hurling
   someone through Hell is just Tuesday.
-- Sarcasm is dry, never cruel slapstick; she's a wit, not a bully.
-- Not actually bloodthirsty: she was among the PCs who refused to fight the Bremen
+- Sarcasm is dry, never cruel slapstick; he's a wit, not a bully.
+- Not actually bloodthirsty: he was among the PCs who refused to fight the Bremen
   government over the maer-speaker payment and abstained from that battle.
 
 **Calibration (thin — persona-derived; add real table lines if any surface)**
@@ -50,11 +50,11 @@ In-game Meesmickle is a plain FE8 class; none of these are implemented as skills
 
 Soul Tithe — the Fiend rewards each kill with a sliver of the victim's stolen vitality.
 
-- *Former mechanic concept (now flavor):* on-kill passive: gain temp HP (bypasses her healing restriction)
+- *Former mechanic concept (now flavor):* on-kill passive: gain temp HP (bypasses his healing restriction)
 
 ### Hurl Through Hell
 
-Damnation — she banishes a foe screaming through the Nine Hells; it returns broken.
+Damnation — he banishes a foe screaming through the Nine Hells; it returns broken.
 
 - *Former mechanic concept (now flavor):* 1/chapter finisher proc: after an Eldritch Blast hit, adds a massive psychic burst
 
@@ -62,7 +62,7 @@ Damnation — she banishes a foe screaming through the Nine Hells; it returns br
 
 Shadowmeld — the cat melts into the dark and simply isn't there anymore.
 
-- *Former mechanic concept (now flavor):* activated stance: untargetable by ranged until she moves or acts (Invocation, Ch2)
+- *Former mechanic concept (now flavor):* activated stance: untargetable by ranged until he moves or acts (Invocation, Ch2)
 
 ### Feline Agility
 
@@ -70,19 +70,19 @@ Shadowmeld — the cat melts into the dark and simply isn't there anymore.
 
 ### Fiendish Resilience
 
-Infernal Hide — her fur hardens against whatever's hurting her most today.
+Infernal Hide — his fur hardens against whatever's hurting him most today.
 
 - *Former mechanic concept (now flavor):* 1/chapter: timed flat +DEF/RES self-buff (FE-native)
 
 ### Power Word Kill
 
-Word of Ending — she speaks a single syllable of the Abyss and a weakened foe simply stops.
+Word of Ending — he speaks a single syllable of the Abyss and a weakened foe simply stops.
 
 - *Former mechanic concept (now flavor):* 1/chapter: instakill a target already below the HP threshold (no save)
 
 ### Demiplane
 
-She folds open a pocket of stone-walled nowhere — handy for stashing loot or hiding.
+He folds open a pocket of stone-walled nowhere — handy for stashing loot or hiding.
 
 - *Former mechanic concept (now flavor):* NONE — dropped as a combat ability (no FE analogue). Narrative/utility only.
 
@@ -100,7 +100,7 @@ Spite — strike the cat and hellfire lashes back up your arm.
 
 ### Burning Hands
 
-Brimstone Breath — a fan of sulfurous hellfire from her spread claws.
+Brimstone Breath — a fan of sulfurous hellfire from his spread claws.
 
 - *Former mechanic concept (now flavor):* fire tome, short cone (a few adjacent tiles)
 
@@ -108,7 +108,7 @@ Brimstone Breath — a fan of sulfurous hellfire from her spread claws.
 
 Honeyed Whisper — a purring command the target's body obeys before the mind objects.
 
-- *Former mechanic concept (now flavor):* charm flag: target can't act against Meesmickle this turn (treats her as ally)
+- *Former mechanic concept (now flavor):* charm flag: target can't act against Meesmickle this turn (treats him as ally)
 
 ### Fireball
 
@@ -118,15 +118,15 @@ Hellfire Burst — a bead of fiend-fire that blooms into an inferno.
 
 ### Vampiric Touch
 
-Bloodletting — she drinks the life out of a foe; perfect for a vampire who can't sip potions.
+Bloodletting — he drinks the life out of a foe; perfect for a vampire who can't sip potions.
 
 - *Former mechanic concept (now flavor):* Nosferatu (dark drain): damages the target and heals Meesmickle for a share
 
 ### Dark One's Own Luck
 
-Devil's Favor — the Fiend tips a roll her way, just this once.
+Devil's Favor — the Fiend tips a roll his way, just this once.
 
-- *Former mechanic concept (now flavor):* 1/chapter: reroll one of her own failed attacks or saves
+- *Former mechanic concept (now flavor):* 1/chapter: reroll one of his own failed attacks or saves
 
 ### Eyebite
 
@@ -136,6 +136,6 @@ Evil Eye — a baleful stare that sickens, panics, or simply drops a foe where i
 
 ### Finger of Death
 
-Reaper's Touch — a word of unmaking; the slain rise to serve her.
+Reaper's Touch — a word of unmaking; the slain rise to serve him.
 
 - *Former mechanic concept (now flavor):* dark nuke; if it kills a target, that target rises as a temporary thrall (summon-on-kill)
