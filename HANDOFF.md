@@ -1,4 +1,4 @@
-# Handoff: **#43 CLOSED — full opening montage SHIPPED (crawl + world-map tour, GIF-approved end-to-end). NEXT = ch01 dialogue pass (`/dialogue-pass`, Northlook hiring scene).**
+# Handoff: **#43 CLOSED — full opening montage SHIPPED (crawl + world-map tour, GIF-approved end-to-end). NEXT = PC voice interviews, then the FULL Ch1 slice (#21) — dialogue pass comes LAST in the slice (Nicolas's correction 2026-06-10).**
 
 **Date:** 2026-06-10
 **Last session:** Wired the #43 tour half end-to-end and closed the issue: the book's
@@ -15,11 +15,16 @@ recolor extended through `gUnknown_08A07AEA/B0A`). Pushed through `6865c9a` (Clo
 ---
 
 ## NEXT SESSION (in order)
-1. **ch01 dialogue pass** (`/dialogue-pass`) — Northlook hiring scene opens ch01 and owns
-   the location card + hiring beat (decisions.md §Story & Dialogue). The parked track.
-2. **#29 world map** — the tour's drawn maps bootstrap it; the actual WM screen (nodes,
+1. **PC voice interviews** (in progress 2026-06-10) — structured interview with Nicolas
+   per PC → §Voice sections in `lore/*.md` (format = hlin's: summary, diction rules,
+   calibration lines, banned list). Chapter-independent prep for ALL dialogue passes.
+   Pepperjack & Brie are done by design (each says only their own name).
+2. **Full Ch1 slice (#21, The Iron Trail)** — same order as ch00: map → roster/enemies →
+   objectives/events → playtests → dialogue pass LAST (Northlook hiring scene opens ch01
+   and owns the location card + hiring beat). Don't start with dialogue.
+3. **#29 world map** — the tour's drawn maps bootstrap it; the actual WM screen (nodes,
    travel) is still vanilla Magvel. Next art-path slice candidate.
-3. Scramsax Hero mug still needs the [F2E] license recheck before distribution (carried).
+4. Scramsax Hero mug still needs the [F2E] license recheck before distribution (carried).
 
 ## Current state
 - ✅ **#43 CLOSED**: New Game (MONTAGE=1) plays 7-card crawl over the aurora mural →
