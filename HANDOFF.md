@@ -35,8 +35,8 @@ voice-bible bench for the whole cast.
 - **Meesmickle** (he/him — file pronouns FIXED from she/her) — Salem-from-Sabrina dry
   one-liners, delivered flat; low line-count by design.
 - **Rootis** (he/him) — wholesome Olaf-but-not-silly; matter-of-fact snow-body humor;
-  low line-count by design. (Nicolas struck the sheet's overcomplicated-theories flaw
-  from §Voice — he doesn't remember it at the table.)
+  overcomplicated-theory flaw from his sheet played straight (Nicolas confirmed once
+  he saw it's sheet-sourced); low line-count by design.
 - **Sclorbo** (he/him) — NEVER speaks: impression/gesture stage-direction text only,
   rendered as parentheticals in-ROM (no italic font) — deliberately distinct from
   Marty. Secret stays buried (unplayed hook). Low line-count by design.

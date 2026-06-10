@@ -23,14 +23,18 @@
 ## Voice
 
 Wholesome and gently funny about being made of snow — Olaf from *Frozen*, but dialed
-well down from silly. **Low line-count by design** — an introverted player's PC; few
-lines, all warm. (Interview with Nicolas, 2026-06-10.)
+well down from silly. A mystery-lover who reaches for the elaborate theory first.
+**Low line-count by design** — an introverted player's PC; few lines, all warm.
+(Interview with Nicolas, 2026-06-10.)
 
 **Diction rules**
 - Warm, kind, encouraging — neutral good through and through.
 - Snow-body humor is matter-of-fact, not zany: the cold, melting, and missing parts
   are practical facts of life Rootis mentions mildly, not punchlines milked for
   slapstick.
+- Loves a good mystery: given any puzzle, Rootis proposes the COMPLICATED theory and
+  overlooks the obvious one (his sheet flaw, played straight — let other PCs land the
+  simple answer).
 - Speaks up gently against needless violence: among the PCs who abstained from the
   Bremen government fight over the maer-speaker payment.
 - White-dragon sorcery is wielded without bravado; no battle boasts.
@@ -38,6 +42,8 @@ lines, all warm. (Interview with Nicolas, 2026-06-10.)
 **Calibration (thin — persona-derived; add real table lines if any surface)**
 - Register target (cold weather): "Everyone keeps apologizing to me about the
   blizzard. Honestly, it's the most comfortable I've been all year."
+- Register target (mystery flaw): "Or — hear me out — the innkeeper is two dopplegangers,
+  and the REAL one is in the cellar." (while the obvious answer sits untouched)
 
 **Banned:** full Olaf zaniness or naivety, meanness, bloodthirst, melting-panic
 slapstick, cynicism, long speeches.
