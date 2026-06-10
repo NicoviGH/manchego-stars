@@ -17,6 +17,10 @@ beats → lines, human curates every level). Decided 2026-06-09 (docs/decisions.
 2. **Voice bibles:** `campaigns/rime-of-the-frostmaiden/lore/<speaker>.md` (§Voice:
    diction rules, calibration lines, banned list) and `lore/narration.md` for cards.
    If a speaker has no Voice section yet, write it (with Nicolas) before their lines.
+   For MINOR/incidental NPCs (house visits, villagers, shopkeepers): use
+   `lore/npc-bench.md` — setting-true name bank, one voice texture + one quirk each,
+   Dale occupations, four drop-in pre-gens, and real inter-town travel times for
+   pacing claims. Minor NPCs never get a full bible.
 3. **Beat outline:** the chapter YAML `events:` descriptions. If beats aren't settled,
    settle them with Nicolas before drafting any line.
 4. **Vanilla pacing benchmark** for the slot being written (decomp,
