@@ -13,11 +13,49 @@
 - **Alignment:** chaotic_neutral
 - **Size/age:** small
 
-**Speech:** none
+**Speech:** none on the sheet — he communicates via telepathic rapport spores (see §Voice).
 
 ## Backstory
 
 Part of a myconid circle in the coffee axis of Colombia. Left his community to become a traveling Barista and share the wonderful properties of the Chagaccino with the world. Takes every opportunity to brew and share it with anyone he can.
+
+## Voice
+
+Irony personified: relentlessly friendly fungal barista whose powers are quietly
+terrifying. He has no voice — he "speaks" via telepathic rapport spores, rendered as
+normal dialogue text in-game. The party's diplomat: he'd rather understand a monster
+than fight it. (Interview with Nicolas — Marty's own player — 2026-06-10.)
+
+**Diction rules**
+- Rapport spores read as ordinary dialogue boxes; no special markup. The fungal part
+  lives in scene directions, not the prose.
+- Recurring gag: meeting someone NEW, Marty "coughs" a puff of spores in their face so
+  they can hear him — stage it before his first line to any new character. Never
+  explained, never apologized for.
+- Warm and generous to everyone, strangers included: offers a Chagaccino unprompted,
+  hands out goodberries to keep the party fed. Hospitality is his opening move.
+- The diplomat instinct: he asks for the other side's point of view (wolves, monsters)
+  and offers deals — the wolf pack joined as sled dogs for a promise of goodberries.
+- Never mean or rude, even to enemies. When violence is the path, he goes quiet and
+  lets the action do the talking — little to no battle banter from Marty.
+- The horror stays in stage directions and enemy reactions (spore clouds, corpse
+  blooms), never in his tone. He is cheerful WHILE the killing haze spreads.
+- Bond gag with Braulo's isopod: Marty feeds it pieces of himself (isopods eat
+  fungus) and it likes him for it — in jail it stole the guard's keys for him.
+
+**Calibration moments (table-derived, paraphrased)**
+- Talked the wolf pack out of a fight: convinced the pack leader **Lupin** to join the
+  party as sled dogs, vowing to keep them fed with goodberries.
+- Spoke to the maer monster on the party's behalf to understand its point of view —
+  defusing the second major conflict the party never had to fight.
+- Jailbreak: broke off a piece of himself to feed Braulo's isopod; the isopod came
+  back with the guard's keys.
+- Voice target: "You look cold, friend. *(a polite cough of spores)* Have you ever
+  tried a Chagaccino?"
+
+**Banned:** meanness, rudeness, sarcasm at someone's expense, battle trash-talk,
+menace or gloating about his powers, robot/telepath-speak ("MY SPORES TRANSMIT…"),
+breaking the cheerfulness even mid-carnage.
 
 ## Ability Fantasies (flavor only — not game mechanics)
 
@@ -123,3 +161,7 @@ Vulnerary). Dropped/parked flavor:
 - **Witherspore** ("Chill Touch") — a puff of grave-mold; a second cantrip, folded out for the
   stock single-tome loadout.
 - **Chagaccino Berries** — the in-world flavor for his Goodberry/Vulnerary.
+
+> Nicolas's intent (2026-06-10 interview): replace **Vulneraries with Goodberries
+> party-wide** as the campaign's basic heal item, not just Marty's — Marty keeping the
+> party fed is the in-fiction source.
