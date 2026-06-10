@@ -209,11 +209,21 @@ events:
       "Imagery budget"). They won the fight and it wasn't enough. Then the quiet
       character beat (vanilla 0x918's shape — Eirika's "This is war, isn't it?"
       analog): Hlin, shaken, processes in facts — this is bigger than one bounty;
-      Ten-Towns will need more hands than two tired veterans'. Cut to black on a
-      Northlook location-card tease (decided 2026-06-09: the actual Northlook hiring
-      scene opens ch01, vanilla-style — not here). Sephek lives: a recurring threat
-      whose reckoning is left for the story to place (the book's Torrga Icevein
-      caravan is the natural payoff — held in reserve, not yet committed).
+      Ten-Towns will need more hands than two tired veterans'. Fade to black on
+      Scramsax's last line — no location card here: cards are scene-OPENERS in FE
+      grammar, so ch01's opening owns the Northlook card along with the hiring scene
+      (decided 2026-06-10). Sephek lives: a recurring threat whose reckoning is left
+      for the story to place (the book's Torrga Icevein caravan is the natural
+      payoff — held in reserve, not yet committed).
+    script:                      # LOCKED 2026-06-10 (dialogue pass, co-written; 7 boxes vs ~10-line budget)
+      - scramsax: "Hlin. Look. No body."
+      - hlin: "No blood, either. Shards and frost. That's all he left."
+      - hlin: "We won, Scramsax. We did everything right, and it wasn't enough."
+      - hlin: >-
+          This is bigger than one bounty. Ten-Towns will need
+          more hands than ours — younger ones.
+      - scramsax: "Adventurers. Ngh. I'll need more ale."
+      - fade_to_black: true      # end of prologue — no Northlook card tease
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
