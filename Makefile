@@ -33,8 +33,10 @@ endif
 
 all: fireemblem8.gba
 
+# MONTAGE=1 wires the #43 opening montage (lore crawl on New Game) in place of
+# the dev straight-to-map boot cut. Distribution builds (#37) must set it.
 fireemblem8.gba:
-	python3 tools/build_campaign.py --campaign $(CAMPAIGN)
+	python3 tools/build_campaign.py --campaign $(CAMPAIGN) $(if $(MONTAGE),--montage)
 	$(MAKE) -C fireemblem8u fireemblem8.gba -j$(NPROC)
 
 # Drift guard: docs/tooling consistency. Same logic CI and the git pre-commit hook run.

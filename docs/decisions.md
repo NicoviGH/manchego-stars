@@ -669,6 +669,22 @@ true death** in his payoff chapter (`lore/sephek-kaltro.md` §Imagery budget).
 _Decided: 2026-06-09 with Nicolas (towns: all ten, lake-grouped; location card: yes; Northlook → ch01);
 2026-06-10 (ch00 ends on dialogue fade-out, no card tease — Nicolas's call, FE scene-grammar)._
 
+**Lore crawl rides vanilla's seven-slide proc untouched; slides are re-rendered PNGs, gated by `MONTAGE=1`.**
+The "long ago…" monologue is seven prerendered 4bpp slides (`graphics/op_subtitle/`, `gOpSubtitleGfxLut`), not
+message text — `opsubtitle.c` walks them with hardcoded transitions (plain fades 0-1, flare reveal on 2,
+cross-blends 3-4, mural close 5-6; START skips). Our crawl was locked at 7 cards to reuse that machinery with zero
+proc changes: `tools/gen_subtitle_cards.py` re-renders the slides from `events/opening-montage.yaml` (Georgia 13px
++1px tracking — side-by-side closest to vanilla's serif; quantized into the vanilla 16-color ramp so the warm AA
+browns match; ≤220px lines, 24px pitch, block centered on (120,80); slide-display LUT retimed `120+8·words`,
+clamped 240-360 frames). Index 0 is GBA-transparent → in-engine the cards read cream-on-black like vanilla, so the
+slate PNG background is a converter placeholder only. **Build modes:** default `make` keeps the straight-to-map dev
+boot; `MONTAGE=1 make` keeps `StartIntroMonologue` wired and re-renders the slides (distribution #37 must set it).
+Playtests pass under both: `bootToMap` alternates A/START so the crawl self-skips; `record` A-only boot captures it
+for GIF review. The WM town-tour half of #43 stays SKIPWN'd until its Icewind Dale drawn-map backdrop lands
+(Nicolas 2026-06-10: build it from the book's regional map in `References/Ten-Towns-Maps`, bootstrapping #29).
+_Decided: 2026-06-10; crawl GIF-reviewed and approved by Nicolas (backdrop swap of the rune mural requested —
+opsubtitle-local symbol swap, not a global `Img_CommGameBgScreen` overwrite: shops/chapter-intro/endings share it)._
+
 ---
 
 ## Open Questions (not yet decided)
