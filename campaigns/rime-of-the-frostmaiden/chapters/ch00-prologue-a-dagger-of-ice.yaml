@@ -185,7 +185,9 @@ events:
       - sephek: >-
           The dead you count cheated Auril of what was owed.
           I only balanced the scales.
-      - scramsax: "Enough. Draw steel, killer."
+      - scramsax: >-
+          Save your sermon. I've sized up every sword in the Dale —
+          you're not worth the words.
       - hlin: >-
           I'm too old to wrestle you, Kaltro. Lucky for me… I brought an axe.
   - trigger: boss_low_hp
