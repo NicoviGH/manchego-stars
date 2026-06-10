@@ -32,5 +32,23 @@ lore_crawl:
       on this frigid, blighted land.
 
 town_tour:
-  status: drafting          # being co-written; structure in lore/narration.md
-  cards: []
+  status: locked            # text final; awaiting #43 wiring (pans per card, see lore/narration.md)
+  cards:
+    - >
+      Dalefolk live in a scattering of settlements known as Ten-Towns —
+      clinging to the shores of three frozen lakes.
+    - >
+      Bryn Shander, the walled crossroads — largest of the ten,
+      where every road in the Dale meets.
+    - >
+      On the shores of Maer Dualdon: Targos, Bremen, Termalaine, and
+      Lonelywood — where fleets pull knucklehead trout through the ice.
+    - >
+      On Lac Dinneshere: Easthaven of the ferry, and the twin keeps
+      of Caer-Dineval and Caer-Konig.
+    - >
+      On the Redwaters: Good Mead and Dougan's Hole,
+      smallest and southernmost of the ten.
+    - >
+      Ten towns, alone together at the top of the world.
+      Our tale begins on a snowbound caravan road…
