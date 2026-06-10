@@ -30,8 +30,8 @@ relationship with his "son" Pinky (see [`pinky.md`](pinky.md) — the Wish final
 
 Professor Ratigan (*The Great Mouse Detective*) is the explicit inspiration: a
 grandiose criminal gentleman-genius, eloquent and self-delighted, nominally reformed.
-The cheese puns are the mask; when his dark past surfaces, the puns STOP — that
-contrast is the tell. His genuine warmth exists for exactly one person: Pinky.
+The cheese puns are constitutional — they never stop, dark moments included. His
+genuine warmth exists for exactly one person: Pinky.
 (Interview with Nicolas, 2026-06-10.)
 
 **Diction rules**
@@ -44,8 +44,9 @@ contrast is the tell. His genuine warmth exists for exactly one person: Pinky.
   proposal in any jam.
 - Mobster residue: courteous menace, favors owed, and a rat contact in every town he
   can "make inquiries" through.
-- THE PUNS STOP when the old RBG surfaces — cold, brief, unadorned sentences in his
-  dark moments (see the kobold execution). Scenes should make the silence land.
+- The puns DON'T stop when the old RBG surfaces — his dark side shows in what he
+  DOES (the kobold execution), not in a changed register. A pleasant cheese pun
+  delivered while doing something cold is exactly right.
 - With or about Pinky, the mask drops to plain paternal warmth — no puns needed, no
   grandiosity. This is his growth arc; spend it sparingly so the finale Wish pays off.
 
@@ -60,7 +61,7 @@ contrast is the tell. His genuine warmth exists for exactly one person: Pinky.
 
 **Banned (inferred from the persona — flag anything off):** crude or sloppy speech,
 playing dumb, open villainy in public (the record stays spotless), cruelty or
-coldness toward Pinky, puns during his dark moments, humility.
+coldness toward Pinky, humility.
 
 ## Ability Fantasies (flavor only — not game mechanics)
 

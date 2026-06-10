@@ -35,7 +35,8 @@ voice-bible bench for the whole cast.
 - **Meesmickle** (he/him — file pronouns FIXED from she/her) — Salem-from-Sabrina dry
   one-liners, delivered flat; low line-count by design.
 - **Rootis** (he/him) — wholesome Olaf-but-not-silly; matter-of-fact snow-body humor;
-  overcomplicated-theory flaw played straight; low line-count by design.
+  low line-count by design. (Nicolas struck the sheet's overcomplicated-theories flaw
+  from §Voice — he doesn't remember it at the table.)
 - **Sclorbo** (he/him) — NEVER speaks: impression/gesture stage-direction text only,
   rendered as parentheticals in-ROM (no italic font) — deliberately distinct from
   Marty. Secret stays buried (unplayed hook). Low line-count by design.
@@ -43,8 +44,9 @@ voice-bible bench for the whole cast.
   line-counts are AUTHENTIC, not a gap. All three abstained from the Bremen fight.)*
 - **Prof RBG** — Professor Ratigan register; cheese puns constantly ("Cheesed to meet
   you", "Sounds Gouda to me!") + "Um, actually—" corrections; ex-mobster with an
-  underground rat network (added to his Backstory); **the puns STOP in his dark
-  moments** (kobold execution) — the silence is the tell; warmth reserved for Pinky.
+  underground rat network (added to his Backstory); **the puns NEVER stop** — his
+  dark side (kobold execution) shows in deeds, not a changed register (Nicolas's
+  correction); warmth reserved for Pinky.
   His banned list is inferred, not interviewed — confirm opportunistically.
 - **Wolfram** — materials-science nerd (smells/tastes/EATS metal); METALLO is
   backstory, NOT a speech tic; friendly, never backs down. Calibration: answered the
