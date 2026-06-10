@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
-"""Generate a self-contained HTML tile-map editor for the Prologue (and reusable for any
-chapter): embeds the winter metatile atlas + current layout + terrain data. Nicolas paints
-in-browser and exports a layout JSON, which we compile_layout() directly."""
+"""Generate a self-contained HTML tile-map editor for any chapter map: embeds the winter
+metatile atlas + a winter-reskinned vanilla layout as the starting point + terrain data.
+Nicolas paints in-browser and exports a layout JSON, which import_map_layout.py compiles.
+
+Usage: gen_map_editor.py [vanilla_layout=PrologueMap] [out_html=editor.html] [download=prologue-layout.json]
+e.g.   gen_map_editor.py Ch13EirikaMap 21-iron-trail/editor.html ch01-layout.json"""
 import sys, os, struct, collections, json, io, base64
 DEC='/Users/Yonick/Projects/manchego-stars/fireemblem8u'
 ROOT='/Users/Yonick/Projects/manchego-stars'
@@ -9,11 +12,15 @@ sys.path.insert(0, os.path.join(ROOT,'tools'))
 from map_tileset_tool import _tileset_from_dir, Tileset
 from PIL import Image
 
+LAYOUT=sys.argv[1] if len(sys.argv)>1 else 'PrologueMap'
+OUT_HTML=sys.argv[2] if len(sys.argv)>2 else 'editor.html'
+DOWNLOAD=sys.argv[3] if len(sys.argv)>3 else 'prologue-layout.json'
+
 win=_tileset_from_dir(os.path.join(ROOT,'campaigns/rime-of-the-frostmaiden/maps/tilesets/snowy-bern'))
 van=Tileset(os.path.join(DEC,'graphics/map/ObjectType1.4bpp'),
             os.path.join(DEC,'graphics/map/MapPalette1.gbapal'),
             os.path.join(DEC,'graphics/map/TileConfiguration1.bin'))
-lay=open(os.path.join(DEC,'graphics/map/layout/PrologueMap.bin'),'rb').read()
+lay=open(os.path.join(DEC,f'graphics/map/layout/{LAYOUT}.bin'),'rb').read()
 W,H=lay[0],lay[1]
 cells=[struct.unpack_from('<H',lay,2+i*2)[0]//4 for i in range(W*H)]
 
@@ -38,8 +45,10 @@ for y in range(H):
                     nm=cells[ny*W+nx]
                     if not divergent(nm) and van.terrain(nm)==vt: nb[nm]+=1
         resolved[y*W+x]=nb.most_common(1)[0][0] if nb else MODE.get(vt,FB.get(vt,m))
-remap={int(k):v for k,v in json.load(open(os.path.join(ROOT,'map-review/_remap.json'))).items()} if os.path.exists(os.path.join(ROOT,'map-review/_remap.json')) else {}
-manual=json.load(open(os.path.join(ROOT,'map-review/_manual.json'))) if os.path.exists(os.path.join(ROOT,'map-review/_manual.json')) else {}
+# prologue-era hand overrides apply only to the original PrologueMap session
+_isproto = LAYOUT=='PrologueMap'
+remap={int(k):v for k,v in json.load(open(os.path.join(ROOT,'map-review/_remap.json'))).items()} if _isproto and os.path.exists(os.path.join(ROOT,'map-review/_remap.json')) else {}
+manual=json.load(open(os.path.join(ROOT,'map-review/_manual.json'))) if _isproto and os.path.exists(os.path.join(ROOT,'map-review/_manual.json')) else {}
 def lbl(i): x,y=i%W,i//W; return '%s%d'%(chr(ord('A')+x),y+1)
 grid=[]
 for i in range(W*H):
@@ -59,7 +68,7 @@ TNAME={0x00:'(none)',0x01:'Plains',0x02:'Road',0x05:'House',0x0a:'Fort',0x0b:'Ga
 0x0c:'Forest',0x0d:'Thicket',0x10:'River',0x11:'Mountain',0x12:'Peak',0x13:'Bridge',
 0x15:'Sea',0x17:'Floor',0x19:'Fence',0x1a:'Wall',0x1e:'Door',0x25:'Ruins',0x26:'Cliff',0x3c:'Water'}
 
-HTML=r'''<!doctype html><html><head><meta charset="utf-8"><title>Prologue Map Editor</title>
+HTML=r'''<!doctype html><html><head><meta charset="utf-8"><title>__TITLE__ Map Editor</title>
 <style>
  body{font-family:-apple-system,sans-serif;margin:0;background:#1d1f23;color:#e8e8e8;display:flex;height:100vh;overflow:hidden}
  #left{padding:10px;overflow:auto}#right{flex:1;padding:10px;overflow:auto;border-left:1px solid #3a3d44;min-width:360px}
@@ -79,7 +88,7 @@ HTML=r'''<!doctype html><html><head><meta charset="utf-8"><title>Prologue Map Ed
  </div>
  <canvas id="map"></canvas>
  <div class="hint" id="cell">hover a cell…</div>
- <div class="bar" style="margin-top:8px"><b>How to use:</b> 1) pick a tile on the right (it becomes your brush) &nbsp; 2) click/drag on the map to paint &nbsp; 3) <b>Export</b> → a <i>prologue-layout.json</i> downloads &nbsp; 4) tell Claude "exported" and it compiles + renders.</div>
+ <div class="bar" style="margin-top:8px"><b>How to use:</b> 1) pick a tile on the right (it becomes your brush) &nbsp; 2) click/drag on the map to paint &nbsp; 3) <b>Export</b> → a <i>__DOWNLOAD__</i> downloads &nbsp; 4) tell Claude "exported" and it compiles + renders.</div>
  <textarea id="out" style="width:680px;height:70px;display:none;background:#111;color:#6f6"></textarea>
 </div>
 <div id="right">
@@ -137,7 +146,7 @@ document.getElementById('export').onclick=()=>{
  const js=JSON.stringify({width:W,height:H,grid:GRID});
  const ta=document.getElementById('out');ta.style.display='block';ta.value=js;
  const b=new Blob([js],{type:'application/json'});const a=document.createElement('a');
- a.href=URL.createObjectURL(b);a.download='prologue-layout.json';a.click();
+ a.href=URL.createObjectURL(b);a.download='__DOWNLOAD__';a.click();
 };
 atlas.onload=()=>{drawMap();buildFilter();drawPal();setBrush(brush);};
 </script></body></html>'''
@@ -145,10 +154,11 @@ atlas.onload=()=>{drawMap();buildFilter();drawPal();setBrush(brush);};
 out=(HTML.replace('__W__',str(W)).replace('__H__',str(H)).replace('__ACOLS__',str(ACOLS))
      .replace('__GRID__',json.dumps(grid)).replace('__TERR__',json.dumps(TERR))
      .replace('__PAL__',json.dumps(PAL)).replace('__TNAME__',json.dumps({str(k):v for k,v in TNAME.items()}))
-     .replace('__ATLAS__',ATLAS))
+     .replace('__ATLAS__',ATLAS).replace('__DOWNLOAD__',DOWNLOAD).replace('__TITLE__',LAYOUT))
 # TNAME keys must be numeric in JS object -> emit as numbers
 out=out.replace(json.dumps({str(k):v for k,v in TNAME.items()}),
                 '{'+','.join('%d:%s'%(k,json.dumps(v)) for k,v in TNAME.items())+'}')
-path=os.path.join(ROOT,'map-review/editor.html')
+path=os.path.join(ROOT,'map-review',OUT_HTML)
+os.makedirs(os.path.dirname(path),exist_ok=True)
 open(path,'w').write(out)
 print('wrote',path,'(%d KB)'%(len(out)//1024))
