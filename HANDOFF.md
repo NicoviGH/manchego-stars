@@ -67,7 +67,7 @@ voice-bible bench for the whole cast.
 - ✅ ch00 DONE end-to-end (#20); save-slot banners all blue.
 - ✅ Voice bibles complete: §Voice in ALL PC lore files + hlin/scramsax/sephek;
   `lore/npc-bench.md` = minor-NPC toolkit. (This session — lore-only commits
-  `95abb08`…`95c9ba1`, no ROM changes, build untouched.)
+  `95abb08`…`4dcdfbc` incl. two correction rounds, no ROM changes, build untouched.)
 - ⚠️ ch01+ chapter YAMLs still carry aspirational `ea_file:` fields (schema cleanup).
 - ℹ️ nanobanana MCP broken (retired model id); Nicolas runs Gemini by hand — prompt
   recipe pattern in `map-review/43-tour-map/gemini-prompt.md` (gitignored).
