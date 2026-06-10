@@ -1,127 +1,134 @@
 # chapters/ch01-the-iron-trail.yaml
 # Chapter index: docs/CHAPTERS.md (generated from this file). Rationale: docs/decisions.md.
 # Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
+#
+# FIELD PARITY (decisions.md §Field parity, 2026-06-10): this chapter mirrors vanilla
+# FE8 Ch1 "Escape!" 1:1 on the field — 4 player units fielded, 7 initial enemies + 3
+# reinforcements, lv1 line enemies + lv4 boss, Seize, lose = lord falls. Vanilla data
+# decoded from fireemblem8u git HEAD src/events/ch1-eventudefs.h.
 
 id: ch01-the-iron-trail
 title: "The Iron Trail"
 chapter_number: 1
 milestone: M3
-cadence: full_party_intro       # docs/CHAPTERS.md — 🟦 full-party intro (Seize)
-fe8_base_map: "FE8 Ch1 — Escape!"                   # Seize breather base
+cadence: full_party_intro       # story-wise: whole cast meets at the Northlook (opening
+                                # scene); the FIELD is 4 units (vanilla Ch1 parity)
+fe8_base_map: "FE8 Ch13a — Fluorspar's Oath (layout only)"  # cadence base = FE8 Ch1
+fe8_cadence_base: "FE8 Ch1 — Escape! (Seize breather; field counts mirrored 1:1)"
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
   The party meets at The Northlook tavern in Bryn Shander. Three dwarves hire
-  them to track a missing shipment of iron ingots. They follow the trail past a
-  dismembered body and find the goblin thieves encamped in the snow.
+  them to track a missing shipment of iron ingots. Four of the company take the
+  job into the snow (the rest stay in town); they follow the trail past a
+  dismembered body and find the goblin thieves encamped at the old waystation.
 
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
-  file: maps/ch01-the-iron-trail.tmx     # hand-drawn in Tiled (issue #31)
-  tileset: snow-trail                    # vanilla FE8 snow tileset (Tower of Valni)
-  size: "24×16"                          # approximate — finalize in Tiled
+  file: maps/ch01-the-iron-trail.mar     # painted in the HTML editor (ch00 flow)
+  tileset: snowy-bern                    # shared winter tileset (#41)
+  base_layout: Ch13EirikaMap             # vanilla 25×16 layout, winter-reskinned
+  size: "25x16"
   description: >
-    Linear snowy trail, Bryn Shander outskirts at the left edge, goblin camp
-    at the right edge. Trees and boulders for cover. Slight elevation at the
-    camp perimeter (FE terrain hit/avoid bonus for units on the ridge).
+    Linear snowy trail between peak ridges: Bryn Shander outskirts at the left
+    edge, goblin camp (fort cluster) at the right edge. Forest tiles line the
+    trail for cover (+20 avoid). Peaks are corridor walls only in this chapter —
+    no enemy crosses them (the brigand ridge lesson is ch02's, like vanilla Ch2).
 
 # ── Objective ──────────────────────────────────────────────────────────────────
 objective:
-  type: seize                            # mirrors FE8 Ch1 "Escape!" = Seize
+  type: seize                            # vanilla Ch1 parity (Seize the gate)
   description: "Seize the goblin camp — the chief holds it and the ingots are there"
-  seize_tile: [21, 8]                    # goblin camp center (the chief's tile)
-  # Secondary objective (optional, no penalty if missed):
-  secondary:
-    - type: seize_item
-      item: iron-ingots
-      description: "Recover the iron ingot cache from the chest in the goblin camp"
+  seize_tile: [21, 8]                    # camp center; the chief's tile
+  seize_by: lord                         # the player-chosen lord (#42); engine patches
+                                         # CanUnitSeize to the chosen pid
 
 # ── Win / Lose Conditions ──────────────────────────────────────────────────────
-win_condition: seize_point_held
-lose_condition: all_player_units_defeated
+win_condition: seize                     # lord seizes the camp tile (chief must die first)
+lose_condition: lord_defeated            # the chosen lord falls = game over (vanilla rule);
+                                         # other PCs get flag-less "retreat" defeat quotes
 
 # ── Difficulty ─────────────────────────────────────────────────────────────────
 difficulty_note: >
-  Introductory chapter. Keep enemy count low (8–12 goblins). Tune enemy
-  stats/terrain for comfortable vanilla-FE hit rates (~75%) so players learn the
-  systems gently. No reinforcements. No boss unit.
+  Vanilla Ch1 parity: 4 fielded PCs vs 7 initial enemies (+3 reinforcements).
+  Line goblins are lv1 autoleveled with iron weapons; the chief is lv4 on the
+  seize tile. Enemy mix (3 spears / 3 axes) carries the triangle lesson our
+  lordless cast can actually have: Braulo's axe beats the spear goblins and the
+  spear chief; Wolfram tanks the axe goblins on the wrong end of the triangle;
+  bows/magic are the neutral ranged answer. Comfortable vanilla-FE hit rates
+  (~75%) via forest cover. Clear in ~8-10 turns.
 
 # ── Player Units ──────────────────────────────────────────────────────────────
-# All 7 PCs are available from the start (they met at The Northlook together).
-player_units:
-  - id: braulo
-    position: [3, 8]       # [col, row] — left side of map
-    required: true
-  - id: marty
-    position: [3, 9]
-    required: true
-  - id: meesmickle
-    position: [4, 8]
-    required: true
-  - id: prof-rbg
-    position: [4, 9]
-    required: true
-  - id: rootis
-    position: [2, 8]
-    required: true
-  - id: sclorbo
-    position: [2, 9]
-    required: true
-  - id: wolfram
-    position: [3, 7]
-    required: true
-  - id: pinky                            # RBG's homunculus, available from ch01
-    position: [4, 7]
-    required: false
+# Whole cast is RECRUITED (Northlook scene); the field obeys vanilla Ch1: 4 slots.
+# Pick Units (prep flow) chooses which 4; the chosen lord (#42) is force-deployed.
+deploy_limit: 4                          # vanilla Ch1: Eirika+Seth + Franz+Gilliam = 4
+deploy_slots:                            # [col, row] — west edge, trail mouth
+  - [3, 8]
+  - [3, 9]
+  - [2, 8]
+  - [2, 9]
+# Vanilla fields these 4 as 2 starters + 2 turn-2 arrivals (Franz/Gilliam). We field
+# all 4 from turn 1: the staggered arrival was a story beat for fixed characters and
+# doesn't survive a player-picked party; 4-at-start is the gentler read of the same
+# total (lean generous, feedback_fe-level-design).
 
 # ── Enemy Units ────────────────────────────────────────────────────────────────
+# Vanilla Ch1 enemy table, goblin-skinned: 3 Soldiers (lances) + 3 Fighters (axes)
+# + Breguet (Armor Knight lv4, iron lance, on the objective). Fighters (not
+# brigands) so nothing pathfinds over the peaks.
 enemy_units:
-  - id: goblin
-    name: "Goblin Scout"
-    count: 6
-    positions: [[14,6],[14,8],[14,10],[15,7],[15,9],[16,8]]
-    class: brigand
-    level: 2
+  - id: goblin-spear
+    name: "Goblin Spear"
+    count: 3
+    positions: [[19,7],[19,9],[20,10]]   # holding the camp approach
+    class: soldier
+    level: 1
+    autolevel: true
+    inventory:
+      - id: iron-lance
+        damage_type: piercing   # cosmetic flavor label
+    ai_pattern: hold_then_attack  # vanilla gate-guard posture: attack in range, don't chase
+
+  - id: goblin-axe
+    name: "Goblin Raider"
+    count: 3
+    positions: [[14,8],[15,6],[15,10]]   # mid-trail pursuers
+    class: fighter
+    level: 1
+    autolevel: true
     inventory:
       - id: iron-axe
         damage_type: slashing   # cosmetic flavor label
-    ai_pattern: aggressive   # move toward nearest player unit and attack
-
-  - id: goblin-archer
-    name: "Goblin Archer"
-    count: 3
-    positions: [[17,5],[17,11],[19,8]]
-    class: archer
-    level: 2
-    inventory:
-      - id: iron-bow
-        damage_type: piercing   # cosmetic flavor label
-        range: 2                # FE tile range (bows hit at range 2; no melee counter)
-    ai_pattern: defensive      # stay in place, attack from range
+    ai_pattern: aggressive      # vanilla pursue AI {0x0,0x0A,0x0,0x0}
 
   - id: goblin-chief
     name: "Goblin Chief"
     is_boss: true
     count: 1
-    position: [21, 8]          # goblin camp center
-    class: brigand
+    position: [21, 8]           # the seize tile — full Breguet mirror
+    class: armor-knight         # Breguet's class; magic (def→res) is our "rapier"
     level: 4
     inventory:
-      - id: greatclub           # maps to an FE axe under the hood
-        damage_type: bludgeoning # cosmetic flavor label
-      - id: iron-ingots         # drops on death → chapter item objective
+      - id: iron-lance
+        damage_type: piercing   # cosmetic flavor label
+      - id: iron-ingots         # drops on death → the job's MacGuffin
         is_key_item: true
-    ai_pattern: hold_position   # stays at camp, guards the ingots
+    ai_pattern: hold_position   # Breguet AI {0x3,0x3,0x9,0x20}: attack in place, never move
     death_quote: "Gah! The ironses were ours!"
 
-# ── Chest / Village Loot ───────────────────────────────────────────────────────
-chests:
-  - position: [20, 8]
-    contents:
-      - id: healing-potion
-        count: 2
-      - id: iron-ingots
-        is_key_item: true      # triggers secondary objective if seized
+  - id: goblin-reinforcements
+    name: "Goblin Raider"
+    count: 3                    # vanilla: 2 Fighters + 1 Soldier from the player-start side
+    composition: [fighter, fighter, soldier]
+    level: 1
+    autolevel: true
+    spawn_turn: 3
+    spawn_edge: west            # behind the party, same side as vanilla
+    positions: [[0,7],[0,8],[0,9]]
+    inventory_by_class:
+      fighter: [iron-axe]
+      soldier: [iron-lance]
+    ai_pattern: aggressive
 
 # ── Events ────────────────────────────────────────────────────────────────────
 events:
@@ -134,10 +141,10 @@ events:
       ending, 2026-06-09, vanilla-style): Hlin and Scramsax, fresh off Sephek's
       escape, and Hlin retains the seven — Ten-Towns needs more hands than hers.
       Then the three dwarves approach and explain the missing ingot shipment; they
-      offer 200 GP for recovery. Cut to: the trail. A dismembered body in the snow.
-      Braulo crouches to examine it.
+      offer 200 GP for recovery. The lord choice (#42) and Pick Units happen here:
+      four take the trail. Cut to: the trail. A dismembered body in the snow.
 
-  # Post-map cutscene (after all enemies defeated)
+  # Post-map cutscene (after seize)
   - trigger: chapter_end
     type: cutscene
     ea_file: events/ch01-ending.ea
@@ -147,15 +154,14 @@ events:
       Ten-Towns security work. She mentions other towns having trouble.
       Braulo asks about the sled dog situation. Baxby (an axe-beak) is for sale.
 
-  # Optional: Duvessa Shane introduces herself mid-map if Braulo moves to
-  # a specific trigger tile near the road sign (flavor dialogue only)
+  # Flavor trigger on the trail
   - trigger: unit_on_tile
-    unit: braulo
+    unit: any
     tile: [8, 8]
     type: dialogue
     ea_file: events/ch01-road-sign.ea
     description: >
-      Braulo reads a battered sign: "BRYN SHANDER — 2 MILES. WATCH FOR WOLVES."
+      A battered sign: "BRYN SHANDER — 2 MILES. WATCH FOR WOLVES."
 
 # ── Post-Chapter ──────────────────────────────────────────────────────────────
 post_chapter:
@@ -169,14 +175,17 @@ post_chapter:
 
 # ── Design Notes ───────────────────────────────────────────────────────────────
 design_notes: >
-  Introductory chapter. Teaches: basic movement, attack (vanilla FE combat with
-  the cosmetic D&D damage-type reskin + crit flourish), the weapon triangle (the
-  goblins wield axes — demo that the party's swords beat them), and the Rage
-  consumable (Braulo should use it at least once naturally).
-  Keep it short — 8–10 turns to clear. No complex events. Big focus on the
-  combat UI tutorial feeling natural and legible.
+  Vanilla-Ch1-parity breather Seize. Teaches: basic movement, attack (vanilla FE
+  combat with the cosmetic D&D damage-type reskin + crit flourish), forest cover,
+  and the weapon triangle as our cast actually experiences it — no PC wields a
+  sword, so the lesson is Braulo's axe over enemy spears (and over the spear
+  chief: the boss-matchup edge vanilla gave Eirika's rapier) plus Wolfram
+  feeling axe pressure on his lance. Magic ignoring the chief's armor (def→res)
+  is our armorslayer moment. Braulo should use the Rage consumable at least
+  once naturally. The +3 west-edge reinforcements are vanilla's own pressure
+  beat. No archers, no chests, no ridge-crossers — those lessons start ch02+.
 
-  TODO (deferred — after the Prologue vertical slice): enrich from the book's
+  TODO (deferred — after the Ch1 vertical slice): enrich from the book's
   "Foaming Mugs" quest (book pp.34-35), which this chapter adapts. Candidate
   canon to LAYER ON (do not replace the DM-notes beats): boss → Izobai the
   one-eared goblin boss atop a 20-ft wagon pulled by two polar bears (a

@@ -68,6 +68,44 @@ clear-all-enemies objective is spelled `DefeatAll`.
 
 ---
 
+## 1b. Vanilla field counts — deploy slots per chapter [decomp]
+
+Drives each chapter YAML's `deploy_limit` (decisions.md §Field parity): our chapter N
+fields what vanilla chapter N fields, on both sides. Player slot counts read from the
+ally `UnitDefinition` array sizes in `fireemblem8u/src/events_udefs.s`
+(`.size UnitDef_Event_<Ch>Ally / 20` minus the terminator); enemy counts are decoded
+per-chapter from the event scripts/ROM as each chapter's slice begins (Ch1's full
+table is below; the method is `git show HEAD:src/events/<ch>-eventudefs.h` for
+decompiled chapters, `baserom.gba` struct reads for the rest).
+
+| FE8 ch | Player slots | Notes |
+|---|---|---|
+| Prologue | 2 | Eirika + Seth, fixed |
+| 1 | 2 + 2 ally arrivals = **4** | Franz/Gilliam arrive turn 2 |
+| 2 | 5 | |
+| 3 | 9 | |
+| 4 | 9 | |
+| 5 | 9 | |
+| 5x | 4 | fixed cast (Ephraim gaiden) |
+| 6 | 10 | |
+| 7 | 10 | |
+| 8 | 9 | |
+| 9a | 11 | |
+| 10a | 12 | |
+| 11a | 11 | |
+| 12a–14a | 12 | |
+
+**Vanilla Ch1 "Escape!" full field table** (from `git show HEAD:src/events/ch1-eventudefs.h`):
+- Player: Eirika (lord, Rapier) + Seth start; Franz + Gilliam ally reinforcements.
+- Enemies, initial 7: Breguet (Armor Knight **lv4**, iron lance, holds the Seize
+  gate, AI `{0x3,0x3,0x9,0x20}` attack-in-place/never-move) + 3 Soldiers lv1
+  (iron lances) + 3 Fighters lv1 (iron axes), all autoleveled.
+- Enemy reinforcements: +3 (2 Fighters, 1 Soldier), spawning on the player-start
+  side of the map.
+- No archers, no chests, no gimmicks; objective Seize, lose = Eirika falls.
+
+---
+
 ## 2. Promotion items: what promotes what [decomp]
 
 Verified against `src/data_itemuse.c` (FE8 class IDs) + `texts/texts.txt`. Our
