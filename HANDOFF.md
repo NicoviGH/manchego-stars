@@ -1,114 +1,121 @@
-# Handoff: **PC voice interview COMPLETE — all 10 voices locked into lore/*.md. NEXT = the FULL Ch1 slice (#21, The Iron Trail): map → roster/enemies → objectives/events → playtests → dialogue pass LAST.**
+# Handoff: **Ch1 slice (#21) under way — MAP DONE (painted+committed). NEXT = engine: trace the prep-screen gate → deploy caps (`deploy_limit: 4`) → #42 player-chosen lord → goblin wiring → playtests → dialogue LAST.**
 
 **Date:** 2026-06-10
-**Session focus:** ran the full PC voice interview with Nicolas (one round per PC,
-batched where he batched) and wrote a §Voice section into every PC's lore file —
-Braulo, Marty, Meesmickle, Rootis, Sclorbo, Prof RBG, Wolfram, Pinky, plus writing
-rules codified for Pepperjack & Brie. The dialogue-pass skill now has a complete
-voice-bible bench for the whole cast.
+**Session focus:** Ch1 "The Iron Trail" slice — base-map concepts → Nicolas picked B
+(Ch13a layout, winter-reskinned) → flow/difficulty/win-condition worked out with him →
+**Field parity doctrine** decided & recorded → Nicolas's editor paint pass → map
+compiled, YAML matched to the paint, all pushed (`b2ff3cf`…`0b8dbc6`).
 
-**Live checklist = GitHub issues (#20 ch00 done, #43 closed, #21 = Ch1 slice).**
+**Live checklist = GitHub issues (#21 = Ch1 slice; #42 pulled INTO the slice).**
 
 ---
 
-## NEXT SESSION (in order)
-1. **Full Ch1 slice (#21, The Iron Trail)** — same order as ch00: map → roster/enemies →
-   objectives/events → playtests → dialogue pass LAST (Northlook hiring scene opens ch01
-   and owns the location card + hiring beat; decisions.md §Story & Dialogue). Don't
-   start with dialogue — Nicolas's explicit correction, now twice affirmed.
-2. **#29 world map** — the tour's drawn maps bootstrap it; the WM screen itself (nodes,
-   travel) is still vanilla Magvel.
-3. Scramsax Hero mug still needs the [F2E] license recheck before distribution (carried).
-4. **Goodberry item rename** (new, from the interview): Nicolas intends to replace
-   Vulneraries with **Goodberries** party-wide (Marty keeps the party fed in-fiction).
-   Wire during the Ch1 slice or as a standalone text/item tweak; intent recorded in
-   `lore/marty.md` §Signature gear.
+## THE TWO DECISIONS THAT SHAPE EVERYTHING (recorded in decisions.md, dated 2026-06-10)
+1. **Field parity** — our chapter N mirrors vanilla FE8 chapter N **on the field, both
+   sides**: `deploy_limit` = vanilla's ally-slot count (pacing-ref §1b table, [decomp]),
+   enemy counts/levels/AI mirror vanilla ch N (classes reskinned to our fiction). Cast
+   being recruited ≠ fielded. Ch1 = **4 deploy vs 7+3 goblins**. Map layouts may be
+   borrowed from ANY vanilla chapter; the cadence anchor is always same-numbered ch.
+2. **#42 (player-chosen lord) ships in THIS slice** — menu after ch00 ending, persisted;
+   chosen PC carries `EVFLAG_GAMEOVER` (lose = lord falls); `CanUnitSeize` patched to
+   the chosen pid (win = lord seizes). Others keep flag-less "retreat" quotes.
 
-## Voice interview outcomes (all shipped, committed per-PC)
-- **Braulo** — quiet decider; deal-as-justice ("that was the deal"); full plain
-  sentences, no caveman-speak, no jokes; isopod-in-shell scene gag (stares at Marty,
-  never acknowledged). Calibration: the maer-speaker payment fight he started.
-- **Marty** — Nicolas's own PC. Rapport spores read as NORMAL dialogue; spore-cough
-  gag before his first line to anyone new; cheerful barista diplomat whose powers are
-  horrifying (irony is the voice); goes silent when violence starts. Calibration:
-  Lupin the wolf-leader recruitment, maer parley, isopod jailbreak.
-- **Meesmickle** (he/him — file pronouns FIXED from she/her) — Salem-from-Sabrina dry
-  one-liners, delivered flat; low line-count by design.
-- **Rootis** (he/him) — wholesome Olaf-but-not-silly; matter-of-fact snow-body humor;
-  overcomplicated-theory flaw from his sheet played straight (Nicolas confirmed once
-  he saw it's sheet-sourced); low line-count by design.
-- **Sclorbo** (he/him) — NEVER speaks: impression/gesture stage-direction text only,
-  rendered as parentheticals in-ROM (no italic font) — deliberately distinct from
-  Marty. Secret stays buried (unplayed hook). Low line-count by design.
-- *(The Meesmickle/Rootis/Sclorbo players are the table's introverts → low
-  line-counts are AUTHENTIC, not a gap. All three abstained from the Bremen fight.)*
-- **Prof RBG** — Professor Ratigan register; cheese puns constantly ("Cheesed to meet
-  you", "Sounds Gouda to me!") + "Um, actually—" corrections; ex-mobster with an
-  underground rat network (added to his Backstory); **the puns NEVER stop** — his
-  dark side (kobold execution) shows in deeds, not a changed register (Nicolas's
-  correction); warmth reserved for Pinky.
-  His banned list is inferred, not interviewed — confirm opportunistically.
-- **Wolfram** — materials-science nerd (smells/tastes/EATS metal); METALLO is
-  backstory, NOT a speech tic; friendly, never backs down. Calibration: answered the
-  Bremen speaker's intimidation by biting his axe.
-- **Pinky** — childlike, reverential, "Father said I could!"; volunteers for danger
-  (mine scout). Same player as RBG (Pinky was his construct). Save "am I real?" for
-  the finale Wish — no early angst.
-- **Pepperjack & Brie** — §Speech extended with dialogue-pass writing rules:
-  punctuation/repetition carry meaning, others translate, comprehension never the
-  joke, banned from any word but their own name.
-- Cast-notes memory updated: pronouns, Nicolas-played-Marty, RBG/Pinky same player.
+## NEXT SESSION (in order)
+1. **Trace the prep-screen gate.** `hasPrepScreen` in chapter_settings.json is False for
+   EVERY chapter incl. ones that show preps in-game → the JSON field is dead; find the
+   real gate in C (start: gamecontrol.c chapter-start flow / prep proc entry). Then:
+   `deploy_limit: 4` → build_campaign emits 4 ally slots + Pick Units, lord force-deployed.
+2. **#42 lord select** (menu UI, save persistence, death→EVFLAG_GAMEOVER hook,
+   `CanUnitSeize` patch — vanilla hardcodes Eirika/Ephraim at `bmdifficulty.c:61`).
+3. **Wire ch01 into the build** (model on `inject_prologue`): map pieces (.mar committed),
+   roster per YAML (3 soldier + 3 fighter goblins lv1 autolevel, chief = Armor Knight lv4
+   iron lance Breguet AI `{0x3,0x3,0x9,0x20}` on (21,7), +3 west spawns turn 3), Seize
+   objective + lose hook (gDefeatTalkList HEAD rule!), road sign (8,8), 2 hint houses.
+4. Playtests (win=seize, gameover=lord falls) via tools/playtest; **dialogue pass LAST**.
+5. **Goodberry rename** (Vulnerary→Goodberry party-wide) — lands within this slice.
+6. Carried: #29 world map; Scramsax Hero mug [F2E] license recheck.
+7. **GitHub housekeeping (permission-blocked this session):** #21 body needs the slice
+   checklist; #42 needs a "pulled into slice" comment. Content drafted — re-run with
+   Nicolas present to approve the `gh` calls.
+
+## Ch1 design (source of truth = chapters/ch01-the-iron-trail.yaml)
+- Map: 25×16 Ch13a layout through snowy-bern. Nicolas painted: Bryn Shander compound
+  (west edge, village door **B8=(1,7)**), fort camp structures (glitchy wall-fragment
+  tiles globally → forts), **ruins arch (21,7) = camp center = seize tile = chief's
+  tile**, north house **N3=(13,2)**, ridge smoothing.
+- Hint houses = vanilla Ch1 pattern (msgs 0x93B/0x93C: NO items, pure tactical hints):
+  compound = fort-terrain hint; north = boss hint ("scrap-plate turns blades; magic
+  (def→res) + Braulo's axe-over-spear beat it") — text written in the dialogue pass.
+- Triangle reality: cast has ZERO sword users (axes Braulo / lances Wolfram+Pinky /
+  bows RBG / tomes+staves rest). Old "party's swords" YAML note was stale — fixed.
+- Goblins are FIGHTERS not brigands (no peak-crossing pathing; no village razing).
+  Ridge-crossing lesson deferred to ch02 (vanilla Ch2's gimmick).
+
+## Tried/learned this session
+- Vanilla facts MUST come from `git -C fireemblem8u show HEAD:<file>` (working tree is
+  our injected build artifacts — ch1-eventudefs.h currently holds our ch00 cast!) or
+  from `baserom.gba` (hex-labeled symbols encode vanilla addresses; UnitDefinition is
+  20 B, `include/bmunit.h:195`; faction bits: blue=0 green=1 red=2).
+- Vanilla Ch13a (our map donor) is a Defend-12-turns map; our reversed Seize use keeps
+  its design grammar (held east line, edge-entry lanes). Full decode in chat → key
+  numbers pinned in `docs/fe8-pacing-reference.md` §1b.
+- Editor tooling generalized: `gen_map_editor.py <Layout> <out.html> <download.json>`,
+  `import_map_layout.py <stem> [src]` (compiles .mar/.json + renders preview).
+- Paint-pass round trips: verify authored YAML coords against the painted terrain
+  (3 coords had landed on peaks/walls); ASCII walkability dump + overlay render
+  (`map-review/21-iron-trail/painted-with-units.png`) before sign-off.
+- Browser-tab gotcha: TWO editors may be open (old prologue editor downloads
+  `prologue-layout.json`!) — check export DIMENSIONS before importing; never import a
+  15×10 grid into ch01.
 
 ## Current state
-- ✅ New Game (MONTAGE=1): 7-card crawl over aurora mural → 6-card Icewind Dale tour
-  over the two drawn maps → ch00. Default `make` keeps the straight-to-map dev boot.
-  **Distribution (#37) must set MONTAGE=1.** Both modes green; `verify_text` 3404/0
-  both; win playtest passes both.
-- ✅ ch00 DONE end-to-end (#20); save-slot banners all blue.
-- ✅ Voice bibles complete: §Voice in ALL PC lore files + hlin/scramsax/sephek;
-  `lore/npc-bench.md` = minor-NPC toolkit. (This session — lore-only commits
-  `95abb08`…`4dcdfbc` incl. two correction rounds, no ROM changes, build untouched.)
-- ⚠️ ch01+ chapter YAMLs still carry aspirational `ea_file:` fields (schema cleanup).
-- ℹ️ nanobanana MCP broken (retired model id); Nicolas runs Gemini by hand — prompt
-  recipe pattern in `map-review/43-tour-map/gemini-prompt.md` (gitignored).
+- ✅ Ch1 map committed: `maps/ch01-the-iron-trail.{mar,json}` (NOT yet injected into the
+  ROM build — build_campaign wiring is step 3 above). `make` untouched this session →
+  still green from voice-interview session.
+- ✅ decisions.md §Field parity; fe8-pacing-reference §1b (vanilla deploy-slot table +
+  full vanilla Ch1 field table); ch01 YAML fully rewritten (parity + paint-matched).
+- ✅ ch00 DONE (#20); New Game montage flow unchanged. Voice bibles complete (lore/*.md).
+- ⚠️ ch02+ YAMLs still carry aspirational `ea_file:` fields (schema cleanup, carried).
+- ℹ️ Stray uncommitted: `map-review/` renders (gitignored); two old `prologue-layout*.json`
+  in ~/Downloads (Jun 8, 5 cosmetic ch00 tweaks never imported — confirm or trash).
 
 ## Blockers
-- None.
+- None. (#42 menu UI is the biggest unknown; prep-gate trace is the first domino.)
 
 ## Key files
-- `campaigns/.../lore/*.md` — voice bibles (§Voice now exists for EVERY PC + guests).
-  `lore/npc-bench.md` = minor-NPC toolkit.
-- `.claude/skills/dialogue-pass/SKILL.md` — the dialogue workflow (inputs/gates).
-- `tools/gen_drawnmap.py` — map-art → drawn-map converter (extend for #29).
-- `tools/build_campaign.py` — `inject_world_tour`, `inject_title_theme` (save-slot fix).
-- `campaigns/.../events/tour-map-{a-dale,b-towns}.*` — locked tour backdrops.
-- `References/NPCs/2410173-Icewind_Dale_NPCs.pdf` — purchased NPC builder (distilled
-  into npc-bench.md; full tables there).
-- `docs/decisions.md` §Story & Dialogue — crawl + tour wiring entries (format gotchas).
+- `campaigns/.../chapters/ch01-the-iron-trail.yaml` — the slice's source of truth.
+- `campaigns/.../maps/ch01-the-iron-trail.{mar,json}` — painted layout (compiled).
+- `map-review/21-iron-trail/` — editor.html, concept renders, REVIEW.md, unit overlay.
+- `docs/decisions.md` §Field parity, §Game over, §gDefeatTalkList — the rules ch01 wiring must follow.
+- `docs/fe8-pacing-reference.md` §1b — vanilla field counts [decomp].
+- `tools/{gen_map_editor,import_map_layout,render_reskin_concepts}.py` — map tooling (now generic).
+- `fireemblem8u/src/bmdifficulty.c:61` `CanUnitSeize`; `bmtrick.c` game-over check
+  (`EVFLAG_GAMEOVER || CountAvailableBlueUnits()==0`) — #42 patch points.
+- `tools/build_campaign.py:inject_prologue` — the model for `inject_ch01`.
 
 ## Gotchas (carried)
 - Story text: YAML `script:` → build_campaign generates bodies; `make` overwrites manual
   decomp edits. Gate: `python3 tools/verify_text.py`.
 - Odd-length NAME strings: pad with [.] (terminator parity).
+- gDefeatTalkList: chapter-keyed entries at the HEAD of the table; never after `{.pid=-1}`.
 - Synthetic macOS keypresses don't reach mGBA; in-emulator Lua is the path.
-- Bash cwd drifts between tool calls — always `cd` to repo root for git/make.
-- **PNG → `open` (Preview); GIF → `open -a Safari`** (Preview shows GIFs static —
-  missed twice now).
+- Bash cwd drifts between tool calls — always `cd` to repo root for git/make (bit again).
+- **PNG → `open` (Preview); GIF → `open -a Safari`.**
 - Frostmaiden book: `references/References/icewind-dale-...pdf` (symlink →
   `/Users/Yonick/Documents/D&D/5E/`); DM notes:
   `/Users/Yonick/Documents/Claude/Projects/Manchego Stars / Fire Emblem Game/References/DungeonMasterNotesIcewindDale.pdf`.
-- PDF page = printed page + 1 (Cold Open boxed text: printed p.22 → PDF 23).
+- PDF page = printed page + 1.
 
 ## Memory
-- [[manchego-stars-project]] · [[project_manchego_stars_cast_notes]] ·
-  [[feedback_collaborative_story_planning]] · [[feedback_answer_before_picker]] ·
-  [[feedback_sharing_visual_drafts]] · [[feedback_use_decomp]] ·
-  [[feedback_show_before_committing_art]] · [[manchego-stars-automated-playtests]] ·
-  [[feedback_check_references_for_art]]
+- [[manchego-stars-project]] · [[feedback_fe-strictness]] (field parity is its sharpest
+  form yet — recorded in decisions.md) · [[feedback_collaborative_map_design]] ·
+  [[feedback_use_decomp]] · [[feedback_answer_before_picker]] ·
+  [[feedback_sharing_visual_drafts]] · [[manchego-stars-automated-playtests]] ·
+  [[feedback_show_before_committing_art]]
 
 ## Standing rules
-Combat = pure vanilla FE. Story/dialogue = collaborative (variants → Nicolas picks; full
-quotes in picker descriptions); in-engine review = GIFs via `record`, opened in Safari,
-wait for his OK before committing art-visible content. Auto-push to main once green;
-never commit the `fireemblem8u` submodule pointer. Playtests machine-run for logic,
-Nicolas for feel.
+Combat = pure vanilla FE; **field parity with vanilla ch N (both sides) is now doctrine**.
+Story/dialogue = collaborative (variants → Nicolas picks); in-engine review = GIFs via
+`record` in Safari, wait for OK before committing art-visible content. Auto-push to main
+once green; never commit the `fireemblem8u` submodule pointer. Playtests machine-run for
+logic, Nicolas for feel.
