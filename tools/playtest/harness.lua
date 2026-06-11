@@ -126,6 +126,15 @@ end
 local function pokeHarmless(u) -- can't counter-kill (keeps the boss alive)
     emu:write8(u.addr + 0x14, 0) -- pow
 end
+local function pokeFastConfig() -- many-combat phases: map-anim battles + fast speed
+    -- PlaySt config (gPlaySt+0x40, include/types.h PlaySt_OptionBits):
+    -- bit 7 gameSpeed (1 = fast), bits 17-18 animationType (1 = OFF -> map combat)
+    local a = SYM.gPlaySt + 0x40
+    local c = ru32(a)
+    c = (c & ~(3 << 17)) | (1 << 17)
+    c = c | (1 << 7)
+    emu:write32(a, c)
+end
 
 local function tileOccupied(x, y)
     for _, base in ipairs({ SYM.gUnitArrayBlue, SYM.gUnitArrayRed }) do
@@ -199,14 +208,35 @@ local function reachCost(x, y)
     local row = ru32(ru32(SYM.gBmMapMovement) + y * 4)
     return ru8(row + x)
 end
-local function marchToward(u, tx, ty)
-    if not cursorTo(u.x, u.y) then return false end
-    press(K.A)
-    wait(12) -- selection computes the move-range map
-    if not menuOpen() then -- selected a unit, not opened the map menu
+local function marchToward(u, tx, ty, maxx, maxy)
+    maxx, maxy = maxx or 14, maxy or 9 -- default = ch00 map; ch01 is 25x16
+    -- Select the unit. The A press can be eaten (phase-banner interlude still
+    -- animating), leaving a STALE movement map that reads cost 0 everywhere --
+    -- the scan would then "reach" any tile and the follow-up A on it opens the
+    -- map menu, whose UP-wrapped last entry is End (a wasted turn, the
+    -- ch01win bug). A real movement map always has unreachable tiles, so
+    -- demand some before trusting it.
+    local selected = false
+    for attempt = 1, 4 do
+        if not cursorTo(u.x, u.y) then return false end
+        press(K.A)
+        wait(12) -- selection computes the move-range map
+        if menuOpen() then press(K.B); wait(10); return false end -- unit exhausted
+        local unreachable = 0
+        for y = 0, maxy do
+            for x = 0, maxx do
+                if reachCost(x, y) >= 120 then unreachable = unreachable + 1 end
+            end
+        end
+        if unreachable > 0 then selected = true break end
+        log("  march: movement map stale (eaten A press?); reselecting")
+        press(K.B)
+        wait(40)
+    end
+    if selected then
         local best, bestd = nil, 999
-        for y = 0, 9 do
-            for x = 0, 14 do
+        for y = 0, maxy do
+            for x = 0, maxx do
                 if reachCost(x, y) < 120 and not tileOccupied(x, y)
                     and not (x == u.x and y == u.y) then
                     local d = math.abs(tx - x) + math.abs(ty - y)
@@ -227,8 +257,9 @@ local function marchToward(u, tx, ty)
 end
 
 local EMPTY_TILE = { x = 2, y = 2 } -- far from both rosters on ch00
-local function endTurn()
-    cursorTo(EMPTY_TILE.x, EMPTY_TILE.y)
+local function endTurn(tile)
+    tile = tile or EMPTY_TILE
+    cursorTo(tile.x, tile.y)
     press(K.A)
     if not waitFor(menuOpen, 40) then press(K.B); return false end
     press(K.UP) -- map menu: UP from the top wraps to End (last entry)
@@ -238,8 +269,8 @@ end
 
 -- End turn, then ride out the enemy phase. Returns "gameover" the moment the
 -- game-over screen proc appears, "player" when control comes back, or nil.
-local function runEnemyPhase()
-    if not endTurn() then return nil end
+local function runEnemyPhase(tile)
+    if not endTurn(tile) then return nil end
     waitFor(function() return faction() ~= 0 end, 300)
     for f = 1, 3600 do
         if gameOverActive() then return "gameover" end
@@ -417,6 +448,111 @@ scenarios.ch01 = function()
     end
     result("PASS", string.format(
         "ch01 entered: preps shown, guests gone, %d-unit party fields exactly 4", party))
+end
+
+-- CH01WIN: the default lord (blind A-taps pick Braulo) marches on the camp,
+-- kills the chief, and SEIZES -- in-game proof of the lord-gated Seize
+-- (CanUnitSeize hook, #42) and the win hand-off (Seize macro -> EVFLAG_WIN ->
+-- ending scene -> MNC2(0x3) -> next chapter slot).
+local CH01_PARK = { x = 24, y = 15 } -- empty far corner; ch01 map is 25x16
+scenarios.ch01win = function()
+    if not winCh00() then return end
+    if not waitFor(function() return chapter() == 2 end, 1800) then
+        return result("FAIL", "chapter slot 2 never loaded after the ch00 win")
+    end
+    -- default-lord entry: A-taps ride the save menu + prompt + lord menu
+    -- (item 0 = Braulo) + [Yes] confirm all the way to the prep screen
+    local prep = false
+    for i = 1, 60 do
+        if procActive(SYM.gProcScr_SALLYCURSOR) then prep = true break end
+        press(K.A, 4)
+        wait(36)
+    end
+    if not prep then
+        shot("ch01win-no-prep")
+        return result("FAIL", "prep screen never opened")
+    end
+    wait(180)
+    for i = 1, 40 do
+        if not procActive(SYM.gProcScr_SALLYCURSOR) then break end
+        press(K.B, 4)
+        wait(10)
+        press(K.START, 4)
+        wait(40)
+        if i % 4 == 0 and procActive(SYM.gProcScr_SALLYCURSOR) then press(K.A, 4) wait(20) end
+    end
+    if not waitFor(function()
+        return not procActive(SYM.gProcScr_SALLYCURSOR)
+            and faction() == 0 and turn() >= 1
+    end, 1200) then
+        shot("ch01win-prep-stuck")
+        return result("FAIL", "could not leave preparations via Fight!")
+    end
+    wait(120)
+    shot("ch01win-map")
+    pokeFastConfig() -- 10-goblin enemy phases: map combat + fast speed
+    local chief = red(CHAR_CHIEF)
+    if not chief then return result("FAIL", "chief not in the red array") end
+    local goal = { x = chief.x, y = chief.y } -- chief holds the seize tile
+    pokeFrail(chief)
+    log(string.format("chief frail on the seize tile (%d,%d); marching Braulo",
+        goal.x, goal.y))
+    for t = 1, 18 do
+        -- sync to the player phase; the A-taps also clear stray textboxes
+        -- (road-sign AREA event, defeat quotes)
+        waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
+        wait(100) -- let the PLAYER PHASE banner finish (it eats key presses)
+        local b0 = blue(0x01)
+        log(string.format("loop %d: turn=%d faction=0x%02X braulo=(%d,%d) chiefdead=%s",
+            t, turn(), faction(), b0 and b0.x or -1, b0 and b0.y or -1,
+            tostring(isDead(red(CHAR_CHIEF)))))
+        -- every other goblin dies to the first counter (frail) and deals no
+        -- damage (harmless): the escort can't kill anyone OR bodyblock the
+        -- trail for long. This run asserts seize logic, not combat survival.
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and r.charId ~= CHAR_CHIEF and not isDead(r) then
+                pokeFrail(r)
+                pokeHarmless(r)
+            end
+        end
+        local braulo = blue(0x01)
+        if isDead(braulo) then return result("FAIL", "Braulo died on the march") end
+        chief = red(CHAR_CHIEF)
+        if chief and not isDead(chief) then
+            if math.abs(braulo.x - chief.x) + math.abs(braulo.y - chief.y) == 1 then
+                -- adjacent: attack in place (move onto own tile opens the menu)
+                if moveUnit(braulo.x, braulo.y, braulo.x, braulo.y) then
+                    shot("ch01win-attack-chief")
+                    chooseAttack(braulo.addr)
+                end
+            else
+                local moved = marchToward(braulo, goal.x, goal.y + 1, 24, 15)
+                b0 = blue(0x01)
+                log(string.format("  march -> %s, braulo=(%d,%d)",
+                    tostring(moved), b0.x, b0.y))
+            end
+        else
+            -- chief down: Braulo onto the seize tile; Seize tops the menu there
+            if moveUnit(braulo.x, braulo.y, goal.x, goal.y) then
+                shot("ch01win-seize-menu")
+                press(K.A) -- Seize
+            end
+            local won = waitFor(function() return chapter() ~= 2 end, 3600, true)
+            shot("ch01win-after-seize")
+            if won then
+                return result("PASS", string.format(
+                    "Braulo seized the camp; chapter advanced 2 -> %d", chapter()))
+            end
+            press(K.B); press(K.B) -- menu surprise: back out, retry next turn
+        end
+        local phase = runEnemyPhase(CH01_PARK)
+        if phase == "gameover" then
+            return result("FAIL", "unexpected game over in the win run")
+        end
+    end
+    shot("ch01win-timeout")
+    result("FAIL", "could not seize the camp in 14 turns")
 end
 
 -- RECORDLORD (#42): continuous frame capture of the lord-select flow for the
