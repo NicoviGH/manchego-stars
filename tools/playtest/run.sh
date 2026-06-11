@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run an automated ch00 playtest scenario in mGBA (headed, but fully scripted).
 #
-#   tools/playtest/run.sh win|gameover|retreat|titlecard|scenes [--keep-open]
+#   tools/playtest/run.sh win|gameover|retreat|titlecard|scenes|ch01 [--keep-open]
 #
 # Requires the mGBA 0.11+ nightly (has --script); auto-downloads it into
 # tools/emulator/mGBA-dev.app on first run. Results land in

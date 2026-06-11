@@ -270,16 +270,18 @@ end
 -- ---------------------------------------------------------------- scenarios
 local scenarios = {}
 
--- WIN: kill Sephek -> DefeatBoss -> ending scene -> chapter advances.
-scenarios.win = function()
-    if not bootToMap() then return result("FAIL", "never reached the map") end
+-- Play ch00 to the boss kill and wait out the ending scene. Returns true once
+-- the chapter has advanced past the host slot, nil/false (with its own FAIL
+-- result already logged) otherwise. Shared by the win and ch01 scenarios.
+local function winCh00()
+    if not bootToMap() then result("FAIL", "never reached the map") return false end
     local sephek = red(CHAR_SEPHEK)
-    if not sephek then return result("FAIL", "Sephek not found in red array") end
+    if not sephek then result("FAIL", "Sephek not found in red array") return false end
     pokeFrail(sephek)
     log(string.format("Sephek at (%d,%d) poked to 1 HP", sephek.x, sephek.y))
     for t = 1, 6 do
         local scram = blue(CHAR_SCRAMSAX)
-        if isDead(scram) then return result("FAIL", "Scramsax died in the win run") end
+        if isDead(scram) then result("FAIL", "Scramsax died in the win run") return false end
         -- adjacent tile next to the boss, then attack (steel sword, range 1)
         local tx, ty = sephek.x, sephek.y + 1
         if tileOccupied(tx, ty) then tx, ty = sephek.x - 1, sephek.y end
@@ -287,29 +289,128 @@ scenarios.win = function()
             shot("attacking-sephek")
             chooseAttack(scram.addr)
         end
+        if not isDead(red(CHAR_SEPHEK)) then
+            log("Sephek alive after turn " .. t .. " (miss?); ending turn and retrying")
+            local phase = runEnemyPhase()
+            if phase == "gameover" then
+                result("FAIL", "unexpected game over in win run")
+                return false
+            end
+        end
         if isDead(red(CHAR_SEPHEK)) then
             log("Sephek dead; waiting for the chapter to end")
             shot("sephek-dead")
             local ended = waitFor(function() return chapter() ~= HOST_CHAPTER end, 3600, true)
             shot("after-boss-kill")
-            if ended then
-                return result("PASS", string.format(
-                    "DefeatBoss fired; chapter advanced %d -> %d", HOST_CHAPTER, chapter()))
-            end
-            return result("FAIL", "Sephek died but the chapter never ended")
-        end
-        log("Sephek alive after turn " .. t .. " (miss?); ending turn and retrying")
-        local phase = runEnemyPhase()
-        if phase == "gameover" then return result("FAIL", "unexpected game over in win run") end
-        if isDead(red(CHAR_SEPHEK)) then -- counter-kill on enemy phase also wins
-            local ended = waitFor(function() return chapter() ~= HOST_CHAPTER end, 3600, true)
-            shot("after-boss-kill")
-            if ended then return result("PASS", "DefeatBoss fired (counter-kill); chapter advanced") end
-            return result("FAIL", "Sephek died but the chapter never ended")
+            if ended then return true end
+            result("FAIL", "Sephek died but the chapter never ended")
+            return false
         end
     end
     shot("win-timeout")
     result("FAIL", "could not kill Sephek in 6 turns")
+    return false
+end
+
+-- WIN: kill Sephek -> DefeatBoss -> ending scene -> chapter advances.
+scenarios.win = function()
+    if winCh00() then
+        result("PASS", string.format(
+            "DefeatBoss fired; chapter advanced %d -> %d", HOST_CHAPTER, chapter()))
+    end
+end
+
+-- CH01: ride the ch00 win into chapter slot 2 and smoke the ch01 entry:
+-- the ch00 guests leave the party (DISA), the prep screen opens (SALLYCURSOR,
+-- via the PREP event command), Fight! hands over control, and the deployed
+-- count equals the 4-slot field-parity cap (the ally UnitDefinition template).
+scenarios.ch01 = function()
+    if not winCh00() then return end
+    if not waitFor(function() return chapter() == 2 end, 1800) then
+        return result("FAIL", "chapter slot 2 never loaded after the ch00 win")
+    end
+    log("in ch01 (chapter slot 2); clicking through the post-chapter save menu")
+    -- The post-chapter save menu sits between MNC2 and the ch01 beginning
+    -- scene: A-tap until the prep screen proc appears (the scene itself is
+    -- input-free), then stop -- further A's would toggle Pick Units entries.
+    local prep = false
+    for i = 1, 60 do
+        if procActive(SYM.gProcScr_SALLYCURSOR) then prep = true break end
+        if i % 12 == 0 then
+            shot(string.format("ch01-wait-%02d", i))
+            log(string.format("waiting: chapter=%d faction=0x%02X turn=%d",
+                chapter(), faction(), turn()))
+        end
+        press(K.A, 4)
+        wait(36)
+    end
+    if not prep then
+        shot("ch01-no-prep")
+        for i = 0, 63 do -- dump live procs for post-mortem (nm the addresses)
+            local a = SYM.sProcArray + i * 0x6C
+            local p = ru32(a)
+            if p ~= 0 then
+                -- EventEngineProc: +0x30 pEventStart, +0x38 pEventCurrent
+                log(string.format("proc[%02d] script=0x%08X evStart=0x%08X evCur=0x%08X",
+                    i, p, ru32(a + 0x30), ru32(a + 0x38)))
+            end
+        end
+        return result("FAIL", "prep screen never opened (PREP event cmd)")
+    end
+    wait(180) -- let the preparations menu draw
+    shot("ch01-prep-menu")
+    -- START = Fight! (PrepScreenMenu_OnStartPress). B first backs out of any
+    -- state a boot keypress may have left; A every few tries clicks through a
+    -- confirm if one appears.
+    for i = 1, 40 do
+        if not procActive(SYM.gProcScr_SALLYCURSOR) then break end
+        press(K.B, 4)
+        wait(10)
+        press(K.START, 4)
+        wait(40)
+        if i % 4 == 0 and procActive(SYM.gProcScr_SALLYCURSOR) then press(K.A, 4) wait(20) end
+    end
+    local fighting = waitFor(function()
+        return not procActive(SYM.gProcScr_SALLYCURSOR)
+            and faction() == 0 and turn() >= 1
+    end, 1200)
+    if not fighting then
+        shot("ch01-prep-stuck")
+        return result("FAIL", "could not leave preparations via Fight!")
+    end
+    wait(120) -- phase intro
+    shot("ch01-map")
+    if blue(CHAR_HLIN) or blue(CHAR_SCRAMSAX) then
+        return result("FAIL", "ch00 guests still in the party in ch01")
+    end
+    local party, deployed = 0, 0
+    for i = 0, 50 do
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u then
+            party = party + 1
+            -- on the field = not US_HIDDEN (1<<0) and not US_NOT_DEPLOYED (1<<3)
+            if (u.state & 0x9) == 0 and u.x ~= 0xFF then deployed = deployed + 1 end
+        end
+    end
+    log(string.format("party=%d deployed=%d turn=%d", party, deployed, turn()))
+    for i = 0, 50 do -- blue + red unit tables for the post-run eyeball
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u then log(string.format("blue[%02d] char=0x%02X pos=(%d,%d) state=0x%08X",
+            i, u.charId, u.x, u.y, u.state)) end
+        local r = unitAt(SYM.gUnitArrayRed, i)
+        if r then log(string.format("red[%02d]  char=0x%02X pos=(%d,%d) state=0x%08X",
+            i, r.charId, r.x, r.y, r.state)) end
+    end
+    if deployed ~= 4 then
+        return result("FAIL", string.format(
+            "deploy cap broken: %d units on the field (want 4)", deployed))
+    end
+    if party <= 4 then
+        return result("FAIL", string.format(
+            "party is only %d units -- the cast join LOAD did not run", party))
+    end
+    result("PASS", string.format(
+        "ch01 entered: preps shown, guests gone, %d-unit party fields exactly 4", party))
 end
 
 -- SCENES: contact-sheet capture of every dialogue page (opening card + briefing,

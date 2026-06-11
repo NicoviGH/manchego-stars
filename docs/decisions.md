@@ -249,6 +249,40 @@ Sanctioned deviations are recorded per-chapter in the YAML (ch01: 4-at-start ins
 of vanilla's 2+2 staggered arrival — staggering doesn't survive a player-picked party).
 _Decided: 2026-06-10 (Nicolas; "1:1 alignment to the units on the field, chapter by chapter")_
 
+**How the deploy cap + prep screen are actually wired (the [decomp] mechanism).**
+`hasPrepScreen` in `chapter_settings.json` is dead — "left over from FE7"
+(`chapterdata.h:37`). The real gate is the `PREP` event command (0x3E,
+`Event3E_PrepScreenCall` → `gProcScr_SALLYCURSOR`): every vanilla prep chapter
+(Ch4+) ends its beginning scene with `CALL(EventScr_08591FD8)` (`eventscr.c:4283`,
+a shared `CLEAN`/`PREP`/`CLEAN` script), and so does our ch01. The deploy cap is
+the **ally `UnitDefinition` table itself**: `GetChapterAllyUnitCount()` counts its
+entries (zero-terminator scan), the prep flow clamps deployment to that count
+(`SortPlayerUnitsForPrepScreen`), and the table's `xPosition/yPosition` are the
+deploy tiles. The table is never LOADed on a prep chapter — the whole party joins
+via a separate join-LOAD in the beginning scene and the engine benches everyone
+past the cap. Force-deployment = `gForceDeploymentList` (`data_event_trigger.c`,
+`{pid, route, chapter}`; vanilla: Eirika/Ephraim everywhere + per-chapter joiners) —
+#42's chosen-lord patch point. Prep-header cosmetics: `prepScreenNumber` in
+chapter settings is a double-wide glyph index = **2 × chapter number**.
+Note ch01 has a prep screen where vanilla Ch1 has none: the cap is the parity;
+Pick Units only chooses *which* PCs fill it (Nicolas, 2026-06-10).
+_Decided: 2026-06-10 (decomp trace, ch01 slice)_
+
+**No world map ⇒ `GetBattleMapKind()` falls back to STORY (engine hardening).**
+Vanilla classifies most chapter slots (slot 2 onward — `CHAPTER_L_2`...) by scanning
+`gGMData` world-map node state and falls back to `BATTLEMAP_KIND_SKIRMISH` when no
+node matches; entering through the world map guarantees a node match. Our boot and
+`MNC2` chapter hand-offs never populate `gGMData`, so every node-slot chapter was
+misclassified as a skirmish — which swaps the beginning scene for
+`EventScr_SkirmishCommonBeginning` (black-screen hang; `bm.c CallBeginningEvents`),
+hides the ally unit table, and disables force-deploy. Patched in
+`build_campaign._patch_battle_map_kind_fallback`: the no-node fallback returns
+STORY. Skirmishes are unreachable without a world map, so nothing legitimate hits
+the old fallback. Slot 1 (ch00's host) never needed this — it's in the function's
+hardcoded STORY list, which is why the prologue worked and ch01 didn't.
+_Decided: 2026-06-10 (ch01 slice debugging; found via proc-table dump → `evStart =
+EventScr_SkirmishCommonBeginning`)_
+
 **Game over = the lord-analog only; story-required allies "retreat" instead.**
 A chapter's game-over trigger is the must-survive lead alone (ch00: Hlin; from Ch1
 the player-chosen lord, #42) — vanilla's exact shape: only Eirika/Ephraim carry

@@ -28,6 +28,8 @@ WANTED = [
     'sProc_Menu',               # proc script: a menu is open
     'gProcScr_ChapterStatusScreen',  # proc script: map-menu Status screen, which
                                 # draws the chapter title card (src/uichapterstatus.c)
+    'gProcScr_SALLYCURSOR',     # proc script: the preparations screen
+                                # (src/prep_sallycursor.c; opened by event cmd 0x3E)
 ]
 
 

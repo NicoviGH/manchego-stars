@@ -28,19 +28,26 @@ CHAP_TITLE_DIR = os.path.join(REPO, 'fireemblem8u', 'graphics', 'chap_title')
 WORDS = {
     'Prologue:': (0, 16, 69),   # "Prologue: The Fall of Renais"
     'of':        (0, 125, 138),
+    'Ch.1:':     (1, 57, 91),   # "Ch.1: Escape!" -- vanilla's own chapter prefix
+    'The':       (0, 74, 96),
 }
 
 # Single letters. Sources: img0 "Prologue: The Fall of Renais",
-# img4 "Ch.4: Ancient Horrors", img9 "Ch.7: It's a Trap!" (lone 'a' word),
-# img10 "Ch.8: Distant Blade".
+# img1 "Ch.1: Escape!", img4 "Ch.4: Ancient Horrors",
+# img9 "Ch.7: It's a Trap!" (lone 'a' word), img10 "Ch.8: Distant Blade".
 LETTERS = {
     'A': (4, 71, 80),
     'D': (10, 78, 87),
     'I': (9, 87, 93),
+    'T': (9, 119, 128),         # "Trap!"
     'a': (9, 110, 117),
     'c': (4, 88, 93),
     'e': (0, 58, 64),
     'g': (0, 44, 52),
+    'i': (0, 168, 172),         # "Renais"
+    'l': (0, 35, 39),           # "Prologue" (second ascender)
+    'n': (0, 155, 161),         # "Renais"
+    'o': (0, 29, 34),           # "Prologue" (first o; 34 starts the l ascender)
     'r': (0, 23, 29),
 }
 
