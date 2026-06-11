@@ -164,6 +164,20 @@ CH01_ITEM_IDS = {'iron-lance': 'ITEM_LANCE_IRON', 'iron-axe': 'ITEM_AXE_IRON'}
 CH01_CLASS_IDS = {'soldier': 'CLASS_SOLDIER', 'fighter': 'CLASS_FIGHTER',
                   'armor-knight': 'CLASS_ARMOR_KNIGHT'}
 
+# Lord select (#42): in ch01's beginning scene (after the Northlook muster, before
+# preparations) the player picks the company's must-survive lead from the classed
+# cast -- a route-split menu clone (cf. ch8-eventscript.h). The pick is stored as
+# ONE permanent event flag per candidate (base + menu index). Permanent flags
+# (ids >= 101, eventinfo.c SetFlag) ride the save file and are zeroed on New Game
+# (ResetPermanentFlags, bmsave.c); vanilla scripts touch none above 0xE7, so the
+# 0xF0 block is ours. Engine hooks: _inject_lord_select_engine.
+EVENTINFO_C = os.path.join(DECOMP, 'src', 'eventinfo.c')
+BMDIFFICULTY_C = os.path.join(DECOMP, 'src', 'bmdifficulty.c')
+LORDSEL_FLAG_BASE = 0xF0
+LORDSEL_PROMPT_MSG = 0x957   # dead vanilla slot-2 scene text (cf. inject_ch01 step 6)
+LORDSEL_CONFIRM_MSGS = (0x959, 0x95A, 0x95B, 0x95C, 0x95D, 0x95E, 0x95F,
+                        0x962, 0x963, 0x964)  # same dead pool, one per candidate
+
 # FE8's unit-name buffer; longer names overflow and garble the display.
 FE_NAME_MAX = 12
 
@@ -200,7 +214,12 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         # inject_world_tour on MONTAGE=1 builds
                         'src/worldmap_rm.c',
                         # battle-map-kind fallback patch (no world map -> STORY)
-                        'src/worldmap_path.c'] + [
+                        'src/worldmap_path.c',
+                        # lord select (#42): LordSelect_GetPid + force-deploy hook
+                        # (eventinfo) and the Seize gate (bmdifficulty); the UnitKill
+                        # hook (bmunit.c) and defeat-quote demotions
+                        # (data_battlequotes.c) ride files already listed above
+                        'src/eventinfo.c', 'src/bmdifficulty.c'] + [
                         'graphics/op_subtitle/OpSubtitle_%02d.png' % i
                         for i in range(gen_subtitle_cards.CARD_COUNT)]
 
@@ -1341,6 +1360,157 @@ def _patch_battle_map_kind_fallback():
         f.write(text.replace(orig, patched, 1))
 
 
+def _inject_lord_select_engine():
+    """Lord select (#42), engine side: make the player-chosen lead real.
+
+    The ch01 menu (inject_ch01) records the pick as permanent flag
+    LORDSEL_FLAG_BASE + menu index. Four campaign-agnostic hooks consume it:
+      1. LordSelect_GetPid (new, eventinfo.c): scan the flags over the
+         build-generated gLordSelectCandidates pid table (events_udefs.c);
+         fallback = first candidate while nothing is set, so a debug entry
+         straight into a chapter never soft-locks (issue #42's requirement).
+      2. IsCharacterForceDeployed_ (eventinfo.c): the chosen lead is always
+         fielded by the prep flow.
+      3. CanUnitSeize (bmdifficulty.c): Seize belongs to the chosen lead
+         (vanilla hardcoded Eirika/Ephraim by route/chapter).
+      4. UnitKill (bmunit.c): the chosen lead's death raises EVFLAG_GAMEOVER --
+         caught by each chapter's CauseGameOverIfLordDies AFEV -- whatever the
+         death path. The vanilla route-wide Eirika/Ephraim defeat entries
+         (chapter 0xFF + EVFLAG_GAMEOVER, data_battlequotes.c) are demoted to
+         plain quotes: the cast members riding those slots must be able to die
+         like anyone else when they are not the chosen lead.
+    """
+    # 1 + 2: eventinfo.c -- GetPid above the force-deploy lookup, hook inside it.
+    with open(EVENTINFO_C, encoding='utf-8') as f:
+        text = f.read()
+    orig = ('//! FE8U = 0x08084800\n'
+            'bool IsCharacterForceDeployed_(u16 pid)\n'
+            '{\n'
+            '    struct ForceDeploymentEnt * it;\n'
+            '\n'
+            '    for (it = gForceDeploymentList; it->pid != (u16)-1; it++)\n')
+    if text.count(orig) != 1:
+        sys.exit('ERROR: IsCharacterForceDeployed_ not in expected vanilla form in %s'
+                 % EVENTINFO_C)
+    hooked = (
+        '/* Lord select (campaign engine, #42): resolve the player-chosen lead.\n'
+        '   gLordSelectCandidates (events_udefs.c, build-generated) lists the cast\n'
+        '   pids in menu order; the ch01 menu records the pick as permanent flag\n'
+        '   0x%X + index (saved with the file; zeroed on New Game by\n'
+        '   ResetPermanentFlags). Fallback while nothing is set (debug entry\n'
+        '   before the menu has run): the first candidate. */\n'
+        'u16 LordSelect_GetPid(void)\n'
+        '{\n'
+        '    extern const u16 gLordSelectCandidates[];\n'
+        '    int i;\n'
+        '\n'
+        '    for (i = 0; gLordSelectCandidates[i] != 0xFFFF; i++) {\n'
+        '        if (CheckFlag(0x%X + i)) {\n'
+        '            return gLordSelectCandidates[i];\n'
+        '        }\n'
+        '    }\n'
+        '\n'
+        '    return gLordSelectCandidates[0];\n'
+        '}\n'
+        '\n'
+        '//! FE8U = 0x08084800\n'
+        'bool IsCharacterForceDeployed_(u16 pid)\n'
+        '{\n'
+        '    struct ForceDeploymentEnt * it;\n'
+        '\n'
+        '    /* Lord select (campaign engine, #42): the chosen lead is always\n'
+        '       fielded. */\n'
+        '    if (pid == LordSelect_GetPid())\n'
+        '        return true;\n'
+        '\n'
+        '    for (it = gForceDeploymentList; it->pid != (u16)-1; it++)\n'
+        % (LORDSEL_FLAG_BASE, LORDSEL_FLAG_BASE))
+    with open(EVENTINFO_C, 'w', encoding='utf-8') as f:
+        f.write(text.replace(orig, hooked, 1))
+
+    # 3: bmdifficulty.c -- Seize gate.
+    with open(BMDIFFICULTY_C, encoding='utf-8') as f:
+        text = f.read()
+    orig = ('s8 CanUnitSeize(struct Unit* unit) {\n'
+            '    int leaderId;\n'
+            '\n'
+            '    switch (gPlaySt.chapterModeIndex) {\n'
+            '        case 2: // Eirika\n'
+            '            leaderId = CHARACTER_EIRIKA;\n'
+            '            break;\n'
+            '        case 1: // tutorial (chapter 0-8)\n'
+            '            leaderId = CHARACTER_EIRIKA;\n'
+            '            break;\n'
+            '        case 3: // Ephraim\n'
+            '            leaderId = CHARACTER_EPHRAIM;\n'
+            '            break;\n'
+            '    }\n'
+            '\n'
+            '    if (gPlaySt.chapterIndex == 5) {\n'
+            '        leaderId = CHARACTER_EPHRAIM;\n'
+            '    }\n'
+            '\n'
+            '    return unit->pCharacterData->number == leaderId;\n'
+            '}')
+    if text.count(orig) != 1:
+        sys.exit('ERROR: CanUnitSeize not in expected vanilla form in %s'
+                 % BMDIFFICULTY_C)
+    patched = ('s8 CanUnitSeize(struct Unit* unit) {\n'
+               '    /* Lord select (campaign engine, #42): Seize belongs to the\n'
+               '       player-chosen lead (vanilla hardcoded Eirika/Ephraim by\n'
+               '       route/chapter). */\n'
+               '    extern u16 LordSelect_GetPid(void);\n'
+               '\n'
+               '    return unit->pCharacterData->number == LordSelect_GetPid();\n'
+               '}')
+    with open(BMDIFFICULTY_C, 'w', encoding='utf-8') as f:
+        f.write(text.replace(orig, patched, 1))
+
+    # 4a: bmunit.c -- death hook.
+    with open(BMUNIT_C, encoding='utf-8') as f:
+        text = f.read()
+    orig = ('        else {\n'
+            '            unit->state |= US_DEAD | US_HIDDEN;\n'
+            '            InitUnitsupports(unit);\n'
+            '        }\n')
+    if text.count(orig) != 1:
+        sys.exit('ERROR: UnitKill blue-death branch not in expected vanilla form in %s'
+                 % BMUNIT_C)
+    hooked = ('        else {\n'
+              '            /* Lord select (campaign engine, #42): the chosen lead\'s\n'
+              '               fall ends the run whatever killed them -- raise the\n'
+              '               game-over flag the chapter Misc AFEV\n'
+              '               (CauseGameOverIfLordDies) fires on. */\n'
+              '            extern u16 LordSelect_GetPid(void);\n'
+              '            extern void SetFlag(int flag);\n'
+              '\n'
+              '            if (UNIT_CHAR_ID(unit) == LordSelect_GetPid())\n'
+              '                SetFlag(0x65); /* EVFLAG_GAMEOVER */\n'
+              '\n'
+              '            unit->state |= US_DEAD | US_HIDDEN;\n'
+              '            InitUnitsupports(unit);\n'
+              '        }\n')
+    with open(BMUNIT_C, 'w', encoding='utf-8') as f:
+        f.write(text.replace(orig, hooked, 1))
+
+    # 4b: data_battlequotes.c -- demote the route-wide lord game-over entries.
+    with open(BATTLEQUOTES_C, encoding='utf-8') as f:
+        text = f.read()
+    for msg in ('0x0C23', '0x0C24'):  # vanilla Eirika / Ephraim farewell quotes
+        orig = ('        .flag    = EVFLAG_GAMEOVER,\n'
+                '        .msg     = %s,\n' % msg)
+        if text.count(orig) != 1:
+            sys.exit('ERROR: route-wide lord defeat entry (%s) not in expected '
+                     'vanilla form in %s' % (msg, BATTLEQUOTES_C))
+        text = text.replace(orig, (
+            '        .flag    = 0x0000, /* lord select (#42): game over is keyed\n'
+            '                              to the chosen lead (UnitKill hook), not\n'
+            '                              this slot; quote stays */\n'
+            '        .msg     = %s,\n' % msg), 1)
+    with open(BATTLEQUOTES_C, 'w', encoding='utf-8') as f:
+        f.write(text)
+
+
 def _inject_mu_override_hook():
     """Patch GetMuImg to return a per-character custom MU (hover/walk) sheet before
     the class default, reusing the class motion script (only the graphics change)."""
@@ -2408,6 +2578,7 @@ def inject_ch01(campaign, verbose=True):
     #    - UnitDef_088B4344: the 7 initial goblins. UnitDef_088B44AC: the 3 west
     #      reinforcements (turn 3).
     cast = []
+    cast_names = []  # parallel to cast: lord-select menu/confirm display names (#42)
     for unit_id, slot in PORTRAIT_MAP.items():
         unit = load_unit(campaign, unit_id)
         unit.setdefault('id', unit_id)
@@ -2418,6 +2589,10 @@ def inject_ch01(campaign, verbose=True):
             sys.exit('ERROR: no loadout for %s (unit %s)' % (class_enum, unit_id))
         cast.append((unit_id, slot, class_enum,
                      int(unit.get('fe_stats', {}).get('level', 1))))
+        cast_names.append(display_name(unit))
+    if len(cast) > len(LORDSEL_CONFIRM_MSGS):
+        sys.exit('ERROR: %d lord candidates > %d reserved confirm text ids'
+                 % (len(cast), len(LORDSEL_CONFIRM_MSGS)))
     if len(cast) > len(CH01_JOIN_POSITIONS):
         sys.exit('ERROR: %d classed cast > %d ch01 join positions'
                  % (len(cast), len(CH01_JOIN_POSITIONS)))
@@ -2503,6 +2678,16 @@ def inject_ch01(campaign, verbose=True):
             ('UnitDef_088B44AC[] =', reinforce)):
         block = '{\n' + '\n'.join(entries) + '\n    { 0 },\n}'
         udefs = _replace_brace_block(udefs, marker, block, EVENTS_UDEFS_C)
+    # Lord-select candidate pids (#42), menu order = classed cast order; the engine
+    # recovers the chosen pid by scanning permanent flags LORDSEL_FLAG_BASE + i
+    # (LordSelect_GetPid, eventinfo.c).
+    udefs += '\n'.join(
+        ['', '/* Lord-select candidate pids (#42, build-generated): menu order =',
+         '   classed cast order; chosen pid = flag scan (LordSelect_GetPid). */',
+         'CONST_DATA u16 gLordSelectCandidates[] = {'] +
+        ['    CHARACTER_%s, /* %s */' % (slot.upper(), uid)
+         for uid, slot, _, _ in cast] +
+        ['    0xFFFF,', '};', ''])
     with open(EVENTS_UDEFS_C, 'w', encoding='utf-8') as f:
         f.write(udefs)
 
@@ -2511,9 +2696,8 @@ def inject_ch01(campaign, verbose=True):
     #    phase, act on the following enemy phase -- cf. ch9a). Location: the two
     #    vanilla-Ch1-parity hint houses + Seize on the chief's tile (the Seize macro
     #    raises EVFLAG_WIN -> ending scene). Misc: the road-sign AREA trigger +
-    #    CauseGameOverIfLordDies (fires on EVFLAG_GAMEOVER; the chosen lord's flagged
-    #    defeat quote is #42's job -- until then Braulo rides EIRIKA, whose vanilla
-    #    chapter=0xFF EVFLAG_GAMEOVER quote already covers the default lord).
+    #    CauseGameOverIfLordDies (fires on EVFLAG_GAMEOVER, raised by the UnitKill
+    #    hook when the chosen lead falls -- _inject_lord_select_engine, #42).
     sx, sy = chap['objective']['seize_tile']
     houses = [e for e in chap['events'] if e.get('type') == 'house']
     sign = next(e for e in chap['events'] if e.get('trigger') == 'unit_on_tile')
@@ -2549,8 +2733,82 @@ def inject_ch01(campaign, verbose=True):
     #    own departure idiom), enemies deploy, the cast joins, then the shared prep
     #    call. PREP hides all units, runs Pick Units (cap 4), and redeploys the picks
     #    onto the ally-template tiles.
+    # 4a. Lord-select menu (#42), prepended so the scene below can ASMC it. Pure
+    #     route-split clone: same draw callback, same menu flow, same confirm idiom
+    #     (Command stores the confirm text id in EVT_SLOT_C; the scene SADDs it
+    #     into slot 2, TEXTSHOW(0xffff) shows it, and the [Yes] answer comes back
+    #     in EVT_SLOT_C -- 1 = yes, anything else re-opens the menu).
+    items = []
+    for i, ((uid, slot, _, _), name) in enumerate(zip(cast, cast_names)):
+        items.append(
+            '    {\n'
+            '        .name = (const char *)0x8205958, /* vanilla dummy (rodata is discarded) */\n'
+            '        .nameMsgId = 0x%X, /* %s rides this vanilla name slot */\n'
+            '        .overrideId = %d,\n'
+            '        .color = TEXT_COLOR_SYSTEM_WHITE,\n'
+            '        .isAvailable = MenuAlwaysEnabled,\n'
+            '        .onDraw = MenuCommand_DrawRouteSplit,\n'
+            '        .onSelected = Command_SelectLord,\n'
+            '    },' % (vanilla_name_text_id(slot), uid, i))
+    menu_code = (
+        '/* ==== Lord select (#42, build-generated): pre-preparations leader menu ====\n'
+        '   Route-split menu clone (cf. CallRouteSplitMenu, ch8-eventscript.h). The\n'
+        '   pick is stored as permanent flag 0x%X + item index and read back by\n'
+        '   LordSelect_GetPid (eventinfo.c) to drive force-deploy, Seize, and the\n'
+        '   lord-death game over. One confirm text per candidate (dead vanilla\n'
+        '   slot-2 message ids). */\n'
+        '\n'
+        '#include "uimenu.h"\n'
+        '#include "fontgrp.h"\n'
+        '#include "hardware.h"\n'
+        '#include "uiutils.h"\n'
+        '\n'
+        'extern const u16 gLordSelectCandidates[]; /* events_udefs.c */\n'
+        '\n'
+        'static CONST_DATA u16 sLordSelectConfirmMsg[] = { %s };\n'
+        '\n'
+        'u8 Command_SelectLord(struct MenuProc* menu, struct MenuItemProc* menu_item)\n'
+        '{\n'
+        '    int i;\n'
+        '\n'
+        '    /* re-picks (confirm answered "No") must not leave a stale flag */\n'
+        '    for (i = 0; gLordSelectCandidates[i] != 0xFFFF; i++) {\n'
+        '        ClearFlag(0x%X + i);\n'
+        '    }\n'
+        '\n'
+        '    SetFlag(0x%X + menu_item->itemNumber);\n'
+        '    SetEventSlotC(sLordSelectConfirmMsg[menu_item->itemNumber]);\n'
+        '\n'
+        '    return MENU_ACT_CLEAR | MENU_ACT_SND6A | MENU_ACT_END | MENU_ACT_SKIPCURSOR;\n'
+        '}\n'
+        '\n'
+        'CONST_DATA struct MenuItemDef MenuItemDef_LordSelect[] = {\n'
+        '%s\n'
+        '    { 0 }\n'
+        '};\n'
+        '\n'
+        'CONST_DATA struct MenuDef MenuDef_LordSelect = {\n'
+        '    .rect = {9, 1, 12, 0},\n'
+        '    .style = 1,\n'
+        '    .menuItems = MenuItemDef_LordSelect,\n'
+        '};\n'
+        '\n'
+        'void CallLordSelectMenu(ProcPtr proc)\n'
+        '{\n'
+        '    ClearBg0Bg1();\n'
+        '    SetDispEnable(1, 1, 1, 1, 1);\n'
+        '    SetTextFont(0);\n'
+        '    InitSystemTextFont();\n'
+        '    LoadUiFrameGraphics();\n'
+        '    StartMenu(&MenuDef_LordSelect, proc);\n'
+        '}\n'
+        '\n'
+        % (LORDSEL_FLAG_BASE, ', '.join('0x%X' % m for m in
+                                        LORDSEL_CONFIRM_MSGS[:len(cast)]),
+           LORDSEL_FLAG_BASE, LORDSEL_FLAG_BASE, '\n'.join(items)))
     with open(CH2_EVENTSCRIPT_H, encoding='utf-8') as f:
         script = f.read()
+    script = menu_code + script
     script = _replace_brace_block(
         script, 'EventScr_Ch2_BeginningScene[] =',
         '{\n'
@@ -2560,10 +2818,29 @@ def inject_ch01(campaign, verbose=True):
         '    ENUN\n'
         '    LOAD1(0x1, UnitDef_088B440C) /* the company signs on at the Northlook */\n'
         '    ENUN\n'
+        '    FADU(16) /* chapter loads come up black; reveal the map (cf. vanilla Ch4) */\n'
+        '    /* Lord select (#42): vanilla route-split idiom (cf. ch8). */\n'
+        '    EVBIT_MODIFY(0x4)\n'
+        '    TUTORIALTEXTBOXSTART\n'
+        '    SVAL(EVT_SLOT_B, 0xffffffff)\n'
+        '    TEXTSHOW(0x%X) /* "Who will lead them north?" */\n'
+        '    TEXTEND\n'
+        '    REMA\n'
+        'LABEL(0x0)\n'
+        '    ASMC(CallLordSelectMenu)\n'
+        '    SADD(EVT_SLOT_2, EVT_SLOT_C, EVT_SLOT_0)\n'
+        '    TUTORIALTEXTBOXSTART\n'
+        '    SVAL(EVT_SLOT_B, 0xffffffff)\n'
+        '    TEXTSHOW(0xffff) /* confirm body from slot 2: "Will N lead...?" [Yes] */\n'
+        '    TEXTEND\n'
+        '    REMA\n'
+        '    SVAL(EVT_SLOT_7, 0x1)\n'
+        '    BNE(0x0, EVT_SLOT_C, EVT_SLOT_7) /* "No" -> pick again */\n'
+        '    EVBIT_MODIFY(0x0)\n'
         '    CALL(EventScr_08591FD8) /* preparations (PREP, event cmd 0x3E) */\n'
         '    ENUT(8)\n'
         '    EVBIT_T(7)\n'
-        '    ENDA\n}', CH2_EVENTSCRIPT_H)
+        '    ENDA\n}' % LORDSEL_PROMPT_MSG, CH2_EVENTSCRIPT_H)
     script = _replace_brace_block(
         script, 'EventScr_Ch2_Turn1Player[] =',
         '{\n    SVAL(EVT_SLOT_2, UnitDef_088B44AC)\n'
@@ -2639,6 +2916,15 @@ def inject_ch01(campaign, verbose=True):
                      'BRYN SHANDER -- 2 MILES.[LF]\nWATCH FOR WOLVES.[.][X]')
     set_message_body(lines, 0x954,
                      'The iron ingots are recovered.[X]')
+    # Lord select (#42): prompt + per-candidate confirm texts, vanilla route-split
+    # shape (cf. MSG_C14/C17/C18) incl. the odd-printable-count [.] parity pad.
+    l1, l2 = 'The company gathers at the Northlook.', 'Who will lead them north?'
+    set_message_body(lines, LORDSEL_PROMPT_MSG, '%s[LF]\n%s%s[A][X]'
+                     % (l1, l2, '[.]' if (len(l1) + len(l2)) % 2 else ''))
+    for i, name in enumerate(cast_names):
+        q = 'Will %s lead the company?' % name
+        set_message_body(lines, LORDSEL_CONFIRM_MSGS[i], '%s%s[LF]\n[Yes][X]'
+                         % (q, '[.]' if len(q) % 2 else ''))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 
@@ -2682,6 +2968,8 @@ def main():
         print('  GetTerrainName: bounds-guarded against OOB terrain ids (defensive)')
         _patch_battle_map_kind_fallback()
         print('  GetBattleMapKind: no-world-map fallback = STORY (slot 2+ chapters)')
+        _inject_lord_select_engine()
+        print('  lord select (#42): GetPid + force-deploy/Seize/game-over keyed to the chosen lead')
         print('names:')
         inject_names(args.campaign)
         print('characters:')

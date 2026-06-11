@@ -26,6 +26,12 @@ local UNIT_SIZE = 0x48
 local US_DEAD = 4 -- include/bmunit.h (1 << 2)
 local CHAR_HLIN, CHAR_SCRAMSAX, CHAR_SEPHEK = 0x0D, 0x11, 0x68 -- NATASHA/KYLE/ONEILL slots
 local HOST_CHAPTER = 1 -- prologue is hosted on chapter slot 1; MNC2(0x2) on win
+-- Lord select (#42): menu order = classed cast order (build_campaign PORTRAIT_MAP);
+-- the LAST candidate (pinky, NEIMI slot) is benched by default under the 4-slot
+-- deploy cap, so choosing them is the visible force-deploy differential.
+local LORD_CANDIDATES = 8
+local LORDSEL_FLAG_BASE = 0xF0
+local CHAR_PINKY, CHAR_CHIEF = 0x08, 0x46 -- NEIMI slot / BREGUET slot (ch01 boss)
 
 local logfile = io.open(PLAYTEST_LOG, "w")
 local function log(s)
@@ -411,6 +417,110 @@ scenarios.ch01 = function()
     end
     result("PASS", string.format(
         "ch01 entered: preps shown, guests gone, %d-unit party fields exactly 4", party))
+end
+
+-- CH01LORD (#42): pick the LAST lord candidate -- benched by default under the
+-- 4-slot deploy cap -- and assert the choice is real: the permanent flag is
+-- set, the pick is force-deployed onto the field (cap intact), and their death
+-- ends in the game-over screen (UnitKill hook -> EVFLAG_GAMEOVER -> AFEV).
+scenarios.ch01lord = function()
+    if not winCh00() then return end
+    if not waitFor(function() return chapter() == 2 end, 1800) then
+        return result("FAIL", "chapter slot 2 never loaded after the ch00 win")
+    end
+    log("in ch01; riding the save menu to the lord-select menu")
+    -- The lord menu is the first generic menu while the beginning scene's
+    -- goblins are on the map (the post-chapter save screen runs before any
+    -- LOAD; the prep screen comes after the menu).
+    local atMenu = false
+    for i = 1, 60 do
+        if menuOpen() and red(CHAR_CHIEF) then atMenu = true break end
+        if procActive(SYM.gProcScr_SALLYCURSOR) then break end -- overshot it
+        press(K.A, 4)
+        wait(36)
+    end
+    if not atMenu then
+        shot("ch01lord-no-menu")
+        return result("FAIL", "lord-select menu never opened before preps")
+    end
+    shot("lord-menu")
+    for _ = 1, LORD_CANDIDATES - 1 do press(K.DOWN, 4) wait(8) end
+    shot("lord-menu-last")
+    press(K.A, 4)
+    wait(40)
+    shot("lord-confirm")
+    -- A answers the [Yes] confirm; then A-tap to the prep screen.
+    local prep = false
+    for i = 1, 40 do
+        if procActive(SYM.gProcScr_SALLYCURSOR) then prep = true break end
+        press(K.A, 4)
+        wait(36)
+    end
+    if not prep then
+        shot("ch01lord-no-prep")
+        return result("FAIL", "prep screen never opened after the lord pick")
+    end
+    if not eventFlag(LORDSEL_FLAG_BASE + LORD_CANDIDATES - 1) then
+        return result("FAIL", "lord-choice permanent flag not set after confirm")
+    end
+    wait(180)
+    shot("ch01lord-prep")
+    for i = 1, 40 do
+        if not procActive(SYM.gProcScr_SALLYCURSOR) then break end
+        press(K.B, 4)
+        wait(10)
+        press(K.START, 4)
+        wait(40)
+        if i % 4 == 0 and procActive(SYM.gProcScr_SALLYCURSOR) then press(K.A, 4) wait(20) end
+    end
+    local fighting = waitFor(function()
+        return not procActive(SYM.gProcScr_SALLYCURSOR)
+            and faction() == 0 and turn() >= 1
+    end, 1200)
+    if not fighting then
+        shot("ch01lord-prep-stuck")
+        return result("FAIL", "could not leave preparations via Fight!")
+    end
+    wait(120)
+    shot("ch01lord-map")
+    local lord = blue(CHAR_PINKY)
+    if not lord or (lord.state & 0x9) ~= 0 or lord.x == 0xFF then
+        return result("FAIL", "chosen lord (char 0x08) is not force-deployed")
+    end
+    local deployed = 0
+    for i = 0, 50 do
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u and (u.state & 0x9) == 0 and u.x ~= 0xFF then deployed = deployed + 1 end
+    end
+    if deployed ~= 4 then
+        return result("FAIL", string.format(
+            "deploy cap broken with forced lord: %d on the field (want 4)", deployed))
+    end
+    log(string.format("chosen lord fielded at (%d,%d), deployed=%d; feeding them to the goblins",
+        lord.x, lord.y, deployed))
+    pokeFrail(lord)
+    for t = 1, 8 do
+        lord = blue(CHAR_PINKY)
+        if isDead(lord) or gameOverActive() then break end
+        marchToward(lord, 14, 9) -- adjacent to the (14,8) hold-and-attack soldier
+        shot("lord-march-turn" .. t)
+        local phase = runEnemyPhase()
+        if phase == "gameover" then break end
+    end
+    if waitFor(gameOverActive, 1800, true) then
+        shot("lord-game-over")
+        return result("PASS",
+            "chosen lord: flag set, force-deployed under the 4-cap, death = game over")
+    end
+    shot("ch01lord-no-gameover")
+    log(string.format("debug: EVFLAG_GAMEOVER=%s lordflag=%s dead=%s",
+        tostring(eventFlag(0x65)),
+        tostring(eventFlag(LORDSEL_FLAG_BASE + LORD_CANDIDATES - 1)),
+        tostring(isDead(blue(CHAR_PINKY)))))
+    if isDead(blue(CHAR_PINKY)) then
+        return result("FAIL", "chosen lord died but NO game over followed")
+    end
+    result("FAIL", "could not get the chosen lord killed in 8 turns")
 end
 
 -- SCENES: contact-sheet capture of every dialogue page (opening card + briefing,
