@@ -419,6 +419,47 @@ scenarios.ch01 = function()
         "ch01 entered: preps shown, guests gone, %d-unit party fields exactly 4", party))
 end
 
+-- RECORDLORD (#42): continuous frame capture of the lord-select flow for the
+-- review GIF -- prompt, menu, cursor walk to the last candidate, confirm text
+-- typing out, Yes, and the hand-off into the prep screen. Frames tagged "lord"
+-- (every 5th frame) are assembled offline.
+scenarios.recordlord = function()
+    local function recwait(n, tag)
+        for f = 1, n do
+            if f % 5 == 0 then shot(tag) end
+            yield()
+        end
+    end
+    if not winCh00() then return end
+    if not waitFor(function() return chapter() == 2 end, 1800) then
+        return result("FAIL", "chapter slot 2 never loaded after the ch00 win")
+    end
+    local atMenu = false
+    for i = 1, 60 do
+        if menuOpen() and red(CHAR_CHIEF) then atMenu = true break end
+        if procActive(SYM.gProcScr_SALLYCURSOR) then break end
+        press(K.A, 4)
+        recwait(36, "lord")
+    end
+    if not atMenu then return result("FAIL", "lord-select menu never opened") end
+    recwait(90, "lord") -- linger on the freshly opened menu
+    for _ = 1, LORD_CANDIDATES - 1 do
+        press(K.DOWN, 4)
+        recwait(20, "lord") -- visible cursor walk down the cast
+    end
+    recwait(60, "lord")
+    press(K.A, 4)
+    recwait(200, "lord") -- confirm text types out in full
+    press(K.A, 4)        -- Yes
+    for i = 1, 40 do
+        if procActive(SYM.gProcScr_SALLYCURSOR) then break end
+        press(K.A, 4)
+        recwait(36, "lord")
+    end
+    recwait(300, "lord") -- a beat of the prep screen
+    result("PASS", "lord-select flow frames recorded")
+end
+
 -- CH01LORD (#42): pick the LAST lord candidate -- benched by default under the
 -- 4-slot deploy cap -- and assert the choice is real: the permanent flag is
 -- set, the pick is force-deployed onto the field (cap intact), and their death
