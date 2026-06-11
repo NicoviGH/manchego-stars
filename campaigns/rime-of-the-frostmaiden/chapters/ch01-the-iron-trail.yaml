@@ -39,7 +39,9 @@ map:
 objective:
   type: seize                            # vanilla Ch1 parity (Seize the gate)
   description: "Seize the goblin camp — the chief holds it and the ingots are there"
-  seize_tile: [21, 8]                    # camp center; the chief's tile
+  seize_tile: [21, 7]                    # the painted ruins arch (editor V8) — camp center,
+                                         # the chief's tile. Ruins = no terrain bonus (vanilla
+                                         # Breguet's gate gave +20avo/+3def; gentler here)
   seize_by: lord                         # the player-chosen lord (#42); engine patches
                                          # CanUnitSeize to the chosen pid
 
@@ -92,7 +94,7 @@ enemy_units:
   - id: goblin-axe
     name: "Goblin Raider"
     count: 3
-    positions: [[14,8],[15,6],[15,10]]   # mid-trail pursuers
+    positions: [[14,8],[13,6],[15,10]]   # mid-trail pursuers ((15,6) became peak in the paint)
     class: fighter
     level: 1
     autolevel: true
@@ -105,7 +107,7 @@ enemy_units:
     name: "Goblin Chief"
     is_boss: true
     count: 1
-    position: [21, 8]           # the seize tile — full Breguet mirror
+    position: [21, 7]           # the seize tile (painted ruins arch) — full Breguet mirror
     class: armor-knight         # Breguet's class; magic (def→res) is our "rapier"
     level: 4
     inventory:
@@ -124,7 +126,7 @@ enemy_units:
     autolevel: true
     spawn_turn: 3
     spawn_edge: west            # behind the party, same side as vanilla
-    positions: [[0,7],[0,8],[0,9]]
+    positions: [[0,8],[0,9],[0,10]]   # (0,7) is the painted compound wall
     inventory_by_class:
       fighter: [iron-axe]
       soldier: [iron-lance]
@@ -162,6 +164,25 @@ events:
     ea_file: events/ch01-road-sign.ea
     description: >
       A battered sign: "BRYN SHANDER — 2 MILES. WATCH FOR WOLVES."
+
+  # Hint houses — vanilla Ch1 parity (two House visits, NO items; msgs 0x93B/0x93C
+  # are pure tactical hints). Dialogue written in the dialogue pass.
+  - trigger: visit
+    tile: [1, 7]                # the compound door at the Bryn Shander outskirts (B8)
+    type: house
+    ea_file: events/ch01-house-compound.ea
+    description: >
+      TERRAIN HINT (vanilla house 1 analogue): a Ten-Towner warns the goblins have
+      dug into the old waystation — the fort mounds shrug off blows and the snow
+      heals them up (fort terrain: +20 avoid, +2 def, heals).
+  - trigger: visit
+    tile: [13, 2]               # the north house off the mid-trail (N3)
+    type: house
+    ea_file: events/ch01-house-north.ea
+    description: >
+      BOSS HINT (vanilla house 2 analogue, the "rapier/armorslayer" hint re-cast):
+      the chief wears scrap-plate that turns blades — but magic doesn't care about
+      plate (def→res), and an axe has the edge over his spear.
 
 # ── Post-Chapter ──────────────────────────────────────────────────────────────
 post_chapter:
