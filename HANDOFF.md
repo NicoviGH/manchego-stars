@@ -1,147 +1,135 @@
-# Handoff: **Ch1 slice (#21) — #42 LORD SELECT DONE (Nicolas approved the UI) + ch01 WIN/SEIZE PLAYTESTED (`ch01win` PASS: Braulo marches, chief falls, Seize → chapter 3). NEXT = goblin art decision (Nicolas) → Goodberry rename → dialogue LAST.**
+# Handoff: **Ch1 slice (#21) — IZOBAI BOSS PORTRAIT SHIPPED (commit 5459864, pushed). NEXT = execute the documented goblin-grunt-classes plan (issue #21 comment), then Goodberry rename, dialogue LAST.**
 
-**Date:** 2026-06-10
-**Session focus:** #42 player-chosen lord end to end (route-split menu, permanent-flag
-persistence, the four engine hooks; Nicolas placed the menu after the Northlook muster
-and approved the UI from the review GIF), then the ch01 **win/seize** playtest:
-`ch01win` PASSES — Braulo marches the trail, the chief falls, Seize fires the ending
-and MNC2 advances to chapter slot 3. Ch1's engine work is now fully machine-verified
-(entry/preps/cap, chosen-lord force-deploy + game over, win-by-Seize).
+**Date:** 2026-06-16
+**Session focus:** Goblin art for ch01 (#21, next-step #1 from last handoff). Decided the
+map-sprite approach with Nicolas, built + shipped a custom **Izobai** boss portrait, and —
+when reskinning the grunt classes turned out to be a campaign-wide trap — designed and
+**documented a non-destructive plan** for the grunt map sprites, to be executed fresh.
 
-**Live checklist = GitHub issues (#21 = Ch1 slice; #42 CLOSED by e5013c0).**
+**Live checklist = GitHub issue #21 (Ch1 slice). The goblin-grunt-classes execution plan
+is a comment on #21:** https://github.com/NicoviGH/manchego-stars/issues/21#issuecomment-4719413468
 
 ---
 
-## THE LORD-SELECT MECHANISM (full detail in decisions.md §Player-chosen lord, 2026-06-10)
-- **UI**: vanilla post-Ch8 route-split menu clone (`CallRouteSplitMenu` idiom,
-  ch8-eventscript.h): ASMC opens StartMenu over the map; per-candidate confirm text,
-  `[Yes]` answer lands in EVT_SLOT_C, "No" loops back to the menu (LABEL/BNE).
-- **Persistence**: ONE permanent flag per candidate, `0xF0 + menu index` — saved with
-  the file, zeroed on New Game (`ResetPermanentFlags`, bmsave.c); vanilla scripts use
-  nothing above 0xE7. `LordSelect_GetPid` (injected, eventinfo.c) scans; fallback =
-  first candidate (Braulo) so debug entry never soft-locks.
-- **Hooks** (`build_campaign._inject_lord_select_engine`, campaign-agnostic):
-  `IsCharacterForceDeployed_` (always fielded), `CanUnitSeize` (chosen lead only),
-  `UnitKill` (death → EVFLAG_GAMEOVER, any death path), vanilla route-wide
-  Eirika/Ephraim GAMEOVER defeat entries demoted to flag-less quotes.
-- Candidates/menu/confirm texts build-generated from the classed cast (PORTRAIT_MAP
-  order, 8 today). Confirm/prompt = dead vanilla slot-2 text ids (0x957, 0x959+).
+## What shipped this session (commit 5459864, pushed to main)
+- **Izobai boss portrait** — the Foaming Mugs goblin boss is **book canon** (a female
+  Karkolohk warlord; DM notes had only "a group of goblins", unnamed — Izobai is the
+  published-book name we adopted). Custom bust = **AlexYTXG's "Bandit Pegasus Knight"**
+  FE-Repo mug, **recoloured to green goblin skin** (luminance-preserving ramp; red
+  hair/headband/red outfit kept). Nicolas iterated: dropped a tusk+pointy-ear edit,
+  chose "slightly greener than the first recolour".
+- Wiring: `campaigns/.../portraits/izobai.png` (96×80, 16-colour, **0px clipped** in the
+  FE8 dead-zone), `GUEST_PORTRAIT_MAP['izobai'] = 'Breguet'` in build_campaign (the
+  chief's death-quote FID is FID_Breguet → that slot now shows Izobai), chief **renamed
+  "Goblin Chief" → "Izobai"** in ch01 yaml. CREDITS.md rows added (Bandit Peg + goblin
+  spearman).
+- Verified: `make` green, `verify_text` 3404/0 runaway, **ch01win PASS** (march → Izobai
+  falls → Seize → chapter 3).
+
+## Map-sprite decisions (locked with Nicolas)
+- **Grunts** (lance "Goblin Spear"/soldier, axe "Goblin Raider"/fighter): reuse the
+  **one** goblin map sprite in the whole FE-Repo — **"Battle of Wesnoth (M) Goblin
+  Spearman" {BoW, Norikins}** (Map Sprites/Monsters – Dragons & Special). Vendored to
+  `map-review/goblin-art/goblin-spearman-{stand,walk}.png`. Sprite/weapon mismatch (spear
+  art, axe combat) is fine — same as Wolfram (axe art, lance combat). Weapons stay mixed
+  3-lance/3-axe (triangle lesson); NOT reclassed to all-spears.
+- **Chief**: stays the **vanilla Knight** (armor-knight) map sprite — same class as
+  Wolfram, so it's correct and needs no custom sprite.
+- **Grunts render reddish/maroon** under the enemy faction palette (green would need a
+  dedicated palette-bank engine detour — Nicolas chose to skip that).
 
 ## NEXT SESSION (in order)
-1. **Goblin art decision with Nicolas:** map sprites + boss portrait for
-   soldier/fighter/armor-knight goblins. FE-Repo reskin bases ([[reference_fe_repo]]);
-   grunts show vanilla class names + sprites; chief shows vanilla Breguet face in his
-   death quote (0x961 staging uses FID_Breguet).
-2. **Goodberry rename** (Vulnerary→Goodberry party-wide) — lands within this slice.
-3. **Dialogue pass LAST**: Northlook opening (hand-off from ch00 ending), lord-select
-   prompt/confirm wording, house hints 0x93B/0x93C, road sign 0x955, ending 0x954,
-   chief quote 0x961; then `record`/`recordlord` GIFs → Nicolas sign-off.
-4. Carried: #29 world map; Scramsax Hero mug [F2E] license recheck; ch02+ YAML
-   `ea_file:` schema cleanup; GitHub housekeeping (#21 slice checklist) — gh ran fine
-   this session for `issue view`; broader writes still try with Nicolas present.
+1. **Execute the goblin-grunt-classes plan** (full detail = the #21 comment above).
+   TL;DR: the grunts are generic **pid 0x80** → per-character sprite override impossible →
+   must be class-level; but reskinning the shared `CLASS_SOLDIER`/`CLASS_FIGHTER` is
+   campaign-wide (Nicolas flagged: would force every future soldier/fighter to be a goblin).
+   So **clone soldier+fighter into 2 unused class slots** (GOBLIN_SOLDIER/GOBLIN_FIGHTER,
+   identical stats, only the map SMS changed), assign the ch01 grunts to them via campaign
+   data, keep vanilla classes human. Reversible + reusable. Mechanism stays
+   campaign-agnostic in C (engine/content boundary). Verify with a **map-sprite playtest
+   screenshot** (new — past shots flashed by mid-transition).
+2. **Goodberry rename** (Vulnerary→Goodberry party-wide) — within this slice.
+3. **Dialogue pass LAST**: Northlook opening, lord-select prompt/confirm, house hints
+   0x93B/0x93C (note: 0x93C + the chief death quote still read **masculine "his/chief"** —
+   update for **Izobai/female** in the dialogue pass), road sign 0x955, ending 0x954,
+   chief quote 0x961; then `record` GIFs → Nicolas sign-off.
+4. Carried: #29 world map; Scramsax Hero mug [F2E] license recheck; **AlexYTXG Bandit-Peg
+   + BoW goblin-spearman license recheck before distribution** (no [F2E] tag on the
+   bandit-peg filename); ch02+ YAML `ea_file:` schema cleanup.
 
-## What was wired this session
-- `build_campaign.py`: `_inject_lord_select_engine` (4 hooks above; runs with the
-  engine-hardening block), LORDSEL_* constants, candidate-table append to
-  events_udefs.c, menu C code prepended to ch2-eventscript.h (its OWN #includes:
-  uimenu/fontgrp/hardware/uiutils — ch2's stock include set lacks them), beginning
-  scene rebuilt with FADU(16) + prompt + LABEL/ASMC/confirm/BNE loop before PREP.
-- `harness.lua`: `ch01lord` (menu-driven pick of the LAST candidate = pinky/NEIMI,
-  benched by default → asserts flag set + force-deployed under the 4-cap + death =
-  game-over screen), `recordlord` (continuous "lord"-tagged frames), and `ch01win`
-  (default lord marches to (21,7), kills the chief, **Seize → chapter 3**; escort
-  goblins poked frail+harmless so they can't kill or bodyblock; chief frail). New
-  consts LORD_CANDIDATES=8, LORDSEL_FLAG_BASE, CHAR_PINKY=0x08, CHAR_CHIEF=0x46.
-  Harness hardening: `marchToward` takes map bounds (ch01 = 25×16) and verifies the
-  selection actually computed a movement map; `endTurn`/`runEnemyPhase` take an
-  optional cursor-park tile; `pokeFastConfig` = map-anim combat + fast game speed
-  (10-goblin enemy phases overflow the 3600-frame budget with full battle anims).
-- GIF pipeline (no ffmpeg/magick on this Mac): PIL assembles
-  `/tmp/playtest-recordlord/*-lord.png` → 2x NEAREST → 83ms frames →
-  map-review/lord-select/lord-select-flow.gif (+ 3 stills). **GIF → `open -a Safari`.**
-
-## Tried/learned this session
-- **Chapter loads come up BLACK**: the menu ran invisibly (pure-black screenshots)
-  until the scene got vanilla's `FADU(16)`-after-LOAD idiom (cf. Ch4 beginning).
-  Any future pre-PREP scene content needs the same.
-- **rodata is discarded by the decomp ldscript**: `static const` tables and `""`
-  string literals in injected C land in `.rodata` → link error ("defined in
-  discarded section"). Use `CONST_DATA` (= SECTION(".data")) and vanilla's dummy
-  `.name = (const char *)0x8205958` pointer instead of `""`.
-- chX-eventscript.h files each carry their OWN #include list (compiled together in
-  events_script.c but agbcc -Werror trips on implicit decls before later includes).
-- Save-menu vs lord-menu discrimination in the harness: the lord menu is the first
-  `sProc_Menu` while ch01's goblins exist (`red(0x46)`) — the save screen runs
-  before any LOAD. A-tap races (tap lands the frame the menu opens → selects item
-  0) FAIL loudly, never false-PASS (flag assert catches the wrong pick).
-- Vanilla `[Yes]` text command = the whole confirm mechanism; result in EVT_SLOT_C
-  (1 = yes). Parity rule for generated bodies: printable chars only, pad `[.]` when
-  odd (mirrors MSG_C14/C17/C18).
-- `cast[0]` (PORTRAIT_MAP order) = braulo = the no-flag fallback — keep braulo first.
-- **The phase banner eats key presses**: an A meant to select a unit lands in the
-  PLAYER PHASE interlude → no selection → `gBmMapMovement` is stale (reads cost 0
-  everywhere) → the old marchToward "moved" to any tile, A on empty ground opened
-  the MAP menu, and chooseWait's UP-wrap picked **End** — silently burning whole
-  turns. Fixes: wait ~100 frames after phase sync AND demand unreachable tiles in
-  the movement map before trusting it (a real map always has some).
-- Seize is the TOP action-menu item on the seize tile (assumed from vanilla,
-  confirmed by ch01win) — plain A after moving onto it.
+## Tried / learned this session
+- **FE-Repo goblin inventory is thin**: exactly ONE goblin **map sprite** (the BoW
+  Spearman) and **ZERO goblin portraits** (Portrait Repository has no goblin/monster mug;
+  closest is a "Moloch Sorcerer"). So the boss face had to be a **reskin of a human mug**,
+  not a vendored goblin — pulled candidates from `Portrait Repository/Generic Characters
+  (Villagers, Goons, and Loons)` and recoloured.
+- **Skin-recolour gotchas** (all in `map-review/goblin-art/` scratch):
+  (a) the warm-hue skin heuristic also catches tan **scarves** (Female Fighter v3) and
+  the **bright face highlight is a near-white "cream"** the heuristic skips — include the
+  cream index explicitly or the face stays pale; (b) **RGBA-key bug**: mapping keyed by
+  3-tuples never matches `getpixel` 4-tuples → silent no-op (showed the original tan skin);
+  key by `(r,g,b,255)`; (c) green ramp needs **g≫r** or it reads khaki/yellow.
+- **Izobai is canon-female** ("a bossy goblin named Izobai", Karkolohk, escapes swearing
+  revenge → recurring-villain hook). Nicolas wants her female; the green-goblin bust is.
+- Map-sprite architecture (for the plan): `gClassData[]` indexed by `classId-1`
+  (`bmunit.c:206`); `ClassData.SMSId`@off6 → WAIT/idle table; MOVE/walk table indexed by
+  `classId-1` directly (`mu.c:1139`). Cast's per-character injection (cast palette bank
+  0xB) is the WRONG tool for enemies (we want faction palette). Class enum maxes 0x7F →
+  repurpose unused slots, don't extend the array.
 
 ## Current state
-- ✅ `make` green; `verify_text` 3404 msgs 0 runaway; playtests PASS: ch00
-  win/gameover/retreat, ch01 (default lord via blind A-taps), **ch01lord**,
-  **ch01win** (seize → chapter 3).
-- ✅ Pushed `e5013c0` (Closes #42), `e83e725` (recordlord + handoff); ch01win +
-  harness hardening in the commit carrying this handoff update.
-- ✅ Menu UI **approved by Nicolas** (GIF review): 8 names over the winter map,
-  confirm box types out, prep screen force-deploys the pick. ch00 Braulo-death
-  game over now rides the UnitKill hook (vanilla route-wide entry demoted) —
-  `gameover` scenario PASS.
-- ⚠️ House/sign/ending/lord-prompt texts are functional placeholders (dialogue pass).
+- ✅ Ch1 engine fully machine-verified (entry/preps/cap, lord-select force-deploy + game
+  over, win-by-Seize). `make` green, `verify_text` 3404/0, playtests PASS (ch00
+  win/gameover/retreat, ch01 default-lord, ch01lord, ch01win).
+- ✅ **Izobai boss portrait shipped + pushed** (5459864). Nicolas approved the bust look.
+- ⚠️ **Grunt map sprites NOT yet done** — plan documented on #21, ready to execute fresh.
+- ⚠️ Dialogue still placeholder; gendered chief text needs the Izobai/female pass.
 - ⚠️ ch01 ending MNC2(0x3) lands on vanilla Ch3 until ch02 is wired.
-- ⚠️ Party=8 assert + LORD_CANDIDATES=8 in harness must bump when pepperjack & brie
-  get class YAMLs (they're name-only; excluded from cast/candidates).
-- ℹ️ ch02+ YAMLs still carry aspirational `ea_file:` fields (schema cleanup, carried).
 
 ## Blockers
-- None. (Goblin art is a Nicolas-decision walkthrough, not a blocker.)
+- None. (Goblin-class work is documented and ready; it's an engine/tooling task, not a blocker.)
 
 ## Key files
-- `tools/build_campaign.py` — `_inject_lord_select_engine`, LORDSEL_* constants,
-  `inject_ch01` (menu codegen in step 4a, texts in step 6).
-- `tools/playtest/harness.lua` — `ch01lord`, `ch01win`, `recordlord`, lord consts.
-- `docs/decisions.md` — §Player-chosen lord (2026-06-10) = the mechanism SoT.
-- `map-review/lord-select/` — stills + flow GIF shown to Nicolas.
-- `campaigns/.../chapters/ch01-the-iron-trail.yaml` — slice source of truth.
-- `fireemblem8u/src/events/ch8-eventscript.h` (vanilla route-split donor, via
-  `git -C fireemblem8u show HEAD:...`).
+- `tools/build_campaign.py` — `GUEST_PORTRAIT_MAP` (izobai→Breguet), `inject_portraits`,
+  `inject_ch01` (`CH01_CLASS_IDS`, `enemy_entry`, chief name/quote staging ~L2643–2905);
+  for the plan: `_inject_idle_sprites`/`_inject_mu_sprites` (~L1773+, the cast path to
+  branch from — but NOT reuse the cast-palette bank for enemies).
+- `campaigns/rime-of-the-frostmaiden/portraits/izobai.png` — the shipped bust.
+- `campaigns/.../chapters/ch01-the-iron-trail.yaml` — chief = "Izobai", goblin roster.
+- `map-review/goblin-art/` — review renders (approved sheet, dead-zone preview, the
+  goblin-spearman stand/walk to vendor, recolour scratch). **PNG → `open`.**
+- `fireemblem8u/src/data_classes.c` + `include/bmunit.h` (ClassData/SMSId) +
+  `src/unit_icon_move_data.c` (move table) — the goblin-class plan touches these.
+- `tools/playtest/harness.lua` — `ch01win`/`ch01lord`; will need a map-sprite shot for
+  goblin-grunt verification.
 
 ## Gotchas (carried)
-- Story text: YAML `script:` → build_campaign generates bodies; `make` overwrites
-  manual decomp edits. Gate: `python3 tools/verify_text.py`.
-- Odd-length NAME strings: pad with [.] (terminator parity); generated lord texts
-  already do this.
+- **rodata is discarded by the decomp ldscript**: injected `static const` tables / `""`
+  literals → link error. Use `CONST_DATA` (.data) + vanilla dummy string pointers.
+- Story text: YAML `script:` → build generates bodies; `make` overwrites manual decomp
+  edits. Gate: `python3 tools/verify_text.py`.
+- Odd-length NAME strings: pad with `[.]` (terminator parity).
 - gDefeatTalkList: chapter-keyed entries at the HEAD; never after `{.pid=-1}`.
 - Vanilla facts: `git -C fireemblem8u show HEAD:<file>` — the working tree holds OUR
-  injected artifacts.
-- Bash cwd drifts between tool calls — `cd` to repo root for git/make (bit AGAIN:
-  ran make from fireemblem8u/ and got "up to date" from the decomp's own Makefile).
-- **PNG → `open` (Preview); GIF → `open -a Safari`.**
-- Synthetic macOS keypresses don't reach mGBA; in-emulator Lua is the path.
-- Pinky is male — "he" (memory: cast notes; slipped twice this session).
-- Frostmaiden book: `references/References/icewind-dale-...pdf`; DM notes:
-  `/Users/Yonick/Documents/Claude/Projects/Manchego Stars / Fire Emblem Game/References/DungeonMasterNotesIcewindDale.pdf`.
-  PDF page = printed page + 1.
+  injected artifacts. **Never commit the `fireemblem8u` submodule pointer.**
+- Bash cwd drifts; the built ROM lands at `fireemblem8u/fireemblem8.gba` (NOT repo root).
+- Synthetic macOS keypresses don't reach mGBA; in-emulator Lua is the path. Playtest
+  screenshots can land mid-transition (the death-quote frame was missed) — linger/extra A.
+- PNG → `open` (Preview); GIF → `open -a Safari`.
+- Pinky is male ("he"). Izobai is female ("she").
+- Frostmaiden book (`references/References/icewind-dale-...pdf`, 324pp, **image-only, no
+  text layer** — use `pdftoppm`) PDF page = printed + 1; DM notes
+  `.../References/DungeonMasterNotesIcewindDale.pdf` (has a text layer).
 
 ## Memory
-[[manchego-stars-project]] · [[feedback_fe-strictness]] · [[feedback_use_decomp]] ·
-[[manchego-stars-automated-playtests]] · [[feedback_sharing_visual_drafts]] ·
-[[feedback_answer_before_picker]] · [[reference_fe_repo]] (goblin reskins next) ·
-[[project_manchego_stars_cast_notes]] (Pinky = he)
+[[manchego-stars-project]] · [[feedback_custom_art_lever]] · [[feedback_nicolas_not_an_artist]] ·
+[[project_manchego_stars_portrait_pipeline]] · [[feedback_show_before_committing_art]] ·
+[[reference_fe_repo]] · [[feedback_vendor_community_assets]] · [[manchego-stars-automated-playtests]] ·
+[[feedback_answer_before_picker]] · [[project_manchego_stars_cast_notes]] (Pinky=he; Izobai=she)
 
 ## Standing rules
-Combat = pure vanilla FE; **field parity with vanilla ch N (both sides) is doctrine**
-(the cap is the parity; Pick Units only chooses who fills it; the chosen lord is
-force-deployed). Story/dialogue = collaborative (variants → Nicolas picks); art shown
-before committing. Auto-push to main once green; never commit the `fireemblem8u`
-submodule pointer. Playtests machine-run for logic, Nicolas for feel.
+Combat = pure vanilla FE; field parity with vanilla ch N is doctrine (cap = parity; chosen
+lord force-deployed). Custom art on EVERY sprite part, follow concept faithfully, one
+artwork at a time, **show before committing**. Story/dialogue = collaborative (variants →
+Nicolas picks). Auto-push to main once green; never commit the `fireemblem8u` submodule
+pointer. Playtests machine-run for logic, Nicolas for feel.
