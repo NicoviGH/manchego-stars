@@ -357,6 +357,36 @@ scenarios.win = function()
     end
 end
 
+-- GOODBERRY: boot to the ch00 map, open Hlin's Item menu (she carries a Hand Axe +
+-- a Goodberry, the reflavored Vulnerary), and screenshot the item list + the
+-- highlighted Goodberry so the new name + blueberry icon can be eyeballed in-game.
+scenarios.goodberry = function()
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    local hlin = blue(CHAR_HLIN)
+    if not hlin then return result("FAIL", "Hlin not found in blue array") end
+    log(string.format("Hlin at (%d,%d)", hlin.x, hlin.y))
+    -- select Hlin and re-confirm her own tile -> action menu (no move).
+    if not moveUnit(hlin.x, hlin.y, hlin.x, hlin.y) then
+        return result("FAIL", "action menu never opened for Hlin")
+    end
+    shot("action-menu")
+    -- No enemy is in handaxe range at turn 1, so the command menu is [Item, Wait];
+    -- A picks Item (top). Screenshot shows both items with icons + names.
+    press(K.A)
+    wait(40)
+    shot("item-list")
+    -- inventory order is Hand Axe (slot 1) then Goodberry (slot 2): DOWN highlights
+    -- the Goodberry, refreshing the name/description panel.
+    press(K.DOWN)
+    wait(30)
+    shot("goodberry-highlighted")
+    -- open the item submenu (Use/Trade/Discard) -> shows the item description too.
+    press(K.A)
+    wait(40)
+    shot("goodberry-detail")
+    result("PASS", "Goodberry item menu captured (see screenshots)")
+end
+
 -- CH01: ride the ch00 win into chapter slot 2 and smoke the ch01 entry:
 -- the ch00 guests leave the party (DISA), the prep screen opens (SALLYCURSOR,
 -- via the PREP event command), Fight! hands over control, and the deployed
