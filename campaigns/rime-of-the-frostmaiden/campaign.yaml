@@ -62,6 +62,24 @@ world_map:
     name: "Easthaven"
     unlocks_after: null  # never a friendly visit in MVP
 
+# Enemy class reskins (#21): clone a vanilla class into an otherwise-unused class slot
+# with a custom MAP sprite only (stats + battle anim ride along unchanged), so enemies
+# of that class show a themed overworld sprite without touching the shared vanilla class.
+# Reversible + reusable; build wiring = build_campaign.inject_enemy_class_reskins. Each
+# `sprite` resolves map_sprites/<sprite>.png (idle) + <sprite>_mu.png (walk); reskins
+# sharing a sprite share one sheet. The slots are vanilla's unused ballista-empty classes
+# (unreferenced by this campaign). Ch1 grunts (soldier/fighter goblins) use these; the
+# chief stays the vanilla Knight. Grunts render reddish under the enemy faction palette.
+enemy_class_reskins:
+  - id: goblin-soldier
+    base: CLASS_SOLDIER
+    slot: CLASS_BLST_REGULAR_EMPTY
+    sprite: goblin-spearman
+  - id: goblin-fighter
+    base: CLASS_FIGHTER
+    slot: CLASS_BLST_LONG_EMPTY
+    sprite: goblin-spearman
+
 # D&D content sources (frozen snapshots committed at data/)
 data_sources:
   srd: data/srd/srd-snapshot.json

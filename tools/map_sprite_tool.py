@@ -205,6 +205,51 @@ def recolour(base_path, palette_path, out_path, overrides=None):
     sheet_info(out_path, (dfw, dfh))
 
 
+def remap_sms_palette(src_path, donor_palette_png, out_path, overrides=None):
+    """Remap a vendored map-sprite sheet onto a vanilla class's STANDARD SMS palette
+    index layout, so an ENEMY-faction unit of a reskinned class renders it coherently.
+
+    Sibling to recolour(): recolour() targets the bespoke CAST palette (player cast, own
+    OBJ bank); this targets a vanilla class wait sheet's palette -- the standard SMS
+    palette the engine recolours per faction (player/enemy/NPC) at load. The engine never
+    reads the sheet's own palette; only each pixel's INDEX matters -- it must pick the
+    right role (outline/skin/cloth/...) in the standard layout so the faction palette tints
+    it sensibly (enemy red, etc.). index 0 stays transparent; every other src colour maps to
+    the nearest standard-palette entry among indices 1..15. `overrides` ({src_idx: std_idx})
+    forces a role mapping when nearest-RGB reads wrong (the maroon-fix knob, plan step 8).
+    Returns the src->std index map; the saved PNG keeps the donor palette for previewing.
+    """
+    overrides = overrides or {}
+    im = Image.open(src_path)
+    if im.mode != 'P':
+        sys.exit('ERROR: %s is mode %s; expected an indexed (mode P) sheet' % (src_path, im.mode))
+    src_pal = im.getpalette() or []
+    tgt = _read_palette(donor_palette_png)
+    tgt_rgb = [tuple(tgt[3 * i:3 * i + 3]) for i in range(16)]
+
+    remap = {0: 0}
+    for di in set(im.getdata()):
+        if di == 0:
+            continue
+        if di in overrides:
+            remap[di] = overrides[di]
+            continue
+        dr, dg, db = src_pal[3 * di:3 * di + 3]
+        best, best_d = 1, None
+        for ci in range(1, 16):
+            cr, cg, cb = tgt_rgb[ci]
+            d = (dr - cr) ** 2 + (dg - cg) ** 2 + (db - cb) ** 2
+            if best_d is None or d < best_d:
+                best, best_d = ci, d
+        remap[di] = best
+
+    out = Image.new('P', im.size)
+    out.putpalette(tgt)
+    out.putdata([remap[px] for px in im.getdata()])
+    out.save(out_path)
+    return remap
+
+
 def synth_mu_sheet(idle_path, donor, out_path, y_nudge=0, verbose=True):
     """Synthesize a static-"glide" MU (hover/walk) sheet from a finished idle sheet.
 

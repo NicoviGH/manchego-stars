@@ -42,6 +42,7 @@ DECOMP = os.path.join(REPO, 'fireemblem8u')
 PORTRAIT_DIR = os.path.join(DECOMP, 'graphics', 'portrait')
 CHARACTERS_C = os.path.join(DECOMP, 'src', 'data_characters.c')
 CLASSES_C = os.path.join(DECOMP, 'src', 'data_classes.c')
+CLASSES_H = os.path.join(DECOMP, 'include', 'constants', 'classes.h')
 TEXTS_TXT = os.path.join(DECOMP, 'texts', 'texts.txt')
 PORTRAIT_DATA_C = os.path.join(DECOMP, 'src', 'portrait_data.c')
 # Our busts are all framed identically: the mouth window sits at tile (col 2, row 6)
@@ -191,6 +192,8 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         'src/bmcamadjust.c',
                         'src/unit_icon_wait_data.c', 'src/unit_icon_move_data.c', 'src/mu.c',
                         'src/bmudisp.c',
+                        # enemy class reskins (#21): cloned goblin classes in gClassData
+                        'src/data_classes.c',
                         'data/const_data_unit_icon_wait.s', 'data/const_data_unit_icon_move.s',
                         'include/unit_icon_pointer.h',
                         'data/const_data_chapter_maps.s', 'data/data_8B363C.s',
@@ -1850,6 +1853,189 @@ def _inject_mu_sprites(mu, pointer_externs):
     _inject_mu_override_hook()
 
 
+# --- Enemy class reskins (#21) ----------------------------------------------------
+# Give an ENEMY a themed overworld sprite without touching its shared vanilla class.
+# Reskinning CLASS_SOLDIER/CLASS_FIGHTER directly is campaign-wide (every soldier/fighter
+# in every chapter would change); instead we CLONE a base class into an otherwise-unused
+# class slot (identical stats + battle anim -> gameplay unchanged) and swap only its MAP
+# sprite. Grunts get assigned the cloned class; vanilla classes stay human. Reversible
+# and reusable. Unlike the cast path (per-CHARACTER override, bespoke cast palette in its
+# own OBJ bank), enemies render their class SMS under the standard ENEMY faction palette,
+# so the donor sheet is remapped onto the standard SMS palette index layout (not the cast
+# one). The "goblin"/chapter framing lives in campaign YAML; this code is class-agnostic.
+
+
+def _parse_class_enum_values():
+    """CLASS_X -> int value from constants/classes.h (move/class tables index by id-1)."""
+    out = {}
+    pat = re.compile(r'(CLASS_[A-Z0-9_]+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)')
+    with open(CLASSES_H, encoding='utf-8') as f:
+        for line in f:
+            m = pat.search(line)
+            if m:
+                out[m.group(1)] = int(m.group(2), 0)
+    return out
+
+
+def _class_field(class_enum, field):
+    """Read a numeric field (e.g. SMSId) from a gClassData entry, as written in the C."""
+    with open(CLASSES_C, encoding='utf-8') as f:
+        text = f.read()
+    bs, be = _find_brace_block(text, '[%s - 1]' % class_enum, CLASSES_C)
+    m = re.search(r'\.' + field + r'\s*=\s*(0x[0-9A-Fa-f]+|\d+)', text[bs:be])
+    if not m:
+        sys.exit('ERROR: .%s not found in gClassData[%s]' % (field, class_enum))
+    return int(m.group(1), 0)
+
+
+def _wait_table_len():
+    """Count rows currently in unit_icon_wait_table[] -> the next free SMS id (rows are
+    0-indexed by SMS id). Read AFTER inject_map_sprites so the cast rows are included."""
+    with open(UNIT_ICON_WAIT_C, encoding='utf-8') as f:
+        lines = f.read().splitlines()
+    di, ci = _table_close_line(lines, 'unit_icon_wait_table[]')
+    return sum(1 for i in range(di + 1, ci) if lines[i].lstrip().startswith('{'))
+
+
+def _wait_symbol_at(sms_id):
+    """The donor `unit_icon_wait_<Name>_sheet` symbol at row `sms_id` (its `// N` comment),
+    and the bare <Name>. The vanilla wait rows are emitted `{..., sym}, // N`."""
+    with open(UNIT_ICON_WAIT_C, encoding='utf-8') as f:
+        for line in f:
+            m = re.search(r'(unit_icon_wait_(\w+)_sheet)\}.*//\s*%d\s*$' % sms_id, line)
+            if m:
+                return m.group(1), m.group(2)
+    sys.exit('ERROR: no wait-table row at SMS id %d' % sms_id)
+
+
+def _move_motion_at(class_value):
+    """The motion script symbol on the move-table row at index class_value-1 (`// N`)."""
+    idx = class_value - 1
+    with open(UNIT_ICON_MOVE_C, encoding='utf-8') as f:
+        for line in f:
+            m = re.search(r'\{[^,]+,\s*(\w+)\}.*//\s*%d\s*$' % idx, line)
+            if m:
+                return m.group(1)
+    sys.exit('ERROR: no move-table row at index %d (class %#x)' % (idx, class_value))
+
+
+def _set_move_row(class_value, sheet_sym, motion_sym):
+    """Rewrite the move-table row at index class_value-1 (located by its `// N` comment)."""
+    idx = class_value - 1
+    with open(UNIT_ICON_MOVE_C, encoding='utf-8') as f:
+        text = f.read()
+    pat = re.compile(r'^\t\{[^\n]*\}, // %d$' % idx, re.MULTILINE)
+    new, n = pat.subn('\t{%s, %s}, // %d' % (sheet_sym, motion_sym, idx), text, count=1)
+    if n == 0:
+        sys.exit('ERROR: move-table row // %d not found to reskin' % idx)
+    with open(UNIT_ICON_MOVE_C, 'w', encoding='utf-8') as f:
+        f.write(new)
+
+
+def enemy_class_reskins(campaign):
+    """The campaign's declared enemy class reskins (campaign.yaml `enemy_class_reskins`),
+    as a list of dicts {id, base, slot, sprite}. Empty if none declared."""
+    cfg = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
+    with open(cfg, encoding='utf-8') as f:
+        return (yaml.safe_load(f) or {}).get('enemy_class_reskins') or []
+
+
+def inject_enemy_class_reskins(campaign, verbose=True):
+    """Clone each declared base class into its unused slot with a custom MAP sprite only.
+
+    Per reskin (campaign.yaml): clone gClassData[base-1] into [slot-1] (full copy so the
+    battle anim/stats ride along -> combat unchanged), repoint .number/.SMSId; append the
+    reskin's idle sheet as a new wait-table row at that SMSId; repoint the move-table row
+    at slot-1 to the reskin's walk sheet (reusing the base class's motion script). Sheets
+    are remapped onto the BASE class's standard SMS palette (map_sprite_tool) so the enemy
+    faction palette colours them. Sprites are de-duped: reskins that share a `sprite` share
+    one wait row / move sheet (one goblin sprite, two classes)."""
+    reskins = enemy_class_reskins(campaign)
+    if not reskins:
+        if verbose:
+            print('  (no enemy_class_reskins declared)')
+        return
+    asset_dir = os.path.join(REPO, 'campaigns', campaign, 'map_sprites')
+    values = _parse_class_enum_values()
+    pointer_externs = []
+    sprite_sms = {}        # sprite stem -> SMS id of its (shared) wait row
+    sprite_move_sym = {}   # sprite stem -> move-sheet symbol
+
+    for rk in reskins:
+        base, slot, sprite = rk['base'], rk['slot'], rk['sprite']
+        for key in ('base', 'slot'):
+            if rk[key] not in values:
+                sys.exit('ERROR: enemy_class_reskins %s: unknown class %r' % (rk['id'], rk[key]))
+
+        # Donor SMS palette + geometry come from the base class's vanilla wait sheet.
+        base_sms = _class_field(base, 'SMSId')
+        donor_sym, donor_name = _wait_symbol_at(base_sms)
+        donor_png = os.path.join(WAIT_GFX_DIR, donor_sym + '.png')
+
+        # Graphics once per unique sprite (shared across reskins of the same sprite).
+        if sprite not in sprite_sms:
+            stand = os.path.join(asset_dir, sprite + '.png')
+            walk = os.path.join(asset_dir, sprite + '_mu.png')
+            for p in (stand, walk):
+                if not os.path.isfile(p):
+                    sys.exit('ERROR: enemy_class_reskins %s: missing map_sprites/%s'
+                             % (rk['id'], os.path.basename(p)))
+            sym = sprite.replace('-', '_')
+            wait_sym = 'unit_icon_wait_manchego_%s_sheet' % sym
+            move_sym = 'unit_icon_move_manchego_%s_sheet' % sym
+            # Remap onto the base class's standard SMS palette (enemy faction recolours it).
+            map_sprite_tool.remap_sms_palette(stand, donor_png,
+                                              os.path.join(WAIT_GFX_DIR, wait_sym + '.png'))
+            map_sprite_tool.remap_sms_palette(walk, donor_png,
+                                              os.path.join(MOVE_GFX_DIR, move_sym + '.png'))
+            # Validate geometry against the donor (wait sheet vs base SMS, move vs 32x32).
+            _, dfw, dfh = map_sprite_tool.donor_sms_geometry(donor_name)
+            macro, fw, fh, _ = map_sprite_tool.sheet_info(
+                os.path.join(WAIT_GFX_DIR, wait_sym + '.png'), (dfw, dfh))
+            map_sprite_tool.validate_mu_sheet(os.path.join(MOVE_GFX_DIR, move_sym + '.png'))
+
+            sms_id = _wait_table_len()
+            _append_table_rows(UNIT_ICON_WAIT_C, 'unit_icon_wait_table[]',
+                               ['\t{0, %s, %s}, // %d %s (reskin)' % (macro, wait_sym, sms_id, sprite)])
+            with open(UNIT_ICON_WAIT_S, 'a', encoding='utf-8') as f:
+                f.write('\n/* Manchego Stars enemy class reskin idle (#21) */\n'
+                        '\t.global %s\n%s:\n'
+                        '\t.incbin "graphics/unit_icon/wait/%s.4bpp.lz"\n\t.align 2, 0\n'
+                        % (wait_sym, wait_sym, wait_sym))
+            with open(UNIT_ICON_MOVE_S, 'a', encoding='utf-8') as f:
+                f.write('\n/* Manchego Stars enemy class reskin walk (#21) */\n'
+                        '\t.global %s\n%s:\n'
+                        '\t.incbin "graphics/unit_icon/move/%s.4bpp.lz"\n\t.align 2, 0\n'
+                        % (move_sym, move_sym, move_sym))
+            pointer_externs += ['extern char %s[];' % wait_sym, 'extern char %s[];' % move_sym]
+            sprite_sms[sprite] = sms_id
+            sprite_move_sym[sprite] = move_sym
+
+        # Clone base class -> slot (full body), repoint number + SMSId.
+        with open(CLASSES_C, encoding='utf-8') as f:
+            text = f.read()
+        bs, be = _find_brace_block(text, '[%s - 1]' % base, CLASSES_C)
+        body = text[bs:be]
+        body = _set_field(body, 'number', slot, CLASSES_C, base)
+        body = _set_field(body, 'SMSId', '0x%x' % sprite_sms[sprite], CLASSES_C, base)
+        text = _replace_brace_block(text, '[%s - 1]' % slot, body, CLASSES_C)
+        with open(CLASSES_C, 'w', encoding='utf-8') as f:
+            f.write(text)
+
+        # Repoint the cloned class's move-table row to the reskin walk sheet, reusing the
+        # base class's motion script (so it animates like the base class).
+        _set_move_row(values[slot], sprite_move_sym[sprite], _move_motion_at(values[base]))
+
+        if verbose:
+            print('  %-16s = clone %s -> %s (SMS %d, sprite %s)'
+                  % (rk['id'], base, slot, sprite_sms[sprite], sprite))
+
+    if pointer_externs:
+        with open(UNIT_ICON_POINTER_H, 'a', encoding='utf-8') as f:
+            f.write('\n/* Manchego Stars enemy class reskin sprites (#21) */\n'
+                    + '\n'.join(pointer_externs) + '\n')
+
+
 # --- Map tileset + layout (#40/#41) ----------------------------------------------
 # A GBAFE map = 4 data pieces the decomp wires through gChapterDataAssetTable
 # (data/data_8B363C.s) and incbins in data/const_data_chapter_maps.s: tile GRAPHICS
@@ -2644,15 +2830,26 @@ def inject_ch01(campaign, verbose=True):
     by_eid = {e['id']: e for e in chap['enemy_units']}
     spear, axe = by_eid['goblin-spear'], by_eid['goblin-axe']
     chief, reinf = by_eid['goblin-chief'], by_eid['goblin-reinforcements']
+
+    # Ch1's grunts are goblins on the map: swap their vanilla class for the cloned goblin
+    # class (same stats/anim, goblin map sprite -- inject_enemy_class_reskins). Keyed by
+    # the base class enum so only declared reskins apply; the chief (armor-knight) has no
+    # reskin and stays the vanilla Knight sprite.
+    reskin_by_base = {rk['base']: rk['slot'] for rk in enemy_class_reskins(campaign)}
+
+    def grunt_class(cls_label):
+        base = CH01_CLASS_IDS[cls_label]
+        return reskin_by_base.get(base, base)
+
     enemies = []
     for x, y in spear['positions']:
         enemies.append(enemy_entry(
-            '0x80', CH01_CLASS_IDS[spear['class']], spear['level'], True, x, y,
+            '0x80', grunt_class(spear['class']), spear['level'], True, x, y,
             CH01_ITEM_IDS[spear['inventory'][0]['id']], CH01_AI[spear['ai_pattern']],
             ' /* goblin spear -- camp approach */'))
     for x, y in axe['positions']:
         enemies.append(enemy_entry(
-            '0x80', CH01_CLASS_IDS[axe['class']], axe['level'], True, x, y,
+            '0x80', grunt_class(axe['class']), axe['level'], True, x, y,
             CH01_ITEM_IDS[axe['inventory'][0]['id']], CH01_AI[axe['ai_pattern']],
             ' /* goblin raider -- mid-trail pursuer */'))
     cx, cy = chief['position']
@@ -2667,7 +2864,7 @@ def inject_ch01(campaign, verbose=True):
     reinforce = []
     for cls, (x, y) in zip(reinf['composition'], reinf['positions']):
         reinforce.append(enemy_entry(
-            '0x80', CH01_CLASS_IDS[cls], reinf['level'], True, x, y,
+            '0x80', grunt_class(cls), reinf['level'], True, x, y,
             CH01_ITEM_IDS[reinf['inventory_by_class'][cls][0]],
             CH01_AI['reinforce'], ' /* west reinforcement, turn %d */'
             % reinf['spawn_turn']))
@@ -2981,6 +3178,8 @@ def main():
         patch_portrait_geometry(args.campaign)
         print('map sprites:')
         inject_map_sprites(args.campaign)
+        print('enemy class reskins (#21):')
+        inject_enemy_class_reskins(args.campaign)  # after map sprites (SMS ids), before ch01
         print('winter tileset:')
         inject_winter_tileset(args.campaign)
         print('title theme:')

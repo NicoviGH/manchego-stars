@@ -546,6 +546,27 @@ so a standard-palette sheet is the only way to add a custom sprite alongside the
 compare its 16-colour palette to `unit_icon_pal_player.agbpal` — exact match ⇒ guest path (no override); custom colours
 ⇒ it must be re-indexed to `cast_palette.png` and join the cast bank.
 
+**Enemy map sprites: clone the class into an unused slot, don't reskin the shared class (#21, 2026-06-16).**
+The cast's per-CHARACTER override is the wrong tool for ENEMIES: generic grunts share a pid (`0x80`), so there is no
+character to key on, and the cast bank forces the cast palette (enemies want their faction palette). Reskinning the
+shared `CLASS_SOLDIER`/`CLASS_FIGHTER` SMS would turn **every** soldier/fighter in **every** chapter into the themed
+sprite (and would have to be undone the moment a chapter wants human soldiers as enemies). So we **clone** the base
+class into an otherwise-unused class slot — vanilla's ballista-empty classes (`CLASS_BLST_REGULAR_EMPTY` 0x6A,
+`CLASS_BLST_LONG_EMPTY` 0x6B), which exist in `gClassData`/the move table but are unreferenced by this campaign — copying
+the **entire** class body (so stats, weapon ranks, terrain tables, and `pBattleAnimDef` ride along ⇒ combat is identical
+and never crashes) and changing only `.number`, `.SMSId` (→ a new wait row) and the move-table row at `slot-1` (→ the
+themed walk sheet, reusing the base class's motion script). Enemies of the cloned class render the themed sprite under
+the standard **enemy faction palette**, so the donor sheet is remapped onto the **base class's standard SMS palette index
+layout** (`map_sprite_tool.remap_sms_palette`), NOT the cast palette. Reversible (delete the YAML block) and reusable
+(any future themed enemy). The mechanism is campaign-agnostic C; the goblin/chapter framing lives in campaign YAML
+(`campaign.yaml enemy_class_reskins: [{id, base, slot, sprite}]`), injected by `build_campaign.inject_enemy_class_reskins`
+and opted into per chapter by `inject_ch01`'s grunt-class swap. Ch1's grunts use it (`goblin-spearman` for both the
+soldier and fighter grunts; the chief stays the vanilla Knight). Verified non-destructive: the `CLASS_SOLDIER`/
+`CLASS_FIGHTER` entries are byte-unchanged (SMSId 0x3f/0x31). Predicted-maroon turned out **green** in-game — the goblin's
+green skin nearest-maps to an SMS index the enemy palette leaves green (faction recolour hits cloth/armour, not skin),
+a happy outcome (overrides on `remap_sms_palette` are the knob if a future reskin reads wrong).
+_Decided: 2026-06-16; shipped for the ch01 goblin grunts (#21), `make` green + `ch01win` PASS + map screenshot._
+
 **Palette off-by-one (2026-06-06, found on the first in-game cast test).** The cast bank loads one slot high: a
 rainbow-palette test (each index a distinct hue) showed every sprite index `k` rendering cast colour `k-1`
 (snowman-white→yellow, meesmickle's red cape→cyan, etc.). `gMapSpriteOverride`/`gCastMapPalette` data and the 4bpp
