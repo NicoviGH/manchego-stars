@@ -3,8 +3,9 @@
 **Date:** 2026-06-16
 **Session focus:** Executed the documented goblin-grunt-classes plan (#21). Ch1's soldier/
 fighter grunts are now **goblins on the map** via a non-destructive class-clone mechanism;
-vanilla soldier/fighter untouched. `make` green, `verify_text` 3404/0, `ch01win` PASS,
-map screenshot confirms clean green goblins.
+vanilla soldier/fighter untouched. Nicolas picked the **Fire Imp** sprite (red, under the
+enemy palette) after a wider search. `make` green, `verify_text` 3404/0, `ch01win` PASS,
+in-game screenshot confirms clean red imps.
 
 **Live checklist = GitHub issue #21 (Ch1 slice).**
 
@@ -19,16 +20,19 @@ an enemy a themed overworld sprite without touching its shared vanilla class:
   class body (stats + weapon ranks + terrain + `pBattleAnimDef` ⇒ combat identical), changing
   only `.number`, `.SMSId` and the move-table row. Vanilla soldier/fighter stay human.
 - **Standard SMS palette, not the cast bank.** Enemies render their class SMS under the
-  **enemy faction palette**, so the goblin sheet is remapped onto the base class's standard SMS
-  index layout (`map_sprite_tool.remap_sms_palette`) — distinct from the cast's purple-bank path.
-- **Both grunt classes share the ONE goblin sprite** (BoW/Norikins "Goblin Spearman", credited
-  CREDITS.md row 29). Idle SMS 116 (0x74); walk reuses the soldier/fighter motion script.
-- **Predicted maroon came out GREEN** in-game — the goblin's green skin nearest-maps to an SMS
-  index the enemy palette leaves green (faction recolour hits cloth/armour, not skin). Happy
-  accident; `remap_sms_palette` overrides are the knob if a future reskin reads wrong.
-- Verified: `make` green, `verify_text` 3404/0, **ch01win PASS** (combat works via cloned anim;
-  chief kill → Seize → ch3); map screenshot `/tmp/playtest-ch01win/05-ch01win-map.png` shows two
-  clean green goblin grunts; `CLASS_SOLDIER`/`CLASS_FIGHTER` entries byte-unchanged (SMSId 0x3f/0x31).
+  **enemy faction palette**, so the sprite is mapped onto the base class's standard SMS index
+  layout (`map_sprite_tool.remap_sms_palette`) — distinct from the cast's purple-bank path.
+- **Sprite = the Fire Imp** {Alexsplode, FE-Repo} for both grunt classes (Nicolas picked it after
+  a wider FE-Repo + external search; the BoW goblin was a dark, unreadable blob). The imp is
+  authored in the **standard SMS palette**, so under the enemy palette it's a **fully-shaded RED
+  imp** (glowing eyes, pointy ears) — no remap guesswork. It's a **tall 16×32** sprite on a
+  16×16-combat class; `frame: 16x32` in the reskin YAML sets the wait-row size flag. Idle SMS 116;
+  walk = the imp's own 15-block sheet, reusing the soldier/fighter motion script.
+- **Green was rejected** (curiosity render only): green is the NPC/ally palette (reads as friendly +
+  applied by allegiance), and a custom green needs an OBJ bank the cast already own. Red is correct.
+- Verified: `make` green, `verify_text` 3404/0, **ch01win PASS**; in-game zoom
+  (`map-review/goblin-review/08-imp-ingame-zoom.png`) shows clean red imps; `CLASS_SOLDIER`/
+  `CLASS_FIGHTER` entries byte-unchanged (SMSId 0x3f/0x31).
 
 ## Files touched
 - `tools/map_sprite_tool.py` — new `remap_sms_palette()` (sibling to `recolour`; targets a vanilla
@@ -38,9 +42,10 @@ an enemy a themed overworld sprite without touching its shared vanilla class:
   `_move_motion_at`, `_set_move_row`, `enemy_class_reskins`); wired into `main()` AFTER
   `inject_map_sprites` (SMS-id ordering) and BEFORE `inject_ch01`; `inject_ch01` grunt-class swap
   (`grunt_class()` via `reskin_by_base`); `src/data_classes.c` added to `PATCHED_DECOMP_FILES`.
-- `campaigns/.../campaign.yaml` — `enemy_class_reskins:` block (goblin-soldier/goblin-fighter).
-- `campaigns/.../map_sprites/goblin-spearman.png` (+ `_mu.png`) — vendored stand/walk sheets.
-- `docs/decisions.md` — Art & Audio: the clone-into-unused-slot decision (dated 2026-06-16).
+- `campaigns/.../campaign.yaml` — `enemy_class_reskins:` block (sprite=fire-imp, frame=16x32).
+- `campaigns/.../map_sprites/fire-imp.png` (+ `_mu.png`) — vendored stand/walk, standard palette.
+- `docs/decisions.md` — Art & Audio: clone-into-unused-slot + standard-palette-sprite + `frame` override.
+- `CREDITS.md` — Fire Imp {Alexsplode, F2E}.
 
 ## NEXT SESSION (in order)
 1. **Goodberry rename** (Vulnerary → Goodberry party-wide) — within this slice.
@@ -57,7 +62,7 @@ an enemy a themed overworld sprite without touching its shared vanilla class:
   win-by-Seize). `make` green, `verify_text` 3404/0, playtests PASS (ch00 win/gameover/retreat,
   ch01 default-lord, ch01lord, ch01win).
 - ✅ **Izobai boss portrait shipped** (commit 5459864). Nicolas approved the bust.
-- ✅ **Goblin grunt map sprites shipped** (this session). Green goblins on the map; reusable
+- ✅ **Goblin grunt map sprites shipped** (this session). Red Fire-Imp grunts on the map; reusable
   enemy-class-reskin mechanism for future themed enemies.
 - ⚠️ Dialogue still placeholder; gendered chief text needs the Izobai/female pass.
 - ⚠️ ch01 ending MNC2(0x3) lands on vanilla Ch3 until ch02 is wired.

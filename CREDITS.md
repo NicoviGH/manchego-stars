@@ -26,7 +26,7 @@ Source: **[Klokinator/FE-Repo](https://github.com/Klokinator/FE-Repo)** (communi
 | `Pirate Lady (Version 3)` portrait | Hlin Trollbane ch00 guest portrait (silver-haired age recolor; vendored at `campaigns/.../portraits/vendor/`) | **Cygnus** | F2E |
 | `Hero` portrait | Scramsax ch00 guest portrait (used as-is; vendored at `campaigns/.../portraits/vendor/`) | **LaurentLacroix, UltraFenix, monk-han** | no tag in filename — recheck before distribution |
 | `Bandit Pegasus Knight` portrait | Izobai ch01 goblin boss portrait (green-goblin skin reskin; dresses the Breguet slot) | **AlexYTXG** | no tag in filename — recheck before distribution |
-| `Battle of Wesnoth (M) Goblin Spearman` map sprite (stand + walk) | ch01 goblin grunt map-sprite base (soldier/fighter classes) | **BoW (Battle of Wesnoth), Norikins** | F2E |
+| `Fire Imp (U)` map sprite (stand + walk) | ch01 goblin grunt map-sprite (soldier/fighter reskin classes; renders as a red imp under the enemy palette) | **Alexsplode** | F2E |
 
 (Each FE-Repo asset folder ships a `CREDITS.txt` — copy its exact line here when we lock the asset.)
 

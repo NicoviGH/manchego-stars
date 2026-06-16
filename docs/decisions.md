@@ -559,13 +559,28 @@ themed walk sheet, reusing the base class's motion script). Enemies of the clone
 the standard **enemy faction palette**, so the donor sheet is remapped onto the **base class's standard SMS palette index
 layout** (`map_sprite_tool.remap_sms_palette`), NOT the cast palette. Reversible (delete the YAML block) and reusable
 (any future themed enemy). The mechanism is campaign-agnostic C; the goblin/chapter framing lives in campaign YAML
-(`campaign.yaml enemy_class_reskins: [{id, base, slot, sprite}]`), injected by `build_campaign.inject_enemy_class_reskins`
-and opted into per chapter by `inject_ch01`'s grunt-class swap. Ch1's grunts use it (`goblin-spearman` for both the
-soldier and fighter grunts; the chief stays the vanilla Knight). Verified non-destructive: the `CLASS_SOLDIER`/
-`CLASS_FIGHTER` entries are byte-unchanged (SMSId 0x3f/0x31). Predicted-maroon turned out **green** in-game — the goblin's
-green skin nearest-maps to an SMS index the enemy palette leaves green (faction recolour hits cloth/armour, not skin),
-a happy outcome (overrides on `remap_sms_palette` are the knob if a future reskin reads wrong).
-_Decided: 2026-06-16; shipped for the ch01 goblin grunts (#21), `make` green + `ch01win` PASS + map screenshot._
+(`campaign.yaml enemy_class_reskins: [{id, base, slot, sprite, frame?}]`), injected by
+`build_campaign.inject_enemy_class_reskins` and opted into per chapter by `inject_ch01`'s grunt-class swap. Ch1's grunts
+use it (the **Fire Imp** {Alexsplode, FE-Repo} for both soldier and fighter grunts — the "Foaming Mugs goblins"; the
+chief stays the vanilla Knight). Verified non-destructive: the `CLASS_SOLDIER`/`CLASS_FIGHTER` entries are byte-unchanged
+(SMSId 0x3f/0x31).
+
+**Pick a sprite already drawn in the standard SMS palette.** The first attempt (BoW "Goblin Spearman") had its own
+9-colour palette, so nearest-mapping it to the standard layout collapsed it to a dark, unreadable blob (and a remap-target
+bug — matching to the *player* palette while the unit displays under the *enemy* palette — turned its red pixels green by
+accident). The Fire Imp is authored in the **standard SMS palette**: its body sits on the faction-colour ramp (indices
+7–10), so under the enemy palette it becomes a **fully-shaded red imp** (glowing eyes, pointy ears) with zero remap
+guesswork — the remap is an identity pass. Lesson: prefer FE-Repo sprites already in the standard palette; the index roles
+must line up with the faction ramp or the faction recolour produces mud. **Green enemies are not practical** — green is the
+NPC/ally palette (the engine applies it by allegiance, and FE's colour language reads green as friendly), and a custom
+green-in-a-spare-bank would need an OBJ bank, but the one free bank (`0xB`) is already the cast's; red is the correct,
+free "enemy" signal.
+
+**`frame` override for off-size sprites.** A reskin sprite need not match the base class's SMS size: the Fire Imp is a
+tall **16×32** sprite on a 16×16-combat soldier/fighter. The optional `frame: 16x32` in the reskin YAML sets the wait-row
+size flag; the engine draws the taller idle correctly (same mechanism mounted 16×32 classes use) while combat stays the
+base class's. Absent `frame`, the base class's own SMS geometry is used.
+_Decided: 2026-06-16; shipped for the ch01 grunts (#21) as the Fire Imp, `make` green + `ch01win` PASS + in-game screenshot._
 
 **Palette off-by-one (2026-06-06, found on the first in-game cast test).** The cast bank loads one slot high: a
 rainbow-palette test (each index a distinct hue) showed every sprite index `k` rendering cast colour `k-1`

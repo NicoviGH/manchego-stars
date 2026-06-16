@@ -1988,8 +1988,14 @@ def inject_enemy_class_reskins(campaign, verbose=True):
                                               os.path.join(WAIT_GFX_DIR, wait_sym + '.png'))
             map_sprite_tool.remap_sms_palette(walk, donor_png,
                                               os.path.join(MOVE_GFX_DIR, move_sym + '.png'))
-            # Validate geometry against the donor (wait sheet vs base SMS, move vs 32x32).
-            _, dfw, dfh = map_sprite_tool.donor_sms_geometry(donor_name)
+            # Idle frame geometry: a `frame` override (e.g. "16x32") when the sprite is a
+            # different size class than the base (the Fire Imp is a tall 16x32 sprite on a
+            # 16x16 soldier/fighter -- the engine draws it via the wait-row size flag);
+            # else the base class's own SMS size.
+            if rk.get('frame'):
+                dfw, dfh = (int(v) for v in str(rk['frame']).lower().split('x'))
+            else:
+                _, dfw, dfh = map_sprite_tool.donor_sms_geometry(donor_name)
             macro, fw, fh, _ = map_sprite_tool.sheet_info(
                 os.path.join(WAIT_GFX_DIR, wait_sym + '.png'), (dfw, dfh))
             map_sprite_tool.validate_mu_sheet(os.path.join(MOVE_GFX_DIR, move_sym + '.png'))

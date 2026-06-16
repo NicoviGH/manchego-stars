@@ -68,17 +68,23 @@ world_map:
 # Reversible + reusable; build wiring = build_campaign.inject_enemy_class_reskins. Each
 # `sprite` resolves map_sprites/<sprite>.png (idle) + <sprite>_mu.png (walk); reskins
 # sharing a sprite share one sheet. The slots are vanilla's unused ballista-empty classes
-# (unreferenced by this campaign). Ch1 grunts (soldier/fighter goblins) use these; the
-# chief stays the vanilla Knight. Grunts render reddish under the enemy faction palette.
+# (unreferenced by this campaign). `frame` (optional) overrides the idle frame size when
+# the sprite isn't the base class's size class -- the Fire Imp is a tall 16x32 sprite on
+# a 16x16-combat soldier/fighter, which the engine draws via the wait-row size flag.
+# Ch1 grunts (the "Foaming Mugs goblins") use these; the chief stays the vanilla Knight.
+# The Fire Imp {Alexsplode, FE-Repo} reads as a red imp under the enemy faction palette
+# (its body sits on the standard faction-colour ramp -> fully shaded red, glowing eyes).
 enemy_class_reskins:
   - id: goblin-soldier
     base: CLASS_SOLDIER
     slot: CLASS_BLST_REGULAR_EMPTY
-    sprite: goblin-spearman
+    sprite: fire-imp
+    frame: 16x32
   - id: goblin-fighter
     base: CLASS_FIGHTER
     slot: CLASS_BLST_LONG_EMPTY
-    sprite: goblin-spearman
+    sprite: fire-imp
+    frame: 16x32
 
 # D&D content sources (frozen snapshots committed at data/)
 data_sources:
