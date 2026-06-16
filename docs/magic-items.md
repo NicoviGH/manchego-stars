@@ -43,7 +43,7 @@
 |---|---|---|---|
 | Staff of Power | +2 AC/saves/atk; stores spells; 20 charges; retributive strike | Signature staff: +stats while held; charge-spend nukes; 1-time retributive blast | post-MVP |
 | Wand of Magic Detection | Detect magic 3/day | flavor / treasure-finding event | — |
-| Potion of Healing ×2 | 2d4+2 heal | Vulnerary-equivalent consumable | Ch1 ok |
+| Potion of Healing ×2 | 2d4+2 heal | "Goodberry" — reflavored Vulnerary (party-wide consumable name) | Ch1 ok |
 
 ## Sclorbo — Bard (Lore), Chwinga
 | Item | What it is (5e) | FE conversion idea | Gate |

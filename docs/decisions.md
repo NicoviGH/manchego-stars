@@ -582,6 +582,23 @@ size flag; the engine draws the taller idle correctly (same mechanism mounted 16
 base class's. Absent `frame`, the base class's own SMS geometry is used.
 _Decided: 2026-06-16; shipped for the ch01 grunts (#21) as the Fire Imp, `make` green + `ch01win` PASS + in-game screenshot._
 
+**Item reflavor = global name + icon swap per item id; the cast's per-unit `name:` fields are documentation only (#21, 2026-06-16).**
+FE8 stores **one** name message and **one** 16×16 icon per item id (`gItemData[].nameTextId` / `.iconId`), so a reflavored
+consumable necessarily reads the same for the whole party — the per-unit inventory `name:` fields in the cast YAML (which
+historically varied: "Healing Potion" / "Blood Vial" / "Goodberry") cannot differ in-engine and are kept purely as
+documentation/flavor. The reflavored Vulnerary is unified party-wide as **"Goodberry"** (Marty's druidic ration; Meesmickle's
+blood-draught flavor survives only as a YAML comment). Two campaign-agnostic, data-driven mechanisms inject this:
+`build_campaign.inject_item_names` (campaign.yaml `item_names: {ITEM_ENUM: name}` → rewrites the item's `nameTextId` message,
+terminator-parity padded) and `build_campaign.inject_item_icons` (campaign.yaml `item_icons: {ITEM_ENUM: asset}` → overwrites
+the item's tracked `.png` source under `graphics/item_icon/`, which gbagfx compiles to the `.4bpp`). Both resolve the item's
+id/iconId from `data_items.c` and the icon's source file from `data_item_icon.s`'s incbin order — never hardcoded. The icon is
+authored from FE8's **shared item-icon palette** (one fixed 16-colour bank for all item icons) via `tools/item_icon_tool.py`
+(`blueberry_grid`, design "L2": blue body, dark five-point calyx button, green branch rooted in the button's centre, single
+left leaf — iterated with Nicolas, renders in `map-review/goodberry-icon/`). Authoring in the shared palette means the icon
+needs no recolour; a vendored fruit icon would have had to be re-indexed to that palette anyway, so generated-via-tooling was
+simpler than sourcing from the FE-Repo.
+_Decided: 2026-06-16; shipped for the Goodberry (#21), `make` green + `verify_text` 3404/0 + `ch01win` PASS + in-ROM icon render._
+
 **Palette off-by-one (2026-06-06, found on the first in-game cast test).** The cast bank loads one slot high: a
 rainbow-palette test (each index a distinct hue) showed every sprite index `k` rendering cast colour `k-1`
 (snowman-white→yellow, meesmickle's red cape→cyan, etc.). `gMapSpriteOverride`/`gCastMapPalette` data and the 4bpp

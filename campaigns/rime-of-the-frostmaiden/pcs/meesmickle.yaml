@@ -85,8 +85,9 @@ growth_rates:
 
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
 # MVP: stock FE weapons — tome stats inherited from the vanilla item in `fe_base` (no custom
-# Might). Eldritch/force flavor rides on the sprite art + damage_type label. Blood Vial is a
-# reflavored Vulnerary (flavor: she drinks blood instead of quaffing a potion).
+# Might). Eldritch/force flavor rides on the sprite art + damage_type label. The reflavored
+# Vulnerary is the party-wide "Goodberry" (campaign.yaml item_names); narrative flavor: she
+# crushes the berry into a blood-dark draught rather than quaffing a potion.
 inventory:
   - id: eldritch-blast
     name: "Eldritch Blast"
@@ -95,8 +96,8 @@ inventory:
     fe_weapon_type: Dark      # FE Shaman weapon class (baseRanks ITYPE_DARK)
     range: 2
     damage_type: force        # cosmetic flavor label only
-  - id: blood-vial
-    name: "Blood Vial"        # reflavored Vulnerary (consumable)
+  - id: goodberry
+    name: "Goodberry"         # reflavored Vulnerary (party-wide name; her "blood-dark draught")
     fe_base: vulnerary
     uses: 3
 # -- Unique Abilities ------------------------------------------------------

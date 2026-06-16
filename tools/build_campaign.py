@@ -43,6 +43,7 @@ PORTRAIT_DIR = os.path.join(DECOMP, 'graphics', 'portrait')
 CHARACTERS_C = os.path.join(DECOMP, 'src', 'data_characters.c')
 CLASSES_C = os.path.join(DECOMP, 'src', 'data_classes.c')
 CLASSES_H = os.path.join(DECOMP, 'include', 'constants', 'classes.h')
+ITEMS_C = os.path.join(DECOMP, 'src', 'data_items.c')
 TEXTS_TXT = os.path.join(DECOMP, 'texts', 'texts.txt')
 PORTRAIT_DATA_C = os.path.join(DECOMP, 'src', 'portrait_data.c')
 # Our busts are all framed identically: the mouth window sits at tile (col 2, row 6)
@@ -194,6 +195,8 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         'src/bmudisp.c',
                         # enemy class reskins (#21): cloned goblin classes in gClassData
                         'src/data_classes.c',
+                        # Goodberry (#21): vulnerary icon swapped by inject_item_icons
+                        'graphics/item_icon/item_icon_vulnerary.png',
                         'data/const_data_unit_icon_wait.s', 'data/const_data_unit_icon_move.s',
                         'include/unit_icon_pointer.h',
                         'data/const_data_chapter_maps.s', 'data/data_8B363C.s',
@@ -544,6 +547,99 @@ def inject_names(campaign, verbose=True):
         set_message_body(lines, text_id, name_message_body(name))
         if verbose:
             print('  %-10s -> MSG_%03X (was %s): %s' % (unit_id, text_id, slot, name))
+    with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines))
+
+
+def item_name_text_id(item_enum):
+    """nameTextId of a vanilla item, scanned from data_items.c. FE8 stores one name
+    message per item id (gItemData[].nameTextId), so renaming it retitles every copy
+    of that item in-game -- read the id from the decomp, never hardcode."""
+    marker = '[%s] = {' % item_enum
+    with open(ITEMS_C, encoding='utf-8') as f:
+        lines = f.read().splitlines()
+    for i, line in enumerate(lines):
+        if marker in line:
+            for probe in lines[i:i + 12]:
+                m = re.search(r'\.nameTextId\s*=\s*(0x[0-9a-fA-F]+|\d+)', probe)
+                if m:
+                    return int(m.group(1), 0)
+    sys.exit('ERROR: could not find nameTextId for %s in %s' % (item_enum, ITEMS_C))
+
+
+def item_icon_id(item_enum):
+    """gItemData[item].iconId, scanned from data_items.c."""
+    marker = '[%s] = {' % item_enum
+    with open(ITEMS_C, encoding='utf-8') as f:
+        lines = f.read().splitlines()
+    for i, line in enumerate(lines):
+        if marker in line:
+            for probe in lines[i:i + 12]:
+                m = re.search(r'\.iconId\s*=\s*(0x[0-9a-fA-F]+|\d+)', probe)
+                if m:
+                    return int(m.group(1), 0)
+    sys.exit('ERROR: could not find iconId for %s in %s' % (item_enum, ITEMS_C))
+
+
+def item_icon_png_path(icon_id):
+    """The graphics/item_icon/*.png build-source file an iconId resolves to. Item icons
+    are 16x16 4bpp tiles concatenated in data/data_item_icon.s in iconId order
+    (item_icon_tiles); the Nth .incbin (0-based) is iconId N, and the decomp builds each
+    .4bpp from a same-named .png (`%.4bpp: %.png`). Read it, never hardcode the name."""
+    s = os.path.join(DECOMP, 'data', 'data_item_icon.s')
+    incbins = re.findall(r'\.incbin\s+"(graphics/item_icon/[^"]+)\.4bpp"',
+                         open(s, encoding='utf-8').read())
+    if icon_id >= len(incbins):
+        sys.exit('ERROR: iconId %#x past %d item icons in %s' % (icon_id, len(incbins), s))
+    return incbins[icon_id] + '.png'
+
+
+def inject_item_icons(campaign, verbose=True):
+    """Swap a vanilla item's 16x16 icon for a campaign asset from campaign.yaml
+    `item_icons:` (ITEM enum -> item_icons/<name>.png). Overwrites the item's tracked
+    .png source (gbagfx makes the .4bpp at build). FE8 keeps one icon per item id, so
+    every copy shows the new art (cf. inject_item_names for the name)."""
+    cfg = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
+    with open(cfg, encoding='utf-8') as f:
+        icons = (yaml.safe_load(f) or {}).get('item_icons') or {}
+    if not icons:
+        if verbose:
+            print('  (no item_icons declared)')
+        return
+    from PIL import Image
+    for item_enum, asset in icons.items():
+        src = os.path.join(REPO, 'campaigns', campaign, 'item_icons', asset + '.png')
+        if not os.path.isfile(src):
+            sys.exit('ERROR: item_icon asset not found: %s' % src)
+        im = Image.open(src)
+        if im.mode != 'P' or im.size != (16, 16):
+            sys.exit('ERROR: %s must be a 16x16 indexed (mode P) PNG; got %s %s'
+                     % (src, im.mode, im.size))
+        rel = item_icon_png_path(item_icon_id(item_enum))
+        shutil.copyfile(src, os.path.join(DECOMP, rel))
+        if verbose:
+            print('  %-18s -> %s' % (item_enum, rel))
+
+
+def inject_item_names(campaign, verbose=True):
+    """Rename vanilla items globally from campaign.yaml `item_names:` (ITEM enum ->
+    display name). FE8 keeps a single name per item id, so a reflavored consumable
+    reads the same for the whole party (cf. the cast's per-unit flavor names are
+    documentation only -- the engine can't differ them)."""
+    cfg = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
+    with open(cfg, encoding='utf-8') as f:
+        renames = (yaml.safe_load(f) or {}).get('item_names') or {}
+    if not renames:
+        if verbose:
+            print('  (no item_names declared)')
+        return
+    with open(TEXTS_TXT, encoding='utf-8') as f:
+        lines = f.read().split('\n')
+    for item_enum, name in renames.items():
+        text_id = item_name_text_id(item_enum)
+        set_message_body(lines, text_id, name_message_body(str(name)))
+        if verbose:
+            print('  %-18s -> MSG_%03X: %s' % (item_enum, text_id, name))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 
@@ -3178,6 +3274,10 @@ def main():
         print('  lord select (#42): GetPid + force-deploy/Seize/game-over keyed to the chosen lead')
         print('names:')
         inject_names(args.campaign)
+        print('item names:')
+        inject_item_names(args.campaign)
+        print('item icons:')
+        inject_item_icons(args.campaign)
         print('characters:')
         patch_character_data(args.campaign)
         print('portrait geometry:')

@@ -85,7 +85,7 @@ inventory:
     fe_base: iron-lance                   # vanilla FE8 stats (Mt/Hit/Crit/Wt/uses)
     fe_weapon_type: Lance                 # FE Pegasus Knight weapon class (baseRanks ITYPE_LANCE, D)
   - id: vulnerary
-    name: "Healing Potion"                # reflavored Vulnerary (consumable)
+    name: "Goodberry"             # reflavored Vulnerary (party-wide name; see campaign.yaml item_names)
     fe_base: vulnerary
     uses: 3
 

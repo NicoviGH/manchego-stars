@@ -86,6 +86,23 @@ enemy_class_reskins:
     sprite: fire-imp
     frame: 16x32
 
+# Item name overrides: rename a vanilla item's in-game text globally (build wiring =
+# build_campaign.inject_item_names, which rewrites gItemData[].nameTextId's message).
+# FE8 stores ONE name per item id, so every copy reads the same -- the cast's per-unit
+# inventory `name:` fields (Healing Potion / Blood Vial / ...) are documentation only and
+# can't differ in-engine. The reflavored Vulnerary is unified party-wide as "Goodberry"
+# (Marty's druidic ration; everyone shares one consumable name).
+item_names:
+  ITEM_VULNERARY: "Goodberry"
+
+# Item icon overrides: swap a vanilla item's 16x16 icon for a campaign asset under
+# item_icons/<name>.4bpp (build wiring = build_campaign.inject_item_icons, which resolves
+# the item's iconId -> its incbin in data/data_item_icon.s and overwrites that .4bpp).
+# One icon per item id, so every Goodberry shows the berry. The asset is authored from
+# FE8's shared item-icon palette via tools/item_icon_tool.py (blueberry_grid, design L2).
+item_icons:
+  ITEM_VULNERARY: goodberry
+
 # D&D content sources (frozen snapshots committed at data/)
 data_sources:
   srd: data/srd/srd-snapshot.json

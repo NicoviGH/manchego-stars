@@ -109,7 +109,7 @@ inventory:
   # NOTE: the former "Shocking Grasp" lightning tome is removed — Archer/Sniper is a Bow-only line in
   # FE8 and has no tome rank. The cannon/lightning fantasy lives in Pepperjack (a recruitable unit).
   - id: vulnerary
-    name: "Healing Potion"    # reflavored Vulnerary (consumable)
+    name: "Goodberry"             # reflavored Vulnerary (party-wide name; see campaign.yaml item_names)
     fe_base: vulnerary
     uses: 2
 # -- Unique Abilities ------------------------------------------------------

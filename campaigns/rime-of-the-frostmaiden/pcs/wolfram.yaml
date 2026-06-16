@@ -100,7 +100,7 @@ inventory:
     range: 2
     damage_type: bludgeoning        # cosmetic flavor label only
   - id: vulnerary
-    name: "Healing Potion"          # reflavored Vulnerary (consumable)
+    name: "Goodberry"             # reflavored Vulnerary (party-wide name; see campaign.yaml item_names)
     fe_base: vulnerary
     uses: 2
 # -- Unique Abilities ------------------------------------------------------
