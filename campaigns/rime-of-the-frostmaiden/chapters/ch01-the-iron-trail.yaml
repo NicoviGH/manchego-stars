@@ -141,12 +141,104 @@ events:
     type: cutscene
     ea_file: events/ch01-opening.ea
     description: >
-      The Northlook tavern — opens on the ch00 hand-off (moved here from the prologue
-      ending, 2026-06-09, vanilla-style): Hlin and Scramsax, fresh off Sephek's
-      escape, and Hlin retains the seven — Ten-Towns needs more hands than hers.
-      Then the three dwarves approach and explain the missing ingot shipment; they
-      offer 200 GP for recovery. The lord choice (#42) and Pick Units happen here:
-      four take the trail. Cut to: the trail. A dismembered body in the snow.
+      The Northlook, Bryn Shander. Hlin and Scramsax come in from the cold, talking of
+      hiring adventurers; the seven are already in the taproom, each for their own
+      reasons, and reveal themselves one by one as Hlin works the room. Hlin lays out the
+      campaign's stakes — the unnatural endless winter and its agents — then puts the
+      company to a first test: she brings the dwarf Hruna over with the stolen iron-ingot
+      job (RBG haggles the price to 200 GP; Braulo calls it fair and commits). She asks
+      for one voice to lead, handing into lord-select (#42) and Pick Units; four take the
+      trail.
+      LOCKED dialogue-pass text below (Beat 1, co-written with Nicolas 2026-06-16).
+      PENDING (not done by this commit): slot-2 eventscript wiring that consumes this
+      script, the tavern background art (Fireplace-base reskin or custom Northlook
+      interior; show-before-commit), the Hruna portrait, and the in-game motion review.
+    script:                       # LOCKED 2026-06-16 (dialogue pass, co-written with Nicolas)
+      - location_card: "The Northlook"
+      # ── A — Hlin & Scramsax come in from the cold ──
+      # (Scramsax stamps snow off his boots, surveys his crowded taproom; nods at the mounted fish)
+      - scramsax: >-
+          Ngh. Walk to the Eastway and back, and the place fills with strangers.
+          Mind Ol' Bitey, the lot of you — he's stuffed, but he still bites the
+          ones who don't pay their tab.
+      # (Hlin lowers herself onto a stool, pipe unlit)
+      - hlin: >-
+          Strangers with steel, Scramsax. That's what I came back for. I can't
+          walk that road again — not alone. Not at my age.
+      # (Scramsax prices the room with one unimpressed sweep)
+      - scramsax: >-
+          Steel. I've got a mushroom, a snowman, a cat in the corner, and whatever
+          that one's licking off my bar rail. Take your pick, Trollbane.
+      # ── B — the cast, one by one (drawn out as Hlin looks the room over) ──
+      # (Wolfram straightens from the bar rail, unembarrassed) — plants the iron
+      - wolfram: >-
+          Your rail's pig iron, friend. But the brackets? Good Clan Battlehammer
+          steel. Haven't tasted ore this clean since I came north.
+      # (Marty coughs a soft puff of spores in Hlin's face, pours from a battered thermos,
+      #  taps in a measure of powder labelled "CHAGACCINO"; he never acknowledges the spores)
+      - marty: "You look cold. Mushroom coffee?"
+      # (Scramsax, deadpan — trimmable)
+      - scramsax: "He does that to everyone. Drink's better than it sounds."
+      # (Rootis waves from his seat)
+      - rootis: "Don't mind me — just enjoying the weather."
+      # (Meesmickle: a cat watching from the shadows, not moving)
+      - meesmickle: >-
+          A talking mushroom, a snowman, and a bounty hunter buying drinks.
+          Wonderful. I was worried tonight would be dull.
+      # Sclorbo never speaks — impression/gesture text, rendered in parentheses
+      - sclorbo: >-
+          (A tiny chwinga hops onto the table and beams pure welcome at Hlin —
+          sit, rest, you're among friends.)
+      # (RBG sweeps off his hat) — the businessman arrives
+      - prof-rbg: >-
+          Cheesed to make your acquaintance, madam. Professor R.B. Geenius —
+          inventor, problem-solver, the one sensible mind in the room. You did
+          say... coin?
+      # (Braulo sets down his tankard; a small isopod peeks from the lip of his shell,
+      #  watching the mushroom) — he speaks only for himself here
+      - braulo: "Name the job and the price. If it's fair, I'm in."
+      # ── C — Hlin's story (the campaign's stakes) ──
+      # (Hlin lights her pipe at last)
+      - hlin: >-
+          Most of you aren't from the Dale, so I'll keep it simple. This winter
+          doesn't end. Two years now — no thaw, no spring, the sun giving up a
+          little more of the sky each week.
+      - hlin: >-
+          A cold this long stops behaving like cold. It seems to have a will of
+          its own — and whatever it wants, it doesn't work the snow alone.
+      - hlin: >-
+          I met one of its agents this winter — a man the cold wouldn't touch,
+          wielding a dagger made of ice. Town by town, he hunted down those who'd
+          cheated the sacrifices, and made certain the cold got its due. I cut him
+          down myself... and he got up and walked off into the storm.
+      # (a dry pull on the pipe)
+      - hlin: >-
+          Whatever's got hold of this Dale, it'll take more hands than mine. Hands
+          like yours — if you've the stomach for the work.
+      # ── D — the test → Hruna's iron job ──
+      # (Hlin raises a hand toward the bar — she brings Hruna over)
+      - hlin: >-
+          But I don't hire on a handshake. There's a job that wants doing tonight.
+          Do it, and we'll talk about the rest. Hruna?
+      # (Hruna, a dwarf with a frost-scarred ear, leans in; voice like gravel)
+      - hruna: >-
+          A sled of our iron went out for Blackiron's forge three days back. Forty
+          Battlehammer ingots. It never came.
+      - hruna: >-
+          We found sled-tracks off the high trail. And worse. Bring our iron home,
+          and there's good coin in it — and three dwarves who don't forget a debt.
+      # ── E — the price, the leader's word → lord-select ──
+      # (RBG produces a small abacus) — does the haggling
+      - prof-rbg: >-
+          "Good coin" is wonderfully vague, madam. Allow me — say two hundred gold,
+          and a discount at this Blackiron's forge? Then we'd have a most Gouda
+          arrangement.
+      # (Braulo nods once) — calls it fair, commits the party
+      - braulo: "Fair price for honest work. We'll bring the iron back."
+      # (Hlin looks them over) — hands into the lord-select menu (#42, msg 0x957)
+      - hlin: >-
+          Then it's settled. But a job needs one voice to answer for it. Who leads
+          them up the trail?
 
   # Post-map cutscene (after seize)
   - trigger: chapter_end
