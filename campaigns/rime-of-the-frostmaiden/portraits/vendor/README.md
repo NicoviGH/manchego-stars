@@ -9,6 +9,7 @@ Source: [Klokinator/FE-Repo](https://github.com/Klokinator/FE-Repo),
 |---|---|---|---|
 | `Pirate Lady (Version 3) {Cygnus} [F2E].png` | Hlin Trollbane (ch00 guest) — silver-haired age recolor | Cygnus | F2E (free to edit) |
 | `Hero {LaurentLacroix, UltraFenix, monk-han}.png` | Scramsax (ch00 guest) — used as-is | LaurentLacroix, UltraFenix, monk-han | none in filename — recheck before distribution |
+| `Generic Villager {Cynon} [F2E].png` | Hruna (ch01 guest) — periwinkle→olive-wool coat recolor | Cynon | F2E (free to edit) |
 
 `../guest_vendor_busts.py` regenerates the shipped busts from these sheets
 (96×80 crop, palette fixes, index-0 transparent). Credit lines mirrored in the

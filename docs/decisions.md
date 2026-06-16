@@ -516,6 +516,11 @@ a missing bust keeps the vanilla face. Guest art records live in the chapter YAM
 no `{pcs,npcs}` YAML).
 _Decided: 2026-06-09 (ch00 guest looks picked by Nicolas: Sephek custom w/ ice dagger; Hlin = Pirate Lady v3
 silver-haired recolor; Scramsax = community Hero mug as-is)._
+_ch01 Hruna (Foaming Mugs quest-giver): vendored **Generic Villager {Cynon} [F2E]**, periwinkle→olive-wool
+recolor; rides the generic `Villager_Woman` face slot (FID 0x60). Deliberately departs from book canon (the
+bundled, scarf-wrapped, eyes-only frost-dwarf) in favour of an open, sympathetic "please help us" mug — Nicolas's
+call for a one-chapter NPC (a scarf-wrapped Assassin recolor was prototyped and rejected as "too suspicious").
+Decided: 2026-06-16._
 
 **Map sprites: per-CHARACTER sprite + palette override; custom cast share a bespoke palette in their own OBJ bank.**
 FE8 draws overworld sprites by **class** (`GetUnitSMSId → pClassData->SMSId`), so a class swap would hit every unit of

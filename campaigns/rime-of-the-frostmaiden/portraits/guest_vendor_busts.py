@@ -12,6 +12,12 @@ Both community mugs keep their original art; the transforms are mechanical:
       shield dwarf ... past her prime" (book p.22); look picked 2026-06-09
 * scramsax <- vendor/Hero {LaurentLacroix, UltraFenix, monk-han}.png
     - 96x80 main-mug crop, used as-is
+* hruna <- vendor/Generic Villager {Cynon} [F2E].png
+    - 96x80 main-mug crop
+    - periwinkle shirt -> olive wool cold-weather coat (Icewind Dale frost-dwarf
+      quest-giver; book p.34 Foaming Mugs). Sympathetic "please help us" read
+      picked over the canon scarf-wrapped look on 2026-06-16 (Nicolas's call for
+      a one-chapter NPC); auburn hair reads as a dwarf. Cynon's mug is [F2E].
 
 Output format is the bust-pipeline contract: 96x80 indexed PNG, <=16 colors,
 index 0 = the transparent background.
@@ -23,6 +29,14 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 VENDOR = os.path.join(HERE, 'vendor')
+
+HRUNA_RECOLOR = {
+    # periwinkle shirt -> olive wool coat
+    (112, 120, 192): (124, 144, 96),
+    (80, 88, 144):   (88, 106, 66),
+    (56, 64, 80):    (54, 68, 44),
+    (40, 80, 104):   (54, 68, 44),   # merge teal accent into the deep coat shadow
+}
 
 HLIN_RECOLOR = {
     # merges (color budget 18 -> 16)
@@ -68,6 +82,15 @@ def main():
     bg = tuple(int(v) for v in np.array(mug)[0, 0])
     out = os.path.join(HERE, 'scramsax.png')
     to_indexed(mug, bg).save(out)
+    print('-> %s' % out)
+
+    sheet = Image.open(os.path.join(
+        VENDOR, 'Generic Villager {Cynon} [F2E].png')).convert('RGB')
+    mug = np.array(sheet.crop((0, 0, 96, 80)))
+    for src, dst in HRUNA_RECOLOR.items():
+        mug[(mug == src).all(axis=-1)] = dst
+    out = os.path.join(HERE, 'hruna.png')
+    to_indexed(Image.fromarray(mug), (160, 192, 144)).save(out)
     print('-> %s' % out)
 
 

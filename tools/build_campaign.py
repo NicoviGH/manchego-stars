@@ -306,6 +306,10 @@ GUEST_PORTRAIT_MAP = {
     # ch01 boss Izobai rides the Breguet slot (CH01_BOSS_SLOT); her death-quote FID
     # is FID_Breguet, so dressing that slot with izobai.png shows her green-goblin bust.
     'izobai':         'Breguet',
+    # ch01 Foaming Mugs quest-giver Hruna rides the generic Villager_Woman face slot
+    # (FID tag [FID_VillagerWoman] = 0x60) -- a throwaway NPC mug used nowhere else,
+    # so dressing it with hruna.png is collision-free. Cutscene-only (no map unit).
+    'hruna':          'Villager_Woman',
 }
 
 
