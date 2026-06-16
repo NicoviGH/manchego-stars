@@ -104,7 +104,9 @@ enemy_units:
     ai_pattern: aggressive      # vanilla pursue AI {0x0,0x0A,0x0,0x0}
 
   - id: goblin-chief
-    name: "Goblin Chief"
+    name: "Izobai"               # the Foaming Mugs goblin boss (book canon); a female
+                                  # Karkolohk warlord. Custom green-goblin bust dresses
+                                  # the Breguet slot (GUEST_PORTRAIT_MAP izobai->Breguet).
     is_boss: true
     count: 1
     position: [21, 7]           # the seize tile (painted ruins arch) — full Breguet mirror

@@ -297,6 +297,9 @@ GUEST_PORTRAIT_MAP = {
     'hlin-trollbane': 'Natasha',
     'scramsax':       'Kyle',
     'sephek-kaltro':  'O_Neill',
+    # ch01 boss Izobai rides the Breguet slot (CH01_BOSS_SLOT); her death-quote FID
+    # is FID_Breguet, so dressing that slot with izobai.png shows her green-goblin bust.
+    'izobai':         'Breguet',
 }
 
 
