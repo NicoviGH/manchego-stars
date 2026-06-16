@@ -13,33 +13,93 @@ cutscenes (scene art/images), not just text.
 
 ---
 
-## NEXT UP — Ch1 dialogue pass + cutscenes (the slice's last item)
+## NEXT UP — Ch1 "The Iron Trail" dialogue pass + cutscenes (the slice's LAST item)
 
-**This is the active task.** Use the **`dialogue-pass`** skill (voice-bible-grounded,
-variant-based, vanilla-paced). Collaborative: bring 2–3 variants per beat, Nicolas picks; then
-`record` GIFs for sign-off. Story sources of truth = the DM-notes PDF + the Frostmaiden book
-(read them directly; see Gotchas for paths) — don't invent.
+**This is the active task. START HERE on a fresh instance.** Use the **`dialogue-pass`** skill
+(voice-bible-grounded, variant-based, vanilla-paced). Collaborative: bring 2–3 variants per beat,
+Nicolas owns voice/picks, lock a beat before the next; then `record` GIFs (motion, not stills) →
+sign-off. **Don't summarize from memory** — re-open the sources per beat.
 
-**Text beats still placeholder (message IDs, from `inject_ch01` in `tools/build_campaign.py`):**
-- Northlook opening scene · lord-select prompt/confirm (`LORDSEL_PROMPT_MSG`, `LORDSEL_CONFIRM_MSGS`)
-- house hints `0x93B` / `0x93C` · road sign `0x955` · chapter-ending `0x954` · chief quote `0x961`
-- ⚠️ **Gendered text fix:** `0x93C` **and the chief death quote** still read masculine
-  ("his/chief") — the Ch1 chief is **Izobai (female)**. Update to she/her.
-- Optional: rename grunts "goblins"→"imps" in roster/dialogue (art is an imp; class ids stay `goblin-*`).
+### How it's wired (facts)
+- **Our Ch1 is hosted on chapter slot 2** (`EventScr_Ch2_*` in `fireemblem8u/src/events/ch2-eventscript.h`);
+  ch00 prologue is on slot 1 (the vanilla Ch1 group). All Ch1 wiring is **inline eventscript** via
+  `_replace_brace_block` in `inject_ch01` (`tools/build_campaign.py`) — the YAML `ea_file:` fields are
+  descriptive only; there are no `.ea` files.
+- Text → `set_message_body` into `texts/texts.txt`; gate with `python3 tools/verify_text.py` (0 runaway);
+  odd-length strings pad `[.]`. Message slots in use (slot-2 / vanilla-Ch1 dead slots):
+  `LORDSEL_PROMPT_MSG=0x957`, `LORDSEL_CONFIRM_MSGS=0x959..0x95F` (per-candidate), road sign `0x955`,
+  house1 `0x93B`, house2 `0x93C`, ending `0x954`, chief death-quote `0x961`. Boss rides the **BREGUET**
+  slot (`CH01_BOSS_SLOT`).
+- Reusable scene-art machinery (do NOT reinvent): `_script_to_message` (lazy faces, `[A][LF]` pages,
+  29-char on-map bubble wrap); `inject_opening_montage`/`inject_world_tour` (full-screen card slides +
+  drawn map, MONTAGE=1) = the pattern for drawn cutscene backgrounds; chapter title cards are images
+  (`graphics/chap_title/chap_title_*.png`, glacial-blue). Save draft scene art to `map-review/` + `open`.
 
-**Cutscenes-with-images (Nicolas's note "incl. cutscenes with images"):** scope the visual side
-up front — what scene art each beat needs and the mechanism. Relevant existing machinery to reuse,
-NOT reinvent:
-- `inject_ch01` already stages cutscene `script:` blocks via `_script_to_message` (faces load
-  lazily; `[A][LF]` page breaks; map-bubble width caveats are handled).
-- `inject_opening_montage` / `inject_world_tour` (MONTAGE=1 builds) handle the lore-crawl card
-  slides + drawn-map tour — the pattern for full-screen scene images already exists.
-- Chapter title cards are IMAGES (`graphics/chap_title/chap_title_*.png`, glacial-blue theme).
-- Portraits exist for the cast + Izobai; cutscene "faces" come from those slots.
-- **First step when starting:** read the ch01 YAML `script:`/scene blocks + the `dialogue-pass`
-  skill, then decide per-beat which need a drawn scene image vs. portrait-on-map dialogue, and
-  bring options to Nicolas. Save any draft scene art to `map-review/` and `open` it (he can't see
-  inline renders).
+### CANON DIGEST (read from source this session — cite, don't paraphrase from here when drafting)
+**DM notes** (`references/References/DungeonMasterNotesIcewindDale.pdf`, full text): party of "adventurers
+and misfits" meets in **The Northlook** (inn/tavern, de-facto capital **Bryn Shander**); **three dwarves**
+ask help tracking a **missing shipment of iron ingots**; party tracks the **missing sled** to a
+**dismembered body**, then finds **goblins** stealing the ingots; dispatch, return iron for a reward.
+Then **Duvessa Shane, Speaker of Bryn Shander**, hires them for Ten-Towns' troubles (shorter days /
+worsening winter) and points them to **Targos** (unrest after a **frost-druid** visit); as they leave,
+**Velynne Harpell** (Arcane Brotherhood) warns to watch for a **missing orb** her colleague stole. Party
+buys **Baxby the axe-beak** to pull a town-to-town sled; head west to Targos.
+**Book** (`...icewind-dale-rime-of-the-frostmaidenpdf_compress.pdf`, image-only; PDF pg = printed+1):
+- *Foaming Mugs* quest, printed p.34 (PDF 35–36): ingots are **Clan Battlehammer**'s from the mine at
+  **Kelvin's Cairn**, to be delivered to **Blackiron Blades** (Bryn Shander smithy); reward = a **gemstone
+  (50 gp) each + 10% Blackiron discount** + dwarven friendship; need **snowshoes**. The three frostfallen
+  dwarves: **Hruna** (speaks for the group; raspy voice from years of smoking; lost her right ear + two
+  fingers to frostbite), **Korux** (silent; lost three fingers, two toes, his nose; can cover snowshoe cost),
+  **Storn** (terrified of white dragons, keeps glancing at the sky).
+- *Oobok's Remains* (PDF 36): the dismembered corpse is **Oobok the dwarf**, torn apart and **eaten by a
+  YETI** (it took his head); the goblins' snowshoe tracks (a half-dozen Small humanoids) lead south to the
+  thieves hauling the sled. → a two-killer mystery: yeti ate Oobok, goblins took the steel.
+- *Goblins / Izobai* (PDF 36): **Izobai**, the **one-eared goblin boss**, commands a **trained (hooded)
+  hawk** (the scout that spotted the sled) and rides atop a **20-ft wagon** with a **lit torch**, drawn by
+  **two roaring polar bears**; six goblins haul the 900-lb sled.
+- Bryn Shander (printed p.32) & locations (p.32–33): walled hill town; Auril's winter is strangling trade
+  and the locals' goodwill ("no safer place to spend coin or the night"). **Duvessa Shane** = young
+  **lawful-good human noble**, head of the Council/Speaker. **Sheriff Markham Southwell** = LG veteran
+  enforcer. **The Northlook** = rowdiest tavern, best spot for leads/rumors; **owned by Scramsax** (retired
+  sellsword/veteran — *our ch00 guest*), who bought & stuffed **Ol' Bitey**, the battle-scarred knucklehead
+  trout mounted over the hearth (a prank spell makes it snap and sometimes sing). Duvessa portrait p.33;
+  Sheriff portrait p.33.
+
+### CHRONOLOGICAL BEAT OUTLINE (our flow ‖ FE8 Ch1 cadence parallel)
+FE8 Ch1 parallel = the decomp `EventScr_Ch1_*` skeleton (slot-1 structure, now ch00's): BeginningScene
+(loc title + ally scene + enemy/boss intro) → Turn1Enemy boss taunt → AllyReinforceArrive + Talks →
+Houses ×2 → EnemyReinforceArrive → DefeatBoss/Seize → EndingScene → MNC2.
+
+| # | Our beat | FE8 Ch1 parallel | Msg slot(s) | Speakers | Status | Image / background |
+|---|----------|------------------|-------------|----------|--------|--------------------|
+| 0 | Title card "The Iron Trail" | loc brown-box (0x664) | (title art) | — | ✅ shipped (glacial-blue) | **DONE** (image exists) |
+| 1 | **Opening — The Northlook**: Scramsax's tavern; Hlin hands the seven off ("Ten-Towns needs younger hands"); Hruna/Korux/Storn explain the stolen ingot sled → hire the party | BeginningScene ally+enemy intro (0x90D/0x90E) | NEW scene text (precede lord-select) | Hlin, Scramsax, Hruna (+Korux/Storn beats), cast | ❌ **NOT WRITTEN** (jumps straight to lord-select) | **Drawn BG candidate: Northlook interior** (Ol' Bitey over the hearth). Portraits needed: Hruna/Korux/Storn (3 dwarves) |
+| 2 | **Lord select**: "Who leads them north?" + per-PC confirm | (no vanilla analogue; #42) | 0x957 + 0x959.. | narration | ⚠️ functional placeholder | none (menu) |
+| 3 | **Road sign** (tile 8,8): "BRYN SHANDER — 2 MILES. WATCH FOR WOLVES." | AREA flavor | 0x955 | sign | ⚠️ placeholder (ok) | none |
+| 3b| **Oobok's body** on the trail (optional new beat): a PC reads the scene — yeti-torn dwarf, goblin tracks south | (no direct analogue) | NEW (or fold into sign/area) | a PC | ❌ optional/new | optional drawn BG: body in the snow |
+| 4 | **House 1 (1,7)** terrain hint: goblins dug into the waystation; mounds shrug blows + heal | Visit1 (0x93B) | 0x93B | villager (FID_VillagerMan3) | ⚠️ placeholder → voice | none |
+| 5 | **House 2 (13,2)** boss hint: scrap-plate turns blades, magic ignores plate, axe beats spear | Visit2 (0x93C) | 0x93C | villager | ⚠️ placeholder + ⚠️ **regender → Izobai (she/her)** | none |
+| 6 | **Izobai turn-1 taunt** (optional new): one-eared boss, hawk on her arm, atop the wagon | Turn1Enemy boss taunt (0x930) | NEW (battle-talk slot) | Izobai | ❌ optional/new | none (portrait exists) |
+| 7 | **Izobai death quote** (currently "Gah! The ironses were ours!") | DefeatBoss | 0x961 | Izobai | ⚠️ rewrite in her voice | none (portrait exists) |
+| 8 | **Ending — recovery & retainer**: ingots recovered → **Duvessa Shane** + guards thank the party, hire them for Ten-Towns work, point to **Targos**; Braulo asks re: sled dogs → **Baxby** for sale. (Hook: **Velynne Harpell**'s missing orb, per DM notes) | EndingScene (0x918) → MNC2 | 0x954 → MNC2(0x3) | Duvessa, Braulo, (Velynne?) | ⚠️ one-line placeholder → full scene | **Drawn BG candidate: goblin camp aftermath / Duvessa at the gate**. Portrait needed: Duvessa Shane (book p.33 ref); maybe Velynne |
+
+### IMAGE / BACKGROUND PLAN (Nicolas's ask #2 — tied to the beats above)
+- **Drawn full-screen backgrounds (decide per beat, show-before-commit):** (a) **Northlook interior** [Beat 1],
+  optional (b) **Oobok's body in the snow** [Beat 3b], (c) **goblin-camp aftermath / Duvessa arrives** [Beat 8].
+  Mechanism = the montage/tour card-slide pattern.
+- **New portraits (guest policy: vendor by default, custom if recurring):** **Duvessa Shane** (recurs as Speaker
+  → likely custom from book p.33 ref) and the **three dwarves** Hruna/Korux/Storn (one-chapter → vendor/bench).
+  Optional **Velynne Harpell** if the orb hook is used (she recurs later → custom eventually).
+- **Already have:** cast portraits, Hlin & Scramsax (ch00 guests), Izobai, the title card, a villager FID.
+
+### OPEN QUESTIONS FOR NICOLAS (resolve as we go, chronologically)
+1. Beat 1: where does the **Hlin→party hand-off** live — here at the Northlook, or is it already covered by
+   the ch00 ending (0x918 "Ten-Towns will need more hands")? Avoid repeating it.
+2. Name **Oobok** / foreshadow the **yeti** (Beat 3b)? (Yetis/ice-trolls return at Easthaven.) Drawn BG or skip?
+3. Lean into book canon for Izobai — **hawk + polar-bear wagon + torch** in her taunt, or keep it lean?
+4. Ending: include the **Velynne Harpell orb** hook now (sets up later chapters) or hold it?
+5. Grenade rename "goblins"→"imps" in roster/dialogue (art is an imp; class ids stay `goblin-*`)?
+6. Cutscene-visual style overall: **drawn BGs** for 1/8 (cinematic, bigger lift) vs **portrait-on-map** (vanilla, fast)?
 
 ---
 
