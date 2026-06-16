@@ -398,10 +398,11 @@ scenarios.ch01 = function()
     end
     log("in ch01 (chapter slot 2); clicking through the post-chapter save menu")
     -- The post-chapter save menu sits between MNC2 and the ch01 beginning
-    -- scene: A-tap until the prep screen proc appears (the scene itself is
-    -- input-free), then stop -- further A's would toggle Pick Units entries.
+    -- scene: A-tap through the Beat-1 Northlook scene (#21, ~22 dialogue pages +
+    -- the lord-select prompt/menu/confirm) until the prep screen proc appears,
+    -- then stop -- further A's would toggle Pick Units entries.
     local prep = false
-    for i = 1, 60 do
+    for i = 1, 200 do
         if procActive(SYM.gProcScr_SALLYCURSOR) then prep = true break end
         if i % 12 == 0 then
             shot(string.format("ch01-wait-%02d", i))
@@ -490,10 +491,11 @@ scenarios.ch01win = function()
     if not waitFor(function() return chapter() == 2 end, 1800) then
         return result("FAIL", "chapter slot 2 never loaded after the ch00 win")
     end
-    -- default-lord entry: A-taps ride the save menu + prompt + lord menu
-    -- (item 0 = Braulo) + [Yes] confirm all the way to the prep screen
+    -- default-lord entry: A-taps ride the save menu + the Beat-1 Northlook scene
+    -- (#21, ~22 pages) + the lord prompt + lord menu (item 0 = Braulo) + [Yes]
+    -- confirm all the way to the prep screen
     local prep = false
-    for i = 1, 60 do
+    for i = 1, 200 do
         if procActive(SYM.gProcScr_SALLYCURSOR) then prep = true break end
         press(K.A, 4)
         wait(36)
@@ -728,6 +730,58 @@ scenarios.ch01lord = function()
         return result("FAIL", "chosen lord died but NO game over followed")
     end
     result("FAIL", "could not get the chosen lord killed in 8 turns")
+end
+
+-- SCENESCH01 (#21): contact-sheet capture of the ch01 Beat-1 Northlook scene --
+-- the scenic bg_Fireplace opening, the 4-face roll-call choreography (one face per
+-- line via _script_to_message's eviction), and the lord-select hand-off. Wins ch00,
+-- rides into slot 2, then drops a screenshot once each page has finished typing,
+-- right before the advance press, so every dialogue page + its staged face is on a
+-- still. Stops at the prep proc (further A's would toggle Pick Units).
+scenarios.scenesch01 = function()
+    if not winCh00() then return end
+    if not waitFor(function() return chapter() == 2 end, 1800) then
+        return result("FAIL", "chapter slot 2 never loaded after the ch00 win")
+    end
+    log("ch01 Beat-1 scene capture: shot before every advance")
+    pokeFastConfig() -- fast text so each A reliably advances one page (cleaner stills)
+    for i = 1, 120 do
+        if procActive(SYM.gProcScr_SALLYCURSOR) then
+            shot("ch01scene-prep")
+            return result("PASS", "ch01 Beat-1 scene contact sheet captured")
+        end
+        wait(40) -- let the (now fast) page finish typing before the still
+        shot("ch01scene")
+        press(K.A, 4)
+    end
+    shot("scenesch01-timeout")
+    result("FAIL", "prep never opened during ch01 scene capture")
+end
+
+-- RECORDCH01 (#21): continuous frame capture (every 6th emulated frame) through the
+-- ch01 Beat-1 Northlook scene -> roll-call choreography -> lord-select, so the face
+-- fades and the post-scene map reveal can be reviewed as MOTION (a GIF, assembled
+-- offline). Default text speed (no pokeFastConfig) so the pacing is what a player sees.
+scenarios.recordch01 = function()
+    if not winCh00() then return end
+    if not waitFor(function() return chapter() == 2 end, 1800) then
+        return result("FAIL", "chapter slot 2 never loaded after the ch00 win")
+    end
+    log("recording ch01 Beat-1 scene frames (op)")
+    local prep = false
+    for i = 1, 200 do
+        if procActive(SYM.gProcScr_SALLYCURSOR) then prep = true break end
+        for f = 1, 48 do
+            if f % 6 == 0 then shot("op") end
+            yield()
+        end
+        press(K.A, 4)
+    end
+    if not prep then
+        shot("recordch01-no-prep")
+        return result("FAIL", "prep never opened (record)")
+    end
+    return result("PASS", "ch01 Beat-1 scene frames recorded (op)")
 end
 
 -- SCENES: contact-sheet capture of every dialogue page (opening card + briefing,

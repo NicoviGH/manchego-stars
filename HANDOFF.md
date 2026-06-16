@@ -1,7 +1,76 @@
-# Handoff: Ch1 slice (#21) — Beat 1 art DONE (tavern BG = bg_Fireplace; Hruna bust shipped, `5c6e4bb`). NEXT = WIRE Beat 1 into inject_ch01 (the 4-face-slot constraint is the crux) → motion review → resume trail beats.
+# Handoff: Ch1 slice (#21) — Beat 1 Northlook scene DONE, motion-reviewed & APPROVED (4 review rounds w/ Nicolas), committed. NEXT = resume the trail beats.
 
-**Date:** 2026-06-16 (session 2)
-**Session focus:** Beat-1 **art-shop (steps 1–2 of the prior plan), now DONE & pushed** (`5c6e4bb`):
+**Date:** 2026-06-16 (session 3)
+**Session focus:** **Step 3 — wired Beat 1 into `inject_ch01`** (the scenic `bg_Fireplace`
+Northlook scene + the 4-face-slot fix), then iterated with Nicolas across 4 motion reviews to a
+sign-off (full design recorded in `docs/decisions.md` → "Multi-speaker cutscene faces"). `make`
+green, `verify_text` 3404/0, **all playtests PASS** (ch00 win/gameover, ch01 entry, ch01win).
+Review GIF: `map-review/ch01-beat1-northlook.gif` (gitignored). **Fade transitions kept** (final).
+
+**What landed (working tree, uncommitted):**
+- **`_script_to_message` is now position-aware with auto-eviction** (the finalized 4-face fix):
+  tracks PODIUMS (screen positions) not speakers; re-using a podium emits `[OpenX][ClearFace]`
+  (~16f fade), and a full pool (4) evicts the LRU podium. Faceless speakers (fid `None`) print a
+  box with no `[LoadFace]`. Optional `width` arg (29 map / 42 scenic). **Prologue output is
+  byte-identical** (≤4 distinct podiums → old lazy-load behaviour); verified by `verify_text`.
+- **`_fid_tag`** gained `'VILLAGER_WOMAN': 'VillagerWoman'` (Hruna's real tag `[FID_VillagerWoman]`).
+- **YAML** (`ch01-the-iron-trail.yaml`): added 4 `beat_break` sentinels (A|B|C|D|E seams) + a
+  comment that the final Hlin line is the lord-prompt. **Dialogue text untouched** (still locked).
+- **`inject_ch01`**: step 0 splits the locked `script:` on `beat_break` into 5 beats, builds the
+  podium staging, and pops Hlin's final line for the over-map lord prompt; step 4 prepends the
+  scenic scene to `EventScr_Ch2_BeginningScene`; step 6 writes the card + beat bodies + a
+  face-bearing `0x957`. Message ids: card `0x945`, beats A–E `0x940–0x944` (dead vanilla Ch1
+  tutorial slots; the prologue host strips Ch1's tutorial lists so they never display).
+- **Scene shape** (head of BeginningScene): `REMOVEPORTRAITS` → `BACG(BG_FIREPLACE)` → `FADU(16)`
+  → `BROWNBOXTEXT(0x945)` "The Northlook" (auto-dismisses — it's a blocking 100f+fade proc, no
+  lingering) → `Text(0x940..0x944)` (each `Text` ends in REMA → **clears faces → fresh 4-face
+  budget per beat**, BG persists across REMA, cf. ch16a) → `FADI(16)` → **`LOMA(0x2)`** → existing
+  DISA/LOAD/`FADU(16)`(map) → lord-select. The lord prompt now uses `TEXTSTART` (was
+  `TUTORIALTEXTBOXSTART`) so Hlin's face shows on `0x957`.
+- **BG-garble fix (session-3, post-first-review):** BACG clobbers the map's BG VRAM, so just
+  fading back up showed a corrupted tilemap behind the lord prompt/menu. Fixed with the vanilla
+  **ch13a** idiom — `FADI(16)` → `SVAL(EVT_SLOT_B,0)` → `LOMA(CH01_HOST_INDEX)` (`RestartBattleMap`
+  reloads the map graphics for the already-current chapter) → `FADU`. Replaces the `RemoveBGIfNeeded`
+  call (that helper is for chapter *transitions*, not return-to-this-map). Verified clean in-game.
+- **Name confirmed:** DM notes say *"The Northlook, the inn and tavern"* — the name is **"The
+  Northlook"** (it IS the inn; "Inn" is not part of the name). Card text is correct.
+- **Motion review GIF:** `map-review/ch01-beat1-northlook.gif` (`run.sh recordch01` → Pillow).
+- **Staging — TWO-SIDED (revised after review 2):** quest-givers on the RIGHT (Hlin `[OpenMidRight]`,
+  Scramsax `[OpenFarRight]`, Hruna `[OpenRight]`), party on the LEFT. The roll-call rotates one PC
+  through `[OpenMidLeft]`; **monologue beats PRELOAD silent PC listeners** (`_script_to_message`'s new
+  `preload=`) so Hlin/RBG address a populated room; **Hruna stands across from RBG** in the haggle.
+  **Sclorbo now has his Ross face** (was faceless). All beats ≤4 concurrent faces (budget-safe).
+- **BG-garble fix + scenic lord-select:** `BACG` draws on **BG3**; the menu's `ClearBg0Bg1` only
+  touches BG0/1, and `CallLordSelectMenu` now does `SetDispEnable(1,1,0,1,1)` (BG2/map OFF) — so the
+  lord-select plays over its own scenic BG (`CH01_LORDSEL_BG = BG_STONE_CHAMBER`, a swappable
+  placeholder), NOT the battle map. After the pick: `FADI` → `LOMA(host)` (`RestartBattleMap`) →
+  DISA/LOAD/`FADU` → prep. **Hlin's "who leads?" stays in beat E at the Northlook** (no over-map prompt).
+- **Playtest harness:** ch01/ch01win A-tap budgets 60→200; added **`scenesch01`** (per-page contact
+  sheet) and **`recordch01`** (continuous frames → Pillow GIF). Open GIFs with **`open -a Safari`**.
+
+### Review 3 — applied (this session, still uncommitted)
+- **Marty's spore cough** → a parenthetical page (no FE8 particle system); **Sclorbo gets his Ross face**.
+- **Meesmickle line:** "a bounty hunter" → "**a scale-less dragonborn**" (Wolfram).
+- **Staging reworked to clean TWO-SHOTS** (podium geometry: only MidLeft↔MidRight are ≥96px apart, so
+  speakers rotate through one inner podium, Hlin anchors mid-right). Fixes the Hlin/Scramsax and
+  Hlin/Hruna overlap. Beat C listeners cut 3→2 (far-left + left). RBG haggles across from Hruna.
+- **Pinky has presence:** RBG adds "this is my boy, Pinky" and **Pinky (Neimi) peeks from far-left**.
+- **Lord-select confirm:** "lead the **party**" (was "company").
+
+### Review 4 — applied (this session, still uncommitted)
+- **Marty pours coffee** (was "cocoa").
+- **RBG + Pinky:** kept together in beat B (Pinky `[OpenFarLeft]` beside his father at mid-left,
+  Hlin watching mid-right). The B2 two-shot split was tried and **reverted** — Nicolas: the stacked
+  pair "was fine actually."
+- **Lord-select BG = `BG_DARKLING_WOODS`** — Nicolas: "the most Icewind Dale of the options."
+
+### Beat 1 — SETTLED
+Face transitions = **fade** (`[ClearFace]`), Nicolas's call. Full rationale + the whole scene
+design are in `docs/decisions.md` ("Multi-speaker cutscene faces"). No open questions on Beat 1.
+
+---
+
+## Prior session (2) — Beat-1 art DONE & pushed (`5c6e4bb`)
 - **Tavern BG = vanilla `bg_Fireplace`** (`BG_FIREPLACE = 0x09`, `constants/backgrounds.h`), used
   **as-is** (no reskin) — Nicolas picked it over `bg_House`. Hearth common room; matches the
   Ol'-Bitey-over-the-hearth canon. No custom work.
@@ -20,79 +89,20 @@ RBG haggles the iron job to 200 GP; Braulo commits; Hlin asks who leads → hand
 
 ---
 
-## NEXT UP — WIRE Beat 1 (step 3), then motion review, then the trail beats
+## NEXT UP — Nicolas motion-review sign-off → commit → trail beats
 
-**START HERE on a fresh instance.** Steps 1–2 (BG + Hruna art) are DONE. Remaining:
+**START HERE.** Steps 1–3 (BG, Hruna bust, **wiring**) are DONE; the scene builds, plays, and
+passes every playtest. The change is **uncommitted, pending Nicolas's sign-off** on the face
+choreography (the one thing playtests can't judge).
 
-3. **Wire Beat 1** into `inject_ch01` (`tools/build_campaign.py`, ~2814) — consume the chapter_start
-   `script:` and stage it as a **scenic off-map scene over `bg_Fireplace`** at the HEAD of
-   `EventScr_Ch2_BeginningScene` (currently ~3118–3149), BEFORE the existing guest-DISA / roster
-   LOAD / lord-select. **Idioms already reverse-engineered this session:**
-   - **Scenic BG:** `BACG(BG_FIREPLACE)` → `FADU(n)` → `TEXTSHOW(msg)/TEXTEND/REMA` → `FADI(n)` →
-     `REMOVEPORTRAITS` + `CALL(EventScr_RemoveBGIfNeeded)`. Template = **`lordsplit-eventscript.h`**
-     (a scene→menu, exactly our scene→lord-select shape). `Text_BG(bg,msg)` (Convo_Helpers.h) is the
-     one-shot bundled form; use the explicit form so the location card + multiple messages share the BG.
-   - **Location card** "The Northlook": `BROWNBOXTEXT(card_msg, x, y)` over the BG (prologue uses
-     `BROWNBOXTEXT(0x664,8,8)`); card text via `name_message_body`.
-   - **⚠️ THE CRUX — the 4-face fix (FINALIZED PLAN below).** `FACE_SLOT_COUNT = 4` (`include/face.h:4`):
-     only 4 faces can be loaded at once (the `gFaces` pool; `FindFreeFaceSlot` returns −1 when full).
-     Beat 1 has ~10 speakers, and `_script_to_message` (build_campaign ~493) lazy-loads each speaker
-     once and **never clears** → overflows. Verified engine facts (don't re-derive):
-       * `sTalkState->faces[8]` is **position-indexed** (`scene.h:77`); `[OpenX]` (textdefs 8–15) sets
-         the active position via `SetActiveTalkFace(pos−8)`; `[LoadFace][FID]` loads into a free `gFaces`
-         slot at the active position (`scene.c:855`).
-       * `[ClearFace]` (`scene.c:888`) fades out `faces[activePosition]` and frees its `gFaces` slot —
-         so **`[OpenX][ClearFace]` clears the face at position X**. (≈16-frame fade per clear → reads as
-         nice pacing between speakers.)
-       * Vanilla `.h` files never use the `[ClearFace]` text tag — they cap scenes at ≤4 faces. We're the
-         first to need eviction, so this is a genuine `_script_to_message` extension.
-
-     **FIX = make `_script_to_message` POSITION-aware with auto-eviction** (one general change; the
-     prologue's 3-speaker call is unaffected). Replace the flat `loaded` set with a `live` map of
-     **position → speaker** (≤4 entries) and an LRU order, then per dialogue block:
-     ```
-     pos, fid = staging[speaker]            # staging stays speaker -> ([OpenX], fid_or_None)
-     if live.get(pos) == speaker:           # already on screen here -> just re-activate
-         touch LRU
-     else:
-         if pos in live:                    # someone else holds this podium -> clear them
-             emit '[OpenPOS][ClearFace]'; del live[pos]
-         while len(live) >= 4:              # all 4 podiums full -> evict LRU podium
-             p_old = lru.pop(0); emit '[OpenP_OLD][ClearFace]'; del live[p_old]
-         emit '[OpenPOS][LoadFace][FID]'; live[pos] = speaker; lru.append(pos)
-     emit page text (existing [OpenPOS][A]...[A] shape)
-     ```
-     This makes **podiums (positions) the budget, not speakers** — so the 7-PC roll-call can all share
-     ONE spotlight position (each new PC auto-clears the previous → one face at a time), while Hlin
-     stays anchored at another podium. Suggested staging (≤3 concurrent, well under the cap; final
-     count/positions are a **feel** call for the step-4 motion review): Hlin `[OpenMidRight]` (anchor),
-     Scramsax `[OpenFarRight]`, the 7 PCs all `[OpenMidLeft]` (rotating spotlight), Hruna `[OpenLeft]`.
-   - **`staging` builds for all 10:** 7 PCs via `PORTRAIT_MAP` slots, Scramsax=`Kyle`, Hlin=`Natasha`,
-     **Hruna=`Villager_Woman`**. ⚠️ `_fid_tag('Villager_Woman')` → `[FID_Villager_Woman]` (underscore,
-     WRONG); real tag is `[FID_VillagerWoman]`. Fix: hardcode Hruna's fid `'[FID_VillagerWoman]'`, **or**
-     add `'VILLAGER_WOMAN': 'VillagerWoman'` to the `special` dict in `_fid_tag` (build_campaign ~536,
-     which is keyed by UPPERCASE slot like the existing `'ONEILL'`) and call `_fid_tag('VILLAGER_WOMAN')`.
-   - **Faceless / stage-business handling:** **Sclorbo** never speaks — render his parenthetical as a
-     box with NO `[LoadFace]`; give him a staging entry `(pos, None)` and have the eviction code emit an
-     `[OpenX]` to an **unoccupied** podium so no loaded face mouth-moves under his impression text.
-     **Marty's spore-cough + Braulo's isopod** are stage directions, NOT message text — drop them (the
-     YAML carries them as `#` comments only).
-   - **Message split (recommended structure):** stage one persistent `BACG(BG_FIREPLACE)` and show the
-     opening as **per-beat messages** A/B/C/D/E (the script's `# ── A/B/C… ──` seams), each its own
-     `TEXTSHOW(msg)/TEXTEND/REMA`. Reasons: bounds message byte-length (watch for any buffer cap — a
-     single ~22-entry message may be too long; **verify at build**), gives natural `REMA` pauses, and
-     keeps each message's face state self-contained. Eviction still needed WITHIN beat B (roll-call =
-     9 speakers). Allocate dead slot-2 message ids for the boxes (the `0x94x`/`0x95x` band around the
-     lord-select ids has unused slots; cf. prologue's 0x90D/0x90E).
-   - **Location card + lord-select handoff:** `BROWNBOXTEXT("The Northlook", x, y)` over the BG.
-     The existing lord-select (`LORDSEL_PROMPT_MSG=0x957`) must follow the scene — and Hlin's FINAL
-     scripted line ("…Who leads them up the trail?") already asks the question, so **don't ask twice.**
-     Recommended: end the scenic E-message one line early and set **0x957 = that final Hlin line**
-     (with her face, shown over the map after `FADU`), so the question lands exactly once as the direct
-     lead-in to the menu. (Currently 0x957 is faceless narration "The company gathers… / Who will lead…".)
-4. **In-game MOTION review** (`tools/playtest/run.sh record` → GIFs in `map-review/` → `open -a
-   Safari`), then Nicolas sign-off — validates the face choreography. Stills mislead. Decided 2026-06-10.
-5. **Resume the dialogue pass on the trail beats** — same variant flow:
+1. **Motion-review sign-off (Nicolas).** Review `map-review/ch01-beat1-northlook.png` (per-page
+   contact sheet; regenerate with `bash tools/playtest/run.sh scenesch01` → Pillow dedupe+grid).
+   Confirm the 3 feel calls at the top of this doc (spotlight `[ClearFace]` fades · Hlin's face over
+   the map for the lord prompt · the lingering watcher during Sclorbo's pantomime). For true motion
+   I can add a `recordch01` GIF scenario if the stills aren't enough.
+2. **Commit** once signed off (doc + YAML + tools in one commit; `Closes` nothing — #21 slice
+   continues). `make` green, `verify_text` 3404/0, playtests PASS are already in hand. Auto-push.
+3. **Resume the dialogue pass on the trail beats** — same variant flow:
    road sign (0x955, placeholder→voice) · **the body** (Beat 3b: yeti-torn dwarf, two sets of
    tracks, one huge — the chapter's most story; foreshadows the Easthaven yeti) · House 1 terrain
    hint (0x93B) · House 2 boss hint (0x93C, also **regender to Izobai she/her**) · **Izobai
@@ -120,18 +130,15 @@ RBG haggles the iron job to 200 GP; Braulo commits; Hlin asks who leads → hand
 
 ---
 
-## Accomplished this session
+## Accomplished (session 2 — the art + the wiring plan now implemented)
 - **Beat-1 art DONE & pushed (`5c6e4bb`):** tavern BG = `bg_Fireplace` (as-is, Nicolas's pick over
   `bg_House`); **Hruna bust** = vendored Generic Villager {Cynon} [F2E] olive-wool recolor on the
   `Villager_Woman` slot (sympathetic mug, not the canon scarf-dwarf — his call). Recipe in
   `guest_vendor_busts.py`; credited; `docs/decisions.md` updated. `make` green, verify_text 3404/0.
-- **Reverse-engineered + FINALIZED the step-3 wiring plan** (NEXT UP §3): the scenic `BACG`/`Text_BG`
-  idiom (`lordsplit-eventscript.h` template), `BG_FIREPLACE=0x09`, the location-card `BROWNBOXTEXT`,
-  and the full **4-face-slot fix** — position-aware auto-eviction in `_script_to_message` (pseudocode
-  in §3), with the two engine facts verified (`faces[8]` position-indexed; `[ClearFace]` frees the
-  active podium). The next instance can implement directly from §3.
+- The step-3 wiring plan reverse-engineered that session (scenic `BACG` idiom, `BG_FIREPLACE=0x09`,
+  the 4-face position-aware eviction) is **now implemented** — see the session-3 block up top.
 
-## Tried but didn't work (this session)
+## Tried but didn't work (session 2 — Hruna art)
 - **Hruna as a canon scarf-wrapped frost-dwarf** (Assassin {SSHX} [F2E] mug, frost- and wool-recolored):
   on-canon (book: "bundled… only their eyes visible") and a clean [F2E] license, but Nicolas rejected
   it as **"too suspicious"** — a hooded/masked figure reads sinister, wrong for a sympathetic
@@ -148,18 +155,20 @@ RBG haggles the iron job to 200 GP; Braulo commits; Hlin asks who leads → hand
   ch01 default-lord, ch01lord, ch01win, goodberry).
 - ✅ Izobai boss portrait · ✅ Fire Imp grunt sprites · ✅ Goodberry reflavor · ✅ Beat 1 dialogue
   text locked · ✅ **tavern BG picked** · ✅ **Hruna bust shipped & injected**.
-- ⚠️ **Beat 1 not yet playable** — the locked YAML script is still inert until `inject_ch01` consumes
-  it (step 3 wiring + step 4 motion review). The Hruna bust is injected but referenced by nothing yet.
+- ✅ **Beat 1 WIRED & playing** (this session, uncommitted): scenic Northlook scene + 4-face
+  roll-call + Hlin-led lord prompt. `make` green, `verify_text` 3404/0, playtests PASS
+  (ch00 win/gameover, ch01 entry, ch01win). Hruna's bust now renders in the scene.
+- ⚠️ **Uncommitted — awaiting Nicolas's motion-review sign-off** on the choreography (the 3 feel
+  calls at the top). Contact sheet: `map-review/ch01-beat1-northlook.png`.
 - ⚠️ Trail beats still placeholder; gendered chief text (0x93C/0x961) needs the Izobai she/her fix.
 - ⚠️ ch01 ending MNC2(0x3) lands on vanilla Ch3 until ch02 is wired.
 
 ## Blockers
-- None.
+- **Nicolas motion-review sign-off** gates the commit (logic is done & green).
 
 ## Next steps (priority order)
-1. **Wire Beat 1** into `inject_ch01` — the scenic `bg_Fireplace` scene at the head of
-   `EventScr_Ch2_BeginningScene`; mind the **4-face-slot limit** (NEXT UP §3 has the full idiom map).
-2. **In-game motion review** → Nicolas sign-off (validates face choreography).
+1. **Nicolas signs off** on the Beat-1 choreography (review `map-review/ch01-beat1-northlook.png`).
+2. **Commit** the wiring (build_campaign.py + YAML + harness.lua + HANDOFF/decisions) and auto-push.
 3. **Resume dialogue pass on the trail beats** (start with the body; write Izobai's voice bible
    before her taunt/death quote; regender 0x93C/0x961 to she/her).
 4. Carried: #29 world map; license rechecks before distribution (Scramsax Hero mug, AlexYTXG

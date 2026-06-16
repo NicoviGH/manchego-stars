@@ -849,6 +849,45 @@ unselected slots stay vanilla green; the per-difficulty pairs stay vanilla (sema
 _Decided: 2026-06-10; full New-Game-to-map GIF reviewed and approved by Nicolas ("perfect"), save-slot fix verified
 in-emulator. Closes the tour half of #43 and bootstraps #29._
 
+**Multi-speaker cutscene faces: the budget is PODIUMS (positions), not speakers (the 4-face fix).**
+Only `FACE_SLOT_COUNT = 4` faces load at once (the `gFaces` pool; `include/face.h`), but a big set
+piece (the ch01 Beat-1 Northlook scene) has ~10 speakers. `_script_to_message` tracks the 8 talk
+POSITIONS as a live map (≤4 loaded) + an LRU: reusing a podium for a new speaker emits
+`[OpenX][ClearFace]` (scene.c fades out `faces[activePosition]` and frees its slot; the command's
+temporary lock means the fade-out completes BEFORE the next `[LoadFace]`, so the pool never
+overflows), and a full pool evicts the LRU. A `preload` list seeds silent **listeners** before the
+dialogue (so no one talks to an empty room); a `(podium, None)` staging value is a faceless box.
+≤4-podium scripts (the prologue) render byte-identically to the old lazy-load path.
+
+**Staging = clean two-shots.** Face podiums (gTalkFaceHPosLut, px = x·8; faces are 96px wide):
+FarLeft 24 / MidLeft 48 / Left 72 / Right 168 / MidRight 192 / FarRight 216. Only podiums ≥96px
+apart avoid overlap, so the one clean pair is **MidLeft ↔ MidRight** (144px). Speakers therefore
+rotate through the mid-left spotlight with the anchor (Hlin) at mid-right; listeners fill outer
+podiums where slight overlap reads as "standing together." (Decided after Nicolas flagged 3-stacked
+listeners and Hlin/Scramsax overlap as too crowded.)
+
+**Scene wiring.** The locked chapter `script:` splits on `beat_break` sentinels into one `Text()`
+per beat — each `Text` ends in `REMA`, which clears all faces (`sub_800E640`) → a fresh 4-face
+budget per beat while the `BACG` background persists across `REMA` (cf. ch16a). At the head of
+`EventScr_Ch2_BeginningScene`: `REMOVEPORTRAITS`→`BACG(BG_FIREPLACE)`→`FADU`→`BROWNBOXTEXT`
+(auto-dismissing "The Northlook" card)→beats A–E (Hlin's "who leads?" lands in beat E, still at the
+Northlook)→`FADI`. Then the **lord-select runs over its own scenic BG, not the battle map**
+(`CH01_LORDSEL_BG = BG_DARKLING_WOODS`): `BACG` draws on BG3, the menu's `ClearBg0Bg1` only touches
+BG0/1, and `CallLordSelectMenu` sets `SetDispEnable(1,1,0,1,1)` (BG2/map OFF). After the pick:
+`FADI`→`LOMA(host)` (`RestartBattleMap` rebuilds the map BG VRAM that `BACG` clobbered — cf. ch13a;
+plain `RemoveBGIfNeeded` is for chapter *transitions*)→DISA/LOAD→`FADU`→PREP.
+
+**Transitions: keep the FADE (vanilla-flavored).** Vanilla never reuses one podium for different
+*people* — each speaker gets their own slot (≤4), faces fade in once, `REMA` clears between messages
+(`[ClearFace]` is in 0/119 vanilla scripts); the in-place swap (`sub_80066E0`) is vanilla but only
+for one character's *expression* change. So for our one-podium roll-call the `[ClearFace]` fade
+("one leaves, next arrives") fits vanilla's grammar; a swap would morph one face into another.
+_Decided 2026-06-16 with Nicolas across four motion reviews (`map-review/ch01-beat1-northlook.gif`,
+`run.sh recordch01`): Sclorbo shows his Ross face; Marty's spore-cough is a parenthetical (FE8 has
+no cutscene particle FX); Pinky (Neimi) appears beside RBG at his intro; lord-select confirm reads
+"lead the party." `make` green, `verify_text` 3404/0, playtests PASS (ch00 win/gameover, ch01 entry,
+ch01win). #21._
+
 ---
 
 ## Open Questions (not yet decided)

@@ -179,6 +179,15 @@ LORDSEL_FLAG_BASE = 0xF0
 LORDSEL_PROMPT_MSG = 0x957   # dead vanilla slot-2 scene text (cf. inject_ch01 step 6)
 LORDSEL_CONFIRM_MSGS = (0x959, 0x95A, 0x95B, 0x95C, 0x95D, 0x95E, 0x95F,
                         0x962, 0x963, 0x964)  # same dead pool, one per candidate
+# Beat 1 (#21) "The Northlook" scenic opening: a location card + one message per
+# beat (A-E), all riding dead vanilla Ch1-tutorial slot-2 message ids (the prologue
+# host strips Ch1's tutorial event lists, so these never display in our ROM).
+CH01_BEAT1_CARD_MSG = 0x945
+CH01_BEAT1_MSGS = (0x940, 0x941, 0x942, 0x943, 0x944)  # A,B,C,D,E (0x945 = card)
+# Scenic BG the lord-select menu plays over (NOT the battle map). A standalone "choose
+# your leader" screen. Darkling Woods -- "the most Icewind Dale of the options" (Nicolas,
+# 2026-06-16). Swap freely to any backgrounds.h enum.
+CH01_LORDSEL_BG = 'BG_DARKLING_WOODS'
 
 # FE8's unit-name buffer; longer names overflow and garble the display.
 FE_NAME_MAX = 12
@@ -490,7 +499,7 @@ def _wrap_fe_lines(text, width=29):
     return out
 
 
-def _script_to_message(script, staging):
+def _script_to_message(script, staging, width=29, face_budget=4, preload=None):
     """Render a chapter-YAML cutscene `script:` block as an FE8 message body.
 
     Mirrors the vanilla shape (cf. MSG_910/911): faces are loaded lazily at a
@@ -508,34 +517,83 @@ def _script_to_message(script, staging):
     the offscreen/empty-bubble bug of the 2026-06-10 scenes captures. Vanilla
     never ships an [A] that isn't terminal or [LF]-followed; now neither do we.
 
-    `location_card` / `fade_to_black` entries are staged by the event script, not
-    the message, and are skipped here. `staging` maps speaker key ->
-    ([OpenX] tag, [FID_x] tag).
+    FACE BUDGET (the 4-slot fix, #21 Beat 1): only FACE_SLOT_COUNT = 4 faces can
+    be loaded at once (the gFaces pool; include/face.h). Vanilla .h scenes cap at
+    <=4 by hand, but our big set pieces (the Northlook roll-call) have ~10
+    speakers in one message, so this tracks PODIUMS (screen positions), not
+    speakers, as the budget. `live` maps an [OpenX] tag -> the speaker whose face
+    sits there; `lru` orders podiums least-recently-used first. When a podium is
+    re-used by a different speaker we emit `[OpenX][ClearFace]` (scene.c: fades
+    out faces[activePosition] and frees its gFaces slot, ~16-frame fade -> reads
+    as pacing between speakers); when all four are full we evict the LRU podium.
+    A rotating spotlight (many speakers staged to ONE podium) thus shows one face
+    at a time while other speakers stay anchored elsewhere. The temporary lock on
+    [ClearFace] means the fade-out frees its slot BEFORE the following [LoadFace]
+    runs, so the pool never momentarily overflows. (With <=4 distinct podiums this
+    is byte-for-byte the old lazy-load behaviour -- the prologue is unaffected.)
+
+    A `staging` value of (open_tag, None) is a FACELESS speaker (stage business):
+    its text prints in a box with no [LoadFace], at a podium that should be left
+    unoccupied so no loaded face mouth-moves under it.
+
+    `preload` is a list of (open_tag, [FID_x]) faces shown BEFORE the dialogue --
+    silent listeners (e.g. the party watching Hlin's monologue, or Hruna standing
+    across from RBG). They seed the live map so the speaker(s) talk TO a populated
+    room instead of an empty one; keep preload podiums distinct from the beat's
+    speaker podiums, and the total (preload + concurrent speakers) within the
+    4-face budget so no listener is evicted.
+
+    `location_card` / `fade_to_black` / `beat_break` entries are staged by the
+    event script (or split into separate messages), not the message body, and are
+    skipped here. `width` is the wrap width (29 = map speech bubble; ~42 for a
+    full-screen scenic BG -- see _wrap_fe_lines).
     """
     blocks = []   # (speaker, [page, ...]); page = 'line1[LF]\nline2'
     for entry in script:
         (speaker, text), = entry.items()
-        if speaker in ('location_card', 'fade_to_black'):
+        if speaker in ('location_card', 'fade_to_black', 'beat_break'):
             continue
-        lines = _wrap_fe_lines(_fe_dialogue_text(text))
+        lines = _wrap_fe_lines(_fe_dialogue_text(text), width)
         pages = ['[LF]\n'.join(lines[p:p + 2]) for p in range(0, len(lines), 2)]
         if blocks and blocks[-1][0] == speaker:
             blocks[-1][1].extend(pages)
         else:
             blocks.append((speaker, pages))
-    parts, loaded = [], set()
+    parts = []
+    live = {}   # [OpenX] tag -> speaker currently holding that podium's face
+    lru = []    # [OpenX] tags, least-recently-used first
+    for pos, fid in (preload or []):          # silent listeners, loaded first
+        parts.append('%s[LoadFace]%s' % (pos, fid))
+        live[pos] = '\x00listener'            # sentinel: never matches a real speaker
+        lru.append(pos)
     for speaker, pages in blocks:
         open_tag, fid_tag = staging[speaker]
-        if speaker not in loaded:
+        body = open_tag + '[A][LF]\n'.join(pages) + '[A]'
+        if fid_tag is None:           # faceless stage business -- no face, no slot
+            parts.append(body)
+            continue
+        if live.get(open_tag) == speaker:           # already on screen here
+            lru.remove(open_tag)
+            lru.append(open_tag)
+        else:
+            if open_tag in live:                    # podium held by someone else
+                parts.append(open_tag + '[ClearFace]')
+                del live[open_tag]
+                lru.remove(open_tag)
+            while len(live) >= face_budget:         # all podiums full -> evict LRU
+                old = lru.pop(0)
+                parts.append(old + '[ClearFace]')
+                del live[old]
             parts.append('%s[LoadFace]%s' % (open_tag, fid_tag))
-            loaded.add(speaker)
-        parts.append(open_tag + '[A][LF]\n'.join(pages) + '[A]')
+            live[open_tag] = speaker
+            lru.append(open_tag)
+        parts.append(body)
     return '\n'.join(parts) + '[X]'
 
 
 def _fid_tag(slot):
     """textdefs.txt face-tag for a vanilla character slot (CamelCase, irregulars mapped)."""
-    special = {'ONEILL': 'ONeill'}
+    special = {'ONEILL': 'ONeill', 'VILLAGER_WOMAN': 'VillagerWoman'}
     return '[FID_%s]' % special.get(slot, slot.title())
 
 
@@ -2830,6 +2888,70 @@ def inject_ch01(campaign, verbose=True):
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH01_CHAPTER_YAML)
 
+    # 0. Beat 1 (#21): the Northlook opening, consumed from the chapter YAML's locked
+    #    chapter_start `script:` and staged below (step 4) as a scenic off-map scene
+    #    (BACG bg_Fireplace) at the head of EventScr_Ch2_BeginningScene. The script
+    #    splits on `beat_break` sentinels into 5 messages (A-E); each rides one `Text()`
+    #    whose trailing REMA clears all faces (scene.c sub_800E640) -> a fresh 4-face
+    #    budget per beat. TWO SIDES: the quest-givers stand on the RIGHT (Hlin mid-right,
+    #    Scramsax far-right, Hruna right) and the party on the LEFT. The roll-call rotates
+    #    one PC at a time through the mid-left spotlight (eviction); monologue beats PRELOAD
+    #    a few PCs as silent listeners on the left so Hlin/RBG address a populated room
+    #    instead of empty air, and the haggle puts Hruna across from RBG. Hlin's final
+    #    "who leads?" line stays in the scene (end of beat E, at the Northlook); the
+    #    lord-select menu then plays over its own scenic BG (not the battle map).
+    b1_script = next(e for e in chap['events']
+                     if e['trigger'] == 'chapter_start')['script']
+    b1_card = next(v for e in b1_script for k, v in e.items() if k == 'location_card')
+    b1_beats = [[]]
+    for entry in b1_script:
+        (k, v), = entry.items()
+        if k == 'location_card':
+            continue
+        if k == 'beat_break':
+            b1_beats.append([])
+            continue
+        b1_beats[-1].append(entry)
+    if len(b1_beats) != len(CH01_BEAT1_MSGS):
+        sys.exit('ERROR: ch01 Beat 1 split into %d beats; expected %d (check '
+                 'beat_break markers in the YAML)' % (len(b1_beats), len(CH01_BEAT1_MSGS)))
+
+    def b1_fid(spk):
+        if spk == 'hlin':
+            return _fid_tag(PROLOGUE_HLIN_SLOT)
+        if spk == 'scramsax':
+            return _fid_tag(PROLOGUE_SCRAMSAX_SLOT)
+        if spk == 'hruna':
+            return _fid_tag('VILLAGER_WOMAN')
+        if spk in PORTRAIT_MAP:
+            return _fid_tag(PORTRAIT_MAP[spk].upper())
+        sys.exit('ERROR: ch01 Beat 1 unknown speaker %r' % spk)
+    # Podium geometry (gTalkFaceHPosLut, scene.c, px = x*8; faces are 96px = 12 tiles):
+    # FarLeft 24 | MidLeft 48 | Left 72 | Right 168 | MidRight 192 | FarRight 216.
+    # Two faces only avoid overlap when >=96px apart, so the clean "two-shot" is
+    # MidLeft <-> MidRight (144px). Speakers therefore default to the mid-left podium
+    # and Hlin anchors mid-right; everyone rotating through one inner podium keeps the
+    # stage to two non-overlapping faces (Nicolas, 2026-06-16: Hlin/Scramsax & the
+    # 3-stack were too crowded). Silent listeners fill the OUTER podiums where a touch
+    # of overlap reads as "a couple standing together."
+    b1_home = {'hlin': '[OpenMidRight]'}
+
+    def b1_stage(beat, overrides=None):
+        ov = overrides or {}
+        return {k: (ov.get(k, b1_home.get(k, '[OpenMidLeft]')), b1_fid(k))
+                for e in beat for k in e}
+    # per-beat silent listeners (podium -> face), and per-beat speaker-podium overrides
+    b1_preload = [
+        [],                                                            # A: Scramsax<->Hlin two-shot
+        [('[OpenMidRight]', b1_fid('hlin'))],                          # B: Hlin watches the roll-call
+        [('[OpenFarLeft]', b1_fid('braulo')), ('[OpenLeft]', b1_fid('wolfram'))],   # C: party listens (2)
+        [],                                                            # D: Hruna<->Hlin two-shot
+        [('[OpenMidRight]', b1_fid('hruna'))],                         # E: Hruna across from RBG
+    ]
+    # beat B: Pinky peeks out far-left beside his father (RBG speaks from mid-left) --
+    # they read fine stacked together as a pair (Nicolas, 2026-06-16: keep, don't split).
+    b1_overrides = [None, {'pinky': '[OpenFarLeft]'}, None, None, None]
+
     # 1. Map: register the painted layout and point slot 2 at it + the winter tileset
     #    (same flow as inject_prologue step 1). Goal display = vanilla Ch1's own Seize
     #    template (windowDataType "seize"), copied from slot 1 while it is still vanilla.
@@ -3102,7 +3224,9 @@ def inject_ch01(campaign, verbose=True):
         'void CallLordSelectMenu(ProcPtr proc)\n'
         '{\n'
         '    ClearBg0Bg1();\n'
-        '    SetDispEnable(1, 1, 1, 1, 1);\n'
+        '    /* BG2 OFF: the menu plays over a scenic BACG on BG3 (#21), not the battle\n'
+        '       map -- leaving BG2 enabled would show the (disabled) map layer behind. */\n'
+        '    SetDispEnable(1, 1, 0, 1, 1);\n'
         '    SetTextFont(0);\n'
         '    InitSystemTextFont();\n'
         '    LoadUiFrameGraphics();\n'
@@ -3115,23 +3239,40 @@ def inject_ch01(campaign, verbose=True):
     with open(CH2_EVENTSCRIPT_H, encoding='utf-8') as f:
         script = f.read()
     script = menu_code + script
+    beat1_labels = ['A -- Hlin & Scramsax in from the cold',
+                    'B -- the roll-call (PCs one at a time + RBG/Pinky, Hlin watching)',
+                    "C -- Hlin's story: the endless winter",
+                    "D -- the test: Hruna's iron job",
+                    'E -- the price; Braulo commits; Hlin asks who leads']
+    beat1_text_calls = ''.join(
+        '    Text(0x%X) /* %s */\n' % (m, lbl)
+        for m, lbl in zip(CH01_BEAT1_MSGS, beat1_labels))
+    beat1_scene = (
+        '    /* Beat 1 (#21): the Northlook -- scenic off-map scene over bg_Fireplace.\n'
+        '       Built from the chapter YAML; faces are budget-managed (the 4-slot fix\n'
+        '       in _script_to_message) and staged as clean two-shots (speakers rotate\n'
+        '       through the mid-left/mid-right inner podiums; silent listeners fill the\n'
+        '       outer ones so no one talks to an empty room). The brown-box card\n'
+        '       auto-dismisses (blocks ~100 frames then fades). Beat E ends on Hlin\'s\n'
+        '       "who leads?" -- still at the Northlook. */\n'
+        '    REMOVEPORTRAITS\n'
+        '    BACG(BG_FIREPLACE)\n'
+        '    FADU(16) /* chapter loads come up black; reveal the tavern BG */\n'
+        '    BROWNBOXTEXT(0x%X, 8, 8) /* "The Northlook" location card */\n'
+        % CH01_BEAT1_CARD_MSG
+        + beat1_text_calls +
+        '    FADI(16) /* fade the Northlook out */\n')
     script = _replace_brace_block(
         script, 'EventScr_Ch2_BeginningScene[] =',
         '{\n'
-        '    DISA(CHARACTER_NATASHA) /* Hlin stays in Bryn Shander (ch00 guest) */\n'
-        '    DISA(CHARACTER_KYLE)    /* Scramsax departs (ch00 guest) */\n'
-        '    LOAD1(0x1, UnitDef_088B4344) /* goblins */\n'
-        '    ENUN\n'
-        '    LOAD1(0x1, UnitDef_088B440C) /* the company signs on at the Northlook */\n'
-        '    ENUN\n'
-        '    FADU(16) /* chapter loads come up black; reveal the map (cf. vanilla Ch4) */\n'
-        '    /* Lord select (#42): vanilla route-split idiom (cf. ch8). */\n'
+        + beat1_scene +
+        '    /* Lord select (#42) on its OWN scenic BG -- a "choose your leader" screen,\n'
+        '       NOT the battle map (Nicolas, 2026-06-16). The menu window draws on BG0/1\n'
+        '       over the BACG on BG3; CallLordSelectMenu keeps BG2 (map) off. */\n'
+        '    REMOVEPORTRAITS\n'
+        '    BACG(%s)\n'
+        '    FADU(16)\n'
         '    EVBIT_MODIFY(0x4)\n'
-        '    TUTORIALTEXTBOXSTART\n'
-        '    SVAL(EVT_SLOT_B, 0xffffffff)\n'
-        '    TEXTSHOW(0x%X) /* "Who will lead them north?" */\n'
-        '    TEXTEND\n'
-        '    REMA\n'
         'LABEL(0x0)\n'
         '    ASMC(CallLordSelectMenu)\n'
         '    SADD(EVT_SLOT_2, EVT_SLOT_C, EVT_SLOT_0)\n'
@@ -3143,10 +3284,21 @@ def inject_ch01(campaign, verbose=True):
         '    SVAL(EVT_SLOT_7, 0x1)\n'
         '    BNE(0x0, EVT_SLOT_C, EVT_SLOT_7) /* "No" -> pick again */\n'
         '    EVBIT_MODIFY(0x0)\n'
+        '    /* leader chosen: fade the scenic BG out, build the battle map, deploy. */\n'
+        '    FADI(16)\n'
+        '    SVAL(EVT_SLOT_B, 0x0) /* map camera origin for the reload */\n'
+        '    LOMA(0x%X) /* RestartBattleMap -- builds the trail map fresh (cf. ch13a) */\n'
+        '    DISA(CHARACTER_NATASHA) /* Hlin stays in Bryn Shander (ch00 guest) */\n'
+        '    DISA(CHARACTER_KYLE)    /* Scramsax departs (ch00 guest) */\n'
+        '    LOAD1(0x1, UnitDef_088B4344) /* goblins */\n'
+        '    ENUN\n'
+        '    LOAD1(0x1, UnitDef_088B440C) /* the company signs on at the Northlook */\n'
+        '    ENUN\n'
+        '    FADU(16) /* reveal the trail map (cf. vanilla Ch4) */\n'
         '    CALL(EventScr_08591FD8) /* preparations (PREP, event cmd 0x3E) */\n'
         '    ENUT(8)\n'
         '    EVBIT_T(7)\n'
-        '    ENDA\n}' % LORDSEL_PROMPT_MSG, CH2_EVENTSCRIPT_H)
+        '    ENDA\n}' % (CH01_LORDSEL_BG, CH01_HOST_INDEX), CH2_EVENTSCRIPT_H)
     script = _replace_brace_block(
         script, 'EventScr_Ch2_Turn1Player[] =',
         '{\n    SVAL(EVT_SLOT_2, UnitDef_088B44AC)\n'
@@ -3222,13 +3374,20 @@ def inject_ch01(campaign, verbose=True):
                      'BRYN SHANDER -- 2 MILES.[LF]\nWATCH FOR WOLVES.[.][X]')
     set_message_body(lines, 0x954,
                      'The iron ingots are recovered.[X]')
-    # Lord select (#42): prompt + per-candidate confirm texts, vanilla route-split
-    # shape (cf. MSG_C14/C17/C18) incl. the odd-printable-count [.] parity pad.
-    l1, l2 = 'The company gathers at the Northlook.', 'Who will lead them north?'
-    set_message_body(lines, LORDSEL_PROMPT_MSG, '%s[LF]\n%s%s[A][X]'
-                     % (l1, l2, '[.]' if (len(l1) + len(l2)) % 2 else ''))
+    # Beat 1 (#21): the Northlook opening. Card + one message per beat (A-E), rendered
+    # from the chapter YAML's locked script with the scenic full-screen wrap width and
+    # the per-beat two-sided staging + silent listeners built in step 0. Each beat rides
+    # its own Text()/REMA, so the 4-face budget resets per beat.
+    set_message_body(lines, CH01_BEAT1_CARD_MSG, name_message_body(b1_card))
+    for i, (msg_id, beat) in enumerate(zip(CH01_BEAT1_MSGS, b1_beats)):
+        set_message_body(lines, msg_id, _script_to_message(
+            beat, b1_stage(beat, b1_overrides[i]), width=42, preload=b1_preload[i]))
+    # Lord select (#42): Hlin's "who leads?" already lands in beat E (at the Northlook),
+    # so the menu opens directly over its scenic BG -- no separate prompt. Per-candidate
+    # confirm texts keep the vanilla route-split shape (cf. MSG_C14/C17/C18) incl. the
+    # odd-printable-count [.] parity pad.
     for i, name in enumerate(cast_names):
-        q = 'Will %s lead the company?' % name
+        q = 'Will %s lead the party?' % name
         set_message_body(lines, LORDSEL_CONFIRM_MSGS[i], '%s%s[LF]\n[Yes][X]'
                          % (q, '[.]' if len(q) % 2 else ''))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:

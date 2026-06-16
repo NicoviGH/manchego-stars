@@ -170,12 +170,17 @@ events:
           Steel. I've got a mushroom, a snowman, a cat in the corner, and whatever
           that one's licking off my bar rail. Take your pick, Trollbane.
       # ── B — the cast, one by one (drawn out as Hlin looks the room over) ──
+      - beat_break: B            # build splits the scene here -> its own message (REMA pause + fresh face budget)
       # (Wolfram straightens from the bar rail, unembarrassed) — plants the iron
       - wolfram: >-
           Your rail's pig iron, friend. But the brackets? Good Clan Battlehammer
           steel. Haven't tasted ore this clean since I came north.
       # (Marty coughs a soft puff of spores in Hlin's face, pours from a battered thermos,
       #  taps in a measure of powder labelled "CHAGACCINO"; he never acknowledges the spores)
+      # Rendered as a parenthetical stage-direction page (FE8 cutscenes have no particle FX).
+      - marty: >-
+          (A soft puff of spores drifts off him as he leans in, pouring coffee
+          from a battered thermos into a cup marked CHAGACCINO.)
       - marty: "You look cold. Mushroom coffee?"
       # (Scramsax, deadpan — trimmable)
       - scramsax: "He does that to everyone. Drink's better than it sounds."
@@ -183,8 +188,8 @@ events:
       - rootis: "Don't mind me — just enjoying the weather."
       # (Meesmickle: a cat watching from the shadows, not moving)
       - meesmickle: >-
-          A talking mushroom, a snowman, and a bounty hunter buying drinks.
-          Wonderful. I was worried tonight would be dull.
+          A talking mushroom, a snowman, and a scale-less dragonborn buying
+          drinks. Wonderful. I was worried tonight would be dull.
       # Sclorbo never speaks — impression/gesture text, rendered in parentheses
       - sclorbo: >-
           (A tiny chwinga hops onto the table and beams pure welcome at Hlin —
@@ -194,10 +199,16 @@ events:
           Cheesed to make your acquaintance, madam. Professor R.B. Geenius —
           inventor, problem-solver, the one sensible mind in the room. You did
           say... coin?
+      # (RBG steps aside; his son Pinky has been hiding behind his coat the whole time)
+      - prof-rbg: "Oh — and this is my boy, Pinky. Say hello, Pinky."
+      - pinky: >-
+          (Pinky pokes his head out from behind his father and gives a small,
+          shy wave.)
       # (Braulo sets down his tankard; a small isopod peeks from the lip of his shell,
       #  watching the mushroom) — he speaks only for himself here
       - braulo: "Name the job and the price. If it's fair, I'm in."
       # ── C — Hlin's story (the campaign's stakes) ──
+      - beat_break: C
       # (Hlin lights her pipe at last)
       - hlin: >-
           Most of you aren't from the Dale, so I'll keep it simple. This winter
@@ -216,6 +227,7 @@ events:
           Whatever's got hold of this Dale, it'll take more hands than mine. Hands
           like yours — if you've the stomach for the work.
       # ── D — the test → Hruna's iron job ──
+      - beat_break: D
       # (Hlin raises a hand toward the bar — she brings Hruna over)
       - hlin: >-
           But I don't hire on a handshake. There's a job that wants doing tonight.
@@ -228,6 +240,7 @@ events:
           We found sled-tracks off the high trail. And worse. Bring our iron home,
           and there's good coin in it — and three dwarves who don't forget a debt.
       # ── E — the price, the leader's word → lord-select ──
+      - beat_break: E
       # (RBG produces a small abacus) — does the haggling
       - prof-rbg: >-
           "Good coin" is wonderfully vague, madam. Allow me — say two hundred gold,
@@ -235,7 +248,10 @@ events:
           arrangement.
       # (Braulo nods once) — calls it fair, commits the party
       - braulo: "Fair price for honest work. We'll bring the iron back."
-      # (Hlin looks them over) — hands into the lord-select menu (#42, msg 0x957)
+      # (Hlin looks them over) — this final line is the LAST script entry; the build
+      # pops it from the scenic scene and renders it as the over-map lord-select
+      # prompt (msg 0x957, with Hlin's face), so the question lands once, right
+      # before the Pick-a-leader menu (#42).
       - hlin: >-
           Then it's settled. But a job needs one voice to answer for it. Who leads
           them up the trail?
