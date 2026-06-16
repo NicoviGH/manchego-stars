@@ -34,27 +34,62 @@ RBG haggles the iron job to 200 GP; Braulo commits; Hlin asks who leads → hand
      one-shot bundled form; use the explicit form so the location card + multiple messages share the BG.
    - **Location card** "The Northlook": `BROWNBOXTEXT(card_msg, x, y)` over the BG (prologue uses
      `BROWNBOXTEXT(0x664,8,8)`); card text via `name_message_body`.
-   - **⚠️ THE CRUX — `FACE_SLOT_COUNT = 4`** (`include/face.h:4`) but Beat 1 has **~10 speakers**.
-     `_script_to_message` lazy-loads each speaker once and **never clears** (fine for the prologue's
-     3 speakers; OVERFLOWS here — `FindFreeFaceSlot` returns −1 after 4). `[ClearFace]` (ctrl 17,
-     `scene.c:888`) fades out the **active** face slot, so eviction = emit `[OpenX][ClearFace]` for an
-     LRU speaker before loading a 5th. **Plan:** extend `_script_to_message` to keep ≤4 concurrent
-     faces (evict LRU), OR split the opening into ≤4-distinct-speaker messages with `REMOVEPORTRAITS`
-     between them. Positions: 8 exist (`[OpenFarLeft]`..`[OpenFarFarRight]`, textdefs 8–15) but only 4
-     slots — reuse them; the 7-PC roll-call likely reads best **one PC at a time** (clear between),
-     Hlin/Scramsax held as the anchor pair. The exact face count/positions are a **feel** call for the
-     motion review (step 4).
-   - **Staging dict** (speaker key → `([OpenX], _fid_tag(slot))`) for all 10: 7 PCs via `PORTRAIT_MAP`
-     slots, Scramsax=`Kyle`, Hlin=`Natasha`, **Hruna=`Villager_Woman`** — NOTE `_fid_tag('Villager_Woman')`
-     yields `[FID_Villager_Woman]` (underscore) but the real tag is `[FID_VillagerWoman]`; add to the
-     `special` dict in `_fid_tag` (build_campaign ~534) or hardcode Hruna's tag.
-   - **Sclorbo** = parenthetical impression text, **NO face** (`[OpenX]` with no LoadFace, or plain text);
-     **Marty's spore-cough + Braulo's isopod** = stage business, NOT message text (drop or comment).
-   - **`location_card` + the existing lord-select (`LORDSEL_PROMPT_MSG=0x957`) must follow the scene.**
-     Hlin's final scripted line already asks "who leads?" — reconcile with 0x957 so the question isn't
-     asked twice (either trim the scene's last line into 0x957, or reword 0x957 to a brief connective).
-   - Allocate dead slot-2 message id(s) for the new opening box(es) (cf. how 0x90D/0x90E were used in
-     the prologue; the `0x95x` band around the lord-select ids has dead slots).
+   - **⚠️ THE CRUX — the 4-face fix (FINALIZED PLAN below).** `FACE_SLOT_COUNT = 4` (`include/face.h:4`):
+     only 4 faces can be loaded at once (the `gFaces` pool; `FindFreeFaceSlot` returns −1 when full).
+     Beat 1 has ~10 speakers, and `_script_to_message` (build_campaign ~493) lazy-loads each speaker
+     once and **never clears** → overflows. Verified engine facts (don't re-derive):
+       * `sTalkState->faces[8]` is **position-indexed** (`scene.h:77`); `[OpenX]` (textdefs 8–15) sets
+         the active position via `SetActiveTalkFace(pos−8)`; `[LoadFace][FID]` loads into a free `gFaces`
+         slot at the active position (`scene.c:855`).
+       * `[ClearFace]` (`scene.c:888`) fades out `faces[activePosition]` and frees its `gFaces` slot —
+         so **`[OpenX][ClearFace]` clears the face at position X**. (≈16-frame fade per clear → reads as
+         nice pacing between speakers.)
+       * Vanilla `.h` files never use the `[ClearFace]` text tag — they cap scenes at ≤4 faces. We're the
+         first to need eviction, so this is a genuine `_script_to_message` extension.
+
+     **FIX = make `_script_to_message` POSITION-aware with auto-eviction** (one general change; the
+     prologue's 3-speaker call is unaffected). Replace the flat `loaded` set with a `live` map of
+     **position → speaker** (≤4 entries) and an LRU order, then per dialogue block:
+     ```
+     pos, fid = staging[speaker]            # staging stays speaker -> ([OpenX], fid_or_None)
+     if live.get(pos) == speaker:           # already on screen here -> just re-activate
+         touch LRU
+     else:
+         if pos in live:                    # someone else holds this podium -> clear them
+             emit '[OpenPOS][ClearFace]'; del live[pos]
+         while len(live) >= 4:              # all 4 podiums full -> evict LRU podium
+             p_old = lru.pop(0); emit '[OpenP_OLD][ClearFace]'; del live[p_old]
+         emit '[OpenPOS][LoadFace][FID]'; live[pos] = speaker; lru.append(pos)
+     emit page text (existing [OpenPOS][A]...[A] shape)
+     ```
+     This makes **podiums (positions) the budget, not speakers** — so the 7-PC roll-call can all share
+     ONE spotlight position (each new PC auto-clears the previous → one face at a time), while Hlin
+     stays anchored at another podium. Suggested staging (≤3 concurrent, well under the cap; final
+     count/positions are a **feel** call for the step-4 motion review): Hlin `[OpenMidRight]` (anchor),
+     Scramsax `[OpenFarRight]`, the 7 PCs all `[OpenMidLeft]` (rotating spotlight), Hruna `[OpenLeft]`.
+   - **`staging` builds for all 10:** 7 PCs via `PORTRAIT_MAP` slots, Scramsax=`Kyle`, Hlin=`Natasha`,
+     **Hruna=`Villager_Woman`**. ⚠️ `_fid_tag('Villager_Woman')` → `[FID_Villager_Woman]` (underscore,
+     WRONG); real tag is `[FID_VillagerWoman]`. Fix: hardcode Hruna's fid `'[FID_VillagerWoman]'`, **or**
+     add `'VILLAGER_WOMAN': 'VillagerWoman'` to the `special` dict in `_fid_tag` (build_campaign ~536,
+     which is keyed by UPPERCASE slot like the existing `'ONEILL'`) and call `_fid_tag('VILLAGER_WOMAN')`.
+   - **Faceless / stage-business handling:** **Sclorbo** never speaks — render his parenthetical as a
+     box with NO `[LoadFace]`; give him a staging entry `(pos, None)` and have the eviction code emit an
+     `[OpenX]` to an **unoccupied** podium so no loaded face mouth-moves under his impression text.
+     **Marty's spore-cough + Braulo's isopod** are stage directions, NOT message text — drop them (the
+     YAML carries them as `#` comments only).
+   - **Message split (recommended structure):** stage one persistent `BACG(BG_FIREPLACE)` and show the
+     opening as **per-beat messages** A/B/C/D/E (the script's `# ── A/B/C… ──` seams), each its own
+     `TEXTSHOW(msg)/TEXTEND/REMA`. Reasons: bounds message byte-length (watch for any buffer cap — a
+     single ~22-entry message may be too long; **verify at build**), gives natural `REMA` pauses, and
+     keeps each message's face state self-contained. Eviction still needed WITHIN beat B (roll-call =
+     9 speakers). Allocate dead slot-2 message ids for the boxes (the `0x94x`/`0x95x` band around the
+     lord-select ids has unused slots; cf. prologue's 0x90D/0x90E).
+   - **Location card + lord-select handoff:** `BROWNBOXTEXT("The Northlook", x, y)` over the BG.
+     The existing lord-select (`LORDSEL_PROMPT_MSG=0x957`) must follow the scene — and Hlin's FINAL
+     scripted line ("…Who leads them up the trail?") already asks the question, so **don't ask twice.**
+     Recommended: end the scenic E-message one line early and set **0x957 = that final Hlin line**
+     (with her face, shown over the map after `FADU`), so the question lands exactly once as the direct
+     lead-in to the menu. (Currently 0x957 is faceless narration "The company gathers… / Who will lead…".)
 4. **In-game MOTION review** (`tools/playtest/run.sh record` → GIFs in `map-review/` → `open -a
    Safari`), then Nicolas sign-off — validates the face choreography. Stills mislead. Decided 2026-06-10.
 5. **Resume the dialogue pass on the trail beats** — same variant flow:
@@ -90,9 +125,22 @@ RBG haggles the iron job to 200 GP; Braulo commits; Hlin asks who leads → hand
   `bg_House`); **Hruna bust** = vendored Generic Villager {Cynon} [F2E] olive-wool recolor on the
   `Villager_Woman` slot (sympathetic mug, not the canon scarf-dwarf — his call). Recipe in
   `guest_vendor_busts.py`; credited; `docs/decisions.md` updated. `make` green, verify_text 3404/0.
-- **Reverse-engineered the step-3 wiring** (see NEXT UP §3): the scenic `BACG`/`Text_BG` idiom
-  (`lordsplit-eventscript.h` template), `BG_FIREPLACE=0x09`, the location-card `BROWNBOXTEXT`, and
-  the **4-face-slot constraint** (`FACE_SLOT_COUNT=4` vs ~10 speakers) + the `[ClearFace]` eviction fix.
+- **Reverse-engineered + FINALIZED the step-3 wiring plan** (NEXT UP §3): the scenic `BACG`/`Text_BG`
+  idiom (`lordsplit-eventscript.h` template), `BG_FIREPLACE=0x09`, the location-card `BROWNBOXTEXT`,
+  and the full **4-face-slot fix** — position-aware auto-eviction in `_script_to_message` (pseudocode
+  in §3), with the two engine facts verified (`faces[8]` position-indexed; `[ClearFace]` frees the
+  active podium). The next instance can implement directly from §3.
+
+## Tried but didn't work (this session)
+- **Hruna as a canon scarf-wrapped frost-dwarf** (Assassin {SSHX} [F2E] mug, frost- and wool-recolored):
+  on-canon (book: "bundled… only their eyes visible") and a clean [F2E] license, but Nicolas rejected
+  it as **"too suspicious"** — a hooded/masked figure reads sinister, wrong for a sympathetic
+  quest-giver. → Switched to the open-faced Generic Villager. **Lesson:** for NPCs, the emotional read
+  Nicolas wants can outrank book canon; lead with the *feel* of the scene, not the literal description.
+- **A wool-scarf collar painted onto the villager** — prototyped (cream cowl over the throat), looked
+  fine, but Nicolas said "nevermind on the scarf." Final = plain olive-wool coat, no scarf. (The
+  scratch recolor/preview scripts + ref downloads were cleaned up; only `hruna.png` + the vendor recipe
+  shipped.)
 
 ## Current state
 - ✅ Ch1 engine machine-verified (entry/preps/deploy-cap, lord-select force-deploy + game over,
