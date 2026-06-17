@@ -1,11 +1,18 @@
-# Handoff: Ch1 slice (#21) — Beat 1 Northlook scene DONE, motion-reviewed & APPROVED (4 review rounds w/ Nicolas), committed. NEXT = resume the trail beats.
+# Handoff: Ch1 slice (#21) — Beat 1 + the TRAIL BEATS DONE & approved (Northlook scene, sign/body, house hints, Izobai taunt + death, 'Ol Bitey). NEXT = ch01 ending scene (Duvessa) + wire ch02 so the ending stops landing on vanilla Ch3.
 
-**Date:** 2026-06-16 (session 3)
-**Session focus:** **Step 3 — wired Beat 1 into `inject_ch01`** (the scenic `bg_Fireplace`
-Northlook scene + the 4-face-slot fix), then iterated with Nicolas across 4 motion reviews to a
-sign-off (full design recorded in `docs/decisions.md` → "Multi-speaker cutscene faces"). `make`
-green, `verify_text` 3404/0, **all playtests PASS** (ch00 win/gameover, ch01 entry, ch01win).
-Review GIF: `map-review/ch01-beat1-northlook.gif` (gitignored). **Fade transitions kept** (final).
+**Date:** 2026-06-17 (session 4)
+**Session focus:** Finished the **ch01 dialogue pass** (interactive, one beat at a time):
+- **Beat 1 Northlook scene** (session 3) — scenic `bg_Fireplace` + the 4-face fix; approved.
+- **Trail beats** (this session): road sign + dismembered sled-driver folded into one trailhead
+  trigger; two house hints reskinned from **vanilla Ch1's own house quotes**; **Izobai** voice bible
+  (`lore/izobai.md`) + turn-1 taunt (spare `EventScr_Ch2_Turn2Player`) + death quote; Braulo's beat-E
+  line de-collectivised ("Fair price for honest work."). Design in `docs/decisions.md` → "Ch1 trail beats".
+- **'Ol Bitey** — the stuffed fish — mounted over the Northlook hearth via `inject_northlook_bitey`
+  (custom in-palette BG edit as an idempotent build step). Reviewed in-game, Nicolas: "he's perfect."
+- Hit + fixed the **Huffman terminator-parity bug** on the body narration (`_term_pad` `[.]` helper).
+
+`make` green, `verify_text` 3404/0, **playtests PASS** (ch00 win/gameover, ch01 entry, ch01win).
+GIFs (gitignored): `ch01-beat1-northlook.gif`, `ch01-izobai-taunt.gif`.
 
 **What landed (working tree, uncommitted):**
 - **`_script_to_message` is now position-aware with auto-eviction** (the finalized 4-face fix):

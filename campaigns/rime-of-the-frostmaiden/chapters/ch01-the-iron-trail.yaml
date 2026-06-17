@@ -118,7 +118,9 @@ enemy_units:
       - id: iron-ingots         # drops on death → the job's MacGuffin
         is_key_item: true
     ai_pattern: hold_position   # Breguet AI {0x3,0x3,0x9,0x20}: attack in place, never move
-    death_quote: "Gah! The ironses were ours!"
+    # Voice: cunning, mocking, mercenary bandit-warlord (lore/izobai.md). LOCKED 2026-06-17.
+    taunt: "The iron's right here, under my boots. Come and take it."
+    death_quote: "Should've taken the gold... and run..."
 
   - id: goblin-reinforcements
     name: "Goblin Raider"
@@ -246,8 +248,9 @@ events:
           "Good coin" is wonderfully vague, madam. Allow me — say two hundred gold,
           and a discount at this Blackiron's forge? Then we'd have a most Gouda
           arrangement.
-      # (Braulo nods once) — calls it fair, commits the party
-      - braulo: "Fair price for honest work. We'll bring the iron back."
+      # (Braulo nods once) — judges the price fair; he speaks only for himself, the
+      #  company's "yes" is the lord-select that follows (Nicolas, 2026-06-17)
+      - braulo: "Fair price for honest work."
       # (Hlin looks them over) — this final line is the LAST script entry; the build
       # pops it from the scenic scene and renders it as the over-map lord-select
       # prompt (msg 0x957, with Hlin's face), so the question lands once, right
@@ -273,7 +276,10 @@ events:
     type: dialogue
     ea_file: events/ch01-road-sign.ea
     description: >
-      A battered sign: "BRYN SHANDER — 2 MILES. WATCH FOR WOLVES."
+      LOCKED 2026-06-17 (dialogue pass). The trailhead sign + the body, folded into
+      one trigger: a battered sign, freshly gouged "— KEEP WALKING —"; and just past
+      it, the smashed sled and its driver (a dwarf, in pieces — Hruna's kin), the iron
+      gone, goblin tracks leading up. Faceless narration (msgs 0x955 + body 0x956).
 
   # Hint houses — vanilla Ch1 parity (two House visits, NO items; msgs 0x93B/0x93C
   # are pure tactical hints). Dialogue written in the dialogue pass.

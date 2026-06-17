@@ -587,6 +587,68 @@ scenarios.ch01win = function()
     result("FAIL", "could not seize the camp in 14 turns")
 end
 
+-- RECORDCH01TRAIL (#21): capture the in-battle trail beats as motion for review --
+-- Izobai's turn-1 taunt and her death quote, both over the snowy map with her custom
+-- bust. Rides the ch00 win -> ch01 prep -> fight, then captures frames ("trail").
+scenarios.recordch01trail = function()
+    if not winCh00() then return end
+    if not waitFor(function() return chapter() == 2 end, 1800) then
+        return result("FAIL", "chapter slot 2 never loaded after the ch00 win")
+    end
+    local prep = false
+    for i = 1, 200 do
+        if procActive(SYM.gProcScr_SALLYCURSOR) then prep = true break end
+        press(K.A, 4); wait(36)
+    end
+    if not prep then shot("trail-no-prep"); return result("FAIL", "prep never opened") end
+    wait(180)
+    for i = 1, 40 do
+        if not procActive(SYM.gProcScr_SALLYCURSOR) then break end
+        press(K.B, 4); wait(10); press(K.START, 4); wait(40)
+        if i % 4 == 0 and procActive(SYM.gProcScr_SALLYCURSOR) then press(K.A, 4) wait(20) end
+    end
+    if not waitFor(function()
+        return not procActive(SYM.gProcScr_SALLYCURSOR) and faction() == 0 and turn() >= 1
+    end, 1200) then return result("FAIL", "could not leave preparations") end
+    local function recwait(n, tag)
+        for f = 1, n do if f % 5 == 0 then shot(tag) end yield() end
+    end
+    -- turn 1: Izobai's taunt auto-fires at the player-phase start (normal text speed
+    -- so the typewriter + her face read in motion); A-tap slowly to advance it.
+    for i = 1, 12 do recwait(24, "trail"); press(K.A, 4) end
+    pokeFastConfig()
+    local chief = red(CHAR_CHIEF)
+    if not chief then return result("FAIL", "chief not found") end
+    local goal = { x = chief.x, y = chief.y }
+    for t = 1, 18 do
+        waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
+        wait(60)
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+        end
+        local braulo = blue(0x01)
+        if isDead(braulo) then return result("FAIL", "Braulo died on the march") end
+        chief = red(CHAR_CHIEF)
+        if chief and not isDead(chief) then
+            if math.abs(braulo.x - chief.x) + math.abs(braulo.y - chief.y) == 1 then
+                if moveUnit(braulo.x, braulo.y, braulo.x, braulo.y) then
+                    chooseAttack(braulo.addr)
+                    recwait(70, "trail") -- the death quote
+                end
+            else
+                marchToward(braulo, goal.x, goal.y + 1, 24, 15)
+            end
+        else
+            recwait(30, "trail")
+            return result("PASS", "ch01 trail beats recorded (taunt + death)")
+        end
+        local phase = runEnemyPhase(CH01_PARK)
+        if phase == "gameover" then return result("FAIL", "unexpected game over") end
+    end
+    result("FAIL", "could not reach Izobai")
+end
+
 -- RECORDLORD (#42): continuous frame capture of the lord-select flow for the
 -- review GIF -- prompt, menu, cursor walk to the last candidate, confirm text
 -- typing out, Yes, and the hand-off into the prep screen. Frames tagged "lord"

@@ -888,6 +888,21 @@ no cutscene particle FX); Pinky (Neimi) appears beside RBG at his intro; lord-se
 "lead the party." `make` green, `verify_text` 3404/0, playtests PASS (ch00 win/gameover, ch01 entry,
 ch01win). #21._
 
+**Ch1 trail beats: vanilla-reskin hints, an Izobai boss voice, and 'Ol Bitey over the hearth.**
+The two house hints reskin **vanilla Ch1's own house quotes** (`0x93B`/`0x93C`, the ids we reuse):
+the gate→"the mounds provide defense and heal wounds to boot," and the armor-knight→Izobai's
+scrap-plate "turns aside almost any blade… I know my armor, though… a good blast of magic could get
+right through it" (the weapon-triangle tip was cut — vanilla's house never carries it). The road
+sign + the dismembered sled-driver fold into one trailhead trigger. Izobai (`lore/izobai.md`,
+cunning/mocking mercenary) gets a turn-1 taunt (spare `EventScr_Ch2_Turn2Player` slot) and a death
+quote. **'Ol Bitey** — the stuffed fish Scramsax name-drops — is mounted over the Northlook hearth
+by `inject_northlook_bitey`: a build step that git-restores the vanilla `bg_Fireplace.png` (idempotent),
+paints a small fish using ONLY existing palette colours (so each 8x8 tile stays in its 4bpp 16-colour
+bank), and clears the converted intermediates so `make` re-derives them. Hand-written narration must
+pass `_term_pad` (the `[.]` Huffman terminator-parity pad) or it bleeds into the next message.
+_Decided 2026-06-17 with Nicolas (interactive dialogue pass, one beat at a time; Bitey art reviewed
+in-game). `make` green, `verify_text` 3404/0, ch01win PASS. #21._
+
 ---
 
 ## Open Questions (not yet decided)

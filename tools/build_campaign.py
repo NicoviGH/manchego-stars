@@ -184,6 +184,8 @@ LORDSEL_CONFIRM_MSGS = (0x959, 0x95A, 0x95B, 0x95C, 0x95D, 0x95E, 0x95F,
 # host strips Ch1's tutorial event lists, so these never display in our ROM).
 CH01_BEAT1_CARD_MSG = 0x945
 CH01_BEAT1_MSGS = (0x940, 0x941, 0x942, 0x943, 0x944)  # A,B,C,D,E (0x945 = card)
+CH01_BODY_MSG = 0x956    # the dismembered sled-driver, found just past the road sign
+CH01_TAUNT_MSG = 0x960   # Izobai's turn-1 boss taunt (both dead vanilla Ch1-tutorial slots)
 # Scenic BG the lord-select menu plays over (NOT the battle map). A standalone "choose
 # your leader" screen. Darkling Woods -- "the most Icewind Dale of the options" (Nicolas,
 # 2026-06-16). Swap freely to any backgrounds.h enum.
@@ -497,6 +499,17 @@ def _wrap_fe_lines(text, width=29):
     if cur:
         out.append(cur)
     return out
+
+
+def _term_pad(body):
+    """FE8 Huffman terminator-parity (see [[manchego_stars_text_terminator_parity]]):
+    when a message's printable-char count is ODD the 0x00 terminator can't stand alone,
+    so the decoder runs past [X] into the next message (garbage + bleed-through). Pad
+    with a [.] before [X] to flip parity even. No-op when already even."""
+    visible = re.sub(r'\[[^\]]*\]', '', body).replace('\n', '')
+    if len(visible) % 2 and body.endswith('[X]'):
+        body = body[:-3] + '[.][X]'
+    return body
 
 
 def _script_to_message(script, staging, width=29, face_budget=4, preload=None):
@@ -3133,7 +3146,10 @@ def inject_ch01(campaign, verbose=True):
         info = f.read()
     info = _replace_brace_block(
         info, 'EventListScr_Ch2_Turn[] =',
-        '{\n    TURN(0x0, EventScr_Ch2_Turn1Player, %d, 0, FACTION_ID_BLUE)\n'
+        '{\n    TURN(0x0, EventScr_Ch2_Turn2Player, 1, 0, FACTION_ID_BLUE)'
+        ' /* Izobai turn-1 taunt */\n'
+        '    TURN(0x0, EventScr_Ch2_Turn1Player, %d, 0, FACTION_ID_BLUE)'
+        ' /* west reinforcements */\n'
         '    END_MAIN\n}' % reinf['spawn_turn'], CH2_EVENTINFO_H)
     info = _replace_brace_block(
         info, 'EventListScr_Ch2_Character[] =', '{\n    END_MAIN\n}', CH2_EVENTINFO_H)
@@ -3304,6 +3320,12 @@ def inject_ch01(campaign, verbose=True):
         '{\n    SVAL(EVT_SLOT_2, UnitDef_088B44AC)\n'
         '    CALL(EventScr_LoadReinforce)\n'
         '    EVBIT_T(7)\n    ENDA\n}', CH2_EVENTSCRIPT_H)
+    # Izobai's turn-1 taunt rides the spare vanilla Turn2Player slot (externed in
+    # eventcall.h; fired at turn 1 by the Turn list above), shown over the map.
+    script = _replace_brace_block(
+        script, 'EventScr_Ch2_Turn2Player[] =',
+        '{\n    TEXTSHOW(0x%X) /* Izobai turn-1 taunt */\n    TEXTEND\n    REMA\n'
+        '    EVBIT_T(7)\n    ENDA\n}' % CH01_TAUNT_MSG, CH2_EVENTSCRIPT_H)
     script = _replace_brace_block(
         script, 'EventScr_Ch2_Village1[] =',
         '{\n    IGNORE_KEYS(0)\n    HouseEvent(0x93B, 0x0)\n}', CH2_EVENTSCRIPT_H)
@@ -3312,8 +3334,10 @@ def inject_ch01(campaign, verbose=True):
         '{\n    IGNORE_KEYS(0)\n    HouseEvent(0x93C, 0x0)\n}', CH2_EVENTSCRIPT_H)
     script = _replace_brace_block(
         script, 'EventScr_Ch2_Talk_EirikaRoss[] =',
-        '{\n    TEXTSHOW(0x955) /* road sign */\n    TEXTEND\n    REMA\n'
-        '    EVBIT_T(7)\n    ENDA\n}', CH2_EVENTSCRIPT_H)
+        '{\n    TEXTSHOW(0x955) /* road sign + gouged warning */\n    TEXTEND\n    REMA\n'
+        '    TEXTSHOW(0x%X) /* the smashed sled + the body, just past the sign */\n'
+        '    TEXTEND\n    REMA\n'
+        '    EVBIT_T(7)\n    ENDA\n}' % CH01_BODY_MSG, CH2_EVENTSCRIPT_H)
     script = _replace_brace_block(
         script, 'EventScr_Ch2_EndingScene[] =',
         '{\n    MUSC(SONG_VICTORY)\n'
@@ -3358,20 +3382,35 @@ def inject_ch01(campaign, verbose=True):
     set_message_body(lines, host['goal']['windowTextId'],
                      name_message_body('Seize camp'))
     chief.setdefault('id', 'goblin-chief')
+    # Izobai (boss, her custom bust on the Breguet slot): turn-1 taunt + death quote,
+    # both from the chapter YAML (lore/izobai.md voice). She/her throughout.
+    izobai_face = {'izobai': ('[OpenMidRight]', _fid_tag(CH01_BOSS_SLOT))}
+    set_message_body(lines, CH01_TAUNT_MSG, _script_to_message(
+        [{'izobai': chief['taunt']}], izobai_face))
     set_message_body(lines, 0x961, _script_to_message(
-        [{'chief': chief['death_quote']}],
-        {'chief': ('[OpenMidRight]', _fid_tag(CH01_BOSS_SLOT))}))
-    villager = {'villager': ('[OpenMidLeft]', '[FID_VillagerMan3]')}
+        [{'izobai': chief['death_quote']}], izobai_face))
+    # Hint houses -- vanilla Ch1's own two house quotes (0x93B/0x93C) reskinned with the
+    # goblin nouns (dialogue pass, 2026-06-17). Two different villager faces, like vanilla.
     set_message_body(lines, 0x93B, _script_to_message([{'villager': (
-        'The goblins dug into the old waystation. Those mounds shrug off blows, '
-        'and the snow mends whoever holds them. Mind how they sit their ground.'
-    )}], villager))
+        "The rumors are true, aren't they? Goblins have taken the old waystation. "
+        "Looks like they've dug into the mounds, too. Smart work -- the mounds provide "
+        "defense and heal wounds to boot. They must be vicious, to have taken it. "
+        'Watch yourself.'
+    )}], {'villager': ('[OpenMidLeft]', '[FID_VillagerMan3]')}))
     set_message_body(lines, 0x93C, _script_to_message([{'villager': (
-        'Their chief bolted scrap-plate over his hide -- blades just skip off it. '
-        'But plate means nothing to magic, and an axe will beat that spear of his.'
-    )}], villager))
-    set_message_body(lines, 0x955,
-                     'BRYN SHANDER -- 2 MILES.[LF]\nWATCH FOR WOLVES.[.][X]')
+        'That goblin warlord, Izobai, was wearing the finest scrap-plate I have seen. '
+        'It looked like it could turn aside almost any blade you swing at it. I know '
+        "my armor, though. I'll wager a good blast of magic could get right through it."
+    )}], {'villager': ('[OpenMidLeft]', '[FID_VillagerMan4]')}))
+    # Trailhead (msg 0x955) = the sign + gouged warning; the body (CH01_BODY_MSG) follows
+    # in the same trigger -- faceless narration, hand-wrapped at the on-map width.
+    set_message_body(lines, 0x955, _term_pad(
+                     'BRYN SHANDER -- 2 MILES.[LF]\nBelow it, freshly gouged:[A][LF]\n'
+                     '-- KEEP WALKING --[X]'))
+    set_message_body(lines, CH01_BODY_MSG, _term_pad(
+                     'Just past the sign, a sled[LF]\nlies smashed in the snow.[A][LF]\n'
+                     'Its driver lies beside it --[LF]\na dwarf, in pieces.[A][LF]\n'
+                     'The iron is gone. Goblin[LF]\ntracks lead up the trail.[X]'))
     set_message_body(lines, 0x954,
                      'The iron ingots are recovered.[X]')
     # Beat 1 (#21): the Northlook opening. Card + one message per beat (A-E), rendered
@@ -3409,6 +3448,50 @@ def inject_ch01(campaign, verbose=True):
               '%d west reinforcements turn %d'
               % (len(cast), len(enemies) - 1, cx, cy, len(reinforce),
                  reinf['spawn_turn']))
+
+
+def inject_northlook_bitey(verbose=True):
+    """Mount 'Ol Bitey -- the Northlook's stuffed-fish trophy -- over the hearth (#21
+    Beat 1 set dressing; Scramsax name-drops him in beat A). A custom edit to the vanilla
+    bg_Fireplace convo background: restore the vanilla PNG first (idempotent across
+    builds), paint a small cold-water fish using ONLY existing palette colours (so each
+    8x8 tile stays within its 4bpp 16-colour bank), and drop the converted intermediates
+    so `make` re-derives them. Centered on the hearth (fire centre x=135); the cool
+    blue-purple tones read as a frozen-lake trophy and survive the tile conversion."""
+    from PIL import ImageDraw
+    bg = os.path.join(DECOMP, 'graphics', 'bg', 'bg_Fireplace.png')
+    subprocess.run(['git', '-C', DECOMP, 'checkout', '--', 'graphics/bg/bg_Fireplace.png'],
+                   check=True)
+    im = Image.open(bg)
+    pal = im.getpalette()
+    inv = {tuple(pal[i * 3:i * 3 + 3]): i for i in range(256)}
+    body, hi, mid, outl, fin = (64, 32, 88), (120, 64, 80), (88, 40, 80), (0, 0, 64), (0, 0, 56)
+    def c(rgb):
+        return rgb + (255,)
+    ov = Image.new('RGBA', (34, 15), (0, 0, 0, 0))
+    d = ImageDraw.Draw(ov)
+    d.ellipse([5, 3, 26, 11], fill=c(body), outline=c(outl))     # body
+    d.arc([6, 6, 25, 12], 20, 160, fill=c(mid))                  # belly sheen
+    d.polygon([(12, 3), (20, 3), (16, 0)], fill=c(fin))          # dorsal fin
+    d.polygon([(25, 7), (33, 1), (30, 7), (33, 13)], fill=c(fin), outline=c(outl))  # forked tail
+    d.polygon([(12, 8), (16, 8), (12, 13)], fill=c(fin))         # pectoral fin
+    d.line([(5, 7), (1, 7)], fill=c(outl))                       # open mouth
+    d.ellipse([7, 5, 10, 8], fill=c(hi), outline=c(outl))        # eye socket
+    d.point((8, 6), fill=c(outl))                                # pupil
+    op, ovp = im.load(), ov.load()
+    ox, oy = 118, 89                                             # centered over the hearth
+    for y in range(15):
+        for x in range(34):
+            r, g, b, a = ovp[x, y]
+            if a > 0:
+                op[ox + x, oy + y] = inv[(r, g, b)]
+    im.save(bg)
+    for ext in ('.feimg2.bin', '.feimg2.bin.lz', '.fetsa2.bin', '.gbapal'):
+        stale = bg[:-4] + ext
+        if os.path.exists(stale):
+            os.remove(stale)
+    if verbose:
+        print("  'Ol Bitey mounted over the Northlook hearth (bg_Fireplace, #21)")
 
 
 def main():
@@ -3455,6 +3538,7 @@ def main():
         inject_title_theme(args.campaign)
         print('chapter 1 (#21):')
         inject_ch01(args.campaign)  # MUST precede inject_prologue (vanilla goal read)
+        inject_northlook_bitey()    # 'Ol Bitey over the tavern hearth (Beat 1 set dressing)
         print('prologue (New Game target):')
         inject_prologue(args.campaign, montage=args.montage)
     print('done. Run `make` to compile the ROM.')
