@@ -136,6 +136,15 @@ ch01win re-verified for the new title-return path; recordprep unchanged.
    repointed to Y=80 to carry the subtitle row, scroll banner dropped) + icy-blue backdrop with the
    two dragons removed (`title_main_background.gbapal` hue-set blue, dragon foreground blanked — both
    idempotent). Wired in `inject_title_screen`. `map-review/title-final-icyblue.png`.
+   - **Boot fixes** (`8af6425`, `01ba6a1`): (a) cold boot was skipping the title (PostIntro routes
+     the cold-boot `EVENT_RETURN` straight to the New Game menu; the removed op-anim no longer flipped
+     it) -> `_cut_boot_intro` now sets StartGame's action to `USR_SKIPPED` so boot shows the title;
+     (b) the title crashed after ~13.5s idle (`Title_IDLE` fired `CLASS_REEL` -> attract demo, which
+     crashes) -> patched so the idle timeout never fires. Verified via `bootobserve` + `ch01win`
+     (boot→title→play→Seize→ending→title) + `titlecard`.
+   - **ALPHA shipped:** `dist/ManchegoStars-Alpha-2026-06-17.gba` (git-ignored; embeds base ROM).
+     Contents: title + Prologue (Ch00) + Ch1 (real full-strength goblins + Izobai + turn-3 goblin
+     reinforcements) -> ending -> dev placeholder -> title.
    - **Optional future upgrade:** the actual Frostmaiden cover painting as the BG. Parked — FE8's
      title BG is a custom two-blob + TSA + palette format (~640 tiles), so dropping a full painting in
      is high-effort/high-risk; the icy-blue recolor was the agreed pragmatic call for the alpha.
