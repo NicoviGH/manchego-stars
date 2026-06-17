@@ -55,13 +55,22 @@ EOF
 pkill -9 -i mgba 2>/dev/null || true
 rm -f "$REPO/fireemblem8u/fireemblem8.sav"   # fresh save: New Game is the default path
 
+# Assert scenarios run at 240fps (frameskips ~4x -- fine, they only poll memory).
+# record* scenarios need FAITHFUL motion: at 240fps the "frame" callback fires only
+# every ~4th emulated frame (frameskip), so screenshots alias the engine's ~16-frame
+# face fades into 1-frame "blips". 60fps + videoSync renders every frame -> the callback
+# (and shot()) fire every emulated frame -> smooth fades. The grind is slower, so the
+# deadline is longer too.
+FPS=240; VSYNC=0; DEADLINE_S=420
+case "$SCENARIO" in record*) FPS=60; VSYNC=1; DEADLINE_S=1100 ;; esac
+
 "$APP" --script "$WRAPPER" \
-    -C mute=1 -C fpsTarget=240 -C audioSync=0 -C videoSync=0 \
+    -C mute=1 -C fpsTarget=$FPS -C audioSync=0 -C videoSync=$VSYNC \
     "$ROM" >"$OUT/mgba-stdout.log" 2>&1 &
 MGBA_PID=$!
 
 echo "running scenario '$SCENARIO' (mGBA pid $MGBA_PID); polling $LOG"
-DEADLINE=$((SECONDS + 420))
+DEADLINE=$((SECONDS + DEADLINE_S))
 VERDICT=""
 while [ $SECONDS -lt $DEADLINE ]; do
     if [ -f "$LOG" ] && grep -q "RESULT:" "$LOG"; then

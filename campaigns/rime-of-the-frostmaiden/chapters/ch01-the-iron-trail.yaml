@@ -284,12 +284,13 @@ events:
       Baxby base class = Cavalier, Franz donor (npcs/baxby.yaml).
     script:                       # LOCKED 2026-06-17 (dialogue pass, co-written with Nicolas)
       - location_card: "Bryn Shander"
-      # ── A — Duvessa arrives and thanks the company ──
+      # ── A — Duvessa thanks the company, hires them, grants the sled, points west ──
+      # (one continuous Duvessa beat -- NO beat_break inside it, so her face never fades
+      #  out and back in mid-speech. The build splits the scene into separate messages,
+      #  each with a face-clearing REMA, ONLY where the on-screen cast actually changes.)
       - duvessa: >-
           I'm Duvessa Shane — I speak for Bryn Shander. You brought our iron home,
           and the truth of what happened to the driver. Thank you.
-      # ── B — the hire + she grants the wrecked trail sled + points west ──
-      - beat_break: B
       - duvessa: >-
           That job was a test, and you passed it. I've trouble in every town and too
           few I trust to send — take a standing commission from the Council.
@@ -322,7 +323,14 @@ events:
       - duvessa: >-
           A sled's no use without something to pull it. There's an axe-beak at the
           market — two hundred gold. Strong old bird; he's outlasted three owners.
-      # (Marty leans in and coughs a soft puff of spores at the bird so it can hear him)
+      # ── E2 — Marty approaches the bird; Baxby answers (split so Duvessa clears out
+      #         at the REMA boundary instead of swapping to Baxby on the same podium) ──
+      - beat_break: E2
+      # Marty's spore-cough, shown as a faceless stage-business box (no portrait) so the
+      # action reads in-game (Nicolas 2026-06-17), then he speaks.
+      - narration: >-
+          Marty leans in close and breathes a soft puff of spores over the
+          old bird, so that it might hear him.
       - marty: "Hello, friend. Do you have a name?"
       - baxby: >-
           ...Baxby. I've hauled freight over this ice longer than most of you have

@@ -188,7 +188,7 @@ CH01_BEAT1_MSGS = (0x940, 0x941, 0x942, 0x943, 0x944)  # A,B,C,D,E (0x945 = card
 # per beat (A-F), on the same dead vanilla Ch1-tutorial slot-2 pool as Beat 1 (the
 # prologue host strips Ch1's event lists, so these ids never display in our ROM).
 CH01_ENDING_CARD_MSG = 0x94C
-CH01_ENDING_MSGS = (0x946, 0x947, 0x948, 0x949, 0x94A, 0x94B)  # A,B,C,D,E,F
+CH01_ENDING_MSGS = (0x946, 0x947, 0x948, 0x949, 0x94A, 0x94B)  # AB,C,D,E1,E2,F
 CH01_BODY_MSG = 0x956    # the dismembered sled-driver, found just past the road sign
 CH01_TAUNT_MSG = 0x960   # Izobai's turn-1 boss taunt (both dead vanilla Ch1-tutorial slots)
 # Scenic BG the lord-select menu plays over (NOT the battle map). A standalone "choose
@@ -3005,6 +3005,8 @@ def inject_ch01(campaign, verbose=True):
                  'beat_break markers in the YAML)' % (len(end_beats), len(CH01_ENDING_MSGS)))
 
     def end_fid(spk):
+        if spk == 'narration':                  # faceless stage-business box (no portrait)
+            return None
         if spk in PORTRAIT_MAP:
             return _fid_tag(PORTRAIT_MAP[spk].upper())
         if spk in GUEST_PORTRAIT_MAP:           # duvessa/hruna/baxby cutscene faces
@@ -3021,19 +3023,18 @@ def inject_ch01(campaign, verbose=True):
         ov = overrides or {}
         return {k: (ov.get(k, end_home.get(k, '[OpenMidLeft]')), end_fid(k))
                 for e in beat for k in e}
-    # per-beat silent listeners: in the beats where Duvessa addresses the party (A/B/F)
-    # seat Marty (Seth) on the left so she isn't talking to an empty room. C/D/E are
-    # self-populated two-/three-shots, so no preload.
-    end_preload = [
-        [('[OpenMidLeft]', end_fid('marty'))],   # A: Duvessa thanks the party
-        [('[OpenMidLeft]', end_fid('marty'))],   # B: commission + the sled + west
-        [],                                       # C: Wolfram <-> Hruna (iron)
-        [],                                       # D: RBG names the sled; Meesmickle quip
-        [],                                       # E: Duvessa -> Marty <-> Baxby
-        [('[OpenMidLeft]', end_fid('marty'))],   # F: "Targos is expecting weather."
-    ]
-    end_overrides = [None, None, {'hruna': '[OpenMidRight]'},
-                     {'meesmickle': '[OpenMidRight]'}, {'baxby': '[OpenMidRight]'}, None]
+    # NO silent-listener preloads: a preloaded face fades out and back in at every beat's
+    # REMA boundary it straddles -- exactly the Marty/Duvessa "flashing during dialogue"
+    # Nicolas flagged 2026-06-17. Each beat now shows ONLY its actual speakers, and the
+    # scene is split so no character spans a REMA: consecutive same-speaker beats are
+    # merged (A+B = one continuous Duvessa beat), and the REMA fades land only between
+    # genuinely different casts (read as scene transitions, not flashes). In E2 the right
+    # podium starts EMPTY so Baxby fades in fresh for his answer (Duvessa was cleared at
+    # the E1->E2 boundary, never swapped on the same podium).
+    end_preload = [[], [], [], [], [], []]
+    end_overrides = [None, {'hruna': '[OpenMidRight]'},
+                     {'meesmickle': '[OpenMidRight]'}, None,
+                     {'baxby': '[OpenMidRight]'}, None]
 
     # 1. Map: register the painted layout and point slot 2 at it + the winter tileset
     #    (same flow as inject_prologue step 1). Goal display = vanilla Ch1's own Seize
@@ -3417,11 +3418,11 @@ def inject_ch01(campaign, verbose=True):
     end_text_calls = ''.join(
         '    Text(0x%X) /* %s */\n' % (m, lbl)
         for m, lbl in zip(CH01_ENDING_MSGS,
-                          ['A -- Duvessa thanks the company',
-                           'B -- commission + the wrecked sled + go west to Targos',
+                          ['A+B -- Duvessa thanks them, commissions them, grants the sled, points west',
                            'C -- Wolfram asks Hruna for the iron to armor the sled',
                            'D -- RBG over-engineers it; names it the Rolling Cheddar',
-                           'E -- Marty wins over Baxby the axe-beak (first recruit)',
+                           'E1 -- Duvessa points to the axe-beak at the market',
+                           'E2 -- Marty wins over Baxby the axe-beak (first recruit)',
                            'F -- "Targos is expecting weather. Better hurry."']))
     script = _replace_brace_block(
         script, 'EventScr_Ch2_EndingScene[] =',

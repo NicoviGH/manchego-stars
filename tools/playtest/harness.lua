@@ -612,6 +612,7 @@ scenarios.recordending = function()
     end
     if not prep then shot("ending-no-prep"); return result("FAIL", "prep never opened") end
     wait(180)
+    shot("prep")   -- diagnose the prep-screen "black splotches" Nicolas flagged
     for i = 1, 40 do
         if not procActive(SYM.gProcScr_SALLYCURSOR) then break end
         press(K.B, 4); wait(10); press(K.START, 4); wait(40)
@@ -653,16 +654,18 @@ scenarios.recordending = function()
                 press(K.A) -- Seize
             end
             wait(40)
-            pokeNormalConfig() -- readable typewriter for the cutscene
-            -- capture a frame every 12th + an A-tap every ~48 frames so each text page
-            -- holds ~4 still frames (readable dwell once typing completes); playback fps
-            -- in make_gif then sets the final read pace. Runs until the ending's MNC2
-            -- advances the chapter (or a frame-budget guard sized for the long beat E).
+            pokeNormalConfig() -- normal text speed so the typewriter + face fades animate
+            -- FAITHFUL capture (run.sh runs record* at 60fps so the frame callback -- and
+            -- shot() -- fires EVERY emulated frame, not every ~4th as at 240fps). A frame
+            -- every 4th (15fps) renders the engine's ~16-frame face fades as SMOOTH fades
+            -- rather than the 1-frame "blips" sparse capture produced. A-tap every ~72
+            -- frames so each page fully types out then holds -> the true player flow.
+            -- Assemble at 15fps (make_gif --fps 15) for ~real-time playback.
             local fr = 0
-            while chapter() == 2 and fr < 5000 do
+            while chapter() == 2 and fr < 7000 do
                 fr = fr + 1
-                if fr % 12 == 0 then shot("end") end
-                if fr % 48 == 0 then press(K.A, 4) end
+                if fr % 4 == 0 then shot("end") end
+                if fr % 72 == 0 then press(K.A, 4) end
                 yield()
             end
             shot("ending-after")
