@@ -1,11 +1,13 @@
-# Handoff: Ch1 (#21) — ending dialogue LOCKED + Duvessa portrait DONE. NEXT = Baxby art → ending eventscript wiring → Bryn Shander BG → wire ch02.
+# Handoff: Ch1 (#21) — ending dialogue LOCKED + ALL ending art DONE (Duvessa + Baxby). NEXT = wiring: Baxby unit/sprite/face → ending eventscript → Bryn Shander BG → ch02 host.
 
 **Date:** 2026-06-17 (session 5)
 **Where we are:** Ch1 "The Iron Trail" is fully playable and written through the battle.
-The **ch01 ending scene ("The Rolling Cheddar") is now WRITTEN and LOCKED** in the YAML, and
-**Duvessa Shane's portrait is done + wired** (build green). The ending is NOT yet wired into
-the eventscript (still the placeholder in-game), and **Baxby** still needs art. After the
-scene is wired, **ch02** needs hosting so the ending stops landing on vanilla Ch3.
+The **ch01 ending scene ("The Rolling Cheddar") is WRITTEN + LOCKED** in the YAML, and **all
+its art is done**: Duvessa Shane's portrait (wired), Baxby's map sprite (hand-painted by
+Nicolas), and Baxby's portrait (committed, not yet wired). What remains is **engine WIRING**
+(no more art/feel decisions except the Bryn Shander BG): consume the locked ending script in
+the eventscript, wire Baxby as a recruit + his face/sprite, and host ch02 so the ending stops
+landing on vanilla Ch3.
 
 `make` green · `verify_text` 3404/0 · playtests PASS (ch00 win/gameover, ch01 entry, ch01win).
 
@@ -37,6 +39,19 @@ scene is wired, **ch02** needs hosting so the ending stops landing on vanilla Ch
   reproducible generator (decodes clean Selena from git HEAD → RGB recolor → 96×80 indexed) +
   `duvessa.png`/`_preview.png`; `GUEST_PORTRAIT_MAP['duvessa']='Selena'` (collision-free). Approved
   look: brown hair, navy coat, white fur, blue earring, sleeve kept brown.
+- **Baxby map sprite DONE** — `map_sprites/baxby.png` (32×96, 3 frames, cast palette). Reskinned from
+  the FE-Repo **Chocobo Rider {SkidMarc25}** (rider + lance stripped, snowy tundra recolor); **hand-
+  painted by Nicolas** in `tools/map_sprite_editor.py` (I prepped the canvas + donor reference, he did
+  the pixels). 3 frames reused for both idle + walk (Meesmickle pattern). NOTE: the editor's **Finish**
+  button is broken (Save works) — minor tool bug to fix.
+- **Baxby portrait DONE** (committed, not yet wired) — `portraits/baxby.png`. Ref = the **axe-beak art
+  from the Frostmaiden book, modified with Gemini** (Nicolas), then `ref_to_bust.py --crop
+  780,18,1920,940 --flip-h --zoom 0.88` (max size with the whole beak clear of the dead corners).
+  Credited in CREDITS.md (WotC-derived + AI-assisted + the Chocobo base). Render params still need to
+  move into a `baxby.yaml` `art.render` block at wiring.
+- **Gemini note:** I can't drive Gemini directly (API key gets 403 on image endpoints; the nanobanana
+  MCP is pinned to a retired model → 404). Portraits go the proven route: **Nicolas generates on his
+  side**, hands me the PNG, I run the bust pipeline.
 
 ## Current state
 - ✅ Ch1 engine + all in-battle content (entry, lord-select, deploy cap, houses, sign/body, Izobai
@@ -46,24 +61,28 @@ scene is wired, **ch02** needs hosting so the ending stops landing on vanilla Ch
   yet consumed.
 - ⚠️ **ch01 ending lands on vanilla Ch3** (`MNC2(0x3)`) until ch02 is wired.
 
-## Next steps (priority order)
-1. **Baxby art (needs Nicolas's eye; vendor-first per his steer).** Axe-beak → no vanilla portrait
-   match; **search the FE-Repo** ([[reference_fe_repo]]) for a bird/beast **portrait** (recruit mug)
-   + an **axe-beak map sprite** (recipe: [[manchego_stars_guest_map_sprite_wiring]] +
-   `tools/map_sprite_tool.py`; pegasus/wyvern/bird-type bases). Baxby SPEAKS in the ending (needs a
-   face/FID) AND is a purchasable map unit (recruit @200, `post_chapter`) with base class = **cavalier**
-   (Seth chassis — confirm/author his unit YAML; he may not have one yet). Show-before-commit.
+## Next steps (priority order) — ALL WIRING now (art is done); no art/feel input needed except the BG
+1. **Wire Baxby** (3 sub-parts):
+   (a) **cutscene face** — he SPEAKS in the ending; add a `GUEST_PORTRAIT_MAP` entry (`'baxby': <some
+   collision-free vanilla slot>`) so `portraits/baxby.png` dresses it, and map the `baxby:` speaker →
+   that slot's FID in the ending staging.
+   (b) **recruit unit** — purchasable @200 in `post_chapter`; author `baxby.yaml` (class = **cavalier**,
+   Seth chassis; record the `art.render` block: ref `References/PCs/Baxby.png`, crop [780,18,1920,940],
+   flip_h, zoom 0.88). Decide his deploy/recruit wiring (he also appears in ch02 deployment if bought).
+   (c) **map sprite injection** — wire `map_sprites/baxby.png` (3-frame 32×32, idle+walk reuse) for his
+   unit; guest-sprite path per [[manchego_stars_guest_map_sprite_wiring]] (cast palette → cast bank).
 2. **Wire the ending eventscript** (`inject_ch01` → `EventScr_Ch2_EndingScene`). Mirror the Beat-1
    opening machinery: split the locked `chapter_end` script on `beat_break` (A–F), allocate ~6 dead
    message ids + a location card, build `ending_staging` (speakers→podium/FID: `duvessa`→FID_Selena,
    `hruna`→FID_VillagerWoman, `baxby`→its slot, cast via PORTRAIT_MAP), `_script_to_message` each beat
    with REMA between, then victory sting → `MNC2`. 7 speakers across 6 beats — lean on podium eviction.
 3. **Bryn Shander gate/market BG** — the ending is scenic (in-town). Needs a `BACG` background (reskin
-   a vanilla town BG or build one; show-before-commit). Until then the scene can run on a placeholder BG.
+   a vanilla town BG or build one; show-before-commit — the one remaining art piece). Placeholder BG OK until then.
 4. **Wire ch02** ("cold-welcome", `unlocks_chapter` in ch01 `post_chapter`) so the ending's `MNC2`
    targets a real ch02 host slot, not vanilla Ch3. Mirror the inject_ch01 hosting pattern.
 5. **Carried:** #29 world map; pre-distribution license rechecks (Scramsax Hero mug, AlexYTXG
-   Bandit-Peg — no [F2E] tags; Fire Imp + Cynon villager ARE [F2E]); ch02+ YAML `ea_file:` cleanup.
+   Bandit-Peg, **Chocobo {SkidMarc25}** — no [F2E] tags; Fire Imp + Cynon villager ARE [F2E]);
+   ch02+ YAML `ea_file:` cleanup; fix the map_sprite_editor **Finish** button.
 
 ## Key files
 - `campaigns/.../chapters/ch01-the-iron-trail.yaml` — `events[chapter_end]` (ending scene to write),
