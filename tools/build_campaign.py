@@ -1011,6 +1011,17 @@ def _cut_boot_intro(montage=False):
                      '', gc, count=1)
     if n1 == 0:
         sys.exit('ERROR: ProcScr_OpAnim start not found in %s' % GAMECONTROL_C)
+    # With the OpAnim attract gone, nothing flips the cold-boot action from EVENT_RETURN
+    # (which GameControl_PostIntro routes to the New Game/Extras save menu) to USR_SKIPPED
+    # (-> LGAMECTRL_TITLE_DIRECT -> StartTitleScreen). Set it directly in StartGame so a
+    # fresh boot still SHOWS the title screen (then START there proceeds to New Game as
+    # usual) instead of skipping straight to the menu.
+    gc, n_act = re.subn(
+        r'proc->nextAction = GAME_ACTION_EVENT_RETURN;',
+        'proc->nextAction = GAME_ACTION_USR_SKIPPED; '
+        '/* manchego: no op-anim -> boot to the title screen */', gc, count=1)
+    if n_act == 0:
+        sys.exit('ERROR: StartGame cold-boot nextAction not found in %s' % GAMECONTROL_C)
     if not montage:
         gc, n2 = re.subn(r'\n(\s*)StartIntroMonologue\(proc\);',
                          r'\n\1return; /* manchego: skip intro monologue */',

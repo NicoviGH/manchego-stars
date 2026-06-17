@@ -1100,6 +1100,21 @@ end
 -- dev placeholder's MNTS, and shoots a "title" frame once gProcScr_TitleScreen draws.
 -- A standalone boot-capture is unreliable: the attract reel races past the title.)
 
+-- BOOTOBSERVE: screenshot the natural boot sequence with NO input, to see whether the
+-- title screen actually appears at boot (diagnostic).
+scenarios.bootobserve = function()
+    log("observing boot; one tap to clear Health&Safety, then hands-off")
+    press(K.A, 4); wait(120); press(K.A, 4); wait(60)  -- clear the H&S 'press any button'
+    for f = 1, 2400 do
+        if f % 40 == 0 then
+            shot(string.format("boot-%04d-ch%d-title%s", f, chapter(),
+                tostring(procActive(SYM.gProcScr_TitleScreen))))
+        end
+        yield()
+    end
+    return result("PASS", "boot observed")
+end
+
 -- TITLECARD: open the map menu -> Status screen, which decompresses the
 -- chapter title card (chap_title_data[chapTitleId]) -- the artifact screenshot
 -- is how a recomposed title gets eyeballed without a manual run.
