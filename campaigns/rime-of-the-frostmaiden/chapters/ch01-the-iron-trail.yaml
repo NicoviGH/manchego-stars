@@ -279,7 +279,8 @@ events:
       Meesmickle/Marty/Baxby faces staged with the 4-face budget (Duvessa hosts mid-
       right; Baxby's cutscene face rides the Forde slot, GUEST_PORTRAIT_MAP). PENDING:
       Baxby's recruit UNIT + axe-beak map-sprite injection (his bust + face are done);
-      a custom Bryn Shander market BG (BG_GATE placeholder for now, show-before-commit);
+      the ending plays over vanilla BG_NORMAL_VILLAGE (winterize attempts washed it out;
+      using it as-is per Nicolas 2026-06-17);
       ch02 host (MNC2(0x3) drops to vanilla Ch3 until then); in-game motion review.
       Baxby base class = Cavalier, Franz donor (npcs/baxby.yaml).
     script:                       # LOCKED 2026-06-17 (dialogue pass, co-written with Nicolas)

@@ -3434,9 +3434,10 @@ def inject_ch01(campaign, verbose=True):
     # ch01 ending "The Rolling Cheddar" (#21): scenic in-town scene, same machinery as
     # Beat 1's BeginningScene -- a "Bryn Shander" brown-box card + one Text() per beat
     # (A-F), each Text()'s trailing REMA clearing faces (fresh 4-face budget). The locked
-    # bodies + staging are built in step 0b/step 6. BG_GATE is a PLACEHOLDER until the
-    # custom Bryn Shander market BG lands (show-before-commit -- HANDOFF step 3). MNC2(0x3)
-    # still drops to vanilla Ch3 until ch02 is hosted (HANDOFF step 4).
+    # bodies + staging are built in step 0b/step 6. The scene plays over the vanilla
+    # BG_NORMAL_VILLAGE (we tried winterizing it but a palette swap just washes it out and
+    # no clean FE8 snow-village BG was available, so we use it as-is; Nicolas 2026-06-17).
+    # MNC2(0x3) still drops to vanilla Ch3 until ch02 is hosted (HANDOFF step 4).
     end_text_calls = ''.join(
         '    Text(0x%X) /* %s */\n' % (m, lbl)
         for m, lbl in zip(CH01_ENDING_MSGS,
@@ -3450,7 +3451,7 @@ def inject_ch01(campaign, verbose=True):
         script, 'EventScr_Ch2_EndingScene[] =',
         '{\n    MUSC(SONG_VICTORY)\n'
         '    REMOVEPORTRAITS\n'
-        '    BACG(BG_GATE) /* PLACEHOLDER -- Bryn Shander market BG pending (#21) */\n'
+        '    BACG(BG_NORMAL_VILLAGE) /* Bryn Shander -- vanilla village BG (winterize not worth it; Nicolas, 2026-06-17) */\n'
         '    FADU(16) /* chapter ending comes up black; reveal the town BG */\n'
         '    BROWNBOXTEXT(0x%X, 8, 8) /* "Bryn Shander" location card */\n'
         % CH01_ENDING_CARD_MSG
