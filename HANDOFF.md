@@ -1,11 +1,11 @@
-# Handoff: Ch1 (#21) — dialogue pass DONE & committed. NEXT = the ch01 ENDING scene (Duvessa + Baxby; needs art) → then wire ch02.
+# Handoff: Ch1 (#21) — ending dialogue LOCKED + Duvessa portrait DONE. NEXT = Baxby art → ending eventscript wiring → Bryn Shander BG → wire ch02.
 
-**Date:** 2026-06-17 (end of session 4)
+**Date:** 2026-06-17 (session 5)
 **Where we are:** Ch1 "The Iron Trail" is fully playable and written through the battle.
-The opening Northlook scene + all trail beats are committed (`b0c03cf`). The one remaining
-ch01 gap is the **ending cutscene** (currently a one-line placeholder), which needs new
-**art** (Duvessa + Baxby). After that, **ch02** needs wiring so the ending stops landing
-on vanilla Ch3.
+The **ch01 ending scene ("The Rolling Cheddar") is now WRITTEN and LOCKED** in the YAML, and
+**Duvessa Shane's portrait is done + wired** (build green). The ending is NOT yet wired into
+the eventscript (still the placeholder in-game), and **Baxby** still needs art. After the
+scene is wired, **ch02** needs hosting so the ending stops landing on vanilla Ch3.
 
 `make` green · `verify_text` 3404/0 · playtests PASS (ch00 win/gameover, ch01 entry, ch01win).
 
@@ -22,33 +22,47 @@ on vanilla Ch3.
     into the next message without it).
 - Design depth recorded in `docs/decisions.md` ("Multi-speaker cutscene faces" + "Ch1 trail beats").
 
+## Accomplished (session 5, committed + pushed)
+- **ch01 ending scene "The Rolling Cheddar" WRITTEN + LOCKED** (co-written with Nicolas) — recorded as
+  `events[chapter_end].script` in `ch01-the-iron-trail.yaml`. Beats A–F: Duvessa thanks them → Council
+  commission + grants the **wrecked trail sled** (she gifts it; dwarves wrote it off) + points west to
+  **Targos** → **Wolfram** asks Hruna for the recovered **iron** to armor it (Hruna grants) → **RBG**
+  over-engineers the repair + names it the **Rolling Cheddar** → **Meesmickle** dry button ("a dry
+  corner for me… I'll allow it") → **Marty** wins over **Baxby** the axe-beak with food/shelter (first
+  recruit; Baxby = dignified hard-worker, not mean) → Duvessa "Targos is expecting weather. Better
+  hurry." Velynne's orb hook stays HELD for the ch02 cold-open. **"iron" not "steel"** throughout.
+  New **`lore/duvessa-shane.md`** voice bible (earnest young stateswoman; book p.32–33).
+- **Duvessa portrait DONE + wired** — a palette recolor of **vanilla Selena** (Nicolas's base pick:
+  her fur-shoulder bust reads as a winter official; matches book p.33). `portraits/duvessa.py`
+  reproducible generator (decodes clean Selena from git HEAD → RGB recolor → 96×80 indexed) +
+  `duvessa.png`/`_preview.png`; `GUEST_PORTRAIT_MAP['duvessa']='Selena'` (collision-free). Approved
+  look: brown hair, navy coat, white fur, blue earring, sleeve kept brown.
+
 ## Current state
 - ✅ Ch1 engine + all in-battle content (entry, lord-select, deploy cap, houses, sign/body, Izobai
-  taunt + death, Seize win). Combat is vanilla-parity.
-- ⚠️ **ch01 ending scene is a placeholder** — `EventScr_Ch2_EndingScene` = victory sting +
-  `TEXTSHOW(0x954)` ("The iron ingots are recovered.") + `MNC2(0x3)`. The real scene isn't written.
+  taunt + death, Seize win). Combat is vanilla-parity. Ending dialogue LOCKED + Duvessa face ready.
+- ⚠️ **ending NOT wired in-game yet** — `EventScr_Ch2_EndingScene` is still the placeholder
+  (`TEXTSHOW(0x954)` "The iron ingots are recovered." + `MNC2(0x3)`). The locked YAML script is not
+  yet consumed.
 - ⚠️ **ch01 ending lands on vanilla Ch3** (`MNC2(0x3)`) until ch02 is wired.
 
 ## Next steps (priority order)
-1. **Write + wire the ch01 ending scene** (`events[chapter_end]` in the YAML → `EventScr_Ch2_EndingScene`).
-   Per the DM notes: **Duvessa Shane** (Speaker of Bryn Shander) arrives with two guards, thanks the
-   party, pays the reward, and **hires them for ongoing Ten-Towns security — points them to Targos**
-   (frost-druid unrest). Braulo asks about sled dogs → **Baxby the axe-beak** is for sale (200 GP;
-   `post_chapter.units_available_to_recruit`). Use the **dialogue-pass skill** (variants → Nicolas
-   picks; read voice bibles first). Velynne Harpell's stolen-orb hook is HELD for the **Ch2 cold-open**
-   (DM notes: "as the party leave town… head west to Targos"), so don't spend it here.
-2. **ART NEEDS (custom, show-before-commit)** — gate the ending scene:
-   - **Duvessa Shane portrait** — recurring NPC (rides a guest face slot like Hlin/Hruna; add to
-     `GUEST_PORTRAIT_MAP`). Mine `References/` first ([[feedback_check_references_for_art]]); she's a
-     book NPC (Ten-Towns). Pipeline: `tools/portrait_tool.py` / `ref_to_bust.py`
-     ([[project_manchego_stars_portrait_pipeline]]). Likely also a **Duvessa voice bible** (she recurs).
-   - **Baxby the axe-beak** — needs a **portrait** (shop/recruit mug) **and a map sprite** (axe-beak
-     mount). Map-sprite recipe: [[manchego_stars_guest_map_sprite_wiring]] + `tools/map_sprite_tool.py`;
-     base candidates in the FE-Repo ([[reference_fe_repo]] — pegasus/wyvern/bird-type). Baxby is a
-     mount, probably non-speaking (no full bible; `npc-bench` at most).
-3. **Wire ch02** ("cold-welcome", `unlocks_chapter` in ch01 `post_chapter`) so the ending's `MNC2`
+1. **Baxby art (needs Nicolas's eye; vendor-first per his steer).** Axe-beak → no vanilla portrait
+   match; **search the FE-Repo** ([[reference_fe_repo]]) for a bird/beast **portrait** (recruit mug)
+   + an **axe-beak map sprite** (recipe: [[manchego_stars_guest_map_sprite_wiring]] +
+   `tools/map_sprite_tool.py`; pegasus/wyvern/bird-type bases). Baxby SPEAKS in the ending (needs a
+   face/FID) AND is a purchasable map unit (recruit @200, `post_chapter`) with base class = **cavalier**
+   (Seth chassis — confirm/author his unit YAML; he may not have one yet). Show-before-commit.
+2. **Wire the ending eventscript** (`inject_ch01` → `EventScr_Ch2_EndingScene`). Mirror the Beat-1
+   opening machinery: split the locked `chapter_end` script on `beat_break` (A–F), allocate ~6 dead
+   message ids + a location card, build `ending_staging` (speakers→podium/FID: `duvessa`→FID_Selena,
+   `hruna`→FID_VillagerWoman, `baxby`→its slot, cast via PORTRAIT_MAP), `_script_to_message` each beat
+   with REMA between, then victory sting → `MNC2`. 7 speakers across 6 beats — lean on podium eviction.
+3. **Bryn Shander gate/market BG** — the ending is scenic (in-town). Needs a `BACG` background (reskin
+   a vanilla town BG or build one; show-before-commit). Until then the scene can run on a placeholder BG.
+4. **Wire ch02** ("cold-welcome", `unlocks_chapter` in ch01 `post_chapter`) so the ending's `MNC2`
    targets a real ch02 host slot, not vanilla Ch3. Mirror the inject_ch01 hosting pattern.
-4. **Carried:** #29 world map; pre-distribution license rechecks (Scramsax Hero mug, AlexYTXG
+5. **Carried:** #29 world map; pre-distribution license rechecks (Scramsax Hero mug, AlexYTXG
    Bandit-Peg — no [F2E] tags; Fire Imp + Cynon villager ARE [F2E]); ch02+ YAML `ea_file:` cleanup.
 
 ## Key files
