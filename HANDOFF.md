@@ -36,6 +36,14 @@ ch01win re-verified for the new title-return path; recordprep unchanged.
 - **Playtest harness** (`c5f7703`, `e4efde8`). Added the `gProcScr_TitleScreen` symbol; `recordending`
   + `ch01win` now assert the ending reaches the **title** via the placeholder (the placeholder
   lengthened the post-seize path, so `ch01win`'s win budget went 3600→9000). Both PASS.
+- **Title screen: gold "MANCHEGO STARS" logo** (`e7bff72`) — for the ALPHA bundle. The boot title's
+  stylized gold "FIRE EMBLEM" is a ~10-letter one-off (only its own letters exist), so the missing
+  letters are **hand-built**: `tools/gen_gold_title.py` draws each glyph as a shape mask and
+  auto-applies the logo's per-row gold sheen + red-brown outline + drop shadow + italic shear (all read
+  off the vanilla logo). `inject_title_screen()` regenerates `title_fire_emblem_logo.png` each build
+  (gbagfx rebuilds the .4bpp.lz; palette + sprite OAM untouched), centered in the on-screen window so
+  nothing clips. Confirmed in-game via `recordending` (shoots the title once it draws);
+  `map-review/title-ingame-manchego-stars.png`. **Approved by Nicolas** (chose hand-built letterforms).
 
 ## Accomplished (session 7, committed + pushed)
 - **Ending dialogue "flashing" fixed + Marty's spore-cough added** (`0581a35`). The flashing was real:
@@ -122,11 +130,20 @@ ch01win re-verified for the new title-return path; recordprep unchanged.
      to ch02's blue `UnitDefinition` (he's a free recruit, so he just starts deployable in ch02);
      map-sprite injection per [[manchego_stars_guest_map_sprite_wiring]] (cast palette → purple bank,
      the bank the prep fix protects). `map_sprites/baxby.png` + bust are already committed.
-2. **Prep roster overlap** (deferred) — only if Nicolas wants it before more chapters; it's a focused
+2. **Finish the ALPHA title screen** (in progress). Gold "MANCHEGO STARS" logo done; remaining:
+   - **Subtitle** "THE SACRED STONES" → "Rime of the Frostmaiden". It's a separate scroll-banner
+     sprite (`gSprite_Title_SacredStonesBanner`, drawn from `graphics/titlescreen/title_logos.png`,
+     256×40, which also holds "Press START" — preserve that). Its own serif banner font; "Rime of the
+     Frostmaiden" is long for the scroll, so confirm wrap/size with Nicolas.
+   - **Themed background** (Nicolas, 2026-06-17): the vanilla two-dragons BG is off-theme — replace
+     with Frostmaiden cover-style art (the icy owlbear/yeti image Nicolas posted). It's a BG-LAYER job
+     (not the logo sprite): `title_main_background_1/2` + `title_dragon_foreground` (+ TSA/palettes),
+     a good fit for the Gemini→indexed pipeline. Get the source art into `References/` first.
+3. **Prep roster overlap** (deferred) — only if Nicolas wants it before more chapters; it's a focused
    prep-scroll-system rewrite. Verify with `recordprep` (now fast via checkpoints).
-3. **In-game confirms (Nicolas, opportunistic):** 'Ol Bitey in the Northlook scene; overall ending feel;
+4. **In-game confirms (Nicolas, opportunistic):** 'Ol Bitey in the Northlook scene; overall ending feel;
    the dev placeholder / RBG pun wording (copy lives in `DEV_PLACEHOLDER_LINE`).
-4. **Carried:** custom Bryn Shander winter BG via Gemini (parked); #29 world map; pre-distribution
+5. **Carried:** custom Bryn Shander winter BG via Gemini (parked); #29 world map; pre-distribution
    license rechecks (Scramsax Hero mug, AlexYTXG Bandit-Peg, **Chocobo {SkidMarc25}** — no [F2E] tags;
    Fire Imp + Cynon villager ARE [F2E]); ch02+ YAML `ea_file:` cleanup; map_sprite_editor **Finish**
    button bug.
