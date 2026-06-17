@@ -2471,6 +2471,13 @@ def inject_title_screen(campaign, verbose=True):
     src = src.replace(
         '    PutSpriteExt(1, 16, 85, gSprite_Title_SacredStonesBanner, 0x31A0);',
         '    /* manchego: scroll banner dropped (subtitle is in the logo graphic) */')
+    # Disable the title's idle timeout: after ~13.5s with no input Title_IDLE fires
+    # GAME_ACTION_CLASS_REEL -> the attract/class-reel demo, which crashes (we removed the
+    # op-anim path + the demo's class/chapter data no longer matches). Never time out --
+    # the title just holds with its music until the player presses START.
+    src = src.replace(
+        '        if (proc->timer_idle == 815)',
+        '        if (0) /* manchego: never time out to the attract demo (it crashes) */')
     with open(ts_c, 'w', encoding='utf-8') as f:
         f.write(src)
 
