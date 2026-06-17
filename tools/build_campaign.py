@@ -2462,8 +2462,39 @@ def inject_title_screen(campaign, verbose=True):
         '    /* manchego: scroll banner dropped (subtitle is in the logo graphic) */')
     with open(ts_c, 'w', encoding='utf-8') as f:
         f.write(src)
+
+    # 3. Theme the backdrop: recolor the mountain/sky bg palette to icy blue and blank
+    #    the two-dragon foreground (off-theme). Recolour SETS hue (idempotent -- rebuilds
+    #    don't drift); blanking the dragon tiles makes BG0 fully transparent.
+    import colorsys
+    import struct
+    pal_path = os.path.join(ts_dir, 'title_main_background.gbapal')
+    with open(pal_path, 'rb') as f:
+        raw = f.read()
+    out = bytearray()
+    for i in range(0, len(raw), 2):
+        v = struct.unpack('<H', raw[i:i + 2])[0]
+        r, g, b = (v & 31) / 31, ((v >> 5) & 31) / 31, ((v >> 10) & 31) / 31
+        _, l, s = colorsys.rgb_to_hls(r, g, b)
+        nr, ng, nb = colorsys.hls_to_rgb(0.57, l, max(s, 0.45))  # ~205deg icy blue
+        nv = (round(nr * 31) | (round(ng * 31) << 5) | (round(nb * 31) << 10))
+        out += struct.pack('<H', nv)
+    with open(pal_path, 'wb') as f:
+        f.write(bytes(out))
+
+    dragon_png = os.path.join(ts_dir, 'title_dragon_foreground.png')
+    from PIL import Image as _Image
+    dr = _Image.open(dragon_png)
+    blank = _Image.new('P', dr.size, 0)
+    blank.putpalette(dr.getpalette())
+    blank.save(dragon_png)
+    for stale in ('.4bpp', '.4bpp.lz'):
+        p = dragon_png[:-4] + stale
+        if os.path.exists(p):
+            os.remove(p)
     if verbose:
-        print('  boot title -> "MANCHEGO STARS" + "RIME OF THE / FROSTMAIDEN"')
+        print('  boot title -> "MANCHEGO STARS" + "RIME OF THE / FROSTMAIDEN"; '
+              'bg recolored icy blue, dragons removed')
 
 
 def inject_title_theme(campaign, verbose=True):
