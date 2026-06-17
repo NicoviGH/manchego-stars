@@ -509,7 +509,8 @@ end
 -- CH01WIN: the default lord (blind A-taps pick Braulo) marches on the camp,
 -- kills the chief, and SEIZES -- in-game proof of the lord-gated Seize
 -- (CanUnitSeize hook, #42) and the win hand-off (Seize macro -> EVFLAG_WIN ->
--- ending scene -> MNC2(0x3) -> next chapter slot).
+-- ending scene -> dev placeholder -> MNTS back to the title screen, since ch02 is
+-- not hosted yet).
 local CH01_PARK = { x = 24, y = 15 } -- empty far corner; ch01 map is 25x16
 scenarios.ch01win = function()
     if not winCh00() then return end
@@ -595,11 +596,13 @@ scenarios.ch01win = function()
                 shot("ch01win-seize-menu")
                 press(K.A) -- Seize
             end
-            local won = waitFor(function() return chapter() ~= 2 end, 3600, true)
+            local won = waitFor(function()
+                return chapter() ~= 2 or procActive(SYM.gProcScr_TitleScreen)
+            end, 3600, true)
             shot("ch01win-after-seize")
             if won then
-                return result("PASS", string.format(
-                    "Braulo seized the camp; chapter advanced 2 -> %d", chapter()))
+                return result("PASS",
+                    "Braulo seized the camp; ending + dev placeholder played -> title")
             end
             press(K.B); press(K.B) -- menu surprise: back out, retry next turn
         end
@@ -726,18 +729,22 @@ scenarios.recordending = function()
     pokeNormalConfig() -- normal text speed so the typewriter + face fades animate
     press(K.A) -- Seize (the menu was saved open) -> the ending hand-off
     wait(40)
-    local fr = 0
-    while chapter() == 2 and fr < 7000 do
+    -- ch02 isn't hosted, so the ending runs the dev placeholder (RBG's cheese pun over
+    -- the campfire) and MNTS's back to the title screen -- record through all of it until
+    -- gProcScr_TitleScreen comes up.
+    local fr, atTitle = 0, false
+    while fr < 9000 do
         fr = fr + 1
         if fr % 4 == 0 then shot("end") end
         if fr % 72 == 0 then press(K.A, 4) end
+        if procActive(SYM.gProcScr_TitleScreen) then atTitle = true break end
         yield()
     end
     shot("ending-after")
-    if chapter() ~= 2 then
-        return result("PASS", string.format("ending recorded; chapter advanced 2 -> %d", chapter()))
+    if atTitle then
+        return result("PASS", "ending + dev placeholder recorded; returned to the title screen")
     end
-    result("FAIL", "ending never advanced past slot 2")
+    result("FAIL", "ending never reached the title screen (dev placeholder stuck?)")
 end
 
 -- RECORDCH01TRAIL (#21): capture the in-battle trail beats as motion for review --

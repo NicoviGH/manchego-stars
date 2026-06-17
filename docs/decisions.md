@@ -480,6 +480,19 @@ _Decided: May 2026_
 FE8's arena is removed. Wolfram's Forge fills the "spend gold to get stronger" role.
 _Decided: May 2026_
 
+**Gold availability follows vanilla FE8 — no per-chapter clear bonus**
+FE8 grants gold only from in-map sources, never a flat "chapter cleared" stipend
+(verified in the decomp: the prologue/Ch1/Ch2 event scripts give zero gold). Our gold
+likewise comes only from: gold-giving villages (`SVAL(EVT_SLOT_3, n)` +
+`GIVEITEMTOMAIN(leader)` → "Got n gold" popup), sellable enemy drops + gems
+(RedGem/BlueGem/…), and chests. Chapter YAML records gold as concrete in-map sources,
+**not** an abstract `gold_reward` field. ch01 is a net wash like vanilla Ch1 (~0 gold):
+the ~200g job payment for recovering the iron is immediately spent winning over Baxby (a
+**free story-recruit** — FE8 shops sell items, not units, so recruitment is a unit join,
+not a purchase), so nothing is added or subtracted in-game. The "two hundred gold" in the
+ending dialogue is flavor only.
+_Decided: 2026-06-17_
+
 ---
 
 ## Distribution & Scope
@@ -498,6 +511,15 @@ Eastway Ambush)**, ends in a scripted defeat — "You wake up on the road to Rev
 End…" → credits. Revel's End itself is the post-MVP **Ch 9** (`docs/roadmap.md`).
 Chapters beyond the DM notes require a future writing session.
 _Decided: May 2026; recount to 8 on 2026-05-31 after the old Ch 4 was split into Ch 4 (White Moose) + Ch 5 (Elven Tomb)_
+
+**Unbuilt chapter boundaries land on a reusable dev placeholder, not a vanilla map**
+We develop chapter-by-chapter, so a finished chapter's `unlocks_chapter` often points at a
+chapter that isn't hosted yet. Instead of `MNC2`'ing onto a leftover vanilla map, such a
+boundary ends on the **dev placeholder** (`dev_placeholder_scene` in `tools/build_campaign.py`):
+RBG delivers a cheese-pun "still under construction, thanks for playtesting" line over the
+campfire BG, then `MNTS` returns to the title screen. It's a pure event scene (no map/units).
+Punt it forward at each new boundary until the real next chapter lands.
+_Decided: 2026-06-17_
 
 ---
 

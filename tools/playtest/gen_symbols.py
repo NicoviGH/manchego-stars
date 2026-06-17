@@ -30,6 +30,8 @@ WANTED = [
                                 # draws the chapter title card (src/uichapterstatus.c)
     'gProcScr_SALLYCURSOR',     # proc script: the preparations screen
                                 # (src/prep_sallycursor.c; opened by event cmd 0x3E)
+    'gProcScr_TitleScreen',     # proc script: the title screen (src/titlescreen.c).
+                                # Active after the dev placeholder's MNTS return.
 ]
 
 

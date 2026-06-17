@@ -192,6 +192,21 @@ CH01_ENDING_CARD_MSG = 0x94C
 CH01_ENDING_MSGS = (0x946, 0x947, 0x948, 0x949, 0x94A, 0x94B)  # AB,C,D,E1,E2,F
 CH01_BODY_MSG = 0x956    # the dismembered sled-driver, found just past the road sign
 CH01_TAUNT_MSG = 0x960   # Izobai's turn-1 boss taunt (both dead vanilla Ch1-tutorial slots)
+# Dev placeholder -- the reusable "next chapter isn't built yet" landing. A chapter whose
+# `unlocks_chapter` target isn't hosted yet ends HERE instead of MNC2'ing onto an unbuilt
+# slot (which would drop the player on a leftover vanilla map): RBG delivers a cheese-pun
+# "thanks for playtesting" line over the campfire BG, then MNTS returns to the title
+# screen (a pure event scene -- no map/units needed). Punt it forward (call
+# dev_placeholder_scene) at each new chapter boundary until the real next chapter lands.
+# See docs/decisions.md "Dev placeholder".
+DEV_PLACEHOLDER_MSG = 0x954   # free slot-2 id (the old unused "ingots recovered" body)
+DEV_PLACEHOLDER_SPEAKER = 'prof-rbg'   # RBG, the company's over-engineer (Moulder slot)
+DEV_PLACEHOLDER_LINE = (
+    "Ah -- mind the edge there, friends! That's as far as we've built the world. "
+    "The rest is still curing down in the cellar -- you can't rush a good wheel, you "
+    "know. Thank you kindly for playtesting! Hold your whey... there's a great deal "
+    "more adventure left to age. Come back when it's ripe."
+)
 # Scenic BG the lord-select menu plays over (NOT the battle map). A standalone "choose
 # your leader" screen. Darkling Woods -- "the most Icewind Dale of the options" (Nicolas,
 # 2026-06-16). Swap freely to any backgrounds.h enum.
@@ -598,10 +613,15 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None):
         lru.append(pos)
     for speaker, pages in blocks:
         open_tag, fid_tag = staging[speaker]
-        body = open_tag + '[A][LF]\n'.join(pages) + '[A]'
         if fid_tag is None:           # faceless stage business -- no face, no slot
-            parts.append(body)
+            # Emit NO [OpenX] code: those are portrait POSITION anchors (textdefs.txt
+            # [OpenMidLeft]=9 ... ); opening one without a [LoadFace] anchors the text
+            # window to an absent portrait's mouth and the box renders as a cramped,
+            # mis-placed sliver (the "Marty leans in..." narration bug, 2026-06-17).
+            # Plain text shows in the default full-width box, which is what narration wants.
+            parts.append('[A][LF]\n'.join(pages) + '[A]')
             continue
+        body = open_tag + '[A][LF]\n'.join(pages) + '[A]'
         if live.get(open_tag) == speaker:           # already on screen here
             lru.remove(open_tag)
             lru.append(open_tag)
@@ -625,6 +645,34 @@ def _fid_tag(slot):
     """textdefs.txt face-tag for a vanilla character slot (CamelCase, irregulars mapped)."""
     special = {'ONEILL': 'ONeill', 'VILLAGER_WOMAN': 'VillagerWoman'}
     return '[FID_%s]' % special.get(slot, slot.title())
+
+
+def dev_placeholder_scene():
+    """Event-script tail for an unbuilt chapter boundary (see DEV_PLACEHOLDER_MSG).
+
+    Drop this in place of an `MNC2(next)` whose next chapter isn't hosted yet: the
+    caller has just faded to black (FADI), so this reveals the campfire BG, shows
+    RBG's "still under construction" cheese-pun line, then returns to the title
+    screen (MNTS = EvtBackToTitle -> GAME_ACTION_EVENT_RETURN, eventscr.c). No chapter
+    is loaded, so the player never lands on a leftover vanilla map. The matching
+    message body is set by dev_placeholder_message()."""
+    return (
+        '    REMOVEPORTRAITS\n'
+        '    BACG(BG_FIREPLACE) /* dev placeholder: RBG by the campfire */\n'
+        '    FADU(16)\n'
+        '    Text(0x%X) /* RBG: "still under construction" cheese pun */\n'
+        '    FADI(16)\n'
+        '    MNTS(0x0) /* next chapter not built yet -> back to title */\n'
+        % DEV_PLACEHOLDER_MSG)
+
+
+def dev_placeholder_message():
+    """The RBG dev-placeholder message body (one speaker, scenic wrap)."""
+    slot = PORTRAIT_MAP[DEV_PLACEHOLDER_SPEAKER]
+    return _script_to_message(
+        [{DEV_PLACEHOLDER_SPEAKER: DEV_PLACEHOLDER_LINE}],
+        {DEV_PLACEHOLDER_SPEAKER: ('[OpenMidLeft]', _fid_tag(slot))},
+        width=42)
 
 
 def inject_names(campaign, verbose=True):
@@ -3437,7 +3485,10 @@ def inject_ch01(campaign, verbose=True):
     # bodies + staging are built in step 0b/step 6. The scene plays over the vanilla
     # BG_NORMAL_VILLAGE (we tried winterizing it but a palette swap just washes it out and
     # no clean FE8 snow-village BG was available, so we use it as-is; Nicolas 2026-06-17).
-    # MNC2(0x3) still drops to vanilla Ch3 until ch02 is hosted (HANDOFF step 4).
+    # ch02 isn't hosted yet, so instead of MNC2'ing onto a leftover vanilla map the
+    # ending lands on the reusable dev placeholder (dev_placeholder_scene): RBG's
+    # "still under construction" cheese pun, then back to title. Swap to MNC2(ch02 slot)
+    # when ch02 lands.
     end_text_calls = ''.join(
         '    Text(0x%X) /* %s */\n' % (m, lbl)
         for m, lbl in zip(CH01_ENDING_MSGS,
@@ -3457,7 +3508,8 @@ def inject_ch01(campaign, verbose=True):
         % CH01_ENDING_CARD_MSG
         + end_text_calls +
         '    FADI(16) /* fade the town out */\n'
-        '    MNC2(0x3) /* next host slot (ch02, when it lands) */\n    ENDA\n}',
+        + dev_placeholder_scene() +
+        '    ENDA\n}',
         CH2_EVENTSCRIPT_H)
     with open(CH2_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
         f.write(script)
@@ -3529,8 +3581,9 @@ def inject_ch01(campaign, verbose=True):
     # Shander" card + one message per beat (A-F), rendered at the scenic full-screen wrap
     # with the staging built in step 0b (Duvessa hosts mid-right; two-shots opposite).
     # Each beat rides its own Text()/REMA (step 4), so the 4-face budget resets per beat.
-    # (0x954, the old placeholder "ingots recovered" body, is now unused -- the recovery
-    # is told in beat A; left vanilla-dead like the rest of the slot-2 pool.)
+    # (0x954, the old placeholder "ingots recovered" body, is repurposed as the dev
+    # placeholder line -- DEV_PLACEHOLDER_MSG; the ingot recovery is told in beat A.)
+    set_message_body(lines, DEV_PLACEHOLDER_MSG, dev_placeholder_message())
     set_message_body(lines, CH01_ENDING_CARD_MSG, name_message_body(end_card))
     for i, (msg_id, beat) in enumerate(zip(CH01_ENDING_MSGS, end_beats)):
         set_message_body(lines, msg_id, _script_to_message(

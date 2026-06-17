@@ -376,13 +376,19 @@ events:
       plate (def→res), and an axe has the edge over his spear.
 
 # ── Post-Chapter ──────────────────────────────────────────────────────────────
+# Economy follows vanilla FE8: NO flat per-chapter clear bonus -- gold comes only from
+# in-map sources (gold-giving villages, sellable drops/gems, chests, arena). See
+# docs/decisions.md "Economy". ch01 is a net wash, like vanilla Ch1 (~0 gold): the
+# company's ~200g job payment for recovering the iron is immediately spent winning over
+# Baxby, so nothing is added or subtracted in-game (Nicolas, 2026-06-17). The "two
+# hundred gold" in the ending dialogue is flavor only.
 post_chapter:
-  gold_reward: 300              # base reward (+ enemy drops)
+  net_gold: 0                   # job pay (~200g) == Baxby's keep; no in-game add/subtract
   available_shops: [bryn-shander]
-  units_available_to_recruit:
-    - id: baxby
-      cost_gp: 200
-      description: "Purchase Baxby the axe-beak at the Bryn Shander market"
+  units_available_to_recruit:   # Baxby = FREE story-recruit, won over in the ending
+    - id: baxby                 # cutscene; joins as a ch02 starting unit. FE8 shops sell
+      via: story                # items, not units, so this is recruitment, not a purchase.
+      joins: ch02-cold-welcome
   unlocks_chapter: ch02-cold-welcome
 
 # ── Design Notes ───────────────────────────────────────────────────────────────
