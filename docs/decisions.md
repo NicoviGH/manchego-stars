@@ -364,6 +364,24 @@ _Decided: 2026-06-09 (titlecard scenario added 2026-06-09: opens the map-menu St
 screen — which decompresses the title card — and screenshots it, so recomposed titles
 get eyeballed without a manual run)_
 
+**Recording a cutscene as a review GIF (the standard way to show Nicolas motion).**
+The harness fast-forwards cutscenes (mashes A), so an assert scenario's screenshots land
+on fades — to SEE a scene play, use a `record*` scenario: it drives the game to the
+scene, then captures PNG motion frames `NN-<tag>.png` into `/tmp/playtest-<scenario>/`.
+Existing: `recordending` (ch01 outro, tag `end`), `recordch01trail` (`trail`),
+`recordlord` (`lord`), `recordch01`/`record`/`scenes` (`op`/`bt`). To record a NEW scene,
+add `scenarios.record<name>` that drives to it then captures; for an OUTRO, reuse the win
+drive (cf. `recordending`'s copy of `ch01win`) and swap the fast win-wait for
+`pokeNormalConfig()` (restores readable typewriter speed after the battle's
+`pokeFastConfig`) + a slow capture loop (`if fr%8==0 then shot; if fr%18==0 then press A`
+until `chapter()` advances). Then assemble + show:
+`tools/playtest/make_gif.py <scenario> <tag> --name <basename> --open` (PIL; `--fps`
+controls read pace — **~6 fps for text-heavy scenes Nicolas needs to read**, 12 for quick
+motion; `--scale` nearest-upscales the 240×160 frame; `--open` saves to `map-review/`,
+gitignored, and opens in Safari since Preview paginates GIFs and inline renders aren't
+visible to Nicolas — [[feedback_sharing_visual_drafts]]).
+_Decided: 2026-06-17 (#21 ending review)._
+
 **Chapter title cards are IMAGES, recomposed from vanilla glyphs.**
 FE8's intro/Status title banner is a 4bpp graphic (`chap_title_data[chapTitleId]`,
 `src/chapter_title.c`), not text — text ids (`chapTitleTextId`, 0x160+) only feed the

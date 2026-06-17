@@ -136,6 +136,13 @@ local function pokeFastConfig() -- many-combat phases: map-anim battles + fast s
     emu:write32(a, c)
 end
 
+local function pokeNormalConfig() -- cutscene recording: clear gameSpeed so the
+    -- text typewriter types at a readable pace (the default the player sees), undoing
+    -- a prior pokeFastConfig from the battle grind.
+    local a = SYM.gPlaySt + 0x40
+    emu:write32(a, ru32(a) & ~(1 << 7))
+end
+
 local function tileOccupied(x, y)
     for _, base in ipairs({ SYM.gUnitArrayBlue, SYM.gUnitArrayRed }) do
         for i = 0, 23 do
@@ -585,6 +592,90 @@ scenarios.ch01win = function()
     end
     shot("ch01win-timeout")
     result("FAIL", "could not seize the camp in 14 turns")
+end
+
+-- RECORDENDING (#21): drive ch01 to the Seize exactly like ch01win, then -- instead
+-- of mashing A through the win hand-off -- restore readable text speed and capture the
+-- ending cutscene "The Rolling Cheddar" as motion frames (tagged "end", every 6th
+-- frame) for the review GIF (tools/playtest/make_gif.py assembles them offline). This
+-- is the standard way to record an OUTRO scene: reuse the win drive, swap the fast
+-- win-wait for pokeNormalConfig + a slow A-tap record loop.
+scenarios.recordending = function()
+    if not winCh00() then return end
+    if not waitFor(function() return chapter() == 2 end, 1800) then
+        return result("FAIL", "chapter slot 2 never loaded after the ch00 win")
+    end
+    local prep = false
+    for i = 1, 200 do
+        if procActive(SYM.gProcScr_SALLYCURSOR) then prep = true break end
+        press(K.A, 4); wait(36)
+    end
+    if not prep then shot("ending-no-prep"); return result("FAIL", "prep never opened") end
+    wait(180)
+    for i = 1, 40 do
+        if not procActive(SYM.gProcScr_SALLYCURSOR) then break end
+        press(K.B, 4); wait(10); press(K.START, 4); wait(40)
+        if i % 4 == 0 and procActive(SYM.gProcScr_SALLYCURSOR) then press(K.A, 4) wait(20) end
+    end
+    if not waitFor(function()
+        return not procActive(SYM.gProcScr_SALLYCURSOR) and faction() == 0 and turn() >= 1
+    end, 1200) then return result("FAIL", "could not leave preparations") end
+    wait(120)
+    pokeFastConfig() -- speed through the goblin grind to the seize
+    local chief = red(CHAR_CHIEF)
+    if not chief then return result("FAIL", "chief not in the red array") end
+    local goal = { x = chief.x, y = chief.y }
+    pokeFrail(chief)
+    local function recwait(n, tag)
+        for f = 1, n do if f % 6 == 0 then shot(tag) end yield() end
+    end
+    for t = 1, 18 do
+        waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
+        wait(100)
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and r.charId ~= CHAR_CHIEF and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+        end
+        local braulo = blue(0x01)
+        if isDead(braulo) then return result("FAIL", "Braulo died on the march") end
+        chief = red(CHAR_CHIEF)
+        if chief and not isDead(chief) then
+            if math.abs(braulo.x - chief.x) + math.abs(braulo.y - chief.y) == 1 then
+                if moveUnit(braulo.x, braulo.y, braulo.x, braulo.y) then
+                    chooseAttack(braulo.addr)
+                end
+            else
+                marchToward(braulo, goal.x, goal.y + 1, 24, 15)
+            end
+        else
+            -- chief down: seize, then RECORD the ending at readable speed
+            if moveUnit(braulo.x, braulo.y, goal.x, goal.y) then
+                press(K.A) -- Seize
+            end
+            wait(40)
+            pokeNormalConfig() -- readable typewriter for the cutscene
+            -- capture a frame every 12th + an A-tap every ~48 frames so each text page
+            -- holds ~4 still frames (readable dwell once typing completes); playback fps
+            -- in make_gif then sets the final read pace. Runs until the ending's MNC2
+            -- advances the chapter (or a frame-budget guard sized for the long beat E).
+            local fr = 0
+            while chapter() == 2 and fr < 5000 do
+                fr = fr + 1
+                if fr % 12 == 0 then shot("end") end
+                if fr % 48 == 0 then press(K.A, 4) end
+                yield()
+            end
+            shot("ending-after")
+            if chapter() ~= 2 then
+                return result("PASS", string.format(
+                    "ending recorded; chapter advanced 2 -> %d", chapter()))
+            end
+            return result("FAIL", "ending never advanced past slot 2")
+        end
+        local phase = runEnemyPhase(CH01_PARK)
+        if phase == "gameover" then return result("FAIL", "unexpected game over") end
+    end
+    result("FAIL", "could not reach the seize tile")
 end
 
 -- RECORDCH01TRAIL (#21): capture the in-battle trail beats as motion for review --

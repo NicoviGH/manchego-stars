@@ -1,18 +1,29 @@
 #!/usr/bin/env bash
-# Run an automated ch00 playtest scenario in mGBA (headed, but fully scripted).
+# Run an automated playtest scenario in mGBA (headed, but fully scripted).
 #
-#   tools/playtest/run.sh win|gameover|retreat|titlecard|scenes|ch01 [--keep-open]
+#   tools/playtest/run.sh <scenario> [--keep-open]
+#
+# Logic scenarios (assert PASS/FAIL):  win | gameover | retreat | ch01win | titlecard
+# Recording scenarios (drop motion frames for a review GIF):
+#   recordending     -- the ch01 "Rolling Cheddar" outro cutscene (frames tagged "end")
+#   recordch01trail  -- ch01 in-battle trail beats: Izobai taunt + death ("trail")
+#   recordlord       -- the lord-select flow ("lord")
+#   recordch01 | record | scenes -- opening / Beat-1 scene frames ("op"/"bt")
+#
+# To turn recorded frames into a GIF and show Nicolas (he can't see inline renders):
+#   tools/playtest/make_gif.py <scenario> <tag> --name <basename> --open
+#   e.g. tools/playtest/make_gif.py recordending end --name ch01-ending --open
 #
 # Requires the mGBA 0.11+ nightly (has --script); auto-downloads it into
 # tools/emulator/mGBA-dev.app on first run. Results land in
-# /tmp/playtest-<scenario>/ (log + milestone screenshots); exit code 0 = PASS.
+# /tmp/playtest-<scenario>/ (log + frames/screenshots); exit code 0 = PASS.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 APP="$REPO/tools/emulator/mGBA-dev.app/Contents/MacOS/mGBA"
 ROM="$REPO/fireemblem8u/fireemblem8.gba"
-SCENARIO="${1:?usage: run.sh win|gameover|retreat|titlecard|scenes|record}"
+SCENARIO="${1:?usage: run.sh <scenario>  (see header: win|ch01win|recordending|... + make_gif.py)}"
 KEEP_OPEN="${2:-}"
 
 OUT="/tmp/playtest-$SCENARIO"
