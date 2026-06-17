@@ -742,10 +742,12 @@ scenarios.recordending = function()
         if procActive(SYM.gProcScr_TitleScreen) then atTitle = true break end
         yield()
     end
-    shot("ending-after")
     if atTitle then
+        wait(120) -- let the title fade in + the logo/banner draw
+        shot("title")
         return result("PASS", "ending + dev placeholder recorded; returned to the title screen")
     end
+    shot("ending-after")
     result("FAIL", "ending never reached the title screen (dev placeholder stuck?)")
 end
 
@@ -1093,6 +1095,10 @@ scenarios.record = function()
     recwait(40, "bt")
     return result("PASS", "video frames recorded (op + bt)")
 end
+
+-- (The boot title screen is captured by `recordending` -- it ends on the title via the
+-- dev placeholder's MNTS, and shoots a "title" frame once gProcScr_TitleScreen draws.
+-- A standalone boot-capture is unreliable: the attract reel races past the title.)
 
 -- TITLECARD: open the map menu -> Status screen, which decompresses the
 -- chapter title card (chap_title_data[chapTitleId]) -- the artifact screenshot

@@ -2424,6 +2424,25 @@ def inject_winter_tileset(campaign, verbose=True):
               % (WINTER_TILESET, base, base + len(labels) - 1, TEST_CHAPTER_INDEX))
 
 
+def inject_title_screen(campaign, verbose=True):
+    """Replace the boot title screen's gold "FIRE EMBLEM" logo with "MANCHEGO
+    STARS" in the same gold letterform style (gen_gold_title hand-built glyphs +
+    the logo's own gradient/outline/shadow). Only the image source changes: the
+    decomp's generic gbagfx rule rebuilds title_fire_emblem_logo.4bpp(.lz) from
+    the .png, the palette is preserved, and gSprite_Title_FireEmblemLogo /
+    data_titlescreen.s are untouched. Idempotent (rebuilds a fresh canvas)."""
+    import gen_gold_title
+    logo_png = os.path.join(DECOMP, 'graphics', 'titlescreen',
+                            'title_fire_emblem_logo.png')
+    gen_gold_title.compose_logo('MANCHEGO STARS').save(logo_png)
+    for stale in ('.4bpp', '.4bpp.lz'):
+        p = logo_png[:-4] + stale
+        if os.path.exists(p):
+            os.remove(p)
+    if verbose:
+        print('  boot title logo -> "MANCHEGO STARS" (gold letterforms)')
+
+
 def inject_title_theme(campaign, verbose=True):
     """Recolor the chapter-title banner palettes from campaign.yaml `title_theme`.
 
@@ -3721,6 +3740,8 @@ def main():
         inject_winter_tileset(args.campaign)
         print('title theme:')
         inject_title_theme(args.campaign)
+        print('title screen:')
+        inject_title_screen(args.campaign)
         print('chapter 1 (#21):')
         inject_ch01(args.campaign)  # MUST precede inject_prologue (vanilla goal read)
         inject_northlook_bitey()    # 'Ol Bitey over the tavern hearth (Beat 1 set dressing)
