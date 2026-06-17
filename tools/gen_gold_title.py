@@ -202,6 +202,48 @@ GLYPHS = {
           "###     ### ",
           "###      ###",
           "            "],
+    'I': ["######",
+          "######",
+          "  ##  ",
+          "  ##  ",
+          "  ##  ",
+          "  ##  ",
+          "  ##  ",
+          "  ##  ",
+          "  ##  ",
+          "  ##  ",
+          "  ##  ",
+          "######",
+          "######",
+          "      "],
+    'F': ["##########",
+          "##########",
+          "###       ",
+          "###       ",
+          "###       ",
+          "########  ",
+          "########  ",
+          "###       ",
+          "###       ",
+          "###       ",
+          "###       ",
+          "###       ",
+          "###       ",
+          "          "],
+    'D': ["#########   ",
+          "########### ",
+          "###     ### ",
+          "###      ###",
+          "###      ###",
+          "###      ###",
+          "###      ###",
+          "###      ###",
+          "###      ###",
+          "###     ### ",
+          "########### ",
+          "#########   ",
+          "            ",
+          "            "],
 }
 
 
@@ -289,12 +331,18 @@ def compose(text):
     return im
 
 
-def compose_logo(text='MANCHEGO STARS', top=5):
+SUB_FILL = 7        # logo-palette cream (255,255,213) -- light subtitle ink
+SUB_OUTLINE = 14    # logo-palette dark red-brown (82,16,8) -- subtitle outline
+
+
+def compose_logo(text='MANCHEGO STARS', subtitle=('RIME OF THE', 'FROSTMAIDEN'),
+                 top=5, sub_top=34):
     """Full 256x64 drop-in replacement for title_fire_emblem_logo.png: `text` in
-    gold at the top band (where "FIRE EMBLEM" sat), the rest cleared. Keeps the
-    vanilla logo palette so the title sprite + its .gbapal are unchanged. The
-    faint vanilla subtitle in the lower half is dropped (the prominent subtitle
-    is the separate scroll banner)."""
+    gold at the top, the two-line `subtitle` (slab-serif, gen_subtitle) below it in
+    cream with a dark outline. Both ride the vanilla logo palette so the sprite +
+    .gbapal are unchanged (the old scroll banner is disabled separately). The faint
+    vanilla lower-half subtitle is dropped."""
+    import gen_subtitle
     base = Image.open(LOGO)
     word = np.array(compose(text))
     h, w = word.shape
@@ -304,6 +352,23 @@ def compose_logo(text='MANCHEGO STARS', top=5):
     canvas = np.zeros((64, 256), dtype=np.uint8)
     x = max(0, (VIS_W - w) // 2)   # centre within the on-screen window, not the canvas
     canvas[top:top + h, x:x + w] = word
+
+    if subtitle:
+        sub = np.array(gen_subtitle.compose_lines(list(subtitle)))  # 17=ink,255=bg
+        ink = sub == 17
+        sh, sw = ink.shape
+        sx = max(0, (VIS_W - sw) // 2)
+        # outline first (8-neighbour halo), then cream fill
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                ys, xs = np.where(ink)
+                ny, nx = ys + dy + sub_top, xs + dx + sx
+                ok = (ny >= 0) & (ny < 64) & (nx >= 0) & (nx < 256)
+                canvas[ny[ok], nx[ok]] = np.where(canvas[ny[ok], nx[ok]] == 0,
+                                                  SUB_OUTLINE, canvas[ny[ok], nx[ok]])
+        ys, xs = np.where(ink)
+        canvas[ys + sub_top, xs + sx] = SUB_FILL
+
     im = Image.fromarray(canvas)
     im.putpalette(base.getpalette())
     return im

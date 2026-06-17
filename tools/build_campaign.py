@@ -2432,15 +2432,38 @@ def inject_title_screen(campaign, verbose=True):
     the .png, the palette is preserved, and gSprite_Title_FireEmblemLogo /
     data_titlescreen.s are untouched. Idempotent (rebuilds a fresh canvas)."""
     import gen_gold_title
-    logo_png = os.path.join(DECOMP, 'graphics', 'titlescreen',
-                            'title_fire_emblem_logo.png')
-    gen_gold_title.compose_logo('MANCHEGO STARS').save(logo_png)
+    ts_dir = os.path.join(DECOMP, 'graphics', 'titlescreen')
+
+    # 1. Logo graphic (256x64): "MANCHEGO STARS" gold in the top 32 rows; the two-line
+    #    subtitle in the bottom 32 rows (the half the second sprite draws). title_logos
+    #    is read as tiles (pixel edits don't map to sprite regions), but the logo graphic
+    #    maps cleanly, so both texts live here.
+    logo_png = os.path.join(ts_dir, 'title_fire_emblem_logo.png')
+    gen_gold_title.compose_logo('MANCHEGO STARS',
+                                ('RIME OF THE', 'FROSTMAIDEN')).save(logo_png)
     for stale in ('.4bpp', '.4bpp.lz'):
         p = logo_png[:-4] + stale
         if os.path.exists(p):
             os.remove(p)
+
+    # 2. titlescreen.c: the vanilla second logo sprite (0x2080) draws the bottom 32 rows
+    #    as a blended glow at Y=53 (oam0=1077), overlapping the logo. Repoint it to a
+    #    plain draw at Y=80 so those rows (our subtitle) render BELOW the logo; and drop
+    #    the "THE SACRED STONES" scroll banner. Idempotent.
+    ts_c = os.path.join(DECOMP, 'src', 'titlescreen.c')
+    with open(ts_c, encoding='utf-8') as f:
+        src = f.read()
+    src = src.replace(
+        '    PutSpriteExt(2, 4, 1077, gSprite_Title_FireEmblemLogo, 0x2080);',
+        '    PutSpriteExt(1, 4, 80, gSprite_Title_FireEmblemLogo, 0x2080); '
+        '/* manchego: subtitle row, below the logo */')
+    src = src.replace(
+        '    PutSpriteExt(1, 16, 85, gSprite_Title_SacredStonesBanner, 0x31A0);',
+        '    /* manchego: scroll banner dropped (subtitle is in the logo graphic) */')
+    with open(ts_c, 'w', encoding='utf-8') as f:
+        f.write(src)
     if verbose:
-        print('  boot title logo -> "MANCHEGO STARS" (gold letterforms)')
+        print('  boot title -> "MANCHEGO STARS" + "RIME OF THE / FROSTMAIDEN"')
 
 
 def inject_title_theme(campaign, verbose=True):
