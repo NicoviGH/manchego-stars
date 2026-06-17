@@ -96,6 +96,7 @@ UNIT_ICON_MOVE_C = os.path.join(DECOMP, 'src', 'unit_icon_move_data.c')
 UNIT_ICON_MOVE_S = os.path.join(DECOMP, 'data', 'const_data_unit_icon_move.s')
 MOVE_GFX_DIR = os.path.join(DECOMP, 'graphics', 'unit_icon', 'move')
 BMUDISP_C = os.path.join(DECOMP, 'src', 'bmudisp.c')
+PREP_UNITSELECT_C = os.path.join(DECOMP, 'src', 'prep_unitselect.c')
 # New-game boots straight into the test chapter (skip the vanilla prologue) so the
 # spawn is one "New Game" away. CHAPTER_L_1 = 0x01 (constants/chapters.h).
 TEST_CHAPTER_INDEX = 1
@@ -208,7 +209,7 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         'src/gamecontrol.c', 'src/bmio.c', 'src/bmunit.c', 'src/bmmap.c',
                         'src/bmcamadjust.c',
                         'src/unit_icon_wait_data.c', 'src/unit_icon_move_data.c', 'src/mu.c',
-                        'src/bmudisp.c',
+                        'src/bmudisp.c', 'src/prep_unitselect.c',
                         # enemy class reskins (#21): cloned goblin classes in gClassData
                         'src/data_classes.c',
                         # Goodberry (#21): vulnerary icon swapped by inject_item_icons
@@ -1833,6 +1834,27 @@ def _inject_palette_bank_hook():
 
     with open(BMUDISP_C, 'w', encoding='utf-8') as f:
         f.write(text)
+
+    # prep_unitselect.c: PrepUnit_InitSMS loads the unit-sprite palettes (incl. our cast
+    # palette into the purple bank 0x0B) then immediately zeros bank 0x0B -- vanilla
+    # cleanup that's harmless there (no purple-faction units in prep) but blanks our
+    # custom cast map sprites to BLACK silhouettes on the Pick Units roster. Drop the
+    # fill: ApplyUnitSpritePalettes already left bank 0x0B holding the correct cast palette.
+    with open(PREP_UNITSELECT_C, encoding='utf-8') as f:
+        prep = f.read()
+    fill_orig = ('    ApplyUnitSpritePalettes();\n'
+                 '    CpuFastFill(0, PAL_OBJ(0x0B), 0x20);\n')
+    fill_hooked = ('    ApplyUnitSpritePalettes();\n'
+                   '    /* Manchego Stars: vanilla zeros the purple OBJ bank (0x0B) here --\n'
+                   '     * unused in vanilla prep -- but our custom cast map sprites render\n'
+                   '     * from it, so keep the cast palette ApplyUnitSpritePalettes just\n'
+                   '     * loaded instead of blanking it (else the roster goes black). */\n')
+    if fill_orig not in prep:
+        sys.exit('ERROR: PrepUnit_InitSMS purple-bank fill not in expected form in %s'
+                 % PREP_UNITSELECT_C)
+    prep = prep.replace(fill_orig, fill_hooked, 1)
+    with open(PREP_UNITSELECT_C, 'w', encoding='utf-8') as f:
+        f.write(prep)
 
 
 def _inject_cast_palette(palette_u16, char_slots):
