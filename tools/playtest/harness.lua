@@ -596,9 +596,11 @@ scenarios.ch01win = function()
                 shot("ch01win-seize-menu")
                 press(K.A) -- Seize
             end
+            -- generous budget: post-seize plays the full ending cutscene + the dev
+            -- placeholder before MNTS reaches the title (longer than the old 3600).
             local won = waitFor(function()
                 return chapter() ~= 2 or procActive(SYM.gProcScr_TitleScreen)
-            end, 3600, true)
+            end, 9000, true)
             shot("ch01win-after-seize")
             if won then
                 return result("PASS",
