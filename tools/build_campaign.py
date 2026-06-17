@@ -321,6 +321,11 @@ GUEST_PORTRAIT_MAP = {
     # (FID tag [FID_VillagerWoman] = 0x60) -- a throwaway NPC mug used nowhere else,
     # so dressing it with hruna.png is collision-free. Cutscene-only (no map unit).
     'hruna':          'Villager_Woman',
+    # ch01-ending patron Duvessa Shane (Speaker of Bryn Shander) rides the Selena slot:
+    # her bust is a palette recolor of vanilla Selena (portraits/duvessa.py), and Selena
+    # is a late-game Grado boss absent from our MVP chapters (ch00-08), so dressing
+    # FID_Selena with duvessa.png is collision-free. Recurring cutscene NPC (no map unit).
+    'duvessa':        'Selena',
 }
 
 
