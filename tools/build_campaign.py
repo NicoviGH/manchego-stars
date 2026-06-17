@@ -3585,27 +3585,37 @@ def inject_northlook_bitey(verbose=True):
                    check=True)
     im = Image.open(bg)
     pal = im.getpalette()
-    inv = {tuple(pal[i * 3:i * 3 + 3]): i for i in range(256)}
-    body, hi, mid, outl, fin = (64, 32, 88), (120, 64, 80), (88, 40, 80), (0, 0, 64), (0, 0, 56)
-    def c(rgb):
+    # FE8 convo backgrounds are 4bpp: each 8x8 tile may only reference ONE 16-colour
+    # sub-palette. The mantle tiles where Bitey hangs all use sub-palette BLOCK 5
+    # (indices 80..95, the warm-stone tones) -- so the fish MUST be painted with block-5
+    # indices, or the tile conversion can't fit its colours and garbles it to a black
+    # blob (the old cool-blue fish drew from another block -> the in-game blob Nicolas
+    # flagged). So a dark *smoked-fish* trophy in stone tones, reading against the light
+    # tan wall by VALUE + a crisp black outline. Stamp explicit indices (not an RGB
+    # lookup, which could resolve to the same colour in the wrong block).
+    OUTL, BODY, BELLY, FIN, EYE = 80, 89, 82, 84, 92  # block-5 indices (see palette)
+    cmap = {}
+    def c(idx):
+        rgb = tuple(pal[idx * 3:idx * 3 + 3])
+        cmap[rgb] = idx
         return rgb + (255,)
     ov = Image.new('RGBA', (34, 15), (0, 0, 0, 0))
     d = ImageDraw.Draw(ov)
-    d.ellipse([5, 3, 26, 11], fill=c(body), outline=c(outl))     # body
-    d.arc([6, 6, 25, 12], 20, 160, fill=c(mid))                  # belly sheen
-    d.polygon([(12, 3), (20, 3), (16, 0)], fill=c(fin))          # dorsal fin
-    d.polygon([(25, 7), (33, 1), (30, 7), (33, 13)], fill=c(fin), outline=c(outl))  # forked tail
-    d.polygon([(12, 8), (16, 8), (12, 13)], fill=c(fin))         # pectoral fin
-    d.line([(5, 7), (1, 7)], fill=c(outl))                       # open mouth
-    d.ellipse([7, 5, 10, 8], fill=c(hi), outline=c(outl))        # eye socket
-    d.point((8, 6), fill=c(outl))                                # pupil
+    d.ellipse([5, 3, 26, 11], fill=c(BODY), outline=c(OUTL))     # body
+    d.arc([6, 6, 25, 12], 20, 160, fill=c(BELLY))               # belly sheen
+    d.polygon([(12, 3), (20, 3), (16, 0)], fill=c(FIN))         # dorsal fin
+    d.polygon([(25, 7), (33, 1), (30, 7), (33, 13)], fill=c(FIN), outline=c(OUTL))  # forked tail
+    d.polygon([(12, 8), (16, 8), (12, 13)], fill=c(FIN))        # pectoral fin
+    d.line([(5, 7), (1, 7)], fill=c(OUTL))                      # open mouth
+    d.ellipse([7, 5, 10, 8], fill=c(EYE), outline=c(OUTL))      # eye socket (light, reads)
+    d.point((8, 6), fill=c(OUTL))                               # pupil
     op, ovp = im.load(), ov.load()
     ox, oy = 118, 89                                             # centered over the hearth
     for y in range(15):
         for x in range(34):
             r, g, b, a = ovp[x, y]
             if a > 0:
-                op[ox + x, oy + y] = inv[(r, g, b)]
+                op[ox + x, oy + y] = cmap[(r, g, b)]
     im.save(bg)
     for ext in ('.feimg2.bin', '.feimg2.bin.lz', '.fetsa2.bin', '.gbapal'):
         stale = bg[:-4] + ext
