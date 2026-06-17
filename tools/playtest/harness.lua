@@ -143,6 +143,24 @@ local function pokeNormalConfig() -- cutscene recording: clear gameSpeed so the
     emu:write32(a, ru32(a) & ~(1 << 7))
 end
 
+-- Save-state checkpoints (PLAYTEST_STATEDIR set by run.sh). Lets a slow scene's lead-up
+-- be built ONCE at top speed by a ckpt_* scenario, then the scene itself replayed at
+-- viewable speed by a record* scenario that loads the state -- no full playthrough each
+-- spot-check. run.sh stamps the ROM hash so a stale state is rebuilt after a rebuild.
+local function statePath(name) return PLAYTEST_STATEDIR .. "/" .. name .. ".ss" end
+local function saveState(name)
+    local ok = false
+    pcall(function() ok = emu:saveStateFile(statePath(name)) end)
+    log("saveState " .. name .. " -> " .. tostring(ok))
+    return ok
+end
+local function loadState(name)
+    local ok = false
+    pcall(function() ok = emu:loadStateFile(statePath(name)) end)
+    log("loadState " .. name .. " -> " .. tostring(ok))
+    return ok
+end
+
 local function tileOccupied(x, y)
     for _, base in ipairs({ SYM.gUnitArrayBlue, SYM.gUnitArrayRed }) do
         for i = 0, 23 do
@@ -594,25 +612,29 @@ scenarios.ch01win = function()
     result("FAIL", "could not seize the camp in 14 turns")
 end
 
--- RECORDENDING (#21): drive ch01 to the Seize exactly like ch01win, then -- instead
--- of mashing A through the win hand-off -- restore readable text speed and capture the
--- ending cutscene "The Rolling Cheddar" as motion frames (tagged "end", every 6th
--- frame) for the review GIF (tools/playtest/make_gif.py assembles them offline). This
--- is the standard way to record an OUTRO scene: reuse the win drive, swap the fast
--- win-wait for pokeNormalConfig + a slow A-tap record loop.
-scenarios.recordending = function()
-    if not winCh00() then return end
-    if not waitFor(function() return chapter() == 2 end, 1800) then
-        return result("FAIL", "chapter slot 2 never loaded after the ch00 win")
-    end
-    local prep = false
+-- ---- CHECKPOINTS (#21): build a slow scene's lead-up ONCE at top speed (ckpt_*), then
+-- replay just the scene at viewable speed (record*, which loads the save state). run.sh
+-- orchestrates: it runs the ckpt_* builder at 240fps if the state is missing/stale, then
+-- the record* scenario at 60fps. The lead-up drivers are shared here so the checkpoint
+-- and a from-scratch run stay in lock-step.
+
+-- Drive ch00 win -> ch01 prep screen OPEN (default-lord A-taps through the save menu +
+-- the Beat-1 Northlook scene + lord select). true at the prep proc.
+local function reachPrep()
+    if not winCh00() then return false end
+    if not waitFor(function() return chapter() == 2 end, 1800) then return false end
     for i = 1, 200 do
-        if procActive(SYM.gProcScr_SALLYCURSOR) then prep = true break end
+        if procActive(SYM.gProcScr_SALLYCURSOR) then return true end
         press(K.A, 4); wait(36)
     end
-    if not prep then shot("ending-no-prep"); return result("FAIL", "prep never opened") end
+    return false
+end
+
+-- From the open prep screen, leave via Fight! and grind (escort poked frail+harmless) to
+-- the seize-ready state: chief dead, Braulo moved ONTO the seize tile with its action
+-- menu open (Seize on top). Returns true there -- the caller presses A to Seize.
+local function leavePrepAndGrindToSeize()
     wait(180)
-    shot("prep")   -- diagnose the prep-screen "black splotches" Nicolas flagged
     for i = 1, 40 do
         if not procActive(SYM.gProcScr_SALLYCURSOR) then break end
         press(K.B, 4); wait(10); press(K.START, 4); wait(40)
@@ -620,16 +642,13 @@ scenarios.recordending = function()
     end
     if not waitFor(function()
         return not procActive(SYM.gProcScr_SALLYCURSOR) and faction() == 0 and turn() >= 1
-    end, 1200) then return result("FAIL", "could not leave preparations") end
+    end, 1200) then return false end
     wait(120)
     pokeFastConfig() -- speed through the goblin grind to the seize
     local chief = red(CHAR_CHIEF)
-    if not chief then return result("FAIL", "chief not in the red array") end
+    if not chief then return false end
     local goal = { x = chief.x, y = chief.y }
     pokeFrail(chief)
-    local function recwait(n, tag)
-        for f = 1, n do if f % 6 == 0 then shot(tag) end yield() end
-    end
     for t = 1, 18 do
         waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
         wait(100)
@@ -638,47 +657,87 @@ scenarios.recordending = function()
             if r and r.charId ~= CHAR_CHIEF and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
         end
         local braulo = blue(0x01)
-        if isDead(braulo) then return result("FAIL", "Braulo died on the march") end
+        if isDead(braulo) then return false end
         chief = red(CHAR_CHIEF)
         if chief and not isDead(chief) then
             if math.abs(braulo.x - chief.x) + math.abs(braulo.y - chief.y) == 1 then
-                if moveUnit(braulo.x, braulo.y, braulo.x, braulo.y) then
-                    chooseAttack(braulo.addr)
-                end
+                if moveUnit(braulo.x, braulo.y, braulo.x, braulo.y) then chooseAttack(braulo.addr) end
             else
                 marchToward(braulo, goal.x, goal.y + 1, 24, 15)
             end
         else
-            -- chief down: seize, then RECORD the ending at readable speed
+            -- chief down: move Braulo onto the seize tile (menu opens, Seize on top).
             if moveUnit(braulo.x, braulo.y, goal.x, goal.y) then
-                press(K.A) -- Seize
+                wait(20)
+                return true
             end
-            wait(40)
-            pokeNormalConfig() -- normal text speed so the typewriter + face fades animate
-            -- FAITHFUL capture (run.sh runs record* at 60fps so the frame callback -- and
-            -- shot() -- fires EVERY emulated frame, not every ~4th as at 240fps). A frame
-            -- every 4th (15fps) renders the engine's ~16-frame face fades as SMOOTH fades
-            -- rather than the 1-frame "blips" sparse capture produced. A-tap every ~72
-            -- frames so each page fully types out then holds -> the true player flow.
-            -- Assemble at 15fps (make_gif --fps 15) for ~real-time playback.
-            local fr = 0
-            while chapter() == 2 and fr < 7000 do
-                fr = fr + 1
-                if fr % 4 == 0 then shot("end") end
-                if fr % 72 == 0 then press(K.A, 4) end
-                yield()
-            end
-            shot("ending-after")
-            if chapter() ~= 2 then
-                return result("PASS", string.format(
-                    "ending recorded; chapter advanced 2 -> %d", chapter()))
-            end
-            return result("FAIL", "ending never advanced past slot 2")
+            press(K.B); press(K.B)
         end
         local phase = runEnemyPhase(CH01_PARK)
-        if phase == "gameover" then return result("FAIL", "unexpected game over") end
+        if phase == "gameover" then return false end
     end
-    result("FAIL", "could not reach the seize tile")
+    return false
+end
+
+-- CKPT_PREP: fast (240fps) -- drive to the prep screen and snapshot it.
+scenarios.ckpt_prep = function()
+    if not reachPrep() then shot("ckpt-prep-fail"); return result("FAIL", "prep never opened") end
+    wait(60)
+    saveState("prep")
+    result("PASS", "prep checkpoint saved")
+end
+
+-- CKPT_SEIZE: fast (240fps) -- drive to Braulo-on-the-seize-tile (menu open) and snapshot
+-- BEFORE pressing Seize, so record* replays the ending fresh from ROM.
+scenarios.ckpt_seize = function()
+    if not reachPrep() then shot("ckpt-seize-noprep"); return result("FAIL", "prep never opened") end
+    if not leavePrepAndGrindToSeize() then shot("ckpt-seize-fail")
+        return result("FAIL", "could not reach the seize tile") end
+    saveState("seize")
+    result("PASS", "seize checkpoint saved (Braulo on tile, menu open)")
+end
+
+-- RECORDPREP: viewable (60fps) -- load the prep checkpoint, then open Pick Units and
+-- pan the deploy map, capturing frames ("prep") to hunt the prep-screen "black
+-- splotches". run.sh builds the checkpoint first if needed.
+scenarios.recordprep = function()
+    wait(30) -- let the core settle past boot before loading
+    if not loadState("prep") then return result("FAIL", "no prep checkpoint (run.sh builds it)") end
+    wait(60)
+    shot("prep")                 -- the Preparations menu
+    press(K.A, 4); wait(80)      -- Pick Units (top item) -> the deploy map
+    for i = 1, 24 do
+        for f = 1, 6 do shot("prep") yield() end
+        press(K.RIGHT, 4)
+    end
+    result("PASS", "prep + Pick Units captured")
+end
+
+-- RECORDENDING: viewable (60fps) -- load the seize checkpoint, press Seize, and capture
+-- the "Rolling Cheddar" ending as motion frames ("end"). FAITHFUL capture: at 60fps the
+-- frame callback (and shot()) fires every emulated frame, so the engine's ~16-frame face
+-- fades render smoothly (at 240fps frameskip aliases them into 1-frame "blips"). A frame
+-- every 4th (~15fps); A-tap every ~72 so each page fully types then holds. Assemble at
+-- 15fps (make_gif --fps 15) for ~real-time playback.
+scenarios.recordending = function()
+    wait(30) -- let the core settle past boot before loading
+    if not loadState("seize") then return result("FAIL", "no seize checkpoint (run.sh builds it)") end
+    wait(20)
+    pokeNormalConfig() -- normal text speed so the typewriter + face fades animate
+    press(K.A) -- Seize (the menu was saved open) -> the ending hand-off
+    wait(40)
+    local fr = 0
+    while chapter() == 2 and fr < 7000 do
+        fr = fr + 1
+        if fr % 4 == 0 then shot("end") end
+        if fr % 72 == 0 then press(K.A, 4) end
+        yield()
+    end
+    shot("ending-after")
+    if chapter() ~= 2 then
+        return result("PASS", string.format("ending recorded; chapter advanced 2 -> %d", chapter()))
+    end
+    result("FAIL", "ending never advanced past slot 2")
 end
 
 -- RECORDCH01TRAIL (#21): capture the in-battle trail beats as motion for review --
