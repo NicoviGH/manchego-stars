@@ -184,6 +184,11 @@ LORDSEL_CONFIRM_MSGS = (0x959, 0x95A, 0x95B, 0x95C, 0x95D, 0x95E, 0x95F,
 # host strips Ch1's tutorial event lists, so these never display in our ROM).
 CH01_BEAT1_CARD_MSG = 0x945
 CH01_BEAT1_MSGS = (0x940, 0x941, 0x942, 0x943, 0x944)  # A,B,C,D,E (0x945 = card)
+# ch01 ending "The Rolling Cheddar" (#21): a "Bryn Shander" location card + one message
+# per beat (A-F), on the same dead vanilla Ch1-tutorial slot-2 pool as Beat 1 (the
+# prologue host strips Ch1's event lists, so these ids never display in our ROM).
+CH01_ENDING_CARD_MSG = 0x94C
+CH01_ENDING_MSGS = (0x946, 0x947, 0x948, 0x949, 0x94A, 0x94B)  # A,B,C,D,E,F
 CH01_BODY_MSG = 0x956    # the dismembered sled-driver, found just past the road sign
 CH01_TAUNT_MSG = 0x960   # Izobai's turn-1 boss taunt (both dead vanilla Ch1-tutorial slots)
 # Scenic BG the lord-select menu plays over (NOT the battle map). A standalone "choose
@@ -326,6 +331,12 @@ GUEST_PORTRAIT_MAP = {
     # is a late-game Grado boss absent from our MVP chapters (ch00-08), so dressing
     # FID_Selena with duvessa.png is collision-free. Recurring cutscene NPC (no map unit).
     'duvessa':        'Selena',
+    # ch01 recruit Baxby the axe-beak (npcs/baxby.yaml) rides the vanilla Forde slot --
+    # a Cavalier (matching Baxby's donor class) absent from our MVP chapters (ch00-08),
+    # so dressing FID_Forde with baxby.png is collision-free. This wires his CUTSCENE
+    # FACE (he speaks in the ch01 ending); his recruit UNIT + map sprite ride this same
+    # Forde character slot when that wiring lands (see HANDOFF "Wire Baxby" b/c).
+    'baxby':          'Forde',
 }
 
 
@@ -2970,6 +2981,60 @@ def inject_ch01(campaign, verbose=True):
     # they read fine stacked together as a pair (Nicolas, 2026-06-16: keep, don't split).
     b1_overrides = [None, {'pinky': '[OpenFarLeft]'}, None, None, None]
 
+    # 0b. Ending "The Rolling Cheddar" (#21): the locked chapter_end `script:`, consumed
+    #     the same way as Beat 1 -- a "Bryn Shander" location card + one message per beat
+    #     (A-F), each rendered with the scenic full-screen wrap and staged below; each
+    #     rides its own Text()/REMA in EventScr_Ch2_EndingScene (step 4) so the 4-face
+    #     budget resets per beat. Duvessa (the host, Speaker of Bryn Shander) anchors the
+    #     mid-right podium throughout; the party speaks from mid-left, with the other beat
+    #     speaker(s) staged as clean two-shots opposite her (cf. Beat 1 podium geometry).
+    end_script = next(e for e in chap['events']
+                      if e['trigger'] == 'chapter_end')['script']
+    end_card = next(v for e in end_script for k, v in e.items() if k == 'location_card')
+    end_beats = [[]]
+    for entry in end_script:
+        (k, v), = entry.items()
+        if k == 'location_card':
+            continue
+        if k == 'beat_break':
+            end_beats.append([])
+            continue
+        end_beats[-1].append(entry)
+    if len(end_beats) != len(CH01_ENDING_MSGS):
+        sys.exit('ERROR: ch01 ending split into %d beats; expected %d (check '
+                 'beat_break markers in the YAML)' % (len(end_beats), len(CH01_ENDING_MSGS)))
+
+    def end_fid(spk):
+        if spk in PORTRAIT_MAP:
+            return _fid_tag(PORTRAIT_MAP[spk].upper())
+        if spk in GUEST_PORTRAIT_MAP:           # duvessa/hruna/baxby cutscene faces
+            return _fid_tag(GUEST_PORTRAIT_MAP[spk].upper())
+        sys.exit('ERROR: ch01 ending unknown speaker %r' % spk)
+    # Duvessa hosts from mid-right (like Hlin in Beat 1); everyone else defaults mid-left.
+    # Per-beat overrides put the OTHER speaker opposite her for a clean two-shot: Hruna
+    # (C) and Meesmickle (D) take mid-right; in E, Baxby takes mid-right -- evicting
+    # Duvessa's face there (a [ClearFace] step-out) as she gestures to the market and the
+    # bird steps forward. Marty stays mid-left across E.
+    end_home = {'duvessa': '[OpenMidRight]'}
+
+    def end_stage(beat, overrides=None):
+        ov = overrides or {}
+        return {k: (ov.get(k, end_home.get(k, '[OpenMidLeft]')), end_fid(k))
+                for e in beat for k in e}
+    # per-beat silent listeners: in the beats where Duvessa addresses the party (A/B/F)
+    # seat Marty (Seth) on the left so she isn't talking to an empty room. C/D/E are
+    # self-populated two-/three-shots, so no preload.
+    end_preload = [
+        [('[OpenMidLeft]', end_fid('marty'))],   # A: Duvessa thanks the party
+        [('[OpenMidLeft]', end_fid('marty'))],   # B: commission + the sled + west
+        [],                                       # C: Wolfram <-> Hruna (iron)
+        [],                                       # D: RBG names the sled; Meesmickle quip
+        [],                                       # E: Duvessa -> Marty <-> Baxby
+        [('[OpenMidLeft]', end_fid('marty'))],   # F: "Targos is expecting weather."
+    ]
+    end_overrides = [None, None, {'hruna': '[OpenMidRight]'},
+                     {'meesmickle': '[OpenMidRight]'}, {'baxby': '[OpenMidRight]'}, None]
+
     # 1. Map: register the painted layout and point slot 2 at it + the winter tileset
     #    (same flow as inject_prologue step 1). Goal display = vanilla Ch1's own Seize
     #    template (windowDataType "seize"), copied from slot 1 while it is still vanilla.
@@ -3343,11 +3408,31 @@ def inject_ch01(campaign, verbose=True):
         '    TEXTSHOW(0x%X) /* the smashed sled + the body, just past the sign */\n'
         '    TEXTEND\n    REMA\n'
         '    EVBIT_T(7)\n    ENDA\n}' % CH01_BODY_MSG, CH2_EVENTSCRIPT_H)
+    # ch01 ending "The Rolling Cheddar" (#21): scenic in-town scene, same machinery as
+    # Beat 1's BeginningScene -- a "Bryn Shander" brown-box card + one Text() per beat
+    # (A-F), each Text()'s trailing REMA clearing faces (fresh 4-face budget). The locked
+    # bodies + staging are built in step 0b/step 6. BG_GATE is a PLACEHOLDER until the
+    # custom Bryn Shander market BG lands (show-before-commit -- HANDOFF step 3). MNC2(0x3)
+    # still drops to vanilla Ch3 until ch02 is hosted (HANDOFF step 4).
+    end_text_calls = ''.join(
+        '    Text(0x%X) /* %s */\n' % (m, lbl)
+        for m, lbl in zip(CH01_ENDING_MSGS,
+                          ['A -- Duvessa thanks the company',
+                           'B -- commission + the wrecked sled + go west to Targos',
+                           'C -- Wolfram asks Hruna for the iron to armor the sled',
+                           'D -- RBG over-engineers it; names it the Rolling Cheddar',
+                           'E -- Marty wins over Baxby the axe-beak (first recruit)',
+                           'F -- "Targos is expecting weather. Better hurry."']))
     script = _replace_brace_block(
         script, 'EventScr_Ch2_EndingScene[] =',
         '{\n    MUSC(SONG_VICTORY)\n'
-        '    TEXTSHOW(0x954) /* ingots recovered (placeholder) */\n'
-        '    TEXTEND\n    REMA\n    FADI(16)\n'
+        '    REMOVEPORTRAITS\n'
+        '    BACG(BG_GATE) /* PLACEHOLDER -- Bryn Shander market BG pending (#21) */\n'
+        '    FADU(16) /* chapter ending comes up black; reveal the town BG */\n'
+        '    BROWNBOXTEXT(0x%X, 8, 8) /* "Bryn Shander" location card */\n'
+        % CH01_ENDING_CARD_MSG
+        + end_text_calls +
+        '    FADI(16) /* fade the town out */\n'
         '    MNC2(0x3) /* next host slot (ch02, when it lands) */\n    ENDA\n}',
         CH2_EVENTSCRIPT_H)
     with open(CH2_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
@@ -3416,8 +3501,16 @@ def inject_ch01(campaign, verbose=True):
                      'Just past the sign, a sled[LF]\nlies smashed in the snow.[A][LF]\n'
                      'Its driver lies beside it --[LF]\na dwarf, in pieces.[A][LF]\n'
                      'The iron is gone. Goblin[LF]\ntracks lead up the trail.[X]'))
-    set_message_body(lines, 0x954,
-                     'The iron ingots are recovered.[X]')
+    # ch01 ending "The Rolling Cheddar" (#21): the locked chapter_end script -> a "Bryn
+    # Shander" card + one message per beat (A-F), rendered at the scenic full-screen wrap
+    # with the staging built in step 0b (Duvessa hosts mid-right; two-shots opposite).
+    # Each beat rides its own Text()/REMA (step 4), so the 4-face budget resets per beat.
+    # (0x954, the old placeholder "ingots recovered" body, is now unused -- the recovery
+    # is told in beat A; left vanilla-dead like the rest of the slot-2 pool.)
+    set_message_body(lines, CH01_ENDING_CARD_MSG, name_message_body(end_card))
+    for i, (msg_id, beat) in enumerate(zip(CH01_ENDING_MSGS, end_beats)):
+        set_message_body(lines, msg_id, _script_to_message(
+            beat, end_stage(beat, end_overrides[i]), width=42, preload=end_preload[i]))
     # Beat 1 (#21): the Northlook opening. Card + one message per beat (A-E), rendered
     # from the chapter YAML's locked script with the scenic full-screen wrap width and
     # the per-beat two-sided staging + silent listeners built in step 0. Each beat rides

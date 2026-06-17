@@ -274,10 +274,14 @@ events:
       of food and shelter — Baxby, the first recruit. She sends them west to Targos.
       LOCKED dialogue-pass text below (co-written with Nicolas 2026-06-17). The
       ch02 cold-open spends the held Velynne stolen-orb hook ("as the party leave
-      town"). PENDING (not this commit): slot eventscript wiring that consumes this
-      script (EventScr_Ch2_EndingScene); ART GATE — Duvessa bust (GUEST_PORTRAIT_MAP),
-      Baxby bust + axe-beak map sprite, a Bryn Shander gate/market scenic BG; in-game
-      motion review. Baxby base class = cavalier (Seth chassis) — confirm in his unit YAML at wiring.
+      town"). WIRED in-game (inject_ch01 → EventScr_Ch2_EndingScene): scenic BACG +
+      "Bryn Shander" card + one Text() per beat (A–F), Duvessa/Wolfram/Hruna/RBG/
+      Meesmickle/Marty/Baxby faces staged with the 4-face budget (Duvessa hosts mid-
+      right; Baxby's cutscene face rides the Forde slot, GUEST_PORTRAIT_MAP). PENDING:
+      Baxby's recruit UNIT + axe-beak map-sprite injection (his bust + face are done);
+      a custom Bryn Shander market BG (BG_GATE placeholder for now, show-before-commit);
+      ch02 host (MNC2(0x3) drops to vanilla Ch3 until then); in-game motion review.
+      Baxby base class = Cavalier, Franz donor (npcs/baxby.yaml).
     script:                       # LOCKED 2026-06-17 (dialogue pass, co-written with Nicolas)
       - location_card: "Bryn Shander"
       # ── A — Duvessa arrives and thanks the company ──

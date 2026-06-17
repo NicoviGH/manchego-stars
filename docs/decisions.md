@@ -905,6 +905,25 @@ in-game). `make` green, `verify_text` 3404/0, ch01win PASS. #21._
 
 ---
 
+**Ch1 ending "The Rolling Cheddar" wired the same way as Beat 1.**
+The locked `chapter_end` script is consumed by `inject_ch01` into `EventScr_Ch2_EndingScene` exactly
+like the opening: a scenic `BACG` + a "Bryn Shander" brown-box card + one `Text()` per beat (A–F),
+each `Text()`'s trailing `REMA` clearing faces so the 4-face budget resets per beat. Speakers are
+staged as clean two-shots — **Duvessa (the host) anchors mid-right** and the party speaks mid-left,
+with the other beat speaker placed opposite her; in beat E **Baxby evicts Duvessa's mid-right podium**
+(`[OpenMidRight][ClearFace]`) as she gestures to the market and the bird steps forward. Bodies/card
+ride the same dead vanilla Ch1-tutorial slot-2 ids as Beat 1 (`0x946`–`0x94C`). **Baxby's cutscene
+face rides the vanilla Forde slot** (`GUEST_PORTRAIT_MAP`): Forde is a Cavalier — matching Baxby's
+donor class — absent from our MVP chapters (ch00–08), so dressing `FID_Forde` with `baxby.png` is
+collision-free; his recruit UNIT + map sprite will ride that same Forde character slot when wired.
+The scene plays over a **`BG_GATE` placeholder** (the custom Bryn Shander market BG is the one
+remaining ending art piece, show-before-commit) and `MNC2(0x3)` still drops to vanilla Ch3 until ch02
+is hosted.
+_Wired 2026-06-17. `make` green, `verify_text` 3404/0, ch01win PASS (ending runs through all 6 beats
+→ advances). Feel/motion review is Nicolas's in-game pass. #21._
+
+---
+
 ## Open Questions (not yet decided)
 
 See `docs/PRD.md §13` for the full list. Key unresolved items:
