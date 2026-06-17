@@ -1,15 +1,41 @@
-# Handoff: Ch1 (#21) — ending cutscene polished + plays clean; deploy-screen + Bitey fixed; fast scene-recording tooling. NEXT = Baxby recruit UNIT → ch02 host (prep-roster overlap deferred).
+# Handoff: Ch1 (#21) — reusable DEV PLACEHOLDER for unbuilt chapters (RBG cheese pun → title); faceless-narration box bug fixed; economy reconciled to vanilla. NEXT = host ch02 (Baxby's recruit unit falls out of it as a one-liner).
 
-**Date:** 2026-06-17 (session 7)
-**Where we are:** Ch1 "The Iron Trail" is fully playable and the **ending cutscene "The Rolling
-Cheddar" plays cleanly in-game** (dialogue flashing fixed, Marty's spore-cough added, over the vanilla
-`BG_NORMAL_VILLAGE`). This session also fixed two in-game bugs Nicolas caught on a live playthrough
-(Pick Units black silhouettes; 'Ol Bitey rendering as a blob) and built **save-state checkpoint
-tooling** so scenes can be spot-checked fast. What remains for ch01 to be content-complete: **Baxby's
-recruit UNIT + map-sprite** (his bust + cutscene face are done) and **hosting ch02** so the ending
-stops landing on vanilla Ch3.
+**Date:** 2026-06-17 (session 8)
+**Where we are:** Ch1 "The Iron Trail" is fully playable and content-complete enough to ship for
+playtest: the ending cutscene "The Rolling Cheddar" plays cleanly and now lands on a **reusable dev
+placeholder** instead of vanilla Ch3 — RBG delivers a "still under construction, thanks for
+playtesting" cheese pun over the campfire BG, then returns to the title screen. This session also
+**fixed the faceless-narration box** (Marty's "leans in..." stage line rendered as a cramped sliver +
+corrupted his next line) and **reconciled the economy to vanilla FE8** (no flat per-chapter gold
+bonus; ch01 is a net wash). The remaining ch01→ch02 work is now **hosting ch02**; Baxby's recruit
+unit falls out of that as a one-liner (see the net-new correction below).
 
-`make` green · `verify_text` 3404/0 · playtests PASS (ch01win; recordending advances 2→3; recordprep).
+`make` green · `verify_text` 3404/0 · playtests: recordending PASS (ending + placeholder → title);
+ch01win re-verified for the new title-return path; recordprep unchanged.
+
+## Accomplished (session 8, committed + pushed)
+- **Reusable DEV PLACEHOLDER for unbuilt chapters** (`c5f7703`). A chapter whose `unlocks_chapter`
+  target isn't hosted yet now lands on `dev_placeholder_scene()` instead of `MNC2`'ing onto a leftover
+  vanilla map: `REMOVEPORTRAITS` → `BACG(BG_FIREPLACE)` → RBG's "still under construction, thanks for
+  playtesting" cheese-pun `Text()` → `MNTS` back to the **title screen**. Pure event scene (no
+  map/units; `MNTS`/`EvtBackToTitle` = `GAME_ACTION_EVENT_RETURN`, eventscr.c). ch01's ending uses it
+  (was dropping to vanilla Ch3). Punt it forward at each new boundary. Confirmed in-game (campfire +
+  pun render clean). Copy lives in `DEV_PLACEHOLDER_LINE` — trivially editable.
+- **Faceless-narration box bug FIXED** (`c5f7703`). Marty's "leans in close and breathes a soft
+  puff…" stage line (a faceless `narration` speaker) rendered as a **cramped 2-char sliver** and
+  **corrupted Marty's next line** (his bust shoved to the bottom edge). Cause: `_script_to_message`
+  prepended an `[OpenMidLeft]` to faceless boxes — but `[Open*]` (textdefs 8–15) are portrait POSITION
+  anchors, so opening one with no `[LoadFace]` anchors the window to an absent portrait's mouth.
+  Faceless boxes now emit **no `[OpenX]`** → plain full-width box. Verified in captured frames.
+- **Economy reconciled to vanilla FE8** (`c5f7703`). Decomp-checked: FE8 grants **no flat per-chapter
+  clear bonus** (prologue/Ch1/Ch2 event scripts give zero gold); gold comes only from in-map sources —
+  gold-giving villages (`SVAL(EVT_SLOT_3,n)` + `GIVEITEMTOMAIN(leader)`), sellable drops/gems, chests.
+  ch01 is a **net wash** like vanilla Ch1 (~0 gold): the ~200g job pay is spent winning over Baxby (a
+  **free story-recruit** — FE8 shops sell items, not units). `decisions.md §Economy` + ch01
+  `post_chapter` reconciled (`gold_reward` dropped); the "two hundred gold" line is flavor only.
+- **Playtest harness** (`c5f7703`, `e4efde8`). Added the `gProcScr_TitleScreen` symbol; `recordending`
+  + `ch01win` now assert the ending reaches the **title** via the placeholder (the placeholder
+  lengthened the post-seize path, so `ch01win`'s win budget went 3600→9000). Both PASS.
 
 ## Accomplished (session 7, committed + pushed)
 - **Ending dialogue "flashing" fixed + Marty's spore-cough added** (`0581a35`). The flashing was real:
@@ -47,7 +73,7 @@ stops landing on vanilla Ch3.
   real snow but 40px short → any fill looks tiled/stretched). Per Nicolas, use the vanilla village
   as-is and move on. (The `BG_GATE` placeholder is gone.)
 
-## Tried but didn't work (this session)
+## Tried but didn't work (session 7, still relevant)
 - **Winterizing `BG_NORMAL_VILLAGE` via palette swap** — a recolor can only desaturate, can't ADD snow
   accumulation; over-whitening washed the walls out, restraining it left it "just desaturated."
   Abandoned → vanilla village.
@@ -60,12 +86,16 @@ stops landing on vanilla Ch3.
 ## Current state
 - ✅ Ch1 engine + all in-battle content (entry, lord-select, deploy cap, houses, sign/body, Izobai
   taunt + death, Seize win). Combat vanilla-parity.
-- ✅ **Ending cutscene plays clean** — flashing fixed, cough added, over `BG_NORMAL_VILLAGE`. 6 beats
-  (A+B, C, D, E1, E2, F), all faces incl. Baxby on the Forde slot. Verified via `recordending`.
+- ✅ **Ending cutscene plays clean** — flashing fixed, cough added, **faceless narration box fixed**,
+  over `BG_NORMAL_VILLAGE`. 6 beats (A+B, C, D, E1, E2, F), all faces incl. Baxby on the Forde slot.
+- ✅ **Ending lands on the dev placeholder → title** (no longer vanilla Ch3). `recordending` + `ch01win`
+  PASS through to `gProcScr_TitleScreen`.
+- ✅ **Economy is vanilla-faithful** — no flat per-chapter bonus; ch01 = net wash (see decisions.md).
 - ✅ **Pick Units / deploy roster renders correctly** (palette fix). ✅ 'Ol Bitey reads as a fish.
-- ⚠️ **Baxby is a cutscene face only** — recruit UNIT + map-sprite NOT wired (can speak, can't be
-  bought/deployed). `npcs/baxby.yaml` design is authored (Cavalier, Franz donor, rides **Forde** slot).
-- ⚠️ **ch01 ending lands on vanilla Ch3** (`MNC2(0x3)`) until ch02 is hosted.
+- ⚠️ **Baxby is a cutscene face only** — recruit UNIT + map-sprite not wired yet. This is now a
+  one-liner that rides **hosting ch02** (he's a free story-recruit = a ch02 blue `UnitDefinition`
+  entry; see the net-new correction in Next steps). `npcs/baxby.yaml` authored (Cavalier, Franz donor,
+  **Forde** slot).
 - ⚠️ **Prep roster sprite overlap** (DEFERRED) — Braulo/Wolfram/Meesmickle/Baxby use 32×32 map sprites
   but the roster is pitched 16px, so adjacent sprites overlap. Fixing it is a deep/risky rewrite of
   FE8's prep scroll system (16px hardcoded in ~20 spots: sprite/cursor/error-box Y + `yDiff_cur` math
@@ -73,31 +103,45 @@ stops landing on vanilla Ch3.
   vs dedicate a focused pass). **Awaiting Nicolas's call** (last open question of the session).
 
 ## Next steps (priority order)
-1. **Wire Baxby's recruit UNIT + map sprite** (#5 on the list). `npcs/baxby.yaml` authored; he rides
-   the **Forde** character slot (same slot his cutscene face already dresses). Needs: name "Baxby" on
-   the Forde slot; his Cavalier class/stats/inventory on a free unit slot; purchasable @200 from
-   `post_chapter.units_available_to_recruit` — **NB `post_chapter` is NOT consumed by build_campaign
-   yet; the recruit/market machinery is net-new**; map-sprite injection per
-   [[manchego_stars_guest_map_sprite_wiring]] (cast palette → purple bank — same bank the prep fix
-   above protects); appears in ch02 deployment if bought.
-2. **Host ch02** ("cold-welcome", `unlocks_chapter` in ch01 `post_chapter`) so the ending's `MNC2`
-   targets a real ch02 slot, not vanilla Ch3. Mirror the `inject_ch01` hosting pattern.
-3. **Prep roster overlap** (deferred) — only if Nicolas wants it before more chapters; it's a focused
+> **Net-new correction (2026-06-17):** an earlier handoff called Baxby's "recruit/market machinery
+> net-new." That conflated two things. **Recruiting a unit and carrying it across chapters is 100%
+> vanilla** — a unit joins by being a blue `UnitDefinition` (`LoadUnit`/`LoadUnits`, bmunit.c) and
+> persists via the save system, exactly like the existing roster. Even deducting gold is a vanilla
+> event cmd (`EvtGiveMoneymAtSlot3NoPopup` → `EVSUBCMD_GIVETOSLOT3`, eventscr.c). The ONLY non-vanilla
+> thing is a literal "shop sells a *character*" UI (FE8 shops sell items only) — and **we don't need
+> it**: Baxby is a free story-recruit won over in the ending, so he's just a ch02 starting unit.
+
+1. **Host ch02 "Cold Welcome"** — the real remaining work, and Baxby's recruit unit falls out of it as
+   a one-liner. ch02 is designed in YAML but has **no build assets** (no map/`.mar`, no events, not
+   hosted). Needs: a map (yaml says **reskin vanilla FE8 Ch2** — same layout, arctic palette, per
+   [[project_manchego_stars_winter_reskin]]); the enemy roster/boss/reinforcements; chapter-start +
+   inn cutscenes; hosting on the next chapter slot (mirror `inject_ch01`); then point ch01's ending at
+   `MNC2(<ch02 slot>)` instead of `dev_placeholder_scene()`. **Map design is Nicolas-driven**
+   ([[feedback_collaborative_map_design]]) — bring concepts before building.
+   - **Baxby (rides ch02):** add "Baxby" name on the **Forde** slot + his Cavalier class/stats/inventory
+     to ch02's blue `UnitDefinition` (he's a free recruit, so he just starts deployable in ch02);
+     map-sprite injection per [[manchego_stars_guest_map_sprite_wiring]] (cast palette → purple bank,
+     the bank the prep fix protects). `map_sprites/baxby.png` + bust are already committed.
+2. **Prep roster overlap** (deferred) — only if Nicolas wants it before more chapters; it's a focused
    prep-scroll-system rewrite. Verify with `recordprep` (now fast via checkpoints).
-4. **In-game confirms (Nicolas, opportunistic):** 'Ol Bitey in the Northlook scene; overall ending feel.
-5. **Carried:** custom Bryn Shander winter BG via Gemini (parked); #29 world map; pre-distribution
+3. **In-game confirms (Nicolas, opportunistic):** 'Ol Bitey in the Northlook scene; overall ending feel;
+   the dev placeholder / RBG pun wording (copy lives in `DEV_PLACEHOLDER_LINE`).
+4. **Carried:** custom Bryn Shander winter BG via Gemini (parked); #29 world map; pre-distribution
    license rechecks (Scramsax Hero mug, AlexYTXG Bandit-Peg, **Chocobo {SkidMarc25}** — no [F2E] tags;
    Fire Imp + Cynon villager ARE [F2E]); ch02+ YAML `ea_file:` cleanup; map_sprite_editor **Finish**
    button bug.
 
 ## Key files
-- `tools/build_campaign.py` — `inject_ch01` (ending = `EventScr_Ch2_EndingScene`: `BACG(BG_NORMAL_VILLAGE)`
-  + per-beat `Text()`; `end_stage`/`end_home`/`end_preload`(all [])/`end_overrides`; faceless
-  `narration` speaker); `_inject_palette_bank_hook` (bmudisp cast-palette + the new prep_unitselect
-  CpuFastFill drop); `inject_northlook_bitey` (block-5 fish); `_script_to_message`; `_term_pad`;
+- `tools/build_campaign.py` — `dev_placeholder_scene`/`dev_placeholder_message` + `DEV_PLACEHOLDER_*`
+  (the reusable unbuilt-boundary scene; ch01 ending calls it instead of `MNC2`); `inject_ch01` (ending
+  = `EventScr_Ch2_EndingScene`: `BACG(BG_NORMAL_VILLAGE)` + per-beat `Text()`;
+  `end_stage`/`end_home`/`end_preload`(all [])/`end_overrides`; faceless `narration` speaker);
+  `_script_to_message` (**faceless speakers now emit NO `[OpenX]`** → plain full-width box);
+  `_inject_palette_bank_hook`; `inject_northlook_bitey` (block-5 fish); `_term_pad`;
   `PORTRAIT_MAP`/`GUEST_PORTRAIT_MAP` (`baxby→Forde`); `CH01_ENDING_MSGS`/`CH01_ENDING_CARD_MSG`.
 - `campaigns/.../chapters/ch01-the-iron-trail.yaml` — `events[chapter_end].script` (A+B merged, E1/E2
-  split, narration cough); `post_chapter` (Baxby @200, `unlocks_chapter: ch02-cold-welcome`).
+  split, narration cough); `post_chapter` (vanilla economy: `net_gold: 0`, Baxby = free story-recruit,
+  `unlocks_chapter: ch02-cold-welcome`).
 - `campaigns/.../npcs/baxby.yaml` — recruit-unit design (Cavalier, Franz donor, Forde slot, art.render).
 - `tools/playtest/` — `run.sh` (checkpoint orchestration + 60fps for record*); `harness.lua`
   (`saveState`/`loadState`, `reachPrep`/`leavePrepAndGrindToSeize`, `ckpt_prep`/`ckpt_seize`,
