@@ -130,15 +130,16 @@ ch01win re-verified for the new title-return path; recordprep unchanged.
      to ch02's blue `UnitDefinition` (he's a free recruit, so he just starts deployable in ch02);
      map-sprite injection per [[manchego_stars_guest_map_sprite_wiring]] (cast palette → purple bank,
      the bank the prep fix protects). `map_sprites/baxby.png` + bust are already committed.
-2. **Finish the ALPHA title screen** (in progress). Gold "MANCHEGO STARS" logo done; remaining:
-   - **Subtitle** "THE SACRED STONES" → "Rime of the Frostmaiden". It's a separate scroll-banner
-     sprite (`gSprite_Title_SacredStonesBanner`, drawn from `graphics/titlescreen/title_logos.png`,
-     256×40, which also holds "Press START" — preserve that). Its own serif banner font; "Rime of the
-     Frostmaiden" is long for the scroll, so confirm wrap/size with Nicolas.
-   - **Themed background** (Nicolas, 2026-06-17): the vanilla two-dragons BG is off-theme — replace
-     with Frostmaiden cover-style art (the icy owlbear/yeti image Nicolas posted). It's a BG-LAYER job
-     (not the logo sprite): `title_main_background_1/2` + `title_dragon_foreground` (+ TSA/palettes),
-     a good fit for the Gemini→indexed pipeline. Get the source art into `References/` first.
+2. **ALPHA title screen — DONE** (`e7bff72`, `f8b9621`, `3c212ff`). Gold "MANCHEGO STARS" logo
+   (hand-built glyphs, `gen_gold_title.py`) + two-line cream serif subtitle "RIME OF THE /
+   FROSTMAIDEN" (`gen_subtitle.py`, both baked into the logo graphic; the second logo sprite was
+   repointed to Y=80 to carry the subtitle row, scroll banner dropped) + icy-blue backdrop with the
+   two dragons removed (`title_main_background.gbapal` hue-set blue, dragon foreground blanked — both
+   idempotent). Wired in `inject_title_screen`. `map-review/title-final-icyblue.png`.
+   - **Optional future upgrade:** the actual Frostmaiden cover painting as the BG. Parked — FE8's
+     title BG is a custom two-blob + TSA + palette format (~640 tiles), so dropping a full painting in
+     is high-effort/high-risk; the icy-blue recolor was the agreed pragmatic call for the alpha.
+     Source art saved by Nicolas at `~/Downloads/FrostmaidenCover.jpeg` (move into `References/` if pursued).
 3. **Prep roster overlap** (deferred) — only if Nicolas wants it before more chapters; it's a focused
    prep-scroll-system rewrite. Verify with `recordprep` (now fast via checkpoints).
 4. **In-game confirms (Nicolas, opportunistic):** 'Ol Bitey in the Northlook scene; overall ending feel;
