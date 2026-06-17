@@ -2465,22 +2465,27 @@ def inject_title_screen(campaign, verbose=True):
 
     # 3. Theme the backdrop: recolor the mountain/sky bg palette to icy blue and blank
     #    the two-dragon foreground (off-theme). Recolour SETS hue (idempotent -- rebuilds
-    #    don't drift); blanking the dragon tiles makes BG0 fully transparent.
+    #    don't drift); blanking the dragon tiles makes BG0 fully transparent. We edit the
+    #    COMMITTED JASC .pal source (the .gbapal is build-generated -- %.gbapal: %.pal --
+    #    so it isn't present at inject time on a clean checkout) and drop the stale .gbapal
+    #    so gbagfx regenerates it blue. Index 0 (the magenta placeholder) is left alone.
     import colorsys
-    import struct
-    pal_path = os.path.join(ts_dir, 'title_main_background.gbapal')
-    with open(pal_path, 'rb') as f:
-        raw = f.read()
-    out = bytearray()
-    for i in range(0, len(raw), 2):
-        v = struct.unpack('<H', raw[i:i + 2])[0]
-        r, g, b = (v & 31) / 31, ((v >> 5) & 31) / 31, ((v >> 10) & 31) / 31
+    pal_path = os.path.join(ts_dir, 'title_main_background.pal')
+    with open(pal_path, encoding='utf-8') as f:
+        lines = f.read().splitlines()
+    for i in range(4, len(lines)):           # lines 0-2 = header, line 3 = index 0
+        parts = lines[i].split()
+        if len(parts) != 3:
+            continue
+        r, g, b = (int(c) / 255 for c in parts)
         _, l, s = colorsys.rgb_to_hls(r, g, b)
         nr, ng, nb = colorsys.hls_to_rgb(0.57, l, max(s, 0.45))  # ~205deg icy blue
-        nv = (round(nr * 31) | (round(ng * 31) << 5) | (round(nb * 31) << 10))
-        out += struct.pack('<H', nv)
-    with open(pal_path, 'wb') as f:
-        f.write(bytes(out))
+        lines[i] = '%d %d %d' % (round(nr * 255), round(ng * 255), round(nb * 255))
+    with open(pal_path, 'w', encoding='utf-8', newline='') as f:
+        f.write('\r\n'.join(lines) + '\r\n')   # gbagfx requires CRLF .pal line endings
+    gbapal = pal_path[:-4] + '.gbapal'
+    if os.path.exists(gbapal):
+        os.remove(gbapal)
 
     dragon_png = os.path.join(ts_dir, 'title_dragon_foreground.png')
     from PIL import Image as _Image
