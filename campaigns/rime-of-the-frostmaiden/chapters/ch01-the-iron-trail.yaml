@@ -310,8 +310,9 @@ events:
       - prof-rbg: >-
           And every fortress wants a name. Gentlemen — the Rolling Cheddar. Sharp,
           well-aged, and utterly impenetrable.
-      # (Braulo judges the practical sense of it; he speaks only for himself)
-      - braulo: "A wagon we don't have to rent. That'll do."
+      # (Meesmickle, dry, claims the warm corner -- makes the sled "home" without
+      #  repeating RBG's mod list; his quip is the beat's box button)
+      - meesmickle: "As long as there's a dry corner in it for me... I'll allow it."
       # ── E — Baxby the axe-beak: Marty wins him over → first recruit ──
       - beat_break: E
       - duvessa: >-
