@@ -264,10 +264,71 @@ events:
     type: cutscene
     ea_file: events/ch01-ending.ea
     description: >
-      The party recovers the iron ingots. Duvessa Shane arrives with a pair of
-      town guards. She thanks the party and offers them a retainer for ongoing
-      Ten-Towns security work. She mentions other towns having trouble.
-      Braulo asks about the sled dog situation. Baxby (an axe-beak) is for sale.
+      "The Rolling Cheddar." Back inside the Bryn Shander gate with the recovered
+      iron, the party is met by Speaker Duvessa Shane. She thanks them, hands them a
+      standing Council commission for Ten-Towns trouble, and grants them the wrecked
+      trail sled (the dwarves wrote it off). Wolfram asks Hruna for some of the
+      returned iron to armor it; RBG over-engineers the repair and dubs the sled the
+      "Rolling Cheddar" — the party's mobile home. Duvessa points to an axe-beak at
+      the market; Marty speaks to it (rapport spores) and wins it over with a promise
+      of food and shelter — Baxby, the first recruit. She sends them west to Targos.
+      LOCKED dialogue-pass text below (co-written with Nicolas 2026-06-17). The
+      ch02 cold-open spends the held Velynne stolen-orb hook ("as the party leave
+      town"). PENDING (not this commit): slot eventscript wiring that consumes this
+      script (EventScr_Ch2_EndingScene); ART GATE — Duvessa bust (GUEST_PORTRAIT_MAP),
+      Baxby bust + axe-beak map sprite, a Bryn Shander gate/market scenic BG; in-game
+      motion review. Baxby base class = cavalier (Seth chassis) — confirm in his unit YAML at wiring.
+    script:                       # LOCKED 2026-06-17 (dialogue pass, co-written with Nicolas)
+      - location_card: "Bryn Shander"
+      # ── A — Duvessa arrives and thanks the company ──
+      - duvessa: >-
+          I'm Duvessa Shane — I speak for Bryn Shander. You brought our iron home,
+          and the truth of what happened to the driver. Thank you.
+      # ── B — the hire + she grants the wrecked trail sled + points west ──
+      - beat_break: B
+      - duvessa: >-
+          That job was a test, and you passed it. I've trouble in every town and too
+          few I trust to send — take a standing commission from the Council.
+      - duvessa: >-
+          That wrecked sled you found on the trail? The dwarves have written it off.
+          Mend it, and it's yours. Then go west, to Targos — frost druids in the
+          streets, and folk starting to listen.
+      # ── C — Wolfram asks Hruna for the iron to armor the sled ──
+      - beat_break: C
+      # (Wolfram crouches by the returned iron and bites a corner off an ingot)
+      - wolfram: >-
+          ...Battlehammer iron. Clean all the way through. Hruna — could you spare a
+          few? Give me the iron and a forge-night, and nothing on the road dents this sled.
+      - hruna: >-
+          Spare them? Lad, you brought the whole load home. Take what you need. Clan
+          Battlehammer doesn't forget who walked that trail.
+      # ── D — RBG over-engineers the repair and names the sled ──
+      - beat_break: D
+      - prof-rbg: >-
+          Um, actually — you'll want an expert's eye on the mountings. Reinforced
+          runners, a strongbox under the bench... a rolling fortress.
+      - prof-rbg: >-
+          And every fortress wants a name. Gentlemen — the Rolling Cheddar. Sharp,
+          well-aged, and utterly impenetrable.
+      # (Braulo judges the practical sense of it; he speaks only for himself)
+      - braulo: "A wagon we don't have to rent. That'll do."
+      # ── E — Baxby the axe-beak: Marty wins him over → first recruit ──
+      - beat_break: E
+      - duvessa: >-
+          A sled's no use without something to pull it. There's an axe-beak at the
+          market — two hundred gold. Strong old bird; he's outlasted three owners.
+      # (Marty leans in and coughs a soft puff of spores at the bird so it can hear him)
+      - marty: "Hello, friend. Do you have a name?"
+      - baxby: >-
+          ...Baxby. I've hauled freight over this ice longer than most of you have
+          breathed. I don't pull for just anyone.
+      - marty: >-
+          Then pull for us. You'll be fed when we eat, sheltered when there's shelter,
+          and never worked past your strength. You have my word.
+      - baxby: "...Hm. Honest terms. Hitch me up, then — let's see this road of yours."
+      # ── Closing box button → sends them west (ch02 opens on the road + Velynne hook) ──
+      - beat_break: F
+      - duvessa: "Then it's settled. Targos is expecting weather. Better hurry."
 
   # Flavor trigger on the trail
   - trigger: unit_on_tile
