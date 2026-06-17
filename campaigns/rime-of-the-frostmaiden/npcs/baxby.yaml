@@ -1,0 +1,93 @@
+# npcs/baxby.yaml — Baxby the axe-beak (ch01 recruit; the party's sled-puller / mount)
+# Class roster: docs/CLASSES.md (generated). Rationale: docs/decisions.md §Class Mapping.
+# Combat is vanilla FE (docs/decisions.md §Combat). damage_type labels are cosmetic.
+#
+# STATUS: design record. NOT yet wired into build_campaign (load_unit is explicit, so
+# this file is inert until the Baxby wiring lands: free character slot + recruit logic +
+# map-sprite injection + cutscene face). See HANDOFF.md "Wire Baxby".
+
+id: baxby
+name: Baxby
+# fe_name not needed — "Baxby" is 5 chars, well under FE8's 12-char name buffer.
+
+# ── Recruit ──────────────────────────────────────────────────────────────────
+# Purchased at the Bryn Shander market for 200 GP (ch01 post_chapter); first recruit.
+# Won over in the ch01 ending cutscene (Marty's promise of food + shelter).
+recruit:
+  chapter: ch01-the-iron-trail
+  cost_gp: 200
+  via: market               # post_chapter.units_available_to_recruit
+
+# ── Donor class (Nicolas, 2026-06-17) ────────────────────────────────────────
+# Use the SECOND mounted unit the vanilla game gives you — FRANZ, the fresh Cavalier —
+# NOT Seth, the prepromote Paladin (Jagen) with little growth runway left. Baxby is a
+# fresh Cavalier so he keeps full growth potential over the campaign. (Franz's actual
+# CHARACTER slot is taken by Wolfram in our hack, so Baxby rides a free slot authored to
+# the Cavalier class profile below; Franz's character growths 80/40/40/50/25/20/40 are
+# the reference if we want to nudge him toward the fresh-cavalier ceiling at balance.)
+donor:
+  mounted_order: 2          # Seth(Paladin)=1, Franz(Cavalier)=2
+  character: Franz
+  why: fresh Cavalier = full growth runway (vs Seth's promoted Jagen)
+
+# ── FE8 stats (vanilla Cavalier class data, verbatim from data_classes.c) ─────
+# Authored FE-style (no 5e conversion). Sword + Lance mount; beak/claws are flavor on a
+# vanilla lance/sword (the weapon TYPE drives the triangle, the bird look rides the art).
+fe_stats:
+  class: Cavalier
+  level: 1
+  HP: 20
+  STR: 5
+  SKL: 2
+  SPD: 5
+  DEF: 6
+  RES: 0
+  LCK: 0                    # ClassData has no base luck
+  MOV: 7                    # Cavalier baseMov (mounted)
+  CON: 9
+
+# ── Growth Rates (% per level) — vanilla Cavalier class growths from data_classes.c ──
+growth_rates:
+  HP: 75
+  STR: 35
+  SKL: 40
+  SPD: 28
+  DEF: 15
+  RES: 15
+  LCK: 30
+
+# ── Promotion (FE8 branched Cavalier) ─────────────────────────────────────────
+promotion:
+  branch: [Paladin, "Great Knight"]   # vanilla Cavalier branch (classchg-data.c [CLASS_CAVALIER])
+  default: Paladin
+
+# ── Inventory (joins with stock gear) ─────────────────────────────────────────
+inventory:
+  - id: iron-lance
+    name: "Iron Lance"
+    fe_base: iron-lance
+    fe_weapon_type: Lance
+    damage_type: piercing             # cosmetic — the beak/talons
+  - id: iron-sword
+    name: "Iron Sword"
+    fe_base: iron-sword
+    fe_weapon_type: Sword
+    damage_type: slashing             # cosmetic
+
+# ── Art ────────────────────────────────────────────────────────────────────────
+# Portrait + map sprite are DONE (committed). Battle anim deferred (#39).
+art:
+  approach: vendor-reskin
+  render:                             # portraits/baxby.png — byte-reproducible bust
+    ref: "References/PCs/Baxby.png"   # axe-beak art from the Frostmaiden book, Gemini-modified (Nicolas)
+    crop: [780, 18, 1920, 940]
+    flip_h: true                      # face FE8-canonical screen-left
+    zoom: 0.88                        # max size with the whole beak clear of the dead corners
+    hand_pass: null
+    credit: "WotC book art (axe-beak) + Google Gemini; see CREDITS.md"
+  map_sprite:                         # map_sprites/baxby.png — hand-painted by Nicolas
+    base: Chocobo Rider (F) Lance {SkidMarc25}   # FE-Repo; rider+lance stripped, snowy recolor
+    size: 32x32
+    frames: 3                         # first 3 frames reused for idle + walk (Meesmickle pattern)
+    palette: cast                     # cast_palette.png (cast OBJ bank)
+    credit: "FE-Repo Chocobo Rider {SkidMarc25}; see CREDITS.md"

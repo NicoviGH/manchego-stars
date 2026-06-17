@@ -26,6 +26,7 @@ roster derived from the unit YAML.
 
 | Unit | FE base | Promotion | Joins via |
 |---|---|---|---|
+| Baxby | Cavalier | **Paladin** / Great Knight | — |
 | Brie | TBD (post-MVP) | — | story — Prof. R.B. Geenius builds Brie (a later chapter) |
 | Pepperjack | TBD (post-MVP) | — | story — Prof. R.B. Geenius builds Pepperjack |
 | Pinky | Pegasus Knight | **Falcon Knight** / Wyvern Knight | available from Chapter 1 |
