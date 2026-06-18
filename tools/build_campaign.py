@@ -334,6 +334,12 @@ STAT_DONOR = {
 GROWTH_FIELDS = ('growthHP', 'growthPow', 'growthSkl', 'growthSpd',
                  'growthDef', 'growthRes', 'growthLck')
 
+# Personal-BASE donor (the starting stat line). Usually the same canonical unit as the
+# growth donor above, but the two shamans split: both take EWAN's Ch1-appropriate bases
+# (Knoll's are lv9-inflated), then diverge on growths -- Marty on Knoll's curve (-> Druid),
+# Meesmickle on Ewan's (-> Summoner). docs/decisions.md "Party-side parity" / issue #45.
+BASE_DONOR = dict(STAT_DONOR, marty='CHARACTER_EWAN', meesmickle='CHARACTER_EWAN')
+
 
 # our cast bust  ->  vanilla portrait slot whose graphic files we overwrite.
 # Slots are FE8's earliest-available cast so one early chapter shows many faces.
@@ -882,6 +888,27 @@ def donor_growths_and_ranks(vanilla_text, donor_char):
     rm = re.search(r'\.baseRanks\s*=\s*(\{.*?\})', block, re.DOTALL)
     ranks = re.sub(r'\s+', ' ', rm.group(1)).strip() if rm else '{}'
     return growths, ranks
+
+
+# A donor's personal base layer = the displayed-stat fields keyed as gCharacterData
+# stores them (base* deltas the engine adds on top of the class base). Luck is
+# character-only, so a missing field reads 0. baseMov is class-only -> excluded.
+BASE_FIELDS = ('baseHP', 'basePow', 'baseSkl', 'baseSpd', 'baseDef',
+               'baseRes', 'baseLck', 'baseCon')
+
+
+def donor_base_stats(vanilla_text, donor_char):
+    """Read a stat-donor unit's personal BASE stats from VANILLA data_characters.c
+    text. These are the personal line a class-matched canonical unit carries on top
+    of its class base -- inheriting them lifts our cast off "naked class" frailty to
+    vanilla parity. Mirrors donor_growths_and_ranks (same snapshot discipline)."""
+    s, e = _find_brace_block(vanilla_text, '[%s - 1]' % donor_char, CHARACTERS_C)
+    block = vanilla_text[s:e]
+    bases = {}
+    for bf in BASE_FIELDS:
+        m = re.search(r'\.' + bf + r'\s*=\s*(-?\d+)', block)
+        bases[bf] = int(m.group(1)) if m else 0
+    return bases
 
 
 def _set_gender(block, female):

@@ -53,6 +53,18 @@ def check_python_compiles(fail):
         fail.append('tools/ has a Python file that does not compile')
 
 
+def check_tests_pass(fail):
+    """Run the Python unit tests (tools/test_*.py). The combat math in fe_combat.py is
+    the difficulty engine's arbiter -- a silent regression there mis-grades every chapter."""
+    import subprocess
+    for t in sorted(glob.glob(os.path.join(REPO, 'tools', 'test_*.py'))):
+        r = subprocess.run([sys.executable, t], capture_output=True, text=True)
+        if r.returncode != 0:
+            tail = (r.stderr or r.stdout).strip().splitlines()
+            fail.append('unit tests fail: %s (%s)' % (
+                os.path.relpath(t, REPO), tail[-1] if tail else 'see output'))
+
+
 def check_yaml_parses(fail):
     import yaml
     for f in glob.glob(os.path.join(REPO, 'campaigns/**/*.yaml'), recursive=True):
@@ -122,7 +134,7 @@ def check_engine_guards_present(fail):
 
 def main():
     fail = []
-    for check in (check_python_compiles, check_yaml_parses,
+    for check in (check_python_compiles, check_tests_pass, check_yaml_parses,
                   check_tool_refs_exist, check_no_dead_concepts,
                   check_generated_indexes_fresh, check_engine_guards_present):
         check(fail)

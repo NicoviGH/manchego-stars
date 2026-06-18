@@ -29,7 +29,7 @@ export PATH := $(BREW_PY):$(PATH)
 endif
 endif
 
-.PHONY: all clean verify check
+.PHONY: all clean verify check test difficulty
 
 all: fireemblem8.gba
 
@@ -47,6 +47,16 @@ check:
 # so there is no sha1 match to check.)
 verify:
 	@python3 tools/verify_text.py
+
+# Run the Python unit tests (combat math + stat resolution + difficulty engine).
+# Also run by `make check` / CI / the pre-commit hook.
+test:
+	@for t in tools/test_*.py; do echo "== $$t =="; python3 $$t || exit 1; done
+
+# Static per-chapter difficulty / vanilla-parity report (no ROM build, no mGBA).
+#   make difficulty CH=ch01
+difficulty:
+	@python3 tools/difficulty.py --campaign $(CAMPAIGN) --chapter $(CH)
 
 clean:
 	$(MAKE) -C fireemblem8u clean
