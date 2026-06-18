@@ -6,6 +6,7 @@
 
 id: wolfram
 name: Wolfram
+death_quote: "Melt me down... forge something better."  # falls-in-battle quote (#6 dialogue pass; lore/wolfram.md)
 portrait_ref: portraits/wolfram.png     # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/wolfram.jpeg
 # Portrait source: https://www.dndbeyond.com/avatars/25957/254/1581111423-74374750.jpeg

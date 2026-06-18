@@ -4,6 +4,7 @@
 
 id: prof-rbg
 name: "Prof. R.B. Geenius"
+death_quote: "Ah... discheesed at last. ...Be Gouda, Pinky."  # falls-in-battle quote (#6 dialogue pass; lore/prof-rbg.md)
 fe_name: "Prof. RBG"                      # FE8 name buffer is <=12 chars; full name overflows it
 portrait_ref: portraits/prof-rbg.png     # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/prof-rbg.jpg

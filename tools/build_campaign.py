@@ -194,6 +194,21 @@ CH01_ENDING_CARD_MSG = 0x94C
 CH01_ENDING_MSGS = (0x946, 0x947, 0x948, 0x949, 0x94A, 0x94B)  # AB,C,D,E1,E2,F
 CH01_BODY_MSG = 0x956    # the dismembered sled-driver, found just past the road sign
 CH01_TAUNT_MSG = 0x960   # Izobai's turn-1 boss taunt (both dead vanilla Ch1-tutorial slots)
+# Per-PC death quotes (#6, dialogue pass 2026-06-17): one universal dying line per
+# deployable cast member, shown with their bust when they fall in ANY chapter. Each
+# rides a dead vanilla Ch1-tutorial slot-2 message id (the prologue host strips Ch1's
+# tutorial event lists, so these never display in our ROM -> safe campaign-wide).
+# Keyed by cast unit_id; the PC rides its PORTRAIT_MAP slot, so pid/FID = CHARACTER_<slot>.
+PC_DEATH_QUOTE_MSGS = {
+    'braulo':     0x94D,
+    'marty':      0x94E,
+    'wolfram':    0x94F,
+    'meesmickle': 0x950,
+    'prof-rbg':   0x951,
+    'rootis':     0x952,
+    'sclorbo':    0x953,
+    'pinky':      0x958,
+}
 # Dev placeholder -- the reusable "next chapter isn't built yet" landing. A chapter whose
 # `unlocks_chapter` target isn't hosted yet ends HERE instead of MNC2'ing onto an unbuilt
 # slot (which would drop the player on a leftover vanilla map): RBG delivers a cheese-pun
@@ -3644,9 +3659,18 @@ def inject_ch01(campaign, verbose=True):
     script = _replace_brace_block(
         script, 'EventScr_Ch2_Village2[] =',
         '{\n    IGNORE_KEYS(0)\n    HouseEvent(0x93C, 0x0)\n}', CH2_EVENTSCRIPT_H)
+    # The trailhead sign + the body are faceless narration shown OVER the battle map.
+    # SOLOTEXTBOXSTART renders them in an opaque, bordered box (gProcScr_BoxDialogue,
+    # helpbox.c) instead of the default translucent map talk window -- readable over the
+    # snow (#5 "roadsign hard to read", Nicolas 2026-06-17). EVT_SLOT_B = 0x00FF00FF feeds
+    # x=y=0xFF into sub_800E31C, so the box auto-centers on screen (dialogue-box config
+    # flag 0x100). One SOLOTEXTBOXSTART per page since REMA tears the talk down between them.
     script = _replace_brace_block(
         script, 'EventScr_Ch2_Talk_EirikaRoss[] =',
-        '{\n    TEXTSHOW(0x955) /* road sign + gouged warning */\n    TEXTEND\n    REMA\n'
+        '{\n    SVAL(EVT_SLOT_B, 0xFF00FF) /* x=y=0xFF -> auto-center the solo box */\n'
+        '    SOLOTEXTBOXSTART\n'
+        '    TEXTSHOW(0x955) /* road sign + gouged warning */\n    TEXTEND\n    REMA\n'
+        '    SOLOTEXTBOXSTART\n'
         '    TEXTSHOW(0x%X) /* the smashed sled + the body, just past the sign */\n'
         '    TEXTEND\n    REMA\n'
         '    EVBIT_T(7)\n    ENDA\n}' % CH01_BODY_MSG, CH2_EVENTSCRIPT_H)
@@ -3850,6 +3874,55 @@ def inject_northlook_bitey(verbose=True):
         print("  'Ol Bitey mounted over the Northlook hearth (bg_Fireplace, #21)")
 
 
+def inject_pc_death_quotes(campaign, verbose=True):
+    """Universal per-PC death quotes (#6): when a deployable cast member falls, FE8's
+    gDefeatTalkList machinery (DisplayDefeatTalkForPid, eventinfo.c) shows their dying
+    line with their bust -- exactly the vanilla player-death-quote path (cf. Natasha
+    MSG_9C6, Forde MSG_9DC). Entries go at the HEAD of the list (GetDefeatTalkEntry
+    returns the first pid match) with route=ANY, chapter=0xFF and no flag, so they fire
+    in EVERY chapter. Each PC rides its PORTRAIT_MAP slot, so pid + face = CHARACTER_<slot>
+    / [FID_<slot>]. Quote text lives in the unit YAML (`death_quote`); bodies render via
+    _script_to_message with the bust on the left podium, like the boss death quotes."""
+    cast = classed_cast(campaign)
+    # 1. Text bodies (each quote in a map talk box with the faller's bust, left podium).
+    with open(TEXTS_TXT, encoding='utf-8') as f:
+        lines = f.read().split('\n')
+    rows = []
+    for unit_id, slot, _, _ in cast:
+        if unit_id not in PC_DEATH_QUOTE_MSGS:
+            sys.exit('ERROR: no death-quote msg id allocated for cast member %r' % unit_id)
+        unit = load_unit(campaign, unit_id)
+        quote = unit.get('death_quote')
+        if not quote:
+            sys.exit('ERROR: %s YAML has no death_quote (#6 requires one per cast member)'
+                     % unit_id)
+        msg = PC_DEATH_QUOTE_MSGS[unit_id]
+        set_message_body(lines, msg, _script_to_message(
+            [{unit_id: quote}], {unit_id: ('[OpenMidLeft]', _fid_tag(slot))}))
+        rows.append(
+            '    {\n'
+            '        .pid     = CHARACTER_%s, /* %s death quote (#6, any chapter) */\n'
+            '        .route   = CHAPTER_MODE_ANY,\n'
+            '        .chapter = 0xFF, /* fires in every chapter */\n'
+            '        .msg     = 0x%04X,\n'
+            '    },' % (slot.upper(), unit_id, msg))
+    with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines))
+    # 2. Prepend the entries at the head of gDefeatTalkList (same idiom as the boss
+    #    quotes; distinct pids, so ordering vs. those is immaterial).
+    with open(BATTLEQUOTES_C, encoding='utf-8') as f:
+        bq = f.read()
+    head = 'CONST_DATA struct DefeatTalkEnt gDefeatTalkList[] = {\n'
+    if bq.count(head) != 1:
+        sys.exit('ERROR: gDefeatTalkList head not in expected form in %s'
+                 % BATTLEQUOTES_C)
+    bq = bq.replace(head, head + '\n'.join(rows) + '\n')
+    with open(BATTLEQUOTES_C, 'w', encoding='utf-8') as f:
+        f.write(bq)
+    if verbose:
+        print('  death quotes: %d cast members (chapter=any)' % len(rows))
+
+
 def main():
     ap = argparse.ArgumentParser(description='Inject campaign content into the decomp build.')
     ap.add_argument('--campaign', default='rime-of-the-frostmaiden')
@@ -3899,6 +3972,8 @@ def main():
         inject_northlook_bitey()    # 'Ol Bitey over the tavern hearth (Beat 1 set dressing)
         print('prologue (New Game target):')
         inject_prologue(args.campaign, montage=args.montage)
+        print('death quotes (#6):')
+        inject_pc_death_quotes(args.campaign)
     print('done. Run `make` to compile the ROM.')
 
 

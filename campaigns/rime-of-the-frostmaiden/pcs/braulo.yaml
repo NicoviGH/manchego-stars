@@ -4,6 +4,7 @@
 
 id: braulo
 name: Braulo
+death_quote: "The shell's yours now... pass it on..."  # falls-in-battle quote (#6 dialogue pass; lore/braulo.md)
 portrait_ref: portraits/braulo.png       # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/braulo.jpeg
 # Portrait source: https://www.dndbeyond.com/avatars/25784/526/1581111423-73827256.jpeg
