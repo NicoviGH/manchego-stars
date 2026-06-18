@@ -867,10 +867,11 @@ scenarios.recordsupply = function()
         "Braulo benched (field=%d, no Braulo); Pinky the chosen lord opened the convoy via Supply", onField))
 end
 
--- RECORDRESCUE: reproduce the "rescued cast sprite renders BLACK" bug. At the deploy zone
--- (turn 1, no enemy in range, so Rescue is the top action-menu item) one cast unit rescues
--- an adjacent ally; capture the rescue selection + carry animation + the carried-unit
--- overlay densely so the custom-map-sprite palette-bank fault is visible for diagnosis.
+-- RECORDRESCUE: reproduce the "rescued cast sprite renders BLACK" bug (#44). One cast unit
+-- rescues an adjacent ally; the lifted unit's map-unit (MU) sprite is captured. Root cause
+-- (diagnosed session 12): the MU's STANDING facing draws the class SMS through the cast
+-- palette bank (a general cast-MU fault; the rescue lift halts to standing, so it's the most
+-- visible case). The custom idle SMS and walking AP path are unaffected. See issue #44.
 scenarios.recordrescue = function()
     wait(30)
     if not loadState("prep") then return result("FAIL", "no prep checkpoint (run.sh builds it)") end
@@ -884,32 +885,53 @@ scenarios.recordrescue = function()
     if not waitFor(function()
         return faction() == 0 and turn() >= 1 and not procActive(SYM.gProcScr_SALLYCURSOR)
     end, 1200) then shot("rescue-no-map"); return result("FAIL", "never reached the map") end
-    wait(120)
-    waitFor(function() return faction() == 0 and not menuOpen() end, 3000, true)
-    wait(40); shot("rescue")
-    -- Rescuer = the lord (force-deployed, always present); target = an adjacent deployed ally.
-    local rescuer = blue(0x01)
-    if not rescuer then return result("FAIL", "lord not on field") end
-    local target
+    -- The prep checkpoint sits BEFORE the Ch1 battle-start cutscene and the PLAYER PHASE
+    -- banner; both must finish before a unit is selectable. StdEventEngine runs the cutscene
+    -- -- wait for it to go idle (tapping A to advance dialogue), then settle past the banner.
+    -- (Waiting only on "not menuOpen" returns mid-banner, where the menu A press is eaten.)
+    if not waitFor(function()
+        return faction() == 0 and turn() >= 1
+            and not procActive(SYM.ProcScr_StdEventEngine) and not menuOpen()
+    end, 3000, true) then shot("rescue-no-map"); return result("FAIL", "cutscene never cleared") end
+    wait(150); shot("rescue")                              -- let the PLAYER PHASE banner pass
+    -- FE8 only offers Rescue when the rescuer's Aid >= the target's Con, so not every adjacent
+    -- pair is liftable. Try each deployed unit until one actually lifts a neighbour; confirm via
+    -- US_RESCUING (0x10, include/bmunit.h -- NOT 0x1000), then capture the lift. With no enemy
+    -- in range Rescue is the top action-menu item: A enters target-select, A picks the sole
+    -- adjacent target. That lifted MU is the custom-cast sprite #44 reports rendering BLACK.
+    local US_RESCUING = 0x10
+    local function tryRescue(rescuer)
+        local target
+        for i = 0, 50 do
+            local u = unitAt(SYM.gUnitArrayBlue, i)
+            if u and u.charId ~= rescuer.charId and (u.state & 0x9) == 0 and u.x ~= 0xFF
+               and math.abs(u.x - rescuer.x) + math.abs(u.y - rescuer.y) == 1 then target = u break end
+        end
+        if not target then return nil end
+        if not moveUnit(rescuer.x, rescuer.y, rescuer.x, rescuer.y) then return nil end
+        press(K.A, 4); wait(16)                            -- top item -> target-select (if Rescue)
+        press(K.A, 4)                                      -- pick the sole adjacent target
+        for f = 1, 80 do if f % 3 == 0 then shot("rescue") end yield() end  -- the lift animation
+        local r = blue(rescuer.charId)
+        if r and (r.state & US_RESCUING) ~= 0 then return target.charId end
+        press(K.B, 4); press(K.B, 4); press(K.B, 4)        -- not liftable: back fully out
+        waitFor(function() return faction() == 0 and not menuOpen() end, 150, true)
+        return nil
+    end
+    waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
+    wait(30)
+    local rescued, rescuerId
     for i = 0, 50 do
         local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and u.charId ~= 0x01 and (u.state & 0x9) == 0 and u.x ~= 0xFF
-           and math.abs(u.x - rescuer.x) + math.abs(u.y - rescuer.y) == 1 then target = u break end
+        if u and (u.state & 0x9) == 0 and u.x ~= 0xFF then
+            rescued = tryRescue(u)
+            if rescued then rescuerId = u.charId; break end
+        end
     end
-    if not target then return result("FAIL", "no adjacent ally to rescue") end
-    log(string.format("rescuer(%d,%d) rescuing charId=0x%02X at (%d,%d)",
-        rescuer.x, rescuer.y, target.charId, target.x, target.y))
-    if not moveUnit(rescuer.x, rescuer.y, rescuer.x, rescuer.y) then
-        shot("rescue-no-menu"); return result("FAIL", "action menu never opened")
-    end
-    shot("rescue")                                         -- action menu (Rescue = top item)
-    press(K.A, 4); wait(20); shot("rescue")                -- select Rescue -> target select
-    press(K.A, 4)                                          -- pick the sole adjacent target
-    for f = 1, 90 do if f % 3 == 0 then shot("rescue") end yield() end  -- carry anim + overlay
-    shot("rescue")
-    local carrying = (blue(0x01).state & 0x1000) ~= 0      -- US_RESCUING
-    log("lord US_RESCUING=" .. tostring(carrying))
-    result("PASS", "rescue captured (carried-sprite frames; US_RESCUING=" .. tostring(carrying) .. ")")
+    if not rescued then shot("rescue-none"); return result("FAIL", "no rescuer could lift an ally") end
+    wait(20); shot("rescue")
+    log(string.format("charId 0x%02X rescued charId 0x%02X (US_RESCUING set)", rescuerId, rescued))
+    result("PASS", string.format("rescue lift captured: 0x%02X carrying 0x%02X", rescuerId, rescued))
 end
 
 -- RECORDFIX (#5 + #6): in-game capture of the two text fixes. #5 is now a BATTLE-START
