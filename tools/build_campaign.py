@@ -335,10 +335,15 @@ GROWTH_FIELDS = ('growthHP', 'growthPow', 'growthSkl', 'growthSpd',
                  'growthDef', 'growthRes', 'growthLck')
 
 # Personal-BASE donor (the starting stat line). Usually the same canonical unit as the
-# growth donor above, but the two shamans split: both take EWAN's Ch1-appropriate bases
-# (Knoll's are lv9-inflated), then diverge on growths -- Marty on Knoll's curve (-> Druid),
-# Meesmickle on Ewan's (-> Summoner). docs/decisions.md "Party-side parity" / issue #45.
+# rank donor (STAT_DONOR), but the two shamans take EWAN's Ch1-appropriate bases (Knoll's
+# are lv9-inflated). docs/decisions.md "Party-side parity" / issue #45.
 BASE_DONOR = dict(STAT_DONOR, marty='CHARACTER_EWAN', meesmickle='CHARACTER_EWAN')
+
+# GROWTH donor (the level-up curve). Same as the rank donor except Meesmickle, who grows
+# on EWAN's curve (-> Summoner: dodge/luck) while Marty keeps Knoll's (-> Druid: soak/nuke).
+# Ranks stay on STAT_DONOR so both shamans keep Knoll's ITYPE_DARK rank (Ewan is Anima-only,
+# so his tome wouldn't equip). docs/decisions.md "Party-side parity" / issue #45.
+GROWTH_DONOR = dict(STAT_DONOR, meesmickle='CHARACTER_EWAN')
 
 
 # our cast bust  ->  vanilla portrait slot whose graphic files we overwrite.
@@ -852,11 +857,21 @@ def _set_field(block, field, value, path, marker):
     return new
 
 
-def class_base_stats(class_enum):
-    """Read a class's base stats from data_classes.c, keyed by CharacterData field
-    name (baseHP, basePow, ...). Luck is character-only, so baseLck defaults to 0."""
-    with open(CLASSES_C, encoding='utf-8') as f:
-        text = f.read()
+def vanilla_decomp_text(relpath):
+    """Committed (HEAD) text of a decomp source file -- immune to the working-tree patching
+    the build applies to PATCHED_DECOMP_FILES (e.g. data_characters.c portrait slots get
+    overwritten, data_classes.c gets enemy-class clones). Anything that wants the *vanilla*
+    value (donor stats, class bases, the difficulty engine) must read through here, not the
+    mutable working tree. relpath is under fireemblem8u/, e.g. 'src/data_characters.c'."""
+    return subprocess.check_output(['git', '-C', DECOMP, 'show', 'HEAD:' + relpath],
+                                   encoding='utf-8')
+
+
+def class_base_stats(class_enum, classes_text=None):
+    """Read a class's base stats, keyed by CharacterData field name (baseHP, basePow, ...).
+    Luck is character-only, so baseLck defaults to 0. `classes_text` overrides the source
+    (pass vanilla_decomp_text('src/data_classes.c') to be immune to reskin patching)."""
+    text = classes_text if classes_text is not None else open(CLASSES_C, encoding='utf-8').read()
     s, e = _find_brace_block(text, '[%s - 1]' % class_enum, CLASSES_C)
     block = text[s:e]
     out = {'baseLck': 0}
@@ -911,6 +926,21 @@ def donor_base_stats(vanilla_text, donor_char):
     return bases
 
 
+def personal_base_deltas(fe_stats, class_base, donor_base):
+    """The personal-base layer to patch into a cast slot's gCharacterData, keyed by base
+    field. FE8 shows class base + this layer, so each field is (authored fe_stat - class
+    base) + the donor's personal base: an FE-strict unit (fe_stats == class base) lands on
+    its donor's line, and any deliberate authored divergence stacks on top. MOV is class-
+    only (no STAT_FIELD entry) and is skipped."""
+    out = {}
+    for fe, value in fe_stats.items():
+        field = STAT_FIELD.get(fe)
+        if field is None:
+            continue
+        out[field] = int(value) - class_base.get(field, 0) + donor_base.get(field, 0)
+    return out
+
+
 def _set_gender(block, female):
     """Set the CA_FEMALE attribute. Replaces .attributes if present; if absent,
     inserts it only when female (absent already means 0 == male)."""
@@ -929,7 +959,10 @@ def patch_character_data(campaign, verbose=True):
     """Inject class + base stats into each cast slot's gCharacterData entry."""
     with open(CHARACTERS_C, encoding='utf-8') as f:
         text = f.read()
-    vanilla = text  # snapshot for reading stat-donor growths/ranks (pre-patch)
+    # Donor bases/growths/ranks are read from the committed (HEAD) source, NOT `text`:
+    # several donors (Gilliam, Neimi, Moulder, Vanessa) ride portrait slots this very pass
+    # overwrites, so a working-tree read could see an already-patched donor.
+    vanilla = vanilla_decomp_text('src/data_characters.c')
 
     for unit_id, slot in PORTRAIT_MAP.items():
         unit = load_unit(campaign, unit_id)
@@ -954,19 +987,18 @@ def patch_character_data(campaign, verbose=True):
         block = _set_field(block, 'affinity', 'UNIT_AFFIN_ANIMA', CHARACTERS_C, marker)
         block = _set_field(block, 'baseLevel', int(st.get('level', 1)), CHARACTERS_C, marker)
 
-        deltas = {}
-        for fe in st:
-            field = STAT_FIELD.get(fe)
-            if field is None:
-                continue
-            delta = int(st[fe]) - cbase.get(field, 0)
-            deltas[field] = delta
+        # Personal base layer = (authored - class) + the donor's personal line, so the
+        # cast lands at vanilla parity instead of "naked class" (donor-base inheritance, #45).
+        dbase = donor_base_stats(vanilla, BASE_DONOR[unit_id])
+        deltas = personal_base_deltas(st, cbase, dbase)
+        for field, delta in deltas.items():
             block = _set_field(block, field, delta, CHARACTERS_C, marker)
 
-        # Growths + weapon ranks: take a class-matched vanilla unit's (the donor),
-        # so the unit levels and fights like a real FE unit of its class.
-        donor = STAT_DONOR[unit_id]
-        growths, ranks = donor_growths_and_ranks(vanilla, donor)
+        # Growths from the growth donor, weapon ranks from the rank donor (usually the same
+        # unit; the shamans split -- Mees grows on Ewan but keeps Knoll's Dark rank). Both
+        # read from VANILLA so the unit levels and fights like a real FE unit of its class.
+        growths, _ = donor_growths_and_ranks(vanilla, GROWTH_DONOR[unit_id])
+        _, ranks = donor_growths_and_ranks(vanilla, STAT_DONOR[unit_id])
         for gf, gv in growths.items():
             block = _set_field(block, gf, gv, CHARACTERS_C, marker)
         block, n = re.subn(r'(\.baseRanks\s*=\s*)\{.*?\}',
@@ -987,10 +1019,13 @@ def patch_character_data(campaign, verbose=True):
                              if k in st)
             nz = {k: v for k, v in deltas.items() if v != 0}
             tag = '' if not nz else '  (deltas %s)' % nz
-            print('  %-10s -> %-8s: %s L%s  %s  growths+ranks<-%s%s%s'
+            short = lambda d: d.replace('CHARACTER_', '')
+            donors = 'base<-%s grow<-%s rank<-%s' % (
+                short(BASE_DONOR[unit_id]), short(GROWTH_DONOR[unit_id]),
+                short(STAT_DONOR[unit_id]))
+            print('  %-10s -> %-8s: %s L%s  %s  %s%s%s'
                   % (unit_id, slot, class_enum, st.get('level', 1), shown,
-                     donor.replace('CHARACTER_', ''),
-                     '  [F]' if female else '', tag))
+                     donors, '  [F]' if female else '', tag))
 
     with open(CHARACTERS_C, 'w', encoding='utf-8') as f:
         f.write(text)

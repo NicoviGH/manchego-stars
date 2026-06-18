@@ -71,11 +71,12 @@ CAMPAIGN = 'rime-of-the-frostmaiden'
 class PlayerStatResolution(unittest.TestCase):
     """Effective stats = class base + donor personal base (donor-base inheritance)."""
 
-    def test_wolfram_is_pure_armor_knight_base(self):
-        # Gilliam (donor) has no personal line, so Wolfram == Armor Knight class base.
+    def test_wolfram_inherits_gilliams_durable_line(self):
+        # Armor Knight class base + Gilliam's real personal line (read from committed source,
+        # since Gilliam's slot is build-overwritten): a tanky lord, not naked class.
         u = df.player_combatant(CAMPAIGN, 'wolfram')
         self.assertEqual((u.hp, u.pow, u.skl, u.spd, u.df, u.res, u.lck, u.con),
-                         (17, 5, 2, 0, 9, 0, 0, 13))
+                         (25, 9, 6, 3, 9, 3, 3, 14))
         self.assertEqual(u.weapon.name, 'iron-lance')
 
     def test_marty_inherits_ewan_bases_not_shaman_naked(self):

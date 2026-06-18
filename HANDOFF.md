@@ -1,41 +1,45 @@
 # Handoff — Manchego Stars · live state + pointers (backlog lives in GitHub issues, not here)
 
 **Date:** 2026-06-18 (session 15)
-**Session focus:** Built the **difficulty engine** (#45 item 1) — the static per-chapter parity
-arbiter — on a tested combat core, and laid the shared stat primitive item 2 will consume. The
-engine modeling **confirms donor-base inheritance reaches vanilla Ch1 parity**. `make` ROM output
-unchanged (the new primitives aren't wired into the build path yet — that's item 2).
+**Session focus:** Built the **difficulty engine** (#45 item 1) on a tested combat core, then landed
+**donor-base inheritance in the build** (#45 item 2) so the ROM cast actually reaches vanilla Ch1
+parity — `make` green, ROM rebuilt. Two commits: `6a40cb4` (engine), then this one (item 2 + a
+hermetic-read fix that corrects several units the engine had misread).
 
 ## This session (shipped)
 - **`tools/fe_combat.py`** — the FE8 combat math (AS, doubling, triangle, hit, damage incl.
   magic-vs-Res + effective ×3, RTK, **kills/round capped 1.0/unit**) as ONE tested source of truth
   (the decomp's own formulas). 31 tests, incl. a canonical Eirika-one-rounds-the-Ch1-boss oracle.
-- **`tools/difficulty.py`** — per-chapter analyzer: `make difficulty CH=ch01` (or
-  `python3 tools/difficulty.py --chapter ch01`). Resolves cast effective stats (class base + donor
-  personal line), parses chapter `enemy_units`, reports durability / throughput / carry /
-  **lord×team sweep** / **vanilla-delta**. 11 tests (pure metrics + I/O vs real Ch1 data).
-- **`tools/build_campaign.py`** — added `donor_base_stats()` + `BASE_DONOR` map (shamans→Ewan
-  bases), the shared primitive item 2 uses. 3 tests. **Not yet called by `patch_character_data`.**
-- **Tests gated:** `make test` + `check.py`/CI/pre-commit now run all `tools/test_*.py` (45 total).
-- **Retired the old one-off `balance_report.py`** — superseded by `difficulty.py`; its untested
-  duplicate of the combat math is gone (now `fe_combat.py`). decisions.md refs updated.
+- **`tools/difficulty.py`** — per-chapter analyzer: `make difficulty CH=ch01`. Resolves cast
+  effective stats (class base + donor line), parses chapter `enemy_units`, reports durability /
+  throughput / carry / **lord×team sweep** / **vanilla-delta**. 11 tests.
+- **`tools/build_campaign.py` (item 2 — the build change):** `patch_character_data` now injects each
+  cast slot's **donor personal bases** (`BASE_DONOR`; shamans→Ewan) via the tested
+  `personal_base_deltas()`. Shaman growth split: `GROWTH_DONOR` (Mees grows on Ewan→Summoner, Marty
+  on Knoll→Druid) while **ranks stay on Knoll** (`STAT_DONOR`) so both keep ITYPE_DARK and the flux
+  tome equips (Ewan is Anima-only — switching the rank donor would have broken it). 8 tests.
+- **Hermetic-read fix (correctness):** donor/class stats are now read from the **committed (HEAD)**
+  decomp via `vanilla_decomp_text()`, not the build-mutated working tree. Four donors
+  (Gilliam/Neimi/Moulder/Vanessa) ride portrait slots the build overwrites, so working-tree reads
+  showed them *naked* — which had made the engine (and `6a40cb4`'s oracles) understate
+  Wolfram/Pinky/sclorbo/prof-rbg. Oracles corrected; tests now pass clean-tree AND dirty-tree.
+- **Tests gated:** `make test` + `check.py`/CI/pre-commit run all `tools/test_*.py` (45 total).
+- **Retired the old one-off `balance_report.py`** (superseded by `difficulty.py`/`fe_combat.py`).
 
-### What the engine says about Ch1 (the alpha-feedback chapter)
-With donor bases modeled, our **best-4 field is at vanilla parity**: throughput **3.94 vs 3.74**,
-durability(min) **2.6 vs 2.8**, and **rootis one-rounds the lv4 armor boss with magic** (def→res).
-The **Spd-0 cliff still shows on Wolfram (dura 1.8) and Pinky (1.4)** — exactly the glass lords the
-per-lord survivability floor (#45 item 3) is designed to lift. Sweep: every lord choice is viable.
+### Corrected Ch1 parity (the alpha-feedback chapter)
+Best-4 field at vanilla parity: throughput **4.00 vs 3.74**, durability(min) **2.8 = 2.8** (exact),
+**rootis one-rounds the lv4 armor boss with magic** (def→res). **Every lord choice is viable**
+(sweep thru 3.74–4.00). Wolfram is a proper **tank** (HP25/Def9, dura 5.9 — the earlier "frail
+Wolfram" was the dirty-tree artifact). The real glass units are the **shamans (dura 2.6)** — exactly
+the per-lord survivability floor's target (#45 item 3).
 
 ## Next (all in #45, in checklist order)
-1. **Item 2 — donor-base inheritance in the BUILD.** Wire `patch_character_data` to add
-   `donor_base_stats(BASE_DONOR[uid])` into the personal layer (currently sets `fe_stats − class_base`
-   = 0). Makes the ROM cast match what the engine models. **Then `make` green + re-run
-   `make difficulty CH=ch01` to confirm ROM parity.** Sub-item (Part B): shaman growth split — Mees's
-   growth/rank donor KNOLL→EWAN (NB: check Ewan vs Knoll `baseRanks` keeps Dark rank so the flux tome
-   still equips); Marty stays Knoll growths. Bases already correct via `BASE_DONOR`.
-2. **Item 3** — per-lord HP/Def floor (build-generated delta table + engine hook).
-3. **Item 4** — `pinky.yaml` → `pcs/`. **Item 5** — recruit schedule (#17).
-4. **#46** lord-select UX (needs Nicolas's UI direction). **#47** alpha-feedback tracker.
+1. **Item 3** — per-lord HP/Def floor: build-generated per-lord delta table + an engine hook applying
+   the chosen lord's delta at chapter start (keyed on the lord-select flag). **One-time** (fades).
+   Target ~5-hits-to-down: ~0 for tanks (Wolfram/Braulo), +7/+4 for the glass shamans.
+2. **Item 4** — `pinky.yaml` → `pcs/` (he's the 8th PC + a lord candidate). **Item 5** — recruit
+   schedule to match vanilla cadence (#17).
+3. **#46** lord-select UX (needs Nicolas's UI direction). **#47** alpha-feedback tracker.
 
 > Backlog/todos live in **GitHub issues** (labelled), not this file. HANDOFF = live state + pointers.
 
@@ -52,7 +56,10 @@ montage). NEVER a bare `make` for a shippable ROM — it strips the montage.
 - **Never commit the `fireemblem8u` submodule pointer** (build artifact); stage repo files explicitly.
 - Story text → `make` regenerates bodies; gate with `python3 tools/verify_text.py` after text changes.
 - The difficulty engine is a **static proxy** (no positioning/turns/AI) — the playtest harness
-  (`tools/playtest/`) is the dynamic arbiter. It models the donor-base DESIGN; item 2 makes it real.
+  (`tools/playtest/`) is the dynamic arbiter.
+- **Vanilla decomp reads go through `build_campaign.vanilla_decomp_text()` (HEAD), never the working
+  tree** — the build overwrites donor portrait slots (Gilliam/Neimi/Moulder/Vanessa) + reskins
+  classes, so a working-tree read of donor/class stats can be silently wrong (this bit the engine).
 
 ## Standing rules
 Combat = pure vanilla FE; field parity with vanilla ch N is doctrine. Custom art where it matters,

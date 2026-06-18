@@ -37,26 +37,35 @@ CLASS_TAGS = {
     'CLASS_WYVERN_RIDER': frozenset({'flier'}),
 }
 
-_vanilla_chars = None       # cached data_characters.c snapshot (donor bases)
-_classes_text = None        # cached data_classes.c (class growths)
+# The engine models VANILLA, so every decomp read is the committed (HEAD) source, never
+# the working tree the build mutates (donor portrait slots + reskinned classes). Cached.
+_vanilla_chars = None
+_vanilla_classes = None
 
 
 def _characters_text():
     global _vanilla_chars
     if _vanilla_chars is None:
-        with open(bc.CHARACTERS_C, encoding='utf-8') as f:
-            _vanilla_chars = f.read()
+        _vanilla_chars = bc.vanilla_decomp_text('src/data_characters.c')
     return _vanilla_chars
 
 
+def _classes_text():
+    global _vanilla_classes
+    if _vanilla_classes is None:
+        _vanilla_classes = bc.vanilla_decomp_text('src/data_classes.c')
+    return _vanilla_classes
+
+
+def _class_base(class_enum):
+    return bc.class_base_stats(class_enum, _classes_text())
+
+
 def _class_growths(class_enum):
-    """Read a class's growth rates from data_classes.c (for autoleveling enemies)."""
-    global _classes_text
-    if _classes_text is None:
-        with open(bc.CLASSES_C, encoding='utf-8') as f:
-            _classes_text = f.read()
-    s, e = bc._find_brace_block(_classes_text, '[%s - 1]' % class_enum, bc.CLASSES_C)
-    block = _classes_text[s:e]
+    """Read a class's growth rates (for autoleveling enemies) from vanilla data_classes.c."""
+    text = _classes_text()
+    s, e = bc._find_brace_block(text, '[%s - 1]' % class_enum, bc.CLASSES_C)
+    block = text[s:e]
     out = {}
     for gf in bc.GROWTH_FIELDS:
         m = re.search(r'\.' + gf + r'\s*=\s*(-?\d+)', block)
@@ -98,7 +107,7 @@ def player_combatant(campaign, uid):
     unit = bc.load_unit(campaign, uid)
     unit.setdefault('id', uid)
     class_enum = bc.class_enum_for(unit)
-    cbase = bc.class_base_stats(class_enum)
+    cbase = _class_base(class_enum)
     dbase = bc.donor_base_stats(_characters_text(), bc.BASE_DONOR[uid])
     eff = {f: cbase.get(f, 0) + dbase.get(f, 0) for f in bc.BASE_FIELDS}
     weapon = _weapon_for(unit.get('inventory'))
@@ -112,7 +121,7 @@ def _enemy_class_enum(token):
 
 def _one_enemy(name, class_token, level, weapon):
     class_enum = _enemy_class_enum(class_token)
-    stats = autolevel(bc.class_base_stats(class_enum),
+    stats = autolevel(_class_base(class_enum),
                       _class_growths(class_enum), int(level))
     return _stats_to_combatant(name, stats, weapon, CLASS_TAGS.get(class_enum, frozenset()))
 
