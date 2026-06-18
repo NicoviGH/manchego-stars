@@ -87,7 +87,7 @@ growth_rates:
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
 # MVP: stock FE weapons — tome stats inherited from the vanilla item in `fe_base` (no custom
 # Might). Eldritch/force flavor rides on the sprite art + damage_type label. The reflavored
-# Vulnerary is the party-wide "Goodberry" (campaign.yaml item_names); narrative flavor: she
+# Vulnerary is the party-wide "Goodberry" (campaign.yaml item_names); narrative flavor: he
 # crushes the berry into a blood-dark draught rather than quaffing a potion.
 inventory:
   - id: eldritch-blast
