@@ -253,8 +253,9 @@ _Decided: 2026-06-10 (Nicolas; "1:1 alignment to the units on the field, chapter
 "Field parity" (above) mirrors vanilla's enemies and deploy cap; this is the party half. Each PC
 inherits its class-matched vanilla donor's **personal base stats** (`build_campaign.py` →
 `STAT_DONOR`; the build already inherits that donor's growths + ranks, so base inheritance extends
-the same path). Shamans take **Ewan bases / Knoll growths** (Knoll's lv9 bases are too hot for
-Ch1). This lifts the cast off its "naked class" lines — personal bases were all 0, i.e.
+the same path). Shamans take **Ewan (Ch1-appropriate) bases** (Knoll's lv9 bases are too hot
+for Ch1), with **growths split toward their promotions** — Marty → Knoll → Druid, Meesmickle →
+Ewan → Summoner (#45). This lifts the cast off its "naked class" lines — personal bases were all 0, i.e.
 generic-enemy frailty plus a Spd-0 doubling cliff — to **vanilla parity on both durability and
 kill-throughput** (`tools/balance_report.py`). The player-chosen lord (#42), who must survive,
 additionally gets a runtime per-lord **HP/Def top-up to a ~5-enemy-hits-to-down floor** (0 for
