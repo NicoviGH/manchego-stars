@@ -3143,13 +3143,19 @@ def inject_ch01(campaign, verbose=True):
     b1_preload = [
         [],                                                            # A: Scramsax<->Hlin two-shot
         [('[OpenMidRight]', b1_fid('hlin'))],                          # B: Hlin watches the roll-call
-        [('[OpenFarLeft]', b1_fid('braulo')), ('[OpenLeft]', b1_fid('wolfram'))],   # C: party listens (2)
+        [('[OpenLeft]', b1_fid('wolfram'))],                           # C: Wolfram listens (Braulo speaks here now)
         [],                                                            # D: Hruna<->Hlin two-shot
         [('[OpenMidRight]', b1_fid('hruna'))],                         # E: Hruna across from RBG
     ]
-    # beat B: Pinky peeks out far-left beside his father (RBG speaks from mid-left) --
-    # they read fine stacked together as a pair (Nicolas, 2026-06-16: keep, don't split).
-    b1_overrides = [None, {'pinky': '[OpenFarLeft]'}, None, None, None]
+    # beat B: Pinky peeks out far-left beside his father (RBG speaks from mid-left) -- they
+    # read as a pair (Nicolas, 2026-06-16: keep). Beat B now ENDS on that pair: Braulo's
+    # "name the job" line moved to the head of beat C (YAML), so the beat's REMA clears the
+    # RBG+Pinky pair before Braulo speaks. Otherwise Pinky lingered far-left BEHIND Braulo:
+    # he sits on a different podium than the one Braulo's mid-left load would evict, so
+    # nothing cleared him (Nicolas's friends, 2026-06-17). In beat C Braulo speaks from his
+    # crowd spot (FarLeft) and stays as a silent listener through Hlin's story.
+    b1_overrides = [None, {'pinky': '[OpenFarLeft]'},
+                    {'braulo': '[OpenFarLeft]'}, None, None]
 
     # 0b. Ending "The Rolling Cheddar" (#21): the locked chapter_end `script:`, consumed
     #     the same way as Beat 1 -- a "Bryn Shander" location card + one message per beat

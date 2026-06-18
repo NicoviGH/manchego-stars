@@ -206,11 +206,13 @@ events:
       - pinky: >-
           (Pinky pokes his head out from behind his father and gives a small,
           shy wave.)
-      # (Braulo sets down his tankard; a small isopod peeks from the lip of his shell,
-      #  watching the mushroom) — he speaks only for himself here
-      - braulo: "Name the job and the price. If it's fair, I'm in."
-      # ── C — Hlin's story (the campaign's stakes) ──
+      # ── C — Braulo cuts to business, then Hlin's story (the campaign's stakes) ──
+      # Beat B ends on the RBG+Pinky two-shot; this break's REMA clears them so Braulo
+      # starts on a fresh stage (otherwise shy Pinky lingered far-left behind Braulo).
       - beat_break: C
+      # (Braulo sets down his tankard; a small isopod peeks from the lip of his shell,
+      #  watching the mushroom) — he speaks only for himself, then settles in for Hlin's tale
+      - braulo: "Name the job and the price. If it's fair, I'm in."
       # (Hlin lights her pipe at last)
       - hlin: >-
           Most of you aren't from the Dale, so I'll keep it simple. This winter
