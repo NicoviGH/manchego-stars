@@ -909,7 +909,10 @@ scenarios.recordrescue = function()
         end
         if not target then return nil end
         if not moveUnit(rescuer.x, rescuer.y, rescuer.x, rescuer.y) then return nil end
+        waitFor(function() return menuOpen() end, 90, true)  -- action menu up
+        wait(12); shot("menu")                             -- CAPTURE the action menu (Rescue should be top)
         press(K.A, 4); wait(16)                            -- top item -> target-select (if Rescue)
+        wait(12); shot("targetsel")                        -- CAPTURE the rescue target-select
         press(K.A, 4)                                      -- pick the sole adjacent target
         for f = 1, 80 do if f % 3 == 0 then shot("rescue") end yield() end  -- the lift animation
         local r = blue(rescuer.charId)
@@ -932,6 +935,61 @@ scenarios.recordrescue = function()
     wait(20); shot("rescue")
     log(string.format("charId 0x%02X rescued charId 0x%02X (US_RESCUING set)", rescuerId, rescued))
     result("PASS", string.format("rescue lift captured: 0x%02X carrying 0x%02X", rescuerId, rescued))
+end
+
+-- RECORDTRADE (#44 follow-up): capture the TRADE screen. Nicolas: the black bodies
+-- may have been in the trade menu, not the rescue lift. Same prep lead-up as
+-- recordrescue, then a cast unit opens Trade with an adjacent ally; the trade screen
+-- (both units' map-sprite icons + item lists) is captured for inspection.
+scenarios.recordtrade = function()
+    wait(30)
+    if not loadState("prep") then return result("FAIL", "no prep checkpoint (run.sh builds it)") end
+    wait(60)
+    for i = 1, 40 do                                       -- leave prep via Fight!
+        if not procActive(SYM.gProcScr_SALLYCURSOR) and not procActive(SYM.ProcScr_PrepUnitScreen)
+           and faction() == 0 and turn() >= 1 then break end
+        press(K.B, 4); wait(10); press(K.START, 4); wait(40)
+        if i % 3 == 0 then press(K.A, 4); wait(20) end
+    end
+    if not waitFor(function()
+        return faction() == 0 and turn() >= 1 and not procActive(SYM.gProcScr_SALLYCURSOR)
+    end, 1200) then shot("trade-no-map"); return result("FAIL", "never reached the map") end
+    if not waitFor(function()
+        return faction() == 0 and turn() >= 1
+            and not procActive(SYM.ProcScr_StdEventEngine) and not menuOpen()
+    end, 3000, true) then shot("trade-no-map"); return result("FAIL", "cutscene never cleared") end
+    wait(150)
+    waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
+    wait(30)
+    local function tryTrade(actor)
+        local target
+        for i = 0, 50 do
+            local u = unitAt(SYM.gUnitArrayBlue, i)
+            if u and u.charId ~= actor.charId and (u.state & 0x9) == 0 and u.x ~= 0xFF
+               and math.abs(u.x - actor.x) + math.abs(u.y - actor.y) == 1 then target = u break end
+        end
+        if not target then return nil end
+        if not moveUnit(actor.x, actor.y, actor.x, actor.y) then return nil end
+        wait(12); shot("menu")                             -- action menu (note option order)
+        press(K.DOWN, 4); wait(6); shot("nav")             -- step 1
+        press(K.DOWN, 4); wait(6); shot("nav")             -- step 2 (Trade if order R/I/T/S/W)
+        press(K.A, 4); wait(16); shot("tradesel")          -- selected -> partner-select (if Trade)
+        press(K.A, 4)                                      -- pick the sole adjacent ally
+        for f = 1, 30 do if f % 4 == 0 then shot("trade") end yield() end
+        press(K.B, 4); press(K.B, 4); press(K.B, 4)        -- exit (so a wrong pick backs out)
+        waitFor(function() return faction() == 0 and not menuOpen() end, 150, true)
+        return target.charId
+    end
+    local partner
+    for i = 0, 50 do
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u and (u.state & 0x9) == 0 and u.x ~= 0xFF then
+            partner = tryTrade(u)
+            if partner then break end
+        end
+    end
+    if not partner then shot("trade-none"); return result("FAIL", "no unit could trade") end
+    result("PASS", string.format("trade screen captured (partner 0x%02X)", partner))
 end
 
 -- RECORDFIX (#5 + #6): in-game capture of the two text fixes. #5 is now a BATTLE-START

@@ -92,6 +92,7 @@ case "$SCENARIO" in
     recordprep)   BUILDER=ckpt_prep;      CKPT=prep ;;
     recordsupply) BUILDER=ckpt_lordpinky; CKPT=lordpinky ;;
     recordrescue) BUILDER=ckpt_prep;      CKPT=prep ;;
+    recordtrade)  BUILDER=ckpt_prep;      CKPT=prep ;;
     recordfix)    BUILDER=ckpt_prep;      CKPT=prep ;;
 esac
 if [ -n "$BUILDER" ]; then

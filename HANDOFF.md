@@ -1,51 +1,33 @@
-# Handoff: rescue #44 fix DECIDED (route MUs via AP path — implement next). Ch1 difficulty QUANTIFIED but the APPROACH IS STILL OPEN — evaluating options (lord-as-anchor is one idea on the table, NOT chosen; deploy-limit + levers undecided).
+# Handoff: #44 CLOSED (phantom — Meesmickle is a black cat by design; no render bug). Ch1 difficulty is the one live open item — QUANTIFIED, but the APPROACH is still Nicolas's design call (lord-anchor vs party-bump vs guest vs deploy — nothing chosen).
 
-**Date:** 2026-06-18 (session 12)
-**Where we are:** Overnight session on the two open items from session 11. Both are now
-**diagnosed/quantified with reusable tooling**, and both land on a **decision Nicolas needs
-to make** (a risky engine fix vs the gentler options; which difficulty levers to pull).
+**Date:** 2026-06-18 (session 13)
+**Where we are:** Chased #44 ("rescued cast sprite renders BLACK") to ground and found it's a
+non-bug — closed it. No engine change shipped; mu.c untouched. The only carried-over open item is
+the **Ch1 difficulty** approach, which needs a design decision from Nicolas (not an engineering task).
 
-`make` green (untouched ROM — only Lua/Python tooling changed) · `recordrescue` PASS (now
-reliable) · `balance_report.py` runs clean · drift clean. **Commits `8acd12c`, `992d3ad`.**
+`make` green (untouched ROM — only Lua playtest tooling changed) · `recordrescue` + new
+`recordtrade` PASS · drift clean.
 
-## Shipped this session (committed + pushed)
-- **Reliable `recordrescue` repro + #44 root cause** (`8acd12c`). The old scenario fired the
-  rescue mid-PLAYER-PHASE-banner and checked the wrong `US_RESCUING` bit (`0x1000`, should be
-  `0x10`), so it never lifted anyone. Now it waits out the battle-start cutscene
-  (`StdEventEngine`) + banner, iterates deployed units until one can lift a neighbour (FE8 gates
-  Rescue on Aid≥Con), and asserts `US_RESCUING`. Reproduces the black sprite every run.
-- **`tools/balance_report.py`** (`992d3ad`) — the parked balance-report idea, built. FE8 combat
-  math (decomp formulas) for our cast vs vanilla Ch1 vs the shared enemies. `python3 tools/balance_report.py`.
+## ✅ #44 "rescued cast sprite renders BLACK" — CLOSED, not-a-bug
+There is **no render fault.** The "black sprite" is **Meesmickle** (GILLIAM slot): a deliberately
+black cat with a red cape — his correct map sprite. A bystander Meesmickle near a rescue got misread
+as a broken cast unit (greyed-out *acted* units are also just normal desaturation).
 
-## 🟢 Rescue #44 — root cause found, FIX DECIDED (route MUs via AP path; implement next session)
-**Nicolas's call (2026-06-18): option 1 — route cast MUs through the AP path when "standing."**
-The synth MU sheet already holds the idle pose in every frame, so the AP path renders the custom
-sprite instead of the class SMS. **The gate (`charId in gMuImgOverride`) is NON-NEGOTIABLE — Nicolas
-confirmed (2026-06-18): only the CAST may change. Every stock/vanilla/guest-only-walk character must
-keep its full class animations (walk + everything) 100% untouched.** The table is empty for stock
-units, so the dispatch change must apply ONLY to entries in it. Note this fix touches only the brief
-*standing* moment of cast MUs — walking is the AP path and is already untouched for everyone; the
-cast stays idle-only by design (we add no walk art, just stop the standing pose rendering black).
-Verify via `recordrescue` (lift = colourful custom sprite, not black) + `ch01win` (stock/vanilla
-units still walk + animate normally, no regressions). Implementation detail to mind: when `facing==STANDING`, `SetMuFacing` calls
-`SetStandingMuFacing` (not `AP_SwitchAnimation`), so a valid AP animation must be ensured for the
-cast-MU standing case before `PutMu` can render it.
+The session-12 root cause was **also wrong, and its "decided fix" was a no-op.** The blamed path —
+`mu.c:856` `facing == MU_FACING_STANDING → PutMuSMS` — is **dead code**: `src/mu.o` builds from
+`src/mu.c` (`.dep/src/mu.d`; `ASM_SUBDIR=asm`, so `mu.s` is dead reference), and `MU_FACING_STANDING`
+(15) is **assigned nowhere** in any compiled `.c`. `proc->facing` is only ever `UNK11` or a
+`SetMuFacing` arg, and no caller passes 15 → `PutMuSMS` never runs. Rerouting it changes a branch
+that's never taken.
 
-Diagnosed with live mGBA instrumentation (palette-RAM/OAM/VRAM reads; instrumentation removed).
-**It is NOT a palette-bank bug** (the earlier theory): OBJ bank 0x0B holds the correct cast
-palette the whole time, and the MU sheet on disk is correct. The real fault:
-- The MU display dispatch (`mu.c:856`) routes `facing == MU_FACING_STANDING → PutMuSMS`, which
-  draws the **class** SMS (`GetClassSMSId`) through the cast palette → near-black. `GetMuImg`/the
-  `#38` override does **not** cover this path; `StartUiStandingMu` (the would-be custom loader) is
-  dead code. **It's a general cast-MU fault, not rescue-specific** — also hits a *selected idle*
-  unit. The rescue lift halts to standing, so it's the most visible case (and what got noticed).
-  Walking uses the AP path (custom sheet in `gMUGfxBuffer`) and is likely fine. (Caution: the fix
-  touches hot vanilla MU rendering — every unit's movement display — so verify broadly, not just
-  the rescue case.)
+**Verified clean** (full custom art, correct palette): the rescue lift (Braulo carrying Marty),
+the rescue action menu, the rescue target-select previews, and the **trade menu** (Braulo the orange
+crab + Marty the mushroom-person). Captures in `map-review/rescue-44-*.png`. Full record: the
+closed issue #44 + [[project_manchego_stars_cast_notes]] (Meesmickle = black cat by design).
 
-## 🟡 Ch1 difficulty — QUANTIFIED; approach STILL OPEN (evaluating options, nothing chosen)
-`balance_report.py` settles it: **the enemies are not the problem — the party is.** Our line
-goblins are **lv1** (class base); vanilla Ch1's were **lv2-3** + the same lv4 boss, so our enemy
+## 🟡 Ch1 difficulty — QUANTIFIED; approach STILL OPEN (Nicolas's design call, nothing chosen)
+`balance_report.py` settles the diagnosis: **the enemies are not the problem — the party is.** Our
+line goblins are **lv1** (class base); vanilla Ch1's were **lv2-3** + the same lv4 boss, so our enemy
 field is marginally *easier*. The gap is entirely the lordless cast:
 - **Durability:** vanilla's *frailest* fielded unit (Eirika, 2.8 enemy-hits-to-down) ≈ our
   *sturdiest*. Half our cast drops in **<2 hits** open ground (~2.6 with forest). **Seth takes 17.5.**
@@ -61,9 +43,9 @@ field is marginally *easier*. The gap is entirely the lordless cast:
   5.9** (leanable, still a fight) → Seth-17.5 (solos). Constraints if pursued: MVP unpromoted ⇒
   level-boosted *in-class* anchor (flavour follows the picked class), NOT a promoted Paladin;
   campaign-wide; a pure level-boost won't fix class holes (e.g. Wolfram Spd-15% doubling) so it'd
-  need a survivability floor. Nicolas also floated an alt framing: instead level the fielded party
-  to ≈ vanilla's 4 (caveat: vanilla's output is Seth-concentrated, so a flat ensemble bump can't
-  match it — *someone* still has to anchor).
+  need a survivability floor. Alt framing he floated: instead level the fielded party to ≈ vanilla's
+  4 (caveat: vanilla's output is Seth-concentrated, so a flat ensemble bump can't match it — *someone*
+  still has to anchor).
 - **Per-unit anchor tweak** — e.g. Wolfram +3 Spd → survivability 1.8→3.9 (stops the fighter double).
 - **Guest veteran (a Jagen)** fielded in Ch1, like the prologue's Scramsax.
 - **deploy_limit 4 → 5/6** (output 44%→50–55%) — Nicolas wants to discuss; **undecided**.
@@ -72,34 +54,37 @@ field is marginally *easier*. The gap is entirely the lordless cast:
 - **AVOID:** nerfing the (already-gentle) enemies; blanket party-leveling (doesn't fix durability).
 
 **Offered next step (NOT greenlit):** extend `tools/balance_report.py` to model "lord-mode" at 2–3
-tiers across all 7 lord candidates, to pick the dial on numbers. Nicolas may want to keep weighing
-the *concept* (lord-anchor vs party-bump vs guest vs deploy) before any modelling.
+tiers across all 7 lord candidates, to pick the dial on numbers — *only if* Nicolas wants to decide on
+numbers rather than keep weighing the concept (lord-anchor vs party-bump vs guest vs deploy).
 
-## On-demand builds (unchanged)
+## Next up
+- **Ch1 difficulty decision** (Nicolas) — pick the lever family, then I model/implement.
+- Otherwise back to the **ART path** (map sprites / battle anims) via the test-chapter loop
+  ([[project_manchego_stars]] current focus).
+
+## On-demand builds
 `tools/build.sh test` (lean) · `tools/build.sh dist` (with #43 montage; stamps `dist/`). NEVER a
 bare `make` for a shippable ROM — it strips the montage.
 
-## Key files (this session)
-- `tools/playtest/harness.lua` — `recordrescue` rewritten (cutscene-wait + rescuer iteration +
-  correct `US_RESCUING`). `tools/balance_report.py` — Ch1 combat-math comparison + lever sim.
+## Playtest tooling (this session)
+- `tools/playtest/harness.lua` — new **`recordtrade`** scenario (captures the trade screen: both
+  units' panels + items) and added action-menu / target-select `shot()`s to `recordrescue`.
+- `tools/playtest/run.sh` — `recordtrade → ckpt_prep` (reuses the prep checkpoint).
 
-## Gotchas (carried + new)
-- **`recordrescue` is the #44 repro** (`tools/playtest/run.sh recordrescue`); the lifted cast unit
-  renders black. **`US_RESCUING = 0x10`** (1<<4), not 0x1000.
-- **#44 is a STANDING-MU fault**, not a palette bug — don't re-chase the palette bank (it's correct).
+## Gotchas (carried)
 - Background `run.sh` calls need an explicit `cd`/absolute path (shell cwd resets between tool
   calls — a relative `tools/playtest/run.sh` silently no-ops from the wrong dir).
 - `record*` defaults to 60fps+videoSync; `PT_FPS=240 tools/playtest/run.sh <scen>` for fast
-  static/proc-detected captures. Built ROM at `fireemblem8u/fireemblem8.gba`. Nicolas can't see
-  inline renders — save to `map-review/` and `open`. Izobai female; Pinky male.
+  static/menu captures. Built ROM at `fireemblem8u/fireemblem8.gba`. Nicolas can't see inline
+  renders — save to `map-review/` and `open`. Izobai female; Pinky male. **Meesmickle is a black cat
+  by design** (don't mistake him for a render bug); greyed = normal acted desaturation.
 - **Never commit the `fireemblem8u` submodule pointer** (build artifact); stage repo files explicitly.
 - Story text → `make` regenerates bodies; gate with `verify_text` after any text change.
 
 ## Memory
-[[manchego-stars-project]] · [[project_manchego_stars_campaign_structure]] · [[manchego-stars-automated-playtests]] ·
-[[manchego_stars_guest_map_sprite_wiring]] · [[feedback_use_decomp]] · [[feedback_fe-level-design]] ·
-[[feedback_proactive-push]] · [[feedback_handoff_vs_memory]] · [[feedback_answer_before_picker]] ·
-[[manchego_stars_rescue_standing_mu_bug]] · [[manchego_stars_ch1_difficulty]]
+[[project_manchego_stars]] · [[project_manchego_stars_campaign_structure]] · [[manchego_stars_automated_playtests]] ·
+[[project_manchego_stars_cast_notes]] · [[manchego_stars_ch1_difficulty]] · [[feedback_use_decomp]] ·
+[[feedback_fe-level-design]] · [[feedback_proactive-push]] · [[feedback_handoff_vs_memory]] · [[feedback_answer_before_picker]]
 
 ## Standing rules
 Combat = pure vanilla FE; field parity with vanilla ch N is doctrine. Custom art where it matters,
