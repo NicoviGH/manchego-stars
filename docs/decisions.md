@@ -863,6 +863,18 @@ book's ch1 opener painting (aurora over a snow-buried township, `campaigns/.../e
 derives the 256×160 16-color mural: brightness 0.75, 15 colors + black at GBA-transparent index 0).
 _Decided: 2026-06-10; crawl and aurora mural both GIF-reviewed and approved by Nicolas._
 
+**Build the two flavours with `tools/build.sh test|dist` — a plain `make` after `build_campaign --montage` silently clobbers the montage.**
+The `fireemblem8.gba` make target ALWAYS re-runs `build_campaign.py`, appending `--montage` only when `MONTAGE=1`. So the
+intuitive "run `build_campaign.py --montage`, then `make`" sequence re-runs the generator WITHOUT the flag on that second
+step and reverts the montage sources → a no-opener ROM byte-identical to the test build (this masqueraded as a "montage
+won't compile / stale-objects" bug for a whole session; it was never a compile problem). The montage flavour MUST be one
+command: `make MONTAGE=1`, wrapped as `tools/build.sh dist` (test = `tools/build.sh test`). A correct montage ROM's md5 is
+NOT the no-opener `142971e3`. Sanity check after a build: `grep -c "skip intro monologue" fireemblem8u/src/gamecontrol.c`
+= 0 for dist, 1 for test. Also: the decomp ships Linux `#!/bin/python3` shebangs that `setup-toolchain.sh` rewrites for
+macOS, but any `git checkout` inside the `fireemblem8u` submodule reverts them (`bad interpreter` on the next build);
+`build.sh` re-applies the fix idempotently. _Decided: 2026-06-17; root-caused + dist (with opener) GIF-verified end-to-end
+(`run.sh recordopening`: title → New Game → lore crawl → Ten Towns tour → prologue map)._
+
 **World-map tour rides vanilla's drawn-map slot with two Icewind Dale backdrops, selected by a free mask bit.**
 The drawn map (`WM_SHOWDRAWNMAP` → `StartGmapRm`, `worldmap_rm.c`) is one 240×160 prerendered screen: a 30×20 TSA
 over ≤640 unique 4bpp tiles at BG VRAM 0, palette rows 5-8 (raw TSA entries get +0x5000). `tools/gen_drawnmap.py`

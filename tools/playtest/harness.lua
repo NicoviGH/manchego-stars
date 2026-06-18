@@ -1127,18 +1127,39 @@ scenarios.recordopening = function()
     if not atTitle then return result("FAIL", "title screen never reached") end
     wait(40); shot("opening")                                 -- title
     press(K.START, 6); wait(40)                               -- START -> New Game / file select
-    -- file-select = New Game -> pick empty slot -> confirm Yes (exactly 3 taps); any extra
-    -- tap would skip the first crawl slides (A skips the monologue).
-    press(K.A, 4); wait(45); press(K.A, 4); wait(45); press(K.A, 4); wait(45)
+    -- Mash A to clear the New Game / file-select menu and start a fresh game. A is SAFE
+    -- here: only START skips the crawl (OpSubtitle_HandleStartPress), A does NOT -- so we
+    -- can tap through the menu without losing montage slides. Stop the instant the crawl
+    -- proc (gProcScr_OpSubtitle) goes live, then hand off so it auto-advances on its timer.
+    local sawCrawl = false
+    for i = 1, 60 do
+        if procActive(SYM.gProcScr_OpSubtitle) then sawCrawl = true break end
+        if inChapter() then break end                         -- non-montage build: no crawl
+        press(K.A, 3); wait(20)
+    end
     pokeNormalConfig()                                        -- readable crawl/tour speed
-    -- now the lore crawl auto-plays (A would skip it) -- hands off, dense screenshots
-    for f = 1, 1500 do
-        if f % 3 == 0 then shot("opening") end
+    -- The lore crawl auto-advances on its own timer (A is a no-op there), but the Ten
+    -- Towns world-map tour that follows is WM_TEXT pages that WAIT on a down-arrow prompt
+    -- and only advance on A. So tap A periodically throughout: harmless during the crawl,
+    -- and it walks the map tour forward. Readable speed makes the opener long -> generous
+    -- budget; shoot every 6th frame to keep the frame count sane for a GIF.
+    for f = 1, 9000 do
+        if f % 6 == 0 then shot("opening") end
+        if f % 45 == 0 then press(K.A, 3) end                 -- advance the WM tour pages
+        if procActive(SYM.gProcScr_OpSubtitle) then sawCrawl = true end
         if inChapter() then break end                         -- montage done -> prologue map
         yield()
     end
     shot("opening-after")
-    return result("PASS", string.format("opening montage recorded (reached chapter=%d)", chapter()))
+    if not sawCrawl then
+        return result("FAIL",
+            "no opening crawl (gProcScr_OpSubtitle never ran) -- montage not in this ROM?")
+    end
+    if not inChapter() then
+        return result("FAIL", "crawl played but never reached the prologue map")
+    end
+    return result("PASS", string.format(
+        "opening montage played (crawl seen) -> reached chapter=%d", chapter()))
 end
 
 -- TITLECARD: open the map menu -> Status screen, which decompresses the

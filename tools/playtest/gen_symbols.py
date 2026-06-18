@@ -32,6 +32,9 @@ WANTED = [
                                 # (src/prep_sallycursor.c; opened by event cmd 0x3E)
     'gProcScr_TitleScreen',     # proc script: the title screen (src/titlescreen.c).
                                 # Active after the dev placeholder's MNTS return.
+    'gProcScr_OpSubtitle',      # proc script: the opening subtitle crawl (src/opsubtitle.c).
+                                # In a --montage build this carries the #43 lore crawl, so a
+                                # live instance == the montage opener actually played.
 ]
 
 

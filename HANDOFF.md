@@ -1,56 +1,35 @@
-# Handoff: ALPHA shipped (title + Prologue + Ch1) BUT the opening montage won't compile into the dist ROM — ACTIVE BUG. Also done this session: full alpha title screen + two boot fixes.
+# Handoff: DIST ALPHA NOW HAS THE OPENING MONTAGE — the `--montage` bug is fixed; one-command `tools/build.sh test|dist` added; `recordopening` is now a real montage gate.
 
-**Date:** 2026-06-17 (session 9)
-**Where we are:** We built an alpha bundle for Nicolas's friends (title → Prologue → Ch1 → ending →
-dev placeholder → title). Title screen is fully done (gold MANCHEGO STARS + serif RIME OF THE
-FROSTMAIDEN + icy-blue bg) and two boot bugs are fixed (title now appears at boot; no idle crash).
-**The OPEN PROBLEM:** Nicolas played and the **opening cutscenes are missing** (the Frostmaiden lore
-crawl + Ten Towns world-map tour). Those only wire on a `--montage` build (`#43`), and we cannot get a
-working montage ROM out the door — see "🔴 ACTIVE BUG" below. The non-montage dist
-(`dist/ManchegoStars-Alpha-2026-06-17.gba`, MD5 `142971e3`) has NO opener.
+**Date:** 2026-06-17 (session 10)
+**Where we are:** The alpha bundle is complete and correct: title → **opening montage (lore crawl + Ten
+Towns world-map tour)** → Prologue → Ch1 → ending → dev placeholder → title. The dist ROM
+(`dist/ManchegoStars-Alpha-2026-06-17.gba`, MD5 **`d70ed9ff`**) now plays the opener Nicolas was
+missing. Verified end-to-end in-emulator and GIF'd (`map-review/alpha-opening-montage.gif`).
 
-`make` green · `verify_text` 3404/0 · `ch01win`/`recordending`/`bootobserve` PASS. **Last commit
-`4b4cfb1`.**
+`make`/`build.sh` green · `verify_text` 3404/0 · `recordopening` PASS (real gate now). **Ready to commit.**
 
-## 🔴 ACTIVE BUG — the `--montage` opener won't make it into the ROM
-**Goal:** ship the dist alpha WITH the opening montage (lore crawl + Ten Towns map). It plays before
-the Prologue (vanilla placement, confirmed). The montage is authored + locked
-(`campaigns/.../events/opening-montage.yaml`) and wires via `build_campaign.py --montage`
-(`inject_opening_montage` + `inject_world_tour`, called in `inject_prologue` when `montage=True`).
+## ✅ RESOLVED — the `--montage` opener now ships in the dist ROM
+It was never a compile/stale-object problem. The `fireemblem8.gba` make target **always re-runs**
+`build_campaign.py`, appending `--montage` only when `MONTAGE=1`. The session-9 workflow was
+`build_campaign.py --montage` **then a plain `make`** — and that plain `make` re-ran the generator
+WITHOUT `--montage`, reverting the montage sources right before compiling → a no-opener ROM identical
+to the test build (`142971e3`). The earlier "`make clean` flips to skip=1" symptom was the same thing
+plus a red herring: a `git checkout` in the submodule reverts the macOS `#!/bin/python3` shebang fix
+(`bad interpreter`), which looked like clean breaking the montage.
 
-**Two findings, one fixed, one OPEN:**
-1. ✅ FIXED (`4b4cfb1`): `restore_vanilla_sources` used `git checkout -- <file>` (restores from the
-   INDEX), so a staged non-montage patch (the monologue-skip in `gamecontrol.c`) leaked into
-   `--montage` builds. Changed to `git checkout HEAD --`. Now standalone `build_campaign.py --montage`
-   RELIABLY leaves `gamecontrol.c` with `skip intro monologue` count = **0** (montage; verified 3×).
-   The non-montage cut lives in `_cut_boot_intro` under `if not montage` (build_campaign.py ~L1026).
-2. 🔴 OPEN: with **correct montage sources** (skip=0, the prologue-WM block is the full
-   `WM_SHOWDRAWNMAP`/`WM_TEXT(0x8DB)` tour, NOT the `SKIPWN` gut), `make` STILL emits a ROM
-   **byte-identical** to the non-montage build (MD5 `142971e3`). So either `make` reuses stale objects
-   (gamecontrol.o not recompiled despite the source change), or the montage data isn't linked.
-   - A full `make clean` did NOT help — AND `make clean` BEFORE `build_campaign --montage` flips the
-     sources back to **skip=1** (non-montage). `make clean` doesn't touch git, so it likely removes a
-     generated file `build_campaign`/`inject_prologue` depends on, changing its behaviour. Standalone
-     `build_campaign --montage` (no clean) gives skip=0; `make clean` then it gives skip=1.
-   - NEXT DEBUG: (a) after `build_campaign --montage` (skip=0), force-rebuild ONLY the montage TUs
-     (`touch fireemblem8u/src/gamecontrol.c src/opsubtitle.c src/worldmap_rm.c src/events/prologue-wm.h
-     data/data_opsubtitle.s` then `make`) and diff the ROM; (b) confirm gamecontrol.o actually
-     recompiles (check its mtime + `arm-none-eabi-objdump` for the skip `return`); (c) find what
-     `make clean` removes that makes `inject_prologue` regress to skip=1 (instrument
-     `inject_opening_montage`/`inject_world_tour` for a silent failure that aborts before the WM/
-     monologue stay-wired). FUNCTIONAL test = `tools/playtest/run.sh recordopening` (boot→title→New
-     Game→ should show lore crawl + the "The Eastway" Ten-Towns map → Prologue). A correct montage ROM
-     MUST have an MD5 ≠ `142971e3`.
+**Fix:** build the montage flavour as a single `make MONTAGE=1`, wrapped as `tools/build.sh dist`
+(test = `tools/build.sh test`). `build.sh` also re-applies the shebang fix idempotently so a submodule
+checkout can't break the next build. A correct montage ROM's md5 ≠ `142971e3`;
+`grep -c "skip intro monologue" fireemblem8u/src/gamecontrol.c` = 0 (dist) / 1 (test). Full rationale
+in `decisions.md` (Story & Dialogue → the new "Build the two flavours" entry).
 
-**Note on crawl input (answered for Nicolas):** per `opsubtitle.c:147`, **START skips** the crawl;
-slides auto-advance on a per-slide timer; **A does NOT skip it** (Nicolas was right). So A-mashing in
-captures never skipped the crawl — the "no opener" was purely the non-montage ROM.
-
-**On-demand builds (Nicolas's ask):** we want to build the trimmed TEST version (no montage, fast
-straight-to-map boot) OR the full DIST version (with opener) easily. Today: `build_campaign.py` (test)
-vs `build_campaign.py --montage` (dist), then `make`. Once the bug above is fixed, wrap these in a
-`tools/build.sh test|dist` (or Make targets) so it's one command — and document the
-no-`make-clean`-before-montage rule.
+**`recordopening` hardened into a real gate.** It was silently PASSing on a stuck New-Game menu
+(reported `chapter=0`, the default read). Now: added the `gProcScr_OpSubtitle` symbol; the scenario
+mashes A to clear the menu (safe — only START skips the crawl, A is a no-op there, per
+`opsubtitle.c:147`), then taps A through the WM-tour pages (those wait on a ▼ prompt, they do NOT
+auto-advance), and PASS REQUIRES the crawl proc to actually run **and** reach the prologue map. So a
+non-montage ROM now FAILS it. Confirmed: title → New Game → lore crawl ("Far north, beyond the Spine
+of the World…") → Ten Towns map (Bryn Shander/Targos/Easthaven…) → prologue map (`HOST_CHAPTER=1`).
 
 ## Where Ch1 / ch02 stand (carried, lower priority than the bug)
 Ch1 "The Iron Trail" is fully playable and the ending lands on the reusable **dev placeholder** (RBG
@@ -204,6 +183,11 @@ falls out as a one-liner — see net-new correction below).
    button bug.
 
 ## Key files
+- `tools/build.sh test|dist` — **the supported way to build either flavour.** `test` = `make`
+  (no opener, fast straight-to-map boot); `dist` = `make MONTAGE=1` + stamps `dist/`. Re-applies the
+  macOS shebang fix idempotently. Never run `build_campaign.py --montage` then a bare `make` (clobbers).
+- `tools/playtest/` — `recordopening` is now a real montage gate (`gProcScr_OpSubtitle` symbol added to
+  `gen_symbols.py`); see the RESOLVED section above for its A-mash-then-handoff logic.
 - `tools/build_campaign.py` — `dev_placeholder_scene`/`dev_placeholder_message` + `DEV_PLACEHOLDER_*`
   (the reusable unbuilt-boundary scene; ch01 ending calls it instead of `MNC2`); `inject_ch01` (ending
   = `EventScr_Ch2_EndingScene`: `BACG(BG_NORMAL_VILLAGE)` + per-beat `Text()`;
