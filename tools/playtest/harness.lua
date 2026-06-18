@@ -861,6 +861,168 @@ scenarios.recordsupply = function()
         "Braulo benched (field=%d, no Braulo); Pinky the chosen lord opened the convoy via Supply", onField))
 end
 
+-- RECORDRESCUE: reproduce the "rescued cast sprite renders BLACK" bug. At the deploy zone
+-- (turn 1, no enemy in range, so Rescue is the top action-menu item) one cast unit rescues
+-- an adjacent ally; capture the rescue selection + carry animation + the carried-unit
+-- overlay densely so the custom-map-sprite palette-bank fault is visible for diagnosis.
+scenarios.recordrescue = function()
+    wait(30)
+    if not loadState("prep") then return result("FAIL", "no prep checkpoint (run.sh builds it)") end
+    wait(60)
+    for i = 1, 40 do                                       -- leave prep via Fight!
+        if not procActive(SYM.gProcScr_SALLYCURSOR) and not procActive(SYM.ProcScr_PrepUnitScreen)
+           and faction() == 0 and turn() >= 1 then break end
+        press(K.B, 4); wait(10); press(K.START, 4); wait(40)
+        if i % 3 == 0 then press(K.A, 4); wait(20) end
+    end
+    if not waitFor(function()
+        return faction() == 0 and turn() >= 1 and not procActive(SYM.gProcScr_SALLYCURSOR)
+    end, 1200) then shot("rescue-no-map"); return result("FAIL", "never reached the map") end
+    wait(120)
+    waitFor(function() return faction() == 0 and not menuOpen() end, 3000, true)
+    wait(40); shot("rescue")
+    -- Rescuer = the lord (force-deployed, always present); target = an adjacent deployed ally.
+    local rescuer = blue(0x01)
+    if not rescuer then return result("FAIL", "lord not on field") end
+    local target
+    for i = 0, 50 do
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u and u.charId ~= 0x01 and (u.state & 0x9) == 0 and u.x ~= 0xFF
+           and math.abs(u.x - rescuer.x) + math.abs(u.y - rescuer.y) == 1 then target = u break end
+    end
+    if not target then return result("FAIL", "no adjacent ally to rescue") end
+    log(string.format("rescuer(%d,%d) rescuing charId=0x%02X at (%d,%d)",
+        rescuer.x, rescuer.y, target.charId, target.x, target.y))
+    if not moveUnit(rescuer.x, rescuer.y, rescuer.x, rescuer.y) then
+        shot("rescue-no-menu"); return result("FAIL", "action menu never opened")
+    end
+    shot("rescue")                                         -- action menu (Rescue = top item)
+    press(K.A, 4); wait(20); shot("rescue")                -- select Rescue -> target select
+    press(K.A, 4)                                          -- pick the sole adjacent target
+    for f = 1, 90 do if f % 3 == 0 then shot("rescue") end yield() end  -- carry anim + overlay
+    shot("rescue")
+    local carrying = (blue(0x01).state & 0x1000) ~= 0      -- US_RESCUING
+    log("lord US_RESCUING=" .. tostring(carrying))
+    result("PASS", "rescue captured (carried-sprite frames; US_RESCUING=" .. tostring(carrying) .. ")")
+end
+
+-- RECORDFIX (#5 + #6): in-game capture of the two text fixes. #5 is now a BATTLE-START
+-- event (turn 1), so the roadsign + body narration (opaque SOLOTEXTBOXSTART boxes) auto-play
+-- the instant the map begins -- reliably screenshotted here. #6: a non-lord PC is given a big
+-- movBonus to cross the trail, frailed, and killed on the enemy phase (asserts a PC death in
+-- combat actually triggers -- scout died=true). Braulo-lord prep checkpoint.
+-- KNOWN GAP: the per-PC death-quote BOX is a brief in-battle battle-quote event
+-- (DisplayDefeatTalkForPid -> CallBattleQuoteEventInBattle); frame-sampling doesn't reliably
+-- land on it. The death is confirmed and the quote renders correctly in-game (Nicolas saw
+-- Marty's). A robust box capture would detect the battle-quote event proc and hold on it --
+-- TODO when that proc is wired into symbols.lua.
+scenarios.recordfix = function()
+    wait(30)
+    if not loadState("prep") then return result("FAIL", "no prep checkpoint (run.sh builds it)") end
+    wait(60)
+    -- Leave prep via Fight! -- press A ONLY while still in prep (to answer the confirm);
+    -- never during the turn-1 events, or the sign (first event) gets mashed past.
+    for i = 1, 30 do
+        if not procActive(SYM.gProcScr_SALLYCURSOR) and not procActive(SYM.ProcScr_PrepUnitScreen) then break end
+        press(K.B, 4); wait(10); press(K.START, 4); wait(40)
+        if (procActive(SYM.gProcScr_SALLYCURSOR) or procActive(SYM.ProcScr_PrepUnitScreen))
+           and i % 3 == 0 then press(K.A, 4); wait(20) end
+    end
+    waitFor(function() return not procActive(SYM.gProcScr_SALLYCURSOR)
+        and not procActive(SYM.ProcScr_PrepUnitScreen) end, 600)
+    -- #5: the battle-start roadsign + body + Izobai taunt auto-play at turn 1. Slow-capture
+    -- from BEFORE the first box -- screenshot densely, advance with A only every ~1s so each
+    -- opaque box lingers and reads (the sign is the FIRST event, so it must not be skipped).
+    for f = 1, 900 do
+        if f % 3 == 0 then shot("fix") end
+        if f % 60 == 0 then press(K.A, 3) end             -- advance banner + sign/body/taunt boxes
+        if faction() == 0 and not menuOpen() and turn() >= 1 and f > 540 then break end
+        yield()
+    end
+    waitFor(function() return faction() == 0 and not menuOpen() end, 2000, true)
+    wait(30); shot("fix")
+    -- #6: deterministic PC death. March a non-lord PC up to a goblin (topping up its HP so
+    -- it survives the approach), then frail+harmless it and ATTACK -- the goblin's counter
+    -- kills the 1-HP scout on the player phase (no enemy-AI dependency), firing its per-PC
+    -- death quote with its bust. Capture the quote densely.
+    local scoutId
+    for i = 0, 50 do
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u and u.charId ~= 0x01 and (u.state & 0x9) == 0 and u.x ~= 0xFF then scoutId = u.charId break end
+    end
+    if not scoutId then return result("FAIL", "no non-lord PC deployed") end
+    -- Map combat (battle anims OFF) + NORMAL speed: the per-PC death quote is a battle-quote
+    -- event shown during the killing combat (DisplayDefeatTalkForPid); with full battle anims
+    -- it's buried/aliased, but in map combat it shows as a readable, lingering map overlay.
+    do
+        local a = SYM.gPlaySt + 0x40; local c = ru32(a)
+        c = (c & ~(3 << 17)) | (1 << 17)   -- animationType = OFF (map combat)
+        c = c & ~(1 << 7)                  -- gameSpeed = normal (quote stays readable)
+        emu:write32(a, c)
+    end
+    local function nearestGoblin(s)
+        local g, gd = nil, 999
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) and r.x ~= 0xFF then
+                local d = math.abs(r.x - s.x) + math.abs(r.y - s.y)
+                if d < gd then g, gd = r, d end
+            end
+        end
+        return g, gd
+    end
+    local sawDeath = false
+    for t = 1, 7 do
+        local s = blue(scoutId)
+        if not s or isDead(s) then sawDeath = isDead(blue(scoutId)); break end
+        local g, gd = nearestGoblin(s)
+        local ng = 0
+        for i = 0, 23 do local r = unitAt(SYM.gUnitArrayRed, i); if r and not isDead(r) and r.x ~= 0xFF then ng = ng + 1 end end
+        log(string.format("#6 turn %d: scout 0x%02X at (%d,%d) HP=%d gobl=%d nearestGd=%s",
+            t, scoutId, s.x, s.y, s.curHP or -1, ng, tostring(gd)))
+        if not g then break end
+        if gd <= 1 then                                    -- adjacent: frail and ride enemy
+            for k = 1, 4 do                                 -- phases (re-frail each) until a goblin connects
+                local sk = blue(scoutId)
+                if not sk or isDead(sk) then sawDeath = isDead(blue(scoutId)); break end
+                pokeFrail(sk)
+                press(K.B, 3); wait(8); press(K.B, 3); wait(8)  -- clear any stray menu
+                endTurn(CH01_PARK)
+                waitFor(function() return faction() ~= 0 end, 300)
+                -- Advance the enemy phase with A ONLY until the scout dies; the moment it
+                -- falls, STOP pressing A so the death-quote box lingers, and shoot densely
+                -- through that window (the A-mash was dismissing the brief quote before).
+                local deathFrame = nil
+                for f = 1, 1500 do
+                    if f % 2 == 0 then shot("fix") end
+                    if not deathFrame and f % 60 == 0 then press(K.A, 3) end
+                    if isDead(blue(scoutId)) and not deathFrame then deathFrame = f; sawDeath = true end
+                    if gameOverActive() then break end
+                    if deathFrame and f > deathFrame + 240 then break end
+                    if not deathFrame and faction() == 0 and not menuOpen() and f > 600 then break end
+                    yield()
+                end
+                if sawDeath or gameOverActive() then break end
+            end
+            break
+        end
+        emu:write8(s.addr + 0x1D, 20)                      -- big movBonus: clear the trail
+                                                           -- peaks/forest and reach a goblin in one turn
+        marchToward(s, g.x, g.y, 24, 15)                   -- close on the goblin
+        local s2 = blue(scoutId); if s2 then emu:write8(s2.addr + 0x13, 40) end  -- survive approach
+        endTurn(CH01_PARK)
+        if waitFor(function() return faction() ~= 0 end, 300) then
+            waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
+        end
+        if isDead(blue(scoutId)) then sawDeath = true; break end
+        if gameOverActive() then break end
+    end
+    shot("fix")
+    log("scout died=" .. tostring(sawDeath))
+    if not sawDeath then return result("FAIL", "scout did not die -- no death quote captured") end
+    result("PASS", "fix: battle-start roadsign (#5) + PC death quote (#6)")
+end
+
 -- RECORDENDING: viewable (60fps) -- load the seize checkpoint, press Seize, and capture
 -- the "Rolling Cheddar" ending as motion frames ("end"). FAITHFUL capture: at 60fps the
 -- frame callback (and shot()) fires every emulated frame, so the engine's ~16-frame face

@@ -91,6 +91,8 @@ case "$SCENARIO" in
     recordending) BUILDER=ckpt_seize;     CKPT=seize ;;
     recordprep)   BUILDER=ckpt_prep;      CKPT=prep ;;
     recordsupply) BUILDER=ckpt_lordpinky; CKPT=lordpinky ;;
+    recordrescue) BUILDER=ckpt_prep;      CKPT=prep ;;
+    recordfix)    BUILDER=ckpt_prep;      CKPT=prep ;;
 esac
 if [ -n "$BUILDER" ]; then
     if [ ! -f "$STATE_DIR/$CKPT.ss" ] || [ "$(cat "$STATE_DIR/$CKPT.romhash" 2>/dev/null || true)" != "$ROMHASH" ]; then
@@ -109,5 +111,9 @@ fi
 # record* now LOADS a checkpoint (no grind), so its deadline is short.
 FPS=240; VSYNC=0; DEADLINE_S=420
 case "$SCENARIO" in record*) FPS=60; VSYNC=1; DEADLINE_S=300 ;; esac
+# PT_FPS overrides the rate. 60fps+videoSync is only needed to capture smooth cutscene
+# FADES; verification captures of static text/boxes (sign, death quote) read fine at top
+# speed, so `PT_FPS=240 ... recordfix` runs ~4x faster.
+if [ -n "${PT_FPS:-}" ]; then FPS="$PT_FPS"; [ "$PT_FPS" -ge 240 ] && VSYNC=0; fi
 run_mgba "$SCENARIO" "$FPS" "$VSYNC" "$DEADLINE_S"
 case "$VERDICT" in *PASS*) exit 0 ;; *) exit 1 ;; esac
