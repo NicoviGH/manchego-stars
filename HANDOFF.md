@@ -1,4 +1,4 @@
-# Handoff: rescue #44 fix DECIDED (route MUs via AP path — implement next) + Ch1 difficulty going the "chosen-lord = the anchor/Jagen" route (Nicolas's idea); next step = model lord-mode tiers in balance_report.py. Decisions captured below.
+# Handoff: rescue #44 fix DECIDED (route MUs via AP path — implement next). Ch1 difficulty QUANTIFIED but the APPROACH IS STILL OPEN — evaluating options (lord-as-anchor is one idea on the table, NOT chosen; deploy-limit + levers undecided).
 
 **Date:** 2026-06-18 (session 12)
 **Where we are:** Overnight session on the two open items from session 11. Both are now
@@ -20,10 +20,14 @@ reliable) · `balance_report.py` runs clean · drift clean. **Commits `8acd12c`,
 ## 🟢 Rescue #44 — root cause found, FIX DECIDED (route MUs via AP path; implement next session)
 **Nicolas's call (2026-06-18): option 1 — route cast MUs through the AP path when "standing."**
 The synth MU sheet already holds the idle pose in every frame, so the AP path renders the custom
-sprite instead of the class SMS. Gate it on a campaign-agnostic "has custom MU?" check
-(`charId in gMuImgOverride`, empty in vanilla ⇒ zero stock-unit change). Verify via `recordrescue`
-(lift should now be the colourful custom sprite, not black) + `ch01win` (no movement-render
-regressions). Implementation detail to mind: when `facing==STANDING`, `SetMuFacing` calls
+sprite instead of the class SMS. **The gate (`charId in gMuImgOverride`) is NON-NEGOTIABLE — Nicolas
+confirmed (2026-06-18): only the CAST may change. Every stock/vanilla/guest-only-walk character must
+keep its full class animations (walk + everything) 100% untouched.** The table is empty for stock
+units, so the dispatch change must apply ONLY to entries in it. Note this fix touches only the brief
+*standing* moment of cast MUs — walking is the AP path and is already untouched for everyone; the
+cast stays idle-only by design (we add no walk art, just stop the standing pose rendering black).
+Verify via `recordrescue` (lift = colourful custom sprite, not black) + `ch01win` (stock/vanilla
+units still walk + animate normally, no regressions). Implementation detail to mind: when `facing==STANDING`, `SetMuFacing` calls
 `SetStandingMuFacing` (not `AP_SwitchAnimation`), so a valid AP animation must be ensured for the
 cast-MU standing case before `PutMu` can render it.
 
@@ -39,7 +43,7 @@ palette the whole time, and the MU sheet on disk is correct. The real fault:
   touches hot vanilla MU rendering — every unit's movement display — so verify broadly, not just
   the rescue case.)
 
-## 🟡 Ch1 difficulty — QUANTIFIED; going the "chosen-lord = the anchor" route (Nicolas's idea)
+## 🟡 Ch1 difficulty — QUANTIFIED; approach STILL OPEN (evaluating options, nothing chosen)
 `balance_report.py` settles it: **the enemies are not the problem — the party is.** Our line
 goblins are **lv1** (class base); vanilla Ch1's were **lv2-3** + the same lv4 boss, so our enemy
 field is marginally *easier*. The gap is entirely the lordless cast:
@@ -50,24 +54,26 @@ field is marginally *easier*. The gap is entirely the lordless cast:
 - **Output gap:** **Seth alone = 48% of vanilla's 4-unit DPR.** Our best 4 = 44% of vanilla;
   our best 6 = 55% → **more bodies can't replace the missing carry.**
 
-**DIRECTION (Nicolas, 2026-06-18):** make the **player-chosen lord the party's anchor** (its
-Jagen/Seth). This restores the structure we stripped going lordless — vanilla Ch1 is winnable
-largely *because* of one anchor — and gives lord-select real weight + a consistent anchor all
-campaign (the lord persists). The decision is **how strong** (a dial), framed by the quantified
-hits-to-down: our best today = **Braulo 2.8**; **Jagen-lite ≈ vanilla Gilliam 5.9** (leanable, still
-a real fight); **full Seth 17.5** (solos the map). Lean toward the **Gilliam end** for a friend group.
-Constraints: (1) **MVP is unpromoted** → a level-boosted *in-class* anchor (flavour follows the
-picked class — offensive vs wall), NOT a promoted Paladin; (2) it's **campaign-wide** (boost rides
-forward — a feature). A pure level-boost helps offense but won't fix class-specific holes (e.g.
-Wolfram's Spd-15% doubling), so it likely needs a small **survivability floor** (AS-to-dodge-doubles
-+ an HP/Def minimum) on top.
+**STATUS: still evaluating — NOTHING decided.** Options on the table (lean-generous, no enemy nerfs):
+- **"Lord-mode" — the player-chosen lord becomes the party's anchor (Nicolas's idea, UNDECIDED).**
+  Restores vanilla's "one anchor carries it" structure + gives lord-select weight + a campaign-long
+  anchor (lord persists). Open sub-dial = how strong: Braulo-2.8 (today) → **Jagen-lite ≈ Gilliam
+  5.9** (leanable, still a fight) → Seth-17.5 (solos). Constraints if pursued: MVP unpromoted ⇒
+  level-boosted *in-class* anchor (flavour follows the picked class), NOT a promoted Paladin;
+  campaign-wide; a pure level-boost won't fix class holes (e.g. Wolfram Spd-15% doubling) so it'd
+  need a survivability floor. Nicolas also floated an alt framing: instead level the fielded party
+  to ≈ vanilla's 4 (caveat: vanilla's output is Seth-concentrated, so a flat ensemble bump can't
+  match it — *someone* still has to anchor).
+- **Per-unit anchor tweak** — e.g. Wolfram +3 Spd → survivability 1.8→3.9 (stops the fighter double).
+- **Guest veteran (a Jagen)** fielded in Ch1, like the prologue's Scramsax.
+- **deploy_limit 4 → 5/6** (output 44%→50–55%) — Nicolas wants to discuss; **undecided**.
+- **Forest-cover routing** (free, +20 avo → squishies 1.9→2.6) — secondary.
+- **Generous campaign EXP** — long-game lever; barely moves Ch1 durability (def growths 5–15%).
+- **AVOID:** nerfing the (already-gentle) enemies; blanket party-leveling (doesn't fix durability).
 
-**NEXT STEP:** extend `tools/balance_report.py` to model "lord-mode" at 2–3 tiers (level-only /
-level+floor / Seth-tier) for **all 7 lord candidates**, print durability+output, so Nicolas picks
-the dial with data. **deploy_limit (4/5/6) is still open** — settle it *after* the anchor tier
-(with a real anchor, 4–5 may be plenty; without, lean 6). Forest-cover routing (free, +20 avo →
-squishies 1.9→2.6) and generous campaign EXP stay as secondary levers. **AVOID:** nerfing the
-(already-gentle) enemies; blanket party-leveling (doesn't fix durability anyway).
+**Offered next step (NOT greenlit):** extend `tools/balance_report.py` to model "lord-mode" at 2–3
+tiers across all 7 lord candidates, to pick the dial on numbers. Nicolas may want to keep weighing
+the *concept* (lord-anchor vs party-bump vs guest vs deploy) before any modelling.
 
 ## On-demand builds (unchanged)
 `tools/build.sh test` (lean) · `tools/build.sh dist` (with #43 montage; stamps `dist/`). NEVER a
