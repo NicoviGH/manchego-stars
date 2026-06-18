@@ -306,6 +306,12 @@ local function runEnemyPhase(tile)
     return nil
 end
 
+-- Detecting an on-screen in-battle quote box: procActive(SYM.ProcScr_BattleEventEngine) is
+-- true exactly while a brief in-combat line is up (per-PC DEATH quotes, boss taunts; started
+-- by CallBattleQuoteEventInBattle, src/event.c). Capture loops watch it to hold + screenshot
+-- the box instead of A-mashing past it (recordfix #6). NOTE: ProcScr_StdEventEngine is live
+-- during ALL normal map/turn event processing, so it must NOT be used to gate "a quote is up".
+
 -- ---------------------------------------------------------------- boot
 local function inChapter()
     return chapter() == HOST_CHAPTER and faction() == 0 and turn() >= 1
@@ -909,13 +915,10 @@ end
 -- RECORDFIX (#5 + #6): in-game capture of the two text fixes. #5 is now a BATTLE-START
 -- event (turn 1), so the roadsign + body narration (opaque SOLOTEXTBOXSTART boxes) auto-play
 -- the instant the map begins -- reliably screenshotted here. #6: a non-lord PC is given a big
--- movBonus to cross the trail, frailed, and killed on the enemy phase (asserts a PC death in
--- combat actually triggers -- scout died=true). Braulo-lord prep checkpoint.
--- KNOWN GAP: the per-PC death-quote BOX is a brief in-battle battle-quote event
--- (DisplayDefeatTalkForPid -> CallBattleQuoteEventInBattle); frame-sampling doesn't reliably
--- land on it. The death is confirmed and the quote renders correctly in-game (Nicolas saw
--- Marty's). A robust box capture would detect the battle-quote event proc and hold on it --
--- TODO when that proc is wired into symbols.lua.
+-- movBonus to cross the trail, frailed, and killed on the enemy phase; the per-PC death-quote
+-- box is captured via captureEnemyPhaseQuotes (proc-detected: holds + shoots while
+-- ProcScr_BattleEventEngine is live, instead of blind A-mashing that dismissed it). Asserts
+-- BOTH the death AND the quote box on screen. Braulo-lord prep checkpoint.
 scenarios.recordfix = function()
     wait(30)
     if not loadState("prep") then return result("FAIL", "no prep checkpoint (run.sh builds it)") end
@@ -971,7 +974,7 @@ scenarios.recordfix = function()
         end
         return g, gd
     end
-    local sawDeath = false
+    local sawDeath, quoteShot = false, false
     for t = 1, 7 do
         local s = blue(scoutId)
         if not s or isDead(s) then sawDeath = isDead(blue(scoutId)); break end
@@ -989,20 +992,28 @@ scenarios.recordfix = function()
                 press(K.B, 3); wait(8); press(K.B, 3); wait(8)  -- clear any stray menu
                 endTurn(CH01_PARK)
                 waitFor(function() return faction() ~= 0 end, 300)
-                -- Advance the enemy phase with A ONLY until the scout dies; the moment it
-                -- falls, STOP pressing A so the death-quote box lingers, and shoot densely
-                -- through that window (the A-mash was dismissing the brief quote before).
-                local deathFrame = nil
-                for f = 1, 1500 do
-                    if f % 2 == 0 then shot("fix") end
-                    if not deathFrame and f % 60 == 0 then press(K.A, 3) end
+                -- Ride the enemy phase at the proven cadence (A every ~60 advances it; the
+                -- frail adjacent scout dies). When the in-battle quote engine goes live
+                -- (ProcScr_BattleEventEngine -> the death quote, possibly at the phase
+                -- boundary), STOP the advance and capture every frame, paging it slowly.
+                local deathFrame, go = nil, false
+                for f = 1, 1800 do
+                    local quoteUp = procActive(SYM.ProcScr_BattleEventEngine)
+                    if f % 2 == 0 or quoteUp then shot("fix") end
+                    if quoteUp then
+                        quoteShot = true
+                        if f % 24 == 0 then press(K.A, 3) end       -- page the quote
+                    elseif not deathFrame and f % 60 == 0 then
+                        press(K.A, 3)                               -- advance the enemy phase
+                    end
                     if isDead(blue(scoutId)) and not deathFrame then deathFrame = f; sawDeath = true end
-                    if gameOverActive() then break end
-                    if deathFrame and f > deathFrame + 240 then break end
+                    if gameOverActive() then go = true; break end
+                    if deathFrame and quoteShot and f > deathFrame + 90 then break end
+                    if deathFrame and f > deathFrame + 540 then break end
                     if not deathFrame and faction() == 0 and not menuOpen() and f > 600 then break end
                     yield()
                 end
-                if sawDeath or gameOverActive() then break end
+                if (sawDeath and quoteShot) or go then break end
             end
             break
         end
@@ -1018,9 +1029,10 @@ scenarios.recordfix = function()
         if gameOverActive() then break end
     end
     shot("fix")
-    log("scout died=" .. tostring(sawDeath))
+    log("scout died=" .. tostring(sawDeath) .. " quoteBoxShot=" .. tostring(quoteShot))
     if not sawDeath then return result("FAIL", "scout did not die -- no death quote captured") end
-    result("PASS", "fix: battle-start roadsign (#5) + PC death quote (#6)")
+    if not quoteShot then return result("FAIL", "PC died but the death-quote box was never on screen (proc not detected)") end
+    result("PASS", "fix: battle-start roadsign (#5) + PC death-quote box captured (#6)")
 end
 
 -- RECORDENDING: viewable (60fps) -- load the seize checkpoint, press Seize, and capture

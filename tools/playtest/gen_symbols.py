@@ -39,6 +39,12 @@ WANTED = [
     'ProcScr_BmSupplyScreen',   # proc script: the in-map Supply (convoy) screen, opened by
                                 # the unit-menu Supply command (src/prep_itemsupply.c). A live
                                 # instance == a unit actually opened the convoy on the field.
+    'ProcScr_BattleEventEngine',# proc script: in-battle event engine (src/event.c). Runs
+                                # CallBattleQuoteEventInBattle -> the brief in-combat quotes
+                                # (per-PC DEATH quotes, boss taunts). A live instance == a
+                                # quote box is on screen NOW -> hold + screenshot it.
+    'ProcScr_StdEventEngine',   # proc script: the standard (map) event engine. A live
+                                # instance == a map cutscene/talk event is running.
 ]
 
 
