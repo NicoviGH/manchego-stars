@@ -263,7 +263,11 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
 
 
 def restore_vanilla_sources():
-    subprocess.run(['git', '-C', DECOMP, 'checkout', '--'] + PATCHED_DECOMP_FILES,
+    # Restore explicitly from HEAD (not the index): `git checkout -- <file>` pulls from
+    # the staging area, so a previously-staged patched file would survive and corrupt the
+    # build (e.g. the non-montage monologue-skip leaking into a --montage build). `HEAD --`
+    # always resets to the committed vanilla source.
+    subprocess.run(['git', '-C', DECOMP, 'checkout', 'HEAD', '--'] + PATCHED_DECOMP_FILES,
                    check=True)
 
 # Our cast wear stock vanilla FE8 classes (docs/decisions.md Class Mapping). Map

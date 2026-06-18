@@ -1115,6 +1115,32 @@ scenarios.bootobserve = function()
     return result("PASS", "boot observed")
 end
 
+-- RECORDOPENING: boot -> title -> START -> New Game, then record the #43 opening montage
+-- (Frostmaiden lore crawl + Ten Towns world-map tour) to confirm it plays + doesn't crash.
+scenarios.recordopening = function()
+    -- press A to clear the logos + Health&Safety; STOP the instant the title is up
+    local atTitle = false
+    for i = 1, 160 do
+        if procActive(SYM.gProcScr_TitleScreen) then atTitle = true break end
+        press(K.A, 3); wait(18)
+    end
+    if not atTitle then return result("FAIL", "title screen never reached") end
+    wait(40); shot("opening")                                 -- title
+    press(K.START, 6); wait(40)                               -- START -> New Game / file select
+    -- file-select = New Game -> pick empty slot -> confirm Yes (exactly 3 taps); any extra
+    -- tap would skip the first crawl slides (A skips the monologue).
+    press(K.A, 4); wait(45); press(K.A, 4); wait(45); press(K.A, 4); wait(45)
+    pokeNormalConfig()                                        -- readable crawl/tour speed
+    -- now the lore crawl auto-plays (A would skip it) -- hands off, dense screenshots
+    for f = 1, 1500 do
+        if f % 3 == 0 then shot("opening") end
+        if inChapter() then break end                         -- montage done -> prologue map
+        yield()
+    end
+    shot("opening-after")
+    return result("PASS", string.format("opening montage recorded (reached chapter=%d)", chapter()))
+end
+
 -- TITLECARD: open the map menu -> Status screen, which decompresses the
 -- chapter title card (chap_title_data[chapTitleId]) -- the artifact screenshot
 -- is how a recomposed title gets eyeballed without a manual run.
