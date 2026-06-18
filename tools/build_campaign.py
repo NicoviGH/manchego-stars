@@ -176,6 +176,8 @@ CH01_CLASS_IDS = {'soldier': 'CLASS_SOLDIER', 'fighter': 'CLASS_FIGHTER',
 # 0xF0 block is ours. Engine hooks: _inject_lord_select_engine.
 EVENTINFO_C = os.path.join(DECOMP, 'src', 'eventinfo.c')
 BMDIFFICULTY_C = os.path.join(DECOMP, 'src', 'bmdifficulty.c')
+BMMENU_C = os.path.join(DECOMP, 'src', 'bmmenu.c')
+DATA_EVENT_TRIGGER_C = os.path.join(DECOMP, 'src', 'data_event_trigger.c')
 LORDSEL_FLAG_BASE = 0xF0
 LORDSEL_PROMPT_MSG = 0x957   # dead vanilla slot-2 scene text (cf. inject_ch01 step 6)
 LORDSEL_CONFIRM_MSGS = (0x959, 0x95A, 0x95B, 0x95C, 0x95D, 0x95E, 0x95F,
@@ -256,8 +258,11 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         # lord select (#42): LordSelect_GetPid + force-deploy hook
                         # (eventinfo) and the Seize gate (bmdifficulty); the UnitKill
                         # hook (bmunit.c) and defeat-quote demotions
-                        # (data_battlequotes.c) ride files already listed above
-                        'src/eventinfo.c', 'src/bmdifficulty.c'] + [
+                        # (data_battlequotes.c) ride files already listed above.
+                        # The convoy gate (bmmenu) + the vanilla force-deploy table
+                        # (data_event_trigger) are routed through LordSelect too.
+                        'src/eventinfo.c', 'src/bmdifficulty.c',
+                        'src/bmmenu.c', 'src/data_event_trigger.c'] + [
                         'graphics/op_subtitle/OpSubtitle_%02d.png' % i
                         for i in range(gen_subtitle_cards.CARD_COUNT)]
 
@@ -1621,7 +1626,7 @@ def _inject_lord_select_engine():
     """Lord select (#42), engine side: make the player-chosen lead real.
 
     The ch01 menu (inject_ch01) records the pick as permanent flag
-    LORDSEL_FLAG_BASE + menu index. Four campaign-agnostic hooks consume it:
+    LORDSEL_FLAG_BASE + menu index. Six campaign-agnostic hooks consume it:
       1. LordSelect_GetPid (new, eventinfo.c): scan the flags over the
          build-generated gLordSelectCandidates pid table (events_udefs.c);
          fallback = first candidate while nothing is set, so a debug entry
@@ -1636,6 +1641,13 @@ def _inject_lord_select_engine():
          (chapter 0xFF + EVFLAG_GAMEOVER, data_battlequotes.c) are demoted to
          plain quotes: the cast members riding those slots must be able to die
          like anyone else when they are not the chosen lead.
+      5. SupplyUsability (bmmenu.c): convoy/supply access belongs to the chosen
+         lead (vanilla hardcoded Eirika/Ephraim by route) -- otherwise a cast
+         member on the Eirika slot inherits free convoy access.
+      6. gForceDeploymentList (data_event_trigger.c): cleared. Vanilla's static
+         by-slot force-deploy table would force-field cast riding those slots
+         (e.g. CHARACTER_EIRIKA/COMMON = Braulo, every chapter) on top of hook 2's
+         chosen lead. Hook 2 is now the ONLY force-deploy.
     """
     # 1 + 2: eventinfo.c -- GetPid above the force-deploy lookup, hook inside it.
     with open(EVENTINFO_C, encoding='utf-8') as f:
@@ -1765,6 +1777,59 @@ def _inject_lord_select_engine():
             '                              this slot; quote stays */\n'
             '        .msg     = %s,\n' % msg), 1)
     with open(BATTLEQUOTES_C, 'w', encoding='utf-8') as f:
+        f.write(text)
+
+    # 5: bmmenu.c -- convoy/supply gate. SupplyUsability hardcodes the route lord
+    #    (Eirika/Ephraim) as the unit that can open the supply anywhere; a cast member
+    #    riding that slot (Braulo on CHARACTER_EIRIKA) inherits free convoy access.
+    #    Route it through the chosen lead instead (mirrors the Seize gate).
+    with open(BMMENU_C, encoding='utf-8') as f:
+        text = f.read()
+    orig = ('    switch (gPlaySt.chapterModeIndex)\n'
+            '    {\n'
+            '        case CHAPTER_MODE_EIRIKA:\n'
+            '            pid = CHARACTER_EIRIKA;\n'
+            '            break;\n'
+            '\n'
+            '        case CHAPTER_MODE_EPHRAIM:\n'
+            '            pid = CHARACTER_EPHRAIM;\n'
+            '            break;\n'
+            '\n'
+            '        default:\n'
+            '            pid = CHARACTER_EIRIKA;\n'
+            '            break;\n'
+            '    }\n')
+    if text.count(orig) != 1:
+        sys.exit('ERROR: SupplyUsability lord switch not in expected vanilla form in %s'
+                 % BMMENU_C)
+    patched = ('    /* Lord select (campaign engine, #42): convoy access belongs to the\n'
+               '       player-chosen lead (vanilla hardcoded Eirika/Ephraim by route). The\n'
+               '       cast ride ordinary slots, so a unit on the Eirika slot must NOT get\n'
+               '       free supply unless they ARE the chosen lord. */\n'
+               '    {\n'
+               '        extern u16 LordSelect_GetPid(void);\n'
+               '        pid = LordSelect_GetPid();\n'
+               '    }\n')
+    with open(BMMENU_C, 'w', encoding='utf-8') as f:
+        f.write(text.replace(orig, patched, 1))
+
+    # 6: data_event_trigger.c -- the vanilla static force-deploy table. It hard-fields
+    #    Eirika/Ephraim (and later-route units) BY SLOT; our cast ride those slots, so
+    #    e.g. CHARACTER_EIRIKA in COMMON mode force-fields Braulo every chapter, on top
+    #    of the player's chosen lead. Clear it: the ONLY forced unit is the chosen lead
+    #    (the IsCharacterForceDeployed_ hook, #2 above). Any future per-chapter forced
+    #    unit is added our way, not via this vanilla table.
+    with open(DATA_EVENT_TRIGGER_C, encoding='utf-8') as f:
+        text = f.read()
+    cleared = ('{\n'
+               '    /* Lord select (campaign engine, #42): cleared -- the chosen lead is\n'
+               '       force-fielded by IsCharacterForceDeployed_; vanilla\'s by-slot\n'
+               '       entries would wrongly force cast members riding those slots. */\n'
+               '    {-1, 0, 0},\n'
+               '}')
+    text = _replace_brace_block(text, 'gForceDeploymentList[] =', cleared,
+                                DATA_EVENT_TRIGGER_C)
+    with open(DATA_EVENT_TRIGGER_C, 'w', encoding='utf-8') as f:
         f.write(text)
 
 
