@@ -3463,17 +3463,23 @@ def inject_ch01(campaign, verbose=True):
     #    reinforcement idiom: FACTION_ID_BLUE = appear at the start of the player
     #    phase, act on the following enemy phase -- cf. ch9a). Location: the two
     #    vanilla-Ch1-parity hint houses + Seize on the chief's tile (the Seize macro
-    #    raises EVFLAG_WIN -> ending scene). Misc: the road-sign AREA trigger +
+    #    raises EVFLAG_WIN -> ending scene). Turn: the road-sign+body narration at
+    #    battle start (turn 1, #5) + Izobai's taunt + reinforcements. Misc:
     #    CauseGameOverIfLordDies (fires on EVFLAG_GAMEOVER, raised by the UnitKill
     #    hook when the chosen lead falls -- _inject_lord_select_engine, #42).
     sx, sy = chap['objective']['seize_tile']
     houses = [e for e in chap['events'] if e.get('type') == 'house']
-    sign = next(e for e in chap['events'] if e.get('trigger') == 'unit_on_tile')
+    # The road-sign + body narration (#5): fires at BATTLE START as a turn-1 event (not a
+    # tile step), so the party always reads it. Presence-checked here; wired as the first
+    # turn-1 TURN entry below (its script body is EventScr_Ch2_Talk_EirikaRoss, step 4).
+    next(e for e in chap['events'] if e.get('trigger') == 'battle_start')
     with open(CH2_EVENTINFO_H, encoding='utf-8') as f:
         info = f.read()
     info = _replace_brace_block(
         info, 'EventListScr_Ch2_Turn[] =',
-        '{\n    TURN(0x0, EventScr_Ch2_Turn2Player, 1, 0, FACTION_ID_BLUE)'
+        '{\n    TURN(0x0, EventScr_Ch2_Talk_EirikaRoss, 1, 0, FACTION_ID_BLUE)'
+        ' /* #5: roadsign + body, read at battle start (was a [8,8] tile trigger) */\n'
+        '    TURN(0x0, EventScr_Ch2_Turn2Player, 1, 0, FACTION_ID_BLUE)'
         ' /* Izobai turn-1 taunt */\n'
         '    TURN(0x0, EventScr_Ch2_Turn1Player, %d, 0, FACTION_ID_BLUE)'
         ' /* west reinforcements */\n'
@@ -3489,9 +3495,7 @@ def inject_ch01(campaign, verbose=True):
            houses[1]['tile'][0], houses[1]['tile'][1], sx, sy), CH2_EVENTINFO_H)
     info = _replace_brace_block(
         info, 'EventListScr_Ch2_Misc[] =',
-        '{\n    AREA(EVFLAG_TMP(9), EventScr_Ch2_Talk_EirikaRoss, %d, %d, %d, %d)\n'
-        '    CauseGameOverIfLordDies\n    END_MAIN\n}'
-        % (sign['tile'][0], sign['tile'][1], sign['tile'][0], sign['tile'][1]),
+        '{\n    CauseGameOverIfLordDies\n    END_MAIN\n}',
         CH2_EVENTINFO_H)
     info = _replace_brace_block(
         info, 'EventListScr_Ch2_Tutorial[] =', '{\n    NULL\n}', CH2_EVENTINFO_H)
@@ -3659,12 +3663,14 @@ def inject_ch01(campaign, verbose=True):
     script = _replace_brace_block(
         script, 'EventScr_Ch2_Village2[] =',
         '{\n    IGNORE_KEYS(0)\n    HouseEvent(0x93C, 0x0)\n}', CH2_EVENTSCRIPT_H)
-    # The trailhead sign + the body are faceless narration shown OVER the battle map.
-    # SOLOTEXTBOXSTART renders them in an opaque, bordered box (gProcScr_BoxDialogue,
-    # helpbox.c) instead of the default translucent map talk window -- readable over the
-    # snow (#5 "roadsign hard to read", Nicolas 2026-06-17). EVT_SLOT_B = 0x00FF00FF feeds
-    # x=y=0xFF into sub_800E31C, so the box auto-centers on screen (dialogue-box config
-    # flag 0x100). One SOLOTEXTBOXSTART per page since REMA tears the talk down between them.
+    # The trailhead sign + the body are faceless narration shown OVER the battle map at
+    # BATTLE START (wired as the first turn-1 TURN entry above, #5 Nicolas 2026-06-17 --
+    # was a [8,8] tile trigger; now the party always reads it). SOLOTEXTBOXSTART renders
+    # them in an opaque, bordered box (gProcScr_BoxDialogue, helpbox.c) instead of the
+    # default translucent map talk window -- readable over the snow ("roadsign hard to
+    # read"). EVT_SLOT_B = 0x00FF00FF feeds x=y=0xFF into sub_800E31C, so the box
+    # auto-centers (dialogue-box config flag 0x100). One SOLOTEXTBOXSTART per page since
+    # REMA tears the talk down between them.
     script = _replace_brace_block(
         script, 'EventScr_Ch2_Talk_EirikaRoss[] =',
         '{\n    SVAL(EVT_SLOT_B, 0xFF00FF) /* x=y=0xFF -> auto-center the solo box */\n'

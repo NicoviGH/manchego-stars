@@ -346,17 +346,17 @@ events:
       - beat_break: F
       - duvessa: "Then it's settled. Targos is expecting weather. Better hurry."
 
-  # Flavor trigger on the trail
-  - trigger: unit_on_tile
-    unit: any
-    tile: [8, 8]
+  # Trail flavor, read at battle start
+  - trigger: battle_start
     type: dialogue
     ea_file: events/ch01-road-sign.ea
     description: >
-      LOCKED 2026-06-17 (dialogue pass). The trailhead sign + the body, folded into
-      one trigger: a battered sign, freshly gouged "— KEEP WALKING —"; and just past
-      it, the smashed sled and its driver (a dwarf, in pieces — Hruna's kin), the iron
-      gone, goblin tracks leading up. Faceless narration (msgs 0x955 + body 0x956).
+      LOCKED 2026-06-17 (dialogue pass). Fires at BATTLE START (#5, 2026-06-17) as a turn-1
+      event instead of a [8,8] tile step, so the party always reads it (no dependency on
+      pathing over the sign). The trailhead sign + the body, folded into one beat: a battered
+      sign, freshly gouged "— KEEP WALKING —"; and just past it, the smashed sled and its
+      driver (a dwarf, in pieces — Hruna's kin), the iron gone, goblin tracks leading up.
+      Faceless narration (msgs 0x955 + body 0x956), each in an opaque SOLOTEXTBOXSTART box.
 
   # Hint houses — vanilla Ch1 parity (two House visits, NO items; msgs 0x93B/0x93C
   # are pure tactical hints). Dialogue written in the dialogue pass.
