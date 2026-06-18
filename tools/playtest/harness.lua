@@ -828,9 +828,12 @@ scenarios.recordlord = function()
     if not waitFor(function() return chapter() == 2 end, 1800) then
         return result("FAIL", "chapter slot 2 never loaded after the ch00 win")
     end
+    -- lord-select menu is a StartMenu over a scenic BG (no chief on the map yet);
+    -- detect by menuOpen() alone (the save screen is a different proc). 200-iter
+    -- budget to ride the save menu + the ~22-page Northlook scene.
     local atMenu = false
-    for i = 1, 60 do
-        if menuOpen() and red(CHAR_CHIEF) then atMenu = true break end
+    for i = 1, 200 do
+        if menuOpen() then atMenu = true break end
         if procActive(SYM.gProcScr_SALLYCURSOR) then break end
         press(K.A, 4)
         recwait(36, "lord")
@@ -867,9 +870,15 @@ scenarios.ch01lord = function()
     -- The lord menu is the first generic menu while the beginning scene's
     -- goblins are on the map (the post-chapter save screen runs before any
     -- LOAD; the prep screen comes after the menu).
+    -- A-taps ride the save menu + the ~22-page Beat-1 Northlook scene to the lord
+    -- prompt+menu (cf. ch01win's 200-iter budget; the old 60 ran out mid-scene).
+    -- The lord-select menu is a StartMenu(MenuDef_LordSelect) over a scenic BG
+    -- (BG_DARKLING_WOODS) BEFORE the battle map loads -- so the chief is NOT in the
+    -- red array during it. Detect it by menuOpen() alone (sProc_Menu); the earlier
+    -- post-chapter save screen is a different proc and does not trip menuOpen().
     local atMenu = false
-    for i = 1, 60 do
-        if menuOpen() and red(CHAR_CHIEF) then atMenu = true break end
+    for i = 1, 200 do
+        if menuOpen() then atMenu = true break end
         if procActive(SYM.gProcScr_SALLYCURSOR) then break end -- overshot it
         press(K.A, 4)
         wait(36)
