@@ -635,6 +635,30 @@ local function reachPrep()
     return false
 end
 
+-- Like reachPrep, but PICK THE LAST lord candidate (Pinky, not the default Braulo)
+-- at the lord-select menu before continuing to prep. Used to checkpoint a Pinky-as-lord
+-- prep so the convoy/force-deploy lord-select fixes can be exercised for a NON-Braulo lord.
+local function reachPrepPinky()
+    if not winCh00() then return false end
+    if not waitFor(function() return chapter() == 2 end, 1800) then return false end
+    local atMenu = false
+    for i = 1, 200 do
+        if menuOpen() then atMenu = true break end          -- scenic lord-select menu
+        if procActive(SYM.gProcScr_SALLYCURSOR) then break end
+        press(K.A, 4); wait(36)
+    end
+    if not atMenu then return false end
+    wait(40)
+    for _ = 1, LORD_CANDIDATES - 1 do press(K.DOWN, 4); wait(8) end  -- walk to Pinky (last)
+    press(K.A, 4); wait(40)                                  -- pick
+    press(K.A, 4); wait(20)                                  -- [Yes] confirm
+    for i = 1, 80 do
+        if procActive(SYM.gProcScr_SALLYCURSOR) then return true end
+        press(K.A, 4); wait(36)
+    end
+    return false
+end
+
 -- From the open prep screen, leave via Fight! and grind (escort poked frail+harmless) to
 -- the seize-ready state: chief dead, Braulo moved ONTO the seize tile with its action
 -- menu open (Seize on top). Returns true there -- the caller presses A to Seize.
@@ -692,6 +716,16 @@ scenarios.ckpt_prep = function()
     result("PASS", "prep checkpoint saved")
 end
 
+-- CKPT_LORDPINKY: fast (240fps) -- drive to the prep screen with PINKY chosen as lord,
+-- and snapshot it. Lets recordsupply iterate the prep-bench + map-Supply navigation fast.
+scenarios.ckpt_lordpinky = function()
+    if not reachPrepPinky() then shot("ckpt-lordpinky-fail")
+        return result("FAIL", "Pinky-lord prep never opened") end
+    wait(60)
+    saveState("lordpinky")
+    result("PASS", "Pinky-lord prep checkpoint saved")
+end
+
 -- CKPT_SEIZE: fast (240fps) -- drive to Braulo-on-the-seize-tile (menu open) and snapshot
 -- BEFORE pressing Seize, so record* replays the ending fresh from ROM.
 scenarios.ckpt_seize = function()
@@ -716,6 +750,115 @@ scenarios.recordprep = function()
         press(K.RIGHT, 4)
     end
     result("PASS", "prep + Pick Units captured")
+end
+
+-- RECORDSUPPLY (#2/#3): with PINKY as lord, bench Braulo + deploy 3 non-Braulo in prep,
+-- then on the map have Pinky (the chosen lord) open the convoy via the Supply command --
+-- the cross-character behavioural proof that force-deploy + supply follow the chosen lead.
+local US_NOT_DEPLOYED = 0x08
+local CHAR_BRAULO, CHAR_PINKY_LORD = 0x01, 0x08
+local function isDeployedInPrep(charId)
+    local u = blue(charId)
+    return u and (u.state & US_NOT_DEPLOYED) == 0
+end
+local function countDeployedPrep()
+    local n = 0
+    for i = 0, 50 do
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u and u.charId ~= 0 and (u.state & US_NOT_DEPLOYED) == 0 then n = n + 1 end
+    end
+    return n
+end
+scenarios.recordsupply = function()
+    wait(30)
+    if not loadState("lordpinky") then return result("FAIL", "no lordpinky checkpoint (run.sh builds it)") end
+    wait(60)
+    shot("supply")                                        -- prep main, Pinky as lord
+    press(K.A, 4); wait(60)                               -- enter Pick Units (single A from prep)
+    if not procActive(SYM.ProcScr_PrepUnitScreen) then
+        shot("supply-no-pickunits")
+        return result("FAIL", "Pick Units screen never opened")
+    end
+    shot("supply")
+    -- Pick Units 2-col list, cursor starts on Pinky (pos 0):
+    --   0 Pinky | 1 Braulo / 2 Marty | 3 Wolfram / 4 Mees | 5 RBG / 6 Rootis | 7 Sclorbo
+    -- Bench Braulo (pos 1): RIGHT to him, A only if he is currently deployed.
+    press(K.RIGHT, 4); wait(20)
+    if isDeployedInPrep(CHAR_BRAULO) then press(K.A, 4); wait(20) end
+    shot("supply")
+    -- Top up to 4 with non-Braulo units: walk down col 1 (RBG pos5, Sclorbo pos7) and
+    -- deploy benched ones until the cap is full. (Cursor is on Braulo/pos1.)
+    for _, downs in ipairs({2, 2}) do          -- pos1 -> pos5 (RBG); pos5 -> pos7 (Sclorbo)
+        if countDeployedPrep() >= 4 then break end
+        for _ = 1, downs do press(K.DOWN, 4); wait(12) end
+        press(K.A, 4); wait(20)                -- deploy the (benched) unit here
+        shot("supply")
+    end
+    log(string.format("prep: brauloDeployed=%s deployedCount=%d",
+        tostring(isDeployedInPrep(CHAR_BRAULO)), countDeployedPrep()))
+    -- Launch the chapter straight from Pick Units (START = Fight!).
+    press(K.START, 4); wait(40)
+    for i = 1, 30 do
+        if not procActive(SYM.gProcScr_SALLYCURSOR) and not procActive(SYM.ProcScr_PrepUnitScreen)
+           and faction() == 0 and turn() >= 1 then break end
+        press(K.A, 4); wait(30)
+    end
+    if not waitFor(function()
+        return faction() == 0 and turn() >= 1
+            and not procActive(SYM.gProcScr_SALLYCURSOR)
+    end, 1200) then
+        shot("supply-no-map")
+        return result("FAIL", "never reached the player-phase map")
+    end
+    wait(120); shot("supply")                             -- the deployed field
+    -- Map-side assertions: Braulo benched (not on field), Pinky deployed, exactly 4 out.
+    local braulo = blue(CHAR_BRAULO)
+    local braOnField = braulo and (braulo.state & 0x9) == 0 and braulo.x ~= 0xFF
+    local pinky = blue(CHAR_PINKY_LORD)
+    local pinkyOnField = pinky and (pinky.state & 0x9) == 0 and pinky.x ~= 0xFF
+    local onField = 0
+    for i = 0, 50 do
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u and (u.state & 0x9) == 0 and u.x ~= 0xFF then onField = onField + 1 end
+    end
+    log(string.format("map: braulo=%s pinky=%s field=%d",
+        tostring(braOnField), tostring(pinkyOnField), onField))
+    if braOnField then return result("FAIL", "Braulo is on the field (should be benched)") end
+    if not pinkyOnField then return result("FAIL", "Pinky (lord) not deployed") end
+    -- Open Pinky's action menu (select + no-move) and screenshot it to find the Supply row.
+    waitFor(function() return faction() == 0 and not menuOpen() end, 3000, true)
+    wait(60)
+    local usedSupply = false
+    pinky = blue(CHAR_PINKY_LORD)
+    if moveUnit(pinky.x, pinky.y, pinky.x, pinky.y) then
+        wait(40); shot("supply")                          -- Pinky's menu: Rescue/Item/Trade/Supply/Wait
+        -- Supply is row 3 (Rescue0 Item1 Trade2 Supply3 Wait4); cursor starts at row 0.
+        press(K.DOWN, 4); wait(12)
+        press(K.DOWN, 4); wait(12)
+        press(K.DOWN, 4); wait(12); shot("supply")        -- cursor on Supply
+        press(K.A, 4); wait(60)
+        usedSupply = procActive(SYM.ProcScr_BmSupplyScreen)
+        shot("supply")                                    -- the convoy screen -> Pinky USING Supply
+        log("pinky opened convoy=" .. tostring(usedSupply))
+        press(K.B, 4); wait(20); press(K.B, 4); wait(20)  -- back out of convoy + menu
+    else
+        shot("supply-no-menu")
+    end
+    -- Contrast: a NON-lord deployed unit's action menu has NO Supply row.
+    waitFor(function() return faction() == 0 and not menuOpen() end, 1500, true)
+    for i = 0, 50 do
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u and u.charId ~= CHAR_PINKY_LORD and (u.state & 0x9) == 0 and u.x ~= 0xFF then
+            if moveUnit(u.x, u.y, u.x, u.y) then wait(40); shot("supply") end  -- no Supply row
+            press(K.B, 4); wait(20); press(K.B, 4); wait(20)
+            break
+        end
+    end
+    if not usedSupply then
+        return result("FAIL", "Pinky (lord) could not open the convoy via Supply")
+    end
+    result("PASS", string.format(
+        "Braulo benched (field=%d, no Braulo); Pinky the chosen lord opened the convoy via Supply", onField))
 end
 
 -- RECORDENDING: viewable (60fps) -- load the seize checkpoint, press Seize, and capture

@@ -35,6 +35,10 @@ WANTED = [
     'gProcScr_OpSubtitle',      # proc script: the opening subtitle crawl (src/opsubtitle.c).
                                 # In a --montage build this carries the #43 lore crawl, so a
                                 # live instance == the montage opener actually played.
+    'ProcScr_PrepUnitScreen',   # proc script: the prep "Pick Units" screen (deploy/bench).
+    'ProcScr_BmSupplyScreen',   # proc script: the in-map Supply (convoy) screen, opened by
+                                # the unit-menu Supply command (src/prep_itemsupply.c). A live
+                                # instance == a unit actually opened the convoy on the field.
 ]
 
 

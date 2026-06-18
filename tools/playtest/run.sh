@@ -88,8 +88,9 @@ EOF
 # scenario. Build it (240fps) if the state is missing or was made for a different ROM.
 BUILDER=""; CKPT=""
 case "$SCENARIO" in
-    recordending) BUILDER=ckpt_seize; CKPT=seize ;;
-    recordprep)   BUILDER=ckpt_prep;  CKPT=prep ;;
+    recordending) BUILDER=ckpt_seize;     CKPT=seize ;;
+    recordprep)   BUILDER=ckpt_prep;      CKPT=prep ;;
+    recordsupply) BUILDER=ckpt_lordpinky; CKPT=lordpinky ;;
 esac
 if [ -n "$BUILDER" ]; then
     if [ ! -f "$STATE_DIR/$CKPT.ss" ] || [ "$(cat "$STATE_DIR/$CKPT.romhash" 2>/dev/null || true)" != "$ROMHASH" ]; then
