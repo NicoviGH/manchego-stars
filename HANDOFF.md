@@ -22,8 +22,8 @@ that's never taken.
 
 **Verified clean** (full custom art, correct palette): the rescue lift (Braulo carrying Marty),
 the rescue action menu, the rescue target-select previews, and the **trade menu** (Braulo the orange
-crab + Marty the mushroom-person). Captures in `map-review/rescue-44-*.png`. Full record: the
-closed issue #44 + [[project_manchego_stars_cast_notes]] (Meesmickle = black cat by design).
+crab + Marty the mushroom-person). Captures in `map-review/rescue-44-*.png`. Full record + the
+dead-code finding: the **closed issue #44** (Meesmickle is a black cat by design).
 
 ## 🟡 Ch1 difficulty — QUANTIFIED; approach STILL OPEN (Nicolas's design call, nothing chosen)
 `balance_report.py` settles the diagnosis: **the enemies are not the problem — the party is.** Our
