@@ -1,98 +1,88 @@
 # Handoff — Manchego Stars · live state + pointers (backlog lives in GitHub issues, not here)
 
-**Date:** 2026-06-19 (session 16)
-**Session focus:** Finished the #45 difficulty work through **item 3a** (the per-lord floor *solver*),
-then ran a **full planning session** with Nicolas: decomposed the road to ship into streams, locked a
-**delivery model** (vertical-slice CD pipeline), and specced the first pipeline sub-project (#48).
-Pickup is sequenced for **parallel two-instance work** (content track ‖ pipeline track) — see Next.
+**Date:** 2026-06-19 (session 17)
+**Session focus:** Ran **Phase 0** (the on-`main`, pre-split groundwork): finished the #45
+lord-floor wiring (items **3b + 3c**) and landed `parity_reference` across every authored
+chapter (#48 item 1, Nicolas-approved). Both shared-file streams are now de-conflicted, so the
+campaign can split into the two parallel instances. Phase 0 is **done**.
 
 ## Shipped this session
-- **Balance engine (#45 items 1–3a)** — commits `6a40cb4` / `f380696` / `7bb3efc`:
-  - `tools/fe_combat.py` — FE8 combat math, ONE tested source of truth (31 tests; canonical
-    Eirika-one-rounds-the-Ch1-boss oracle).
-  - `tools/difficulty.py` — `make difficulty CH=ch01` (durability / throughput / carry / lord×team
-    sweep / vanilla-delta) + `--lord-floor` solver (item 3a: `bulk_durability` + `lord_floor_delta`,
-    HP/Def/Res only, Res-vs-magic, target 3.5 reproduces the hand-set +7/+4).
-  - `build_campaign.py` — donor-base inheritance (item 2: `BASE_DONOR` / `GROWTH_DONOR` /
-    `personal_base_deltas`; shaman split keeps Knoll's Dark rank) + the **hermetic-read fix**
-    (`vanilla_decomp_text` — read donors from HEAD, not the build-mutated tree).
-  - 58 tests gated in `check.py`. Retired `balance_report.py`.
-  - **Ch1 verdict:** cast at vanilla parity (best-4 thru 4.00 vs 3.74, dura 2.8 = 2.8, rootis
-    one-rounds the armor boss via magic); every lord viable; shamans are the glass picks (dura 2.6)
-    the floor targets. Wolfram is a tank (5.9) — "frail Wolfram" was the dirty-tree artifact.
-- **Planning artifacts** — commit `f813654`:
-  - `decisions.md` ADRs: **process hybrid** (superpowers layered on this repo's knowledge
-    architecture; spec = ADR + issue, no `docs/superpowers/specs/`), **delivery model** (vertical
-    slices through a CD pipeline; content track ‖ pipeline track), **enemy-pressure parity**.
-  - **#48** — static-engine→all-chapters spec (awaiting Nicolas's review). **#49** — roadmap epic
-    (streams + dependency spine).
+- **Lord survivability floor (#45 3b + 3c)** — commit `1456ecf`, playtest-verified:
+  - **3b** `build_campaign.py` emits `gLordFloorDeltas[]` (events_udefs.c): one
+    `{+maxHP,+Def,+Res}` row per lord candidate = `difficulty.lord_floor_delta` @3.5 vs Ch1
+    enemies, parallel to `gLordSelectCandidates[]`. Ch1 → shamans +7HP/+4Def, armor tanks 0.
+    TDD: `bc.lord_floor_rows` (2 tests; suite now 60).
+  - **3c** `LordFloor_ApplyOnce` (eventinfo.c, beside `LordSelect_GetPid`) bakes the chosen
+    lead's row into HP/Def/Res **once**, gated by permanent flag `0xFA`, **spent only on a
+    real application** (pick flag set AND lead found) so the prologue/pre-deploy phases skip.
+  - **Hook point = `EndPrepScreen`** (prep_sallycursor.c, after `ShrinkPlayerUnits`). The open
+    Q is resolved with a real lesson (below): phase-start seams fire too early on a prep
+    chapter's turn 1.
+  - Guarded in `check.py check_engine_guards_present`; decision in `decisions.md`
+    ("Lord floor, runtime mechanism").
+  - **Verified:** `tools/playtest/run.sh lordfloor` (new scenario) — marty +7HP/+4Def at Ch1
+    **turn 1**, stable across 3 player phases (no double-apply). `ch01win` still PASSes.
+- **`parity_reference` across Prologue–Ch8 (#48 item 1)** — commit `fe8cd06`. Per-chapter
+  enemy-pressure bar; values follow each chapter's authored cadence base (ch01 → FE8 Ch1, not
+  its Ch13a layout; others → `fe8_base_map`). ch04/ch05 both → FE8 Ch4 (its two halves). **ch08
+  → FE8 Ch13 but flagged informational** (its objective is a scripted defeat, not a clearable
+  gate) — confirm that's the intent when #48's extractor/CI is built.
+- **Drive-by:** fixed `.gitignore` so `tools/playtest/states/` is actually ignored (the line
+  had an inline comment, which git doesn't honor).
 
-## Next — pickup is sequenced for parallel work
+## Hook-point lesson (worth keeping)
+A one-time stat change to the **chosen lord must apply at `EndPrepScreen`** (deployment
+finalization), NOT at a player-phase-start seam. On a **prep chapter's turn 1**, the prep
+"Fight!" path reaches the player phase *before* `BmMain_StartPhase` and *before* the cursor
+reset run — and the lead isn't deployed/`GetUnitFromCharId`-findable until prep finalizes — so
+a floor hooked at either seam silently lands a **phase late** (it worked turn 2, not turn 1).
+Only the playtest caught this; `make`-green did not.
 
-**Phase 0 — do these in ONE session on `main` before launching the two instances** (they clear the
-shared-file collisions so two Claudes don't stomp each other):
-
-1. **Finish #45 3b + 3c (the floor wiring).** It's in-flight, the most `build_campaign.py`-invasive
-   pipeline change, and needs playtest — land it on `main` first so both tracks start from a clean base.
-   - **3b (build table):** emit `gLordFloorDeltas[]` right after the `gLordSelectCandidates[]`
-     emission (`build_campaign.py` ~L3514, `events_udefs.c`), one row per candidate (menu order) =
-     `difficulty.lord_floor_delta(...)` @target 3.5 vs Ch1 enemies (`difficulty.load_field(campaign,
-     'ch01')`; **local-import difficulty inside the fn** — avoid the import cycle). Ch1 → marty/mees
-     +7HP/+4Def, tanks 0.
-   - **3c (engine hook):** campaign-agnostic C, mirror `_inject_lord_select_engine`'s
-     string-replace + guard idiom. At chapter start, gated by a permanent "applied" flag (free one
-     near `LORDSEL_FLAG_BASE=0xF0`), find the chosen lord via `LordSelect_GetPid()`, add its
-     `gLordFloorDeltas` row to `unit->maxHP`/`curHP`/`def`/`res`. Apply-ONCE → bakes into the saved
-     unit, fades as it levels. Register the guard in `check.py check_engine_guards_present`.
-     **Open Q to resolve first:** the chapter-init hook point that runs once after units load (the
-     cursor guard hooks `GetPlayerStartCursorPosition` turn-1 — semantically wrong for stats).
-   - **3c MUST be playtest-verified** (`tools/playtest/`): pick a frail lord (marty), confirm +7 HP at
-     Ch1 start and that it carries into Ch2 (no double-apply). `make`-green won't prove persist.
-     *(This is also the first brick of the pipeline track's I/O harness.)*
-
-2. **Set up the parallel protocol.** A git worktree/branch per track + ownership of the shared seams:
-   - `build_campaign.py` — content owns the `inject_*`/chapter section; pipeline owns the
-     stat/engine-hook section (`difficulty.py`/`fe_combat.py` are pipeline-only).
-   - chapter YAMLs — content owns most fields; pipeline owns `parity_reference`. **Land
-     `parity_reference` across all authored chapter YAMLs in one early commit** (de-conflicts; it's
-     #48's first checklist item).
-   - Rebase often; small batches.
-
-**Then split into two parallel instances:**
-- **Content track (instance A) 🔒** — author Ch2→Ch8 slices (#22–#28): each via brainstorm +
-  `dialogue-pass` + wire + pass the CI gates + ship to friends. Plus enemy YAML #18, NPC stubs #17,
-  art #19/#38/#39, `pinky.yaml`→`pcs/` (#45-4), recruit schedule (#45-5).
-- **Pipeline track (instance B) ⚡** — **#48** first (run `writing-plans` once Nicolas OKs the issue →
-  TDD), then the playtest platform (I/O harness → stability fuzzer → LLM-player), then mechanics/flavor
-  #11/#9/#8/#46.
-- Bird's-eye roadmap: **#49**. The one file both tracks touch is `build_campaign.py` — keep edits in
-  each track's section + rebase often.
+## Next — Phase 0 done; split into the two parallel instances (HANDOFF §protocol below)
+- **Content track (instance A) 🔒** — author Ch2→Ch8 slices (#22–#28): brainstorm +
+  `dialogue-pass` + wire + pass CI gates + ship. Plus enemy YAML #18, NPC stubs #17, art
+  #19/#38/#39, `pinky.yaml`→`pcs/` (#45-4), recruit schedule (#45-5). **Owns** `build_campaign.py`
+  `inject_*`/chapter section + most chapter-YAML fields.
+- **Pipeline track (instance B) ⚡** — **#48** next items (run `writing-plans` now that the
+  issue is approved → TDD the `vanilla_enemies` extractor + `enemy_pressure` metric + the
+  per-chapter / campaign-curve reports). Then the playtest platform (I/O harness → fuzzer →
+  LLM-player), then mechanics/flavor #11/#9/#8/#46. **Owns** the stat/engine-hook section of
+  `build_campaign.py` (+ `difficulty.py`/`fe_combat.py`, pipeline-only) + `parity_reference`.
+- **Parallel protocol:** worktree/branch per track; `build_campaign.py` is the one file both
+  touch — keep edits in each track's section, **rebase often, small batches**. Each instance
+  creates its own worktree at launch (none created yet — nothing to use them this session).
+- Bird's-eye roadmap: **#49**.
 
 > Backlog/todos live in **GitHub issues** (labelled), not this file. HANDOFF = live state + pointers.
 
 ## Builds / tools
-`make difficulty CH=chNN` (per-chapter parity) · `make difficulty` (campaign curve — after #48) ·
-`make test` (58 unit tests) · `make check` (drift guard, incl. tests). ROM: `tools/build.sh test`
-(lean) · `tools/build.sh dist` (with #43 montage). NEVER a bare `make` for a shippable ROM — strips
-the montage.
+`make difficulty CH=chNN --lord-floor` (per-lord floor table) · `make difficulty CH=chNN`
+(parity report) · `make test` (60 unit tests) · `make check` (drift guard, incl. tests). ROM:
+`tools/build.sh test` (lean) · `tools/build.sh dist` (with #43 montage). NEVER a bare `make`
+for a shippable ROM — strips the montage. Floor playtest: `tools/playtest/run.sh lordfloor`.
 
 ## Gotchas (operational)
-- **Vanilla decomp reads go through `build_campaign.vanilla_decomp_text()` (HEAD), never the working
-  tree** — the build overwrites donor portrait slots (Gilliam/Neimi/Moulder/Vanessa) + reskins classes,
-  so a working-tree read of donor/class stats is silently wrong (bit the engine this session).
-- The difficulty engine is a **static proxy** (no positioning/turns/AI) — `tools/playtest/` is the
-  dynamic arbiter.
-- **Never commit the `fireemblem8u` submodule pointer** (build artifact); stage repo files explicitly.
-- **Parallel work:** `build_campaign.py` is the one file both tracks touch — keep edits localized +
-  rebase often (Phase 0.2).
-- Background `run.sh` needs an explicit `cd`/absolute path; `PT_FPS=240 tools/playtest/run.sh <scen>`
-  for fast captures. Built ROM at `fireemblem8u/fireemblem8.gba`. Nicolas can't see inline renders —
-  save to `map-review/` + `open`.
+- **New decomp patch target → add it to `PATCHED_DECOMP_FILES`** (build_campaign.py) or the
+  build is non-idempotent: `restore_vanilla_sources` won't reset it, so the *second* inject
+  sees the already-patched file and the `count == 1` guard aborts. (Bit `bm.c` this session.)
+- **Engine stat changes to the chosen lord go in `EndPrepScreen`, not a phase-start seam** —
+  see the hook-point lesson above. `make`-green can't prove apply timing; playtest it.
+- **Vanilla decomp reads go through `build_campaign.vanilla_decomp_text()` (HEAD), never the
+  working tree** — the build overwrites donor slots + reskins classes (`difficulty._characters_text`
+  / `_classes_text` already do this, so `lord_floor_rows` is hermetic mid-build).
+- The difficulty engine is a **static proxy** (no positioning/turns/AI) — `tools/playtest/` is
+  the dynamic arbiter (it caught the floor timing bug).
+- **Never commit the `fireemblem8u` submodule pointer** (build artifact); stage repo files
+  explicitly.
+- Background `run.sh` needs an explicit `cd`/absolute path; `PT_FPS=240 tools/playtest/run.sh
+  <scen>` for fast captures. Built ROM at `fireemblem8u/fireemblem8.gba`. Nicolas can't see
+  inline renders — save to `map-review/` + `open`.
 - Story text → `make` regenerates bodies; gate with `python3 tools/verify_text.py` after text changes.
 
 ## Standing rules
-Combat = pure vanilla FE; field parity with vanilla ch N is doctrine. **Process:** superpowers workflow
-(brainstorm → spec → TDD → verify → review) layered on this repo's knowledge architecture; spec =
-`decisions.md` ADR + GitHub issue (NOT `docs/superpowers/specs/`). Custom art where it matters, **show
-before committing**; 2-3 options, Nicolas drives. **Project knowledge lives in the repo** (decisions.md
-/ YAML / issues), NOT private memory. Auto-push to main once green; never commit the submodule pointer.
+Combat = pure vanilla FE; field parity with vanilla ch N is doctrine. **Process:** superpowers
+workflow (brainstorm → spec → TDD → verify → review) layered on this repo's knowledge
+architecture; spec = `decisions.md` ADR + GitHub issue (NOT `docs/superpowers/specs/`). Custom
+art where it matters, **show before committing**; 2-3 options, Nicolas drives. **Project
+knowledge lives in the repo** (decisions.md / YAML / issues), NOT private memory. Auto-push to
+main once green; never commit the submodule pointer.
