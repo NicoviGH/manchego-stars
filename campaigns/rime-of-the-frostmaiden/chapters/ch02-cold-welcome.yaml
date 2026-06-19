@@ -50,7 +50,7 @@ objective:
 win_condition: all_enemies_defeated
 lose_condition: all_player_units_defeated         # FE8 lord rule; sled loss is a soft penalty
 soft_penalty_on_sled_loss:
-  description: "Forfeit the chapter chest + post-chapter gold; Wolfram's armoring beat is cut from the inn cutscene."
+  description: "Forfeit the chapter chest + the post-chapter gold reward."
 
 # ── Difficulty ─────────────────────────────────────────────────────────────────
 difficulty_note: >
@@ -204,9 +204,10 @@ events:
       the crowd spreading Auril's word, then slips away (seeds the Ch4 frost-druid
       fight — no combat here). Inn scene: only RBG, Marty, and Meesmickle take rooms;
       Braulo holes up in his shell, Rootis and Sclorbo camp in the snow, Wolfram
-      forges armored siding onto the sled from the ch01 iron ingots (cut if the sled
-      was lost). Overheard rumors: Messie the Maer Monster off Bremen; frost druids
-      north near Lonelywood. Party decides to head north first.
+      re-plates the raid's battle-damage — hammering the claw-gouges and the captain's
+      steel out of the Rolling Cheddar's siding it was already armored with in ch01
+      (plays only if the sled survived). Overheard rumors: Messie the Maer Monster off
+      Bremen; frost druids north near Lonelywood. Party decides to head north first.
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
@@ -220,9 +221,11 @@ design_notes: >
   FE8 base: "The Protected" (DefeatAll + defend-in-place). The frost druid is a
   cutscene seed only — FE8 withholds enemy casters until mid-game, and our first
   enemy caster is the Ch4 frost-druid boss; introducing one here would break the
-  early physical-triangle teaching ramp. Wolfram's sled-armoring (iron ingots → sled
-  siding) is his secondary signature beat — show it in the inn cutscene (cut if the
-  sled was lost, which also forfeits the reward: that is the chapter's "protect" stake).
+  early physical-triangle teaching ramp. Wolfram's metal-craft is his secondary
+  signature beat: the ch01 ending already armored the Rolling Cheddar (his forge-night),
+  so the Ch2 inn payoff is him re-plating the raid's battle-damage — and it plays only
+  if the sled survived. Losing the sled forfeits the chest + reward: that is the
+  chapter's "protect" stake.
   Snow wolves and road bandits are the same axe-brigand chassis so balance is
   identical; the variety is sprite + flavor, with the single bow-user adding a ranged
   threat exactly as FE8 Ch2 does.
