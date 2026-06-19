@@ -5,13 +5,13 @@ parallel-work model is the ADR in `docs/decisions.md` (§Delivery model → Para
 Engine-content file seam); work tracker #50; backlog is **GitHub issues** (#49 ② Pipeline track),
 not this file. Don't clobber the content track's `HANDOFF-content.md`.
 
-## Launch this instance (paste as the kickoff prompt)
-> You are the **Pipeline-track** instance for Manchego Stars (trunk-based, your own worktree).
-> 1. Bootstrap an isolated build env: `tools/worktree-setup.sh ../ms-pipeline` (creates the
->    worktree on branch `inst/pipeline` + symlinks the toolchain). `cd ../ms-pipeline`.
-> 2. Read `CLAUDE.md`, this file, and `docs/decisions.md`, then continue from **Next** below.
-> 3. Trunk-based: small commits, `git pull --rebase origin main` often, push when green, no
->    long-lived branches, never commit the `fireemblem8u` submodule pointer.
+## Start here (fresh instance — do this first)
+You are the **Pipeline-track** instance for Manchego Stars (trunk-based, your own worktree).
+1. Bootstrap an isolated build env: `tools/worktree-setup.sh ../ms-pipeline` (creates the worktree
+   on branch `inst/pipeline` + symlinks the toolchain). `cd ../ms-pipeline`.
+2. Read `CLAUDE.md` and `docs/decisions.md`, then continue from **Next** below.
+3. Trunk-based: small commits, `git pull --rebase origin main` often, push when green, no
+   long-lived branches, never commit the `fireemblem8u` submodule pointer.
 
 ## You own (edit freely)
 - `tools/inject/engine_hooks.py` — the 5 campaign-agnostic engine hooks

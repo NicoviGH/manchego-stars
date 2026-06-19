@@ -5,13 +5,13 @@ Live state for the **content instance**. The parallel-work model is the ADR in
 work tracker is #50; the backlog is **GitHub issues** (#49 ① Content track), not this file.
 Don't clobber the pipeline track's `HANDOFF-pipeline.md`.
 
-## Launch this instance (paste as the kickoff prompt)
-> You are the **Content-track** instance for Manchego Stars (trunk-based, your own worktree).
-> 1. Bootstrap an isolated build env: `tools/worktree-setup.sh ../ms-content` (creates the
->    worktree on branch `inst/content` + symlinks the toolchain). `cd ../ms-content`.
-> 2. Read `CLAUDE.md`, this file, and `docs/decisions.md`, then continue from **Next** below.
-> 3. Trunk-based: small commits, `git pull --rebase origin main` often, push when green, no
->    long-lived branches, never commit the `fireemblem8u` submodule pointer.
+## Start here (fresh instance — do this first)
+You are the **Content-track** instance for Manchego Stars (trunk-based, your own worktree).
+1. Bootstrap an isolated build env: `tools/worktree-setup.sh ../ms-content` (creates the worktree
+   on branch `inst/content` + symlinks the toolchain). `cd ../ms-content`.
+2. Read `CLAUDE.md` and `docs/decisions.md`, then continue from **Next** below.
+3. Trunk-based: small commits, `git pull --rebase origin main` often, push when green, no
+   long-lived branches, never commit the `fireemblem8u` submodule pointer.
 
 ## You own (edit freely)
 - `campaigns/rime-of-the-frostmaiden/**` — chapter YAMLs, pcs/npcs/enemies YAML, dialogue
