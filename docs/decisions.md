@@ -145,6 +145,28 @@ by machine, at the moment work happens, so it doesn't rely on anyone remembering
   `DEAD_CONCEPTS` in `check.py` so it can't come back.
 _Decided: 2026-06-04_
 
+**Process: the superpowers workflow layers ON TOP of this knowledge architecture (not a replacement).**
+The repo predates the superpowers plugin; the two are orthogonal. Superpowers is a per-task *process*
+(brainstorm → spec → TDD → verify → review → finish-branch); the conventions above are the *knowledge
+architecture* (single source of truth, ADRs here, issues-as-backlog, docs generated from YAML, the
+`check.py` drift guard). We adopt the superpowers process habits where additive and keep this knowledge
+architecture authoritative — it is the more drift-resistant half (a standalone `docs/superpowers/specs/`
+design doc would be a fourth place a spec can rot, invisible to the drift guard). **Override:** the
+brainstorming skill's spec lands as an ADR here (the decision) + a GitHub issue (design + execution
+checklist), NOT a `docs/superpowers/specs/` file — don't reintroduce that path.
+_Decided: 2026-06-19 (Nicolas)_
+
+**Delivery model: chapters ship as vertical slices through a CD pipeline.**
+The unit of delivery is a *playable* chapter slice (map + events + enemies + cast-at-parity + portraits +
+draft dialogue), shipped to the friend group; polish (custom battle anims, final portraits, final
+dialogue) is a later layer applied to an already-playable slice, so gameplay is testable before the art
+exists. Every slice passes the same gates before friends see it: the drift guard (`check.py`), balance
+parity (`make difficulty CH=chNN`), and stability (boots + completes crash-free). Two parallel tracks: the
+**content track** (author each slice — sequential, needs Nicolas / voice bibles / DM notes, un-swarmable)
+and the **pipeline track** (the CI gates + injection tooling — parallelizable, the part agents accelerate),
+which meet at the gate. The same machine feeds the post-MVP back half (Ch9–21) as the DM notes land.
+_Decided: 2026-06-19 (Nicolas)_
+
 ---
 
 ## Combat System
@@ -267,6 +289,18 @@ all matter. The per-chapter **difficulty engine** is `tools/difficulty.py` (`mak
 CH=chNN`), built on the tested combat core `tools/fe_combat.py` (the decomp's own formulas);
 execution plan + full spec: issue #45.
 _Decided: 2026-06-18 (Nicolas; difficulty analysis session — supersedes the open "Ch1 difficulty" item)_
+
+**Per-chapter parity beyond Ch1 = enemy-pressure vs a `parity_reference` vanilla chapter.**
+Our cast is fixed all game and already at vanilla parity (above), so a chapter's difficulty is set by its
+enemies + deploy cap. The difficulty engine measures **enemy pressure** — threat/slot (Σ enemy
+damage-per-round vs a fixed yardstick unit ÷ deploy cap) and clear-load/slot (Σ enemy bulk ÷ deploy cap) —
+for our chapter and for the vanilla chapter named in a new per-chapter YAML field `parity_reference:
+"FE8 ChN"` (the cadence-bar source of truth; vanilla enemies auto-extracted from the decomp's
+`chN-eventudefs.h`). Parity = within a band. The engine also still reports our actual cast vs our enemies
+(throughput / durability / carry) as the absolute "can our roster clear it" check. **First cut analyzes at
+base level**; leveled stat projection is a deferred fast-follow (needs the recruit schedule, #45 item 5).
+Execution + full design: #48.
+_Decided: 2026-06-19 (Nicolas)_
 
 **How the deploy cap + prep screen are actually wired (the [decomp] mechanism).**
 `hasPrepScreen` in `chapter_settings.json` is dead — "left over from FE7"
