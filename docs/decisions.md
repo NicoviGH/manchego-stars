@@ -358,12 +358,16 @@ red array names) — the single human-curated point of "which vanilla arrays ARE
 Both sides project every enemy (generics AND named bosses) off **class base autoleveled to its level** — a
 boss's personal line is the dynamic playtest's concern, not this static proxy — so ours and vanilla resolve
 on identical footing and the yardstick/deploy-cap cancel in the ratio. Validation: our Ch1, mirrored 1:1 off
-FE8 Ch1, reads at parity (threat ×0.89, clear-load ×0.97, both inside ±25%). Registry seeded with Prologue +
-Ch1; Ch2–Ch6/Ch13 array curation is a fill-in fast-follow (and moot until those slices author enemy
-inventories — uninventoried enemies carry no modeled weapon and drop out). The verdict is **reported, not yet
-a hard CI gate** (gating would red the build on the not-yet-authored Ch2+); wiring the gate waits on those
-slices. `make difficulty CH=chNN` gains the pressure line; `make difficulty` (no CH) prints the campaign
-curve. _Implemented: 2026-06-19 (CLAUDE; pipeline track, TDD)_
+FE8 Ch1, reads at parity (threat ×0.89, clear-load ×0.97, both inside ±25%). Registry curation method for the
+events_udefs.c chapters: the arrays a chapter's `chN-eventscript.h` references **whose RED units carry
+weapons** — which excludes the interleaved skirmish/tower data (unreferenced) and the cutscene/preview arrays
+(endgame villains placed with empty `.items`). Curated + fully modeled: Prologue, Ch1, **Ch2 (9), Ch3 (10),
+Ch5 (23)**. Deferred to a follow-up: **FE8 Ch4/Ch6/Ch13**, which need the monster weapon set (claws/eyes) and
+a few extended weapons (halberd, venin, horseslayer…) added to `fe_combat.W` — Ch4 "Ancient Horrors" is an
+all-monster map, so its whole force is unmodeled until then. The verdict is **reported, not yet a hard CI
+gate** (gating would red the build on the not-yet-authored Ch2+); wiring the gate waits on those slices.
+`make difficulty CH=chNN` gains the pressure line; `make difficulty` (no CH) prints the campaign curve.
+_Implemented: 2026-06-19 (CLAUDE; pipeline track, TDD)_
 
 **How the deploy cap + prep screen are actually wired (the [decomp] mechanism).**
 `hasPrepScreen` in `chapter_settings.json` is dead — "left over from FE7"

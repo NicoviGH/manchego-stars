@@ -156,16 +156,11 @@ def enemy_combatants(enemy_def):
 # pressure sets its bar. We resolve that to the decomp UnitDefinition array(s) holding the
 # fightable red force and project each enemy off class base -- the same footing as ours.
 
-# decomp item enum -> fe_combat weapon key. Only attacking weapons; staves/consumables/keys
-# are absent on purpose (an enemy with no entry here carries no modeled threat -> skipped).
-ITEM_TO_WEAPON = {
-    'ITEM_SWORD_IRON': 'iron-sword', 'ITEM_SWORD_STEEL': 'steel-sword',
-    'ITEM_SWORD_RAPIER': 'rapier', 'ITEM_LANCE_IRON': 'iron-lance',
-    'ITEM_LANCE_SILVER': 'silver-lance', 'ITEM_LANCE_JAVELIN': 'javelin',
-    'ITEM_AXE_IRON': 'iron-axe', 'ITEM_AXE_HANDAXE': 'hand-axe',
-    'ITEM_BOW_IRON': 'iron-bow', 'ITEM_ANIMA_FIRE': 'fire',
-    'ITEM_DARK_FLUX': 'flux',
-}
+# decomp item enum -> fe_combat weapon key. The inverse of build_campaign's canonical
+# weapon->ITEM map (one source for both directions). Only attacking weapons are listed there;
+# staves/consumables/keys are absent on purpose (an enemy carrying only those resolves to no
+# modeled weapon and is skipped -- with a warning, see unmodeled_enemies).
+ITEM_TO_WEAPON = {item: key for key, item in bc.WEAPON_ITEM_ENUM.items()}
 
 # parity_reference -> (decomp relpath, [UnitDefinition array names]) for its red force.
 # The single curation point: which vanilla arrays ARE a chapter's fightable enemies (named
@@ -176,6 +171,18 @@ PARITY_REFERENCE_UDEFS = {
                      ['UnitDef_Event_PrologueEnemy']),
     'FE8 Ch1': ('src/events/ch1-eventudefs.h',
                 ['UnitDef_Event_Ch1Enemy', 'UnitDef_Event_Ch1EnemyReinforce']),
+    # Ch2+ enemies live in the monolithic events_udefs.c with address-named arrays. The
+    # right ones are those a chapter's eventscript references AND whose RED units carry
+    # weapons -- which excludes the interleaved skirmish/tower data (not referenced) and the
+    # cutscene/preview arrays (villains placed with empty .items). Method per chapter:
+    # `grep UnitDef_ src/events/chN-eventscript.h`, keep arrays with armed FACTION_ID_RED
+    # entries. Verified all-modeled: Ch2=9, Ch3=10, Ch5=23 enemies.
+    'FE8 Ch2': ('src/events_udefs.c',
+                ['UnitDef_088B4344', 'UnitDef_088B4470', 'UnitDef_088B44AC']),
+    'FE8 Ch3': ('src/events_udefs.c', ['UnitDef_088B463C']),
+    'FE8 Ch5': ('src/events_udefs.c',
+                ['UnitDef_088B5798', 'UnitDef_088B56F8', 'UnitDef_088B5860',
+                 'UnitDef_088B589C', 'UnitDef_088B58D8', 'UnitDef_088B5914']),
 }
 
 

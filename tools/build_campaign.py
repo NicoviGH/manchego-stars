@@ -167,7 +167,9 @@ WEAPON_ITEM_ENUM = {
     'iron-sword': 'ITEM_SWORD_IRON', 'steel-sword': 'ITEM_SWORD_STEEL',
     'rapier': 'ITEM_SWORD_RAPIER', 'iron-lance': 'ITEM_LANCE_IRON',
     'silver-lance': 'ITEM_LANCE_SILVER', 'javelin': 'ITEM_LANCE_JAVELIN',
-    'iron-axe': 'ITEM_AXE_IRON', 'hand-axe': 'ITEM_AXE_HANDAXE',
+    'killing-edge': 'ITEM_SWORD_KILLER',
+    'iron-axe': 'ITEM_AXE_IRON', 'steel-axe': 'ITEM_AXE_STEEL',
+    'hand-axe': 'ITEM_AXE_HANDAXE',
     'iron-bow': 'ITEM_BOW_IRON', 'fire': 'ITEM_ANIMA_FIRE', 'flux': 'ITEM_DARK_FLUX',
 }
 

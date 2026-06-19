@@ -233,6 +233,23 @@ class VanillaEnemies(unittest.TestCase):
     def test_unmapped_reference_returns_none(self):
         self.assertIsNone(df.vanilla_enemies('FE8 Ch99'))
 
+    def test_ch2_reference_is_nine_armed_enemies_incl_steel_axe(self):
+        # Curated from events_udefs.c (arrays ch2-eventscript references, armed RED only);
+        # all 9 resolve (needs steel-axe). Cutscene/skirmish arrays excluded by design.
+        enemies = df.vanilla_enemies('FE8 Ch2')
+        self.assertEqual(len(enemies), 9)
+        self.assertIn('steel-axe', {u.weapon.name for u in enemies})
+
+    def test_ch3_reference_is_ten_armed_enemies(self):
+        # The Riev/Caellach/Valter cutscene array (empty items) is NOT this chapter's force.
+        enemies = df.vanilla_enemies('FE8 Ch3')
+        self.assertEqual(len(enemies), 10)
+
+    def test_ch5_reference_is_twentythree_armed_incl_killing_edge(self):
+        enemies = df.vanilla_enemies('FE8 Ch5')
+        self.assertEqual(len(enemies), 23)
+        self.assertIn('killing-edge', {u.weapon.name for u in enemies})
+
 
 CAMPAIGN = 'rime-of-the-frostmaiden'
 
