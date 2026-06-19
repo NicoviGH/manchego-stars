@@ -630,7 +630,9 @@ as a line on the chapter's vertical-slice checklist and re-checked at playtest:
 
 A dialogue nudge is at most belt-and-suspenders, never the fix. **Ch1 (The Iron Trail) currently
 fails this** — the camp tile reads "Plain" and the boss stands away from it → go-fix tracked in
-**#57**. Apply the checkpoint to the Prologue and every future Seize map.
+**#57**. Applies to every Seize-objective map — in the MVP that's **Ch1 (#57/#21)** and
+**Ch3 — The Termalaine Mine (#23)**; re-check any future Seize map. (The Prologue is `defeat_boss`,
+not Seize, so it's out of scope.)
 _Decided: 2026-06-19; from the brother's v0.1.0 playtest (#56 → #57)._
 
 **Title banner theme: "glacial blue", a pure PALETTE recolor (no pixel edits).**
