@@ -4,6 +4,11 @@
 #   tools/playtest/run.sh <scenario> [--keep-open]
 #
 # Logic scenarios (assert PASS/FAIL):  win | gameover | retreat | ch01win | titlecard
+# Stability scenarios (PASS/FAIL liveness over a run):
+#   smoke | smoke_ch01   -- idle the party; catch crashes/soft-locks (#49)
+#   clear | clear_ch01   -- greedy clear-bot plays to a win (#60)
+#   fuzz  | fuzz_ch01    -- SEEDED random-input soak (#49); set PT_SEED=N (default 1) to
+#                           pick the seed; a FAIL prints the seed so PT_SEED=N replays it
 # Recording scenarios (drop motion frames for a review GIF):
 #   recordending  -- the ch01 "Rolling Cheddar" outro cutscene (frames tagged "end")
 #   recordprep    -- the Preparations + Pick Units deploy screen (frames "prep")
@@ -60,6 +65,7 @@ PLAYTEST_SCENARIO = "$scen"
 PLAYTEST_LOG = "$log"
 PLAYTEST_SHOTDIR = "$out"
 PLAYTEST_STATEDIR = "$STATE_DIR"
+PLAYTEST_SEED = "${PT_SEED:-1}"
 dofile("$HERE/harness.lua")
 EOF
     rm -f "$REPO/fireemblem8u/fireemblem8.sav"   # fresh save: New Game is the default path
@@ -112,8 +118,8 @@ fi
 # record* now LOADS a checkpoint (no grind), so its deadline is short.
 FPS=240; VSYNC=0; DEADLINE_S=420
 case "$SCENARIO" in record*) FPS=60; VSYNC=1; DEADLINE_S=300 ;; esac
-# smoke_* plays a full chapter (lead-in + up to a 30-turn idle budget) -> longer wall.
-case "$SCENARIO" in smoke*) DEADLINE_S=600 ;; esac
+# smoke_* / fuzz_* play a full chapter (lead-in + a long idle/random soak) -> longer wall.
+case "$SCENARIO" in smoke*|fuzz*) DEADLINE_S=600 ;; esac
 # PT_FPS overrides the rate. 60fps+videoSync is only needed to capture smooth cutscene
 # FADES; verification captures of static text/boxes (sign, death quote) read fine at top
 # speed, so `PT_FPS=240 ... recordfix` runs ~4x faster.
