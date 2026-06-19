@@ -97,6 +97,7 @@ UNIT_ICON_MOVE_S = os.path.join(DECOMP, 'data', 'const_data_unit_icon_move.s')
 MOVE_GFX_DIR = os.path.join(DECOMP, 'graphics', 'unit_icon', 'move')
 BMUDISP_C = os.path.join(DECOMP, 'src', 'bmudisp.c')
 PREP_UNITSELECT_C = os.path.join(DECOMP, 'src', 'prep_unitselect.c')
+PREP_SALLYCURSOR_C = os.path.join(DECOMP, 'src', 'prep_sallycursor.c')
 # New-game boots straight into the test chapter (skip the vanilla prologue) so the
 # spawn is one "New Game" away. CHAPTER_L_1 = 0x01 (constants/chapters.h).
 TEST_CHAPTER_INDEX = 1
@@ -179,6 +180,11 @@ BMDIFFICULTY_C = os.path.join(DECOMP, 'src', 'bmdifficulty.c')
 BMMENU_C = os.path.join(DECOMP, 'src', 'bmmenu.c')
 DATA_EVENT_TRIGGER_C = os.path.join(DECOMP, 'src', 'data_event_trigger.c')
 LORDSEL_FLAG_BASE = 0xF0
+# Lord survivability floor (#45 3c) "applied" flag: one permanent flag, just above the
+# 0xF0..0xF9 candidate-pick block (LORDSEL_CONFIRM_MSGS caps the cast at 10), so the floor
+# bakes into the chosen lead's saved stats exactly once. Permanent flags span 100..299
+# (GetPermanentFlagBitsSize = 0x19 bytes), so 0xFA is in range and free.
+LORDFLOOR_APPLIED_FLAG = 0xFA
 LORDSEL_PROMPT_MSG = 0x957   # dead vanilla slot-2 scene text (cf. inject_ch01 step 6)
 LORDSEL_CONFIRM_MSGS = (0x959, 0x95A, 0x95B, 0x95C, 0x95D, 0x95E, 0x95F,
                         0x962, 0x963, 0x964)  # same dead pool, one per candidate
@@ -277,7 +283,10 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         # The convoy gate (bmmenu) + the vanilla force-deploy table
                         # (data_event_trigger) are routed through LordSelect too.
                         'src/eventinfo.c', 'src/bmdifficulty.c',
-                        'src/bmmenu.c', 'src/data_event_trigger.c'] + [
+                        'src/bmmenu.c', 'src/data_event_trigger.c',
+                        # lord survivability floor (#45 3c): LordFloor_ApplyOnce (eventinfo,
+                        # already listed) + its EndPrepScreen call site (prep_sallycursor)
+                        'src/prep_sallycursor.c'] + [
                         'graphics/op_subtitle/OpSubtitle_%02d.png' % i
                         for i in range(gen_subtitle_cards.CARD_COUNT)]
 
@@ -1699,6 +1708,25 @@ def _patch_battle_map_kind_fallback():
         f.write(text.replace(orig, patched, 1))
 
 
+def lord_floor_rows(campaign, uids, ch='ch01', target=3.5):
+    """Per-lord survivability-floor deltas (#45 3b): one (uid, hp, def, res) tuple per uid,
+    in input order, = difficulty.lord_floor_delta vs chapter `ch`'s enemies @`target` bulk-
+    durability. The engine adds the CHOSEN lord's row to its stats ONCE at chapter start
+    (#45 3c), so it must stay parallel to the gLordSelectCandidates[] it is indexed against.
+
+    Local-imports difficulty: difficulty imports this module, so a top-level import would
+    cycle (HANDOFF gotcha)."""
+    import difficulty
+    _, _, line, bosses, _, _ = difficulty.load_field(campaign, ch)
+    threat = line + bosses
+    rows = []
+    for uid in uids:
+        f = difficulty.lord_floor_delta(
+            difficulty.player_combatant(campaign, uid), threat, target=target)
+        rows.append((uid, f.hp, f.df, f.res))
+    return rows
+
+
 def _inject_lord_select_engine():
     """Lord select (#42), engine side: make the player-chosen lead real.
 
@@ -1908,6 +1936,116 @@ def _inject_lord_select_engine():
                                 DATA_EVENT_TRIGGER_C)
     with open(DATA_EVENT_TRIGGER_C, 'w', encoding='utf-8') as f:
         f.write(text)
+
+
+def _inject_lord_floor_engine():
+    """Lord survivability floor (#45 3c), engine side: bake the player-chosen lead's
+    base-level top-up into its stats ONCE, the first player phase it is fielded.
+
+    Consumes the build-generated gLordFloorDeltas[] table (inject_ch01, events_udefs.c):
+    one { +maxHP, +Def, +Res } row per candidate, parallel to gLordSelectCandidates[]. Two
+    campaign-agnostic hooks (string-replace + count-guard, like _inject_lord_select_engine,
+    which MUST run first -- this anchors on its injected LordSelect_GetPid):
+
+      1. LordFloor_ApplyOnce (new, eventinfo.c): find the chosen lead's index via the
+         lord-select flags, look up its floor row, add it to maxHP/curHP/def/res, then set a
+         permanent "applied" flag. No-op once applied; no-op until a pick exists (prologue:
+         nothing chosen -> skip) and the lead is on the field. The applied flag is spent ONLY
+         on a real application, so it can never be consumed early -> the floor always lands.
+
+      2. EndPrepScreen (prep_sallycursor.c): call it once the prep "Fight!" has finalized
+         deployment (right after ShrinkPlayerUnits compacts the roster). The chosen lead is
+         deployed + VALID here and the pick is already recorded (the menu runs earlier, in the
+         beginning scene). Phase-start seams (BmMain_StartPhase, the cursor reset) fire BEFORE
+         prep deployment finalizes on turn 1 -- the lead isn't findable yet, so the floor lands
+         a phase late (ch01 verified -- tools/playtest lordfloor showed +7 at turn 2, not turn
+         1). Lord-select is always a prep chapter, so this single deployment seam suffices; the
+         apply-once flag covers later Fight!s.
+    """
+    # 1: eventinfo.c -- LordFloor_ApplyOnce, right after the injected LordSelect_GetPid.
+    with open(EVENTINFO_C, encoding='utf-8') as f:
+        text = f.read()
+    anchor = ('    return gLordSelectCandidates[0];\n'
+              '}\n')
+    if text.count(anchor) != 1:
+        sys.exit('ERROR: LordSelect_GetPid tail not found in %s -- '
+                 '_inject_lord_floor_engine must run after _inject_lord_select_engine'
+                 % EVENTINFO_C)
+    floor_fn = (
+        '    return gLordSelectCandidates[0];\n'
+        '}\n'
+        '\n'
+        '/* Lord survivability floor (campaign engine, #45 3c): once, at the first\n'
+        '   player phase the chosen lead is fielded, add its base-level top-up\n'
+        '   (gLordFloorDeltas, events_udefs.c -- { +maxHP, +Def, +Res } per candidate,\n'
+        '   parallel to gLordSelectCandidates) to maxHP/curHP/Def/Res. A permanent\n'
+        '   "applied" flag makes it happen exactly once and bake into the save, then\n'
+        '   fade as the unit levels (Jagen-style). No-op until the ch01 menu has\n'
+        '   recorded a pick (prologue: skip, flag stays clear) and the lead is on the\n'
+        '   map -- the applied flag is spent ONLY on a real application, never early. */\n'
+        'void LordFloor_ApplyOnce(void)\n'
+        '{\n'
+        '    extern const u16 gLordSelectCandidates[];\n'
+        '    extern const s8 gLordFloorDeltas[];\n'
+        '    struct Unit * unit;\n'
+        '    int i;\n'
+        '\n'
+        '    if (CheckFlag(0x%X))\n'
+        '        return;\n'
+        '\n'
+        '    /* the ch01 menu records the pick as permanent flag 0x%X + menu index */\n'
+        '    for (i = 0; gLordSelectCandidates[i] != 0xFFFF; i++) {\n'
+        '        if (CheckFlag(0x%X + i))\n'
+        '            break;\n'
+        '    }\n'
+        '    if (gLordSelectCandidates[i] == 0xFFFF)\n'
+        '        return; /* no pick yet (prologue) -- retry next chapter */\n'
+        '\n'
+        '    unit = GetUnitFromCharId(gLordSelectCandidates[i]);\n'
+        '    if (unit == NULL)\n'
+        '        return; /* chosen lead not on the field yet -- retry, flag stays clear */\n'
+        '\n'
+        '    unit->maxHP += gLordFloorDeltas[i * 3 + 0];\n'
+        '    unit->curHP += gLordFloorDeltas[i * 3 + 0];\n'
+        '    unit->def   += gLordFloorDeltas[i * 3 + 1];\n'
+        '    unit->res   += gLordFloorDeltas[i * 3 + 2];\n'
+        '\n'
+        '    SetFlag(0x%X);\n'
+        '}\n'
+        % (LORDFLOOR_APPLIED_FLAG, LORDSEL_FLAG_BASE, LORDSEL_FLAG_BASE,
+           LORDFLOOR_APPLIED_FLAG))
+    with open(EVENTINFO_C, 'w', encoding='utf-8') as f:
+        f.write(text.replace(anchor, floor_fn, 1))
+
+    # 2: prep_sallycursor.c -- call it at the END of EndPrepScreen, right after
+    #    ShrinkPlayerUnits() has compacted the deployed roster. This is the deployment-
+    #    finalization point on the prep "Fight!" path: the chosen lead is force-deployed and
+    #    VALID here, and the ch01 lord-select menu (which runs earlier, in the beginning scene)
+    #    has already recorded the pick. Phase-start seams (BmMain_StartPhase, the cursor reset)
+    #    fire BEFORE prep deployment finalizes on turn 1, so the lead isn't yet findable and
+    #    the floor lands a phase late (ch01 verified via tools/playtest lordfloor: those seams
+    #    gave +7 at turn 2, not turn 1). Lord-select is always a prep chapter, and the
+    #    apply-once flag covers every later Fight!, so this single seam suffices.
+    with open(PREP_SALLYCURSOR_C, encoding='utf-8') as f:
+        text = f.read()
+    orig = ('    ShrinkPlayerUnits();\n'
+            '    Proc_EndEach(gProcScr_SALLYCURSOR);\n')
+    if text.count(orig) != 1:
+        sys.exit('ERROR: EndPrepScreen ShrinkPlayerUnits tail not in expected vanilla form '
+                 'in %s' % PREP_SALLYCURSOR_C)
+    hooked = ('    ShrinkPlayerUnits();\n'
+              '\n'
+              '    /* Lord survivability floor (campaign engine, #45 3c): now that the chosen\n'
+              '       lead is deployed and the roster is finalized, bake its base-level top-up\n'
+              '       in once. Apply-once flag makes later prep Fight!s no-ops. */\n'
+              '    {\n'
+              '        extern void LordFloor_ApplyOnce(void);\n'
+              '        LordFloor_ApplyOnce();\n'
+              '    }\n'
+              '\n'
+              '    Proc_EndEach(gProcScr_SALLYCURSOR);\n')
+    with open(PREP_SALLYCURSOR_C, 'w', encoding='utf-8') as f:
+        f.write(text.replace(orig, hooked, 1))
 
 
 def _inject_mu_override_hook():
@@ -3518,6 +3656,20 @@ def inject_ch01(campaign, verbose=True):
         ['    CHARACTER_%s, /* %s */' % (slot.upper(), uid)
          for uid, slot, _, _ in cast] +
         ['    0xFFFF,', '};', ''])
+    # Lord survivability floors (#45 3b): per-candidate { +maxHP, +Def, +Res }, PARALLEL to
+    # gLordSelectCandidates above (same menu order). Computed @target 3.5 bulk-durability vs
+    # Ch1 enemies -- the shamans' frail floor; the armor tanks score 0. The engine adds the
+    # chosen lord's triple to its unit ONCE at chapter start, flag-gated (#45 3c).
+    floor_rows = lord_floor_rows(campaign, [uid for uid, _, _, _ in cast])
+    udefs += '\n'.join(
+        ['', '/* Lord survivability floors (#45 3b, build-generated): per-candidate',
+         '   { +maxHP, +Def, +Res } at base level, parallel to gLordSelectCandidates above.',
+         "   The engine adds the chosen lord's triple to maxHP/curHP/def/res ONCE at chapter",
+         '   start, gated by a permanent flag (#45 3c) -- bakes in, then fades as it levels. */',
+         'CONST_DATA s8 gLordFloorDeltas[] = {'] +
+        ['    %d, %d, %d, /* %s */' % (hp, df, res, uid)
+         for uid, hp, df, res in floor_rows] +
+        ['};', ''])
     with open(EVENTS_UDEFS_C, 'w', encoding='utf-8') as f:
         f.write(udefs)
 
@@ -4015,6 +4167,8 @@ def main():
         print('  GetBattleMapKind: no-world-map fallback = STORY (slot 2+ chapters)')
         _inject_lord_select_engine()
         print('  lord select (#42): GetPid + force-deploy/Seize/game-over keyed to the chosen lead')
+        _inject_lord_floor_engine()  # after lord-select: anchors on its LordSelect_GetPid
+        print('  lord floor (#45 3c): chosen lead\'s survivability top-up baked in once at ch start')
         print('names:')
         inject_names(args.campaign)
         print('item names:')

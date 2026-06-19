@@ -84,5 +84,30 @@ class DonorMaps(unittest.TestCase):
         self.assertEqual(bc.GROWTH_DONOR['meesmickle'], 'CHARACTER_EWAN')
 
 
+class LordFloorRows(unittest.TestCase):
+    """The per-lord survivability-floor table (#45 3b) the build emits as gLordFloorDeltas[]
+    and the engine applies once at chapter start (#45 3c). One (hp, def, res) row per lord
+    candidate, in the menu order the C table is indexed by. Oracle: difficulty --lord-floor."""
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def test_ch1_deltas_match_the_floor_solver(self):
+        # vs Ch1 enemies @target 3.5: the shamans are the glass picks (+7HP/+4Def); the armor
+        # tanks (braulo/wolfram) already clear the floor, so they take nothing.
+        rows = {uid: (hp, df, res) for uid, hp, df, res in bc.lord_floor_rows(
+            self.CAMPAIGN, ['marty', 'meesmickle', 'pinky', 'braulo', 'wolfram'])}
+        self.assertEqual(rows['marty'], (7, 4, 0))
+        self.assertEqual(rows['meesmickle'], (7, 4, 0))
+        self.assertEqual(rows['pinky'], (0, 4, 0))
+        self.assertEqual(rows['braulo'], (0, 0, 0))
+        self.assertEqual(rows['wolfram'], (0, 0, 0))
+
+    def test_rows_preserve_candidate_order(self):
+        # gLordFloorDeltas[] is indexed parallel to gLordSelectCandidates[], so the row order
+        # MUST match the menu order it is handed -- a reorder would mis-assign every floor.
+        order = ['wolfram', 'marty', 'pinky']
+        self.assertEqual([uid for uid, *_ in bc.lord_floor_rows(self.CAMPAIGN, order)], order)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -732,6 +732,95 @@ scenarios.ckpt_lordpinky = function()
     result("PASS", "Pinky-lord prep checkpoint saved")
 end
 
+-- LORDFLOOR (#45 3c): pick MARTY (the frail shaman) as lord and verify the survivability
+-- floor bakes in exactly ONCE -- +7 maxHP / +4 def at ch01 turn 1 -- and does NOT re-apply
+-- on later player phases. ch02 isn't a playable map yet, so the within-chapter multi-phase
+-- stability + the permanent applied-flag (0xFA) stand in for "carries into ch02 with no
+-- double-apply": both ride the identical BmMain_StartPhase -> LordFloor_ApplyOnce
+-- early-return once the flag is set. make-green can't prove this -- only a real run can.
+scenarios.lordfloor = function()
+    local MARTY = 0x02                 -- marty rides CHARACTER_SETH (lord-select menu index 1)
+    local BASE_HP, FLOOR_HP = 18, 25   -- base maxHP 18, floor +7 (difficulty --lord-floor oracle)
+    local BASE_DEF, FLOOR_DEF = 2, 6   -- base def 2, floor +4
+    local APPLIED = 0xFA               -- LORDFLOOR_APPLIED_FLAG (permanent)
+
+    if not winCh00() then return result("FAIL", "never won ch00") end
+    if not waitFor(function() return chapter() == 2 end, 1800) then
+        return result("FAIL", "ch01 never started") end
+
+    -- ride the save menu + Northlook scene to the scenic lord-select menu, then pick MARTY.
+    local atMenu = false
+    for _ = 1, 200 do
+        if menuOpen() then atMenu = true break end
+        if procActive(SYM.gProcScr_SALLYCURSOR) then break end
+        press(K.A, 4); wait(36)
+    end
+    if not atMenu then return result("FAIL", "lord-select menu never opened") end
+    wait(40)
+    press(K.DOWN, 4); wait(8)          -- index 0 (Braulo) -> index 1 (Marty)
+    press(K.A, 4); wait(40)            -- pick
+    press(K.A, 4); wait(20)            -- [Yes] confirm
+
+    -- through prep -> Fight! -> interactive turn 1.
+    for _ = 1, 80 do
+        if procActive(SYM.gProcScr_SALLYCURSOR) then break end
+        press(K.A, 4); wait(36)
+    end
+    for i = 1, 40 do
+        if not procActive(SYM.gProcScr_SALLYCURSOR) then break end
+        press(K.B, 4); wait(10); press(K.START, 4); wait(40)
+        if i % 4 == 0 and procActive(SYM.gProcScr_SALLYCURSOR) then press(K.A, 4); wait(20) end
+    end
+    if not waitFor(function()
+        return not procActive(SYM.gProcScr_SALLYCURSOR) and faction() == 0 and turn() >= 1
+    end, 1200) then return result("FAIL", "ch01 turn 1 never reached") end
+    wait(60)
+
+    -- marty must be force-deployed (the chosen lord) and floored at turn 1.
+    local marty = blue(MARTY)
+    if not marty then return result("FAIL", "marty (chosen lord) not on the field at ch01 t1") end
+    local hp1, df1 = ru8(marty.addr + 0x12), ru8(marty.addr + 0x17)
+    shot("lordfloor-t1")
+    -- DIAGNOSTIC (#45 3c debug): dump pick flags + marty stats + applied flag at t1.
+    local pickset = "none"
+    for i = 0, LORD_CANDIDATES - 1 do
+        if eventFlag(LORDSEL_FLAG_BASE + i) then pickset = string.format("0x%X (idx %d)", LORDSEL_FLAG_BASE + i, i) end
+    end
+    log(string.format("t%d: pick flag set=%s; marty maxHP=%d def=%d; applied(0xFA)=%s",
+        turn(), pickset, hp1, df1, tostring(eventFlag(APPLIED))))
+    if not eventFlag(APPLIED) then
+        return result("FAIL", string.format("applied flag 0x%X clear at ch01 t1 -- floor not "
+            .. "baked in by player-phase start (maxHP=%d, want %d)", APPLIED, hp1, FLOOR_HP)) end
+    if hp1 ~= FLOOR_HP then
+        return result("FAIL", string.format(
+            "marty maxHP=%d at ch01 t1, want %d (base %d +7 floor)", hp1, FLOOR_HP, BASE_HP)) end
+    if df1 ~= FLOOR_DEF then
+        return result("FAIL", string.format(
+            "marty def=%d at ch01 t1, want %d (base %d +4 floor)", df1, FLOOR_DEF, BASE_DEF)) end
+
+    -- advance two player phases; the floor must NOT stack (flag-gated apply-once = the same
+    -- early-return that protects the carry into ch02). Enemies poked harmless so marty lives.
+    for _ = 1, 2 do
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) then pokeHarmless(r) end
+        end
+        if runEnemyPhase(CH01_PARK) == "gameover" then
+            return result("FAIL", "unexpected game over during the floor stability check") end
+        marty = blue(MARTY)
+        if not marty then return result("FAIL", "marty vanished mid-check") end
+        local hp = ru8(marty.addr + 0x12)
+        log(string.format("t%d: marty maxHP=%d (stable check)", turn(), hp))
+        if hp ~= FLOOR_HP then
+            return result("FAIL", string.format(
+                "marty maxHP=%d at ch01 t%d -- floor RE-APPLIED (double-apply bug)", hp, turn())) end
+    end
+
+    result("PASS", string.format(
+        "marty floored ONCE: maxHP %d->%d (+7), def %d->%d (+4), flag 0x%X set at t1, stable across 3 player phases",
+        BASE_HP, FLOOR_HP, BASE_DEF, FLOOR_DEF, APPLIED))
+end
+
 -- CKPT_SEIZE: fast (240fps) -- drive to Braulo-on-the-seize-tile (menu open) and snapshot
 -- BEFORE pressing Seize, so record* replays the ending fresh from ROM.
 scenarios.ckpt_seize = function()

@@ -113,7 +113,7 @@ def check_generated_indexes_fresh(fail):
 
 
 def check_engine_guards_present(fail):
-    """Engine-hardening guards must stay wired into the build.
+    """Engine-hardening guards + campaign-engine hooks must stay wired into the build.
 
     The prologue garbage-band crash (debrief in docs/decisions.md) was a chapter whose
     "lord" rides a non-LORD-class slot: FE8's chapter-start cursor centering derefs a NULL
@@ -122,6 +122,8 @@ def check_engine_guards_present(fail):
     these two campaign-agnostic guards in build_campaign.py. Removing either silently
     re-introduces the crash, so guard their presence here. (The patches themselves also
     fail the build if the decomp source form changes -- see their `if orig not in text`.)
+    The campaign-engine hooks below are likewise build-time string-replaces that leave no
+    other trace, so a refactor could silently drop a shipped mechanic -- guard them too.
     """
     bc = open(os.path.join(REPO, 'tools', 'build_campaign.py'), encoding='utf-8').read()
     for fn in ('_patch_player_start_cursor_guard', '_patch_terrain_name_guard'):
@@ -130,6 +132,13 @@ def check_engine_guards_present(fail):
             fail.append('engine guard %s() missing or never called in '
                         'tools/build_campaign.py -- would re-introduce the prologue '
                         'garbage-band/off-map-cursor crash (see docs/decisions.md)' % fn)
+    for fn, mechanic in (
+            ('_inject_lord_floor_engine',
+             'the #45 lord survivability-floor application -- the chosen lead would lose '
+             'its one-time base-level HP/Def/Res top-up, making the glass picks traps'),):
+        if bc.count(fn) < 2:
+            fail.append('campaign-engine hook %s() missing or never called in '
+                        'tools/build_campaign.py -- would silently drop %s' % (fn, mechanic))
 
 
 def main():
