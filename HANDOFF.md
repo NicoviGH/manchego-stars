@@ -1,53 +1,39 @@
-# Handoff — Manchego Stars · live state + pointers (backlog lives in GitHub issues, not here)
+# Handoff — Manchego Stars · `main` = integration/solo router
 
-**Date:** 2026-06-19 (session 18)
-**Session focus:** Shipped the **v0.1.0 friend release** and stood up the **parallel-work
-infrastructure** (#50) so two instances can run at once. Single instance this session.
+**What this file is.** You're on `main` — the integration/solo tree (cross-track merges and ad-hoc
+one-offs). This file holds only what belongs to no single lane, and carries **no per-session
+snapshot**, so it can't go stale. For what shipped recently, read `git log --oneline -20` + closed
+issues — that's the live record, not this file.
 
-## Shipped this session (all on main, green, pushed)
-- **v0.1.0 friend release** — versioning scheme `v0.<chapters-playable>.<patch>` (`VERSION` file;
-  `tools/build.sh dist` stamps `dist/ManchegoStars-v<VERSION>-DATE.gba`; tagged `v0.1.0`). Fixes the
-  Ch1 difficulty soft-trap (carries the #45 lord floor). Smoke-tested: `ch01win` PASS on the dist
-  montage ROM (boot → prologue → Ch1 → seize → ending → title). **Friend-shippable.** ADR in
-  `decisions.md` §Distribution & Scope; noted on #37.
-- **Parallel-work infrastructure (#50)** — the dev-infra to run content 🔒 + pipeline ⚡ as two
-  instances:
-  - **Build isolation proven**: git 2.50 gives each worktree its own submodule gitdir; an isolated
-    build succeeded (~1m46s). `tools/worktree-setup.sh` bootstraps an instance worktree (add
-    worktree → init submodule from local objects → symlink the gitignored toolchain).
-  - **Engine/content file seam**: extracted the 5 campaign-agnostic engine hooks into
-    `tools/inject/engine_hooks.py` + shared `tools/inject/decomp.py`; `build_campaign.py` (4204→3713
-    lines) orchestrates them. Sprite/palette hooks stay with content. `check.py` guard rewritten
-    (def-in-module + call-in-orchestrator; both arms verified to bite). **Behavior-preserving:
-    byte-identical ROM** + `make test` (60) + `lordfloor` PASS.
-  - **Per-track files**: `HANDOFF-content.md` / `HANDOFF-pipeline.md` (each has its launch/kickoff
-    prompt + ownership map + next steps).
-  - Two ADRs in `decisions.md` §Delivery model.
+## Where the live state lives
+- **Content track** (Ch2+ slices, dialogue, art) → `HANDOFF-content.md` — owned by the content instance.
+- **Pipeline track** (difficulty/parity engine, playtest, CI) → `HANDOFF-pipeline.md` — owned by the pipeline instance.
+- **Backlog & milestones** → GitHub issues (#49 roadmap). **Decisions** → `docs/decisions.md`.
+  **Operating instructions** → `CLAUDE.md`.
+- Each lane runs in its own worktree (`../ms-content`, `../ms-pipeline`); don't do track work on `main`.
 
-## Next session
-**To go parallel:** launch two instances using the kickoff prompts at the top of
-`HANDOFF-content.md` (→ Ch2 slice #22) and `HANDOFF-pipeline.md` (→ #48 next items). Each
-bootstraps its own worktree via `tools/worktree-setup.sh`; both trunk-based onto main.
-**Single-instance** work continues from those same per-track Next lists. Roadmap: #49.
+## Current release
+**v0.1.0** friend release — Ch1 playable. Versioning `v0.<chapters-playable>.<patch>` (`VERSION` file,
+tag `v0.1.0`); `tools/build.sh dist` is the friend build. ADR: `decisions.md` §Distribution & Scope (#37).
 
 ## Builds / tools
 `tools/build.sh test` (lean dev) · `tools/build.sh dist` (montage; **the friend build**) ·
-`make difficulty CH=chNN [--lord-floor]` · `make test` (60) · `make check` (drift guard) ·
-`tools/playtest/run.sh lordfloor|ch01win|win|titlecard` · `tools/worktree-setup.sh <path>`
-(bootstrap a parallel instance). NEVER a bare `make` for a shippable ROM.
+`make difficulty CH=chNN [--lord-floor]` · `make test` · `make check` (drift guard) ·
+`tools/playtest/run.sh lordfloor|ch01win|win|titlecard` · `tools/worktree-setup.sh ../ms-<track>`.
+**Never a bare `make` for a shippable ROM.**
 
-## Gotchas (operational)
-- **New decomp patch target → add it to `PATCHED_DECOMP_FILES`** or the build is non-idempotent.
-- **Engine stat changes to the chosen lord go in `EndPrepScreen`**, not a phase-start seam.
-- Engine hooks now live in `tools/inject/engine_hooks.py`; the drift guard points there.
+## Cross-cutting gotchas
+- New decomp patch target → add it to `PATCHED_DECOMP_FILES`, or the build is non-idempotent.
+- Engine stat changes to the chosen lord go in `EndPrepScreen`, not a phase-start seam.
+- Engine hooks live in `tools/inject/engine_hooks.py`; the drift guard points there.
 - `make`-green can't prove apply timing — `tools/playtest/` is the dynamic arbiter.
 - Vanilla decomp reads go through `build_campaign.vanilla_decomp_text()` (HEAD), never the worktree.
-- **Never commit the `fireemblem8u` submodule pointer.** Nicolas can't see inline renders — save to
-  `map-review/` + `open`. Behavior-preserving refactor ⇒ byte-identical ROM (use the md5 as proof).
+- **Never commit the `fireemblem8u` submodule pointer.** A behavior-preserving refactor ⇒ byte-identical
+  ROM (md5 = proof). Nicolas can't see inline renders — save to `map-review/` + `open`.
 
 ## Standing rules
 Combat = pure vanilla FE; field parity with vanilla ch N is doctrine. **Process:** superpowers
-(brainstorm → spec → TDD → verify → review); spec = `decisions.md` ADR + GitHub issue. Custom art
-where it matters, **show before committing** (2-3 options, Nicolas drives). **Project knowledge
-lives in the repo** (issues = backlog, `decisions.md` = decisions, HANDOFF = live state), not private
-memory. **Trunk-based: auto-push to main once green; small commits; never long-lived branches.**
+(brainstorm → spec → TDD → verify → review); spec = `decisions.md` ADR + GitHub issue. Custom art where
+it matters, **show before committing** (2-3 options, Nicolas drives). **Project knowledge lives in the
+repo** (issues = backlog, `decisions.md` = decisions, lane HANDOFFs = live state), not private memory.
+**Trunk-based: auto-push to main once green; small commits; never long-lived branches.**
