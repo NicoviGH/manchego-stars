@@ -160,7 +160,37 @@ events:
   - trigger: chapter_start
     type: cutscene
     ea_file: events/ch02-opening.ea
-    description: "Setting off from Bryn Shander with the parked sled. Velynne Harpell's warning about the missing orb echoes (foreshadow)."
+    description: >
+      Bryn Shander west gate — the company rolls out with the Rolling Cheddar and Baxby.
+      Vellynne Harpell, an Arcane Brotherhood necromancer on a kobold-drawn sled, stops
+      them and sets them on the trail of her stolen orb (the Professor Skant orb; thief =
+      Nass Lantomir, both unnamed here), seeding the recurring Brotherhood arc. Tight
+      three-hander: Vellynne / RBG / Braulo, with a Meesmickle button. Voice grounding:
+      lore/vellynne-harpell.md (register B — icy-formal, no contractions) +
+      lore/frostmaiden-voices.md; FE8 cadence per fireemblem8u/texts/texts.txt.
+      LOCKED dialogue-pass text below (co-written with Nicolas 2026-06-19). PENDING (not
+      this commit): ch02 host wiring + the eventscript that consumes this script, Vellynne's
+      cutscene portrait (#19), and the in-game motion review.
+    script:                       # LOCKED 2026-06-19 (dialogue pass, co-written with Nicolas)
+      - location_card: "Bryn Shander — West Gate"
+      # (The Rolling Cheddar groans through the west gate, Baxby in the traces. A second
+      #  sled waits in the drifts — no dogs in its harness, only two kobolds, gray and
+      #  frost-split, that do not breathe. The woman aboard does not climb down; her hands
+      #  shake in her lap, and she stills them.)
+      - vellynne: "A moment. You are for the west road — and I have a use for that."
+      - vellynne: >-
+          There is an orb out there, somewhere in the white. Smoked glass, no bigger than
+          a fist. It speaks — and it does not know when to stop. It is mine. One of my
+          Brotherhood decided otherwise. Bring it back, and you will be paid.
+      - prof-rbg: "...An orb that speaks. And 'paid' comes to how much, precisely?"
+      - vellynne: >-
+          Enough. But you are not the only ones on this road — and I do not finish second.
+          Reach it before she does.
+      # (She lifts one trembling hand; the dead things lean into the harness, and the sled
+      #  glides off without a sound.)
+      - beat_break: B            # Vellynne's face clears (REMA) before the party reacts on a fresh stage
+      - meesmickle: "Her sled's pulled by corpses... Wonderful."
+      - braulo: "If we cross it, we cross it. We've a road to make."
   - trigger: turn_start
     turn: 3
     type: reinforcement
