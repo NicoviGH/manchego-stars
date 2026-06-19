@@ -153,11 +153,106 @@ def check_engine_guards_present(fail):
                         '(see docs/decisions.md)' % (fn, fn, mechanic))
 
 
+# ── Engine/content lane ownership (the seam, enforced) ────────────────────────────
+# Single source of truth for which track may edit which file (mirrors the "You own"
+# lists in HANDOFF-content.md / HANDOFF-pipeline.md). Anything not listed is SHARED
+# (either lane may edit: tools/inject/**, docs/**, HANDOFF*, CLAUDE.md, Makefile, ...).
+# Decision: docs/decisions.md -> Engine/content file seam (enforcement). Issue #55.
+PIPELINE_EXCLUSIVE_FILES = {
+    'tools/difficulty.py', 'tools/fe_combat.py', 'tools/check.py', 'tools/build.sh',
+    'tools/worktree-setup.sh', 'tools/test_difficulty.py', 'tools/test_fe_combat.py',
+    'tools/test_check_lanes.py',
+}
+PIPELINE_EXCLUSIVE_DIRS = ('tools/playtest/', 'tools/hooks/', '.github/workflows/')
+CONTENT_EXCLUSIVE_FILES = {
+    'tools/build_campaign.py', 'tools/portrait_tool.py', 'tools/map_sprite_tool.py',
+    'tools/ref_to_bust.py', 'tools/test_build_campaign.py',
+}
+CONTENT_EXCLUSIVE_DIRS = ('campaigns/',)
+
+
+def _file_lane(path):
+    """The lane that exclusively owns `path` ('pipeline'|'content'), or None if shared."""
+    path = path.replace(os.sep, '/')
+    if path in PIPELINE_EXCLUSIVE_FILES or path.startswith(PIPELINE_EXCLUSIVE_DIRS):
+        return 'pipeline'
+    if path in CONTENT_EXCLUSIVE_FILES or path.startswith(CONTENT_EXCLUSIVE_DIRS):
+        return 'content'
+    return None
+
+
+def _lane_violations(lane, changed_files):
+    """(path, owner) for each changed file the current `lane` may NOT edit. A file owned by
+    the other lane is a violation; with no lane set, ANY lane-exclusive file is (forces
+    source authoring into a laned worktree). Shared files never violate."""
+    out = []
+    for path in changed_files:
+        owner = _file_lane(path)
+        if owner is not None and owner != lane:
+            out.append((path, owner))
+    return out
+
+
+def _git(args):
+    import subprocess
+    try:
+        r = subprocess.run(['git'] + args, cwd=REPO, capture_output=True, text=True)
+        return r.stdout.strip()
+    except Exception:
+        return ''
+
+
+def _current_lane():
+    lane = _git(['config', 'manchego.lane'])
+    if lane in ('pipeline', 'content'):
+        return lane
+    branch = _git(['rev-parse', '--abbrev-ref', 'HEAD'])
+    if branch.startswith('inst/'):
+        if 'content' in branch:
+            return 'content'
+        if 'pipeline' in branch:
+            return 'pipeline'
+    return None
+
+
+def _changed_files():
+    """Files to check: staged (pre-commit), else the diff vs main on an inst/* branch (CI/
+    pre-push). Empty on main with nothing staged -> the guard no-ops on the integration tree."""
+    staged = [l for l in _git(['diff', '--cached', '--name-only']).splitlines() if l.strip()]
+    if staged:
+        return staged
+    branch = _git(['rev-parse', '--abbrev-ref', 'HEAD'])
+    if branch.startswith('inst/'):
+        base = _git(['merge-base', 'HEAD', 'origin/main']) or _git(['merge-base', 'HEAD', 'main'])
+        if base:
+            return [l for l in _git(['diff', '--name-only', base, 'HEAD']).splitlines()
+                    if l.strip()]
+    return []
+
+
+def check_lane_ownership(fail):
+    """Block a commit that edits across the engine/content seam (#55). Keyed on the
+    per-worktree `manchego.lane` (set by tools/worktree-setup.sh). `git commit --no-verify`
+    is the deliberate escape for a genuine integration/admin commit."""
+    lane = _current_lane()
+    for path, owner in _lane_violations(lane, _changed_files()):
+        if lane is None:
+            fail.append('lane: %s is %s-owned, but no manchego.lane is set here -- author it '
+                        'from your inst/%s worktree (tools/worktree-setup.sh), or '
+                        '`git commit --no-verify` for a deliberate integration commit'
+                        % (path, owner, owner))
+        else:
+            fail.append('lane: %s is %s-owned, but this is the %s lane -- coordinate via an '
+                        'issue instead of crossing the seam (--no-verify to override)'
+                        % (path, owner, lane))
+
+
 def main():
     fail = []
     for check in (check_python_compiles, check_tests_pass, check_yaml_parses,
                   check_tool_refs_exist, check_no_dead_concepts,
-                  check_generated_indexes_fresh, check_engine_guards_present):
+                  check_generated_indexes_fresh, check_engine_guards_present,
+                  check_lane_ownership):
         check(fail)
     if fail:
         print('DRIFT (%d):' % len(fail))
