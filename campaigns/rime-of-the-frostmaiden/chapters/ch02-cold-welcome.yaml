@@ -11,6 +11,7 @@ cadence: breather_defend          # see docs/CHAPTERS.md — 🟦
 # Tactical base map this chapter reskins. We keep FE8's tuned layout (spawn edges,
 # choke points, terrain bonuses) and repaint it to the arctic/Icewind Dale theme.
 fe8_base_map: "FE8 Ch2 — The Protected"   # DefeatAll + defend-in-place; src/events/ch2-eventinfo.h
+parity_reference: "FE8 Ch2"   # #48 enemy-pressure parity bar — The Protected — defend-in-place breather
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >

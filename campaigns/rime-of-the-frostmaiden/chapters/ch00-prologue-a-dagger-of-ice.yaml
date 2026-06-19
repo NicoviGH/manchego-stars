@@ -14,6 +14,7 @@ chapter_number: 0
 milestone: M3
 cadence: tutorial               # see docs/CHAPTERS.md — DefeatBoss, basics only
 fe8_base_map: "FE8 Prologue — The Fall of Renais"   # DefeatBoss tutorial base
+parity_reference: "FE8 Prologue"   # #48 enemy-pressure parity bar — DefeatBoss tutorial cadence
 is_prologue: true
 
 # ── Narrative ──────────────────────────────────────────────────────────────────

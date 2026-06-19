@@ -8,6 +8,7 @@ chapter_number: 7
 milestone: M3
 cadence: big_battle_gray        # see docs/CHAPTERS.md — 🟥 (morally gray)
 fe8_base_map: "FE8 Ch6 — Victims of War"            # DefeatBoss base
+parity_reference: "FE8 Ch6"   # #48 enemy-pressure parity bar — Victims of War — DefeatBoss
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >

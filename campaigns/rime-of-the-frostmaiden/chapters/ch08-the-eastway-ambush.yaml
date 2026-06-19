@@ -9,6 +9,7 @@ chapter_number: 8
 milestone: M3
 cadence: scripted_defeat        # see docs/CHAPTERS.md — 🎬 (the MVP wall)
 fe8_base_map: "FE8 Ch13 — Hamill Canyon"            # Survive/terrain base (objective match, not 1:1 ch#)
+parity_reference: "FE8 Ch13"   # #48 enemy-pressure parity bar — Hamill Canyon enemies; NB objective is a SCRIPTED DEFEAT so parity is informational, not a CI gate
 is_mvp_finale: true
 
 # ── Narrative ──────────────────────────────────────────────────────────────────

@@ -8,6 +8,7 @@ chapter_number: 6
 milestone: M3
 cadence: marquee_setpiece       # see docs/CHAPTERS.md — 🎬 (the Navarre/Joshua moment)
 fe8_base_map: "FE8 Ch5 — The Empire's Reach"        # DefeatBoss set-piece base
+parity_reference: "FE8 Ch5"   # #48 enemy-pressure parity bar — The Empire's Reach — DefeatBoss set-piece
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >

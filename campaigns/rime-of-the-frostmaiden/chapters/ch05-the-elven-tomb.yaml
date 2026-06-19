@@ -10,6 +10,7 @@ chapter_number: 5
 milestone: M3
 cadence: first_boss             # see docs/CHAPTERS.md — 🟥
 fe8_base_map: "FE8 Ch4 — Ancient Horrors"           # the DefeatBoss half (boss in a contained arena)
+parity_reference: "FE8 Ch4"   # #48 enemy-pressure parity bar — Ancient Horrors — DefeatBoss half
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >

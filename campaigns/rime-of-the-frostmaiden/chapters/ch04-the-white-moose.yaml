@@ -11,6 +11,7 @@ chapter_number: 4
 milestone: M3
 cadence: monster_debut          # see docs/CHAPTERS.md — 🟨 fog-of-war forest hunt (tone shift to monsters)
 fe8_base_map: "FE8 Ch4 — Ancient Horrors"           # the DefeatAll/monster-debut half
+parity_reference: "FE8 Ch4"   # #48 enemy-pressure parity bar — Ancient Horrors — DefeatAll/monster-debut half
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >

@@ -8,6 +8,7 @@ chapter_number: 3
 milestone: M3
 cadence: gimmick_multilevel     # see docs/CHAPTERS.md — 🟨
 fe8_base_map: "FE8 Ch3 — The Bandits of Borgo"      # Seize big-battle base
+parity_reference: "FE8 Ch3"   # #48 enemy-pressure parity bar — The Bandits of Borgo — Seize big-battle
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
