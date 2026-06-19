@@ -25,42 +25,36 @@ You are the **Content-track** instance for Manchego Stars (trunk-based, your own
 - `tools/inject/engine_hooks.py`, `tools/inject/decomp.py` (shared — propose changes, don't fork)
 - `tools/difficulty.py`, `tools/fe_combat.py`, `tools/check.py`, `tools/playtest/**`, CI
 
-## Last session (2026-06-19, pm) — all pushed to main, green
-**Ch2/Ch1 inn drift bug FIXED + a worktree commit-hook blocker fixed + the worktree workflow rule
-codified.** Three commits on `main` (`421fe98..35debda`):
-- **`cc3207c` fix(ch02) (#22)** — the drift bug is resolved. The Targos-inn beat no longer claims
-  Wolfram *first-armors* the sled (it's already armored at the end of Ch1 — `ch01` ending beats C–D,
-  his forge-night, RBG names the *Rolling Cheddar*). Rewrote all three spots in
-  `ch02-cold-welcome.yaml`: `soft_penalty_on_sled_loss` (now just chest + gold forfeit), the
-  `chapter_end` inn event description (Wolfram **re-plates the raid's battle-damage**, plays only if
-  the sled survived), and `design_notes`. Flavor-only fields → ROM-neutral; `make check` clean.
-- **`dcbb247` fix(build)** — `vanilla_decomp_text` now strips inherited git env. `git -C fireemblem8u
-  show HEAD:…` was exiting 128 under the **pre-commit hook in a worktree** (git sets `GIT_DIR` for
-  hooks, which overrides `-C` discovery → resolves against the superproject). This had been blocking
-  *every* commit from `../ms-content` / `../ms-pipeline`. Reproduced + verified the fix under a
-  simulated hook env.
-- **`35debda` docs** — Nicolas's rule: **"work the content/pipeline track" always means cd into that
-  track's worktree first, never `main`.** Rewrote the CLAUDE.md routing (dropped the old "sequential
-  work needs none of this" carve-out), aligned both HANDOFF kickoffs, recorded it in `decisions.md`.
+## Last session (2026-06-19, pm) — pushed to main, green
+**`ch02-rear-ambush` turn-3 bark LOCKED.** Commit `76cd540` feat(ch02) (#22). Speaker resolved —
+**Wolfram** (Nicolas's pick over Braulo): keeps the decisive-command beat off Braulo twice in one
+chapter (the opening cutscene already ends on his settle-it line) and ties the bark to the sled
+Wolfram forged in ch01 / re-plates at the inn. Locked text in `ch02-cold-welcome.yaml`'s turn-3
+event: *"Wolves at our backs — the sled." / "Hold here. I've got the rear."* — terse FE8
+reinforcement-bark cadence, ends on the order; passed the `dialogue-pass` craft check. Text-only
+YAML, **unwired** (eventscript + on-map bubble fit deferred, same posture as the locked opening
+event) → ROM-neutral; `make check` clean. **One wiring flag recorded in the event description:**
+line 1 is 31 chars, past the 29-char on-map bubble wrap → at insertion it wraps to the bubble's 2nd
+line (or `[LF]` split); verify the right-side bubble isn't pushed offscreen by the width measure.
 
-**Not done (Nicolas's call, teed up below):** the `ch02-rear-ambush` speaker pick and the
-`ch02-targos-inn` beat intent — both surfaced with drafts/options, neither locked.
+Prior session (same day, `421fe98..35debda`, all shipped): Ch2/Ch1 inn drift bug FIXED (`cc3207c` —
+Targos-inn beat now has Wolfram **re-plating raid battle-damage**, not first-armoring; soft-penalty
+is just chest + gold forfeit); worktree commit-hook blocker fixed (`dcbb247` — `vanilla_decomp_text`
+strips inherited git env so `git -C fireemblem8u show` survives the pre-commit hook in a worktree);
+worktree-always rule codified (`35debda`).
+
+**Not done (Nicolas's call, teed up below):** the `ch02-targos-inn` beat intent — needs his beat
+direction before drafting.
 
 ## Next (priority order)
-1. **Lock `ch02-rear-ambush`** (turn-3 combat bark; #22) — **decision pending: speaker is Wolfram
-   vs Braulo** (asked Nicolas at end of last session; not yet answered). Drafted + voice-grounded,
-   budget = 1–2 lines / 1 screen, ends on the order. On his pick → run `dialogue-pass` to finalize
-   voice, then commit the lock into `ch02-cold-welcome.yaml`'s rear-ambush event.
-   - **Wolfram** (leanest, matches FE8's terse reinforcement barks): "Wolves at our backs — the sled." / "Hold here. I've got the rear."
-   - **Braulo** (decisive settle-it leader beat): "More of them, behind the sled." / "Turn and hold the line. That's the work now."
-2. **`ch02-targos-inn`** (chapter end) — the big multi-beat scene (frozen-sacrifice discovery,
+1. **`ch02-targos-inn`** (chapter end) — the big multi-beat scene (frozen-sacrifice discovery,
    frost-druid glimpse = Ch4 seed, inn room/camp split, **Wolfram's re-plating payoff per the fix
    above**, Maer Monster + Lonelywood rumors). **Needs Nicolas's beat intent before drafting.**
    Then **ch02 host wiring** (not built yet — MNC2 drops to vanilla Ch3) + Vellynne cutscene
    portrait (#19) + in-game motion review.
-3. Supporting content as Ch2 needs them: enemy YAML pass #18, NPC/recruit stubs #17, recruit
+2. Supporting content as Ch2 needs them: enemy YAML pass #18, NPC/recruit stubs #17, recruit
    schedule (#45 item 5), world-map unlock #29.
-4. Art passes layer on already-playable slices: portraits #19, overworld sprites #38.
+3. Art passes layer on already-playable slices: portraits #19, overworld sprites #38.
 
 ## Watch out
 - **Writing any dialogue → invoke the `dialogue-pass` skill first.** Voice grounding lives in the
