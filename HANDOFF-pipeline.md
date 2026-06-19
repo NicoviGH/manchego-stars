@@ -26,15 +26,17 @@ You are the **Pipeline-track** instance for Manchego Stars (trunk-based, your ow
   call in `build_campaign.py` (the only content-file line you touch) — then update the guard.
 
 ## Next (priority order)
-1. **#48 — difficulty engine → all chapters**: the **enemy-pressure engine landed** (extractor +
-   `enemy_pressure`/`pressure_verdict`/`chapter_enemy_force`, per-chapter report line, `make
-   difficulty` campaign curve; Ch1 reads at parity ×0.89/×0.97). Remaining fast-follows:
-   (a) curate the vanilla arrays for Ch2–Ch6/Ch13 in `PARITY_REFERENCE_UDEFS` (the registry near the
-       top of the "Vanilla enemy extraction" block in `tools/difficulty.py`) — find each reference's
-       fightable red `UnitDefinition` arrays in `events_udefs.c` (HEAD); blocked-ish until those
-       slices author enemy inventories (uninventoried enemies drop out → `(no ref)`/0.0 on the curve);
-   (b) wire the **hard CI gate** (verdict OFF → fail) once Ch2+ enemies exist, so it doesn't red the
-       build today; (c) leveled stat projection (#45 item 5). Full status: issue #48 comment.
+1. **#48 — difficulty engine → all chapters**: engine landed + **registry now covers Prologue, Ch1,
+   Ch2 (9), Ch3 (10), Ch5 (23)** (curation method documented at the `PARITY_REFERENCE_UDEFS` block:
+   eventscript-referenced arrays with armed RED units; excludes skirmish + cutscene arrays). Also
+   shipped this session: warn-on-dropped-boss guardrail (#51), prologue boss weapon driven from YAML
+   (#52, byte-identical). Remaining fast-follows:
+   (a) **#53** — model FE8 monster + extended weapons (claws/eyes, halberd, venin, horseslayer) to
+       curate the last refs **FE8 Ch4 (ch04/ch05), Ch6 (ch07), Ch13 (ch08)**; Ch4 is all-monster so
+       its whole force is unmodeled until then;
+   (b) wire the **hard CI gate** (verdict OFF → fail) once Ch2+ enemies are authored, so it doesn't red
+       the build today; (c) leveled stat projection (#45 item 5). Note: the gate stays informative until
+       the **content track authors Ch2+ enemy inventories** (curve shows our side 0.0 / `!!boss dropped`).
 2. **Playtest platform**: grow `tools/playtest/` from the floor/ch01win scenarios toward an I/O
    harness → stability fuzzer → LLM-player (#49 dependency spine: `3c → I/O harness → …`).
 3. Mechanics/flavor leaves once specced: lord-select UX #46, d20 crit #11, spell-economy #9,
