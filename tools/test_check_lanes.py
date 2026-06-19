@@ -45,14 +45,12 @@ class LaneViolations(unittest.TestCase):
         self.assertEqual(check._lane_violations('pipeline',
                          ['tools/inject/decomp.py', 'docs/decisions.md']), [])
 
-    def test_no_lane_blocks_any_exclusive_file(self):
-        # Authoring loose on main (no manchego.lane) blocks lane-exclusive files -- this is
-        # what would have caught me editing build_campaign.py from the primary checkout.
-        v = check._lane_violations(None, ['tools/build_campaign.py'])
-        self.assertEqual(v, [('tools/build_campaign.py', 'content')])
-
-    def test_no_lane_still_allows_shared(self):
-        self.assertEqual(check._lane_violations(None, ['docs/decisions.md', 'HANDOFF.md']), [])
+    def test_no_lane_is_the_unrestricted_integration_tree(self):
+        # The primary checkout (no lane) is integration/solo work -- nothing is blocked there,
+        # so a single window on `main` can edit any file. Enforcement lives in lane worktrees.
+        self.assertEqual(check._lane_violations(None, ['tools/build_campaign.py',
+                                                       'tools/difficulty.py', 'campaigns/x.yaml']),
+                         [])
 
 
 if __name__ == '__main__':

@@ -207,13 +207,15 @@ pipeline = `difficulty.py`/`fe_combat.py`/`check.py`/`playtest/**`/`build.sh`/`w
 `.github/workflows/**`; content = `campaigns/**`/`build_campaign.py`/`portrait_tool.py`/`map_sprite_tool.py`/
 `ref_to_bust.py`; everything else incl. `tools/inject/**` + docs = shared) and `check_lane_ownership()`, run
 by the pre-commit hook + CI. The lane is read from the `inst/<track>` **branch name** (inherently
-per-worktree; `.git/config` is shared), `manchego.lane` config as fallback. A staged file owned by the other
-lane is blocked; **with no lane set, ANY lane-exclusive file is blocked** — so you can't author source loose
-on the primary checkout (the exact hole that bit us). `git commit --no-verify` is the deliberate-integration
-escape. CI enforces on `inst/*` PRs via `GITHUB_HEAD_REF`/`BASE_REF`. Consequence: each instance **must**
-work in its own `tools/worktree-setup.sh ../ms-<track>` worktree; the primary checkout is integration-only.
-Shared cross-lane constants (e.g. the weapon↔ITEM map) live in `tools/inject/decomp.py`, not either side's
-file. Issue #55. _Decided: 2026-06-19_
+per-worktree; `.git/config` is shared), `manchego.lane` config as fallback. **Enforcement is scoped to lane
+worktrees**: on `inst/<track>` a staged file owned by the *other* lane is blocked (`--no-verify` overrides;
+CI enforces on `inst/*` PRs via `GITHUB_HEAD_REF`/`BASE_REF`). The **primary checkout (`main`) is
+unrestricted** — it's the integration/solo tree where one person does one thing at a time, so there's no seam
+to cross; blocking it would only tax normal single-window work. The seam can only be *violated* when two
+instances run concurrently, and concurrency already **requires** a worktree per instance (two builds in one
+tree corrupt each other) — so enforcing exactly where worktrees exist covers the real risk. Shared cross-lane
+constants (e.g. the weapon↔ITEM map) live in `tools/inject/decomp.py`, not either side's file. Issue #55.
+_Decided: 2026-06-19_
 
 ---
 

@@ -71,21 +71,24 @@ cd fireemblem8u
 - If you're about to hardcode "braulo" or "ch03" in a `.c` file — stop. It belongs in YAML.
 - Code review rule: any C change that references a character by name, a chapter number, or a plot event is rejected
 
-## Parallel Tracks: lane ownership is ENFORCED (read before committing)
+## Tracks & the engine/content seam
 
-Content and pipeline run as two instances; the engine/content seam is enforced, not honor-system
-(`docs/decisions.md` → Seam enforcement; issue #55). **Bootstrap your own worktree FIRST** — it is
-the mandatory first action, not optional:
-- Content: `tools/worktree-setup.sh ../ms-content` (→ `inst/content`). Owns `campaigns/**`,
-  `tools/build_campaign.py` + the art tools.
-- Pipeline: `tools/worktree-setup.sh ../ms-pipeline` (→ `inst/pipeline`). Owns `tools/difficulty.py`,
-  `fe_combat.py`, `check.py`, `playtest/**`, `build.sh`, CI.
-- Shared (either lane): `tools/inject/**`, `docs/**`, `HANDOFF*`, `CLAUDE.md`, `Makefile`.
+Work splits into a **content** track (`campaigns/**`, `tools/build_campaign.py` + art tools) and a
+**pipeline** track (`tools/difficulty.py`, `fe_combat.py`, `check.py`, `playtest/**`, `build.sh`, CI).
+Shared by both: `tools/inject/**`, `docs/**`, `HANDOFF*`, `CLAUDE.md`, `Makefile`. Rationale +
+enforcement: `docs/decisions.md` → Seam enforcement (#55).
 
-`tools/check.py check_lane_ownership` (pre-commit + CI) **blocks** a commit that edits the other lane's
-files — and blocks ANY lane-exclusive file when you're not in a lane worktree (e.g. loose on `main`). If
-you need a change across the seam, coordinate via a GitHub issue; `git commit --no-verify` is the only
-(deliberate, rare) escape. Never commit the `fireemblem8u` submodule pointer.
+**This handoff/checklist routes by where you are** (run `git rev-parse --abbrev-ref HEAD`):
+- On **`main`** (the primary `manchego-stars` checkout) → the integration/solo tree. Read `HANDOFF.md`.
+  **No lane is enforced here** — edit anything; you're one person doing one thing at a time.
+- On **`inst/content`** / **`inst/pipeline`** (a worktree, opened as its own VS Code folder) → you ARE
+  that track. Read `HANDOFF-content.md` / `HANDOFF-pipeline.md` and stay in your lane:
+  `check.py check_lane_ownership` (pre-commit + CI) blocks editing the *other* lane's files
+  (`--no-verify` overrides). This is only needed when both instances run **at once** (two builds in one
+  tree corrupt each other), so each concurrent instance gets its own `tools/worktree-setup.sh ../ms-<track>`
+  worktree = its own VS Code window. Sequential work needs none of this — just use the main window.
+
+Never commit the `fireemblem8u` submodule pointer.
 
 ## Working Conventions (Definition of Done)
 

@@ -182,9 +182,13 @@ def _file_lane(path):
 
 
 def _lane_violations(lane, changed_files):
-    """(path, owner) for each changed file the current `lane` may NOT edit. A file owned by
-    the other lane is a violation; with no lane set, ANY lane-exclusive file is (forces
-    source authoring into a laned worktree). Shared files never violate."""
+    """(path, owner) for each changed file the current `lane` may NOT edit. Enforced only when
+    you are IN a lane -- i.e. a worktree on an inst/<track> branch, which is where two instances
+    run concurrently and could collide. The primary checkout has no lane: it's the unrestricted
+    integration/solo tree (only ever one of you there), so nothing is a violation. Shared files
+    never violate from either lane."""
+    if lane is None:
+        return []
     out = []
     for path in changed_files:
         owner = _file_lane(path)
@@ -249,20 +253,14 @@ def _changed_files():
 
 
 def check_lane_ownership(fail):
-    """Block a commit that edits across the engine/content seam (#55). Keyed on the
-    per-worktree `manchego.lane` (set by tools/worktree-setup.sh). `git commit --no-verify`
-    is the deliberate escape for a genuine integration/admin commit."""
+    """Block a commit that crosses the engine/content seam (#55) when you're in a lane worktree
+    (branch inst/<track>). The primary checkout is unrestricted integration. `git commit
+    --no-verify` overrides for a deliberate exception."""
     lane = _current_lane()
     for path, owner in _lane_violations(lane, _changed_files()):
-        if lane is None:
-            fail.append('lane: %s is %s-owned, but no manchego.lane is set here -- author it '
-                        'from your inst/%s worktree (tools/worktree-setup.sh), or '
-                        '`git commit --no-verify` for a deliberate integration commit'
-                        % (path, owner, owner))
-        else:
-            fail.append('lane: %s is %s-owned, but this is the %s lane -- coordinate via an '
-                        'issue instead of crossing the seam (--no-verify to override)'
-                        % (path, owner, lane))
+        fail.append('lane: %s is %s-owned, but this worktree is the %s lane -- coordinate via '
+                    'an issue instead of crossing the seam (--no-verify to override)'
+                    % (path, owner, lane))
 
 
 def main():

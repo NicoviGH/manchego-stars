@@ -68,6 +68,14 @@ if [ -z "$LANE" ]; then
     echo "         seam guard can identify this worktree (else lane-exclusive edits are blocked)." >&2
 fi
 
+# Idempotent: if the worktree already exists, reuse it (so this is safe to re-run / alias).
+if git worktree list --porcelain | grep -qx "worktree $(cd "$(dirname "$WT_PATH")" && pwd)/$(basename "$WT_PATH")" \
+   || [ -e "$WT_PATH/.git" ]; then
+    echo ">> worktree '$WT_PATH' already exists (lane: ${LANE:-NONE}) -- reusing it"
+    echo ">> ready. Open this folder in VS Code, or:  ( cd $WT_PATH && tools/build.sh test )"
+    exit 0
+fi
+
 echo ">> creating worktree '$WT_PATH' on branch '$BRANCH'  (lane: ${LANE:-NONE})"
 if git show-ref --verify --quiet "refs/heads/$BRANCH"; then
     git worktree add "$WT_PATH" "$BRANCH"

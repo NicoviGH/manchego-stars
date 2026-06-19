@@ -13,8 +13,8 @@ not this file. Don't clobber the content track's `HANDOFF-content.md`.
 ## Seam enforcement landed (2026-06-19, #55) — READ IF YOU RUN PARALLEL
 The first parallel run had violations (pipeline edited content's `build_campaign.py`) because the
 seam was honor-system and no worktree isolation was actually engaged. Now **enforced**:
-- `check.py check_lane_ownership` (pre-commit + CI) blocks cross-lane edits; with no lane set it
-  blocks ANY lane-exclusive file (can't author loose on `main`). Lane = `inst/<track>` branch name.
+- `check.py check_lane_ownership` (pre-commit + CI) blocks cross-lane edits **when you're in a lane
+  worktree** (branch `inst/<track>`). The primary `main` checkout is unrestricted integration/solo work.
 - `worktree-setup.sh` derives/announces the lane + ensures the hook runs. **Each instance MUST work
   in its `../ms-<track>` worktree** (CLAUDE.md §Parallel Tracks; decisions.md §Seam enforcement).
 - The shared weapon↔ITEM map moved to `tools/inject/decomp.py`; **#53 weapon work never touches
