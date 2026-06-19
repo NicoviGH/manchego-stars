@@ -372,11 +372,14 @@ local function procFingerprint()
     return fp
 end
 
--- smoke <prologue>: prologue is reachable straight from New Game (bootToMap). Later
--- chapters need a per-chapter save-state checkpoint (states/ infra) -- deferred.
-scenarios.smoke = function()
-    if not bootToMap() then return result("FAIL", "never reached the map") end
-    local startChapter = chapter()
+-- The idle drive loop, shared by every smoke_* scenario: from the moment we are on a
+-- chapter's map (startChapter = the host slot), idle every player unit and just end each
+-- turn, sampling state into a frame-age-trimmed ring and asking liveness.classify each
+-- cycle. This is a STABILITY net: PASS = no crash/soft-lock over the run, whether it
+-- ended in a clean terminal OR simply survived the turn budget still cycling (an idle
+-- party usually can't force a terminal, so budget-survival is the normal healthy
+-- outcome -- not a warning). FAIL = soft-lock. Completability is the clear-bot's job.
+local function smokeDrive(startChapter)
     local cfg = { softlock_frames = 2400 }   -- ~40 emulated-sec; >> a slow enemy phase
     local budgetTurns = 30
     local snaps = {}
@@ -406,8 +409,8 @@ scenarios.smoke = function()
         end
         if turn() > budgetTurns then
             shot("smoke-budget")
-            return result("INCONCLUSIVE",
-                string.format("alive after %d turns, no terminal", budgetTurns))
+            return result("PASS", string.format(
+                "survived %d turns, no crash/soft-lock (no terminal)", budgetTurns))
         end
         -- Drive one small step: idle the player phase (just end the turn); otherwise
         -- nudge dialogue / phase interludes along. Sampling stays continuous so an
@@ -419,7 +422,16 @@ scenarios.smoke = function()
         end
         wait(8)
     end
-    return result("INCONCLUSIVE", "step cap reached without a terminal")
+    -- Unreachable in practice (budgetTurns trips first); a backstop if turns somehow
+    -- never advance past the budget yet classify never sees a freeze.
+    return result("FAIL", "step cap reached without a terminal or budget")
+end
+
+-- smoke: prologue is reachable straight from New Game (bootToMap). Later chapters need
+-- their own "reach the map" lead-in (smoke_ch01) or a save-state checkpoint (deferred).
+scenarios.smoke = function()
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    return smokeDrive(chapter())
 end
 
 -- Play ch00 to the boss kill and wait out the ending scene. Returns true once
@@ -502,14 +514,14 @@ scenarios.goodberry = function()
     result("PASS", "Goodberry item menu captured (see screenshots)")
 end
 
--- CH01: ride the ch00 win into chapter slot 2 and smoke the ch01 entry:
--- the ch00 guests leave the party (DISA), the prep screen opens (SALLYCURSOR,
--- via the PREP event command), Fight! hands over control, and the deployed
--- count equals the 4-slot field-parity cap (the ally UnitDefinition template).
-scenarios.ch01 = function()
-    if not winCh00() then return end
+-- Reach the ch01 map: ride the ch00 win into chapter slot 2, A-tap through the
+-- post-chapter save + Beat-1 scene to the prep screen, then Fight! into the phase.
+-- Returns true once control is on the ch01 map; false (with its own FAIL logged)
+-- otherwise. Shared by scenarios.ch01 (entry assertions) and scenarios.smoke_ch01.
+local function reachCh01Map()
+    if not winCh00() then return false end
     if not waitFor(function() return chapter() == 2 end, 1800) then
-        return result("FAIL", "chapter slot 2 never loaded after the ch00 win")
+        result("FAIL", "chapter slot 2 never loaded after the ch00 win"); return false
     end
     log("in ch01 (chapter slot 2); clicking through the post-chapter save menu")
     -- The post-chapter save menu sits between MNC2 and the ch01 beginning
@@ -538,7 +550,7 @@ scenarios.ch01 = function()
                     i, p, ru32(a + 0x30), ru32(a + 0x38)))
             end
         end
-        return result("FAIL", "prep screen never opened (PREP event cmd)")
+        result("FAIL", "prep screen never opened (PREP event cmd)"); return false
     end
     wait(180) -- let the preparations menu draw
     shot("ch01-prep-menu")
@@ -559,10 +571,17 @@ scenarios.ch01 = function()
     end, 1200)
     if not fighting then
         shot("ch01-prep-stuck")
-        return result("FAIL", "could not leave preparations via Fight!")
+        result("FAIL", "could not leave preparations via Fight!"); return false
     end
     wait(120) -- phase intro
     shot("ch01-map")
+    return true
+end
+
+-- CH01: reach the ch01 map, then assert the entry invariants -- the ch00 guests left
+-- the party (DISA), and the deployed count equals the 4-slot field-parity cap.
+scenarios.ch01 = function()
+    if not reachCh01Map() then return end
     if blue(CHAR_HLIN) or blue(CHAR_SCRAMSAX) then
         return result("FAIL", "ch00 guests still in the party in ch01")
     end
@@ -594,6 +613,13 @@ scenarios.ch01 = function()
     end
     result("PASS", string.format(
         "ch01 entered: preps shown, guests gone, %d-unit party fields exactly 4", party))
+end
+
+-- smoke_ch01: extend the stability net to the first authored chapter (#21) -- reach the
+-- ch01 map via the prologue-clear lead-in, then idle-drive it to a clean terminal.
+scenarios.smoke_ch01 = function()
+    if not reachCh01Map() then return end
+    return smokeDrive(chapter())
 end
 
 -- CH01WIN: the default lord (blind A-taps pick Braulo) marches on the camp,

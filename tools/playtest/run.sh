@@ -112,15 +112,11 @@ fi
 # record* now LOADS a checkpoint (no grind), so its deadline is short.
 FPS=240; VSYNC=0; DEADLINE_S=420
 case "$SCENARIO" in record*) FPS=60; VSYNC=1; DEADLINE_S=300 ;; esac
+# smoke_* plays a full chapter (lead-in + up to a 30-turn idle budget) -> longer wall.
+case "$SCENARIO" in smoke*) DEADLINE_S=600 ;; esac
 # PT_FPS overrides the rate. 60fps+videoSync is only needed to capture smooth cutscene
 # FADES; verification captures of static text/boxes (sign, death quote) read fine at top
 # speed, so `PT_FPS=240 ... recordfix` runs ~4x faster.
 if [ -n "${PT_FPS:-}" ]; then FPS="$PT_FPS"; [ "$PT_FPS" -ge 240 ] && VSYNC=0; fi
 run_mgba "$SCENARIO" "$FPS" "$VSYNC" "$DEADLINE_S"
-case "$VERDICT" in
-    *PASS*) exit 0 ;;
-    # smoke net (#49): alive past the turn budget with no terminal -- not a crash, so it
-    # must not red a gate, but it wants a human look (never silently "healthy").
-    *INCONCLUSIVE*) echo "WARN: INCONCLUSIVE -- ran the budget with no terminal; needs a look"; exit 0 ;;
-    *) exit 1 ;;
-esac
+case "$VERDICT" in *PASS*) exit 0 ;; *) exit 1 ;; esac

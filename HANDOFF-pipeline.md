@@ -7,15 +7,15 @@ the lane guard is `check.py check_lane_ownership`). Seam enforcement (#55) + par
 **Shared builds/gotchas/rules → `HANDOFF.md` + `CLAUDE.md`; this file holds only my current state +
 pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
 
-## Now (2026-06-19) — parity engine live; playtest smoke net underway (liveness brick landed)
-- **#49 playtest platform started — smoke liveness net** (decisions.md §Playtest platform first brick). The
-  pure stability classifier `tools/playtest/liveness.lua` + `test_liveness.lua` (6 asserts) **landed TDD,
-  green in `make test`** (gated on `lua`; `brew install lua` done on this box). Design: a generic driver boots
-  any reachable chapter, idles all units + ends each turn, asserts a clean terminal with no crash/soft-lock —
-  PASS / FAIL / INCONCLUSIVE. **Next brick:** the smoke driver as a `harness.lua` scenario (`scenarios.smoke*`)
-  reusing the in-scope primitives + `liveness.lua` (no `io_core` extraction — one file = single source of
-  truth; YAGNI till a non-coroutine consumer needs it) + a `run.sh smoke <prologue|...>` runner,
-  integration-verified on a built ROM. Then the stability fuzzer / LLM-player.
+## Now (2026-06-19) — parity engine live; playtest smoke net working on prologue + ch01
+- **#49 smoke liveness net LANDED & verified** (decisions.md §Playtest platform first brick). Pure classifier
+  `liveness.lua` + `test_liveness.lua` (6 asserts, TDD, in `make test`; needs `lua` — `brew install lua`).
+  Driver is a `harness.lua` scenario (`smokeDrive` + `scenarios.smoke` / `scenarios.smoke_ch01`) reusing
+  in-scope primitives (no `io_core` extraction — one file = single source of truth; YAGNI). `reachCh01Map`
+  factored out of `scenarios.ch01` (shared lead-in, no dup). **2 outcomes:** PASS = no crash/soft-lock over
+  the run (clean terminal OR survived the 30-turn budget); FAIL = soft-lock/crash. Verified on a built ROM:
+  `run.sh smoke` + `run.sh smoke_ch01` both PASS (idle party survives 30 turns on both — completability is
+  the clear-bot's job); `ch01`/`win` unregressed. ch02+ needs save-state checkpoints (deferred).
   NB local full builds: go through `tools/build.sh` (or apply its `#!/bin/python3`→`env python3` sed) — a
   bare `make` dies `Error 126` on the decomp's Linux-shebang gfx tools until that fix is applied.
 - **#48 parity engine + informative CI curve** are live: `make difficulty` runs the campaign curve in CI
@@ -31,11 +31,14 @@ pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
   Ch6 (→ our ch07). FE8 Ch13 (→ our ch08) is the lone deferred reference.
 
 ## Next (priority order)
-1. **Playtest smoke net — continue** (#49, IN PROGRESS; see "Now"): the smoke driver as a `harness.lua`
-   scenario + `run.sh smoke` runner, integration-verified on a built ROM. Then the stability fuzzer
-   (randomized/seeded inputs) and the LLM-player. ch02+ reachability needs per-chapter save-state
-   checkpoints (reuse `states/` infra), deferred till those chapters exist; Prologue is reachable from New
-   Game now (Ch01 needs a prologue-clear lead-in, like `ch01win`).
+1. **Greedy clear-bot** (#49, the spine's next brick): a `harness.lua` scenario that actually *plays* a
+   chapter with REAL combat (target → move adjacent → attack → advance toward boss → boss-kill/seize) and
+   asserts a win — completability coverage the idle smoke net can't give, and the precursor to the LLM-player.
+   More greenfield than it looks: the existing `win`/`winCh00` *cheat* (`pokeFrail` the boss, hardcode
+   `CHAR_SEPHEK`), so a genuine clear needs generic boss detection + real-combat strategy (the move/attack
+   primitives `marchToward`/`chooseAttack`/`moveUnit` already exist). Then the stability fuzzer (seeded random
+   inputs over the same I/O layer). ch02+ smoke/clear coverage needs per-chapter save-state checkpoints
+   (reuse `states/` infra), deferred till those chapters are built.
 2. **#53 tail — FE8 Ch13 reference** (→ our ch08, deferred/optional): bigger than billed — needs ~11 *standard*
    weapons modeled (silver/steel/killer/slim/short-spear/elfire/zanbato/swordslayer/purge), not a few exotics.
    ch08 is a scripted-defeat objective (never CI-gated), so it's informational polish; do it only if idle.
