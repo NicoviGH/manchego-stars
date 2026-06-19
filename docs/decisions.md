@@ -609,6 +609,25 @@ screen keeps vanilla's "Defeat O'Neill") from the chapter YAML. Extend the glyph
 per new chapter title.
 _Decided: 2026-06-09_
 
+**Seize-map legibility: the seize tile must read as a seize point and the boss sits on it — a level-design checkpoint**
+Vanilla FE8 doesn't *prompt* a seize. The goal window for `GOAL_TYPE_SEIZE` prints a static
+label and returns with no counter ([player_interface.c:1585-1592](../blob/main/fireemblem8u/src/player_interface.c#L1585-L1592)); the actual teaching is **spatial** — the Seize command is tile-gated to a
+`TERRAIN_THRONE`/`TERRAIN_GATE` tile (`UnitActionMenu_CanSeize` → `TILE_COMMAND_SEIZE`,
+`src/bmmenu.c`), that tile is a visually unmistakable throne/gate, and the **boss conventionally
+stands on it**, so kill → obvious empty special tile → Seize is one square. There is no
+auto-tutorial (only the player-initiated Guide, `src/bmguide.c`). The label alone does **not**
+carry it. So every Seize-objective map must pass a **design-review checkpoint**, verified per map
+as a line on the chapter's vertical-slice checklist and re-checked at playtest:
+- **(a)** the seize tile uses distinct Seize terrain (throne/gate-style) so it reads as a special
+  tile *and* the tile-info readout is not "Plain"; and
+- **(b)** the boss is placed **on** the seize tile (or the tile is otherwise made unmistakable the
+  moment the boss dies), so killing the boss self-evidently reveals where to go.
+
+A dialogue nudge is at most belt-and-suspenders, never the fix. **Ch1 (The Iron Trail) currently
+fails this** — the camp tile reads "Plain" and the boss stands away from it → go-fix tracked in
+**#57**. Apply the checkpoint to the Prologue and every future Seize map.
+_Decided: 2026-06-19; from the brother's v0.1.0 playtest (#56 → #57)._
+
 **Title banner theme: "glacial blue", a pure PALETTE recolor (no pixel edits).**
 The banner's whole look is palette data: letters ride `gPal_08A07C58`'s green tint
 pair (Status config `0x80`; `gPal_08A07AD8` is the bonus-claim green ramp), and the
