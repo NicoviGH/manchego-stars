@@ -1,10 +1,11 @@
 # Handoff — Manchego Stars · live state + pointers (backlog lives in GitHub issues, not here)
 
 **Date:** 2026-06-18 (session 15)
-**Session focus:** Built the **difficulty engine** (#45 item 1) on a tested combat core, then landed
-**donor-base inheritance in the build** (#45 item 2) so the ROM cast actually reaches vanilla Ch1
-parity — `make` green, ROM rebuilt. Two commits: `6a40cb4` (engine), then this one (item 2 + a
-hermetic-read fix that corrects several units the engine had misread).
+**Session focus:** #45 items 1–3a. Built the **difficulty engine** (item 1) on a tested combat core,
+landed **donor-base inheritance in the build** (item 2, + a hermetic-read fix), then built the
+**per-lord survivability-floor solver** (item 3a) and decided its design with Nicolas (target locked
+**3.5**). `make` green, ROM rebuilt. Three commits: `6a40cb4` (engine), `f380696` (donor-base +
+hermetic fix), `7bb3efc` (floor solver). **Item 3 engine wiring (3b+3c) is the pickup — see Next.**
 
 ## This session (shipped)
 - **`tools/fe_combat.py`** — the FE8 combat math (AS, doubling, triangle, hit, damage incl.
@@ -23,7 +24,11 @@ hermetic-read fix that corrects several units the engine had misread).
   (Gilliam/Neimi/Moulder/Vanessa) ride portrait slots the build overwrites, so working-tree reads
   showed them *naked* — which had made the engine (and `6a40cb4`'s oracles) understate
   Wolfram/Pinky/sclorbo/prof-rbg. Oracles corrected; tests now pass clean-tree AND dirty-tree.
-- **Tests gated:** `make test` + `check.py`/CI/pre-commit run all `tools/test_*.py` (45 total).
+- **Lord-floor solver (item 3a):** `difficulty.py --lord-floor [--target/--def-cap/--res-cap/--hp-cap]`
+  — `bulk_durability()` (worst-case, dodge ignored) + `lord_floor_delta()` (cheapest HP/Def/Res to a
+  target; Res vs magic threats, Def vs physical; never Spd/Lck; `reached=False` flags effective-weapon
+  cases stats can't fix). Defaults (target 3.5, caps 4/4/12) reproduce the hand-set +7/+4. 8 tests.
+- **Tests gated:** `make test` + `check.py`/CI/pre-commit run all `tools/test_*.py` (58 total).
 - **Retired the old one-off `balance_report.py`** (superseded by `difficulty.py`/`fe_combat.py`).
 
 ### Corrected Ch1 parity (the alpha-feedback chapter)
@@ -41,9 +46,25 @@ the per-lord survivability floor's target (#45 item 3).
    (worst-case rounds-to-down, hits assumed to connect — a must-survive lord shouldn't lean on dodge
    RNG); target **~3.5** from "survive a chokepoint gang-up + a reaction turn", bounded below the
    natural tanks. Defaults reproduce the hand-set **+7/+4** on shamans; Braulo/Wolfram → 0.
-   **Remaining (pending Nicolas's param sign-off):** generate the per-lord delta table at build time
-   + a campaign-agnostic engine hook applying the chosen lord's delta at chapter start (keyed on the
-   lord-select pid). **One-time** (computed at Ch1, fades as the party levels).
+   **Target LOCKED at 3.5** (Nicolas, this session). Remaining = the engine wiring (do 3b+3c
+   together; emitting 3b without 3c is dead data):
+   - **3b (build-time table, low-risk):** emit `gLordFloorDeltas[]` right after the
+     `gLordSelectCandidates[]` emission (`build_campaign.py` ~L3514, in `events_udefs.c`), one row
+     per candidate (same menu order) = `difficulty.lord_floor_delta(...)` @target 3.5 vs Ch1 enemies
+     (use `difficulty.load_field(campaign,'ch01')`; **local-import difficulty inside the fn** —
+     difficulty imports build_campaign, so avoid the top-level cycle). Verify generated rows vs the
+     (unit-tested) solver; Ch1 → marty/mees +7HP/+4Def, tanks 0.
+   - **3c (engine hook, careful):** campaign-agnostic C, mirror `_inject_lord_select_engine`'s
+     string-replace+guard idiom. At chapter start, gated by a permanent "applied" flag (grab a free
+     one near `LORDSEL_FLAG_BASE=0xF0`), find the chosen lord via `LordSelect_GetPid()` (already in
+     eventinfo.c), look up its `gLordFloorDeltas` row, add to `unit->maxHP`/`curHP`/`def`/`res`
+     (Unit fields confirmed in `include/bmunit.h`). Apply-ONCE so it bakes into the saved unit and
+     **fades as it levels**. Register the new guard in `tools/check.py check_engine_guards_present`.
+   - **3c MUST be PLAYTEST-verified** (`tools/playtest/`): build-green won't prove the bump persists
+     across the Ch1→Ch2 transition / doesn't double-apply. Pick a frail lord (e.g. marty), confirm
+     +7HP at Ch1 start and that it carries into Ch2. Open question to resolve first: the exact
+     chapter-init hook point that runs once after units load (the cursor guard hooks
+     `GetPlayerStartCursorPosition`, turn-1 — semantically wrong for stats; find the proper init fn).
 2. **Item 4** — `pinky.yaml` → `pcs/` (he's the 8th PC + a lord candidate). **Item 5** — recruit
    schedule to match vanilla cadence (#17).
 3. **#46** lord-select UX (needs Nicolas's UI direction). **#47** alpha-feedback tracker.
