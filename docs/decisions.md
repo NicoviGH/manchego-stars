@@ -1196,6 +1196,24 @@ _Wired 2026-06-17. `make` green, `verify_text` 3404/0, ch01win PASS (ending runs
 
 ---
 
+**Sephek Kaltro arc — distinct from Ravisin; ch02 plants the breadcrumb; reckoning held for Act II.**
+Sephek (ch00 prologue boss, escapes undead) and **Ravisin** (ch05 "The Elven Tomb" frost-druid boss,
+the beast-awakener) are **separate villains and stay separate** — both serve Auril (canon: Sephek is a
+frost-druid spirit in a drowned mariner's body, book p.23-24), but Ravisin's ch05 stays our clean first
+boss kill and Sephek is never folded into it (that would spend his reserved drowned-mariner death-reveal
+in her fight). The **ch02-targos-inn** ending plants his first breadcrumb: the frozen body is one of his
+sacrifice-lottery executions; the town blames the druids' rumor, while **Rootis** privately recognizes
+the dagger-of-ice M.O. from **Hlin's briefing** (the party didn't witness ch00 — that prologue deploys
+Hlin + Scramsax only, so Rootis knows the method, not the man). No fight here. His **reckoning** is held
+for **Act II**: the book reserved the Torrga Icevein caravan as his payoff venue, but ch00 already uses
+that caravan as its setting, so his true death gets a fresh Act-II setting — **provisionally a secondary
+boss on a multi-boss map** (vanilla precedent: FE8 Ch15 Caellach + Valter, the Final chapter's Demon King
++ Lyon; our own ch05 already runs Ravisin + the White Moose), firmed when the back-half DM notes arrive.
+Don't spend his death-reveal imagery before then.
+_Decided 2026-06-19 with Nicolas (interactive story + dialogue pass for ch02-targos-inn)._
+
+---
+
 ## Open Questions (not yet decided)
 
 See `docs/PRD.md §13` for the full list. Key unresolved items:

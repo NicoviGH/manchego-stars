@@ -17,9 +17,10 @@ parity_reference: "FE8 Ch2"   # #48 enemy-pressure parity bar — The Protected 
 narrative: >
   The party escorts the sled west toward Targos and is ambushed on the open road
   by a raider band preying on Ten-Towns traffic. In Targos they find a frozen body
-  — a human sacrifice to Auril — and glimpse a frost druid slipping through the
-  crowd, spreading word that Ten-Towners must appease the Frostmaiden. Rumor of the
-  Maer Monster off Bremen surfaces at the inn.
+  — the town reads it as a sacrifice the frost druids demand to appease Auril, but
+  Rootis recognizes the dagger-of-ice kill as Sephek Kaltro's, the ch00 killer who
+  was meant to be dead. Rumor of the Maer Monster off Bremen surfaces at the inn;
+  the druids' trail runs north, and the party follows it toward Lonelywood.
 
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
@@ -213,14 +214,39 @@ events:
     type: cutscene
     ea_file: events/ch02-targos-inn.ea
     description: >
-      Targos arrival. The frozen-sacrifice discovery. A frost druid is glimpsed in
-      the crowd spreading Auril's word, then slips away (seeds the Ch4 frost-druid
-      fight — no combat here). Inn scene: only RBG, Marty, and Meesmickle take rooms;
-      Braulo holes up in his shell, Rootis and Sclorbo camp in the snow, Wolfram
-      re-plates the raid's battle-damage — hammering the claw-gouges and the captain's
-      steel out of the Rolling Cheddar's siding it was already armored with in ch01
-      (plays only if the sled survived). Overheard rumors: Messie the Maer Monster off
-      Bremen; frost druids north near Lonelywood. Party decides to head north first.
+      Targos arrival (post-victory). The frozen-sacrifice discovery: the town reads the
+      body as the frost druids' doing — Auril is owed, appease her — while Rootis privately
+      recognizes the dagger-of-ice kill as Sephek Kaltro's, the ch00 killer Hlin couldn't
+      bury (a breadcrumb — he's alive and moving; no combat here; see docs/decisions.md
+      §Story → Sephek arc). The inn/camp night is folded into one narration card (FE8 can't
+      stage five faces and ch02 has no house-text slot yet): RBG/Marty/Meesmickle take rooms,
+      Braulo shells up, Rootis + Sclorbo camp, Wolfram re-plates the raid's battle-damage on
+      the Rolling Cheddar (plays only if the sled survived — armored since ch01). The fork: a
+      Messie/Bremen bounty (south, money) vs the druids' trail (north, the job) — RBG calls it
+      north. Seeds the Maer Monster (ch06) and the Lonelywood/druid line. LOCKED dialogue-pass
+      text below (co-written with Nicolas 2026-06-19). PENDING (not this commit): ch02 host
+      wiring + the eventscript that consumes this script.
+    script:                     # LOCKED 2026-06-19 (dialogue pass, co-written with Nicolas)
+      - location_card: "Targos"
+      # (The square. A body sits frozen against the well, rimed white. A Targos fisher
+      #  hangs back, won't go near it. Minor NPC → generic FE8 villager face at wiring;
+      #  npc-bench texture: brittle fisher.)
+      - targos-fisher: >-
+          Don't cut him down. His name was drawn, and the cold came for him —
+          that's how she knows we're listening.
+      - beat_break: B           # the fisher clears; the party gathers at the body, Rootis crouches in
+      # (Rootis reads the kill — being made of the cold himself, he feels how it was done.)
+      - rootis: "Everyone here says Auril. But look — one clean cut, iced from within."
+      - rootis: "That's the man Hlin warned us about. The dagger of ice."
+      - beat_break: C           # nightfall; a narration card over the camp (no staged faces)
+      - narration: >-
+          Three took rooms. The rest took the cold: a shell, a drift, and Wolfram's
+          hammer ringing the sled till dawn.
+      - beat_break: D           # morning; the party weighs the road ahead
+      - prof-rbg: "My rats whisper coin off Bremen — some lake-beast, 'Messie,' swamping boats. Very Gouda."
+      - prof-rbg: >-
+          But the trail worth chasing runs north — the druids, to Lonelywood.
+          Let the lake-beast keep. We follow the rumor.
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
@@ -231,11 +257,13 @@ post_chapter:
 
 # ── Design Notes ─────────────────────────────────────────────────────────────────
 design_notes: >
-  FE8 base: "The Protected" (DefeatAll + defend-in-place). The frost druid is a
-  cutscene seed only — FE8 withholds enemy casters until mid-game, and our first
-  enemy caster is the Ch4 frost-druid boss; introducing one here would break the
-  early physical-triangle teaching ramp. Wolfram's metal-craft is his secondary
-  signature beat: the ch01 ending already armored the Rolling Cheddar (his forge-night),
+  FE8 base: "The Protected" (DefeatAll + defend-in-place). No enemy caster on the field —
+  FE8 withholds casters until mid-game and our first is the ch05 frost-druid boss (Ravisin);
+  an early one would break the physical-triangle teaching ramp. The ending's frozen body is a
+  *story* seed only (no combat here): the town blames the druids' sacrifice rumor, while Rootis
+  clocks it as Sephek's dagger-of-ice kill — a breadcrumb for his Act-II reckoning, distinct
+  from Ravisin (see docs/decisions.md §Story → Sephek arc). Wolfram's metal-craft is his
+  secondary signature beat: the ch01 ending already armored the Rolling Cheddar (his forge-night),
   so the Ch2 inn payoff is him re-plating the raid's battle-damage — and it plays only
   if the sled survived. Losing the sled forfeits the chest + reward: that is the
   chapter's "protect" stake.

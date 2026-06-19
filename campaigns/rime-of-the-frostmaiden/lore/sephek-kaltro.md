@@ -2,8 +2,11 @@
 
 > Prologue boss; recurring villain (escapes the cold open via misty step). **Mechanics
 > live in [`chapters/ch00-prologue-a-dagger-of-ice.yaml`](../chapters/ch00-prologue-a-dagger-of-ice.yaml).**
-> His true death is reserved for his payoff chapter (the Torrga Icevein caravan, held in
-> reserve) — see "Imagery budget" below.
+> The ch00 prologue already uses Torrga Icevein's caravan as its *setting*, so his true death
+> gets a fresh **Act-II** venue — provisionally a secondary boss on a multi-boss map, firmed
+> when the back-half DM notes land (see `docs/decisions.md` §Story → Sephek arc). He is **distinct
+> from Ravisin** (the ch05 frost-druid boss); ch02 plants his first breadcrumb (Rootis IDs his
+> kill at Targos). Death-reveal imagery still reserved — see "Imagery budget" below.
 
 ## Concept
 
