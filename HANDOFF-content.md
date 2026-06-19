@@ -25,43 +25,42 @@ You are the **Content-track** instance for Manchego Stars (trunk-based, your own
 - `tools/inject/engine_hooks.py`, `tools/inject/decomp.py` (shared — propose changes, don't fork)
 - `tools/difficulty.py`, `tools/fe_combat.py`, `tools/check.py`, `tools/playtest/**`, CI
 
-## Last session (2026-06-19, pm)
-**Ch2 rear-ambush beat drafted (not locked) + a Ch2/Ch1 drift bug surfaced.** Ran the
-`dialogue-pass` prep for `ch02-rear-ambush` (read the Wolfram/Braulo/RBG §Voice bibles + the FE8
-reinforcement-bark cadence in `texts.txt` — model line is the terse `"We're surrounded."`). Brought
-speaker+line variants; **nothing locked** (Nicolas paused on the inn question, below). No commits
-this session.
+## Last session (2026-06-19, pm) — all pushed to main, green
+**Ch2/Ch1 inn drift bug FIXED + a worktree commit-hook blocker fixed + the worktree workflow rule
+codified.** Three commits on `main` (`421fe98..35debda`):
+- **`cc3207c` fix(ch02) (#22)** — the drift bug is resolved. The Targos-inn beat no longer claims
+  Wolfram *first-armors* the sled (it's already armored at the end of Ch1 — `ch01` ending beats C–D,
+  his forge-night, RBG names the *Rolling Cheddar*). Rewrote all three spots in
+  `ch02-cold-welcome.yaml`: `soft_penalty_on_sled_loss` (now just chest + gold forfeit), the
+  `chapter_end` inn event description (Wolfram **re-plates the raid's battle-damage**, plays only if
+  the sled survived), and `design_notes`. Flavor-only fields → ROM-neutral; `make check` clean.
+- **`dcbb247` fix(build)** — `vanilla_decomp_text` now strips inherited git env. `git -C fireemblem8u
+  show HEAD:…` was exiting 128 under the **pre-commit hook in a worktree** (git sets `GIT_DIR` for
+  hooks, which overrides `-C` discovery → resolves against the superproject). This had been blocking
+  *every* commit from `../ms-content` / `../ms-pipeline`. Reproduced + verified the fix under a
+  simulated hook env.
+- **`35debda` docs** — Nicolas's rule: **"work the content/pipeline track" always means cd into that
+  track's worktree first, never `main`.** Rewrote the CLAUDE.md routing (dropped the old "sequential
+  work needs none of this" carve-out), aligned both HANDOFF kickoffs, recorded it in `decisions.md`.
 
-**⚠ DRIFT BUG found — fix before the inn beat.** The Ch2 YAML still has **Wolfram armoring the
-sled in the Targos inn cutscene**, but the sled is **already armored at the END of Ch1** (shipped
-v0.1.0 canon: `ch01-the-iron-trail.yaml` ending beats C–D — Wolfram bites an ingot, asks Hruna for
-the iron + a forge-night; RBG over-engineers & names it the *Rolling Cheddar*). So `ch02` contradicts
-shipped Ch1 in **two** places:
-- the `ch02-targos-inn` event description: *"Wolfram forges armored siding onto the sled from the
-  ch01 iron ingots"* — he can't first-armor a sled that's already armored.
-- `soft_penalty_on_sled_loss`: *"Wolfram's armoring beat is cut from the inn cutscene"* — that
-  beat doesn't exist to cut.
-These need a real replacement: a new inn payoff for Wolfram (e.g. he *repairs raid battle-damage* /
-re-plates a gouged side, not first-time armoring) AND a real soft-penalty stake for losing the sled
-(chest + post-chapter gold forfeit already stands; the "armoring cut" line must go).
+**Not done (Nicolas's call, teed up below):** the `ch02-rear-ambush` speaker pick and the
+`ch02-targos-inn` beat intent — both surfaced with drafts/options, neither locked.
 
 ## Next (priority order)
-1. **Fix the Ch2 inn drift (above) FIRST** — it's a correctness bug in `ch02-cold-welcome.yaml`,
-   not just prose. Rewrite the `ch02-targos-inn` event description + `soft_penalty_on_sled_loss`
-   so neither claims a first-time armoring. Clean rewrite, no "changed on DATE" banners.
-2. **Lock `ch02-rear-ambush`** (turn-3 combat bark; #22) — decision pending: **speaker is a
-   toss-up between Wolfram and Braulo** (my earlier "Wolfram pre-echoes his armoring" pitch is
-   DEAD — the armoring is a Ch1 beat). Drafted, budget = 1–2 lines / 1 screen, end on the order:
-   - **Wolfram W3** (leanest, matches FE8): "Wolves at our backs — the sled." / "Hold here. I've got the rear."
-   - **Braulo B1** (decisive settle-it): "More of them, behind the sled." / "Turn and hold the line. That's the work now."
-3. **`ch02-targos-inn`** (chapter end) — the big multi-beat scene (frozen-sacrifice discovery,
-   frost-druid glimpse = Ch4 seed, inn room/camp split, **Wolfram inn payoff per #1**, Maer Monster
-   + Lonelywood rumors). **Needs Nicolas's beat intent before drafting.**
+1. **Lock `ch02-rear-ambush`** (turn-3 combat bark; #22) — **decision pending: speaker is Wolfram
+   vs Braulo** (asked Nicolas at end of last session; not yet answered). Drafted + voice-grounded,
+   budget = 1–2 lines / 1 screen, ends on the order. On his pick → run `dialogue-pass` to finalize
+   voice, then commit the lock into `ch02-cold-welcome.yaml`'s rear-ambush event.
+   - **Wolfram** (leanest, matches FE8's terse reinforcement barks): "Wolves at our backs — the sled." / "Hold here. I've got the rear."
+   - **Braulo** (decisive settle-it leader beat): "More of them, behind the sled." / "Turn and hold the line. That's the work now."
+2. **`ch02-targos-inn`** (chapter end) — the big multi-beat scene (frozen-sacrifice discovery,
+   frost-druid glimpse = Ch4 seed, inn room/camp split, **Wolfram's re-plating payoff per the fix
+   above**, Maer Monster + Lonelywood rumors). **Needs Nicolas's beat intent before drafting.**
    Then **ch02 host wiring** (not built yet — MNC2 drops to vanilla Ch3) + Vellynne cutscene
    portrait (#19) + in-game motion review.
-4. Supporting content as Ch2 needs them: enemy YAML pass #18, NPC/recruit stubs #17, recruit
+3. Supporting content as Ch2 needs them: enemy YAML pass #18, NPC/recruit stubs #17, recruit
    schedule (#45 item 5), world-map unlock #29.
-5. Art passes layer on already-playable slices: portraits #19, overworld sprites #38.
+4. Art passes layer on already-playable slices: portraits #19, overworld sprites #38.
 
 ## Watch out
 - **Writing any dialogue → invoke the `dialogue-pass` skill first.** Voice grounding lives in the
