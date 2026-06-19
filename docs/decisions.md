@@ -537,6 +537,25 @@ _Decided: 2026-06-09 (titlecard scenario added 2026-06-09: opens the map-menu St
 screen — which decompresses the title card — and screenshots it, so recomposed titles
 get eyeballed without a manual run)_
 
+**Playtest platform first brick = a generic SMOKE LIVENESS net, not more hand-scripted scenarios (#49).**
+The #49 spine is `I/O harness → stability fuzzer → LLM-player`. The first brick is a generic driver that
+boots any reachable chapter, **idles every player unit and just ends the turn each phase**, and asserts the
+chapter reaches a clean terminal **with no crash/soft-lock/hang** — most chapters terminate in a *loss*
+(idle party overwhelmed), which for a *stability* net is a fine clean terminal. The point is to exercise
+load + every phase/event path to a clean end as content lands (#20–#28), catching the boot/soft-lock/text-
+decoder-runaway class — not to win (winning is the next brick, a greedy clear-bot). **Three outcomes:**
+clean terminal = PASS (exit 0); crash/soft-lock = FAIL (exit 1); ran the turn budget still-alive =
+INCONCLUSIVE (exit 0 + loud WARN, never silently "healthy"). The stability verdict is a **pure function over
+state snapshots** (`tools/playtest/liveness.lua`: `{frame,turn,faction,hpsum,procfp,chapter_advanced,
+gameover}` series → `LIVE|TERMINAL_WIN|TERMINAL_LOSS|SOFTLOCK`) so it is **unit-tested without an emulator**
+(`test_liveness.lua`, run by `make test`) — soft-lock = no change in `{turn,faction,hpsum,procfp}` for
+`softlock_frames` while input is being fed; budget-exhaustion and a wedged emulator live outside the pure
+verdict (driver → INCONCLUSIVE; run.sh wall-clock → ERROR). This makes `lua` a **dev dependency** (macOS:
+`brew install lua`; `make test` skips the Lua tests with a notice when it's absent). The harness's existing
+I/O primitives (memory reads, state accessors, unit access, input, save/load) are being lifted into a shared
+`io_core.lua` the smoke driver + existing scenarios both source (single source of truth, no dup).
+_Decided: 2026-06-19 (CLAUDE; pipeline track. liveness.lua + tests landed TDD; io_core extraction + smoke.lua driver follow)_
+
 **Recording a cutscene as a review GIF (the standard way to show Nicolas motion).**
 The harness fast-forwards cutscenes (mashes A), so an assert scenario's screenshots land
 on fades — to SEE a scene play, use a `record*` scenario: it drives the game to the

@@ -52,6 +52,9 @@ verify:
 # Also run by `make check` / CI / the pre-commit hook.
 test:
 	@for t in tools/test_*.py; do echo "== $$t =="; python3 $$t || exit 1; done
+	@if command -v lua >/dev/null 2>&1; then \
+		for t in tools/playtest/test_*.lua; do echo "== $$t =="; lua $$t || exit 1; done; \
+	else echo "== skipping Lua playtest tests (no 'lua'; brew install lua) =="; fi
 
 # Static per-chapter difficulty / vanilla-parity report (no ROM build, no mGBA).
 #   make difficulty CH=ch01     # one chapter's report
