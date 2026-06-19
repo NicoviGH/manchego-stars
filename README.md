@@ -2,8 +2,6 @@
 
 > A GBA tactics ROM hack of *Fire Emblem: The Sacred Stones*, based on a D&D 5e *Rime of the Frostmaiden* campaign.
 
-**Private distribution only — for the 7 campaign players.**
-
 The party's *Icewind Dale* adventure — a hermit crab barbarian, a mushroom druid, a vampire warlock, a ratfolk artificer, a snowperson sorcerer, a chwinga bard, and a drakeborn metallurgist — playable as a GBA tactics game. **Combat stays vanilla Fire Emblem** (hit/avoid/might/crit); D&D is flavor on top — the characters, their classes, spells-as-tomes, and a cosmetic d20 flourish on crits. Prologue + 8 chapters, from the goblin iron quest to the Revel's End cliffhanger.
 
 ## Playtest feedback
@@ -32,6 +30,10 @@ make CAMPAIGN=rime-of-the-frostmaiden -j$(nproc)
 - [`docs/decisions.md`](docs/decisions.md) — settled design decisions
 - [`CLAUDE.md`](CLAUDE.md) — agent conventions and session guide
 
-## License
+## License & legal
 
-Engine code is derived from `fireemblem8u` (© their respective authors). Campaign content is private and not for redistribution.
+A free, non-commercial fan project — not affiliated with or endorsed by Nintendo, Intelligent Systems, or Wizards of the Coast.
+
+- **No ROM included.** You must supply your own legal copy of *Fire Emblem: The Sacred Stones* (USA) to build or play.
+- Engine code derives from the `fireemblem8u` decompilation (© its respective authors).
+- *Fire Emblem* and *Rime of the Frostmaiden*, and their assets, belong to their respective owners (Nintendo / Intelligent Systems; Wizards of the Coast). Original campaign writing and art are © their creators.
