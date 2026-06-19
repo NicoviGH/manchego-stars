@@ -844,8 +844,17 @@ def vanilla_decomp_text(relpath):
     overwritten, data_classes.c gets enemy-class clones). Anything that wants the *vanilla*
     value (donor stats, class bases, the difficulty engine) must read through here, not the
     mutable working tree. relpath is under fireemblem8u/, e.g. 'src/data_characters.c'."""
+    # Strip inherited git env so `git -C DECOMP` discovers the submodule's own gitdir.
+    # Git sets GIT_DIR (etc.) when this runs inside a commit hook, and an explicit
+    # GIT_DIR overrides the -C discovery -- so `show HEAD:...` resolves against the
+    # superproject and fails (128). Bit us committing from a content/pipeline worktree,
+    # whose submodule gitdir is separate from the superproject's.
+    env = {k: v for k, v in os.environ.items()
+           if k not in ('GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX',
+                        'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY', 'GIT_NAMESPACE',
+                        'GIT_ALTERNATE_OBJECT_DIRECTORIES')}
     return subprocess.check_output(['git', '-C', DECOMP, 'show', 'HEAD:' + relpath],
-                                   encoding='utf-8')
+                                   encoding='utf-8', env=env)
 
 
 def class_base_stats(class_enum, classes_text=None):
