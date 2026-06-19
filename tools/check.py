@@ -202,32 +202,49 @@ def _git(args):
         return ''
 
 
+def _lane_of(name):
+    if 'content' in name:
+        return 'content'
+    if 'pipeline' in name:
+        return 'pipeline'
+    return None
+
+
 def _current_lane():
     """This worktree's lane. Branch first -- the `inst/<track>` branch is inherently
-    per-worktree, so it self-identifies even though .git/config is shared. `manchego.lane`
-    is the explicit fallback (e.g. the primary checkout during bootstrapping)."""
+    per-worktree, so it self-identifies even though .git/config is shared. In a CI pull
+    request the branch is detached, so GITHUB_HEAD_REF (the PR source branch) is used.
+    `manchego.lane` is the explicit fallback (e.g. the primary checkout during bootstrapping)."""
+    head_ref = os.environ.get('GITHUB_HEAD_REF', '')       # set only in a CI PR
+    if head_ref.startswith('inst/'):
+        return _lane_of(head_ref)
     branch = _git(['rev-parse', '--abbrev-ref', 'HEAD'])
     if branch.startswith('inst/'):
-        if 'content' in branch:
-            return 'content'
-        if 'pipeline' in branch:
-            return 'pipeline'
+        return _lane_of(branch)
     lane = _git(['config', 'manchego.lane'])
     return lane if lane in ('pipeline', 'content') else None
 
 
+def _diff_names(base):
+    return [l for l in _git(['diff', '--name-only', base, 'HEAD']).splitlines() if l.strip()]
+
+
 def _changed_files():
-    """Files to check: staged (pre-commit), else the diff vs main on an inst/* branch (CI/
-    pre-push). Empty on main with nothing staged -> the guard no-ops on the integration tree."""
+    """Files to check: staged (pre-commit), else the diff vs the base. In a CI pull request
+    that base is origin/<GITHUB_BASE_REF>; on a local inst/* branch it's the merge-base with
+    main. Empty on main with nothing staged -> the guard no-ops on the integration tree."""
     staged = [l for l in _git(['diff', '--cached', '--name-only']).splitlines() if l.strip()]
     if staged:
         return staged
+    base_ref = os.environ.get('GITHUB_BASE_REF', '')       # set only in a CI PR
+    if base_ref:
+        base = _git(['merge-base', 'HEAD', 'origin/' + base_ref]) or 'origin/' + base_ref
+        return _diff_names(base)
     branch = _git(['rev-parse', '--abbrev-ref', 'HEAD'])
     if branch.startswith('inst/'):
         base = _git(['merge-base', 'HEAD', 'origin/main']) or _git(['merge-base', 'HEAD', 'main'])
         if base:
-            return [l for l in _git(['diff', '--name-only', base, 'HEAD']).splitlines()
-                    if l.strip()]
+            return _diff_names(base)
     return []
 
 

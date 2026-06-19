@@ -15,7 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        # no submodules: we don't build the ROM here, and fireemblem8u is huge.
+        with:
+          # no submodules: we don't build the ROM here, and fireemblem8u is huge.
+          # Full history so the seam guard can diff a PR against its base branch.
+          fetch-depth: 0
 
       - uses: actions/setup-python@v6
         with:
@@ -26,8 +29,10 @@ jobs:
 
       # Same drift guard the git pre-commit hook and `make check` run -- ONE source of
       # check logic (tools/check.py): tooling compiles, YAML parses, no doc references a
-      # missing tool, no resurrected dead concepts.
-      - name: Drift guard (tools/check.py)
+      # missing tool, no resurrected dead concepts, AND the engine/content seam lane guard
+      # (#55 -- enforces on PRs from inst/* branches via GITHUB_HEAD_REF/BASE_REF; no-ops on
+      # a direct push to main, where the pre-commit hook is the enforcement point).
+      - name: Drift guard + seam lane guard (tools/check.py)
         run: python3 tools/check.py
 
   # The real "make green" gate. Mirrors the fireemblem8u decomp's own build.yml: a
