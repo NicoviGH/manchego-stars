@@ -7,7 +7,7 @@ the lane guard is `check.py check_lane_ownership`). Seam enforcement (#55) + par
 **Shared builds/gotchas/rules → `HANDOFF.md` + `CLAUDE.md`; this file holds only my current state +
 pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
 
-## Now (2026-06-19) — parity engine live; playtest smoke net + clear-bot working on the prologue
+## Now (2026-06-19) — parity engine live; playtest smoke net + clear-bot clearing prologue + ch01
 - **#60 greedy clear-bot LANDED & verified — clears prologue AND ch01** (decisions.md §Playtest platform
   brick 2). One generic `clearDrive` loop PLAYS a chapter with real combat (no `pokeFrail`): march/attack
   toward the boss, then if not already won, **Seize** the boss's old tile. Won both the prologue (DefeatBoss)
@@ -23,8 +23,6 @@ pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
   the run (clean terminal OR survived the 30-turn budget); FAIL = soft-lock/crash. Verified on a built ROM:
   `run.sh smoke` + `run.sh smoke_ch01` both PASS (idle party survives 30 turns on both — completability is
   the clear-bot's job); `ch01`/`win` unregressed. ch02+ needs save-state checkpoints (deferred).
-  NB local full builds: go through `tools/build.sh` (or apply its `#!/bin/python3`→`env python3` sed) — a
-  bare `make` dies `Error 126` on the decomp's Linux-shebang gfx tools until that fix is applied.
 - **#48 parity engine + informative CI curve** are live: `make difficulty` runs the campaign curve in CI
   (always exits 0) so balance spikes / parity regressions surface on every PR. Ch1 validates at parity.
 - **Hard gate built but unwired** (#48 (b)): `make difficulty-gate` (`difficulty.py --curve --check`) exits
@@ -53,6 +51,11 @@ pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
    matchups #8. Injection pipeline #14 / maps #40 gate content.
 
 ## Watch out (pipeline-lane only)
+- **Running playtest scenarios needs a built ROM + `lua`.** Build via `tools/build.sh` (it applies the
+  decomp's `#!/bin/python3`→`env python3` shebang fix); a bare `make` dies `Error 126` on the gfx tools on
+  macOS. The pure Lua tests (`test_liveness.lua`/`test_clearbot.lua`) need `lua` (`brew install lua`); `make
+  test` skips them with a notice when it's absent. Regenerate `symbols.lua` (`gen_symbols.py`, auto by run.sh)
+  after a rebuild.
 - **Vanilla-only weapons (monster/exotic) belong in `difficulty.py`, not `WEAPON_ITEM_ENUM`** — that map is
   content-owned; keep it to weapons our cast actually uses, and derive `ITEM_TO_WEAPON` from it + the
   difficulty-local vanilla-only extension.
