@@ -112,7 +112,7 @@ no update ever propagated. These conventions keep a single source of truth.
 - *Settled decisions & rationale* → this file (`decisions.md`).
 - *Per-chapter facts* → chapter YAML → generated `CHAPTERS.md`. *Unit facts* → unit YAML → `CLASSES.md`.
 - *Work backlog* → GitHub issues (milestones M0–M4).
-- *Current session state* → `HANDOFF.md`. *Vision/pitch* → `PRD.md` (no specifics that live elsewhere).
+- *Live state* → the **per-track** handoffs (`HANDOFF-content.md` / `HANDOFF-pipeline.md`), each maintained by its lane instance; `/handoff` run in a lane updates that lane's file. **`HANDOFF.md` is a thin router** (integration-tree pointers + current release) and carries no per-session snapshot, so it can't drift — recent history lives in `git log` + closed issues, not there. *Vision/pitch* → `PRD.md` (no specifics that live elsewhere).
 - `CLAUDE.md` is lean **operating instructions + pointers**, not a fact store (a bloated CLAUDE.md gets ignored). If a fact belongs in two docs, one of them should link instead.
 
 **Record decisions when made.** Any change that alters architecture, scope, tooling, or a
@@ -202,7 +202,7 @@ _Decided: 2026-06-19_
 The first parallel run had violations — the pipeline instance edited `build_campaign.py` (content-owned)
 because nothing *stopped* it (and because no worktree isolation was actually engaged: both sessions ran in
 the primary checkout on `main`). Documentation + the file seam weren't enough; ownership is now **enforced**.
-`tools/check.py` carries the ownership map (single source, mirrors the `HANDOFF-*.md` "You own" lists:
+`tools/check.py` carries the ownership map (single source, also summarized in `CLAUDE.md` §Tracks:
 pipeline = `difficulty.py`/`fe_combat.py`/`check.py`/`playtest/**`/`build.sh`/`worktree-setup.sh`/`hooks/**`/
 `.github/workflows/**`; content = `campaigns/**`/`build_campaign.py`/`portrait_tool.py`/`map_sprite_tool.py`/
 `ref_to_bust.py`; everything else incl. `tools/inject/**` + docs = shared) and `check_lane_ownership()`, run
