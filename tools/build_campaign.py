@@ -160,6 +160,24 @@ CH01_AI = {
     'hold_position':    '{0x3, 0x3, 0x9, 0x20}',  # Breguet: attack in place, never move
     'reinforce':        '{0x0, 0x0, 0x9, 0x0}',   # vanilla Ch1 reinforcement wave
 }
+# Vanilla FE8 weapon key -> ITEM_ enum (constants/items.h). The single map from a YAML
+# weapon (a plain vanilla id, or a flavor name's fe_base) to the decomp item the build
+# emits, so enemy/guest loadouts are driven by the chapter YAML, not hardcoded.
+WEAPON_ITEM_ENUM = {
+    'iron-sword': 'ITEM_SWORD_IRON', 'steel-sword': 'ITEM_SWORD_STEEL',
+    'rapier': 'ITEM_SWORD_RAPIER', 'iron-lance': 'ITEM_LANCE_IRON',
+    'silver-lance': 'ITEM_LANCE_SILVER', 'javelin': 'ITEM_LANCE_JAVELIN',
+    'iron-axe': 'ITEM_AXE_IRON', 'hand-axe': 'ITEM_AXE_HANDAXE',
+    'iron-bow': 'ITEM_BOW_IRON', 'fire': 'ITEM_ANIMA_FIRE', 'flux': 'ITEM_DARK_FLUX',
+}
+
+
+def fe_item_enum(inv_entry):
+    """The vanilla ITEM_ enum for a YAML inventory entry -- its fe_base (flavor name over a
+    vanilla weapon) if present, else its id (a plain vanilla weapon)."""
+    return WEAPON_ITEM_ENUM[inv_entry.get('fe_base') or inv_entry['id']]
+
+
 CH01_ITEM_IDS = {'iron-lance': 'ITEM_LANCE_IRON', 'iron-axe': 'ITEM_AXE_IRON'}
 CH01_CLASS_IDS = {'soldier': 'CLASS_SOLDIER', 'fighter': 'CLASS_FIGHTER',
                   'armor-knight': 'CLASS_ARMOR_KNIGHT'}
@@ -2439,6 +2457,10 @@ def inject_prologue(campaign, verbose=True, montage=False):
     # roster levels/items below + the guest stat patch in step 4b.)
     hlin_slot, scram_slot, sephek_slot = (
         PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT)
+    # Structural data the build emits comes from the ch00 YAML (single source of truth).
+    chap = _load_prologue_chapter(campaign)
+    by_id = {u['id']: u for u in chap['player_units'] + chap['enemy_units']}
+    sephek_item = fe_item_enum(by_id['sephek-kaltro']['inventory'][0])   # ice-longsword -> steel
     # Hlin = frail must-survive lead -> UNPROMOTED Fighter (frail like vanilla Eirika next to a
     # promoted unit; a custom FEMALE Fighter map sprite distinguishes her from the male Fighter
     # guards -- see inject_map_sprites). Scramsax = dominant promoted "Jeigan" (Hero, the Seth
@@ -2528,7 +2550,7 @@ def inject_prologue(campaign, verbose=True, montage=False):
         '        .xPosition = 14,\n'
         '        .yPosition = 8,\n'
         '        .redaCount = 0,\n'
-        '        .items = { ITEM_SWORD_STEEL },\n'
+        '        .items = { %s },\n'
         '        .ai = {0x3, 0x3, 0x9, 0x20}, /* attack in place, never move (Breguet) */\n'
         '    },\n'
         '    {\n'
@@ -2554,7 +2576,7 @@ def inject_prologue(campaign, verbose=True, montage=False):
         '        .ai = {0x0, 0xa, 0x0, 0x0},\n'
         '    },\n'
         '    { 0 },\n'
-        '}' % sephek_slot)
+        '}' % (sephek_slot, sephek_item))
     with open(CH1_UDEFS_H, encoding='utf-8') as f:
         udefs = f.read()
     udefs = _replace_brace_block(udefs, 'UnitDef_Event_Ch1Ally[] =', ally, CH1_UDEFS_H)
@@ -2621,9 +2643,8 @@ def inject_prologue(campaign, verbose=True, montage=False):
         f.write(script)
 
     # 4. Names (read from the chapter YAML so they live in one place; fe_name handles
-    #    FE8's 12-char buffer -- see [[manchego-stars-fe-name-truncation]]).
-    chap = _load_prologue_chapter(campaign)
-    by_id = {u['id']: u for u in chap['player_units'] + chap['enemy_units']}
+    #    FE8's 12-char buffer -- see [[manchego-stars-fe-name-truncation]]). chap/by_id
+    #    were loaded at the top of the function.
     name_slots = [(PROLOGUE_HLIN_SLOT, 'hlin-trollbane'),
                   (PROLOGUE_SCRAMSAX_SLOT, 'scramsax'),
                   (PROLOGUE_SEPHEK_SLOT, 'sephek-kaltro')]

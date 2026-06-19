@@ -73,6 +73,20 @@ class PersonalBaseDeltas(unittest.TestCase):
         self.assertNotIn('baseMov', out)
 
 
+class FeItemEnum(unittest.TestCase):
+    """Resolve a YAML inventory entry to its vanilla ITEM_ enum -- via fe_base (a flavor
+    name over a vanilla weapon) else the id itself (a plain vanilla weapon). Lets the
+    prologue injector drive the boss weapon from the ch00 YAML, not a hardcode (#52)."""
+
+    def test_resolves_flavor_weapon_via_fe_base(self):
+        # Sephek's "ice-longsword" is flavor; fe_base steel-sword supplies the real item.
+        self.assertEqual(bc.fe_item_enum({'id': 'ice-longsword', 'fe_base': 'steel-sword'}),
+                         'ITEM_SWORD_STEEL')
+
+    def test_resolves_plain_weapon_via_id(self):
+        self.assertEqual(bc.fe_item_enum({'id': 'iron-axe'}), 'ITEM_AXE_IRON')
+
+
 class DonorMaps(unittest.TestCase):
     def test_shamans_take_ewan_bases_but_keep_dark_rank_donor(self):
         # Bases from Ewan (Ch1-appropriate); ranks stay on Knoll (ITYPE_DARK), so the
