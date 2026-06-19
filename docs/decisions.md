@@ -551,10 +551,13 @@ gameover}` series → `LIVE|TERMINAL_WIN|TERMINAL_LOSS|SOFTLOCK`) so it is **uni
 (`test_liveness.lua`, run by `make test`) — soft-lock = no change in `{turn,faction,hpsum,procfp}` for
 `softlock_frames` while input is being fed; budget-exhaustion and a wedged emulator live outside the pure
 verdict (driver → INCONCLUSIVE; run.sh wall-clock → ERROR). This makes `lua` a **dev dependency** (macOS:
-`brew install lua`; `make test` skips the Lua tests with a notice when it's absent). The harness's existing
-I/O primitives (memory reads, state accessors, unit access, input, save/load) are being lifted into a shared
-`io_core.lua` the smoke driver + existing scenarios both source (single source of truth, no dup).
-_Decided: 2026-06-19 (CLAUDE; pipeline track. liveness.lua + tests landed TDD; io_core extraction + smoke.lua driver follow)_
+`brew install lua`; `make test` skips the Lua tests with a notice when it's absent). The smoke **driver**
+is just another scenario in `harness.lua` (`scenarios.smoke*`) reusing the primitives already in scope —
+`harness.lua` is the I/O harness (primitives + scenario registry + per-frame coroutine runner) in one file,
+so a scenario already shares everything: no `io_core` extraction, one file = single source of truth. Only
+the pure verdict is a separate module (`liveness.lua`). Extracting an `io_core` for a future non-coroutine
+consumer (the fuzzer's external driver / LLM-player) is deferred until one actually exists (YAGNI).
+_Decided: 2026-06-19 (CLAUDE; pipeline track. liveness.lua + tests landed TDD; smoke driver scenario + run.sh wiring follow)_
 
 **Recording a cutscene as a review GIF (the standard way to show Nicolas motion).**
 The harness fast-forwards cutscenes (mashes A), so an assert scenario's screenshots land

@@ -338,6 +338,90 @@ end
 -- ---------------------------------------------------------------- scenarios
 local scenarios = {}
 
+-- ---- smoke liveness net (#49): boot a chapter, idle every player unit and just end
+-- each turn, and assert the chapter reaches a CLEAN TERMINAL (win OR loss) with no
+-- crash / soft-lock / hang -- the first brick of the playtest platform. Most chapters
+-- terminate in a loss (idle party overwhelmed), which for a STABILITY net is a fine
+-- clean terminal: the point is to exercise load + every phase/event path to a clean
+-- end as content lands, not to win (winning is the next brick). The verdict is the
+-- pure classifier in liveness.lua (unit-tested without an emulator). PASS = clean
+-- terminal, FAIL = soft-lock, INCONCLUSIVE = alive past the turn budget (run.sh treats
+-- INCONCLUSIVE as exit 0 + WARN; a wedged emulator is run.sh's wall-clock deadline).
+local LIVENESS = dofile(PLAYTEST_DIR .. "/liveness.lua")
+
+local function hpSum()
+    local s = 0
+    for _, base in ipairs({ SYM.gUnitArrayBlue, SYM.gUnitArrayRed }) do
+        for i = 0, 23 do
+            local u = unitAt(base, i)
+            if u and (u.state & US_DEAD) == 0 then s = s + u.hp end
+        end
+    end
+    return s
+end
+
+-- A small bitmask of which key procs are active. It flips as menus/combat/events come
+-- and go, so a value frozen across the soft-lock window means a genuine freeze (the
+-- text-decoder-runaway / infinite-loop class), not a quiet-but-live enemy phase.
+local function procFingerprint()
+    local fp = 0
+    if procActive(SYM.sProc_Menu) then fp = fp | 1 end
+    if procActive(SYM.ProcScr_BattleEventEngine) then fp = fp | 2 end
+    if procActive(SYM.ProcScr_StdEventEngine) then fp = fp | 4 end
+    if procActive(SYM.ProcScr_GameOverScreen) then fp = fp | 8 end
+    return fp
+end
+
+-- smoke <prologue>: prologue is reachable straight from New Game (bootToMap). Later
+-- chapters need a per-chapter save-state checkpoint (states/ infra) -- deferred.
+scenarios.smoke = function()
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    local startChapter = chapter()
+    local cfg = { softlock_frames = 2400 }   -- ~40 emulated-sec; >> a slow enemy phase
+    local budgetTurns = 30
+    local snaps = {}
+    log(string.format("smoke: chapter %d, budget %d turns, softlock %d frames",
+        startChapter, budgetTurns, cfg.softlock_frames))
+    for _ = 1, 100000 do
+        local over = gameOverActive()
+        local won = (not over) and chapter() ~= startChapter and chapter() ~= 0
+        snaps[#snaps + 1] = {
+            frame = emu:currentFrame(), turn = turn(), faction = faction(),
+            hpsum = hpSum(), procfp = procFingerprint(),
+            chapter_advanced = won, gameover = over,
+        }
+        -- Keep the ring spanning at least the soft-lock window (+ margin), so classify
+        -- can actually measure a long freeze; trim by frame-age, not element count.
+        local newest = snaps[#snaps].frame
+        while #snaps > 2 and snaps[1].frame < newest - (cfg.softlock_frames + 240) do
+            table.remove(snaps, 1)
+        end
+        local v = LIVENESS.classify(snaps, cfg)
+        if v.state == "TERMINAL_WIN" then
+            shot("smoke-win"); return result("PASS", "win -- " .. v.why)
+        elseif v.state == "TERMINAL_LOSS" then
+            shot("smoke-loss"); return result("PASS", "clean loss -- " .. v.why)
+        elseif v.state == "SOFTLOCK" then
+            shot("smoke-softlock"); return result("FAIL", "soft-lock -- " .. v.why)
+        end
+        if turn() > budgetTurns then
+            shot("smoke-budget")
+            return result("INCONCLUSIVE",
+                string.format("alive after %d turns, no terminal", budgetTurns))
+        end
+        -- Drive one small step: idle the player phase (just end the turn); otherwise
+        -- nudge dialogue / phase interludes along. Sampling stays continuous so an
+        -- in-enemy-phase freeze is caught, not hidden inside a blocking phase call.
+        if faction() == 0 and not menuOpen() and turn() >= 1 then
+            endTurn()
+        else
+            press(K.A, 2)
+        end
+        wait(8)
+    end
+    return result("INCONCLUSIVE", "step cap reached without a terminal")
+end
+
 -- Play ch00 to the boss kill and wait out the ending scene. Returns true once
 -- the chapter has advanced past the host slot, nil/false (with its own FAIL
 -- result already logged) otherwise. Shared by the win and ch01 scenarios.

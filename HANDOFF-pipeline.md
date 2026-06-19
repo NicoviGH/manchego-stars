@@ -12,9 +12,12 @@ pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
   pure stability classifier `tools/playtest/liveness.lua` + `test_liveness.lua` (6 asserts) **landed TDD,
   green in `make test`** (gated on `lua`; `brew install lua` done on this box). Design: a generic driver boots
   any reachable chapter, idles all units + ends each turn, asserts a clean terminal with no crash/soft-lock —
-  PASS / FAIL / INCONCLUSIVE. **Next two bricks:** extract `io_core.lua` (lift harness.lua's primitives, no
-  behavior change — verify by re-running `win`/`ch01win`/`gameover`/`retreat`), then `smoke.lua` + a
-  `run.sh smoke <prologue|ch01>` runner (integration-verify on a built ROM). Then fuzzer / LLM-player.
+  PASS / FAIL / INCONCLUSIVE. **Next brick:** the smoke driver as a `harness.lua` scenario (`scenarios.smoke*`)
+  reusing the in-scope primitives + `liveness.lua` (no `io_core` extraction — one file = single source of
+  truth; YAGNI till a non-coroutine consumer needs it) + a `run.sh smoke <prologue|...>` runner,
+  integration-verified on a built ROM. Then the stability fuzzer / LLM-player.
+  NB local full builds: go through `tools/build.sh` (or apply its `#!/bin/python3`→`env python3` sed) — a
+  bare `make` dies `Error 126` on the decomp's Linux-shebang gfx tools until that fix is applied.
 - **#48 parity engine + informative CI curve** are live: `make difficulty` runs the campaign curve in CI
   (always exits 0) so balance spikes / parity regressions surface on every PR. Ch1 validates at parity.
 - **Hard gate built but unwired** (#48 (b)): `make difficulty-gate` (`difficulty.py --curve --check`) exits
@@ -28,10 +31,11 @@ pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
   Ch6 (→ our ch07). FE8 Ch13 (→ our ch08) is the lone deferred reference.
 
 ## Next (priority order)
-1. **Playtest smoke net — continue** (#49, IN PROGRESS; see "Now"): `io_core.lua` extraction → `smoke.lua`
-   driver + `run.sh smoke` runner. Then the stability fuzzer (randomized/seeded inputs) and the LLM-player.
-   ch02+ reachability needs per-chapter save-state checkpoints (reuse `states/` infra), deferred till those
-   chapters exist; Prologue + Ch01 are reachable from New Game now.
+1. **Playtest smoke net — continue** (#49, IN PROGRESS; see "Now"): the smoke driver as a `harness.lua`
+   scenario + `run.sh smoke` runner, integration-verified on a built ROM. Then the stability fuzzer
+   (randomized/seeded inputs) and the LLM-player. ch02+ reachability needs per-chapter save-state
+   checkpoints (reuse `states/` infra), deferred till those chapters exist; Prologue is reachable from New
+   Game now (Ch01 needs a prologue-clear lead-in, like `ch01win`).
 2. **#53 tail — FE8 Ch13 reference** (→ our ch08, deferred/optional): bigger than billed — needs ~11 *standard*
    weapons modeled (silver/steel/killer/slim/short-spear/elfire/zanbato/swordslayer/purge), not a few exotics.
    ch08 is a scripted-defeat objective (never CI-gated), so it's informational polish; do it only if idle.
