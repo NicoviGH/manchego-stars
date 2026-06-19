@@ -59,6 +59,35 @@ do
     check(L.classify(s, cfg).state, "TERMINAL_WIN", "terminal takes precedence over SOFTLOCK")
 end
 
+-- NUDGE (the fuzzer's unstick watchdog): when cfg.nudge_frames is set, a stall past it but
+-- short of softlock_frames is NUDGE -- "try to unstick (mash B)", not yet a failure.
+local nudgeCfg = { softlock_frames = 600, nudge_frames = 200 }
+do
+    local s = { snap(0, 2, 0x80, 50, 5), snap(300, 2, 0x80, 50, 5) }  -- 200 <= 300 < 600
+    check(L.classify(s, nudgeCfg).state, "NUDGE", "stall past nudge, short of softlock -> NUDGE")
+end
+
+-- Past softlock_frames is still SOFTLOCK even with nudging on (a B-mash that can't escape
+-- IS the bug we want to catch -- a screen with no exit).
+do
+    local s = {}
+    for i = 0, 10 do s[#s + 1] = snap(i * 100, 2, 0x80, 50, 5) end  -- 1000 frames frozen
+    check(L.classify(s, nudgeCfg).state, "SOFTLOCK", "past softlock -> SOFTLOCK even with nudging")
+end
+
+-- Below the nudge threshold is plain LIVE.
+do
+    local s = { snap(0, 2, 0x80, 50, 5), snap(100, 2, 0x80, 50, 5) }  -- 100 < 200
+    check(L.classify(s, nudgeCfg).state, "LIVE", "short freeze (< nudge) -> LIVE")
+end
+
+-- Backward compat: a cfg WITHOUT nudge_frames (what the smoke driver passes) never NUDGEs --
+-- a mid-length stall stays LIVE exactly as before, so the smoke net is unchanged.
+do
+    local s = { snap(0, 2, 0x80, 50, 5), snap(400, 2, 0x80, 50, 5) }  -- 400 < 600, no nudge cfg
+    check(L.classify(s, cfg).state, "LIVE", "no nudge_frames in cfg -> never NUDGE")
+end
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else

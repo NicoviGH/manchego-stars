@@ -13,7 +13,10 @@
 --   gameover          true while the game-over proc is active (= loss)
 --
 -- classify(snapshots, cfg) -> { state = <STATE>, why = <string> }
---   STATE: "LIVE" | "TERMINAL_WIN" | "TERMINAL_LOSS" | "SOFTLOCK"
+--   STATE: "LIVE" | "TERMINAL_WIN" | "TERMINAL_LOSS" | "NUDGE" | "SOFTLOCK"
+--   cfg.nudge_frames (optional): a shorter stall => NUDGE, the fuzzer's unstick signal
+--     ("mash B to back out of a benign menu"), not yet a failure. Omit it (as the smoke
+--     driver does) and NUDGE is never returned -- the verdict is unchanged.
 --   cfg.softlock_frames: frames with no change in {turn,faction,hpsum,procfp} => SOFTLOCK.
 --
 -- There is deliberately no budget/HANG state: exhausting the in-game turn budget while
@@ -48,6 +51,10 @@ function M.classify(snapshots, cfg)
     if stuck >= cfg.softlock_frames then
         return { state = "SOFTLOCK",
                  why = string.format("no state change for %d frames", stuck) }
+    end
+    if cfg.nudge_frames and stuck >= cfg.nudge_frames then
+        return { state = "NUDGE",
+                 why = string.format("stalled %d frames; try to unstick", stuck) }
     end
     return { state = "LIVE", why = "state still advancing" }
 end

@@ -376,6 +376,7 @@ end
 -- (no hardcoded char ids) + the pure pickTarget core; the scenario owns the driving.
 local CLEARBOT = dofile(PLAYTEST_DIR .. "/clearbot.lua")
 local CA_BOSS = (1 << 15)   -- include/bmunit.h:326 (character/class attribute)
+local FUZZRNG = dofile(PLAYTEST_DIR .. "/fuzzrng.lua")   -- seeded PRNG + input policy (#49)
 
 -- A unit's character carries the CA_BOSS attribute: pCharacterData (Unit +0x00) ->
 -- CharacterData.attributes (+0x28). True for named bosses (Sephek, the ch01 chief, ...).
@@ -784,6 +785,125 @@ scenarios.clear_ch01 = function()
     if not reachCh01Map() then return end
     pokeFastConfig() -- many-combat enemy phases: map-anim battles + fast speed
     return clearDrive(chapter(), 24, 15, CH01_PARK)
+end
+
+-- ---- stability fuzzer (#49): SEEDED random inputs over the same I/O layer, hunting the
+-- crashes/soft-locks the DIRECTED smoke/clear bots can't -- they only ever drive clean,
+-- scripted input orderings. A "smart monkey": broad in-chapter key surface (incl START/
+-- SELECT so it reaches the menus), weighted toward the productive map keys, plus an
+-- unstick watchdog -- when liveness reports a NUDGE stall it mashes B to back out of
+-- whatever benign menu it wandered into. If even that can't escape for the full
+-- softlock window, that IS the bug (a screen with no exit). The PRNG and weighting are
+-- the pure, unit-tested core (fuzzrng.lua); this owns the emulator driving. Boot/title/
+-- prep fuzzing is a separate, noisier surface, deferred to a later brick.
+local FUZZ_ALPHABET = {
+    { key = K.A,      weight = 5, hold = 3 },   -- confirm / select / attack: the workhorse
+    { key = K.B,      weight = 4, hold = 3 },   -- cancel / back: also the natural unstick key
+    { key = K.UP,     weight = 3, hold = 3 },
+    { key = K.DOWN,   weight = 3, hold = 3 },
+    { key = K.LEFT,   weight = 3, hold = 3 },
+    { key = K.RIGHT,  weight = 3, hold = 3 },
+    { key = K.START,  weight = 1, hold = 3 },   -- rare: reach the map menu, don't live in it
+    { key = K.SELECT, weight = 1, hold = 3 },
+}
+
+-- A RESPONSIVENESS fingerprint for the fuzzer (not the smoke bot's progress fingerprint).
+-- The smoke bot idles, so a frozen {turn,faction,hpsum,procfp} means a genuine freeze. The
+-- fuzzer instead roams the cursor with random D-pad presses WITHOUT advancing the turn, so
+-- the progress key sits still on a perfectly responsive map -- a false soft-lock. Folding
+-- the map cursor in makes "no change" mean the game stopped RESPONDING to input (a real
+-- freeze/crash), not merely "the random bot hasn't made progress". Proc bits live above the
+-- cursor bytes so they never collide (map coords are < 256). Fed as the snapshot's `procfp`,
+-- so liveness.lua stays pure and unchanged.
+local function fuzzFingerprint()
+    local cx, cy = cursor()
+    return (procFingerprint() << 16) | ((cx & 0xFF) << 8) | (cy & 0xFF)
+end
+
+-- In live gameplay (a battle map, EITHER phase) iff a player unit is loaded and we are not
+-- on the title screen. Deliberately NOT inChapter() -- that requires faction()==0, so it is
+-- false during a legitimate enemy phase. The liveness key {turn,faction,hpsum,procfp} is only
+-- meaningful here; on the title/main menu it is trivially frozen, which is NOT a soft-lock.
+local function liveOnMap()
+    return unitAt(SYM.gUnitArrayBlue, 0) ~= nil
+        and not procActive(SYM.gProcScr_TitleScreen)
+end
+
+local function fuzzDrive(startChapter)
+    local seed = math.floor(tonumber(PLAYTEST_SEED) or 1)
+    local rng = FUZZRNG.new(seed)
+    -- Two stall thresholds: NUDGE (try to unstick) well before SOFTLOCK (genuine failure).
+    local cfg = { softlock_frames = 2400, nudge_frames = 600 }
+    local budgetFrames = 60000   -- ~250s wall at 240fps; comfortably under run.sh's deadline
+    local snaps = {}
+    local startFrame, recoverStep = emu:currentFrame(), 0
+    log(string.format("fuzz: chapter %d, SEED %d, budget %d frames, nudge %d, softlock %d "
+        .. "(reproduce a FAIL with PT_SEED=%d)",
+        startChapter, seed, budgetFrames, cfg.nudge_frames, cfg.softlock_frames, seed))
+    for _ = 1, 1000000 do
+        -- Budget first, so it bounds us even while recovering off-map (an unrecoverable
+        -- menu just rides the budget out to a PASS -- no crash is no crash).
+        if emu:currentFrame() - startFrame > budgetFrames then
+            shot("fuzz-budget")
+            return result("PASS", string.format(
+                "survived %d frames on seed %d, no crash/soft-lock", budgetFrames, seed))
+        end
+        -- Off the battle map: a random Suspend can drop us to the title (a legit non-crash
+        -- state where the liveness key is frozen and B can't escape). Don't judge liveness
+        -- here -- drive the menus FORWARD back into play (START/A like bootToMap) and drop
+        -- the stale frozen history so re-entry doesn't instantly trip the soft-lock window.
+        if not liveOnMap() then
+            snaps = {}
+            recoverStep = recoverStep + 1
+            press(recoverStep % 2 == 0 and K.A or K.START, 4)
+            wait(20)
+        else
+            local over = gameOverActive()
+            local won = (not over) and chapter() ~= startChapter and chapter() ~= 0
+            snaps[#snaps + 1] = {
+                frame = emu:currentFrame(), turn = turn(), faction = faction(),
+                hpsum = hpSum(), procfp = fuzzFingerprint(),
+                chapter_advanced = won, gameover = over,
+            }
+            local newest = snaps[#snaps].frame
+            while #snaps > 2 and snaps[1].frame < newest - (cfg.softlock_frames + 240) do
+                table.remove(snaps, 1)
+            end
+            local v = LIVENESS.classify(snaps, cfg)
+            if v.state == "TERMINAL_WIN" then
+                shot("fuzz-win"); return result("PASS", "win -- " .. v.why)
+            elseif v.state == "TERMINAL_LOSS" then
+                shot("fuzz-loss"); return result("PASS", "clean loss -- " .. v.why)
+            elseif v.state == "SOFTLOCK" then
+                shot("fuzz-softlock")
+                return result("FAIL", string.format(
+                    "soft-lock on seed %d (reproduce: PT_SEED=%d run.sh fuzz) -- %s", seed, seed, v.why))
+            end
+            -- Drive one step: on a NUDGE stall, mash B to unstick; otherwise inject a weighted
+            -- random key. Sampling stays continuous so an in-phase freeze is still caught.
+            if v.state == "NUDGE" then
+                press(K.B, 3)
+            else
+                local e = FUZZRNG.weightedPick(rng, FUZZ_ALPHABET)
+                press(e.key, e.hold)
+            end
+            wait(8)
+        end
+    end
+    return result("FAIL", "step cap reached without a terminal or budget")
+end
+
+-- fuzz: the prologue, reachable straight from New Game.
+scenarios.fuzz = function()
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    return fuzzDrive(chapter())
+end
+
+-- fuzz_ch01: the first authored chapter -- same random soak on a bigger map with combat.
+scenarios.fuzz_ch01 = function()
+    if not reachCh01Map() then return end
+    pokeFastConfig() -- keep enemy phases quick if random End-Turns roll into them
+    return fuzzDrive(chapter())
 end
 
 -- CH01WIN: the default lord (blind A-taps pick Braulo) marches on the camp,

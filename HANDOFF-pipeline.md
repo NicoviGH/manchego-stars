@@ -7,7 +7,18 @@ the lane guard is `check.py check_lane_ownership`). Seam enforcement (#55) + par
 **Shared builds/gotchas/rules → `HANDOFF.md` + `CLAUDE.md`; this file holds only my current state +
 pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
 
-## Now (2026-06-19) — parity engine live; playtest smoke net + clear-bot clearing prologue + ch01
+## Now (2026-06-19) — parity engine live; playtest smoke net + clear-bot + seeded fuzzer
+- **#49 stability fuzzer LANDED & verified — seeded "smart monkey"** (decisions.md §Playtest platform brick
+  3). Random inputs over the same I/O layer to hunt crashes/soft-locks the directed bots miss. Own LCG PRNG
+  (`fuzzrng.lua`, NOT host `math.random` — so a `PT_SEED=N` crash replays identically on the CI `lua` and
+  mGBA's Lua); PRNG + weighted policy TDD'd (`test_fuzzrng.lua`, 9 asserts, in `make test`). Broad in-chapter
+  key surface (incl START/SELECT) + a **B-mash unstick watchdog**: liveness gained a shorter `nudge_frames`
+  stall → `NUDGE` → driver mashes B (TDD'd, `test_liveness.lua` now 10 asserts). Two false positives fixed in
+  the *driver* (liveness stayed pure): off-map title-screen (drive menus forward via `liveOnMap`, not
+  `inChapter`) and cursor-roam (feed a **responsiveness** fingerprint, `fuzzFingerprint` folds the cursor into
+  `procfp` — "no change" = game stopped *responding*, not "bot made no progress"). Scenarios `fuzz` /
+  `fuzz_ch01`; `PT_SEED=N run.sh fuzz`. Verified: 5 seeds clean on the prologue (1 win, 4 budget-survival).
+  **Next:** the LLM-player (swap the rule-based policy); ch02+ coverage needs per-chapter save-state checkpoints.
 - **#60 greedy clear-bot LANDED & verified — clears prologue AND ch01** (decisions.md §Playtest platform
   brick 2). One generic `clearDrive` loop PLAYS a chapter with real combat (no `pokeFrail`): march/attack
   toward the boss, then if not already won, **Seize** the boss's old tile. Won both the prologue (DefeatBoss)
@@ -36,12 +47,13 @@ pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
   Ch6 (→ our ch07). FE8 Ch13 (→ our ch08) is the lone deferred reference.
 
 ## Next (priority order)
-1. **Stability fuzzer** (#49, next platform brick): seeded random inputs over the same I/O layer to hunt
-   crashes/soft-locks the directed smoke/clear bots miss. Then the **LLM-player** (swap the clear-bot's
-   rule-based policy for an LLM) — and its **graduation benchmark: play vanilla FE8** (#49 comment, Nicolas).
-   The clear-bot already clears prologue + ch01 (DefeatBoss + Seize) with real combat; harder chapters may
-   still need gang-up / don't-feed-the-lord / heal logic. ch02+ smoke/clear coverage needs per-chapter
-   save-state checkpoints (reuse `states/` infra), deferred till those chapters are built.
+1. **LLM-player** (#49, next platform brick — fuzzer now landed): swap the clear-bot's rule-based policy for
+   an LLM, with the **graduation benchmark: play vanilla FE8** (#49 comment, Nicolas). The clear-bot already
+   clears prologue + ch01 (DefeatBoss + Seize) with real combat; harder chapters may still need gang-up /
+   don't-feed-the-lord / heal logic. The fuzzer (`fuzz`/`fuzz_ch01`) now soaks for crashes/soft-locks on the
+   prologue; **fuzz_ch02+ smoke/clear coverage needs per-chapter save-state checkpoints** (reuse `states/`
+   infra), deferred till those chapters are built. Fuzzer follow-ups if idle: a `fuzz_boot` surface (New
+   Game→title→prep), and a CI seed-sweep (run a fixed seed set, e.g. `for s in 1..N`, as a soak gate).
 2. **#53 tail — FE8 Ch13 reference** (→ our ch08, deferred/optional): bigger than billed — needs ~11 *standard*
    weapons modeled (silver/steel/killer/slim/short-spear/elfire/zanbato/swordslayer/purge), not a few exotics.
    ch08 is a scripted-defeat objective (never CI-gated), so it's informational polish; do it only if idle.
