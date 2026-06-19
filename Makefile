@@ -54,9 +54,14 @@ test:
 	@for t in tools/test_*.py; do echo "== $$t =="; python3 $$t || exit 1; done
 
 # Static per-chapter difficulty / vanilla-parity report (no ROM build, no mGBA).
-#   make difficulty CH=ch01
+#   make difficulty CH=ch01     # one chapter's report
+#   make difficulty             # campaign-wide enemy-pressure curve (all chapters)
 difficulty:
+ifeq ($(strip $(CH)),)
+	@python3 tools/difficulty.py --campaign $(CAMPAIGN) --curve
+else
 	@python3 tools/difficulty.py --campaign $(CAMPAIGN) --chapter $(CH)
+endif
 
 clean:
 	$(MAKE) -C fireemblem8u clean

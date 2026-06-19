@@ -65,6 +65,157 @@ class Carry(unittest.TestCase):
         self.assertAlmostEqual(rounds, 2.5)
 
 
+class EnemyPressure(unittest.TestCase):
+    """Per-deploy-slot enemy pressure vs a fixed yardstick (the #48 parity metric).
+
+    threat/slot = Σ(enemy dpr vs yardstick) ÷ deploy cap;
+    clear-load/slot = Σ(yardstick rounds-to-kill each enemy) ÷ deploy cap.
+    The yardstick cancels in an ours-vs-vanilla ratio."""
+
+    def _yard(self):
+        return combatant('yard', hp=20, pow_=0, skl=0, spd=0, dfc=0, res=0, lck=0,
+                         con=20, weapon='iron-sword')
+
+    def test_threat_and_clearload_per_slot_with_hand_oracle(self):
+        yard = self._yard()
+        # e1 (iron-lance, +1 triangle vs yard's sword): dpr = (10+7+1)*1*(80+15)/100 = 17.1;
+        #   yard->e1 dmg = (5-1)=4 @ (90-15)% = 3.0/round -> 20/3.0 = 6.6667 rounds.
+        e1 = combatant('e1', hp=20, pow_=10, skl=0, spd=0, dfc=0, con=20, weapon='iron-lance')
+        # e2 (iron-sword, neutral): dpr = (4+5)*1*90/100 = 8.1;
+        #   yard->e2 dmg = 5 @ 90% = 4.5/round -> 20/4.5 = 4.4444 rounds.
+        e2 = combatant('e2', hp=20, pow_=4, skl=0, spd=0, dfc=0, con=20, weapon='iron-sword')
+        threat, clearload = df.enemy_pressure([e1, e2], deploy_cap=2, yardstick=yard)
+        self.assertAlmostEqual(threat, (17.1 + 8.1) / 2)
+        self.assertAlmostEqual(clearload, (20 / 3.0 + 20 / 4.5) / 2)
+
+    def test_pressure_scales_inversely_with_deploy_cap(self):
+        yard = self._yard()
+        e1 = combatant('e1', hp=20, pow_=10, skl=0, spd=0, dfc=0, con=20, weapon='iron-lance')
+        t2, c2 = df.enemy_pressure([e1], deploy_cap=2, yardstick=yard)
+        t4, c4 = df.enemy_pressure([e1], deploy_cap=4, yardstick=yard)
+        self.assertAlmostEqual(t2, 2 * t4)
+        self.assertAlmostEqual(c2, 2 * c4)
+
+
+class PressureVerdict(unittest.TestCase):
+    def test_within_band_both_metrics_is_ok(self):
+        v = df.pressure_verdict((10.0, 5.0), (10.0, 4.5), band=0.25)
+        self.assertAlmostEqual(v['threat_ratio'], 1.0)
+        self.assertEqual(v['threat'], 'OK')
+        self.assertEqual(v['load'], 'OK')          # 5.0/4.5 = 1.11, inside ±25%
+        self.assertEqual(v['verdict'], 'OK')
+
+    def test_threat_above_band_is_harder_and_off(self):
+        v = df.pressure_verdict((15.0, 4.5), (10.0, 4.5), band=0.25)
+        self.assertEqual(v['threat'], 'harder')    # 1.5 ratio
+        self.assertEqual(v['verdict'], 'OFF')
+
+    def test_clearload_below_band_is_easier_and_off(self):
+        v = df.pressure_verdict((10.0, 2.0), (10.0, 4.5), band=0.25)
+        self.assertEqual(v['load'], 'easier')      # 0.44 ratio
+        self.assertEqual(v['verdict'], 'OFF')
+
+
+class ChapterEnemyForce(unittest.TestCase):
+    def test_expands_count_and_composition_into_per_unit_force(self):
+        chap = {'enemy_units': [
+            {'id': 'g', 'class': 'fighter', 'level': 1, 'count': 3,
+             'inventory': [{'id': 'iron-axe'}]},
+            {'id': 'r', 'composition': ['fighter', 'fighter', 'soldier'], 'level': 1,
+             'count': 3, 'inventory_by_class': {'fighter': ['iron-axe'],
+                                                'soldier': ['iron-lance']}},
+            {'id': 'boss', 'class': 'armor-knight', 'level': 4, 'is_boss': True,
+             'count': 1, 'inventory': [{'id': 'iron-lance'}]},
+        ]}
+        force = df.chapter_enemy_force(chap)
+        self.assertEqual(len(force), 7)            # 3 + 3 + 1, bosses included
+        names = [u.weapon.name for u in force]
+        self.assertEqual(names.count('iron-axe'), 5)    # 3 fighters + 2 fighters
+        self.assertEqual(names.count('iron-lance'), 2)  # 1 soldier + the boss
+
+    def test_drops_enemies_with_no_modeled_weapon(self):
+        # A healer / unmodeled-weapon enemy carries no threat in this proxy -> excluded
+        # (mirrors the vanilla side, which also drops staff/throwaway-only units).
+        chap = {'enemy_units': [
+            {'id': 'cleric', 'class': 'priest', 'level': 1, 'count': 2,
+             'inventory': [{'id': 'heal'}]},          # staff -> not in fc.W
+            {'id': 'g', 'class': 'fighter', 'level': 1, 'count': 1,
+             'inventory': [{'id': 'iron-axe'}]},
+        ]}
+        force = df.chapter_enemy_force(chap)
+        self.assertEqual([u.weapon.name for u in force], ['iron-axe'])
+
+
+_UDEF_SNIPPET = """
+CONST_DATA struct UnitDefinition UnitDef_Test[] = {
+    {
+        .charIndex = CHARACTER_BREGUET,
+        .classIndex = CLASS_ARMOR_KNIGHT,
+        .allegiance = FACTION_ID_RED,
+        .level = 4,
+        .items = {
+            ITEM_LANCE_IRON,
+        },
+    },
+    {
+        .charIndex = 0x80,
+        .classIndex = CLASS_SOLDIER,
+        .autolevel = 1,
+        .allegiance = FACTION_ID_RED,
+        .level = 2,
+        .items = {
+            ITEM_LANCE_IRON,
+            ITEM_VULNERARY,
+        },
+    },
+    {
+        .charIndex = CHARACTER_EIRIKA,
+        .classIndex = CLASS_EIRIKA_LORD,
+        .allegiance = FACTION_ID_BLUE,
+        .level = 1,
+        .items = {
+            ITEM_SWORD_RAPIER,
+        },
+    },
+    { 0 },
+};
+"""
+
+
+class VanillaUnitDefParser(unittest.TestCase):
+    def test_parses_each_entry_class_level_allegiance_items(self):
+        defs = df.vanilla_unit_defs(_UDEF_SNIPPET, 'UnitDef_Test')
+        self.assertEqual(len(defs), 3)           # the { 0 } terminator is skipped
+        self.assertEqual(defs[0], {'classIndex': 'CLASS_ARMOR_KNIGHT', 'level': 4,
+                                   'allegiance': 'FACTION_ID_RED',
+                                   'items': ['ITEM_LANCE_IRON']})
+        self.assertEqual(defs[1]['classIndex'], 'CLASS_SOLDIER')
+        self.assertEqual(defs[1]['items'], ['ITEM_LANCE_IRON', 'ITEM_VULNERARY'])
+        self.assertEqual(defs[2]['allegiance'], 'FACTION_ID_BLUE')
+
+
+class VanillaEnemies(unittest.TestCase):
+    """Integration: extract a parity reference's red enemy force from the decomp (HEAD)."""
+
+    def test_ch1_reference_is_the_ten_escape_enemies(self):
+        # Vanilla FE8 Ch1 "Escape!": 7 initial (Breguet L4 armor + 3 soldiers + 3 fighters)
+        # + 3 reinforcements. All red, iron lance/axe -- the bar our ch01 mirrors 1:1.
+        enemies = df.vanilla_enemies('FE8 Ch1')
+        self.assertEqual(len(enemies), 10)
+        # Boss is first: armor-knight projected to L4 (class base + 3 levels of growth).
+        boss = enemies[0]
+        self.assertEqual(boss.weapon.name, 'iron-lance')
+        self.assertEqual({u.weapon.name for u in enemies}, {'iron-lance', 'iron-axe'})
+
+    def test_prologue_reference_is_the_three_fighters(self):
+        enemies = df.vanilla_enemies('FE8 Prologue')
+        self.assertEqual(len(enemies), 3)        # only the fightable PrologueEnemy array
+        self.assertEqual({u.weapon.name for u in enemies}, {'iron-axe'})
+
+    def test_unmapped_reference_returns_none(self):
+        self.assertIsNone(df.vanilla_enemies('FE8 Ch99'))
+
+
 CAMPAIGN = 'rime-of-the-frostmaiden'
 
 

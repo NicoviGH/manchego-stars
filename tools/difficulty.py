@@ -120,11 +120,17 @@ def _enemy_class_enum(token):
     return 'CLASS_' + str(token).upper().replace('-', '_')
 
 
-def _one_enemy(name, class_token, level, weapon):
-    class_enum = _enemy_class_enum(class_token)
-    stats = autolevel(_class_base(class_enum),
-                      _class_growths(class_enum), int(level))
+def _enemy_from_enum(name, class_enum, level, weapon):
+    """One Combatant: class base autoleveled to `level`, wielding `weapon`. The vanilla
+    enemy stat path -- generics AND named bosses alike are modeled off class base (so ours
+    and the vanilla reference resolve on the same footing; a boss's personal line is the
+    dynamic playtest's concern, not this static pressure proxy)."""
+    stats = autolevel(_class_base(class_enum), _class_growths(class_enum), int(level))
     return _stats_to_combatant(name, stats, weapon, CLASS_TAGS.get(class_enum, frozenset()))
+
+
+def _one_enemy(name, class_token, level, weapon):
+    return _enemy_from_enum(name, _enemy_class_enum(class_token), level, weapon)
 
 
 def enemy_combatants(enemy_def):
@@ -143,6 +149,138 @@ def enemy_combatants(enemy_def):
         weapon = _weapon_for([{'id': w} for w in by_class.get(cls, [])])
         out.append(_one_enemy('%s-%s' % (name, cls), cls, level, weapon))
     return out
+
+
+# ── Vanilla enemy extraction (the #48 parity reference force) ─────────────────────
+# A chapter's `parity_reference` (e.g. "FE8 Ch1") names the vanilla chapter whose enemy
+# pressure sets its bar. We resolve that to the decomp UnitDefinition array(s) holding the
+# fightable red force and project each enemy off class base -- the same footing as ours.
+
+# decomp item enum -> fe_combat weapon key. Only attacking weapons; staves/consumables/keys
+# are absent on purpose (an enemy with no entry here carries no modeled threat -> skipped).
+ITEM_TO_WEAPON = {
+    'ITEM_SWORD_IRON': 'iron-sword', 'ITEM_SWORD_STEEL': 'steel-sword',
+    'ITEM_SWORD_RAPIER': 'rapier', 'ITEM_LANCE_IRON': 'iron-lance',
+    'ITEM_LANCE_SILVER': 'silver-lance', 'ITEM_LANCE_JAVELIN': 'javelin',
+    'ITEM_AXE_IRON': 'iron-axe', 'ITEM_AXE_HANDAXE': 'hand-axe',
+    'ITEM_BOW_IRON': 'iron-bow', 'ITEM_ANIMA_FIRE': 'fire',
+    'ITEM_DARK_FLUX': 'flux',
+}
+
+# parity_reference -> (decomp relpath, [UnitDefinition array names]) for its red force.
+# The single curation point: which vanilla arrays ARE a chapter's fightable enemies (named
+# *Enemy arrays for the decompiled-to-C early chapters; cutscene/throne-room/skirmish arrays
+# are deliberately excluded). Extend as later references are curated (#48).
+PARITY_REFERENCE_UDEFS = {
+    'FE8 Prologue': ('src/events/prologue-eventudefs.h',
+                     ['UnitDef_Event_PrologueEnemy']),
+    'FE8 Ch1': ('src/events/ch1-eventudefs.h',
+                ['UnitDef_Event_Ch1Enemy', 'UnitDef_Event_Ch1EnemyReinforce']),
+}
+
+
+def _brace_entries(body):
+    """Yield each top-level `{...}` group's inner text from an array body, tracking brace
+    depth so a unit's nested `.items = {...}` / `.ai = {...}` don't split it early."""
+    depth, start = 0, None
+    for i, ch in enumerate(body):
+        if ch == '{':
+            if depth == 0:
+                start = i + 1
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                yield body[start:i]
+
+
+def vanilla_unit_defs(text, array_name):
+    """Parse `CONST_DATA struct UnitDefinition <array_name>[] = { ... };` from decomp text
+    into a list of per-entry dicts (classIndex, level, allegiance, items). The trailing
+    `{ 0 }` terminator (no .classIndex) is skipped."""
+    s, e = bc._find_brace_block(text, array_name + '[]', '<udef:%s>' % array_name)
+    body = text[s + 1:e - 1]
+    out = []
+    for block in _brace_entries(body):           # top-level { ... } per unit (handles
+        cls = re.search(r'\.classIndex\s*=\s*(\w+)', block)   # nested .items/.ai braces
+        if not cls:                              # the { 0 } terminator
+            continue
+        lvl = re.search(r'\.level\s*=\s*(\d+)', block)
+        alg = re.search(r'\.allegiance\s*=\s*(\w+)', block)
+        items = re.search(r'\.items\s*=\s*\{(.*?)\}', block, re.S)
+        out.append({
+            'classIndex': cls.group(1),
+            'level': int(lvl.group(1)) if lvl else 1,
+            'allegiance': alg.group(1) if alg else None,
+            'items': [t.strip() for t in items.group(1).split(',') if t.strip()]
+                     if items else [],
+        })
+    return out
+
+
+def _weapon_from_item_enums(item_enums):
+    """First decomp item enum that maps to a real attacking weapon (else None)."""
+    for it in item_enums:
+        key = ITEM_TO_WEAPON.get(it)
+        if key:
+            return fc.W[key]
+    return None
+
+
+def vanilla_enemies(parity_ref):
+    """The vanilla reference chapter's fightable red force as a flat list of Combatants
+    (each projected off class base to its level). None if the reference isn't curated yet;
+    enemies with no modeled weapon (staff/throwaway only) are dropped."""
+    spec = PARITY_REFERENCE_UDEFS.get(parity_ref)
+    if spec is None:
+        return None
+    relpath, arrays = spec
+    text = bc.vanilla_decomp_text(relpath)
+    out = []
+    for array_name in arrays:
+        for i, d in enumerate(vanilla_unit_defs(text, array_name)):
+            if d['allegiance'] != 'FACTION_ID_RED':
+                continue
+            weapon = _weapon_from_item_enums(d['items'])
+            if weapon is None:
+                continue
+            out.append(_enemy_from_enum('%s#%d' % (array_name, i),
+                                        d['classIndex'], d['level'], weapon))
+    return out
+
+
+def pressure_verdict(ours, vanilla, band=0.25):
+    """Compare our (threat/slot, clear-load/slot) to the vanilla reference's. Each metric
+    is tagged OK / harder / easier by whether its ratio sits inside ±band of parity; the
+    overall verdict is OFF if either metric strays. The band is tunable (#48 ~±25%)."""
+    (ot, ol), (vt, vl) = ours, vanilla
+    tr = ot / vt if vt else float('inf')
+    lr = ol / vl if vl else float('inf')
+
+    def tag(r):
+        return 'OK' if abs(r - 1) <= band else ('harder' if r > 1 else 'easier')
+
+    threat, load = tag(tr), tag(lr)
+    return {'threat_ratio': tr, 'load_ratio': lr, 'threat': threat, 'load': load,
+            'verdict': 'OK' if threat == 'OK' and load == 'OK' else 'OFF'}
+
+
+def chapter_enemy_force(chap):
+    """Our chapter's full enemy force as a flat per-unit Combatant list (bosses included),
+    honoring each entry's `count`/`composition` -- the multiplicity enemy_combatants drops.
+    This is the our-side input to enemy_pressure (the parity comparand to vanilla_enemies)."""
+    out = []
+    for ed in chap.get('enemy_units', []):
+        if 'composition' in ed and 'class' not in ed:
+            level = ed.get('level', 1)
+            name = ed.get('id', ed.get('name', 'enemy'))
+            by_class = ed.get('inventory_by_class', {})
+            for cls in ed.get('composition', []):
+                weapon = _weapon_for([{'id': w} for w in by_class.get(cls, [])])
+                out.append(_one_enemy('%s-%s' % (name, cls), cls, level, weapon))
+        else:
+            out.extend(enemy_combatants(ed) * int(ed.get('count', 1)))
+    return [u for u in out if u.weapon is not None]   # drop unmodeled-weapon (staff) enemies
 
 
 # ── Pure metrics layer (no I/O; operates on fe_combat.Combatant) ──────────────────
@@ -178,6 +316,28 @@ def carry(boss, party, terrain_avoid=0):
     ranked = sorted(party, key=lambda u: fc.rounds_to_kill(u, boss, terrain_avoid))
     best = ranked[0]
     return best, fc.rounds_to_kill(best, boss, terrain_avoid)
+
+
+# A fixed, campaign-neutral reference attacker/defender. enemy_pressure measures every
+# enemy against THIS unit, so a chapter's pressure is comparable to its vanilla reference's
+# on the same scale; the yardstick's exact stats cancel in an ours-vs-vanilla ratio. Chosen
+# as a plain mid-game footsoldier (iron sword, no triangle bias, modest bulk/offense).
+YARDSTICK = fc.Combatant('yardstick', hp=24, pow=8, skl=8, spd=8, df=6, res=4, lck=4,
+                         con=10, weapon=fc.W['iron-sword'])
+
+
+def enemy_pressure(enemies, deploy_cap, yardstick=YARDSTICK):
+    """Per-deploy-slot enemy pressure of an enemy list, as (threat/slot, clear-load/slot).
+
+    threat/slot = Σ damage_per_round(enemy -> yardstick) ÷ deploy_cap -- how much incoming
+    damage each of our slots must weather. clear-load/slot = Σ yardstick rounds_to_kill(enemy)
+    ÷ deploy_cap -- how much killing each slot must do to clear the map. Both measured against
+    the fixed YARDSTICK so ours and the vanilla reference land on one scale; the metric is a
+    static proxy (no positioning/AI/terrain), read as a ratio within a tolerance band."""
+    cap = max(1, deploy_cap)
+    threat = sum(fc.damage_per_round(e, yardstick) for e in enemies) / cap
+    clearload = sum(fc.rounds_to_kill(yardstick, e) for e in enemies) / cap
+    return threat, clearload
 
 
 def bulk_durability(unit, enemies):
@@ -384,6 +544,78 @@ def report(campaign, ch):
     else:
         print('\n(no vanilla reference field recorded for Ch%s yet -- delta skipped)' % num)
 
+    _print_pressure(_chapter_pressure(chap))
+
+
+def _chapter_pressure(chap, band=0.25):
+    """Enemy-pressure parity for one loaded chapter dict: our force vs its parity_reference's
+    vanilla force, threat/slot + clear-load/slot, with a verdict. `vanilla` is None when the
+    reference isn't curated yet (#48 registry)."""
+    deploy_cap = int(chap.get('deploy_limit', len(ROSTER)))
+    ours_force = chapter_enemy_force(chap)
+    ours = enemy_pressure(ours_force, deploy_cap)
+    ref = chap.get('parity_reference')
+    van = vanilla_enemies(ref)
+    out = {'reference': ref, 'deploy_cap': deploy_cap, 'ours': ours,
+           'n_ours': len(ours_force), 'vanilla': None}
+    if van is not None:
+        out['vanilla'] = enemy_pressure(van, deploy_cap)
+        out['n_vanilla'] = len(van)
+        out['verdict'] = pressure_verdict(ours, out['vanilla'], band)
+    return out
+
+
+def _print_pressure(p):
+    ot, ol = p['ours']
+    print('\n-- ENEMY-PRESSURE PARITY (vs %s) ' % (p['reference'] or '?') + '-' * 30)
+    if p['vanilla'] is None:
+        print('  ours (%d enemies / %d slots): threat/slot %.1f · clear-load/slot %.1f'
+              % (p['n_ours'], p['deploy_cap'], ot, ol))
+        print('  (no curated vanilla force for %r yet -- parity delta skipped)'
+              % p['reference'])
+        return
+    vt, vl = p['vanilla']
+    v = p['verdict']
+    print('  vanilla %-11s (%2d enemies): threat/slot %4.1f · clear-load/slot %4.1f'
+          % (p['reference'], p['n_vanilla'], vt, vl))
+    print('  ours    %-11s (%2d enemies): threat/slot %4.1f (x%.2f %s) · '
+          'clear-load/slot %4.1f (x%.2f %s)'
+          % ('', p['n_ours'], ot, v['threat_ratio'], v['threat'],
+             ol, v['load_ratio'], v['load']))
+    print('  verdict: %s' % ('PARITY (within band)' if v['verdict'] == 'OK'
+                             else 'OFF-PARITY -- threat %s, clear-load %s' % (v['threat'], v['load'])))
+
+
+def curve_report(campaign, band=0.25):
+    """Campaign-wide enemy-pressure curve: one row per authored chapter, ours vs its vanilla
+    reference, so spikes/sags across the arc are visible at a glance (#48)."""
+    paths = sorted(glob.glob(os.path.join(
+        bc.REPO, 'campaigns', campaign, 'chapters', 'ch*.yaml')))
+    bar = '=' * 86
+    print(bar)
+    print('CAMPAIGN ENEMY-PRESSURE CURVE -- ours vs vanilla parity_reference   '
+          '[STATIC proxy]')
+    print(bar)
+    print('  %-22s %-13s %-15s %-17s %s'
+          % ('chapter', 'reference', 'threat/slot', 'clear-load/slot', 'verdict'))
+    chaps = []
+    for path in paths:
+        with open(path, encoding='utf-8') as f:
+            chaps.append(bc.yaml.safe_load(f))
+    for chap in sorted(chaps, key=lambda c: c.get('chapter_number', 99)):
+        p = _chapter_pressure(chap, band)
+        ot, ol = p['ours']
+        label = 'CH%s %s' % (chap.get('chapter_number'), chap.get('id', ''))
+        if p['vanilla'] is None:
+            print('  %-22s %-13s %5.1f           %5.1f             (no ref)'
+                  % (label[:22], (p['reference'] or '?')[:13], ot, ol))
+            continue
+        vt, vl = p['vanilla']
+        v = p['verdict']
+        print('  %-22s %-13s %4.1f (x%.2f)     %4.1f (x%.2f)       %s'
+              % (label[:22], (p['reference'] or '?')[:13], ot, v['threat_ratio'],
+                 ol, v['load_ratio'], v['verdict']))
+
 
 def _fmt_delta(f):
     parts = [('%+d HP' % f.hp) if f.hp else '', ('%+d Def' % f.df) if f.df else '',
@@ -416,8 +648,10 @@ def lord_floor_report(campaign, ch, target=3.5, def_cap=4, res_cap=4, hp_cap=12)
 
 def main():
     ap = bc.argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument('--chapter', required=True, help='chapter id, e.g. ch01')
+    ap.add_argument('--chapter', help='chapter id, e.g. ch01 (omit with --curve)')
     ap.add_argument('--campaign', default='rime-of-the-frostmaiden')
+    ap.add_argument('--curve', action='store_true',
+                    help='emit the campaign-wide enemy-pressure curve (all chapters)')
     ap.add_argument('--lord-floor', action='store_true',
                     help='emit the per-lord survivability-floor table instead of the parity report')
     ap.add_argument('--target', type=float, default=3.5, help='floor: target bulk rounds-to-down')
@@ -425,7 +659,11 @@ def main():
     ap.add_argument('--res-cap', type=int, default=4, help='floor: max +Res')
     ap.add_argument('--hp-cap', type=int, default=12, help='floor: max +HP')
     args = ap.parse_args()
-    if args.lord_floor:
+    if args.curve:
+        curve_report(args.campaign)
+    elif not args.chapter:
+        ap.error('--chapter is required (or pass --curve for the campaign-wide report)')
+    elif args.lord_floor:
         lord_floor_report(args.campaign, args.chapter, args.target,
                           args.def_cap, args.res_cap, args.hp_cap)
     else:

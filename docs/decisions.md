@@ -343,12 +343,27 @@ Our cast is fixed all game and already at vanilla parity (above), so a chapter's
 enemies + deploy cap. The difficulty engine measures **enemy pressure** — threat/slot (Σ enemy
 damage-per-round vs a fixed yardstick unit ÷ deploy cap) and clear-load/slot (Σ enemy bulk ÷ deploy cap) —
 for our chapter and for the vanilla chapter named in a new per-chapter YAML field `parity_reference:
-"FE8 ChN"` (the cadence-bar source of truth; vanilla enemies auto-extracted from the decomp's
-`chN-eventudefs.h`). Parity = within a band. The engine also still reports our actual cast vs our enemies
-(throughput / durability / carry) as the absolute "can our roster clear it" check. **First cut analyzes at
-base level**; leveled stat projection is a deferred fast-follow (needs the recruit schedule, #45 item 5).
-Execution + full design: #48.
+"FE8 ChN"` (the cadence-bar source of truth; vanilla enemies auto-extracted from the decomp). Parity =
+within a band. The engine also still reports our actual cast vs our enemies (throughput / durability /
+carry) as the absolute "can our roster clear it" check. **First cut analyzes at base level**; leveled stat
+projection is a deferred fast-follow (needs the recruit schedule, #45 item 5). Execution + full design: #48.
 _Decided: 2026-06-19 (Nicolas)_
+
+**Implementation: the vanilla force comes from a curated array registry, not a per-chapter header.**
+The decomp only decompiled enemy `UnitDefinition` arrays to C for the Prologue + Ch1 (`*-eventudefs.h`);
+Ch2+ live in the monolithic `events_udefs.c` with address-named arrays interleaved with green/skirmish/
+cutscene units that a region-scan would wrongly pull in. So `tools/difficulty.py` resolves a
+`parity_reference` through a small **registry** (`PARITY_REFERENCE_UDEFS`: ref → file + the exact fightable
+red array names) — the single human-curated point of "which vanilla arrays ARE this chapter's enemies".
+Both sides project every enemy (generics AND named bosses) off **class base autoleveled to its level** — a
+boss's personal line is the dynamic playtest's concern, not this static proxy — so ours and vanilla resolve
+on identical footing and the yardstick/deploy-cap cancel in the ratio. Validation: our Ch1, mirrored 1:1 off
+FE8 Ch1, reads at parity (threat ×0.89, clear-load ×0.97, both inside ±25%). Registry seeded with Prologue +
+Ch1; Ch2–Ch6/Ch13 array curation is a fill-in fast-follow (and moot until those slices author enemy
+inventories — uninventoried enemies carry no modeled weapon and drop out). The verdict is **reported, not yet
+a hard CI gate** (gating would red the build on the not-yet-authored Ch2+); wiring the gate waits on those
+slices. `make difficulty CH=chNN` gains the pressure line; `make difficulty` (no CH) prints the campaign
+curve. _Implemented: 2026-06-19 (CLAUDE; pipeline track, TDD)_
 
 **How the deploy cap + prep screen are actually wired (the [decomp] mechanism).**
 `hasPrepScreen` in `chapter_settings.json` is dead — "left over from FE7"
