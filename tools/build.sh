@@ -45,9 +45,14 @@ fi
 echo ">> dist build (MONTAGE=1: with the #43 opening montage)"
 make CAMPAIGN="$CAMPAIGN" MONTAGE=1
 
-OUT="dist/ManchegoStars-Alpha-$(date +%Y-%m-%d).gba"
+# Versioned dist stamp (see docs/decisions.md §Distribution & Scope -> Versioning).
+# Scheme: v0.<chapters-playable>.<patch>, staying 0.x until the full MVP ships as v1.0.
+# "Alpha" remains the title-screen/README label for the whole 0.x phase; the FILE is versioned.
+VERSION="$(tr -d ' \t\n\r' < VERSION)"
+OUT="dist/ManchegoStars-v${VERSION}-$(date +%Y-%m-%d).gba"
 mkdir -p dist
 cp fireemblem8u/fireemblem8.gba "$OUT"
 echo ">> stamped $OUT"
 echo "   md5: $(md5 -q "$OUT" 2>/dev/null || md5sum "$OUT" | cut -d' ' -f1)"
 echo "   (a montage ROM's md5 MUST differ from the no-opener 142971e3 build)"
+echo ">> to ship: git tag v${VERSION} && git push --tags"
