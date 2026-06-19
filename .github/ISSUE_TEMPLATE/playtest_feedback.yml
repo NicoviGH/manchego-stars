@@ -1,5 +1,9 @@
+# UPKEEP: when a new chapter ships, add it to the `where` dropdown and add the new
+# version to the `version` dropdown (default = newest). Keep this list to what friends
+# can actually reach in a released build — never list unbuilt chapters. Tie this to the
+# release step (#37) so the form tracks the friend build.
 name: "🎮 Playtest feedback"
-description: "Tell Nicolas what you thought — anything from a bug to a vibe. Three quick fields."
+description: "Tell Nicolas what you thought — anything from a bug to a vibe. A few quick fields."
 title: "[Playtest] "
 labels: ["playtest"]
 body:
@@ -8,7 +12,17 @@ body:
       value: |
         Thanks for playing **Manchego Stars**! Just say what's on your mind in plain
         words — no need to be technical. Nicolas (with Claude's help) sorts it into the
-        right chapter and the right kind of fix. Only the last box is required.
+        right place. Only the last box is required.
+  - type: dropdown
+    id: version
+    attributes:
+      label: "Which build are you playing?"
+      description: "It's in the name of the ROM file Nicolas sent you — e.g. `ManchegoStars-v0.1.0-…gba`."
+      options:
+        - "v0.1.0"
+        - "Not sure / can't find it"
+    validations:
+      required: false
   - type: dropdown
     id: where
     attributes:
@@ -18,13 +32,6 @@ body:
         - "Title / opening montage"
         - "Prologue — A Dagger of Ice"
         - "Ch1 — The Iron Trail"
-        - "Ch2 — Cold Welcome"
-        - "Ch3 — The Termalaine Mine"
-        - "Ch4 — The White Moose"
-        - "Ch5 — The Elven Tomb"
-        - "Ch6 — The Maer Monster"
-        - "Ch7 — Blood in Bremen"
-        - "Ch8 — The Eastway Ambush"
         - "World map / menus / prep screen"
         - "Not sure / general impression"
     validations:

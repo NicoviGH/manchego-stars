@@ -67,7 +67,9 @@ a sprite that misleads in combat → `art` + `bug`). Also capture **sentiment** 
 
 1. **Parse** the raw text semantically — what actually happened, where, how it felt, what
    they expected vs. got. Don't keyword-match; read it. Pull the area even when the friend
-   said "not sure" (infer from unit/scene names).
+   said "not sure" (infer from unit/scene names). **Capture the build version** (the form
+   asks; ad-hoc, ask Nicolas which build) and record it in the filed issue — a finding is
+   only meaningful against a known ROM, and it may already be fixed on a newer build.
 2. **Classify** → label(s) + area + sentiment, per the tables above.
 3. **Decide weight** — mirror #47:
    - **Lightweight** (a clear, bounded fix or a one-line impression): becomes a **checklist
@@ -102,3 +104,6 @@ a sprite that misleads in combat → `art` + `bug`). Also capture **sentiment** 
   with your reasoning; he owns the call.
 - Keep the form's "what kind" dropdown and this taxonomy in lockstep — they're one source
   of truth split across two files.
+- **Per-release upkeep:** when a chapter ships or a new build goes out, update the form's
+  `where` + `version` dropdowns (tie to release #37) so friends only ever see what they can
+  reach. Never list unbuilt chapters — that's what prompted trimming the form to v0.1.0.
