@@ -10,6 +10,18 @@ not this file. Don't clobber the content track's `HANDOFF-content.md`.
 > touching it); a merge conflict there is the main parallel risk. Pure-pipeline files (`difficulty.py`,
 > `fe_combat.py`, `playtest/**`, CI) are conflict-safe.
 
+## Seam enforcement landed (2026-06-19, #55) — READ IF YOU RUN PARALLEL
+The first parallel run had violations (pipeline edited content's `build_campaign.py`) because the
+seam was honor-system and no worktree isolation was actually engaged. Now **enforced**:
+- `check.py check_lane_ownership` (pre-commit + CI) blocks cross-lane edits; with no lane set it
+  blocks ANY lane-exclusive file (can't author loose on `main`). Lane = `inst/<track>` branch name.
+- `worktree-setup.sh` derives/announces the lane + ensures the hook runs. **Each instance MUST work
+  in its `../ms-<track>` worktree** (CLAUDE.md §Parallel Tracks; decisions.md §Seam enforcement).
+- The shared weapon↔ITEM map moved to `tools/inject/decomp.py`; **#53 weapon work never touches
+  `build_campaign.py`** now. Proven: in an `inst/pipeline` worktree, editing `build_campaign.py` is
+  blocked, `difficulty.py` allowed; `--no-verify` is the only escape. The primary checkout is
+  integration-only (lane unset).
+
 ## Last session (2026-06-19, pipeline) — all on main, green, pushed
 - **#48 enemy-pressure parity engine** landed: `vanilla_enemies` (decomp extractor),
   `enemy_pressure` (threat/slot + clear-load/slot vs a fixed yardstick), `pressure_verdict`,
