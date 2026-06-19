@@ -372,6 +372,67 @@ local function procFingerprint()
     return fp
 end
 
+-- ---- greedy clear-bot (#60): real-combat chapter completion. Generic boss detection
+-- (no hardcoded char ids) + the pure pickTarget core; the scenario owns the driving.
+local CLEARBOT = dofile(PLAYTEST_DIR .. "/clearbot.lua")
+local CA_BOSS = (1 << 15)   -- include/bmunit.h:326 (character/class attribute)
+
+-- A unit's character carries the CA_BOSS attribute: pCharacterData (Unit +0x00) ->
+-- CharacterData.attributes (+0x28). True for named bosses (Sephek, the ch01 chief, ...).
+local function unitIsBoss(u)
+    local chptr = ru32(u.addr)
+    if chptr == 0 then return false end
+    return (ru32(chptr + 0x28) & CA_BOSS) ~= 0
+end
+
+-- The live boss in the red array (the first CA_BOSS unit), or nil.
+local function findBoss()
+    for i = 0, 23 do
+        local u = unitAt(SYM.gUnitArrayRed, i)
+        if u and not isDead(u) and unitIsBoss(u) then return u end
+    end
+    return nil
+end
+
+-- Live red units as plain {x,y,hp,is_boss} tables for the pure pickTarget core.
+local function liveEnemies()
+    local out = {}
+    for i = 0, 23 do
+        local u = unitAt(SYM.gUnitArrayRed, i)
+        if u and not isDead(u) then
+            out[#out + 1] = { x = u.x, y = u.y, hp = u.hp, is_boss = unitIsBoss(u) }
+        end
+    end
+    return out
+end
+
+-- Select unit u and return the tiles it can move to this turn (cost < 120, free, plus its
+-- own tile -- attack-from-here), leaving it selected with the move range shown. nil if the
+-- unit is exhausted (selecting opened a menu) or the cursor never reached it. Reuses the
+-- stale-move-map guard from marchToward (an eaten A press reads cost 0 everywhere).
+local function selectAndReach(u, maxx, maxy)
+    maxx, maxy = maxx or 14, maxy or 9
+    for _ = 1, 4 do
+        if not cursorTo(u.x, u.y) then return nil end
+        press(K.A)
+        wait(12)
+        if menuOpen() then press(K.B); wait(10); return nil end
+        local reach, unreachable = {}, 0
+        for y = 0, maxy do
+            for x = 0, maxx do
+                if reachCost(x, y) >= 120 then
+                    unreachable = unreachable + 1
+                elseif (x == u.x and y == u.y) or not tileOccupied(x, y) then
+                    reach[#reach + 1] = { x = x, y = y }
+                end
+            end
+        end
+        if unreachable > 0 then return reach end   -- a real move map has unreachable tiles
+        press(K.B); wait(40)                        -- stale map (eaten A press); reselect
+    end
+    return nil
+end
+
 -- The idle drive loop, shared by every smoke_* scenario: from the moment we are on a
 -- chapter's map (startChapter = the host slot), idle every player unit and just end each
 -- turn, sampling state into a frame-age-trimmed ring and asking liveness.classify each
@@ -620,6 +681,83 @@ end
 scenarios.smoke_ch01 = function()
     if not reachCh01Map() then return end
     return smokeDrive(chapter())
+end
+
+-- clearprobe: confirm generic boss detection (CA_BOSS) finds the prologue boss with no
+-- hardcoded char id -- the foundation the clear-bot stands on. PASS = a boss was found.
+scenarios.clearprobe = function()
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    local boss = findBoss()
+    if not boss then return result("FAIL", "no CA_BOSS unit found in the red array") end
+    log(string.format("boss found: char=0x%02X at (%d,%d) hp=%d",
+        boss.charId, boss.x, boss.y, boss.hp))
+    result("PASS", string.format("CA_BOSS boss detected (char 0x%02X)", boss.charId))
+end
+
+-- One player unit's action for the clear-bot: select it, pick a melee target (boss-first
+-- via pickTarget) and attack from the reachable adjacent tile, else advance toward the
+-- boss at (bx,by). GUARANTEES it leaves no unit selected (commit via Attack/Wait, or
+-- back out with B) so the next unit / end-turn isn't driving a stale selection.
+local function clearUnitAct(u, bx, by)
+    local reach = selectAndReach(u)
+    if not reach then return end                 -- exhausted/unreachable; nothing selected
+    local pick = CLEARBOT.pickTarget(reach, liveEnemies(), { range = 1 })
+    local tile = pick and pick.tile
+    if not tile then                             -- no target in range: step toward the boss
+        local bestd = 999
+        for _, t in ipairs(reach) do
+            local d = math.abs(bx - t.x) + math.abs(by - t.y)
+            if d < bestd then tile, bestd = t, d end
+        end
+    end
+    if tile and cursorTo(tile.x, tile.y) then
+        press(K.A)
+        if waitFor(menuOpen, 40) then
+            if pick then chooseAttack(u.addr) else chooseWait() end
+            return
+        end
+    end
+    press(K.B); press(K.B)                       -- never leave a unit selected
+end
+
+-- clear <prologue>: actually PLAY the chapter with real combat (no pokeFrail) -- march on
+-- the boss, attack with each unit, ride out enemy phases, until the chapter advances (win)
+-- or we lose (game over) / run the turn budget. The completability brick (#60).
+scenarios.clear = function()
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    local startChapter = chapter()
+    local boss = findBoss()
+    if not boss then return result("FAIL", "no boss found to clear toward") end
+    log(string.format("clear: boss char=0x%02X at (%d,%d) hp=%d",
+        boss.charId, boss.x, boss.y, boss.hp))
+    local budgetTurns = 12
+    for t = 1, budgetTurns do
+        for i = 0, 7 do
+            if chapter() ~= startChapter then
+                shot("clear-win")
+                return result("PASS", string.format(
+                    "chapter advanced %d -> %d by turn %d", startChapter, chapter(), t))
+            end
+            local u = unitAt(SYM.gUnitArrayBlue, i)
+            if u and not isDead(u) and (u.state & 0x2) == 0 then   -- live, not yet acted
+                local b = findBoss()
+                clearUnitAct(u, b and b.x or boss.x, b and b.y or boss.y)
+            end
+        end
+        local phase = runEnemyPhase()
+        if phase == "gameover" then
+            shot("clear-gameover")
+            return result("FAIL", string.format("game over on turn %d -- bot lost units", t))
+        end
+        if chapter() ~= startChapter then
+            shot("clear-win")
+            return result("PASS", string.format(
+                "chapter advanced %d -> %d by turn %d", startChapter, chapter(), t))
+        end
+    end
+    shot("clear-timeout")
+    return result("FAIL", string.format("could not clear in %d turns (boss %s)",
+        budgetTurns, findBoss() and "alive" or "dead"))
 end
 
 -- CH01WIN: the default lord (blind A-taps pick Braulo) marches on the camp,

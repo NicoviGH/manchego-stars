@@ -563,6 +563,20 @@ the pure verdict is a separate module (`liveness.lua`). Extracting an `io_core` 
 consumer (the fuzzer's external driver / LLM-player) is deferred until one actually exists (YAGNI).
 _Decided: 2026-06-19 (CLAUDE; pipeline track. liveness.lua + tests landed TDD; smoke driver scenario + run.sh wiring follow)_
 
+**Playtest platform brick 2 = a greedy CLEAR-BOT that proves completability with real combat (#60).**
+The smoke net proves a chapter doesn't crash/soft-lock; the clear-bot proves it can be *won* — and is the
+rule-based precursor to the LLM-player (swap the policy later). `scenarios.clear` actually plays the chapter
+(no `pokeFrail` cheat like `scenarios.win`): each player phase it marches every unit at the boss and attacks
+with real combat, rides out enemy phases, and wins when the chapter advances (FAIL on game-over or a turn
+budget). **Boss detection is generic** — a red unit whose `CharacterData.attributes` (`pCharacterData` at
+Unit `+0x00`, attributes `+0x28`) has `CA_BOSS = (1 << 15)` (`include/bmunit.h:326`) — no hardcoded char ids
+(verified: finds Sephek `0x68` on the prologue). The target choice is a **pure** function
+(`clearbot.lua` `pickTarget(reachable, enemies, prefs)`: melee-range, boss-first then lowest-HP), unit-tested
+without an emulator (`test_clearbot.lua`, in `make test`) — driving stays in the scenario. A naive greedy
+melee strategy was enough to clear the prologue in 4 turns with real combat (no gang-up/heal logic needed
+yet); harder chapters may need it. ch01's Seize objective + ch02+ (save-state checkpoints) are follow-ups (#60).
+_Decided: 2026-06-19 (CLAUDE; pipeline track. pickTarget TDD + scenarios.clear/clearprobe verified on a built ROM)_
+
 **Recording a cutscene as a review GIF (the standard way to show Nicolas motion).**
 The harness fast-forwards cutscenes (mashes A), so an assert scenario's screenshots land
 on fades — to SEE a scene play, use a `record*` scenario: it drives the game to the
