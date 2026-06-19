@@ -40,8 +40,10 @@ seam was honor-system and no worktree isolation was actually engaged. Now **enfo
 
 ## Start here (fresh instance — do this first)
 You are the **Pipeline-track** instance for Manchego Stars (trunk-based, your own worktree).
-1. **MANDATORY first:** bootstrap your isolated worktree — `tools/worktree-setup.sh ../ms-pipeline`
-   (branch `inst/pipeline` + toolchain symlinks), then `cd ../ms-pipeline`. This is now **enforced**:
+1. **MANDATORY first — work in the pipeline worktree, never on `main`.** It already exists at
+   `../ms-pipeline` on branch `inst/pipeline` — `cd ../ms-pipeline` and confirm with
+   `git rev-parse --abbrev-ref HEAD`. Only if missing, bootstrap it: `tools/worktree-setup.sh
+   ../ms-pipeline` (branch + toolchain symlinks), then `cd ../ms-pipeline`. This is **enforced**:
    `check.py check_lane_ownership` (pre-commit + CI) blocks pipeline edits to content-owned files and
    blocks any lane-exclusive file when you're not in a lane worktree. Don't work loose on `main`.
 2. Read `CLAUDE.md` (§Parallel Tracks) and `docs/decisions.md` (§Seam enforcement), then continue from

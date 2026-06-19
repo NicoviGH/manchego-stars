@@ -78,15 +78,19 @@ Work splits into a **content** track (`campaigns/**`, `tools/build_campaign.py` 
 Shared by both: `tools/inject/**`, `docs/**`, `HANDOFF*`, `CLAUDE.md`, `Makefile`. Rationale +
 enforcement: `docs/decisions.md` → Seam enforcement (#55).
 
+**Working a track means working in that track's worktree** — always, even solo. When asked to
+"work the content track" / "work the pipeline track", switch into that track's worktree first
+(`../ms-content` on `inst/content`, `../ms-pipeline` on `inst/pipeline`); they're already bootstrapped,
+and `tools/worktree-setup.sh ../ms-<track>` re-creates one if missing. **Don't do track work on `main`.**
+
 **This handoff/checklist routes by where you are** (run `git rev-parse --abbrev-ref HEAD`):
-- On **`main`** (the primary `manchego-stars` checkout) → the integration/solo tree. Read `HANDOFF.md`.
-  **No lane is enforced here** — edit anything; you're one person doing one thing at a time.
+- On **`main`** (the primary `manchego-stars` checkout) → the integration/solo tree, for cross-track
+  merges and ad-hoc one-offs only. Read `HANDOFF.md`. **No lane is enforced here.**
 - On **`inst/content`** / **`inst/pipeline`** (a worktree, opened as its own VS Code folder) → you ARE
   that track. Read `HANDOFF-content.md` / `HANDOFF-pipeline.md` and stay in your lane:
   `check.py check_lane_ownership` (pre-commit + CI) blocks editing the *other* lane's files
-  (`--no-verify` overrides). This is only needed when both instances run **at once** (two builds in one
-  tree corrupt each other), so each concurrent instance gets its own `tools/worktree-setup.sh ../ms-<track>`
-  worktree = its own VS Code window. Sequential work needs none of this — just use the main window.
+  (`--no-verify` overrides). Worktree isolation is also what lets two instances run **at once** (two
+  builds in one tree would corrupt each other); each instance gets its own worktree = its own VS Code window.
 
 Never commit the `fireemblem8u` submodule pointer.
 

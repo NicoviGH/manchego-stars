@@ -217,6 +217,16 @@ tree corrupt each other) — so enforcing exactly where worktrees exist covers t
 constants (e.g. the weapon↔ITEM map) live in `tools/inject/decomp.py`, not either side's file. Issue #55.
 _Decided: 2026-06-19_
 
+**Track work always happens in that track's worktree — even solo.** "Work the content track" / "work the
+pipeline track" means: switch into `../ms-content` (`inst/content`) or `../ms-pipeline` (`inst/pipeline`)
+*first*, then work. `main` is reserved for cross-track integration and ad-hoc one-offs. This is broader than
+the build-isolation rationale above (which only *requires* a worktree when two instances run concurrently):
+making the worktree the unconditional home for track work removes the "is anyone else running?" judgment call,
+keeps every track commit on its `inst/<track>` branch where the lane guard applies, and means a fresh instance
+told to "work the content track" lands in the right tree by default instead of editing `main`. The worktrees
+are persistent (already bootstrapped); `tools/worktree-setup.sh` only re-creates a missing one.
+_Decided: 2026-06-19 (Nicolas)_
+
 ---
 
 ## Combat System

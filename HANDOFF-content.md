@@ -7,8 +7,10 @@ Don't clobber the pipeline track's `HANDOFF-pipeline.md`.
 
 ## Start here (fresh instance — do this first)
 You are the **Content-track** instance for Manchego Stars (trunk-based, your own worktree).
-1. Bootstrap an isolated build env: `tools/worktree-setup.sh ../ms-content` (creates the worktree
-   on branch `inst/content` + symlinks the toolchain). `cd ../ms-content`.
+1. **Work in the content worktree, never on `main`.** It already exists at `../ms-content` on branch
+   `inst/content` — `cd ../ms-content` and confirm with `git rev-parse --abbrev-ref HEAD`. Only if it's
+   missing, bootstrap it: `tools/worktree-setup.sh ../ms-content` (creates the worktree + symlinks the
+   toolchain), then `cd ../ms-content`.
 2. Read `CLAUDE.md` and `docs/decisions.md`, then continue from **Next** below.
 3. Trunk-based: small commits, `git pull --rebase origin main` often, push when green, no
    long-lived branches, never commit the `fireemblem8u` submodule pointer.
