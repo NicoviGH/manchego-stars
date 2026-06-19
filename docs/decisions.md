@@ -198,6 +198,23 @@ per hook, that it is *defined* in `engine_hooks.py` AND *called* (`engine_hooks.
 byte-identical ROM (md5 unchanged) plus `lordfloor`/`ch01win` playtests. Work tracker #50.
 _Decided: 2026-06-19_
 
+**Seam enforcement: a lane-ownership guard, because the seam was honor-system and got crossed.**
+The first parallel run had violations — the pipeline instance edited `build_campaign.py` (content-owned)
+because nothing *stopped* it (and because no worktree isolation was actually engaged: both sessions ran in
+the primary checkout on `main`). Documentation + the file seam weren't enough; ownership is now **enforced**.
+`tools/check.py` carries the ownership map (single source, mirrors the `HANDOFF-*.md` "You own" lists:
+pipeline = `difficulty.py`/`fe_combat.py`/`check.py`/`playtest/**`/`build.sh`/`worktree-setup.sh`/`hooks/**`/
+`.github/workflows/**`; content = `campaigns/**`/`build_campaign.py`/`portrait_tool.py`/`map_sprite_tool.py`/
+`ref_to_bust.py`; everything else incl. `tools/inject/**` + docs = shared) and `check_lane_ownership()`, run
+by the pre-commit hook + CI. The lane is read from the `inst/<track>` **branch name** (inherently
+per-worktree; `.git/config` is shared), `manchego.lane` config as fallback. A staged file owned by the other
+lane is blocked; **with no lane set, ANY lane-exclusive file is blocked** — so you can't author source loose
+on the primary checkout (the exact hole that bit us). `git commit --no-verify` is the deliberate-integration
+escape. CI enforces on `inst/*` PRs via `GITHUB_HEAD_REF`/`BASE_REF`. Consequence: each instance **must**
+work in its own `tools/worktree-setup.sh ../ms-<track>` worktree; the primary checkout is integration-only.
+Shared cross-lane constants (e.g. the weapon↔ITEM map) live in `tools/inject/decomp.py`, not either side's
+file. Issue #55. _Decided: 2026-06-19_
+
 ---
 
 ## Combat System

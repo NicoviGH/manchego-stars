@@ -28,9 +28,12 @@ not this file. Don't clobber the content track's `HANDOFF-content.md`.
 
 ## Start here (fresh instance — do this first)
 You are the **Pipeline-track** instance for Manchego Stars (trunk-based, your own worktree).
-1. Bootstrap an isolated build env: `tools/worktree-setup.sh ../ms-pipeline` (creates the worktree
-   on branch `inst/pipeline` + symlinks the toolchain). `cd ../ms-pipeline`.
-2. Read `CLAUDE.md` and `docs/decisions.md`, then continue from **Next** below.
+1. **MANDATORY first:** bootstrap your isolated worktree — `tools/worktree-setup.sh ../ms-pipeline`
+   (branch `inst/pipeline` + toolchain symlinks), then `cd ../ms-pipeline`. This is now **enforced**:
+   `check.py check_lane_ownership` (pre-commit + CI) blocks pipeline edits to content-owned files and
+   blocks any lane-exclusive file when you're not in a lane worktree. Don't work loose on `main`.
+2. Read `CLAUDE.md` (§Parallel Tracks) and `docs/decisions.md` (§Seam enforcement), then continue from
+   **Next** below.
 3. Trunk-based: small commits, `git pull --rebase origin main` often, push when green, no
    long-lived branches, never commit the `fireemblem8u` submodule pointer.
 

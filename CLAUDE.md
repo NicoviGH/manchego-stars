@@ -71,6 +71,22 @@ cd fireemblem8u
 - If you're about to hardcode "braulo" or "ch03" in a `.c` file — stop. It belongs in YAML.
 - Code review rule: any C change that references a character by name, a chapter number, or a plot event is rejected
 
+## Parallel Tracks: lane ownership is ENFORCED (read before committing)
+
+Content and pipeline run as two instances; the engine/content seam is enforced, not honor-system
+(`docs/decisions.md` → Seam enforcement; issue #55). **Bootstrap your own worktree FIRST** — it is
+the mandatory first action, not optional:
+- Content: `tools/worktree-setup.sh ../ms-content` (→ `inst/content`). Owns `campaigns/**`,
+  `tools/build_campaign.py` + the art tools.
+- Pipeline: `tools/worktree-setup.sh ../ms-pipeline` (→ `inst/pipeline`). Owns `tools/difficulty.py`,
+  `fe_combat.py`, `check.py`, `playtest/**`, `build.sh`, CI.
+- Shared (either lane): `tools/inject/**`, `docs/**`, `HANDOFF*`, `CLAUDE.md`, `Makefile`.
+
+`tools/check.py check_lane_ownership` (pre-commit + CI) **blocks** a commit that edits the other lane's
+files — and blocks ANY lane-exclusive file when you're not in a lane worktree (e.g. loose on `main`). If
+you need a change across the seam, coordinate via a GitHub issue; `git commit --no-verify` is the only
+(deliberate, rare) escape. Never commit the `fireemblem8u` submodule pointer.
+
 ## Working Conventions (Definition of Done)
 
 Rationale and the long form: `docs/decisions.md` → Working Conventions. Every change:
