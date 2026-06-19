@@ -29,7 +29,17 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WT_PATH="${1:-}"
 [ -n "$WT_PATH" ] || { echo "usage: tools/worktree-setup.sh <path> [branch]" >&2; exit 2; }
 
-BRANCH="${2:-inst/$(basename "$WT_PATH")}"
+# Default branch: a clean lane name derived from the path (../ms-content -> inst/content),
+# so the seam guard reads the lane straight off the branch. Override with the 2nd arg.
+if [ -n "${2:-}" ]; then
+    BRANCH="$2"
+else
+    case "$(basename "$WT_PATH")" in
+        *content*)  BRANCH="inst/content" ;;
+        *pipeline*) BRANCH="inst/pipeline" ;;
+        *)          BRANCH="inst/$(basename "$WT_PATH")" ;;
+    esac
+fi
 
 # These toolchain artifacts are gitignored (built by setup-toolchain.sh) and so
 # absent from a fresh submodule checkout. They are static native binaries -- safe
