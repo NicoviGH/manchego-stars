@@ -195,7 +195,20 @@ events:
     turn: 3
     type: reinforcement
     ea_file: events/ch02-rear-ambush.ea
-    description: "Wolves emerge from the rear (edge opposite the captain) — teach defending the back line."
+    description: >
+      Wolves emerge from the rear (edge opposite the captain) — teach defending the
+      back line. Wolfram (the armored anchor who forged the sled in ch01 and re-plates
+      it at the inn) calls the rear: terse FE8 reinforcement-bark cadence, ends on the
+      order. LOCKED dialogue-pass text below (speaker chosen by Nicolas 2026-06-19).
+      PENDING (not wired yet): the eventscript that consumes this + on-map bubble fit —
+      "Wolves at our backs — the sled." is 31 chars, past the 29-char bubble wrap, so at
+      insertion it wraps to the bubble's 2nd line (or split with [LF]); verify the
+      right-side bubble isn't pushed offscreen by the width measure.
+    script:                     # LOCKED 2026-06-19 (dialogue pass, speaker chosen by Nicolas)
+      # (Turn 3. Two Snow Wolves drop in at the rear edge, opposite the captain, lunging
+      #  for the parked sled. Wolfram pivots to the back line and plants himself there.)
+      - wolfram: "Wolves at our backs — the sled."
+      - wolfram: "Hold here. I've got the rear."
   - trigger: chapter_end
     type: cutscene
     ea_file: events/ch02-targos-inn.ea
