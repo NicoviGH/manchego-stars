@@ -1,0 +1,56 @@
+name: "🎮 Playtest feedback"
+description: "Tell Nicolas what you thought — anything from a bug to a vibe. Three quick fields."
+title: "[Playtest] "
+labels: ["playtest"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for playing **Manchego Stars**! Just say what's on your mind in plain
+        words — no need to be technical. Nicolas (with Claude's help) sorts it into the
+        right chapter and the right kind of fix. Only the last box is required.
+  - type: dropdown
+    id: where
+    attributes:
+      label: "Where in the game?"
+      description: "Roughly where this happened. Pick 'Not sure' if you don't remember."
+      options:
+        - "Title / opening montage"
+        - "Prologue — A Dagger of Ice"
+        - "Ch1 — The Iron Trail"
+        - "Ch2 — Cold Welcome"
+        - "Ch3 — The Termalaine Mine"
+        - "Ch4 — The White Moose"
+        - "Ch5 — The Elven Tomb"
+        - "Ch6 — The Maer Monster"
+        - "Ch7 — Blood in Bremen"
+        - "Ch8 — The Eastway Ambush"
+        - "World map / menus / prep screen"
+        - "Not sure / general impression"
+    validations:
+      required: false
+  - type: dropdown
+    id: kind
+    attributes:
+      label: "What kind of feedback? (just a hint — pick whatever's closest)"
+      description: "Don't overthink it. Claude reads your actual words; this only nudges the sorting."
+      options:
+        - "🐛 Something broke / looked wrong"
+        - "⚖️ Too hard or too easy"
+        - "📖 Story / dialogue / a character"
+        - "🎨 Art / sprites / map looks"
+        - "🎵 Music or sound"
+        - "💡 An idea or suggestion"
+        - "🗣️ Just a general impression"
+    validations:
+      required: false
+  - type: textarea
+    id: what
+    attributes:
+      label: "What happened? Tell me about it."
+      description: |
+        In your own words. The more specific the better — which unit, which moment, how it
+        felt, what you expected vs. what you got. Drag in a screenshot if you have one.
+      placeholder: "e.g. Brie kept getting one-shot by the archers on the bridge, and I had no idea the goblins could see that far. Felt unfair more than hard."
+    validations:
+      required: true
