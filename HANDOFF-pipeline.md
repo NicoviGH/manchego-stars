@@ -8,12 +8,13 @@ the lane guard is `check.py check_lane_ownership`). Seam enforcement (#55) + par
 pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
 
 ## Now (2026-06-19) — parity engine live; playtest smoke net + clear-bot working on the prologue
-- **#60 greedy clear-bot LANDED & verified** (decisions.md §Playtest platform brick 2). `scenarios.clear`
-  PLAYS the prologue with real combat (no `pokeFrail`) and won (chapter 1→2 by turn 4). Generic boss
-  detection via `CA_BOSS` (CharacterData attrs `+0x28`, `1<<15`) — no hardcoded char ids (finds Sephek
-  `0x68`). Pure target core `clearbot.lua` `pickTarget` (melee, boss-first/lowest-HP), TDD'd
-  (`test_clearbot.lua`, 9 asserts, in `make test`). `clearprobe` = a cheap boss-detection check. **Next:**
-  ch01 clear (Seize objective) + harder chapters may need gang-up/heal; then the stability fuzzer.
+- **#60 greedy clear-bot LANDED & verified — clears prologue AND ch01** (decisions.md §Playtest platform
+  brick 2). One generic `clearDrive` loop PLAYS a chapter with real combat (no `pokeFrail`): march/attack
+  toward the boss, then if not already won, **Seize** the boss's old tile. Won both the prologue (DefeatBoss)
+  and **ch01 (Seize, real combat through 10 goblins)** in 3 turns each, no game-over. Generic boss detection
+  via `CA_BOSS` (CharacterData attrs `+0x28`, `1<<15`) — no hardcoded ids (finds Sephek `0x68`, chief `0x46`).
+  Pure target core `clearbot.lua` `pickTarget`, TDD'd (`test_clearbot.lua`, 9 asserts, `make test`).
+  Scenarios: `clear` / `clear_ch01` / `clearprobe`. **Next:** stability fuzzer; ch02+ needs checkpoints.
 - **#49 smoke liveness net LANDED & verified** (decisions.md §Playtest platform first brick). Pure classifier
   `liveness.lua` + `test_liveness.lua` (6 asserts, TDD, in `make test`; needs `lua` — `brew install lua`).
   Driver is a `harness.lua` scenario (`smokeDrive` + `scenarios.smoke` / `scenarios.smoke_ch01`) reusing
@@ -37,11 +38,12 @@ pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
   Ch6 (→ our ch07). FE8 Ch13 (→ our ch08) is the lone deferred reference.
 
 ## Next (priority order)
-1. **Clear-bot — continue** (#60): the prologue clears; next is **ch01 (Seize objective)** — reuse
-   `reachCh01Map` as the lead-in, add Seize handling (the lord must reach the seize tile, not just kill the
-   boss). Harder chapters may need gang-up / don't-feed-the-lord / heal logic. Then the **stability fuzzer**
-   (seeded random inputs over the same I/O layer). ch02+ smoke/clear coverage needs per-chapter save-state
-   checkpoints (reuse `states/` infra), deferred till those chapters are built.
+1. **Stability fuzzer** (#49, next platform brick): seeded random inputs over the same I/O layer to hunt
+   crashes/soft-locks the directed smoke/clear bots miss. Then the **LLM-player** (swap the clear-bot's
+   rule-based policy for an LLM) — and its **graduation benchmark: play vanilla FE8** (#49 comment, Nicolas).
+   The clear-bot already clears prologue + ch01 (DefeatBoss + Seize) with real combat; harder chapters may
+   still need gang-up / don't-feed-the-lord / heal logic. ch02+ smoke/clear coverage needs per-chapter
+   save-state checkpoints (reuse `states/` infra), deferred till those chapters are built.
 2. **#53 tail — FE8 Ch13 reference** (→ our ch08, deferred/optional): bigger than billed — needs ~11 *standard*
    weapons modeled (silver/steel/killer/slim/short-spear/elfire/zanbato/swordslayer/purge), not a few exotics.
    ch08 is a scripted-defeat objective (never CI-gated), so it's informational polish; do it only if idle.

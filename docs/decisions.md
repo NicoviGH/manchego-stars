@@ -572,10 +572,15 @@ budget). **Boss detection is generic** — a red unit whose `CharacterData.attri
 Unit `+0x00`, attributes `+0x28`) has `CA_BOSS = (1 << 15)` (`include/bmunit.h:326`) — no hardcoded char ids
 (verified: finds Sephek `0x68` on the prologue). The target choice is a **pure** function
 (`clearbot.lua` `pickTarget(reachable, enemies, prefs)`: melee-range, boss-first then lowest-HP), unit-tested
-without an emulator (`test_clearbot.lua`, in `make test`) — driving stays in the scenario. A naive greedy
-melee strategy was enough to clear the prologue in 4 turns with real combat (no gang-up/heal logic needed
-yet); harder chapters may need it. ch01's Seize objective + ch02+ (save-state checkpoints) are follow-ups (#60).
-_Decided: 2026-06-19 (CLAUDE; pipeline track. pickTarget TDD + scenarios.clear/clearprobe verified on a built ROM)_
+without an emulator (`test_clearbot.lua`, in `make test`) — driving stays in the scenario. **Both win
+objectives are handled generically by one `clearDrive` loop**: kill the boss, and if the chapter hasn't
+already advanced (DefeatBoss), send a unit onto the boss's old tile to **Seize** (the seize tile = the dead
+boss's tile; a non-seizer just Waits, so the loop tries the next unit) — win = chapter advances OR the title
+screen (ch01's ch02 isn't hosted). A naive greedy melee strategy cleared **both the prologue (DefeatBoss) and
+ch01 (Seize, real combat through a 10-goblin escort) in 3 turns each** with no `pokeFrail` and no game-over —
+no gang-up/heal/don't-feed-the-lord logic needed yet (harder chapters may). ch02+ (save-state checkpoints) is
+the remaining follow-up (#60).
+_Decided: 2026-06-19 (CLAUDE; pipeline track. pickTarget TDD; scenarios.clear + clear_ch01 + clearprobe verified on a built ROM)_
 
 **Recording a cutscene as a review GIF (the standard way to show Nicolas motion).**
 The harness fast-forwards cutscenes (mashes A), so an assert scenario's screenshots land

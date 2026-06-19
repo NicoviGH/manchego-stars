@@ -720,52 +720,77 @@ local function clearUnitAct(u, bx, by)
     press(K.B); press(K.B)                       -- never leave a unit selected
 end
 
--- clear <prologue>: actually PLAY the chapter with real combat (no pokeFrail) -- march on
--- the boss, attack with each unit, ride out enemy phases, until the chapter advances (win)
--- or we lose (game over) / run the turn budget. The completability brick (#60).
-scenarios.clear = function()
-    if not bootToMap() then return result("FAIL", "never reached the map") end
-    local startChapter = chapter()
+local CH01_PARK = { x = 24, y = 15 } -- empty far corner; ch01 map is 25x16
+
+-- The clear loop, shared by every clear_* scenario: actually PLAY the chapter with real
+-- combat (no pokeFrail) -- each player phase, march/attack every unit toward the boss; once
+-- the boss is dead, if the chapter hasn't already advanced (DefeatBoss objective), send a
+-- unit onto the boss's old tile to SEIZE (Seize objective). Win = the chapter advances (or
+-- the title screen -- ch01's ch02 isn't hosted yet). FAIL = game over / turn budget. The
+-- completability brick (#60). maxx/maxy = map bounds; park = the end-turn empty tile.
+local function clearDrive(startChapter, maxx, maxy, park)
+    maxx, maxy = maxx or 14, maxy or 9
     local boss = findBoss()
     if not boss then return result("FAIL", "no boss found to clear toward") end
-    log(string.format("clear: boss char=0x%02X at (%d,%d) hp=%d",
-        boss.charId, boss.x, boss.y, boss.hp))
-    local budgetTurns = 12
+    log(string.format("clear: boss char=0x%02X at (%d,%d) hp=%d on a %dx%d map",
+        boss.charId, boss.x, boss.y, boss.hp, maxx + 1, maxy + 1))
+    local seizeTile = { x = boss.x, y = boss.y }   -- killed boss's tile = the seize point
+    local budgetTurns = 18
+    local function won() return chapter() ~= startChapter or procActive(SYM.gProcScr_TitleScreen) end
     for t = 1, budgetTurns do
+        waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
+        wait(60) -- let the player-phase banner finish (it eats key presses)
         for i = 0, 7 do
-            if chapter() ~= startChapter then
-                shot("clear-win")
-                return result("PASS", string.format(
-                    "chapter advanced %d -> %d by turn %d", startChapter, chapter(), t))
-            end
+            if won() then shot("clear-win")
+                return result("PASS", string.format("won by turn %d (chapter %d)", t, chapter())) end
             local u = unitAt(SYM.gUnitArrayBlue, i)
             if u and not isDead(u) and (u.state & 0x2) == 0 then   -- live, not yet acted
                 local b = findBoss()
-                clearUnitAct(u, b and b.x or boss.x, b and b.y or boss.y)
+                if b then
+                    seizeTile = { x = b.x, y = b.y }
+                    clearUnitAct(u, b.x, b.y)
+                elseif moveUnit(u.x, u.y, seizeTile.x, seizeTile.y) then
+                    -- boss dead, not yet won -> Seize. It tops the menu for a unit that can
+                    -- seize; for any other unit A just Waits, so we back out and try the next.
+                    shot("clear-seize-try")
+                    press(K.A)
+                    if waitFor(won, 9000, true) then shot("clear-seized")
+                        return result("PASS", string.format("seized by turn %d", t)) end
+                    press(K.B); press(K.B)
+                end
             end
         end
-        local phase = runEnemyPhase()
-        if phase == "gameover" then
-            shot("clear-gameover")
-            return result("FAIL", string.format("game over on turn %d -- bot lost units", t))
-        end
-        if chapter() ~= startChapter then
-            shot("clear-win")
-            return result("PASS", string.format(
-                "chapter advanced %d -> %d by turn %d", startChapter, chapter(), t))
-        end
+        if won() then shot("clear-win")
+            return result("PASS", string.format("won by turn %d (chapter %d)", t, chapter())) end
+        local phase = runEnemyPhase(park)
+        if phase == "gameover" then shot("clear-gameover")
+            return result("FAIL", string.format("game over on turn %d -- bot lost units", t)) end
     end
     shot("clear-timeout")
     return result("FAIL", string.format("could not clear in %d turns (boss %s)",
         budgetTurns, findBoss() and "alive" or "dead"))
 end
 
+-- clear: the prologue (DefeatBoss), reachable straight from New Game.
+scenarios.clear = function()
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    return clearDrive(chapter(), 14, 9)
+end
+
+-- clear_ch01: the first authored chapter (#21) -- a Seize objective on a 25x16 map with a
+-- 10-goblin escort. Real combat, so survival is genuinely at stake (unlike ch01win, which
+-- pokes everything frail to isolate the seize logic).
+scenarios.clear_ch01 = function()
+    if not reachCh01Map() then return end
+    pokeFastConfig() -- many-combat enemy phases: map-anim battles + fast speed
+    return clearDrive(chapter(), 24, 15, CH01_PARK)
+end
+
 -- CH01WIN: the default lord (blind A-taps pick Braulo) marches on the camp,
 -- kills the chief, and SEIZES -- in-game proof of the lord-gated Seize
 -- (CanUnitSeize hook, #42) and the win hand-off (Seize macro -> EVFLAG_WIN ->
 -- ending scene -> dev placeholder -> MNTS back to the title screen, since ch02 is
--- not hosted yet).
-local CH01_PARK = { x = 24, y = 15 } -- empty far corner; ch01 map is 25x16
+-- not hosted yet). (CH01_PARK is defined up by the clear-bot.)
 scenarios.ch01win = function()
     if not winCh00() then return end
     if not waitFor(function() return chapter() == 2 end, 1800) then
