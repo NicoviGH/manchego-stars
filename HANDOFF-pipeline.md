@@ -26,8 +26,15 @@ You are the **Pipeline-track** instance for Manchego Stars (trunk-based, your ow
   call in `build_campaign.py` (the only content-file line you touch) — then update the guard.
 
 ## Next (priority order)
-1. **#48 — difficulty engine → all chapters**: next items (per-chapter enemy-pressure extractor +
-   CI gate; confirm the ch08 "FE8 Ch13" informational flag once the extractor lands).
+1. **#48 — difficulty engine → all chapters**: the **enemy-pressure engine landed** (extractor +
+   `enemy_pressure`/`pressure_verdict`/`chapter_enemy_force`, per-chapter report line, `make
+   difficulty` campaign curve; Ch1 reads at parity ×0.89/×0.97). Remaining fast-follows:
+   (a) curate the vanilla arrays for Ch2–Ch6/Ch13 in `PARITY_REFERENCE_UDEFS` (the registry near the
+       top of the "Vanilla enemy extraction" block in `tools/difficulty.py`) — find each reference's
+       fightable red `UnitDefinition` arrays in `events_udefs.c` (HEAD); blocked-ish until those
+       slices author enemy inventories (uninventoried enemies drop out → `(no ref)`/0.0 on the curve);
+   (b) wire the **hard CI gate** (verdict OFF → fail) once Ch2+ enemies exist, so it doesn't red the
+       build today; (c) leveled stat projection (#45 item 5). Full status: issue #48 comment.
 2. **Playtest platform**: grow `tools/playtest/` from the floor/ch01win scenarios toward an I/O
    harness → stability fuzzer → LLM-player (#49 dependency spine: `3c → I/O harness → …`).
 3. Mechanics/flavor leaves once specced: lord-select UX #46, d20 crit #11, spell-economy #9,
