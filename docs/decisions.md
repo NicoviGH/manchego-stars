@@ -727,6 +727,20 @@ file/tag is versioned, the in-game label is not. The first build under this sche
 `ManchegoStars-Alpha-2026-06-17.gba` is **not** retro-tagged — the scheme starts clean at `v0.1.0`.
 _Decided: 2026-06-19_
 
+**Playtest carryover: ship a per-release starter save; don't rely on cross-build SRAM compatibility**
+Each new build a tester receives ships with a **starter `.sav`** that drops them at the newest
+playable chapter (prior chapters marked cleared), so playtesters **never replay Prologue/Ch 1** to
+reach new content. We do **not** lean on save carryover across builds: FE8 validates a save by a
+**fixed** magic (`SAVEMAGIC32`/`SAVEMAGIC16`) + a checksum (`fireemblem8u/src/bmsave-lib.c`), and
+`EraseSramDataIfInvalid` wipes anything that fails on boot. The magic is constant, so a rebuild
+*alone* doesn't invalidate a save — but adding/finishing chapters shifts the save-data layout
+(chapter count, unit tables, `PlaySt`, SRAM offsets), after which an old `.sav` fails the checksum
+(auto-wiped) or loads as garbage. Emulator save-*states* are ROM-version-specific and break every
+build, so testers are told to use the provided save and not carry old saves/states. The starter
+save is produced/bundled by the friend build (`tools/build.sh dist`, release #37). A future in-game
+**chapter-select / debug warp** is a possible cleaner alternative (more work, reusable) — stretch.
+_Decided: 2026-06-19; from the brother's v0.1.0 playtest (#59)_
+
 ---
 
 ## Art & Audio
