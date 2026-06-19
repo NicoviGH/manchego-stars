@@ -5,10 +5,11 @@ parallel-work model is the ADR in `docs/decisions.md` (§Delivery model → Para
 Engine-content file seam); work tracker #50; backlog is **GitHub issues** (#49 ② Pipeline track),
 not this file. Don't clobber the content track's `HANDOFF-content.md`.
 
-> **A content-track instance is ACTIVE in parallel right now** (Nicolas is driving it). Stay strictly
-> in the pipeline lane — especially **avoid editing `tools/build_campaign.py`** (content is likely
-> touching it); a merge conflict there is the main parallel risk. Pure-pipeline files (`difficulty.py`,
-> `fe_combat.py`, `playtest/**`, CI) are conflict-safe.
+> **Always work in this `../ms-pipeline` worktree, never on `main`** (the doctrine, per CLAUDE.md
+> §Tracks + decisions.md — even solo). Stay strictly in the pipeline lane: **don't edit
+> `tools/build_campaign.py`** (content-owned; the lane guard blocks it, and it's the main parallel
+> merge-conflict risk). Pure-pipeline files (`difficulty.py`, `fe_combat.py`, `playtest/**`, CI) are
+> conflict-safe. If a content instance is running in parallel, `git pull --rebase origin main` often.
 
 ## Seam enforcement landed (2026-06-19, #55) — READ IF YOU RUN PARALLEL
 The first parallel run had violations (pipeline edited content's `build_campaign.py`) because the
@@ -22,7 +23,19 @@ seam was honor-system and no worktree isolation was actually engaged. Now **enfo
   blocked, `difficulty.py` allowed; `--no-verify` is the only escape. The primary checkout is
   integration-only (lane unset).
 
-## Last session (2026-06-19, pipeline) — all on main, green, pushed
+## Last session (2026-06-19, pipeline) — #53 monster/extended weapons (worktree, green)
+- **#53 landed** (in the `inst/pipeline` worktree): added 9 vanilla-only weapons to `fe_combat.W`
+  (monster claws `fetid/rotten/venin-claw`, `evil-eye`, + `thunder/iron-blade/venin-axe/halberd/horseslayer`),
+  stats from `data_items.c` HEAD. Mapping lives in a **difficulty-local** `VANILLA_ONLY_ITEM_TO_WEAPON`
+  merged into `ITEM_TO_WEAPON` — **not** in content-owned `WEAPON_ITEM_ENUM` (seam rule; see decisions.md).
+- Curated registry entries for **FE8 Ch4 (23, all-monster)** and **FE8 Ch6 (25)** — our ch04/ch05 (Ch4)
+  and ch07 (Ch6) now resolve a reference bar. Method: armed-RED arrays the eventscript references. Ch6's 2
+  staff-only healers drop by design (weaponless ≠ unmodeled-weapon). TDD: +3 tests, 38 pass; all 4 suites green.
+- Curve confirms the references are live; **our side still 0.0 / !!boss dropped** because content hasn't
+  authored Ch4–7 enemy inventories yet (expected — that's the content track's job; gates the hard CI flip, #48 (b)).
+- **FE8 Ch13** (our ch08) is the lone deferred reference — informational scripted-defeat, lowest priority.
+
+## Earlier session (2026-06-19, pipeline) — all on main, green, pushed
 - **#48 enemy-pressure parity engine** landed: `vanilla_enemies` (decomp extractor),
   `enemy_pressure` (threat/slot + clear-load/slot vs a fixed yardstick), `pressure_verdict`,
   `chapter_enemy_force`; per-chapter report section + `make difficulty` (no CH) campaign curve. Ch1
@@ -64,16 +77,11 @@ You are the **Pipeline-track** instance for Manchego Stars (trunk-based, your ow
   call in `build_campaign.py` (the only content-file line you touch) — then update the guard.
 
 ## Next (priority order)
-1. **#53 — model FE8 monster + extended weapons** (the hot continuation; #48 issue body has the exact
-   enums + method). Add to `fe_combat.W`: monster weapons (`ITEM_MONSTER_EVILEYE/FETIDCLW/ROTTENCLW/
-   VENINCLW`) and extended standard weapons (`ANIMA_THUNDER`, `AXE_HALBERD`, `AXE_VENIN`, `BLADE_IRON`,
-   `LANCE_HORSESLAYER` — halberd/horseslayer are *effective-vs-class*, set the `effective` frozenset).
-   Pull stats from `fireemblem8u/src/data_items.c` (HEAD). **Keep these vanilla-only items in a
-   difficulty-local map merged into `ITEM_TO_WEAPON` — do NOT add them to `build_campaign.WEAPON_ITEM_ENUM`**
-   (our content never authors monster/exotic items, and that file is content-owned + a parallel-conflict
-   risk). Then curate registry entries for **FE8 Ch4 (→ch04/ch05), Ch6 (→ch07), Ch13 (→ch08, informational)**
-   using the documented method (`grep UnitDef_ src/events/chN-eventscript.h`, keep arrays whose RED units
-   carry weapons). TDD all-modeled counts. Ch4 "Ancient Horrors" is all-monster, so it's the real blocker.
+1. **#53 tail — FE8 Ch13 reference** (→ our ch08, informational only, lowest priority). Ch4/Ch6 + the
+   monster/extended weapon set landed last session. Ch13 "Hamill Canyon" is a large mixed force with several
+   more exotic/monster weapons; curate via the same method (`grep UnitDef_ src/events/ch13-eventscript.h`,
+   keep armed-RED arrays), add any missing weapons to `fe_combat.W` + `VANILLA_ONLY_ITEM_TO_WEAPON`, TDD the
+   count. Since ch08 is a scripted-defeat objective (not a CI-gated chapter), this is genuinely optional polish.
 2. **Hard CI gate** (#48 (b)): verdict OFF → fail, but only once the content track has authored Ch2+
    enemy inventories (today the curve shows our side `0.0` / `!!boss dropped`, so a gate would red the
    build). Gate informatively first (warn), flip to fail when content lands. Leveled stat projection

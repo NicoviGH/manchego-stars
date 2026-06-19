@@ -250,6 +250,32 @@ class VanillaEnemies(unittest.TestCase):
         self.assertEqual(len(enemies), 23)
         self.assertIn('killing-edge', {u.weapon.name for u in enemies})
 
+    def test_ch4_reference_is_all_monster_force_fully_modeled(self):
+        # FE8 Ch4 "Ancient Horrors": all-monster map; needs the monster claws + Evil Eye (#53).
+        # All 23 armed RED units resolve -- zero unmodeled-weapon drops.
+        enemies = df.vanilla_enemies('FE8 Ch4')
+        self.assertEqual(len(enemies), 23)
+        names = {u.weapon.name for u in enemies}
+        self.assertIn('fetid-claw', names)
+        self.assertIn('evil-eye', names)
+
+    def test_ch6_reference_resolves_all_armed_only_staff_healers_dropped(self):
+        # FE8 Ch6 "Victims of War": needs thunder/halberd/venin-axe/iron-blade/horseslayer +
+        # the venin-claw Bael (#53). 27 armed RED; the 2 staff-only healers carry no weapon and
+        # are dropped by design, leaving 25 -- no unmodeled-weapon drop remains.
+        enemies = df.vanilla_enemies('FE8 Ch6')
+        self.assertEqual(len(enemies), 25)
+        names = {u.weapon.name for u in enemies}
+        self.assertIn('horseslayer', names)
+        self.assertIn('venin-claw', names)
+
+    def test_vanilla_only_weapons_all_have_modeled_stats(self):
+        # Every difficulty-local vanilla-only item maps to a weapon present in fe_combat.W,
+        # and none of them leaked into the content-owned WEAPON_ITEM_ENUM (#53 seam rule).
+        for item, key in df.VANILLA_ONLY_ITEM_TO_WEAPON.items():
+            self.assertIn(key, fc.W)
+            self.assertNotIn(item, df.WEAPON_ITEM_ENUM.values())
+
 
 CAMPAIGN = 'rime-of-the-frostmaiden'
 

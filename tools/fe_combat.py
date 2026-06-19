@@ -56,6 +56,23 @@ W = {
     'fire':         Weapon('fire',         5, 90,  0, 4,  'magic', rng=(1, 2)),
     'lightning':    Weapon('lightning',    4, 95,  5, 6,  'magic', rng=(1, 2)),
     'flux':         Weapon('flux',         7, 80,  0, 8,  'magic', rng=(1, 2)),
+    # Extended vanilla weapons carried only by enemy parity-reference forces (FE8 Ch4/Ch6),
+    # never by our cast. The difficulty engine maps the decomp items to these for the static
+    # threat proxy; they are NOT in build_campaign.WEAPON_ITEM_ENUM (content-owned). #53.
+    'thunder':      Weapon('thunder',      8, 80,  5, 6,  'magic', rng=(1, 2)),
+    'iron-blade':   Weapon('iron-blade',   9, 70,  0, 12, 'sword'),
+    'venin-axe':    Weapon('venin-axe',    4, 60,  0, 10, 'axe'),
+    'halberd':      Weapon('halberd',      10, 60, 0, 15, 'axe',
+                           effective=frozenset({'cav'})),
+    'horseslayer':  Weapon('horseslayer',  7, 70,  0, 13, 'lance',
+                           effective=frozenset({'cav'})),
+    # Monster claws are plain physical might (off-triangle); Evil Eye is monster dark magic.
+    # Venin weapons poison rather than deal HP damage in vanilla -- modeled at base might as a
+    # low static-DPR proxy (#53 note) so the unit still resolves and counts as modeled.
+    'fetid-claw':   Weapon('fetid-claw',   12, 75, 0, 10, 'monster'),
+    'rotten-claw':  Weapon('rotten-claw',  7, 80,  0, 8,  'monster'),
+    'venin-claw':   Weapon('venin-claw',   6, 65,  0, 10, 'monster'),
+    'evil-eye':     Weapon('evil-eye',     7, 85,  0, 6,  'magic', rng=(1, 2)),
 }
 
 

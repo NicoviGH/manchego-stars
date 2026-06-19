@@ -161,7 +161,22 @@ def enemy_combatants(enemy_def):
 # weapon->ITEM map (one source for both directions). Only attacking weapons are listed there;
 # staves/consumables/keys are absent on purpose (an enemy carrying only those resolves to no
 # modeled weapon and is skipped -- with a warning, see unmodeled_enemies).
+# Vanilla-only (monster/exotic) weapons that ONLY the parity-reference forces carry -- our
+# cast never authors these, so they stay out of the content-owned WEAPON_ITEM_ENUM (#53,
+# HANDOFF "Watch out") and live here, merged into the reverse map below.
+VANILLA_ONLY_ITEM_TO_WEAPON = {
+    'ITEM_ANIMA_THUNDER':     'thunder',
+    'ITEM_BLADE_IRON':        'iron-blade',
+    'ITEM_AXE_VENIN':         'venin-axe',
+    'ITEM_AXE_HALBERD':       'halberd',
+    'ITEM_LANCE_HORSESLAYER': 'horseslayer',
+    'ITEM_MONSTER_FETIDCLW':  'fetid-claw',
+    'ITEM_MONSTER_ROTTENCLW': 'rotten-claw',
+    'ITEM_MONSTER_VENINCLW':  'venin-claw',
+    'ITEM_MONSTER_EVILEYE':   'evil-eye',
+}
 ITEM_TO_WEAPON = {item: key for key, item in WEAPON_ITEM_ENUM.items()}
+ITEM_TO_WEAPON.update(VANILLA_ONLY_ITEM_TO_WEAPON)
 
 # parity_reference -> (decomp relpath, [UnitDefinition array names]) for its red force.
 # The single curation point: which vanilla arrays ARE a chapter's fightable enemies (named
@@ -184,6 +199,16 @@ PARITY_REFERENCE_UDEFS = {
     'FE8 Ch5': ('src/events_udefs.c',
                 ['UnitDef_088B5798', 'UnitDef_088B56F8', 'UnitDef_088B5860',
                  'UnitDef_088B589C', 'UnitDef_088B58D8', 'UnitDef_088B5914']),
+    # Ch4 "Ancient Horrors" -- all-monster force (#53). The three ch4-eventscript.h arrays whose
+    # RED units are armed; the rest are green/NPC/cutscene placements (red=0). Needs the monster
+    # claws + Evil Eye modeled (Bonewalker/Revenant carry iron-sword/iron-lance too).
+    'FE8 Ch4': ('src/events_udefs.c',
+                ['UnitDef_088B4A80', 'UnitDef_088B4C24', 'UnitDef_088B4C88']),
+    # Ch6 "Victims of War" -- mixed force (#53). The two armed-RED arrays ch6 references; needs
+    # thunder/halberd/venin-axe/iron-blade/horseslayer + the venin-claw Bael. Staff-only healers
+    # in the main array carry no weapon and are dropped by design (not an unmodeled-weapon drop).
+    'FE8 Ch6': ('src/events_udefs.c',
+                ['UnitDef_088B61A8', 'UnitDef_088B64F0']),
 }
 
 

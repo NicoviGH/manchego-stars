@@ -391,12 +391,25 @@ FE8 Ch1, reads at parity (threat ×0.89, clear-load ×0.97, both inside ±25%). 
 events_udefs.c chapters: the arrays a chapter's `chN-eventscript.h` references **whose RED units carry
 weapons** — which excludes the interleaved skirmish/tower data (unreferenced) and the cutscene/preview arrays
 (endgame villains placed with empty `.items`). Curated + fully modeled: Prologue, Ch1, **Ch2 (9), Ch3 (10),
-Ch5 (23)**. Deferred to a follow-up: **FE8 Ch4/Ch6/Ch13**, which need the monster weapon set (claws/eyes) and
-a few extended weapons (halberd, venin, horseslayer…) added to `fe_combat.W` — Ch4 "Ancient Horrors" is an
-all-monster map, so its whole force is unmodeled until then. The verdict is **reported, not yet a hard CI
-gate** (gating would red the build on the not-yet-authored Ch2+); wiring the gate waits on those slices.
+Ch4 (23), Ch5 (23), Ch6 (25)**. **FE8 Ch13** (our ch08 — a scripted-defeat objective, informational only, not
+a CI-gated chapter) is the lone deferred reference. The verdict is **reported, not yet a hard CI gate**
+(gating would red the build on the not-yet-authored Ch2+); wiring the gate waits on those slices.
 `make difficulty CH=chNN` gains the pressure line; `make difficulty` (no CH) prints the campaign curve.
 _Implemented: 2026-06-19 (CLAUDE; pipeline track, TDD)_
+
+**Monster/exotic enemy weapons stay out of the content-owned weapon map; venin is a base-might proxy (#53).**
+FE8 Ch4 "Ancient Horrors" (all-monster) and Ch6 "Victims of War" needed weapons our cast never carries: the
+monster claws (`fetid/rotten/venin-claw`), Evil Eye, and extended standards (`thunder`, `halberd`, `venin-axe`,
+`iron-blade`, `horseslayer`). Their stats live in `fe_combat.W`, but the decomp-item→weapon mapping for them is
+a **difficulty-local** `VANILLA_ONLY_ITEM_TO_WEAPON` merged into `ITEM_TO_WEAPON` — deliberately **not** in
+`inject/decomp.py`'s content-facing `WEAPON_ITEM_ENUM` (that map drives the build's authored YAML loadouts and
+is content-owned across the seam; our cast authors none of these). Modeling calls: **venin/poison weapons**
+(which drain HP over turns in vanilla, not on-hit) are modeled at their **base might** as a low static-DPR
+proxy — low threat, but the unit still resolves and counts as modeled rather than being dropped. **Monster
+claws** are plain physical might (off-triangle, vs Def); **halberd/horseslayer** keep their effective-vs-cav
+triple. **Staff-only healers** (a Priest/Troubadour carrying no weapon) are still dropped by design — that is a
+weaponless drop, not an unmodeled-weapon drop, so an all-modeled reference can legitimately resolve fewer
+units than it has armed-RED entries (Ch6: 27 armed → 25 modeled). _Implemented: 2026-06-19 (CLAUDE; pipeline track, TDD)_
 
 **How the deploy cap + prep screen are actually wired (the [decomp] mechanism).**
 `hasPrepScreen` in `chapter_settings.json` is dead — "left over from FE7"
