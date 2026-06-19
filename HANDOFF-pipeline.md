@@ -15,7 +15,8 @@ not this file. Don't clobber the content track's `HANDOFF-content.md`.
 The first parallel run had violations (pipeline edited content's `build_campaign.py`) because the
 seam was honor-system and no worktree isolation was actually engaged. Now **enforced**:
 - `check.py check_lane_ownership` (pre-commit + CI) blocks cross-lane edits **when you're in a lane
-  worktree** (branch `inst/<track>`). The primary `main` checkout is unrestricted integration/solo work.
+  worktree** (branch `inst/<track>`). `main` is lane-unrestricted but, per the always-worktree rule
+  (#35debda), is for integration/cross-track merges only — **never solo track work** (do that in the worktree).
 - `worktree-setup.sh` derives/announces the lane + ensures the hook runs. **Each instance MUST work
   in its `../ms-<track>` worktree** (CLAUDE.md §Parallel Tracks; decisions.md §Seam enforcement).
 - The shared weapon↔ITEM map moved to `tools/inject/decomp.py`; **#53 weapon work never touches
@@ -103,4 +104,7 @@ You are the **Pipeline-track** instance for Manchego Stars (trunk-based, your ow
 - Engine stat changes to the chosen lord go in `EndPrepScreen`, not a phase-start seam.
 - `make`-green can't prove apply timing — `tools/playtest/` is the dynamic arbiter; run it.
 - Vanilla decomp reads go through `build_campaign.vanilla_decomp_text()` (HEAD), never the worktree.
+  It now **strips inherited git env** (`dcbb247`) — `git -C fireemblem8u show HEAD:…` was exiting 128
+  under the pre-commit hook in a worktree (git exports `GIT_DIR`, which overrode `-C` discovery). If a
+  worktree commit fails on a submodule read, that's the class of bug; don't reach for `--no-verify`.
 - A behavior-preserving refactor should yield a byte-identical ROM (md5) — use that as proof.
