@@ -133,6 +133,24 @@ class ChapterEnemyForce(unittest.TestCase):
         self.assertEqual(names.count('iron-axe'), 5)    # 3 fighters + 2 fighters
         self.assertEqual(names.count('iron-lance'), 2)  # 1 soldier + the boss
 
+    def test_unmodeled_enemies_reports_dropped_entries_with_boss_flag(self):
+        # The metric drops enemies whose weapon isn't modeled; this surfaces them (esp.
+        # bosses) so a skewed verdict is loud, not silent (#51).
+        chap = {'enemy_units': [
+            {'id': 'sephek', 'class': 'myrmidon', 'level': 5, 'is_boss': True,
+             'inventory': [{'id': 'ice-longsword'}]},      # flavor name, no fe_base
+            {'id': 'guard', 'class': 'fighter', 'level': 2,
+             'inventory': [{'id': 'iron-axe'}]},           # resolves -> not reported
+        ]}
+        dropped = df.unmodeled_enemies(chap)
+        self.assertEqual(dropped, [{'id': 'sephek', 'is_boss': True}])
+
+    def test_unmodeled_enemies_empty_when_all_resolve(self):
+        chap = {'enemy_units': [
+            {'id': 'guard', 'class': 'fighter', 'level': 2,
+             'inventory': [{'id': 'iron-axe'}]}]}
+        self.assertEqual(df.unmodeled_enemies(chap), [])
+
     def test_drops_enemies_with_no_modeled_weapon(self):
         # A healer / unmodeled-weapon enemy carries no threat in this proxy -> excluded
         # (mirrors the vanilla side, which also drops staff/throwaway-only units).

@@ -283,6 +283,24 @@ def chapter_enemy_force(chap):
     return [u for u in out if u.weapon is not None]   # drop unmodeled-weapon (staff) enemies
 
 
+def unmodeled_enemies(chap):
+    """Enemy entries that contribute NO modeled-weapon units (so chapter_enemy_force drops
+    them) -- returned as {id, is_boss} so the report can warn instead of silently skewing the
+    verdict (#51). A boss here means the parity read for that chapter is untrustworthy."""
+    out = []
+    for ed in chap.get('enemy_units', []):
+        if 'composition' in ed and 'class' not in ed:
+            by_class = ed.get('inventory_by_class', {})
+            modeled = any(_weapon_for([{'id': w} for w in by_class.get(cls, [])])
+                          for cls in ed.get('composition', []))
+        else:
+            modeled = _weapon_for(ed.get('inventory')) is not None
+        if not modeled:
+            out.append({'id': ed.get('id', ed.get('name', 'enemy')),
+                        'is_boss': bool(ed.get('is_boss'))})
+    return out
+
+
 # ── Pure metrics layer (no I/O; operates on fe_combat.Combatant) ──────────────────
 # The three FE survival questions, each a single number so a chapter can be compared
 # to vanilla at a glance.
@@ -557,7 +575,8 @@ def _chapter_pressure(chap, band=0.25):
     ref = chap.get('parity_reference')
     van = vanilla_enemies(ref)
     out = {'reference': ref, 'deploy_cap': deploy_cap, 'ours': ours,
-           'n_ours': len(ours_force), 'vanilla': None}
+           'n_ours': len(ours_force), 'vanilla': None,
+           'dropped': unmodeled_enemies(chap)}
     if van is not None:
         out['vanilla'] = enemy_pressure(van, deploy_cap)
         out['n_vanilla'] = len(van)
@@ -565,9 +584,19 @@ def _chapter_pressure(chap, band=0.25):
     return out
 
 
+def _warn_dropped(dropped, indent='  '):
+    """Emit a warning per enemy the metric couldn't model (no FE-base weapon). A dropped
+    boss means the verdict is unreliable for that chapter -- say so loudly (#51)."""
+    for d in dropped:
+        tag = '!! BOSS DROPPED -- verdict UNRELIABLE' if d['is_boss'] else 'dropped'
+        print('%sWARN: %s (%s -- no modeled weapon; add fe_base in its YAML inventory)'
+              % (indent, d['id'], tag))
+
+
 def _print_pressure(p):
     ot, ol = p['ours']
     print('\n-- ENEMY-PRESSURE PARITY (vs %s) ' % (p['reference'] or '?') + '-' * 30)
+    _warn_dropped(p['dropped'])
     if p['vanilla'] is None:
         print('  ours (%d enemies / %d slots): threat/slot %.1f · clear-load/slot %.1f'
               % (p['n_ours'], p['deploy_cap'], ot, ol))
@@ -602,19 +631,26 @@ def curve_report(campaign, band=0.25):
     for path in paths:
         with open(path, encoding='utf-8') as f:
             chaps.append(bc.yaml.safe_load(f))
+    any_dropped_boss = False
     for chap in sorted(chaps, key=lambda c: c.get('chapter_number', 99)):
         p = _chapter_pressure(chap, band)
         ot, ol = p['ours']
         label = 'CH%s %s' % (chap.get('chapter_number'), chap.get('id', ''))
+        boss_drop = any(d['is_boss'] for d in p['dropped'])
+        any_dropped_boss = any_dropped_boss or boss_drop
+        flag = '  !!boss dropped' if boss_drop else ''
         if p['vanilla'] is None:
-            print('  %-22s %-13s %5.1f           %5.1f             (no ref)'
-                  % (label[:22], (p['reference'] or '?')[:13], ot, ol))
+            print('  %-22s %-13s %5.1f           %5.1f             (no ref)%s'
+                  % (label[:22], (p['reference'] or '?')[:13], ot, ol, flag))
             continue
         vt, vl = p['vanilla']
         v = p['verdict']
-        print('  %-22s %-13s %4.1f (x%.2f)     %4.1f (x%.2f)       %s'
+        print('  %-22s %-13s %4.1f (x%.2f)     %4.1f (x%.2f)       %s%s'
               % (label[:22], (p['reference'] or '?')[:13], ot, v['threat_ratio'],
-                 ol, v['load_ratio'], v['verdict']))
+                 ol, v['load_ratio'], v['verdict'], flag))
+    if any_dropped_boss:
+        print('\n  !! a dropped boss means that row\'s verdict is unreliable -- its scariest '
+              'unit\n     carries an unmodeled weapon. Add fe_base to its YAML inventory (#51/#52).')
 
 
 def _fmt_delta(f):
