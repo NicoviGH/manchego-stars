@@ -7,21 +7,23 @@ ownership map, and trunk rules → `CLAUDE.md` §Tracks (read first; the lane gu
 + `CLAUDE.md`; this file holds only my current state + content-lane-specific gotchas.** Don't touch
 `HANDOFF-pipeline.md`.
 
-## Now (2026-06-19) — `ch02-rear-ambush` bark LOCKED; targos-inn is next (needs Nicolas)
-`ch02-rear-ambush` turn-3 bark locked (`76cd540`, #22): speaker **Wolfram** (Nicolas's pick — keeps the
-decisive-command beat off Braulo twice in one chapter, and ties to the sled Wolfram forged in ch01 /
-re-plates at the inn). Text in `ch02-cold-welcome.yaml` turn-3 event: *"Wolves at our backs — the sled." /
-"Hold here. I've got the rear."* Text-only YAML, **unwired** (eventscript + on-map bubble deferred) →
-ROM-neutral. ⚠ **Wiring flag:** line 1 is 31 chars, past the 29-char on-map bubble wrap → at insertion it
-wraps / needs an `[LF]` split; verify the right-side bubble isn't pushed offscreen.
-(Earlier same day, all shipped: the Ch2/Ch1 inn drift bug is fixed — Targos-inn is now Wolfram **re-plating
-raid battle-damage**, not first-armoring; soft-penalty = chest + post-chapter gold forfeit.)
+## Now (2026-06-19) — ch02 dialogue fully LOCKED; host wiring is the next gate
+All three ch02 cutscenes are now locked text in `ch02-cold-welcome.yaml` — opening, turn-3 rear-ambush
+bark, and the **targos-inn ending** (`2e60003`, #22). The ending lands the **Sephek breadcrumb**: town
+blames the druids' Auril rumor; **Rootis** IDs the dagger-of-ice kill from Hlin's briefing (no fight);
+camp = one narration card; **RBG** calls the fork north onto the druids' trail (Messie bounty left for
+ch06). **New canon** in `decisions.md` §Story (Sephek arc): distinct from Ravisin (ch05); his reckoning
+is held for an **Act-II multi-boss slot** (ch00 already uses the Torrga caravan as its *setting*); stale
+"Torrga = payoff venue" note fixed in `lore/sephek-kaltro.md`.
+All ch02 cutscene text is **unwired** — eventscript + host wiring is next (MNC2 still drops to vanilla
+Ch3). ⚠ Wiring flag still open: the rear-ambush bark line is 31 chars, past the 29-char on-map bubble
+wrap → at insertion it wraps / needs an `[LF]` split; verify the right-side bubble isn't pushed offscreen.
 
 ## Next (priority order)
-1. **`ch02-targos-inn`** (chapter end) — the big multi-beat scene (frozen-sacrifice discovery, frost-druid
-   glimpse = Ch4 seed, inn room/camp split, **Wolfram's re-plating payoff**, Maer Monster + Lonelywood
-   rumors). **Needs Nicolas's beat intent before drafting.** Then **ch02 host wiring** (not built — MNC2
-   drops to vanilla Ch3) + Vellynne cutscene portrait (#19) + in-game motion review.
+1. **ch02 host wiring** — host ch02 in the decomp + the eventscripts that consume the three locked
+   cutscenes (opening / rear-ambush / targos-inn) via `build_campaign.py inject_*`, so MNC2 stops dropping
+   to vanilla Ch3. Mind the rear-ambush bubble-width flag at insertion. Then Vellynne cutscene portrait
+   (#19) + in-game motion review of all three scenes.
 2. Supporting content as Ch2 needs them: enemy YAML pass #18, NPC/recruit stubs #17, recruit schedule
    (#45 item 5), world-map unlock #29.
 3. Art passes layer on already-playable slices: portraits #19, overworld sprites #38.
