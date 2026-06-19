@@ -54,11 +54,34 @@ if [ ! -x "fireemblem8u/tools/agbcc/bin/agbcc" ]; then
     exit 1
 fi
 
-echo ">> creating worktree '$WT_PATH' on branch '$BRANCH'"
+# The lane (content|pipeline) the seam guard enforces is derived from the branch name --
+# inst/*content* -> content, inst/*pipeline* -> pipeline (tools/check.py _current_lane). A
+# worktree off a name with neither is allowed but UN-laned: the guard will then block any
+# lane-exclusive file there, so warn loudly.
+case "$BRANCH" in
+    *content*)  LANE=content ;;
+    *pipeline*) LANE=pipeline ;;
+    *)          LANE="" ;;
+esac
+if [ -z "$LANE" ]; then
+    echo "WARNING: branch '$BRANCH' maps to no lane -- name it inst/...content/pipeline so the" >&2
+    echo "         seam guard can identify this worktree (else lane-exclusive edits are blocked)." >&2
+fi
+
+echo ">> creating worktree '$WT_PATH' on branch '$BRANCH'  (lane: ${LANE:-NONE})"
 if git show-ref --verify --quiet "refs/heads/$BRANCH"; then
     git worktree add "$WT_PATH" "$BRANCH"
 else
     git worktree add -b "$BRANCH" "$WT_PATH"
+fi
+
+# Make the seam guard active in the worktree. The lane is read from the branch name
+# (tools/check.py _current_lane), so no per-worktree config is needed. core.hooksPath drives
+# the pre-commit hook; it's inherited from the shared config, but set it if unset (relative
+# -> resolves to this worktree's tools/hooks).
+if [ -z "$(git config core.hooksPath || true)" ]; then
+    git config core.hooksPath tools/hooks
+    echo "   set core.hooksPath=tools/hooks (was unset) so the pre-commit seam guard runs"
 fi
 
 echo ">> initialising the fireemblem8u submodule in the worktree (from local objects)"

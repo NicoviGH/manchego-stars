@@ -203,16 +203,17 @@ def _git(args):
 
 
 def _current_lane():
-    lane = _git(['config', 'manchego.lane'])
-    if lane in ('pipeline', 'content'):
-        return lane
+    """This worktree's lane. Branch first -- the `inst/<track>` branch is inherently
+    per-worktree, so it self-identifies even though .git/config is shared. `manchego.lane`
+    is the explicit fallback (e.g. the primary checkout during bootstrapping)."""
     branch = _git(['rev-parse', '--abbrev-ref', 'HEAD'])
     if branch.startswith('inst/'):
         if 'content' in branch:
             return 'content'
         if 'pipeline' in branch:
             return 'pipeline'
-    return None
+    lane = _git(['config', 'manchego.lane'])
+    return lane if lane in ('pipeline', 'content') else None
 
 
 def _changed_files():
