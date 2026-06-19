@@ -116,6 +116,36 @@ class PressureVerdict(unittest.TestCase):
         self.assertEqual(v['verdict'], 'OFF')
 
 
+class CurveGate(unittest.TestCase):
+    """The --check gate (#48 (b)): a chapter that claims a vanilla parity reference must
+    be at-parity AND reliably measured. Chapters with no curated reference are informational
+    and never gate. Wired into CI informatively (no --check) until content authors the Ch2+
+    enemy inventories; then the CI step flips to --check to make off-parity a build failure."""
+
+    def _row(self, label, has_ref=True, verdict='OK', boss_drop=False):
+        return {'label': label, 'has_ref': has_ref, 'verdict': verdict,
+                'boss_drop': boss_drop}
+
+    def test_all_at_parity_with_an_uncurated_chapter_passes(self):
+        rows = [self._row('CH1', verdict='OK'),
+                self._row('CH8', has_ref=False, verdict=None)]
+        self.assertEqual(df.curve_gate_failures(rows), [])
+
+    def test_off_parity_referenced_chapter_fails(self):
+        rows = [self._row('CH1', verdict='OK'),
+                self._row('CH2', verdict='OFF')]
+        self.assertEqual(df.curve_gate_failures(rows), ['CH2'])
+
+    def test_dropped_boss_on_referenced_chapter_fails_even_if_verdict_ok(self):
+        # A dropped boss makes the verdict unreliable -- an unreliable OK is not a pass.
+        rows = [self._row('CH3', verdict='OK', boss_drop=True)]
+        self.assertEqual(df.curve_gate_failures(rows), ['CH3'])
+
+    def test_uncurated_chapter_never_gates_even_with_a_dropped_boss(self):
+        rows = [self._row('CH8', has_ref=False, verdict=None, boss_drop=True)]
+        self.assertEqual(df.curve_gate_failures(rows), [])
+
+
 class ChapterEnemyForce(unittest.TestCase):
     def test_expands_count_and_composition_into_per_unit_force(self):
         chap = {'enemy_units': [

@@ -392,9 +392,20 @@ events_udefs.c chapters: the arrays a chapter's `chN-eventscript.h` references *
 weapons** — which excludes the interleaved skirmish/tower data (unreferenced) and the cutscene/preview arrays
 (endgame villains placed with empty `.items`). Curated + fully modeled: Prologue, Ch1, **Ch2 (9), Ch3 (10),
 Ch4 (23), Ch5 (23), Ch6 (25)**. **FE8 Ch13** (our ch08 — a scripted-defeat objective, informational only, not
-a CI-gated chapter) is the lone deferred reference. The verdict is **reported, not yet a hard CI gate**
-(gating would red the build on the not-yet-authored Ch2+); wiring the gate waits on those slices.
-`make difficulty CH=chNN` gains the pressure line; `make difficulty` (no CH) prints the campaign curve.
+a CI-gated chapter) is the lone deferred reference. `make difficulty CH=chNN` gains the pressure line;
+`make difficulty` (no CH) prints the campaign curve.
+_Implemented: 2026-06-19 (CLAUDE; pipeline track, TDD)_
+
+**The parity curve is surfaced in CI informatively; the hard gate is built but unwired until content lands (#48 (b)).**
+CI's `build` job now runs `make difficulty` on every build (after the submodule checkout it needs to read
+the decomp HEAD), so balance spikes/sags and parity regressions are visible on every PR. It is **informative
+only** — `make difficulty` always exits 0. The enforcing form is `make difficulty-gate`
+(`difficulty.py --curve --check`): `curve_gate_failures(rows)` fails any chapter that **claims a
+`parity_reference`** and is either off-parity (`verdict != OK`) or unreliably measured (a dropped boss — an
+unreliable OK is not a pass); chapters with no curated reference are informational and never gate. Today
+`difficulty-gate` is RED by design (our Ch2–Ch7 enemy inventories aren't authored yet, so our side reads 0.0 /
+off-parity), so CI runs the informative `difficulty`. **The flip is a one-word CI change** —
+`difficulty` → `difficulty-gate` — once the content track authors those slices.
 _Implemented: 2026-06-19 (CLAUDE; pipeline track, TDD)_
 
 **Monster/exotic enemy weapons stay out of the content-owned weapon map; venin is a base-might proxy (#53).**

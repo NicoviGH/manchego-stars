@@ -648,9 +648,20 @@ def _print_pressure(p):
                              else 'OFF-PARITY -- threat %s, clear-load %s' % (v['threat'], v['load'])))
 
 
+def curve_gate_failures(rows):
+    """The --check gate: return the labels of chapters that should fail the build. A chapter
+    fails when it claims a vanilla parity_reference (`has_ref`) and is either off-parity
+    (`verdict != 'OK'`) or unreliably measured (`boss_drop` -- its scariest unit carries an
+    unmodeled weapon, so even an 'OK' verdict can't be trusted). Chapters with no curated
+    reference are informational and never gate (#48 (b))."""
+    return [r['label'] for r in rows
+            if r['has_ref'] and (r['verdict'] != 'OK' or r['boss_drop'])]
+
+
 def curve_report(campaign, band=0.25):
     """Campaign-wide enemy-pressure curve: one row per authored chapter, ours vs its vanilla
-    reference, so spikes/sags across the arc are visible at a glance (#48)."""
+    reference, so spikes/sags across the arc are visible at a glance (#48). Returns the per-chapter
+    rows (label / has_ref / verdict / boss_drop) so the --check gate can act on them."""
     paths = sorted(glob.glob(os.path.join(
         bc.REPO, 'campaigns', campaign, 'chapters', 'ch*.yaml')))
     bar = '=' * 86
@@ -664,6 +675,7 @@ def curve_report(campaign, band=0.25):
     for path in paths:
         with open(path, encoding='utf-8') as f:
             chaps.append(bc.yaml.safe_load(f))
+    rows = []
     any_dropped_boss = False
     for chap in sorted(chaps, key=lambda c: c.get('chapter_number', 99)):
         p = _chapter_pressure(chap, band)
@@ -672,7 +684,11 @@ def curve_report(campaign, band=0.25):
         boss_drop = any(d['is_boss'] for d in p['dropped'])
         any_dropped_boss = any_dropped_boss or boss_drop
         flag = '  !!boss dropped' if boss_drop else ''
-        if p['vanilla'] is None:
+        has_ref = p['vanilla'] is not None
+        verdict = p['verdict']['verdict'] if has_ref else None
+        rows.append({'label': label[:22].strip(), 'has_ref': has_ref,
+                     'verdict': verdict, 'boss_drop': boss_drop})
+        if not has_ref:
             print('  %-22s %-13s %5.1f           %5.1f             (no ref)%s'
                   % (label[:22], (p['reference'] or '?')[:13], ot, ol, flag))
             continue
@@ -684,6 +700,7 @@ def curve_report(campaign, band=0.25):
     if any_dropped_boss:
         print('\n  !! a dropped boss means that row\'s verdict is unreliable -- its scariest '
               'unit\n     carries an unmodeled weapon. Add fe_base to its YAML inventory (#51/#52).')
+    return rows
 
 
 def _fmt_delta(f):
@@ -721,6 +738,9 @@ def main():
     ap.add_argument('--campaign', default='rime-of-the-frostmaiden')
     ap.add_argument('--curve', action='store_true',
                     help='emit the campaign-wide enemy-pressure curve (all chapters)')
+    ap.add_argument('--check', action='store_true',
+                    help='with --curve: exit non-zero if any referenced chapter is off-parity '
+                         'or unreliably measured (the hard CI gate, #48 (b))')
     ap.add_argument('--lord-floor', action='store_true',
                     help='emit the per-lord survivability-floor table instead of the parity report')
     ap.add_argument('--target', type=float, default=3.5, help='floor: target bulk rounds-to-down')
@@ -729,8 +749,16 @@ def main():
     ap.add_argument('--hp-cap', type=int, default=12, help='floor: max +HP')
     args = ap.parse_args()
     if args.curve:
-        curve_report(args.campaign)
-    elif not args.chapter:
+        rows = curve_report(args.campaign)
+        if args.check:
+            fails = curve_gate_failures(rows)
+            if fails:
+                print('\n!! PARITY GATE: %d chapter(s) off-parity or unreliable: %s'
+                      % (len(fails), ', '.join(fails)))
+                bc.sys.exit(1)
+            print('\nPARITY GATE: all referenced chapters at parity.')
+        return
+    if not args.chapter:
         ap.error('--chapter is required (or pass --curve for the campaign-wide report)')
     elif args.lord_floor:
         lord_floor_report(args.campaign, args.chapter, args.target,

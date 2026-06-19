@@ -72,3 +72,12 @@ jobs:
       # runaway decodes) that has bitten twice before.
       - name: Verify ROM text decodes cleanly
         run: python3 tools/verify_text.py
+
+      # Surface the campaign enemy-pressure curve (ours vs vanilla parity references) on
+      # every build so balance spikes/sags and parity regressions are visible at a glance
+      # (#48). INFORMATIVE only today: the content track hasn't authored the Ch2+ enemy
+      # inventories yet, so our side reads 0.0 / off-parity. Flip `difficulty` ->
+      # `difficulty-gate` (the --check form) to make off-parity a hard build failure once
+      # content lands (#48 (b)). Reads the decomp HEAD, so it needs the submodule (above).
+      - name: Enemy-pressure parity curve (informative)
+        run: make CAMPAIGN=rime-of-the-frostmaiden difficulty

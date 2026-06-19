@@ -24,7 +24,17 @@ seam was honor-system and no worktree isolation was actually engaged. Now **enfo
   blocked, `difficulty.py` allowed; `--no-verify` is the only escape. The primary checkout is
   integration-only (lane unset).
 
-## Last session (2026-06-19, pipeline) — #53 monster/extended weapons (worktree, green)
+## Last session (2026-06-19, pipeline) — #48(b) informative CI parity gate (worktree, green)
+- **Parity curve now runs in CI informatively.** Added an "Enemy-pressure parity curve (informative)"
+  step to the `build` job (`make difficulty`; uses the submodule that job already checks out to read
+  decomp HEAD) — so balance spikes/sags and parity regressions show on every PR. Always exits 0.
+- **Hard gate built but unwired.** `difficulty.py --curve --check` (=`make difficulty-gate`) exits
+  non-zero on any chapter that claims a `parity_reference` and is off-parity OR has a dropped boss
+  (unreliable OK ≠ pass); no-ref chapters never gate. Pure `curve_gate_failures(rows)`; `curve_report`
+  now returns rows. **The flip is one word in CI** (`difficulty` → `difficulty-gate`) once content
+  authors Ch2+ inventories — RED-by-design today (our side 0.0). TDD: +4 tests, 42 pass; 4 suites green.
+
+## Earlier session (2026-06-19, pipeline) — #53 monster/extended weapons (worktree, green)
 - **#53 landed** (in the `inst/pipeline` worktree): added 9 vanilla-only weapons to `fe_combat.W`
   (monster claws `fetid/rotten/venin-claw`, `evil-eye`, + `thunder/iron-blade/venin-axe/halberd/horseslayer`),
   stats from `data_items.c` HEAD. Mapping lives in a **difficulty-local** `VANILLA_ONLY_ITEM_TO_WEAPON`
@@ -36,7 +46,7 @@ seam was honor-system and no worktree isolation was actually engaged. Now **enfo
   authored Ch4–7 enemy inventories yet (expected — that's the content track's job; gates the hard CI flip, #48 (b)).
 - **FE8 Ch13** (our ch08) is the lone deferred reference — informational scripted-defeat, lowest priority.
 
-## Earlier session (2026-06-19, pipeline) — all on main, green, pushed
+## Earliest session (2026-06-19, pipeline) — #48/#51/#52, all on main, green, pushed
 - **#48 enemy-pressure parity engine** landed: `vanilla_enemies` (decomp extractor),
   `enemy_pressure` (threat/slot + clear-load/slot vs a fixed yardstick), `pressure_verdict`,
   `chapter_enemy_force`; per-chapter report section + `make difficulty` (no CH) campaign curve. Ch1
@@ -83,10 +93,11 @@ You are the **Pipeline-track** instance for Manchego Stars (trunk-based, your ow
    more exotic/monster weapons; curate via the same method (`grep UnitDef_ src/events/ch13-eventscript.h`,
    keep armed-RED arrays), add any missing weapons to `fe_combat.W` + `VANILLA_ONLY_ITEM_TO_WEAPON`, TDD the
    count. Since ch08 is a scripted-defeat objective (not a CI-gated chapter), this is genuinely optional polish.
-2. **Hard CI gate** (#48 (b)): verdict OFF → fail, but only once the content track has authored Ch2+
-   enemy inventories (today the curve shows our side `0.0` / `!!boss dropped`, so a gate would red the
-   build). Gate informatively first (warn), flip to fail when content lands. Leveled stat projection
-   (#45 item 5) pairs here.
+2. **Flip the CI parity gate to enforcing** (#48 (b)): the informative curve now runs in CI and the
+   enforcing form exists (`make difficulty-gate`). When the content track has authored the Ch2+ enemy
+   inventories (today our side is `0.0` / `!!boss dropped`, so enforcing would red the build), change the
+   CI step's `difficulty` → `difficulty-gate` — that's the whole flip. Leveled stat projection (#45 item 5)
+   pairs here (sharpens the projection the gate measures against).
 3. **Playtest platform** (the #49 strategic spine — good fresh-instance work): grow `tools/playtest/`
    from the floor/ch01win scenarios toward an I/O harness → stability fuzzer → LLM-player.
 4. Mechanics/flavor leaves once specced: lord-select UX #46, d20 crit #11, spell-economy #9,
