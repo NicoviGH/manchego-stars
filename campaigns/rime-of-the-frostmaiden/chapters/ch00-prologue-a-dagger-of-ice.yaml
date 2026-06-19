@@ -127,6 +127,9 @@ enemy_units:
     level: 5
     inventory:
       - id: ice-longsword
+        fe_base: steel-sword     # vanilla FE8 stats; matches the ROM (inject_prologue
+                                 # ships ITEM_SWORD_STEEL on the boss). "Ice Longsword" is
+                                 # the book flavor name; damage_type below is cosmetic.
         damage_type: cold        # cosmetic flavor label
     flavor_traits:               # narrative only — NOT mechanical in the prologue
       - "Kiss of the Frostmaiden: the cold does not touch him (undead servant of Auril)"
