@@ -125,20 +125,32 @@ def check_engine_guards_present(fail):
     The campaign-engine hooks below are likewise build-time string-replaces that leave no
     other trace, so a refactor could silently drop a shipped mechanic -- guard them too.
     """
+    # The hooks now live in tools/inject/engine_hooks.py (pipeline-owned) and are
+    # orchestrated from tools/build_campaign.py (#50 file seam). Two precise checks per
+    # hook: it must be DEFINED in the engine-hooks module AND CALLED from the orchestrator.
+    # A refactor that drops either side fails here loudly.
+    eh = open(os.path.join(REPO, 'tools', 'inject', 'engine_hooks.py'), encoding='utf-8').read()
     bc = open(os.path.join(REPO, 'tools', 'build_campaign.py'), encoding='utf-8').read()
-    for fn in ('_patch_player_start_cursor_guard', '_patch_terrain_name_guard'):
-        # definition (def fn(...)) + at least one call site -> name appears >= 2x.
-        if bc.count(fn) < 2:
-            fail.append('engine guard %s() missing or never called in '
-                        'tools/build_campaign.py -- would re-introduce the prologue '
-                        'garbage-band/off-map-cursor crash (see docs/decisions.md)' % fn)
     for fn, mechanic in (
+            ('_patch_player_start_cursor_guard',
+             'the prologue garbage-band / off-map-cursor crash guard'),
+            ('_patch_terrain_name_guard',
+             'the out-of-bounds terrain-name read guard'),
+            ('_patch_battle_map_kind_fallback',
+             'the no-world-map STORY fallback for slot-2+ chapters'),
+            ('_inject_lord_select_engine',
+             'the #42 lord-select mechanic (GetPid / force-deploy / Seize / game-over '
+             'keyed to the chosen lead)'),
             ('_inject_lord_floor_engine',
-             'the #45 lord survivability-floor application -- the chosen lead would lose '
-             'its one-time base-level HP/Def/Res top-up, making the glass picks traps'),):
-        if bc.count(fn) < 2:
-            fail.append('campaign-engine hook %s() missing or never called in '
-                        'tools/build_campaign.py -- would silently drop %s' % (fn, mechanic))
+             'the #45 lord survivability-floor one-time HP/Def/Res top-up, without which '
+             'the glass picks become traps')):
+        if ('def %s(' % fn) not in eh:
+            fail.append('engine hook %s() not DEFINED in tools/inject/engine_hooks.py '
+                        '-- would silently drop %s (see docs/decisions.md)' % (fn, mechanic))
+        if ('engine_hooks.%s(' % fn) not in bc:
+            fail.append('engine hook %s() never CALLED (engine_hooks.%s(...)) from '
+                        'tools/build_campaign.py -- would silently drop %s '
+                        '(see docs/decisions.md)' % (fn, fn, mechanic))
 
 
 def main():

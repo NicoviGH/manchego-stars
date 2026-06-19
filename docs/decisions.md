@@ -182,6 +182,22 @@ for the source/build tree. Worktrees are work tracker #50. The file-level engine
 is preventative polish on top of isolation, not a prerequisite for it.
 _Decided: 2026-06-19_
 
+**Engine/content file seam: the 5 campaign-agnostic engine hooks live in `tools/inject/`, not `build_campaign.py`.**
+So the pipeline track never has to open the content track's file. `tools/inject/decomp.py` holds the
+shared decomp-patch primitives (`_find_brace_block`, `_replace_brace_block`) + the decomp paths both
+sides patch; `tools/inject/engine_hooks.py` holds the 5 hooks (player-start-cursor guard, terrain-name
+guard, battle-map-kind fallback, lord-select, lord-floor) + their engine-only path/flag constants.
+`build_campaign.py` imports from `decomp` and orchestrates `engine_hooks.*`. The 6 sprite/palette
+injection hooks **stay** in `build_campaign.py` (content-owned): new chapters bring new cast art, so
+that machinery belongs with content — which is why this is the *narrow* (5-hook) split, not all 11.
+Done **preventatively** rather than "when it bites": the seam is already known (waiting for a merge
+conflict teaches us nothing new) and a silently mis-resolved conflict could drop an engine hook — the
+exact failure `check.py check_engine_guards_present` exists to catch. That guard is rewritten to assert,
+per hook, that it is *defined* in `engine_hooks.py` AND *called* (`engine_hooks.<fn>(...)`) from
+`build_campaign.py`; both arms verified to bite. The refactor is behavior-preserving — proven by a
+byte-identical ROM (md5 unchanged) plus `lordfloor`/`ch01win` playtests. Work tracker #50.
+_Decided: 2026-06-19_
+
 ---
 
 ## Combat System
