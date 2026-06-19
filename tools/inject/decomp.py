@@ -18,6 +18,28 @@ BMUNIT_C = os.path.join(DECOMP, 'src', 'bmunit.c')
 LORDSEL_FLAG_BASE = 0xF0
 
 
+# Vanilla FE8 weapon key -> ITEM_ enum (constants/items.h). The single source mapping a
+# campaign weapon (a plain vanilla id, or a flavor name's fe_base) to the decomp item.
+# Shared because BOTH sides need it: content (build_campaign) emits enemy/guest loadouts from
+# it; pipeline (difficulty) inverts it to resolve vanilla enemies. Lives here so neither side
+# has to open the other's file to extend it (the seam: docs/decisions.md).
+WEAPON_ITEM_ENUM = {
+    'iron-sword': 'ITEM_SWORD_IRON', 'steel-sword': 'ITEM_SWORD_STEEL',
+    'rapier': 'ITEM_SWORD_RAPIER', 'iron-lance': 'ITEM_LANCE_IRON',
+    'silver-lance': 'ITEM_LANCE_SILVER', 'javelin': 'ITEM_LANCE_JAVELIN',
+    'killing-edge': 'ITEM_SWORD_KILLER',
+    'iron-axe': 'ITEM_AXE_IRON', 'steel-axe': 'ITEM_AXE_STEEL',
+    'hand-axe': 'ITEM_AXE_HANDAXE',
+    'iron-bow': 'ITEM_BOW_IRON', 'fire': 'ITEM_ANIMA_FIRE', 'flux': 'ITEM_DARK_FLUX',
+}
+
+
+def fe_item_enum(inv_entry):
+    """The vanilla ITEM_ enum for a YAML inventory entry -- its fe_base (flavor name over a
+    vanilla weapon) if present, else its id (a plain vanilla weapon)."""
+    return WEAPON_ITEM_ENUM[inv_entry.get('fe_base') or inv_entry['id']]
+
+
 def _find_brace_block(text, marker, path):
     """Return (start, end) covering the `{...}` (brace-balanced) after `marker`."""
     at = text.find(marker)

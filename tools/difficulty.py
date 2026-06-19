@@ -24,6 +24,7 @@ import re
 
 import build_campaign as bc
 import fe_combat as fc
+from inject.decomp import WEAPON_ITEM_ENUM   # shared weapon<->ITEM map (seam-neutral)
 
 # Class -> effectiveness tag a unit carries as a DEFENDER (so enemy effective weapons
 # and our rapier resolve). Only the classes our cast/enemies use need entries.
@@ -160,7 +161,7 @@ def enemy_combatants(enemy_def):
 # weapon->ITEM map (one source for both directions). Only attacking weapons are listed there;
 # staves/consumables/keys are absent on purpose (an enemy carrying only those resolves to no
 # modeled weapon and is skipped -- with a warning, see unmodeled_enemies).
-ITEM_TO_WEAPON = {item: key for key, item in bc.WEAPON_ITEM_ENUM.items()}
+ITEM_TO_WEAPON = {item: key for key, item in WEAPON_ITEM_ENUM.items()}
 
 # parity_reference -> (decomp relpath, [UnitDefinition array names]) for its red force.
 # The single curation point: which vanilla arrays ARE a chapter's fightable enemies (named

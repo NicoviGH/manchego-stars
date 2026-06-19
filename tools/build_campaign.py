@@ -38,7 +38,8 @@ from PIL import Image  # noqa: E402
 import yaml  # noqa: E402
 from inject.decomp import (  # noqa: E402  shared decomp paths + patch primitives
     REPO, DECOMP, _find_brace_block, _replace_brace_block,
-    BATTLEQUOTES_C, BMUNIT_C, LORDSEL_FLAG_BASE)
+    BATTLEQUOTES_C, BMUNIT_C, LORDSEL_FLAG_BASE,
+    WEAPON_ITEM_ENUM, fe_item_enum)  # shared weapon<->ITEM map (used by inject_prologue)
 from inject import engine_hooks  # noqa: E402  campaign-agnostic engine C-source hooks
 
 PORTRAIT_DIR = os.path.join(DECOMP, 'graphics', 'portrait')
@@ -160,26 +161,6 @@ CH01_AI = {
     'hold_position':    '{0x3, 0x3, 0x9, 0x20}',  # Breguet: attack in place, never move
     'reinforce':        '{0x0, 0x0, 0x9, 0x0}',   # vanilla Ch1 reinforcement wave
 }
-# Vanilla FE8 weapon key -> ITEM_ enum (constants/items.h). The single map from a YAML
-# weapon (a plain vanilla id, or a flavor name's fe_base) to the decomp item the build
-# emits, so enemy/guest loadouts are driven by the chapter YAML, not hardcoded.
-WEAPON_ITEM_ENUM = {
-    'iron-sword': 'ITEM_SWORD_IRON', 'steel-sword': 'ITEM_SWORD_STEEL',
-    'rapier': 'ITEM_SWORD_RAPIER', 'iron-lance': 'ITEM_LANCE_IRON',
-    'silver-lance': 'ITEM_LANCE_SILVER', 'javelin': 'ITEM_LANCE_JAVELIN',
-    'killing-edge': 'ITEM_SWORD_KILLER',
-    'iron-axe': 'ITEM_AXE_IRON', 'steel-axe': 'ITEM_AXE_STEEL',
-    'hand-axe': 'ITEM_AXE_HANDAXE',
-    'iron-bow': 'ITEM_BOW_IRON', 'fire': 'ITEM_ANIMA_FIRE', 'flux': 'ITEM_DARK_FLUX',
-}
-
-
-def fe_item_enum(inv_entry):
-    """The vanilla ITEM_ enum for a YAML inventory entry -- its fe_base (flavor name over a
-    vanilla weapon) if present, else its id (a plain vanilla weapon)."""
-    return WEAPON_ITEM_ENUM[inv_entry.get('fe_base') or inv_entry['id']]
-
-
 CH01_ITEM_IDS = {'iron-lance': 'ITEM_LANCE_IRON', 'iron-axe': 'ITEM_AXE_IRON'}
 CH01_CLASS_IDS = {'soldier': 'CLASS_SOLDIER', 'fighter': 'CLASS_FIGHTER',
                   'armor-knight': 'CLASS_ARMOR_KNIGHT'}
