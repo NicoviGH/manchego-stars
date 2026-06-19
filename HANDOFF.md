@@ -42,8 +42,13 @@ floor fix**, so a frail-lord pick could soft-trap them before the ending. This b
 module (to be created); `build_campaign.py` imports + orchestrates them. Result: pipeline owns
 `engine_hooks.py` + `difficulty.py` + `fe_combat.py`; content owns `build_campaign.py`'s
 `inject_*` + chapter YAMLs — ownership maps to **files**, not etiquette.
-- **CRITICAL:** `check.py check_engine_guards_present` greps `build_campaign.py` for the guard
-  fn names — after the move it must grep the new module, or the guard silently misfires. Update it.
+- **CRITICAL — rewrite the guard, don't just re-point it.** `check_engine_guards_present` counts
+  each hook fn `>=2x` in `build_campaign.py` (def + call co-located). The split breaks that: the
+  **def** moves to the new module, the **call** stays in the orchestrator, so neither file has it
+  twice and the guard fails (loudly — good) until fixed. Rewrite to two precise checks per hook —
+  `def <fn>` present in the engine-hooks module (defined) AND `<fn>` present in `build_campaign.py`
+  (orchestrator calls it). Then prove it still bites: delete one call, confirm `make check` fails,
+  restore.
 - Pure refactor → keep `make check` green and re-run `lordfloor` + `ch01win` to prove no behavior
   change.
 
