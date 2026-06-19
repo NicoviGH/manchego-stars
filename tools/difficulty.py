@@ -18,6 +18,7 @@ All combat math is fe_combat.py (the decomp's own formulas, tested). Stat resolu
 shares build_campaign.py's primitives so there is one source of truth for "what is this
 unit's stat line".
 """
+import dataclasses
 import os
 import re
 
@@ -179,6 +180,62 @@ def carry(boss, party, terrain_avoid=0):
     return best, fc.rounds_to_kill(best, boss, terrain_avoid)
 
 
+def bulk_durability(unit, enemies):
+    """Worst-case enemy-rounds-to-down: like durability but assuming every hit CONNECTS
+    (no avoid/RNG), still counting doubling. The right lens for a must-survive lord -- you
+    design for the bad case, not the average -- so a dodge-tank isn't credited for luck."""
+    worst = float('inf')
+    for e in enemies:
+        dmg = fc.damage(e, unit)
+        if dmg <= 0:
+            continue
+        per_round = dmg * (2 if fc.doubles(e, unit) else 1)
+        worst = min(worst, unit.hp / per_round)
+    return worst
+
+
+@dataclasses.dataclass
+class LordFloor:
+    """A per-lord survivability top-up: +HP / +Def / +Res, the bulk-durability it reaches,
+    and whether the caps got there. `reached=False` flags a lord stats can't save from the
+    chapter's threat (e.g. effective weapons) -- a positioning answer, not a stat one."""
+    hp: int
+    df: int
+    res: int
+    bulk: float
+    reached: bool
+
+
+def lord_floor_delta(unit, enemies, target=3.5, def_cap=4, res_cap=4, hp_cap=12):
+    """Smallest HP/Def/Res bump lifting `unit` to `target` worst-case rounds-to-down.
+
+    Survival-only stats (never Spd/Lck -- those add offense/dodge). The threat-appropriate
+    defence (Res if the binding enemy is magic, else Def) is spent up to its cap, then HP
+    fills the rest -- which keeps defence bumps modest and reproduces the hand-set +7/+4 on
+    a Ch1 shaman. 0 for units already at/above target; `reached=False` if the caps fall
+    short. The floor is computed ONCE (early game) and then fades as the party levels."""
+    def with_delta(dh, dd, dr):
+        return dataclasses.replace(unit, hp=unit.hp + dh, df=unit.df + dd, res=unit.res + dr)
+
+    if bulk_durability(unit, enemies) >= target:
+        return LordFloor(0, 0, 0, bulk_durability(unit, enemies), True)
+
+    # Binding threat sets which defence stat blunts the most damage.
+    binding = min(enemies, key=lambda e: bulk_durability(unit, [e]))
+    magic = binding.weapon.kind == 'magic'
+    dh = dd = dr = 0
+    cap = res_cap if magic else def_cap
+    while bulk_durability(with_delta(dh, dd, dr), enemies) < target and (dr if magic else dd) < cap:
+        if magic:
+            dr += 1
+        else:
+            dd += 1
+    while bulk_durability(with_delta(dh, dd, dr), enemies) < target and dh < hp_cap:
+        dh += 1
+    b = bulk_durability(with_delta(dh, dd, dr), enemies)
+    return LordFloor(dh, dd, dr, b, b >= target)
+
+
 def lord_team_sweep(roster, line_enemies, bosses, deploy_limit, terrain_avoid=0):
     """For each candidate lord, the best `deploy_limit`-unit field anchored on that lord
     (the rest are the highest-throughput others), with the field's headline metrics.
@@ -328,12 +385,51 @@ def report(campaign, ch):
         print('\n(no vanilla reference field recorded for Ch%s yet -- delta skipped)' % num)
 
 
+def _fmt_delta(f):
+    parts = [('%+d HP' % f.hp) if f.hp else '', ('%+d Def' % f.df) if f.df else '',
+             ('%+d Res' % f.res) if f.res else '']
+    return ' '.join(p for p in parts if p) or '(none)'
+
+
+def lord_floor_report(campaign, ch, target=3.5, def_cap=4, res_cap=4, hp_cap=12):
+    chap, roster, line, bosses, deploy_limit, labels = load_field(campaign, ch)
+    threat = line + bosses
+    bar = '=' * 80
+    print(bar)
+    print('CH%s "%s" -- LORD SURVIVABILITY FLOOR'
+          % (chap.get('chapter_number'), chap.get('title', ch)))
+    print(bar)
+    print('Metric: bulk durability (worst-case enemy-rounds-to-down -- hits assumed to')
+    print('connect, doubling counted, avoid ignored). Survival-only stats (HP/Def/Res; never')
+    print('Spd/Lck). Target %.1f. Caps: Def +%d, Res +%d, HP +%d. Computed ONCE, then fades.'
+          % (target, def_cap, res_cap, hp_cap))
+    print('Threat: %s\n' % '; '.join(labels))
+    print('  %-12s %5s   %-22s %6s   %s'
+          % ('lord', 'bulk', 'floor delta', '->bulk', 'note'))
+    for u in sorted(roster, key=lambda x: bulk_durability(x, threat)):
+        f = lord_floor_delta(u, threat, target, def_cap, res_cap, hp_cap)
+        note = 'already a tank' if (f.hp, f.df, f.res) == (0, 0, 0) else (
+            '' if f.reached else 'UNREACHABLE by stats -- positioning/item answer')
+        print('  %-12s %5.1f   %-22s %6.1f   %s'
+              % (u.name, bulk_durability(u, threat), _fmt_delta(f), f.bulk, note))
+
+
 def main():
     ap = bc.argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--chapter', required=True, help='chapter id, e.g. ch01')
     ap.add_argument('--campaign', default='rime-of-the-frostmaiden')
+    ap.add_argument('--lord-floor', action='store_true',
+                    help='emit the per-lord survivability-floor table instead of the parity report')
+    ap.add_argument('--target', type=float, default=3.5, help='floor: target bulk rounds-to-down')
+    ap.add_argument('--def-cap', type=int, default=4, help='floor: max +Def')
+    ap.add_argument('--res-cap', type=int, default=4, help='floor: max +Res')
+    ap.add_argument('--hp-cap', type=int, default=12, help='floor: max +HP')
     args = ap.parse_args()
-    report(args.campaign, args.chapter)
+    if args.lord_floor:
+        lord_floor_report(args.campaign, args.chapter, args.target,
+                          args.def_cap, args.res_cap, args.hp_cap)
+    else:
+        report(args.campaign, args.chapter)
 
 
 if __name__ == '__main__':

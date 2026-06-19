@@ -143,5 +143,62 @@ class LordTeamSweep(unittest.TestCase):
         self.assertAlmostEqual(tiny_row['throughput'], 1.4)
 
 
+class BulkDurability(unittest.TestCase):
+    """Worst-case enemy-rounds-to-down assuming every hit connects (no avoid/RNG)."""
+
+    def test_rounds_when_hits_connect(self):
+        unit = combatant('u', hp=20, dfc=0, spd=0, weapon='iron-lance')
+        a = combatant('a', pow_=4, spd=0, weapon='iron-bow')   # 10 dmg, single
+        self.assertAlmostEqual(df.bulk_durability(unit, [a]), 2.0)
+
+    def test_counts_doubling(self):
+        unit = combatant('u', hp=20, dfc=1, spd=0, weapon='iron-lance')
+        a = combatant('a', pow_=0, spd=10, weapon='iron-bow')  # 5 dmg x2 (AS 10 vs 0)
+        self.assertAlmostEqual(df.bulk_durability(unit, [a]), 2.0)
+
+    def test_ignores_avoid_unlike_durability(self):
+        # A dodge-tank (huge avoid) is NOT credited -- bulk is the must-survive worst case.
+        unit = combatant('u', hp=20, dfc=0, spd=50, lck=30, weapon='iron-lance')
+        a = combatant('a', pow_=4, spd=0, weapon='iron-bow')
+        self.assertAlmostEqual(df.bulk_durability(unit, [a]), 2.0)
+
+    def test_infinite_when_it_cannot_be_damaged(self):
+        unit = combatant('u', hp=20, dfc=99, weapon='iron-lance')
+        a = combatant('a', pow_=4, weapon='iron-bow')
+        self.assertEqual(df.bulk_durability(unit, [a]), float('inf'))
+
+
+class LordFloorSolver(unittest.TestCase):
+    def test_zero_for_a_unit_already_above_target(self):
+        tank = combatant('tank', hp=40, dfc=8, weapon='iron-lance')
+        e = combatant('e', pow_=5, spd=0, weapon='iron-axe')   # bulk 40/6 = 6.7
+        f = df.lord_floor_delta(tank, [e], target=3.5)
+        self.assertEqual((f.hp, f.df, f.res), (0, 0, 0))
+        self.assertTrue(f.reached)
+
+    def test_physical_threat_spends_def_to_cap_then_hp(self):
+        # A frail shaman vs the goblin fighter -> reproduces the locked +7 HP / +4 Def.
+        mage = combatant('mage', hp=18, dfc=2, spd=6, con=7, weapon='flux')
+        fighter = combatant('fighter', pow_=5, spd=4, con=11, weapon='iron-axe')
+        f = df.lord_floor_delta(mage, [fighter], target=3.5, def_cap=4)
+        self.assertEqual((f.hp, f.df, f.res), (7, 4, 0))
+        self.assertTrue(f.reached)
+
+    def test_magic_threat_spends_res_not_def(self):
+        # An armor lord vs a magic attacker: Def is inert, so the solver buys Res.
+        armor = combatant('armor', hp=25, dfc=9, res=3, spd=3, con=14, weapon='iron-lance')
+        mage = combatant('druid', pow_=8, spd=6, con=6, weapon='flux')
+        f = df.lord_floor_delta(armor, [mage], target=3.5, def_cap=4, res_cap=4)
+        self.assertEqual((f.hp, f.df, f.res), (3, 0, 4))
+
+    def test_flags_unreachable_within_caps(self):
+        # Effective-weapon-style burst the caps can't answer -> reached False (a positioning
+        # problem, not a stat one).
+        flier = combatant('flier', hp=10, dfc=0, spd=0, weapon='iron-lance')
+        sniper = combatant('sniper', pow_=20, spd=0, weapon='iron-axe')
+        f = df.lord_floor_delta(flier, [sniper], target=3.5, def_cap=2, hp_cap=5)
+        self.assertFalse(f.reached)
+
+
 if __name__ == '__main__':
     unittest.main()

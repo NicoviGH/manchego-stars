@@ -34,9 +34,16 @@ Wolfram" was the dirty-tree artifact). The real glass units are the **shamans (d
 the per-lord survivability floor's target (#45 item 3).
 
 ## Next (all in #45, in checklist order)
-1. **Item 3** — per-lord HP/Def floor: build-generated per-lord delta table + an engine hook applying
-   the chosen lord's delta at chapter start (keyed on the lord-select flag). **One-time** (fades).
-   Target ~5-hits-to-down: ~0 for tanks (Wolfram/Braulo), +7/+4 for the glass shamans.
+1. **Item 3 — per-lord survivability floor.** Analysis tool BUILT: `difficulty.py --lord-floor`
+   (`--target/--def-cap/--res-cap/--hp-cap`) emits the per-lord delta table. Design decided with
+   Nicolas: **survival-only stats HP/Def/Res** (never Spd/Lck — they add offense/dodge); **Res** in
+   the model (threat-driven: armor-vs-magic gets Res, not inert Def); metric = **bulk durability**
+   (worst-case rounds-to-down, hits assumed to connect — a must-survive lord shouldn't lean on dodge
+   RNG); target **~3.5** from "survive a chokepoint gang-up + a reaction turn", bounded below the
+   natural tanks. Defaults reproduce the hand-set **+7/+4** on shamans; Braulo/Wolfram → 0.
+   **Remaining (pending Nicolas's param sign-off):** generate the per-lord delta table at build time
+   + a campaign-agnostic engine hook applying the chosen lord's delta at chapter start (keyed on the
+   lord-select pid). **One-time** (computed at Ch1, fades as the party levels).
 2. **Item 4** — `pinky.yaml` → `pcs/` (he's the 8th PC + a lord candidate). **Item 5** — recruit
    schedule to match vanilla cadence (#17).
 3. **#46** lord-select UX (needs Nicolas's UI direction). **#47** alpha-feedback tracker.
