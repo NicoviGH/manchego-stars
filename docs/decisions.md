@@ -1050,7 +1050,7 @@ _Decided: 2026-06-07_
 
 ## Class Mapping & Promotions
 
-All 7 PCs (and recruits) are **stock vanilla FE8 classes** — class bases, caps, MOV, and CON come
+All 8 PCs (and recruits) are **stock vanilla FE8 classes** — class bases, caps, MOV, and CON come
 from the class (`fireemblem8u/src/data_classes.c`). **No custom classes, no per-character
 abilities.** Individuality comes from flavor text, sprite/portrait art, and palette.
 
@@ -1079,13 +1079,14 @@ Canto, flight, etc. We dropped the homebrew D&D ability layer, not FE mechanics.
 | Rootis | Mage | Sorcerer (Draconic) |
 | Sclorbo | Priest | Bard (College of Lore) |
 | Wolfram | Knight (Armor Knight) | Metallurgist |
+| Pinky | Pegasus Knight | — (RBG's homunculus "son"; no D&D class — the 8th PC, a lord candidate) |
 
-Marty & Meesmickle share the Shaman chassis but differentiate at **promotion**, not base.
+Marty & Meesmickle share the Shaman base class and the same Ewan-donor **bases**, but they are **not** stat-twins from the start: their **personal growths differ from level 1** (Marty inherits Knoll's, Meesmickle Ewan's — split toward their promotions), and the class branches at the Master Seal (Marty → **Druid**, Meesmickle → **Summoner**). Donor split detail: §Party-side parity (#45).
 _Decided: 2026-05-30 (supersedes the 2026-05-27 "Marty→Monk for sprite differentiation," which forced an illegal Monk→Summoner promotion)_
 
-**Pepperjack & Brie: RBG-crafted constructs that join as regular FE8 units (class + intro TBD at chapter-build time)**
-Lore: they're automatons RBG (Artillerist artificer) builds — D&D "ballistae"/cannon-constructs, not PCs. FE8 has **no playable Ballistician class** (`CLASS_BLST_LONG_*` are inert map objects; ballistae are siege *terrain/items* a unit rides). So they are **not** modeled as ballistae. Instead they enter the army the **normal FE8 way** — introduced via chapter events whenever the story has RBG build them (recruit/reinforcement flow, mirroring how the base game stages unit arrivals). Their stock FE8 class and arrival chapter are chosen **when we build those chapters**, not up front. Until then their YAML carries `class: null` (name-only in the build). Brie is the only female of the 10 (`gender: female`).
-_Decided: 2026-06-04_
+**Pepperjack & Brie are vanilla FE8 map ballistae (siege the party mans), NOT roster recruits**
+RBG (an Artillerist artificer) builds his ordnance — the cannon-golem art (barrel snout, rope fuse) was always artillery — so they're implemented the **vanilla way**: a map-placed siege emplacement (ballista terrain + the ballista object), not a unit class. **No recruit slot, no `deploy_limit` cost**; their YAML carries `fe_stats.class: null` with `role: ballista`, because a ballista is map equipment, not a character. They appear from the vanilla ballista era — FE8 debuts ballistae in Ch10 "Revolt at Carcino" (Eirika route) → our ~Ch10 onward — as flavored emplacements on relevant maps; the party mans them like any FE8 ballista (`US_IN_BALLISTA`). They're a couple (Brie built for Pepperjack, Adam/Eve framing) with mirrored designs in opposing palettes, and speak Pokémon-style (each only says its own name — "Pepperjack!" / "Brie!"). Brie is the only female of the cast (`gender: female`). Combined concept ref → `data/portraits/pepperjack-and-brie.jpeg`; full flavor → `lore/pepperjack-and-brie.md`.
+_Decided: 2026-06-20 (supersedes the 2026-05-29 "ordinary recruits, not summons" and the 2026-06-04 "join as regular FE8 units, not ballistae" framings — we don't break from vanilla, so ballistae stay map siege)_
 
 **Promotions are FE8's vanilla BRANCHED choice (the player picks at the Master Seal)**
 Every promoting class has two vanilla options (`fireemblem8u/src/classchg-data.c`); each unit YAML
@@ -1097,7 +1098,7 @@ lists the `branch` + a thematic `default` (in **bold**):
 - Rootis: Mage → {**Sage**, Mage Knight}
 - Sclorbo: Priest → {**Bishop**, Sage}
 - Wolfram: Armor Knight → {**General**, Great Knight}
-- Pinky (recruit): Pegasus Knight → {**Falcon Knight**, Wyvern Knight}
+- Pinky: Pegasus Knight → {**Falcon Knight**, Wyvern Knight}
 _Decided: 2026-05-30 (fixes the illegal Monk→Summoner and the non-existent "Dark Sage")_
 
 **Sclorbo: stock Priest → Bishop (staff healer; attack tomes at promotion)**
@@ -1110,14 +1111,6 @@ _Decided: 2026-05-29_
 A plain anima caster (ice = flavor only). The earlier "Dragon Wings = Manakete-style class
 transform" and "custom flier Sage" are gone with the ability strip — no transform, no dragon form,
 no Sorcery Points. His draconic identity is sprite art + lore.
-_Decided: 2026-05-29_
-
-**Pepperjack & Brie are separate recruitable units, not RBG summons**
-Two sentient automatons RBG builds; each joins the army as an ordinary FE8 recruit (`npcs/`), not a
-deployable cannon/summon, and is a stock vanilla class (TBD post-MVP). Pokémon-style speech (each
-only says its own name — "Pepperjack!" / "Brie!"); they're dating. Pinky (RBG's homunculus "son")
-is a third recruit — the army's flier (Pegasus Knight). Combined portrait at
-`data/portraits/pepperjack-and-brie.jpeg`. Full flavor in `lore/pepperjack-and-brie.md`, `lore/pinky.md`.
 _Decided: 2026-05-29_
 
 **FE stat column folds 5e stats to FE stats**
@@ -1142,7 +1135,7 @@ The MVP plays entirely **unpromoted** (5e levels 1–5); promotions are post-MVP
 - **Promotions go live ~Ch 10–12** (see memory `manchego-stars-campaign-structure`); PCs reach
   5e ~L11 / first FE promotion there. Specific crests (Knight Crest, Guiding Ring) may
   *flavor-appear* for an early single promotion, but the **Master Seal is the universal
-  mechanism** (avoids class-matching headaches across 7 PCs).
+  mechanism** (avoids class-matching headaches across 8 PCs).
 _Decided: May 2026; renumbered to Ch 8→9 on 2026-05-31 after the Ch 4 split (was Ch 7→8)_
 
 ---

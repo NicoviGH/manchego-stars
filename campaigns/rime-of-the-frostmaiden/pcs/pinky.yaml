@@ -1,16 +1,15 @@
-# npcs/pinky.yaml — Pinky, Prof. R.B. Geenius's homunculus 'son'; the army's flier.
+# pcs/pinky.yaml — Pinky, Prof. R.B. Geenius's homunculus 'son'; the army's flier.
+# The 8th PC and a lord candidate (#42/#46): founding cast, deployed at the Northlook in Ch1
+# alongside the other seven, classed (Pegasus Knight) and wired in PORTRAIT_MAP / STAT_DONOR.
 # Lean unit definition (mechanics only). Narrative/flavor lives in ../lore/pinky.md.
-# Pinky is NOT an RBG ability/summon — joins the army as an ordinary FE8 recruit and is a stock
-# vanilla FE8 class (Pegasus Knight). The "homunculus" identity is flavor only, not a mechanic.
+# The "homunculus" identity is flavor only, not a mechanic — in-game a stock FE8 Pegasus Knight.
 
 id: pinky
 name: Pinky
 death_quote: "Father...? Did I do good? ...I'll get up in a minute..."  # falls-in-battle quote (#6 dialogue pass; lore/pinky.md)
 portrait_ref: portraits/pinky.png        # 96×80 bust shipped; GBA tile-sheet wiring pending (issue #23)
 
-# How Pinky enters the army (story recruit; not a gameplay summon).
-recruited_via: "available from Chapter 1"
-built_by: prof-rbg                        # RBG's homunculus 'son'
+built_by: prof-rbg                        # RBG's homunculus 'son' (flavor)
 
 # ── Portrait art brief (drives tools/ref_to_bust.py) ──
 art:

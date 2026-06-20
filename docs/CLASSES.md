@@ -17,6 +17,7 @@ roster derived from the unit YAML.
 | Braulo | Barbarian (Path of the Berserker) — Hermit Crab | Pirate | **Berserker** / Warrior |
 | Marty the Merry Mushroom | Druid (Circle of Spores) — Sporemaster | Shaman | **Druid** / Summoner |
 | Meesmickle | Warlock (The Fiend) — Vampire Tabaxi | Shaman | **Summoner** / Druid |
+| Pinky | — | Pegasus Knight | **Falcon Knight** / Wyvern Knight |
 | Prof. R.B. Geenius | Artificer (Artillerist) — Underfolk | Archer | **Sniper** / Ranger |
 | Rootis | Sorcerer (Draconic Bloodline) — Snowperson | Mage (Ice) | **Sage** / Mage Knight |
 | Sclorbo | Bard (College of Lore) — Chwinga | Priest | **Bishop** / Sage |
@@ -31,7 +32,6 @@ roster derived from the unit YAML.
 | Brie | TBD (post-MVP) | — | not a recruit — vanilla map ballista (RBG's siege), from ~Ch10 |
 | Lupin | Cavalier | **Paladin** / Great Knight | story — Marty talks the direwolf pack into the sled team (Ch4) |
 | Pepperjack | TBD (post-MVP) | — | not a recruit — vanilla map ballista (RBG's siege), from ~Ch10 |
-| Pinky | Pegasus Knight | **Falcon Knight** / Wyvern Knight | available from Chapter 1 |
 | Sahnar | Myrmidon | **Swordmaster** / Assassin | story — freed from the sarcophagus in the Elven Tomb (Ch5) |
 | Trex | Thief | **Rogue** / Assassin | story — joins after the Termalaine mine (Ch3) |
 
