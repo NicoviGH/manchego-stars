@@ -15,8 +15,8 @@ parity_reference: "FE8 Ch2"   # #48 enemy-pressure parity bar — The Protected 
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
-  The party escorts the sled west toward Targos and is ambushed on the open road
-  by a raider band preying on Ten-Towns traffic. In Targos they find a frozen body
+  The party rolls west toward Targos in the Rolling Cheddar — their home on runners —
+  and is ambushed on the open road by a raider band preying on Ten-Towns traffic. In Targos they find a frozen body
   — the town reads it as a sacrifice the frost druids demand to appease Auril, but
   Rootis recognizes the dagger-of-ice kill as Sephek Kaltro's, the ch00 killer who
   was meant to be dead. Rumor of the Maer Monster off Bremen surfaces at the inn;
@@ -24,12 +24,14 @@ narrative: >
 
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
-  file: maps/ch02-cold-welcome.tmx
-  tileset: snow-road
+  file: maps/ch02-cold-welcome.mar     # hand-authored on the snow metatiles (ch01 flow)
+  tileset: snowy-bern                  # shared winter tileset (#41)
+  base_layout: Ch2Map                  # vanilla 15×15 "The Protected", winter-reskinned
   size: "15×15"                 # compact, mirrors FE8 Ch2 (coords top out ~14×14)
   description: >
-    Compact snowy road into Targos. Party enters from one corner with the parked
-    Rolling Cheddar sled; the raider band holds the far edges and converges. Tree
+    Compact snowy road into Targos. The party rides in aboard the Rolling Cheddar —
+    their home-sled — which halts at the entry corner when the raid hits; the raider
+    band holds the far edges and converges on it. Tree
     lines and snowdrifts give terrain-avoid cover on the flanks. Reskin of FE8 Ch2:
     same choke points and spawn geography, arctic palette. Terrain types map 1:1
     (FE forest → snowy pines, fort → ice cairn, village → Ten-Towns hut).
@@ -37,8 +39,9 @@ map:
 # ── Objective ──────────────────────────────────────────────────────────────────
 # Mirrors FE8 Ch2 "The Protected": DefeatAll with a defend-in-place layer. FE8's
 # "protect" is a SOFT fail (you lose the recruit/village if too slow, not a game
-# over). Ours: lose the sled and you forfeit the convoy supplies + reward, but the
-# chapter is not lost. Hard lose = party wiped (lord rule).
+# over). Ours: the sled is the party's own home on runners — lose it and you forfeit
+# the chest + reward (stores lost with the home), but the chapter is not lost. Hard
+# lose = party wiped (lord rule).
 objective:
   type: defeat_all
   description: "Defeat the entire raider band"

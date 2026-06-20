@@ -6,8 +6,8 @@ Nicolas paints in-browser and exports a layout JSON, which import_map_layout.py 
 Usage: gen_map_editor.py [vanilla_layout=PrologueMap] [out_html=editor.html] [download=prologue-layout.json]
 e.g.   gen_map_editor.py Ch13EirikaMap 21-iron-trail/editor.html ch01-layout.json"""
 import sys, os, struct, collections, json, io, base64
-DEC='/Users/Yonick/Projects/manchego-stars/fireemblem8u'
-ROOT='/Users/Yonick/Projects/manchego-stars'
+ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # repo root (worktree-aware)
+DEC=os.path.join(ROOT,'fireemblem8u')
 sys.path.insert(0, os.path.join(ROOT,'tools'))
 from map_tileset_tool import _tileset_from_dir, Tileset
 from PIL import Image
@@ -17,8 +17,13 @@ OUT_HTML=sys.argv[2] if len(sys.argv)>2 else 'editor.html'
 DOWNLOAD=sys.argv[3] if len(sys.argv)>3 else 'prologue-layout.json'
 
 win=_tileset_from_dir(os.path.join(ROOT,'campaigns/rime-of-the-frostmaiden/maps/tilesets/snowy-bern'))
-van=Tileset(os.path.join(DEC,'graphics/map/ObjectType1.4bpp'),
-            os.path.join(DEC,'graphics/map/MapPalette1.gbapal'),
+# `van` is consulted ONLY for .terrain(m) (vanilla tileset-1 terrain table) to decide which
+# reskinned cells diverge; its gfx/pal are never rendered. The decomp's raw vanilla gfx
+# (ObjectType1.4bpp / MapPalette1.gbapal) are build-only artifacts and may be absent, so we
+# feed the winter gfx/pal (irrelevant) alongside the real vanilla config.
+SNOW=os.path.join(ROOT,'campaigns/rime-of-the-frostmaiden/maps/tilesets/snowy-bern')
+van=Tileset(os.path.join(SNOW,'snowy-bern.4bpp'),
+            os.path.join(SNOW,'snowy-bern.gbapal'),
             os.path.join(DEC,'graphics/map/TileConfiguration1.bin'))
 lay=open(os.path.join(DEC,f'graphics/map/layout/{LAYOUT}.bin'),'rb').read()
 W,H=lay[0],lay[1]
@@ -45,6 +50,14 @@ for y in range(H):
                     nm=cells[ny*W+nx]
                     if not divergent(nm) and van.terrain(nm)==vt: nb[nm]+=1
         resolved[y*W+x]=nb.most_common(1)[0][0] if nb else MODE.get(vt,FB.get(vt,m))
+# Learned reskin: Nicolas's hand-retiles (reskin-learned.json) override the naive auto-reskin
+# for any vanilla metatile he's already taught, so each new chapter inherits his conventions
+# (villages, mountains, forests...) as the starting point instead of the smeared default.
+_learned_path=os.path.join(ROOT,'campaigns/rime-of-the-frostmaiden/maps/reskin-learned.json')
+_learned=json.load(open(_learned_path)).get('map',{}) if os.path.exists(_learned_path) else {}
+for i in range(W*H):
+    w=_learned.get(str(cells[i]))
+    if w is not None: resolved[i]=w
 # prologue-era hand overrides apply only to the original PrologueMap session
 _isproto = LAYOUT=='PrologueMap'
 remap={int(k):v for k,v in json.load(open(os.path.join(ROOT,'map-review/_remap.json'))).items()} if _isproto and os.path.exists(os.path.join(ROOT,'map-review/_remap.json')) else {}
@@ -61,12 +74,44 @@ for m in range(1024):
     atlas.paste(win.metatile_image(m), ((m%ACOLS)*16,(m//ACOLS)*16))
 buf=io.BytesIO(); atlas.save(buf,'PNG'); ATLAS=base64.b64encode(buf.getvalue()).decode()
 
+# vanilla-art reference: the ORIGINAL FE8 layout in its native tileset, for side-by-side
+# comparison while painting. The raw .4bpp/.gbapal are build-only artifacts often absent
+# in a fresh tree, so build them on demand with the decomp's OWN gbagfx (authoritative;
+# a hand-rolled PNG/JASC decode gets the palette wrong), then render via the standard path.
+import subprocess
+def _ensure_built(src, dst):
+    if not os.path.exists(dst):
+        subprocess.run([os.path.join(DEC,'tools/gbagfx/gbagfx'), src, dst], check=True)
+_ensure_built(os.path.join(DEC,'graphics/map/ObjectType1.png'),  os.path.join(DEC,'graphics/map/ObjectType1.4bpp'))
+_ensure_built(os.path.join(DEC,'graphics/map/MapPalette1.pal'),  os.path.join(DEC,'graphics/map/MapPalette1.gbapal'))
+vanart=Tileset(os.path.join(DEC,'graphics/map/ObjectType1.4bpp'),
+               os.path.join(DEC,'graphics/map/MapPalette1.gbapal'),
+               os.path.join(DEC,'graphics/map/TileConfiguration1.bin'))
+vref=Image.new('RGB',(W*16,H*16))
+for i,m in enumerate(cells):
+    vref.paste(vanart.metatile_image(m),((i%W)*16,(i//W)*16))
+vbuf=io.BytesIO(); vref.save(vbuf,'PNG'); VANREF=base64.b64encode(vbuf.getvalue()).decode()
+
 def nonempty(m): return any(struct.unpack_from('<H',win.cfg,m*8+s*2)[0]&0x3FF for s in range(4))
+def is_filler(m):
+    """A solid-orange placeholder slot in the community tileset (not a paintable tile)."""
+    d=win.metatile_image(m).getdata()
+    if len(set(d))>3: return False
+    r,g,b=collections.Counter(d).most_common(1)[0][0]
+    return r>180 and 90<g<190 and b<90
 TERR=[win.terrain(m) for m in range(1024)]
-PAL=[m for m in range(1024) if nonempty(m)]
-TNAME={0x00:'(none)',0x01:'Plains',0x02:'Road',0x05:'House',0x0a:'Fort',0x0b:'Gate',
-0x0c:'Forest',0x0d:'Thicket',0x10:'River',0x11:'Mountain',0x12:'Peak',0x13:'Bridge',
-0x15:'Sea',0x17:'Floor',0x19:'Fence',0x1a:'Wall',0x1e:'Door',0x25:'Ruins',0x26:'Cliff',0x3c:'Water'}
+# palette = real, paintable tiles only — drop empty + orange-filler slots that just clutter it
+PAL=[m for m in range(1024) if nonempty(m) and not is_filler(m)]
+# friendly names for EVERY terrain id present (decomp's terrains.h ids, named for a winter map
+# so the unnamed "Tile 2C/2E/Stairs/Ruins" slots that actually hold frozen BUILDINGS read clearly)
+TNAME={0x00:'(empty)',0x01:'Snow ground',0x02:'Road / path',0x03:'Village (visit)',
+0x04:'Village (used)',0x05:'House',0x06:'Armory',0x07:'Vendor',0x08:'Arena',0x0a:'Fort / cairn',
+0x0b:'Gate',0x0c:'Pines (forest)',0x0d:'Thicket',0x10:'River / ice',0x11:'Mountain',
+0x12:'Peak (impass.)',0x13:'Bridge',0x15:'Sea / ice',0x17:'Floor',0x19:'Fence',
+0x1a:'Wall (impass.)',0x1b:'Wall (broken)',0x1d:'Pillar',0x1e:'Door',0x1f:'Throne',
+0x20:'Chest (empty)',0x21:'Chest',0x25:'Ruins / wall',0x26:'Cliff (impass.)',
+0x2c:'Building edge',0x2d:'Stairs / floor',0x2e:'Building / roof',0x32:'Fence',
+0x34:'Bridge',0x36:'Deep ice',0x3c:'Water',0x3f:'Ship / brace'}
 
 HTML=r'''<!doctype html><html><head><meta charset="utf-8"><title>__TITLE__ Map Editor</title>
 <style>
@@ -84,9 +129,13 @@ HTML=r'''<!doctype html><html><head><meta charset="utf-8"><title>__TITLE__ Map E
   <select id="mode"><option value="one">paint one cell</option><option value="all">replace ALL matching (global)</option></select>
   <button id="undo">undo (z)</button>
   <button id="export">⬇ Export layout</button>
+  <label style="margin-left:8px"><input type="checkbox" id="grid" checked> grid &amp; terrain borders (g)</label>
   <span id="brush" class="hint"></span>
  </div>
- <canvas id="map"></canvas>
+ <div style="display:flex;gap:14px;align-items:flex-start">
+  <div><div class="hint" style="margin-bottom:4px"><b>VANILLA</b> reference (read-only)</div><canvas id="ref"></canvas></div>
+  <div><div class="hint" style="margin-bottom:4px"><b>YOUR MAP</b> — paint here</div><canvas id="map"></canvas></div>
+ </div>
  <div class="hint" id="cell">hover a cell…</div>
  <div class="bar" style="margin-top:8px"><b>How to use:</b> 1) pick a tile on the right (it becomes your brush) &nbsp; 2) click/drag on the map to paint &nbsp; 3) <b>Export</b> → a <i>__DOWNLOAD__</i> downloads &nbsp; 4) tell Claude "exported" and it compiles + renders.</div>
  <textarea id="out" style="width:680px;height:70px;display:none;background:#111;color:#6f6"></textarea>
@@ -101,18 +150,28 @@ const W=__W__,H=__H__,T=16,ACOLS=__ACOLS__;
 let GRID=__GRID__; const TERR=__TERR__,PAL=__PAL__,TNAME=__TNAME__;
 const WALK=new Set([0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x0a,0x0b,0x0c,0x0d,0x0e,0x13,0x17,0x1f]);
 const atlas=new Image(); atlas.src="data:image/png;base64,__ATLAS__";
+const vanref=new Image(); vanref.src="data:image/png;base64,__VANREF__";
 const MC=48, PC=34, PCOLS=16;
 const map=document.getElementById('map'), mx=map.getContext('2d');
+const ref=document.getElementById('ref'), rx=ref.getContext('2d');
 const pal=document.getElementById('pal'), px=pal.getContext('2d');
 map.width=W*MC; map.height=H*MC;
-let brush=PAL[0], hist=[], curFilter='all', palList=PAL.slice();
+ref.width=W*MC; ref.height=H*MC; rx.imageSmoothingEnabled=false;
+function drawRef(hl){
+ if(vanref.complete) rx.drawImage(vanref,0,0,W*MC,H*MC);
+ if(showGrid) for(let i=0;i<W*H;i++){const x=(i%W)*MC,y=(Math.floor(i/W))*MC;
+  rx.strokeStyle='rgba(255,255,255,0.12)';rx.lineWidth=1;rx.strokeRect(x+0.5,y+0.5,MC,MC);}
+ if(hl>=0){const x=(hl%W)*MC,y=(Math.floor(hl/W))*MC;
+  rx.strokeStyle='#ffd84d';rx.lineWidth=3;rx.strokeRect(x+1,y+1,MC-2,MC-2);}
+}
+let brush=PAL[0], hist=[], curFilter='all', palList=PAL.slice(), showGrid=true;
 
 function tileSrc(m){return [(m%ACOLS)*T,(Math.floor(m/ACOLS))*T];}
 function drawMap(){
  for(let i=0;i<W*H;i++){const m=GRID[i],x=(i%W)*MC,y=(Math.floor(i/W))*MC;
   const[s,t]=tileSrc(m); mx.drawImage(atlas,s,t,T,T,x,y,MC,MC);
-  mx.strokeStyle=WALK.has(TERR[m])?'#28d228':'#eb2d2d'; mx.lineWidth=2;
-  mx.strokeRect(x+1,y+1,MC-2,MC-2);}
+  if(showGrid){mx.strokeStyle=WALK.has(TERR[m])?'#28d228':'#eb2d2d'; mx.lineWidth=2;
+   mx.strokeRect(x+1,y+1,MC-2,MC-2);}}
 }
 function buildFilter(){
  const f=document.getElementById('filter'); const terrs=[...new Set(PAL.map(m=>TERR[m]))].sort((a,b)=>a-b);
@@ -137,24 +196,31 @@ function paintAt(i){
 let down=false;
 function cellAt(e){const r=map.getBoundingClientRect();const x=Math.floor((e.clientX-r.left)/MC),y=Math.floor((e.clientY-r.top)/MC);return (x>=0&&x<W&&y>=0&&y<H)?y*W+x:-1;}
 map.onmousedown=e=>{down=true;const i=cellAt(e);if(i>=0)paintAt(i);};
-map.onmousemove=e=>{const i=cellAt(e);if(i>=0){const x=i%W,y=Math.floor(i/W);document.getElementById('cell').textContent=String.fromCharCode(65+x)+(y+1)+'  tile i'+GRID[i]+' ('+(TNAME[TERR[GRID[i]]]||TERR[GRID[i]])+')';if(down)paintAt(i);}};
+map.onmousemove=e=>{const i=cellAt(e);if(i>=0){const x=i%W,y=Math.floor(i/W);document.getElementById('cell').textContent=String.fromCharCode(65+x)+(y+1)+'  tile i'+GRID[i]+' ('+(TNAME[TERR[GRID[i]]]||TERR[GRID[i]])+')';drawRef(i);if(down)paintAt(i);}};
+map.onmouseleave=()=>drawRef(-1);
 window.onmouseup=()=>down=false;
 pal.onmousedown=e=>{const r=pal.getBoundingClientRect();const k=Math.floor((e.clientY-r.top)/PC)*PCOLS+Math.floor((e.clientX-r.left)/PC);if(k>=0&&k<palList.length)setBrush(palList[k]);};
 document.getElementById('undo').onclick=()=>{if(hist.length){GRID=hist.pop();drawMap();}};
-window.onkeydown=e=>{if(e.key==='z'){if(hist.length){GRID=hist.pop();drawMap();}}};
+document.getElementById('grid').onchange=e=>{showGrid=e.target.checked;drawMap();drawRef(-1);};
+window.onkeydown=e=>{
+ if(e.key==='z'){if(hist.length){GRID=hist.pop();drawMap();}}
+ if(e.key==='g'){const g=document.getElementById('grid');g.checked=!g.checked;showGrid=g.checked;drawMap();drawRef(-1);}
+};
 document.getElementById('export').onclick=()=>{
  const js=JSON.stringify({width:W,height:H,grid:GRID});
  const ta=document.getElementById('out');ta.style.display='block';ta.value=js;
  const b=new Blob([js],{type:'application/json'});const a=document.createElement('a');
  a.href=URL.createObjectURL(b);a.download='__DOWNLOAD__';a.click();
 };
-atlas.onload=()=>{drawMap();buildFilter();drawPal();setBrush(brush);};
+atlas.onload=()=>{drawMap();buildFilter();drawPal();setBrush(brush);drawRef(-1);};
+vanref.onload=()=>drawRef(-1);
 </script></body></html>'''
 
 out=(HTML.replace('__W__',str(W)).replace('__H__',str(H)).replace('__ACOLS__',str(ACOLS))
      .replace('__GRID__',json.dumps(grid)).replace('__TERR__',json.dumps(TERR))
      .replace('__PAL__',json.dumps(PAL)).replace('__TNAME__',json.dumps({str(k):v for k,v in TNAME.items()}))
-     .replace('__ATLAS__',ATLAS).replace('__DOWNLOAD__',DOWNLOAD).replace('__TITLE__',LAYOUT))
+     .replace('__ATLAS__',ATLAS).replace('__VANREF__',VANREF)
+     .replace('__DOWNLOAD__',DOWNLOAD).replace('__TITLE__',LAYOUT))
 # TNAME keys must be numeric in JS object -> emit as numbers
 out=out.replace(json.dumps({str(k):v for k,v in TNAME.items()}),
                 '{'+','.join('%d:%s'%(k,json.dumps(v)) for k,v in TNAME.items())+'}')
@@ -162,3 +228,17 @@ path=os.path.join(ROOT,'map-review',OUT_HTML)
 os.makedirs(os.path.dirname(path),exist_ok=True)
 open(path,'w').write(out)
 print('wrote',path,'(%d KB)'%(len(out)//1024))
+
+# Dump the auto-reskinned starting grid as an importable layout JSON (so the faithful
+# winter reskin can be compiled/rendered immediately, before any hand-painting), and
+# render a PNG preview of it so the starting point is visible without opening the editor.
+start_json=os.path.join(ROOT,'map-review',DOWNLOAD)
+json.dump({'width':W,'height':H,'grid':grid},open(start_json,'w'))
+print('wrote starting layout',start_json)
+Z=4*16
+prev=Image.new('RGB',(W*Z,H*Z))
+for i,m in enumerate(grid):
+    prev.paste(win.metatile_image(m).resize((Z,Z),Image.NEAREST),((i%W)*Z,(i//W)*Z))
+png=os.path.join(ROOT,'map-review',os.path.splitext(os.path.basename(OUT_HTML))[0]+'-start.png')
+prev.save(png)
+print('rendered start preview',png)

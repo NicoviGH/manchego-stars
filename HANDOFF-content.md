@@ -21,18 +21,22 @@ Land them as the **next unit of work**, before more Ch2 — otherwise they sit u
 
 Both gate Ch1 #21's Definition of Done.
 
-## Now (2026-06-19) — ch02 dialogue all LOCKED; host wiring BLOCKED on the missing ch02 map
-All three ch02 cutscenes are locked text in `ch02-cold-welcome.yaml` (opening, turn-3 rear-ambush bark,
-targos-inn ending — `2e60003`, #22) but **unwired**. The ending lands the **Sephek breadcrumb** (town
-blames the druids' Auril rumor; **Rootis** IDs the dagger-of-ice kill from Hlin's briefing — no fight;
-**RBG** forks the party north onto the druids' trail). Sephek arc recorded in `decisions.md` §Story
-(distinct from Ravisin (ch05); reckoning → an Act-II multi-boss slot; `lore/sephek-kaltro.md` note fixed).
+## Now (2026-06-20) — ch02 map DONE (Nicolas hand-retiled); host wiring is the next gate
+ch02 dialogue is locked (opening, turn-3 rear-ambush bark, targos-inn ending — `2e60003`, #22) and the
+**map is now authored**: `maps/ch02-cold-welcome.mar`+`.json` — a 15×15 winter reskin of FE8 Ch2 that
+**Nicolas painted by hand** in the browser editor (villages rebuilt from winter building tiles, mountains
++ fort + ground retiled). Framing fixed in the YAML: the Rolling Cheddar is the party's **home on runners**
+(not an escorted convoy). The off-map cutscenes stay map-independent; deploy/enemy/objective coords now
+have a real map to land on.
 
-**Host wiring can't start: ch02 has no map layout.** `inject_ch01` injects a real `.mar`+`.json` layout
-per chapter (ch00/ch01/test each have one); ch02 has **none** — the YAML's `maps/ch02-cold-welcome.tmx`
-was never authored. **Decided with Nicolas: design the ch02 map FIRST, then host the whole slice in one
-pass** (avoids throwaway deploy/enemy placement on a placeholder). Off-map cutscene wiring is
-map-independent and could go first, but we're sequencing map-first.
+**Map-tooling upgrades this session (all in `tools/`, content lane):** `gen_map_editor.py` now renders a
+side-by-side **vanilla reference** (built via the decomp's own `gbagfx` — never hand-decode the PNG/pal),
+a grid/terrain-border toggle (`g`), a decluttered palette (orange filler slots dropped) with **every
+terrain id named** (the frozen-building groups read "Building / roof" etc. instead of raw hex). Nicolas's
+retile was diffed vs vanilla Ch2 → **`maps/reskin-learned.json`** (50 vanilla→winter tile mappings) which
+`gen_map_editor` now applies, so future chapters inherit his conventions as the starting reskin.
+`gen_map_editor.py` + `import_map_layout.py` are now worktree-aware (root from `__file__`).
+Tree-diversity experiment was rejected — winter pines too alike; his uniform pine (192) reads best.
 ⚠ Carry-forward flag: the rear-ambush bark line is 31 chars, past the 29-char on-map bubble wrap → at
 insertion it wraps / needs an `[LF]` split; verify the right-side bubble isn't pushed offscreen.
 
@@ -41,18 +45,15 @@ insertion it wraps / needs an `[LF]` split; verify the right-side bubble isn't p
    deepening Ch2 or they sit unaddressed on the build every tester plays. #57 is isolated (`ch01` YAML);
    **#58 shares `build_campaign.py:654`** with ch02 wiring, so it bundles into that branch and lands
    before more ch02 cutscene wiring.
-2. **Design the ch02 map** (#22) — 15×15 snow-road reskin of FE8 Ch2 ("same choke points + spawn
-   geography", per the YAML `map:` block); shared `snowy-bern` winter tileset is already injected. Per the
-   collaborative-map flow: bring Nicolas 2–3 layout concepts, iterate, then author the `.mar`+`.json`
-   layout under `campaigns/.../maps/`.
-3. **Host ch02 (full slice)** once the map lands — write `inject_ch02` modeled on `inject_ch01`: host on
-   chapter **slot 3** (`EventScr_Ch3_*`), inject the three locked cutscenes (off-map opening BACG scene +
-   targos-inn ending + the turn-3 rear-ambush TURN event), place deploy/enemies/defend-sled objective on
-   the new map, and flip ch01's ending from the dev placeholder to **`MNC2(0x3)`**. Mind the rear-ambush
-   bubble-width flag. Then Vellynne cutscene portrait (#19) + in-game motion review.
-4. Supporting content as Ch2 needs them: enemy YAML pass #18, NPC/recruit stubs #17, recruit schedule
+2. **Host ch02 (full slice)** (#22) — the map is done; write `inject_ch02` modeled on `inject_ch01`: host
+   on chapter **slot 3** (`EventScr_Ch3_*`), register `maps/ch02-cold-welcome.mar` + the winter tileset,
+   inject the three locked cutscenes (off-map opening BACG scene + targos-inn ending + the turn-3
+   rear-ambush TURN event), place deploy/enemies/defend-sled objective on the new map, and flip ch01's
+   ending from the dev placeholder to **`MNC2(0x3)`**. Mind the rear-ambush bubble-width flag. Then
+   Vellynne cutscene portrait (#19) + in-game motion review.
+3. Supporting content as Ch2 needs them: enemy YAML pass #18, NPC/recruit stubs #17, recruit schedule
    (#45 item 5), world-map unlock #29.
-5. Art passes layer on already-playable slices: portraits #19, overworld sprites #38.
+4. Art passes layer on already-playable slices: portraits #19, overworld sprites #38.
 
 ## Watch out (content-lane only)
 - **Writing any dialogue → invoke the `dialogue-pass` skill first.** Voice grounding lives in the repo:

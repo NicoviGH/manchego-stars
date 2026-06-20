@@ -6,7 +6,7 @@ Usage: import_map_layout.py <map-stem> [src-json]
 e.g.   import_map_layout.py ch01-the-iron-trail ~/Downloads/ch01-layout.json
        (src defaults to ~/Downloads/<map-stem>-layout.json, then ~/Downloads/prologue-layout.json)"""
 import sys, os, json
-ROOT='/Users/Yonick/Projects/manchego-stars'
+ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # repo root (worktree-aware)
 sys.path.insert(0, os.path.join(ROOT,'tools'))
 from map_tileset_tool import _tileset_from_dir, compile_layout
 from PIL import Image
