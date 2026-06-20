@@ -66,8 +66,13 @@ difficulty_note: >
   the edge OPPOSITE the boss to flank a party that has pushed forward (FE8's pattern).
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
+# Field parity (decisions.md §"Field parity", 2026-06-10): deploy_limit = vanilla Ch2's
+# player deploy-slot count = 5 (Eirika/Seth/Franz/Gilliam/Moulder). Our 8-strong cast does
+# NOT widen the field — the prep screen (Pick Units) chooses which 5 take it; the chosen
+# lord (#42) is force-deployed. This models our difficulty to vanilla's despite the bigger cast.
+deploy_limit: 5
 deployment:
-  note: "All 7 PCs + Baxby (if purchased in ch01) + the Rolling Cheddar sled. Positions set in Tiled."
+  note: "Pick Units fields 5 of {7 PCs + Baxby} (vanilla Ch2 fields 5) + the Rolling Cheddar sled."
   defend_unit:
     id: rolling-cheddar
     type: sled
@@ -89,8 +94,10 @@ enemy_units:
     flavor: "rends with frost-rimed claws"
     class: brigand
     level: 3
-    weapon: iron-axe            # mechanically an axe; reskinned as claws in animation
-    damage_type: slashing       # cosmetic label only
+    autolevel: true
+    inventory:
+      - id: iron-axe            # mechanically an axe; reskinned as claws in animation
+        damage_type: slashing   # cosmetic label only
     ai_pattern: aggressive
   - id: road-bandit
     name: "Road Bandit"
@@ -99,8 +106,10 @@ enemy_units:
     flavor: "Ten-Towns road raider"
     class: brigand
     level: 3
-    weapon: iron-axe
-    damage_type: slashing
+    autolevel: true
+    inventory:
+      - id: iron-axe
+        damage_type: slashing
     ai_pattern: aggressive
     item_drop: vulnerary        # one dropper, mirrors FE8's Ch2 vulnerary drop
   - id: frost-hunter
@@ -110,8 +119,10 @@ enemy_units:
     flavor: "looses ice-fletched arrows from the drifts"
     class: archer
     level: 2
-    weapon: iron-bow
-    damage_type: piercing
+    autolevel: true
+    inventory:
+      - id: iron-bow
+        damage_type: piercing
     ai_pattern: aggressive
   - id: raider-bruiser
     name: "Grukk the Bruiser"
@@ -121,8 +132,10 @@ enemy_units:
     flavor: "the captain's right hand"
     class: brigand
     level: 4
-    weapon: iron-axe
-    damage_type: slashing
+    autolevel: false                 # named mid-tier, fixed stats (FE8 "Bone")
+    inventory:
+      - id: iron-axe
+        damage_type: slashing
     ai_pattern: hold_position
   - id: raider-captain
     name: "Halvar the Raider Captain"
@@ -132,8 +145,10 @@ enemy_units:
     flavor: "leads the band that's been bleeding the Targos road"
     class: brigand
     level: 5
-    weapon: steel-axe
-    damage_type: slashing
+    autolevel: true                  # boss, modeled like vanilla Bazba (L6 steel-axe)
+    inventory:
+      - id: steel-axe
+        damage_type: slashing
     ai_pattern: hold_position        # stationary guard, not a fleeing caster
     death_quote: "Should've… paid the toll…"
 
@@ -144,8 +159,10 @@ reinforcements:
     fe_mechanic: axe-brigand
     class: brigand
     level: 3
-    weapon: iron-axe
-    damage_type: slashing
+    autolevel: true
+    inventory:
+      - id: iron-axe
+        damage_type: slashing
     trigger_turn: 3
     spawn_edge: opposite_boss        # flanks a party pushed toward the boss (FE8 pattern)
     ai_pattern: aggressive

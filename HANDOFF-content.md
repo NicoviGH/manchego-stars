@@ -21,13 +21,26 @@ Land them as the **next unit of work**, before more Ch2 — otherwise they sit u
 
 Both gate Ch1 #21's Definition of Done.
 
-## Now (2026-06-20) — ch02 map DONE (Nicolas hand-retiled); host wiring is the next gate
+## Now (2026-06-20) — ch02 map + dialogue DONE; Ch2 dev 🅿️ PARKED on the difficulty engine (#61/#62)
 ch02 dialogue is locked (opening, turn-3 rear-ambush bark, targos-inn ending — `2e60003`, #22) and the
-**map is now authored**: `maps/ch02-cold-welcome.mar`+`.json` — a 15×15 winter reskin of FE8 Ch2 that
+**map is authored**: `maps/ch02-cold-welcome.mar`+`.json` — a 15×15 winter reskin of FE8 Ch2 that
 **Nicolas painted by hand** in the browser editor (villages rebuilt from winter building tiles, mountains
-+ fort + ground retiled). Framing fixed in the YAML: the Rolling Cheddar is the party's **home on runners**
-(not an escorted convoy). The off-map cutscenes stay map-independent; deploy/enemy/objective coords now
-have a real map to land on.
++ fort + ground retiled). Framing fixed in the YAML: the Rolling Cheddar is the party's **home on runners**.
+ch02 `enemy_units` converted to the canonical schema (class/level/`autolevel`/`inventory`) so the
+difficulty engine + inject can read them.
+
+**🅿️ PARKED (Nicolas, 2026-06-20): no more Ch2 dev until the difficulty engine is reliable.** Driving ch02
+through `tools/difficulty.py` surfaced two engine math defects that make party-side balancing blind:
+**#61** (no vanilla player FIELD for Ch2 → party-parity delta skipped) and **#62** (healers crash / a base
+Priest's promotion-locked tome is miscounted as throughput — engine ignores the `unlock: promotion` flag).
+Both filed `tooling`+`balance`, with acceptance criteria, and listed under #49 ② Pipeline. #22 is labelled
+`blocked`. What IS known: **enemy-pressure parity verified ×0.88 (within band)**; our 4-attacker core
+(3.69 kills/rd) ≈ vanilla's 4 (3.42); **Sclorbo = our Moulder** (base Priest, staff-only = 0 offense).
+**Deploy is NOT an open question** — per decisions.md §"Field parity" (2026-06-10), `deploy_limit` = vanilla
+chapter N's count, so **ch02 `deploy_limit: 5`** (set in the YAML; Pick Units fields 5 of our 8, chosen lord
+force-deployed) and **enemies mirror vanilla Ch2 1:1 — never scaled**. The park is purely on engine
+reliability: once #61/#62 land, re-run `difficulty.py --chapter ch02` to confirm our best-5 sits at vanilla
+parity on the party side (today that delta is skipped/untrustworthy), then place units + build inject_ch02.
 
 **Map-tooling upgrades this session (all in `tools/`, content lane):** `gen_map_editor.py` now renders a
 side-by-side **vanilla reference** (built via the decomp's own `gbagfx` — never hand-decode the PNG/pal),
