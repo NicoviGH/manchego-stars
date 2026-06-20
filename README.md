@@ -9,10 +9,8 @@ The party's *Icewind Dale* adventure — a hermit crab barbarian, a mushroom dru
 **New here? Start with the [playtester guide →](docs/playtesters.md)** — install on your phone and,
 the important part, **keep your progress when a new build drops**.
 
-- **Get the build** — easiest: ask Nicolas for the private pre-patched link. Or, if you own a legal
-  copy of *Fire Emblem: The Sacred Stones* (USA), grab the public `manchego-stars.bps` patch from the
-  **[latest release](https://github.com/NicoviGH/manchego-stars/releases/latest)** and apply it to your
-  ROM with a browser patcher like [rompatcher.me](https://www.marcrobledo.com/RomPatcher.js/).
+- **Get the build** — Nicolas shares a private link to the latest pre-patched `.gba` with the
+  playtesters. (The game is distributed privately, not as a public download — see the guide.)
 - **Play on** — Android **Pizza Boy GBA** or iOS **Delta**. Save **in-game** (not emulator save-states),
   and carry your `.sav` forward each update. Step-by-step for both emulators is in the guide.
 - **Found a bug, balance gripe, or typo?** **[Open the feedback form →](https://github.com/NicoviGH/manchego-stars/issues/new?template=playtest_feedback.yml)** (a free GitHub account is needed to submit).

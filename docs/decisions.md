@@ -795,14 +795,19 @@ _Decided: 2026-06-17_
 
 ## Distribution & Scope
 
-**Distribution: private pre-patched ROM to the players, plus a public `.bps` patch on GitHub Releases**
-The 7 players get a **private, pre-patched `.gba`** sent directly (Nicolas shares a link) — no public
-hosting of the copyrighted ROM. Because the repo is public, each release **also** publishes a
-**`.bps` patch** (contains no ROM bytes, so it's legal to host) that anyone with their own legal copy
-of FE8 (USA) can apply (e.g. via rompatcher.me) — the README is the tester landing page covering both
-paths (`docs/playtesters.md`). The only public artifact is the patch, never the ROM. Non-SRD content
-(Artificer, Circle of Spores, homebrew races) is used freely for this distribution.
-_Decided: May 2026; extended 2026-06-20 to add the public `.bps` patch + landing page (#59)_
+**Distribution: private, pre-patched `.gba` shared with the 7 players (no public ROM or patch)**
+Players get a pre-patched `.gba` via a private link Nicolas shares — no public hosting of the
+copyrighted ROM. The README + `docs/playtesters.md` are the tester landing page (install + carry
+your save), pointing at that private link. A **public `.bps` patch was evaluated and rejected**
+(#59): the `fireemblem8u` decomp build on our toolchain is **non-matching** — it does not
+byte-reproduce retail FE8 (recompiled code + re-compressed graphics differ across the ROM), so a
+patch from a tester's retail ROM to our build is ~ROM-sized (measured **11.4 MB, 71% of the ROM**),
+a pointless download that also effectively republishes the game. A small public patch would first
+require a byte-matching build (a separate toolchain effort, not planned). The pure-Python BPS
+encoder (`tools/make_bps.py`, tested) stays in the repo for that future, or for small deltas between
+our own consecutive builds. Non-SRD content (Artificer, Circle of Spores, homebrew races) is used
+freely for this private distribution.
+_Decided: May 2026; reaffirmed private-only 2026-06-20 after the public-`.bps` evaluation (#59)_
 
 **Permadeath: player choice via FE8's Casual/Classic toggle**
 The toggle ships as-is from vanilla FE8. In-fiction flavor for Casual retreats: "retreated to the sled" / "carried to safety by Baxby."
@@ -848,8 +853,8 @@ drops and an old `.sav` stays valid. Default is therefore **carry-forward**: tes
 build) and move it onto the new build; per-emulator steps (Pizza Boy / Delta) live in
 `docs/playtesters.md`. `tools/check.py check_save_layout_stable` pins those constants and fails the
 build if a future submodule bump ever shifts the layout — **that** drop, and only that, gets a
-per-release starter `.sav` (the fallback) plus a save-version note. Build/dist + the `.bps` patch:
-`tools/build.sh dist`, release #37.
+per-release starter `.sav` (the fallback) plus a save-version note. Build/dist stamps the private
+`.gba`: `tools/build.sh dist` (#37).
 _Decided: 2026-06-20 (revises the 2026-06-19 starter-save-first call from #59 after verifying the layout is stable)_
 
 ---

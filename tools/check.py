@@ -227,6 +227,7 @@ PIPELINE_EXCLUSIVE_FILES = {
     'tools/difficulty.py', 'tools/fe_combat.py', 'tools/check.py', 'tools/build.sh',
     'tools/worktree-setup.sh', 'tools/test_difficulty.py', 'tools/test_fe_combat.py',
     'tools/test_check_lanes.py', 'tools/test_check_save_layout.py',
+    'tools/make_bps.py', 'tools/test_make_bps.py',
 }
 PIPELINE_EXCLUSIVE_DIRS = ('tools/playtest/', 'tools/hooks/', '.github/workflows/')
 CONTENT_EXCLUSIVE_FILES = {

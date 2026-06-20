@@ -10,17 +10,9 @@ If you hit a bug, a balance gripe, or a typo, please
 
 ## 1. Get the game
 
-You have two ways to install — pick whichever is easier for you.
-
-**A. Pre-patched build (easiest — ask Nicolas for the link).** Download the ready-to-play `.gba`
-from the private link Nicolas shares with you, and skip to step 2.
-
-**B. Patch it yourself (public).** If you own a legal copy of *Fire Emblem: The Sacred Stones*
-(USA), you can build the game from the public patch:
-1. Grab `manchego-stars.bps` from the [latest release](https://github.com/NicoviGH/manchego-stars/releases/latest).
-2. On your phone, open a browser patcher like **[rompatcher.me](https://www.marcrobledo.com/RomPatcher.js/)**.
-3. Pick your FE8 `.gba` as the ROM, pick `manchego-stars.bps` as the patch, tap **Apply**, and
-   save the patched `.gba`.
+Manchego Stars is shared **privately** with playtesters — Nicolas will send you a link to the
+ready-to-play `.gba`. Download it onto your phone and continue to step 2. (There's no public
+download; the game is a private, non-commercial fan build.)
 
 ---
 
