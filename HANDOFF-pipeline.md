@@ -7,7 +7,22 @@ the lane guard is `check.py check_lane_ownership`). Seam enforcement (#55) + par
 **Shared builds/gotchas/rules → `HANDOFF.md` + `CLAUDE.md`; this file holds only my current state +
 pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
 
-## Now (2026-06-19) — parity engine live; playtest smoke net + clear-bot + seeded fuzzer
+## Now (2026-06-20) — party-side parity delta now auto-derived + healer modeling
+- **#61 + #62 LANDED & verified — the party-side parity delta works for Ch2+ and models healers**
+  (decisions.md §A fielded healer… / §The vanilla PLAYER deploy field…). Two content-track-filed bugs found
+  bringing ch02 (#22) to parity: (a) the player-side delta was hand-keyed in a `VANILLA_FIELDS` dict (Ch1 only →
+  every other chapter printed "delta skipped"); (b) a staff-only healer crashed the run (`NoneType.wt`) or got
+  mis-roled as an attacker. Fixes: **`fe_combat` is now None-weapon-safe** (a `weapon=None` support unit = 0
+  throughput, still a body for durability); **`_weapon_for` honors the YAML `unlock` flag** (base Sclorbo →
+  weaponless support, not an inflated 0.84 kpr); the **vanilla player field auto-derives from the decomp**
+  (`PARITY_REFERENCE_ALLY_UDEFS` → blue force-deploy/reinforce arrays, `.charIndex` → class base + personal line,
+  no autolevel, first-attacking weapon — mirrors `player_combatant`). `VANILLA_FIELDS` deleted. Ch1 delta
+  materially unchanged (thru 3.74→3.69, dura/carry identical; HEAD is more faithful). `make difficulty`,
+  `make test`, `make check` all green; 50 difficulty + 35 fe_combat asserts. **Healing stays unmodeled** (proxy
+  disclaimer; both sides run a healer → largely canceling). **Next:** content authors Ch2+ enemy inventories so
+  the curve's enemy-pressure half has a real our-side force (today CH2+ reads 0.0 / OFF by design).
+
+## Earlier (2026-06-19) — parity engine live; playtest smoke net + clear-bot + seeded fuzzer
 - **CI fixed + `make test` gated in CI.** The `checks` job had been RED since ~23:15 2026-06-19:
   `check.py` runs the Python unit tests, two of which read the `fireemblem8u` decomp
   (`vanilla_decomp_text` → `git -C fireemblem8u show HEAD:…`) and import `build_campaign`

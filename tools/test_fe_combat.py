@@ -196,6 +196,36 @@ class KillsPerRound(unittest.TestCase):
         self.assertEqual(fc.kills_per_round(atk, dfn), 0.0)
 
 
+class SupportUnit(unittest.TestCase):
+    """A staff-only / weaponless unit (weapon=None) -- a fielded healer (#62). It must not
+    crash the combat math: it deals no damage as an attacker, but is still a valid defender
+    (enemies can hit it, so its durability is computable)."""
+
+    def support(self, spd=8, con=10, df=5, res=5, lck=0):
+        return fc.Combatant('healer', hp=24, pow=0, skl=8, spd=spd, df=df, res=res,
+                            lck=lck, con=con, weapon=None)
+
+    def test_attack_speed_has_no_weight_penalty(self):
+        # No weapon -> no weight to bear -> AS is just Spd (no crash on weapon.wt).
+        self.assertEqual(fc.attack_speed(self.support(spd=8)), 8)
+
+    def test_deals_no_damage_as_attacker(self):
+        self.assertEqual(fc.damage(self.support(), defender(df=2, weapon=fc.W['iron-lance'])), 0)
+
+    def test_no_throughput_as_attacker(self):
+        dfn = defender(df=2, weapon=fc.W['iron-lance'])
+        self.assertEqual(fc.damage_per_round(self.support(), dfn), 0.0)
+        self.assertEqual(fc.kills_per_round(self.support(), dfn), 0.0)
+
+    def test_can_be_attacked_as_defender(self):
+        # An armed enemy still resolves damage/hit against a weaponless defender (triangle
+        # is neutral -- the healer has no weapon kind), so durability stays computable.
+        atk = attacker(5, fc.W['iron-axe'], skl=8)           # 5 + 8 mt, vs Def 5
+        healer = self.support(df=5)
+        self.assertEqual(fc.damage(atk, healer), 8)
+        self.assertGreater(fc.damage_per_round(atk, healer), 0)
+
+
 class CanonicalMatchup(unittest.TestCase):
     """End-to-end against a real vanilla FE8 Ch1 matchup -- the model must reproduce it."""
 

@@ -92,7 +92,10 @@ class Combatant:
 
 
 def attack_speed(c):
-    """Spd minus the weight the unit can't carry (Wt over Con), floored at 0."""
+    """Spd minus the weight the unit can't carry (Wt over Con), floored at 0. A weaponless
+    support unit (weapon=None, a fielded healer) bears no weight, so its AS is just Spd."""
+    if c.weapon is None:
+        return max(0, c.spd)
     return max(0, c.spd - max(0, c.weapon.wt - c.con))
 
 
@@ -123,7 +126,10 @@ def damage(atk, dfn):
     """Damage atk deals to dfn on a single connecting hit (max 0). Magic resolves
     against Res, everything else against Def; an effective weapon triples the whole
     attack (Pow + Mt + triangle) before the defence is subtracted."""
-    raw = atk.pow + atk.weapon.mt + triangle(atk.weapon.kind, dfn.weapon.kind)
+    if atk.weapon is None:                # a weaponless support unit can't attack
+        return 0
+    tri = triangle(atk.weapon.kind, dfn.weapon.kind) if dfn.weapon else 0
+    raw = atk.pow + atk.weapon.mt + tri
     if atk.weapon.effective & dfn.tags:
         raw *= 3
     defence = dfn.res if atk.weapon.kind == 'magic' else dfn.df
@@ -132,7 +138,7 @@ def damage(atk, dfn):
 
 def hit_chance(atk, dfn, terrain_avoid=0):
     """Displayed hit% (0-100): atk's accuracy minus dfn's avoid, on dfn's terrain."""
-    tri = triangle(atk.weapon.kind, dfn.weapon.kind)
+    tri = triangle(atk.weapon.kind, dfn.weapon.kind) if dfn.weapon else 0
     accuracy = atk.skl * 2 + atk.weapon.hit + atk.lck // 2 + tri * 15
     avoid = attack_speed(dfn) * 2 + terrain_avoid + dfn.lck
     return max(0, min(100, accuracy - avoid))
@@ -141,6 +147,8 @@ def hit_chance(atk, dfn, terrain_avoid=0):
 def damage_per_round(atk, dfn, terrain_avoid=0):
     """Expected damage atk deals dfn over one combat round: per-hit damage x hit count
     (2 on a follow-up) x hit probability. A static proxy -- no positioning or AI."""
+    if atk.weapon is None:                # weaponless support unit -> no offense
+        return 0.0
     hits = 2 if doubles(atk, dfn) else 1
     return damage(atk, dfn) * hits * hit_chance(atk, dfn, terrain_avoid) / 100.0
 

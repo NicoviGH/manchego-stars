@@ -88,8 +88,14 @@ def autolevel(base, growths, level):
 
 def _weapon_for(inventory):
     """First inventory entry that resolves (via fe_base, else id) to a real attacking
-    weapon. Staves/consumables aren't in fe_combat.W, so they're skipped."""
+    weapon usable in the modeled (base-class) state. Staves/consumables aren't in
+    fe_combat.W, so they're skipped; items with an `unlock` precondition (e.g. a base
+    Priest's promotion-gated Light tomes) are skipped too -- so a staff-only healer
+    resolves to None, the support path, instead of leaking promoted kit into base offense
+    or crashing (#62). The YAML's own `unlock` flag is the data-driven gate."""
     for item in inventory or []:
+        if item.get('unlock'):                    # not yet usable at base class
+            continue
         key = item.get('fe_base') or item.get('id')
         if key in fc.W:
             return fc.W[key]
@@ -211,6 +217,18 @@ PARITY_REFERENCE_UDEFS = {
                 ['UnitDef_088B61A8', 'UnitDef_088B64F0']),
 }
 
+# parity_reference -> (decomp relpath, [UnitDefinition array names]) for its vanilla PLAYER
+# deploy field (#61) -- the player-side analogue of PARITY_REFERENCE_UDEFS. The blue force the
+# reference chapter force-deploys (its force-deploy + reinforcement arrays), derived from HEAD
+# so the party-side yardstick stays honest with no hand-maintained stat table. Each named ally
+# resolves to class base + its personal line (the same donor-base inheritance our cast uses);
+# a staff-only ally (Moulder) resolves to weaponless support (#62). Extend as references curate.
+PARITY_REFERENCE_ALLY_UDEFS = {
+    'FE8 Ch1': ('src/events/ch1-eventudefs.h',
+                ['UnitDef_Event_Ch1Ally', 'UnitDef_Event_Ch1AllyReinforce']),
+    'FE8 Ch2': ('src/events_udefs.c', ['UnitDef_Event_Ch2Ally']),
+}
+
 
 def _brace_entries(body):
     """Yield each top-level `{...}` group's inner text from an array body, tracking brace
@@ -229,8 +247,9 @@ def _brace_entries(body):
 
 def vanilla_unit_defs(text, array_name):
     """Parse `CONST_DATA struct UnitDefinition <array_name>[] = { ... };` from decomp text
-    into a list of per-entry dicts (classIndex, level, allegiance, items). The trailing
-    `{ 0 }` terminator (no .classIndex) is skipped."""
+    into a list of per-entry dicts (charIndex, classIndex, level, allegiance, items). The
+    trailing `{ 0 }` terminator (no .classIndex) is skipped. `charIndex` is the named
+    character enum for allies/bosses (a numeric token for generics, None if absent)."""
     s, e = bc._find_brace_block(text, array_name + '[]', '<udef:%s>' % array_name)
     body = text[s + 1:e - 1]
     out = []
@@ -238,10 +257,12 @@ def vanilla_unit_defs(text, array_name):
         cls = re.search(r'\.classIndex\s*=\s*(\w+)', block)   # nested .items/.ai braces
         if not cls:                              # the { 0 } terminator
             continue
+        chi = re.search(r'\.charIndex\s*=\s*(\w+)', block)
         lvl = re.search(r'\.level\s*=\s*(\d+)', block)
         alg = re.search(r'\.allegiance\s*=\s*(\w+)', block)
         items = re.search(r'\.items\s*=\s*\{(.*?)\}', block, re.S)
         out.append({
+            'charIndex': chi.group(1) if chi else None,
             'classIndex': cls.group(1),
             'level': int(lvl.group(1)) if lvl else 1,
             'allegiance': alg.group(1) if alg else None,
@@ -279,6 +300,39 @@ def vanilla_enemies(parity_ref):
                 continue
             out.append(_enemy_from_enum('%s#%d' % (array_name, i),
                                         d['classIndex'], d['level'], weapon))
+    return out
+
+
+def _ally_combatant(char_enum, class_enum, weapon):
+    """One vanilla ally Combatant: class base + the named character's personal line (the same
+    donor-base inheritance our cast uses, mirroring player_combatant), at its stored base --
+    allies aren't autoleveled, their CharacterData stats are already the join-level display.
+    Named off charIndex (CHARACTER_EIRIKA -> 'Eirika')."""
+    cbase = _class_base(class_enum)
+    dbase = bc.donor_base_stats(_characters_text(), char_enum)
+    eff = {f: cbase.get(f, 0) + dbase.get(f, 0) for f in bc.BASE_FIELDS}
+    name = char_enum.replace('CHARACTER_', '').title()
+    return _stats_to_combatant(name, eff, weapon, CLASS_TAGS.get(class_enum, frozenset()))
+
+
+def vanilla_allies(parity_ref):
+    """The vanilla reference chapter's PLAYER deploy field as a list of Combatants -- the
+    party-side parity yardstick (#61), derived from the decomp (HEAD) the same way the enemy
+    force is. None if the reference isn't curated yet. Each named blue unit resolves off class
+    base + personal line; a staff-only ally (Moulder) resolves to weaponless support (#62),
+    kept as a body for durability. Weapon = first attacking item (as our cast is modeled)."""
+    spec = PARITY_REFERENCE_ALLY_UDEFS.get(parity_ref)
+    if spec is None:
+        return None
+    relpath, arrays = spec
+    text = bc.vanilla_decomp_text(relpath)
+    out = []
+    for array_name in arrays:
+        for d in vanilla_unit_defs(text, array_name):
+            if d['allegiance'] != 'FACTION_ID_BLUE' or not d['charIndex']:
+                continue
+            weapon = _weapon_from_item_enums(d['items'])
+            out.append(_ally_combatant(d['charIndex'], d['classIndex'], weapon))
     return out
 
 
@@ -479,18 +533,6 @@ def lord_team_sweep(roster, line_enemies, bosses, deploy_limit, terrain_avoid=0)
 # ── Chapter loading + report (I/O + presentation) ─────────────────────────────────
 import glob       # noqa: E402
 
-# Vanilla FE8 reference fields, by chapter number -- the parity yardstick. Ch1 is the
-# 4 units vanilla actually deploys at "Escape!"; stats are char+class from git HEAD.
-# Extend as later chapters are mirrored.
-VANILLA_FIELDS = {
-    1: [
-        fc.Combatant('Eirika', 16, 4, 8, 9, 3, 1, 5, 5, fc.W['rapier']),
-        fc.Combatant('Seth', 30, 14, 13, 12, 11, 8, 13, 11, fc.W['silver-lance']),
-        fc.Combatant('Franz', 20, 7, 5, 7, 6, 1, 2, 9, fc.W['iron-lance']),
-        fc.Combatant('Gilliam', 25, 9, 6, 3, 9, 3, 3, 13, fc.W['iron-lance']),
-    ],
-}
-
 ROSTER = list(bc.BASE_DONOR.keys())     # the playable cast (each has a stat donor)
 
 
@@ -539,6 +581,18 @@ def _fmt_rounds(r):
     return 'inf' if r == float('inf') else '%.1f' % r
 
 
+def _fmt_dura_delta(ours, van):
+    """Signed ours-vs-vanilla delta for a rounds-like metric, inf-safe (inf - inf is 0, not
+    nan; a lone inf reads as +/-inf)."""
+    if ours == float('inf') and van == float('inf'):
+        return '+0.0'
+    if ours == float('inf'):
+        return '+inf'
+    if van == float('inf'):
+        return '-inf'
+    return '%+.1f' % (ours - van)
+
+
 def report(campaign, ch):
     chap, roster, line, bosses, deploy_limit, labels = load_field(campaign, ch)
     num = chap.get('chapter_number')
@@ -562,7 +616,7 @@ def report(campaign, ch):
         dfst = durability(u, line, 20)
         print('  %-11s %3d%3d%3d%3d%3d%3d%3d%3d  %-9s  %4.1f /%4.1f    %.2f%s'
               % (u.name, u.hp, u.pow, u.skl, u.spd, u.df, u.res, u.lck, u.con,
-                 u.weapon.name, do, dfst, best[0],
+                 u.weapon.name if u.weapon else '(staff)', do, dfst, best[0],
                  (' vs ' + best[1].name) if best[1] else ''))
 
     field = _best_field(roster, line, deploy_limit)
@@ -581,19 +635,22 @@ def report(campaign, ch):
               % (r['lord'].name, r['throughput'], r['min_durability'], boss,
                  ', '.join(u.name for u in r['team'])))
 
-    van = VANILLA_FIELDS.get(num)
+    ref = chap.get('parity_reference')
+    van = vanilla_allies(ref)
     if van:
         vm = _metrics(van, line, bosses)
-        print('\n-- VANILLA Ch%s PARITY DELTA ' % num + '-' * 49)
+        print('\n-- VANILLA Ch%s PARITY DELTA (%s deploy, from HEAD) ' % (num, ref) + '-' * 24)
         print('  vanilla (%s): thru %.2f · dura(min) %.1f%s'
               % ('/'.join(u.name for u in van), vm['throughput'], vm['min_durability'],
                  ' · carry %s' % _fmt_rounds(vm['carry'][1]) if 'carry' in vm else ''))
-        print('  ours (best %d):  thru %.2f (%+.2f) · dura(min) %.1f (%+.1f)%s'
+        print('  ours (best %d):  thru %.2f (%+.2f) · dura(min) %s (%s)%s'
               % (deploy_limit, m['throughput'], m['throughput'] - vm['throughput'],
-                 m['min_durability'], m['min_durability'] - vm['min_durability'],
+                 _fmt_rounds(m['min_durability']),
+                 _fmt_dura_delta(m['min_durability'], vm['min_durability']),
                  ' · carry %s' % _fmt_rounds(m['carry'][1]) if 'carry' in m else ''))
     else:
-        print('\n(no vanilla reference field recorded for Ch%s yet -- delta skipped)' % num)
+        print('\n(no vanilla reference field for Ch%s (parity_reference=%r) -- delta skipped)'
+              % (num, ref))
 
     _print_pressure(_chapter_pressure(chap))
 

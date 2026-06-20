@@ -7,6 +7,8 @@ combatants and hand-computed oracles; the I/O layer is tested against real Ch1 d
 
     python3 tools/test_difficulty.py
 """
+import contextlib
+import io
 import os
 import sys
 import unittest
@@ -194,6 +196,29 @@ class ChapterEnemyForce(unittest.TestCase):
         self.assertEqual([u.weapon.name for u in force], ['iron-axe'])
 
 
+class WeaponUnlockGating(unittest.TestCase):
+    """_weapon_for ignores inventory items whose `unlock` precondition isn't met for the
+    modeled (base-class) state (#62). A base Priest's promotion-gated Light tomes don't leak
+    into base-class offense; a staff-only loadout resolves to None (the support path)."""
+
+    def test_skips_unlock_gated_weapon(self):
+        # The only attacking item is promotion-gated -> no base-class weapon.
+        inv = [{'id': 'frostsong', 'fe_base': 'lightning', 'unlock': 'promotion'}]
+        self.assertIsNone(df._weapon_for(inv))
+
+    def test_staff_only_loadout_is_support(self):
+        # Heal staff (not in fc.W) + a promotion-gated tome -> weaponless support, not the tome.
+        inv = [{'id': 'heal-staff', 'fe_base': 'heal'},
+               {'id': 'frostsong', 'fe_base': 'lightning', 'unlock': 'promotion'}]
+        self.assertIsNone(df._weapon_for(inv))
+
+    def test_ungated_weapon_still_resolves(self):
+        # A non-gated weapon ahead of (or behind) a gated one is still picked.
+        inv = [{'id': 'iron-sword'},
+               {'id': 'frostsong', 'fe_base': 'lightning', 'unlock': 'promotion'}]
+        self.assertEqual(df._weapon_for(inv).name, 'iron-sword')
+
+
 _UDEF_SNIPPET = """
 CONST_DATA struct UnitDefinition UnitDef_Test[] = {
     {
@@ -234,12 +259,19 @@ class VanillaUnitDefParser(unittest.TestCase):
     def test_parses_each_entry_class_level_allegiance_items(self):
         defs = df.vanilla_unit_defs(_UDEF_SNIPPET, 'UnitDef_Test')
         self.assertEqual(len(defs), 3)           # the { 0 } terminator is skipped
-        self.assertEqual(defs[0], {'classIndex': 'CLASS_ARMOR_KNIGHT', 'level': 4,
+        self.assertEqual(defs[0], {'charIndex': 'CHARACTER_BREGUET',
+                                   'classIndex': 'CLASS_ARMOR_KNIGHT', 'level': 4,
                                    'allegiance': 'FACTION_ID_RED',
                                    'items': ['ITEM_LANCE_IRON']})
         self.assertEqual(defs[1]['classIndex'], 'CLASS_SOLDIER')
         self.assertEqual(defs[1]['items'], ['ITEM_LANCE_IRON', 'ITEM_VULNERARY'])
         self.assertEqual(defs[2]['allegiance'], 'FACTION_ID_BLUE')
+
+    def test_captures_named_character_index(self):
+        # Named units (allies, bosses) carry a .charIndex; a generic's numeric one is kept too.
+        defs = df.vanilla_unit_defs(_UDEF_SNIPPET, 'UnitDef_Test')
+        self.assertEqual(defs[0]['charIndex'], 'CHARACTER_BREGUET')
+        self.assertEqual(defs[2]['charIndex'], 'CHARACTER_EIRIKA')
 
 
 class VanillaEnemies(unittest.TestCase):
@@ -307,6 +339,62 @@ class VanillaEnemies(unittest.TestCase):
             self.assertNotIn(item, df.WEAPON_ITEM_ENUM.values())
 
 
+class ReportSmoke(unittest.TestCase):
+    """The full report() path end-to-end on real chapter data -- the only caller of the
+    parity-delta formatting, so it guards the wiring (#61/#62) the metric unit tests can't
+    (e.g. a healer in the field, a derived vanilla delta, inf-safe delta formatting)."""
+
+    def _run(self, ch):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            df.report('rime-of-the-frostmaiden', ch)
+        return buf.getvalue()
+
+    def test_ch01_report_prints_a_derived_vanilla_delta(self):
+        out = self._run('ch01')
+        self.assertIn('VANILLA Ch1 PARITY DELTA', out)
+        self.assertNotIn('delta skipped', out)
+
+    def test_ch02_report_with_a_fielded_healer_does_not_crash(self):
+        # ch02's roster includes the staff-only Sclorbo and the derived vanilla field
+        # includes Moulder -- the healer-modeling repro from #62. Must print a delta.
+        out = self._run('ch02')
+        self.assertIn('VANILLA Ch2 PARITY DELTA', out)
+        self.assertIn('(staff)', out)          # Sclorbo rendered as weaponless support
+
+
+class VanillaAllies(unittest.TestCase):
+    """Integration: derive a parity reference's vanilla PLAYER deploy field from the decomp
+    (HEAD), keyed off the chapter's parity_reference -- the player-side yardstick (#61). Named
+    units resolve to class base + their personal line (mirroring our cast); a staff-only ally
+    (Moulder) resolves to weaponless support (mirroring our Sclorbo, #62)."""
+
+    def test_unmapped_reference_returns_none(self):
+        self.assertIsNone(df.vanilla_allies('FE8 Ch99'))
+
+    def test_ch1_reference_is_the_four_deploy_units(self):
+        # FE8 Ch1 deploy: Eirika + Seth (Ally) + Franz + Gilliam (AllyReinforce), all blue.
+        allies = df.vanilla_allies('FE8 Ch1')
+        self.assertEqual({u.name for u in allies},
+                         {'Eirika', 'Seth', 'Franz', 'Gilliam'})
+        eirika = next(u for u in allies if u.name == 'Eirika')
+        self.assertEqual(eirika.weapon.name, 'rapier')
+        gilliam = next(u for u in allies if u.name == 'Gilliam')
+        # Stored personal line + Armor Knight base (from HEAD); not autoleveled.
+        self.assertEqual((gilliam.hp, gilliam.pow, gilliam.skl, gilliam.spd,
+                          gilliam.df, gilliam.res, gilliam.lck, gilliam.con),
+                         (25, 9, 6, 3, 9, 3, 3, 14))
+
+    def test_ch2_reference_fields_moulder_as_staff_only_support(self):
+        # FE8 Ch2 deploy adds Moulder (base Priest, heal staff only) -> weaponless support,
+        # exactly the healer-modeling #62 handles; the run must not crash.
+        allies = df.vanilla_allies('FE8 Ch2')
+        self.assertEqual({u.name for u in allies},
+                         {'Eirika', 'Seth', 'Franz', 'Gilliam', 'Moulder'})
+        moulder = next(u for u in allies if u.name == 'Moulder')
+        self.assertIsNone(moulder.weapon)
+
+
 CAMPAIGN = 'rime-of-the-frostmaiden'
 
 
@@ -335,6 +423,15 @@ class PlayerStatResolution(unittest.TestCase):
         self.assertEqual((u.hp, u.pow, u.skl, u.spd, u.df, u.res, u.lck, u.con),
                          (27, 7, 7, 9, 6, 1, 3, 13))
         self.assertEqual(u.weapon.name, 'iron-axe')
+
+    def test_sclorbo_is_a_support_unit_at_base(self):
+        # Base Priest = staff-only; his Light tomes are unlock: promotion (sclorbo.yaml). The
+        # heal staff isn't a modeled weapon, so he resolves to weaponless support -> 0
+        # throughput (not the inflated 0.84 from crediting a tome he can't wield at base) (#62).
+        u = df.player_combatant(CAMPAIGN, 'sclorbo')
+        self.assertIsNone(u.weapon)
+        goblin = combatant('g', hp=20, dfc=2, weapon='iron-axe')
+        self.assertEqual(fc.kills_per_round(u, goblin), 0.0)
 
 
 class EnemyStatResolution(unittest.TestCase):
