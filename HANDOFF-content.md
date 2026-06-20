@@ -7,19 +7,21 @@ ownership map, and trunk rules → `CLAUDE.md` §Tracks (read first; the lane gu
 + `CLAUDE.md`; this file holds only my current state + content-lane-specific gotchas.** Don't touch
 `HANDOFF-pipeline.md`.
 
-## 🔴 DO FIRST — clear the live Ch1 playtest fixes before deepening Ch2 (flagged 2026-06-19)
-Two content-track fixes from friends' **v0.1.0** runs are live on the build every new tester plays.
-Land them as the **next unit of work**, before more Ch2 — otherwise they sit unaddressed:
-- **#57 — Ch1 Seize unclear:** make the seize tile read as a seize point. Edits **only**
-  `chapters/ch01-the-iron-trail.yaml` (`seize_tile [21,7]` terrain + boss placement) — isolated, no
-  injector touch. Decomp rationale + the seize-legibility checkpoint are on #57 and `decisions.md`
-  §Combat System.
-- **#58 — narration/aside text boxless over cutscene art:** fix at `build_campaign.py:654` (the
-  "Marty leans in…" narration path). ⚠ **Bundle with the ch02 wiring branch** — it shares
-  `build_campaign.py` with ch02 host wiring, so a separate lane would conflict; and land #58's box
-  convention **before** wiring more ch02 cutscenes, or you re-do Ch2 narration against changed behavior.
+## ✅ DONE 2026-06-20 — Ch1 v0.1.0 playtest fixes #57 + #58 landed
+Both live-build fixes from the brother's v0.1.0 run are fixed and verified in-engine:
+- **#57 — Ch1 Seize legible:** seize tile [21,7] is now the castle-gate metatile 938
+  (`TERRAIN_GATE_CASTLE`) — reads as a Seize point, chief on it. **Restores vanilla Ch1's gate
+  +20avo/+3def to the boss** (the bonus-free ruins tile was the deviation). ⚠ **Pipeline track:**
+  the boss is now tankier — account for the gate terrain in ch01's parity bar (flagged in
+  `decisions.md` §Combat resolution + the seize ADR).
+- **#58 — narration boxes opaque:** faceless `narration:`/asides now ride an auto-centered
+  `SOLOTEXTBOXSTART` box (was the translucent `Text()` window, illegible over BACG art). New
+  `_scenic_beat_calls` helper in `build_campaign.py` applies it per-beat across opening + ending;
+  a beat mixing narration + faces must be split with a `beat_break` (ch01 ending E2/E2b, msg 0x93D).
+  Convention recorded in `decisions.md` §Story & Dialogue. **Apply to ch02 cutscenes as you wire them.**
 
-Both gate Ch1 #21's Definition of Done.
+Verified: `tools/build.sh test` green, `verify_text.py` 3404 msgs/0 runaway, `recordending` PASS
+(narration box opaque on-screen). Ch1 #21 DoD: these two boxes checked.
 
 ## Now (2026-06-20) — ch02 map + dialogue DONE; Ch2 dev 🅿️ PARKED on the difficulty engine (#61/#62)
 ch02 dialogue is locked (opening, turn-3 rear-ambush bark, targos-inn ending — `2e60003`, #22) and the

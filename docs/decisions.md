@@ -681,12 +681,18 @@ as a line on the chapter's vertical-slice checklist and re-checked at playtest:
 - **(b)** the boss is placed **on** the seize tile (or the tile is otherwise made unmistakable the
   moment the boss dies), so killing the boss self-evidently reveals where to go.
 
-A dialogue nudge is at most belt-and-suspenders, never the fix. **Ch1 (The Iron Trail) currently
-fails this** — the camp tile reads "Plain" and the boss stands away from it → go-fix tracked in
-**#57**. Applies to every Seize-objective map — in the MVP that's **Ch1 (#57/#21)** and
-**Ch3 — The Termalaine Mine (#23)**; re-check any future Seize map. (The Prologue is `defeat_boss`,
-not Seize, so it's out of scope.)
+A dialogue nudge is at most belt-and-suspenders, never the fix. Applies to every Seize-objective
+map — in the MVP that's **Ch1 (#57/#21)** and **Ch3 — The Termalaine Mine (#23)**; re-check any
+future Seize map. (The Prologue is `defeat_boss`, not Seize, so it's out of scope.)
 _Decided: 2026-06-19; from the brother's v0.1.0 playtest (#56 → #57)._
+
+**Ch1 resolution (2026-06-20, #57).** The camp seize tile [21,7] is now the snowy-bern castle-gate
+metatile 938 (`TERRAIN_GATE_CASTLE`) — reads unmistakably as a Seize point (criterion a), with the
+chief on it (criterion b). This also **restores vanilla Ch1's gate bonus (+20 avo / +3 def)** to the
+boss: the v0.1.0 tile was a deliberate bonus-free "ruins arch" deviation, now reverted to full
+"Seize the gate" field parity (the deviation was the outlier, not the bonus). ⚠ The boss is
+correspondingly tankier — flagged to the pipeline/difficulty track so its ch01 parity bar accounts
+for the terrain. Ch3's seize tile still needs the same pass.
 
 **Title banner theme: "glacial blue", a pure PALETTE recolor (no pixel edits).**
 The banner's whole look is palette data: letters ride `gPal_08A07C58`'s green tint
@@ -1132,6 +1138,18 @@ _Decided: May 2026; renumbered to Ch 8→9 on 2026-05-31 after the Ch 4 split (w
 ---
 
 ## Story & Dialogue
+
+**Faceless narration/asides always ride an opaque SOLOTEXTBOXSTART box, never the translucent talk window (#58).**
+A `narration:` (faceless) line shown via the default `Text()`/TEXTSTART path renders in the translucent
+conversation window — illegible over a BACG's scene art (the brother's v0.1.0 "Marty leans in..." aside). The
+engine routes text type 0 (TEXTSTART) to the faced talk system (`sub_800E210`) and type 4 (SOLOTEXTBOXSTART) to
+the opaque, auto-centered BoxDialogue (`sub_800E31C`, helpbox.c) — and the opaque box draws **no faces**. So in
+`build_campaign.py`, scenic beats are emitted per-beat (`_scenic_beat_calls`): a beat that is ALL faceless
+narration rides `SVAL(EVT_SLOT_B,0xFF00FF) + SOLOTEXTBOXSTART` (auto-center) and is wrapped at the on-map width
+(28, not the 42 scenic wrap, so the centered box fits 240px); any faced beat stays on `Text()`. Because the box
+can't mix with faces, a beat mixing narration + dialogue must be **split** with a `beat_break` (e.g. ch01 ending
+E2/E2b) so the aside gets its own box. Campaign-wide convention; the road-sign narration already used this.
+_Decided: 2026-06-20; from the brother's v0.1.0 playtest (#58)._
 
 **Dialogue is co-written via the `dialogue-pass` skill: voice bibles → beats → 2–3 variants per beat, Nicolas picks.**
 Neither of us is a creative writer, so the workflow encodes what three expert communities converge on — FE hack
