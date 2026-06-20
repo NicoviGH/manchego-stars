@@ -188,7 +188,10 @@ CH01_BEAT1_MSGS = (0x940, 0x941, 0x942, 0x943, 0x944)  # A,B,C,D,E (0x945 = card
 # per beat (A-F), on the same dead vanilla Ch1-tutorial slot-2 pool as Beat 1 (the
 # prologue host strips Ch1's event lists, so these ids never display in our ROM).
 CH01_ENDING_CARD_MSG = 0x94C
-CH01_ENDING_MSGS = (0x946, 0x947, 0x948, 0x949, 0x94A, 0x94B)  # AB,C,D,E1,E2,F
+# AB,C,D,E1,E2(narration),E2b(Marty/Baxby),F. 0x93D is a dead vanilla Ch1-tutorial
+# slot-2 id (weapon-triangle blurb, stripped by the prologue host) reused for the
+# faceless "Marty leans in..." narration that #58 split into its own opaque box.
+CH01_ENDING_MSGS = (0x946, 0x947, 0x948, 0x949, 0x93D, 0x94A, 0x94B)
 CH01_BODY_MSG = 0x956    # the dismembered sled-driver, found just past the road sign
 CH01_TAUNT_MSG = 0x960   # Izobai's turn-1 boss taunt (both dead vanilla Ch1-tutorial slots)
 # Per-PC death quotes (#6, dialogue pass 2026-06-17): one universal dying line per
@@ -674,6 +677,28 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None):
             lru.append(open_tag)
         parts.append(body)
     return '\n'.join(parts) + '[X]'
+
+
+def _beat_is_narration(beat):
+    """True if every entry in a scenic beat is faceless `narration` stage-business."""
+    return bool(beat) and all('narration' in e for e in beat)
+
+
+def _scenic_beat_calls(msgs, beats, labels):
+    """One event-script text call per scenic beat. A beat that is ALL faceless
+    `narration` rides an opaque, auto-centered SOLOTEXTBOXSTART box (gProcScr_BoxDialogue,
+    helpbox.c) so the aside is never boxless over the scene art (#58); EVT_SLOT_B =
+    0x00FF00FF feeds x=y=0xFF -> auto-center (dialogue-box config flag 0x100, sub_800E31C).
+    A beat with any faced speaker rides the normal talk window via Text() (TEXTSTART)."""
+    out = []
+    for msg, beat, lbl in zip(msgs, beats, labels):
+        if _beat_is_narration(beat):
+            out.append('    SVAL(EVT_SLOT_B, 0xFF00FF) /* auto-center the opaque solo box (#58) */\n'
+                       '    SOLOTEXTBOXSTART\n'
+                       '    TEXTSHOW(0x%X) /* %s */\n    TEXTEND\n    REMA\n' % (msg, lbl))
+        else:
+            out.append('    Text(0x%X) /* %s */\n' % (msg, lbl))
+    return ''.join(out)
 
 
 def _fid_tag(slot):
@@ -3013,9 +3038,11 @@ def inject_ch01(campaign, verbose=True):
     # genuinely different casts (read as scene transitions, not flashes). In E2 the right
     # podium starts EMPTY so Baxby fades in fresh for his answer (Duvessa was cleared at
     # the E1->E2 boundary, never swapped on the same podium).
-    end_preload = [[], [], [], [], [], []]
+    end_preload = [[], [], [], [], [], [], []]
+    # AB, C, D, E1, E2(narration -- faceless, override unused), E2b(Baxby fades in
+    # mid-right opposite Marty), F.
     end_overrides = [None, {'hruna': '[OpenMidRight]'},
-                     {'meesmickle': '[OpenMidRight]'}, None,
+                     {'meesmickle': '[OpenMidRight]'}, None, None,
                      {'baxby': '[OpenMidRight]'}, None]
 
     # 1. Map: register the painted layout and point slot 2 at it + the winter tileset
@@ -3331,9 +3358,7 @@ def inject_ch01(campaign, verbose=True):
                     "C -- Hlin's story: the endless winter",
                     "D -- the test: Hruna's iron job",
                     'E -- the price; Braulo commits; Hlin asks who leads']
-    beat1_text_calls = ''.join(
-        '    Text(0x%X) /* %s */\n' % (m, lbl)
-        for m, lbl in zip(CH01_BEAT1_MSGS, beat1_labels))
+    beat1_text_calls = _scenic_beat_calls(CH01_BEAT1_MSGS, b1_beats, beat1_labels)
     beat1_scene = (
         '    /* Beat 1 (#21): the Northlook -- scenic off-map scene over bg_Fireplace.\n'
         '       Built from the chapter YAML; faces are budget-managed (the 4-slot fix\n'
@@ -3430,15 +3455,15 @@ def inject_ch01(campaign, verbose=True):
     # ending lands on the reusable dev placeholder (dev_placeholder_scene): RBG's
     # "still under construction" cheese pun, then back to title. Swap to MNC2(ch02 slot)
     # when ch02 lands.
-    end_text_calls = ''.join(
-        '    Text(0x%X) /* %s */\n' % (m, lbl)
-        for m, lbl in zip(CH01_ENDING_MSGS,
-                          ['A+B -- Duvessa thanks them, commissions them, grants the sled, points west',
-                           'C -- Wolfram asks Hruna for the iron to armor the sled',
-                           'D -- RBG over-engineers it; names it the Rolling Cheddar',
-                           'E1 -- Duvessa points to the axe-beak at the market',
-                           'E2 -- Marty wins over Baxby the axe-beak (first recruit)',
-                           'F -- "Targos is expecting weather. Better hurry."']))
+    end_text_calls = _scenic_beat_calls(
+        CH01_ENDING_MSGS, end_beats,
+        ['A+B -- Duvessa thanks them, commissions them, grants the sled, points west',
+         'C -- Wolfram asks Hruna for the iron to armor the sled',
+         'D -- RBG over-engineers it; names it the Rolling Cheddar',
+         'E1 -- Duvessa points to the axe-beak at the market',
+         'E2 -- "Marty leans in..." faceless narration (opaque solo box, #58)',
+         'E2b -- Marty wins over Baxby the axe-beak (first recruit)',
+         'F -- "Targos is expecting weather. Better hurry."'])
     script = _replace_brace_block(
         script, 'EventScr_Ch2_EndingScene[] =',
         '{\n    MUSC(SONG_VICTORY)\n'
@@ -3527,8 +3552,12 @@ def inject_ch01(campaign, verbose=True):
     set_message_body(lines, DEV_PLACEHOLDER_MSG, dev_placeholder_message())
     set_message_body(lines, CH01_ENDING_CARD_MSG, name_message_body(end_card))
     for i, (msg_id, beat) in enumerate(zip(CH01_ENDING_MSGS, end_beats)):
+        # Faceless-narration beats ride the opaque, auto-centered SOLOTEXTBOXSTART box
+        # (#58): wrap at the on-map width so the centered box fits the 240px screen (42
+        # overflows it); faced beats use the full-screen scenic wrap.
+        w = 28 if _beat_is_narration(beat) else 42
         set_message_body(lines, msg_id, _script_to_message(
-            beat, end_stage(beat, end_overrides[i]), width=42, preload=end_preload[i]))
+            beat, end_stage(beat, end_overrides[i]), width=w, preload=end_preload[i]))
     # Beat 1 (#21): the Northlook opening. Card + one message per beat (A-E), rendered
     # from the chapter YAML's locked script with the scenic full-screen wrap width and
     # the per-beat two-sided staging + silent listeners built in step 0. Each beat rides

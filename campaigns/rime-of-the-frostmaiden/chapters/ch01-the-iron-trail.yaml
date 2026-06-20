@@ -40,9 +40,13 @@ map:
 objective:
   type: seize                            # vanilla Ch1 parity (Seize the gate)
   description: "Seize the goblin camp — the chief holds it and the ingots are there"
-  seize_tile: [21, 7]                    # the painted ruins arch (editor V8) — camp center,
-                                         # the chief's tile. Ruins = no terrain bonus (vanilla
-                                         # Breguet's gate gave +20avo/+3def; gentler here)
+  seize_tile: [21, 7]                    # the camp's castle-gate tile (snowy-bern metatile 938,
+                                         # TERRAIN_GATE_CASTLE) — camp center, the chief's tile.
+                                         # Reads unmistakably as a Seize point (#57 legibility
+                                         # checkpoint, decisions.md §Combat); the gate carries
+                                         # vanilla Breguet's +20avo/+3def — full vanilla-Ch1
+                                         # "Seize the gate" parity (the earlier bonus-free ruins
+                                         # tile was the deviation; restored 2026-06-20).
   seize_by: lord                         # the player-chosen lord (#42); engine patches
                                          # CanUnitSeize to the chosen pid
 
@@ -110,7 +114,9 @@ enemy_units:
                                   # the Breguet slot (GUEST_PORTRAIT_MAP izobai->Breguet).
     is_boss: true
     count: 1
-    position: [21, 7]           # the seize tile (painted ruins arch) — full Breguet mirror
+    position: [21, 7]           # ON the seize tile (castle-gate, metatile 938) — full Breguet
+                                #   mirror, incl. the gate's +20avo/+3def (kill boss -> the gate
+                                #   tile is the obvious empty Seize square; #57 criterion b)
     class: armor-knight         # Breguet's class; magic (def→res) is our "rapier"
     level: 4
     inventory:
@@ -335,6 +341,10 @@ events:
       - narration: >-
           Marty leans in close and breathes a soft puff of spores over the
           old bird, so that it might hear him.
+      # Split so the faceless narration above gets its OWN opaque SOLOTEXTBOXSTART box
+      # (#58: asides must never render boxless over the scene art); Marty's faced
+      # dialogue below resumes in the normal talk window.
+      - beat_break: E2b
       - marty: "Hello, friend. Do you have a name?"
       - baxby: >-
           ...Baxby. I've hauled freight over this ice longer than most of you have
