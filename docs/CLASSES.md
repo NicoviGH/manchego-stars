@@ -28,15 +28,16 @@ roster derived from the unit YAML.
 |---|---|---|---|
 | Basil | Priest | **Bishop** / Sage | story — repotted from the Elven Tomb (Ch5) |
 | Baxby | Cavalier | **Paladin** / Great Knight | — |
-| Brie | TBD (post-MVP) | — | story — Prof. R.B. Geenius builds Brie (~Ch11, after Pepperjack) |
+| Brie | TBD (post-MVP) | — | not a recruit — vanilla map ballista (RBG's siege), from ~Ch10 |
 | Lupin | Cavalier | **Paladin** / Great Knight | story — Marty talks the direwolf pack into the sled team (Ch4) |
-| Pepperjack | TBD (post-MVP) | — | story — Prof. R.B. Geenius builds Pepperjack (~Ch9, vanilla ballista era) |
+| Pepperjack | TBD (post-MVP) | — | not a recruit — vanilla map ballista (RBG's siege), from ~Ch10 |
 | Pinky | Pegasus Knight | **Falcon Knight** / Wyvern Knight | available from Chapter 1 |
 | Sahnar | Myrmidon | **Swordmaster** / Assassin | story — freed from the sarcophagus in the Elven Tomb (Ch5) |
 | Trex | Thief | **Rogue** / Assassin | story — joins after the Termalaine mine (Ch3) |
 
-> **Note.** `pepperjack`/`brie` carry `fe_stats.class: null` — they are RBG-built
-> **ballistae** (siege), a role with no stock FE8 unit class; mechanics are a
-> post-MVP design call (see their YAMLs). Recruit class/role for Trex, Sahnar,
-> Lupin, Basil is now LOCKED in their unit YAML (full bases/growths authored at
-> wiring); `docs/CHAPTERS.md` shows where each joins.
+> **Note.** `pepperjack`/`brie` carry `fe_stats.class: null` because they are NOT
+> roster recruits — they are vanilla FE8 **map ballistae** (siege emplacements the
+> party mans), flavored as RBG's cannon-constructs, appearing from the vanilla
+> ballista era (~Ch10). Recruit class/role for Trex, Sahnar, Lupin, Basil is LOCKED
+> in their unit YAML (full bases/growths authored at wiring); `docs/CHAPTERS.md`
+> shows where each joins.

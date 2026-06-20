@@ -51,7 +51,7 @@ difficulty_note: >
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
-  note: "7 PCs + Trex + Pinky + Sahnar (the Mummy) deployable. Baxby, Lupin, and Basil are non-combat caravan NPCs. Positions set in Tiled. (Casual/Classic permadeath toggle still applies up to the scripted end.)"
+  note: "Deployable pool: 7 PCs + Pinky + Baxby (Cav) + Trex (Thief) + Lupin (beast-Cav) + Sahnar (Myr) + Basil (Priest), capped by deploy_limit (TBD). Only the pack direwolves stay non-combat dressing. Positions set in Tiled. (Casual/Classic permadeath toggle still applies up to the scripted end.)"
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
 enemy_units:

@@ -63,8 +63,6 @@ deployment:
     (beast-Cav) + Sahnar (Myr, recruited here) + Basil (Priest, recruited here).
     Only the pack-dressing direwolves stay non-combat. deploy_limit caps the field
     to vanilla parity (TBD this pass). Positions set in Tiled.
-    NOTE: ch06-08 deployment notes still say Baxby/Lupin/Basil are non-combat —
-    refresh those when their deploy_limits are set (see roadmap recruit cadence).
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
 enemy_units:

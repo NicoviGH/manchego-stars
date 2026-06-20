@@ -73,7 +73,7 @@ difficulty_note: >
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
-  note: "7 PCs + Trex + Pinky + Sahnar (the Mummy) deployable, split across the two boats — small creatures on the Burly Ram, Braulo/Wolfram on the Pronged Goat. Marty MUST be deployable (his Talk is the hidden resolution). Baxby, Lupin, and Basil are non-combat caravan NPCs. Positions set in Tiled."
+  note: "Deployable pool: 7 PCs + Pinky + Baxby (Cav) + Trex (Thief) + Lupin (beast-Cav) + Sahnar (Myr) + Basil (Priest), capped by deploy_limit (TBD), split across the two boats — small units (Basil/Trex/Sahnar/casters) on the Burly Ram, Braulo/Wolfram on the Pronged Goat. Marty MUST be deployable (his Talk is the hidden resolution). The beast-cavalry (Baxby/Lupin) may bench on the boat map by terrain — authoring call. Only the pack direwolves stay non-combat dressing. Positions set in Tiled."
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
 enemy_units:
