@@ -57,6 +57,16 @@ def check_tests_pass(fail):
     """Run the Python unit tests (tools/test_*.py). The combat math in fe_combat.py is
     the difficulty engine's arbiter -- a silent regression there mis-grades every chapter."""
     import subprocess
+    # Several tests read the FE8 decomp via `git -C fireemblem8u show HEAD:...`
+    # (vanilla_decomp_text). When the submodule isn't checked out -- the lightweight CI
+    # `checks` job omits it (2.3GB) -- they cannot run; that job instead leans on CI's
+    # `build` job (submodule + deps), which runs `make test`. Skip here so the drift guard
+    # stays decoupled from the heavy checkout. Locally the submodule is present, so the
+    # pre-commit hook and `make check` still run the full suite.
+    if not os.path.isdir(os.path.join(REPO, 'fireemblem8u', 'src')):
+        print('check_tests_pass: skipping unit tests (fireemblem8u submodule not checked '
+              'out; the CI build job runs `make test`)')
+        return
     for t in sorted(glob.glob(os.path.join(REPO, 'tools', 'test_*.py'))):
         r = subprocess.run([sys.executable, t], capture_output=True, text=True)
         if r.returncode != 0:

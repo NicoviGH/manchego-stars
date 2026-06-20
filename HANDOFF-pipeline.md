@@ -8,12 +8,15 @@ the lane guard is `check.py check_lane_ownership`). Seam enforcement (#55) + par
 pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
 
 ## Now (2026-06-19) — parity engine live; playtest smoke net + clear-bot + seeded fuzzer
-- **CI fixed + `make test` wired into the `checks` job.** The `checks` job had been RED since
-  ~23:15 2026-06-19: `check.py` runs the Python unit tests, which import `build_campaign.py`
-  (→ `gen_chapter_title`/`gen_subtitle_cards` → PIL + numpy), but the job installed only `pyyaml`
-  (`ModuleNotFoundError: No module named 'PIL'`). Fix: install `pillow numpy` + `lua5.4` (aliased
-  to `lua`) and add a `make test` step — now the pure-Lua playtest tests
-  (`test_liveness`/`test_clearbot`/`test_fuzzrng`) are gated in CI too (resolves old Next #2).
+- **CI fixed + `make test` gated in CI.** The `checks` job had been RED since ~23:15 2026-06-19:
+  `check.py` runs the Python unit tests, two of which read the `fireemblem8u` decomp
+  (`vanilla_decomp_text` → `git -C fireemblem8u show HEAD:…`) and import `build_campaign`
+  (→ PIL/numpy) — but the lightweight `checks` job has neither those deps nor the submodule
+  (2.3GB, deliberately omitted). Fix, two parts: (1) `check_tests_pass` now **self-skips when the
+  submodule isn't checked out**, keeping the drift guard decoupled from the heavy checkout (local
+  pre-commit still runs the full suite); (2) **`make test` now runs in the `build` job** — the only
+  CI job with the submodule + numpy/pillow — plus `lua5.4`, so the pure-Lua playtest tests
+  (`test_liveness`/`test_clearbot`/`test_fuzzrng`) are gated too. Resolves old Next #2.
 - **#49 stability fuzzer LANDED & verified — seeded "smart monkey"** (decisions.md §Playtest platform brick
   3). Random inputs over the same I/O layer to hunt crashes/soft-locks the directed bots miss. Own LCG PRNG
   (`fuzzrng.lua`, NOT host `math.random` — so a `PT_SEED=N` crash replays identically on the CI `lua` and
@@ -72,11 +75,12 @@ pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
    matchups #8. Injection pipeline #14 / maps #40 gate content.
 
 ## Watch out (pipeline-lane only)
-- **The `checks` CI job must install whatever the Python unit tests import.** `check.py` runs
-  `tools/test_*.py`; `test_build_campaign`/`test_difficulty` import `build_campaign.py`, which pulls in
-  PIL + numpy at module load. If you add a test (or an import to build_campaign) that needs a new lib,
-  add it to the `checks` job's `Install deps` (the lightweight job, NOT just the `build` job) or CI goes
-  red on a `ModuleNotFoundError` that never shows up locally. `make test` runs there too (gates the Lua tests).
+- **CI unit tests run in the `build` job, not the lightweight `checks` job.** Two tests
+  (`test_build_campaign`/`test_difficulty`) read the `fireemblem8u` decomp (`vanilla_decomp_text`) and
+  import `build_campaign` (→ PIL/numpy); only the `build` job checks out the submodule + has those deps.
+  `check_tests_pass` self-skips when the submodule is absent, so the `checks` job stays lightweight
+  (`pyyaml` only). A new test/import needing a new lib → add it to the **`build`** job's deps, and the
+  pre-commit hook (submodule present locally) is your fast local gate.
 - **Running playtest scenarios needs a built ROM + `lua`.** Build via `tools/build.sh` (it applies the
   decomp's `#!/bin/python3`→`env python3` shebang fix); a bare `make` dies `Error 126` on the gfx tools on
   macOS. The pure Lua tests (`test_liveness.lua`/`test_clearbot.lua`) need `lua` (`brew install lua`); `make
