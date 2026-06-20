@@ -795,9 +795,14 @@ _Decided: 2026-06-17_
 
 ## Distribution & Scope
 
-**Distribution: private, pre-patched ROM sent directly to 7 players**
-No patch file, no RomHack Plaza listing, no public hosting. Non-SRD content (Artificer, Circle of Spores, homebrew races) can be used freely for this private distribution.
-_Decided: May 2026_
+**Distribution: private pre-patched ROM to the players, plus a public `.bps` patch on GitHub Releases**
+The 7 players get a **private, pre-patched `.gba`** sent directly (Nicolas shares a link) — no public
+hosting of the copyrighted ROM. Because the repo is public, each release **also** publishes a
+**`.bps` patch** (contains no ROM bytes, so it's legal to host) that anyone with their own legal copy
+of FE8 (USA) can apply (e.g. via rompatcher.me) — the README is the tester landing page covering both
+paths (`docs/playtesters.md`). The only public artifact is the patch, never the ROM. Non-SRD content
+(Artificer, Circle of Spores, homebrew races) is used freely for this distribution.
+_Decided: May 2026; extended 2026-06-20 to add the public `.bps` patch + landing page (#59)_
 
 **Permadeath: player choice via FE8's Casual/Classic toggle**
 The toggle ships as-is from vanilla FE8. In-fiction flavor for Casual retreats: "retreated to the sled" / "carried to safety by Baxby."
@@ -830,19 +835,22 @@ file/tag is versioned, the in-game label is not. The first build under this sche
 `ManchegoStars-Alpha-2026-06-17.gba` is **not** retro-tagged — the scheme starts clean at `v0.1.0`.
 _Decided: 2026-06-19_
 
-**Playtest carryover: ship a per-release starter save; don't rely on cross-build SRAM compatibility**
-Each new build a tester receives ships with a **starter `.sav`** that drops them at the newest
-playable chapter (prior chapters marked cleared), so playtesters **never replay Prologue/Ch 1** to
-reach new content. We do **not** lean on save carryover across builds: FE8 validates a save by a
-**fixed** magic (`SAVEMAGIC32`/`SAVEMAGIC16`) + a checksum (`fireemblem8u/src/bmsave-lib.c`), and
-`EraseSramDataIfInvalid` wipes anything that fails on boot. The magic is constant, so a rebuild
-*alone* doesn't invalidate a save — but adding/finishing chapters shifts the save-data layout
-(chapter count, unit tables, `PlaySt`, SRAM offsets), after which an old `.sav` fails the checksum
-(auto-wiped) or loads as garbage. Emulator save-*states* are ROM-version-specific and break every
-build, so testers are told to use the provided save and not carry old saves/states. The starter
-save is produced/bundled by the friend build (`tools/build.sh dist`, release #37). A future in-game
-**chapter-select / debug warp** is a possible cleaner alternative (more work, reusable) — stretch.
-_Decided: 2026-06-19; from the brother's v0.1.0 playtest (#59)_
+**Playtest carryover: testers carry their own `.sav` across builds; a per-release starter save is the fallback**
+FE8 validates a save by a **fixed** magic (`SAVEMAGIC32`/`SAVEMAGIC16`) + a checksum over the save
+block (`fireemblem8u/src/bmsave-lib.c`, `ReadGlobalSaveInfo`/`ReadSaveBlockInfo`); `EraseSramDataIfInvalid`
+wipes anything that fails on boot. Those magics are compile-time constants, so a **rebuild alone never
+invalidates a save** — the only thing that can is the save-block *layout* shifting, which moves the old
+bytes to wrong offsets and fails the checksum. Manchego Stars reskins **within FE8's fixed chapter/
+character slots** and never touches the save structs, the array dims that size `struct GameSaveBlock`
+(`BWL_ARRAY_NUM` roster, `WIN_ARRAY_NUM` chapters), or the magics — so the layout is stable across our
+drops and an old `.sav` stays valid. Default is therefore **carry-forward**: testers keep their battery
+`.sav` (in-game Save — **not** emulator save-*states*, which are ROM-version-specific and break every
+build) and move it onto the new build; per-emulator steps (Pizza Boy / Delta) live in
+`docs/playtesters.md`. `tools/check.py check_save_layout_stable` pins those constants and fails the
+build if a future submodule bump ever shifts the layout — **that** drop, and only that, gets a
+per-release starter `.sav` (the fallback) plus a save-version note. Build/dist + the `.bps` patch:
+`tools/build.sh dist`, release #37.
+_Decided: 2026-06-20 (revises the 2026-06-19 starter-save-first call from #59 after verifying the layout is stable)_
 
 ---
 
