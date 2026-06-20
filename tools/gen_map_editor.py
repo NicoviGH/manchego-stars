@@ -67,6 +67,21 @@ grid=[]
 for i in range(W*H):
     t=manual.get(lbl(i), resolved[i]); grid.append(remap.get(t,t))
 
+# Optional 4th arg: seed the editable grid from an existing compiled .mar so Nicolas
+# continues editing the CURRENT chapter map (gate, prior hand-retiles) instead of a
+# fresh reskin of the vanilla layout. The .mar stores metatile<<5 (see compile_layout);
+# its sibling .json carries the dims, which must match the chosen layout.
+SEED_MAR=sys.argv[4] if len(sys.argv)>4 else None
+if SEED_MAR:
+    SEED_MAR=os.path.expanduser(SEED_MAR)
+    seed=open(SEED_MAR,'rb').read()
+    sj=json.load(open(os.path.splitext(SEED_MAR)[0]+'.json'))
+    if (sj['width'],sj['height'])!=(W,H):
+        sys.exit('ERROR: seed .mar is %dx%d but layout %s is %dx%d'
+                 %(sj['width'],sj['height'],LAYOUT,W,H))
+    grid=[struct.unpack_from('<H',seed,i*2)[0]>>5 for i in range(W*H)]
+    print('seeded editable grid from',SEED_MAR)
+
 # atlas image: 32 cols x 32 rows of 16px tiles (clean, contiguous)
 ACOLS=32; AROWS=32
 atlas=Image.new('RGB',(ACOLS*16, AROWS*16))
