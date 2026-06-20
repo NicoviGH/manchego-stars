@@ -1,0 +1,40 @@
+# npcs/sahnar.yaml — Sahnar, the reawakened moon-elf mummy (ch05 recruit)
+# Class roster: docs/CLASSES.md (generated). Rationale: docs/decisions.md §Class Mapping.
+# Combat is vanilla FE (docs/decisions.md §Combat). damage_type labels are cosmetic.
+#
+# STATUS: design record / stub. Class + role LOCKED (Nicolas, 2026-06-20). NOT yet wired
+# into build_campaign (inert until the recruit wiring lands). Full bases/growths to be
+# authored verbatim from the donor's vanilla Myrmidon class data at wiring.
+
+id: sahnar
+name: Sahnar
+
+# D&D flavor (from the DM notes): a reawakened mummy in the elven tomb who "is happy to
+# help the party as long as they can learn more about druids in this time period." A
+# moon-elf, freed by the moonlight-brazier puzzle.
+dnd:
+  class: Mummy (moon-elf)
+  race: Elf (undead)
+
+# ── Role (LOCKED 2026-06-20) ─────────────────────────────────────────────────
+# MYRMIDON — fills the dedicated sword crit-duelist hole (we have sword ACCESS via Baxby
+# + promos, but no Joshua-style duelist). The elegant moon-elf blade fits; undead-magic
+# (Druid/Shaman) was the alt but we're already magic-rich, so sword is the coverage win.
+fe_stats:
+  class: Myrmidon
+donor:
+  character: Joshua         # vanilla Myrmidon — bases/growths reference (data_classes.c)
+  why: the game's crit-sword duelist archetype
+
+promotion:
+  branch: [Swordmaster, Assassin]  # vanilla FE8 Myrmidon branch (classchg-data.c [CLASS_MYRMIDON])
+  default: Swordmaster
+
+recruited_via: "story — freed from the sarcophagus in the Elven Tomb (Ch5)"
+recruit:
+  chapter: ch05-the-elven-tomb
+  via: story                # light the moonlight brazier to open the sarcophagus
+
+# ── Art (reskin lever: stock chassis, custom skin) ───────────────────────────
+art:
+  approach: custom            # moon-elf mummy over the Myrmidon chassis; bust + map sprite TBD (#19/#38)

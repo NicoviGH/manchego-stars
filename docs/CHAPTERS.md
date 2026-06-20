@@ -18,8 +18,8 @@ rules) lives in `docs/decisions.md` and `docs/fe8-pacing-reference.md`.
 | 1 | The Iron Trail | 🟦 full-party intro | Seize — Seize the goblin camp — the chief holds it and the ingots are there | baxby | Ch 2 |
 | 2 | Cold Welcome | 🟦 breather / defend | DefeatAll — Defeat the entire raider band | — | Ch 3 |
 | 3 | The Termalaine Mine | 🟨 gimmick (multi-level) | Seize — Descend the shaft and seize the deep workings — the flooded lower gallery where the Grells nest. Reaching it requires the full descent; the win triggers on the seize tile. Slaying the Grells guarding it is incidental. | trex | Ch 4 |
-| 4 | The White Moose | 🟨 monster debut (fog) | DefeatAll — Rout the forest's hostile beasts and spirits | +npc: lupin | Ch 5 |
-| 5 | The Elven Tomb | 🟥 first boss | DefeatBoss — Defeat Ravisin, the frost druid (her guardians and the moose needn't all fall) | sahnar +npc: basil | Ch 6 |
+| 4 | The White Moose | 🟨 monster debut (fog) | DefeatAll — Rout the forest's hostile beasts and spirits | lupin +npc: lupin-pack | Ch 5 |
+| 5 | The Elven Tomb | 🟥 first boss | DefeatBoss — Defeat Ravisin, the frost druid (her guardians and the moose needn't all fall) | sahnar, basil | Ch 6 |
 | 6 | The Maer Monster | 🎬 marquee set-piece | DefeatBoss / Talk — Defeat Messie OR have Marty Talk to her while adjacent | — | Ch 7 |
 | 7 | Blood in Bremen | 🟥 big battle (gray) | DefeatBoss — Defeat Dorbulgruf (his guards needn't all fall) | — | Ch 8 |
 | 8 | The Eastway Ambush | 🎬 scripted defeat | Survive — Survive 8–10 turns — the outcome is scripted (unwinnable by design) | — | Ch 9 (post-MVP) |

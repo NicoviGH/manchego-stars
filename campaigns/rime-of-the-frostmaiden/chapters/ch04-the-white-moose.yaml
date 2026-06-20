@@ -142,13 +142,16 @@ events:
 post_chapter:
   gold_reward: 200
   available_shops: [lonelywood]
-  units_available_to_recruit: []         # no playable recruit this chapter
+  units_available_to_recruit:            # Lupin = playable recruit (LOCKED 2026-06-20)
+    - id: lupin                          # Cavalier under the hood, wolf sprite on top
+      via: story                         #   (no beast class needed); see npcs/lupin.yaml
+      joins: ch05-the-elven-tomb         # first deployable the chapter after he's won over
   caravan_npcs_added:
-    - id: lupin
+    - id: lupin-pack
       description: >
-        Lupin, the bespectacled talking wolf, and his pack — non-combat NPCs that
-        join Baxby pulling the sled (the 'reins'). Story/flavor presence; not a
-        deployable unit (canonically the pack never fights for the party).
+        The rest of Lupin's direwolf pack join Baxby pulling the sled (the 'reins') —
+        flavor caravan presence. Lupin HIMSELF is now a deployable beast-cavalier
+        (npcs/lupin.yaml); the pack stays non-combat dressing.
   unlocks_chapter: ch05-the-elven-tomb
 
 # ── Signature Moment anchored here ───────────────────────────────────────────────

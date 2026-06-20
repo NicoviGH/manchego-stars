@@ -102,10 +102,11 @@ def generate():
                      % (squish(u['name']), fe_base(u),
                         promotion_cell(u.get('promotion')), joins))
     lines.append('')
-    lines.append('> **Note.** `pepperjack`/`brie` carry `fe_stats.class: null` — their FE-legal')
-    lines.append('> class is a deliberate post-MVP TBD. Other recruits referenced in the chapters')
-    lines.append('> (Baxby, Trex, Sahnar, Lupin, Basil) do not yet have unit YAML; see the chapter')
-    lines.append('> files and `docs/CHAPTERS.md` for where they join.')
+    lines.append('> **Note.** `pepperjack`/`brie` carry `fe_stats.class: null` — they are RBG-built')
+    lines.append('> **ballistae** (siege), a role with no stock FE8 unit class; mechanics are a')
+    lines.append('> post-MVP design call (see their YAMLs). Recruit class/role for Trex, Sahnar,')
+    lines.append('> Lupin, Basil is now LOCKED in their unit YAML (full bases/growths authored at')
+    lines.append('> wiring); `docs/CHAPTERS.md` shows where each joins.')
     lines.append('')
     return '\n'.join(lines), (len(pcs), len(npcs))
 

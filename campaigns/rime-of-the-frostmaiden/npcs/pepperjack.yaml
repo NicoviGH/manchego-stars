@@ -1,7 +1,9 @@
-# npcs/pepperjack.yaml — Pepperjack, a recruitable automaton built by Prof. R.B. Geenius.
+# npcs/pepperjack.yaml — Pepperjack, a BALLISTA construct built by Prof. R.B. Geenius.
 # Lean unit definition (mechanics only). Narrative/flavor lives in
-# ../lore/pepperjack-and-brie.md. Pepperjack is NOT an RBG ability/summon — he joins the army
-# as an ordinary FE8 recruit and is a stock vanilla FE8 class (no custom turret/AoE kit).
+# ../lore/pepperjack-and-brie.md. Pepperjack is NOT an RBG ability/summon — he joins the
+# army as a recruit. ROLE LOCKED (Nicolas, 2026-06-20): a BALLISTA / siege engine — the
+# cannon-golem art (barrel snout, fuse) was always artillery; RBG the Artillerist builds
+# his ordnance. Debuts when vanilla introduces ballistae (route-split / mid-game era).
 
 id: pepperjack
 name: Pepperjack
@@ -35,18 +37,28 @@ art:
     gunmetal greys ×4, barrel-bore black, orange eye + white, red (star + chili mustache),
     tan fuse, boot-grey, black outline. Mirror of Brie's palette.
 
-# How he enters the army (story recruit; not a gameplay summon).
-recruited_via: "story — Prof. R.B. Geenius builds Pepperjack"
+# How he enters the army (story recruit; not a gameplay summon). Debut keyed to vanilla's
+# ballista era — route-split / mid-game (~our Ch9, Act II opening). Exact FE8 ballista-debut
+# chapter is [FE8]-tier (ballistae are unit-placed objects in baserom blobs, not decodable
+# from the map terrain — to pin via in-emulator check or unit-blob decode; see roadmap).
+recruited_via: "story — Prof. R.B. Geenius builds Pepperjack (~Ch9, vanilla ballista era)"
 built_by: prof-rbg
 paired_with: brie               # dating Brie; deployed as a pair, narratively
+recruit:
+  chapter: ch09-revels-end      # PROVISIONAL — pin to the exact vanilla ballista-debut chapter
+  via: story
 
-# ── FE Starting Stats — TBD (post-MVP) ─────────────────────────────────────────
-# FE-legal class/stats/growths/inventory to be authored post-MVP, verbatim from a vanilla FE8
-# class in fireemblem8u/src/data_classes.c (same rule as the 7 PCs: stock class, no custom tuning,
-# element/identity is flavor only). Stub left intentionally empty until then.
+# ── FE role: BALLISTA (siege) — LOCKED 2026-06-20 ──────────────────────────────
+# IMPLEMENTATION CAVEAT: FE8 has no playable ballista UNIT class in data_classes.c —
+# ballistae are map-placed siege objects a unit mans (US_IN_BALLISTA on ballista terrain).
+# So "Pepperjack is a ballista" needs a design call at wiring: either a deployable siege
+# piece RBG sets up per map, or a small engine extension (a Ballistician-style mobile unit,
+# which vanilla FE8 lacks). Recorded as the role; mechanics authored post-MVP.
 fe_stats:
-  class: null                   # TBD — pick a vanilla FE8 class post-MVP
+  class: null                   # no stock FE8 ballista unit class — see caveat above
+  role: ballista                # siege / long-range artillery
   promoted_class: null
   level: 1
 
-# inventory: TBD post-MVP (FE-legal weapon for the chosen class).
+# inventory (concept): Ballista / Iron Ballista / Killer Ballista (ITEM_BALLISTA_*), tier
+# scaling with the era. Authored at wiring.
