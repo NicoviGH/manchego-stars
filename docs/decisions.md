@@ -422,6 +422,32 @@ triple. **Staff-only healers** (a Priest/Troubadour carrying no weapon) are stil
 weaponless drop, not an unmodeled-weapon drop, so an all-modeled reference can legitimately resolve fewer
 units than it has armed-RED entries (Ch6: 27 armed → 25 modeled). _Implemented: 2026-06-19 (CLAUDE; pipeline track, TDD)_
 
+**A fielded healer/support unit is modeled as weaponless (0 throughput, still a body for durability); `_weapon_for` honors the YAML `unlock` flag (#62).**
+The difficulty engine couldn't fairly model a staff-only unit (our Sclorbo, vanilla's Moulder): `_weapon_for`
+either crashed (`attack_speed` → `NoneType.wt`) or mis-roled a base healer as an attacker by crediting a tome
+its base class can't wield. Two changes: (1) **`fe_combat` is now None-weapon-safe** — a `Combatant(weapon=None)`
+has attack speed = Spd (no weight to bear), deals 0 damage / 0 throughput as an attacker, but is a valid
+*defender* (enemies still resolve hit/damage against it, so its durability is computed). (2) **`_weapon_for`
+skips inventory items whose `unlock` precondition isn't met** for the modeled (base-class) state — the YAML's
+own `unlock: promotion` flag (e.g. `sclorbo.yaml`'s Light tomes) is the data-driven gate, cleaner than
+inferring class weapon-ranks. So a base Priest resolves to **weaponless support = 0 throughput**, mirroring
+vanilla Moulder, instead of an inflated 0.84 kills/round. **Healing itself stays unmodeled** (the static proxy
+disclaims it; both our and vanilla fields run a healer, so `durability(min)` understatement is largely a
+canceling artifact) — modeling heal-per-turn was scoped out as optional. _Implemented: 2026-06-20 (CLAUDE; pipeline track, TDD)_
+
+**The vanilla PLAYER deploy field is derived from the decomp per chapter, not hand-maintained (#61).**
+The party-side parity delta (our cast vs vanilla's deploy on the same enemy set) was keyed off a hand-curated
+`VANILLA_FIELDS` dict that only held Ch1, so every other chapter printed "delta skipped." It now derives from
+the decomp (HEAD) the same way the enemy force does: `PARITY_REFERENCE_ALLY_UDEFS` maps a chapter's
+`parity_reference` to the reference chapter's blue force-deploy + reinforcement `UnitDefinition` arrays
+(e.g. `UnitDef_Event_Ch1Ally`/`…AllyReinforce`, `UnitDef_Event_Ch2Ally`). Each named ally resolves to
+**class base + its personal line** (the same donor-base inheritance our cast uses, via the unit's `.charIndex`)
+— allies are **not** autoleveled (CharacterData stores their join-level display stats), and the weapon is the
+**first attacking item** (symmetry with how `player_combatant` models our cast; a staff-only ally → weaponless
+support per #62). `VANILLA_FIELDS` is deleted. The Ch1 delta is materially unchanged (throughput 3.74 → 3.69,
+durability/carry identical) — the small shift is *more* faithful (Seth/Franz now use their equipped first weapon
+from HEAD, not a hand-picked strongest), and Gilliam's hand-typo Con 13 is corrected to 14. _Implemented: 2026-06-20 (CLAUDE; pipeline track, TDD)_
+
 **How the deploy cap + prep screen are actually wired (the [decomp] mechanism).**
 `hasPrepScreen` in `chapter_settings.json` is dead — "left over from FE7"
 (`chapterdata.h:37`). The real gate is the `PREP` event command (0x3E,
