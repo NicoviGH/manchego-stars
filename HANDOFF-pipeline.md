@@ -7,7 +7,33 @@ the lane guard is `check.py check_lane_ownership`). Seam enforcement (#55) + par
 **Shared builds/gotchas/rules → `HANDOFF.md` + `CLAUDE.md`; this file holds only my current state +
 pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
 
-## Now (2026-06-20) — party-side parity delta now auto-derived + healer modeling
+## Now (2026-06-20) — save carry-forward shipped (#59 closed); LLM-player epic spec'd (#63); lord-select UX up next (#46)
+- **#59 LANDED & CLOSED — testers carry their own `.sav` across builds; public patch rejected.**
+  FE8 save validity = a **fixed** magic + a checksum (`bmsave-lib.c` `ReadGlobalSaveInfo`/`ReadSaveBlockInfo`),
+  so a rebuild alone never invalidates a save — only a save-block *layout* shift does. We reskin within
+  FE8's fixed slots and never touch the save structs or the dims that size `GameSaveBlock`
+  (`BWL_ARRAY_NUM`/`WIN_ARRAY_NUM`), so an old `.sav` stays valid drop-to-drop → **no per-release starter
+  save needed**. New guard **`check.py check_save_layout_stable`** pins those constants + the magics (TDD
+  `tools/test_check_save_layout.py`); a red = the one drop that needs the starter-save fallback. Tester
+  landing page: README "▶ Play it" + **`docs/playtesters.md`** (carry-save steps for Pizza Boy / Delta;
+  in-game Save, not save-states). **Public `.bps` evaluated & REJECTED:** our decomp build is non-matching
+  vs retail (~67% of bytes differ → an 11.4 MB "patch"), so distribution stays the **private pre-patched
+  `.gba`** Nicolas links to friends. Pure-Python BPS encoder **`tools/make_bps.py`** (TDD, round-trips real
+  16MB ROMs) kept for a future byte-matching build / inter-build deltas. ADRs: decisions.md §Distribution.
+- **#63 LLM-player brainstormed → captured as a GitHub epic (NOT started).** Soak/balance tool, built
+  policy-and-transport-first, vanilla-FE8 as the validation milestone. Locked architecture: **sidecar
+  file-handshake** (mGBA Lua ↔ `tools/playtest/llm_player.py`), **per-turn commander** policy (whole board
+  → ordered unit orders; the harness executes via existing primitives), **Sonnet default** (`PT_MODEL`
+  knob), **board-hash-keyed transcript = cache + replay in one** (satisfies the "identical on CI lua &
+  mGBA" rule and makes re-soaks free). TDD-ordered milestones **M1–M5** on the issue; ADR lands with M1.
+  No spec doc (per convention). The swap point is still the pure `clearbot.lua` `pickTarget`.
+- **Next: #46 lord-select UX** (alpha feedback #4 / #47) — Nicolas is picking this up next. New mechanic/UX
+  → brainstorm/spec pass FIRST, captured as a GitHub issue (no spec doc), then TDD. Engine-labeled but a
+  pipeline-lane "mechanics/flavor leaf" per #49. Engine already has `_inject_lord_select_engine` +
+  `_inject_lord_floor_engine` hooks (guarded in `check_engine_guards_present`) — this is the *selection-menu
+  UX* on top (show each candidate's PC summary, explain the choice).
+
+## Earlier (2026-06-20) — party-side parity delta auto-derived + healer modeling (#61/#62)
 - **#61 + #62 LANDED & verified — the party-side parity delta works for Ch2+ and models healers**
   (decisions.md §A fielded healer… / §The vanilla PLAYER deploy field…). Two content-track-filed bugs found
   bringing ch02 (#22) to parity: (a) the player-side delta was hand-keyed in a `VANILLA_FIELDS` dict (Ch1 only →
@@ -71,25 +97,34 @@ pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
   Ch6 (→ our ch07). FE8 Ch13 (→ our ch08) is the lone deferred reference.
 
 ## Next (priority order)
-1. **LLM-player** (#49, next platform brick — fuzzer now landed): swap the clear-bot's rule-based policy for
-   an LLM, with the **graduation benchmark: play vanilla FE8** (#49 comment, Nicolas). The clear-bot already
-   clears prologue + ch01 (DefeatBoss + Seize) with real combat; harder chapters may still need gang-up /
-   don't-feed-the-lord / heal logic. The fuzzer (`fuzz`/`fuzz_ch01`) now soaks for crashes/soft-locks on the
-   prologue; **fuzz_ch02+ smoke/clear coverage needs per-chapter save-state checkpoints** (reuse `states/`
-   infra), deferred till those chapters are built. Seed-sweep DONE: `tools/playtest/fuzz_sweep.sh [N]` (or
-   `PT_SEEDS="…"`) soaks many seeds and fails on any — a **LOCAL pre-release gate, NOT CI** (CI builds a mock
-   ROM + has no mGBA, so it can't run any in-emulator scenario; see checks.yml). `fuzz_boot` (New
-   Game→title→prep) is NOT a quick follow-up after all — it needs a **non-cursor responsiveness signal**
-   (`fuzzFingerprint` folds the *map* cursor, useless on menus), so treat it as its own small design piece.
-2. **#53 tail — FE8 Ch13 reference** (→ our ch08, deferred/optional): bigger than billed — needs ~11 *standard*
+1. **#46 lord-select UX** (immediate — Nicolas is picking this up): resolves the last open alpha-feedback
+   item (#47 #4 — "explain the choice + show the candidates" at the lord-select menu). New mechanic/UX →
+   **brainstorm/spec pass FIRST**, capture as a GitHub issue (no spec doc, per `feedback_no_spec_docs`), then
+   TDD. The selection *mechanic* already exists (`_inject_lord_select_engine` in `tools/inject/engine_hooks.py`,
+   guarded by `check_engine_guards_present`); this adds the prep-screen-style PC summary + framing on top.
+2. **LLM-player #63 — M1** (epic spec'd this session): the pure cores — board serializer + order-schema
+   validator + board-hash transcript record/replay — TDD'd on plain `lua`/Python (`test_llm_player.*`, in
+   `make test`), **no LLM calls yet** (replay a hand-written transcript). ADR for the settled design lands with
+   M1. Then M2 (sidecar handshake, replay-only on the prologue) → M3 (live policy) → M4 (soak report → curve)
+   → M5 (vanilla-FE8 validation). Swap point: `tools/playtest/clearbot.lua` `pickTarget`. ch02+ soak still
+   needs per-chapter save-state checkpoints (deferred till those chapters exist).
+3. **#53 tail — FE8 Ch13 reference** (→ our ch08, deferred/optional): bigger than billed — needs ~11 *standard*
    weapons modeled (silver/steel/killer/slim/short-spear/elfire/zanbato/swordslayer/purge), not a few exotics.
    ch08 is a scripted-defeat objective (never CI-gated), so it's informational polish; do it only if idle.
-3. **Flip the CI parity gate to enforcing** (#48 (b)): once content authors the Ch2+ enemy inventories,
+4. **Flip the CI parity gate to enforcing** (#48 (b)): once content authors the Ch2+ enemy inventories,
    change the CI step's `difficulty` → `difficulty-gate`. Leveled stat projection (#45 item 5) pairs here.
-4. Mechanics/flavor leaves once specced: lord-select UX #46, d20 crit #11, spell-economy #9, iconic
-   matchups #8. Injection pipeline #14 / maps #40 gate content.
+5. Other mechanics/flavor leaves once specced: d20 crit #11, spell-economy #9, iconic matchups #8.
+   Injection pipeline #14 / maps #40 gate content.
 
 ## Watch out (pipeline-lane only)
+- **The decomp build is NON-MATCHING vs retail FE8 (~67% of bytes differ).** Confirmed by diffing the base
+  ROM against our built `.gba` (only the trailing ~5MB of padding matches). So **no small retail→build patch
+  exists** — a `.bps` is ~ROM-sized (11.4 MB). Distribution is therefore the **private pre-patched `.gba`**,
+  not a public patch. Don't re-attempt a public `.bps` without first making the build byte-match (a separate
+  toolchain effort). `tools/make_bps.py` is correct + tested but intentionally **unwired** for public patches.
+- **Save layout must stay stable for testers to keep progress (#59).** `check_save_layout_stable` fails the
+  build if `BWL_ARRAY_NUM`/`WIN_ARRAY_NUM`/`SAVEMAGIC16/32` ever drift (e.g. a submodule bump). If it goes
+  red, that drop genuinely breaks old saves → ship a per-release starter `.sav` for it and re-pin the guard.
 - **CI unit tests run in the `build` job, not the lightweight `checks` job.** Two tests
   (`test_build_campaign`/`test_difficulty`) read the `fireemblem8u` decomp (`vanilla_decomp_text`) and
   import `build_campaign` (→ PIL/numpy); only the `build` job checks out the submodule + has those deps.
