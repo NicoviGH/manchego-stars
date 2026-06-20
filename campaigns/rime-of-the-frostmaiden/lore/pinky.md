@@ -1,8 +1,8 @@
 # Pinky — Lore & Flavor
 
-> Narrative and flavor for Pinky. **Mechanics live in [`npcs/pinky.yaml`](../npcs/pinky.yaml)** —
-> Pinky is a stock vanilla FE8 Pegasus Knight (the army's flier), not an RBG summon. Everything
-> below is story/flavor only.
+> Narrative and flavor for Pinky. **Mechanics live in [`pcs/pinky.yaml`](../pcs/pinky.yaml)** —
+> Pinky is the 8th PC and a lord candidate: a stock vanilla FE8 Pegasus Knight (the army's flier),
+> not an RBG summon. Everything below is story/flavor only.
 
 ## Concept
 
@@ -13,7 +13,7 @@ flier with vanilla stats.
 
 - **Built by / parent:** Prof. R.B. Geenius
 - **Role:** flier (Pegasus Knight → Falcon Knight)
-- **Recruited:** available from Chapter 1
+- **Joins:** founding party — deployed at the Northlook in Ch1 with the rest of the cast (8th PC, lord candidate)
 - **Pronouns:** he/him
 
 ## Voice
