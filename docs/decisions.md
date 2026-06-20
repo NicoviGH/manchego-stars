@@ -350,6 +350,16 @@ CH=chNN`), built on the tested combat core `tools/fe_combat.py` (the decomp's ow
 execution plan + full spec: issue #45.
 _Decided: 2026-06-18 (Nicolas; difficulty analysis session — supersedes the open "Ch1 difficulty" item)_
 
+**Two healers, differentiated by donor (same move as the shamans).** Sclorbo and Basil are both
+Priests, so they get *distinct* vanilla donor lines to avoid stat-twins: **Sclorbo → Moulder** (the
+durable "war-priest": HP70/Def25, balanced, accurate) and **Basil → Natasha** (the frail "mage-healer":
+HP50/Def15 but Pow60/Res55/Lck60 — a glass, dodgy, magically-potent nuke-healer). The frail line sits
+on Basil deliberately: **Sclorbo is a lord candidate** (#42) and the per-lord floor would have to work
+harder on a frailer lord (he's already the weakest, staff-only lord pick), whereas **Basil is not a lord**
+(joins Ch5, after the Ch1 lord-select), so frailty there carries no survivability-floor cost — and "fragile
+but potent natural magic" suits an awakened shrub. Donor stats only; both stay Priest → Bishop/Sage.
+_Decided: 2026-06-20 (Nicolas)._
+
 **Lord floor, runtime mechanism (#45 3b/3c): a build-baked table applied once at the first player phase.**
 The build emits `gLordFloorDeltas[]` (`events_udefs.c`, parallel to `gLordSelectCandidates[]`): one
 `{+maxHP, +Def, +Res}` row per candidate = `difficulty.lord_floor_delta` @target 3.5 vs Ch1 enemies (Ch1 →

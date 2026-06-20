@@ -9,21 +9,28 @@
 id: basil
 name: Basil
 
-# D&D flavor (from the DM notes): a sentient shrub that produces Goodberries, found in the
-# elven tomb; the party repots and names it.
+# D&D flavor: canonically the book's **Awakened Shrub** — an intelligent, speaking shrub
+# that grows edible berries, awakened by the frost druid Ravisin in the Elven Tomb (Rime of
+# the Frostmaiden, printed p.85 / area E9; Appendix B "Awakened Shrub"). The book never names
+# it; "Basil" is our table's name (DM notes: "Basil(?)").
 dnd:
   class: Awakened Shrub (goodberry)
   race: Plant
 
 # ── Role (LOCKED 2026-06-20) ─────────────────────────────────────────────────
 # PRIEST — our SECOND healer (we ran one-healer-thin on Sclorbo all game). A plant that
-# literally produces healing berries = a staff healer, flavor and function in one. Slow,
-# low-move foot unit suits a potted shrub. Light magic comes on the Bishop promotion.
+# literally produces healing berries = a staff healer, flavor and function in one.
+# HEALER DIFFERENTIATION (Nicolas, 2026-06-20), mirroring the Marty/Meesmickle shaman split:
+#   - Sclorbo = MOULDER donor -> the durable "war-priest" (HP70/Def25, balanced, lord-viable).
+#   - Basil   = NATASHA donor -> the frail "mage-healer" (HP50/Def15 but Pow60/Res55/Lck60):
+#       a glass, dodgy, magically-potent nuke-healer. Frailty is fine HERE because Basil is
+#       NOT a lord candidate (lord-select is the Ch1 founding cast; Basil joins Ch5), so no
+#       survivability-floor burden — and "fragile but potent natural magic" suits a shrub.
 fe_stats:
   class: Priest
 donor:
-  character: Moulder        # vanilla Priest — bases/growths reference (data_classes.c)
-  why: the game's starter staff healer = full growth runway
+  character: Natasha        # vanilla Cleric — frail/high-magic line (distinct from Sclorbo's Moulder)
+  why: glass mage-healer identity, opposite Sclorbo's durable Moulder line; Basil is no lord, so frailty costs nothing
 
 promotion:
   branch: [Bishop, Sage]    # vanilla FE8 Priest branch (classchg-data.c)
