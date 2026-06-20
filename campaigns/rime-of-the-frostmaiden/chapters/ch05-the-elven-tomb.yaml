@@ -59,8 +59,12 @@ difficulty_note: >
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
   note: >
-    7 PCs + Trex + Pinky deployable. Baxby and Lupin (the sled team) and Basil
-    are non-combat NPCs and are not deployed. Positions set in Tiled.
+    Deployable pool by Ch5: 7 PCs + Pinky + Baxby (Cav) + Trex (Thief) + Lupin
+    (beast-Cav) + Sahnar (Myr, recruited here) + Basil (Priest, recruited here).
+    Only the pack-dressing direwolves stay non-combat. deploy_limit caps the field
+    to vanilla parity (TBD this pass). Positions set in Tiled.
+    NOTE: ch06-08 deployment notes still say Baxby/Lupin/Basil are non-combat —
+    refresh those when their deploy_limits are set (see roadmap recruit cadence).
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
 enemy_units:
@@ -144,14 +148,13 @@ post_chapter:
   gold_reward: 350
   available_shops: [lonelywood]
   units_available_to_recruit:
-    - id: sahnar
-      description: "Sahnar, the reawakened moon-elf mummy (recruited by lighting the brazier). Playable unit."
-  caravan_npcs_added:
-    - id: basil
+    - id: sahnar                         # Myrmidon (sword duelist); see npcs/sahnar.yaml
+      description: "Sahnar, the reawakened moon-elf mummy (recruited by lighting the brazier). Playable Myrmidon."
+    - id: basil                          # Priest — 2nd healer (LOCKED 2026-06-20); see npcs/basil.yaml
       description: >
-        Basil, the sentient goodberry shrub — a non-combat caravan NPC, not a
-        deployable unit. He is the in-fiction source of the party's 'Goodberries'
-        (reflavored Vulneraries) in the supply/shop from here on. No new mechanic.
+        Basil, the sentient goodberry shrub — now a PLAYABLE healer (Priest). His
+        Goodberries are the cosmetic skin on a vanilla heal staff; he is also the
+        in-fiction source of the party's reflavored Vulneraries in the shop.
   unlocks_chapter: ch06-the-maer-monster
 
 design_notes: >
@@ -159,4 +162,5 @@ design_notes: >
   the villain thread tying the white moose (ch04) → this tomb → Messie (ch06): she
   awakened them all. She drops the LOCKED 'crest of cold iron' (the promotion
   Chekhov's gun for the Ch8→9 seam). The brazier puzzle is optional and the only
-  way to recruit Sahnar. Basil is folded into the caravan shop, not made a fighter.
+  way to recruit Sahnar. Basil joins as our second healer (Priest) — the goodberry
+  shrub as a literal heal-staff unit (LOCKED 2026-06-20).

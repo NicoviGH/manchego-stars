@@ -1,7 +1,10 @@
-# npcs/brie.yaml — Brie, a recruitable automaton built by Prof. R.B. Geenius.
+# npcs/brie.yaml — Brie, a BALLISTA construct built by Prof. R.B. Geenius.
 # Lean unit definition (mechanics only). Narrative/flavor lives in
-# ../lore/pepperjack-and-brie.md. Brie is NOT an RBG ability/summon — she joins the army as an
-# ordinary FE8 recruit and is a stock vanilla FE8 class (no custom turret/AoE kit).
+# ../lore/pepperjack-and-brie.md. Brie is NOT an RBG ability/summon — she joins the army as
+# a recruit. ROLE LOCKED (Nicolas, 2026-06-20): a BALLISTA / siege engine (mirror of
+# Pepperjack — same cannon-golem chassis). RBG the Artillerist builds the pair; Brie debuts
+# a chapter or two after Pepperjack (still the vanilla ballista era). See pepperjack.yaml
+# for the implementation caveat (FE8 has no playable ballista unit class).
 
 id: brie
 name: Brie
@@ -36,19 +39,23 @@ art:
     pinks ×4 (hot→deep), barrel-bore dark-magenta, eye (blue shadow + purple iris + white),
     cyan star, pink fuse, boot-pink, black outline. Mirror of Pepperjack's palette.
 
-# How she enters the army (story recruit; not a gameplay summon). Recruited a later chapter than
-# Pepperjack.
-recruited_via: "story — Prof. R.B. Geenius builds Brie (a later chapter)"
+# How she enters the army (story recruit; not a gameplay summon). Debuts a chapter or two
+# after Pepperjack, still in the vanilla ballista era (~our Ch11, Act II).
+recruited_via: "story — Prof. R.B. Geenius builds Brie (~Ch11, after Pepperjack)"
 built_by: prof-rbg
 paired_with: pepperjack         # dating Pepperjack; deployed as a pair, narratively
+recruit:
+  chapter: ch11-the-long-climb  # PROVISIONAL — a chapter or two after Pepperjack's debut
+  via: story
 
-# ── FE Starting Stats — TBD (post-MVP) ─────────────────────────────────────────
-# FE-legal class/stats/growths/inventory to be authored post-MVP, verbatim from a vanilla FE8
-# class in fireemblem8u/src/data_classes.c (same rule as the 7 PCs: stock class, no custom tuning,
-# element/identity is flavor only). Stub left intentionally empty until then.
+# ── FE role: BALLISTA (siege) — LOCKED 2026-06-20 ──────────────────────────────
+# Same role + implementation caveat as Pepperjack (see pepperjack.yaml): no stock FE8
+# ballista unit class; mechanics (deployable siege piece vs. engine extension) authored
+# at wiring, post-MVP.
 fe_stats:
-  class: null                   # TBD — pick a vanilla FE8 class post-MVP
+  class: null                   # no stock FE8 ballista unit class — see pepperjack.yaml caveat
+  role: ballista                # siege / long-range artillery
   promoted_class: null
   level: 1
 
-# inventory: TBD post-MVP (FE-legal weapon for the chosen class).
+# inventory (concept): Ballista / Iron Ballista / Killer Ballista (ITEM_BALLISTA_*).

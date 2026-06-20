@@ -1,0 +1,42 @@
+# npcs/lupin.yaml — Lupin, the bespectacled talking direwolf (ch04 recruit)
+# Class roster: docs/CLASSES.md (generated). Rationale: docs/decisions.md §Class Mapping.
+# Combat is vanilla FE (docs/decisions.md §Combat). damage_type labels are cosmetic.
+#
+# STATUS: design record / stub. Class + role LOCKED (Nicolas, 2026-06-20) — promoted from
+# "non-combat sled NPC" to a playable recruit. NOT yet wired into build_campaign (inert
+# until the recruit wiring lands). Full bases/growths from the donor's Cavalier data at wiring.
+
+id: lupin
+name: Lupin
+
+# D&D flavor (from the DM notes): the leader of the direwolf pack in the White Moose forest
+# — "wears glasses and has the ability to speak"; Marty talks the pack into joining, and
+# they take to the reins of the Rolling Cheddar beside Baxby.
+dnd:
+  class: Direwolf (awakened)
+  race: Direwolf
+
+# ── Role (LOCKED 2026-06-20: reskin lever) ───────────────────────────────────
+# CAVALIER under the hood, WOLF sprite on top — no beast class needed; the wolf IS the
+# mount. Gives mounted melee (sword/lance) and thickens our thin cavalry line. Pairs with
+# Baxby (axe-beak Cavalier) as the "beast-cavalry" sled team — on-theme with the campaign's
+# befriend-the-creatures motif. Custom map sprite + battle anim required (#38/#39).
+fe_stats:
+  class: Cavalier
+donor:
+  character: Kyle           # vanilla Cavalier — bases/growths reference (Franz is Baxby's ref)
+  why: fresh Cavalier = full growth runway; distinct donor from Baxby
+
+promotion:
+  branch: [Paladin, "Great Knight"]   # vanilla FE8 Cavalier branch (classchg-data.c [CLASS_CAVALIER])
+  default: Paladin
+
+recruited_via: "story — Marty talks the direwolf pack into the sled team (Ch4)"
+recruit:
+  chapter: ch04-the-white-moose
+  via: story
+
+# ── Art (reskin lever: stock chassis, custom skin) ───────────────────────────
+art:
+  approach: custom            # direwolf map sprite + battle anim over the Cavalier chassis (#38/#39)
+  note: "the wolf is the mount — no rider; sibling treatment to Baxby's axe-beak"

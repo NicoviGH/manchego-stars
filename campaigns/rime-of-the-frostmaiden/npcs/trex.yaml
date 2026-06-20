@@ -1,0 +1,40 @@
+# npcs/trex.yaml — Trex, the winged kobold (ch03 recruit)
+# Class roster: docs/CLASSES.md (generated). Rationale: docs/decisions.md §Class Mapping.
+# Combat is vanilla FE (docs/decisions.md §Combat). damage_type labels are cosmetic.
+#
+# STATUS: design record / stub. Class + role LOCKED (Nicolas, 2026-06-20). NOT yet wired
+# into build_campaign (inert until the recruit wiring lands: free slot + recruit logic +
+# portrait + map sprite). Full bases/growths to be authored verbatim from the donor's
+# vanilla Thief class data (data_classes.c) at wiring.
+
+id: trex
+name: Trex
+
+# D&D flavor (from the DM notes): the kobold leader in the Termalaine gem mine — "a
+# slightly smarter kobold who fashioned cosmetic wings for himself." Joins post-chapter.
+dnd:
+  class: Kobold (winged)
+  race: Kobold
+
+# ── Role (LOCKED 2026-06-20) ─────────────────────────────────────────────────
+# THIEF — fills the army's utility hole (steal / chests / doors); the campaign gives us
+# no other thief. Cleverness fits; Assassin promotion also adds a sword. The "cosmetic
+# wings" are exactly that — cosmetic art, NOT a flier (Thief is a foot unit).
+fe_stats:
+  class: Thief
+donor:
+  character: Colm           # vanilla Thief — bases/growths reference (data_classes.c)
+  why: the game's starter Thief = full growth runway for a fresh utility unit
+
+promotion:
+  branch: [Rogue, Assassin]  # vanilla FE8 Thief branch (classchg-data.c [CLASS_THIEF])
+  default: Rogue
+
+recruited_via: "story — joins after the Termalaine mine (Ch3)"
+recruit:
+  chapter: ch03-the-termalaine-mine
+  via: story
+
+# ── Art (reskin lever: stock chassis, custom skin) ───────────────────────────
+art:
+  approach: custom            # kobold (winged) over the Thief chassis; ref-to-bust + map sprite TBD (#19/#38)

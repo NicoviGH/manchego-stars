@@ -69,6 +69,47 @@
 
 ---
 
+## Recruit cadence (by role) 🧩
+
+> **Method (Nicolas, 2026-06-20):** class is the *chassis* (move/weapon/stat shape); the
+> character is custom art on top ("custom art is the lever"). We don't field a vanilla-sized
+> army — the cast meets by Ch1 and we hold parity via `deploy_limit`. So we recruit to fill
+> **roles**, skinning canon characters onto whatever chassis the army needs. Per-unit detail
+> lives in `campaigns/.../npcs/*.yaml` (the source of truth); this is the schedule overview.
+
+**Locked recruits (class + role settled; full bases/growths authored at wiring):**
+
+| Joins | Character | Chassis (FE class) | Role filled | Skin |
+|---|---|---|---|---|
+| Ch1 | 8 PCs | — | core triangle/magic/heal/flier/armor | — |
+| Ch2 | **Baxby** | Cavalier | sword access + cavalry | axe-beak (done) |
+| Ch3 | **Trex** | Thief | **utility** (steal/chests/doors) | winged kobold |
+| Ch4→5 | **Lupin** | Cavalier | 2nd cavalry / mobile melee | direwolf (the wolf *is* the mount; pairs w/ Baxby as "beast-cavalry") |
+| Ch5 | **Sahnar** | Myrmidon | **sword duelist** (crit) | moon-elf mummy |
+| Ch5 | **Basil** | Priest | **2nd healer** | goodberry shrub (heals = handing out berries) |
+| ~Ch9 | **Pepperjack** | *ballista* | long-range siege | RBG cannon-construct |
+| ~Ch11 | **Brie** | *ballista* | long-range siege | RBG cannon-construct (mirror of Pepperjack) |
+
+By **Ch5** every core FE role is covered with zero magic redundancy (we're already deep on
+casters: Marty/Mees dark, Rootis anima, Sclorbo/Basil staff). The back half adds RBG's
+**ballistae** at the vanilla ballista era, then rides promotions + gear (the reward curve above).
+
+**Open items on the recruit plan:**
+- **Pepperjack/Brie = ballistae.** ⚠ FE8 has **no playable ballista unit class** — ballistae are
+  map-placed siege objects. Implementation (deployable siege piece RBG sets up, vs. a small
+  engine extension for a mobile Ballistician-style unit) is a post-MVP design call. Debut chapter
+  is **[FE8]-tier / provisional** — pin to the exact vanilla ballista-debut chapter via an
+  in-emulator check or unit-blob decode (the unit data is baserom-incbin, not in the map terrain).
+- **Vellynne Harpell → stays an NPC.** Her only honest class is a 4th caster (we're saturated);
+  recurring self-interested ally / quest + shop, not a roster unit.
+- **Lupin needs custom beast art** (direwolf map sprite + battle anim over the Cavalier chassis) —
+  art spend, #38/#39.
+- **ch06–08 deployment notes** still call Baxby/Lupin/Basil "non-combat" — refresh those (and set
+  their `deploy_limit`s to vanilla parity) when each chapter is authored.
+- **Back half (Ch9–21) recruits beyond the above are unknowable until the DM notes arrive** — only
+  Vellynne (NPC) + the RBG ballistae are firm; the other Arcane Brotherhood wizards (Nass, Avarice,
+  Dzaan) are currently rivals, possible redeemed-late recruits if the real story goes there.
+
 ## Open questions for Nicolas (post-MVP / story)
 
 1. **The rest of the DM notes** — the single biggest unblock. Everything in Act II

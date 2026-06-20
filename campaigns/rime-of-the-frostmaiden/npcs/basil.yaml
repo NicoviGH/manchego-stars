@@ -1,0 +1,40 @@
+# npcs/basil.yaml — Basil, the sentient goodberry shrub (ch05 recruit)
+# Class roster: docs/CLASSES.md (generated). Rationale: docs/decisions.md §Class Mapping.
+# Combat is vanilla FE (docs/decisions.md §Combat).
+#
+# STATUS: design record / stub. Class + role LOCKED (Nicolas, 2026-06-20) — promoted from
+# "non-combat caravan NPC" to a playable recruit. NOT yet wired into build_campaign (inert
+# until the recruit wiring lands). Full bases/growths from the donor's Priest data at wiring.
+
+id: basil
+name: Basil
+
+# D&D flavor (from the DM notes): a sentient shrub that produces Goodberries, found in the
+# elven tomb; the party repots and names it.
+dnd:
+  class: Awakened Shrub (goodberry)
+  race: Plant
+
+# ── Role (LOCKED 2026-06-20) ─────────────────────────────────────────────────
+# PRIEST — our SECOND healer (we ran one-healer-thin on Sclorbo all game). A plant that
+# literally produces healing berries = a staff healer, flavor and function in one. Slow,
+# low-move foot unit suits a potted shrub. Light magic comes on the Bishop promotion.
+fe_stats:
+  class: Priest
+donor:
+  character: Moulder        # vanilla Priest — bases/growths reference (data_classes.c)
+  why: the game's starter staff healer = full growth runway
+
+promotion:
+  branch: [Bishop, Sage]    # vanilla FE8 Priest branch (classchg-data.c)
+  default: Bishop
+
+recruited_via: "story — repotted from the Elven Tomb (Ch5)"
+recruit:
+  chapter: ch05-the-elven-tomb
+  via: story
+
+# ── Art (reskin lever: stock chassis, custom skin) ───────────────────────────
+art:
+  approach: custom            # potted goodberry shrub over the Priest chassis; bust + map sprite TBD (#19/#38)
+  staff_flavor: "heals by handing out Goodberries (cosmetic skin on a vanilla heal staff)"
