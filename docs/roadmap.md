@@ -87,28 +87,28 @@
 | Ch4→5 | **Lupin** | Cavalier | 2nd cavalry / mobile melee | direwolf (the wolf *is* the mount; pairs w/ Baxby as "beast-cavalry") |
 | Ch5 | **Sahnar** | Myrmidon | **sword duelist** (crit) | moon-elf mummy |
 | Ch5 | **Basil** | Priest | **2nd healer** | goodberry shrub (heals = handing out berries) |
-| ~Ch9 | **Pepperjack** | *ballista* | long-range siege | RBG cannon-construct |
-| ~Ch11 | **Brie** | *ballista* | long-range siege | RBG cannon-construct (mirror of Pepperjack) |
 
 By **Ch5** every core FE role is covered with zero magic redundancy (we're already deep on
-casters: Marty/Mees dark, Rootis anima, Sclorbo/Basil staff). The back half adds RBG's
-**ballistae** at the vanilla ballista era, then rides promotions + gear (the reward curve above).
+casters: Marty/Mees dark, Rootis anima, Sclorbo/Basil staff). The back half rides promotions +
+gear (the reward curve above) — the roster stops growing at Ch5 (no new permanent recruits unless
+the DM notes add them).
+
+**RBG's ballistae (Pepperjack & Brie) — NOT roster recruits.** They are vanilla FE8 **map
+ballistae** (siege emplacements the party mans), flavored as RBG's cannon-constructs — we don't
+break from vanilla to make ballistae into units. They appear on relevant maps from the **vanilla
+ballista era: FE8 Ch10 "Revolt at Carcino" → our ~Ch10 onward**. No recruit slot, no `deploy_limit`
+cost. (`npcs/pepperjack.yaml`, `npcs/brie.yaml`.)
 
 **Open items on the recruit plan:**
-- **Pepperjack/Brie = ballistae.** ⚠ FE8 has **no playable ballista unit class** — ballistae are
-  map-placed siege objects. Implementation (deployable siege piece RBG sets up, vs. a small
-  engine extension for a mobile Ballistician-style unit) is a post-MVP design call. Debut chapter
-  is **[FE8]-tier / provisional** — pin to the exact vanilla ballista-debut chapter via an
-  in-emulator check or unit-blob decode (the unit data is baserom-incbin, not in the map terrain).
 - **Vellynne Harpell → stays an NPC.** Her only honest class is a 4th caster (we're saturated);
   recurring self-interested ally / quest + shop, not a roster unit.
 - **Lupin needs custom beast art** (direwolf map sprite + battle anim over the Cavalier chassis) —
   art spend, #38/#39.
-- **ch06–08 deployment notes** still call Baxby/Lupin/Basil "non-combat" — refresh those (and set
-  their `deploy_limit`s to vanilla parity) when each chapter is authored.
+- **deploy_limit for ch03–08** still unset — set to vanilla parity when each chapter is authored
+  (the deployment notes now list the full deployable pool).
 - **Back half (Ch9–21) recruits beyond the above are unknowable until the DM notes arrive** — only
-  Vellynne (NPC) + the RBG ballistae are firm; the other Arcane Brotherhood wizards (Nass, Avarice,
-  Dzaan) are currently rivals, possible redeemed-late recruits if the real story goes there.
+  Vellynne (NPC) + the RBG map-ballistae are firm; the other Arcane Brotherhood wizards (Nass,
+  Avarice, Dzaan) are currently rivals, possible redeemed-late recruits if the real story goes there.
 
 ## Open questions for Nicolas (post-MVP / story)
 

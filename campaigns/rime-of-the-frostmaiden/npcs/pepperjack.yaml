@@ -1,9 +1,11 @@
 # npcs/pepperjack.yaml — Pepperjack, a BALLISTA construct built by Prof. R.B. Geenius.
 # Lean unit definition (mechanics only). Narrative/flavor lives in
-# ../lore/pepperjack-and-brie.md. Pepperjack is NOT an RBG ability/summon — he joins the
-# army as a recruit. ROLE LOCKED (Nicolas, 2026-06-20): a BALLISTA / siege engine — the
-# cannon-golem art (barrel snout, fuse) was always artillery; RBG the Artillerist builds
-# his ordnance. Debuts when vanilla introduces ballistae (route-split / mid-game era).
+# ../lore/pepperjack-and-brie.md. ROLE LOCKED (Nicolas, 2026-06-20): Pepperjack is a
+# vanilla FE8 BALLISTA — a map-placed siege emplacement the party mans, NOT a roster
+# recruit (we don't break from vanilla to make ballistae into units). RBG the Artillerist
+# builds his ordnance; the cannon-golem art (barrel snout, fuse) was always artillery.
+# Appears from the vanilla ballista era — FE8 debuts ballistae in Ch10 "Revolt at Carcino"
+# (Eirika route) — i.e. our ~Ch10 onward, as a flavored emplacement on relevant maps.
 
 id: pepperjack
 name: Pepperjack
@@ -37,28 +39,21 @@ art:
     gunmetal greys ×4, barrel-bore black, orange eye + white, red (star + chili mustache),
     tan fuse, boot-grey, black outline. Mirror of Brie's palette.
 
-# How he enters the army (story recruit; not a gameplay summon). Debut keyed to vanilla's
-# ballista era — route-split / mid-game (~our Ch9, Act II opening). Exact FE8 ballista-debut
-# chapter is [FE8]-tier (ballistae are unit-placed objects in baserom blobs, not decodable
-# from the map terrain — to pin via in-emulator check or unit-blob decode; see roadmap).
-recruited_via: "story — Prof. R.B. Geenius builds Pepperjack (~Ch9, vanilla ballista era)"
+# NOT a roster recruit — a vanilla map ballista, flavored as RBG's siege construct. Placed
+# on relevant maps from the ballista era (FE8 Ch10 "Revolt at Carcino" -> our ~Ch10); the
+# party mans it like any FE8 ballista (US_IN_BALLISTA on ballista terrain).
+recruited_via: "not a recruit — vanilla map ballista (RBG's siege), from ~Ch10"
 built_by: prof-rbg
-paired_with: brie               # dating Brie; deployed as a pair, narratively
-recruit:
-  chapter: ch09-revels-end      # PROVISIONAL — pin to the exact vanilla ballista-debut chapter
-  via: story
+paired_with: brie               # the matching ballista, placed together when both appear
 
-# ── FE role: BALLISTA (siege) — LOCKED 2026-06-20 ──────────────────────────────
-# IMPLEMENTATION CAVEAT: FE8 has no playable ballista UNIT class in data_classes.c —
-# ballistae are map-placed siege objects a unit mans (US_IN_BALLISTA on ballista terrain).
-# So "Pepperjack is a ballista" needs a design call at wiring: either a deployable siege
-# piece RBG sets up per map, or a small engine extension (a Ballistician-style mobile unit,
-# which vanilla FE8 lacks). Recorded as the role; mechanics authored post-MVP.
+# ── FE role: BALLISTA (siege), the VANILLA way — LOCKED 2026-06-20 ──────────────
+# Implemented as a stock FE8 ballista: a map-placed siege emplacement (ballista terrain +
+# the ballista object), NOT a unit class. No recruit slot, no deploy_limit cost. fe_stats
+# stays null because a ballista is map equipment, not a character class. The "Pepperjack"
+# identity is custom art/flavor on the emplacement.
 fe_stats:
-  class: null                   # no stock FE8 ballista unit class — see caveat above
-  role: ballista                # siege / long-range artillery
-  promoted_class: null
-  level: 1
+  class: null                   # a ballista is a map object, not a unit class
+  role: ballista                # vanilla siege emplacement (ITEM_BALLISTA_* on a ballista tile)
+  level: null
 
-# inventory (concept): Ballista / Iron Ballista / Killer Ballista (ITEM_BALLISTA_*), tier
-# scaling with the era. Authored at wiring.
+# weapon: Ballista / Iron Ballista / Killer Ballista (ITEM_BALLISTA_*), tier scaling with the era.
