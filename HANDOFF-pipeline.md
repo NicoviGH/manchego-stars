@@ -52,14 +52,20 @@ pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
    clears prologue + ch01 (DefeatBoss + Seize) with real combat; harder chapters may still need gang-up /
    don't-feed-the-lord / heal logic. The fuzzer (`fuzz`/`fuzz_ch01`) now soaks for crashes/soft-locks on the
    prologue; **fuzz_ch02+ smoke/clear coverage needs per-chapter save-state checkpoints** (reuse `states/`
-   infra), deferred till those chapters are built. Fuzzer follow-ups if idle: a `fuzz_boot` surface (New
-   Game→title→prep), and a CI seed-sweep (run a fixed seed set, e.g. `for s in 1..N`, as a soak gate).
-2. **#53 tail — FE8 Ch13 reference** (→ our ch08, deferred/optional): bigger than billed — needs ~11 *standard*
+   infra), deferred till those chapters are built. Seed-sweep DONE: `tools/playtest/fuzz_sweep.sh [N]` (or
+   `PT_SEEDS="…"`) soaks many seeds and fails on any — a **LOCAL pre-release gate, NOT CI** (CI builds a mock
+   ROM + has no mGBA, so it can't run any in-emulator scenario; see checks.yml). `fuzz_boot` (New
+   Game→title→prep) is NOT a quick follow-up after all — it needs a **non-cursor responsiveness signal**
+   (`fuzzFingerprint` folds the *map* cursor, useless on menus), so treat it as its own small design piece.
+2. **CI doesn't run `make test`** (the pure lua/py unit tests) — checks.yml runs `check.py` + build +
+   verify_text + difficulty only, so `test_fuzzrng`/`test_liveness`/`test_clearbot` aren't gated in CI. Wiring
+   `make test` into the `checks` job (needs `lua` + numpy/pillow installed) is a cheap, high-value hardening.
+3. **#53 tail — FE8 Ch13 reference** (→ our ch08, deferred/optional): bigger than billed — needs ~11 *standard*
    weapons modeled (silver/steel/killer/slim/short-spear/elfire/zanbato/swordslayer/purge), not a few exotics.
    ch08 is a scripted-defeat objective (never CI-gated), so it's informational polish; do it only if idle.
-3. **Flip the CI parity gate to enforcing** (#48 (b)): once content authors the Ch2+ enemy inventories,
+4. **Flip the CI parity gate to enforcing** (#48 (b)): once content authors the Ch2+ enemy inventories,
    change the CI step's `difficulty` → `difficulty-gate`. Leveled stat projection (#45 item 5) pairs here.
-4. Mechanics/flavor leaves once specced: lord-select UX #46, d20 crit #11, spell-economy #9, iconic
+5. Mechanics/flavor leaves once specced: lord-select UX #46, d20 crit #11, spell-economy #9, iconic
    matchups #8. Injection pipeline #14 / maps #40 gate content.
 
 ## Watch out (pipeline-lane only)
