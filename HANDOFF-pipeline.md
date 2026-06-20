@@ -8,6 +8,12 @@ the lane guard is `check.py check_lane_ownership`). Seam enforcement (#55) + par
 pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
 
 ## Now (2026-06-19) — parity engine live; playtest smoke net + clear-bot + seeded fuzzer
+- **CI fixed + `make test` wired into the `checks` job.** The `checks` job had been RED since
+  ~23:15 2026-06-19: `check.py` runs the Python unit tests, which import `build_campaign.py`
+  (→ `gen_chapter_title`/`gen_subtitle_cards` → PIL + numpy), but the job installed only `pyyaml`
+  (`ModuleNotFoundError: No module named 'PIL'`). Fix: install `pillow numpy` + `lua5.4` (aliased
+  to `lua`) and add a `make test` step — now the pure-Lua playtest tests
+  (`test_liveness`/`test_clearbot`/`test_fuzzrng`) are gated in CI too (resolves old Next #2).
 - **#49 stability fuzzer LANDED & verified — seeded "smart monkey"** (decisions.md §Playtest platform brick
   3). Random inputs over the same I/O layer to hunt crashes/soft-locks the directed bots miss. Own LCG PRNG
   (`fuzzrng.lua`, NOT host `math.random` — so a `PT_SEED=N` crash replays identically on the CI `lua` and
@@ -57,18 +63,20 @@ pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
    ROM + has no mGBA, so it can't run any in-emulator scenario; see checks.yml). `fuzz_boot` (New
    Game→title→prep) is NOT a quick follow-up after all — it needs a **non-cursor responsiveness signal**
    (`fuzzFingerprint` folds the *map* cursor, useless on menus), so treat it as its own small design piece.
-2. **CI doesn't run `make test`** (the pure lua/py unit tests) — checks.yml runs `check.py` + build +
-   verify_text + difficulty only, so `test_fuzzrng`/`test_liveness`/`test_clearbot` aren't gated in CI. Wiring
-   `make test` into the `checks` job (needs `lua` + numpy/pillow installed) is a cheap, high-value hardening.
-3. **#53 tail — FE8 Ch13 reference** (→ our ch08, deferred/optional): bigger than billed — needs ~11 *standard*
+2. **#53 tail — FE8 Ch13 reference** (→ our ch08, deferred/optional): bigger than billed — needs ~11 *standard*
    weapons modeled (silver/steel/killer/slim/short-spear/elfire/zanbato/swordslayer/purge), not a few exotics.
    ch08 is a scripted-defeat objective (never CI-gated), so it's informational polish; do it only if idle.
-4. **Flip the CI parity gate to enforcing** (#48 (b)): once content authors the Ch2+ enemy inventories,
+3. **Flip the CI parity gate to enforcing** (#48 (b)): once content authors the Ch2+ enemy inventories,
    change the CI step's `difficulty` → `difficulty-gate`. Leveled stat projection (#45 item 5) pairs here.
-5. Mechanics/flavor leaves once specced: lord-select UX #46, d20 crit #11, spell-economy #9, iconic
+4. Mechanics/flavor leaves once specced: lord-select UX #46, d20 crit #11, spell-economy #9, iconic
    matchups #8. Injection pipeline #14 / maps #40 gate content.
 
 ## Watch out (pipeline-lane only)
+- **The `checks` CI job must install whatever the Python unit tests import.** `check.py` runs
+  `tools/test_*.py`; `test_build_campaign`/`test_difficulty` import `build_campaign.py`, which pulls in
+  PIL + numpy at module load. If you add a test (or an import to build_campaign) that needs a new lib,
+  add it to the `checks` job's `Install deps` (the lightweight job, NOT just the `build` job) or CI goes
+  red on a `ModuleNotFoundError` that never shows up locally. `make test` runs there too (gates the Lua tests).
 - **Running playtest scenarios needs a built ROM + `lua`.** Build via `tools/build.sh` (it applies the
   decomp's `#!/bin/python3`→`env python3` shebang fix); a bare `make` dies `Error 126` on the gfx tools on
   macOS. The pure Lua tests (`test_liveness.lua`/`test_clearbot.lua`) need `lua` (`brew install lua`); `make

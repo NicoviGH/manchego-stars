@@ -24,8 +24,17 @@ jobs:
         with:
           python-version: "3.12"
 
+      # pillow + numpy: tools/check.py runs the Python unit tests, which import
+      # build_campaign.py (-> gen_chapter_title/gen_subtitle_cards -> PIL + numpy).
+      # lua: `make test` also runs the pure-Lua playtest tests (liveness/clearbot/
+      # fuzzrng); ubuntu ships the binary as `lua5.4`, so alias it to `lua` (what the
+      # Makefile probes for). None of this builds the ROM -- it just runs test scripts.
       - name: Install deps
-        run: pip install pyyaml
+        run: |
+          pip install pyyaml pillow numpy
+          sudo apt-get update
+          sudo apt-get install -y lua5.4
+          sudo ln -sf "$(command -v lua5.4)" /usr/local/bin/lua
 
       # Same drift guard the git pre-commit hook and `make check` run -- ONE source of
       # check logic (tools/check.py): tooling compiles, YAML parses, no doc references a
@@ -34,6 +43,13 @@ jobs:
       # a direct push to main, where the pre-commit hook is the enforcement point).
       - name: Drift guard + seam lane guard (tools/check.py)
         run: python3 tools/check.py
+
+      # Unit tests (Python combat/difficulty + pure-Lua playtest logic). check.py above
+      # already runs the Python tests for the pre-commit path; running `make test` here is
+      # the single source that ALSO gates the Lua tests (test_liveness/clearbot/fuzzrng),
+      # which nothing else in CI covers. No mGBA needed -- these are pure logic tests.
+      - name: Unit tests (make test)
+        run: make test
 
   # The real "make green" gate. Mirrors the fireemblem8u decomp's own build.yml: a
   # MOCK base ROM (random 16MB) lets `make` compile + link the full ROM without the
