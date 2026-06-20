@@ -7,7 +7,7 @@ the lane guard is `check.py check_lane_ownership`). Seam enforcement (#55) + par
 **Shared builds/gotchas/rules → `HANDOFF.md` + `CLAUDE.md`; this file holds only my current state +
 pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
 
-## Now (2026-06-20) — save carry-forward shipped (#59 closed); LLM-player epic spec'd (#63); lord-select UX up next (#46)
+## Now (2026-06-20) — save carry-forward shipped (#59 closed); LLM-player epic spec'd (#63); #63 M1 up next (#46 reassigned to content lane)
 - **#59 LANDED & CLOSED — testers carry their own `.sav` across builds; public patch rejected.**
   FE8 save validity = a **fixed** magic + a checksum (`bmsave-lib.c` `ReadGlobalSaveInfo`/`ReadSaveBlockInfo`),
   so a rebuild alone never invalidates a save — only a save-block *layout* shift does. We reskin within
@@ -27,11 +27,12 @@ pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
   knob), **board-hash-keyed transcript = cache + replay in one** (satisfies the "identical on CI lua &
   mGBA" rule and makes re-soaks free). TDD-ordered milestones **M1–M5** on the issue; ADR lands with M1.
   No spec doc (per convention). The swap point is still the pure `clearbot.lua` `pickTarget`.
-- **Next: #46 lord-select UX** (alpha feedback #4 / #47) — Nicolas is picking this up next. New mechanic/UX
-  → brainstorm/spec pass FIRST, captured as a GitHub issue (no spec doc), then TDD. Engine-labeled but a
-  pipeline-lane "mechanics/flavor leaf" per #49. Engine already has `_inject_lord_select_engine` +
-  `_inject_lord_floor_engine` hooks (guarded in `check_engine_guards_present`) — this is the *selection-menu
-  UX* on top (show each candidate's PC summary, explain the choice).
+- **#46 lord-select UX REASSIGNED to the content lane (NOT pipeline).** Brainstormed w/ Nicolas 2026-06-20
+  and design-locked on the issue, then track-corrected: every file it touches is content-owned
+  (`tools/build_campaign.py` + `campaigns/.../pcs/*.yaml` `lord_pitch:` field + an `onSwitchIn` menu hook),
+  zero pipeline files — so it was relabeled `engine`→`content`+`tooling` and is being implemented in the
+  `inst/content` worktree. Don't pull it back here.
+- **Next (pipeline): #63 M1 — LLM-player pure cores** (see Next #1 below).
 
 ## Earlier (2026-06-20) — party-side parity delta auto-derived + healer modeling (#61/#62)
 - **#61 + #62 LANDED & verified — the party-side parity delta works for Ch2+ and models healers**
@@ -97,23 +98,19 @@ pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
   Ch6 (→ our ch07). FE8 Ch13 (→ our ch08) is the lone deferred reference.
 
 ## Next (priority order)
-1. **#46 lord-select UX** (immediate — Nicolas is picking this up): resolves the last open alpha-feedback
-   item (#47 #4 — "explain the choice + show the candidates" at the lord-select menu). New mechanic/UX →
-   **brainstorm/spec pass FIRST**, capture as a GitHub issue (no spec doc, per `feedback_no_spec_docs`), then
-   TDD. The selection *mechanic* already exists (`_inject_lord_select_engine` in `tools/inject/engine_hooks.py`,
-   guarded by `check_engine_guards_present`); this adds the prep-screen-style PC summary + framing on top.
-2. **LLM-player #63 — M1** (epic spec'd this session): the pure cores — board serializer + order-schema
+1. **LLM-player #63 — M1** (immediate; epic spec'd 2026-06-20): the pure cores — board serializer + order-schema
    validator + board-hash transcript record/replay — TDD'd on plain `lua`/Python (`test_llm_player.*`, in
    `make test`), **no LLM calls yet** (replay a hand-written transcript). ADR for the settled design lands with
    M1. Then M2 (sidecar handshake, replay-only on the prologue) → M3 (live policy) → M4 (soak report → curve)
    → M5 (vanilla-FE8 validation). Swap point: `tools/playtest/clearbot.lua` `pickTarget`. ch02+ soak still
    needs per-chapter save-state checkpoints (deferred till those chapters exist).
-3. **#53 tail — FE8 Ch13 reference** (→ our ch08, deferred/optional): bigger than billed — needs ~11 *standard*
+   (#46 lord-select UX was the prior #1 here but is now **content-lane** — see Now.)
+2. **#53 tail — FE8 Ch13 reference** (→ our ch08, deferred/optional): bigger than billed — needs ~11 *standard*
    weapons modeled (silver/steel/killer/slim/short-spear/elfire/zanbato/swordslayer/purge), not a few exotics.
    ch08 is a scripted-defeat objective (never CI-gated), so it's informational polish; do it only if idle.
-4. **Flip the CI parity gate to enforcing** (#48 (b)): once content authors the Ch2+ enemy inventories,
+3. **Flip the CI parity gate to enforcing** (#48 (b)): once content authors the Ch2+ enemy inventories,
    change the CI step's `difficulty` → `difficulty-gate`. Leveled stat projection (#45 item 5) pairs here.
-5. Other mechanics/flavor leaves once specced: d20 crit #11, spell-economy #9, iconic matchups #8.
+4. Other mechanics/flavor leaves once specced: d20 crit #11, spell-economy #9, iconic matchups #8.
    Injection pipeline #14 / maps #40 gate content.
 
 ## Watch out (pipeline-lane only)
