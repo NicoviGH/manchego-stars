@@ -7,112 +7,81 @@ ownership map, and trunk rules → `CLAUDE.md` §Tracks (read first; the lane gu
 + `CLAUDE.md`; this file holds only my current state + content-lane-specific gotchas.** Don't touch
 `HANDOFF-pipeline.md`.
 
-## Now (2026-06-21) — #46 lord-select pitches 🅿️ APPROVED, awaiting "go" to wire · onboarding guardrail SHIPPED
+## Now / Next (priority order)
 
-**🅿️ #46 lord-select UX — 8 pitches approved by Nicolas, PARKED on his "go" to wire.**
-Candidate set **confirmed = 8** (not the old "5" guess): every classed cast member in `PORTRAIT_MAP`
-order — braulo, marty, wolfram, meesmickle, prof-rbg, rootis, sclorbo, **pinky** (now a proper PC, see
-below). Tone fork **resolved: mechanical** (Nicolas: blended was too flavor-heavy) — drafts re-tuned to
-mirror FE8's own class-help register (`texts.txt` MSG_30C–33x), strength-then-weakness, ~2–3 lines.
-The 8 approved drafts live in this session's transcript; resume by writing them into `pcs/*.yaml`.
-- **Uncommitted scaffolding from the prior session (still in the worktree, NOT committed):**
-  `tools/build_campaign.py` `lord_pitch_text(unit)` (hard-fails on a missing pitch) +
-  `lord_select_menu_code(...)` (the card generator w/ `onSwitchIn LordSelect_DrawCard`); `LordPitch` +
-  `LordSelectMenuCode` test classes in `tools/test_build_campaign.py`. Old inline menu still drives
-  `inject_ch01` (un-regressed). **Don't lose these — they're the wiring target.**
-- **LEFT to finish #46:** ① write the 8 `lord_pitch:` fields. ② allocate a VETTED dead-msg-id block for
-  the pitch + explainer bodies (`set_message_body`), add a `vanilla_portrait_id(slot)` helper, compute
-  `portrait_ids`, swap `inject_ch01` → `lord_select_menu_code(...)`. ⚠ **`0x965–0x96E` are NOT
-  dead** — live FE8 tutorial strings (the "pegasus knights fly over mountains" / `FID_EphraimFlashback`);
-  vetted pool is `0x940–0x964` (~full). ③ build + mGBA render (tune card wrap; confirm `onSwitchIn`
-  fires on the *initial* highlight, else blank until cursor moves); show Nicolas. ④ ADR + `Closes #46`
-  (+ close tracker #47).
+### 1. 🚧 #46 lord-select UX — pitches DRAFTED (mechanical), awaiting sign-off, then wire
 
-**✅ SHIPPED this session — FE8 onboarding-parity guardrail (`7856528`, merged main).** Combat is
-vanilla-strict, but rewriting cutscenes can silently strip the onboarding a vanilla player gets (delivered
-via BOTH `PLAY_FLAG_TUTORIAL` boxes *and* mandatory dialogue). System: `onboarding-catalog.yaml` (what
-vanilla teaches + channel + decomp citation) → chapter `introduces:` ledger → `gen_onboarding_index.py` →
-`docs/ONBOARDING.md` (4/20 covered) → `test_onboarding.py` (integrity + freshness) → **dialogue-pass
-"Tutorial-parity check" step** (the reflex: flag each first-appearance concept, owe the vanilla heads-up).
-ADR in `decisions.md` §Story & Dialogue. **Open work tracked in #64** (catalog decomp sweep, the 16 Pending
-concepts, prologue-box verification, the pipeline-lane `check.py` freshness fold-in).
+The choose-your-lead screen (#46, last open alpha item #47 #4): a one-time explainer + a per-candidate
+card (portrait + a short strengths/weaknesses **pitch**) refreshing live as the cursor moves. Design
+locked on #46. **No numeric stats** (no live-`Unit` dependency at menu time); pitch is hand-authored
+YAML (`lord_pitch:` per PC).
 
-**✅ SHIPPED this session — Pinky = 8th PC + lord candidate; stale roster defs reconciled** (`8a4912e` /
-`d2b48a8`). `git mv npcs/pinky.yaml → pcs/`; decisions.md 7→8 PCs + base-class row; reconciled the two stale
-Pepperjack & Brie paragraphs into one current "vanilla map ballistae" decision; fixed the stale
-Marty/Meesmickle "differentiate at promotion, not base" note (they split growths from L1). (#45 leftover
-item resolved; couldn't tick its checkbox — closed issue, write denied.)
+**Candidate set = 8** (every classed cast member, `PORTRAIT_MAP` order): braulo, marty, wolfram,
+meesmickle, prof-rbg, rootis, sclorbo, pinky. Tone = **mechanical** (Nicolas: blended too flavor-heavy);
+drafts mirror FE8's own class-help register (`texts.txt` MSG_30C–33x).
 
-## ✅ DONE 2026-06-20 — Ch1 v0.1.0 playtest fixes #57 + #58 landed
-Both live-build fixes from the brother's v0.1.0 run are fixed and verified in-engine:
-- **#57 — Ch1 Seize legible:** seize tile [21,7] is now the castle-gate metatile 938
-  (`TERRAIN_GATE_CASTLE`) — reads as a Seize point, chief on it. **Restores vanilla Ch1's gate
-  +20avo/+3def to the boss** (the bonus-free ruins tile was the deviation). ⚠ **Pipeline track:**
-  the boss is now tankier — account for the gate terrain in ch01's parity bar (flagged in
-  `decisions.md` §Combat resolution + the seize ADR).
-- **#58 — narration boxes opaque:** faceless `narration:`/asides now ride an auto-centered
-  `SOLOTEXTBOXSTART` box (was the translucent `Text()` window, illegible over BACG art). New
-  `_scenic_beat_calls` helper in `build_campaign.py` applies it per-beat across opening + ending;
-  a beat mixing narration + faces must be split with a `beat_break` (ch01 ending E2/E2b, msg 0x93D).
-  Convention recorded in `decisions.md` §Story & Dialogue. **Apply to ch02 cutscenes as you wire them.**
+**⏳ AWAITING NICOLAS — two small calls before these lock (asked, not yet answered):**
+(a) faint flavor tint (e.g. RBG's "Um, actually—") or fully plain? (b) keep qualitative (no numbers,
+per the #46 lock) or show base stats? **Latest drafts (verbatim — re-confirm before committing):**
+- **braulo** — "Axe fighter, at home in any terrain. High power and HP — but low skill, and weak to magic."
+- **marty** — "Dark mage — stronger but slower than a mage. Strikes resistance at range; fragile."
+- **meesmickle** — "Dark mage; strong, slow magic at range. Gains Summon on promotion — but frail."
+- **wolfram** — "Heavily armored knight. Towering defense and HP — but poor movement, weak to magic."
+- **prof-rbg** — "Bowman who attacks from afar — deadly to fliers. No melee: helpless when cornered."
+- **rootis** — "Anima mage — solid skill, low physical strength. Reliable damage at range; frail."
+- **sclorbo** — "Spiritual guide who heals allies with sacred staves. Deals no damage — keep him guarded."
+- **pinky** — "Airborne knight — flies over any terrain, resists magic. Weak to bows; keep clear of archers."
 
-Verified: `tools/build.sh test` green, `verify_text.py` 3404 msgs/0 runaway, `recordending` PASS
-(narration box opaque on-screen). Ch1 #21 DoD: these two boxes checked.
+**⚠ Uncommitted scaffolding already in this worktree (`git status` will show it — DON'T lose it):**
+`tools/build_campaign.py` `lord_pitch_text(unit)` (hard-fails on a missing pitch) +
+`lord_select_menu_code(...)` (card generator w/ `onSwitchIn LordSelect_DrawCard`); `LordPitch` +
+`LordSelectMenuCode` classes in `tools/test_build_campaign.py` (suite was 20/20 green). Old inline menu
+still drives `inject_ch01`, so the build is un-regressed.
 
-## Now (2026-06-20) — ch02 map + dialogue DONE; Ch2 dev 🅿️ PARKED on the difficulty engine (#61/#62)
-ch02 dialogue is locked (opening, turn-3 rear-ambush bark, targos-inn ending — `2e60003`, #22) and the
-**map is authored**: `maps/ch02-cold-welcome.mar`+`.json` — a 15×15 winter reskin of FE8 Ch2 that
-**Nicolas painted by hand** in the browser editor (villages rebuilt from winter building tiles, mountains
-+ fort + ground retiled). Framing fixed in the YAML: the Rolling Cheddar is the party's **home on runners**.
-ch02 `enemy_units` converted to the canonical schema (class/level/`autolevel`/`inventory`) so the
-difficulty engine + inject can read them.
+**LEFT to finish #46:** ① get the two calls answered → write the 8 `lord_pitch:` fields into `pcs/*.yaml`
+(invoke `dialogue-pass`). ② allocate a VETTED dead-msg-id block for pitch + explainer bodies
+(`set_message_body`), add `vanilla_portrait_id(slot)` helper, compute `portrait_ids`, swap `inject_ch01`
+→ `lord_select_menu_code(...)`. **⚠ `0x965–0x96E` are NOT dead** (live FE8 tutorial strings — pegasus/
+mountains, `FID_EphraimFlashback`); vetted pool `0x940–0x964` (~full) — trace any reuse first. ③ build +
+mGBA render: tune card wrap; confirm `onSwitchIn` fires on the *initial* highlight (else blank until the
+cursor moves — may need a first-draw after `StartMenu`). Show Nicolas (show-before-committing). ④ ADR +
+`Closes #46` (and close tracker #47, the last open alpha item).
 
-**🅿️ PARKED (Nicolas, 2026-06-20): no more Ch2 dev until the difficulty engine is reliable.** Driving ch02
-through `tools/difficulty.py` surfaced two engine math defects that make party-side balancing blind:
-**#61** (no vanilla player FIELD for Ch2 → party-parity delta skipped) and **#62** (healers crash / a base
-Priest's promotion-locked tome is miscounted as throughput — engine ignores the `unlock: promotion` flag).
-Both filed `tooling`+`balance`, with acceptance criteria, and listed under #49 ② Pipeline. #22 is labelled
-`blocked`. What IS known: **enemy-pressure parity verified ×0.88 (within band)**; our 4-attacker core
-(3.69 kills/rd) ≈ vanilla's 4 (3.42); **Sclorbo = our Moulder** (base Priest, staff-only = 0 offense).
-**Deploy is NOT an open question** — per decisions.md §"Field parity" (2026-06-10), `deploy_limit` = vanilla
-chapter N's count, so **ch02 `deploy_limit: 5`** (set in the YAML; Pick Units fields 5 of our 8, chosen lord
-force-deployed) and **enemies mirror vanilla Ch2 1:1 — never scaled**. The park is purely on engine
-reliability: once #61/#62 land, re-run `difficulty.py --chapter ch02` to confirm our best-5 sits at vanilla
-parity on the party side (today that delta is skipped/untrustworthy), then place units + build inject_ch02.
+### 2. Host ch02 full slice (#22) — UNBLOCKED (was parked on #61/#62, both now CLOSED)
 
-**Map-tooling upgrades this session (all in `tools/`, content lane):** `gen_map_editor.py` now renders a
-side-by-side **vanilla reference** (built via the decomp's own `gbagfx` — never hand-decode the PNG/pal),
-a grid/terrain-border toggle (`g`), a decluttered palette (orange filler slots dropped) with **every
-terrain id named** (the frozen-building groups read "Building / roof" etc. instead of raw hex). Nicolas's
-retile was diffed vs vanilla Ch2 → **`maps/reskin-learned.json`** (50 vanilla→winter tile mappings) which
-`gen_map_editor` now applies, so future chapters inherit his conventions as the starting reskin.
-`gen_map_editor.py` + `import_map_layout.py` are now worktree-aware (root from `__file__`).
-Tree-diversity experiment was rejected — winter pines too alike; his uniform pine (192) reads best.
-⚠ Carry-forward flag: the rear-ambush bark line is 31 chars, past the 29-char on-map bubble wrap → at
-insertion it wraps / needs an `[LF]` split; verify the right-side bubble isn't pushed offscreen.
+The Ch2 park was purely on the difficulty engine (#61 vanilla player FIELD, #62 healer modeling). **Both
+issues are now CLOSED**, so the exit criterion is met: **re-run `tools/difficulty.py --chapter ch02`** to
+confirm our best-5 sits at vanilla parity on the party side (was skipped/untrustworthy before), THEN place
+units + build `inject_ch02`. Already done: ch02 dialogue locked (`2e60003`), map authored
+(`maps/ch02-cold-welcome.mar`+`.json`, hand-painted winter reskin), `enemy_units` on the canonical schema,
+`deploy_limit: 5` (vanilla-Ch2 count; enemies mirror vanilla 1:1, never scaled). Model `inject_ch02` on
+`inject_ch01`: host on **slot 3** (`EventScr_Ch3_*`), register the map + winter tileset, inject the 3
+cutscenes (off-map opening BACG + targos-inn ending + turn-3 rear-ambush TURN), place deploy/enemies/
+defend-sled objective, flip ch01's ending placeholder to **`MNC2(0x3)`**. **⚠ rear-ambush bark = 31 chars**,
+past the 29-char on-map bubble wrap → needs an `[LF]` split; verify the right-side bubble isn't offscreen.
+Apply the #58 opaque-narration-box convention to ch02 cutscenes. Then Vellynne cutscene portrait (#19).
 
-## Next (priority order)
-1. **🚧 Resume #46 lord-select UX** — see the "Now" block above for the exact resume steps (author the 5
-   `lord_pitch:` blurbs via `dialogue-pass` → vetted dead-id block + swap `inject_ch01` to the generator →
-   build/render → ADR + `Closes #46`). The Python scaffolding is done + green; this is wiring + content + build.
-2. **Host ch02 (full slice)** (#22) — the map is done; write `inject_ch02` modeled on `inject_ch01`: host
-   on chapter **slot 3** (`EventScr_Ch3_*`), register `maps/ch02-cold-welcome.mar` + the winter tileset,
-   inject the three locked cutscenes (off-map opening BACG scene + targos-inn ending + the turn-3
-   rear-ambush TURN event), place deploy/enemies/defend-sled objective on the new map, and flip ch01's
-   ending from the dev placeholder to **`MNC2(0x3)`**. Mind the rear-ambush bubble-width flag. Then
-   Vellynne cutscene portrait (#19) + in-game motion review.
-3. Supporting content as Ch2 needs them: enemy YAML pass #18, NPC/recruit stubs #17, recruit schedule
-   (#45 item 5), world-map unlock #29.
-4. Art passes layer on already-playable slices: portraits #19, overworld sprites #38.
+### 3. Supporting content / art (as Ch2+ needs them)
+Enemy YAML pass #18 · NPC/recruit stubs #17 · world-map unlock #29 · portraits #19 · overworld sprites #38.
+Onboarding-parity coverage as chapters are authored → **#64** (run the dialogue-pass "Tutorial-parity check").
+
+## Recently shipped this session (context — all on `main`)
+- **FE8 onboarding-parity guardrail** (`7856528`): `onboarding-catalog.yaml` + chapter `introduces:` ledger
+  → `gen_onboarding_index.py` → `docs/ONBOARDING.md` (4/20) → `test_onboarding.py` → dialogue-pass
+  "Tutorial-parity check" step. ADR in `decisions.md` §Story & Dialogue. **Open work → #64.**
+- **Pinky = 8th PC + lord candidate** (`8a4912e`/`d2b48a8`): `pinky.yaml` moved `npcs/`→`pcs/`; decisions.md
+  reconciled to 8 PCs; stale Pepperjack/Brie + Marty/Meesmickle notes fixed. (#45 leftover ticked.)
+- **`gh` rejection fix:** Nicolas pasted an `autoMode.allow` block into `~/.claude/settings.json` — issue/PR
+  writes no longer hit the classifier soft-deny. (I can't write classifier/autoMode rules myself — hard
+  block; hand the user the JSON. `permissions.allow` alone does NOT override the classifier.)
 
 ## Watch out (content-lane only)
-- **Writing any dialogue → invoke the `dialogue-pass` skill first.** Voice grounding lives in the repo:
-  per-NPC `lore/*.md` §Voice bibles + `lore/frostmaiden-voices.md` (canon cast) + the FE8 cadence corpus
-  `fireemblem8u/texts/texts.txt`. Read sources BEFORE asking Nicolas; bring drafts, not questions.
+- **Writing any dialogue → invoke the `dialogue-pass` skill first** (now includes the Tutorial-parity step).
+  Voice grounding: per-NPC `lore/*.md` §Voice + `lore/frostmaiden-voices.md` + `fireemblem8u/texts/texts.txt`.
+  Read sources BEFORE asking; bring drafts, not questions.
 - Long unit names overflow FE8's name buffer — add a short `fe_name` (≤12) to new units.
 - Story bodies are `make`-regenerated; gate text changes with `python3 tools/verify_text.py`.
-- **Chapter hosting (model on `inject_ch01`, `tools/build_campaign.py`):** each campaign chapter rides the
-  *next* vanilla slot (ch01→slot 2 `EventScr_Ch2_*`; ch02→**slot 3** `EventScr_Ch3_*`) and needs a real
-  `.mar`+`.json` map layout — no layout = no playable map. Off-map cutscenes (opening BACG / ending) are
-  map-independent; deploy/enemy/objective coords need the map. Chapters chain via `MNC2(<next slot>)`; an
-  unhosted next chapter dead-ends on `dev_placeholder_scene`.
+- **Chapter hosting (model on `inject_ch01`):** each campaign chapter rides the *next* vanilla slot
+  (ch01→slot 2; ch02→**slot 3**) and needs a real `.mar`+`.json` map. Off-map cutscenes are map-independent;
+  deploy/enemy/objective coords need the map. Chapters chain via `MNC2(<next slot>)`; an unhosted next
+  chapter dead-ends on `dev_placeholder_scene`.
