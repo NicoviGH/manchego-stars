@@ -28,8 +28,11 @@ stdlib-only) + `.claude/hooks/session-start.sh` registered in `.claude/settings.
 reconciliation reflex every session, runs the script when `gh` is present; dependency-free so it works on
 the web) + `dialogue-pass` skill "Close the loop" step (prompt `Closes #N` when locked dialogue finishes a
 chapter issue) + ADR in `decisions.md` (2026-06-21). The hook fires live (confirmed on this session's
-resume). ⚠ The script flags **#21 (Ch1)** too — Ch1 is shipped + open; reconcile it (close, or note why it
-stays open as a tracker) next time it surfaces.
+resume). The script also flagged **#21 (Ch1)** — RESOLVED as a false positive: Ch1 is shipped but stays
+open because the **lord-select UX (#46)** came in as Ch1 playtest feedback (alpha item #4), so it's
+**in-scope for the Ch1 vertical slice**. #46 is now a **sub-issue of #21** (recorded on both issues). The
+finishing #46 commit must `Closes #46` **and** `Closes #21` (see Next #1). Ch1 art (#38/#39) is layered
+polish, not slice-gating.
 
 ## Now (2026-06-21) — #46 lord-select pitches 🅿️ APPROVED, awaiting "go" to wire · onboarding guardrail SHIPPED
 
@@ -50,7 +53,7 @@ The 8 approved drafts live in this session's transcript; resume by writing them 
   dead** — live FE8 tutorial strings (the "pegasus knights fly over mountains" / `FID_EphraimFlashback`);
   vetted pool is `0x940–0x964` (~full). ③ build + mGBA render (tune card wrap; confirm `onSwitchIn`
   fires on the *initial* highlight, else blank until cursor moves); show Nicolas. ④ ADR + `Closes #46`
-  (+ close tracker #47).
+  **and `Closes #21`** (#46 is a sub-issue of the Ch1 slice — finishing it signs off Ch1) (+ close tracker #47).
 
 **✅ SHIPPED this session — FE8 onboarding-parity guardrail (`7856528`, merged main).** Combat is
 vanilla-strict, but rewriting cutscenes can silently strip the onboarding a vanilla player gets (delivered
@@ -118,7 +121,8 @@ insertion it wraps / needs an `[LF]` split; verify the right-side bubble isn't p
 ## Next (priority order)
 1. **🚧 Resume #46 lord-select UX** — see the "Now" block above for the exact resume steps (author the 5
    `lord_pitch:` blurbs via `dialogue-pass` → vetted dead-id block + swap `inject_ch01` to the generator →
-   build/render → ADR + `Closes #46`). The Python scaffolding is done + green; this is wiring + content + build.
+   build/render → ADR + `Closes #46` **+ `Closes #21`** — #46 is a sub-issue of the Ch1 slice, so finishing
+   it signs off Ch1). The Python scaffolding is done + green; this is wiring + content + build.
 2. **Host ch02 (full slice)** (#22) — the map is done; write `inject_ch02` modeled on `inject_ch01`: host
    on chapter **slot 3** (`EventScr_Ch3_*`), register `maps/ch02-cold-welcome.mar` + the winter tileset,
    inject the three locked cutscenes (off-map opening BACG scene + targos-inn ending + the turn-3
