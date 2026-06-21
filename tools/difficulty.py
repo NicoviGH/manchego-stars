@@ -706,13 +706,17 @@ def _print_pressure(p):
 
 
 def curve_gate_failures(rows):
-    """The --check gate: return the labels of chapters that should fail the build. A chapter
-    fails when it claims a vanilla parity_reference (`has_ref`) and is either off-parity
-    (`verdict != 'OK'`) or unreliably measured (`boss_drop` -- its scariest unit carries an
-    unmodeled weapon, so even an 'OK' verdict can't be trusted). Chapters with no curated
-    reference are informational and never gate (#48 (b))."""
+    """The --check gate: return the labels of chapters that should fail the build. PER-CHAPTER
+    opt-in (#48 (b)): the gate enforces a chapter only once content marks it balance-final with
+    `balance_locked: true` in its YAML -- so we can author chapters as we go without an
+    unwritten or mid-authoring chapter reddening CI. A LOCKED chapter fails when it is off-parity
+    (`verdict != 'OK'`), unreliably measured (`boss_drop` -- its scariest unit carries an
+    unmodeled weapon, so even an 'OK' verdict can't be trusted), or has no curated reference at
+    all (`not has_ref` -- you can't lock a chapter the metric can't measure; a config mistake,
+    surfaced loudly). UNLOCKED chapters are informational and never gate; with zero locks the
+    gate passes, so --check can ship before any chapter is locked."""
     return [r['label'] for r in rows
-            if r['has_ref'] and (r['verdict'] != 'OK' or r['boss_drop'])]
+            if r['locked'] and (not r['has_ref'] or r['verdict'] != 'OK' or r['boss_drop'])]
 
 
 def curve_report(campaign, band=0.25):
@@ -740,10 +744,13 @@ def curve_report(campaign, band=0.25):
         label = 'CH%s %s' % (chap.get('chapter_number'), chap.get('id', ''))
         boss_drop = any(d['is_boss'] for d in p['dropped'])
         any_dropped_boss = any_dropped_boss or boss_drop
+        locked = bool(chap.get('balance_locked', False))
         flag = '  !!boss dropped' if boss_drop else ''
+        if locked:
+            flag += '  [locked]'
         has_ref = p['vanilla'] is not None
         verdict = p['verdict']['verdict'] if has_ref else None
-        rows.append({'label': label[:22].strip(), 'has_ref': has_ref,
+        rows.append({'label': label[:22].strip(), 'locked': locked, 'has_ref': has_ref,
                      'verdict': verdict, 'boss_drop': boss_drop})
         if not has_ref:
             print('  %-22s %-13s %5.1f           %5.1f             (no ref)%s'
