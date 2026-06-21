@@ -145,6 +145,28 @@ by machine, at the moment work happens, so it doesn't rely on anyone remembering
   `DEAD_CONCEPTS` in `check.py` so it can't come back.
 _Decided: 2026-06-04_
 
+**Backstop: a SessionStart hook reconciles open issues against shipped state.**
+The Definition of Done's only lever for closing an issue is a manual `Closes #N`
+in a commit, and GitHub issue state lives *outside* the repo — so `check.py` /
+`make` / CI can never catch "work shipped but the issue is still open." That blind
+spot is real: #20 (Prologue) was done on 2026-06-10 but its completing dialogue
+landed in a Ch2-focused commit that never said `Closes #20`, so it sat open
+eleven days until a session-start review caught it. The closing keyword will
+always be skippable, so the fix is a periodic reconciliation, not more
+discipline: `.claude/hooks/session-start.sh` (registered in `.claude/settings.json`)
+injects the reconciliation reflex into every session and, when `gh` is available,
+runs `tools/issue_reconcile.py` to surface shipped-but-open chapter issues. A
+chapter counts as *shipped* when its YAML dialogue is LOCKED **and** it has a
+host/inject function in `build_campaign.py` (the "locked but unhosted" state —
+e.g. ch02/#22 — is genuinely unfinished and is *not* flagged). The hook is
+dependency-free so it works in Claude Code on the web (no `gh`); the script's
+pure cores are unit-tested in `tools/test_issue_reconcile.py`. Front-line
+complement: the `dialogue-pass` skill's "Close the loop" step prompts `Closes #N`
+when locked dialogue completes a chapter's tracking issue (dialogue is usually
+its last gating item). `issue_reconcile.py` is shared-lane (advisory, not part of
+the `check.py` drift guard).
+_Decided: 2026-06-21 (Nicolas)_
+
 **Process: the superpowers workflow layers ON TOP of this knowledge architecture (not a replacement).**
 The repo predates the superpowers plugin; the two are orthogonal. Superpowers is a per-task *process*
 (brainstorm → spec → TDD → verify → review → finish-branch); the conventions above are the *knowledge

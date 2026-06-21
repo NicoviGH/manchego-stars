@@ -100,3 +100,18 @@ alternative lines, Nicolas decides whether the lock reopens.
   (the width measure doesn't stop at [A], and right-side bubbles have no
   position clamp -- merged turns = offscreen bubble); a boss "steps out" via a
   message SPLIT + LOAD1 between, never a lazy right-face load mid-message.
+
+## Close the loop (after the dialogue lands)
+
+Locked dialogue is usually the LAST gating item on a chapter's tracking issue,
+so finishing it often *completes* that issue -- the moment to close it, not
+later. Skipping this is exactly how #20 (Prologue) sat open for eleven days
+after its dialogue shipped in a Ch2-focused commit that never said `Closes #20`.
+
+- Check the chapter's tracking issue (`#2x`): does this dialogue complete its
+  remaining checklist? If yes, the commit that lands the text says **`Closes #N`**
+  (Definition of Done, `docs/decisions.md` -> Working Conventions). If the
+  chapter still needs hosting/placement, say `Refs #N` and leave it open.
+- If the dialogue is incidental to a *different* chapter's commit (the #20
+  failure mode), still tick/close the issue it actually finishes -- don't let
+  the commit's headline subject decide which issue gets reconciled.
