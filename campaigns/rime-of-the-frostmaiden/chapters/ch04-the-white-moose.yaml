@@ -13,6 +13,18 @@ cadence: monster_debut          # see docs/CHAPTERS.md — 🟨 fog-of-war fores
 fe8_base_map: "FE8 Ch4 — Ancient Horrors"           # the DefeatAll/monster-debut half
 parity_reference: "FE8 Ch4"   # #48 enemy-pressure parity bar — Ancient Horrors — DefeatAll/monster-debut half
 
+# Onboarding parity (see docs/ONBOARDING.md + the dialogue-pass parity step): concepts
+# making their FIRST campaign appearance here, and how WE deliver the vanilla heads-up.
+introduces:
+  - concept: monsters            # FE8 introduces its monster foe-type here (cadence: monster_debut)
+    coverage: both               # vanilla effective-weapon help + an in-scene call-out
+    where: "Lonelywood — first monster sighting in the forest hunt"
+    status: planned
+  - concept: fog-of-war          # the forest hunt is our first fog map (vanilla Ch4 cadence)
+    coverage: dialogue
+    where: "forest approach — a PC flags limited sight"
+    status: planned
+
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
   At Lonelywood, the town's hard-of-hearing old Speaker shelters the party and
