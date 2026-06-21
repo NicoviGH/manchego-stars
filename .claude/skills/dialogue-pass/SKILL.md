@@ -25,6 +25,28 @@ beats → lines, human curates every level). Decided 2026-06-09 (docs/decisions.
    settle them with Nicolas before drafting any line.
 4. **Vanilla pacing benchmark** for the slot being written (decomp,
    `fireemblem8u/src/events/*-eventscript.h` + `texts/texts.txt`).
+5. **Onboarding catalog + coverage:** `docs/ONBOARDING.md` (generated) +
+   `campaigns/.../onboarding-catalog.yaml` (what vanilla teaches, the channel, the decomp
+   citation) and the prior chapters' `introduces:` ledger — for the tutorial-parity check below.
+
+## Tutorial-parity check (run when settling a chapter's beats)
+
+Combat is vanilla-strict, so this is about **timing**, not new mechanics: whenever a concept
+first becomes relevant in *our* chapter order, our players must get the same heads-up a vanilla
+player gets — vanilla weaves it into BOTH flag-gated tutorial boxes AND mandatory story dialogue
+(a veteran who declines the tutorial still sees the dialogue half). Rewriting cutscenes can
+silently strip it. So, before locking beats:
+
+1. List the mechanics/unit-types this chapter introduces (new enemy class, flier, fog, monster,
+   siege, thief, status, terrain gimmick…). For each, check the prior chapters' `introduces:`
+   ledger: is this its **first** campaign appearance?
+2. For each first, look it up in the catalog. If vanilla teaches it (and where/which channel),
+   we owe an equivalent heads-up here — flag it to Nicolas: *"first monsters appear here; vanilla
+   has a character call it out — we should too."* Pick the channel per the C-hybrid: a vanilla
+   box for dry systemic lessons (triangle, terrain), in-voice dialogue for threats/narrative ones.
+3. Record the decision as an `introduces:` entry on the chapter YAML (`concept`, `coverage`,
+   `where`, `status`), then `python3 tools/gen_onboarding_index.py` (freshness +
+   orphan/double-debut integrity are gated by `tools/test_onboarding.py`). A concept debuts once.
 
 ## Drafting loop (per beat, WITH Nicolas — never solo)
 

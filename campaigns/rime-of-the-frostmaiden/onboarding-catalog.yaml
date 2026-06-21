@@ -1,0 +1,156 @@
+# FE8 onboarding-parity catalog — what vanilla FE8 teaches, and through which channel.
+#
+# WHY: combat is vanilla-strict (no new mechanics), but we rewrite cutscenes and reorder
+# content, so we can silently strip the onboarding a vanilla player gets — putting our
+# friends at a disadvantage. This catalog is the STABLE record (vanilla never changes) of
+# every onboarding concept, the channel it rides, and the verbatim line/citation from the
+# decomp. The LIVING half is each chapter YAML's `introduces:` field (which concept first
+# appears in OUR order + how we cover it). The dialogue-pass skill cross-checks the two at
+# beat-planning time; `tools/gen_onboarding_index.py` rolls up coverage → docs/ONBOARDING.md.
+#
+# channel: tutorial = PLAY_FLAG_TUTORIAL-gated box (a vet who declines never sees it);
+#          dialogue = mandatory story line shown to everyone in Normal; both = vanilla uses each.
+# citation: texts/texts.txt MSG id (decomp) where verified this session; "decomp sweep TBD"
+#          where the concept is certain but its exact vanilla trigger still needs grounding.
+# This is a LIVING file — add concepts/citations as the decomp sweep + chapter authoring proceed.
+
+concepts:
+  - id: movement-and-selecting
+    concept: "Move a unit, select it, end turn"
+    vanilla_channel: tutorial
+    vanilla_when: "Prologue"
+    vanilla_text: "Place the cursor on a unit and press the A Button to move."
+    citation: "decomp sweep TBD (Prologue tutorial sequence)"
+
+  - id: attacking-basics
+    concept: "Initiate combat; read the battle forecast"
+    vanilla_channel: tutorial
+    vanilla_when: "Prologue"
+    vanilla_text: "Move next to an enemy and press the A Button to attack."
+    citation: "decomp sweep TBD (Prologue tutorial sequence)"
+
+  - id: weapon-triangle
+    concept: "Weapon triangle: swords > axes > lances > swords"
+    vanilla_channel: both
+    vanilla_when: "Guide + early chapters; reinforced in story dialogue"
+    vanilla_text: "Swords do well against axes. Axes do well against lances. Lances do well against swords. This is called the Weapon Triangle."
+    citation: "MSG_613"
+
+  - id: magic-trinity
+    concept: "Trinity of magic: Light > Dark > Anima > Light"
+    vanilla_channel: tutorial
+    vanilla_when: "Guide; first magic units"
+    vanilla_text: "Light is strong against Dark. Dark is strong against Anima. Anima is strong against Light. This is called the Trinity of Magic."
+    citation: "MSG_614"
+
+  - id: effective-weapons
+    concept: "Some weapons are extra-effective vs a unit type (icon glows)"
+    vanilla_channel: tutorial
+    vanilla_when: "Guide; first effective matchup"
+    vanilla_text: "Some weapons are especially effective against certain units... for example, bows are particularly effective against flying units."
+    citation: "MSG_615"
+
+  - id: fliers-vs-bows
+    concept: "Fliers ignore terrain but are vulnerable to bows"
+    vanilla_channel: both
+    vanilla_when: "First flier near mountains/archers (the Vanessa rescue tutorial)"
+    vanilla_text: "Because pegasus knights fly, mountains do not block their movement. However, they are vulnerable to missile attacks, so watch out for archers."
+    citation: "MSG_96F"
+
+  - id: physical-defense
+    concept: "DEF reduces physical damage; armor/mercs are sturdy"
+    vanilla_channel: tutorial
+    vanilla_when: "Guide"
+    vanilla_text: "Each unit's DEF (defense) attribute shows how well he defends against physical attacks... Knights and mercenaries have good defense."
+    citation: "MSG_617"
+
+  - id: magical-resistance
+    concept: "RES reduces magic damage; casters resist magic"
+    vanilla_channel: tutorial
+    vanilla_when: "Guide; first enemy mages"
+    vanilla_text: "Your unit's RES (resistance) attribute shows how well he defends against [magic]... Mages, monks, clerics & shamans have high resistance."
+    citation: "MSG_618"
+
+  - id: criticals
+    concept: "Critical hits deal triple damage; chance scales with skill/weapon"
+    vanilla_channel: tutorial
+    vanilla_when: "Guide"
+    vanilla_text: "Critical hits inflict three times the normal damage to enemies."
+    citation: "MSG_616"
+
+  - id: healing
+    concept: "Restore HP with vulneraries/elixirs (self) and staves (allies)"
+    vanilla_channel: tutorial
+    vanilla_when: "Guide; first healer"
+    vanilla_text: "Restore HP to your units by using vulneraries, elixirs, and staves... Vulneraries and elixirs heal only the user, while staves heal only the units on whom they're used."
+    citation: "MSG_619"
+
+  - id: terrain-bonuses
+    concept: "Terrain (forests, etc.) grants avoid/defense"
+    vanilla_channel: both
+    vanilla_when: "Guide; reinforced when a foe 'uses the terrain wisely'"
+    vanilla_text: "Forests and other map areas may offer terrain bonuses. Units in forests are harder to hit and take less damage when struck."
+    citation: "MSG_9B9 (story reinforcement: MSG_~11616, Tirado on Ephraim)"
+
+  - id: terrain-heal-tiles
+    concept: "Forts/gates/thrones auto-heal a unit that ends its turn there"
+    vanilla_channel: tutorial
+    vanilla_when: "Guide; first fort/gate map"
+    vanilla_text: "Any unit that ends its turn on a fortress, castle gate, gate, or throne will regain some HP automatically."
+    citation: "MSG_627"
+
+  - id: rescue
+    concept: "Rescue carries a unit; mounted units can move after rescuing"
+    vanilla_channel: tutorial
+    vanilla_when: "Vanessa rescues Ross (early)"
+    vanilla_text: "Pegasus knights, cavaliers, and other mounted units can continue moving after they've rescued someone."
+    citation: "MSG_970-977"
+
+  - id: status-effects
+    concept: "Abnormal states (sleep, poison, etc.) disable/erode a unit"
+    vanilla_channel: tutorial
+    vanilla_when: "Guide; first status staff/enemy"
+    vanilla_text: "There are five abnormal states a unit can enter: 1. Sleep (Asleep and unable to move)..."
+    citation: "MSG_61A"
+
+  - id: monsters
+    concept: "Monster enemies are a distinct foe type; some weapons are effective vs them"
+    vanilla_channel: both
+    vanilla_when: "First monster encounter (our ch04 monster debut, cadence: monster_debut)"
+    vanilla_text: "Effective against monsters. (item help on Slayer/monster-effective gear)"
+    citation: "MSG_454-457 (monster-effective weapons); story intro: decomp sweep TBD"
+
+  - id: fog-of-war
+    concept: "Fog of war hides enemies outside vision range"
+    vanilla_channel: tutorial
+    vanilla_when: "First fog chapter"
+    vanilla_text: "(fog-of-war intro)"
+    citation: "decomp sweep TBD"
+
+  - id: stealing-thieves
+    concept: "Thieves steal items; protect valuables / loot enemies"
+    vanilla_channel: both
+    vanilla_when: "First thief; a villager warns Eirika to hide her bracelet"
+    vanilla_text: "But you should be careful, wearing such a valuable item so openly... There are gold-hungry thieves and bandits everywhere."
+    citation: "MSG_~9624 (story); Steal command tutorial: decomp sweep TBD"
+
+  - id: ballista-siege
+    concept: "Siege/ballista emplacements fire from long range; a unit mans them"
+    vanilla_channel: tutorial
+    vanilla_when: "Vanilla ballista era (~Ch10); our RBG ballistae (Pepperjack/Brie)"
+    vanilla_text: "(siege weapons fire missiles from long range)"
+    citation: "MSG_~5288 (siege); decomp sweep TBD"
+
+  - id: promotion-master-seal
+    concept: "Master Seal promotes a unit to its advanced class (player picks the branch)"
+    vanilla_channel: tutorial
+    vanilla_when: "Promotions go live ~Ch10-12 (see decisions.md Class Mapping)"
+    vanilla_text: "(use a Master Seal to change a unit to its promoted class)"
+    citation: "decomp sweep TBD"
+
+  - id: supports
+    concept: "Support conversations build bonuses between paired units"
+    vanilla_channel: dialogue
+    vanilla_when: "Once supports are unlocked"
+    vanilla_text: "(support conversations grant combat bonuses to nearby paired units)"
+    citation: "decomp sweep TBD"

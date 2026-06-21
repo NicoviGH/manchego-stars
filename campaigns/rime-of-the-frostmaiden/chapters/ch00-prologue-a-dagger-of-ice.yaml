@@ -17,6 +17,19 @@ fe8_base_map: "FE8 Prologue — The Fall of Renais"   # DefeatBoss tutorial base
 parity_reference: "FE8 Prologue"   # #48 enemy-pressure parity bar — DefeatBoss tutorial cadence
 is_prologue: true
 
+# Onboarding parity (see docs/ONBOARDING.md + the dialogue-pass parity step): the basics
+# vanilla teaches in its Prologue. We rewrite the beginning scene, so these must be kept
+# deliberately (don't let the scene rewrite strip vanilla's tutorial boxes).
+introduces:
+  - concept: movement-and-selecting
+    coverage: tutorial
+    where: "prologue tutorial sequence (verify vanilla boxes survive the scene rewrite)"
+    status: planned
+  - concept: attacking-basics
+    coverage: tutorial
+    where: "prologue tutorial sequence (first attack on Sephek's pack)"
+    status: planned
+
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
   Cold open, before our seven ever meet. Ten-Towns has gone two years without a
