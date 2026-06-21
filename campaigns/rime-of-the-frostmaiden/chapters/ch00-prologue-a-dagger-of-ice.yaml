@@ -15,6 +15,7 @@ milestone: M3
 cadence: tutorial               # see docs/CHAPTERS.md — DefeatBoss, basics only
 fe8_base_map: "FE8 Prologue — The Fall of Renais"   # DefeatBoss tutorial base
 parity_reference: "FE8 Prologue"   # #48 enemy-pressure parity bar — DefeatBoss tutorial cadence
+balance_locked: true   # #48 (b): balance-final — CI hard-fails on a parity regression here
 is_prologue: true
 
 # Onboarding parity (see docs/ONBOARDING.md + the dialogue-pass parity step): the basics

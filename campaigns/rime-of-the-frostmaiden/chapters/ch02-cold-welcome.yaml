@@ -12,6 +12,7 @@ cadence: breather_defend          # see docs/CHAPTERS.md — 🟦
 # choke points, terrain bonuses) and repaint it to the arctic/Icewind Dale theme.
 fe8_base_map: "FE8 Ch2 — The Protected"   # DefeatAll + defend-in-place; src/events/ch2-eventinfo.h
 parity_reference: "FE8 Ch2"   # #48 enemy-pressure parity bar — The Protected — defend-in-place breather
+balance_locked: true   # #48 (b): balance-final — CI hard-fails on a parity regression here
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
