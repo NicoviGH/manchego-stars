@@ -7,6 +7,30 @@ ownership map, and trunk rules → `CLAUDE.md` §Tracks (read first; the lane gu
 + `CLAUDE.md`; this file holds only my current state + content-lane-specific gotchas.** Don't touch
 `HANDOFF-pipeline.md`.
 
+## Now (2026-06-21, review session) — #20 closed (was done, never reconciled) · issue-reconciliation backstop SHIPPED
+
+**✅ #20 (Prologue) CLOSED — it was done since 2026-06-10, just never reconciled.** The cutscenes +
+co-written dialogue all ship via `inject_prologue` step 4c (`build_campaign.py`, msgs 0x90D/0x90E
+opening, 0x914 mid-fight, 0x918 ending + death/defeat quotes) generated from the locked
+`ch00-prologue-a-dagger-of-ice.yaml` `script:` blocks; played end-to-end in the alpha run (#47). The
+issue sat open only because its checkboxes were never ticked. Closed `completed` with a note; final
+pre-distribution playthrough stays tracked in #31. (Stale crumb left in ch00 YAML: an `ea_file:
+events/ch00-ending.ea` that doesn't exist and isn't used — build generates bodies directly. Harmless;
+clean up if you touch that YAML.)
+
+**✅ SHIPPED — SessionStart issue-reconciliation backstop (`d36c55d`, pushed).** Diagnosed why #20 was
+missed: the only issue-closing lever is a manual `Closes #N`, and issue state lives outside the repo, so
+`check.py`/`make`/CI can never catch "shipped but open" (the #20 dialogue landed in a Ch2-focused commit
+that never named it). Fix (all shared-lane; avoids pipeline-exclusive `tools/hooks/` + `check.py`):
+`tools/issue_reconcile.py` (flags open chapter issues whose chapter is SHIPPED = locked dialogue AND a
+host/inject fn, yet never closed by a commit; pure cores tested in `tools/test_issue_reconcile.py`,
+stdlib-only) + `.claude/hooks/session-start.sh` registered in `.claude/settings.json` (injects the
+reconciliation reflex every session, runs the script when `gh` is present; dependency-free so it works on
+the web) + `dialogue-pass` skill "Close the loop" step (prompt `Closes #N` when locked dialogue finishes a
+chapter issue) + ADR in `decisions.md` (2026-06-21). The hook fires live (confirmed on this session's
+resume). ⚠ The script flags **#21 (Ch1)** too — Ch1 is shipped + open; reconcile it (close, or note why it
+stays open as a tracker) next time it surfaces.
+
 ## Now (2026-06-21) — #46 lord-select pitches 🅿️ APPROVED, awaiting "go" to wire · onboarding guardrail SHIPPED
 
 **🅿️ #46 lord-select UX — 8 pitches approved by Nicolas, PARKED on his "go" to wire.**
