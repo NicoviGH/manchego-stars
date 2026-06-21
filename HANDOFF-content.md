@@ -7,6 +7,42 @@ ownership map, and trunk rules → `CLAUDE.md` §Tracks (read first; the lane gu
 + `CLAUDE.md`; this file holds only my current state + content-lane-specific gotchas.** Don't touch
 `HANDOFF-pipeline.md`.
 
+## Now (2026-06-21) — #46 lord-select pitches 🅿️ APPROVED, awaiting "go" to wire · onboarding guardrail SHIPPED
+
+**🅿️ #46 lord-select UX — 8 pitches approved by Nicolas, PARKED on his "go" to wire.**
+Candidate set **confirmed = 8** (not the old "5" guess): every classed cast member in `PORTRAIT_MAP`
+order — braulo, marty, wolfram, meesmickle, prof-rbg, rootis, sclorbo, **pinky** (now a proper PC, see
+below). Tone fork **resolved: mechanical** (Nicolas: blended was too flavor-heavy) — drafts re-tuned to
+mirror FE8's own class-help register (`texts.txt` MSG_30C–33x), strength-then-weakness, ~2–3 lines.
+The 8 approved drafts live in this session's transcript; resume by writing them into `pcs/*.yaml`.
+- **Uncommitted scaffolding from the prior session (still in the worktree, NOT committed):**
+  `tools/build_campaign.py` `lord_pitch_text(unit)` (hard-fails on a missing pitch) +
+  `lord_select_menu_code(...)` (the card generator w/ `onSwitchIn LordSelect_DrawCard`); `LordPitch` +
+  `LordSelectMenuCode` test classes in `tools/test_build_campaign.py`. Old inline menu still drives
+  `inject_ch01` (un-regressed). **Don't lose these — they're the wiring target.**
+- **LEFT to finish #46:** ① write the 8 `lord_pitch:` fields. ② allocate a VETTED dead-msg-id block for
+  the pitch + explainer bodies (`set_message_body`), add a `vanilla_portrait_id(slot)` helper, compute
+  `portrait_ids`, swap `inject_ch01` → `lord_select_menu_code(...)`. ⚠ **`0x965–0x96E` are NOT
+  dead** — live FE8 tutorial strings (the "pegasus knights fly over mountains" / `FID_EphraimFlashback`);
+  vetted pool is `0x940–0x964` (~full). ③ build + mGBA render (tune card wrap; confirm `onSwitchIn`
+  fires on the *initial* highlight, else blank until cursor moves); show Nicolas. ④ ADR + `Closes #46`
+  (+ close tracker #47).
+
+**✅ SHIPPED this session — FE8 onboarding-parity guardrail (`7856528`, merged main).** Combat is
+vanilla-strict, but rewriting cutscenes can silently strip the onboarding a vanilla player gets (delivered
+via BOTH `PLAY_FLAG_TUTORIAL` boxes *and* mandatory dialogue). System: `onboarding-catalog.yaml` (what
+vanilla teaches + channel + decomp citation) → chapter `introduces:` ledger → `gen_onboarding_index.py` →
+`docs/ONBOARDING.md` (4/20 covered) → `test_onboarding.py` (integrity + freshness) → **dialogue-pass
+"Tutorial-parity check" step** (the reflex: flag each first-appearance concept, owe the vanilla heads-up).
+ADR in `decisions.md` §Story & Dialogue. **Open work tracked in #64** (catalog decomp sweep, the 16 Pending
+concepts, prologue-box verification, the pipeline-lane `check.py` freshness fold-in).
+
+**✅ SHIPPED this session — Pinky = 8th PC + lord candidate; stale roster defs reconciled** (`8a4912e` /
+`d2b48a8`). `git mv npcs/pinky.yaml → pcs/`; decisions.md 7→8 PCs + base-class row; reconciled the two stale
+Pepperjack & Brie paragraphs into one current "vanilla map ballistae" decision; fixed the stale
+Marty/Meesmickle "differentiate at promotion, not base" note (they split growths from L1). (#45 leftover
+item resolved; couldn't tick its checkbox — closed issue, write denied.)
+
 ## ✅ DONE 2026-06-20 — Ch1 v0.1.0 playtest fixes #57 + #58 landed
 Both live-build fixes from the brother's v0.1.0 run are fixed and verified in-engine:
 - **#57 — Ch1 Seize legible:** seize tile [21,7] is now the castle-gate metatile 938
@@ -56,10 +92,9 @@ Tree-diversity experiment was rejected — winter pines too alike; his uniform p
 insertion it wraps / needs an `[LF]` split; verify the right-side bubble isn't pushed offscreen.
 
 ## Next (priority order)
-1. **🔴 DO FIRST — Ch1 v0.1.0 playtest fixes #57 + #58** (see the DO FIRST blocker above). Land before
-   deepening Ch2 or they sit unaddressed on the build every tester plays. #57 is isolated (`ch01` YAML);
-   **#58 shares `build_campaign.py:654`** with ch02 wiring, so it bundles into that branch and lands
-   before more ch02 cutscene wiring.
+1. **🚧 Resume #46 lord-select UX** — see the "Now" block above for the exact resume steps (author the 5
+   `lord_pitch:` blurbs via `dialogue-pass` → vetted dead-id block + swap `inject_ch01` to the generator →
+   build/render → ADR + `Closes #46`). The Python scaffolding is done + green; this is wiring + content + build.
 2. **Host ch02 (full slice)** (#22) — the map is done; write `inject_ch02` modeled on `inject_ch01`: host
    on chapter **slot 3** (`EventScr_Ch3_*`), register `maps/ch02-cold-welcome.mar` + the winter tileset,
    inject the three locked cutscenes (off-map opening BACG scene + targos-inn ending + the turn-3
