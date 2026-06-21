@@ -396,17 +396,24 @@ a CI-gated chapter) is the lone deferred reference. `make difficulty CH=chNN` ga
 `make difficulty` (no CH) prints the campaign curve.
 _Implemented: 2026-06-19 (CLAUDE; pipeline track, TDD)_
 
-**The parity curve is surfaced in CI informatively; the hard gate is built but unwired until content lands (#48 (b)).**
-CI's `build` job now runs `make difficulty` on every build (after the submodule checkout it needs to read
-the decomp HEAD), so balance spikes/sags and parity regressions are visible on every PR. It is **informative
-only** — `make difficulty` always exits 0. The enforcing form is `make difficulty-gate`
-(`difficulty.py --curve --check`): `curve_gate_failures(rows)` fails any chapter that **claims a
-`parity_reference`** and is either off-parity (`verdict != OK`) or unreliably measured (a dropped boss — an
-unreliable OK is not a pass); chapters with no curated reference are informational and never gate. Today
-`difficulty-gate` is RED by design (our Ch2–Ch7 enemy inventories aren't authored yet, so our side reads 0.0 /
-off-parity), so CI runs the informative `difficulty`. **The flip is a one-word CI change** —
-`difficulty` → `difficulty-gate` — once the content track authors those slices.
-_Implemented: 2026-06-19 (CLAUDE; pipeline track, TDD)_
+**The parity curve is surfaced in CI, and the hard gate enforces per-chapter via an opt-in `balance_locked` flag (#48 (b)).**
+CI's `build` job runs `make difficulty-gate` (`difficulty.py --curve --check`) on every build (after the
+submodule checkout it needs to read the decomp HEAD), so balance spikes/sags and parity regressions are
+visible on every PR **and** a regression on a finished chapter hard-fails the build. The gate is **per-chapter
+opt-in**: because we author chapters as we go (the campaign isn't done until it's basically done), an
+all-chapters gate would redden CI for every unwritten chapter. Instead a chapter is enforced only once content
+marks it balance-final with **`balance_locked: true`** in its chapter YAML. `curve_gate_failures(rows)` fails a
+**locked** chapter that is off-parity (`verdict != OK`), unreliably measured (a dropped boss — an unreliable OK
+is not a pass), or has no curated `parity_reference` at all (you can't lock a chapter the metric can't measure —
+a config mistake, surfaced loudly). **Unlocked** chapters (unwritten or mid-authoring) stay informational and
+never gate, so an in-progress chapter never reddens CI; with zero locks the gate passes (enforces nothing),
+which is why `--check` can ship before any chapter is locked. The lock is set in the **content** lane
+(`campaigns/**`); the gate logic that reads it is **pipeline** (`difficulty.py`). Workflow: author a chapter's
+enemy inventory → confirm it reads OK on the curve → add `balance_locked: true` → CI now defends it.
+Decision: explicit flag over auto-detecting an authored force, because a parity gate's job is to lock in
+*finished* work — auto-detect can't tell "balanced" from "halfway through placing enemies" and would fire
+mid-authoring (Nicolas, 2026-06-21).
+_Implemented: 2026-06-19 (informative curve); per-chapter gate enforcing 2026-06-21 (CLAUDE; pipeline track, TDD)_
 
 **Monster/exotic enemy weapons stay out of the content-owned weapon map; venin is a base-might proxy (#53).**
 FE8 Ch4 "Ancient Horrors" (all-monster) and Ch6 "Victims of War" needed weapons our cast never carries: the

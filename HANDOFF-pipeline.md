@@ -7,7 +7,20 @@ the lane guard is `check.py check_lane_ownership`). Seam enforcement (#55) + par
 **Shared builds/gotchas/rules → `HANDOFF.md` + `CLAUDE.md`; this file holds only my current state +
 pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
 
-## Now (2026-06-20) — save carry-forward shipped (#59 closed); LLM-player epic spec'd (#63); #63 M1 up next (#46 reassigned to content lane)
+## Now (2026-06-21) — per-chapter parity gate is enforcing (#48 (b)); #63 M1 landed (M2 next); #46 reassigned to content
+- **#48 (b) parity gate is now ENFORCING, per-chapter & opt-in — LANDED & verified** (decisions.md §The parity
+  curve is surfaced in CI…). CI flipped `make difficulty` → **`make difficulty-gate`**. A chapter is gated only
+  once content marks it balance-final with **`balance_locked: true`** in its chapter YAML; `curve_gate_failures`
+  fails a *locked* chapter that's off-parity, has a dropped boss, or has no curated `parity_reference` (can't
+  lock a hollow chapter). *Unlocked* chapters (unwritten / mid-authoring) stay informational and never redden CI;
+  with zero locks the gate passes, so the flip shipped green. TDD'd (`test_difficulty.py` CurveGate, 6 asserts;
+  54 total green; `make check` clean). Rationale: we author chapters as we go, so an all-at-once gate was wrong
+  (Nicolas, 2026-06-21). **Content-lane follow-up (not mine to commit from here):** add `balance_locked: true`
+  to **ch00/ch01/ch02** (already at parity on the curve) to switch on their enforcement.
+- **#63 M1 (LLM-player pure cores) LANDED** (commit `e7b8b2b`; decisions.md §Playtest platform brick 4). All
+  three pure cores done & green — board serializer + order-schema validator + board-hash transcript record/replay
+  (`tools/playtest/llm_player.py`, `tools/test_llm_player.py`, 20 asserts in `make test`), lane-ownership wired,
+  no LLM calls yet. **Next on #63 = M2** (sidecar + `llmDrive` handshake, replay-only on the prologue).
 - **#59 LANDED & CLOSED — testers carry their own `.sav` across builds; public patch rejected.**
   FE8 save validity = a **fixed** magic + a checksum (`bmsave-lib.c` `ReadGlobalSaveInfo`/`ReadSaveBlockInfo`),
   so a rebuild alone never invalidates a save — only a save-block *layout* shift does. We reskin within
@@ -98,20 +111,20 @@ pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
   Ch6 (→ our ch07). FE8 Ch13 (→ our ch08) is the lone deferred reference.
 
 ## Next (priority order)
-1. **LLM-player #63 — M1** (immediate; epic spec'd 2026-06-20): the pure cores — board serializer + order-schema
-   validator + board-hash transcript record/replay — TDD'd on plain `lua`/Python (`test_llm_player.*`, in
-   `make test`), **no LLM calls yet** (replay a hand-written transcript). ADR for the settled design lands with
-   M1. Then M2 (sidecar handshake, replay-only on the prologue) → M3 (live policy) → M4 (soak report → curve)
-   → M5 (vanilla-FE8 validation). Swap point: `tools/playtest/clearbot.lua` `pickTarget`. ch02+ soak still
-   needs per-chapter save-state checkpoints (deferred till those chapters exist).
-   (#46 lord-select UX was the prior #1 here but is now **content-lane** — see Now.)
-2. **#53 tail — FE8 Ch13 reference** (→ our ch08, deferred/optional): bigger than billed — needs ~11 *standard*
+1. **LLM-player #63 — M2** (immediate; M1 landed `e7b8b2b`): sidecar + handshake, **replay-only**. Build
+   `llm_player.py`'s request/response file loop + an `llmDrive` harness scenario; run the prologue end-to-end
+   **from a recorded transcript** (deterministic, zero LLM cost) on a built ROM. Proves the plumbing before any
+   live model call. Then M3 (live policy, `PT_MODEL`, per `claude-api` skill) → M4 (soak report → curve) → M5
+   (vanilla-FE8 validation). Swap point: `tools/playtest/clearbot.lua` `pickTarget`. ch02+ soak still needs
+   per-chapter save-state checkpoints (deferred till those chapters exist).
+2. **Land `balance_locked: true` on ch00/ch01/ch02** (content lane): the per-chapter gate (#48 (b)) is live and
+   enforcing but inert until a chapter opts in. Those three read OK on the curve, so locking them switches on
+   real regression protection. Tiny content-lane edit — route to the `inst/content` instance.
+3. **#53 tail — FE8 Ch13 reference** (→ our ch08, deferred/optional): bigger than billed — needs ~11 *standard*
    weapons modeled (silver/steel/killer/slim/short-spear/elfire/zanbato/swordslayer/purge), not a few exotics.
    ch08 is a scripted-defeat objective (never CI-gated), so it's informational polish; do it only if idle.
-3. **Flip the CI parity gate to enforcing** (#48 (b)): once content authors the Ch2+ enemy inventories,
-   change the CI step's `difficulty` → `difficulty-gate`. Leveled stat projection (#45 item 5) pairs here.
 4. Other mechanics/flavor leaves once specced: d20 crit #11, spell-economy #9, iconic matchups #8.
-   Injection pipeline #14 / maps #40 gate content.
+   Injection pipeline #14 / maps #40 gate content. (#46 lord-select UX moved to **content-lane** — see Now.)
 
 ## Watch out (pipeline-lane only)
 - **The decomp build is NON-MATCHING vs retail FE8 (~67% of bytes differ).** Confirmed by diffing the base

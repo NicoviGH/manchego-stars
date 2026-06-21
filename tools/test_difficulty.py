@@ -119,32 +119,46 @@ class PressureVerdict(unittest.TestCase):
 
 
 class CurveGate(unittest.TestCase):
-    """The --check gate (#48 (b)): a chapter that claims a vanilla parity reference must
-    be at-parity AND reliably measured. Chapters with no curated reference are informational
-    and never gate. Wired into CI informatively (no --check) until content authors the Ch2+
-    enemy inventories; then the CI step flips to --check to make off-parity a build failure."""
+    """The --check gate (#48 (b)): PER-CHAPTER opt-in. We author chapters as we go, so the
+    gate enforces a chapter only once content marks it balance-final with `balance_locked:
+    true`. A LOCKED chapter must be at-parity, reliably measured, AND have a curated
+    reference -- otherwise it fails loudly (you can't lock a hollow/unmeasurable chapter).
+    UNLOCKED chapters (unwritten or mid-authoring) are informational and never gate, so an
+    in-progress chapter never reddens CI. With zero locks the gate passes (enforces
+    nothing), so --check can ship before any chapter is locked. (#48 (b), per-chapter)."""
 
-    def _row(self, label, has_ref=True, verdict='OK', boss_drop=False):
-        return {'label': label, 'has_ref': has_ref, 'verdict': verdict,
-                'boss_drop': boss_drop}
+    def _row(self, label, locked=False, has_ref=True, verdict='OK', boss_drop=False):
+        return {'label': label, 'locked': locked, 'has_ref': has_ref,
+                'verdict': verdict, 'boss_drop': boss_drop}
 
-    def test_all_at_parity_with_an_uncurated_chapter_passes(self):
-        rows = [self._row('CH1', verdict='OK'),
-                self._row('CH8', has_ref=False, verdict=None)]
+    def test_no_locked_chapters_passes_even_when_some_are_off_parity(self):
+        # The unwritten-chapters case: CH3-7 read OFF but aren't locked -> no gate.
+        rows = [self._row('CH1', locked=True, verdict='OK'),
+                self._row('CH3', locked=False, verdict='OFF', boss_drop=True),
+                self._row('CH8', locked=False, has_ref=False, verdict=None)]
         self.assertEqual(df.curve_gate_failures(rows), [])
 
-    def test_off_parity_referenced_chapter_fails(self):
-        rows = [self._row('CH1', verdict='OK'),
-                self._row('CH2', verdict='OFF')]
+    def test_locked_off_parity_chapter_fails(self):
+        rows = [self._row('CH1', locked=True, verdict='OK'),
+                self._row('CH2', locked=True, verdict='OFF')]
         self.assertEqual(df.curve_gate_failures(rows), ['CH2'])
 
-    def test_dropped_boss_on_referenced_chapter_fails_even_if_verdict_ok(self):
+    def test_locked_at_parity_chapter_passes(self):
+        rows = [self._row('CH1', locked=True, verdict='OK')]
+        self.assertEqual(df.curve_gate_failures(rows), [])
+
+    def test_locked_dropped_boss_fails_even_if_verdict_ok(self):
         # A dropped boss makes the verdict unreliable -- an unreliable OK is not a pass.
-        rows = [self._row('CH3', verdict='OK', boss_drop=True)]
+        rows = [self._row('CH3', locked=True, verdict='OK', boss_drop=True)]
         self.assertEqual(df.curve_gate_failures(rows), ['CH3'])
 
-    def test_uncurated_chapter_never_gates_even_with_a_dropped_boss(self):
-        rows = [self._row('CH8', has_ref=False, verdict=None, boss_drop=True)]
+    def test_locking_a_chapter_with_no_curated_reference_fails(self):
+        # Can't lock a chapter the metric can't measure -- a config mistake, surfaced loudly.
+        rows = [self._row('CH8', locked=True, has_ref=False, verdict=None)]
+        self.assertEqual(df.curve_gate_failures(rows), ['CH8'])
+
+    def test_unlocked_off_parity_chapter_never_gates(self):
+        rows = [self._row('CH2', locked=False, verdict='OFF', boss_drop=True)]
         self.assertEqual(df.curve_gate_failures(rows), [])
 
 
