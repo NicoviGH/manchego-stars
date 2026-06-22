@@ -5,6 +5,9 @@
 id: ch07-blood-in-bremen
 title: "Blood in Bremen"
 chapter_number: 7
+status: planned                # brainstorm SEED, NOT authoritative: enemy roster/levels/beats are
+                               # re-grounded against vanilla + party data when the slice is reached
+                               # (brainstorming skill digests this). Exempt from the parity gate until then.
 milestone: M3
 cadence: big_battle_gray        # see docs/CHAPTERS.md — 🟥 (morally gray)
 fe8_base_map: "FE8 Ch6 — Victims of War"            # DefeatBoss base

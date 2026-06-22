@@ -601,6 +601,10 @@ def report(campaign, ch):
     print('CH%s "%s" -- difficulty / vanilla parity   [STATIC proxy -- playtest is arbiter]'
           % (num, chap.get('title', ch)))
     print(bar)
+    if chap.get('status') == 'planned':
+        print('** PLANNED chapter -- brainstorm SEED, NOT authoritative. The enemy roster/levels'
+              '\n   below are ungrounded and will be re-grounded against vanilla + party data when'
+              '\n   this slice is built; treat the numbers as a sketch, not a parity reading. **\n')
     print('Field: deploy %d of %d cast   Enemies: %s' % (deploy_limit, len(roster),
                                                           '; '.join(labels)))
 
@@ -739,9 +743,19 @@ def curve_report(campaign, band=0.25):
     rows = []
     any_dropped_boss = False
     for chap in sorted(chaps, key=lambda c: c.get('chapter_number', 99)):
+        label = 'CH%s %s' % (chap.get('chapter_number'), chap.get('id', ''))
+        # `status: planned` chapters are brainstorm SEED, not authoritative -- their enemy
+        # roster/levels are re-grounded against vanilla + party data when the slice is reached
+        # (the brainstorming skill digests them). The static proxy can't model an ungrounded
+        # sketch, so list it as planned rather than printing a phantom 0.0/OFF. It never gates
+        # (not added to `rows`); a planned chapter that is also balance_locked is a config error
+        # caught by check.py's chapter-status lint.
+        if chap.get('status') == 'planned':
+            print('  %-22s %-13s   -- planned (seed; grounded on arrival, not modeled) --'
+                  % (label[:22], (chap.get('parity_reference', '?') or '?')[:13]))
+            continue
         p = _chapter_pressure(chap, band)
         ot, ol = p['ours']
-        label = 'CH%s %s' % (chap.get('chapter_number'), chap.get('id', ''))
         boss_drop = any(d['is_boss'] for d in p['dropped'])
         any_dropped_boss = any_dropped_boss or boss_drop
         locked = bool(chap.get('balance_locked', False))

@@ -94,6 +94,12 @@ decompiled chapters, `baserom.gba` struct reads for the rest).
 | 10a | 12 | |
 | 11a | 11 | |
 | 12a–14a | 12 | |
+| 15a–Final | ~12 | plateau; exact pin deferred (late ally arrays are raw-address blobs) |
+
+**The curve climbs then plateaus — it never stops.** From Ch10a it holds ~12 through the back half.
+This field cap (how many deploy) is the basis of the **recruit budget** — how big the *roster* should
+grow to feed that cap with a real Pick-Units choice + a permadeath bench: see `decisions.md`
+§"Recruit budget" (~16–18 roster, not capped at Ch5).
 
 **Vanilla Ch1 "Escape!" full field table** (from `git show HEAD:src/events/ch1-eventudefs.h`):
 - Player: Eirika (lord, Rapier) + Seth start; Franz + Gilliam ally reinforcements.

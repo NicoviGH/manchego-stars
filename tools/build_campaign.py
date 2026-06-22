@@ -143,6 +143,8 @@ PROLOGUE_GUEST_SPRITES = [
 # as the prologue's slot-0 avoidance). Design SoT: chapters/ch01-the-iron-trail.yaml.
 CH2_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch2-eventinfo.h')
 CH2_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch2-eventscript.h')
+CH3_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch3-eventinfo.h')
+CH3_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch3-eventscript.h')
 EVENTS_UDEFS_C = os.path.join(DECOMP, 'src', 'events_udefs.c')
 CH01_HOST_INDEX = 2          # CHAPTER_L_2 -- the prologue ending's MNC2(0x2) target
 CH01_LAYOUT = ('Ch01IronTrailMap', 'ch01-the-iron-trail')  # (asset label, maps/ stem)
@@ -228,6 +230,47 @@ DEV_PLACEHOLDER_LINE = (
 # your leader" screen. Darkling Woods -- "the most Icewind Dale of the options" (Nicolas,
 # 2026-06-16). Swap freely to any backgrounds.h enum.
 CH01_LORDSEL_BG = 'BG_DARKLING_WOODS'
+
+# ── Ch2 "Cold Welcome" (#22): hosted on chapter slot 3 (ch01's MNC2(0x3) target) ──
+# Party PERSISTS from ch01 (no cast re-LOAD); the prep flow fields 5 of the saved roster
+# (cap = UnitDef_Event_Ch3Ally entry count) and force-deploys the ch01-chosen lord
+# (flag-driven, IsCharacterForceDeployed_ -- no per-chapter wiring). DefeatAll: the slot-3
+# host goal is swapped to vanilla slot-4's defeat_all template and the vanilla Ch3
+# Seize(14,1) is dropped, so CountRedUnits() drives the rout win; CauseGameOverIfLordDies
+# already sits in EventListScr_Ch3_Misc.
+CH02_HOST_INDEX = 3          # CHAPTER_L_3 -- ch01's ending MNC2(0x3) target
+CH02_LAYOUT = ('Ch02ColdWelcomeMap', 'ch02-cold-welcome')  # (asset label, maps/ stem)
+CH02_CHAPTER_YAML = 'ch02-cold-welcome.yaml'
+CH02_BOSS_SLOT = 'BAZBA'      # vanilla Ch3's boss slot -- Halvar mirror (custom bust #19 later)
+CH02_MINIBOSS_SLOT = 'BONE'   # vanilla Ch2's named mid-tier, idle on slot 3 -- Grukk (bust later)
+# Vellynne Harpell (recurring Brotherhood NPC) has no map unit in ch02; her CUTSCENE FACE
+# rides FID_Ismaire -- a regal vanilla woman absent from our ch00-08 chapters, collision-free.
+# Her custom bust (#19) is OPTIONAL: this is a flagged placeholder until that art lands.
+CH02_VELLYNNE_SLOT = 'ISMAIRE'
+CH02_FISHER_FID = '[FID_VillagerOldMan]'   # the brittle Targos fisher -- generic villager mug
+CH02_OPENING_BG = 'BG_NORMAL_VILLAGE'      # Bryn Shander west gate (placeholder BG; polish later)
+CH02_ENDING_BG = 'BG_NORMAL_VILLAGE'       # Targos square at nightfall (placeholder BG)
+# Enemy AI byte vectors + class/item maps (FE8-valid, mirrored from ch01's proven set).
+CH02_AI = {
+    'aggressive':    '{0x0, 0x0, 0x1, 0x0}',    # pursue/charge
+    'hold_position': '{0x3, 0x3, 0x9, 0x20}',   # boss/miniboss: attack in place, never move
+    'reinforce':     '{0x0, 0x0, 0x9, 0x0}',    # reinforcement wave
+}
+CH02_CLASS_IDS = {'brigand': 'CLASS_BRIGAND', 'archer': 'CLASS_ARCHER'}
+CH02_ITEM_IDS = {'iron-axe': 'ITEM_AXE_IRON', 'steel-axe': 'ITEM_AXE_STEEL',
+                 'iron-bow': 'ITEM_BOW_IRON', 'vulnerary': 'ITEM_VULNERARY'}
+CH02_GENERIC_PID = '0x8e'    # vanilla slot-3 generic-minion charIndex (autolevelled trash)
+# Cutscene message ids -- the dead vanilla Ch3 scene/talk/turn texts our host overwrites
+# (referenced ONLY by ch3-eventscript.h scenes we replace; 0x993/0x994 are LIVE battle
+# quotes in data_battlequotes.c and are deliberately NOT in this pool -- see decisions.md
+# "Ch2 hosting"). Opening (Vellynne): card + 2 beats. Rear bark: 1. Ending (Targos): card +
+# 4 beats. Boss death quote: 1.
+CH02_OPENING_CARD_MSG = 0x98b
+CH02_OPENING_MSGS = (0x98c, 0x98e)            # A (Vellynne/RBG), B (Meesmickle/Braulo)
+CH02_BARK_MSG = 0x990                         # Wolfram's turn-3 rear-ambush bark (over map)
+CH02_ENDING_CARD_MSG = 0x995
+CH02_ENDING_MSGS = (0x996, 0x997, 0x998, 0x999)  # A fisher, B Rootis, C narration(#58), D RBG
+CH02_BOSS_DEATH_MSG = 0x99a                   # Halvar's death quote (gDefeatTalkList, slot 3)
 
 # FE8's unit-name buffer; longer names overflow and garble the display.
 FE_NAME_MAX = 12
@@ -3474,8 +3517,8 @@ def inject_ch01(campaign, verbose=True):
         % CH01_ENDING_CARD_MSG
         + end_text_calls +
         '    FADI(16) /* fade the town out */\n'
-        + dev_placeholder_scene() +
-        '    ENDA\n}',
+        '    MNC2(0x%X) /* -> ch02 "Cold Welcome", hosted on chapter slot 3 (inject_ch02) */\n'
+        '    ENDA\n}' % CH02_HOST_INDEX,
         CH2_EVENTSCRIPT_H)
     with open(CH2_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
         f.write(script)
@@ -3593,6 +3636,345 @@ def inject_ch01(campaign, verbose=True):
               '%d west reinforcements turn %d'
               % (len(cast), len(enemies) - 1, cx, cy, len(reinforce),
                  reinf['spawn_turn']))
+
+
+def inject_ch02(campaign, verbose=True):
+    """Wire Ch2 "Cold Welcome" (#22) onto chapter slot 3 (ch01's MNC2(0x3) target).
+
+    Simpler than inject_ch01: the party PERSISTS from ch01 (no cast re-LOAD, no
+    lord-select menu), and the win is DefeatAll (no Seize). The slot-3 host goal is
+    swapped to vanilla slot-4's defeat_all template, the vanilla Ch3 Seize(14,1) is
+    dropped (so engine CountRedUnits() drives the rout win), and the ch01-chosen lord
+    is auto-force-deployed by the flag-driven IsCharacterForceDeployed_ hook
+    (_inject_lord_select_engine) -- no per-chapter wiring beyond the
+    CauseGameOverIfLordDies that already sits in EventListScr_Ch3_Misc.
+
+    DEFERRED checkpoints (flagged, not in this pass): the sled defend-in-place
+    soft-fail mechanic + sled sprite, Vellynne's cutscene bust (#19, shown as a
+    placeholder vanilla face here), the snow-wolf/road-bandit map-sprite reskin
+    (vanilla brigand sprite for now), the chest+vulnerary drop, and the in-game
+    load-test. This pass hosts a clean DefeatAll slice with the three locked cutscenes.
+    """
+    maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
+    chap = _load_chapter_yaml(campaign, CH02_CHAPTER_YAML)
+
+    # 0. Cutscene beat splits, consumed from the locked chapter YAML (cf. inject_ch01).
+    def split_beats(trigger):
+        scr = next(e for e in chap['events'] if e.get('trigger') == trigger)['script']
+        card = next((v for e in scr for k, v in e.items() if k == 'location_card'), None)
+        beats = [[]]
+        for entry in scr:
+            (k, v), = entry.items()
+            if k == 'location_card':
+                continue
+            if k == 'beat_break':
+                beats.append([])
+                continue
+            beats[-1].append(entry)
+        return card, beats
+
+    op_card, op_beats = split_beats('chapter_start')
+    end_card, end_beats = split_beats('chapter_end')
+    bark = next(e for e in chap['events']
+                if e.get('trigger') == 'turn_start')['script']
+    if len(op_beats) != len(CH02_OPENING_MSGS):
+        sys.exit('ERROR: ch02 opening split into %d beats; expected %d (check '
+                 'beat_break markers)' % (len(op_beats), len(CH02_OPENING_MSGS)))
+    if len(end_beats) != len(CH02_ENDING_MSGS):
+        sys.exit('ERROR: ch02 ending split into %d beats; expected %d (check '
+                 'beat_break markers)' % (len(end_beats), len(CH02_ENDING_MSGS)))
+
+    def cut_fid(spk):
+        if spk == 'narration':                 # faceless stage-business box (#58)
+            return None
+        if spk == 'vellynne':                  # recurring NPC: placeholder face (#19)
+            return _fid_tag(CH02_VELLYNNE_SLOT)
+        if spk == 'targos-fisher':             # generic villager mug
+            return CH02_FISHER_FID
+        if spk in PORTRAIT_MAP:
+            return _fid_tag(PORTRAIT_MAP[spk].upper())
+        sys.exit('ERROR: ch02 unknown cutscene speaker %r' % spk)
+
+    # Vellynne anchors mid-right (the quest-giver, cf. Hlin/Duvessa); everyone else
+    # speaks from mid-left. The ending beats are single-speaker each, so mid-left is
+    # enough (no two-shots, no preloads -> no REMA face-flashing, cf. inject_ch01).
+    op_home = {'vellynne': '[OpenMidRight]'}
+
+    def stage(beat, home):
+        return {k: (home.get(k, '[OpenMidLeft]'), cut_fid(k))
+                for e in beat for k in e}
+
+    # 1. Map: register the painted layout, point slot 3 at it + the winter tileset, and
+    #    swap the host goal to vanilla slot-4's defeat_all template (cf. inject_ch01 step 1).
+    label, stem = CH02_LAYOUT
+    for ext in ('mar', 'json'):
+        shutil.copyfile(os.path.join(maps_dir, '%s.%s' % (stem, ext)),
+                        os.path.join(MAP_LAYOUT_DIR, '%s.%s' % (label, ext)))
+    with open(CONST_MAPS_S, 'a', encoding='utf-8') as f:
+        f.write('\n'.join([
+            '', '/* Manchego Stars ch02 layout (#22) */',
+            '\t.align 2, 0', '\t.global %s' % label, '%s:' % label,
+            '\t.incbin "graphics/map/layout/%s.bin.lz"' % label]) + '\n')
+    layout_idx = _append_asm_table_words(ASSET_TABLE_S, 'gChapterDataAssetTable', [label])
+    obj_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'ObjectTypeSnow')
+    pal_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'MapPaletteSnow')
+    cfg_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'TileConfigurationSnow')
+    with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
+        settings = json.load(f)
+    host = settings['chapters'][CH02_HOST_INDEX]
+    defeat_goal = settings['chapters'][4]['goal']
+    if defeat_goal.get('windowDataType') != 'defeat_all':
+        sys.exit('ERROR: slot 4 goal is not the vanilla defeat_all template '
+                 '(needed as the ch02 DefeatAll donor)')
+    host['map'].update({'obj1Id': obj_idx, 'obj2Id': 0, 'paletteId': pal_idx,
+                        'tileConfigId': cfg_idx, 'mainLayerId': layout_idx,
+                        'objAnimId': 0, 'paletteAnimId': 0, 'changeLayerId': 0})
+    host['goal'] = dict(defeat_goal)
+    host['prepScreenNumber'] = chap['chapter_number'] * 2   # "Chapter 2" header (2*N)
+    with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
+        json.dump(settings, f, indent=2)
+
+    # 2. Rosters (events_udefs.c). Two tables, reusing vanilla Ch3 symbols (already
+    #    declared by ch3-eventinfo/scripts, so no extern surgery):
+    #    - UnitDef_Event_Ch3Ally: the 5-slot deploy template = THE CAP. Never LOADed;
+    #      the prep flow reads its entry count (cap) + positions (deploy tiles). The
+    #      party itself persists from ch01 (no join-LOAD).
+    #    - UnitDef_088B463C: the raider band (Beginning-scene LOAD1). 0x8e = generic
+    #      autolevelled trash; Grukk rides the vanilla Bone slot, Halvar the Bazba slot.
+    #    - UnitDef_088B4718: the turn-3 rear wolves (was vanilla Colm; repointed RED).
+    cast = []
+    for unit_id, slot in PORTRAIT_MAP.items():
+        unit = load_unit(campaign, unit_id)
+        unit.setdefault('id', unit_id)
+        class_enum = class_enum_for(unit)
+        if class_enum is None:
+            continue
+        cast.append((unit_id, slot, class_enum,
+                     int(unit.get('fe_stats', {}).get('level', 1))))
+    if len(cast) < chap['deploy_limit']:
+        sys.exit('ERROR: %d classed cast < ch02 deploy_limit %d'
+                 % (len(cast), chap['deploy_limit']))
+    leader = 'CHARACTER_%s' % cast[0][1].upper()
+
+    def ally_entry(slot, class_enum, level, x, y, comment):
+        return ('    {\n'
+                '        .charIndex = CHARACTER_%s,%s\n'
+                '        .classIndex = %s,\n'
+                '        .leaderCharIndex = %s,\n'
+                '        .allegiance = FACTION_ID_BLUE,\n'
+                '        .level = %d,\n'
+                '        .xPosition = %d,\n'
+                '        .yPosition = %d,\n'
+                '        .redaCount = 0,\n'
+                '        .items = { 0 },\n'
+                '    },' % (slot.upper(), comment, class_enum, leader, level, x, y))
+
+    deploy_slots = chap['deploy_slots']
+    if len(deploy_slots) != chap['deploy_limit']:
+        sys.exit('ERROR: ch02 deploy_slots (%d) != deploy_limit (%d)'
+                 % (len(deploy_slots), chap['deploy_limit']))
+    deploy = [ally_entry(slot, ce, lv, x, y,
+                         ' /* deploy slot %d (cap template, never LOADed) */' % i)
+              for i, ((uid, slot, ce, lv), (x, y))
+              in enumerate(zip(cast[:chap['deploy_limit']], deploy_slots))]
+
+    def enemy_entry(char, class_enum, level, autolevel, x, y, item, ai, comment):
+        return ('    {\n'
+                '        .charIndex = %s,%s\n'
+                '        .classIndex = %s,\n'
+                '%s'
+                '        .allegiance = FACTION_ID_RED,\n'
+                '        .level = %d,\n'
+                '        .xPosition = %d,\n'
+                '        .yPosition = %d,\n'
+                '        .redaCount = 0,\n'
+                '        .items = { %s },\n'
+                '        .ai = %s,\n'
+                '    },' % (char, comment, class_enum,
+                           '        .autolevel = 1,\n' if autolevel else '',
+                           level, x, y, item, ai))
+
+    by_eid = {e['id']: e for e in chap['enemy_units']}
+    wolf, bandit, hunter = by_eid['snow-wolf'], by_eid['road-bandit'], by_eid['frost-hunter']
+    grukk, halvar = by_eid['raider-bruiser'], by_eid['raider-captain']
+    reinf = chap['reinforcements'][0]
+    brig, arch = CH02_CLASS_IDS['brigand'], CH02_CLASS_IDS['archer']
+    axe, steel, bow = (CH02_ITEM_IDS['iron-axe'], CH02_ITEM_IDS['steel-axe'],
+                       CH02_ITEM_IDS['iron-bow'])
+
+    enemies = []
+    for x, y in wolf['positions']:
+        enemies.append(enemy_entry(CH02_GENERIC_PID, brig, wolf['level'], True, x, y,
+                                   axe, CH02_AI['aggressive'], ' /* snow wolf */'))
+    for x, y in bandit['positions']:
+        enemies.append(enemy_entry(CH02_GENERIC_PID, brig, bandit['level'], True, x, y,
+                                   axe, CH02_AI['aggressive'], ' /* road bandit */'))
+    for x, y in hunter['positions']:
+        enemies.append(enemy_entry(CH02_GENERIC_PID, arch, hunter['level'], True, x, y,
+                                   bow, CH02_AI['aggressive'], ' /* frost hunter (archer) */'))
+    gx, gy = grukk['position']
+    enemies.append(enemy_entry('CHARACTER_%s' % CH02_MINIBOSS_SLOT, brig, grukk['level'],
+                               False, gx, gy, axe, CH02_AI['hold_position'],
+                               ' /* Grukk the Bruiser -- miniboss, fixed bases */'))
+    hx, hy = halvar['position']
+    enemies.append(enemy_entry('CHARACTER_%s' % CH02_BOSS_SLOT, brig, halvar['level'],
+                               True, hx, hy, steel, CH02_AI['hold_position'],
+                               ' /* Halvar the Raider Captain -- boss, steel axe */'))
+    reinforce = [enemy_entry(CH02_GENERIC_PID, brig, reinf['level'], True, x, y,
+                             axe, CH02_AI['reinforce'],
+                             ' /* rear wolf, turn %d */' % reinf['trigger_turn'])
+                 for x, y in reinf['positions']]
+
+    with open(EVENTS_UDEFS_C, encoding='utf-8') as f:
+        udefs = f.read()
+    for marker, entries in (
+            ('UnitDef_Event_Ch3Ally[] =', deploy),
+            ('UnitDef_088B463C[] =', enemies),
+            ('UnitDef_088B4718[] =', reinforce)):
+        block = '{\n' + '\n'.join(entries) + '\n    { 0 },\n}'
+        udefs = _replace_brace_block(udefs, marker, block, EVENTS_UDEFS_C)
+    with open(EVENTS_UDEFS_C, 'w', encoding='utf-8') as f:
+        f.write(udefs)
+
+    # 3. Event lists (ch3-eventinfo.h). Turn: the rear wolves on turn 3 (FACTION_ID_BLUE
+    #    appear-at-player-phase idiom, cf. inject_ch01). Character/Location cleared: no
+    #    talks, and DROP the vanilla Seize(14,1) + chests/doors so DefeatAll (CountRedUnits)
+    #    is the only win path. Misc keeps its vanilla CauseGameOverIfLordDies untouched.
+    with open(CH3_EVENTINFO_H, encoding='utf-8') as f:
+        info = f.read()
+    info = _replace_brace_block(
+        info, 'EventListScr_Ch3_Turn[] =',
+        '{\n    TURN(0x0, EventScr_Ch3_Turn1Npc, %d, 0, FACTION_ID_BLUE)'
+        ' /* turn-%d rear wolves + Wolfram bark */\n    END_MAIN\n}'
+        % (reinf['trigger_turn'], reinf['trigger_turn']), CH3_EVENTINFO_H)
+    info = _replace_brace_block(
+        info, 'EventListScr_Ch3_Character[] =', '{\n    END_MAIN\n}', CH3_EVENTINFO_H)
+    info = _replace_brace_block(
+        info, 'EventListScr_Ch3_Location[] =', '{\n    END_MAIN\n}', CH3_EVENTINFO_H)
+    with open(CH3_EVENTINFO_H, 'w', encoding='utf-8') as f:
+        f.write(info)
+
+    # 4. Scenes (ch3-eventscript.h). Beginning: Vellynne's opening over a scenic BACG,
+    #    then LOMA rebuilds the battle map fresh (the BACG clobbered it, cf. inject_ch01),
+    #    the raiders LOAD, and the shared prep call runs Pick Units (cap 5, lord
+    #    force-deployed). Turn1Npc: the turn-3 reinforcement LOAD + Wolfram's bark over the
+    #    map. Ending: the Targos discovery, then the dev placeholder (ch03 not hosted yet).
+    op_text_calls = _scenic_beat_calls(
+        CH02_OPENING_MSGS, op_beats,
+        ['A -- Vellynne stops them; RBG haggles the orb job',
+         'B -- Meesmickle & Braulo react to the corpse-sled'])
+    end_text_calls = _scenic_beat_calls(
+        CH02_ENDING_MSGS, end_beats,
+        ['A -- the Targos fisher warns them off the frozen body',
+         'B -- Rootis clocks the dagger-of-ice kill (Sephek breadcrumb)',
+         'C -- nightfall narration over the camp (#58 opaque box)',
+         'D -- RBG sets the road north (lets the Bremen bounty keep)'])
+    with open(CH3_EVENTSCRIPT_H, encoding='utf-8') as f:
+        script = f.read()
+    script = _replace_brace_block(
+        script, 'EventScr_Ch3_BeginningScene[] =',
+        '{\n'
+        '    MUSC(SONG_TENSION)\n'
+        '    REMOVEPORTRAITS\n'
+        '    BACG(%s) /* Bryn Shander west gate (placeholder BG; #22 polish) */\n'
+        '    FADU(16)\n'
+        '    BROWNBOXTEXT(0x%X, 8, 8) /* "Bryn Shander -- West Gate" card */\n'
+        % (CH02_OPENING_BG, CH02_OPENING_CARD_MSG)
+        + op_text_calls +
+        '    FADI(16) /* fade the scenic BG out */\n'
+        '    SVAL(EVT_SLOT_B, 0x0) /* map camera origin */\n'
+        '    LOMA(0x%X) /* RestartBattleMap -- build the ch02 map fresh (cf. inject_ch01) */\n'
+        '    LOAD1(0x1, UnitDef_088B463C) /* the raider band */\n'
+        '    ENUN\n'
+        '    FADU(16) /* reveal the battle map */\n'
+        '    CALL(EventScr_08591FD8) /* preparations (PREP, event cmd 0x3E) -- cap 5 */\n'
+        '    ENUT(8)\n'
+        '    EVBIT_T(7)\n'
+        '    ENDA\n}' % CH02_HOST_INDEX, CH3_EVENTSCRIPT_H)
+    script = _replace_brace_block(
+        script, 'EventScr_Ch3_Turn1Npc[] =',
+        '{\n    SVAL(EVT_SLOT_2, UnitDef_088B4718)\n'
+        '    CALL(EventScr_LoadReinforce)\n'
+        '    TEXTSHOW(0x%X) /* Wolfram: wolves at our backs -- hold the rear */\n'
+        '    TEXTEND\n    REMA\n'
+        '    EVBIT_T(7)\n    ENDA\n}' % CH02_BARK_MSG, CH3_EVENTSCRIPT_H)
+    script = _replace_brace_block(
+        script, 'EventScr_Ch3_EndingScene[] =',
+        '{\n    MUSC(SONG_VICTORY)\n'
+        '    REMOVEPORTRAITS\n'
+        '    BACG(%s) /* Targos square (placeholder BG; #22 polish) */\n'
+        '    FADU(16)\n'
+        '    BROWNBOXTEXT(0x%X, 8, 8) /* "Targos" card */\n'
+        % (CH02_ENDING_BG, CH02_ENDING_CARD_MSG)
+        + end_text_calls +
+        '    FADI(16) /* fade the town out */\n'
+        + dev_placeholder_scene() +     # ch03 not hosted yet -> dev landing, then title
+        '    ENDA\n}', CH3_EVENTSCRIPT_H)
+    with open(CH3_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
+        f.write(script)
+
+    # 5. Halvar's defeat quote -> head of gDefeatTalkList (same shadowing rule as ch01:
+    #    a head entry wins the first-match scan, shadowing any vanilla Bazba entry).
+    quote = ('    {\n'
+             '        .pid     = CHARACTER_%s, /* Halvar death quote (ch02) */\n'
+             '        .route   = CHAPTER_MODE_ANY,\n'
+             '        .chapter = CHAPTER_L_3, /* ch02 is hosted on chapter slot 3 */\n'
+             '        .msg     = 0x%X,\n'
+             '    },' % (CH02_BOSS_SLOT, CH02_BOSS_DEATH_MSG))
+    with open(BATTLEQUOTES_C, encoding='utf-8') as f:
+        bq = f.read()
+    head = 'CONST_DATA struct DefeatTalkEnt gDefeatTalkList[] = {\n'
+    if bq.count(head) != 1:
+        sys.exit('ERROR: gDefeatTalkList head not in expected form in %s' % BATTLEQUOTES_C)
+    bq = bq.replace(head, head + quote + '\n')
+    with open(BATTLEQUOTES_C, 'w', encoding='utf-8') as f:
+        f.write(bq)
+
+    # 6. Texts. Overwritten ids are dead vanilla Ch3 scene/talk/turn messages (the vanilla
+    #    Ch3 scenes are gone); 0x993/0x994 are LIVE battle quotes and are NOT in the pool.
+    with open(TEXTS_TXT, encoding='utf-8') as f:
+        lines = f.read().split('\n')
+    set_message_body(lines, host['chapTitleTextId'], name_message_body(chap['title']))
+    set_message_body(lines, host['goal']['statusObjectiveTextId'],
+                     name_message_body('Defeat all foes'))
+    set_message_body(lines, host['goal']['windowTextId'],
+                     name_message_body('Rout the enemy'))
+    set_message_body(lines, CH02_OPENING_CARD_MSG, name_message_body(op_card))
+    for msg_id, beat in zip(CH02_OPENING_MSGS, op_beats):
+        w = 28 if _beat_is_narration(beat) else 42
+        set_message_body(lines, msg_id, _script_to_message(
+            beat, stage(beat, op_home), width=w))
+    # Wolfram's rear-ambush bark, shown over the map (29-tile bubble wrap; the 31-char
+    # "Wolves at our backs -- the sled." auto-wraps via _wrap_fe_lines).
+    set_message_body(lines, CH02_BARK_MSG, _script_to_message(
+        bark, {'wolfram': ('[OpenMidLeft]', _fid_tag(PORTRAIT_MAP['wolfram'].upper()))},
+        width=29))
+    set_message_body(lines, CH02_ENDING_CARD_MSG, name_message_body(end_card))
+    for msg_id, beat in zip(CH02_ENDING_MSGS, end_beats):
+        w = 28 if _beat_is_narration(beat) else 42
+        set_message_body(lines, msg_id, _script_to_message(
+            beat, stage(beat, {}), width=w))
+    set_message_body(lines, CH02_BOSS_DEATH_MSG, _script_to_message(
+        [{'halvar': halvar['death_quote']}],
+        {'halvar': ('[OpenMidRight]', _fid_tag(CH02_BOSS_SLOT))}, width=29))
+    with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines))
+
+    # 6a. Title card image (4bpp banner) -- DEFERRED (#22 "Title card" checklist item).
+    #     gen_chapter_title's atlas lacks the "Ch.2: Cold Welcome" glyphs (C/W/d/m + the
+    #     "Ch.2:" prefix), and composing them means cutting glyphs by eye from the vanilla
+    #     cards -- a visual artifact for Nicolas to sign off. Until then the vanilla slot-3
+    #     card shows as a placeholder; the build stays green. To finish: extend
+    #     LETTERS/WORDS in gen_chapter_title.py, then compose chap_title_<chapTitleId>.png
+    #     (cf. inject_ch01 step 6a).
+
+    if verbose:
+        print('  ch02 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; '
+              'DefeatAll, deploy cap %d + PREP (lord auto-force-deployed)'
+              % (obj_idx, pal_idx, cfg_idx, layout_idx, CH02_HOST_INDEX, len(deploy)))
+        print('  rosters: party persists, %d raiders (Grukk@%s Halvar@%s) + %d rear '
+              'wolves turn %d' % (len(enemies), (gx, gy), (hx, hy),
+                                  len(reinforce), reinf['trigger_turn']))
 
 
 def inject_northlook_bitey(verbose=True):
@@ -3747,6 +4129,8 @@ def main():
         print('chapter 1 (#21):')
         inject_ch01(args.campaign)  # MUST precede inject_prologue (vanilla goal read)
         inject_northlook_bitey()    # 'Ol Bitey over the tavern hearth (Beat 1 set dressing)
+        print('chapter 2 (#22):')
+        inject_ch02(args.campaign)  # hosts slot 3; ch01's ending MNC2(0x3) lands here
         print('prologue (New Game target):')
         inject_prologue(args.campaign, montage=args.montage)
         print('death quotes (#6):')

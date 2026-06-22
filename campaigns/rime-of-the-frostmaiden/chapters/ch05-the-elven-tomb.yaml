@@ -7,6 +7,9 @@
 id: ch05-the-elven-tomb
 title: "The Elven Tomb"
 chapter_number: 5
+status: planned                # brainstorm SEED, NOT authoritative: enemy roster/levels/beats are
+                               # re-grounded against vanilla + party data when the slice is reached
+                               # (brainstorming skill digests this). Exempt from the parity gate until then.
 milestone: M3
 cadence: first_boss             # see docs/CHAPTERS.md — 🟥
 fe8_base_map: "FE8 Ch4 — Ancient Horrors"           # the DefeatBoss half (boss in a contained arena)

@@ -10,12 +10,14 @@
 id: ch01-the-iron-trail
 title: "The Iron Trail"
 chapter_number: 1
+status: active                 # built / in-progress slice; combat data is grounded + authoritative
 milestone: M3
 cadence: full_party_intro       # story-wise: whole cast meets at the Northlook (opening
                                 # scene); the FIELD is 4 units (vanilla Ch1 parity)
 fe8_base_map: "FE8 Ch13a — Fluorspar's Oath (layout only)"  # cadence base = FE8 Ch1
 fe8_cadence_base: "FE8 Ch1 — Escape! (Seize breather; field counts mirrored 1:1)"
 parity_reference: "FE8 Ch1"   # #48 enemy-pressure parity bar — Escape! — field counts mirrored 1:1 (cadence base, not the Ch13a layout)
+balance_locked: true   # #48 (b): balance-final — CI hard-fails on a parity regression here
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >

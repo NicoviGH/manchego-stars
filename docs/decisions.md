@@ -217,6 +217,18 @@ tree corrupt each other) — so enforcing exactly where worktrees exist covers t
 constants (e.g. the weapon↔ITEM map) live in `tools/inject/decomp.py`, not either side's file. Issue #55.
 _Decided: 2026-06-19_
 
+**Seam refinement: content-feature `record*` playtest scenarios are content spot-checks, not pipeline infra.**
+The playtest *harness/framework* (`harness.lua`, clearbot, liveness, the verification scenarios) stays
+pipeline-owned. But a `record*` scenario that captures a **content** feature for review (e.g. `recordlord`
+for the #46 lord-select cards) is a content spot-check — the `dialogue-pass` workflow itself mandates
+`run.sh record` + `make_gif.py` to show Nicolas cutscene/card renders — so the content lane must be able to
+author it without a worktree hop. *Running* any scenario was always in-lane; only *editing* `tools/playtest/**`
+was blocked. **Mechanism (queued, pipeline-owned edit): carve content review scenarios into a content-owned
+file** the harness includes (e.g. `tools/playtest/content_scenarios.lua` added to `CONTENT_EXCLUSIVE_FILES`,
+or a `record*`-name carve-out in `_file_lane`), so the lane guard lets content own its capture scenarios while
+the framework stays pipeline. Until that lands, a content `record*` addition commits with `--no-verify`.
+_Decided: 2026-06-22 (Nicolas — "B for sure"; mechanism queued for a pipeline-lane instance)_
+
 **Track work always happens in that track's worktree — even solo.** "Work the content track" / "work the
 pipeline track" means: switch into `../ms-content` (`inst/content`) or `../ms-pipeline` (`inst/pipeline`)
 *first*, then work. `main` is reserved for cross-track integration and ad-hoc one-offs. This is broader than
@@ -349,6 +361,28 @@ all matter. The per-chapter **difficulty engine** is `tools/difficulty.py` (`mak
 CH=chNN`), built on the tested combat core `tools/fe_combat.py` (the decomp's own formulas);
 execution plan + full spec: issue #45.
 _Decided: 2026-06-18 (Nicolas; difficulty analysis session — supersedes the open "Ch1 difficulty" item)_
+
+**Recruit budget: the roster tracks vanilla's field-growth curve to a ~16–18 pool — NOT capped at Ch5.**
+The binding *field* size is `deploy_limit` = vanilla chapter N's deploy-slot count (§Field parity;
+table in `fe8-pacing-reference.md` §1b). That curve, [decomp]-verified through Ch14a, **climbs and
+then plateaus — it never stops**: `2 → 4 → 5 → 9 → 9 → 9 → (5x:4) → 10 → 10 → 9 → 11 → 12 → 11 → 12 →
+12`, holding **~12 from Ch10a through the back half** (exact Ch15–Final pin deferred, same honesty
+tier as §1b — the late ally arrays are raw-address blobs; the plateau is the load-bearing fact).
+Because our model **recruits the whole cast and Pick-Units deploys `deploy_limit` of them**
+(§Field parity), the *roster* must sit **above** the peak field, or Pick Units is a formality and a
+single permadeath drops you under the cap. Vanilla always carries a bench above the deploy cap; we
+should too.
+**The math that kills the old "stops at Ch5" cap:** 8 PCs + the locked Ch2–5 recruits
+(Baxby/Trex/Lupin/Sahnar/Basil) = **13** — which only *barely fills* the Ch9→endgame field cap of
+11–12 (bench ≈ 1). That is a forced-deploy roster with no choice and no permadeath slack. **Budget:
+grow the roster to ≈ peak field + a ~4–6 bench = ~16–18 units**, i.e. **~3–5 more permanent recruits
+across Ch6–21**, added as the DM notes supply bodies (which/where stays DM-notes-gated — see
+`roadmap.md`). This governs **roster size, not field size** (per-chapter field stays vanilla via
+`deploy_limit`), and recruits still earn their slot by **filling a role gap** (the by-role method in
+`roadmap.md`) — the budget says *how many*, the role principle says *which*.
+_Reconstructed: 2026-06-22 (CLAUDE, from the decomp field-growth curve at Nicolas's direction) —
+supersedes the stale `roadmap.md` "roster stops growing at Ch5" line; the original budget sweep was
+done in-session and never recorded, which this ADR fixes._
 
 **Two healers, differentiated by donor (same move as the shamans).** Sclorbo and Basil are both
 Priests, so they get *distinct* vanilla donor lines to avoid stat-twins: **Sclorbo → Moulder** (the
@@ -484,6 +518,41 @@ Note ch01 has a prep screen where vanilla Ch1 has none: the cap is the parity;
 Pick Units only chooses *which* PCs fill it (Nicolas, 2026-06-10).
 _Decided: 2026-06-10 (decomp trace, ch01 slice)_
 
+**Ch2 "Cold Welcome" hosting (#22): slot 3, party-persist, DefeatAll — simpler than ch01.**
+ch02 rides the *next* vanilla slot after ch01 (slot 2 → slot 3, `CHAPTER_L_3`), reached by
+ch01's ending `MNC2(0x3)` (was the dev placeholder). Three ways it diverges from `inject_ch01`,
+all because the slice is mid-campaign rather than the cast's first chapter:
+(1) **Party persists** — no cast join-LOAD; the saved roster carries over and the prep flow
+fields 5 of it (cap = `UnitDef_Event_Ch3Ally` entry count). (2) **No lord-select** — the lead was
+chosen in ch01; the flag-driven `IsCharacterForceDeployed_` hook auto-force-deploys it in *any*
+later chapter with zero per-chapter wiring (only `CauseGameOverIfLordDies`, already vanilla in
+`EventListScr_Ch3_Misc`, is needed). (3) **DefeatAll, not Seize** — the slot-3 host `goal` is
+swapped to vanilla **slot-4's `defeat_all` template** (`windowDataType: defeat_all`), and the
+vanilla Ch3 `Seize(14,1)` + chests/doors are dropped from `EventListScr_Ch3_Location`, so the
+engine's `CountRedUnits()` rout-win is the only path. Enemy/reinforcement tables reuse vanilla Ch3
+symbols (`UnitDef_088B463C` raiders, `UnitDef_088B4718` repointed RED for the turn-3 rear wolves);
+Halvar rides the Bazba slot, Grukk the Bone slot.
+**Two non-obvious gotchas this surfaced:**
+• **The winter map is a faithful reskin — walkability ≈ vanilla FE8 Ch2.** A cell-by-cell terrain
+diff (our `.mar` vs vanilla `Ch2Map`, terrain bytes off each tileset's `.bin`) differs on **2 of 225
+cells** (the two village tiles). So positions are authored on the built `.mar`'s walkable tiles
+(plains/forest), verified in-bounds. Two real traps: (1) author against the committed **`.mar`**, NOT
+`map-review/*-layout.json` — that review grid disagrees with the build on ~5 cells; (2) our current
+placements are an *own* defend-east arrangement, not vanilla Ch2's literal tiles — mirroring vanilla's
+exact placements is an open option if we want strict positional parity. (Parity the gate enforces is
+the enemy *count/level* mix, not tiles.)
+• **Ch2 cutscene msg-id pool = dead vanilla Ch3 scene texts** `0x98b–0x992, 0x995–0x99a`
+(referenced only by the `ch3-eventscript.h` scenes our host overwrites). **`0x993`/`0x994` are LIVE
+battle quotes in `data_battlequotes.c`** and are deliberately excluded — the exact false-negative
+the handoff warns hex-grep produces.
+**Deferred (flagged in code, not in this pass):** the sled defend-in-place soft-fail mechanic +
+sled sprite, Vellynne's cutscene bust (#19 — a placeholder `FID_Ismaire` face shows meanwhile),
+the snow-wolf/road-bandit map-sprite reskin (vanilla brigand sprite for now), the chest +
+vulnerary drop, the "Chapter 2" title-card glyphs (atlas lacks C/W/d/m), and the in-game
+load-test. The chapter builds green, decodes clean (`verify_text` 0 runaway), and chains
+ch01 → ch02 → dev placeholder (ch03 unhosted).
+_Implemented: 2026-06-22 (CLAUDE; content track — host wiring + cutscenes, build-green)_
+
 **No world map ⇒ `GetBattleMapKind()` falls back to STORY (engine hardening).**
 Vanilla classifies most chapter slots (slot 2 onward — `CHAPTER_L_2`...) by scanning
 `gGMData` world-map node state and falls back to `BATTLEMAP_KIND_SKIRMISH` when no
@@ -541,6 +610,26 @@ Verified by the `ch01lord` playtest: pick the last candidate (benched by default
 under the 4-cap) → flag set, force-deployed with the cap intact, death = game-over
 screen; ch00 gameover/retreat semantics unchanged.
 _Decided: 2026-06-10 (placement Nicolas; mechanism decomp-traced; closes #42)_
+
+**Lord-select UI (#46): a candidate-info screen reskinned from "Pick Units", not a hand-built menu.**
+The pick screen shows each candidate's portrait + a qualitative **pitch** (strengths/weaknesses
+in words; **no numeric stats** — a hand-authored `lord_pitch:` per PC YAML, Nicolas 2026-06-21)
+so the choice is informed. A first hand-built menu (custom frames + full-bust `StartFace2` +
+multi-line text drawn straight to BG) was abandoned: the bust wouldn't render over the scenic
+BACG (OBJ-vs-BG priority), `DrawUiFrame2` borders didn't show, and pitch text spilled/bled.
+Instead we **clone-and-adapt `prep_unitselect.c`** (the deploy "Pick Units" screen) into a
+dedicated **`engine/lord_select_screen.c`** — it already is a scrollable unit list + live
+`PutFaceChibi` portrait + side panel, so it inherits a working, polished UX. The **pitch panel
+replaces the inventory panel**; Up/Down live-refreshes portrait + pitch; **A → "Will N lead?"
+[Yes/No]** confirm sets the same permanent lord flag (`LORDSEL_FLAG_BASE + i`, read by
+`LordSelect_GetPid`). Driven by build-generated `gLordSelectCandidates[]` + parallel
+`sLordSelectPitchMsg[]`; portrait id + name come from each pid's `CharacterData` (no dependency
+on units being loaded at menu time). It is a **dedicated** screen (the real prep screen is
+untouched) and **must carry custom flair** — a distinct frame/title/tint so players don't
+confuse it with the prep screen that follows minutes later (flair is part of the DoD, not
+deferred). A one-time explainer text box precedes it (feedback item #4's "(a) explain"). Full
+DoD checklist lives on **#46**.
+_Decided: 2026-06-22 (Nicolas; reskin direction his; supersedes the hand-built menu; tracked on #46)_
 
 **Chapter outcomes ride gDefeatTalkList; entries go at the HEAD of the table.**
 A chapter's win and lose are both event-flag watchers in `EventListScr_<Ch>_Misc`

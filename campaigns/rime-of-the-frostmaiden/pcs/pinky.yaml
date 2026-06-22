@@ -7,6 +7,7 @@
 id: pinky
 name: Pinky
 death_quote: "Father...? Did I do good? ...I'll get up in a minute..."  # falls-in-battle quote (#6 dialogue pass; lore/pinky.md)
+lord_pitch: "Airborne knight -- flies over any terrain, resists magic. Weak to bows; keep clear of archers."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
 portrait_ref: portraits/pinky.png        # 96×80 bust shipped; GBA tile-sheet wiring pending (issue #23)
 
 built_by: prof-rbg                        # RBG's homunculus 'son' (flavor)
