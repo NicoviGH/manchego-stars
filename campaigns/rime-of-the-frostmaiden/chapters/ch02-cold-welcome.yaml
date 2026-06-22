@@ -72,6 +72,16 @@ difficulty_note: >
 # NOT widen the field — the prep screen (Pick Units) chooses which 5 take it; the chosen
 # lord (#42) is force-deployed. This models our difficulty to vanilla's despite the bigger cast.
 deploy_limit: 5
+# [col, row] — the NW entry corner, ringing the parked sled. FIRST PASS (parity intent
+# only): vanilla Ch2's ally tiles land on walls/peaks in Nicolas's hand-retiled paint, so
+# these are authored against THIS map's actual walkable tiles (plains/forest), not vanilla
+# coords. The party rolls in NW; the raid converges from the E/SE. Nicolas to adjust on the paint.
+deploy_slots:
+  - [0, 3]
+  - [0, 4]
+  - [0, 5]
+  - [1, 5]
+  - [2, 4]
 deployment:
   note: "Pick Units fields 5 of {7 PCs + Baxby} (vanilla Ch2 fields 5) + the Rolling Cheddar sled."
   defend_unit:
@@ -79,6 +89,7 @@ deployment:
     type: sled
     behavior: stationary        # parked; the raid comes to it (FE8 defend-in-place)
     must_survive: soft          # destruction = soft penalty, not game over
+    position: [1, 4]            # parked in the NW corner, ringed by the deploy slots
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
 # Mirrors FE8 Ch2 structure: ~6 trash + 1 named miniboss + 1 boss + 2 turn-3
@@ -91,6 +102,7 @@ enemy_units:
   - id: snow-wolf
     name: "Snow Wolf"
     count: 3
+    positions: [[9,6],[10,8],[9,8]]   # converging through the center on the parked sled
     fe_mechanic: axe-brigand    # Brigand class, axe-type weapon → in the weapon triangle
     flavor: "rends with frost-rimed claws"
     class: brigand
@@ -103,6 +115,7 @@ enemy_units:
   - id: road-bandit
     name: "Road Bandit"
     count: 2
+    positions: [[11,7],[12,8]]        # holding the eastern approach; (12,8) forest = the dropper
     fe_mechanic: axe-brigand
     flavor: "Ten-Towns road raider"
     class: brigand
@@ -116,6 +129,7 @@ enemy_units:
   - id: frost-hunter
     name: "Frost Hunter"
     count: 1
+    positions: [[13,8]]               # in the eastern treeline (forest avoid), near the boss
     fe_mechanic: archer         # single ranged unit for variety, as FE8 Ch2 does
     flavor: "looses ice-fletched arrows from the drifts"
     class: archer
@@ -129,6 +143,7 @@ enemy_units:
     name: "Grukk the Bruiser"
     is_miniboss: true
     count: 1
+    position: [13, 6]           # guards beside the captain on the eastern edge
     fe_mechanic: axe-brigand    # named mid-tier, guards near the boss (FE8 "Bone")
     flavor: "the captain's right hand"
     class: brigand
@@ -142,6 +157,7 @@ enemy_units:
     name: "Halvar the Raider Captain"
     is_boss: true
     count: 1
+    position: [14, 5]           # anchored on the far-east edge — the band's far corner
     fe_mechanic: steel-axe-brigand   # the one real threat = FE8's Steel-Axe Bazba mirror
     flavor: "leads the band that's been bleeding the Targos road"
     class: brigand
@@ -166,11 +182,12 @@ reinforcements:
         damage_type: slashing
     trigger_turn: 3
     spawn_edge: opposite_boss        # flanks a party pushed toward the boss (FE8 pattern)
+    positions: [[0,6],[0,7]]         # west edge (boss anchors east) — emerge behind a pushed party, lunge at the sled
     ai_pattern: aggressive
 
 # ── Chests / Village ─────────────────────────────────────────────────────────────
 chests:
-  - position: tbd
+  - position: [5, 11]                # southern plains pocket — a small detour off the defend line
     contents:
       - id: vulnerary
         count: 1
