@@ -511,11 +511,14 @@ engine's `CountRedUnits()` rout-win is the only path. Enemy/reinforcement tables
 symbols (`UnitDef_088B463C` raiders, `UnitDef_088B4718` repointed RED for the turn-3 rear wolves);
 Halvar rides the Bazba slot, Grukk the Bone slot.
 **Two non-obvious gotchas this surfaced:**
-• **Vanilla-parity coords don't fit a hand-retiled map.** The ch02 YAML's unit positions were
-authored against the *actual* walkable tiles of Nicolas's hand-retiled paint (terrain bytes off
-`TileConfigurationSnow.bin`: plains/forest walkable, peak/wall blocked) — *not* vanilla FE8 Ch2's
-coordinates, several of which land on walls/peaks in our paint. Parity is the enemy *count/level*
-mix, not literal tiles.
+• **The winter map is a faithful reskin — walkability ≈ vanilla FE8 Ch2.** A cell-by-cell terrain
+diff (our `.mar` vs vanilla `Ch2Map`, terrain bytes off each tileset's `.bin`) differs on **2 of 225
+cells** (the two village tiles). So positions are authored on the built `.mar`'s walkable tiles
+(plains/forest), verified in-bounds. Two real traps: (1) author against the committed **`.mar`**, NOT
+`map-review/*-layout.json` — that review grid disagrees with the build on ~5 cells; (2) our current
+placements are an *own* defend-east arrangement, not vanilla Ch2's literal tiles — mirroring vanilla's
+exact placements is an open option if we want strict positional parity. (Parity the gate enforces is
+the enemy *count/level* mix, not tiles.)
 • **Ch2 cutscene msg-id pool = dead vanilla Ch3 scene texts** `0x98b–0x992, 0x995–0x99a`
 (referenced only by the `ch3-eventscript.h` scenes our host overwrites). **`0x993`/`0x994` are LIVE
 battle quotes in `data_battlequotes.c`** and are deliberately excluded — the exact false-negative

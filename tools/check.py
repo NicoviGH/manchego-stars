@@ -84,6 +84,30 @@ def check_yaml_parses(fail):
             fail.append('YAML does not parse: %s (%s)' % (os.path.relpath(f, REPO), e))
 
 
+def check_chapter_status(fail):
+    """Every chapter YAML must declare its maturity: `status: active|planned`. Vertical-slice
+    workflow -- `planned` chapters are non-authoritative brainstorm SEED (enemy roster/levels
+    re-grounded against vanilla + party data on arrival), `active` ones are built/in-progress
+    with grounded combat data. Invariant: a `planned` chapter must NOT be `balance_locked: true`
+    -- you cannot lock the parity of a chapter whose enemies are an ungrounded sketch (that
+    half-state is exactly what makes the difficulty curve and readers treat a seed as truth)."""
+    import yaml
+    for f in sorted(glob.glob(os.path.join(
+            REPO, 'campaigns/*/chapters/ch*.yaml'))):
+        rel = os.path.relpath(f, REPO)
+        try:
+            d = yaml.safe_load(open(f, encoding='utf-8')) or {}
+        except Exception:
+            continue                       # parse errors are check_yaml_parses' job
+        status = d.get('status')
+        if status not in ('active', 'planned'):
+            fail.append('%s: missing/invalid `status` (must be active|planned, got %r)'
+                        % (rel, status))
+        elif status == 'planned' and d.get('balance_locked'):
+            fail.append('%s: status:planned cannot be balance_locked:true -- a planned '
+                        'chapter is an ungrounded seed; ground it and flip to active first' % rel)
+
+
 def check_tool_refs_exist(fail):
     pat = re.compile(r'tools/([\w-]+\.(?:py|rb))')
     for d in _docs():
@@ -332,7 +356,7 @@ def check_lane_ownership(fail):
 def main():
     fail = []
     for check in (check_python_compiles, check_tests_pass, check_yaml_parses,
-                  check_tool_refs_exist, check_no_dead_concepts,
+                  check_chapter_status, check_tool_refs_exist, check_no_dead_concepts,
                   check_generated_indexes_fresh, check_engine_guards_present,
                   check_save_layout_stable, check_lane_ownership):
         check(fail)

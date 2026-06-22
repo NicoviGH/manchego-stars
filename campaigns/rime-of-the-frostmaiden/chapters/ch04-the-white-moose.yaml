@@ -8,6 +8,9 @@
 id: ch04-the-white-moose
 title: "The White Moose"
 chapter_number: 4
+status: planned                # brainstorm SEED, NOT authoritative: enemy roster/levels/beats are
+                               # re-grounded against vanilla + party data when the slice is reached
+                               # (brainstorming skill digests this). Exempt from the parity gate until then.
 milestone: M3
 cadence: monster_debut          # see docs/CHAPTERS.md — 🟨 fog-of-war forest hunt (tone shift to monsters)
 fe8_base_map: "FE8 Ch4 — Ancient Horrors"           # the DefeatAll/monster-debut half

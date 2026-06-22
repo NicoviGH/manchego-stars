@@ -6,6 +6,9 @@
 id: ch08-the-eastway-ambush
 title: "The Eastway Ambush"
 chapter_number: 8
+status: planned                # brainstorm SEED, NOT authoritative: enemy roster/levels/beats are
+                               # re-grounded against vanilla + party data when the slice is reached
+                               # (brainstorming skill digests this). Exempt from the parity gate until then.
 milestone: M3
 cadence: scripted_defeat        # see docs/CHAPTERS.md — 🎬 (the MVP wall)
 fe8_base_map: "FE8 Ch13 — Hamill Canyon"            # Survive/terrain base (objective match, not 1:1 ch#)

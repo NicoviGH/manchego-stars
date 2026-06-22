@@ -5,6 +5,7 @@
 id: ch02-cold-welcome
 title: "Cold Welcome"
 chapter_number: 2
+status: active                 # built / in-progress slice; combat data is grounded + authoritative
 milestone: M3
 cadence: breather_defend          # see docs/CHAPTERS.md — 🟦
 

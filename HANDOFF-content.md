@@ -63,9 +63,11 @@ didn't draw, text spilled. Nicolas's call: **clone-and-adapt a vanilla menu** �
 **What landed (this session):** `inject_ch02` hosts Ch2 on chapter slot 3 — `make` green, `verify_text`
 0 runaway, drift clean, 12 unit tests pass, cutscenes decode clean (spot-checked). ch01 → ch02 →
 dev placeholder (ch03 unhosted) chains. ADR in `decisions.md` §"Ch2 hosting".
-- **Positions** authored into the ch02 YAML against the **real hand-retiled map's walkable tiles**
-  (terrain off `TileConfigurationSnow.bin`; plains/forest walkable, peak/wall blocked) — *not* vanilla Ch2
-  coords (several land on walls/peaks). Party+sled NW corner; boss far-east; rear wolves on the west edge.
+- **Positions** authored on the built **`.mar`**'s walkable tiles (plains/forest), verified in-bounds.
+  The winter map is a **faithful reskin** of FE8 Ch2 (terrain diff vs `Ch2Map` = 2/225 cells), so
+  walkability ≈ vanilla. Placement is our own defend-east arrangement (party+sled NW, boss far-east, rear
+  wolves west edge) — NOT vanilla's literal tiles; mirroring vanilla exactly is an open option. (Author
+  against the `.mar`, not `map-review/*-layout.json` — the review grid disagrees with the build.)
 - **DefeatAll**: slot-3 host goal = vanilla slot-4's `defeat_all` template; `Seize(14,1)`+chests/doors dropped
   from `EventListScr_Ch3_Location` (`CountRedUnits()` win). Lord auto-force-deploys (flag hook; nothing per-chapter).
 - **Cutscenes** built from the locked YAML: Vellynne opening (BACG, placeholder `FID_Ismaire` face), Wolfram
