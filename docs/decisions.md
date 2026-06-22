@@ -362,6 +362,28 @@ CH=chNN`), built on the tested combat core `tools/fe_combat.py` (the decomp's ow
 execution plan + full spec: issue #45.
 _Decided: 2026-06-18 (Nicolas; difficulty analysis session — supersedes the open "Ch1 difficulty" item)_
 
+**Recruit budget: the roster tracks vanilla's field-growth curve to a ~16–18 pool — NOT capped at Ch5.**
+The binding *field* size is `deploy_limit` = vanilla chapter N's deploy-slot count (§Field parity;
+table in `fe8-pacing-reference.md` §1b). That curve, [decomp]-verified through Ch14a, **climbs and
+then plateaus — it never stops**: `2 → 4 → 5 → 9 → 9 → 9 → (5x:4) → 10 → 10 → 9 → 11 → 12 → 11 → 12 →
+12`, holding **~12 from Ch10a through the back half** (exact Ch15–Final pin deferred, same honesty
+tier as §1b — the late ally arrays are raw-address blobs; the plateau is the load-bearing fact).
+Because our model **recruits the whole cast and Pick-Units deploys `deploy_limit` of them**
+(§Field parity), the *roster* must sit **above** the peak field, or Pick Units is a formality and a
+single permadeath drops you under the cap. Vanilla always carries a bench above the deploy cap; we
+should too.
+**The math that kills the old "stops at Ch5" cap:** 8 PCs + the locked Ch2–5 recruits
+(Baxby/Trex/Lupin/Sahnar/Basil) = **13** — which only *barely fills* the Ch9→endgame field cap of
+11–12 (bench ≈ 1). That is a forced-deploy roster with no choice and no permadeath slack. **Budget:
+grow the roster to ≈ peak field + a ~4–6 bench = ~16–18 units**, i.e. **~3–5 more permanent recruits
+across Ch6–21**, added as the DM notes supply bodies (which/where stays DM-notes-gated — see
+`roadmap.md`). This governs **roster size, not field size** (per-chapter field stays vanilla via
+`deploy_limit`), and recruits still earn their slot by **filling a role gap** (the by-role method in
+`roadmap.md`) — the budget says *how many*, the role principle says *which*.
+_Reconstructed: 2026-06-22 (CLAUDE, from the decomp field-growth curve at Nicolas's direction) —
+supersedes the stale `roadmap.md` "roster stops growing at Ch5" line; the original budget sweep was
+done in-session and never recorded, which this ADR fixes._
+
 **Two healers, differentiated by donor (same move as the shamans).** Sclorbo and Basil are both
 Priests, so they get *distinct* vanilla donor lines to avoid stat-twins: **Sclorbo → Moulder** (the
 durable "war-priest": HP70/Def25, balanced, accurate) and **Basil → Natasha** (the frail "mage-healer":

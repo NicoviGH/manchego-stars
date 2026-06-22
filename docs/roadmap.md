@@ -72,10 +72,15 @@
 ## Recruit cadence (by role) 🧩
 
 > **Method (Nicolas, 2026-06-20):** class is the *chassis* (move/weapon/stat shape); the
-> character is custom art on top ("custom art is the lever"). We don't field a vanilla-sized
-> army — the cast meets by Ch1 and we hold parity via `deploy_limit`. So we recruit to fill
-> **roles**, skinning canon characters onto whatever chassis the army needs. Per-unit detail
-> lives in `campaigns/.../npcs/*.yaml` (the source of truth); this is the schedule overview.
+> character is custom art on top ("custom art is the lever"). The whole cast meets by Ch1; each
+> chapter **fields a vanilla-sized force** via `deploy_limit` (= vanilla chapter N's deploy slots),
+> and Pick-Units chooses who takes it. So we recruit to fill **roles**, skinning canon characters
+> onto whatever chassis the army needs. Per-unit detail lives in `campaigns/.../npcs/*.yaml` (the
+> source of truth); this is the schedule overview.
+>
+> **Budget:** see `decisions.md` §"Recruit budget" — the *roster* tracks vanilla's field-growth
+> curve to a **~16–18 pool** (peak field ~12 + bench), so it **keeps growing past Ch5**; the
+> by-role table below is the *which*, the budget is the *how many*.
 
 **Locked recruits (class + role settled; full bases/growths authored at wiring):**
 
@@ -88,10 +93,13 @@
 | Ch5 | **Sahnar** | Myrmidon | **sword duelist** (crit) | moon-elf mummy |
 | Ch5 | **Basil** | Priest | **2nd healer** | goodberry shrub (heals = handing out berries) |
 
-By **Ch5** every core FE role is covered with zero magic redundancy (we're already deep on
-casters: Marty/Mees dark, Rootis anima, Sclorbo/Basil staff). The back half rides promotions +
-gear (the reward curve above) — the roster stops growing at Ch5 (no new permanent recruits unless
-the DM notes add them).
+By **Ch5** every core FE *role* is covered with zero magic redundancy (we're already deep on
+casters: Marty/Mees dark, Rootis anima, Sclorbo/Basil staff) — but the **roster is not done growing**.
+That's 13 units (8 PCs + 5), which only barely fills the Ch9→endgame field cap of 11–12 (≈1 bench).
+Per `decisions.md` §"Recruit budget", we keep recruiting toward a **~16–18 pool** (**~3–5 more
+permanent recruits across Ch6–21**) so Pick-Units stays a real choice and permadeath has slack — added
+as the DM notes supply bodies (which/where below stays DM-notes-gated). The back half also rides
+promotions + gear (the reward curve above), but those are *on top of* the growing roster, not instead.
 
 **RBG's ballistae (Pepperjack & Brie) — NOT roster recruits.** They are vanilla FE8 **map
 ballistae** (siege emplacements the party mans), flavored as RBG's cannon-constructs — we don't
