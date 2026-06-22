@@ -418,17 +418,24 @@ a CI-gated chapter) is the lone deferred reference. `make difficulty CH=chNN` ga
 `make difficulty` (no CH) prints the campaign curve.
 _Implemented: 2026-06-19 (CLAUDE; pipeline track, TDD)_
 
-**The parity curve is surfaced in CI informatively; the hard gate is built but unwired until content lands (#48 (b)).**
-CI's `build` job now runs `make difficulty` on every build (after the submodule checkout it needs to read
-the decomp HEAD), so balance spikes/sags and parity regressions are visible on every PR. It is **informative
-only** — `make difficulty` always exits 0. The enforcing form is `make difficulty-gate`
-(`difficulty.py --curve --check`): `curve_gate_failures(rows)` fails any chapter that **claims a
-`parity_reference`** and is either off-parity (`verdict != OK`) or unreliably measured (a dropped boss — an
-unreliable OK is not a pass); chapters with no curated reference are informational and never gate. Today
-`difficulty-gate` is RED by design (our Ch2–Ch7 enemy inventories aren't authored yet, so our side reads 0.0 /
-off-parity), so CI runs the informative `difficulty`. **The flip is a one-word CI change** —
-`difficulty` → `difficulty-gate` — once the content track authors those slices.
-_Implemented: 2026-06-19 (CLAUDE; pipeline track, TDD)_
+**The parity curve is surfaced in CI, and the hard gate enforces per-chapter via an opt-in `balance_locked` flag (#48 (b)).**
+CI's `build` job runs `make difficulty-gate` (`difficulty.py --curve --check`) on every build (after the
+submodule checkout it needs to read the decomp HEAD), so balance spikes/sags and parity regressions are
+visible on every PR **and** a regression on a finished chapter hard-fails the build. The gate is **per-chapter
+opt-in**: because we author chapters as we go (the campaign isn't done until it's basically done), an
+all-chapters gate would redden CI for every unwritten chapter. Instead a chapter is enforced only once content
+marks it balance-final with **`balance_locked: true`** in its chapter YAML. `curve_gate_failures(rows)` fails a
+**locked** chapter that is off-parity (`verdict != OK`), unreliably measured (a dropped boss — an unreliable OK
+is not a pass), or has no curated `parity_reference` at all (you can't lock a chapter the metric can't measure —
+a config mistake, surfaced loudly). **Unlocked** chapters (unwritten or mid-authoring) stay informational and
+never gate, so an in-progress chapter never reddens CI; with zero locks the gate passes (enforces nothing),
+which is why `--check` can ship before any chapter is locked. The lock is set in the **content** lane
+(`campaigns/**`); the gate logic that reads it is **pipeline** (`difficulty.py`). Workflow: author a chapter's
+enemy inventory → confirm it reads OK on the curve → add `balance_locked: true` → CI now defends it.
+Decision: explicit flag over auto-detecting an authored force, because a parity gate's job is to lock in
+*finished* work — auto-detect can't tell "balanced" from "halfway through placing enemies" and would fire
+mid-authoring (Nicolas, 2026-06-21).
+_Implemented: 2026-06-19 (informative curve); per-chapter gate enforcing 2026-06-21 (CLAUDE; pipeline track, TDD)_
 
 **Monster/exotic enemy weapons stay out of the content-owned weapon map; venin is a base-might proxy (#53).**
 FE8 Ch4 "Ancient Horrors" (all-monster) and Ch6 "Victims of War" needed weapons our cast never carries: the
@@ -677,6 +684,33 @@ inputs to surface the crashes/soft-locks those miss. Decisions:
   no false positives. The remaining #49 spine after this is the LLM-player (swap the rule-based policy).
 _Decided: 2026-06-19 (CLAUDE; pipeline track. fuzzrng + liveness NUDGE TDD; scenarios.fuzz + fuzz_ch01 verified across seeds on a built ROM)_
 
+**Playtest platform brick 4 = an LLM-player as a SOAK/BALANCE tool, built policy-and-transport-first (#63).**
+The final #49 spine brick swaps the greedy clear-bot's rule-based `pickTarget` for an LLM *policy* over the
+same I/O layer. Its job is dynamic balance signal — when a competent player loses units or barely clears a
+chapter, that's the same signal `difficulty.py` models statically, now observed live; its credibility bar is
+beating vanilla FE8 (so the signal isn't overfit to our maps). Locked architecture (brainstormed w/ Nicolas):
+- **Transport = sidecar file-handshake.** mGBA's embedded Lua can't make network calls, so the harness
+  serializes the board to a request file and blocks; an external `tools/playtest/llm_player.py` (Anthropic SDK,
+  ordinary testable Python) decides and writes the response. Mirrors the platform doctrine — *pure core, driver
+  owns I/O* — with the LLM **policy** in the Python sidecar. (Rejected: in-emulator socket = fragile.)
+- **Granularity = per-turn commander.** The LLM gets the whole board once per player phase and emits an ordered
+  list of unit orders; the harness executes them with existing primitives. ~6–8× fewer calls than per-unit and
+  better play (tactics are interdependent: gang-up, bait, stay out of boss range).
+- **Model = Sonnet default, `PT_MODEL` knob.** A weak player fires *false* balance alarms, defeating the soak,
+  so default to one that plays well; a cheap Haiku soak is one flag away. No tiered/escalation plumbing (YAGNI).
+- **Determinism + cost = one artifact, the board-hash-keyed transcript.** Each decision is keyed by
+  `hash(serialize_board) + seed + chapter + turn`: replay hit → cached orders (free, deterministic); miss in
+  replay → hard fail; miss in local soak → call the LLM, append. This single mechanism satisfies the platform's
+  "replays identically on CI `lua` and mGBA" rule **and** makes re-soaks cost nothing.
+- **M1 (this commit) = the three PURE cores only, no LLM calls** (TDD, `tools/test_llm_player.py` in `make
+  test`, no emulator): `serialize_board` (deterministic compact JSON — units normalized by id so unit-array
+  iteration order can't change the bytes/key), `validate_orders` (illegal orders → a `rejected` list with
+  reasons so a bad LLM turn is dropped, never soft-locks — the harness runs the survivors), and `Transcript`
+  record/replay keyed by `transcript_key`. Swap point stays the pure `clearbot.lua pickTarget`. M2 wires the
+  sidecar handshake + `llmDrive` scenario (replay-only on the prologue), M3 the live policy, M4 the soak report
+  into the difficulty curve, M5 the vanilla-FE8 validation milestone (needs a save-state checkpoint).
+_Decided: 2026-06-20 (CLAUDE; pipeline track. Epic #63; M1 cores TDD'd green, 20 asserts in make test)_
+
 **Recording a cutscene as a review GIF (the standard way to show Nicolas motion).**
 The harness fast-forwards cutscenes (mashes A), so an assert scenario's screenshots land
 on fades — to SEE a scene play, use a `record*` scenario: it drives the game to the
@@ -837,9 +871,19 @@ _Decided: 2026-06-17_
 
 ## Distribution & Scope
 
-**Distribution: private, pre-patched ROM sent directly to 7 players**
-No patch file, no RomHack Plaza listing, no public hosting. Non-SRD content (Artificer, Circle of Spores, homebrew races) can be used freely for this private distribution.
-_Decided: May 2026_
+**Distribution: private, pre-patched `.gba` shared with the 7 players (no public ROM or patch)**
+Players get a pre-patched `.gba` via a private link Nicolas shares — no public hosting of the
+copyrighted ROM. The README + `docs/playtesters.md` are the tester landing page (install + carry
+your save), pointing at that private link. A **public `.bps` patch was evaluated and rejected**
+(#59): the `fireemblem8u` decomp build on our toolchain is **non-matching** — it does not
+byte-reproduce retail FE8 (recompiled code + re-compressed graphics differ across the ROM), so a
+patch from a tester's retail ROM to our build is ~ROM-sized (measured **11.4 MB, 71% of the ROM**),
+a pointless download that also effectively republishes the game. A small public patch would first
+require a byte-matching build (a separate toolchain effort, not planned). The pure-Python BPS
+encoder (`tools/make_bps.py`, tested) stays in the repo for that future, or for small deltas between
+our own consecutive builds. Non-SRD content (Artificer, Circle of Spores, homebrew races) is used
+freely for this private distribution.
+_Decided: May 2026; reaffirmed private-only 2026-06-20 after the public-`.bps` evaluation (#59)_
 
 **Permadeath: player choice via FE8's Casual/Classic toggle**
 The toggle ships as-is from vanilla FE8. In-fiction flavor for Casual retreats: "retreated to the sled" / "carried to safety by Baxby."
@@ -872,19 +916,22 @@ file/tag is versioned, the in-game label is not. The first build under this sche
 `ManchegoStars-Alpha-2026-06-17.gba` is **not** retro-tagged — the scheme starts clean at `v0.1.0`.
 _Decided: 2026-06-19_
 
-**Playtest carryover: ship a per-release starter save; don't rely on cross-build SRAM compatibility**
-Each new build a tester receives ships with a **starter `.sav`** that drops them at the newest
-playable chapter (prior chapters marked cleared), so playtesters **never replay Prologue/Ch 1** to
-reach new content. We do **not** lean on save carryover across builds: FE8 validates a save by a
-**fixed** magic (`SAVEMAGIC32`/`SAVEMAGIC16`) + a checksum (`fireemblem8u/src/bmsave-lib.c`), and
-`EraseSramDataIfInvalid` wipes anything that fails on boot. The magic is constant, so a rebuild
-*alone* doesn't invalidate a save — but adding/finishing chapters shifts the save-data layout
-(chapter count, unit tables, `PlaySt`, SRAM offsets), after which an old `.sav` fails the checksum
-(auto-wiped) or loads as garbage. Emulator save-*states* are ROM-version-specific and break every
-build, so testers are told to use the provided save and not carry old saves/states. The starter
-save is produced/bundled by the friend build (`tools/build.sh dist`, release #37). A future in-game
-**chapter-select / debug warp** is a possible cleaner alternative (more work, reusable) — stretch.
-_Decided: 2026-06-19; from the brother's v0.1.0 playtest (#59)_
+**Playtest carryover: testers carry their own `.sav` across builds; a per-release starter save is the fallback**
+FE8 validates a save by a **fixed** magic (`SAVEMAGIC32`/`SAVEMAGIC16`) + a checksum over the save
+block (`fireemblem8u/src/bmsave-lib.c`, `ReadGlobalSaveInfo`/`ReadSaveBlockInfo`); `EraseSramDataIfInvalid`
+wipes anything that fails on boot. Those magics are compile-time constants, so a **rebuild alone never
+invalidates a save** — the only thing that can is the save-block *layout* shifting, which moves the old
+bytes to wrong offsets and fails the checksum. Manchego Stars reskins **within FE8's fixed chapter/
+character slots** and never touches the save structs, the array dims that size `struct GameSaveBlock`
+(`BWL_ARRAY_NUM` roster, `WIN_ARRAY_NUM` chapters), or the magics — so the layout is stable across our
+drops and an old `.sav` stays valid. Default is therefore **carry-forward**: testers keep their battery
+`.sav` (in-game Save — **not** emulator save-*states*, which are ROM-version-specific and break every
+build) and move it onto the new build; per-emulator steps (Pizza Boy / Delta) live in
+`docs/playtesters.md`. `tools/check.py check_save_layout_stable` pins those constants and fails the
+build if a future submodule bump ever shifts the layout — **that** drop, and only that, gets a
+per-release starter `.sav` (the fallback) plus a save-version note. Build/dist stamps the private
+`.gba`: `tools/build.sh dist` (#37).
+_Decided: 2026-06-20 (revises the 2026-06-19 starter-save-first call from #59 after verifying the layout is stable)_
 
 ---
 

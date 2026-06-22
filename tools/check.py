@@ -163,6 +163,61 @@ def check_engine_guards_present(fail):
                         '(see docs/decisions.md)' % (fn, fn, mechanic))
 
 
+# ── Save-layout stability (so testers can carry their .sav across builds) ──────────
+# A battery .sav is accepted on a new build iff its validity magics + checksum still
+# match (bmsave-lib.c:125-128, ReadSaveBlockInfo). Those magics are constant, so a
+# rebuild alone never invalidates a save -- the ONLY thing that can is the save-block
+# LAYOUT shifting, which moves the old bytes to wrong offsets and fails the checksum.
+# struct GameSaveBlock's size is driven by two array dims; pin them (and the magics) so
+# the day a submodule bump grows the roster/chapter arrays, CI goes red and that drop
+# (and only that drop) needs the #59 starter-save fallback. Decision: docs/decisions.md
+# -> Playtest distribution: carry-forward saves. Source-only grep (no compile), so it
+# self-skips with the rest when the submodule is absent.
+PINNED_SAVE_LAYOUT = {
+    'BWL_ARRAY_NUM': 0x46,   # roster size  -> sizeof(GameSaveBlock.pidStats)
+    'WIN_ARRAY_NUM': 0x30,   # chapter count -> sizeof(GameSaveBlock.chapterStats)
+    'SAVEMAGIC16': 0x200A,   # save-block validity magic (constant)
+    'SAVEMAGIC32': 0x40624,  # save-block validity magic (constant)
+}
+
+
+def _parse_save_layout_constants(text):
+    """Pull the pinned save-layout constants out of decomp header text. Handles both the
+    `#define BWL_ARRAY_NUM 0x46` form and the `SAVEMAGIC16 = 0x200A,` enum form. The word
+    boundary keeps SAVEMAGIC32 from capturing SAVEMAGIC32_ARENA. Missing names are omitted."""
+    out = {}
+    for name in PINNED_SAVE_LAYOUT:
+        m = re.search(r'\b' + re.escape(name) + r'\b\s*=?\s*(0x[0-9A-Fa-f]+|\d+)', text)
+        if m:
+            out[name] = int(m.group(1), 0)
+    return out
+
+
+def _save_layout_drift(found):
+    """Drift messages comparing parsed constants `found` against PINNED_SAVE_LAYOUT."""
+    msgs = []
+    for name, want in PINNED_SAVE_LAYOUT.items():
+        if name not in found:
+            msgs.append('save-layout constant %s not found in the decomp -- header '
+                        'restructured; testers\' saves may break (see #59)' % name)
+        elif found[name] != want:
+            msgs.append('save-layout constant %s changed (%#x -> %#x): struct GameSaveBlock '
+                        'shifts, so old battery saves fail the checksum and auto-wipe. Ship a '
+                        'per-release starter save for this drop (#59 fallback) and re-pin here.'
+                        % (name, want, found[name]))
+    return msgs
+
+
+def check_save_layout_stable(fail):
+    """Guard that a tester's battery .sav still loads on a new build (#59 carry-forward)."""
+    header = os.path.join(REPO, 'fireemblem8u', 'include', 'bmsave.h')
+    if not os.path.isfile(header):
+        print('check_save_layout_stable: skipping (fireemblem8u submodule not checked out)')
+        return
+    found = _parse_save_layout_constants(open(header, encoding='utf-8').read())
+    fail.extend(_save_layout_drift(found))
+
+
 # ── Engine/content lane ownership (the seam, enforced) ────────────────────────────
 # Single source of truth for which track may edit which file (mirrors the "You own"
 # lists in HANDOFF-content.md / HANDOFF-pipeline.md). Anything not listed is SHARED
@@ -171,7 +226,8 @@ def check_engine_guards_present(fail):
 PIPELINE_EXCLUSIVE_FILES = {
     'tools/difficulty.py', 'tools/fe_combat.py', 'tools/check.py', 'tools/build.sh',
     'tools/worktree-setup.sh', 'tools/test_difficulty.py', 'tools/test_fe_combat.py',
-    'tools/test_check_lanes.py',
+    'tools/test_check_lanes.py', 'tools/test_check_save_layout.py',
+    'tools/make_bps.py', 'tools/test_make_bps.py', 'tools/test_llm_player.py',
 }
 PIPELINE_EXCLUSIVE_DIRS = ('tools/playtest/', 'tools/hooks/', '.github/workflows/')
 CONTENT_EXCLUSIVE_FILES = {
@@ -278,7 +334,7 @@ def main():
     for check in (check_python_compiles, check_tests_pass, check_yaml_parses,
                   check_tool_refs_exist, check_no_dead_concepts,
                   check_generated_indexes_fresh, check_engine_guards_present,
-                  check_lane_ownership):
+                  check_save_layout_stable, check_lane_ownership):
         check(fail)
     if fail:
         print('DRIFT (%d):' % len(fail))
