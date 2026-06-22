@@ -496,6 +496,38 @@ Note ch01 has a prep screen where vanilla Ch1 has none: the cap is the parity;
 Pick Units only chooses *which* PCs fill it (Nicolas, 2026-06-10).
 _Decided: 2026-06-10 (decomp trace, ch01 slice)_
 
+**Ch2 "Cold Welcome" hosting (#22): slot 3, party-persist, DefeatAll — simpler than ch01.**
+ch02 rides the *next* vanilla slot after ch01 (slot 2 → slot 3, `CHAPTER_L_3`), reached by
+ch01's ending `MNC2(0x3)` (was the dev placeholder). Three ways it diverges from `inject_ch01`,
+all because the slice is mid-campaign rather than the cast's first chapter:
+(1) **Party persists** — no cast join-LOAD; the saved roster carries over and the prep flow
+fields 5 of it (cap = `UnitDef_Event_Ch3Ally` entry count). (2) **No lord-select** — the lead was
+chosen in ch01; the flag-driven `IsCharacterForceDeployed_` hook auto-force-deploys it in *any*
+later chapter with zero per-chapter wiring (only `CauseGameOverIfLordDies`, already vanilla in
+`EventListScr_Ch3_Misc`, is needed). (3) **DefeatAll, not Seize** — the slot-3 host `goal` is
+swapped to vanilla **slot-4's `defeat_all` template** (`windowDataType: defeat_all`), and the
+vanilla Ch3 `Seize(14,1)` + chests/doors are dropped from `EventListScr_Ch3_Location`, so the
+engine's `CountRedUnits()` rout-win is the only path. Enemy/reinforcement tables reuse vanilla Ch3
+symbols (`UnitDef_088B463C` raiders, `UnitDef_088B4718` repointed RED for the turn-3 rear wolves);
+Halvar rides the Bazba slot, Grukk the Bone slot.
+**Two non-obvious gotchas this surfaced:**
+• **Vanilla-parity coords don't fit a hand-retiled map.** The ch02 YAML's unit positions were
+authored against the *actual* walkable tiles of Nicolas's hand-retiled paint (terrain bytes off
+`TileConfigurationSnow.bin`: plains/forest walkable, peak/wall blocked) — *not* vanilla FE8 Ch2's
+coordinates, several of which land on walls/peaks in our paint. Parity is the enemy *count/level*
+mix, not literal tiles.
+• **Ch2 cutscene msg-id pool = dead vanilla Ch3 scene texts** `0x98b–0x992, 0x995–0x99a`
+(referenced only by the `ch3-eventscript.h` scenes our host overwrites). **`0x993`/`0x994` are LIVE
+battle quotes in `data_battlequotes.c`** and are deliberately excluded — the exact false-negative
+the handoff warns hex-grep produces.
+**Deferred (flagged in code, not in this pass):** the sled defend-in-place soft-fail mechanic +
+sled sprite, Vellynne's cutscene bust (#19 — a placeholder `FID_Ismaire` face shows meanwhile),
+the snow-wolf/road-bandit map-sprite reskin (vanilla brigand sprite for now), the chest +
+vulnerary drop, the "Chapter 2" title-card glyphs (atlas lacks C/W/d/m), and the in-game
+load-test. The chapter builds green, decodes clean (`verify_text` 0 runaway), and chains
+ch01 → ch02 → dev placeholder (ch03 unhosted).
+_Implemented: 2026-06-22 (CLAUDE; content track — host wiring + cutscenes, build-green)_
+
 **No world map ⇒ `GetBattleMapKind()` falls back to STORY (engine hardening).**
 Vanilla classifies most chapter slots (slot 2 onward — `CHAPTER_L_2`...) by scanning
 `gGMData` world-map node state and falls back to `BATTLEMAP_KIND_SKIRMISH` when no
