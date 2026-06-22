@@ -5,6 +5,7 @@
 id: meesmickle
 name: Meesmickle
 death_quote: "Nine lives. ...Somebody miscounted."  # falls-in-battle quote (#6 dialogue pass; lore/meesmickle.md)
+lord_pitch: "Dark mage; strong, slow magic at range. Gains Summon on promotion -- but frail."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
 portrait_ref: portraits/meesmickle.png   # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/meesmickle.jpeg
 # Portrait source: https://www.dndbeyond.com/avatars/25348/435/1581111423-72613637.jpeg

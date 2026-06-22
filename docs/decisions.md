@@ -217,6 +217,18 @@ tree corrupt each other) — so enforcing exactly where worktrees exist covers t
 constants (e.g. the weapon↔ITEM map) live in `tools/inject/decomp.py`, not either side's file. Issue #55.
 _Decided: 2026-06-19_
 
+**Seam refinement: content-feature `record*` playtest scenarios are content spot-checks, not pipeline infra.**
+The playtest *harness/framework* (`harness.lua`, clearbot, liveness, the verification scenarios) stays
+pipeline-owned. But a `record*` scenario that captures a **content** feature for review (e.g. `recordlord`
+for the #46 lord-select cards) is a content spot-check — the `dialogue-pass` workflow itself mandates
+`run.sh record` + `make_gif.py` to show Nicolas cutscene/card renders — so the content lane must be able to
+author it without a worktree hop. *Running* any scenario was always in-lane; only *editing* `tools/playtest/**`
+was blocked. **Mechanism (queued, pipeline-owned edit): carve content review scenarios into a content-owned
+file** the harness includes (e.g. `tools/playtest/content_scenarios.lua` added to `CONTENT_EXCLUSIVE_FILES`,
+or a `record*`-name carve-out in `_file_lane`), so the lane guard lets content own its capture scenarios while
+the framework stays pipeline. Until that lands, a content `record*` addition commits with `--no-verify`.
+_Decided: 2026-06-22 (Nicolas — "B for sure"; mechanism queued for a pipeline-lane instance)_
+
 **Track work always happens in that track's worktree — even solo.** "Work the content track" / "work the
 pipeline track" means: switch into `../ms-content` (`inst/content`) or `../ms-pipeline` (`inst/pipeline`)
 *first*, then work. `main` is reserved for cross-track integration and ad-hoc one-offs. This is broader than
@@ -534,6 +546,26 @@ Verified by the `ch01lord` playtest: pick the last candidate (benched by default
 under the 4-cap) → flag set, force-deployed with the cap intact, death = game-over
 screen; ch00 gameover/retreat semantics unchanged.
 _Decided: 2026-06-10 (placement Nicolas; mechanism decomp-traced; closes #42)_
+
+**Lord-select UI (#46): a candidate-info screen reskinned from "Pick Units", not a hand-built menu.**
+The pick screen shows each candidate's portrait + a qualitative **pitch** (strengths/weaknesses
+in words; **no numeric stats** — a hand-authored `lord_pitch:` per PC YAML, Nicolas 2026-06-21)
+so the choice is informed. A first hand-built menu (custom frames + full-bust `StartFace2` +
+multi-line text drawn straight to BG) was abandoned: the bust wouldn't render over the scenic
+BACG (OBJ-vs-BG priority), `DrawUiFrame2` borders didn't show, and pitch text spilled/bled.
+Instead we **clone-and-adapt `prep_unitselect.c`** (the deploy "Pick Units" screen) into a
+dedicated **`engine/lord_select_screen.c`** — it already is a scrollable unit list + live
+`PutFaceChibi` portrait + side panel, so it inherits a working, polished UX. The **pitch panel
+replaces the inventory panel**; Up/Down live-refreshes portrait + pitch; **A → "Will N lead?"
+[Yes/No]** confirm sets the same permanent lord flag (`LORDSEL_FLAG_BASE + i`, read by
+`LordSelect_GetPid`). Driven by build-generated `gLordSelectCandidates[]` + parallel
+`sLordSelectPitchMsg[]`; portrait id + name come from each pid's `CharacterData` (no dependency
+on units being loaded at menu time). It is a **dedicated** screen (the real prep screen is
+untouched) and **must carry custom flair** — a distinct frame/title/tint so players don't
+confuse it with the prep screen that follows minutes later (flair is part of the DoD, not
+deferred). A one-time explainer text box precedes it (feedback item #4's "(a) explain"). Full
+DoD checklist lives on **#46**.
+_Decided: 2026-06-22 (Nicolas; reskin direction his; supersedes the hand-built menu; tracked on #46)_
 
 **Chapter outcomes ride gDefeatTalkList; entries go at the HEAD of the table.**
 A chapter's win and lose are both event-flag watchers in `EventListScr_<Ch>_Misc`

@@ -6,6 +6,7 @@
 id: sclorbo
 name: Sclorbo
 death_quote: "(Sclorbo's glow dims -- one last wave of courage, then still.)"  # falls-in-battle quote (#6); impression text, never speaks (lore/sclorbo.md)
+lord_pitch: "Spiritual guide who heals allies with sacred staves. Deals no damage -- keep him guarded."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
 portrait_ref: portraits/sclorbo.png     # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/sclorbo.jpeg
 # Portrait source: https://www.dndbeyond.com/avatars/25339/252/1581111423-72588721.jpeg
