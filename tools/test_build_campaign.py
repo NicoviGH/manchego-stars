@@ -123,5 +123,39 @@ class LordFloorRows(unittest.TestCase):
         self.assertEqual([uid for uid, *_ in bc.lord_floor_rows(self.CAMPAIGN, order)], order)
 
 
+class BattleAnimInjection(unittest.TestCase):
+    """Pure transforms behind the faked-battle-anim injection (#65 M-A)."""
+
+    BANIM = ('struct BattleAnim banim_data[] = {\n'
+             '\t{"arcm_ar1", &banim_arcm_ar1_modes_bin, &banim_arcm_ar1_motion_o, '
+             '&banim_arcm_ar1_oam_r_bin, &banim_arcm_ar1_oam_l_bin, &banim_arcm_ar1_agbpal}, // 0x25\n'
+             '\t{"arcm_ar1", &banim_arcm_ar1_2_modes_bin, &banim_arcm_ar1_2_motion_o, '
+             '&banim_arcm_ar1_2_oam_r_bin, &banim_arcm_ar1_2_oam_l_bin, &banim_arcm_ar1_2_agbpal}, // 0x26\n'
+             '};\n')
+
+    def test_append_row_grows_by_one_and_returns_the_new_id(self):
+        new, anim_id = bc.banim_append_row(self.BANIM, 'rbg_ar1')
+        self.assertEqual(anim_id, 2)                                  # 2 rows -> id 0x2
+        self.assertEqual(new.count('\t{"'), 3)                        # grew by exactly one
+        self.assertIn('{"rbg_ar1", &banim_rbg_ar1_modes_bin, &banim_rbg_ar1_motion_o, '
+                      '&banim_rbg_ar1_oam_r_bin, &banim_rbg_ar1_oam_l_bin, '
+                      '&banim_rbg_ar1_agbpal}', new)
+
+    def test_append_row_leaves_the_donor_rows_byte_unchanged(self):
+        new, _ = bc.banim_append_row(self.BANIM, 'rbg_ar1')
+        for donor in ('arcm_ar1_modes_bin', 'arcm_ar1_2_modes_bin'):
+            self.assertEqual(new.count(donor), self.BANIM.count(donor))  # additive only
+        self.assertLess(new.index('};'), len(new))                       # still closed
+
+    def test_repoint_conf_changes_only_the_matched_weapon_index(self):
+        conf = ('CONST_DATA struct BattleAnimDef AnimConf_088AF150[] = {\n'
+                '    { .wtype = 0x0100 | ITYPE_BOW, .index = 0x0026, },\n'
+                '    { .wtype = 0x0100 | ITYPE_ITEM, .index = 0x0027, },\n'
+                '    { 0 }\n};\n')
+        new = bc.banim_repoint_conf(conf, 'AnimConf_088AF150', '0x0100 | ITYPE_BOW', 0xC9)
+        self.assertIn('.wtype = 0x0100 | ITYPE_BOW, .index = 0xC9', new)
+        self.assertIn('.wtype = 0x0100 | ITYPE_ITEM, .index = 0x0027', new)  # untouched
+
+
 if __name__ == '__main__':
     unittest.main()

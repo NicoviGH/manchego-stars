@@ -32,6 +32,7 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import portrait_tool  # noqa: E402
 import map_sprite_tool  # noqa: E402
+import ref_to_battleframe  # noqa: E402  faked-battle-anim asset generator (#65)
 import gen_chapter_title  # noqa: E402
 import gen_subtitle_cards  # noqa: E402
 from PIL import Image  # noqa: E402
@@ -46,6 +47,13 @@ PORTRAIT_DIR = os.path.join(DECOMP, 'graphics', 'portrait')
 CHARACTERS_C = os.path.join(DECOMP, 'src', 'data_characters.c')
 CLASSES_C = os.path.join(DECOMP, 'src', 'data_classes.c')
 CLASSES_H = os.path.join(DECOMP, 'include', 'constants', 'classes.h')
+# Faked battle anims (#65): the decomp files the injection appends to / patches.
+BANIM_DATA_C = os.path.join(DECOMP, 'src', 'banim_data.c')
+BANIM_POINTER_H = os.path.join(DECOMP, 'include', 'banim_pointer.h')
+BANIMCONF_C = os.path.join(DECOMP, 'src', 'data_banimconf.c')
+BANIM_LINKER = os.path.join(DECOMP, 'linker_script_banim.txt')
+BANIM_DATA_DIR = os.path.join(DECOMP, 'data', 'banim')
+BANIM_GFX_DIR = os.path.join(DECOMP, 'graphics', 'banim')
 ITEMS_C = os.path.join(DECOMP, 'src', 'data_items.c')
 TEXTS_TXT = os.path.join(DECOMP, 'texts', 'texts.txt')
 PORTRAIT_DATA_C = os.path.join(DECOMP, 'src', 'portrait_data.c')
@@ -301,6 +309,10 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         'src/bmudisp.c', 'src/prep_unitselect.c',
                         # enemy class reskins (#21): cloned goblin classes in gClassData
                         'src/data_classes.c',
+                        # faked battle anims (#65): appended banim_data row + pointer
+                        # externs + linker block, and the donor class's repointed AnimConf
+                        'src/banim_data.c', 'include/banim_pointer.h',
+                        'src/data_banimconf.c', 'linker_script_banim.txt',
                         # Goodberry (#21): vulnerary icon swapped by inject_item_icons
                         'graphics/item_icon/item_icon_vulnerary.png',
                         'data/const_data_unit_icon_wait.s', 'data/const_data_unit_icon_move.s',
@@ -2095,6 +2107,152 @@ def enemy_class_reskins(campaign):
     cfg = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
     with open(cfg, encoding='utf-8') as f:
         return (yaml.safe_load(f) or {}).get('enemy_class_reskins') or []
+
+
+# --- Faked battle animations (#65) -----------------------------------------------
+# Give a unit a custom battle anim from 1-3 static frames + the engine's effects, with
+# NO hand-drawn motion. ref_to_battleframe generates the assets (sheets + agbpal +
+# motion.s) cloning a donor class's timing; this injects them additively: append a
+# banim_data[] row (the table self-sizes via banim_number) -> a new animId, then repoint
+# the donor class's AnimConf weapon entry at it. Reversible (the four files restore to
+# vanilla each build). M-A = frame-swap of the Archer (RBG, an archer, fights with his art).
+
+# donor 'clone_from' -> (FE class enum, the AnimConf weapon entry whose index we repoint).
+BANIM_DONORS = {'archer': ('CLASS_ARCHER', '0x0100 | ITYPE_BOW')}
+
+
+def banim_append_row(text, abbr):
+    """Append a banim_data[] row for `abbr`; return (new_text, anim_id).
+
+    anim_id = the count of existing rows (the table is appended-to, so the donor rows are
+    byte-unchanged and `banim_number = sizeof(...)` picks up the growth automatically)."""
+    anim_id = text.count('\t{"')
+    row = ('\t{"%s", &banim_%s_modes_bin, &banim_%s_motion_o, &banim_%s_oam_r_bin, '
+           '&banim_%s_oam_l_bin, &banim_%s_agbpal}, // 0x%X (#65)\n'
+           % (abbr, abbr, abbr, abbr, abbr, abbr, anim_id))
+    close = text.rindex('};')
+    return text[:close] + row + text[close:], anim_id
+
+
+def banim_repoint_conf(text, conf_sym, wtype_literal, new_index):
+    """In AnimConf `conf_sym`, set the `.index` of the entry matching `wtype_literal`."""
+    bs, be = _find_brace_block(text, '%s[] =' % conf_sym, BANIMCONF_C)
+    block = text[bs:be]
+    pat = re.compile(r'(\.wtype\s*=\s*' + re.escape(wtype_literal) +
+                     r'\s*,\s*\.index\s*=\s*)(0x[0-9A-Fa-f]+|\d+)')
+    new_block, n = pat.subn(lambda m: '%s0x%X' % (m.group(1), new_index), block, count=1)
+    if n == 0:
+        sys.exit('ERROR: banim repoint: wtype %r not found in %s' % (wtype_literal, conf_sym))
+    return text[:bs] + new_block + text[be:]
+
+
+def _banim_palette(frame_imgs):
+    """A <=16-colour palette for the frames: index 0 transparent + each opaque colour."""
+    pal = [(0, 0, 0)]
+    for im in frame_imgs:
+        for cnt, rgba in im.getcolors(1 << 24):
+            if rgba[3] > 0 and rgba[:3] not in pal:
+                pal.append(rgba[:3])
+    return pal
+
+
+def units_with_battle_anim(campaign):
+    """(unit_id, unit) for every pc/npc YAML carrying a `battle_anim:` block."""
+    out = []
+    for sub in ('pcs', 'npcs'):
+        d = os.path.join(REPO, 'campaigns', campaign, sub)
+        if not os.path.isdir(d):
+            continue
+        for fn in sorted(os.listdir(d)):
+            if not fn.endswith('.yaml'):
+                continue
+            with open(os.path.join(d, fn), encoding='utf-8') as f:
+                u = yaml.safe_load(f)
+            if u and u.get('battle_anim'):
+                out.append((u.get('id', fn[:-5]), u))
+    return out
+
+
+def inject_battle_anims(campaign, verbose=True):
+    """Generate + inject each unit's faked battle animation (additive donor-prime, #65)."""
+    from PIL import Image
+    units = units_with_battle_anim(campaign)
+    if not units:
+        if verbose:
+            print('  (no battle_anim blocks declared)')
+        return
+    anim_dir = os.path.join(REPO, 'campaigns', campaign, 'battle_anims')
+    os.makedirs(BANIM_DATA_DIR, exist_ok=True)
+    os.makedirs(BANIM_GFX_DIR, exist_ok=True)
+
+    for uid, unit in units:
+        cfg = unit['battle_anim']
+        clone_from = cfg['clone_from']
+        if clone_from not in BANIM_DONORS:
+            sys.exit('ERROR: battle_anim %s: unsupported clone_from %r' % (uid, clone_from))
+        donor_class, wtype = BANIM_DONORS[clone_from]
+        abbr = cfg.get('abbr') or (uid.replace('-', '').replace('prof', '')[:5] + '_ar1')
+        frame_imgs = [Image.open(os.path.join(anim_dir, p)).convert('RGBA')
+                      for p in cfg['frames']]
+        palette = _banim_palette(frame_imgs)
+        res = ref_to_battleframe.build_battle_anim(abbr, frame_imgs, palette)
+
+        # 1. assets into the decomp (motion.s, per-frame sheet PNGs, agbpal blob)
+        with open(os.path.join(BANIM_DATA_DIR, 'banim_%s_motion.s' % abbr), 'w',
+                  encoding='utf-8') as f:
+            f.write(res['motion_s'])
+        for i, sheet in enumerate(res['sheets']):
+            sheet.save(os.path.join(BANIM_GFX_DIR, 'banim_%s_sheet_%d.png' % (abbr, i)))
+        with open(os.path.join(BANIM_GFX_DIR, 'banim_%s.agbpal' % abbr), 'wb') as f:
+            f.write(res['pal'])
+
+        # 2. linker block (sheets, palette, oam, script, modes), in build order
+        block = (['graphics/banim/banim_%s_sheet_%d.4bpp.lz' % (abbr, i)
+                  for i in range(len(res['sheets']))]
+                 + ['graphics/banim/banim_%s.agbpal.lz' % abbr,
+                    'data/banim/banim_%s_oam_l.bin.lz' % abbr,
+                    'data/banim/banim_%s_oam_r.bin.lz' % abbr,
+                    'data/banim/banim_%s_motion.o|.data.script>lz' % abbr,
+                    'data/banim/banim_%s_modes.bin' % abbr])
+        with open(BANIM_LINKER, 'a', encoding='utf-8') as f:
+            f.write('\n# Manchego Stars faked battle anim (#65): %s\n' % uid)
+            f.write('\n'.join(block) + '\n')
+
+        # 3. banim_data[] row -> new animId, plus its pointer externs
+        with open(BANIM_DATA_C, encoding='utf-8') as f:
+            text = f.read()
+        text, anim_id = banim_append_row(text, abbr)
+        with open(BANIM_DATA_C, 'w', encoding='utf-8') as f:
+            f.write(text)
+        with open(BANIM_POINTER_H, 'a', encoding='utf-8') as f:
+            f.write('// battle animation 0x%X (Manchego Stars #65: %s)\n' % (anim_id, uid))
+            for sym, ty in [('modes_bin', 'int'), ('motion_o', 'char'),
+                            ('oam_r_bin', 'char'), ('oam_l_bin', 'char'),
+                            ('agbpal', 'char')]:
+                f.write('extern %s banim_%s_%s;\n' % (ty, abbr, sym))
+
+        # 4. repoint the donor class's AnimConf weapon entry at the new animId
+        conf_sym = _class_field_symbol(donor_class, 'pBattleAnimDef')
+        with open(BANIMCONF_C, encoding='utf-8') as f:
+            conf = f.read()
+        conf = banim_repoint_conf(conf, conf_sym, wtype, anim_id)
+        with open(BANIMCONF_C, 'w', encoding='utf-8') as f:
+            f.write(conf)
+
+        if verbose:
+            print('  %-14s = banim %s (animId 0x%X), %s.%s -> it'
+                  % (uid, abbr, anim_id, donor_class, wtype))
+
+
+def _class_field_symbol(class_enum, field):
+    """Read a symbol-valued field (e.g. .pBattleAnimDef = AnimConf_X) from gClassData."""
+    with open(CLASSES_C, encoding='utf-8') as f:
+        text = f.read()
+    bs, be = _find_brace_block(text, '[%s - 1]' % class_enum, CLASSES_C)
+    m = re.search(r'\.' + field + r'\s*=\s*(\w+)', text[bs:be])
+    if not m:
+        sys.exit('ERROR: .%s symbol not found in gClassData[%s]' % (field, class_enum))
+    return m.group(1)
 
 
 def inject_enemy_class_reskins(campaign, verbose=True):
@@ -4202,6 +4360,8 @@ def main():
         inject_map_sprites(args.campaign)
         print('enemy class reskins (#21):')
         inject_enemy_class_reskins(args.campaign)  # after map sprites (SMS ids), before ch01
+        print('battle anims (#65):')
+        inject_battle_anims(args.campaign)
         print('winter tileset:')
         inject_winter_tileset(args.campaign)
         print('title theme:')

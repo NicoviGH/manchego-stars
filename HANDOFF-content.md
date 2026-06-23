@@ -103,8 +103,22 @@ gunslinger; **Archer is purely the parity/anim donor** — gun↔arrow dissonanc
   table self-sizes via `banim_number`. linker block: 3×`_sheet_N.4bpp.lz`, `.agbpal.lz`, `oam_l/_r.bin.lz`,
   `_motion.o|.data.script>lz`, `_modes.bin`.
 - **Next M-A slices (TDD each):** ~~(1) OBJ-shape merge~~ ✅; ~~(2) palette + flat sheet emit~~ ✅;
-  ~~(3a) OBJ→OAM/tile bridge~~ ✅; ~~(3b) sheet builder + motion.s gen + driver~~ ✅; (4) `build_campaign`
-  injection (Archer-clone class + `banim_data` row + linker block + asset emit) + a `battle_anim:` YAML block on
+  ~~(3a) OBJ→OAM/tile bridge~~ ✅; ~~(3b) sheet builder + motion.s gen + driver~~ ✅; ~~(4) `build_campaign`
+  injection + `battle_anim:` YAML~~ ✅ — **ROM BUILDS GREEN with RBG's custom anim injected** (`make` green,
+  `make test` 29+15, `verify_text` 0 runaway). `inject_battle_anims` (build_campaign.py): per unit with a
+  `battle_anim:` block, generate assets → write `data/banim/banim_<abbr>_motion.s` + `graphics/banim/
+  banim_<abbr>_sheet_{0,1,2}.png` + `.agbpal`, append the linker block + a `banim_data[]` row (→ **animId
+  0xC9**, donor rows byte-unchanged) + pointer externs, and repoint the donor class's AnimConf weapon entry.
+  Pure helpers `banim_append_row`/`banim_repoint_conf` TDD'd in test_build_campaign.py. The 4 patched decomp
+  files are in `PATCHED_DECOMP_FILES` (restore→re-inject each build = idempotent). RBG's YAML carries the
+  `battle_anim:` block (clone_from archer, frames ready/windup/peak). **M-A = "frame-swap of the Archer"**: I
+  repoint `CLASS_ARCHER`'s bow AnimConf (`AnimConf_088AF150`, archer-exclusive) → so RBG AND the ch02 enemy
+  archer fire with RBG's art. Per-unit isolation (Archer-clone class so generic enemy archers stay vanilla) is
+  the M-A→M-B boundary, deferred. (5) **REMAINING: capture the battle on-screen** (pipeline-lane playtest
+  scenario + `make_gif.py`) → deliver the GIF to Nicolas (he's away — email/Drive). ADR for the faking approach
+  lands with this. The capture needs an archer bow-attack with anims ON; the only checkpoint is `seize` (ch01),
+  and whether RBG is among ch01's 4 deployed is prep-dependent — simplest sure target is the ch02 enemy archer
+  (no ch02 ckpt yet) or forcing a blue unit→archer in the seize state. NOTE: a `battle_anim:` block on
   `motion.s` text assembly — emit the 3-beat oam_l/oam_r frames (Ready/Wind-up/Peak) from `pack_frame_oam`/
   `mirror_oam`, and a script/modes table cloning the archer's **ranged** attack cadence. ⚠️ **Use the FULL
   `arcm_ar1` `mode_attack_range` as the template** (`start_attack_1/2` → draw frames → `sound_pull_bow` →
