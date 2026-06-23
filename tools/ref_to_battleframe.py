@@ -92,6 +92,61 @@ def build_sheet_png(tiles, palette, tiles_per_row=32):
     return sheet
 
 
+OBJ_HFLIP = 0x1000  # attr1 bit12
+SHEET_COLS = 32     # banim sheets are 2D char-mapped, 32 tiles (256px) wide
+
+
+def square_obj_attrs(w):
+    """Square OBJ cell-side (1/2/4) -> (attr0 shape bits, attr1 size bits)."""
+    size = {1: 0x0000, 2: 0x4000, 4: 0x8000}[w]
+    return (0x0000, size)
+
+
+def _obj_wpx(attr0, attr1):
+    """Pixel width of a square OBJ from its attr bits (size0/1/2 -> 8/16/32)."""
+    return {0x0000: 8, 0x4000: 16, 0x8000: 32}[attr1 & 0xC000]
+
+
+def pack_frame_oam(objs, center_px, sheet_cols=SHEET_COLS):
+    """Merged OBJs -> (oam_r entries, placements), 2D-addressed tile blocks.
+
+    Each OBJ is laid into the sheet on a shelf (left-to-right, wrap at sheet_cols),
+    keeping its w*h tiles a contiguous 2D rectangle so its base tile = row*32+col
+    addresses the whole OBJ the way the banim 2D char map expects. Returns oam entries
+    {attr0, attr1, attr2(base tile), dx, dy(pixel offset from centre)} plus parallel
+    placements {cx, cy, w, h, col, row} for the sheet builder to blit the pixels.
+    """
+    cxp, cyp = center_px
+    entries, placements = [], []
+    col = row = shelf_h = 0
+    for o in objs:
+        w, h = o["w"], o["h"]
+        if col + w > sheet_cols:          # wrap to the next shelf
+            col, row, shelf_h = 0, row + shelf_h, 0
+        attr0, attr1 = square_obj_attrs(w)
+        entries.append({
+            "attr0": attr0, "attr1": attr1, "attr2": row * sheet_cols + col,
+            "dx": o["cx"] * TILE - cxp, "dy": o["cy"] * TILE - cyp,
+        })
+        placements.append({"cx": o["cx"], "cy": o["cy"], "w": w, "h": h,
+                           "col": col, "row": row})
+        col += w
+        shelf_h = max(shelf_h, h)
+    return entries, placements
+
+
+def mirror_oam(entries):
+    """oam_r -> oam_l: add the h-flip bit and mirror each OBJ's dx about the centre."""
+    out = []
+    for e in entries:
+        wpx = _obj_wpx(e["attr0"], e["attr1"])
+        out.append({
+            "attr0": e["attr0"], "attr1": e["attr1"] | OBJ_HFLIP, "attr2": e["attr2"],
+            "dx": -(e["dx"] + wpx), "dy": e["dy"],
+        })
+    return out
+
+
 def _cell_is_empty(im, ox, oy):
     """True if the 8x8 cell at (ox, oy) is fully transparent."""
     for y in range(oy, oy + TILE):

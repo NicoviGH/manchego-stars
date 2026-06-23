@@ -133,6 +133,62 @@ class TestSheetPng(unittest.TestCase):
         self.assertEqual(sheet.getpixel((0, 8)), 1)    # 3rd tile wrapped to row 2
 
 
+class TestObjAttrs(unittest.TestCase):
+    """Square merged OBJ (cell-side 1/2/4) -> GBA OAM shape+size control bits.
+
+    attr0 bits14-15 = shape (square=0), attr1 bits14-15 = size. For squares:
+    1 cell (8x8)=size0, 2 cells (16x16)=size1=0x4000, 4 cells (32x32)=size2=0x8000.
+    """
+
+    def test_square_sizes(self):
+        self.assertEqual(rb.square_obj_attrs(1), (0x0000, 0x0000))
+        self.assertEqual(rb.square_obj_attrs(2), (0x0000, 0x4000))
+        self.assertEqual(rb.square_obj_attrs(4), (0x0000, 0x8000))
+
+
+class TestPackFrameOam(unittest.TestCase):
+    """Merged OBJs -> oam_r entries with 2D-addressed tile indices + centred offsets.
+
+    FE8 banim sheets are 2D char-mapped (stride 32): a w*h-cell OBJ at sheet (col,row)
+    has base tile row*32+col and spans a contiguous 2D block, so the allocator must keep
+    each OBJ's tiles a rectangle. dx/dy are pixel offsets from the sprite centre.
+    """
+
+    def test_single_obj_base_tile_and_centred_offset(self):
+        objs = [{"cx": 4, "cy": 4, "w": 2, "h": 2}]   # at pixel (32,32)
+        entries, _ = rb.pack_frame_oam(objs, center_px=(32, 32))
+        self.assertEqual(len(entries), 1)
+        e = entries[0]
+        self.assertEqual((e["attr0"], e["attr1"]), (0x0000, 0x4000))  # 16x16
+        self.assertEqual(e["attr2"], 0)                                # first block, tile 0
+        self.assertEqual((e["dx"], e["dy"]), (0, 0))                   # centred
+
+    def test_second_obj_gets_next_2d_tile_block(self):
+        objs = [{"cx": 0, "cy": 0, "w": 2, "h": 2}, {"cx": 2, "cy": 0, "w": 1, "h": 1}]
+        entries, _ = rb.pack_frame_oam(objs, center_px=(0, 0))
+        # A spans sheet cols 0-1; B is the next free column on the same shelf -> tile 2.
+        self.assertEqual(entries[0]["attr2"], 0)
+        self.assertEqual(entries[1]["attr2"], 2)
+
+    def test_offsets_are_relative_to_center(self):
+        objs = [{"cx": 0, "cy": 0, "w": 1, "h": 1}]
+        entries, _ = rb.pack_frame_oam(objs, center_px=(32, 32))
+        self.assertEqual((entries[0]["dx"], entries[0]["dy"]), (-32, -32))
+
+
+class TestMirrorOam(unittest.TestCase):
+    """oam_r -> oam_l: set the h-flip bit and mirror dx about the sprite centre line."""
+
+    def test_sets_hflip_and_mirrors_dx(self):
+        r = [{"attr0": 0x0000, "attr1": 0x4000, "attr2": 5, "dx": -8, "dy": -16}]  # 16x16
+        l = rb.mirror_oam(r)
+        self.assertEqual(l[0]["attr1"], 0x5000)        # 0x4000 | 0x1000 hflip
+        self.assertEqual(l[0]["attr0"], 0x0000)        # shape unchanged
+        self.assertEqual(l[0]["attr2"], 5)             # same tiles
+        self.assertEqual(l[0]["dx"], -8)               # -(dx + 16px) = -(-8+16) = -8
+        self.assertEqual(l[0]["dy"], -16)              # vertical unchanged
+
+
 class TestTiler(unittest.TestCase):
     def test_skips_fully_transparent_cells_and_places_the_filled_one(self):
         # 16x16 = a 2x2 grid of 8x8 cells; fill only the bottom-right cell.

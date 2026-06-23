@@ -75,11 +75,26 @@ gunslinger; **Archer is purely the parity/anim donor** — gun↔arrow dissonanc
   The build does `%.4bpp: %.png` via gbagfx, so we emit the PNG, not the 4bpp. 7 new TDD'd asserts (now 14 in
   `make test`). Donor `.agbpal` format confirmed (128 B = 64 BGR555 hwords; sheet PNG = mode P, 16-entry pal,
   256px wide = 32 tiles/row).
-- **Next M-A slices (TDD each):** ~~(1) OBJ-shape merge~~ ✅; ~~(2) 4bpp sheet + palette emit~~ ✅;
-  (3) `motion.s` generator — emit the 3-beat oam_l/oam_r frames (Ready/Wind-up/Peak) from `merge_objects`, and
-  a script/modes table cloning the donor archer's **ranged** timing + `call_spell_anim`/`hit_normal` placement
-  (model the 3-frame structure on `armm_sp1`, not the full 16-frame `arcm_ar1`); the 13 modes reuse the 3
-  frames (stand=0; attack/dodge/miss=0→1→2→1); (4) `build_campaign` append-injection (`banim_data` row +
+- **DONE (slice 3a — OBJ→OAM/tile bridge):** `square_obj_attrs(w)` (cell-side→attr0 shape/attr1 size),
+  `pack_frame_oam(objs, center_px)` (merged OBJs → oam_r entries + parallel sheet placements), `mirror_oam`
+  (oam_r→oam_l: set h-flip bit + mirror dx). 5 new TDD'd asserts (now **19** in `make test`).
+- **⚠️ KEY FORMAT FINDING (corrects the slice plan):** FE8 banim sheets are **2D char-mapped, stride 32** —
+  a w×h-cell OBJ at sheet (col,row) has base tile `row*32+col` and spans a *contiguous 2D rectangle* (16×16 at
+  tile N → N, N+1, N+32, N+33; the donor's body OBJs step by 0x20 vertically). So an OBJ's tile index must
+  address a 2D block, NOT a position in a flat deduped tile list. **Consequence:** slice-2's `build_sheet_png`
+  (flat row-major list) is only correct for the all-8×8 case; the merged case needs an **OBJ-aware** sheet
+  builder that blits each OBJ's pixels at its `pack_frame_oam` placement (`build_sheet_from_placements`, in 3b).
+  `agbpal_bytes` is unaffected (correct). `pack_frame_oam` already emits the right 2D `attr2` + placements.
+- **Next M-A slices (TDD each):** ~~(1) OBJ-shape merge~~ ✅; ~~(2) palette + flat sheet emit~~ ✅;
+  ~~(3a) OBJ→OAM/tile bridge~~ ✅; (3b) OBJ-aware sheet builder (`build_sheet_from_placements`) + full
+  `motion.s` text assembly — emit the 3-beat oam_l/oam_r frames (Ready/Wind-up/Peak) from `pack_frame_oam`/
+  `mirror_oam`, and a script/modes table cloning the archer's **ranged** attack cadence. ⚠️ **Use the FULL
+  `arcm_ar1` `mode_attack_range` as the template** (`start_attack_1/2` → draw frames → `sound_pull_bow` →
+  `call_spell_anim` (the arrow) → `wait_hp_deplete` → `end_mode`); the `arcm_ar1_2` variant has **no
+  `call_spell_anim`** (it just holds frame 0 — no projectile). Collapse the donor's ~17 draw frames onto our 3
+  beats: stand=frame0; attack/dodge/miss = 0→1(held longest)→2(+`call_spell_anim` on the peak)→1→0. modes
+  table = 12 mode-offset words + zero padding (model the section layout on `arcm_ar1_2`, which is the clean
+  3-frame skeleton even though its attack lacks the spell). (4) `build_campaign` append-injection (`banim_data` row +
   `linker_script_banim.txt` block + RBG class repoint, donor row byte-unchanged); (5) lock art into repo +
   build ROM + force a battle + capture (playtest harness + `make_gif.py`) → show Nicolas. **ADR for the whole
   faking approach lands with the on-screen slice (5).**
