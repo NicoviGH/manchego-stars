@@ -384,6 +384,25 @@ _Reconstructed: 2026-06-22 (CLAUDE, from the decomp field-growth curve at Nicola
 supersedes the stale `roadmap.md` "roster stops growing at Ch5" line; the original budget sweep was
 done in-session and never recorded, which this ADR fixes._
 
+**Reward/item budget: a chapter's loot mirrors its `parity_reference` vanilla chapter — same as its enemies.**
+Just as `deploy_limit` and the enemy roster track the parity-reference chapter (§Field parity), so does
+the REWARD footprint — by **channel** (village / chest / shop / boss-drop) and **tier** (consumable →
+gem/gold → basic weapon → stat-booster → promotion item → Silver → Sacred/legendary). The
+decomp-pinned curve is `fe8-pacing-reference.md §3`. **Hard caps read off that curve:** no
+**stat-boosters** and no **promotion items** until a chapter whose `parity_reference` is ≥ **FE8 Ch5**;
+no **Silver** weapon until ≥ **Ch8**; no **Master Seal / Secret Shop / Sacred weapon** until ≥ **Ch14a**.
+Placement follows the **parity_reference, not our chapter number** — our 8-chapter MVP maps to
+*non-consecutive* FE8 chapters (e.g. ch08 → FE8 Ch13), so a chapter's reward tier is its reference's,
+not "chapter N's." This is the item analogue of the recruit budget; per-chapter loot is authored in the
+chapter YAML (the data is the doc). Consistent with the promotion seam (Ch8→9): our MVP chapters
+(parity ≤ Ch13) sit below the Master-Seal threshold (Ch15a), so promotions stay deferred to Revel's End.
+Worked example — **ch02 (parity FE8 Ch2):** gems + premium consumables only (**Red Gem / Elixir /
+Pure Water**, the exact vanilla Ch2 village gifts) + a regular armory + one enemy consumable drop;
+**no boosters, no promos.** The three chwinga "charms" ARE those three gifts, 1:1.
+_Reconstructed: 2026-06-22 (CLAUDE, decomp event-data + `events_shoplist.c` scan) — upgrades
+fe8-pacing §3 from era-buckets to a decomp-pinned curve (correcting the old "promos at Ch9–13": promos
++ boosters actually start Ch5, Master Seal/Secret Shop start ~Ch14a). Companion to the recruit budget._
+
 **Two healers, differentiated by donor (same move as the shamans).** Sclorbo and Basil are both
 Priests, so they get *distinct* vanilla donor lines to avoid stat-twins: **Sclorbo → Moulder** (the
 durable "war-priest": HP70/Def25, balanced, accurate) and **Basil → Natasha** (the frail "mage-healer":

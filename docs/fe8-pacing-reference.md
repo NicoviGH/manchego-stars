@@ -138,30 +138,49 @@ seam) is in `docs/decisions.md`.
 
 ---
 
-## 3. When FE8 hands out rewards [FE8]
+## 3. When FE8 hands out rewards [decomp]
 
-The schedule, by era (not exact chapter — see sourcing note):
+Per-chapter reward footprint, read from the event data: `Chest(ITEM, x, y)` in
+`<ch>-eventinfo.h`; **gifts** = `SVAL(EVT_SLOT_3, item)` → `GIVEITEMTO` in
+`<ch>-eventscript.h` (this conflates *village* gifts and *story/cutscene* gives — both are
+"items the player acquires that chapter"); shop tiles + inventories in `events_shoplist.c`;
+boss/enemy drops in the unit defs. Eirika route:
 
-- **Early (FE8 Prologue–7):** consumables, gold, basic weapons, the occasional
-  stat booster in a chest/village. **No promotion items.** Vulnerary, small gold
-  purses, a Steel/secondary weapon, the first stat-booster (e.g. an Energy Ring)
-  as a "reward chest" payoff. Villages give gold or a single nice item.
-- **Route-split era (FE8 9–13):** **first promotion items appear** (Knight Crest,
-  Hero Crest, Guiding Ring), more stat boosters, better weapons (Silver tier),
-  first **Master Seal**. Secret Shops begin selling premium goods.
-- **Late (FE8 14–20):** Master Seals become reliably available (Secret Shops),
-  legendary/Sacred weapons appear as chest/boss drops, big gold.
-- **Story-gated:** the lord's Lunar/Solar Brace promotion lands ~FE8 15–16.
+| FE8 ch | chests | gifts (village / story) | shop | first-of-tier |
+|---|---|---|---|---|
+| Prologue | — | Rapier (Eirika prf) | — | prf weapon |
+| 1 | — | — | — | — |
+| **2** | — | **Red Gem, Elixir, Pure Water** | Armory + Shop | gems + premium consumables |
+| 3 | iron lance/sword, hand axe, javelin | — | — | **first chests** (basic gear) |
+| 4 | — | iron axe | — | — |
+| **5** | — | **Guiding Ring, Armorslayer, Booster(Def/Skl), Torch** | Armory/Shop/Vendor | **first stat-booster + first promo item** |
+| 5x | Elixir, Killer Lance | — | — | first killer weapon |
+| 6 | — | **Orion's Bolt**, Antitoxin | — | |
+| 7 | — | — | — | |
+| **8** | **Silver Sword, Elysian Whip, Booster(HP)** | 10,000g | — | **first Silver weapon** |
+| 9a | — | Booster(HP/Def), Rapier | Armory/Shop/Vendor | |
+| 11a | Restore staff, Short Spear, Booster(Skl) | — | — | |
+| 12a | — | Barrier staff | Shop/Vendor | |
+| 13a | — | 5,000g ×2 | — | |
+| **14a** | Repair, Dragon Lance, Spear, Booster(Pow), Guiding Ring | Audhulma, Excalibur (sacred) | **Secret Shop** | **first Sacred weapon + first Secret Shop** |
+| **15a** | — | Gleipnir, Garm, Audhulma, Excalibur, **Master Seal** | — | **first Master Seal** |
+| 16a | Knight Crest, Tomahawk, Booster(Res) | Siegmund, Sieglinde, **Lunar/Solar Brace** | — | lord braces (story promo) |
+| 17a | — | Nidhogg, Vidofnir, Rescue | — | |
+| 19a | Runesword, Fenrir, Fortify, Booster(Spd), Bolting | Ivaldi, Latona, 10,000g, Lightbrand | Secret Shop | |
+| 21a | Booster(HP), Master Seal | — | — | |
 
-**Villages, chests, secret shops, droppers:**
-- **Villages**: visit for gold or one item; a thief/brigand may destroy them
-  (turn pressure).
-- **Chests**: need a thief or a Door/Chest Key. Big-battle maps usually hide the
-  best treasure behind enemy lines — risk/reward.
-- **Secret Shops**: require a Member Card; sell premium consumables + Master
-  Seals. Gated mid-game.
-- **Boss drops**: bosses frequently carry their weapon or a promotion item as a
-  guaranteed drop — diegetic reward placement.
+**Channels:** villages/houses (gold/gems/consumables early → promo items, boosters, sacred
+weapons mid/late); **chests** (basic gear from Ch3 → Silver/promo/booster mid → legendary late;
+need a thief or a Chest/Door Key); **shops** — Armory/Vendor sell iron-tier weapons + consumables
+from **Ch2**, **Secret Shops** sell Silver/Brave/Killer/gems/Master Seals, **Member-Card-gated,
+from ~Ch14a** (`events_shoplist.c`); boss/enemy **drops** (a carried item — e.g. Ch2's one
+Vulnerary on a brigand).
+
+**Tier thresholds — the budget caps (corrects the old era-buckets):** stat-boosters AND the first
+promotion item both appear at **FE8 Ch5** (villages — *earlier* than the "Ch9–13" lore had it);
+first **Silver** weapon at **Ch8**; first **Master Seal**, first **Secret Shop**, and first
+**Sacred weapon** at **~Ch14a–15a** (*later* than lore had the Master Seal). Nothing above a
+chapter's tier appears before it. Stat-boosters then recur ~1 per chapter (≈10–12 across the route).
 
 ---
 
@@ -178,7 +197,6 @@ post-MVP question — see `docs/roadmap.md`.)
 
 ## Open Items / deferred grounding
 
-- [ ] **Pin exact promotion-item chapters** by reading FE8 event scripts in the
-  decomp (`fireemblem8u/` event data) rather than community memory — upgrade the
-  §3 era-buckets to exact chapters. Deferred (event-script archaeology); current
-  numbers are [FE8]-tier.
+- [x] **Pin exact promotion-item chapters** — done 2026-06-22: §3 is now a [decomp]-pinned
+  per-chapter curve (chests/gifts/shops scanned from the event data + `events_shoplist.c`), and
+  the budget rule lives in `decisions.md` §"Reward/item budget".
