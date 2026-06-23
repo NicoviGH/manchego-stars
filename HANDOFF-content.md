@@ -17,6 +17,10 @@ ownership map, and trunk rules → `CLAUDE.md` §Tracks (read first; the lane gu
   enemy parity (chardalyn berserkers), 3 GREEN chwinga protect layer with the per-unit soft-fail
   charm-gift mechanic (`CHECK_ALIVE` → `GIVEITEMTO` at the ending scene), sled + invented chest dropped.
   ADR extended in `decisions.md` §"Ch2 hosting". **Remaining for ch02 = the human checkpoints (§1 below).**
+- **A LATER, PARALLEL session (battle animations, #65) advanced HEAD to `bbc6f78`** — the Milestone-A
+  *tiler core* + tests, on top of the ch02 reground; `make test` green, drift clean. **Independent of ch02's
+  checkpoints** — see the Battle animations section under Now/Next. (So `inst/content` is now ~5 ahead of
+  `main`; the ch02 reground is still the substantive content to merge down.)
 
 ## Decisions locked this session (all recorded in the repo — don't re-derive)
 - **Recruit budget** (`decisions.md` §"Recruit budget"): roster tracks vanilla's field-growth curve to a
@@ -33,6 +37,39 @@ ownership map, and trunk rules → `CLAUDE.md` §Tracks (read first; the lane gu
   is stale, disagrees ~5 cells). (Corrects an earlier wrong "walkability diverged" note.)
 
 ## Now / Next (priority order)
+
+### 🎨 Battle animations — faked static-frame anims (#65) — Milestone A IN PROGRESS
+**Spec = epic #65 (read it first: architecture, beats, milestones).** Goal: any non-vanilla-class unit gets a
+custom battle anim from **1–3 static frames + the engine's existing effects** — no hand-drawn motion. RBG (a
+gunslinger; **Archer is purely the parity/anim donor** — gun↔arrow dissonance is parked) is the M-A bootstrap.
+- **Approach (locked, additive "donor-prime"):** APPEND a new `banim_data[]` entry cloned from a donor class
+  (RBG → vanilla Archer `arcm_ar1`), swapping art only — never consume a class. Beats = **Ready / Wind-up /
+  Action-peak**; the 13 modes reuse them (stand=frame0; attack/dodge/miss=`0→1→2→1`, hit fires on the peak).
+- **Format mapped (decomp-grounded), per entry:** `graphics/banim/banim_<n>_sheet_*.4bpp(.lz)` +
+  `banim_<n>.agbpal(.lz)` + `data/banim/banim_<n>_motion.s` (→ `oam_l`/`oam_r`/`.data.script`/`modes` via objcopy)
+  + a block in `linker_script_banim.txt` + a row in `src/banim_data.c`. A class picks its anim via
+  `ClassData.pBattleAnimDef`→`GetBattleAnimationId`→animId. Script cmds (`include/banim_code.inc`):
+  `banim_code_frame dur,sheet,frame,oam` + `banim_code_hit_normal` + `banim_code_call_spell_anim` (fires the
+  projectile). OAM frame = `banim_frame_oam attr0,attr1,attr2,dx,dy` lists. NOTE: banim assets are NOT rebuilt
+  from a PNG like portraits — they're linked from the `.s` + sheets by `scripts/arm_compressing_linker.py`.
+- **DONE this session:** `tools/ref_to_battleframe.py` **tiler core** (`tile_sprite`: sprite→8×8 OBJ tiles +
+  OAM entries, byte-identical tiles deduped), TDD'd green (`tools/test_ref_to_battleframe.py`, 3 asserts, in
+  `make test`). Committed `bbc6f78`.
+- **RBG art — quality LOCKED, NOT yet in repo:** 3 transparent PNGs at `…/Battle Anims/RBG Battle/{RBGReady,
+  RBGwindup,RBGAction}.png` (1920×1080, left-facing). **Shared 14-colour palette** (2 ea yellow/purple/green/
+  brown/pink + 2 outline-black + gun-gray + highlight; **pink protected** — it kept getting median-cut away).
+  Flattened/keyed previews live in that folder's `cleaned/`. TODO: bring the 3 frames into the repo + author a
+  `battle_anim:` YAML block on RBG.
+- **Finding:** RBG@64×64 → **47 OBJ cells** (8×8-only) — too many; vanilla covers a battle sprite in ~16 via
+  larger OBJ shapes. So the next tiler slice is greedy-merge into 16×16/32×32 objects.
+- **Next M-A slices (TDD each):** (1) OBJ-shape merge; (2) 4bpp sheet + palette emit (to RBG's 14-col pal);
+  (3) `motion.s` generator (clone `arcm_ar1` script/modes/timing, point frames at RBG tiles); (4)
+  `build_campaign` append-injection (`banim_data` row + linker block + RBG class repoint); (5) lock art into
+  repo + build ROM + force a battle + capture (playtest harness + `make_gif.py`) → show Nicolas. **ADR for the
+  whole faking approach lands with the on-screen slice (5).**
+- **Lane:** authoring/injection = content; the battle-capture verification scenario = pipeline. `tools/
+  ref_to_battleframe.py` is currently SHARED (registering it in `check.py`'s CONTENT_EXCLUSIVE needs a
+  pipeline-lane edit — deferred).
 
 ### 1. 🎯 ch02 "Cold Welcome" (#22) — TACTICAL REGROUND DONE (`b0576f1`); 3 human checkpoints remain
 The enemy/chwinga/gift/mechanic reground is **built green** (`inject_ch02` rewritten: parity enemies,
