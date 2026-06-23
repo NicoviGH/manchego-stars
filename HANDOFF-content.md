@@ -8,16 +8,15 @@ ownership map, and trunk rules → `CLAUDE.md` §Tracks (read first; the lane gu
 `HANDOFF-pipeline.md`.
 
 ## Base state (clean — start here)
-- **`main` = `f12643d`** — all content-lane work integrated; the cross-seam debt (pipeline-file edits
-  that were riding `inst/content`) was merged & cleared. **`inst/content` = `1085baa`**, ahead of main by
-  one docs-only commit (the reward-budget ADR); merge it down whenever convenient.
-- **`make` green** as of the last build (`74f9d16`), `verify_text` 0 runaway (3404 msgs), drift clean,
-  12 unit tests pass. Commits since are docs-only. Working tree clean except the `fireemblem8u` submodule
-  pointer (build artifact — **never commit it**).
-- **This session = analysis + grounding (no new build).** ch02's design got fully ground-out against the
-  decomp + the Frostmaiden book and **locked** (see §1); two campaign budgets were reconstructed and
-  recorded (see §"Decisions locked"). The previously-built `inject_ch02` (`74f9d16`) reflects an *older*
-  design and is about to be **reground** — that's the next task.
+- **`inst/content` = `b0576f1`**, ahead of `main` (`f12643d`) by 3 commits (reward-budget ADR, design-lock
+  handoff, **the ch02 reground**); fast-forwardable — merge down to `main` + push.
+- **`make` green** as of the reground build (`b0576f1`), `verify_text` 0 runaway (3404 msgs), drift clean,
+  `difficulty.py --chapter ch02` PARITY, `check.py` clean. Working tree clean except the `fireemblem8u`
+  submodule pointer (build artifact — **never commit it**).
+- **This session = ch02 REGROUND, built green.** The locked design (§1) is now implemented: vanilla-Ch2
+  enemy parity (chardalyn berserkers), 3 GREEN chwinga protect layer with the per-unit soft-fail
+  charm-gift mechanic (`CHECK_ALIVE` → `GIVEITEMTO` at the ending scene), sled + invented chest dropped.
+  ADR extended in `decisions.md` §"Ch2 hosting". **Remaining for ch02 = the human checkpoints (§1 below).**
 
 ## Decisions locked this session (all recorded in the repo — don't re-derive)
 - **Recruit budget** (`decisions.md` §"Recruit budget"): roster tracks vanilla's field-growth curve to a
@@ -35,10 +34,22 @@ ownership map, and trunk rules → `CLAUDE.md` §Tracks (read first; the lane gu
 
 ## Now / Next (priority order)
 
-### 1. 🎯 ch02 "Cold Welcome" REGROUND + REBUILD (#22) — design LOCKED, ready to execute
-The brainstorm is finished; build it. The current `inject_ch02` (`74f9d16`) has the *old* invented design
-(wolf/bandit raiders at hand-placed "defend-east" tiles, sled-as-protect deferred, no chwinga). **Replace
-per the locked design below.** Read `decisions.md` §"Ch2 hosting", §"Reward/item budget" first.
+### 1. 🎯 ch02 "Cold Welcome" (#22) — TACTICAL REGROUND DONE (`b0576f1`); 3 human checkpoints remain
+The enemy/chwinga/gift/mechanic reground is **built green** (`inject_ch02` rewritten: parity enemies,
+GREEN chwinga table `088B4718`, per-survivor `CHECK_ALIVE`→`GIVEITEMTO` gifts, reinforcements →`088B4758`,
+sled dropped). What's LEFT before ch02 is "done":
+- **(a) Dialogue reground — Nicolas co-write via `dialogue-pass`.** The LOCKED 2026-06-19 cutscene text
+  still frames the dropped sled (Wolfram's rear-bark "…the sled"; ending narration "…ringing the sled")
+  and calls the reinforcements "Snow Wolves", and the opening lacks a chwinga intro beat (a Marty line —
+  the befriend-creatures diplomat). Wired as placeholder meanwhile; YAML has a PENDING block marking the
+  three edits. Changing the opening beat count touches `CH02_OPENING_MSGS`.
+- **(b) Chwinga + Vellynne art (#38/#39, #19).** Map-sprite reskin + portraits + name-text
+  (Mote/Rime/Glimmer) over the DARA/KLIMT/MANSEL placeholder slots; Vellynne's cutscene bust. **Show
+  Nicolas before commit** (no art committed without sign-off).
+- **(c) mGBA load-test** ch01→ch02→win→chains; verify the chwinga LOAD green, the archer threatens the
+  pegasi, and surviving chwinga deliver their charms at the ending.
+
+The original locked-design spec is preserved below for reference (now implemented):
 
 **A. Enemies → vanilla FE8 Ch2 "The Protected" parity (exact mix + tiles), reskinned as chardalyn berserkers.**
 - Use vanilla Ch2's ACTUAL UnitDef positions + levels (from `git -C fireemblem8u show HEAD:src/events_udefs.c`
