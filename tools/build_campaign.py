@@ -255,11 +255,25 @@ CH02_AI = {
     'aggressive':    '{0x0, 0x0, 0x1, 0x0}',    # pursue/charge
     'hold_position': '{0x3, 0x3, 0x9, 0x20}',   # boss/miniboss: attack in place, never move
     'reinforce':     '{0x0, 0x0, 0x9, 0x0}',    # reinforcement wave
+    'cautious':      '{0x0, 0x3, 0x0, 0x0}',    # green chwinga: AttackInRangeAI -- defend, don't pursue (vanilla Garcia)
 }
-CH02_CLASS_IDS = {'brigand': 'CLASS_BRIGAND', 'archer': 'CLASS_ARCHER'}
+CH02_CLASS_IDS = {'brigand': 'CLASS_BRIGAND', 'archer': 'CLASS_ARCHER',
+                  'pegasus_knight': 'CLASS_PEGASUS_KNIGHT'}   # chwinga chassis (balance match to Ross+Garcia)
 CH02_ITEM_IDS = {'iron-axe': 'ITEM_AXE_IRON', 'steel-axe': 'ITEM_AXE_STEEL',
-                 'iron-bow': 'ITEM_BOW_IRON', 'vulnerary': 'ITEM_VULNERARY'}
+                 'iron-bow': 'ITEM_BOW_IRON', 'vulnerary': 'ITEM_VULNERARY',
+                 'slim-lance': 'ITEM_LANCE_SLIM',
+                 'red-gem': 'ITEM_REDGEM', 'elixir': 'ITEM_ELIXIR', 'pure-water': 'ITEM_PUREWATER'}
 CH02_GENERIC_PID = '0x8e'    # vanilla slot-3 generic-minion charIndex (autolevelled trash)
+# The three GREEN chwinga (protect layer): each rides a distinct minor vanilla NPC slot so
+# its survival is individually trackable via CHECK_ALIVE at the ending scene. Slots are
+# collision-free (absent from our ch00-08); their map sprite + portrait + name-text
+# (Mote/Rime/Glimmer) are the art checkpoint (#38/#39) -- placeholder vanilla faces meanwhile.
+# (yaml_id, vanilla character slot, charm-gift item the survivor delivers)
+CH02_CHWINGA = (
+    ('chwinga-mote',    'DARA',   'red-gem'),
+    ('chwinga-rime',    'KLIMT',  'elixir'),
+    ('chwinga-glimmer', 'MANSEL', 'pure-water'),
+)
 # Cutscene message ids -- the dead vanilla Ch3 scene/talk/turn texts our host overwrites
 # (referenced ONLY by ch3-eventscript.h scenes we replace; 0x993/0x994 are LIVE battle
 # quotes in data_battlequotes.c and are deliberately NOT in this pool -- see decisions.md
@@ -3649,11 +3663,19 @@ def inject_ch02(campaign, verbose=True):
     (_inject_lord_select_engine) -- no per-chapter wiring beyond the
     CauseGameOverIfLordDies that already sits in EventListScr_Ch3_Misc.
 
-    DEFERRED checkpoints (flagged, not in this pass): the sled defend-in-place
-    soft-fail mechanic + sled sprite, Vellynne's cutscene bust (#19, shown as a
-    placeholder vanilla face here), the snow-wolf/road-bandit map-sprite reskin
-    (vanilla brigand sprite for now), the chest+vulnerary drop, and the in-game
-    load-test. This pass hosts a clean DefeatAll slice with the three locked cutscenes.
+    The protect layer is three GREEN chwinga (pegasus chassis, vanilla Colm table
+    088B4718 repurposed) on distinct NPC slots; each surviving chwinga gifts a charm
+    (Red Gem / Elixir / Pure Water) at the ending scene via CHECK_ALIVE -> GIVEITEMTO
+    (per-unit soft-fail, no game over). Enemies are vanilla Ch2's exact mix, reflavored
+    chardalyn berserkers. Reinforcements move to the empty table 088B4758 (088B4718 is
+    now the chwinga).
+
+    DEFERRED checkpoints (flagged, not in this pass): the DIALOGUE REGROUND -- the locked
+    cutscene text still frames the dropped sled + "snow wolves" and lacks a chwinga intro
+    beat (Nicolas co-write via the dialogue-pass skill; wired as placeholder meanwhile);
+    the chwinga art (map sprite + portrait + name-text over DARA/KLIMT/MANSEL, #38/#39);
+    Vellynne's cutscene bust (#19, placeholder vanilla face here); the chardalyn map-sprite
+    reskin (vanilla brigand sprite for now); and the in-game load-test.
     """
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH02_CHAPTER_YAML)
@@ -3734,14 +3756,18 @@ def inject_ch02(campaign, verbose=True):
     with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=2)
 
-    # 2. Rosters (events_udefs.c). Two tables, reusing vanilla Ch3 symbols (already
-    #    declared by ch3-eventinfo/scripts, so no extern surgery):
+    # 2. Rosters (events_udefs.c). Four tables, reusing vanilla Ch3 symbols (already
+    #    declared in eventcall.h, so no extern surgery):
     #    - UnitDef_Event_Ch3Ally: the 5-slot deploy template = THE CAP. Never LOADed;
     #      the prep flow reads its entry count (cap) + positions (deploy tiles). The
     #      party itself persists from ch01 (no join-LOAD).
-    #    - UnitDef_088B463C: the raider band (Beginning-scene LOAD1). 0x8e = generic
-    #      autolevelled trash; Grukk rides the vanilla Bone slot, Halvar the Bazba slot.
-    #    - UnitDef_088B4718: the turn-3 rear wolves (was vanilla Colm; repointed RED).
+    #    - UnitDef_088B463C: the RED raider band (Beginning-scene LOAD1) -- vanilla Ch2's
+    #      exact mix, reflavored chardalyn berserkers. 0x8e = generic autolevelled trash;
+    #      Grukk rides the vanilla Bone slot, Halvar the Bazba slot.
+    #    - UnitDef_088B4718: the 3 GREEN chwinga (LOAD1 at chapter start, green from .allegiance;
+    #      was vanilla Colm's green table). Distinct NPC slots so CHECK_ALIVE tracks each.
+    #    - UnitDef_088B4758: the turn-3 RED reinforcement pair (the empty vanilla table;
+    #      088B4718 is now the chwinga). Vanilla 088B4470 mix = one L2 + one L3 brigand.
     cast = []
     for unit_id, slot in PORTRAIT_MAP.items():
         unit = load_unit(campaign, unit_id)
@@ -3778,7 +3804,8 @@ def inject_ch02(campaign, verbose=True):
               for i, ((uid, slot, ce, lv), (x, y))
               in enumerate(zip(cast[:chap['deploy_limit']], deploy_slots))]
 
-    def enemy_entry(char, class_enum, level, autolevel, x, y, item, ai, comment):
+    def enemy_entry(char, class_enum, level, autolevel, x, y, items, ai, comment,
+                    itemdrop=False):
         return ('    {\n'
                 '        .charIndex = %s,%s\n'
                 '        .classIndex = %s,\n'
@@ -3788,49 +3815,89 @@ def inject_ch02(campaign, verbose=True):
                 '        .xPosition = %d,\n'
                 '        .yPosition = %d,\n'
                 '        .redaCount = 0,\n'
+                '%s'
                 '        .items = { %s },\n'
                 '        .ai = %s,\n'
                 '    },' % (char, comment, class_enum,
                            '        .autolevel = 1,\n' if autolevel else '',
-                           level, x, y, item, ai))
+                           level, x, y,
+                           '        .itemDrop = 1,\n' if itemdrop else '',
+                           items, ai))
+
+    def green_entry(slot, level, x, y, items, ai, comment):
+        return ('    {\n'
+                '        .charIndex = CHARACTER_%s,%s\n'
+                '        .classIndex = %s,\n'
+                '        .autolevel = 1,\n'          # lean on the pegasus class curve (bases = tuning checkpoint)
+                '        .allegiance = FACTION_ID_GREEN,\n'
+                '        .level = %d,\n'
+                '        .xPosition = %d,\n'
+                '        .yPosition = %d,\n'
+                '        .redaCount = 0,\n'
+                '        .items = { %s },\n'
+                '        .ai = %s,\n'
+                '    },' % (slot.upper(), comment, CH02_CLASS_IDS['pegasus_knight'],
+                           level, x, y, items, ai))
 
     by_eid = {e['id']: e for e in chap['enemy_units']}
-    wolf, bandit, hunter = by_eid['snow-wolf'], by_eid['road-bandit'], by_eid['frost-hunter']
+    raider = by_eid['chardalyn-raider']            # 2x L3 generic brigand (vanilla #1 + #5)
+    scavenger = by_eid['chardalyn-scavenger']      # 1x L3, the vulnerary dropper (vanilla #4)
+    skirmisher = by_eid['chardalyn-skirmisher']    # 1x L2 generic brigand (vanilla #6)
+    archer = by_eid['frost-archer']                # 1x L1 archer (vanilla #2)
     grukk, halvar = by_eid['raider-bruiser'], by_eid['raider-captain']
     reinf = chap['reinforcements'][0]
     brig, arch = CH02_CLASS_IDS['brigand'], CH02_CLASS_IDS['archer']
-    axe, steel, bow = (CH02_ITEM_IDS['iron-axe'], CH02_ITEM_IDS['steel-axe'],
-                       CH02_ITEM_IDS['iron-bow'])
+    axe, steel, bow, vuln, lance = (CH02_ITEM_IDS['iron-axe'], CH02_ITEM_IDS['steel-axe'],
+                                    CH02_ITEM_IDS['iron-bow'], CH02_ITEM_IDS['vulnerary'],
+                                    CH02_ITEM_IDS['slim-lance'])
 
+    # 2a. RED raider band (088B463C) -- vanilla Ch2 parity, reflavored chardalyn berserkers.
     enemies = []
-    for x, y in wolf['positions']:
-        enemies.append(enemy_entry(CH02_GENERIC_PID, brig, wolf['level'], True, x, y,
-                                   axe, CH02_AI['aggressive'], ' /* snow wolf */'))
-    for x, y in bandit['positions']:
-        enemies.append(enemy_entry(CH02_GENERIC_PID, brig, bandit['level'], True, x, y,
-                                   axe, CH02_AI['aggressive'], ' /* road bandit */'))
-    for x, y in hunter['positions']:
-        enemies.append(enemy_entry(CH02_GENERIC_PID, arch, hunter['level'], True, x, y,
-                                   bow, CH02_AI['aggressive'], ' /* frost hunter (archer) */'))
+    for x, y in raider['positions']:
+        enemies.append(enemy_entry(CH02_GENERIC_PID, brig, raider['level'], True, x, y,
+                                   axe, CH02_AI['aggressive'], ' /* chardalyn berserker */'))
+    for x, y in scavenger['positions']:
+        enemies.append(enemy_entry(CH02_GENERIC_PID, brig, scavenger['level'], True, x, y,
+                                   '%s, %s' % (axe, vuln), CH02_AI['aggressive'],
+                                   ' /* chardalyn scavenger -- drops the vulnerary */',
+                                   itemdrop=True))
+    for x, y in skirmisher['positions']:
+        enemies.append(enemy_entry(CH02_GENERIC_PID, brig, skirmisher['level'], True, x, y,
+                                   axe, CH02_AI['aggressive'], ' /* chardalyn skirmisher (L2) */'))
+    for x, y in archer['positions']:
+        enemies.append(enemy_entry(CH02_GENERIC_PID, arch, archer['level'], True, x, y,
+                                   bow, CH02_AI['aggressive'],
+                                   ' /* chardalyn hunter (archer) -- hard-counters the pegasi */'))
     gx, gy = grukk['position']
     enemies.append(enemy_entry('CHARACTER_%s' % CH02_MINIBOSS_SLOT, brig, grukk['level'],
                                False, gx, gy, axe, CH02_AI['hold_position'],
-                               ' /* Grukk the Bruiser -- miniboss, fixed bases */'))
+                               ' /* Grukk the Bruiser -- miniboss, fixed bases (Bone slot) */'))
     hx, hy = halvar['position']
     enemies.append(enemy_entry('CHARACTER_%s' % CH02_BOSS_SLOT, brig, halvar['level'],
                                True, hx, hy, steel, CH02_AI['hold_position'],
-                               ' /* Halvar the Raider Captain -- boss, steel axe */'))
-    reinforce = [enemy_entry(CH02_GENERIC_PID, brig, reinf['level'], True, x, y,
-                             axe, CH02_AI['reinforce'],
-                             ' /* rear wolf, turn %d */' % reinf['trigger_turn'])
-                 for x, y in reinf['positions']]
+                               ' /* Halvar the Raider Captain -- boss, steel axe (Bazba slot) */'))
+
+    # 2b. GREEN chwinga (088B4718) -- the protect layer; positions + per-survivor gift
+    #     come from the YAML deployment.green_allies (id order matches CH02_CHWINGA).
+    chwinga_by_id = {g['id']: g for g in chap['deployment']['green_allies']}
+    chwinga = [green_entry(slot, chwinga_by_id[uid]['level'],
+                           chwinga_by_id[uid]['position'][0], chwinga_by_id[uid]['position'][1],
+                           lance, CH02_AI['cautious'], ' /* chwinga %s (%s) */' % (uid, gift))
+               for uid, slot, gift in CH02_CHWINGA]
+
+    # 2c. RED reinforcements (088B4758) -- vanilla 088B4470 mix: one L2 + one L3, turn 3.
+    reinforce = [enemy_entry(CH02_GENERIC_PID, brig, lv, True, x, y, axe,
+                             CH02_AI['reinforce'], ' /* rear raider L%d, turn %d */'
+                             % (lv, reinf['trigger_turn']))
+                 for (x, y), lv in zip(reinf['positions'], reinf['levels'])]
 
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:
         udefs = f.read()
     for marker, entries in (
             ('UnitDef_Event_Ch3Ally[] =', deploy),
             ('UnitDef_088B463C[] =', enemies),
-            ('UnitDef_088B4718[] =', reinforce)):
+            ('UnitDef_088B4718[] =', chwinga),
+            ('UnitDef_088B4758[] =', reinforce)):
         block = '{\n' + '\n'.join(entries) + '\n    { 0 },\n}'
         udefs = _replace_brace_block(udefs, marker, block, EVENTS_UDEFS_C)
     with open(EVENTS_UDEFS_C, 'w', encoding='utf-8') as f:
@@ -3884,7 +3951,8 @@ def inject_ch02(campaign, verbose=True):
         '    FADI(16) /* fade the scenic BG out */\n'
         '    SVAL(EVT_SLOT_B, 0x0) /* map camera origin */\n'
         '    LOMA(0x%X) /* RestartBattleMap -- build the ch02 map fresh (cf. inject_ch01) */\n'
-        '    LOAD1(0x1, UnitDef_088B463C) /* the raider band */\n'
+        '    LOAD1(0x1, UnitDef_088B463C) /* the RED raider band */\n'
+        '    LOAD1(0x1, UnitDef_088B4718) /* the 3 GREEN chwinga (protect layer) */\n'
         '    ENUN\n'
         '    FADU(16) /* reveal the battle map */\n'
         '    CALL(EventScr_08591FD8) /* preparations (PREP, event cmd 0x3E) -- cap 5 */\n'
@@ -3893,14 +3961,27 @@ def inject_ch02(campaign, verbose=True):
         '    ENDA\n}' % CH02_HOST_INDEX, CH3_EVENTSCRIPT_H)
     script = _replace_brace_block(
         script, 'EventScr_Ch3_Turn1Npc[] =',
-        '{\n    SVAL(EVT_SLOT_2, UnitDef_088B4718)\n'
+        '{\n    SVAL(EVT_SLOT_2, UnitDef_088B4758)\n'
         '    CALL(EventScr_LoadReinforce)\n'
-        '    TEXTSHOW(0x%X) /* Wolfram: wolves at our backs -- hold the rear */\n'
+        '    TEXTSHOW(0x%X) /* Wolfram: hold the rear (rear-ambush bark) */\n'
         '    TEXTEND\n    REMA\n'
         '    EVBIT_T(7)\n    ENDA\n}' % CH02_BARK_MSG, CH3_EVENTSCRIPT_H)
+    # Per-chwinga charm-gift: read each chwinga's survival (CHECK_ALIVE writes EVT_SLOT_C)
+    # while the battle units are still loaded, BEQ past the give if it fell, else drop the
+    # charm into the leader's inventory (overflow -> convoy). This is the chapter's
+    # per-unit soft-fail signature beat (cf. vanilla survival idiom, ch10b ending).
+    chwinga_gifts = ''.join(
+        '    SVAL(EVT_SLOT_3, %s) /* %s charm */\n'
+        '    CHECK_ALIVE(CHARACTER_%s)\n'
+        '    BEQ(0x%X, EVT_SLOT_C, EVT_SLOT_0) /* fell -> forfeit its own charm */\n'
+        '    GIVEITEMTO(CHAR_EVT_PLAYER_LEADER)\n'
+        'LABEL(0x%X)\n'
+        % (CH02_ITEM_IDS[gift], uid, slot.upper(), 0x30 + i, 0x30 + i)
+        for i, (uid, slot, gift) in enumerate(CH02_CHWINGA))
     script = _replace_brace_block(
         script, 'EventScr_Ch3_EndingScene[] =',
         '{\n    MUSC(SONG_VICTORY)\n'
+        + chwinga_gifts +               # per-survivor charm-gifts (read while units are loaded)
         '    REMOVEPORTRAITS\n'
         '    BACG(%s) /* Targos square (placeholder BG; #22 polish) */\n'
         '    FADU(16)\n'
@@ -3972,9 +4053,10 @@ def inject_ch02(campaign, verbose=True):
         print('  ch02 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; '
               'DefeatAll, deploy cap %d + PREP (lord auto-force-deployed)'
               % (obj_idx, pal_idx, cfg_idx, layout_idx, CH02_HOST_INDEX, len(deploy)))
-        print('  rosters: party persists, %d raiders (Grukk@%s Halvar@%s) + %d rear '
-              'wolves turn %d' % (len(enemies), (gx, gy), (hx, hy),
-                                  len(reinforce), reinf['trigger_turn']))
+        print('  rosters: party persists, %d chardalyn raiders (Grukk@%s Halvar@%s) + %d '
+              'rear raiders turn %d; %d GREEN chwinga (per-survivor charm-gifts)'
+              % (len(enemies), (gx, gy), (hx, hy), len(reinforce),
+                 reinf['trigger_turn'], len(chwinga)))
 
 
 def inject_northlook_bitey(verbose=True):

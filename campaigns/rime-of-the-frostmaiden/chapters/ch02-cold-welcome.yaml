@@ -31,41 +31,46 @@ map:
   base_layout: Ch2Map                  # vanilla 15×15 "The Protected", winter-reskinned
   size: "15×15"                 # compact, mirrors FE8 Ch2 (coords top out ~14×14)
   description: >
-    Compact snowy road into Targos. The party rides in aboard the Rolling Cheddar —
-    their home-sled — which halts at the entry corner when the raid hits; the raider
-    band holds the far edges and converges on it. Tree
-    lines and snowdrifts give terrain-avoid cover on the flanks. Reskin of FE8 Ch2:
-    same choke points and spawn geography, arctic palette. Terrain types map 1:1
-    (FE forest → snowy pines, fort → ice cairn, village → Ten-Towns hut).
+    Compact snowy road into Targos. The party rolls in aboard the Rolling Cheddar (their
+    home on runners, a narrative vehicle — not an on-map unit), and three green chwinga
+    are caught on the road just ahead when the raid hits; the chardalyn band holds the far
+    edges and converges on them. Tree lines and snowdrifts give terrain-avoid cover on the
+    flanks. Reskin of FE8 Ch2: same choke points and spawn geography, arctic palette.
+    Terrain types map 1:1 (FE forest → snowy pines, fort → ice cairn, village → Ten-Towns hut).
 
 # ── Objective ──────────────────────────────────────────────────────────────────
-# Mirrors FE8 Ch2 "The Protected": DefeatAll with a defend-in-place layer. FE8's
-# "protect" is a SOFT fail (you lose the recruit/village if too slow, not a game
-# over). Ours: the sled is the party's own home on runners — lose it and you forfeit
-# the chest + reward (stores lost with the home), but the chapter is not lost. Hard
-# lose = party wiped (lord rule).
+# Mirrors FE8 Ch2 "The Protected": DefeatAll with a protect layer. FE8's "protect" is a
+# SOFT fail — you lose the green ally/village if too slow, not a game over (Ross/Garcia
+# are green allies you shield, not a hard escort). Ours: three GREEN chwinga (harmless
+# snow-spirits, lightly armed) are the protected allies. The signature beat is PER-UNIT
+# soft-fail: a chwinga that dies forfeits ITS OWN charm-gift only (a flag is set on its
+# death and checked at chapter end), never a game over. Hard lose = party wiped (lord rule).
 objective:
   type: defeat_all
-  description: "Defeat the entire raider band"
+  description: "Defeat the raider band; keep the chwinga alive to claim their charms"
   constraint:
-    type: defend_in_place
-    unit: rolling-cheddar
-    description: "Keep the parked Rolling Cheddar sled alive through the raid"
-    fail_is_soft: true          # losing the sled forfeits the reward, not the chapter
+    type: protect_green_allies
+    units: [chwinga-mote, chwinga-rime, chwinga-glimmer]
+    description: "Each chwinga that survives gifts a charm at chapter end (per-unit soft-fail)"
+    fail_is_soft: true          # a fallen chwinga forfeits only its own gift, not the chapter
 
 win_condition: all_enemies_defeated
-lose_condition: all_player_units_defeated         # FE8 lord rule; sled loss is a soft penalty
-soft_penalty_on_sled_loss:
-  description: "Forfeit the chapter chest + the post-chapter gold reward."
+lose_condition: all_player_units_defeated         # FE8 lord rule; chwinga loss is a per-unit soft penalty
+soft_penalty_on_chwinga_loss:
+  description: "Each chwinga that dies forfeits its own charm-gift; surviving chwinga still gift theirs."
 
 # ── Difficulty ─────────────────────────────────────────────────────────────────
 difficulty_note: >
-  Teaches defend-in-place: the sled is a stationary objective the raid converges on,
-  so the party must hold a perimeter rather than rush forward. All-physical roster
-  (axe + one bow) keeps the weapon triangle readable — no enemy magic yet (FE8 fields
-  no enemy casters until ~Ch5–6; our first enemy caster is the Ch4 frost druid).
-  Comfortable vanilla-FE hit rates (~75%). One reinforcement pair enters turn 3 from
-  the edge OPPOSITE the boss to flank a party that has pushed forward (FE8's pattern).
+  Teaches protect-the-vulnerable: three green chwinga sit where the raid converges, so
+  the party must hold a perimeter around them rather than rush forward. The chwinga ride
+  the Pegasus chassis (verified balance match to vanilla's Ross+Garcia green help), and
+  the single enemy ARCHER hard-counters fliers (iron bow vs three pegasi) — that bow IS
+  the protect tension. All-physical roster (axe + one bow) keeps the weapon triangle
+  readable — no enemy magic yet (FE8 fields no enemy casters until ~Ch5–6; our first is
+  the Ch4 frost druid). Comfortable vanilla-FE hit rates (~75%). One reinforcement pair
+  enters turn 3 from the edge OPPOSITE the boss to flank a party that has pushed forward
+  (FE8's pattern). Parity bar: vanilla enemies + 3 green chwinga ≈ vanilla Ch2 (5 raiders
+  + green Ross/Garcia) — the chwinga are the swing factor, not enemy-level inflation.
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 # Field parity (decisions.md §"Field parity", 2026-06-10): deploy_limit = vanilla Ch2's
@@ -84,41 +89,73 @@ deploy_slots:
   - [1, 5]
   - [2, 4]
 deployment:
-  note: "Pick Units fields 5 of {7 PCs + Baxby} (vanilla Ch2 fields 5) + the Rolling Cheddar sled."
-  defend_unit:
-    id: rolling-cheddar
-    type: sled
-    behavior: stationary        # parked; the raid comes to it (FE8 defend-in-place)
-    must_survive: soft          # destruction = soft penalty, not game over
-    position: [1, 4]            # parked in the NW corner, ringed by the deploy slots
+  note: "Pick Units fields 5 of {7 PCs + Baxby} (vanilla Ch2 fields 5). The party rolls in NW; 3 green chwinga sit just ahead, in the raid's path."
+  # ── Protected: 3 GREEN chwinga (replaces the dropped sled) ──────────────────────
+  # Harmless gift-spirits (book: "Starting Quest: Nature Spirits", p25–26) on the
+  # Pegasus chassis (CLASS_PEGASUS_KNIGHT 0x48) — the verified balance match to vanilla's
+  # green Ross+Garcia (3 pegs ≈ 9–11 output vs 12; Mage over-shoots Res≈0 brigands,
+  # Myrmidon wildly over). Armed light (Slim Lance) so they defend themselves like the
+  # vanilla greens, who aren't defenseless. Cautious green AI (defend, don't suicide).
+  # They sit just ahead of the NW deploy ring, in the raid's converging path → the party
+  # must shield them. Repurposes vanilla Ch3's Colm GREEN table (UnitDef_088B4718).
+  green_allies:
+    - id: chwinga-mote
+      name: "Snow Mote"
+      fe_name: "Mote"             # ≤12 — name buffer safety
+      class: pegasus_knight
+      level: 1
+      position: [3, 4]
+      inventory: [slim-lance]
+      ai_pattern: cautious        # defend, don't charge into the raid
+      gift: red-gem               # ITEM_REDGEM 0x76 — gifted at chapter end IF it survives
+    - id: chwinga-rime
+      name: "Rime Spark"
+      fe_name: "Rime"
+      class: pegasus_knight
+      level: 1
+      position: [3, 5]
+      inventory: [slim-lance]
+      ai_pattern: cautious
+      gift: elixir                # ITEM_ELIXIR 0x6D
+    - id: chwinga-glimmer
+      name: "Glimmerfrost"
+      fe_name: "Glimmer"
+      class: pegasus_knight
+      level: 1
+      position: [2, 6]
+      inventory: [slim-lance]
+      ai_pattern: cautious
+      gift: pure-water            # ITEM_PUREWATER 0x6E
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
-# Mirrors FE8 Ch2 structure: ~6 trash + 1 named miniboss + 1 boss + 2 turn-3
-# reinforcements. Almost mono-chassis (axe-brigand) plus a single ranged unit, all
-# Iron-tier except the boss's Steel weapon — exactly how FE8 keeps a breather clean.
-# Wolves and bandits are the SAME chassis under the hood (axe-brigand); only the
-# sprite + flavor differ. The weapon-triangle arrow shows because the weapon TYPE
-# is axe (src/bmbattle.c sWeaponTriangleRules) — claws are flavor, not a monster weapon.
+# EXACT vanilla FE8 Ch2 "The Protected" roster (count + level + mix), reskinned as
+# CHARDALYN BERSERKERS — Auril-maddened humans (book: Wilderness Encounters #7, p107).
+# Zero reskin stretch: maddened humans wield real axes/bow, so they ARE FE8 brigands +
+# an archer (in the weapon triangle, src/bmbattle.c sWeaponTriangleRules). Grounded in
+# the decomp tables UnitDef_088B4344 (field) + UnitDef_088B44AC (Bazba) + UnitDef_088B4470
+# (reinforcements): 4 generic Brigand (L3,L3-drops-vulnerary,L3,L2) + 1 Archer (L1) +
+# Bone (named L4, fixed) + Bazba (named L6, Steel Axe). Halvar = Bazba slot, Grukk = Bone
+# slot. All Iron-tier except the boss's Steel — exactly how FE8 keeps a breather clean.
 enemy_units:
-  - id: snow-wolf
-    name: "Snow Wolf"
-    count: 3
-    positions: [[9,6],[10,8],[9,8]]   # converging through the center on the parked sled
+  - id: chardalyn-raider
+    name: "Chardalyn Berserker"
+    count: 2                          # vanilla 088B4344 #1 + #5 (plain L3 brigands)
+    positions: [[9,6],[10,8]]         # converging through the center
     fe_mechanic: axe-brigand    # Brigand class, axe-type weapon → in the weapon triangle
-    flavor: "rends with frost-rimed claws"
+    flavor: "an Auril-maddened raider, frost crusting the skin"
     class: brigand
     level: 3
     autolevel: true
     inventory:
-      - id: iron-axe            # mechanically an axe; reskinned as claws in animation
+      - id: iron-axe
         damage_type: slashing   # cosmetic label only
     ai_pattern: aggressive
-  - id: road-bandit
-    name: "Road Bandit"
-    count: 2
-    positions: [[11,7],[12,8]]        # holding the eastern approach; (12,8) forest = the dropper
+  - id: chardalyn-scavenger
+    name: "Chardalyn Berserker"
+    count: 1                          # vanilla 088B4344 #4 — the L3 dropper
+    positions: [[6,10]]               # vanilla's SW dropper tile (088B4344 #4 = 6,10)
     fe_mechanic: axe-brigand
-    flavor: "Ten-Towns road raider"
+    flavor: "scavenges the Targos road for the mad-cold"
     class: brigand
     level: 3
     autolevel: true
@@ -126,15 +163,28 @@ enemy_units:
       - id: iron-axe
         damage_type: slashing
     ai_pattern: aggressive
-    item_drop: vulnerary        # one dropper, mirrors FE8's Ch2 vulnerary drop
-  - id: frost-hunter
-    name: "Frost Hunter"
-    count: 1
-    positions: [[13,8]]               # in the eastern treeline (forest avoid), near the boss
-    fe_mechanic: archer         # single ranged unit for variety, as FE8 Ch2 does
-    flavor: "looses ice-fletched arrows from the drifts"
-    class: archer
+    item_drop: vulnerary        # the one dropper, mirrors vanilla Ch2's vulnerary drop
+  - id: chardalyn-skirmisher
+    name: "Chardalyn Berserker"
+    count: 1                          # vanilla 088B4344 #6 (the lone L2 brigand)
+    positions: [[9,8]]
+    fe_mechanic: axe-brigand
+    flavor: "the youngest of the maddened band"
+    class: brigand
     level: 2
+    autolevel: true
+    inventory:
+      - id: iron-axe
+        damage_type: slashing
+    ai_pattern: aggressive
+  - id: frost-archer
+    name: "Chardalyn Hunter"
+    count: 1                          # vanilla 088B4344 #2 — the single L1 archer
+    positions: [[13,8]]               # eastern treeline (forest avoid), near the boss
+    fe_mechanic: archer         # single ranged unit — hard-counters the green pegasi
+    flavor: "looses ice-fletched arrows at anything that flies"
+    class: archer
+    level: 1
     autolevel: true
     inventory:
       - id: iron-bow
@@ -145,11 +195,11 @@ enemy_units:
     is_miniboss: true
     count: 1
     position: [13, 6]           # guards beside the captain on the eastern edge
-    fe_mechanic: axe-brigand    # named mid-tier, guards near the boss (FE8 "Bone")
-    flavor: "the captain's right hand"
+    fe_mechanic: axe-brigand    # named mid-tier, guards near the boss (FE8 "Bone" slot)
+    flavor: "the captain's right hand, half-gone to the cold"
     class: brigand
     level: 4
-    autolevel: false                 # named mid-tier, fixed stats (FE8 "Bone")
+    autolevel: false                 # named mid-tier, FIXED bases (vanilla "Bone")
     inventory:
       - id: iron-axe
         damage_type: slashing
@@ -160,10 +210,10 @@ enemy_units:
     count: 1
     position: [14, 5]           # anchored on the far-east edge — the band's far corner
     fe_mechanic: steel-axe-brigand   # the one real threat = FE8's Steel-Axe Bazba mirror
-    flavor: "leads the band that's been bleeding the Targos road"
+    flavor: "leads the band the chardalyn drove mad — the last to fully turn"
     class: brigand
-    level: 5
-    autolevel: true                  # boss, modeled like vanilla Bazba (L6 steel-axe)
+    level: 6                          # vanilla Bazba is L6 steel-axe (UnitDef_088B44AC)
+    autolevel: true                  # boss, modeled exactly on vanilla Bazba
     inventory:
       - id: steel-axe
         damage_type: slashing
@@ -171,29 +221,34 @@ enemy_units:
     death_quote: "Should've… paid the toll…"
 
 reinforcements:
-  - id: rear-wolves
-    name: "Snow Wolf"
-    count: 2
+  - id: rear-raiders
+    name: "Chardalyn Berserker"
+    count: 2                          # vanilla reinforcement UnitDef_088B4470 (L2 + L3)
     fe_mechanic: axe-brigand
     class: brigand
-    level: 3
+    levels: [2, 3]                    # vanilla 088B4470 = one L2 + one L3 brigand
     autolevel: true
     inventory:
       - id: iron-axe
         damage_type: slashing
     trigger_turn: 3
     spawn_edge: opposite_boss        # flanks a party pushed toward the boss (FE8 pattern)
-    positions: [[0,6],[0,7]]         # west edge (boss anchors east) — emerge behind a pushed party, lunge at the sled
+    positions: [[0,6],[0,7]]         # west edge (boss anchors east) — emerge behind a pushed party
     ai_pattern: aggressive
 
-# ── Chests / Village ─────────────────────────────────────────────────────────────
-chests:
-  - position: [5, 11]                # southern plains pocket — a small detour off the defend line
-    contents:
-      - id: vulnerary
-        count: 1
-      - id: gold
-        amount: 120
+# ── Rewards (no chest — vanilla Ch2 has none) ─────────────────────────────────────
+# Vanilla Ch2's loot = three VILLAGE GIFTS (Red Gem / Elixir / Pure Water) + one enemy
+# vulnerary drop. Reward ADR (decisions.md §"Reward/item budget"): ch02 parity = FE8 Ch2
+# = gems + premium consumables, NO boosters/promos. We deliver the three gifts 1:1 as the
+# chwinga charm-gifts (per-survivor, see green_allies above), and the enemy drop is the
+# chardalyn-scavenger's vulnerary. No on-map chest (vanilla Ch2 has none).
+chests: []
+charm_gifts:
+  note: "Each SURVIVING chwinga gifts its charm at chapter end (gated on the per-unit survival flag)."
+  gifts:                             # 1:1 with vanilla Ch2's three village gifts
+    - { from: chwinga-mote,    item: red-gem,    hex: "0x76" }
+    - { from: chwinga-rime,    item: elixir,     hex: "0x6D" }
+    - { from: chwinga-glimmer, item: pure-water, hex: "0x6E" }
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
 events:
@@ -289,23 +344,36 @@ events:
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
-  gold_reward: 250                 # forfeited if the sled was destroyed
+  gold_reward: 0                   # vanilla Ch2 gives no gold (decisions.md §Gold); the chwinga charms ARE the reward
   available_shops: [targos]
   units_available_to_recruit: []   # Baxby is ch01; no new recruit here
   unlocks_chapter: ch03-the-termalaine-mine
 
+# ── PENDING: dialogue reground (Nicolas co-write, dialogue-pass skill) ─────────────
+# The LOCKED 2026-06-19 cutscene text above still frames the dropped SLED (Wolfram's
+# rear-bark "…the sled"; the ending narration "Wolfram's hammer ringing the sled") and
+# the reinforcements as "Snow Wolves". With the sled dropped and chwinga added, this
+# text is thematically stale and must be reground via the dialogue-pass skill WITH Nicolas:
+#   (1) opening — add a small chwinga intro beat (why the spirits are on the road / the
+#       party shielding them; a Marty line fits — the befriend-creatures diplomat);
+#   (2) rear-bark — de-sled it (chardalyn raiders at our backs, not "the sled");
+#   (3) ending — re-point Wolfram's inn payoff off the sled (he re-plates gear / the camp).
+# Left intact (not unilaterally rewritten) per feedback_show_before_committing + the
+# dialogue-pass discipline. Build wires the existing text as placeholder until then.
+
 # ── Design Notes ─────────────────────────────────────────────────────────────────
 design_notes: >
-  FE8 base: "The Protected" (DefeatAll + defend-in-place). No enemy caster on the field —
-  FE8 withholds casters until mid-game and our first is the ch05 frost-druid boss (Ravisin);
-  an early one would break the physical-triangle teaching ramp. The ending's frozen body is a
+  FE8 base: "The Protected" (DefeatAll + protect-the-green-ally). No enemy caster on the
+  field — FE8 withholds casters until mid-game and our first is the ch05 frost-druid boss
+  (Ravisin); an early one would break the physical-triangle teaching ramp. The protect
+  layer is three GREEN chwinga (snow-spirits) on the Pegasus chassis — the verified balance
+  match to vanilla's green Ross+Garcia — with the chapter's SIGNATURE beat being per-unit
+  soft-fail: a chwinga that dies forfeits only its own charm-gift (Red Gem / Elixir / Pure
+  Water, vanilla Ch2's three village gifts 1:1), never a game over. The single enemy archer
+  hard-counters the fliers, so the bow IS the protect tension. The ending's frozen body is a
   *story* seed only (no combat here): the town blames the druids' sacrifice rumor, while Rootis
   clocks it as Sephek's dagger-of-ice kill — a breadcrumb for his Act-II reckoning, distinct
-  from Ravisin (see docs/decisions.md §Story → Sephek arc). Wolfram's metal-craft is his
-  secondary signature beat: the ch01 ending already armored the Rolling Cheddar (his forge-night),
-  so the Ch2 inn payoff is him re-plating the raid's battle-damage — and it plays only
-  if the sled survived. Losing the sled forfeits the chest + reward: that is the
-  chapter's "protect" stake.
-  Snow wolves and road bandits are the same axe-brigand chassis so balance is
-  identical; the variety is sprite + flavor, with the single bow-user adding a ranged
-  threat exactly as FE8 Ch2 does.
+  from Ravisin (see docs/decisions.md §Story → Sephek arc). The chardalyn berserkers are
+  Auril-maddened humans — real axes/bow, zero reskin stretch, so balance is exactly vanilla
+  Ch2's; the variety is sprite + flavor, with the single bow-user adding a ranged threat
+  exactly as FE8 Ch2 does.

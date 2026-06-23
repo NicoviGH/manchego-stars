@@ -16,7 +16,7 @@ rules) lives in `docs/decisions.md` and `docs/fe8-pacing-reference.md`.
 |---|---|---|---|---|---|
 | P | A Dagger of Ice | 🟦 tutorial | DefeatBoss — Defeat Sephek Kaltro | — | Ch 1 |
 | 1 | The Iron Trail | 🟦 full-party intro | Seize — Seize the goblin camp — the chief holds it and the ingots are there | baxby | Ch 2 |
-| 2 | Cold Welcome | 🟦 breather / defend | DefeatAll — Defeat the entire raider band | — | Ch 3 |
+| 2 | Cold Welcome | 🟦 breather / defend | DefeatAll — Defeat the raider band; keep the chwinga alive to claim their charms | — | Ch 3 |
 | 3 | The Termalaine Mine | 🟨 gimmick (multi-level) | Seize — Descend the shaft and seize the deep workings — the flooded lower gallery where the Grells nest. Reaching it requires the full descent; the win triggers on the seize tile. Slaying the Grells guarding it is incidental. | trex | Ch 4 |
 | 4 | The White Moose | 🟨 monster debut (fog) | DefeatAll — Rout the forest's hostile beasts and spirits | lupin +npc: lupin-pack | Ch 5 |
 | 5 | The Elven Tomb | 🟥 first boss | DefeatBoss — Defeat Ravisin, the frost druid (her guardians and the moose needn't all fall) | sahnar, basil | Ch 6 |
