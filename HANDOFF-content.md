@@ -8,109 +8,113 @@ ownership map, and trunk rules → `CLAUDE.md` §Tracks (read first; the lane gu
 `HANDOFF-pipeline.md`.
 
 ## Base state (clean — start here)
-- `inst/content` synced to `main` base (`288b1a1`); **ahead by ch02 work** (`6a52682`, `74f9d16`) pushed to
-  `origin/inst/content`.
-- **`make` green**, `verify_text` 0 runaway (3404 msgs), drift clean, 12 unit tests pass. Working tree clean
-  (only the `fireemblem8u` submodule pointer, a build artifact — **never commit it**).
-- **Committed last session** (`eaaf340`): 8 `lord_pitch:` YAML fields + #46-reskin & seam-refinement ADRs.
-  The hand-built lord-select menu was discarded (superseded by the reskin); `build_campaign.py` clean base.
-- **Committed THIS session** (ch02, #22 — see §2): `6a52682` ch02 unit positions (vs the real hand-retiled
-  map); `74f9d16` `inject_ch02` host wiring + 3 cutscenes (build-green). #22 boxes checked: Host/Units/Cutscenes.
+- **`main` = `f12643d`** — all content-lane work integrated; the cross-seam debt (pipeline-file edits
+  that were riding `inst/content`) was merged & cleared. **`inst/content` = `1085baa`**, ahead of main by
+  one docs-only commit (the reward-budget ADR); merge it down whenever convenient.
+- **`make` green** as of the last build (`74f9d16`), `verify_text` 0 runaway (3404 msgs), drift clean,
+  12 unit tests pass. Commits since are docs-only. Working tree clean except the `fireemblem8u` submodule
+  pointer (build artifact — **never commit it**).
+- **This session = analysis + grounding (no new build).** ch02's design got fully ground-out against the
+  decomp + the Frostmaiden book and **locked** (see §1); two campaign budgets were reconstructed and
+  recorded (see §"Decisions locked"). The previously-built `inject_ch02` (`74f9d16`) reflects an *older*
+  design and is about to be **reground** — that's the next task.
+
+## Decisions locked this session (all recorded in the repo — don't re-derive)
+- **Recruit budget** (`decisions.md` §"Recruit budget"): roster tracks vanilla's field-growth curve to a
+  **~16–18 pool**, NOT capped at Ch5. `deploy_limit` = vanilla field per chapter; recruits fill role gaps.
+  Killed the stale roadmap "stops at Ch5" line.
+- **Reward/item budget** (`decisions.md` §"Reward/item budget" + `fe8-pacing-reference.md §3`, now a
+  [decomp]-pinned per-chapter curve): a chapter's loot mirrors its `parity_reference` (channel + tier).
+  Caps: no boosters/promo before parity ≥ FE8 **Ch5**; no Silver before **Ch8**; no Master Seal / Secret
+  Shop / Sacred before **~Ch14a**. Placement follows the parity_reference, not our chapter number.
+- **Chapter status** (`check.py check_chapter_status`): every chapter YAML carries `status: active|planned`;
+  planned = brainstorm seed (tooling skips them in the curve/gate). ch00–02 active, ch03–08 planned.
+- **ch02 map is a FAITHFUL reskin** of FE8 Ch2 (terrain diff vs `Ch2Map` = **2/225** cells). Vanilla Ch2's
+  literal unit tiles ARE valid in-game — author against the committed **`.mar`** (the `map-review/*-layout.json`
+  is stale, disagrees ~5 cells). (Corrects an earlier wrong "walkability diverged" note.)
 
 ## Now / Next (priority order)
 
-### 1. 🚧 #46 lord-select — DESIGN LOCKED, build is the next task (reskin "Pick Units")
+### 1. 🎯 ch02 "Cold Welcome" REGROUND + REBUILD (#22) — design LOCKED, ready to execute
+The brainstorm is finished; build it. The current `inject_ch02` (`74f9d16`) has the *old* invented design
+(wolf/bandit raiders at hand-placed "defend-east" tiles, sled-as-protect deferred, no chwinga). **Replace
+per the locked design below.** Read `decisions.md` §"Ch2 hosting", §"Reward/item budget" first.
 
-**Read first:** issue **#46** (the locked design + DoD checklist comment) + `decisions.md` §Lord-select UI.
+**A. Enemies → vanilla FE8 Ch2 "The Protected" parity (exact mix + tiles), reskinned as chardalyn berserkers.**
+- Use vanilla Ch2's ACTUAL UnitDef positions + levels (from `git -C fireemblem8u show HEAD:src/events_udefs.c`
+  tables `088B4344` enemies + `088B44AC` Bazba): ~6 Brigand (Iron Axe, **L1**, one drops a Vulnerary) + 1
+  Archer (Iron Bow, L1) + **Bone** (named Brigand **L4**) + **Bazba** (Steel Axe). NOT my old L3 / defend-east
+  placement.
+- **Flavor = chardalyn berserkers** — Auril-maddened humans (physical axe/bow, **zero reskin stretch**, ties
+  to ch02's frost-druid/Auril plot; book: Wilderness Encounters #7, p107). Boss **Halvar** → Bazba slot;
+  miniboss **Grukk** → Bone slot.
+- Re-verify `python3 tools/difficulty.py --chapter ch02` lands PARITY *with the chwinga green help counted*
+  (see B) — vanilla enemies + 3 peg-chwinga ≈ vanilla Ch2 (5 + Ross/Garcia). If it sags, the chwinga are the
+  swing factor, not enemy-level inflation.
 
-A hand-built menu (custom frames + `StartFace2` bust + multi-line text drawn to BG) was tried and
-**abandoned**: the bust wouldn't render over the scenic BACG (OBJ-vs-BG priority), `DrawUiFrame2` borders
-didn't draw, text spilled. Nicolas's call: **clone-and-adapt a vanilla menu** — **`prep_unitselect.c`**
-(the deploy "Pick Units" screen: already a scrollable unit list + live `PutFaceChibi` portrait + side panel).
+**B. Protected → 3 GREEN Pegasus chwinga (DROP the sled entirely).**
+- Chwinga = the vulnerable green allies you protect (mirrors vanilla's Ross/Garcia, who are green). Book:
+  "Starting Quest: Nature Spirits" (p25–26) — harmless gift-giving snow-spirits; we arm them so they defend
+  themselves (like Ross/Garcia, who aren't defenseless).
+- **Chassis = `CLASS_PEGASUS_KNIGHT`** (verified balance match): 3 pegs ≈ Ross+Garcia in output (9–11 vs 12)
+  & survivability; **Mage over-shoots** (magic hits Res≈0 on brigands) and **Myrmidon wildly over** (sword>axe
+  + doubling = 3.5× output). The ch02 **archer hard-counters fliers** (iron-bow ×3) → that's the protect tension.
+- **Green table:** repurpose vanilla Ch3's Colm green table (`UnitDef_088B4718`, already FACTION_GREEN) for the
+  chwinga; the old build used it for RED reinforcements — reassign (fold any kept reinforcement into the RED
+  `088B463C`, or drop the turn-3 wave). Cautious green AI (defend, don't suicide). `fe_name` ≤12.
+- **NEW mechanic:** green protected allies + per-unit soft-fail. A chwinga that dies forfeits *its* charm only
+  (set a flag on death, checked at chapter end) — not a game over. This is the chapter's signature beat.
+- **Art (checkpoint, #38/#39):** tiny-spirit reskin over the Pegasus chassis — show Nicolas before commit.
 
-**The build:**
-- Clone+adapt `prep_unitselect.c` → **`engine/lord_select_screen.c`** (a *dedicated* screen; the real prep
-  screen stays untouched). Campaign-agnostic; driven by build-generated `gLordSelectCandidates[]` + a parallel
-  pitch-msg table; **portrait id + name from each pid's `CharacterData`** (no live-Unit dependency).
-- **Pitch panel replaces the inventory panel** (qualitative, no stats). Up/Down live-refresh portrait + pitch;
-  **A → "Will N lead the party?" [Yes/No]** → sets `LORDSEL_FLAG_BASE + i` (read by `LordSelect_GetPid`).
-- **(a) explainer** shown once before the screen. Locked text (variant A): *"Choose who leads the party. Your
-  leader must survive every battle -- if they fall, the journey ends."*
-- `build_campaign.py`: generate the pitch-msg table, write pitch + explainer bodies (`set_message_body`),
-  add a `vanilla_portrait_id`/`lord_pitch_text` helper, replace `CallLordSelectMenu` → `StartLordSelectScreen`.
-  Wire `engine/lord_select_screen.c` into the decomp build (objects list + ldscript). **Use `EWRAM_OVERLAY(0)`
-  for writable buffers** (the vanilla idiom — `events_script.o` discards `.bss`, which is why the hand-built
-  `static struct Text` wouldn't link).
-- **Custom flair (in DoD, NOT deferred):** distinct frame/title/tint so players don't confuse it with the prep
-  screen minutes later. Build first, then flair.
-- Gates: `make` green · `verify_text` 0 runaway · unit tests · **mGBA `recordlord` render → Nicolas sign-off**
-  (show-before-committing). Commit `Closes #46` **and** `Closes #21`; ADR already in `decisions.md`.
+**C. Charms/gifts → the exact vanilla Ch2 village loot, 1:1 with the chwinga.**
+- Each SURVIVING chwinga gifts one of: **Red Gem `0x76` / Elixir `0x6D` / Pure Water `0x6E`** (vanilla Ch2's
+  three village gifts). Deliver at chapter end gated on the per-chwinga survival flag. In-budget by the
+  Reward ADR (ch02 parity = FE8 Ch2 = gems + premium consumables; **no boosters/promos**).
 
-**Reusable (already done — don't redo):**
-- **Pitches** are committed in `pcs/*.yaml` (`lord_pitch:`, plain + qualitative). `build_campaign` doesn't read
-  them yet (inert until the reskin wires them).
-- **Vetted dead msg-id block** (zero live-script refs; not `data_battlequotes.c` death quotes): **pitches**
-  `0x929,0x92A,0x92B,0x92C,0x92D,0x92E,0x92F,0x932`; **explainer** `0x957`. (`0x965–0x96E` are LIVE — flashback.)
-- **Clone findings** (`prep_unitselect.c`): writable buffers `EWRAM_OVERLAY(0)`; list drawn to BG2, screen sets
-  up its **own** full-screen bg (good — separates from the cutscene, and the flair pass owns the look); list
-  source `MakePrepUnitList`/`GetUnitFromPrepList` (swap for the candidate table); `PrepUnit_DrawUnitItems` is the
-  panel to replace with the pitch; `PrepUnit_HandlePressA` is the select hook to repoint at pick+confirm.
-- **`recordlord`** already exists in `harness.lua` (pipeline-authored, on main) — use it for the render:
-  `PT_FPS=240 tools/playtest/run.sh recordlord` → `tools/playtest/make_gif.py recordlord lord --name lord-select`.
-  The menu cards are late in the frame sequence (~before the confirm); the GIF capture works as-is.
+**D. Keep / drop / dialogue.**
+- KEEP: `deploy_limit` 5, party persists, **Baxby's cutscene join unchanged** (do NOT rewrite it), DefeatAll,
+  lord auto-deploy, the 3 locked cutscenes. NO Talk-recruit in ch02 (Baxby = the recruit; Talk planned elsewhere).
+- DROP: the sled (and its soft-fail/chest-forfeit framing) and my hand-placed positions.
+- **Dialogue (invoke `dialogue-pass` skill):** the locked cutscenes don't mention the chwinga — they need a
+  small intro beat (why they're on the road / the party shielding them; a Marty line fits — he's the
+  befriend-creatures diplomat). Co-write per the skill; ground in `lore/marty.md`.
+- **Gates:** `make` green · `verify_text` 0 · `difficulty.py --chapter ch02` PARITY · mGBA load-test (ch01→ch02
+  →win→chains) · art sign-off (chwinga + Vellynne #19). ADR the locked design in `decisions.md` (extend
+  §"Ch2 hosting") in the SAME commit (no separate spec doc — `feedback_no_spec_docs`).
 
-### 2. ch02 slice (#22) — ✅ HOSTED & build-green (commits `6a52682` positions, `74f9d16` inject_ch02)
-**What landed (this session):** `inject_ch02` hosts Ch2 on chapter slot 3 — `make` green, `verify_text`
-0 runaway, drift clean, 12 unit tests pass, cutscenes decode clean (spot-checked). ch01 → ch02 →
-dev placeholder (ch03 unhosted) chains. ADR in `decisions.md` §"Ch2 hosting".
-- **Positions** authored on the built **`.mar`**'s walkable tiles (plains/forest), verified in-bounds.
-  The winter map is a **faithful reskin** of FE8 Ch2 (terrain diff vs `Ch2Map` = 2/225 cells), so
-  walkability ≈ vanilla. Placement is our own defend-east arrangement (party+sled NW, boss far-east, rear
-  wolves west edge) — NOT vanilla's literal tiles; mirroring vanilla exactly is an open option. (Author
-  against the `.mar`, not `map-review/*-layout.json` — the review grid disagrees with the build.)
-- **DefeatAll**: slot-3 host goal = vanilla slot-4's `defeat_all` template; `Seize(14,1)`+chests/doors dropped
-  from `EventListScr_Ch3_Location` (`CountRedUnits()` win). Lord auto-force-deploys (flag hook; nothing per-chapter).
-- **Cutscenes** built from the locked YAML: Vellynne opening (BACG, placeholder `FID_Ismaire` face), Wolfram
-  turn-3 rear bark (auto-wrapped), Targos-inn ending (#58 opaque narration box). Halvar death quote wired.
-- **msg-id pool** = dead vanilla Ch3 scene texts `0x98b–0x99a`; **`0x993`/`0x994` are LIVE battle quotes,
-  excluded** (the hex-grep false-negative the gotchas warn about). (The handoff's old `0x933/0x937/0x938`
-  spares were unused — the Ch3 scene pool is bigger and cleaner.)
-
-**REMAINING for #22 (deferred, flagged in code + the ADR):**
-- **Defend-in-place sled soft-fail** (novel green-unit + flag mechanic: sled death → forfeit chest+250g, not
-  game over) **+ sled sprite** — the chapter's defining layer; not yet built.
-- **Vellynne cutscene portrait #19** (placeholder vanilla face shows meanwhile).
-- snow-wolf / road-bandit **map-sprite reskin** (vanilla brigand sprite for now; #38).
-- **chest** + vulnerary drop placement (chest pos authored in YAML at `[5,11]`, not yet wired — needs a
-  thief/key decision).
-- **Title card** "Chapter 2: Cold Welcome" — `gen_chapter_title` atlas lacks C/W/d/m + the "Ch.2:" prefix;
-  extend `LETTERS`/`WORDS` then compose (a visual artifact → Nicolas sign-off; cf. inject_ch01 step 6a). VISUAL.
-- **Load-test** (mGBA / Nicolas): ch01 clear → ch02 plays → win → chains; verify cutscene staging + reinforcement.
+### 2. 🅿️ #46 lord-select reskin — DESIGN LOCKED, PARKED (needs Nicolas at his computer for the render sign-off)
+This is the deferred UI work ("pick up the lord ux when home"). Build = clone/adapt `prep_unitselect.c` →
+**`engine/lord_select_screen.c`** (dedicated screen; real prep untouched), driven by build-generated
+`gLordSelectCandidates[]` + a parallel pitch-msg table (portrait+name from each pid's `CharacterData`). Pitch
+panel replaces the inventory panel (qualitative, no stats); Up/Down live-refresh; A → "Will N lead?" [Yes/No]
+→ sets `LORDSEL_FLAG_BASE + i`. (a)-explainer once before (locked text in issue #46). Writable buffers →
+`EWRAM_OVERLAY(0)`. Custom flair (distinct frame/title/tint) is in DoD, build-then-flair.
+- **Reusable:** pitches committed in `pcs/*.yaml` (`lord_pitch:`, inert until wired); dead msg-ids — pitches
+  `0x929–0x92F,0x932`, explainer `0x957` (`0x965–0x96E` are LIVE); `recordlord` exists in `harness.lua`
+  (`PT_FPS=240 tools/playtest/run.sh recordlord` → `make_gif.py`). Gate: mGBA render → Nicolas sign-off;
+  commit `Closes #46`+`Closes #21`; ADR already in `decisions.md` §Lord-select UI.
 
 ### 3. Supporting content / art
-Enemy YAML pass #18 · NPC/recruit stubs #17 · world-map unlock #29 · portraits #19 · overworld sprites #38 ·
-onboarding-parity #64.
-
-## Seam refinement (B) — ratified, NOT built, NOT urgent
-`decisions.md` §Seam refinement: content-feature `record*` scenarios are content spot-checks. **Not built**, and
-no longer pressing — a `recordlord` already exists on main (pipeline-authored) and *running* it was never blocked.
-If the content lane needs to author/tune its own capture scenario before the mechanism lands (carve a content-owned
-`tools/playtest/content_scenarios.lua` the harness includes — a **pipeline** `check.py`/`harness.lua` edit), use
-`--no-verify` for that one commit.
+Vellynne portrait #19 · ch02 title card (gen_chapter_title atlas lacks C/W/d/m — VISUAL, sign-off) · enemy
+YAML pass #18 · NPC/recruit stubs #17 · world-map unlock #29 · overworld sprites #38 · onboarding-parity #64.
 
 ## Watch out (content-lane only)
-- **msg-id vetting is treacherous:** `data_battlequotes.c` stores ids 4-digit zero-padded (`0x0935`), and
-  `msg_data.c` packs them as halfword arrays — naïve hex-grep gives false negatives. Vet by **content** (a
-  one-chapter scene line our host overwrites?) + check `data_battlequotes.c` in the `0x0XXX` form.
-- **Writing any dialogue → invoke the `dialogue-pass` skill first.** Voice grounding: per-NPC `lore/*.md` §Voice +
-  `lore/frostmaiden-voices.md` + `fireemblem8u/texts/texts.txt`. Read sources first; bring drafts.
+- **msg-id vetting is treacherous:** `data_battlequotes.c` stores ids 4-digit zero-padded (`0x0935`); naïve
+  hex-grep gives false negatives. Vet by **content** + check `data_battlequotes.c` in the `0x0XXX` form. (ch02
+  used dead Ch3-scene ids `0x98b–0x99a`, excluding the LIVE `0x993`/`0x994`.)
+- **Writing any dialogue → invoke the `dialogue-pass` skill first.** Voice grounding: per-NPC `lore/*.md` §Voice
+  + `lore/frostmaiden-voices.md` + `fireemblem8u/texts/texts.txt`. Read sources first; bring drafts.
+- **DM notes are a baseline, not a cage** — invented content (e.g. ch02's combat; the canonical Targos leg has
+  none) is legit; say canon-vs-invented, don't treat "not in the notes" as wrong. Story sources of truth:
+  `References/DungeonMasterNotesIcewindDale.pdf` + the Frostmaiden book PDF (image-only; read pages via the
+  Read tool's `pages`).
+- **Reward placement follows `parity_reference`, not chapter number** (Reward ADR). Our MVP (parity ≤ Ch13) is
+  below the Master-Seal/Secret-Shop line → promotions stay deferred to Revel's End.
 - Long unit names overflow FE8's name buffer — add a short `fe_name` (≤12) to new units.
 - Story bodies are `make`-regenerated; gate text changes with `python3 tools/verify_text.py`.
-- **Chapter hosting (model on `inject_ch01`):** each chapter rides the *next* vanilla slot (ch01→2; ch02→**3**)
-  and needs a real `.mar`+`.json` map. Chapters chain via `MNC2(<next slot>)`; an unhosted next chapter
-  dead-ends on `dev_placeholder_scene`.
-- **Engine UI in a custom event-menu:** writable globals can't live in `events_script.o` (its `.bss` is
-  discarded); use `EWRAM_OVERLAY(0)`. OBJ-based faces (`StartFace2`) don't render over an opaque BACG (priority)
-  — the reskin sidesteps both by using its own bg + `PutFaceChibi`.
-- **The repo moves under you:** scheduled/parallel pipeline work lands on `main` mid-session. Re-check
-  `git log main` and sync before a big build (this handoff was written after one such sync).
+- **Chapter hosting (model on `inject_ch01`/`inject_ch02`):** each chapter rides the *next* vanilla slot
+  (ch01→2; ch02→**3**); chains via `MNC2(<next slot>)`; an unhosted next chapter dead-ends on
+  `dev_placeholder_scene`. ch02 is party-persist (no cast re-LOAD), DefeatAll (slot-4 goal donor), lord
+  auto-force-deployed (flag hook — nothing per-chapter).
+- **The repo moves under you:** parallel pipeline work lands on `main`. Re-check `git log main` and sync before
+  a big build.
