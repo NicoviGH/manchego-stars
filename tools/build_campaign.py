@@ -51,6 +51,7 @@ CLASSES_H = os.path.join(DECOMP, 'include', 'constants', 'classes.h')
 BANIM_DATA_C = os.path.join(DECOMP, 'src', 'banim_data.c')
 BANIM_POINTER_H = os.path.join(DECOMP, 'include', 'banim_pointer.h')
 BANIMCONF_C = os.path.join(DECOMP, 'src', 'data_banimconf.c')
+BANIM_EKRBATTLE_H = os.path.join(DECOMP, 'include', 'ekrbattle.h')
 BANIM_LINKER = os.path.join(DECOMP, 'linker_script_banim.txt')
 BANIM_DATA_DIR = os.path.join(DECOMP, 'data', 'banim')
 BANIM_GFX_DIR = os.path.join(DECOMP, 'graphics', 'banim')
@@ -310,9 +311,11 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         # enemy class reskins (#21): cloned goblin classes in gClassData
                         'src/data_classes.c',
                         # faked battle anims (#65): appended banim_data row + pointer
-                        # externs + linker block, and the donor class's repointed AnimConf
+                        # externs + linker block; the Archer-CLONE class + its new AnimConf
+                        # (data_classes.c already listed); the AnimConf's extern decl
                         'src/banim_data.c', 'include/banim_pointer.h',
-                        'src/data_banimconf.c', 'linker_script_banim.txt',
+                        'src/data_banimconf.c', 'include/ekrbattle.h',
+                        'linker_script_banim.txt',
                         # Goodberry (#21): vulnerary icon swapped by inject_item_icons
                         'graphics/item_icon/item_icon_vulnerary.png',
                         'data/const_data_unit_icon_wait.s', 'data/const_data_unit_icon_move.s',
@@ -975,6 +978,19 @@ def class_enum_for(unit):
     return CLASS_MAP[base]
 
 
+def deploy_class_for(unit):
+    """The class enum a unit is DEPLOYED as (its `defaultClass` + UnitDef `classIndex`).
+
+    A unit with a faked battle anim (#65) rides a stat-identical *clone* class (`clone_into`)
+    so ONLY its own unit shows the custom anim -- generic/enemy units of the donor class keep
+    the vanilla anim. Everyone else deploys as their plain class. Stats/loadout still resolve
+    against `class_enum_for` (the real vanilla class), so the clone is invisible to them."""
+    ba = unit.get('battle_anim')
+    if ba and ba.get('clone_into'):
+        return ba['clone_into']
+    return class_enum_for(unit)
+
+
 def donor_growths_and_ranks(vanilla_text, donor_char):
     """Read a stat-donor unit's growths + baseRanks initializer from VANILLA
     data_characters.c text (so it's unaffected by patches we apply this run)."""
@@ -1067,7 +1083,7 @@ def patch_character_data(campaign, verbose=True):
         marker = '[CHARACTER_%s - 1]' % slot.upper()
         s, e = _find_brace_block(text, marker, CHARACTERS_C)
         block = text[s:e]
-        block = _set_field(block, 'defaultClass', class_enum, CHARACTERS_C, marker)
+        block = _set_field(block, 'defaultClass', deploy_class_for(unit), CHARACTERS_C, marker)
         block = _set_field(block, 'affinity', 'UNIT_AFFIN_ANIMA', CHARACTERS_C, marker)
         block = _set_field(block, 'baseLevel', int(st.get('level', 1)), CHARACTERS_C, marker)
 
@@ -1512,7 +1528,7 @@ def inject_test_chapter(campaign, verbose=True):
             '        .yPosition = %d,\n'
             '        .redaCount = 0,\n'
             '        .items = { %s },\n'
-            '    },' % (slot.upper(), class_enum, leader,
+            '    },' % (slot.upper(), deploy_class_for(unit), leader,
                         int(unit.get('fe_stats', {}).get('level', 1)),
                         x, y, items))
     roster = '{\n' + '\n'.join(entries) + '\n    { 0 },\n}'
@@ -2111,13 +2127,14 @@ def enemy_class_reskins(campaign):
 
 # --- Faked battle animations (#65) -----------------------------------------------
 # Give a unit a custom battle anim from 1-3 static frames + the engine's effects, with
-# NO hand-drawn motion. ref_to_battleframe generates the assets (sheets + agbpal +
-# motion.s) cloning a donor class's timing; this injects them additively: append a
-# banim_data[] row (the table self-sizes via banim_number) -> a new animId, then repoint
-# the donor class's AnimConf weapon entry at it. Reversible (the four files restore to
-# vanilla each build). M-A = frame-swap of the Archer (RBG, an archer, fights with his art).
+# NO hand-drawn motion. ref_to_battleframe generates the assets (sheets + agbpal + motion.s)
+# cloning a donor class's timing; this injects them ADDITIVELY: append a banim_data[] row
+# (-> a new animId), then -- so generic/enemy archers stay vanilla -- give the unit a
+# stat-identical CLONE of the donor class (clone_into) whose private AnimConf selects the new
+# animId, and deploy the unit as that clone (deploy_class_for). Nothing vanilla is overwritten
+# (donor class + AnimConf byte-unchanged). Reversible: the patched files restore each build.
 
-# donor 'clone_from' -> (FE class enum, the AnimConf weapon entry whose index we repoint).
+# donor 'clone_from' -> (FE donor class enum, the AnimConf weapon entry to repoint in the clone).
 BANIM_DONORS = {'archer': ('CLASS_ARCHER', '0x0100 | ITYPE_BOW')}
 
 
@@ -2144,6 +2161,20 @@ def banim_repoint_conf(text, conf_sym, wtype_literal, new_index):
     if n == 0:
         sys.exit('ERROR: banim repoint: wtype %r not found in %s' % (wtype_literal, conf_sym))
     return text[:bs] + new_block + text[be:]
+
+
+def banim_clone_conf(text, src_sym, new_sym, wtype_literal, new_index):
+    """Append a COPY of AnimConf `src_sym` as `new_sym`, with the `wtype_literal` entry's
+    `.index` set to `new_index`. `src_sym` is left byte-unchanged (the donor class keeps the
+    vanilla anim). Returns the new text (declaration appended)."""
+    bs, be = _find_brace_block(text, '%s[] =' % src_sym, BANIMCONF_C)
+    block = text[bs:be]
+    pat = re.compile(r'(\.wtype\s*=\s*' + re.escape(wtype_literal) +
+                     r'\s*,\s*\.index\s*=\s*)(0x[0-9A-Fa-f]+|\d+)')
+    new_block, n = pat.subn(lambda m: '%s0x%X' % (m.group(1), new_index), block, count=1)
+    if n == 0:
+        sys.exit('ERROR: banim clone: wtype %r not found in %s' % (wtype_literal, src_sym))
+    return text + '\nCONST_DATA struct BattleAnimDef %s[] = %s;\n' % (new_sym, new_block)
 
 
 def _banim_palette(frame_imgs):
@@ -2231,17 +2262,41 @@ def inject_battle_anims(campaign, verbose=True):
                             ('agbpal', 'char')]:
                 f.write('extern %s banim_%s_%s;\n' % (ty, abbr, sym))
 
-        # 4. repoint the donor class's AnimConf weapon entry at the new animId
-        conf_sym = _class_field_symbol(donor_class, 'pBattleAnimDef')
+        # 4. ADDITIVE isolation: instead of repointing the shared donor class, give the unit
+        #    a stat-identical CLONE class whose own AnimConf selects the new animId. The donor
+        #    class + its AnimConf stay byte-vanilla, so every generic/enemy unit of that class
+        #    keeps the stock anim; only this unit (deploy_class_for -> clone_into) changes.
+        clone_slot = cfg.get('clone_into')
+        if not clone_slot:
+            sys.exit('ERROR: battle_anim %s: missing clone_into (the Archer-clone slot)' % uid)
+        new_conf = 'AnimConf_%s' % abbr
+        src_conf = _class_field_symbol(donor_class, 'pBattleAnimDef')  # e.g. AnimConf_088AF150
+        # 4a. a private AnimConf = copy of the donor's, with the weapon entry -> new animId.
+        #     NOTE: AnimConf `.index` is animId+1 -- GetBattleAnimationId returns `idx - 1`
+        #     (vanilla archer bow .index 0x26 -> animId 0x25). So encode anim_id + 1.
         with open(BANIMCONF_C, encoding='utf-8') as f:
             conf = f.read()
-        conf = banim_repoint_conf(conf, conf_sym, wtype, anim_id)
+        conf = banim_clone_conf(conf, src_conf, new_conf, wtype, anim_id + 1)
         with open(BANIMCONF_C, 'w', encoding='utf-8') as f:
             f.write(conf)
+        with open(BANIM_EKRBATTLE_H, 'a', encoding='utf-8') as f:
+            f.write('extern CONST_DATA struct BattleAnimDef %s[]; /* Manchego Stars #65 */\n'
+                    % new_conf)
+        # 4b. clone the donor ClassData into clone_slot (full copy = identical stats/combat),
+        #     repoint .number + .pBattleAnimDef -> the private AnimConf
+        with open(CLASSES_C, encoding='utf-8') as f:
+            ctext = f.read()
+        bs, be = _find_brace_block(ctext, '[%s - 1]' % donor_class, CLASSES_C)
+        body = ctext[bs:be]
+        body = _set_field(body, 'number', clone_slot, CLASSES_C, donor_class)
+        body = _set_field(body, 'pBattleAnimDef', new_conf, CLASSES_C, donor_class)
+        ctext = _replace_brace_block(ctext, '[%s - 1]' % clone_slot, body, CLASSES_C)
+        with open(CLASSES_C, 'w', encoding='utf-8') as f:
+            f.write(ctext)
 
         if verbose:
-            print('  %-14s = banim %s (animId 0x%X), %s.%s -> it'
-                  % (uid, abbr, anim_id, donor_class, wtype))
+            print('  %-14s = banim %s (animId 0x%X); clone %s -> %s (%s.%s)'
+                  % (uid, abbr, anim_id, donor_class, clone_slot, new_conf, wtype))
 
 
 def _class_field_symbol(class_enum, field):
@@ -3312,7 +3367,7 @@ def inject_ch01(campaign, verbose=True):
             continue
         if class_enum not in CLASS_LOADOUT:
             sys.exit('ERROR: no loadout for %s (unit %s)' % (class_enum, unit_id))
-        cast.append((unit_id, slot, class_enum,
+        cast.append((unit_id, slot, class_enum, deploy_class_for(unit),
                      int(unit.get('fe_stats', {}).get('level', 1))))
         cast_names.append(display_name(unit))
     if len(cast) > len(LORDSEL_CONFIRM_MSGS):
@@ -3336,12 +3391,14 @@ def inject_ch01(campaign, verbose=True):
                 '        .items = { %s },\n'
                 '    },' % (slot.upper(), comment, class_enum, leader, level, x, y, items))
 
-    join = [ally_entry(slot, ce, lv, x, y, ', '.join(CLASS_LOADOUT[ce]),
+    # classIndex rides the DEPLOY class (dce -- the Archer-clone for RBG, #65); items/loadout
+    # still come from the real vanilla class (ce). For most units dce == ce.
+    join = [ally_entry(slot, dce, lv, x, y, ', '.join(CLASS_LOADOUT[ce]),
                        ' /* %s */' % uid)
-            for (uid, slot, ce, lv), (x, y) in zip(cast, CH01_JOIN_POSITIONS)]
-    deploy = [ally_entry(slot, ce, lv, x, y, '0',
+            for (uid, slot, ce, dce, lv), (x, y) in zip(cast, CH01_JOIN_POSITIONS)]
+    deploy = [ally_entry(slot, dce, lv, x, y, '0',
                          ' /* deploy slot %d (cap template, never LOADed) */' % i)
-              for i, ((uid, slot, ce, lv), (x, y))
+              for i, ((uid, slot, ce, dce, lv), (x, y))
               in enumerate(zip(cast[:len(chap['deploy_slots'])], chap['deploy_slots']))]
     if len(deploy) != chap['deploy_limit']:
         sys.exit('ERROR: deploy_slots (%d) != deploy_limit (%d) in ch01 YAML'
@@ -3422,13 +3479,13 @@ def inject_ch01(campaign, verbose=True):
          '   classed cast order; chosen pid = flag scan (LordSelect_GetPid). */',
          'CONST_DATA u16 gLordSelectCandidates[] = {'] +
         ['    CHARACTER_%s, /* %s */' % (slot.upper(), uid)
-         for uid, slot, _, _ in cast] +
+         for uid, slot, _, _, _ in cast] +
         ['    0xFFFF,', '};', ''])
     # Lord survivability floors (#45 3b): per-candidate { +maxHP, +Def, +Res }, PARALLEL to
     # gLordSelectCandidates above (same menu order). Computed @target 3.5 bulk-durability vs
     # Ch1 enemies -- the shamans' frail floor; the armor tanks score 0. The engine adds the
     # chosen lord's triple to its unit ONCE at chapter start, flag-gated (#45 3c).
-    floor_rows = lord_floor_rows(campaign, [uid for uid, _, _, _ in cast])
+    floor_rows = lord_floor_rows(campaign, [uid for uid, _, _, _, _ in cast])
     udefs += '\n'.join(
         ['', '/* Lord survivability floors (#45 3b, build-generated): per-candidate',
          '   { +maxHP, +Def, +Res } at base level, parallel to gLordSelectCandidates above.',
@@ -3496,7 +3553,7 @@ def inject_ch01(campaign, verbose=True):
     #     into slot 2, TEXTSHOW(0xffff) shows it, and the [Yes] answer comes back
     #     in EVT_SLOT_C -- 1 = yes, anything else re-opens the menu).
     items = []
-    for i, ((uid, slot, _, _), name) in enumerate(zip(cast, cast_names)):
+    for i, ((uid, slot, _, _, _), name) in enumerate(zip(cast, cast_names)):
         items.append(
             '    {\n'
             '        .name = (const char *)0x8205958, /* vanilla dummy (rodata is discarded) */\n'

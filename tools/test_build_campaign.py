@@ -156,6 +156,19 @@ class BattleAnimInjection(unittest.TestCase):
         self.assertIn('.wtype = 0x0100 | ITYPE_BOW, .index = 0xC9', new)
         self.assertIn('.wtype = 0x0100 | ITYPE_ITEM, .index = 0x0027', new)  # untouched
 
+    def test_clone_conf_appends_a_private_copy_and_leaves_the_donor_vanilla(self):
+        conf = ('CONST_DATA struct BattleAnimDef AnimConf_088AF150[] = {\n'
+                '    { .wtype = 0x0100 | ITYPE_BOW, .index = 0x0026, },\n'
+                '    { 0 }\n};\n')
+        new = bc.banim_clone_conf(conf, 'AnimConf_088AF150', 'AnimConf_rbg_ar1',
+                                  '0x0100 | ITYPE_BOW', 0xC9)
+        # donor entry byte-unchanged
+        self.assertIn('AnimConf_088AF150[] = {\n    { .wtype = 0x0100 | ITYPE_BOW, '
+                      '.index = 0x0026, },', new)
+        # a NEW conf appended, with the bow entry repointed
+        self.assertIn('struct BattleAnimDef AnimConf_rbg_ar1[] =', new)
+        self.assertIn('.wtype = 0x0100 | ITYPE_BOW, .index = 0xC9', new)
+
 
 if __name__ == '__main__':
     unittest.main()
