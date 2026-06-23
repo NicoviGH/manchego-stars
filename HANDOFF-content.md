@@ -70,6 +70,12 @@ gunslinger; **Archer is purely the parity/anim donor** — gun↔arrow dissonanc
 - **Lane:** authoring/injection = content; the battle-capture verification scenario = pipeline. `tools/
   ref_to_battleframe.py` is currently SHARED (registering it in `check.py`'s CONTENT_EXCLUSIVE needs a
   pipeline-lane edit — deferred).
+- **Speed-up (teed up, not done):** the *build* is a sequential TDD chain — keep it on one instance. But three
+  independent decomp-research unknowns can be fanned out to **parallel `Explore` subagents** first: (1) the OAM
+  `attr0/attr1/attr2` bit encoding behind `banim_frame_oam`; (2) the donor `arcm_ar1` `motion.s` full 13-mode/
+  script structure to clone (timing + `hit`/`call_spell_anim` placement); (3) the 4bpp + `.agbpal` + linker
+  registration mechanics (`linker_script_banim.txt` + `banim_data[]` ordering). Run those concurrently to start
+  research-complete, then implement serially.
 
 ### 1. 🎯 ch02 "Cold Welcome" (#22) — TACTICAL REGROUND DONE (`b0576f1`); 3 human checkpoints remain
 The enemy/chwinga/gift/mechanic reground is **built green** (`inject_ch02` rewritten: parity enemies,
