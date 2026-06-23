@@ -18,6 +18,8 @@ TILE = 8  # GBA OBJ tiles are 8x8
 SQUARE_SIZES = (4, 2, 1)  # legal GBA square OBJ side, in 8x8 cells (32x32 / 16x16 / 8x8)
 PAL_BANK = 16     # colours per GBA 4bpp sub-palette
 PAL_BANKS = 4     # a banim .agbpal holds 4 sub-palettes (64 BGR555 hwords, 128 bytes)
+SHEET_COLS = 32   # banim sheets are 2D char-mapped, 32 tiles (256px) wide
+OBJ_HFLIP = 0x1000  # attr1 bit12 (h-flip)
 
 
 def _bgr555(rgb):
@@ -66,6 +68,35 @@ def merge_objects(filled, cols, rows):
     return objs
 
 
+def build_sheet_from_placements(frame_img, placements, palette, sheet_cols=SHEET_COLS):
+    """Blit each placed OBJ's pixels onto a 256-wide (32-tile) indexed sheet.
+
+    The sheet is 2D char-mapped (stride `sheet_cols`), so an OBJ that `pack_frame_oam`
+    addressed at base tile row*32+col must have its source pixels at (col*8, row*8).
+    Each OBJ's source is `frame_img` cropped at its sprite cell (cx,cy) for w*h tiles.
+    Returns a mode-"P" image (transparent->index 0), height = used tile rows * 8.
+    """
+    used_rows = max((p["row"] + p["h"] for p in placements), default=1)
+    w, h = sheet_cols * TILE, used_rows * TILE
+    lut = {c: i for i, c in enumerate(palette[:PAL_BANK])}
+    sheet = Image.new("P", (w, h), 0)
+    flat = []
+    for c in palette[:PAL_BANK]:
+        flat += list(c)
+    flat += [0] * (3 * PAL_BANK - len(flat))
+    sheet.putpalette(flat)
+    src = frame_img.load()
+    for p in placements:
+        sx0, sy0 = p["cx"] * TILE, p["cy"] * TILE
+        dx0, dy0 = p["col"] * TILE, p["row"] * TILE
+        for dy in range(p["h"] * TILE):
+            for dx in range(p["w"] * TILE):
+                r, g, b, a = src[sx0 + dx, sy0 + dy]
+                if a != 0:
+                    sheet.putpixel((dx0 + dx, dy0 + dy), lut.get((r, g, b), 0))
+    return sheet
+
+
 def build_sheet_png(tiles, palette, tiles_per_row=32):
     """Lay deduped 8x8 `tiles` row-major into an indexed (mode "P") sheet PNG.
 
@@ -90,10 +121,6 @@ def build_sheet_png(tiles, palette, tiles_per_row=32):
                 r, g, b, a = px[x, y]
                 sheet.putpixel((ox + x, oy + y), 0 if a == 0 else lut.get((r, g, b), 0))
     return sheet
-
-
-OBJ_HFLIP = 0x1000  # attr1 bit12
-SHEET_COLS = 32     # banim sheets are 2D char-mapped, 32 tiles (256px) wide
 
 
 def square_obj_attrs(w):
@@ -145,6 +172,114 @@ def mirror_oam(entries):
             "dx": -(e["dx"] + wpx), "dy": e["dy"],
         })
     return out
+
+
+# The 12 banim modes, in banim_data modes-table order. For a faked ranged unit every
+# attack_* mode runs the draw-and-fire template, dodges hop, stands hold frame 0.
+_MODE_ORDER = [
+    ("attack_close", "attack"), ("attack_close_back", "attack"),
+    ("attack_close_critical", "attack"), ("attack_close_critical_back", "attack"),
+    ("attack_range", "attack"), ("attack_range_critical", "attack"),
+    ("dodge_close", "dodge"), ("dodge_range", "dodge"),
+    ("stand_close", "stand"), ("stand", "stand"), ("stand_range", "stand"),
+    ("attack_miss", "miss"),
+]
+
+
+def _frame_cmd(abbr, dur, i):
+    """A banim_code_frame line: frame i lives on sheet i, oam at frame i's _r offset."""
+    return ("\tbanim_code_frame %d, banim_%s_sheet_%d, %d, "
+            "banim_%s_oam_frame_%d_r - banim_%s_oam_r" % (dur, abbr, i, i, abbr, i, abbr))
+
+
+def _mode_body(abbr, kind):
+    """Emit one mode's script lines for the 3-beat (Ready/Wind-up/Peak) fake."""
+    if kind == "attack":   # draw (0->1 held) -> peak (2) + loose arrow -> recover
+        return ["\tbanim_code_start_attack_1", "\tbanim_code_start_attack_2",
+                _frame_cmd(abbr, 3, 0), "\tbanim_code_sound_pull_bow",
+                _frame_cmd(abbr, 18, 1), _frame_cmd(abbr, 3, 2),
+                "\tbanim_code_call_spell_anim", _frame_cmd(abbr, 1, 2),
+                "\tbanim_code_wait_hp_deplete", "\tbanim_code_start_opposite_turn",
+                _frame_cmd(abbr, 3, 0), "\tbanim_code_end_dodge",
+                "\tbanim_code_end_mode"]
+    if kind == "dodge":    # hop: 0 -> 1 -> 2 -> (wait) -> 1
+        return ["\tbanim_code_dodge_to_before", _frame_cmd(abbr, 1, 0),
+                _frame_cmd(abbr, 3, 1), _frame_cmd(abbr, 1, 2),
+                "\tbanim_code_wait_hp_deplete", _frame_cmd(abbr, 3, 1),
+                "\tbanim_code_end_dodge", "\tbanim_code_end_mode"]
+    if kind == "stand":    # hold the ready frame
+        return [_frame_cmd(abbr, 1, 0), "\tbanim_code_wait_hp_deplete",
+                "\tbanim_code_end_mode"]
+    return [_frame_cmd(abbr, 4, 0), "\tbanim_code_end_mode"]   # miss
+
+
+def _oam_line(e):
+    return ("\tbanim_frame_oam 0x%X, 0x%X, 0x%X, %d, %d"
+            % (e["attr0"], e["attr1"], e["attr2"], e["dx"], e["dy"]))
+
+
+def emit_motion_s(abbr, frames):
+    """Assemble the full banim motion.s text for `abbr` from 3 frames' OAM.
+
+    `frames` is a list of {"oam_r": [...], "oam_l": [...]} (Ready/Wind-up/Peak). Emits the
+    .data.oam_l / .oam_r / .script (12 modes) / .modes sections. oam_l mirrors oam_r 1:1 so
+    frame i is at the same byte offset in both tables (the script references the _r offset;
+    the engine adds it to the oam_l base when the unit faces the other way).
+    """
+    L = ["@ vim:ft=armv4",
+         "\t.global banim_%s_script" % abbr,
+         "\t.global banim_%s_oam_r" % abbr,
+         "\t.global banim_%s_oam_l" % abbr,
+         '\t.include "../include/banim_sheet.inc"',
+         '\t.include "../include/banim_code.inc"',
+         '\t.include "../include/banim_code_frame.inc"',
+         "@ faked battle animation (donor-prime, #65)"]
+
+    for side in ("l", "r"):
+        L.append("\t.section .data.oam_%s" % side)
+        L.append("banim_%s_oam_%s:" % (abbr, side))
+        for i, fr in enumerate(frames):
+            L.append("banim_%s_oam_frame_%d_%s:" % (abbr, i, side))
+            for e in fr["oam_%s" % side]:
+                L.append(_oam_line(e))
+            L.append("\tbanim_frame_end")
+
+    L.append("\t.section .data.script")
+    L.append("banim_%s_script:" % abbr)
+    for name, kind in _MODE_ORDER:
+        L.append("banim_%s_mode_%s:" % (abbr, name))
+        L += _mode_body(abbr, kind)
+
+    L.append("\t.section .data.modes")
+    for name, _ in _MODE_ORDER:
+        L.append("\t.word banim_%s_mode_%s - banim_%s_script" % (abbr, name, abbr))
+    for _ in range(12):
+        L.append("\t.word 0")
+    return "\n".join(L) + "\n"
+
+
+def build_battle_anim(abbr, frame_imgs, palette, center_px=None):
+    """Drive the whole faked-anim build: 3 frames -> sheets + agbpal + motion.s text.
+
+    Per frame: tile -> merge filled cells into OBJs -> pack to oam_r + 2D placements ->
+    mirror to oam_l -> blit the sheet. All frames use ONE shared anchor (`center_px`,
+    default a torso point) so the body stays put on screen. Returns
+    {"sheets": [P-image x N], "pal": <128 bytes>, "motion_s": <str>}.
+    """
+    if center_px is None:
+        w, h = frame_imgs[0].size
+        center_px = (w // 2, h * 5 // 8)
+    sheets, frames = [], []
+    for im in frame_imgs:
+        cols, rows = im.size[0] // TILE, im.size[1] // TILE
+        _, oam = tile_sprite(im)
+        filled = {(o["dx"] // TILE, o["dy"] // TILE) for o in oam}
+        objs = merge_objects(filled, cols, rows)
+        entries, placements = pack_frame_oam(objs, center_px)
+        sheets.append(build_sheet_from_placements(im, placements, palette))
+        frames.append({"oam_r": entries, "oam_l": mirror_oam(entries)})
+    return {"sheets": sheets, "pal": agbpal_bytes(palette),
+            "motion_s": emit_motion_s(abbr, frames)}
 
 
 def _cell_is_empty(im, ox, oy):

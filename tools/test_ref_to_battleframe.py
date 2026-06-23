@@ -189,6 +189,121 @@ class TestMirrorOam(unittest.TestCase):
         self.assertEqual(l[0]["dy"], -16)              # vertical unchanged
 
 
+class TestSheetFromPlacements(unittest.TestCase):
+    """Blit each OBJ's source pixels to its 2D placement on a 256-wide (32-tile) sheet.
+
+    pack_frame_oam emits attr2 = row*32+col; the sheet must put that OBJ's pixels at
+    (col*8, row*8) so the 2D char-map address resolves. Output is indexed mode "P".
+    """
+
+    def _frame(self):  # 16x16 sprite, top-left cell red, others transparent
+        im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+        for y in range(8):
+            for x in range(8):
+                im.putpixel((x, y), (255, 0, 0, 255))
+        return im
+
+    def test_width_is_256_and_indexed(self):
+        frame = self._frame()
+        placements = [{"cx": 0, "cy": 0, "w": 1, "h": 1, "col": 0, "row": 0}]
+        sheet = rb.build_sheet_from_placements(frame, placements, [(0, 0, 0), (255, 0, 0)])
+        self.assertEqual(sheet.mode, "P")
+        self.assertEqual(sheet.size[0], 256)            # 32 tiles wide (2D stride)
+
+    def test_blits_obj_pixels_at_its_col_row(self):
+        frame = self._frame()
+        # place that red cell at sheet col 3, row 1 -> pixels at (24, 8)
+        placements = [{"cx": 0, "cy": 0, "w": 1, "h": 1, "col": 3, "row": 1}]
+        sheet = rb.build_sheet_from_placements(frame, placements, [(0, 0, 0), (255, 0, 0)])
+        self.assertEqual(sheet.getpixel((24, 8)), 1)    # red -> palette index 1
+        self.assertEqual(sheet.getpixel((0, 0)), 0)     # elsewhere transparent -> 0
+
+    def test_multi_tile_obj_blits_its_whole_block(self):
+        frame = Image.new("RGBA", (16, 16), (255, 0, 0, 255))  # full 16x16 red
+        placements = [{"cx": 0, "cy": 0, "w": 2, "h": 2, "col": 0, "row": 0}]
+        sheet = rb.build_sheet_from_placements(frame, placements, [(0, 0, 0), (255, 0, 0)])
+        for (x, y) in [(0, 0), (15, 0), (0, 15), (15, 15)]:
+            self.assertEqual(sheet.getpixel((x, y)), 1)  # whole 2x2-tile block filled
+
+
+class TestEmitMotionS(unittest.TestCase):
+    """Assemble the full banim motion.s text (oam_l, oam_r, script, modes sections).
+
+    Clones the archer ranged cadence onto 3 beats (Ready/Wind-up/Peak): the arrow fires
+    via call_spell_anim on the peak. Script references the _r oam offsets; oam_l mirrors
+    1:1 so frame N sits at the same byte offset in both tables (engine flips by base).
+    """
+
+    def _frames(self):
+        e0 = [{"attr0": 0, "attr1": 0x4000, "attr2": 0, "dx": -8, "dy": -8}]
+        return [{"oam_r": e0, "oam_l": rb.mirror_oam(e0)} for _ in range(3)]
+
+    def test_has_all_four_sections_and_globals(self):
+        s = rb.emit_motion_s("rbg_ar1", self._frames())
+        for sect in [".section .data.oam_l", ".section .data.oam_r",
+                     ".section .data.script", ".section .data.modes"]:
+            self.assertIn(sect, s)
+        self.assertIn(".global banim_rbg_ar1_script", s)
+        self.assertIn("banim_rbg_ar1_oam_r:", s)
+
+    def test_attack_modes_fire_the_projectile_on_the_peak(self):
+        s = rb.emit_motion_s("rbg_ar1", self._frames())
+        self.assertIn("banim_rbg_ar1_mode_attack_range:", s)
+        self.assertIn("banim_code_call_spell_anim", s)        # the arrow
+        self.assertIn("banim_code_wait_hp_deplete", s)
+
+    def test_references_all_three_frames(self):
+        s = rb.emit_motion_s("rbg_ar1", self._frames())
+        for i in range(3):
+            self.assertIn("banim_rbg_ar1_oam_frame_%d_r" % i, s)
+            self.assertIn("banim_rbg_ar1_oam_frame_%d_l" % i, s)
+
+    def test_modes_table_is_12_modes_plus_12_zero_padding(self):
+        s = rb.emit_motion_s("rbg_ar1", self._frames())
+        modes = s.split(".section .data.modes")[1]
+        self.assertEqual(modes.count("- banim_rbg_ar1_script"), 12)  # 12 named modes
+        self.assertEqual(modes.count(".word 0"), 12)                 # 12 zero padding
+
+    def test_oam_entry_emits_five_attr_fields(self):
+        s = rb.emit_motion_s("rbg_ar1", self._frames())
+        # the one OBJ in frame 0 right: attr0=0x0, attr1=0x4000, attr2=0, dx=-8, dy=-8
+        self.assertIn("banim_frame_oam 0x0, 0x4000, 0x0, -8, -8", s)
+
+
+class TestBuildBattleAnim(unittest.TestCase):
+    """End-to-end driver: 3 frame images + abbr + palette -> sheets, agbpal, motion.s.
+
+    Orchestrates the tested pieces (tile -> merge -> pack -> sheet) per frame against one
+    shared anchor, then assembles the motion.s. Integration guard over the wiring.
+    """
+
+    def _frames(self):
+        out = []
+        for n in range(3):
+            im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+            for y in range(8, 16):
+                for x in range(8, 16):
+                    im.putpixel((x, y), (200, 0, 0, 255))
+            out.append(im)
+        return out
+
+    def test_returns_three_sheets_palette_and_motion(self):
+        res = rb.build_battle_anim("rbg_ar1", self._frames(), [(0, 0, 0), (200, 0, 0)])
+        self.assertEqual(len(res["sheets"]), 3)
+        self.assertTrue(all(s.mode == "P" for s in res["sheets"]))
+        self.assertEqual(len(res["pal"]), 128)
+        self.assertIn("banim_rbg_ar1_script", res["motion_s"])
+        self.assertIn("banim_code_call_spell_anim", res["motion_s"])
+
+    def test_all_frames_share_one_anchor(self):
+        # identical frames -> identical oam offsets across all 3 (same anchor used)
+        res = rb.build_battle_anim("rbg_ar1", self._frames(), [(0, 0, 0), (200, 0, 0)])
+        m = res["motion_s"]
+        f0 = m.split("banim_rbg_ar1_oam_frame_0_r:")[1].split("banim_frame_end")[0]
+        f1 = m.split("banim_rbg_ar1_oam_frame_1_r:")[1].split("banim_frame_end")[0]
+        self.assertEqual(f0.strip(), f1.strip())
+
+
 class TestTiler(unittest.TestCase):
     def test_skips_fully_transparent_cells_and_places_the_filled_one(self):
         # 16x16 = a 2x2 grid of 8x8 cells; fill only the bottom-right cell.

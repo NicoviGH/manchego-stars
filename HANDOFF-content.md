@@ -85,8 +85,26 @@ gunslinger; **Archer is purely the parity/anim donor** — gun↔arrow dissonanc
   (flat row-major list) is only correct for the all-8×8 case; the merged case needs an **OBJ-aware** sheet
   builder that blits each OBJ's pixels at its `pack_frame_oam` placement (`build_sheet_from_placements`, in 3b).
   `agbpal_bytes` is unaffected (correct). `pack_frame_oam` already emits the right 2D `attr2` + placements.
+- **DONE (slice 3b — sheet builder + motion.s gen + driver):** `build_sheet_from_placements` (blit each OBJ's
+  pixels to its 2D placement on a 256-wide sheet), `emit_motion_s(abbr, frames)` (full .s text: oam_l/oam_r +
+  12-mode script on the ranged 3-beat template `start_attack_1/2`→draw 0→1(held 18)→2→`call_spell_anim`→
+  `wait_hp_deplete`→recover, + 24-word modes table), `build_battle_anim(abbr, frame_imgs, palette)` driver
+  (tile→merge→pack→sheet per frame on ONE shared anchor → {sheets, pal, motion_s}). 10 new TDD'd asserts (now
+  **29** in `make test`). Smoke-tested on the real descaled RBG frames: 14-col pal, 3 sheets, 21/14/20 OBJ/frame.
+- **RBG art IS IN the repo (descaled, Nicolas OK'd provisionally 2026-06-23):** `battle_anims/prof-rbg/{ready,
+  windup,peak}.png` — 88×64, common feet-anchor, snapped to the shared 15-col `_fam` palette (the `flat15`
+  variants do NOT share a palette — 42-col union; use `_fam`). Uncommitted pending the in-context look.
+- **⚠️ ENGINE FINDING (slice 4 route):** the live battle path (`banim-ekrbattleintro.c:1006`) calls plain
+  `GetBattleAnimationId` (class-based via `pClassData->pBattleAnimDef`), NOT `_WithUnique`. The per-character
+  unique path (`CharacterData._u25` → `gUnitSpecificBanimConfigs`) is **FE7-leftover, only wired to the triangle
+  forecast** — it will NOT drive the real battle anim. So M-A follows the locked design: a **stat-identical
+  Archer-clone class** (copy `CLASS_ARCHER` ClassData, repoint its `pBattleAnimDef` at the new animId) assigned
+  to RBG. banim_data row format: `{"rbg_ar1", &…_modes_bin, &…_motion_o, &…_oam_r_bin, &…_oam_l_bin, &…_agbpal}`;
+  table self-sizes via `banim_number`. linker block: 3×`_sheet_N.4bpp.lz`, `.agbpal.lz`, `oam_l/_r.bin.lz`,
+  `_motion.o|.data.script>lz`, `_modes.bin`.
 - **Next M-A slices (TDD each):** ~~(1) OBJ-shape merge~~ ✅; ~~(2) palette + flat sheet emit~~ ✅;
-  ~~(3a) OBJ→OAM/tile bridge~~ ✅; (3b) OBJ-aware sheet builder (`build_sheet_from_placements`) + full
+  ~~(3a) OBJ→OAM/tile bridge~~ ✅; ~~(3b) sheet builder + motion.s gen + driver~~ ✅; (4) `build_campaign`
+  injection (Archer-clone class + `banim_data` row + linker block + asset emit) + a `battle_anim:` YAML block on
   `motion.s` text assembly — emit the 3-beat oam_l/oam_r frames (Ready/Wind-up/Peak) from `pack_frame_oam`/
   `mirror_oam`, and a script/modes table cloning the archer's **ranged** attack cadence. ⚠️ **Use the FULL
   `arcm_ar1` `mode_attack_range` as the template** (`start_attack_1/2` → draw frames → `sound_pull_bow` →
