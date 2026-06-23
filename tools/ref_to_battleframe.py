@@ -13,6 +13,35 @@ This module is built bottom-up, TDD'd in test_ref_to_battleframe.py (in `make te
 from PIL import Image
 
 TILE = 8  # GBA OBJ tiles are 8x8
+SQUARE_SIZES = (4, 2, 1)  # legal GBA square OBJ side, in 8x8 cells (32x32 / 16x16 / 8x8)
+
+
+def merge_objects(filled, cols, rows):
+    """Pack the filled 8x8 cells into the fewest legal square GBA OBJs.
+
+    `filled` is a set of (cx, cy) cell coords; `cols`/`rows` bound the grid. Returns a
+    list of {cx, cy, w, h} placements (w==h, in cells) covering EXACTLY the filled cells.
+    A larger OBJ is placed only when every cell it spans is filled -- so a merged OBJ
+    never draws a transparent/garbage tile, the way one 16x16 over an L-shape would.
+
+    Greedy, row-major, largest-first: 47 stray 8x8 cells collapse to ~16 when the sprite
+    body has solid 2x2/4x4 blocks; irregular edges stay 8x8.
+    """
+    remaining = set(filled)
+    objs = []
+    for cy in range(rows):
+        for cx in range(cols):
+            if (cx, cy) not in remaining:
+                continue
+            for s in SQUARE_SIZES:
+                if cx + s > cols or cy + s > rows:
+                    continue
+                block = {(cx + dx, cy + dy) for dx in range(s) for dy in range(s)}
+                if block <= remaining:
+                    objs.append({"cx": cx, "cy": cy, "w": s, "h": s})
+                    remaining -= block
+                    break
+    return objs
 
 
 def _cell_is_empty(im, ox, oy):

@@ -52,21 +52,32 @@ gunslinger; **Archer is purely the parity/anim donor** — gun↔arrow dissonanc
   `banim_code_frame dur,sheet,frame,oam` + `banim_code_hit_normal` + `banim_code_call_spell_anim` (fires the
   projectile). OAM frame = `banim_frame_oam attr0,attr1,attr2,dx,dy` lists. NOTE: banim assets are NOT rebuilt
   from a PNG like portraits — they're linked from the `.s` + sheets by `scripts/arm_compressing_linker.py`.
-- **DONE this session:** `tools/ref_to_battleframe.py` **tiler core** (`tile_sprite`: sprite→8×8 OBJ tiles +
-  OAM entries, byte-identical tiles deduped), TDD'd green (`tools/test_ref_to_battleframe.py`, 3 asserts, in
-  `make test`). Committed `bbc6f78`.
+- **DONE (tiler core):** `tools/ref_to_battleframe.py` `tile_sprite` (sprite→8×8 OBJ tiles + OAM entries,
+  byte-identical tiles deduped), TDD'd green. Committed `bbc6f78`.
+- **DONE (slice 1 — OBJ-shape merge):** `merge_objects(filled, cols, rows)` greedily packs filled 8×8 cells
+  into the fewest **legal square** GBA OBJs (4×4/2×2/1×1 cells = 32×32/16×16/8×8 px), largest-first,
+  row-major, **never covering an empty cell** (no garbage tiles). 4 new TDD'd asserts in `make test` (now 7).
+  Reduction verified on a humanoid-ish 64×64 silhouette: 32 cells → 5 OBJs, exact coverage. **Square-only for
+  now** — wide/tall shapes (2×1, 1×2, 4×2…) + bounded-waste merges are a noted follow-up if 16 isn't hit on
+  RBG. OAM encoding mapped from the decomp: `banim_frame_oam attr0,attr1,attr2,dx,dy` — attr0 bits14-15 = shape
+  (0=square/0x4000=wide/0x8000=tall), attr1 bits14-15 = size + bit12/13 = h/v-flip (oam_l flips the right-facing
+  base), attr2 = tile|palbank, dx/dy = pixel offset.
 - **RBG art — quality LOCKED, NOT yet in repo:** 3 transparent PNGs at `…/Battle Anims/RBG Battle/{RBGReady,
   RBGwindup,RBGAction}.png` (1920×1080, left-facing). **Shared 14-colour palette** (2 ea yellow/purple/green/
   brown/pink + 2 outline-black + gun-gray + highlight; **pink protected** — it kept getting median-cut away).
   Flattened/keyed previews live in that folder's `cleaned/`. TODO: bring the 3 frames into the repo + author a
   `battle_anim:` YAML block on RBG.
 - **Finding:** RBG@64×64 → **47 OBJ cells** (8×8-only) — too many; vanilla covers a battle sprite in ~16 via
-  larger OBJ shapes. So the next tiler slice is greedy-merge into 16×16/32×32 objects.
-- **Next M-A slices (TDD each):** (1) OBJ-shape merge; (2) 4bpp sheet + palette emit (to RBG's 14-col pal);
-  (3) `motion.s` generator (clone `arcm_ar1` script/modes/timing, point frames at RBG tiles); (4)
-  `build_campaign` append-injection (`banim_data` row + linker block + RBG class repoint); (5) lock art into
-  repo + build ROM + force a battle + capture (playtest harness + `make_gif.py`) → show Nicolas. **ADR for the
-  whole faking approach lands with the on-screen slice (5).**
+  larger OBJ shapes. Slice 1's square-merge addresses this (verify the real RBG count once art is in repo).
+- **Next M-A slices (TDD each):** ~~(1) OBJ-shape merge~~ ✅; (2) 4bpp sheet + palette emit (to RBG's 14-col
+  pal) — index the deduped tiles against the shared 14-col palette, emit `_sheet_N.4bpp`(PNG) + `.agbpal`;
+  (3) `motion.s` generator — emit the 3-beat oam_l/oam_r frames (Ready/Wind-up/Peak) from `merge_objects`, and
+  a script/modes table cloning the donor archer's **ranged** timing + `call_spell_anim`/`hit_normal` placement
+  (model the 3-frame structure on `armm_sp1`, not the full 16-frame `arcm_ar1`); the 13 modes reuse the 3
+  frames (stand=0; attack/dodge/miss=0→1→2→1); (4) `build_campaign` append-injection (`banim_data` row +
+  `linker_script_banim.txt` block + RBG class repoint, donor row byte-unchanged); (5) lock art into repo +
+  build ROM + force a battle + capture (playtest harness + `make_gif.py`) → show Nicolas. **ADR for the whole
+  faking approach lands with the on-screen slice (5).**
 - **Lane:** authoring/injection = content; the battle-capture verification scenario = pipeline. `tools/
   ref_to_battleframe.py` is currently SHARED (registering it in `check.py`'s CONTENT_EXCLUSIVE needs a
   pipeline-lane edit — deferred).
