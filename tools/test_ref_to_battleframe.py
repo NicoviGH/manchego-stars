@@ -64,6 +64,75 @@ class TestMergeObjects(unittest.TestCase):
         self.assertLess(len(objs), len(filled))      # actually merged
 
 
+class TestAgbpal(unittest.TestCase):
+    """16-colour palette -> the 128-byte .agbpal the banim build links (4x16 BGR555).
+
+    FE8 banim palettes are 4 sub-palettes of 16 colours (64 BGR555 hwords). Our OAM
+    references palbank 0; we mirror our one 16-colour palette across all 4 banks so any
+    bank renders sanely. Colours are 5-bit BGR555: hword = (b>>3)<<10 | (g>>3)<<5 | r>>3.
+    """
+
+    def test_length_is_128_bytes(self):
+        self.assertEqual(len(rb.agbpal_bytes([(0, 0, 0)])), 128)
+
+    def test_encodes_colours_as_bgr555(self):
+        b = rb.agbpal_bytes([(0, 0, 0), (255, 255, 255), (255, 0, 0)])
+        import struct
+        v = struct.unpack("<64H", b)
+        self.assertEqual(v[0], 0x0000)   # black
+        self.assertEqual(v[1], 0x7FFF)   # white
+        self.assertEqual(v[2], 0x001F)   # pure red -> low 5 bits
+
+    def test_pads_short_palette_then_mirrors_across_4_banks(self):
+        b = rb.agbpal_bytes([(0, 0, 0), (255, 255, 255)])
+        import struct
+        v = struct.unpack("<64H", b)
+        self.assertEqual(v[2], 0)        # padded within the bank
+        for bank in range(4):            # each 16-entry bank mirrors bank 0
+            self.assertEqual(v[bank * 16 + 0], 0x0000)
+            self.assertEqual(v[bank * 16 + 1], 0x7FFF)
+
+
+class TestSheetPng(unittest.TestCase):
+    """Deduped 8x8 tiles + palette -> the indexed sheet PNG gbagfx turns into .4bpp.
+
+    The banim build does `%.4bpp: %.png` via gbagfx, so we emit a mode-"P" PNG: tiles
+    laid out row-major in a tiles_per_row grid, every pixel an index into the <=16-colour
+    palette (index 0 = transparent backdrop, FE convention).
+    """
+
+    def _tile(self, rgba):
+        im = Image.new("RGBA", (8, 8), rgba)
+        return im
+
+    def test_is_indexed_mode_with_grid_dimensions(self):
+        tiles = [self._tile((255, 0, 0, 255)), self._tile((0, 0, 255, 255))]
+        pal = [(0, 0, 0), (255, 0, 0), (0, 0, 255)]
+        sheet = rb.build_sheet_png(tiles, pal, tiles_per_row=2)
+        self.assertEqual(sheet.mode, "P")
+        self.assertEqual(sheet.size, (16, 8))     # 2 tiles wide, 1 row tall
+
+    def test_pixels_map_to_palette_indices(self):
+        tiles = [self._tile((255, 0, 0, 255)), self._tile((0, 0, 255, 255))]
+        pal = [(0, 0, 0), (255, 0, 0), (0, 0, 255)]
+        sheet = rb.build_sheet_png(tiles, pal, tiles_per_row=2)
+        self.assertEqual(sheet.getpixel((0, 0)), 1)    # red tile -> index 1
+        self.assertEqual(sheet.getpixel((8, 0)), 2)    # blue tile -> index 2
+
+    def test_transparent_pixels_are_index_zero(self):
+        tiles = [self._tile((0, 0, 0, 0))]             # fully transparent tile
+        pal = [(0, 0, 0), (255, 0, 0)]
+        sheet = rb.build_sheet_png(tiles, pal, tiles_per_row=2)
+        self.assertEqual(sheet.getpixel((0, 0)), 0)
+
+    def test_wraps_to_next_row_past_tiles_per_row(self):
+        tiles = [self._tile((255, 0, 0, 255))] * 3
+        pal = [(0, 0, 0), (255, 0, 0)]
+        sheet = rb.build_sheet_png(tiles, pal, tiles_per_row=2)
+        self.assertEqual(sheet.size, (16, 16))         # 3 tiles -> 2 rows
+        self.assertEqual(sheet.getpixel((0, 8)), 1)    # 3rd tile wrapped to row 2
+
+
 class TestTiler(unittest.TestCase):
     def test_skips_fully_transparent_cells_and_places_the_filled_one(self):
         # 16x16 = a 2x2 grid of 8x8 cells; fill only the bottom-right cell.

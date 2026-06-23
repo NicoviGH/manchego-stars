@@ -10,10 +10,32 @@ This module is built bottom-up, TDD'd in test_ref_to_battleframe.py (in `make te
   * tile_sprite -- cut a sprite into the 8x8 OBJ tiles a GBA sheet is built from, emitting
     one OAM entry per non-empty cell. (further stages added as TDD proceeds)
 """
+import struct
+
 from PIL import Image
 
 TILE = 8  # GBA OBJ tiles are 8x8
 SQUARE_SIZES = (4, 2, 1)  # legal GBA square OBJ side, in 8x8 cells (32x32 / 16x16 / 8x8)
+PAL_BANK = 16     # colours per GBA 4bpp sub-palette
+PAL_BANKS = 4     # a banim .agbpal holds 4 sub-palettes (64 BGR555 hwords, 128 bytes)
+
+
+def _bgr555(rgb):
+    """Pack an 8-bit (r, g, b) into a GBA BGR555 hword."""
+    r, g, b = rgb
+    return ((b >> 3) << 10) | ((g >> 3) << 5) | (r >> 3)
+
+
+def agbpal_bytes(palette):
+    """A <=16-colour palette -> the 128-byte .agbpal the banim build links.
+
+    Encodes the colours as BGR555, pads the bank to 16 entries with 0, and mirrors that
+    one 16-colour bank across all 4 sub-palettes (our OAM only references palbank 0; the
+    other banks are kept sane in case the engine touches them).
+    """
+    bank = [_bgr555(c) for c in palette[:PAL_BANK]]
+    bank += [0] * (PAL_BANK - len(bank))
+    return struct.pack("<%dH" % (PAL_BANK * PAL_BANKS), *(bank * PAL_BANKS))
 
 
 def merge_objects(filled, cols, rows):
@@ -42,6 +64,32 @@ def merge_objects(filled, cols, rows):
                     remaining -= block
                     break
     return objs
+
+
+def build_sheet_png(tiles, palette, tiles_per_row=32):
+    """Lay deduped 8x8 `tiles` row-major into an indexed (mode "P") sheet PNG.
+
+    Every pixel becomes an index into `palette` (<=16 (r,g,b) colours); a transparent
+    pixel (alpha 0) maps to index 0, the FE backdrop convention. gbagfx turns the PNG
+    into the linked .4bpp at build time (`%.4bpp: %.png`).
+    """
+    rows = (len(tiles) + tiles_per_row - 1) // tiles_per_row
+    w, h = tiles_per_row * TILE, max(rows, 1) * TILE
+    lut = {c: i for i, c in enumerate(palette[:PAL_BANK])}
+    sheet = Image.new("P", (w, h), 0)
+    flat = []
+    for c in palette[:PAL_BANK]:
+        flat += list(c)
+    flat += [0] * (3 * PAL_BANK - len(flat))
+    sheet.putpalette(flat)
+    for ti, tile in enumerate(tiles):
+        ox, oy = (ti % tiles_per_row) * TILE, (ti // tiles_per_row) * TILE
+        px = tile.load()
+        for y in range(TILE):
+            for x in range(TILE):
+                r, g, b, a = px[x, y]
+                sheet.putpixel((ox + x, oy + y), 0 if a == 0 else lut.get((r, g, b), 0))
+    return sheet
 
 
 def _cell_is_empty(im, ox, oy):

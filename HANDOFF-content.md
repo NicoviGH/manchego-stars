@@ -69,8 +69,13 @@ gunslinger; **Archer is purely the parity/anim donor** — gun↔arrow dissonanc
   `battle_anim:` YAML block on RBG.
 - **Finding:** RBG@64×64 → **47 OBJ cells** (8×8-only) — too many; vanilla covers a battle sprite in ~16 via
   larger OBJ shapes. Slice 1's square-merge addresses this (verify the real RBG count once art is in repo).
-- **Next M-A slices (TDD each):** ~~(1) OBJ-shape merge~~ ✅; (2) 4bpp sheet + palette emit (to RBG's 14-col
-  pal) — index the deduped tiles against the shared 14-col palette, emit `_sheet_N.4bpp`(PNG) + `.agbpal`;
+- **DONE (slice 2 — sheet + palette emit):** `agbpal_bytes(palette)` → the 128-byte `.agbpal` (4×16 BGR555,
+  our 16-col bank mirrored across all 4 sub-pals; `hword = (b>>3)<<10|(g>>3)<<5|(r>>3)`); `build_sheet_png(
+  tiles, palette, tiles_per_row=32)` → indexed mode-"P" sheet PNG (row-major tile grid, transparent→index 0).
+  The build does `%.4bpp: %.png` via gbagfx, so we emit the PNG, not the 4bpp. 7 new TDD'd asserts (now 14 in
+  `make test`). Donor `.agbpal` format confirmed (128 B = 64 BGR555 hwords; sheet PNG = mode P, 16-entry pal,
+  256px wide = 32 tiles/row).
+- **Next M-A slices (TDD each):** ~~(1) OBJ-shape merge~~ ✅; ~~(2) 4bpp sheet + palette emit~~ ✅;
   (3) `motion.s` generator — emit the 3-beat oam_l/oam_r frames (Ready/Wind-up/Peak) from `merge_objects`, and
   a script/modes table cloning the donor archer's **ranged** timing + `call_spell_anim`/`hit_normal` placement
   (model the 3-frame structure on `armm_sp1`, not the full 16-frame `arcm_ar1`); the 13 modes reuse the 3
