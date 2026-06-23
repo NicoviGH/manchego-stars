@@ -2154,6 +2154,83 @@ scenarios.retreat = function()
     result("PASS", "Scramsax died; quote path ran with no game over; battle continues")
 end
 
+-- RECORDRBG (#65 demo): lord-select RBG (force-deploy), drive him to fire his bow at an
+-- enemy with FULL battle anims, screenshotting the custom RBG animation ("rbg" frames).
+local function pokeAnimsOn() -- full battle anims + viewable speed (undo winCh00's grind config)
+    local a = SYM.gPlaySt + 0x40
+    emu:write32(a, (ru32(a) & ~(3 << 17)) & ~(1 << 7)) -- animationType 0 (anims ON), gameSpeed normal
+end
+local function captureAttack(actorAddr, tag) -- like chooseAttack but shoot frames through the anim
+    press(K.A); wait(20)  -- Attack
+    press(K.A); wait(20)  -- weapon
+    press(K.A)            -- target -> combat
+    for f = 1, 500 do
+        if (ru32(actorAddr + 0x0C) & 0x2) ~= 0 then break end -- US_UNSELECTABLE = combat done
+        if f % 3 == 0 then shot(tag) end
+        yield()
+    end
+    wait(30)
+end
+scenarios.recordrbg = function()
+    local RBG = 0x05            -- CHARACTER_MOULDER (RBG's slot), lord-select menu index 4
+    local CLONE_NUMBER = 0x6C   -- CLASS_BLST_KILLER_EMPTY (the Archer-clone class)
+    if not winCh00() then return result("FAIL", "never won ch00") end
+    if not waitFor(function() return chapter() == 2 end, 1800) then
+        return result("FAIL", "ch01 never started") end
+    local atMenu = false
+    for _ = 1, 200 do
+        if menuOpen() then atMenu = true break end
+        if procActive(SYM.gProcScr_SALLYCURSOR) then break end
+        press(K.A, 4); wait(36)
+    end
+    if not atMenu then return result("FAIL", "lord-select menu never opened") end
+    wait(40)
+    for _ = 1, 4 do press(K.DOWN, 4); wait(8) end  -- index 0 (Braulo) -> index 4 (RBG)
+    press(K.A, 4); wait(40)   -- pick
+    press(K.A, 4); wait(20)   -- [Yes]
+    for _ = 1, 80 do
+        if procActive(SYM.gProcScr_SALLYCURSOR) then break end
+        press(K.A, 4); wait(36)
+    end
+    for i = 1, 40 do
+        if not procActive(SYM.gProcScr_SALLYCURSOR) then break end
+        press(K.B, 4); wait(10); press(K.START, 4); wait(40)
+        if i % 4 == 0 and procActive(SYM.gProcScr_SALLYCURSOR) then press(K.A, 4); wait(20) end
+    end
+    if not waitFor(function()
+        return not procActive(SYM.gProcScr_SALLYCURSOR) and faction() == 0 and turn() >= 1
+    end, 1200) then return result("FAIL", "ch01 turn 1 never reached") end
+    wait(60); pokeAnimsOn()
+    local rbg = blue(RBG)
+    if not rbg then return result("FAIL", "RBG not on the field after lord-select") end
+    local cls = ru8(ru32(rbg.addr + 0x04) + 0x04) -- pClassData->number
+    log(string.format("RBG at (%d,%d) class=0x%X (want 0x%X clone)", rbg.x, rbg.y, cls, CLONE_NUMBER))
+    shot("rbg-deploy")
+    for phase = 1, 6 do
+        rbg = blue(RBG)
+        if isDead(rbg) then return result("FAIL", "RBG died before firing") end
+        pokeAnimsOn()
+        local reach = selectAndReach(rbg, 24, 15)
+        press(K.B); wait(10)  -- deselect; re-select to act
+        if reach then
+            local pick = CLEARBOT.pickTarget(reach, liveEnemies(), { range = 2 })
+            if pick then
+                if moveUnit(rbg.x, rbg.y, pick.tile.x, pick.tile.y) then
+                    captureAttack(rbg.addr, "rbg"); shot("rbg-after")
+                    return result("PASS", string.format("RBG bow shot captured (class 0x%X)", cls))
+                end
+            else
+                local es = liveEnemies()
+                if #es > 0 then marchToward(rbg, es[1].x, es[1].y, 24, 15); chooseWait() end
+            end
+        end
+        endTurn()
+        waitFor(function() return faction() == 0 and turn() >= phase + 1 end, 1500); wait(40)
+    end
+    shot("rbg-noshot")
+    return result("FAIL", "RBG never got a bow shot off in 6 phases")
+end
+
 -- ---------------------------------------------------------------- runner
 local co = coroutine.create(function()
     log("scenario: " .. PLAYTEST_SCENARIO)
