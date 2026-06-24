@@ -343,14 +343,17 @@ def _changed_files():
 
 
 def check_lane_ownership(fail):
-    """Block a commit that crosses the engine/content seam (#55) when you're in a lane worktree
-    (branch inst/<track>). The primary checkout is unrestricted integration. `git commit
-    --no-verify` overrides for a deliberate exception."""
-    lane = _current_lane()
-    for path, owner in _lane_violations(lane, _changed_files()):
-        fail.append('lane: %s is %s-owned, but this worktree is the %s lane -- coordinate via '
-                    'an issue instead of crossing the seam (--no-verify to override)'
-                    % (path, owner, lane))
+    """ADVISORY since 2026-06-24 (feature-flow, decisions.md -> Coordination model): NOT a gate.
+    Fixed lanes were retired because features routinely span the engine/content seam (e.g. an
+    anim capture = its record* scenario + the sandbox build it fires on), and a hard glob block
+    sawed such a feature in half. So this no longer fails -- it just surfaces, on a legacy
+    `inst/<track>` branch, that a change touches the other desk's historical files, so the PR
+    review names the cross-desk contract. The HARD invariant is now check_engine_guards_present
+    (the 5 engine hooks); desk ownership is reviewed at the PR. The glob map (above) is the seed
+    of the desk map. Dormant on `feat/*` branches (no lane), which is the steady state."""
+    for path, owner in _lane_violations(_current_lane(), _changed_files()):
+        print('  note: %s is historically %s-side -- if this PR spans desks, name the contract in review'
+              % (path, owner))
 
 
 def main():
