@@ -12,6 +12,10 @@
 # Recording scenarios (drop motion frames for a review GIF):
 #   recordending  -- the ch01 "Rolling Cheddar" outro cutscene (frames tagged "end")
 #   recordprep    -- the Preparations + Pick Units deploy screen (frames "prep")
+#   recordrbg     -- RBG's custom battle anim ("rbg"); loads the rbgch01 checkpoint
+#   recordrbgtest -- RBG firing on a `make TESTCH=1` playtest ROM: New Game boots STRAIGHT
+#                    into the Ch1 sandbox (RBG pre-deployed + foes), so boot->fire ~30s with
+#                    no prologue grind, lord-select, or save-state. Build TESTCH=1 first.
 #   recordch01trail / recordlord / recordch01 / record / scenes -- other scenes
 #
 # CHECKPOINTS (fast playtest, viewable spot-check): record scenarios load a save state

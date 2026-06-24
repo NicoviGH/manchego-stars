@@ -2261,6 +2261,25 @@ scenarios.recordrbg = function()
     return result("PASS", string.format("RBG bow shot captured (class 0x%X)", cls))
 end
 
+-- RECORDRBGTEST (#65): capture RBG firing on a `make TESTCH=1` playtest ROM. New Game boots
+-- straight into the Ch1 sandbox with RBG pre-deployed + foes loaded, so there's NO prologue
+-- grind, lord-select, or save-state -- boot -> position -> fire (~30s). Build with TESTCH=1
+-- first; on a normal ROM RBG isn't deployed and this FAILs with a clear message.
+scenarios.recordrbgtest = function()
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    wait(60); pokeAnimsOn()
+    local rbg = blue(RBG_PID)
+    if not rbg then return result("FAIL", "RBG not deployed -- build the ROM with TESTCH=1") end
+    local cls = ru8(ru32(rbg.addr + 0x04) + 0x04)
+    log(string.format("RBG at (%d,%d) class=0x%X (want 0x6C clone)", rbg.x, rbg.y, cls))
+    if not positionRbgForShot() then shot("rbgtest-noshot")
+        return result("FAIL", "RBG never reached firing position") end
+    shot("rbg-deploy")
+    captureAttack(rbg.addr, "rbg"); shot("rbg-after")
+    return result("PASS", string.format("RBG bow shot captured on TESTCH ROM (class 0x%X)", cls))
+end
+
+
 -- ---------------------------------------------------------------- runner
 local co = coroutine.create(function()
     log("scenario: " .. PLAYTEST_SCENARIO)
