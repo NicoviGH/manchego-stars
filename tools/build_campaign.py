@@ -1560,6 +1560,8 @@ def inject_test_chapter(campaign, verbose=True):
     with open(CH1_EVENTSCRIPT_H, encoding='utf-8') as f:
         script = f.read()
     minimal_begin = ('{\n'
+                     '    LOAD1(1, UnitDef_Event_Ch1Enemy)\n'   # keep the vanilla foes (reskinned) so the sandbox is combat-ready
+                     '    ENUN\n'
                      '    LOAD1(1, UnitDef_Event_Ch1Ally)\n'
                      '    ENUN\n'
                      '    ENDA\n'
@@ -4385,6 +4387,11 @@ def main():
     ap.add_argument('--montage', action='store_true',
                     help='wire the #43 opening montage (lore crawl) instead of the '
                          'dev boot cut; dev builds keep the straight-to-map boot')
+    ap.add_argument('--test-chapter', action='store_true',
+                    help='PLAYTEST build: New Game boots straight into a Ch1 sandbox '
+                         'with the whole cast deployed + the (reskinned) foes, cutscenes '
+                         'stripped -- skips the prologue grind for fast in-engine testing. '
+                         'Mutually exclusive with the prologue (both host chapter slot 1).')
     args = ap.parse_args()
 
     print('build_campaign: injecting "%s" into %s' % (args.campaign, DECOMP))
@@ -4430,8 +4437,12 @@ def main():
         inject_northlook_bitey()    # 'Ol Bitey over the tavern hearth (Beat 1 set dressing)
         print('chapter 2 (#22):')
         inject_ch02(args.campaign)  # hosts slot 3; ch01's ending MNC2(0x3) lands here
-        print('prologue (New Game target):')
-        inject_prologue(args.campaign, montage=args.montage)
+        if args.test_chapter:
+            print('TEST CHAPTER (playtest: New Game -> Ch1 sandbox, cast deployed):')
+            inject_test_chapter(args.campaign)   # slot 1 sandbox, in place of the prologue
+        else:
+            print('prologue (New Game target):')
+            inject_prologue(args.campaign, montage=args.montage)
         print('death quotes (#6):')
         inject_pc_death_quotes(args.campaign)
     print('done. Run `make` to compile the ROM.')
