@@ -25,6 +25,9 @@ WANTED = [
     'sProcArray',               # proc pool: 64 x 0x6C (src/proc.c)
     'gBmMapMovement',           # u8** move-cost map, valid while a unit is selected
                                 # (include/bmmap.h; < 120 = reachable)
+    'gBmMapUnit',               # u8** tile->unit grid (include/bmmap.h): gBmMapUnit[y][x] is the
+                                # on-tile unit id the engine uses for cursor selection. Relocating
+                                # a unit must update THIS, not just its xPos/yPos.
     'gChapterFlagBits',         # event flags < 100, bit (flag-1) (src/eventinfo.c)
     'gPermanentFlagBits',       # event flags > 100, bit (flag-101)
     'ProcScr_GameOverScreen',   # proc script: game-over screen active

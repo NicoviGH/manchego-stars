@@ -39,9 +39,17 @@ pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
   `gProc_ekrBattle` proc actually ran), robust to the attacker dying in the counter or killing + a
   level-up that outlasts the budget (plain `US_UNSELECTABLE` missed those). The only hand-data is a
   `name→pid` `CAST` table mirroring `build_campaign` PORTRAIT_MAP. `PT_CHAR` rides through `run.sh` like
-  `PT_SEED`; `recordrbgtest` stays as the RBG back-compat alias. **Verified on the sandbox:** `prof-rbg`
-  (bow 2-2) PASS, `braulo` (axe 1-1, levels up) PASS, `sclorbo` (staff) clean FAIL; `recordrbg`
-  (checkpoint, real campaign) unregressed; `lua` tests + `make` green.
+  `PT_SEED`; `recordrbgtest` stays as the RBG back-compat alias.
+  - **Far-spawn fix (2026-06-24):** the 6-phase march couldn't cross the whole map, so cast members
+    that spawn far from the goblin cluster (marty, meesmickle) timed out. `positionForShot` now
+    **teleports the unit onto a firing tile and attacks IN PLACE**: write its xPos/yPos AND move its
+    entry in **`gBmMapUnit`** (the engine's tile→unit grid — selection reads that, not xPos, so a raw
+    position write desynced it), then `moveUnit(self,self)` opens the action menu (a foe is already in
+    weapon range). No second move to a different tile (that stranded some units with no menu — the real
+    cause, not class-specific). The march is now just a fallback. ~4× faster (no marching). **Verified
+    on the sandbox — ALL 8 cast correct:** prof-rbg (bow 2-2), braulo (axe 1-1), wolfram (lance 1-1),
+    pinky (1-1), rootis (anima 1-2), marty + meesmickle (dark 1-2) all PASS; sclorbo (staff) clean FAIL.
+    `recordrbg` (checkpoint, real campaign) unregressed; `lua` tests + `make` green.
 - **#48 (b) parity gate is now ENFORCING, per-chapter & opt-in — LANDED & verified** (decisions.md §The parity
   curve is surfaced in CI…). CI flipped `make difficulty` → **`make difficulty-gate`**. A chapter is gated only
   once content marks it balance-final with **`balance_locked: true`** in its chapter YAML; `curve_gate_failures`
