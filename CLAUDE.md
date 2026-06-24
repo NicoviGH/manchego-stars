@@ -13,7 +13,7 @@ The data is the doc — facts live in exactly one place, and indexes are generat
 | Unit class / promotion | `campaigns/.../{pcs,npcs}/*.yaml` → generated `docs/CLASSES.md` |
 | Settled design decisions (combat, triangle, economy, class mapping, promotion seam) | `docs/decisions.md` |
 | Generic 5e→FE engine conversion | `docs/rules-mapping.md` |
-| Adding a unit's art / battle anim / platform (repeatable how-to) | `docs/asset-pipeline.md` |
+| Adding a unit's art / battle anim / platform | the **`inject_battle_anims` / `inject_battle_platforms` docstrings** (how) + `decisions.md` Art & Audio (why) + the **`custom_unit` issue template** (checklist) |
 | FE8 cadence/reward grounding | `docs/fe8-pacing-reference.md` |
 | Post-MVP (Act II–V) plan | `docs/roadmap.md` |
 | Vision / architecture / phased roadmap | `docs/PRD.md` |

@@ -2211,7 +2211,26 @@ def units_with_battle_anim(campaign):
 
 
 def inject_battle_anims(campaign, verbose=True):
-    """Generate + inject each unit's faked battle animation (additive donor-prime, #65)."""
+    """Generate + inject each unit's faked battle animation (additive donor-prime, #65).
+
+    ADDING A UNIT (the repeatable how): give its YAML a `battle_anim:` block --
+        clone_from: archer                  # donor class: timing/effects/modes + the weapon slot
+        clone_into: CLASS_<FREE_SLOT>       # a FREE class enum -> this unit's PRIVATE clone class
+        abbr: <stem>                        # banim asset stem (<=12 chars)
+        frames: [<unit>/ready.png, <unit>/windup.png, <unit>/peak.png]  # 1-3, Ready->Windup->Peak
+    Frames: BOX-descale the hi-res (e.g. 1920x1080) source poses onto a ~88x64 canvas with a COMMON
+    feet-anchor + a protected ~15-colour palette. NEVER re-shrink an already-small frame (non-integer
+    re-shrink looks muddy) -- to rescale a unit, re-descale from the hi-res master.
+
+    This APPENDS a banim_data[] row (table self-sizes) and CLONES the donor class into clone_into with
+    its OWN AnimConf, so the donor class + generic/enemy units of it stay byte-vanilla -- only this
+    unit (deployed AS the clone via deploy_class_for) shows the custom anim. Stats ride STAT_DONOR/
+    BASE_DONOR/GROWTH_DONOR; PORTRAIT_MAP ties the unit id -> its vanilla character slot.
+
+    !! OFF-BY-ONE: the clone's AnimConf `.index` MUST be `anim_id + 1` (GetBattleAnimationId returns
+       idx - 1). Get it wrong and a PURPLE DRAGON renders instead of the unit.
+    Decisions/rationale: decisions.md (Art & Audio, the additive clone-class call).
+    """
     from PIL import Image
     units = units_with_battle_anim(campaign)
     if not units:
@@ -4427,7 +4446,29 @@ def _terrain_snow_ground(terrain, base, rough_open):
 
 
 def inject_battle_platforms(campaign, verbose=True):
-    """Vendor the snow/ice battle platforms + remap snow chapters' terrain->ground (#65)."""
+    """Vendor the snow/ice battle platforms + remap snow chapters' terrain->ground (#65).
+
+    ADDING A PLATFORM (the repeatable how):
+      1. Source from the FE-Repo `{Cynon} Battle Platforms` pack (F2E; back-up `{WAve}`). Pull one
+         file without cloning the 2.3GB repo:
+           gh api "repos/Klokinator/FE-Repo/contents/<URL-encoded path>" \\
+             | python3 -c "import sys,json;[print(e['download_url']) for e in json.load(sys.stdin)]"
+           curl -fsSL "<download_url>" -o campaigns/<c>/platforms/<stem>.png
+         It MUST be indexed mode P, 256x32, <=16 colours, dense indices 0-15 (vanilla platform format).
+         CREDIT the author in CREDITS.md. Pick the look book-grounded (Everlasting Rime = twilight ->
+         Medium/Night palettes, not bright Light); record the per-chapter pick in decisions.md.
+      2. Add it to BATTLE_PLATFORMS `(png stem, symbol stem, tint)` -- tint 0.80 cools a bright
+         platform to twilight, 1.0 = as-is. It vendors (PNG->.4bpp.lz via the Makefile gbagfx rule +
+         a generated .agbpal), appends an extern (banim_pointer.h), an .incbin (data_banim_terrain.s),
+         and a battle_terrain_table row (banim_terrain_data.c; indices from PLATFORM_BASE_INDEX).
+
+    PER-CHAPTER look: set a chapter's `battleTileSet` in chapter_settings.json to 0 (snow-OPEN ->
+    Snowdrift, via BanimTerrainGroundDefault) or 0x15 (snow-ROUGH -> Uneven, via Tileset15). A third
+    look (e.g. a frozen-lake chapter -> Ice) = add a BanimTerrainGround_Tileset16 + a `case 0x16` in
+    banim-battleparse.c + point the chapter at it. Terrain category -> ground = _terrain_snow_ground
+    (_PLAT_ICE / _PLAT_ROUGH / else drift). All patched decomp files are in PATCHED_DECOMP_FILES.
+    Decisions/rationale: decisions.md (Art & Audio).
+    """
     import json as _json
     import re as _re
     import struct as _struct
@@ -4466,12 +4507,19 @@ def inject_battle_platforms(campaign, verbose=True):
     with open(BANIM_TERRAIN_INCBIN_S, 'a', encoding='utf-8') as f:
         f.write('\n/* Manchego Stars battle platforms (#65) */\n' + '\n'.join(incbins) + '\n')
 
-    # 2. append rows to battle_terrain_table[] (before its closing };)
+    # 2. append rows to battle_terrain_table[] (before its closing };). DRIFT GUARD: our grounds
+    #    get indices from PLATFORM_BASE_INDEX, which assumes the (restored-vanilla) table holds
+    #    exactly that many entries (0..base-1). If a submodule bump ever resizes the vanilla table,
+    #    fail loudly here rather than silently mis-index the new grounds.
     with open(BANIM_TERRAIN_DATA_C, encoding='utf-8') as f:
         td = f.read()
-    if '// 114\n};' not in td:
-        sys.exit('ERROR: battle_terrain_table does not end at index 114 as expected')
-    td = td.replace('// 114\n};', '// 114\n' + '\n'.join(rows) + '\n};', 1)
+    last = base - 1
+    table_body = re.search(r'battle_terrain_table\[\]\s*=\s*\{(.*?)\n\};', td, re.S)
+    vanilla_count = len(re.findall(r'^\s*\{".*?\}, //', table_body.group(1), re.M)) if table_body else -1
+    if vanilla_count != base or ('// %d\n};' % last) not in td:
+        sys.exit('ERROR: battle_terrain_table has %d entries, expected PLATFORM_BASE_INDEX=%d '
+                 '(vanilla table size shifted -- update PLATFORM_BASE_INDEX)' % (vanilla_count, base))
+    td = td.replace('// %d\n};' % last, '// %d\n' % last + '\n'.join(rows) + '\n};', 1)
     with open(BANIM_TERRAIN_DATA_C, 'w', encoding='utf-8') as f:
         f.write(td)
 

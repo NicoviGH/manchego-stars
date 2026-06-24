@@ -11,9 +11,9 @@ gotchas.** Don't touch `HANDOFF-pipeline.md`.
   snow-platform epic + the ch02 reground. Fast-forwardable; merge down to `main` + push when ready.
 - **`make` green** (last verified on the **real campaign + platforms** build, non-TESTCH). Drift
   clean, working tree clean except the `fireemblem8u` submodule pointer (**never commit it**).
-- **The repeatable how-to for all of the below is now `docs/asset-pipeline.md`** (linked from
-  CLAUDE.md). Read it before doing the next unit — it captures the prompts, tools, additive
-  clone-class method, platform vendoring/injection, and the fast-iteration loop.
+- **The repeatable how lives at the convention homes** (no standalone doc): the
+  `inject_battle_anims` / `inject_battle_platforms` **docstrings** (how) + `decisions.md` Art & Audio
+  (why) + the **`custom_unit` issue template** (per-unit checklist). Read those before the next unit.
 
 ## ✅ Done this session — #65 battle anims + snow platforms (RBG, end-to-end)
 The faked-battle-anim epic is **complete for RBG and the pipeline is generalized**:
@@ -50,7 +50,8 @@ as the menu; the scenario still returns PASS unconditionally). **Diagnose from
 `/tmp/playtest-recordrbgtest/02-rbg-deploy.png`** (the state captureAttack starts from) + the early
 `*-rbg.png` frames; likely needs an extra confirm or a wait on the action menu before the first A.
 Until fixed, use `recordrbg` with a **fresh** checkpoint (don't reuse a checkpoint across an
-injection change — ROM layout shifts corrupt the save-state). Details in `asset-pipeline.md` §6.
+injection change — ROM layout shifts corrupt the save-state). See the `inject_test_chapter`
+docstring + run.sh recording header.
 
 ### 1. 🎯 ch02 "Cold Welcome" (#22) — tactical reground DONE; 3 human checkpoints remain
 The enemy/chwinga/gift/mechanic reground is **built green** (`inject_ch02`: parity enemies, GREEN
@@ -77,11 +78,11 @@ in `harness.lua`. Gate: mGBA render → Nicolas sign-off; `Closes #46`+`#21`; AD
 ### 3. Supporting content / art
 Vellynne portrait #19 · ch02 title card (atlas lacks C/W/d/m — visual, sign-off) · enemy YAML pass
 #18 · NPC/recruit stubs #17 · world-map unlock #29 · overworld sprites #38 · onboarding-parity #64.
-**The remaining cast/enemies follow `docs/asset-pipeline.md` §5 (the per-unit checklist).**
+**The remaining cast/enemies follow the `custom_unit` issue template (open one per unit).**
 
 ## Watch out (content-lane only)
 - **Additive, never global** — clone classes / new terrain slots / appended banim rows; never edit a
-  shared vanilla class/anim/terrain in place. (`asset-pipeline.md`, `decisions.md`.)
+  shared vanilla class/anim/terrain in place. (`decisions.md` Art & Audio; the inject_* docstrings.)
 - **msg-id vetting is treacherous:** `data_battlequotes.c` stores ids 4-digit zero-padded (`0x0935`);
   vet by **content** in the `0x0XXX` form, not naïve hex-grep.
 - **Writing any dialogue → invoke `dialogue-pass` first.** Voice grounding: per-NPC `lore/*.md` §Voice
