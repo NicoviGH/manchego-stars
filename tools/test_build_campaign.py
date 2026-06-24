@@ -123,6 +123,37 @@ class LordFloorRows(unittest.TestCase):
         self.assertEqual([uid for uid, *_ in bc.lord_floor_rows(self.CAMPAIGN, order)], order)
 
 
+class LordSelectPitches(unittest.TestCase):
+    """The qualitative candidate blurbs (#46) the build emits as gLordSelectPitchMsg[],
+    drawn by lord_select_screen.c as the cursor lands on each candidate. One (uid, pitch)
+    per candidate, in the menu order the C table is indexed by -- PARALLEL to
+    gLordSelectCandidates[]. The pitch is hand-authored YAML (lord_pitch:), never derived
+    from stats; the build HARD-FAILS if any candidate lacks one (no silent gaps)."""
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def test_returns_each_candidates_authored_pitch_in_order(self):
+        rows = bc.lord_select_pitches(self.CAMPAIGN, ['braulo', 'pinky', 'wolfram'])
+        self.assertEqual([uid for uid, _ in rows], ['braulo', 'pinky', 'wolfram'])
+        self.assertEqual(rows[0][1],
+                         bc.load_unit(self.CAMPAIGN, 'braulo')['lord_pitch'])
+        self.assertEqual(rows[1][1],
+                         bc.load_unit(self.CAMPAIGN, 'pinky')['lord_pitch'])
+
+    def test_preserves_candidate_order(self):
+        # gLordSelectPitchMsg[] is indexed parallel to gLordSelectCandidates[]: a reorder
+        # would show the wrong blurb under every cursor position.
+        order = ['wolfram', 'marty', 'pinky']
+        self.assertEqual([uid for uid, _ in bc.lord_select_pitches(self.CAMPAIGN, order)],
+                         order)
+
+    def test_hard_fails_when_a_candidate_lacks_a_pitch(self):
+        # Baxby (an NPC) carries no lord_pitch -> the build must refuse rather than ship a
+        # blank card (the "no silent gaps" lock, Nicolas 2026-06-20).
+        with self.assertRaises(SystemExit):
+            bc.lord_select_pitches(self.CAMPAIGN, ['braulo', 'baxby'])
+
+
 class BattleAnimInjection(unittest.TestCase):
     """Pure transforms behind the faked-battle-anim injection (#65 M-A)."""
 

@@ -190,6 +190,24 @@ CH01_CLASS_IDS = {'soldier': 'CLASS_SOLDIER', 'fighter': 'CLASS_FIGHTER',
 LORDSEL_PROMPT_MSG = 0x957   # dead vanilla slot-2 scene text (cf. inject_ch01 step 6)
 LORDSEL_CONFIRM_MSGS = (0x959, 0x95A, 0x95B, 0x95C, 0x95D, 0x95E, 0x95F,
                         0x962, 0x963, 0x964)  # same dead pool, one per candidate
+# Lord-select candidate pitch blurbs (#46): one dead Ch1-tutorial slot-2 id per candidate,
+# PARALLEL to LORDSEL_CONFIRM_MSGS (same 10-cap), drawn by lord_select_screen.c as the
+# cursor lands on each candidate. Plus a one-time explainer box shown before the screen
+# ("(a) explain", feedback #4). Pool vetting (the "msg-id vetting is treacherous" gotcha):
+# 0x966-0x970 are referenced ONLY by the vanilla Ch1 (slot-2) tutorial event scripts our
+# prologue host strips -> never displayed in our ROM; checked clean of live data_battlequotes.c
+# refs (the 0x993/0x994 false-negative lesson) and of the lone live use in the range (0x980,
+# bmdifficulty.c), which is excluded.
+LORDSEL_EXPLAINER_MSG = 0x966
+LORDSEL_PITCH_MSGS = (0x967, 0x968, 0x969, 0x96A, 0x96B, 0x96C, 0x96D,
+                      0x96E, 0x96F, 0x970)  # one per candidate (cast capped at 10)
+# The one-time "(a) explain" box (feedback #4): drawn once before the pick loop. Locked
+# gist (decisions.md / #46): the chosen hero is the must-survive lead for the whole
+# campaign. Faithful to the gist; final wording is Nicolas's render-review call.
+LORDSEL_EXPLAINER_TEXT = (
+    "One of you must lead the company. Your chosen hero carries the whole "
+    "campaign -- if they fall in battle, the war is lost. Choose well."
+)
 # Beat 1 (#21) "The Northlook" scenic opening: a location card + one message per
 # beat (A-E), all riding dead vanilla Ch1-tutorial slot-2 message ids (the prologue
 # host strips Ch1's tutorial event lists, so these never display in our ROM).
@@ -1714,6 +1732,23 @@ def lord_floor_rows(campaign, uids, ch='ch01', target=3.5):
         f = difficulty.lord_floor_delta(
             difficulty.player_combatant(campaign, uid), threat, target=target)
         rows.append((uid, f.hp, f.df, f.res))
+    return rows
+
+
+def lord_select_pitches(campaign, uids):
+    """Per-candidate lord-select blurbs (#46): one (uid, pitch) tuple per uid, in input
+    order, read off each cast member's hand-authored `lord_pitch:` YAML. The build emits
+    these as gLordSelectPitchMsg[], PARALLEL to gLordSelectCandidates[] -- lord_select.c
+    draws candidate i's pitch as the cursor lands on it. Hard-fails if any candidate lacks
+    a pitch: a blank card would ship silently (the "no silent gaps" lock, Nicolas
+    2026-06-20)."""
+    rows = []
+    for uid in uids:
+        pitch = load_unit(campaign, uid).get('lord_pitch')
+        if not pitch:
+            sys.exit('ERROR: lord-select candidate %r has no lord_pitch (#46): every '
+                     'candidate needs a qualitative blurb -- no silent gaps.' % uid)
+        rows.append((uid, pitch))
     return rows
 
 
@@ -3739,23 +3774,59 @@ def inject_ch01(campaign, verbose=True):
             '        .isAvailable = MenuAlwaysEnabled,\n'
             '        .onDraw = MenuCommand_DrawRouteSplit,\n'
             '        .onSelected = Command_SelectLord,\n'
+            '        .onSwitchIn = LordSelect_DrawCard, /* #46: live candidate card */\n'
             '    },' % (vanilla_name_text_id(slot), uid, i))
     menu_code = (
-        '/* ==== Lord select (#42, build-generated): pre-preparations leader menu ====\n'
-        '   Route-split menu clone (cf. CallRouteSplitMenu, ch8-eventscript.h). The\n'
-        '   pick is stored as permanent flag 0x%X + item index and read back by\n'
-        '   LordSelect_GetPid (eventinfo.c) to drive force-deploy, Seize, and the\n'
-        '   lord-death game over. One confirm text per candidate (dead vanilla\n'
-        '   slot-2 message ids). */\n'
+        '/* ==== Lord select (#42/#46, build-generated): "choose your lead" screen ====\n'
+        '   A stock candidate menu (route-split flow: pick -> confirm text in EVT_SLOT_C)\n'
+        '   COMPOSED with a live info card. The names list rides the right column; as the\n'
+        '   cursor lands on candidate i the menu engine fires onSwitchIn (uimenu.c), which\n'
+        '   draws that candidate\'s chibi FACE (a BG tilemap face -- layers over the scenic\n'
+        '   BACG, no OBJ-vs-BG priority fight) + NAME + qualitative PITCH (#46) into a\n'
+        '   stock UI frame on the left. No bespoke screen: built from PutFaceChibi +\n'
+        '   DrawUiFrame + PutDrawText (Nicolas 2026-06-24, supersedes the prep_unitselect\n'
+        '   clone). The pick is stored as permanent flag 0x%X + item index and read back\n'
+        '   by LordSelect_GetPid (eventinfo.c). One confirm + one pitch text per candidate\n'
+        '   (dead vanilla Ch1-tutorial slot-2 message ids). Coords are render-tunable. */\n'
         '\n'
         '#include "uimenu.h"\n'
-        '#include "fontgrp.h"\n'
         '#include "hardware.h"\n'
         '#include "uiutils.h"\n'
+        '#include "bmlib.h"\n'
+        '#include "bmunit.h"\n'
+        '#include "face.h"\n'
+        '#include "helpbox.h"\n'
+        '#include "statscreen.h"\n'
         '\n'
         'extern const u16 gLordSelectCandidates[]; /* events_udefs.c */\n'
         '\n'
         'static CONST_DATA u16 sLordSelectConfirmMsg[] = { %s };\n'
+        '/* #46: qualitative blurb per candidate, PARALLEL to gLordSelectCandidates. */\n'
+        'static CONST_DATA u16 sLordSelectPitchMsg[] = { %s };\n'
+        '\n'
+        '/* #46 card: as the cursor lands on candidate i, draw their chibi FACE into the\n'
+        '   left BG block (PutFaceChibi -> BG tilemap, so it layers over the scenic BACG --\n'
+        '   no OBJ-vs-BG priority fight) and show their qualitative PITCH in a stock,\n'
+        '   self-framed, auto-wrapped help box. The candidate NAMES are the menu list\n'
+        '   itself (right column). No Text scratch: the eventscript TU keeps no mutable\n'
+        '   storage, so we compose ready-made components (PutFaceChibi + StartHelpBox)\n'
+        '   rather than manage tiles. */\n'
+        'int LordSelect_DrawCard(struct MenuProc* menu, struct MenuItemProc* menu_item)\n'
+        '{\n'
+        '    const struct CharacterData* cd =\n'
+        '        GetCharacterData(gLordSelectCandidates[menu_item->itemNumber]);\n'
+        '\n'
+        '    /* face block: clear interior (keep the frame border), redraw the chibi. */\n'
+        '    TileMap_FillRect(TILEMAP_LOCATED(gBG0TilemapBuffer, 1, 2), 6, 6, 0);\n'
+        '    PutFaceChibi(cd->portraitId, TILEMAP_LOCATED(gBG0TilemapBuffer, 2, 2),\n'
+        '                 0x270, 2, 0);\n'
+        '    BG_EnableSyncByMask(BG0_SYNC_BIT);\n'
+        '\n'
+        '    /* pitch: stock framed + auto-wrapped help box (replaces the previous one as\n'
+        '       the cursor moves). Pixel coords, render-tunable. */\n'
+        '    StartHelpBox(8, 0x60, sLordSelectPitchMsg[menu_item->itemNumber]);\n'
+        '    return 0;\n'
+        '}\n'
         '\n'
         'u8 Command_SelectLord(struct MenuProc* menu, struct MenuItemProc* menu_item)\n'
         '{\n'
@@ -3778,7 +3849,7 @@ def inject_ch01(campaign, verbose=True):
         '};\n'
         '\n'
         'CONST_DATA struct MenuDef MenuDef_LordSelect = {\n'
-        '    .rect = {9, 1, 12, 0},\n'
+        '    .rect = {20, 2, 9, 0}, /* names ride the right column; card fills the left */\n'
         '    .style = 1,\n'
         '    .menuItems = MenuItemDef_LordSelect,\n'
         '};\n'
@@ -3792,11 +3863,19 @@ def inject_ch01(campaign, verbose=True):
         '    SetTextFont(0);\n'
         '    InitSystemTextFont();\n'
         '    LoadUiFrameGraphics();\n'
+        '    LoadHelpBoxGfx(NULL, -1); /* #46: gfx for the pitch help box (cf. statscreen) */\n'
+        '\n'
+        '    /* #46: a stock frame backing the chibi face (drawn once; onSwitchIn refills\n'
+        '       the interior). The pitch rides its own help-box frame; names ride the\n'
+        '       menu list -- so this is the only frame we draw. */\n'
+        '    DrawUiFrame(gBG0TilemapBuffer, 0, 1, 6, 6, 0, 1);\n'
+        '\n'
         '    StartMenu(&MenuDef_LordSelect, proc);\n'
         '}\n'
         '\n'
-        % (LORDSEL_FLAG_BASE, ', '.join('0x%X' % m for m in
-                                        LORDSEL_CONFIRM_MSGS[:len(cast)]),
+        % (LORDSEL_FLAG_BASE,
+           ', '.join('0x%X' % m for m in LORDSEL_CONFIRM_MSGS[:len(cast)]),
+           ', '.join('0x%X' % m for m in LORDSEL_PITCH_MSGS[:len(cast)]),
            LORDSEL_FLAG_BASE, LORDSEL_FLAG_BASE, '\n'.join(items)))
     with open(CH2_EVENTSCRIPT_H, encoding='utf-8') as f:
         script = f.read()
@@ -3833,6 +3912,12 @@ def inject_ch01(campaign, verbose=True):
         '    BACG(%s)\n'
         '    FADU(16)\n'
         '    EVBIT_MODIFY(0x4)\n'
+        '    /* #46 (a): one-time explainer -- the chosen lead is the must-survive\n'
+        '       company lead campaign-long. Shown ONCE, before the re-pick loop. */\n'
+        '    TUTORIALTEXTBOXSTART\n'
+        '    TEXTSHOW(0x%X)\n'
+        '    TEXTEND\n'
+        '    REMA\n'
         'LABEL(0x0)\n'
         '    ASMC(CallLordSelectMenu)\n'
         '    SADD(EVT_SLOT_2, EVT_SLOT_C, EVT_SLOT_0)\n'
@@ -3858,7 +3943,8 @@ def inject_ch01(campaign, verbose=True):
         '    CALL(EventScr_08591FD8) /* preparations (PREP, event cmd 0x3E) */\n'
         '    ENUT(8)\n'
         '    EVBIT_T(7)\n'
-        '    ENDA\n}' % (CH01_LORDSEL_BG, CH01_HOST_INDEX), CH2_EVENTSCRIPT_H)
+        '    ENDA\n}' % (CH01_LORDSEL_BG, LORDSEL_EXPLAINER_MSG, CH01_HOST_INDEX),
+        CH2_EVENTSCRIPT_H)
     script = _replace_brace_block(
         script, 'EventScr_Ch2_Turn1Player[] =',
         '{\n    SVAL(EVT_SLOT_2, UnitDef_088B44AC)\n'
@@ -4022,6 +4108,22 @@ def inject_ch01(campaign, verbose=True):
         q = 'Will %s lead the party?' % name
         set_message_body(lines, LORDSEL_CONFIRM_MSGS[i], '%s%s[LF]\n[Yes][X]'
                          % (q, '[.]' if len(q) % 2 else ''))
+    # Lord-select candidate pitches (#46): shown IN-MENU by LordSelect_DrawCard via the
+    # stock StartHelpBox (a talk-decoded, self-framed box), so [LF] sets the box's line
+    # breaks and the standard [.] parity pad applies (no [A] paging -- a help box is one
+    # static panel). Build hard-fails on a missing pitch (lord_select_pitches).
+    for i, (uid, pitch) in enumerate(lord_select_pitches(campaign,
+                                                         [u for u, *_ in cast])):
+        body = '[LF]'.join(_wrap_fe_lines(_fe_dialogue_text(pitch), width=22))
+        set_message_body(lines, LORDSEL_PITCH_MSGS[i], _term_pad(body + '[X]'))
+    # The one-time explainer box (#46 (a)) rides the normal tutorial text box, so it uses
+    # the talk decoder: [A] page breaks every two lines + the standard [.] parity pad.
+    expl = _wrap_fe_lines(_fe_dialogue_text(LORDSEL_EXPLAINER_TEXT), width=29)
+    expl_body = ''.join(
+        ln + ('' if j == len(expl) - 1
+              else '[A]' if (j + 1) % 2 == 0 else '[LF]')
+        for j, ln in enumerate(expl))
+    set_message_body(lines, LORDSEL_EXPLAINER_MSG, _term_pad(expl_body + '[X]'))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 
