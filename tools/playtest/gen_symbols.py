@@ -19,6 +19,9 @@ WANTED = [
     'gBmSt',                    # live map cursor (include/types.h)
     'gUnitArrayBlue',           # player units (include/bmunit.h)
     'gUnitArrayRed',            # enemy units
+    'gItemData',                # struct ItemData[] (include/bmitem.h): per-item attributes
+                                # (IA_WEAPON/IA_STAFF @ +0x08) + encodedRange (min<<4|max @ +0x19).
+                                # Lets the harness read a unit's weapon reach generically.
     'sProcArray',               # proc pool: 64 x 0x6C (src/proc.c)
     'gBmMapMovement',           # u8** move-cost map, valid while a unit is selected
                                 # (include/bmmap.h; < 120 = reachable)

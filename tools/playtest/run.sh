@@ -13,9 +13,15 @@
 #   recordending  -- the ch01 "Rolling Cheddar" outro cutscene (frames tagged "end")
 #   recordprep    -- the Preparations + Pick Units deploy screen (frames "prep")
 #   recordrbg     -- RBG's custom battle anim ("rbg"); loads the rbgch01 checkpoint
-#   recordrbgtest -- RBG firing on a `make TESTCH=1` playtest ROM: New Game boots STRAIGHT
-#                    into the Ch1 sandbox (RBG pre-deployed + foes), so boot->fire ~30s with
-#                    no prologue grind, lord-select, or save-state. Build TESTCH=1 first.
+#   recordanim    -- ANY cast member's battle anim on a `make TESTCH=1` ROM: New Game boots
+#                    STRAIGHT into the Ch1 sandbox (whole cast + foes pre-deployed), so
+#                    boot->fire ~30s, no prologue grind / lord-select / save-state. Pick the
+#                    unit with PT_CHAR=<id> (default prof-rbg): braulo marty meesmickle wolfram
+#                    prof-rbg rootis sclorbo pinky. Frames are tagged <id>, so:
+#                      PT_CHAR=braulo tools/playtest/run.sh recordanim
+#                      tools/playtest/make_gif.py recordanim braulo --name braulo-anim --open
+#                    A staff-only unit (sclorbo) FAILs cleanly: no attack = no combat anim.
+#                    Build TESTCH=1 first. (recordrbgtest is the back-compat alias for RBG.)
 #   recordch01trail / recordlord / recordch01 / record / scenes -- other scenes
 #
 # CHECKPOINTS (fast playtest, viewable spot-check): record scenarios load a save state
@@ -70,6 +76,7 @@ PLAYTEST_LOG = "$log"
 PLAYTEST_SHOTDIR = "$out"
 PLAYTEST_STATEDIR = "$STATE_DIR"
 PLAYTEST_SEED = "${PT_SEED:-1}"
+PLAYTEST_CHAR = "${PT_CHAR:-}"
 dofile("$HERE/harness.lua")
 EOF
     rm -f "$REPO/fireemblem8u/fireemblem8.sav"   # fresh save: New Game is the default path
