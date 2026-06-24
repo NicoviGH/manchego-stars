@@ -31,12 +31,15 @@ ADR: `decisions.md` §Distribution.
 
 ## Now / Next
 
-### Content — Ch2 "Cold Welcome" (#22): tactical reground built green; 3 human checkpoints remain
-- **(a) Dialogue reground** (co-write via the `dialogue-pass` skill): locked cutscene text still frames
-  the dropped sled, calls reinforcements "Snow Wolves", and lacks a chwinga intro beat (a Marty line);
-  YAML has a PENDING block marking the edits. *(In flight — see open PR.)*
-- **(b) Chwinga + Vellynne art** (#38/#39/#19): map-sprite reskin + portraits + name-text over
-  placeholders; Vellynne bust. **Show before commit.**
+### Content — Ch2 "Cold Welcome" (#22): tactical reground built green; 2 human checkpoints remain
+- **(a) Dialogue reground** — ✅ DONE, merged in #70 (`37f327c`): opening chwinga-adoption beat
+  (Sclorbo's kin + Marty's Chagaccino), turn-1 RBG→Pinky archer tutorial (fliers-vs-bows debut),
+  de-sledded rear bark + ending card. Host wired (3 opening beats + turn-1 tutorial scene reusing the
+  dead `Ch3_Turn2Player` slot + turn-3 bark). Msg-id reuse vetted clean (0x98d/0x98f free; 0x991's only
+  live ref is Bazba's talk in the emptied Character list).
+- **(b) Chwinga + Vellynne art** (#38/#39/#19): map-sprite reskin + portraits (Mote/Rime/Glimmer) +
+  name-text over placeholders; Vellynne bust. **Show before commit.** Plus the **title card** ("Cold
+  Welcome" — `gen_chapter_title` atlas missing C/W/d/m glyphs).
 - **(c) mGBA load-test** ch01→ch02→win→chains (chwinga LOAD, archer threatens pegasi, survivors deliver
   charms). Fast via `make TESTCH=1` (wire a ch02 sandbox) or the `recordrbg`/checkpoint path.
 - Per-unit art/anim follows the **convention homes** — `inject_battle_anims` / `inject_battle_platforms`
