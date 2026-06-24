@@ -1050,6 +1050,21 @@ _Decided: 2026-06-20 (revises the 2026-06-19 starter-save-first call from #59 af
 
 ## Art & Audio
 
+**Battle-anim ground platforms: vendored snow/ice (FE-Repo, not stone)**
+FE8's battle "platform" (the ground combatants stand on) is terrain-driven (`gBanimFloorfx` →
+`battle_terrain_table[]`); vanilla has **no snow platform** (the pale `siroyuka1` is a stone floor).
+So we vendor from the FE-Repo `{Cynon} Battle Platforms` pack (F2E, **credit Cynon** in `CREDITS.md`),
+256×32 = drop-in for the vanilla format. Per-chapter picks, book-grounded (twilight palettes for the
+Everlasting Rime, never the bright "Light" daylight unless chosen):
+- **Prologue (the Eastway caravan road, windswept tundra)** → `Snowdrift`, palette cooled ~20% for twilight.
+- **Ch1 (the Iron Trail, rocky mountain pass)** → `Snow Uneven Ground` (**Light** — Nicolas's pick 2026-06-23; Night/Medium read too dark/blue).
+- **Frozen-water beats** (Lac Dinneshere etc.) → back-pocket `Ice Flat` / `Ice FE6 Magically Frozen Lake`.
+Previews captured by forcing the `siroyuka1` slot; **real insertion is pending** = add new
+`battle_terrain_table` slots + wire the snow map-terrain → the right ground (so it resolves per-tile,
+no force). RBG's faked battle anim keeps its **current scale** (the ~0.92× shrink was previewed and
+declined — Nicolas, 2026-06-23).
+_Decided: 2026-06-23_
+
 **Maps: hand-drawn in Tiled, NOT AI-generated**
 Use community Frostmaiden maps (from `docs/frostmaiden-resources.md`) as layout references. Use FEUniverse map pool for tileset/format guidance. Agents help with unit placement and events, never spatial layout.
 _Decided: May 2026_
