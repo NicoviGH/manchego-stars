@@ -123,7 +123,7 @@ no update ever propagated. These conventions keep a single source of truth.
 - *Settled decisions & rationale* → this file (`decisions.md`).
 - *Per-chapter facts* → chapter YAML → generated `CHAPTERS.md`. *Unit facts* → unit YAML → `CLASSES.md`.
 - *Work backlog* → GitHub issues (milestones M0–M4).
-- *Live state* → the **per-track** handoffs (`HANDOFF-content.md` / `HANDOFF-pipeline.md`), each maintained by its lane instance; `/handoff` run in a lane updates that lane's file. **`HANDOFF.md` is a thin router** (integration-tree pointers + current release) and carries no per-session snapshot, so it can't drift — recent history lives in `git log` + closed issues, not there. *Vision/pitch* → `PRD.md` (no specifics that live elsewhere).
+- *Live state* → the single **`HANDOFF.md`** (one trunk, feature-flow — the per-track handoffs were retired 2026-06-24); `/handoff` refreshes it in place. Keep it lean: live Now/Next + gotchas + pointers, no per-session history (that's `git log` + closed issues). *Vision/pitch* → `PRD.md` (no specifics that live elsewhere).
 - `CLAUDE.md` is lean **operating instructions + pointers**, not a fact store (a bloated CLAUDE.md gets ignored). If a fact belongs in two docs, one of them should link instead.
 
 **Record decisions when made.** Any change that alters architecture, scope, tooling, or a

@@ -295,11 +295,11 @@ def check_save_layout_stable(fail):
     fail.extend(_save_layout_drift(found))
 
 
-# ── Engine/content lane ownership (the seam, enforced) ────────────────────────────
-# Single source of truth for which track may edit which file (mirrors the "You own"
-# lists in HANDOFF-content.md / HANDOFF-pipeline.md). Anything not listed is SHARED
-# (either lane may edit: tools/inject/**, docs/**, HANDOFF*, CLAUDE.md, Makefile, ...).
-# Decision: docs/decisions.md -> Engine/content file seam (enforcement). Issue #55.
+# ── Desk map (advisory since feature-flow) ────────────────────────────────────────
+# Which "desk" historically owns which file. Since 2026-06-24 this is an ADVISORY signal
+# (check_lane_ownership notes a cross-desk change), NOT a gate -- the hard invariant is
+# check_engine_campaign_agnostic. Anything not listed is shared (tools/inject/**, docs/**,
+# HANDOFF.md, CLAUDE.md, Makefile, ...). Decision: docs/decisions.md -> Coordination model (#66).
 PIPELINE_EXCLUSIVE_FILES = {
     'tools/difficulty.py', 'tools/fe_combat.py', 'tools/check.py', 'tools/build.sh',
     'tools/worktree-setup.sh', 'tools/test_difficulty.py', 'tools/test_fe_combat.py',

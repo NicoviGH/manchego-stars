@@ -26,7 +26,7 @@ class FileLane(unittest.TestCase):
 
     def test_shared_files_are_unowned(self):
         for p in ('tools/inject/decomp.py', 'tools/inject/engine_hooks.py',
-                  'docs/decisions.md', 'CLAUDE.md', 'Makefile', 'HANDOFF-pipeline.md'):
+                  'docs/decisions.md', 'CLAUDE.md', 'Makefile', 'HANDOFF.md'):
             self.assertIsNone(check._file_lane(p), p)
 
 
