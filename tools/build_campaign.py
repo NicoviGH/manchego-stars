@@ -287,6 +287,18 @@ CH02_CHWINGA = (
 # faction palette -- identical green triplets (Nicolas 2026-06-24). Build-time derived from
 # this cast sprite; see _inject_ch02_chwinga_sprites.
 CH02_CHWINGA_SPRITE_SRC = 'sclorbo'
+# Their PORTRAITS are the same move: Sclorbo's bust with the icy-blue glow ramp hue-shifted
+# to spirit-green (Nicolas-approved 2026-06-24), build-derived from his portrait (no committed
+# asset). Each chwinga's vanilla portrait slot is collision-free (absent from our ch00-08):
+# Dara reuses FE8's Saleh-grandmother face (Dara IS Saleh's grandmother), Klimt/Mansel their own.
+CH02_CHWINGA_PORTRAIT_SLOT = {'DARA': 'Saleh_Grandma', 'KLIMT': 'Klimt', 'MANSEL': 'Mansel'}
+# blue glow ramp -> spirit-green, keyed by SOURCE RGB (robust to palette reordering); the
+# same ramp as the map sprite. Everything else (fur collar, tan robe, red tassels) untouched.
+CH02_CHWINGA_GLOW_RECOLOR = {
+    (96, 211, 219): (150, 230, 160), (113, 188, 214): (140, 205, 150),
+    (81, 165, 185): (100, 185, 120), (63, 141, 165): (78, 155, 95),
+    (57, 117, 138): (58, 120, 78),
+}
 # Cutscene message ids -- the dead vanilla Ch3 scene/talk/turn texts our host overwrites
 # (referenced ONLY by ch3-eventscript.h scenes we replace; 0x993/0x994 are LIVE battle
 # quotes in data_battlequotes.c and are deliberately NOT in this pool -- see decisions.md
@@ -2039,6 +2051,53 @@ def _inject_ch02_chwinga_sprites(campaign, verbose=True):
     if verbose:
         print('  chwinga (green NPC) -> idle SMS %d + MU, slots: %s'
               % (sms, ', '.join(slots)))
+
+
+def inject_ch02_chwinga_faces(campaign, verbose=True):
+    """Dress the 3 green chwinga (CH02_CHWINGA) with Sclorbo's bust recoloured green + their
+    fe_names. The bust is build-derived from sclorbo.png -- the blue glow ramp hue-shifted to
+    spirit-green, the same swap as the map sprite -- so the single source stays Sclorbo's
+    portrait (no committed derived asset). Each chwinga's vanilla portrait slot is collision-
+    free; names come from the ch02 YAML (deployment.green_allies fe_name)."""
+    bust_path = os.path.join(_bust_dir(campaign), CH02_CHWINGA_SPRITE_SRC + '.png')
+    if not os.path.isfile(bust_path):
+        if verbose:
+            print('  (no %s bust yet; chwinga keep vanilla faces/names)' % CH02_CHWINGA_SPRITE_SRC)
+        return
+    # 1. recolour Sclorbo's bust: blue glow ramp -> spirit-green (by source RGB).
+    im = Image.open(bust_path).convert('P')
+    pal = list(im.getpalette()[:48])
+    for i in range(16):
+        rgb = tuple(pal[i * 3:i * 3 + 3])
+        if rgb in CH02_CHWINGA_GLOW_RECOLOR:
+            pal[i * 3:i * 3 + 3] = list(CH02_CHWINGA_GLOW_RECOLOR[rgb])
+    chwinga_bust = im.copy()
+    chwinga_bust.putpalette(pal)
+    tileset, mouth, chibi, pal_bytes = portrait_tool.generate(chwinga_bust, static_portrait=True)
+
+    # 2. dress each chwinga's collision-free portrait slot with the one shared green bust.
+    for vanilla in CH02_CHWINGA_PORTRAIT_SLOT.values():
+        base = os.path.join(PORTRAIT_DIR, 'portrait_' + vanilla)
+        tileset.save(base + '_tileset.png')
+        mouth.save(base + '_mouth.png')
+        chibi.save(base + '_chibi.png')
+        with open(base + '_palette.agbpal', 'wb') as f:
+            f.write(pal_bytes)
+
+    # 3. name each chwinga slot from the ch02 YAML fe_name (Mote / Rime / Glimmer).
+    chap = _load_chapter_yaml(campaign, CH02_CHAPTER_YAML)
+    by_id = {g['id']: g for g in chap['deployment']['green_allies']}
+    with open(TEXTS_TXT, encoding='utf-8') as f:
+        lines = f.read().split('\n')
+    for uid, slot, _gift in CH02_CHWINGA:
+        set_message_body(lines, vanilla_name_text_id(slot),
+                         name_message_body(display_name(by_id[uid])))
+    with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines))
+    if verbose:
+        names = ', '.join(display_name(by_id[uid]) for uid, _, _ in CH02_CHWINGA)
+        print('  chwinga faces -> %s (shared green bust + names: %s)'
+              % (', '.join(CH02_CHWINGA_PORTRAIT_SLOT.values()), names))
 
 
 def _donor_base(campaign, uid, guest_bases=None):
@@ -4745,6 +4804,7 @@ def main():
         inject_northlook_bitey()    # 'Ol Bitey over the tavern hearth (Beat 1 set dressing)
         print('chapter 2 (#22):')
         inject_ch02(args.campaign)  # hosts slot 3; ch01's ending MNC2(0x3) lands here
+        inject_ch02_chwinga_faces(args.campaign)  # green chwinga bust + Mote/Rime/Glimmer names
         if args.test_chapter:
             print('TEST CHAPTER (playtest: New Game -> Ch1 sandbox, cast deployed):')
             inject_test_chapter(args.campaign)   # slot 1 sandbox, in place of the prologue
