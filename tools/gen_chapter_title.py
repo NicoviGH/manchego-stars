@@ -33,19 +33,24 @@ WORDS = {
 }
 
 # Single letters. Sources: img0 "Prologue: The Fall of Renais",
-# img1 "Ch.1: Escape!", img4 "Ch.4: Ancient Horrors",
-# img9 "Ch.7: It's a Trap!" (lone 'a' word), img10 "Ch.8: Distant Blade".
+# img1 "Ch.1: Escape!", img4 "Ch.4: Ancient Horrors", img7 "Ch.6: Victims of War",
+# img9 "Ch.7: It's a Trap!" (lone 'a' word), img10 "Ch.9: Distant Blade",
+# img87 "Creature Campaign".
 LETTERS = {
     'A': (4, 71, 80),
+    'C': (87, 42, 51),          # "Creature" -- leading C (clean, no left neighbor)
     'D': (10, 78, 87),
     'I': (9, 87, 93),
     'T': (9, 119, 128),         # "Trap!"
+    'W': (7, 138, 150),         # "War" -- the W (W+a kern in source; cut before 'a')
     'a': (9, 110, 117),
     'c': (4, 88, 93),
+    'd': (10, 144, 152),        # "Blade" -- the d (d+e kern in source; cut before 'e')
     'e': (0, 58, 64),
     'g': (0, 44, 52),
     'i': (0, 168, 172),         # "Renais"
     'l': (0, 35, 39),           # "Prologue" (second ascender)
+    'm': (7, 100, 110),         # "Victims" -- the m
     'n': (0, 155, 161),         # "Renais"
     'o': (0, 29, 34),           # "Prologue" (first o; 34 starts the l ascender)
     'r': (0, 23, 29),
