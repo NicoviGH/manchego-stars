@@ -45,6 +45,9 @@ WANTED = [
                                 # quote box is on screen NOW -> hold + screenshot it.
     'ProcScr_StdEventEngine',   # proc script: the standard (map) event engine. A live
                                 # instance == a map cutscene/talk event is running.
+    'gProc_ekrBattle',          # proc script: the on-map battle (EKR) animation engine
+                                # (src/banim-ekrbattle.c). A live instance == a combat is
+                                # actually animating -> used to confirm an attack committed.
 ]
 
 

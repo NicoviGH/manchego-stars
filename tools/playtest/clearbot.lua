@@ -9,10 +9,13 @@
 -- pickTarget(reachable, enemies, prefs) -> { target = <enemy>, tile = {x,y} } | nil
 --   reachable: list of {x,y} tiles the unit can move to this turn (its own tile included)
 --   enemies:   list of {x,y,hp,is_boss}
---   prefs.range: weapon reach in tiles (1 = melee adjacency; 2 = e.g. a hand axe)
+--   prefs.range:     weapon MAX reach in tiles (1 = melee adjacency; 2 = e.g. a hand axe)
+--   prefs.min_range: weapon MIN reach (default 1); 2 for a bow, which CANNOT hit an adjacent
+--                    foe -- striking from range 1 leaves no Attack command, so the strike
+--                    tile must sit at min_range..range, not 1..range.
 --   Returns the best attackable enemy + the reachable tile to strike from, or nil if no
---   enemy sits within `range` of any reachable tile. Preference: the boss first, then the
---   lowest-HP enemy (likeliest kill).
+--   enemy sits within [min_range, range] of any reachable tile. Preference: the boss first,
+--   then the lowest-HP enemy (likeliest kill).
 
 local M = {}
 
@@ -20,11 +23,12 @@ local function manhattan(ax, ay, bx, by)
     return math.abs(ax - bx) + math.abs(ay - by)
 end
 
--- A reachable tile from which `e` is within `range` (and not the enemy's own tile), or nil.
-local function attackTileFor(reachable, e, range)
+-- A reachable tile from which `e` is within [minRange, range] (so a bow, minRange 2, won't
+-- pick an adjacent tile it can't fire from), or nil.
+local function attackTileFor(reachable, e, range, minRange)
     for _, t in ipairs(reachable) do
         local d = manhattan(t.x, t.y, e.x, e.y)
-        if d >= 1 and d <= range then return t end
+        if d >= minRange and d <= range then return t end
     end
     return nil
 end
@@ -37,9 +41,10 @@ end
 
 function M.pickTarget(reachable, enemies, prefs)
     local range = (prefs and prefs.range) or 1
+    local minRange = (prefs and prefs.min_range) or 1
     local best, bestTile
     for _, e in ipairs(enemies) do
-        local tile = attackTileFor(reachable, e, range)
+        local tile = attackTileFor(reachable, e, range, minRange)
         if tile and (not best or preferred(e, best)) then
             best, bestTile = e, tile
         end

@@ -8,30 +8,27 @@ the lane guard is `check.py check_lane_ownership`). Seam enforcement (#55) + par
 pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
 
 ## Now (2026-06-24) — #65 capture tooling landed + the rbg capture made honest/robust; parity gate enforcing (#48 b); #63 M1 landed (M2 next)
-- **#65 capture tooling LANDED + the deferred `captureAttack` fix LANDED (2026-06-24).** Added `recordrbg`
+- **#65 capture tooling LANDED + `recordrbgtest` fully unblocked end-to-end (2026-06-24).** Added `recordrbg`
   (loads an `rbgch01` checkpoint instead of replaying the prologue → ~12s), `make_gif.py --mp4`
   (local-only; **GIF stays the GitHub-review format** — a committed `.mp4` is a binary download, not
-  inline), and `recordrbgtest` (capture on a `make TESTCH=1` ROM that boots straight into the Ch1
-  sandbox). **The capture is now honest + robust:** `captureAttack` (1) **settles the action menu
-  (`wait(20)`) before the first A** — `positionRbgForShot`'s `moveUnit` returns the instant
-  `menuOpen()` flips true, while the slide-in is still eating input, so without the settle only 2 of
-  the 3 menu confirms land and the unit stalls parked on target-selection (the reported symptom); and
-  (2) **RETURNS whether combat actually started** (US_UNSELECTABLE), and `recordrbg`/`recordrbgtest`
-  now **FAIL** when it didn't, instead of returning PASS unconditionally (the old misleading green).
-  Verified end-to-end on **`recordrbg`** (fresh checkpoint, normal build): real Soldier-vs-RBG battle
-  anim captured (122 frames, 70 distinct sizes — not a frozen menu), loop broke at US_UNSELECTABLE,
-  honest PASS; `lua` playtest tests + `check.py` clean. **`recordrbgtest`'s sandbox end-to-end is NOT
-  pipeline-verifiable** — its `make TESTCH=1` build is content-lane and **unwired on this branch**
-  (`inject_test_chapter` exists but `main()` never calls it; a pipeline-side reconstruction deploys RBG
-  as vanilla `CLASS_ARCHER 0x19`, not the `0x6C` clone, and fails before the menu). So the settle is
-  the best-supported mitigation but is only proven on `recordrbg`; if it's insufficient on the real
-  sandbox, `recordrbgtest` now goes **truthfully RED** rather than false-green. **Content follow-up:**
-  wire `make TESTCH=1` (skip `inject_prologue`'s boot-cut — `inject_test_chapter` does its own; they
-  double-cut otherwise) so `recordrbgtest` can be verified faithfully. **Checkpoint reuse caveat
+  inline), and `recordrbgtest` (`make TESTCH=1` ROM boots straight into the Ch1 sandbox, RBG the `0x6C`
+  archer-clone pre-deployed). **Three real root causes fixed** (the "needs a settle" hypothesis was
+  wrong — the menu was always responsive): (1) the **boot-cut decision is localized** to one
+  `_configure_boot()` owner in `build_campaign.py`, called once from `main()` — `inject_prologue` /
+  `inject_test_chapter` no longer each cut the intro + redirect New Game (the duplication that
+  double-cut/crashed; content had already made them XOR, this removes the duplication itself);
+  (2) **`clearbot.pickTarget` gained `min_range`** — RBG fires a BOW (2-range only), so `positionRbgForShot`
+  must not park it adjacent (range 1) where there's NO Attack command and `captureAttack`'s presses
+  wander the Item menu; (3) **`captureAttack`'s target confirm is feedback-driven** — with several foes in
+  bow range the BKSEL cursor can start off a target, so it presses A and cycles targets (RIGHT) until a
+  battle actually animates (`gProc_ekrBattle`), then stops (pressing during the anim would skip it). It
+  also **RETURNS whether combat started** (US_UNSELECTABLE); `recordrbg`/`recordrbgtest` **FAIL** if it
+  didn't (no more unconditional PASS). **Verified end-to-end on BOTH**: `recordrbgtest` captures a real
+  Soldier-vs-RBG bow anim on the sandbox (162 frames, 97 distinct sizes, honest PASS); `recordrbg`
+  unregressed (cached checkpoint, PASS); `lua` tests + `make` green. **Checkpoint reuse caveat
   unchanged:** DON'T reuse an `rbgch01` checkpoint across an injection/build change (ROM layout shifts
   corrupt the save-state → capture shows the map/menu, never the battle; safe only across pure
-  graphics-byte swaps). The `TESTCH=1` build + the anim/platform "how" live in **content**
-  (`build_campaign` docstrings); this is just the capture scenario.
+  graphics-byte swaps).
 - **#48 (b) parity gate is now ENFORCING, per-chapter & opt-in — LANDED & verified** (decisions.md §The parity
   curve is surfaced in CI…). CI flipped `make difficulty` → **`make difficulty-gate`**. A chapter is gated only
   once content marks it balance-final with **`balance_locked: true`** in its chapter YAML; `curve_gate_failures`

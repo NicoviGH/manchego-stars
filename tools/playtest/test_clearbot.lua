@@ -68,6 +68,20 @@ do
     check(pick ~= nil, true, "range 2 reaches distance 2")
 end
 
+-- A BOW (min_range 2): an ADJACENT enemy is NOT attackable -- striking from range 1 leaves
+-- no Attack command, so pickTarget must skip the adjacent tile (#65 recordrbgtest bug).
+do
+    local adjacent = tiles({ 4, 5 })  -- distance 1 from the foe at (4,6)
+    local enemies = { { x = 4, y = 6, hp = 20, is_boss = false } }
+    check(C.pickTarget(adjacent, enemies, { range = 2, min_range = 2 }), nil,
+          "bow (min_range 2) won't pick an adjacent tile it can't fire from")
+    -- but a true range-2 tile IS picked, and an adjacent one is left out of a mixed reach.
+    local mixed = tiles({ 4, 5 }, { 4, 4 })  -- (4,5)=dist 1, (4,4)=dist 2
+    local pick = C.pickTarget(mixed, enemies, { range = 2, min_range = 2 })
+    check(pick ~= nil and pick.tile.x == 4 and pick.tile.y == 4, true,
+          "bow strikes from the range-2 tile (4,4), not the adjacent (4,5)")
+end
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else
