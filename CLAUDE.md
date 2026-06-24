@@ -72,28 +72,45 @@ cd fireemblem8u
 - If you're about to hardcode "braulo" or "ch03" in a `.c` file — stop. It belongs in YAML.
 - Code review rule: any C change that references a character by name, a chapter number, or a plot event is rejected
 
-## Tracks & the engine/content seam
+## Coordination: feature-flow (one feature, one branch, one PR)
 
-Work splits into a **content** track (`campaigns/**`, `tools/build_campaign.py` + art tools) and a
-**pipeline** track (`tools/difficulty.py`, `fe_combat.py`, `check.py`, `playtest/**`, `build.sh`, CI).
-Shared by both: `tools/inject/**`, `docs/**`, `HANDOFF*`, `CLAUDE.md`, `Makefile`. Rationale +
-enforcement: `docs/decisions.md` → Seam enforcement (#55).
+Work is organized by **feature**, not by fixed lanes (rationale: `docs/decisions.md` → Coordination
+model). A task = a GitHub issue → a short-lived `feat/<n>-slug` branch off `main` → an **ephemeral
+worktree** for build isolation (`git worktree add ../ms-<slug> -b feat/<n>-slug origin/main`; drop it
+when merged) → a **PR** → CI + `/code-review` → squash-merge to `main` → delete the branch + worktree.
+Concurrency = as many worktrees as you have features in flight (two ROM builds in one tree corrupt each
+other, so each concurrent agent gets its own worktree — that's the *only* thing isolation is for).
 
-**Working a track means working in that track's worktree** — always, even solo. When asked to
-"work the content track" / "work the pipeline track", switch into that track's worktree first
-(`../ms-content` on `inst/content`, `../ms-pipeline` on `inst/pipeline`); they're already bootstrapped,
-and `tools/worktree-setup.sh ../ms-<track>` re-creates one if missing. **Don't do track work on `main`.**
+A feature **may span** what used to be the "content" and "pipeline" lanes — that's the point: capturing
+a unit's battle anim is one feature (the `record*` scenario **and** the sandbox build it fires on).
+Ownership lives on the **PR + issue**, decided at review, not on a file glob.
 
-**This handoff/checklist routes by where you are** (run `git rev-parse --abbrev-ref HEAD`):
-- On **`main`** (the primary `manchego-stars` checkout) → the integration/solo tree, for cross-track
-  merges and ad-hoc one-offs only. Read `HANDOFF.md`. **No lane is enforced here.**
-- On **`inst/content`** / **`inst/pipeline`** (a worktree, opened as its own VS Code folder) → you ARE
-  that track. Read `HANDOFF-content.md` / `HANDOFF-pipeline.md` and stay in your lane:
-  `check.py check_lane_ownership` (pre-commit + CI) blocks editing the *other* lane's files
-  (`--no-verify` overrides). Worktree isolation is also what lets two instances run **at once** (two
-  builds in one tree would corrupt each other); each instance gets its own worktree = its own VS Code window.
+**Two boundaries, two strengths** — don't conflate them:
+- **Engine/content invariant (HARD gate):** the Engine/Content Boundary Rule above + the 5 engine hooks
+  in `tools/inject/` (guarded by `check.py check_engine_guards_present`). A `.c`/`.s` change that names a
+  character, chapter, or plot event is **rejected**. Real decision-hiding; it stays a gate.
+- **Desk ownership (REVIEWED, not blocked):** which desk owns a responsibility is a review judgment.
+  `check.py check_lane_ownership` is now an **advisory** that flags a cross-desk change so the PR names
+  the contract.
 
 Never commit the `fireemblem8u` submodule pointer.
+
+## Design placement test ("not my job" / "no need to know")
+
+Deciding *where a line of code goes* (Cockburn, *Simplifying Software Design*, 2026): treat each module
+as a clerk with a **filing cabinet** (its private state) and a **phone** (its interface), then —
+- **"Not my job"** — push each line downhill to the desk that owns it. A handler that only forwards
+  ("call the Buy process") should be *one line*. A desk doing work it doesn't own → move the work.
+- **"No need to know"** — a desk must not reach into another's cabinet (private state) or depend on its
+  internals. Talk over the phone (interface) only.
+- **Futures, not "simplicity"** — judge a boundary by *which future changes it makes cheap*. Localize
+  decisions likely to change (Parnas); gather what changes for the same reason, separate what changes for
+  different reasons. Don't refactor for futures you can't name (the 109 KB `harness.lua` stays whole —
+  its only likely change is "add a scenario," which is cheap).
+
+**Code-review rule:** a change where one desk reaches into another's cabinet — or that scatters one
+decision across desks (e.g. the boot-cut duplicated in `inject_prologue` + `inject_test_chapter`) — is
+rejected; localize the decision first.
 
 ## Working Conventions (Definition of Done)
 

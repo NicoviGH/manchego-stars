@@ -209,46 +209,45 @@ per hook, that it is *defined* in `engine_hooks.py` AND *called* (`engine_hooks.
 byte-identical ROM (md5 unchanged) plus `lordfloor`/`ch01win` playtests. Work tracker #50.
 _Decided: 2026-06-19_
 
-**Seam enforcement: a lane-ownership guard, because the seam was honor-system and got crossed.**
-The first parallel run had violations — the pipeline instance edited `build_campaign.py` (content-owned)
-because nothing *stopped* it (and because no worktree isolation was actually engaged: both sessions ran in
-the primary checkout on `main`). Documentation + the file seam weren't enough; ownership is now **enforced**.
-`tools/check.py` carries the ownership map (single source, also summarized in `CLAUDE.md` §Tracks:
-pipeline = `difficulty.py`/`fe_combat.py`/`check.py`/`playtest/**`/`build.sh`/`worktree-setup.sh`/`hooks/**`/
-`.github/workflows/**`; content = `campaigns/**`/`build_campaign.py`/`portrait_tool.py`/`map_sprite_tool.py`/
-`ref_to_bust.py`; everything else incl. `tools/inject/**` + docs = shared) and `check_lane_ownership()`, run
-by the pre-commit hook + CI. The lane is read from the `inst/<track>` **branch name** (inherently
-per-worktree; `.git/config` is shared), `manchego.lane` config as fallback. **Enforcement is scoped to lane
-worktrees**: on `inst/<track>` a staged file owned by the *other* lane is blocked (`--no-verify` overrides;
-CI enforces on `inst/*` PRs via `GITHUB_HEAD_REF`/`BASE_REF`). The **primary checkout (`main`) is
-unrestricted** — it's the integration/solo tree where one person does one thing at a time, so there's no seam
-to cross; blocking it would only tax normal single-window work. The seam can only be *violated* when two
-instances run concurrently, and concurrency already **requires** a worktree per instance (two builds in one
-tree corrupt each other) — so enforcing exactly where worktrees exist covers the real risk. Shared cross-lane
-constants (e.g. the weapon↔ITEM map) live in `tools/inject/decomp.py`, not either side's file. Issue #55.
-_Decided: 2026-06-19_
+**Coordination model: feature-flow over fixed lanes.** We first split work into two fixed lanes
+(content = `campaigns/**` + `build_campaign.py` + art tools; pipeline = `difficulty.py`/`fe_combat.py`/
+`check.py`/`playtest/**`/`build.sh`/CI) and **enforced** them with a file-glob ownership guard
+(`check.py check_lane_ownership`, keyed off the `inst/<track>` branch; #55) because the seam was
+honor-system and got crossed. The guard worked, but the lanes were the wrong *shape*: real features
+routinely **span** the glob seam — the per-chapter parity gate (gate + `balance_locked`), adding a weapon
+(combat-model map + `WEAPON_ITEM_ENUM`), lord-select UX (bounced engine→content over *file paths*), and
+capturing a unit's battle anim (the `record*` scenario **and** the sandbox build it fires on). A fixed
+partition doesn't *prevent* collisions on a spanning feature; it **saws the feature in half** so neither
+lane can finish-and-verify it. We already patched around it once (the 2026-06-22 "content `record*` are
+content spot-checks" carve-out — queued, never landed) and hit the same wall again with `recordrbgtest`
+(capture = pipeline scenario, sandbox = content build → un-verifiable from either lane).
 
-**Seam refinement: content-feature `record*` playtest scenarios are content spot-checks, not pipeline infra.**
-The playtest *harness/framework* (`harness.lua`, clearbot, liveness, the verification scenarios) stays
-pipeline-owned. But a `record*` scenario that captures a **content** feature for review (e.g. `recordlord`
-for the #46 lord-select cards) is a content spot-check — the `dialogue-pass` workflow itself mandates
-`run.sh record` + `make_gif.py` to show Nicolas cutscene/card renders — so the content lane must be able to
-author it without a worktree hop. *Running* any scenario was always in-lane; only *editing* `tools/playtest/**`
-was blocked. **Mechanism (queued, pipeline-owned edit): carve content review scenarios into a content-owned
-file** the harness includes (e.g. `tools/playtest/content_scenarios.lua` added to `CONTENT_EXCLUSIVE_FILES`,
-or a `record*`-name carve-out in `_file_lane`), so the lane guard lets content own its capture scenarios while
-the framework stays pipeline. Until that lands, a content `record*` addition commits with `--no-verify`.
-_Decided: 2026-06-22 (Nicolas — "B for sure"; mechanism queued for a pipeline-lane instance)_
+The root error was **conflating build-isolation with ownership**. Isolation (two ROM builds corrupt one
+tree) is physical and is solved by *a* worktree — any worktree. Ownership (who may change what) is logical
+and got welded onto the same `inst/<track>` worktree, forcing work to partition by file type. Unwelded:
 
-**Track work always happens in that track's worktree — even solo.** "Work the content track" / "work the
-pipeline track" means: switch into `../ms-content` (`inst/content`) or `../ms-pipeline` (`inst/pipeline`)
-*first*, then work. `main` is reserved for cross-track integration and ad-hoc one-offs. This is broader than
-the build-isolation rationale above (which only *requires* a worktree when two instances run concurrently):
-making the worktree the unconditional home for track work removes the "is anyone else running?" judgment call,
-keeps every track commit on its `inst/<track>` branch where the lane guard applies, and means a fresh instance
-told to "work the content track" lands in the right tree by default instead of editing `main`. The worktrees
-are persistent (already bootstrapped); `tools/worktree-setup.sh` only re-creates a missing one.
-_Decided: 2026-06-19 (Nicolas)_
+- **Feature-flow.** A task = issue → short-lived `feat/<n>-slug` branch off `main` → an **ephemeral**
+  worktree (isolation only) → a **PR** → CI + `/code-review` → squash-merge → drop the branch + worktree.
+  Concurrency = N feature worktrees, not two fixed slots. A PR may span the old seam; that is the point.
+- **The "not my job" propagation test runs at PR review** — push the change through the desks and watch
+  the reactions (my job / I can help / no impact / no need to know). Review is where ownership is decided,
+  replacing the pre-commit glob block.
+- **Engine/content stays a HARD invariant.** The Engine/Content Boundary Rule (no character/chapter/plot
+  in `.c`/`.s`) + the 5 engine hooks in `tools/inject/` (`check_engine_guards_present`) are genuine
+  decision-hiding and remain gates. *Follow-up:* mechanize the name-in-C check (today a review rule).
+- **`check_lane_ownership` is demoted to an advisory** desk-span note (no longer a block). The glob map it
+  carries is the seed of the **desk map**: each desk = a responsibility + its phone (interface) + its
+  cabinet (private files), the design vocabulary enforced at review.
+- **Design placement** follows the three reflexes (`CLAUDE.md` → Design placement test): *not my job*
+  (push each line to its owner), *no need to know* (no desk reaches into another's cabinet), *futures*
+  (judge boundaries by the changes they make cheap; localize decisions likely to change — but don't split
+  what has no expensive future, e.g. `harness.lua`).
+
+Supersedes the fixed-lane ADRs (Seam enforcement #55; the 2026-06-22 `record*` refinement; "track work
+always in that track's worktree"). The two ADRs above — worktree isolation and the 5-hook engine/content
+file seam — **stand**: worktrees are now ephemeral-per-feature, and the file seam is the hard invariant
+feature-flow keeps.
+_Decided: 2026-06-24 (Nicolas — chose feature-flow + PRs; codified from the "not my job" design review)_
 
 ---
 
