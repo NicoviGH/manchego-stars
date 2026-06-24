@@ -70,7 +70,7 @@ cd fireemblem8u
 - Engine code (`engine/`, `fireemblem8u/src/`) must be campaign-agnostic
 - Campaign data (`campaigns/rime-of-the-frostmaiden/`) is injected at build time by `tools/build_campaign.py`
 - If you're about to hardcode "braulo" or "ch03" in a `.c` file — stop. It belongs in YAML.
-- Code review rule: any C change that references a character by name, a chapter number, or a plot event is rejected
+- Enforced: `check.py check_engine_campaign_agnostic` (CI + pre-commit) scans the hand-written engine sources (`engine/**`, `tools/inject/engine_hooks.py`, `decomp.py`) for any campaign character id and rejects it. (Chapter-number / plot-event references stay a review-judgment call.)
 
 ## Coordination: feature-flow (one feature, one branch, one PR)
 

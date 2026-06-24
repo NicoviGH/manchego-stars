@@ -187,6 +187,59 @@ def check_engine_guards_present(fail):
                         '(see docs/decisions.md)' % (fn, fn, mechanic))
 
 
+# ── Engine campaign-agnosticism (the Engine/Content Boundary Rule, mechanized) ─────
+# Hand-written engine code must never name a campaign character: build_campaign INJECTS
+# names into the fireemblem8u working tree at build time, so the committed engine sources
+# stay reusable for any campaign ("braulo" belongs in YAML, not a .c). This was a
+# code-review rule (CLAUDE.md Engine/Content Boundary Rule); now a gate. Scope = what WE
+# author -- engine/** + the engine-hook injectors; the fireemblem8u submodule is vanilla +
+# build-injected and never committed by us, so it's deliberately excluded. Decision:
+# docs/decisions.md -> Coordination model (mechanize the name-in-C check).
+ENGINE_SOURCE_GLOBS = ('engine/**/*.c', 'engine/**/*.h', 'engine/**/*.s',
+                       'tools/inject/engine_hooks.py', 'tools/inject/decomp.py')
+
+
+def _campaign_character_ids():
+    """Lowercased character ids from every pcs/npcs YAML -- the campaign-specific tokens
+    engine code must not hardcode. Read off the `id:` line so the lightweight checks job
+    needs no YAML load."""
+    ids = set()
+    for sub in ('pcs', 'npcs'):
+        for f in glob.glob(os.path.join(REPO, 'campaigns/**', sub, '*.yaml'), recursive=True):
+            m = re.search(r'(?m)^id:\s*([A-Za-z0-9_-]+)', open(f, encoding='utf-8').read())
+            if m:
+                ids.add(m.group(1).lower())
+    return ids
+
+
+def _engine_name_hits(ids, text):
+    """(token, lineno) for each campaign character id named in `text`. Word-boundaried and
+    case-insensitive, so 'brie' never matches 'brief' but 'BRAULO' in a comment is caught.
+    Pure (no I/O) so it's unit-tested directly."""
+    if not ids:
+        return []
+    pat = re.compile(r'\b(' + '|'.join(re.escape(i) for i in sorted(ids)) + r')\b', re.I)
+    hits = []
+    for n, line in enumerate(text.splitlines(), 1):
+        m = pat.search(line)
+        if m:
+            hits.append((m.group(1).lower(), n))
+    return hits
+
+
+def check_engine_campaign_agnostic(fail):
+    ids = _campaign_character_ids()
+    if not ids:
+        return
+    for g in ENGINE_SOURCE_GLOBS:
+        for path in glob.glob(os.path.join(REPO, g), recursive=True):
+            rel = os.path.relpath(path, REPO)
+            for tok, n in _engine_name_hits(ids, open(path, encoding='utf-8').read()):
+                fail.append('engine: %s:%d names campaign character %r -- engine code must be '
+                            'campaign-agnostic; inject it from YAML (CLAUDE.md Engine/Content '
+                            'Boundary Rule)' % (rel, n, tok))
+
+
 # ── Save-layout stability (so testers can carry their .sav across builds) ──────────
 # A battery .sav is accepted on a new build iff its validity magics + checksum still
 # match (bmsave-lib.c:125-128, ReadSaveBlockInfo). Those magics are constant, so a
@@ -361,6 +414,7 @@ def main():
     for check in (check_python_compiles, check_tests_pass, check_yaml_parses,
                   check_chapter_status, check_tool_refs_exist, check_no_dead_concepts,
                   check_generated_indexes_fresh, check_engine_guards_present,
+                  check_engine_campaign_agnostic,
                   check_save_layout_stable, check_lane_ownership):
         check(fail)
     if fail:

@@ -178,7 +178,7 @@ def _inject_lord_select_engine():
          member on the Eirika slot inherits free convoy access.
       6. gForceDeploymentList (data_event_trigger.c): cleared. Vanilla's static
          by-slot force-deploy table would force-field cast riding those slots
-         (e.g. CHARACTER_EIRIKA/COMMON = Braulo, every chapter) on top of hook 2's
+         (e.g. whoever rides CHARACTER_EIRIKA in COMMON mode, every chapter) on top of hook 2's
          chosen lead. Hook 2 is now the ONLY force-deploy.
     """
     # 1 + 2: eventinfo.c -- GetPid above the force-deploy lookup, hook inside it.
@@ -313,7 +313,7 @@ def _inject_lord_select_engine():
 
     # 5: bmmenu.c -- convoy/supply gate. SupplyUsability hardcodes the route lord
     #    (Eirika/Ephraim) as the unit that can open the supply anywhere; a cast member
-    #    riding that slot (Braulo on CHARACTER_EIRIKA) inherits free convoy access.
+    #    riding that slot (e.g. CHARACTER_EIRIKA) inherits free convoy access.
     #    Route it through the chosen lead instead (mirrors the Seize gate).
     with open(BMMENU_C, encoding='utf-8') as f:
         text = f.read()
@@ -347,7 +347,7 @@ def _inject_lord_select_engine():
 
     # 6: data_event_trigger.c -- the vanilla static force-deploy table. It hard-fields
     #    Eirika/Ephraim (and later-route units) BY SLOT; our cast ride those slots, so
-    #    e.g. CHARACTER_EIRIKA in COMMON mode force-fields Braulo every chapter, on top
+    #    e.g. CHARACTER_EIRIKA in COMMON mode force-fields whoever rides it every chapter, on top
     #    of the player's chosen lead. Clear it: the ONLY forced unit is the chosen lead
     #    (the IsCharacterForceDeployed_ hook, #2 above). Any future per-chapter forced
     #    unit is added our way, not via this vanilla table.
