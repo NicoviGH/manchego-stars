@@ -484,6 +484,11 @@ GUEST_PORTRAIT_MAP = {
     # FACE (he speaks in the ch01 ending); his recruit UNIT + map sprite ride this same
     # Forde character slot when that wiring lands (see HANDOFF "Wire Baxby" b/c).
     'baxby':          'Forde',
+    # ch02 quest-giver Vellynne Harpell (recurring Arcane Brotherhood necromancer) rides
+    # the vanilla Ismaire slot (CH02_VELLYNNE_SLOT) -- a regal woman absent from our ch00-08,
+    # collision-free. Her bust is the FE-Repo Sonya (Witch) mug with a snow-white hair recolor
+    # (portraits/vellynne.py); cutscene-only (no map unit).
+    'vellynne':       'Ismaire',
 }
 
 
