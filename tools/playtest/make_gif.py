@@ -23,8 +23,10 @@ Options:
   --scale S  integer upscale of the 240x160 GBA frame (default 2)
   --out DIR  output dir (default: <repo>/map-review)
   --mp4      encode an H.264 .mp4 via ffmpeg instead of a .gif (smaller, no
-             quantization artifacts; the shareable format -- commit it for
-             GitHub-mobile review, see [[feedback_remote_file_delivery]])
+             quantization artifacts; good for LOCAL viewing). NOTE: a committed
+             .mp4 does NOT render inline on GitHub (web or mobile) -- it is a
+             binary download -- so for repo-committed review use the default GIF
+             (GitHub renders GIFs inline). See [[feedback_remote_file_delivery]].
   --open     open the finished GIF/MP4
 
 Requires ffmpeg on PATH for --mp4 (brew install ffmpeg).

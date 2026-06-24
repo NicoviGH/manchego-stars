@@ -100,6 +100,7 @@ case "$SCENARIO" in
     recordrescue) BUILDER=ckpt_prep;      CKPT=prep ;;
     recordtrade)  BUILDER=ckpt_prep;      CKPT=prep ;;
     recordfix)    BUILDER=ckpt_prep;      CKPT=prep ;;
+    recordrbg)    BUILDER=ckpt_rbgch01;   CKPT=rbgch01 ;;
 esac
 if [ -n "$BUILDER" ]; then
     if [ ! -f "$STATE_DIR/$CKPT.ss" ] || [ "$(cat "$STATE_DIR/$CKPT.romhash" 2>/dev/null || true)" != "$ROMHASH" ]; then

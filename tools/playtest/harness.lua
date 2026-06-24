@@ -2171,19 +2171,22 @@ local function captureAttack(actorAddr, tag) -- like chooseAttack but shoot fram
     end
     wait(30)
 end
-scenarios.recordrbg = function()
-    local RBG = 0x05            -- CHARACTER_MOULDER (RBG's slot), lord-select menu index 4
-    local CLONE_NUMBER = 0x6C   -- CLASS_BLST_KILLER_EMPTY (the Archer-clone class)
-    if not winCh00() then return result("FAIL", "never won ch00") end
+local RBG_PID = 0x05           -- CHARACTER_MOULDER (RBG's slot), lord-select menu index 4
+-- Shared lead-up for the RBG demo: win the prologue, lord-select RBG into ch01,
+-- stop on ch01 turn-1 player phase with RBG deployed. Returns (rbg unit) or (false, err).
+-- Built ONCE at 240fps into the "rbgch01" checkpoint (ckpt_rbgch01); recordrbg LOADS it
+-- so the slow prologue+lord-select grind isn't replayed every capture (#65).
+local function reachRbgCh01()
+    if not winCh00() then return false, "never won ch00" end
     if not waitFor(function() return chapter() == 2 end, 1800) then
-        return result("FAIL", "ch01 never started") end
+        return false, "ch01 never started" end
     local atMenu = false
     for _ = 1, 200 do
         if menuOpen() then atMenu = true break end
         if procActive(SYM.gProcScr_SALLYCURSOR) then break end
         press(K.A, 4); wait(36)
     end
-    if not atMenu then return result("FAIL", "lord-select menu never opened") end
+    if not atMenu then return false, "lord-select menu never opened" end
     wait(40)
     for _ = 1, 4 do press(K.DOWN, 4); wait(8) end  -- index 0 (Braulo) -> index 4 (RBG)
     press(K.A, 4); wait(40)   -- pick
@@ -2199,16 +2202,20 @@ scenarios.recordrbg = function()
     end
     if not waitFor(function()
         return not procActive(SYM.gProcScr_SALLYCURSOR) and faction() == 0 and turn() >= 1
-    end, 1200) then return result("FAIL", "ch01 turn 1 never reached") end
-    wait(60); pokeAnimsOn()
-    local rbg = blue(RBG)
-    if not rbg then return result("FAIL", "RBG not on the field after lord-select") end
-    local cls = ru8(ru32(rbg.addr + 0x04) + 0x04) -- pClassData->number
-    log(string.format("RBG at (%d,%d) class=0x%X (want 0x%X clone)", rbg.x, rbg.y, cls, CLONE_NUMBER))
-    shot("rbg-deploy")
+    end, 1200) then return false, "ch01 turn 1 never reached" end
+    local rbg = blue(RBG_PID)
+    if not rbg then return false, "RBG not on the field after lord-select" end
+    return rbg
+end
+
+-- Drive RBG (already deployed in ch01) within bow range of an enemy and leave him
+-- ON the firing tile with his action menu open. Marches over turns until something
+-- is in 2-range. Returns true (ready to attack) or false. The slow part of the demo,
+-- so the checkpoint is saved right AFTER this -- recordrbg then just fires (#65).
+local function positionRbgForShot()
     for phase = 1, 6 do
-        rbg = blue(RBG)
-        if isDead(rbg) then return result("FAIL", "RBG died before firing") end
+        local rbg = blue(RBG_PID)
+        if isDead(rbg) then return false end
         pokeAnimsOn()
         local reach = selectAndReach(rbg, 24, 15)
         press(K.B); wait(10)  -- deselect; re-select to act
@@ -2216,8 +2223,7 @@ scenarios.recordrbg = function()
             local pick = CLEARBOT.pickTarget(reach, liveEnemies(), { range = 2 })
             if pick then
                 if moveUnit(rbg.x, rbg.y, pick.tile.x, pick.tile.y) then
-                    captureAttack(rbg.addr, "rbg"); shot("rbg-after")
-                    return result("PASS", string.format("RBG bow shot captured (class 0x%X)", cls))
+                    return true  -- on the firing tile, action menu open
                 end
             else
                 local es = liveEnemies()
@@ -2227,8 +2233,32 @@ scenarios.recordrbg = function()
         endTurn()
         waitFor(function() return faction() == 0 and turn() >= phase + 1 end, 1500); wait(40)
     end
-    shot("rbg-noshot")
-    return result("FAIL", "RBG never got a bow shot off in 6 phases")
+    return false
+end
+
+scenarios.ckpt_rbgch01 = function()
+    local rbg, err = reachRbgCh01()
+    if not rbg then shot("ckpt-rbgch01-fail"); return result("FAIL", err) end
+    if not positionRbgForShot() then shot("ckpt-rbgch01-noshot")
+        return result("FAIL", "RBG never got into firing position in 6 phases") end
+    saveState("rbgch01")
+    result("PASS", "rbgch01 checkpoint saved (RBG on firing tile, action menu open)")
+end
+
+scenarios.recordrbg = function()
+    local RBG = RBG_PID
+    local CLONE_NUMBER = 0x6C   -- CLASS_BLST_KILLER_EMPTY (the Archer-clone class)
+    wait(30) -- let the core settle past boot before loading
+    if not loadState("rbgch01") then
+        return result("FAIL", "no rbgch01 checkpoint (run.sh builds it)") end
+    wait(60); pokeAnimsOn()
+    local rbg = blue(RBG)
+    if not rbg then return result("FAIL", "RBG not on the field after load") end
+    local cls = ru8(ru32(rbg.addr + 0x04) + 0x04) -- pClassData->number
+    log(string.format("RBG at (%d,%d) class=0x%X (want 0x%X clone), firing", rbg.x, rbg.y, cls, CLONE_NUMBER))
+    shot("rbg-deploy")
+    captureAttack(rbg.addr, "rbg"); shot("rbg-after")
+    return result("PASS", string.format("RBG bow shot captured (class 0x%X)", cls))
 end
 
 -- ---------------------------------------------------------------- runner
