@@ -3948,6 +3948,9 @@ def inject_ch02(campaign, verbose=True):
     if len(end_beats) != len(CH02_ENDING_MSGS):
         sys.exit('ERROR: ch02 ending split into %d beats; expected %d (check '
                  'beat_break markers)' % (len(end_beats), len(CH02_ENDING_MSGS)))
+    if len(tutorial) != len(CH02_TUTORIAL_MSGS):
+        sys.exit('ERROR: ch02 turn-1 tutorial has %d lines; expected %d '
+                 '(zip would silently drop the extra)' % (len(tutorial), len(CH02_TUTORIAL_MSGS)))
 
     def cut_fid(spk):
         if spk == 'narration':                 # faceless stage-business box (#58)
