@@ -31,17 +31,18 @@ ADR: `decisions.md` §Distribution.
 
 ## Now / Next
 
-### Content — Ch2 "Cold Welcome" (#22): tactical reground built green; 2 human checkpoints remain
+### Content — Ch2 "Cold Welcome" (#22): art complete; title card + load-test remain
 - **(a) Dialogue reground** — ✅ DONE, merged in #70 (`37f327c`): opening chwinga-adoption beat
   (Sclorbo's kin + Marty's Chagaccino), turn-1 RBG→Pinky archer tutorial (fliers-vs-bows debut),
   de-sledded rear bark + ending card. Host wired (3 opening beats + turn-1 tutorial scene reusing the
   dead `Ch3_Turn2Player` slot + turn-3 bark). Msg-id reuse vetted clean (0x98d/0x98f free; 0x991's only
   live ref is Bazba's talk in the emptied Character list).
-- **(b) Chwinga + Vellynne art** (#38/#39/#19): **chwinga DONE** — map sprites (#74 `45d62fb`),
-  portraits + Mote/Rime/Glimmer names (#75 `fb8f3ac`). The whole chwinga look = Sclorbo's sprite & bust
-  reused with the icy-blue glow recoloured spirit-green (he IS a chwinga), build-derived from his assets
-  (no committed copies); ADRs in decisions.md Art & Audio. STILL OPEN: **Vellynne bust** (#19) — recurring
-  Brotherhood NPC cutscene face — **show before commit**; plus the **title card** ("Cold Welcome" —
+- **(b) Chwinga + Vellynne art** (#38/#39/#19): **DONE** — chwinga map sprites (#74 `45d62fb`),
+  portraits + Mote/Rime/Glimmer names (#75 `fb8f3ac`), Vellynne bust (#19 `3efdd29`). The whole chwinga
+  look = Sclorbo's sprite & bust reused with the icy-blue glow recoloured spirit-green (he IS a chwinga),
+  build-derived from his assets (no committed copies). Vellynne = FE-Repo Sonya (Witch) mug with a
+  magenta→snow-white hair recolor (`portraits/vellynne.py`, dresses the Ismaire slot; credit JeyTheCount).
+  ADRs in decisions.md Art & Audio. STILL OPEN (lighter): the **title card** ("Cold Welcome" —
   `gen_chapter_title` atlas missing C/W/d/m glyphs).
 - **(c) mGBA load-test** ch01→ch02→win→chains (chwinga LOAD, archer threatens pegasi, survivors deliver
   charms). Fast via `make TESTCH=1` (wire a ch02 sandbox) or the `recordrbg`/checkpoint path.
