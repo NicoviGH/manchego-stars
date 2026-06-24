@@ -2164,16 +2164,23 @@ end
 -- frames across the battle anim. RETURNS whether combat actually started -- the caller
 -- MUST check it; a stall on the menu is a FAIL, not a silent PASS (#65).
 local function captureAttack(actorAddr, tag) -- like chooseAttack but shoot frames through the anim
-    -- The action menu can have JUST opened: positionRbgForShot's moveUnit returns the
-    -- instant menuOpen() flips true, while the slide-in is still animating and eating
-    -- input. Settle before the first A or that press is dropped, only 2 of the 3 confirms
-    -- land, and we stall parked on target-selection (the recordrbgtest symptom). recordrbg
-    -- dodged this only via its pre-settled checkpoint + wait(60); make captureAttack itself
-    -- robust so any caller (live or checkpoint) is safe.
-    wait(20)
+    -- The action menu is open with Attack available (the caller positions the unit so its
+    -- weapon can reach a foe -- a bow parked at range 1 has NO Attack command; the returned
+    -- verdict catches a miss). Attack -> weapon select -> target select. In target select the
+    -- BKSEL cursor (separate from the map cursor) can start OFF a target when several foes are
+    -- in range, so a single blind A may not commit -- press A to confirm and, if no battle
+    -- starts, cycle to the next target (RIGHT) and retry. Stop the instant a battle animates
+    -- (gProc_ekrBattle): pressing A during the anim would skip it.
+    local function combatLive() return procActive(SYM.gProc_ekrBattle)
+        or (ru32(actorAddr + 0x0C) & 0x2) ~= 0 end
     press(K.A); wait(20)  -- Attack -> weapon select
     press(K.A); wait(20)  -- weapon  -> target select
-    press(K.A)            -- target  -> combat
+    for _ = 1, 8 do
+        if combatLive() then break end
+        press(K.A); wait(14)          -- confirm the highlighted target
+        if combatLive() then break end
+        press(K.RIGHT); wait(8)       -- A didn't commit -> cycle to the next in-range target
+    end
     local done = false
     for f = 1, 500 do
         if (ru32(actorAddr + 0x0C) & 0x2) ~= 0 then done = true; break end -- US_UNSELECTABLE = combat done
@@ -2232,7 +2239,9 @@ local function positionRbgForShot()
         local reach = selectAndReach(rbg, 24, 15)
         press(K.B); wait(10)  -- deselect; re-select to act
         if reach then
-            local pick = CLEARBOT.pickTarget(reach, liveEnemies(), { range = 2 })
+            -- RBG fires a BOW: min_range 2, so we don't park adjacent (range 1) where the
+            -- bow has no Attack command and captureAttack would wander the Item menu (#65).
+            local pick = CLEARBOT.pickTarget(reach, liveEnemies(), { range = 2, min_range = 2 })
             if pick then
                 if moveUnit(rbg.x, rbg.y, pick.tile.x, pick.tile.y) then
                     return true  -- on the firing tile, action menu open

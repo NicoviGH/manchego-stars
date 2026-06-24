@@ -249,6 +249,19 @@ file seam — **stand**: worktrees are now ephemeral-per-feature, and the file s
 feature-flow keeps.
 _Decided: 2026-06-24 (Nicolas — chose feature-flow + PRs; codified from the "not my job" design review)_
 
+**Boot decision localized; bows need a min-range in playtest targeting (the first feature-flow feature).**
+The boot cut + New-Game redirect were decided in BOTH `inject_prologue` and `inject_test_chapter` (the
+duplication the Coordination ADR cites). Localized to one `_configure_boot(target, montage)` owner called
+once from `build_campaign.main()`; the two target injectors no longer re-decide it. This — plus two
+playtest fixes — unblocks `recordrbgtest` (capture RBG's bow anim on the `make TESTCH=1` sandbox)
+end-to-end: (a) `clearbot.pickTarget` takes a **`min_range`** so a 2-range-only bow isn't parked
+adjacent (range 1), where there is no Attack command; (b) `captureAttack`'s target confirm is
+**feedback-driven** (press A, cycle targets, until `gProc_ekrBattle` animates) because with several foes
+in range the BKSEL select cursor can start off a target. Verified end-to-end on the sandbox AND on
+`recordrbg` (no regression). The "menu just opened, settle before the first A" hypothesis was wrong — the
+menu was responsive throughout; positioning + multi-target confirm were the real causes.
+_Decided: 2026-06-24_
+
 ---
 
 ## Combat System

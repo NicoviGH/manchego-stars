@@ -1244,6 +1244,17 @@ def _redirect_new_game(chapter_index):
         f.write(bmio)
 
 
+def _configure_boot(new_game_target, montage=False):
+    """Single owner of the boot decision. inject_prologue and inject_test_chapter each used
+    to cut the intro + redirect New Game themselves -- the SAME decision scattered across two
+    desks, which double-cut and crashed if both ran. Localized here: cut the attract / intro /
+    world-map sequences, then point New Game at `new_game_target` (the host chapter slot the
+    prologue OR the Ch1 sandbox loads through -- both PROLOGUE_HOST_INDEX). Call ONCE from
+    main(), after whichever target injector ran."""
+    _cut_boot_intro(montage=montage)
+    _redirect_new_game(new_game_target)
+
+
 def inject_opening_montage(campaign, verbose=True):
     """#43 lore crawl: re-render vanilla's seven opening-monologue slides from the
     campaign's locked card text and retime the display LUT to our word counts.
@@ -1575,12 +1586,9 @@ def inject_test_chapter(campaign, verbose=True):
     with open(CH1_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
         f.write(script)
 
-    # Dev loop: cut every pre-map sequence so a fresh boot lands on the title and New
-    # Game drops straight onto the map, then redirect the prologue slot -> Ch1 so the
-    # New Game target is this sandbox chapter.
-    _cut_boot_intro()
-    _redirect_new_game(TEST_CHAPTER_INDEX)
-
+    # The boot cut + New-Game redirect (so a fresh boot lands on the title and New Game drops
+    # straight onto this sandbox chapter) are the single owner _configure_boot()'s job, called
+    # once from main() -- not re-decided here.
     if verbose:
         for unit_id, slot, class_enum, _ in units:
             print('  %-10s -> Ch1 ally (%s as %s)'
@@ -3155,13 +3163,11 @@ def inject_prologue(campaign, verbose=True, montage=False):
     with open(BATTLEQUOTES_C, 'w', encoding='utf-8') as f:
         f.write(bq)
 
-    # 6. Boot flow: cut the attract/intro/world-map sequences, and redirect New Game from
-    #    the prologue slot (0) to the host chapter (1) at StartBattleMap -- so the game
-    #    loads our prologue through the normal-chapter path, dodging the prologue slot's
-    #    special-cased HUD/terrain handling that garbled the screen. MONTAGE=1 keeps the
-    #    intro monologue and re-renders its slides as our lore crawl (#43).
-    _cut_boot_intro(montage=montage)
-    _redirect_new_game(PROLOGUE_HOST_INDEX)
+    # 6. Opening montage (#43): when MONTAGE=1, re-render the intro-monologue slides as our
+    #    lore crawl + the world-map tour. The boot cut + New-Game redirect themselves (so the
+    #    prologue loads through host chapter slot 1, dodging the prologue slot's special-cased
+    #    HUD/terrain handling) are the single owner _configure_boot()'s job, called once from
+    #    main() -- MONTAGE=1 there keeps the intro monologue for these slides to replace.
     if montage:
         print('opening montage (#43):')
         inject_opening_montage(campaign, verbose=verbose)
@@ -4637,9 +4643,11 @@ def main():
         if args.test_chapter:
             print('TEST CHAPTER (playtest: New Game -> Ch1 sandbox, cast deployed):')
             inject_test_chapter(args.campaign)   # slot 1 sandbox, in place of the prologue
+            _configure_boot(TEST_CHAPTER_INDEX)  # sandbox never montages
         else:
             print('prologue (New Game target):')
             inject_prologue(args.campaign, montage=args.montage)
+            _configure_boot(PROLOGUE_HOST_INDEX, montage=args.montage)
         print('death quotes (#6):')
         inject_pc_death_quotes(args.campaign)
     print('done. Run `make` to compile the ROM.')
