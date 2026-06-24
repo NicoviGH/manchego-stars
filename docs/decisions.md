@@ -234,7 +234,9 @@ and got welded onto the same `inst/<track>` worktree, forcing work to partition 
   replacing the pre-commit glob block.
 - **Engine/content stays a HARD invariant.** The Engine/Content Boundary Rule (no character/chapter/plot
   in `.c`/`.s`) + the 5 engine hooks in `tools/inject/` (`check_engine_guards_present`) are genuine
-  decision-hiding and remain gates. *Follow-up:* mechanize the name-in-C check (today a review rule).
+  decision-hiding and remain gates. The character-name half is now mechanized
+  (`check_engine_campaign_agnostic` scans the hand-written engine sources for any campaign id);
+  chapter-number / plot-event references stay a review-judgment call.
 - **`check_lane_ownership` is demoted to an advisory** desk-span note (no longer a block). The glob map it
   carries is the seed of the **desk map**: each desk = a responsibility + its phone (interface) + its
   cabinet (private files), the design vocabulary enforced at review.
