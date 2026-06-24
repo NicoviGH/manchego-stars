@@ -7,7 +7,20 @@ the lane guard is `check.py check_lane_ownership`). Seam enforcement (#55) + par
 **Shared builds/gotchas/rules → `HANDOFF.md` + `CLAUDE.md`; this file holds only my current state +
 pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
 
-## Now (2026-06-21) — per-chapter parity gate is enforcing (#48 (b)); #63 M1 landed (M2 next); #46 reassigned to content
+## Now (2026-06-24) — #65 capture tooling landed, one deferred fix is TOP NEXT; parity gate enforcing (#48 b); #63 M1 landed (M2 next)
+- **#65 capture tooling LANDED (2026-06-23/24) + one DEFERRED fix — TOP NEXT TASK.** Added `recordrbg`
+  (loads an `rbgch01` checkpoint instead of replaying the prologue → ~12s), `make_gif.py --mp4`
+  (local-only; **GIF stays the GitHub-review format** — a committed `.mp4` is a binary download, not
+  inline), and `recordrbgtest` (capture on a `make TESTCH=1` ROM that boots straight into the Ch1
+  sandbox). **⚠️ DEFERRED FIX — `recordrbgtest` doesn't reach the battle anim:** its `captureAttack`
+  A-press sequence stalls on the attack-forecast/weapon-select menu on the sandbox (frames come out as
+  the menu; the scenario still returns PASS *unconditionally*, so the PASS is misleading). Diagnose
+  from `/tmp/playtest-recordrbgtest/02-rbg-deploy.png` (the state `captureAttack` starts from) + the
+  early `*-rbg.png` frames; likely needs an extra confirm or a wait on the action menu before the
+  first A. **Until fixed, use `recordrbg` with a FRESH checkpoint** — DON'T reuse a checkpoint across
+  an injection/build change (ROM layout shifts corrupt the save-state → capture shows the map/menu,
+  never the battle; reuse is only safe across pure graphics-byte swaps). The `TESTCH=1` build itself +
+  the anim/platform "how" live in **content** (`build_campaign` docstrings); this is just the capture scenario.
 - **#48 (b) parity gate is now ENFORCING, per-chapter & opt-in — LANDED & verified** (decisions.md §The parity
   curve is surfaced in CI…). CI flipped `make difficulty` → **`make difficulty-gate`**. A chapter is gated only
   once content marks it balance-final with **`balance_locked: true`** in its chapter YAML; `curve_gate_failures`
