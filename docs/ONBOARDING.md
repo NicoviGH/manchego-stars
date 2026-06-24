@@ -23,7 +23,7 @@ the tutorial never sees it) · `dialogue` = mandatory story line, shown to every
 | weapon-triangle — Weapon triangle: swords > axes > lances > swords | both | — *(pending)* |
 | magic-trinity — Trinity of magic: Light > Dark > Anima > Light | tutorial | — *(pending)* |
 | effective-weapons — Some weapons are extra-effective vs a unit type (icon glows) | tutorial | — *(pending)* |
-| fliers-vs-bows — Fliers ignore terrain but are vulnerable to bows | both | — *(pending)* |
+| fliers-vs-bows — Fliers ignore terrain but are vulnerable to bows | both | Ch 2 — dialogue (active) |
 | physical-defense — DEF reduces physical damage; armor/mercs are sturdy | tutorial | — *(pending)* |
 | magical-resistance — RES reduces magic damage; casters resist magic | tutorial | — *(pending)* |
 | criticals — Critical hits deal triple damage; chance scales with skill/weapon | tutorial | — *(pending)* |
@@ -48,7 +48,6 @@ authored, the dialogue-pass parity step should claim the ones debuting there
 - **weapon-triangle** — Weapon triangle: swords > axes > lances > swords _(vanilla: both; MSG_613)_
 - **magic-trinity** — Trinity of magic: Light > Dark > Anima > Light _(vanilla: tutorial; MSG_614)_
 - **effective-weapons** — Some weapons are extra-effective vs a unit type (icon glows) _(vanilla: tutorial; MSG_615)_
-- **fliers-vs-bows** — Fliers ignore terrain but are vulnerable to bows _(vanilla: both; MSG_96F)_
 - **physical-defense** — DEF reduces physical damage; armor/mercs are sturdy _(vanilla: tutorial; MSG_617)_
 - **magical-resistance** — RES reduces magic damage; casters resist magic _(vanilla: tutorial; MSG_618)_
 - **criticals** — Critical hits deal triple damage; chance scales with skill/weapon _(vanilla: tutorial; MSG_616)_

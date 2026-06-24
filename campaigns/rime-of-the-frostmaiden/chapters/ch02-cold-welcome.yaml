@@ -15,6 +15,13 @@ fe8_base_map: "FE8 Ch2 — The Protected"   # DefeatAll + defend-in-place; src/e
 parity_reference: "FE8 Ch2"   # #48 enemy-pressure parity bar — The Protected — defend-in-place breather
 balance_locked: true   # #48 (b): balance-final — CI hard-fails on a parity regression here
 
+# ── Onboarding (what this chapter first teaches) ─────────────────────────────────
+introduces:
+  - concept: fliers-vs-bows      # bows are effective vs fliers — DEBUT (player flier Pinky + the green chwinga)
+    coverage: dialogue           # C-hybrid: in-voice threat call-out (RBG→Pinky, turn 1), not a vanilla tutorial box
+    where: "turn-1 RBG→Pinky archer warning — the Chardalyn Hunter threatens flier Pinky & the chwinga"
+    status: active
+
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
   The party rolls west toward Targos in the Rolling Cheddar — their home on runners —
@@ -286,24 +293,55 @@ events:
       - beat_break: B            # Vellynne's face clears (REMA) before the party reacts on a fresh stage
       - meesmickle: "Her sled's pulled by corpses... Wonderful."
       - braulo: "If we cross it, we cross it. We've a road to make."
+      - beat_break: C            # REGROUND 2026-06-24 — fresh stage on the chwinga; Sclorbo + Marty (2 faces, clear of FE8's limit)
+      # (Just off the road, three chwinga play house in the snow — a stolen plate, pinecones
+      #  for a feast. Sclorbo, a chwinga himself, lights up and goes straight to them; the three
+      #  swarm him, masks tilting up — kin to kin. Marty crouches and pours a thimble of
+      #  Chagaccino onto their little pretend-table.)
+      - marty: "Chagaccino?"
+      # (The three abandon their pretend-feast for the real one and tumble in at the company's
+      #  heels. No one says "protect them" — the spirits are simply with us now; the threat on
+      #  the field carries the protect stakes, taught by the RBG→Pinky archer beat below.)
+  - trigger: turn_start
+    turn: 1
+    type: cutscene
+    ea_file: events/ch02-archer-warning.ea
+    description: >
+      Tutorial-parity beat (fliers-vs-bows DEBUT — see `introduces:`). The Chardalyn Hunter
+      is on the board from turn 1; RBG — a bow-user himself (Iron Bow) — warns his flier
+      "son" Pinky to keep clear of it. Teaches the player the bow→flier lesson that ALSO
+      governs shielding the flying chwinga (no one tells the player to protect them; the
+      threat does). Vanilla pairs this with the Vanessa rescue tutorial ("pegasus knights
+      ...are vulnerable to missile attacks, so watch out for archers"). RBG stays in his
+      pun-professor register — mask-drop warmth is reserved for the finale Wish — while Pinky
+      takes it to heart. LOCKED 2026-06-24 (dialogue pass, co-written with Nicolas). PENDING
+      (not wired): the eventscript + Text_BG fit (RBG's line paginates — it's a portrait
+      cutscene, not a 29-char on-map bubble); consider a proximity trigger (Pinky near bow
+      range) over turn-1 if the wiring supports it cleanly.
+    script:                     # LOCKED 2026-06-24 (dialogue pass, co-written with Nicolas)
+      # (Turn 1. The Chardalyn Hunter sits in the eastern treeline, bow strung. RBG marks it,
+      #  then glances to Pinky on the wing.)
+      - prof-rbg: "Um, actually, Pinky — mind that bowman. Wings and arrows don't mix; he'll make Swiss cheese of you. Keep well clear."
+      - pinky: "...Okay, Father. I'll be careful."
   - trigger: turn_start
     turn: 3
     type: reinforcement
     ea_file: events/ch02-rear-ambush.ea
     description: >
-      Wolves emerge from the rear (edge opposite the captain) — teach defending the
-      back line. Wolfram (the armored anchor who forged the sled in ch01 and re-plates
-      it at the inn) calls the rear: terse FE8 reinforcement-bark cadence, ends on the
-      order. LOCKED dialogue-pass text below (speaker chosen by Nicolas 2026-06-19).
-      PENDING (not wired yet): the eventscript that consumes this + on-map bubble fit —
-      "Wolves at our backs — the sled." is 31 chars, past the 29-char bubble wrap, so at
-      insertion it wraps to the bubble's 2nd line (or split with [LF]); verify the
-      right-side bubble isn't pushed offscreen by the width measure.
-    script:                     # LOCKED 2026-06-19 (dialogue pass, speaker chosen by Nicolas)
-      # (Turn 3. Two Snow Wolves drop in at the rear edge, opposite the captain, lunging
-      #  for the parked sled. Wolfram pivots to the back line and plants himself there.)
-      - wolfram: "Wolves at our backs — the sled."
-      - wolfram: "Hold here. I've got the rear."
+      Chardalyn raiders drop in at the rear (west edge, opposite the captain) and make for
+      the chwinga — teach defending the back line. Wolfram (the armored anchor) pivots to
+      the rear and plants himself between the raiders and the spirits: terse FE8
+      reinforcement-bark cadence, ends on the order. LOCKED dialogue-pass text below
+      (reground 2026-06-24; speaker chosen by Nicolas 2026-06-19). PENDING (not wired yet):
+      the eventscript that consumes this + on-map bubble fit — both lines are ≤21 chars
+      (well inside the 29-char bubble wrap); verify the right-side bubble isn't pushed
+      offscreen by the width measure.
+    script:                     # LOCKED 2026-06-24 (dialogue pass, reground; speaker chosen by Nicolas 2026-06-19)
+      # (Turn 3. Two chardalyn raiders drop in at the rear edge, opposite the captain,
+      #  flanking toward the chwinga. Wolfram pivots to the back line and plants himself
+      #  between them and the spirits.)
+      - wolfram: "Raiders at our backs."
+      - wolfram: "Get behind the plate."
   - trigger: chapter_end
     type: cutscene
     ea_file: events/ch02-targos-inn.ea
@@ -314,8 +352,8 @@ events:
       bury (a breadcrumb — he's alive and moving; no combat here; see docs/decisions.md
       §Story → Sephek arc). The inn/camp night is folded into one narration card (FE8 can't
       stage five faces and ch02 has no house-text slot yet): RBG/Marty/Meesmickle take rooms,
-      Braulo shells up, Rootis + Sclorbo camp, Wolfram re-plates the raid's battle-damage on
-      the Rolling Cheddar (plays only if the sled survived — armored since ch01). The fork: a
+      Braulo shells up, Rootis + Sclorbo camp, Wolfram re-forges the raid's battle-damage off
+      the party's dented armor (the sled is dropped — reground 2026-06-24). The fork: a
       Messie/Bremen bounty (south, money) vs the druids' trail (north, the job) — RBG calls it
       north. Seeds the Maer Monster (ch06) and the Lonelywood/druid line. LOCKED dialogue-pass
       text below (co-written with Nicolas 2026-06-19). PENDING (not this commit): ch02 host
@@ -333,9 +371,10 @@ events:
       - rootis: "Everyone here says Auril. But look — one clean cut, iced from within."
       - rootis: "That's the man Hlin warned us about. The dagger of ice."
       - beat_break: C           # nightfall; a narration card over the camp (no staged faces)
+      # card de-sledded (reground 2026-06-24): Wolfram's hammer rings on dented plate, not the sled
       - narration: >-
           Three took rooms. The rest took the cold: a shell, a drift, and Wolfram's
-          hammer ringing the sled till dawn.
+          hammer ringing on dented plate till dawn.
       - beat_break: D           # morning; the party weighs the road ahead
       - prof-rbg: "My rats whisper coin off Bremen — some lake-beast, 'Messie,' swamping boats. Very Gouda."
       - prof-rbg: >-
@@ -349,17 +388,17 @@ post_chapter:
   units_available_to_recruit: []   # Baxby is ch01; no new recruit here
   unlocks_chapter: ch03-the-termalaine-mine
 
-# ── PENDING: dialogue reground (Nicolas co-write, dialogue-pass skill) ─────────────
-# The LOCKED 2026-06-19 cutscene text above still frames the dropped SLED (Wolfram's
-# rear-bark "…the sled"; the ending narration "Wolfram's hammer ringing the sled") and
-# the reinforcements as "Snow Wolves". With the sled dropped and chwinga added, this
-# text is thematically stale and must be reground via the dialogue-pass skill WITH Nicolas:
-#   (1) opening — add a small chwinga intro beat (why the spirits are on the road / the
-#       party shielding them; a Marty line fits — the befriend-creatures diplomat);
-#   (2) rear-bark — de-sled it (chardalyn raiders at our backs, not "the sled");
-#   (3) ending — re-point Wolfram's inn payoff off the sled (he re-plates gear / the camp).
-# Left intact (not unilaterally rewritten) per feedback_show_before_committing + the
-# dialogue-pass discipline. Build wires the existing text as placeholder until then.
+# ── Dialogue reground (DONE 2026-06-24, dialogue-pass co-write with Nicolas) ───────
+# Reground from the 2026-06-19 text (which framed the dropped sled + "Snow Wolves") to the
+# merged tactical design (sled dropped, 3 green chwinga, chardalyn raiders):
+#   (1) opening — chwinga adoption beat (beat_break C): Sclorbo, a chwinga, meets his kin;
+#       Marty pours a Chagaccino. No "protect them" line — the threat on the field carries it.
+#   (1b) turn-1 tutorial beat — RBG warns flier Pinky off the archer (fliers-vs-bows DEBUT;
+#        see `introduces:`), the in-voice heads-up vanilla owes via the Vanessa rescue tutorial.
+#   (2) rear-bark — de-sledded: raiders flank the chwinga; Wolfram holds the rear ("the plate").
+#   (3) ending card — Wolfram's hammer rings on dented plate, not the sled.
+# STILL PENDING for ch02 (NOT dialogue): the .ea eventscript wiring for all four beats +
+# chwinga/Vellynne art (#38/#39/#19) + the mGBA load-test.
 
 # ── Design Notes ─────────────────────────────────────────────────────────────────
 design_notes: >

@@ -286,10 +286,11 @@ CH02_CHWINGA = (
 # Cutscene message ids -- the dead vanilla Ch3 scene/talk/turn texts our host overwrites
 # (referenced ONLY by ch3-eventscript.h scenes we replace; 0x993/0x994 are LIVE battle
 # quotes in data_battlequotes.c and are deliberately NOT in this pool -- see decisions.md
-# "Ch2 hosting"). Opening (Vellynne): card + 2 beats. Rear bark: 1. Ending (Targos): card +
-# 4 beats. Boss death quote: 1.
+# "Ch2 hosting"). Opening (Vellynne): card + 3 beats. Turn-1 archer tutorial: 2. Rear bark:
+# 1. Ending (Targos): card + 4 beats. Boss death quote: 1.
 CH02_OPENING_CARD_MSG = 0x98b
-CH02_OPENING_MSGS = (0x98c, 0x98e)            # A (Vellynne/RBG), B (Meesmickle/Braulo)
+CH02_OPENING_MSGS = (0x98c, 0x98e, 0x98d)     # A (Vellynne/RBG), B (Meesmickle/Braulo), C (chwinga: Sclorbo's kin + Marty)
+CH02_TUTORIAL_MSGS = (0x98f, 0x991)           # turn-1 fliers-vs-bows debut: RBG warns flier Pinky / Pinky
 CH02_BARK_MSG = 0x990                         # Wolfram's turn-3 rear-ambush bark (over map)
 CH02_ENDING_CARD_MSG = 0x995
 CH02_ENDING_MSGS = (0x996, 0x997, 0x998, 0x999)  # A fisher, B Rootis, C narration(#58), D RBG
@@ -3938,7 +3939,9 @@ def inject_ch02(campaign, verbose=True):
     op_card, op_beats = split_beats('chapter_start')
     end_card, end_beats = split_beats('chapter_end')
     bark = next(e for e in chap['events']
-                if e.get('trigger') == 'turn_start')['script']
+                if e.get('trigger') == 'turn_start' and e.get('turn') == 3)['script']
+    tutorial = next(e for e in chap['events']
+                    if e.get('trigger') == 'turn_start' and e.get('turn') == 1)['script']
     if len(op_beats) != len(CH02_OPENING_MSGS):
         sys.exit('ERROR: ch02 opening split into %d beats; expected %d (check '
                  'beat_break markers)' % (len(op_beats), len(CH02_OPENING_MSGS)))
@@ -4151,8 +4154,10 @@ def inject_ch02(campaign, verbose=True):
         info = f.read()
     info = _replace_brace_block(
         info, 'EventListScr_Ch3_Turn[] =',
-        '{\n    TURN(0x0, EventScr_Ch3_Turn1Npc, %d, 0, FACTION_ID_BLUE)'
-        ' /* turn-%d rear wolves + Wolfram bark */\n    END_MAIN\n}'
+        '{\n    TURN(0x0, EventScr_Ch3_Turn2Player, 1, 0, FACTION_ID_BLUE)'
+        ' /* turn-1 fliers-vs-bows: RBG warns flier Pinky off the archer */\n'
+        '    TURN(0x0, EventScr_Ch3_Turn1Npc, %d, 0, FACTION_ID_BLUE)'
+        ' /* turn-%d rear raiders + Wolfram bark */\n    END_MAIN\n}'
         % (reinf['trigger_turn'], reinf['trigger_turn']), CH3_EVENTINFO_H)
     info = _replace_brace_block(
         info, 'EventListScr_Ch3_Character[] =', '{\n    END_MAIN\n}', CH3_EVENTINFO_H)
@@ -4169,7 +4174,12 @@ def inject_ch02(campaign, verbose=True):
     op_text_calls = _scenic_beat_calls(
         CH02_OPENING_MSGS, op_beats,
         ['A -- Vellynne stops them; RBG haggles the orb job',
-         'B -- Meesmickle & Braulo react to the corpse-sled'])
+         'B -- Meesmickle & Braulo react to the corpse-sled',
+         'C -- Sclorbo meets his chwinga kin; Marty offers a Chagaccino'])
+    tut_text_calls = _scenic_beat_calls(
+        CH02_TUTORIAL_MSGS, [[ln] for ln in tutorial],
+        ['RBG warns flier Pinky off the archer (fliers-vs-bows debut)',
+         'Pinky takes it to heart'])
     end_text_calls = _scenic_beat_calls(
         CH02_ENDING_MSGS, end_beats,
         ['A -- the Targos fisher warns them off the frozen body',
@@ -4206,6 +4216,14 @@ def inject_ch02(campaign, verbose=True):
         '    TEXTSHOW(0x%X) /* Wolfram: hold the rear (rear-ambush bark) */\n'
         '    TEXTEND\n    REMA\n'
         '    EVBIT_T(7)\n    ENDA\n}' % CH02_BARK_MSG, CH3_EVENTSCRIPT_H)
+    # Turn-1 fliers-vs-bows tutorial (repurposes the dead vanilla Ch3 Turn2Player scene):
+    # RBG warns flier Pinky off the Chardalyn Hunter -- the in-voice heads-up vanilla owes
+    # via the Vanessa rescue. Portrait talk over the map; no BACG (would clobber the map).
+    script = _replace_brace_block(
+        script, 'EventScr_Ch3_Turn2Player[] =',
+        '{\n' + tut_text_calls +
+        '    REMA\n'
+        '    EVBIT_T(7)\n    ENDA\n}', CH3_EVENTSCRIPT_H)
     # Per-chwinga charm-gift: read each chwinga's survival (CHECK_ALIVE writes EVT_SLOT_C)
     # while the battle units are still loaded, BEQ past the give if it fell, else drop the
     # charm into the leader's inventory (overflow -> convoy). This is the chapter's
@@ -4265,6 +4283,10 @@ def inject_ch02(campaign, verbose=True):
         w = 28 if _beat_is_narration(beat) else 42
         set_message_body(lines, msg_id, _script_to_message(
             beat, stage(beat, op_home), width=w))
+    # Turn-1 fliers-vs-bows tutorial: one portrait box per line (RBG, then Pinky), Text_BG 42-wrap.
+    for msg_id, ln in zip(CH02_TUTORIAL_MSGS, tutorial):
+        set_message_body(lines, msg_id, _script_to_message(
+            [ln], stage([ln], op_home), width=42))
     # Wolfram's rear-ambush bark, shown over the map (29-tile bubble wrap; the 31-char
     # "Wolves at our backs -- the sled." auto-wraps via _wrap_fe_lines).
     set_message_body(lines, CH02_BARK_MSG, _script_to_message(
