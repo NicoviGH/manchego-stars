@@ -105,6 +105,18 @@ fi
 echo ">> initialising the fireemblem8u submodule in the worktree (from local objects)"
 ( cd "$WT_PATH" && git submodule update --init fireemblem8u )
 
+# A fresh decomp checkout's graphics scripts hard-code `#!/bin/python3`, which doesn't exist
+# on macOS (python3 lives at /usr/bin/python3). The Makefile runs them via their shebang, so a
+# fresh worktree fails to REGENERATE graphics (the primary checkout already has them built, so
+# it never hits this). Repoint to `env python3` (portable; the submodule is a build artifact,
+# so this local edit is never committed). Only act where /bin/python3 is actually missing.
+if [ ! -e /bin/python3 ]; then
+    echo ">> repointing decomp gfx-script shebangs to env python3 (no /bin/python3 on this host)"
+    grep -rl '#!/bin/python3' "$WT_PATH/fireemblem8u/scripts" 2>/dev/null | while IFS= read -r f; do
+        perl -i -pe 's{\A#!/bin/python3$}{#!/usr/bin/env python3}' "$f"
+    done
+fi
+
 echo ">> symlinking the build toolchain from the primary checkout (shared, read-only)"
 M="$REPO/fireemblem8u"
 W="$WT_PATH/fireemblem8u"
