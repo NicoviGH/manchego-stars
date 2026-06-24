@@ -1168,6 +1168,18 @@ use it (the **Fire Imp** {Alexsplode, FE-Repo} for both soldier and fighter grun
 chief stays the vanilla Knight). Verified non-destructive: the `CLASS_SOLDIER`/`CLASS_FIGHTER` entries are byte-unchanged
 (SMSId 0x3f/0x31).
 
+**Green NPC chwinga: per-CHARACTER override of a derived cast sprite, tinted by the green faction palette (#38, 2026-06-24).**
+The ch02 chwinga are the green-faction mirror of the enemy reskin. Unlike enemy grunts they ride **distinct NPC slots**
+(`DARA`/`KLIMT`/`MANSEL`) — so the cast's per-CHARACTER `gMapSpriteOverride` IS the right tool (their class,
+`CLASS_PEGASUS_KNIGHT`, is a balance chassis shared with player flier Pinky, so a class-level reskin would turn Pinky into
+a chwinga). They are kept OUT of `gMapPaletteOverride`, so `GetUnitSpritePalette` falls through to the faction switch and
+the **green NPC bank** tints them automatically (no bespoke palette). Sprite source: Sclorbo's map sprite — he is a
+chwinga (Nicolas, 2026-06-24: "use his sprite, apply the green ally palette"; identical green triplets, blue glow kept).
+His **cast-palette** sheet is remapped onto his SMS base's (`Civilian_F1`) standard role layout at build time
+(`map_sprite_tool.remap_sms_palette`), so the single source of truth stays `sclorbo.png` (no committed derived asset);
+one shared SMS slot + glide MU sheet serve all three identical NPC slots. Injected by
+`build_campaign._inject_ch02_chwinga_sprites` (inside `inject_map_sprites`, which owns the override tables).
+
 **Pick a sprite already drawn in the standard SMS palette.** The first attempt (BoW "Goblin Spearman") had its own
 9-colour palette, so nearest-mapping it to the standard layout collapsed it to a dark, unreadable blob (and a remap-target
 bug — matching to the *player* palette while the unit displays under the *enemy* palette — turned its red pixels green by

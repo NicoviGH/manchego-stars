@@ -283,6 +283,10 @@ CH02_CHWINGA = (
     ('chwinga-rime',    'KLIMT',  'elixir'),
     ('chwinga-glimmer', 'MANSEL', 'pure-water'),
 )
+# The chwinga wear Sclorbo's chwinga map sprite (he is one), recoloured by the green NPC
+# faction palette -- identical green triplets (Nicolas 2026-06-24). Build-time derived from
+# this cast sprite; see _inject_ch02_chwinga_sprites.
+CH02_CHWINGA_SPRITE_SRC = 'sclorbo'
 # Cutscene message ids -- the dead vanilla Ch3 scene/talk/turn texts our host overwrites
 # (referenced ONLY by ch3-eventscript.h scenes we replace; 0x993/0x994 are LIVE battle
 # quotes in data_battlequotes.c and are deliberately NOT in this pool -- see decisions.md
@@ -1949,6 +1953,11 @@ def inject_map_sprites(campaign, verbose=True):
                      % campaign)
         _inject_cast_palette(_read_cast_palette(pal_png), custom_slots)
 
+    # ch02 green chwinga: reskin minor NPC slots with Sclorbo's chwinga map sprite, tinted
+    # by the green faction palette (no bespoke palette -- they're green faction). Runs here
+    # because inject_map_sprites owns the gMapSpriteOverride / gMuImgOverride tables.
+    _inject_ch02_chwinga_sprites(campaign, verbose=verbose)
+
     if verbose:
         guest_uids = {uid for uid, _, _, _ in guest_idle}
         for uid, slot, class_enum, sms in idle + guest_idle:
@@ -1959,6 +1968,77 @@ def inject_map_sprites(campaign, verbose=True):
             print('  %-14s -> hover/walk MU sheet (%s, %s)' % (uid, slot, kind))
         if custom_slots:
             print('  cast palette -> purple OBJ bank for: %s' % ', '.join(custom_slots))
+
+
+def _insert_table_head(path, decl, rows_text):
+    """Insert `rows_text` right after a C array's `decl ... = {` opener (front of the
+    table). Used to add entries to an already-emitted, terminator-closed override table
+    without keying on the terminator (which several tables in the same file share)."""
+    with open(path, encoding='utf-8') as f:
+        text = f.read()
+    m = re.search(re.escape(decl) + r'[^\n]*\{\n', text)
+    if not m:
+        sys.exit('ERROR: %r opener not found in %s' % (decl, path))
+    text = text[:m.end()] + rows_text + text[m.end():]
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(text)
+
+
+def _inject_ch02_chwinga_sprites(campaign, verbose=True):
+    """The 3 green chwinga (CH02_CHWINGA slots) wear Sclorbo's chwinga map sprite,
+    recoloured by the GREEN NPC faction palette. They are green-faction, so they are kept
+    OUT of the cast palette override (gMapPaletteOverride) -- GetUnitSpritePalette falls to
+    the faction switch and tints the standard role layout green automatically (cf. the
+    enemy reskins, which do the same for the red faction). Sclorbo's cast-palette sheet is
+    remapped onto his SMS base's standard role layout at build time, so the single source
+    of truth stays sclorbo.png (no committed derived asset); one shared SMS slot + MU sheet
+    serve all three identical NPC slots. Must run inside inject_map_sprites (it owns the
+    gMapSpriteOverride / gMuImgOverride tables)."""
+    asset_dir = os.path.join(REPO, 'campaigns', campaign, 'map_sprites')
+    src_idle = os.path.join(asset_dir, CH02_CHWINGA_SPRITE_SRC + '.png')
+    if not os.path.isfile(src_idle):
+        if verbose:
+            print('  (no %s.png yet; chwinga keep their class sprite)' % CH02_CHWINGA_SPRITE_SRC)
+        return
+    donor = _donor_base(campaign, CH02_CHWINGA_SPRITE_SRC)        # 'Civilian_F1'
+    donor_png = os.path.join(WAIT_GFX_DIR, 'unit_icon_wait_%s_sheet.png' % donor)
+    _, dfw, dfh = map_sprite_tool.donor_sms_geometry(donor)
+
+    wait_sym = 'unit_icon_wait_manchego_chwinga_sheet'
+    move_sym = 'unit_icon_move_manchego_chwinga_sheet'
+    role_idle = os.path.join(WAIT_GFX_DIR, wait_sym + '.png')
+    move_png = os.path.join(MOVE_GFX_DIR, move_sym + '.png')
+    # Remap Sclorbo's cast-palette tiles onto the donor's standard role layout (so the
+    # green faction palette tints them), then synth the idle-only glide MU sheet from it.
+    map_sprite_tool.remap_sms_palette(src_idle, donor_png, role_idle)
+    map_sprite_tool.synth_mu_sheet(role_idle, donor, move_png, verbose=False)
+    macro, _, _, _ = map_sprite_tool.sheet_info(role_idle, (dfw, dfh))
+
+    sms = _wait_table_len()
+    _append_table_rows(UNIT_ICON_WAIT_C, 'unit_icon_wait_table[]',
+                       ['\t{0, %s, %s}, // %d chwinga (green NPC)' % (macro, wait_sym, sms)])
+    with open(UNIT_ICON_WAIT_S, 'a', encoding='utf-8') as f:
+        f.write('\n/* Manchego Stars green chwinga idle sprite (#38) */\n'
+                '\t.global %s\n%s:\n\t.incbin "graphics/unit_icon/wait/%s.4bpp.lz"\n'
+                '\t.align 2, 0\n' % (wait_sym, wait_sym, wait_sym))
+    with open(UNIT_ICON_MOVE_S, 'a', encoding='utf-8') as f:
+        f.write('\n/* Manchego Stars green chwinga hover/walk (MU) sprite (#38) */\n'
+                '\t.global %s\n%s:\n\t.incbin "graphics/unit_icon/move/%s.4bpp.lz"\n'
+                '\t.align 2, 0\n' % (move_sym, move_sym, move_sym))
+    with open(UNIT_ICON_POINTER_H, 'a', encoding='utf-8') as f:
+        f.write('\n/* Manchego Stars green chwinga map sprite (#38) */\n'
+                'extern char %s[];\nextern char %s[];\n' % (wait_sym, move_sym))
+
+    # The three NPC slots all override onto the one shared chwinga slot/sheet. Insert at
+    # the front of each table (linear scan; chwinga charIds are distinct from cast slots).
+    slots = [slot for _, slot, _ in CH02_CHWINGA]
+    _insert_table_head(UNIT_ICON_WAIT_C, 'gMapSpriteOverride[]',
+                       ''.join('\tCHARACTER_%s, %d,\n' % (s.upper(), sms) for s in slots))
+    _insert_table_head(UNIT_ICON_MOVE_C, 'gMuImgOverride[]',
+                       ''.join('\t{CHARACTER_%s, %s},\n' % (s.upper(), move_sym) for s in slots))
+    if verbose:
+        print('  chwinga (green NPC) -> idle SMS %d + MU, slots: %s'
+              % (sms, ', '.join(slots)))
 
 
 def _donor_base(campaign, uid, guest_bases=None):
