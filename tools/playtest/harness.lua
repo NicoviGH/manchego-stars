@@ -2260,26 +2260,75 @@ local function reachRbgCh01()
     return rbg
 end
 
+-- gBmMapUnit[y][x] -- the engine's tile->unit grid (u8**, indexed like gBmMapMovement). It,
+-- not the unit's xPos/yPos, is what cursor-selection reads, so a relocate must update both.
+local function mapUnitRow(y) return ru32(ru32(SYM.gBmMapUnit) + y * 4) end
+local function mapUnitAt(x, y) return ru8(mapUnitRow(y) + x) end
+local function setMapUnit(x, y, v) emu:write8(mapUnitRow(y) + x, v) end
+
+-- Relocate the unit straight onto a free tile within [mn,mx] of a live enemy, so a unit that
+-- SPAWNS far from the fight doesn't have to march across the map (6 phases can't cross it -- a
+-- far spawn timed out). Writes xPos/yPos AND moves the unit's entry in gBmMapUnit (vacate old
+-- tile, occupy new) so the engine can still select it from the new tile. Attack availability
+-- depends only on an enemy being in weapon range of the unit's TILE, not the terrain under it,
+-- so any in-range, grid-free, in-bounds tile works. Prefers the farthest in-range tile (e.g. a
+-- bow at exactly 2). Returns true if relocated.
+local function teleportToFiringTile(u, mn, mx)
+    local grid = mapUnitAt(u.x, u.y)        -- this unit's id in the grid (preserves faction bits)
+    if grid == 0 then return false end       -- not tracked where we think -> don't risk it
+    for _, e in ipairs(liveEnemies()) do
+        for r = mx, mn, -1 do
+            for dx = -r, r do
+                local ady = r - math.abs(dx)
+                for _, dy in ipairs(ady == 0 and { 0 } or { ady, -ady }) do
+                    local tx, ty = e.x + dx, e.y + dy
+                    if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0 then
+                        setMapUnit(u.x, u.y, 0)                 -- vacate the old tile
+                        emu:write8(u.addr + 0x10, tx); emu:write8(u.addr + 0x11, ty)
+                        setMapUnit(tx, ty, grid)                -- occupy the new tile
+                        log(string.format("  teleported to (%d,%d) [range %d of enemy (%d,%d)]", tx, ty, r, e.x, e.y))
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
 -- Drive the deployed unit `pid` within its weapon's reach of an enemy and leave it ON the
 -- firing tile with its action menu open. Reads the unit's ACTUAL reach each phase
 -- (unitAttackRange), so a bow won't park adjacent (range 1, no Attack) and a melee weapon
--- won't park at range 2 -- one function for every cast member. Returns true (ready) or false.
+-- won't park at range 2 -- one function for every cast member. A far spawn is teleported into
+-- the fight first (the 6-phase march can't cross the whole map). Returns true (ready) or false.
 -- The slow part of the checkpoint demo, so the state is saved right AFTER this (#65).
 local function positionForShot(pid)
+    local u = blue(pid)
+    if not u then return false end
+    local mn, mx = unitAttackRange(u)
+    if not mn then return false end          -- staff/non-attacker: nothing to position for
+    pokeAnimsOn()
+    -- Primary path: teleport ONTO a firing tile, then attack IN PLACE. The unit is already
+    -- within [mn,mx] of a foe, so "moving" to its own tile opens the action menu with Attack
+    -- available -- no second move to a different tile (that proved flaky: some units stranded
+    -- mid-move with the menu never opening). Works for every cast member regardless of spawn.
+    if teleportToFiringTile(u, mn, mx) then
+        u = blue(pid)
+        if moveUnit(u.x, u.y, u.x, u.y) then return true end
+    end
+    -- Fallback (teleport found no free in-range tile): march in over up to 6 turns.
     for phase = 1, 6 do
-        local u = blue(pid)
+        u = blue(pid)
         if isDead(u) then return false end
-        local mn, mx = unitAttackRange(u)
-        if not mn then return false end   -- staff/non-attacker: nothing to position for
+        mn, mx = unitAttackRange(u)
+        if not mn then return false end
         pokeAnimsOn()
         local reach = selectAndReach(u, 24, 15)
         press(K.B); wait(10)  -- deselect; re-select to act
         if reach then
             local pick = CLEARBOT.pickTarget(reach, liveEnemies(), { range = mx, min_range = mn })
             if pick then
-                if moveUnit(u.x, u.y, pick.tile.x, pick.tile.y) then
-                    return true  -- on the firing tile, action menu open
-                end
+                if moveUnit(u.x, u.y, pick.tile.x, pick.tile.y) then return true end
             else
                 local es = liveEnemies()
                 if #es > 0 then marchToward(u, es[1].x, es[1].y, 24, 15); chooseWait() end
