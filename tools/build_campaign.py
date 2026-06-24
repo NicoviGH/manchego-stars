@@ -316,6 +316,10 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         'src/banim_data.c', 'include/banim_pointer.h',
                         'src/data_banimconf.c', 'include/ekrbattle.h',
                         'linker_script_banim.txt',
+                        # battle ground platforms (#65): vendored snow/ice grounds appended to
+                        # battle_terrain_table + the terrain->ground remap (snow chapters)
+                        'src/banim_terrain_data.c', 'data/data_banim_terrain.s',
+                        'src/data_terrains.c', 'src/banim-battleparse.c', 'include/variables.h',
                         # Goodberry (#21): vulnerary icon swapped by inject_item_icons
                         'graphics/item_icon/item_icon_vulnerary.png',
                         'data/const_data_unit_icon_wait.s', 'data/const_data_unit_icon_move.s',
@@ -4379,6 +4383,149 @@ def inject_pc_death_quotes(campaign, verbose=True):
         print('  death quotes: %d cast members (chapter=any)' % len(rows))
 
 
+# --- Battle ground platforms (#65): vendored snow/ice grounds + terrain remap -------
+# FE8's battle platform (the ground combatants stand on) is terrain-driven
+# (gBanimFloorfx -> battle_terrain_table[idx]); vanilla has no snow ground (the pale
+# siroyuka1 is stone). We vendor F2E platforms from the FE-Repo {Cynon} pack into NEW
+# battle_terrain_table slots, then remap the terrain->ground tables so our snow chapters
+# resolve snow grounds per tile. Sources: campaigns/<c>/platforms/<stem>.png (indexed P,
+# 256x32 -- the vanilla platform format). Decided: decisions.md (Art & Audio, 2026-06-23).
+BANIM_TERRAIN_GFX = os.path.join(DECOMP, 'graphics', 'banim', 'terrain')
+BANIM_TERRAIN_DATA_C = os.path.join(DECOMP, 'src', 'banim_terrain_data.c')
+BANIM_TERRAIN_INCBIN_S = os.path.join(DECOMP, 'data', 'data_banim_terrain.s')
+BANIM_POINTER_H_TERR = os.path.join(DECOMP, 'include', 'banim_pointer.h')
+DATA_TERRAINS_C = os.path.join(DECOMP, 'src', 'data_terrains.c')
+BANIM_BATTLEPARSE_C = os.path.join(DECOMP, 'src', 'banim-battleparse.c')
+VARIABLES_H = os.path.join(DECOMP, 'include', 'variables.h')
+CHAPTER_SETTINGS_JSON_PLAT = os.path.join(DECOMP, 'src', 'data', 'chapter_settings.json')
+
+# (campaign png stem, decomp symbol stem, twilight tint). Grounds get table indices in
+# append order from PLATFORM_BASE_INDEX. Offsets: 0=Snowdrift, 1=rough(SnowUneven), 2=Ice.
+BATTLE_PLATFORMS = [
+    ('snowdrift',         'snowdrift', 0.80),  # open windswept snow, cooled for twilight
+    ('snow-uneven-light', 'snowrough', 1.00),  # rough snowy ground over rock
+    ('ice-flat',          'snowice',   1.00),  # frozen lake/river
+]
+PLATFORM_BASE_INDEX = 115  # battle_terrain_table currently ends at 114
+_PLAT_ICE = {'RIVER', 'SEA', 'LAKE', 'WATER', 'GLACIER', 'SNAG', 'DEEPS', 'SHIP_FLAT',
+             'SHIP_WRECK'}
+_PLAT_ROUGH = {'MOUNTAIN', 'PEAK', 'CLIFF', 'VALLEY', 'RUINS_REGULAR', 'RUINS_VILLAGE',
+               'RUBBLE', 'PILLAR', 'WALL_REGULAR', 'WALL_DAMAGED', 'FENCE_REGULAR',
+               'FENCE_32', 'FORT', 'GATE_CASTLE', 'GATE_REGULAR', 'SKY', 'BARREL', 'BONE',
+               'DARK', 'GUNNELS', 'BRACE', 'MAST', 'BALLISTA_REGULAR', 'BALLISTA_LONG',
+               'BALLISTA_KILLER'}
+
+
+def _terrain_snow_ground(terrain, base, rough_open):
+    """Ground index for TERRAIN_<terrain> on a snow map. rough_open=True (the Ch1 'rough'
+    tileset) sends open/flat ground to the rough platform instead of the drift."""
+    if terrain in _PLAT_ICE:
+        return base + 2
+    if terrain in _PLAT_ROUGH:
+        return base + 1
+    return base + (1 if rough_open else 0)
+
+
+def inject_battle_platforms(campaign, verbose=True):
+    """Vendor the snow/ice battle platforms + remap snow chapters' terrain->ground (#65)."""
+    import json as _json
+    import re as _re
+    import struct as _struct
+    from PIL import Image
+    base = PLATFORM_BASE_INDEX
+    plat_dir = os.path.join(REPO, 'campaigns', campaign, 'platforms')
+
+    # 1. vendor each platform: png -> decomp (Makefile gbagfx makes .4bpp.lz) + agbpal
+    externs, incbins, rows = [], [], []
+    for n, (stem, sym, tint) in enumerate(BATTLE_PLATFORMS):
+        im = Image.open(os.path.join(plat_dir, stem + '.png'))
+        if im.mode != 'P':
+            sys.exit('ERROR: platform %s must be indexed (mode P), got %s' % (stem, im.mode))
+        tsym, psym = 'battle_terrain_ms_%s_tileset' % sym, 'battle_terrain_ms_%s_pal' % sym
+        im.save(os.path.join(BANIM_TERRAIN_GFX, tsym + '.png'))
+        pal = im.getpalette()
+        blob = bytearray()
+        for i in range(16):
+            r, g, b = pal[i * 3], pal[i * 3 + 1], pal[i * 3 + 2]
+            if i != 0 and tint != 1.0:
+                r, g, b = r * tint, g * tint, min(255, b * tint + 16)
+            blob += _struct.pack('<H', (min(31, int(r) >> 3)) | (min(31, int(g) >> 3) << 5)
+                                 | (min(31, int(b) >> 3) << 10))
+        with open(os.path.join(BANIM_TERRAIN_GFX, psym + '.agbpal'), 'wb') as f:
+            f.write(blob)
+        externs += ['extern short %s[];' % psym, 'extern char %s[];' % tsym]
+        incbins += ['\t.global %s' % tsym, '%s:' % tsym,
+                    '\t.incbin "graphics/banim/terrain/%s.4bpp.lz"' % tsym, '\t.align 2, 0',
+                    '\t.global %s' % psym, '%s:' % psym,
+                    '\t.incbin "graphics/banim/terrain/%s.agbpal"' % psym, '\t.align 2, 0']
+        rows.append('\t{"ms_%s", %s, %s, 0}, // %d  (FE-Repo {Cynon}, F2E)'
+                    % (sym, tsym, psym, base + n))
+
+    with open(BANIM_POINTER_H_TERR, 'a', encoding='utf-8') as f:
+        f.write('\n/* Manchego Stars battle platforms (#65) */\n' + '\n'.join(externs) + '\n')
+    with open(BANIM_TERRAIN_INCBIN_S, 'a', encoding='utf-8') as f:
+        f.write('\n/* Manchego Stars battle platforms (#65) */\n' + '\n'.join(incbins) + '\n')
+
+    # 2. append rows to battle_terrain_table[] (before its closing };)
+    with open(BANIM_TERRAIN_DATA_C, encoding='utf-8') as f:
+        td = f.read()
+    if '// 114\n};' not in td:
+        sys.exit('ERROR: battle_terrain_table does not end at index 114 as expected')
+    td = td.replace('// 114\n};', '// 114\n' + '\n'.join(rows) + '\n};', 1)
+    with open(BANIM_TERRAIN_DATA_C, 'w', encoding='utf-8') as f:
+        f.write(td)
+
+    # 3. terrain->ground remap. Default = snow-OPEN (prologue/sandbox, tileset 0);
+    #    a new Tileset15 = snow-ROUGH (Ch1). Both reference the new grounds.
+    with open(DATA_TERRAINS_C, encoding='utf-8') as f:
+        dt = f.read()
+
+    def _snow_body(default_body, rough_open):
+        return _re.sub(
+            r'\[TERRAIN_(\w+)\]\s*=\s*-?\d+,',
+            lambda mm: '[TERRAIN_%s] = %d,'
+            % (mm.group(1), _terrain_snow_ground(mm.group(1), base, rough_open)),
+            default_body)
+
+    m = _re.search(r'(BanimTerrainGroundDefault\[\] =\s*\{)(.*?)(\n\};)', dt, _re.S)
+    open_body, rough_body = _snow_body(m.group(2), False), _snow_body(m.group(2), True)
+    dt = dt[:m.start()] + m.group(1) + open_body + m.group(3) + dt[m.end():]
+    rough_arr = 'CONST_DATA s8 BanimTerrainGround_Tileset15[] = {%s\n};\n\n' % rough_body
+    dt = dt.replace('CONST_DATA s8 BanimTerrainGroundDefault[] = {',
+                    rough_arr + 'CONST_DATA s8 BanimTerrainGroundDefault[] = {', 1)
+    with open(DATA_TERRAINS_C, 'w', encoding='utf-8') as f:
+        f.write(dt)
+
+    # 4. extern (variables.h) + switch case (banim-battleparse.c) for Tileset15
+    with open(VARIABLES_H, encoding='utf-8') as f:
+        vh = f.read()
+    vh = vh.replace('extern CONST_DATA s8 BanimTerrainGround_Tileset01[];',
+                    'extern CONST_DATA s8 BanimTerrainGround_Tileset15[];\n'
+                    'extern CONST_DATA s8 BanimTerrainGround_Tileset01[];', 1)
+    with open(VARIABLES_H, 'w', encoding='utf-8') as f:
+        f.write(vh)
+    with open(BANIM_BATTLEPARSE_C, encoding='utf-8') as f:
+        bp = f.read()
+    bp = bp.replace(
+        '    case 0:\n    default:\n        return BanimTerrainGroundDefault[terrain];',
+        '    case 0x15:\n        return BanimTerrainGround_Tileset15[terrain];\n\n'
+        '    case 0:\n    default:\n        return BanimTerrainGroundDefault[terrain];', 1)
+    with open(BANIM_BATTLEPARSE_C, 'w', encoding='utf-8') as f:
+        f.write(bp)
+
+    # 5. point Ch1 (chapter idx 2) at the rough snow tileset (0x15); prologue (idx 1) keeps 0
+    with open(CHAPTER_SETTINGS_JSON_PLAT, encoding='utf-8') as f:
+        cs = _json.load(f)
+    cs['chapters'][2]['battleTileSet'] = 0x15
+    with open(CHAPTER_SETTINGS_JSON_PLAT, 'w', encoding='utf-8') as f:
+        _json.dump(cs, f, indent=2)
+
+    if verbose:
+        print('  %d platforms -> battle_terrain_table[%d..%d] (FE-Repo {Cynon}, F2E)'
+              % (len(BATTLE_PLATFORMS), base, base + len(BATTLE_PLATFORMS) - 1))
+        print('  terrain->ground: Default=snow-open (Snowdrift); Tileset15=snow-rough; Ch1->0x15')
+
+
 def main():
     ap = argparse.ArgumentParser(description='Inject campaign content into the decomp build.')
     ap.add_argument('--campaign', default='rime-of-the-frostmaiden')
@@ -4428,6 +4575,8 @@ def main():
         inject_battle_anims(args.campaign)
         print('winter tileset:')
         inject_winter_tileset(args.campaign)
+        print('battle platforms (#65):')
+        inject_battle_platforms(args.campaign)
         print('title theme:')
         inject_title_theme(args.campaign)
         print('title screen:')

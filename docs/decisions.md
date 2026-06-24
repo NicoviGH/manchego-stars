@@ -1059,10 +1059,14 @@ Everlasting Rime, never the bright "Light" daylight unless chosen):
 - **Prologue (the Eastway caravan road, windswept tundra)** → `Snowdrift`, palette cooled ~20% for twilight.
 - **Ch1 (the Iron Trail, rocky mountain pass)** → `Snow Uneven Ground` (**Light** — Nicolas's pick 2026-06-23; Night/Medium read too dark/blue).
 - **Frozen-water beats** (Lac Dinneshere etc.) → back-pocket `Ice Flat` / `Ice FE6 Magically Frozen Lake`.
-Previews captured by forcing the `siroyuka1` slot; **real insertion is pending** = add new
-`battle_terrain_table` slots + wire the snow map-terrain → the right ground (so it resolves per-tile,
-no force). RBG's faked battle anim keeps its **current scale** (the ~0.92× shrink was previewed and
-declined — Nicolas, 2026-06-23).
+**Done (2026-06-23):** `inject_battle_platforms` vendors the three platforms into new
+`battle_terrain_table` slots (115–117), remaps `BanimTerrainGroundDefault` to snow-OPEN
+(plains→Snowdrift, rough→Uneven, water→Ice) for the prologue/sandbox (`battleTileSet 0`), and
+adds a snow-ROUGH `BanimTerrainGround_Tileset15` (open ground→Uneven) that **Ch1 (idx 2)** is
+pointed at via `chapter_settings.json`. Resolves per-tile, no force. Verified in-engine: RBG
+fires in real Ch1 on the Uneven ground unforced. RBG's faked battle anim keeps its **current
+scale** (the ~0.92× shrink was previewed and declined). Future snow chapters: set their
+`battleTileSet` to 0 (open) or 0x15 (rough) per scenery.
 _Decided: 2026-06-23_
 
 **Maps: hand-drawn in Tiled, NOT AI-generated**

@@ -170,5 +170,30 @@ class BattleAnimInjection(unittest.TestCase):
         self.assertIn('.wtype = 0x0100 | ITYPE_BOW, .index = 0xC9', new)
 
 
+class BattlePlatformTerrain(unittest.TestCase):
+    """Terrain category -> snow ground index (#65). base = first vendored ground slot;
+    offsets 0=Snowdrift, 1=Snow Uneven (rough), 2=Ice."""
+
+    def test_open_ground_is_snowdrift_on_the_open_tileset(self):
+        # plains/road/floor read as open drift on the snow-OPEN tileset (prologue).
+        self.assertEqual(bc._terrain_snow_ground('PLAINS', 115, False), 115)
+        self.assertEqual(bc._terrain_snow_ground('ROAD', 115, False), 115)
+
+    def test_open_ground_becomes_rough_on_the_rough_tileset(self):
+        # the Ch1 snow-ROUGH tileset sends the same open ground to Snow Uneven.
+        self.assertEqual(bc._terrain_snow_ground('PLAINS', 115, True), 116)
+        self.assertEqual(bc._terrain_snow_ground('ROAD', 115, True), 116)
+
+    def test_rough_terrain_is_always_uneven(self):
+        for t in ('MOUNTAIN', 'PEAK', 'CLIFF', 'VALLEY'):
+            self.assertEqual(bc._terrain_snow_ground(t, 115, False), 116)
+            self.assertEqual(bc._terrain_snow_ground(t, 115, True), 116)
+
+    def test_water_terrain_is_always_ice(self):
+        for t in ('LAKE', 'SEA', 'RIVER', 'WATER', 'GLACIER'):
+            self.assertEqual(bc._terrain_snow_ground(t, 115, False), 117)
+            self.assertEqual(bc._terrain_snow_ground(t, 115, True), 117)  # even on the rough tileset
+
+
 if __name__ == '__main__':
     unittest.main()
