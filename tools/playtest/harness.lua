@@ -2160,16 +2160,28 @@ local function pokeAnimsOn() -- full battle anims + viewable speed (undo winCh00
     local a = SYM.gPlaySt + 0x40
     emu:write32(a, (ru32(a) & ~(3 << 17)) & ~(1 << 7)) -- animationType 0 (anims ON), gameSpeed normal
 end
+-- Drive the open action menu through Attack -> weapon -> target -> combat, shooting
+-- frames across the battle anim. RETURNS whether combat actually started -- the caller
+-- MUST check it; a stall on the menu is a FAIL, not a silent PASS (#65).
 local function captureAttack(actorAddr, tag) -- like chooseAttack but shoot frames through the anim
-    press(K.A); wait(20)  -- Attack
-    press(K.A); wait(20)  -- weapon
-    press(K.A)            -- target -> combat
+    -- The action menu can have JUST opened: positionRbgForShot's moveUnit returns the
+    -- instant menuOpen() flips true, while the slide-in is still animating and eating
+    -- input. Settle before the first A or that press is dropped, only 2 of the 3 confirms
+    -- land, and we stall parked on target-selection (the recordrbgtest symptom). recordrbg
+    -- dodged this only via its pre-settled checkpoint + wait(60); make captureAttack itself
+    -- robust so any caller (live or checkpoint) is safe.
+    wait(20)
+    press(K.A); wait(20)  -- Attack -> weapon select
+    press(K.A); wait(20)  -- weapon  -> target select
+    press(K.A)            -- target  -> combat
+    local done = false
     for f = 1, 500 do
-        if (ru32(actorAddr + 0x0C) & 0x2) ~= 0 then break end -- US_UNSELECTABLE = combat done
+        if (ru32(actorAddr + 0x0C) & 0x2) ~= 0 then done = true; break end -- US_UNSELECTABLE = combat done
         if f % 3 == 0 then shot(tag) end
         yield()
     end
     wait(30)
+    return done
 end
 local RBG_PID = 0x05           -- CHARACTER_MOULDER (RBG's slot), lord-select menu index 4
 -- Shared lead-up for the RBG demo: win the prologue, lord-select RBG into ch01,
@@ -2257,7 +2269,9 @@ scenarios.recordrbg = function()
     local cls = ru8(ru32(rbg.addr + 0x04) + 0x04) -- pClassData->number
     log(string.format("RBG at (%d,%d) class=0x%X (want 0x%X clone), firing", rbg.x, rbg.y, cls, CLONE_NUMBER))
     shot("rbg-deploy")
-    captureAttack(rbg.addr, "rbg"); shot("rbg-after")
+    local fired = captureAttack(rbg.addr, "rbg"); shot("rbg-after")
+    if not fired then
+        return result("FAIL", "captureAttack never reached combat (stale checkpoint or stuck on menu)") end
     return result("PASS", string.format("RBG bow shot captured (class 0x%X)", cls))
 end
 
@@ -2275,7 +2289,9 @@ scenarios.recordrbgtest = function()
     if not positionRbgForShot() then shot("rbgtest-noshot")
         return result("FAIL", "RBG never reached firing position") end
     shot("rbg-deploy")
-    captureAttack(rbg.addr, "rbg"); shot("rbg-after")
+    local fired = captureAttack(rbg.addr, "rbg"); shot("rbg-after")
+    if not fired then
+        return result("FAIL", "captureAttack never reached combat -- stuck on the action/target menu") end
     return result("PASS", string.format("RBG bow shot captured on TESTCH ROM (class 0x%X)", cls))
 end
 

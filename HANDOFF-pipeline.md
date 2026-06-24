@@ -7,20 +7,31 @@ the lane guard is `check.py check_lane_ownership`). Seam enforcement (#55) + par
 **Shared builds/gotchas/rules → `HANDOFF.md` + `CLAUDE.md`; this file holds only my current state +
 pipeline-lane-specific gotchas.** Don't touch `HANDOFF-content.md`.
 
-## Now (2026-06-24) — #65 capture tooling landed, one deferred fix is TOP NEXT; parity gate enforcing (#48 b); #63 M1 landed (M2 next)
-- **#65 capture tooling LANDED (2026-06-23/24) + one DEFERRED fix — TOP NEXT TASK.** Added `recordrbg`
+## Now (2026-06-24) — #65 capture tooling landed + the rbg capture made honest/robust; parity gate enforcing (#48 b); #63 M1 landed (M2 next)
+- **#65 capture tooling LANDED + the deferred `captureAttack` fix LANDED (2026-06-24).** Added `recordrbg`
   (loads an `rbgch01` checkpoint instead of replaying the prologue → ~12s), `make_gif.py --mp4`
   (local-only; **GIF stays the GitHub-review format** — a committed `.mp4` is a binary download, not
   inline), and `recordrbgtest` (capture on a `make TESTCH=1` ROM that boots straight into the Ch1
-  sandbox). **⚠️ DEFERRED FIX — `recordrbgtest` doesn't reach the battle anim:** its `captureAttack`
-  A-press sequence stalls on the attack-forecast/weapon-select menu on the sandbox (frames come out as
-  the menu; the scenario still returns PASS *unconditionally*, so the PASS is misleading). Diagnose
-  from `/tmp/playtest-recordrbgtest/02-rbg-deploy.png` (the state `captureAttack` starts from) + the
-  early `*-rbg.png` frames; likely needs an extra confirm or a wait on the action menu before the
-  first A. **Until fixed, use `recordrbg` with a FRESH checkpoint** — DON'T reuse a checkpoint across
-  an injection/build change (ROM layout shifts corrupt the save-state → capture shows the map/menu,
-  never the battle; reuse is only safe across pure graphics-byte swaps). The `TESTCH=1` build itself +
-  the anim/platform "how" live in **content** (`build_campaign` docstrings); this is just the capture scenario.
+  sandbox). **The capture is now honest + robust:** `captureAttack` (1) **settles the action menu
+  (`wait(20)`) before the first A** — `positionRbgForShot`'s `moveUnit` returns the instant
+  `menuOpen()` flips true, while the slide-in is still eating input, so without the settle only 2 of
+  the 3 menu confirms land and the unit stalls parked on target-selection (the reported symptom); and
+  (2) **RETURNS whether combat actually started** (US_UNSELECTABLE), and `recordrbg`/`recordrbgtest`
+  now **FAIL** when it didn't, instead of returning PASS unconditionally (the old misleading green).
+  Verified end-to-end on **`recordrbg`** (fresh checkpoint, normal build): real Soldier-vs-RBG battle
+  anim captured (122 frames, 70 distinct sizes — not a frozen menu), loop broke at US_UNSELECTABLE,
+  honest PASS; `lua` playtest tests + `check.py` clean. **`recordrbgtest`'s sandbox end-to-end is NOT
+  pipeline-verifiable** — its `make TESTCH=1` build is content-lane and **unwired on this branch**
+  (`inject_test_chapter` exists but `main()` never calls it; a pipeline-side reconstruction deploys RBG
+  as vanilla `CLASS_ARCHER 0x19`, not the `0x6C` clone, and fails before the menu). So the settle is
+  the best-supported mitigation but is only proven on `recordrbg`; if it's insufficient on the real
+  sandbox, `recordrbgtest` now goes **truthfully RED** rather than false-green. **Content follow-up:**
+  wire `make TESTCH=1` (skip `inject_prologue`'s boot-cut — `inject_test_chapter` does its own; they
+  double-cut otherwise) so `recordrbgtest` can be verified faithfully. **Checkpoint reuse caveat
+  unchanged:** DON'T reuse an `rbgch01` checkpoint across an injection/build change (ROM layout shifts
+  corrupt the save-state → capture shows the map/menu, never the battle; safe only across pure
+  graphics-byte swaps). The `TESTCH=1` build + the anim/platform "how" live in **content**
+  (`build_campaign` docstrings); this is just the capture scenario.
 - **#48 (b) parity gate is now ENFORCING, per-chapter & opt-in — LANDED & verified** (decisions.md §The parity
   curve is surfaced in CI…). CI flipped `make difficulty` → **`make difficulty-gate`**. A chapter is gated only
   once content marks it balance-final with **`balance_locked: true`** in its chapter YAML; `curve_gate_failures`
