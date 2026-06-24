@@ -38,20 +38,13 @@ The faked-battle-anim epic is **complete for RBG and the pipeline is generalized
   not inline on GitHub) to `docs/demo/` + push → Nicolas views on GitHub. Previews in `docs/demo/`:
   `rbg-battle.gif`, `prologue-snowdrift.gif`, `ch1-snow-uneven.gif`/`-light.gif`.
 
-**Cross-lane (committed to `inst/pipeline`, not here):** `recordrbg` checkpoint capture scenario,
-`make_gif.py --mp4` (local-only), `recordrbgtest` (see deferred fix below).
+**Cross-lane (PIPELINE lane — committed to `inst/pipeline`, tracked in `HANDOFF-pipeline.md`, not my
+task):** `recordrbg` checkpoint capture, `make_gif.py --mp4` (local-only), and `recordrbgtest` —
+whose **deferred fix** (doesn't reach the battle anim on the TESTCH sandbox) is the pipeline lane's
+top next task. Content only relies on the *capability*: `make TESTCH=1` + `run.sh recordrbg` (fresh
+checkpoint) to verify a unit in-engine.
 
 ## Now / Next (priority order)
-
-### 0. 🔧 Fix `recordrbgtest` (deferred from this session — do fresh) — PIPELINE lane
-The grind-free TESTCH capture scenario **doesn't reach the battle anim** — its `captureAttack`
-A-press sequence stalls on the attack-forecast/weapon-select menu on the sandbox (frames come out
-as the menu; the scenario still returns PASS unconditionally). **Diagnose from
-`/tmp/playtest-recordrbgtest/02-rbg-deploy.png`** (the state captureAttack starts from) + the early
-`*-rbg.png` frames; likely needs an extra confirm or a wait on the action menu before the first A.
-Until fixed, use `recordrbg` with a **fresh** checkpoint (don't reuse a checkpoint across an
-injection change — ROM layout shifts corrupt the save-state). See the `inject_test_chapter`
-docstring + run.sh recording header.
 
 ### 1. 🎯 ch02 "Cold Welcome" (#22) — tactical reground DONE; 3 human checkpoints remain
 The enemy/chwinga/gift/mechanic reground is **built green** (`inject_ch02`: parity enemies, GREEN
