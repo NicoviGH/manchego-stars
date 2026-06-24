@@ -37,9 +37,11 @@ ADR: `decisions.md` §Distribution.
   de-sledded rear bark + ending card. Host wired (3 opening beats + turn-1 tutorial scene reusing the
   dead `Ch3_Turn2Player` slot + turn-3 bark). Msg-id reuse vetted clean (0x98d/0x98f free; 0x991's only
   live ref is Bazba's talk in the emptied Character list).
-- **(b) Chwinga + Vellynne art** (#38/#39/#19): map-sprite reskin + portraits (Mote/Rime/Glimmer) +
-  name-text over placeholders; Vellynne bust. **Show before commit.** Plus the **title card** ("Cold
-  Welcome" — `gen_chapter_title` atlas missing C/W/d/m glyphs).
+- **(b) Chwinga + Vellynne art** (#38/#39/#19): **map-sprite reskin ✅ landed in #74 (`45d62fb`)** —
+  the 3 chwinga wear Sclorbo's sprite tinted by the green NPC faction palette (per-char
+  `gMapSpriteOverride`, build-derived from `sclorbo.png`; ADR in decisions.md Art & Audio). STILL OPEN:
+  portraits (Mote/Rime/Glimmer) + name-text over placeholders; Vellynne bust. **Show before commit.**
+  Plus the **title card** ("Cold Welcome" — `gen_chapter_title` atlas missing C/W/d/m glyphs).
 - **(c) mGBA load-test** ch01→ch02→win→chains (chwinga LOAD, archer threatens pegasi, survivors deliver
   charms). Fast via `make TESTCH=1` (wire a ch02 sandbox) or the `recordrbg`/checkpoint path.
 - Per-unit art/anim follows the **convention homes** — `inject_battle_anims` / `inject_battle_platforms`
