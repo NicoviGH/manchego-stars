@@ -201,6 +201,7 @@ LORDSEL_CONFIRM_MSGS = (0x959, 0x95A, 0x95B, 0x95C, 0x95D, 0x95E, 0x95F,
 LORDSEL_EXPLAINER_MSG = 0x966
 LORDSEL_PITCH_MSGS = (0x967, 0x968, 0x969, 0x96A, 0x96B, 0x96C, 0x96D,
                       0x96E, 0x96F, 0x970)  # one per candidate (cast capped at 10)
+LORDSEL_HEADER_MSG = 0x971   # "Choose your lead" prep-screen header (#46); same dead pool
 # The one-time "(a) explain" box (feedback #4): drawn once before the pick loop. Locked
 # gist (decisions.md / #46): the chosen hero is the must-survive lead for the whole
 # campaign. Faithful to the gist; final wording is Nicolas's render-review call.
@@ -3699,6 +3700,19 @@ def inject_ch01(campaign, verbose=True):
         ['    CHARACTER_%s, /* %s */' % (slot.upper(), uid)
          for uid, slot, _, _, _ in cast] +
         ['    0xFFFF,', '};', ''])
+    # Lord-select prep-screen UI (#46): the qualitative pitch shown in the info panel,
+    # PARALLEL to gLordSelectCandidates, + the "Choose your lead" header. Read by the
+    # lord-mode prep screen (engine_hooks._inject_lord_select_prep_mode).
+    pitch_ids = LORDSEL_PITCH_MSGS[:len(cast)]
+    udefs += '\n'.join(
+        ['', '/* Lord-select pitch (#46): one blurb msg id per candidate, parallel to',
+         '   gLordSelectCandidates; drawn in the prep info panel. */',
+         'CONST_DATA u16 gLordSelectPitchMsg[] = {'] +
+        ['    0x%X, /* %s */' % (mid, uid)
+         for mid, (uid, _, _, _, _) in zip(pitch_ids, cast)] +
+        ['};',
+         '/* Lord-select "Choose your lead" header msg id (#46). */',
+         'CONST_DATA u16 gLordSelectHeaderMsg = 0x%X;' % LORDSEL_HEADER_MSG, ''])
     # Lord survivability floors (#45 3b): per-candidate { +maxHP, +Def, +Res }, PARALLEL to
     # gLordSelectCandidates above (same menu order). Computed @target 3.5 bulk-durability vs
     # Ch1 enemies -- the shamans' frail floor; the armor tanks score 0. The engine adds the
@@ -4146,6 +4160,8 @@ def inject_ch01(campaign, verbose=True):
               else '[A]' if (j + 1) % 2 == 0 else '[LF]')
         for j, ln in enumerate(expl))
     set_message_body(lines, LORDSEL_EXPLAINER_MSG, _term_pad(expl_body + '[X]'))
+    # Prep-screen header (#46): "Choose your lead" replaces "Pick N Units Left" in lord mode.
+    set_message_body(lines, LORDSEL_HEADER_MSG, _term_pad('Choose your lead[X]'))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 

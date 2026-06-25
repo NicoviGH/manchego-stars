@@ -475,6 +475,32 @@ def _inject_lord_select_prep_mode():
         '        if (START_BUTTON & gKeyStatusPtr->newKeys) {\n'
         '            if (gLordSelectPrepMode || 0 == proc->cur_counter) {\n', 1)
 
+    # 5b. DrawPickLeftBar: in lord mode the header reads "Choose your lead", not the
+    #     "Pick N Units Left  x/y" deploy counter.
+    orig = ('void PrepUnit_DrawPickLeftBar(struct ProcPrepUnit *proc, s8 val)\n'
+            '{\n'
+            '    if (0 == val) {\n')
+    if text.count(orig) != 1:
+        sys.exit('ERROR: PrepUnit_DrawPickLeftBar head not in expected form in %s'
+                 % PREP_UNITSELECT_C)
+    text = text.replace(orig,
+        'void PrepUnit_DrawPickLeftBar(struct ProcPrepUnit *proc, s8 val)\n'
+        '{\n'
+        '    if (gLordSelectPrepMode) {\n'
+        '        if (0 == val) {\n'
+        '            extern const u16 gLordSelectHeaderMsg;\n'
+        '            ClearText(&gPrepUnitTexts[0x15]);\n'
+        '            PutDrawText(&gPrepUnitTexts[0x15],\n'
+        '                TILEMAP_LOCATED(gBG0TilemapBuffer, 0xD, 0x1),\n'
+        '                TEXT_COLOR_SYSTEM_WHITE, 0, 0,\n'
+        '                GetStringFromIndex(gLordSelectHeaderMsg));\n'
+        '            BG_EnableSyncByMask(BG0_SYNC_BIT);\n'
+        '        }\n'
+        '        return;\n'
+        '    }\n'
+        '\n'
+        '    if (0 == val) {\n', 1)
+
     # 6. Entry point, appended after the proc script (which it references).
     text += (
         '\n'
