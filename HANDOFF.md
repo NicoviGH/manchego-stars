@@ -33,20 +33,21 @@ ADR: `decisions.md` §Distribution.
 
 ## Now / Next
 
-### Content — Ch2 ✅ shipped (#22 closed), but TWO polish items found in demo review (2026-06-25)
-Build + dialogue + art + title card merged; structural load-test automated; pacing signed off.
-Then Nicolas reviewed a demo-GIF reel and flagged two post-ship items (NOT gating Ch3):
-- **#81 (`bug`+`content`)** — the "Bryn Shander" location pop-up in the **opening** cutscene renders
-  **garbled text**. Check the opening card text (`CH02_OPENING_CARD_MSG` / `BROWNBOXTEXT` label in
+### Content — Ch2 (#22 REOPENED 2026-06-25) — two demo-review polish items left
+Build + dialogue + art + title card merged; structural load-test automated; pacing signed off. Then a
+demo-GIF review surfaced two polish items, folded into **#22's vertical-slice checklist** (chapter
+feedback rides the slice issue, not standalone — #81/#82 were closed into it). NOT gating Ch3:
+- **opening text (`bug`/`content`)** — the "Bryn Shander" location pop-up in the **opening** cutscene
+  renders **garbled text**. Check the card text (`CH02_OPENING_CARD_MSG` / `BROWNBOXTEXT` label in
   `inject_ch02`) + `tools/verify_text.py`; recapture `recordch02intro` to confirm.
-- **#82 (`art`)** — the **Targos ending** BG reuses the generic `BG_NORMAL_VILLAGE` placeholder (same
-  as the opening). Wants a **darker/colder** distinct town backdrop — **vendor a winter/dark-town BG**
-  (FE-Repo `gh api … download_url` → curl, like the winter tiles), convert to FE8 BG (additive), point
+- **Targos ending BG (`art`)** — the **ending** reuses the generic `BG_NORMAL_VILLAGE` (same as the
+  opening). Wants a **darker/colder** distinct backdrop — **vendor a winter/dark-town BG** (FE-Repo
+  `gh api … download_url` → curl, like the winter tiles), convert to FE8 BG (additive), point
   `CH02_ENDING_BG` at it. Show Nicolas before committing.
 - **Demo reel** lives on the **unmerged `demo/ch2-gifs` branch** (`docs/demo/ch2-cold-welcome.md` —
-  opening/map/combat/closing GIFs + the `recordch02{intro,map,combat,ending}` harness scenarios). The
-  record scenarios are reusable tooling; the opening/ending GIFs will be **stale once #81/#82 land**, so
-  regenerate + decide merge-vs-drop after those fixes. Merge decision still open.
+  opening/map/combat/closing GIFs + the reusable `recordch02{intro,map,combat,ending}` harness
+  scenarios). The opening/ending GIFs go **stale once the two items land**, so regenerate + decide
+  merge-vs-drop after the fixes.
 
 ### Content — Ch3 "The Termalaine Mine" (#23) — NEXT chapter slice
 Not started. Reuse the Ch2 vertical-slice component breakdown (tracked as a checklist on the issue):
