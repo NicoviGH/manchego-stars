@@ -1753,10 +1753,11 @@ scenarios.recordlordfast = function()
     end
     if not atPrep then shot("lordfast-noprep")
         return result("FAIL", "lord-select prep never opened on the fast-boot") end
-    recwait(90, "lordfast")            -- settled on the first candidate
+    recwait(50, "lordfast")            -- settle on the first candidate
     for _ = 1, LORD_CANDIDATES - 1 do
         press(K.DOWN, 4)
-        recwait(24, "lordfast")        -- cursor walk down the cast (each card)
+        for f = 1, 24 do yield() end   -- let the bust gfx finish streaming in (no shots)
+        recwait(26, "lordfast")        -- THEN capture the SETTLED card (no transitions)
     end
     recwait(40, "lordfast")
     press(K.A, 4)                      -- anoint the highlighted lead
