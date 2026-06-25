@@ -34,6 +34,10 @@ _Decided: 2026-06-04_
 FE8 packs text two bytes per u16; `[X]` = the 0x00 string terminator. An odd number of name bytes pairs the 0x00 into the last glyph, so the decoder runs away. Vanilla pads odd names with `[.]` (`Franz[.][X]` vs `Seth[X]`); `build_campaign.py` does the same. Always confirm text with `tools/verify_text.py` (decodes messages straight from the built ROM — no mGBA), not by eye.
 _Decided: 2026-06-04_
 
+**Card/name text from YAML must be ASCII-folded before FE8 encoding — `name_message_body` does it centrally.**
+Dialogue routed through `_script_to_message` already gets `_fe_dialogue_text` (em-dash→`--`, smart-quotes→ASCII, etc.), but location-card/title/name text bypassed that path and went straight to `name_message_body` — so a literal em-dash in a YAML `location_card` ("Bryn Shander — West Gate") reached the encoder as a non-charset byte and **garbled the ch02 opening card** (#22). Fix: `name_message_body` now `_fe_dialogue_text`-normalizes first, so every card/title/name is charset-safe and the terminator-parity count sees the bytes the encoder will actually emit. Keep authored unicode in the YAML; the encoding boundary folds it.
+_Decided: 2026-06-25_
+
 **Test-chapter spawn = vanilla Ch1 map stripped to a sandbox (not a hand-authored chapter).**
 The first in-engine check that names + portraits + classes + stats land together (Milestone B step 3) keeps vanilla Ch1's **map** but guts its scripting, via `build_campaign.py:inject_test_chapter`:
 - rewrites the player roster (`UnitDef_Event_Ch1Ally`) to our 8 classed cast (each rides its `PORTRAIT_MAP` slot's `CHARACTER_` id, so its injected name/portrait/class/stats show; `redaCount = 0` places it statically at `xPosition/yPosition`, per `eventscr.c:sub_800F8A8`);
