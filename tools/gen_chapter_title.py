@@ -14,14 +14,18 @@ unknown glyphs are a hard error, never a silent fallback.
 
 Usage: gen_chapter_title.py "Prologue: A Dagger of Ice" out.png [preview4x.png]
 """
+import io
 import os
+import subprocess
 import sys
 
 import numpy as np
 from PIL import Image
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CHAP_TITLE_DIR = os.path.join(REPO, 'fireemblem8u', 'graphics', 'chap_title')
+DECOMP = os.path.join(REPO, 'fireemblem8u')
+CHAP_TITLE_DIR = os.path.join(DECOMP, 'graphics', 'chap_title')
+CARD_REL = 'graphics/chap_title/chap_title_%d.png'
 
 # Whole words cut intact from vanilla cards (pixel-perfect, shadows included).
 # (source image index, x0, x1) -- end-exclusive columns in the 256x16 source.
@@ -29,23 +33,29 @@ WORDS = {
     'Prologue:': (0, 16, 69),   # "Prologue: The Fall of Renais"
     'of':        (0, 125, 138),
     'Ch.1:':     (1, 57, 91),   # "Ch.1: Escape!" -- vanilla's own chapter prefix
+    'Ch.2:':     (2, 40, 74),   # "Ch.2: The Protected" -- vanilla's own chapter prefix
     'The':       (0, 74, 96),
 }
 
 # Single letters. Sources: img0 "Prologue: The Fall of Renais",
-# img1 "Ch.1: Escape!", img4 "Ch.4: Ancient Horrors",
-# img9 "Ch.7: It's a Trap!" (lone 'a' word), img10 "Ch.8: Distant Blade".
+# img1 "Ch.1: Escape!", img4 "Ch.4: Ancient Horrors", img7 "Ch.6: Victims of War",
+# img9 "Ch.7: It's a Trap!" (lone 'a' word), img10 "Ch.9: Distant Blade",
+# img87 "Creature Campaign".
 LETTERS = {
     'A': (4, 71, 80),
+    'C': (87, 42, 51),          # "Creature" -- leading C (clean, no left neighbor)
     'D': (10, 78, 87),
     'I': (9, 87, 93),
     'T': (9, 119, 128),         # "Trap!"
+    'W': (7, 138, 150),         # "War" -- the W (W+a kern in source; cut before 'a')
     'a': (9, 110, 117),
     'c': (4, 88, 93),
+    'd': (10, 144, 152),        # "Blade" -- the d (d+e kern in source; cut before 'e')
     'e': (0, 58, 64),
     'g': (0, 44, 52),
     'i': (0, 168, 172),         # "Renais"
     'l': (0, 35, 39),           # "Prologue" (second ascender)
+    'm': (7, 100, 110),         # "Victims" -- the m
     'n': (0, 155, 161),         # "Renais"
     'o': (0, 29, 34),           # "Prologue" (first o; 34 starts the l ascender)
     'r': (0, 23, 29),
@@ -66,9 +76,27 @@ COLON_GAP = 5       # ...but 5 after a "Prologue:"-style prefix (matches img0)
 _cache = {}
 
 
+def _vanilla_card(idx):
+    """The VANILLA chap_title PNG from the submodule's git HEAD. The atlas cuts vanilla
+    letterforms, and the build overwrites some cards (img1/img2/img3 become our hosted
+    chapters) BEFORE later chapters compose -- reading the working tree would cut a glyph
+    from the wrong (already-injected) card. Mirror build_campaign.vanilla_decomp_text's
+    env handling (a commit hook sets GIT_DIR, which would override -C discovery). Falls
+    back to the working tree if git/HEAD is unavailable (ad-hoc standalone use)."""
+    env = {k: v for k, v in os.environ.items()
+           if k not in ('GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX',
+                        'GIT_OBJECT_DIRECTORY')}
+    try:
+        raw = subprocess.check_output(
+            ['git', '-C', DECOMP, 'show', 'HEAD:' + CARD_REL % idx], env=env)
+        return Image.open(io.BytesIO(raw))
+    except (subprocess.CalledProcessError, OSError):
+        return Image.open(os.path.join(CHAP_TITLE_DIR, 'chap_title_%d.png' % idx))
+
+
 def _load(idx):
     if idx not in _cache:
-        im = Image.open(os.path.join(CHAP_TITLE_DIR, 'chap_title_%d.png' % idx))
+        im = _vanilla_card(idx)
         _cache[idx] = (np.array(im), im.getpalette())
     return _cache[idx]
 
