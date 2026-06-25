@@ -199,6 +199,7 @@ enemy_units:
     ai_pattern: aggressive
   - id: raider-bruiser
     name: "Grukk the Bruiser"
+    fe_name: "Grukk"            # ≤12 — overrides the vanilla "Bone" slot name plate
     is_miniboss: true
     count: 1
     position: [13, 6]           # guards beside the captain on the eastern edge
@@ -213,6 +214,7 @@ enemy_units:
     ai_pattern: hold_position
   - id: raider-captain
     name: "Halvar the Raider Captain"
+    fe_name: "Halvar"          # ≤12 — overrides the vanilla "Bazba" slot name plate
     is_boss: true
     count: 1
     position: [14, 5]           # anchored on the far-east edge — the band's far corner
