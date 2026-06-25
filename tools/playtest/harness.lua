@@ -1747,7 +1747,7 @@ scenarios.recordlordfast = function()
     -- title -> New Game -> sandbox -> BeginningScene fires StartLordSelectPrep
     local atPrep = false
     for i = 1, 160 do
-        if procActive(SYM.ProcScr_PrepUnitScreen) then atPrep = true break end
+        if menuOpen() then atPrep = true break end
         press(i % 2 == 0 and K.A or K.START, 4)
         wait(22)
     end

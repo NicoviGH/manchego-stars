@@ -1617,18 +1617,27 @@ def inject_test_chapter(campaign, verbose=True, lord_boot=False):
     # chapter's player UnitDefinition; ENUN waits for the placement; ENDA ends.
     with open(CH1_EVENTSCRIPT_H, encoding='utf-8') as f:
         script = f.read()
-    # DEBUG fast-boot (#46): once the cast is loaded, open straight into the lord-select
-    # prep screen so iterating on it is compile-time only (no playthrough grind). The prep
-    # list builds from the just-loaded cast; A picks the lead, then control returns here.
-    lord_boot_step = '    ASMC(StartLordSelectPrep)\n' if lord_boot else ''
-    minimal_begin = ('{\n'
-                     '    LOAD1(1, UnitDef_Event_Ch1Enemy)\n'   # keep the vanilla foes (reskinned) so the sandbox is combat-ready
-                     '    ENUN\n'
-                     '    LOAD1(1, UnitDef_Event_Ch1Ally)\n'
-                     '    ENUN\n'
-                     + lord_boot_step +
-                     '    ENDA\n'
-                     '}')
+    if lord_boot:
+        # DEBUG fast-boot (#46): a pure off-map scene that opens straight into the
+        # lord-select menu over its scenic BG (matches the real ch1 flow: scenic BG +
+        # cutscene-mode EVBIT, NO map deploy -- the menu reads CharacterData, not loaded
+        # units). Compile-time-only iteration on the screen.
+        minimal_begin = ('{\n'
+                         '    REMOVEPORTRAITS\n'
+                         '    BACG(%s)\n'
+                         '    FADU(16)\n'
+                         '    EVBIT_MODIFY(0x4)\n'
+                         '    ASMC(CallLordSelectMenu)\n'
+                         '    ENDA\n'
+                         '}' % CH01_LORDSEL_BG)
+    else:
+        minimal_begin = ('{\n'
+                         '    LOAD1(1, UnitDef_Event_Ch1Enemy)\n'   # keep the vanilla foes (reskinned) so the sandbox is combat-ready
+                         '    ENUN\n'
+                         '    LOAD1(1, UnitDef_Event_Ch1Ally)\n'
+                         '    ENUN\n'
+                         '    ENDA\n'
+                         '}')
     script = _replace_brace_block(
         script, 'EventScr_Ch1_BeginningScene[] =', minimal_begin, CH1_EVENTSCRIPT_H)
     with open(CH1_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
@@ -3816,9 +3825,7 @@ def inject_ch01(campaign, verbose=True):
         '#include "bmlib.h"\n'
         '#include "bmunit.h"\n'
         '#include "face.h"\n'
-        '#include "helpbox.h"\n'
-        '#include "statscreen.h"\n'
-        '#include "proc.h"\n'
+        '#include "fontgrp.h"\n'
         '\n'
         'extern const u16 gLordSelectCandidates[]; /* events_udefs.c */\n'
         '\n'
@@ -3826,37 +3833,51 @@ def inject_ch01(campaign, verbose=True):
         '/* #46: qualitative blurb per candidate, PARALLEL to gLordSelectCandidates. */\n'
         'static CONST_DATA u16 sLordSelectPitchMsg[] = { %s };\n'
         '\n'
-        '/* #46 card: as the cursor lands on candidate i, draw their chibi FACE into the\n'
-        '   left BG block (PutFaceChibi -> BG tilemap, so it layers over the scenic BACG --\n'
-        '   no OBJ-vs-BG priority fight) and show their qualitative PITCH in a stock,\n'
-        '   self-framed, auto-wrapped help box. The candidate NAMES are the menu list\n'
-        '   itself (right column). No Text scratch: the eventscript TU keeps no mutable\n'
-        '   storage, so we compose ready-made components (PutFaceChibi + StartHelpBox)\n'
-        '   rather than manage tiles. */\n'
+        '/* #46 card (Nicolas 2026-06-25 layout): names MENU on the LEFT; as the cursor\n'
+        '   lands on candidate i, draw their FULL 80x72 bust on the RIGHT (PutFace80x72 ->\n'
+        '   BG tilemap, so the real portrait layers over the scenic BACG -- the OBJ bust\n'
+        '   that sank v1 is avoided) + the qualitative PITCH wrapped BELOW it. The pitch\n'
+        '   lines reuse the resident gShopItemTexts handles (shop is idle here; the\n'
+        '   eventscript TU keeps no mutable storage of its own), drawn line-by-line by\n'
+        '   splitting the [LF]-wrapped body. Coords are render-tunable. */\n'
+        'extern struct Text gShopItemTexts[]; /* resident scratch (bmshop.c), idle here */\n'
+        '\n'
         'int LordSelect_DrawCard(struct MenuProc* menu, struct MenuItemProc* menu_item)\n'
         '{\n'
         '    const struct CharacterData* cd =\n'
         '        GetCharacterData(gLordSelectCandidates[menu_item->itemNumber]);\n'
+        '    const char* s = GetStringFromIndex(sLordSelectPitchMsg[menu_item->itemNumber]);\n'
+        '    char buf[40];\n'
+        '    char* o = buf;\n'
+        '    int line = 0;\n'
         '\n'
-        '    /* face block (BOTTOM-left, below the top-left pitch box -- Nicolas\n'
-        '       2026-06-24): clear interior (keep the frame border), redraw the chibi. */\n'
-        '    TileMap_FillRect(TILEMAP_LOCATED(gBG0TilemapBuffer, 1, 13), 5, 4, 0);\n'
-        '    PutFaceChibi(cd->portraitId, TILEMAP_LOCATED(gBG0TilemapBuffer, 1, 13),\n'
-        '                 0x270, 2, 0);\n'
-        '    BG_EnableSyncByMask(BG0_SYNC_BIT);\n'
+        '    /* full bust, RIGHT (clear the 10x9 block first, then redraw). */\n'
+        '    TileMap_FillRect(TILEMAP_LOCATED(gBG0TilemapBuffer, 0x12, 0x2), 10, 9, 0);\n'
+        '    PutFace80x72(menu, TILEMAP_LOCATED(gBG0TilemapBuffer, 0x12, 0x2),\n'
+        '                 cd->portraitId, 0x200, 0xD);\n'
         '\n'
-        '    /* pitch: stock framed + auto-wrapped help box, top-left (replaces the\n'
-        '       previous one as the cursor moves). Pixel coords, render-tunable. */\n'
-        '    StartHelpBox(8, 0x50, sLordSelectPitchMsg[menu_item->itemNumber]);\n'
-        '    /* snap past the help box\'s 12-frame resize tween so the pitch reads\n'
-        '       INSTANTLY as the cursor moves, not typed-in (#46, Nicolas 2026-06-24):\n'
-        '       UpdateHelpBoxDisplay interpolates the box Init->Final by timer/timerMax,\n'
-        '       so timer = timerMax lands it fully grown on the next frame. */\n'
-        '    {\n'
-        '        struct HelpBoxProc* hb = (struct HelpBoxProc*)Proc_Find(gProcScr_HelpBox);\n'
-        '        if (hb)\n'
-        '            hb->timer = hb->timerMax;\n'
+        '    /* pitch, wrapped BELOW the bust: [LF](0x01)-delimited lines -> a resident\n'
+        '       Text handle each. */\n'
+        '    TileMap_FillRect(TILEMAP_LOCATED(gBG0TilemapBuffer, 0x11, 0xC), 0xD, 6, 0);\n'
+        '    for (;; s++) {\n'
+        '        if (*s == 0x01 || *s == 0x00) {\n'
+        '            *o = 0;\n'
+        '            if (line < 6) {\n'
+        '                ClearText(&gShopItemTexts[line]);\n'
+        '                PutDrawText(&gShopItemTexts[line],\n'
+        '                            TILEMAP_LOCATED(gBG0TilemapBuffer, 0x12, 0xC + line),\n'
+        '                            TEXT_COLOR_SYSTEM_WHITE, 0, 0, buf);\n'
+        '            }\n'
+        '            if (*s == 0x00)\n'
+        '                break;\n'
+        '            line++;\n'
+        '            o = buf;\n'
+        '        } else {\n'
+        '            *o++ = *s;\n'
+        '        }\n'
         '    }\n'
+        '\n'
+        '    BG_EnableSyncByMask(BG0_SYNC_BIT);\n'
         '    return 0;\n'
         '}\n'
         '\n'
@@ -3872,10 +3893,6 @@ def inject_ch01(campaign, verbose=True):
         '    SetFlag(0x%X + menu_item->itemNumber);\n'
         '    SetEventSlotC(sLordSelectConfirmMsg[menu_item->itemNumber]);\n'
         '\n'
-        '    /* tear down the pitch help box so it does not linger behind the confirm\n'
-        '       box ("Will N lead?") the eventscript shows next (#46). */\n'
-        '    EndHelpBox();\n'
-        '\n'
         '    return MENU_ACT_CLEAR | MENU_ACT_SND6A | MENU_ACT_END | MENU_ACT_SKIPCURSOR;\n'
         '}\n'
         '\n'
@@ -3885,13 +3902,15 @@ def inject_ch01(campaign, verbose=True):
         '};\n'
         '\n'
         'CONST_DATA struct MenuDef MenuDef_LordSelect = {\n'
-        '    .rect = {20, 2, 9, 0}, /* names ride the right column; card fills the left */\n'
+        '    .rect = {1, 4, 9, 0}, /* names MENU on the LEFT (left-to-right reading) */\n'
         '    .style = 1,\n'
         '    .menuItems = MenuItemDef_LordSelect,\n'
         '};\n'
         '\n'
         'void CallLordSelectMenu(ProcPtr proc)\n'
         '{\n'
+        '    int i;\n'
+        '\n'
         '    ClearBg0Bg1();\n'
         '    /* BG2 OFF: the menu plays over a scenic BACG on BG3 (#21), not the battle\n'
         '       map -- leaving BG2 enabled would show the (disabled) map layer behind. */\n'
@@ -3899,12 +3918,18 @@ def inject_ch01(campaign, verbose=True):
         '    SetTextFont(0);\n'
         '    InitSystemTextFont();\n'
         '    LoadUiFrameGraphics();\n'
-        '    LoadHelpBoxGfx(NULL, -1); /* #46: gfx for the pitch help box (cf. statscreen) */\n'
         '\n'
-        '    /* #46: a stock frame backing the chibi face at the BOTTOM-left (drawn once;\n'
-        '       onSwitchIn refills the interior). The pitch rides its own help-box frame\n'
-        '       up top; names ride the menu list -- so this is the only frame we draw. */\n'
-        '    DrawUiFrame(gBG0TilemapBuffer, 0, 12, 6, 5, 0, 1);\n'
+        '    /* title across the TOP (#46 layout). */\n'
+        '    PutString(TILEMAP_LOCATED(gBG0TilemapBuffer, 2, 1), TEXT_COLOR_SYSTEM_WHITE,\n'
+        '              GetStringFromIndex(0x%X));\n'
+        '\n'
+        '    /* pitch-line text handles (resident gShopItemTexts; init once, redrawn per\n'
+        '       cursor move in LordSelect_DrawCard). */\n'
+        '    for (i = 0; i < 6; i++)\n'
+        '        InitText(&gShopItemTexts[i], 0xD);\n'
+        '\n'
+        '    /* frame the blurb box under the bust (RIGHT); the names menu draws its own. */\n'
+        '    DrawUiFrame(gBG0TilemapBuffer, 0x10, 0xB, 0xD, 7, 0, 1);\n'
         '\n'
         '    StartMenu(&MenuDef_LordSelect, proc);\n'
         '}\n'
@@ -3912,10 +3937,22 @@ def inject_ch01(campaign, verbose=True):
         % (LORDSEL_FLAG_BASE,
            ', '.join('0x%X' % m for m in LORDSEL_CONFIRM_MSGS[:len(cast)]),
            ', '.join('0x%X' % m for m in LORDSEL_PITCH_MSGS[:len(cast)]),
-           LORDSEL_FLAG_BASE, LORDSEL_FLAG_BASE, '\n'.join(items)))
+           LORDSEL_FLAG_BASE, LORDSEL_FLAG_BASE, '\n'.join(items),
+           LORDSEL_HEADER_MSG))
     with open(CH2_EVENTSCRIPT_H, encoding='utf-8') as f:
         script = f.read()
     script = menu_code + script
+    # Declare CallLordSelectMenu in eventcall.h so eventscript files included BEFORE
+    # ch2-eventscript.h (e.g. the ch1 sandbox, debug fast-boot) can ASMC it.
+    eventcall_h = os.path.join(DECOMP, 'include', 'eventcall.h')
+    with open(eventcall_h, encoding='utf-8') as f:
+        ec = f.read()
+    anchor = 'void CallRouteSplitMenu(ProcPtr proc);\n'
+    if anchor in ec and 'CallLordSelectMenu' not in ec:
+        ec = ec.replace(
+            anchor, anchor + 'void CallLordSelectMenu(ProcPtr proc); /* lord select (#46) */\n', 1)
+        with open(eventcall_h, 'w', encoding='utf-8') as f:
+            f.write(ec)
     beat1_labels = ['A -- Hlin & Scramsax in from the cold',
                     'B -- the roll-call (PCs one at a time + RBG/Pinky, Hlin watching)',
                     "C -- Hlin's story: the endless winter",
@@ -4927,8 +4964,6 @@ def main():
         print('  lord select (#42): GetPid + force-deploy/Seize/game-over keyed to the chosen lead')
         engine_hooks._inject_lord_floor_engine()  # after lord-select: anchors on its LordSelect_GetPid
         print('  lord floor (#45 3c): chosen lead\'s survivability top-up baked in once at ch start')
-        engine_hooks._inject_lord_select_prep_mode()
-        print('  lord select (#46): the real prep "Pick Units" screen runs as the lord picker')
         print('names:')
         inject_names(args.campaign)
         print('item names:')
