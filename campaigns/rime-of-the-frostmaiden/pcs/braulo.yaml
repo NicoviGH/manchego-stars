@@ -5,7 +5,7 @@
 id: braulo
 name: Braulo
 death_quote: "The shell's yours now... pass it on..."  # falls-in-battle quote (#6 dialogue pass; lore/braulo.md)
-lord_pitch: "Axe fighter, at home in any terrain. High power and HP -- but low skill, and weak to magic."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
+lord_pitch: "Axe fighter -- tough and strong, but weak to magic."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
 portrait_ref: portraits/braulo.png       # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/braulo.jpeg
 # Portrait source: https://www.dndbeyond.com/avatars/25784/526/1581111423-73827256.jpeg

@@ -6,7 +6,7 @@
 id: rootis
 name: Rootis
 death_quote: "Oh... this is the melting part. ...It was warm, with you."  # falls-in-battle quote (#6 dialogue pass; lore/rootis.md)
-lord_pitch: "Anima mage -- solid skill, low physical strength. Reliable damage at range; frail."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
+lord_pitch: "Armored knight -- huge defense, slow, weak to magic."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
 portrait_ref: portraits/rootis.png      # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/rootis.jpeg   # note: source file was named "Rootis Character Sheet.jpeg" — it's the portrait
 # Portrait source: https://www.dndbeyond.com/avatars/25348/565/1581111423-72613710.jpeg
