@@ -31,7 +31,7 @@ ADR: `decisions.md` §Distribution.
 
 ## Now / Next
 
-### Content — Ch2 "Cold Welcome" (#22): art complete; title card + load-test remain
+### Content — Ch2 "Cold Welcome" (#22): build-complete; only the mGBA load-test (c) remains
 - **(a) Dialogue reground** — ✅ DONE, merged in #70 (`37f327c`): opening chwinga-adoption beat
   (Sclorbo's kin + Marty's Chagaccino), turn-1 RBG→Pinky archer tutorial (fliers-vs-bows debut),
   de-sledded rear bark + ending card. Host wired (3 opening beats + turn-1 tutorial scene reusing the
@@ -42,10 +42,15 @@ ADR: `decisions.md` §Distribution.
   look = Sclorbo's sprite & bust reused with the icy-blue glow recoloured spirit-green (he IS a chwinga),
   build-derived from his assets (no committed copies). Vellynne = FE-Repo Sonya (Witch) mug with a
   magenta→snow-white hair recolor (`portraits/vellynne.py`, dresses the Ismaire slot; credit JeyTheCount).
-  ADRs in decisions.md Art & Audio. STILL OPEN (lighter): the **title card** ("Cold Welcome" —
-  `gen_chapter_title` atlas missing C/W/d/m glyphs).
-- **(c) mGBA load-test** ch01→ch02→win→chains (chwinga LOAD, archer threatens pegasi, survivors deliver
-  charms). Fast via `make TESTCH=1` (wire a ch02 sandbox) or the `recordrbg`/checkpoint path.
+  ADRs in decisions.md Art & Audio.
+- **Title card** — ✅ DONE, merged in #77 (`68a10ee`): "Ch.2: Cold Welcome" in vanilla letterforms
+  (prologue/ch1 prefixed style). Added C/W/d/m + the "Ch.2:" prefix to the `gen_chapter_title` atlas;
+  `_load` now reads source cards from git HEAD (vanilla), so inject_ch01 overwriting `chap_title_2.png`
+  before ch02 composes no longer corrupts the "Ch.2:" cut.
+- **(c) mGBA load-test** — THE ONLY #22 ITEM LEFT (needs Nicolas at the emulator): ch01→ch02→win→chains
+  (chwinga LOAD, archer threatens pegasi, survivors deliver charms) + a pacing check on the 5 cutscene
+  moments + see the chwinga/Vellynne faces, names, and the new title card in motion. Fast via
+  `make TESTCH=1` (wire a ch02 sandbox) or the `recordrbg`/checkpoint path.
 - Per-unit art/anim follows the **convention homes** — `inject_battle_anims` / `inject_battle_platforms`
   docstrings (how) + `decisions.md` Art & Audio (why) + the **`custom_unit` issue template** (per-unit
   checklist); open one issue per remaining cast/enemy.
