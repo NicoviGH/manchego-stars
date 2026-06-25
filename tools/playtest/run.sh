@@ -118,7 +118,9 @@ case "$SCENARIO" in
     recordfix)    BUILDER=ckpt_prep;      CKPT=prep ;;
     recordrbg)    BUILDER=ckpt_rbgch01;   CKPT=rbgch01 ;;
     # ch02 (#22) scenarios LOAD the ch02start state (the real ch00->ch01->ch02 chain, paid once).
-    ch02|smoke_ch02|clear_ch02) BUILDER=ckpt_ch02start; CKPT=ch02start ;;
+    ch02|smoke_ch02|clear_ch02|recordch02map|recordch02combat) BUILDER=ckpt_ch02start; CKPT=ch02start ;;
+    # the opening-cutscene demo loads a state saved just BEFORE the ch02 opening plays.
+    recordch02intro) BUILDER=ckpt_ch02intro; CKPT=ch02intro ;;
 esac
 if [ -n "$BUILDER" ]; then
     if [ ! -f "$STATE_DIR/$CKPT.ss" ] || [ "$(cat "$STATE_DIR/$CKPT.romhash" 2>/dev/null || true)" != "$ROMHASH" ]; then
