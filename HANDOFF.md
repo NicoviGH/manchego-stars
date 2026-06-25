@@ -49,7 +49,24 @@ feedback rides the slice issue, not standalone — #81/#82 were closed into it).
   scenarios). The opening/ending GIFs go **stale once the two items land**, so regenerate + decide
   merge-vs-drop after the fixes.
 
-### Content — Ch3 "The Termalaine Mine" (#23) — NEXT chapter slice
+### Content — Party battle animations (#65 Milestone B) — NEXT SESSION pickup (Nicolas)
+RBG validated the faked-anim pipeline end-to-end (#65 **Milestone A**, merged): donor-prime, additive,
+3 static AI frames (Ready / Wind-up / Peak) cloned onto a donor class's cadence — see
+`campaigns/.../pcs/prof-rbg.yaml` `battle_anim:` block as the working template, and the
+`inject_battle_anims` docstring (how) + `decisions.md` Art & Audio (why). **7 party members still have NO
+`battle_anim:` block** — do the rest:
+- **Per PC:** add a `battle_anim:` block (clone_from donor class · clone_into an additive `*_EMPTY`
+  CLONE class slot · `abbr` stem ≤12 · `frames: [ready, windup, peak]`); generate frames with
+  `tools/ref_to_battleframe.py` (concept ref → 16-colour indexed sheet + OAM + palette — Nicolas can't
+  draw, CLAUDE generates via tooling); `inject_battle_anims` appends one `banim_data[]` row + repoints
+  the class; review with `tools/playtest/run.sh recordanim PT_CHAR=<uid>` → `make_gif.py recordanim <id>
+  --open`. **Custom art is the lever — go custom per concept art; SHOW Nicolas before committing.**
+- **Donor mapping by class** (the 3 poses are archetype-specific, the cadence is the donor's):
+  braulo = Fighter (axe melee) · wolfram = Knight (lance melee) · pinky = Pegasus (lance, flier) ·
+  marty + meesmickle = Shaman (dark caster) · rootis = Mage (anima caster) · sclorbo = Cleric (staff).
+- One feature-flow branch per unit (or a small batch); use the `custom_unit` issue template per PC.
+
+### Content — Ch3 "The Termalaine Mine" (#23) — chapter slice (after the anims / concurrent)
 Not started. Reuse the Ch2 vertical-slice component breakdown (tracked as a checklist on the issue):
 design+dialogue lock (invoke `dialogue-pass`; ground in DM notes PDF + Frostmaiden book) → map
 (`#40` Tiled→`.mar` pipeline) → host on the next vanilla slot (model on `inject_ch01`/`inject_ch02`;
@@ -57,8 +74,9 @@ design+dialogue lock (invoke `dialogue-pass`; ground in DM notes PDF + Frostmaid
 (`ch03`/`smoke_ch03`/`clear_ch03`, mirroring ch02). Then chapters #24–#28 (Ch4–Ch8) follow the same slice.
 
 ### Parked / supporting
-- Per-unit art/anim → the **convention homes** (`inject_battle_anims`/`inject_battle_platforms`
-  docstrings + `decisions.md` Art & Audio + the `custom_unit` issue template); one issue per cast/enemy.
+- Enemy/NPC art/anim → the **convention homes** (`inject_battle_anims`/`inject_battle_platforms`
+  docstrings + `decisions.md` Art & Audio + the `custom_unit` issue template); one issue per unit. (The
+  PARTY anims are the active next pickup above.)
 - Supporting backlog: enemy YAML #18 · NPC stubs #17 · world-map #29 · overworld sprites #38 ·
   onboarding-parity #64 · faked battle anims epic #65.
 
