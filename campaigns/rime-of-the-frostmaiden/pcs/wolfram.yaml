@@ -7,7 +7,7 @@
 id: wolfram
 name: Wolfram
 death_quote: "Melt me down... forge something better."  # falls-in-battle quote (#6 dialogue pass; lore/wolfram.md)
-lord_pitch: "Flying knight -- resists magic, weak to bows."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
+lord_pitch: "Armored knight -- huge defense and HP, but slow."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
 portrait_ref: portraits/wolfram.png     # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/wolfram.jpeg
 # Portrait source: https://www.dndbeyond.com/avatars/25957/254/1581111423-74374750.jpeg
