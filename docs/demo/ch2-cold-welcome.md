@@ -1,6 +1,6 @@
 # Ch2 "Cold Welcome" — demo reel
 
-Captured from the playtest harness (`tools/playtest/run.sh recordch02intro|recordch02map|recordch02combat`)
+Captured from the playtest harness (`tools/playtest/run.sh recordch02intro|recordch02map|recordch02combat|recordch02ending`)
 off the real ch00→ch01→ch02 chain. GIFs render inline on GitHub mobile.
 
 ## Opening cutscene
@@ -19,3 +19,10 @@ camp E/SE, "Rout the enemy" objective.
 A cast member trades blows with a chardalyn raider ("Cutthroat") on the snow battle platform.
 
 ![ch2 combat](ch02-combat-cold-welcome.gif)
+
+## Closing cutscene
+Targos square at nightfall: the surviving chwinga's charm-gifts land, then the fisher / Rootis /
+narration / RBG beats — incl. the Sephek breadcrumb ("one clean cut, iced from within"). Surviving
+chwinga deliver Red Gem / Elixir / Pure Water. Normal text speed.
+
+![ch2 closing cutscene](ch02-ending-cold-welcome.gif)

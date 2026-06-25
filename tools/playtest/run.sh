@@ -118,7 +118,7 @@ case "$SCENARIO" in
     recordfix)    BUILDER=ckpt_prep;      CKPT=prep ;;
     recordrbg)    BUILDER=ckpt_rbgch01;   CKPT=rbgch01 ;;
     # ch02 (#22) scenarios LOAD the ch02start state (the real ch00->ch01->ch02 chain, paid once).
-    ch02|smoke_ch02|clear_ch02|recordch02map|recordch02combat) BUILDER=ckpt_ch02start; CKPT=ch02start ;;
+    ch02|smoke_ch02|clear_ch02|recordch02map|recordch02combat|recordch02ending) BUILDER=ckpt_ch02start; CKPT=ch02start ;;
     # the opening-cutscene demo loads a state saved just BEFORE the ch02 opening plays.
     recordch02intro) BUILDER=ckpt_ch02intro; CKPT=ch02intro ;;
 esac
@@ -141,7 +141,7 @@ FPS=240; VSYNC=0; DEADLINE_S=420
 case "$SCENARIO" in record*) FPS=60; VSYNC=1; DEADLINE_S=300 ;; esac
 # smoke_* / fuzz_* / clear_ch02 play a full chapter (lead-in + a long idle/random/clear soak)
 # -> longer wall.
-case "$SCENARIO" in smoke*|fuzz*|clear_ch02) DEADLINE_S=600 ;; esac
+case "$SCENARIO" in smoke*|fuzz*|clear_ch02|recordch02ending) DEADLINE_S=600 ;; esac
 # PT_FPS overrides the rate. 60fps+videoSync is only needed to capture smooth cutscene
 # FADES; verification captures of static text/boxes (sign, death quote) read fine at top
 # speed, so `PT_FPS=240 ... recordfix` runs ~4x faster.

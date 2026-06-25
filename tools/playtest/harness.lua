@@ -2873,6 +2873,56 @@ scenarios.recordch02combat = function()
     result("PASS", "ch02 combat recorded")
 end
 
+-- recordch02ending: the closing cutscene -- rout the band (deterministic frail+teleport, as in
+-- clear_ch02), then capture the Targos ending beats (fisher / Rootis / #58 narration box / RBG)
+-- at viewable speed. Frames tagged "ending". One run off ch02start (no fragile mid-scene state).
+scenarios.recordch02ending = function()
+    wait(30)
+    if not loadState("ch02start") then return result("FAIL", "no ch02start checkpoint (run.sh builds it)") end
+    wait(60)
+    pokeFastConfig()
+    local start = chapter()
+    for t = 1, 12 do
+        if chapter() ~= start or procActive(SYM.gProcScr_TitleScreen) then break end
+        waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
+        wait(60)
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+        end
+        for i = 0, 7 do
+            if #liveEnemies() == 0 then break end
+            local u = unitAt(SYM.gUnitArrayBlue, i)
+            if u and not isDead(u) and (u.state & 0x2) == 0 then
+                local mn, mx = unitAttackRange(u)
+                if mn and teleportToFiringTile(u, mn, mx) then
+                    u = blue(u.charId)
+                    if u and moveUnit(u.x, u.y, u.x, u.y) then
+                        chooseAttack(u.addr)
+                        waitFor(function() return faction() == 0 and not menuOpen()
+                            and not procActive(SYM.gProc_ekrBattle) end, 600)
+                    end
+                end
+            end
+        end
+        if #liveEnemies() == 0 then break end
+        if runEnemyPhase(CH02_PARK) == "gameover" then return result("FAIL", "party lost") end
+    end
+    if #liveEnemies() ~= 0 then return result("FAIL", "rout incomplete -- no ending to record") end
+    endTurn()   -- fire the DefeatAll win -> the ending scene
+    pokeNormalConfig()   -- readable text speed for the capture
+    local fr, atTitle = 0, false
+    while fr < 6000 do
+        fr = fr + 1
+        if fr % 4 == 0 then shot("ending") end
+        if fr % 60 == 0 then press(K.A, 4) end
+        if procActive(SYM.gProcScr_TitleScreen) then atTitle = true break end
+        yield()
+    end
+    shot("ending")
+    result("PASS", atTitle and "ch02 ending recorded (reached title)" or "ch02 ending recorded")
+end
+
 -- ---------------------------------------------------------------- runner
 local co = coroutine.create(function()
     log("scenario: " .. PLAYTEST_SCENARIO)
