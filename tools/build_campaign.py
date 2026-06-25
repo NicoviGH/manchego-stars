@@ -344,7 +344,7 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         'src/bmcamadjust.c',
                         'src/unit_icon_wait_data.c', 'src/unit_icon_move_data.c', 'src/mu.c',
                         'src/bmudisp.c', 'src/prep_unitselect.c',
-                        # lord-select prep mode (#46): StartLordSelectPrep decl for eventscripts
+                        # lord-select (#46): CallLordSelectMenu decl for eventscripts
                         'include/eventcall.h',
                         # enemy class reskins (#21): cloned goblin classes in gClassData
                         'src/data_classes.c',
@@ -1627,18 +1627,33 @@ def inject_test_chapter(campaign, verbose=True, lord_boot=False):
     with open(CH1_EVENTSCRIPT_H, encoding='utf-8') as f:
         script = f.read()
     if lord_boot:
-        # DEBUG fast-boot (#46): a pure off-map scene that opens straight into the
-        # lord-select menu over its scenic BG (matches the real ch1 flow: scenic BG +
-        # cutscene-mode EVBIT, NO map deploy -- the menu reads CharacterData, not loaded
-        # units). Compile-time-only iteration on the screen.
+        # DEBUG fast-boot (#46): a pure off-map scene that mirrors the REAL ch1 lord-select
+        # sequence -- the one-time explainer, then the re-pick LABEL(0)/menu/confirm loop --
+        # over the scenic BG, minus only the post-Yes map build (no deploy: the menu reads
+        # CharacterData, not loaded units). This verifies the explainer + "Will N lead?"
+        # confirm in-engine, not just the menu. Compile-time-only iteration on the screen.
         minimal_begin = ('{\n'
                          '    REMOVEPORTRAITS\n'
                          '    BACG(%s)\n'
                          '    FADU(16)\n'
                          '    EVBIT_MODIFY(0x4)\n'
+                         '    TUTORIALTEXTBOXSTART\n'
+                         '    TEXTSHOW(0x%X) /* one-time explainer */\n'
+                         '    TEXTEND\n'
+                         '    REMA\n'
+                         'LABEL(0x0)\n'
                          '    ASMC(CallLordSelectMenu)\n'
+                         '    SADD(EVT_SLOT_2, EVT_SLOT_C, EVT_SLOT_0)\n'
+                         '    TUTORIALTEXTBOXSTART\n'
+                         '    SVAL(EVT_SLOT_B, 0xffffffff)\n'
+                         '    TEXTSHOW(0xffff) /* "Will N lead...?" [Yes] from slot 2 */\n'
+                         '    TEXTEND\n'
+                         '    REMA\n'
+                         '    SVAL(EVT_SLOT_7, 0x1)\n'
+                         '    BNE(0x0, EVT_SLOT_C, EVT_SLOT_7) /* "No" -> pick again */\n'
+                         '    FADI(16)\n'
                          '    ENDA\n'
-                         '}' % CH01_LORDSEL_BG)
+                         '}' % (CH01_LORDSEL_BG, LORDSEL_EXPLAINER_MSG))
     else:
         minimal_begin = ('{\n'
                          '    LOAD1(1, UnitDef_Event_Ch1Enemy)\n'   # keep the vanilla foes (reskinned) so the sandbox is combat-ready
@@ -1764,8 +1779,8 @@ def lord_floor_rows(campaign, uids, ch='ch01', target=3.5):
 def lord_select_pitches(campaign, uids):
     """Per-candidate lord-select blurbs (#46): one (uid, pitch) tuple per uid, in input
     order, read off each cast member's hand-authored `lord_pitch:` YAML. The build emits
-    these as gLordSelectPitchMsg[], PARALLEL to gLordSelectCandidates[] -- lord_select.c
-    draws candidate i's pitch as the cursor lands on it. Hard-fails if any candidate lacks
+    these as sLordSelectPitchMsg[] (eventscript TU), PARALLEL to gLordSelectCandidates[] --
+    LordSelect_DrawCard draws candidate i's pitch as the cursor lands on it. Hard-fails if any candidate lacks
     a pitch: a blank card would ship silently (the "no silent gaps" lock, Nicolas
     2026-06-20)."""
     rows = []
@@ -3718,19 +3733,9 @@ def inject_ch01(campaign, verbose=True):
         ['    CHARACTER_%s, /* %s */' % (slot.upper(), uid)
          for uid, slot, _, _, _ in cast] +
         ['    0xFFFF,', '};', ''])
-    # Lord-select prep-screen UI (#46): the qualitative pitch shown in the info panel,
-    # PARALLEL to gLordSelectCandidates, + the "Choose your lead" header. Read by the
-    # lord-mode prep screen (engine_hooks._inject_lord_select_prep_mode).
-    pitch_ids = LORDSEL_PITCH_MSGS[:len(cast)]
-    udefs += '\n'.join(
-        ['', '/* Lord-select pitch (#46): one blurb msg id per candidate, parallel to',
-         '   gLordSelectCandidates; drawn in the prep info panel. */',
-         'CONST_DATA u16 gLordSelectPitchMsg[] = {'] +
-        ['    0x%X, /* %s */' % (mid, uid)
-         for mid, (uid, _, _, _, _) in zip(pitch_ids, cast)] +
-        ['};',
-         '/* Lord-select "Choose your lead" header msg id (#46). */',
-         'CONST_DATA u16 gLordSelectHeaderMsg = 0x%X;' % LORDSEL_HEADER_MSG, ''])
+    # (The per-candidate pitch + "Choose your lead" header msg ids live in the eventscript
+    #  TU as sLordSelectPitchMsg[] / an inlined header, drawn directly by LordSelect_DrawCard
+    #  -- no global table is needed.)
     # Lord survivability floors (#45 3b): per-candidate { +maxHP, +Def, +Res }, PARALLEL to
     # gLordSelectCandidates above (same menu order). Computed @target 3.5 bulk-durability vs
     # Ch1 enemies -- the shamans' frail floor; the armor tanks score 0. The engine adds the

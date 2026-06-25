@@ -1744,7 +1744,7 @@ scenarios.recordlordfast = function()
     local function recwait(n, tag)
         for f = 1, n do if f % 5 == 0 then shot(tag) end yield() end
     end
-    -- title -> New Game -> sandbox -> BeginningScene fires StartLordSelectPrep
+    -- title -> New Game -> sandbox -> BeginningScene runs the explainer + ASMCs CallLordSelectMenu
     local atPrep = false
     for i = 1, 160 do
         if menuOpen() then atPrep = true break end
@@ -1760,8 +1760,13 @@ scenarios.recordlordfast = function()
         recwait(26, "lordfast")        -- THEN capture the SETTLED card (no transitions)
     end
     recwait(40, "lordfast")
-    press(K.A, 4)                      -- anoint the highlighted lead
-    recwait(120, "lordfast")           -- the screen fades out + control returns
+    press(K.A, 4)                      -- select the highlighted lead -> confirm box
+    for f = 1, 30 do yield() end       -- let the menu tear down + confirm box open
+    press(K.A, 4)                      -- fast-forward the (slow) typewriter
+    for f = 1, 24 do yield() end
+    recwait(30, "lordfast-confirm")    -- capture the full "Will <name> lead the party?" [Yes/No]
+    press(K.A, 4)                      -- [Yes] -> the re-pick loop exits (FADI/ENDA)
+    recwait(90, "lordfast")            -- the screen fades out + control returns
     result("PASS", "lord-select prep fast-boot frames recorded")
 end
 

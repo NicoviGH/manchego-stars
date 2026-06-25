@@ -124,8 +124,8 @@ class LordFloorRows(unittest.TestCase):
 
 
 class LordSelectPitches(unittest.TestCase):
-    """The qualitative candidate blurbs (#46) the build emits as gLordSelectPitchMsg[],
-    drawn by lord_select_screen.c as the cursor lands on each candidate. One (uid, pitch)
+    """The qualitative candidate blurbs (#46) the build emits as sLordSelectPitchMsg[],
+    drawn by LordSelect_DrawCard as the cursor lands on each candidate. One (uid, pitch)
     per candidate, in the menu order the C table is indexed by -- PARALLEL to
     gLordSelectCandidates[]. The pitch is hand-authored YAML (lord_pitch:), never derived
     from stats; the build HARD-FAILS if any candidate lacks one (no silent gaps)."""
@@ -141,7 +141,7 @@ class LordSelectPitches(unittest.TestCase):
                          bc.load_unit(self.CAMPAIGN, 'pinky')['lord_pitch'])
 
     def test_preserves_candidate_order(self):
-        # gLordSelectPitchMsg[] is indexed parallel to gLordSelectCandidates[]: a reorder
+        # sLordSelectPitchMsg[] is indexed parallel to gLordSelectCandidates[]: a reorder
         # would show the wrong blurb under every cursor position.
         order = ['wolfram', 'marty', 'pinky']
         self.assertEqual([uid for uid, _ in bc.lord_select_pitches(self.CAMPAIGN, order)],
@@ -152,6 +152,39 @@ class LordSelectPitches(unittest.TestCase):
         # blank card (the "no silent gaps" lock, Nicolas 2026-06-20).
         with self.assertRaises(SystemExit):
             bc.lord_select_pitches(self.CAMPAIGN, ['braulo', 'baxby'])
+
+
+class TerminatorParity(unittest.TestCase):
+    """_term_pad guards FE8's Huffman terminator: the utf8 packer pairs printable bytes
+    two-at-a-time, so a printable run with an ODD length swallows the byte after it. When
+    that byte is [X] (0x00) the decoder runs into the next message. The parity that matters
+    is the FINAL run (printables after the last control code), NOT the whole message
+    (decisions.md, refined 2026-06-25 for the multi-line lord-select pitches, #46)."""
+
+    def test_single_run_even_is_left_alone(self):
+        self.assertEqual(bc._term_pad('Seth[X]'), 'Seth[X]')        # 4 even -> no pad
+
+    def test_single_run_odd_is_padded(self):
+        self.assertEqual(bc._term_pad('Franz[X]'), 'Franz[.][X]')   # 5 odd -> pad
+
+    def test_multiline_even_total_but_odd_final_run_is_padded(self):
+        # The bug class: earlier [LF] runs are odd, so the TOTAL is even (old code skipped
+        # the pad) yet the FINAL run is odd and eats [X]. Mirrors Pinky's 16+19+13 pitch.
+        self.assertEqual(bc._term_pad('a[LF]cde[X]'), 'a[LF]cde[.][X]')   # total 4 even, final 3 odd
+        self.assertEqual(bc._term_pad('Flying[LF]over[LF]bows[X]'),       # 6+4+4=14 even, final 4 even
+                         'Flying[LF]over[LF]bows[X]')                     # -> no pad (final even)
+
+    def test_multiline_odd_total_but_even_final_run_is_not_padded(self):
+        # The inverse: odd total would have tripped the old whole-message rule, but the
+        # final run is even, so [X] is safe and no pad is wanted.
+        self.assertEqual(bc._term_pad('abc[LF]de[X]'), 'abc[LF]de[X]')    # total 5 odd, final 2 even
+
+    def test_control_codes_do_not_count_toward_the_final_run(self):
+        # The final run is the printables after the LAST control tag; an [A]/[LF] resets it.
+        self.assertEqual(bc._term_pad('hello[A][X]'), 'hello[A][X]')      # final run empty -> no pad
+
+    def test_no_terminator_is_a_noop(self):
+        self.assertEqual(bc._term_pad('odd'), 'odd')
 
 
 class BattleAnimInjection(unittest.TestCase):
