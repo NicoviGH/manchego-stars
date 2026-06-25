@@ -31,7 +31,7 @@ ADR: `decisions.md` §Distribution.
 
 ## Now / Next
 
-### Content — Ch2 "Cold Welcome" (#22): build-complete; only the mGBA load-test (c) remains
+### Content — Ch2 "Cold Welcome" (#22): build-complete; structural load-test automated, only the human PACING pass (c) remains
 - **(a) Dialogue reground** — ✅ DONE, merged in #70 (`37f327c`): opening chwinga-adoption beat
   (Sclorbo's kin + Marty's Chagaccino), turn-1 RBG→Pinky archer tutorial (fliers-vs-bows debut),
   de-sledded rear bark + ending card. Host wired (3 opening beats + turn-1 tutorial scene reusing the
@@ -47,10 +47,13 @@ ADR: `decisions.md` §Distribution.
   (prologue/ch1 prefixed style). Added C/W/d/m + the "Ch.2:" prefix to the `gen_chapter_title` atlas;
   `_load` now reads source cards from git HEAD (vanilla), so inject_ch01 overwriting `chap_title_2.png`
   before ch02 composes no longer corrupts the "Ch.2:" cut.
-- **(c) mGBA load-test** — THE ONLY #22 ITEM LEFT (needs Nicolas at the emulator): ch01→ch02→win→chains
-  (chwinga LOAD, archer threatens pegasi, survivors deliver charms) + a pacing check on the 5 cutscene
-  moments + see the chwinga/Vellynne faces, names, and the new title card in motion. Fast via
-  `make TESTCH=1` (wire a ch02 sandbox) or the `recordrbg`/checkpoint path.
+- **(c) load-test** — STRUCTURAL half ✅ AUTOMATED (this branch): three playtest scenarios off a
+  `ch02start` checkpoint (real ch00→ch01→ch02 chain, paid once), all PASS — `ch02` (entry: 3 green
+  chwinga + 5 deployed + archer + boss), `smoke_ch02` (loads/no soft-lock through the cutscenes),
+  `clear_ch02` (DefeatAll rout → chains → all 3 chwinga charms delivered, CHECK_ALIVE→GIVEITEMTO).
+  Run: `tools/playtest/run.sh ch02|smoke_ch02|clear_ch02` (builds the checkpoint on first run).
+  **PACING half still needs Nicolas at mGBA**: judge the 5 cutscene moments in motion + see the
+  chwinga/Vellynne faces, names, and the new title card. ADR in decisions.md (Working Conventions tail).
 - Per-unit art/anim follows the **convention homes** — `inject_battle_anims` / `inject_battle_platforms`
   docstrings (how) + `decisions.md` Art & Audio (why) + the **`custom_unit` issue template** (per-unit
   checklist); open one issue per remaining cast/enemy.
