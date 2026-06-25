@@ -33,10 +33,20 @@ ADR: `decisions.md` §Distribution.
 
 ## Now / Next
 
-### Content — Ch2 ✅ COMPLETE (#22 closed, 2026-06-25)
-Build + dialogue + art + title card all merged; structural load-test automated (the 3 `*_ch02`
-scenarios above) and the **pacing pass signed off by Nicolas**. Nothing left on Ch2. The ch02
-scenarios + the `inject_ch02` host are the **template for the next chapter slice**.
+### Content — Ch2 ✅ shipped (#22 closed), but TWO polish items found in demo review (2026-06-25)
+Build + dialogue + art + title card merged; structural load-test automated; pacing signed off.
+Then Nicolas reviewed a demo-GIF reel and flagged two post-ship items (NOT gating Ch3):
+- **#81 (`bug`+`content`)** — the "Bryn Shander" location pop-up in the **opening** cutscene renders
+  **garbled text**. Check the opening card text (`CH02_OPENING_CARD_MSG` / `BROWNBOXTEXT` label in
+  `inject_ch02`) + `tools/verify_text.py`; recapture `recordch02intro` to confirm.
+- **#82 (`art`)** — the **Targos ending** BG reuses the generic `BG_NORMAL_VILLAGE` placeholder (same
+  as the opening). Wants a **darker/colder** distinct town backdrop — **vendor a winter/dark-town BG**
+  (FE-Repo `gh api … download_url` → curl, like the winter tiles), convert to FE8 BG (additive), point
+  `CH02_ENDING_BG` at it. Show Nicolas before committing.
+- **Demo reel** lives on the **unmerged `demo/ch2-gifs` branch** (`docs/demo/ch2-cold-welcome.md` —
+  opening/map/combat/closing GIFs + the `recordch02{intro,map,combat,ending}` harness scenarios). The
+  record scenarios are reusable tooling; the opening/ending GIFs will be **stale once #81/#82 land**, so
+  regenerate + decide merge-vs-drop after those fixes. Merge decision still open.
 
 ### Content — Ch3 "The Termalaine Mine" (#23) — NEXT chapter slice
 Not started. Reuse the Ch2 vertical-slice component breakdown (tracked as a checklist on the issue):
