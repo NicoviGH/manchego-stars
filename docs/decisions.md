@@ -286,6 +286,25 @@ _Decided: 2026-06-25 (CLAUDE; brainstormed-then-TDD; assert depth "Core + charm 
 
 ---
 
+**Clear-bot pathing: BFS march + multi-range + stall watchdog landed; #60 still open on boss-breach.**
+The #22 work exposed that the greedy clear-bot (#60) can't complete ch01/ch02 unaided. Reworked it
+toward a real fair-play completability gate: (a) a **BFS distance-field march** (pure `pathing.lua`,
+unit-tested in `test_pathing.lua`) over a walkable map from `gBmMapTerrain` — units route *around*
+walls/water toward the boss instead of greedy-Manhattan stranding; (b) **multi-range targeting**
+(`clearUnitAct` reads each unit's real `unitAttackRange` instead of hardcoding range 1); (c) a **stall
+watchdog** (no-progress turns → `B`-unstick, then a clean `stuck` FAIL); (d) a **bug fix** — a title
+screen without a chapter advance is now a game-over, not a false win (old `clearDrive` could PASS a
+loss). `clear` (prologue) now passes fair-play. **Not fully closed:** on ch01 the bot marches to the
+walled boss-camp (gate at a `TERRAIN_GATE_CASTLE` ringed by walls) but jams ~8 tiles out with a thin
+2-unit deploy — the open work is last-mile **breach/unjam** logic (field more units; slip around a
+chokepoint; focus-fire the nearest reachable straggler), tracked on #60. Until then `reachCh02Map`
+keeps its directed ch01-seize helper (it can't ride the fair-play bot yet). Passability uses a
+conservative impassable-terrain set (walls/peaks/water/fence/snag/cliff); high-cost-but-passable
+terrain stays passable because the per-turn `selectAndReach` still enforces true reach.
+_Decided: 2026-06-25 (CLAUDE; brainstormed-then-TDD; scope "full gate" — Nicolas; landed partial + kept #60 open after the breach proved deeper)_
+
+---
+
 ## Combat System
 
 > **2026-05-28 — Combat resolution reverted to vanilla FE.** The earlier "Hybrid

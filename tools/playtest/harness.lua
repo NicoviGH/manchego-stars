@@ -116,6 +116,19 @@ local function blue(charId) return findUnit(SYM.gUnitArrayBlue, 8, charId) end
 local function red(charId) return findUnit(SYM.gUnitArrayRed, 24, charId) end
 local function isDead(u) return u == nil or (u.state & US_DEAD) ~= 0 end
 
+-- A unit's attack reach from its equipped (items[0]) weapon, via gItemData (include/bmitem.h:
+-- attributes +0x08, encodedRange +0x19 = min<<4 | max; ItemData stride 0x24). Returns
+-- (minRange, maxRange) for a real weapon, or nil for a staff / non-attacker (no IA_WEAPON).
+local ITEMDATA_STRIDE = 0x24
+local function unitAttackRange(u)
+    local item = ru16(u.addr + 0x1E) & 0xFF       -- items[0] item id (low byte; high byte = uses)
+    if item == 0 then return nil end
+    local data = SYM.gItemData + item * ITEMDATA_STRIDE
+    if (ru32(data + 0x08) & 0x1) == 0 then return nil end   -- IA_WEAPON unset -> staff/non-weapon
+    local er = ru8(data + 0x19)
+    return (er >> 4), (er & 0xF)
+end
+
 local function pokeFrail(u) -- 1 HP, no def/res/spd/lck: next clean hit kills
     emu:write8(u.addr + 0x13, 1) -- curHP
     emu:write8(u.addr + 0x16, 0) -- spd
@@ -376,8 +389,41 @@ end
 -- (no hardcoded char ids) + the pure pickTarget core; the scenario owns the driving.
 local CLEARBOT = dofile(PLAYTEST_DIR .. "/clearbot.lua")
 local CH02 = dofile(PLAYTEST_DIR .. "/ch02check.lua")   -- pure charm-delivery check (#22)
+local PATHING = dofile(PLAYTEST_DIR .. "/pathing.lua")  -- pure BFS distance field (#60 march)
 local CA_BOSS = (1 << 15)   -- include/bmunit.h:326 (character/class attribute)
 local FUZZRNG = dofile(PLAYTEST_DIR .. "/fuzzrng.lua")   -- seeded PRNG + input policy (#49)
+
+-- Terrain ids (include/constants/terrains.h) that hard-block a foot/mounted march -- used to
+-- build the passability map for the BFS distance field (#60). High-cost-but-passable terrain
+-- (mountain, river, forest, etc.) is left passable on purpose: the field only needs to route
+-- AROUND walls/water; the per-turn selectAndReach still enforces each unit's true reach.
+local IMPASSABLE_TERRAIN = {
+    [0x10] = true,  -- RIVER (deep; foot can't cross)
+    [0x12] = true,  -- PEAK
+    [0x15] = true,  -- SEA
+    [0x16] = true,  -- LAKE
+    [0x19] = true,  -- FENCE
+    [0x1A] = true,  -- WALL_REGULAR
+    [0x1B] = true,  -- WALL_DAMAGED
+    [0x26] = true,  -- CLIFF
+    [0x33] = true,  -- SNAG
+    [0x35] = true,  -- SKY
+    [0x36] = true,  -- DEEPS
+    [0x3C] = true,  -- WATER
+}
+local function terrainAt(x, y)
+    return ru8(ru32(ru32(SYM.gBmMapTerrain) + y * 4) + x)   -- gBmMapTerrain[y][x] (u8**)
+end
+
+-- BFS path-distance field from the boss tile over walkable terrain on the [0..maxx]x[0..maxy]
+-- map: dist[y][x] = steps to reach the boss routing around hard obstacles, or nil (unreachable).
+-- The clear-bot ranks its reachable tiles by this instead of raw Manhattan, so a unit walks
+-- AROUND a wall toward a held boss instead of stranding against it.
+local function bossDistanceField(boss, maxx, maxy)
+    local w, h = maxx + 1, maxy + 1
+    local function isPassable(x, y) return not IMPASSABLE_TERRAIN[terrainAt(x, y)] end
+    return PATHING.distanceField(w, h, isPassable, { x = boss.x, y = boss.y })
+end
 
 -- A unit's character carries the CA_BOSS attribute: pCharacterData (Unit +0x00) ->
 -- CharacterData.attributes (+0x28). True for named bosses (Sephek, the ch01 chief, ...).
@@ -696,20 +742,23 @@ scenarios.clearprobe = function()
     result("PASS", string.format("CA_BOSS boss detected (char 0x%02X)", boss.charId))
 end
 
--- One player unit's action for the clear-bot: select it, pick a melee target (boss-first
--- via pickTarget) and attack from the reachable adjacent tile, else advance toward the
--- boss at (bx,by). GUARANTEES it leaves no unit selected (commit via Attack/Wait, or
--- back out with B) so the next unit / end-turn isn't driving a stale selection.
-local function clearUnitAct(u, bx, by)
+-- One player unit's action for the clear-bot: select it, pick a target at the unit's REAL weapon
+-- reach (boss-first via pickTarget, so bows/magic act at range), and attack from the reachable
+-- tile; else step to the reachable tile NEAREST the boss by path distance (`field`, BFS around
+-- walls) -- falling back to Manhattan toward `goal` only where the field is unreachable. GUARANTEES
+-- it leaves no unit selected (commit via Attack/Wait, or back out with B).
+local function clearUnitAct(u, field, goal)
     local reach = selectAndReach(u)
     if not reach then return end                 -- exhausted/unreachable; nothing selected
-    local pick = CLEARBOT.pickTarget(reach, liveEnemies(), { range = 1 })
+    local mn, mx = unitAttackRange(u)
+    local pick = mn and CLEARBOT.pickTarget(reach, liveEnemies(), { range = mx, min_range = mn }) or nil
     local tile = pick and pick.tile
-    if not tile then                             -- no target in range: step toward the boss
-        local bestd = 999
+    if not tile then                             -- no target in range: advance toward the boss
+        local best = math.huge
         for _, t in ipairs(reach) do
-            local d = math.abs(bx - t.x) + math.abs(by - t.y)
-            if d < bestd then tile, bestd = t, d end
+            local fd = field and field[t.y] and field[t.y][t.x]
+            local score = fd or (1000 + math.abs(goal.x - t.x) + math.abs(goal.y - t.y))
+            if score < best then tile, best = t, score end
         end
     end
     if tile and cursorTo(tile.x, tile.y) then
@@ -739,18 +788,38 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
         boss.charId, boss.x, boss.y, boss.hp, maxx + 1, maxy + 1))
     local seizeTile = { x = boss.x, y = boss.y }   -- killed boss's tile = the seize point
     local budgetTurns = 18
-    local function won() return chapter() ~= startChapter or procActive(SYM.gProcScr_TitleScreen) end
+    -- A real win ADVANCES the chapter. The title screen WITHOUT an advance means game-over ->
+    -- title (a loss), not a win -- so this stays an honest fair-play gate (#60).
+    local function won() return chapter() ~= startChapter end
+    local function lost() return gameOverActive() or procActive(SYM.gProcScr_TitleScreen) end
+    -- progress = the nearest live unit's path-distance to the boss (lower is better).
+    local function nearestBossDist(field)
+        local best = math.huge
+        for i = 0, 7 do
+            local u = unitAt(SYM.gUnitArrayBlue, i)
+            if u and not isDead(u) then
+                local fd = field and field[u.y] and field[u.y][u.x]
+                if fd and fd < best then best = fd end
+            end
+        end
+        return best
+    end
+    local lastDist, lastEnemies, stall = math.huge, math.huge, 0
     for t = 1, budgetTurns do
         waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
         wait(60) -- let the player-phase banner finish (it eats key presses)
+        press(K.B); wait(6)   -- NUDGE unstick: clear any stray menu before driving
+        local b = findBoss()
+        local field = b and bossDistanceField(b, maxx, maxy) or nil
         for i = 0, 7 do
             if won() then return "won", t end
+            if lost() then return "gameover", t end
             local u = unitAt(SYM.gUnitArrayBlue, i)
             if u and not isDead(u) and (u.state & 0x2) == 0 then   -- live, not yet acted
-                local b = findBoss()
+                b = findBoss()
                 if b then
                     seizeTile = { x = b.x, y = b.y }
-                    clearUnitAct(u, b.x, b.y)
+                    clearUnitAct(u, field, b)
                 elseif moveUnit(u.x, u.y, seizeTile.x, seizeTile.y) then
                     -- boss dead, not yet won -> Seize. It tops the menu for a unit that can
                     -- seize; for any other unit A just Waits, so we back out and try the next.
@@ -762,13 +831,48 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
             end
         end
         if won() then return "won", t end
+        if lost() then return "gameover", t end
         if runEnemyPhase(park) == "gameover" then return "gameover", t end
+        -- stall watchdog: bail cleanly if no progress (nearer the boss OR fewer foes) for 3 turns,
+        -- instead of grinding the full budget on a wedged bot.
+        local dist, enemies = nearestBossDist(field), #liveEnemies()
+        if dist < lastDist or enemies < lastEnemies then stall = 0 else stall = stall + 1 end
+        lastDist, lastEnemies = math.min(dist, lastDist), math.min(enemies, lastEnemies)
+        log(string.format("clear turn %d: nearestBossDist=%s enemies=%d stall=%d",
+            t, dist == math.huge and "inf" or dist, enemies, stall))
+        if stall >= 3 then
+            -- diagnose the stall: is the boss walled off (field can't reach its neighbours), and
+            -- where are the remaining foes / our units relative to the field?
+            local bb = findBoss()
+            if bb then
+                local f = bossDistanceField(bb, maxx, maxy)
+                local nb = {}
+                for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+                    local nx, ny = bb.x + d[1], bb.y + d[2]
+                    nb[#nb + 1] = string.format("(%d,%d)terr=0x%02X fd=%s", nx, ny,
+                        (nx >= 0 and ny >= 0 and nx <= maxx and ny <= maxy) and terrainAt(nx, ny) or -1,
+                        (f[ny] and f[ny][nx]) and tostring(f[ny][nx]) or "nil")
+                end
+                log(string.format("STALL boss=(%d,%d) terr=0x%02X neighbours: %s",
+                    bb.x, bb.y, terrainAt(bb.x, bb.y), table.concat(nb, " ")))
+                for _, e in ipairs(liveEnemies()) do
+                    log(string.format("  enemy (%d,%d) hp=%d boss=%s fd=%s", e.x, e.y, e.hp,
+                        tostring(e.is_boss), (f[e.y] and f[e.y][e.x]) and tostring(f[e.y][e.x]) or "nil"))
+                end
+                for i = 0, 7 do
+                    local u = unitAt(SYM.gUnitArrayBlue, i)
+                    if u and not isDead(u) then log(string.format("  unit (%d,%d) fd=%s",
+                        u.x, u.y, (f[u.y] and f[u.y][u.x]) and tostring(f[u.y][u.x]) or "nil")) end
+                end
+            end
+            return "stuck", t
+        end
     end
     return "timeout", budgetTurns
 end
 
--- The verdict wrapper, shared by every clear_* scenario. Win = the chapter advances (or the
--- title screen -- e.g. a not-yet-hosted next chapter). FAIL = game over / turn budget.
+-- The verdict wrapper, shared by every clear_* scenario. Win = the chapter advances. FAIL =
+-- game over (incl. a loss kicking back to the title) / no progress (stuck) / turn budget.
 local function clearDrive(startChapter, maxx, maxy, park)
     local status, t = clearUntilAdvance(startChapter, maxx, maxy, park)
     if status == "won" then shot("clear-win")
@@ -776,6 +880,9 @@ local function clearDrive(startChapter, maxx, maxy, park)
     if status == "noboss" then return result("FAIL", "no boss found to clear toward") end
     if status == "gameover" then shot("clear-gameover")
         return result("FAIL", string.format("game over on turn %d -- bot lost units", t)) end
+    if status == "stuck" then shot("clear-stuck")
+        return result("FAIL", string.format("no progress for 3 turns by turn %d (boss %s)",
+            t, findBoss() and "alive" or "dead")) end
     shot("clear-timeout")
     return result("FAIL", string.format("could not clear in %d turns (boss %s)",
         t, findBoss() and "alive" or "dead"))
@@ -2218,20 +2325,6 @@ local CAST = {
     ['prof-rbg'] = 0x05, rootis = 0x06, sclorbo = 0x07, pinky = 0x08,
     rbg = 0x05,  -- alias for prof-rbg (the #65 first mover)
 }
-
--- A unit's attack reach from its equipped (items[0]) weapon, via gItemData (include/bmitem.h:
--- attributes +0x08, encodedRange +0x19 = min<<4 | max; ItemData stride 0x24). Returns
--- (minRange, maxRange) for a real weapon, or nil for a staff / non-attacker (no IA_WEAPON) --
--- which is how a healer is detected (no combat anim to capture).
-local ITEMDATA_STRIDE = 0x24
-local function unitAttackRange(u)
-    local item = ru16(u.addr + 0x1E) & 0xFF       -- items[0] item id (low byte; high byte = uses)
-    if item == 0 then return nil end
-    local data = SYM.gItemData + item * ITEMDATA_STRIDE
-    if (ru32(data + 0x08) & 0x1) == 0 then return nil end   -- IA_WEAPON unset -> staff/non-weapon
-    local er = ru8(data + 0x19)
-    return (er >> 4), (er & 0xF)
-end
 
 -- Shared lead-up for the RBG demo: win the prologue, lord-select RBG into ch01,
 -- stop on ch01 turn-1 player phase with RBG deployed. Returns (rbg unit) or (false, err).

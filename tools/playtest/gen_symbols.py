@@ -33,6 +33,9 @@ WANTED = [
     'gBmMapUnit',               # u8** tile->unit grid (include/bmmap.h): gBmMapUnit[y][x] is the
                                 # on-tile unit id the engine uses for cursor selection. Relocating
                                 # a unit must update THIS, not just its xPos/yPos.
+    'gBmMapTerrain',            # u8** terrain-id grid (include/bmmap.h): gBmMapTerrain[y][x] is the
+                                # TERRAIN_* id, used to build a passability map for the clear-bot's
+                                # BFS march-to-boss (#60).
     'gChapterFlagBits',         # event flags < 100, bit (flag-1) (src/eventinfo.c)
     'gPermanentFlagBits',       # event flags > 100, bit (flag-101)
     'ProcScr_GameOverScreen',   # proc script: game-over screen active
