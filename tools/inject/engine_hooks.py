@@ -20,7 +20,6 @@ BMMENU_C = os.path.join(DECOMP, 'src', 'bmmenu.c')
 DATA_EVENT_TRIGGER_C = os.path.join(DECOMP, 'src', 'data_event_trigger.c')
 EVENTINFO_C = os.path.join(DECOMP, 'src', 'eventinfo.c')
 PREP_SALLYCURSOR_C = os.path.join(DECOMP, 'src', 'prep_sallycursor.c')
-PREP_UNITSELECT_C = os.path.join(DECOMP, 'src', 'prep_unitselect.c')
 LORDFLOOR_APPLIED_FLAG = 0xFA
 
 
