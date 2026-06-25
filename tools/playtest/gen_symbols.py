@@ -19,6 +19,11 @@ WANTED = [
     'gBmSt',                    # live map cursor (include/types.h)
     'gUnitArrayBlue',           # player units (include/bmunit.h)
     'gUnitArrayRed',            # enemy units
+    'gUnitArrayGreen',          # green (ally/NPC) units (include/bmunit.h) -- the ch02 chwinga
+                                # protect layer rides this array (FACTION_ID_GREEN).
+    'gConvoyItemArray',         # the convoy (extern u16[]; include/variables.h). Low byte of
+                                # each entry is the item id -- where an overflow charm-gift lands.
+    'gConvoyItemCount',         # u8 count of live convoy entries (include/bmcontainer.h).
     'gItemData',                # struct ItemData[] (include/bmitem.h): per-item attributes
                                 # (IA_WEAPON/IA_STAFF @ +0x08) + encodedRange (min<<4|max @ +0x19).
                                 # Lets the harness read a unit's weapon reach generically.

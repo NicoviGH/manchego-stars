@@ -4,9 +4,14 @@
 #   tools/playtest/run.sh <scenario> [--keep-open]
 #
 # Logic scenarios (assert PASS/FAIL):  win | gameover | retreat | ch01win | titlecard
+#   ch02   -- ch2 (#22) ENTRY assertions off the ch02start checkpoint: 3 green chwinga on the
+#             field, party at the deploy cap, the archer (fliers-vs-bows debut) + boss present.
 # Stability scenarios (PASS/FAIL liveness over a run):
 #   smoke | smoke_ch01   -- idle the party; catch crashes/soft-locks (#49)
+#   smoke_ch02           -- the same net on ch02 (loads ch02start; catches a cutscene soft-lock)
 #   clear | clear_ch01   -- greedy clear-bot plays to a win (#60)
+#   clear_ch02           -- rout ch02 (DefeatAll) keeping the chwinga alive, then verify all 3
+#                           chwinga charm-gifts (CHECK_ALIVE -> GIVEITEMTO) reach leader/convoy (#22)
 #   fuzz  | fuzz_ch01    -- SEEDED random-input soak (#49); set PT_SEED=N (default 1) to
 #                           pick the seed; a FAIL prints the seed so PT_SEED=N replays it
 # Recording scenarios (drop motion frames for a review GIF):
@@ -112,11 +117,13 @@ case "$SCENARIO" in
     recordtrade)  BUILDER=ckpt_prep;      CKPT=prep ;;
     recordfix)    BUILDER=ckpt_prep;      CKPT=prep ;;
     recordrbg)    BUILDER=ckpt_rbgch01;   CKPT=rbgch01 ;;
+    # ch02 (#22) scenarios LOAD the ch02start state (the real ch00->ch01->ch02 chain, paid once).
+    ch02|smoke_ch02|clear_ch02) BUILDER=ckpt_ch02start; CKPT=ch02start ;;
 esac
 if [ -n "$BUILDER" ]; then
     if [ ! -f "$STATE_DIR/$CKPT.ss" ] || [ "$(cat "$STATE_DIR/$CKPT.romhash" 2>/dev/null || true)" != "$ROMHASH" ]; then
         echo "== checkpoint '$CKPT' missing/stale -> building at top speed (240fps) =="
-        run_mgba "$BUILDER" 240 0 600
+        run_mgba "$BUILDER" 240 0 900   # ch02start plays the whole ch00->ch01->ch02 chain
         case "$VERDICT" in
             *PASS*) echo "$ROMHASH" > "$STATE_DIR/$CKPT.romhash" ;;
             *) echo "checkpoint build FAILED -- aborting"; exit 1 ;;
@@ -130,8 +137,9 @@ fi
 # record* now LOADS a checkpoint (no grind), so its deadline is short.
 FPS=240; VSYNC=0; DEADLINE_S=420
 case "$SCENARIO" in record*) FPS=60; VSYNC=1; DEADLINE_S=300 ;; esac
-# smoke_* / fuzz_* play a full chapter (lead-in + a long idle/random soak) -> longer wall.
-case "$SCENARIO" in smoke*|fuzz*) DEADLINE_S=600 ;; esac
+# smoke_* / fuzz_* / clear_ch02 play a full chapter (lead-in + a long idle/random/clear soak)
+# -> longer wall.
+case "$SCENARIO" in smoke*|fuzz*|clear_ch02) DEADLINE_S=600 ;; esac
 # PT_FPS overrides the rate. 60fps+videoSync is only needed to capture smooth cutscene
 # FADES; verification captures of static text/boxes (sign, death quote) read fine at top
 # speed, so `PT_FPS=240 ... recordfix` runs ~4x faster.
