@@ -692,12 +692,21 @@ def _wrap_fe_lines(text, width=29):
 
 def _term_pad(body):
     """FE8 Huffman terminator-parity (see [[manchego_stars_text_terminator_parity]]):
-    when a message's printable-char count is ODD the 0x00 terminator can't stand alone,
-    so the decoder runs past [X] into the next message (garbage + bleed-through). Pad
-    with a [.] before [X] to flip parity even. No-op when already even."""
-    visible = re.sub(r'\[[^\]]*\]', '', body).replace('\n', '')
-    if len(visible) % 2 and body.endswith('[X]'):
-        body = body[:-3] + '[.][X]'
+    the utf8 message packer (textprocess.py) pairs printable bytes two-at-a-time, so a
+    printable run with an ODD length makes its last char swallow the FOLLOWING byte --
+    and when that byte is the 0x00 terminator the decoder runs past [X] into the next
+    message (garbage + bleed-through). Pad with a [.] before [X] so the odd char eats the
+    pad instead. The parity that matters is the FINAL run (the printables after the last
+    control code), NOT the whole message: a multi-line body whose earlier [LF] runs are
+    odd can sum to an even total yet still have an odd final run (Pinky: 16+19+13=48 even,
+    final run 13 odd). No-op when the final run is already even."""
+    if not body.endswith('[X]'):
+        return body
+    inner = body[:-3]                       # strip the [X] terminator
+    last_close = inner.rfind(']')           # final run = text after the last control tag
+    final_run = (inner[last_close + 1:] if last_close != -1 else inner).replace('\n', '')
+    if len(final_run) % 2:
+        body = inner + '[.][X]'
     return body
 
 
@@ -3826,9 +3835,6 @@ def inject_ch01(campaign, verbose=True):
         '#include "bmunit.h"\n'
         '#include "face.h"\n'
         '#include "fontgrp.h"\n'
-        '#include "helpbox.h"\n'
-        '#include "statscreen.h"\n'
-        '#include "proc.h"\n'
         '\n'
         'extern const u16 gLordSelectCandidates[]; /* events_udefs.c */\n'
         '\n'
@@ -3838,33 +3844,63 @@ def inject_ch01(campaign, verbose=True):
         '\n'
         '/* #46 card (Nicolas 2026-06-25 layout): names MENU on the LEFT; as the cursor\n'
         '   lands on candidate i, draw their FULL 80x72 bust on the RIGHT (PutFace80x72 ->\n'
-        '   BG tilemap, so the real portrait layers over the scenic BACG -- the OBJ bust\n'
-        '   that sank v1 is avoided) + the qualitative PITCH wrapped BELOW it. The pitch\n'
-        '   PITCH in a stock HELP BOX -- which keeps its OWN VRAM, so the pitch does not\n'
-        '   fight the shared font tile pool that the 8-item menu already exhausts (each\n'
-        '   glyph is 2 tiles tall, so 8 names eat the whole width). The help box\'s\n'
-        '   auto-position is overridden so it sits in the panel below the bust. */\n'
+        '   BG tilemap, over the scenic BACG) + the qualitative PITCH wrapped BELOW it.\n'
+        '   The 8-item menu exhausts the shared system-font tile pool (each glyph is 2\n'
+        '   tiles tall), so the pitch gets its OWN font in free BG VRAM (tile 0x100, the\n'
+        '   gap between the system font at 0x80 and the bust at 0x200) -- no clash with\n'
+        '   the menu name tiles, full manual control of the box. */\n'
+        'extern void InitTextFont(struct Font * font, void * vram, int chr, int palid);\n'
+        '\n'
         'int LordSelect_DrawCard(struct MenuProc* menu, struct MenuItemProc* menu_item)\n'
         '{\n'
         '    const struct CharacterData* cd =\n'
         '        GetCharacterData(gLordSelectCandidates[menu_item->itemNumber]);\n'
-        '    struct HelpBoxProc* hb;\n'
+        '    const char* s = GetStringFromIndex(sLordSelectPitchMsg[menu_item->itemNumber]);\n'
+        '    struct Font pitchFont;\n'
+        '    char buf[40];\n'
+        '    char* o = buf;\n'
+        '    int line = 0;\n'
         '\n'
-        '    /* full bust, RIGHT: clear the BG0 block (reveals the opaque right-panel box\n'
-        '       on BG1 behind -- the portrait now sits on a blue backing), then redraw. */\n'
-        '    TileMap_FillRect(TILEMAP_LOCATED(gBG0TilemapBuffer, 0xE, 5), 15, 9, 0);\n'
-        '    PutFace80x72(menu, TILEMAP_LOCATED(gBG0TilemapBuffer, 0x11, 5),\n'
+        '    /* full bust, RIGHT, top-aligned at row 4 (rows 4..0xC): on a 20-row screen\n'
+        '       under a 4-row title, this is the only fit that leaves 3 pitch lines\n'
+        '       (rows 0xD/0xF/0x11) clear of the box bottom border at row 0x13. Clear the\n'
+        '       BG0 block first (reveals the blue panel on BG1), then redraw. */\n'
+        '    TileMap_FillRect(TILEMAP_LOCATED(gBG0TilemapBuffer, 0xE, 4), 15, 9, 0);\n'
+        '    PutFace80x72(menu, TILEMAP_LOCATED(gBG0TilemapBuffer, 0x11, 4),\n'
         '                 cd->portraitId, 0x200, 0xD);\n'
         '\n'
-        '    /* pitch: stock help box (own VRAM), auto-position overridden to the panel\n'
-        '       below the bust; snap past the resize tween (timer = timerMax). */\n'
-        '    StartHelpBox(0x70, 0x70, sLordSelectPitchMsg[menu_item->itemNumber]);\n'
-        '    hb = (struct HelpBoxProc*)Proc_Find(gProcScr_HelpBox);\n'
-        '    if (hb) {\n'
-        '        hb->xBox = hb->xBoxInit = hb->xBoxFinal = 0x70;\n'
-        '        hb->yBox = hb->yBoxInit = hb->yBoxFinal = 0x70;\n'
-        '        hb->timer = hb->timerMax;\n'
+        '    /* pitch BELOW the bust, in its OWN font/VRAM (tile 0x140), so it never\n'
+        '       collides with the menu name tiles. [LF]-delimited lines, two tile-rows\n'
+        '       apart (FE8 text is 16px tall); control bytes (the [.] parity pad) skipped.\n'
+        '       Restore the system font afterwards so the menu keeps drawing. */\n'
+        '    InitTextFont(&pitchFont, (void*)(0x06000000 + 0x2800), 0x140, 0);\n'
+        '    /* Scrub the WHOLE pitch tile band (3 lines x 15 cols x 2 rows = 90 tiles)\n'
+        '       before drawing: a shorter line over a previous candidate\'s longer one left\n'
+        '       its tail glyphs in VRAM (per-line ClearText alone did not catch it). */\n'
+        '    CpuFastFill16(0, (void*)(0x06000000 + 0x2800), 90 * 0x20);\n'
+        '    TileMap_FillRect(TILEMAP_LOCATED(gBG0TilemapBuffer, 0xE, 0xD), 15, 6, 0);\n'
+        '    for (;; s++) {\n'
+        '        if (*s == 0x01 || *s == 0x00) {\n'
+        '            *o = 0;\n'
+        '            /* PutDrawText(NULL,...) InitTexts a throwaway Text from the ACTIVE\n'
+        '               font (pitchFont) -- so the line\'s tiles allocate fresh from tile\n'
+        '               0x140, chr_counter advancing per line so lines do not overlap. */\n'
+        '            if (line < 3 && o != buf)\n'
+        '                PutDrawText((struct Text*)0,\n'
+        '                            TILEMAP_LOCATED(gBG0TilemapBuffer, 0xE, 0xD + 2 * line),\n'
+        '                            TEXT_COLOR_SYSTEM_WHITE, 0, 15, buf);\n'
+        '            if (*s == 0x00)\n'
+        '                break;\n'
+        '            line++;\n'
+        '            o = buf;\n'
+        '        } else if ((u8)*s >= 0x20) {\n'
+        '            *o++ = *s;\n'
+        '        }\n'
         '    }\n'
+        '    SetTextFont(0); /* restore the system font for the menu */\n'
+        '    InitSystemTextFont();\n'
+        '\n'
+        '    BG_EnableSyncByMask(BG0_SYNC_BIT | BG1_SYNC_BIT);\n'
         '    return 0;\n'
         '}\n'
         '\n'
@@ -3880,7 +3916,6 @@ def inject_ch01(campaign, verbose=True):
         '    SetFlag(0x%X + menu_item->itemNumber);\n'
         '    SetEventSlotC(sLordSelectConfirmMsg[menu_item->itemNumber]);\n'
         '\n'
-        '    EndHelpBox(); /* tear the pitch box down before the confirm box shows */\n'
         '    return MENU_ACT_CLEAR | MENU_ACT_SND6A | MENU_ACT_END | MENU_ACT_SKIPCURSOR;\n'
         '}\n'
         '\n'
@@ -3904,7 +3939,6 @@ def inject_ch01(campaign, verbose=True):
         '    SetTextFont(0);\n'
         '    InitSystemTextFont();\n'
         '    LoadUiFrameGraphics();\n'
-        '    LoadHelpBoxGfx(NULL, -1); /* gfx for the pitch help box (its own VRAM) */\n'
         '\n'
         '    /* title across the TOP: opaque frame box on the menu back BG (BG1, where the\n'
         '       UI-frame gfx is loaded), text on the front BG (BG0). */\n'
@@ -3912,9 +3946,10 @@ def inject_ch01(campaign, verbose=True):
         '    PutStringCentered(TILEMAP_LOCATED(gBG0TilemapBuffer, 0xB, 1),\n'
         '                      TEXT_COLOR_SYSTEM_WHITE, 0xE, GetStringFromIndex(0x%X));\n'
         '\n'
-        '    /* opaque panel backing the BUST (BG1); the pitch rides its own help-box\n'
-        '       frame below it. */\n'
-        '    DrawUiFrame(gBG1TilemapBuffer, 0xD, 4, 0x11, 0xB, 0, 1);\n'
+        '    /* opaque panel backing the BUST + pitch (BG1). Right edge (0xD+0x10=0x1D)\n'
+        '       lines up with the title box right edge (0xA+0x13=0x1D), per Nicolas. Tall\n'
+        '       enough (rows 4..0x14) for the 9-row bust AND 3 pitch lines below it. */\n'
+        '    DrawUiFrame(gBG1TilemapBuffer, 0xD, 4, 0x10, 0x10, 0, 1);\n'
         '\n'
         '    /* (blurb text handles are InitText\'d in LordSelect_DrawCard, parked above\n'
         '       the menu names that StartMenu allocates below.) */\n'
