@@ -343,6 +343,8 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         'src/bmcamadjust.c',
                         'src/unit_icon_wait_data.c', 'src/unit_icon_move_data.c', 'src/mu.c',
                         'src/bmudisp.c', 'src/prep_unitselect.c',
+                        # lord-select prep mode (#46): StartLordSelectPrep decl for eventscripts
+                        'include/eventcall.h',
                         # enemy class reskins (#21): cloned goblin classes in gClassData
                         'src/data_classes.c',
                         # faked battle anims (#65): appended banim_data row + pointer
@@ -1551,7 +1553,7 @@ def inject_world_tour(campaign, verbose=True):
               '(ten-towns) wired via GMAPRM_FLAG_4' % (len(cards), TOUR_TEXT_ID))
 
 
-def inject_test_chapter(campaign, verbose=True):
+def inject_test_chapter(campaign, verbose=True, lord_boot=False):
     """Rewrite Ch1's ally roster to our classed cast and disable Ch1 tutorials."""
     # Build the cast roster in PORTRAIT_MAP order, skipping name-only units (no class).
     units = []
@@ -1614,11 +1616,16 @@ def inject_test_chapter(campaign, verbose=True):
     # chapter's player UnitDefinition; ENUN waits for the placement; ENDA ends.
     with open(CH1_EVENTSCRIPT_H, encoding='utf-8') as f:
         script = f.read()
+    # DEBUG fast-boot (#46): once the cast is loaded, open straight into the lord-select
+    # prep screen so iterating on it is compile-time only (no playthrough grind). The prep
+    # list builds from the just-loaded cast; A picks the lead, then control returns here.
+    lord_boot_step = '    ASMC(StartLordSelectPrep)\n' if lord_boot else ''
     minimal_begin = ('{\n'
                      '    LOAD1(1, UnitDef_Event_Ch1Enemy)\n'   # keep the vanilla foes (reskinned) so the sandbox is combat-ready
                      '    ENUN\n'
                      '    LOAD1(1, UnitDef_Event_Ch1Ally)\n'
                      '    ENUN\n'
+                     + lord_boot_step +
                      '    ENDA\n'
                      '}')
     script = _replace_brace_block(
@@ -4879,7 +4886,14 @@ def main():
                          'with the whole cast deployed + the (reskinned) foes, cutscenes '
                          'stripped -- skips the prologue grind for fast in-engine testing. '
                          'Mutually exclusive with the prologue (both host chapter slot 1).')
+    ap.add_argument('--lord-boot', action='store_true',
+                    help='DEBUG fast-boot (#46, implies --test-chapter): the Ch1 sandbox '
+                         'opens straight into the lord-select prep screen on New Game, so '
+                         'iterating on that screen is compile-time only -- no playthrough '
+                         'grind (see decisions.md / the debug-fast-boot convention).')
     args = ap.parse_args()
+    if args.lord_boot:
+        args.test_chapter = True  # the fast-boot rides the sandbox
 
     print('build_campaign: injecting "%s" into %s' % (args.campaign, DECOMP))
     print('portraits:')
@@ -4897,6 +4911,8 @@ def main():
         print('  lord select (#42): GetPid + force-deploy/Seize/game-over keyed to the chosen lead')
         engine_hooks._inject_lord_floor_engine()  # after lord-select: anchors on its LordSelect_GetPid
         print('  lord floor (#45 3c): chosen lead\'s survivability top-up baked in once at ch start')
+        engine_hooks._inject_lord_select_prep_mode()
+        print('  lord select (#46): the real prep "Pick Units" screen runs as the lord picker')
         print('names:')
         inject_names(args.campaign)
         print('item names:')
@@ -4929,7 +4945,7 @@ def main():
         inject_ch02_chwinga_faces(args.campaign)  # green chwinga bust + Mote/Rime/Glimmer names
         if args.test_chapter:
             print('TEST CHAPTER (playtest: New Game -> Ch1 sandbox, cast deployed):')
-            inject_test_chapter(args.campaign)   # slot 1 sandbox, in place of the prologue
+            inject_test_chapter(args.campaign, lord_boot=args.lord_boot)   # slot 1 sandbox, in place of the prologue
             _configure_boot(TEST_CHAPTER_INDEX)  # sandbox never montages
         else:
             print('prologue (New Game target):')

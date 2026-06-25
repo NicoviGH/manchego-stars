@@ -20,6 +20,7 @@ BMMENU_C = os.path.join(DECOMP, 'src', 'bmmenu.c')
 DATA_EVENT_TRIGGER_C = os.path.join(DECOMP, 'src', 'data_event_trigger.c')
 EVENTINFO_C = os.path.join(DECOMP, 'src', 'eventinfo.c')
 PREP_SALLYCURSOR_C = os.path.join(DECOMP, 'src', 'prep_sallycursor.c')
+PREP_UNITSELECT_C = os.path.join(DECOMP, 'src', 'prep_unitselect.c')
 LORDFLOOR_APPLIED_FLAG = 0xFA
 
 
@@ -362,6 +363,154 @@ def _inject_lord_select_engine():
     text = _replace_brace_block(text, 'gForceDeploymentList[] =', cleared,
                                 DATA_EVENT_TRIGGER_C)
     with open(DATA_EVENT_TRIGGER_C, 'w', encoding='utf-8') as f:
+        f.write(text)
+
+
+def _inject_lord_select_prep_mode():
+    """Lord select (#46), UI: run the REAL prep "Pick Units" screen as a one-shot
+    "choose your lead" picker, reusing its polished list + live portrait + panel
+    instead of a hand-built menu (Nicolas 2026-06-25).
+
+    StartLordSelectPrep(parent) flips a resident mode flag and Proc_StartBlocking's the
+    vanilla ProcScr_PrepUnitScreen. The cast must already be loaded -- the prep list
+    builds purely from loaded units (MakePrepUnitList -> GetUnit + IsUnitInCurrentRoster),
+    so no prep-menu (ProcAtMenu) context is needed; the mode flag guards the few spots
+    that would otherwise reach into that parent. A on a candidate records the pick as the
+    permanent lord flag (LORDSEL_FLAG_BASE + index over gLordSelectCandidates, the same
+    flag LordSelect_GetPid reads) and exits the screen. Campaign-agnostic: candidate pids
+    come from the build-generated gLordSelectCandidates table.
+    """
+    # 1. Resident mode flag in bmunit.c (its ewram_data section is linked; the prep TU's
+    #    is not). Sits beside gActiveUnitId.
+    with open(BMUNIT_C, encoding='utf-8') as f:
+        text = f.read()
+    orig = 'EWRAM_DATA u8 gActiveUnitId = 0;\n'
+    if text.count(orig) != 1:
+        sys.exit('ERROR: gActiveUnitId anchor not found in %s' % BMUNIT_C)
+    text = text.replace(
+        orig,
+        orig + '/* Lord select (#46): 1 while the prep screen runs as the lord picker. */\n'
+        'EWRAM_DATA u8 gLordSelectPrepMode = 0;\n', 1)
+    with open(BMUNIT_C, 'w', encoding='utf-8') as f:
+        f.write(text)
+
+    with open(PREP_UNITSELECT_C, encoding='utf-8') as f:
+        text = f.read()
+
+    # 2. OnInit: in lord mode skip the ProcAtMenu parent reads (there is no such parent).
+    orig = ('    proc->max_counter = ((struct ProcAtMenu *)(proc->proc_parent))->max_counter;\n'
+            '    proc->cur_counter = ((struct ProcAtMenu *)(proc->proc_parent))->cur_counter;\n'
+            '    proc->yDiff_cur = ((struct ProcAtMenu *)(proc->proc_parent))->yDiff;\n')
+    if text.count(orig) != 1:
+        sys.exit('ERROR: ProcPrepUnit_OnInit parent reads not in expected form in %s'
+                 % PREP_UNITSELECT_C)
+    text = text.replace(orig,
+        '    if (gLordSelectPrepMode) {\n'
+        '        proc->max_counter = 99; /* lord pick: no deploy cap */\n'
+        '        proc->cur_counter = 0;\n'
+        '        proc->yDiff_cur = 0;\n'
+        '    } else {\n'
+        '        proc->max_counter = ((struct ProcAtMenu *)(proc->proc_parent))->max_counter;\n'
+        '        proc->cur_counter = ((struct ProcAtMenu *)(proc->proc_parent))->cur_counter;\n'
+        '        proc->yDiff_cur = ((struct ProcAtMenu *)(proc->proc_parent))->yDiff;\n'
+        '    }\n', 1)
+
+    # 3. OnEnd: in lord mode skip the parent writeback + clear the mode flag.
+    orig = ('void ProcPrepUnit_OnEnd(struct ProcPrepUnit *proc)\n'
+            '{\n'
+            '    ((struct ProcAtMenu *)(proc->proc_parent))->yDiff = proc->yDiff_cur;\n')
+    if text.count(orig) != 1:
+        sys.exit('ERROR: ProcPrepUnit_OnEnd not in expected form in %s' % PREP_UNITSELECT_C)
+    text = text.replace(orig,
+        'void ProcPrepUnit_OnEnd(struct ProcPrepUnit *proc)\n'
+        '{\n'
+        '    if (gLordSelectPrepMode) {\n'
+        '        gLordSelectPrepMode = 0;\n'
+        '        EndMuralBackground_();\n'
+        '        return;\n'
+        '    }\n'
+        '    ((struct ProcAtMenu *)(proc->proc_parent))->yDiff = proc->yDiff_cur;\n', 1)
+
+    # 4. HandlePressA: in lord mode A anoints the lead (sets the lord flag) and exits.
+    orig = ('s8 PrepUnit_HandlePressA(struct ProcPrepUnit *proc)\n'
+            '{\n'
+            '    struct Unit *unit = GetUnitFromPrepList(proc->list_num_cur);\n')
+    if text.count(orig) != 1:
+        sys.exit('ERROR: PrepUnit_HandlePressA head not in expected form in %s'
+                 % PREP_UNITSELECT_C)
+    text = text.replace(orig,
+        orig +
+        '\n'
+        '    if (gLordSelectPrepMode) {\n'
+        '        /* Lord select (#46): record the pick as permanent flag\n'
+        '           LORDSEL_FLAG_BASE + index over gLordSelectCandidates (events_udefs.c),\n'
+        '           read back by LordSelect_GetPid. Clear any prior pick first. */\n'
+        '        extern const u16 gLordSelectCandidates[];\n'
+        '        extern void SetFlag(int flag);\n'
+        '        extern void ClearFlag(int flag);\n'
+        '        int i;\n'
+        '        int pid = unit->pCharacterData->number;\n'
+        '\n'
+        '        for (i = 0; gLordSelectCandidates[i] != 0xFFFF; i++)\n'
+        '            ClearFlag(0x%X + i);\n'
+        '        for (i = 0; gLordSelectCandidates[i] != 0xFFFF; i++) {\n'
+        '            if (gLordSelectCandidates[i] == pid) {\n'
+        '                SetFlag(0x%X + i);\n'
+        '                break;\n'
+        '            }\n'
+        '        }\n'
+        '        PlaySoundEffect(SONG_SE_SYS_WINDOW_SELECT1);\n'
+        '        Proc_Goto(proc, PROC_LABEL_PREPUNIT_PRESS_B); /* fade out + end */\n'
+        '        return 0;\n'
+        '    }\n'
+        % (LORDSEL_FLAG_BASE, LORDSEL_FLAG_BASE), 1)
+
+    # 5. Idle: in lord mode START must not "Fight" -- the only exit is A (pick a lead).
+    orig = ('        if (START_BUTTON & gKeyStatusPtr->newKeys) {\n'
+            '            if (0 == proc->cur_counter) {\n')
+    if text.count(orig) != 1:
+        sys.exit('ERROR: ProcPrepUnit_Idle START handler not in expected form in %s'
+                 % PREP_UNITSELECT_C)
+    text = text.replace(orig,
+        '        if (START_BUTTON & gKeyStatusPtr->newKeys) {\n'
+        '            if (gLordSelectPrepMode || 0 == proc->cur_counter) {\n', 1)
+
+    # 6. Entry point, appended after the proc script (which it references).
+    text += (
+        '\n'
+        '/* Lord select (#46): launch THIS screen as the lord picker. The cast must be\n'
+        '   loaded already (the prep list builds from loaded units). */\n'
+        'extern u8 gLordSelectPrepMode;\n'
+        '\n'
+        'void StartLordSelectPrep(ProcPtr parent)\n'
+        '{\n'
+        '    gLordSelectPrepMode = 1;\n'
+        '    Proc_StartBlocking(ProcScr_PrepUnitScreen, parent);\n'
+        '}\n')
+
+    # Externs needed in the few patched functions (gLordSelectPrepMode is defined in
+    # bmunit.c). Declare it once near the top, after the includes block.
+    inc_anchor = '#include "constants/songs.h"\n'
+    if text.count(inc_anchor) != 1:
+        sys.exit('ERROR: include anchor not found in %s' % PREP_UNITSELECT_C)
+    text = text.replace(
+        inc_anchor,
+        inc_anchor + '\nextern u8 gLordSelectPrepMode; /* lord select (#46) */\n', 1)
+
+    with open(PREP_UNITSELECT_C, 'w', encoding='utf-8') as f:
+        f.write(text)
+
+    # 7. Declare StartLordSelectPrep for the eventscripts that ASMC it (cross-TU), in the
+    #    vanilla home for event-callable functions (beside CallRouteSplitMenu).
+    eventcall_h = os.path.join(DECOMP, 'include', 'eventcall.h')
+    with open(eventcall_h, encoding='utf-8') as f:
+        text = f.read()
+    orig = 'void CallRouteSplitMenu(ProcPtr proc);\n'
+    if text.count(orig) != 1:
+        sys.exit('ERROR: CallRouteSplitMenu decl anchor not found in %s' % eventcall_h)
+    text = text.replace(
+        orig, orig + 'void StartLordSelectPrep(ProcPtr proc); /* lord select (#46) */\n', 1)
+    with open(eventcall_h, 'w', encoding='utf-8') as f:
         f.write(text)
 
 
