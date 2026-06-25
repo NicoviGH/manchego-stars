@@ -57,9 +57,6 @@ design+dialogue lock (invoke `dialogue-pass`; ground in DM notes PDF + Frostmaid
 (`ch03`/`smoke_ch03`/`clear_ch03`, mirroring ch02). Then chapters #24–#28 (Ch4–Ch8) follow the same slice.
 
 ### Parked / supporting
-- **#46 lord-select reskin** — DESIGN-LOCKED & PARKED (needs Nicolas at mGBA for sign-off): clone
-  `prep_unitselect.c` → `engine/lord_select_screen.c`, build-generated `gLordSelectCandidates[]` +
-  pitch table; pitches in `pcs/*.yaml` (`lord_pitch:`); `recordlord` scenario exists.
 - Per-unit art/anim → the **convention homes** (`inject_battle_anims`/`inject_battle_platforms`
   docstrings + `decisions.md` Art & Audio + the `custom_unit` issue template); one issue per cast/enemy.
 - Supporting backlog: enemy YAML #18 · NPC stubs #17 · world-map #29 · overworld sprites #38 ·

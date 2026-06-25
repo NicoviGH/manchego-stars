@@ -5,7 +5,7 @@
 id: marty
 name: "Marty the Merry Mushroom"
 death_quote: "(a soft puff of spores) Don't grieve, friends... I'm only rejoining the cycle..."  # falls-in-battle quote (#6 dialogue pass; lore/marty.md)
-lord_pitch: "Dark mage -- stronger but slower than a mage. Strikes resistance at range; fragile."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
+lord_pitch: "Dark mage -- strikes resistance at range, but frail."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
 fe_name: Marty                            # FE8 name buffer is <=12 chars; full name overflows it
 portrait_ref: portraits/marty.png       # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/marty.jpeg

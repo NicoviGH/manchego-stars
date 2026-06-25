@@ -1852,6 +1852,40 @@ scenarios.recordlord = function()
     result("PASS", "lord-select flow frames recorded")
 end
 
+-- RECORDLORDFAST (#46 debug): on a `make LORDBOOT=1` ROM, New Game boots the sandbox
+-- straight into the lord-select prep screen (no ch00 win, no Northlook scene). Detect the
+-- prep proc, screenshot the card, walk the candidates, pick one. Compile-time-only
+-- iteration on the lord screen (see the debug-fast-boot convention).
+scenarios.recordlordfast = function()
+    local function recwait(n, tag)
+        for f = 1, n do if f % 5 == 0 then shot(tag) end yield() end
+    end
+    -- title -> New Game -> sandbox -> BeginningScene runs the explainer + ASMCs CallLordSelectMenu
+    local atPrep = false
+    for i = 1, 160 do
+        if menuOpen() then atPrep = true break end
+        press(i % 2 == 0 and K.A or K.START, 4)
+        wait(22)
+    end
+    if not atPrep then shot("lordfast-noprep")
+        return result("FAIL", "lord-select prep never opened on the fast-boot") end
+    recwait(50, "lordfast")            -- settle on the first candidate
+    for _ = 1, LORD_CANDIDATES - 1 do
+        press(K.DOWN, 4)
+        for f = 1, 24 do yield() end   -- let the bust gfx finish streaming in (no shots)
+        recwait(26, "lordfast")        -- THEN capture the SETTLED card (no transitions)
+    end
+    recwait(40, "lordfast")
+    press(K.A, 4)                      -- select the highlighted lead -> confirm box
+    for f = 1, 30 do yield() end       -- let the menu tear down + confirm box open
+    press(K.A, 4)                      -- fast-forward the (slow) typewriter
+    for f = 1, 24 do yield() end
+    recwait(30, "lordfast-confirm")    -- capture the full "Will <name> lead the party?" [Yes/No]
+    press(K.A, 4)                      -- [Yes] -> the re-pick loop exits (FADI/ENDA)
+    recwait(90, "lordfast")            -- the screen fades out + control returns
+    result("PASS", "lord-select prep fast-boot frames recorded")
+end
+
 -- CH01LORD (#42): pick the LAST lord candidate -- benched by default under the
 -- 4-slot deploy cap -- and assert the choice is real: the permanent flag is
 -- set, the pick is force-deployed onto the field (cap intact), and their death

@@ -190,6 +190,25 @@ CH01_CLASS_IDS = {'soldier': 'CLASS_SOLDIER', 'fighter': 'CLASS_FIGHTER',
 LORDSEL_PROMPT_MSG = 0x957   # dead vanilla slot-2 scene text (cf. inject_ch01 step 6)
 LORDSEL_CONFIRM_MSGS = (0x959, 0x95A, 0x95B, 0x95C, 0x95D, 0x95E, 0x95F,
                         0x962, 0x963, 0x964)  # same dead pool, one per candidate
+# Lord-select candidate pitch blurbs (#46): one dead Ch1-tutorial slot-2 id per candidate,
+# PARALLEL to LORDSEL_CONFIRM_MSGS (same 10-cap), drawn by lord_select_screen.c as the
+# cursor lands on each candidate. Plus a one-time explainer box shown before the screen
+# ("(a) explain", feedback #4). Pool vetting (the "msg-id vetting is treacherous" gotcha):
+# 0x966-0x970 are referenced ONLY by the vanilla Ch1 (slot-2) tutorial event scripts our
+# prologue host strips -> never displayed in our ROM; checked clean of live data_battlequotes.c
+# refs (the 0x993/0x994 false-negative lesson) and of the lone live use in the range (0x980,
+# bmdifficulty.c), which is excluded.
+LORDSEL_EXPLAINER_MSG = 0x966
+LORDSEL_PITCH_MSGS = (0x967, 0x968, 0x969, 0x96A, 0x96B, 0x96C, 0x96D,
+                      0x96E, 0x96F, 0x970)  # one per candidate (cast capped at 10)
+LORDSEL_HEADER_MSG = 0x971   # "Choose your lead" prep-screen header (#46); same dead pool
+# The one-time "(a) explain" box (feedback #4): drawn once before the pick loop. Locked
+# gist (decisions.md / #46): the chosen hero is the must-survive lead for the whole
+# campaign. Faithful to the gist; final wording is Nicolas's render-review call.
+LORDSEL_EXPLAINER_TEXT = (
+    "One of you must lead the company. Your chosen hero carries the whole "
+    "campaign -- if they fall in battle, the war is lost. Choose well."
+)
 # Beat 1 (#21) "The Northlook" scenic opening: a location card + one message per
 # beat (A-E), all riding dead vanilla Ch1-tutorial slot-2 message ids (the prologue
 # host strips Ch1's tutorial event lists, so these never display in our ROM).
@@ -325,6 +344,8 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         'src/bmcamadjust.c',
                         'src/unit_icon_wait_data.c', 'src/unit_icon_move_data.c', 'src/mu.c',
                         'src/bmudisp.c', 'src/prep_unitselect.c',
+                        # lord-select (#46): CallLordSelectMenu decl for eventscripts
+                        'include/eventcall.h',
                         # enemy class reskins (#21): cloned goblin classes in gClassData
                         'src/data_classes.c',
                         # faked battle anims (#65): appended banim_data row + pointer
@@ -673,12 +694,21 @@ def _wrap_fe_lines(text, width=29):
 
 def _term_pad(body):
     """FE8 Huffman terminator-parity (see [[manchego_stars_text_terminator_parity]]):
-    when a message's printable-char count is ODD the 0x00 terminator can't stand alone,
-    so the decoder runs past [X] into the next message (garbage + bleed-through). Pad
-    with a [.] before [X] to flip parity even. No-op when already even."""
-    visible = re.sub(r'\[[^\]]*\]', '', body).replace('\n', '')
-    if len(visible) % 2 and body.endswith('[X]'):
-        body = body[:-3] + '[.][X]'
+    the utf8 message packer (textprocess.py) pairs printable bytes two-at-a-time, so a
+    printable run with an ODD length makes its last char swallow the FOLLOWING byte --
+    and when that byte is the 0x00 terminator the decoder runs past [X] into the next
+    message (garbage + bleed-through). Pad with a [.] before [X] so the odd char eats the
+    pad instead. The parity that matters is the FINAL run (the printables after the last
+    control code), NOT the whole message: a multi-line body whose earlier [LF] runs are
+    odd can sum to an even total yet still have an odd final run (Pinky: 16+19+13=48 even,
+    final run 13 odd). No-op when the final run is already even."""
+    if not body.endswith('[X]'):
+        return body
+    inner = body[:-3]                       # strip the [X] terminator
+    last_close = inner.rfind(']')           # final run = text after the last control tag
+    final_run = (inner[last_close + 1:] if last_close != -1 else inner).replace('\n', '')
+    if len(final_run) % 2:
+        body = inner + '[.][X]'
     return body
 
 
@@ -1535,7 +1565,39 @@ def inject_world_tour(campaign, verbose=True):
               '(ten-towns) wired via GMAPRM_FLAG_4' % (len(cards), TOUR_TEXT_ID))
 
 
-def inject_test_chapter(campaign, verbose=True):
+def _lord_select_event_seq(bg_const, explainer_msg):
+    """The #46 lord-select interaction as an event-script fragment: open the scenic BG,
+    show the one-time explainer ONCE, then the LABEL(0) re-pick loop (menu -> "Will N
+    lead?" confirm in EVT_SLOT_C -> BNE back to the menu on "No"). Returns the fragment
+    up to and INCLUDING the BNE; callers append their own tail after it -- the real ch1
+    BeginningScene does EVBIT_MODIFY(0x0)+FADI+map build, the lord-fast debug boot just
+    FADI+ENDA. Single home so the debug boot can't drift from the flow it claims to verify
+    (CLAUDE.md design-placement rule -- one decision, one desk)."""
+    return (
+        '    REMOVEPORTRAITS\n'
+        '    BACG(%s)\n'
+        '    FADU(16)\n'
+        '    EVBIT_MODIFY(0x4)\n'
+        '    /* #46 (a): one-time explainer -- the chosen lead is the must-survive\n'
+        '       company lead campaign-long. Shown ONCE, before the re-pick loop. */\n'
+        '    TUTORIALTEXTBOXSTART\n'
+        '    TEXTSHOW(0x%X)\n'
+        '    TEXTEND\n'
+        '    REMA\n'
+        'LABEL(0x0)\n'
+        '    ASMC(CallLordSelectMenu)\n'
+        '    SADD(EVT_SLOT_2, EVT_SLOT_C, EVT_SLOT_0)\n'
+        '    TUTORIALTEXTBOXSTART\n'
+        '    SVAL(EVT_SLOT_B, 0xffffffff)\n'
+        '    TEXTSHOW(0xffff) /* confirm body from slot 2: "Will N lead...?" [Yes] */\n'
+        '    TEXTEND\n'
+        '    REMA\n'
+        '    SVAL(EVT_SLOT_7, 0x1)\n'
+        '    BNE(0x0, EVT_SLOT_C, EVT_SLOT_7) /* "No" -> pick again */\n'
+        % (bg_const, explainer_msg))
+
+
+def inject_test_chapter(campaign, verbose=True, lord_boot=False):
     """Rewrite Ch1's ally roster to our classed cast and disable Ch1 tutorials."""
     # Build the cast roster in PORTRAIT_MAP order, skipping name-only units (no class).
     units = []
@@ -1598,13 +1660,25 @@ def inject_test_chapter(campaign, verbose=True):
     # chapter's player UnitDefinition; ENUN waits for the placement; ENDA ends.
     with open(CH1_EVENTSCRIPT_H, encoding='utf-8') as f:
         script = f.read()
-    minimal_begin = ('{\n'
-                     '    LOAD1(1, UnitDef_Event_Ch1Enemy)\n'   # keep the vanilla foes (reskinned) so the sandbox is combat-ready
-                     '    ENUN\n'
-                     '    LOAD1(1, UnitDef_Event_Ch1Ally)\n'
-                     '    ENUN\n'
-                     '    ENDA\n'
-                     '}')
+    if lord_boot:
+        # DEBUG fast-boot (#46): a pure off-map scene that mirrors the REAL ch1 lord-select
+        # sequence (the SHARED _lord_select_event_seq -- explainer + re-pick loop) over the
+        # scenic BG, minus only the post-Yes map build (no deploy: the menu reads
+        # CharacterData, not loaded units). Verifies the explainer + "Will N lead?" confirm
+        # in-engine, not just the menu. Compile-time-only iteration on the screen.
+        minimal_begin = ('{\n'
+                         + _lord_select_event_seq(CH01_LORDSEL_BG, LORDSEL_EXPLAINER_MSG)
+                         + '    FADI(16)\n'
+                           '    ENDA\n'
+                           '}')
+    else:
+        minimal_begin = ('{\n'
+                         '    LOAD1(1, UnitDef_Event_Ch1Enemy)\n'   # keep the vanilla foes (reskinned) so the sandbox is combat-ready
+                         '    ENUN\n'
+                         '    LOAD1(1, UnitDef_Event_Ch1Ally)\n'
+                         '    ENUN\n'
+                         '    ENDA\n'
+                         '}')
     script = _replace_brace_block(
         script, 'EventScr_Ch1_BeginningScene[] =', minimal_begin, CH1_EVENTSCRIPT_H)
     with open(CH1_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
@@ -1716,6 +1790,23 @@ def lord_floor_rows(campaign, uids, ch='ch01', target=3.5):
         f = difficulty.lord_floor_delta(
             difficulty.player_combatant(campaign, uid), threat, target=target)
         rows.append((uid, f.hp, f.df, f.res))
+    return rows
+
+
+def lord_select_pitches(campaign, uids):
+    """Per-candidate lord-select blurbs (#46): one (uid, pitch) tuple per uid, in input
+    order, read off each cast member's hand-authored `lord_pitch:` YAML. The build emits
+    these as sLordSelectPitchMsg[] (eventscript TU), PARALLEL to gLordSelectCandidates[] --
+    LordSelect_DrawCard draws candidate i's pitch as the cursor lands on it. Hard-fails if any candidate lacks
+    a pitch: a blank card would ship silently (the "no silent gaps" lock, Nicolas
+    2026-06-20)."""
+    rows = []
+    for uid in uids:
+        pitch = load_unit(campaign, uid).get('lord_pitch')
+        if not pitch:
+            sys.exit('ERROR: lord-select candidate %r has no lord_pitch (#46): every '
+                     'candidate needs a qualitative blurb -- no silent gaps.' % uid)
+        rows.append((uid, pitch))
     return rows
 
 
@@ -3659,6 +3750,9 @@ def inject_ch01(campaign, verbose=True):
         ['    CHARACTER_%s, /* %s */' % (slot.upper(), uid)
          for uid, slot, _, _, _ in cast] +
         ['    0xFFFF,', '};', ''])
+    # (The per-candidate pitch + "Choose your lead" header msg ids live in the eventscript
+    #  TU as sLordSelectPitchMsg[] / an inlined header, drawn directly by LordSelect_DrawCard
+    #  -- no global table is needed.)
     # Lord survivability floors (#45 3b): per-candidate { +maxHP, +Def, +Res }, PARALLEL to
     # gLordSelectCandidates above (same menu order). Computed @target 3.5 bulk-durability vs
     # Ch1 enemies -- the shamans' frail floor; the armor tanks score 0. The engine adds the
@@ -3741,23 +3835,98 @@ def inject_ch01(campaign, verbose=True):
             '        .isAvailable = MenuAlwaysEnabled,\n'
             '        .onDraw = MenuCommand_DrawRouteSplit,\n'
             '        .onSelected = Command_SelectLord,\n'
+            '        .onSwitchIn = LordSelect_DrawCard, /* #46: live candidate card */\n'
             '    },' % (vanilla_name_text_id(slot), uid, i))
     menu_code = (
-        '/* ==== Lord select (#42, build-generated): pre-preparations leader menu ====\n'
-        '   Route-split menu clone (cf. CallRouteSplitMenu, ch8-eventscript.h). The\n'
-        '   pick is stored as permanent flag 0x%X + item index and read back by\n'
-        '   LordSelect_GetPid (eventinfo.c) to drive force-deploy, Seize, and the\n'
-        '   lord-death game over. One confirm text per candidate (dead vanilla\n'
-        '   slot-2 message ids). */\n'
+        '/* ==== Lord select (#42/#46, build-generated): "choose your lead" screen ====\n'
+        '   A stock candidate menu (route-split flow: pick -> confirm text in EVT_SLOT_C)\n'
+        '   COMPOSED with a live info card (Nicolas 2026-06-25 layout, supersedes the\n'
+        '   prep_unitselect clone). The names list rides the LEFT column; as the cursor\n'
+        '   lands on candidate i the menu engine fires onSwitchIn (uimenu.c), which draws\n'
+        '   that candidate\'s FULL 80x72 bust on the RIGHT (PutFace80x72 -> BG tilemap, so\n'
+        '   it layers over the scenic BACG with no OBJ-vs-BG priority fight) + the\n'
+        '   qualitative PITCH (#46) below it, in DrawUiFrame panels. The pick is stored as\n'
+        '   permanent flag 0x%X + item index and read back by LordSelect_GetPid\n'
+        '   (eventinfo.c). One confirm + one pitch text per candidate (dead vanilla\n'
+        '   Ch1-tutorial slot-2 message ids). Coords are render-tunable. */\n'
         '\n'
         '#include "uimenu.h"\n'
-        '#include "fontgrp.h"\n'
         '#include "hardware.h"\n'
         '#include "uiutils.h"\n'
+        '#include "bmlib.h"\n'
+        '#include "bmunit.h"\n'
+        '#include "face.h"\n'
+        '#include "fontgrp.h"\n'
         '\n'
         'extern const u16 gLordSelectCandidates[]; /* events_udefs.c */\n'
         '\n'
         'static CONST_DATA u16 sLordSelectConfirmMsg[] = { %s };\n'
+        '/* #46: qualitative blurb per candidate, PARALLEL to gLordSelectCandidates. */\n'
+        'static CONST_DATA u16 sLordSelectPitchMsg[] = { %s };\n'
+        '\n'
+        '/* #46 card (Nicolas 2026-06-25 layout): names MENU on the LEFT; as the cursor\n'
+        '   lands on candidate i, draw their FULL 80x72 bust on the RIGHT (PutFace80x72 ->\n'
+        '   BG tilemap, over the scenic BACG) + the qualitative PITCH wrapped BELOW it.\n'
+        '   The 8-item menu exhausts the shared system-font tile pool (each glyph is 2\n'
+        '   tiles tall), so the pitch gets its OWN font in free BG VRAM (tile 0x140 =\n'
+        '   VRAM 0x2800 (0x140<<5), in the gap between the menu pool -- which spills just\n'
+        '   past the system font at 0x80 -- and the bust at 0x200) -- no clash with the\n'
+        '   menu name tiles, full manual control of the box. */\n'
+        'extern void InitTextFont(struct Font * font, void * vram, int chr, int palid);\n'
+        '\n'
+        'int LordSelect_DrawCard(struct MenuProc* menu, struct MenuItemProc* menu_item)\n'
+        '{\n'
+        '    const struct CharacterData* cd =\n'
+        '        GetCharacterData(gLordSelectCandidates[menu_item->itemNumber]);\n'
+        '    const char* s = GetStringFromIndex(sLordSelectPitchMsg[menu_item->itemNumber]);\n'
+        '    struct Font pitchFont;\n'
+        '    char buf[40];\n'
+        '    char* o = buf;\n'
+        '    int line = 0;\n'
+        '\n'
+        '    /* full bust, RIGHT, top-aligned at row 4 (rows 4..0xC): on a 20-row screen\n'
+        '       under a 4-row title, this is the only fit that leaves 3 pitch lines\n'
+        '       (rows 0xD/0xF/0x11) clear of the box bottom border at row 0x13. Clear the\n'
+        '       BG0 block first (reveals the blue panel on BG1), then redraw. */\n'
+        '    TileMap_FillRect(TILEMAP_LOCATED(gBG0TilemapBuffer, 0xE, 4), 15, 9, 0);\n'
+        '    PutFace80x72(menu, TILEMAP_LOCATED(gBG0TilemapBuffer, 0x11, 4),\n'
+        '                 cd->portraitId, 0x200, 0xD);\n'
+        '\n'
+        '    /* pitch BELOW the bust, in its OWN font/VRAM (tile 0x140), so it never\n'
+        '       collides with the menu name tiles. [LF]-delimited lines, two tile-rows\n'
+        '       apart (FE8 text is 16px tall); control bytes (the [.] parity pad) skipped.\n'
+        '       Restore the system font afterwards so the menu keeps drawing. */\n'
+        '    InitTextFont(&pitchFont, (void*)(0x06000000 + 0x2800), 0x140, 0);\n'
+        '    /* Scrub the WHOLE pitch tile band (3 lines x 15 cols x 2 rows = 90 tiles)\n'
+        '       before drawing: a shorter line over a previous candidate\'s longer one left\n'
+        '       its tail glyphs in VRAM (per-line ClearText alone did not catch it). */\n'
+        '    CpuFastFill16(0, (void*)(0x06000000 + 0x2800), 90 * 0x20);\n'
+        '    TileMap_FillRect(TILEMAP_LOCATED(gBG0TilemapBuffer, 0xE, 0xD), 15, 6, 0);\n'
+        '    for (;; s++) {\n'
+        '        if (*s == 0x01 || *s == 0x00) {\n'
+        '            *o = 0;\n'
+        '            /* PutDrawText(NULL,...) InitTexts a throwaway Text from the ACTIVE\n'
+        '               font (pitchFont) -- so the line\'s tiles allocate fresh from tile\n'
+        '               0x140, chr_counter advancing per line so lines do not overlap. */\n'
+        '            if (line < 3 && o != buf)\n'
+        '                PutDrawText((struct Text*)0,\n'
+        '                            TILEMAP_LOCATED(gBG0TilemapBuffer, 0xE, 0xD + 2 * line),\n'
+        '                            TEXT_COLOR_SYSTEM_WHITE, 0, 15, buf);\n'
+        '            if (*s == 0x00)\n'
+        '                break;\n'
+        '            line++;\n'
+        '            o = buf;\n'
+        '        } else if ((u8)*s >= 0x20 && o < buf + sizeof(buf) - 1) {\n'
+        '            *o++ = *s; /* bounded: a pathologically long unwrapped line truncates,\n'
+        '                          never smashes the stack (lines wrap at 20, buf is 40) */\n'
+        '        }\n'
+        '    }\n'
+        '    SetTextFont(0); /* restore the system font for the menu */\n'
+        '    InitSystemTextFont();\n'
+        '\n'
+        '    BG_EnableSyncByMask(BG0_SYNC_BIT | BG1_SYNC_BIT);\n'
+        '    return 0;\n'
+        '}\n'
         '\n'
         'u8 Command_SelectLord(struct MenuProc* menu, struct MenuItemProc* menu_item)\n'
         '{\n'
@@ -3780,7 +3949,7 @@ def inject_ch01(campaign, verbose=True):
         '};\n'
         '\n'
         'CONST_DATA struct MenuDef MenuDef_LordSelect = {\n'
-        '    .rect = {9, 1, 12, 0},\n'
+        '    .rect = {1, 0, 9, 0}, /* names MENU on the LEFT (left-to-right reading) */\n'
         '    .style = 1,\n'
         '    .menuItems = MenuItemDef_LordSelect,\n'
         '};\n'
@@ -3794,15 +3963,42 @@ def inject_ch01(campaign, verbose=True):
         '    SetTextFont(0);\n'
         '    InitSystemTextFont();\n'
         '    LoadUiFrameGraphics();\n'
+        '\n'
+        '    /* title across the TOP: opaque frame box on the menu back BG (BG1, where the\n'
+        '       UI-frame gfx is loaded), text on the front BG (BG0). */\n'
+        '    DrawUiFrame(gBG1TilemapBuffer, 0xA, 0, 0x13, 4, 0, 1);\n'
+        '    PutStringCentered(TILEMAP_LOCATED(gBG0TilemapBuffer, 0xB, 1),\n'
+        '                      TEXT_COLOR_SYSTEM_WHITE, 0xE, GetStringFromIndex(0x%X));\n'
+        '\n'
+        '    /* opaque panel backing the BUST + pitch (BG1). Right edge (0xD+0x10=0x1D)\n'
+        '       lines up with the title box right edge (0xA+0x13=0x1D), per Nicolas. Tall\n'
+        '       enough (rows 4..0x14) for the 9-row bust AND 3 pitch lines below it. */\n'
+        '    DrawUiFrame(gBG1TilemapBuffer, 0xD, 4, 0x10, 0x10, 0, 1);\n'
+        '\n'
+        '    /* (blurb text handles are InitText\'d in LordSelect_DrawCard, parked above\n'
+        '       the menu names that StartMenu allocates below.) */\n'
         '    StartMenu(&MenuDef_LordSelect, proc);\n'
         '}\n'
         '\n'
-        % (LORDSEL_FLAG_BASE, ', '.join('0x%X' % m for m in
-                                        LORDSEL_CONFIRM_MSGS[:len(cast)]),
-           LORDSEL_FLAG_BASE, LORDSEL_FLAG_BASE, '\n'.join(items)))
+        % (LORDSEL_FLAG_BASE,
+           ', '.join('0x%X' % m for m in LORDSEL_CONFIRM_MSGS[:len(cast)]),
+           ', '.join('0x%X' % m for m in LORDSEL_PITCH_MSGS[:len(cast)]),
+           LORDSEL_FLAG_BASE, LORDSEL_FLAG_BASE, '\n'.join(items),
+           LORDSEL_HEADER_MSG))
     with open(CH2_EVENTSCRIPT_H, encoding='utf-8') as f:
         script = f.read()
     script = menu_code + script
+    # Declare CallLordSelectMenu in eventcall.h so eventscript files included BEFORE
+    # ch2-eventscript.h (e.g. the ch1 sandbox, debug fast-boot) can ASMC it.
+    eventcall_h = os.path.join(DECOMP, 'include', 'eventcall.h')
+    with open(eventcall_h, encoding='utf-8') as f:
+        ec = f.read()
+    anchor = 'void CallRouteSplitMenu(ProcPtr proc);\n'
+    if anchor in ec and 'CallLordSelectMenu' not in ec:
+        ec = ec.replace(
+            anchor, anchor + 'void CallLordSelectMenu(ProcPtr proc); /* lord select (#46) */\n', 1)
+        with open(eventcall_h, 'w', encoding='utf-8') as f:
+            f.write(ec)
     beat1_labels = ['A -- Hlin & Scramsax in from the cold',
                     'B -- the roll-call (PCs one at a time + RBG/Pinky, Hlin watching)',
                     "C -- Hlin's story: the endless winter",
@@ -3830,22 +4026,11 @@ def inject_ch01(campaign, verbose=True):
         + beat1_scene +
         '    /* Lord select (#42) on its OWN scenic BG -- a "choose your leader" screen,\n'
         '       NOT the battle map (Nicolas, 2026-06-16). The menu window draws on BG0/1\n'
-        '       over the BACG on BG3; CallLordSelectMenu keeps BG2 (map) off. */\n'
-        '    REMOVEPORTRAITS\n'
-        '    BACG(%s)\n'
-        '    FADU(16)\n'
-        '    EVBIT_MODIFY(0x4)\n'
-        'LABEL(0x0)\n'
-        '    ASMC(CallLordSelectMenu)\n'
-        '    SADD(EVT_SLOT_2, EVT_SLOT_C, EVT_SLOT_0)\n'
-        '    TUTORIALTEXTBOXSTART\n'
-        '    SVAL(EVT_SLOT_B, 0xffffffff)\n'
-        '    TEXTSHOW(0xffff) /* confirm body from slot 2: "Will N lead...?" [Yes] */\n'
-        '    TEXTEND\n'
-        '    REMA\n'
-        '    SVAL(EVT_SLOT_7, 0x1)\n'
-        '    BNE(0x0, EVT_SLOT_C, EVT_SLOT_7) /* "No" -> pick again */\n'
-        '    EVBIT_MODIFY(0x0)\n'
+        '       over the BACG on BG3; CallLordSelectMenu keeps BG2 (map) off. The explainer\n'
+        '       + re-pick loop is the SHARED _lord_select_event_seq (also the lord-fast\n'
+        '       debug boot); here we append the post-Yes map build. */\n'
+        + _lord_select_event_seq(CH01_LORDSEL_BG, LORDSEL_EXPLAINER_MSG)
+        + '    EVBIT_MODIFY(0x0)\n'
         '    /* leader chosen: fade the scenic BG out, build the battle map, deploy. */\n'
         '    FADI(16)\n'
         '    SVAL(EVT_SLOT_B, 0x0) /* map camera origin for the reload */\n'
@@ -3860,7 +4045,8 @@ def inject_ch01(campaign, verbose=True):
         '    CALL(EventScr_08591FD8) /* preparations (PREP, event cmd 0x3E) */\n'
         '    ENUT(8)\n'
         '    EVBIT_T(7)\n'
-        '    ENDA\n}' % (CH01_LORDSEL_BG, CH01_HOST_INDEX), CH2_EVENTSCRIPT_H)
+        '    ENDA\n}' % (CH01_HOST_INDEX,),
+        CH2_EVENTSCRIPT_H)
     script = _replace_brace_block(
         script, 'EventScr_Ch2_Turn1Player[] =',
         '{\n    SVAL(EVT_SLOT_2, UnitDef_088B44AC)\n'
@@ -4024,6 +4210,25 @@ def inject_ch01(campaign, verbose=True):
         q = 'Will %s lead the party?' % name
         set_message_body(lines, LORDSEL_CONFIRM_MSGS[i], '%s%s[LF]\n[Yes][X]'
                          % (q, '[.]' if len(q) % 2 else ''))
+    # Lord-select candidate pitches (#46): drawn IN-MENU by LordSelect_DrawCard, which
+    # splits the decoded body on [LF] and renders each line through its own dedicated font
+    # (no [A] paging -- the pitch is one static 3-line panel below the bust). _term_pad
+    # guards the terminator parity (final-run rule). Build hard-fails on a missing pitch
+    # (lord_select_pitches).
+    for i, (uid, pitch) in enumerate(lord_select_pitches(campaign,
+                                                         [u for u, *_ in cast])):
+        body = '[LF]'.join(_wrap_fe_lines(_fe_dialogue_text(pitch), width=20))
+        set_message_body(lines, LORDSEL_PITCH_MSGS[i], _term_pad(body + '[X]'))
+    # The one-time explainer box (#46 (a)) rides the normal tutorial text box, so it uses
+    # the talk decoder: [A] page breaks every two lines + the standard [.] parity pad.
+    expl = _wrap_fe_lines(_fe_dialogue_text(LORDSEL_EXPLAINER_TEXT), width=29)
+    expl_body = ''.join(
+        ln + ('' if j == len(expl) - 1
+              else '[A]' if (j + 1) % 2 == 0 else '[LF]')
+        for j, ln in enumerate(expl))
+    set_message_body(lines, LORDSEL_EXPLAINER_MSG, _term_pad(expl_body + '[X]'))
+    # Prep-screen header (#46): "Choose your lead" replaces "Pick N Units Left" in lord mode.
+    set_message_body(lines, LORDSEL_HEADER_MSG, _term_pad('Choose your lead[X]'))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 
@@ -4767,7 +4972,14 @@ def main():
                          'with the whole cast deployed + the (reskinned) foes, cutscenes '
                          'stripped -- skips the prologue grind for fast in-engine testing. '
                          'Mutually exclusive with the prologue (both host chapter slot 1).')
+    ap.add_argument('--lord-boot', action='store_true',
+                    help='DEBUG fast-boot (#46, implies --test-chapter): the Ch1 sandbox '
+                         'opens straight into the lord-select prep screen on New Game, so '
+                         'iterating on that screen is compile-time only -- no playthrough '
+                         'grind (see decisions.md / the debug-fast-boot convention).')
     args = ap.parse_args()
+    if args.lord_boot:
+        args.test_chapter = True  # the fast-boot rides the sandbox
 
     print('build_campaign: injecting "%s" into %s' % (args.campaign, DECOMP))
     print('portraits:')
@@ -4817,7 +5029,7 @@ def main():
         inject_ch02_chwinga_faces(args.campaign)  # green chwinga bust + Mote/Rime/Glimmer names
         if args.test_chapter:
             print('TEST CHAPTER (playtest: New Game -> Ch1 sandbox, cast deployed):')
-            inject_test_chapter(args.campaign)   # slot 1 sandbox, in place of the prologue
+            inject_test_chapter(args.campaign, lord_boot=args.lord_boot)   # slot 1 sandbox, in place of the prologue
             _configure_boot(TEST_CHAPTER_INDEX)  # sandbox never montages
         else:
             print('prologue (New Game target):')

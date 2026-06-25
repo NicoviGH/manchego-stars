@@ -5,7 +5,7 @@
 id: prof-rbg
 name: "Prof. R.B. Geenius"
 death_quote: "Ah... discheesed at last. ...Be Gouda, Pinky."  # falls-in-battle quote (#6 dialogue pass; lore/prof-rbg.md)
-lord_pitch: "Bowman who attacks from afar -- deadly to fliers. No melee: helpless when cornered."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
+lord_pitch: "Archer -- deadly to fliers, but helpless up close."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
 fe_name: "Prof. RBG"                      # FE8 name buffer is <=12 chars; full name overflows it
 portrait_ref: portraits/prof-rbg.png     # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/prof-rbg.jpg
