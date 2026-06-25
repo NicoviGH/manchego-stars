@@ -22,46 +22,69 @@ ADR: `decisions.md` §Distribution.
 
 ## Tools (quick ref)
 - `make difficulty CH=chNN` · `make difficulty-gate` (enforcing parity curve) · `make test` · `make check` (drift).
-- `tools/playtest/run.sh recordanim` — capture **any** cast member's battle anim on a `make TESTCH=1` ROM
-  (`PT_CHAR=<id>`: braulo marty meesmickle wolfram prof-rbg rootis sclorbo pinky; a staff user FAILs
-  cleanly). `tools/playtest/make_gif.py recordanim <id> --open` → review GIF. `recordrbg` = RBG on the
-  real campaign (checkpoint). Other scenarios: `win|gameover|ch01win|clear|fuzz`.
+- **Playtest scenarios** `tools/playtest/run.sh <scenario>` (need a built ROM + `lua`):
+  - logic/stability: `win|gameover|ch01win|clear|clear_ch01|smoke|smoke_ch01|fuzz`
+  - **ch2 (#22):** `ch02` (entry asserts) · `smoke_ch02` (soft-lock net) · `clear_ch02` (rout→chain→charms) —
+    all load a `ch02start` checkpoint, built once from the real ch00→ch01→ch02 chain.
+  - `recordanim` (any cast battle anim on a `TESTCH=1` ROM, `PT_CHAR=<id>`) · `recordrbg` · `recordlord`.
+  - `make_gif.py <scenario> <tag> --open` → review GIF.
 - **Delivery to friends:** commit a **GIF** (never MP4 — a committed `.mp4` is a binary download, not
   inline on GitHub) to `docs/demo/` + push.
 
 ## Now / Next
 
-### Content — Ch2 "Cold Welcome" (#22): art complete; title card + load-test remain
-- **(a) Dialogue reground** — ✅ DONE, merged in #70 (`37f327c`): opening chwinga-adoption beat
-  (Sclorbo's kin + Marty's Chagaccino), turn-1 RBG→Pinky archer tutorial (fliers-vs-bows debut),
-  de-sledded rear bark + ending card. Host wired (3 opening beats + turn-1 tutorial scene reusing the
-  dead `Ch3_Turn2Player` slot + turn-3 bark). Msg-id reuse vetted clean (0x98d/0x98f free; 0x991's only
-  live ref is Bazba's talk in the emptied Character list).
-- **(b) Chwinga + Vellynne art** (#38/#39/#19): **DONE** — chwinga map sprites (#74 `45d62fb`),
-  portraits + Mote/Rime/Glimmer names (#75 `fb8f3ac`), Vellynne bust (#19 `3efdd29`). The whole chwinga
-  look = Sclorbo's sprite & bust reused with the icy-blue glow recoloured spirit-green (he IS a chwinga),
-  build-derived from his assets (no committed copies). Vellynne = FE-Repo Sonya (Witch) mug with a
-  magenta→snow-white hair recolor (`portraits/vellynne.py`, dresses the Ismaire slot; credit JeyTheCount).
-  ADRs in decisions.md Art & Audio. STILL OPEN (lighter): the **title card** ("Cold Welcome" —
-  `gen_chapter_title` atlas missing C/W/d/m glyphs).
-- **(c) mGBA load-test** ch01→ch02→win→chains (chwinga LOAD, archer threatens pegasi, survivors deliver
-  charms). Fast via `make TESTCH=1` (wire a ch02 sandbox) or the `recordrbg`/checkpoint path.
-- Per-unit art/anim follows the **convention homes** — `inject_battle_anims` / `inject_battle_platforms`
-  docstrings (how) + `decisions.md` Art & Audio (why) + the **`custom_unit` issue template** (per-unit
-  checklist); open one issue per remaining cast/enemy.
-- Supporting: Vellynne portrait #19 · ch02 title card · enemy YAML #18 · NPC stubs #17 · world-map #29 ·
-  overworld sprites #38 · onboarding-parity #64.
+### Content — Ch2 (#22 REOPENED 2026-06-25) — two demo-review polish items left
+Build + dialogue + art + title card merged; structural load-test automated; pacing signed off. Then a
+demo-GIF review surfaced two polish items, folded into **#22's vertical-slice checklist** (chapter
+feedback rides the slice issue, not standalone — #81/#82 were closed into it). NOT gating Ch3:
+- **opening text (`bug`/`content`)** — the "Bryn Shander" location pop-up in the **opening** cutscene
+  renders **garbled text**. Check the card text (`CH02_OPENING_CARD_MSG` / `BROWNBOXTEXT` label in
+  `inject_ch02`) + `tools/verify_text.py`; recapture `recordch02intro` to confirm.
+- **Targos ending BG (`art`)** — the **ending** reuses the generic `BG_NORMAL_VILLAGE` (same as the
+  opening). Wants a **darker/colder** distinct backdrop — **vendor a winter/dark-town BG** (FE-Repo
+  `gh api … download_url` → curl, like the winter tiles), convert to FE8 BG (additive), point
+  `CH02_ENDING_BG` at it. Show Nicolas before committing.
+- **Demo reel** lives on the **unmerged `demo/ch2-gifs` branch** (`docs/demo/ch2-cold-welcome.md` —
+  opening/map/combat/closing GIFs + the reusable `recordch02{intro,map,combat,ending}` harness
+  scenarios). The opening/ending GIFs go **stale once the two items land**, so regenerate + decide
+  merge-vs-drop after the fixes.
+
+### Content — Ch3 "The Termalaine Mine" (#23) — NEXT chapter slice
+Not started. Reuse the Ch2 vertical-slice component breakdown (tracked as a checklist on the issue):
+design+dialogue lock (invoke `dialogue-pass`; ground in DM notes PDF + Frostmaiden book) → map
+(`#40` Tiled→`.mar` pipeline) → host on the next vanilla slot (model on `inject_ch01`/`inject_ch02`;
+`MNC2(<next>)`) → units/objective/cutscenes → art per `#38/#39` → title card → load-test scenarios
+(`ch03`/`smoke_ch03`/`clear_ch03`, mirroring ch02). Then chapters #24–#28 (Ch4–Ch8) follow the same slice.
+
+### Parked / supporting
+- Per-unit art/anim → the **convention homes** (`inject_battle_anims`/`inject_battle_platforms`
+  docstrings + `decisions.md` Art & Audio + the `custom_unit` issue template); one issue per cast/enemy.
+- Supporting backlog: enemy YAML #18 · NPC stubs #17 · world-map #29 · overworld sprites #38 ·
+  onboarding-parity #64 · faked battle anims epic #65.
 
 ### Pipeline — playtest / parity
-- **LLM-player #63 — M2 next** (M1 landed): sidecar + `llmDrive` handshake, **replay-only** from a recorded
-  transcript on a built ROM (deterministic, zero LLM cost). Then M3 live policy (`PT_MODEL`, per `claude-api`
-  skill) → M4 soak→curve → M5 vanilla-FE8 validation. Swap point: `clearbot.lua pickTarget`.
-- **Land `balance_locked: true` on ch00/ch01/ch02** — the per-chapter parity gate (#48b) is enforcing but
-  inert until a chapter opts in; those three read OK on the curve.
-- #53 tail (FE8 Ch13 ref → our ch08): ~11 standard weapons to model; informational (ch08 is scripted-defeat,
-  never CI-gated) — do only if idle. Other mechanics leaves: d20 crit #11, spell-economy #9, iconic matchups #8.
+- **Clear-bot #60 — partial landed (#79, 2026-06-25), STILL OPEN.** BFS distance-field march
+  (`pathing.lua` + `gBmMapTerrain`), multi-range targeting, a stall watchdog, and a title=loss
+  bugfix are in; `clear` (prologue) passes fair-play. **Remaining:** the bot jams at ch01's walled
+  boss-camp with a thin 2-unit deploy — last-mile **breach/unjam** logic (field more units / slip a
+  chokepoint / focus-fire the nearest reachable straggler). Precise diagnosis on issue #60.
+- **LLM-player #63 — M2 next** (M1 landed): sidecar + `llmDrive` handshake, **replay-only** from a
+  recorded transcript on a built ROM (deterministic, zero LLM cost). Then M3 live policy (`PT_MODEL`,
+  per `claude-api` skill) → M4 soak→curve → M5 vanilla-FE8 validation. Swap point: `clearbot.lua pickTarget`.
+- **Land `balance_locked: true` on ch00/ch01** (ch02 already set) — the per-chapter parity gate (#48b)
+  is enforcing but inert until a chapter opts in; ch00/ch01 read OK on the curve.
+- #53 tail (FE8 Ch13 ref → our ch08): ~11 standard weapons to model; informational (ch08 is
+  scripted-defeat, never CI-gated) — do only if idle. Other mechanics leaves: d20 crit #11,
+  spell-economy #9, iconic matchups #8.
 
 ## Gotchas (cross-cutting)
+- **Clear-bot can't fully clear a chapter yet (#60).** For helpers that must REACH a later chapter,
+  don't rely on a fair-play clear: `reachCh02Map` uses a **directed ch01-seize** (frail escort +
+  lord-march), and `clear_ch02` uses **frail+teleport** to rout deterministically (its job is the
+  charm-wiring test, not bot combat). A fair-play `clear`/`clear_ch01` is blocked on the #60 breach work.
+- **Don't reuse a playtest checkpoint across an injection/build change** — only across pure graphics-byte
+  swaps; a stale save-state shows the map/menu, never the battle. Checkpoints are ROM-hash-stamped in
+  `tools/playtest/states/` (gitignored); delete the `.ss`/`.romhash` to force a rebuild.
 - **Additive, never global** (content art): clone classes / new terrain slots / appended `banim` rows;
   never edit a shared vanilla class/anim/terrain in place. `decisions.md` Art & Audio + the `inject_*` docstrings.
 - **Engine hooks live in `tools/inject/engine_hooks.py`** (guarded by `check_engine_guards_present`); engine
@@ -73,13 +96,12 @@ ADR: `decisions.md` §Distribution.
 - **`make`-green can't prove apply timing** — `tools/playtest/` is the dynamic arbiter. Scenarios need a built
   ROM + `lua` (`brew install lua`); regenerate `symbols.lua` (auto by `run.sh`) after a rebuild.
 - **CI unit tests run in the `build` job, not the lightweight `checks` job** (they need the submodule +
-  numpy/PIL); a new test needing a new lib → add it to the `build` job's deps.
+  numpy/PIL); a new test needing a new lib → add it to the `build` job's deps. Playtest *scenarios* (mGBA)
+  are NOT CI-gated; the pure `test_*.lua` cores (incl. `test_pathing.lua`, `test_ch02check.lua`) ARE, via `make test`.
 - **Distribution is the private pre-patched `.gba`** — the decomp build is non-matching vs retail (~67% of
   bytes differ), so no small public patch exists. `tools/make_bps.py` is correct but intentionally unwired.
 - **Save layout must stay stable for testers** (#59): `check_save_layout_stable` reds on a `BWL_ARRAY_NUM`/
   `WIN_ARRAY_NUM`/`SAVEMAGIC` drift → that drop needs a per-release starter `.sav`.
-- **Don't reuse a playtest checkpoint across an injection/build change** — only across pure graphics-byte
-  swaps; a stale save-state shows the map/menu, never the battle.
 - **Writing any dialogue → invoke `dialogue-pass` first** (voice grounding: per-NPC `lore/*.md` §Voice +
   `frostmaiden-voices.md`; story sources: the DM-notes PDF + the Frostmaiden book via `pdftoppm`). Story
   bodies are `make`-regenerated; gate text changes with `python3 tools/verify_text.py`.

@@ -266,6 +266,45 @@ _Decided: 2026-06-24_
 
 ---
 
+**Ch2 load-test: automate the STRUCTURAL half in the harness; the PACING half stays human.**
+The only open #22 item was the in-emulator load-test. It splits in two: *structural* (does ch02
+LOAD off the real `MNC2(0x3)` chain, not soft-lock, and is it winnable — chwinga load green, the
+archer present, surviving chwinga deliver charms) and *pacing* (judging the 5 cutscenes in motion).
+The structural half is now machine-verified by the playtest harness; the pacing half is left a
+human-at-mGBA pass. **Reached via the REAL chain, not a ch02 sandbox** — a `TESTCH=2`-style boot
+would skip the `MNC2(0x3)` transition the load-test most needs to prove, so `reachCh02Map` clears
+ch00 + ch01 with the clear-bot and A-mashes through the ending→opening→prep onto the ch02 map. That
+deep chain is paid **once** into a `ch02start` save-state checkpoint (`ckpt_ch02start`, like
+`rbgch01`); `ch02` (entry assertions), `smoke_ch02` (soft-lock net), and `clear_ch02` load it. The
+3 green chwinga are kept alive during `clear_ch02` (direct HP/def poke) so the charm-gift path
+(`CHECK_ALIVE → GIVEITEMTO`) runs deterministically — whether they survive under real play is a
+balance question for the human pass, not the wiring test. Charm delivery is verified by scanning
+all blue inventories + the convoy (`gConvoyItemArray`) for the three charm ids; the pure membership
+core is unit-tested in `test_ch02check.lua`. `clearDrive` was split into a non-terminating
+`clearUntilAdvance` (the loop) + a verdict wrapper so the chain helper can keep driving past a win.
+_Decided: 2026-06-25 (CLAUDE; brainstormed-then-TDD; assert depth "Core + charm delivery" — Nicolas)_
+
+---
+
+**Clear-bot pathing: BFS march + multi-range + stall watchdog landed; #60 still open on boss-breach.**
+The #22 work exposed that the greedy clear-bot (#60) can't complete ch01/ch02 unaided. Reworked it
+toward a real fair-play completability gate: (a) a **BFS distance-field march** (pure `pathing.lua`,
+unit-tested in `test_pathing.lua`) over a walkable map from `gBmMapTerrain` — units route *around*
+walls/water toward the boss instead of greedy-Manhattan stranding; (b) **multi-range targeting**
+(`clearUnitAct` reads each unit's real `unitAttackRange` instead of hardcoding range 1); (c) a **stall
+watchdog** (no-progress turns → `B`-unstick, then a clean `stuck` FAIL); (d) a **bug fix** — a title
+screen without a chapter advance is now a game-over, not a false win (old `clearDrive` could PASS a
+loss). `clear` (prologue) now passes fair-play. **Not fully closed:** on ch01 the bot marches to the
+walled boss-camp (gate at a `TERRAIN_GATE_CASTLE` ringed by walls) but jams ~8 tiles out with a thin
+2-unit deploy — the open work is last-mile **breach/unjam** logic (field more units; slip around a
+chokepoint; focus-fire the nearest reachable straggler), tracked on #60. Until then `reachCh02Map`
+keeps its directed ch01-seize helper (it can't ride the fair-play bot yet). Passability uses a
+conservative impassable-terrain set (walls/peaks/water/fence/snag/cliff); high-cost-but-passable
+terrain stays passable because the per-turn `selectAndReach` still enforces true reach.
+_Decided: 2026-06-25 (CLAUDE; brainstormed-then-TDD; scope "full gate" — Nicolas; landed partial + kept #60 open after the breach proved deeper)_
+
+---
+
 ## Combat System
 
 > **2026-05-28 — Combat resolution reverted to vanilla FE.** The earlier "Hybrid

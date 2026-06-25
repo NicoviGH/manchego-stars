@@ -19,6 +19,11 @@ WANTED = [
     'gBmSt',                    # live map cursor (include/types.h)
     'gUnitArrayBlue',           # player units (include/bmunit.h)
     'gUnitArrayRed',            # enemy units
+    'gUnitArrayGreen',          # green (ally/NPC) units (include/bmunit.h) -- the ch02 chwinga
+                                # protect layer rides this array (FACTION_ID_GREEN).
+    'gConvoyItemArray',         # the convoy (extern u16[]; include/variables.h). Low byte of
+                                # each entry is the item id -- where an overflow charm-gift lands.
+    'gConvoyItemCount',         # u8 count of live convoy entries (include/bmcontainer.h).
     'gItemData',                # struct ItemData[] (include/bmitem.h): per-item attributes
                                 # (IA_WEAPON/IA_STAFF @ +0x08) + encodedRange (min<<4|max @ +0x19).
                                 # Lets the harness read a unit's weapon reach generically.
@@ -28,6 +33,9 @@ WANTED = [
     'gBmMapUnit',               # u8** tile->unit grid (include/bmmap.h): gBmMapUnit[y][x] is the
                                 # on-tile unit id the engine uses for cursor selection. Relocating
                                 # a unit must update THIS, not just its xPos/yPos.
+    'gBmMapTerrain',            # u8** terrain-id grid (include/bmmap.h): gBmMapTerrain[y][x] is the
+                                # TERRAIN_* id, used to build a passability map for the clear-bot's
+                                # BFS march-to-boss (#60).
     'gChapterFlagBits',         # event flags < 100, bit (flag-1) (src/eventinfo.c)
     'gPermanentFlagBits',       # event flags > 100, bit (flag-101)
     'ProcScr_GameOverScreen',   # proc script: game-over screen active

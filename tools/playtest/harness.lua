@@ -116,6 +116,19 @@ local function blue(charId) return findUnit(SYM.gUnitArrayBlue, 8, charId) end
 local function red(charId) return findUnit(SYM.gUnitArrayRed, 24, charId) end
 local function isDead(u) return u == nil or (u.state & US_DEAD) ~= 0 end
 
+-- A unit's attack reach from its equipped (items[0]) weapon, via gItemData (include/bmitem.h:
+-- attributes +0x08, encodedRange +0x19 = min<<4 | max; ItemData stride 0x24). Returns
+-- (minRange, maxRange) for a real weapon, or nil for a staff / non-attacker (no IA_WEAPON).
+local ITEMDATA_STRIDE = 0x24
+local function unitAttackRange(u)
+    local item = ru16(u.addr + 0x1E) & 0xFF       -- items[0] item id (low byte; high byte = uses)
+    if item == 0 then return nil end
+    local data = SYM.gItemData + item * ITEMDATA_STRIDE
+    if (ru32(data + 0x08) & 0x1) == 0 then return nil end   -- IA_WEAPON unset -> staff/non-weapon
+    local er = ru8(data + 0x19)
+    return (er >> 4), (er & 0xF)
+end
+
 local function pokeFrail(u) -- 1 HP, no def/res/spd/lck: next clean hit kills
     emu:write8(u.addr + 0x13, 1) -- curHP
     emu:write8(u.addr + 0x16, 0) -- spd
@@ -375,8 +388,42 @@ end
 -- ---- greedy clear-bot (#60): real-combat chapter completion. Generic boss detection
 -- (no hardcoded char ids) + the pure pickTarget core; the scenario owns the driving.
 local CLEARBOT = dofile(PLAYTEST_DIR .. "/clearbot.lua")
+local CH02 = dofile(PLAYTEST_DIR .. "/ch02check.lua")   -- pure charm-delivery check (#22)
+local PATHING = dofile(PLAYTEST_DIR .. "/pathing.lua")  -- pure BFS distance field (#60 march)
 local CA_BOSS = (1 << 15)   -- include/bmunit.h:326 (character/class attribute)
 local FUZZRNG = dofile(PLAYTEST_DIR .. "/fuzzrng.lua")   -- seeded PRNG + input policy (#49)
+
+-- Terrain ids (include/constants/terrains.h) that hard-block a foot/mounted march -- used to
+-- build the passability map for the BFS distance field (#60). High-cost-but-passable terrain
+-- (mountain, river, forest, etc.) is left passable on purpose: the field only needs to route
+-- AROUND walls/water; the per-turn selectAndReach still enforces each unit's true reach.
+local IMPASSABLE_TERRAIN = {
+    [0x10] = true,  -- RIVER (deep; foot can't cross)
+    [0x12] = true,  -- PEAK
+    [0x15] = true,  -- SEA
+    [0x16] = true,  -- LAKE
+    [0x19] = true,  -- FENCE
+    [0x1A] = true,  -- WALL_REGULAR
+    [0x1B] = true,  -- WALL_DAMAGED
+    [0x26] = true,  -- CLIFF
+    [0x33] = true,  -- SNAG
+    [0x35] = true,  -- SKY
+    [0x36] = true,  -- DEEPS
+    [0x3C] = true,  -- WATER
+}
+local function terrainAt(x, y)
+    return ru8(ru32(ru32(SYM.gBmMapTerrain) + y * 4) + x)   -- gBmMapTerrain[y][x] (u8**)
+end
+
+-- BFS path-distance field from the boss tile over walkable terrain on the [0..maxx]x[0..maxy]
+-- map: dist[y][x] = steps to reach the boss routing around hard obstacles, or nil (unreachable).
+-- The clear-bot ranks its reachable tiles by this instead of raw Manhattan, so a unit walks
+-- AROUND a wall toward a held boss instead of stranding against it.
+local function bossDistanceField(boss, maxx, maxy)
+    local w, h = maxx + 1, maxy + 1
+    local function isPassable(x, y) return not IMPASSABLE_TERRAIN[terrainAt(x, y)] end
+    return PATHING.distanceField(w, h, isPassable, { x = boss.x, y = boss.y })
+end
 
 -- A unit's character carries the CA_BOSS attribute: pCharacterData (Unit +0x00) ->
 -- CharacterData.attributes (+0x28). True for named bosses (Sephek, the ch01 chief, ...).
@@ -695,20 +742,23 @@ scenarios.clearprobe = function()
     result("PASS", string.format("CA_BOSS boss detected (char 0x%02X)", boss.charId))
 end
 
--- One player unit's action for the clear-bot: select it, pick a melee target (boss-first
--- via pickTarget) and attack from the reachable adjacent tile, else advance toward the
--- boss at (bx,by). GUARANTEES it leaves no unit selected (commit via Attack/Wait, or
--- back out with B) so the next unit / end-turn isn't driving a stale selection.
-local function clearUnitAct(u, bx, by)
+-- One player unit's action for the clear-bot: select it, pick a target at the unit's REAL weapon
+-- reach (boss-first via pickTarget, so bows/magic act at range), and attack from the reachable
+-- tile; else step to the reachable tile NEAREST the boss by path distance (`field`, BFS around
+-- walls) -- falling back to Manhattan toward `goal` only where the field is unreachable. GUARANTEES
+-- it leaves no unit selected (commit via Attack/Wait, or back out with B).
+local function clearUnitAct(u, field, goal)
     local reach = selectAndReach(u)
     if not reach then return end                 -- exhausted/unreachable; nothing selected
-    local pick = CLEARBOT.pickTarget(reach, liveEnemies(), { range = 1 })
+    local mn, mx = unitAttackRange(u)
+    local pick = mn and CLEARBOT.pickTarget(reach, liveEnemies(), { range = mx, min_range = mn }) or nil
     local tile = pick and pick.tile
-    if not tile then                             -- no target in range: step toward the boss
-        local bestd = 999
+    if not tile then                             -- no target in range: advance toward the boss
+        local best = math.huge
         for _, t in ipairs(reach) do
-            local d = math.abs(bx - t.x) + math.abs(by - t.y)
-            if d < bestd then tile, bestd = t, d end
+            local fd = field and field[t.y] and field[t.y][t.x]
+            local score = fd or (1000 + math.abs(goal.x - t.x) + math.abs(goal.y - t.y))
+            if score < best then tile, best = t, score end
         end
     end
     if tile and cursorTo(tile.x, tile.y) then
@@ -723,53 +773,119 @@ end
 
 local CH01_PARK = { x = 24, y = 15 } -- empty far corner; ch01 map is 25x16
 
--- The clear loop, shared by every clear_* scenario: actually PLAY the chapter with real
--- combat (no pokeFrail) -- each player phase, march/attack every unit toward the boss; once
--- the boss is dead, if the chapter hasn't already advanced (DefeatBoss objective), send a
--- unit onto the boss's old tile to SEIZE (Seize objective). Win = the chapter advances (or
--- the title screen -- ch01's ch02 isn't hosted yet). FAIL = game over / turn budget. The
--- completability brick (#60). maxx/maxy = map bounds; park = the end-turn empty tile.
-local function clearDrive(startChapter, maxx, maxy, park)
+-- The clear loop body (no verdict): actually PLAY the chapter with real combat (no pokeFrail)
+-- -- each player phase, march/attack every unit toward the boss; once the boss is dead, if the
+-- chapter hasn't already advanced (DefeatBoss objective), send a unit onto the boss's old tile
+-- to SEIZE (Seize objective). Returns a status ("noboss"|"won"|"gameover"|"timeout") and the
+-- turn it ended on. clearDrive wraps this with a PASS/FAIL verdict; reachCh02Map (#22) uses it
+-- to clear ch01 and then keep driving into the ch02 cutscene chain. maxx/maxy = map bounds;
+-- park = the end-turn empty tile. The completability brick (#60).
+local function clearUntilAdvance(startChapter, maxx, maxy, park)
     maxx, maxy = maxx or 14, maxy or 9
     local boss = findBoss()
-    if not boss then return result("FAIL", "no boss found to clear toward") end
+    if not boss then return "noboss", 0 end
     log(string.format("clear: boss char=0x%02X at (%d,%d) hp=%d on a %dx%d map",
         boss.charId, boss.x, boss.y, boss.hp, maxx + 1, maxy + 1))
     local seizeTile = { x = boss.x, y = boss.y }   -- killed boss's tile = the seize point
     local budgetTurns = 18
-    local function won() return chapter() ~= startChapter or procActive(SYM.gProcScr_TitleScreen) end
+    -- A real win ADVANCES the chapter. The title screen WITHOUT an advance means game-over ->
+    -- title (a loss), not a win -- so this stays an honest fair-play gate (#60).
+    local function won() return chapter() ~= startChapter end
+    local function lost() return gameOverActive() or procActive(SYM.gProcScr_TitleScreen) end
+    -- progress = the nearest live unit's path-distance to the boss (lower is better).
+    local function nearestBossDist(field)
+        local best = math.huge
+        for i = 0, 7 do
+            local u = unitAt(SYM.gUnitArrayBlue, i)
+            if u and not isDead(u) then
+                local fd = field and field[u.y] and field[u.y][u.x]
+                if fd and fd < best then best = fd end
+            end
+        end
+        return best
+    end
+    local lastDist, lastEnemies, stall = math.huge, math.huge, 0
     for t = 1, budgetTurns do
         waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
         wait(60) -- let the player-phase banner finish (it eats key presses)
+        press(K.B); wait(6)   -- NUDGE unstick: clear any stray menu before driving
+        local b = findBoss()
+        local field = b and bossDistanceField(b, maxx, maxy) or nil
         for i = 0, 7 do
-            if won() then shot("clear-win")
-                return result("PASS", string.format("won by turn %d (chapter %d)", t, chapter())) end
+            if won() then return "won", t end
+            if lost() then return "gameover", t end
             local u = unitAt(SYM.gUnitArrayBlue, i)
             if u and not isDead(u) and (u.state & 0x2) == 0 then   -- live, not yet acted
-                local b = findBoss()
+                b = findBoss()
                 if b then
                     seizeTile = { x = b.x, y = b.y }
-                    clearUnitAct(u, b.x, b.y)
+                    clearUnitAct(u, field, b)
                 elseif moveUnit(u.x, u.y, seizeTile.x, seizeTile.y) then
                     -- boss dead, not yet won -> Seize. It tops the menu for a unit that can
                     -- seize; for any other unit A just Waits, so we back out and try the next.
                     shot("clear-seize-try")
                     press(K.A)
-                    if waitFor(won, 9000, true) then shot("clear-seized")
-                        return result("PASS", string.format("seized by turn %d", t)) end
+                    if waitFor(won, 9000, true) then return "won", t end
                     press(K.B); press(K.B)
                 end
             end
         end
-        if won() then shot("clear-win")
-            return result("PASS", string.format("won by turn %d (chapter %d)", t, chapter())) end
-        local phase = runEnemyPhase(park)
-        if phase == "gameover" then shot("clear-gameover")
-            return result("FAIL", string.format("game over on turn %d -- bot lost units", t)) end
+        if won() then return "won", t end
+        if lost() then return "gameover", t end
+        if runEnemyPhase(park) == "gameover" then return "gameover", t end
+        -- stall watchdog: bail cleanly if no progress (nearer the boss OR fewer foes) for 3 turns,
+        -- instead of grinding the full budget on a wedged bot.
+        local dist, enemies = nearestBossDist(field), #liveEnemies()
+        if dist < lastDist or enemies < lastEnemies then stall = 0 else stall = stall + 1 end
+        lastDist, lastEnemies = math.min(dist, lastDist), math.min(enemies, lastEnemies)
+        log(string.format("clear turn %d: nearestBossDist=%s enemies=%d stall=%d",
+            t, dist == math.huge and "inf" or dist, enemies, stall))
+        if stall >= 3 then
+            -- diagnose the stall: is the boss walled off (field can't reach its neighbours), and
+            -- where are the remaining foes / our units relative to the field?
+            local bb = findBoss()
+            if bb then
+                local f = bossDistanceField(bb, maxx, maxy)
+                local nb = {}
+                for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+                    local nx, ny = bb.x + d[1], bb.y + d[2]
+                    nb[#nb + 1] = string.format("(%d,%d)terr=0x%02X fd=%s", nx, ny,
+                        (nx >= 0 and ny >= 0 and nx <= maxx and ny <= maxy) and terrainAt(nx, ny) or -1,
+                        (f[ny] and f[ny][nx]) and tostring(f[ny][nx]) or "nil")
+                end
+                log(string.format("STALL boss=(%d,%d) terr=0x%02X neighbours: %s",
+                    bb.x, bb.y, terrainAt(bb.x, bb.y), table.concat(nb, " ")))
+                for _, e in ipairs(liveEnemies()) do
+                    log(string.format("  enemy (%d,%d) hp=%d boss=%s fd=%s", e.x, e.y, e.hp,
+                        tostring(e.is_boss), (f[e.y] and f[e.y][e.x]) and tostring(f[e.y][e.x]) or "nil"))
+                end
+                for i = 0, 7 do
+                    local u = unitAt(SYM.gUnitArrayBlue, i)
+                    if u and not isDead(u) then log(string.format("  unit (%d,%d) fd=%s",
+                        u.x, u.y, (f[u.y] and f[u.y][u.x]) and tostring(f[u.y][u.x]) or "nil")) end
+                end
+            end
+            return "stuck", t
+        end
     end
+    return "timeout", budgetTurns
+end
+
+-- The verdict wrapper, shared by every clear_* scenario. Win = the chapter advances. FAIL =
+-- game over (incl. a loss kicking back to the title) / no progress (stuck) / turn budget.
+local function clearDrive(startChapter, maxx, maxy, park)
+    local status, t = clearUntilAdvance(startChapter, maxx, maxy, park)
+    if status == "won" then shot("clear-win")
+        return result("PASS", string.format("won by turn %d (chapter %d)", t, chapter())) end
+    if status == "noboss" then return result("FAIL", "no boss found to clear toward") end
+    if status == "gameover" then shot("clear-gameover")
+        return result("FAIL", string.format("game over on turn %d -- bot lost units", t)) end
+    if status == "stuck" then shot("clear-stuck")
+        return result("FAIL", string.format("no progress for 3 turns by turn %d (boss %s)",
+            t, findBoss() and "alive" or "dead")) end
     shot("clear-timeout")
     return result("FAIL", string.format("could not clear in %d turns (boss %s)",
-        budgetTurns, findBoss() and "alive" or "dead"))
+        t, findBoss() and "alive" or "dead"))
 end
 
 -- clear: the prologue (DefeatBoss), reachable straight from New Game.
@@ -2244,20 +2360,6 @@ local CAST = {
     rbg = 0x05,  -- alias for prof-rbg (the #65 first mover)
 }
 
--- A unit's attack reach from its equipped (items[0]) weapon, via gItemData (include/bmitem.h:
--- attributes +0x08, encodedRange +0x19 = min<<4 | max; ItemData stride 0x24). Returns
--- (minRange, maxRange) for a real weapon, or nil for a staff / non-attacker (no IA_WEAPON) --
--- which is how a healer is detected (no combat anim to capture).
-local ITEMDATA_STRIDE = 0x24
-local function unitAttackRange(u)
-    local item = ru16(u.addr + 0x1E) & 0xFF       -- items[0] item id (low byte; high byte = uses)
-    if item == 0 then return nil end
-    local data = SYM.gItemData + item * ITEMDATA_STRIDE
-    if (ru32(data + 0x08) & 0x1) == 0 then return nil end   -- IA_WEAPON unset -> staff/non-weapon
-    local er = ru8(data + 0x19)
-    return (er >> 4), (er & 0xF)
-end
-
 -- Shared lead-up for the RBG demo: win the prologue, lord-select RBG into ch01,
 -- stop on ch01 turn-1 player phase with RBG deployed. Returns (rbg unit) or (false, err).
 -- Built ONCE at 240fps into the "rbgch01" checkpoint (ckpt_rbgch01); recordrbg LOADS it
@@ -2443,6 +2545,291 @@ scenarios.recordrbgtest = function()
     return captureCharAnim("rbg")
 end
 
+
+-- ================================================================ ch02 load-test (#22)
+-- The structural half of the Ch2 "Cold Welcome" load-test: does ch02 LOAD off the real
+-- ch01->ch02 chain (MNC2(0x3)), not soft-lock, and is it winnable -- with the 3 GREEN chwinga
+-- protect layer present and their per-survivor charm-gifts (CHECK_ALIVE -> GIVEITEMTO) actually
+-- landing. The PACING half (judging the 5 cutscenes in motion) stays a human-at-mGBA pass.
+-- Built on a "ch02start" save-state checkpoint (ckpt_ch02start plays the whole chain ONCE at
+-- top speed); ch02 / smoke_ch02 / clear_ch02 LOAD it so each is fast. Char/class/item ids from
+-- the decomp + the ch02 build (CH02_CHWINGA / CH02_ITEM_IDS in tools/build_campaign.py).
+local CH02_CHWINGA_PIDS = { 0xCA, 0xC9, 0xC8 }   -- DARA/KLIMT/MANSEL = Mote/Rime/Glimmer (green)
+local CH02_CHARMS = { 0x76, 0x6D, 0x6E }         -- Red Gem / Elixir / Pure Water (the gifts)
+local CLASS_ARCHER = 0x19                          -- the fliers-vs-bows debut enemy (CH02_CLASS_IDS)
+local CH02_CHAPTER = 3                             -- ch02 hosts on chapter slot 3 (ch01 -> MNC2(0x3))
+local CH02_PARK = { x = 0, y = 0 }                -- NW corner end-turn tile (15x15 map; deploy is row 3+)
+
+-- Directed ch01 seize (the generic clear-bot is too slow to seize ch01's 25x16 map reliably):
+-- march the lord onto the chief's throne, poking the chief + escort frail/harmless so the march
+-- can't be blocked or killed. Modeled on scenarios.ch01win; reachCh02Map only needs to REACH
+-- ch02, not fairly test ch01 balance. Returns "won" once ch01 hands off, else "timeout"/"gameover".
+local CH01_CHIEF, CH01_LORD = CHAR_CHIEF, 0x01   -- ch01 boss (BREGUET slot) + Braulo (default lord)
+local function seizeCh01ToCh02()
+    pokeFastConfig()   -- 10-goblin enemy phases: map combat + fast speed
+    local chief = red(CH01_CHIEF)
+    if not chief then return "noboss" end
+    local goal = { x = chief.x, y = chief.y }   -- the chief holds the seize tile
+    pokeFrail(chief)
+    log(string.format("ch01 seize: chief frail on (%d,%d); marching the lord", goal.x, goal.y))
+    for t = 1, 18 do
+        if chapter() ~= 2 then return "won" end
+        waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
+        wait(100)   -- let the player-phase banner finish (it eats key presses)
+        for i = 0, 23 do   -- the escort dies to the first counter and deals no damage
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and r.charId ~= CH01_CHIEF and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+        end
+        local lord = blue(CH01_LORD)
+        if not lord or isDead(lord) then return "gameover" end
+        chief = red(CH01_CHIEF)
+        if chief and not isDead(chief) then
+            if math.abs(lord.x - chief.x) + math.abs(lord.y - chief.y) == 1 then
+                if moveUnit(lord.x, lord.y, lord.x, lord.y) then chooseAttack(lord.addr) end
+            else
+                marchToward(lord, goal.x, goal.y + 1, 24, 15)
+            end
+        else
+            if moveUnit(lord.x, lord.y, goal.x, goal.y) then press(K.A) end   -- Seize tops the menu here
+            if waitFor(function() return chapter() ~= 2 end, 9000, true) then return "won" end
+            press(K.B); press(K.B)
+        end
+        if runEnemyPhase(CH01_PARK) == "gameover" then return "gameover" end
+    end
+    return "timeout"
+end
+
+-- Reach the ch02 map off the REAL chain: clear ch00, seize ch01, then A-mash through the ch01
+-- ending + ch02 opening cutscenes + prep onto the map. This is the chain (MNC2(0x3)) the load-test
+-- most needs to prove. Returns true once on the ch02 map (faction 0, turn >= 1).
+local function reachCh02Map()
+    if not reachCh01Map() then return false end
+    log("seizing ch01 to chain into ch02 (slot 3)")
+    local status = seizeCh01ToCh02()
+    log(string.format("ch01 seize status=%s chapter=%d faction=0x%02X turn=%d title=%s",
+        status, chapter(), faction(), turn(), tostring(procActive(SYM.gProcScr_TitleScreen))))
+    if status ~= "won" then
+        result("FAIL", "ch01 seize did not complete (" .. status .. ") -- can't reach ch02"); return false end
+    -- A-mash the ch01 ending cutscene + post-chapter save menu (they gate the MNC2(0x3)
+    -- transition) until ch02 (slot 3) actually loads.
+    local loaded = false
+    for i = 1, 400 do
+        if chapter() == CH02_CHAPTER then loaded = true break end
+        if i % 20 == 0 then log(string.format("await ch02: chapter=%d faction=0x%02X turn=%d title=%s",
+            chapter(), faction(), turn(), tostring(procActive(SYM.gProcScr_TitleScreen)))) end
+        press(K.A, 4); wait(36)
+    end
+    if not loaded then
+        shot("ch02-never-loaded")
+        result("FAIL", "ch02 (slot 3) never loaded after the ch01 win"); return false end
+    log("in ch02 (slot 3); A-mashing the opening cutscene to the prep (Pick Units) screen")
+    -- The ch02 opening (title card + 3 beats) precedes prep. A-mash until Pick Units opens.
+    local prep = false
+    for i = 1, 400 do
+        if procActive(SYM.gProcScr_SALLYCURSOR) then prep = true break end
+        if i % 20 == 0 then log(string.format("ch02 wait prep: chapter=%d faction=0x%02X turn=%d",
+            chapter(), faction(), turn())) end
+        press(K.A, 4); wait(36)
+    end
+    if prep then
+        wait(180)
+        for i = 1, 40 do
+            if not procActive(SYM.gProcScr_SALLYCURSOR) then break end
+            press(K.B, 4); wait(10); press(K.START, 4); wait(40)
+            if i % 4 == 0 and procActive(SYM.gProcScr_SALLYCURSOR) then press(K.A, 4); wait(20) end
+        end
+    end
+    -- A-mash the beginning scene (+ turn-1 tutorial) until the map is fully LIVE: enemies loaded,
+    -- the party deployed, player control, no cutscene. Units/enemies/green chwinga load here -- the
+    -- earlier "faction 0 + turn 1" fired during the opening cutscene, before any of them existed.
+    local function partyDeployed()
+        for j = 0, 7 do local u = unitAt(SYM.gUnitArrayBlue, j)
+            if u and (u.state & 0x9) == 0 and u.x ~= 0xFF then return true end end
+        return false
+    end
+    local onmap = false
+    for i = 1, 400 do
+        if chapter() == CH02_CHAPTER and faction() == 0 and turn() >= 1
+            and unitAt(SYM.gUnitArrayRed, 0) ~= nil and partyDeployed()
+            and not procActive(SYM.ProcScr_StdEventEngine) and not procActive(SYM.gProcScr_SALLYCURSOR)
+            and not menuOpen() then onmap = true break end
+        if i % 20 == 0 then log(string.format(
+            "await ch02 map: chapter=%d faction=0x%02X turn=%d red0=%s deployed=%s evt=%s",
+            chapter(), faction(), turn(), tostring(unitAt(SYM.gUnitArrayRed, 0) ~= nil),
+            tostring(partyDeployed()), tostring(procActive(SYM.ProcScr_StdEventEngine)))) end
+        press(K.A, 4); wait(36)
+    end
+    if not onmap then
+        shot("ch02-map-not-live")
+        result("FAIL", "ch02 map never became live (party/enemies never loaded)"); return false end
+    wait(120)
+    shot("ch02-map")
+    return true
+end
+
+-- ckpt_ch02start: build the ch02start checkpoint once (run.sh runs this at 240fps when the
+-- state is missing/stale), so the deep ch00->ch01->ch02 chain is paid once per ROM build.
+scenarios.ckpt_ch02start = function()
+    if not reachCh02Map() then return end   -- reachCh02Map already set a FAIL verdict
+    saveState("ch02start")
+    result("PASS", "ch02start checkpoint saved (on the ch02 map, turn 1)")
+end
+
+-- Read every collected item id (low byte) from all blue inventories + the convoy -- where a
+-- charm-gift lands (leader's inventory, overflow -> convoy).
+local function collectedItems()
+    local items = {}
+    for i = 0, 7 do
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u then for s = 0, 4 do items[#items + 1] = ru16(u.addr + 0x1E + s * 2) & 0xFF end end
+    end
+    local n = ru8(SYM.gConvoyItemCount)
+    if n > 0x57 then n = 0x57 end   -- convoy cap (supplyItems[0xB0/2])
+    for i = 0, n - 1 do items[#items + 1] = ru16(SYM.gConvoyItemArray + i * 2) & 0xFF end
+    return items
+end
+
+-- Keep the 3 green chwinga alive so the gift path (CHECK_ALIVE -> GIVEITEMTO) is exercised
+-- deterministically -- whether they survive UNDER REAL PLAY is a balance/pacing question for
+-- the human pass, not the wiring test.
+local function protectChwinga()
+    for _, pid in ipairs(CH02_CHWINGA_PIDS) do
+        local g = findUnit(SYM.gUnitArrayGreen, 20, pid)
+        if g and not isDead(g) then
+            emu:write8(g.addr + 0x13, 60)   -- curHP
+            emu:write8(g.addr + 0x17, 30)   -- def
+            emu:write8(g.addr + 0x18, 30)   -- res
+        end
+    end
+end
+
+-- ch02: entry assertions on the ch02 map (mirrors scenarios.ch01). The 3 green chwinga are on
+-- the field, the party deploys to the cap, and the archer + boss are present.
+scenarios.ch02 = function()
+    wait(30)
+    if not loadState("ch02start") then return result("FAIL", "no ch02start checkpoint (run.sh builds it)") end
+    wait(90)
+    -- diagnostic: dump every non-null green slot (and the blue/red char ids) so a missing-chwinga
+    -- failure shows whether they are absent, on another faction, or under unexpected char ids.
+    for i = 0, 19 do
+        local g = unitAt(SYM.gUnitArrayGreen, i)
+        if g then log(string.format("green[%02d] char=0x%02X pos=(%d,%d) hp=%d state=0x%08X",
+            i, g.charId, g.x, g.y, g.hp, g.state)) end
+    end
+    local blueids, redids = {}, {}
+    for i = 0, 7 do local u = unitAt(SYM.gUnitArrayBlue, i); if u then blueids[#blueids+1] = string.format("0x%02X", u.charId) end end
+    for i = 0, 23 do local r = unitAt(SYM.gUnitArrayRed, i); if r then redids[#redids+1] = string.format("0x%02X", r.charId) end end
+    log("blue=" .. table.concat(blueids, ",") .. " | red=" .. table.concat(redids, ","))
+    local chwinga = 0
+    for _, pid in ipairs(CH02_CHWINGA_PIDS) do
+        local g = findUnit(SYM.gUnitArrayGreen, 20, pid)
+        if g and not isDead(g) then chwinga = chwinga + 1
+            log(string.format("chwinga 0x%02X at (%d,%d) hp=%d", pid, g.x, g.y, g.hp)) end
+    end
+    local deployed = 0
+    for i = 0, 7 do
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u and (u.state & 0x9) == 0 and u.x ~= 0xFF then deployed = deployed + 1 end
+    end
+    local archer, boss = false, false
+    for i = 0, 23 do
+        local r = unitAt(SYM.gUnitArrayRed, i)
+        if r and not isDead(r) then
+            if ru8(ru32(r.addr + 0x04) + 0x04) == CLASS_ARCHER then archer = true end
+            if unitIsBoss(r) then boss = true end
+        end
+    end
+    log(string.format("ch02 entry: chwinga=%d deployed=%d archer=%s boss=%s",
+        chwinga, deployed, tostring(archer), tostring(boss)))
+    shot("ch02-entry")
+    if chwinga ~= 3 then return result("FAIL", string.format("want 3 green chwinga, found %d", chwinga)) end
+    if deployed ~= 5 then return result("FAIL", string.format("deploy cap broken: %d on field (want 5)", deployed)) end
+    if not archer then return result("FAIL", "no enemy archer (fliers-vs-bows debut) on the field") end
+    if not boss then return result("FAIL", "no boss on the field") end
+    result("PASS", string.format("ch02 entered: 3 chwinga green, %d deployed, archer + boss present", deployed))
+end
+
+-- smoke_ch02: stability net on the ch02 map -- idle-drive to a clean terminal, catching a
+-- crash / soft-lock on load or during the 5 cutscenes.
+scenarios.smoke_ch02 = function()
+    wait(30)
+    if not loadState("ch02start") then return result("FAIL", "no ch02start checkpoint (run.sh builds it)") end
+    wait(90)
+    return smokeDrive(chapter())
+end
+
+-- clear_ch02: the completability + chain + charm-delivery proof. Rout the raider band (DefeatAll)
+-- while keeping the chwinga alive, then watch the ending scene gift all 3 charms to the leader /
+-- convoy. PASS = routed, chained, and all 3 chwinga charms delivered.
+scenarios.clear_ch02 = function()
+    wait(30)
+    if not loadState("ch02start") then return result("FAIL", "no ch02start checkpoint (run.sh builds it)") end
+    wait(90)
+    pokeFastConfig()
+    local start = chapter()
+    local function advanced() return chapter() ~= start or procActive(SYM.gProcScr_TitleScreen) end
+    local best = {}
+    local function snapCharms()
+        local d = CH02.deliveredCharms(collectedItems(), CH02_CHARMS)
+        if #d > #best then best = d end
+    end
+    -- Deterministic rout: the generic clear-bot is unreliable on ch02 (fumbles into item menus),
+    -- so each player phase we frail+harmless every enemy (1 HP, no power) and teleport a party unit
+    -- adjacent to each live foe to one-shot it via REAL combat -- the kill goes through the death
+    -- hook that fires the DefeatAll win check (a raw US_DEAD poke would NOT). clear_ch02 verifies the
+    -- win->ending->charm WIRING, not ch02 balance (that's the human pacing pass + the difficulty gate).
+    local routed = false
+    for t = 1, 12 do
+        if advanced() then break end
+        waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
+        wait(60)
+        protectChwinga()
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+        end
+        for i = 0, 7 do
+            if advanced() or #liveEnemies() == 0 then break end
+            local u = unitAt(SYM.gUnitArrayBlue, i)
+            if u and not isDead(u) and (u.state & 0x2) == 0 then
+                local mn, mx = unitAttackRange(u)
+                if mn and teleportToFiringTile(u, mn, mx) then
+                    u = blue(u.charId)   -- refresh after the teleport relocates it
+                    if u and moveUnit(u.x, u.y, u.x, u.y) then
+                        chooseAttack(u.addr)
+                        waitFor(function() return faction() == 0 and not menuOpen()
+                            and not procActive(SYM.gProc_ekrBattle) end, 600)   -- let the kill resolve
+                    end
+                end
+            end
+        end
+        log(string.format("clear_ch02 turn %d: liveEnemies=%d chapter=%d", t, #liveEnemies(), chapter()))
+        if #liveEnemies() == 0 then routed = true; break end
+        if advanced() then break end
+        if runEnemyPhase(CH02_PARK) == "gameover" then
+            shot("clear-ch02-gameover")
+            return result("FAIL", string.format("game over on turn %d -- party lost", t)) end
+        snapCharms()
+    end
+    shot("clear-ch02-routed")
+    log(string.format("rout=%s; ending the turn to fire the DefeatAll win check", tostring(routed)))
+    -- Routed: force the phase-end DefeatAll check, then FINE-GRAINED poll the ending scene so the
+    -- charm-gifts (CHECK_ALIVE -> GIVEITEMTO) are captured before the ch03 placeholder/title clears
+    -- the convoy/inventory. (Coarse polling skipped the charm window last time.)
+    if routed and not advanced() then endTurn() end
+    for _ = 1, 1200 do
+        snapCharms()
+        if #best >= 3 then break end
+        if procActive(SYM.gProcScr_TitleScreen) then snapCharms(); break end
+        press(K.A, 2); wait(8)
+    end
+    shot("clear-ch02-ending")
+    log(string.format("charms delivered: %d/3", #best))
+    if #best < 3 then
+        return result("FAIL", string.format(
+            "ch02 charm-gift broken: only %d/3 chwinga charms reached the leader/convoy", #best)) end
+    result("PASS", "ch02 routed + chained; all 3 chwinga charms delivered (CHECK_ALIVE -> GIVEITEMTO)")
+end
 
 -- ---------------------------------------------------------------- runner
 local co = coroutine.create(function()
