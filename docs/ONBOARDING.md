@@ -32,9 +32,9 @@ the tutorial never sees it) · `dialogue` = mandatory story line, shown to every
 | terrain-heal-tiles — Forts/gates/thrones auto-heal a unit that ends its turn there | tutorial | — *(pending)* |
 | rescue — Rescue carries a unit; mounted units can move after rescuing | tutorial | — *(pending)* |
 | status-effects — Abnormal states (sleep, poison, etc.) disable/erode a unit | tutorial | — *(pending)* |
-| monsters — Monster enemies are a distinct foe type; some weapons are effective vs them | both | Ch 4 — both (planned) |
+| monsters — Monster enemies are a distinct foe type; some weapons are effective vs them | both | Ch 3 — dialogue (active) |
 | fog-of-war — Fog of war hides enemies outside vision range | tutorial | Ch 4 — dialogue (planned) |
-| stealing-thieves — Thieves steal items; protect valuables / loot enemies | both | — *(pending)* |
+| stealing-thieves — Thieves steal items; protect valuables / loot enemies | both | Ch 3 — both (active) |
 | ballista-siege — Siege/ballista emplacements fire from long range; a unit mans them | tutorial | — *(pending)* |
 | promotion-master-seal — Master Seal promotes a unit to its advanced class (player picks the branch) | tutorial | — *(pending)* |
 | supports — Support conversations build bonuses between paired units | dialogue | — *(pending)* |
@@ -56,7 +56,6 @@ authored, the dialogue-pass parity step should claim the ones debuting there
 - **terrain-heal-tiles** — Forts/gates/thrones auto-heal a unit that ends its turn there _(vanilla: tutorial; MSG_627)_
 - **rescue** — Rescue carries a unit; mounted units can move after rescuing _(vanilla: tutorial; MSG_970-977)_
 - **status-effects** — Abnormal states (sleep, poison, etc.) disable/erode a unit _(vanilla: tutorial; MSG_61A)_
-- **stealing-thieves** — Thieves steal items; protect valuables / loot enemies _(vanilla: both; MSG_~9624 (story); Steal command tutorial: decomp sweep TBD)_
 - **ballista-siege** — Siege/ballista emplacements fire from long range; a unit mans them _(vanilla: tutorial; MSG_~5288 (siege); decomp sweep TBD)_
 - **promotion-master-seal** — Master Seal promotes a unit to its advanced class (player picks the branch) _(vanilla: tutorial; decomp sweep TBD)_
 - **supports** — Support conversations build bonuses between paired units _(vanilla: dialogue; decomp sweep TBD)_
