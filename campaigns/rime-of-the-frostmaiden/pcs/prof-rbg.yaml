@@ -49,9 +49,12 @@ art:
 # Frames descaled from the RBG Battle art onto the shared 14-colour palette (#65 M-A).
 battle_anim:
   clone_from: archer                   # donor: timing/effects/13 modes + the ITYPE_BOW slot
-  clone_into: CLASS_BLST_KILLER_EMPTY  # RBG's stat-identical Archer-CLONE slot (additive):
-                                       # only RBG's unit rides it, so generic/enemy archers
-                                       # keep the vanilla Archer anim. Free ballista slot 0x6C.
+  motion: ranged
+  # No class slot: rides the per-character _u25 table (#65 M-B). Deploys as vanilla Archer.
+  # Frames are still the M-A set (88x64, over-scaled vs vanilla ~35px). The vanilla rescale
+  # (target body ~38) is BLOCKED: every my-descaler RBG frame renders a persistent CYAN overlay
+  # in-engine while M-A frames + braulo render clean (NOT scale/motion -- see HANDOFF.md RBG bug).
+  # When fixed: re-descale clean from "Battle Anims/RBG Battle/cleaned/*_fam.png" hi-res, --noflip.
   abbr: rbg_ar1                         # banim asset stem (<=12 chars)
   frames:                              # 1-3, in beat order (Ready -> Wind-up -> Peak)
     - prof-rbg/ready.png

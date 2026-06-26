@@ -234,6 +234,63 @@ class BattleAnimInjection(unittest.TestCase):
         self.assertIn('.wtype = 0x0100 | ITYPE_BOW, .index = 0xC9', new)
 
 
+class CharacterUniqueBanim(unittest.TestCase):
+    """Per-character battle anims (#65 M-B): the scalable, no-class-slot path. A unit's
+    AnimConf is appended to gUnitSpecificBanimConfigs[] and the character's _u25 indexes it;
+    an engine hook swaps the combat lookup to GetBattleAnimationId_WithUnique."""
+
+    CONFIGS = ('CONST_DATA struct BattleAnimDef * gUnitSpecificBanimConfigs[] = {\n'
+               '    NULL,\n'
+               '    AnimConf_Unused_LuciusUnpromoted,\n'
+               '    AnimConf_Unused_LuciusPromoted,\n'
+               '};\n')
+
+    def test_unique_append_returns_next_index_and_appends_the_symbol(self):
+        new, idx = bc.banim_unique_append(self.CONFIGS, 'AnimConf_brau_ax1')
+        self.assertEqual(idx, 3)                       # NULL + 2 existing -> new is index 3
+        self.assertIn('    AnimConf_brau_ax1,', new)
+        self.assertLess(new.index('AnimConf_brau_ax1'), new.index('};'))  # before close
+
+    def test_unique_append_leaves_existing_rows_unchanged(self):
+        new, _ = bc.banim_unique_append(self.CONFIGS, 'AnimConf_brau_ax1')
+        self.assertIn('    NULL,\n    AnimConf_Unused_LuciusUnpromoted,', new)
+
+    CHAR = ('    [CHARACTER_EIRIKA - 1] = {\n'
+            '        .nameTextId = 0x212,\n'
+            '        .number = CHARACTER_EIRIKA,\n'
+            '        .defaultClass = CLASS_PIRATE,\n'
+            '    },\n')
+
+    def test_set_char_u25_inserts_both_indices(self):
+        new = bc.banim_set_char_u25(self.CHAR, 3)
+        self.assertIn('._u25 = { 3, 3 },', new)
+        self.assertIn('.number = CHARACTER_EIRIKA,', new)   # didn't clobber siblings
+
+    def test_set_char_u25_is_idempotent_and_overwrites(self):
+        once = bc.banim_set_char_u25(self.CHAR, 3)
+        twice = bc.banim_set_char_u25(once, 7)
+        self.assertIn('._u25 = { 7, 7 },', twice)
+        self.assertEqual(twice.count('._u25'), 1)           # replaced, not duplicated
+
+    def test_combat_anim_hook_swaps_all_calls_and_widens_out_param(self):
+        from inject import engine_hooks as eh
+        src = ('    u32 animid1, animid2;\n'
+               '    a = GetBattleAnimationId(unit_bu1, animdef1, bu1->weapon, &animid1);\n'
+               '    b = GetBattleAnimationId(unit_bu2, animdef2, bu2->weapon, &animid2);\n')
+        out = eh._swap_combat_anim_to_unique(src)
+        self.assertIn('int animid1, animid2;', out)
+        self.assertNotIn('u32 animid1', out)
+        self.assertEqual(out.count('GetBattleAnimationId_WithUnique(unit_bu'), 2)
+        self.assertNotIn('GetBattleAnimationId(unit_bu', out)
+
+    def test_combat_anim_hook_is_idempotent(self):
+        from inject import engine_hooks as eh
+        src = ('    u32 animid1, animid2;\n'
+               '    a = GetBattleAnimationId(unit_bu1, animdef1, bu1->weapon, &animid1);\n')
+        once = eh._swap_combat_anim_to_unique(src)
+        self.assertEqual(eh._swap_combat_anim_to_unique(once), once)
+
+
 class BattlePlatformTerrain(unittest.TestCase):
     """Terrain category -> snow ground index (#65). base = first vendored ground slot;
     offsets 0=Snowdrift, 1=Snow Uneven (rough), 2=Ice."""

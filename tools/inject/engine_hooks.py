@@ -12,6 +12,7 @@ from inject.decomp import (
     BATTLEQUOTES_C, BMUNIT_C, LORDSEL_FLAG_BASE)
 
 # Decomp source files patched ONLY by the engine hooks below.
+BANIM_EKRBATTLEINTRO_C = os.path.join(DECOMP, 'src', 'banim-ekrbattleintro.c')
 BMCAMADJUST_C = os.path.join(DECOMP, 'src', 'bmcamadjust.c')
 BMMAP_C = os.path.join(DECOMP, 'src', 'bmmap.c')
 WORLDMAP_PATH_C = os.path.join(DECOMP, 'src', 'worldmap_path.c')
@@ -21,6 +22,36 @@ DATA_EVENT_TRIGGER_C = os.path.join(DECOMP, 'src', 'data_event_trigger.c')
 EVENTINFO_C = os.path.join(DECOMP, 'src', 'eventinfo.c')
 PREP_SALLYCURSOR_C = os.path.join(DECOMP, 'src', 'prep_sallycursor.c')
 LORDFLOOR_APPLIED_FLAG = 0xFA
+
+
+def _swap_combat_anim_to_unique(text):
+    """Pure transform: route the combat battle-anim lookup through the per-character
+    GetBattleAnimationId_WithUnique (#65 M-B), and widen the out param (u32 animid -> int)
+    to match its signature. Idempotent -- the swapped name no longer matches the search."""
+    text = text.replace('u32 animid1, animid2;', 'int animid1, animid2;')
+    return text.replace('GetBattleAnimationId(unit_bu',
+                        'GetBattleAnimationId_WithUnique(unit_bu')
+
+
+def _patch_banim_character_unique():
+    """Route FE8 combat anim selection through the per-character unique table (#65 M-B).
+
+    Vanilla FE8 picks the battle anim purely by CLASS (GetBattleAnimationId); the
+    per-character _u25 -> gUnitSpecificBanimConfigs path (a FE7 holdover) is only wired to
+    the weapon-triangle preview, not real combat. This swaps the four combat call sites to
+    the _WithUnique variant so every NAMED unit (PCs, bosses) can carry a custom battle anim
+    via data alone -- no cloned class slot per unit (the slot budget is only ~3). Generic
+    enemy classes are unaffected (no unique character id). Campaign-agnostic; guarded here
+    and asserted by check.py check_engine_guards_present."""
+    with open(BANIM_EKRBATTLEINTRO_C, encoding='utf-8') as f:
+        text = f.read()
+    if 'GetBattleAnimationId(unit_bu' not in text:
+        if 'GetBattleAnimationId_WithUnique(unit_bu' in text:
+            return  # already swapped (idempotent)
+        sys.exit('ERROR: banim combat call sites not in expected vanilla form in %s'
+                 % BANIM_EKRBATTLEINTRO_C)
+    with open(BANIM_EKRBATTLEINTRO_C, 'w', encoding='utf-8') as f:
+        f.write(_swap_combat_anim_to_unique(text))
 
 
 def _patch_player_start_cursor_guard():

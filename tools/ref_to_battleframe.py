@@ -192,8 +192,57 @@ def _frame_cmd(abbr, dur, i):
             "banim_%s_oam_frame_%d_r - banim_%s_oam_r" % (dur, abbr, i, i, abbr, i, abbr))
 
 
-def _mode_body(abbr, kind):
+def _mode_order(motion):
+    """The 12 modes in banim-table order, with the kind picked for `motion`.
+
+    The engine's mode ORDER is fixed; only each mode's body kind varies. A melee unit
+    can't strike at range, so its attack_range/_critical modes hold the ready frame
+    (kind "stand") instead of running the lunge-and-swing (cadence: FE8 Pirate axe)."""
+    if motion == "melee":
+        return [(n, "stand" if n.startswith("attack_range") else k)
+                for n, k in _MODE_ORDER]
+    return list(_MODE_ORDER)
+
+
+def _melee_mode_body(abbr, kind):
+    """One mode's script for the 3-beat MELEE fake (cadence from FE8 Pirate axe).
+
+    Lunge in (start_attack_1/2) -> wind the weapon up (frame 1 held longest) -> swing
+    through (frame 2) and land banim_code_hit_normal on contact -> recover and turn back.
+    No projectile: the hit IS the contact. Dodge hops backward (dodge_to_back). The lunge
+    travel + return are engine commands inherited from the donor, not drawn frames."""
+    if kind == "attack":   # ready -> wind up (held) -> swing-through + hit on contact
+        return ["\tbanim_code_start_attack_1", "\tbanim_code_start_attack_2",
+                _frame_cmd(abbr, 1, 0), "\tbanim_code_sound_axe_swing_short",
+                _frame_cmd(abbr, 20, 1), "\tbanim_code_sound_axe_swing_long",
+                "\tbanim_code_effect_dirt_kick", _frame_cmd(abbr, 3, 2),
+                "\tbanim_code_prepare_hp_deplete", _frame_cmd(abbr, 3, 2),
+                "\tbanim_code_sound_hit_eliwood_promoted_durandal",
+                "\tbanim_code_hit_normal", _frame_cmd(abbr, 1, 0),
+                "\tbanim_code_wait_hp_deplete", "\tbanim_code_start_opposite_turn",
+                _frame_cmd(abbr, 3, 0), "\tbanim_code_end_dodge",
+                "\tbanim_code_end_mode"]
+    if kind == "dodge":    # hop backward: ready -> wind-up -> ready
+        return ["\tbanim_code_dodge_to_back", _frame_cmd(abbr, 1, 0),
+                "\tbanim_code_start_dodge", _frame_cmd(abbr, 3, 1),
+                "\tbanim_code_wait_hp_deplete", _frame_cmd(abbr, 3, 0),
+                "\tbanim_code_end_dodge", "\tbanim_code_end_mode"]
+    if kind == "stand":    # hold the ready frame (also melee's "attack at range")
+        return [_frame_cmd(abbr, 1, 0), "\tbanim_code_wait_hp_deplete",
+                "\tbanim_code_end_mode"]
+    # miss: lunge and swing through, but no hit lands
+    return ["\tbanim_code_start_attack_1", "\tbanim_code_start_attack_2",
+            _frame_cmd(abbr, 1, 0), "\tbanim_code_sound_axe_swing_short",
+            _frame_cmd(abbr, 20, 1), "\tbanim_code_sound_axe_swing_long",
+            "\tbanim_code_effect_dirt_kick", _frame_cmd(abbr, 3, 2),
+            "\tbanim_code_wait_hp_deplete", "\tbanim_code_start_opposite_turn",
+            _frame_cmd(abbr, 3, 0), "\tbanim_code_end_dodge", "\tbanim_code_end_mode"]
+
+
+def _mode_body(abbr, kind, motion="ranged"):
     """Emit one mode's script lines for the 3-beat (Ready/Wind-up/Peak) fake."""
+    if motion == "melee":
+        return _melee_mode_body(abbr, kind)
     if kind == "attack":   # draw (0->1 held) -> peak (2) + loose arrow -> recover
         return ["\tbanim_code_start_attack_1", "\tbanim_code_start_attack_2",
                 _frame_cmd(abbr, 3, 0), "\tbanim_code_sound_pull_bow",
@@ -218,13 +267,14 @@ def _oam_line(e):
             % (e["attr0"], e["attr1"], e["attr2"], e["dx"], e["dy"]))
 
 
-def emit_motion_s(abbr, frames):
+def emit_motion_s(abbr, frames, motion="ranged"):
     """Assemble the full banim motion.s text for `abbr` from 3 frames' OAM.
 
-    `frames` is a list of {"oam_r": [...], "oam_l": [...]} (Ready/Wind-up/Peak). Emits the
-    .data.oam_l / .oam_r / .script (12 modes) / .modes sections. oam_l mirrors oam_r 1:1 so
-    frame i is at the same byte offset in both tables (the script references the _r offset;
-    the engine adds it to the oam_l base when the unit faces the other way).
+    `frames` is a list of {"oam_r": [...], "oam_l": [...]} (Ready/Wind-up/Peak). `motion`
+    selects the cadence ("ranged" = archer draw-and-fire, "melee" = lunge-and-swing). Emits
+    the .data.oam_l / .oam_r / .script (12 modes) / .modes sections. oam_l mirrors oam_r 1:1
+    so frame i is at the same byte offset in both tables (the script references the _r
+    offset; the engine adds it to the oam_l base when the unit faces the other way).
     """
     L = ["@ vim:ft=armv4",
          "\t.global banim_%s_script" % abbr,
@@ -246,24 +296,26 @@ def emit_motion_s(abbr, frames):
 
     L.append("\t.section .data.script")
     L.append("banim_%s_script:" % abbr)
-    for name, kind in _MODE_ORDER:
+    order = _mode_order(motion)
+    for name, kind in order:
         L.append("banim_%s_mode_%s:" % (abbr, name))
-        L += _mode_body(abbr, kind)
+        L += _mode_body(abbr, kind, motion)
 
     L.append("\t.section .data.modes")
-    for name, _ in _MODE_ORDER:
+    for name, _ in order:
         L.append("\t.word banim_%s_mode_%s - banim_%s_script" % (abbr, name, abbr))
     for _ in range(12):
         L.append("\t.word 0")
     return "\n".join(L) + "\n"
 
 
-def build_battle_anim(abbr, frame_imgs, palette, center_px=None):
+def build_battle_anim(abbr, frame_imgs, palette, center_px=None, motion="ranged"):
     """Drive the whole faked-anim build: 3 frames -> sheets + agbpal + motion.s text.
 
     Per frame: tile -> merge filled cells into OBJs -> pack to oam_r + 2D placements ->
     mirror to oam_l -> blit the sheet. All frames use ONE shared anchor (`center_px`,
-    default a torso point) so the body stays put on screen. Returns
+    default a torso point) so the body stays put on screen. `motion` selects the script
+    cadence ("ranged"/"melee"). Returns
     {"sheets": [P-image x N], "pal": <128 bytes>, "motion_s": <str>}.
     """
     if center_px is None:
@@ -279,7 +331,7 @@ def build_battle_anim(abbr, frame_imgs, palette, center_px=None):
         sheets.append(build_sheet_from_placements(im, placements, palette))
         frames.append({"oam_r": entries, "oam_l": mirror_oam(entries)})
     return {"sheets": sheets, "pal": agbpal_bytes(palette),
-            "motion_s": emit_motion_s(abbr, frames)}
+            "motion_s": emit_motion_s(abbr, frames, motion)}
 
 
 def _cell_is_empty(im, ox, oy):

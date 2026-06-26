@@ -43,6 +43,23 @@ art:
       - segmented white belly plating
       - red recolour into the shared cast palette
 
+# ── Battle Animation (faked donor-prime, #65 Milestone B) ────────────────────────
+# Anchor-swinging crab brute on the Pirate axe cadence (his FE class). Source poses in
+# "Battle Anims/Braulo Battle/"; FE frames rebuilt by tools/descale_battleframe.py:
+#   --body 44 --sharpen 1.8 --thin-outline --flat "red:3,orange:3,grey:2,brown:3"
+# (flip to FE-left; ~44px body = vanilla scale so he sits centred on the platform, a touch
+# bigger than a 33px Pirate as the crab bruiser; flat family palette + 1px outline).
+# Detail/palette refinement deferred -- size locked first (Nicolas, 2026-06-26).
+battle_anim:
+  clone_from: pirate                    # donor: Pirate axe timing/effects/13 modes + ITYPE_AXE
+  motion: melee                         # lunge-and-swing; banim_code_hit_normal on the swing-through
+  # No class slot: rides the per-character _u25 table (#65 M-B). Deploys as vanilla Pirate.
+  abbr: brau_ax1                        # banim asset stem (<=12)
+  frames:                               # Ready -> Wind-up -> Peak (anchor: guard -> cocked -> swung)
+    - braulo/ready.png
+    - braulo/windup.png
+    - braulo/peak.png
+
 # ── D&D 5e Source (reference only — does NOT drive FE mechanics) ────────────────
 # FE stats come verbatim from the vanilla class below, not from D&D scores.
 # Raw sheet: data/pc-sheets/braulo.json  ·  Curated flavor: lore/braulo.md

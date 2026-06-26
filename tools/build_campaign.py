@@ -51,6 +51,7 @@ CLASSES_H = os.path.join(DECOMP, 'include', 'constants', 'classes.h')
 BANIM_DATA_C = os.path.join(DECOMP, 'src', 'banim_data.c')
 BANIM_POINTER_H = os.path.join(DECOMP, 'include', 'banim_pointer.h')
 BANIMCONF_C = os.path.join(DECOMP, 'src', 'data_banimconf.c')
+BANIMCONFUNK_C = os.path.join(DECOMP, 'src', 'data_banimconfunk.c')  # gUnitSpecificBanimConfigs
 BANIM_EKRBATTLE_H = os.path.join(DECOMP, 'include', 'ekrbattle.h')
 BANIM_LINKER = os.path.join(DECOMP, 'linker_script_banim.txt')
 BANIM_DATA_DIR = os.path.join(DECOMP, 'data', 'banim')
@@ -354,6 +355,10 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         'src/banim_data.c', 'include/banim_pointer.h',
                         'src/data_banimconf.c', 'include/ekrbattle.h',
                         'linker_script_banim.txt',
+                        # #65 M-B (character-unique anims, no class slot): the per-character
+                        # config table gets the AnimConf appended; the combat-lookup engine
+                        # hook swaps GetBattleAnimationId -> _WithUnique in ekrbattleintro
+                        'src/data_banimconfunk.c', 'src/banim-ekrbattleintro.c',
                         # battle ground platforms (#65): vendored snow/ice grounds appended to
                         # battle_terrain_table + the terrain->ground remap (snow chapters)
                         'src/banim_terrain_data.c', 'data/data_banim_terrain.s',
@@ -1039,13 +1044,9 @@ def class_enum_for(unit):
 def deploy_class_for(unit):
     """The class enum a unit is DEPLOYED as (its `defaultClass` + UnitDef `classIndex`).
 
-    A unit with a faked battle anim (#65) rides a stat-identical *clone* class (`clone_into`)
-    so ONLY its own unit shows the custom anim -- generic/enemy units of the donor class keep
-    the vanilla anim. Everyone else deploys as their plain class. Stats/loadout still resolve
-    against `class_enum_for` (the real vanilla class), so the clone is invisible to them."""
-    ba = unit.get('battle_anim')
-    if ba and ba.get('clone_into'):
-        return ba['clone_into']
+    Every cast member deploys as their plain vanilla class. Custom battle anims no longer
+    need a clone class: they ride the per-character `_u25` table (#65 M-B, see
+    inject_battle_anims + the _patch_banim_character_unique engine hook)."""
     return class_enum_for(unit)
 
 
@@ -2386,8 +2387,13 @@ def enemy_class_reskins(campaign):
 # animId, and deploy the unit as that clone (deploy_class_for). Nothing vanilla is overwritten
 # (donor class + AnimConf byte-unchanged). Reversible: the patched files restore each build.
 
-# donor 'clone_from' -> (FE donor class enum, the AnimConf weapon entry to repoint in the clone).
-BANIM_DONORS = {'archer': ('CLASS_ARCHER', '0x0100 | ITYPE_BOW')}
+# donor 'clone_from' -> (FE donor class enum, the AnimConf weapon entry to repoint in the
+# clone, the cadence the faked motion.s is built with: 'ranged' draw-and-fire / 'melee'
+# lunge-and-swing). The cadence is studied from the donor class's own vanilla motion.s.
+BANIM_DONORS = {
+    'archer': ('CLASS_ARCHER', '0x0100 | ITYPE_BOW', 'ranged'),
+    'pirate': ('CLASS_PIRATE', '0x0100 | ITYPE_AXE', 'melee'),
+}
 
 
 def banim_append_row(text, abbr):
@@ -2401,6 +2407,30 @@ def banim_append_row(text, abbr):
            % (abbr, abbr, abbr, abbr, abbr, abbr, anim_id))
     close = text.rindex('};')
     return text[:close] + row + text[close:], anim_id
+
+
+def banim_unique_append(text, conf_sym):
+    """Append `conf_sym` to gUnitSpecificBanimConfigs[] (#65 M-B); return (text, index).
+
+    The character-unique path (no class slot): a unit's AnimConf is registered here and the
+    character's _u25 points at the returned index. Self-sizing, so existing rows are
+    byte-unchanged. index = the count of existing entries (each carries a trailing comma)."""
+    marker = 'gUnitSpecificBanimConfigs[] = {'
+    bs = text.index(marker) + len(marker)
+    be = text.index('};', bs)
+    block = text[bs:be]
+    index = block.count(',')
+    return text[:bs] + block.rstrip() + '\n    %s,\n' % conf_sym + text[be:], index
+
+
+def banim_set_char_u25(block, index):
+    """Set a character block's `._u25 = { index, index }` (#65 M-B), inserting after
+    `.number` if absent, overwriting in place if already present (both promote states)."""
+    val = '._u25 = { %d, %d },' % (index, index)
+    if '._u25' in block:
+        return re.sub(r'\._u25 = \{[^}]*\},', val, block)
+    m = re.search(r'\n([ \t]*)\.number = [^\n]*\n', block)
+    return block[:m.end()] + m.group(1) + val + '\n' + block[m.end():]
 
 
 def banim_repoint_conf(text, conf_sym, wtype_literal, new_index):
@@ -2492,12 +2522,13 @@ def inject_battle_anims(campaign, verbose=True):
         clone_from = cfg['clone_from']
         if clone_from not in BANIM_DONORS:
             sys.exit('ERROR: battle_anim %s: unsupported clone_from %r' % (uid, clone_from))
-        donor_class, wtype = BANIM_DONORS[clone_from]
+        donor_class, wtype, motion = BANIM_DONORS[clone_from]
+        motion = cfg.get('motion', motion)            # YAML may override the donor default
         abbr = cfg.get('abbr') or (uid.replace('-', '').replace('prof', '')[:5] + '_ar1')
         frame_imgs = [Image.open(os.path.join(anim_dir, p)).convert('RGBA')
                       for p in cfg['frames']]
         palette = _banim_palette(frame_imgs)
-        res = ref_to_battleframe.build_battle_anim(abbr, frame_imgs, palette)
+        res = ref_to_battleframe.build_battle_anim(abbr, frame_imgs, palette, motion=motion)
 
         # 1. assets into the decomp (motion.s, per-frame sheet PNGs, agbpal blob)
         with open(os.path.join(BANIM_DATA_DIR, 'banim_%s_motion.s' % abbr), 'w',
@@ -2533,13 +2564,12 @@ def inject_battle_anims(campaign, verbose=True):
                             ('agbpal', 'char')]:
                 f.write('extern %s banim_%s_%s;\n' % (ty, abbr, sym))
 
-        # 4. ADDITIVE isolation: instead of repointing the shared donor class, give the unit
-        #    a stat-identical CLONE class whose own AnimConf selects the new animId. The donor
-        #    class + its AnimConf stay byte-vanilla, so every generic/enemy unit of that class
-        #    keeps the stock anim; only this unit (deploy_class_for -> clone_into) changes.
-        clone_slot = cfg.get('clone_into')
-        if not clone_slot:
-            sys.exit('ERROR: battle_anim %s: missing clone_into (the Archer-clone slot)' % uid)
+        # 4. CHARACTER-UNIQUE (no class slot, #65 M-B): build the unit's private AnimConf,
+        #    register it in the per-character table, and point the character's _u25 at it.
+        #    The donor class + every generic/enemy unit of it stay byte-vanilla; only THIS
+        #    named character animates custom (the _patch_banim_character_unique engine hook
+        #    routes combat through GetBattleAnimationId_WithUnique, which reads _u25). Scales
+        #    to every PC + named boss -- bounded by the anim table, not the ~3 class slots.
         new_conf = 'AnimConf_%s' % abbr
         src_conf = _class_field_symbol(donor_class, 'pBattleAnimDef')  # e.g. AnimConf_088AF150
         # 4a. a private AnimConf = copy of the donor's, with the weapon entry -> new animId.
@@ -2553,21 +2583,28 @@ def inject_battle_anims(campaign, verbose=True):
         with open(BANIM_EKRBATTLE_H, 'a', encoding='utf-8') as f:
             f.write('extern CONST_DATA struct BattleAnimDef %s[]; /* Manchego Stars #65 */\n'
                     % new_conf)
-        # 4b. clone the donor ClassData into clone_slot (full copy = identical stats/combat),
-        #     repoint .number + .pBattleAnimDef -> the private AnimConf
-        with open(CLASSES_C, encoding='utf-8') as f:
+        # 4b. register the AnimConf in gUnitSpecificBanimConfigs[] -> its table index.
+        with open(BANIMCONFUNK_C, encoding='utf-8') as f:
+            unk = f.read()
+        unk, u25 = banim_unique_append(unk, new_conf)
+        with open(BANIMCONFUNK_C, 'w', encoding='utf-8') as f:
+            f.write(unk)
+        # 4c. point the character's _u25 (both promote states) at that index. The PC rides a
+        #     vanilla character slot (PORTRAIT_MAP); the engine hook makes combat consult it.
+        slot = PORTRAIT_MAP.get(uid)
+        if not slot:
+            sys.exit('ERROR: battle_anim %s: no PORTRAIT_MAP character slot for _u25' % uid)
+        marker = '[CHARACTER_%s - 1]' % slot.upper()
+        with open(CHARACTERS_C, encoding='utf-8') as f:
             ctext = f.read()
-        bs, be = _find_brace_block(ctext, '[%s - 1]' % donor_class, CLASSES_C)
-        body = ctext[bs:be]
-        body = _set_field(body, 'number', clone_slot, CLASSES_C, donor_class)
-        body = _set_field(body, 'pBattleAnimDef', new_conf, CLASSES_C, donor_class)
-        ctext = _replace_brace_block(ctext, '[%s - 1]' % clone_slot, body, CLASSES_C)
-        with open(CLASSES_C, 'w', encoding='utf-8') as f:
+        cs, ce = _find_brace_block(ctext, marker, CHARACTERS_C)
+        ctext = ctext[:cs] + banim_set_char_u25(ctext[cs:ce], u25) + ctext[ce:]
+        with open(CHARACTERS_C, 'w', encoding='utf-8') as f:
             f.write(ctext)
 
         if verbose:
-            print('  %-14s = banim %s (animId 0x%X); clone %s -> %s (%s.%s)'
-                  % (uid, abbr, anim_id, donor_class, clone_slot, new_conf, wtype))
+            print('  %-14s = banim %s (animId 0x%X); _u25[%d] -> %s on char %s (%s)'
+                  % (uid, abbr, anim_id, u25, new_conf, slot, wtype))
 
 
 def _class_field_symbol(class_enum, field):
@@ -4997,6 +5034,8 @@ def main():
         print('  lord select (#42): GetPid + force-deploy/Seize/game-over keyed to the chosen lead')
         engine_hooks._inject_lord_floor_engine()  # after lord-select: anchors on its LordSelect_GetPid
         print('  lord floor (#45 3c): chosen lead\'s survivability top-up baked in once at ch start')
+        engine_hooks._patch_banim_character_unique()
+        print('  banim (#65): combat anim lookup -> GetBattleAnimationId_WithUnique (per-character _u25)')
         print('names:')
         inject_names(args.campaign)
         print('item names:')

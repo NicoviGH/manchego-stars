@@ -177,7 +177,10 @@ def check_engine_guards_present(fail):
              'keyed to the chosen lead)'),
             ('_inject_lord_floor_engine',
              'the #45 lord survivability-floor one-time HP/Def/Res top-up, without which '
-             'the glass picks become traps')):
+             'the glass picks become traps'),
+            ('_patch_banim_character_unique',
+             'the #65 per-character battle-anim hook (combat -> GetBattleAnimationId_WithUnique, '
+             'reading _u25); without it every PC custom anim silently reverts to its class anim')):
         if ('def %s(' % fn) not in eh:
             fail.append('engine hook %s() not DEFINED in tools/inject/engine_hooks.py '
                         '-- would silently drop %s (see docs/decisions.md)' % (fn, mechanic))

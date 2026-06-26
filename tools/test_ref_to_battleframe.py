@@ -270,6 +270,48 @@ class TestEmitMotionS(unittest.TestCase):
         self.assertIn("banim_frame_oam 0x0, 0x4000, 0x0, -8, -8", s)
 
 
+class TestMeleeMotionS(unittest.TestCase):
+    """The melee cadence (FE8 Pirate axe study): lunge in, swing, hit on contact, return.
+
+    Differs from the ranged (archer) cadence cloned for RBG: NO projectile
+    (call_spell_anim); the hit is banim_code_hit_normal on the swing-through; the unit
+    lunges (start_attack_1/2 + start_opposite_turn) and dodges BACKWARD (dodge_to_back); and
+    a melee unit cannot strike at range, so attack_range just holds the ready frame.
+    """
+
+    def _frames(self):
+        e0 = [{"attr0": 0, "attr1": 0x4000, "attr2": 0, "dx": -8, "dy": -8}]
+        return [{"oam_r": e0, "oam_l": rb.mirror_oam(e0)} for _ in range(3)]
+
+    def _mode(self, s, name, abbr="brau_an1"):
+        after = s.split("banim_%s_mode_%s:" % (abbr, name))[1]
+        return after.split("\nbanim_%s_mode_" % abbr)[0]
+
+    def test_attack_close_lunges_swings_and_lands_no_projectile(self):
+        s = rb.emit_motion_s("brau_an1", self._frames(), motion="melee")
+        body = self._mode(s, "attack_close")
+        self.assertIn("banim_code_start_attack_1", body)        # lunge in
+        self.assertIn("banim_code_sound_axe_swing_long", body)  # the swing
+        self.assertIn("banim_code_effect_dirt_kick", body)
+        self.assertIn("banim_code_hit_normal", body)            # melee contact
+        self.assertNotIn("banim_code_call_spell_anim", body)    # no arrow/spell
+
+    def test_melee_dodges_backward(self):
+        s = rb.emit_motion_s("brau_an1", self._frames(), motion="melee")
+        self.assertIn("banim_code_dodge_to_back", self._mode(s, "dodge_close"))
+
+    def test_melee_cannot_strike_at_range(self):
+        s = rb.emit_motion_s("brau_an1", self._frames(), motion="melee")
+        body = self._mode(s, "attack_range")
+        self.assertNotIn("banim_code_start_attack_1", body)     # no lunge
+        self.assertNotIn("banim_code_hit_normal", body)         # no hit at range
+
+    def test_ranged_motion_is_still_the_default(self):
+        s = rb.emit_motion_s("rbg_ar1", self._frames())         # no motion= -> ranged
+        self.assertIn("banim_code_call_spell_anim", s)
+        self.assertNotIn("banim_code_dodge_to_back", s)
+
+
 class TestBuildBattleAnim(unittest.TestCase):
     """End-to-end driver: 3 frame images + abbr + palette -> sheets, agbpal, motion.s.
 
