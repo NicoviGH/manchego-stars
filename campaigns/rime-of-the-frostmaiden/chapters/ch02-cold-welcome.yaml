@@ -114,7 +114,10 @@ deployment:
       position: [3, 4]
       inventory: [slim-lance]
       ai_pattern: cautious        # defend, don't charge into the raid
-      gift: red-gem               # ITEM_REDGEM 0x76 — gifted at chapter end IF it survives
+      gift: hand-axe              # DEVIATION (ch02↔ch03 swap, ADR in decisions.md): vanilla Ch2's Red Gem
+                                  # moves to ch03's gem-mine chest; this slot takes ch03's Hand Axe instead.
+                                  # Net wealth + item set across ch02+ch03 = vanilla. (Useful to Braulo; a
+                                  # chwinga scavenging a discarded hatchet in Icewind Dale reads fine.)
     - id: chwinga-rime
       name: "Rime Spark"
       fe_name: "Rime"
@@ -199,6 +202,7 @@ enemy_units:
     ai_pattern: aggressive
   - id: raider-bruiser
     name: "Grukk the Bruiser"
+    fe_name: "Grukk"            # ≤12 — overrides the vanilla "Bone" slot name plate
     is_miniboss: true
     count: 1
     position: [13, 6]           # guards beside the captain on the eastern edge
@@ -213,6 +217,7 @@ enemy_units:
     ai_pattern: hold_position
   - id: raider-captain
     name: "Halvar the Raider Captain"
+    fe_name: "Halvar"          # ≤12 — overrides the vanilla "Bazba" slot name plate
     is_boss: true
     count: 1
     position: [14, 5]           # anchored on the far-east edge — the band's far corner
@@ -274,7 +279,7 @@ events:
       this commit): ch02 host wiring + the eventscript that consumes this script, Vellynne's
       cutscene portrait (#19), and the in-game motion review.
     script:                       # LOCKED 2026-06-19 (dialogue pass, co-written with Nicolas)
-      - location_card: "Bryn Shander — West Gate"
+      - location_card: "Bryn Shander"   # nameplate caps at 96px (3 text sprites); the "West Gate" beat is set by the scene/dialogue below
       # (The Rolling Cheddar groans through the west gate, Baxby in the traces. A second
       #  sled waits in the drifts — no dogs in its harness, only two kobolds, gray and
       #  frost-split, that do not breathe. The woman aboard does not climb down; her hands

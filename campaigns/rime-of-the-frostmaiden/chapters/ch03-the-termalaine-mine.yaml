@@ -5,123 +5,279 @@
 id: ch03-the-termalaine-mine
 title: "The Termalaine Mine"
 chapter_number: 3
-status: planned                # brainstorm SEED, NOT authoritative: enemy roster/levels/beats are
-                               # re-grounded against vanilla + party data when the slice is reached
-                               # (brainstorming skill digests this). Exempt from the parity gate until then.
+status: active                 # design locked + grounded (decomp + DM notes + Frostmaiden book); slice in build
 milestone: M3
-cadence: gimmick_multilevel     # see docs/CHAPTERS.md — 🟨
-fe8_base_map: "FE8 Ch3 — The Bandits of Borgo"      # Seize big-battle base
+cadence: big_battle_seize       # see docs/CHAPTERS.md — mirrors FE8 Ch3 "big battle / recruit" (Colm→Trex)
+fe8_base_map: "FE8 Ch3 — The Bandits of Borgo"      # Seize big-battle; geometry borrowed + repainted as a mine
+                                                    # interior (rooms via walls+doors), per decisions.md (ch01 rode Ch13a)
 parity_reference: "FE8 Ch3"   # #48 enemy-pressure parity bar — The Bandits of Borgo — Seize big-battle
 
+# ── Onboarding (what this chapter first teaches) ─────────────────────────────────
+# Cadence anchor = vanilla Ch3, which recruits Colm (the first thief) → the steal/chests/
+# doors lesson; our Trex (Colm-based) carries it. We ALSO move the monster foe-type debut
+# here (deviation, ADR in decisions.md): the grell is a real FE monster and chronologically
+# the party's first, one chapter before vanilla's Ch4. Moved OUT of ch04's `introduces`.
+introduces:
+  - concept: stealing-thieves    # thief utility: open chests/doors, loot — DEBUT (Trex = our only thief)
+    coverage: both               # gameplay (door/chest-gated rooms need a thief or a key) + a Trex bark
+    where: "Trex joins mid-map; the mine's locked rooms + chests reward the thief (keys drop as backup)"
+    status: active
+  - concept: monsters            # FE8's monster foe-type — DEBUT here (moved from ch04); the Grell is a real Mogall
+    coverage: dialogue           # foe-type tone shift in-scene (the Pinky shaft-scout reveal); monster-effective
+                                 # GEAR stays deferred (none on the reward curve until later) — see decisions.md
+    where: "the deep shaft — Pinky scouts the dark and the Grell is revealed (the army's first true monster)"
+    status: active
+
 # ── Narrative ──────────────────────────────────────────────────────────────────
+# Grounded: Frostmaiden book "A Beautiful Mine" (pp.93–96) + the DM notes. Termalaine's
+# tourmaline mine (a cavern in a hill NE of town) is overrun by kobolds and miners have
+# vanished; the town posts a bounty to clear it. The truth (the book's "something else
+# wrong"): a Grell — an Underdark aberration — came up the mine's central shaft "in search
+# of food" and is preying on miners AND kobolds, which is why the kobolds are agitated. Their
+# leader, Trex (a clever winged kobold — canon), defects to the party.
 narrative: >
-  Kobolds have taken over Termalaine's gemstone mine and miners are vanishing.
-  Inside, the party finds kobolds on the upper levels and Grells lurking in the
-  deep shaft. Wolfram digs out gem samples and snacks on ore; RBG executes a
-  kobold at gunpoint during a "good cop, bad cop" interrogation; the party meets
-  Trex, a clever kobold who fashioned cosmetic wings. They send Pinky to scout
-  the shaft, then slay the Grells.
+  Termalaine's tourmaline mine has been overrun by kobolds and its miners have
+  gone missing, so the town posts a bounty to clear it. Inside, the kobolds are
+  territorial but rattled — something deeper is hunting them too. Wolfram digs
+  tourmalines from the walls and snacks on raw ore; the party corners a kobold and
+  RBG executes it at gunpoint during a "good cop, bad cop" interrogation; then they
+  meet Trex, the clever winged kobold leading the warren, who throws in with them.
+  At the central shaft they send Pinky into the dark to scout — and a Grell, the
+  aberration that crawled up from the Underdark, is revealed. They take the deep
+  workings and head back to Termalaine to collect the bounty.
 
 # ── Map ────────────────────────────────────────────────────────────────────────
+# Structure: rooms-on-ONE-flat-map (FE8 has no z-levels; "multi-level" is impossible —
+# decisions.md ADR). The book's 3-level mine collapses into a horizontal sequence of walled
+# chambers joined by DOORS (TERRAIN_DOOR) and chokepoints, with one scripted "open the way
+# down" map-change (TILECHANGE) at the Pinky-scout beat. Doors make Trex (the thief) matter.
 map:
-  file: maps/ch03-termalaine-mine.tmx
-  tileset: cave-interior        # FEUniverse cave tileset, arctic palette swap
-  size: "24×24"                 # multi-level — finalize in Tiled
+  file: maps/ch03-termalaine-mine.mar    # hand-authored on the cave/interior metatiles
+  tileset: cave-interior        # vendored FE cave/dungeon tileset, arctic palette (model on the ch01/ch02 winter pipeline)
+  base_layout: Ch3Map           # vanilla Ch3 "Bandits of Borgo" geometry, repainted as a mine interior
+  size: "15×10ish"              # mirror vanilla Ch3's coordinate space (enemy tiles cite vanilla); finalize in the map tool
   description: >
-    First multi-level interior. Kobolds hold the upper galleries and the path
-    down; a vertical shaft drops to the lower workings (the seize tile) where the
-    Grells nest. Stairs/ladders are the chokepoints. Teaches vertical navigation.
+    A walled mine interior read left-to-right as a descent: a tool-room entrance →
+    kobold-held galleries (chokepoints + doors) → a river-cavern pinch → the
+    processing room → a sealed passage that a scripted map-change opens onto the
+    deep workings = the grell's lair = the seize tile. Doors/chests reward the thief.
 
 # ── Objective ──────────────────────────────────────────────────────────────────
 objective:
   type: seize
   description: >
-    Descend the shaft and seize the deep workings — the flooded lower gallery
-    where the Grells nest. Reaching it requires the full descent; the win
-    triggers on the seize tile. Slaying the Grells guarding it is incidental.
+    Fight down through the kobold-held rooms and seize the deep workings — the
+    grell's lair at the bottom of the central shaft (vanilla Ch3's seize tile,
+    14,1). The grell guards it; the way in opens after Pinky scouts the shaft.
 
 win_condition: seize_point_held
-lose_condition: all_player_units_defeated
+lose_condition: all_player_units_defeated         # FE8 lord rule
 
 difficulty_note: >
-  The single teaching goal is verticality — descending the shaft. Kobolds are a
-  normal fight on the path down (not skippable); the 2 Grells (mini-bosses) are
-  the real threat, made scary by the cramped chokepoint of the lower shaft rather
-  than by stat inflation. Lean generous: the chokepoint rewards careful play.
+  Enemy pressure mirrors vanilla FE8 Ch3 1:1 (10 slots; see enemy_units) — verified
+  on `make difficulty CH=ch03`: clear-load x0.99, threat x1.12 (within band). The
+  threat runs a touch hot because the Grell attacks with magic (Evil Eye) against
+  our melee cast's low RES — intentional: an eldritch horror should out-threaten a
+  bandit. The doors/chokepoints, not stat inflation, make the descent tense.
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
-  note: "All 7 PCs + Baxby. Pinky (RBG's homunculus) used as a scripted scout. Positions set in Tiled."
+  # Field parity: deploy_limit = vanilla FE8 Ch3 player deploy-slot count (decisions.md §Field parity;
+  # fe8-pacing-reference §1b: Ch3 = 9, read from .size UnitDef_Event_Ch3Ally/20).
+  deploy_limit: 9               # vanilla FE8 Ch3 fields 9 — ~our whole current roster (8 PCs + Baxby)
+  note: "Pick Units fields up to deploy_limit; the chosen lord (#42) is force-deployed.
+         Pinky is used in a scripted shaft-scout beat. Positions set in the map tool."
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
+# 1:1 reskin of vanilla FE8 Ch3 "The Bandits of Borgo" red force (UnitDef_088B463C):
+# 10 slots = Bazba(Brig L6 boss) + 6 Brigand + 1 Mercenary + 1 Archer + 1 Thief, with
+# two key-droppers (Door Key / Chest Key). We keep the class/level/weapon mix so enemy
+# pressure mirrors vanilla (tools/difficulty.py); the ONE deliberate deviation is the boss
+# slot: Bazba's Brigand becomes the GRELL (a real FE monster — CLASS_MOGALL — since a grell
+# IS a floating tentacled eye-aberration). A same-level mogall is far frailer than a Brigand,
+# so the grell carries a level bump to hold Bazba's pressure — verified on `make difficulty
+# CH=ch03`, not faked via the class. The kobolds are agitated victims (the grell preys on
+# them too), territorial toward intruders; Trex (their leader) defects to the party mid-map.
 enemy_units:
-  - id: kobold
-    name: "Mine Kobold"
-    count: 8
-    class: brigand
-    level: 3
-    weapon: iron-axe
-    damage_type: slashing
-    ai_pattern: defensive       # guard the galleries and the path down the shaft
+  # ── BOSS SLOT (vanilla Bazba, Brigand L6 @ (14,1) GuardTile) → the GRELL ──
   - id: grell
     name: "Grell"
-    is_boss: true               # mini-boss tier
-    count: 2
-    class: mogall               # FE8 monster class (floating eye-aberration); reskinned as a Grell
-    level: 5
-    damage_type: lightning      # flavor label only
-    ai_pattern: aggressive
-    revealed_by: pinky_scout    # hidden in the dark until the shaft-mouth scout cutscene
+    fe_name: "Grell"
+    is_boss: true
+    count: 1
+    positions: [[14, 1]]        # vanilla seize tile = the deep workings / grell lair
+    class: mogall               # FE8 monster (floating eye-aberration) — the real creature, not a reskin
+    level: 12                   # BUMP over Bazba's L6: mogall bases are frail; level holds boss pressure (iterate on difficulty tool)
+    autolevel: true
+    inventory:
+      - id: evil-eye            # the mogall's innate ranged magic gaze (hits RES); flavor = lightning tentacle
+    ai_pattern: aggressive      # guards the lair; revealed by the Pinky shaft-scout (scripted spawn, not fog)
+    revealed_by: pinky_scout
     death_quote: "*a wet, clicking shriek*"
+  # ── 6 Brigand kobolds (vanilla L3-L4 brigands; 2 are key-droppers below) → Icewind kobolds ──
+  - id: kobold-axe
+    name: "Icewind Kobold"
+    count: 1                    # vanilla brigand @ (7,2) L3 iron-axe
+    positions: [[7, 2]]
+    class: brigand
+    level: 3
+    autolevel: true
+    inventory:
+      - id: iron-axe            # pick/hatchet
+    ai_pattern: defensive       # territorial; hold the galleries
+  - id: kobold-thrower-l3
+    name: "Icewind Kobold"
+    count: 1                    # vanilla brigand @ (9,8) L3 hand-axe
+    positions: [[9, 8]]
+    class: brigand
+    level: 3
+    autolevel: true
+    inventory:
+      - id: hand-axe            # throwing pick (1-2 range)
+    ai_pattern: defensive
+  - id: kobold-thrower-l4
+    name: "Icewind Kobold"
+    count: 1                    # vanilla brigand @ (14,11) L4 hand-axe
+    positions: [[14, 11]]
+    class: brigand
+    level: 4
+    autolevel: true
+    inventory:
+      - id: hand-axe
+    ai_pattern: defensive
+  - id: kobold-steel
+    name: "Icewind Brute"
+    count: 1                    # vanilla brigand @ (14,6) L3 steel-axe (the grell's nearest enforcer)
+    positions: [[14, 6]]
+    class: brigand
+    level: 3
+    autolevel: true
+    inventory:
+      - id: steel-axe           # heavy mining maul
+    ai_pattern: defensive
+  # ── 1 Mercenary (vanilla L2 merc @ (15,2)) → a blade-kobold ──
+  - id: kobold-blade
+    name: "Kobold Skirmisher"
+    count: 1
+    class: mercenary
+    level: 2
+    autolevel: true
+    inventory:
+      - id: iron-sword
+    ai_pattern: defensive
+  # ── 1 Archer (vanilla L4 archer @ (12,9)) → a kobold slinger ──
+  - id: kobold-slinger
+    name: "Kobold Slinger"
+    count: 1
+    class: archer
+    level: 4
+    autolevel: true
+    inventory:
+      - id: iron-bow            # dart/sling — the chapter's single ranged kobold
+    ai_pattern: defensive
+  # ── 1 Thief (vanilla enemy thief @ (9,11)) → a giant rat scavenger (book M3 River Cavern) ──
+  - id: giant-rat
+    name: "Giant Rat"
+    count: 1
+    class: thief
+    level: 3
+    autolevel: true
+    inventory:
+      - id: iron-sword          # claws/bite (modeled as the vanilla thief's blade)
+    ai_pattern: aggressive      # scurries the tunnels (the book's rodent tracks)
+  # ── 2 key-droppers (vanilla Door Key / Chest Key brigands) → kobolds that drop the keys ──
+  - id: kobold-keykeep-door
+    name: "Icewind Kobold"
+    count: 1
+    positions: [[5, 9]]
+    class: brigand
+    level: 3
+    autolevel: true
+    inventory:
+      - id: iron-axe
+    item_drop: door-key         # so a player who hasn't recruited Trex yet can still open doors
+    ai_pattern: defensive
+  - id: kobold-keykeep-chest
+    name: "Icewind Kobold"
+    count: 1
+    positions: [[7, 11]]
+    class: brigand
+    level: 3
+    autolevel: true
+    inventory:
+      - id: iron-axe
+    item_drop: chest-key        # backup chest access (Trex is the intended opener)
+    ai_pattern: defensive
 
 # ── Chests / Mine Loot ───────────────────────────────────────────────────────────
+# Reward footprint mirrors vanilla FE8 Ch3 (decisions.md §Reward budget; fe8-pacing-reference
+# §3): Ch3's channel is its FIRST CHESTS = basic iron-tier gear (Iron Lance/Sword + Hand Axe +
+# Javelin), opened by a thief/key. NO stat-booster (capped at parity ≥ FE8 Ch5) and NO raw gold
+# (vanilla gives none before Ch8). DEVIATION (ADR in decisions.md): one chest = a Tourmaline
+# (= a Red Gem, 2,500g) — the Hand Axe that would sit here is swapped to ch02's chwinga-mote
+# gift, and ch02's Red Gem moves here. Net wealth + item set across ch02+ch03 = vanilla; only
+# the location of the two items swaps. Thematic: it's a famous gem mine, and Trex opens the seam.
+# Trex (recruited mid-map) is the intended opener; the two key-dropper kobolds are the backup.
 chests:
-  - position: tbd               # upper side gallery — a short detour off the main descent (NOT gated behind the Grells)
+  - position: tbd               # the mine tools — reflavored basic gear (book M1 Tool Room: "racks of picks and hammers")
     contents:
-      - id: stat-booster        # FIRST stat-booster of the game (docs/fe8-pacing-reference.md §3)
-        which: energy-ring      # FE8 Energy Ring (+2 Pow); broadly useful first booster
-  - position: tbd               # deep, near the seize tile — a "while you're here" gold grab
+      - id: iron-lance          # a miner's drill-spear
+  - position: tbd
     contents:
-      - id: gem-cache
-        amount: 300             # gold value
+      - id: iron-sword          # a cutting tool
+  - position: tbd
+    contents:
+      - id: javelin             # a throwing pick (vanilla Ch3's off-on-its-own chest)
+  - position: tbd               # the deep seam, near the lair — Trex's signature pop
+    contents:
+      - id: red-gem             # a pink Tourmaline — Termalaine's signature gem (2,500g sell). DEVIATION: see ADR.
+        flavor: "a fist-sized rose-pink tourmaline, the best seam in the mine"
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
+# Beat PLACEMENT only — final dialogue is written via the dialogue-pass skill (voice bibles +
+# the #58 opaque-box narration convention), gated by tools/verify_text.py. Grounded in the DM
+# notes + book "A Beautiful Mine."
 events:
   - trigger: chapter_start
     type: cutscene
     ea_file: events/ch03-opening.ea
-    description: "Termalaine; the missing miners; party enters the mine. Wolfram eyes the ore."
+    description: >
+      Termalaine; the bounty to clear the kobold-overrun gem mine; the missing
+      miners. The party enters. Wolfram eyes the tourmaline seams and the ore.
   - trigger: midmap
     type: cutscene
     ea_file: events/ch03-rbg-execution.ea
     description: >
-      Mid-map scripted beat: the kobold interrogation. RBG executes the kobold at
-      gunpoint (rbg_kobold_execution). Wolfram's ore-snacking gag plays here too
-      (wolfram_ore_snacking). Then Trex appears and the shaft to the Grells opens.
+      Mid-map scripted beat: the party corners a kobold for a "good cop, bad cop"
+      interrogation and RBG executes it at gunpoint (rbg_kobold_execution); Wolfram's
+      ore-snacking gag plays here (wolfram_ore_snacking). Then Trex — the clever
+      winged kobold leader — is met and DEFECTS to the party (trex recruited; he
+      reveals the warren is being hunted from below). Trex's thieving = the chapter's
+      thief/chests/doors lesson.
   - trigger: shaft_mouth_reached
     type: cutscene
     ea_file: events/ch03-pinky-scout.ea
     description: >
-      Scripted scout beat (pinky_scout), fires when the first unit reaches the lip
-      of the shaft. The drop is black — no one can see the bottom. RBG, only half
-      willing to send his boy into the dark, lets Pinky (the army's flier) dive to
-      scout. The camera pans down the shaft with him and the 2 Grells are REVEALED
-      here (vanilla enemy reveal — they are not visible before this). Pinky rockets
-      back up rattled ("Eyes. Big wet ones. Lots of 'em."); RBG, relieved, gives the
-      descend order with a protective line that seeds the finale Wish ("Nothing down
-      there is taking you from me."). The way down opens.
+      Scripted scout beat (pinky_scout), fires when the first unit reaches the central
+      shaft. The drop is black. RBG, only half willing to send his boy into the dark,
+      lets Pinky (the army's flier) dive to scout. The Grell is REVEALED here — a
+      scripted enemy spawn (NOT fog; Ch3 has no fog), the army's first true monster.
+      Pinky rockets back up rattled; RBG, relieved, gives the descend order with a
+      protective line that seeds the finale Wish ("Nothing down there is taking you
+      from me."). A map-change opens the way to the deep workings (the seize tile).
   - trigger: chapter_end
     type: cutscene
     ea_file: events/ch03-ending.ea
-    description: "Grells slain; party returns to Termalaine for the reward. Trex asks to come along."
+    description: "Grell slain, deep workings seized; the party returns to Termalaine to collect the bounty."
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
-  gold_reward: 300
-  available_shops: [termalaine]
-  units_available_to_recruit:
+  # No raw gold (vanilla gives none before FE8 Ch8); the chapter's wealth is the in-map
+  # Tourmaline chest (= Red Gem, sell for 2,500g). The town "bounty" is narrative flavor.
+  available_shops: [termalaine] # gems / mining equipment / unusual items (campaign.yaml; unlocks after ch03)
+  units_recruited_in_chapter:
     - id: trex
-      description: "Trex the winged kobold joins post-chapter"
+      where: "mid-map cutscene (rbg-execution beat) — defects, then thieves for the party"
   unlocks_chapter: ch04-the-white-moose
 
 # ── Signature Moments anchored here ──────────────────────────────────────────────
@@ -132,7 +288,12 @@ signature_moments:
     trigger: wolfram_ore_snacking
 
 design_notes: >
-  Verticality is the single teaching goal (descend the shaft to the seize tile).
-  Two PC signature beats land in the mid-map cutscene (RBG + Wolfram). The first
-  stat-booster (Energy Ring) sits in an accessible upper side gallery — an
-  exploration reward, not risk-gated. Recruit Trex post-chapter.
+  Identity: the thief/chests/doors dungeon-seize (vanilla Ch3 "big battle / recruit"),
+  reskinned as Termalaine's gem mine. Teaching goal = the thief utility, carried by Trex
+  (our Colm), made meaningful by door/chest-gated rooms. ALSO the monster foe-type debut
+  (moved here from ch04): the Grell is a real FE Mogall and chronologically the party's
+  first monster. FE8 has no multi-level maps, so the book's 3-level mine is one flat walled
+  interior + one "open the way down" map-change. Two PC signature beats (RBG execution +
+  Wolfram ore-snacking) land in the mid-map cutscene. Enemy/reward footprints both mirror
+  vanilla FE8 Ch3; the only deviations (grell=monster boss, the ch02↔ch03 gem/hand-axe swap,
+  the monster-debut move) are recorded in decisions.md and net-neutral to parity.

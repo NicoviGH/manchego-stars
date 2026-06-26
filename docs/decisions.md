@@ -34,6 +34,11 @@ _Decided: 2026-06-04_
 FE8 packs text two bytes per u16; `[X]` = the 0x00 string terminator. The packer (`textprocess.py`) pairs printable bytes two-at-a-time but emits each control byte (`[LF]`=0x01, `[X]`=0x00, the `[.]` pad=0x1F) as its own u16, which realigns the pairing — so each *run* of printables between control codes pairs independently. A run with an **odd** length makes its last char swallow the *following* byte; when that byte is the `[X]` terminator, the decoder runs past it into the next message (garbage + bleed-through). Vanilla pads odd names with `[.]` (`Franz[.][X]` vs `Seth[X]`); `build_campaign.py`'s `_term_pad` does the same — but the parity that matters is the **final run** (the printables after the last control code), **not** the whole message: a multi-line body whose earlier `[LF]` runs are odd can sum to an even total yet still have an odd final run that eats `[X]` (Pinky's pitch: 16+19+13 = 48 even, final run 13 odd → runaway). Note `verify_text.py` only flags *length* runaways (>~2133 vals), so a short bleed into the very next message passes its sweep — decode the specific ids (`verify_text.py 0xNNN`) and read the tail when authoring multi-line messages.
 _Decided: 2026-06-04; refined 2026-06-25 (final-run parity — multi-line lord-select pitches, #46)_
 
+**Card/name text from YAML must be ASCII-folded before FE8 encoding — `name_message_body` does it centrally.**
+Dialogue routed through `_script_to_message` already gets `_fe_dialogue_text` (em-dash→`--`, smart-quotes→ASCII, etc.), but location-card/title/name text bypassed that path and went straight to `name_message_body` — so a literal em-dash in a YAML `location_card` ("Bryn Shander — West Gate") reached the encoder as a non-charset byte and **garbled the ch02 opening card** (#22). Fix: `name_message_body` now `_fe_dialogue_text`-normalizes first, so every card/title/name is charset-safe and the terminator-parity count sees the bytes the encoder will actually emit. Keep authored unicode in the YAML; the encoding boundary folds it.
+**Companion gotcha — location-card nameplates cap at ~96px.** `BROWNBOXTEXT`/`StartBrownTextBox` draws the card text as exactly **3×32px sprites** (`popup.c` `BrownTextBox_Loop`, `for (i=0;i<3;i++)`); the brown *border* grows with the string but the *text* region is fixed, so anything past ~12-14 chars clips silently (the in-engine capture caught "Bryn Shander — West Gate" rendering "Bryn Shander -- We"). Keep `location_card:` values to short place names (vanilla does: "Targos", "Bryn Shander"); push locational detail into the scene/dialogue, not the plate. Don't widen the shared widget (it's a vanilla popup — "additive, never global").
+_Decided: 2026-06-25_
+
 **Test-chapter spawn = vanilla Ch1 map stripped to a sandbox (not a hand-authored chapter).**
 The first in-engine check that names + portraits + classes + stats land together (Milestone B step 3) keeps vanilla Ch1's **map** but guts its scripting, via `build_campaign.py:inject_test_chapter`:
 - rewrites the player roster (`UnitDef_Event_Ch1Ally`) to our 8 classed cast (each rides its `PORTRAIT_MAP` slot's `CHARACTER_` id, so its injected name/portrait/class/stats show; `redaCount = 0` places it statically at `xPosition/yPosition`, per `eventscr.c:sub_800F8A8`);
@@ -460,12 +465,40 @@ Placement follows the **parity_reference, not our chapter number** — our 8-cha
 not "chapter N's." This is the item analogue of the recruit budget; per-chapter loot is authored in the
 chapter YAML (the data is the doc). Consistent with the promotion seam (Ch8→9): our MVP chapters
 (parity ≤ Ch13) sit below the Master-Seal threshold (Ch15a), so promotions stay deferred to Revel's End.
-Worked example — **ch02 (parity FE8 Ch2):** gems + premium consumables only (**Red Gem / Elixir /
-Pure Water**, the exact vanilla Ch2 village gifts) + a regular armory + one enemy consumable drop;
-**no boosters, no promos.** The three chwinga "charms" ARE those three gifts, 1:1.
+Worked example — **ch02 (parity FE8 Ch2):** gems + premium consumables only (vanilla Ch2's village
+gifts) + a regular armory + one enemy consumable drop; **no boosters, no promos.** The three chwinga
+"charms" are those gifts — **Elixir / Pure Water / Hand Axe** (the Hand Axe stands in for vanilla's
+**Red Gem**, which is lent forward to ch03's gem mine; see the Ch3-deviations ADR below — net wealth
+across ch02+ch03 is unchanged).
 _Reconstructed: 2026-06-22 (CLAUDE, decomp event-data + `events_shoplist.c` scan) — upgrades
 fe8-pacing §3 from era-buckets to a decomp-pinned curve (correcting the old "promos at Ch9–13": promos
 + boosters actually start Ch5, Master Seal/Secret Shop start ~Ch14a). Companion to the recruit budget._
+
+**Ch3 "The Termalaine Mine" — three sanctioned deviations from strict per-chapter parity.**
+ch03 reskins vanilla FE8 Ch3 "The Bandits of Borgo" (Seize big-battle; the game's first chests +
+first thief). Roster + reward footprints mirror it 1:1, with three deliberate, parity-neutral
+deviations (Nicolas-directed, this session):
+1. **The boss is a real monster.** A grell IS a floating tentacled eye-aberration, so the boss slot
+   (vanilla Bazba, Brigand L6) becomes a **CLASS_MOGALL** with the Evil Eye — NOT a frailty cheat.
+   A same-level mogall is far weaker than a Brigand, so it carries a **level bump (L12)** to hold
+   Bazba's pressure. Verified on `make difficulty CH=ch03`: clear-load ×0.99, threat ×1.12 (within
+   band; the magic Evil Eye vs our low-RES melee runs intentionally hot). Parity is *measured*, not
+   assumed — this is exactly the wiggle-room the difficulty engine exists to provide.
+2. **Monster foe-type debut moves ch04 → ch03.** The grell is chronologically the party's first
+   monster. The `introduces: monsters` ledger entry moved to ch03 (out of ch04, which stays a
+   monster/fog set-piece but is no longer the *first*). Monster-effective GEAR stays deferred (none
+   on the reward curve yet).
+3. **The ch02↔ch03 gem/hand-axe swap.** Vanilla's single early gem (the Ch2 Red Gem) is *lent
+   forward* to ch03's gem mine (it's literally a famous tourmaline mine; Trex the thief opens the
+   seam). To keep wealth on-curve, vanilla Ch3's Hand Axe chest moves *back* to ch02's chwinga-mote
+   gift. Net result: total wealth AND the exact item set across ch02+ch03 are identical to vanilla —
+   only the chapter each of the two items appears in is swapped. (We considered keeping the gem at
+   ch02 for strict per-chapter parity; chose the swap for the gem-mine payoff, since it's net-neutral
+   and the Ch2 gem money is meant for world-map shopping after the chapter anyway, not the thin Ch2 armory.)
+_Decided: 2026-06-26 (Nicolas + CLAUDE, Ch3 design-lock session; grounded in the FE8 decomp, the DM
+notes, and the Frostmaiden book "A Beautiful Mine" pp.93–96). FE8 has no multi-level maps, so the
+book's 3-level mine is authored as one flat walled interior (rooms via TERRAIN_DOOR + one TILECHANGE),
+not a verticality gimmick — the doors make the thief (Trex) matter._
 
 **Two healers, differentiated by donor (same move as the shamans).** Sclorbo and Basil are both
 Priests, so they get *distinct* vanilla donor lines to avoid stat-twins: **Sclorbo → Moulder** (the
@@ -1175,6 +1208,24 @@ campaign-agnostically.
   for A and ate the budget before the swing drew. Fix: tap A while the quote box is up, screenshot
   only quote-less frames, and key the verdict on capturing real anim frames (`sawAnim`).
 _Decided: 2026-06-26_
+
+**Event backgrounds (`BACG`): vendored winter CGs, injected as NEW `gConvoBackgroundData` slots**
+Cutscene backdrops are `gConvoBackgroundData[]` (eventscr2.c) `{tiles, map, palette}` triples, 240×160,
+4bpp with up to **8 sixteen-colour sub-palettes** (one per 8×8 tile = 128 colours). We vendor winter
+backdrops from the FE-Repo (catalogued in `map-review/iwd-bg-library.md`; the Icewind Dale set is rich)
+and add each as an **additive new slot** past `BG_BLANK` (0x35) — never reskin a vanilla entry.
+- **Pipeline:** `tools/bg_to_fe8.py` (any image → 240×160, GBA-5bit, tile-banked mode-P PNG; greedy ≤8
+  banks) → `inject_backgrounds` copies it to `graphics/bg/`, appends the enum id (backgrounds.h),
+  extern decls (bg.h), table row (eventscr2.c) and incbin symbols (data_bg.s); make's generic
+  gbagfx/FETSATOOL rules build the bins. The 4 patched files are in `PATCHED_DECOMP_FILES`.
+- **Gotcha — index 0 is transparent.** GBA BG colour index 0 shows the backdrop (FE8 sets it black),
+  so a converter that uses local index 0 for a real colour renders **black holes** wherever that colour
+  appears (caught in-engine on the ch02 Targos BG: the bright sky/snow speckled black). `bg_to_fe8.py`
+  reserves index 0 (colours start at local 1; ≤15 usable per bank). A flat-quant *preview* won't show
+  this — only the real GBA render does, so **verify event BGs in-engine**, not by reconstructing the PNG.
+- **Slot ceiling:** only 0x36 is free before `BG_RANDOM` (0x37); a 2nd campaign BG must relocate
+  BG_RANDOM first (verify nothing hardcodes 0x37). First use: ch02 Targos ending (Zeldacrafter snow-town).
+_Decided: 2026-06-25_
 
 **Maps: hand-drawn in Tiled, NOT AI-generated**
 Use community Frostmaiden maps (from `docs/frostmaiden-resources.md`) as layout references. Use FEUniverse map pool for tileset/format guidance. Agents help with unit placement and events, never spatial layout.

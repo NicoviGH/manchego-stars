@@ -28,6 +28,7 @@ CADENCE = {
     'full_party_intro':   ('\U0001F7E6', 'full-party intro'),
     'breather_defend':    ('\U0001F7E6', 'breather / defend'),
     'gimmick_multilevel': ('\U0001F7E8', 'gimmick (multi-level)'),
+    'big_battle_seize':   ('\U0001F7E5', 'big battle (seize)'),
     'monster_debut':      ('\U0001F7E8', 'monster debut (fog)'),
     'first_boss':         ('\U0001F7E5', 'first boss'),
     'marquee_setpiece':   ('\U0001F3AC', 'marquee set-piece'),
