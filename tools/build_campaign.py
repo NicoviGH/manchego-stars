@@ -4279,7 +4279,7 @@ def inject_backgrounds(campaign, verbose=True):
     incbin symbols (data_bg.s) -- never an edit to a vanilla entry. PNGs come from
     campaigns/<c>/backgrounds/ (tools/bg_to_fe8.py output); the decomp's generic
     gbagfx/FETSATOOL rules build .feimg2.bin.lz / .fetsa2.bin / .gbapal at make time. The
-    three patched decomp files are in PATCHED_DECOMP_FILES (restored from HEAD each build),
+    four patched decomp files are in PATCHED_DECOMP_FILES (restored from HEAD each build),
     so insert-before-anchor stays idempotent; the copied PNG + its stale bins are refreshed."""
     if CAMPAIGN_BG_SLOT0 + len(CAMPAIGN_BGS) > 0x37:
         sys.exit('ERROR: campaign BGs collide with BG_RANDOM (0x37); relocate it first')

@@ -48,6 +48,13 @@ def bank_pack(idx):
         for tx in range(W // 8):
             sets[(ty, tx)] = frozenset(
                 np.unique(idx[ty * 8:ty * 8 + 8, tx * 8:tx * 8 + 8]).tolist())
+    # An FE8 BG tile maps to ONE 16-colour bank (index 0 reserved -> 15 usable), so a tile
+    # needing >15 colours is unrepresentable -- fail clearly rather than later StopIteration.
+    over = [k for k, s in sets.items() if len(s) > 15]
+    if over:
+        ty, tx = over[0]
+        sys.exit('ERROR: tile (col %d, row %d) needs %d colours (>15); an FE8 BG tile maps '
+                 'to one 16-colour bank. Pre-reduce the source.' % (tx, ty, len(sets[(ty, tx)])))
     banks = []  # each a set of global colour indices
     # place the colour-richest tiles first so sparse tiles slot into existing banks
     for key in sorted(sets, key=lambda k: -len(sets[k])):
