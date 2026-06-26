@@ -357,8 +357,10 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         'linker_script_banim.txt',
                         # #65 M-B (character-unique anims, no class slot): the per-character
                         # config table gets the AnimConf appended; the combat-lookup engine
-                        # hook swaps GetBattleAnimationId -> _WithUnique in ekrbattleintro
+                        # hook swaps GetBattleAnimationId -> _WithUnique in ekrbattleintro;
+                        # GetBanimPalette in ekrmain gets the custom-banim palette guard
                         'src/data_banimconfunk.c', 'src/banim-ekrbattleintro.c',
+                        'src/banim-ekrmain.c',
                         # battle ground platforms (#65): vendored snow/ice grounds appended to
                         # battle_terrain_table + the terrain->ground remap (snow chapters)
                         'src/banim_terrain_data.c', 'data/data_banim_terrain.s',

@@ -344,6 +344,15 @@ class TestMeleeLunge(unittest.TestCase):
         e = [{"attr0": 0, "attr1": 0, "attr2": 0, "dx": 5, "dy": -3}]
         self.assertIs(rb._lunge(e, 0), e)
 
+    def test_build_battle_anim_rejects_non_three_frame_sets(self):
+        # the mode scripts reference frames 0/1/2 by index; <3 would emit an undefined
+        # oam_frame_2 label -> a cryptic assembler failure. Fail clearly at build time instead.
+        pal = [(0, 0, 0), (200, 40, 40)]
+        for n in (1, 2, 4):
+            imgs = [self._frame_img() for _ in range(n)]
+            with self.assertRaises(ValueError):
+                rb.build_battle_anim("brau_ax1", imgs, pal, motion="melee")
+
     def test_melee_peak_frame_lunges_forward_vs_ranged(self):
         imgs = [self._frame_img() for _ in range(3)]
         pal = [(0, 0, 0), (200, 40, 40)]

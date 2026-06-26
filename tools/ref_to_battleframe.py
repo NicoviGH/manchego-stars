@@ -341,6 +341,12 @@ def build_battle_anim(abbr, frame_imgs, palette, center_px=None, motion="ranged"
     Pirate (the ranged cadence keeps the static anchor -- there the projectile travels, not the
     body). Returns {"sheets": [P-image x N], "pal": <128 bytes>, "motion_s": <str>}.
     """
+    # The mode scripts (_mode_body / _melee_mode_body) reference frames 0/1/2 by index, so a
+    # unit MUST supply exactly 3 (Ready/Wind-up/Peak); fewer would emit a banim_code_frame for an
+    # oam_frame_2 label that's never defined -> a cryptic assembler undefined-symbol failure.
+    if len(frame_imgs) != 3:
+        raise ValueError("battle_anim %r needs exactly 3 frames (ready/windup/peak); got %d"
+                         % (abbr, len(frame_imgs)))
     if center_px is None:
         w, h = frame_imgs[0].size
         center_px = (w // 2, h * 5 // 8)
