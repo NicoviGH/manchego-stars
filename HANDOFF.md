@@ -65,7 +65,9 @@ Art & Audio (two 2026-06-26 ADRs, why). **6 PCs still have NO `battle_anim:` blo
 - **Per PC:** add a `battle_anim:` block (`clone_from` donor class · `motion: ranged|melee` · `abbr` stem
   ≤12 · `frames: [ready, windup, peak]` — **exactly 3, enforced**). Generate the 3 frames with
   `tools/descale_battleframe.py` from hi-res concept poses (CLAUDE generates art via tooling — Nicolas
-  can't draw). Review: `PT_CHAR=<uid> tools/playtest/run.sh recordanim` → `make_gif.py recordanim <id>
+  can't draw). **Palette: `--flat` only for warm-hued units (braulo); omit it (adaptive) or pass a
+  custom hue spec for green/blue/purple units (RBG) — the default `--flat` families are crab-tuned**
+  (see `descale_battleframe.py` FLAT_SPEC). Review: `PT_CHAR=<uid> tools/playtest/run.sh recordanim` → `make_gif.py recordanim <id>
   --name <id>-anim`, commit the GIF to `docs/demo/` + push (GitHub blob = the mobile-review channel).
   **SHOW Nicolas before committing art.**
 - **Melee units get the LUNGE free:** `motion: melee` auto-bakes the Pirate-style forward step
