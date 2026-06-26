@@ -92,6 +92,14 @@ def _dilate4(a):
     return out
 
 
+# `--flat` snaps to these curated hue families (cleaner cel bands than the busy adaptive
+# median-cut). BUT the families + the _family() HSV thresholds below are tuned for a WARM
+# palette (braulo the red/orange crab). A unit whose colours fall outside red/orange/grey/brown
+# -- e.g. RBG's green body + purple hat + yellow -- gets mangled by --flat (its greens/purples
+# have no family and collapse), so RBG is descaled WITHOUT --flat (the default adaptive median-
+# cut palette). Rule of thumb for the remaining PCs: use --flat only for warm-hued units; for
+# anything green/blue/purple-dominant either omit --flat (adaptive) or pass a custom spec
+# (--flat "green:3,purple:2,grey:2,...") whose names match _family()'s buckets.
 FLAT_SPEC = (("red", 2), ("orange", 2), ("grey", 2), ("brown", 2))  # + black + white = 10
 
 
