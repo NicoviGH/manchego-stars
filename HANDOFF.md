@@ -10,6 +10,10 @@ Issue → short-lived `feat/<slug>` branch off `main` → an ephemeral worktree 
 (`decisions.md` → Coordination model). Hard invariants: no character/chapter/plot in `.c`/`.s`
 (`check.py check_engine_campaign_agnostic`); never commit the `fireemblem8u` submodule pointer.
 
+> **Worktree friction (single-agent):** a fresh worktree's `fireemblem8u` submodule isn't provisioned
+> (no `baserom.gba`, no built `scaninc`/toolchain) → builds die late. With no concurrent builds it's
+> faster to work a feature branch **in the main tree** (already provisioned) than to set a worktree up.
+
 ## Current release
 **v0.1.0** friend release — Ch1 playable. Builds:
 - `tools/build.sh dist` — **the friend build** (with the #43 opening montage), stamped into `dist/`.
@@ -22,32 +26,46 @@ ADR: `decisions.md` §Distribution.
 
 ## Tools (quick ref)
 - `make difficulty CH=chNN` · `make difficulty-gate` (enforcing parity curve) · `make test` · `make check` (drift).
+- **`bg_to_fe8.py`** (new in `tools/`, lands with **PR #88**) `<src-img> <out.png> [--fit crop|pad]` —
+  any image → an FE8 event-BG source PNG (240×160, GBA-5bit, **tile-banked** mode-P, ≤8 banks; reserves
+  transparent index 0). Feed the output to `inject_backgrounds` (the campaign's `backgrounds/<stem>.png`).
+  Winter-BG catalogue: `map-review/iwd-bg-library.md` (FE-Repo shortlist, downloaded to `map-review/iwd-bg-candidates/`).
 - **Playtest scenarios** `tools/playtest/run.sh <scenario>` (need a built ROM + `lua`):
   - logic/stability: `win|gameover|ch01win|clear|clear_ch01|smoke|smoke_ch01|fuzz`
   - **ch2 (#22):** `ch02` (entry asserts) · `smoke_ch02` (soft-lock net) · `clear_ch02` (rout→chain→charms) —
     all load a `ch02start` checkpoint, built once from the real ch00→ch01→ch02 chain.
+  - **GIF/record scenarios live on the unmerged `demo/ch2-gifs` branch:** `recordch02{intro,map,combat,ending}`
+    (+ a 126-line `harness.lua` addition). To re-capture from a feature branch, pull just those two files:
+    `git checkout demo/ch2-gifs -- tools/playtest/harness.lua tools/playtest/run.sh` (don't commit them).
+    A ROM change re-stamps the checkpoint → a full ch00→ch01→ch02 chain rebuild per capture (~minutes).
   - `recordanim` (any cast battle anim on a `TESTCH=1` ROM, `PT_CHAR=<id>`) · `recordrbg` · `recordlord`.
   - `make_gif.py <scenario> <tag> --open` → review GIF.
-- **Delivery to friends:** commit a **GIF** (never MP4 — a committed `.mp4` is a binary download, not
-  inline on GitHub) to `docs/demo/` + push.
+- **Delivery to friends / Nicolas-on-mobile:** commit a **GIF or PNG** (never MP4 — a committed `.mp4`
+  is a binary download, not inline on GitHub) to `docs/demo/` + push → he views the GitHub blob URL.
+  Inline renders + `open` in Preview don't reach him on his phone.
 
 ## Now / Next
 
-### Content — Ch2 (#22 REOPENED 2026-06-25) — two demo-review polish items left
-Build + dialogue + art + title card merged; structural load-test automated; pacing signed off. Then a
-demo-GIF review surfaced two polish items, folded into **#22's vertical-slice checklist** (chapter
-feedback rides the slice issue, not standalone — #81/#82 were closed into it). NOT gating Ch3:
-- **opening text (`bug`/`content`)** — the "Bryn Shander" location pop-up in the **opening** cutscene
-  renders **garbled text**. Check the card text (`CH02_OPENING_CARD_MSG` / `BROWNBOXTEXT` label in
-  `inject_ch02`) + `tools/verify_text.py`; recapture `recordch02intro` to confirm.
-- **Targos ending BG (`art`)** — the **ending** reuses the generic `BG_NORMAL_VILLAGE` (same as the
-  opening). Wants a **darker/colder** distinct backdrop — **vendor a winter/dark-town BG** (FE-Repo
-  `gh api … download_url` → curl, like the winter tiles), convert to FE8 BG (additive), point
-  `CH02_ENDING_BG` at it. Show Nicolas before committing.
-- **Demo reel** lives on the **unmerged `demo/ch2-gifs` branch** (`docs/demo/ch2-cold-welcome.md` —
-  opening/map/combat/closing GIFs + the reusable `recordch02{intro,map,combat,ending}` harness
-  scenarios). The opening/ending GIFs go **stale once the two items land**, so regenerate + decide
-  merge-vs-drop after the fixes.
+### Content — Ch2 (#22) — both demo-review items FIXED, in review (PRs #85 + #88); pending merge
+The two demo-review polish items are resolved and in review (NOT gating Ch3). After both merge +
+the demo reel is regenerated → **close #22**.
+- **Opening card (PR #85)** — the garbled "Bryn Shander — West Gate" card. Root cause: a literal
+  em-dash in the YAML `location_card` reached the FE8 encoder unnormalized. Fixed centrally in
+  `name_message_body` (now ASCII-folds via `_fe_dialogue_text`). The in-engine capture then caught a
+  **2nd** issue text-decode can't see: the brown location nameplate caps text at **96px** (3×32px
+  sprites, `popup.c` `BrownTextBox_Loop`) → long cards clip. Shortened the card to **"Bryn Shander"**.
+  `verify_text` clean; verified in-engine.
+- **Targos ending BG + villain names (PR #88)** — the ending reused `BG_NORMAL_VILLAGE`. Vendored a
+  frozen Ten-Towns snow-town (FE-Repo **{Zeldacrafter}**) as a **NEW additive** `gConvoBackgroundData`
+  slot `BG_MS_TARGOS_WINTER` (0x36), `CH02_ENDING_BG` repointed. **New reusable pipeline:**
+  `bg_to_fe8.py` + `inject_backgrounds` (see Gotchas). The top-left blue shape is an in-scene
+  **banner** — kept (Nicolas's call; an earlier paint-out was reverted). **Folded in:** the boss/miniboss
+  rode vanilla slots and leaked the vanilla **"Bazba"/"Bone"** names on the unit window + death quote →
+  renamed to **Halvar/Grukk** (`inject_ch02` now overrides the slot name like `inject_ch01` does). Verified
+  in-engine (`recordch02ending` PASS; no BG holes, names correct).
+- **Demo reel** (unmerged `demo/ch2-gifs`, `docs/demo/ch2-cold-welcome.md`): the opening/ending GIFs are
+  now **stale** → regenerate after #85+#88 merge, then decide merge-vs-drop. Scratch review images (the
+  before/afters shown to Nicolas) live on the **`review/ch02-ending-bg`** branch — not for merge.
 
 ### Content — Party battle animations (#65 Milestone B) — NEXT SESSION pickup (Nicolas)
 RBG validated the faked-anim pipeline end-to-end (#65 **Milestone A**, merged): donor-prime, additive,
@@ -72,6 +90,8 @@ design+dialogue lock (invoke `dialogue-pass`; ground in DM notes PDF + Frostmaid
 (`#40` Tiled→`.mar` pipeline) → host on the next vanilla slot (model on `inject_ch01`/`inject_ch02`;
 `MNC2(<next>)`) → units/objective/cutscenes → art per `#38/#39` → title card → load-test scenarios
 (`ch03`/`smoke_ch03`/`clear_ch03`, mirroring ch02). Then chapters #24–#28 (Ch4–Ch8) follow the same slice.
+Ch3+ ending BGs: vendor from the **winter-BG library** (`map-review/iwd-bg-library.md`) via the
+`bg_to_fe8.py` → `inject_backgrounds` pipeline (relocate `BG_RANDOM` once a 2nd slot is needed).
 
 ### Parked / supporting
 - Enemy/NPC art/anim → the **convention homes** (`inject_battle_anims`/`inject_battle_platforms`
@@ -96,6 +116,24 @@ design+dialogue lock (invoke `dialogue-pass`; ground in DM notes PDF + Frostmaid
   spell-economy #9, iconic matchups #8.
 
 ## Gotchas (cross-cutting)
+- **Event BGs: vendored winter CGs → NEW `gConvoBackgroundData` slots, additive.** `bg_to_fe8.py`
+  (any image → 240×160 tile-banked PNG) → `inject_backgrounds` (copies to `graphics/bg/`, appends the
+  enum id `backgrounds.h` + extern decls `bg.h` + table row `eventscr2.c` + incbin symbols `data_bg.s`;
+  make's generic gbagfx/FETSATOOL rules build the bins). The 4 patched files are in `PATCHED_DECOMP_FILES`.
+  **Only slot 0x36 is free before `BG_RANDOM` (0x37)** — a 2nd campaign BG must relocate BG_RANDOM first
+  (verify nothing hardcodes 0x37 in-engine).
+- **Event-BG color index 0 is TRANSPARENT** — a GBA BG renders index-0 pixels as the backdrop (FE8 sets
+  it black). A converter that uses local index 0 for a real colour → **black holes** wherever that colour
+  appears (the bright sky/snow speckled black on the first Targos capture). `bg_to_fe8.py` reserves
+  index 0 (colours start at local 1). A flat-quant *preview* won't show this — **verify event BGs in-engine.**
+- **Location-card nameplate caps at ~96px** — `BROWNBOXTEXT`/`StartBrownTextBox` draws the card text as
+  exactly 3×32px sprites (`popup.c` `BrownTextBox_Loop`); the border grows but the text region is fixed,
+  so >~12–14 chars clip silently. Keep `location_card:` to short place names ("Targos", "Bryn Shander");
+  push detail into the scene/dialogue. Companion to the text terminator-parity gotcha (`decisions.md`).
+- **Vanilla character-slot display names leak.** A boss/miniboss riding a vanilla slot (Bazba/Bone/
+  Breguet/O'Neill) shows the *vanilla* name on the unit window + death quote unless the chapter injector
+  overrides it: `set_message_body(vanilla_name_text_id(slot), name_message_body(display_name(unit)))`
+  (see `inject_ch01`/`inject_ch02`). Give the unit a short `fe_name` (≤12).
 - **Clear-bot can't fully clear a chapter yet (#60).** For helpers that must REACH a later chapter,
   don't rely on a fair-play clear: `reachCh02Map` uses a **directed ch01-seize** (frail escort +
   lord-march), and `clear_ch02` uses **frail+teleport** to rout deterministically (its job is the
@@ -103,15 +141,17 @@ design+dialogue lock (invoke `dialogue-pass`; ground in DM notes PDF + Frostmaid
 - **Don't reuse a playtest checkpoint across an injection/build change** — only across pure graphics-byte
   swaps; a stale save-state shows the map/menu, never the battle. Checkpoints are ROM-hash-stamped in
   `tools/playtest/states/` (gitignored); delete the `.ss`/`.romhash` to force a rebuild.
-- **Additive, never global** (content art): clone classes / new terrain slots / appended `banim` rows;
-  never edit a shared vanilla class/anim/terrain in place. `decisions.md` Art & Audio + the `inject_*` docstrings.
+- **Additive, never global** (content art): clone classes / new terrain slots / appended `banim` rows /
+  appended BG slots; never edit a shared vanilla class/anim/terrain/BG in place. `decisions.md` Art & Audio
+  + the `inject_*` docstrings.
 - **Engine hooks live in `tools/inject/engine_hooks.py`** (guarded by `check_engine_guards_present`); engine
   stat changes to the chosen lord go in `EndPrepScreen`, not a phase-start seam.
 - **New decomp patch target → add it to `PATCHED_DECOMP_FILES`**, or the build is non-idempotent.
 - **Vanilla decomp reads go through `build_campaign.vanilla_decomp_text()` (HEAD)**, never the worktree —
   it also strips inherited git env (`GIT_DIR` overrode `-C` discovery → exit 128 under the pre-commit hook
   in a worktree; don't reach for `--no-verify`).
-- **`make`-green can't prove apply timing** — `tools/playtest/` is the dynamic arbiter. Scenarios need a built
+- **`make`-green can't prove apply timing OR rendering** — `tools/playtest/` is the dynamic arbiter
+  (apply timing, soft-locks, **and BG/sprite rendering** — see the index-0 holes). Scenarios need a built
   ROM + `lua` (`brew install lua`); regenerate `symbols.lua` (auto by `run.sh`) after a rebuild.
 - **CI unit tests run in the `build` job, not the lightweight `checks` job** (they need the submodule +
   numpy/PIL); a new test needing a new lib → add it to the `build` job's deps. Playtest *scenarios* (mGBA)
@@ -122,7 +162,8 @@ design+dialogue lock (invoke `dialogue-pass`; ground in DM notes PDF + Frostmaid
   `WIN_ARRAY_NUM`/`SAVEMAGIC` drift → that drop needs a per-release starter `.sav`.
 - **Writing any dialogue → invoke `dialogue-pass` first** (voice grounding: per-NPC `lore/*.md` §Voice +
   `frostmaiden-voices.md`; story sources: the DM-notes PDF + the Frostmaiden book via `pdftoppm`). Story
-  bodies are `make`-regenerated; gate text changes with `python3 tools/verify_text.py`.
+  bodies are `make`-regenerated; gate text changes with `python3 tools/verify_text.py`. **Card/name text
+  from YAML is ASCII-folded centrally in `name_message_body`** (em-dash → `--`), so keep authored unicode.
 - **`msg-id` vetting is treacherous** — `data_battlequotes.c` stores ids 4-digit zero-padded (`0x0935`);
   vet in the `0x0XXX` form, not naïve hex-grep. Long unit names overflow FE8's buffer → add a short
   `fe_name` (≤12). Reward placement follows `parity_reference`, not chapter number.
