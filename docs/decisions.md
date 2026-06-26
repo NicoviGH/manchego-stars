@@ -1133,6 +1133,24 @@ scale** (the ~0.92× shrink was previewed and declined). Future snow chapters: s
 `battleTileSet` to 0 (open) or 0x15 (rough) per scenery.
 _Decided: 2026-06-23_
 
+**Event backgrounds (`BACG`): vendored winter CGs, injected as NEW `gConvoBackgroundData` slots**
+Cutscene backdrops are `gConvoBackgroundData[]` (eventscr2.c) `{tiles, map, palette}` triples, 240×160,
+4bpp with up to **8 sixteen-colour sub-palettes** (one per 8×8 tile = 128 colours). We vendor winter
+backdrops from the FE-Repo (catalogued in `map-review/iwd-bg-library.md`; the Icewind Dale set is rich)
+and add each as an **additive new slot** past `BG_BLANK` (0x35) — never reskin a vanilla entry.
+- **Pipeline:** `tools/bg_to_fe8.py` (any image → 240×160, GBA-5bit, tile-banked mode-P PNG; greedy ≤8
+  banks) → `inject_backgrounds` copies it to `graphics/bg/`, appends the enum id (backgrounds.h),
+  extern decls (bg.h), table row (eventscr2.c) and incbin symbols (data_bg.s); make's generic
+  gbagfx/FETSATOOL rules build the bins. The 4 patched files are in `PATCHED_DECOMP_FILES`.
+- **Gotcha — index 0 is transparent.** GBA BG colour index 0 shows the backdrop (FE8 sets it black),
+  so a converter that uses local index 0 for a real colour renders **black holes** wherever that colour
+  appears (caught in-engine on the ch02 Targos BG: the bright sky/snow speckled black). `bg_to_fe8.py`
+  reserves index 0 (colours start at local 1; ≤15 usable per bank). A flat-quant *preview* won't show
+  this — only the real GBA render does, so **verify event BGs in-engine**, not by reconstructing the PNG.
+- **Slot ceiling:** only 0x36 is free before `BG_RANDOM` (0x37); a 2nd campaign BG must relocate
+  BG_RANDOM first (verify nothing hardcodes 0x37). First use: ch02 Targos ending (Zeldacrafter snow-town).
+_Decided: 2026-06-25_
+
 **Maps: hand-drawn in Tiled, NOT AI-generated**
 Use community Frostmaiden maps (from `docs/frostmaiden-resources.md`) as layout references. Use FEUniverse map pool for tileset/format guidance. Agents help with unit placement and events, never spatial layout.
 _Decided: May 2026_
