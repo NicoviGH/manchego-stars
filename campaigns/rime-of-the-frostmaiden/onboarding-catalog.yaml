@@ -116,7 +116,7 @@ concepts:
   - id: monsters
     concept: "Monster enemies are a distinct foe type; some weapons are effective vs them"
     vanilla_channel: both
-    vanilla_when: "First monster encounter (our ch04 monster debut, cadence: monster_debut)"
+    vanilla_when: "First monster encounter (our ch03 — the Termalaine Grell, a real Mogall; moved up from ch04 — see decisions.md ADR)"
     vanilla_text: "Effective against monsters. (item help on Slayer/monster-effective gear)"
     citation: "MSG_454-457 (monster-effective weapons); story intro: decomp sweep TBD"
 

@@ -465,12 +465,40 @@ Placement follows the **parity_reference, not our chapter number** — our 8-cha
 not "chapter N's." This is the item analogue of the recruit budget; per-chapter loot is authored in the
 chapter YAML (the data is the doc). Consistent with the promotion seam (Ch8→9): our MVP chapters
 (parity ≤ Ch13) sit below the Master-Seal threshold (Ch15a), so promotions stay deferred to Revel's End.
-Worked example — **ch02 (parity FE8 Ch2):** gems + premium consumables only (**Red Gem / Elixir /
-Pure Water**, the exact vanilla Ch2 village gifts) + a regular armory + one enemy consumable drop;
-**no boosters, no promos.** The three chwinga "charms" ARE those three gifts, 1:1.
+Worked example — **ch02 (parity FE8 Ch2):** gems + premium consumables only (vanilla Ch2's village
+gifts) + a regular armory + one enemy consumable drop; **no boosters, no promos.** The three chwinga
+"charms" are those gifts — **Elixir / Pure Water / Hand Axe** (the Hand Axe stands in for vanilla's
+**Red Gem**, which is lent forward to ch03's gem mine; see the Ch3-deviations ADR below — net wealth
+across ch02+ch03 is unchanged).
 _Reconstructed: 2026-06-22 (CLAUDE, decomp event-data + `events_shoplist.c` scan) — upgrades
 fe8-pacing §3 from era-buckets to a decomp-pinned curve (correcting the old "promos at Ch9–13": promos
 + boosters actually start Ch5, Master Seal/Secret Shop start ~Ch14a). Companion to the recruit budget._
+
+**Ch3 "The Termalaine Mine" — three sanctioned deviations from strict per-chapter parity.**
+ch03 reskins vanilla FE8 Ch3 "The Bandits of Borgo" (Seize big-battle; the game's first chests +
+first thief). Roster + reward footprints mirror it 1:1, with three deliberate, parity-neutral
+deviations (Nicolas-directed, this session):
+1. **The boss is a real monster.** A grell IS a floating tentacled eye-aberration, so the boss slot
+   (vanilla Bazba, Brigand L6) becomes a **CLASS_MOGALL** with the Evil Eye — NOT a frailty cheat.
+   A same-level mogall is far weaker than a Brigand, so it carries a **level bump (L12)** to hold
+   Bazba's pressure. Verified on `make difficulty CH=ch03`: clear-load ×0.99, threat ×1.12 (within
+   band; the magic Evil Eye vs our low-RES melee runs intentionally hot). Parity is *measured*, not
+   assumed — this is exactly the wiggle-room the difficulty engine exists to provide.
+2. **Monster foe-type debut moves ch04 → ch03.** The grell is chronologically the party's first
+   monster. The `introduces: monsters` ledger entry moved to ch03 (out of ch04, which stays a
+   monster/fog set-piece but is no longer the *first*). Monster-effective GEAR stays deferred (none
+   on the reward curve yet).
+3. **The ch02↔ch03 gem/hand-axe swap.** Vanilla's single early gem (the Ch2 Red Gem) is *lent
+   forward* to ch03's gem mine (it's literally a famous tourmaline mine; Trex the thief opens the
+   seam). To keep wealth on-curve, vanilla Ch3's Hand Axe chest moves *back* to ch02's chwinga-mote
+   gift. Net result: total wealth AND the exact item set across ch02+ch03 are identical to vanilla —
+   only the chapter each of the two items appears in is swapped. (We considered keeping the gem at
+   ch02 for strict per-chapter parity; chose the swap for the gem-mine payoff, since it's net-neutral
+   and the Ch2 gem money is meant for world-map shopping after the chapter anyway, not the thin Ch2 armory.)
+_Decided: 2026-06-26 (Nicolas + CLAUDE, Ch3 design-lock session; grounded in the FE8 decomp, the DM
+notes, and the Frostmaiden book "A Beautiful Mine" pp.93–96). FE8 has no multi-level maps, so the
+book's 3-level mine is authored as one flat walled interior (rooms via TERRAIN_DOOR + one TILECHANGE),
+not a verticality gimmick — the doors make the thief (Trex) matter._
 
 **Two healers, differentiated by donor (same move as the shamans).** Sclorbo and Basil are both
 Priests, so they get *distinct* vanilla donor lines to avoid stat-twins: **Sclorbo → Moulder** (the

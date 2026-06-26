@@ -19,10 +19,9 @@ parity_reference: "FE8 Ch4"   # #48 enemy-pressure parity bar — Ancient Horror
 # Onboarding parity (see docs/ONBOARDING.md + the dialogue-pass parity step): concepts
 # making their FIRST campaign appearance here, and how WE deliver the vanilla heads-up.
 introduces:
-  - concept: monsters            # FE8 introduces its monster foe-type here (cadence: monster_debut)
-    coverage: both               # vanilla effective-weapon help + an in-scene call-out
-    where: "Lonelywood — first monster sighting in the forest hunt"
-    status: planned
+  # NOTE: the `monsters` foe-type debut MOVED to ch03 (the Grell is a real Mogall and the party's
+  # chronologically-first monster) — see decisions.md ADR. ch04 stays a monster/fog set-piece but is
+  # no longer the FIRST monster (cadence token left as a planned-seed; regrounded when this slice lands).
   - concept: fog-of-war          # the forest hunt is our first fog map (vanilla Ch4 cadence)
     coverage: dialogue
     where: "forest approach — a PC flags limited sight"

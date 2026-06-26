@@ -114,7 +114,10 @@ deployment:
       position: [3, 4]
       inventory: [slim-lance]
       ai_pattern: cautious        # defend, don't charge into the raid
-      gift: red-gem               # ITEM_REDGEM 0x76 — gifted at chapter end IF it survives
+      gift: hand-axe              # DEVIATION (ch02↔ch03 swap, ADR in decisions.md): vanilla Ch2's Red Gem
+                                  # moves to ch03's gem-mine chest; this slot takes ch03's Hand Axe instead.
+                                  # Net wealth + item set across ch02+ch03 = vanilla. (Useful to Braulo; a
+                                  # chwinga scavenging a discarded hatchet in Icewind Dale reads fine.)
     - id: chwinga-rime
       name: "Rime Spark"
       fe_name: "Rime"
