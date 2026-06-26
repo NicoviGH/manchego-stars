@@ -192,8 +192,61 @@ def _frame_cmd(abbr, dur, i):
             "banim_%s_oam_frame_%d_r - banim_%s_oam_r" % (dur, abbr, i, i, abbr, i, abbr))
 
 
-def _mode_body(abbr, kind):
+def _mode_order(motion):
+    """The 12 modes in banim-table order, with the kind picked for `motion`.
+
+    The engine's mode ORDER is fixed; only each mode's body kind varies. A melee unit
+    can't strike at range, so its attack_range/_critical modes hold the ready frame
+    (kind "stand") instead of running the lunge-and-swing (cadence: FE8 Pirate axe)."""
+    if motion == "melee":
+        return [(n, "stand" if n.startswith("attack_range") else k)
+                for n, k in _MODE_ORDER]
+    return list(_MODE_ORDER)
+
+
+def _melee_mode_body(abbr, kind):
+    """One mode's script for the 3-beat MELEE fake (cadence from FE8 Pirate axe).
+
+    Cadence matched to the FE8 Pirate axe (banim_pirm_ax1): ready -> wind up (frame 1, held
+    longest, coiled back) -> lunge into the swing (frame 2, the peak holds its forward dx
+    through the hit, mirroring the Pirate's frames 2/3/5 ~7 ticks at dx ~-45) -> hit_normal on
+    contact -> ease back over a 6-tick return (the Pirate's frames 7/8) and turn. No projectile:
+    the hit IS the contact. Dodge hops backward (dodge_to_back). The forward step is the OAM
+    lunge baked by build_battle_anim (MELEE_LUNGE_DX), held here by keeping frame 2 on-screen."""
+    if kind == "attack":   # ready -> wind up -> lunge & HOLD forward through the hit -> ease back
+        return ["\tbanim_code_start_attack_1", "\tbanim_code_start_attack_2",
+                _frame_cmd(abbr, 1, 0), "\tbanim_code_sound_axe_swing_short",
+                _frame_cmd(abbr, 20, 1), "\tbanim_code_sound_axe_swing_long",
+                "\tbanim_code_effect_dirt_kick", _frame_cmd(abbr, 3, 2),
+                "\tbanim_code_prepare_hp_deplete", _frame_cmd(abbr, 3, 2),
+                "\tbanim_code_sound_hit_eliwood_promoted_durandal",
+                "\tbanim_code_hit_normal", _frame_cmd(abbr, 1, 2),   # hold the lunge through the hit
+                "\tbanim_code_wait_hp_deplete", "\tbanim_code_start_opposite_turn",
+                _frame_cmd(abbr, 3, 0), _frame_cmd(abbr, 3, 0),      # ease back (Pirate f7+f8, 6 ticks)
+                "\tbanim_code_end_dodge", "\tbanim_code_end_mode"]
+    if kind == "dodge":    # hop backward: ready -> wind-up -> ready
+        return ["\tbanim_code_dodge_to_back", _frame_cmd(abbr, 1, 0),
+                "\tbanim_code_start_dodge", _frame_cmd(abbr, 3, 1),
+                "\tbanim_code_wait_hp_deplete", _frame_cmd(abbr, 3, 0),
+                "\tbanim_code_end_dodge", "\tbanim_code_end_mode"]
+    if kind == "stand":    # hold the ready frame (also melee's "attack at range")
+        return [_frame_cmd(abbr, 1, 0), "\tbanim_code_wait_hp_deplete",
+                "\tbanim_code_end_mode"]
+    # miss: lunge and swing through, hold the forward beat (like the hit), but no contact lands
+    return ["\tbanim_code_start_attack_1", "\tbanim_code_start_attack_2",
+            _frame_cmd(abbr, 1, 0), "\tbanim_code_sound_axe_swing_short",
+            _frame_cmd(abbr, 20, 1), "\tbanim_code_sound_axe_swing_long",
+            "\tbanim_code_effect_dirt_kick", _frame_cmd(abbr, 3, 2),
+            _frame_cmd(abbr, 4, 2),                                 # hold forward (matches the hit beat)
+            "\tbanim_code_wait_hp_deplete", "\tbanim_code_start_opposite_turn",
+            _frame_cmd(abbr, 3, 0), _frame_cmd(abbr, 3, 0), "\tbanim_code_end_dodge",
+            "\tbanim_code_end_mode"]
+
+
+def _mode_body(abbr, kind, motion="ranged"):
     """Emit one mode's script lines for the 3-beat (Ready/Wind-up/Peak) fake."""
+    if motion == "melee":
+        return _melee_mode_body(abbr, kind)
     if kind == "attack":   # draw (0->1 held) -> peak (2) + loose arrow -> recover
         return ["\tbanim_code_start_attack_1", "\tbanim_code_start_attack_2",
                 _frame_cmd(abbr, 3, 0), "\tbanim_code_sound_pull_bow",
@@ -218,13 +271,14 @@ def _oam_line(e):
             % (e["attr0"], e["attr1"], e["attr2"], e["dx"], e["dy"]))
 
 
-def emit_motion_s(abbr, frames):
+def emit_motion_s(abbr, frames, motion="ranged"):
     """Assemble the full banim motion.s text for `abbr` from 3 frames' OAM.
 
-    `frames` is a list of {"oam_r": [...], "oam_l": [...]} (Ready/Wind-up/Peak). Emits the
-    .data.oam_l / .oam_r / .script (12 modes) / .modes sections. oam_l mirrors oam_r 1:1 so
-    frame i is at the same byte offset in both tables (the script references the _r offset;
-    the engine adds it to the oam_l base when the unit faces the other way).
+    `frames` is a list of {"oam_r": [...], "oam_l": [...]} (Ready/Wind-up/Peak). `motion`
+    selects the cadence ("ranged" = archer draw-and-fire, "melee" = lunge-and-swing). Emits
+    the .data.oam_l / .oam_r / .script (12 modes) / .modes sections. oam_l mirrors oam_r 1:1
+    so frame i is at the same byte offset in both tables (the script references the _r
+    offset; the engine adds it to the oam_l base when the unit faces the other way).
     """
     L = ["@ vim:ft=armv4",
          "\t.global banim_%s_script" % abbr,
@@ -246,40 +300,69 @@ def emit_motion_s(abbr, frames):
 
     L.append("\t.section .data.script")
     L.append("banim_%s_script:" % abbr)
-    for name, kind in _MODE_ORDER:
+    order = _mode_order(motion)
+    for name, kind in order:
         L.append("banim_%s_mode_%s:" % (abbr, name))
-        L += _mode_body(abbr, kind)
+        L += _mode_body(abbr, kind, motion)
 
     L.append("\t.section .data.modes")
-    for name, _ in _MODE_ORDER:
+    for name, _ in order:
         L.append("\t.word banim_%s_mode_%s - banim_%s_script" % (abbr, name, abbr))
     for _ in range(12):
         L.append("\t.word 0")
     return "\n".join(L) + "\n"
 
 
-def build_battle_anim(abbr, frame_imgs, palette, center_px=None):
+# Melee lunge: the FE8 Pirate-axe anim sweeps the sprite's screen dx ~0 -> -45 -> 0 across the
+# attack -- the body steps INTO the swing toward the foe, then recovers. A faked anim with
+# statically-anchored frames (we pin ONE feet point so the body holds still between beats) loses
+# that, so the unit swings ON THE SPOT instead of lunging (the vanilla-vs-braulo side-by-side
+# bug). For melee we bake a per-beat forward step into the OAM dx: ready neutral, wind-up coils
+# slightly back, peak lunges toward the foe (negative dx in oam_r; mirror_oam flips it for oam_l,
+# so the unit lunges the right way on either platform). Magnitude tracks the vanilla Pirate's
+# frame-2 mean dx (~ -40). Ranged keeps the static anchor (the projectile, not the body, travels).
+MELEE_LUNGE_DX = (0, 4, -40)   # (ready, wind-up, peak)
+
+
+def _lunge(entries, dx):
+    """Shift every OAM entry's dx by `dx` (a melee forward step); identity when dx == 0."""
+    if not dx:
+        return entries
+    return [dict(e, dx=e["dx"] + dx) for e in entries]
+
+
+def build_battle_anim(abbr, frame_imgs, palette, center_px=None, motion="ranged"):
     """Drive the whole faked-anim build: 3 frames -> sheets + agbpal + motion.s text.
 
     Per frame: tile -> merge filled cells into OBJs -> pack to oam_r + 2D placements ->
-    mirror to oam_l -> blit the sheet. All frames use ONE shared anchor (`center_px`,
-    default a torso point) so the body stays put on screen. Returns
-    {"sheets": [P-image x N], "pal": <128 bytes>, "motion_s": <str>}.
+    mirror to oam_l -> blit the sheet. Frames share ONE anchor (`center_px`, default a torso
+    point) so the body stays put between beats; for `motion="melee"` a per-beat forward step
+    (MELEE_LUNGE_DX) is then added to the OAM so the unit lunges into the swing like the donor
+    Pirate (the ranged cadence keeps the static anchor -- there the projectile travels, not the
+    body). Returns {"sheets": [P-image x N], "pal": <128 bytes>, "motion_s": <str>}.
     """
+    # The mode scripts (_mode_body / _melee_mode_body) reference frames 0/1/2 by index, so a
+    # unit MUST supply exactly 3 (Ready/Wind-up/Peak); fewer would emit a banim_code_frame for an
+    # oam_frame_2 label that's never defined -> a cryptic assembler undefined-symbol failure.
+    if len(frame_imgs) != 3:
+        raise ValueError("battle_anim %r needs exactly 3 frames (ready/windup/peak); got %d"
+                         % (abbr, len(frame_imgs)))
     if center_px is None:
         w, h = frame_imgs[0].size
         center_px = (w // 2, h * 5 // 8)
     sheets, frames = [], []
-    for im in frame_imgs:
+    for i, im in enumerate(frame_imgs):
         cols, rows = im.size[0] // TILE, im.size[1] // TILE
         _, oam = tile_sprite(im)
         filled = {(o["dx"] // TILE, o["dy"] // TILE) for o in oam}
         objs = merge_objects(filled, cols, rows)
         entries, placements = pack_frame_oam(objs, center_px)
+        if motion == "melee":
+            entries = _lunge(entries, MELEE_LUNGE_DX[i] if i < len(MELEE_LUNGE_DX) else 0)
         sheets.append(build_sheet_from_placements(im, placements, palette))
         frames.append({"oam_r": entries, "oam_l": mirror_oam(entries)})
     return {"sheets": sheets, "pal": agbpal_bytes(palette),
-            "motion_s": emit_motion_s(abbr, frames)}
+            "motion_s": emit_motion_s(abbr, frames, motion)}
 
 
 def _cell_is_empty(im, ox, oy):

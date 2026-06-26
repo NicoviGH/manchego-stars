@@ -1161,6 +1161,54 @@ scale** (the ~0.92× shrink was previewed and declined). Future snow chapters: s
 `battleTileSet` to 0 (open) or 0x15 (rough) per scenery.
 _Decided: 2026-06-23_
 
+**Faked battle anims: per-CHARACTER (`_u25`), not per-class clones (#65 M-A → M-B)**
+Milestone A (RBG) gave a unit its custom anim by cloning a stat-identical **class** (`clone_into`)
+and repointing the clone's `AnimConf`. That does **not scale**: FE8 has only ~3 unused class slots
+(`CLASS_BLST_*_EMPTY`), and the goblin map-sprite reskins (#21) already take two. So M-B moves the
+PCs to FE8's dormant **per-character** path: an engine hook (`_patch_banim_character_unique`, in
+`engine_hooks.py`) swaps the four combat anim lookups in `banim-ekrbattleintro.c` from
+`GetBattleAnimationId` → `GetBattleAnimationId_WithUnique`, which reads `pCharacterData->_u25` →
+`gUnitSpecificBanimConfigs[]`. Per PC, `inject_battle_anims` appends the unit's `AnimConf` to that
+table and sets the character's `_u25` index; **no class slot, ever** — the unit deploys as its plain
+vanilla class. Scales to all 8 PCs + any **named boss** (anything with a unique character id).
+- **Generic enemies stay class-bound.** A horde of goblins shares one character id (0), so `_u25`
+  can't address them; their custom asset is a class-bound **map sprite** anyway. A goblin *battle*
+  anim (#90) would attach as a class-level `.pBattleAnimDef` on their existing reskin clone class.
+- **RBG migrated** off its clone (freed `CLASS_BLST_KILLER_EMPTY`). Pure text transforms are TDD'd
+  (`test_build_campaign.CharacterUniqueBanim`); the hook is guarded by `check_engine_guards_present`.
+- **Melee cadence** is studied per donor from the decomp (`ref_to_battleframe._melee_mode_body`,
+  from the vanilla Pirate axe `motion.s`): lunge-in, wind-up held longest, `hit_normal` on the
+  swing-through, backward dodge, no projectile. FE frames built by `tools/descale_battleframe.py`
+  (flip → uniform scale → shared feet anchor → sharpen → curated family palette → 1px outline).
+- Verified in-engine (TESTCH sandbox `recordanim`): **braulo** (deploys Pirate 0x42) and **RBG**
+  (deploys Archer 0x19) both animate custom via `_u25`; braulo's 96-tile sprite fits VRAM.
+_Decided: 2026-06-26_
+
+**Faked anim fidelity pass: archer-palette cyan, melee lunge, record-capture (#65 M-B)**
+Three faults surfaced when polishing RBG + braulo end-to-end on the `_u25` path; all fixed
+campaign-agnostically.
+- **RBG "cyan" was an engine bug, not the art.** `GetBanimPalette` (`banim-ekrmain.c`) loads a
+  combatant's palette from `banim_data[GetBanimPalette(banim_id)]`, but for `CLASS_ARCHER/_F/
+  SNIPER/_F` it returns a hardcoded canonical **bow** palette row (0x25/0x27/0x29/0x2B) *regardless
+  of `banim_id`* — a vanilla palette-share that is only correct for the stock bow anim. RBG deploys
+  as a real `CLASS_ARCHER` (the whole point of `_u25`: no class slot), so his custom appended banim's
+  tiles got painted with the vanilla archer palette → cyan. M-A's class-clone dodged it by deploying
+  as a ballista clone, not `CLASS_ARCHER`. Fix: `engine_hooks._patch_banim_palette_custom_guard`
+  short-circuits `GetBanimPalette` to return `banim_id` for any **custom (appended) banim** (id ≥ the
+  vanilla banim count, derived at inject time), before the vanilla switch — vanilla units byte-for-byte
+  unchanged. Guarded by `check_engine_guards_present`; TDD'd. RBG also **rescaled to vanilla** (body 38).
+- **Melee LUNGE lives in the frame OAM, not the script.** The Pirate's forward step is its frames'
+  dx sweep (~0 → −45 → 0), but a faked anim anchors all frames to one feet point, so braulo swung on
+  the spot. `build_battle_anim` now bakes a per-beat forward OAM step (`MELEE_LUNGE_DX`) for melee, and
+  `_melee_mode_body` **holds** the lunged peak through the hit then eases back over a 6-tick return —
+  matching the Pirate's frames 2/3/5 (forward) + 7/8 (return). DEFERRED: the white swing-arc
+  weapon-trail (**#91**).
+- **`recordanim` capture caught the quote, not the attack.** `captureAttack` counted entering
+  `gProc_ekrBattle` as success, but a talky foe's in-battle quote (`ProcScr_BattleEventEngine`) holds
+  for A and ate the budget before the swing drew. Fix: tap A while the quote box is up, screenshot
+  only quote-less frames, and key the verdict on capturing real anim frames (`sawAnim`).
+_Decided: 2026-06-26_
+
 **Event backgrounds (`BACG`): vendored winter CGs, injected as NEW `gConvoBackgroundData` slots**
 Cutscene backdrops are `gConvoBackgroundData[]` (eventscr2.c) `{tiles, map, palette}` triples, 240×160,
 4bpp with up to **8 sixteen-colour sub-palettes** (one per 8×8 tile = 128 colours). We vendor winter
