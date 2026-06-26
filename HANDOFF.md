@@ -46,26 +46,14 @@ ADR: `decisions.md` §Distribution.
 
 ## Now / Next
 
-### Content — Ch2 (#22) — both demo-review items FIXED, in review (PRs #85 + #88); pending merge
-The two demo-review polish items are resolved and in review (NOT gating Ch3). After both merge +
-the demo reel is regenerated → **close #22**.
-- **Opening card (PR #85)** — the garbled "Bryn Shander — West Gate" card. Root cause: a literal
-  em-dash in the YAML `location_card` reached the FE8 encoder unnormalized. Fixed centrally in
-  `name_message_body` (now ASCII-folds via `_fe_dialogue_text`). The in-engine capture then caught a
-  **2nd** issue text-decode can't see: the brown location nameplate caps text at **96px** (3×32px
-  sprites, `popup.c` `BrownTextBox_Loop`) → long cards clip. Shortened the card to **"Bryn Shander"**.
-  `verify_text` clean; verified in-engine.
-- **Targos ending BG + villain names (PR #88)** — the ending reused `BG_NORMAL_VILLAGE`. Vendored a
-  frozen Ten-Towns snow-town (FE-Repo **{Zeldacrafter}**) as a **NEW additive** `gConvoBackgroundData`
-  slot `BG_MS_TARGOS_WINTER` (0x36), `CH02_ENDING_BG` repointed. **New reusable pipeline:**
-  `bg_to_fe8.py` + `inject_backgrounds` (see Gotchas). The top-left blue shape is an in-scene
-  **banner** — kept (Nicolas's call; an earlier paint-out was reverted). **Folded in:** the boss/miniboss
-  rode vanilla slots and leaked the vanilla **"Bazba"/"Bone"** names on the unit window + death quote →
-  renamed to **Halvar/Grukk** (`inject_ch02` now overrides the slot name like `inject_ch01` does). Verified
-  in-engine (`recordch02ending` PASS; no BG holes, names correct).
-- **Demo reel** (unmerged `demo/ch2-gifs`, `docs/demo/ch2-cold-welcome.md`): the opening/ending GIFs are
-  now **stale** → regenerate after #85+#88 merge, then decide merge-vs-drop. Scratch review images (the
-  before/afters shown to Nicolas) live on the **`review/ch02-ending-bg`** branch — not for merge.
+### Content — Ch2 (#22) — DONE / CLOSED (2026-06-26)
+Both demo-review polish items merged (PR #85 ASCII-fold opening card; PR #88 Targos winter BG +
+Bazba/Bone→Halvar/Grukk name-leak fix), all slice checklist items checked → **#22 closed**, stale
+`blocked` label removed.
+- **Non-gating leftover:** the demo reel on the unmerged `demo/ch2-gifs` branch (`docs/demo/ch2-cold-welcome.md`)
+  is now **stale** vs the merged fixes → decide regenerate-vs-drop as a standalone demo-asset task. NOT part
+  of the slice DoD, ships nothing (v0.1.0 is Ch1-only). Scratch review images live on `review/ch02-ending-bg`
+  (not for merge).
 
 ### Content — Party battle animations (#65 Milestone B) — NEXT SESSION pickup (Nicolas)
 RBG validated the faked-anim pipeline end-to-end (#65 **Milestone A**, merged): donor-prime, additive,
@@ -84,14 +72,28 @@ RBG validated the faked-anim pipeline end-to-end (#65 **Milestone A**, merged): 
   marty + meesmickle = Shaman (dark caster) · rootis = Mage (anima caster) · sclorbo = Cleric (staff).
 - One feature-flow branch per unit (or a small batch); use the `custom_unit` issue template per PC.
 
-### Content — Ch3 "The Termalaine Mine" (#23) — chapter slice (after the anims / concurrent)
-Not started. Reuse the Ch2 vertical-slice component breakdown (tracked as a checklist on the issue):
-design+dialogue lock (invoke `dialogue-pass`; ground in DM notes PDF + Frostmaiden book) → map
-(`#40` Tiled→`.mar` pipeline) → host on the next vanilla slot (model on `inject_ch01`/`inject_ch02`;
-`MNC2(<next>)`) → units/objective/cutscenes → art per `#38/#39` → title card → load-test scenarios
-(`ch03`/`smoke_ch03`/`clear_ch03`, mirroring ch02). Then chapters #24–#28 (Ch4–Ch8) follow the same slice.
-Ch3+ ending BGs: vendor from the **winter-BG library** (`map-review/iwd-bg-library.md`) via the
-`bg_to_fe8.py` → `inject_backgrounds` pipeline (relocate `BG_RANDOM` once a 2nd slot is needed).
+### Content — Ch3 "The Termalaine Mine" (#23) — DESIGN LOCKED (PR #92 merged 2026-06-26); build beats remain
+The full design slice is regrounded, parity-verified, and merged. Decisions/deviations live in
+`decisions.md` → **Ch3 ADR (2026-06-26)**; the live build checklist is on **#23**. State of the design:
+- **Identity:** reskins **vanilla FE8 Ch3 "The Bandits of Borgo"** (Seize big-battle; FE8's first chests +
+  first thief) as Termalaine's kobold-overrun tourmaline mine. Teaching goal = the **thief** (Trex = our
+  Colm), made to matter by door/chest-gated rooms. Grounded in the DM notes + the Frostmaiden book
+  "A Beautiful Mine" (pp.93–96).
+- **Structure:** rooms-on-ONE-flat-map (FE8 has no z-levels) — walls + `TERRAIN_DOOR` + one scripted
+  "open the way down" `TILECHANGE`. (Multi-level/Tower-Ruins structure reserved for a future prison-break.)
+- **Enemies:** 1:1 reskin of vanilla Ch3's 10-slot force — kobolds + a giant rat + the **Grell (Mogall L12,
+  Evil Eye)** as boss. **Parity verified** `make difficulty CH=ch03` (clear-load ×0.99, threat ×1.12, in band).
+- **3 deviations (net-neutral, ADR):** boss is a real monster (Mogall, not a frailty cheat); monster-debut
+  moved ch04→ch03 (`introduces` ledger); ch02↔ch03 gem/hand-axe swap (ch02 chwinga-mote now gifts a Hand Axe,
+  the Red Gem moved to a ch03 tourmaline chest — total wealth unchanged).
+- **Recruit:** Trex (canon winged kobold leader) defects mid-map.
+- **Build beats remaining (unchecked on #23, priority order):** `dialogue-pass` for the 4 cutscene beats
+  (opening / RBG-execution + Trex recruit / Pinky shaft-scout reveal / Termalaine ending) → map build
+  (`#40`; cave/interior tileset + doors + the map-change) → host on the next vanilla slot (`MNC2`; model on
+  `inject_ch01`/`inject_ch02`) → units/objective/cutscene wiring → art (Grell/Trex/kobold/giant-rat sprites;
+  **grell ref = book p.96**) → title card → load-test scenarios (`ch03`/`smoke_ch03`/`clear_ch03`, mirror ch02).
+- Then chapters #24–#28 (Ch4–Ch8) follow the same slice. Ch3+ ending BGs: vendor from the **winter-BG library**
+  (`map-review/iwd-bg-library.md`) via `bg_to_fe8.py` → `inject_backgrounds` (relocate `BG_RANDOM` once a 2nd slot is needed).
 
 ### Parked / supporting
 - Enemy/NPC art/anim → the **convention homes** (`inject_battle_anims`/`inject_battle_platforms`
