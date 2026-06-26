@@ -13,6 +13,8 @@ from inject.decomp import (
 
 # Decomp source files patched ONLY by the engine hooks below.
 BANIM_EKRBATTLEINTRO_C = os.path.join(DECOMP, 'src', 'banim-ekrbattleintro.c')
+BANIM_EKRMAIN_C = os.path.join(DECOMP, 'src', 'banim-ekrmain.c')
+BANIM_DATA_C = os.path.join(DECOMP, 'src', 'banim_data.c')
 BMCAMADJUST_C = os.path.join(DECOMP, 'src', 'bmcamadjust.c')
 BMMAP_C = os.path.join(DECOMP, 'src', 'bmmap.c')
 WORLDMAP_PATH_C = os.path.join(DECOMP, 'src', 'worldmap_path.c')
@@ -52,6 +54,57 @@ def _patch_banim_character_unique():
                  % BANIM_EKRBATTLEINTRO_C)
     with open(BANIM_EKRBATTLEINTRO_C, 'w', encoding='utf-8') as f:
         f.write(_swap_combat_anim_to_unique(text))
+
+
+def _guard_banim_palette_custom(text, first_custom_banim):
+    """Pure transform: in GetBanimPalette, short-circuit CUSTOM (appended) banim ids to
+    their OWN palette before the vanilla archer/sniper class->palette redirect.
+
+    Vanilla GetBanimPalette loads the combatant's banim palette from
+    banim_data[GetBanimPalette(banim_id, pos)], but for CLASS_ARCHER/_F/SNIPER/_F it returns
+    a hardcoded canonical bow palette row (0x25/0x27/0x29/0x2B) regardless of banim_id -- a
+    palette-share that is correct ONLY when the unit runs the stock bow anim. A custom (#65)
+    unit deployed AS a real archer via the per-character _u25 path runs an APPENDED banim
+    whose tiles index its own palette in its own banim_data row; the redirect then paints
+    those tiles with the vanilla archer palette -- the RBG 'cyan' mis-render. Appended rows
+    are ids >= the vanilla banim count, so bypass the switch for them. Vanilla units (ids <
+    the count) hit the switch byte-for-byte as before. Idempotent."""
+    anchor = '    jid = bu->unit.pClassData->number;\n    switch (jid) {'
+    guard = ('    if (banim_id >= 0x%X) /* MS #65: a custom (appended) banim keeps its own '
+             'palette; the\n                              vanilla archer/sniper palette-share '
+             'below is for stock bow anims only. */\n'
+             '        return banim_id;\n' % first_custom_banim)
+    if guard in text or anchor not in text:
+        return text  # already guarded, or unexpected vanilla form (caller asserts)
+    return text.replace(anchor, guard + anchor, 1)
+
+
+def _vanilla_banim_count():
+    """Count banim_data[] rows in the (vanilla, freshly-restored) banim_data.c. Engine hooks
+    run after restore_vanilla_sources() and BEFORE inject_battle_anims appends our rows, so
+    this is the vanilla count = the id of the first custom (appended) row."""
+    with open(BANIM_DATA_C, encoding='utf-8') as f:
+        return sum(1 for ln in f if ln.lstrip().startswith('{"'))
+
+
+def _patch_banim_palette_custom_guard():
+    """Make GetBanimPalette honour a custom unit's OWN palette (#65 M-B, the RBG cyan fix).
+
+    Companion to _patch_banim_character_unique: that routes the combat ANIM lookup through
+    the per-character _u25 table, but the PALETTE still loads via GetBanimPalette, whose
+    vanilla archer/sniper class special-case mis-redirects a custom-anim archer to the stock
+    bow palette (cyan). This guards it so appended banim rows keep their own palette.
+    Campaign-agnostic; guarded here and asserted by check.py check_engine_guards_present."""
+    with open(BANIM_EKRMAIN_C, encoding='utf-8') as f:
+        text = f.read()
+    out = _guard_banim_palette_custom(text, _vanilla_banim_count())
+    if out == text:
+        if 'MS #65: a custom (appended) banim keeps its own palette' in text:
+            return  # already guarded (idempotent)
+        sys.exit('ERROR: GetBanimPalette not in expected vanilla form in %s'
+                 % BANIM_EKRMAIN_C)
+    with open(BANIM_EKRMAIN_C, 'w', encoding='utf-8') as f:
+        f.write(out)
 
 
 def _patch_player_start_cursor_guard():

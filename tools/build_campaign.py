@@ -5036,6 +5036,8 @@ def main():
         print('  lord floor (#45 3c): chosen lead\'s survivability top-up baked in once at ch start')
         engine_hooks._patch_banim_character_unique()
         print('  banim (#65): combat anim lookup -> GetBattleAnimationId_WithUnique (per-character _u25)')
+        engine_hooks._patch_banim_palette_custom_guard()
+        print('  banim (#65): GetBanimPalette -> custom (appended) banims keep own palette (RBG cyan fix)')
         print('names:')
         inject_names(args.campaign)
         print('item names:')

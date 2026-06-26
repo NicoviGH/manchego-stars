@@ -1,9 +1,10 @@
 # Handoff — Manchego Stars · live state
 
 **THIS IS A WORKTREE** (`/Users/Yonick/Projects/ms-banim-party`, branch `feat/65-party-battle-anims`,
-off `main`). The in-flight work below is **UNCOMMITTED**. Fresh instance: open THIS directory and read
-this file. Project-wide state (Ch2/#22, clear-bot/#60, etc.) is unchanged on `main` — see
-`git log origin/main` + GitHub issues; this handoff is scoped to the active feature.
+off `main`). RBG + braulo are **committed on this branch and ready for PR/`/code-review`** (not yet
+merged to `main`). Fresh instance: open THIS directory and read this file. Project-wide state (Ch2/#22,
+clear-bot/#60, etc.) is unchanged on `main` — see `git log origin/main` + GitHub issues; this handoff is
+scoped to the active feature.
 
 ## ACTIVE FEATURE — #65 Milestone B: party battle animations (character-unique, no class slots)
 
@@ -29,38 +30,35 @@ taken by goblin reskins #21, 1 by RBG). **Switched to FE8's per-CHARACTER path:*
   2026-06-26). Python tests green (`test_ref_to_battleframe` 33, `test_build_campaign` 35);
   `python3 tools/check.py` → drift clean; TESTCH build GREEN.
 
-### braulo — WORKS ✅
-Anchor-swinging crab on the **Pirate-axe melee cadence** (studied from vanilla
-`banim_pirm_ax1_motion.s`: lunge-in, wind-up held longest, `hit_normal` on swing-through, backward
-dodge, no projectile — `ref_to_battleframe._melee_mode_body`, TDD'd). Frames at **vanilla scale (body
-44, flat-13 palette, thin outline)** via `tools/descale_battleframe.py`; sits centered on the platform,
-renders clean in-engine (`recordanim PT_CHAR=braulo` PASS, class 0x42 = vanilla Pirate). GIF:
-`map-review/braulo-anim.gif`. **Nicolas is reviewing the cadence — get sign-off.**
+### braulo — DONE ✅ (lunge + matched Pirate cadence, Nicolas-signed)
+Anchor-swinging crab on the **Pirate-axe melee cadence** (`ref_to_battleframe._melee_mode_body`, TDD'd).
+Two fixes this session made it match the donor:
+- **Lunge.** The Pirate's forward step lives in its frame OAM dx sweep (~0 → −45 → 0), but a faked anim
+  pins all frames to one feet point, so braulo swung on the spot. `build_battle_anim` now bakes a
+  per-beat forward OAM step (`MELEE_LUNGE_DX`, peak dx ~−40) for melee — braulo steps INTO the swing.
+- **Held cadence.** `_melee_mode_body` holds the lunged peak THROUGH the hit, then eases back over a
+  6-tick return (matching the Pirate's frames 2/3/5 forward + 7/8 return) — no snap-back.
+Frames vanilla-scale (body 44). Verified in-engine vs a stock-Pirate capture (`docs/demo/braulo-vs-
+vanilla-pirate.gif`). DEFERRED: the white **swing-arc weapon-trail** → issue **#91** (braulo has the
+lunge + dirt-kick + on-contact hit-spark, but not the vanilla's drawn slash arc).
 
-### RBG — BLOCKED on a cyan render bug 🛑 (systematic-debugging in progress)
-RBG renders with a **persistent cyan overlay glow** in-engine (green body shows THROUGH it → engine
-overlay, not a wrong palette; the built `agbpal` decodes CORRECT). Isolated so far:
-- **NOT scale** — Test A (my-descaler RBG at body 64 / 104×72) = cyan.
-- **NOT motion** — Test B (RBG with `motion: melee`) = cyan.
-- **Tied to my-descaler's RBG frame ASSETS**: M-A's original 88×64 RBG frames render CLEAN; braulo's
-  my-descaler frames render CLEAN; only **my-descaler RBG frames** are cyan.
-- Sprite SHAPE is correct & animates (frames differ). Looks like the **EKR intro materialize not
-  resolving for RBG**, or a palette/transparency-index quirk specific to RBG's green/purple palette
-  via the descaler. Izobai (vanilla, beside RBG) resolves to normal in the same frame.
-- **NEXT debug step:** diff the *generated* assets (sheets / `_oam` / `agbpal` / `motion.s`) of
-  my-descaler-RBG vs the working **M-A-RBG** baseline (revert frames + rebuild to regenerate it), and
-  vs my-descaler-**braulo** (clean). Find what the descaler does to RBG but not braulo (suspects:
-  `_outline`/`_crisp`/`_shared_palette` passes; a near-transparent edge index; palette ordering). Form
-  Hypothesis C, test minimally (per superpowers:systematic-debugging).
+### RBG — DONE ✅ (cyan root-caused + fixed, rescaled to vanilla)
+The "cyan" was an **engine bug, not the art**: `GetBanimPalette` (`banim-ekrmain.c`) forces any
+`CLASS_ARCHER/_F/SNIPER/_F` unit to the canonical vanilla **bow** palette (0x25/0x27/0x29/0x2B)
+*regardless of `banim_id`* — fine for the stock bow anim, but RBG deploys as a real `CLASS_ARCHER` on
+the `_u25` path, so his custom appended banim's tiles got painted with the vanilla archer palette → cyan.
+(M-A dodged it by deploying as a ballista clone, not `CLASS_ARCHER`.) Fix:
+`engine_hooks._patch_banim_palette_custom_guard` returns `banim_id` for any **custom (appended)** banim
+(id ≥ vanilla count, derived at inject), before the vanilla switch — vanilla units byte-unchanged; TDD'd,
+guarded by `check_engine_guards_present`. RBG then **rescaled to vanilla** (body 38, from
+`Battle Anims/RBG Battle/cleaned/*_fam.png`, `--noflip`). Green + on-platform in-engine; the engine arrow
+projectile is intact. GIF `docs/demo/rbg-anim.gif`.
 
-### ⚠️ MESSY DEBUG STATE TO RESET before continuing
-- `pcs/prof-rbg.yaml` has **TEMP `motion: melee`** (line ~52) — revert to `motion: ranged`.
-- `battle_anims/prof-rbg/*.png` are currently **Test-A frames (104×72, my-descaler, CYAN)** —
-  `git checkout HEAD -- campaigns/rime-of-the-frostmaiden/battle_anims/prof-rbg/` restores the
-  known-good **M-A frames (clean, but over-scaled 88×64)**.
-- `battle_anims/braulo/*.png` = vanilla-scale body-44 (KEEP).
-- Decision locked: **scale = match vanilla** (RBG ~38, braulo 44); RBG-shrink reverses the 2026-06-23
-  "keep RBG scale" ADR; **detail/palette cleanup deferred** ("size first" — Nicolas).
+### Recording harness fix (folded in)
+`recordanim` GIFs were showing only the foe's battle-quote, never the swing: `captureAttack` treated
+entering `gProc_ekrBattle` as success, but a talky foe's in-battle quote (`ProcScr_BattleEventEngine`)
+held for A and ate the capture budget. Fixed: tap A while the quote box is up, screenshot only the
+quote-less anim frames, verdict keys on `sawAnim`. Now the GIFs show the real attack + damage + impact.
 
 ### Worktree build is SET UP (don't re-debug this)
 Fresh submodule lacked the decomp toolchain; bridged from the main tree
@@ -72,15 +70,14 @@ recordanim` → `tools/playtest/make_gif.py recordanim <id> --name <id>-anim`. (
 `/tmp/playtest-recordanim/` each run — capture one unit at a time.)
 
 ### Next steps (priority)
-1. **Reset the debug state** (above). 2. **Root-cause RBG cyan** (asset diff, Hypothesis C).
-3. Re-descale RBG to vanilla scale (body 38) cleanly once cyan is fixed — proper source is
-   `Battle Anims/RBG Battle/cleaned/*_fam.png` (hi-res clean family palette; `--noflip`), NOT the muddy
-   shrink-of-a-shrink. 4. Both GIFs → `docs/demo/` + push (GitHub view). 5. braulo cadence sign-off.
-   6. **Commit + `/code-review`** (sizable engine+content change). 7. Detail/palette cleanup.
-   8. Roll out remaining 6 PCs (wolfram=Knight/lance, pinky=Pegasus, marty+meesmickle=Shaman,
+RBG + braulo are **DONE** (cyan fixed, both rescaled to vanilla, braulo lunge+cadence). Remaining:
+1. **PR + `/code-review`** this branch (sizable engine+content change), then squash-merge.
+2. **Swing-arc weapon-trail** for braulo (and a reusable per-weapon version) — issue **#91**.
+3. **Roll out the remaining 6 PCs** (wolfram=Knight/lance, pinky=Pegasus, marty+meesmickle=Shaman,
    rootis=Mage, sclorbo=Cleric/staff; **meesmickle has a parked vendored Kitsune anim** at
    `battle_anims/_parked/`). Each = donor in `BANIM_DONORS` (+ its motion cadence if new) + 3 frames +
-   ~4-line `battle_anim:` block.
+   ~4-line `battle_anim:` block. Melee units inherit the `MELEE_LUNGE_DX` lunge automatically.
+4. **Goblin enemy battle anim** — issue **#90** (class-bound, not `_u25`).
 
 ## Key files (this feature)
 - `tools/descale_battleframe.py` — hi-res poses → FE-scale frames. **Prime suspect for the RBG cyan.**

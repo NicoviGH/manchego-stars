@@ -290,6 +290,47 @@ class CharacterUniqueBanim(unittest.TestCase):
         once = eh._swap_combat_anim_to_unique(src)
         self.assertEqual(eh._swap_combat_anim_to_unique(once), once)
 
+    # GetBanimPalette: a CUSTOM (appended) banim must keep its OWN palette. Vanilla forces
+    # CLASS_ARCHER/_F/SNIPER/_F to the canonical bow palette (0x25/0x27/0x29/0x2B) regardless
+    # of banim_id -- right for the stock anim, but it mis-paints a custom-anim unit deployed
+    # AS a real archer (the per-character _u25 path). That was the RBG "cyan" bug (#65).
+    PALFN = ('int GetBanimPalette(int banim_id, enum ekr_battle_unit_position pos)\n'
+             '{\n'
+             '    u32 jid;\n'
+             '    struct BattleUnit *bu;\n\n'
+             '    if (EKR_POS_L == pos)\n'
+             '        bu = gpEkrBattleUnitLeft;\n'
+             '    else\n'
+             '        bu = gpEkrBattleUnitRight;\n\n'
+             '    jid = bu->unit.pClassData->number;\n'
+             '    switch (jid) {\n'
+             '    case CLASS_ARCHER:\n'
+             '        return 0x25;\n'
+             '    default:\n'
+             '        return banim_id;\n'
+             '    }\n'
+             '}\n')
+
+    def test_banim_palette_guard_short_circuits_custom_ids_before_the_switch(self):
+        from inject import engine_hooks as eh
+        out = eh._guard_banim_palette_custom(self.PALFN, 0xC9)
+        # the guard returns banim_id for any appended id, BEFORE the class switch runs
+        self.assertIn('if (banim_id >= 0xC9)', out)
+        self.assertLess(out.index('if (banim_id >= 0xC9)'),
+                        out.index('switch (jid)'))
+        # vanilla switch body is left intact
+        self.assertIn('case CLASS_ARCHER:\n        return 0x25;', out)
+
+    def test_banim_palette_guard_is_idempotent(self):
+        from inject import engine_hooks as eh
+        once = eh._guard_banim_palette_custom(self.PALFN, 0xC9)
+        self.assertEqual(eh._guard_banim_palette_custom(once, 0xC9), once)
+
+    def test_banim_palette_guard_noops_when_form_unexpected(self):
+        from inject import engine_hooks as eh
+        self.assertEqual(eh._guard_banim_palette_custom('something else', 0xC9),
+                         'something else')
+
 
 class BattlePlatformTerrain(unittest.TestCase):
     """Terrain category -> snow ground index (#65). base = first vendored ground slot;

@@ -49,7 +49,11 @@ art:
 #   --body 44 --sharpen 1.8 --thin-outline --flat "red:3,orange:3,grey:2,brown:3"
 # (flip to FE-left; ~44px body = vanilla scale so he sits centred on the platform, a touch
 # bigger than a 33px Pirate as the crab bruiser; flat family palette + 1px outline).
-# Detail/palette refinement deferred -- size locked first (Nicolas, 2026-06-26).
+# The melee cadence reproduces the vanilla Pirate's LUNGE: build_battle_anim bakes a per-beat
+# forward OAM step (MELEE_LUNGE_DX, peak dx ~-40 like gBanim frame-2), and _melee_mode_body
+# HOLDS that lunged peak through the hit then eases back -- so he steps INTO the swing instead
+# of swinging on the spot (decisions.md Art & Audio). DEFERRED: the white swing-arc weapon-trail
+# (#91) -- braulo has the lunge + dirt-kick + hit-spark but not the vanilla's drawn slash arc.
 battle_anim:
   clone_from: pirate                    # donor: Pirate axe timing/effects/13 modes + ITYPE_AXE
   motion: melee                         # lunge-and-swing; banim_code_hit_normal on the swing-through

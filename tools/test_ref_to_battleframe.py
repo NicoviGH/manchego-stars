@@ -296,6 +296,16 @@ class TestMeleeMotionS(unittest.TestCase):
         self.assertIn("banim_code_hit_normal", body)            # melee contact
         self.assertNotIn("banim_code_call_spell_anim", body)    # no arrow/spell
 
+    def test_melee_holds_the_lunge_through_the_hit(self):
+        # match the Pirate cadence: the peak (frame 2, the lunged OAM) stays on-screen THROUGH
+        # banim_code_hit_normal -- not a snap back to the resting frame 0 -- so the forward step
+        # lingers like the donor's frames 2/3/5 instead of flicking.
+        body = self._mode(rb.emit_motion_s("brau_an1", self._frames(), motion="melee"),
+                          "attack_close")
+        after_hit = body.split("banim_code_hit_normal")[1]
+        first_frame = after_hit.split("banim_code_frame", 1)[1].split("\n")[0]
+        self.assertIn("brau_an1_sheet_2", first_frame)   # holds the peak, not sheet_0 (rest)
+
     def test_melee_dodges_backward(self):
         s = rb.emit_motion_s("brau_an1", self._frames(), motion="melee")
         self.assertIn("banim_code_dodge_to_back", self._mode(s, "dodge_close"))
@@ -310,6 +320,45 @@ class TestMeleeMotionS(unittest.TestCase):
         s = rb.emit_motion_s("rbg_ar1", self._frames())         # no motion= -> ranged
         self.assertIn("banim_code_call_spell_anim", s)
         self.assertNotIn("banim_code_dodge_to_back", s)
+
+
+class TestMeleeLunge(unittest.TestCase):
+    """Melee bakes a per-beat forward step into the OAM dx so the unit LUNGES into the swing
+    like the donor Pirate (vanilla frame-2 mean dx ~ -40). Ranged keeps the static anchor."""
+
+    def _frame_img(self):
+        im = Image.new("RGBA", (24, 24), (0, 0, 0, 0))
+        for x in range(8, 16):
+            for y in range(8, 16):
+                im.putpixel((x, y), (200, 40, 40, 255))   # one opaque 8x8 block
+        return im
+
+    def test_lunge_shifts_every_entry_dx(self):
+        e = [{"attr0": 0, "attr1": 0, "attr2": 0, "dx": 5, "dy": -3}]
+        out = rb._lunge(e, -40)
+        self.assertEqual(out[0]["dx"], -35)
+        self.assertEqual(out[0]["dy"], -3)                # dy untouched
+        self.assertEqual(e[0]["dx"], 5)                   # original not mutated
+
+    def test_lunge_zero_is_identity(self):
+        e = [{"attr0": 0, "attr1": 0, "attr2": 0, "dx": 5, "dy": -3}]
+        self.assertIs(rb._lunge(e, 0), e)
+
+    def test_melee_peak_frame_lunges_forward_vs_ranged(self):
+        imgs = [self._frame_img() for _ in range(3)]
+        pal = [(0, 0, 0), (200, 40, 40)]
+        melee = rb.build_battle_anim("brau_ax1", imgs, pal, motion="melee")
+        ranged = rb.build_battle_anim("brau_ax1", imgs, pal, motion="ranged")
+        # parse peak (frame 2) oam_r dx from each motion.s
+        import re
+        def peak_dx(s):
+            after = s.split("banim_brau_ax1_oam_frame_2_r:")[1]
+            body = after.split("banim_frame_end")[0]
+            return [int(m) for m in re.findall(r"banim_frame_oam[^\n]*?,\s*(-?\d+),\s*-?\d+", body)]
+        # peak lunges forward by MELEE_LUNGE_DX[2] (negative dx in oam_r) vs the static ranged frame
+        self.assertEqual([d - rb.MELEE_LUNGE_DX[2] for d in peak_dx(melee["motion_s"])],
+                         peak_dx(ranged["motion_s"]))
+        self.assertLess(rb.MELEE_LUNGE_DX[2], 0)          # forward = toward the foe
 
 
 class TestBuildBattleAnim(unittest.TestCase):

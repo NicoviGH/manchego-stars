@@ -207,21 +207,23 @@ def _mode_order(motion):
 def _melee_mode_body(abbr, kind):
     """One mode's script for the 3-beat MELEE fake (cadence from FE8 Pirate axe).
 
-    Lunge in (start_attack_1/2) -> wind the weapon up (frame 1 held longest) -> swing
-    through (frame 2) and land banim_code_hit_normal on contact -> recover and turn back.
-    No projectile: the hit IS the contact. Dodge hops backward (dodge_to_back). The lunge
-    travel + return are engine commands inherited from the donor, not drawn frames."""
-    if kind == "attack":   # ready -> wind up (held) -> swing-through + hit on contact
+    Cadence matched to the FE8 Pirate axe (banim_pirm_ax1): ready -> wind up (frame 1, held
+    longest, coiled back) -> lunge into the swing (frame 2, the peak holds its forward dx
+    through the hit, mirroring the Pirate's frames 2/3/5 ~7 ticks at dx ~-45) -> hit_normal on
+    contact -> ease back over a 6-tick return (the Pirate's frames 7/8) and turn. No projectile:
+    the hit IS the contact. Dodge hops backward (dodge_to_back). The forward step is the OAM
+    lunge baked by build_battle_anim (MELEE_LUNGE_DX), held here by keeping frame 2 on-screen."""
+    if kind == "attack":   # ready -> wind up -> lunge & HOLD forward through the hit -> ease back
         return ["\tbanim_code_start_attack_1", "\tbanim_code_start_attack_2",
                 _frame_cmd(abbr, 1, 0), "\tbanim_code_sound_axe_swing_short",
                 _frame_cmd(abbr, 20, 1), "\tbanim_code_sound_axe_swing_long",
                 "\tbanim_code_effect_dirt_kick", _frame_cmd(abbr, 3, 2),
                 "\tbanim_code_prepare_hp_deplete", _frame_cmd(abbr, 3, 2),
                 "\tbanim_code_sound_hit_eliwood_promoted_durandal",
-                "\tbanim_code_hit_normal", _frame_cmd(abbr, 1, 0),
+                "\tbanim_code_hit_normal", _frame_cmd(abbr, 1, 2),   # hold the lunge through the hit
                 "\tbanim_code_wait_hp_deplete", "\tbanim_code_start_opposite_turn",
-                _frame_cmd(abbr, 3, 0), "\tbanim_code_end_dodge",
-                "\tbanim_code_end_mode"]
+                _frame_cmd(abbr, 3, 0), _frame_cmd(abbr, 3, 0),      # ease back (Pirate f7+f8, 6 ticks)
+                "\tbanim_code_end_dodge", "\tbanim_code_end_mode"]
     if kind == "dodge":    # hop backward: ready -> wind-up -> ready
         return ["\tbanim_code_dodge_to_back", _frame_cmd(abbr, 1, 0),
                 "\tbanim_code_start_dodge", _frame_cmd(abbr, 3, 1),
@@ -230,13 +232,15 @@ def _melee_mode_body(abbr, kind):
     if kind == "stand":    # hold the ready frame (also melee's "attack at range")
         return [_frame_cmd(abbr, 1, 0), "\tbanim_code_wait_hp_deplete",
                 "\tbanim_code_end_mode"]
-    # miss: lunge and swing through, but no hit lands
+    # miss: lunge and swing through, hold the forward beat (like the hit), but no contact lands
     return ["\tbanim_code_start_attack_1", "\tbanim_code_start_attack_2",
             _frame_cmd(abbr, 1, 0), "\tbanim_code_sound_axe_swing_short",
             _frame_cmd(abbr, 20, 1), "\tbanim_code_sound_axe_swing_long",
             "\tbanim_code_effect_dirt_kick", _frame_cmd(abbr, 3, 2),
+            _frame_cmd(abbr, 4, 2),                                 # hold forward (matches the hit beat)
             "\tbanim_code_wait_hp_deplete", "\tbanim_code_start_opposite_turn",
-            _frame_cmd(abbr, 3, 0), "\tbanim_code_end_dodge", "\tbanim_code_end_mode"]
+            _frame_cmd(abbr, 3, 0), _frame_cmd(abbr, 3, 0), "\tbanim_code_end_dodge",
+            "\tbanim_code_end_mode"]
 
 
 def _mode_body(abbr, kind, motion="ranged"):
@@ -309,25 +313,46 @@ def emit_motion_s(abbr, frames, motion="ranged"):
     return "\n".join(L) + "\n"
 
 
+# Melee lunge: the FE8 Pirate-axe anim sweeps the sprite's screen dx ~0 -> -45 -> 0 across the
+# attack -- the body steps INTO the swing toward the foe, then recovers. A faked anim with
+# statically-anchored frames (we pin ONE feet point so the body holds still between beats) loses
+# that, so the unit swings ON THE SPOT instead of lunging (the vanilla-vs-braulo side-by-side
+# bug). For melee we bake a per-beat forward step into the OAM dx: ready neutral, wind-up coils
+# slightly back, peak lunges toward the foe (negative dx in oam_r; mirror_oam flips it for oam_l,
+# so the unit lunges the right way on either platform). Magnitude tracks the vanilla Pirate's
+# frame-2 mean dx (~ -40). Ranged keeps the static anchor (the projectile, not the body, travels).
+MELEE_LUNGE_DX = (0, 4, -40)   # (ready, wind-up, peak)
+
+
+def _lunge(entries, dx):
+    """Shift every OAM entry's dx by `dx` (a melee forward step); identity when dx == 0."""
+    if not dx:
+        return entries
+    return [dict(e, dx=e["dx"] + dx) for e in entries]
+
+
 def build_battle_anim(abbr, frame_imgs, palette, center_px=None, motion="ranged"):
     """Drive the whole faked-anim build: 3 frames -> sheets + agbpal + motion.s text.
 
     Per frame: tile -> merge filled cells into OBJs -> pack to oam_r + 2D placements ->
-    mirror to oam_l -> blit the sheet. All frames use ONE shared anchor (`center_px`,
-    default a torso point) so the body stays put on screen. `motion` selects the script
-    cadence ("ranged"/"melee"). Returns
-    {"sheets": [P-image x N], "pal": <128 bytes>, "motion_s": <str>}.
+    mirror to oam_l -> blit the sheet. Frames share ONE anchor (`center_px`, default a torso
+    point) so the body stays put between beats; for `motion="melee"` a per-beat forward step
+    (MELEE_LUNGE_DX) is then added to the OAM so the unit lunges into the swing like the donor
+    Pirate (the ranged cadence keeps the static anchor -- there the projectile travels, not the
+    body). Returns {"sheets": [P-image x N], "pal": <128 bytes>, "motion_s": <str>}.
     """
     if center_px is None:
         w, h = frame_imgs[0].size
         center_px = (w // 2, h * 5 // 8)
     sheets, frames = [], []
-    for im in frame_imgs:
+    for i, im in enumerate(frame_imgs):
         cols, rows = im.size[0] // TILE, im.size[1] // TILE
         _, oam = tile_sprite(im)
         filled = {(o["dx"] // TILE, o["dy"] // TILE) for o in oam}
         objs = merge_objects(filled, cols, rows)
         entries, placements = pack_frame_oam(objs, center_px)
+        if motion == "melee":
+            entries = _lunge(entries, MELEE_LUNGE_DX[i] if i < len(MELEE_LUNGE_DX) else 0)
         sheets.append(build_sheet_from_placements(im, placements, palette))
         frames.append({"oam_r": entries, "oam_l": mirror_oam(entries)})
     return {"sheets": sheets, "pal": agbpal_bytes(palette),
