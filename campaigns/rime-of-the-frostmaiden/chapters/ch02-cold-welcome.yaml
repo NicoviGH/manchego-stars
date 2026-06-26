@@ -274,7 +274,7 @@ events:
       this commit): ch02 host wiring + the eventscript that consumes this script, Vellynne's
       cutscene portrait (#19), and the in-game motion review.
     script:                       # LOCKED 2026-06-19 (dialogue pass, co-written with Nicolas)
-      - location_card: "Bryn Shander — West Gate"
+      - location_card: "Bryn Shander"   # nameplate caps at 96px (3 text sprites); the "West Gate" beat is set by the scene/dialogue below
       # (The Rolling Cheddar groans through the west gate, Baxby in the traces. A second
       #  sled waits in the drifts — no dogs in its harness, only two kobolds, gray and
       #  frost-split, that do not breathe. The woman aboard does not climb down; her hands

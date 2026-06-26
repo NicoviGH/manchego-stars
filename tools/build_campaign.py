@@ -642,7 +642,14 @@ def name_message_body(name):
     that bit the earlier reset). Vanilla pads odd-length names with `[.]` (0x1F,
     absorbed into the last glyph) to keep the byte count even: "Seth[X]" but
     "Franz[.][X]". We do the same.
+
+    Names come straight from YAML, so they may carry unicode punctuation the FE8
+    charset can't render (an em-dash garbled the ch02 "Bryn Shander -- West Gate"
+    opening card, #22). Normalize through `_fe_dialogue_text` first -- the same
+    ASCII-fold `_script_to_message` applies to dialogue -- so the parity count
+    below sees the bytes the encoder will actually emit, not the unicode source.
     """
+    name = _fe_dialogue_text(name)
     pad = '[.]' if len(name.encode('utf-8')) % 2 == 1 else ''
     return name + pad + '[X]'
 
