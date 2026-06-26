@@ -55,21 +55,28 @@ Bazba/Bone→Halvar/Grukk name-leak fix), all slice checklist items checked → 
   of the slice DoD, ships nothing (v0.1.0 is Ch1-only). Scratch review images live on `review/ch02-ending-bg`
   (not for merge).
 
-### Content — Party battle animations (#65 Milestone B) — NEXT SESSION pickup (Nicolas)
-RBG validated the faked-anim pipeline end-to-end (#65 **Milestone A**, merged): donor-prime, additive,
-3 static AI frames (Ready / Wind-up / Peak) cloned onto a donor class's cadence — see
-`campaigns/.../pcs/prof-rbg.yaml` `battle_anim:` block as the working template, and the
-`inject_battle_anims` docstring (how) + `decisions.md` Art & Audio (why). **7 party members still have NO
-`battle_anim:` block** — do the rest:
-- **Per PC:** add a `battle_anim:` block (clone_from donor class · clone_into an additive `*_EMPTY`
-  CLONE class slot · `abbr` stem ≤12 · `frames: [ready, windup, peak]`); generate frames with
-  `tools/ref_to_battleframe.py` (concept ref → 16-colour indexed sheet + OAM + palette — Nicolas can't
-  draw, CLAUDE generates via tooling); `inject_battle_anims` appends one `banim_data[]` row + repoints
-  the class; review with `tools/playtest/run.sh recordanim PT_CHAR=<uid>` → `make_gif.py recordanim <id>
-  --open`. **Custom art is the lever — go custom per concept art; SHOW Nicolas before committing.**
-- **Donor mapping by class** (the 3 poses are archetype-specific, the cadence is the donor's):
-  braulo = Fighter (axe melee) · wolfram = Knight (lance melee) · pinky = Pegasus (lance, flier) ·
-  marty + meesmickle = Shaman (dark caster) · rootis = Mage (anima caster) · sclorbo = Cleric (staff).
+### Content — Party battle animations (#65 Milestone B) — 2 of 8 done; NEXT = the other 6 PCs
+**RBG + braulo are DONE & merged (PR #94).** The pipeline is FE8's per-CHARACTER `_u25` path — **no
+class slot per unit**: `inject_battle_anims` appends the unit's `AnimConf` to `gUnitSpecificBanimConfigs[]`
+and sets the character's `_u25`; the `_patch_banim_character_unique` engine hook routes combat to
+`GetBattleAnimationId_WithUnique`. Working templates: `campaigns/.../pcs/{prof-rbg,braulo}.yaml`
+`battle_anim:` blocks; the `inject_battle_anims` + `_melee_mode_body` docstrings (how) + `decisions.md`
+Art & Audio (two 2026-06-26 ADRs, why). **6 PCs still have NO `battle_anim:` block** — do the rest:
+- **Per PC:** add a `battle_anim:` block (`clone_from` donor class · `motion: ranged|melee` · `abbr` stem
+  ≤12 · `frames: [ready, windup, peak]` — **exactly 3, enforced**). Generate the 3 frames with
+  `tools/descale_battleframe.py` from hi-res concept poses (CLAUDE generates art via tooling — Nicolas
+  can't draw). Review: `PT_CHAR=<uid> tools/playtest/run.sh recordanim` → `make_gif.py recordanim <id>
+  --name <id>-anim`, commit the GIF to `docs/demo/` + push (GitHub blob = the mobile-review channel).
+  **SHOW Nicolas before committing art.**
+- **Melee units get the LUNGE free:** `motion: melee` auto-bakes the Pirate-style forward step
+  (`MELEE_LUNGE_DX`) + held-peak cadence. New melee donors just need their cadence in `_melee_mode_body`
+  if it differs from the axe. Ranged units keep the static anchor (the projectile travels, not the body).
+- **Donor mapping by class** (3 poses are archetype-specific, the cadence is the donor's):
+  wolfram = Knight (lance melee) · pinky = Pegasus (lance, flier) · marty + meesmickle = Shaman (dark
+  caster) · rootis = Mage (anima caster) · sclorbo = Cleric (staff — non-attacker, may need a heal pose).
+  **meesmickle has a parked vendored Kitsune anim** at `battle_anims/_parked/`.
+- **Deferred polish (tracked, not blocking):** braulo's white swing-arc weapon-trail → **#91**; goblin
+  enemy class-level anim → **#90**.
 - One feature-flow branch per unit (or a small batch); use the `custom_unit` issue template per PC.
 
 ### Content — Ch3 "The Termalaine Mine" (#23) — DESIGN LOCKED (PR #92 merged 2026-06-26); build beats remain
