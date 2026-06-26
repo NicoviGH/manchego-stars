@@ -2331,22 +2331,34 @@ local function captureAttack(actorAddr, tag) -- like chooseAttack but shoot fram
         if combatLive() then break end
         press(K.RIGHT); wait(8)       -- A didn't commit -> cycle to the next in-range target
     end
-    -- Shoot through the anim. Success = the battle proc (gProc_ekrBattle) actually ran, i.e. a
-    -- battle ANIMATED and we captured it -- robust whether the attacker survives, dies in the
-    -- counter, or kills + triggers a level-up that outlasts the budget (US_UNSELECTABLE alone
-    -- misses those). A stall on the menu never starts the proc, so sawCombat stays false -> FAIL.
-    -- Stop early once combat finishes (or the actor is greyed) so we don't shoot dead frames.
-    local sawCombat = false
-    for f = 1, 600 do
+    -- Shoot through the anim. Success = the battle proc (gProc_ekrBattle) actually ran AND we
+    -- captured real ANIM frames -- robust whether the attacker survives, dies in the counter, or
+    -- kills + triggers a level-up that outlasts the budget. A stall on the menu never starts the
+    -- proc, so sawAnim stays false -> FAIL.
+    --
+    -- A talky foe (boss taunt / per-PC line) raises an in-battle QUOTE box during gProc_ekrBattle
+    -- (ProcScr_BattleEventEngine) that WAITS for A and would otherwise eat the whole budget before
+    -- the attack draws -- the bug that made every recordanim GIF show only the quote, never the
+    -- hit/damage. So: tap A WHILE the quote box is up to dismiss it (it only blocks here, the pure
+    -- anim takes no input), and screenshot ONLY when no quote box is up -- those are the real
+    -- draw/fire/impact/HP-drain frames. Never tap during the pure anim (that would skip it); the
+    -- quote-proc gate guarantees we only press while a text box holds.
+    local sawCombat, sawAnim = false, false
+    for f = 1, 900 do
         local inCombat = procActive(SYM.gProc_ekrBattle)
         if inCombat then sawCombat = true
         elseif sawCombat then break end                        -- combat played and finished
-        if (ru32(actorAddr + 0x0C) & 0x2) ~= 0 then break end  -- actor acted (survived)
-        if f % 3 == 0 then shot(tag) end
+        if (ru32(actorAddr + 0x0C) & 0x2) ~= 0 and not inCombat then break end  -- actor acted
+        if procActive(SYM.ProcScr_BattleEventEngine) then
+            press(K.A, 2)                                      -- advance/dismiss the quote box
+        elseif inCombat then
+            sawAnim = true
+            if f % 3 == 0 then shot(tag) end                   -- the actual attack anim
+        end
         yield()
     end
     wait(30)
-    return sawCombat
+    return sawAnim
 end
 local RBG_PID = 0x05           -- CHARACTER_MOULDER (RBG's slot), lord-select menu index 4
 
