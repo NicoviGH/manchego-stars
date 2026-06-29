@@ -9,35 +9,34 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 > live pickup — its engine/tooling half is merged & inert; it's waiting only on art.** See §Wolfram + the
 > ready-to-run prompt pack at the bottom of this file. Nicolas is mobile-only the week of 2026-06-29.
 
-> **🛠 Desktop fix needed — branch cleanup + env policy (2026-06-29):** An audit on
-> `claude/audit-open-branches-5suz48` found **11 stale remote branches** the squash-merge convention
-> should have deleted (the 8 closed-unmerged PRs #67/#70/#74/#75/#76/#77/#95/#96 + the three never-PR'd
-> `claude/content-track-review-5rpjy8` / `demo/ch2-gifs` / `review/ch02-ending-bg`). The work landed on
-> `main` via separate squash-merges; the branches are leftover. **Two things to do from desktop:**
+> **🛠 Desktop fix needed — branch cleanup + env policy (2026-06-29):** An audit found **12 stale
+> remote branches** the squash-merge convention should have deleted: the 8 closed-merged PR branches
+> (#67/#70/#74/#75/#76/#77/#95/#96), the 3 never-PR'd (`claude/content-track-review-5rpjy8` /
+> `demo/ch2-gifs` / `review/ch02-ending-bg`), and the now-obsolete prior audit branch itself
+> (`claude/audit-open-branches-5suz48`, superseded by this commit). Re-probed from a fresh web session
+> 2026-06-29: blocker unchanged — `git push --delete` still HTTP 403, REST `DELETE /git/refs/...` still
+> returns `"GitHub access is not enabled for this session."` **Two things to do from desktop:**
 >
-> 1. **Delete the 11 stale branches.** From a local checkout:
+> 1. **Flip the GitHub repo setting "Automatically delete head branches"** (Settings → General →
+>    Pull Requests; mobile-reachable). That sweeps every squash-merged branch on merge so this
+>    backlog can't re-accumulate. **After flipping, squash-merging this PR will auto-delete
+>    `claude/branch-cleanup-1c1081`** — one less branch to chase manually.
+> 2. **Delete the 12 stale branches.** From a local checkout:
 >    ```sh
 >    git push origin --delete \
->      claude/content-track-review-5rpjy8 demo/ch2-gifs \
+>      claude/audit-open-branches-5suz48 claude/content-track-review-5rpjy8 demo/ch2-gifs \
 >      docs/descale-palette-guidance docs/handoff-65-mb-done \
 >      feat/19-vellynne-portrait feat/22-ch02-dialogue-reground feat/22-title-card \
 >      feat/38-chwinga-map-sprites feat/39-chwinga-portraits feat/engine-name-check \
 >      review/ch02-ending-bg
 >    ```
->    Keep `main`, `docs/handoff-ch3-map-pickup` (open PR #101), and any active audit branch.
-> 2. **Fix the Claude-Code-on-the-web env so future sessions can do this themselves.** The web env's
->    git proxy rejects ref-delete pushes with HTTP 403; the GitHub REST `DELETE /git/refs/heads/...`
->    returns `"GitHub access is not enabled for this session. An org admin must connect the Claude
->    GitHub App for this organization."` Two checks: (a) **github.com/settings/installations → Claude**
->    — confirm *Contents* is read-and-write and this repo is in the access list; (b) the env's network
->    policy in claude.com/code → this environment's settings — bump to a policy that allows full GitHub
->    write (see https://code.claude.com/docs/en/claude-code-on-the-web for policy names). Verify by
->    asking the next web session to delete a throwaway branch end-to-end.
->
-> **Convention drift to watch:** CLAUDE.md mandates *"squash-merge to `main` → delete the branch + worktree"* —
-> the 8 closed-PR branches show this step has been skipped repeatedly. Either bake it into the merge
-> step (GitHub repo setting → "Automatically delete head branches" toggle, also reachable on mobile)
-> or treat skipped deletion as a PR-checklist regression.
+>    Keep `main` and `docs/handoff-ch3-map-pickup` (open PR #101).
+> 3. **Fix the Claude-Code-on-the-web env so future sessions can do this themselves.** Two checks:
+>    (a) **github.com/settings/installations → Claude** — confirm *Contents* is read-and-write and
+>    this repo is in the access list; (b) the env's network policy in claude.com/code → this
+>    environment's settings — bump to a policy that allows full GitHub write (see
+>    https://code.claude.com/docs/en/claude-code-on-the-web for policy names). Verify by asking the
+>    next web session to delete a throwaway branch end-to-end.
 
 ## Workflow — feature-flow
 Issue → short-lived `feat/<slug>` branch off `main` → an ephemeral worktree → PR → CI + `/code-review`
