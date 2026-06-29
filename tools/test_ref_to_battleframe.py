@@ -316,6 +316,35 @@ class TestMeleeMotionS(unittest.TestCase):
         self.assertNotIn("banim_code_start_attack_1", body)     # no lunge
         self.assertNotIn("banim_code_hit_normal", body)         # no hit at range
 
+    def test_lance_cadence_uses_armored_thrust_not_axe_swing(self):
+        # Knight (Armor Knight, decomp banim_armm_sp1) lance cadence: heavy armored steps +
+        # an armored leap into the thrust + a thrust whoosh + heavy-weight screen shake --
+        # NOT the Pirate's axe swing / dirt kick. Verified against the decomp armm_sp1 script.
+        s = rb.emit_motion_s("wolf_ln1", self._frames(), motion="melee", cadence="lance")
+        body = self._mode(s, "attack_close", abbr="wolf_ln1")
+        self.assertIn("banim_code_sound_step_heavy_quick", body)   # heavy armored step
+        self.assertIn("banim_code_sound_armor_leap", body)         # the armored lunge
+        self.assertIn("banim_code_shake_screnn_slightly", body)    # heavy-weight screen shake
+        self.assertIn("banim_code_sound_sword_slash_air", body)    # the thrust whoosh
+        self.assertIn("banim_code_hit_normal", body)               # melee contact (shared)
+        self.assertNotIn("banim_code_sound_axe_swing_long", body)  # not the axe swing
+        self.assertNotIn("banim_code_effect_dirt_kick", body)      # not the axe's dirt kick
+
+    def test_lance_miss_also_uses_armored_cadence_not_axe(self):
+        # a missed lance attack swings the same armored thrust (no contact) -- still no axe sounds.
+        s = rb.emit_motion_s("wolf_ln1", self._frames(), motion="melee", cadence="lance")
+        body = self._mode(s, "attack_miss", abbr="wolf_ln1")
+        self.assertIn("banim_code_sound_armor_leap", body)
+        self.assertNotIn("banim_code_sound_axe_swing_long", body)
+        self.assertNotIn("banim_code_hit_normal", body)            # a miss lands no hit
+
+    def test_axe_cadence_is_still_the_melee_default(self):
+        # default melee cadence stays the Pirate axe (braulo) -- a new donor must opt in.
+        body = self._mode(rb.emit_motion_s("brau_an1", self._frames(), motion="melee"),
+                          "attack_close")
+        self.assertIn("banim_code_sound_axe_swing_long", body)
+        self.assertNotIn("banim_code_sound_armor_leap", body)
+
     def test_ranged_motion_is_still_the_default(self):
         s = rb.emit_motion_s("rbg_ar1", self._frames())         # no motion= -> ranged
         self.assertIn("banim_code_call_spell_anim", s)
