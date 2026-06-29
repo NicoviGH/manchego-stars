@@ -44,8 +44,10 @@ art:
       - red recolour into the shared cast palette
 
 # ── Battle Animation (faked donor-prime, #65 Milestone B) ────────────────────────
-# Anchor-swinging crab brute on the Pirate axe cadence (his FE class). Source poses in
-# "Battle Anims/Braulo Battle/"; FE frames rebuilt by tools/descale_battleframe.py:
+# Anchor-swinging crab brute on the Pirate axe cadence (his FE class). Source poses:
+# ready/windup = "Battle Anims/Braulo Battle/Braulo{Ready,Windup}.png"; peak =
+# "Battle Anims/BrauloAction2.png" (revised action pose, replaced the original
+# Braulo Battle/BrauloAction.png). FE frames rebuilt by tools/descale_battleframe.py:
 #   --body 44 --sharpen 1.8 --thin-outline --flat "red:3,orange:3,grey:2,brown:3"
 # (flip to FE-left; ~44px body = vanilla scale so he sits centred on the platform, a touch
 # bigger than a 33px Pirate as the crab bruiser; flat family palette + 1px outline).
