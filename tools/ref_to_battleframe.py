@@ -204,25 +204,51 @@ def _mode_order(motion):
     return list(_MODE_ORDER)
 
 
-def _melee_mode_body(abbr, kind):
-    """One mode's script for the 3-beat MELEE fake (cadence from FE8 Pirate axe).
+# Per-donor MELEE sound/effect cadence. Both share the 3-beat lunge SHAPE (ready -> coil ->
+# lunge & hold through the hit -> ease back); only the audio/FX punctuation differs, studied
+# from each donor's decomp script. "axe" = FE8 Pirate (banim_pirm_ax1); "lance" = FE8 Armor
+# Knight (banim_armm_sp1) -- heavy armored steps + an armored leap + a thrust whoosh + the
+# heavy-weight screen shake, and the lighter hit-sound variant (no '_durandal').
+_MELEE_CADENCE = {
+    "axe": {
+        "windup": ["\tbanim_code_sound_axe_swing_short"],
+        "swing":  ["\tbanim_code_sound_axe_swing_long", "\tbanim_code_effect_dirt_kick"],
+        "hit":    ["\tbanim_code_sound_hit_eliwood_promoted_durandal"],
+        "impact": [],
+        "back":   [],
+    },
+    "lance": {
+        "windup": ["\tbanim_code_sound_step_heavy_quick"],
+        "swing":  ["\tbanim_code_sound_armor_leap", "\tbanim_code_shake_screnn_slightly"],
+        "hit":    ["\tbanim_code_sound_sword_slash_air",
+                   "\tbanim_code_sound_hit_eliwood_promoted"],
+        "impact": ["\tbanim_code_shake_screnn_slightly"],
+        "back":   ["\tbanim_code_sound_step_heavy_quick"],
+    },
+}
 
-    Cadence matched to the FE8 Pirate axe (banim_pirm_ax1): ready -> wind up (frame 1, held
+
+def _melee_mode_body(abbr, kind, cadence="axe"):
+    """One mode's script for the 3-beat MELEE fake.
+
+    Cadence SHAPE matched to the FE8 Pirate axe (banim_pirm_ax1): ready -> wind up (frame 1, held
     longest, coiled back) -> lunge into the swing (frame 2, the peak holds its forward dx
     through the hit, mirroring the Pirate's frames 2/3/5 ~7 ticks at dx ~-45) -> hit_normal on
     contact -> ease back over a 6-tick return (the Pirate's frames 7/8) and turn. No projectile:
     the hit IS the contact. Dodge hops backward (dodge_to_back). The forward step is the OAM
-    lunge baked by build_battle_anim (MELEE_LUNGE_DX), held here by keeping frame 2 on-screen."""
+    lunge baked by build_battle_anim (MELEE_LUNGE_DX), held here by keeping frame 2 on-screen.
+    `cadence` swaps only the per-donor sound/FX punctuation (see _MELEE_CADENCE); the lance
+    cadence (FE8 Armor Knight banim_armm_sp1) reads as a heavy armored thrust, not an axe swing."""
+    c = _MELEE_CADENCE[cadence]
     if kind == "attack":   # ready -> wind up -> lunge & HOLD forward through the hit -> ease back
         return ["\tbanim_code_start_attack_1", "\tbanim_code_start_attack_2",
-                _frame_cmd(abbr, 1, 0), "\tbanim_code_sound_axe_swing_short",
-                _frame_cmd(abbr, 20, 1), "\tbanim_code_sound_axe_swing_long",
-                "\tbanim_code_effect_dirt_kick", _frame_cmd(abbr, 3, 2),
-                "\tbanim_code_prepare_hp_deplete", _frame_cmd(abbr, 3, 2),
-                "\tbanim_code_sound_hit_eliwood_promoted_durandal",
-                "\tbanim_code_hit_normal", _frame_cmd(abbr, 1, 2),   # hold the lunge through the hit
+                _frame_cmd(abbr, 1, 0)] + c["windup"] + [
+                _frame_cmd(abbr, 20, 1)] + c["swing"] + [
+                _frame_cmd(abbr, 3, 2),
+                "\tbanim_code_prepare_hp_deplete", _frame_cmd(abbr, 3, 2)] + c["hit"] + [
+                "\tbanim_code_hit_normal", _frame_cmd(abbr, 1, 2)] + c["impact"] + [
                 "\tbanim_code_wait_hp_deplete", "\tbanim_code_start_opposite_turn",
-                _frame_cmd(abbr, 3, 0), _frame_cmd(abbr, 3, 0),      # ease back (Pirate f7+f8, 6 ticks)
+                _frame_cmd(abbr, 3, 0)] + c["back"] + [_frame_cmd(abbr, 3, 0),
                 "\tbanim_code_end_dodge", "\tbanim_code_end_mode"]
     if kind == "dodge":    # hop backward: ready -> wind-up -> ready
         return ["\tbanim_code_dodge_to_back", _frame_cmd(abbr, 1, 0),
@@ -234,19 +260,19 @@ def _melee_mode_body(abbr, kind):
                 "\tbanim_code_end_mode"]
     # miss: lunge and swing through, hold the forward beat (like the hit), but no contact lands
     return ["\tbanim_code_start_attack_1", "\tbanim_code_start_attack_2",
-            _frame_cmd(abbr, 1, 0), "\tbanim_code_sound_axe_swing_short",
-            _frame_cmd(abbr, 20, 1), "\tbanim_code_sound_axe_swing_long",
-            "\tbanim_code_effect_dirt_kick", _frame_cmd(abbr, 3, 2),
+            _frame_cmd(abbr, 1, 0)] + c["windup"] + [
+            _frame_cmd(abbr, 20, 1)] + c["swing"] + [
+            _frame_cmd(abbr, 3, 2),
             _frame_cmd(abbr, 4, 2),                                 # hold forward (matches the hit beat)
             "\tbanim_code_wait_hp_deplete", "\tbanim_code_start_opposite_turn",
             _frame_cmd(abbr, 3, 0), _frame_cmd(abbr, 3, 0), "\tbanim_code_end_dodge",
             "\tbanim_code_end_mode"]
 
 
-def _mode_body(abbr, kind, motion="ranged"):
+def _mode_body(abbr, kind, motion="ranged", cadence="axe"):
     """Emit one mode's script lines for the 3-beat (Ready/Wind-up/Peak) fake."""
     if motion == "melee":
-        return _melee_mode_body(abbr, kind)
+        return _melee_mode_body(abbr, kind, cadence)
     if kind == "attack":   # draw (0->1 held) -> peak (2) + loose arrow -> recover
         return ["\tbanim_code_start_attack_1", "\tbanim_code_start_attack_2",
                 _frame_cmd(abbr, 3, 0), "\tbanim_code_sound_pull_bow",
@@ -271,7 +297,7 @@ def _oam_line(e):
             % (e["attr0"], e["attr1"], e["attr2"], e["dx"], e["dy"]))
 
 
-def emit_motion_s(abbr, frames, motion="ranged"):
+def emit_motion_s(abbr, frames, motion="ranged", cadence="axe"):
     """Assemble the full banim motion.s text for `abbr` from 3 frames' OAM.
 
     `frames` is a list of {"oam_r": [...], "oam_l": [...]} (Ready/Wind-up/Peak). `motion`
@@ -303,7 +329,7 @@ def emit_motion_s(abbr, frames, motion="ranged"):
     order = _mode_order(motion)
     for name, kind in order:
         L.append("banim_%s_mode_%s:" % (abbr, name))
-        L += _mode_body(abbr, kind, motion)
+        L += _mode_body(abbr, kind, motion, cadence)
 
     L.append("\t.section .data.modes")
     for name, _ in order:
@@ -331,7 +357,7 @@ def _lunge(entries, dx):
     return [dict(e, dx=e["dx"] + dx) for e in entries]
 
 
-def build_battle_anim(abbr, frame_imgs, palette, center_px=None, motion="ranged"):
+def build_battle_anim(abbr, frame_imgs, palette, center_px=None, motion="ranged", cadence="axe"):
     """Drive the whole faked-anim build: 3 frames -> sheets + agbpal + motion.s text.
 
     Per frame: tile -> merge filled cells into OBJs -> pack to oam_r + 2D placements ->
@@ -362,7 +388,7 @@ def build_battle_anim(abbr, frame_imgs, palette, center_px=None, motion="ranged"
         sheets.append(build_sheet_from_placements(im, placements, palette))
         frames.append({"oam_r": entries, "oam_l": mirror_oam(entries)})
     return {"sheets": sheets, "pal": agbpal_bytes(palette),
-            "motion_s": emit_motion_s(abbr, frames, motion)}
+            "motion_s": emit_motion_s(abbr, frames, motion, cadence)}
 
 
 def _cell_is_empty(im, ox, oy):

@@ -245,6 +245,21 @@ class CharacterUniqueBanim(unittest.TestCase):
                '    AnimConf_Unused_LuciusPromoted,\n'
                '};\n')
 
+    def test_knight_donor_maps_to_armor_knight_lance_cadence(self):
+        # wolfram et al. ride CLASS_ARMOR_KNIGHT (display "Knight") with a lance and the
+        # heavy armored thrust cadence (decomp banim_armm_sp1), not the Pirate axe.
+        donor_class, wtype, motion, cadence = bc.BANIM_DONORS['knight']
+        self.assertEqual(donor_class, 'CLASS_ARMOR_KNIGHT')
+        self.assertIn('ITYPE_LANCE', wtype)
+        self.assertEqual(motion, 'melee')
+        self.assertEqual(cadence, 'lance')
+
+    def test_every_melee_donor_names_a_known_cadence(self):
+        from ref_to_battleframe import _MELEE_CADENCE
+        for name, (_dc, _wt, motion, cadence) in bc.BANIM_DONORS.items():
+            if motion == 'melee':
+                self.assertIn(cadence, _MELEE_CADENCE, name)
+
     def test_unique_append_returns_next_index_and_appends_the_symbol(self):
         new, idx = bc.banim_unique_append(self.CONFIGS, 'AnimConf_brau_ax1')
         self.assertEqual(idx, 3)                       # NULL + 2 existing -> new is index 3

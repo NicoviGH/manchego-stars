@@ -2410,9 +2410,14 @@ def enemy_class_reskins(campaign):
 # donor 'clone_from' -> (FE donor class enum, the AnimConf weapon entry to repoint in the
 # clone, the cadence the faked motion.s is built with: 'ranged' draw-and-fire / 'melee'
 # lunge-and-swing). The cadence is studied from the donor class's own vanilla motion.s.
+# clone_from: (donor_class, weapon_type, motion, melee_cadence). `motion` picks the mode
+# SHAPE (ranged draw-and-fire vs melee lunge-and-swing); `melee_cadence` picks the per-donor
+# sound/FX punctuation within a melee body (ref_to_battleframe._MELEE_CADENCE) -- None for
+# ranged donors, which never run a melee body.
 BANIM_DONORS = {
-    'archer': ('CLASS_ARCHER', '0x0100 | ITYPE_BOW', 'ranged'),
-    'pirate': ('CLASS_PIRATE', '0x0100 | ITYPE_AXE', 'melee'),
+    'archer': ('CLASS_ARCHER',       '0x0100 | ITYPE_BOW',   'ranged', None),
+    'pirate': ('CLASS_PIRATE',       '0x0100 | ITYPE_AXE',   'melee',  'axe'),
+    'knight': ('CLASS_ARMOR_KNIGHT', '0x0100 | ITYPE_LANCE', 'melee',  'lance'),
 }
 
 
@@ -2542,13 +2547,15 @@ def inject_battle_anims(campaign, verbose=True):
         clone_from = cfg['clone_from']
         if clone_from not in BANIM_DONORS:
             sys.exit('ERROR: battle_anim %s: unsupported clone_from %r' % (uid, clone_from))
-        donor_class, wtype, motion = BANIM_DONORS[clone_from]
+        donor_class, wtype, motion, cadence = BANIM_DONORS[clone_from]
         motion = cfg.get('motion', motion)            # YAML may override the donor default
+        cadence = cfg.get('cadence', cadence)         # ...and its melee cadence
         abbr = cfg.get('abbr') or (uid.replace('-', '').replace('prof', '')[:5] + '_ar1')
         frame_imgs = [Image.open(os.path.join(anim_dir, p)).convert('RGBA')
                       for p in cfg['frames']]
         palette = _banim_palette(frame_imgs)
-        res = ref_to_battleframe.build_battle_anim(abbr, frame_imgs, palette, motion=motion)
+        res = ref_to_battleframe.build_battle_anim(abbr, frame_imgs, palette, motion=motion,
+                                                   cadence=cadence or 'axe')
 
         # 1. assets into the decomp (motion.s, per-frame sheet PNGs, agbpal blob)
         with open(os.path.join(BANIM_DATA_DIR, 'banim_%s_motion.s' % abbr), 'w',
