@@ -13,6 +13,13 @@ Issue → short-lived `feat/<slug>` branch off `main` → an ephemeral worktree 
 > **Worktree friction (single-agent):** a fresh worktree's `fireemblem8u` submodule isn't provisioned
 > (no `baserom.gba`, no built `scaninc`/toolchain) → builds die late. With no concurrent builds it's
 > faster to work a feature branch **in the main tree** (already provisioned) than to set a worktree up.
+>
+> **BUT concurrent agents MUST each use their own worktree.** Separate branches alone do NOT isolate
+> parallel work — the one shared working tree + index means a stray `git add -A`/commit from one agent
+> sweeps the other's files into its commit (happened 2026-06-29: the #23 dialogue and #65 braulo work
+> tangled on one tree; untangled with no loss, but costly). The main-tree shortcut holds ONLY for a
+> single writer. Two agents at once → `git worktree add` per agent (worktree friction is acceptable for
+> non-build edits like YAML/lore/docs; builds still need the submodule provisioned).
 
 ## Current release
 **v0.1.0** friend release — Ch1 playable. Builds:
@@ -81,26 +88,30 @@ Art & Audio (two 2026-06-26 ADRs, why). **6 PCs still have NO `battle_anim:` blo
   enemy class-level anim → **#90**.
 - One feature-flow branch per unit (or a small batch); use the `custom_unit` issue template per PC.
 
-### Content — Ch3 "The Termalaine Mine" (#23) — DESIGN LOCKED (PR #92 merged 2026-06-26); build beats remain
-The full design slice is regrounded, parity-verified, and merged. Decisions/deviations live in
-`decisions.md` → **Ch3 ADR (2026-06-26)**; the live build checklist is on **#23**. State of the design:
-- **Identity:** reskins **vanilla FE8 Ch3 "The Bandits of Borgo"** (Seize big-battle; FE8's first chests +
-  first thief) as Termalaine's kobold-overrun tourmaline mine. Teaching goal = the **thief** (Trex = our
-  Colm), made to matter by door/chest-gated rooms. Grounded in the DM notes + the Frostmaiden book
-  "A Beautiful Mine" (pp.93–96).
-- **Structure:** rooms-on-ONE-flat-map (FE8 has no z-levels) — walls + `TERRAIN_DOOR` + one scripted
-  "open the way down" `TILECHANGE`. (Multi-level/Tower-Ruins structure reserved for a future prison-break.)
-- **Enemies:** 1:1 reskin of vanilla Ch3's 10-slot force — kobolds + a giant rat + the **Grell (Mogall L12,
-  Evil Eye)** as boss. **Parity verified** `make difficulty CH=ch03` (clear-load ×0.99, threat ×1.12, in band).
-- **3 deviations (net-neutral, ADR):** boss is a real monster (Mogall, not a frailty cheat); monster-debut
-  moved ch04→ch03 (`introduces` ledger); ch02↔ch03 gem/hand-axe swap (ch02 chwinga-mote now gifts a Hand Axe,
-  the Red Gem moved to a ch03 tourmaline chest — total wealth unchanged).
-- **Recruit:** Trex (canon winged kobold leader) defects mid-map.
-- **Build beats remaining (unchecked on #23, priority order):** `dialogue-pass` for the 4 cutscene beats
-  (opening / RBG-execution + Trex recruit / Pinky shaft-scout reveal / Termalaine ending) → map build
-  (`#40`; cave/interior tileset + doors + the map-change) → host on the next vanilla slot (`MNC2`; model on
-  `inject_ch01`/`inject_ch02`) → units/objective/cutscene wiring → art (Grell/Trex/kobold/giant-rat sprites;
-  **grell ref = book p.96**) → title card → load-test scenarios (`ch03`/`smoke_ch03`/`clear_ch03`, mirror ch02).
+### Content — Ch3 "The Termalaine Mine" (#23) — DESIGN + DIALOGUE LOCKED; map/wiring/art beats remain. NEXT = map (#40)
+Design slice merged (PR #92); **all 4 cutscene beats now written + merged (PR #97, dialogue-pass w/ Nicolas).**
+Decisions/deviations: `decisions.md` → Ch3 ADR; live build checklist on **#23**.
+- **Dialogue DONE (PR #97):** the 4 beats are recorded as `script:` blocks in
+  `chapters/ch03-the-termalaine-mine.yaml` (opening / mid-map execution+Trex recruit / Pinky shaft-scout /
+  ending). New voice bible `lore/trex.md` (self-taught winged-kobold negotiator; module ghost-possession
+  dropped). ch02 ending seeded with RBG's avarice routing the party through Termalaine (motivates the stop).
+  **Not host-wired yet** → scripts validated by YAML-parse + drift only; **in-game MOTION REVIEW of all 4
+  beats (+ the ch02 seed line) is still owed — it happens at the cutscene-wiring beat, not before.**
+- **Mid-map cutscene fires on the BRUTE miniboss's DEFEAT** (the `kobold-steel` "Icewind Brute" slot): flag
+  it the miniboss + position it mid-galleries at units/objective wiring. The beaten Brute lunges at Pinky
+  (Pinky = RBG's METAL homunculus — claws ring off, no harm) → RBG executes. Pinky-is-metal is load-bearing there.
+- **Identity/structure/enemies** (design-locked, unchanged): vanilla FE8 Ch3 "Bandits of Borgo" reskin —
+  Seize big-battle, thief/chests/doors lesson (Trex = our Colm); rooms-on-ONE-flat-map (walls + `TERRAIN_DOOR`
+  + one "open the way down" `TILECHANGE`); 1:1 10-slot force, **Grell (Mogall L12, Evil Eye)** boss,
+  parity-verified (`make difficulty CH=ch03`). 3 net-neutral deviations (monster boss / monster-debut moved
+  ch04→ch03 / ch02↔ch03 gem-hand-axe swap) in the Ch3 ADR.
+- **Build beats remaining (#23, priority order) — NEXT = map:**
+  1. **Map build (`#40`)** ← fresh pickup: cave/interior tileset + doors + the "open the way down" map-change.
+  2. Host on the next vanilla slot (`MNC2`; model `inject_ch01`/`inject_ch02`).
+  3. Units/objective/cutscene wiring — `inject_ch03` consumes the ch03 `script:` blocks; wire the Brute-defeat
+     trigger, the Pinky-scout grell spawn + map-change, Trex recruit. New generic cutscene mugs needed
+     (`boy-crier`, `kobold-brute`, Maxol — like ch02's `targos-fisher`). **Motion-review the 4 beats here.**
+  4. Art (Grell/Trex/kobold/giant-rat; **grell ref = book p.96**) → title card → load-test (`ch03`/`smoke_ch03`/`clear_ch03`, mirror ch02).
 - Then chapters #24–#28 (Ch4–Ch8) follow the same slice. Ch3+ ending BGs: vendor from the **winter-BG library**
   (`map-review/iwd-bg-library.md`) via `bg_to_fe8.py` → `inject_backgrounds` (relocate `BG_RANDOM` once a 2nd slot is needed).
 
