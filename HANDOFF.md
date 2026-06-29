@@ -88,7 +88,7 @@ Art & Audio (two 2026-06-26 ADRs, why). **6 PCs still have NO `battle_anim:` blo
   enemy class-level anim → **#90**.
 - One feature-flow branch per unit (or a small batch); use the `custom_unit` issue template per PC.
 
-### Content — Ch3 "The Termalaine Mine" (#23) — DESIGN + DIALOGUE LOCKED; map/wiring/art beats remain. NEXT = map (#40)
+### Content — Ch3 "The Termalaine Mine" (#23) — DESIGN + DIALOGUE LOCKED; map IN PROGRESS (#40, PAUSED on blockout OK)
 Design slice merged (PR #92); **all 4 cutscene beats now written + merged (PR #97, dialogue-pass w/ Nicolas).**
 Decisions/deviations: `decisions.md` → Ch3 ADR; live build checklist on **#23**.
 - **Dialogue DONE (PR #97):** the 4 beats are recorded as `script:` blocks in
@@ -100,18 +100,43 @@ Decisions/deviations: `decisions.md` → Ch3 ADR; live build checklist on **#23*
 - **Mid-map cutscene fires on the BRUTE miniboss's DEFEAT** (the `kobold-steel` "Icewind Brute" slot): flag
   it the miniboss + position it mid-galleries at units/objective wiring. The beaten Brute lunges at Pinky
   (Pinky = RBG's METAL homunculus — claws ring off, no harm) → RBG executes. Pinky-is-metal is load-bearing there.
-- **Identity/structure/enemies** (design-locked, unchanged): vanilla FE8 Ch3 "Bandits of Borgo" reskin —
-  Seize big-battle, thief/chests/doors lesson (Trex = our Colm); rooms-on-ONE-flat-map (walls + `TERRAIN_DOOR`
-  + one "open the way down" `TILECHANGE`); 1:1 10-slot force, **Grell (Mogall L12, Evil Eye)** boss,
-  parity-verified (`make difficulty CH=ch03`). 3 net-neutral deviations (monster boss / monster-debut moved
-  ch04→ch03 / ch02↔ch03 gem-hand-axe swap) in the Ch3 ADR.
-- **Build beats remaining (#23, priority order) — NEXT = map:**
-  1. **Map build (`#40`)** ← fresh pickup: cave/interior tileset + doors + the "open the way down" map-change.
-  2. Host on the next vanilla slot (`MNC2`; model `inject_ch01`/`inject_ch02`).
-  3. Units/objective/cutscene wiring — `inject_ch03` consumes the ch03 `script:` blocks; wire the Brute-defeat
-     trigger, the Pinky-scout grell spawn + map-change, Trex recruit. New generic cutscene mugs needed
-     (`boy-crier`, `kobold-brute`, Maxol — like ch02's `targos-fisher`). **Motion-review the 4 beats here.**
-  4. Art (Grell/Trex/kobold/giant-rat; **grell ref = book p.96**) → title card → load-test (`ch03`/`smoke_ch03`/`clear_ch03`, mirror ch02).
+- **Identity/structure/enemies** (design-locked): Seize big-battle, thief/chests/doors lesson (Trex = our
+  Colm); rooms-on-ONE-flat-map (walls + `TERRAIN_DOOR` + one "open the way down" `TILECHANGE`); 1:1 10-slot
+  force, **Grell (Mogall L12, Evil Eye)** boss, parity-verified (`make difficulty CH=ch03`). 3 net-neutral
+  deviations (monster boss / monster-debut moved ch04→ch03 / ch02↔ch03 gem-hand-axe swap) in the Ch3 ADR.
+
+#### Map (#40) — IN PROGRESS, decisions made 2026-06-29; PAUSED awaiting Nicolas's blockout OK
+Two decisions this session change the earlier "reskin vanilla Borgo on a winter tileset" plan:
+- **Tileset DECIDED = Cynon's Mineshaft (Gray palette)** — a purpose-built cave/mine tileset (rock walls,
+  cart tracks, timber supports, crystal/ore seams, water) vendored from **FE-Repo** (`Klokinator/FE-Repo`
+  → `Tilesets/Caves/Cynon's Mineshaft - Tileset`; CC, Cynon endorses cross-engine use). Staged at
+  `map-review/ch03-tileset-candidates/cynon-mineshaft-src/` (`.mapchip_config` + Gray object PNG + CREDITS).
+  **NO re-palette** — native grey already reads as a frozen Icewind mine (Nicolas's call; the old winter
+  re-palette trick is NOT needed for a tileset that's already cave-themed). At build: **credit Cynon in `CREDITS.md`**.
+- **Layout PIVOT — author a CUSTOM layout from the book's "Gem Mine" map, NOT a Borgo reskin.** Reference =
+  *Frostmaiden* book Map 1.19 "Gem Mine" (printed p.97 = PDF p.98), cropped to
+  `map-review/ch03-tileset-candidates/REF-gem-mine-map.png` and `docs/demo/ch03-gem-mine-reference.png`.
+  3 levels → ONE flat plane (FE8 has no z-levels), organic caves → 16px grid, ~40sq wide → ~22. A **flattened
+  blockout** (book rooms M1–M8 → our chapter beats: M1 tool-room deploy, mid-gallery Brute choke, M3 river
+  pinch, M5/M6 sealed shaft = Pinky-scout map-change, M8 grell-lair seize) is **posted on issue #23** and is
+  **the pending decision** — Nicolas reviews on mobile this week before any painting starts.
+- **Importer is a THIN converter (good #40 news).** Format decoded + validated: `mapchip_config` = **9216 B =
+  exactly the decomp config** (8192 TSA + 1024 terrain); object PNG = **256×256 mode-P, 4-bit local indices**
+  (pixels 0–15) + a 256-color (16-bank) palette → straight to `ObjectType.4bpp` + `MapPalette.gbapal`. A
+  throwaway renderer assembled Cynon's own `Test Map.tmx` correctly →
+  `map-review/ch03-tileset-candidates/mineshaft-testmap-gray.png` (= `docs/demo/ch03-mineshaft-tileset-demo.png`),
+  proving tiles assemble. So #40 task 2 = a small converter, not a toolchain.
+- **Build order once the blockout is OK'd:** (1) write the `mapchip_config`+object-PNG → `.4bpp/.gbapal/.bin`
+  converter; vendor as tileset **`cave-interior`** under `campaigns/.../maps/tilesets/`. (2) Seed a paint
+  canvas on it from the blockout (extend `gen_map_editor` to load a vendored tileset + a custom/blank layout —
+  today it only reskins a vanilla layout on `snowy-bern`). (3) Paint against the reference →
+  `import_map_layout` → `.mar` → in-engine load-test. **Enemy/chest positions move off the old Borgo coords
+  onto the new layout** (parity unchanged — same 10-unit roster, just repositioned; re-finalize in the map tool).
+- **Then (post-map, unchanged):** host on next vanilla slot (`MNC2`; model `inject_ch01`/`inject_ch02`) →
+  units/objective/cutscene wiring (`inject_ch03` consumes the `script:` blocks; Brute-defeat trigger,
+  Pinky-scout grell spawn + map-change, Trex recruit; new generic mugs `boy-crier`/`kobold-brute`/Maxol) +
+  **motion-review the 4 beats** → art (Grell/Trex/kobold/giant-rat; **grell ref = book p.96**) → title card →
+  load-test (`ch03`/`smoke_ch03`/`clear_ch03`, mirror ch02).
 - Then chapters #24–#28 (Ch4–Ch8) follow the same slice. Ch3+ ending BGs: vendor from the **winter-BG library**
   (`map-review/iwd-bg-library.md`) via `bg_to_fe8.py` → `inject_backgrounds` (relocate `BG_RANDOM` once a 2nd slot is needed).
 
