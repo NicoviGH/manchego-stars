@@ -244,31 +244,167 @@ events:
     description: >
       Termalaine; the bounty to clear the kobold-overrun gem mine; the missing
       miners. The party enters. Wolfram eyes the tourmaline seams and the ore.
-  - trigger: midmap
+      Picks up the ch02 ending seed (RBG routed the company through the gem town for
+      the tourmaline) and subverts it: he came for easy gems, finds a closed mine and
+      a monster bounty. RBG keeps the public mask UP (no open villainy in a town
+      street — his banned list); the naked greed already aired in the ch02 seed. The
+      "KOBOLDS ONLY" sign (book p.95, elegant calligraphy) is the first whisper of
+      Trex. LOCKED 2026-06-26 (dialogue-pass, co-written with Nicolas). PENDING: the
+      eventscript that consumes this + Darmo's generic villager mug + motion review.
+    script:                     # LOCKED 2026-06-26 (dialogue pass, co-written with Nicolas)
+      - location_card: "Termalaine"
+      # (The gem town. Empty ore-carts line a tunnel-mouth in the hillside. A boy stands
+      #  on a crate, bellowing the news to a street that walks straight past him. Minor NPC
+      #  → generic FE8 villager face at wiring; book p.95 = Darmo Mazle; npc-bench texture: loud.)
+      - boy-crier: "Mine's closed! Monsters in the dark! Speaker Maxol pays fifty gold to whoever clears it out!"
+      - prof-rbg: >-
+          Monsters menacing honest miners? We'd be remiss to walk past. ...And the mine
+          does sit full of unminded tourmaline. A public service, Pinky. Mostly.
+      - beat_break: B           # the party reaches the tunnel-mouth; Wolfram has stopped, breathing in
+      # (Wolfram at the mine mouth — the senses come first; he smells the ore before he names it.)
+      - wolfram: "...Pink tourmaline. A whole seam of it. We're going in."
+      # (A crude charcoal sign is propped against the empty carts — book p.95.)
+      - narration: "The sign read KOBOLDS ONLY — in a hand far too elegant for any kobold."
+  - trigger: midmap   # fires on the BRUTE's DEFEAT (the mid-gallery miniboss) — a defeat-triggered
+                      # death cutscene. The "good cop / bad cop" routine collapses into the boss's
+                      # death beat: Marty's mercy fails, the beaten Brute makes one last lunge at
+                      # Pinky, RBG delivers the kill. Keeps the parity roster intact (real combat
+                      # kill, not a cutscene-removal). The Brute = the kobold-steel "Icewind Brute"
+                      # slot; flag it the miniboss + position it mid-galleries at units/objective wiring.
     type: cutscene
     ea_file: events/ch03-rbg-execution.ea
     description: >
-      Mid-map scripted beat: the party corners a kobold for a "good cop, bad cop"
-      interrogation and RBG executes it at gunpoint (rbg_kobold_execution); Wolfram's
-      ore-snacking gag plays here (wolfram_ore_snacking). Then Trex — the clever
-      winged kobold leader — is met and DEFECTS to the party (trex recruited; he
-      reveals the warren is being hunted from below). Trex's thieving = the chapter's
-      thief/chests/doors lesson.
+      Mid-map signature beat, fires on the Brute miniboss's defeat. The "good cop /
+      bad cop" routine fails: Marty (the diplomat) tries mercy on the beaten Brute; it
+      lunges at Pinky instead (claws ring off the homunculus — no harm) and RBG, whose
+      one warmth is his son, executes it at gunpoint (rbg_kobold_execution) — pleasant
+      pun, cold act. Pinky reads it innocently as rescue (he doesn't see the rest);
+      RBG's warmth seeds beat 3 + the finale Wish. Wolfram's ore-snacking gag deflates
+      it (wolfram_ore_snacking — he obliviously missed the whole thing). Then Trex —
+      the self-taught winged kobold leader — drops in, plays the Brute off as one of
+      his own troublemakers, and DEFECTS, revealing the grell in the deep and offering
+      his thieving (the chapter's thief/chests/doors lesson). Voice: lore/{prof-rbg,
+      marty,wolfram,pinky,braulo,trex}.md. LOCKED 2026-06-26 (dialogue-pass, co-written
+      with Nicolas). PENDING: eventscript + Brute-defeat trigger + Darmo/kobold mugs +
+      Trex recruit wiring + motion review.
+    script:                     # LOCKED 2026-06-26 (dialogue pass, co-written with Nicolas)
+      # ── A: the routine fails (the Brute, beaten, makes his last move) ──
+      # (The Brute is beaten — down at the back of the gallery, his packmates dead around
+      #  him, the party closing in. Marty crouches to its level; Pinky drifts in, kind.
+      #  Marty coughs a soft puff of spores so it can hear him — his rapport-spore gag.)
+      - marty: "Easy, friend. It's over. No one else has to be hurt."
+      # (The Brute ignores him — fixes on the smallest, softest-looking of them and lunges
+      #  with the last of its strength, claws for Pinky's throat. They meet metal in a
+      #  screech of sparks: Pinky is RBG's homunculus construct (lore/pinky.md). It reels back.)
+      - kobold-brute: "You— you not soft! What ARE you—?!"
+      - beat_break: B
+      # ── B: the shot (someone went for his son; the pun-professor warmth is gone) ──
+      # (It does not matter to RBG that the claws found nothing. One crack; the Brute drops
+      #  for good. He lowers the smoking Fonduedler — no professor left in his face.)
+      - prof-rbg: "Say cheese."
+      - pinky: "...Father! You saved me!"
+      # (RBG turns to the boy, and the warmth floods back — for him alone. Seeds beat 3's
+      #  "Nothing down there is taking you from me" and the finale Wish.)
+      - prof-rbg: "Always, my boy. Always."
+      - beat_break: C
+      # ── C: Wolfram (comic reset — he missed all of it) ──
+      # (Across the gallery, oblivious, Wolfram lowers a fistful of ore he's been chewing.
+      #  The senses come first; he names the metal before he notices the room — lore/wolfram.md.)
+      - wolfram: "Copper, tin... a touch of silver. Good ore."
+      - wolfram: "...Did something happen?"
+      - beat_break: D
+      # ── D: Trex defects (self-taught eloquence vs the broken-Common kobold above) ──
+      # (A scrape of claw above; a winged kobold drops down lightly, holding himself like he's
+      #  addressing a court — fashioned, strapped-on wings. He takes in the Brute's body without
+      #  a flicker, and plays it off: the aggressive ones were trouble for him too — lore/trex.md.)
+      - trex: >-
+          Ah — the Brute. Aggressive to a fault, that one; trouble for my own warren as
+          much as for you. Between us? You've done me a kindness.
+      - trex: "I am Trex. You'll forgive the wings — a leader must look the part."
+      - trex: >-
+          There is a thing in the deep, eating my people and yours. I cannot fight it —
+          but I know every lock in this mine, and I will open what you cannot. Help me
+          kill it, and the mine — its doors, its gems — is yours.
+      # (The thief's offer = the chapter's chests/doors lesson; Braulo's one blunt line
+      #  settles it, in his fair-dealing register — lore/braulo.md.)
+      - braulo: "He opens the locks, we take the mine. Fair deal."
+      - prof-rbg: "Welcome aboard, little dragon."
   - trigger: shaft_mouth_reached
     type: cutscene
     ea_file: events/ch03-pinky-scout.ea
     description: >
       Scripted scout beat (pinky_scout), fires when the first unit reaches the central
-      shaft. The drop is black. RBG, only half willing to send his boy into the dark,
-      lets Pinky (the army's flier) dive to scout. The Grell is REVEALED here — a
-      scripted enemy spawn (NOT fog; Ch3 has no fog), the army's first true monster.
-      Pinky rockets back up rattled; RBG, relieved, gives the descend order with a
-      protective line that seeds the finale Wish ("Nothing down there is taking you
-      from me."). A map-change opens the way to the deep workings (the seize tile).
+      shaft. Pure RBG/Pinky two-hander, played OBLIQUE — the emotion lives in staging,
+      not stated lines: Pinky volunteers eagerly; RBG's reluctance is an over-long pause
+      + a clipped "you hear me?"; the grell is revealed only through Pinky's terror on
+      the way back up ("it looked at me" — quietly seeds its Evil Eye gaze), NOT shown.
+      The Grell spawns here (scripted, NOT fog; Ch3 has no fog) — the army's first true
+      monster. RBG's protectiveness (the finale-Wish seed) is carried by ACTION — he
+      steps between his son and the shaft — with the on-the-nose "nothing is taking you
+      from me" line deliberately CUT (Nicolas), ending cold on "Form up." A map-change
+      grinds the sealed way down open onto the deep workings (the seize tile). Voice:
+      lore/{prof-rbg,pinky}.md. LOCKED 2026-06-26 (dialogue-pass, co-written with
+      Nicolas). PENDING: eventscript + grell scripted-spawn + map-change wiring + motion review.
+    script:                     # LOCKED 2026-06-26 (dialogue pass, co-written with Nicolas)
+      # ── A: Pinky volunteers ──
+      # (The central shaft — a black drop, water hissing far below. Pinky is already at the
+      #  lip, wings half-open, bright; his bible's calibration beat for this exact scene.)
+      - pinky: "I'll look. Quick and quiet, I promise!"
+      - beat_break: B
+      # ── B: RBG assents (reluctance shown, never stated) ──
+      # (RBG looks at the dark, then at him. The pause goes a beat too long.)
+      - prof-rbg: "...Straight back. You hear me?"
+      - pinky: "Straight back!"
+      # (He drops into the black. Gone.)
+      - beat_break: C
+      # ── C: the grell, through Pinky's terror (not shown) ──
+      # (Silence; the waterfall. Then, far below, a wet clicking shriek that is no animal.
+      #  A beat of nothing. Pinky rockets back up white-faced and doesn't stop until he's
+      #  behind his father. The Grell spawns here — scripted, not fog. "looked at me" seeds Evil Eye.)
+      - pinky: "It looked at me. It— ...Father, it looked at me."
+      - beat_break: D
+      # ── D: the order (protectiveness = action, the Wish-seed line CUT) ──
+      # (RBG steps between the boy and the shaft — the finale-Wish seed, carried by the move,
+      #  not a line. A map-change grinds the sealed way down open onto the deep workings = seize tile.)
+      - prof-rbg: "Form up."
   - trigger: chapter_end
     type: cutscene
     ea_file: events/ch03-ending.ea
-    description: "Grell slain, deep workings seized; the party returns to Termalaine to collect the bounty."
+    description: >
+      Denouement, kept short. Grell slain, mine seized, party back in Termalaine for the
+      bounty (RBG's avarice from the ch02 seed pays off — the tourmaline). The grell's
+      death is the LEVER that resolves the kobolds-vs-town B-plot: the town feared the
+      kobolds as the mine's threat, but with the real monster dead they're seen as fellow
+      survivors → accepted. That acceptance is exactly what FREES Trex to leave with the
+      party (his people no longer need him; the self-taught striver's curiosity — "a world
+      I've only read about" — finally has room). Closes on Meesmickle's deadpan button
+      (his first + only line of the chapter, by design — low-line-count persona). The
+      road-north stage direction tees ch04's druid thread without a line. Voice:
+      lore/{prof-rbg,trex,meesmickle}.md. LOCKED 2026-06-26 (dialogue-pass, co-written
+      with Nicolas). PENDING: eventscript + Maxol generic mug + motion review.
+    script:                     # LOCKED 2026-06-26 (dialogue pass, co-written with Nicolas)
+      - location_card: "Termalaine"
+      # ── A: bounty + gems (RBG's avarice payoff from the ch02 seed) ──
+      # (Termalaine square, the mine cleared. Speaker Maxol counts the bounty into RBG's glove;
+      #  Wolfram's pack clinks with raw tourmaline. Maxol = book p.93 town speaker, minor NPC → generic mug.)
+      - prof-rbg: "Always a pleasure to serve. ...The gems, we'll call a gratuity."
+      - beat_break: B
+      # ── B: the grell's death opens the town to the kobolds → frees Trex to leave ──
+      # (Across the square, Trex stands with his kobolds before the wary townsfolk — the grell's
+      #  carcass behind him making his case. He negotiates them in; the dead monster is his leverage.)
+      - trex: >-
+          Not us. That was your monster — we only hid from it, same as you. Let us work the
+          mine. You've seen what's worse.
+      # (The deal struck, his kobolds filing in. Trex turns to the party instead of following —
+      #  his people finally safe without him, the bookish striver free for the first time.)
+      - trex: >-
+          They have walls now. They don't need me to keep them. ...And I've a world I've only
+          read about. If you'll have a thief?
+      - beat_break: C
+      # ── C: Meesmickle's deadpan button — his only line of the chapter (lore/meesmickle.md).
+      #  Road north resumes the druid thread (ch04) by staging, not a line. ──
+      # (The company back on the lakeshore road north, Trex falling in at the back.)
+      - meesmickle: "He glued on wings and taught himself to talk. Most qualified hire so far."
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:

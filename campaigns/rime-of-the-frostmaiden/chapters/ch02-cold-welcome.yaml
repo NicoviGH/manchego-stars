@@ -360,10 +360,11 @@ events:
       Braulo shells up, Rootis + Sclorbo camp, Wolfram re-forges the raid's battle-damage off
       the party's dented armor (the sled is dropped — reground 2026-06-24). The fork: a
       Messie/Bremen bounty (south, money) vs the druids' trail (north, the job) — RBG calls it
-      north. Seeds the Maer Monster (ch06) and the Lonelywood/druid line. LOCKED dialogue-pass
-      text below (co-written with Nicolas 2026-06-19). PENDING (not this commit): ch02 host
-      wiring + the eventscript that consumes this script.
-    script:                     # LOCKED 2026-06-19 (dialogue pass, co-written with Nicolas)
+      north, then points the company through Termalaine (the gem town on the lakeshore road)
+      to seed ch03's mine. Seeds the Maer Monster (ch06) and the Lonelywood/druid line. LOCKED
+      dialogue-pass text below (co-written with Nicolas 2026-06-19; Termalaine seed added
+      2026-06-26). Wired by inject_ch02 (build_campaign.py).
+    script:                     # LOCKED 2026-06-19 (dialogue pass, co-written with Nicolas); Termalaine seed added 2026-06-26
       - location_card: "Targos"
       # (The square. A body sits frozen against the well, rimed white. A Targos fisher
       #  hangs back, won't go near it. Minor NPC → generic FE8 villager face at wiring;
@@ -385,6 +386,13 @@ events:
       - prof-rbg: >-
           But the trail worth chasing runs north — the druids, to Lonelywood.
           Let the lake-beast keep. We follow the rumor.
+      # Termalaine seed (2026-06-26): RBG's avarice routes the company through the gem town
+      # → ch03. "My rats" = his intel network (the rumor reached him), not a contact staged
+      # on the map. Same beat as the lines above (no new beat_break) — single-speaker RBG.
+      - prof-rbg: >-
+          North — past Termalaine, the gem town. My rats tell me they pull tourmaline
+          out of the ground there by the fistful. Pockets in, pockets out, eh, Pinky?
+          Positively Gouda.
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
@@ -402,8 +410,10 @@ post_chapter:
 #        see `introduces:`), the in-voice heads-up vanilla owes via the Vanessa rescue tutorial.
 #   (2) rear-bark — de-sledded: raiders flank the chwinga; Wolfram holds the rear ("the plate").
 #   (3) ending card — Wolfram's hammer rings on dented plate, not the sled.
-# STILL PENDING for ch02 (NOT dialogue): the .ea eventscript wiring for all four beats +
-# chwinga/Vellynne art (#38/#39/#19) + the mGBA load-test.
+# Eventscript wiring for all four beats LANDED via inject_ch02 (build_campaign.py); #22 closed.
+# 2026-06-26 — Termalaine seed: appended one RBG avarice line to the ending (beat D) so the
+#   ch02→ch03 hop is motivated on the lakeshore road (a gem town en route to Lonelywood).
+#   Same beat, no new beat_break → the ending beat count stays 4 (CH02_ENDING_MSGS holds).
 
 # ── Design Notes ─────────────────────────────────────────────────────────────────
 design_notes: >
