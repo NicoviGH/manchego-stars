@@ -487,21 +487,6 @@ vanilla FE under the hood"). So:
   its D&D inspiration); see Weapon & Magic §.
 _Decided: 2026-05-28 (resistance dropped); 2026-06-04 (labels/enum/icon dropped too — vestigial)_
 
-**The campaign's one iconic matchup ships (#8): fire-line tomes ×3 vs ice trolls + frost druids.**
-`campaign.yaml iconic_matchups:` is the source of truth (weapons by `WEAPON_ITEM_ENUM` key,
-targets by class token → `CLASS_` enum); `build_campaign.inject_iconic_matchups` appends one
-`ItemEffectiveness_*` class list per matchup to `data_itemuse.c` and points each weapon's
-`.pEffectiveness` at it — pure vanilla ×3 math, and a weapon already carrying vanilla
-effectiveness is refused (never silently overwritten). First (and for now only) entry:
-`fire`/`elfire` vs `cyclops` (the ch08 Ice Troll reskin) + `druid` (Ravisin, ch05) —
-"fire bites Icewind's ice-creatures." The difficulty model mirrors it (`fe_combat.W`
-effective sets + `CLASS_TAGS` cyclops/druid tags), and `test_iconic_matchups.py` pins
-YAML ↔ model consistency so a matchup can't exist in the ROM but not the balance math
-(or vice versa). Vanilla parity references are unaffected (their yardstick targets carry
-no matchup tag). In-emulator verification (fire vs an ice troll on a built map) rides the
-ch05/ch08 slice load-tests — those chapters aren't hosted yet.
-_Decided: 2026-07-02 (CLAUDE; closes #8's build half)_
-
 **Hit-rate tuning: vanilla FE, no special floor needed**
 With vanilla FE hit/avoid restored, FE8's native 70–95% hit norms apply directly —
 the old d20-variance problem and the "skill floor" mitigation are moot. Tune
