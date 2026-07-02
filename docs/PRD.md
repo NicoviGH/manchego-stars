@@ -83,7 +83,7 @@ A patched FE8 ROM built from the `fireemblem8u` C decompilation. Campaign conten
 
 ## 7. Art Direction
 
-The player cast + named recruits get **fully custom** indexed-palette art for **every** sprite part — portrait, map sprite, AND battle animation. Not recolored vanilla, not reused class anims. Since combat is pure vanilla FE8, the art is the biggest lever for campaign feel. Each piece is produced **faithfully from the character's clean Gemini/Nano-Banana bust reference** via tooling (`tools/ref_to_bust.py` → `tools/portrait_tool.py`) — converted, not hand-pixeled. Delivered in three waves: (1) portraits [done], (2) map sprites [#38], (3) battle animations [#39]. Per-character briefs live in each unit's YAML `art:` block; render → show Nicolas → wait for OK → commit.
+The player cast + named recruits get **fully custom** indexed-palette art for **every** sprite part — portrait, map sprite, AND battle animation. Not recolored vanilla, not reused class anims. Since combat is pure vanilla FE8, the art is the biggest lever for campaign feel. Each piece is produced **faithfully from the character's clean Gemini/Nano-Banana bust reference** via tooling (`tools/ref_to_bust.py` → `tools/portrait_tool.py`) — converted, not hand-pixeled. Delivered in three waves: (1) portraits [done], (2) map sprites [#38], (3) battle animations [#65]. Per-character briefs live in each unit's YAML `art:` block; render → show Nicolas → wait for OK → commit.
 
 - **Enemy sprites/portraits:** vanilla FE8 where the look fits; community/custom only for creatures with no vanilla analogue (Grells, Messie, ice trolls) and key NPCs (Duvessa Shane, Trex, Messie, Dorbulgruf).
 - **Map tiles:** vanilla FE8 snow/ice + community arctic tilesets; community Frostmaiden maps as *layout reference* for hand-drawn FE maps. Custom interiors likely needed for the mine, tomb, water/boat, and town maps.
@@ -159,7 +159,7 @@ Tracked as GitHub issues (milestones **M0–M4**); the live backlog is the issue
 
 - **M0 — Repo Boots Clean:** scaffold + decomp builds clean + toolchain verified. *(done)*
 - **M1 — D&D Combat Layer Works:** the D&D flavor layer on vanilla FE combat — weapon-effectiveness matchups (#8), spell-tome economy (#9), cosmetic d20 crit flourish (#11). *(not started; the damage-type label/icon items #7/#10 were dropped as vestigial — see decisions.md)*
-- **M2 — One PC End-to-End:** the injector + Braulo fully translated (portrait + name + class/stats + verify). *(done — the pipeline now covers all 10 cast)*
+- **M2 — One PC End-to-End:** the injector + Braulo fully translated (portrait + name + class/stats + verify). *(done — the pipeline now covers all 10 cast: the 8 PCs + Pepperjack & Brie)*
 - **M3 — 8 Chapters Playable:** all cast, NPCs, enemies, 8 chapters, maps, dialogue, events; map sprites; world map. *(in progress)*
 - **M4 — Ship It:** playtest, balance, final art/dialogue, battle anims, title/credits, distribute.
 

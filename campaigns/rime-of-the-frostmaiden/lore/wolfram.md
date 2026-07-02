@@ -138,3 +138,23 @@ MVP loadout is a stock Iron Lance + Javelin (the Javelin is the armored unit's r
 His fire/forge identity rides on the sprite art, not the item names. Named gear, post-MVP:
 
 - **Warhammer** — his heavy personal weapon → an FE Lance (tier TBD, post-MVP).
+
+## §Battle-anim prompt pack (#65 — run in Gemini, edit-from-concept on `References/References/PCs/Wolfram full.png`, magenta #FF00FF bg)
+
+_Moved here from `HANDOFF.md` 2026-07-02 — per-unit art briefs live with the unit._
+
+Preamble (every pose): *"Redraw the referenced character as a full-body Fire Emblem: Sacred Stones GBA
+battle sprite — flat cel shading, hard outlines, ≤16 flat colors, three-quarter side view facing right,
+flat magenta (#FF00FF) background, no effects. SIMPLIFY for small-sprite readability like a vanilla FE8
+sprite: bold chunky shapes, strong clear silhouette, minimal interior detail — drop the tiny rivets,
+speckled scales and fine straps, and consolidate the ice-crystal clusters into just one or two bold
+accents. Keep only what reads at ~50px tall: his grey metal-scaled body, beard and topknot, the warhammer,
+and one bold crystal accent; keep his colors from the reference."*
+
+- **ready** → `Pose: Ready — neutral standing guard, warhammer held at rest in both hands across the body.`
+- **windup** → `Pose: Wind-up — coiled back on the rear foot, warhammer hauled high overhead, both arms cocked, knees bent, ready to strike.`
+- **peak** → `Pose: Peak — lunging forward, warhammer swung all the way down to full arm extension at the point of impact, front foot planted forward, feet near the same ground spot.`
+
+Tips: generate **ready first**, then make windup/peak **edits of that ready frame** so the simplified design
++ palette carry over. If Gemini won't drop detail, push the simplify clause harder ("flat, almost no
+interior lines, think 16-bit"). Magenta or transparent bg both fine — Claude keys the magenta before descale.

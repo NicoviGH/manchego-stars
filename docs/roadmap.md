@@ -87,7 +87,7 @@
 | Joins | Character | Chassis (FE class) | Role filled | Skin |
 |---|---|---|---|---|
 | Ch1 | 8 PCs | — | core triangle/magic/heal/flier/armor | — |
-| Ch2 | **Baxby** | Cavalier | sword access + cavalry | axe-beak (done) |
+| Ch1 | **Baxby** | Cavalier | sword access + cavalry | axe-beak (done) |
 | Ch3 | **Trex** | Thief | **utility** (steal/chests/doors) | winged kobold |
 | Ch4→5 | **Lupin** | Cavalier | 2nd cavalry / mobile melee | direwolf (the wolf *is* the mount; pairs w/ Baxby as "beast-cavalry") |
 | Ch5 | **Sahnar** | Myrmidon | **sword duelist** (crit) | moon-elf mummy |

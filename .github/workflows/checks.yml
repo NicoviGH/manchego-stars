@@ -64,10 +64,23 @@ jobs:
       - name: Unit tests (make test)
         run: make test
 
-      - name: Install agbcc into the decomp
+      # agbcc changes rarely; cache the built compiler (~2-3 min of every run otherwise).
+      # Bump the key suffix to force a rebuild if agbcc upstream ever matters.
+      - name: Cache agbcc
+        id: agbcc-cache
+        uses: actions/cache@v4
+        with:
+          path: agbcc
+          key: agbcc-${{ runner.os }}-v1
+
+      - name: Build agbcc (cache miss only)
+        if: steps.agbcc-cache.outputs.cache-hit != 'true'
         run: |
           git clone https://github.com/pret/agbcc.git
-          cd agbcc && ./build.sh && ./install.sh "$GITHUB_WORKSPACE/fireemblem8u"
+          cd agbcc && ./build.sh
+
+      - name: Install agbcc into the decomp
+        run: cd agbcc && ./install.sh "$GITHUB_WORKSPACE/fireemblem8u"
 
       - name: Build decomp tools
         run: cd fireemblem8u && ./build_tools.sh
