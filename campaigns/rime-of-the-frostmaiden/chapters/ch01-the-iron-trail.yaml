@@ -70,16 +70,17 @@ difficulty_note: >
 # ── Player Units ──────────────────────────────────────────────────────────────
 # Whole cast is RECRUITED (Northlook scene); the field obeys vanilla Ch1: 4 slots.
 # Pick Units (prep flow) chooses which 4; the chosen lord (#42) is force-deployed.
-deploy_limit: 4                          # vanilla Ch1: Eirika+Seth + Franz+Gilliam = 4
-deploy_slots:                            # [col, row] — west edge, trail mouth
-  - [3, 8]
-  - [3, 9]
-  - [2, 8]
-  - [2, 9]
-# Vanilla fields these 4 as 2 starters + 2 turn-2 arrivals (Franz/Gilliam). We field
-# all 4 from turn 1: the staggered arrival was a story beat for fixed characters and
-# doesn't survive a player-picked party; 4-at-start is the gentler read of the same
-# total (lean generous, feedback_fe-level-design).
+deployment:
+  deploy_limit: 4                        # vanilla Ch1: Eirika+Seth + Franz+Gilliam = 4
+  deploy_slots:                          # [col, row] — west edge, trail mouth
+    - [3, 8]
+    - [3, 9]
+    - [2, 8]
+    - [2, 9]
+  # Vanilla fields these 4 as 2 starters + 2 turn-2 arrivals (Franz/Gilliam). We field
+  # all 4 from turn 1: the staggered arrival was a story beat for fixed characters and
+  # doesn't survive a player-picked party; 4-at-start is the gentler read of the same
+  # total (lean generous, feedback_fe-level-design).
 
 # ── Enemy Units ────────────────────────────────────────────────────────────────
 # Vanilla Ch1 enemy table, goblin-skinned: 3 Soldiers (lances) + 3 Fighters (axes)

@@ -108,6 +108,71 @@ def check_chapter_status(fail):
                         'chapter is an ungrounded seed; ground it and flip to active first' % rel)
 
 
+def _chapter_deployment_violations(rel, d):
+    """Schema violations for one parsed chapter YAML (pure; unit-tested in
+    test_check_chapter_schema.py). The normalized shape (#107, audit 2.2): ALL
+    deployment data lives under the `deployment:` block (deploy_limit,
+    deploy_slots, note, green_allies); `player_units:` is the one alternative
+    (a fixed-roster chapter with no prep screen, i.e. the prologue)."""
+    msgs = []
+    for legacy in ('deploy_limit', 'deploy_slots'):
+        if legacy in d:
+            msgs.append('%s: top-level `%s` -- deployment data lives under the '
+                        '`deployment:` block (#107 normalized schema)' % (rel, legacy))
+    has_pu, has_dep = 'player_units' in d, 'deployment' in d
+    if has_pu == has_dep:
+        msgs.append('%s: a chapter expresses its roster as EITHER `player_units:` '
+                    '(fixed roster, no prep screen) OR a `deployment:` block -- '
+                    'found %s' % (rel, 'both' if has_pu else 'neither'))
+    if not has_dep:
+        return msgs
+    dep = d.get('deployment')
+    if not isinstance(dep, dict):
+        msgs.append('%s: `deployment:` must be a mapping' % rel)
+        return msgs
+    limit = dep.get('deploy_limit')
+    if limit is not None and (not isinstance(limit, int) or limit <= 0):
+        msgs.append('%s: deployment.deploy_limit must be a positive int (got %r)'
+                    % (rel, limit))
+        limit = None
+    slots = dep.get('deploy_slots')
+    if slots is not None:
+        bad = [s for s in slots if not (isinstance(s, list) and len(s) == 2
+                                        and all(isinstance(c, int) for c in s))]
+        if bad:
+            msgs.append('%s: deployment.deploy_slots entries must be [col, row] '
+                        'int pairs (first bad: %r)' % (rel, bad[0]))
+        if len(slots) != limit:
+            msgs.append('%s: deployment.deploy_slots (%d) must match '
+                        'deployment.deploy_limit (%r) -- the slot list IS the cap '
+                        'template' % (rel, len(slots), limit))
+    if d.get('status') == 'active' and limit is None:
+        msgs.append('%s: an active chapter with a `deployment:` block needs a '
+                    'machine-readable deployment.deploy_limit (prose notes are for '
+                    'planned seeds)' % rel)
+    for g in dep.get('green_allies') or []:
+        missing = [k for k in ('id', 'class', 'level', 'position') if k not in g]
+        if missing:
+            msgs.append('%s: deployment.green_allies entry %r missing %s'
+                        % (rel, g.get('id', '?'), ', '.join(missing)))
+    return msgs
+
+
+def check_chapter_deployment_schema(fail):
+    """The normalized chapter deployment schema (#107): kills the audit-2.2 drift
+    where no two chapters expressed their roster the same way (four shapes across
+    9 files). The injectors and difficulty.py read ONE shape; this gate keeps new
+    chapters on it."""
+    import yaml
+    for f in sorted(glob.glob(os.path.join(REPO, 'campaigns/*/chapters/ch*.yaml'))):
+        rel = os.path.relpath(f, REPO)
+        try:
+            d = yaml.safe_load(open(f, encoding='utf-8')) or {}
+        except Exception:
+            continue                       # parse errors are check_yaml_parses' job
+        fail.extend(_chapter_deployment_violations(rel, d))
+
+
 def check_tool_refs_exist(fail):
     pat = re.compile(r'tools/([\w-]+\.(?:py|rb))')
     for d in _docs():
@@ -419,7 +484,8 @@ def check_lane_ownership(fail):
 def main():
     fail = []
     for check in (check_python_compiles, check_tests_pass, check_yaml_parses,
-                  check_chapter_status, check_tool_refs_exist, check_no_dead_concepts,
+                  check_chapter_status, check_chapter_deployment_schema,
+                  check_tool_refs_exist, check_no_dead_concepts,
                   check_generated_indexes_fresh, check_engine_guards_present,
                   check_engine_campaign_agnostic,
                   check_save_layout_stable, check_lane_ownership):
