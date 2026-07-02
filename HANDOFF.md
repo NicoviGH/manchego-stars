@@ -7,7 +7,9 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 > **Last session (2026-06-29):** braulo battle anim got a revised peak frame (PR #98), the Knight/lance
 > banim donor tooling landed (PR #99), and Ch3 dialogue locked (PR #97). **Wolfram's battle anim is the
 > live pickup — its engine/tooling half is merged & inert; it's waiting only on art.** See §Wolfram + the
-> ready-to-run prompt pack at the bottom of this file. Nicolas is mobile-only the week of 2026-06-29.
+> ready-to-run prompt pack at the bottom of this file. **Ch3 map (#40) also moved:** tileset decided
+> (Cynon's Mineshaft, Gray) + layout pivot to a custom Gem-Mine plan — **flattened blockout posted on #23,
+> awaiting Nicolas's OK** (see §Map (#40)). Nicolas is mobile-only the week of 2026-06-29.
 
 > **🛠 Desktop fix needed — branch cleanup + env policy (2026-06-29):** An audit found **12 stale
 > remote branches** the squash-merge convention should have deleted: the 8 closed-merged PR branches
@@ -136,18 +138,51 @@ Teaching goal = the **thief** (Trex = our Colm). Decisions/deviations: `decision
 live build checklist on **#23**.
 - **NEW (#97):** the **4 cutscene beats are written/locked** (opening / RBG-execution + Trex recruit / Pinky
   shaft-scout / Termalaine ending) co-authored via `dialogue-pass`; Trex lore + `lore/trex.md` landed.
-- **Build beats remaining (unchecked on #23, priority order):** map build (`#40`; cave/interior tileset +
-  doors + the "open the way down" `TILECHANGE`) → host on the next vanilla slot (`MNC2`; model on
-  `inject_ch01`/`inject_ch02`) → units/objective/cutscene wiring (consume the locked `script:` beats) → art
-  (Grell/Trex/kobold/giant-rat sprites; **grell ref = book p.96**) → title card → load-test scenarios
-  (`ch03`/`smoke_ch03`/`clear_ch03`, mirror ch02). Parity already verified `make difficulty CH=ch03`.
-- Ch3+ ending BGs: vendor from the winter-BG library via `bg_to_fe8.py` → `inject_backgrounds`.
-- Then chapters #24–#28 (Ch4–Ch8) follow the same vertical-slice pattern.
+- **Wiring notes owed later:** in-game **MOTION REVIEW of all 4 beats** (+ the ch02 seed line) happens at
+  the cutscene-wiring beat. **Mid-map cutscene fires on the BRUTE miniboss's DEFEAT** (the `kobold-steel`
+  "Icewind Brute" slot): flag it the miniboss + position it mid-galleries at units/objective wiring
+  (Pinky-is-metal is load-bearing in that beat).
+
+#### Map (#40) — IN PROGRESS, decisions made 2026-06-29; PAUSED awaiting Nicolas's blockout OK
+Two decisions this session change the earlier "reskin vanilla Borgo on a winter tileset" plan:
+- **Tileset DECIDED = Cynon's Mineshaft (Gray palette)** — a purpose-built cave/mine tileset (rock walls,
+  cart tracks, timber supports, crystal/ore seams, water) vendored from **FE-Repo** (`Klokinator/FE-Repo`
+  → `Tilesets/Caves/Cynon's Mineshaft - Tileset`; CC, Cynon endorses cross-engine use). Staged at
+  `map-review/ch03-tileset-candidates/cynon-mineshaft-src/` (`.mapchip_config` + Gray object PNG + CREDITS).
+  **NO re-palette** — native grey already reads as a frozen Icewind mine (Nicolas's call; the old winter
+  re-palette trick is NOT needed for a tileset that's already cave-themed). At build: **credit Cynon in `CREDITS.md`**.
+- **Layout PIVOT — author a CUSTOM layout from the book's "Gem Mine" map, NOT a Borgo reskin.** Reference =
+  *Frostmaiden* book Map 1.19 "Gem Mine" (printed p.97 = PDF p.98), cropped to
+  `map-review/ch03-tileset-candidates/REF-gem-mine-map.png` and `docs/demo/ch03-gem-mine-reference.png`.
+  3 levels → ONE flat plane (FE8 has no z-levels), organic caves → 16px grid, ~40sq wide → ~22. A **flattened
+  blockout** (book rooms M1–M8 → our chapter beats: M1 tool-room deploy, mid-gallery Brute choke, M3 river
+  pinch, M5/M6 sealed shaft = Pinky-scout map-change, M8 grell-lair seize) is **posted on issue #23** and is
+  **the pending decision** — Nicolas reviews on mobile before any painting starts.
+- **Importer is a THIN converter (good #40 news).** Format decoded + validated: `mapchip_config` = **9216 B =
+  exactly the decomp config** (8192 TSA + 1024 terrain); object PNG = **256×256 mode-P, 4-bit local indices**
+  (pixels 0–15) + a 256-color (16-bank) palette → straight to `ObjectType.4bpp` + `MapPalette.gbapal`. A
+  throwaway renderer assembled Cynon's own `Test Map.tmx` correctly →
+  `map-review/ch03-tileset-candidates/mineshaft-testmap-gray.png` (= `docs/demo/ch03-mineshaft-tileset-demo.png`),
+  proving tiles assemble. So #40 task 2 = a small converter, not a toolchain.
+- **Build order once the blockout is OK'd:** (1) write the `mapchip_config`+object-PNG → `.4bpp/.gbapal/.bin`
+  converter; vendor as tileset **`cave-interior`** under `campaigns/.../maps/tilesets/`. (2) Seed a paint
+  canvas on it from the blockout (extend `gen_map_editor` to load a vendored tileset + a custom/blank layout —
+  today it only reskins a vanilla layout on `snowy-bern`). (3) Paint against the reference →
+  `import_map_layout` → `.mar` → in-engine load-test. **Enemy/chest positions move off the old Borgo coords
+  onto the new layout** (parity unchanged — same 10-unit roster, just repositioned; re-finalize in the map tool).
+- **Then (post-map, unchanged):** host on next vanilla slot (`MNC2`; model `inject_ch01`/`inject_ch02`) →
+  units/objective/cutscene wiring (`inject_ch03` consumes the `script:` blocks; Brute-defeat trigger,
+  Pinky-scout grell spawn + map-change, Trex recruit; new generic mugs `boy-crier`/`kobold-brute`/Maxol) +
+  **motion-review the 4 beats** → art (Grell/Trex/kobold/giant-rat; **grell ref = book p.96**) → title card →
+  load-test (`ch03`/`smoke_ch03`/`clear_ch03`, mirror ch02). Parity already verified `make difficulty CH=ch03`.
+- Then chapters #24–#28 (Ch4–Ch8) follow the same slice. Ch3+ ending BGs: vendor from the **winter-BG library**
+  (`map-review/iwd-bg-library.md`) via `bg_to_fe8.py` → `inject_backgrounds` (relocate `BG_RANDOM` once a 2nd slot is needed).
 
 ### Content — Ch2 (#22) — DONE / CLOSED (2026-06-26)
 All slice items merged (#85 card, #88 Targos BG + name-leak fix); #22 closed. Non-gating leftover: the demo
 reel on the unmerged `demo/ch2-gifs` branch is stale vs the merged fixes — regenerate-vs-drop as a standalone
-demo-asset task (ships nothing; v0.1.0 is Ch1-only).
+demo-asset task (ships nothing; v0.1.0 is Ch1-only). Scratch review images live on `review/ch02-ending-bg`
+(not for merge).
 
 ### Parked / supporting
 - Enemy/NPC art/anim → convention homes (`inject_battle_anims`/`inject_battle_platforms` docstrings +
