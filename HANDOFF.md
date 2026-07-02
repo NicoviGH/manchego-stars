@@ -11,29 +11,29 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 > (Cynon's Mineshaft, Gray) + layout pivot to a custom Gem-Mine plan — **flattened blockout posted on #23,
 > awaiting Nicolas's OK** (see §Map (#40)). Nicolas is mobile-only the week of 2026-06-29.
 
-> **🛠 Desktop fix needed — branch cleanup + env policy (2026-06-29):** An audit found **12 stale
-> remote branches** the squash-merge convention should have deleted: the 8 closed-merged PR branches
-> (#67/#70/#74/#75/#76/#77/#95/#96), the 3 never-PR'd (`claude/content-track-review-5rpjy8` /
-> `demo/ch2-gifs` / `review/ch02-ending-bg`), and the now-obsolete prior audit branch itself
-> (`claude/audit-open-branches-5suz48`, superseded by this commit). Re-probed from a fresh web session
-> 2026-06-29: blocker unchanged — `git push --delete` still HTTP 403, REST `DELETE /git/refs/...` still
-> returns `"GitHub access is not enabled for this session."` **Two things to do from desktop:**
+> **🛠 Desktop fix needed — branch cleanup + env policy (2026-06-29; re-probed 2026-07-02):** An audit
+> found **13 stale remote branches** the squash-merge convention should have deleted. 2026-07-02 web
+> re-probe: the env can now **push to branches and squash-merge PRs via the GitHub MCP** (PR #101 was
+> conflict-resolved and merged from the web) — but **ref-deletes are still blocked** (`git push
+> --delete` hangs at the proxy; no repo-settings API either). **To do from desktop:**
 >
 > 1. **Flip the GitHub repo setting "Automatically delete head branches"** (Settings → General →
 >    Pull Requests; mobile-reachable). That sweeps every squash-merged branch on merge so this
 >    backlog can't re-accumulate. **After flipping, squash-merging this PR will auto-delete
 >    `claude/branch-cleanup-1c1081`** — one less branch to chase manually.
-> 2. **Delete the 12 stale branches.** From a local checkout:
+> 2. **Delete the stale branches.** From a local checkout:
 >    ```sh
 >    git push origin --delete \
->      claude/audit-open-branches-5suz48 claude/content-track-review-5rpjy8 demo/ch2-gifs \
->      docs/descale-palette-guidance docs/handoff-65-mb-done \
+>      claude/audit-open-branches-5suz48 claude/content-track-review-5rpjy8 \
+>      docs/descale-palette-guidance docs/handoff-65-mb-done docs/handoff-ch3-map-pickup \
 >      feat/19-vellynne-portrait feat/22-ch02-dialogue-reground feat/22-title-card \
 >      feat/38-chwinga-map-sprites feat/39-chwinga-portraits feat/engine-name-check \
 >      review/ch02-ending-bg
 >    ```
->    Keep `main` and `docs/handoff-ch3-map-pickup` (open PR #101).
-> 3. **Fix the Claude-Code-on-the-web env so future sessions can do this themselves.** Two checks:
+>    (`docs/handoff-ch3-map-pickup` joined the list when PR #101 squash-merged, 2026-07-02.)
+>    **`demo/ch2-gifs` is deliberately NOT on the list** — it still holds the only copy of the
+>    unmerged `recordch02*` cutscene-GIF scenarios; decide regenerate-vs-drop first (§Ch2), then delete.
+> 3. **Fix the Claude-Code-on-the-web env so future sessions can delete refs themselves.** Two checks:
 >    (a) **github.com/settings/installations → Claude** — confirm *Contents* is read-and-write and
 >    this repo is in the access list; (b) the env's network policy in claude.com/code → this
 >    environment's settings — bump to a policy that allows full GitHub write (see
