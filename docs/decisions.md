@@ -474,6 +474,9 @@ vanilla FE under the hood"). So:
   damage-type label, enum, or UI icon either — the whole apparatus was a vestige of the old
   "D&D combat layer." Combat and item data are pure vanilla FE8.
 - **Iconic matchups use vanilla FE weapon effectiveness, keyed to the target's CLASS.**
+  *(SUPERSEDED 2026-07-02 — Nicolas: even data-level effectiveness additions violate the
+  vanilla-combat principle; the #8 fire-vs-ice implementation was reverted. See "Iconic
+  matchups are OUT" in the dated decisions below.)*
   FE8's effectiveness system has eight class-keyed categories (`src/data_items.c`
   `ItemEffectiveness_*`): Armor, ArmorAndHorse, Horse, Flier, FlierAndMonsters, Monsters,
   Dragon, Swordsman. Effectiveness is a property of a weapon against an enemy class —
@@ -1157,8 +1160,9 @@ There is **no** damage-type label, enum, weapon tag, or combat-preview icon — 
 of the abandoned "D&D combat layer" and added nothing once combat went pure-FE. A character's
 elemental identity (Rootis = ice, Marty = spores/poison, …) is carried by **sprite/portrait art,
 item names, and — eventually — custom battle animations** (where the spell visual can reference the
-D&D spell for inspiration), not by any mechanic or UI tag. Iconic matchups still use vanilla FE
-weapon **effectiveness**, keyed to enemy class (see Combat System §). Retires GitHub issues #7
+D&D spell for inspiration), not by any mechanic or UI tag. ~~Iconic matchups still use vanilla FE
+weapon **effectiveness**, keyed to enemy class (see Combat System §).~~ *(That carve-out was
+superseded 2026-07-02 — iconic matchups are out entirely; see below.)* Retires GitHub issues #7
 (damage-type enum) and #10 (combat-preview icon).
 _Decided: 2026-06-04 (supersedes the 13-damage-type-label plan; resistance was already dropped 2026-05-28)_
 
@@ -1177,16 +1181,28 @@ GetItemAfterUse`, high-byte uses counter), the uses/maxUses display on BOTH the 
 the stat screen, and gold-restock shops (`bmshop.c` sells fresh full-uses items at
 `costPerUse × uses`; vanilla Ch5's vendor already stocks Fire + Lightning tomes) are ALL stock
 behavior — and the primary-cantrip counts already sit in decision B's band (Fire 40, Flux 45,
-Thunder/Lightning 35, Elfire/Shine 30). **"Gray out depleted" conflicts with vanilla**: a
-spent tome breaks and vanishes like an iron sword; we accept break-and-rebuy (it IS the
-decision-B economy) unless Nicolas asks for a persistent grayed slot (question posted on #9).
+Thunder/Lightning 35, Elfire/Shine 30). **Depleted tomes break-and-rebuy, no gray-out**
+(Nicolas, 2026-07-02, settling the question posted on #9): a spent tome breaks and vanishes
+like an iron sword — stock FE8 behavior IS the decision-B economy; a persistent grayed slot
+would deviate from vanilla for no mechanical gain.
 What remains is CONTENT, landing with its first consumer per the no-dead-code rule: a
 `shops:` block + `ShopList_Event_*` injection when the first shop chapter is authored
 (vanilla cadence: ~Ch5), per-PC `inventory:` → loadout wiring (today `CLASS_LOADOUT` ships
 class-stock items; changing it alters playtested ch01 balance, so it rides a chapter slice
 with an emulator pass), and secondary-cantrip `maxUses` overrides once the per-PC spell kits
-assign them (same string-patch idiom as #8's effectiveness injection).
-_Decided: 2026-07-02 (CLAUDE; resolves #9's engine half as already-vanilla)_
+assign them (the same data_items string-patch idiom the injector already uses elsewhere).
+_Decided: 2026-07-02 (CLAUDE; resolves #9's engine half as already-vanilla; gray-out settled by Nicolas same day)_
+
+**Iconic matchups are OUT — the vanilla principle covers item DATA, not just mechanisms (#8 reverted).**
+The #8 implementation (Fire/Elfire flagged `effective` vs the ice-monster classes, PR #114) used only
+FE8's native effectiveness system — but Nicolas ruled (2026-07-02) that the vanilla-combat principle
+extends to item *data*: stock weapons must behave exactly as a vanilla FE8 player expects, and vanilla
+Fire/Elfire carry no effectiveness. "Vanilla mechanism, custom data" is fine for units/stats/enemies but
+not for changing how stock items compute damage. PR #114 was reverted wholesale (injector, campaign.yaml
+`iconic_matchups:` block, elfire weapon model, class tags, tests, and its ADR); the 2026-05-28/06-04
+"iconic matchups via effectiveness" carve-outs above are annotated superseded. Fire-vs-ice survives as
+**flavor only** — item names, dialogue, and battle-anim art. Issue #8 closes as not-planned.
+_Decided: 2026-07-02 (Nicolas; supersedes the 2026-05-28 iconic-matchup carve-out)_
 
 **MVP weapons = stock FE weapons (no custom Might); personal weapons are post-MVP**
 PCs carry plain vanilla FE weapons whose stats (Mt/Hit/Crit/Wt/uses) come verbatim from a stock

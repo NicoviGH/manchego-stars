@@ -7,8 +7,9 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 > **Last session (2026-07-02, web):** 8-item hard-queue burn-down, all merged via feature-flow —
 > chapter-deployment schema + generic injection consumers (#107, PR #109) · **#40 tileset converter +
 > vendored `cave-interior`** (PR #111 — ch03 map is now paint-ready once the blockout is OK'd) ·
-> injection-order guard + lossless GIF deltas (PR #112) · **#8 iconic matchups** (fire-vs-ice via vanilla
-> effectiveness, PR #114) · **#11 d20 nat-20 crit flourish** (PR #115) · **#60 clear-bot last-mile
+> injection-order guard + lossless GIF deltas (PR #112) · ~~#8 iconic matchups (PR #114)~~ **REVERTED
+> same day — Nicolas: effectiveness additions to stock items violate the vanilla principle; fire-vs-ice
+> is flavor only** · **#11 d20 nat-20 crit flourish** (PR #115) · **#60 clear-bot last-mile
 > breach** (pickMove core + the reach-window root-cause fix, PR #116; ch01 clear needs a local mGBA
 > confirm) · **#9 resolved as "vanilla IS the spell economy"** (ADR, PR #117; gray-out question to
 > Nicolas on #9) · **#63 M2 sidecar + provider-agnostic LLM policy** (PR #118 — free local
@@ -208,9 +209,9 @@ demo-asset task (ships nothing; v0.1.0 is Ch1-only). Scratch review images live 
   replay is free forever. M3 = staff driving + multi-target disambiguation → M4 soak→curve → M5 vanilla-FE8.
 - **Land `balance_locked: true` on ch00/ch01** (ch02 set); the per-chapter parity gate (#48b) is enforcing
   but inert until a chapter opts in; ch00/ch01 read OK.
-- #53 tail (FE8 Ch13 → our ch08): ~11 standard weapons, informational. Former leaves all landed 2026-07-02:
-  d20 crit #11 ✓ · iconic matchups #8 ✓ · spell-economy #9 = vanilla behavior (content lands per-chapter;
-  gray-out question open on #9).
+- #53 tail (FE8 Ch13 → our ch08): ~11 standard weapons, informational. Former leaves settled 2026-07-02:
+  d20 crit #11 ✓ · iconic matchups #8 **reverted + closed not-planned** (vanilla principle covers item
+  data; flavor only) · spell-economy #9 = vanilla behavior incl. break-and-rebuy (content lands per-chapter).
 
 ## Gotchas (cross-cutting)
 
