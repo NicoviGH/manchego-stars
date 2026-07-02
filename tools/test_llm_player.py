@@ -223,5 +223,227 @@ class TestTranscriptRecord(unittest.TestCase):
         self.assertEqual(got, orders)
 
 
+class TestBuildPrompt(unittest.TestCase):
+    def test_prompt_carries_faction_board_and_schema(self):
+        system, user = llm_player.build_prompt(sample_board(), 'blue')
+        self.assertIn('blue army', system)
+        self.assertIn('"orders"', system)                     # the reply schema
+        self.assertIn('DefeatBoss', user)                     # the objective
+        self.assertIn(llm_player.serialize_board(sample_board()), user)
+
+    def test_prompt_is_reproducible(self):
+        self.assertEqual(llm_player.build_prompt(sample_board(), 'blue'),
+                         llm_player.build_prompt(sample_board(), 'blue'))
+
+
+class TestParseOrders(unittest.TestCase):
+    """parse_orders never raises: prose-wrapped, fenced, or garbage model output all
+    resolve to a (possibly empty) list of dict orders."""
+
+    ORDERS = [{'unit': 1, 'move_to': {'x': 5, 'y': 4}, 'action': 'attack', 'target': 104}]
+
+    def test_bare_object_with_orders_key(self):
+        self.assertEqual(llm_player.parse_orders(json.dumps({'orders': self.ORDERS})),
+                         self.ORDERS)
+
+    def test_bare_array(self):
+        self.assertEqual(llm_player.parse_orders(json.dumps(self.ORDERS)), self.ORDERS)
+
+    def test_json_inside_a_code_fence(self):
+        text = 'Here is my plan:\n```json\n%s\n```\nGood luck!' % json.dumps(
+            {'orders': self.ORDERS})
+        self.assertEqual(llm_player.parse_orders(text), self.ORDERS)
+
+    def test_json_wrapped_in_prose(self):
+        text = 'I will attack. %s That is all.' % json.dumps({'orders': self.ORDERS})
+        self.assertEqual(llm_player.parse_orders(text), self.ORDERS)
+
+    def test_garbage_returns_empty(self):
+        self.assertEqual(llm_player.parse_orders('I surrender.'), [])
+        self.assertEqual(llm_player.parse_orders(''), [])
+        self.assertEqual(llm_player.parse_orders(None), [])
+        self.assertEqual(llm_player.parse_orders('{"orders": "all of them"}'), [])
+
+    def test_non_dict_entries_are_dropped(self):
+        text = json.dumps({'orders': [self.ORDERS[0], 'retreat!', 7]})
+        self.assertEqual(llm_player.parse_orders(text), self.ORDERS)
+
+
+class TestPolicyConfig(unittest.TestCase):
+    def test_defaults_to_anthropic_sonnet(self):
+        cfg = llm_player.policy_config(env={})
+        self.assertEqual(cfg['provider'], 'anthropic')
+        self.assertEqual(cfg['model'], 'claude-sonnet-5')
+
+    def test_openai_provider_defaults_to_a_free_local_model(self):
+        cfg = llm_player.policy_config(env={'PT_PROVIDER': 'openai'})
+        self.assertEqual(cfg['provider'], 'openai')
+        self.assertEqual(cfg['model'], 'llama3.1')
+        self.assertIsNone(cfg['base_url'])   # transport falls back to OLLAMA_BASE_URL
+
+    def test_env_knobs_override(self):
+        cfg = llm_player.policy_config(env={
+            'PT_PROVIDER': 'openai', 'PT_MODEL': 'gemma3:12b',
+            'PT_BASE_URL': 'http://gpubox:8080/v1', 'PT_API_KEY': 'k'})
+        self.assertEqual(cfg['model'], 'gemma3:12b')
+        self.assertEqual(cfg['base_url'], 'http://gpubox:8080/v1')
+        self.assertEqual(cfg['api_key'], 'k')
+
+    def test_unknown_provider_fails_loudly(self):
+        with self.assertRaises(ValueError):
+            llm_player.policy_config(env={'PT_PROVIDER': 'skynet'})
+
+    def test_anthropic_without_a_key_fails_loudly(self):
+        with self.assertRaises(ValueError):
+            llm_player.make_policy('blue', env={})
+
+
+class TestTransports(unittest.TestCase):
+    """The two HTTP transports, with _post_json stubbed -- asserts each provider's wire
+    shape (URL, auth header, payload) and response extraction."""
+
+    def _capture(self, response):
+        calls = []
+
+        def fake_post(url, headers, payload, timeout=120):
+            calls.append({'url': url, 'headers': headers, 'payload': payload})
+            return response
+        return calls, fake_post
+
+    def test_anthropic_wire_shape(self):
+        calls, fake = self._capture(
+            {'content': [{'type': 'text', 'text': '{"orders": []}'}]})
+        orig = llm_player._post_json
+        llm_player._post_json = fake
+        try:
+            got = llm_player._call_anthropic(
+                {'model': 'claude-sonnet-5', 'api_key': 'sk-test', 'base_url': None},
+                'sys', 'user')
+        finally:
+            llm_player._post_json = orig
+        self.assertEqual(got, '{"orders": []}')
+        self.assertEqual(calls[0]['url'], llm_player.ANTHROPIC_URL)
+        self.assertEqual(calls[0]['headers']['x-api-key'], 'sk-test')
+        self.assertEqual(calls[0]['payload']['system'], 'sys')
+        self.assertEqual(calls[0]['payload']['messages'][0]['content'], 'user')
+
+    def test_openai_wire_shape_defaults_to_ollama(self):
+        calls, fake = self._capture(
+            {'choices': [{'message': {'content': '{"orders": []}'}}]})
+        orig = llm_player._post_json
+        llm_player._post_json = fake
+        try:
+            got = llm_player._call_openai(
+                {'model': 'llama3.1', 'api_key': None, 'base_url': None}, 'sys', 'user')
+        finally:
+            llm_player._post_json = orig
+        self.assertEqual(got, '{"orders": []}')
+        self.assertEqual(calls[0]['url'],
+                         llm_player.OLLAMA_BASE_URL + '/chat/completions')
+        self.assertEqual(calls[0]['headers']['authorization'], 'Bearer ollama')
+        self.assertEqual(calls[0]['payload']['messages'][0]['role'], 'system')
+
+    def test_make_policy_runs_prompt_through_transport_and_parse(self):
+        board = sample_board()
+
+        def transport(cfg, system, user):
+            self.assertIn(llm_player.serialize_board(board), user)
+            return 'Sure! ```json\n{"orders": [{"unit": 1}]}\n```'
+        policy = llm_player.make_policy(
+            'blue', env={'PT_PROVIDER': 'openai'}, transport=transport)
+        self.assertEqual(policy(board), [{'unit': 1}])
+
+
+class TestSidecar(unittest.TestCase):
+    """The file handshake, played from the harness's side of the directory."""
+
+    GOOD = [{'unit': 1, 'move_to': {'x': 5, 'y': 4}, 'action': 'attack', 'target': 104}]
+    BAD = [{'unit': 999, 'move_to': {'x': 0, 'y': 0}, 'action': 'wait'}]
+
+    def _write_req(self, d, n, board=None, turn=2):
+        req = {'seed': 7, 'chapter': 'ch00', 'turn': turn, 'faction': 'blue',
+               'board': board or sample_board()}
+        with open(os.path.join(d, 'req-%d.json' % n), 'w', encoding='utf-8') as f:
+            json.dump(req, f)
+        return req
+
+    def _replay_sidecar(self, d, orders, turn=2):
+        key = llm_player.transcript_key(sample_board(), seed=7, chapter='ch00', turn=turn)
+        t = llm_player.Transcript(entries={key: orders}, mode='replay')
+        return llm_player.Sidecar(d, t)
+
+    def test_step_answers_a_request_with_validated_orders(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._write_req(d, 1)
+            sidecar = self._replay_sidecar(d, self.GOOD + self.BAD)
+            self.assertEqual(sidecar.step(), 1)
+            with open(os.path.join(d, 'resp-1.json'), encoding='utf-8') as f:
+                resp = json.load(f)
+            self.assertEqual(resp['orders'], self.GOOD)      # the bad order was culled
+            self.assertEqual(len(resp['rejected']), 1)
+            self.assertEqual(os.listdir(d), sorted(os.listdir(d)))  # no .tmp left over
+            self.assertNotIn('resp-1.json.tmp', os.listdir(d))
+
+    def test_step_is_idle_when_nothing_is_pending(self):
+        with tempfile.TemporaryDirectory() as d:
+            sidecar = self._replay_sidecar(d, self.GOOD)
+            self.assertIsNone(sidecar.step())
+
+    def test_step_skips_already_answered_requests(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._write_req(d, 1)
+            sidecar = self._replay_sidecar(d, self.GOOD)
+            self.assertEqual(sidecar.step(), 1)
+            self.assertIsNone(sidecar.step())                # 1 is answered; nothing new
+
+    def test_lowest_numbered_request_goes_first(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._write_req(d, 2, turn=3)
+            self._write_req(d, 1, turn=2)
+            key2 = llm_player.transcript_key(sample_board(), seed=7, chapter='ch00', turn=3)
+            key1 = llm_player.transcript_key(sample_board(), seed=7, chapter='ch00', turn=2)
+            t = llm_player.Transcript(entries={key1: self.GOOD, key2: []}, mode='replay')
+            sidecar = llm_player.Sidecar(d, t)
+            self.assertEqual(sidecar.step(), 1)
+            self.assertEqual(sidecar.step(), 2)
+
+    def test_replay_miss_writes_an_error_response_then_raises(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._write_req(d, 1)
+            sidecar = llm_player.Sidecar(d, llm_player.Transcript(mode='replay'))
+            with self.assertRaises(llm_player.TranscriptMiss):
+                sidecar.step()
+            with open(os.path.join(d, 'resp-1.json'), encoding='utf-8') as f:
+                resp = json.load(f)
+            self.assertEqual(resp['orders'], [])
+            self.assertIn('transcript miss', resp['error'])
+
+    def test_record_mode_calls_policy_and_fills_the_transcript(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._write_req(d, 1)
+            calls = []
+
+            def policy(board):
+                calls.append(1)
+                return self.GOOD
+            t = llm_player.Transcript(mode='record')
+            sidecar = llm_player.Sidecar(d, t, policy=policy)
+            self.assertEqual(sidecar.step(), 1)
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(len(t.entries), 1)              # the decision was recorded
+            # replaying the SAME board from the filled transcript needs no policy
+            self._write_req(d, 2, turn=2)
+            replay = llm_player.Sidecar(d, llm_player.Transcript(
+                entries=t.entries, mode='replay'))
+            self.assertEqual(replay.step(), 2)
+
+    def test_serve_stops_on_the_stop_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._write_req(d, 1)
+            sidecar = self._replay_sidecar(d, self.GOOD)
+            open(os.path.join(d, 'stop'), 'w').close()
+            self.assertEqual(sidecar.serve(poll_interval=0.01), 1)
+
+
 if __name__ == '__main__':
     unittest.main()

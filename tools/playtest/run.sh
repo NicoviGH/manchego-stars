@@ -14,6 +14,15 @@
 #                           chwinga charm-gifts (CHECK_ALIVE -> GIVEITEMTO) reach leader/convoy (#22)
 #   fuzz  | fuzz_ch01    -- SEEDED random-input soak (#49); set PT_SEED=N (default 1) to
 #                           pick the seed; a FAIL prints the seed so PT_SEED=N replays it
+#   llm                  -- LLM-player commander on the prologue (#63): the harness
+#                           handshakes with an EXTERNAL sidecar over PT_LLM_DIR (default
+#                           /tmp/playtest-llm-handshake). Start the sidecar first:
+#                             python3 tools/playtest/llm_player.py serve \
+#                                 --dir /tmp/playtest-llm-handshake \
+#                                 --transcript tools/playtest/transcripts/prologue.json
+#                           Replay-only by default (zero LLM cost); add --record + env
+#                           knobs (PT_PROVIDER=openai for a free local Ollama model,
+#                           PT_MODEL, PT_BASE_URL) to record a fresh transcript.
 # Recording scenarios (drop motion frames for a review GIF):
 #   recordending  -- the ch01 "Rolling Cheddar" outro cutscene (frames tagged "end")
 #   recordprep    -- the Preparations + Pick Units deploy screen (frames "prep")
@@ -53,6 +62,14 @@ KEEP_OPEN="${2:-}"
 STATE_DIR="$HERE/states"
 mkdir -p "$STATE_DIR"
 
+# LLM-player handshake dir (#63): fresh req/resp files per run -- a stale resp-1.json
+# from the last run would satisfy the first poll instantly with old orders.
+LLM_DIR="${PT_LLM_DIR:-/tmp/playtest-llm-handshake}"
+if [ "$SCENARIO" = "llm" ]; then
+    mkdir -p "$LLM_DIR"
+    rm -f "$LLM_DIR"/req-*.json "$LLM_DIR"/resp-*.json "$LLM_DIR"/*.tmp "$LLM_DIR/stop"
+fi
+
 if [ ! -x "$APP" ]; then
     echo "mGBA dev build missing; downloading nightly..."
     curl -fsSL -o /tmp/mgba-nightly.dmg "https://s3.amazonaws.com/mgba/mGBA-build-latest-macos.dmg"
@@ -82,6 +99,7 @@ PLAYTEST_SHOTDIR = "$out"
 PLAYTEST_STATEDIR = "$STATE_DIR"
 PLAYTEST_SEED = "${PT_SEED:-1}"
 PLAYTEST_CHAR = "${PT_CHAR:-}"
+PLAYTEST_LLMDIR = "$LLM_DIR"
 dofile("$HERE/harness.lua")
 EOF
     rm -f "$REPO/fireemblem8u/fireemblem8.sav"   # fresh save: New Game is the default path
@@ -137,9 +155,9 @@ fi
 # record* now LOADS a checkpoint (no grind), so its deadline is short.
 FPS=240; VSYNC=0; DEADLINE_S=420
 case "$SCENARIO" in record*) FPS=60; VSYNC=1; DEADLINE_S=300 ;; esac
-# smoke_* / fuzz_* / clear_ch02 play a full chapter (lead-in + a long idle/random/clear soak)
-# -> longer wall.
-case "$SCENARIO" in smoke*|fuzz*|clear_ch02) DEADLINE_S=600 ;; esac
+# smoke_* / fuzz_* / clear_ch02 / llm play a full chapter (lead-in + a long soak; the
+# llm handshake also waits wall-clock on the sidecar each turn) -> longer wall.
+case "$SCENARIO" in smoke*|fuzz*|clear_ch02|llm) DEADLINE_S=600 ;; esac
 # PT_FPS overrides the rate. 60fps+videoSync is only needed to capture smooth cutscene
 # FADES; verification captures of static text/boxes (sign, death quote) read fine at top
 # speed, so `PT_FPS=240 ... recordfix` runs ~4x faster.
