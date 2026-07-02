@@ -4,12 +4,19 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-06-29):** braulo battle anim got a revised peak frame (PR #98), the Knight/lance
-> banim donor tooling landed (PR #99), and Ch3 dialogue locked (PR #97). **Wolfram's battle anim is the
-> live pickup — its engine/tooling half is merged & inert; it's waiting only on art.** See §Wolfram; the
-> ready-to-run prompt pack is in `lore/wolfram.md`. **Ch3 map (#40) also moved:** tileset decided
-> (Cynon's Mineshaft, Gray) + layout pivot to a custom Gem-Mine plan — **flattened blockout posted on #23,
-> awaiting Nicolas's OK** (see §Map (#40)). Nicolas is mobile-only the week of 2026-06-29.
+> **Last session (2026-07-02, web):** 8-item hard-queue burn-down, all merged via feature-flow —
+> chapter-deployment schema + generic injection consumers (#107, PR #109) · **#40 tileset converter +
+> vendored `cave-interior`** (PR #111 — ch03 map is now paint-ready once the blockout is OK'd) ·
+> injection-order guard + lossless GIF deltas (PR #112) · **#8 iconic matchups** (fire-vs-ice via vanilla
+> effectiveness, PR #114) · **#11 d20 nat-20 crit flourish** (PR #115) · **#60 clear-bot last-mile
+> breach** (pickMove core + the reach-window root-cause fix, PR #116; ch01 clear needs a local mGBA
+> confirm) · **#9 resolved as "vanilla IS the spell economy"** (ADR, PR #117; gray-out question to
+> Nicolas on #9) · **#63 M2 sidecar + provider-agnostic LLM policy** (PR #118 — free local
+> Llama/Gemma via Ollama one env var away, per Nicolas's cost call). **Wolfram's battle anim remains
+> art-blocked** (§Wolfram; prompts in `lore/wolfram.md`). **Ch3 blockout still awaits Nicolas's OK on
+> #23** — and ch03's `deploy_limit: 9` exceeds the 8-unit classed roster (Baxby unclassed; note on #23).
+> In-emulator verification of #60/#63 needs a local (mGBA) session: `clear_ch01`, then an `llm` record
+> run to mint `transcripts/prologue.json`.
 
 > **🛠 Desktop fix needed — branch cleanup + env policy (2026-06-29; re-probed 2026-07-02):** An audit
 > found **13 stale remote branches** the squash-merge convention should have deleted. 2026-07-02 web
@@ -87,6 +94,7 @@ ADR: `decisions.md` §Distribution.
   `inject_backgrounds`. Winter-BG catalogue: `map-review/iwd-bg-library.md`.
 - **Playtest scenarios** `tools/playtest/run.sh <scenario>` (need a built ROM + `lua`):
   - logic/stability: `win|gameover|ch01win|clear|clear_ch01|smoke|smoke_ch01|fuzz`
+  - **LLM commander (#63):** `llm` — needs the sidecar running (`llm_player.py serve`; see run.sh header).
   - **ch2 (#22):** `ch02` · `smoke_ch02` · `clear_ch02` (all load a `ch02start` checkpoint).
   - **Battle-anim capture:** `PT_CHAR=<id> tools/playtest/run.sh recordanim` on a `make TESTCH=1` ROM
     (New Game → straight to a forced battle for that unit) → `tools/playtest/make_gif.py recordanim <id>
@@ -164,11 +172,11 @@ Two decisions this session change the earlier "reskin vanilla Borgo on a winter 
   throwaway renderer assembled Cynon's own `Test Map.tmx` correctly →
   `map-review/ch03-tileset-candidates/mineshaft-testmap-gray.png` (= `docs/demo/ch03-mineshaft-tileset-demo.png`),
   proving tiles assemble. So #40 task 2 = a small converter, not a toolchain.
-- **Build order once the blockout is OK'd:** (1) write the `mapchip_config`+object-PNG → `.4bpp/.gbapal/.bin`
-  converter; vendor as tileset **`cave-interior`** under `campaigns/.../maps/tilesets/`. (2) Seed a paint
-  canvas on it from the blockout (extend `gen_map_editor` to load a vendored tileset + a custom/blank layout —
-  today it only reskins a vanilla layout on `snowy-bern`). (3) Paint against the reference →
-  `import_map_layout` → `.mar` → in-engine load-test. **Enemy/chest positions move off the old Borgo coords
+- **Build order once the blockout is OK'd:** ~~(1) converter~~ ~~(2) editor support~~ — **both LANDED
+  2026-07-02 (PR #111):** `map_tileset_tool.py import/render-tmx`, tileset **`cave-interior`** vendored
+  under `campaigns/.../maps/tilesets/` (Cynon credited in `CREDITS.md`), `gen_map_editor --tileset
+  cave-interior --blank WxH [--ref img]` seeds a blank canvas, layouts carry their tileset in `.json`.
+  Remaining: (3) Paint against the reference → `import_map_layout` → `.mar` → in-engine load-test. **Enemy/chest positions move off the old Borgo coords
   onto the new layout** (parity unchanged — same 10-unit roster, just repositioned; re-finalize in the map tool).
 - **Then (post-map, unchanged):** host on next vanilla slot (`MNC2`; model `inject_ch01`/`inject_ch02`) →
   units/objective/cutscene wiring (`inject_ch03` consumes the `script:` blocks; Brute-defeat trigger,
@@ -191,15 +199,18 @@ demo-asset task (ships nothing; v0.1.0 is Ch1-only). Scratch review images live 
   onboarding-parity #64 · faked battle anims epic #65.
 
 ### Pipeline — playtest / parity
-- **Clear-bot #60 — partial landed (#79), STILL OPEN.** BFS distance-field march + multi-range targeting +
-  stall watchdog are in; `clear` (prologue) passes fair-play. **Remaining:** the bot jams at ch01's walled
-  boss-camp with a thin 2-unit deploy — last-mile breach/unjam logic. Diagnosis on #60.
-- **LLM-player #63 — M2 next** (M1 landed): replay-only from a recorded transcript (deterministic, zero
-  cost) → M3 live policy (`PT_MODEL`) → M4 soak→curve → M5 vanilla-FE8 validation. Swap: `clearbot.lua pickTarget`.
+- **Clear-bot #60 — code complete (PR #116), needs a local `clear_ch01` mGBA confirm to close.**
+  `pickMove` march core (field-first, claimed-tile avoidance, cork-jam fallback) + the root-cause fix:
+  `selectAndReach`'s default 15×10 window clipped ch01 reach at x=14 — bounds now threaded.
+- **LLM-player #63 — M1+M2 landed (PR #118), M3 next.** Sidecar file-handshake + `llm` scenario +
+  provider-agnostic policy (`PT_PROVIDER=openai` + local Ollama = free Llama/Gemma; anthropic/Sonnet
+  default per the epic). First local run: sidecar `--record` to mint `transcripts/prologue.json`, then
+  replay is free forever. M3 = staff driving + multi-target disambiguation → M4 soak→curve → M5 vanilla-FE8.
 - **Land `balance_locked: true` on ch00/ch01** (ch02 set); the per-chapter parity gate (#48b) is enforcing
   but inert until a chapter opts in; ch00/ch01 read OK.
-- #53 tail (FE8 Ch13 → our ch08): ~11 standard weapons, informational. Other leaves: d20 crit #11,
-  spell-economy #9, iconic matchups #8.
+- #53 tail (FE8 Ch13 → our ch08): ~11 standard weapons, informational. Former leaves all landed 2026-07-02:
+  d20 crit #11 ✓ · iconic matchups #8 ✓ · spell-economy #9 = vanilla behavior (content lands per-chapter;
+  gray-out question open on #9).
 
 ## Gotchas (cross-cutting)
 

@@ -1046,6 +1046,196 @@ scenarios.fuzz_ch01 = function()
     return fuzzDrive(chapter())
 end
 
+-- ---- LLM-player commander (#63 M2): the sidecar file-handshake. Once per player
+-- phase the harness exports the WHOLE board as req-<n>.json into PLAYTEST_LLMDIR,
+-- blocks (polling) for resp-<n>.json from the external sidecar
+-- (`tools/playtest/llm_player.py serve`, replay-only by default -- zero LLM cost),
+-- and executes the returned orders with the existing primitives. The sidecar has
+-- already validated the orders against this exact board (validate_orders), so an
+-- illegal order arriving here means the board CHANGED under us (a kill freed a tile)
+-- -- those just fail to commit and are logged, never soft-lock. Timeout / malformed
+-- response -> FAIL, like every brick.
+local JSONF = dofile(PLAYTEST_DIR .. "/json.lua")
+local LLMDIR = (type(PLAYTEST_LLMDIR) == "string" and PLAYTEST_LLMDIR) or "/tmp/playtest-llm-handshake"
+
+-- Exported unit ids must be UNIQUE and stable across the run: blue units use charId
+-- (PCs are distinct), red units use 1000+slot (generics SHARE a charId, so the slot
+-- disambiguates which brigand an attack order targets).
+local LLM_RED_ID_BASE = 1000
+
+local function llmExportBoard(objective, maxx, maxy)
+    local units = {}
+    for i = 0, 7 do
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u and not isDead(u) then
+            local canAct = (u.state & 0x2) == 0
+            local reach = {}
+            if canAct then
+                local r = selectAndReach(u, maxx, maxy)
+                press(K.B) wait(6)   -- deselect: the export must not leave a unit selected
+                if r then for _, t in ipairs(r) do reach[#reach + 1] = { t.x, t.y } end end
+            end
+            local mn, mx = unitAttackRange(u)
+            units[#units + 1] = {
+                id = u.charId, faction = "blue", x = u.x, y = u.y,
+                hp = u.hp, maxhp = ru8(u.addr + 0x12), can_act = canAct,
+                boss = false, reach = reach, range = mn and { mn, mx } or nil,
+            }
+        end
+    end
+    for i = 0, 23 do
+        local u = unitAt(SYM.gUnitArrayRed, i)
+        if u and not isDead(u) then
+            local mn, mx = unitAttackRange(u)
+            units[#units + 1] = {
+                id = LLM_RED_ID_BASE + i, faction = "red", x = u.x, y = u.y,
+                hp = u.hp, maxhp = ru8(u.addr + 0x12), can_act = false,
+                boss = unitIsBoss(u), reach = {}, range = mn and { mn, mx } or nil,
+            }
+        end
+    end
+    return { objective = objective, map = { w = maxx + 1, h = maxy + 1 }, units = units }
+end
+
+-- Write req-<n>.json (tmp+rename, mirroring the sidecar, so a half-written request is
+-- never read) and poll for resp-<n>.json. Returns the decoded response table, or
+-- (nil, why). The poll is wall-clock bound (the sidecar answers in wall time; at
+-- 240fps a frame budget would be 4x too impatient).
+local function llmHandshake(n, req, timeoutSecs)
+    local reqPath = LLMDIR .. "/req-" .. n .. ".json"
+    local tmp = reqPath .. ".tmp"
+    local f, err = io.open(tmp, "w")
+    if not f then return nil, "cannot write " .. tmp .. ": " .. tostring(err) end
+    f:write(JSONF.encode(req))
+    f:close()
+    os.rename(tmp, reqPath)
+    local respPath = LLMDIR .. "/resp-" .. n .. ".json"
+    local deadline = os.time() + (timeoutSecs or 90)
+    while os.time() < deadline do
+        local rf = io.open(respPath, "r")
+        if rf then
+            local body = rf:read("a")
+            rf:close()
+            local resp, derr = JSONF.decode(body)
+            if not resp then return nil, "malformed resp-" .. n .. ".json: " .. tostring(derr) end
+            return resp
+        end
+        wait(30)
+    end
+    return nil, "sidecar timeout waiting for resp-" .. n .. ".json (is llm_player.py serve running?)"
+end
+
+-- Drain every open menu level (submenus -- weapon/item lists -- are ALSO sProc_Menu,
+-- so a fixed two-B backout can strand a level), then one more B to drop a move-range
+-- selection. Restores the harness invariant: never leave a unit selected.
+local function llmBackout()
+    for _ = 1, 6 do
+        if not menuOpen() then break end
+        press(K.B) wait(8)
+    end
+    press(K.B) wait(8)
+end
+
+-- Resolve an exported unit id back to a live unit: blue = charId, red = 1000+slot
+-- (generics share charIds; see llmExportBoard).
+local function llmUnitById(id)
+    if type(id) ~= "number" then return nil end
+    if id >= LLM_RED_ID_BASE then return unitAt(SYM.gUnitArrayRed, id - LLM_RED_ID_BASE) end
+    return blue(id)
+end
+
+-- Execute one validated order with the existing primitives. M2 limitation (noted in
+-- decisions.md): chooseAttack fires on the UI's default target, which is the intended
+-- one whenever a single enemy is in range of the strike tile; multi-target
+-- disambiguation is an M3 refinement.
+local function llmExecOrder(o)
+    if type(o.unit) ~= "number" or type(o.move_to) ~= "table" then return false end
+    local u = blue(o.unit)
+    if not u or isDead(u) or (u.state & 0x2) ~= 0 then return false end
+    -- the sidecar validated against the REQUEST board; re-check what can have changed
+    -- since (an earlier order killed the target) before blind-A driving the menu --
+    -- with no live target the action menu has no Attack entry and A/A/A would walk
+    -- into the Item submenu instead
+    local action = o.action
+    if action == "attack" then
+        local tgt = llmUnitById(o.target)
+        if not tgt or isDead(tgt) then action = "wait" end
+    end
+    if not moveUnit(u.x, u.y, o.move_to.x, o.move_to.y) then return false end
+    if action == "attack" then
+        chooseAttack(u.addr)
+    elseif action == "seize" then
+        press(K.A) wait(30)   -- Seize tops the menu for a seize-capable unit on the tile
+        if menuOpen() then llmBackout() return false end   -- no Seize here: back out fully
+    else
+        chooseWait()          -- wait/staff: staff driving is an M3 refinement
+    end
+    if menuOpen() then llmBackout() return false end
+    return true
+end
+
+-- The LLM-commander loop body (no verdict): per player phase export the board, ask the
+-- sidecar, execute the orders, end the turn. Same terminal detection as the clear-bot.
+local function llmUntilAdvance(startChapter, objective, maxx, maxy, park)
+    local function won() return chapter() ~= startChapter end
+    local function lost() return gameOverActive() or procActive(SYM.gProcScr_TitleScreen) end
+    local budgetTurns = 18
+    local seed = math.floor(tonumber(PLAYTEST_SEED) or 1)
+    local n = 0
+    for t = 1, budgetTurns do
+        waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
+        wait(60)              -- let the player-phase banner finish (it eats key presses)
+        press(K.B) wait(6)    -- NUDGE unstick: clear any stray menu before driving
+        n = n + 1
+        local req = { seed = seed, chapter = startChapter, turn = turn(), faction = "blue",
+                      board = llmExportBoard(objective, maxx, maxy) }
+        local resp, why = llmHandshake(n, req)
+        if not resp then return "handshake: " .. why, t end
+        if resp.error then return "sidecar: " .. tostring(resp.error), t end
+        local orders = resp.orders or {}
+        log(string.format("llm turn %d: %d orders (%d rejected sidecar-side)",
+            t, #orders, resp.rejected and #resp.rejected or 0))
+        for _, o in ipairs(orders) do
+            if won() then return "won", t end
+            if lost() then return "gameover", t end
+            if not llmExecOrder(o) then
+                log(string.format("llm: order for unit %s -> (%s,%s) did not commit",
+                    tostring(o.unit), tostring(o.move_to and o.move_to.x),
+                    tostring(o.move_to and o.move_to.y)))
+            end
+        end
+        if won() then return "won", t end
+        if lost() then return "gameover", t end
+        if runEnemyPhase(park) == "gameover" then return "gameover", t end
+    end
+    return "timeout", budgetTurns
+end
+
+local function llmDrive(startChapter, objective, maxx, maxy, park)
+    local status, t = llmUntilAdvance(startChapter, objective, maxx, maxy, park)
+    if status == "won" then shot("llm-win")
+        return result("PASS", string.format("LLM commander won by turn %d (chapter %d)", t, chapter())) end
+    if status == "gameover" then shot("llm-gameover")
+        return result("FAIL", string.format("game over on turn %d", t)) end
+    if status == "timeout" then shot("llm-timeout")
+        return result("FAIL", string.format("no win in %d turns (boss %s)",
+            t, findBoss() and "alive" or "dead")) end
+    shot("llm-fail")
+    return result("FAIL", status .. string.format(" (turn %d)", t))
+end
+
+-- llm: the prologue (DefeatBoss) driven by the sidecar commander. Replay-only run:
+--   python3 tools/playtest/llm_player.py serve --dir /tmp/playtest-llm-handshake \
+--       --transcript tools/playtest/transcripts/prologue.json     # (other terminal)
+--   tools/playtest/run.sh llm
+-- Record a fresh transcript (live model; see PT_PROVIDER/PT_MODEL/PT_BASE_URL for the
+-- free local Ollama path) by adding --record to the serve command.
+scenarios.llm = function()
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    pokeFastConfig()
+    return llmDrive(chapter(), "DefeatBoss", 14, 9)
+end
+
 -- CH01WIN: the default lord (blind A-taps pick Braulo) marches on the camp,
 -- kills the chief, and SEIZES -- in-game proof of the lord-gated Seize
 -- (CanUnitSeize hook, #42) and the win hand-off (Seize macro -> EVFLAG_WIN ->
