@@ -208,6 +208,65 @@ def check_chapter_deployment_schema(fail):
         fail.extend(_chapter_deployment_violations(rel, d))
 
 
+# ── Injection ordering (audit 2.6 / #110) ─────────────────────────────────────
+# The documented MUST-precede pairs in build_campaign.main(). These lived only in
+# comments ("MUST precede inject_prologue"); one reorder breaks the build at its
+# most expensive point. check_engine_guards_present pins presence; this pins order.
+INJECTION_ORDER = [
+    ('_inject_lord_select_engine', '_inject_lord_floor_engine',
+     'lord floor anchors on lord-select\'s LordSelect_GetPid'),
+    ('inject_map_sprites', 'inject_enemy_class_reskins',
+     'reskins consume the SMS ids map-sprite injection creates'),
+    ('inject_enemy_class_reskins', 'inject_ch01',
+     "ch01's goblin grunts ride the reskinned clone classes"),
+    ('inject_winter_tileset', 'inject_ch01',
+     'chapter maps register against the tileset asset-table labels'),
+    ('inject_winter_tileset', 'inject_prologue',
+     'the prologue map registers against the tileset asset-table labels'),
+    ('inject_ch01', 'inject_prologue',
+     'inject_prologue overwrites the slot-1 Seize goal template inject_ch01 copies'),
+]
+
+
+def _injection_call_sequence(text):
+    """First-call order of top-level steps in build_campaign.main(). Textual order
+    == execution order there (the only branch chooses BETWEEN later steps, never
+    hoists one earlier)."""
+    m = re.search(r'\ndef main\(\):.*', text, re.S)
+    if not m:
+        return []
+    names = re.findall(r'^\s+(?:engine_hooks\.)?(\w+)\(', m.group(0), re.M)
+    seen, order = set(), []
+    for n in names:
+        if n not in seen:
+            seen.add(n)
+            order.append(n)
+    return order
+
+
+def _injection_order_violations(order):
+    msgs = []
+    pos = {n: i for i, n in enumerate(order)}
+    for before, after, why in INJECTION_ORDER:
+        missing = [n for n in (before, after) if n not in pos]
+        if missing:
+            msgs.append('injection-order constraint references unknown step(s) %s '
+                        '-- renamed/removed? update INJECTION_ORDER in check.py'
+                        % ', '.join(missing))
+        elif pos[before] > pos[after]:
+            msgs.append('build_campaign.main(): %s must run before %s -- %s'
+                        % (before, after, why))
+    return msgs
+
+
+def check_injection_order(fail):
+    """Injection steps run in a dependency order that used to live only in main()'s
+    comments (audit 2.6): pin the documented MUST-precede pairs."""
+    path = os.path.join(REPO, 'tools', 'build_campaign.py')
+    fail.extend(_injection_order_violations(
+        _injection_call_sequence(open(path, encoding='utf-8').read())))
+
+
 def check_tool_refs_exist(fail):
     pat = re.compile(r'tools/([\w-]+\.(?:py|rb))')
     for d in _docs():
@@ -520,6 +579,7 @@ def main():
     fail = []
     for check in (check_python_compiles, check_tests_pass, check_yaml_parses,
                   check_chapter_status, check_chapter_deployment_schema,
+                  check_injection_order,
                   check_tool_refs_exist, check_no_dead_concepts,
                   check_generated_indexes_fresh, check_engine_guards_present,
                   check_engine_campaign_agnostic,
