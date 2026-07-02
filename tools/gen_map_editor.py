@@ -19,9 +19,19 @@ sys.path.insert(0, os.path.join(ROOT,'tools'))
 from map_tileset_tool import _tileset_from_dir, Tileset
 from PIL import Image
 
-FLAGS={a.split('=',1)[0]:a.split('=',1)[1] for a in sys.argv[1:]
-       if a.startswith('--') and '=' in a}
-ARGS=[a for a in sys.argv[1:] if not a.startswith('--')]
+KNOWN_FLAGS={'--tileset','--blank','--fill','--ref'}
+FLAGS={}
+ARGS=[]
+for a in sys.argv[1:]:
+    if a.startswith('--'):
+        k,_,v=a.partition('=')
+        if k not in KNOWN_FLAGS:
+            sys.exit('ERROR: unknown flag %r (known: %s)'%(a,' '.join(sorted(KNOWN_FLAGS))))
+        if not _:
+            sys.exit('ERROR: flags take the --name=value form (got %r)'%a)
+        FLAGS[k]=v
+    else:
+        ARGS.append(a)
 TILESET=FLAGS.get('--tileset','snowy-bern')
 BLANK=FLAGS.get('--blank')
 if BLANK:
@@ -104,6 +114,10 @@ if SEED_MAR:
     if (sj['width'],sj['height'])!=(W,H):
         sys.exit('ERROR: seed .mar is %dx%d but layout %s is %dx%d'
                  %(sj['width'],sj['height'],LAYOUT,W,H))
+    if sj.get('tileset','snowy-bern')!=TILESET:
+        sys.exit('ERROR: seed .mar was painted on tileset %r but this canvas is %r '
+                 '-- its metatile indices would reinterpret as the wrong art/terrain'
+                 %(sj.get('tileset','snowy-bern'),TILESET))
     grid=[struct.unpack_from('<H',seed,i*2)[0]>>5 for i in range(W*H)]
     print('seeded editable grid from',SEED_MAR)
 
@@ -163,6 +177,12 @@ TNAME={0x00:'(empty)',0x01:'Snow ground',0x02:'Road / path',0x03:'Village (visit
 0x20:'Chest (empty)',0x21:'Chest',0x25:'Ruins / wall',0x26:'Cliff (impass.)',
 0x2c:'Building edge',0x2d:'Stairs / floor',0x2e:'Building / roof',0x32:'Fence',
 0x34:'Bridge',0x36:'Deep ice',0x3c:'Water',0x3f:'Ship / brace'}
+# Non-winter tilesets (--tileset=cave-interior, ...): strip the snow flavor from the
+# shared terrain ids so the hover/palette labels don't describe a mine in snowfield
+# terms. Terrain SEMANTICS are the tileset's own terrain bytes either way.
+if TILESET!='snowy-bern':
+    TNAME.update({0x01:'Ground',0x0c:'Cover (forest-type)',0x10:'River / stream',
+                  0x11:'Rock / rough',0x15:'Water (impass.)',0x36:'Deep water'})
 
 HTML=r'''<!doctype html><html><head><meta charset="utf-8"><title>__TITLE__ Map Editor</title>
 <style>

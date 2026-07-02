@@ -16,11 +16,15 @@ stem=sys.argv[1]
 if len(sys.argv)>2:
     src=os.path.expanduser(sys.argv[2])
 else:
+    # Legacy fallbacks apply ONLY to their own chapters -- a stale prologue export
+    # must never silently compile as some other chapter's map (#40 review).
     cands=[os.path.expanduser(f'~/Downloads/{stem}-layout.json'),
            os.path.expanduser('~/Downloads/ch01-layout.json') if stem.startswith('ch01') else None,
-           os.path.expanduser('~/Downloads/prologue-layout.json')]
+           os.path.expanduser('~/Downloads/prologue-layout.json')
+           if stem.startswith(('ch00','prologue')) else None]
     src=next((c for c in cands if c and os.path.exists(c)), None)
-    if not src: sys.exit('no exported layout JSON found in ~/Downloads')
+    if not src:
+        sys.exit(f'no exported layout JSON found (looked for ~/Downloads/{stem}-layout.json)')
 d=json.load(open(src))
 W,H,flat=d['width'],d['height'],d['grid']
 assert len(flat)==W*H, 'grid size mismatch'

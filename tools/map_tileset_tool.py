@@ -227,6 +227,13 @@ def tmx_grid(tmx_path):
     if len(gids) != w * h:
         sys.exit('ERROR: %s layer holds %d tiles; expected %dx%d'
                  % (tmx_path, len(gids), w, h))
+    empty = gids.count(0)
+    if empty:
+        # Tiled writes gid="0" for an EMPTY cell (its map-change layers are full of
+        # them); an FE map layer has no empty -- passing it through would index
+        # metatile -1 (renders garbage, crashes compile_layout).
+        sys.exit('ERROR: %s main layer has %d empty cells (gid 0) -- fill the '
+                 'layer before importing' % (tmx_path, empty))
     return [[gids[y * w + x] - first for x in range(w)] for y in range(h)]
 
 
