@@ -91,14 +91,7 @@ def check_chapter_status(fail):
     with grounded combat data. Invariant: a `planned` chapter must NOT be `balance_locked: true`
     -- you cannot lock the parity of a chapter whose enemies are an ungrounded sketch (that
     half-state is exactly what makes the difficulty curve and readers treat a seed as truth)."""
-    import yaml
-    for f in sorted(glob.glob(os.path.join(
-            REPO, 'campaigns/*/chapters/ch*.yaml'))):
-        rel = os.path.relpath(f, REPO)
-        try:
-            d = yaml.safe_load(open(f, encoding='utf-8')) or {}
-        except Exception:
-            continue                       # parse errors are check_yaml_parses' job
+    for rel, d in _chapters():
         status = d.get('status')
         if status not in ('active', 'planned'):
             fail.append('%s: missing/invalid `status` (must be active|planned, got %r)'
@@ -106,6 +99,113 @@ def check_chapter_status(fail):
         elif status == 'planned' and d.get('balance_locked'):
             fail.append('%s: status:planned cannot be balance_locked:true -- a planned '
                         'chapter is an ungrounded seed; ground it and flip to active first' % rel)
+
+
+def _chapters():
+    """Yield (relpath, parsed_dict) for every chapter YAML. THE chapter iterator --
+    per-chapter gates consume this so the glob + parse-error policy (parse errors
+    are check_yaml_parses' job) lives in one place."""
+    import yaml
+    for f in sorted(glob.glob(os.path.join(REPO, 'campaigns/*/chapters/ch*.yaml'))):
+        try:
+            d = yaml.safe_load(open(f, encoding='utf-8')) or {}
+        except Exception:
+            continue
+        yield os.path.relpath(f, REPO), d
+
+
+def _int_pair(v):
+    """True for a [col, row] coordinate pair of real ints (bool is an int subtype
+    but a YAML `yes` is never a coordinate)."""
+    return (isinstance(v, list) and len(v) == 2
+            and all(isinstance(c, int) and not isinstance(c, bool) for c in v))
+
+
+def _unit_entry_violations(rel, kind, entries):
+    """Entries of a roster list (player_units / green_allies) must be mappings
+    carrying what the injectors index: id/class/level/position ([col, row])."""
+    msgs = []
+    for g in entries or []:
+        if not isinstance(g, dict):
+            msgs.append('%s: %s entry %r must be a mapping (id/class/level/'
+                        'position ...)' % (rel, kind, g))
+            continue
+        missing = [k for k in ('id', 'class', 'level', 'position') if k not in g]
+        if missing:
+            msgs.append('%s: %s entry %r missing %s'
+                        % (rel, kind, g.get('id', '?'), ', '.join(missing)))
+        elif not _int_pair(g['position']):
+            msgs.append('%s: %s entry %r position must be a [col, row] int pair '
+                        '(got %r)' % (rel, kind, g['id'], g['position']))
+    return msgs
+
+
+def _chapter_deployment_violations(rel, d):
+    """Schema violations for one parsed chapter YAML (pure; unit-tested in
+    test_check_chapter_schema.py). The normalized shape (#107, audit 2.2): ALL
+    deployment data lives under the `deployment:` block (deploy_limit,
+    deploy_slots, note, green_allies); `player_units:` is the one alternative,
+    reserved for a fixed-roster chapter with no prep screen (`is_prologue: true`
+    gates it structurally, not by convention)."""
+    msgs = []
+    for legacy in ('deploy_limit', 'deploy_slots'):
+        if legacy in d:
+            msgs.append('%s: top-level `%s` -- deployment data lives under the '
+                        '`deployment:` block (#107 normalized schema)' % (rel, legacy))
+    has_pu, has_dep = 'player_units' in d, 'deployment' in d
+    if has_pu == has_dep:
+        msgs.append('%s: a chapter expresses its roster as EITHER `player_units:` '
+                    '(fixed roster, no prep screen) OR a `deployment:` block -- '
+                    'found %s' % (rel, 'both' if has_pu else 'neither'))
+    if has_pu:
+        if not d.get('is_prologue'):
+            msgs.append('%s: `player_units:` is the fixed-roster prologue shape -- '
+                        'a prep-screen chapter takes a `deployment:` block '
+                        '(is_prologue: true gates the exception)' % rel)
+        msgs.extend(_unit_entry_violations(rel, 'player_units', d['player_units']))
+    if not has_dep:
+        return msgs
+    dep = d.get('deployment')
+    if not isinstance(dep, dict):
+        msgs.append('%s: `deployment:` must be a mapping' % rel)
+        return msgs
+    limit = dep.get('deploy_limit')
+    limit_ok = isinstance(limit, int) and not isinstance(limit, bool) and limit > 0
+    if limit is not None and not limit_ok:
+        msgs.append('%s: deployment.deploy_limit must be a positive int (got %r)'
+                    % (rel, limit))
+    slots = dep.get('deploy_slots')
+    if slots is not None and not isinstance(slots, list):
+        msgs.append('%s: deployment.deploy_slots must be a list of [col, row] '
+                    'pairs (got %r)' % (rel, slots))
+        slots = None
+    if slots is not None:
+        bad = [s for s in slots if not _int_pair(s)]
+        if bad:
+            msgs.append('%s: deployment.deploy_slots entries must be [col, row] '
+                        'int pairs (first bad: %r)' % (rel, bad[0]))
+        # One typo shouldn't cascade: the match rule only fires when the limit
+        # itself parsed clean (missing limit still counts as a mismatch).
+        if (limit is None or limit_ok) and len(slots) != limit:
+            msgs.append('%s: deployment.deploy_slots (%d) must match '
+                        'deployment.deploy_limit (%r) -- the slot list IS the cap '
+                        'template' % (rel, len(slots), limit))
+    if d.get('status') == 'active' and limit is None:
+        msgs.append('%s: an active chapter with a `deployment:` block needs a '
+                    'machine-readable deployment.deploy_limit (prose notes are for '
+                    'planned seeds)' % rel)
+    msgs.extend(_unit_entry_violations(rel, 'deployment.green_allies',
+                                       dep.get('green_allies')))
+    return msgs
+
+
+def check_chapter_deployment_schema(fail):
+    """The normalized chapter deployment schema (#107): kills the audit-2.2 drift
+    where no two chapters expressed their roster the same way (four shapes across
+    9 files). The injectors and difficulty.py read ONE shape; this gate keeps new
+    chapters on it."""
+    for rel, d in _chapters():
+        fail.extend(_chapter_deployment_violations(rel, d))
 
 
 def check_tool_refs_exist(fail):
@@ -419,7 +519,8 @@ def check_lane_ownership(fail):
 def main():
     fail = []
     for check in (check_python_compiles, check_tests_pass, check_yaml_parses,
-                  check_chapter_status, check_tool_refs_exist, check_no_dead_concepts,
+                  check_chapter_status, check_chapter_deployment_schema,
+                  check_tool_refs_exist, check_no_dead_concepts,
                   check_generated_indexes_fresh, check_engine_guards_present,
                   check_engine_campaign_agnostic,
                   check_save_layout_stable, check_lane_ownership):

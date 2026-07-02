@@ -545,6 +545,20 @@ def chapter_path(campaign, ch):
     return hits[0]
 
 
+def chapter_deploy_limit(chap, default):
+    """The chapter's field cap from its `deployment:` block (#107 normalized schema);
+    chapters without one (the fixed-roster prologue, prose-only seeds) fall back to
+    `default` (= whole roster). The retired top-level shape is rejected loudly --
+    silently modeling a mis-placed cap as "whole roster" would bake wrong parity
+    numbers into a tuning session before the pre-commit gate ever runs."""
+    if 'deploy_limit' in chap or 'deploy_slots' in chap:
+        sys.exit('ERROR: %s: top-level deploy_limit/deploy_slots -- move under the '
+                 '`deployment:` block (#107 schema; check.py explains)'
+                 % chap.get('id', 'chapter'))
+    limit = (chap.get('deployment') or {}).get('deploy_limit')
+    return int(limit) if limit is not None else int(default)
+
+
 def load_field(campaign, ch):
     """Assemble (roster, line_enemies, bosses, deploy_limit, enemy_labels) for a chapter."""
     with open(chapter_path(campaign, ch), encoding='utf-8') as f:
@@ -558,7 +572,7 @@ def load_field(campaign, ch):
         labels.append('%dx %s (%s l%s)' % (count, ed.get('name', ed.get('id', '?')),
                                            kind, ed.get('level', 1)))
         (bosses if ed.get('is_boss') else line).extend(units)
-    return chap, roster, line, bosses, int(chap.get('deploy_limit', len(roster))), labels
+    return chap, roster, line, bosses, chapter_deploy_limit(chap, len(roster)), labels
 
 
 def _metrics(party, line, bosses):
@@ -663,7 +677,7 @@ def _chapter_pressure(chap, band=0.25):
     """Enemy-pressure parity for one loaded chapter dict: our force vs its parity_reference's
     vanilla force, threat/slot + clear-load/slot, with a verdict. `vanilla` is None when the
     reference isn't curated yet (#48 registry)."""
-    deploy_cap = int(chap.get('deploy_limit', len(ROSTER)))
+    deploy_cap = chapter_deploy_limit(chap, len(ROSTER))
     ours_force = chapter_enemy_force(chap)
     ours = enemy_pressure(ours_force, deploy_cap)
     ref = chap.get('parity_reference')

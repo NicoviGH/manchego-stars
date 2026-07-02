@@ -3528,6 +3528,21 @@ def _split_script_beats(script, card_required=True):
     return card, beats
 
 
+def _split_event_beats(chap, trigger, err_label, msg_ids=None, card_required=True):
+    """Locate the chapter event with `trigger` and split its locked `script:` into
+    (location_card, beats) (cf. _split_script_beats). Passing the scene's reserved
+    `msg_ids` block guards the split against it -- a count mismatch means a
+    beat_break drifted in the YAML and a zip would silently drop the extra."""
+    ev = next((e for e in chap['events'] if e.get('trigger') == trigger), None)
+    if ev is None:
+        sys.exit('ERROR: %s: no %r event in the chapter YAML' % (err_label, trigger))
+    card, beats = _split_script_beats(ev['script'], card_required=card_required)
+    if msg_ids is not None and len(beats) != len(msg_ids):
+        sys.exit('ERROR: %s split into %d beats; expected %d (check beat_break '
+                 'markers in the YAML)' % (err_label, len(beats), len(msg_ids)))
+    return card, beats
+
+
 def _cutscene_fid(spk, special, err_label, fallback=None):
     """Speaker id -> face tag for a chapter cutscene: the chapter's `special` speakers
     first (guest slots, faceless `narration` -> None), then the PC PORTRAIT_MAP, then
@@ -3541,6 +3556,14 @@ def _cutscene_fid(spk, special, err_label, fallback=None):
     sys.exit('ERROR: %s %r' % (err_label, spk))
 
 
+def _make_fid(special, err_label, fallback=None):
+    """A chapter's speaker->face function (a closure over _cutscene_fid), the shape
+    _stage_beat/_emit_scene_beats consume."""
+    def fid(spk):
+        return _cutscene_fid(spk, special, err_label, fallback=fallback)
+    return fid
+
+
 def _stage_beat(beat, fid, home, overrides=None):
     """Podium staging for one scenic beat: speaker -> (podium, face tag). Speakers
     default to the mid-left podium; `home` anchors recurring speakers (quest-givers),
@@ -3549,6 +3572,25 @@ def _stage_beat(beat, fid, home, overrides=None):
     ov = overrides or {}
     return {k: (ov.get(k, home.get(k, '[OpenMidLeft]')), fid(k))
             for e in beat for k in e}
+
+
+def _emit_scene_beats(lines, msg_ids, beats, fid, home, overrides=None,
+                      preloads=None, width=None):
+    """Write one message per scenic beat (staging via _stage_beat, body via
+    _script_to_message). width=None picks per beat: faceless-narration beats ride
+    the opaque, auto-centered SOLOTEXTBOXSTART box (#58) wrapped at the on-map 28
+    (42 overflows the centered box); faced beats use the full-screen scenic 42.
+    A fixed width (e.g. 42) overrides for scenes with no narration beats."""
+    overrides = overrides or [None] * len(beats)
+    preloads = preloads or [None] * len(beats)
+    if not (len(overrides) == len(preloads) == len(beats)):
+        sys.exit('ERROR: scene staging lists out of step with its %d beats '
+                 '(%d overrides, %d preloads) for msgs %s' %
+                 (len(beats), len(overrides), len(preloads), msg_ids))
+    for msg_id, beat, override, preload in zip(msg_ids, beats, overrides, preloads):
+        w = width if width is not None else (28 if _beat_is_narration(beat) else 42)
+        set_message_body(lines, msg_id, _script_to_message(
+            beat, _stage_beat(beat, fid, home, override), width=w, preload=preload))
 
 
 def _register_chapter_map(maps_dir, layout, comment):
@@ -3596,19 +3638,70 @@ def _retarget_host_chapter(host_index, goal_slot, goal_type, goal_err, indices,
     return host
 
 
-def _ally_unit_entry(leader, slot, class_enum, level, x, y, items, comment):
-    """One ally UnitDefinition row (events_udefs.c) for a chapter join/deploy table."""
-    return ('    {\n'
-            '        .charIndex = CHARACTER_%s,%s\n'
-            '        .classIndex = %s,\n'
-            '        .leaderCharIndex = %s,\n'
-            '        .allegiance = FACTION_ID_BLUE,\n'
-            '        .level = %d,\n'
-            '        .xPosition = %d,\n'
-            '        .yPosition = %d,\n'
-            '        .redaCount = 0,\n'
-            '        .items = { %s },\n'
-            '    },' % (slot.upper(), comment, class_enum, leader, level, x, y, items))
+def _classed_cast(campaign):
+    """The classed cast in PORTRAIT_MAP order: (unit_id, slot, class_enum,
+    deploy_class_enum, level) per unit, plus a parallel display-name list.
+    Units with no class mapping (non-combat NPCs) are skipped."""
+    cast, names = [], []
+    for unit_id, slot in PORTRAIT_MAP.items():
+        unit = load_unit(campaign, unit_id)
+        unit.setdefault('id', unit_id)
+        class_enum = class_enum_for(unit)
+        if class_enum is None:
+            continue
+        cast.append((unit_id, slot, class_enum, deploy_class_for(unit),
+                     int(unit.get('fe_stats', {}).get('level', 1))))
+        names.append(display_name(unit))
+    if not cast:
+        sys.exit('ERROR: no classed cast -- every PORTRAIT_MAP unit is missing a '
+                 'class mapping (check the pcs/*.yaml fe_stats blocks)')
+    return cast, names
+
+
+def _ally_unit_entry(leader, slot, class_enum, level, x, y, items, comment,
+                     allegiance='BLUE', autolevel=False, ai=None):
+    """One non-RED UnitDefinition row (events_udefs.c) for a chapter join/deploy/
+    green-ally table. leader=None omits the leaderCharIndex field; autolevel/ai
+    toggle their optional lines (GREEN allies use all three)."""
+    fields = ['.charIndex = CHARACTER_%s,%s' % (slot.upper(), comment),
+              '.classIndex = %s,' % class_enum]
+    if leader:
+        fields.append('.leaderCharIndex = %s,' % leader)
+    if autolevel:
+        fields.append('.autolevel = 1,')
+    fields += ['.allegiance = FACTION_ID_%s,' % allegiance,
+               '.level = %d,' % level,
+               '.xPosition = %d,' % x,
+               '.yPosition = %d,' % y,
+               '.redaCount = 0,',
+               '.items = { %s },' % items]
+    if ai:
+        fields.append('.ai = %s,' % ai)
+    return '    {\n' + ''.join('        %s\n' % f for f in fields) + '    },'
+
+
+def _deploy_cap_entries(chap, cast, leader, label):
+    """The ally deploy "cap template" rows from the chapter's `deployment:` block
+    (#107 schema): never LOADed -- the prep flow reads the table's entry count as
+    the field cap and its coords as the deploy tiles. classIndex rides
+    deploy_class_for (today == the plain vanilla class; custom anims need no clone
+    class since the per-character _u25 path, #65 M-B)."""
+    dep = chap.get('deployment') or {}
+    slots, limit = dep.get('deploy_slots'), dep.get('deploy_limit')
+    if not slots:
+        sys.exit('ERROR: %s has no deployment.deploy_slots -- a hosted chapter '
+                 'needs its deploy tiles authored (they land with the map paint)'
+                 % label)
+    if len(slots) != limit:
+        sys.exit('ERROR: %s deployment.deploy_slots (%d) != deploy_limit (%s)'
+                 % (label, len(slots), limit))
+    if len(cast) < limit:
+        sys.exit('ERROR: %d classed cast < %s deploy_limit %d'
+                 % (len(cast), label, limit))
+    return [_ally_unit_entry(leader, slot, dce, lv, x, y, '0',
+                             ' /* deploy slot %d (cap template, never LOADed) */' % i)
+            for i, ((uid, slot, ce, dce, lv), (x, y))
+            in enumerate(zip(cast[:limit], slots))]
 
 
 def _enemy_unit_entry(char, class_enum, level, autolevel, x, y, items, ai, comment,
@@ -3690,19 +3783,13 @@ def inject_ch01(campaign, verbose=True):
     #    instead of empty air, and the haggle puts Hruna across from RBG. Hlin's final
     #    "who leads?" line stays in the scene (end of beat E, at the Northlook); the
     #    lord-select menu then plays over its own scenic BG (not the battle map).
-    b1_script = next(e for e in chap['events']
-                     if e['trigger'] == 'chapter_start')['script']
-    b1_card, b1_beats = _split_script_beats(b1_script)
-    if len(b1_beats) != len(CH01_BEAT1_MSGS):
-        sys.exit('ERROR: ch01 Beat 1 split into %d beats; expected %d (check '
-                 'beat_break markers in the YAML)' % (len(b1_beats), len(CH01_BEAT1_MSGS)))
+    b1_card, b1_beats = _split_event_beats(chap, 'chapter_start', 'ch01 Beat 1',
+                                           CH01_BEAT1_MSGS)
 
     b1_guests = {'hlin': _fid_tag(PROLOGUE_HLIN_SLOT),
                  'scramsax': _fid_tag(PROLOGUE_SCRAMSAX_SLOT),
                  'hruna': _fid_tag('VILLAGER_WOMAN')}
-
-    def b1_fid(spk):
-        return _cutscene_fid(spk, b1_guests, 'ch01 Beat 1 unknown speaker')
+    b1_fid = _make_fid(b1_guests, 'ch01 Beat 1 unknown speaker')
     # Podium geometry (gTalkFaceHPosLut, scene.c, px = x*8; faces are 96px = 12 tiles):
     # FarLeft 24 | MidLeft 48 | Left 72 | Right 168 | MidRight 192 | FarRight 216.
     # Two faces only avoid overlap when >=96px apart, so the clean "two-shot" is
@@ -3737,18 +3824,13 @@ def inject_ch01(campaign, verbose=True):
     #     budget resets per beat. Duvessa (the host, Speaker of Bryn Shander) anchors the
     #     mid-right podium throughout; the party speaks from mid-left, with the other beat
     #     speaker(s) staged as clean two-shots opposite her (cf. Beat 1 podium geometry).
-    end_script = next(e for e in chap['events']
-                      if e['trigger'] == 'chapter_end')['script']
-    end_card, end_beats = _split_script_beats(end_script)
-    if len(end_beats) != len(CH01_ENDING_MSGS):
-        sys.exit('ERROR: ch01 ending split into %d beats; expected %d (check '
-                 'beat_break markers in the YAML)' % (len(end_beats), len(CH01_ENDING_MSGS)))
+    end_card, end_beats = _split_event_beats(chap, 'chapter_end', 'ch01 ending',
+                                             CH01_ENDING_MSGS)
 
-    def end_fid(spk):
-        # narration = faceless stage-business box (no portrait); the fallback covers
-        # the duvessa/hruna/baxby cutscene faces (GUEST_PORTRAIT_MAP).
-        return _cutscene_fid(spk, {'narration': None}, 'ch01 ending unknown speaker',
-                             fallback=GUEST_PORTRAIT_MAP)
+    # narration = faceless stage-business box (no portrait); the fallback covers
+    # the duvessa/hruna/baxby cutscene faces (GUEST_PORTRAIT_MAP).
+    end_fid = _make_fid({'narration': None}, 'ch01 ending unknown speaker',
+                        fallback=GUEST_PORTRAIT_MAP)
     # Duvessa hosts from mid-right (like Hlin in Beat 1); everyone else defaults mid-left.
     # Per-beat overrides put the OTHER speaker opposite her for a clean two-shot: Hruna
     # (C) and Meesmickle (D) take mid-right; in E, Baxby takes mid-right -- evicting
@@ -3790,19 +3872,11 @@ def inject_ch01(campaign, verbose=True):
     #      Northlook; the engine benches everyone past the cap).
     #    - UnitDef_088B4344: the 7 initial goblins. UnitDef_088B44AC: the 3 west
     #      reinforcements (turn 3).
-    cast = []
-    cast_names = []  # parallel to cast: lord-select menu/confirm display names (#42)
-    for unit_id, slot in PORTRAIT_MAP.items():
-        unit = load_unit(campaign, unit_id)
-        unit.setdefault('id', unit_id)
-        class_enum = class_enum_for(unit)
-        if class_enum is None:
-            continue
+    # cast_names is parallel to cast: lord-select menu/confirm display names (#42)
+    cast, cast_names = _classed_cast(campaign)
+    for unit_id, _, class_enum, _, _ in cast:
         if class_enum not in CLASS_LOADOUT:
             sys.exit('ERROR: no loadout for %s (unit %s)' % (class_enum, unit_id))
-        cast.append((unit_id, slot, class_enum, deploy_class_for(unit),
-                     int(unit.get('fe_stats', {}).get('level', 1))))
-        cast_names.append(display_name(unit))
     if len(cast) > len(LORDSEL_CONFIRM_MSGS):
         sys.exit('ERROR: %d lord candidates > %d reserved confirm text ids'
                  % (len(cast), len(LORDSEL_CONFIRM_MSGS)))
@@ -3816,13 +3890,7 @@ def inject_ch01(campaign, verbose=True):
     join = [_ally_unit_entry(leader, slot, dce, lv, x, y,
                              ', '.join(CLASS_LOADOUT[ce]), ' /* %s */' % uid)
             for (uid, slot, ce, dce, lv), (x, y) in zip(cast, CH01_JOIN_POSITIONS)]
-    deploy = [_ally_unit_entry(leader, slot, dce, lv, x, y, '0',
-                               ' /* deploy slot %d (cap template, never LOADed) */' % i)
-              for i, ((uid, slot, ce, dce, lv), (x, y))
-              in enumerate(zip(cast[:len(chap['deploy_slots'])], chap['deploy_slots']))]
-    if len(deploy) != chap['deploy_limit']:
-        sys.exit('ERROR: deploy_slots (%d) != deploy_limit (%d) in ch01 YAML'
-                 % (len(deploy), chap['deploy_limit']))
+    deploy = _deploy_cap_entries(chap, cast, leader, 'ch01')
 
     by_eid = {e['id']: e for e in chap['enemy_units']}
     spear, axe = by_eid['goblin-spear'], by_eid['goblin-axe']
@@ -4314,23 +4382,15 @@ def inject_ch01(campaign, verbose=True):
     # placeholder line -- DEV_PLACEHOLDER_MSG; the ingot recovery is told in beat A.)
     set_message_body(lines, DEV_PLACEHOLDER_MSG, dev_placeholder_message())
     set_message_body(lines, CH01_ENDING_CARD_MSG, name_message_body(end_card))
-    for i, (msg_id, beat) in enumerate(zip(CH01_ENDING_MSGS, end_beats)):
-        # Faceless-narration beats ride the opaque, auto-centered SOLOTEXTBOXSTART box
-        # (#58): wrap at the on-map width so the centered box fits the 240px screen (42
-        # overflows it); faced beats use the full-screen scenic wrap.
-        w = 28 if _beat_is_narration(beat) else 42
-        set_message_body(lines, msg_id, _script_to_message(
-            beat, _stage_beat(beat, end_fid, end_home, end_overrides[i]),
-            width=w, preload=end_preload[i]))
+    _emit_scene_beats(lines, CH01_ENDING_MSGS, end_beats, end_fid, end_home,
+                      end_overrides, end_preload)
     # Beat 1 (#21): the Northlook opening. Card + one message per beat (A-E), rendered
     # from the chapter YAML's locked script with the scenic full-screen wrap width and
     # the per-beat two-sided staging + silent listeners built in step 0. Each beat rides
     # its own Text()/REMA, so the 4-face budget resets per beat.
     set_message_body(lines, CH01_BEAT1_CARD_MSG, name_message_body(b1_card))
-    for i, (msg_id, beat) in enumerate(zip(CH01_BEAT1_MSGS, b1_beats)):
-        set_message_body(lines, msg_id, _script_to_message(
-            beat, _stage_beat(beat, b1_fid, b1_home, b1_overrides[i]),
-            width=42, preload=b1_preload[i]))
+    _emit_scene_beats(lines, CH01_BEAT1_MSGS, b1_beats, b1_fid, b1_home,
+                      b1_overrides, b1_preload, width=42)
     # Lord select (#42): Hlin's "who leads?" already lands in beat E (at the Northlook),
     # so the menu opens directly over its scenic BG -- no separate prompt. Per-candidate
     # confirm texts keep the vanilla route-split shape (cf. MSG_C14/C17/C18) incl. the
@@ -4487,22 +4547,14 @@ def inject_ch02(campaign, verbose=True):
     chap = _load_chapter_yaml(campaign, CH02_CHAPTER_YAML)
 
     # 0. Cutscene beat splits, consumed from the locked chapter YAML (cf. inject_ch01).
-    def split_beats(trigger):
-        scr = next(e for e in chap['events'] if e.get('trigger') == trigger)['script']
-        return _split_script_beats(scr, card_required=False)
-
-    op_card, op_beats = split_beats('chapter_start')
-    end_card, end_beats = split_beats('chapter_end')
+    op_card, op_beats = _split_event_beats(chap, 'chapter_start', 'ch02 opening',
+                                           CH02_OPENING_MSGS, card_required=False)
+    end_card, end_beats = _split_event_beats(chap, 'chapter_end', 'ch02 ending',
+                                             CH02_ENDING_MSGS, card_required=False)
     bark = next(e for e in chap['events']
                 if e.get('trigger') == 'turn_start' and e.get('turn') == 3)['script']
     tutorial = next(e for e in chap['events']
                     if e.get('trigger') == 'turn_start' and e.get('turn') == 1)['script']
-    if len(op_beats) != len(CH02_OPENING_MSGS):
-        sys.exit('ERROR: ch02 opening split into %d beats; expected %d (check '
-                 'beat_break markers)' % (len(op_beats), len(CH02_OPENING_MSGS)))
-    if len(end_beats) != len(CH02_ENDING_MSGS):
-        sys.exit('ERROR: ch02 ending split into %d beats; expected %d (check '
-                 'beat_break markers)' % (len(end_beats), len(CH02_ENDING_MSGS)))
     if len(tutorial) != len(CH02_TUTORIAL_MSGS):
         sys.exit('ERROR: ch02 turn-1 tutorial has %d lines; expected %d '
                  '(zip would silently drop the extra)' % (len(tutorial), len(CH02_TUTORIAL_MSGS)))
@@ -4513,8 +4565,7 @@ def inject_ch02(campaign, verbose=True):
         'targos-fisher': CH02_FISHER_FID,          # generic villager mug
     }
 
-    def cut_fid(spk):
-        return _cutscene_fid(spk, cut_special, 'ch02 unknown cutscene speaker')
+    cut_fid = _make_fid(cut_special, 'ch02 unknown cutscene speaker')
 
     # Vellynne anchors mid-right (the quest-giver, cf. Hlin/Duvessa); everyone else
     # speaks from mid-left. The ending beats are single-speaker each, so mid-left is
@@ -4544,43 +4595,9 @@ def inject_ch02(campaign, verbose=True):
     #      was vanilla Colm's green table). Distinct NPC slots so CHECK_ALIVE tracks each.
     #    - UnitDef_088B4758: the turn-3 RED reinforcement pair (the empty vanilla table;
     #      088B4718 is now the chwinga). Vanilla 088B4470 mix = one L2 + one L3 brigand.
-    cast = []
-    for unit_id, slot in PORTRAIT_MAP.items():
-        unit = load_unit(campaign, unit_id)
-        unit.setdefault('id', unit_id)
-        class_enum = class_enum_for(unit)
-        if class_enum is None:
-            continue
-        cast.append((unit_id, slot, class_enum,
-                     int(unit.get('fe_stats', {}).get('level', 1))))
-    if len(cast) < chap['deploy_limit']:
-        sys.exit('ERROR: %d classed cast < ch02 deploy_limit %d'
-                 % (len(cast), chap['deploy_limit']))
+    cast, _ = _classed_cast(campaign)
     leader = 'CHARACTER_%s' % cast[0][1].upper()
-
-    deploy_slots = chap['deploy_slots']
-    if len(deploy_slots) != chap['deploy_limit']:
-        sys.exit('ERROR: ch02 deploy_slots (%d) != deploy_limit (%d)'
-                 % (len(deploy_slots), chap['deploy_limit']))
-    deploy = [_ally_unit_entry(leader, slot, ce, lv, x, y, '0',
-                               ' /* deploy slot %d (cap template, never LOADed) */' % i)
-              for i, ((uid, slot, ce, lv), (x, y))
-              in enumerate(zip(cast[:chap['deploy_limit']], deploy_slots))]
-
-    def green_entry(slot, level, x, y, items, ai, comment):
-        return ('    {\n'
-                '        .charIndex = CHARACTER_%s,%s\n'
-                '        .classIndex = %s,\n'
-                '        .autolevel = 1,\n'          # lean on the pegasus class curve (bases = tuning checkpoint)
-                '        .allegiance = FACTION_ID_GREEN,\n'
-                '        .level = %d,\n'
-                '        .xPosition = %d,\n'
-                '        .yPosition = %d,\n'
-                '        .redaCount = 0,\n'
-                '        .items = { %s },\n'
-                '        .ai = %s,\n'
-                '    },' % (slot.upper(), comment, CH02_CLASS_IDS['pegasus_knight'],
-                           level, x, y, items, ai))
+    deploy = _deploy_cap_entries(chap, cast, leader, 'ch02')
 
     by_eid = {e['id']: e for e in chap['enemy_units']}
     raider = by_eid['chardalyn-raider']            # 2x L3 generic brigand (vanilla #1 + #5)
@@ -4626,12 +4643,19 @@ def inject_ch02(campaign, verbose=True):
         True, hx, hy, steel, CH02_AI['hold_position'],
         ' /* Halvar the Raider Captain -- boss, steel axe (Bazba slot) */'))
 
-    # 2b. GREEN chwinga (088B4718) -- the protect layer; positions + per-survivor gift
-    #     come from the YAML deployment.green_allies (id order matches CH02_CHWINGA).
+    # 2b. GREEN chwinga (088B4718) -- the protect layer; class + level + positions +
+    #     per-survivor gift come from the YAML deployment.green_allies (id order
+    #     matches CH02_CHWINGA). autolevel leans on the class curve (bases = tuning
+    #     checkpoint).
     chwinga_by_id = {g['id']: g for g in chap['deployment']['green_allies']}
-    chwinga = [green_entry(slot, chwinga_by_id[uid]['level'],
-                           chwinga_by_id[uid]['position'][0], chwinga_by_id[uid]['position'][1],
-                           lance, CH02_AI['cautious'], ' /* chwinga %s (%s) */' % (uid, gift))
+    chwinga = [_ally_unit_entry(None, slot,
+                                CH02_CLASS_IDS[chwinga_by_id[uid]['class']],
+                                chwinga_by_id[uid]['level'],
+                                chwinga_by_id[uid]['position'][0],
+                                chwinga_by_id[uid]['position'][1],
+                                lance, ' /* chwinga %s (%s) */' % (uid, gift),
+                                allegiance='GREEN', autolevel=True,
+                                ai=CH02_AI['cautious'])
                for uid, slot, gift in CH02_CHWINGA]
 
     # 2c. RED reinforcements (088B4758) -- vanilla 088B4470 mix: one L2 + one L3, turn 3.
@@ -4785,10 +4809,7 @@ def inject_ch02(campaign, verbose=True):
     set_message_body(lines, host['goal']['windowTextId'],
                      name_message_body('Rout the enemy'))
     set_message_body(lines, CH02_OPENING_CARD_MSG, name_message_body(op_card))
-    for msg_id, beat in zip(CH02_OPENING_MSGS, op_beats):
-        w = 28 if _beat_is_narration(beat) else 42
-        set_message_body(lines, msg_id, _script_to_message(
-            beat, _stage_beat(beat, cut_fid, op_home), width=w))
+    _emit_scene_beats(lines, CH02_OPENING_MSGS, op_beats, cut_fid, op_home)
     # Turn-1 fliers-vs-bows tutorial: one portrait box per line (RBG, then Pinky), Text_BG 42-wrap.
     for msg_id, ln in zip(CH02_TUTORIAL_MSGS, tutorial):
         set_message_body(lines, msg_id, _script_to_message(
@@ -4799,10 +4820,7 @@ def inject_ch02(campaign, verbose=True):
         bark, {'wolfram': ('[OpenMidLeft]', _fid_tag(PORTRAIT_MAP['wolfram'].upper()))},
         width=29))
     set_message_body(lines, CH02_ENDING_CARD_MSG, name_message_body(end_card))
-    for msg_id, beat in zip(CH02_ENDING_MSGS, end_beats):
-        w = 28 if _beat_is_narration(beat) else 42
-        set_message_body(lines, msg_id, _script_to_message(
-            beat, _stage_beat(beat, cut_fid, {}), width=w))
+    _emit_scene_beats(lines, CH02_ENDING_MSGS, end_beats, cut_fid, {})
     set_message_body(lines, CH02_BOSS_DEATH_MSG, _script_to_message(
         [{'halvar': halvar['death_quote']}],
         {'halvar': ('[OpenMidRight]', _fid_tag(CH02_BOSS_SLOT))}, width=29))

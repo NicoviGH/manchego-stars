@@ -84,18 +84,18 @@ difficulty_note: >
 # player deploy-slot count = 5 (Eirika/Seth/Franz/Gilliam/Moulder). Our 8-strong cast does
 # NOT widen the field — the prep screen (Pick Units) chooses which 5 take it; the chosen
 # lord (#42) is force-deployed. This models our difficulty to vanilla's despite the bigger cast.
-deploy_limit: 5
-# [col, row] — the NW entry corner, ringing the parked sled. FIRST PASS (parity intent
-# only): vanilla Ch2's ally tiles land on walls/peaks in Nicolas's hand-retiled paint, so
-# these are authored against THIS map's actual walkable tiles (plains/forest), not vanilla
-# coords. The party rolls in NW; the raid converges from the E/SE. Nicolas to adjust on the paint.
-deploy_slots:
-  - [0, 3]
-  - [0, 4]
-  - [0, 5]
-  - [1, 5]
-  - [2, 4]
 deployment:
+  deploy_limit: 5
+  # [col, row] — the NW entry corner, ringing the parked sled. FIRST PASS (parity intent
+  # only): vanilla Ch2's ally tiles land on walls/peaks in Nicolas's hand-retiled paint, so
+  # these are authored against THIS map's actual walkable tiles (plains/forest), not vanilla
+  # coords. The party rolls in NW; the raid converges from the E/SE. Nicolas to adjust on the paint.
+  deploy_slots:
+    - [0, 3]
+    - [0, 4]
+    - [0, 5]
+    - [1, 5]
+    - [2, 4]
   note: "Pick Units fields 5 of {7 PCs + Baxby} (vanilla Ch2 fields 5). The party rolls in NW; 3 green chwinga sit just ahead, in the raid's path."
   # ── Protected: 3 GREEN chwinga (replaces the dropped sled) ──────────────────────
   # Harmless gift-spirits (book: "Starting Quest: Nature Spirits", p25–26) on the
