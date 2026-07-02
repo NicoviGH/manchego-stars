@@ -1141,6 +1141,23 @@ layer (the whole party shops, scavenges, rations). Flavor the restock per charac
 scribe / pray); mechanically these are vanilla FE tomes/staves.
 _Decided: 2026-05-29 (supersedes the May 2026 "free chapter-refill, cantrips infinite, slots not buyable")_
 
+**Decision B needs (almost) no code — vanilla FE8 IS the spell economy (#9 delta audit).**
+Decomp-grounded findings (issue #9 has the full table): tome depletion (`bmitem.c
+GetItemAfterUse`, high-byte uses counter), the uses/maxUses display on BOTH the item menu and
+the stat screen, and gold-restock shops (`bmshop.c` sells fresh full-uses items at
+`costPerUse × uses`; vanilla Ch5's vendor already stocks Fire + Lightning tomes) are ALL stock
+behavior — and the primary-cantrip counts already sit in decision B's band (Fire 40, Flux 45,
+Thunder/Lightning 35, Elfire/Shine 30). **"Gray out depleted" conflicts with vanilla**: a
+spent tome breaks and vanishes like an iron sword; we accept break-and-rebuy (it IS the
+decision-B economy) unless Nicolas asks for a persistent grayed slot (question posted on #9).
+What remains is CONTENT, landing with its first consumer per the no-dead-code rule: a
+`shops:` block + `ShopList_Event_*` injection when the first shop chapter is authored
+(vanilla cadence: ~Ch5), per-PC `inventory:` → loadout wiring (today `CLASS_LOADOUT` ships
+class-stock items; changing it alters playtested ch01 balance, so it rides a chapter slice
+with an emulator pass), and secondary-cantrip `maxUses` overrides once the per-PC spell kits
+assign them (same string-patch idiom as #8's effectiveness injection).
+_Decided: 2026-07-02 (CLAUDE; resolves #9's engine half as already-vanilla)_
+
 **MVP weapons = stock FE weapons (no custom Might); personal weapons are post-MVP**
 PCs carry plain vanilla FE weapons whose stats (Mt/Hit/Crit/Wt/uses) come verbatim from a stock
 FE8 item, named in each inventory entry's `fe_base` field — there is **no custom Might authoring**.
