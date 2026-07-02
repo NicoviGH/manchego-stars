@@ -40,7 +40,6 @@ if BLANK:
     # Custom canvas on a vendored tileset (#40): no vanilla layout to derive from.
     W,H=(int(v) for v in BLANK.lower().split('x'))
     FILL=int(FLAGS.get('--fill','0'))
-    cells=[FILL]*(W*H)          # reference-pane cells (unused when --ref is given)
     grid=[FILL]*(W*H)
 else:
     # `van` is consulted ONLY for .terrain(m) (vanilla tileset-1 terrain table) to decide which
@@ -288,10 +287,7 @@ print('wrote',path,'(%d KB)'%(len(out)//1024))
 start_json=os.path.join(ROOT,'map-review',DOWNLOAD)
 json.dump({'tileset':TILESET,'width':W,'height':H,'grid':grid},open(start_json,'w'))
 print('wrote starting layout',start_json)
-Z=4*16
-prev=Image.new('RGB',(W*Z,H*Z))
-for i,m in enumerate(grid):
-    prev.paste(win.metatile_image(m).resize((Z,Z),Image.NEAREST),((i%W)*Z,(i//W)*Z))
+from map_tileset_tool import render_grid
 png=os.path.join(ROOT,'map-review',os.path.splitext(os.path.basename(OUT_HTML))[0]+'-start.png')
-prev.save(png)
+render_grid(win,[grid[r*W:(r+1)*W] for r in range(H)],png,zoom=4)
 print('rendered start preview',png)

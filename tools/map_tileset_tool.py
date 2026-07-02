@@ -178,6 +178,7 @@ def convert_object_png(png_path):
                 left, right = px[base + b * 2], px[base + b * 2 + 1]
                 gfx.append(left | (right << 4))
     rgb = img.getpalette()
+    rgb = rgb + [0] * (PALETTE_BANKS * 16 * 3 - len(rgb))   # PIL trims short palettes
     pal = bytearray()
     for c in range(PALETTE_BANKS * 16):
         r, g, b = rgb[c * 3], rgb[c * 3 + 1], rgb[c * 3 + 2]

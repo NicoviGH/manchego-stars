@@ -2769,9 +2769,10 @@ CHAPTER_SETTINGS_JSON = os.path.join(DECOMP, 'src', 'data', 'chapter_settings.js
 
 # The campaign's tilesets (maps/tilesets/<name>/, vendored via map_tileset_tool
 # import). Each registers under ObjectType<Stem>/MapPalette<Stem>/
-# TileConfiguration<Stem> asset labels (_register_tileset).
+# TileConfiguration<Stem> asset labels (_register_tileset). Further tilesets
+# (e.g. cave-interior, #40/#23) register in the chapter injector that first
+# consumes them.
 WINTER_TILESET = 'snowy-bern'         # shared winter overworld (#41), stem Snow
-CAVE_TILESET = 'cave-interior'        # Cynon's Mineshaft, Gray (#40/#23), stem Cave
 WINTER_TEST_LAYOUT = ('ChTestSnowMap', 'ch-test-snowfield')  # (asset label, campaign source stem)
 
 

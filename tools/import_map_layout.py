@@ -8,8 +8,7 @@ e.g.   import_map_layout.py ch01-the-iron-trail ~/Downloads/ch01-layout.json
 import sys, os, json
 ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # repo root (worktree-aware)
 sys.path.insert(0, os.path.join(ROOT,'tools'))
-from map_tileset_tool import _tileset_from_dir, compile_layout
-from PIL import Image
+from map_tileset_tool import _tileset_from_dir, compile_layout, render_grid
 
 if len(sys.argv)<2:
     sys.exit('usage: import_map_layout.py <map-stem> [src-json]')
@@ -34,10 +33,5 @@ compile_layout(grid, out_bin, stem, tileset=tileset)
 print('compiled', out_bin, f'({W}x{H}, tileset {tileset})')
 
 win=_tileset_from_dir(os.path.join(mapdir,f'tilesets/{tileset}'))
-Z=4*16
-img=Image.new('RGB',(W*Z,H*Z))
-for i,m in enumerate(flat):
-    img.paste(win.metatile_image(m).resize((Z,Z),Image.NEAREST),((i%W)*Z,(i//W)*Z))
-prev=os.path.join(ROOT,f'map-review/{stem}-painted.png')
-img.save(prev)
+prev=render_grid(win, grid, os.path.join(ROOT,f'map-review/{stem}-painted.png'), zoom=4)
 print('rendered preview', prev, '; imported from', src)
