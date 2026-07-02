@@ -63,6 +63,9 @@ cd fireemblem8u
 - Match the existing file and function naming conventions in `fireemblem8u/src/`
 - New engine behavior ships as string-patch hooks in `tools/inject/engine_hooks.py` — never hand-edits
   to `fireemblem8u/src/` (our decomp edits are build artifacts, restored on every build)
+- Comments say **why**; the **what** lives in code + tests. When a change retires a mechanism or term,
+  register its key phrases in `tools/check.py` `DEAD_CONCEPTS` in the same commit — the drift lint scans
+  docs AND hand-written code comments (`docs/decisions.md` → "Comments are testimony").
 
 ## Engine / Content Boundary Rule
 
