@@ -31,6 +31,7 @@ WEAPON_ITEM_ENUM = {
     'iron-axe': 'ITEM_AXE_IRON', 'steel-axe': 'ITEM_AXE_STEEL',
     'hand-axe': 'ITEM_AXE_HANDAXE',
     'iron-bow': 'ITEM_BOW_IRON', 'fire': 'ITEM_ANIMA_FIRE', 'flux': 'ITEM_DARK_FLUX',
+    'elfire': 'ITEM_ANIMA_ELFIRE',
 }
 
 

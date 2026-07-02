@@ -103,6 +103,20 @@ item_names:
 item_icons:
   ITEM_VULNERARY: goodberry
 
+# Iconic matchups (#8): flag weapons `effective` vs enemy CLASSES via FE8's native
+# effectiveness (x3 damage, decisions.md §Combat "Iconic matchups" -- class-keyed,
+# no resistance tables, use SPARINGLY). Injected by build_campaign.inject_iconic_matchups:
+# each entry appends one ItemEffectiveness_* class list to the decomp and points the
+# named weapons' .pEffectiveness at it. Weapon keys = WEAPON_ITEM_ENUM names; class
+# tokens = decomp CLASS_ enums lowercased (cyclops -> CLASS_CYCLOPS).
+iconic_matchups:
+  - id: fire-vs-ice
+    weapons: [fire, elfire]           # the fire-line anima tomes
+    effective_vs: [cyclops, druid]    # ice trolls (ch08 cyclops reskin) + frost
+                                      # druids (Ravisin, ch05). cyclops-2 unused by
+                                      # our chapters; add it here if that changes.
+    note: "Fire bites Icewind's ice-creatures -- the campaign's one elemental truth."
+
 # D&D content sources (frozen snapshots committed at data/)
 data_sources:
   srd: data/srd/srd-snapshot.json
