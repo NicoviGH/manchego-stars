@@ -1,0 +1,56 @@
+# TEMPORARY verification gate for the #104 pure-code-motion refactor.
+# Builds the ROM twice in one job — once from origin/main's tools/, once from this
+# branch's — against the SAME mock base ROM, and fails unless the two .gba files are
+# byte-identical. Proves the refactor changed no emitted byte.
+# DELETE THIS FILE before/at merge; it has no value after #104 lands.
+name: rom-diff
+
+on:
+  pull_request:
+    paths:
+      - "tools/**"
+
+jobs:
+  rom-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential binutils-arm-none-eabi libpng-dev lua5.4
+          sudo ln -sf "$(command -v lua5.4)" /usr/local/bin/lua
+          python3 -m pip install ttp numpy pillow pyyaml
+
+      - name: Install agbcc into the decomp
+        run: |
+          git clone https://github.com/pret/agbcc.git
+          cd agbcc && ./build.sh && ./install.sh "$GITHUB_WORKSPACE/fireemblem8u"
+
+      - name: Build decomp tools
+        run: cd fireemblem8u && ./build_tools.sh
+
+      - name: Mock base ROM (one file, shared by both builds)
+        run: head -c 16M /dev/urandom > fireemblem8u/baserom.gba
+
+      - name: Build A — origin/main's injector
+        run: |
+          git checkout origin/main -- tools campaigns Makefile
+          make CAMPAIGN=rime-of-the-frostmaiden
+          sha1sum fireemblem8u/fireemblem8.gba | tee /tmp/rom-a.sha
+
+      - name: Build B — this branch's injector
+        run: |
+          git checkout HEAD -- tools campaigns Makefile
+          make CAMPAIGN=rime-of-the-frostmaiden
+          sha1sum fireemblem8u/fireemblem8.gba | tee /tmp/rom-b.sha
+
+      - name: Compare
+        run: |
+          a=$(cut -d' ' -f1 /tmp/rom-a.sha); b=$(cut -d' ' -f1 /tmp/rom-b.sha)
+          echo "main: $a"; echo "branch: $b"
+          test "$a" = "$b" && echo "ROMs are byte-identical ✅"
