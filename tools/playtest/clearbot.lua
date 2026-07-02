@@ -53,4 +53,76 @@ function M.pickTarget(reachable, enemies, prefs)
     return nil
 end
 
+local function tileKey(x, y) return x .. "," .. y end
+
+-- Off-field sentinel: a tile the BFS never reached must score worse than ANY real
+-- field distance. Real distances are bounded by map area (FE8 maps are < 65536
+-- tiles); Manhattan by map perimeter -- both far under this.
+local OFFFIELD = 1000000
+
+-- pickMove(reachable, opts) -> {x,y} | nil -- the march decision when nothing is
+-- attackable this turn (#60 last-mile breach). Pure, like pickTarget: the scenario
+-- reads reachability/field/positions and owns the actual moving.
+--   opts.field:   BFS distance field to the boss (pathing.lua); nil-tolerant
+--   opts.cur:     the unit's current {x,y}
+--   opts.goal:    the boss {x,y} (Manhattan fallback where the field has no value)
+--   opts.blocked: set (keyed "x,y") of tiles claimed by OTHER friendly units this
+--                 phase, so two marchers stop fighting over the same chokepoint tile
+--   opts.enemies: live enemies -- cork pressure when the boss path is jammed
+-- Decision: the unblocked reachable tile with the lowest field distance, Manhattan
+-- tiebroken (keeps momentum on field plateaus). If that does NOT improve on the
+-- unit's current field distance -- the walled-camp jam -- push toward the nearest
+-- CORK enemy: one at least as boss-near as we are (fd(e) <= curFd). Stragglers
+-- BEHIND the advance never trigger the fallback, so a follower whose best tile is
+-- merely claimed by its leader holds the line instead of marching backward; among
+-- equally-cork-near tiles the boss-nearest wins (no oscillation).
+function M.pickMove(reachable, opts)
+    opts = opts or {}
+    local field, cur, goal = opts.field, opts.cur, opts.goal
+    local blocked = opts.blocked or {}
+    local enemies = opts.enemies or {}
+    local function fd(x, y) return field and field[y] and field[y][x] end
+    local function score(t)
+        local m = goal and manhattan(t.x, t.y, goal.x, goal.y) or 0
+        return (fd(t.x, t.y) or (OFFFIELD + m)) * 1000 + m
+    end
+    local best, bestScore
+    for _, t in ipairs(reachable) do
+        if not blocked[tileKey(t.x, t.y)] then
+            local s = score(t)
+            if not bestScore or s < bestScore then best, bestScore = t, s end
+        end
+    end
+    if not best then return nil end
+    -- a nil fd (unit/tile off the field, e.g. terrain-disconnected from the boss)
+    -- counts as maximally far, so a fully-disconnected unit still gets the cork
+    -- fallback rather than silently Manhattan-pressing against a wall
+    local curFd = (cur and fd(cur.x, cur.y)) or OFFFIELD
+    local bestFd = fd(best.x, best.y) or OFFFIELD
+    if bestFd >= curFd and #enemies > 0 then
+        local corks = {}
+        for _, e in ipairs(enemies) do
+            local efd = fd(e.x, e.y) or OFFFIELD
+            if efd <= curFd then corks[#corks + 1] = e end
+        end
+        local eb, ebs
+        for _, t in ipairs(reachable) do
+            if not blocked[tileKey(t.x, t.y)] then
+                local near = math.huge
+                for _, e in ipairs(corks) do
+                    near = math.min(near, manhattan(t.x, t.y, e.x, e.y))
+                end
+                if near < math.huge then
+                    local s = near * (OFFFIELD * 1000) + score(t)
+                    if not ebs or s < ebs then eb, ebs = t, s end
+                end
+            end
+        end
+        if eb then return eb end
+    end
+    return best
+end
+
+M.tileKey = tileKey
+
 return M

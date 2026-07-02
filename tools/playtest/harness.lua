@@ -747,28 +747,34 @@ end
 -- tile; else step to the reachable tile NEAREST the boss by path distance (`field`, BFS around
 -- walls) -- falling back to Manhattan toward `goal` only where the field is unreachable. GUARANTEES
 -- it leaves no unit selected (commit via Attack/Wait, or back out with B).
-local function clearUnitAct(u, field, goal)
-    local reach = selectAndReach(u)
+local function clearUnitAct(u, field, goal, blocked, claimed, maxx, maxy)
+    -- thread the REAL map bounds through: selectAndReach defaults to a 15x10
+    -- window, which clipped every reach list at x=14 on ch01's 25x16 map -- the
+    -- probable root cause of the #60 stall at exactly (14,8)
+    local reach = selectAndReach(u, maxx, maxy)
     if not reach then return end                 -- exhausted/unreachable; nothing selected
     local mn, mx = unitAttackRange(u)
-    local pick = mn and CLEARBOT.pickTarget(reach, liveEnemies(), { range = mx, min_range = mn }) or nil
+    local enemies = liveEnemies()
+    local pick = mn and CLEARBOT.pickTarget(reach, enemies, { range = mx, min_range = mn }) or nil
     local tile = pick and pick.tile
-    if not tile then                             -- no target in range: advance toward the boss
-        local best = math.huge
-        for _, t in ipairs(reach) do
-            local fd = field and field[t.y] and field[t.y][t.x]
-            local score = fd or (1000 + math.abs(goal.x - t.x) + math.abs(goal.y - t.y))
-            if score < best then tile, best = t, score end
-        end
+    if not tile then
+        -- no target in range: march (pure decision core -- field-first with a
+        -- Manhattan tiebreak, claimed-tile avoidance, and the chokepoint-jam
+        -- fallback that pushes at the nearest enemy cork; #60 last-mile breach)
+        tile = CLEARBOT.pickMove(reach, { field = field, cur = { x = u.x, y = u.y },
+                                          goal = goal, blocked = blocked,
+                                          enemies = enemies })
     end
     if tile and cursorTo(tile.x, tile.y) then
         press(K.A)
         if waitFor(menuOpen, 40) then
             if pick then chooseAttack(u.addr) else chooseWait() end
-            return
+            if claimed then claimed[CLEARBOT.tileKey(tile.x, tile.y)] = true end
+            return tile
         end
     end
     press(K.B); press(K.B)                       -- never leave a unit selected
+    return tile, true                            -- true = the move DIDN'T commit
 end
 
 local CH01_PARK = { x = 24, y = 15 } -- empty far corner; ch01 map is 25x16
@@ -811,6 +817,7 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
         press(K.B); wait(6)   -- NUDGE unstick: clear any stray menu before driving
         local b = findBoss()
         local field = b and bossDistanceField(b, maxx, maxy) or nil
+        local claimed = {}                       -- destinations committed this phase
         for i = 0, 7 do
             if won() then return "won", t end
             if lost() then return "gameover", t end
@@ -819,7 +826,24 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
                 b = findBoss()
                 if b then
                     seizeTile = { x = b.x, y = b.y }
-                    clearUnitAct(u, field, b)
+                    -- other live units' CURRENT tiles are unstandable too
+                    local blocked = {}
+                    for k in pairs(claimed) do blocked[k] = true end
+                    for j = 0, 7 do
+                        local o = unitAt(SYM.gUnitArrayBlue, j)
+                        if o and not isDead(o) and j ~= i then
+                            blocked[CLEARBOT.tileKey(o.x, o.y)] = true
+                        end
+                    end
+                    local tile, failed = clearUnitAct(u, field, b, blocked, claimed,
+                                                      maxx, maxy)
+                    if failed and tile then
+                        -- decision was made but the move never committed: a
+                        -- MECHANICAL failure (cursor/menu), not a pathing one --
+                        -- the distinction the #60 stall logs couldn't see
+                        log(string.format("clear: unit (%d,%d) chose (%d,%d) but the "
+                            .. "move didn't commit", u.x, u.y, tile.x, tile.y))
+                    end
                 elseif moveUnit(u.x, u.y, seizeTile.x, seizeTile.y) then
                     -- boss dead, not yet won -> Seize. It tops the menu for a unit that can
                     -- seize; for any other unit A just Waits, so we back out and try the next.
