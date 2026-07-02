@@ -1029,9 +1029,15 @@ def _crit_flourish_bins(png_path):
     centering the art on the upper screen."""
     from PIL import Image
     im = Image.open(png_path).convert('RGBA')
-    if im.width % 8 or im.height % 8 or im.width > 240 or im.height > 120:
-        sys.exit('ERROR: %s must be 8px-multiple dims, <=240x120' % png_path)
+    if im.width % 8 or im.height % 8 or im.width > 240 or im.height > 160:
+        sys.exit('ERROR: %s must be 8px-multiple dims within the 240x160 screen'
+                 % png_path)
     tw, th = im.width // 8, im.height // 8
+    # SpellFx_RegisterBgGfx decompresses into gSpellAnimBgfx (0x1D00 B = 232
+    # tiles, banim-ekrbattle.c) -- overflow corrupts adjacent banim overlay state
+    if tw * th + 1 > 232:
+        sys.exit('ERROR: %s is %d tiles + 1 blank; the SpellFx gfx buffer holds '
+                 '232 (gSpellAnimBgfx, 0x1D00 B)' % (png_path, tw * th))
     px = im.load()
     colors = []
 
@@ -1083,6 +1089,13 @@ def inject_crit_flourish(campaign, verbose=True):
                        ('msd20crit_tsa', tsa)):
         with open(os.path.join(DECOMP, 'graphics', 'banim', stem + '.bin'), 'wb') as f:
             f.write(data)
+    with open(DATA_BANIM_S, encoding='utf-8') as f:
+        already = '.global Img_MsD20Crit' in f.read()
+    if already:
+        # idempotent like the C-side 'MS #11' guard: a second run in one process
+        # must not append duplicate labels (assembler: symbol already defined)
+        engine_hooks._inject_crit_d20_flourish()
+        return
     with open(DATA_BANIM_S, 'a', encoding='utf-8') as f:
         f.write('\n'.join([
             '', '/* Manchego Stars #11: nat-20 crit flourish (campaign asset) */']

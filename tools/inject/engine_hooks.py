@@ -563,13 +563,20 @@ def _inject_lord_floor_engine():
 def _inject_crit_d20_flourish():
     """#11: the cosmetic nat-20 flourish. When an FE crit fires in a battle anim,
     a d20 showing 20 pops on the effect layer (BG1) the exact frame the vanilla
-    crit flash cleans up -- same proc tree, sequenced ownership, so neither the
-    flash nor combat pacing changes (the C08 handler never blocks on efx procs).
-    FE crit math stays the SOLE trigger: this hooks the flash's own teardown,
-    which only ever runs on a crit round. The die is a centered HUD overlay, so
-    the tilemap copies through the non-mirrored path regardless of attacker side.
-    Asset symbols (Img/Pal/Tsa_MsD20Crit) are injected from the campaign by
-    build_campaign.inject_crit_flourish -- this patch is campaign-agnostic."""
+    crit flash tears down -- both the plain crit flash AND the pierce-crit flash
+    (Silencer is deliberately excluded: it has its own distinctive Chill flourish,
+    and no MVP cast member can Silencer anyway). FE crit math stays the SOLE
+    trigger: these teardowns only ever run on a crit round.
+
+    The die is PROC-LESS: registered once, then the vanilla effect lifecycle owns
+    BG1 -- a successor effect (brave second hit, magic counter's spell background)
+    simply draws over it, and the battle-scene exit resets the layer. Nothing of
+    ours ever clears BG1 later, so no lingering proc can blank a newcomer's
+    tilemap mid-display (the clobber class a timed teardown would create). It is
+    a centered HUD overlay copied through the non-mirrored tilemap path, so the
+    "20" never mirrors with attacker side. Asset symbols (Img/Pal/Tsa_MsD20Crit)
+    are injected from the campaign by build_campaign.inject_crit_flourish -- this
+    patch is campaign-agnostic."""
     with open(BANIM_EFXHIT_C, encoding='utf-8') as f:
         text = f.read()
     if 'MS #11' in text:
@@ -582,26 +589,15 @@ def _inject_crit_d20_flourish():
     block = (
         '#include "constants/video-banim.h" /* OBJPAL_BANIM_SPELL_BG (MS #11) */\n'
         '\n'
-        '/* MS #11: cosmetic nat-20 flourish. The die rides the SpellFx BG1 layer\n'
-        '   right after the crit flash clears it; ~46 frames, then normal teardown. */\n'
+        '/* MS #11: cosmetic nat-20 flourish -- drawn once at a crit flash teardown;\n'
+        '   the vanilla effect lifecycle owns BG1 from there (a successor effect\n'
+        '   overwrites it, the scene exit resets it). */\n'
         'extern const u16 Img_MsD20Crit[];\n'
         'extern const u16 Pal_MsD20Crit[];\n'
         'extern const u16 Tsa_MsD20Crit[];\n'
         '\n'
-        'void efxMsD20CritMain(struct ProcEfxBG * proc);\n'
-        '\n'
-        'CONST_DATA struct ProcCmd ProcScr_efxMsD20Crit[] = {\n'
-        '    PROC_NAME("efxMsD20Crit"),\n'
-        '    PROC_REPEAT(efxMsD20CritMain),\n'
-        '    PROC_END\n'
-        '};\n'
-        '\n'
-        'void NewEfxMsD20Crit(struct Anim * anim)\n'
+        'static void MsD20CritShow(void)\n'
         '{\n'
-        '    struct ProcEfxBG * proc;\n'
-        '    proc = Proc_Start(ProcScr_efxMsD20Crit, PROC_TREE_3);\n'
-        '    proc->anim = anim;\n'
-        '    proc->timer = 0;\n'
         '    SpellFx_RegisterBgGfx(Img_MsD20Crit, 0x2000);\n'
         '    SpellFx_RegisterBgPal(Pal_MsD20Crit, 0x20);\n'
         '    LZ77UnCompWram(Tsa_MsD20Crit, gEkrTsaBuffer);\n'
@@ -609,39 +605,27 @@ def _inject_crit_d20_flourish():
         '               OBJPAL_BANIM_SPELL_BG, 0x100);\n'
         '    BG_EnableSyncByMask(BG1_SYNC_BIT);\n'
         '}\n'
-        '\n'
-        'void efxMsD20CritMain(struct ProcEfxBG * proc)\n'
-        '{\n'
-        '    if (++proc->timer == 0x2E) {\n'
-        '        SpellFx_ClearBG1();\n'
-        '        Proc_Break(proc);\n'
-        '    }\n'
-        '}\n'
         '\n')
     text = text.replace(anchor, block + anchor, 1)
 
-    # the bare teardown body appears in more than one efx proc -- anchor on the
-    # enclosing function so only the crit flash's teardown is hooked
-    orig = ('void efxCriricalEffectBGMain(struct ProcEfxBG * proc)\n'
-            '{\n'
-            '    if (++proc->timer == 0x11) {\n'
-            '        SpellFx_ClearBG1();\n'
+    # hook BOTH crit-flash teardowns (plain + pierce); the bare body appears in
+    # more than one proc, so anchor on each enclosing function
+    for fn in ('efxCriricalEffectBGMain', 'efxPierceCriticalEffectBGMain'):
+        orig = ('void %s(struct ProcEfxBG * proc)\n'
+                '{\n'
+                '    if (++proc->timer == 0x11) {\n'
+                '        SpellFx_ClearBG1();\n'
+                '        SetDefaultColorEffects_();\n'
+                '        Proc_Break(proc);\n'
+                '    }\n'
+                '}\n' % fn)
+        if text.count(orig) != 1:
+            sys.exit('ERROR: %s teardown not in expected vanilla form in %s'
+                     % (fn, BANIM_EFXHIT_C))
+        hooked = orig.replace(
+            '        SetDefaultColorEffects_();\n',
             '        SetDefaultColorEffects_();\n'
-            '        Proc_Break(proc);\n'
-            '    }\n'
-            '}\n')
-    if text.count(orig) != 1:
-        sys.exit('ERROR: efxCriricalEffectBGMain teardown not in expected vanilla '
-                 'form in %s' % BANIM_EFXHIT_C)
-    hooked = ('void efxCriricalEffectBGMain(struct ProcEfxBG * proc)\n'
-              '{\n'
-              '    if (++proc->timer == 0x11) {\n'
-              '        SpellFx_ClearBG1();\n'
-              '        SetDefaultColorEffects_();\n'
-              '        NewEfxMsD20Crit(proc->anim); /* MS #11: nat-20 die in the tail */\n'
-              '        Proc_Break(proc);\n'
-              '    }\n'
-              '}\n')
-    text = text.replace(orig, hooked, 1)
+            '        MsD20CritShow(); /* MS #11: the nat-20 die takes the cleared layer */\n')
+        text = text.replace(orig, hooked, 1)
     with open(BANIM_EFXHIT_C, 'w', encoding='utf-8') as f:
         f.write(text)
