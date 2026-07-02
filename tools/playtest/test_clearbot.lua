@@ -106,14 +106,29 @@ do
 end
 
 -- Chokepoint jam: nothing reachable improves the current fd -> push at the
--- nearest enemy (the cork) instead of idling.
+-- nearest CORK enemy. The cork sits OFF the goal axis so this answer differs
+-- from the plain field+Manhattan pick -- deleting the fallback fails this test.
 do
-    local field = { [0] = { [0] = 8, [1] = 8, [2] = 8 } }   -- a plateau, no progress
+    local field = { [0] = { [0] = 8, [1] = 8, [2] = 8 },
+                    [1] = { [0] = 8, [1] = 8, [2] = 8 } }   -- a plateau, no progress
     local reach = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 })
-    local mv = C.pickMove(reach, { field = field, cur = { x = 0, y = 0 },
+    local mv = C.pickMove(reach, { field = field, cur = { x = 2, y = 0 },
                                    goal = { x = 9, y = 0 },
-                                   enemies = { { x = 3, y = 0, hp = 20 } } })
-    check(mv.x, 2, "jammed march -> tile nearest the enemy cork")
+                                   enemies = { { x = 0, y = 1, hp = 20 } } })  -- cork, fd 8
+    check(mv.x .. "," .. mv.y, "0,0", "jammed march -> tile nearest the off-axis cork")
+end
+
+-- A straggler BEHIND the advance (farther from the boss than we are) never
+-- triggers the fallback: the follower whose best tile is claimed holds the
+-- line instead of marching backward (the oscillation bug).
+do
+    local field = { [0] = { [0] = 10, [1] = 9, [2] = 8, [3] = 7 } }
+    local reach = tiles({ 1, 0 }, { 2, 0 }, { 3, 0 })
+    local blocked = { [C.tileKey(3, 0)] = true }             -- leader claimed the front
+    local mv = C.pickMove(reach, { field = field, cur = { x = 2, y = 0 },
+                                   goal = { x = 9, y = 0 }, blocked = blocked,
+                                   enemies = { { x = 0, y = 0, hp = 20 } } })  -- fd 10 > cur 8
+    check(mv.x, 2, "straggler behind never pulls the follower backward")
 end
 
 -- Field-less tiles fall back to Manhattan-toward-goal (off-field never beats on-field).

@@ -747,8 +747,11 @@ end
 -- tile; else step to the reachable tile NEAREST the boss by path distance (`field`, BFS around
 -- walls) -- falling back to Manhattan toward `goal` only where the field is unreachable. GUARANTEES
 -- it leaves no unit selected (commit via Attack/Wait, or back out with B).
-local function clearUnitAct(u, field, goal, blocked, claimed)
-    local reach = selectAndReach(u)
+local function clearUnitAct(u, field, goal, blocked, claimed, maxx, maxy)
+    -- thread the REAL map bounds through: selectAndReach defaults to a 15x10
+    -- window, which clipped every reach list at x=14 on ch01's 25x16 map -- the
+    -- probable root cause of the #60 stall at exactly (14,8)
+    local reach = selectAndReach(u, maxx, maxy)
     if not reach then return end                 -- exhausted/unreachable; nothing selected
     local mn, mx = unitAttackRange(u)
     local enemies = liveEnemies()
@@ -832,7 +835,8 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
                             blocked[CLEARBOT.tileKey(o.x, o.y)] = true
                         end
                     end
-                    local tile, failed = clearUnitAct(u, field, b, blocked, claimed)
+                    local tile, failed = clearUnitAct(u, field, b, blocked, claimed,
+                                                      maxx, maxy)
                     if failed and tile then
                         -- decision was made but the move never committed: a
                         -- MECHANICAL failure (cursor/menu), not a pathing one --
