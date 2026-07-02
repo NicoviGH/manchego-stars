@@ -4,7 +4,7 @@ concept previews (map-review/). Divergent metatiles (terrain mismatch between th
 two tilesets) are ironed out with the same neighbor/mode substitution the layout
 editor uses, so the preview reads as a finished winter map, not a glitch sheet."""
 import sys, os, struct, collections
-ROOT = '/Users/Yonick/Projects/manchego-stars'
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEC = os.path.join(ROOT, 'fireemblem8u')
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 from map_tileset_tool import _tileset_from_dir, Tileset

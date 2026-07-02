@@ -9,9 +9,11 @@ the red cape). Stored locally because FE-Repo / community links rot.
 **Authors / credit:** ZoramineFae, Clendo — **F2E** (free-to-edit). Credit them on use.
 
 **Format:** standard GBAFE sheet+script (248×160 canvas) — `Monster.txt` script + `Monster Sheet 1–4.png`
-+ `Monster.gif` preview. This is the format our planned decomp-native battle-anim inserter (#39)
-will consume. The 144 individual frame PNGs were NOT stored (derived from the sheets).
++ `Monster.gif` preview. The 144 individual frame PNGs were NOT stored (derived from the sheets).
 
-**Status:** DEFERRED. Battle anims are post-MVP (M4); the inserter (#39) isn't built yet.
-This is a find-to-park, not wired in. The Meesmickle **map sprite** uses the FE-Repo **Tiger**
-(see `map_sprites/` — sandbox `meesmickle-tiger`).
+**Status:** PARKED as an *alternative* base. The battle-anim pipeline that actually shipped (#65,
+2026-06: RBG + braulo) is the per-character 3-frame descaled-pose path (`build_battle_anim` +
+`tools/descale_battleframe.py`), which does NOT consume full GBAFE sheets like this one — meesmickle's
+planned route is the Shaman donor + 3 descaled poses (see `HANDOFF.md` §the other 5 PCs). This sheet
+stays parked in case a full-sheet reskin is ever wanted instead. The Meesmickle **map sprite** uses
+the FE-Repo **Tiger** (see `map_sprites/` — sandbox `meesmickle-tiger`).

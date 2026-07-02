@@ -3,6 +3,20 @@
 > These decisions are **settled**. Do not re-open them without a strong reason.
 > Add new decisions here when they are made. Date each entry.
 
+**Contents:**
+[Engine & Tech Stack](#engine--tech-stack) ·
+[Documentation Model](#documentation-model) ·
+[Working Conventions](#working-conventions-definition-of-done) ·
+[Combat System](#combat-system) ·
+[Weapon & Magic Systems](#weapon--magic-systems) ·
+[Economy](#economy) ·
+[Distribution & Scope](#distribution--scope) ·
+[Art & Audio](#art--audio) ·
+[Class Mapping & Promotions](#class-mapping--promotions) ·
+[Story & Dialogue](#story--dialogue) ·
+[Operational Gotchas](#operational-gotchas-durable) ·
+[Open Questions](#open-questions-not-yet-decided)
+
 ---
 
 ## Engine & Tech Stack
@@ -465,8 +479,8 @@ across Ch6–21**, added as the DM notes supply bodies (which/where stays DM-not
 `deploy_limit`), and recruits still earn their slot by **filling a role gap** (the by-role method in
 `roadmap.md`) — the budget says *how many*, the role principle says *which*.
 _Reconstructed: 2026-06-22 (CLAUDE, from the decomp field-growth curve at Nicolas's direction) —
-supersedes the stale `roadmap.md` "roster stops growing at Ch5" line; the original budget sweep was
-done in-session and never recorded, which this ADR fixes._
+superseded the then-stale `roadmap.md` "roster stops growing at Ch5" line (roadmap since fixed); the
+original budget sweep was done in-session and never recorded, which this ADR fixes._
 
 **Reward/item budget: a chapter's loot mirrors its `parity_reference` vanilla chapter — same as its enemies.**
 Just as `deploy_limit` and the enemy roster track the parity-reference chapter (§Field parity), so does
@@ -1746,6 +1760,53 @@ boss on a multi-boss map** (vanilla precedent: FE8 Ch15 Caellach + Valter, the F
 + Lyon; our own ch05 already runs Ravisin + the White Moose), firmed when the back-half DM notes arrive.
 Don't spend his death-reveal imagery before then.
 _Decided 2026-06-19 with Nicolas (interactive story + dialogue pass for ch02-targos-inn)._
+
+---
+
+## Operational Gotchas (durable)
+
+_Moved here from `HANDOFF.md` 2026-07-02 (audit): these are durable engineering constraints, not
+session state. `HANDOFF.md` points here._
+
+- **Per-unit descale recipe is recorded in the unit YAML comment** (data-is-the-doc) — read it before
+  regenerating; don't guess flags. Swapping ONE pose still requires re-descaling the **whole 3-frame set
+  together** (shared palette recompute shifts the other two — that's correct, not a bug).
+- **Battle-anim frames are a hard 3** (ready/windup/peak; script refs frames 0/1/2; `build_battle_anim`
+  rejects any other count). The "march" is faked by the per-donor sound/shake cadence + a single engine
+  OAM lunge (`MELEE_LUNGE_DX` −40 on peak), not extra art frames.
+- **`make_gif.py` writes only to `map-review/` (gitignored).** To share with Nicolas, copy the GIF to
+  `docs/demo/` and commit — otherwise the GitHub blob stays stale.
+- **Event BGs: vendored winter CGs → NEW `gConvoBackgroundData` slots, additive** (`bg_to_fe8.py` →
+  `inject_backgrounds`). **Color index 0 is TRANSPARENT** — using it for a real colour → black holes;
+  `bg_to_fe8.py` reserves it. **Only slot 0x36 is free before `BG_RANDOM` (0x37).** Verify event BGs
+  **in-engine** (flat preview won't show the holes).
+- **Location-card nameplate caps at ~96px** — >~12–14 chars clip silently. Keep `location_card:` short.
+- **Vanilla character-slot display names leak** unless the injector overrides it:
+  `set_message_body(vanilla_name_text_id(slot), name_message_body(display_name(unit)))`. Give units a short `fe_name` (≤12).
+- **Clear-bot can't fully clear a chapter yet (#60).** Helpers that must REACH a later chapter use directed
+  seizes / frail+teleport (`reachCh02Map`, `clear_ch02`), not fair-play clears.
+- **Don't reuse a playtest checkpoint across an injection/build change** — only across pure graphics-byte
+  swaps. Checkpoints are ROM-hash-stamped in `tools/playtest/states/` (gitignored); delete `.ss`/`.romhash`
+  to force a rebuild. (A battle-anim frame change IS a build change → re-record from a fresh ROM.)
+- **Additive, never global** (content art): clone classes / new terrain/banim/BG slots; never edit a shared
+  vanilla one in place.
+- **Engine hooks live in `tools/inject/engine_hooks.py`** (guarded by `check_engine_guards_present`).
+- **New decomp patch target → add it to `PATCHED_DECOMP_FILES`**, or the build is non-idempotent.
+- **Vanilla decomp reads go through `build_campaign.vanilla_decomp_text()` (HEAD)**, never the worktree.
+- **`make`-green can't prove apply timing OR rendering** — `tools/playtest/` is the dynamic arbiter. Needs a
+  built ROM + `lua`; `run.sh` regenerates `symbols.lua` after a rebuild.
+- **CI unit tests run in the `build` job, not the lightweight `checks` job** (need submodule + numpy/PIL).
+  mGBA playtest *scenarios* are NOT CI-gated; the `test_*.lua` cores ARE, via `make test`.
+- **Distribution is the private pre-patched `.gba`** (decomp build is non-matching vs retail).
+- **Save layout must stay stable for testers** (#59): `check_save_layout_stable` reds on layout drift.
+- **Writing any dialogue → invoke `dialogue-pass` first.** Story bodies are `make`-regenerated; gate text
+  changes with `python3 tools/verify_text.py`. Card/name text is ASCII-folded in `name_message_body`.
+- **`msg-id` vetting is treacherous** — `data_battlequotes.c` stores ids 4-digit zero-padded; vet in `0x0XXX` form.
+- **Chapter hosting** (model on `inject_ch01`/`inject_ch02`): each chapter rides the *next* vanilla slot,
+  chained via `MNC2(<next slot>)`; new snow chapters set `battleTileSet` `0` (open) or `0x15` (rough).
+- **Vanilla-only (monster/exotic) weapons belong in `difficulty.py`**, not `WEAPON_ITEM_ENUM`.
+- **Never a bare `make` for a shippable ROM** — `tools/build.sh` applies the decomp shebang fix; a bare
+  `make` dies on the gfx tools on macOS (`decisions.md` §Distribution).
 
 ---
 

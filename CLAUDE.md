@@ -1,6 +1,6 @@
 # CLAUDE.md — Manchego Stars
 
-Manchego Stars is a GBA tactics ROM hack of *Fire Emblem: The Sacred Stones* (FE8), built from the `fireemblem8u` C decompilation. It turns a completed D&D 5e *Rime of the Frostmaiden* campaign into a playable tactics game: 7 player characters become FE units (FE8 classes, FE8 stats), and the campaign's narrative chapters become FE maps. **Combat is vanilla FE8 — FE hit/avoid/might/crit, FE stats, no conversion.** D&D is flavor layered on top; the d20 survives only as a cosmetic nat-20 animation triggered by FE's own crit math. Distribution is private — pre-patched ROM sent to the campaign players.
+Manchego Stars is a GBA tactics ROM hack of *Fire Emblem: The Sacred Stones* (FE8), built from the `fireemblem8u` C decompilation. It turns a completed D&D 5e *Rime of the Frostmaiden* campaign into a playable tactics game: 8 player characters become FE units (FE8 classes, FE8 stats), and the campaign's narrative chapters become FE maps. **Combat is vanilla FE8 — FE hit/avoid/might/crit, FE stats, no conversion.** D&D is flavor layered on top; the d20 survives only as a cosmetic nat-20 animation triggered by FE's own crit math. Distribution is private — pre-patched ROM sent to the campaign players.
 
 ## Source of Truth
 
@@ -37,7 +37,7 @@ Read these at the top of every session before touching code:
 | PC D&D Beyond JSON sheets | `data/pc-sheets/*.json` |
 | PC portrait URLs | `data/pc-sheets/portraits.json` |
 | FE8 decomp | `fireemblem8u/` (git submodule) |
-| Engine patches | `engine/` |
+| Engine hooks (decomp string-patches) | `tools/inject/engine_hooks.py` (+ `tools/inject/decomp.py`) |
 | Campaign data | `campaigns/rime-of-the-frostmaiden/` |
 | Planning docs | `docs/` |
 
@@ -61,7 +61,8 @@ cd fireemblem8u
 - No C99 features: no VLAs, no `//` comments in new C files (use `/* */`), no designated initializers (`.field = value`)
 - No `stdint.h` types in engine files — use the decomp's existing typedefs (`u8`, `u16`, `u32`, `s8`, `s16`, `s32`)
 - Match the existing file and function naming conventions in `fireemblem8u/src/`
-- New engine modules go in `engine/`, not directly in `fireemblem8u/src/`
+- New engine behavior ships as string-patch hooks in `tools/inject/engine_hooks.py` — never hand-edits
+  to `fireemblem8u/src/` (our decomp edits are build artifacts, restored on every build)
 
 ## Engine / Content Boundary Rule
 
@@ -74,43 +75,25 @@ cd fireemblem8u
 
 ## Coordination: feature-flow (one feature, one branch, one PR)
 
-Work is organized by **feature**, not by fixed lanes (rationale: `docs/decisions.md` → Coordination
-model). A task = a GitHub issue → a short-lived `feat/<n>-slug` branch off `main` → an **ephemeral
-worktree** for build isolation (`git worktree add ../ms-<slug> -b feat/<n>-slug origin/main`; drop it
-when merged) → a **PR** → CI + `/code-review` → squash-merge to `main` → delete the branch + worktree.
-Concurrency = as many worktrees as you have features in flight (two ROM builds in one tree corrupt each
-other, so each concurrent agent gets its own worktree — that's the *only* thing isolation is for).
-
-A feature **may span** what used to be the "content" and "pipeline" lanes — that's the point: capturing
-a unit's battle anim is one feature (the `record*` scenario **and** the sandbox build it fires on).
-Ownership lives on the **PR + issue**, decided at review, not on a file glob.
-
-**Two boundaries, two strengths** — don't conflate them:
-- **Engine/content invariant (HARD gate):** the Engine/Content Boundary Rule above + the 5 engine hooks
-  in `tools/inject/` (guarded by `check.py check_engine_guards_present`). A `.c`/`.s` change that names a
-  character, chapter, or plot event is **rejected**. Real decision-hiding; it stays a gate.
-- **Desk ownership (REVIEWED, not blocked):** which desk owns a responsibility is a review judgment.
-  `check.py check_lane_ownership` is now an **advisory** that flags a cross-desk change so the PR names
-  the contract.
-
-Never commit the `fireemblem8u` submodule pointer.
+Rationale + long form: `docs/decisions.md` → Coordination model. The operating rules:
+- A task = a GitHub issue → short-lived `feat/<n>-slug` branch off `main` → PR → CI + `/code-review`
+  → squash-merge → delete the branch. A feature may span engine + content — ownership lives on the
+  PR + issue, not a file glob.
+- **Concurrent agents each get their own worktree** (two ROM builds in one tree corrupt each other;
+  a single writer may work the provisioned main tree — see `HANDOFF.md`).
+- **Engine/content invariant is a HARD gate** (the Boundary Rule above + the 5 engine hooks in
+  `tools/inject/`, guarded by `check.py check_engine_guards_present`). Desk ownership is a review
+  judgment (`check_lane_ownership` is advisory).
+- Never commit the `fireemblem8u` submodule pointer.
 
 ## Design placement test ("not my job" / "no need to know")
 
-Deciding *where a line of code goes* (Cockburn, *Simplifying Software Design*, 2026): treat each module
-as a clerk with a **filing cabinet** (its private state) and a **phone** (its interface), then —
-- **"Not my job"** — push each line downhill to the desk that owns it. A handler that only forwards
-  ("call the Buy process") should be *one line*. A desk doing work it doesn't own → move the work.
-- **"No need to know"** — a desk must not reach into another's cabinet (private state) or depend on its
-  internals. Talk over the phone (interface) only.
-- **Futures, not "simplicity"** — judge a boundary by *which future changes it makes cheap*. Localize
-  decisions likely to change (Parnas); gather what changes for the same reason, separate what changes for
-  different reasons. Don't refactor for futures you can't name (the 109 KB `harness.lua` stays whole —
-  its only likely change is "add a scenario," which is cheap).
-
-**Code-review rule:** a change where one desk reaches into another's cabinet — or that scatters one
-decision across desks (e.g. the boot-cut duplicated in `inject_prologue` + `inject_test_chapter`) — is
-rejected; localize the decision first.
+Long form + examples: `docs/decisions.md` → Coordination model. In brief (Cockburn): push each line
+to the desk that owns it; talk over interfaces, never reach into another module's private state; judge
+a boundary by which *named* future changes it makes cheap (don't refactor for futures you can't name —
+e.g. `harness.lua` stays whole; its only likely change is "add a scenario").
+**Code-review rule:** a change that reaches into another desk's cabinet or scatters one decision
+across desks is rejected; localize the decision first.
 
 ## Working Conventions (Definition of Done)
 

@@ -20,9 +20,9 @@ Source: **[Klokinator/FE-Repo](https://github.com/Klokinator/FE-Repo)** (communi
 | Asset | Used for | Author | License |
 |---|---|---|---|
 | `Cowboy (M) Gun` map sprite (stand + walk) | prof-rbg gunslinger map-sprite base (candidate) | **MeatofJustice** | F2E |
-| `Flintlocker` gunner battle animation | prof-rbg battle-anim base (candidate; #39, deferred) | **ObsidianDaddy** | F2E |
+| `Flintlocker` gunner battle animation | prof-rbg battle-anim base (candidate; superseded — RBG's shipped anim (#65) uses descaled custom poses) | **ObsidianDaddy** | F2E |
 | `Tiger (U)` map sprite (stand + walk) | meesmickle aristocat map-sprite base (candidate; sandbox copy not kept in-tree — re-vendor from FE-Repo when picked up) | **RandomWizard, Squaresoft** | F2E |
-| `[Wolf-Variant] [F] Kitsune` battle animation | meesmickle battle-anim base (parked at `campaigns/.../battle_anims/_parked/`; #39, deferred) | **ZoramineFae, Clendo** | F2E |
+| `[Wolf-Variant] [F] Kitsune` battle animation | meesmickle battle-anim base (parked at `campaigns/.../battle_anims/_parked/`; alternative to the #65 descaled-pose path) | **ZoramineFae, Clendo** | F2E |
 | `Pirate Lady (Version 3)` portrait | Hlin Trollbane ch00 guest portrait (silver-haired age recolor; vendored at `campaigns/.../portraits/vendor/`) | **Cygnus** | F2E |
 | `Hero` portrait | Scramsax ch00 guest portrait (used as-is; vendored at `campaigns/.../portraits/vendor/`) | **LaurentLacroix, UltraFenix, monk-han** | no tag in filename — recheck before distribution |
 | `Bandit Pegasus Knight` portrait | Izobai ch01 goblin boss portrait (green-goblin skin reskin; dresses the Breguet slot) | **AlexYTXG** | no tag in filename — recheck before distribution |
