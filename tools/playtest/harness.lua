@@ -1125,6 +1125,25 @@ local function llmHandshake(n, req, timeoutSecs)
     return nil, "sidecar timeout waiting for resp-" .. n .. ".json (is llm_player.py serve running?)"
 end
 
+-- Drain every open menu level (submenus -- weapon/item lists -- are ALSO sProc_Menu,
+-- so a fixed two-B backout can strand a level), then one more B to drop a move-range
+-- selection. Restores the harness invariant: never leave a unit selected.
+local function llmBackout()
+    for _ = 1, 6 do
+        if not menuOpen() then break end
+        press(K.B) wait(8)
+    end
+    press(K.B) wait(8)
+end
+
+-- Resolve an exported unit id back to a live unit: blue = charId, red = 1000+slot
+-- (generics share charIds; see llmExportBoard).
+local function llmUnitById(id)
+    if type(id) ~= "number" then return nil end
+    if id >= LLM_RED_ID_BASE then return unitAt(SYM.gUnitArrayRed, id - LLM_RED_ID_BASE) end
+    return blue(id)
+end
+
 -- Execute one validated order with the existing primitives. M2 limitation (noted in
 -- decisions.md): chooseAttack fires on the UI's default target, which is the intended
 -- one whenever a single enemy is in range of the strike tile; multi-target
@@ -1133,15 +1152,25 @@ local function llmExecOrder(o)
     if type(o.unit) ~= "number" or type(o.move_to) ~= "table" then return false end
     local u = blue(o.unit)
     if not u or isDead(u) or (u.state & 0x2) ~= 0 then return false end
+    -- the sidecar validated against the REQUEST board; re-check what can have changed
+    -- since (an earlier order killed the target) before blind-A driving the menu --
+    -- with no live target the action menu has no Attack entry and A/A/A would walk
+    -- into the Item submenu instead
+    local action = o.action
+    if action == "attack" then
+        local tgt = llmUnitById(o.target)
+        if not tgt or isDead(tgt) then action = "wait" end
+    end
     if not moveUnit(u.x, u.y, o.move_to.x, o.move_to.y) then return false end
-    if o.action == "attack" then
+    if action == "attack" then
         chooseAttack(u.addr)
-    elseif o.action == "seize" then
+    elseif action == "seize" then
         press(K.A) wait(30)   -- Seize tops the menu for a seize-capable unit on the tile
+        if menuOpen() then llmBackout() return false end   -- no Seize here: back out fully
     else
         chooseWait()          -- wait/staff: staff driving is an M3 refinement
     end
-    if menuOpen() then press(K.B) press(K.B) return false end
+    if menuOpen() then llmBackout() return false end
     return true
 end
 

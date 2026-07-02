@@ -138,6 +138,54 @@ class TestOrderValidator(unittest.TestCase):
         self.assertEqual(accepted, [])
         self.assertIn('target', rejected[0]['reason'])
 
+    def test_rejects_attacking_a_friendly_unit(self):
+        board = sample_board()
+        board['units'].append({'id': 2, 'name': 'Marty', 'faction': 'blue',
+                               'class': 'Fighter', 'x': 4, 'y': 5, 'hp': 20,
+                               'maxhp': 20, 'range': [1, 1], 'can_act': True,
+                               'boss': False, 'reach': []})
+        orders = [{'unit': 1, 'move_to': {'x': 4, 'y': 4},
+                   'action': 'attack', 'target': 2}]
+        accepted, rejected = llm_player.validate_orders(orders, board, 'blue')
+        self.assertEqual(accepted, [])
+        self.assertIn('friendly', rejected[0]['reason'])
+
+    def test_staff_needs_a_friendly_target(self):
+        board = sample_board()
+        board['units'].append({'id': 2, 'name': 'Marty', 'faction': 'blue',
+                               'class': 'Fighter', 'x': 4, 'y': 5, 'hp': 20,
+                               'maxhp': 20, 'range': [1, 1], 'can_act': True,
+                               'boss': False, 'reach': []})
+        heal = [{'unit': 1, 'move_to': {'x': 3, 'y': 5}, 'action': 'staff', 'target': 2}]
+        accepted, rejected = llm_player.validate_orders(heal, board, 'blue')
+        self.assertEqual(len(accepted), 1)
+        zap = [{'unit': 1, 'move_to': {'x': 5, 'y': 4}, 'action': 'staff', 'target': 104}]
+        accepted, rejected = llm_player.validate_orders(zap, board, 'blue')
+        self.assertEqual(accepted, [])
+        self.assertIn('friendly', rejected[0]['reason'])
+
+    def test_rejects_an_attack_from_a_rangeless_unit(self):
+        # the exporter omits 'range' for staff-only/weaponless units: they can target
+        # NOTHING (a defaulted melee range would send the blind-A executor into the
+        # wrong submenu)
+        board = sample_board()
+        del board['units'][0]['range']
+        orders = [{'unit': 1, 'move_to': {'x': 5, 'y': 4},
+                   'action': 'attack', 'target': 104}]
+        accepted, rejected = llm_player.validate_orders(orders, board, 'blue')
+        self.assertEqual(accepted, [])
+        self.assertIn('range', rejected[0]['reason'])
+
+    def test_seize_is_gated_on_the_objective(self):
+        board = sample_board()                               # objective: DefeatBoss
+        orders = [{'unit': 1, 'move_to': {'x': 4, 'y': 4}, 'action': 'seize'}]
+        accepted, rejected = llm_player.validate_orders(orders, board, 'blue')
+        self.assertEqual(accepted, [])
+        self.assertIn('objective', rejected[0]['reason'])
+        board['objective'] = 'Seize'
+        accepted, rejected = llm_player.validate_orders(orders, board, 'blue')
+        self.assertEqual(len(accepted), 1)
+
     def test_keeps_the_good_order_and_drops_the_bad_one(self):
         board = sample_board()
         orders = [
@@ -268,6 +316,19 @@ class TestParseOrders(unittest.TestCase):
         text = json.dumps({'orders': [self.ORDERS[0], 'retreat!', 7]})
         self.assertEqual(llm_player.parse_orders(text), self.ORDERS)
 
+    def test_non_finite_numbers_are_rejected(self):
+        # json.loads accepts NaN/Infinity by default (and 1e999 overflows to inf via
+        # the ordinary float path); letting one through would write a resp/transcript
+        # the strict Lua-side reader cannot parse -- permanently
+        self.assertEqual(llm_player.parse_orders(
+            '{"orders": [{"unit": 1, "move_to": {"x": NaN, "y": 0}}]}'), [])
+        self.assertEqual(llm_player.parse_orders(
+            '{"orders": [{"unit": 1e999, "move_to": {"x": 3, "y": 0}}]}'), [])
+        # a finite sibling order survives the cull
+        got = llm_player.parse_orders(
+            '{"orders": [{"unit": 1e999}, {"unit": 1, "action": "wait"}]}')
+        self.assertEqual(got, [{'unit': 1, 'action': 'wait'}])
+
 
 class TestPolicyConfig(unittest.TestCase):
     def test_defaults_to_anthropic_sonnet(self):
@@ -296,6 +357,21 @@ class TestPolicyConfig(unittest.TestCase):
     def test_anthropic_without_a_key_fails_loudly(self):
         with self.assertRaises(ValueError):
             llm_player.make_policy('blue', env={})
+
+    def test_anthropic_key_never_feeds_the_openai_provider(self):
+        # ANTHROPIC_API_KEY as the openai fallback would Bearer-leak the Anthropic
+        # secret to whatever host PT_BASE_URL names
+        cfg = llm_player.policy_config(env={
+            'PT_PROVIDER': 'openai', 'ANTHROPIC_API_KEY': 'sk-ant-secret'})
+        self.assertIsNone(cfg['api_key'])
+        cfg = llm_player.policy_config(env={'ANTHROPIC_API_KEY': 'sk-ant-secret'})
+        self.assertEqual(cfg['api_key'], 'sk-ant-secret')    # anthropic still gets it
+
+    def test_anthropic_with_an_injected_transport_needs_no_key(self):
+        # the keyless-test carve-out: a stub transport must bypass the key check
+        policy = llm_player.make_policy(
+            'blue', env={}, transport=lambda cfg, s, u: '{"orders": [{"unit": 1}]}')
+        self.assertEqual(policy(sample_board()), [{'unit': 1}])
 
 
 class TestTransports(unittest.TestCase):
@@ -443,6 +519,74 @@ class TestSidecar(unittest.TestCase):
             sidecar = self._replay_sidecar(d, self.GOOD)
             open(os.path.join(d, 'stop'), 'w').close()
             self.assertEqual(sidecar.serve(poll_interval=0.01), 1)
+
+    def test_a_half_written_request_is_not_pending(self):
+        # the harness writes tmp+rename; the .tmp must never be read as a request
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, 'req-1.json.tmp'), 'w', encoding='utf-8') as f:
+                f.write('{"seed": 7, "chap')
+            sidecar = self._replay_sidecar(d, self.GOOD)
+            self.assertIsNone(sidecar.step())
+
+    def test_a_request_vanishing_mid_step_is_tolerated(self):
+        # run.sh's stale-file cleanup can delete a request between the sidecar's
+        # listdir and open (documented startup order starts the sidecar first)
+        with tempfile.TemporaryDirectory() as d:
+            self._write_req(d, 1)
+            sidecar = self._replay_sidecar(d, self.GOOD)
+            real_pending = sidecar._pending()
+            self.assertEqual(real_pending, [1])
+            os.unlink(os.path.join(d, 'req-1.json'))
+            sidecar._pending = lambda: real_pending          # listdir already happened
+            self.assertIsNone(sidecar.step())
+
+    def test_a_policy_failure_still_answers_the_harness(self):
+        # endpoint down (Ollama not running) must be a fast diagnosable FAIL on the
+        # harness side, not a silent 90s handshake timeout
+        with tempfile.TemporaryDirectory() as d:
+            self._write_req(d, 1)
+
+            def broken_policy(board):
+                raise RuntimeError('http://localhost:11434/v1 -> unreachable')
+            sidecar = llm_player.Sidecar(
+                d, llm_player.Transcript(mode='record'), policy=broken_policy)
+            with self.assertRaises(RuntimeError):
+                sidecar.step()
+            with open(os.path.join(d, 'resp-1.json'), encoding='utf-8') as f:
+                resp = json.load(f)
+            self.assertEqual(resp['orders'], [])
+            self.assertIn('unreachable', resp['error'])
+
+
+class TestPostJson(unittest.TestCase):
+    """_post_json's error wrapping (the diagnostic text is the product here)."""
+
+    def _patch_urlopen(self, exc):
+        import urllib.request as ur
+        orig = ur.urlopen
+
+        def fake(req, timeout=None):
+            raise exc
+        ur.urlopen = fake
+        self.addCleanup(setattr, ur, 'urlopen', orig)
+
+    def test_http_error_carries_the_body(self):
+        import io
+        import urllib.error
+        self._patch_urlopen(urllib.error.HTTPError(
+            'http://x/v1', 401, 'unauthorized', {}, io.BytesIO(b'{"error":"bad key"}')))
+        with self.assertRaises(RuntimeError) as cm:
+            llm_player._post_json('http://x/v1', {}, {})
+        self.assertIn('bad key', str(cm.exception))
+        self.assertIn('401', str(cm.exception))
+
+    def test_connection_error_names_the_ollama_hint(self):
+        import urllib.error
+        self._patch_urlopen(urllib.error.URLError('connection refused'))
+        with self.assertRaises(RuntimeError) as cm:
+            llm_player._post_json('http://localhost:11434/v1/chat/completions', {}, {})
+        self.assertIn('unreachable', str(cm.exception))
+        self.assertIn('ollama serve', str(cm.exception))
 
 
 if __name__ == '__main__':

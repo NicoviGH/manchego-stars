@@ -23,6 +23,7 @@ Design + settled decisions: docs/decisions.md -> Playtest platform brick 4; epic
 import argparse
 import hashlib
 import json
+import math
 import os
 import re
 import sys
@@ -61,9 +62,12 @@ def validate_orders(orders, board, faction):
     (each `{order, reason}`) as a play-quality signal -- a bad LLM turn is dropped, never
     soft-locked. An order is `{unit, move_to:{x,y}, action, target?}`. Rejections, in the
     order checked: unknown unit; not the commanded faction; unit can't still act;
-    `move_to` outside the unit's reachable set; unknown action; a targeted action
-    (attack/staff) whose target is missing, unknown, dead, or out of weapon range from
-    `move_to`.
+    `move_to` outside the unit's reachable set; unknown action; `seize` when the board's
+    objective isn't Seize (the exporter carries no goal tile, so objective is the gate);
+    a targeted action (attack/staff) whose target is missing, unknown, dead, on the
+    wrong side (attack needs a foe, staff an ally), or out of range from `move_to` --
+    where a unit the exporter gave no `range` (staff-only/weaponless) can target nothing
+    at all: the blind-A executor would walk into the wrong submenu (staff driving is M3).
     """
     by_id = {u['id']: u for u in board.get('units', [])}
     accepted, rejected = [], []
@@ -91,6 +95,10 @@ def validate_orders(orders, board, faction):
             rejected.append(_reject(order, 'unknown action %r' % (action,)))
             continue
 
+        if action == 'seize' and board.get('objective') != 'Seize':
+            rejected.append(_reject(order, 'objective is not Seize'))
+            continue
+
         if action in TARGETED_ACTIONS:
             target = by_id.get(order.get('target'))
             if target is None:
@@ -99,7 +107,18 @@ def validate_orders(orders, board, faction):
             if target.get('hp', 0) <= 0:
                 rejected.append(_reject(order, 'target is already dead'))
                 continue
-            lo, hi = unit.get('range', [1, 1])
+            if action == 'attack' and target.get('faction') == faction:
+                rejected.append(_reject(order, 'attack target is a friendly unit'))
+                continue
+            if action == 'staff' and target.get('faction') != faction:
+                rejected.append(_reject(order, 'staff target is not a friendly unit'))
+                continue
+            rng = unit.get('range')
+            if not rng:
+                rejected.append(_reject(order, 'unit has no attack range '
+                                               '(staff/weaponless; staff driving is M3)'))
+                continue
+            lo, hi = rng
             dist = abs(tile[0] - target['x']) + abs(tile[1] - target['y'])
             if dist < lo or dist > hi:
                 rejected.append(_reject(order, 'target is out of weapon range'))
@@ -193,6 +212,20 @@ def build_prompt(board, faction):
     return system, user
 
 
+def _all_finite(obj):
+    """No NaN/Infinity anywhere in the parsed value (json.loads accepts them, but a
+    non-finite number would round-trip into a resp/transcript that strict JSON readers
+    -- json.lua -- cannot parse). Note `1e999` overflows to inf via the ordinary float
+    path, so this must inspect VALUES; a parse_constant hook alone misses it."""
+    if isinstance(obj, float):
+        return math.isfinite(obj)
+    if isinstance(obj, dict):
+        return all(_all_finite(v) for v in obj.values())
+    if isinstance(obj, list):
+        return all(_all_finite(v) for v in obj)
+    return True
+
+
 def parse_orders(text):
     """Model output text -> the orders list, or [] on anything unparseable.
 
@@ -220,7 +253,7 @@ def parse_orders(text):
         if isinstance(got, dict):
             got = got.get('orders')
         if isinstance(got, list):
-            return [o for o in got if isinstance(o, dict)]
+            return [o for o in got if isinstance(o, dict) and _all_finite(o)]
     return []
 
 
@@ -253,6 +286,11 @@ def _post_json(url, headers, payload, timeout=120):
     except urllib.error.HTTPError as e:
         raise RuntimeError('%s -> HTTP %d: %s'
                            % (url, e.code, e.read().decode('utf-8', 'replace')[:500]))
+    except urllib.error.URLError as e:
+        # The first failure a free-local-model user hits is "Ollama isn't running";
+        # name it instead of dying with a bare connection error.
+        raise RuntimeError('%s -> unreachable (%s); is the endpoint up? '
+                           '(free local path: `ollama serve`)' % (url, e.reason))
 
 
 def _call_anthropic(cfg, system, user):
@@ -296,11 +334,17 @@ def policy_config(env=None):
     if provider not in PROVIDERS:
         raise ValueError('PT_PROVIDER must be one of %s, got %r'
                          % ('/'.join(sorted(PROVIDERS)), provider))
+    api_key = env.get('PT_API_KEY') or None
+    if provider == 'anthropic':
+        # ANTHROPIC_API_KEY feeds ONLY the anthropic transport -- resolving it for the
+        # openai provider would Bearer-leak the Anthropic secret to whatever host
+        # PT_BASE_URL names.
+        api_key = api_key or env.get('ANTHROPIC_API_KEY') or None
     return {
         'provider': provider,
         'model': env.get('PT_MODEL') or DEFAULT_MODELS[provider],
         'base_url': env.get('PT_BASE_URL') or None,
-        'api_key': env.get('PT_API_KEY') or env.get('ANTHROPIC_API_KEY') or None,
+        'api_key': api_key,
     }
 
 
@@ -356,7 +400,10 @@ class Sidecar:
         final = os.path.join(self.dir, 'resp-%d.json' % n)
         tmp = final + '.tmp'
         with open(tmp, 'w', encoding='utf-8') as f:
-            json.dump(payload, f)
+            # allow_nan=False: json.lua is a strict reader; parse_orders already gates
+            # non-finite numbers out, this makes a future leak loud instead of shipping
+            # a resp the harness can't parse
+            json.dump(payload, f, allow_nan=False)
         os.replace(tmp, final)
 
     def step(self):
@@ -365,8 +412,14 @@ class Sidecar:
         if not pending:
             return None
         n = pending[0]
-        with open(os.path.join(self.dir, 'req-%d.json' % n), encoding='utf-8') as f:
-            req = json.load(f)
+        try:
+            with open(os.path.join(self.dir, 'req-%d.json' % n), encoding='utf-8') as f:
+                req = json.load(f)
+        except FileNotFoundError:
+            # run.sh's stale-file cleanup can race a sidecar started first (per the
+            # documented order) and delete a request between our listdir and open --
+            # a vanished request simply isn't pending anymore
+            return None
         board = req['board']
         faction = req.get('faction', self.faction)
         try:
@@ -376,6 +429,12 @@ class Sidecar:
                                             decide_fn=self.policy)
         except TranscriptMiss as e:
             self._write_resp(n, {'orders': [], 'error': 'transcript miss: %s' % e})
+            raise
+        except Exception as e:
+            # A live-policy failure (endpoint down, HTTP error) must still answer the
+            # harness -- an error response is a fast, diagnosable FAIL; silence is a
+            # 90-second timeout pointing at the wrong suspect.
+            self._write_resp(n, {'orders': [], 'error': '%s: %s' % (type(e).__name__, e)})
             raise
         accepted, rejected = validate_orders(orders, board, faction)
         self._write_resp(n, {'orders': accepted, 'rejected': rejected})
@@ -424,6 +483,13 @@ def main(argv=None):
         policy = None
         print('replay mode: %d recorded decisions' % len(transcript.entries))
     sidecar = Sidecar(args.dir, transcript, policy=policy, faction=args.faction)
+    stale = sidecar._pending()
+    if stale:
+        # run.sh clears the handshake dir when IT starts; a request already waiting
+        # when the SIDECAR starts is usually a crashed prior run about to be answered
+        # against a board that no longer exists.
+        print('WARNING: pre-existing request(s) %s in %s -- if these are from a '
+              'crashed run, stop and clear the dir' % (stale, args.dir))
     try:
         answered = sidecar.serve(log=lambda s: print(s, flush=True))
     finally:

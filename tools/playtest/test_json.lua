@@ -96,5 +96,9 @@ check(J.decode(nil), nil, "non-string input returns nil")
 check(J.decode('{"a" 1}'), nil, "missing colon returns nil")
 check(J.decode("[1,2,"), nil, "unclosed array returns nil")
 
-print(string.format("json: %d tests, %d failures", tests, fails))
-os.exit(fails == 0 and 0 or 1)
+if fails == 0 then
+    print(string.format("ok -- %d assertions", tests))
+    os.exit(0)
+end
+print(string.format("%d/%d FAILED", fails, tests))
+os.exit(1)

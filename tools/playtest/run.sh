@@ -22,7 +22,9 @@
 #                                 --transcript tools/playtest/transcripts/prologue.json
 #                           Replay-only by default (zero LLM cost); add --record + env
 #                           knobs (PT_PROVIDER=openai for a free local Ollama model,
-#                           PT_MODEL, PT_BASE_URL) to record a fresh transcript.
+#                           PT_MODEL, PT_BASE_URL) to record a fresh transcript. When
+#                           the run ends this script touches <dir>/stop: the sidecar
+#                           drains, saves its transcript, and exits on its own.
 # Recording scenarios (drop motion frames for a review GIF):
 #   recordending  -- the ch01 "Rolling Cheddar" outro cutscene (frames tagged "end")
 #   recordprep    -- the Preparations + Pick Units deploy screen (frames "prep")
@@ -155,12 +157,18 @@ fi
 # record* now LOADS a checkpoint (no grind), so its deadline is short.
 FPS=240; VSYNC=0; DEADLINE_S=420
 case "$SCENARIO" in record*) FPS=60; VSYNC=1; DEADLINE_S=300 ;; esac
-# smoke_* / fuzz_* / clear_ch02 / llm play a full chapter (lead-in + a long soak; the
-# llm handshake also waits wall-clock on the sidecar each turn) -> longer wall.
-case "$SCENARIO" in smoke*|fuzz*|clear_ch02|llm) DEADLINE_S=600 ;; esac
+# smoke_* / fuzz_* / clear_ch02 play a full chapter (lead-in + a long soak) -> longer
+# wall. llm waits wall-clock on the sidecar EVERY turn (18 turns x 90s handshake
+# budget), and a --record run against a slow local model legitimately uses it -- so its
+# deadline covers the harness's own worst case instead of killing a healthy run.
+case "$SCENARIO" in smoke*|fuzz*|clear_ch02) DEADLINE_S=600 ;; llm) DEADLINE_S=2100 ;; esac
 # PT_FPS overrides the rate. 60fps+videoSync is only needed to capture smooth cutscene
 # FADES; verification captures of static text/boxes (sign, death quote) read fine at top
 # speed, so `PT_FPS=240 ... recordfix` runs ~4x faster.
 if [ -n "${PT_FPS:-}" ]; then FPS="$PT_FPS"; [ "$PT_FPS" -ge 240 ] && VSYNC=0; fi
 run_mgba "$SCENARIO" "$FPS" "$VSYNC" "$DEADLINE_S"
+# Tell the sidecar the run is over: serve() drains any pending request, saves its
+# transcript (record mode), and exits -- without this it polls forever and a recorded
+# transcript would only be saved by a clean Ctrl-C.
+if [ "$SCENARIO" = "llm" ]; then touch "$LLM_DIR/stop"; fi
 case "$VERDICT" in *PASS*) exit 0 ;; *) exit 1 ;; esac
