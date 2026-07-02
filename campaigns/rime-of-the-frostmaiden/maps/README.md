@@ -48,17 +48,46 @@ so it dropped in with no grit / Map Hacking Suite recompile:
 `ObjectTypeSnow` / `MapPaletteSnow` / `TileConfigurationSnow` and repoints the **test chapter**
 (the `inject_test_chapter` target) at it, so `make` + New Game load-tests the tileset in-engine.
 
+## Add a tileset (#40)
+
+Vendor any FEBuilder/FE-Repo-format tileset (a `.mapchip_config` + a 256×256 mode-P
+object-palette PNG — the format every FE-Repo tileset ships in) with one command:
+
+```sh
+python3 tools/map_tileset_tool.py import <config.mapchip_config> <object-palette.png> \
+    campaigns/rime-of-the-frostmaiden/maps/tilesets/<name>
+```
+
+The config is byte-identical to the decomp's (copied through, after a palette-bank
+sanity check); the PNG packs to `.4bpp` + `.gbapal`. Copy the asset's bundled
+`CREDITS.txt` into the tileset dir and add the author to `/CREDITS.md`. If the asset
+ships a Tiled test map, vendor that too and verify the import end-to-end:
+
+```sh
+python3 tools/map_tileset_tool.py render-tmx tilesets/<name> tilesets/<name>/test-map.tmx out.png
+```
+
+`tilesets/cave-interior/` (Cynon's Mineshaft, Gray — Ch3's mine, #23) was vendored this
+way; its test-map render is pinned pixel-exact against
+`docs/demo/ch03-mineshaft-tileset-demo.png` in `tools/test_map_tileset.py`.
+
 ## Add a map (current path)
 
-1. Drop the tileset sources in `tilesets/<name>/` (if new).
-2. Author a layout. Today: a `<map>.mar` + `<map>.json` on that tileset's metatiles. Each
-   `.mar` cell is 2 bytes encoding `metatile_index × 32` (so `mar_to_map`'s `>>3` yields the
-   `.bin` value `metatile_index × 4`). To see which metatile index is which terrain, render the
-   tileset's metatile **atlas** (4bpp + palette + TSA) — see the atlas snippet used to pick the
-   snow-ground tile (index 6) for the test field.
-3. Register + wire it in `build_campaign.py` (model on `inject_winter_tileset`): copy pieces in,
-   append asset-table words, set the chapter's `chapter_settings.json` map indices.
+1. Drop the tileset sources in `tilesets/<name>/` (see **Add a tileset** above, if new).
+2. Author a layout in the browser editor (`tools/gen_map_editor.py`):
+   - **Reskin flow** (winter chapters): `gen_map_editor.py <VanillaLayout> out.html <dl.json>`
+     seeds a winter-reskinned vanilla layout, vanilla map in the reference pane.
+   - **Custom-canvas flow** (#40, ch03+): `gen_map_editor.py --tileset=<name> --blank=WxH
+     [--fill=N] [--ref=book-map.png] out.html <dl.json>` starts a blank canvas on a vendored
+     tileset, with any reference image (e.g. the flattened book-map blockout) in the pane.
+     A trailing `seed.mar` arg resumes an existing layout in either flow.
+   - Export downloads a layout JSON (stamped with its tileset); `import_map_layout.py`
+     compiles it to `<map>.mar` + `<map>.json` and renders a preview on that tileset.
+   Hand-encoding, if ever needed: each `.mar` cell is 2 bytes encoding `metatile_index × 32`
+   (so `mar_to_map`'s `>>3` yields the `.bin` value `metatile_index × 4`); the `atlas`
+   subcommand renders which metatile is which.
+3. Register + wire it in `build_campaign.py`: `_register_tileset(campaign, '<name>', '<Stem>', …)`
+   once per tileset + `_register_chapter_map(…, tileset_stem='<Stem>')` per chapter, then
+   `_retarget_host_chapter` sets the chapter's `chapter_settings.json` map indices. The winter
+   tileset rides `inject_winter_tileset`; `cave-interior` registers with the ch03 injector (#23).
 4. `make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba` and load-test in mGBA.
-
-**Next (#40 task 2 / #20):** a Tiled `.tmx` → `.bin` converter so real maps (e.g. the Prologue
-Bryn Shander street) can be drawn visually instead of hand-encoding `.mar`.

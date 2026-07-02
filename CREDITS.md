@@ -39,6 +39,7 @@ Source: **[Klokinator/FE-Repo](https://github.com/Klokinator/FE-Repo)** (communi
 | Asset | Used for | Authors | Source | License |
 |---|---|---|---|---|
 | **Snowy Bern / Snowy Peaks** tileset (graphics + palette + tile config) | the campaign's shared winter tileset (Prologue town → Ch8 ice canyon) | **ZoramineFae** (assembled the insertable version), **Vennobennu** ("Snowy Peaks Revised" updates), **FEAW** (2015 original), **Sme** (original Discord source) | [FEUniverse t/7204](https://feuniverse.us/t/snowy-bern-snowy-peaks-tileset/7204) | F2U (community free-to-use with credit) |
+| **Cynon's Mineshaft** tileset, Gray palette (graphics + palette + tile config) | Ch3 "The Termalaine Mine" cave interior (`maps/tilesets/cave-interior/`, #40/#23) | **Cynon**; additional credits **GoudaGrabber** (rolling stock, north stairway), **Atlas** (one of the palettes); adapts tiles from FE6/7/8, FF4/6, PMD, RPG Maker 2000/2003, Pokémon G/S/C, Treasure of the Rudras, Thomas the Tank Engine (CD32) | [Klokinator/FE-Repo](https://github.com/Klokinator/FE-Repo) → `Tilesets/Caves/Cynon's Mineshaft - Tileset` (bundled `CREDITS.txt` vendored alongside) | F2E; author explicitly endorses cross-engine conversion |
 
 ## Purchased assets
 | Asset | Used for | Author | Source / License |

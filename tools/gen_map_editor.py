@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
-"""Generate a self-contained HTML tile-map editor for any chapter map: embeds the winter
-metatile atlas + a winter-reskinned vanilla layout as the starting point + terrain data.
-Nicolas paints in-browser and exports a layout JSON, which import_map_layout.py compiles.
+"""Generate a self-contained HTML tile-map editor for any chapter map: embeds a
+tileset's metatile atlas + a starting layout + terrain data. Nicolas paints
+in-browser and exports a layout JSON, which import_map_layout.py compiles.
 
-Usage: gen_map_editor.py [vanilla_layout=PrologueMap] [out_html=editor.html] [download=prologue-layout.json]
-e.g.   gen_map_editor.py Ch13EirikaMap 21-iron-trail/editor.html ch01-layout.json"""
+Two modes:
+1. Vanilla reskin (the ch00-ch02 flow): a winter-reskinned vanilla layout is the
+   starting point, the vanilla map renders in the reference pane.
+     gen_map_editor.py [vanilla_layout=PrologueMap] [out_html] [download] [seed.mar]
+2. Vendored tileset + custom canvas (#40, ch03+): a blank (or seeded) canvas on a
+   community tileset; --ref puts any image (e.g. the book map crop) in the
+   reference pane. No vanilla layout, no decomp gbagfx needed.
+     gen_map_editor.py --tileset=cave-interior --blank=22x30 [--fill=N] \
+         [--ref=path.png] [out_html] [download] [seed.mar]"""
 import sys, os, struct, collections, json, io, base64
 ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # repo root (worktree-aware)
 DEC=os.path.join(ROOT,'fireemblem8u')
@@ -12,66 +19,94 @@ sys.path.insert(0, os.path.join(ROOT,'tools'))
 from map_tileset_tool import _tileset_from_dir, Tileset
 from PIL import Image
 
-LAYOUT=sys.argv[1] if len(sys.argv)>1 else 'PrologueMap'
-OUT_HTML=sys.argv[2] if len(sys.argv)>2 else 'editor.html'
-DOWNLOAD=sys.argv[3] if len(sys.argv)>3 else 'prologue-layout.json'
+KNOWN_FLAGS={'--tileset','--blank','--fill','--ref'}
+FLAGS={}
+ARGS=[]
+for a in sys.argv[1:]:
+    if a.startswith('--'):
+        k,_,v=a.partition('=')
+        if k not in KNOWN_FLAGS:
+            sys.exit('ERROR: unknown flag %r (known: %s)'%(a,' '.join(sorted(KNOWN_FLAGS))))
+        if not _:
+            sys.exit('ERROR: flags take the --name=value form (got %r)'%a)
+        FLAGS[k]=v
+    else:
+        ARGS.append(a)
+TILESET=FLAGS.get('--tileset','snowy-bern')
+BLANK=FLAGS.get('--blank')
+if BLANK:
+    LAYOUT='%s (custom canvas)'%TILESET
+    OUT_HTML=ARGS[0] if len(ARGS)>0 else 'editor.html'
+    DOWNLOAD=ARGS[1] if len(ARGS)>1 else '%s-layout.json'%TILESET
+    SEED_ARG=ARGS[2] if len(ARGS)>2 else None
+else:
+    LAYOUT=ARGS[0] if len(ARGS)>0 else 'PrologueMap'
+    OUT_HTML=ARGS[1] if len(ARGS)>1 else 'editor.html'
+    DOWNLOAD=ARGS[2] if len(ARGS)>2 else 'prologue-layout.json'
+    SEED_ARG=ARGS[3] if len(ARGS)>3 else None
 
-win=_tileset_from_dir(os.path.join(ROOT,'campaigns/rime-of-the-frostmaiden/maps/tilesets/snowy-bern'))
-# `van` is consulted ONLY for .terrain(m) (vanilla tileset-1 terrain table) to decide which
-# reskinned cells diverge; its gfx/pal are never rendered. The decomp's raw vanilla gfx
-# (ObjectType1.4bpp / MapPalette1.gbapal) are build-only artifacts and may be absent, so we
-# feed the winter gfx/pal (irrelevant) alongside the real vanilla config.
-SNOW=os.path.join(ROOT,'campaigns/rime-of-the-frostmaiden/maps/tilesets/snowy-bern')
-van=Tileset(os.path.join(SNOW,'snowy-bern.4bpp'),
-            os.path.join(SNOW,'snowy-bern.gbapal'),
-            os.path.join(DEC,'graphics/map/TileConfiguration1.bin'))
-lay=open(os.path.join(DEC,f'graphics/map/layout/{LAYOUT}.bin'),'rb').read()
-W,H=lay[0],lay[1]
-cells=[struct.unpack_from('<H',lay,2+i*2)[0]//4 for i in range(W*H)]
+win=_tileset_from_dir(os.path.join(ROOT,'campaigns/rime-of-the-frostmaiden/maps/tilesets',TILESET))
+if BLANK:
+    # Custom canvas on a vendored tileset (#40): no vanilla layout to derive from.
+    W,H=(int(v) for v in BLANK.lower().split('x'))
+    FILL=int(FLAGS.get('--fill','0'))
+    grid=[FILL]*(W*H)
+else:
+    # `van` is consulted ONLY for .terrain(m) (vanilla tileset-1 terrain table) to decide which
+    # reskinned cells diverge; its gfx/pal are never rendered. The decomp's raw vanilla gfx
+    # (ObjectType1.4bpp / MapPalette1.gbapal) are build-only artifacts and may be absent, so we
+    # feed the winter gfx/pal (irrelevant) alongside the real vanilla config.
+    SNOW=os.path.join(ROOT,'campaigns/rime-of-the-frostmaiden/maps/tilesets/snowy-bern')
+    van=Tileset(os.path.join(SNOW,'snowy-bern.4bpp'),
+                os.path.join(SNOW,'snowy-bern.gbapal'),
+                os.path.join(DEC,'graphics/map/TileConfiguration1.bin'))
+    lay=open(os.path.join(DEC,f'graphics/map/layout/{LAYOUT}.bin'),'rb').read()
+    W,H=lay[0],lay[1]
+    cells=[struct.unpack_from('<H',lay,2+i*2)[0]//4 for i in range(W*H)]
 
-# current final grid (base iron-out + remap + manual)  -> editor starting point
-def divergent(m): return win.terrain(m)!=van.terrain(m)
-modec=collections.defaultdict(collections.Counter)
-for m in cells:
-    if not divergent(m): modec[van.terrain(m)][m]+=1
-MODE={t:c.most_common(1)[0][0] for t,c in modec.items()}
-FB={0x01:6,0x0c:192,0x10:568,0x12:418,0x13:2}
-resolved=[0]*(W*H)
-for y in range(H):
-    for x in range(W):
-        m=cells[y*W+x]
-        if not divergent(m): resolved[y*W+x]=m; continue
-        vt=van.terrain(m); nb=collections.Counter()
-        for dy in(-1,0,1):
-            for dx in(-1,0,1):
-                if dx==0 and dy==0: continue
-                nx,ny=x+dx,y+dy
-                if 0<=nx<W and 0<=ny<H:
-                    nm=cells[ny*W+nx]
-                    if not divergent(nm) and van.terrain(nm)==vt: nb[nm]+=1
-        resolved[y*W+x]=nb.most_common(1)[0][0] if nb else MODE.get(vt,FB.get(vt,m))
-# Learned reskin: Nicolas's hand-retiles (reskin-learned.json) override the naive auto-reskin
-# for any vanilla metatile he's already taught, so each new chapter inherits his conventions
-# (villages, mountains, forests...) as the starting point instead of the smeared default.
-_learned_path=os.path.join(ROOT,'campaigns/rime-of-the-frostmaiden/maps/reskin-learned.json')
-_learned=json.load(open(_learned_path)).get('map',{}) if os.path.exists(_learned_path) else {}
-for i in range(W*H):
-    w=_learned.get(str(cells[i]))
-    if w is not None: resolved[i]=w
-# prologue-era hand overrides apply only to the original PrologueMap session
-_isproto = LAYOUT=='PrologueMap'
-remap={int(k):v for k,v in json.load(open(os.path.join(ROOT,'map-review/_remap.json'))).items()} if _isproto and os.path.exists(os.path.join(ROOT,'map-review/_remap.json')) else {}
-manual=json.load(open(os.path.join(ROOT,'map-review/_manual.json'))) if _isproto and os.path.exists(os.path.join(ROOT,'map-review/_manual.json')) else {}
-def lbl(i): x,y=i%W,i//W; return '%s%d'%(chr(ord('A')+x),y+1)
-grid=[]
-for i in range(W*H):
-    t=manual.get(lbl(i), resolved[i]); grid.append(remap.get(t,t))
+    # current final grid (base iron-out + remap + manual)  -> editor starting point
+    def divergent(m): return win.terrain(m)!=van.terrain(m)
+    modec=collections.defaultdict(collections.Counter)
+    for m in cells:
+        if not divergent(m): modec[van.terrain(m)][m]+=1
+    MODE={t:c.most_common(1)[0][0] for t,c in modec.items()}
+    FB={0x01:6,0x0c:192,0x10:568,0x12:418,0x13:2}
+    resolved=[0]*(W*H)
+    for y in range(H):
+        for x in range(W):
+            m=cells[y*W+x]
+            if not divergent(m): resolved[y*W+x]=m; continue
+            vt=van.terrain(m); nb=collections.Counter()
+            for dy in(-1,0,1):
+                for dx in(-1,0,1):
+                    if dx==0 and dy==0: continue
+                    nx,ny=x+dx,y+dy
+                    if 0<=nx<W and 0<=ny<H:
+                        nm=cells[ny*W+nx]
+                        if not divergent(nm) and van.terrain(nm)==vt: nb[nm]+=1
+            resolved[y*W+x]=nb.most_common(1)[0][0] if nb else MODE.get(vt,FB.get(vt,m))
+    # Learned reskin: Nicolas's hand-retiles (reskin-learned.json) override the naive auto-reskin
+    # for any vanilla metatile he's already taught, so each new chapter inherits his conventions
+    # (villages, mountains, forests...) as the starting point instead of the smeared default.
+    _learned_path=os.path.join(ROOT,'campaigns/rime-of-the-frostmaiden/maps/reskin-learned.json')
+    _learned=json.load(open(_learned_path)).get('map',{}) if os.path.exists(_learned_path) else {}
+    for i in range(W*H):
+        w=_learned.get(str(cells[i]))
+        if w is not None: resolved[i]=w
+    # prologue-era hand overrides apply only to the original PrologueMap session
+    _isproto = LAYOUT=='PrologueMap'
+    remap={int(k):v for k,v in json.load(open(os.path.join(ROOT,'map-review/_remap.json'))).items()} if _isproto and os.path.exists(os.path.join(ROOT,'map-review/_remap.json')) else {}
+    manual=json.load(open(os.path.join(ROOT,'map-review/_manual.json'))) if _isproto and os.path.exists(os.path.join(ROOT,'map-review/_manual.json')) else {}
+    def lbl(i): x,y=i%W,i//W; return '%s%d'%(chr(ord('A')+x),y+1)
+    grid=[]
+    for i in range(W*H):
+        t=manual.get(lbl(i), resolved[i]); grid.append(remap.get(t,t))
 
-# Optional 4th arg: seed the editable grid from an existing compiled .mar so Nicolas
+# Optional trailing arg: seed the editable grid from an existing compiled .mar so Nicolas
 # continues editing the CURRENT chapter map (gate, prior hand-retiles) instead of a
-# fresh reskin of the vanilla layout. The .mar stores metatile<<5 (see compile_layout);
-# its sibling .json carries the dims, which must match the chosen layout.
-SEED_MAR=sys.argv[4] if len(sys.argv)>4 else None
+# fresh reskin/blank canvas. The .mar stores metatile<<5 (see compile_layout);
+# its sibling .json carries the dims, which must match the chosen canvas.
+SEED_MAR=SEED_ARG
 if SEED_MAR:
     SEED_MAR=os.path.expanduser(SEED_MAR)
     seed=open(SEED_MAR,'rb').read()
@@ -79,6 +114,10 @@ if SEED_MAR:
     if (sj['width'],sj['height'])!=(W,H):
         sys.exit('ERROR: seed .mar is %dx%d but layout %s is %dx%d'
                  %(sj['width'],sj['height'],LAYOUT,W,H))
+    if sj.get('tileset','snowy-bern')!=TILESET:
+        sys.exit('ERROR: seed .mar was painted on tileset %r but this canvas is %r '
+                 '-- its metatile indices would reinterpret as the wrong art/terrain'
+                 %(sj.get('tileset','snowy-bern'),TILESET))
     grid=[struct.unpack_from('<H',seed,i*2)[0]>>5 for i in range(W*H)]
     print('seeded editable grid from',SEED_MAR)
 
@@ -89,22 +128,33 @@ for m in range(1024):
     atlas.paste(win.metatile_image(m), ((m%ACOLS)*16,(m//ACOLS)*16))
 buf=io.BytesIO(); atlas.save(buf,'PNG'); ATLAS=base64.b64encode(buf.getvalue()).decode()
 
-# vanilla-art reference: the ORIGINAL FE8 layout in its native tileset, for side-by-side
-# comparison while painting. The raw .4bpp/.gbapal are build-only artifacts often absent
-# in a fresh tree, so build them on demand with the decomp's OWN gbagfx (authoritative;
-# a hand-rolled PNG/JASC decode gets the palette wrong), then render via the standard path.
-import subprocess
-def _ensure_built(src, dst):
-    if not os.path.exists(dst):
-        subprocess.run([os.path.join(DEC,'tools/gbagfx/gbagfx'), src, dst], check=True)
-_ensure_built(os.path.join(DEC,'graphics/map/ObjectType1.png'),  os.path.join(DEC,'graphics/map/ObjectType1.4bpp'))
-_ensure_built(os.path.join(DEC,'graphics/map/MapPalette1.pal'),  os.path.join(DEC,'graphics/map/MapPalette1.gbapal'))
-vanart=Tileset(os.path.join(DEC,'graphics/map/ObjectType1.4bpp'),
-               os.path.join(DEC,'graphics/map/MapPalette1.gbapal'),
-               os.path.join(DEC,'graphics/map/TileConfiguration1.bin'))
-vref=Image.new('RGB',(W*16,H*16))
-for i,m in enumerate(cells):
-    vref.paste(vanart.metatile_image(m),((i%W)*16,(i//W)*16))
+# Reference pane. Custom-canvas mode embeds --ref (any image, e.g. the flattened
+# book-map blockout) stretched to the canvas so the yellow hover-highlight lines up;
+# without --ref it stays a dark placeholder. Reskin mode renders the ORIGINAL FE8
+# layout in its native tileset for side-by-side comparison while painting. The raw
+# .4bpp/.gbapal are build-only artifacts often absent in a fresh tree, so build them
+# on demand with the decomp's OWN gbagfx (authoritative; a hand-rolled PNG/JASC
+# decode gets the palette wrong), then render via the standard path.
+if BLANK:
+    REF_IMG=FLAGS.get('--ref')
+    if REF_IMG:
+        vref=Image.open(os.path.expanduser(REF_IMG)).convert('RGB').resize(
+            (W*16,H*16),Image.LANCZOS)
+    else:
+        vref=Image.new('RGB',(W*16,H*16),(28,30,36))
+else:
+    import subprocess
+    def _ensure_built(src, dst):
+        if not os.path.exists(dst):
+            subprocess.run([os.path.join(DEC,'tools/gbagfx/gbagfx'), src, dst], check=True)
+    _ensure_built(os.path.join(DEC,'graphics/map/ObjectType1.png'),  os.path.join(DEC,'graphics/map/ObjectType1.4bpp'))
+    _ensure_built(os.path.join(DEC,'graphics/map/MapPalette1.pal'),  os.path.join(DEC,'graphics/map/MapPalette1.gbapal'))
+    vanart=Tileset(os.path.join(DEC,'graphics/map/ObjectType1.4bpp'),
+                   os.path.join(DEC,'graphics/map/MapPalette1.gbapal'),
+                   os.path.join(DEC,'graphics/map/TileConfiguration1.bin'))
+    vref=Image.new('RGB',(W*16,H*16))
+    for i,m in enumerate(cells):
+        vref.paste(vanart.metatile_image(m),((i%W)*16,(i//W)*16))
 vbuf=io.BytesIO(); vref.save(vbuf,'PNG'); VANREF=base64.b64encode(vbuf.getvalue()).decode()
 
 def nonempty(m): return any(struct.unpack_from('<H',win.cfg,m*8+s*2)[0]&0x3FF for s in range(4))
@@ -127,6 +177,12 @@ TNAME={0x00:'(empty)',0x01:'Snow ground',0x02:'Road / path',0x03:'Village (visit
 0x20:'Chest (empty)',0x21:'Chest',0x25:'Ruins / wall',0x26:'Cliff (impass.)',
 0x2c:'Building edge',0x2d:'Stairs / floor',0x2e:'Building / roof',0x32:'Fence',
 0x34:'Bridge',0x36:'Deep ice',0x3c:'Water',0x3f:'Ship / brace'}
+# Non-winter tilesets (--tileset=cave-interior, ...): strip the snow flavor from the
+# shared terrain ids so the hover/palette labels don't describe a mine in snowfield
+# terms. Terrain SEMANTICS are the tileset's own terrain bytes either way.
+if TILESET!='snowy-bern':
+    TNAME.update({0x01:'Ground',0x0c:'Cover (forest-type)',0x10:'River / stream',
+                  0x11:'Rock / rough',0x15:'Water (impass.)',0x36:'Deep water'})
 
 HTML=r'''<!doctype html><html><head><meta charset="utf-8"><title>__TITLE__ Map Editor</title>
 <style>
@@ -222,7 +278,7 @@ window.onkeydown=e=>{
  if(e.key==='g'){const g=document.getElementById('grid');g.checked=!g.checked;showGrid=g.checked;drawMap();drawRef(-1);}
 };
 document.getElementById('export').onclick=()=>{
- const js=JSON.stringify({width:W,height:H,grid:GRID});
+ const js=JSON.stringify({tileset:'__TILESET__',width:W,height:H,grid:GRID});
  const ta=document.getElementById('out');ta.style.display='block';ta.value=js;
  const b=new Blob([js],{type:'application/json'});const a=document.createElement('a');
  a.href=URL.createObjectURL(b);a.download='__DOWNLOAD__';a.click();
@@ -235,7 +291,8 @@ out=(HTML.replace('__W__',str(W)).replace('__H__',str(H)).replace('__ACOLS__',st
      .replace('__GRID__',json.dumps(grid)).replace('__TERR__',json.dumps(TERR))
      .replace('__PAL__',json.dumps(PAL)).replace('__TNAME__',json.dumps({str(k):v for k,v in TNAME.items()}))
      .replace('__ATLAS__',ATLAS).replace('__VANREF__',VANREF)
-     .replace('__DOWNLOAD__',DOWNLOAD).replace('__TITLE__',LAYOUT))
+     .replace('__DOWNLOAD__',DOWNLOAD).replace('__TITLE__',LAYOUT)
+     .replace('__TILESET__',TILESET))
 # TNAME keys must be numeric in JS object -> emit as numbers
 out=out.replace(json.dumps({str(k):v for k,v in TNAME.items()}),
                 '{'+','.join('%d:%s'%(k,json.dumps(v)) for k,v in TNAME.items())+'}')
@@ -248,12 +305,9 @@ print('wrote',path,'(%d KB)'%(len(out)//1024))
 # winter reskin can be compiled/rendered immediately, before any hand-painting), and
 # render a PNG preview of it so the starting point is visible without opening the editor.
 start_json=os.path.join(ROOT,'map-review',DOWNLOAD)
-json.dump({'width':W,'height':H,'grid':grid},open(start_json,'w'))
+json.dump({'tileset':TILESET,'width':W,'height':H,'grid':grid},open(start_json,'w'))
 print('wrote starting layout',start_json)
-Z=4*16
-prev=Image.new('RGB',(W*Z,H*Z))
-for i,m in enumerate(grid):
-    prev.paste(win.metatile_image(m).resize((Z,Z),Image.NEAREST),((i%W)*Z,(i//W)*Z))
+from map_tileset_tool import render_grid
 png=os.path.join(ROOT,'map-review',os.path.splitext(os.path.basename(OUT_HTML))[0]+'-start.png')
-prev.save(png)
+render_grid(win,[grid[r*W:(r+1)*W] for r in range(H)],png,zoom=4)
 print('rendered start preview',png)

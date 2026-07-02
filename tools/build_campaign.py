@@ -2767,13 +2767,12 @@ CONST_MAPS_S = os.path.join(DECOMP, 'data', 'const_data_chapter_maps.s')
 ASSET_TABLE_S = os.path.join(DECOMP, 'data', 'data_8B363C.s')
 CHAPTER_SETTINGS_JSON = os.path.join(DECOMP, 'src', 'data', 'chapter_settings.json')
 
-# Registered as asset-table entries (label -> decomp incbin source we copy in).
-WINTER_TILESET = 'snowy-bern'
-WINTER_ASSETS = [  # (asset-table label, decomp filename, incbin path)
-    ('ObjectTypeSnow',        'ObjectTypeSnow.4bpp',         'graphics/map/ObjectTypeSnow.4bpp.lz'),
-    ('MapPaletteSnow',        'MapPaletteSnow.gbapal',       'graphics/map/MapPaletteSnow.gbapal'),
-    ('TileConfigurationSnow', 'TileConfigurationSnow.bin',   'graphics/map/TileConfigurationSnow.bin.lz'),
-]
+# The campaign's tilesets (maps/tilesets/<name>/, vendored via map_tileset_tool
+# import). Each registers under ObjectType<Stem>/MapPalette<Stem>/
+# TileConfiguration<Stem> asset labels (_register_tileset). Further tilesets
+# (e.g. cave-interior, #40/#23) register in the chapter injector that first
+# consumes them.
+WINTER_TILESET = 'snowy-bern'         # shared winter overworld (#41), stem Snow
 WINTER_TEST_LAYOUT = ('ChTestSnowMap', 'ch-test-snowfield')  # (asset label, campaign source stem)
 
 
@@ -2820,56 +2819,70 @@ def _asm_table_word_index(path, table_label, word_label):
     sys.exit('ERROR: .word %r not found under %r in %s' % (word_label, table_label, path))
 
 
+def _register_tileset(campaign, tileset, label_stem, comment):
+    """Copy a vendored tileset's 3 pieces (maps/tilesets/<tileset>/, the
+    map_tileset_tool import format) into the decomp, register their incbins in
+    CONST_MAPS_S under `comment` + fresh gChapterDataAssetTable slots, and return
+    {'obj','pal','cfg'} asset indices. Labels are ObjectType<Stem> /
+    MapPalette<Stem> / TileConfiguration<Stem>; gfx + config ride the Makefile
+    %.lz rule, the palette stays raw like vanilla MapPaletteN.gbapal."""
+    ts_dir = os.path.join(REPO, 'campaigns', campaign, 'maps', 'tilesets', tileset)
+    assets = [  # (asset-table label, source ext, incbin ext)
+        ('ObjectType%s' % label_stem, '4bpp', '4bpp.lz'),
+        ('MapPalette%s' % label_stem, 'gbapal', 'gbapal'),
+        ('TileConfiguration%s' % label_stem, 'bin', 'bin.lz'),
+    ]
+    incbin = ['\n/* %s */' % comment]
+    for label, src_ext, inc_ext in assets:
+        shutil.copyfile(os.path.join(ts_dir, '%s.%s' % (tileset, src_ext)),
+                        os.path.join(MAP_GFX_DIR, '%s.%s' % (label, src_ext)))
+        incbin += ['\t.align 2, 0', '\t.global %s' % label, '%s:' % label,
+                   '\t.incbin "graphics/map/%s.%s"' % (label, inc_ext)]
+    with open(CONST_MAPS_S, 'a', encoding='utf-8') as f:
+        f.write('\n'.join(incbin) + '\n')
+    base = _append_asm_table_words(ASSET_TABLE_S, 'gChapterDataAssetTable',
+                                   [a[0] for a in assets])
+    return {'obj': base, 'pal': base + 1, 'cfg': base + 2}
+
+
 def inject_winter_tileset(campaign, verbose=True):
     """Register the winter tileset (#41) + a flat test layout and repoint the test
     chapter at them, so a build load-tests the tileset in-engine (#40)."""
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
-    ts_dir = os.path.join(maps_dir, 'tilesets', WINTER_TILESET)
 
-    # 1. Copy the tileset pieces into the decomp (raw; the Makefile %.lz rule compresses
-    #    gfx + config, palette stays raw like vanilla MapPaletteN.gbapal).
-    for label, fname, _ in WINTER_ASSETS:
-        src = os.path.join(ts_dir, {'ObjectTypeSnow': '%s.4bpp' % WINTER_TILESET,
-                                    'MapPaletteSnow': '%s.gbapal' % WINTER_TILESET,
-                                    'TileConfigurationSnow': '%s.bin' % WINTER_TILESET}[label])
-        shutil.copyfile(src, os.path.join(MAP_GFX_DIR, fname))
+    # 1. Tileset pieces -> decomp + asset table (shared path, #40).
+    ts_idx = _register_tileset(campaign, WINTER_TILESET, 'Snow',
+                               'Manchego Stars winter tileset (#40/#41)')
 
-    # 2. Copy the test layout source (.mar + .json -> Makefile mar_to_map -> .bin -> .lz).
+    # 2. Copy the test layout source (.mar + .json -> Makefile mar_to_map -> .bin -> .lz),
+    #    register its incbin + asset-table slot.
     layout_label, stem = WINTER_TEST_LAYOUT
     for ext in ('mar', 'json'):
         shutil.copyfile(os.path.join(maps_dir, '%s.%s' % (stem, ext)),
                         os.path.join(MAP_LAYOUT_DIR, '%s.%s' % (layout_label, ext)))
-
-    # 3. Define the asset symbols (incbin) at the end of const_data_chapter_maps.s.
-    incbin = ['\n/* Manchego Stars winter tileset + test layout (#40/#41) */']
-    for label, _, path in WINTER_ASSETS:
-        incbin += ['\t.align 2, 0', '\t.global %s' % label, '%s:' % label,
-                   '\t.incbin "%s"' % path]
-    incbin += ['\t.align 2, 0', '\t.global %s' % layout_label, '%s:' % layout_label,
-               '\t.incbin "graphics/map/layout/%s.bin.lz"' % layout_label]
     with open(CONST_MAPS_S, 'a', encoding='utf-8') as f:
-        f.write('\n'.join(incbin) + '\n')
+        f.write('\n'.join([
+            '', '/* Manchego Stars winter test layout (#40/#41) */',
+            '\t.align 2, 0', '\t.global %s' % layout_label, '%s:' % layout_label,
+            '\t.incbin "graphics/map/layout/%s.bin.lz"' % layout_label]) + '\n')
+    layout_idx = _append_asm_table_words(ASSET_TABLE_S, 'gChapterDataAssetTable',
+                                         [layout_label])
 
-    # 4. Append them to gChapterDataAssetTable; the first lands at the prior entry count.
-    labels = [a[0] for a in WINTER_ASSETS] + [layout_label]
-    base = _append_asm_table_words(ASSET_TABLE_S, 'gChapterDataAssetTable', labels)
-    idx = {label: base + i for i, label in enumerate(labels)}
-
-    # 5. Repoint the TEST chapter (the inject_test_chapter target) at the winter tileset
+    # 3. Repoint the TEST chapter (the inject_test_chapter target) at the winter tileset
     #    + flat layout. obj2/anim/changes off -> the flat field needs none.
     with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
         settings = json.load(f)
     cmap = settings['chapters'][TEST_CHAPTER_INDEX]['map']
-    cmap.update({'obj1Id': idx['ObjectTypeSnow'], 'obj2Id': 0,
-                 'paletteId': idx['MapPaletteSnow'], 'tileConfigId': idx['TileConfigurationSnow'],
-                 'mainLayerId': idx[layout_label], 'objAnimId': 0, 'paletteAnimId': 0,
+    cmap.update({'obj1Id': ts_idx['obj'], 'obj2Id': 0,
+                 'paletteId': ts_idx['pal'], 'tileConfigId': ts_idx['cfg'],
+                 'mainLayerId': layout_idx, 'objAnimId': 0, 'paletteAnimId': 0,
                  'changeLayerId': 0})
     with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=2)
 
     if verbose:
         print('  %s tileset -> asset table [%d..%d]; test chapter (idx %d) repointed'
-              % (WINTER_TILESET, base, base + len(labels) - 1, TEST_CHAPTER_INDEX))
+              % (WINTER_TILESET, ts_idx['obj'], layout_idx, TEST_CHAPTER_INDEX))
 
 
 def inject_title_screen(campaign, verbose=True):
@@ -3098,19 +3111,8 @@ def inject_prologue(campaign, verbose=True, montage=False):
     #    stripped chapter (garbage band, bad string-pointer loads), while a normal chapter's
     #    group (Ch1Events, asset[10]) loads cleanly -- proven by inject_test_chapter. New Game
     #    redirects 0 -> 1 (step 6). The prologue slot is left vanilla and never loaded.
-    label, stem = PROLOGUE_LAYOUT
-    for ext in ('mar', 'json'):
-        shutil.copyfile(os.path.join(maps_dir, '%s.%s' % (stem, ext)),
-                        os.path.join(MAP_LAYOUT_DIR, '%s.%s' % (label, ext)))
-    with open(CONST_MAPS_S, 'a', encoding='utf-8') as f:
-        f.write('\n'.join([
-            '', '/* Manchego Stars prologue layout (#20) */',
-            '\t.align 2, 0', '\t.global %s' % label, '%s:' % label,
-            '\t.incbin "graphics/map/layout/%s.bin.lz"' % label]) + '\n')
-    layout_idx = _append_asm_table_words(ASSET_TABLE_S, 'gChapterDataAssetTable', [label])
-    obj_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'ObjectTypeSnow')
-    pal_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'MapPaletteSnow')
-    cfg_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'TileConfigurationSnow')
+    obj_idx, pal_idx, cfg_idx, layout_idx = _register_chapter_map(
+        maps_dir, PROLOGUE_LAYOUT, 'Manchego Stars prologue layout (#20)')
     with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
         settings = json.load(f)
     host = settings['chapters'][PROLOGUE_HOST_INDEX]
@@ -3593,23 +3595,41 @@ def _emit_scene_beats(lines, msg_ids, beats, fid, home, overrides=None,
             beat, _stage_beat(beat, fid, home, override), width=w, preload=preload))
 
 
+# Vendored tileset -> _register_tileset label stem. A chapter map's tileset comes
+# from its layout .json (stamped by the editor-export/import pipeline), so the map
+# can never silently register against the wrong tileset's gfx/palette/terrain.
+TILESET_STEMS = {'snowy-bern': 'Snow', 'cave-interior': 'Cave'}
+
+
 def _register_chapter_map(maps_dir, layout, comment):
     """Copy a painted chapter layout (maps/<stem>.{mar,json}) into the decomp, register
     its incbin in CONST_MAPS_S under `comment` + a fresh gChapterDataAssetTable slot,
-    and return the (obj, pal, cfg, layout) asset indices for the winter-tileset map."""
+    and return the (obj, pal, cfg, layout) asset indices for the layout's OWN tileset
+    (read from its .json; absent = the legacy snowy-bern maps). The tileset must
+    already be registered -- Snow rides inject_winter_tileset, Cave lands with the
+    ch03 injector; an unregistered label sys.exits by name in _asm_table_word_index."""
     label, stem = layout
     for ext in ('mar', 'json'):
         shutil.copyfile(os.path.join(maps_dir, '%s.%s' % (stem, ext)),
                         os.path.join(MAP_LAYOUT_DIR, '%s.%s' % (label, ext)))
+    with open(os.path.join(maps_dir, '%s.json' % stem), encoding='utf-8') as f:
+        tileset = json.load(f).get('tileset', WINTER_TILESET)
+    if tileset not in TILESET_STEMS:
+        sys.exit('ERROR: %s.json names tileset %r -- add it to TILESET_STEMS and '
+                 'register it (_register_tileset) first' % (stem, tileset))
+    ts = TILESET_STEMS[tileset]
     with open(CONST_MAPS_S, 'a', encoding='utf-8') as f:
         f.write('\n'.join([
             '', '/* %s */' % comment,
             '\t.align 2, 0', '\t.global %s' % label, '%s:' % label,
             '\t.incbin "graphics/map/layout/%s.bin.lz"' % label]) + '\n')
     layout_idx = _append_asm_table_words(ASSET_TABLE_S, 'gChapterDataAssetTable', [label])
-    obj_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'ObjectTypeSnow')
-    pal_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'MapPaletteSnow')
-    cfg_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'TileConfigurationSnow')
+    obj_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable',
+                                    'ObjectType%s' % ts)
+    pal_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable',
+                                    'MapPalette%s' % ts)
+    cfg_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable',
+                                    'TileConfiguration%s' % ts)
     return obj_idx, pal_idx, cfg_idx, layout_idx
 
 
