@@ -3502,6 +3502,163 @@ def _load_chapter_yaml(campaign, filename):
         return yaml.safe_load(f)
 
 
+# --- Shared chapter-injection helpers (#104): hoisted from inject_ch01/inject_ch02 ---
+# so ch03+ reuse them instead of growing new copy-paste siblings. Pure string/file
+# mechanics only -- everything chapter-specific rides in as an argument.
+
+def _split_script_beats(script, card_required=True):
+    """Split a locked chapter-YAML cutscene `script:` into (location_card, beats):
+    entries accumulate into the current beat, `beat_break` sentinels start a new one,
+    and the `location_card` rides out separately (card_required=False tolerates a
+    script without one and returns card=None)."""
+    if card_required:
+        card = next(v for e in script for k, v in e.items() if k == 'location_card')
+    else:
+        card = next((v for e in script for k, v in e.items()
+                     if k == 'location_card'), None)
+    beats = [[]]
+    for entry in script:
+        (k, v), = entry.items()
+        if k == 'location_card':
+            continue
+        if k == 'beat_break':
+            beats.append([])
+            continue
+        beats[-1].append(entry)
+    return card, beats
+
+
+def _cutscene_fid(spk, special, err_label, fallback=None):
+    """Speaker id -> face tag for a chapter cutscene: the chapter's `special` speakers
+    first (guest slots, faceless `narration` -> None), then the PC PORTRAIT_MAP, then
+    an optional `fallback` portrait map (e.g. GUEST_PORTRAIT_MAP) checked LAST."""
+    if spk in special:
+        return special[spk]
+    if spk in PORTRAIT_MAP:
+        return _fid_tag(PORTRAIT_MAP[spk].upper())
+    if fallback and spk in fallback:
+        return _fid_tag(fallback[spk].upper())
+    sys.exit('ERROR: %s %r' % (err_label, spk))
+
+
+def _stage_beat(beat, fid, home, overrides=None):
+    """Podium staging for one scenic beat: speaker -> (podium, face tag). Speakers
+    default to the mid-left podium; `home` anchors recurring speakers (quest-givers),
+    `overrides` moves a speaker for this beat only; faces resolve through the
+    chapter's fid function (cf. _cutscene_fid)."""
+    ov = overrides or {}
+    return {k: (ov.get(k, home.get(k, '[OpenMidLeft]')), fid(k))
+            for e in beat for k in e}
+
+
+def _register_chapter_map(maps_dir, layout, comment):
+    """Copy a painted chapter layout (maps/<stem>.{mar,json}) into the decomp, register
+    its incbin in CONST_MAPS_S under `comment` + a fresh gChapterDataAssetTable slot,
+    and return the (obj, pal, cfg, layout) asset indices for the winter-tileset map."""
+    label, stem = layout
+    for ext in ('mar', 'json'):
+        shutil.copyfile(os.path.join(maps_dir, '%s.%s' % (stem, ext)),
+                        os.path.join(MAP_LAYOUT_DIR, '%s.%s' % (label, ext)))
+    with open(CONST_MAPS_S, 'a', encoding='utf-8') as f:
+        f.write('\n'.join([
+            '', '/* %s */' % comment,
+            '\t.align 2, 0', '\t.global %s' % label, '%s:' % label,
+            '\t.incbin "graphics/map/layout/%s.bin.lz"' % label]) + '\n')
+    layout_idx = _append_asm_table_words(ASSET_TABLE_S, 'gChapterDataAssetTable', [label])
+    obj_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'ObjectTypeSnow')
+    pal_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'MapPaletteSnow')
+    cfg_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'TileConfigurationSnow')
+    return obj_idx, pal_idx, cfg_idx, layout_idx
+
+
+def _retarget_host_chapter(host_index, goal_slot, goal_type, goal_err, indices,
+                           chapter_number):
+    """Point host chapter slot `host_index` (chapter_settings.json) at a registered
+    map (`indices` from _register_chapter_map) and copy vanilla slot `goal_slot`'s
+    goal template (checked against windowDataType `goal_type`, else sys.exit(goal_err)).
+    The prep-screen header reads "Chapter NN" from prepScreenNumber, not the slot
+    index. It is a double-wide glyph index: vanilla slots carry exactly 2 * chapter
+    number (slot1=2, slot2=4, ... both ch5 and ch5x = 10). Returns the host dict."""
+    obj_idx, pal_idx, cfg_idx, layout_idx = indices
+    with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
+        settings = json.load(f)
+    host = settings['chapters'][host_index]
+    goal = settings['chapters'][goal_slot]['goal']
+    if goal.get('windowDataType') != goal_type:
+        sys.exit(goal_err)
+    host['map'].update({'obj1Id': obj_idx, 'obj2Id': 0, 'paletteId': pal_idx,
+                        'tileConfigId': cfg_idx, 'mainLayerId': layout_idx,
+                        'objAnimId': 0, 'paletteAnimId': 0, 'changeLayerId': 0})
+    host['goal'] = dict(goal)
+    host['prepScreenNumber'] = chapter_number * 2
+    with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
+        json.dump(settings, f, indent=2)
+    return host
+
+
+def _ally_unit_entry(leader, slot, class_enum, level, x, y, items, comment):
+    """One ally UnitDefinition row (events_udefs.c) for a chapter join/deploy table."""
+    return ('    {\n'
+            '        .charIndex = CHARACTER_%s,%s\n'
+            '        .classIndex = %s,\n'
+            '        .leaderCharIndex = %s,\n'
+            '        .allegiance = FACTION_ID_BLUE,\n'
+            '        .level = %d,\n'
+            '        .xPosition = %d,\n'
+            '        .yPosition = %d,\n'
+            '        .redaCount = 0,\n'
+            '        .items = { %s },\n'
+            '    },' % (slot.upper(), comment, class_enum, leader, level, x, y, items))
+
+
+def _enemy_unit_entry(char, class_enum, level, autolevel, x, y, items, ai, comment,
+                      itemdrop=False):
+    """One enemy UnitDefinition row; autolevel/itemdrop toggle their optional fields."""
+    return ('    {\n'
+            '        .charIndex = %s,%s\n'
+            '        .classIndex = %s,\n'
+            '%s'
+            '        .allegiance = FACTION_ID_RED,\n'
+            '        .level = %d,\n'
+            '        .xPosition = %d,\n'
+            '        .yPosition = %d,\n'
+            '        .redaCount = 0,\n'
+            '%s'
+            '        .items = { %s },\n'
+            '        .ai = %s,\n'
+            '    },' % (char, comment, class_enum,
+                       '        .autolevel = 1,\n' if autolevel else '',
+                       level, x, y,
+                       '        .itemDrop = 1,\n' if itemdrop else '',
+                       items, ai))
+
+
+def _prepend_defeat_quote(quote):
+    """Prepend an entry at the HEAD of gDefeatTalkList (battlequotes.c): the head entry
+    wins GetDefeatTalkEntry's first-match scan, shadowing any vanilla entry for the
+    same pid further down (the shadowing rule debriefed in inject_prologue step 5)."""
+    with open(BATTLEQUOTES_C, encoding='utf-8') as f:
+        bq = f.read()
+    head = 'CONST_DATA struct DefeatTalkEnt gDefeatTalkList[] = {\n'
+    if bq.count(head) != 1:
+        sys.exit('ERROR: gDefeatTalkList head not in expected form in %s'
+                 % BATTLEQUOTES_C)
+    bq = bq.replace(head, head + quote + '\n')
+    with open(BATTLEQUOTES_C, 'w', encoding='utf-8') as f:
+        f.write(bq)
+
+
+def _write_chapter_title_card(host, title):
+    """Compose the chapter's title-card banner (the intro/status banner is a 4bpp
+    image, not text) and drop stale converted intermediates so make re-converts."""
+    title_png = os.path.join(DECOMP, 'graphics', 'chap_title',
+                             'chap_title_%d.png' % host['chapTitleId'])
+    gen_chapter_title.compose_title(title).save(title_png)
+    for stale in (title_png[:-4] + '.4bpp', title_png[:-4] + '.4bpp.lz'):
+        if os.path.exists(stale):
+            os.remove(stale)
+
+
 def inject_ch01(campaign, verbose=True):
     """Wire Ch1 "The Iron Trail" (#21) onto chapter slot 2 (ch00's MNC2(0x2) target).
 
@@ -3535,30 +3692,17 @@ def inject_ch01(campaign, verbose=True):
     #    lord-select menu then plays over its own scenic BG (not the battle map).
     b1_script = next(e for e in chap['events']
                      if e['trigger'] == 'chapter_start')['script']
-    b1_card = next(v for e in b1_script for k, v in e.items() if k == 'location_card')
-    b1_beats = [[]]
-    for entry in b1_script:
-        (k, v), = entry.items()
-        if k == 'location_card':
-            continue
-        if k == 'beat_break':
-            b1_beats.append([])
-            continue
-        b1_beats[-1].append(entry)
+    b1_card, b1_beats = _split_script_beats(b1_script)
     if len(b1_beats) != len(CH01_BEAT1_MSGS):
         sys.exit('ERROR: ch01 Beat 1 split into %d beats; expected %d (check '
                  'beat_break markers in the YAML)' % (len(b1_beats), len(CH01_BEAT1_MSGS)))
 
+    b1_guests = {'hlin': _fid_tag(PROLOGUE_HLIN_SLOT),
+                 'scramsax': _fid_tag(PROLOGUE_SCRAMSAX_SLOT),
+                 'hruna': _fid_tag('VILLAGER_WOMAN')}
+
     def b1_fid(spk):
-        if spk == 'hlin':
-            return _fid_tag(PROLOGUE_HLIN_SLOT)
-        if spk == 'scramsax':
-            return _fid_tag(PROLOGUE_SCRAMSAX_SLOT)
-        if spk == 'hruna':
-            return _fid_tag('VILLAGER_WOMAN')
-        if spk in PORTRAIT_MAP:
-            return _fid_tag(PORTRAIT_MAP[spk].upper())
-        sys.exit('ERROR: ch01 Beat 1 unknown speaker %r' % spk)
+        return _cutscene_fid(spk, b1_guests, 'ch01 Beat 1 unknown speaker')
     # Podium geometry (gTalkFaceHPosLut, scene.c, px = x*8; faces are 96px = 12 tiles):
     # FarLeft 24 | MidLeft 48 | Left 72 | Right 168 | MidRight 192 | FarRight 216.
     # Two faces only avoid overlap when >=96px apart, so the clean "two-shot" is
@@ -3568,11 +3712,6 @@ def inject_ch01(campaign, verbose=True):
     # 3-stack were too crowded). Silent listeners fill the OUTER podiums where a touch
     # of overlap reads as "a couple standing together."
     b1_home = {'hlin': '[OpenMidRight]'}
-
-    def b1_stage(beat, overrides=None):
-        ov = overrides or {}
-        return {k: (ov.get(k, b1_home.get(k, '[OpenMidLeft]')), b1_fid(k))
-                for e in beat for k in e}
     # per-beat silent listeners (podium -> face), and per-beat speaker-podium overrides
     b1_preload = [
         [],                                                            # A: Scramsax<->Hlin two-shot
@@ -3600,39 +3739,22 @@ def inject_ch01(campaign, verbose=True):
     #     speaker(s) staged as clean two-shots opposite her (cf. Beat 1 podium geometry).
     end_script = next(e for e in chap['events']
                       if e['trigger'] == 'chapter_end')['script']
-    end_card = next(v for e in end_script for k, v in e.items() if k == 'location_card')
-    end_beats = [[]]
-    for entry in end_script:
-        (k, v), = entry.items()
-        if k == 'location_card':
-            continue
-        if k == 'beat_break':
-            end_beats.append([])
-            continue
-        end_beats[-1].append(entry)
+    end_card, end_beats = _split_script_beats(end_script)
     if len(end_beats) != len(CH01_ENDING_MSGS):
         sys.exit('ERROR: ch01 ending split into %d beats; expected %d (check '
                  'beat_break markers in the YAML)' % (len(end_beats), len(CH01_ENDING_MSGS)))
 
     def end_fid(spk):
-        if spk == 'narration':                  # faceless stage-business box (no portrait)
-            return None
-        if spk in PORTRAIT_MAP:
-            return _fid_tag(PORTRAIT_MAP[spk].upper())
-        if spk in GUEST_PORTRAIT_MAP:           # duvessa/hruna/baxby cutscene faces
-            return _fid_tag(GUEST_PORTRAIT_MAP[spk].upper())
-        sys.exit('ERROR: ch01 ending unknown speaker %r' % spk)
+        # narration = faceless stage-business box (no portrait); the fallback covers
+        # the duvessa/hruna/baxby cutscene faces (GUEST_PORTRAIT_MAP).
+        return _cutscene_fid(spk, {'narration': None}, 'ch01 ending unknown speaker',
+                             fallback=GUEST_PORTRAIT_MAP)
     # Duvessa hosts from mid-right (like Hlin in Beat 1); everyone else defaults mid-left.
     # Per-beat overrides put the OTHER speaker opposite her for a clean two-shot: Hruna
     # (C) and Meesmickle (D) take mid-right; in E, Baxby takes mid-right -- evicting
     # Duvessa's face there (a [ClearFace] step-out) as she gestures to the market and the
     # bird steps forward. Marty stays mid-left across E.
     end_home = {'duvessa': '[OpenMidRight]'}
-
-    def end_stage(beat, overrides=None):
-        ov = overrides or {}
-        return {k: (ov.get(k, end_home.get(k, '[OpenMidLeft]')), end_fid(k))
-                for e in beat for k in e}
     # NO silent-listener preloads: a preloaded face fades out and back in at every beat's
     # REMA boundary it straddles -- exactly the Marty/Duvessa "flashing during dialogue"
     # Nicolas flagged 2026-06-17. Each beat now shows ONLY its actual speakers, and the
@@ -3651,36 +3773,14 @@ def inject_ch01(campaign, verbose=True):
     # 1. Map: register the painted layout and point slot 2 at it + the winter tileset
     #    (same flow as inject_prologue step 1). Goal display = vanilla Ch1's own Seize
     #    template (windowDataType "seize"), copied from slot 1 while it is still vanilla.
-    label, stem = CH01_LAYOUT
-    for ext in ('mar', 'json'):
-        shutil.copyfile(os.path.join(maps_dir, '%s.%s' % (stem, ext)),
-                        os.path.join(MAP_LAYOUT_DIR, '%s.%s' % (label, ext)))
-    with open(CONST_MAPS_S, 'a', encoding='utf-8') as f:
-        f.write('\n'.join([
-            '', '/* Manchego Stars ch01 layout (#21) */',
-            '\t.align 2, 0', '\t.global %s' % label, '%s:' % label,
-            '\t.incbin "graphics/map/layout/%s.bin.lz"' % label]) + '\n')
-    layout_idx = _append_asm_table_words(ASSET_TABLE_S, 'gChapterDataAssetTable', [label])
-    obj_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'ObjectTypeSnow')
-    pal_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'MapPaletteSnow')
-    cfg_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'TileConfigurationSnow')
-    with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
-        settings = json.load(f)
-    host = settings['chapters'][CH01_HOST_INDEX]
-    seize_goal = settings['chapters'][1]['goal']
-    if seize_goal.get('windowDataType') != 'seize':
-        sys.exit('ERROR: slot 1 goal is not the vanilla Seize template -- '
-                 'inject_ch01 must run BEFORE inject_prologue')
-    host['map'].update({'obj1Id': obj_idx, 'obj2Id': 0, 'paletteId': pal_idx,
-                        'tileConfigId': cfg_idx, 'mainLayerId': layout_idx,
-                        'objAnimId': 0, 'paletteAnimId': 0, 'changeLayerId': 0})
-    host['goal'] = dict(seize_goal)
-    # The prep-screen header reads "Chapter NN" from prepScreenNumber, not the
-    # slot index. It is a double-wide glyph index: vanilla slots carry exactly
-    # 2 * chapter number (slot1=2, slot2=4, ... both ch5 and ch5x = 10).
-    host['prepScreenNumber'] = chap['chapter_number'] * 2
-    with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
-        json.dump(settings, f, indent=2)
+    indices = _register_chapter_map(maps_dir, CH01_LAYOUT,
+                                    'Manchego Stars ch01 layout (#21)')
+    obj_idx, pal_idx, cfg_idx, layout_idx = indices
+    host = _retarget_host_chapter(
+        CH01_HOST_INDEX, 1, 'seize',
+        'ERROR: slot 1 goal is not the vanilla Seize template -- '
+        'inject_ch01 must run BEFORE inject_prologue',
+        indices, chap['chapter_number'])
 
     # 2. Rosters (events_udefs.c). Four tables, all reusing vanilla Ch2 symbols so no
     #    extern surgery is needed (scripts/eventinfo already declare them):
@@ -3711,47 +3811,18 @@ def inject_ch01(campaign, verbose=True):
                  % (len(cast), len(CH01_JOIN_POSITIONS)))
     leader = 'CHARACTER_%s' % cast[0][1].upper()
 
-    def ally_entry(slot, class_enum, level, x, y, items, comment):
-        return ('    {\n'
-                '        .charIndex = CHARACTER_%s,%s\n'
-                '        .classIndex = %s,\n'
-                '        .leaderCharIndex = %s,\n'
-                '        .allegiance = FACTION_ID_BLUE,\n'
-                '        .level = %d,\n'
-                '        .xPosition = %d,\n'
-                '        .yPosition = %d,\n'
-                '        .redaCount = 0,\n'
-                '        .items = { %s },\n'
-                '    },' % (slot.upper(), comment, class_enum, leader, level, x, y, items))
-
     # classIndex rides the DEPLOY class (dce -- the Archer-clone for RBG, #65); items/loadout
     # still come from the real vanilla class (ce). For most units dce == ce.
-    join = [ally_entry(slot, dce, lv, x, y, ', '.join(CLASS_LOADOUT[ce]),
-                       ' /* %s */' % uid)
+    join = [_ally_unit_entry(leader, slot, dce, lv, x, y,
+                             ', '.join(CLASS_LOADOUT[ce]), ' /* %s */' % uid)
             for (uid, slot, ce, dce, lv), (x, y) in zip(cast, CH01_JOIN_POSITIONS)]
-    deploy = [ally_entry(slot, dce, lv, x, y, '0',
-                         ' /* deploy slot %d (cap template, never LOADed) */' % i)
+    deploy = [_ally_unit_entry(leader, slot, dce, lv, x, y, '0',
+                               ' /* deploy slot %d (cap template, never LOADed) */' % i)
               for i, ((uid, slot, ce, dce, lv), (x, y))
               in enumerate(zip(cast[:len(chap['deploy_slots'])], chap['deploy_slots']))]
     if len(deploy) != chap['deploy_limit']:
         sys.exit('ERROR: deploy_slots (%d) != deploy_limit (%d) in ch01 YAML'
                  % (len(deploy), chap['deploy_limit']))
-
-    def enemy_entry(char, class_enum, level, autolevel, x, y, items, ai, comment):
-        return ('    {\n'
-                '        .charIndex = %s,%s\n'
-                '        .classIndex = %s,\n'
-                '%s'
-                '        .allegiance = FACTION_ID_RED,\n'
-                '        .level = %d,\n'
-                '        .xPosition = %d,\n'
-                '        .yPosition = %d,\n'
-                '        .redaCount = 0,\n'
-                '        .items = { %s },\n'
-                '        .ai = %s,\n'
-                '    },' % (char, comment, class_enum,
-                           '        .autolevel = 1,\n' if autolevel else '',
-                           level, x, y, items, ai))
 
     by_eid = {e['id']: e for e in chap['enemy_units']}
     spear, axe = by_eid['goblin-spear'], by_eid['goblin-axe']
@@ -3769,12 +3840,12 @@ def inject_ch01(campaign, verbose=True):
 
     enemies = []
     for x, y in spear['positions']:
-        enemies.append(enemy_entry(
+        enemies.append(_enemy_unit_entry(
             '0x80', grunt_class(spear['class']), spear['level'], True, x, y,
             CH01_ITEM_IDS[spear['inventory'][0]['id']], CH01_AI[spear['ai_pattern']],
             ' /* goblin spear -- camp approach */'))
     for x, y in axe['positions']:
-        enemies.append(enemy_entry(
+        enemies.append(_enemy_unit_entry(
             '0x80', grunt_class(axe['class']), axe['level'], True, x, y,
             CH01_ITEM_IDS[axe['inventory'][0]['id']], CH01_AI[axe['ai_pattern']],
             ' /* goblin raider -- mid-trail pursuer */'))
@@ -3782,14 +3853,14 @@ def inject_ch01(campaign, verbose=True):
     # The iron-ingots MacGuffin stays narrative (no FE8 item exists for it yet);
     # recovery is told in the ending scene. The chief mirrors Breguet 1:1: his slot's
     # vanilla boss bases, no autolevel, lv4, attack-in-place AI, ON the seize tile.
-    enemies.append(enemy_entry(
+    enemies.append(_enemy_unit_entry(
         'CHARACTER_%s' % CH01_BOSS_SLOT, CH01_CLASS_IDS[chief['class']],
         chief['level'], False, cx, cy,
         CH01_ITEM_IDS[chief['inventory'][0]['id']], CH01_AI[chief['ai_pattern']],
         ' /* goblin chief -- boss, holds the seize tile */'))
     reinforce = []
     for cls, (x, y) in zip(reinf['composition'], reinf['positions']):
-        reinforce.append(enemy_entry(
+        reinforce.append(_enemy_unit_entry(
             '0x80', grunt_class(cls), reinf['level'], True, x, y,
             CH01_ITEM_IDS[reinf['inventory_by_class'][cls][0]],
             CH01_AI['reinforce'], ' /* west reinforcement, turn %d */'
@@ -4188,15 +4259,7 @@ def inject_ch01(campaign, verbose=True):
              '        .chapter = CHAPTER_L_2, /* ch01 is hosted on chapter slot 2 */\n'
              '        .msg     = 0x0961, /* body rewritten from the chapter YAML */\n'
              '    },' % CH01_BOSS_SLOT)
-    with open(BATTLEQUOTES_C, encoding='utf-8') as f:
-        bq = f.read()
-    head = 'CONST_DATA struct DefeatTalkEnt gDefeatTalkList[] = {\n'
-    if bq.count(head) != 1:
-        sys.exit('ERROR: gDefeatTalkList head not in expected form in %s'
-                 % BATTLEQUOTES_C)
-    bq = bq.replace(head, head + quote + '\n')
-    with open(BATTLEQUOTES_C, 'w', encoding='utf-8') as f:
-        f.write(bq)
+    _prepend_defeat_quote(quote)
 
     # 6. Texts. Overwritten ids are vanilla slot-2 messages our build can never show
     #    (the vanilla Ch2 scenes are gone) plus vanilla Ch1's own house hints, which
@@ -4257,7 +4320,8 @@ def inject_ch01(campaign, verbose=True):
         # overflows it); faced beats use the full-screen scenic wrap.
         w = 28 if _beat_is_narration(beat) else 42
         set_message_body(lines, msg_id, _script_to_message(
-            beat, end_stage(beat, end_overrides[i]), width=w, preload=end_preload[i]))
+            beat, _stage_beat(beat, end_fid, end_home, end_overrides[i]),
+            width=w, preload=end_preload[i]))
     # Beat 1 (#21): the Northlook opening. Card + one message per beat (A-E), rendered
     # from the chapter YAML's locked script with the scenic full-screen wrap width and
     # the per-beat two-sided staging + silent listeners built in step 0. Each beat rides
@@ -4265,7 +4329,8 @@ def inject_ch01(campaign, verbose=True):
     set_message_body(lines, CH01_BEAT1_CARD_MSG, name_message_body(b1_card))
     for i, (msg_id, beat) in enumerate(zip(CH01_BEAT1_MSGS, b1_beats)):
         set_message_body(lines, msg_id, _script_to_message(
-            beat, b1_stage(beat, b1_overrides[i]), width=42, preload=b1_preload[i]))
+            beat, _stage_beat(beat, b1_fid, b1_home, b1_overrides[i]),
+            width=42, preload=b1_preload[i]))
     # Lord select (#42): Hlin's "who leads?" already lands in beat E (at the Northlook),
     # so the menu opens directly over its scenic BG -- no separate prompt. Per-candidate
     # confirm texts keep the vanilla route-split shape (cf. MSG_C14/C17/C18) incl. the
@@ -4297,12 +4362,7 @@ def inject_ch01(campaign, verbose=True):
         f.write('\n'.join(lines))
 
     # 6a. Title card image (the intro/status banner is a 4bpp image, not text).
-    title_png = os.path.join(DECOMP, 'graphics', 'chap_title',
-                             'chap_title_%d.png' % host['chapTitleId'])
-    gen_chapter_title.compose_title('Ch.1: ' + chap['title']).save(title_png)
-    for stale in (title_png[:-4] + '.4bpp', title_png[:-4] + '.4bpp.lz'):
-        if os.path.exists(stale):
-            os.remove(stale)
+    _write_chapter_title_card(host, 'Ch.1: ' + chap['title'])
 
     if verbose:
         print('  ch01 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; '
@@ -4429,17 +4489,7 @@ def inject_ch02(campaign, verbose=True):
     # 0. Cutscene beat splits, consumed from the locked chapter YAML (cf. inject_ch01).
     def split_beats(trigger):
         scr = next(e for e in chap['events'] if e.get('trigger') == trigger)['script']
-        card = next((v for e in scr for k, v in e.items() if k == 'location_card'), None)
-        beats = [[]]
-        for entry in scr:
-            (k, v), = entry.items()
-            if k == 'location_card':
-                continue
-            if k == 'beat_break':
-                beats.append([])
-                continue
-            beats[-1].append(entry)
-        return card, beats
+        return _split_script_beats(scr, card_required=False)
 
     op_card, op_beats = split_beats('chapter_start')
     end_card, end_beats = split_beats('chapter_end')
@@ -4457,55 +4507,30 @@ def inject_ch02(campaign, verbose=True):
         sys.exit('ERROR: ch02 turn-1 tutorial has %d lines; expected %d '
                  '(zip would silently drop the extra)' % (len(tutorial), len(CH02_TUTORIAL_MSGS)))
 
+    cut_special = {
+        'narration': None,                         # faceless stage-business box (#58)
+        'vellynne': _fid_tag(CH02_VELLYNNE_SLOT),  # recurring NPC: placeholder face (#19)
+        'targos-fisher': CH02_FISHER_FID,          # generic villager mug
+    }
+
     def cut_fid(spk):
-        if spk == 'narration':                 # faceless stage-business box (#58)
-            return None
-        if spk == 'vellynne':                  # recurring NPC: placeholder face (#19)
-            return _fid_tag(CH02_VELLYNNE_SLOT)
-        if spk == 'targos-fisher':             # generic villager mug
-            return CH02_FISHER_FID
-        if spk in PORTRAIT_MAP:
-            return _fid_tag(PORTRAIT_MAP[spk].upper())
-        sys.exit('ERROR: ch02 unknown cutscene speaker %r' % spk)
+        return _cutscene_fid(spk, cut_special, 'ch02 unknown cutscene speaker')
 
     # Vellynne anchors mid-right (the quest-giver, cf. Hlin/Duvessa); everyone else
     # speaks from mid-left. The ending beats are single-speaker each, so mid-left is
     # enough (no two-shots, no preloads -> no REMA face-flashing, cf. inject_ch01).
     op_home = {'vellynne': '[OpenMidRight]'}
 
-    def stage(beat, home):
-        return {k: (home.get(k, '[OpenMidLeft]'), cut_fid(k))
-                for e in beat for k in e}
-
     # 1. Map: register the painted layout, point slot 3 at it + the winter tileset, and
     #    swap the host goal to vanilla slot-4's defeat_all template (cf. inject_ch01 step 1).
-    label, stem = CH02_LAYOUT
-    for ext in ('mar', 'json'):
-        shutil.copyfile(os.path.join(maps_dir, '%s.%s' % (stem, ext)),
-                        os.path.join(MAP_LAYOUT_DIR, '%s.%s' % (label, ext)))
-    with open(CONST_MAPS_S, 'a', encoding='utf-8') as f:
-        f.write('\n'.join([
-            '', '/* Manchego Stars ch02 layout (#22) */',
-            '\t.align 2, 0', '\t.global %s' % label, '%s:' % label,
-            '\t.incbin "graphics/map/layout/%s.bin.lz"' % label]) + '\n')
-    layout_idx = _append_asm_table_words(ASSET_TABLE_S, 'gChapterDataAssetTable', [label])
-    obj_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'ObjectTypeSnow')
-    pal_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'MapPaletteSnow')
-    cfg_idx = _asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', 'TileConfigurationSnow')
-    with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
-        settings = json.load(f)
-    host = settings['chapters'][CH02_HOST_INDEX]
-    defeat_goal = settings['chapters'][4]['goal']
-    if defeat_goal.get('windowDataType') != 'defeat_all':
-        sys.exit('ERROR: slot 4 goal is not the vanilla defeat_all template '
-                 '(needed as the ch02 DefeatAll donor)')
-    host['map'].update({'obj1Id': obj_idx, 'obj2Id': 0, 'paletteId': pal_idx,
-                        'tileConfigId': cfg_idx, 'mainLayerId': layout_idx,
-                        'objAnimId': 0, 'paletteAnimId': 0, 'changeLayerId': 0})
-    host['goal'] = dict(defeat_goal)
-    host['prepScreenNumber'] = chap['chapter_number'] * 2   # "Chapter 2" header (2*N)
-    with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
-        json.dump(settings, f, indent=2)
+    indices = _register_chapter_map(maps_dir, CH02_LAYOUT,
+                                    'Manchego Stars ch02 layout (#22)')
+    obj_idx, pal_idx, cfg_idx, layout_idx = indices
+    host = _retarget_host_chapter(
+        CH02_HOST_INDEX, 4, 'defeat_all',
+        'ERROR: slot 4 goal is not the vanilla defeat_all template '
+        '(needed as the ch02 DefeatAll donor)',
+        indices, chap['chapter_number'])
 
     # 2. Rosters (events_udefs.c). Four tables, reusing vanilla Ch3 symbols (already
     #    declared in eventcall.h, so no extern surgery):
@@ -4533,47 +4558,14 @@ def inject_ch02(campaign, verbose=True):
                  % (len(cast), chap['deploy_limit']))
     leader = 'CHARACTER_%s' % cast[0][1].upper()
 
-    def ally_entry(slot, class_enum, level, x, y, comment):
-        return ('    {\n'
-                '        .charIndex = CHARACTER_%s,%s\n'
-                '        .classIndex = %s,\n'
-                '        .leaderCharIndex = %s,\n'
-                '        .allegiance = FACTION_ID_BLUE,\n'
-                '        .level = %d,\n'
-                '        .xPosition = %d,\n'
-                '        .yPosition = %d,\n'
-                '        .redaCount = 0,\n'
-                '        .items = { 0 },\n'
-                '    },' % (slot.upper(), comment, class_enum, leader, level, x, y))
-
     deploy_slots = chap['deploy_slots']
     if len(deploy_slots) != chap['deploy_limit']:
         sys.exit('ERROR: ch02 deploy_slots (%d) != deploy_limit (%d)'
                  % (len(deploy_slots), chap['deploy_limit']))
-    deploy = [ally_entry(slot, ce, lv, x, y,
-                         ' /* deploy slot %d (cap template, never LOADed) */' % i)
+    deploy = [_ally_unit_entry(leader, slot, ce, lv, x, y, '0',
+                               ' /* deploy slot %d (cap template, never LOADed) */' % i)
               for i, ((uid, slot, ce, lv), (x, y))
               in enumerate(zip(cast[:chap['deploy_limit']], deploy_slots))]
-
-    def enemy_entry(char, class_enum, level, autolevel, x, y, items, ai, comment,
-                    itemdrop=False):
-        return ('    {\n'
-                '        .charIndex = %s,%s\n'
-                '        .classIndex = %s,\n'
-                '%s'
-                '        .allegiance = FACTION_ID_RED,\n'
-                '        .level = %d,\n'
-                '        .xPosition = %d,\n'
-                '        .yPosition = %d,\n'
-                '        .redaCount = 0,\n'
-                '%s'
-                '        .items = { %s },\n'
-                '        .ai = %s,\n'
-                '    },' % (char, comment, class_enum,
-                           '        .autolevel = 1,\n' if autolevel else '',
-                           level, x, y,
-                           '        .itemDrop = 1,\n' if itemdrop else '',
-                           items, ai))
 
     def green_entry(slot, level, x, y, items, ai, comment):
         return ('    {\n'
@@ -4605,28 +4597,34 @@ def inject_ch02(campaign, verbose=True):
     # 2a. RED raider band (088B463C) -- vanilla Ch2 parity, reflavored chardalyn berserkers.
     enemies = []
     for x, y in raider['positions']:
-        enemies.append(enemy_entry(CH02_GENERIC_PID, brig, raider['level'], True, x, y,
-                                   axe, CH02_AI['aggressive'], ' /* chardalyn berserker */'))
+        enemies.append(_enemy_unit_entry(
+            CH02_GENERIC_PID, brig, raider['level'], True, x, y,
+            axe, CH02_AI['aggressive'], ' /* chardalyn berserker */'))
     for x, y in scavenger['positions']:
-        enemies.append(enemy_entry(CH02_GENERIC_PID, brig, scavenger['level'], True, x, y,
-                                   '%s, %s' % (axe, vuln), CH02_AI['aggressive'],
-                                   ' /* chardalyn scavenger -- drops the vulnerary */',
-                                   itemdrop=True))
+        enemies.append(_enemy_unit_entry(
+            CH02_GENERIC_PID, brig, scavenger['level'], True, x, y,
+            '%s, %s' % (axe, vuln), CH02_AI['aggressive'],
+            ' /* chardalyn scavenger -- drops the vulnerary */',
+            itemdrop=True))
     for x, y in skirmisher['positions']:
-        enemies.append(enemy_entry(CH02_GENERIC_PID, brig, skirmisher['level'], True, x, y,
-                                   axe, CH02_AI['aggressive'], ' /* chardalyn skirmisher (L2) */'))
+        enemies.append(_enemy_unit_entry(
+            CH02_GENERIC_PID, brig, skirmisher['level'], True, x, y,
+            axe, CH02_AI['aggressive'], ' /* chardalyn skirmisher (L2) */'))
     for x, y in archer['positions']:
-        enemies.append(enemy_entry(CH02_GENERIC_PID, arch, archer['level'], True, x, y,
-                                   bow, CH02_AI['aggressive'],
-                                   ' /* chardalyn hunter (archer) -- hard-counters the pegasi */'))
+        enemies.append(_enemy_unit_entry(
+            CH02_GENERIC_PID, arch, archer['level'], True, x, y,
+            bow, CH02_AI['aggressive'],
+            ' /* chardalyn hunter (archer) -- hard-counters the pegasi */'))
     gx, gy = grukk['position']
-    enemies.append(enemy_entry('CHARACTER_%s' % CH02_MINIBOSS_SLOT, brig, grukk['level'],
-                               False, gx, gy, axe, CH02_AI['hold_position'],
-                               ' /* Grukk the Bruiser -- miniboss, fixed bases (Bone slot) */'))
+    enemies.append(_enemy_unit_entry(
+        'CHARACTER_%s' % CH02_MINIBOSS_SLOT, brig, grukk['level'],
+        False, gx, gy, axe, CH02_AI['hold_position'],
+        ' /* Grukk the Bruiser -- miniboss, fixed bases (Bone slot) */'))
     hx, hy = halvar['position']
-    enemies.append(enemy_entry('CHARACTER_%s' % CH02_BOSS_SLOT, brig, halvar['level'],
-                               True, hx, hy, steel, CH02_AI['hold_position'],
-                               ' /* Halvar the Raider Captain -- boss, steel axe (Bazba slot) */'))
+    enemies.append(_enemy_unit_entry(
+        'CHARACTER_%s' % CH02_BOSS_SLOT, brig, halvar['level'],
+        True, hx, hy, steel, CH02_AI['hold_position'],
+        ' /* Halvar the Raider Captain -- boss, steel axe (Bazba slot) */'))
 
     # 2b. GREEN chwinga (088B4718) -- the protect layer; positions + per-survivor gift
     #     come from the YAML deployment.green_allies (id order matches CH02_CHWINGA).
@@ -4637,9 +4635,9 @@ def inject_ch02(campaign, verbose=True):
                for uid, slot, gift in CH02_CHWINGA]
 
     # 2c. RED reinforcements (088B4758) -- vanilla 088B4470 mix: one L2 + one L3, turn 3.
-    reinforce = [enemy_entry(CH02_GENERIC_PID, brig, lv, True, x, y, axe,
-                             CH02_AI['reinforce'], ' /* rear raider L%d, turn %d */'
-                             % (lv, reinf['trigger_turn']))
+    reinforce = [_enemy_unit_entry(CH02_GENERIC_PID, brig, lv, True, x, y, axe,
+                                   CH02_AI['reinforce'], ' /* rear raider L%d, turn %d */'
+                                   % (lv, reinf['trigger_turn']))
                  for (x, y), lv in zip(reinf['positions'], reinf['levels'])]
 
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:
@@ -4768,14 +4766,7 @@ def inject_ch02(campaign, verbose=True):
              '        .chapter = CHAPTER_L_3, /* ch02 is hosted on chapter slot 3 */\n'
              '        .msg     = 0x%X,\n'
              '    },' % (CH02_BOSS_SLOT, CH02_BOSS_DEATH_MSG))
-    with open(BATTLEQUOTES_C, encoding='utf-8') as f:
-        bq = f.read()
-    head = 'CONST_DATA struct DefeatTalkEnt gDefeatTalkList[] = {\n'
-    if bq.count(head) != 1:
-        sys.exit('ERROR: gDefeatTalkList head not in expected form in %s' % BATTLEQUOTES_C)
-    bq = bq.replace(head, head + quote + '\n')
-    with open(BATTLEQUOTES_C, 'w', encoding='utf-8') as f:
-        f.write(bq)
+    _prepend_defeat_quote(quote)
 
     # 6. Texts. Overwritten ids are dead vanilla Ch3 scene/talk/turn messages (the vanilla
     #    Ch3 scenes are gone); 0x993/0x994 are LIVE battle quotes and are NOT in the pool.
@@ -4797,11 +4788,11 @@ def inject_ch02(campaign, verbose=True):
     for msg_id, beat in zip(CH02_OPENING_MSGS, op_beats):
         w = 28 if _beat_is_narration(beat) else 42
         set_message_body(lines, msg_id, _script_to_message(
-            beat, stage(beat, op_home), width=w))
+            beat, _stage_beat(beat, cut_fid, op_home), width=w))
     # Turn-1 fliers-vs-bows tutorial: one portrait box per line (RBG, then Pinky), Text_BG 42-wrap.
     for msg_id, ln in zip(CH02_TUTORIAL_MSGS, tutorial):
         set_message_body(lines, msg_id, _script_to_message(
-            [ln], stage([ln], op_home), width=42))
+            [ln], _stage_beat([ln], cut_fid, op_home), width=42))
     # Wolfram's rear-ambush bark, shown over the map (29-tile bubble wrap; the 31-char
     # "Wolves at our backs -- the sled." auto-wraps via _wrap_fe_lines).
     set_message_body(lines, CH02_BARK_MSG, _script_to_message(
@@ -4811,7 +4802,7 @@ def inject_ch02(campaign, verbose=True):
     for msg_id, beat in zip(CH02_ENDING_MSGS, end_beats):
         w = 28 if _beat_is_narration(beat) else 42
         set_message_body(lines, msg_id, _script_to_message(
-            beat, stage(beat, {}), width=w))
+            beat, _stage_beat(beat, cut_fid, {}), width=w))
     set_message_body(lines, CH02_BOSS_DEATH_MSG, _script_to_message(
         [{'halvar': halvar['death_quote']}],
         {'halvar': ('[OpenMidRight]', _fid_tag(CH02_BOSS_SLOT))}, width=29))
@@ -4821,13 +4812,8 @@ def inject_ch02(campaign, verbose=True):
     # 6a. Title card image (the intro/status banner is a 4bpp image, not text) -- "Ch.2:
     #     <title>" composed from vanilla glyphs (gen_chapter_title reads the source cards
     #     from HEAD, so inject_ch01 overwriting chap_title_2.png first doesn't disturb the
-    #     "Ch.2:" cut). Stale .4bpp/.lz intermediates are removed so make re-converts.
-    title_png = os.path.join(DECOMP, 'graphics', 'chap_title',
-                             'chap_title_%d.png' % host['chapTitleId'])
-    gen_chapter_title.compose_title('Ch.2: ' + chap['title']).save(title_png)
-    for stale in (title_png[:-4] + '.4bpp', title_png[:-4] + '.4bpp.lz'):
-        if os.path.exists(stale):
-            os.remove(stale)
+    #     "Ch.2:" cut).
+    _write_chapter_title_card(host, 'Ch.2: ' + chap['title'])
 
     if verbose:
         print('  ch02 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; '
