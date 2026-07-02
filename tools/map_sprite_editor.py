@@ -17,7 +17,8 @@ The idle preview follows the FE8 decomp exactly (src/bmudisp.c sub_8026FF4 / the
 GetGameClock() % 72 ladder): standing sprites animate frames 0,1,2 only, held
 32 / 4 / 32 / 4 ticks (frame 0, 1, 2, 1) at 60fps -- a slow two-pose bob.
 
-It is deliberately stdlib-only (http.server) -- no pip installs, no framework, no network
+It is deliberately framework-free (stdlib http.server + the repo's existing Pillow
+dep for image IO) -- no new installs, no web framework, no network
 calls, nothing leaves the machine. Sheet-agnostic by design (frame geometry from
 map_sprite_tool.sheet_info, --fw/--fh override), so the painting surface carries over to
 battle-animation frames later (the anim *scripting* is a separate problem).

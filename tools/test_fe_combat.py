@@ -99,12 +99,14 @@ class Damage(unittest.TestCase):
         atk = attacker(5, fc.W['lightning'])             # 5 + 4 mt, vs Res 0
         self.assertEqual(fc.damage(atk, defender(df=9, res=0)), 9)
 
-    def test_effective_weapon_triples_whole_attack(self):
+    def test_effective_weapon_triples_the_weapon_half(self):
         # Vanilla Eirika rapier (sword) vs the Armor boss with a lance (Def 9): sword
-        # is at a triangle DISADVANTAGE to lance (-1), so (4 + 7 - 1) x3 - 9 = 21.
+        # is at a triangle DISADVANTAGE to lance (-1); the decomp triples the WEAPON
+        # half only, then adds Pow (bmbattle.c ComputeBattleUnitAttack):
+        # (7 - 1) x3 + 4 - 9 = 13. (The old model tripled the whole sum -> 21.)
         eirika = attacker(4, fc.W['rapier'])
         boss = defender(df=9, weapon=fc.W['iron-lance'], tags=frozenset({'armor'}))
-        self.assertEqual(fc.damage(eirika, boss), 21)
+        self.assertEqual(fc.damage(eirika, boss), 13)
 
     def test_damage_never_negative(self):
         atk = attacker(1, fc.W['iron-sword'])            # 1 + 5 mt vs Def 20
@@ -234,7 +236,7 @@ class CanonicalMatchup(unittest.TestCase):
                               con=5, weapon=fc.W['rapier'])
         boss = fc.Combatant('Izobai', hp=20, pow=8, skl=2, spd=1, df=9, res=0, lck=2,
                             con=13, weapon=fc.W['iron-lance'], tags=frozenset({'armor'}))
-        self.assertEqual(fc.damage(eirika, boss), 21)        # effective rapier, -1 triangle
+        self.assertEqual(fc.damage(eirika, boss), 13)        # (7-1)x3 + 4 - 9; x3 on Mt+tri only
         self.assertEqual(fc.hit_chance(eirika, boss), 94)
         self.assertTrue(fc.doubles(eirika, boss))            # AS 9 vs 1
         self.assertEqual(fc.kills_per_round(eirika, boss), 1.0)

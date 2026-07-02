@@ -1,8 +1,8 @@
 -- liveness.lua -- pure stability classifier for the playtest smoke net (#49).
 --
 -- NO emulator calls: a function over a series of state snapshots, so it is unit-tested
--- without mGBA (tools/playtest/test_liveness.lua). The smoke driver (smoke.lua) samples
--- real memory into snapshots and asks classify() what to do each cycle.
+-- without mGBA (tools/playtest/test_liveness.lua). The smoke driver (smokeDrive in
+-- harness.lua) samples real memory into snapshots and asks classify() what to do each cycle.
 --
 -- A snapshot is a table:
 --   frame             monotonic emulated-frame counter at sample time
@@ -20,8 +20,9 @@
 --   cfg.softlock_frames: frames with no change in {turn,faction,hpsum,procfp} => SOFTLOCK.
 --
 -- There is deliberately no budget/HANG state: exhausting the in-game turn budget while
--- still LIVE is the driver's call (-> INCONCLUSIVE), and a wedged emulator is caught by
--- run.sh's wall-clock deadline -- both outside this pure verdict.
+-- still LIVE is the driver's call (smokeDrive PASSes it -- an idle party usually can't
+-- force a terminal), and a wedged emulator is caught by run.sh's wall-clock deadline --
+-- both outside this pure verdict.
 
 local M = {}
 

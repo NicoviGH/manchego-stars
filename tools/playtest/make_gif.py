@@ -43,10 +43,17 @@ REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 
 def collect_frames(shotdir, tag):
-    """Frames are `NN-<tag>.png`; NN is a zero-padded global counter, so lexical
-    sort == capture order. Filter to the tag (substring after the NN- prefix)."""
-    return sorted(f for f in glob.glob(os.path.join(shotdir, '*.png'))
-                  if tag in os.path.basename(f).split('-', 1)[-1])
+    """Frames are `NN-<tag>.png`; NN is the harness's global shot counter. Sort
+    NUMERICALLY on it -- the counter's zero padding (%02d) runs out at 99 while a
+    record run shoots hundreds of frames, so a lexical sort would splice '100-'
+    before '99-' and scramble the capture order mid-scene."""
+
+    def shot_no(path):
+        head = os.path.basename(path).split('-', 1)[0]
+        return int(head) if head.isdigit() else -1
+
+    return sorted((f for f in glob.glob(os.path.join(shotdir, '*.png'))
+                   if tag in os.path.basename(f).split('-', 1)[-1]), key=shot_no)
 
 
 def mp4_cmd(in_pattern, out, fps, scale):

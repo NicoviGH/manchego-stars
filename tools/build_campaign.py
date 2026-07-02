@@ -9,12 +9,15 @@ restore vanilla with `git -C fireemblem8u checkout <path>`.
 Engine/Content boundary (CLAUDE.md): the GENERATOR knows character/chapter names;
 the C/asm it EMITS is just data. No campaign name is ever hardcoded in engine C.
 
---- Milestone A (current): PORTRAITS ---------------------------------------------
+--- Milestone A (landed first; the file has since grown far past it): PORTRAITS --
 For each named cast member, run the bust through portrait_tool.generate (4 decomp
 assets) and overwrite a vanilla portrait slot's source files in
 graphics/portrait/. The decomp's generic gbagfx pattern rules rebuild the
-.4bpp/.4bpp.fk/.4bpp.lz on the next `make`; data_portrait[] is untouched, so the
-mapped vanilla character simply wears our face. Zero C changes, fully reversible.
+.4bpp/.4bpp.fk/.4bpp.lz on the next `make`; patch_portrait_geometry also rewrites
+the slot's mouth/eye FaceData in src/portrait_data.c (a PATCHED_DECOMP_FILES
+build artifact, restored each build) so our faces blink/talk in the right place.
+Milestones B+ (names, class/stats, battle anims, full chapter codegen) live
+further down this file -- main() is the authoritative pass list.
 
 Milestones B+ (characters, chapter, dialogue codegen) hang off the same CLI.
 """
@@ -69,7 +72,8 @@ PORTRAIT_DATA_C = os.path.join(DECOMP, 'src', 'portrait_data.c')
 PORTRAIT_GEOMETRY = '2, 6, 3, 4'   # xMouth, yMouth, xEyes, yEyes
 # Test-chapter spawn (Milestone B step 3): we hijack the vanilla Ch1 ally roster to
 # stand up our classed cast on one real map -- the first in-engine confirmation of
-# names + portraits + classes + stats together. These are the only two files it touches.
+# names + portraits + classes + stats together. It touches the three ch1-event files
+# below (udefs + eventinfo + eventscript).
 CH1_UDEFS_H = os.path.join(DECOMP, 'src', 'events', 'ch1-eventudefs.h')
 CH1_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch1-eventinfo.h')
 CH1_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch1-eventscript.h')
@@ -194,8 +198,9 @@ CH01_CLASS_IDS = {'soldier': 'CLASS_SOLDIER', 'fighter': 'CLASS_FIGHTER',
 # 0xF0 block is ours. Engine hooks: _inject_lord_select_engine.
 # Lord survivability floor (#45 3c) "applied" flag: one permanent flag, just above the
 # 0xF0..0xF9 candidate-pick block (LORDSEL_CONFIRM_MSGS caps the cast at 10), so the floor
-# bakes into the chosen lead's saved stats exactly once. Permanent flags span 100..299
-# (GetPermanentFlagBitsSize = 0x19 bytes), so 0xFA is in range and free.
+# bakes into the chosen lead's saved stats exactly once. Permanent flags span 101..300
+# (SetPermanentFlag rejects <= 100, then indexes flag-101 into 0x19 bytes = 200 bits),
+# so 0xFA is in range and free.
 LORDSEL_PROMPT_MSG = 0x957   # dead vanilla slot-2 scene text (cf. inject_ch01 step 6)
 LORDSEL_CONFIRM_MSGS = (0x959, 0x95A, 0x95B, 0x95C, 0x95D, 0x95E, 0x95F,
                         0x962, 0x963, 0x964)  # same dead pool, one per candidate
@@ -203,8 +208,9 @@ LORDSEL_CONFIRM_MSGS = (0x959, 0x95A, 0x95B, 0x95C, 0x95D, 0x95E, 0x95F,
 # PARALLEL to LORDSEL_CONFIRM_MSGS (same 10-cap), drawn by lord_select_screen.c as the
 # cursor lands on each candidate. Plus a one-time explainer box shown before the screen
 # ("(a) explain", feedback #4). Pool vetting (the "msg-id vetting is treacherous" gotcha):
-# 0x966-0x970 are referenced ONLY by the vanilla Ch1 (slot-2) tutorial event scripts our
-# prologue host strips -> never displayed in our ROM; checked clean of live data_battlequotes.c
+# 0x966-0x970 are referenced ONLY by vanilla Ch2's slot-2 event scripts
+# (ch2-eventscript.h) -- dead because inject_ch01 replaces the slot-2 events (NOT
+# because of the prologue host); checked clean of live data_battlequotes.c
 # refs (the 0x993/0x994 false-negative lesson) and of the lone live use in the range (0x980,
 # bmdifficulty.c), which is excluded.
 LORDSEL_EXPLAINER_MSG = 0x966
@@ -224,19 +230,23 @@ LORDSEL_EXPLAINER_TEXT = (
 CH01_BEAT1_CARD_MSG = 0x945
 CH01_BEAT1_MSGS = (0x940, 0x941, 0x942, 0x943, 0x944)  # A,B,C,D,E (0x945 = card)
 # ch01 ending "The Rolling Cheddar" (#21): a "Bryn Shander" location card + one message
-# per beat (A-F), on the same dead vanilla Ch1-tutorial slot-2 pool as Beat 1 (the
-# prologue host strips Ch1's event lists, so these ids never display in our ROM).
+# per beat (A-F), on the dead slot-2 pool (see Beat 1). CAVEAT (comment audit
+# 2026-07-02): 0x949/0x94A/0x94B/0x94C are ALSO TEXTSHOWn by the tutorial-mode trade
+# demo compiled into src/bmtrade.c, which nothing patches -- if tutorial mode's trade
+# demo ever runs in our ROM, these ending-scene bodies would display there (same
+# false-negative class as the 0x993/0x994 lesson; needs an emulator repro to size).
 CH01_ENDING_CARD_MSG = 0x94C
 # AB,C,D,E1,E2(narration),E2b(Marty/Baxby),F. 0x93D is a dead vanilla Ch1-tutorial
 # slot-2 id (weapon-triangle blurb, stripped by the prologue host) reused for the
 # faceless "Marty leans in..." narration that #58 split into its own opaque box.
 CH01_ENDING_MSGS = (0x946, 0x947, 0x948, 0x949, 0x93D, 0x94A, 0x94B)
-CH01_BODY_MSG = 0x956    # the dismembered sled-driver, found just past the road sign
-CH01_TAUNT_MSG = 0x960   # Izobai's turn-1 boss taunt (both dead vanilla Ch1-tutorial slots)
+CH01_BODY_MSG = 0x956    # the dismembered sled-driver (dead vanilla Ch2 slot-2 scene id)
+CH01_TAUNT_MSG = 0x960   # Izobai's turn-1 boss taunt (no vanilla event-script ref at all)
 # Per-PC death quotes (#6, dialogue pass 2026-06-17): one universal dying line per
 # deployable cast member, shown with their bust when they fall in ANY chapter. Each
-# rides a dead vanilla Ch1-tutorial slot-2 message id (the prologue host strips Ch1's
-# tutorial event lists, so these never display in our ROM -> safe campaign-wide).
+# rides a dead slot-2 message id: 0x94D-0x953 are Ch1-tutorial ids (stripped by the
+# prologue host); pinky's 0x958 is a vanilla Ch2 scene id, dead because inject_ch01
+# replaces the slot-2 events. All vetted unreferenced elsewhere -> safe campaign-wide.
 # Keyed by cast unit_id; the PC rides its PORTRAIT_MAP slot, so pid/FID = CHARACTER_<slot>.
 PC_DEATH_QUOTE_MSGS = {
     'braulo':     0x94D,
@@ -488,7 +498,8 @@ GROWTH_DONOR = dict(STAT_DONOR, meesmickle='CHARACTER_EWAN')
 
 # our cast bust  ->  vanilla portrait slot whose graphic files we overwrite.
 # Slots are FE8's earliest-available cast so one early chapter shows many faces.
-# (portrait-only mapping; class/stat mapping comes in Milestone B.)
+# (Started as the portrait mapping; it is now the general character-slot key --
+# names, class/stats/growths/gender, death quotes, and map sprites all ride it.)
 PORTRAIT_MAP = {
     'braulo':     'Eirika',    # the prologue lord -- first face the player sees
     'marty':      'Seth',
@@ -1119,8 +1130,9 @@ def inject_crit_flourish(campaign, verbose=True):
 # new identity, not "naked class" frailty (decisions.md: even character-level
 # mechanical data is vanilla; ours is the donor CHOICE + cosmetics + levels).
 # Any deliberate YAML divergence still stacks on top so displayed stats ==
-# fe_stats. portraitId, attributes (gender), and pSupportData are left as the
-# vanilla slot's -- gender/supports are a later YAML-driven pass.
+# fe_stats. Gender IS driven from YAML (_set_gender rewrites .attributes CA_FEMALE);
+# only portraitId and pSupportData are left as the vanilla slot's -- supports are a
+# later YAML-driven pass.
 
 def _set_field(block, field, value, path, marker):
     """Replace `.field = ...,` within `block`. Errors if the field isn't present."""
@@ -1335,8 +1347,9 @@ def patch_character_data(campaign, verbose=True):
 #     nothing references removed units or fires a win/lose condition,
 #   * cut the boot attract reel + redirect prologue->Ch1 so a fresh boot lands on the
 #     title and New Game drops straight onto the map (dev loop).
-# Result: New Game -> Ch1 map with the 8 cast, no cutscene, no game over -- a pure
-# look-test (no enemies, no objective; reset when done). Each cast unit rides its
+# Result: New Game -> Ch1 map with the 8 cast, no cutscene, no game over -- a
+# combat-ready sandbox (the vanilla foes stay, reskinned; no objective -- reset when
+# done; battle-anim capture fires on them). Each cast unit rides its
 # PORTRAIT_MAP slot's CHARACTER_ id, so its injected name/portrait/class/stats show.
 # redaCount=0 places a unit statically at xPosition/yPosition (eventscr.c sub_800F8A8).
 # All edits are restorable build artifacts (PATCHED_DECOMP_FILES). Authored chapters
@@ -1417,8 +1430,10 @@ def _redirect_new_game(chapter_index):
     """Redirect the prologue slot -> `chapter_index` at the authoritative map-load point,
     StartBattleMap (feeds gPlaySt.chapterIndex into InitChapterMap/fog/weather): if
     (chapterIndex == 0) chapterIndex = N. chapterIndex == 0 there can only be a fresh
-    game's prologue (skirmishes use PLAY_FLAGs; later chapters nonzero). Only the test
-    sandbox needs this; the real prologue IS chapter 0, so it doesn't redirect."""
+    game's prologue (skirmishes use PLAY_FLAGs; later chapters nonzero). BOTH boot
+    modes ride this: the sandbox redirects 0 -> the Ch1 slot, and the real game
+    redirects 0 -> PROLOGUE_HOST_INDEX (slot 1, where the prologue is hosted --
+    main() calls _configure_boot on every non-sandbox build)."""
     with open(BMIO_C, encoding='utf-8') as f:
         bmio = f.read()
     bmio, n = re.subn(
@@ -1833,8 +1848,11 @@ def inject_test_chapter(campaign, verbose=True, lord_boot=False):
 # FE8 draws map sprites by class (GetUnitSMSId -> pClassData->SMSId). To give each
 # cast member a distinct overworld sprite without touching stock classes or vanilla
 # enemies, we add a custom SMS slot per cast member (ids CUSTOM_SMS_BASE+) and a
-# per-CHARACTER override in GetUnitSMSId. Colours come from the one shared cast
-# palette (unit_icon_pal_player.agbpal) -- map sprites can't carry their own.
+# per-CHARACTER override in GetUnitSMSId. Colours come from the bespoke cast OBJ
+# palette (map_sprites/cast_palette.png -> gCastMapPalette via _inject_cast_palette;
+# the shared player blue bank stays untouched) -- a map sprite still can't carry its
+# OWN palette, they all share the cast bank. Cold-open guests render through the
+# vanilla unit_icon_pal_player.agbpal.
 
 
 def classed_cast(campaign):
@@ -2000,7 +2018,9 @@ def _inject_mu_override_hook():
 
 def _read_cast_palette(path):
     """Read cast_palette.png (indexed) -> 16 GBA15 u16 colours (index 0 transparent).
-    Pads short palettes with black; errors if it carries more than 16 entries."""
+    Pads short palettes with black; errors if any pixel USES an index above 15 (a
+    carried-but-unused longer palette, e.g. PIL's padded 256, is tolerated -- only
+    the first 16 entries are read)."""
     im = Image.open(path)
     if im.mode != 'P':
         sys.exit('ERROR: %s must be indexed (mode P) so it defines the cast palette' % path)
@@ -2515,10 +2535,12 @@ def enemy_class_reskins(campaign):
 # Give a unit a custom battle anim from 1-3 static frames + the engine's effects, with
 # NO hand-drawn motion. ref_to_battleframe generates the assets (sheets + agbpal + motion.s)
 # cloning a donor class's timing; this injects them ADDITIVELY: append a banim_data[] row
-# (-> a new animId), then -- so generic/enemy archers stay vanilla -- give the unit a
-# stat-identical CLONE of the donor class (clone_into) whose private AnimConf selects the new
-# animId, and deploy the unit as that clone (deploy_class_for). Nothing vanilla is overwritten
-# (donor class + AnimConf byte-unchanged). Reversible: the patched files restore each build.
+# (-> a new animId), then -- so generic/enemy units of the class stay vanilla -- register a
+# PRIVATE AnimConf for the CHARACTER in gUnitSpecificBanimConfigs and point its _u25 at it
+# (the per-character path; _patch_banim_character_unique routes combat through
+# GetBattleAnimationId_WithUnique). No class clone: the unit deploys as its plain vanilla
+# class (deploy_class_for). Nothing vanilla is overwritten (donor class + AnimConf
+# byte-unchanged). Reversible: the patched files restore each build.
 
 # donor 'clone_from' -> (FE donor class enum, the AnimConf weapon entry to repoint in the
 # clone, the cadence the faked motion.s is built with: 'ranged' draw-and-fire / 'melee'
@@ -2629,21 +2651,23 @@ def inject_battle_anims(campaign, verbose=True):
 
     ADDING A UNIT (the repeatable how): give its YAML a `battle_anim:` block --
         clone_from: archer                  # donor class: timing/effects/modes + the weapon slot
-        clone_into: CLASS_<FREE_SLOT>       # a FREE class enum -> this unit's PRIVATE clone class
         abbr: <stem>                        # banim asset stem (<=12 chars)
         frames: [<unit>/ready.png, <unit>/windup.png, <unit>/peak.png]  # 1-3, Ready->Windup->Peak
+        # (+ optional motion/cadence per BANIM_DONORS; no class key -- see below)
     Frames: BOX-descale the hi-res (e.g. 1920x1080) source poses onto a ~88x64 canvas with a COMMON
     feet-anchor + a protected ~15-colour palette. NEVER re-shrink an already-small frame (non-integer
     re-shrink looks muddy) -- to rescale a unit, re-descale from the hi-res master.
 
-    This APPENDS a banim_data[] row (table self-sizes) and CLONES the donor class into clone_into with
-    its OWN AnimConf, so the donor class + generic/enemy units of it stay byte-vanilla -- only this
-    unit (deployed AS the clone via deploy_class_for) shows the custom anim. Stats ride STAT_DONOR/
+    This APPENDS a banim_data[] row (table self-sizes) and registers a PRIVATE AnimConf for the
+    CHARACTER (gUnitSpecificBanimConfigs + the character's _u25, routed by
+    _patch_banim_character_unique) -- the donor class, its AnimConf, and every generic/enemy unit
+    of it stay byte-vanilla, and the unit deploys as its PLAIN vanilla class (deploy_class_for;
+    the earlier clone-class approach is retired). Stats ride STAT_DONOR/
     BASE_DONOR/GROWTH_DONOR; PORTRAIT_MAP ties the unit id -> its vanilla character slot.
 
-    !! OFF-BY-ONE: the clone's AnimConf `.index` MUST be `anim_id + 1` (GetBattleAnimationId returns
+    !! OFF-BY-ONE: the private AnimConf `.index` MUST be `anim_id + 1` (GetBattleAnimationId returns
        idx - 1). Get it wrong and a PURPLE DRAGON renders instead of the unit.
-    Decisions/rationale: decisions.md (Art & Audio, the additive clone-class call).
+    Decisions/rationale: decisions.md (Art & Audio, the per-character _u25 call).
     """
     from PIL import Image
     units = units_with_battle_anim(campaign)
@@ -3201,7 +3225,8 @@ def inject_prologue(campaign, verbose=True, montage=False):
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     # Cold-open guests ride non-PORTRAIT_MAP vanilla slots (PROLOGUE_*_SLOT). Classes mirror
     # the ch00 YAML: a strong promoted "Jeigan" (Scramsax/Hero) + the frail must-survive lead
-    # (Hlin/Warrior) -- the vanilla Prologue Seth+Eirika dynamic. (Difficulty lives in the
+    # (Hlin/Fighter, UNPROMOTED -- the frailty is the point) -- the vanilla Prologue
+    # Seth+Eirika dynamic. (Difficulty lives in the
     # roster levels/items below + the guest stat patch in step 4b.)
     hlin_slot, scram_slot, sephek_slot = (
         PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT)
@@ -3244,8 +3269,9 @@ def inject_prologue(campaign, verbose=True, montage=False):
         json.dump(settings, f, indent=2)
 
     # 2. Rewrite the two prologue rosters. redaCount=0 places units statically at
-    #    xPosition/yPosition (like inject_test_chapter); the boss rides the ONEILL slot so
-    #    its CA_BOSS attribute makes DefeatBoss fire on death. Positions/levels/items from
+    #    xPosition/yPosition (like inject_test_chapter); the boss rides the ONEILL slot
+    #    (CA_BOSS marks it a boss for autolevel/UI -- the DefeatBoss EVENT flag comes from
+    #    the flagged defeat quote in step 5, not from CA_BOSS). Positions/levels/items from
     #    the chapter YAML (0-indexed x,y). AI: boss = Breguet's stationary-aggressive bytes
     #    {AI_A_03 ActionStanding, AI_B_03 NeverMove, config} (cp_data.c gAi1/2ScriptTable) --
     #    NOT O'Neill's {0x6,0x3} "DoNothing", which only works because the vanilla tutorial
@@ -3325,8 +3351,8 @@ def inject_prologue(campaign, verbose=True, montage=False):
     #    empty the Turn/Character/Location lists and null the tutorial list, then replace the
     #    beginning scene with a bare deploy of both rosters. The Misc list keeps the win/lose
     #    machinery in the vanilla Prologue's shape (prologue-eventinfo.h): DefeatBoss = AFEV
-    #    on EVFLAG_DEFEAT_BOSS, which the engine sets when a CA_BOSS unit (Sephek, on the
-    #    ONEILL slot) dies -> runs the ending scene; CauseGameOverIfLordDies = AFEV on
+    #    on EVFLAG_DEFEAT_BOSS, which Sephek's FLAGGED DEFEAT QUOTE sets on his death
+    #    (step 5; CA_BOSS alone sets nothing) -> runs the ending scene; CauseGameOverIfLordDies = AFEV on
     #    EVFLAG_GAMEOVER, which Hlin's flagged defeat quote sets (step 5).
     with open(CH1_EVENTINFO_H, encoding='utf-8') as f:
         info = f.read()
@@ -3908,7 +3934,7 @@ def inject_ch01(campaign, verbose=True):
     #    chapter_start `script:` and staged below (step 4) as a scenic off-map scene
     #    (BACG bg_Fireplace) at the head of EventScr_Ch2_BeginningScene. The script
     #    splits on `beat_break` sentinels into 5 messages (A-E); each rides one `Text()`
-    #    whose trailing REMA clears all faces (scene.c sub_800E640) -> a fresh 4-face
+    #    whose trailing REMA clears all faces (eventscr.c sub_800E640) -> a fresh 4-face
     #    budget per beat. TWO SIDES: the quest-givers stand on the RIGHT (Hlin mid-right,
     #    Scramsax far-right, Hruna right) and the party on the LEFT. The roll-call rotates
     #    one PC at a time through the mid-left spotlight (eviction); monologue beats PRELOAD
@@ -4018,8 +4044,9 @@ def inject_ch01(campaign, verbose=True):
                  % (len(cast), len(CH01_JOIN_POSITIONS)))
     leader = 'CHARACTER_%s' % cast[0][1].upper()
 
-    # classIndex rides the DEPLOY class (dce -- the Archer-clone for RBG, #65); items/loadout
-    # still come from the real vanilla class (ce). For most units dce == ce.
+    # classIndex rides the DEPLOY class (dce) -- which today equals the real vanilla class
+    # (ce) for EVERY unit: the #65 clone-class approach is retired (custom anims ride the
+    # per-character _u25 path; see deploy_class_for). The split survives only as a seam.
     join = [_ally_unit_entry(leader, slot, dce, lv, x, y,
                              ', '.join(CLASS_LOADOUT[ce]), ' /* %s */' % uid)
             for (uid, slot, ce, dce, lv), (x, y) in zip(cast, CH01_JOIN_POSITIONS)]
@@ -4423,10 +4450,9 @@ def inject_ch01(campaign, verbose=True):
     # bodies + staging are built in step 0b/step 6. The scene plays over the vanilla
     # BG_NORMAL_VILLAGE (we tried winterizing it but a palette swap just washes it out and
     # no clean FE8 snow-village BG was available, so we use it as-is; Nicolas 2026-06-17).
-    # ch02 isn't hosted yet, so instead of MNC2'ing onto a leftover vanilla map the
-    # ending lands on the reusable dev placeholder (dev_placeholder_scene): RBG's
-    # "still under construction" cheese pun, then back to title. Swap to MNC2(ch02 slot)
-    # when ch02 lands.
+    # The ending MNC2s into ch02 "Cold Welcome" (hosted on chapter slot 3 by
+    # inject_ch02; see the generated EventScr_Ch2_EndingScene below). Before ch02 landed
+    # it parked on the dev placeholder instead.
     end_text_calls = _scenic_beat_calls(
         CH01_ENDING_MSGS, end_beats,
         ['A+B -- Duvessa thanks them, commissions them, grants the sled, points west',
@@ -4549,7 +4575,8 @@ def inject_ch01(campaign, verbose=True):
               else '[A]' if (j + 1) % 2 == 0 else '[LF]')
         for j, ln in enumerate(expl))
     set_message_body(lines, LORDSEL_EXPLAINER_MSG, _term_pad(expl_body + '[X]'))
-    # Prep-screen header (#46): "Choose your lead" replaces "Pick N Units Left" in lord mode.
+    # Lord-select screen title (#46): "Choose your lead", drawn by the generated
+    # CallLordSelectMenu title box (the prep screen's own "Pick N Units Left" is untouched).
     set_message_body(lines, LORDSEL_HEADER_MSG, _term_pad('Choose your lead[X]'))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
@@ -4809,7 +4836,7 @@ def inject_ch02(campaign, verbose=True):
     with open(EVENTS_UDEFS_C, 'w', encoding='utf-8') as f:
         f.write(udefs)
 
-    # 3. Event lists (ch3-eventinfo.h). Turn: the rear wolves on turn 3 (FACTION_ID_BLUE
+    # 3. Event lists (ch3-eventinfo.h). Turn: the rear raiders on turn 3 (FACTION_ID_BLUE
     #    appear-at-player-phase idiom, cf. inject_ch01). Character/Location cleared: no
     #    talks, and DROP the vanilla Seize(14,1) + chests/doors so DefeatAll (CountRedUnits)
     #    is the only win path. Misc keeps its vanilla CauseGameOverIfLordDies untouched.
@@ -4947,8 +4974,8 @@ def inject_ch02(campaign, verbose=True):
     for msg_id, ln in zip(CH02_TUTORIAL_MSGS, tutorial):
         set_message_body(lines, msg_id, _script_to_message(
             [ln], _stage_beat([ln], cut_fid, op_home), width=42))
-    # Wolfram's rear-ambush bark, shown over the map (29-tile bubble wrap; the 31-char
-    # "Wolves at our backs -- the sled." auto-wraps via _wrap_fe_lines).
+    # Wolfram's rear-ambush bark, shown over the map (29-tile bubble wrap via
+    # _wrap_fe_lines; the current YAML lines fit unwrapped).
     set_message_body(lines, CH02_BARK_MSG, _script_to_message(
         bark, {'wolfram': ('[OpenMidLeft]', _fid_tag(PORTRAIT_MAP['wolfram'].upper()))},
         width=29))

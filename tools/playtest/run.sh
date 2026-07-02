@@ -4,6 +4,8 @@
 #   tools/playtest/run.sh <scenario> [--keep-open]
 #
 # Logic scenarios (assert PASS/FAIL):  win | gameover | retreat | ch01win | titlecard
+#   also: ch01 (entry asserts) | ch01lord | lordfloor | goodberry | clearprobe
+#   (harness.lua's `scenarios` table is the authoritative full list)
 #   ch02   -- ch2 (#22) ENTRY assertions off the ch02start checkpoint: 3 green chwinga on the
 #             field, party at the deploy cap, the archer (fliers-vs-bows debut) + boss present.
 # Stability scenarios (PASS/FAIL liveness over a run):
@@ -20,6 +22,8 @@
 #                             python3 tools/playtest/llm_player.py serve \
 #                                 --dir /tmp/playtest-llm-handshake \
 #                                 --transcript tools/playtest/transcripts/prologue.json
+#                           (prologue.json is MINTED by the first --record run; until then
+#                           replay mode has nothing to serve -- see transcripts/README.md.)
 #                           Replay-only by default (zero LLM cost); add --record + env
 #                           knobs (PT_PROVIDER=openai for a free local Ollama model,
 #                           PT_MODEL, PT_BASE_URL) to record a fresh transcript. When
@@ -38,7 +42,9 @@
 #                      tools/playtest/make_gif.py recordanim braulo --name braulo-anim --open
 #                    A staff-only unit (sclorbo) FAILs cleanly: no attack = no combat anim.
 #                    Build TESTCH=1 first. (recordrbgtest is the back-compat alias for RBG.)
-#   recordch01trail / recordlord / recordch01 / record / scenes -- other scenes
+#   recordch01trail / recordlord / recordlordfast / recordch01 / recordopening /
+#   record / scenes / scenesch01 / bootobserve -- other scenes (no checkpoint: these
+#   replay their full lead-in at 60fps, so they are the slowest captures)
 #
 # CHECKPOINTS (fast playtest, viewable spot-check): record scenarios load a save state
 # built ONCE at top speed (240fps) by a ckpt_* scenario, then replay JUST that section
@@ -154,7 +160,8 @@ if [ -n "$BUILDER" ]; then
 fi
 
 # Main run: record* at 60fps (faithful motion); everything else at 240fps (top speed).
-# record* now LOADS a checkpoint (no grind), so its deadline is short.
+# The checkpoint-backed record* scenarios (table above) skip the grind; the rest replay
+# their full lead-in and simply have to fit the record deadline.
 FPS=240; VSYNC=0; DEADLINE_S=420
 case "$SCENARIO" in record*) FPS=60; VSYNC=1; DEADLINE_S=300 ;; esac
 # smoke_* / fuzz_* / clear_ch02 play a full chapter (lead-in + a long soak) -> longer

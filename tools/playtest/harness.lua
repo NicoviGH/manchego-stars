@@ -2,9 +2,14 @@
 --
 -- Launched by run.sh via a generated wrapper that sets:
 --   PLAYTEST_DIR      -- this directory (for dofile of symbols.lua)
---   PLAYTEST_SCENARIO -- "win" | "gameover" | "retreat" | "titlecard"
+--   PLAYTEST_SCENARIO -- which `scenarios.<name>` to run (the table below is the
+--                        authoritative list; run.sh's header groups the main ones)
 --   PLAYTEST_LOG      -- log file path (runner polls it for "RESULT:")
 --   PLAYTEST_SHOTDIR  -- screenshot directory for milestone/debug captures
+--   PLAYTEST_STATEDIR -- save-state checkpoint dir (ckpt_*/record* scenarios)
+--   PLAYTEST_SEED     -- fuzz/llm seed (PT_SEED)
+--   PLAYTEST_CHAR     -- recordanim unit id (PT_CHAR)
+--   PLAYTEST_LLMDIR   -- #63 sidecar handshake dir (PT_LLM_DIR)
 --
 -- Design: one coroutine resumed once per emulated frame; every wait is a
 -- yield loop over real memory state (closed loop, no frame-perfect timing).
@@ -44,7 +49,7 @@ end
 local nshot = 0
 local function shot(tag)
     nshot = nshot + 1
-    local p = string.format("%s/%02d-%s.png", PLAYTEST_SHOTDIR, nshot, tag)
+    local p = string.format("%s/%04d-%s.png", PLAYTEST_SHOTDIR, nshot, tag)
     pcall(function() emu:screenshot(p) end)
     log("screenshot: " .. p)
 end
@@ -358,8 +363,9 @@ local scenarios = {}
 -- clean terminal: the point is to exercise load + every phase/event path to a clean
 -- end as content lands, not to win (winning is the next brick). The verdict is the
 -- pure classifier in liveness.lua (unit-tested without an emulator). PASS = clean
--- terminal, FAIL = soft-lock, INCONCLUSIVE = alive past the turn budget (run.sh treats
--- INCONCLUSIVE as exit 0 + WARN; a wedged emulator is run.sh's wall-clock deadline).
+-- terminal OR alive past the turn budget (an idle party usually can't force a terminal,
+-- so budget-survival is the healthy outcome); FAIL = soft-lock. A wedged emulator is
+-- caught by run.sh's wall-clock deadline.
 local LIVENESS = dofile(PLAYTEST_DIR .. "/liveness.lua")
 
 local function hpSum()
@@ -537,7 +543,8 @@ local function smokeDrive(startChapter)
 end
 
 -- smoke: prologue is reachable straight from New Game (bootToMap). Later chapters need
--- their own "reach the map" lead-in (smoke_ch01) or a save-state checkpoint (deferred).
+-- their own "reach the map" lead-in (smoke_ch01) or a save-state checkpoint
+-- (smoke_ch02 loads the ch02start state).
 scenarios.smoke = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end
     return smokeDrive(chapter())
@@ -783,8 +790,9 @@ local CH01_PARK = { x = 24, y = 15 } -- empty far corner; ch01 map is 25x16
 -- -- each player phase, march/attack every unit toward the boss; once the boss is dead, if the
 -- chapter hasn't already advanced (DefeatBoss objective), send a unit onto the boss's old tile
 -- to SEIZE (Seize objective). Returns a status ("noboss"|"won"|"gameover"|"timeout") and the
--- turn it ended on. clearDrive wraps this with a PASS/FAIL verdict; reachCh02Map (#22) uses it
--- to clear ch01 and then keep driving into the ch02 cutscene chain. maxx/maxy = map bounds;
+-- turn it ended on. clearDrive (its only caller) wraps this with a PASS/FAIL verdict.
+-- (reachCh02Map (#22) does NOT ride it -- the generic bot is too slow to seize ch01
+-- reliably, so it uses the directed seizeCh01ToCh02.) maxx/maxy = map bounds;
 -- park = the end-turn empty tile. The completability brick (#60).
 local function clearUntilAdvance(startChapter, maxx, maxy, park)
     maxx, maxy = maxx or 14, maxy or 9
@@ -895,7 +903,8 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
     return "timeout", budgetTurns
 end
 
--- The verdict wrapper, shared by every clear_* scenario. Win = the chapter advances. FAIL =
+-- The verdict wrapper for clear + clear_ch01 (clear_ch02 has its own rout loop +
+-- verdicts). Win = the chapter advances. FAIL =
 -- game over (incl. a loss kicking back to the title) / no progress (stuck) / turn budget.
 local function clearDrive(startChapter, maxx, maxy, park)
     local status, t = clearUntilAdvance(startChapter, maxx, maxy, park)
@@ -1226,7 +1235,8 @@ end
 
 -- llm: the prologue (DefeatBoss) driven by the sidecar commander. Replay-only run:
 --   python3 tools/playtest/llm_player.py serve --dir /tmp/playtest-llm-handshake \
---       --transcript tools/playtest/transcripts/prologue.json     # (other terminal)
+--       --transcript tools/playtest/transcripts/prologue.json     # (other terminal;
+--       the transcript file is MINTED by the first --record run -- see the README there)
 --   tools/playtest/run.sh llm
 -- Record a fresh transcript (live model; see PT_PROVIDER/PT_MODEL/PT_BASE_URL for the
 -- free local Ollama path) by adding --record to the serve command.
@@ -1239,8 +1249,8 @@ end
 -- CH01WIN: the default lord (blind A-taps pick Braulo) marches on the camp,
 -- kills the chief, and SEIZES -- in-game proof of the lord-gated Seize
 -- (CanUnitSeize hook, #42) and the win hand-off (Seize macro -> EVFLAG_WIN ->
--- ending scene -> dev placeholder -> MNTS back to the title screen, since ch02 is
--- not hosted yet). (CH01_PARK is defined up by the clear-bot.)
+-- ending scene -> MNC2 into the hosted ch02). (CH01_PARK is defined up by the
+-- clear-bot.)
 scenarios.ch01win = function()
     if not winCh00() then return end
     if not waitFor(function() return chapter() == 2 end, 1800) then
@@ -1325,8 +1335,8 @@ scenarios.ch01win = function()
                 shot("ch01win-seize-menu")
                 press(K.A) -- Seize
             end
-            -- generous budget: post-seize plays the full ending cutscene + the dev
-            -- placeholder before MNTS reaches the title (longer than the old 3600).
+            -- generous budget: post-seize plays the full ending cutscene before
+            -- MNC2 chains into the hosted ch02 (longer than the old 3600).
             local won = waitFor(function()
                 return chapter() ~= 2 or procActive(SYM.gProcScr_TitleScreen)
             end, 9000, true)
@@ -1940,9 +1950,9 @@ scenarios.recordending = function()
     pokeNormalConfig() -- normal text speed so the typewriter + face fades animate
     press(K.A) -- Seize (the menu was saved open) -> the ending hand-off
     wait(40)
-    -- ch02 isn't hosted, so the ending runs the dev placeholder (RBG's cheese pun over
-    -- the campfire) and MNTS's back to the title screen -- record through all of it until
-    -- gProcScr_TitleScreen comes up.
+    -- the ending plays the full outro then MNC2s into the hosted ch02 -- record
+    -- through all of it until the chapter advances (the title-screen check below is
+    -- the legacy pre-ch02 exit, kept as a harmless backstop).
     local fr, atTitle = 0, false
     while fr < 9000 do
         fr = fr + 1
@@ -2348,9 +2358,10 @@ scenarios.record = function()
     return result("PASS", "video frames recorded (op + bt)")
 end
 
--- (The boot title screen is captured by `recordending` -- it ends on the title via the
--- dev placeholder's MNTS, and shoots a "title" frame once gProcScr_TitleScreen draws.
--- A standalone boot-capture is unreliable: the attract reel races past the title.)
+-- (A dedicated title-screen capture used to ride recordending's post-ending MNTS,
+-- but ch02 is hosted now -- the ch01 ending MNC2s onward instead of returning to the
+-- title. A standalone boot-capture is unreliable: the attract reel races past the
+-- title; bootobserve below is the tool for boot-sequence questions.)
 
 -- BOOTOBSERVE: screenshot the natural boot sequence with NO input, to see whether the
 -- title screen actually appears at boot (diagnostic).
@@ -2910,7 +2921,7 @@ local function collectedItems()
         if u then for s = 0, 4 do items[#items + 1] = ru16(u.addr + 0x1E + s * 2) & 0xFF end end
     end
     local n = ru8(SYM.gConvoyItemCount)
-    if n > 0x57 then n = 0x57 end   -- convoy cap (supplyItems[0xB0/2])
+    if n > 100 then n = 100 end     -- convoy cap (CONVOY_ITEM_COUNT, bmcontainer.h)
     for i = 0, n - 1 do items[#items + 1] = ru16(SYM.gConvoyItemArray + i * 2) & 0xFF end
     return items
 end

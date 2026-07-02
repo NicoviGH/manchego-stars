@@ -2,13 +2,14 @@
 """Repo drift guard. ONE source of check logic, run by CI, the git pre-commit hook,
 and `make check`. Keeps doc/plan drift from landing.
 
-Catches:
-  1. Python tooling that doesn't compile.
-  2. Campaign YAML that doesn't parse.
-  3. Docs referencing a tools/<x>.py|rb that doesn't exist.
-  4. Resurrected "dead concepts" -- abandoned tool names, dead code symbols, retired
-     implementation phrases -- in any doc except decisions.md (the ADR log that is
-     *supposed* to record what we dropped).
+Catches (main() is the authoritative list -- one check_* per gate): compile/parse
+gates (Python tooling, unit tests, campaign YAML), doc/comment drift (dangling
+tools/docs references, resurrected "dead concepts" -- abandoned tool names, dead
+symbols, retired implementation phrases -- everywhere except decisions.md, the ADR
+log that is *supposed* to record what we dropped, and test_* fixtures), generated
+indexes freshness, chapter status/deployment schema, injection order, the
+engine-hook guards, the engine/content boundary, save-layout stability, and
+advisory lane ownership.
 
 What it does NOT catch: arbitrary prose that contradicts the code without using a
 known-dead term. The defense there is single source of truth (link, don't restate)
@@ -20,6 +21,7 @@ Exit 0 = clean, 1 = drift found. Run from the repo root.
 import glob
 import os
 import re
+import subprocess
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -27,17 +29,35 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Docs that carry prose facts (decisions.md is handled specially per-check).
 DOC_GLOBS = ['docs/**/*.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md']
 
-# Terms that are NEVER legitimate in vision/ops docs: abandoned tools, dead code
-# symbols, retired implementation phrases. decisions.md is EXEMPT (its ADRs record
-# what we abandoned, e.g. "supersedes the flat-E placeholder"). Context-dependent
-# terms (Event Assembler / devkitARM / "damage-type") are intentionally NOT here --
-# they appear legitimately in negation ("no Event Assembler").
+# Terms that are NEVER legitimate in vision/ops docs OR hand-written code comments:
+# abandoned tools, dead code symbols, retired implementation phrases. decisions.md
+# and this file are EXEMPT (the ADR log records what we dropped; this list names it).
+# Context-dependent terms (Event Assembler / devkitARM / "damage-type") are
+# intentionally NOT here -- they appear legitimately in negation ("no Event
+# Assembler").
+#
+# REGISTRY DISCIPLINE (decisions.md 2026-07-02 "Comments are testimony"): when a
+# change RETIRES a mechanism or term, add its key phrases here in the same commit.
+# The 2026-07-02 stale-comment incident ("zeroed personal growths" surviving in a
+# build_campaign.py header long after donor-parity replaced it, then leaking into
+# an ADR) happened because this scan covered docs only and the growth patterns were
+# too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
     r'build-campaign\.ts', r'build-events\.ts', r'pull-srd', r'map-class\.ts',
     r'srd-snapshot', r'open5e-snapshot', r'CLASS_WEAPON', r'WPN_EXP_E',
-    r'zeroed.{0,3}growth', r'flat-?E rank', r'pure[- ]class growth',
+    r'zeroed.{0,24}growths?', r'flat-?E rank', r'pure[- ]class (?:growth|rate)',
     r'gen-chapter-index\.rb', r'gen-class-index\.rb',  # ported to Python 2026-06-09
+    # retired by the 2026-07-02 comment sweep:
+    r'clone_into',                     # #65 clone-class approach -> per-character _u25
+    r'tileset_stem\s*=',               # _register_chapter_map reads the layout's stamp
+    r'BATTLE_FOLLOWUP_THRESHOLD',      # misnomer; real: BATTLE_FOLLOWUP_SPEED_THRESHOLD
 ]
+
+# Hand-written source whose comments carry doctrine -- the same drift surface as
+# docs. The decomp submodule, generated artifacts, and caches are not ours to lint.
+CODE_GLOBS = ['tools/*.py', 'tools/inject/*.py', 'tools/playtest/*.py',
+              'tools/playtest/*.lua', 'tools/*.sh', 'tools/playtest/*.sh',
+              'engine/**/*.c', 'engine/**/*.h', 'Makefile']
 
 
 def _docs():
@@ -45,6 +65,18 @@ def _docs():
     for g in DOC_GLOBS:
         out += glob.glob(os.path.join(REPO, g), recursive=True)
     return [d for d in out if os.path.isfile(d)]
+
+
+def _handwritten_sources():
+    out = []
+    for g in CODE_GLOBS:
+        out += glob.glob(os.path.join(REPO, g), recursive=True)
+    # check.py hosts the DEAD_CONCEPTS registry and test_* files quote dead phrases
+    # as regression fixtures -- both exempt, like decisions.md.
+    me = os.path.abspath(__file__)
+    return [p for p in out
+            if os.path.isfile(p) and os.path.abspath(p) != me
+            and not os.path.basename(p).startswith('test_')]
 
 
 def check_python_compiles(fail):
@@ -268,17 +300,34 @@ def check_injection_order(fail):
 
 
 def check_tool_refs_exist(fail):
-    pat = re.compile(r'tools/([\w-]+\.(?:py|rb))')
-    for d in _docs():
-        for m in pat.findall(open(d, encoding='utf-8').read()):
-            if not os.path.isfile(os.path.join(REPO, 'tools', m)):
-                fail.append('%s references tools/%s which does not exist'
-                            % (os.path.relpath(d, REPO), m))
+    """A doc or code comment naming tools/<x>.py|rb, or a docs/<x>.md path, must
+    point at a file that exists -- dangling pointers are the cheapest-to-catch form
+    of comment rot (2026-07-02 comment-drift ADR)."""
+    # (?<![\w/]) keeps "texttools/x.py" or "fireemblem8u/tools/..." from reading as
+    # our tools/; a missing-but-gitignored target is a declared build artifact
+    # (e.g. playtest/symbols.lua), not a dangling pointer.
+    tool_pat = re.compile(r'(?<![\w/])tools/([\w./-]*[\w-]\.(?:py|rb|lua|sh))')
+    doc_pat = re.compile(r'(?<![\w/])docs/([\w./-]*[\w-]\.md)')
+
+    def _gitignored(rel):
+        return subprocess.run(['git', 'check-ignore', '-q', rel], cwd=REPO).returncode == 0
+
+    for d in _docs() + _handwritten_sources():
+        text = open(d, encoding='utf-8').read()
+        rel = os.path.relpath(d, REPO)
+        for prefix, pat in (('tools', tool_pat), ('docs', doc_pat)):
+            for m in pat.findall(text):
+                target = '%s/%s' % (prefix, m)
+                if not os.path.isfile(os.path.join(REPO, target)) and not _gitignored(target):
+                    fail.append('%s references %s which does not exist' % (rel, target))
 
 
 def check_no_dead_concepts(fail):
+    """Retired terms/mechanisms must not survive in docs OR hand-written code
+    comments (the 2026-07-02 incident: a superseded mechanism lived on in a
+    build_campaign.py header and got copied into an ADR as fact)."""
     pat = re.compile('|'.join(DEAD_CONCEPTS), re.I)
-    for d in _docs():
+    for d in _docs() + _handwritten_sources():
         if os.path.basename(d) == 'decisions.md':
             continue
         for i, line in enumerate(open(d, encoding='utf-8'), 1):
@@ -312,7 +361,8 @@ def check_engine_guards_present(fail):
     "lord" rides a non-LORD-class slot: FE8's chapter-start cursor centering derefs a NULL
     leader unit, parks the cursor off-map, and an out-of-bounds terrain read runs the text
     decoder away into gBmSt. Our whole cast uses non-lord slots, so EVERY chapter needs
-    these two campaign-agnostic guards in build_campaign.py. Removing either silently
+    these two campaign-agnostic guards (defined in tools/inject/engine_hooks.py, called
+    from build_campaign.py). Removing either silently
     re-introduces the crash, so guard their presence here. (The patches themselves also
     fail the build if the decomp source form changes -- see their `if orig not in text`.)
     The campaign-engine hooks below are likewise build-time string-replaces that leave no
@@ -412,7 +462,8 @@ def check_engine_campaign_agnostic(fail):
 
 # ── Save-layout stability (so testers can carry their .sav across builds) ──────────
 # A battery .sav is accepted on a new build iff its validity magics + checksum still
-# match (bmsave-lib.c:125-128, ReadSaveBlockInfo). Those magics are constant, so a
+# match (bmsave-lib.c ReadGlobalSaveInfo, the magic16/magic32/checksum condition; the
+# per-block form is ReadSaveBlockInfo). Those magics are constant, so a
 # rebuild alone never invalidates a save -- the ONLY thing that can is the save-block
 # LAYOUT shifting, which moves the old bytes to wrong offsets and fails the checksum.
 # struct GameSaveBlock's size is driven by two array dims; pin them (and the magics) so
@@ -572,7 +623,8 @@ def check_lane_ownership(fail):
     sawed such a feature in half. So this no longer fails -- it just surfaces, on a legacy
     `inst/<track>` branch, that a change touches the other desk's historical files, so the PR
     review names the cross-desk contract. The HARD invariant is now check_engine_guards_present
-    (the 5 engine hooks); desk ownership is reviewed at the PR. The glob map (above) is the seed
+    (every hook in its guarded tuple -- count-free on purpose, the tuple is the truth); desk
+    ownership is reviewed at the PR. The glob map (above) is the seed
     of the desk map. Dormant on `feat/*` branches (no lane), which is the steady state."""
     for path, owner in _lane_violations(_current_lane(), _changed_files()):
         print('  note: %s is historically %s-side -- if this PR spans desks, name the contract in review'

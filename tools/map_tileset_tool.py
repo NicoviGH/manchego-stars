@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Map tileset helpers (#40 task 2): render a GBAFE tileset's metatiles so maps can
-be authored by metatile index, and compile a hand-authored layout grid -> the decomp
-layout .bin (and matching .json).
+be authored by metatile index, and compile a hand-authored layout grid -> the
+FEBuilder-format .mar the decomp build consumes (+ the matching .json); the decomp's
+own scripts/mar_to_map.py turns that into the layout .bin at ROM-build time (writing
+the .bin directly scrambles the map -- see compile_layout).
 
 A GBAFE tileset is 3 raw pieces (the decomp/FEBuilder format, see maps/README.md):
   <name>.4bpp    1024 8x8 tiles, 4bpp (32768 B)

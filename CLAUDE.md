@@ -63,6 +63,9 @@ cd fireemblem8u
 - Match the existing file and function naming conventions in `fireemblem8u/src/`
 - New engine behavior ships as string-patch hooks in `tools/inject/engine_hooks.py` — never hand-edits
   to `fireemblem8u/src/` (our decomp edits are build artifacts, restored on every build)
+- Comments say **why**; the **what** lives in code + tests. When a change retires a mechanism or term,
+  register its key phrases in `tools/check.py` `DEAD_CONCEPTS` in the same commit — the drift lint scans
+  docs AND hand-written code comments (`docs/decisions.md` → "Comments are testimony").
 
 ## Engine / Content Boundary Rule
 
@@ -81,9 +84,10 @@ Rationale + long form: `docs/decisions.md` → Coordination model. The operating
   PR + issue, not a file glob.
 - **Concurrent agents each get their own worktree** (two ROM builds in one tree corrupt each other;
   a single writer may work the provisioned main tree — see `HANDOFF.md`).
-- **Engine/content invariant is a HARD gate** (the Boundary Rule above + the 5 engine hooks in
-  `tools/inject/`, guarded by `check.py check_engine_guards_present`). Desk ownership is a review
-  judgment (`check_lane_ownership` is advisory).
+- **Engine/content invariant is a HARD gate** (the Boundary Rule above + the engine hooks in
+  `tools/inject/`, guarded by `check.py check_engine_guards_present` — its tuple is the
+  authoritative hook list, don't cite a count). Desk ownership is a review judgment
+  (`check_lane_ownership` is advisory).
 - Never commit the `fireemblem8u` submodule pointer.
 
 ## Design placement test ("not my job" / "no need to know")

@@ -127,7 +127,9 @@ against a reviewed render -- `cave-interior` (Cynon's Mineshaft, Gray; CC, cross
 endorsed in its CREDITS) reproduces `docs/demo/ch03-mineshaft-tileset-demo.png` pixel-exact,
 gated in `tools/test_map_tileset.py`. Engine seam: `_register_tileset(campaign, name, Stem,
 comment)` registers any vendored tileset's asset-table entries (winter now rides it);
-`_register_chapter_map(..., tileset_stem=)` points a chapter map at any registered tileset.
+`_register_chapter_map(maps_dir, layout, comment)` points a chapter map at whichever registered
+tileset the layout's own `.json` `tileset` stamp names (resolved via `TILESET_STEMS` -- no
+per-call tileset argument).
 Layout JSONs (editor export + compiled `<map>.json`) now stamp their `tileset`, so
 `import_map_layout.py` compiles + previews on the right one. The map editor gained the
 custom-canvas mode for non-reskin chapters: `gen_map_editor.py --tileset=cave-interior
@@ -306,7 +308,8 @@ and got welded onto the same `inst/<track>` worktree, forcing work to partition 
   the reactions (my job / I can help / no impact / no need to know). Review is where ownership is decided,
   replacing the pre-commit glob block.
 - **Engine/content stays a HARD invariant.** The Engine/Content Boundary Rule (no character/chapter/plot
-  in `.c`/`.s`) + the 5 engine hooks in `tools/inject/` (`check_engine_guards_present`) are genuine
+  in `.c`/`.s`) + the engine hooks in `tools/inject/` (`check_engine_guards_present`; its guarded tuple
+  is the authoritative list — the count here read "5" long after it grew) are genuine
   decision-hiding and remain gates. The character-name half is now mechanized
   (`check_engine_campaign_agnostic` scans the hand-written engine sources for any campaign id);
   chapter-number / plot-event references stay a review-judgment call.
@@ -1214,6 +1217,28 @@ PR #114 was reverted wholesale (injector, campaign.yaml
 "iconic matchups via effectiveness" carve-outs above are annotated superseded. Fire-vs-ice survives as
 **flavor only** — item names, dialogue, and battle-anim art. Issue #8 closes as not-planned.
 _Decided: 2026-07-02 (Nicolas; supersedes the 2026-05-28 iconic-matchup carve-out)_
+
+**Comments are testimony, code is evidence — the comment-drift guard (post-mortem of the "zeroed growths" incident).**
+A stale `build_campaign.py` section header claimed "zeroed personal growths / pure class rate" long after
+donor-parity replaced that mechanism; an ADR then cited the comment as fact and had to be corrected twice
+(PRs #120/#121) — while the *tests* pinning the real donor behavior were green the whole time. Root cause:
+comments restating WHAT code does are unverified duplication (a single-source-of-truth violation), and the
+existing dead-concepts lint scanned docs only, with patterns too narrow for the comment's phrasing. Settled:
+- **The dead-concepts lint scans hand-written CODE comments too** (`check.py` `CODE_GLOBS`: tools py/lua/sh,
+  engine C, Makefile — decomp submodule, generated files, `check.py` itself, and `test_*` fixtures exempt),
+  and `check_tool_refs_exist` now also catches dangling `tools/…`/`docs/…` pointers in code comments
+  (gitignored targets = declared build artifacts, not rot). Regression-pinned by
+  `tools/test_check_comment_drift.py`, including the exact incident line.
+- **Registry discipline:** a change that RETIRES a mechanism or term registers its key phrases in
+  `DEAD_CONCEPTS` in the same commit — that registration is what makes the lint effective; the incident's
+  phrases were registered but too narrowly (now broadened). This joins the Definition of Done.
+- **Write rules:** a comment says WHY; the WHAT belongs to the code and its tests. An ADR asserting a
+  mechanical fact must be verified against the implementing symbol (cite it), never against nearby prose.
+  Semantic drift the lint can't see is caught by the same rule in review: header comments of touched
+  sections are in scope for every diff review.
+- A full 7-agent comment-vs-code sweep of the hand-written tree ran with this change; findings fixed in the
+  same PR.
+_Decided: 2026-07-02 (CLAUDE after Nicolas caught the propagated stale comment; guard + sweep in one PR)_
 
 **MVP weapons = stock FE weapons (no custom Might); personal weapons are post-MVP**
 PCs carry plain vanilla FE weapons whose stats (Mt/Hit/Crit/Wt/uses) come verbatim from a stock
