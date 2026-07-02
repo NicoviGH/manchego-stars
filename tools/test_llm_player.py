@@ -381,8 +381,8 @@ class TestSidecar(unittest.TestCase):
                 resp = json.load(f)
             self.assertEqual(resp['orders'], self.GOOD)      # the bad order was culled
             self.assertEqual(len(resp['rejected']), 1)
-            self.assertEqual(os.listdir(d), sorted(os.listdir(d)))  # no .tmp left over
-            self.assertNotIn('resp-1.json.tmp', os.listdir(d))
+            # atomic write: only the rename target remains, no .tmp left behind
+            self.assertEqual([f for f in os.listdir(d) if f.endswith('.tmp')], [])
 
     def test_step_is_idle_when_nothing_is_pending(self):
         with tempfile.TemporaryDirectory() as d:
