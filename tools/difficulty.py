@@ -548,8 +548,15 @@ def chapter_path(campaign, ch):
 def chapter_deploy_limit(chap, default):
     """The chapter's field cap from its `deployment:` block (#107 normalized schema);
     chapters without one (the fixed-roster prologue, prose-only seeds) fall back to
-    `default` (= whole roster)."""
-    return int((chap.get('deployment') or {}).get('deploy_limit', default))
+    `default` (= whole roster). The retired top-level shape is rejected loudly --
+    silently modeling a mis-placed cap as "whole roster" would bake wrong parity
+    numbers into a tuning session before the pre-commit gate ever runs."""
+    if 'deploy_limit' in chap or 'deploy_slots' in chap:
+        sys.exit('ERROR: %s: top-level deploy_limit/deploy_slots -- move under the '
+                 '`deployment:` block (#107 schema; check.py explains)'
+                 % chap.get('id', 'chapter'))
+    limit = (chap.get('deployment') or {}).get('deploy_limit')
+    return int(limit) if limit is not None else int(default)
 
 
 def load_field(campaign, ch):

@@ -7,17 +7,12 @@ pins the ONE normalized shape (`deployment:` block owns deploy_limit/deploy_slot
 green_allies; `player_units:` only for the fixed-roster prologue) so the shared injector
 machinery and difficulty.py can read a single access path.
 """
-import glob
 import os
 import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import check  # noqa: E402
-
-import yaml  # noqa: E402
-
-REPO = check.REPO
 
 
 def violations(d):
@@ -47,7 +42,9 @@ class TestNormalizedShapePasses(unittest.TestCase):
 
     def test_prologue_player_units(self):
         self.assertEqual(
-            violations({'status': 'active', 'player_units': [{'id': 'hlin'}]}), [])
+            violations({'status': 'active', 'is_prologue': True,
+                        'player_units': [{'id': 'hlin', 'class': 'fighter',
+                                          'level': 3, 'position': [8, 5]}]}), [])
 
     def test_green_allies_complete_entries(self):
         d = valid_active()
@@ -111,14 +108,64 @@ class TestDriftShapesFail(unittest.TestCase):
         self.assertTrue(any('green_allies' in m and 'class' in m for m in msgs))
 
 
+class TestMalformedYamlIsAViolationNotACrash(unittest.TestCase):
+    # A typo'd chapter must produce a per-file message, never a traceback that
+    # aborts check.py and skips every later gate.
+
+    def test_scalar_deploy_slots(self):
+        d = valid_active()
+        d['deployment']['deploy_slots'] = 5     # confused slots with the limit
+        self.assertTrue(any('must be a list' in m for m in violations(d)))
+
+    def test_string_green_ally_entry(self):
+        d = valid_active()
+        d['deployment']['green_allies'] = ['chwinga-mote']   # bare id, no mapping
+        self.assertTrue(any('must be a mapping' in m for m in violations(d)))
+
+    def test_boolean_deploy_limit_rejected(self):
+        # YAML `deploy_limit: yes` parses to True; isinstance(True, int) is True,
+        # so an explicit bool exclusion keeps a typo from becoming a cap of 1.
+        d = valid_active()
+        d['deployment']['deploy_limit'] = True
+        d['deployment']['deploy_slots'] = [[3, 8]]
+        self.assertTrue(any('positive int' in m for m in violations(d)))
+
+    def test_green_ally_position_shape_checked(self):
+        # inject_ch02 indexes position[0]/position[1]; the gate must reject what
+        # the consumer would crash on.
+        d = valid_active()
+        d['deployment']['green_allies'] = [{'id': 'chwinga-mote',
+                                            'class': 'pegasus_knight',
+                                            'level': 1, 'position': 7}]
+        self.assertTrue(any('position' in m and '[col, row]' in m
+                            for m in violations(d)))
+
+    def test_one_bad_limit_does_not_cascade(self):
+        # A single typo'd limit reports ONCE; the slots-match and
+        # machine-readable rules stay quiet (same root cause).
+        d = valid_active()
+        d['deployment']['deploy_limit'] = 'five'
+        msgs = violations(d)
+        self.assertEqual(len(msgs), 1, msgs)
+        self.assertIn('positive int', msgs[0])
+
+    def test_player_units_requires_is_prologue(self):
+        # The fixed-roster escape hatch is tied to is_prologue structurally --
+        # a prep-screen chapter can't dodge deployment validation by switching
+        # roster shapes.
+        d = {'status': 'active',
+             'player_units': [{'id': 'x', 'class': 'fighter', 'level': 1,
+                               'position': [1, 1]}]}
+        self.assertTrue(any('is_prologue' in m for m in violations(d)))
+
+
 class TestRealChapters(unittest.TestCase):
     def test_all_repo_chapters_pass(self):
-        for f in sorted(glob.glob(os.path.join(
-                REPO, 'campaigns/*/chapters/ch*.yaml'))):
-            with open(f, encoding='utf-8') as fh:
-                d = yaml.safe_load(fh) or {}
-            self.assertEqual(
-                check._chapter_deployment_violations(os.path.relpath(f, REPO), d), [])
+        # Exercise the PUBLIC gate exactly as CI runs it (glob + parse policy
+        # included), not a hand-rolled copy of its loop.
+        fail = []
+        check.check_chapter_deployment_schema(fail)
+        self.assertEqual(fail, [])
 
 
 if __name__ == '__main__':

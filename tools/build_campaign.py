@@ -3528,21 +3528,19 @@ def _split_script_beats(script, card_required=True):
     return card, beats
 
 
-def _split_event_beats(chap, trigger, err_label, card_required=True):
+def _split_event_beats(chap, trigger, err_label, msg_ids=None, card_required=True):
     """Locate the chapter event with `trigger` and split its locked `script:` into
-    (location_card, beats) (cf. _split_script_beats)."""
+    (location_card, beats) (cf. _split_script_beats). Passing the scene's reserved
+    `msg_ids` block guards the split against it -- a count mismatch means a
+    beat_break drifted in the YAML and a zip would silently drop the extra."""
     ev = next((e for e in chap['events'] if e.get('trigger') == trigger), None)
     if ev is None:
         sys.exit('ERROR: %s: no %r event in the chapter YAML' % (err_label, trigger))
-    return _split_script_beats(ev['script'], card_required=card_required)
-
-
-def _require_beat_count(beats, msg_ids, label):
-    """Guard a beat split against its reserved message-id block: a mismatch means a
-    beat_break drifted in the YAML and zip would silently drop the extra."""
-    if len(beats) != len(msg_ids):
+    card, beats = _split_script_beats(ev['script'], card_required=card_required)
+    if msg_ids is not None and len(beats) != len(msg_ids):
         sys.exit('ERROR: %s split into %d beats; expected %d (check beat_break '
-                 'markers in the YAML)' % (label, len(beats), len(msg_ids)))
+                 'markers in the YAML)' % (err_label, len(beats), len(msg_ids)))
+    return card, beats
 
 
 def _cutscene_fid(spk, special, err_label, fallback=None):
@@ -3583,11 +3581,16 @@ def _emit_scene_beats(lines, msg_ids, beats, fid, home, overrides=None,
     the opaque, auto-centered SOLOTEXTBOXSTART box (#58) wrapped at the on-map 28
     (42 overflows the centered box); faced beats use the full-screen scenic 42.
     A fixed width (e.g. 42) overrides for scenes with no narration beats."""
-    for i, (msg_id, beat) in enumerate(zip(msg_ids, beats)):
+    overrides = overrides or [None] * len(beats)
+    preloads = preloads or [None] * len(beats)
+    if not (len(overrides) == len(preloads) == len(beats)):
+        sys.exit('ERROR: scene staging lists out of step with its %d beats '
+                 '(%d overrides, %d preloads) for msgs %s' %
+                 (len(beats), len(overrides), len(preloads), msg_ids))
+    for msg_id, beat, override, preload in zip(msg_ids, beats, overrides, preloads):
         w = width if width is not None else (28 if _beat_is_narration(beat) else 42)
         set_message_body(lines, msg_id, _script_to_message(
-            beat, _stage_beat(beat, fid, home, overrides[i] if overrides else None),
-            width=w, preload=preloads[i] if preloads else None))
+            beat, _stage_beat(beat, fid, home, override), width=w, preload=preload))
 
 
 def _register_chapter_map(maps_dir, layout, comment):
@@ -3649,6 +3652,9 @@ def _classed_cast(campaign):
         cast.append((unit_id, slot, class_enum, deploy_class_for(unit),
                      int(unit.get('fe_stats', {}).get('level', 1))))
         names.append(display_name(unit))
+    if not cast:
+        sys.exit('ERROR: no classed cast -- every PORTRAIT_MAP unit is missing a '
+                 'class mapping (check the pcs/*.yaml fe_stats blocks)')
     return cast, names
 
 
@@ -3657,35 +3663,38 @@ def _ally_unit_entry(leader, slot, class_enum, level, x, y, items, comment,
     """One non-RED UnitDefinition row (events_udefs.c) for a chapter join/deploy/
     green-ally table. leader=None omits the leaderCharIndex field; autolevel/ai
     toggle their optional lines (GREEN allies use all three)."""
-    return ('    {\n'
-            '        .charIndex = CHARACTER_%s,%s\n'
-            '        .classIndex = %s,\n'
-            '%s'
-            '%s'
-            '        .allegiance = FACTION_ID_%s,\n'
-            '        .level = %d,\n'
-            '        .xPosition = %d,\n'
-            '        .yPosition = %d,\n'
-            '        .redaCount = 0,\n'
-            '        .items = { %s },\n'
-            '%s'
-            '    },' % (slot.upper(), comment, class_enum,
-                       '        .leaderCharIndex = %s,\n' % leader if leader else '',
-                       '        .autolevel = 1,\n' if autolevel else '',
-                       allegiance, level, x, y, items,
-                       '        .ai = %s,\n' % ai if ai else ''))
+    fields = ['.charIndex = CHARACTER_%s,%s' % (slot.upper(), comment),
+              '.classIndex = %s,' % class_enum]
+    if leader:
+        fields.append('.leaderCharIndex = %s,' % leader)
+    if autolevel:
+        fields.append('.autolevel = 1,')
+    fields += ['.allegiance = FACTION_ID_%s,' % allegiance,
+               '.level = %d,' % level,
+               '.xPosition = %d,' % x,
+               '.yPosition = %d,' % y,
+               '.redaCount = 0,',
+               '.items = { %s },' % items]
+    if ai:
+        fields.append('.ai = %s,' % ai)
+    return '    {\n' + ''.join('        %s\n' % f for f in fields) + '    },'
 
 
 def _deploy_cap_entries(chap, cast, leader, label):
     """The ally deploy "cap template" rows from the chapter's `deployment:` block
     (#107 schema): never LOADed -- the prep flow reads the table's entry count as
-    the field cap and its coords as the deploy tiles. classIndex rides the DEPLOY
-    class (the Archer-clone for RBG, #65), like the actual fielded units."""
+    the field cap and its coords as the deploy tiles. classIndex rides
+    deploy_class_for (today == the plain vanilla class; custom anims need no clone
+    class since the per-character _u25 path, #65 M-B)."""
     dep = chap.get('deployment') or {}
     slots, limit = dep.get('deploy_slots'), dep.get('deploy_limit')
-    if not slots or len(slots) != limit:
-        sys.exit('ERROR: %s deployment.deploy_slots (%s) != deploy_limit (%s)'
-                 % (label, len(slots or []), limit))
+    if not slots:
+        sys.exit('ERROR: %s has no deployment.deploy_slots -- a hosted chapter '
+                 'needs its deploy tiles authored (they land with the map paint)'
+                 % label)
+    if len(slots) != limit:
+        sys.exit('ERROR: %s deployment.deploy_slots (%d) != deploy_limit (%s)'
+                 % (label, len(slots), limit))
     if len(cast) < limit:
         sys.exit('ERROR: %d classed cast < %s deploy_limit %d'
                  % (len(cast), label, limit))
@@ -3774,8 +3783,8 @@ def inject_ch01(campaign, verbose=True):
     #    instead of empty air, and the haggle puts Hruna across from RBG. Hlin's final
     #    "who leads?" line stays in the scene (end of beat E, at the Northlook); the
     #    lord-select menu then plays over its own scenic BG (not the battle map).
-    b1_card, b1_beats = _split_event_beats(chap, 'chapter_start', 'ch01 Beat 1')
-    _require_beat_count(b1_beats, CH01_BEAT1_MSGS, 'ch01 Beat 1')
+    b1_card, b1_beats = _split_event_beats(chap, 'chapter_start', 'ch01 Beat 1',
+                                           CH01_BEAT1_MSGS)
 
     b1_guests = {'hlin': _fid_tag(PROLOGUE_HLIN_SLOT),
                  'scramsax': _fid_tag(PROLOGUE_SCRAMSAX_SLOT),
@@ -3815,8 +3824,8 @@ def inject_ch01(campaign, verbose=True):
     #     budget resets per beat. Duvessa (the host, Speaker of Bryn Shander) anchors the
     #     mid-right podium throughout; the party speaks from mid-left, with the other beat
     #     speaker(s) staged as clean two-shots opposite her (cf. Beat 1 podium geometry).
-    end_card, end_beats = _split_event_beats(chap, 'chapter_end', 'ch01 ending')
-    _require_beat_count(end_beats, CH01_ENDING_MSGS, 'ch01 ending')
+    end_card, end_beats = _split_event_beats(chap, 'chapter_end', 'ch01 ending',
+                                             CH01_ENDING_MSGS)
 
     # narration = faceless stage-business box (no portrait); the fallback covers
     # the duvessa/hruna/baxby cutscene faces (GUEST_PORTRAIT_MAP).
@@ -4539,15 +4548,13 @@ def inject_ch02(campaign, verbose=True):
 
     # 0. Cutscene beat splits, consumed from the locked chapter YAML (cf. inject_ch01).
     op_card, op_beats = _split_event_beats(chap, 'chapter_start', 'ch02 opening',
-                                           card_required=False)
+                                           CH02_OPENING_MSGS, card_required=False)
     end_card, end_beats = _split_event_beats(chap, 'chapter_end', 'ch02 ending',
-                                             card_required=False)
+                                             CH02_ENDING_MSGS, card_required=False)
     bark = next(e for e in chap['events']
                 if e.get('trigger') == 'turn_start' and e.get('turn') == 3)['script']
     tutorial = next(e for e in chap['events']
                     if e.get('trigger') == 'turn_start' and e.get('turn') == 1)['script']
-    _require_beat_count(op_beats, CH02_OPENING_MSGS, 'ch02 opening')
-    _require_beat_count(end_beats, CH02_ENDING_MSGS, 'ch02 ending')
     if len(tutorial) != len(CH02_TUTORIAL_MSGS):
         sys.exit('ERROR: ch02 turn-1 tutorial has %d lines; expected %d '
                  '(zip would silently drop the extra)' % (len(tutorial), len(CH02_TUTORIAL_MSGS)))
@@ -4636,11 +4643,13 @@ def inject_ch02(campaign, verbose=True):
         True, hx, hy, steel, CH02_AI['hold_position'],
         ' /* Halvar the Raider Captain -- boss, steel axe (Bazba slot) */'))
 
-    # 2b. GREEN chwinga (088B4718) -- the protect layer; positions + per-survivor gift
-    #     come from the YAML deployment.green_allies (id order matches CH02_CHWINGA).
-    #     autolevel leans on the pegasus class curve (bases = tuning checkpoint).
+    # 2b. GREEN chwinga (088B4718) -- the protect layer; class + level + positions +
+    #     per-survivor gift come from the YAML deployment.green_allies (id order
+    #     matches CH02_CHWINGA). autolevel leans on the class curve (bases = tuning
+    #     checkpoint).
     chwinga_by_id = {g['id']: g for g in chap['deployment']['green_allies']}
-    chwinga = [_ally_unit_entry(None, slot, CH02_CLASS_IDS['pegasus_knight'],
+    chwinga = [_ally_unit_entry(None, slot,
+                                CH02_CLASS_IDS[chwinga_by_id[uid]['class']],
                                 chwinga_by_id[uid]['level'],
                                 chwinga_by_id[uid]['position'][0],
                                 chwinga_by_id[uid]['position'][1],
