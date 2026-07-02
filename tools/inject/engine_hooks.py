@@ -23,6 +23,7 @@ BMMENU_C = os.path.join(DECOMP, 'src', 'bmmenu.c')
 DATA_EVENT_TRIGGER_C = os.path.join(DECOMP, 'src', 'data_event_trigger.c')
 EVENTINFO_C = os.path.join(DECOMP, 'src', 'eventinfo.c')
 PREP_SALLYCURSOR_C = os.path.join(DECOMP, 'src', 'prep_sallycursor.c')
+BANIM_EFXHIT_C = os.path.join(DECOMP, 'src', 'banim-efxhit.c')
 LORDFLOOR_APPLIED_FLAG = 0xFA
 
 
@@ -557,3 +558,74 @@ def _inject_lord_floor_engine():
               '    Proc_EndEach(gProcScr_SALLYCURSOR);\n')
     with open(PREP_SALLYCURSOR_C, 'w', encoding='utf-8') as f:
         f.write(text.replace(orig, hooked, 1))
+
+
+def _inject_crit_d20_flourish():
+    """#11: the cosmetic nat-20 flourish. When an FE crit fires in a battle anim,
+    a d20 showing 20 pops on the effect layer (BG1) the exact frame the vanilla
+    crit flash tears down -- both the plain crit flash AND the pierce-crit flash
+    (Silencer is deliberately excluded: it has its own distinctive Chill flourish,
+    and no MVP cast member can Silencer anyway). FE crit math stays the SOLE
+    trigger: these teardowns only ever run on a crit round.
+
+    The die is PROC-LESS: registered once, then the vanilla effect lifecycle owns
+    BG1 -- a successor effect (brave second hit, magic counter's spell background)
+    simply draws over it, and the battle-scene exit resets the layer. Nothing of
+    ours ever clears BG1 later, so no lingering proc can blank a newcomer's
+    tilemap mid-display (the clobber class a timed teardown would create). It is
+    a centered HUD overlay copied through the non-mirrored tilemap path, so the
+    "20" never mirrors with attacker side. Asset symbols (Img/Pal/Tsa_MsD20Crit)
+    are injected from the campaign by build_campaign.inject_crit_flourish -- this
+    patch is campaign-agnostic."""
+    with open(BANIM_EFXHIT_C, encoding='utf-8') as f:
+        text = f.read()
+    if 'MS #11' in text:
+        return
+
+    anchor = 'CONST_DATA struct ProcCmd ProcScr_efxCriricalEffect[] = {'
+    if text.count(anchor) != 1:
+        sys.exit('ERROR: ProcScr_efxCriricalEffect not in expected vanilla form '
+                 'in %s' % BANIM_EFXHIT_C)
+    block = (
+        '#include "constants/video-banim.h" /* OBJPAL_BANIM_SPELL_BG (MS #11) */\n'
+        '\n'
+        '/* MS #11: cosmetic nat-20 flourish -- drawn once at a crit flash teardown;\n'
+        '   the vanilla effect lifecycle owns BG1 from there (a successor effect\n'
+        '   overwrites it, the scene exit resets it). */\n'
+        'extern const u16 Img_MsD20Crit[];\n'
+        'extern const u16 Pal_MsD20Crit[];\n'
+        'extern const u16 Tsa_MsD20Crit[];\n'
+        '\n'
+        'static void MsD20CritShow(void)\n'
+        '{\n'
+        '    SpellFx_RegisterBgGfx(Img_MsD20Crit, 0x2000);\n'
+        '    SpellFx_RegisterBgPal(Pal_MsD20Crit, 0x20);\n'
+        '    LZ77UnCompWram(Tsa_MsD20Crit, gEkrTsaBuffer);\n'
+        '    EfxTmCpyBG(gEkrTsaBuffer, gBG1TilemapBuffer, 30, 20,\n'
+        '               OBJPAL_BANIM_SPELL_BG, 0x100);\n'
+        '    BG_EnableSyncByMask(BG1_SYNC_BIT);\n'
+        '}\n'
+        '\n')
+    text = text.replace(anchor, block + anchor, 1)
+
+    # hook BOTH crit-flash teardowns (plain + pierce); the bare body appears in
+    # more than one proc, so anchor on each enclosing function
+    for fn in ('efxCriricalEffectBGMain', 'efxPierceCriticalEffectBGMain'):
+        orig = ('void %s(struct ProcEfxBG * proc)\n'
+                '{\n'
+                '    if (++proc->timer == 0x11) {\n'
+                '        SpellFx_ClearBG1();\n'
+                '        SetDefaultColorEffects_();\n'
+                '        Proc_Break(proc);\n'
+                '    }\n'
+                '}\n' % fn)
+        if text.count(orig) != 1:
+            sys.exit('ERROR: %s teardown not in expected vanilla form in %s'
+                     % (fn, BANIM_EFXHIT_C))
+        hooked = orig.replace(
+            '        SetDefaultColorEffects_();\n',
+            '        SetDefaultColorEffects_();\n'
+            '        MsD20CritShow(); /* MS #11: the nat-20 die takes the cleared layer */\n')
+        text = text.replace(orig, hooked, 1)
+    with open(BANIM_EFXHIT_C, 'w', encoding='utf-8') as f:
+        f.write(text)

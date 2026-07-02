@@ -343,7 +343,11 @@ def check_engine_guards_present(fail):
             ('_patch_banim_palette_custom_guard',
              'the #65 GetBanimPalette guard (a custom appended banim keeps its OWN palette); '
              'without it a custom-anim unit on an archer/sniper class mis-loads the vanilla bow '
-             'palette -- the RBG cyan mis-render')):
+             'palette -- the RBG cyan mis-render'),
+            ('_inject_crit_d20_flourish',
+             'the #11 nat-20 crit flourish (a d20 pops on the SpellFx layer at the '
+             'crit-flash teardown) -- the d20, the whole D&D thesis, would silently '
+             'vanish from crits')):
         if ('def %s(' % fn) not in eh:
             fail.append('engine hook %s() not DEFINED in tools/inject/engine_hooks.py '
                         '-- would silently drop %s (see docs/decisions.md)' % (fn, mechanic))
