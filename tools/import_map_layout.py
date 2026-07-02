@@ -27,13 +27,13 @@ W,H,flat=d['width'],d['height'],d['grid']
 assert len(flat)==W*H, 'grid size mismatch'
 grid=[flat[r*W:(r+1)*W] for r in range(H)]
 
+tileset=d.get('tileset','snowy-bern')     # editor exports stamp their tileset (#40)
 mapdir=os.path.join(ROOT,'campaigns/rime-of-the-frostmaiden/maps')
 out_bin=os.path.join(mapdir,f'{stem}.mar')
-compile_layout(grid, out_bin, stem)
-json.dump({'id': stem, 'width': W, 'height': H}, open(os.path.join(mapdir,f'{stem}.json'),'w'))
-print('compiled', out_bin, f'({W}x{H})')
+compile_layout(grid, out_bin, stem, tileset=tileset)
+print('compiled', out_bin, f'({W}x{H}, tileset {tileset})')
 
-win=_tileset_from_dir(os.path.join(mapdir,'tilesets/snowy-bern'))
+win=_tileset_from_dir(os.path.join(mapdir,f'tilesets/{tileset}'))
 Z=4*16
 img=Image.new('RGB',(W*Z,H*Z))
 for i,m in enumerate(flat):
