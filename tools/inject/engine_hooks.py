@@ -23,6 +23,7 @@ BMMENU_C = os.path.join(DECOMP, 'src', 'bmmenu.c')
 DATA_EVENT_TRIGGER_C = os.path.join(DECOMP, 'src', 'data_event_trigger.c')
 EVENTINFO_C = os.path.join(DECOMP, 'src', 'eventinfo.c')
 PREP_SALLYCURSOR_C = os.path.join(DECOMP, 'src', 'prep_sallycursor.c')
+BANIM_EFXHIT_C = os.path.join(DECOMP, 'src', 'banim-efxhit.c')
 LORDFLOOR_APPLIED_FLAG = 0xFA
 
 
@@ -557,3 +558,88 @@ def _inject_lord_floor_engine():
               '    Proc_EndEach(gProcScr_SALLYCURSOR);\n')
     with open(PREP_SALLYCURSOR_C, 'w', encoding='utf-8') as f:
         f.write(text.replace(orig, hooked, 1))
+
+
+def _inject_crit_d20_flourish():
+    """#11: the cosmetic nat-20 flourish. When an FE crit fires in a battle anim,
+    a d20 showing 20 pops on the effect layer (BG1) the exact frame the vanilla
+    crit flash cleans up -- same proc tree, sequenced ownership, so neither the
+    flash nor combat pacing changes (the C08 handler never blocks on efx procs).
+    FE crit math stays the SOLE trigger: this hooks the flash's own teardown,
+    which only ever runs on a crit round. The die is a centered HUD overlay, so
+    the tilemap copies through the non-mirrored path regardless of attacker side.
+    Asset symbols (Img/Pal/Tsa_MsD20Crit) are injected from the campaign by
+    build_campaign.inject_crit_flourish -- this patch is campaign-agnostic."""
+    with open(BANIM_EFXHIT_C, encoding='utf-8') as f:
+        text = f.read()
+    if 'MS #11' in text:
+        return
+
+    anchor = 'CONST_DATA struct ProcCmd ProcScr_efxCriricalEffect[] = {'
+    if text.count(anchor) != 1:
+        sys.exit('ERROR: ProcScr_efxCriricalEffect not in expected vanilla form '
+                 'in %s' % BANIM_EFXHIT_C)
+    block = (
+        '/* MS #11: cosmetic nat-20 flourish. The die rides the SpellFx BG1 layer\n'
+        '   right after the crit flash clears it; ~46 frames, then normal teardown. */\n'
+        'extern const u16 Img_MsD20Crit[];\n'
+        'extern const u16 Pal_MsD20Crit[];\n'
+        'extern const u16 Tsa_MsD20Crit[];\n'
+        '\n'
+        'void efxMsD20CritMain(struct ProcEfxBG * proc);\n'
+        '\n'
+        'CONST_DATA struct ProcCmd ProcScr_efxMsD20Crit[] = {\n'
+        '    PROC_NAME("efxMsD20Crit"),\n'
+        '    PROC_REPEAT(efxMsD20CritMain),\n'
+        '    PROC_END\n'
+        '};\n'
+        '\n'
+        'void NewEfxMsD20Crit(struct Anim * anim)\n'
+        '{\n'
+        '    struct ProcEfxBG * proc;\n'
+        '    proc = Proc_Start(ProcScr_efxMsD20Crit, PROC_TREE_3);\n'
+        '    proc->anim = anim;\n'
+        '    proc->timer = 0;\n'
+        '    SpellFx_RegisterBgGfx(Img_MsD20Crit, 0x2000);\n'
+        '    SpellFx_RegisterBgPal(Pal_MsD20Crit, 0x20);\n'
+        '    LZ77UnCompWram(Tsa_MsD20Crit, gEkrTsaBuffer);\n'
+        '    EfxTmCpyBG(gEkrTsaBuffer, gBG1TilemapBuffer, 30, 20,\n'
+        '               OBJPAL_BANIM_SPELL_BG, 0x100);\n'
+        '    BG_EnableSyncByMask(BG1_SYNC_BIT);\n'
+        '}\n'
+        '\n'
+        'void efxMsD20CritMain(struct ProcEfxBG * proc)\n'
+        '{\n'
+        '    if (++proc->timer == 0x2E) {\n'
+        '        SpellFx_ClearBG1();\n'
+        '        Proc_Break(proc);\n'
+        '    }\n'
+        '}\n'
+        '\n')
+    text = text.replace(anchor, block + anchor, 1)
+
+    # the bare teardown body appears in more than one efx proc -- anchor on the
+    # enclosing function so only the crit flash's teardown is hooked
+    orig = ('void efxCriricalEffectBGMain(struct ProcEfxBG * proc)\n'
+            '{\n'
+            '    if (++proc->timer == 0x11) {\n'
+            '        SpellFx_ClearBG1();\n'
+            '        SetDefaultColorEffects_();\n'
+            '        Proc_Break(proc);\n'
+            '    }\n'
+            '}\n')
+    if text.count(orig) != 1:
+        sys.exit('ERROR: efxCriricalEffectBGMain teardown not in expected vanilla '
+                 'form in %s' % BANIM_EFXHIT_C)
+    hooked = ('void efxCriricalEffectBGMain(struct ProcEfxBG * proc)\n'
+              '{\n'
+              '    if (++proc->timer == 0x11) {\n'
+              '        SpellFx_ClearBG1();\n'
+              '        SetDefaultColorEffects_();\n'
+              '        NewEfxMsD20Crit(proc->anim); /* MS #11: nat-20 die in the tail */\n'
+              '        Proc_Break(proc);\n'
+              '    }\n'
+              '}\n')
+    text = text.replace(orig, hooked, 1)
+    with open(BANIM_EFXHIT_C, 'w', encoding='utf-8') as f:
+        f.write(text)

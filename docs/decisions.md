@@ -402,6 +402,28 @@ for D&D feel. It does not gate or alter the hit — resolution is pure FE. This 
 the only place the die appears.
 _Decided: 2026-05-28_
 
+**The d20 flourish SHIPS (#11): a gold nat-20 pops at the crit flash's teardown.**
+Implementation seam (decomp-traced): FE8 rules a round a crit in `banim-battleparse.c`
+(BATTLE_HIT_ATTR_CRIT → the crit anim modes); the C08 anim command fires the white
+crit flash (`ProcScr_efxCriricalEffect*`, `banim-efxhit.c`) and never blocks the script,
+and the flash's BG proc tears BG1 down after 17 frames. The hook
+(`engine_hooks._inject_crit_d20_flourish`, guarded in `check_engine_guards_present`)
+starts a cloned SpellFx proc AT that teardown — sequenced BG1 ownership, so neither the
+flash nor combat pacing changes, and FE crit math stays the sole trigger. The die is a
+centered HUD overlay copied through the non-mirrored tilemap path (attacker side never
+mirrors the "20"), held ~46 frames. **Engine/content split:** the hook is campaign-
+agnostic; the ART is the campaign's (`battle_anims/d20-crit.png`, PIL-authored gold d20)
+— no asset, no flourish, pure vanilla crits. Asset pipeline: PNG → 4bpp sheet (tile 0
+blank) + 16-color pal + 30×20 TSA, wrapped in stored-form GBA LZ77 (literal-only blocks
+— always-valid input for `LZ77UnCompWram`, no compressor to vendor), incbin'd into
+`data/data_banim.s`. `test_crit_flourish.py` decodes the injected bytes back and pins
+them pixel-exact against the source PNG; the static preview Nicolas reviews is
+`docs/demo/d20-crit-flourish-preview.png` (rendered FROM the injected bytes). Deferred:
+map-battle (no-anim) crits — a different rendering path (`mapanim_spellassoc.c` MU
+flash); and in-emulator motion review (`recordanim` on a crit) at the next capture
+session.
+_Decided: 2026-07-02 (CLAUDE; decomp-traced; closes #11's anim-mode scope)_
+
 **AC (Armor Class): dropped as a mechanic**
 Defense is FE's `DEF` (vs physical) and `RES` (vs magic), plus speed/luck/terrain
 avoid — exactly as vanilla FE. There is no separate to-hit target. The `ac:` source
