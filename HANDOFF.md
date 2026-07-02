@@ -6,8 +6,8 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 
 > **Last session (2026-06-29):** braulo battle anim got a revised peak frame (PR #98), the Knight/lance
 > banim donor tooling landed (PR #99), and Ch3 dialogue locked (PR #97). **Wolfram's battle anim is the
-> live pickup — its engine/tooling half is merged & inert; it's waiting only on art.** See §Wolfram + the
-> ready-to-run prompt pack at the bottom of this file. **Ch3 map (#40) also moved:** tileset decided
+> live pickup — its engine/tooling half is merged & inert; it's waiting only on art.** See §Wolfram; the
+> ready-to-run prompt pack is in `lore/wolfram.md`. **Ch3 map (#40) also moved:** tileset decided
 > (Cynon's Mineshaft, Gray) + layout pivot to a custom Gem-Mine plan — **flattened blockout posted on #23,
 > awaiting Nicolas's OK** (see §Map (#40)). Nicolas is mobile-only the week of 2026-06-29.
 
