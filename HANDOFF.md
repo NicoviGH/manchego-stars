@@ -17,10 +17,10 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 > conflict-resolved and merged from the web) — but **ref-deletes are still blocked** (`git push
 > --delete` hangs at the proxy; no repo-settings API either). **To do from desktop:**
 >
-> 1. **Flip the GitHub repo setting "Automatically delete head branches"** (Settings → General →
->    Pull Requests; mobile-reachable). That sweeps every squash-merged branch on merge so this
->    backlog can't re-accumulate. **After flipping, squash-merging this PR will auto-delete
->    `claude/branch-cleanup-1c1081`** — one less branch to chase manually.
+> 1. ~~Flip the GitHub repo setting "Automatically delete head branches"~~ — **DONE (Nicolas,
+>    2026-07-02, from mobile).** Verified working: `feat/104-inject-chapter-extract` auto-deleted
+>    when PR #105 squash-merged. The backlog can no longer re-accumulate; only the one-time
+>    deletion of the pre-existing stale branches (step 2) remains.
 > 2. **Delete the stale branches.** From a local checkout:
 >    ```sh
 >    git push origin --delete \
