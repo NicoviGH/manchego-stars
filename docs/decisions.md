@@ -1197,8 +1197,12 @@ _Decided: 2026-07-02 (CLAUDE; resolves #9's engine half as already-vanilla; gray
 The #8 implementation (Fire/Elfire flagged `effective` vs the ice-monster classes, PR #114) used only
 FE8's native effectiveness system — but Nicolas ruled (2026-07-02) that the vanilla-combat principle
 extends to item *data*: stock weapons must behave exactly as a vanilla FE8 player expects, and vanilla
-Fire/Elfire carry no effectiveness. "Vanilla mechanism, custom data" is fine for units/stats/enemies but
-not for changing how stock items compute damage. PR #114 was reverted wholesale (injector, campaign.yaml
+Fire/Elfire carry no effectiveness. The precise boundary (Nicolas, same day): **character-level data is
+ours; class data and stock-item data stay verbatim vanilla.** Our cast and enemy rosters ride unmodified
+vanilla classes exactly the way FE8's own cast does — custom names, portraits, personal bases/growths,
+levels, and placements are the same kind of data FE8 layers on its own characters (Franz has personal
+stats on the Cavalier class; so does Baxby). Nothing about a *class* or a *stock item* changes — no
+custom classes, no stat/effectiveness/might edits to stock weapons. PR #114 was reverted wholesale (injector, campaign.yaml
 `iconic_matchups:` block, elfire weapon model, class tags, tests, and its ADR); the 2026-05-28/06-04
 "iconic matchups via effectiveness" carve-outs above are annotated superseded. Fire-vs-ice survives as
 **flavor only** — item names, dialogue, and battle-anim art. Issue #8 closes as not-planned.
