@@ -1110,11 +1110,15 @@ def inject_crit_flourish(campaign, verbose=True):
 
 # --- Milestone B: character stats / class -----------------------------------------
 # Write each cast unit's vanilla-class identity into its portrait slot's
-# gCharacterData[] entry: defaultClass, affinity (Anima, cosmetic), baseLevel,
-# personal base stats = (YAML fe_stats - class base), the class's weapon-type rank,
-# and zeroed personal growths (so the unit grows at its pure class rate). When
-# fe_stats match the class verbatim (the FE-strict default) the personal bases come
-# out 0; any deliberate YAML divergence is still honored so displayed stats ==
+# gCharacterData[] entry: defaultClass, affinity (Anima, cosmetic), baseLevel --
+# and the MECHANICAL character layer inherited from a class-matched VANILLA DONOR
+# (STAT_DONOR / GROWTH_DONOR): personal bases = (YAML fe_stats - class base) + the
+# donor's personal bases, growths copied verbatim from the growth donor, weapon
+# ranks from the rank donor. So an FE-strict unit (fe_stats == class base, the
+# default) lands exactly on its donor's statline -- vanilla character data under a
+# new identity, not "naked class" frailty (decisions.md: even character-level
+# mechanical data is vanilla; ours is the donor CHOICE + cosmetics + levels).
+# Any deliberate YAML divergence still stacks on top so displayed stats ==
 # fe_stats. portraitId, attributes (gender), and pSupportData are left as the
 # vanilla slot's -- gender/supports are a later YAML-driven pass.
 
