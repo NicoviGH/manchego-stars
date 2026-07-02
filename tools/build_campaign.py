@@ -372,6 +372,8 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         # battle_terrain_table + the terrain->ground remap (snow chapters)
                         'src/banim_terrain_data.c', 'data/data_banim_terrain.s',
                         'src/data_terrains.c', 'src/banim-battleparse.c', 'include/variables.h',
+                        # iconic matchups (#8): appended effectiveness lists + repointed weapons
+                        'src/data_items.c', 'src/data_itemuse.c',
                         # Goodberry (#21): vulnerary icon swapped by inject_item_icons
                         'graphics/item_icon/item_icon_vulnerary.png',
                         'data/const_data_unit_icon_wait.s', 'data/const_data_unit_icon_move.s',
@@ -997,6 +999,88 @@ def inject_item_names(campaign, verbose=True):
             print('  %-18s -> MSG_%03X: %s' % (item_enum, text_id, name))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
+
+
+ITEMUSE_C = os.path.join(DECOMP, 'src', 'data_itemuse.c')
+
+
+def _matchup_class_list(matchup, classes_h):
+    """The C definition of one iconic matchup's ItemEffectiveness_* class list:
+    (identifier, C snippet). Class tokens resolve like enemy YAML classes
+    ('cyclops' -> CLASS_CYCLOPS) and must exist in the decomp's classes.h."""
+    ident = 'ItemEffectiveness_Iconic_%s' % re.sub(r'[^A-Za-z0-9]', '_',
+                                                   str(matchup['id']))
+    rows = []
+    for tok in matchup['effective_vs']:
+        enum = 'CLASS_' + str(tok).upper().replace('-', '_')
+        if not re.search(r'\b%s\b' % enum, classes_h):
+            sys.exit('ERROR: iconic matchup %r: no %s in the decomp classes.h'
+                     % (matchup['id'], enum))
+        rows.append('    %s,\n' % enum)
+    return ident, ('\n/* Manchego Stars iconic matchup (#8): %s */\n'
+                   'CONST_DATA u8 %s[] = {\n%s    0,\n};\n'
+                   % (matchup['id'], ident, ''.join(rows)))
+
+
+def inject_iconic_matchups(campaign, verbose=True):
+    """Iconic matchups (#8): flag weapons `effective` vs enemy CLASSES using FE8's
+    native effectiveness (x3 damage; decisions.md §Combat "Iconic matchups" --
+    class-keyed, sparse, no resistance tables). campaign.yaml `iconic_matchups:`
+    is the source of truth; each entry appends one ItemEffectiveness_* class list
+    to data_itemuse.c and points the named weapons' .pEffectiveness at it. A
+    weapon that already carries vanilla effectiveness is refused: overwriting it
+    would silently drop vanilla behavior (pick another weapon or fold the vanilla
+    classes into the matchup deliberately)."""
+    cfg = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
+    with open(cfg, encoding='utf-8') as f:
+        matchups = (yaml.safe_load(f) or {}).get('iconic_matchups') or []
+    if not matchups:
+        return
+    classes_h = open(os.path.join(DECOMP, 'include', 'constants', 'classes.h'),
+                     encoding='utf-8').read()
+    with open(ITEMS_C, encoding='utf-8') as f:
+        items_src = f.read()
+    lists, externs = [], []
+    for m in matchups:
+        ident, snippet = _matchup_class_list(m, classes_h)
+        lists.append(snippet)
+        externs.append('extern CONST_DATA u8 %s[];\n' % ident)
+        for wkey in m['weapons']:
+            item = WEAPON_ITEM_ENUM.get(wkey)
+            if item is None:
+                sys.exit('ERROR: iconic matchup %r: unknown weapon %r (add it to '
+                         'WEAPON_ITEM_ENUM)' % (m['id'], wkey))
+            marker = '[%s] = {' % item
+            if items_src.count(marker) != 1:
+                sys.exit('ERROR: %s entry not found in data_items.c' % item)
+            at = items_src.index(marker)
+            end = items_src.index('\n\t},', at)
+            if '.pEffectiveness' in items_src[at:end]:
+                sys.exit('ERROR: %s already carries vanilla effectiveness -- '
+                         'refusing to overwrite it for matchup %r' % (item, m['id']))
+            # vanilla field order puts pEffectiveness right after .attributes
+            attr_end = items_src.index('\n', items_src.index('.attributes', at))
+            items_src = (items_src[:attr_end]
+                         + '\n\t\t.pEffectiveness = %s,' % ident
+                         + items_src[attr_end:])
+        if verbose:
+            print('  %s: %s -> x3 vs %s' % (m['id'], ', '.join(m['weapons']),
+                                            ', '.join(m['effective_vs'])))
+    with open(ITEMS_C, 'w', encoding='utf-8') as f:
+        f.write(items_src)
+    with open(ITEMUSE_C, 'a', encoding='utf-8') as f:
+        f.write(''.join(lists))
+    # data_items.c sees the lists through variables.h (where the vanilla
+    # ItemEffectiveness_* externs live).
+    with open(VARIABLES_H, encoding='utf-8') as f:
+        var_h = f.read()
+    anchor = 'extern CONST_DATA u8 ItemEffectiveness_Monsters[];'
+    if var_h.count(anchor) != 1:
+        sys.exit('ERROR: ItemEffectiveness_Monsters extern not in expected form '
+                 'in variables.h')
+    var_h = var_h.replace(anchor, anchor + '\n' + ''.join(externs).rstrip('\n'))
+    with open(VARIABLES_H, 'w', encoding='utf-8') as f:
+        f.write(var_h)
 
 
 # --- Milestone B: character stats / class -----------------------------------------
@@ -5186,6 +5270,8 @@ def main():
         inject_item_names(args.campaign)
         print('item icons:')
         inject_item_icons(args.campaign)
+        print('iconic matchups (#8):')
+        inject_iconic_matchups(args.campaign)
         print('characters:')
         patch_character_data(args.campaign)
         print('portrait geometry:')

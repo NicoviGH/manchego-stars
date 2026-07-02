@@ -37,6 +37,10 @@ CLASS_TAGS = {
     'CLASS_PEGASUS_KNIGHT': frozenset({'flier'}),
     'CLASS_FALCON_KNIGHT': frozenset({'flier'}),
     'CLASS_WYVERN_RIDER': frozenset({'flier'}),
+    # iconic-matchup targets (#8): fire-line tomes are x3 vs these (fe_combat.W)
+    'CLASS_CYCLOPS': frozenset({'cyclops'}),
+    'CLASS_CYCLOPS_2': frozenset({'cyclops'}),
+    'CLASS_DRUID': frozenset({'druid'}),
 }
 
 # The engine models VANILLA, so every decomp read is the committed (HEAD) source, never

@@ -53,7 +53,13 @@ W = {
     'hand-axe':     Weapon('hand-axe',     7, 60,  0, 11, 'axe',   rng=(1, 2)),
     'iron-bow':     Weapon('iron-bow',     6, 85,  0, 5,  'bow',   rng=(2, 2),
                            effective=frozenset({'flier'})),
-    'fire':         Weapon('fire',         5, 90,  0, 4,  'magic', rng=(1, 2)),
+    # fire-line tomes carry the campaign's ONE iconic matchup (#8, campaign.yaml
+    # iconic_matchups): x3 vs ice trolls (cyclops reskin) + frost druids. Vanilla
+    # parity-reference forces are unaffected (their targets carry neither tag).
+    'fire':         Weapon('fire',         5, 90,  0, 4,  'magic', rng=(1, 2),
+                           effective=frozenset({'cyclops', 'druid'})),
+    'elfire':       Weapon('elfire',       10, 85, 0, 10, 'magic', rng=(1, 2),
+                           effective=frozenset({'cyclops', 'druid'})),
     'lightning':    Weapon('lightning',    4, 95,  5, 6,  'magic', rng=(1, 2)),
     'flux':         Weapon('flux',         7, 80,  0, 8,  'magic', rng=(1, 2)),
     # Extended vanilla weapons carried only by enemy parity-reference forces (FE8 Ch4/Ch6),
