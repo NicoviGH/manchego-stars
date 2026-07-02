@@ -580,6 +580,8 @@ def _inject_crit_d20_flourish():
         sys.exit('ERROR: ProcScr_efxCriricalEffect not in expected vanilla form '
                  'in %s' % BANIM_EFXHIT_C)
     block = (
+        '#include "constants/video-banim.h" /* OBJPAL_BANIM_SPELL_BG (MS #11) */\n'
+        '\n'
         '/* MS #11: cosmetic nat-20 flourish. The die rides the SpellFx BG1 layer\n'
         '   right after the crit flash clears it; ~46 frames, then normal teardown. */\n'
         'extern const u16 Img_MsD20Crit[];\n'
