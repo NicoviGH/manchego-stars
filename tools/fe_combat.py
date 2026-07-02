@@ -12,9 +12,10 @@ Combat model (bmbattle.c line cites):
   Hit     = Skl*2 + wpnHit + Lck//2 + triangleHit          (l.578)
   Avoid   = AS*2 + terrainAvoid + Lck                       (l.582)
   HitShown= clamp(atkHit - defAvoid, 0, 100)               (l.600-603)
-  Atk     = Pow + wpnMt + triangleDmg   (x3 whole if effective, l.531)
+  Atk     = Pow + (wpnMt + triangleDmg)  (the Mt+tri HALF x3 if effective, l.527-556:
+            battleAttack = Mt + tri, tripled on effectiveness, THEN += Pow)
   Damage  = max(0, Atk - (Def | Res))                       Res for magic
-  Double  if (atkAS - defAS) >= 4                           (BATTLE_FOLLOWUP_THRESHOLD)
+  Double  if (atkAS - defAS) >= 4                     (BATTLE_FOLLOWUP_SPEED_THRESHOLD)
 Triangle (GBA FE8): advantage +1 Mt / +15 Hit, disadvantage -1 Mt / -15 Hit.
 """
 from dataclasses import dataclass, field
@@ -50,7 +51,7 @@ W = {
     'killing-edge': Weapon('killing-edge', 9, 75, 30, 7,  'sword'),
     'iron-axe':     Weapon('iron-axe',     8, 75,  0, 10, 'axe'),
     'steel-axe':    Weapon('steel-axe',    11, 65, 0, 15, 'axe'),
-    'hand-axe':     Weapon('hand-axe',     7, 60,  0, 11, 'axe',   rng=(1, 2)),
+    'hand-axe':     Weapon('hand-axe',     7, 60,  0, 12, 'axe',   rng=(1, 2)),
     'iron-bow':     Weapon('iron-bow',     6, 85,  0, 5,  'bow',   rng=(2, 2),
                            effective=frozenset({'flier'})),
     'fire':         Weapon('fire',         5, 90,  0, 4,  'magic', rng=(1, 2)),
@@ -99,7 +100,7 @@ def attack_speed(c):
     return max(0, c.spd - max(0, c.weapon.wt - c.con))
 
 
-# A 4-point attack-speed lead earns a follow-up attack (BATTLE_FOLLOWUP_THRESHOLD).
+# A 4-point attack-speed lead earns a follow-up attack (BATTLE_FOLLOWUP_SPEED_THRESHOLD).
 FOLLOWUP_THRESHOLD = 4
 
 
@@ -124,14 +125,17 @@ def triangle(atk_kind, def_kind):
 
 def damage(atk, dfn):
     """Damage atk deals to dfn on a single connecting hit (max 0). Magic resolves
-    against Res, everything else against Def; an effective weapon triples the whole
-    attack (Pow + Mt + triangle) before the defence is subtracted."""
+    against Res, everything else against Def; an effective weapon triples the WEAPON
+    half only (Mt + triangle) -- Pow is added after, per the decomp
+    (bmbattle.c ComputeBattleUnitAttack: battleAttack = Mt + tri, x3 on
+    effectiveness, then += Pow; the sacred-twins x2 special case is not modeled)."""
     if atk.weapon is None:                # a weaponless support unit can't attack
         return 0
     tri = triangle(atk.weapon.kind, dfn.weapon.kind) if dfn.weapon else 0
-    raw = atk.pow + atk.weapon.mt + tri
+    raw = atk.weapon.mt + tri
     if atk.weapon.effective & dfn.tags:
         raw *= 3
+    raw += atk.pow
     defence = dfn.res if atk.weapon.kind == 'magic' else dfn.df
     return max(0, raw - defence)
 

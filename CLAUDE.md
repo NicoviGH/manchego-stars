@@ -84,9 +84,10 @@ Rationale + long form: `docs/decisions.md` → Coordination model. The operating
   PR + issue, not a file glob.
 - **Concurrent agents each get their own worktree** (two ROM builds in one tree corrupt each other;
   a single writer may work the provisioned main tree — see `HANDOFF.md`).
-- **Engine/content invariant is a HARD gate** (the Boundary Rule above + the 5 engine hooks in
-  `tools/inject/`, guarded by `check.py check_engine_guards_present`). Desk ownership is a review
-  judgment (`check_lane_ownership` is advisory).
+- **Engine/content invariant is a HARD gate** (the Boundary Rule above + the engine hooks in
+  `tools/inject/`, guarded by `check.py check_engine_guards_present` — its tuple is the
+  authoritative hook list, don't cite a count). Desk ownership is a review judgment
+  (`check_lane_ownership` is advisory).
 - Never commit the `fireemblem8u` submodule pointer.
 
 ## Design placement test ("not my job" / "no need to know")

@@ -66,10 +66,10 @@ else
 	@python3 tools/difficulty.py --campaign $(CAMPAIGN) --chapter $(CH)
 endif
 
-# Enforcing form of the campaign curve (#48 (b)): non-zero exit if any referenced chapter
-# is off-parity or unreliably measured. CI runs the informative `difficulty` today and flips
-# to this target once the content track authors the Ch2+ enemy inventories (until then our
-# side is 0.0 and this is RED by design).
+# Enforcing form of the campaign curve (#48 (b)): per-chapter OPT-IN gate -- non-zero
+# exit only for chapters marked `balance_locked: true` in their YAML that read
+# off-parity or unreliably measured (with zero locks the gate passes). CI runs this
+# target; chapters opt in as their enemy inventories are authored and playtested.
 difficulty-gate:
 	@python3 tools/difficulty.py --campaign $(CAMPAIGN) --curve --check
 

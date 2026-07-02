@@ -209,8 +209,9 @@ def generate(bust, xmouth=2, ymouth=6, static_portrait=False):
     by hand is infeasible for custom art, so instead we defeat the animation:
       * bake the WHOLE neutral face (eyes + mouth) into the tileset — do NOT blank
         the mouth window the way animated vanilla portraits do;
-      * emit an all-transparent (index 0) frames file, so every overlay frame the
-        engine paints is empty and the static face underneath always shows through.
+      * fill every mouth/blink frame slot with the NEUTRAL mouth/eye crop (opaque --
+        NOT transparent), so each overlay frame the engine paints repaints the same
+        neutral pixels that are already there.
     Net effect: the engine "animates", but nothing ever moves — a locked still.
     """
     mouth_bx = (xmouth - 4) * 8 + 32   # bust x of the 32x16 mouth window
@@ -326,7 +327,7 @@ def main():
         parser.add_argument('--ymouth', type=int, default=6,
                             help='mouth tile-row offset (default 6)')
         parser.add_argument('--static', action='store_true',
-                            help='non-animated bust: full face in tileset, transparent frames')
+                            help='non-animated bust: full face in tileset, neutral-crop frames')
         args = parser.parse_args(sys.argv[2:])
 
         im = Image.open(args.bust)

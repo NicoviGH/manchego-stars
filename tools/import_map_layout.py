@@ -4,7 +4,9 @@ campaigns/.../maps/ and render a confirmation preview to map-review/.
 
 Usage: import_map_layout.py <map-stem> [src-json]
 e.g.   import_map_layout.py ch01-the-iron-trail ~/Downloads/ch01-layout.json
-       (src defaults to ~/Downloads/<map-stem>-layout.json, then ~/Downloads/prologue-layout.json)"""
+       (src defaults to ~/Downloads/<map-stem>-layout.json; ch00/prologue stems also try
+        ~/Downloads/prologue-layout.json and ch01 stems ~/Downloads/ch01-layout.json --
+        any other stem has no second fallback)"""
 import sys, os, json
 ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # repo root (worktree-aware)
 sys.path.insert(0, os.path.join(ROOT,'tools'))

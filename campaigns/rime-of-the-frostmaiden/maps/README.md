@@ -87,7 +87,8 @@ way; its test-map render is pinned pixel-exact against
    (so `mar_to_map`'s `>>3` yields the `.bin` value `metatile_index × 4`); the `atlas`
    subcommand renders which metatile is which.
 3. Register + wire it in `build_campaign.py`: `_register_tileset(campaign, '<name>', '<Stem>', …)`
-   once per tileset + `_register_chapter_map(…, tileset_stem='<Stem>')` per chapter, then
+   once per tileset; per chapter, `_register_chapter_map(maps_dir, layout, comment)` reads the
+   tileset from the layout's own `.json` `tileset` stamp (resolved via `TILESET_STEMS`), then
    `_retarget_host_chapter` sets the chapter's `chapter_settings.json` map indices. The winter
    tileset rides `inject_winter_tileset`; `cave-interior` registers with the ch03 injector (#23).
 4. `make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba` and load-test in mGBA.

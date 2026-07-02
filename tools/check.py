@@ -2,13 +2,14 @@
 """Repo drift guard. ONE source of check logic, run by CI, the git pre-commit hook,
 and `make check`. Keeps doc/plan drift from landing.
 
-Catches:
-  1. Python tooling that doesn't compile.
-  2. Campaign YAML that doesn't parse.
-  3. Docs referencing a tools/<x>.py|rb that doesn't exist.
-  4. Resurrected "dead concepts" -- abandoned tool names, dead code symbols, retired
-     implementation phrases -- in any doc except decisions.md (the ADR log that is
-     *supposed* to record what we dropped).
+Catches (main() is the authoritative list -- one check_* per gate): compile/parse
+gates (Python tooling, unit tests, campaign YAML), doc/comment drift (dangling
+tools/docs references, resurrected "dead concepts" -- abandoned tool names, dead
+symbols, retired implementation phrases -- everywhere except decisions.md, the ADR
+log that is *supposed* to record what we dropped, and test_* fixtures), generated
+indexes freshness, chapter status/deployment schema, injection order, the
+engine-hook guards, the engine/content boundary, save-layout stability, and
+advisory lane ownership.
 
 What it does NOT catch: arbitrary prose that contradicts the code without using a
 known-dead term. The defense there is single source of truth (link, don't restate)
@@ -46,6 +47,10 @@ DEAD_CONCEPTS = [
     r'srd-snapshot', r'open5e-snapshot', r'CLASS_WEAPON', r'WPN_EXP_E',
     r'zeroed.{0,24}growths?', r'flat-?E rank', r'pure[- ]class (?:growth|rate)',
     r'gen-chapter-index\.rb', r'gen-class-index\.rb',  # ported to Python 2026-06-09
+    # retired by the 2026-07-02 comment sweep:
+    r'clone_into',                     # #65 clone-class approach -> per-character _u25
+    r'tileset_stem\s*=',               # _register_chapter_map reads the layout's stamp
+    r'BATTLE_FOLLOWUP_THRESHOLD',      # misnomer; real: BATTLE_FOLLOWUP_SPEED_THRESHOLD
 ]
 
 # Hand-written source whose comments carry doctrine -- the same drift surface as
@@ -356,7 +361,8 @@ def check_engine_guards_present(fail):
     "lord" rides a non-LORD-class slot: FE8's chapter-start cursor centering derefs a NULL
     leader unit, parks the cursor off-map, and an out-of-bounds terrain read runs the text
     decoder away into gBmSt. Our whole cast uses non-lord slots, so EVERY chapter needs
-    these two campaign-agnostic guards in build_campaign.py. Removing either silently
+    these two campaign-agnostic guards (defined in tools/inject/engine_hooks.py, called
+    from build_campaign.py). Removing either silently
     re-introduces the crash, so guard their presence here. (The patches themselves also
     fail the build if the decomp source form changes -- see their `if orig not in text`.)
     The campaign-engine hooks below are likewise build-time string-replaces that leave no
@@ -456,7 +462,8 @@ def check_engine_campaign_agnostic(fail):
 
 # ── Save-layout stability (so testers can carry their .sav across builds) ──────────
 # A battery .sav is accepted on a new build iff its validity magics + checksum still
-# match (bmsave-lib.c:125-128, ReadSaveBlockInfo). Those magics are constant, so a
+# match (bmsave-lib.c ReadGlobalSaveInfo, the magic16/magic32/checksum condition; the
+# per-block form is ReadSaveBlockInfo). Those magics are constant, so a
 # rebuild alone never invalidates a save -- the ONLY thing that can is the save-block
 # LAYOUT shifting, which moves the old bytes to wrong offsets and fails the checksum.
 # struct GameSaveBlock's size is driven by two array dims; pin them (and the magics) so
@@ -616,7 +623,8 @@ def check_lane_ownership(fail):
     sawed such a feature in half. So this no longer fails -- it just surfaces, on a legacy
     `inst/<track>` branch, that a change touches the other desk's historical files, so the PR
     review names the cross-desk contract. The HARD invariant is now check_engine_guards_present
-    (the 5 engine hooks); desk ownership is reviewed at the PR. The glob map (above) is the seed
+    (every hook in its guarded tuple -- count-free on purpose, the tuple is the truth); desk
+    ownership is reviewed at the PR. The glob map (above) is the seed
     of the desk map. Dormant on `feat/*` branches (no lane), which is the steady state."""
     for path, owner in _lane_violations(_current_lane(), _changed_files()):
         print('  note: %s is historically %s-side -- if this PR spans desks, name the contract in review'

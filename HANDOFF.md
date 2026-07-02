@@ -207,8 +207,9 @@ demo-asset task (ships nothing; v0.1.0 is Ch1-only). Scratch review images live 
   provider-agnostic policy (`PT_PROVIDER=openai` + local Ollama = free Llama/Gemma; anthropic/Sonnet
   default per the epic). First local run: sidecar `--record` to mint `transcripts/prologue.json`, then
   replay is free forever. M3 = staff driving + multi-target disambiguation → M4 soak→curve → M5 vanilla-FE8.
-- **Land `balance_locked: true` on ch00/ch01** (ch02 set); the per-chapter parity gate (#48b) is enforcing
-  but inert until a chapter opts in; ch00/ch01 read OK.
+- **`balance_locked: true` is LIVE on ch00/ch01/ch02** — the per-chapter parity gate (#48b,
+  `make difficulty-gate`, in CI) actively enforces all three; new chapters opt in as their enemy
+  inventories are authored and playtested.
 - #53 tail (FE8 Ch13 → our ch08): ~11 standard weapons, informational. Former leaves settled 2026-07-02:
   d20 crit #11 ✓ · iconic matchups #8 **reverted + closed not-planned** (vanilla principle covers item
   data; flavor only) · spell-economy #9 = vanilla behavior incl. break-and-rebuy (content lands per-chapter).

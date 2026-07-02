@@ -127,7 +127,9 @@ against a reviewed render -- `cave-interior` (Cynon's Mineshaft, Gray; CC, cross
 endorsed in its CREDITS) reproduces `docs/demo/ch03-mineshaft-tileset-demo.png` pixel-exact,
 gated in `tools/test_map_tileset.py`. Engine seam: `_register_tileset(campaign, name, Stem,
 comment)` registers any vendored tileset's asset-table entries (winter now rides it);
-`_register_chapter_map(..., tileset_stem=)` points a chapter map at any registered tileset.
+`_register_chapter_map(maps_dir, layout, comment)` points a chapter map at whichever registered
+tileset the layout's own `.json` `tileset` stamp names (resolved via `TILESET_STEMS` -- no
+per-call tileset argument).
 Layout JSONs (editor export + compiled `<map>.json`) now stamp their `tileset`, so
 `import_map_layout.py` compiles + previews on the right one. The map editor gained the
 custom-canvas mode for non-reskin chapters: `gen_map_editor.py --tileset=cave-interior
@@ -306,7 +308,8 @@ and got welded onto the same `inst/<track>` worktree, forcing work to partition 
   the reactions (my job / I can help / no impact / no need to know). Review is where ownership is decided,
   replacing the pre-commit glob block.
 - **Engine/content stays a HARD invariant.** The Engine/Content Boundary Rule (no character/chapter/plot
-  in `.c`/`.s`) + the 5 engine hooks in `tools/inject/` (`check_engine_guards_present`) are genuine
+  in `.c`/`.s`) + the engine hooks in `tools/inject/` (`check_engine_guards_present`; its guarded tuple
+  is the authoritative list — the count here read "5" long after it grew) are genuine
   decision-hiding and remain gates. The character-name half is now mechanized
   (`check_engine_campaign_agnostic` scans the hand-written engine sources for any campaign id);
   chapter-number / plot-event references stay a review-judgment call.

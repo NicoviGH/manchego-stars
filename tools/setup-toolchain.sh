@@ -6,8 +6,10 @@
 # decomp quickstart.sh does not handle (Homebrew deps, a python >= 3.10 with
 # numpy/pillow, agbcc, and a few Linux-only shebangs in the submodule scripts).
 #
-# After this completes, `make` from the repo root produces a byte-identical
-# vanilla FE8 ROM (verify with `make verify`).
+# After this completes, `make` from the repo root builds the campaign-injected
+# fireemblem8.gba (we diverge from vanilla on purpose -- no sha1 match; `make
+# verify` runs the text-decode regression instead). To prove the BASE decomp
+# builds clean, use the decomp's own quickstart (see CLAUDE.md Build Command).
 #
 # Usage: tools/setup-toolchain.sh
 set -euo pipefail

@@ -7,7 +7,7 @@ with transparent headroom on top and small side margins (verified against
 vanilla Eirika: opaque rows 11-79, cols 21-88). A reference where the subject
 fills its own frame edge-to-edge therefore reads "zoomed in" when converted
 directly. This tool detects the subject, then composites it onto a flat-bg
-canvas at ~1.2 aspect — bottom-anchored, ~16% headroom, ~12% side margins — so
+canvas at ~1.2 aspect — bottom-anchored, ~10% headroom, ~5% side margins (SUBJ_H_FRAC/SUBJ_W_FRAC = 0.90) — so
 `ref_to_bust.py` produces Braulo-style framing.
 
 Usage:

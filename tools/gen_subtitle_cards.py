@@ -12,7 +12,7 @@ seven slides from the campaign YAML.
 Style is matched to the vanilla cards, measured off the shipped PNGs: slate
 background (palette index 0), cream text quantized into the vanilla 16-color
 ramp (the warm antialiasing browns come from the quantization), 24px line
-pitch, text block centered on (120, 80), <= 214px line width. Letterforms are
+pitch, text block centered on (120, 80), <= 220px line width (MAX_LINE_W). Letterforms are
 Georgia 13px with +1px tracking -- side-by-side closest to vanilla's serif
 (see the 2026-06-10 decisions.md entry).
 

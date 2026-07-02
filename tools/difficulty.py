@@ -77,7 +77,8 @@ def _class_growths(class_enum):
 
 def autolevel(base, growths, level):
     """Project class-base stats up `level` (FE generic-enemy autolevel on class growths,
-    bmunit.c:792). Per stat: base + round-half-up((level-1) * growth%). Con/Mov don't grow."""
+    UnitAutolevelCore, bmunit.c:776-786, applied with level-1 by UnitAutolevel). Per
+    stat: base + round-half-up((level-1) * growth%). Con/Mov don't grow."""
     out = dict(base)
     gains = level - 1
     for gf in bc.GROWTH_FIELDS:
@@ -426,7 +427,8 @@ def carry(boss, party, terrain_avoid=0):
 # A fixed, campaign-neutral reference attacker/defender. enemy_pressure measures every
 # enemy against THIS unit, so a chapter's pressure is comparable to its vanilla reference's
 # on the same scale; the yardstick's exact stats cancel in an ours-vs-vanilla ratio. Chosen
-# as a plain mid-game footsoldier (iron sword, no triangle bias, modest bulk/offense).
+# as a plain mid-game footsoldier (iron sword -- triangle-ACTIVE like any sword, so it
+# reads +1Mt/+15Hit vs axe foes and -1/-15 vs lances; modest bulk/offense).
 YARDSTICK = fc.Combatant('yardstick', hp=24, pow=8, skl=8, spd=8, df=6, res=4, lck=4,
                          con=10, weapon=fc.W['iron-sword'])
 
@@ -831,8 +833,9 @@ def main():
     ap.add_argument('--curve', action='store_true',
                     help='emit the campaign-wide enemy-pressure curve (all chapters)')
     ap.add_argument('--check', action='store_true',
-                    help='with --curve: exit non-zero if any referenced chapter is off-parity '
-                         'or unreliably measured (the hard CI gate, #48 (b))')
+                    help='with --curve: the hard CI gate (#48 (b)) -- exit non-zero if any '
+                         'balance_locked chapter is off-parity, unreliably measured, or '
+                         'missing its reference (UNLOCKED chapters never gate)')
     ap.add_argument('--lord-floor', action='store_true',
                     help='emit the per-lord survivability-floor table instead of the parity report')
     ap.add_argument('--target', type=float, default=3.5, help='floor: target bulk rounds-to-down')

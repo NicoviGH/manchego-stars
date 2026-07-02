@@ -11,7 +11,9 @@ from inject.decomp import (
     DECOMP, _replace_brace_block,
     BATTLEQUOTES_C, BMUNIT_C, LORDSEL_FLAG_BASE)
 
-# Decomp source files patched ONLY by the engine hooks below.
+# Decomp source files the engine hooks read or patch. One exception to "patched
+# here": BANIM_DATA_C is only READ by the hooks (_vanilla_banim_count); the content
+# side appends its rows (build_campaign.py inject_battle_anims).
 BANIM_EKRBATTLEINTRO_C = os.path.join(DECOMP, 'src', 'banim-ekrbattleintro.c')
 BANIM_EKRMAIN_C = os.path.join(DECOMP, 'src', 'banim-ekrmain.c')
 BANIM_DATA_C = os.path.join(DECOMP, 'src', 'banim_data.c')
