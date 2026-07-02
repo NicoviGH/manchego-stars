@@ -77,6 +77,62 @@ def write_mp4(frames, out, fps, scale):
         shutil.rmtree(seqdir, ignore_errors=True)
 
 
+def _shared_palette(imgs):
+    """One palette for the whole clip. A GBA clip usually has <=256 unique colors
+    total, so the palette is exact (lossless); busier clips get a mediancut over a
+    sheet of EVERY frame (so one-frame colors like crit flashes still land a
+    palette slot). No dither either way -- pixel art quantizes clean."""
+    colors = set()
+    for im in imgs:
+        got = im.getcolors(maxcolors=257)
+        if got is None:
+            colors = None
+            break
+        colors.update(c for _, c in got)
+        if len(colors) > 256:
+            colors = None
+            break
+    if colors is not None:
+        pal = Image.new('P', (1, 1))
+        pal.putpalette([v for c in sorted(colors) for v in c])
+        return pal
+    sheet = Image.new('RGB', (imgs[0].width, imgs[0].height * len(imgs)))
+    for i, im in enumerate(imgs):
+        sheet.paste(im, (0, i * imgs[0].height))
+    return sheet.quantize(colors=256, method=Image.MEDIANCUT)
+
+
+def _decoded_frames(data):
+    import io
+    from PIL import ImageSequence
+    return [f.convert('RGB').tobytes()
+            for f in ImageSequence.Iterator(Image.open(io.BytesIO(data)))]
+
+
+def encode_gif(imgs, duration):
+    """RGB frames -> (gif bytes, 'delta'|'full'). The delta path -- one shared
+    palette + disposal=1 -- lets PIL store dirty-rect diffs instead of full
+    frames (5-6x smaller on battle-anim clips whose background never moves;
+    audit 2.7 -- committed docs/demo GIFs live in git history forever). NO
+    optimize=True there: it re-maps palette indices per frame, which corrupts
+    cross-frame deltas (verified: menu-transition clips decode garbled). The
+    result is self-checked by decoding it back; if the delta encode is bigger OR
+    decodes off by more than the quantizer itself, ship the legacy full-frame
+    form (disposal=2) instead."""
+    import io
+    q = [im.quantize(palette=_shared_palette(imgs), dither=Image.Dither.NONE)
+         for im in imgs]
+    delta, full = io.BytesIO(), io.BytesIO()
+    q[0].save(delta, 'GIF', save_all=True, append_images=q[1:], loop=0,
+              duration=duration, disposal=1)
+    q[0].save(full, 'GIF', save_all=True, append_images=q[1:], loop=0,
+              duration=duration, disposal=2)
+    delta, full = delta.getvalue(), full.getvalue()
+    if len(delta) < len(full) and _decoded_frames(delta) == _decoded_frames(full):
+        return delta, 'delta'
+    return full, 'full'
+
+
 def main(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument('scenario')
@@ -120,10 +176,11 @@ def main(argv):
         imgs.append(im)
 
     out = os.path.join(a.out, name + '.gif')
-    imgs[0].save(out, save_all=True, append_images=imgs[1:], loop=0,
-                 duration=int(1000 / a.fps), disposal=2)
-    print('wrote %s (%d frames, %.0f fps, %dx scale)'
-          % (out, len(imgs), a.fps, a.scale))
+    data, how = encode_gif(imgs, int(1000 / a.fps))
+    with open(out, 'wb') as f:
+        f.write(data)
+    print('wrote %s (%d frames, %.0f fps, %dx scale, %s encoding, %d KB)'
+          % (out, len(imgs), a.fps, a.scale, how, len(data) // 1024))
 
     if a.do_open:
         subprocess.run(['open', '-a', 'Safari', out], check=False)
