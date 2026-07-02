@@ -53,4 +53,56 @@ function M.pickTarget(reachable, enemies, prefs)
     return nil
 end
 
+local function tileKey(x, y) return x .. "," .. y end
+
+-- pickMove(reachable, opts) -> {x,y} | nil -- the march decision when nothing is
+-- attackable this turn (#60 last-mile breach). Pure, like pickTarget: the scenario
+-- reads reachability/field/positions and owns the actual moving.
+--   opts.field:   BFS distance field to the boss (pathing.lua); nil-tolerant
+--   opts.cur:     the unit's current {x,y}
+--   opts.goal:    the boss {x,y} (Manhattan fallback where the field has no value)
+--   opts.blocked: set (keyed "x,y") of tiles claimed by OTHER friendly units this
+--                 phase, so two marchers stop fighting over the same chokepoint tile
+--   opts.enemies: live enemies -- straggler pressure when the boss path is jammed
+-- Decision: the unblocked reachable tile with the lowest field distance, Manhattan
+-- tiebroken (keeps momentum on field plateaus). If the best tile does NOT improve
+-- on the unit's current field distance -- the walled-camp jam: a chokepoint or a
+-- friendly/enemy cork means no reachable tile gets nearer the boss -- push toward
+-- the nearest live enemy instead (kill the cork, unjam next turn).
+function M.pickMove(reachable, opts)
+    opts = opts or {}
+    local field, cur, goal = opts.field, opts.cur, opts.goal
+    local blocked = opts.blocked or {}
+    local enemies = opts.enemies or {}
+    local function fd(x, y) return field and field[y] and field[y][x] end
+    local best, bestScore
+    for _, t in ipairs(reachable) do
+        if not blocked[tileKey(t.x, t.y)] then
+            local m = goal and manhattan(t.x, t.y, goal.x, goal.y) or 0
+            local f = fd(t.x, t.y)
+            local score = (f or (1000 + m)) * 1000 + m
+            if not bestScore or score < bestScore then best, bestScore = t, score end
+        end
+    end
+    if not best then return nil end
+    local curFd = cur and fd(cur.x, cur.y)
+    local bestFd = fd(best.x, best.y)
+    if curFd and bestFd and bestFd >= curFd and #enemies > 0 then
+        local eb, ebs
+        for _, t in ipairs(reachable) do
+            if not blocked[tileKey(t.x, t.y)] then
+                local near = math.huge
+                for _, e in ipairs(enemies) do
+                    near = math.min(near, manhattan(t.x, t.y, e.x, e.y))
+                end
+                if not ebs or near < ebs then eb, ebs = t, near end
+            end
+        end
+        if eb then return eb end
+    end
+    return best
+end
+
+M.tileKey = tileKey
+
 return M
