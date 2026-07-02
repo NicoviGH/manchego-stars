@@ -408,10 +408,15 @@ Implementation seam (decomp-traced): FE8 rules a round a crit in `banim-battlepa
 crit flash (`ProcScr_efxCriricalEffect*`, `banim-efxhit.c`) and never blocks the script,
 and the flash's BG proc tears BG1 down after 17 frames. The hook
 (`engine_hooks._inject_crit_d20_flourish`, guarded in `check_engine_guards_present`)
-starts a cloned SpellFx proc AT that teardown — sequenced BG1 ownership, so neither the
-flash nor combat pacing changes, and FE crit math stays the sole trigger. The die is a
-centered HUD overlay copied through the non-mirrored tilemap path (attacker side never
-mirrors the "20"), held ~46 frames. **Engine/content split:** the hook is campaign-
+draws the die AT that teardown — **proc-less by design** (review-hardened): registered
+once, then the vanilla effect lifecycle owns BG1 (a successor effect — a brave second
+hit, a magic counter's spell background — draws over it; the scene exit resets it), so
+nothing of ours can blank a newcomer's tilemap later. Covers BOTH crit-flash teardowns
+(plain + pierce); Silencer is deliberately excluded — it has its own distinctive Chill
+flourish, and no MVP cast member can Silencer. Neither the flash nor combat pacing
+changes; FE crit math stays the sole trigger. The die is a centered HUD overlay copied
+through the non-mirrored tilemap path (attacker side never mirrors the "20").
+**Engine/content split:** the hook is campaign-
 agnostic; the ART is the campaign's (`battle_anims/d20-crit.png`, PIL-authored gold d20)
 — no asset, no flourish, pure vanilla crits. Asset pipeline: PNG → 4bpp sheet (tile 0
 blank) + 16-color pal + 30×20 TSA, wrapped in stored-form GBA LZ77 (literal-only blocks
