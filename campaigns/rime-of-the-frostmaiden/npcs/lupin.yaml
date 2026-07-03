@@ -5,6 +5,8 @@
 # STATUS: design record / stub. Class + role LOCKED (Nicolas, 2026-06-20) — promoted from
 # "non-combat sled NPC" to a playable recruit. NOT yet wired into build_campaign (inert
 # until the recruit wiring lands). Full bases/growths from the donor's Cavalier data at wiring.
+# Voice bible: ../lore/lupin.md (locked 2026-07-03 with the ch04 dialogue pass — blunt
+# pack-pragmatist; table-canon character grounded in the book's awaken magic).
 
 id: lupin
 name: Lupin
