@@ -4,20 +4,27 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-07-02, web):** 8-item hard-queue burn-down, all merged via feature-flow —
-> chapter-deployment schema + generic injection consumers (#107, PR #109) · **#40 tileset converter +
-> vendored `cave-interior`** (PR #111 — ch03 map is now paint-ready once the blockout is OK'd) ·
-> injection-order guard + lossless GIF deltas (PR #112) · ~~#8 iconic matchups (PR #114)~~ **REVERTED
-> same day — Nicolas: effectiveness additions to stock items violate the vanilla principle; fire-vs-ice
-> is flavor only** · **#11 d20 nat-20 crit flourish** (PR #115) · **#60 clear-bot last-mile
-> breach** (pickMove core + the reach-window root-cause fix, PR #116; ch01 clear needs a local mGBA
-> confirm) · **#9 resolved as "vanilla IS the spell economy"** (ADR, PR #117; gray-out question to
-> Nicolas on #9) · **#63 M2 sidecar + provider-agnostic LLM policy** (PR #118 — free local
-> Llama/Gemma via Ollama one env var away, per Nicolas's cost call). **Wolfram's battle anim remains
-> art-blocked** (§Wolfram; prompts in `lore/wolfram.md`). **Ch3 blockout still awaits Nicolas's OK on
-> #23** — and ch03's `deploy_limit: 9` exceeds the 8-unit classed roster (Baxby unclassed; note on #23).
-> In-emulator verification of #60/#63 needs a local (mGBA) session: `clear_ch01`, then an `llm` record
-> run to mint `transcripts/prologue.json`.
+> **Last session (2026-07-02→03, web):** 8-item hard-queue burn-down + an evening governance arc, all
+> merged via feature-flow (PRs #109 #111 #112 #114-#124; #114 later reverted):
+> chapter-deployment schema (#107) · **#40 tileset converter + vendored `cave-interior`** (ch03 map is
+> paint-ready once the blockout is OK'd) · injection-order guard + lossless GIF deltas ·
+> **#11 d20 nat-20 crit flourish** · **#60 clear-bot last-mile breach** (needs a local `clear_ch01`
+> confirm to close) · **#63 M2 sidecar + provider-agnostic LLM policy** (free local Llama/Gemma via
+> Ollama; one local `--record` run mints `transcripts/prologue.json`, then replay is free).
+> **Principle rulings (Nicolas):** ~~#8 iconic matchups~~ **reverted, closed not-planned** and #9
+> settled as pure vanilla (break-and-rebuy) — the boundary ADR reached final form over #119-#121:
+> **ALL mechanical data is vanilla** (class data verbatim, character data donor-inherited, items
+> stock; ours = donor choice, cosmetics, levels, roster, placements). **Comment-drift guard + 7-agent
+> sweep** (PR #122): ~50 stale comments fixed, 4 real code bugs (decomp-exact effectiveness formula,
+> hand-axe Wt, GIF frame order past 99, convoy clamp), dead-concepts lint now scans code comments —
+> registry discipline is in CLAUDE.md. **#123 forward projection** (PR #124): `make difficulty` now
+> prints planned chapters' vanilla-reference pressure as their (target) — the arc ch04→ch08 is visible
+> before authoring; FE8 Ch13 curated + six vanilla-only weapons modeled. **Wolfram's battle anim
+> remains art-blocked** (§Wolfram; prompts in `lore/wolfram.md`). **Ch3 blockout still awaits
+> Nicolas's OK on #23**; ch03's `deploy_limit: 9` is correct as designed — Baxby is a fully-specced
+> Cavalier, his YAML just isn't build-wired yet, so **"Wire Baxby" is a prerequisite of the ch03
+> units beat** (corrected note on #23). Latent msg-id/tutorial-trade risk tracked as **#125**.
+> **Local-mGBA follow-ups:** `clear_ch01` (closes #60) · `llm --record` (completes #63 M2's DoD).
 
 > **🛠 Desktop fix needed — branch cleanup + env policy (2026-06-29; re-probed 2026-07-02):** An audit
 > found **13 stale remote branches** the squash-merge convention should have deleted. 2026-07-02 web
