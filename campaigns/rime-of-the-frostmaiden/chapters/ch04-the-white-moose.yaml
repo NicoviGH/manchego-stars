@@ -155,14 +155,12 @@ events:
       - nimsy: >-
           Oh! The MOOSE. Why didn't you say so, dear? Big as a barn and white as
           the drifts. Three loggers in splints, and no arrow's ever touched it.
-      - nimsy: >-
-          It's not hunger, dears. It watches the loggers. Picks them. There's
-          something wrong in those woods.
-      - meesmickle: "A moose nobody can see, in a forest nobody can see. Lovely. I'll get the sled."
+      - meesmickle: "A white moose. In white snow. In fog. Lovely. I'll get the sled."
       - beat_break: B           # cut to the forest edge; fog hangs between the trees
-      # ── B: the fog heads-up (introduces: fog-of-war — the scout can't scout) ──
+      # ── B: the fog heads-up (introduces: fog-of-war — the scout can't scout).
+      #    Pinky's line is the button into gameplay (review cut 2026-07-03 trimmed the
+      #    RBG follow-up; the scene ends on the scout who can't see). ──
       - pinky: "Father, I flew up to look — but the fog just looks back. I can't see past three trees!"
-      - prof-rbg: "Then step where I step, my boy. Everyone — eyes sharp. In this soup, the moose finds US first."
   - trigger: unit_reaches_zone
     zone: forest_clearing
     type: dialogue
@@ -172,9 +170,10 @@ events:
       leader: marty_direwolf_parley (his SECONDARY signature beat; primary is the
       ch06 Messie Talk). Goodberry pack-math wins the parley (one berry = a full
       day's nourishment, RAW — beats "proud starving"); the pack flips green and
-      takes the sled. Lupin's parting line seeds Ravisin as vague dread — he never
-      names her (table-canon Lupin, grounded in the book's awaken magic;
-      lore/lupin.md). LOCKED 2026-07-03 (dialogue-pass, co-written with Nicolas).
+      takes the sled, closing on "Feed them well" (table-canon Lupin, grounded in
+      the book's awaken magic; lore/lupin.md). The Ravisin dread seed lives ONLY
+      in the ending beat (review cut 2026-07-03 removed the bone-trees line here
+      as redundant). LOCKED 2026-07-03 (dialogue-pass, co-written with Nicolas).
       PENDING: eventscript + Lupin mug + motion review.
     script:                     # LOCKED 2026-07-03 (dialogue pass, co-written with Nicolas)
       # (A clearing. The pack slides out of the fog on all sides — six wolves. The one in
@@ -192,9 +191,6 @@ events:
           All winter. ...Meat on feast-days, of course.
       # (Lupin is silent a moment — running the math. It isn't close.)
       - lupin: "Steady food beats proud starving. The pack pulls your sled. Feed them well, mushroom."
-      - lupin: >-
-          One more thing. The one who WOKE us dens past the bone-trees. Your white
-          moose is hers. The pack doesn't go there. Now you do.
   - trigger: moose_sighted
     type: scripted_event
     ea_file: events/ch04-moose-flees.ea
@@ -202,9 +198,8 @@ events:
       The white moose breaks from a clearing and bolts for the northeast edge.
       The party can't run it down — it escapes toward the elven tomb, baiting the
       hunt onward. LOCKED 2026-07-03 (dialogue-pass): mute white ghost — the moose
-      NEVER speaks; the awakened lore is carried by Nimsy's "wrongness" line and
-      Lupin's bone-trees seed. PENDING: eventscript + scripted flee path + motion
-      review.
+      NEVER speaks; the awakened lore is carried solely by Lupin's ending line.
+      PENDING: eventscript + scripted flee path + motion review.
     script:                     # LOCKED 2026-07-03 (dialogue pass, co-written with Nicolas)
       # (A shape in the fog ahead: the white moose, huge and still in the clearing,
       #  watching them. A heartbeat — then it turns and is simply gone, silent, northeast.)
@@ -214,11 +209,12 @@ events:
     ea_file: events/ch04-ending.ea
     description: >
       Forest cleared; the pack takes to the reins beside Baxby while Lupin — the
-      party's new nose — reads the moose's trail to the elven tomb's door (ch05
-      hook: his own "woke us" dread comes back around). Marty pays the pack in
-      berries on-screen (the deal honored). LOCKED 2026-07-03 (dialogue-pass,
-      co-written with Nicolas). PENDING: eventscript + ending BG (winter-BG
-      library) + motion review.
+      party's new nose — reads the moose's trail to the elven tomb's door. His
+      final line is the chapter's ONLY Ravisin seed (vague dread, never named,
+      "bone-trees" deliberately unexplained — review cut 2026-07-03 consolidated
+      the dread here). Marty pays the pack in berries on-screen (the deal
+      honored). LOCKED 2026-07-03 (dialogue-pass, co-written with Nicolas).
+      PENDING: eventscript + ending BG (winter-BG library) + motion review.
     script:                     # LOCKED 2026-07-03 (dialogue pass, co-written with Nicolas)
       # (Dusk; the fog thins. Baxby's sled at the treeline — the pack settles into harness
       #  beside the axe-beak like they've pulled all their lives. Only Lupin stays out of

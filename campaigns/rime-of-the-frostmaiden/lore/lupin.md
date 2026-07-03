@@ -36,16 +36,16 @@ hard, without flourish, and commits completely once the math favors the deal.
 - Scene-direction quirk (pick ONE per scene): he adjusts the spectacles with a paw,
   or peers over them. Never explains them.
 
-**Calibration lines (locked ch04 script, 2026-07-03)**
+**Calibration lines (locked ch04 script, 2026-07-03; trimmed in final review — the
+Ravisin dread is consolidated into the single ending line)**
 - "Six of us. Eight of you — but three smell like prey. Someone's about to have a
   bad afternoon."
 - "The town sends a talking mushroom with... berries. Do I look like a BIRD to you,
   mushroom?"
 - "Steady food beats proud starving. The pack pulls your sled. Feed them well,
   mushroom."
-- "One more thing. The one who WOKE us dens past the bone-trees. Your white moose
-  is hers. The pack doesn't go there. Now you do."
-- "...Everything she wakes comes home to her, eventually."
+- "There. Old elf-stones — and the bone-trees just past. The trail goes in.
+  ...Everything she wakes comes home to her, eventually."
 
 **Banned:** pet/doggy behavior (fetching, tail-wagging comedy), servility toward the
 party (he's a contractor, not a pet), flowery or courtly speech, naming Ravisin
