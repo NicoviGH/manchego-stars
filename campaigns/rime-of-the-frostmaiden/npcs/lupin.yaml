@@ -5,6 +5,8 @@
 # STATUS: design record / stub. Class + role LOCKED (Nicolas, 2026-06-20) — promoted from
 # "non-combat sled NPC" to a playable recruit. NOT yet wired into build_campaign (inert
 # until the recruit wiring lands). Full bases/growths from the donor's Cavalier data at wiring.
+# Voice bible: ../lore/lupin.md (locked 2026-07-03 with the ch04 dialogue pass — blunt
+# pack-pragmatist; table-canon character grounded in the book's awaken magic).
 
 id: lupin
 name: Lupin
@@ -40,3 +42,10 @@ recruit:
 art:
   approach: custom            # direwolf map sprite + battle anim over the Cavalier chassis (#38/#39)
   note: "the wolf is the mount — no rider; sibling treatment to Baxby's axe-beak"
+  render:                             # portraits/lupin.png — byte-reproducible bust
+    ref: "campaigns/rime-of-the-frostmaiden/portraits/vendor/Hipster Wolf Head With Glasses {TotalityDesigns}.png"
+                                      # original vendored in-repo (Redbubble listing, Nicolas 2026-07-03)
+    crop: [-206, 0, 1033, 1032]       # out-of-bounds x pads as background: full head+mane at 1.2 aspect
+    zoom: 1.0                         # full frame; the wide crop already clears the dead corners (0 px clipped)
+    hand_pass: lupin_darken.py        # ref ink is warm charcoal; deepen outline/eyes/glasses to true black
+    credit: "TotalityDesigns (Redbubble) — see CREDITS.md"

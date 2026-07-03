@@ -24,19 +24,22 @@ introduces:
   # no longer the FIRST monster (cadence token left as a planned-seed; regrounded when this slice lands).
   - concept: fog-of-war          # the forest hunt is our first fog map (vanilla Ch4 cadence)
     coverage: dialogue
-    where: "forest approach — a PC flags limited sight"
+    where: "forest-edge fog exchange — Pinky flags the limited sight (script locked; wiring pending)"
     status: planned
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
-  At Lonelywood, the town's hard-of-hearing old Speaker shelters the party and
-  begs their help: a huge white moose has been terrorizing the loggers and
-  eluding every hunter, its pale hide near-invisible in the snow. The party tracks
-  it into the forest, where they cross a pack of hungry, oddly clever wolves led
-  by a bespectacled, speaking leader — Lupin. Marty reasons with them: a steady
-  diet of raw meat in exchange for help. Reined in alongside Baxby, the pack joins
-  the sled. The white moose itself stays just out of reach, fleeing deeper —
-  toward an ancient elven tomb.
+  At Lonelywood, the town's ancient, hard-of-hearing Speaker Nimsy Huddle shelters
+  the party and begs their help: a huge white moose has been terrorizing the
+  loggers and eluding every hunter, its pale hide near-invisible in the snow — and
+  it doesn't hunt like an animal: it watches the loggers, and picks. The party
+  tracks it into the fogbound forest, where they cross a pack of hungry, oddly
+  clever wolves led by a bespectacled, speaking leader — Lupin. Marty parleys:
+  goodberries for the pack's help (one berry is a full day's nourishment, RAW —
+  the end of winter hunger), meat on feast-days. Reined in alongside Baxby, the
+  pack joins the sled. The white moose itself never speaks and stays just out of
+  reach, fleeing deeper — and Lupin noses its trail northeast, to the door of an
+  ancient elven tomb.
 
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
@@ -120,7 +123,7 @@ villages:
         amount: 150
       - id: vulnerary           # the Speaker's hospitality (a 'Goodberry'-flavored consumable)
         amount: 1
-    note: "The hard-of-hearing old Speaker shelters the party overnight (chapter-start cutscene)."
+    note: "Speaker Nimsy Huddle (ancient, hard of hearing) shelters the party overnight (chapter-start cutscene)."
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
 events:
@@ -128,8 +131,36 @@ events:
     type: cutscene
     ea_file: events/ch04-lonelywood.ea
     description: >
-      Lonelywood; the old Speaker's cottage and the white-moose problem; the party
-      enters the foggy forest to track it.
+      Lonelywood; Speaker Nimsy Huddle's cottage (ancient, hard of hearing — book
+      name, table performance) and the white-moose problem; the deaf-Speaker gag
+      resolves through Marty's rapport spores; Meesmickle takes the job; then the
+      forest edge, where Pinky's fog line delivers the fog-of-war heads-up
+      (onboarding parity, in-voice channel). LOCKED 2026-07-03 (dialogue-pass,
+      co-written with Nicolas). PENDING: eventscript + Nimsy generic granny mug +
+      motion review.
+    script:                     # LOCKED 2026-07-03 (dialogue pass, co-written with Nicolas)
+      - location_card: "Lonelywood"
+      # ── A: the Speaker's cottage ──
+      # (Fire, kettle, a tiny, ancient halfling bundled in shawls: Nimsy Huddle, hard of
+      #  hearing. Minor NPC → voices doc §Per-town + generic granny mug at wiring. RBG
+      #  sweeps his hat into a bow.)
+      - prof-rbg: >-
+          Madam Speaker! Professor R.B. Geenius — solver of problems, hunter of
+          horrors. We're told you have a moose.
+      - nimsy: "Eh? MOUSSE? There's no pudding till supper, dear. Sit down."
+      # (Three shouted attempts later. Marty pads forward and politely coughs a puff of
+      #  spores in her face — she blinks, and hears him perfectly. His new-person gag:
+      #  deafness doesn't apply to rapport spores. Never explained — lore/marty.md.)
+      - marty: "You look cold, ma'am. Have you ever tried a Chagaccino? ...Also: the moose?"
+      - nimsy: >-
+          Oh! The MOOSE. Why didn't you say so, dear? Big as a barn and white as
+          the drifts. Three loggers in splints, and no arrow's ever touched it.
+      - meesmickle: "A moose nobody can find, in a forest nobody can see. Lovely. I'll get the sled."
+      - beat_break: B           # cut to the forest edge; fog hangs between the trees
+      # ── B: the fog heads-up (introduces: fog-of-war — the scout can't scout).
+      #    Pinky's line is the button into gameplay (review cut 2026-07-03 trimmed the
+      #    RBG follow-up; the scene ends on the scout who can't see). ──
+      - pinky: "Father, I flew up to look — but the fog just looks back. I can't see past three trees!"
   - trigger: unit_reaches_zone
     zone: forest_clearing
     type: dialogue
@@ -137,20 +168,67 @@ events:
     description: >
       The wolf pack surrounds a clearing. If Marty Talks to Lupin, the bespectacled
       leader: marty_direwolf_parley (his SECONDARY signature beat; primary is the
-      ch06 Messie Talk). The pack confers and agrees; they're reined to the sled.
+      ch06 Messie Talk). Goodberry pack-math wins the parley (one berry = a full
+      day's nourishment, RAW — beats "proud starving"); the pack flips green and
+      takes the sled, closing on "Feed them well" (table-canon Lupin, grounded in
+      the book's awaken magic; lore/lupin.md). The Ravisin dread seed lives ONLY
+      in the ending beat (review cut 2026-07-03 removed the bone-trees line here
+      as redundant). LOCKED 2026-07-03 (dialogue-pass, co-written with Nicolas).
+      PENDING: eventscript + Lupin mug + motion review.
+    script:                     # LOCKED 2026-07-03 (dialogue pass, co-written with Nicolas)
+      # (A clearing. The pack slides out of the fog on all sides — six wolves. The one in
+      #  front wears spectacles — lore/lupin.md. If Marty initiates the Talk:)
+      - lupin: >-
+          Six of us. Eight of you — but three smell like prey. Someone's about to
+          have a bad afternoon.
+      # (Wiring note: keep "Eight" in step with the on-map party count if deployment changes —
+      #  Lupin counting exactly is the joke. Marty steps forward, unbothered, and coughs a
+      #  polite puff of spores in Lupin's face — the new-person gag.)
+      - marty: "Hello, friend. You're not hunting us — you're hungry. What if no wolf ever went hungry again?"
+      - lupin: "The town sends a talking mushroom with... berries. Do I look like a BIRD to you, mushroom?"
+      - marty: >-
+          One berry fills a wolf's belly for a whole day. Every wolf. Every day.
+          All winter. ...Meat on feast-days, of course.
+      # (Lupin is silent a moment — running the math. It isn't close.)
+      - lupin: "Steady food beats proud starving. The pack pulls your sled. Feed them well, mushroom."
   - trigger: moose_sighted
     type: scripted_event
     ea_file: events/ch04-moose-flees.ea
     description: >
       The white moose breaks from a clearing and bolts for the northeast edge.
       The party can't run it down — it escapes toward the elven tomb, baiting the
-      hunt onward.
+      hunt onward. LOCKED 2026-07-03 (dialogue-pass): mute white ghost — the moose
+      NEVER speaks; the awakened lore is carried solely by Lupin's ending line.
+      PENDING: eventscript + scripted flee path + motion review.
+    script:                     # LOCKED 2026-07-03 (dialogue pass, co-written with Nicolas)
+      # (A shape in the fog ahead: the white moose, huge and still in the clearing,
+      #  watching them. A heartbeat — then it turns and is simply gone, silent, northeast.)
+      - prof-rbg: "After it!"
   - trigger: chapter_end
     type: cutscene
     ea_file: events/ch04-ending.ea
     description: >
-      Forest cleared; Lupin and his pack take to the reins beside Baxby. The
-      moose's tracks lead northeast to an ancient elven tomb. The party follows.
+      Forest cleared; the pack takes to the reins beside Baxby while Lupin — the
+      party's new nose — reads the moose's trail to the elven tomb's door. His
+      final line is the chapter's ONLY Ravisin seed (vague dread, never named,
+      "bone-trees" deliberately unexplained — review cut 2026-07-03 consolidated
+      the dread here). Marty pays the pack in berries on-screen (the deal
+      honored). LOCKED 2026-07-03 (dialogue-pass, co-written with Nicolas).
+      PENDING: eventscript + ending BG (winter-BG library) + motion review.
+    script:                     # LOCKED 2026-07-03 (dialogue pass, co-written with Nicolas)
+      # (Dusk; the fog thins. Baxby's sled at the treeline — the pack settles into harness
+      #  beside the axe-beak like they've pulled all their lives. Only Lupin stays out of
+      #  the traces, nose down in the snow.)
+      - lupin: >-
+          Your ghost left a trail after all. Northeast — long strides, no panic.
+          It ran like something that knows where home is.
+      # (Marty starts down the harness line, handing out berries — the deal honored.)
+      - marty: "Then we'll walk it home. After supper, friends."
+      # (Lupin trots ahead to the ridge. Below, half-swallowed by ice: standing stones and
+      #  a worked door. Elf-work, older than the Rime.)
+      - lupin: >-
+          There. Old elf-stones — and the bone-trees just past. The trail goes in.
+          ...Everything she wakes comes home to her, eventually.
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:

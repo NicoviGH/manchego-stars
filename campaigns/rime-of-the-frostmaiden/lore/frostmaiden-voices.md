@@ -43,4 +43,4 @@ grounding. Per-town quest NPCs are pulled to canon **when we stage that chapter*
 
 ## Per-town / per-chapter NPCs — pull to canon when staging that chapter
 
-- **Naerth Maxildanarr** — Targos speaker (Ch2). | **Lonelywood speaker** — old, hard-of-hearing woman (Ch4). | **Dorbulgruf Shalescar** — cantankerous old Bremen dwarf who stiffs the party (Ch7). | Dwarves of the iron job: **Hruna / Korux / Storn** (Ch1, see `izobai.md` notes).
+- **Naerth Maxildanarr** — Targos speaker (Ch2). | **Nimsy Huddle** — Lonelywood speaker (Ch4): book name, table performance — tiny ancient halfling, hard of hearing; calls everyone "dear"; mishears everything until Marty's spores cut through (script locked 2026-07-03, ch04 YAML). | **Dorbulgruf Shalescar** — cantankerous old Bremen dwarf who stiffs the party (Ch7). | Dwarves of the iron job: **Hruna / Korux / Storn** (Ch1, see `izobai.md` notes).
