@@ -173,6 +173,13 @@ def enemy_combatants(enemy_def):
 # HANDOFF "Watch out") and live here, merged into the reverse map below.
 VANILLA_ONLY_ITEM_TO_WEAPON = {
     'ITEM_ANIMA_THUNDER':     'thunder',
+    'ITEM_ANIMA_ELFIRE':      'elfire',       # Ch13 Pablo (plain vanilla stats; the #8
+                                              # effectiveness experiment stays reverted)
+    'ITEM_LANCE_STEEL':       'steel-lance',
+    'ITEM_LANCE_SLIM':        'slim-lance',
+    'ITEM_LANCE_SHORTSPEAR':  'short-spear',
+    'ITEM_BOW_STEEL':         'steel-bow',
+    'ITEM_SWORD_ZANBATO':     'zanbato',
     'ITEM_BLADE_IRON':        'iron-blade',
     'ITEM_AXE_VENIN':         'venin-axe',
     'ITEM_AXE_HALBERD':       'halberd',
@@ -214,6 +221,16 @@ PARITY_REFERENCE_UDEFS = {
     # Ch6 "Victims of War" -- mixed force (#53). The two armed-RED arrays ch6 references; needs
     # thunder/halberd/venin-axe/iron-blade/horseslayer + the venin-claw Bael. Staff-only healers
     # in the main array carry no weapon and are dropped by design (not an unmodeled-weapon drop).
+    # Ch13 "Hamill Canyon" (Eirika route; our ch08's bar, #123). The 11 armed-RED arrays
+    # ch13a-eventscript.h loads: Aias's boss squad + the 20-unit main force + Pablo's
+    # reinforcement wave + cavalry/merc/wyvern packs + Amelia (armed red recruit; she
+    # fights if unrecruited). Excluded: the unarmed cutscene loads (Cormag/Caellach/
+    # Aias-L9 scene arrays) per the registry rule; 2 staff-only healers drop as intended.
+    'FE8 Ch13': ('src/events_udefs.c',
+                 ['UnitDef_088BAA4C', 'UnitDef_088BAA74', 'UnitDef_088BAC18',
+                  'UnitDef_088BACA4', 'UnitDef_088BAD80', 'UnitDef_088BADBC',
+                  'UnitDef_088BADF8', 'UnitDef_088BAE48', 'UnitDef_088BAE84',
+                  'UnitDef_088BAEC0', 'UnitDef_088BAF10']),
     'FE8 Ch6': ('src/events_udefs.c',
                 ['UnitDef_088B61A8', 'UnitDef_088B64F0']),
 }
@@ -302,6 +319,24 @@ def vanilla_enemies(parity_ref):
             out.append(_enemy_from_enum('%s#%d' % (array_name, i),
                                         d['classIndex'], d['level'], weapon))
     return out
+
+
+def vanilla_projection(parity_ref, deploy_cap):
+    """Forward target for a PLANNED chapter (#123): its vanilla reference's own pressure,
+    printed as the bar the authored chapter must land within the parity band of. threat/slot
+    counts the FULL force (every enemy attacks); clear-load/slot skips units the fixed
+    YARDSTICK cannot damage at all (a promoted wall would otherwise read `inf` -- their count
+    is returned so the row can say so instead of hiding them). None if the reference isn't
+    curated. Purely informational: planned chapters never gate."""
+    van = vanilla_enemies(parity_ref)
+    if van is None:
+        return None
+    cap = max(1, deploy_cap)
+    threat = sum(fc.damage_per_round(e, YARDSTICK) for e in van) / cap
+    dentable = [e for e in van if fc.damage(YARDSTICK, e) > 0]
+    clearload = sum(fc.rounds_to_kill(YARDSTICK, e) for e in dentable) / cap
+    return {'threat': threat, 'clearload': clearload,
+            'n': len(van), 'proof': len(van) - len(dentable)}
 
 
 def _ally_combatant(char_enum, class_enum, weapon):
@@ -767,8 +802,19 @@ def curve_report(campaign, band=0.25):
         # (not added to `rows`); a planned chapter that is also balance_locked is a config error
         # caught by check.py's chapter-status lint.
         if chap.get('status') == 'planned':
-            print('  %-22s %-13s   -- planned (seed; grounded on arrival, not modeled) --'
-                  % (label[:22], (chap.get('parity_reference', '?') or '?')[:13]))
+            # our side is an ungrounded seed, but the VANILLA side of the comparison is
+            # computable now (#123): print the reference's own pressure as the forward
+            # target the authored chapter must hit within the band. Never gates.
+            ref = chap.get('parity_reference', '?') or '?'
+            proj = vanilla_projection(ref, chapter_deploy_limit(chap, len(ROSTER)))
+            if proj is None:
+                print('  %-22s %-13s   -- planned (seed; reference not curated yet) --'
+                      % (label[:22], ref[:13]))
+            else:
+                note = (' (%d yardstick-proof units excluded from clear-load)'
+                        % proj['proof']) if proj['proof'] else ''
+                print('  %-22s %-13s %4.1f (target)    %4.1f (target)      planned%s'
+                      % (label[:22], ref[:13], proj['threat'], proj['clearload'], note))
             continue
         p = _chapter_pressure(chap, band)
         ot, ol = p['ours']

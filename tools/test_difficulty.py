@@ -352,6 +352,42 @@ class VanillaEnemies(unittest.TestCase):
             self.assertIn(key, fc.W)
             self.assertNotIn(item, df.WEAPON_ITEM_ENUM.values())
 
+    def test_ch13_reference_is_the_hamill_canyon_force(self):
+        # 52 armed-RED defs across the 11 curated ch13a arrays (boss squad + main force +
+        # Pablo wave + cav/merc/wyvern packs + Amelia); the 2 staff-only healers (sleep,
+        # physic) drop by design, leaving 50 -- no unmodeled-weapon drop remains (#123).
+        enemies = df.vanilla_enemies('FE8 Ch13')
+        self.assertEqual(len(enemies), 50)
+        names = {u.weapon.name for u in enemies}
+        for expected in ('steel-lance', 'elfire', 'zanbato', 'short-spear',
+                         'steel-bow', 'slim-lance'):
+            self.assertIn(expected, names)
+
+
+class VanillaProjection(unittest.TestCase):
+    """Forward targets for planned chapters (#123): the vanilla reference's own pressure."""
+
+    def test_uncurated_reference_projects_none(self):
+        self.assertIsNone(df.vanilla_projection('FE8 Ch99', 8))
+
+    def test_projection_reports_full_threat_and_finite_clearload(self):
+        proj = df.vanilla_projection('FE8 Ch13', 8)
+        self.assertEqual(proj['n'], 50)
+        self.assertGreater(proj['threat'], 0)
+        # promoted walls the early-game yardstick can't dent are EXCLUDED from
+        # clear-load (else it reads inf) and surfaced in `proof` instead
+        self.assertNotEqual(proj['clearload'], float('inf'))
+        self.assertGreater(proj['proof'], 0)
+
+    def test_projection_with_no_walls_matches_enemy_pressure(self):
+        # An early reference (all dentable) must project exactly what the parity row
+        # computes -- the projection is the same bar, shown before our side exists.
+        proj = df.vanilla_projection('FE8 Ch1', 9)
+        self.assertEqual(proj['proof'], 0)
+        t, l = df.enemy_pressure(df.vanilla_enemies('FE8 Ch1'), 9)
+        self.assertAlmostEqual(proj['threat'], t)
+        self.assertAlmostEqual(proj['clearload'], l)
+
 
 class ReportSmoke(unittest.TestCase):
     """The full report() path end-to-end on real chapter data -- the only caller of the
