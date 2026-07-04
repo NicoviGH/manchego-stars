@@ -4,27 +4,27 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-07-02→03, web):** 8-item hard-queue burn-down + an evening governance arc, all
-> merged via feature-flow (PRs #109 #111 #112 #114-#124; #114 later reverted):
-> chapter-deployment schema (#107) · **#40 tileset converter + vendored `cave-interior`** (ch03 map is
-> paint-ready once the blockout is OK'd) · injection-order guard + lossless GIF deltas ·
-> **#11 d20 nat-20 crit flourish** · **#60 clear-bot last-mile breach** (needs a local `clear_ch01`
-> confirm to close) · **#63 M2 sidecar + provider-agnostic LLM policy** (free local Llama/Gemma via
-> Ollama; one local `--record` run mints `transcripts/prologue.json`, then replay is free).
-> **Principle rulings (Nicolas):** ~~#8 iconic matchups~~ **reverted, closed not-planned** and #9
-> settled as pure vanilla (break-and-rebuy) — the boundary ADR reached final form over #119-#121:
-> **ALL mechanical data is vanilla** (class data verbatim, character data donor-inherited, items
-> stock; ours = donor choice, cosmetics, levels, roster, placements). **Comment-drift guard + 7-agent
-> sweep** (PR #122): ~50 stale comments fixed, 4 real code bugs (decomp-exact effectiveness formula,
-> hand-axe Wt, GIF frame order past 99, convoy clamp), dead-concepts lint now scans code comments —
-> registry discipline is in CLAUDE.md. **#123 forward projection** (PR #124): `make difficulty` now
-> prints planned chapters' vanilla-reference pressure as their (target) — the arc ch04→ch08 is visible
-> before authoring; FE8 Ch13 curated + six vanilla-only weapons modeled. **Wolfram's battle anim
-> remains art-blocked** (§Wolfram; prompts in `lore/wolfram.md`). **Ch3 blockout still awaits
-> Nicolas's OK on #23**; ch03's `deploy_limit: 9` is correct as designed — Baxby is a fully-specced
-> Cavalier, his YAML just isn't build-wired yet, so **"Wire Baxby" is a prerequisite of the ch03
-> units beat** (corrected note on #23). Latent msg-id/tutorial-trade risk tracked as **#125**.
-> **Local-mGBA follow-ups:** `clear_ch01` (closes #60) · `llm --record` (completes #63 M2's DoD).
+> **Last session (2026-07-03→04, web/mobile — Nicolas co-writing from his phone):** a full
+> dialogue-pass + rulings session, merged via PRs #127 #128 (+ a BG/ruling PR at wrap):
+> **ch04 "The White Moose" dialogue LOCKED** — all 4 beats co-written, review-trimmed (all Ravisin
+> dread consolidated into Lupin's single ending line), recorded in the ch04 YAML `script:` blocks.
+> **`lore/lupin.md` voice bible NEW** (blunt pack-pragmatist; table-canon wolf grounded in the book's
+> awaken magic). **Lonelywood Speaker = Nimsy Huddle** (book name, table's deaf-granny performance;
+> voices doc §Per-town). **Lupin portrait SHIPPED** (`portraits/lupin.png` + `lupin_darken.py` hand
+> pass; original ref vendored in-repo — TotalityDesigns Redbubble find, credited). **Reference-don't-
+> import principle extended twice (Nicolas rulings):** Nimsy's mug = the VANILLA old-lady generic by
+> portrait id (an FE-Repo import was drafted and rejected), and cutscene BGs = reuse `bg_TargosWinter`
+> for ch03 Termalaine + vanilla `House1` by id for ch04's cottage; ch03 mid-map beats play on-map.
+> **Ch3 layout RULED (the #23 pending decision):** the proposed custom Gem-Mine blockout is REJECTED —
+> **repaint vanilla Borgo geometry with the `cave-interior` tiles** (decisions.md ADR 2026-07-04; the
+> ch03 YAML's `base_layout: Ch3Map` was never actually changed). **NEW capability:** this web container
+> CAN read public GitHub repos via `git clone --filter=blob:none --no-checkout` + raw.githubusercontent
+> (only api.github.com/web-UI are proxy-gated; cross-owner `add_repo` unsupported) — FE-Repo asset
+> vendoring and decomp layout reads work from the web now; scratchpad clones of `FE-Repo` + `fireemblem8u`
+> were used this session. **Next up: the ch03 Borgo→mine retile** (fetch `Ch3Map` layout + vanilla
+> village tile config from the decomp clone, terrain-preserving retile onto `cave-interior`, PNG
+> preview to Nicolas). Still open from before: Wolfram poses (art-blocked on Nicolas) · local-mGBA
+> `clear_ch01` (#60) + `llm --record` (#63) · #125 msg-id risk · desktop stale-branch deletion (below).
 
 > **🛠 Desktop fix needed — branch cleanup + env policy (2026-06-29; re-probed 2026-07-02):** An audit
 > found **13 stale remote branches** the squash-merge convention should have deleted. 2026-07-02 web
@@ -159,40 +159,47 @@ live build checklist on **#23**.
   "Icewind Brute" slot): flag it the miniboss + position it mid-galleries at units/objective wiring
   (Pinky-is-metal is load-bearing in that beat).
 
-#### Map (#40) — IN PROGRESS, decisions made 2026-06-29; PAUSED awaiting Nicolas's blockout OK
-Two decisions this session change the earlier "reskin vanilla Borgo on a winter tileset" plan:
+#### Map (#40) — layout RULED 2026-07-04; next beat = the Borgo→mine retile
 - **Tileset DECIDED = Cynon's Mineshaft (Gray palette)** — a purpose-built cave/mine tileset (rock walls,
   cart tracks, timber supports, crystal/ore seams, water) vendored from **FE-Repo** (`Klokinator/FE-Repo`
-  → `Tilesets/Caves/Cynon's Mineshaft - Tileset`; CC, Cynon endorses cross-engine use). Staged at
-  `map-review/ch03-tileset-candidates/cynon-mineshaft-src/` (`.mapchip_config` + Gray object PNG + CREDITS).
-  **NO re-palette** — native grey already reads as a frozen Icewind mine (Nicolas's call; the old winter
-  re-palette trick is NOT needed for a tileset that's already cave-themed). At build: **credit Cynon in `CREDITS.md`**.
-- **Layout PIVOT — author a CUSTOM layout from the book's "Gem Mine" map, NOT a Borgo reskin.** Reference =
-  *Frostmaiden* book Map 1.19 "Gem Mine" (printed p.97 = PDF p.98), cropped to
-  `map-review/ch03-tileset-candidates/REF-gem-mine-map.png` and `docs/demo/ch03-gem-mine-reference.png`.
-  3 levels → ONE flat plane (FE8 has no z-levels), organic caves → 16px grid, ~40sq wide → ~22. A **flattened
-  blockout** (book rooms M1–M8 → our chapter beats: M1 tool-room deploy, mid-gallery Brute choke, M3 river
-  pinch, M5/M6 sealed shaft = Pinky-scout map-change, M8 grell-lair seize) is **posted on issue #23** and is
-  **the pending decision** — Nicolas reviews on mobile before any painting starts.
+  → `Tilesets/Caves/Cynon's Mineshaft - Tileset`; CC, Cynon endorses cross-engine use), landed in-repo as
+  **`cave-interior`** (PR #111; Cynon credited in `CREDITS.md`). **NO re-palette** — native grey already
+  reads as a frozen Icewind mine (Nicolas's call).
+- **Layout RULED (2026-07-04, Nicolas — closes the #23 pending decision): REPAINT VANILLA BORGO.** The
+  2026-06-29 proposed custom Gem-Mine blockout is **rejected** — don't fabricate map geometry when a
+  vanilla-proven Seize layout exists (decisions.md ADR; consistent with "ALL mechanical data is vanilla").
+  The ch03 YAML's `base_layout: Ch3Map` was never changed, so this restores the recorded design. Enemy/
+  chest tiles stay the vanilla Ch3 coordinates — **the repositioning pass is no longer needed.** The book's
+  Gem Mine map (`docs/demo/ch03-gem-mine-reference.png`) stays flavor reference only.
+- **Retile plan (next session):** blobless-clone the decomp (works from the web container — see the
+  capability note in the Last-session block), pull `graphics/map/layout/` Ch3's map + the vanilla village
+  tileset config, terrain-preserving retile onto `cave-interior` (wall→rock wall, floor→gallery floor,
+  door/chest/throne special-cased), render PNG → show Nicolas → `import_map_layout` → `.mar` → in-engine
+  load-test (local).
 - **Importer is a THIN converter (good #40 news).** Format decoded + validated: `mapchip_config` = **9216 B =
   exactly the decomp config** (8192 TSA + 1024 terrain); object PNG = **256×256 mode-P, 4-bit local indices**
   (pixels 0–15) + a 256-color (16-bank) palette → straight to `ObjectType.4bpp` + `MapPalette.gbapal`. A
   throwaway renderer assembled Cynon's own `Test Map.tmx` correctly →
   `map-review/ch03-tileset-candidates/mineshaft-testmap-gray.png` (= `docs/demo/ch03-mineshaft-tileset-demo.png`),
   proving tiles assemble. So #40 task 2 = a small converter, not a toolchain.
-- **Build order once the blockout is OK'd:** ~~(1) converter~~ ~~(2) editor support~~ — **both LANDED
+- **Build order (layout ruling applied):** ~~(1) converter~~ ~~(2) editor support~~ — **both LANDED
   2026-07-02 (PR #111):** `map_tileset_tool.py import/render-tmx`, tileset **`cave-interior`** vendored
   under `campaigns/.../maps/tilesets/` (Cynon credited in `CREDITS.md`), `gen_map_editor --tileset
   cave-interior --blank WxH [--ref img]` seeds a blank canvas, layouts carry their tileset in `.json`.
-  Remaining: (3) Paint against the reference → `import_map_layout` → `.mar` → in-engine load-test. **Enemy/chest positions move off the old Borgo coords
-  onto the new layout** (parity unchanged — same 10-unit roster, just repositioned; re-finalize in the map tool).
+  Remaining: (3) the **Borgo→mine retile** (see Retile plan above) → `import_map_layout` → `.mar` →
+  in-engine load-test. **Enemy/chest positions stay the vanilla Ch3 coordinates** (Borgo geometry kept,
+  so no repositioning pass; parity unchanged — same 10-unit roster on the cited vanilla tiles).
 - **Then (post-map, unchanged):** host on next vanilla slot (`MNC2`; model `inject_ch01`/`inject_ch02`) →
   units/objective/cutscene wiring (`inject_ch03` consumes the `script:` blocks; Brute-defeat trigger,
   Pinky-scout grell spawn + map-change, Trex recruit; new generic mugs `boy-crier`/`kobold-brute`/Maxol) +
   **motion-review the 4 beats** → art (Grell/Trex/kobold/giant-rat; **grell ref = book p.96**) → title card →
   load-test (`ch03`/`smoke_ch03`/`clear_ch03`, mirror ch02). Parity already verified `make difficulty CH=ch03`.
-- Then chapters #24–#28 (Ch4–Ch8) follow the same slice. Ch3+ ending BGs: vendor from the **winter-BG library**
-  (`map-review/iwd-bg-library.md`) via `bg_to_fe8.py` → `inject_backgrounds` (relocate `BG_RANDOM` once a 2nd slot is needed).
+- Then chapters #24–#28 (Ch4–Ch8) follow the same slice. **Ch3/ch04 cutscene BGs DECIDED 2026-07-04
+  (Nicolas): reference, don't import** — ch03 opening+ending REUSE the ch02 `bg_TargosWinter` slot
+  (Termalaine street; no 2nd slot, so the `BG_RANDOM` relocation stays unneeded); ch03 mid-map beats play
+  ON-MAP; ch04's cottage = VANILLA `House1` by BG id (in-ROM, free). The winter-BG library remains the
+  well for genuinely-new needs (e.g. ch05 tomb exterior — Zeldacrafter's "Snowy ruins" in FE-Repo is a
+  strong candidate).
 
 ### Content — Ch2 (#22) — DONE / CLOSED (2026-06-26)
 All slice items merged (#85 card, #88 Targos BG + name-leak fix); #22 closed. Non-gating leftover: the demo
