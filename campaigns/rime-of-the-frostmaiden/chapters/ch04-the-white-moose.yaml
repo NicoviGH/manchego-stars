@@ -136,14 +136,17 @@ events:
       resolves through Marty's rapport spores; Meesmickle takes the job; then the
       forest edge, where Pinky's fog line delivers the fog-of-war heads-up
       (onboarding parity, in-voice channel). LOCKED 2026-07-03 (dialogue-pass,
-      co-written with Nicolas). PENDING: eventscript + Nimsy generic granny mug +
-      motion review.
+      co-written with Nicolas). Nimsy's mug DECIDED 2026-07-04 (Nicolas): the
+      VANILLA FE8 old-lady generic, referenced by portrait id in the eventscript —
+      it ships in the base ROM, so no vendored asset, no injection, no credit line
+      (an FE-Repo import was drafted and rejected as redundant). PENDING:
+      eventscript (pin the decomp Portrait id there) + motion review.
     script:                     # LOCKED 2026-07-03 (dialogue pass, co-written with Nicolas)
       - location_card: "Lonelywood"
       # ── A: the Speaker's cottage ──
       # (Fire, kettle, a tiny, ancient halfling bundled in shawls: Nimsy Huddle, hard of
-      #  hearing. Minor NPC → voices doc §Per-town + generic granny mug at wiring. RBG
-      #  sweeps his hat into a bow.)
+      #  hearing. Minor NPC → voices doc §Per-town; mug = the VANILLA FE8 old-lady generic
+      #  by portrait id — no asset needed (Nicolas, 2026-07-04). RBG sweeps his hat into a bow.)
       - prof-rbg: >-
           Madam Speaker! Professor R.B. Geenius — solver of problems, hunter of
           horrors. We're told you have a moose.
