@@ -249,8 +249,11 @@ events:
       a monster bounty. RBG keeps the public mask UP (no open villainy in a town
       street — his banned list); the naked greed already aired in the ch02 seed. The
       "KOBOLDS ONLY" sign (book p.95, elegant calligraphy) is the first whisper of
-      Trex. LOCKED 2026-06-26 (dialogue-pass, co-written with Nicolas). PENDING: the
-      eventscript that consumes this + Darmo's generic villager mug + motion review.
+      Trex. LOCKED 2026-06-26 (dialogue-pass, co-written with Nicolas). BG DECIDED
+      2026-07-04 (Nicolas): REUSE the ch02 bg_TargosWinter slot for the Termalaine
+      street (vanilla-style BG reuse; no new slot, dodges the BG_RANDOM relocation).
+      PENDING: the eventscript that consumes this + Darmo's generic villager mug +
+      motion review.
     script:                     # LOCKED 2026-06-26 (dialogue pass, co-written with Nicolas)
       - location_card: "Termalaine"
       # (The gem town. Empty ore-carts line a tunnel-mouth in the hillside. A boy stands
@@ -381,7 +384,9 @@ events:
       (his first + only line of the chapter, by design — low-line-count persona). The
       road-north stage direction tees ch04's druid thread without a line. Voice:
       lore/{prof-rbg,trex,meesmickle}.md. LOCKED 2026-06-26 (dialogue-pass, co-written
-      with Nicolas). PENDING: eventscript + Maxol generic mug + motion review.
+      with Nicolas). BG DECIDED 2026-07-04 (Nicolas): REUSE bg_TargosWinter (same slot
+      as the opening; the two mid-map beats play ON-MAP, no BG). PENDING: eventscript +
+      Maxol generic mug + motion review.
     script:                     # LOCKED 2026-06-26 (dialogue pass, co-written with Nicolas)
       - location_card: "Termalaine"
       # ── A: bounty + gems (RBG's avarice payoff from the ch02 seed) ──
