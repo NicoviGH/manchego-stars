@@ -139,8 +139,11 @@ events:
       co-written with Nicolas). Nimsy's mug DECIDED 2026-07-04 (Nicolas): the
       VANILLA FE8 old-lady generic, referenced by portrait id in the eventscript —
       it ships in the base ROM, so no vendored asset, no injection, no credit line
-      (an FE-Repo import was drafted and rejected as redundant). PENDING:
-      eventscript (pin the decomp Portrait id there) + motion review.
+      (an FE-Repo import was drafted and rejected as redundant). BG DECIDED
+      2026-07-04 (Nicolas): scene A = VANILLA FE8 House1 by BG id (free, in-ROM
+      hearth interior); scene B plays at the forest edge — on-map or vanilla forest
+      BG, pick at wiring. PENDING: eventscript (pin the decomp Portrait + BG ids
+      there) + motion review.
     script:                     # LOCKED 2026-07-03 (dialogue pass, co-written with Nicolas)
       - location_card: "Lonelywood"
       # ── A: the Speaker's cottage ──
