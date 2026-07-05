@@ -27,11 +27,35 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 > `ch03-retile-three-way.png` (vanilla / patchwork-v1 / coherent-v2). **Next up:** Nicolas reviews the v2
 > tiles locally; if approved, write the actual `.mar`/`.json` (via `map_tileset_tool.compile_layout`,
 > already have the exact grid in `retile_map_v2.json`-equivalent form) and wire `ch03-*.yaml`'s `map:`
-> block, then the in-engine load-test. Still open from before: Wolfram poses (art-blocked on Nicolas) ·
-> local-mGBA `clear_ch01` (#60) + `llm --record` (#63) · #125 msg-id risk · desktop stale-branch deletion
-> (below). **NEW capability carried forward:** the web container reads public GitHub repos fine now,
-> including plain `git submodule update --init` when the submodule URL is public HTTPS (no blobless-clone
-> dance needed unless that plain path fails).
+> block, then the in-engine load-test. **NEW capability carried forward:** the web container reads
+> public GitHub repos fine now, including plain `git submodule update --init` when the submodule URL is
+> public HTTPS (no blobless-clone dance needed unless that plain path fails).
+>
+> **Second half of the same session — a model-fit sweep (Sonnet-appropriate issues, no mGBA/art needed),
+> in effort order, each its own PR:** **#17 done** (PR #131) — all 5 NPC/recruit YAMLs (Baxby, Trex,
+> Sahnar, Lupin, Basil) already existed as stubs; filled the 4 missing `fe_stats`/`growth_rates` blocks
+> with vanilla class data verbatim from `data_classes.c`, and documented WHY that's not a stat-twin bug
+> (Lupin/Baxby, Basil/Sclorbo share a class+design-record but diverge in-ROM once `STAT_DONOR` wires
+> their distinct personal donors — the actual differentiation mechanism, confirmed by reading
+> `build_campaign.py`, not something in the YAML). **#53 turned out ALREADY DONE** (byproduct of
+> #123/PR #124, never closed) — verified live (`fe_combat.W` has all the monster/extended weapons,
+> `PARITY_REFERENCE_UDEFS` has Ch4/Ch6/Ch13, zero unmodeled-weapon drops) and closed with the receipts.
+> **#63's issue text was stale** — M1 AND M2 are already done (dated ADRs, `test_llm_player.py` 55 green,
+> `harness.lua`'s `llmDrive` scenario exists); updated the issue's checklist + added a note so nobody
+> re-does that work. **#125 resolved as unreachable, no mGBA needed** (PR #132) — traced
+> `CheckTradeTutorial()`'s gate to its one setter in the whole decomp (an event inside vanilla's REAL Ch1
+> slot, a separate ROM asset from `PrologueEvents`, the only slot our chapter progression ever loads) —
+> static proof, no emulator repro required. **Lesson recorded in decisions.md:** a live-looking msg-id
+> reference can still be dead if its own trigger flag can never be set in our build's chapter-load graph.
+>
+> **Next up, by model fit:** (1) **Nicolas** — review the ch03 retile v2 tiles + local mGBA load-test
+> (blocked on you, see above). (2) **Opus** (cross-cutting/design-sensitive lane per CLAUDE.md's Model
+> Selection Guide) — **#63 M4** (soak report + `difficulty.py` hook): the only code-shaped work left on
+> that epic that doesn't need mGBA (M3/M5 need a local build + live API key regardless of model); it's
+> schema-design work (report shape + aggregation), which is why it's flagged Opus rather than Sonnet —
+> read the freshly-updated #63 issue body first, the milestone checklist there is now accurate. Still
+> open from before: Wolfram poses (art-blocked on Nicolas) · local-mGBA `clear_ch01` (#60) · desktop
+> stale-branch deletion (below).
 
 > **🛠 Desktop fix needed — branch cleanup + env policy (2026-06-29; re-probed 2026-07-02):** An audit
 > found **13 stale remote branches** the squash-merge convention should have deleted. 2026-07-02 web
