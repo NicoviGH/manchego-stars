@@ -230,11 +230,17 @@ LORDSEL_EXPLAINER_TEXT = (
 CH01_BEAT1_CARD_MSG = 0x945
 CH01_BEAT1_MSGS = (0x940, 0x941, 0x942, 0x943, 0x944)  # A,B,C,D,E (0x945 = card)
 # ch01 ending "The Rolling Cheddar" (#21): a "Bryn Shander" location card + one message
-# per beat (A-F), on the dead slot-2 pool (see Beat 1). CAVEAT (comment audit
-# 2026-07-02): 0x949/0x94A/0x94B/0x94C are ALSO TEXTSHOWn by the tutorial-mode trade
-# demo compiled into src/bmtrade.c, which nothing patches -- if tutorial mode's trade
-# demo ever runs in our ROM, these ending-scene bodies would display there (same
-# false-negative class as the 0x993/0x994 lesson; needs an emulator repro to size).
+# per beat (A-F), on the dead slot-2 pool (see Beat 1). RESOLVED (#125, 2026-07-05):
+# 0x949/0x94A/0x94B/0x94C are ALSO TEXTSHOWn by the tutorial-mode trade demo compiled
+# into src/bmtrade.c (EventScr_TradeTut_SelectItem etc.), which nothing patches -- but
+# that demo is gated on CheckTradeTutorial() -> CheckFlag(0x87), and flag 0x87 has
+# exactly one setter in the whole decomp: ENUT(0x87) inside
+# EventScr_Ch1Tut_TradeSelectGalliamEnd (events/ch1-tutorials.h), part of vanilla's
+# REAL Ch1 slot (Ch1Events, data_8B363C.s) -- a separate ROM asset from PrologueEvents,
+# which is the only slot our chapter progression ever loads (New Game redirects to
+# PROLOGUE_HOST_INDEX; see _redirect_new_game). Vanilla Ch1 never loads in our build, so
+# flag 0x87 can never be set, CheckTradeTutorial() always returns false, and the trade
+# demo (and this msg-id collision) is provably unreachable -- no emulator repro needed.
 CH01_ENDING_CARD_MSG = 0x94C
 # AB,C,D,E1,E2(narration),E2b(Marty/Baxby),F. 0x93D is a dead vanilla Ch1-tutorial
 # slot-2 id (weapon-triangle blurb, stripped by the prologue host) reused for the
