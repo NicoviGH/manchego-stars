@@ -4,27 +4,34 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-07-03→04, web/mobile — Nicolas co-writing from his phone):** a full
-> dialogue-pass + rulings session, merged via PRs #127 #128 (+ a BG/ruling PR at wrap):
-> **ch04 "The White Moose" dialogue LOCKED** — all 4 beats co-written, review-trimmed (all Ravisin
-> dread consolidated into Lupin's single ending line), recorded in the ch04 YAML `script:` blocks.
-> **`lore/lupin.md` voice bible NEW** (blunt pack-pragmatist; table-canon wolf grounded in the book's
-> awaken magic). **Lonelywood Speaker = Nimsy Huddle** (book name, table's deaf-granny performance;
-> voices doc §Per-town). **Lupin portrait SHIPPED** (`portraits/lupin.png` + `lupin_darken.py` hand
-> pass; original ref vendored in-repo — TotalityDesigns Redbubble find, credited). **Reference-don't-
-> import principle extended twice (Nicolas rulings):** Nimsy's mug = the VANILLA old-lady generic by
-> portrait id (an FE-Repo import was drafted and rejected), and cutscene BGs = reuse `bg_TargosWinter`
-> for ch03 Termalaine + vanilla `House1` by id for ch04's cottage; ch03 mid-map beats play on-map.
-> **Ch3 layout RULED (the #23 pending decision):** the proposed custom Gem-Mine blockout is REJECTED —
-> **repaint vanilla Borgo geometry with the `cave-interior` tiles** (decisions.md ADR 2026-07-04; the
-> ch03 YAML's `base_layout: Ch3Map` was never actually changed). **NEW capability:** this web container
-> CAN read public GitHub repos via `git clone --filter=blob:none --no-checkout` + raw.githubusercontent
-> (only api.github.com/web-UI are proxy-gated; cross-owner `add_repo` unsupported) — FE-Repo asset
-> vendoring and decomp layout reads work from the web now; scratchpad clones of `FE-Repo` + `fireemblem8u`
-> were used this session. **Next up: the ch03 Borgo→mine retile** (fetch `Ch3Map` layout + vanilla
-> village tile config from the decomp clone, terrain-preserving retile onto `cave-interior`, PNG
-> preview to Nicolas). Still open from before: Wolfram poses (art-blocked on Nicolas) · local-mGBA
-> `clear_ch01` (#60) + `llm --record` (#63) · #125 msg-id risk · desktop stale-branch deletion (below).
+> **Last session (2026-07-05, web — first Sonnet 5 session):** merged the wrap PR #129 (BG decisions +
+> ch3 layout ruling + HANDOFF refresh — hit a real merge conflict in ch04's YAML that #128 had already
+> half-landed; reconciled by hand, drift stayed clean). Then took the **ch03 Borgo→mine retile** partway:
+> `git submodule update --init` pulled the `fireemblem8u` decomp clean (no blobless-clone workaround
+> needed this time — plain init worked); reverse-engineered the decomp's vanilla Ch3 tileset (raw 4-bit
+> grayscale PNG + JASC-PAL → the decomp's own `.4bpp`/`.gbapal`/`.bin` format) to read `Ch3Map`'s real
+> layout + terrain bytes against `include/constants/terrains.h`'s actual enum (not guesswork). Built a
+> **terrain-preserving retile onto `cave-interior`** (every cell keeps its vanilla terrain byte except
+> the 12 PLAINS cells — cave-interior has no usable PLAINS graphic, borrows ROAD's look, flagged +
+> Nicolas-approved) in two passes: v1 matched terrain codes correctly but patchworked unrelated tile
+> families; v2 rebuilt almost the whole map from one confirmed-coherent block in the atlas (idx ~768–895:
+> matching wall/floor/door/throne/barrel/damaged-wall, all one visual set) — 0 unexpected terrain
+> mismatches either pass. **Validated against real vanilla ground truth:** found a genuine chapter-3
+> screenshot at `fe8.triangleattack.com` (native 272×256px, no upscaling — see the new HANDOFF resource
+> note below) confirming the reconstruction's structure (walls/chests/barrels/stairs/door/pond/throne
+> position) was accurate; the one gap (a navy placeholder where vanilla shows an animated glowing icon)
+> is a known static-tile-dump limitation, not a bug. **Parked here, deliberately:** finishing #40 needs
+> Nicolas's eyes on the actual tile choices + a local mGBA load-test (no ROM/mGBA in this container, by
+> design — the base ROM is local-only, never fetched/committed). Preview PNGs are pushed to
+> `review/ch03-borgo-retile-preview` (not merged) — `docs/demo/ch03-retile-preview-v2.png` +
+> `ch03-retile-three-way.png` (vanilla / patchwork-v1 / coherent-v2). **Next up:** Nicolas reviews the v2
+> tiles locally; if approved, write the actual `.mar`/`.json` (via `map_tileset_tool.compile_layout`,
+> already have the exact grid in `retile_map_v2.json`-equivalent form) and wire `ch03-*.yaml`'s `map:`
+> block, then the in-engine load-test. Still open from before: Wolfram poses (art-blocked on Nicolas) ·
+> local-mGBA `clear_ch01` (#60) + `llm --record` (#63) · #125 msg-id risk · desktop stale-branch deletion
+> (below). **NEW capability carried forward:** the web container reads public GitHub repos fine now,
+> including plain `git submodule update --init` when the submodule URL is public HTTPS (no blobless-clone
+> dance needed unless that plain path fails).
 
 > **🛠 Desktop fix needed — branch cleanup + env policy (2026-06-29; re-probed 2026-07-02):** An audit
 > found **13 stale remote branches** the squash-merge convention should have deleted. 2026-07-02 web
@@ -171,11 +178,19 @@ live build checklist on **#23**.
   The ch03 YAML's `base_layout: Ch3Map` was never changed, so this restores the recorded design. Enemy/
   chest tiles stay the vanilla Ch3 coordinates — **the repositioning pass is no longer needed.** The book's
   Gem Mine map (`docs/demo/ch03-gem-mine-reference.png`) stays flavor reference only.
-- **Retile plan (next session):** blobless-clone the decomp (works from the web container — see the
-  capability note in the Last-session block), pull `graphics/map/layout/` Ch3's map + the vanilla village
-  tileset config, terrain-preserving retile onto `cave-interior` (wall→rock wall, floor→gallery floor,
-  door/chest/throne special-cased), render PNG → show Nicolas → `import_map_layout` → `.mar` → in-engine
-  load-test (local).
+- **Retile DONE through the preview stage (2026-07-05), PARKED awaiting Nicolas's local review.**
+  Terrain-preserving retile onto `cave-interior` built and iterated to v2 (one coherent tile-family
+  instead of v1's patchwork; see Last-session block for the full method). Preview PNGs live on
+  `review/ch03-borgo-retile-preview` (not merged) — `docs/demo/ch03-retile-preview-v2.png` is the
+  candidate; `ch03-retile-three-way.png` shows vanilla vs. v1 vs. v2. **Blocked on:** Nicolas eyeballing
+  the actual tile picks + a local mGBA load-test (this container has no base ROM/mGBA, by design). If
+  approved as-is: `map_tileset_tool.compile_layout` turns the retiled grid into the `.mar`/`.json`, then
+  wire `ch03-the-termalaine-mine.yaml`'s `map:` block (its `size: "15×10ish"` comment is stale — the real
+  vanilla Ch3 layout is 17×16, confirmed this session; fix that comment in the same commit). If tile
+  picks need changes: the retile script + curated per-terrain-code tile pools are reproducible from this
+  session's method (vanilla tileset reconstruction → terrain-byte read → hand-picked cave-interior
+  replacements from one coherent atlas region) — re-run with different picks, no need to redo the
+  reverse-engineering.
 - **NEW resource: `fe8.triangleattack.com` hosts a real, native-resolution (272×256px, 1:1 = 17×16
   metatiles, no upscaling) screenshot per vanilla chapter at a predictable path —
   `/assets/images%2Fchapters%2F<chapter_slug>.jpg` (e.g. `the_bandits_of_borgo` → `chapter3.jpg`; find the
@@ -195,9 +210,10 @@ live build checklist on **#23**.
   2026-07-02 (PR #111):** `map_tileset_tool.py import/render-tmx`, tileset **`cave-interior`** vendored
   under `campaigns/.../maps/tilesets/` (Cynon credited in `CREDITS.md`), `gen_map_editor --tileset
   cave-interior --blank WxH [--ref img]` seeds a blank canvas, layouts carry their tileset in `.json`.
-  Remaining: (3) the **Borgo→mine retile** (see Retile plan above) → `import_map_layout` → `.mar` →
-  in-engine load-test. **Enemy/chest positions stay the vanilla Ch3 coordinates** (Borgo geometry kept,
-  so no repositioning pass; parity unchanged — same 10-unit roster on the cited vanilla tiles).
+  Remaining: (3) the **Borgo→mine retile** — preview done, parked on Nicolas's review (see bullet above)
+  → `.mar`/`.json` → wiring → in-engine load-test. **Enemy/chest positions stay the vanilla Ch3
+  coordinates** (Borgo geometry kept, so no repositioning pass; parity unchanged — same 10-unit roster on
+  the cited vanilla tiles).
 - **Then (post-map, unchanged):** host on next vanilla slot (`MNC2`; model `inject_ch01`/`inject_ch02`) →
   units/objective/cutscene wiring (`inject_ch03` consumes the `script:` blocks; Brute-defeat trigger,
   Pinky-scout grell spawn + map-change, Trex recruit; new generic mugs `boy-crier`/`kobold-brute`/Maxol) +
