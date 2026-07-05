@@ -176,6 +176,15 @@ live build checklist on **#23**.
   tileset config, terrain-preserving retile onto `cave-interior` (wall→rock wall, floor→gallery floor,
   door/chest/throne special-cased), render PNG → show Nicolas → `import_map_layout` → `.mar` → in-engine
   load-test (local).
+- **NEW resource: `fe8.triangleattack.com` hosts a real, native-resolution (272×256px, 1:1 = 17×16
+  metatiles, no upscaling) screenshot per vanilla chapter at a predictable path —
+  `/assets/images%2Fchapters%2F<chapter_slug>.jpg` (e.g. `the_bandits_of_borgo` → `chapter3.jpg`; find the
+  slug/asset name via the chapter's page at `fe8.triangleattack.com/chapters/<slug>`). Fetchable directly
+  with `curl` (a browser UA header avoids a block); this is real ground truth for validating a
+  reconstructed/retiled vanilla map — used 2026-07-05 to confirm the ch03 Borgo retile's terrain-code
+  reconstruction was structurally accurate (walls, chests, barrels, stairs, door, water pond, throne-alcove
+  position all matched). Fandom's own wiki (`fireemblem.fandom.com`) 402's programmatic fetches; go via
+  triangleattack or a search engine's redirect instead.
 - **Importer is a THIN converter (good #40 news).** Format decoded + validated: `mapchip_config` = **9216 B =
   exactly the decomp config** (8192 TSA + 1024 terrain); object PNG = **256×256 mode-P, 4-bit local indices**
   (pixels 0–15) + a 256-color (16-bank) palette → straight to `ObjectType.4bpp` + `MapPalette.gbapal`. A
