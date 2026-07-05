@@ -1974,6 +1974,24 @@ _Decided 2026-06-19 with Nicolas (interactive story + dialogue pass for ch02-tar
 
 ---
 
+**#125 msg-id collision (ch01 ending vs. the tutorial trade demo) — RESOLVED unreachable, no emulator
+needed.** `CH01_ENDING_MSGS` (0x949-0x94C) are also `TEXTSHOW`n by vanilla's tutorial-mode trade demo
+compiled into `src/bmtrade.c`, which nothing patches — flagged as a live risk needing an mGBA repro to
+size (#122 comment-sweep). Traced instead: that demo only runs behind `CheckTradeTutorial()` ->
+`CheckFlag(0x87)`, and flag `0x87` has **exactly one setter in the whole decomp** — `ENUT(0x87)` inside
+`EventScr_Ch1Tut_TradeSelectGalliamEnd` (`events/ch1-tutorials.h`), part of vanilla's real Ch1 chapter
+slot (`Ch1Events` in `data_8B363C.s`) — a **separate ROM asset from `PrologueEvents`**, the only slot our
+chapter progression ever loads (New Game redirects to `PROLOGUE_HOST_INDEX`; `_redirect_new_game` in
+`build_campaign.py`). Vanilla's real Ch1 never loads in our build (our "ch01" rides the Prologue slot
+instead), so flag `0x87` can never be set, `CheckTradeTutorial()` always returns false, and the trade
+demo — and this msg-id collision — is unreachable by construction. General lesson for the msg-id-vetting
+gotcha (below): reachability isn't just "is this id referenced elsewhere" (the 0x993/0x994 lesson) — a
+referencing event can ALSO be dead if its own trigger condition (a flag, in this case) can never be set
+in our build's actual chapter-load graph. Static trace of the flag's setter(s) resolves it without mGBA.
+_Decided: 2026-07-05 (CLAUDE; pipeline track. #125, closed not-planned — no code change, comment-only)._
+
+---
+
 ## Operational Gotchas (durable)
 
 _Moved here from `HANDOFF.md` 2026-07-02 (audit): these are durable engineering constraints, not

@@ -2,9 +2,13 @@
 # Class roster: docs/CLASSES.md (generated). Rationale: docs/decisions.md §Class Mapping.
 # Combat is vanilla FE (docs/decisions.md §Combat). damage_type labels are cosmetic.
 #
-# STATUS: design record / stub. Class + role LOCKED (Nicolas, 2026-06-20). NOT yet wired
-# into build_campaign (inert until the recruit wiring lands). Full bases/growths to be
-# authored verbatim from the donor's vanilla Myrmidon class data at wiring.
+# STATUS: design record. Class + role LOCKED (Nicolas, 2026-06-20); bases/growths below are
+# vanilla Myrmidon CLASS data (data_classes.c [CLASS_MYRMIDON - 1], verbatim) -- the same
+# class-generic-data-in-YAML / personal-donor-growths-at-build-time split every other cast
+# member uses (STAT_DONOR in build_campaign.py pulls Joshua's actual personal growths at
+# injection time; this file is the pre-wiring design record, not the final in-ROM numbers).
+# NOT yet wired into build_campaign (inert until the recruit wiring lands: free slot + recruit
+# logic + portrait + map sprite + a STAT_DONOR entry).
 
 id: sahnar
 name: Sahnar
@@ -22,9 +26,30 @@ dnd:
 # (Druid/Shaman) was the alt but we're already magic-rich, so sword is the coverage win.
 fe_stats:
   class: Myrmidon
+  level: 1
+  # Vanilla FE8 Myrmidon stats, verbatim from data_classes.c [CLASS_MYRMIDON - 1].
+  HP: 16
+  STR: 4
+  SKL: 9
+  SPD: 9
+  DEF: 2
+  RES: 0
+  LCK: 0                    # ClassData has no base luck
+  MOV: 5                    # Myrmidon baseMov
+  CON: 8
 donor:
   character: Joshua         # vanilla Myrmidon — bases/growths reference (data_classes.c)
   why: the game's crit-sword duelist archetype
+
+# ── Growth Rates (% per level) — vanilla Myrmidon growths from data_classes.c ─
+growth_rates:
+  HP: 70
+  STR: 35
+  SKL: 40
+  SPD: 40
+  DEF: 15
+  RES: 20
+  LCK: 30
 
 promotion:
   branch: [Swordmaster, Assassin]  # vanilla FE8 Myrmidon branch (classchg-data.c [CLASS_MYRMIDON])
