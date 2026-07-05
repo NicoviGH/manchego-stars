@@ -2,10 +2,13 @@
 # Class roster: docs/CLASSES.md (generated). Rationale: docs/decisions.md §Class Mapping.
 # Combat is vanilla FE (docs/decisions.md §Combat). damage_type labels are cosmetic.
 #
-# STATUS: design record / stub. Class + role LOCKED (Nicolas, 2026-06-20). NOT yet wired
-# into build_campaign (inert until the recruit wiring lands: free slot + recruit logic +
-# portrait + map sprite). Full bases/growths to be authored verbatim from the donor's
-# vanilla Thief class data (data_classes.c) at wiring.
+# STATUS: design record. Class + role LOCKED (Nicolas, 2026-06-20); bases/growths below are
+# vanilla Thief CLASS data (data_classes.c [CLASS_THIEF - 1], verbatim) -- the same
+# class-generic-data-in-YAML / personal-donor-growths-at-build-time split every other cast
+# member uses (STAT_DONOR in build_campaign.py pulls Colm's actual personal growths at
+# injection time; this file is the pre-wiring design record, not the final in-ROM numbers).
+# NOT yet wired into build_campaign (inert until the recruit wiring lands: free slot + recruit
+# logic + portrait + map sprite + a STAT_DONOR entry).
 
 id: trex
 name: Trex
@@ -22,9 +25,30 @@ dnd:
 # wings" are exactly that — cosmetic art, NOT a flier (Thief is a foot unit).
 fe_stats:
   class: Thief
+  level: 1
+  # Vanilla FE8 Thief stats, verbatim from data_classes.c [CLASS_THIEF - 1].
+  HP: 16
+  STR: 3
+  SKL: 1
+  SPD: 9
+  DEF: 2
+  RES: 0
+  LCK: 0                    # ClassData has no base luck
+  MOV: 6                    # Thief baseMov
+  CON: 6
 donor:
   character: Colm           # vanilla Thief — bases/growths reference (data_classes.c)
   why: the game's starter Thief = full growth runway for a fresh utility unit
+
+# ── Growth Rates (% per level) — vanilla Thief growths from data_classes.c ────
+growth_rates:
+  HP: 50
+  STR: 5
+  SKL: 45
+  SPD: 40
+  DEF: 5
+  RES: 20
+  LCK: 40
 
 promotion:
   branch: [Rogue, Assassin]  # vanilla FE8 Thief branch (classchg-data.c [CLASS_THIEF])

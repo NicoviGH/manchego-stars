@@ -2,9 +2,15 @@
 # Class roster: docs/CLASSES.md (generated). Rationale: docs/decisions.md §Class Mapping.
 # Combat is vanilla FE (docs/decisions.md §Combat). damage_type labels are cosmetic.
 #
-# STATUS: design record / stub. Class + role LOCKED (Nicolas, 2026-06-20) — promoted from
-# "non-combat sled NPC" to a playable recruit. NOT yet wired into build_campaign (inert
-# until the recruit wiring lands). Full bases/growths from the donor's Cavalier data at wiring.
+# STATUS: design record. Class + role LOCKED (Nicolas, 2026-06-20) — promoted from
+# "non-combat sled NPC" to a playable recruit; bases/growths below are vanilla Cavalier CLASS
+# data (data_classes.c [CLASS_CAVALIER - 1], verbatim) -- identical to Baxby's, since it's the
+# same class (the class-generic-data-in-YAML / personal-donor-growths-at-build-time split
+# every cast member uses; STAT_DONOR in build_campaign.py pulls Kyle's actual personal growths
+# at injection time, distinct from Baxby's Franz, so the two Cavaliers won't be stat-twins
+# in-ROM even though this design record shows the same class baseline for both).
+# NOT yet wired into build_campaign (inert until the recruit wiring lands: free slot + recruit
+# logic + portrait + map sprite + a STAT_DONOR entry).
 # Voice bible: ../lore/lupin.md (locked 2026-07-03 with the ch04 dialogue pass — blunt
 # pack-pragmatist; table-canon character grounded in the book's awaken magic).
 
@@ -25,9 +31,30 @@ dnd:
 # befriend-the-creatures motif. Custom map sprite + battle anim required (#38/#39).
 fe_stats:
   class: Cavalier
+  level: 1
+  # Vanilla FE8 Cavalier stats, verbatim from data_classes.c [CLASS_CAVALIER - 1].
+  HP: 20
+  STR: 5
+  SKL: 2
+  SPD: 5
+  DEF: 6
+  RES: 0
+  LCK: 0                    # ClassData has no base luck
+  MOV: 7                    # Cavalier baseMov (mounted)
+  CON: 9
 donor:
   character: Kyle           # vanilla Cavalier — bases/growths reference (Franz is Baxby's ref)
   why: fresh Cavalier = full growth runway; distinct donor from Baxby
+
+# ── Growth Rates (% per level) — vanilla Cavalier growths from data_classes.c ─
+growth_rates:
+  HP: 75
+  STR: 35
+  SKL: 40
+  SPD: 28
+  DEF: 15
+  RES: 15
+  LCK: 30
 
 promotion:
   branch: [Paladin, "Great Knight"]   # vanilla FE8 Cavalier branch (classchg-data.c [CLASS_CAVALIER])
