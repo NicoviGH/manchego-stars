@@ -4,7 +4,34 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-07-03→04, web/mobile — Nicolas co-writing from his phone):** a full
+> **Last session (2026-07-05→06, web→desktop — Opus reviewing Sonnet, then a live map collab):**
+> Opened by **reviewing Sonnet's #131/#132** against the decomp — all four NPC class-stat blocks
+> verbatim-correct vs `data_classes.c`; the 0x87 msg-id "unreachable" trace sound (clean, no fixes).
+> Then a long **ch03 map/tileset** session with Nicolas:
+> **① Map reskin tooling FIXED** (`7610564`): `gen_map_editor`'s winter-reskin flow hard-coded vanilla
+> `TileConfiguration1` and applied `reskin-learned.json` to any `--tileset`; ch03 breaks both (Ch3Map
+> rides `TileConfiguration2`; cave-interior ≠ snowy-bern). Now resolves each layout's own tile config
+> from the decomp asset table + `chapter_settings.json`, and gates the learned map on a `"tileset"` stamp.
+> **② Tilesets vendored on-hand** (`c0ec1f0`): FE-Repo **FF5 Caves** (WAve) + **Lava Cave** (HyperGammaSpaces)
+> at `maps/tilesets/{ff5-caves,lava-cave}/` for future chapters (inert until a chapter registers them).
+> **③ FF5 navy chest cherry-picked into `cave-interior`** — closed **metatile 17** / open **29**, palette
+> bank 5, native CHEST terrain (0x21/0x20), pinned Test Map render unchanged. Its art is tagged OPPOSITE
+> to terrain, so the graphics were swapped in `763904d` (17 = green closed, 29 = grey open).
+> **④ ch03 Borgo→mine retile — WIP layout committed** (`17fe5fa`): `ch03-the-termalaine-mine.mar` + `.json`
+> (17×16, cave-interior) + the **`ch03-retile.py` generator** — terrain-based reskin (cave-interior indices
+> are unrelated to vanilla's, so map by terrain role), wall-rim **autotile learned from Cynon's test map**,
+> **throne-dais overlay** on the O1 seize (terrain-matched to vanilla), chest 17. Furniture LOCKED: chest,
+> door (812), throne (784+frame), barrel (822), pillar (739), walls, floor base.
+> **⑤ Floor-detail:** built a **patch-stamp tool** that copies Cynon's hand-painted floor CLUSTERS (moss,
+> crystal veins, formations) from his test map onto our galleries — Nicolas's ruling: use his art, not
+> statistical scatter. **➡ NOW: Nicolas is hand-painting the ch03 floor + the still-open visuals
+> (stairs / road cart-tracks / the E1 well) in his pixel editor** (`gen_map_editor.py --tileset=cave-interior
+> <out.html> <dl.json> maps/ch03-the-termalaine-mine.mar` to resume on the current layout).
+> **Nicolas-at-home queue:** paint ch03 map · generate **Wolfram's 3 poses** (unblocks #65) · **desktop
+> stale-branch deletion** (below — now doable from his machine). **Sonnet follow-ups** set up as GitHub
+> issues (ch03 chest tile-changes + terrain parity after the paint; decisions.md ADR ready now).
+
+> **Prior session (2026-07-03→04, web/mobile — Nicolas co-writing from his phone):** a full
 > dialogue-pass + rulings session, merged via PRs #127 #128 (+ a BG/ruling PR at wrap):
 > **ch04 "The White Moose" dialogue LOCKED** — all 4 beats co-written, review-trimmed (all Ravisin
 > dread consolidated into Lupin's single ending line), recorded in the ch04 YAML `script:` blocks.
@@ -171,11 +198,24 @@ live build checklist on **#23**.
   The ch03 YAML's `base_layout: Ch3Map` was never changed, so this restores the recorded design. Enemy/
   chest tiles stay the vanilla Ch3 coordinates — **the repositioning pass is no longer needed.** The book's
   Gem Mine map (`docs/demo/ch03-gem-mine-reference.png`) stays flavor reference only.
-- **Retile plan (next session):** blobless-clone the decomp (works from the web container — see the
-  capability note in the Last-session block), pull `graphics/map/layout/` Ch3's map + the vanilla village
-  tileset config, terrain-preserving retile onto `cave-interior` (wall→rock wall, floor→gallery floor,
-  door/chest/throne special-cased), render PNG → show Nicolas → `import_map_layout` → `.mar` → in-engine
-  load-test (local).
+- **Retile DONE → WIP `.mar` committed (2026-07-05/06, `17fe5fa`).** Terrain-based retile of vanilla
+  Ch3Map onto `cave-interior`: `maps/ch03-the-termalaine-mine.{mar,json}` + the `ch03-retile.py`
+  generator (reads Ch3Map + TileConfiguration2 from the decomp submodule; re-run after edits). **Cave
+  indices are unrelated to vanilla's, so the map is built by TERRAIN role, not index** — wall-rim
+  **autotile learned from Cynon's Test Map** (`solid-neighbour-dir → rim tile`), **throne-dais overlay**
+  (the pool structure, 784 seat on O1, terrain-matched to vanilla), FF5 navy **chest = metatile 17**
+  (closed) / 29 (open). Furniture LOCKED; **floor + stairs/road/E1-well = Nicolas hand-painting now** in
+  the pixel editor (seed the editor on the committed `.mar`, see the Last-session block).
+- **Floor "random" texture (Nicolas's ask):** don't fake it statistically — **patch-stamp Cynon's actual
+  hand-painted floor clusters** from his Test Map onto our galleries (the tool aligns our floor over his
+  best-fit region and copies his tiles cell-for-cell; moss/crystal/formation clusters land intact). Built
+  + previewed this session; Nicolas is painting directly, but it can seed his canvas.
+- **Remaining after the paint (Sonnet-suitable):** (a) author the per-chest **`17→29` TILECHANGE** in the
+  ch03 map-changes so chests open (FE8 `EventScr_OpenChest` fires a per-map tile-change; vanilla Ch3 has
+  one per chest — reskin them); (b) **floor terrain parity** — the cave floor variants carry terrain
+  `0x2a` (walkable) vs vanilla `FLOOR 0x17`; decide keep-vs-patch for exact parity; (c) then the chapter
+  wiring below.
+- ~~**Retile plan / importer notes**~~ (converter + editor support LANDED PR #111; retile LANDED `17fe5fa`).
 - **Importer is a THIN converter (good #40 news).** Format decoded + validated: `mapchip_config` = **9216 B =
   exactly the decomp config** (8192 TSA + 1024 terrain); object PNG = **256×256 mode-P, 4-bit local indices**
   (pixels 0–15) + a 256-color (16-bank) palette → straight to `ObjectType.4bpp` + `MapPalette.gbapal`. A
