@@ -27,9 +27,13 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 > statistical scatter. **➡ NOW: Nicolas is hand-painting the ch03 floor + the still-open visuals
 > (stairs / road cart-tracks / the E1 well) in his pixel editor** (`gen_map_editor.py --tileset=cave-interior
 > <out.html> <dl.json> maps/ch03-the-termalaine-mine.mar` to resume on the current layout).
-> **Nicolas-at-home queue:** paint ch03 map · generate **Wolfram's 3 poses** (unblocks #65) · **desktop
-> stale-branch deletion** (below — now doable from his machine). **Sonnet follow-ups** set up as GitHub
-> issues (ch03 chest tile-changes + terrain parity after the paint; decisions.md ADR ready now).
+> **Nicolas-at-home queue:** paint ch03 map · generate **Wolfram's 3 poses** (unblocks #65).
+> **Sonnet follow-ups** set up as GitHub issues (ch03 chest tile-changes + terrain parity after the
+> paint; decisions.md ADR ready now).
+>
+> **Update (2026-07-06, desktop):** the stranded mobile-session work was landed to main via **PR #136**
+> (ch03 WIP layout + `ch03-retile.py` + FF5/Lava tilesets + chest fix + reskin-flow fix) — the layout
+> now lives on `main`, resume painting there. The stale-branch backlog was **deleted** (see below).
 
 > **Prior session (2026-07-03→04, web/mobile — Nicolas co-writing from his phone):** a full
 > dialogue-pass + rulings session, merged via PRs #127 #128 (+ a BG/ruling PR at wrap):
@@ -53,34 +57,15 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 > preview to Nicolas). Still open from before: Wolfram poses (art-blocked on Nicolas) · local-mGBA
 > `clear_ch01` (#60) + `llm --record` (#63) · #125 msg-id risk · desktop stale-branch deletion (below).
 
-> **🛠 Desktop fix needed — branch cleanup + env policy (2026-06-29; re-probed 2026-07-02):** An audit
-> found **13 stale remote branches** the squash-merge convention should have deleted. 2026-07-02 web
-> re-probe: the env can now **push to branches and squash-merge PRs via the GitHub MCP** (PR #101 was
-> conflict-resolved and merged from the web) — but **ref-deletes are still blocked** (`git push
-> --delete` hangs at the proxy; no repo-settings API either). **To do from desktop:**
->
-> 1. ~~Flip the GitHub repo setting "Automatically delete head branches"~~ — **DONE (Nicolas,
->    2026-07-02, from mobile).** Verified working: `feat/104-inject-chapter-extract` auto-deleted
->    when PR #105 squash-merged. The backlog can no longer re-accumulate; only the one-time
->    deletion of the pre-existing stale branches (step 2) remains.
-> 2. **Delete the stale branches.** From a local checkout:
->    ```sh
->    git push origin --delete \
->      claude/audit-open-branches-5suz48 claude/content-track-review-5rpjy8 \
->      docs/descale-palette-guidance docs/handoff-65-mb-done docs/handoff-ch3-map-pickup \
->      feat/19-vellynne-portrait feat/22-ch02-dialogue-reground feat/22-title-card \
->      feat/38-chwinga-map-sprites feat/39-chwinga-portraits feat/engine-name-check \
->      review/ch02-ending-bg
->    ```
->    (`docs/handoff-ch3-map-pickup` joined the list when PR #101 squash-merged, 2026-07-02.)
->    **`demo/ch2-gifs` is deliberately NOT on the list** — it still holds the only copy of the
->    unmerged `recordch02*` cutscene-GIF scenarios; decide regenerate-vs-drop first (§Ch2), then delete.
-> 3. **Fix the Claude-Code-on-the-web env so future sessions can delete refs themselves.** Two checks:
->    (a) **github.com/settings/installations → Claude** — confirm *Contents* is read-and-write and
->    this repo is in the access list; (b) the env's network policy in claude.com/code → this
->    environment's settings — bump to a policy that allows full GitHub write (see
->    https://code.claude.com/docs/en/claude-code-on-the-web for policy names). Verify by asking the
->    next web session to delete a throwaway branch end-to-end.
+> **Branch hygiene (resolved 2026-07-06, desktop):** the stale-branch backlog is **cleared** — all 14
+> dead remotes deleted (the 12 audited + `claude/branch-cleanup-1c1081` + `review/ch03-borgo-retile-preview`,
+> plus the fully-merged `claude/compound-engineering-plugin-37vinv`). "Automatically delete head branches"
+> is ON (Nicolas, 2026-07-02) so the backlog can't re-accumulate. Remotes now = `main`, `demo/ch2-gifs`
+> (**deliberately kept** — only copy of the unmerged `recordch02*` cutscene-GIF scenarios; decide
+> regenerate-vs-drop per §Ch2 before deleting), and any live PR branch.
+> **Residual (web-env only):** Claude-Code-on-the-web still can't `git push --delete` (proxy-gated) — desktop
+> sessions can. If future web sessions need self-serve ref-deletes, bump the env network policy to full
+> GitHub write (claude.com/code → env settings; https://code.claude.com/docs/en/claude-code-on-the-web).
 
 ## Workflow — feature-flow
 Issue → short-lived `feat/<slug>` branch off `main` → an ephemeral worktree → PR → CI + `/code-review`
