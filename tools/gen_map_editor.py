@@ -45,6 +45,35 @@ else:
     DOWNLOAD=ARGS[2] if len(ARGS)>2 else 'prologue-layout.json'
     SEED_ARG=ARGS[3] if len(ARGS)>3 else None
 
+def _vanilla_tileconfig_bin(dec, layout):
+    """Resolve the vanilla TileConfiguration a decomp map layout is authored against,
+    from the decomp's own asset table + chapter settings (both committed source, so
+    available whenever the reskin flow's other DEC reads are). Ch1Map/Ch2Map ride
+    TileConfiguration1, but Ch3Map+ ride 2/3/... -- reading the terrain table by the
+    wrong config misclassifies ~80% of a map's metatiles. Falls back to config 1 with a
+    warning if it can't be resolved (the tileset-1 layouts the reskin flow shipped on)."""
+    import re
+    default = os.path.join(dec, 'graphics/map/TileConfiguration1.bin')
+    try:
+        names = []
+        with open(os.path.join(dec, 'data/data_8B363C.s')) as f:
+            for line in f:
+                mo = re.match(r'\s*\.word\s+(\w+)', line)
+                if mo:
+                    names.append(mo.group(1))
+        layout_idx = names.index(layout)
+        settings = json.load(open(os.path.join(dec, 'src/data/chapter_settings.json')))
+        for ch in settings['chapters']:
+            mp = ch.get('map') or {}
+            if mp.get('mainLayerId') == layout_idx:
+                return os.path.join(dec, 'graphics/map', names[mp['tileConfigId']] + '.bin')
+    except (OSError, ValueError, KeyError, IndexError):
+        pass
+    sys.stderr.write('WARN: could not resolve vanilla tile config for %r; '
+                     'using TileConfiguration1\n' % layout)
+    return default
+
+
 win=_tileset_from_dir(os.path.join(ROOT,'campaigns/rime-of-the-frostmaiden/maps/tilesets',TILESET))
 if BLANK:
     # Custom canvas on a vendored tileset (#40): no vanilla layout to derive from.
@@ -52,14 +81,15 @@ if BLANK:
     FILL=int(FLAGS.get('--fill','0'))
     grid=[FILL]*(W*H)
 else:
-    # `van` is consulted ONLY for .terrain(m) (vanilla tileset-1 terrain table) to decide which
-    # reskinned cells diverge; its gfx/pal are never rendered. The decomp's raw vanilla gfx
-    # (ObjectType1.4bpp / MapPalette1.gbapal) are build-only artifacts and may be absent, so we
-    # feed the winter gfx/pal (irrelevant) alongside the real vanilla config.
+    # `van` is consulted ONLY for .terrain(m) (the vanilla terrain table of the layout's OWN
+    # tileset config -- resolved per-layout, since Ch3Map+ ride TileConfiguration2/3/... not 1)
+    # to decide which reskinned cells diverge; its gfx/pal are never rendered. The decomp's raw
+    # vanilla gfx (ObjectType*.4bpp / MapPalette*.gbapal) are build-only artifacts and may be
+    # absent, so we feed the winter gfx/pal (irrelevant) alongside the real vanilla config.
     SNOW=os.path.join(ROOT,'campaigns/rime-of-the-frostmaiden/maps/tilesets/snowy-bern')
     van=Tileset(os.path.join(SNOW,'snowy-bern.4bpp'),
                 os.path.join(SNOW,'snowy-bern.gbapal'),
-                os.path.join(DEC,'graphics/map/TileConfiguration1.bin'))
+                _vanilla_tileconfig_bin(DEC, LAYOUT))
     lay=open(os.path.join(DEC,f'graphics/map/layout/{LAYOUT}.bin'),'rb').read()
     W,H=lay[0],lay[1]
     cells=[struct.unpack_from('<H',lay,2+i*2)[0]//4 for i in range(W*H)]
@@ -88,8 +118,11 @@ else:
     # Learned reskin: Nicolas's hand-retiles (reskin-learned.json) override the naive auto-reskin
     # for any vanilla metatile he's already taught, so each new chapter inherits his conventions
     # (villages, mountains, forests...) as the starting point instead of the smeared default.
+    # Its target indices are metatiles in ONE tileset (the `tileset` stamp, snowy-bern) -- applying
+    # them onto a different --tileset would map to unrelated cave/etc art, so gate on a match.
     _learned_path=os.path.join(ROOT,'campaigns/rime-of-the-frostmaiden/maps/reskin-learned.json')
-    _learned=json.load(open(_learned_path)).get('map',{}) if os.path.exists(_learned_path) else {}
+    _learned_json=json.load(open(_learned_path)) if os.path.exists(_learned_path) else {}
+    _learned=_learned_json.get('map',{}) if _learned_json.get('tileset','snowy-bern')==TILESET else {}
     for i in range(W*H):
         w=_learned.get(str(cells[i]))
         if w is not None: resolved[i]=w

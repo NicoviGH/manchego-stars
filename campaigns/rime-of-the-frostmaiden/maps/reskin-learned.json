@@ -1,5 +1,6 @@
 {
-"_doc": "Learned vanilla-metatile -> snowy-bern-metatile reskin map (from Nicolas hand-retiles). Applied by gen_map_editor as the starting reskin so future chapters inherit his conventions.",
+"_doc": "Learned vanilla-metatile -> snowy-bern-metatile reskin map (from Nicolas hand-retiles). Applied by gen_map_editor as the starting reskin so future chapters inherit his conventions. Target indices are snowy-bern metatiles: gen_map_editor applies this ONLY when --tileset matches `tileset` below (a cave-interior reskin, e.g. ch03, must not inherit snowy-bern indices).",
+"tileset": "snowy-bern",
 "map": {
 "146": 130,
 "198": 130,
