@@ -52,12 +52,12 @@ narrative: >
 # chambers joined by DOORS (TERRAIN_DOOR) and chokepoints, with one scripted "open the way
 # down" map-change (TILECHANGE) at the Pinky-scout beat. Doors make Trex (the thief) matter.
 map:
-  file: maps/ch03-termalaine-mine.mar    # hand-authored on the cave/interior metatiles
+  file: maps/ch03-the-termalaine-mine.mar    # painted on the cave-interior metatiles (gen_map_editor eyedropper flow)
   tileset: cave-interior        # vendored FE cave/dungeon tileset, arctic palette (model on the ch01/ch02 winter pipeline)
   base_layout: Ch3Map           # vanilla Ch3 "Bandits of Borgo" geometry, repainted as a mine interior
                                 #   RULED 2026-07-04 (Nicolas): Borgo repaint CONFIRMED — the 2026-06-29
                                 #   proposed custom Gem-Mine blockout (#23) is rejected; decisions.md ADR.
-  size: "15×10ish"              # mirror vanilla Ch3's coordinate space (enemy tiles cite vanilla); finalize in the map tool
+  size: "17×16"                 # = vanilla Ch3Map dims (enemy/seize tiles cite vanilla coords); painted 2026-07-06
   description: >
     A walled mine interior read left-to-right as a descent: a tool-room entrance →
     kobold-held galleries (chokepoints + doors) → a river-cavern pinch → the
@@ -66,13 +66,15 @@ map:
 
 # ── Objective ──────────────────────────────────────────────────────────────────
 objective:
-  type: seize
+  type: defeat_boss
   description: >
-    Fight down through the kobold-held rooms and seize the deep workings — the
-    grell's lair at the bottom of the central shaft (vanilla Ch3's seize tile,
-    14,1). The grell guards it; the way in opens after Pinky scouts the shaft.
+    Fight down through the kobold-held rooms to the deep workings — the grell's lair
+    at the bottom of the central shaft (14,1) — and kill the grell. DEVIATION from
+    vanilla Ch3 (which is Seize the boss tile): our win is Defeat Boss (slay the
+    aberration), which reads truer for a monster kill than capturing a throne
+    (Nicolas, 2026-07-06; decisions.md). The grell is visible from turn 1.
 
-win_condition: seize_point_held
+win_condition: boss_defeated
 lose_condition: all_player_units_defeated         # FE8 lord rule
 
 difficulty_note: >
@@ -113,8 +115,7 @@ enemy_units:
     autolevel: true
     inventory:
       - id: evil-eye            # the mogall's innate ranged magic gaze (hits RES); flavor = lightning tentacle
-    ai_pattern: aggressive      # guards the lair; revealed by the Pinky shaft-scout (scripted spawn, not fog)
-    revealed_by: pinky_scout
+    ai_pattern: aggressive      # guards the lair; VISIBLE from turn 1 like vanilla Bazba — Pinky's shaft-scout moved into the opening cutscene (player sees the mogall up top), so no in-battle reveal
     death_quote: "*a wet, clicking shriek*"
   # ── 6 Brigand kobolds (vanilla L3-L4 brigands; 2 are key-droppers below) → Icewind kobolds ──
   - id: kobold-axe
@@ -156,37 +157,43 @@ enemy_units:
     autolevel: true
     inventory:
       - id: steel-axe           # heavy mining maul
+      - id: pure-water          # vanilla (14,6) brigand carried Pure Water
     ai_pattern: defensive
   # ── 1 Mercenary (vanilla L2 merc @ (15,2)) → a blade-kobold ──
   - id: kobold-blade
     name: "Kobold Skirmisher"
     count: 1
+    positions: [[15, 2]]        # vanilla merc tile
     class: mercenary
     level: 2
     autolevel: true
     inventory:
       - id: iron-sword
+      - id: antitoxin           # vanilla merc carried Antitoxin
     ai_pattern: defensive
   # ── 1 Archer (vanilla L4 archer @ (12,9)) → a kobold slinger ──
   - id: kobold-slinger
     name: "Kobold Slinger"
     count: 1
+    positions: [[12, 9]]        # vanilla archer tile
     class: archer
     level: 4
     autolevel: true
     inventory:
       - id: iron-bow            # dart/sling — the chapter's single ranged kobold
     ai_pattern: defensive
-  # ── 1 Thief (vanilla enemy thief @ (9,11)) → a giant rat scavenger (book M3 River Cavern) ──
-  - id: giant-rat
-    name: "Giant Rat"
+  # ── 1 Thief (vanilla enemy thief @ (9,11)) → a svirfneblin gem-skulk (deep-gnome looter; not a rat — RBG & Pinky are the party's rats) ──
+  - id: svirfneblin-skulk
+    name: "Svirfneblin Skulk"
+    fe_name: "Deep Gnome"
     count: 1
+    positions: [[9, 11]]        # vanilla enemy-thief tile
     class: thief
     level: 3
     autolevel: true
     inventory:
-      - id: iron-sword          # claws/bite (modeled as the vanilla thief's blade)
-    ai_pattern: aggressive      # scurries the tunnels (the book's rodent tracks)
+      - id: iron-sword          # a fine knife (modeled as the vanilla thief's blade)
+    ai_pattern: aggressive      # slipped up from the Underdark for the tourmaline — ties to the grell's origin; loots like the vanilla thief
   # ── 2 key-droppers (vanilla Door Key / Chest Key brigands) → kobolds that drop the keys ──
   - id: kobold-keykeep-door
     name: "Icewind Kobold"
@@ -440,3 +447,19 @@ design_notes: >
   Wolfram ore-snacking) land in the mid-map cutscene. Enemy/reward footprints both mirror
   vanilla FE8 Ch3; the only deviations (grell=monster boss, the ch02↔ch03 gem/hand-axe swap,
   the monster-debut move) are recorded in decisions.md and net-neutral to parity.
+
+
+  Narrative reframe (2026-07-06, PENDING a dialogue-pass on the #97-locked beats — decisions
+  captured here so nothing is lost; fiction only, roster/positions unchanged = still plays like
+  Bandits of Borgo): (1) the enemy kobolds are a FERAL SPLINTER — the ones who drove the miners
+  out and are blood-drawn by the grell in the deep — NOT Trex's disciplined warren; staged as
+  his broken-Common foil (trex.md "let the gap characterize"). (2) Trex's motive to fight them =
+  purge the feral ones + kill the grell to clear his people's name and win Termalaine's trust
+  (his established goal), resolving "why would he help us fight kobolds." (3) The kobold RBG
+  executes is one of the FERAL ones (retires trex.md's "he is only frightened" calibration line;
+  his entrance pivots from protect-my-kin to distinguish-myself-and-pitch-the-deal). (4) The
+  grell is VISIBLE from turn 1 (like vanilla Bazba); Pinky's shaft-scout folds into the OPENING
+  cutscene (player sees the mogall up top) — revealed_by:pinky_scout dropped from the grell.
+  (5) The vanilla enemy-thief slot is a SVIRFNEBLIN SKULK (deep-gnome gem-looter, Underdark tie
+  to the grell), not a giant rat (RBG & Pinky are the party's rats). Dialogue-pass scope = the
+  opening beat + the RBG-execution/Trex-recruit beat; grounds in trex.md + the book.
