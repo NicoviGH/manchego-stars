@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.join(ROOT,'tools'))
 from map_tileset_tool import _tileset_from_dir, Tileset
 from PIL import Image
 
-KNOWN_FLAGS={'--tileset','--blank','--fill','--ref'}
+KNOWN_FLAGS={'--tileset','--blank','--fill','--ref','--vanilla'}
 FLAGS={}
 ARGS=[]
 for a in sys.argv[1:]:
@@ -34,6 +34,7 @@ for a in sys.argv[1:]:
         ARGS.append(a)
 TILESET=FLAGS.get('--tileset','snowy-bern')
 BLANK=FLAGS.get('--blank')
+VANILLA_REF=FLAGS.get('--vanilla')  # blank mode: render this vanilla layout in the reference pane
 if BLANK:
     LAYOUT='%s (custom canvas)'%TILESET
     OUT_HTML=ARGS[0] if len(ARGS)>0 else 'editor.html'
@@ -72,6 +73,70 @@ def _vanilla_tileconfig_bin(dec, layout):
     sys.stderr.write('WARN: could not resolve vanilla tile config for %r; '
                      'using TileConfiguration1\n' % layout)
     return default
+
+
+def _asset_names(dec):
+    import re
+    names=[]
+    with open(os.path.join(dec,'data/data_8B363C.s')) as f:
+        for line in f:
+            mo=re.match(r'\s*\.word\s+(\w+)',line)
+            if mo: names.append(mo.group(1))
+    return names
+
+
+def _walkable_terrains(dec):
+    """Terrain ids a foot unit can ENTER, read from the engine's OWN move-cost table
+    (data_terrains.s, CommonT1Normal). Cost 0 and 255 are the impassable sentinels;
+    1..254 is enterable (plains=1, forest=2, ...). Drives the editor's green/red
+    passability overlay so it's correct for ANY tileset -- the old hand-list was snow-
+    flavored and wrongly flagged the cave floor (0x2a=SHIP_FLAT, cost 1) as impassable."""
+    import re
+    try:
+        src=open(os.path.join(dec,'src/data_terrains.s'),errors='ignore').read()
+        m=re.search(r'TerrainTable_MovCost_CommonT1Normal:\s*(.*?)(?=\n\w+:|\n\s*\.global|\Z)',src,re.S)
+        vals=[]
+        for tok in re.findall(r'\.byte\s+([^\n]+)',m.group(1)):
+            for v in tok.split(','):
+                v=v.strip()
+                if v: vals.append(int(v,0)&0xFF)
+        return [i for i,c in enumerate(vals) if 0<c<255]
+    except Exception:
+        sys.stderr.write('WARN: could not read move-cost table; using the legacy walk list\n')
+        return [0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x0a,0x0b,0x0c,0x0d,0x0e,0x13,0x17,0x1f]
+
+
+def _render_vanilla_layout(dec, layout):
+    """Render a vanilla FE8 map layout (e.g. Ch3Map) as a PIL image, using ITS OWN
+    tileset. gChapterDataAssetTable (data_8B363C.s) groups each tileset's ObjectType/
+    MapPalette/TileConfiguration right before the layouts that ride it, so resolve the
+    three by scanning BACKWARD from the layout for the nearest of each -- Ch3Map/Ch4Map
+    ride tileset 2, not 1, so hardcoding ObjectType1 would render garbage. The raw
+    .4bpp/.gbapal are build-only artifacts, so build any missing one with the decomp's
+    own gbagfx (authoritative palette). Returns (image, w, h)."""
+    import subprocess
+    names=_asset_names(dec); i=names.index(layout)
+    obj=pal=cfg=None
+    for n in reversed(names[:i]):
+        if cfg is None and n.startswith('TileConfiguration'): cfg=n
+        elif pal is None and n.startswith('MapPalette'): pal=n
+        elif obj is None and n.startswith('ObjectType'): obj=n
+        if obj and pal and cfg: break
+    if not (obj and pal and cfg):
+        raise ValueError('could not resolve tileset assets for %r'%layout)
+    g=os.path.join(dec,'graphics/map')
+    def ensure(src,dst):
+        if not os.path.exists(dst):
+            subprocess.run([os.path.join(dec,'tools/gbagfx/gbagfx'),src,dst],check=True)
+    ensure(os.path.join(g,obj+'.png'), os.path.join(g,obj+'.4bpp'))
+    ensure(os.path.join(g,pal+'.pal'), os.path.join(g,pal+'.gbapal'))
+    ts=Tileset(os.path.join(g,obj+'.4bpp'),os.path.join(g,pal+'.gbapal'),os.path.join(g,cfg+'.bin'))
+    lay=open(os.path.join(g,'layout',layout+'.bin'),'rb').read()
+    w,h=lay[0],lay[1]
+    cells=[struct.unpack_from('<H',lay,2+j*2)[0]//4 for j in range(w*h)]
+    img=Image.new('RGB',(w*16,h*16))
+    for j,m in enumerate(cells): img.paste(ts.metatile_image(m),((j%w)*16,(j//w)*16))
+    return img,w,h
 
 
 win=_tileset_from_dir(os.path.join(ROOT,'campaigns/rime-of-the-frostmaiden/maps/tilesets',TILESET))
@@ -161,6 +226,19 @@ for m in range(1024):
     atlas.paste(win.metatile_image(m), ((m%ACOLS)*16,(m//ACOLS)*16))
 buf=io.BytesIO(); atlas.save(buf,'PNG'); ATLAS=base64.b64encode(buf.getvalue()).decode()
 
+# Eyedropper source (#40, ch03+): if this tileset ships a Tiled demo map (Cynon's
+# hand-painted mineshaft for cave-interior), render it in the right pane so Nicolas grabs
+# tiles straight off finished art -- click a cell, that metatile becomes the brush -- instead
+# of hunting the raw metatile bank. Tilesets with no demo map (snowy-bern's reskin flow) keep
+# the palette. Both draw from the same `win` atlas, so a demo cell and a painted cell match.
+from map_tileset_tool import tmx_grid
+_demo_tmx=os.path.join(ROOT,'campaigns/rime-of-the-frostmaiden/maps/tilesets',TILESET,'test-map.tmx')
+if os.path.exists(_demo_tmx):
+    _dg=tmx_grid(_demo_tmx); DH_DEMO=len(_dg); DW_DEMO=len(_dg[0]); DEMO=[m for row in _dg for m in row]
+    print('eyedropper demo map: %s (%dx%d)'%(os.path.basename(_demo_tmx),DW_DEMO,DH_DEMO))
+else:
+    DEMO=[]; DW_DEMO=0; DH_DEMO=0
+
 # Reference pane. Custom-canvas mode embeds --ref (any image, e.g. the flattened
 # book-map blockout) stretched to the canvas so the yellow hover-highlight lines up;
 # without --ref it stays a dark placeholder. Reskin mode renders the ORIGINAL FE8
@@ -170,7 +248,14 @@ buf=io.BytesIO(); atlas.save(buf,'PNG'); ATLAS=base64.b64encode(buf.getvalue()).
 # decode gets the palette wrong), then render via the standard path.
 if BLANK:
     REF_IMG=FLAGS.get('--ref')
-    if REF_IMG:
+    if VANILLA_REF:
+        # Render the vanilla layout this canvas repaints (e.g. Ch3Map = vanilla Borgo) so
+        # Nicolas matches the original geometry cell-for-cell while painting. Resize to the
+        # canvas only if dims differ (a faithful repaint keeps them equal, so hover aligns).
+        vref,_vw,_vh=_render_vanilla_layout(DEC,VANILLA_REF)
+        if (_vw,_vh)!=(W,H): vref=vref.resize((W*16,H*16),Image.NEAREST)
+        print('vanilla reference: %s (%dx%d)'%(VANILLA_REF,_vw,_vh))
+    elif REF_IMG:
         vref=Image.open(os.path.expanduser(REF_IMG)).convert('RGB').resize(
             (W*16,H*16),Image.LANCZOS)
     else:
@@ -241,24 +326,33 @@ HTML=r'''<!doctype html><html><head><meta charset="utf-8"><title>__TITLE__ Map E
   <div><div class="hint" style="margin-bottom:4px"><b>YOUR MAP</b> — paint here</div><canvas id="map"></canvas></div>
  </div>
  <div class="hint" id="cell">hover a cell…</div>
- <div class="bar" style="margin-top:8px"><b>How to use:</b> 1) pick a tile on the right (it becomes your brush) &nbsp; 2) click/drag on the map to paint &nbsp; 3) <b>Export</b> → a <i>__DOWNLOAD__</i> downloads &nbsp; 4) tell Claude "exported" and it compiles + renders.</div>
+ <div class="bar" style="margin-top:8px"><b>How to use:</b> 1) click a tile on the <b>demo map</b> (right) to grab it as your brush &nbsp; 2) click/drag on the map to paint &nbsp; 3) <b>Export</b> → a <i>__DOWNLOAD__</i> downloads &nbsp; 4) tell Claude "exported" and it compiles + renders.</div>
  <textarea id="out" style="width:680px;height:70px;display:none;background:#111;color:#6f6"></textarea>
 </div>
 <div id="right">
- <div class="bar"><b>TILE PALETTE</b> — click to pick brush. filter:
-  <select id="filter"></select> &nbsp;<span class="hint">green=walkable border on map</span></div>
- <canvas id="pal"></canvas>
+ <div id="demoWrap" style="display:none">
+  <div class="bar"><b>MINE DEMO MAP</b> — click any tile to grab it as your <b>brush</b> (eyedropper). &nbsp;<span class="hint">yellow = current brush · cyan = hover</span></div>
+  <div class="hint" id="demoReadout" style="margin-bottom:6px">hover the demo map…</div>
+  <canvas id="demo"></canvas>
+ </div>
+ <div id="palWrap" style="display:none">
+  <div class="bar"><b>TILE PALETTE</b> — click to pick brush. filter:
+   <select id="filter"></select> &nbsp;<span class="hint">green=walkable border on map</span></div>
+  <canvas id="pal"></canvas>
+ </div>
 </div>
 <script>
 const W=__W__,H=__H__,T=16,ACOLS=__ACOLS__;
 let GRID=__GRID__; const TERR=__TERR__,PAL=__PAL__,TNAME=__TNAME__;
-const WALK=new Set([0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x0a,0x0b,0x0c,0x0d,0x0e,0x13,0x17,0x1f]);
+const WALK=new Set(__WALK__);  // enterable terrains, from the engine's move-cost table
 const atlas=new Image(); atlas.src="data:image/png;base64,__ATLAS__";
 const vanref=new Image(); vanref.src="data:image/png;base64,__VANREF__";
-const MC=48, PC=34, PCOLS=16;
+const MC=48, PC=34, PCOLS=16, DC=22;
+const DEMO=__DEMO__, DW=__DW__, DH=__DH__;
 const map=document.getElementById('map'), mx=map.getContext('2d');
 const ref=document.getElementById('ref'), rx=ref.getContext('2d');
 const pal=document.getElementById('pal'), px=pal.getContext('2d');
+const demo=document.getElementById('demo'), dcx=demo.getContext('2d');
 map.width=W*MC; map.height=H*MC;
 ref.width=W*MC; ref.height=H*MC; rx.imageSmoothingEnabled=false;
 function drawRef(hl){
@@ -274,8 +368,8 @@ function tileSrc(m){return [(m%ACOLS)*T,(Math.floor(m/ACOLS))*T];}
 function drawMap(){
  for(let i=0;i<W*H;i++){const m=GRID[i],x=(i%W)*MC,y=(Math.floor(i/W))*MC;
   const[s,t]=tileSrc(m); mx.drawImage(atlas,s,t,T,T,x,y,MC,MC);
-  if(showGrid){mx.strokeStyle=WALK.has(TERR[m])?'#28d228':'#eb2d2d'; mx.lineWidth=2;
-   mx.strokeRect(x+1,y+1,MC-2,MC-2);}}
+  if(showGrid){mx.strokeStyle=WALK.has(TERR[m])?'#28d228':'#eb2d2d'; mx.lineWidth=1;
+   mx.strokeRect(x+0.5,y+0.5,MC-1,MC-1);}}
 }
 function buildFilter(){
  const f=document.getElementById('filter'); const terrs=[...new Set(PAL.map(m=>TERR[m]))].sort((a,b)=>a-b);
@@ -290,7 +384,24 @@ function drawPal(){
   px.drawImage(atlas,s,t,T,T,x,y,PC-2,PC-2);
   if(m===brush){px.strokeStyle='#ffd84d';px.lineWidth=3;px.strokeRect(x+1,y+1,PC-4,PC-4);}});
 }
-function setBrush(m){brush=m;document.getElementById('brush').textContent='brush = tile i'+m+' ('+(TNAME[TERR[m]]||TERR[m])+')';drawPal();}
+let lastDemoHover=-1;
+function drawDemo(hl){
+ if(hl===undefined)hl=lastDemoHover; lastDemoHover=hl;
+ demo.width=DW*DC; demo.height=DH*DC; dcx.imageSmoothingEnabled=false;
+ for(let i=0;i<DEMO.length;i++){const m=DEMO[i],x=(i%DW)*DC,y=Math.floor(i/DW)*DC;
+  const[s,t]=tileSrc(m); dcx.drawImage(atlas,s,t,T,T,x,y,DC,DC);
+  if(m===brush){dcx.strokeStyle='#ffd84d';dcx.lineWidth=2;dcx.strokeRect(x+1,y+1,DC-2,DC-2);}}
+ if(hl>=0){const x=(hl%DW)*DC,y=Math.floor(hl/DW)*DC;dcx.strokeStyle='#4dd2ff';dcx.lineWidth=2;dcx.strokeRect(x+1,y+1,DC-2,DC-2);}
+}
+function demoCellAt(e){const r=demo.getBoundingClientRect();const x=Math.floor((e.clientX-r.left)/DC),y=Math.floor((e.clientY-r.top)/DC);return(x>=0&&x<DW&&y>=0&&y<DH)?y*DW+x:-1;}
+if(DEMO.length){
+ demo.onmousedown=e=>{const i=demoCellAt(e);if(i>=0)setBrush(DEMO[i]);};
+ demo.onmousemove=e=>{const i=demoCellAt(e);if(i>=0){const m=DEMO[i];
+  document.getElementById('demoReadout').textContent='tile i'+m+'  ('+(TNAME[TERR[m]]||('0x'+TERR[m].toString(16)))+')  — click to grab';drawDemo(i);}};
+ demo.onmouseleave=()=>drawDemo(-1);
+}
+function refreshBrushPanel(){if(DEMO.length)drawDemo();else drawPal();}
+function setBrush(m){brush=m;document.getElementById('brush').textContent='brush = tile i'+m+' ('+(TNAME[TERR[m]]||TERR[m])+')';refreshBrushPanel();}
 function paintAt(i){
  hist.push(GRID.slice());
  if(document.getElementById('mode').value==='all'){const old=GRID[i];for(let j=0;j<GRID.length;j++)if(GRID[j]===old)GRID[j]=brush;}
@@ -316,7 +427,10 @@ document.getElementById('export').onclick=()=>{
  const b=new Blob([js],{type:'application/json'});const a=document.createElement('a');
  a.href=URL.createObjectURL(b);a.download='__DOWNLOAD__';a.click();
 };
-atlas.onload=()=>{drawMap();buildFilter();drawPal();setBrush(brush);drawRef(-1);};
+atlas.onload=()=>{drawMap();
+ if(DEMO.length){document.getElementById('demoWrap').style.display='block';drawDemo(-1);}
+ else{document.getElementById('palWrap').style.display='block';buildFilter();drawPal();}
+ setBrush(brush);drawRef(-1);};
 vanref.onload=()=>drawRef(-1);
 </script></body></html>'''
 
@@ -324,6 +438,8 @@ out=(HTML.replace('__W__',str(W)).replace('__H__',str(H)).replace('__ACOLS__',st
      .replace('__GRID__',json.dumps(grid)).replace('__TERR__',json.dumps(TERR))
      .replace('__PAL__',json.dumps(PAL)).replace('__TNAME__',json.dumps({str(k):v for k,v in TNAME.items()}))
      .replace('__ATLAS__',ATLAS).replace('__VANREF__',VANREF)
+     .replace('__DEMO__',json.dumps(DEMO)).replace('__DW__',str(DW_DEMO)).replace('__DH__',str(DH_DEMO))
+     .replace('__WALK__',json.dumps(_walkable_terrains(DEC)))
      .replace('__DOWNLOAD__',DOWNLOAD).replace('__TITLE__',LAYOUT)
      .replace('__TILESET__',TILESET))
 # TNAME keys must be numeric in JS object -> emit as numbers
