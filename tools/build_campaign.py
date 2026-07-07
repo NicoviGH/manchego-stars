@@ -5032,7 +5032,10 @@ CH03_BOSS_DEATH_MSG = 0x9A3
 CH03_ENDING_SCRIPT = 'EventScr_089F19F8'
 CH03_AI = {'aggressive': '{0x0, 0x0, 0x1, 0x0}',   # pursue/charge
            'defensive':  '{0x3, 0x3, 0x9, 0x20}'}  # attack in place, never move (hold the galleries)
-CH03_CLASS_IDS = {'mogall': 'CLASS_MOGALL', 'brigand': 'CLASS_BRIGAND',
+# Brigand kobolds ride the Lizard-Wildling reskin slot (inject_enemy_class_reskins clones
+# CLASS_BRIGAND -> CLASS_BLST_KILLER_EMPTY with the lizard SMS; combat stays brigand). Grell =
+# vanilla Mogall; blade = Mercenary (Lizardzerker slot lands next); archer/thief stay vanilla.
+CH03_CLASS_IDS = {'mogall': 'CLASS_MOGALL', 'brigand': 'CLASS_BLST_KILLER_EMPTY',
                   'mercenary': 'CLASS_MERCENARY', 'archer': 'CLASS_ARCHER', 'thief': 'CLASS_THIEF'}
 CH03_ITEM_IDS = {'iron-axe': 'ITEM_AXE_IRON', 'hand-axe': 'ITEM_AXE_HANDAXE',
                  'steel-axe': 'ITEM_AXE_STEEL', 'iron-sword': 'ITEM_SWORD_IRON',

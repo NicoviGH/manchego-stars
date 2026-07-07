@@ -3028,6 +3028,40 @@ scenarios.ch03win = function()
     result("PASS", "grell killed -> EVFLAG_DEFEAT_BOSS set -> DefeatBoss ending ran to title (ch03 win wired)")
 end
 
+-- KOBOLDVIEW (#23 art): pull the enemy kobolds ON-SCREEN next to the party so their reskinned
+-- map sprites are visible (the roster deploys off-camera at the enemy tiles). Teleports the first
+-- few red brigand generics (pid 0xaa) to tiles around braulo's spawn and screenshots. No combat.
+scenarios.koboldview = function()
+    if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
+    local leader = blue(0x01)
+    if not leader then return result("FAIL", "leader (braulo) not deployed") end
+    -- collect distinct red generic kobolds (pid 0xaa) and park a few around braulo
+    local spots, si = {}, 1
+    for _, d in ipairs({ {2,0}, {3,0}, {2,-1}, {3,-1}, {2,1}, {3,1}, {4,0} }) do
+        local tx, ty = leader.x + d[1], leader.y + d[2]
+        if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0 then
+            spots[#spots + 1] = { tx, ty }
+        end
+    end
+    local moved = 0
+    for i = 0, 23 do
+        local u = unitAt(SYM.gUnitArrayRed, i)
+        if u and not isDead(u) and u.charId == 0xaa and moved < #spots then
+            moved = moved + 1
+            local s = spots[moved]
+            local grid = mapUnitAt(u.x, u.y)
+            setMapUnit(u.x, u.y, 0)
+            emu:write8(u.addr + 0x10, s[1]); emu:write8(u.addr + 0x11, s[2])
+            setMapUnit(s[1], s[2], grid)
+        end
+    end
+    log(string.format("parked %d kobold(s) next to braulo (%d,%d)", moved, leader.x, leader.y))
+    wait(60)
+    shot("kobolds-on-map")
+    result(moved > 0 and "PASS" or "FAIL",
+        string.format("%d kobold map sprites pulled on-screen for review", moved))
+end
+
 -- ch02: entry assertions on the ch02 map (mirrors scenarios.ch01). The 3 green chwinga are on
 -- the field, the party deploys to the cap, and the archer + boss are present.
 scenarios.ch02 = function()
