@@ -2955,6 +2955,79 @@ local function protectChwinga()
     end
 end
 
+-- CH03WIN (#23 item 1): kill the grell -> its FLAGGED defeat quote sets EVFLAG_DEFEAT_BOSS
+-- -> the Ch4 Misc DefeatBoss AFEV runs the ending. Proves the ch03 win wiring fires. The grell
+-- rides a RAW pid (0xb7, no CA_BOSS -- so the generic clear-bot can't target it) and sits far
+-- from the left-entrance spawn, so we teleport the leader (braulo, pid 0x01) onto a grell-adjacent
+-- tile and strike. Poke the grell frail first (1 HP, no avoid) so one clean melee hit kills; a
+-- Mogall's Evil Eye is range 2+, so a range-1 strike draws no lethal counter. EVFLAG_DEFEAT_BOSS
+-- (flag 2) is the definitive assertion: the engine binds the DefeatBoss AFEV directly to it, and
+-- SetPidDefeatedFlag (eventinfo.c) sets it on the grell's death REGARDLESS of CA_BOSS.
+-- Run: PT_HOST_CHAPTER=4 tools/playtest/run.sh ch03win  (needs a CH03BOOT=1 ROM). Seeds #23 item 7.
+scenarios.ch03win = function()
+    if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
+    if not red(0xb7) then return result("FAIL", "grell (pid 0xb7) not found in the red array") end
+    if not blue(0x01) then return result("FAIL", "leader (braulo, pid 0x01) not deployed") end
+    -- The fast-boot deploys the party weaponless (items='0'; real equipping rides the PREP pass,
+    -- #23 item 2), so give the leader an Iron Axe (id 0x1F | 45 uses) in items[0] so Attack appears.
+    emu:write16(blue(0x01).addr + 0x1E, 0x2D1F)
+    log("leader given an Iron Axe (fast-boot deploys weaponless)")
+    -- Bring the grell TO braulo's isolated left-entrance spawn (no other enemy is near it) so the
+    -- grell is the ONLY unit in braulo's range -- chooseAttack's default target can't pick a kobold
+    -- by mistake (the (14,1) lair sits amid other foes). Up to 3 player turns, enemy-phase between,
+    -- re-frailing + re-parking the grell each turn in case a whiff or its AI move disturbs it.
+    for turn = 1, 3 do
+        local g = red(0xb7)
+        if isDead(g) or eventFlag(2) then break end
+        local leader = blue(0x01)
+        pokeFrail(g)
+        g = red(0xb7)
+        local ggrid = mapUnitAt(g.x, g.y)
+        local parked = false
+        for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+            local tx, ty = leader.x + d[1], leader.y + d[2]
+            if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0 then
+                setMapUnit(g.x, g.y, 0)
+                emu:write8(g.addr + 0x10, tx); emu:write8(g.addr + 0x11, ty)
+                setMapUnit(tx, ty, ggrid)
+                log(string.format("turn %d: grell parked at (%d,%d) next to braulo (%d,%d)",
+                    turn, tx, ty, leader.x, leader.y))
+                parked = true
+                break
+            end
+        end
+        if not parked then return result("FAIL", "no free tile adjacent to braulo to park the grell") end
+        if moveUnit(leader.x, leader.y, leader.x, leader.y) then
+            shot("attacking-grell")
+            chooseAttack(leader.addr)
+        end
+        if isDead(red(0xb7)) or eventFlag(2) then break end
+        log("grell survived turn " .. turn .. " (miss?); running enemy phase to retry")
+        if runEnemyPhase() == "gameover" then return result("FAIL", "unexpected game over in ch03win") end
+    end
+    if not (isDead(red(0xb7)) or eventFlag(2)) then
+        shot("grell-alive")
+        return result("FAIL", "could not kill the grell in 3 turns")
+    end
+    log("grell dead; waiting out the defeat quote for EVFLAG_DEFEAT_BOSS")
+    -- The flag is set AFTER the death quote renders (DisplayDefeatTalkForPid: show msg, THEN
+    -- SetPidDefeatedFlag), so tap A through the shriek line while polling the flag.
+    local won = waitFor(function() return eventFlag(2) end, 3600, true)
+    log(string.format("debug: EVFLAG_DEFEAT_BOSS(2)=%s chapter=%d (host=%d)",
+        tostring(eventFlag(2)), chapter(), HOST_CHAPTER))
+    if not won then
+        shot("grell-dead-no-flag")
+        return result("FAIL", "grell died but EVFLAG_DEFEAT_BOSS never set (win did not fire)")
+    end
+    -- Flag set -> the Misc DefeatBoss AFEV runs the ending script (victory sting -> dev-placeholder
+    -- campfire -> MNTS back to title, since ch04 isn't hosted). Let it play out to the title screen
+    -- WITHOUT mashing A (mashing would hit "Press START" and boot a spurious New Game). Screenshot
+    -- the endpoint as a no-crash confirmation that the ending script itself is valid.
+    wait(240)
+    shot("ch03-ending-ran")
+    result("PASS", "grell killed -> EVFLAG_DEFEAT_BOSS set -> DefeatBoss ending ran to title (ch03 win wired)")
+end
+
 -- ch02: entry assertions on the ch02 map (mirrors scenarios.ch01). The 3 green chwinga are on
 -- the field, the party deploys to the cap, and the archer + boss are present.
 scenarios.ch02 = function()
