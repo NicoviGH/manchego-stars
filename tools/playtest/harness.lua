@@ -30,7 +30,9 @@ dofile(PLAYTEST_DIR .. "/symbols.lua")
 local UNIT_SIZE = 0x48
 local US_DEAD = 4 -- include/bmunit.h (1 << 2)
 local CHAR_HLIN, CHAR_SCRAMSAX, CHAR_SEPHEK = 0x0D, 0x11, 0x68 -- NATASHA/KYLE/ONEILL slots
-local HOST_CHAPTER = 1 -- prologue is hosted on chapter slot 1; MNC2(0x2) on win
+-- prologue/sandbox host on chapter slot 1; a chapter load-test (e.g. --ch03-boot on slot 4)
+-- overrides via PT_HOST_CHAPTER so bootToMap/inChapter recognize the right slot.
+local HOST_CHAPTER = PLAYTEST_HOST_CHAPTER or 1
 -- Lord select (#42): menu order = classed cast order (build_campaign PORTRAIT_MAP);
 -- the LAST candidate (pinky, NEIMI slot) is benched by default under the 4-slot
 -- deploy cap, so choosing them is the visible force-deploy differential.
@@ -2376,6 +2378,19 @@ scenarios.bootobserve = function()
         yield()
     end
     return result("PASS", "boot observed")
+end
+
+-- MAPSHOT: boot to the map and screenshot the deployed field -- the generic "see the
+-- units on the map" chapter load-test (any hosted chapter reachable from New Game, e.g.
+-- a --ch03-boot fast-boot ROM). bootToMap already shoots "map-loaded"; add a few settle
+-- frames for a clean capture. Reusable smoke-look for every new chapter host.
+scenarios.mapshot = function()
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    for i = 1, 6 do
+        wait(20)
+        shot(string.format("mapshot-%02d-ch%d-turn%d", i, chapter(), turn()))
+    end
+    return result("PASS", "map deployed; screenshots taken")
 end
 
 -- RECORDOPENING: boot -> title -> START -> New Game, then record the #43 opening montage

@@ -14,6 +14,7 @@ The data is the doc — facts live in exactly one place, and indexes are generat
 | Settled design decisions (combat, triangle, economy, class mapping, promotion seam) | `docs/decisions.md` |
 | Generic 5e→FE engine conversion | `docs/rules-mapping.md` |
 | Adding a unit's art / battle anim / platform | the **`inject_battle_anims` / `inject_battle_platforms` docstrings** (how) + `decisions.md` Art & Audio (why) + the **`custom_unit` issue template** (checklist) |
+| Hosting a new chapter (map → slot → deploy → win → boot) | **`docs/adding-a-chapter.md`** (the repeatable runbook) + `inject_ch03` (lean reference impl) |
 | FE8 cadence/reward grounding | `docs/fe8-pacing-reference.md` |
 | Post-MVP (Act II–V) plan | `docs/roadmap.md` |
 | Vision / architecture / phased roadmap | `docs/PRD.md` |

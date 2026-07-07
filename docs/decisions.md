@@ -575,10 +575,10 @@ _Reconstructed: 2026-06-22 (CLAUDE, decomp event-data + `events_shoplist.c` scan
 fe8-pacing §3 from era-buckets to a decomp-pinned curve (correcting the old "promos at Ch9–13": promos
 + boosters actually start Ch5, Master Seal/Secret Shop start ~Ch14a). Companion to the recruit budget._
 
-**Ch3 "The Termalaine Mine" — three sanctioned deviations from strict per-chapter parity.**
+**Ch3 "The Termalaine Mine" — four sanctioned deviations from strict per-chapter parity.**
 ch03 reskins vanilla FE8 Ch3 "The Bandits of Borgo" (Seize big-battle; the game's first chests +
-first thief). Roster + reward footprints mirror it 1:1, with three deliberate, parity-neutral
-deviations (Nicolas-directed, this session):
+first thief). Roster + reward footprints mirror it 1:1, with four deliberate, parity-neutral
+deviations (Nicolas-directed):
 1. **The boss is a real monster.** A grell IS a floating tentacled eye-aberration, so the boss slot
    (vanilla Bazba, Brigand L6) becomes a **CLASS_MOGALL** with the Evil Eye — NOT a frailty cheat.
    A same-level mogall is far weaker than a Brigand, so it carries a **level bump (L12)** to hold
@@ -596,10 +596,15 @@ deviations (Nicolas-directed, this session):
    only the chapter each of the two items appears in is swapped. (We considered keeping the gem at
    ch02 for strict per-chapter parity; chose the swap for the gem-mine payoff, since it's net-neutral
    and the Ch2 gem money is meant for world-map shopping after the chapter anyway, not the thin Ch2 armory.)
+4. **Objective is Defeat Boss, not Seize (added 2026-07-06, Nicolas).** Vanilla Ch3 wins by seizing
+   Bazba's tile (14,1); ours wins by **killing the grell** on that tile. Both require defeating the
+   boss — Defeat Boss just drops the extra "step onto the tile" beat, which reads truer for slaying an
+   aberration than capturing a throne. Mechanically near-identical (the grell sits on 14,1 regardless);
+   the parity band is unchanged. (The ch03 YAML `objective.type` and `win_condition` reflect this.)
 _Decided: 2026-06-26 (Nicolas + CLAUDE, Ch3 design-lock session; grounded in the FE8 decomp, the DM
-notes, and the Frostmaiden book "A Beautiful Mine" pp.93–96). FE8 has no multi-level maps, so the
-book's 3-level mine is authored as one flat walled interior (rooms via TERRAIN_DOOR + one TILECHANGE),
-not a verticality gimmick — the doors make the thief (Trex) matter._
+notes, and the Frostmaiden book "A Beautiful Mine" pp.93–96) — item 4 added 2026-07-06. FE8 has no
+multi-level maps, so the book's 3-level mine is authored as one flat walled interior (rooms via
+TERRAIN_DOOR + one TILECHANGE), not a verticality gimmick — the doors make the thief (Trex) matter._
 
 **Ch3 layout = vanilla Borgo geometry repainted, NOT a custom Gem-Mine blockout.**
 The 2026-06-29 session *proposed* pivoting the ch03 layout to a custom flattened trace of the

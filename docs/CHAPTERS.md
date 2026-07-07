@@ -17,7 +17,7 @@ rules) lives in `docs/decisions.md` and `docs/fe8-pacing-reference.md`.
 | P | A Dagger of Ice | 🟦 tutorial | DefeatBoss — Defeat Sephek Kaltro | — | Ch 1 |
 | 1 | The Iron Trail | 🟦 full-party intro | Seize — Seize the goblin camp — the chief holds it and the ingots are there | baxby | Ch 2 |
 | 2 | Cold Welcome | 🟦 breather / defend | DefeatAll — Defeat the raider band; keep the chwinga alive to claim their charms | — | Ch 3 |
-| 3 | The Termalaine Mine | 🟥 big battle (seize) | Seize — Fight down through the kobold-held rooms and seize the deep workings — the grell's lair at the bottom of the central shaft (vanilla Ch3's seize tile, 14,1). The grell guards it; the way in opens after Pinky scouts the shaft. | — | Ch 4 |
+| 3 | The Termalaine Mine | 🟥 big battle (seize) | DefeatBoss — Fight down through the kobold-held rooms to the deep workings — the grell's lair at the bottom of the central shaft (14,1) — and kill the grell. DEVIATION from vanilla Ch3 (which is Seize the boss tile): our win is Defeat Boss (slay the aberration), which reads truer for a monster kill than capturing a throne (Nicolas, 2026-07-06; decisions.md). The grell is visible from turn 1. | — | Ch 4 |
 | 4 | The White Moose | 🟨 monster debut (fog) | DefeatAll — Rout the forest's hostile beasts and spirits | lupin +npc: lupin-pack | Ch 5 |
 | 5 | The Elven Tomb | 🟥 first boss | DefeatBoss — Defeat Ravisin, the frost druid (her guardians and the moose needn't all fall) | sahnar, basil | Ch 6 |
 | 6 | The Maer Monster | 🎬 marquee set-piece | DefeatBoss / Talk — Defeat Messie OR have Marty Talk to her while adjacent | — | Ch 7 |
