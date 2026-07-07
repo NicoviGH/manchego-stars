@@ -2019,6 +2019,14 @@ session state. `HANDOFF.md` points here._
   `set_message_body(vanilla_name_text_id(slot), name_message_body(display_name(unit)))`. Give units a short `fe_name` (≤12).
 - **Clear-bot can't fully clear a chapter yet (#60).** Helpers that must REACH a later chapter use directed
   seizes / frail+teleport (`reachCh02Map`, `clear_ch02`), not fair-play clears.
+- **DefeatBoss fires from the FLAGGED defeat quote, not `CA_BOSS`** (`eventinfo.c`: `SetPidDefeatedFlag`
+  runs for ANY unit whose pid matches a `gDefeatTalkList` entry on death — no boss-attribute gate). So a
+  boss on a **raw pid with no `gCharacterData` entry** (ch03's grell = `0xb7`, chosen to avoid leaking a
+  vanilla boss's name/face/quote) still wins the map via a head-of-list quote keyed to `(pid, CHAPTER_L_N,
+  EVFLAG_DEFEAT_BOSS)`. **Trade-off:** with no `CA_BOSS` it shows **no boss HP gauge** and the generic
+  clear-bot/`findBoss()` (reads `CA_BOSS`) can't target it — so a per-boss load-test must reach it by
+  pid+tile (`ch03win`: teleport the grell to the lord and strike), and a future `clear_chNN` needs either a
+  `CA_BOSS` character entry for the boss or a pid-targeted bot. Verified in-engine (`ch03win`, 2026-07-07).
 - **Don't reuse a playtest checkpoint across an injection/build change** — only across pure graphics-byte
   swaps. Checkpoints are ROM-hash-stamped in `tools/playtest/states/` (gitignored); delete `.ss`/`.romhash`
   to force a rebuild. (A battle-anim frame change IS a build change → re-record from a fresh ROM.)

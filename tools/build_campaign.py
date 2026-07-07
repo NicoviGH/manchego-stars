@@ -5019,8 +5019,17 @@ CH03_LAYOUT = ('Ch03TermalaineMineMap', 'ch03-the-termalaine-mine')  # (asset la
 CH03_CHAPTER_YAML = 'ch03-the-termalaine-mine.yaml'
 CH03_TILESET = 'cave-interior'   # stem 'Cave' (TILESET_STEMS); first chapter to use it -> self-registers
 CH03_GOAL_DONOR = 6              # vanilla slot 6 = defeat_boss goal template (untouched by our injectors)
-CH03_BOSS_PID = '0xb7'          # grell rides the vanilla ch4 boss charIndex
+CH03_BOSS_PID = '0xb7'          # grell rides a raw charIndex (NOT the vanilla ch4 boss ENTOUMBED_CH4=0x49):
+                                # a clean slate -- no vanilla boss name/face/defeat-quote leaks, and our
+                                # flagged gDefeatTalkList entry (CHAPTER_L_4) uniquely keys the DefeatBoss win to it.
 CH03_GENERIC_PID = '0xaa'       # vanilla slot-4 generic-minion charIndex (autolevelled trash)
+# The grell's flagged death quote (gDefeatTalkList) sets EVFLAG_DEFEAT_BOSS -> the Misc DefeatBoss AFEV.
+# Body rides a dead vanilla Ch4 message id: 0x9A3 is the Ch4 opening cutscene's first line (Seth/Eirika at
+# Serafew), referenced ONLY inside EventScr_Ch4_BeginningScene -- which inject_ch03 replaces -> dead in our build.
+CH03_BOSS_DEATH_MSG = 0x9A3
+# DefeatBoss ending script: repurpose the vanilla Ch4 ending EventScr_089F19F8 (defined in ch4-eventscript.h,
+# already extern-referenced by the vanilla Ch4 Misc's DefeatAll -> visible to ch4-eventinfo.h's Misc list).
+CH03_ENDING_SCRIPT = 'EventScr_089F19F8'
 CH03_AI = {'aggressive': '{0x0, 0x0, 0x1, 0x0}',   # pursue/charge
            'defensive':  '{0x3, 0x3, 0x9, 0x20}'}  # attack in place, never move (hold the galleries)
 CH03_CLASS_IDS = {'mogall': 'CLASS_MOGALL', 'brigand': 'CLASS_BRIGAND',
@@ -5043,11 +5052,12 @@ def inject_ch03(campaign, verbose=True):
     entrance + the 10 vanilla-Ch3-parity enemies (reflavored kobolds / grell / svirfneblin)
     at their vanilla tiles, strip cutscenes, and leave a walkable load-test map.
 
-    DEFERRED (next passes, flagged not done): the DefeatBoss(grell) WIN + its flagged
-    defeat quote; the real PREP deploy (needs deployment.deploy_slots authored in the YAML);
-    the opening/recruit CUTSCENES (dialogue-pass on the #97 beats + the 2026-07-06 reframe);
-    Trex recruit; chests/doors; title-card art; enemy/boss art. Boot: --ch03-boot points New
-    Game straight here (mirrors the TESTCH sandbox, but on slot 4 + the cave map)."""
+    The DefeatBoss(grell) WIN is wired: Misc DefeatBoss AFEV + the grell's flagged (EVFLAG_DEFEAT_BOSS)
+    defeat quote + a minimal ending script (victory -> dev-placeholder landing until ch04 hosts).
+    DEFERRED (next passes, flagged not done): the real PREP deploy (needs deployment.deploy_slots
+    authored in the YAML); the opening/recruit/ending CUTSCENES (dialogue-pass on the #97 beats + the
+    2026-07-06 reframe) + chaining ch02->ch03; Trex recruit; chests/doors; title-card art; enemy/boss
+    art. Boot: --ch03-boot points New Game straight here (mirrors the TESTCH sandbox, on slot 4 + cave)."""
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH03_CHAPTER_YAML)
 
@@ -5096,16 +5106,19 @@ def inject_ch03(campaign, verbose=True):
     with open(EVENTS_UDEFS_C, 'w', encoding='utf-8') as f:
         f.write(udefs)
 
-    # 3. Strip cutscenes (cf. inject_test_chapter): empty the Ch4 event lists, keep only
-    #    lord-death game-over in Misc (NO win trigger yet -- DefeatBoss lands with the
-    #    cutscene pass), and make the beginning scene a bare deploy of both rosters.
+    # 3. Strip cutscenes (cf. inject_test_chapter): empty the Ch4 event lists, wire the win/lose
+    #    machinery into Misc (DefeatBoss on the grell's death + lord-death game-over), and make the
+    #    beginning scene a bare deploy of both rosters. DefeatBoss = AFEV on EVFLAG_DEFEAT_BOSS,
+    #    which the grell's FLAGGED defeat quote sets on its death (step 5) -> runs the ending script;
+    #    CauseGameOverIfLordDies = AFEV on EVFLAG_GAMEOVER (the lord's flagged quote / lord-select hook).
     with open(CH4_EVENTINFO_H, encoding='utf-8') as f:
         info = f.read()
     for name in ('EventListScr_Ch4_Turn', 'EventListScr_Ch4_Character', 'EventListScr_Ch4_Location'):
         info = _replace_brace_block(info, name + '[] =', '{\n    END_MAIN\n}', CH4_EVENTINFO_H)
     info = _replace_brace_block(
         info, 'EventListScr_Ch4_Misc[] =',
-        '{\n    CauseGameOverIfLordDies\n    END_MAIN\n}', CH4_EVENTINFO_H)
+        '{\n    DefeatBoss(%s)\n    CauseGameOverIfLordDies\n    END_MAIN\n}' % CH03_ENDING_SCRIPT,
+        CH4_EVENTINFO_H)
     # Ch4's tutorial list is an EventListScr[] (struct array), NOT the prologue's pointer
     # array -- so it terminates with END_MAIN, not NULL (NULL -> int-from-pointer error).
     info = _replace_brace_block(info, 'EventListScr_Ch4_Tutorial[] =', '{\n    END_MAIN\n}', CH4_EVENTINFO_H)
@@ -5117,19 +5130,50 @@ def inject_ch03(campaign, verbose=True):
     begin = ('{\n    LOAD1(0x1, UnitDef_088B4A80)\n    ENUN\n'
              '    LOAD1(0x1, UnitDef_Event_Ch4Ally)\n    ENUN\n    ENDA\n}')
     script = _replace_brace_block(script, 'EventScr_Ch4_BeginningScene[] =', begin, CH4_EVENTSCRIPT_H)
+    # DefeatBoss ending (the script the Misc AFEV runs on the grell's death). MINIMAL for now:
+    # victory sting -> fade -> the dev-placeholder landing (RBG-by-the-campfire, then back to title),
+    # exactly as ch02's ending parks until its next chapter is hosted. ch04 isn't hosted yet, so the
+    # rich ending cutscene (the reframed beats) rides the dialogue-pass (#23 Cutscenes) + the chaining
+    # pass (#23 item 3) that swaps this dev landing for MNC2 -> ch04.
+    ending = ('{\n    MUSC(SONG_VICTORY)\n'
+              '    FADI(16) /* fade the mine out */\n'
+              + dev_placeholder_scene() +
+              '    ENDA\n}')
+    script = _replace_brace_block(script, CH03_ENDING_SCRIPT + '[] =', ending, CH4_EVENTSCRIPT_H)
     with open(CH4_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
         f.write(script)
 
-    # 4. Chapter title text (the status/prep banner).
+    # 4. Texts: chapter title (status/prep banner) + the grell's death quote. The grell has no
+    #    portrait yet (#23 Art), so its line renders FACELESS (stage business, (open, None)) -- a
+    #    reframe-neutral shriek, so it's safe to wire ahead of the cutscene dialogue-pass. Body from
+    #    the chapter YAML (single source of truth); asterisks are the YAML's stage-direction marks.
+    grell = next(e for e in chap['enemy_units'] if e.get('is_boss'))
+    shriek = grell['death_quote'].strip().strip('*').strip()
+    shriek = shriek[0].upper() + shriek[1:] if shriek else shriek
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
     set_message_body(lines, host['chapTitleTextId'], name_message_body(chap['title']))
+    set_message_body(lines, CH03_BOSS_DEATH_MSG, _script_to_message(
+        [{'grell': shriek}], {'grell': ('[OpenMidRight]', None)}))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 
+    # 5. The grell's flagged defeat quote -> head of gDefeatTalkList (first-match scan wins, so this
+    #    head entry keys the DefeatBoss win to the grell's raw pid; no vanilla 0xb7 entry to shadow).
+    #    .flag = EVFLAG_DEFEAT_BOSS is what fires the win (CA_BOSS alone sets nothing -- eventinfo.c
+    #    SetPidDefeatedFlag runs for ANY unit with a matching gDefeatTalkList entry on death).
+    quote = ('    {\n'
+             '        .pid     = %s, /* grell (ch03 boss) death quote sets the DefeatBoss flag */\n'
+             '        .route   = CHAPTER_MODE_ANY,\n'
+             '        .chapter = CHAPTER_L_4, /* ch03 is hosted on chapter slot 4 */\n'
+             '        .flag    = EVFLAG_DEFEAT_BOSS,\n'
+             '        .msg     = 0x%X, /* faceless shriek body (grell death_quote, step 4) */\n'
+             '    },' % (CH03_BOSS_PID, CH03_BOSS_DEATH_MSG))
+    _prepend_defeat_quote(quote)
+
     if verbose:
-        print('  ch03 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; defeat_boss '
-              'goal, %d-unit deploy + %d enemies (grell@14,1); cutscenes + DefeatBoss win deferred'
+        print('  ch03 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; defeat_boss goal + '
+              'DefeatBoss(grell) WIN wired, %d-unit deploy + %d enemies (grell@14,1); rich cutscenes deferred'
               % (obj_idx, pal_idx, cfg_idx, layout_idx, CH03_HOST_INDEX, len(ally_rows), len(enemies)))
 
 
