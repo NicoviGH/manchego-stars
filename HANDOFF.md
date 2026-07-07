@@ -4,36 +4,32 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-07-05→06, web→desktop — Opus reviewing Sonnet, then a live map collab):**
-> Opened by **reviewing Sonnet's #131/#132** against the decomp — all four NPC class-stat blocks
-> verbatim-correct vs `data_classes.c`; the 0x87 msg-id "unreachable" trace sound (clean, no fixes).
-> Then a long **ch03 map/tileset** session with Nicolas:
-> **① Map reskin tooling FIXED** (`7610564`): `gen_map_editor`'s winter-reskin flow hard-coded vanilla
-> `TileConfiguration1` and applied `reskin-learned.json` to any `--tileset`; ch03 breaks both (Ch3Map
-> rides `TileConfiguration2`; cave-interior ≠ snowy-bern). Now resolves each layout's own tile config
-> from the decomp asset table + `chapter_settings.json`, and gates the learned map on a `"tileset"` stamp.
-> **② Tilesets vendored on-hand** (`c0ec1f0`): FE-Repo **FF5 Caves** (WAve) + **Lava Cave** (HyperGammaSpaces)
-> at `maps/tilesets/{ff5-caves,lava-cave}/` for future chapters (inert until a chapter registers them).
-> **③ FF5 navy chest cherry-picked into `cave-interior`** — closed **metatile 17** / open **29**, palette
-> bank 5, native CHEST terrain (0x21/0x20), pinned Test Map render unchanged. Its art is tagged OPPOSITE
-> to terrain, so the graphics were swapped in `763904d` (17 = green closed, 29 = grey open).
-> **④ ch03 Borgo→mine retile — WIP layout committed** (`17fe5fa`): `ch03-the-termalaine-mine.mar` + `.json`
-> (17×16, cave-interior) + the **`ch03-retile.py` generator** — terrain-based reskin (cave-interior indices
-> are unrelated to vanilla's, so map by terrain role), wall-rim **autotile learned from Cynon's test map**,
-> **throne-dais overlay** on the O1 seize (terrain-matched to vanilla), chest 17. Furniture LOCKED: chest,
-> door (812), throne (784+frame), barrel (822), pillar (739), walls, floor base.
-> **⑤ Floor-detail:** built a **patch-stamp tool** that copies Cynon's hand-painted floor CLUSTERS (moss,
-> crystal veins, formations) from his test map onto our galleries — Nicolas's ruling: use his art, not
-> statistical scatter. **➡ NOW: Nicolas is hand-painting the ch03 floor + the still-open visuals
-> (stairs / road cart-tracks / the E1 well) in his pixel editor** (`gen_map_editor.py --tileset=cave-interior
-> <out.html> <dl.json> maps/ch03-the-termalaine-mine.mar` to resume on the current layout).
-> **Nicolas-at-home queue:** paint ch03 map · generate **Wolfram's 3 poses** (unblocks #65).
-> **Sonnet follow-ups** set up as GitHub issues (ch03 chest tile-changes + terrain parity after the
-> paint; decisions.md ADR ready now).
->
-> **Update (2026-07-06, desktop):** the stranded mobile-session work was landed to main via **PR #136**
-> (ch03 WIP layout + `ch03-retile.py` + FF5/Lava tilesets + chest fix + reskin-flow fix) — the layout
-> now lives on `main`, resume painting there. The stale-branch backlog was **deleted** (see below).
+> **Last session (2026-07-06, desktop — ch03 goes PLAYABLE in-engine):** the Termalaine Mine is now
+> painted, hosted, and load-tested. Merged via **PR #139** (editor) + **PR #140** (host).
+> **① Map painted + imported.** Nicolas hand-painted the ch03 floor/entrance on `cave-interior` in the
+> editor → `import_map_layout` → `maps/ch03-the-termalaine-mine.mar` (17×16, 210/272 cells changed).
+> **② Map-painter upgraded (PR #139, #40):** right pane is now an **eyedropper demo-map** (click a tile
+> off Cynon's mineshaft → brush); **`--vanilla=Ch3Map`** renders the real Borgo reference (resolves the
+> layout's OWN tileset by backward-scanning the asset table); thinner 1px gridlines; and an
+> **engine-accurate passability overlay** — the green/red WALK set now reads FE8's own move-cost table
+> (`data_terrains.s`), which proved the cave floor `0x2a`=SHIP_FLAT is walkable (cost 1). The map was
+> never broken; the old hardcoded snow WALK list just mislabeled it.
+> **③ ch03 HOSTED on slot 4 (PR #140, #23):** `inject_ch03` registers the cave tileset + layout, deploys
+> the classed party at the left entrance + the **10 vanilla-Ch3-parity foes** at their vanilla tiles.
+> **`--ch03-boot`** (`make CH03BOOT=1`) + the reusable **`mapshot`** scenario (`PT_HOST_CHAPTER=4`)
+> LOAD-TESTED in mGBA → chapter 4, units deployed, **"Defeat boss"** banner. Shot:
+> `docs/demo/ch03-loadtest-map.png` (regenerate: `PT_HOST_CHAPTER=4 tools/playtest/run.sh mapshot`).
+> **④ Design calls (Nicolas):** objective **Seize → Defeat Boss** (kill the grell; decisions.md item 4);
+> grell **visible from turn 1**; vanilla thief slot → **Svirfneblin Skulk** (NOT a rat — RBG & Pinky are
+> the party's rats); enemy positions/items filled 1:1 from the decomp. A **2026-07-06 narrative reframe**
+> — enemy kobolds are a FERAL splinter Trex is purging to clear his warren's name; RBG executes a feral
+> one; Pinky's scout folds into the OPENING — is captured in the ch03 YAML `design_notes`, **PENDING a
+> dialogue-pass** on the #97 beats (they now partially disagree with it).
+> **⑤ Repeatable process (Nicolas's ask):** **`docs/adding-a-chapter.md`** — the host-a-chapter runbook
+> (slot mapping, goal donors, win-wiring, gotchas, per-chapter DoD), linked from CLAUDE.md. Config-driven
+> `inject_chapter(N)` refactor filed as **#138**. **ch04 is now a doc-follow, not a rediscovery.**
+> **Nicolas-at-home queue:** generate **Wolfram's 3 poses** (unblocks #65 — the last art-blocker).
+> **Remaining ch03 build beats = the #23 checklist** (win-wiring, PREP, cutscenes, art, chaining; see §Ch3).
 
 > **Prior session (2026-07-03→04, web/mobile — Nicolas co-writing from his phone):** a full
 > dialogue-pass + rulings session, merged via PRs #127 #128 (+ a BG/ruling PR at wrap):
@@ -160,71 +156,36 @@ vendored Kitsune anim** at `battle_anims/_parked/`. Each: one `battle_anim:` blo
 feature-flow branch per unit (or small batch), `custom_unit` issue template.
 - **Deferred polish (tracked):** braulo's white swing-arc weapon-trail → **#91**; goblin enemy class-level anim → **#90**.
 
-### Content — Ch3 "The Termalaine Mine" (#23) — design LOCKED (#92) + dialogue LOCKED (#97); build beats remain
-Vanilla-FE8-Ch3 reskin (Seize; first chests + first thief) as Termalaine's kobold-overrun tourmaline mine.
-Teaching goal = the **thief** (Trex = our Colm). Decisions/deviations: `decisions.md` → Ch3 ADR (2026-06-26);
-live build checklist on **#23**.
-- **NEW (#97):** the **4 cutscene beats are written/locked** (opening / RBG-execution + Trex recruit / Pinky
-  shaft-scout / Termalaine ending) co-authored via `dialogue-pass`; Trex lore + `lore/trex.md` landed.
-- **Wiring notes owed later:** in-game **MOTION REVIEW of all 4 beats** (+ the ch02 seed line) happens at
-  the cutscene-wiring beat. **Mid-map cutscene fires on the BRUTE miniboss's DEFEAT** (the `kobold-steel`
-  "Icewind Brute" slot): flag it the miniboss + position it mid-galleries at units/objective wiring
-  (Pinky-is-metal is load-bearing in that beat).
-
-#### Map (#40) — layout RULED 2026-07-04; next beat = the Borgo→mine retile
-- **Tileset DECIDED = Cynon's Mineshaft (Gray palette)** — a purpose-built cave/mine tileset (rock walls,
-  cart tracks, timber supports, crystal/ore seams, water) vendored from **FE-Repo** (`Klokinator/FE-Repo`
-  → `Tilesets/Caves/Cynon's Mineshaft - Tileset`; CC, Cynon endorses cross-engine use), landed in-repo as
-  **`cave-interior`** (PR #111; Cynon credited in `CREDITS.md`). **NO re-palette** — native grey already
-  reads as a frozen Icewind mine (Nicolas's call).
-- **Layout RULED (2026-07-04, Nicolas — closes the #23 pending decision): REPAINT VANILLA BORGO.** The
-  2026-06-29 proposed custom Gem-Mine blockout is **rejected** — don't fabricate map geometry when a
-  vanilla-proven Seize layout exists (decisions.md ADR; consistent with "ALL mechanical data is vanilla").
-  The ch03 YAML's `base_layout: Ch3Map` was never changed, so this restores the recorded design. Enemy/
-  chest tiles stay the vanilla Ch3 coordinates — **the repositioning pass is no longer needed.** The book's
-  Gem Mine map (`docs/demo/ch03-gem-mine-reference.png`) stays flavor reference only.
-- **Retile DONE → WIP `.mar` committed (2026-07-05/06, `17fe5fa`).** Terrain-based retile of vanilla
-  Ch3Map onto `cave-interior`: `maps/ch03-the-termalaine-mine.{mar,json}` + the `ch03-retile.py`
-  generator (reads Ch3Map + TileConfiguration2 from the decomp submodule; re-run after edits). **Cave
-  indices are unrelated to vanilla's, so the map is built by TERRAIN role, not index** — wall-rim
-  **autotile learned from Cynon's Test Map** (`solid-neighbour-dir → rim tile`), **throne-dais overlay**
-  (the pool structure, 784 seat on O1, terrain-matched to vanilla), FF5 navy **chest = metatile 17**
-  (closed) / 29 (open). Furniture LOCKED; **floor + stairs/road/E1-well = Nicolas hand-painting now** in
-  the pixel editor (seed the editor on the committed `.mar`, see the Last-session block).
-- **Floor "random" texture (Nicolas's ask):** don't fake it statistically — **patch-stamp Cynon's actual
-  hand-painted floor clusters** from his Test Map onto our galleries (the tool aligns our floor over his
-  best-fit region and copies his tiles cell-for-cell; moss/crystal/formation clusters land intact). Built
-  + previewed this session; Nicolas is painting directly, but it can seed his canvas.
-- **Remaining after the paint (Sonnet-suitable):** (a) author the per-chest **`17→29` TILECHANGE** in the
-  ch03 map-changes so chests open (FE8 `EventScr_OpenChest` fires a per-map tile-change; vanilla Ch3 has
-  one per chest — reskin them); (b) **floor terrain parity** — the cave floor variants carry terrain
-  `0x2a` (walkable) vs vanilla `FLOOR 0x17`; decide keep-vs-patch for exact parity; (c) then the chapter
-  wiring below.
-- ~~**Retile plan / importer notes**~~ (converter + editor support LANDED PR #111; retile LANDED `17fe5fa`).
-- **Importer is a THIN converter (good #40 news).** Format decoded + validated: `mapchip_config` = **9216 B =
-  exactly the decomp config** (8192 TSA + 1024 terrain); object PNG = **256×256 mode-P, 4-bit local indices**
-  (pixels 0–15) + a 256-color (16-bank) palette → straight to `ObjectType.4bpp` + `MapPalette.gbapal`. A
-  throwaway renderer assembled Cynon's own `Test Map.tmx` correctly →
-  `map-review/ch03-tileset-candidates/mineshaft-testmap-gray.png` (= `docs/demo/ch03-mineshaft-tileset-demo.png`),
-  proving tiles assemble. So #40 task 2 = a small converter, not a toolchain.
-- **Build order (layout ruling applied):** ~~(1) converter~~ ~~(2) editor support~~ — **both LANDED
-  2026-07-02 (PR #111):** `map_tileset_tool.py import/render-tmx`, tileset **`cave-interior`** vendored
-  under `campaigns/.../maps/tilesets/` (Cynon credited in `CREDITS.md`), `gen_map_editor --tileset
-  cave-interior --blank WxH [--ref img]` seeds a blank canvas, layouts carry their tileset in `.json`.
-  Remaining: (3) the **Borgo→mine retile** (see Retile plan above) → `import_map_layout` → `.mar` →
-  in-engine load-test. **Enemy/chest positions stay the vanilla Ch3 coordinates** (Borgo geometry kept,
-  so no repositioning pass; parity unchanged — same 10-unit roster on the cited vanilla tiles).
-- **Then (post-map, unchanged):** host on next vanilla slot (`MNC2`; model `inject_ch01`/`inject_ch02`) →
-  units/objective/cutscene wiring (`inject_ch03` consumes the `script:` blocks; Brute-defeat trigger,
-  Pinky-scout grell spawn + map-change, Trex recruit; new generic mugs `boy-crier`/`kobold-brute`/Maxol) +
-  **motion-review the 4 beats** → art (Grell/Trex/kobold/giant-rat; **grell ref = book p.96**) → title card →
-  load-test (`ch03`/`smoke_ch03`/`clear_ch03`, mirror ch02). Parity already verified `make difficulty CH=ch03`.
-- Then chapters #24–#28 (Ch4–Ch8) follow the same slice. **Ch3/ch04 cutscene BGs DECIDED 2026-07-04
-  (Nicolas): reference, don't import** — ch03 opening+ending REUSE the ch02 `bg_TargosWinter` slot
-  (Termalaine street; no 2nd slot, so the `BG_RANDOM` relocation stays unneeded); ch03 mid-map beats play
-  ON-MAP; ch04's cottage = VANILLA `House1` by BG id (in-ROM, free). The winter-BG library remains the
-  well for genuinely-new needs (e.g. ch05 tomb exterior — Zeldacrafter's "Snowy ruins" in FE-Repo is a
-  strong candidate).
+### Content — Ch3 "The Termalaine Mine" (#23) — map BUILT + HOSTED + load-tested; win/cutscenes/art remain
+Vanilla-FE8-Ch3 reskin as Termalaine's kobold-overrun tourmaline mine. Teaching goal = the **thief**
+(Trex = our Colm). Decisions: `decisions.md` → Ch3 ADR (four deviations + **item 4 = Defeat Boss**) + the
+ch03 YAML `design_notes` (2026-07-06 narrative reframe). **Live build checklist = #23 (the source of truth);
+how-to for the host machinery = `docs/adding-a-chapter.md`.**
+- **DONE (2026-07-06):** map painted on `cave-interior` (Cynon's Mineshaft, Gray; credited) + imported;
+  `inject_ch03` hosts vanilla **slot 4** (Ch4 symbols), deploys party at the left entrance + 10 foes at
+  vanilla-Ch3 tiles (grell@14,1); `--ch03-boot` + `mapshot` load-test PASS. Objective = **Defeat Boss**;
+  grell visible turn 1; vanilla thief slot = **Svirfneblin Skulk**; positions/items 1:1 from the decomp.
+- **REMAINING (unchecked on #23, priority order):**
+  1. **DefeatBoss WIN wiring** — `DefeatBoss(grell)` in the Ch4 Misc list + a flagged `EVFLAG_DEFEAT_BOSS`
+     grell defeat quote + an ending scene (pattern: `inject_prologue`; recipe: runbook step 7). Today the
+     banner reads "Defeat boss" but **nothing ends the map** (Misc = only `CauseGameOverIfLordDies`).
+  2. **Real PREP deploy** — author `deployment.deploy_slots` (9 tiles) in the ch03 YAML + a PREP CALL;
+     today it's a static fast-boot spawn (`CH03_SPAWN_POSITIONS`, left entrance).
+  3. **Chain ch02→ch03** — point ch02's ending `MNC2(0x4)` at ch03 (drop the ch02 dev-placeholder landing).
+  4. **Cutscenes** — run a **dialogue-pass on the REFRAMED beats first** (feral faction / grell visible /
+     Pinky→opening / RBG executes a feral one), then wire (#58 opaque-box). Mid-map cutscene fires on the
+     BRUTE miniboss (`kobold-steel`) defeat — flag it miniboss + position mid-galleries at wiring
+     (Pinky-is-metal is load-bearing there). Motion-review all beats in-engine at wiring.
+  5. **Chests/doors** — per-chest **`17→29` TILECHANGE** (FE8 `EventScr_OpenChest`; vanilla Ch3 has one per
+     chest); Trex opens, the two key-droppers are backup. (Floor-terrain parity is a non-issue — `0x2a` is
+     walkable, confirmed via the move-cost table.)
+  6. **Art** — Grell (Mogall reskin, book p.96) · Trex (winged kobold) · Icewind kobold + **Svirfneblin
+     Skulk** sprites; show Nicolas before commit.
+  7. **Title-card image** ("Ch.3: The Termalaine Mine", vanilla letterforms) + **load-test scenarios**
+     `ch03`/`smoke_ch03`/`clear_ch03` (mirror ch02). Parity already PASS (`make difficulty CH=ch03`).
+- **Cutscene BGs DECIDED 2026-07-04 (Nicolas): reference, don't import** — ch03 opening+ending reuse the
+  ch02 `bg_TargosWinter` slot; mid-map beats play ON-MAP. (ch04's cottage = vanilla `House1` by BG id.)
+- Then chapters #24–#28 (Ch4–Ch8) follow the same slice — now via **`docs/adding-a-chapter.md`**.
 
 ### Content — Ch2 (#22) — DONE / CLOSED (2026-06-26)
 All slice items merged (#85 card, #88 Targos BG + name-leak fix); #22 closed. Non-gating leftover: the demo
