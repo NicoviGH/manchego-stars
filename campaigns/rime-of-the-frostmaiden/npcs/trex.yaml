@@ -61,4 +61,30 @@ recruit:
 
 # ── Art (reskin lever: stock chassis, custom skin) ───────────────────────────
 art:
-  approach: custom            # kobold (winged) over the Thief chassis; ref-to-bust + map sprite TBD (#19/#38)
+  render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
+    ref: "References/PCs/TrexBust.png"   # winged-kobold bust ref (supplied by Nicolas, 2026-07-07)
+    crop: [54, 95, 894, 795]       # ref pixels, ~1.2 aspect — head + shoulders (framing A, Nicolas's pick 2026-07-07)
+    zoom: 0.85                     # top headroom so the swept-back horns clear FE8's dead corners (0 px clipped)
+    flip_h: false                  # ref already faces FE8-canonical screen-left
+    sharpen: 0                     # off (clean ref + pngquant is already crisp)
+    hand_pass: null
+  approach: custom            # winged kobold over the Thief chassis (art-only reskin; mechanics stay vanilla Thief)
+  fidelity: faithful          # keep the kobold/dino anatomy — do NOT humanize
+  must_keep:                  # the tells that make the crop read as "Trex"
+    - red scaled dino/kobold snout (elongated, toothy underjaw)
+    - swept-back horns + spiny frill
+    - brown leather goggle/eye-piece over one eye, gold slit eye
+    - brown coat + cream underscales at the collar
+  face: per-concept           # head as drawn (red kobold), not a human face
+  expression: wry-confident   # the sly-thief energy that carries the steal/chests lesson
+  palette_plan: >             # rough 16-color budget (incl. index-0 transparent)
+    reds ×3 (scales) + dark maroon shade, cream/tan underbelly ×2, browns ×3
+    (coat / goggle / straps), gold eye, grey buckles, black outline. Fits 16.
+  map_sprite:                 # overworld idle/walk base (#38 art loop) — Thief chassis, cosmetic reskin
+    base: Thief               # geometry token only; Trex IS a Thief mechanically
+    footprint: 16x16
+    weapon: stock             # the Thief's dagger — vanilla weapon economy
+    adds:                     # reskin edits layered on the base (beyond recolour)
+      - red kobold recolour into the shared cast palette
+      - swept-back horns on the head
+      - small cosmetic wings (NOT a flier — Thief is a foot unit; the "winged kobold" is art only)
