@@ -4,54 +4,44 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-07-06, desktop — ch03 goes PLAYABLE in-engine):** the Termalaine Mine is now
-> painted, hosted, and load-tested. Merged via **PR #139** (editor) + **PR #140** (host).
-> **① Map painted + imported.** Nicolas hand-painted the ch03 floor/entrance on `cave-interior` in the
-> editor → `import_map_layout` → `maps/ch03-the-termalaine-mine.mar` (17×16, 210/272 cells changed).
-> **② Map-painter upgraded (PR #139, #40):** right pane is now an **eyedropper demo-map** (click a tile
-> off Cynon's mineshaft → brush); **`--vanilla=Ch3Map`** renders the real Borgo reference (resolves the
-> layout's OWN tileset by backward-scanning the asset table); thinner 1px gridlines; and an
-> **engine-accurate passability overlay** — the green/red WALK set now reads FE8's own move-cost table
-> (`data_terrains.s`), which proved the cave floor `0x2a`=SHIP_FLAT is walkable (cost 1). The map was
-> never broken; the old hardcoded snow WALK list just mislabeled it.
-> **③ ch03 HOSTED on slot 4 (PR #140, #23):** `inject_ch03` registers the cave tileset + layout, deploys
-> the classed party at the left entrance + the **10 vanilla-Ch3-parity foes** at their vanilla tiles.
-> **`--ch03-boot`** (`make CH03BOOT=1`) + the reusable **`mapshot`** scenario (`PT_HOST_CHAPTER=4`)
-> LOAD-TESTED in mGBA → chapter 4, units deployed, **"Defeat boss"** banner. Shot:
-> `docs/demo/ch03-loadtest-map.png` (regenerate: `PT_HOST_CHAPTER=4 tools/playtest/run.sh mapshot`).
-> **④ Design calls (Nicolas):** objective **Seize → Defeat Boss** (kill the grell; decisions.md item 4);
-> grell **visible from turn 1**; vanilla thief slot → **Svirfneblin Skulk** (NOT a rat — RBG & Pinky are
-> the party's rats); enemy positions/items filled 1:1 from the decomp. A **2026-07-06 narrative reframe**
-> — enemy kobolds are a FERAL splinter Trex is purging to clear his warren's name; RBG executes a feral
-> one; Pinky's scout folds into the OPENING — is captured in the ch03 YAML `design_notes`, **PENDING a
-> dialogue-pass** on the #97 beats (they now partially disagree with it).
-> **⑤ Repeatable process (Nicolas's ask):** **`docs/adding-a-chapter.md`** — the host-a-chapter runbook
-> (slot mapping, goal donors, win-wiring, gotchas, per-chapter DoD), linked from CLAUDE.md. Config-driven
-> `inject_chapter(N)` refactor filed as **#138**. **ch04 is now a doc-follow, not a rediscovery.**
-> **Nicolas-at-home queue:** generate **Wolfram's 3 poses** (unblocks #65 — the last art-blocker).
-> **Remaining ch03 build beats = the #23 checklist** (win-wiring, PREP, cutscenes, art, chaining; see §Ch3).
+> **Last session (2026-07-07, desktop — ch03 WIN wired + first ch03 art in-engine):** three PRs.
+> **① DefeatBoss WIN (PR #143, MERGED, #23 item 1):** the Termalaine Mine now ENDS when the grell dies.
+> `inject_ch03` wires `DefeatBoss(EventScr_089F19F8)` into the Ch4 Misc + a **flagged** `gDefeatTalkList`
+> quote for the grell (pid `0xb7`, `CHAPTER_L_4`, `EVFLAG_DEFEAT_BOSS`, faceless shriek from the YAML
+> `death_quote`) + a minimal ending (victory → dev-placeholder → title, until ch04 hosts). Verified by the
+> new **`ch03win`** harness scenario (teleport grell to lord, kill, assert `EVFLAG_DEFEAT_BOSS` → ending →
+> title). **Gotcha (decisions.md §Operational Gotchas):** the win fires from the FLAGGED QUOTE, not
+> `CA_BOSS` — the raw-pid grell wins with **no boss HP gauge** and the generic clear-bot can't target it.
+> **② Trex bust (PR #142, MERGED, #19/#23):** ref-to-bust of the winged-kobold recruit (framing A, Nicolas's
+> pick), `portraits/trex.png`, recipe in `trex.yaml art.render`.
+> **③ ch03 MAP SPRITES + swap tool (PR #144, CI GREEN, OPEN — merge it):** the 6 **brigand kobold grunts**
+> render in-engine as red reptiles — reskin `CLASS_BRIGAND → CLASS_BLST_KILLER_EMPTY` (the last free
+> ballista-empty) with the FE-Repo `Brigand (U) Lizard Wildling {Tarantino500}` sprite; enemy faction
+> palette colours it red + its eyes land on the team's leftover key-green so they glow. **archer + thief
+> stay VANILLA** (class read; Nicolas), grell = vanilla Mogall. **Trex map sprite** = same base recoloured
+> onto the CAST palette (red-brown body, tan belly, **gold eyes** via the donor eye `#e81018`→cast idx 12,
+> matching his bust). New **`tools/map_sprite_swapper.py`** (in-browser global cast-index palette-swap UI,
+> idle/walk independent) + **`koboldview`** harness scenario (pull off-camera enemies next to the party).
+> **④ Battle-anim GAP (honest):** there is NO FEditor→decomp importer — `inject_battle_anims` only FAKES a
+> 3-frame anim from static poses (the custom-PC path). So the kobolds keep the **vanilla brigand battle
+> animation** in combat (map-sprite-only, exactly like the Fire Imp goblins); importing the community Lizard
+> anims (Lenh/Seliost1) is a real converter to build (~#90). **⑤ "Add a slot" is feasible (Nicolas's ask):**
+> `gClassData` uses designated initialisers, class id is a `u8` with `0x80–0xFF` free, no count cap — so new
+> classes can be APPENDED (not just the 3 ballista-empties). The mercenary→Lizardzerker brute will use one.
+> **PROCESS SLIP (Nicolas flagged):** most of this map-sprite session ran on `main` before I branched;
+> fixed by `git checkout -b` (uncommitted work follows the checkout) → all on `feat/23-ch03-map-sprites`.
+> **Branch at the FIRST edit of feature work, before touching files.**
 
-> **Prior session (2026-07-03→04, web/mobile — Nicolas co-writing from his phone):** a full
-> dialogue-pass + rulings session, merged via PRs #127 #128 (+ a BG/ruling PR at wrap):
-> **ch04 "The White Moose" dialogue LOCKED** — all 4 beats co-written, review-trimmed (all Ravisin
-> dread consolidated into Lupin's single ending line), recorded in the ch04 YAML `script:` blocks.
-> **`lore/lupin.md` voice bible NEW** (blunt pack-pragmatist; table-canon wolf grounded in the book's
-> awaken magic). **Lonelywood Speaker = Nimsy Huddle** (book name, table's deaf-granny performance;
-> voices doc §Per-town). **Lupin portrait SHIPPED** (`portraits/lupin.png` + `lupin_darken.py` hand
-> pass; original ref vendored in-repo — TotalityDesigns Redbubble find, credited). **Reference-don't-
-> import principle extended twice (Nicolas rulings):** Nimsy's mug = the VANILLA old-lady generic by
-> portrait id (an FE-Repo import was drafted and rejected), and cutscene BGs = reuse `bg_TargosWinter`
-> for ch03 Termalaine + vanilla `House1` by id for ch04's cottage; ch03 mid-map beats play on-map.
-> **Ch3 layout RULED (the #23 pending decision):** the proposed custom Gem-Mine blockout is REJECTED —
-> **repaint vanilla Borgo geometry with the `cave-interior` tiles** (decisions.md ADR 2026-07-04; the
-> ch03 YAML's `base_layout: Ch3Map` was never actually changed). **NEW capability:** this web container
-> CAN read public GitHub repos via `git clone --filter=blob:none --no-checkout` + raw.githubusercontent
-> (only api.github.com/web-UI are proxy-gated; cross-owner `add_repo` unsupported) — FE-Repo asset
-> vendoring and decomp layout reads work from the web now; scratchpad clones of `FE-Repo` + `fireemblem8u`
-> were used this session. **Next up: the ch03 Borgo→mine retile** (fetch `Ch3Map` layout + vanilla
-> village tile config from the decomp clone, terrain-preserving retile onto `cave-interior`, PNG
-> preview to Nicolas). Still open from before: Wolfram poses (art-blocked on Nicolas) · local-mGBA
-> `clear_ch01` (#60) + `llm --record` (#63) · #125 msg-id risk · desktop stale-branch deletion (below).
+> **Prior session (2026-07-06, desktop — ch03 goes PLAYABLE):** map painted on `cave-interior`
+> (`maps/ch03-the-termalaine-mine.mar`, 17×16) + map-painter upgrades (eyedropper, `--vanilla=Ch3Map`,
+> engine-accurate passability proving cave floor `0x2a` walkable) via PR #139; `inject_ch03` HOSTS the map
+> on slot 4 with the classed party + 10 vanilla-Ch3-parity foes, `--ch03-boot`/`mapshot` load-tested, via
+> PR #140. Objective **Defeat Boss** (kill grell@14,1); grell visible turn 1; thief slot = Svirfneblin
+> Skulk. **2026-07-06 narrative reframe** (feral-splinter kobolds / Trex's clear-our-name motive / Pinky
+> scout → opening) in the ch03 YAML `design_notes`, still **PENDING a dialogue-pass** on the #97 beats.
+> Host-a-chapter runbook **`docs/adding-a-chapter.md`**; config-driven `inject_chapter(N)` filed as #138.
+> ch04 dialogue was LOCKED earlier (PRs #127/#128); `lore/lupin.md` voice bible; cutscene BGs reference-not-
+> import (`bg_TargosWinter` for ch03, vanilla `House1` for ch04).
 
 > **Branch hygiene (resolved 2026-07-06, desktop):** the stale-branch backlog is **cleared** — all 14
 > dead remotes deleted (the 12 audited + `claude/branch-cleanup-1c1081` + `review/ch03-borgo-retile-preview`,
@@ -108,8 +98,19 @@ ADR: `decisions.md` §Distribution.
 - **`bg_to_fe8.py`** `<src-img> <out.png> [--fit crop|pad]` — any image → an FE8 event-BG source PNG
   (240×160, GBA-5bit, tile-banked mode-P, ≤8 banks; reserves transparent index 0). Feed to
   `inject_backgrounds`. Winter-BG catalogue: `map-review/iwd-bg-library.md`.
+- **Map-sprite tooling (#38 art loop):** `tools/map_sprite_tool.py` (validate/`recolour`/`remap_sms_palette`/
+  preview) · `tools/map_sprite_editor.py <sheet> <pal> --donor X [--mu]` (in-browser PIXEL editor) ·
+  **`tools/map_sprite_swapper.py --trex` (NEW, PR #144)** — in-browser GLOBAL cast-index palette-swap UI
+  (idle/walk independent sets, live preview, Apply-to-files). Enemy reskin = raw FE-Repo sprite → bg-index-0
+  → `map_sprites/<sprite>.png`+`_mu.png` → `campaign.yaml enemy_class_reskins`; PC = recolour onto cast palette.
+- **FE-Repo vendoring:** `gh api repos/Klokinator/FE-Repo/git/trees/main?recursive=1` is TRUNCATED — navigate
+  via `contents/<dir>` then `curl` the `download_url` (never submodule the 2.3GB repo). Map sprites live under
+  `Map Sprites/Infantry - (Axe) Brigs, Pirates, Zerkers/`.
 - **Playtest scenarios** `tools/playtest/run.sh <scenario>` (need a built ROM + `lua`):
   - logic/stability: `win|gameover|ch01win|clear|clear_ch01|smoke|smoke_ch01|fuzz`
+  - **ch3 (#23):** `PT_HOST_CHAPTER=4 run.sh mapshot` (map+units) · **`ch03win`** (kill grell → assert
+    `EVFLAG_DEFEAT_BOSS` → ending) · **`koboldview`** (pull off-camera enemies next to the party) — all on a
+    `make CH03BOOT=1` ROM (macOS: apply the `build.sh` shebang-fix loop first).
   - **LLM commander (#63):** `llm` — needs the sidecar running (`llm_player.py serve`; see run.sh header).
   - **ch2 (#22):** `ch02` · `smoke_ch02` · `clear_ch02` (all load a `ch02start` checkpoint).
   - **Battle-anim capture:** `PT_CHAR=<id> tools/playtest/run.sh recordanim` on a `make TESTCH=1` ROM
@@ -156,36 +157,35 @@ vendored Kitsune anim** at `battle_anims/_parked/`. Each: one `battle_anim:` blo
 feature-flow branch per unit (or small batch), `custom_unit` issue template.
 - **Deferred polish (tracked):** braulo's white swing-arc weapon-trail → **#91**; goblin enemy class-level anim → **#90**.
 
-### Content — Ch3 "The Termalaine Mine" (#23) — map BUILT + HOSTED + load-tested; win/cutscenes/art remain
+### Content — Ch3 "The Termalaine Mine" (#23) — HOSTED + WIN wired + first art in-engine; cutscenes/recruit/rest remain
 Vanilla-FE8-Ch3 reskin as Termalaine's kobold-overrun tourmaline mine. Teaching goal = the **thief**
 (Trex = our Colm). Decisions: `decisions.md` → Ch3 ADR (four deviations + **item 4 = Defeat Boss**) + the
 ch03 YAML `design_notes` (2026-07-06 narrative reframe). **Live build checklist = #23 (the source of truth);
 how-to for the host machinery = `docs/adding-a-chapter.md`.**
-- **DONE (2026-07-06):** map painted on `cave-interior` (Cynon's Mineshaft, Gray; credited) + imported;
-  `inject_ch03` hosts vanilla **slot 4** (Ch4 symbols), deploys party at the left entrance + 10 foes at
-  vanilla-Ch3 tiles (grell@14,1); `--ch03-boot` + `mapshot` load-test PASS. Objective = **Defeat Boss**;
-  grell visible turn 1; vanilla thief slot = **Svirfneblin Skulk**; positions/items 1:1 from the decomp.
+- **DONE:** map painted + hosted on slot 4 (2026-07-06); **DefeatBoss WIN wired + `ch03win` verified**
+  (PR #143); **kobold-grunt map sprite renders in-engine** (Lizard Wildling enemy reskin, PR #144); **Trex
+  bust** (PR #142) + **Trex map sprite** (cast palette, gold eyes, PR #144). archer + thief kept VANILLA.
+- **FIRST: land PR #144** (CI green, OPEN — ch3 map sprites + swap tool) before continuing on the branch.
 - **REMAINING (unchecked on #23, priority order):**
-  1. **DefeatBoss WIN wiring** — `DefeatBoss(grell)` in the Ch4 Misc list + a flagged `EVFLAG_DEFEAT_BOSS`
-     grell defeat quote + an ending scene (pattern: `inject_prologue`; recipe: runbook step 7). Today the
-     banner reads "Defeat boss" but **nothing ends the map** (Misc = only `CauseGameOverIfLordDies`).
-  2. **Real PREP deploy** — author `deployment.deploy_slots` (9 tiles) in the ch03 YAML + a PREP CALL;
-     today it's a static fast-boot spawn (`CH03_SPAWN_POSITIONS`, left entrance).
-  3. **Chain ch02→ch03** — point ch02's ending `MNC2(0x4)` at ch03 (drop the ch02 dev-placeholder landing).
-  4. **Cutscenes** — run a **dialogue-pass on the REFRAMED beats first** (feral faction / grell visible /
-     Pinky→opening / RBG executes a feral one), then wire (#58 opaque-box). Mid-map cutscene fires on the
-     BRUTE miniboss (`kobold-steel`) defeat — flag it miniboss + position mid-galleries at wiring
-     (Pinky-is-metal is load-bearing there). Motion-review all beats in-engine at wiring.
-  5. **Chests/doors** — per-chest **`17→29` TILECHANGE** (FE8 `EventScr_OpenChest`; vanilla Ch3 has one per
-     chest); Trex opens, the two key-droppers are backup. (Floor-terrain parity is a non-issue — `0x2a` is
-     walkable, confirmed via the move-cost table.)
-  6. **Art** — Grell (Mogall reskin, book p.96) · Trex (winged kobold) · Icewind kobold + **Svirfneblin
-     Skulk** sprites; show Nicolas before commit.
-  7. **Title-card image** ("Ch.3: The Termalaine Mine", vanilla letterforms) + **load-test scenarios**
-     `ch03`/`smoke_ch03`/`clear_ch03` (mirror ch02). Parity already PASS (`make difficulty CH=ch03`).
-- **Cutscene BGs DECIDED 2026-07-04 (Nicolas): reference, don't import** — ch03 opening+ending reuse the
-  ch02 `bg_TargosWinter` slot; mid-map beats play ON-MAP. (ch04's cottage = vanilla `House1` by BG id.)
-- Then chapters #24–#28 (Ch4–Ch8) follow the same slice — now via **`docs/adding-a-chapter.md`**.
+  1. **Enemy sprites, cont'd** — `mercenary` blade kobold → **Lizardzerker {Seliost1}** on a **newly ADDED
+     class slot** (extend `gClassData` past 0x7F — feasible, see last-session ⑤; the 3 ballista-empties are
+     used up: soldier/fighter=fire-imp, brigand=lizard-wildling). Then `map_sprite_swapper.py` isn't needed
+     (enemy uses `remap_sms_palette` onto the base's SMS roles, not the cast palette). Battle anims stay
+     vanilla (importer gap, ~#90). Svirfneblin Skulk / kobold-slinger stay vanilla (Nicolas).
+  2. **Trex recruit wiring** — deploy Trex as a real unit (free char slot + recruit logic + STAT_DONOR),
+     which is ALSO what makes his map sprite render in-engine (`inject_map_sprites` keys off his cast slot).
+     Then the cosmetic **horns/wings** pixel edit (separates him from the grunts) — `map_sprite_editor.py`.
+  3. **Real PREP deploy** — author `deployment.deploy_slots` (9 tiles) + a PREP CALL; today it's the static
+     fast-boot spawn (`CH03_SPAWN_POSITIONS`), which also deploys the party WEAPONLESS (`items='0'`).
+  4. **Chain ch02→ch03** — point ch02's ending `MNC2(0x4)` at ch03 (drop the ch02 dev-placeholder landing).
+  5. **Cutscenes** — dialogue-pass on the REFRAMED beats first (feral faction / grell visible / Pinky→opening
+     / RBG executes a feral one), then wire (#58 opaque-box). Mid-map beat fires on the BRUTE (`kobold-steel`)
+     defeat. Replace the minimal DefeatBoss ending with the real ending cutscene.
+  6. **Chests/doors** — per-chest **`17→29` TILECHANGE**; Trex opens, key-droppers back up.
+  7. **Title-card image** + full load-test scenarios `ch03`/`smoke_ch03`/`clear_ch03` (the `ch03win`/
+     `koboldview` scenarios seed these; a fair-play `clear_ch03` needs a `CA_BOSS` grell or a pid-targeted bot).
+- **Cutscene BGs DECIDED (Nicolas): reference, don't import** — reuse `bg_TargosWinter`; mid-map beats on-map.
+- Then chapters #24–#28 follow the same slice via `docs/adding-a-chapter.md`.
 
 ### Content — Ch2 (#22) — DONE / CLOSED (2026-06-26)
 All slice items merged (#85 card, #88 Targos BG + name-leak fix); #22 closed. Non-gating leftover: the demo
