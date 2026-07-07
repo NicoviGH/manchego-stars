@@ -3062,6 +3062,32 @@ scenarios.koboldview = function()
         string.format("%d kobold map sprites pulled on-screen for review", moved))
 end
 
+-- lzview (#23 review): isolate the ONE blade-kobold (class 0x80 = the Lizardzerker reskin)
+-- and park it right beside braulo, camera on it, for an unambiguous on-map sprite shot.
+scenarios.lzview = function()
+    if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
+    local leader = blue(0x01)
+    if not leader then return result("FAIL", "leader (braulo) not deployed") end
+    local lz
+    for i = 0, 23 do
+        local u = unitAt(SYM.gUnitArrayRed, i)
+        if u and not isDead(u) then
+            local cls = ru8(ru32(u.addr + 4) + 4)   -- unit -> pClassData -> .number
+            if cls == 0x80 then lz = u; break end
+        end
+    end
+    if not lz then return result("FAIL", "no class-0x80 (Lizardzerker) unit on the map") end
+    local tx, ty = leader.x + 1, leader.y
+    setMapUnit(lz.x, lz.y, 0)
+    emu:write8(lz.addr + 0x10, tx); emu:write8(lz.addr + 0x11, ty)
+    setMapUnit(tx, ty, mapUnitAt(leader.x, leader.y))
+    log(string.format("parked Lizardzerker (class 0x80) at (%d,%d) beside braulo (%d,%d)",
+        tx, ty, leader.x, leader.y))
+    wait(60)
+    shot("lizardzerker-on-map")
+    result("PASS", "Lizardzerker parked beside braulo for review")
+end
+
 -- ch02: entry assertions on the ch02 map (mirrors scenarios.ch01). The 3 green chwinga are on
 -- the field, the party deploys to the cap, and the archer + boss are present.
 scenarios.ch02 = function()

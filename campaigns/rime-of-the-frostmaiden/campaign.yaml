@@ -88,12 +88,25 @@ enemy_class_reskins:
   # Ch3 (#23): the Termalaine kobolds. Grunts (axe/thrower/steel/key-droppers) ride the
   # Brigand chassis reskinned to the Lizard Brigand Wildling {Tarantino500, FE-Repo}, which
   # reads as a red reptile under the enemy faction palette. 16x32 tall sprite on a 16x16
-  # brigand, like the Fire Imp. (Blade kobold = Mercenary -> Lizardzerker rides a NEW added
-  # slot; archer + thief stay vanilla so the player can read the class -- Nicolas.)
+  # brigand, like the Fire Imp. (archer + thief stay vanilla so the player can read the
+  # class -- Nicolas.)
   - id: kobold-grunt
     base: CLASS_BRIGAND
     slot: CLASS_BLST_KILLER_EMPTY
     sprite: lizard-wildling
+    frame: 16x32
+  # The lone blade-kobold (Kobold Skirmisher) rides the Mercenary chassis reskinned to the
+  # Lizardzerker {Seliost1, FE-Repo} -- a beefier reptile distinct from the Wildling grunts.
+  # The three vanilla ballista-empties are used up (soldier/fighter=Fire Imp, brigand=
+  # Wildling), so this rides a NEW class id appended past 0x7F (`slot_id`): the build extends
+  # the enum + clones CLASS_MERCENARY into it (_append_new_reskin_slots). Combat stays vanilla
+  # mercenary (map-sprite-only; battle-anim import is the #90 gap). ch03 roster points its
+  # `mercenary` slot at this class via CH03_CLASS_IDS.
+  - id: kobold-blade
+    base: CLASS_MERCENARY
+    slot: CLASS_MNC_LIZARDZERKER
+    slot_id: 0x80
+    sprite: lizardzerker
     frame: 16x32
 
 # Item name overrides: rename a vanilla item's in-game text globally (build wiring =

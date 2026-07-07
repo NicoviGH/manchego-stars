@@ -6,6 +6,7 @@ patcher share, against real vanilla values read from fireemblem8u/src/data_chara
 Run:  python3 tools/test_build_campaign.py
 """
 import os
+import re
 import sys
 import unittest
 
@@ -370,6 +371,70 @@ class BattlePlatformTerrain(unittest.TestCase):
         for t in ('LAKE', 'SEA', 'RIVER', 'WATER', 'GLACIER'):
             self.assertEqual(bc._terrain_snow_ground(t, 115, False), 117)
             self.assertEqual(bc._terrain_snow_ground(t, 115, True), 117)  # even on the rough tileset
+
+
+class AppendedClassSlot(unittest.TestCase):
+    """Extend gClassData past the vanilla 0x7F tail so an enemy reskin can ride a NEW
+    class slot (#23: the Lizardzerker) once the three ballista-empties are used up. Two
+    pure text transforms: insert the enum constant + append a cloned gClassData entry."""
+
+    HEADER = ('enum {\n'
+              '    CLASS_MERCENARY           = 0x05,\n'
+              '    CLASS_JOURNEYMAN_T1       = 0x7E,\n'
+              '    CLASS_PUPIL_T1            = 0x7F,\n'
+              '\n'
+              '    // Hiding the game\'s misery\n'
+              '    CLASS_OBSTACLE = CLASS_EPHRAIM_LORD,\n'
+              '};\n')
+
+    CDATA = ('CONST_DATA struct ClassData gClassData[] = {\n'
+             '    [CLASS_MERCENARY - 1] = {\n'
+             '        .SMSId = 0x10,\n'
+             '        .number = CLASS_MERCENARY,\n'
+             '        .pMapSpriteAnim = &gUnknown_08X,\n'
+             '    },\n'
+             '    [CLASS_PUPIL_T1 - 1] = {\n'
+             '        .SMSId = 0x11,\n'
+             '        .number = CLASS_PUPIL_T1,\n'
+             '    },\n'
+             '};\n')
+
+    def test_enum_insert_places_the_new_constant_after_the_last_numeric_class(self):
+        new = bc.class_enum_insert(self.HEADER, 'CLASS_MNC_LIZARDZERKER', 0x80)
+        self.assertIn('CLASS_MNC_LIZARDZERKER = 0x80,', new)
+        # after the vanilla 0x7F tail, before the CLASS_OBSTACLE alias block
+        self.assertLess(new.index('CLASS_PUPIL_T1'), new.index('CLASS_MNC_LIZARDZERKER'))
+        self.assertLess(new.index('CLASS_MNC_LIZARDZERKER'), new.index('CLASS_OBSTACLE'))
+        # parseable by the existing enum reader -> 0x80
+        self.assertEqual(dict(re.findall(r'(CLASS_MNC_LIZARDZERKER)\s*=\s*(0x[0-9A-Fa-f]+)',
+                                         new)).get('CLASS_MNC_LIZARDZERKER'), '0x80')
+
+    def test_enum_insert_is_idempotent(self):
+        once = bc.class_enum_insert(self.HEADER, 'CLASS_MNC_LIZARDZERKER', 0x80)
+        twice = bc.class_enum_insert(once, 'CLASS_MNC_LIZARDZERKER', 0x80)
+        self.assertEqual(once, twice)
+        self.assertEqual(twice.count('CLASS_MNC_LIZARDZERKER = 0x80,'), 1)
+
+    def test_classdata_append_clones_the_base_body_under_the_new_designator(self):
+        new = bc.classdata_append_clone(self.CDATA, 'CLASS_MERCENARY', 'CLASS_MNC_LIZARDZERKER')
+        self.assertIn('[CLASS_MNC_LIZARDZERKER - 1] = {', new)
+        # the clone carries the base body verbatim (SMSId/anim ride along; the reskin loop
+        # repoints .number/.SMSId afterward via the existing _set_field path)
+        clone = new[new.index('[CLASS_MNC_LIZARDZERKER - 1]'):]
+        self.assertIn('.SMSId = 0x10,', clone)
+        self.assertIn('.pMapSpriteAnim = &gUnknown_08X,', clone)
+
+    def test_classdata_append_leaves_the_base_entry_byte_unchanged(self):
+        new = bc.classdata_append_clone(self.CDATA, 'CLASS_MERCENARY', 'CLASS_MNC_LIZARDZERKER')
+        base = self.CDATA[self.CDATA.index('[CLASS_MERCENARY - 1]'):self.CDATA.index('[CLASS_PUPIL_T1 - 1]')]
+        self.assertIn(base, new)                       # donor block untouched
+        self.assertLess(new.index('[CLASS_MNC_LIZARDZERKER - 1]'), new.rindex('};'))  # inside the array
+
+    def test_classdata_append_is_idempotent(self):
+        once = bc.classdata_append_clone(self.CDATA, 'CLASS_MERCENARY', 'CLASS_MNC_LIZARDZERKER')
+        twice = bc.classdata_append_clone(once, 'CLASS_MERCENARY', 'CLASS_MNC_LIZARDZERKER')
+        self.assertEqual(once, twice)
+        self.assertEqual(twice.count('[CLASS_MNC_LIZARDZERKER - 1] = {'), 1)
 
 
 if __name__ == '__main__':
