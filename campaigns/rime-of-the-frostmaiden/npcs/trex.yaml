@@ -80,11 +80,15 @@ art:
   palette_plan: >             # rough 16-color budget (incl. index-0 transparent)
     reds ×3 (scales) + dark maroon shade, cream/tan underbelly ×2, browns ×3
     (coat / goggle / straps), gold eye, grey buckles, black outline. Fits 16.
-  map_sprite:                 # overworld idle/walk base (#38 art loop) — Thief chassis, cosmetic reskin
-    base: Thief               # geometry token only; Trex IS a Thief mechanically
+  map_sprite:                 # overworld idle/walk base (#38 art loop) — SHIPPED (map_sprites/trex{,_mu}.png)
+    base: Thief               # geometry token only; Trex IS a Thief mechanically (16x16 idle / 32x32 MU)
     footprint: 16x16
-    weapon: stock             # the Thief's dagger — vanilla weapon economy
-    adds:                     # reskin edits layered on the base (beyond recolour)
-      - red kobold recolour into the shared cast palette
-      - swept-back horns on the head
-      - small cosmetic wings (NOT a flier — Thief is a foot unit; the "winged kobold" is art only)
+    source: "Brigand (U) Lizard Wildling {Tarantino500}"  # FE-Repo reptile sprite (CREDITS.md); shared w/ the ch3 kobold grunts
+    recolour: >                # RGB-mapped onto cast_palette.png (red body, tan belly, dark outline), then
+      hand-tuned in tools/map_sprite_swapper.py. The donor's eye colour (#e81018) maps to the cast GOLD
+      (index 12, #cb9d02) so the eyes read distinct against the red -- the "glowing eyes" pop (Nicolas).
+    weapon: donor-axe          # the Lizard Wildling carries an axe; cosmetic only (Trex steals as a Thief)
+    todo:                      # not yet applied (rides a later pass / pixel editor)
+      - swept-back horns + small cosmetic wings (the "winged kobold" tell; distinguishes Trex from the grunts)
+    note: >                    # renders in-engine once Trex is a DEPLOYED unit (recruit wiring, #23) -- the
+      map-sprite override (inject_map_sprites) keys off his cast character slot, which lands with that wiring.
