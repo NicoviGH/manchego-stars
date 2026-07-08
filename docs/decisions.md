@@ -569,7 +569,9 @@ stat patching) still covers every recruit.
 - **Baxby (ch01)** — recruited in the **ch01-ending cutscene** (Marty wins him over). No on-map recruit
   event; he is simply on the ch02+ roster via the filter. His YAML `via: market` / `cost_gp: 200` is
   **cutscene flavor, not a purchase mechanic** (there is no buy-a-unit UI; §Recruit budget: the cast is
-  recruited by story, Pick Units deploys). Rides the vanilla **Forde** slot (donor Franz/Cavalier).
+  recruited by story, Pick Units deploys). Rides the vanilla **Forde** slot (donor Franz/Cavalier); his
+  hand-painted axe-beak map sprite injects on the standard 32x32 cast pattern (`base: Gargoyle` geometry
+  token + synth MU, like braulo/wolfram/meesmickle).
 - **Trex (ch03)** — a **Colm-style on-map TALK recruit**: placed GREEN, joins via `CUSA` when talked to
   (the vanilla `EventScr_Ch3_Talk_NeimiColm → CUSA(COLM)` pattern; `CHAR(flag, script, talker, target)`).
   Rides **Rennac** (donor Colm/Thief). He is the army's ONLY thief, so recruitment must be **non-missable**

@@ -175,9 +175,9 @@ how-to for the host machinery = `docs/adding-a-chapter.md`.**
   roster from the next chapter (`decisions.md` → **Recruit wiring** ADR). **Trex** is now a real unit
   (Rennac slot, Colm donor) placed **GREEN** on the ch03 map (Colm-style talk recruit; his custom map
   sprite now renders in cast colours once he joins). **Baxby** was promoted from cutscene-face to a real
-  unit too (Forde slot, Franz donor) → on the **ch02+ prep** roster (his custom axe-beak sprite is PARKED
-  at `map_sprites/_parked/baxby.png` — 32×32 art vs the vanilla 16×32 Cavalier donor; he uses the stock
-  Cavalier sprite for now, sprite re-fit is a follow-up). Verified in-engine: new **`ch03` scenario** PASS
+  unit too (Forde slot, Franz donor) → on the **ch02+ prep** roster; his hand-painted axe-beak map sprite
+  injects on the standard **32×32 cast pattern** (`base: Gargoyle` geometry token + synth MU, exactly like
+  braulo/wolfram/meesmickle — the base is a geometry token, NOT the FE-Repo source name). Verified in-engine: new **`ch03` scenario** PASS
   (`blue[08]=0x10` Baxby + `green Trex 0x1C @ (10,6)`). **Audit finding:** Lupin/Sahnar/Basil (ch04/ch05)
   are in the SAME "authored-YAML, no unit" state — wire each per its slice.
 - **REMAINING (unchecked on #23, priority order):**
@@ -187,7 +187,7 @@ how-to for the host machinery = `docs/adding-a-chapter.md`.**
      Then the cosmetic **horns/wings** pixel edit (separates him from the grunts) — `map_sprite_editor.py`.
   2. **Real PREP deploy** — author `deployment.deploy_slots` (9 tiles) + a PREP CALL; today it's the static
      fast-boot spawn (`CH03_SPAWN_POSITIONS` = `cast_available_at(3)` = 8 founding + Baxby), party WEAPONLESS
-     (`items='0'`). **Baxby's stock-Cavalier sprite + parked-custom re-fit also tracked here.**
+     (`items='0'`).
   3. **Chain ch02→ch03** — point ch02's ending `MNC2(0x4)` at ch03 (drop the ch02 dev-placeholder landing).
   4. **Cutscenes** — dialogue-pass on the REFRAMED beats first (feral faction / grell visible / Pinky→opening
      / RBG executes a feral one), then wire (#58 opaque-box). Mid-map beat fires on the BRUTE (`kobold-steel`)

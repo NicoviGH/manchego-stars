@@ -5,9 +5,9 @@
 # STATUS: WIRED (#23 recruit pass). Baxby is a real classed cast member (PORTRAIT_MAP ->
 # Forde slot, STAT_DONOR -> Franz). Recruited by the ch01-ending cutscene (Marty wins him
 # over), so cast_available_at() puts him on the ch02+ prep roster automatically -- no on-map
-# recruit event (that's Trex's Colm-style talk recruit). He uses the STOCK Cavalier map
-# sprite for now; his custom sheet is PARKED (map_sprites/_parked/baxby.png -- geometry
-# mismatch, see art.map_sprite below) as a follow-up art task.
+# recruit event (that's Trex's Colm-style talk recruit). His hand-painted custom map sprite
+# (map_sprites/baxby.png, cast palette) injects like every other 32x32 cast sprite -- same
+# base: Gargoyle / synth-MU pattern as braulo/wolfram/meesmickle (see art.map_sprite below).
 
 id: baxby
 name: Baxby
@@ -92,15 +92,10 @@ art:
     zoom: 0.88                        # max size with the whole beak clear of the dead corners
     hand_pass: null
     credit: "WotC book art (axe-beak) + Google Gemini; see CREDITS.md"
-  map_sprite:                         # PARKED at map_sprites/_parked/baxby.png (not injected yet).
-    # Baxby is a real unit NOW on the stock vanilla Cavalier map sprite. His hand-painted custom
-    # sheet is 32x32-per-frame (Chocobo-sized), but the vanilla Cavalier donor SMS is 16x32 --
-    # a geometry mismatch inject_map_sprites can't reconcile (donor_sms_geometry('Cavalier') =
-    # 16x32). To ship the custom sprite it must be re-fit to a 16x32 mounted donor OR ride a
-    # matching 32x32 donor + committed _mu (cf. Trex: base is the VANILLA token 'Thief', with the
-    # FE-Repo pixels in `source`, and a committed trex_mu.png). Follow-up art task.
-    base: Cavalier                    # vanilla geometry token (once the pixels are re-fit to 16x32)
+  map_sprite:                         # map_sprites/baxby.png — hand-painted by Nicolas (cast palette)
+    base: Gargoyle                    # 32x32 3-frame geometry token (SAME as braulo/wolfram/meesmickle);
+                                      # geometry only, not the visible sprite. NOT the FE-Repo source name.
     source: "Chocobo Rider (F) Lance {SkidMarc25}"   # FE-Repo pixels; rider+lance stripped, snowy recolor
-    size: 16x32                       # target (vanilla Cavalier SMS); current _parked art is 32x32
-    palette: cast                     # cast_palette.png (cast OBJ bank)
+    footprint: 16x16                  # sprite frame is 32x32 but the mount reads party-scale
+    palette: cast                     # cast_palette.png (cast OBJ bank); synth MU (no committed _mu)
     credit: "FE-Repo Chocobo Rider {SkidMarc25}; see CREDITS.md"
