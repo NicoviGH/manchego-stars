@@ -371,8 +371,9 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         'src/bmudisp.c', 'src/prep_unitselect.c',
                         # lord-select (#46): CallLordSelectMenu decl for eventscripts
                         'include/eventcall.h',
-                        # enemy class reskins (#21): cloned goblin classes in gClassData
-                        'src/data_classes.c',
+                        # enemy class reskins (#21): cloned goblin classes in gClassData;
+                        # classes.h gets new class ids appended past 0x7F (#23 Lizardzerker)
+                        'src/data_classes.c', 'include/constants/classes.h',
                         # faked battle anims (#65): appended banim_data row + pointer
                         # externs + linker block; the Archer-CLONE class + its new AnimConf
                         # (data_classes.c already listed); the AnimConf's extern decl
@@ -2496,6 +2497,27 @@ def _wait_table_len():
     return sum(1 for i in range(di + 1, ci) if lines[i].lstrip().startswith('{'))
 
 
+def _move_table_len():
+    """Count rows in unit_icon_move_table[] -> the next contiguous class index. The move
+    table is a POSITIONAL array indexed by classId-1 (no designated inits), so an appended
+    class needs its row at exactly this index for the engine's GetMuImg lookup to line up."""
+    with open(UNIT_ICON_MOVE_C, encoding='utf-8') as f:
+        lines = f.read().splitlines()
+    di, ci = _table_close_line(lines, 'unit_icon_move_table[]')
+    return sum(1 for i in range(di + 1, ci) if lines[i].lstrip().startswith('{'))
+
+
+def _move_row_at(class_value):
+    """The `{sheet, motion}` pair on the move-table row at index class_value-1 (`// N`)."""
+    idx = class_value - 1
+    with open(UNIT_ICON_MOVE_C, encoding='utf-8') as f:
+        for line in f:
+            m = re.search(r'(\{[^}]+\}),?\s*//\s*%d\s*$' % idx, line)
+            if m:
+                return m.group(1)
+    sys.exit('ERROR: no move-table row at index %d (class %#x)' % (idx, class_value))
+
+
 def _wait_symbol_at(sms_id):
     """The donor `unit_icon_wait_<Name>_sheet` symbol at row `sms_id` (its `// N` comment),
     and the bare <Name>. The vanilla wait rows are emitted `{..., sym}, // N`."""
@@ -2790,6 +2812,77 @@ def _class_field_symbol(class_enum, field):
     return m.group(1)
 
 
+def class_enum_insert(text, name, value):
+    """Insert `NAME = 0xVALUE,` into the class enum after the last numeric-valued CLASS_
+    entry (idempotent). Extends the vanilla 0x7F tail so an enemy reskin can ride a class
+    slot beyond the three ballista-empties (#23). The value-less `= CLASS_OBSTACLE` alias
+    tail is skipped -- we anchor on the last real id so the enum reader picks up the new
+    constant. Class ids are a u8 with 0x80-0xFF free and gClassData is unsized (no count
+    cap), so appending is safe (see decisions.md / HANDOFF #23)."""
+    if re.search(r'\b' + re.escape(name) + r'\s*=', text):
+        return text
+    anchors = list(re.finditer(r'^([ \t]*)CLASS_[A-Z0-9_]+\s*=\s*(?:0x[0-9A-Fa-f]+|\d+)\s*,',
+                               text, re.M))
+    if not anchors:
+        sys.exit('ERROR: class_enum_insert: no numeric CLASS_ entry to anchor on')
+    m = anchors[-1]
+    eol = text.find('\n', m.end())
+    if eol < 0:
+        eol = len(text)
+    return text[:eol] + '\n%s%s = 0x%02X,' % (m.group(1), name, value) + text[eol:]
+
+
+def classdata_append_clone(text, base_enum, new_enum):
+    """Append a clone of gClassData[base_enum-1] as a NEW [new_enum-1] entry (idempotent).
+    The clone carries the base body verbatim (stats + battle anim ride along); the reskin
+    loop repoints .number/.SMSId afterward via the existing _set_field path. Used when a
+    reskin's `slot` is a freshly-appended class id rather than a vanilla ballista-empty."""
+    designator = '[%s - 1]' % new_enum
+    if designator in text:
+        return text
+    bs, be = _find_brace_block(text, '[%s - 1]' % base_enum, CLASSES_C)
+    body = text[bs:be]
+    _, arr_e = _find_brace_block(text, 'gClassData[] =', CLASSES_C)
+    entry = '    %s = %s,\n' % (designator, body)
+    return text[:arr_e - 1] + entry + text[arr_e - 1:]
+
+
+def _append_new_reskin_slots(reskins, verbose=True):
+    """Append any reskin `slot`s declared with a `slot_id` (a fresh class id past 0x7F)
+    that don't yet exist as classes -- extend the enum + clone the base into gClassData so
+    the per-reskin clone loop can then ride the new slot (#23: the Lizardzerker, once the
+    three ballista-empties are used up). Idempotent (build restores classes.h/.c each run);
+    a reskin whose `slot` is already a real class (vanilla ballista-empty) is left alone."""
+    values = _parse_class_enum_values()
+    header = cdata = None
+    for rk in reskins:
+        if rk.get('slot_id') is None or rk['slot'] in values:
+            continue
+        slot, base, val = rk['slot'], rk['base'], int(str(rk['slot_id']), 0)
+        if header is None:
+            header = open(CLASSES_H, encoding='utf-8').read()
+            cdata = open(CLASSES_C, encoding='utf-8').read()
+        header = class_enum_insert(header, slot, val)
+        cdata = classdata_append_clone(cdata, base, slot)
+        # The positional (class-indexed) move table needs a contiguous row at index val-1
+        # so the reskin loop's _set_move_row can rewrite it; fill any gap with the base's
+        # row (never deployed) and keep the array dense for the engine's GetMuImg lookup.
+        cur = _move_table_len()
+        if val > cur:
+            base_row = _move_row_at(values[base])
+            _append_table_rows(UNIT_ICON_MOVE_C, 'unit_icon_move_table[]',
+                               ['\t%s, // %d' % (base_row, i) for i in range(cur, val)])
+        values[slot] = val
+        if verbose:
+            print('  %-16s = append class %s = 0x%X (clone of %s)'
+                  % (rk['id'], slot, val, base))
+    if header is not None:
+        with open(CLASSES_H, 'w', encoding='utf-8') as f:
+            f.write(header)
+        with open(CLASSES_C, 'w', encoding='utf-8') as f:
+            f.write(cdata)
+
+
 def inject_enemy_class_reskins(campaign, verbose=True):
     """Clone each declared base class into its unused slot with a custom MAP sprite only.
 
@@ -2806,6 +2899,9 @@ def inject_enemy_class_reskins(campaign, verbose=True):
             print('  (no enemy_class_reskins declared)')
         return
     asset_dir = os.path.join(REPO, 'campaigns', campaign, 'map_sprites')
+    # Append any freshly-declared class slots (slot_id present) before resolving enum
+    # values, so a reskin can ride a slot beyond the three vanilla ballista-empties (#23).
+    _append_new_reskin_slots(reskins, verbose)
     values = _parse_class_enum_values()
     pointer_externs = []
     sprite_sms = {}        # sprite stem -> SMS id of its (shared) wait row
@@ -5036,7 +5132,12 @@ CH03_AI = {'aggressive': '{0x0, 0x0, 0x1, 0x0}',   # pursue/charge
 # CLASS_BRIGAND -> CLASS_BLST_KILLER_EMPTY with the lizard SMS; combat stays brigand). Grell =
 # vanilla Mogall; blade = Mercenary (Lizardzerker slot lands next); archer/thief stay vanilla.
 CH03_CLASS_IDS = {'mogall': 'CLASS_MOGALL', 'brigand': 'CLASS_BLST_KILLER_EMPTY',
-                  'mercenary': 'CLASS_MERCENARY', 'archer': 'CLASS_ARCHER', 'thief': 'CLASS_THIEF'}
+                  'mercenary': 'CLASS_MNC_LIZARDZERKER', 'archer': 'CLASS_ARCHER',
+                  'thief': 'CLASS_THIEF',
+                  # the steel brute: a Brigand (parity) that DEPLOYS on the Lizardzerker
+                  # sprite via a brigand-clone class (campaign.yaml kobold-brute). Reached
+                  # through an enemy's `deploy_class` override, not its `class`.
+                  'brigand-brute': 'CLASS_MNC_LIZARDZERKER_BRUTE'}
 CH03_ITEM_IDS = {'iron-axe': 'ITEM_AXE_IRON', 'hand-axe': 'ITEM_AXE_HANDAXE',
                  'steel-axe': 'ITEM_AXE_STEEL', 'iron-sword': 'ITEM_SWORD_IRON',
                  'iron-bow': 'ITEM_BOW_IRON', 'evil-eye': 'ITEM_MONSTER_EVILEYE',
@@ -5089,7 +5190,7 @@ def inject_ch03(campaign, verbose=True):
 
     enemies = []
     for e in chap['enemy_units']:
-        cls = CH03_CLASS_IDS[e['class']]
+        cls = CH03_CLASS_IDS[e.get('deploy_class') or e['class']]  # deploy_class = sprite-only override
         items = ', '.join(CH03_ITEM_IDS[i['id']] for i in e.get('inventory', []))
         drop = e.get('item_drop')
         if drop:

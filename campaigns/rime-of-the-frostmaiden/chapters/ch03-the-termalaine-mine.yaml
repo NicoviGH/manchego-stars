@@ -152,7 +152,10 @@ enemy_units:
     name: "Icewind Brute"
     count: 1                    # vanilla brigand @ (14,6) L3 steel-axe (the grell's nearest enforcer)
     positions: [[14, 6]]
-    class: brigand
+    class: brigand              # parity engine reads this (Brigand base — steel axe + stats)
+    deploy_class: brigand-brute # …but DEPLOYS on the Lizardzerker-brute reskin sprite (campaign.yaml
+                                # kobold-brute → CLASS_MNC_LIZARDZERKER_BRUTE): the big enforcer reads
+                                # as the tall Lizardzerker, not a squat Wildling grunt.
     level: 3
     autolevel: true
     inventory:
