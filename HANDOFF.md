@@ -4,33 +4,29 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-07-08, desktop — ch03 enemy sprites DONE + a reusable "append a class" capability):**
-> **① Appended-class capability (PR #145, MERGED, #23 item 1):** `enemy_class_reskins` can now ride a class
-> id APPENDED past the vanilla `0x7F` tail — the three ballista-empties are used up (soldier/fighter=Fire Imp,
-> brigand=Wildling), so custom enemy classes were out of slots. Two TDD'd pure transforms in
-> `build_campaign.py` — **`class_enum_insert`** (extends `constants/classes.h`) + **`classdata_append_clone`**
-> (clones a base into a new `gClassData` entry) — wired via **`_append_new_reskin_slots`**: a reskin whose
-> `slot` carries a **`slot_id`** and isn't yet a real class gets appended (enum + gClassData clone + a
-> **contiguous `unit_icon_move_table` row**, since that table is POSITIONAL/class-indexed — the append fills
-> `_move_table_len()..val-1`). `classes.h` added to `PATCHED_DECOMP_FILES`. Runs BEFORE the reskin clone loop
-> so `_set_move_row` can repoint the new row. Unblocks unlimited custom enemy classes without touching a real
-> one. **(Ballista non-issue confirmed: FE8 ballistae are terrain-traps + `US_IN_BALLISTA`, NOT the
-> `CLASS_BLST_*` classes — nothing in engine code references those, so our future Pepperjack/Brie ballistae
-> are safe; appending is just the sustainable path now that the empties are spent.)**
-> **② Both ch3 Lizardzerker kobolds (PR #145):** the **blade skirmisher** (`kobold-blade`, Mercenary →
-> `CLASS_MNC_LIZARDZERKER` 0x80) AND the **steel BRUTE** (`kobold-steel`, Brigand → `CLASS_MNC_LIZARDZERKER_BRUTE`
-> 0x81) render as the tall crested red **Lizardzerker** (FE-Repo `Berserker (M) Lizardzerker Axe {Seliost1}`,
-> SMS 119 — shared sheet via the injector's `sprite` de-dup). Plain axe/thrower/key grunts stay the squat
-> **Wildling** (SMS 118). The brute keeps `class: brigand` for the parity engine via a **`deploy_class:
-> brigand-brute` sprite-only override** (inject_ch03 honours `e.get('deploy_class') or e['class']`); `make
-> difficulty CH=ch03` still PARITY. Nicolas chose brute+skirmisher both.
-> **③ Verification GOTCHA (important):** a **memory-teleport** (koboldview/lzview park units) forces FE8 to
-> draw the unit's **walk/MU** frame, which reads squat/wrong and looks like the Wildling — this cost real
-> confusion this session. For a true IDLE-sprite audit use the new **`enemycheck`** scenario: logs every
-> enemy's class + `SMSId` and camera-PANS via `gBmSt.camera` (offset 0x0C) to natural positions, NO teleport.
-> A unit's idle sheet = `pClassData->SMSId` (ClassData offset 0x06); read it to prove which sprite renders.
-> **Battle anims still vanilla** (map-sprite-only; the FEditor→decomp importer is the ~#90 gap). Also merged
-> **PR #144** (Wildling grunts + Trex map sprite + `map_sprite_swapper.py`) at session start.
+> **Last session (2026-07-08 #2, desktop — recruit UNITS + a reusable recruit model; PR #146 OPEN, not merged):**
+> **① Reusable recruit model (decisions.md → "Recruit wiring" ADR):** a recruit is just a **classed cast
+> member + a `recruit.chapter:`** in its YAML — no generic recruit engine (explicitly rejected). Prep
+> availability is one data-driven filter, **`cast_available_at(N)`** = founding party + recruits whose recruit
+> chapter is *before* N (replaces the old `starting_only` flag; `inject_ch01/02/03` call it; `available_at=None`
+> = everyone, for sprites/stats/death-quotes). Each JOIN uses vanilla FE8 primitives **per its own method**.
+> **② Trex** = real unit on the **Rennac** slot (Colm donor), placed **GREEN** on the ch03 map = a **Colm-style
+> TALK recruit** (`CHAR`+`CUSA`, cf. `EventScr_Ch3_Talk_NeimiColm`). On talk, `CUSA` flips him to player faction
+> → he renders in the **cast OBJ palette** (NOT vanilla blue). **③ Baxby** = promoted from cutscene-face
+> (`GUEST_PORTRAIT_MAP`) to a **real unit** on the **Forde** slot (Franz donor, Cavalier). His hand-painted
+> 32×32 axe-beak map sprite injects on the **standard cast pattern** — `base: Gargoyle` (32×32 3-frame GEOMETRY
+> token, NOT the FE-Repo source string) + synth MU, exactly like braulo/wolfram/meesmickle. (Gotcha I hit: I
+> briefly "parked" it citing a bogus geometry mismatch — the fix was just the right `base:` token. **Check a
+> sibling YAML for the pattern before inventing.**) **④** New **`ch03` playtest scenario** (PASS): `blue[08]=0x10`
+> Baxby + `green Trex 0x1C @ (10,6)`. 55 unit tests green, verify_text clean, `make CH03BOOT=1` green.
+> **⑤ LOCKED (Nicolas):** Trex's recruiter = **ANY core party member** (he's the only thief → must be
+> non-missable; guarantees the force-deployed *chosen* lord works; a static `CHAR` entry can't name the runtime
+> lord). Telegraph **Joshua-style** (hint line + FE8's auto Talk prompt).
+> **⚠ GAP FOUND & EMPIRICALLY CONFIRMED (the next task):** cutscene-recruited units **do not persist** into
+> later chapters. ch02 **persists** the party from ch01 and the availability filter only sizes the deploy **cap
+> template (never LOADed)** — nothing LOADs Baxby, so the ch02 `ch02` scenario blue array is `0x01..0x08`, **no
+> Baxby (0x10)**. Only affects **cutscene** recruits (Baxby); **talk** recruits (Trex) are fine — `CUSA` joins
+> them directly. Fix = a per-chapter **join-LOAD of newly-available cutscene recruits** (see Now/Next).
 
 > **Prior sessions (all MERGED; detail in git log / closed issues):** ch03 **DefeatBoss WIN** + `ch03win`
 > scenario (PR #143; **gotcha, decisions.md §Operational Gotchas:** the win fires from the FLAGGED grell quote
@@ -170,21 +166,27 @@ how-to for the host machinery = `docs/adding-a-chapter.md`.**
 - **DONE:** map painted + hosted on slot 4; **DefeatBoss WIN + `ch03win`** (PR #143); **Trex bust** (PR #142);
   **ALL enemy map sprites in-engine** — Wildling grunts (PR #144) + **Lizardzerker blade skirmisher + steel
   brute** on appended classes 0x80/0x81 (PR #145, audited via `enemycheck`). archer + thief + grell VANILLA.
-  **Recruit UNITS wired (`feat/23-trex-recruit-unit`):** the reusable data-driven recruit model landed —
-  a recruit = a classed cast member + a `recruit.chapter`, and `cast_available_at(N)` puts it on the prep
-  roster from the next chapter (`decisions.md` → **Recruit wiring** ADR). **Trex** is now a real unit
-  (Rennac slot, Colm donor) placed **GREEN** on the ch03 map (Colm-style talk recruit; his custom map
-  sprite now renders in cast colours once he joins). **Baxby** was promoted from cutscene-face to a real
-  unit too (Forde slot, Franz donor) → on the **ch02+ prep** roster; his hand-painted axe-beak map sprite
-  injects on the standard **32×32 cast pattern** (`base: Gargoyle` geometry token + synth MU, exactly like
-  braulo/wolfram/meesmickle — the base is a geometry token, NOT the FE-Repo source name). Verified in-engine: new **`ch03` scenario** PASS
-  (`blue[08]=0x10` Baxby + `green Trex 0x1C @ (10,6)`). **Audit finding:** Lupin/Sahnar/Basil (ch04/ch05)
-  are in the SAME "authored-YAML, no unit" state — wire each per its slice.
+  **Recruit UNITS wired on `feat/23-trex-recruit-unit` (PR #146, OPEN — not merged):** reusable data-driven
+  recruit model (`decisions.md` → **Recruit wiring** ADR) — a recruit = a classed cast member + a
+  `recruit.chapter`; `cast_available_at(N)` = founding + recruits recruited before N. **Trex** = real unit
+  (Rennac slot, Colm donor) placed **GREEN** on the ch03 map (Colm-style talk recruit; joins via `CUSA` →
+  cast OBJ palette). **Baxby** = promoted from cutscene-face to a real unit (Forde slot, Franz donor); his
+  hand-painted axe-beak sprite injects on the standard **32×32 cast pattern** (`base: Gargoyle` GEOMETRY
+  token + synth MU, like braulo/wolfram/meesmickle). Verified in-engine: **`ch03` scenario** PASS
+  (`blue[08]=0x10` Baxby + `green Trex 0x1C @ (10,6)`); 55 tests + verify_text green. **Trex talker LOCKED =
+  ANY core party member.** **Audit:** Lupin/Sahnar/Basil (ch04/ch05) are in the SAME "authored-YAML, no unit"
+  state — wire each per its slice.
+  **⚠ NOT done — cutscene recruits don't PERSIST yet:** ch02 persists the party from ch01 and the filter only
+  sizes the deploy cap (never LOADed), so **Baxby is absent from ch02** (confirmed: `ch02` scenario blue =
+  `0x01..0x08`, no `0x10`). Talk recruits (Trex) are fine (`CUSA` joins directly). Fix = item 1 below.
 - **REMAINING (unchecked on #23, priority order):**
-  1. **Trex talk-recruit event** — the `CHAR`+`CUSA` talk trigger + a Joshua-style hint line (he stands
-     green today, joins on talk). **OPEN (Nicolas):** talker = any core party member (non-missable; only
-     thief) vs the chosen lord — see `decisions.md` → Recruit wiring. Rides the ch03 event pass (item 4).
-     Then the cosmetic **horns/wings** pixel edit (separates him from the grunts) — `map_sprite_editor.py`.
+  1. **Recruit-persist join-LOAD (small, solo — DO FIRST):** add a per-chapter join-LOAD of newly-available
+     **cutscene** recruits so Baxby enters the persistent party from ch02. Verify the `ch02` scenario blue
+     array then includes `0x10`. Makes "Baxby in ch02 prep" actually true — last mechanical piece of the
+     recruit feature. (ch02 = `inject_ch02`, currently "party PERSISTS from ch01, no join-LOAD".)
+  2. **Trex talk-recruit event** — the `CHAR(flag, script, <every core-party candidate>, CHARACTER_RENNAC)` +
+     `CUSA(RENNAC)` talk trigger + a Joshua-style hint line (talker = ANY core party, LOCKED). Part of the ch3
+     dialogue pass (his recruit line). Then the cosmetic **horns/wings** pixel edit — `map_sprite_editor.py`.
   2. **Real PREP deploy** — author `deployment.deploy_slots` (9 tiles) + a PREP CALL; today it's the static
      fast-boot spawn (`CH03_SPAWN_POSITIONS` = `cast_available_at(3)` = 8 founding + Baxby), party WEAPONLESS
      (`items='0'`).
