@@ -5133,7 +5133,11 @@ CH03_AI = {'aggressive': '{0x0, 0x0, 0x1, 0x0}',   # pursue/charge
 # vanilla Mogall; blade = Mercenary (Lizardzerker slot lands next); archer/thief stay vanilla.
 CH03_CLASS_IDS = {'mogall': 'CLASS_MOGALL', 'brigand': 'CLASS_BLST_KILLER_EMPTY',
                   'mercenary': 'CLASS_MNC_LIZARDZERKER', 'archer': 'CLASS_ARCHER',
-                  'thief': 'CLASS_THIEF'}
+                  'thief': 'CLASS_THIEF',
+                  # the steel brute: a Brigand (parity) that DEPLOYS on the Lizardzerker
+                  # sprite via a brigand-clone class (campaign.yaml kobold-brute). Reached
+                  # through an enemy's `deploy_class` override, not its `class`.
+                  'brigand-brute': 'CLASS_MNC_LIZARDZERKER_BRUTE'}
 CH03_ITEM_IDS = {'iron-axe': 'ITEM_AXE_IRON', 'hand-axe': 'ITEM_AXE_HANDAXE',
                  'steel-axe': 'ITEM_AXE_STEEL', 'iron-sword': 'ITEM_SWORD_IRON',
                  'iron-bow': 'ITEM_BOW_IRON', 'evil-eye': 'ITEM_MONSTER_EVILEYE',
@@ -5186,7 +5190,7 @@ def inject_ch03(campaign, verbose=True):
 
     enemies = []
     for e in chap['enemy_units']:
-        cls = CH03_CLASS_IDS[e['class']]
+        cls = CH03_CLASS_IDS[e.get('deploy_class') or e['class']]  # deploy_class = sprite-only override
         items = ', '.join(CH03_ITEM_IDS[i['id']] for i in e.get('inventory', []))
         drop = e.get('item_drop')
         if drop:

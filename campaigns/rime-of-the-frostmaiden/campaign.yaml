@@ -108,6 +108,19 @@ enemy_class_reskins:
     slot_id: 0x80
     sprite: lizardzerker
     frame: 16x32
+  # The steel-axe BRUTE (kobold-steel, the grell's enforcer) is the biggest kobold, so it
+  # wears the Lizardzerker too -- but it must stay a Brigand (steel axe + stats + parity), so
+  # it rides its OWN appended class that clones CLASS_BRIGAND and shares the lizardzerker sheet
+  # (the injector de-dups by `sprite`, so 0x80 and 0x81 share SMS row 119 / one move sheet).
+  # The plain axe/thrower/key grunts stay the squat Wildling; blade + brute are the tall
+  # Lizardzerkers. ch03 kobold-steel points its DEPLOY class here via `deploy_class` while
+  # keeping `class: brigand` for the parity engine.
+  - id: kobold-brute
+    base: CLASS_BRIGAND
+    slot: CLASS_MNC_LIZARDZERKER_BRUTE
+    slot_id: 0x81
+    sprite: lizardzerker
+    frame: 16x32
 
 # Item name overrides: rename a vanilla item's in-game text globally (build wiring =
 # build_campaign.inject_item_names, which rewrites gItemData[].nameTextId's message).

@@ -3062,30 +3062,63 @@ scenarios.koboldview = function()
         string.format("%d kobold map sprites pulled on-screen for review", moved))
 end
 
--- lzview (#23 review): isolate the ONE blade-kobold (class 0x80 = the Lizardzerker reskin)
--- and park it right beside braulo, camera on it, for an unambiguous on-map sprite shot.
+-- lzview (#23 review): ISOLATE the ONE blade-kobold (class 0x80 = the Lizardzerker enemy
+-- reskin) so it can't be confused with a red PC (braulo the crab / wolfram). Sweeps EVERY
+-- other unit -- all blue PCs and all other red enemies -- to the far corner, leaving only
+-- the lizardzerker on a visible left-area tile, and logs its SMSId to prove which sheet it
+-- draws (the injected lizardzerker wait row, not a PC's).
 scenarios.lzview = function()
     if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
-    local leader = blue(0x01)
-    if not leader then return result("FAIL", "leader (braulo) not deployed") end
+    local FAR_X, FAR_Y = 16, 15
+    local function stash(u) setMapUnit(u.x, u.y, 0)
+        emu:write8(u.addr + 0x10, FAR_X); emu:write8(u.addr + 0x11, FAR_Y) end
+    -- every blue PC (braulo included) -> far corner, out of the shot
+    for i = 0, 7 do local u = unitAt(SYM.gUnitArrayBlue, i); if u then stash(u) end end
+    -- find the class-0x80 enemy; every OTHER red enemy -> far corner
     local lz
     for i = 0, 23 do
         local u = unitAt(SYM.gUnitArrayRed, i)
         if u and not isDead(u) then
-            local cls = ru8(ru32(u.addr + 4) + 4)   -- unit -> pClassData -> .number
-            if cls == 0x80 then lz = u; break end
+            if ru8(ru32(u.addr + 4) + 4) == 0x80 and not lz then lz = u
+            else stash(u) end
         end
     end
     if not lz then return result("FAIL", "no class-0x80 (Lizardzerker) unit on the map") end
-    local tx, ty = leader.x + 1, leader.y
-    setMapUnit(lz.x, lz.y, 0)
-    emu:write8(lz.addr + 0x10, tx); emu:write8(lz.addr + 0x11, ty)
-    setMapUnit(tx, ty, mapUnitAt(leader.x, leader.y))
-    log(string.format("parked Lizardzerker (class 0x80) at (%d,%d) beside braulo (%d,%d)",
-        tx, ty, leader.x, leader.y))
+    local sms = ru8(ru32(lz.addr + 4) + 6)   -- unit -> pClassData -> .SMSId (offset 0x06)
+    local grid = mapUnitAt(lz.x, lz.y); setMapUnit(lz.x, lz.y, 0)
+    local tx, ty = 4, 10                       -- open, camera-visible, well clear of the corner pile
+    emu:write8(lz.addr + 0x10, tx); emu:write8(lz.addr + 0x11, ty); setMapUnit(tx, ty, grid)
+    log(string.format("LONE enemy Lizardzerker at (%d,%d): class=0x80 SMSId=%d "
+        .. "(all PCs + other enemies swept to %d,%d)", tx, ty, sms, FAR_X, FAR_Y))
     wait(60)
-    shot("lizardzerker-on-map")
-    result("PASS", "Lizardzerker parked beside braulo for review")
+    shot("lizardzerker-isolated")
+    result("PASS", string.format("lone enemy Lizardzerker, class 0x80, SMSId=%d", sms))
+end
+
+-- enemycheck (#23 review): the DEFINITIVE sprite audit. Logs every red enemy's class + SMSId
+-- (idle sheet id), then PANS THE CAMERA (gBmSt.camera, no teleporting) to the brute (14,6)
+-- and blade (15,2) so their true STANDING sprites render -- avoids the walk-frame that a
+-- memory teleport forces. Expect: brute class 0x81 + blade class 0x80 both SMSId 119
+-- (lizardzerker), plain grunts SMSId 118 (wildling).
+scenarios.enemycheck = function()
+    if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
+    for i = 0, 23 do
+        local u = unitAt(SYM.gUnitArrayRed, i)
+        if u and not isDead(u) then
+            local cd = ru32(u.addr + 4)
+            log(string.format("red[%02d] char=0x%02X class=0x%02X SMSId=%d @ (%d,%d)",
+                i, u.charId, ru8(cd + 4), ru8(cd + 6), u.x, u.y))
+        end
+    end
+    local function panTo(tx, ty, name)
+        emu:write16(SYM.gBmSt + 0x0C, math.max(0, tx * 16 - 112))  -- camera.x (px)
+        emu:write16(SYM.gBmSt + 0x0E, math.max(0, ty * 16 - 72))   -- camera.y
+        emu:write16(SYM.gBmSt + 0x14, tx); emu:write16(SYM.gBmSt + 0x16, ty)  -- cursor holds it
+        wait(30); shot(name)
+    end
+    panTo(14, 6, "brute-at-14-6")
+    panTo(15, 2, "blade-at-15-2")
+    result("PASS", "enemy class/SMSId audit + camera pans to brute & blade")
 end
 
 -- ch02: entry assertions on the ch02 map (mirrors scenarios.ch01). The 3 green chwinga are on
