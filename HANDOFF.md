@@ -151,11 +151,12 @@ wolfram is **pure art-in → land** once 3 poses exist. Steps:
 longest, 20t) · peak = lunge & slam to full extension, held through `hit_normal` (engine adds the −40 forward
 OAM lunge; feet stay anchored in the art). 3 frames is a hard cap (script refs frames 0/1/2).
 
-#### The other 5 PCs (after wolfram) — donor mapping by class
+#### The other 5 PCs + Trex (after wolfram) — donor mapping by class
 pinky = Pegasus (lance flier — reuses the lance cadence) · marty + meesmickle = Shaman (dark caster) ·
-rootis = Mage (anima caster) · sclorbo = Cleric (staff — may need a heal pose). **meesmickle has a parked
-vendored Kitsune anim** at `battle_anims/_parked/`. Each: one `battle_anim:` block + 3 descaled frames, one
-feature-flow branch per unit (or small batch), `custom_unit` issue template.
+rootis = Mage (anima caster) · sclorbo = Cleric (staff — may need a heal pose) · **trex = Thief (sword
+melee — donor `myrmidon`/`thief`, braulo's 3-beat recipe; ch03 recruit, added to #65 2026-07-08)**.
+**meesmickle has a parked vendored Kitsune anim** at `battle_anims/_parked/`. Each: one `battle_anim:` block
++ 3 descaled frames, one feature-flow branch per unit (or small batch), `custom_unit` issue template.
 - **Deferred polish (tracked):** braulo's white swing-arc weapon-trail → **#91**; goblin enemy class-level anim → **#90**.
 
 ### Content — Ch3 "The Termalaine Mine" (#23) — HOSTED + WIN + ENEMY SPRITES DONE; recruit/prep/chain/cutscenes/chests remain
@@ -176,14 +177,14 @@ how-to for the host machinery = `docs/adding-a-chapter.md`.**
   (`blue[08]=0x10` Baxby + `green Trex 0x1C @ (10,6)`); 55 tests + verify_text green. **Trex talker LOCKED =
   ANY core party member.** **Audit:** Lupin/Sahnar/Basil (ch04/ch05) are in the SAME "authored-YAML, no unit"
   state — wire each per its slice.
-  **⚠ NOT done — cutscene recruits don't PERSIST yet:** ch02 persists the party from ch01 and the filter only
-  sizes the deploy cap (never LOADed), so **Baxby is absent from ch02** (confirmed: `ch02` scenario blue =
-  `0x01..0x08`, no `0x10`). Talk recruits (Trex) are fine (`CUSA` joins directly). Fix = item 1 below.
+  **✅ DONE — cutscene recruits now PERSIST (2026-07-08, on PR #146):** off-map recruit join-LOAD wired.
+  `build_campaign.offmap_join_recruits(N)` returns the recruits newly available at N that join off-map
+  (`recruit.via` not `story`/`talk`); `inject_ch02` LOADs them (Baxby) on a free vanilla-Ch3 UnitDef symbol
+  (`088B476C`), blue, before the PREP CALL → he enters the saved party. **Empirically verified in-engine:**
+  `tools/playtest/run.sh ch02baxby` PASS — Baxby at `blue[8]=0x10` in the prep roster AND deployable +
+  fighting on the ch02 map (killed a raider in melee). Existing `ch02` scenario still PASS (deploy cap 5).
+  3 new unit tests (58 total green). Talk recruits (Trex) still self-join via `CUSA`.
 - **REMAINING (unchecked on #23, priority order):**
-  1. **Recruit-persist join-LOAD (small, solo — DO FIRST):** add a per-chapter join-LOAD of newly-available
-     **cutscene** recruits so Baxby enters the persistent party from ch02. Verify the `ch02` scenario blue
-     array then includes `0x10`. Makes "Baxby in ch02 prep" actually true — last mechanical piece of the
-     recruit feature. (ch02 = `inject_ch02`, currently "party PERSISTS from ch01, no join-LOAD".)
   2. **Trex talk-recruit event** — the `CHAR(flag, script, <every core-party candidate>, CHARACTER_RENNAC)` +
      `CUSA(RENNAC)` talk trigger + a Joshua-style hint line (talker = ANY core party, LOCKED). Part of the ch3
      dialogue pass (his recruit line). Then the cosmetic **horns/wings** pixel edit — `map_sprite_editor.py`.

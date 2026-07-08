@@ -566,12 +566,20 @@ whole of the "recruits the whole cast; Pick Units deploys `deploy_limit`" model 
 `inject_ch0N` calls `_classed_cast(available_at=N)`; `available_at=None` (map sprites, death quotes,
 stat patching) still covers every recruit.
 **Each recruit's JOIN uses vanilla FE8 primitives, wired per its own method — do NOT generalize:**
-- **Baxby (ch01)** — recruited in the **ch01-ending cutscene** (Marty wins him over). No on-map recruit
-  event; he is simply on the ch02+ roster via the filter. His YAML `via: market` / `cost_gp: 200` is
-  **cutscene flavor, not a purchase mechanic** (there is no buy-a-unit UI; §Recruit budget: the cast is
-  recruited by story, Pick Units deploys). Rides the vanilla **Forde** slot (donor Franz/Cavalier); his
-  hand-painted axe-beak map sprite injects on the standard 32x32 cast pattern (`base: Gargoyle` geometry
-  token + synth MU, like braulo/wolfram/meesmickle).
+- **Baxby (ch01)** — an **off-map CUTSCENE recruit**: won over in the **ch01-ending cutscene** (Marty
+  wins him over) with no on-map unit. The availability filter puts him on the ch02+ prep roster, but the
+  filter only **sizes the deploy cap template** (which is never LOADed) — so it alone does NOT put him in
+  the saved party. He therefore gets an explicit **between-chapter join-LOAD**: `inject_ch02` LOADs him
+  (a free vanilla-Ch3 UnitDef symbol, blue, on a walkable tile) in the beginning scene **before the PREP
+  CALL**, so Pick Units lists him and he persists forward like any deployed unit. This is the general rule
+  for any off-map recruit — `build_campaign.offmap_join_recruits(N)` returns the recruits newly available
+  at chapter N whose `recruit.via` is **not** an on-map talk (`story`/`talk`); each gets a join-LOAD its
+  first chapter on the roster (empirically verified: `run.sh ch02baxby` — Baxby at `blue[8]=0x10`,
+  deployable and fighting on the ch02 map). His YAML `via: market` / `cost_gp: 200` is **cutscene flavor,
+  not a purchase mechanic** (there is no buy-a-unit UI; §Recruit budget: the cast is recruited by story,
+  Pick Units deploys). Rides the vanilla **Forde** slot (donor Franz/Cavalier); his hand-painted axe-beak
+  map sprite injects on the standard 32x32 cast pattern (`base: Gargoyle` geometry token + synth MU, like
+  braulo/wolfram/meesmickle).
 - **Trex (ch03)** — a **Colm-style on-map TALK recruit**: placed GREEN, joins via `CUSA` when talked to
   (the vanilla `EventScr_Ch3_Talk_NeimiColm → CUSA(COLM)` pattern; `CHAR(flag, script, talker, target)`).
   Rides **Rennac** (donor Colm/Thief). He is the army's ONLY thief, so recruitment must be **non-missable**
@@ -794,8 +802,10 @@ _Decided: 2026-06-10 (decomp trace, ch01 slice)_
 ch02 rides the *next* vanilla slot after ch01 (slot 2 → slot 3, `CHAPTER_L_3`), reached by
 ch01's ending `MNC2(0x3)` (was the dev placeholder). Three ways it diverges from `inject_ch01`,
 all because the slice is mid-campaign rather than the cast's first chapter:
-(1) **Party persists** — no cast join-LOAD; the saved roster carries over and the prep flow
-fields 5 of it (cap = `UnitDef_Event_Ch3Ally` entry count). (2) **No lord-select** — the lead was
+(1) **Party persists** — no *founding-cast* join-LOAD; the saved roster carries over and the prep
+flow fields 5 of it (cap = `UnitDef_Event_Ch3Ally` entry count). The one exception is an **off-map
+recruit** who joined in a cutscene and was never a unit (Baxby, ch01 ending): he gets a small
+between-chapter join-LOAD before PREP so he enters the saved party — see the Recruit-wiring ADR. (2) **No lord-select** — the lead was
 chosen in ch01; the flag-driven `IsCharacterForceDeployed_` hook auto-force-deploys it in *any*
 later chapter with zero per-chapter wiring (only `CauseGameOverIfLordDies`, already vanilla in
 `EventListScr_Ch3_Misc`, is needed). (3) **DefeatAll, not Seize** — the slot-3 host `goal` is

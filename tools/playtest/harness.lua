@@ -3205,6 +3205,104 @@ scenarios.smoke_ch02 = function()
     return smokeDrive(chapter())
 end
 
+-- ch02baxby (#23 recruit-persist): prove the ch01-ending CUTSCENE recruit Baxby (CHARACTER_FORDE
+-- 0x10) actually PERSISTS into ch02 as a real party member -- not just sized into the deploy cap
+-- (which never LOADs anyone). Before the off-map recruit join-LOAD (inject_ch02 step 2a-bis, on
+-- UnitDef_088B476C), ch02's blue roster was 0x01..0x08 with NO 0x10; now the join-LOAD LOADs him
+-- into the saved party before PREP. Two proofs: (1) in the prep roster (found in gUnitArrayBlue),
+-- and (2) on the map in combat -- force-deploy him if the prep auto-pick benched him, then attack
+-- a foe and confirm damage landed. NB the roster is 9 deep (8 founding + Baxby), so we search
+-- past blue()'s 8-slot window. Run: tools/playtest/run.sh ch02baxby (needs a normal build).
+local BAXBY_PID = 0x10   -- CHARACTER_FORDE = baxby's cast slot (PORTRAIT_MAP; docs/CLASSES.md)
+scenarios.ch02baxby = function()
+    wait(30)
+    if not loadState("ch02start") then return result("FAIL", "no ch02start checkpoint (run.sh builds it)") end
+    wait(90)
+    -- 1. PREP-ROSTER proof: Baxby must be a real party member. Search the whole blue array (the
+    --    roster is 9 deep: 8 founding 0x01..0x08 + Baxby), not just blue()'s first 8 slots.
+    local baxby, bidx
+    for i = 0, 15 do
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u then
+            log(string.format("blue[%02d] char=0x%02X pos=(%d,%d) state=0x%08X", i, u.charId, u.x, u.y, u.state))
+            if u.charId == BAXBY_PID then baxby, bidx = u, i end
+        end
+    end
+    if not baxby then
+        shot("ch02baxby-absent")
+        return result("FAIL", "Baxby (0x10) NOT in the ch02 party -- recruit-persist join-LOAD missing")
+    end
+    log(string.format("Baxby in the ch02 prep roster at blue[%d] pos=(%d,%d) state=0x%08X",
+        bidx, baxby.x, baxby.y, baxby.state))
+    -- 2. On-map: force-deploy him if the prep auto-pick benched him (US_HIDDEN 0x1 / US_NOT_DEPLOYED
+    --    0x8 set, or x==0xFF) -- clear the bench bits, drop him on a free NW tile, register him in
+    --    the map-unit grid so the engine can select him. (The cap is 5 and he joins last, so the
+    --    auto-pick usually benches him -- exactly the case we must be able to deploy.)
+    if (baxby.state & 0x9) ~= 0 or baxby.x == 0xFF then
+        local idx = ru8(baxby.addr + 0x0B)                    -- unit->index = its map-grid id
+        emu:write32(baxby.addr + 0x0C, baxby.state & ~0x9)    -- clear US_HIDDEN | US_NOT_DEPLOYED
+        local placed = false
+        for _, t in ipairs({ { 0, 3 }, { 0, 4 }, { 1, 4 }, { 2, 3 }, { 1, 3 }, { 0, 5 } }) do
+            if mapUnitAt(t[1], t[2]) == 0 then
+                emu:write8(baxby.addr + 0x10, t[1]); emu:write8(baxby.addr + 0x11, t[2])
+                setMapUnit(t[1], t[2], idx); placed = true
+                log(string.format("force-deployed Baxby at (%d,%d) grid=%d", t[1], t[2], idx))
+                break
+            end
+        end
+        if not placed then return result("FAIL", "no free tile to force-deploy Baxby") end
+    else
+        log("Baxby was auto-deployed by the prep default (already on the field)")
+    end
+    baxby = unitAt(SYM.gUnitArrayBlue, bidx)                   -- refresh after the deploy pokes
+    -- Guard: the join-LOAD arms him (iron sword + iron lance), but if items[0] is empty give him
+    -- an Iron Lance (0x08 | 45 uses) so Attack appears.
+    if (ru16(baxby.addr + 0x1E) & 0xFF) == 0 then
+        emu:write16(baxby.addr + 0x1E, 0x2D08)
+        log("Baxby was weaponless -> gave him an Iron Lance")
+    end
+    shot("ch02baxby-deployed")
+    -- 3. COMBAT proof: teleport him onto a tile within weapon reach of a live raider and attack.
+    --    Frail+harmless every enemy first (1 HP, no counter power) so whichever foe he strikes is a
+    --    clean, deterministic one-round kill he can't die to -- this is a WIRING proof (Baxby fights
+    --    on the ch02 map), not a balance test. PASS = an enemy died to his strike AND he took his
+    --    action (US_UNSELECTABLE), i.e. a real battle round resolved on the map.
+    pokeAnimsOn()
+    local mn, mx = unitAttackRange(baxby)
+    if not mn then return result("FAIL", "Baxby has no attacking weapon equipped") end
+    for i = 0, 23 do
+        local r = unitAt(SYM.gUnitArrayRed, i)
+        if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+    end
+    local liveBefore = #liveEnemies()
+    if not teleportToFiringTile(baxby, mn, mx) then
+        return result("FAIL", "no free tile in Baxby's weapon range of any enemy")
+    end
+    baxby = unitAt(SYM.gUnitArrayBlue, bidx)
+    if not moveUnit(baxby.x, baxby.y, baxby.x, baxby.y) then
+        shot("ch02baxby-no-menu")
+        return result("FAIL", "Baxby's action menu never opened on his firing tile")
+    end
+    shot("ch02baxby-attacking")
+    chooseAttack(baxby.addr)
+    waitFor(function() return not procActive(SYM.gProc_ekrBattle) end, 600)
+    wait(30)
+    local liveAfter = #liveEnemies()
+    baxby = unitAt(SYM.gUnitArrayBlue, bidx)
+    local acted = baxby and (baxby.state & 0x2) ~= 0          -- US_UNSELECTABLE = he took his action
+    log(string.format("Baxby combat: liveEnemies %d -> %d (killed %d); acted=%s",
+        liveBefore, liveAfter, liveBefore - liveAfter, tostring(acted)))
+    shot("ch02baxby-after-combat")
+    if liveAfter >= liveBefore or not acted then
+        return result("FAIL", string.format(
+            "Baxby's attack resolved no combat (enemies %d->%d, acted=%s)",
+            liveBefore, liveAfter, tostring(acted)))
+    end
+    result("PASS", string.format(
+        "Baxby persists into ch02: in the prep roster (blue[%d]=0x10) AND fought on the ch02 map "
+        .. "(killed a raider in melee)", bidx))
+end
+
 -- clear_ch02: the completability + chain + charm-delivery proof. Rout the raider band (DefeatAll)
 -- while keeping the chwinga alive, then watch the ending scene gift all 3 charms to the leader /
 -- convoy. PASS = routed, chained, and all 3 chwinga charms delivered.

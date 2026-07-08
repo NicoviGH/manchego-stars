@@ -301,6 +301,13 @@ CH02_LAYOUT = ('Ch02ColdWelcomeMap', 'ch02-cold-welcome')  # (asset label, maps/
 CH02_CHAPTER_YAML = 'ch02-cold-welcome.yaml'
 CH02_BOSS_SLOT = 'BAZBA'      # vanilla Ch3's boss slot -- Halvar mirror (custom bust #19 later)
 CH02_MINIBOSS_SLOT = 'BONE'   # vanilla Ch2's named mid-tier, idle on slot 3 -- Grukk (bust later)
+# Off-map recruit join-LOAD (#23): Baxby (won over in the ch01-ending cutscene) enters the
+# saved party HERE, his first prep roster. A free vanilla-Ch3-region UnitDef symbol (externed,
+# unused by our ch02 flow); LOAD1'd blue before the PREP CALL -> Pick Units lists him. The join
+# tile is a walkable NW deploy slot (PREP hides everyone and re-picks, so the tile only needs
+# to be valid + collision-free at LOAD time -- clear of the chwinga/raiders).
+CH02_RECRUIT_JOIN_SYMBOL = 'UnitDef_088B476C'
+CH02_RECRUIT_JOIN_POS = (2, 4)
 # Vellynne Harpell (recurring Brotherhood NPC) has no map unit in ch02; her CUTSCENE FACE
 # rides FID_Ismaire -- a regal vanilla woman absent from our ch00-08 chapters, collision-free.
 # Her custom bust (#19) is OPTIONAL: this is a flagged placeholder until that art lands.
@@ -3965,6 +3972,44 @@ def _classed_cast(campaign, available_at=None):
     return cast, names
 
 
+# A recruit placed GREEN on the map in its OWN recruit chapter (a Colm-style talk recruit,
+# e.g. Trex: recruit.via == 'story') self-joins the blue party via CUSA when talked to, so it
+# persists to the next chapter with no extra wiring. Every OTHER recruit joins OFF the map --
+# a cutscene/market recruit, e.g. Baxby (recruit.via == 'market'), won over in a scene with no
+# on-map unit -- so NOTHING puts it in the saved party. cast_available_at() only SIZES the
+# deploy cap template (never LOADed), so an off-map recruit would silently be absent from the
+# field until it gets an explicit between-chapter join-LOAD (#23). This is that discriminator.
+ON_MAP_RECRUIT_VIA = ('story', 'talk')   # placed green + CUSA -> self-joins, persists naturally
+
+
+def offmap_join_recruits(campaign, chapter_number):
+    """Cast members that FIRST enter the persistent party OFF the map at `chapter_number`:
+    recruits whose recruit chapter is the one immediately before (so cast_available_at first
+    lists them now) and whose join method is off-map (recruit.via not in ON_MAP_RECRUIT_VIA).
+    Returns [(unit_id, slot, class_enum, deploy_class_enum, level)], PORTRAIT_MAP order.
+
+    Each such unit needs a beginning-scene LOAD1 so it enters the saved roster -- the prep
+    availability filter only sizes the deploy cap; it never LOADs anyone. Keyed to the
+    immediately-preceding chapter (contiguous hosted chapters, our MVP) so a unit is joined
+    exactly once, the first chapter it rides the prep roster (no re-LOAD -> no duplicate)."""
+    out = []
+    for unit_id, slot in PORTRAIT_MAP.items():
+        unit = load_unit(campaign, unit_id)
+        unit.setdefault('id', unit_id)
+        class_enum = class_enum_for(unit)
+        if class_enum is None:
+            continue
+        rc = recruit_chapter_number(campaign, unit)
+        if rc is None or rc != chapter_number - 1:
+            continue   # not a recruit, or not newly available at THIS chapter
+        via = (unit.get('recruit') or {}).get('via')
+        if via in ON_MAP_RECRUIT_VIA:
+            continue   # on-map talk recruit -- self-joins via CUSA, persists naturally
+        out.append((unit_id, slot, class_enum, deploy_class_for(unit),
+                    int(unit.get('fe_stats', {}).get('level', 1))))
+    return out
+
+
 def _ally_unit_entry(leader, slot, class_enum, level, x, y, items, comment,
                      allegiance='BLUE', autolevel=False, ai=None):
     """One non-RED UnitDefinition row (events_udefs.c) for a chapter join/deploy/
@@ -4831,8 +4876,9 @@ def inject_backgrounds(campaign, verbose=True):
 def inject_ch02(campaign, verbose=True):
     """Wire Ch2 "Cold Welcome" (#22) onto chapter slot 3 (ch01's MNC2(0x3) target).
 
-    Simpler than inject_ch01: the party PERSISTS from ch01 (no cast re-LOAD, no
-    lord-select menu), and the win is DefeatAll (no Seize). The slot-3 host goal is
+    Simpler than inject_ch01: the founding party PERSISTS from ch01 (no cast re-LOAD, no
+    lord-select menu) -- only the ch01 cutscene recruit Baxby gets an explicit off-map
+    join-LOAD here (step 2a-bis), his first prep roster. The win is DefeatAll (no Seize). The slot-3 host goal is
     swapped to vanilla slot-4's defeat_all template, the vanilla Ch3 Seize(14,1) is
     dropped (so engine CountRedUnits() drives the rout win), and the ch01-chosen lord
     is auto-force-deployed by the flag-driven IsCharacterForceDeployed_ hook
@@ -4897,7 +4943,8 @@ def inject_ch02(campaign, verbose=True):
     #    declared in eventcall.h, so no extern surgery):
     #    - UnitDef_Event_Ch3Ally: the 5-slot deploy template = THE CAP. Never LOADed;
     #      the prep flow reads its entry count (cap) + positions (deploy tiles). The
-    #      party itself persists from ch01 (no join-LOAD).
+    #      founding party itself persists from ch01 (no join-LOAD) -- but a cutscene recruit
+    #      (Baxby) was never a unit, so he needs an explicit join-LOAD (UnitDef_088B476C, 2a-bis).
     #    - UnitDef_088B463C: the RED raider band (Beginning-scene LOAD1) -- vanilla Ch2's
     #      exact mix, reflavored chardalyn berserkers. 0x8e = generic autolevelled trash;
     #      Grukk rides the vanilla Bone slot, Halvar the Bazba slot.
@@ -4907,9 +4954,27 @@ def inject_ch02(campaign, verbose=True):
     #      088B4718 is now the chwinga). Vanilla 088B4470 mix = one L2 + one L3 brigand.
     # available_at=2: the party on the field at ch02 -- founding party + Baxby (recruited
     # ch01 at the market); Trex (ch03) is not yet in. Data-driven from each unit's recruit.chapter.
+    # NB this only SIZES the deploy cap; the founding party persists from ch01 but Baxby (a
+    # cutscene recruit) is put in the saved roster by the off-map join-LOAD below (2a-bis, #23).
     cast, _ = _classed_cast(campaign, available_at=chap['chapter_number'])
     leader = 'CHARACTER_%s' % cast[0][1].upper()
     deploy = _deploy_cap_entries(chap, cast, leader, 'ch02')
+
+    # 2a-bis. Off-map recruit join-LOAD: the party persists from ch01 (already in the save),
+    #     but a cutscene recruit was never a unit -- so LOAD him in HERE, his first prep
+    #     roster, or the deploy cap sizes a slot nothing fills (#23). For ch02 that is Baxby
+    #     (ch01 ending cutscene; recruit.via = market = off-map). Each rides its CLASS_LOADOUT
+    #     kit, blue, on a walkable NW tile (PREP re-picks positions). Empty for a chapter with
+    #     no newly-available off-map recruit (then no LOAD1 is emitted -- see step 4).
+    join_recruits = offmap_join_recruits(campaign, chap['chapter_number'])
+    for uid, _s, ce, _d, _l in join_recruits:
+        if ce not in CLASS_LOADOUT:
+            sys.exit('ERROR: no loadout for %s (ch02 join recruit %s)' % (ce, uid))
+    jx, jy = CH02_RECRUIT_JOIN_POS
+    recruit_join = [_ally_unit_entry(leader, slot, dce, lv, jx, jy,
+                                     ', '.join(CLASS_LOADOUT[ce]),
+                                     ' /* %s -- off-map recruit joins the party (#23) */' % uid)
+                    for uid, slot, ce, dce, lv in join_recruits]
 
     by_eid = {e['id']: e for e in chap['enemy_units']}
     raider = by_eid['chardalyn-raider']            # 2x L3 generic brigand (vanilla #1 + #5)
@@ -4978,11 +5043,13 @@ def inject_ch02(campaign, verbose=True):
 
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:
         udefs = f.read()
-    for marker, entries in (
-            ('UnitDef_Event_Ch3Ally[] =', deploy),
-            ('UnitDef_088B463C[] =', enemies),
-            ('UnitDef_088B4718[] =', chwinga),
-            ('UnitDef_088B4758[] =', reinforce)):
+    tables = [('UnitDef_Event_Ch3Ally[] =', deploy),
+              ('UnitDef_088B463C[] =', enemies),
+              ('UnitDef_088B4718[] =', chwinga),
+              ('UnitDef_088B4758[] =', reinforce)]
+    if recruit_join:  # only overwrite the free join table when a recruit actually joins here
+        tables.append(('%s[] =' % CH02_RECRUIT_JOIN_SYMBOL, recruit_join))
+    for marker, entries in tables:
         block = '{\n' + '\n'.join(entries) + '\n    { 0 },\n}'
         udefs = _replace_brace_block(udefs, marker, block, EVENTS_UDEFS_C)
     with open(EVENTS_UDEFS_C, 'w', encoding='utf-8') as f:
@@ -5028,6 +5095,12 @@ def inject_ch02(campaign, verbose=True):
          'B -- Rootis clocks the dagger-of-ice kill (Sephek breadcrumb)',
          'C -- nightfall narration over the camp (#58 opaque box)',
          'D -- RBG sets the road north (lets the Bremen bounty keep)'])
+    # Off-map recruit join-LOAD line: emitted only when a cutscene/market recruit becomes
+    # available this chapter (Baxby, ch02) -> he enters the persistent party right before PREP,
+    # so Pick Units lists him. Empty (no LOAD1) for a chapter with no such recruit.
+    recruit_load = (
+        '    LOAD1(0x1, %s) /* off-map recruit joins the persistent party (#23) */\n'
+        % CH02_RECRUIT_JOIN_SYMBOL if recruit_join else '')
     with open(CH3_EVENTSCRIPT_H, encoding='utf-8') as f:
         script = f.read()
     script = _replace_brace_block(
@@ -5040,17 +5113,19 @@ def inject_ch02(campaign, verbose=True):
         '    BROWNBOXTEXT(0x%X, 8, 8) /* "Bryn Shander -- West Gate" card */\n'
         % (CH02_OPENING_BG, CH02_OPENING_CARD_MSG)
         + op_text_calls +
-        '    FADI(16) /* fade the scenic BG out */\n'
-        '    SVAL(EVT_SLOT_B, 0x0) /* map camera origin */\n'
-        '    LOMA(0x%X) /* RestartBattleMap -- build the ch02 map fresh (cf. inject_ch01) */\n'
-        '    LOAD1(0x1, UnitDef_088B463C) /* the RED raider band */\n'
-        '    LOAD1(0x1, UnitDef_088B4718) /* the 3 GREEN chwinga (protect layer) */\n'
+        ('    FADI(16) /* fade the scenic BG out */\n'
+         '    SVAL(EVT_SLOT_B, 0x0) /* map camera origin */\n'
+         '    LOMA(0x%X) /* RestartBattleMap -- build the ch02 map fresh (cf. inject_ch01) */\n'
+         '    LOAD1(0x1, UnitDef_088B463C) /* the RED raider band */\n'
+         '    LOAD1(0x1, UnitDef_088B4718) /* the 3 GREEN chwinga (protect layer) */\n'
+         % CH02_HOST_INDEX)
+        + recruit_load +
         '    ENUN\n'
         '    FADU(16) /* reveal the battle map */\n'
         '    CALL(EventScr_08591FD8) /* preparations (PREP, event cmd 0x3E) -- cap 5 */\n'
         '    ENUT(8)\n'
         '    EVBIT_T(7)\n'
-        '    ENDA\n}' % CH02_HOST_INDEX, CH3_EVENTSCRIPT_H)
+        '    ENDA\n}', CH3_EVENTSCRIPT_H)
     script = _replace_brace_block(
         script, 'EventScr_Ch3_Turn1Npc[] =',
         '{\n    SVAL(EVT_SLOT_2, UnitDef_088B4758)\n'
@@ -5149,9 +5224,11 @@ def inject_ch02(campaign, verbose=True):
         print('  ch02 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; '
               'DefeatAll, deploy cap %d + PREP (lord auto-force-deployed)'
               % (obj_idx, pal_idx, cfg_idx, layout_idx, CH02_HOST_INDEX, len(deploy)))
-        print('  rosters: party persists, %d chardalyn raiders (Grukk@%s Halvar@%s) + %d '
-              'rear raiders turn %d; %d GREEN chwinga (per-survivor charm-gifts)'
-              % (len(enemies), (gx, gy), (hx, hy), len(reinforce),
+        joined = ', '.join(uid for uid, *_ in join_recruits) or 'none'
+        print('  rosters: party persists + off-map recruit join-LOAD [%s], %d chardalyn '
+              'raiders (Grukk@%s Halvar@%s) + %d rear raiders turn %d; %d GREEN chwinga '
+              '(per-survivor charm-gifts)'
+              % (joined, len(enemies), (gx, gy), (hx, hy), len(reinforce),
                  reinf['trigger_turn'], len(chwinga)))
 
 

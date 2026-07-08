@@ -172,6 +172,31 @@ class RecruitAvailability(unittest.TestCase):
         self.assertIn('baxby', bc.PC_DEATH_QUOTE_MSGS)
         self.assertTrue(bc.load_unit(self.CAMPAIGN, 'baxby').get('death_quote'))
 
+    def test_offmap_recruit_joins_the_chapter_after_recruitment(self):
+        """The availability filter only SIZES the deploy cap; an off-map cutscene recruit
+        (Baxby) needs an explicit between-chapter join-LOAD to enter the saved party. It
+        fires the chapter AFTER recruitment, exactly once (#23 recruit-persist)."""
+        def ids(n):
+            return {u for u, *_ in bc.offmap_join_recruits(self.CAMPAIGN, n)}
+        self.assertEqual(ids(1), set())        # nobody is recruited before ch01
+        self.assertEqual(ids(2), {'baxby'})    # ch01 cutscene recruit joins the party at ch02
+        self.assertEqual(ids(3), set())        # already joined at ch02 -> no re-LOAD (no duplicate)
+
+    def test_offmap_join_excludes_on_map_talk_recruits(self):
+        """Trex is a Colm-style on-map talk recruit (recruit.via = story): he self-joins via
+        CUSA on the map and persists naturally, so he never needs an off-map join-LOAD."""
+        for n in range(1, 6):
+            self.assertNotIn('trex', {u for u, *_ in bc.offmap_join_recruits(self.CAMPAIGN, n)})
+
+    def test_offmap_join_recruit_carries_slot_and_class(self):
+        """The join-LOAD row needs the unit's slot + real/deploy class + level, like the cap."""
+        rows = bc.offmap_join_recruits(self.CAMPAIGN, 2)
+        baxby = next(r for r in rows if r[0] == 'baxby')
+        uid, slot, class_enum, deploy_class, level = baxby
+        self.assertEqual(slot, 'Forde')
+        self.assertEqual(class_enum, 'CLASS_CAVALIER')
+        self.assertIn(class_enum, bc.CLASS_LOADOUT)   # the join-LOAD arms him from CLASS_LOADOUT
+
 
 class LordFloorRows(unittest.TestCase):
     """The per-lord survivability-floor table (#45 3b) the build emits as gLordFloorDeltas[]
