@@ -170,13 +170,24 @@ how-to for the host machinery = `docs/adding-a-chapter.md`.**
 - **DONE:** map painted + hosted on slot 4; **DefeatBoss WIN + `ch03win`** (PR #143); **Trex bust** (PR #142);
   **ALL enemy map sprites in-engine** — Wildling grunts (PR #144) + **Lizardzerker blade skirmisher + steel
   brute** on appended classes 0x80/0x81 (PR #145, audited via `enemycheck`). archer + thief + grell VANILLA.
-  Trex map sprite vendored (cast palette, gold eyes) but only renders once Trex is a deployed unit (item 2).
+  **Recruit UNITS wired (`feat/23-trex-recruit-unit`):** the reusable data-driven recruit model landed —
+  a recruit = a classed cast member + a `recruit.chapter`, and `cast_available_at(N)` puts it on the prep
+  roster from the next chapter (`decisions.md` → **Recruit wiring** ADR). **Trex** is now a real unit
+  (Rennac slot, Colm donor) placed **GREEN** on the ch03 map (Colm-style talk recruit; his custom map
+  sprite now renders in cast colours once he joins). **Baxby** was promoted from cutscene-face to a real
+  unit too (Forde slot, Franz donor) → on the **ch02+ prep** roster (his custom axe-beak sprite is PARKED
+  at `map_sprites/_parked/baxby.png` — 32×32 art vs the vanilla 16×32 Cavalier donor; he uses the stock
+  Cavalier sprite for now, sprite re-fit is a follow-up). Verified in-engine: new **`ch03` scenario** PASS
+  (`blue[08]=0x10` Baxby + `green Trex 0x1C @ (10,6)`). **Audit finding:** Lupin/Sahnar/Basil (ch04/ch05)
+  are in the SAME "authored-YAML, no unit" state — wire each per its slice.
 - **REMAINING (unchecked on #23, priority order):**
-  1. **Trex recruit wiring** — deploy Trex as a real unit (free char slot + recruit logic + STAT_DONOR),
-     which is ALSO what makes his map sprite render in-engine (`inject_map_sprites` keys off his cast slot).
+  1. **Trex talk-recruit event** — the `CHAR`+`CUSA` talk trigger + a Joshua-style hint line (he stands
+     green today, joins on talk). **OPEN (Nicolas):** talker = any core party member (non-missable; only
+     thief) vs the chosen lord — see `decisions.md` → Recruit wiring. Rides the ch03 event pass (item 4).
      Then the cosmetic **horns/wings** pixel edit (separates him from the grunts) — `map_sprite_editor.py`.
   2. **Real PREP deploy** — author `deployment.deploy_slots` (9 tiles) + a PREP CALL; today it's the static
-     fast-boot spawn (`CH03_SPAWN_POSITIONS`), which also deploys the party WEAPONLESS (`items='0'`).
+     fast-boot spawn (`CH03_SPAWN_POSITIONS` = `cast_available_at(3)` = 8 founding + Baxby), party WEAPONLESS
+     (`items='0'`). **Baxby's stock-Cavalier sprite + parked-custom re-fit also tracked here.**
   3. **Chain ch02→ch03** — point ch02's ending `MNC2(0x4)` at ch03 (drop the ch02 dev-placeholder landing).
   4. **Cutscenes** — dialogue-pass on the REFRAMED beats first (feral faction / grell visible / Pinky→opening
      / RBG executes a feral one), then wire (#58 opaque-box). Mid-map beat fires on the BRUTE (`kobold-steel`)

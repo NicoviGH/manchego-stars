@@ -12,6 +12,11 @@
 
 id: trex
 name: Trex
+fe_name: Trex                            # already short; explicit for the <=12-char name buffer
+# Falls-in-battle quote (#6 dialogue pass; lore/trex.md). Self-taught eloquent diplomat to
+# the last -- negotiator's diction ("trade", "term"), dignity over groveling, and the mask of
+# eloquence slipping to his one real subject: the warren's survival.
+death_quote: "Ah -- a poor trade, in the end. See my people safe... that was the only term that ever mattered."
 
 # D&D flavor (from the DM notes): the kobold leader in the Termalaine gem mine — "a
 # slightly smarter kobold who fashioned cosmetic wings for himself." Joins post-chapter.

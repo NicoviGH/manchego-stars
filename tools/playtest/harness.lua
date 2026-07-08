@@ -3121,6 +3121,35 @@ scenarios.enemycheck = function()
     result("PASS", "enemy class/SMSId audit + camera pans to brute & blade")
 end
 
+-- ch03: entry assertions on the ch03 map (mirrors scenarios.ch01/ch02). Proves the recruit
+-- model: Baxby (charId 0x10 = Forde, ch01 recruit) is on the BLUE prep roster, and Trex
+-- (charId 0x1C = Rennac, ch03 talk recruit) stands GREEN on the map -- the vanilla Colm
+-- pre-recruit state (cast colours land once he is talked to -> CUSA). Runs on a
+-- `make CH03BOOT=1` ROM (New Game -> ch03 map).
+scenarios.ch03 = function()
+    if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
+    local BAXBY, TREX = 0x10, 0x1C   -- CHARACTER_FORDE (Baxby) / CHARACTER_RENNAC (Trex)
+    local deployed, baxby = 0, false
+    for i = 0, 15 do
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u then
+            log(string.format("blue[%02d] char=0x%02X pos=(%d,%d) state=0x%08X",
+                i, u.charId, u.x, u.y, u.state))
+            if (u.state & 0x9) == 0 and u.x ~= 0xFF then deployed = deployed + 1 end
+            if u.charId == BAXBY and not isDead(u) then baxby = true end
+        end
+    end
+    local trexGreen = findUnit(SYM.gUnitArrayGreen, 10, TREX)
+    if trexGreen then log(string.format("green Trex(0x1C) @ (%d,%d)", trexGreen.x, trexGreen.y)) end
+    log(string.format("ch03 entry: bluedeployed=%d baxby(0x10)=%s trex_green=%s",
+        deployed, tostring(baxby), tostring(trexGreen ~= nil)))
+    shot("ch03-entry")
+    if not baxby then return result("FAIL", "Baxby (Forde 0x11) not on the ch03 blue roster") end
+    if not trexGreen then return result("FAIL", "Trex (Rennac 0x1C) not placed green (talk-recruit) on the map") end
+    return result("PASS", string.format(
+        "ch03 entered: %d blue (incl Baxby), Trex green talk-recruit on the map", deployed))
+end
+
 -- ch02: entry assertions on the ch02 map (mirrors scenarios.ch01). The 3 green chwinga are on
 -- the field, the party deploys to the cap, and the archer + boss are present.
 scenarios.ch02 = function()
