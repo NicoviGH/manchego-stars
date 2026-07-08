@@ -4,44 +4,49 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-07-07, desktop — ch03 WIN wired + first ch03 art in-engine):** three PRs.
-> **① DefeatBoss WIN (PR #143, MERGED, #23 item 1):** the Termalaine Mine now ENDS when the grell dies.
-> `inject_ch03` wires `DefeatBoss(EventScr_089F19F8)` into the Ch4 Misc + a **flagged** `gDefeatTalkList`
-> quote for the grell (pid `0xb7`, `CHAPTER_L_4`, `EVFLAG_DEFEAT_BOSS`, faceless shriek from the YAML
-> `death_quote`) + a minimal ending (victory → dev-placeholder → title, until ch04 hosts). Verified by the
-> new **`ch03win`** harness scenario (teleport grell to lord, kill, assert `EVFLAG_DEFEAT_BOSS` → ending →
-> title). **Gotcha (decisions.md §Operational Gotchas):** the win fires from the FLAGGED QUOTE, not
-> `CA_BOSS` — the raw-pid grell wins with **no boss HP gauge** and the generic clear-bot can't target it.
-> **② Trex bust (PR #142, MERGED, #19/#23):** ref-to-bust of the winged-kobold recruit (framing A, Nicolas's
-> pick), `portraits/trex.png`, recipe in `trex.yaml art.render`.
-> **③ ch03 MAP SPRITES + swap tool (PR #144, CI GREEN, OPEN — merge it):** the 6 **brigand kobold grunts**
-> render in-engine as red reptiles — reskin `CLASS_BRIGAND → CLASS_BLST_KILLER_EMPTY` (the last free
-> ballista-empty) with the FE-Repo `Brigand (U) Lizard Wildling {Tarantino500}` sprite; enemy faction
-> palette colours it red + its eyes land on the team's leftover key-green so they glow. **archer + thief
-> stay VANILLA** (class read; Nicolas), grell = vanilla Mogall. **Trex map sprite** = same base recoloured
-> onto the CAST palette (red-brown body, tan belly, **gold eyes** via the donor eye `#e81018`→cast idx 12,
-> matching his bust). New **`tools/map_sprite_swapper.py`** (in-browser global cast-index palette-swap UI,
-> idle/walk independent) + **`koboldview`** harness scenario (pull off-camera enemies next to the party).
-> **④ Battle-anim GAP (honest):** there is NO FEditor→decomp importer — `inject_battle_anims` only FAKES a
-> 3-frame anim from static poses (the custom-PC path). So the kobolds keep the **vanilla brigand battle
-> animation** in combat (map-sprite-only, exactly like the Fire Imp goblins); importing the community Lizard
-> anims (Lenh/Seliost1) is a real converter to build (~#90). **⑤ "Add a slot" is feasible (Nicolas's ask):**
-> `gClassData` uses designated initialisers, class id is a `u8` with `0x80–0xFF` free, no count cap — so new
-> classes can be APPENDED (not just the 3 ballista-empties). The mercenary→Lizardzerker brute will use one.
-> **PROCESS SLIP (Nicolas flagged):** most of this map-sprite session ran on `main` before I branched;
-> fixed by `git checkout -b` (uncommitted work follows the checkout) → all on `feat/23-ch03-map-sprites`.
-> **Branch at the FIRST edit of feature work, before touching files.**
+> **Last session (2026-07-08, desktop — ch03 enemy sprites DONE + a reusable "append a class" capability):**
+> **① Appended-class capability (PR #145, MERGED, #23 item 1):** `enemy_class_reskins` can now ride a class
+> id APPENDED past the vanilla `0x7F` tail — the three ballista-empties are used up (soldier/fighter=Fire Imp,
+> brigand=Wildling), so custom enemy classes were out of slots. Two TDD'd pure transforms in
+> `build_campaign.py` — **`class_enum_insert`** (extends `constants/classes.h`) + **`classdata_append_clone`**
+> (clones a base into a new `gClassData` entry) — wired via **`_append_new_reskin_slots`**: a reskin whose
+> `slot` carries a **`slot_id`** and isn't yet a real class gets appended (enum + gClassData clone + a
+> **contiguous `unit_icon_move_table` row**, since that table is POSITIONAL/class-indexed — the append fills
+> `_move_table_len()..val-1`). `classes.h` added to `PATCHED_DECOMP_FILES`. Runs BEFORE the reskin clone loop
+> so `_set_move_row` can repoint the new row. Unblocks unlimited custom enemy classes without touching a real
+> one. **(Ballista non-issue confirmed: FE8 ballistae are terrain-traps + `US_IN_BALLISTA`, NOT the
+> `CLASS_BLST_*` classes — nothing in engine code references those, so our future Pepperjack/Brie ballistae
+> are safe; appending is just the sustainable path now that the empties are spent.)**
+> **② Both ch3 Lizardzerker kobolds (PR #145):** the **blade skirmisher** (`kobold-blade`, Mercenary →
+> `CLASS_MNC_LIZARDZERKER` 0x80) AND the **steel BRUTE** (`kobold-steel`, Brigand → `CLASS_MNC_LIZARDZERKER_BRUTE`
+> 0x81) render as the tall crested red **Lizardzerker** (FE-Repo `Berserker (M) Lizardzerker Axe {Seliost1}`,
+> SMS 119 — shared sheet via the injector's `sprite` de-dup). Plain axe/thrower/key grunts stay the squat
+> **Wildling** (SMS 118). The brute keeps `class: brigand` for the parity engine via a **`deploy_class:
+> brigand-brute` sprite-only override** (inject_ch03 honours `e.get('deploy_class') or e['class']`); `make
+> difficulty CH=ch03` still PARITY. Nicolas chose brute+skirmisher both.
+> **③ Verification GOTCHA (important):** a **memory-teleport** (koboldview/lzview park units) forces FE8 to
+> draw the unit's **walk/MU** frame, which reads squat/wrong and looks like the Wildling — this cost real
+> confusion this session. For a true IDLE-sprite audit use the new **`enemycheck`** scenario: logs every
+> enemy's class + `SMSId` and camera-PANS via `gBmSt.camera` (offset 0x0C) to natural positions, NO teleport.
+> A unit's idle sheet = `pClassData->SMSId` (ClassData offset 0x06); read it to prove which sprite renders.
+> **Battle anims still vanilla** (map-sprite-only; the FEditor→decomp importer is the ~#90 gap). Also merged
+> **PR #144** (Wildling grunts + Trex map sprite + `map_sprite_swapper.py`) at session start.
 
-> **Prior session (2026-07-06, desktop — ch03 goes PLAYABLE):** map painted on `cave-interior`
-> (`maps/ch03-the-termalaine-mine.mar`, 17×16) + map-painter upgrades (eyedropper, `--vanilla=Ch3Map`,
-> engine-accurate passability proving cave floor `0x2a` walkable) via PR #139; `inject_ch03` HOSTS the map
-> on slot 4 with the classed party + 10 vanilla-Ch3-parity foes, `--ch03-boot`/`mapshot` load-tested, via
-> PR #140. Objective **Defeat Boss** (kill grell@14,1); grell visible turn 1; thief slot = Svirfneblin
-> Skulk. **2026-07-06 narrative reframe** (feral-splinter kobolds / Trex's clear-our-name motive / Pinky
-> scout → opening) in the ch03 YAML `design_notes`, still **PENDING a dialogue-pass** on the #97 beats.
-> Host-a-chapter runbook **`docs/adding-a-chapter.md`**; config-driven `inject_chapter(N)` filed as #138.
-> ch04 dialogue was LOCKED earlier (PRs #127/#128); `lore/lupin.md` voice bible; cutscene BGs reference-not-
-> import (`bg_TargosWinter` for ch03, vanilla `House1` for ch04).
+> **Prior sessions (all MERGED; detail in git log / closed issues):** ch03 **DefeatBoss WIN** + `ch03win`
+> scenario (PR #143; **gotcha, decisions.md §Operational Gotchas:** the win fires from the FLAGGED grell quote
+> pid `0xb7`/`EVFLAG_DEFEAT_BOSS`, NOT `CA_BOSS` → no boss HP gauge + the generic clear-bot can't target it).
+> Trex bust (PR #142). ch03 map painted on `cave-interior` (`maps/ch03-the-termalaine-mine.mar`, 17×16) +
+> hosted on slot 4 with the classed party + 10 vanilla-Ch3-parity foes (PRs #139/#140); objective **Defeat
+> Boss** (grell@14,1, visible turn 1); thief slot = Svirfneblin Skulk. **2026-07-06 narrative reframe**
+> (feral-splinter kobolds / Trex's clear-our-name motive / RBG executes a feral one / Pinky scout → opening)
+> in the ch03 YAML `design_notes`, still **PENDING a dialogue-pass** on the #97 beats. Runbook
+> **`docs/adding-a-chapter.md`**; config-driven `inject_chapter(N)` filed as #138. ch04 dialogue LOCKED
+> (PRs #127/#128); `lore/lupin.md` voice bible; cutscene BGs reference-not-import (`bg_TargosWinter` for ch03).
+> **VANILLA Ch3 "Bandits of Borgo" recruit reference (decomp, for the dialogue repass):** the thief is
+> **Colm** — a **green (AI) unit** placed at chapter start (~tile 3,4), recruited when **Neimi TALKS to him**
+> (`CHAR(…, NEIMI, COLM)` → `CUSA` = flip to blue). Vanilla has **no enemy thief** (our svirfneblin-skulk is
+> an ADDED enemy thief). **Open creative fork for the repass:** who is our "Neimi" — the party member who
+> Talks to recruit **Trex**?
 
 > **Branch hygiene (resolved 2026-07-06, desktop):** the stale-branch backlog is **cleared** — all 14
 > dead remotes deleted (the 12 audited + `claude/branch-cleanup-1c1081` + `review/ch03-borgo-retile-preview`,
@@ -157,33 +162,29 @@ vendored Kitsune anim** at `battle_anims/_parked/`. Each: one `battle_anim:` blo
 feature-flow branch per unit (or small batch), `custom_unit` issue template.
 - **Deferred polish (tracked):** braulo's white swing-arc weapon-trail → **#91**; goblin enemy class-level anim → **#90**.
 
-### Content — Ch3 "The Termalaine Mine" (#23) — HOSTED + WIN wired + first art in-engine; cutscenes/recruit/rest remain
+### Content — Ch3 "The Termalaine Mine" (#23) — HOSTED + WIN + ENEMY SPRITES DONE; recruit/prep/chain/cutscenes/chests remain
 Vanilla-FE8-Ch3 reskin as Termalaine's kobold-overrun tourmaline mine. Teaching goal = the **thief**
 (Trex = our Colm). Decisions: `decisions.md` → Ch3 ADR (four deviations + **item 4 = Defeat Boss**) + the
 ch03 YAML `design_notes` (2026-07-06 narrative reframe). **Live build checklist = #23 (the source of truth);
 how-to for the host machinery = `docs/adding-a-chapter.md`.**
-- **DONE:** map painted + hosted on slot 4 (2026-07-06); **DefeatBoss WIN wired + `ch03win` verified**
-  (PR #143); **kobold-grunt map sprite renders in-engine** (Lizard Wildling enemy reskin, PR #144); **Trex
-  bust** (PR #142) + **Trex map sprite** (cast palette, gold eyes, PR #144). archer + thief kept VANILLA.
-- **FIRST: land PR #144** (CI green, OPEN — ch3 map sprites + swap tool) before continuing on the branch.
+- **DONE:** map painted + hosted on slot 4; **DefeatBoss WIN + `ch03win`** (PR #143); **Trex bust** (PR #142);
+  **ALL enemy map sprites in-engine** — Wildling grunts (PR #144) + **Lizardzerker blade skirmisher + steel
+  brute** on appended classes 0x80/0x81 (PR #145, audited via `enemycheck`). archer + thief + grell VANILLA.
+  Trex map sprite vendored (cast palette, gold eyes) but only renders once Trex is a deployed unit (item 2).
 - **REMAINING (unchecked on #23, priority order):**
-  1. **Enemy sprites, cont'd** — `mercenary` blade kobold → **Lizardzerker {Seliost1}** on a **newly ADDED
-     class slot** (extend `gClassData` past 0x7F — feasible, see last-session ⑤; the 3 ballista-empties are
-     used up: soldier/fighter=fire-imp, brigand=lizard-wildling). Then `map_sprite_swapper.py` isn't needed
-     (enemy uses `remap_sms_palette` onto the base's SMS roles, not the cast palette). Battle anims stay
-     vanilla (importer gap, ~#90). Svirfneblin Skulk / kobold-slinger stay vanilla (Nicolas).
-  2. **Trex recruit wiring** — deploy Trex as a real unit (free char slot + recruit logic + STAT_DONOR),
+  1. **Trex recruit wiring** — deploy Trex as a real unit (free char slot + recruit logic + STAT_DONOR),
      which is ALSO what makes his map sprite render in-engine (`inject_map_sprites` keys off his cast slot).
      Then the cosmetic **horns/wings** pixel edit (separates him from the grunts) — `map_sprite_editor.py`.
-  3. **Real PREP deploy** — author `deployment.deploy_slots` (9 tiles) + a PREP CALL; today it's the static
+  2. **Real PREP deploy** — author `deployment.deploy_slots` (9 tiles) + a PREP CALL; today it's the static
      fast-boot spawn (`CH03_SPAWN_POSITIONS`), which also deploys the party WEAPONLESS (`items='0'`).
-  4. **Chain ch02→ch03** — point ch02's ending `MNC2(0x4)` at ch03 (drop the ch02 dev-placeholder landing).
-  5. **Cutscenes** — dialogue-pass on the REFRAMED beats first (feral faction / grell visible / Pinky→opening
+  3. **Chain ch02→ch03** — point ch02's ending `MNC2(0x4)` at ch03 (drop the ch02 dev-placeholder landing).
+  4. **Cutscenes** — dialogue-pass on the REFRAMED beats first (feral faction / grell visible / Pinky→opening
      / RBG executes a feral one), then wire (#58 opaque-box). Mid-map beat fires on the BRUTE (`kobold-steel`)
      defeat. Replace the minimal DefeatBoss ending with the real ending cutscene.
-  6. **Chests/doors** — per-chest **`17→29` TILECHANGE**; Trex opens, key-droppers back up.
-  7. **Title-card image** + full load-test scenarios `ch03`/`smoke_ch03`/`clear_ch03` (the `ch03win`/
-     `koboldview` scenarios seed these; a fair-play `clear_ch03` needs a `CA_BOSS` grell or a pid-targeted bot).
+  5. **Chests/doors** — per-chest **`17→29` TILECHANGE**; Trex opens, key-droppers back up.
+  6. **Title-card image** + full load-test scenarios `ch03`/`smoke_ch03`/`clear_ch03` (the `ch03win`/
+     `koboldview`/`enemycheck` scenarios seed these; a fair-play `clear_ch03` needs a `CA_BOSS` grell or a
+     pid-targeted bot).
 - **Cutscene BGs DECIDED (Nicolas): reference, don't import** — reuse `bg_TargosWinter`; mid-map beats on-map.
 - Then chapters #24–#28 follow the same slice via `docs/adding-a-chapter.md`.
 
