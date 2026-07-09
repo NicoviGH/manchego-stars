@@ -5336,9 +5336,16 @@ CH03_ITEM_IDS = {'iron-axe': 'ITEM_AXE_IRON', 'hand-axe': 'ITEM_AXE_HANDAXE',
 # ch01 recruit). Trex is NOT here -- he is a Colm-style TALK recruit placed GREEN on the map
 # (CH03_TREX_GREEN_POS), joining via CUSA when a party member talks to him (that CHAR talk +
 # its line ride the ch03 event/cutscene pass, #23 item 4). cast_available_at gives him ch04+ prep.
-CH03_SPAWN_POSITIONS = [(1, 10), (1, 11), (1, 12), (1, 9), (1, 8), (2, 8), (0, 10), (0, 12),
-                        (2, 11)]
 CH03_TREX_GREEN_POS = (10, 6)   # mid-galleries: Trex sits green (unrecruited) until talked to
+# Two free vanilla Ch4 UnitDef tables (defined in events_udefs.c, referenced nowhere but
+# themselves -> safe to repurpose, like the enemy table 088B4A80): one holds Trex GREEN
+# (always LOADed, the on-map talk-recruit); the other is the DEBUG-BOOT party seed (the
+# armed field roster, LOADed ONLY on --ch03-boot to found a party from nothing so PREP has
+# something to pick -- exactly ch01's founding-chapter shape). The real chain (item 3) omits
+# the seed: the party persists from ch02, and PREP reads the never-LOADed cap template.
+CH03_TREX_GREEN_SYMBOL = 'UnitDef_088B49CC'
+CH03_BOOT_SEED_SYMBOL = 'UnitDef_088B47E4'
+CH03_PREP_SCRIPT = 'EventScr_08591FD8'   # shared Preparations call (event cmd 0x3E), cf. ch01/ch02
 # Trex talk-recruit wiring (#23 item 2) -- the vanilla Colm/Neimi pattern. Repurpose dead
 # vanilla Ch4 symbols the host frees: EventScr_089F199C is the Ch4 Turn-2 green script (its
 # only referrer was EventListScr_Ch4_Turn, emptied by the host) -> the shared recruit script;
@@ -5352,20 +5359,26 @@ CH4_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch4-eventinfo.h')
 CH4_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch4-eventscript.h')
 
 
-def inject_ch03(campaign, verbose=True):
-    """Fast-boot host for Ch3 "The Termalaine Mine" (#23) on chapter slot 4: register the
-    cave-interior tileset + the painted layout, deploy the classed party at the left
-    entrance + the 10 vanilla-Ch3-parity enemies (reflavored kobolds / grell / svirfneblin)
-    at their vanilla tiles, strip cutscenes, and leave a walkable load-test map.
+def inject_ch03(campaign, boot=False, verbose=True):
+    """Host for Ch3 "The Termalaine Mine" (#23) on chapter slot 4: register the cave-interior
+    tileset + the painted layout, wire the real PREP deploy of the classed party + the 10
+    vanilla-Ch3-parity enemies (reflavored kobolds / grell / svirfneblin) at their vanilla
+    tiles, strip cutscenes, and leave a walkable, playable map.
+
+    Deploy = the vanilla prep-chapter idiom (cf. inject_ch01/inject_ch02): a never-LOADed
+    deploy-cap template (UnitDef_Event_Ch4Ally, sized to cast_available_at(3) over the YAML
+    deploy_slots) + a Preparations CALL that fields the roster (the lord force-deployed).
+    `boot` (the --ch03-boot debug path, New Game straight to slot 4) additionally LOADs an
+    ARMED party seed so PREP has a party to pick from -- ch03 has no prior chapter to found one
+    yet (item 3 chains ch02->ch03, at which point the party persists and the seed drops).
 
     The DefeatBoss(grell) WIN is wired: Misc DefeatBoss AFEV + the grell's flagged (EVFLAG_DEFEAT_BOSS)
     defeat quote + a minimal ending script (victory -> dev-placeholder landing until ch04 hosts).
-    Trex's TALK RECRUIT (#23 item 2) is wired: he stands GREEN (step 2); ANY core party member Talks
+    Trex's TALK RECRUIT (#23 item 2) stands GREEN in its own table; ANY core party member Talks
     to him -> the shared recruit script CUSA-flips him BLUE (the Colm/Neimi pattern -- one CHAR entry
-    per field candidate). DEFERRED (next passes, flagged not done): the real PREP deploy (needs
-    deployment.deploy_slots authored in the YAML); the opening/execution/entrance/ending CUTSCENES
+    per field candidate). DEFERRED (next passes): the opening/execution/entrance/ending CUTSCENES
     (dialogue-pass, decoupled from the recruit) + chaining ch02->ch03; chests/doors; title-card art;
-    enemy/boss art. Boot: --ch03-boot points New Game straight here (like the TESTCH sandbox, slot 4)."""
+    enemy/boss art."""
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH03_CHAPTER_YAML)
 
@@ -5381,26 +5394,40 @@ def inject_ch03(campaign, verbose=True):
         % CH03_GOAL_DONOR, indices, chap['chapter_number'])
 
     # 2. Rosters (events_udefs.c, vanilla Ch4 symbols):
-    #    - UnitDef_Event_Ch4Ally: the ch03 field roster (cast_available_at(3) = the 8 founding
-    #      party + Baxby) as BLUE at the left entrance, PLUS Trex as a GREEN unit in the
-    #      galleries -- the vanilla Colm pattern: he stands green (unrecruited) until a party
-    #      member talks to him (CUSA join). LOADed directly in the beginning scene (no PREP yet).
+    #    - UnitDef_Event_Ch4Ally: the deploy-cap TEMPLATE = THE CAP. NEVER LOADed; PREP reads
+    #      its entry count (cap = cast_available_at(3), the 8 founding party + Baxby) and its
+    #      YAML deploy_slots tiles, then redeploys the picks (cf. ch01/ch02 _deploy_cap_entries).
+    #    - UnitDef_088B47E4 (boot only): the ARMED party seed -- the same field roster with real
+    #      CLASS_LOADOUT kit, LOADed on --ch03-boot so PREP has a party to pick (ch03 has no
+    #      prior chapter to found one yet). The real chain (item 3) omits it: the party persists.
+    #    - UnitDef_088B49CC: Trex, GREEN in the galleries -- the vanilla Colm pattern (he stands
+    #      unrecruited until a party member Talks to him -> CUSA join). Its own table so PREP's
+    #      cap template stays the pure blue roster.
     #    - UnitDef_088B4A80: the 10 enemies (vanilla Ch3 parity) -- grell on the vanilla ch4
     #      boss slot, the kobolds/svirfneblin on the generic autolevelled slot.
     cast, _ = _classed_cast(campaign, available_at=chap['chapter_number'])
+    for uid, _s, ce, _d, _l in cast:
+        if ce not in CLASS_LOADOUT:
+            sys.exit('ERROR: no loadout for %s (ch03 field roster %s)' % (ce, uid))
     leader = 'CHARACTER_%s' % cast[0][1].upper()
-    ally_rows = [
-        _ally_unit_entry(leader, slot, dce, lv, x, y, '0', ' /* %s -- fast-boot deploy */' % uid)
-        for (uid, slot, ce, dce, lv), (x, y) in zip(cast, CH03_SPAWN_POSITIONS)]
+    cap_rows = _deploy_cap_entries(chap, cast, leader, 'ch03')
+    ally = '{\n' + '\n'.join(cap_rows) + '\n    { 0 },\n}'
+    # Boot party seed: the field roster armed from CLASS_LOADOUT, on the deploy_slots tiles
+    # (PREP hides + re-picks them, so the tiles only need to be legal). Built regardless; only
+    # LOADed when boot (step 4). classIndex rides the deploy class (dce == the vanilla class).
+    slots = chap['deployment']['deploy_slots']
+    seed_rows = [_ally_unit_entry(leader, slot, dce, lv, x, y, ', '.join(CLASS_LOADOUT[ce]),
+                                  ' /* %s -- boot party seed (armed; PREP re-picks) */' % uid)
+                 for (uid, slot, ce, dce, lv), (x, y) in zip(cast, slots)]
+    seed = '{\n' + '\n'.join(seed_rows) + '\n    { 0 },\n}'
     # Trex: the chapter's on-map recruit, placed GREEN (Colm-style) at the galleries. He is a
     # classed cast member (full cast, not available_at(3)); pull his slot/class from the roster.
     (trex_uid, tslot, _, tdce, tlv), = on_map_talk_recruits(campaign, chap['chapter_number'])
     tx, ty = CH03_TREX_GREEN_POS
-    ally_rows.append(_ally_unit_entry(
+    trex_green = '{\n' + _ally_unit_entry(
         leader, tslot, tdce, tlv, tx, ty, '0',
         ' /* trex -- green talk-recruit (Colm-style; CUSA on talk, #23 item 2) */',
-        allegiance='GREEN'))
-    ally = '{\n' + '\n'.join(ally_rows) + '\n    { 0 },\n}'
+        allegiance='GREEN') + '\n    { 0 },\n}'
     # Trex talk-recruit (#23 item 2): ONE CHAR entry per core-party candidate (talker = ANY
     # core party member -> the ch03 field roster), all -> the shared recruit script (CUSA flips
     # green Trex blue). FE8's multi-recruiter idiom (cf. vanilla ch14a Rennac). Trex rides Rennac.
@@ -5427,13 +5454,15 @@ def inject_ch03(campaign, verbose=True):
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:
         udefs = f.read()
     udefs = _replace_brace_block(udefs, 'UnitDef_Event_Ch4Ally[] =', ally, EVENTS_UDEFS_C)
+    udefs = _replace_brace_block(udefs, '%s[] =' % CH03_BOOT_SEED_SYMBOL, seed, EVENTS_UDEFS_C)
+    udefs = _replace_brace_block(udefs, '%s[] =' % CH03_TREX_GREEN_SYMBOL, trex_green, EVENTS_UDEFS_C)
     udefs = _replace_brace_block(udefs, 'UnitDef_088B4A80[] =', enemy, EVENTS_UDEFS_C)
     with open(EVENTS_UDEFS_C, 'w', encoding='utf-8') as f:
         f.write(udefs)
 
     # 3. Strip cutscenes (cf. inject_test_chapter): empty the Ch4 event lists, wire the win/lose
     #    machinery into Misc (DefeatBoss on the grell's death + lord-death game-over), and make the
-    #    beginning scene a bare deploy of both rosters. DefeatBoss = AFEV on EVFLAG_DEFEAT_BOSS,
+    #    beginning scene deploy the enemies + green Trex then run Preparations. DefeatBoss = AFEV on EVFLAG_DEFEAT_BOSS,
     #    which the grell's FLAGGED defeat quote sets on its death (step 5) -> runs the ending script;
     #    CauseGameOverIfLordDies = AFEV on EVFLAG_GAMEOVER (the lord's flagged quote / lord-select hook).
     with open(CH4_EVENTINFO_H, encoding='utf-8') as f:
@@ -5454,8 +5483,21 @@ def inject_ch03(campaign, verbose=True):
 
     with open(CH4_EVENTSCRIPT_H, encoding='utf-8') as f:
         script = f.read()
-    begin = ('{\n    LOAD1(0x1, UnitDef_088B4A80)\n    ENUN\n'
-             '    LOAD1(0x1, UnitDef_Event_Ch4Ally)\n    ENUN\n    ENDA\n}')
+    # Beginning scene = the vanilla prep-chapter shape (cf. inject_ch01/ch02): deploy the
+    # enemies + green Trex, then CALL Preparations (PREP reads the never-LOADed cap template
+    # UnitDef_Event_Ch4Ally for the cap + deploy_slots, fields the roster, force-deploys the
+    # lord). --ch03-boot additionally LOADs the armed party seed first, so PREP has a party to
+    # pick from a cold New Game (the real chain persists it from ch02 -- then this seed drops).
+    seed_load = ('    LOAD1(0x1, %s) /* boot: found an armed party so PREP can pick (--ch03-boot) */\n'
+                 '    ENUN\n' % CH03_BOOT_SEED_SYMBOL) if boot else ''
+    begin = ('{\n'
+             '    LOAD1(0x1, UnitDef_088B4A80) /* the vanilla-Ch3-parity enemies */\n    ENUN\n'
+             + seed_load +
+             '    LOAD1(0x1, %s) /* Trex -- green talk-recruit (Colm-style) */\n    ENUN\n'
+             '    CALL(%s) /* preparations (PREP, event cmd 0x3E) -- cap 9, lord force-deployed */\n'
+             '    ENUT(8)\n'
+             '    EVBIT_T(7)\n'
+             '    ENDA\n}' % (CH03_TREX_GREEN_SYMBOL, CH03_PREP_SCRIPT))
     script = _replace_brace_block(script, 'EventScr_Ch4_BeginningScene[] =', begin, CH4_EVENTSCRIPT_H)
     # DefeatBoss ending (the script the Misc AFEV runs on the grell's death). MINIMAL for now:
     # victory sting -> fade -> the dev-placeholder landing (RBG-by-the-campfire, then back to title),
@@ -5511,8 +5553,9 @@ def inject_ch03(campaign, verbose=True):
 
     if verbose:
         print('  ch03 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; defeat_boss goal + '
-              'DefeatBoss(grell) WIN wired, %d-unit deploy + %d enemies (grell@14,1); rich cutscenes deferred'
-              % (obj_idx, pal_idx, cfg_idx, layout_idx, CH03_HOST_INDEX, len(ally_rows), len(enemies)))
+              'DefeatBoss(grell) WIN wired, PREP deploy cap %d%s + %d enemies (grell@14,1); rich cutscenes deferred'
+              % (obj_idx, pal_idx, cfg_idx, layout_idx, CH03_HOST_INDEX, len(cap_rows),
+                 ' (boot-seeded party)' if boot else '', len(enemies)))
 
 
 def inject_northlook_bitey(verbose=True):
@@ -5873,7 +5916,7 @@ def main():
         inject_ch02_chwinga_faces(args.campaign)  # green chwinga bust + Mote/Rime/Glimmer names
         if args.ch03_boot:
             print('CH03 BOOT (playtest: New Game -> Termalaine Mine, party + foes deployed):')
-            inject_ch03(args.campaign)           # slot 4 host + deploy; New Game reroutes 0 -> 4
+            inject_ch03(args.campaign, boot=True)  # slot 4 host + PREP deploy; New Game reroutes 0 -> 4
             _configure_boot(CH03_HOST_INDEX)
         elif args.test_chapter:
             print('TEST CHAPTER (playtest: New Game -> Ch1 sandbox, cast deployed):')
