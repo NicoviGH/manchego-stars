@@ -147,7 +147,12 @@ case "$SCENARIO" in
     recordfix)    BUILDER=ckpt_prep;      CKPT=prep ;;
     recordrbg)    BUILDER=ckpt_rbgch01;   CKPT=rbgch01 ;;
     # ch02 (#22) scenarios LOAD the ch02start state (the real ch00->ch01->ch02 chain, paid once).
-    ch02|smoke_ch02|clear_ch02|ch02baxby) BUILDER=ckpt_ch02start; CKPT=ch02start ;;
+    ch02|smoke_ch02|clear_ch02|ch02baxby|recordch02map|recordch02combat|recordch02ending) BUILDER=ckpt_ch02start; CKPT=ch02start ;;
+    # the opening-cutscene demo loads a state saved just BEFORE the ch02 opening plays.
+    # NOTE (salvage 2026-07-09): the `ckpt_ch02intro` checkpoint builder is NOT defined yet
+    # (add a `scenarios.ckpt_ch02intro` in harness.lua that stops before the ch02 opening);
+    # until then recordch02intro fails to build its state. The other 3 recordch02* run fine.
+    recordch02intro) BUILDER=ckpt_ch02intro; CKPT=ch02intro ;;
 esac
 if [ -n "$BUILDER" ]; then
     if [ ! -f "$STATE_DIR/$CKPT.ss" ] || [ "$(cat "$STATE_DIR/$CKPT.romhash" 2>/dev/null || true)" != "$ROMHASH" ]; then
@@ -168,10 +173,11 @@ fi
 FPS=240; VSYNC=0; DEADLINE_S=420
 case "$SCENARIO" in record*) FPS=60; VSYNC=1; DEADLINE_S=300 ;; esac
 # smoke_* / fuzz_* / clear_ch02 play a full chapter (lead-in + a long soak) -> longer
-# wall. llm waits wall-clock on the sidecar EVERY turn (18 turns x 90s handshake
-# budget), and a --record run against a slow local model legitimately uses it -- so its
-# deadline covers the harness's own worst case instead of killing a healthy run.
-case "$SCENARIO" in smoke*|fuzz*|clear_ch02) DEADLINE_S=600 ;; llm) DEADLINE_S=2100 ;; esac
+# wall. recordch02ending routs the whole band, so it needs the same headroom. llm waits
+# wall-clock on the sidecar EVERY turn (18 turns x 90s handshake budget), and a --record run
+# against a slow local model legitimately uses it -- so its deadline covers the harness's own
+# worst case instead of killing a healthy run.
+case "$SCENARIO" in smoke*|fuzz*|clear_ch02|recordch02ending) DEADLINE_S=600 ;; llm) DEADLINE_S=2100 ;; esac
 # PT_FPS overrides the rate. 60fps+videoSync is only needed to capture smooth cutscene
 # FADES; verification captures of static text/boxes (sign, death quote) read fine at top
 # speed, so `PT_FPS=240 ... recordfix` runs ~4x faster.

@@ -126,6 +126,10 @@ open map-review/... # or copy the /tmp/playtest-<scenario>/*-map-loaded.png
   from HEAD each build.
 - **Vanilla decomp reads go through HEAD**, never the (dirty) worktree — the build leaves the submodule
   patched, so `git show HEAD:<file>` is the source of truth for vanilla data.
+- **Vanilla-map screenshot reference:** `fe8.triangleattack.com` hosts a native-resolution
+  (272×256px, 1:1 = 17×16 metatiles, no upscaling) screenshot per vanilla chapter at a predictable
+  path (`fe8.triangleattack.com/chapters/<slug>`) — useful ground truth when repainting a Borgo-style
+  layout in `gen_map_editor`. Fetchable directly by slug.
 
 ## Per-chapter Definition of Done (fast-boot → full host)
 
