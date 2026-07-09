@@ -148,10 +148,8 @@ case "$SCENARIO" in
     recordrbg)    BUILDER=ckpt_rbgch01;   CKPT=rbgch01 ;;
     # ch02 (#22) scenarios LOAD the ch02start state (the real ch00->ch01->ch02 chain, paid once).
     ch02|smoke_ch02|clear_ch02|ch02baxby|recordch02map|recordch02combat|recordch02ending) BUILDER=ckpt_ch02start; CKPT=ch02start ;;
-    # the opening-cutscene demo loads a state saved just BEFORE the ch02 opening plays.
-    # NOTE (salvage 2026-07-09): the `ckpt_ch02intro` checkpoint builder is NOT defined yet
-    # (add a `scenarios.ckpt_ch02intro` in harness.lua that stops before the ch02 opening);
-    # until then recordch02intro fails to build its state. The other 3 recordch02* run fine.
+    # recordch02intro needs its OWN checkpoint (ckpt_ch02intro, harness.lua) saved just BEFORE the
+    # ch02 opening plays -- ckpt_ch02start is captured at turn 1, after the opening is already over.
     recordch02intro) BUILDER=ckpt_ch02intro; CKPT=ch02intro ;;
 esac
 if [ -n "$BUILDER" ]; then
