@@ -4010,6 +4010,68 @@ def offmap_join_recruits(campaign, chapter_number):
     return out
 
 
+def char_symbol(slot):
+    """The CHARACTER_ enum for a vanilla character slot name (the unit's on-map pid/FID
+    symbol). A cast PC rides its PORTRAIT_MAP slot, so its map identity is CHARACTER_<slot>."""
+    return 'CHARACTER_%s' % slot.upper()
+
+
+def on_map_talk_recruits(campaign, chapter_number):
+    """Cast members recruited MID-MAP via Talk IN `chapter_number` (the mirror of
+    offmap_join_recruits): recruits whose recruit chapter IS this chapter and whose join
+    method is an on-map talk (recruit.via in ON_MAP_RECRUIT_VIA). Returns
+    [(unit_id, slot, class_enum, deploy_class_enum, level)] in PORTRAIT_MAP order. Each is
+    placed GREEN and joined by a CHAR talk -> CUSA (the vanilla Colm/Neimi pattern, #23 item 2)."""
+    out = []
+    for unit_id, slot in PORTRAIT_MAP.items():
+        unit = load_unit(campaign, unit_id)
+        unit.setdefault('id', unit_id)
+        class_enum = class_enum_for(unit)
+        if class_enum is None:
+            continue
+        if recruit_chapter_number(campaign, unit) != chapter_number:
+            continue   # not recruited in THIS chapter
+        if (unit.get('recruit') or {}).get('via') not in ON_MAP_RECRUIT_VIA:
+            continue   # off-map recruit -- joins via offmap_join_recruits, not an on-map talk
+        out.append((unit_id, slot, class_enum, deploy_class_for(unit),
+                    int(unit.get('fe_stats', {}).get('level', 1))))
+    return out
+
+
+def talk_recruiters(campaign, chapter_number):
+    """The candidate RECRUITERS for an on-map talk recruit in chapter N = every core party
+    member on the blue field roster (cast_available_at(N) = _classed_cast(available_at=N)),
+    as CHARACTER_ symbols. "Talker = ANY core party member" (Nicolas, 2026-07-08: the only
+    thief must be non-missable, and a static CHAR can't name the CHOSEN lord) -> one CHAR
+    entry per candidate, all -> the shared recruit script."""
+    cast, _ = _classed_cast(campaign, available_at=chapter_number)
+    return [char_symbol(slot) for _, slot, *_ in cast]
+
+
+def talk_recruit_char_entries(recruiters, target, flag, script):
+    """One CHAR(flag, script, recruiter, target) per recruiter -- FE8's multi-recruiter talk
+    idiom (cf. vanilla ch14a Rennac: two CHAR entries sharing a flag). All share flag + script
+    + target, so ANY recruiter's talk recruits `target` and completing it sets the shared flag,
+    disabling every entry (no re-trigger)."""
+    return ''.join('    CHAR(%s, %s, %s, %s)\n' % (flag, script, r, target)
+                   for r in recruiters)
+
+
+def talk_recruit_script(msg_id, target):
+    """The shared Colm-style talk-recruit script (cf. vanilla EventScr_Ch3_Talk_NeimiColm):
+    show the migrated talk line, CUSA the green `target` to BLUE (EvtChangeFaction), set the
+    map-event visibility evbit, end. MUSS/STAL are trimmed -- the line rides the map talk
+    window, not a fanfare."""
+    return ('{\n'
+            '    TEXTSTART\n'
+            '    TEXTSHOW(0x%X)\n'
+            '    TEXTEND\n'
+            '    REMA\n'
+            '    CUSA(%s) /* green -> blue: the talk recruits the target */\n'
+            '    EVBIT_T(7)\n'
+            '    ENDA\n}' % (msg_id, target))
+
+
 def _ally_unit_entry(leader, slot, class_enum, level, x, y, items, comment,
                      allegiance='BLUE', autolevel=False, ai=None):
     """One non-RED UnitDefinition row (events_udefs.c) for a chapter join/deploy/
@@ -5277,6 +5339,15 @@ CH03_ITEM_IDS = {'iron-axe': 'ITEM_AXE_IRON', 'hand-axe': 'ITEM_AXE_HANDAXE',
 CH03_SPAWN_POSITIONS = [(1, 10), (1, 11), (1, 12), (1, 9), (1, 8), (2, 8), (0, 10), (0, 12),
                         (2, 11)]
 CH03_TREX_GREEN_POS = (10, 6)   # mid-galleries: Trex sits green (unrecruited) until talked to
+# Trex talk-recruit wiring (#23 item 2) -- the vanilla Colm/Neimi pattern. Repurpose dead
+# vanilla Ch4 symbols the host frees: EventScr_089F199C is the Ch4 Turn-2 green script (its
+# only referrer was EventListScr_Ch4_Turn, emptied by the host) -> the shared recruit script;
+# 0x9A5 is a dead Ch4 opening-cutscene line (referenced only by the replaced BeginningScene,
+# like the boss-death 0x9A3) -> the talk body; EVFLAG_TMP(9) is vanilla ch3 Colm's own CHAR
+# talk flag, unused in our minimal host.
+CH03_TREX_TALK_SCRIPT = 'EventScr_089F199C'
+CH03_TREX_TALK_MSG = 0x9A5
+CH03_TREX_TALK_FLAG = 'EVFLAG_TMP(9)'
 CH4_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch4-eventinfo.h')
 CH4_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch4-eventscript.h')
 
@@ -5289,10 +5360,12 @@ def inject_ch03(campaign, verbose=True):
 
     The DefeatBoss(grell) WIN is wired: Misc DefeatBoss AFEV + the grell's flagged (EVFLAG_DEFEAT_BOSS)
     defeat quote + a minimal ending script (victory -> dev-placeholder landing until ch04 hosts).
-    DEFERRED (next passes, flagged not done): the real PREP deploy (needs deployment.deploy_slots
-    authored in the YAML); the opening/recruit/ending CUTSCENES (dialogue-pass on the #97 beats + the
-    2026-07-06 reframe) + chaining ch02->ch03; Trex recruit; chests/doors; title-card art; enemy/boss
-    art. Boot: --ch03-boot points New Game straight here (mirrors the TESTCH sandbox, on slot 4 + cave)."""
+    Trex's TALK RECRUIT (#23 item 2) is wired: he stands GREEN (step 2); ANY core party member Talks
+    to him -> the shared recruit script CUSA-flips him BLUE (the Colm/Neimi pattern -- one CHAR entry
+    per field candidate). DEFERRED (next passes, flagged not done): the real PREP deploy (needs
+    deployment.deploy_slots authored in the YAML); the opening/execution/entrance/ending CUTSCENES
+    (dialogue-pass, decoupled from the recruit) + chaining ch02->ch03; chests/doors; title-card art;
+    enemy/boss art. Boot: --ch03-boot points New Game straight here (like the TESTCH sandbox, slot 4)."""
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH03_CHAPTER_YAML)
 
@@ -5321,14 +5394,20 @@ def inject_ch03(campaign, verbose=True):
         for (uid, slot, ce, dce, lv), (x, y) in zip(cast, CH03_SPAWN_POSITIONS)]
     # Trex: the chapter's on-map recruit, placed GREEN (Colm-style) at the galleries. He is a
     # classed cast member (full cast, not available_at(3)); pull his slot/class from the roster.
-    trex_full = next(c for c in _classed_cast(campaign)[0] if c[0] == 'trex')
-    _, tslot, _, tdce, tlv = trex_full
+    (trex_uid, tslot, _, tdce, tlv), = on_map_talk_recruits(campaign, chap['chapter_number'])
     tx, ty = CH03_TREX_GREEN_POS
     ally_rows.append(_ally_unit_entry(
         leader, tslot, tdce, tlv, tx, ty, '0',
-        ' /* trex -- green talk-recruit (Colm-style; CUSA on talk, #23 item 4) */',
+        ' /* trex -- green talk-recruit (Colm-style; CUSA on talk, #23 item 2) */',
         allegiance='GREEN'))
     ally = '{\n' + '\n'.join(ally_rows) + '\n    { 0 },\n}'
+    # Trex talk-recruit (#23 item 2): ONE CHAR entry per core-party candidate (talker = ANY
+    # core party member -> the ch03 field roster), all -> the shared recruit script (CUSA flips
+    # green Trex blue). FE8's multi-recruiter idiom (cf. vanilla ch14a Rennac). Trex rides Rennac.
+    trex_char = char_symbol(tslot)
+    char_events = ('{\n' + talk_recruit_char_entries(
+        talk_recruiters(campaign, chap['chapter_number']),
+        trex_char, CH03_TREX_TALK_FLAG, CH03_TREX_TALK_SCRIPT) + '    END_MAIN\n}')
 
     enemies = []
     for e in chap['enemy_units']:
@@ -5359,8 +5438,10 @@ def inject_ch03(campaign, verbose=True):
     #    CauseGameOverIfLordDies = AFEV on EVFLAG_GAMEOVER (the lord's flagged quote / lord-select hook).
     with open(CH4_EVENTINFO_H, encoding='utf-8') as f:
         info = f.read()
-    for name in ('EventListScr_Ch4_Turn', 'EventListScr_Ch4_Character', 'EventListScr_Ch4_Location'):
+    for name in ('EventListScr_Ch4_Turn', 'EventListScr_Ch4_Location'):
         info = _replace_brace_block(info, name + '[] =', '{\n    END_MAIN\n}', CH4_EVENTINFO_H)
+    # Character events = the Trex talk-recruit (#23 item 2): the CHAR-per-candidate list.
+    info = _replace_brace_block(info, 'EventListScr_Ch4_Character[] =', char_events, CH4_EVENTINFO_H)
     info = _replace_brace_block(
         info, 'EventListScr_Ch4_Misc[] =',
         '{\n    DefeatBoss(%s)\n    CauseGameOverIfLordDies\n    END_MAIN\n}' % CH03_ENDING_SCRIPT,
@@ -5386,6 +5467,11 @@ def inject_ch03(campaign, verbose=True):
               + dev_placeholder_scene() +
               '    ENDA\n}')
     script = _replace_brace_block(script, CH03_ENDING_SCRIPT + '[] =', ending, CH4_EVENTSCRIPT_H)
+    # Trex talk-recruit script (#23 item 2): repurpose the dead Ch4 Turn-2 green script symbol
+    # -> show Trex's migrated talk line then CUSA green Trex to blue. Every CHAR entry (step 3)
+    # points here, so ANY core party member's talk runs it (the vanilla Colm/Neimi shape).
+    script = _replace_brace_block(script, CH03_TREX_TALK_SCRIPT + '[] =',
+                                  talk_recruit_script(CH03_TREX_TALK_MSG, trex_char), CH4_EVENTSCRIPT_H)
     with open(CH4_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
         f.write(script)
 
@@ -5401,6 +5487,12 @@ def inject_ch03(campaign, verbose=True):
     set_message_body(lines, host['chapTitleTextId'], name_message_body(chap['title']))
     set_message_body(lines, CH03_BOSS_DEATH_MSG, _script_to_message(
         [{'grell': shriek}], {'grell': ('[OpenMidRight]', None)}))
+    # Trex talk-recruit body (#23 item 2): his migrated pitch (chapter YAML talk_recruit event,
+    # single source of truth), faced on the Rennac slot. One speaker -> one [OpenX] block with
+    # page breaks; the recruit script (EventScr_089F199C) TEXTSHOWs it before the CUSA.
+    talk = next(e for e in chap['events'] if e.get('trigger') == 'talk_recruit')['script']
+    set_message_body(lines, CH03_TREX_TALK_MSG, _script_to_message(
+        talk, {trex_uid: ('[OpenMidRight]', _fid_tag(tslot))}))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 

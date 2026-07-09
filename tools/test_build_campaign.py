@@ -198,6 +198,56 @@ class RecruitAvailability(unittest.TestCase):
         self.assertIn(class_enum, bc.CLASS_LOADOUT)   # the join-LOAD arms him from CLASS_LOADOUT
 
 
+class TalkRecruitWiring(unittest.TestCase):
+    """Trex's Colm-style talk recruit (#23 item 2): placed GREEN, recruited when ANY core
+    party member Talks to him (one CHAR entry per candidate -> one shared script -> CUSA).
+    These pin the pure data + string builders inject_ch03 consumes."""
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def test_char_symbol_from_slot(self):
+        self.assertEqual(bc.char_symbol('Rennac'), 'CHARACTER_RENNAC')
+        self.assertEqual(bc.char_symbol('Eirika'), 'CHARACTER_EIRIKA')
+
+    def test_trex_is_ch03_on_map_talk_recruit_on_the_rennac_slot(self):
+        """on_map_talk_recruits(N) = the recruits who join mid-map via Talk in chapter N."""
+        rows = bc.on_map_talk_recruits(self.CAMPAIGN, 3)
+        self.assertEqual([r[0] for r in rows], ['trex'])
+        uid, slot, class_enum, deploy_class, level = rows[0]
+        self.assertEqual(slot, 'Rennac')                 # Trex's on-map CHARACTER symbol slot
+        self.assertEqual(class_enum, 'CLASS_THIEF')
+
+    def test_no_talk_recruit_in_a_chapter_without_one(self):
+        """ch02 has no on-map talk recruit (Baxby is an off-map cutscene recruit)."""
+        self.assertEqual(bc.on_map_talk_recruits(self.CAMPAIGN, 2), [])
+
+    def test_recruiters_are_the_ch03_field_roster_minus_trex(self):
+        """Talker = ANY core party member -> the ch03 blue field roster (cast_available_at(3)).
+        Trex himself is never a recruiter (he is the green target, not on the prep roster)."""
+        recruiters = bc.talk_recruiters(self.CAMPAIGN, 3)
+        field = {bc.char_symbol(slot) for _, slot, *_ in bc._classed_cast(self.CAMPAIGN, available_at=3)[0]}
+        self.assertEqual(set(recruiters), field)
+        self.assertNotIn('CHARACTER_RENNAC', recruiters)   # the target isn't a recruiter
+        self.assertGreaterEqual(len(recruiters), 8)        # the founding party at least
+
+    def test_char_entries_one_per_recruiter_sharing_flag_and_script(self):
+        """The talker-agnostic wiring: one CHAR(flag, script, recruiter, target) per candidate,
+        all pointing at the SAME flag + script + target (so any one talk recruits + disables all)."""
+        recruiters = ['CHARACTER_EIRIKA', 'CHARACTER_FRANZ', 'CHARACTER_GILLIAM']
+        c = bc.talk_recruit_char_entries(recruiters, 'CHARACTER_RENNAC',
+                                         'EVFLAG_TMP(9)', 'EventScr_TrexTalk')
+        self.assertEqual(c.count('CHAR('), 3)
+        for r in recruiters:
+            self.assertIn('CHAR(EVFLAG_TMP(9), EventScr_TrexTalk, %s, CHARACTER_RENNAC)' % r, c)
+
+    def test_recruit_script_flips_the_target_blue_with_cusa(self):
+        """The shared script shows the talk line then CUSA(target) = EvtChangeFaction to BLUE."""
+        s = bc.talk_recruit_script(0x9A5, 'CHARACTER_RENNAC')
+        self.assertIn('TEXTSHOW(0x9A5)', s)
+        self.assertIn('CUSA(CHARACTER_RENNAC)', s)
+        self.assertTrue(s.rstrip().endswith('ENDA\n}') or s.rstrip().endswith('ENDA'))
+
+
 class LordFloorRows(unittest.TestCase):
     """The per-lord survivability-floor table (#45 3b) the build emits as gLordFloorDeltas[]
     and the engine applies once at chapter start (#45 3c). One (hp, def, res) row per lord
