@@ -4,29 +4,26 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-07-08 #2, desktop — recruit UNITS + a reusable recruit model; PR #146 OPEN, not merged):**
-> **① Reusable recruit model (decisions.md → "Recruit wiring" ADR):** a recruit is just a **classed cast
-> member + a `recruit.chapter:`** in its YAML — no generic recruit engine (explicitly rejected). Prep
-> availability is one data-driven filter, **`cast_available_at(N)`** = founding party + recruits whose recruit
-> chapter is *before* N (replaces the old `starting_only` flag; `inject_ch01/02/03` call it; `available_at=None`
-> = everyone, for sprites/stats/death-quotes). Each JOIN uses vanilla FE8 primitives **per its own method**.
-> **② Trex** = real unit on the **Rennac** slot (Colm donor), placed **GREEN** on the ch03 map = a **Colm-style
-> TALK recruit** (`CHAR`+`CUSA`, cf. `EventScr_Ch3_Talk_NeimiColm`). On talk, `CUSA` flips him to player faction
-> → he renders in the **cast OBJ palette** (NOT vanilla blue). **③ Baxby** = promoted from cutscene-face
-> (`GUEST_PORTRAIT_MAP`) to a **real unit** on the **Forde** slot (Franz donor, Cavalier). His hand-painted
-> 32×32 axe-beak map sprite injects on the **standard cast pattern** — `base: Gargoyle` (32×32 3-frame GEOMETRY
-> token, NOT the FE-Repo source string) + synth MU, exactly like braulo/wolfram/meesmickle. (Gotcha I hit: I
-> briefly "parked" it citing a bogus geometry mismatch — the fix was just the right `base:` token. **Check a
-> sibling YAML for the pattern before inventing.**) **④** New **`ch03` playtest scenario** (PASS): `blue[08]=0x10`
-> Baxby + `green Trex 0x1C @ (10,6)`. 55 unit tests green, verify_text clean, `make CH03BOOT=1` green.
-> **⑤ LOCKED (Nicolas):** Trex's recruiter = **ANY core party member** (he's the only thief → must be
-> non-missable; guarantees the force-deployed *chosen* lord works; a static `CHAR` entry can't name the runtime
-> lord). Telegraph **Joshua-style** (hint line + FE8's auto Talk prompt).
-> **⚠ GAP FOUND & EMPIRICALLY CONFIRMED (the next task):** cutscene-recruited units **do not persist** into
-> later chapters. ch02 **persists** the party from ch01 and the availability filter only sizes the deploy **cap
-> template (never LOADed)** — nothing LOADs Baxby, so the ch02 `ch02` scenario blue array is `0x01..0x08`, **no
-> Baxby (0x10)**. Only affects **cutscene** recruits (Baxby); **talk** recruits (Trex) are fine — `CUSA` joins
-> them directly. Fix = a per-chapter **join-LOAD of newly-available cutscene recruits** (see Now/Next).
+> **Last session (2026-07-08 #3, desktop — recruit-persist join-LOAD; PR #146 SQUASH-MERGED to main):**
+> Closed the empirically-confirmed gap from the prior session: **cutscene recruits now PERSIST**. The prep
+> availability filter (`cast_available_at`) only **SIZES the deploy cap template (never LOADed)** — so Baxby
+> (won over in the ch01-ending cutscene, never an on-map unit) was silently absent from ch02 (blue roster was
+> `0x01..0x08`, no `0x10`). **Fix:** `build_campaign.offmap_join_recruits(N)` = recruits newly available at N
+> whose join is off-map (`recruit.via` **not** in `('story','talk')` — on-map talk recruits like Trex self-join
+> via `CUSA` and persist naturally). **`inject_ch02`** LOADs them (Baxby) on a free vanilla-Ch3 UnitDef symbol
+> (`088B476C`), blue, **before the PREP CALL** → Pick Units lists him and he persists forward like any deployed
+> unit. **Verified in-engine** — new **`ch02baxby`** playtest scenario (PASS): Baxby at `blue[8]=0x10` in the
+> ch02 prep roster AND deployable + **fighting on the ch02 map** (his axe-beak sprite renders; killed a raider
+> in melee). **Sprite-render gotcha:** a memory-poked force-deploy sets a unit's logical position but does NOT
+> spawn its standing map sprite — only `RefreshUnitSprites` (phase transition / menu exit) does; cycle one
+> enemy phase after a poke-deploy before screenshotting. Existing `ch02` scenario still PASS (deploy cap 5, no
+> regression); **58 unit tests** green (+3); drift + verify_text clean. Proof stills in `docs/demo/ch02-baxby-*`.
+> **Trex → #65 battle-anim backlog:** reuses the **brigand Wildling** anim (the ch03 kobold reskin), **NOT**
+> myrmidon/thief (Nicolas). **Recruit model (from #2, now merged):** a recruit = classed cast member +
+> `recruit.chapter:`; no generic engine; Trex = Colm-style TALK recruit (Rennac/Colm, green + `CUSA`); Baxby =
+> real unit on Forde (Franz/Cavalier), hand-painted axe-beak sprite on the standard cast pattern. Trex's
+> recruiter LOCKED = **ANY core party member** (only thief → non-missable; a static `CHAR` can't name the
+> runtime lord); telegraph Joshua-style.
 
 > **Prior sessions (all MERGED; detail in git log / closed issues):** ch03 **DefeatBoss WIN** + `ch03win`
 > scenario (PR #143; **gotcha, decisions.md §Operational Gotchas:** the win fires from the FLAGGED grell quote
@@ -186,18 +183,25 @@ how-to for the host machinery = `docs/adding-a-chapter.md`.**
   fighting on the ch02 map (killed a raider in melee). Existing `ch02` scenario still PASS (deploy cap 5).
   3 new unit tests (58 total green). Talk recruits (Trex) still self-join via `CUSA`.
 - **REMAINING (unchecked on #23, priority order):**
-  2. **Trex talk-recruit event** — the `CHAR(flag, script, <every core-party candidate>, CHARACTER_RENNAC)` +
-     `CUSA(RENNAC)` talk trigger + a Joshua-style hint line (talker = ANY core party, LOCKED). Part of the ch3
-     dialogue pass (his recruit line). Then the cosmetic **horns/wings** pixel edit — `map_sprite_editor.py`.
-  2. **Real PREP deploy** — author `deployment.deploy_slots` (9 tiles) + a PREP CALL; today it's the static
+  1. **⭐ NEXT — Ch3 DIALOGUE PASS (do in a FRESH instance via the `dialogue-pass` skill; Nicolas co-writes).**
+     Write the ch03 opening / Trex-recruit / mid-map / ending cutscene text on the **REFRAMED** beats
+     (2026-07-06, in the ch03 YAML `design_notes`): feral-splinter kobolds, Trex's clear-our-name motive, RBG
+     executes a feral one, Pinky scout → opening; the #97 beats. Prep per `feedback_prep_before_drafting_dialogue`
+     — read EVERY speaker's voice bible + `lore/trex.md` + the roster first. This produces the LOCKED text that
+     items 2 & 4 then wire. Open the **OPEN creative fork:** who is our "Neimi" — the party member whose line
+     telegraphs Trex's talk-recruit? (Recruiter is mechanically ANY core party, LOCKED; the *hint line* voice is
+     the creative choice.) Grounding for the repass = the VANILLA Ch3 "Bandits of Borgo" recruit reference below.
+  2. **Trex talk-recruit event** — `CHAR(flag, script, <every core-party candidate>, CHARACTER_RENNAC)` +
+     `CUSA(RENNAC)` + a Joshua-style hint line (talker = ANY core party, LOCKED). Wires the recruit line the
+     dialogue pass produces. Then the cosmetic **horns/wings** pixel edit — `map_sprite_editor.py`.
+  3. **Real PREP deploy** — author `deployment.deploy_slots` (9 tiles) + a PREP CALL; today it's the static
      fast-boot spawn (`CH03_SPAWN_POSITIONS` = `cast_available_at(3)` = 8 founding + Baxby), party WEAPONLESS
-     (`items='0'`).
-  3. **Chain ch02→ch03** — point ch02's ending `MNC2(0x4)` at ch03 (drop the ch02 dev-placeholder landing).
-  4. **Cutscenes** — dialogue-pass on the REFRAMED beats first (feral faction / grell visible / Pinky→opening
-     / RBG executes a feral one), then wire (#58 opaque-box). Mid-map beat fires on the BRUTE (`kobold-steel`)
-     defeat. Replace the minimal DefeatBoss ending with the real ending cutscene.
-  5. **Chests/doors** — per-chest **`17→29` TILECHANGE**; Trex opens, key-droppers back up.
-  6. **Title-card image** + full load-test scenarios `ch03`/`smoke_ch03`/`clear_ch03` (the `ch03win`/
+     (`items='0'`). (The ch02 off-map join-LOAD pattern is the reference for how recruits ride the prep roster.)
+  4. **Chain ch02→ch03** — point ch02's ending `MNC2(0x4)` at ch03 (drop the ch02 dev-placeholder landing).
+  5. **Cutscenes wiring** — once the dialogue pass locks the text, wire it (#58 opaque-box). Mid-map beat fires
+     on the BRUTE (`kobold-steel`) defeat. Replace the minimal DefeatBoss ending with the real ending cutscene.
+  6. **Chests/doors** — per-chest **`17→29` TILECHANGE**; Trex opens, key-droppers back up.
+  7. **Title-card image** + full load-test scenarios `ch03`/`smoke_ch03`/`clear_ch03` (the `ch03win`/
      `koboldview`/`enemycheck` scenarios seed these; a fair-play `clear_ch03` needs a `CA_BOSS` grell or a
      pid-targeted bot).
 - **Cutscene BGs DECIDED (Nicolas): reference, don't import** — reuse `bg_TargosWinter`; mid-map beats on-map.
