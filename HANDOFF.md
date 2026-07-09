@@ -153,8 +153,9 @@ OAM lunge; feet stay anchored in the art). 3 frames is a hard cap (script refs f
 
 #### The other 5 PCs + Trex (after wolfram) — donor mapping by class
 pinky = Pegasus (lance flier — reuses the lance cadence) · marty + meesmickle = Shaman (dark caster) ·
-rootis = Mage (anima caster) · sclorbo = Cleric (staff — may need a heal pose) · **trex = Thief (sword
-melee — donor `myrmidon`/`thief`, braulo's 3-beat recipe; ch03 recruit, added to #65 2026-07-08)**.
+rootis = Mage (anima caster) · sclorbo = Cleric (staff — may need a heal pose) · **trex = Thief but
+reuses the **brigand Wildling** anim (Nicolas, 2026-07-08 — the ch03 kobold reskin, NOT myrmidon/thief);
+ch03 recruit, added to #65**.
 **meesmickle has a parked vendored Kitsune anim** at `battle_anims/_parked/`. Each: one `battle_anim:` block
 + 3 descaled frames, one feature-flow branch per unit (or small batch), `custom_unit` issue template.
 - **Deferred polish (tracked):** braulo's white swing-arc weapon-trail → **#91**; goblin enemy class-level anim → **#90**.
