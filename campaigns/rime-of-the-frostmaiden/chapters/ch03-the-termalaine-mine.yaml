@@ -325,7 +325,7 @@ events:
       "can we go say hello?". WINGS DROPPED (Nicolas 2026-07-09: not in Trex's portrait
       or map sprite, so cut from the fiction; his hook is the self-taught eloquence, not
       the cosmetic gag — see lore/trex.md). Voice: lore/{prof-rbg,marty,wolfram,pinky,
-      braulo,trex}.md. LOCKED 2026-06-26, RE-PASSED 2026-07-09 (dialogue-pass, co-written
+      trex}.md. LOCKED 2026-06-26, RE-PASSED 2026-07-09 (dialogue-pass, co-written
       with Nicolas). PENDING: eventscript + Brute-defeat trigger + Darmo/kobold mugs +
       Trex recruit wiring + motion review.
     script:                     # LOCKED 2026-06-26, RE-PASSED 2026-07-09 (dialogue pass, co-written with Nicolas)
@@ -375,11 +375,12 @@ events:
           people and yours — and I cannot fight it. Help me kill it, and win my warren a
           place in this town, and every lock in this mine opens for you. Its doors, its
           gems — yours.
-      # (Braulo's one blunt line settles it, in his fair-dealing register — lore/braulo.md.)
-      - braulo: "He opens the locks, we take the mine. Fair deal."
       # (Pinky = our "Neimi": the innocent telegraph teaching "talk to the green unit to
       #  recruit". Mechanically the recruiter is ANY core party member; Pinky just cues it.
-      #  RBG answering his son with the welcome is peak paternal-warmth on-brand — lore/{pinky,prof-rbg}.md.)
+      #  RBG answering his son with the welcome is peak paternal-warmth on-brand — lore/{pinky,prof-rbg}.md.
+      #  Braulo's old "he opens the locks, we take the mine — fair deal" settling line was CUT
+      #  2026-07-09 (Nicolas): Trex's own pitch already carries the thief-utility bark, and
+      #  Meesmickle's ending button now echoes it — answering Trex's "if you'll have a thief?".)
       - pinky: "He waved at me! Can we go say hello? Father, can we?"
       - prof-rbg: "Welcome aboard, little dragon."
   # (The standalone shaft_mouth_reached "pinky-scout" beat was RETIRED 2026-07-09: its
@@ -424,9 +425,11 @@ events:
           read about. If you'll have a thief?
       - beat_break: C
       # ── C: Meesmickle's deadpan button — his only line of the chapter (lore/meesmickle.md).
-      #  Road north resumes the druid thread (ch04) by staging, not a line. ──
+      #  Answers Trex's "if you'll have a thief?" AND doubles as the thief-utility telegraph
+      #  (he opens locks) now that Braulo's mid-map line is cut. Road north resumes the druid
+      #  thread (ch04) by staging, not a line. ──
       # (The company back on the lakeshore road north, Trex falling in at the back.)
-      - meesmickle: "Taught himself to read, then talked his way onto the payroll. Most qualified hire so far."
+      - meesmickle: "A thief who opens any lock we point him at. Most qualified hire so far."
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
