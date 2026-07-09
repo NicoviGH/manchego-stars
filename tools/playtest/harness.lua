@@ -3416,23 +3416,86 @@ scenarios.ckpt_ch02intro = function()
     result("PASS", "ch02intro checkpoint saved (ch02 opening, first beat)")
 end
 
--- recordch02intro: the ch02 opening in motion -- title card "Ch.2: Cold Welcome" + the Vellynne
--- and chwinga-adoption beats (custom busts + Mote/Rime/Glimmer names). Frames tagged "intro".
-scenarios.recordch02intro = function()
-    wait(30)
-    if not loadState("ch02intro") then return result("FAIL", "no ch02intro checkpoint (run.sh builds it)") end
-    wait(20)
-    pokeNormalConfig()   -- normal text speed so the typewriter + face fades animate
-    local fr = 0
-    while fr < 6000 do
+-- ============================================================================
+-- GENERIC CUTSCENE RECORDER (record-tooling generalized 2026-07-09)
+-- Every dialogue-cutscene record* scenario is the SAME loop with different params:
+-- load a pre-built save-state, set text speed, take an optional pre-step, then
+-- screenshot on a cadence while pressing A on a cadence, until a terminal proc (or a
+-- frame cap). `recordCutscene` is that loop; the `recordscene` scenario below exposes
+-- it to env vars so ANY cutscene can be recorded with no new Lua.
+--   opts:
+--     state      save-state to load (nil/"" = record from the current position)
+--     tag        frame filename tag (default "scene")
+--     until_     terminal condition: a function, or "prep" (-> Preparations),
+--                "title" (-> title screen), "chapter" (-> chapter advanced), or
+--                nil/"" (frame cap only)
+--     speed      "normal" (typewriter + face fades animate; default) | "fast"
+--     maxFrames  safety cap (default 6000)
+--     shotEvery  screenshot cadence in frames (default 4)
+--     pressEvery A-press cadence in frames (default 60; 0 = never press)
+--     pre        optional fn run once after load, before the loop (e.g. press A to Seize)
+--     post       optional fn(reachedEnd) run once after the loop (e.g. a final "title" shot)
+local function recordCutscene(o)
+    o = o or {}
+    local tag = o.tag or "scene"
+    wait(o.settle or 30)   -- let the core settle past boot before loading
+    if o.state and o.state ~= "" then
+        if not loadState(o.state) then
+            return result("FAIL", "no '" .. o.state .. "' checkpoint (run.sh builds it)")
+        end
+        wait(20)
+    end
+    if o.speed == "fast" then pokeFastConfig() else pokeNormalConfig() end
+    if o.pre then o.pre() end
+    local startCh = chapter()
+    local doneFn
+    if type(o.until_) == "function" then doneFn = o.until_
+    elseif o.until_ == "prep" then doneFn = function() return procActive(SYM.gProcScr_SALLYCURSOR) end
+    elseif o.until_ == "title" then doneFn = function() return procActive(SYM.gProcScr_TitleScreen) end
+    elseif o.until_ == "chapter" then doneFn = function() return chapter() ~= startCh end
+    else doneFn = function() return false end end
+    local maxFrames = o.maxFrames or 6000
+    local shotEvery = o.shotEvery or 4
+    local pressEvery = (o.pressEvery ~= nil) and o.pressEvery or 60
+    local reached, fr = false, 0
+    while fr < maxFrames do
         fr = fr + 1
-        if fr % 4 == 0 then shot("intro") end
-        if fr % 60 == 0 then press(K.A, 4) end                  -- advance the dialogue beats
-        if procActive(SYM.gProcScr_SALLYCURSOR) then break end  -- reached prep -> opening done
+        if fr % shotEvery == 0 then shot(tag) end
+        if pressEvery > 0 and fr % pressEvery == 0 then press(K.A, 4) end   -- advance the dialogue beats
+        if doneFn() then reached = true break end
         yield()
     end
-    shot("intro")
-    result("PASS", "ch02 opening cutscene recorded")
+    shot(tag)
+    if o.post then o.post(reached) end
+    local hasEnd = (type(o.until_) == "function") or (o.until_ and o.until_ ~= "")
+    if hasEnd and not reached then
+        return result("FAIL", tag .. " cutscene never reached its end (" .. tostring(o.until_) .. ")")
+    end
+    return result("PASS", tag .. " cutscene recorded")
+end
+
+-- recordscene: record ANY dialogue cutscene without writing new Lua -- point it at a
+-- pre-built save-state + a terminal condition via env vars. run.sh builds the checkpoint
+-- named by PT_STATE (builder ckpt_<PT_STATE>) if it's missing/stale. Examples:
+--   PT_STATE=ch02intro PT_TAG=intro PT_UNTIL=prep                   tools/playtest/run.sh recordscene
+--   PT_STATE=seize     PT_TAG=end   PT_UNTIL=title PT_PRESSEVERY=72 tools/playtest/run.sh recordscene
+scenarios.recordscene = function()
+    return recordCutscene({
+        state = os.getenv("PT_STATE"),
+        tag = os.getenv("PT_TAG") or "scene",
+        until_ = os.getenv("PT_UNTIL"),
+        speed = os.getenv("PT_SPEED"),
+        maxFrames = tonumber(os.getenv("PT_MAXFRAMES") or ""),
+        shotEvery = tonumber(os.getenv("PT_SHOTEVERY") or ""),
+        pressEvery = tonumber(os.getenv("PT_PRESSEVERY") or ""),
+    })
+end
+
+-- recordch02intro: the ch02 opening in motion -- title card "Ch.2: Cold Welcome" + the Vellynne
+-- and chwinga-adoption beats (custom busts + Mote/Rime/Glimmer names). Frames tagged "intro".
+-- Thin wrapper over recordCutscene (dogfoods the generic recorder).
+scenarios.recordch02intro = function()
+    return recordCutscene({ state = "ch02intro", tag = "intro", until_ = "prep" })
 end
 
 -- recordch02map: pan the cursor across the ch02 map (NW deploy + the 3 green chwinga -> the

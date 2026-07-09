@@ -32,6 +32,11 @@
 #                           the run ends this script touches <dir>/stop: the sidecar
 #                           drains, saves its transcript, and exits on its own.
 # Recording scenarios (drop motion frames for a review GIF):
+#   recordscene   -- GENERIC cutscene recorder: records ANY dialogue cutscene, no new Lua.
+#                    Env: PT_STATE=<checkpoint> PT_TAG=<frametag> PT_UNTIL=prep|title|chapter
+#                    [PT_SPEED=normal|fast] [PT_MAXFRAMES=6000] [PT_PRESSEVERY=60] [PT_SHOTEVERY=4]
+#                      PT_STATE=ch02intro PT_TAG=intro PT_UNTIL=prep tools/playtest/run.sh recordscene
+#                    The named record* cutscene scenarios below are thin wrappers over this.
 #   recordending  -- the ch01 "Rolling Cheddar" outro cutscene (frames tagged "end")
 #   recordprep    -- the Preparations + Pick Units deploy screen (frames "prep")
 #   recordrbg     -- RBG's custom battle anim ("rbg"); loads the rbgch01 checkpoint
@@ -151,6 +156,9 @@ case "$SCENARIO" in
     # recordch02intro needs its OWN checkpoint (ckpt_ch02intro, harness.lua) saved just BEFORE the
     # ch02 opening plays -- ckpt_ch02start is captured at turn 1, after the opening is already over.
     recordch02intro) BUILDER=ckpt_ch02intro; CKPT=ch02intro ;;
+    # recordscene (generic cutscene recorder): PT_STATE names the checkpoint; its builder is
+    # ckpt_<PT_STATE> by convention (matches every ckpt_* above). e.g. PT_STATE=ch02intro.
+    recordscene) CKPT="${PT_STATE:?recordscene needs PT_STATE=<checkpoint> (e.g. PT_STATE=ch02intro)}"; BUILDER="ckpt_${PT_STATE}" ;;
 esac
 if [ -n "$BUILDER" ]; then
     if [ ! -f "$STATE_DIR/$CKPT.ss" ] || [ "$(cat "$STATE_DIR/$CKPT.romhash" 2>/dev/null || true)" != "$ROMHASH" ]; then
