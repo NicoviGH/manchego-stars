@@ -650,6 +650,19 @@ notes, and the Frostmaiden book "A Beautiful Mine" pp.93–96) — item 4 added 
 multi-level maps, so the book's 3-level mine is authored as one flat walled interior (rooms via
 TERRAIN_DOOR + one TILECHANGE), not a verticality gimmick — the doors make the thief (Trex) matter._
 
+**Ch3 dialogue re-pass on the 2026-07-06 reframe (2026-07-09, Nicolas + CLAUDE).** Three fiction
+changes settled while re-passing the opening + RBG-execution/Trex-recruit beats (roster/positions
+unchanged; still plays like Bandits of Borgo): (a) **Trex's cosmetic wings are dropped** — the
+table gave him self-fashioned wings, but they're not in his FE portrait or map sprite, so they're
+cut from the fiction (his hook was always the self-taught eloquence, not the costume). This retires
+`lore/trex.md`'s wings content and Meesmickle's wings-based ending button; it also moots the "wings
+pixel edit" art task on #23. (b) **Pinky's shaft-scout folds into the opening cutscene** — as the
+army's flier he does a flyover recon from the mine mouth; the grell is now **visible at (14,1) from
+turn 1** (Bazba-style), so the old standalone `shaft_mouth_reached` beat, its scripted grell spawn,
+and its "open the way down" map-change are all retired (the deep workings are pathable from the
+start). The RBG/Pinky Wish-seed two-hander is preserved intact. (c) **Canon name fix:** the town
+speaker is **Oarus Masthew** (book pp.93–94), not "Maxol" — corrected in the crier + ending lines.
+
 **Ch3 layout = vanilla Borgo geometry repainted, NOT a custom Gem-Mine blockout.**
 The 2026-06-29 session *proposed* pivoting the ch03 layout to a custom flattened trace of the
 book's Gem Mine map (Map 1.19) and posted a blockout on #23 pending Nicolas's OK. That OK never
