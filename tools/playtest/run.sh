@@ -32,7 +32,17 @@
 #                           the run ends this script touches <dir>/stop: the sidecar
 #                           drains, saves its transcript, and exits on its own.
 # Recording scenarios (drop motion frames for a review GIF):
-#   recordending  -- the ch01 "Rolling Cheddar" outro cutscene (frames tagged "end")
+#   recordscene   -- GENERIC cutscene recorder: records ANY dialogue cutscene, no new Lua.
+#                    Env: PT_STATE=<checkpoint> PT_TAG=<frametag> PT_UNTIL=prep|title|chapter
+#                    [PT_SPEED=normal|fast] [PT_MAXFRAMES=6000] [PT_PRESSEVERY=60] [PT_SHOTEVERY=4]
+#                      PT_STATE=ch02intro PT_TAG=intro PT_UNTIL=prep tools/playtest/run.sh recordscene
+#                    ONE loop (recordCutscene in harness.lua) does the work. recordending and
+#                    recordch02intro are named PRESETS over it (a checkpoint + fixed params).
+#                    The rest are NOT cutscene recorders and stay separate: recordopening /
+#                    recordch01 replay a lead-in instead of loading a checkpoint; scenes /
+#                    record / recordch01trail / recordch02map / recordch02combat drive gameplay
+#                    (boot, unit moves, combat) -- different tools, not duplication.
+#   recordending  -- the ch01 "Rolling Cheddar" outro cutscene (frames tagged "end"); preset over recordscene
 #   recordprep    -- the Preparations + Pick Units deploy screen (frames "prep")
 #   recordrbg     -- RBG's custom battle anim ("rbg"); loads the rbgch01 checkpoint
 #   recordanim    -- ANY cast member's battle anim on a `make TESTCH=1` ROM: New Game boots
@@ -111,6 +121,13 @@ PLAYTEST_SEED = "${PT_SEED:-1}"
 PLAYTEST_CHAR = "${PT_CHAR:-}"
 PLAYTEST_HOST_CHAPTER = ${PT_HOST_CHAPTER:-1}
 PLAYTEST_LLMDIR = "$LLM_DIR"
+PLAYTEST_STATE = "${PT_STATE:-}"
+PLAYTEST_TAG = "${PT_TAG:-}"
+PLAYTEST_UNTIL = "${PT_UNTIL:-}"
+PLAYTEST_SPEED = "${PT_SPEED:-}"
+PLAYTEST_MAXFRAMES = "${PT_MAXFRAMES:-}"
+PLAYTEST_PRESSEVERY = "${PT_PRESSEVERY:-}"
+PLAYTEST_SHOTEVERY = "${PT_SHOTEVERY:-}"
 dofile("$HERE/harness.lua")
 EOF
     rm -f "$REPO/fireemblem8u/fireemblem8.sav"   # fresh save: New Game is the default path
@@ -147,7 +164,13 @@ case "$SCENARIO" in
     recordfix)    BUILDER=ckpt_prep;      CKPT=prep ;;
     recordrbg)    BUILDER=ckpt_rbgch01;   CKPT=rbgch01 ;;
     # ch02 (#22) scenarios LOAD the ch02start state (the real ch00->ch01->ch02 chain, paid once).
-    ch02|smoke_ch02|clear_ch02|ch02baxby) BUILDER=ckpt_ch02start; CKPT=ch02start ;;
+    ch02|smoke_ch02|clear_ch02|ch02baxby|recordch02map|recordch02combat|recordch02ending) BUILDER=ckpt_ch02start; CKPT=ch02start ;;
+    # recordch02intro needs its OWN checkpoint (ckpt_ch02intro, harness.lua) saved just BEFORE the
+    # ch02 opening plays -- ckpt_ch02start is captured at turn 1, after the opening is already over.
+    recordch02intro) BUILDER=ckpt_ch02intro; CKPT=ch02intro ;;
+    # recordscene (generic cutscene recorder): PT_STATE names the checkpoint; its builder is
+    # ckpt_<PT_STATE> by convention (matches every ckpt_* above). e.g. PT_STATE=ch02intro.
+    recordscene) CKPT="${PT_STATE:?recordscene needs PT_STATE=<checkpoint> (e.g. PT_STATE=ch02intro)}"; BUILDER="ckpt_${PT_STATE}" ;;
 esac
 if [ -n "$BUILDER" ]; then
     if [ ! -f "$STATE_DIR/$CKPT.ss" ] || [ "$(cat "$STATE_DIR/$CKPT.romhash" 2>/dev/null || true)" != "$ROMHASH" ]; then
@@ -168,10 +191,11 @@ fi
 FPS=240; VSYNC=0; DEADLINE_S=420
 case "$SCENARIO" in record*) FPS=60; VSYNC=1; DEADLINE_S=300 ;; esac
 # smoke_* / fuzz_* / clear_ch02 play a full chapter (lead-in + a long soak) -> longer
-# wall. llm waits wall-clock on the sidecar EVERY turn (18 turns x 90s handshake
-# budget), and a --record run against a slow local model legitimately uses it -- so its
-# deadline covers the harness's own worst case instead of killing a healthy run.
-case "$SCENARIO" in smoke*|fuzz*|clear_ch02) DEADLINE_S=600 ;; llm) DEADLINE_S=2100 ;; esac
+# wall. recordch02ending routs the whole band, so it needs the same headroom. llm waits
+# wall-clock on the sidecar EVERY turn (18 turns x 90s handshake budget), and a --record run
+# against a slow local model legitimately uses it -- so its deadline covers the harness's own
+# worst case instead of killing a healthy run.
+case "$SCENARIO" in smoke*|fuzz*|clear_ch02|recordch02ending) DEADLINE_S=600 ;; llm) DEADLINE_S=2100 ;; esac
 # PT_FPS overrides the rate. 60fps+videoSync is only needed to capture smooth cutscene
 # FADES; verification captures of static text/boxes (sign, death quote) read fine at top
 # speed, so `PT_FPS=240 ... recordfix` runs ~4x faster.

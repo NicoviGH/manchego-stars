@@ -181,6 +181,67 @@ local function loadState(name)
     return ok
 end
 
+-- ============================================================================
+-- GENERIC CUTSCENE RECORDER (record-tooling generalized 2026-07-09)
+-- Every dialogue-cutscene record* scenario is the SAME loop with different params:
+-- load a pre-built save-state, set text speed, take an optional pre-step, then
+-- screenshot on a cadence while pressing A on a cadence, until a terminal proc (or a
+-- frame cap). `recordCutscene` is that loop; the `recordscene` scenario (far below)
+-- exposes it to PT_* env vars so ANY cutscene can be recorded with no new Lua, and the
+-- named recorders (recordch02intro, recordending) are one-line presets over it.
+-- Defined HERE, above its first caller (recordending) -- a Lua local is only visible
+-- lexically after its definition, so it must precede every scenario that uses it.
+--   opts:
+--     state      save-state to load (nil/"" = record from the current position)
+--     tag        frame filename tag (default "scene")
+--     until_     terminal condition: a function, or "prep" (-> Preparations),
+--                "title" (-> title screen), "chapter" (-> chapter advanced), or
+--                nil/"" (frame cap only)
+--     speed      "normal" (typewriter + face fades animate; default) | "fast"
+--     maxFrames  safety cap (default 6000)
+--     shotEvery  screenshot cadence in frames (default 4)
+--     pressEvery A-press cadence in frames (default 60; 0 = never press)
+--     pre        optional fn run once after load, before the loop (e.g. press A to Seize)
+--     post       optional fn(reachedEnd) run once after the loop (e.g. a final "title" shot)
+local function recordCutscene(o)
+    o = o or {}
+    local tag = o.tag or "scene"
+    wait(o.settle or 30)   -- let the core settle past boot before loading
+    if o.state and o.state ~= "" then
+        if not loadState(o.state) then
+            return result("FAIL", "no '" .. o.state .. "' checkpoint (run.sh builds it)")
+        end
+        wait(20)
+    end
+    if o.speed == "fast" then pokeFastConfig() else pokeNormalConfig() end
+    if o.pre then o.pre() end
+    local startCh = chapter()
+    local doneFn
+    if type(o.until_) == "function" then doneFn = o.until_
+    elseif o.until_ == "prep" then doneFn = function() return procActive(SYM.gProcScr_SALLYCURSOR) end
+    elseif o.until_ == "title" then doneFn = function() return procActive(SYM.gProcScr_TitleScreen) end
+    elseif o.until_ == "chapter" then doneFn = function() return chapter() ~= startCh end
+    else doneFn = function() return false end end
+    local maxFrames = o.maxFrames or 6000
+    local shotEvery = o.shotEvery or 4
+    local pressEvery = (o.pressEvery ~= nil) and o.pressEvery or 60
+    local reached, fr = false, 0
+    while fr < maxFrames do
+        fr = fr + 1
+        if fr % shotEvery == 0 then shot(tag) end
+        if pressEvery > 0 and fr % pressEvery == 0 then press(K.A, 4) end   -- advance the dialogue beats
+        if doneFn() then reached = true break end
+        yield()
+    end
+    shot(tag)
+    if o.post then o.post(reached) end
+    local hasEnd = (type(o.until_) == "function") or (o.until_ and o.until_ ~= "")
+    if hasEnd and not reached then
+        return result("FAIL", tag .. " cutscene never reached its end (" .. tostring(o.until_) .. ")")
+    end
+    return result("PASS", tag .. " cutscene recorded")
+end
+
 local function tileOccupied(x, y)
     for _, base in ipairs({ SYM.gUnitArrayBlue, SYM.gUnitArrayRed }) do
         for i = 0, 23 do
@@ -1945,31 +2006,24 @@ end
 -- fades render smoothly (at 240fps frameskip aliases them into 1-frame "blips"). A frame
 -- every 4th (~15fps); A-tap every ~72 so each page fully types then holds. Assemble at
 -- 15fps (make_gif --fps 15) for ~real-time playback.
+-- recordending: the ch01 "Rolling Cheddar" outro -> title. Named preset over recordCutscene:
+-- load the seize checkpoint, tap Seize (the menu was saved open), then record the outro until
+-- the title screen comes up (a final "title" shot once it does).
 scenarios.recordending = function()
-    wait(30) -- let the core settle past boot before loading
-    if not loadState("seize") then return result("FAIL", "no seize checkpoint (run.sh builds it)") end
-    wait(20)
-    pokeNormalConfig() -- normal text speed so the typewriter + face fades animate
-    press(K.A) -- Seize (the menu was saved open) -> the ending hand-off
-    wait(40)
-    -- the ending plays the full outro then MNC2s into the hosted ch02 -- record
-    -- through all of it until the chapter advances (the title-screen check below is
-    -- the legacy pre-ch02 exit, kept as a harmless backstop).
-    local fr, atTitle = 0, false
-    while fr < 9000 do
-        fr = fr + 1
-        if fr % 4 == 0 then shot("end") end
-        if fr % 72 == 0 then press(K.A, 4) end
-        if procActive(SYM.gProcScr_TitleScreen) then atTitle = true break end
-        yield()
-    end
-    if atTitle then
-        wait(120) -- let the title fade in + the logo/banner draw
-        shot("title")
-        return result("PASS", "ending + dev placeholder recorded; returned to the title screen")
-    end
-    shot("ending-after")
-    result("FAIL", "ending never reached the title screen (dev placeholder stuck?)")
+    -- The ch01 outro now MNC2s into the hosted ch02 (chapter advances); older builds landed
+    -- on a dev placeholder -> title screen. Accept EITHER so the terminal isn't stale.
+    local base
+    return recordCutscene({
+        state = "seize", tag = "end", maxFrames = 9000, pressEvery = 72,
+        pre = function() press(K.A); wait(40) end,   -- Seize (menu saved open) -> the ending hand-off
+        until_ = function()
+            base = base or chapter()
+            return procActive(SYM.gProcScr_TitleScreen) or chapter() ~= base
+        end,
+        post = function(reached)
+            if reached and procActive(SYM.gProcScr_TitleScreen) then wait(120); shot("title") end
+        end,
+    })
 end
 
 -- RECORDCH01TRAIL (#21): capture the in-battle trail beats as motion for review --
@@ -3391,6 +3445,143 @@ scenarios.clear_ch02 = function()
         return result("FAIL", string.format(
             "ch02 charm-gift broken: only %d/3 chwinga charms reached the leader/convoy", #best)) end
     result("PASS", "ch02 routed + chained; all 3 chwinga charms delivered (CHECK_ALIVE -> GIVEITEMTO)")
+end
+
+-- ---- ch02 demo GIFs (#22 review): showcase the chapter on a phone via committed GIFs.
+-- make_gif.py turns the tagged frames into a GIF; commit to docs/demo/ + push (GitHub renders
+-- GIFs inline on mobile). Workflow:
+--   tools/playtest/run.sh recordch02intro && tools/playtest/make_gif.py recordch02intro intro --name ch02-opening
+--   tools/playtest/run.sh recordch02map   && tools/playtest/make_gif.py recordch02map   map   --name ch02-map
+
+-- ckpt_ch02intro: stop at the very start of ch02 (slot 3), BEFORE the opening cutscene plays,
+-- so recordch02intro can replay the title card + Vellynne/chwinga beats at viewable speed.
+scenarios.ckpt_ch02intro = function()
+    if not reachCh01Map() then return end
+    local status = seizeCh01ToCh02()
+    if status ~= "won" then return result("FAIL", "ch01 seize failed (" .. status .. ")") end
+    if not waitFor(function() return chapter() == CH02_CHAPTER end, 600) then
+        return result("FAIL", "ch02 never began") end
+    -- Advance past the title-card transition into the first STABLE opening dialogue beat before
+    -- saving -- a state grabbed mid-transition crashes on resume (mGBA exited early). Wait for the
+    -- map event engine to be running, then let the scene settle on a dialogue box.
+    waitFor(function() return procActive(SYM.ProcScr_StdEventEngine) end, 600)
+    wait(180)
+    saveState("ch02intro")
+    result("PASS", "ch02intro checkpoint saved (ch02 opening, first beat)")
+end
+
+-- (recordCutscene is defined up in the helpers section, before its first caller
+--  recordending -- a local function is only visible lexically AFTER its definition.)
+
+-- recordscene: record ANY dialogue cutscene without writing new Lua -- point it at a
+-- pre-built save-state + a terminal condition via env vars. run.sh builds the checkpoint
+-- named by PT_STATE (builder ckpt_<PT_STATE>) if it's missing/stale. Examples:
+--   PT_STATE=ch02intro PT_TAG=intro PT_UNTIL=prep                   tools/playtest/run.sh recordscene
+--   PT_STATE=seize     PT_TAG=end   PT_UNTIL=title PT_PRESSEVERY=72 tools/playtest/run.sh recordscene
+scenarios.recordscene = function()
+    -- Config arrives as PLAYTEST_* wrapper globals (run.sh maps PT_* -> PLAYTEST_*); mGBA's
+    -- sandboxed lua has no os.getenv, so the whole harness uses injected globals, not the env.
+    local function g(v) return (v ~= nil and v ~= "") and v or nil end
+    return recordCutscene({
+        state = g(PLAYTEST_STATE),
+        tag = g(PLAYTEST_TAG) or "scene",
+        until_ = g(PLAYTEST_UNTIL),
+        speed = g(PLAYTEST_SPEED),
+        maxFrames = tonumber(PLAYTEST_MAXFRAMES or ""),
+        shotEvery = tonumber(PLAYTEST_SHOTEVERY or ""),
+        pressEvery = tonumber(PLAYTEST_PRESSEVERY or ""),
+    })
+end
+
+-- recordch02intro: the ch02 opening in motion -- title card "Ch.2: Cold Welcome" + the Vellynne
+-- and chwinga-adoption beats (custom busts + Mote/Rime/Glimmer names). Frames tagged "intro".
+-- Thin wrapper over recordCutscene (dogfoods the generic recorder).
+scenarios.recordch02intro = function()
+    return recordCutscene({ state = "ch02intro", tag = "intro", until_ = "prep" })
+end
+
+-- recordch02map: pan the cursor across the ch02 map (NW deploy + the 3 green chwinga -> the
+-- chardalyn raiders E/SE), so the GIF shows the snowy layout + the green chwinga map sprites in
+-- their idle bob. Frames tagged "map". Loads the ch02start checkpoint (turn 1, all units placed).
+scenarios.recordch02map = function()
+    wait(30)
+    if not loadState("ch02start") then return result("FAIL", "no ch02start checkpoint (run.sh builds it)") end
+    wait(60); pokeAnimsOn()
+    -- a slow sweep across the 15x15 map; the map-sprite idle animation plays while we pan.
+    local path = { { 2, 4 }, { 4, 4 }, { 6, 5 }, { 8, 6 }, { 10, 7 }, { 12, 7 }, { 13, 6 }, { 11, 8 }, { 8, 8 }, { 4, 5 }, { 3, 4 } }
+    for _, p in ipairs(path) do
+        cursorTo(p[1], p[2])
+        for f = 1, 18 do if f % 3 == 0 then shot("map") end yield() end
+    end
+    result("PASS", "ch02 map pan recorded")
+end
+
+-- recordch02combat: a deployed cast member attacks a chardalyn raider on the ch02 map -- a battle
+-- animation in motion for the demo reel. Frames tagged "combat". Loads the stable ch02start state.
+scenarios.recordch02combat = function()
+    wait(30)
+    if not loadState("ch02start") then return result("FAIL", "no ch02start checkpoint (run.sh builds it)") end
+    wait(60); pokeAnimsOn()
+    local pid
+    for _, p in ipairs({ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }) do
+        local u = blue(p)
+        if u and not isDead(u) and unitAttackRange(u) then pid = p break end
+    end
+    if not pid then return result("FAIL", "no deployed attacker") end
+    if not positionForShot(pid) then return result("FAIL", "couldn't reach a firing tile") end
+    local u = blue(pid)
+    if not captureAttack(u.addr, "combat") then return result("FAIL", "combat never animated") end
+    result("PASS", "ch02 combat recorded")
+end
+
+-- recordch02ending: the closing cutscene -- rout the band (deterministic frail+teleport, as in
+-- clear_ch02), then capture the Targos ending beats (fisher / Rootis / #58 narration box / RBG)
+-- at viewable speed. Frames tagged "ending". One run off ch02start (no fragile mid-scene state).
+scenarios.recordch02ending = function()
+    wait(30)
+    if not loadState("ch02start") then return result("FAIL", "no ch02start checkpoint (run.sh builds it)") end
+    wait(60)
+    pokeFastConfig()
+    local start = chapter()
+    for t = 1, 12 do
+        if chapter() ~= start or procActive(SYM.gProcScr_TitleScreen) then break end
+        waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
+        wait(60)
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+        end
+        for i = 0, 7 do
+            if #liveEnemies() == 0 then break end
+            local u = unitAt(SYM.gUnitArrayBlue, i)
+            if u and not isDead(u) and (u.state & 0x2) == 0 then
+                local mn, mx = unitAttackRange(u)
+                if mn and teleportToFiringTile(u, mn, mx) then
+                    u = blue(u.charId)
+                    if u and moveUnit(u.x, u.y, u.x, u.y) then
+                        chooseAttack(u.addr)
+                        waitFor(function() return faction() == 0 and not menuOpen()
+                            and not procActive(SYM.gProc_ekrBattle) end, 600)
+                    end
+                end
+            end
+        end
+        if #liveEnemies() == 0 then break end
+        if runEnemyPhase(CH02_PARK) == "gameover" then return result("FAIL", "party lost") end
+    end
+    if #liveEnemies() ~= 0 then return result("FAIL", "rout incomplete -- no ending to record") end
+    endTurn()   -- fire the DefeatAll win -> the ending scene
+    pokeNormalConfig()   -- readable text speed for the capture
+    local fr, atTitle = 0, false
+    while fr < 6000 do
+        fr = fr + 1
+        if fr % 4 == 0 then shot("ending") end
+        if fr % 60 == 0 then press(K.A, 4) end
+        if procActive(SYM.gProcScr_TitleScreen) then atTitle = true break end
+        yield()
+    end
+    shot("ending")
+    result("PASS", atTitle and "ch02 ending recorded (reached title)" or "ch02 ending recorded")
 end
 
 -- ---------------------------------------------------------------- runner
