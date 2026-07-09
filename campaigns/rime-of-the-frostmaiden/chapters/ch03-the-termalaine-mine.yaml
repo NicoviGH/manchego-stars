@@ -425,11 +425,11 @@ events:
           read about. If you'll have a thief?
       - beat_break: C
       # ── C: Meesmickle's deadpan button — his only line of the chapter (lore/meesmickle.md).
-      #  Answers Trex's "if you'll have a thief?" AND doubles as the thief-utility telegraph
-      #  (he opens locks) now that Braulo's mid-map line is cut. Road north resumes the druid
-      #  thread (ch04) by staging, not a line. ──
+      #  Folds the self-taught callback + the thief-utility telegraph (he opens locks) into one
+      #  flat line now that Braulo's mid-map line is cut. Road north resumes the druid thread
+      #  (ch04) by staging, not a line. ──
       # (The company back on the lakeshore road north, Trex falling in at the back.)
-      - meesmickle: "A thief who opens any lock we point him at. Most qualified hire so far."
+      - meesmickle: "He taught himself to talk and can open any lock. Most qualified hire so far."
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
