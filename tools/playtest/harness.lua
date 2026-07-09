@@ -3082,6 +3082,69 @@ scenarios.ch03win = function()
     result("PASS", "grell killed -> EVFLAG_DEFEAT_BOSS set -> DefeatBoss ending ran to title (ch03 win wired)")
 end
 
+-- CH03TALK (#23 item 2): prove Trex's TALK-RECRUIT flips him GREEN -> BLUE (the CUSA fires). Boot
+-- the ch03 map, PARK the leader on a free tile adjacent to green Trex (the setMapUnit dance keeps
+-- the occupancy grid in sync, so cursor-select + Talk-adjacency both work with no phase cycle --
+-- same trick ch03win uses to park the grell), then drive the Talk command and assert Trex leaves
+-- the green array and joins the blue one. Run: PT_HOST_CHAPTER=4 run.sh ch03talk (needs CH03BOOT=1).
+scenarios.ch03talk = function()
+    if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
+    local CHAR_TREX = 0x1C -- CHARACTER_RENNAC (Trex rides the Rennac slot)
+    -- ch03 deploys 9+ blue units, so scan the full blue array (blue() only checks the ch00
+    -- 8-slot party -> a recruit at a higher index would be missed).
+    local function blueTrex() return findUnit(SYM.gUnitArrayBlue, 20, CHAR_TREX) end
+    local trex = findUnit(SYM.gUnitArrayGreen, 12, CHAR_TREX)
+    if not trex then return result("FAIL", "green Trex (0x1C) not found in the green array") end
+    if blueTrex() then return result("FAIL", "Trex is already blue before any talk") end
+    local rec = blue(0x01) -- the leader is always deployed and is a recruit candidate
+    if not rec then return result("FAIL", "leader (0x01) not deployed") end
+    log(string.format("green Trex at (%d,%d); recruiter at (%d,%d)", trex.x, trex.y, rec.x, rec.y))
+    shot("ch03talk-green")
+    -- Park the recruiter on a free tile orthogonally adjacent to Trex.
+    local rgrid = mapUnitAt(rec.x, rec.y)
+    local parked = false
+    for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+        local tx, ty = trex.x + d[1], trex.y + d[2]
+        if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0 then
+            setMapUnit(rec.x, rec.y, 0)
+            emu:write8(rec.addr + 0x10, tx); emu:write8(rec.addr + 0x11, ty)
+            setMapUnit(tx, ty, rgrid)
+            log(string.format("recruiter parked at (%d,%d), adjacent to Trex (%d,%d)", tx, ty, trex.x, trex.y))
+            parked = true
+            break
+        end
+    end
+    if not parked then return result("FAIL", "no free tile adjacent to Trex to park the recruiter") end
+    -- Select the recruiter (no move) -> command menu. Adjacent to a talkable green with a matching
+    -- CHAR entry, Talk is the first special row (fast-boot is weaponless, so no Attack precedes it).
+    rec = blue(0x01)
+    waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
+    if not moveUnit(rec.x, rec.y, rec.x, rec.y) then
+        shot("ch03talk-no-menu")
+        return result("FAIL", "could not open the recruiter's command menu")
+    end
+    wait(30); shot("ch03talk-menu")
+    press(K.A, 4); wait(50) -- top row = Talk (when adjacent to the recruitable green)
+    shot("ch03talk-dialogue-1") -- Trex's migrated talk lines rendering in-engine
+    for i = 1, 60 do        -- advance the talk line through to the CUSA, grabbing each page
+        if blueTrex() then break end
+        if i <= 4 then wait(30); shot(string.format("ch03talk-dialogue-p%d", i + 1)) end
+        press(K.A, 3); wait(20)
+    end
+    wait(30); shot("ch03talk-after")
+    for i = 0, 19 do -- dump the full blue roster so the flip is unambiguous
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u then log(string.format("  blue[%02d] char=0x%02X pos=(%d,%d)", i, u.charId, u.x, u.y)) end
+    end
+    local nowBlue = blueTrex() ~= nil
+    local stillGreen = findUnit(SYM.gUnitArrayGreen, 12, CHAR_TREX) ~= nil
+    log(string.format("post-talk: Trex blue=%s stillGreen=%s", tostring(nowBlue), tostring(stillGreen)))
+    if not nowBlue then
+        return result("FAIL", "Trex did not join the blue army after Talk -- CUSA did not fire")
+    end
+    return result("PASS", "Talk -> CUSA: Trex flipped GREEN -> BLUE (talk-recruit wired, #23 item 2)")
+end
+
 -- KOBOLDVIEW (#23 art): pull the enemy kobolds ON-SCREEN next to the party so their reskinned
 -- map sprites are visible (the roster deploys off-camera at the enemy tiles). Teleports the first
 -- few red brigand generics (pid 0xaa) to tiles around braulo's spawn and screenshots. No combat.

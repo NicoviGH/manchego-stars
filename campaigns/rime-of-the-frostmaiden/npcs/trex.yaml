@@ -59,6 +59,18 @@ promotion:
   branch: [Rogue, Assassin]  # vanilla FE8 Thief branch (classchg-data.c [CLASS_THIEF])
   default: Rogue
 
+# ── Inventory — the FIGHTING kit (an iron sword: a Thief fights, weakly, like vanilla Colm).
+#    This is what difficulty.py reads (_weapon_for) to model him as a combatant; without it he
+#    resolved to the staff/support path (0 throughput) as if a healer. The steal/unlock utility
+#    (door + chest keys + vulnerary) rides the DEPLOY loadout CLASS_LOADOUT['CLASS_THIEF'], not
+#    the combat model. fe_base = vanilla FE8 stats (Mt/Hit/Crit/Wt), no custom tuning.
+inventory:
+  - id: iron-sword
+    name: "Iron Sword"
+    fe_base: iron-sword
+    fe_weapon_type: Sword
+    damage_type: slashing           # cosmetic flavor label only
+
 recruited_via: "story — joins after the Termalaine mine (Ch3)"
 recruit:
   chapter: ch03-the-termalaine-mine

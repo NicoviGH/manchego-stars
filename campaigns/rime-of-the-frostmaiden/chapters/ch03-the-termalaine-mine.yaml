@@ -316,18 +316,14 @@ events:
       one warmth is his son, executes it at gunpoint (rbg_kobold_execution) — pleasant
       pun, cold act. Pinky reads it innocently as rescue (he doesn't see the rest);
       RBG's warmth seeds beat 3 + the finale Wish. Wolfram's ore-snacking gag deflates
-      it (wolfram_ore_snacking — he obliviously missed the whole thing). Then Trex —
-      the self-taught kobold leader — drops in, DISAVOWS the Brute as a feral splinter
-      (2026-07-06 reframe: the enemy kobolds are a wild breakaway, not his warren), and
-      DEFECTS, offering to help kill the grell and win his people a place in Termalaine
-      in exchange for his thieving (the chapter's thief/chests/doors lesson). Pinky
-      (our "Neimi", Nicolas 2026-07-09) telegraphs the talk-recruit with an innocent
-      "can we go say hello?". WINGS DROPPED (Nicolas 2026-07-09: not in Trex's portrait
-      or map sprite, so cut from the fiction; his hook is the self-taught eloquence, not
-      the cosmetic gag — see lore/trex.md). Voice: lore/{prof-rbg,marty,wolfram,pinky,
-      trex}.md. LOCKED 2026-06-26, RE-PASSED 2026-07-09 (dialogue-pass, co-written
-      with Nicolas). PENDING: eventscript + Brute-defeat trigger + Darmo/kobold mugs +
-      Trex recruit wiring + motion review.
+      it (wolfram_ore_snacking — he obliviously missed the whole thing). This beat is now
+      RBG's ALONE: Trex's entrance + recruit are DECOUPLED into their own events below
+      (2026-07-09, Nicolas — Colm-style light entrance + everything in the Talk; it fixes an
+      ordering bug and de-crams this cutscene). WINGS DROPPED (Nicolas 2026-07-09: not in
+      Trex's portrait or map sprite, so cut from the fiction — see lore/trex.md). Voice:
+      lore/{prof-rbg,marty,wolfram,pinky}.md. LOCKED 2026-06-26, RE-PASSED 2026-07-09
+      (dialogue-pass, co-written with Nicolas). PENDING: eventscript + Brute-defeat trigger
+      + Darmo/kobold mugs + motion review.
     script:                     # LOCKED 2026-06-26, RE-PASSED 2026-07-09 (dialogue pass, co-written with Nicolas)
       # ── A: the routine fails (the Brute, beaten, makes his last move) ──
       # (The Brute is beaten — down at the back of the gallery, his packmates dead around
@@ -353,36 +349,63 @@ events:
       #  The senses come first; he names the metal before he notices the room — lore/wolfram.md.)
       - wolfram: "Copper, tin... a touch of silver. Good ore."
       - wolfram: "...Did something happen?"
-      - beat_break: D
-      # ── D: Trex defects (self-taught eloquence vs the broken-Common kobold above) ──
-      # (A scrape of claw above; a kobold drops down lightly, holding himself like he's
-      #  addressing a court. He takes in the Brute's body without a flicker and disavows it:
-      #  the wild ones are a feral splinter, not his warren — 2026-07-06 reframe; lore/trex.md.
-      #  The eloquence-vs-broken-Common gap with the just-killed Brute does the work for free.)
+      # (Trex is NOT in this beat anymore — his entrance + recruit are DECOUPLED below.)
+
+  # ── Trex: a Colm-style on-map TALK recruit — DECOUPLED from the RBG-execution beat
+  #    (2026-07-09, Nicolas). Vanilla Colm's entrance is a LIGHT turn-1 green-NPC beat (one
+  #    line, he walks in) and ALL his substance rides the TALK (EventScr_Ch3_Talk_NeimiColm).
+  #    We mirror that: the execution beat above is now RBG's alone; Trex's disavowal + boast +
+  #    deal MOVE to the talk. This fixes an ORDERING bug — a freely-timed talk recruit can't
+  #    put its intro in a fixed Brute-defeat cutscene (a player who talks to green Trex first
+  #    would recruit him BEFORE the cutscene "introduces" him, and his line would thank RBG for
+  #    an execution that hadn't happened). See decisions.md → Ch3 recruit-wiring ADR.
+  - trigger: trex_entrance     # light green-NPC beat (Colm's turn-1 pattern); rides the #23 Cutscenes item
+    type: cutscene
+    description: >
+      Trex's LIGHT entrance (Colm-style). He is the green, non-hostile kobold in the
+      galleries from turn 1; a brief beat delivers Pinky's telegraph — Trex waves, Pinky
+      wants to go say hello — cueing the player to walk a unit over and Talk. No history, no
+      deal here; that all rides the talk-recruit below. Pinky = our "Neimi" (the talk-recruit
+      telegraph). RBG's warm "little dragon" answer indulges his son and pre-welcomes the
+      friendly kobold on sight (kobolds revere dragons — lore/trex.md). Voice:
+      lore/{pinky,prof-rbg,trex}.md. PENDING: eventscript (rides the #23 Cutscenes item with
+      the opening/execution/ending beats).
+    script:                    # LOCKED 2026-07-09 (co-written with Nicolas)
+      # (Trex, green in the galleries, lifts a clawed hand in a careful little wave. Pinky,
+      #  delighted, tugs at the nearest grown-up — the telegraph teaching "talk to the green unit".)
+      - pinky: "He waved at me! Can we go say hello? Father, can we?"
+      - prof-rbg: "Welcome aboard, little dragon."
+  - trigger: talk_recruit      # ANY core party member Talks to green Trex → CUSA join (#23 item 2)
+    type: talk
+    recruits: trex             # inject_ch03 wires CHAR(flag, script, <each core member>, RENNAC) + CUSA(RENNAC)
+    description: >
+      The Trex recruit — his HEAVY dialogue, migrated here from the old RBG-execution beat
+      (2026-07-09, Nicolas). A unit Talks to green Trex → he introduces himself, disavows the
+      wild ones (framed as "the ones your bounty names" — accurate from turn 1 with zero kills,
+      and it ties to his people's trouble with the town), pitches the deal (kill the grell + a
+      place for his warren + every lock opens = the chapter's chests/doors lesson), and joins
+      (CUSA → blue). Recruiter = ANY core party member (non-missable — he's the army's only
+      thief; one CHAR entry per candidate, all → this one script). Trex rides the Rennac slot.
+      Voice: lore/trex.md §Voice. LOCKED 2026-07-09 (co-written with Nicolas).
+    script:                    # LOCKED 2026-07-09 (co-written with Nicolas)
+      # (Trex holds himself like he's addressing a court — the eloquence IS his pitch. He
+      #  disavows the wild ones as a feral splinter; the BOUNTY framing (Nicolas 2026-07-09)
+      #  is true whether or not the party has killed a single one yet.)
       - trex: >-
-          Ah — you've met the wild ones. They broke from my warren when the hunger came
-          up the deep. They drove your miners out; they've earned you every gold of that
-          bounty. Killing them, you do my people a service.
-      # (He introduces himself with a flourish — his one boast is the tongue he taught
-      #  himself from miners' ledgers, "a beat too proudly"; lore/trex.md §Voice.)
+          The wild ones — the ones your bounty names — broke from my warren when the hunger
+          came up the deep. They drove your miners out and fouled our name with the town.
+          Put them down, and you do my people a service.
+      # (His one boast: the tongue he taught himself, worn "a beat too proudly"; lore/trex.md §Voice.)
       - trex: >-
           I am Trex. Forgive the manner of speech — I taught myself your tongue from a
           miner's ledgers, a thousand nights by candle. It has its uses.
-      # (Then the deal: kill the grell AND win his warren a place in Termalaine — his real
-      #  subject is always his people's survival; the thief's offer = the chests/doors lesson.)
+      # (The deal: kill the grell AND win his warren a place in Termalaine — his real subject is
+      #  always his people's survival; the thief's offer carries the chests/doors lesson.)
       - trex: >-
           But the wild ones are the least of it. There is a thing in the deep, eating my
           people and yours — and I cannot fight it. Help me kill it, and win my warren a
           place in this town, and every lock in this mine opens for you. Its doors, its
           gems — yours.
-      # (Pinky = our "Neimi": the innocent telegraph teaching "talk to the green unit to
-      #  recruit". Mechanically the recruiter is ANY core party member; Pinky just cues it.
-      #  RBG answering his son with the welcome is peak paternal-warmth on-brand — lore/{pinky,prof-rbg}.md.
-      #  Braulo's old "he opens the locks, we take the mine — fair deal" settling line was CUT
-      #  2026-07-09 (Nicolas): Trex's own pitch already carries the thief-utility bark, and
-      #  Meesmickle's ending button now echoes it — answering Trex's "if you'll have a thief?".)
-      - pinky: "He waved at me! Can we go say hello? Father, can we?"
-      - prof-rbg: "Welcome aboard, little dragon."
   # (The standalone shaft_mouth_reached "pinky-scout" beat was RETIRED 2026-07-09: its
   #  RBG/Pinky two-hander + grell reveal folded into the chapter_start opening as Pinky's
   #  flyover recon. The grell is now visible at (14,1) from turn 1 (Bazba-style), so there

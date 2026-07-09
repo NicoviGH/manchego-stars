@@ -583,20 +583,36 @@ stat patching) still covers every recruit.
 - **Trex (ch03)** — a **Colm-style on-map TALK recruit**: placed GREEN, joins via `CUSA` when talked to
   (the vanilla `EventScr_Ch3_Talk_NeimiColm → CUSA(COLM)` pattern; `CHAR(flag, script, talker, target)`).
   Rides **Rennac** (donor Colm/Thief). He is the army's ONLY thief, so recruitment must be **non-missable**
-  and telegraphed **Joshua-style** (a hint line + FE8's auto Talk prompt). Talker: see the open decision
-  below. The `CHAR`+`CUSA`+hint-line wiring rides the ch03 event/cutscene pass (#23 item 4); until then
-  he stands green on the map and the availability filter gives him ch04+ prep.
+  and telegraphed **Joshua-style** (a hint line + FE8's auto Talk prompt). Talker = any core party member
+  (below). WIRED (#23 item 2, 2026-07-09): `inject_ch03` emits the `CHAR`-per-candidate list + the shared
+  `CUSA(CHARACTER_RENNAC)` script; the hint line rides the Cutscenes item. The availability filter gives
+  him ch04+ prep, and the `CUSA` join makes him persist naturally (no off-map join-LOAD).
 - **Lupin/Sahnar/Basil (ch04/ch05)** — wired per their YAML method when those slices land (not now).
 **A generic "recruit engine" that auto-registers a unit from its YAML was explicitly rejected** (Nicolas,
 2026-07-08): unit identity (slot/donor/portrait) is genuinely per-unit — vanilla has per-character tables
 too — and each recruit's join method differs, so a one-size engine is over-engineering. The reusable
 pieces are the availability filter + the vanilla `CUSA`/`CHAR` primitives, nothing more.
-**OPEN (talker for Trex):** recruit-able by **any core party member** (guarantees the always-force-deployed
-lord can, since a fixed recruiter is missable and a static `CHAR` entry can't name the *chosen* lord) —
-implemented as one talk entry per lord candidate → `CUSA(Trex)`. Alternative: restrict to the chosen lord.
-Pending Nicolas; lands with #23 item 4.
-_Decided: 2026-07-08 (Nicolas + CLAUDE; the #23 recruit pass — wired Baxby + Trex as the first two
-consumers; audit found Lupin/Sahnar/Basil in the same "authored-YAML, no unit" state, wired per-slice)._
+**Talker for Trex = ANY core party member** (RESOLVED — the only thief must be non-missable, and a static
+`CHAR` can't name the *chosen* lord). Implemented (`build_campaign.talk_recruiters`) as one
+`CHAR(flag, script, <candidate>, CHARACTER_RENNAC)` per field candidate — the ch03 blue roster
+(`cast_available_at(3)`) — all pointing at ONE shared recruit script (`talk_recruit_char_entries` +
+`talk_recruit_script`): completing any one talk runs `CUSA(CHARACTER_RENNAC)` (green→blue) and the shared
+flag disables the rest. FE8's own multi-recruiter idiom (cf. vanilla ch14a Rennac's two `CHAR` entries).
+Verified in-engine: `PT_HOST_CHAPTER=4 run.sh ch03talk` — park a candidate adjacent to green Trex, drive
+Talk → Trex leaves the green array and lands in blue (`blue[09]=0x1C`).
+
+**Entrance + recruit are DECOUPLED from the RBG-execution beat** (the vanilla Colm shape). Colm's on-map
+appearance is a LIGHT turn-1 green-NPC beat (one line); ALL his substance rides the Talk
+(`EventScr_Ch3_Talk_NeimiColm`) — there is no second cutscene that re-introduces him. We now match that:
+the ch03 RBG-execution beat is RBG's alone (+ Wolfram), and Trex's disavowal/boast/deal MOVED to the talk.
+**Why (the bug this fixes):** a freely-timed talk recruit and a fixed Brute-defeat cutscene fire in either
+order, so bolting Trex's introduction onto the execution beat let a player who talked to green Trex first
+recruit him *before* the cutscene "introduced" him — his line even thanked RBG for an execution that hadn't
+happened. The talk line is reframed to "the wild ones — the ones your bounty names" so it is accurate from
+turn 1 with zero kills (the bounty, not a kill count, is the town-trust thread). The light entrance beat
+(Pinky's telegraph + RBG's "little dragon") rides the #23 Cutscenes item with the other scripted beats.
+_Decided: 2026-07-08 (recruit model; Baxby + Trex the first two consumers) + 2026-07-09 (Nicolas + CLAUDE;
+#23 item 2 — talker=any-core-member RESOLVED, Colm-style decouple, talk-recruit wired + verified in-engine)._
 
 **Reward/item budget: a chapter's loot mirrors its `parity_reference` vanilla chapter — same as its enemies.**
 Just as `deploy_limit` and the enemy roster track the parity-reference chapter (§Field parity), so does
