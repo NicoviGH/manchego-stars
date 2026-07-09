@@ -3261,13 +3261,30 @@ scenarios.ch02baxby = function()
         emu:write16(baxby.addr + 0x1E, 0x2D08)
         log("Baxby was weaponless -> gave him an Iron Lance")
     end
-    shot("ch02baxby-deployed")
+    -- The engine only spawns a unit's STANDING map sprite during a sprite refresh
+    -- (RefreshUnitSprites, fired on phase transitions / menu exits, bmio.c) -- a memory-poked
+    -- deploy sets his position but never creates the sprite object. So make every enemy
+    -- frail+harmless (a safe enemy phase) and cycle ONE enemy phase back to player: that refresh
+    -- draws Baxby's real, injected map sprite (the same one ch03 renders) so the still shows him.
+    pokeFastConfig()   -- map-anim + fast so the refresh phase is quick
+    for i = 0, 23 do
+        local r = unitAt(SYM.gUnitArrayRed, i)
+        if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+    end
+    cursorTo(baxby.x, baxby.y); wait(20); shot("ch02baxby-deployed-presprite")
+    if runEnemyPhase(CH02_PARK) == "gameover" then
+        return result("FAIL", "unexpected game over during the sprite-refresh phase")
+    end
+    baxby = unitAt(SYM.gUnitArrayBlue, bidx)
+    if not baxby or isDead(baxby) then return result("FAIL", "Baxby was lost on the refresh phase") end
+    cursorTo(baxby.x, baxby.y); wait(40); shot("ch02baxby-on-map")   -- his sprite now renders
+    log(string.format("Baxby on the ch02 map with his sprite at (%d,%d)", baxby.x, baxby.y))
     -- 3. COMBAT proof: teleport him onto a tile within weapon reach of a live raider and attack.
     --    Frail+harmless every enemy first (1 HP, no counter power) so whichever foe he strikes is a
     --    clean, deterministic one-round kill he can't die to -- this is a WIRING proof (Baxby fights
     --    on the ch02 map), not a balance test. PASS = an enemy died to his strike AND he took his
     --    action (US_UNSELECTABLE), i.e. a real battle round resolved on the map.
-    pokeAnimsOn()
+    pokeAnimsOn()   -- full battle anim for the showcase strike
     local mn, mx = unitAttackRange(baxby)
     if not mn then return result("FAIL", "Baxby has no attacking weapon equipped") end
     for i = 0, 23 do
