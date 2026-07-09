@@ -4,26 +4,46 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-07-09, desktop — ch3 dialogue re-pass MERGED #147; generic cutscene recorder + branch cleanup #148 OPEN/green):**
-> **Ch3 dialogue re-pass (PR #147, SQUASH-MERGED):** re-passed the opening + RBG-execution/Trex-recruit beats on
-> the 2026-07-06 reframe. Pinky's shaft-scout **FOLDED INTO the opening** (he's the flier → a flyover recon; the
-> grell is visible at `(14,1)` from turn 1, Bazba-style; the standalone `shaft_mouth_reached` beat + its scripted
-> spawn/map-change are **retired**). Trex's entrance = feral-splinter disavowal + clear-our-name motive; **wings
-> DROPPED** (not in his portrait/map sprite → cut from the fiction incl. `lore/trex.md` + Meesmickle's ending
-> button; his hook is the self-taught eloquence). **Pinky = our "Neimi"** (the talk-recruit telegraph — the open
-> creative fork, RESOLVED). Canon fix **Maxol→Masthew** (book pp.93–94). `decisions.md` Ch3 ADR records all three.
-> This **LOCKS the cutscene text** that #23 items 2/4/5 wire; beats validated by YAML parse + drift (not host-wired yet).
+> **Last session (2026-07-09 #2, desktop — Ch3 Trex TALK-RECRUIT wired + verified; PR #150 OPEN/green, awaits Nicolas's `gh pr merge`):**
+> **#23 item 2 DONE — Trex talk-recruit (the vanilla Colm/Neimi pattern).** Trex stands GREEN; **ANY core party
+> member** who **Talks** to him flips him blue via `CUSA`. Talker-agnostic + non-missable: one
+> `CHAR(flag, script, <candidate>, CHARACTER_RENNAC)` per ch03 field candidate (`talk_recruiters` =
+> `cast_available_at(3)`), all → ONE shared recruit script (FE8's ch14a-Rennac multi-recruiter idiom). Wiring
+> repurposes dead ch4 symbols the host frees: **`EventScr_089F199C`** (was the Ch4 Turn-2 green script) + msg
+> **`0x9A5`** + **`EVFLAG_TMP(9)`**. New `build_campaign` helpers (all TDD, 6 tests): `char_symbol`,
+> `on_map_talk_recruits`, `talk_recruiters`, `talk_recruit_char_entries`, `talk_recruit_script`.
+> **VERIFIED IN-ENGINE:** `PT_HOST_CHAPTER=4 run.sh ch03talk` **PASS** — park a candidate adjacent to green Trex →
+> Talk (menu row 0) → Trex leaves the green array and lands in **`blue[09]=0x1C`**; the migrated dialogue (bounty
+> framing) renders. **Gotcha:** the `blue()` harness helper scans only 8 slots (ch00 party) — ch03 deploys 9+, so
+> a recruit lands at a higher index; scan the full array (`findUnit(gUnitArrayBlue, 20, …)`).
 >
-> **Generic cutscene recorder + branch cleanup (PR #148, SQUASH-MERGED):**
-> repackaged the per-scene `record*` recorders into ONE `recordCutscene(opts)` + an env-driven **`recordscene`** —
-> record ANY dialogue cutscene with no new Lua (`PT_STATE=<ckpt> PT_TAG=<tag> PT_UNTIL=prep|title|chapter`);
-> `recordch02intro` + `recordending` are one-line presets over it. **VERIFIED IN-ENGINE (3 PASS).** **mGBA IS
-> runnable here** (`tools/emulator/mGBA-dev.app` — run.sh auto-provisions it + builds checkpoints; `/opt/homebrew/bin/lua`
-> present) — running it caught 2 bugs `luac -p` can't: `os.getenv` is dead in mGBA's sandbox (config comes via
-> `PLAYTEST_*` wrapper globals injected by run.sh), and a Lua `local function` used **above** its definition
-> resolves to a nil global. Also salvaged the reusable `recordch02*` tooling from the stale `demo/ch2-gifs` branch
-> (its stale GIFs **dropped** — pre-date the ch2 name-leak fixes) and closed stale PR #130 (its
-> `fe8.triangleattack.com` vanilla-map-screenshot note → `docs/adding-a-chapter.md`).
+> **DECOUPLE (Nicolas):** Trex's entrance + recruit are split **OUT of** the RBG-execution cutscene. Colm's on-map
+> appearance is a LIGHT green-NPC beat and ALL his substance rides the Talk — no second cutscene re-introduces him.
+> So the ch03 **RBG-execution beat is now RBG's alone (+ Wolfram)**, and Trex's disavowal/boast/deal MOVED to the
+> talk. **Why (the bug it fixes):** a freely-timed talk recruit + a fixed Brute-defeat cutscene fire in either
+> order, so bolting Trex's intro onto the execution let a player who talked first recruit him *before* the cutscene
+> "introduced" him. Talk line reframed to *"the wild ones — the ones your bounty names"* (accurate from turn 1,
+> zero kills). ch03 YAML split into `trex_entrance` (light, Pinky telegraph + RBG "little dragon" — rides the
+> Cutscenes item) + `talk_recruit` (the wired substance). ADR in `decisions.md` → Recruit wiring.
+>
+> **Trex iron-sword fix:** he had no YAML `inventory:`, so `difficulty.py` read "no weapon" and modeled him as a
+> **staff healer (0 throughput)** — `make difficulty CH=ch03` showed `(staff)`. Added iron-sword to his YAML
+> inventory (**difficulty-only**: the `inventory` field is read solely by difficulty.py; in-game deploy kit still
+> comes from `CLASS_LOADOUT['CLASS_THIEF']`, unchanged). Now models as iron-sword w/ real throughput. **Confirmed
+> Trex gets Colm's PERSONAL bases + growths via the donor** (BASE/GROWTH/STAT_DONOR=COLM — NOT base-thief): bases
+> HP18/Pow4/Skl4/Spd10/Def3/Res1/Lck8, growths HP75/Pow40/Skl40/Spd65/Def25/Res20/Lck45. ch03 enemy parity
+> unchanged (threat ×1.12, clear-load ×0.99 vs vanilla FE8 Ch3). **Open note:** arming Trex bumped him into the
+> difficulty "best 9 fielded" for ch03 (over sclorbo) — the field-picker draws the full roster, so a recruit shows
+> in its join chapter; the binding **enemy** parity is unaffected. Optional follow-up: filter the party metric to
+> prep-availability (Trex as +1 bonus, not a deploy-slot swap).
+>
+> **Prior session (PRs #147 + #148, both SQUASH-MERGED):** #147 re-passed the ch03 opening + RBG-execution beats on
+> the 2026-07-06 reframe (Pinky's shaft-scout folded into the opening; grell visible turn 1; **wings dropped**;
+> Pinky = our "Neimi") — **LOCKED the cutscene text** the item-2/cutscene passes wire. #148 built the generic
+> **`recordscene`** recorder (`PT_STATE=<ckpt> PT_TAG=<tag> PT_UNTIL=prep|title|chapter` — record ANY cutscene, no
+> new Lua) — **the tool for the deferred ch03 cutscenes**. mGBA runnable here (`tools/emulator/mGBA-dev.app`;
+> `/opt/homebrew/bin/lua`); its sandbox has no `os.getenv` (config via `PLAYTEST_*` wrapper globals) and a Lua
+> `local function` used above its definition resolves to a nil global.
 
 > **Prior session (2026-07-08 #3, MERGED PR #146 — recruit-persist join-LOAD):** cutscene recruits now PERSIST —
 > `build_campaign.offmap_join_recruits(N)` LOADs off-map recruits (Baxby) on a free UnitDef (`088B476C`), blue,
@@ -164,7 +184,7 @@ ch03 recruit, added to #65**.
 + 3 descaled frames, one feature-flow branch per unit (or small batch), `custom_unit` issue template.
 - **Deferred polish (tracked):** braulo's white swing-arc weapon-trail → **#91**; goblin enemy class-level anim → **#90**.
 
-### Content — Ch3 "The Termalaine Mine" (#23) — HOSTED + WIN + ENEMY SPRITES + DIALOGUE DONE; recruit/prep/chain/cutscene-wiring/chests remain
+### Content — Ch3 "The Termalaine Mine" (#23) — HOSTED + WIN + ENEMY SPRITES + DIALOGUE + RECRUIT DONE; ⭐ prep-deploy + cutscene-wiring next; chain/chests/title/art remain
 Vanilla-FE8-Ch3 reskin as Termalaine's kobold-overrun tourmaline mine. Teaching goal = the **thief**
 (Trex = our Colm). Decisions: `decisions.md` → Ch3 ADR (four deviations + **item 4 = Defeat Boss**) + the
 ch03 YAML `design_notes` (2026-07-06 narrative reframe). **Live build checklist = #23 (the source of truth);
@@ -172,7 +192,7 @@ how-to for the host machinery = `docs/adding-a-chapter.md`.**
 - **DONE:** map painted + hosted on slot 4; **DefeatBoss WIN + `ch03win`** (PR #143); **Trex bust** (PR #142);
   **ALL enemy map sprites in-engine** — Wildling grunts (PR #144) + **Lizardzerker blade skirmisher + steel
   brute** on appended classes 0x80/0x81 (PR #145, audited via `enemycheck`). archer + thief + grell VANILLA.
-  **Recruit UNITS wired on `feat/23-trex-recruit-unit` (PR #146, OPEN — not merged):** reusable data-driven
+  **Recruit UNITS wired (PR #146, MERGED):** reusable data-driven
   recruit model (`decisions.md` → **Recruit wiring** ADR) — a recruit = a classed cast member + a
   `recruit.chapter`; `cast_available_at(N)` = founding + recruits recruited before N. **Trex** = real unit
   (Rennac slot, Colm donor) placed **GREEN** on the ch03 map (Colm-style talk recruit; joins via `CUSA` →
@@ -189,26 +209,36 @@ how-to for the host machinery = `docs/adding-a-chapter.md`.**
   `tools/playtest/run.sh ch02baxby` PASS — Baxby at `blue[8]=0x10` in the prep roster AND deployable +
   fighting on the ch02 map (killed a raider in melee). Existing `ch02` scenario still PASS (deploy cap 5).
   3 new unit tests (58 total green). Talk recruits (Trex) still self-join via `CUSA`.
-- **REMAINING (unchecked on #23, priority order):**
-  1. ✅ **DONE (this session, PR #147) — Ch3 DIALOGUE LOCKED.** Opening + RBG-execution/Trex-recruit beats
-     re-passed on the reframe (feral-splinter kobolds, clear-our-name motive, RBG executes a feral one); Pinky's
-     scout **folded into the opening** (grell visible turn 1); **wings dropped**; **Pinky = our "Neimi"** (the
-     talk-recruit hint line). The locked cutscene text lives in the ch03 YAML `script:` blocks — items 2/4/5 WIRE it.
-  2. **⭐ NEXT — Trex talk-recruit event** — `CHAR(flag, script, <every core-party candidate>, CHARACTER_RENNAC)`
-     + `CUSA(RENNAC)`. The hint line is LOCKED (Pinky's "He waved at me! Can we go say hello?" in the mid-map
-     beat); talker = ANY core party member. Trex's map sprite + bust are done — **NO wings anymore** (dropped #147).
-  3. **Real PREP deploy** — author `deployment.deploy_slots` (9 tiles) + a PREP CALL; today it's the static
-     fast-boot spawn (`CH03_SPAWN_POSITIONS` = `cast_available_at(3)` = 8 founding + Baxby), party WEAPONLESS
-     (`items='0'`). (The ch02 off-map join-LOAD pattern is the reference for how recruits ride the prep roster.)
-  4. **Chain ch02→ch03** — point ch02's ending `MNC2(0x4)` at ch03 (drop the ch02 dev-placeholder landing).
-  5. **Cutscenes wiring** — the dialogue text is **LOCKED (#147)**; wire the 3 beats (#58 opaque-box). Opening on
-     chapter_start (incl. Pinky's flyover scout); mid-map on the BRUTE (`kobold-steel`) defeat; replace the minimal
-     DefeatBoss ending with the real ending cutscene. New reusable tool: **`recordscene`** (record any cutscene,
-     #148) captures each beat as a GIF for motion review.
-  6. **Chests/doors** — per-chest **`17→29` TILECHANGE**; Trex opens, key-droppers back up.
-  7. **Title-card image** + full load-test scenarios `ch03`/`smoke_ch03`/`clear_ch03` (the `ch03win`/
+- **DONE (this session, PR #150 OPEN/green):** ✅ **item 2 — Trex TALK-RECRUIT** (green→blue via `CUSA`; talker =
+  any core party member; verified in-engine `ch03talk`) + the **decouple** (entrance/execution split; Trex's
+  substance moved to the Talk) + the **Trex iron-sword** difficulty fix. See the session block up top for detail.
+  Also DONE (PR #147): **Ch3 DIALOGUE LOCKED** — the 3 cutscene beats' text lives in the ch03 YAML `script:` blocks.
+- **REMAINING (unchecked on #23) — ⭐ the next two are the requested handoff targets:**
+  1. **⭐ NEXT-A — Real PREP deploy** (item 3). Author `deployment.deploy_slots` (9 tiles) in the ch03 YAML + wire a
+     **PREP CALL** in `inject_ch03`'s beginning scene (today it's the static `CH03_SPAWN_POSITIONS` fast-boot spawn,
+     party WEAPONLESS `items='0'`). **Reference impls in the SAME file:** `inject_ch01`/`inject_ch02` already emit a
+     PREP flow (`_deploy_cap_entries` + the deploy-cap template + the PREP CALL); the ch02 off-map join-LOAD
+     (`offmap_join_recruits` → Baxby before the PREP CALL) shows how a recruit rides the prep roster. **Cap is
+     already recruit-correct:** `deploy_limit: 9` over `cast_available_at(3)` (9 units, Trex EXCLUDED — he joins
+     mid-map on top, like vanilla Colm; included from ch04). Real equipping (`CLASS_LOADOUT`) lands with the prep
+     flow. Verify with a new/updated scenario that the prep screen opens + Pick Units fields the roster (cf.
+     `recordsupply`/`ch02` menu-driving).
+  2. **⭐ NEXT-B — Cutscene wiring** (the "Cutscenes" item). Text is **LOCKED** in the ch03 YAML `events:` blocks
+     (4 beats: `chapter_start` opening w/ Pinky's flyover scout; `midmap` RBG-execution-on-Brute-defeat — now
+     RBG+Wolfram ONLY, Trex removed; `trex_entrance` LIGHT beat — Pinky telegraph + RBG "little dragon"; `chapter_end`
+     ending). Wire each via the #58 opaque-box narration + the scene helpers (`_emit_scene_beats`/`_scenic_beat_calls`/
+     `_script_to_message` — the ch01/ch02 injectors are the pattern). **Use `dialogue-pass` skill** for any text
+     touch-ups and **`recordscene`** (PR #148: `PT_STATE=<ckpt> PT_TAG=<tag> PT_UNTIL=…`) to capture each beat as a
+     GIF for Nicolas's motion review (deliver via `docs/demo/`). BGs: **reference `bg_TargosWinter`, don't import**
+     (mid-map beats play on-map, no BG). The `talk_recruit` event is already wired (item 2) — don't re-wire it.
+  3. **Chain ch02→ch03** — point ch02's ending `MNC2(0x4)` at ch03 (drop the ch02 dev-placeholder landing); replace
+     the ch03 minimal DefeatBoss ending with the real ending cutscene once ch04 hosts (or park like ch02 until then).
+  4. **Chests/doors** — per-chest **`17→29` TILECHANGE**; Trex opens, key-droppers back up.
+  5. **Title-card image** + full load-test scenarios `ch03`/`smoke_ch03`/`clear_ch03` (the `ch03win`/`ch03talk`/
      `koboldview`/`enemycheck` scenarios seed these; a fair-play `clear_ch03` needs a `CA_BOSS` grell or a
      pid-targeted bot).
+  - **Optional polish:** the recruit talk renders in the **map speech bubble** (no portrait box), canonical for
+    on-map CHAR talks — switch to the full portrait box if Nicolas wants Trex's bust to show on recruit.
 - **Cutscene BGs DECIDED (Nicolas): reference, don't import** — reuse `bg_TargosWinter`; mid-map beats on-map.
 - Then chapters #24–#28 follow the same slice via `docs/adding-a-chapter.md`.
 
