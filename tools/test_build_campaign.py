@@ -99,6 +99,105 @@ class DonorMaps(unittest.TestCase):
         self.assertEqual(bc.GROWTH_DONOR['meesmickle'], 'CHARACTER_EWAN')
 
 
+class TrexRecruitCast(unittest.TestCase):
+    """Trex (ch03 recruit, #23) is a full classed cast member: a Thief riding the vanilla
+    Rennac slot, donoring from Colm, deployable so his vendored custom sprite renders."""
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def test_trex_rides_the_rennac_slot(self):
+        self.assertEqual(bc.PORTRAIT_MAP['trex'], 'Rennac')
+
+    def test_trex_donors_from_colm_for_stats_bases_and_growths(self):
+        self.assertEqual(bc.STAT_DONOR['trex'], 'CHARACTER_COLM')
+        self.assertEqual(bc.BASE_DONOR['trex'], 'CHARACTER_COLM')
+        self.assertEqual(bc.GROWTH_DONOR['trex'], 'CHARACTER_COLM')
+
+    def test_trex_resolves_as_a_thief_in_the_classed_cast(self):
+        cast = {uid: (slot, cls) for uid, slot, cls, _sms in bc.classed_cast(self.CAMPAIGN)}
+        self.assertEqual(cast['trex'], ('Rennac', 'CLASS_THIEF'))
+
+    def test_thief_loadout_and_testch_covers_the_whole_cast(self):
+        # inject_test_chapter needs a Thief loadout + one spawn tile per classed cast
+        # member (10 now: 8 founding + Baxby + Trex); both would sys.exit otherwise.
+        self.assertIn('CLASS_THIEF', bc.CLASS_LOADOUT)
+        allcast, _ = bc._classed_cast(self.CAMPAIGN)   # available_at=None -> everyone
+        self.assertEqual(len(allcast), 10)
+        self.assertGreaterEqual(len(bc.TEST_SPAWN_POSITIONS), len(allcast))
+        # ch03's blue field roster = cast_available_at(3); its deploy tiles must cover it.
+        field, _ = bc._classed_cast(self.CAMPAIGN, available_at=3)
+        self.assertGreaterEqual(len(bc.CH03_SPAWN_POSITIONS), len(field))
+
+    def test_trex_has_a_death_quote_and_a_dead_slot2_msg_id(self):
+        self.assertIn('trex', bc.PC_DEATH_QUOTE_MSGS)
+        unit = bc.load_unit(self.CAMPAIGN, 'trex')
+        self.assertTrue(unit.get('death_quote'))
+
+
+class RecruitAvailability(unittest.TestCase):
+    """The reusable, data-driven recruit model (#23): a recruit is a classed cast member
+    with a `recruit.chapter`; cast_available_at(N) puts it on the field from the chapter
+    AFTER it is recruited. Baxby (ch01 cutscene recruit) and Trex (ch03 talk recruit)."""
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def test_recruit_chapter_numbers(self):
+        for uid, want in (('baxby', 1), ('trex', 3)):
+            u = bc.load_unit(self.CAMPAIGN, uid)
+            self.assertEqual(bc.recruit_chapter_number(self.CAMPAIGN, u), want)
+
+    def test_founding_pc_has_no_recruit_chapter(self):
+        self.assertIsNone(bc.recruit_chapter_number(
+            self.CAMPAIGN, bc.load_unit(self.CAMPAIGN, 'braulo')))
+
+    def test_availability_climbs_with_the_chapters(self):
+        def ids(n):
+            return {u for u, *_ in bc._classed_cast(self.CAMPAIGN, available_at=n)[0]}
+        ch1, ch2, ch3, ch4 = ids(1), ids(2), ids(3), ids(4)
+        self.assertNotIn('baxby', ch1)              # recruited IN ch01 -> not on the ch01 field
+        self.assertIn('baxby', ch2)                 # on the field from ch02 (prep)
+        self.assertEqual(len(ch1), 8)               # the founding party
+        self.assertNotIn('trex', ch3)               # talk-recruited IN ch03 -> placed green, not prep
+        self.assertIn('trex', ch4)                  # on the prep roster from ch04
+        self.assertIn('baxby', ch3)
+
+    def test_baxby_is_a_cavalier_on_the_forde_slot_donoring_franz(self):
+        self.assertEqual(bc.PORTRAIT_MAP['baxby'], 'Forde')
+        self.assertEqual(bc.STAT_DONOR['baxby'], 'CHARACTER_FRANZ')
+        self.assertNotIn('baxby', bc.GUEST_PORTRAIT_MAP)   # promoted from cutscene-face to real unit
+        cast = {u: (s, c) for u, s, c, _ in bc.classed_cast(self.CAMPAIGN)}
+        self.assertEqual(cast['baxby'], ('Forde', 'CLASS_CAVALIER'))
+
+    def test_baxby_has_a_death_quote_and_a_dead_slot2_msg_id(self):
+        self.assertIn('baxby', bc.PC_DEATH_QUOTE_MSGS)
+        self.assertTrue(bc.load_unit(self.CAMPAIGN, 'baxby').get('death_quote'))
+
+    def test_offmap_recruit_joins_the_chapter_after_recruitment(self):
+        """The availability filter only SIZES the deploy cap; an off-map cutscene recruit
+        (Baxby) needs an explicit between-chapter join-LOAD to enter the saved party. It
+        fires the chapter AFTER recruitment, exactly once (#23 recruit-persist)."""
+        def ids(n):
+            return {u for u, *_ in bc.offmap_join_recruits(self.CAMPAIGN, n)}
+        self.assertEqual(ids(1), set())        # nobody is recruited before ch01
+        self.assertEqual(ids(2), {'baxby'})    # ch01 cutscene recruit joins the party at ch02
+        self.assertEqual(ids(3), set())        # already joined at ch02 -> no re-LOAD (no duplicate)
+
+    def test_offmap_join_excludes_on_map_talk_recruits(self):
+        """Trex is a Colm-style on-map talk recruit (recruit.via = story): he self-joins via
+        CUSA on the map and persists naturally, so he never needs an off-map join-LOAD."""
+        for n in range(1, 6):
+            self.assertNotIn('trex', {u for u, *_ in bc.offmap_join_recruits(self.CAMPAIGN, n)})
+
+    def test_offmap_join_recruit_carries_slot_and_class(self):
+        """The join-LOAD row needs the unit's slot + real/deploy class + level, like the cap."""
+        rows = bc.offmap_join_recruits(self.CAMPAIGN, 2)
+        baxby = next(r for r in rows if r[0] == 'baxby')
+        uid, slot, class_enum, deploy_class, level = baxby
+        self.assertEqual(slot, 'Forde')
+        self.assertEqual(class_enum, 'CLASS_CAVALIER')
+        self.assertIn(class_enum, bc.CLASS_LOADOUT)   # the join-LOAD arms him from CLASS_LOADOUT
+
+
 class LordFloorRows(unittest.TestCase):
     """The per-lord survivability-floor table (#45 3b) the build emits as gLordFloorDeltas[]
     and the engine applies once at chapter start (#45 3c). One (hp, def, res) row per lord

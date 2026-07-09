@@ -2,13 +2,20 @@
 # Class roster: docs/CLASSES.md (generated). Rationale: docs/decisions.md §Class Mapping.
 # Combat is vanilla FE (docs/decisions.md §Combat). damage_type labels are cosmetic.
 #
-# STATUS: design record. NOT yet wired into build_campaign (load_unit is explicit, so
-# this file is inert until the Baxby wiring lands: free character slot + recruit logic +
-# map-sprite injection + cutscene face). See HANDOFF.md "Wire Baxby".
+# STATUS: WIRED (#23 recruit pass). Baxby is a real classed cast member (PORTRAIT_MAP ->
+# Forde slot, STAT_DONOR -> Franz). Recruited by the ch01-ending cutscene (Marty wins him
+# over), so cast_available_at() puts him on the ch02+ prep roster automatically -- no on-map
+# recruit event (that's Trex's Colm-style talk recruit). His hand-painted custom map sprite
+# (map_sprites/baxby.png, cast palette) injects like every other 32x32 cast sprite -- same
+# base: Gargoyle / synth-MU pattern as braulo/wolfram/meesmickle (see art.map_sprite below).
 
 id: baxby
 name: Baxby
 # fe_name not needed — "Baxby" is 5 chars, well under FE8's 12-char name buffer.
+# Falls-in-battle quote (#6). Register from his ch01-ending recruit lines (ch01 YAML):
+# a gruff, dignified veteran teamster — "honest terms / hauled freight over this ice" —
+# so his death is a hauler's, framed as the load and the road, not sentiment.
+death_quote: "...Load's too heavy now. Get the sled home without me — that was always the job."
 
 # ── Recruit ──────────────────────────────────────────────────────────────────
 # Purchased at the Bryn Shander market for 200 GP (ch01 post_chapter); first recruit.
@@ -85,9 +92,10 @@ art:
     zoom: 0.88                        # max size with the whole beak clear of the dead corners
     hand_pass: null
     credit: "WotC book art (axe-beak) + Google Gemini; see CREDITS.md"
-  map_sprite:                         # map_sprites/baxby.png — hand-painted by Nicolas
-    base: Chocobo Rider (F) Lance {SkidMarc25}   # FE-Repo; rider+lance stripped, snowy recolor
-    size: 32x32
-    frames: 3                         # first 3 frames reused for idle + walk (Meesmickle pattern)
-    palette: cast                     # cast_palette.png (cast OBJ bank)
+  map_sprite:                         # map_sprites/baxby.png — hand-painted by Nicolas (cast palette)
+    base: Gargoyle                    # 32x32 3-frame geometry token (SAME as braulo/wolfram/meesmickle);
+                                      # geometry only, not the visible sprite. NOT the FE-Repo source name.
+    source: "Chocobo Rider (F) Lance {SkidMarc25}"   # FE-Repo pixels; rider+lance stripped, snowy recolor
+    footprint: 16x16                  # sprite frame is 32x32 but the mount reads party-scale
+    palette: cast                     # cast_palette.png (cast OBJ bank); synth MU (no committed _mu)
     credit: "FE-Repo Chocobo Rider {SkidMarc25}; see CREDITS.md"

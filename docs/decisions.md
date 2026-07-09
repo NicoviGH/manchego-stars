@@ -554,6 +554,50 @@ _Reconstructed: 2026-06-22 (CLAUDE, from the decomp field-growth curve at Nicola
 superseded the then-stale `roadmap.md` "roster stops growing at Ch5" line (roadmap since fixed); the
 original budget sweep was done in-session and never recorded, which this ADR fixes._
 
+**Recruit wiring: a recruit is a classed cast member + a `recruit.chapter`; availability is data-driven; each join uses vanilla primitives per its own method — NO generic recruit engine.**
+A recruitable unit is a full classed cast member — a `PORTRAIT_MAP` slot (a free vanilla character
+whose files it overwrites), a `STAT_DONOR`, a `death_quote` + a dead-slot-2 msg id, its class in
+`CLASS_MAP`/`CLASS_LOADOUT`, and a spawn tile per hosted chapter — exactly like a founding PC. The
+**only** thing that marks it a recruit is a `recruit.chapter:` in its YAML.
+**Prep availability is one shared, data-driven filter:** `build_campaign.cast_available_at(N)` =
+the founding party (no `recruit:` block) + every recruit whose `recruit.chapter` is *before* chapter
+N. So a recruit rides the prep/deploy roster from the chapter **after** it is recruited — which is the
+whole of the "recruits the whole cast; Pick Units deploys `deploy_limit`" model (§Recruit budget).
+`inject_ch0N` calls `_classed_cast(available_at=N)`; `available_at=None` (map sprites, death quotes,
+stat patching) still covers every recruit.
+**Each recruit's JOIN uses vanilla FE8 primitives, wired per its own method — do NOT generalize:**
+- **Baxby (ch01)** — an **off-map CUTSCENE recruit**: won over in the **ch01-ending cutscene** (Marty
+  wins him over) with no on-map unit. The availability filter puts him on the ch02+ prep roster, but the
+  filter only **sizes the deploy cap template** (which is never LOADed) — so it alone does NOT put him in
+  the saved party. He therefore gets an explicit **between-chapter join-LOAD**: `inject_ch02` LOADs him
+  (a free vanilla-Ch3 UnitDef symbol, blue, on a walkable tile) in the beginning scene **before the PREP
+  CALL**, so Pick Units lists him and he persists forward like any deployed unit. This is the general rule
+  for any off-map recruit — `build_campaign.offmap_join_recruits(N)` returns the recruits newly available
+  at chapter N whose `recruit.via` is **not** an on-map talk (`story`/`talk`); each gets a join-LOAD its
+  first chapter on the roster (empirically verified: `run.sh ch02baxby` — Baxby at `blue[8]=0x10`,
+  deployable and fighting on the ch02 map). His YAML `via: market` / `cost_gp: 200` is **cutscene flavor,
+  not a purchase mechanic** (there is no buy-a-unit UI; §Recruit budget: the cast is recruited by story,
+  Pick Units deploys). Rides the vanilla **Forde** slot (donor Franz/Cavalier); his hand-painted axe-beak
+  map sprite injects on the standard 32x32 cast pattern (`base: Gargoyle` geometry token + synth MU, like
+  braulo/wolfram/meesmickle).
+- **Trex (ch03)** — a **Colm-style on-map TALK recruit**: placed GREEN, joins via `CUSA` when talked to
+  (the vanilla `EventScr_Ch3_Talk_NeimiColm → CUSA(COLM)` pattern; `CHAR(flag, script, talker, target)`).
+  Rides **Rennac** (donor Colm/Thief). He is the army's ONLY thief, so recruitment must be **non-missable**
+  and telegraphed **Joshua-style** (a hint line + FE8's auto Talk prompt). Talker: see the open decision
+  below. The `CHAR`+`CUSA`+hint-line wiring rides the ch03 event/cutscene pass (#23 item 4); until then
+  he stands green on the map and the availability filter gives him ch04+ prep.
+- **Lupin/Sahnar/Basil (ch04/ch05)** — wired per their YAML method when those slices land (not now).
+**A generic "recruit engine" that auto-registers a unit from its YAML was explicitly rejected** (Nicolas,
+2026-07-08): unit identity (slot/donor/portrait) is genuinely per-unit — vanilla has per-character tables
+too — and each recruit's join method differs, so a one-size engine is over-engineering. The reusable
+pieces are the availability filter + the vanilla `CUSA`/`CHAR` primitives, nothing more.
+**OPEN (talker for Trex):** recruit-able by **any core party member** (guarantees the always-force-deployed
+lord can, since a fixed recruiter is missable and a static `CHAR` entry can't name the *chosen* lord) —
+implemented as one talk entry per lord candidate → `CUSA(Trex)`. Alternative: restrict to the chosen lord.
+Pending Nicolas; lands with #23 item 4.
+_Decided: 2026-07-08 (Nicolas + CLAUDE; the #23 recruit pass — wired Baxby + Trex as the first two
+consumers; audit found Lupin/Sahnar/Basil in the same "authored-YAML, no unit" state, wired per-slice)._
+
 **Reward/item budget: a chapter's loot mirrors its `parity_reference` vanilla chapter — same as its enemies.**
 Just as `deploy_limit` and the enemy roster track the parity-reference chapter (§Field parity), so does
 the REWARD footprint — by **channel** (village / chest / shop / boss-drop) and **tier** (consumable →
@@ -758,8 +802,10 @@ _Decided: 2026-06-10 (decomp trace, ch01 slice)_
 ch02 rides the *next* vanilla slot after ch01 (slot 2 → slot 3, `CHAPTER_L_3`), reached by
 ch01's ending `MNC2(0x3)` (was the dev placeholder). Three ways it diverges from `inject_ch01`,
 all because the slice is mid-campaign rather than the cast's first chapter:
-(1) **Party persists** — no cast join-LOAD; the saved roster carries over and the prep flow
-fields 5 of it (cap = `UnitDef_Event_Ch3Ally` entry count). (2) **No lord-select** — the lead was
+(1) **Party persists** — no *founding-cast* join-LOAD; the saved roster carries over and the prep
+flow fields 5 of it (cap = `UnitDef_Event_Ch3Ally` entry count). The one exception is an **off-map
+recruit** who joined in a cutscene and was never a unit (Baxby, ch01 ending): he gets a small
+between-chapter join-LOAD before PREP so he enters the saved party — see the Recruit-wiring ADR. (2) **No lord-select** — the lead was
 chosen in ch01; the flag-driven `IsCharacterForceDeployed_` hook auto-force-deploys it in *any*
 later chapter with zero per-chapter wiring (only `CauseGameOverIfLordDies`, already vanilla in
 `EventListScr_Ch3_Misc`, is needed). (3) **DefeatAll, not Seize** — the slot-3 host `goal` is

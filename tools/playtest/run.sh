@@ -8,6 +8,8 @@
 #   (harness.lua's `scenarios` table is the authoritative full list)
 #   ch02   -- ch2 (#22) ENTRY assertions off the ch02start checkpoint: 3 green chwinga on the
 #             field, party at the deploy cap, the archer (fliers-vs-bows debut) + boss present.
+#   ch02baxby -- (#23 recruit-persist) prove Baxby (the ch01-ending cutscene recruit) persists into
+#             ch02: in the prep roster AND deployable + fighting on the ch02 map (force-deploy + strike).
 # Stability scenarios (PASS/FAIL liveness over a run):
 #   smoke | smoke_ch01   -- idle the party; catch crashes/soft-locks (#49)
 #   smoke_ch02           -- the same net on ch02 (loads ch02start; catches a cutscene soft-lock)
@@ -145,7 +147,7 @@ case "$SCENARIO" in
     recordfix)    BUILDER=ckpt_prep;      CKPT=prep ;;
     recordrbg)    BUILDER=ckpt_rbgch01;   CKPT=rbgch01 ;;
     # ch02 (#22) scenarios LOAD the ch02start state (the real ch00->ch01->ch02 chain, paid once).
-    ch02|smoke_ch02|clear_ch02) BUILDER=ckpt_ch02start; CKPT=ch02start ;;
+    ch02|smoke_ch02|clear_ch02|ch02baxby) BUILDER=ckpt_ch02start; CKPT=ch02start ;;
 esac
 if [ -n "$BUILDER" ]; then
     if [ ! -f "$STATE_DIR/$CKPT.ss" ] || [ "$(cat "$STATE_DIR/$CKPT.romhash" 2>/dev/null || true)" != "$ROMHASH" ]; then
