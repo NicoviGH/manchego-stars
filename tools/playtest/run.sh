@@ -36,8 +36,13 @@
 #                    Env: PT_STATE=<checkpoint> PT_TAG=<frametag> PT_UNTIL=prep|title|chapter
 #                    [PT_SPEED=normal|fast] [PT_MAXFRAMES=6000] [PT_PRESSEVERY=60] [PT_SHOTEVERY=4]
 #                      PT_STATE=ch02intro PT_TAG=intro PT_UNTIL=prep tools/playtest/run.sh recordscene
-#                    The named record* cutscene scenarios below are thin wrappers over this.
-#   recordending  -- the ch01 "Rolling Cheddar" outro cutscene (frames tagged "end")
+#                    ONE loop (recordCutscene in harness.lua) does the work. recordending and
+#                    recordch02intro are named PRESETS over it (a checkpoint + fixed params).
+#                    The rest are NOT cutscene recorders and stay separate: recordopening /
+#                    recordch01 replay a lead-in instead of loading a checkpoint; scenes /
+#                    record / recordch01trail / recordch02map / recordch02combat drive gameplay
+#                    (boot, unit moves, combat) -- different tools, not duplication.
+#   recordending  -- the ch01 "Rolling Cheddar" outro cutscene (frames tagged "end"); preset over recordscene
 #   recordprep    -- the Preparations + Pick Units deploy screen (frames "prep")
 #   recordrbg     -- RBG's custom battle anim ("rbg"); loads the rbgch01 checkpoint
 #   recordanim    -- ANY cast member's battle anim on a `make TESTCH=1` ROM: New Game boots
@@ -116,6 +121,13 @@ PLAYTEST_SEED = "${PT_SEED:-1}"
 PLAYTEST_CHAR = "${PT_CHAR:-}"
 PLAYTEST_HOST_CHAPTER = ${PT_HOST_CHAPTER:-1}
 PLAYTEST_LLMDIR = "$LLM_DIR"
+PLAYTEST_STATE = "${PT_STATE:-}"
+PLAYTEST_TAG = "${PT_TAG:-}"
+PLAYTEST_UNTIL = "${PT_UNTIL:-}"
+PLAYTEST_SPEED = "${PT_SPEED:-}"
+PLAYTEST_MAXFRAMES = "${PT_MAXFRAMES:-}"
+PLAYTEST_PRESSEVERY = "${PT_PRESSEVERY:-}"
+PLAYTEST_SHOTEVERY = "${PT_SHOTEVERY:-}"
 dofile("$HERE/harness.lua")
 EOF
     rm -f "$REPO/fireemblem8u/fireemblem8.sav"   # fresh save: New Game is the default path
