@@ -3397,6 +3397,10 @@ def inject_prologue(campaign, verbose=True, montage=False):
     # not the host's. Point slot 0 at the host's card (recomposed in step 4a);
     # slot 0 is never loaded as a chapter, so only this menu metadata matters.
     settings['chapters'][PROLOGUE_CHAPTER_INDEX]['chapTitleId'] = host['chapTitleId']
+    # fadeToBlack=1: the intro ends on black, not a map fade-in (see _retarget_host_chapter) --
+    # our opening is a BG cutscene (the BeginningScene BACGs), so the vanilla map fade-in would
+    # FLASH the map first. Slot 1 shipped with fadeToBlack=0; set it so the prologue matches.
+    host['fadeToBlack'] = 1
     with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=2)
 
@@ -3861,7 +3865,12 @@ def _emit_scene_beats(lines, msg_ids, beats, fid, home, overrides=None,
                  '(%d overrides, %d preloads) for msgs %s' %
                  (len(beats), len(overrides), len(preloads), msg_ids))
     for msg_id, beat, override, preload in zip(msg_ids, beats, overrides, preloads):
-        w = width if width is not None else (28 if _beat_is_narration(beat) else 42)
+        # Faced scene beats render via _scenic_beat_calls -> Text() -> a TALK BUBBLE (PutTalkBubble),
+        # NOT a full-screen box -- and a bubble line over 29 tiles hits the unclamped x = 29 - width
+        # < 0 branch and overflows off the right edge (the ch03 crier "...pays fifty gold to whoever
+        # cle|" bug). So faced beats must wrap at the map-bubble 29 (the entrance line already does);
+        # narration keeps the 28 that fits the auto-centered SOLOTEXTBOXSTART.
+        w = width if width is not None else (28 if _beat_is_narration(beat) else 29)
         set_message_body(lines, msg_id, _script_to_message(
             beat, _stage_beat(beat, fid, home, override), width=w, preload=preload))
 
@@ -3924,6 +3933,13 @@ def _retarget_host_chapter(host_index, goal_slot, goal_type, goal_err, indices,
                         'objAnimId': 0, 'paletteAnimId': 0, 'changeLayerId': 0})
     host['goal'] = dict(goal)
     host['prepScreenNumber'] = chapter_number * 2
+    # fadeToBlack=1: the chapter INTRO ends on BLACK instead of fading the battle map in
+    # (ChapterIntro_LoopFadeToMap, chapterintrofx.c:916 -- fadeToBlack takes the SetDispEnable
+    # black branch, else it blends the map in). Our openings are BG cutscenes (the BeginningScene
+    # BACGs), so the vanilla map fade-in just FLASHES the map for a beat before the BACG. This is
+    # the vanilla mechanism for cutscene-opening chapters (slots 2/3 already ship with it; slot 4
+    # did not -> ch03's opening map flash). Set for every hosted chapter so none flash.
+    host['fadeToBlack'] = 1
     with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=2)
     return host
@@ -4661,7 +4677,9 @@ def inject_ch01(campaign, verbose=True):
         '    ENUN\n'
         '    LOAD1(0x1, UnitDef_088B440C) /* the company signs on at the Northlook */\n'
         '    ENUN\n'
-        '    FADU(16) /* reveal the trail map (cf. vanilla Ch4) */\n'
+        # NO FADU here: the shared prep prologue (EventScr_08591F64) fades to black itself before
+        # drawing Preparations, so revealing the freshly-LOMA'd map first only FLASHES it for a
+        # beat before prep blanks it. Vanilla prep chapters go straight into CALL(prep). Stay black.
         '    CALL(EventScr_08591FD8) /* preparations (PREP, event cmd 0x3E) */\n'
         '    ENUT(8)\n'
         '    EVBIT_T(7)\n'
@@ -5199,7 +5217,8 @@ def inject_ch02(campaign, verbose=True):
          % CH02_HOST_INDEX)
         + recruit_load +
         '    ENUN\n'
-        '    FADU(16) /* reveal the battle map */\n'
+        # NO FADU here: the prep prologue (EventScr_08591F64) fades to black before drawing
+        # Preparations, so revealing the map first only FLASHES it. Stay black into CALL(prep).
         '    CALL(EventScr_08591FD8) /* preparations (PREP, event cmd 0x3E) -- cap 5 */\n'
         '    ENUT(8)\n'
         '    EVBIT_T(7)\n'
@@ -5352,7 +5371,10 @@ CH03_ITEM_IDS = {'iron-axe': 'ITEM_AXE_IRON', 'hand-axe': 'ITEM_AXE_HANDAXE',
 # ch01 recruit). Trex is NOT here -- he is a Colm-style TALK recruit placed GREEN on the map
 # (CH03_TREX_GREEN_POS), joining via CUSA when a party member talks to him (that CHAR talk +
 # its line ride the ch03 event/cutscene pass, #23 item 4). cast_available_at gives him ch04+ prep.
-CH03_TREX_GREEN_POS = (10, 6)   # mid-galleries: Trex sits green (unrecruited) until talked to
+CH03_TREX_GREEN_POS = (2, 4)    # Colm's tile: our map is a 1:1 17x16 retile of vanilla Ch3 (Borgo),
+                                # where green Colm walks to (2,4) on the upper-left ledge (spawns 0,5)
+                                # -- UnitDef_088B4718/REDA_088B456C. Trex mirrors the recruit, so he
+                                # stands green on the same ledge the party naturally reaches to Talk.
 # Two free vanilla Ch4 UnitDef tables (defined in events_udefs.c, referenced nowhere but
 # themselves -> safe to repurpose, like the enemy table 088B4A80): one holds Trex GREEN
 # (always LOADed, the on-map talk-recruit); the other is the DEBUG-BOOT party seed (the
@@ -5570,6 +5592,13 @@ def inject_ch03(campaign, boot=False, verbose=True):
              + town_calls +
              '    REMA /* clear the town portraits before the cut */\n'
              '    FADI(16) /* fade the street out */\n'
+             # BACG (EventShowTextBgDirect) only DECOMPRESSES a new BG when activeTextType is
+             # REMOVEPORTRAITS/_1A22 (eventscr.c:1316) -- every other mode returns EVC_ERROR and
+             # loads nothing. The town Text() beats above expand to TEXTSTART, which left
+             # activeTextType == TEXTSTART, so a bare 2nd BACG was a no-op (stale town BG stayed
+             # in VRAM). Re-arm the load mode first -- the vanilla multi-BG idiom (ch17a: every
+             # BACG rides a REMOVEPORTRAITS-mode scene). Faded to black, so no visible pop.
+             '    REMOVEPORTRAITS /* re-arm BACG BG-load mode (Text() beats reset it to TEXTSTART) */\n'
              '    BACG(%s) /* CUT to the mine interior -- empty, no PCs */\n'
              '    FADU(16)\n'
              % CH03_OPENING_MINE_BG
@@ -5585,7 +5614,11 @@ def inject_ch03(campaign, boot=False, verbose=True):
              + '    LOAD1(0x1, UnitDef_088B4A80) /* the vanilla-Ch3-parity enemies */\n    ENUN\n'
              + seed_load +
              '    LOAD1(0x1, %s) /* Trex -- green talk-recruit (Colm-style) */\n    ENUN\n'
-             '    FADU(16) /* reveal the battle map */\n'
+             # NO FADU here: the shared prep prologue (EventScr_08591F64) fades to black itself
+             # before drawing Preparations, so revealing the freshly-LOMA'd battle map first only
+             # FLASHES it for a beat before prep blanks it again. Vanilla prep chapters (ch10a/ch13a)
+             # go straight from the cutscene into CALL(prep) -- the map is first shown after Fight!,
+             # never before prep. Stay black (the cutscene FADI above) straight into prep.
              '    CALL(%s) /* preparations (PREP, event cmd 0x3E) -- cap 9, lord force-deployed */\n'
              '    ENUT(8)\n'
              '    EVBIT_T(7)\n'
@@ -5630,18 +5663,12 @@ def inject_ch03(campaign, boot=False, verbose=True):
     with open(CH4_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
         f.write(script)
 
-    # 4. Texts: chapter title (status/prep banner) + the grell's death quote. The grell has no
-    #    portrait yet (#23 Art), so its line renders FACELESS (stage business, (open, None)) -- a
-    #    reframe-neutral shriek, so it's safe to wire ahead of the cutscene dialogue-pass. Body from
-    #    the chapter YAML (single source of truth); asterisks are the YAML's stage-direction marks.
-    grell = next(e for e in chap['enemy_units'] if e.get('is_boss'))
-    shriek = grell['death_quote'].strip().strip('*').strip()
-    shriek = shriek[0].upper() + shriek[1:] if shriek else shriek
+    # 4. Texts: chapter title (status/prep banner). The grell's death quote was CUT (Nicolas): it
+    #    has no portrait, so the faceless line rendered boxless + unreadable -- the DefeatBoss win now
+    #    fires silently off the grell's flagged gDefeatTalkList entry (step 5, .msg = 0).
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
     set_message_body(lines, host['chapTitleTextId'], name_message_body(chap['title']))
-    set_message_body(lines, CH03_BOSS_DEATH_MSG, _script_to_message(
-        [{'grell': shriek}], {'grell': ('[OpenMidRight]', None)}))
     # Trex talk-recruit body (#23 item 2): his migrated pitch (chapter YAML talk_recruit event,
     # single source of truth), faced on the Rennac slot. One speaker -> one [OpenX] block with
     # page breaks; the recruit script (EventScr_089F199C) TEXTSHOWs it before the CUSA.
@@ -5661,17 +5688,18 @@ def inject_ch03(campaign, boot=False, verbose=True):
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 
-    # 5. The grell's flagged defeat quote -> head of gDefeatTalkList (first-match scan wins, so this
-    #    head entry keys the DefeatBoss win to the grell's raw pid; no vanilla 0xb7 entry to shadow).
-    #    .flag = EVFLAG_DEFEAT_BOSS is what fires the win (CA_BOSS alone sets nothing -- eventinfo.c
-    #    SetPidDefeatedFlag runs for ANY unit with a matching gDefeatTalkList entry on death).
+    # 5. The grell's flagged gDefeatTalkList entry keys the DefeatBoss win to its raw pid (first-match
+    #    scan wins; no vanilla 0xb7 entry to shadow). .flag = EVFLAG_DEFEAT_BOSS is what fires the win.
+    #    .msg = 0: NO death quote (the grell has no portrait, so the faceless line rendered boxless +
+    #    unreadable; Nicolas cut it). The engine still sets the flag -- DisplayDefeatTalkForPid only
+    #    shows the quote `if (ent->msg != 0)` but SetPidDefeatedFlag runs regardless (eventinfo.c:595).
     quote = ('    {\n'
-             '        .pid     = %s, /* grell (ch03 boss) death quote sets the DefeatBoss flag */\n'
+             '        .pid     = %s, /* grell (ch03 boss): silent defeat -> DefeatBoss flag, no quote */\n'
              '        .route   = CHAPTER_MODE_ANY,\n'
              '        .chapter = CHAPTER_L_4, /* ch03 is hosted on chapter slot 4 */\n'
              '        .flag    = EVFLAG_DEFEAT_BOSS,\n'
-             '        .msg     = 0x%X, /* faceless shriek body (grell death_quote, step 4) */\n'
-             '    },' % (CH03_BOSS_PID, CH03_BOSS_DEATH_MSG))
+             '        .msg     = 0, /* no death quote (faceless -> unreadable; removed) */\n'
+             '    },' % CH03_BOSS_PID)
     _prepend_defeat_quote(quote)
 
     if verbose:
@@ -5923,6 +5951,19 @@ def inject_battle_platforms(campaign, verbose=True):
     rough_arr = 'CONST_DATA s8 BanimTerrainGround_Tileset15[] = {%s\n};\n\n' % rough_body
     dt = dt.replace('CONST_DATA s8 BanimTerrainGroundDefault[] = {',
                     rough_arr + 'CONST_DATA s8 BanimTerrainGroundDefault[] = {', 1)
+    # Tileset16 = CAVE (ch03 Termalaine mine). Unlike snow, this uses EXISTING VANILLA platforms:
+    # the mine floor -> siroyuka1 (the vanilla neutral STONE ground, battle_terrain_table[20], so
+    # ground value 21) and rock walls/cliffs -> gake1 (table[4], value 5). No PNG/append/FE-Repo
+    # pull needed. NOTE the vanilla convention is value == table_index + 1 (the consumer subtracts
+    # 1); do NOT copy the snow base+offset idiom here.
+    def _cave_body(default_body):
+        return _re.sub(
+            r'\[TERRAIN_(\w+)\]\s*=\s*-?\d+,',
+            lambda mm: '[TERRAIN_%s] = %d,' % (mm.group(1), 5 if mm.group(1) in _PLAT_ROUGH else 21),
+            default_body)
+    cave_arr = 'CONST_DATA s8 BanimTerrainGround_Tileset16[] = {%s\n};\n\n' % _cave_body(m.group(2))
+    dt = dt.replace('CONST_DATA s8 BanimTerrainGroundDefault[] = {',
+                    cave_arr + 'CONST_DATA s8 BanimTerrainGroundDefault[] = {', 1)
     with open(DATA_TERRAINS_C, 'w', encoding='utf-8') as f:
         f.write(dt)
 
@@ -5931,6 +5972,7 @@ def inject_battle_platforms(campaign, verbose=True):
         vh = f.read()
     vh = vh.replace('extern CONST_DATA s8 BanimTerrainGround_Tileset01[];',
                     'extern CONST_DATA s8 BanimTerrainGround_Tileset15[];\n'
+                    'extern CONST_DATA s8 BanimTerrainGround_Tileset16[];\n'
                     'extern CONST_DATA s8 BanimTerrainGround_Tileset01[];', 1)
     with open(VARIABLES_H, 'w', encoding='utf-8') as f:
         f.write(vh)
@@ -5939,6 +5981,7 @@ def inject_battle_platforms(campaign, verbose=True):
     bp = bp.replace(
         '    case 0:\n    default:\n        return BanimTerrainGroundDefault[terrain];',
         '    case 0x15:\n        return BanimTerrainGround_Tileset15[terrain];\n\n'
+        '    case 0x16:\n        return BanimTerrainGround_Tileset16[terrain];\n\n'
         '    case 0:\n    default:\n        return BanimTerrainGroundDefault[terrain];', 1)
     with open(BANIM_BATTLEPARSE_C, 'w', encoding='utf-8') as f:
         f.write(bp)
@@ -5947,6 +5990,7 @@ def inject_battle_platforms(campaign, verbose=True):
     with open(CHAPTER_SETTINGS_JSON_PLAT, encoding='utf-8') as f:
         cs = _json.load(f)
     cs['chapters'][2]['battleTileSet'] = 0x15
+    cs['chapters'][CH03_HOST_INDEX]['battleTileSet'] = 0x16  # ch03 cave -> siroyuka1 stone (Tileset16)
     with open(CHAPTER_SETTINGS_JSON_PLAT, 'w', encoding='utf-8') as f:
         _json.dump(cs, f, indent=2)
 
@@ -5954,6 +5998,7 @@ def inject_battle_platforms(campaign, verbose=True):
         print('  %d platforms -> battle_terrain_table[%d..%d] (FE-Repo {Cynon}, F2E)'
               % (len(BATTLE_PLATFORMS), base, base + len(BATTLE_PLATFORMS) - 1))
         print('  terrain->ground: Default=snow-open (Snowdrift); Tileset15=snow-rough; Ch1->0x15')
+        print('  Tileset16=CAVE (vanilla siroyuka1 stone / gake1 rock); ch03->0x16')
 
 
 def main():

@@ -84,6 +84,34 @@ def write_mp4(frames, out, fps, scale):
         shutil.rmtree(seqdir, ignore_errors=True)
 
 
+def write_gif_ffmpeg(frames, out, fps, scale):
+    """Fast, high-quality GIF via ffmpeg palettegen/paletteuse (one shared palette,
+    no dither -- clean for pixel art). PIL's save_all delta+full double-encode plus
+    the decode-back self-check is O(frames^2)-ish and stalls for MINUTES past a few
+    hundred frames; ffmpeg does the same clip in seconds. Frames are sparse-numbered
+    (tag-filtered), so symlink them into a contiguous %04d seq first (cf. write_mp4)."""
+    import shutil
+    import tempfile
+    seqdir = tempfile.mkdtemp(prefix='makegif-seq-')
+    try:
+        for i, f in enumerate(frames):
+            os.symlink(os.path.abspath(f), os.path.join(seqdir, '%04d.png' % i))
+        vf = ('scale=iw*%d:ih*%d:flags=neighbor,split[a][b];'
+              '[a]palettegen=stats_mode=full[p];[b][p]paletteuse=dither=none'
+              % (scale, scale))
+        cmd = ['ffmpeg', '-y', '-framerate', '%g' % fps,
+               '-i', os.path.join(seqdir, '%04d.png'), '-vf', vf, out]
+        subprocess.run(cmd, check=True,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    finally:
+        shutil.rmtree(seqdir, ignore_errors=True)
+
+
+def _have_ffmpeg():
+    from shutil import which
+    return which('ffmpeg') is not None
+
+
 def _shared_palette(imgs):
     """One palette for the whole clip. A GBA clip usually has <=256 unique colors
     total, so the palette is exact (lossless); busier clips get a mediancut over a
@@ -151,6 +179,10 @@ def main(argv):
     ap.add_argument('--mp4', action='store_true',
                     help='encode an H.264 .mp4 via ffmpeg instead of a .gif '
                          '(smaller, no quantization artifacts)')
+    ap.add_argument('--ffmpeg', action='store_true',
+                    help='force the fast ffmpeg palettegen GIF path (default for >300 frames)')
+    ap.add_argument('--pil', action='store_true',
+                    help='force the PIL delta-encode GIF path (small, but slow past a few hundred frames)')
     ap.add_argument('--open', action='store_true', dest='do_open')
     a = ap.parse_args(argv)
 
@@ -183,11 +215,20 @@ def main(argv):
         imgs.append(im)
 
     out = os.path.join(a.out, name + '.gif')
-    data, how = encode_gif(imgs, int(1000 / a.fps))
-    with open(out, 'wb') as f:
-        f.write(data)
-    print('wrote %s (%d frames, %.0f fps, %dx scale, %s encoding, %d KB)'
-          % (out, len(imgs), a.fps, a.scale, how, len(data) // 1024))
+    # ffmpeg palettegen is seconds; PIL's delta+full+decode-check stalls for minutes
+    # past a few hundred frames. Default to ffmpeg for big clips (falls back to PIL if
+    # ffmpeg is missing); --pil forces the PIL delta path, --ffmpeg forces ffmpeg.
+    use_ffmpeg = a.ffmpeg or (not a.pil and len(frames) > 300)
+    if use_ffmpeg and _have_ffmpeg():
+        write_gif_ffmpeg(frames, out, a.fps, a.scale)
+        print('wrote %s (%d frames, %.0f fps, %dx scale, ffmpeg palettegen, %d KB)'
+              % (out, len(frames), a.fps, a.scale, os.path.getsize(out) // 1024))
+    else:
+        data, how = encode_gif(imgs, int(1000 / a.fps))
+        with open(out, 'wb') as f:
+            f.write(data)
+        print('wrote %s (%d frames, %.0f fps, %dx scale, %s encoding, %d KB)'
+              % (out, len(imgs), a.fps, a.scale, how, len(data) // 1024))
 
     if a.do_open:
         subprocess.run(['open', '-a', 'Safari', out], check=False)

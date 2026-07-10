@@ -281,6 +281,18 @@ local function moveUnit(fx, fy, tx, ty)
     press(K.A)
     wait(10) -- movement range now shown
     if not cursorTo(tx, ty) then press(K.B); return false end
+    if fx == tx and fy == ty then
+        -- No-move (act in place): the single confirm-A gets EATEN while the move-range display is
+        -- still animating in when the cursor is already on the tile (no travel delay). Retry A until
+        -- the command menu actually opens, checking BEFORE each press so we never over-advance into
+        -- a menu row. (This is the ch03talk/ch03win/ch03prep driver-pacing regression -- a longer
+        -- opening left less settle time; the retry makes the no-move select robust.)
+        for _ = 1, 10 do
+            if menuOpen() then return true end
+            press(K.A); if waitFor(menuOpen, 14) then return true end
+        end
+        press(K.B); press(K.B); return false
+    end
     press(K.A)
     if waitFor(menuOpen, 40) then return true end
     press(K.B); press(K.B)
@@ -2477,6 +2489,31 @@ scenarios.mapshot = function()
     return result("PASS", "map deployed; screenshots taken")
 end
 
+-- MAPFULL: capture the WHOLE chapter map + units at their starting positions by panning the cursor
+-- over a grid of tiles and screenshotting at each camera clamp; the camera pixel-scroll (gBmSt.camera
+-- @ +0x0C/+0x0E) is baked into each frame's tag so make_gif/stitch_map.py can paste each 240x160
+-- shot at its exact map offset. Fresh CH03BOOT New Game; clears the turn-1 entrance cutscene first.
+scenarios.mapfull = function()
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    waitFor(function()
+        return faction() == 0 and not menuOpen()
+           and not procActive(SYM.ProcScr_StdEventEngine)
+           and not procActive(SYM.ProcScr_BattleEventEngine)
+    end, 900, true)
+    local n = 0
+    for _, cy in ipairs({ 0, 8, 15 }) do
+        for _, cx in ipairs({ 0, 8, 16 }) do
+            cursorTo(cx, cy)
+            wait(24) -- let the camera glide + clamp settle
+            local camx = ru16(SYM.gBmSt + 0x0C)
+            local camy = ru16(SYM.gBmSt + 0x0E)
+            n = n + 1
+            shot(string.format("mapfull-%02d-cx%03d-cy%03d", n, camx, camy))
+        end
+    end
+    return result("PASS", "full-map grid captured (" .. n .. " tiles)")
+end
+
 -- RECORDOPENING: boot -> title -> START -> New Game, then record the #43 opening montage
 -- (Frostmaiden lore crawl + Ten Towns world-map tour) to confirm it plays + doesn't crash.
 scenarios.recordopening = function()
@@ -3650,6 +3687,179 @@ end
 -- New Game (no checkpoint) up to the Preparations screen. Frames tagged "ch03open" -> make_gif.
 scenarios.recordch03open = function()
     return recordCutscene({ tag = "ch03open", until_ = "prep", pressEvery = 90 })
+end
+
+-- recordch03talk: the Trex TALK-RECRUIT in motion (#23 Cutscenes) -- green Trex standing on the
+-- ch03 map, a party member Talks to him, the migrated bounty dialogue plays, and the CUSA flips
+-- him GREEN -> BLUE (cast OBJ palette). Same park-adjacent dance as the ch03talk PASS/FAIL test,
+-- but films densely (every 3 frames) through the beat for a GIF. Fresh CH03BOOT New Game.
+scenarios.recordch03talk = function()
+    if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
+    local CHAR_TREX = 0x1C -- CHARACTER_RENNAC (Trex rides the Rennac slot)
+    local function blueTrex() return findUnit(SYM.gUnitArrayBlue, 20, CHAR_TREX) end
+    local trex = findUnit(SYM.gUnitArrayGreen, 12, CHAR_TREX)
+    if not trex then return result("FAIL", "green Trex (0x1C) not found in the green array") end
+    local rec = blue(0x01)
+    if not rec then return result("FAIL", "leader (0x01) not deployed") end
+    -- Park the recruiter on a free tile orthogonally adjacent to green Trex (setMapUnit keeps the
+    -- occupancy grid in sync so Talk-adjacency reads with no phase cycle -- the ch03talk trick).
+    local rgrid = mapUnitAt(rec.x, rec.y)
+    local parked = false
+    for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+        local tx, ty = trex.x + d[1], trex.y + d[2]
+        if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0 then
+            setMapUnit(rec.x, rec.y, 0)
+            emu:write8(rec.addr + 0x10, tx); emu:write8(rec.addr + 0x11, ty)
+            setMapUnit(tx, ty, rgrid)
+            parked = true
+            break
+        end
+    end
+    if not parked then return result("FAIL", "no free tile adjacent to Trex to park the recruiter") end
+    pokeNormalConfig(); pokeAnimsOn()
+    -- Clear the turn-1 entrance cutscene so we have real control (cf. recordch03win).
+    waitFor(function()
+        return faction() == 0 and not menuOpen()
+           and not procActive(SYM.ProcScr_StdEventEngine)
+           and not procActive(SYM.ProcScr_BattleEventEngine)
+    end, 900, true)
+    -- 1. Frame GREEN Trex on his ledge before the talk.
+    cursorTo(trex.x, trex.y)
+    for f = 1, 60 do if f % 3 == 0 then shot("ch03talk") end yield() end
+    -- 2. Talk: open the recruiter's command menu (Talk = row 0) and film the migrated dialogue
+    --    through to the CUSA flip.
+    rec = blue(0x01)
+    waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
+    -- Robust select-in-place (the confirm-A is eaten by the move-range anim when the cursor is
+    -- already near -- same fix as the grell attack): retry A until the command menu opens.
+    if not cursorTo(rec.x, rec.y) then return result("FAIL", "cursor could not reach the recruiter") end
+    press(K.A); wait(15)
+    local opened = false
+    for _ = 1, 10 do
+        if menuOpen() then opened = true break end
+        press(K.A); if waitFor(menuOpen, 14) then opened = true break end
+    end
+    if not opened then return result("FAIL", "no command menu for the recruiter") end
+    press(K.A, 4) -- Talk (row 0)
+    -- The migrated recruit dialogue is several pages; advance to the end-of-script CUSA. Budget
+    -- generously (the whole multi-page talk) and press A often enough to page past typewritering.
+    for i = 1, 1400 do
+        if i % 3 == 0 then shot("ch03talk") end
+        if blueTrex() then break end
+        if i % 16 == 0 then press(K.A, 3) end -- advance the dialogue pages
+        yield()
+    end
+    if not blueTrex() then return result("FAIL", "Trex never flipped blue (CUSA did not fire)") end
+    for f = 1, 40 do if f % 3 == 0 then shot("ch03talk") end yield() end -- linger on the flip
+    -- 3. The CUSA changes Trex's FACTION, but his standing MAP SPRITE only redraws to the blue
+    --    party palette on a RefreshUnitSprites (phase transition) -- so cycle one phase, then frame
+    --    him again to SHOW the green->blue party-palette sprite (the sprite we painted).
+    cursorTo(trex.x, trex.y)
+    for f = 1, 24 do if f % 3 == 0 then shot("ch03talk") end yield() end
+    runEnemyPhase() -- end turn -> enemy phase -> back to player: triggers the sprite refresh
+    local bt = blueTrex()
+    if bt then cursorTo(bt.x, bt.y) else cursorTo(trex.x, trex.y) end
+    for f = 1, 90 do if f % 3 == 0 then shot("ch03talk") end yield() end -- Trex now blue on the map
+    return result("PASS", "ch03 talk-recruit recorded (green -> blue, sprite refreshed)")
+end
+
+-- recordch03win: the grell/mogall's DEATH + the ending cutscene in motion (#23 Cutscenes). Same
+-- park-the-grell-adjacent + scripted-kill dance as the ch03win PASS/FAIL test, but films densely:
+-- the leader's battle animation, the grell's death, its flagged defeat quote (EVFLAG_DEFEAT_BOSS),
+-- then the DefeatBoss ending cutscene (RBG's bounty over the Termalaine square BG -> title). A
+-- bounded A-cadence advances the ending text beats but stops the instant the title proc appears
+-- (mashing at "Press START" would boot a spurious New Game). Fresh CH03BOOT New Game.
+scenarios.recordch03win = function()
+    if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
+    if not red(0xb7) then return result("FAIL", "grell (pid 0xb7) not found in the red array") end
+    local leader = blue(0x01)
+    if not leader then return result("FAIL", "leader (0x01) not deployed") end
+    emu:write16(leader.addr + 0x1E, 0x2D1F) -- Iron Axe in items[0]: guaranteed in-range kill weapon
+    pokeAnimsOn()
+    -- The longer opening + the turn-1 Trex ENTRANCE cutscene (TURN(1) event) hold control past
+    -- bootToMap; until it clears, moveUnit can't open a command menu (the driver-pacing regression
+    -- the handoff flags). Advance (tapping A) until genuine player control returns.
+    waitFor(function()
+        return faction() == 0 and not menuOpen()
+           and not procActive(SYM.ProcScr_StdEventEngine)
+           and not procActive(SYM.ProcScr_BattleEventEngine)
+    end, 900, true)
+    for f = 1, 20 do if f % 3 == 0 then shot("ch03win") end yield() end -- settle on the map
+    -- Park the frail'd grell on a free tile adjacent to the leader (no other foe near the left
+    -- entrance) so the attack target is unambiguously the grell. Re-park each attempt in case a
+    -- whiff or the grell's AI move disturbs it (mirrors the ch03win PASS/FAIL retry).
+    local function parkGrell()
+        local g = red(0xb7)
+        if not g or isDead(g) then return false end
+        pokeFrail(g); g = red(0xb7)
+        local ggrid = mapUnitAt(g.x, g.y)
+        for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+            local tx, ty = leader.x + d[1], leader.y + d[2]
+            if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0 then
+                setMapUnit(g.x, g.y, 0)
+                emu:write8(g.addr + 0x10, tx); emu:write8(g.addr + 0x11, ty)
+                setMapUnit(tx, ty, ggrid)
+                return true
+            end
+        end
+        return false
+    end
+    -- Attack + FILM the battle anim. moveUnit lands on the command menu; then A(Attack) ->
+    -- A(weapon) -> A(target) starts combat. CRUCIAL: pressing A DURING an FE8 battle anim SKIPS
+    -- it, so we must NOT press once combat starts -- just screenshot every frame while it plays.
+    -- The hit lands late in the anim (grell -> dead); we film the death collapse, THEN tap A to
+    -- clear the EXP/result screen (chooseAttack's greyed+tapA terminator both skips the anim AND
+    -- fires before it renders, which is why the first cut missed the whole kill).
+    local function filmedAttack()
+        leader = blue(0x01)
+        if not cursorTo(leader.x, leader.y) then return end
+        press(K.A); wait(15)         -- select the leader; the move-range display animates in
+        -- Confirm on the leader's own tile (no move) to open the command menu. A SINGLE confirm-A
+        -- gets eaten while the range display is still settling (the ch03win regression: enemy
+        -- poked, actor at rest, cursor already there so no travel delay) -- so retry A until the
+        -- menu actually opens, checking BEFORE each extra press so we never over-advance into it.
+        local opened = false
+        for _ = 1, 10 do
+            if menuOpen() then opened = true break end
+            press(K.A); if waitFor(menuOpen, 14) then opened = true break end
+        end
+        if not opened then press(K.B); press(K.B); return end
+        press(K.A); wait(8); press(K.A); wait(8); press(K.A) -- Attack -> weapon -> target -> combat
+        local deadAt = nil
+        for i = 1, 900 do
+            if i % 2 == 0 then shot("ch03win") end
+            if not deadAt and (isDead(red(0xb7)) or eventFlag(2)) then deadAt = i end
+            if deadAt then
+                if i > deadAt + 200 then break end                 -- ~200f tail: death + defeat quote
+                if i > deadAt + 70 and i % 10 == 0 then press(K.A, 2) end -- clear EXP AFTER the death anim
+            end
+            yield()
+        end
+    end
+    for turn = 1, 3 do
+        if isDead(red(0xb7)) or eventFlag(2) then break end
+        if not parkGrell() then return result("FAIL", "no free tile adjacent to the leader for the grell") end
+        cursorTo(leader.x, leader.y)
+        for f = 1, 30 do if f % 3 == 0 then shot("ch03win") end yield() end -- frame the standoff
+        filmedAttack()
+        if isDead(red(0xb7)) or eventFlag(2) then break end
+        -- a whiff: run the enemy phase (filming) and retry next player turn
+        for f = 1, 40 do if f % 4 == 0 then shot("ch03win") end yield() end
+        if runEnemyPhase() == "gameover" then return result("FAIL", "unexpected game over") end
+    end
+    if not (isDead(red(0xb7)) or eventFlag(2)) then
+        return result("FAIL", "could not kill the grell in 3 turns")
+    end
+    -- Film the defeat quote + the DefeatBoss ending cutscene. Advance text with a bounded
+    -- A-cadence, breaking the instant the title proc appears (mashing there boots a New Game).
+    local presses = 0
+    for i = 1, 2600 do
+        if i % 3 == 0 then shot("ch03win") end
+        if procActive(SYM.gProcScr_TitleScreen) then break end
+        if i % 24 == 0 and presses < 14 then press(K.A, 3); presses = presses + 1 end
+        yield()
+    end
+    result("PASS", "ch03 grell death + ending recorded")
 end
 
 -- recordch02map: pan the cursor across the ch02 map (NW deploy + the 3 green chwinga -> the
