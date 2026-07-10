@@ -2089,6 +2089,18 @@ session state. `HANDOFF.md` points here._
   `inject_backgrounds`). **Color index 0 is TRANSPARENT** — using it for a real colour → black holes;
   `bg_to_fe8.py` reserves it. **Only slot 0x36 is free before `BG_RANDOM` (0x37).** Verify event BGs
   **in-engine** (flat preview won't show the holes).
+- **Cutscene faces: `Text()` self-`REMA`s (clears ALL portraits); to hold one speaker while another
+  exits, author raw + a per-podium `[ClearFace]`.** `Text(msg)` = `TEXTSTART TEXTSHOW TEXTEND REMA`
+  (`Convo_Helpers.h`), so every beat fades out every face at its end. For a "one speaker leaves mid-scene,
+  a co-speaker holds through a pause" beat (ch03 opening: Pinky scouts, RBG waits at the mine mouth):
+  emit **raw `TEXTSTART/TEXTSHOW/TEXTEND` (no `REMA`)** and append **`[OpenX][ClearFace]`** to that beat's
+  message body — `[ClearFace]` fades only `faces[activeFaceSlot]` (`scene.c`), leaving the others up.
+  The next beat's `Text()` opens with `TEXTSTART`; because `Event1A_TEXTSTART` skips its face-clear when
+  the sub-type **equals the still-active** type (`subcode == proc->activeTextType`), the held face carries
+  through and its re-`[LoadFace]` early-returns on the occupied slot (`TalkLoadFace`, no reflicker). Hook:
+  `_script_to_message(trailing=...)` / `_emit_scene_beats(trailings=[...])`. There is **no event-level
+  single-face-remove command** — only `REMA` (all) and `FACE_SHOW`/`EvtDisplayFace` (add one); the
+  per-face *fade-out* is a message text-code, not an event opcode. Verify in-engine (`recordch03open`).
 - **Location-card nameplate caps at ~96px** — >~12–14 chars clip silently. Keep `location_card:` short.
 - **Vanilla character-slot display names leak** unless the injector overrides it:
   `set_message_body(vanilla_name_text_id(slot), name_message_body(display_name(unit)))`. Give units a short `fe_name` (≤12).

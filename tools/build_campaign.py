@@ -784,7 +784,8 @@ def _term_pad(body):
     return body
 
 
-def _script_to_message(script, staging, width=29, face_budget=4, preload=None):
+def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
+                       trailing=None):
     """Render a chapter-YAML cutscene `script:` block as an FE8 message body.
 
     Mirrors the vanilla shape (cf. MSG_910/911): faces are loaded lazily at a
@@ -832,6 +833,12 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None):
     event script (or split into separate messages), not the message body, and are
     skipped here. `width` is the wrap width (29 = map speech bubble; ~42 for a
     full-screen scenic BG -- see _wrap_fe_lines).
+
+    `trailing` is a raw text-code string appended just before the [X] terminator --
+    e.g. '[OpenMidLeft][ClearFace]' to fade ONLY that podium's face at the beat's
+    end (scene.c: StartFaceFadeOut on faces[activeFaceSlot]), leaving the others up.
+    The one low-level face control the podium auto-manager doesn't infer: a speaker
+    who exits mid-scene while a co-speaker holds (the ch03 Pinky-scout -> RBG waits).
     """
     blocks = []   # (speaker, [page, ...]); page = 'line1[LF]\nline2'
     for entry in script:
@@ -878,7 +885,7 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None):
             live[open_tag] = speaker
             lru.append(open_tag)
         parts.append(body)
-    return '\n'.join(parts) + '[X]'
+    return '\n'.join(parts) + (trailing or '') + '[X]'
 
 
 def _beat_is_narration(beat):
@@ -3852,19 +3859,23 @@ def _stage_beat(beat, fid, home, overrides=None):
 
 
 def _emit_scene_beats(lines, msg_ids, beats, fid, home, overrides=None,
-                      preloads=None, width=None):
+                      preloads=None, width=None, trailings=None):
     """Write one message per scenic beat (staging via _stage_beat, body via
     _script_to_message). width=None picks per beat: faceless-narration beats ride
     the opaque, auto-centered SOLOTEXTBOXSTART box (#58) wrapped at the on-map 28
     (42 overflows the centered box); faced beats use the full-screen scenic 42.
-    A fixed width (e.g. 42) overrides for scenes with no narration beats."""
+    A fixed width (e.g. 42) overrides for scenes with no narration beats.
+    `trailings` (parallel to beats) appends a raw text-code to a beat's body -- see
+    _script_to_message's `trailing` (the single-face-exit fade)."""
     overrides = overrides or [None] * len(beats)
     preloads = preloads or [None] * len(beats)
-    if not (len(overrides) == len(preloads) == len(beats)):
+    trailings = trailings or [None] * len(beats)
+    if not (len(overrides) == len(preloads) == len(trailings) == len(beats)):
         sys.exit('ERROR: scene staging lists out of step with its %d beats '
-                 '(%d overrides, %d preloads) for msgs %s' %
-                 (len(beats), len(overrides), len(preloads), msg_ids))
-    for msg_id, beat, override, preload in zip(msg_ids, beats, overrides, preloads):
+                 '(%d overrides, %d preloads, %d trailings) for msgs %s' %
+                 (len(beats), len(overrides), len(preloads), len(trailings), msg_ids))
+    for msg_id, beat, override, preload, trailing in zip(
+            msg_ids, beats, overrides, preloads, trailings):
         # Faced scene beats render via _scenic_beat_calls -> Text() -> a TALK BUBBLE (PutTalkBubble),
         # NOT a full-screen box -- and a bubble line over 29 tiles hits the unclamped x = 29 - width
         # < 0 branch and overflows off the right edge (the ch03 crier "...pays fifty gold to whoever
@@ -3872,7 +3883,8 @@ def _emit_scene_beats(lines, msg_ids, beats, fid, home, overrides=None,
         # narration keeps the 28 that fits the auto-centered SOLOTEXTBOXSTART.
         w = width if width is not None else (28 if _beat_is_narration(beat) else 29)
         set_message_body(lines, msg_id, _script_to_message(
-            beat, _stage_beat(beat, fid, home, override), width=w, preload=preload))
+            beat, _stage_beat(beat, fid, home, override), width=w, preload=preload,
+            trailing=trailing))
 
 
 # Vendored tileset -> _register_tileset label stem. A chapter map's tileset comes
@@ -5578,8 +5590,18 @@ def inject_ch03(campaign, boot=False, verbose=True):
     # Split the beat calls around the BG cut: A-B over the town, C-E inside the mine.
     town_calls = _scenic_beat_calls(CH03_OPENING_MSGS[:2], op_beats[:2], labels[:2])
     sign_call = _scenic_beat_calls(CH03_OPENING_MSGS[2:3], op_beats[2:3], labels[2:3])   # SOLOTEXTBOXSTART sign
-    scout_call = _scenic_beat_calls(CH03_OPENING_MSGS[3:4], op_beats[3:4], labels[3:4])  # Pinky scouts out
     return_call = _scenic_beat_calls(CH03_OPENING_MSGS[4:5], op_beats[4:5], labels[4:5])  # Pinky returns
+    # Beat D (Pinky scouts) is RAW TEXTSTART/SHOW/END -- NOT the Text() macro, whose trailing
+    # REMA fades ALL portraits (why RBG used to vanish for the pause). No REMA here: RBG's face
+    # persists (Pinky's own portrait fades at the beat's end via a trailing [ClearFace] in the
+    # message body -- see CH03_OPENING_TRAILINGS). The over-long STAL(90) then holds on RBG alone
+    # (he watches the dark; Nicolas 2026-07-10). Beat E's Text() re-opens with TEXTSTART, which
+    # equals the still-active TEXTSTART type -> Event1A_TEXTSTART skips its face-clear, so RBG
+    # carries through un-reloaded (TalkLoadFace early-returns on the occupied slot -- no reflicker)
+    # while Pinky fades back in white-faced. Its trailing REMA then clears both into the FADI.
+    scout_raw = ('    TEXTSTART\n'
+                 '    TEXTSHOW(0x%X) /* %s */\n'
+                 '    TEXTEND\n' % (CH03_OPENING_MSGS[3], labels[3]))
     seed_load = ('    LOAD1(0x1, %s) /* boot: found an armed party so PREP can pick (--ch03-boot) */\n'
                  '    ENUN\n' % CH03_BOOT_SEED_SYMBOL) if boot else ''
     begin = ('{\n'
@@ -5603,9 +5625,8 @@ def inject_ch03(campaign, boot=False, verbose=True):
              '    FADU(16)\n'
              % CH03_OPENING_MINE_BG
              + sign_call            # the KOBOLDS ONLY sign over the empty cave (#58 opaque box)
-             + scout_call +         # Pinky scouts: "I'll look ahead" / RBG / "Straight back!"
-             '    REMA /* Pinky wings off into the dark -- portraits fade out */\n'
-             '    STAL(90) /* the over-long tension pause on the empty cave (RBG watches) */\n'
+             + scout_raw +          # Pinky scouts: "I'll look ahead" / RBG / "Straight back!" (RAW, no REMA)
+             '    STAL(90) /* over-long tension pause -- Pinky winged off, RBG holds at the mouth */\n'
              + return_call +        # Pinky fades back in, white-faced: "it looked at me" / RBG "Form up"
              '    FADI(16) /* fade the mine cutscene out */\n'
              '    SVAL(EVT_SLOT_B, 0x0) /* map camera origin for the reload */\n'
@@ -5680,7 +5701,13 @@ def inject_ch03(campaign, boot=False, verbose=True):
     # entrance line (map-bubble wrap 29). Speakers resolve through cut_fid (cast busts + the crier
     # mug + faceless narration). RBG anchors mid-right in the opening + entrance (op_home).
     set_message_body(lines, CH03_OPENING_CARD_MSG, name_message_body(op_card))
-    _emit_scene_beats(lines, CH03_OPENING_MSGS, op_beats, cut_fid, op_home)
+    # Beat D (Pinky scouts, index 3) fades ONLY Pinky at its end so RBG holds through the STAL(90)
+    # pause (Nicolas 2026-07-10). Pinky sits at the _stage_beat default podium ([OpenMidLeft] --
+    # op_home anchors only prof-rbg, to [OpenMidRight]); the trailing [ClearFace] there fades his
+    # portrait out, RBG's untouched. Pairs with scout_raw (no trailing REMA) in the event script.
+    op_trailings = [None, None, None, '[OpenMidLeft][ClearFace]', None]
+    _emit_scene_beats(lines, CH03_OPENING_MSGS, op_beats, cut_fid, op_home,
+                      trailings=op_trailings)
     set_message_body(lines, CH03_ENDING_CARD_MSG, name_message_body(end_card))
     _emit_scene_beats(lines, CH03_ENDING_MSGS, end_beats, cut_fid, {})
     set_message_body(lines, CH03_TREX_ENTRANCE_MSG, _script_to_message(
