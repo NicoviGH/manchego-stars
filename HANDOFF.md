@@ -4,43 +4,55 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-07-09 #4, desktop — Ch3 CUTSCENE WIRING (NEXT-B): opening/entrance/ending + Wolfram fix + sustainable BG-append infra + mine BG vendored; WIP mid-scene BG swap NOT rendering. Branch `feat/23-ch03-cutscenes` pushed (commit 89c1a55), NO PR — not merge-ready. DEBUG the swap in a fresh systematic-debugging pass.):**
-> **DONE + verified in-engine** (`recordch03open` PASS, `PT_HOST_CHAPTER=4` CH03BOOT=1): the **opening** (chapter_start),
-> **Trex's turn-1 entrance** (Colm light-beat pattern, on-map), and the **ending** (chapter_end → dev-placeholder landing)
-> cutscenes are wired via the ch01/ch02 scene helpers (`_split_event_beats`/`_emit_scene_beats`/`_scenic_beat_calls`/
-> `_make_fid`). Speakers: cast busts via `PORTRAIT_MAP`; `narration`→faceless #58 opaque box; the boy-crier rides a
-> generic villager mug (`CH03_CRIER_FID = [FID_VillagerYoungBoy]`). Msg ids ride the dead Ch4 cutscene block 0x9A6–0x9B9
-> (git-verified dead: referenced only by the replaced Ch4 scripts). Turn-1 entrance reuses the dead Village script
-> `EventScr_089F1B38`; ending reuses `EventScr_089F19F8`.
-> **Wolfram text BUG FIXED** (Nicolas caught it): the KOBOLDS-ONLY sign was crammed into Wolfram's talk bubble → a
-> `GetStrTalkLen` width-merge bug (cramped 2-word box). Fix = give narration its OWN beat (all-narration →
-> `SOLOTEXTBOXSTART` opaque box). **Rule:** narration must NEVER share a beat with a faced speaker. Verified: Wolfram
-> renders full-width, sign is its own box.
-> **`Masthew` verified CANON** (book scan p.93 = "Oarus Masthew"; the prior wrong "Maxol" was already corrected —
-> `decisions.md` §680). Book scan: `references/References/icewind-dale-rime-of-the-frostmaidenpdf_compress.pdf`
-> (image-only → `pdftoppm -r 110 -png`, PDF page = printed+1).
-> **SUSTAINABLE BG-append infra** (Nicolas's call — append, don't shove): campaign event BGs now append PAST the
-> `BG_RANDOM` sentinel (0x38+) with harmless placeholder table rows at 0x36/0x37 keeping gConvoBackgroundData
-> index==enum contiguous — the same "append into free enum space, never disturb a vanilla slot" model as the
-> class/enemy slots (0x80+). `CAMPAIGN_BG_SLOT0 = 0x38`; verified injecting + building (`BG_MS_TARGOS_WINTER=0x38`,
-> `BG_MS_TERMALAINE_MINE=0x39`). Note TargosWinter renumbered 0x36→0x38 (transparent, name-based).
-> **Mine BG vendored:** FE7 `Cave.png` from FE-Repo (`BGs, Interface Elements/Background CGs/FE7 BG's/Cave.png`) →
-> `bg_to_fe8.py --fit crop` → `campaigns/.../backgrounds/bg_TermalaineMine.png` (2 banks, 29 colours). Renders clean.
+> **Last session (2026-07-10, desktop→remote — Ch3 CUTSCENE POLISH pass on `feat/23-ch03-cutscenes`. Committed `1bd8e26`
+> + pushed (NO PR yet). Opening GIF at `docs/demo/ch03-opening.gif` — GitHub blob renders it inline. TWO items still
+> OPEN: the opening MAP FLASH + the Pinky-scout staging — a fresh instance should take those next.):**
+> **BG SWAP FIXED** (the prior session's ⭐ blocker): `BACG` (`EventShowTextBgDirect`, eventscr.c:1316) only DECOMPRESSES
+> a new BG when `proc->activeTextType` is `REMOVEPORTRAITS`/`_1A22`; the town `Text()` beats left it in `TEXTSTART`, so the
+> 2nd `BACG(mine)` was a silent no-op (stale town stayed in VRAM). Fix = re-arm with `REMOVEPORTRAITS` before the 2nd BACG
+> (the vanilla ch17a multi-BG idiom). Verified in-engine + Nicolas watched.
+> **PREP MAP-FLASH FIXED (ch01/ch02/ch03):** dropped the `FADU`-reveal before `CALL(prep)` — the shared prep prologue
+> (`EventScr_08591F64`) self-fades, so revealing the freshly-LOMA'd map first only flashed it. Now black→prep.
+> **CRIER TEXT OVERFLOW FIXED:** faced scene beats render as talk BUBBLES (`_scenic_beat_calls`→`Text()`→PutTalkBubble,
+> ≤29), NOT full-screen — a >29 line hits the unclamped `x = 29 - width < 0` branch and runs off the right edge. Fixed
+> `_emit_scene_beats` faced default 42→29 (systemic). Box now bounded.
+> **BGs (Nicolas iterated):** town `{Zeldacrafter}` source was 256×160 with cols 240-255 BLACK PADDING → old center-crop
+> landed it as an 8px right strip; re-cropped to the real 240 content. Cave redone from the genuine FE7-native `Cave.png`
+> (256×160, mine-mouth, NO LANCZOS/zoom/banding). THEN both zoomed **~7.7%** (center-crop 222×148→NEAREST 240×160) so
+> content bleeds to all 4 edges — kills the ENGINE-rendered right-edge black (the asset+TSA were already full-width;
+> the black was the rightmost display column). Verified in-game: town right cols 84-121 (non-black). `bg_to_fe8.py`
+> LANCZOS→NEAREST. Cave = 4 banks/58 colours (within limits).
+> **CAVE BATTLE PLATFORM FIXED:** the combat platform was default PURPLE (cave terrain unwired). Added a Cave ground array
+> (`BanimTerrainGround_Tileset16`) mapping mine floor→vanilla `siroyuka1` STONE (value 21) / rock walls→`gake1` (5);
+> `ch03 battleTileSet→0x16` (inject_battle_platforms). Verified stone in the grell battle.
+> **TREX REPOSITIONED (10,6)→(2,4):** research CONFIRMED our `ch03-the-termalaine-mine.mar` is a **1:1 17×16 retile of
+> vanilla Ch3 (Borgo)** (`Ch3Map.json`); green Colm spawns (0,5) → walks to standing tile **(2,4)** (`UnitDef_088B4718`/
+> `REDA_088B456C`). Grell already matches Bazba at (14,1). Trex now stands green on Colm's ledge. `CH03_TREX_GREEN_POS=(2,4)`.
+> **MOGALL DEATH QUOTE REMOVED** (Nicolas: faceless→unreadable): the grell's `gDefeatTalkList` entry `.msg = 0` — the win
+> still fires (DisplayDefeatTalkForPid shows the quote only `if (ent->msg != 0)` but SetPidDefeatedFlag runs regardless,
+> eventinfo.c:595). Silent DefeatBoss.
+> **RECORDER + TOOLING:** new `recordch03talk` (green→Talk→blue + phase-cycle sprite refresh), `recordch03win` (battle
+> anim + death + ending), `recordmapfull` (pan-grid full-map stitch, camera scroll @ gBmSt+0x0C). **`moveUnit` no-move
+> confirm-A RETRY fix** — the confirm-A was eaten by the move-range anim when the cursor was already on the tile; this was
+> the driver-pacing regression the prior handoff flagged. **`ch03prep`/`ch03talk`/`ch03win` all PASS again.** `make_gif.py`
+> now has an **ffmpeg palettegen fast path** (>300 frames: 8 min → 2.7 s; the PIL delta+decode-check stalled). Record ~4×
+> faster + lossless via `PT_FPS=240` (screenshots fire per game-frame regardless of wall-clock speed).
+> **RESOLVED (not bugs):** Trex's red-caped map sprite = his recruited PC-blue palette (Nicolas confirmed appropriate);
+> vanilla FE8 has **no "X joined" popup** (Colm recruit = TEXTSHOW→CUSA, verified) — an add would be non-vanilla.
 >
-> **⭐ WIP / KNOWN OPEN — the mid-scene town→mine BG SWAP does NOT render.** The opening plays entirely over the town
-> BG; `BACG(town)` then a second `BACG(mine)` mid-scene keeps showing the town for the following text beats (the sign
-> + Pinky's scout). The `FADI→BACG→FADU` idiom works for our text-LESS dev-placeholder (BG_FIREPLACE) but not when
-> text follows the 2nd BACG. **HINT (Nicolas):** the vanilla PROLOGUE changes scenes **map→BG→map** — route the swap
-> THROUGH the map (LOMA) or a `CLEAN` between the two BGs, OR use vanilla's `Text_BG(bg,msg)` per-text binding
-> (`Convo_Helpers.h`; vanilla ch4 used `Text_BG(BG_NORMAL_VILLAGE, 0x9b4)`) / `STARTFADE`+`FAWU` sequencing
-> (`ch16a-eventscript.h`). This is the fresh-instance's job (use superpowers `systematic-debugging`).
-> **Also WIP:** Pinky fade-out/in staging (`REMA` + `STAL(90)` + reload — wired, only matters once the cave shows);
-> and `ch03prep`/`ch03win`/`ch03talk` drivers now FAIL on the longer opening's `STAL` pacing (their A/START mash blows
-> past prep) — but **`recordch03open` PASSES**, proving the opening itself is sound; the scenario DRIVERS need the tweak.
-> **Staging Nicolas locked** (co-directed this session): town (crier+bounty) → Wolfram "we're going in" → **cut to
-> empty cave** → the sign → characters → Pinky scouts (fades OUT into the dark) → over-long tension pause → Pinky
-> fades back IN white-faced ("it saw me") → RBG "Form up." All wired in `inject_ch03`'s BeginningScene; just needs the
-> BG actually swapping.
+> **⭐ OPEN #1 — the OPENING MAP FLASH (fresh instance: this next).** After the placeholder "Za'ha Woods" title card the
+> **chapter map fades in for ~4 frames** (recordch03open frames 289-292) before the town `BACG`. Root: `BmMain_StartIntroFx`
+> (bm.c label 0) → `gProcScr_ChapterIntro` → `ChapterIntro_BeginFadeToMap`/`LoopFadeToMap` reveals the map BEFORE
+> `CallBeginningEvents` (the BeginningScene) runs. **`fadeToBlack=1` did NOT fix it** (I set it on all hosted slots — it
+> matches ch01/ch02, but `SetDispEnable(1,1,1,0,0)` keeps the map LAYERS on; it only skips the fade *animation*). Needs a
+> TARGETED engine hook to keep the map layer OFF during the intro (let the BeginningScene own the first reveal), OR it may
+> be **CH03BOOT-debug-specific** (ch01/ch02 with `fadeToBlack=1` don't flash in their chained flow; unverifiable until the
+> ch02→ch03 chain is wired). Likely BUNDLE with title-card #4 (same intro sequence — the "Za'ha Woods" card is the same
+> unauthored placeholder). Nicolas wants it fixed **systemically** (all chapters). fadeToBlack is committed but inert.
+> **⭐ OPEN #2 — PINKY SCOUT STAGING.** Nicolas: when Pinky scouts, only **Pinky** fades out; **RBG STAYS** waiting at the
+> cave mouth (currently BOTH vanish — each `Text()` beat auto-`REMA`s all portraits). Needs `FACE_SHOW` (`EvtDisplayFace`)
+> to hold RBG's portrait through the `STAL(90)` pause — low-level face control our scene helpers don't expose. Focused
+> scene-authoring task (get the slot/config right; `FACE_SHOW` is barely used in vanilla).
 >
 > **Prior session (2026-07-09 #3, desktop — Ch3 REAL PREP DEPLOY wired + verified; PR #151 MERGED):**
 > **#23 item 3 DONE — the ch03 party picks in via Preparations** (the vanilla ch01/ch02 flow), replacing the
@@ -275,19 +287,20 @@ how-to for the host machinery = `docs/adding-a-chapter.md`.**
   party ARMED from `CLASS_LOADOUT`). Trex moved to his own green table (`UnitDef_088B49CC`); `--ch03-boot` LOADs an
   armed seed (`UnitDef_088B47E4`); new `inject_ch03(boot=)` param (chaining pass omits the seed). `bootToMap` is
   PREP-aware. Verified: `ch03prep` PASS; flow in `docs/demo/ch03-prep-{menu,fielded}.png`.
-- **PARTIALLY DONE (this session, branch `feat/23-ch03-cutscenes` @ 89c1a55, NO PR — WIP):** the **Cutscenes** item.
-  ✅ **opening** (chapter_start), **Trex turn-1 entrance** (Colm light beat), **ending** (chapter_end → dev-placeholder)
-  wired + rendering (custom busts, text, faceless #58 narration). ✅ **Wolfram/narration width BUG fixed** (narration
-  gets its own opaque box — never share a faced beat). ✅ **Sustainable BG-append infra** (campaign BGs append past
-  `BG_RANDOM` at 0x38+; `CAMPAIGN_BG_SLOT0=0x38`). ✅ **mine BG vendored** (FE7 Cave → `bg_TermalaineMine.png`).
-  ⛔ **BLOCKED — the mid-scene town→mine BG SWAP does not render** (opening stays on the town BG). See the top
-  session block for the full repro + Nicolas's **map→BG→map** hint + the `Text_BG`/`STARTFADE` leads. Also open:
-  Pinky fade-out/in (wired, needs the cave to show) + `ch03prep`/`ch03win`/`ch03talk` drivers need a `STAL`-pacing
-  tweak (`recordch03open` PASSES → opening is sound). **Fresh instance: use superpowers `systematic-debugging`.**
+- **CUTSCENES — largely DONE (branch `feat/23-ch03-cutscenes` @ `1bd8e26`, pushed, NO PR yet):**
+  ✅ opening / Trex turn-1 entrance / ending wired + rendering; ✅ Wolfram/narration width fix; ✅ BG-append infra.
+  ✅ **town→mine BG SWAP FIXED** (REMOVEPORTRAITS re-arm before the 2nd BACG — see top block). ✅ **prep map-flash fixed**
+  (ch01/ch02/ch03). ✅ **crier text overflow fixed** (faced beats wrap 29). ✅ **BGs** (town de-padded + both zoomed ~7.7%,
+  right-edge black gone; cave = FE7-native mine-mouth). ✅ **cave battle platform** (siroyuka1 stone). ✅ **Trex→(2,4)**
+  (Colm's tile). ✅ **mogall death quote removed** (silent win). ✅ **drivers un-regressed** (`moveUnit` retry;
+  `ch03prep`/`ch03talk`/`ch03win` PASS). ✅ recorders (`recordch03talk`/`win`/`mapfull`) + `make_gif` ffmpeg fast path.
+  ⛔ **STILL OPEN (fresh instance):** (1) the **opening MAP FLASH** (chapter-intro reveals the map ~4 frames before the
+  town BACG; `fadeToBlack` did NOT fix it — needs an engine hook or bundle with title-card #4); (2) **Pinky-scout staging**
+  (only Pinky fades, RBG stays — needs `FACE_SHOW`). Full detail in the top session block.
 - **REMAINING (unchecked on #23):**
-  1. **⭐ NEXT — finish the opening BG swap** (the blocker above), then the **midmap RBG-EXECUTION beat** (RBG guns
-     down the beaten Brute + Wolfram's ore gag — **Nicolas confirmed KEEP it**, RBG-only, Trex-free). Midmap needs a
-     Brute-**miniboss unique pid** (like the grell's 0xb7, not the shared 0xaa) + a **flagged-defeat AFEV** trigger
+  1. **⭐ NEXT — the OPENING MAP FLASH + Pinky-scout staging** (the two ⛔ above), then the **midmap RBG-EXECUTION beat**
+     (RBG guns down the beaten Brute + Wolfram's ore gag — **Nicolas confirmed KEEP it**, RBG-only, Trex-free). Midmap needs
+     a Brute-**miniboss unique pid** (like the grell's 0xb7, not the shared 0xaa) + a **flagged-defeat AFEV** trigger
      (`AFEV(trigger, midmap_script, tmp_flag)` fired by a gDefeatTalkList entry on the Brute's death — mirror the
      grell's DefeatBoss wiring) + a kobold-brute mug (or faceless like the grell). Msg ids reserved 0x9AF–0x9B1.
   2. **Chain ch02→ch03** — point ch02's ending `MNC2(0x4)` at ch03 (drop the ch02 dev-placeholder landing); replace
@@ -295,12 +308,15 @@ how-to for the host machinery = `docs/adding-a-chapter.md`.**
      **When this lands, drop the `--ch03-boot` armed party seed** — call `inject_ch03(boot=False)` in the real chain
      so the persistent ch02 party feeds PREP (the `boot=` param + the seed table are already in place for this).
   3. **Chests/doors** — per-chest **`17→29` TILECHANGE**; Trex opens, key-droppers back up.
-  4. **Title-card image** + full load-test scenarios `ch03`/`smoke_ch03`/`clear_ch03` (the `ch03prep`/`ch03win`/
-     `ch03talk`/`koboldview`/`enemycheck` scenarios seed these; a fair-play `clear_ch03` needs a `CA_BOSS` grell or a
-     pid-targeted bot).
+  4. **Title-card** (replace the vanilla slot-4 **"Za'ha Woods"** placeholder that shows at chapter start) — **couple this
+     with the opening map-flash fix** (both are the same `gProcScr_ChapterIntro` sequence). + full load-test scenarios
+     `ch03`/`smoke_ch03`/`clear_ch03` (the `ch03prep`/`ch03win`/`ch03talk`/`koboldview`/`enemycheck` scenarios seed these;
+     a fair-play `clear_ch03` needs a `CA_BOSS` grell or a pid-targeted bot).
   - **Optional polish:** the recruit talk renders in the **map speech bubble** (no portrait box), canonical for
     on-map CHAR talks — switch to the full portrait box if Nicolas wants Trex's bust to show on recruit.
-- **Cutscene BGs DECIDED (Nicolas): reference, don't import** — reuse `bg_TargosWinter`; mid-map beats on-map.
+- **Cutscene BGs (updated 2026-07-10):** real BGs vendored/authored — `bg_TargosWinter` (town, {Zeldacrafter}, de-padded +
+  zoomed) + `bg_TermalaineMine` (cave, FE7-native, zoomed). `bg_to_fe8.py` uses NEAREST + a slight zoom so content bleeds
+  to all edges (no engine right-edge black). mid-map beats stay on-map.
 - Then chapters #24–#28 follow the same slice via `docs/adding-a-chapter.md`.
 
 ### Content — Ch2 (#22) — DONE / CLOSED (2026-06-26)
