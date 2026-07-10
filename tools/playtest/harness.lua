@@ -399,9 +399,39 @@ local function inChapter()
         and unitAt(SYM.gUnitArrayBlue, 0) ~= nil
 end
 
+-- Drive OUT of the Preparations screen via Fight! (PrepScreenMenu_OnStartPress), if it is
+-- open. Real PREP chapters (ch03, #23 item 3) interpose Preparations between the beginning
+-- scene and the map; FE8 auto-fills deployment to the cap, so a plain Fight! fields the
+-- roster. B first backs out of any submenu a boot keypress may have opened; A clears a stray
+-- confirm. No-op (returns true) when no prep proc is up (the TESTCH sandbox / static boots).
+-- Mirrors reachCh01Map's prep loop, shared for the fresh-boot ch03 scenarios.
+local function driveThroughPrep()
+    if not procActive(SYM.gProcScr_SALLYCURSOR) then return true end
+    wait(180) -- let the preparations menu draw
+    shot("prep-menu")
+    for i = 1, 40 do
+        if not procActive(SYM.gProcScr_SALLYCURSOR) then break end
+        press(K.B, 4)
+        wait(10)
+        press(K.START, 4)
+        wait(40)
+        if i % 4 == 0 and procActive(SYM.gProcScr_SALLYCURSOR) then press(K.A, 4) wait(20) end
+    end
+    return waitFor(function()
+        return not procActive(SYM.gProcScr_SALLYCURSOR) and faction() == 0 and turn() >= 1
+    end, 1200)
+end
+
 local function bootToMap()
     log("booting to map (fresh save -> New Game)")
-    for i = 1, 90 do
+    for i = 1, 120 do
+        -- Real PREP chapters (ch03) open Preparations before the map; Fight! into the phase.
+        if procActive(SYM.gProcScr_SALLYCURSOR) then
+            if not driveThroughPrep() then
+                shot("boot-prep-stuck")
+                return false
+            end
+        end
         if inChapter() then
             wait(120) -- let deploy events settle
             press(K.B); press(K.B)
@@ -3022,10 +3052,11 @@ scenarios.ch03win = function()
     if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
     if not red(0xb7) then return result("FAIL", "grell (pid 0xb7) not found in the red array") end
     if not blue(0x01) then return result("FAIL", "leader (braulo, pid 0x01) not deployed") end
-    -- The fast-boot deploys the party weaponless (items='0'; real equipping rides the PREP pass,
-    -- #23 item 2), so give the leader an Iron Axe (id 0x1F | 45 uses) in items[0] so Attack appears.
+    -- The party now deploys ARMED via PREP (#23 item 3, CLASS_LOADOUT), but force an Iron Axe
+    -- (id 0x1F | 45 uses) into items[0] so the scripted kill has a guaranteed in-range melee
+    -- weapon regardless of the leader's exact loadout.
     emu:write16(blue(0x01).addr + 0x1E, 0x2D1F)
-    log("leader given an Iron Axe (fast-boot deploys weaponless)")
+    log("leader given an Iron Axe (guaranteed in-range weapon for the scripted kill)")
     -- Bring the grell TO braulo's isolated left-entrance spawn (no other enemy is near it) so the
     -- grell is the ONLY unit in braulo's range -- chooseAttack's default target can't pick a kobold
     -- by mistake (the (14,1) lair sits amid other foes). Up to 3 player turns, enemy-phase between,
@@ -3115,8 +3146,8 @@ scenarios.ch03talk = function()
         end
     end
     if not parked then return result("FAIL", "no free tile adjacent to Trex to park the recruiter") end
-    -- Select the recruiter (no move) -> command menu. Adjacent to a talkable green with a matching
-    -- CHAR entry, Talk is the first special row (fast-boot is weaponless, so no Attack precedes it).
+    -- Select the recruiter (no move) -> command menu. Parked next to ISOLATED green Trex in the
+    -- galleries (no enemy in weapon range), Talk is the first command row -- no Attack precedes it.
     rec = blue(0x01)
     waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
     if not moveUnit(rec.x, rec.y, rec.x, rec.y) then
@@ -3143,6 +3174,56 @@ scenarios.ch03talk = function()
         return result("FAIL", "Trex did not join the blue army after Talk -- CUSA did not fire")
     end
     return result("PASS", "Talk -> CUSA: Trex flipped GREEN -> BLUE (talk-recruit wired, #23 item 2)")
+end
+
+-- CH03PREP (#23 item 3): prove the REAL PREP deploy. Boot toward the chapter and assert the
+-- Preparations screen OPENS (the CALL(EventScr_08591FD8) fired), then Fight! into the phase and
+-- assert the field roster deployed at the cap (9 = cast_available_at(3): 8 founding + Baxby) --
+-- Trex is NOT among them (he joins mid-map, green, via Talk). Run: PT_HOST_CHAPTER=4 run.sh
+-- ch03prep (needs a CH03BOOT=1 ROM). The boot LOADs an armed party seed so PREP has a roster.
+scenarios.ch03prep = function()
+    -- Boot toward the chapter; stop the moment Preparations opens (don't let a stray A field it).
+    local prep = false
+    for i = 1, 120 do
+        if procActive(SYM.gProcScr_SALLYCURSOR) then prep = true break end
+        if inChapter() then break end
+        press(i % 2 == 0 and K.A or K.START, 4)
+        wait(26)
+    end
+    if not prep then
+        shot("ch03prep-no-prep")
+        return result("FAIL", "Preparations screen never opened (PREP CALL did not fire)")
+    end
+    log("Preparations screen opened; Fight! into the phase")
+    shot("ch03prep-open")
+    if not driveThroughPrep() then
+        shot("ch03prep-stuck")
+        return result("FAIL", "could not Fight! out of Preparations")
+    end
+    wait(120) -- phase intro
+    shot("ch03prep-map")
+    local party, deployed = 0, 0
+    for i = 0, 23 do
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u then
+            party = party + 1
+            -- on the field = not US_HIDDEN (1<<0) and not US_NOT_DEPLOYED (1<<3), real tile
+            if (u.state & 0x9) == 0 and u.x ~= 0xFF then deployed = deployed + 1 end
+            log(string.format("  blue[%02d] char=0x%02X pos=(%d,%d) state=0x%08X",
+                i, u.charId, u.x, u.y, u.state))
+        end
+    end
+    local CHAR_TREX = 0x1C
+    if findUnit(SYM.gUnitArrayBlue, 20, CHAR_TREX) then
+        return result("FAIL", "Trex is on the prep roster -- he must join mid-map (green), not deploy")
+    end
+    log(string.format("party=%d deployed=%d turn=%d", party, deployed, turn()))
+    if deployed ~= 9 then
+        return result("FAIL", string.format(
+            "PREP deploy cap broken: %d units on the field (want 9)", deployed))
+    end
+    result("PASS", string.format(
+        "ch03 Preparations opened -> Fight! fielded %d units (cap 9), Trex held green", deployed))
 end
 
 -- KOBOLDVIEW (#23 art): pull the enemy kobolds ON-SCREEN next to the party so their reskinned

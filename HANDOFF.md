@@ -4,7 +4,24 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-07-09 #2, desktop — Ch3 Trex TALK-RECRUIT wired + verified; PR #150 OPEN/green, awaits Nicolas's `gh pr merge`):**
+> **Last session (2026-07-09 #3, desktop — Ch3 REAL PREP DEPLOY wired + verified; PR #151 OPEN/green, awaits Nicolas's `gh pr merge`):**
+> **#23 item 3 DONE — the ch03 party picks in via Preparations** (the vanilla ch01/ch02 flow), replacing the
+> weaponless static fast-boot. Authored `deployment.deploy_slots` (9 west-entrance tiles) in the ch03 YAML;
+> `inject_ch03` now builds `UnitDef_Event_Ch4Ally` as the **never-LOADed deploy-cap template** (sized to
+> `cast_available_at(3)` = 8 founding + Baxby, one row per deploy_slot via `_deploy_cap_entries`) + a **PREP CALL**
+> (`EventScr_08591FD8`) — the roster fields, lord force-deployed, party ARMED from `CLASS_LOADOUT`. **Trex moved OUT**
+> of the ally table into his own GREEN table (`UnitDef_088B49CC`) so PREP's cap stays the pure blue roster. New
+> `inject_ch03(boot=)` param: **`--ch03-boot` LOADs an armed party SEED** (`UnitDef_088B47E4`) so PREP has a party
+> from a cold New Game; the future chaining pass calls `boot=False` (party persists from ch02, seed dropped).
+> **`bootToMap` is now PREP-aware** (`driveThroughPrep` — Fight! when the Preparations proc is up, no-op otherwise),
+> so ALL fresh-boot ch03 scenarios traverse the new prep screen. **VERIFIED IN-ENGINE** (`PT_HOST_CHAPTER=4`,
+> CH03BOOT=1): new **`ch03prep`** PASS — prep opens → Fight! fields **9 units at the deploy_slots**, Trex held green;
+> `ch03win` + `ch03talk` still PASS through the prep-aware boot. 100 unit tests + `make check` + verify_text green.
+> Real flow: `docs/demo/ch03-prep-{menu,fielded}.png`. **Gotcha:** the two free repurposed Ch4 tables
+> (`088B47E4` seed, `088B49CC` Trex-green) are vanilla tables referenced nowhere but themselves — safe to overwrite,
+> like the enemy table `088B4A80`. NEXT-B (cutscene wiring) is the last big ch03 item.
+>
+> **Prior session (2026-07-09 #2, desktop — Ch3 Trex TALK-RECRUIT wired + verified; PR #150 MERGED):**
 > **#23 item 2 DONE — Trex talk-recruit (the vanilla Colm/Neimi pattern).** Trex stands GREEN; **ANY core party
 > member** who **Talks** to him flips him blue via `CUSA`. Talker-agnostic + non-missable: one
 > `CHAR(flag, script, <candidate>, CHARACTER_RENNAC)` per ch03 field candidate (`talk_recruiters` =
@@ -133,9 +150,10 @@ ADR: `decisions.md` §Distribution.
   `Map Sprites/Infantry - (Axe) Brigs, Pirates, Zerkers/`.
 - **Playtest scenarios** `tools/playtest/run.sh <scenario>` (need a built ROM + `lua`):
   - logic/stability: `win|gameover|ch01win|clear|clear_ch01|smoke|smoke_ch01|fuzz`
-  - **ch3 (#23):** `PT_HOST_CHAPTER=4 run.sh mapshot` (map+units) · **`ch03win`** (kill grell → assert
-    `EVFLAG_DEFEAT_BOSS` → ending) · **`koboldview`** (pull off-camera enemies next to the party) — all on a
-    `make CH03BOOT=1` ROM (macOS: apply the `build.sh` shebang-fix loop first).
+  - **ch3 (#23):** `PT_HOST_CHAPTER=4 run.sh mapshot` (map+units) · **`ch03prep`** (Preparations opens → Fight!
+    fields 9 at the deploy_slots, Trex green) · **`ch03win`** (kill grell → assert `EVFLAG_DEFEAT_BOSS` → ending) ·
+    **`ch03talk`** (Trex green→blue via Talk) · **`koboldview`** (pull off-camera enemies next to the party) — all on
+    a `make CH03BOOT=1` ROM (macOS: apply the `build.sh` shebang-fix loop first). `bootToMap` drives through PREP.
   - **LLM commander (#63):** `llm` — needs the sidecar running (`llm_player.py serve`; see run.sh header).
   - **ch2 (#22):** `ch02` · `smoke_ch02` · `clear_ch02` (all load a `ch02start` checkpoint).
   - **Battle-anim capture:** `PT_CHAR=<id> tools/playtest/run.sh recordanim` on a `make TESTCH=1` ROM
@@ -184,7 +202,7 @@ ch03 recruit, added to #65**.
 + 3 descaled frames, one feature-flow branch per unit (or small batch), `custom_unit` issue template.
 - **Deferred polish (tracked):** braulo's white swing-arc weapon-trail → **#91**; goblin enemy class-level anim → **#90**.
 
-### Content — Ch3 "The Termalaine Mine" (#23) — HOSTED + WIN + ENEMY SPRITES + DIALOGUE + RECRUIT DONE; ⭐ prep-deploy + cutscene-wiring next; chain/chests/title/art remain
+### Content — Ch3 "The Termalaine Mine" (#23) — HOSTED + WIN + ENEMY SPRITES + DIALOGUE + RECRUIT + PREP-DEPLOY DONE; ⭐ cutscene-wiring next; chain/chests/title/art remain
 Vanilla-FE8-Ch3 reskin as Termalaine's kobold-overrun tourmaline mine. Teaching goal = the **thief**
 (Trex = our Colm). Decisions: `decisions.md` → Ch3 ADR (four deviations + **item 4 = Defeat Boss**) + the
 ch03 YAML `design_notes` (2026-07-06 narrative reframe). **Live build checklist = #23 (the source of truth);
@@ -209,21 +227,23 @@ how-to for the host machinery = `docs/adding-a-chapter.md`.**
   `tools/playtest/run.sh ch02baxby` PASS — Baxby at `blue[8]=0x10` in the prep roster AND deployable +
   fighting on the ch02 map (killed a raider in melee). Existing `ch02` scenario still PASS (deploy cap 5).
   3 new unit tests (58 total green). Talk recruits (Trex) still self-join via `CUSA`.
-- **DONE (this session, PR #150 OPEN/green):** ✅ **item 2 — Trex TALK-RECRUIT** (green→blue via `CUSA`; talker =
+- **DONE (PR #150, MERGED):** ✅ **item 2 — Trex TALK-RECRUIT** (green→blue via `CUSA`; talker =
   any core party member; verified in-engine `ch03talk`) + the **decouple** (entrance/execution split; Trex's
-  substance moved to the Talk) + the **Trex iron-sword** difficulty fix. See the session block up top for detail.
+  substance moved to the Talk) + the **Trex iron-sword** difficulty fix.
   Also DONE (PR #147): **Ch3 DIALOGUE LOCKED** — the 3 cutscene beats' text lives in the ch03 YAML `script:` blocks.
-- **REMAINING (unchecked on #23) — ⭐ the next two are the requested handoff targets:**
-  1. **⭐ NEXT-A — Real PREP deploy** (item 3). Author `deployment.deploy_slots` (9 tiles) in the ch03 YAML + wire a
-     **PREP CALL** in `inject_ch03`'s beginning scene (today it's the static `CH03_SPAWN_POSITIONS` fast-boot spawn,
-     party WEAPONLESS `items='0'`). **Reference impls in the SAME file:** `inject_ch01`/`inject_ch02` already emit a
-     PREP flow (`_deploy_cap_entries` + the deploy-cap template + the PREP CALL); the ch02 off-map join-LOAD
-     (`offmap_join_recruits` → Baxby before the PREP CALL) shows how a recruit rides the prep roster. **Cap is
-     already recruit-correct:** `deploy_limit: 9` over `cast_available_at(3)` (9 units, Trex EXCLUDED — he joins
-     mid-map on top, like vanilla Colm; included from ch04). Real equipping (`CLASS_LOADOUT`) lands with the prep
-     flow. Verify with a new/updated scenario that the prep screen opens + Pick Units fields the roster (cf.
-     `recordsupply`/`ch02` menu-driving).
-  2. **⭐ NEXT-B — Cutscene wiring** (the "Cutscenes" item). Text is **LOCKED** in the ch03 YAML `events:` blocks
+- **DONE (this session, PR #151 OPEN/green):** ✅ **item 3 — Real PREP deploy.** The ch03 party now picks in via
+  **Preparations** (the vanilla ch01/ch02 flow), replacing the weaponless static fast-boot. Authored
+  `deployment.deploy_slots` (9 west-entrance tiles); `UnitDef_Event_Ch4Ally` = the never-LOADed deploy-cap
+  template (sized to `cast_available_at(3)`); a **PREP CALL** fields the roster (lord force-deployed, party ARMED
+  from `CLASS_LOADOUT`). **Trex moved out** to his own green table (`UnitDef_088B49CC`) so the cap stays the pure
+  blue roster. `--ch03-boot` LOADs an **armed party seed** (`UnitDef_088B47E4`) so PREP has a roster from a cold
+  New Game; new `inject_ch03(boot=)` param — the **chaining pass (item below) omits the seed** (party persists from
+  ch02). **`bootToMap` is now PREP-aware** (`driveThroughPrep`), so all fresh-boot ch03 scenarios traverse the prep
+  screen. **VERIFIED IN-ENGINE** (`PT_HOST_CHAPTER=4`, CH03BOOT=1): new **`ch03prep`** PASS (prep opens → Fight!
+  fields 9 at the deploy_slots, Trex held green); `ch03win` + `ch03talk` still PASS through the prep-aware boot.
+  100 tests + verify_text green. Flow captured in `docs/demo/ch03-prep-{menu,fielded}.png`.
+- **REMAINING (unchecked on #23) — ⭐ NEXT-B (cutscene wiring) is the requested handoff target:**
+  1. **⭐ NEXT-B — Cutscene wiring** (the "Cutscenes" item). Text is **LOCKED** in the ch03 YAML `events:` blocks
      (4 beats: `chapter_start` opening w/ Pinky's flyover scout; `midmap` RBG-execution-on-Brute-defeat — now
      RBG+Wolfram ONLY, Trex removed; `trex_entrance` LIGHT beat — Pinky telegraph + RBG "little dragon"; `chapter_end`
      ending). Wire each via the #58 opaque-box narration + the scene helpers (`_emit_scene_beats`/`_scenic_beat_calls`/
@@ -231,11 +251,13 @@ how-to for the host machinery = `docs/adding-a-chapter.md`.**
      touch-ups and **`recordscene`** (PR #148: `PT_STATE=<ckpt> PT_TAG=<tag> PT_UNTIL=…`) to capture each beat as a
      GIF for Nicolas's motion review (deliver via `docs/demo/`). BGs: **reference `bg_TargosWinter`, don't import**
      (mid-map beats play on-map, no BG). The `talk_recruit` event is already wired (item 2) — don't re-wire it.
-  3. **Chain ch02→ch03** — point ch02's ending `MNC2(0x4)` at ch03 (drop the ch02 dev-placeholder landing); replace
+  2. **Chain ch02→ch03** — point ch02's ending `MNC2(0x4)` at ch03 (drop the ch02 dev-placeholder landing); replace
      the ch03 minimal DefeatBoss ending with the real ending cutscene once ch04 hosts (or park like ch02 until then).
-  4. **Chests/doors** — per-chest **`17→29` TILECHANGE**; Trex opens, key-droppers back up.
-  5. **Title-card image** + full load-test scenarios `ch03`/`smoke_ch03`/`clear_ch03` (the `ch03win`/`ch03talk`/
-     `koboldview`/`enemycheck` scenarios seed these; a fair-play `clear_ch03` needs a `CA_BOSS` grell or a
+     **When this lands, drop the `--ch03-boot` armed party seed** — call `inject_ch03(boot=False)` in the real chain
+     so the persistent ch02 party feeds PREP (the `boot=` param + the seed table are already in place for this).
+  3. **Chests/doors** — per-chest **`17→29` TILECHANGE**; Trex opens, key-droppers back up.
+  4. **Title-card image** + full load-test scenarios `ch03`/`smoke_ch03`/`clear_ch03` (the `ch03prep`/`ch03win`/
+     `ch03talk`/`koboldview`/`enemycheck` scenarios seed these; a fair-play `clear_ch03` needs a `CA_BOSS` grell or a
      pid-targeted bot).
   - **Optional polish:** the recruit talk renders in the **map speech bubble** (no portrait box), canonical for
     on-map CHAR talks — switch to the full portrait box if Nicolas wants Trex's bust to show on recruit.

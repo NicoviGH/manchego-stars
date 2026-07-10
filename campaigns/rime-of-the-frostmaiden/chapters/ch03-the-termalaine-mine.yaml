@@ -89,8 +89,21 @@ deployment:
   # Field parity: deploy_limit = vanilla FE8 Ch3 player deploy-slot count (decisions.md §Field parity;
   # fe8-pacing-reference §1b: Ch3 = 9, read from .size UnitDef_Event_Ch3Ally/20).
   deploy_limit: 9               # vanilla FE8 Ch3 fields 9 — ~our whole current roster (8 PCs + Baxby)
+  # [col, row] — the west entrance of the mine (the same walkable left-edge tiles the
+  # fast-boot spawned onto; PREP hides everyone and redeploys the picks onto these). One
+  # per deploy_limit (the _deploy_cap_entries schema requires len(deploy_slots) == deploy_limit).
+  deploy_slots:
+    - [1, 10]
+    - [1, 11]
+    - [1, 12]
+    - [1, 9]
+    - [1, 8]
+    - [2, 8]
+    - [0, 10]
+    - [0, 12]
+    - [2, 11]
   note: "Pick Units fields up to deploy_limit; the chosen lord (#42) is force-deployed.
-         Pinky is used in a scripted shaft-scout beat. Positions set in the map tool."
+         Pinky is used in a scripted shaft-scout beat. Trex joins mid-map (green, via Talk)."
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
 # 1:1 reskin of vanilla FE8 Ch3 "The Bandits of Borgo" red force (UnitDef_088B463C):

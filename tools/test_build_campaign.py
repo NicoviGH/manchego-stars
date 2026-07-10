@@ -124,9 +124,10 @@ class TrexRecruitCast(unittest.TestCase):
         allcast, _ = bc._classed_cast(self.CAMPAIGN)   # available_at=None -> everyone
         self.assertEqual(len(allcast), 10)
         self.assertGreaterEqual(len(bc.TEST_SPAWN_POSITIONS), len(allcast))
-        # ch03's blue field roster = cast_available_at(3); its deploy tiles must cover it.
+        # ch03's blue field roster = cast_available_at(3); its PREP deploy tiles must cover it.
         field, _ = bc._classed_cast(self.CAMPAIGN, available_at=3)
-        self.assertGreaterEqual(len(bc.CH03_SPAWN_POSITIONS), len(field))
+        chap = bc._load_chapter_yaml(self.CAMPAIGN, bc.CH03_CHAPTER_YAML)
+        self.assertGreaterEqual(len(chap['deployment']['deploy_slots']), len(field))
 
     def test_trex_has_a_death_quote_and_a_dead_slot2_msg_id(self):
         self.assertIn('trex', bc.PC_DEATH_QUOTE_MSGS)
@@ -246,6 +247,46 @@ class TalkRecruitWiring(unittest.TestCase):
         self.assertIn('TEXTSHOW(0x9A5)', s)
         self.assertIn('CUSA(CHARACTER_RENNAC)', s)
         self.assertTrue(s.rstrip().endswith('ENDA\n}') or s.rstrip().endswith('ENDA'))
+
+
+class Ch03PrepDeploy(unittest.TestCase):
+    """Ch03 real PREP deploy (#23 item 3): the field roster picks in via Preparations,
+    exactly like ch01/ch02 -- a never-LOADed deploy-cap template (UnitDef_Event_Ch4Ally)
+    sized to cast_available_at(3), + a PREP CALL. These pin the YAML + cap builder the
+    inject_ch03 beginning scene consumes."""
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH03_CHAPTER_YAML)
+
+    def test_deploy_slots_authored_and_sized_to_the_cap(self):
+        """deploy_limit = vanilla FE8 Ch3's 9; deploy_slots is authored 1:1 with it (the
+        schema _deploy_cap_entries enforces: len(slots) == deploy_limit)."""
+        dep = self._chap()['deployment']
+        self.assertEqual(dep['deploy_limit'], 9)
+        self.assertEqual(len(dep['deploy_slots']), 9)
+        for xy in dep['deploy_slots']:
+            self.assertEqual(len(xy), 2)   # [col, row]
+
+    def test_cap_covers_the_ch03_field_roster(self):
+        """The cap fields the whole ch03 roster = cast_available_at(3) (8 founding + Baxby);
+        Trex is EXCLUDED (he joins mid-map, green, via Talk -- like vanilla Colm)."""
+        field, _ = bc._classed_cast(self.CAMPAIGN, available_at=3)
+        self.assertEqual(self._chap()['deployment']['deploy_limit'], len(field))
+        self.assertNotIn('trex', {u for u, *_ in field})
+
+    def test_deploy_cap_entries_yields_one_row_per_slot(self):
+        """_deploy_cap_entries (the shared ch01/ch02 builder) now succeeds for ch03: one
+        never-LOADed ally row per deploy slot, tile coords from the YAML."""
+        chap = self._chap()
+        field, _ = bc._classed_cast(self.CAMPAIGN, available_at=3)
+        leader = 'CHARACTER_%s' % field[0][1].upper()
+        rows = bc._deploy_cap_entries(chap, field, leader, 'ch03')
+        self.assertEqual(len(rows), chap['deployment']['deploy_limit'])
+        for (x, y) in chap['deployment']['deploy_slots']:
+            self.assertTrue(any('.xPosition = %d,' % x in r and '.yPosition = %d,' % y in r
+                                for r in rows))
 
 
 class LordFloorRows(unittest.TestCase):
