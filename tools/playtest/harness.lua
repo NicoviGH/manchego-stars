@@ -3644,6 +3644,14 @@ scenarios.recordch02intro = function()
     return recordCutscene({ state = "ch02intro", tag = "intro", until_ = "prep" })
 end
 
+-- recordch03open: the ch03 OPENING in motion (#23 Cutscenes) -- the Termalaine street over the
+-- reused Targos-winter BG: the boy crier + RBG's bounty, Wolfram's ore + the KOBOLDS ONLY sign
+-- (#58 narration box), Pinky's flyover recon revealing the grell. Records from the fresh CH03BOOT
+-- New Game (no checkpoint) up to the Preparations screen. Frames tagged "ch03open" -> make_gif.
+scenarios.recordch03open = function()
+    return recordCutscene({ tag = "ch03open", until_ = "prep", pressEvery = 90 })
+end
+
 -- recordch02map: pan the cursor across the ch02 map (NW deploy + the 3 green chwinga -> the
 -- chardalyn raiders E/SE), so the GIF shows the snowy layout + the green chwinga map sprites in
 -- their idle bob. Frames tagged "map". Loads the ch02start checkpoint (turn 1, all units placed).

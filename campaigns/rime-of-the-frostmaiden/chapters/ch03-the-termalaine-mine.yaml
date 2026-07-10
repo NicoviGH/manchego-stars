@@ -298,14 +298,20 @@ events:
       - beat_break: B           # the party reaches the tunnel-mouth; Wolfram has stopped, breathing in
       # (Wolfram at the mine mouth — the senses come first; he smells the ore before he names it.)
       - wolfram: "...Pink tourmaline. A whole seam of it. We're going in."
+      - beat_break: C           # the sign gets its OWN beat: faceless stage-direction narration reads in
+                                # the opaque centered box (#58), not crammed into Wolfram's portrait box
+                                # (a talk-bubble width bug — narration must never share a faced speaker's beat).
       # (A crude charcoal sign is propped against the empty carts — book p.95.)
       - narration: "The sign read KOBOLDS ONLY — in a hand far too elegant for any kobold."
-      - beat_break: C           # Pinky wings ahead over the workings — the flier's recon (folded in from the old shaft-scout beat)
+      - beat_break: D           # Pinky wings ahead over the workings — the flier's recon (folded in from the old shaft-scout beat)
       # (Pinky is the army's flier; his scout reads as a quick flyover from the mine mouth.
       #  RBG's reluctance is the over-long pause, never a stated line — lore/{pinky,prof-rbg}.md.)
       - pinky: "I'll look ahead! Quick and quiet, I promise!"
       - prof-rbg: "...Straight back. You hear me?"
       - pinky: "Straight back!"
+      - beat_break: E           # Pinky FADES OUT here — he wings off into the dark (the injector clears his
+                                # portrait, holds the over-long RBG-tension pause on the empty cave, then fades
+                                # him back in white-faced for the line below). Staging split, same locked text.
       # (He lifts over the dark of the mine. Far below at the deep workings, something vast
       #  turns a single wet eye up to follow him. He drops back to the party white-faced.
       #  The grell is VISIBLE at (14,1) from turn 1, Bazba-style — no fog, no scripted spawn.
