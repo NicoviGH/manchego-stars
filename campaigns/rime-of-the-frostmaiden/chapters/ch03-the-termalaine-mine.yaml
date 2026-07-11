@@ -374,11 +374,11 @@ events:
       - pinky: "...Father! You saved me!"
       - prof-rbg: "Always, my boy. Always."
       - beat_break: C        # ── C: Wolfram (comic reset — oblivious, ate ore through all of it) ──
-      # (The senses come first; he names the mineral before he notices the room. It's TOURMALINE —
-      #  the mine's whole prize, the seam he scented at the mouth in the opening (Nicolas 2026-07-11:
-      #  tourmaline is setting-true, not generic copper/silver). Trimmed to the punchline so the
-      #  deflation lands — the "…Did I miss something?" beat is the scene's quotable button. lore/wolfram.md.)
-      - wolfram: "Tourmaline. I could taste it from the tunnel mouth."
+      # (He's been CHEWING a fistful of it through the whole execution — the senses/taste come first,
+      #  casual metal-eating gag (lore/wolfram.md). It's TOURMALINE, the mine's whole prize, the seam
+      #  he scented at the mouth in the opening (Nicolas 2026-07-11: tourmaline is setting-true, and he
+      #  should be tasting/enjoying it). The "…Did I miss something?" beat is the scene's quotable button.)
+      - wolfram: "Mm. This tourmaline tastes incredible."
       - wolfram: "...Did I miss something?"
       # (Trex is NOT in this beat — his entrance + recruit are DECOUPLED below.)
 

@@ -5590,7 +5590,9 @@ def inject_ch03(campaign, boot=False, verbose=True):
     cut_fid = _make_fid(cut_special, 'ch03 unknown cutscene speaker', fallback=GUEST_PORTRAIT_MAP)
     # RBG anchors mid-right through the opening (the leader who answers): the beat-A crier
     # two-shot + the beat-C Pinky/RBG flyover two-hander stage cleanly without face-flashing.
-    op_home = {'prof-rbg': '[OpenMidRight]'}
+    # The midmap Brute also anchors mid-right (facing Pinky at mid-left) -- its A-beat preload +
+    # its A3 snarl land on the same podium; it never shares a beat with RBG, so no collision.
+    op_home = {'prof-rbg': '[OpenMidRight]', 'kobold-brute': '[OpenMidRight]'}
 
     # 1. Map: register the cave-interior tileset (first chapter to use it) + the painted
     #    layout, point slot 4 at them, and borrow slot 6's defeat_boss goal banner.
@@ -5873,13 +5875,18 @@ def inject_ch03(campaign, boot=False, verbose=True):
                       trailings=op_trailings)
     set_message_body(lines, CH03_ENDING_CARD_MSG, name_message_body(end_card))
     _emit_scene_beats(lines, CH03_ENDING_MSGS, end_beats, cut_fid, {})
-    # Midmap RBG-execution beats (on-map, no card): faced beats wrap at the map-bubble 29 (RBG anchors
-    # mid-right via op_home); the faceless Brute snarl wraps at 28 for the auto-centered opaque box (a
-    # 29-tile line clips its centered frame). Speakers resolve through cut_fid (kobold-brute -> None).
-    for msg, beat in zip(CH03_MIDMAP_MSGS, mid_beats):
+    # Midmap RBG-execution beats (on-map, no card): faced beats wrap at the map-bubble 29; the two
+    # faceless ACTION boxes wrap at 28 for the auto-centered opaque box. Beat A (Pinky's opening)
+    # PRELOADS the Brute's mug as a silent listener at mid-right, so the player sees WHO Pinky is
+    # talking to before it lunges (the Brute otherwise only appeared when it snarled in A3 -- Nicolas
+    # 2026-07-11). The Brute + RBG both anchor mid-right via op_home (never on screen together; each
+    # beat's REMA clears faces); Pinky/party default mid-left.
+    brute_face = cut_fid('kobold-brute')   # [FID_Caellach] -- the Brute's mug slot
+    mid_preloads = [[('[OpenMidRight]', brute_face)]] + [None] * (len(mid_beats) - 1)
+    for msg, beat, preload in zip(CH03_MIDMAP_MSGS, mid_beats, mid_preloads):
         w = 28 if _beat_is_faceless(beat, cut_fid) else 29
         set_message_body(lines, msg, _script_to_message(
-            beat, _stage_beat(beat, cut_fid, op_home), width=w))
+            beat, _stage_beat(beat, cut_fid, op_home), width=w, preload=preload))
     set_message_body(lines, CH03_TREX_ENTRANCE_MSG, _script_to_message(
         trex_entr, _stage_beat(trex_entr, cut_fid, op_home), width=29))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
