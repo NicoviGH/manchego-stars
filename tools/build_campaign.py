@@ -5536,10 +5536,12 @@ CH03_BRUTE_MINIBOSS_PID = '0xb6'   # the Icewind Brute -- a clean raw charIndex 
 CH03_BRUTE_DEFEAT_FLAG = 'EVFLAG_TMP(10)'  # set by the Brute's silent gDefeatTalkList entry on death
 CH03_MIDMAP_GUARD_FLAG = 'EVFLAG_TMP(11)'  # AFEV ent-flag: guards the one-shot (set after the beat fires)
 CH03_MIDMAP_SCRIPT = 'EventScr_089F1BD8'   # dead vanilla Ch4 script (defined-only; its list ref dropped by the host)
-# 4 beats: A Marty's mercy (faced bubble) · A2 the Brute's snarl (FACELESS -> opaque auto-centered box,
-# split out of A so Marty's bubble doesn't mis-wrap) · B the shot (faced) · C Wolfram comic reset (faced).
-# 0x9B2/0x9B3 are the opening's Pinky-scout beats; the midmap borrows 0x9B4 from the dead Ch4 block.
-CH03_MIDMAP_MSGS = (0x9AF, 0x9B0, 0x9B1, 0x9B4)
+# 7 beats (RESTAGED 2026-07-11): A Pinky reaches out (faced) · A2 the Brute lunges at Pinky (FACELESS
+# action box) · A3 the Brute's snarl (faced mug) · B RBG "Say cheese" (faced) · B2 the shot/kill (FACELESS
+# action box) · B3 Pinky+RBG (faced two-hander) · C Wolfram (faced). The two faceless narration boxes ride
+# the opaque auto-centered box (_beat_is_faceless -> SOLOTEXTBOXSTART). 0x9B2/0x9B3 are the opening's
+# Pinky-scout beats; the midmap borrows 0x9B4..0x9B7 from the dead Ch4 block.
+CH03_MIDMAP_MSGS = (0x9AF, 0x9B0, 0x9B1, 0x9B4, 0x9B5, 0x9B6, 0x9B7)
 CH03_CRIER_FID = '[FID_VillagerYoungBoy]'   # the boy crying the bounty on his crate (book p.95; generic mug)
 CH4_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch4-eventinfo.h')
 CH4_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch4-eventscript.h')
@@ -5824,9 +5826,12 @@ def inject_ch03(campaign, boot=False, verbose=True):
     # (SOLOTEXTBOXSTART) -- a map bubble anchors to a speaking unit and an AFEV has none, so a faceless
     # bubble renders off the tilemap. All four midmap speakers now have mugs (the Brute got one on the
     # Caellach slot), so all four are faced bubbles here. EVBIT_T(7) marks the map event done.
-    mid_labels = ['A -- Marty tries mercy on the beaten Brute (faced)',
-                  'A2 -- the Brute lunges at Pinky; claws ring off the homunculus (faced)',
-                  'B -- RBG executes the Brute at gunpoint ("Say cheese"); Pinky reads it as rescue (faced)',
+    mid_labels = ['A -- Pinky reaches out to the beaten Brute (faced)',
+                  'A2 -- ACTION: the Brute lunges at Pinky; claws ring off metal (faceless box)',
+                  'A3 -- the Brute\'s shock: "you not soft?!" (faced mug)',
+                  'B -- RBG levels the Fonduedler: "Say cheese." (faced)',
+                  'B2 -- ACTION: the shot; the Brute drops dead (faceless box)',
+                  'B3 -- Pinky "you saved me!" / RBG "always, my boy" (faced two-hander)',
                   'C -- Wolfram\'s oblivious ore gag deflates the moment (faced)']
     mid_calls = ''
     for msg, beat, lbl in zip(CH03_MIDMAP_MSGS, mid_beats, mid_labels):

@@ -4022,10 +4022,14 @@ scenarios.recordch03midmap = function()
     -- Film the EXP screen + the execution beats ONE PAGE AT A TIME: a hold long enough for the page
     -- to draw + linger, THEN one A. Enough steps to reach Wolfram's last line (EXP + Marty + Brute +
     -- RBG x3 + Wolfram x2 ~= 8 pages; extra steps film the map resuming, proof the chapter continues).
-    press(K.A, 3); wait(30)                                     -- dismiss the EXP/level screen
-    for _ = 1, 14 do
-        for f = 1, 75 do if f % 3 == 0 then shot("ch03midmap") end yield() end  -- page draws + holds
-        press(K.A, 3)                                                          -- advance one page
+    -- Film the whole scene (EXP + 7 beats / 2 action boxes ~= 13 pages) ONE PAGE AT A TIME: a fixed
+    -- 70-frame hold (each page draws + lingers, readable) then a ROBUST A (8-frame press -- a short
+    -- press(A,3) under-registers at 240fps, so 13 pages fell short). Generous step count (22 > 13
+    -- pages) covers a stray missed press + films the map resuming after the guard flag sets.
+    press(K.A, 8); wait(40)                                     -- dismiss the EXP/level screen
+    for _ = 1, 22 do
+        for f = 1, 70 do if f % 3 == 0 then shot("ch03midmap") end yield() end  -- page draws + holds
+        press(K.A, 8)                                                          -- advance one page (robust)
     end
     result("PASS", "ch03 Brute death + RBG-execution midmap recorded")
 end

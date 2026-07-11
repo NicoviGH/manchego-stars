@@ -675,35 +675,36 @@ class Ch03MidmapExecution(unittest.TestCase):
         self.assertIn('.flag    = %s' % bc.CH03_BRUTE_DEFEAT_FLAG, q)
         self.assertIn('.msg     = 0', q)
 
-    def test_midmap_yaml_splits_into_the_four_reserved_beats(self):
-        """The locked midmap `script:` splits into exactly 4 beats matching the reserved msg-id block:
-        A Marty (faced) / A2 the faceless Brute snarl (split out of A so a mixed faced+faceless bubble
-        doesn't mis-wrap) / B RBG's shot (faced) / C Wolfram (faced). A beat_break drift would desync
-        the zip (guarded by _split_event_beats)."""
-        self.assertEqual(len(bc.CH03_MIDMAP_MSGS), 4)
+    def test_midmap_yaml_splits_into_the_seven_restaged_beats(self):
+        """The restaged midmap `script:` splits into 7 beats matching the reserved msg-id block:
+        A Pinky / A2 ACTION attack / A3 Brute snarl / B RBG "Say cheese" / B2 ACTION shot /
+        B3 Pinky+RBG / C Wolfram. A beat_break drift would desync the zip (guarded by _split_event_beats)."""
+        self.assertEqual(len(bc.CH03_MIDMAP_MSGS), 7)
         _card, beats = bc._split_event_beats(self._chap(), 'midmap', 'ch03 midmap',
                                              bc.CH03_MIDMAP_MSGS, card_required=False)
-        self.assertEqual(len(beats), 4)
+        self.assertEqual(len(beats), 7)
 
-    def test_midmap_all_beats_faced_via_the_brute_mug_slot(self):
-        """The RBG-execution beats route by face. With the Brute's mug dressed on the Caellach guest
-        slot, every midmap speaker resolves to a face (fallback=GUEST_PORTRAIT_MAP), so all four beats
-        render as faced map bubbles -- none fall back to the opaque auto-centered box."""
+    def test_midmap_action_boxes_faceless_dialogue_beats_faced(self):
+        """Routing by face: the two ACTION narration beats (A2 the attack, B2 the shot) are faceless ->
+        the opaque auto-centered box; the five dialogue beats (Pinky / Brute / RBG / Pinky+RBG / Wolfram)
+        resolve to faces -> map talk bubbles. The Brute is faced via its Caellach mug (fallback)."""
         self.assertEqual(bc.GUEST_PORTRAIT_MAP.get('kobold-brute'), 'Caellach')
         _card, beats = bc._split_event_beats(self._chap(), 'midmap', 'ch03 midmap',
                                              bc.CH03_MIDMAP_MSGS, card_required=False)
         fid = bc._make_fid({'narration': None, 'boy-crier': '[FID_x]'}, 'ch03 midmap test',
                            fallback=bc.GUEST_PORTRAIT_MAP)
-        self.assertFalse(any(bc._beat_is_faceless(b, fid) for b in beats))
+        self.assertEqual([bc._beat_is_faceless(b, fid) for b in beats],
+                         [False, True, False, False, True, False, False])
 
     def test_beat_is_faceless_detects_a_mugless_speaker(self):
-        """The routing mechanism itself: a beat whose only speaker resolves faceless (no mug) IS
-        flagged faceless -> it would ride the opaque box (the fallback for any future mugless NPC)."""
+        """The routing mechanism: without the Brute's mug, its snarl beat (A3) also flags faceless ->
+        it would ride the opaque box (the fallback for any future mugless NPC), alongside the two
+        genuine narration action boxes."""
         _card, beats = bc._split_event_beats(self._chap(), 'midmap', 'ch03 midmap',
                                              bc.CH03_MIDMAP_MSGS, card_required=False)
         mugless = bc._make_fid({'narration': None, 'kobold-brute': None}, 'ch03 midmap test')
         self.assertEqual([bc._beat_is_faceless(b, mugless) for b in beats],
-                         [False, True, False, False])   # A2 (the Brute) faceless when it has no mug
+                         [False, True, True, False, True, False, False])   # A3 (Brute) faceless w/o a mug
 
 
 if __name__ == '__main__':
