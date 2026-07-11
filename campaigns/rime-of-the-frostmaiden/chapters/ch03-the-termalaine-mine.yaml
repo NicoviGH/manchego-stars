@@ -165,6 +165,10 @@ enemy_units:
     name: "Icewind Brute"
     count: 1                    # vanilla brigand @ (14,6) L3 steel-axe (the grell's nearest enforcer)
     positions: [[14, 6]]
+    is_miniboss: true           # the mid-map RBG-execution trigger (#23 item 1): a unique raw pid
+                                # (CH03_BRUTE_MINIBOSS_PID) + a silent flagged gDefeatTalkList entry;
+                                # its death fires the on-map execution cutscene (Misc AFEV). Combat
+                                # stays parity Brigand — this only keys the death event to it.
     class: brigand              # parity engine reads this (Brigand base — steel axe + stats)
     deploy_class: brigand-brute # …but DEPLOYS on the Lizardzerker-brute reskin sprite (campaign.yaml
                                 # kobold-brute → CLASS_MNC_LIZARDZERKER_BRUTE): the big enforcer reads
@@ -349,6 +353,10 @@ events:
       #  him, the party closing in. Marty crouches to its level; Pinky drifts in, kind.
       #  Marty coughs a soft puff of spores so it can hear him — his rapport-spore gag.)
       - marty: "Easy, friend. It's over. No one else has to be hurt."
+      - beat_break: A2       # the Brute's snarl is its OWN beat (pacing: Marty's plea, then the Brute's
+                             # defiant lunge). It now has a mug (Caellach guest slot), so it renders as a
+                             # faced bubble like the rest — NOT merged into Marty's beat (one bubble per
+                             # beat reads cleaner, and a mixed multi-speaker bubble had wrapped poorly).
       # (The Brute ignores him — fixes on the smallest, softest-looking of them and lunges
       #  with the last of its strength, claws for Pinky's throat. They meet metal in a
       #  screech of sparks: Pinky is RBG's homunculus construct (lore/pinky.md). It reels back.)

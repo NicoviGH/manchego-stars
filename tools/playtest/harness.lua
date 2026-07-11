@@ -3150,6 +3150,85 @@ scenarios.ch03win = function()
     result("PASS", "grell killed -> EVFLAG_DEFEAT_BOSS set -> DefeatBoss ending ran to title (ch03 win wired)")
 end
 
+-- CH03MIDMAP (#23 item 1): kill the Icewind Brute (the mid-map MINIBOSS) -> its FLAGGED silent
+-- defeat quote sets EVFLAG_TMP(10) -> the Ch4 Misc AFEV(EVFLAG_TMP(11), midmap, EVFLAG_TMP(10))
+-- runs the on-map RBG-execution cutscene ONCE. Proves the midmap trigger fires and the chapter
+-- KEEPS GOING (unlike the boss WIN). The Brute rides a unique raw pid (0xb6, distinct from the
+-- 0xaa generics + the 0xb7 grell) so its flagged death keys the trigger to it alone. Same
+-- park-adjacent-and-strike trick as ch03win; the Brute is a melee Brigand, so poke it frail (1 HP)
+-- and hit at range 1 -- a dead defender throws no counter. Must NOT touch the grell (that would end
+-- the chapter). Definitive assertion: EVFLAG_TMP(10) (Brute defeated) then EVFLAG_TMP(11) (the AFEV
+-- guard, set AFTER the midmap script runs). Run: PT_HOST_CHAPTER=4 run.sh ch03midmap (needs CH03BOOT=1).
+scenarios.ch03midmap = function()
+    if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
+    if not red(0xb6) then return result("FAIL", "Icewind Brute (pid 0xb6) not found in the red array") end
+    if not blue(0x01) then return result("FAIL", "leader (braulo, pid 0x01) not deployed") end
+    -- Force an Iron Axe into items[0] so the scripted kill has a guaranteed in-range melee weapon.
+    emu:write16(blue(0x01).addr + 0x1E, 0x2D1F)
+    log("leader given an Iron Axe (guaranteed in-range weapon for the scripted kill)")
+    -- Bring the Brute TO braulo's isolated left-entrance spawn so it is the ONLY unit in range
+    -- (the (14,6) enforcer sits amid the grell + kobolds). Up to 3 player turns, enemy phase
+    -- between, re-frailing + re-parking each turn against a whiff or an AI move.
+    for turn = 1, 3 do
+        local b = red(0xb6)
+        if isDead(b) or eventFlag(10) then break end
+        local leader = blue(0x01)
+        pokeFrail(b)
+        b = red(0xb6)
+        local bgrid = mapUnitAt(b.x, b.y)
+        local parked = false
+        for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+            local tx, ty = leader.x + d[1], leader.y + d[2]
+            if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0 then
+                setMapUnit(b.x, b.y, 0)
+                emu:write8(b.addr + 0x10, tx); emu:write8(b.addr + 0x11, ty)
+                setMapUnit(tx, ty, bgrid)
+                log(string.format("turn %d: Brute parked at (%d,%d) next to braulo (%d,%d)",
+                    turn, tx, ty, leader.x, leader.y))
+                parked = true
+                break
+            end
+        end
+        if not parked then return result("FAIL", "no free tile adjacent to braulo to park the Brute") end
+        if moveUnit(leader.x, leader.y, leader.x, leader.y) then
+            shot("attacking-brute")
+            chooseAttack(leader.addr)
+        end
+        if isDead(red(0xb6)) or eventFlag(10) then break end
+        log("Brute survived turn " .. turn .. " (miss?); running enemy phase to retry")
+        if runEnemyPhase() == "gameover" then return result("FAIL", "unexpected game over in ch03midmap") end
+    end
+    if not (isDead(red(0xb6)) or eventFlag(10)) then
+        shot("brute-alive")
+        return result("FAIL", "could not kill the Brute in 3 turns")
+    end
+    -- The silent (msg=0) quote sets EVFLAG_TMP(10) on death (SetPidDefeatedFlag, no portrait to render).
+    log("Brute dead; polling EVFLAG_TMP(10) (the AFEV's watched flag)")
+    if not waitFor(function() return eventFlag(10) end, 600, true) then
+        shot("brute-dead-no-flag")
+        return result("FAIL", "Brute died but EVFLAG_TMP(10) never set (defeat quote did not fire)")
+    end
+    -- Flag 10 set -> at the next event scan the Misc AFEV runs the on-map execution cutscene (3
+    -- Text() beats). Let the first beat render, screenshot it, then tap A through while polling the
+    -- guard flag EVFLAG_TMP(11), which the AFEV sets ONLY after its script completes.
+    wait(90)
+    shot("ch03-midmap-beat")
+    local fired = waitFor(function() return eventFlag(11) end, 3600, true)
+    log(string.format("debug: EVFLAG_TMP(10)=%s EVFLAG_TMP(11)=%s chapter=%d (host=%d)",
+        tostring(eventFlag(10)), tostring(eventFlag(11)), chapter(), HOST_CHAPTER))
+    if not fired then
+        shot("midmap-no-guard")
+        return result("FAIL", "EVFLAG_TMP(10) set but the midmap AFEV never ran (EVFLAG_TMP(11) unset)")
+    end
+    -- The chapter must KEEP GOING (the midmap is not a win): assert we're still on the ch03 map.
+    wait(60)
+    shot("ch03-midmap-done")
+    if chapter() ~= HOST_CHAPTER then
+        return result("FAIL", string.format("midmap ended the chapter (%d != host %d)", chapter(), HOST_CHAPTER))
+    end
+    result("PASS", "Brute killed -> EVFLAG_TMP(10) -> midmap AFEV ran (EVFLAG_TMP(11)) -> chapter continues (ch03 midmap wired)")
+end
+
 -- CH03TALK (#23 item 2): prove Trex's TALK-RECRUIT flips him GREEN -> BLUE (the CUSA fires). Boot
 -- the ch03 map, PARK the leader on a free tile adjacent to green Trex (the setMapUnit dance keeps
 -- the occupancy grid in sync, so cursor-select + Talk-adjacency both work with no phase cycle --
@@ -3860,6 +3939,95 @@ scenarios.recordch03win = function()
         yield()
     end
     result("PASS", "ch03 grell death + ending recorded")
+end
+
+-- recordch03midmap: the Icewind Brute's DEATH + the on-map RBG-execution cutscene in motion (#23
+-- item 1). Same park-adjacent + filmed-kill dance as recordch03win, but targets the Brute (0xb6)
+-- and films the three EXECUTION beats (Marty's mercy / RBG's "Say cheese" shot / Wolfram's ore gag)
+-- that the mid-map AFEV fires on its death -- a bounded A-cadence advances the beats and stops the
+-- instant the guard flag EVFLAG_TMP(11) is set (the chapter keeps going, so there's no title to hit).
+-- Fresh CH03BOOT New Game. Run: PT_HOST_CHAPTER=4 tools/playtest/run.sh recordch03midmap.
+scenarios.recordch03midmap = function()
+    if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
+    if not red(0xb6) then return result("FAIL", "Icewind Brute (pid 0xb6) not found in the red array") end
+    local leader = blue(0x01)
+    if not leader then return result("FAIL", "leader (0x01) not deployed") end
+    emu:write16(leader.addr + 0x1E, 0x2D1F) -- Iron Axe in items[0]: guaranteed in-range kill weapon
+    pokeAnimsOn()
+    waitFor(function()
+        return faction() == 0 and not menuOpen()
+           and not procActive(SYM.ProcScr_StdEventEngine)
+           and not procActive(SYM.ProcScr_BattleEventEngine)
+    end, 900, true)
+    for f = 1, 20 do if f % 3 == 0 then shot("ch03midmap") end yield() end -- settle on the map
+    -- Bring the LEADER to the Brute (at its real central tile ~14,6) rather than dragging the Brute
+    -- to the left-entrance spawn: the execution beats fire ON the kill tile, so killing centrally
+    -- keeps the camera central and the on-map talk bubble on-screen (a left-edge kill anchors the
+    -- bubble off the tilemap). Frail the Brute so the range-1 strike kills before it counters.
+    local function parkBrute()
+        local b = red(0xb6)
+        if not b or isDead(b) then return false end
+        pokeFrail(b); b = red(0xb6)
+        local lgrid = mapUnitAt(leader.x, leader.y)
+        for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+            local tx, ty = b.x + d[1], b.y + d[2]
+            if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0 then
+                setMapUnit(leader.x, leader.y, 0)
+                emu:write8(leader.addr + 0x10, tx); emu:write8(leader.addr + 0x11, ty)
+                setMapUnit(tx, ty, lgrid)
+                leader = blue(0x01)
+                return true
+            end
+        end
+        return false
+    end
+    -- Attack + film the battle anim (do NOT press once combat starts -- A skips an FE8 anim). The
+    -- hit kills the frail'd Brute; film the death, then a LIGHT A-cadence clears the EXP screen
+    -- without mashing into the execution beats that fire right after (EVFLAG_TMP(10) -> the AFEV).
+    local function filmedAttack()
+        leader = blue(0x01)
+        if not cursorTo(leader.x, leader.y) then return end
+        press(K.A); wait(15)
+        local opened = false
+        for _ = 1, 10 do
+            if menuOpen() then opened = true break end
+            press(K.A); if waitFor(menuOpen, 14) then opened = true break end
+        end
+        if not opened then press(K.B); press(K.B); return end
+        press(K.A); wait(8); press(K.A); wait(8); press(K.A) -- Attack -> weapon -> target -> combat
+        -- Film the anim to the death, then STOP -- do NOT clear the EXP screen here. The execution
+        -- beats fire right after the death, so any EXP-mash would blow through them; the slow cadence
+        -- below advances the EXP screen AND the beats one screen at a time.
+        local deadAt = nil
+        for i = 1, 900 do
+            if i % 2 == 0 then shot("ch03midmap") end
+            if not deadAt and (isDead(red(0xb6)) or eventFlag(10)) then deadAt = i end
+            if deadAt and i > deadAt + 120 then break end          -- tail: the death collapse
+            yield()
+        end
+    end
+    for turn = 1, 3 do
+        if isDead(red(0xb6)) or eventFlag(10) then break end
+        if not parkBrute() then return result("FAIL", "no free tile adjacent to the leader for the Brute") end
+        cursorTo(leader.x, leader.y)
+        for f = 1, 30 do if f % 3 == 0 then shot("ch03midmap") end yield() end -- frame the standoff
+        filmedAttack()
+        if isDead(red(0xb6)) or eventFlag(10) then break end
+        for f = 1, 40 do if f % 4 == 0 then shot("ch03midmap") end yield() end
+        if runEnemyPhase() == "gameover" then return result("FAIL", "unexpected game over") end
+    end
+    if not (isDead(red(0xb6)) or eventFlag(10)) then
+        return result("FAIL", "could not kill the Brute in 3 turns")
+    end
+    -- Film the EXP screen + the execution beats ONE PAGE AT A TIME: a hold long enough for the page
+    -- to draw + linger, THEN one A. Enough steps to reach Wolfram's last line (EXP + Marty + Brute +
+    -- RBG x3 + Wolfram x2 ~= 8 pages; extra steps film the map resuming, proof the chapter continues).
+    press(K.A, 3); wait(30)                                     -- dismiss the EXP/level screen
+    for _ = 1, 14 do
+        for f = 1, 75 do if f % 3 == 0 then shot("ch03midmap") end yield() end  -- page draws + holds
+        press(K.A, 3)                                                          -- advance one page
+    end
+    result("PASS", "ch03 Brute death + RBG-execution midmap recorded")
 end
 
 -- recordch02map: pan the cursor across the ch02 map (NW deploy + the 3 green chwinga -> the

@@ -627,5 +627,84 @@ class AppendedClassSlot(unittest.TestCase):
         self.assertEqual(twice.count('[CLASS_MNC_LIZARDZERKER - 1] = {'), 1)
 
 
+class Ch03MidmapExecution(unittest.TestCase):
+    """Ch03 midmap RBG-execution beat (#23 item 1): the Icewind Brute is a mid-map miniboss
+    whose DEFEAT fires a flagged death cutscene (RBG guns down the beaten Brute) -- the mirror
+    of the grell's DefeatBoss WIN, but keyed to a tmp flag + a Misc AFEV instead of the win
+    flag. These pin the pure builders inject_ch03 consumes."""
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH03_CHAPTER_YAML)
+
+    def test_exactly_one_miniboss_and_it_is_the_brute(self):
+        """The RBG-execution trigger = the one enemy flagged `is_miniboss` (the Icewind Brute)."""
+        mbs = bc.midmap_minibosses(self._chap())
+        self.assertEqual([e['id'] for e in mbs], ['kobold-steel'])
+
+    def test_miniboss_pid_is_a_clean_sibling_distinct_from_boss_and_generic(self):
+        """A unique raw pid so the Brute's flagged death quote keys the trigger to it ALONE --
+        not the shared generic 0xaa (all trash) and not the grell's 0xb7 (the WIN)."""
+        self.assertNotIn(bc.CH03_BRUTE_MINIBOSS_PID,
+                         (bc.CH03_GENERIC_PID, bc.CH03_BOSS_PID))
+
+    def test_afev_fires_once_on_the_brute_flag(self):
+        """The Misc AFEV watches the Brute-defeat flag, runs the midmap script, and guards the
+        one-shot with a distinct ent-flag (set after firing) -- else it re-fires every turn."""
+        line = bc.midmap_afev(bc.CH03_MIDMAP_GUARD_FLAG, bc.CH03_MIDMAP_SCRIPT,
+                              bc.CH03_BRUTE_DEFEAT_FLAG)
+        self.assertEqual(line, 'AFEV(%s, %s, %s)' % (bc.CH03_MIDMAP_GUARD_FLAG,
+                                                     bc.CH03_MIDMAP_SCRIPT,
+                                                     bc.CH03_BRUTE_DEFEAT_FLAG))
+        self.assertNotEqual(bc.CH03_MIDMAP_GUARD_FLAG, bc.CH03_BRUTE_DEFEAT_FLAG)
+
+    def test_ch03_tmp_flags_are_all_distinct(self):
+        """tmp flags are chapter-local; the midmap's two must not collide with Trex's talk flag."""
+        flags = {bc.CH03_TREX_TALK_FLAG, bc.CH03_BRUTE_DEFEAT_FLAG, bc.CH03_MIDMAP_GUARD_FLAG}
+        self.assertEqual(len(flags), 3)
+
+    def test_silent_defeat_quote_sets_the_flag_without_a_portrait(self):
+        """flag_defeat_quote = a msg=0 gDefeatTalkList entry: SetPidDefeatedFlag still sets the
+        flag on death (no CA_BOSS gate), but the faceless quote is suppressed (the cutscene is
+        the separate AFEV script). Shared by the grell WIN and the Brute midmap trigger."""
+        q = bc.flag_defeat_quote(bc.CH03_BRUTE_MINIBOSS_PID, 'CHAPTER_L_4',
+                                 bc.CH03_BRUTE_DEFEAT_FLAG, 'brute')
+        self.assertIn('.pid     = %s' % bc.CH03_BRUTE_MINIBOSS_PID, q)
+        self.assertIn('.chapter = CHAPTER_L_4', q)
+        self.assertIn('.flag    = %s' % bc.CH03_BRUTE_DEFEAT_FLAG, q)
+        self.assertIn('.msg     = 0', q)
+
+    def test_midmap_yaml_splits_into_the_four_reserved_beats(self):
+        """The locked midmap `script:` splits into exactly 4 beats matching the reserved msg-id block:
+        A Marty (faced) / A2 the faceless Brute snarl (split out of A so a mixed faced+faceless bubble
+        doesn't mis-wrap) / B RBG's shot (faced) / C Wolfram (faced). A beat_break drift would desync
+        the zip (guarded by _split_event_beats)."""
+        self.assertEqual(len(bc.CH03_MIDMAP_MSGS), 4)
+        _card, beats = bc._split_event_beats(self._chap(), 'midmap', 'ch03 midmap',
+                                             bc.CH03_MIDMAP_MSGS, card_required=False)
+        self.assertEqual(len(beats), 4)
+
+    def test_midmap_all_beats_faced_via_the_brute_mug_slot(self):
+        """The RBG-execution beats route by face. With the Brute's mug dressed on the Caellach guest
+        slot, every midmap speaker resolves to a face (fallback=GUEST_PORTRAIT_MAP), so all four beats
+        render as faced map bubbles -- none fall back to the opaque auto-centered box."""
+        self.assertEqual(bc.GUEST_PORTRAIT_MAP.get('kobold-brute'), 'Caellach')
+        _card, beats = bc._split_event_beats(self._chap(), 'midmap', 'ch03 midmap',
+                                             bc.CH03_MIDMAP_MSGS, card_required=False)
+        fid = bc._make_fid({'narration': None, 'boy-crier': '[FID_x]'}, 'ch03 midmap test',
+                           fallback=bc.GUEST_PORTRAIT_MAP)
+        self.assertFalse(any(bc._beat_is_faceless(b, fid) for b in beats))
+
+    def test_beat_is_faceless_detects_a_mugless_speaker(self):
+        """The routing mechanism itself: a beat whose only speaker resolves faceless (no mug) IS
+        flagged faceless -> it would ride the opaque box (the fallback for any future mugless NPC)."""
+        _card, beats = bc._split_event_beats(self._chap(), 'midmap', 'ch03 midmap',
+                                             bc.CH03_MIDMAP_MSGS, card_required=False)
+        mugless = bc._make_fid({'narration': None, 'kobold-brute': None}, 'ch03 midmap test')
+        self.assertEqual([bc._beat_is_faceless(b, mugless) for b in beats],
+                         [False, True, False, False])   # A2 (the Brute) faceless when it has no mug
+
+
 if __name__ == '__main__':
     unittest.main()

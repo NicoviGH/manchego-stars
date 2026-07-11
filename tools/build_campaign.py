@@ -577,6 +577,12 @@ GUEST_PORTRAIT_MAP = {
     # collision-free. Her bust is the FE-Repo Sonya (Witch) mug with a snow-white hair recolor
     # (portraits/vellynne.py); cutscene-only (no map unit).
     'vellynne':       'Ismaire',
+    # ch03 mid-map RBG-execution beat: the Icewind Brute's snarl now has a mug (Nicolas supplied the
+    # ref, 2026-07-11). It rides the vanilla Caellach slot -- a brutish Grado general absent from our
+    # ch00-08, referenced nowhere else -> collision-free. Bust = ref_to_bust of the HD kobold-brute
+    # ref (flipped to FE8 screen-left, crop 20,90,1970,1710, no sharpen). Cutscene-only (the Brute is
+    # a raw-pid enemy 0xb6; its death quote is silent, so FID_Caellach appears ONLY in the midmap line).
+    'kobold-brute':   'Caellach',
 }
 
 
@@ -891,6 +897,19 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
 def _beat_is_narration(beat):
     """True if every entry in a scenic beat is faceless `narration` stage-business."""
     return bool(beat) and all('narration' in e for e in beat)
+
+
+def _beat_is_faceless(beat, fid):
+    """True if a scenic beat has NO on-screen face -- every speaker resolves faceless (fid k is None).
+    A superset of _beat_is_narration (which keys on the literal 'narration' speaker): also catches a
+    named-but-portraitless speaker (e.g. the ch03 kobold-brute, no mug art). Such a beat CANNOT ride
+    a map talk bubble on-map -- PutTalkBubble anchors to a speaking unit, and an AFEV event script has
+    none, so the bubble renders off the tilemap -- it must use the opaque AUTO-CENTERED box
+    (SOLOTEXTBOXSTART), which needs no anchor. (Over a BG the full-screen window sidesteps this, which
+    is why the opening/ending don't hit it; the mid-map RBG-execution beat, on-map, does.)"""
+    keys = [next(iter(e)) for e in beat
+            if next(iter(e)) not in ('location_card', 'beat_break')]
+    return bool(keys) and all(fid(k) is None for k in keys)
 
 
 def _scenic_beat_calls(msgs, beats, labels):
@@ -4146,6 +4165,39 @@ def talk_recruit_script(msg_id, target):
             '    ENDA\n}' % (msg_id, target))
 
 
+def midmap_minibosses(chap):
+    """Enemy units in a loaded chapter flagged `is_miniboss` -- a mid-map miniboss whose
+    DEFEAT fires a flagged death cutscene (the mirror of the boss's DefeatBoss win, but keyed
+    to a tmp flag + a Misc AFEV rather than EVFLAG_DEFEAT_BOSS). Returns the enemy dicts in
+    YAML order. ch03's Icewind Brute triggers the RBG-execution beat (#23 item 1)."""
+    return [e for e in chap.get('enemy_units', []) if e.get('is_miniboss')]
+
+
+def flag_defeat_quote(pid, chapter_const, flag, comment):
+    """A SILENT (msg=0) gDefeatTalkList entry keying `pid`'s death in `chapter_const` to `flag`.
+    SetPidDefeatedFlag sets the flag on ANY matching pid's death (no CA_BOSS gate, eventinfo.c),
+    while DisplayDefeatTalkForPid suppresses the quote because msg=0 -- so a faceless unit sets
+    an event flag without rendering a boxless, unreadable line. Shared by the ch03 boss WIN
+    (flag=EVFLAG_DEFEAT_BOSS -> the DefeatBoss AFEV) and the Brute miniboss's mid-map death
+    trigger (flag=a tmp flag watched by a Misc AFEV)."""
+    return ('    {\n'
+            '        .pid     = %s, /* %s */\n'
+            '        .route   = CHAPTER_MODE_ANY,\n'
+            '        .chapter = %s,\n'
+            '        .flag    = %s,\n'
+            '        .msg     = 0,\n'
+            '    },' % (pid, comment, chapter_const, flag))
+
+
+def midmap_afev(guard_flag, script, watch_flag):
+    """A Misc AFEV that runs `script` once when `watch_flag` is set (the miniboss's flagged
+    death), guarded by `guard_flag` (EvCheck01_AFEV's ent-flag, set after the entry fires) so it
+    does not re-trigger every subsequent turn. The vanilla mid-map death-scene idiom (cf. ch1
+    AFEV(EVFLAG_TMP(7), EventScr_Ch1_Misc_DefeatBoss, EVFLAG_DEFEAT_BOSS)). guard_flag must
+    differ from watch_flag."""
+    return 'AFEV(%s, %s, %s)' % (guard_flag, script, watch_flag)
+
+
 def _ally_unit_entry(leader, slot, class_enum, level, x, y, items, comment,
                      allegiance='BLUE', autolevel=False, ai=None):
     """One non-RED UnitDefinition row (events_udefs.c) for a chapter join/deploy/
@@ -5455,9 +5507,9 @@ CH03_TREX_TALK_FLAG = 'EVFLAG_TMP(9)'
 # 0x9A3..0x9B9 -- every id there is referenced ONLY by the Ch4 event scripts that inject_ch03
 # replaces (git-verified against the pristine ch4-eventscript.h) -> dead in our build. 0x9A3
 # (boss death) + 0x9A5 (talk) are already claimed above. BG: reuse the ch02 Targos-winter slot
-# for the Termalaine street (Nicolas 2026-07-04: vanilla-style BG reuse, no new slot; the two
-# mid-map beats play ON-MAP, no BG). The midmap RBG-execution beat reserves 0x9AF..0x9B1 for its
-# follow-up slice.
+# for the Termalaine street (Nicolas 2026-07-04: vanilla-style BG reuse, no new slot; the
+# mid-map beats play ON-MAP, no BG). The midmap RBG-execution beat uses 0x9AF..0x9B1 + 0x9B4
+# (0x9B2/0x9B3 are the opening's Pinky-scout beats).
 CH03_OPENING_TOWN_BG = 'BG_MS_TARGOS_WINTER'      # beats A-B: the Termalaine street (crier, bounty, Wolfram)
 CH03_OPENING_MINE_BG = 'BG_MS_TERMALAINE_MINE'    # beats C-E: inside the mine (sign, Pinky's scout) -- swaps in after Wolfram's "we're going in"
 CH03_OPENING_CARD_MSG = 0x9A6
@@ -5469,6 +5521,22 @@ CH03_ENDING_CARD_MSG = 0x9AA
 CH03_ENDING_MSGS = (0x9AB, 0x9AC, 0x9AD)    # A RBG bounty · B Trex negotiates his warren in · C Meesmickle button
 CH03_TREX_ENTRANCE_MSG = 0x9AE              # light turn-1 on-map beat (Pinky telegraph + RBG "little dragon")
 CH03_TREX_ENTRANCE_SCRIPT = 'EventScr_089F1B38'  # dead Ch4 Village script (its list ref is dropped by the host) -> Trex's light turn-1 entrance beat
+# Midmap RBG-execution beat (#23 item 1): the Icewind Brute is a mid-map MINIBOSS whose DEFEAT
+# fires a flagged death cutscene (RBG guns down the beaten Brute) -- the mirror of the grell's
+# DefeatBoss WIN, keyed to a tmp flag + a Misc AFEV instead of the win flag. It rides ON-MAP (no
+# BG), like Trex's entrance. Reuses the dead Ch4 death-scene 0x9AF..0x9B1 message block.
+CH03_BRUTE_MINIBOSS_PID = '0xb6'   # the Icewind Brute -- a clean raw charIndex sibling of the grell's
+                                   # 0xb7 (0xB0..0xB9 are all UNNAMED gaps in gCharacterData, a
+                                   # designated-init array -> zero name/face/quote, no vanilla leak).
+                                   # Distinct from the shared generic 0xaa so its flagged death quote
+                                   # keys the midmap trigger to the Brute ALONE (first-match pid scan).
+CH03_BRUTE_DEFEAT_FLAG = 'EVFLAG_TMP(10)'  # set by the Brute's silent gDefeatTalkList entry on death
+CH03_MIDMAP_GUARD_FLAG = 'EVFLAG_TMP(11)'  # AFEV ent-flag: guards the one-shot (set after the beat fires)
+CH03_MIDMAP_SCRIPT = 'EventScr_089F1BD8'   # dead vanilla Ch4 script (defined-only; its list ref dropped by the host)
+# 4 beats: A Marty's mercy (faced bubble) · A2 the Brute's snarl (FACELESS -> opaque auto-centered box,
+# split out of A so Marty's bubble doesn't mis-wrap) · B the shot (faced) · C Wolfram comic reset (faced).
+# 0x9B2/0x9B3 are the opening's Pinky-scout beats; the midmap borrows 0x9B4 from the dead Ch4 block.
+CH03_MIDMAP_MSGS = (0x9AF, 0x9B0, 0x9B1, 0x9B4)
 CH03_CRIER_FID = '[FID_VillagerYoungBoy]'   # the boy crying the bounty on his crate (book p.95; generic mug)
 CH4_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch4-eventinfo.h')
 CH4_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch4-eventscript.h')
@@ -5493,9 +5561,10 @@ def inject_ch03(campaign, boot=False, verbose=True):
     to him -> the shared recruit script CUSA-flips him BLUE (the Colm/Neimi pattern -- one CHAR entry
     per field candidate). The OPENING (chapter_start, over the Targos-winter BG), Trex's light
     turn-1 ENTRANCE (Colm pattern, on-map), and the ENDING (chapter_end, over the BG -> the
-    dev-placeholder landing) cutscenes are wired here. DEFERRED (follow-up passes): the midmap
-    RBG-EXECUTION beat (needs a Brute-miniboss defeat trigger); chaining ch02->ch03; chests/doors;
-    title-card art; enemy/boss art."""
+    dev-placeholder landing) cutscenes are wired here, as is the mid-map RBG-EXECUTION beat: the
+    Icewind Brute rides a unique miniboss pid + a silent flagged defeat quote, and a Misc AFEV fires
+    the on-map execution cutscene once on its death (the mirror of the boss WIN). DEFERRED (follow-up
+    passes): chaining ch02->ch03; chests/doors; title-card art; enemy/boss art."""
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH03_CHAPTER_YAML)
 
@@ -5505,10 +5574,15 @@ def inject_ch03(campaign, boot=False, verbose=True):
     op_card, op_beats = _split_event_beats(chap, 'chapter_start', 'ch03 opening', CH03_OPENING_MSGS)
     end_card, end_beats = _split_event_beats(chap, 'chapter_end', 'ch03 ending', CH03_ENDING_MSGS)
     trex_entr = next(e for e in chap['events'] if e.get('trigger') == 'trex_entrance')['script']
+    # Midmap RBG-execution beat: on-map (no BG, no card), 3 beats (A/B/C) over 0x9AF..0x9B1.
+    _mid_card, mid_beats = _split_event_beats(chap, 'midmap', 'ch03 midmap', CH03_MIDMAP_MSGS,
+                                              card_required=False)
     # Speaker -> face: cast via PORTRAIT_MAP; narration faceless (opaque #58 box); the boy-crier
     # rides a generic villager mug (his line names Speaker Masthew -- book p.93, Oarus Masthew).
+    # The kobold-brute now has a custom mug on the Caellach guest slot -> it resolves through the
+    # GUEST_PORTRAIT_MAP fallback (checked after cast), so its midmap snarl is a FACED bubble.
     cut_special = {'narration': None, 'boy-crier': CH03_CRIER_FID}
-    cut_fid = _make_fid(cut_special, 'ch03 unknown cutscene speaker')
+    cut_fid = _make_fid(cut_special, 'ch03 unknown cutscene speaker', fallback=GUEST_PORTRAIT_MAP)
     # RBG anchors mid-right through the opening (the leader who answers): the beat-A crier
     # two-shot + the beat-C Pinky/RBG flyover two-hander stage cleanly without face-flashing.
     op_home = {'prof-rbg': '[OpenMidRight]'}
@@ -5575,7 +5649,12 @@ def inject_ch03(campaign, boot=False, verbose=True):
         if drop:
             items = '%s, %s' % (items, CH03_ITEM_IDS[drop]) if items else CH03_ITEM_IDS[drop]
         ai = CH03_AI.get(e.get('ai_pattern', 'defensive'), CH03_AI['defensive'])
-        char = CH03_BOSS_PID if e.get('is_boss') else CH03_GENERIC_PID
+        # The boss (grell) + the mid-map miniboss (Brute) each ride a UNIQUE raw pid so their
+        # flagged gDefeatTalkList entries key their death events (WIN / midmap AFEV) to them
+        # alone; every other enemy shares the generic autolevelled-trash pid.
+        char = (CH03_BOSS_PID if e.get('is_boss')
+                else CH03_BRUTE_MINIBOSS_PID if e.get('is_miniboss')
+                else CH03_GENERIC_PID)
         for x, y in e['positions']:
             enemies.append(_enemy_unit_entry(
                 char, cls, e['level'], bool(e.get('autolevel')), x, y, items, ai,
@@ -5608,9 +5687,16 @@ def inject_ch03(campaign, boot=False, verbose=True):
     info = _replace_brace_block(info, 'EventListScr_Ch4_Location[] =', '{\n    END_MAIN\n}', CH4_EVENTINFO_H)
     # Character events = the Trex talk-recruit (#23 item 2): the CHAR-per-candidate list.
     info = _replace_brace_block(info, 'EventListScr_Ch4_Character[] =', char_events, CH4_EVENTINFO_H)
+    # Misc = the win/lose machinery + the mid-map RBG-execution AFEV. DefeatBoss(ending) fires on
+    # the grell's death (EVFLAG_DEFEAT_BOSS); the midmap AFEV fires ONCE on the Brute's death (its
+    # flagged quote sets CH03_BRUTE_DEFEAT_FLAG), guarded by CH03_MIDMAP_GUARD_FLAG so it doesn't
+    # re-run each turn -- the vanilla mid-map death-scene idiom (cf. ch1's tmp-flag AFEV).
     info = _replace_brace_block(
         info, 'EventListScr_Ch4_Misc[] =',
-        '{\n    DefeatBoss(%s)\n    CauseGameOverIfLordDies\n    END_MAIN\n}' % CH03_ENDING_SCRIPT,
+        '{\n    DefeatBoss(%s)\n    %s /* midmap: RBG executes the beaten Brute (#23) */\n'
+        '    CauseGameOverIfLordDies\n    END_MAIN\n}'
+        % (CH03_ENDING_SCRIPT,
+           midmap_afev(CH03_MIDMAP_GUARD_FLAG, CH03_MIDMAP_SCRIPT, CH03_BRUTE_DEFEAT_FLAG)),
         CH4_EVENTINFO_H)
     # Ch4's tutorial list is an EventListScr[] (struct array), NOT the prologue's pointer
     # array -- so it terminates with END_MAIN, not NULL (NULL -> int-from-pointer error).
@@ -5727,6 +5813,29 @@ def inject_ch03(campaign, boot=False, verbose=True):
     # points here, so ANY core party member's talk runs it (the vanilla Colm/Neimi shape).
     script = _replace_brace_block(script, CH03_TREX_TALK_SCRIPT + '[] =',
                                   talk_recruit_script(CH03_TREX_TALK_MSG, trex_char), CH4_EVENTSCRIPT_H)
+    # Midmap RBG-execution beat (#23 item 1): the Misc AFEV runs this on the Brute's death. Plays
+    # ON-MAP (no BACG -- the chapter continues on the same battle map). Each beat renders by whether
+    # it has a face (_beat_is_faceless): FACED beats ride a map talk bubble via Text() (TEXTSTART..REMA
+    # -- its trailing REMA clears the beat's faces, so none bleed into the next; a bare TEXTSHOW without
+    # it left Pinky up under Wolfram). A speaker with no mug would ride the opaque AUTO-CENTERED box
+    # (SOLOTEXTBOXSTART) -- a map bubble anchors to a speaking unit and an AFEV has none, so a faceless
+    # bubble renders off the tilemap. All four midmap speakers now have mugs (the Brute got one on the
+    # Caellach slot), so all four are faced bubbles here. EVBIT_T(7) marks the map event done.
+    mid_labels = ['A -- Marty tries mercy on the beaten Brute (faced)',
+                  'A2 -- the Brute lunges at Pinky; claws ring off the homunculus (faced)',
+                  'B -- RBG executes the Brute at gunpoint ("Say cheese"); Pinky reads it as rescue (faced)',
+                  'C -- Wolfram\'s oblivious ore gag deflates the moment (faced)']
+    mid_calls = ''
+    for msg, beat, lbl in zip(CH03_MIDMAP_MSGS, mid_beats, mid_labels):
+        if _beat_is_faceless(beat, cut_fid):
+            mid_calls += ('    SVAL(EVT_SLOT_B, 0xFF00FF) /* auto-center the opaque solo box (#58) */\n'
+                          '    SOLOTEXTBOXSTART\n    TEXTSHOW(0x%X) /* %s */\n    TEXTEND\n    REMA\n'
+                          % (msg, lbl))
+        else:
+            mid_calls += '    Text(0x%X) /* %s */\n' % (msg, lbl)
+    script = _replace_brace_block(
+        script, CH03_MIDMAP_SCRIPT + '[] =',
+        '{\n' + mid_calls + '    EVBIT_T(7)\n    ENDA\n}', CH4_EVENTSCRIPT_H)
     with open(CH4_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
         f.write(script)
 
@@ -5756,6 +5865,13 @@ def inject_ch03(campaign, boot=False, verbose=True):
                       trailings=op_trailings)
     set_message_body(lines, CH03_ENDING_CARD_MSG, name_message_body(end_card))
     _emit_scene_beats(lines, CH03_ENDING_MSGS, end_beats, cut_fid, {})
+    # Midmap RBG-execution beats (on-map, no card): faced beats wrap at the map-bubble 29 (RBG anchors
+    # mid-right via op_home); the faceless Brute snarl wraps at 28 for the auto-centered opaque box (a
+    # 29-tile line clips its centered frame). Speakers resolve through cut_fid (kobold-brute -> None).
+    for msg, beat in zip(CH03_MIDMAP_MSGS, mid_beats):
+        w = 28 if _beat_is_faceless(beat, cut_fid) else 29
+        set_message_body(lines, msg, _script_to_message(
+            beat, _stage_beat(beat, cut_fid, op_home), width=w))
     set_message_body(lines, CH03_TREX_ENTRANCE_MSG, _script_to_message(
         trex_entr, _stage_beat(trex_entr, cut_fid, op_home), width=29))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
@@ -5766,18 +5882,19 @@ def inject_ch03(campaign, boot=False, verbose=True):
     #    .msg = 0: NO death quote (the grell has no portrait, so the faceless line rendered boxless +
     #    unreadable; Nicolas cut it). The engine still sets the flag -- DisplayDefeatTalkForPid only
     #    shows the quote `if (ent->msg != 0)` but SetPidDefeatedFlag runs regardless (eventinfo.c:595).
-    quote = ('    {\n'
-             '        .pid     = %s, /* grell (ch03 boss): silent defeat -> DefeatBoss flag, no quote */\n'
-             '        .route   = CHAPTER_MODE_ANY,\n'
-             '        .chapter = CHAPTER_L_4, /* ch03 is hosted on chapter slot 4 */\n'
-             '        .flag    = EVFLAG_DEFEAT_BOSS,\n'
-             '        .msg     = 0, /* no death quote (faceless -> unreadable; removed) */\n'
-             '    },' % CH03_BOSS_PID)
-    _prepend_defeat_quote(quote)
+    #    The Brute miniboss rides the SAME silent-quote idiom: its flagged death sets the tmp flag
+    #    CH03_BRUTE_DEFEAT_FLAG that the mid-map RBG-execution AFEV watches (step 3). Different pids
+    #    -> both entries coexist at the head; the first-match pid scan keys each to its own unit.
+    _prepend_defeat_quote(flag_defeat_quote(
+        CH03_BOSS_PID, 'CHAPTER_L_4', 'EVFLAG_DEFEAT_BOSS',
+        'grell (ch03 boss): silent defeat -> DefeatBoss WIN flag'))
+    _prepend_defeat_quote(flag_defeat_quote(
+        CH03_BRUTE_MINIBOSS_PID, 'CHAPTER_L_4', CH03_BRUTE_DEFEAT_FLAG,
+        'Icewind Brute (ch03 miniboss): silent defeat -> mid-map RBG-execution AFEV'))
 
     if verbose:
         print('  ch03 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; defeat_boss goal + '
-              'DefeatBoss(grell) WIN wired, PREP deploy cap %d%s + %d enemies (grell@14,1); opening/entrance/ending cutscenes wired (midmap deferred)'
+              'DefeatBoss(grell) WIN wired, PREP deploy cap %d%s + %d enemies (grell@14,1); opening/entrance/midmap/ending cutscenes wired'
               % (obj_idx, pal_idx, cfg_idx, layout_idx, CH03_HOST_INDEX, len(cap_rows),
                  ' (boot-seeded party)' if boot else '', len(enemies)))
 
