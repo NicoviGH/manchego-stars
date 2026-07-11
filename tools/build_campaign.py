@@ -5565,36 +5565,73 @@ CH4_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch4-eventinfo.h')
 CH4_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch4-eventscript.h')
 
 
-def _inject_ch03_chest_map_changes(chap, host_index):
-    """Author the ch03 chest tile-changes + point slot `host_index` at them (#23).
+def _read_map_metatile(maps_dir, stem, x, y):
+    """Return the metatile index painted at (x, y) on a compiled .mar layout. compile_layout
+    stores each cell as metatile<<5 with no header (map_tileset_tool), row-major over the
+    width from the paired .json -- so reading the door's OPEN tile off the map itself tracks
+    any re-retile (no hand-copied tile numbers to drift)."""
+    with open(os.path.join(maps_dir, stem + '.json'), encoding='utf-8') as f:
+        w = json.load(f)['width']
+    with open(os.path.join(maps_dir, stem + '.mar'), 'rb') as f:
+        mar = f.read()
+    return struct.unpack_from('<H', mar, (y * w + x) * 2)[0] >> 5
 
-    FE8 flips a chest's tile on loot via a per-chapter MapChange array: opening a chest runs
-    CallChestOpeningEvent(GetMapChangeIdAt(x, y), item) (eventinfo.c), which finds the change
-    whose 1x1 region covers the chest tile and writes its tiles into gBmMapBaseTiles. So one
-    MapChange per chest, at the chest's (x, y), holding the OPEN FF5 navy chest metatile.
+
+def _ch03_tile_changes_asm(chests, doors):
+    """Pure: the MS_Ch03MapChanges ASM block for the ch03 chest + door tile-changes (#23).
+
+    FE8 flips a tile on loot/open via a per-chapter MapChange array: opening a chest runs
+    CallChestOpeningEvent(GetMapChangeIdAt(x, y), item) and opening a door runs
+    CallTileChangeEvent(GetMapChangeIdAt(x, y)) (eventinfo.c) -- both find the change whose
+    1x1 region covers the tile and write its tiles into gBmMapBaseTiles. GetMapChangeIdAt
+    matches by POSITION, so chests and doors share ONE array; ids only need to stay unique.
+
+    chests = [(x, y), ...]        -- all open to the shared FF5 navy chest tile (17->29).
+    doors  = [(x, y, open_metatile), ...] -- each opens to its OWN below-cell floor tile
+             (Nicolas 2026-07-11: an opened door becomes the passable tile directly below it).
 
     struct MapChange { s8 id; u8 xOrigin, yOrigin, xSize, ySize; u8 pad[3]; const void* data; }
-    (12 B; data at 0x08). Tile data is metatile<<2 (the gBmMapBaseTiles encoding; see
-    CH03_CHEST_OPEN_TILE). The array terminates on id < 0. Registered as a fresh
-    gChapterDataAssetTable word; slot `host_index`'s map.changeLayerId indexes it
-    (GetChapterMapChangesPointer -> gChapterDataAssetTable[changeLayerId], chapterdata.c)."""
-    open_tile = CH03_CHEST_OPEN_TILE << 2
-    entries = ''.join(
-        '\t.byte %d, %d, %d, 1, 1, 0, 0, 0\n\t.word MS_Ch03ChestOpenTile\n'
-        % (i, c['position'][0], c['position'][1])
-        for i, c in enumerate(chap['chests']))
-    block = '\n'.join([
-        '', '/* Manchego Stars ch03 chest tile-changes (#23): flip FF5 navy chest %d->%d on loot */'
-        % (CH03_CHEST_CLOSED_TILE, CH03_CHEST_OPEN_TILE),
-        '\t.align 2, 0', '\t.global MS_Ch03ChestMapChanges', 'MS_Ch03ChestMapChanges:',
-        entries.rstrip('\n'),
-        '\t.byte -1, 0, 0, 0, 0, 0, 0, 0 /* terminator (id < 0) */', '\t.word 0',
-        'MS_Ch03ChestOpenTile:',
-        '\t.hword %d /* %d << 2 (open metatile) */' % (open_tile, CH03_CHEST_OPEN_TILE)])
+    (12 B; data at 0x08). Tile data is metatile<<2 (the gBmMapBaseTiles encoding). The array
+    terminates on id < 0. The caller registers MS_Ch03MapChanges as a fresh gChapterDataAssetTable
+    word and points the host slot's map.changeLayerId at it."""
+    lines = ['', '/* Manchego Stars ch03 tile-changes (#23): flip FF5 navy chest %d->%d on loot;'
+             ' open each door to the floor tile directly below it */'
+             % (CH03_CHEST_CLOSED_TILE, CH03_CHEST_OPEN_TILE),
+             '\t.align 2, 0', '\t.global MS_Ch03MapChanges', 'MS_Ch03MapChanges:']
+    tiles = ['MS_Ch03ChestOpenTile:',
+             '\t.hword %d /* %d << 2 (open chest metatile) */'
+             % (CH03_CHEST_OPEN_TILE << 2, CH03_CHEST_OPEN_TILE)]
+    mid = 0
+    for x, y in chests:
+        lines.append('\t.byte %d, %d, %d, 1, 1, 0, 0, 0\n\t.word MS_Ch03ChestOpenTile'
+                     % (mid, x, y))
+        mid += 1
+    for di, (x, y, open_metatile) in enumerate(doors):
+        sym = 'MS_Ch03DoorOpenTile_%d' % di
+        lines.append('\t.byte %d, %d, %d, 1, 1, 0, 0, 0\n\t.word %s' % (mid, x, y, sym))
+        tiles.append('%s:\n\t.hword %d /* %d << 2 (open door -> floor below) */'
+                     % (sym, open_metatile << 2, open_metatile))
+        mid += 1
+    lines.append('\t.byte -1, 0, 0, 0, 0, 0, 0, 0 /* terminator (id < 0) */\n\t.word 0')
+    return '\n'.join(lines + tiles)
+
+
+def _inject_ch03_tile_changes(chap, maps_dir, host_index):
+    """Author the ch03 chest + door tile-changes + point slot `host_index` at them (#23).
+
+    Emits MS_Ch03MapChanges (chests then doors -- see _ch03_tile_changes_asm), registers it as
+    a fresh gChapterDataAssetTable word, and sets the host slot's map.changeLayerId to that index
+    (GetChapterMapChangesPointer -> gChapterDataAssetTable[changeLayerId], chapterdata.c). Each
+    door's open tile is read off the painted map (the metatile directly below the door cell)."""
+    chests = [(c['position'][0], c['position'][1]) for c in chap.get('chests', [])]
+    doors = [(d['position'][0], d['position'][1],
+              _read_map_metatile(maps_dir, CH03_LAYOUT[1], d['position'][0], d['position'][1] + 1))
+             for d in chap.get('doors', [])]
+    block = _ch03_tile_changes_asm(chests, doors)
     with open(CONST_MAPS_S, 'a', encoding='utf-8') as f:
         f.write(block + '\n')
     idx = _append_asm_table_words(ASSET_TABLE_S, 'gChapterDataAssetTable',
-                                  ['MS_Ch03ChestMapChanges'])
+                                  ['MS_Ch03MapChanges'])
     with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
         settings = json.load(f)
     settings['chapters'][host_index]['map']['changeLayerId'] = idx
@@ -5749,16 +5786,20 @@ def inject_ch03(campaign, boot=False, verbose=True):
         '{\n    TURN(0x0, %s, 1, 0, FACTION_ID_BLUE)'
         ' /* turn-1: Trex\'s light entrance (Colm pattern) */\n    END_MAIN\n}'
         % CH03_TREX_ENTRANCE_SCRIPT, CH4_EVENTINFO_H)
-    # Location = the 4 mine chests (#23): each Chest(item, x, y) makes its tile openable
-    # (IsThereClosedChestAt reads this list) and gives the item; the paired MS_Ch03ChestMapChanges
-    # entry (step 6b) flips the FF5 navy chest 17->29 when looted. Coords + items from the YAML
-    # (vanilla Ch3 Borgo 1:1; (8,3) = the Tourmaline, the ch02<->ch03 swap). Doors: follow-up.
-    chest_events = '{\n' + ''.join(
+    # Location = the mine chests + doors (#23). Each Chest(item, x, y) makes its tile openable
+    # (IsThereClosedChestAt reads this list) and gives the item; each Door_(x, y) makes its tile a
+    # thief/key door (TILE_COMMAND_DOOR, script=1 -> CallTileChangeEvent). The paired
+    # MS_Ch03MapChanges entry (step 6b) flips the chest 17->29 on loot / the door to the floor tile
+    # below it on open. Coords + items from the YAML (vanilla Ch3 Borgo 1:1; (8,3) = the Tourmaline,
+    # the ch02<->ch03 swap).
+    loc_events = '{\n' + ''.join(
         '    Chest(%s, %d, %d) /* %s */\n'
         % (CH03_ITEM_IDS[c['contents'][0]['id']], c['position'][0], c['position'][1],
            c['contents'][0]['id'])
-        for c in chap['chests']) + '    END_MAIN\n}'
-    info = _replace_brace_block(info, 'EventListScr_Ch4_Location[] =', chest_events, CH4_EVENTINFO_H)
+        for c in chap['chests']) + ''.join(
+        '    Door_(%d, %d)\n' % (d['position'][0], d['position'][1])
+        for d in chap.get('doors', [])) + '    END_MAIN\n}'
+    info = _replace_brace_block(info, 'EventListScr_Ch4_Location[] =', loc_events, CH4_EVENTINFO_H)
     # Character events = the Trex talk-recruit (#23 item 2): the CHAR-per-candidate list.
     info = _replace_brace_block(info, 'EventListScr_Ch4_Character[] =', char_events, CH4_EVENTINFO_H)
     # Misc = the win/lose machinery + the mid-map RBG-execution AFEV. DefeatBoss(ending) fires on
@@ -5778,10 +5819,10 @@ def inject_ch03(campaign, boot=False, verbose=True):
     with open(CH4_EVENTINFO_H, 'w', encoding='utf-8') as f:
         f.write(info)
 
-    # 3b. Chest tile-changes: pair each Chest() location event above with a MapChange that flips
-    #     the FF5 navy chest 17->29 on loot (must run AFTER _retarget_host_chapter zeroed the
-    #     slot's changeLayerId in step 1).
-    _inject_ch03_chest_map_changes(chap, CH03_HOST_INDEX)
+    # 3b. Tile-changes: pair each Chest()/Door_() location event above with a MapChange -- flips the
+    #     FF5 navy chest 17->29 on loot, and each door to the floor tile below it on open (must run
+    #     AFTER _retarget_host_chapter zeroed the slot's changeLayerId in step 1).
+    _inject_ch03_tile_changes(chap, maps_dir, CH03_HOST_INDEX)
 
     with open(CH4_EVENTSCRIPT_H, encoding='utf-8') as f:
         script = f.read()

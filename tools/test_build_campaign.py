@@ -707,5 +707,51 @@ class Ch03MidmapExecution(unittest.TestCase):
                          [False, True, True, False, True, False, False])   # A3 (Brute) faceless w/o a mug
 
 
+class Ch03TileChanges(unittest.TestCase):
+    """The ch03 chest + door tile-changes (#23): one MapChange array flips each chest's
+    FF5 navy tile 17->29 on loot and opens each door to the floor tile DIRECTLY BELOW it
+    (Nicolas 2026-07-11 -- 'use the tile directly adjacent and below it'). GetMapChangeIdAt
+    matches by POSITION, so chests + doors coexist in one array; ids just stay unique."""
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+    STEM = bc.CH03_LAYOUT[1]
+    MAPS = os.path.join(bc.REPO, 'campaigns', 'rime-of-the-frostmaiden', 'maps')
+
+    def test_reads_the_painted_metatile_at_a_cell(self):
+        # The retile paints the FF5 navy chest (metatile 17) at (6,3); the .mar stores
+        # metatile<<5, so the reader must decode 17 back out.
+        self.assertEqual(bc._read_map_metatile(self.MAPS, self.STEM, 6, 3), 17)
+
+    def test_door_open_tile_is_the_metatile_directly_below(self):
+        # Vanilla Ch3 doors sit at (6,10)/(10,5)/(2,3); the open tile = the cell one row down
+        # on the COMMITTED (hand-painted) map -- road tiles (572/492) + the stairs down (626),
+        # all passable, so the opened door lets the party through.
+        below = [bc._read_map_metatile(self.MAPS, self.STEM, x, y + 1)
+                 for (x, y) in [(6, 10), (10, 5), (2, 3)]]
+        self.assertEqual(below, [572, 626, 492])
+
+    def test_asm_emits_one_change_per_chest_then_per_door_with_unique_ids(self):
+        asm = bc._ch03_tile_changes_asm([(6, 3), (8, 3)], [(6, 10, 98), (2, 3, 66)])
+        ids = [int(l.split(',')[0].split()[1]) for l in asm.splitlines()
+               if l.strip().startswith('.byte') and 'terminator' not in l]
+        self.assertEqual(ids, [0, 1, 2, 3])   # 2 chests then 2 doors, contiguous + unique
+        self.assertIn('.byte -1', asm)        # id<0 terminator closes the array
+
+    def test_asm_chests_share_the_open_chest_tile_word(self):
+        asm = bc._ch03_tile_changes_asm([(6, 3), (8, 3)], [])
+        self.assertEqual(asm.count('.word MS_Ch03ChestOpenTile'), 2)
+        self.assertIn('.hword %d' % (bc.CH03_CHEST_OPEN_TILE << 2), asm)
+
+    def test_asm_each_door_gets_its_own_below_tile_word(self):
+        asm = bc._ch03_tile_changes_asm([], [(6, 10, 98), (10, 5, 302)])
+        self.assertIn('.word MS_Ch03DoorOpenTile_0', asm)
+        self.assertIn('.word MS_Ch03DoorOpenTile_1', asm)
+        self.assertIn('.hword %d' % (98 << 2), asm)     # open metatile stored as metatile<<2
+        self.assertIn('.hword %d' % (302 << 2), asm)
+
+    def test_asm_carries_the_door_cell_coords(self):
+        asm = bc._ch03_tile_changes_asm([], [(6, 10, 98)])
+        self.assertIn('.byte 0, 6, 10, 1, 1, 0, 0, 0', asm)   # id 0 at (x=6, y=10), 1x1 region
+
+
 if __name__ == '__main__':
     unittest.main()

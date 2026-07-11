@@ -265,6 +265,17 @@ chests:
       - id: red-gem             # a pink Tourmaline — Termalaine's signature gem (2,500g sell). DEVIATION: see ADR.
         flavor: "a fist-sized rose-pink tourmaline, the best seam in the mine"
 
+# ── Doors (thief lesson): gate the mine's inner galleries ────────────────────
+# Positions = vanilla FE8 Ch3 (Borgo) door tiles 1:1 (our map is a Borgo retile); the closed
+# single-door metatile (812) is painted at each. A thief (Trex) or a Door Key opens one; on open
+# the tile flips to the passable floor tile DIRECTLY BELOW the door (Nicolas 2026-07-11 — "the
+# tile directly adjacent and below it"), read off the painted map so it tracks any re-retile.
+# (10,5) opens onto the stairs down; (6,10)/(2,3) onto gallery road. Doors make the thief matter.
+doors:
+  - position: [6, 10]           # vanilla Ch3 Door_(6, 10) — the lower gallery
+  - position: [10, 5]           # vanilla Ch3 Door_(10, 5) — gates the stairs down
+  - position: [2, 3]            # vanilla Ch3 Door_(2, 3)  — the upper-left room
+
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
 # Beat PLACEMENT only — final dialogue is written via the dialogue-pass skill (voice bibles +
 # the #58 opaque-box narration convention), gated by tools/verify_text.py. Grounded in the DM
