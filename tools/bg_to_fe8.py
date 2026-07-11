@@ -32,7 +32,11 @@ def fit_240x160(im, mode):
         return im
     scale = max(W / sw, H / sh) if mode == 'crop' else min(W / sw, H / sh)
     nw, nh = max(1, round(sw * scale)), max(1, round(sh * scale))
-    im = im.resize((nw, nh), Image.LANCZOS)
+    # NEAREST, not LANCZOS: these sources are pixel art destined for a GBA 4bpp
+    # re-quantise. Bilinear/Lanczos smoothing invents in-between colours that the
+    # bank-packer then has to quantise back, producing blur + banding. Nearest
+    # preserves the source pixels 1:1.
+    im = im.resize((nw, nh), Image.NEAREST)
     canvas = Image.new('RGB', (W, H), (0, 0, 0))
     canvas.paste(im, ((W - nw) // 2, (H - nh) // 2))
     return canvas

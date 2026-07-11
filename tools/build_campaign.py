@@ -784,7 +784,8 @@ def _term_pad(body):
     return body
 
 
-def _script_to_message(script, staging, width=29, face_budget=4, preload=None):
+def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
+                       trailing=None):
     """Render a chapter-YAML cutscene `script:` block as an FE8 message body.
 
     Mirrors the vanilla shape (cf. MSG_910/911): faces are loaded lazily at a
@@ -832,6 +833,12 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None):
     event script (or split into separate messages), not the message body, and are
     skipped here. `width` is the wrap width (29 = map speech bubble; ~42 for a
     full-screen scenic BG -- see _wrap_fe_lines).
+
+    `trailing` is a raw text-code string appended just before the [X] terminator --
+    e.g. '[OpenMidLeft][ClearFace]' to fade ONLY that podium's face at the beat's
+    end (scene.c: StartFaceFadeOut on faces[activeFaceSlot]), leaving the others up.
+    The one low-level face control the podium auto-manager doesn't infer: a speaker
+    who exits mid-scene while a co-speaker holds (the ch03 Pinky-scout -> RBG waits).
     """
     blocks = []   # (speaker, [page, ...]); page = 'line1[LF]\nline2'
     for entry in script:
@@ -878,7 +885,7 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None):
             live[open_tag] = speaker
             lru.append(open_tag)
         parts.append(body)
-    return '\n'.join(parts) + '[X]'
+    return '\n'.join(parts) + (trailing or '') + '[X]'
 
 
 def _beat_is_narration(beat):
@@ -2174,6 +2181,18 @@ def _inject_cast_palette(palette_u16, char_slots):
     _inject_palette_bank_hook()
 
 
+# Cast members rendered through the SIDE (faction) palette -- green as an NPC, then the
+# standard blue PLAYER palette once recruited -- instead of the bespoke cast OBJ palette.
+# Their custom SHAPE still ships (SMS + MU overrides), but the sheet is remapped onto the
+# donor class's standard SMS role layout (cf. enemy reskins / the ch02 chwinga) and the
+# unit is kept OUT of gMapPaletteOverride, so GetUnitSpritePalette falls through to the
+# faction switch and tints it per side. Needed for a unit that CHANGES faction colour in
+# play: Trex stands GREEN, then the talk-recruit CUSA flips him to the BLUE player palette
+# (#23). A charId-keyed cast override is unconditional -- it would pin one colour, so a
+# green Trex would wrongly render in his blue player palette (Nicolas, 2026-07-10).
+FACTION_TINTED_CAST = frozenset({'trex'})
+
+
 def inject_map_sprites(campaign, verbose=True):
     """Give cast members a custom overworld sprite distinct from their class.
 
@@ -2208,10 +2227,35 @@ def inject_map_sprites(campaign, verbose=True):
     # unit keeps its custom sprite instead of reverting to the stock class one (idle-only
     # decision -- map_sprite_tool.synth_mu_sheet). Synthesized sheets go to a temp dir so
     # no derived asset lands in the working tree; the single source of truth is the idle.
+    # Faction-tinted cast (Trex): remap the cast-palette idle + committed walk onto the
+    # donor class's standard SMS role layout so the faction switch tints them (green NPC ->
+    # blue player on recruit). Same remap as enemy reskins, using the donor WAIT sheet's
+    # palette for BOTH sheets so idle/walk share role indices. Temp dir -> no derived asset
+    # in the tree (single source of truth stays map_sprites/<id>.png).
+    tinted_idle_src, tinted_mu_src, tint_tmp = {}, {}, None
+    for uid, slot, cls, sms in idle:
+        if uid not in FACTION_TINTED_CAST:
+            continue
+        if tint_tmp is None:
+            tint_tmp = tempfile.mkdtemp(prefix='manchego_tint_')
+        donor_png = os.path.join(WAIT_GFX_DIR,
+                                 'unit_icon_wait_%s_sheet.png' % _donor_base(campaign, uid))
+        r_idle = os.path.join(tint_tmp, uid + '.png')
+        map_sprite_tool.remap_sms_palette(os.path.join(asset_dir, uid + '.png'), donor_png, r_idle)
+        tinted_idle_src[uid] = r_idle
+        committed_mu = os.path.join(asset_dir, uid + '_mu.png')
+        if os.path.isfile(committed_mu):
+            r_mu = os.path.join(tint_tmp, uid + '_mu.png')
+            map_sprite_tool.remap_sms_palette(committed_mu, donor_png, r_mu)
+            tinted_mu_src[uid] = r_mu
+
     mu, mu_tmp = [], None
     for uid, slot, cls, sms in idle:
+        if uid in tinted_mu_src:                     # faction-tinted committed walk (remapped)
+            mu.append((uid, slot, cls, tinted_mu_src[uid]))
+            continue
         committed = os.path.join(asset_dir, uid + '_mu.png')
-        if os.path.isfile(committed):
+        if uid not in FACTION_TINTED_CAST and os.path.isfile(committed):
             mu.append((uid, slot, cls, committed))
             continue
         if mu_tmp is None:
@@ -2219,7 +2263,10 @@ def inject_map_sprites(campaign, verbose=True):
         src = os.path.join(mu_tmp, uid + '_mu.png')
         nudge = ((load_unit(campaign, uid).get('art') or {}).get('map_sprite') or {}).get(
             'glide_nudge', 0)
-        map_sprite_tool.synth_mu_sheet(os.path.join(asset_dir, uid + '.png'),
+        # A tinted unit with no committed walk glides from its REMAPPED role idle (so the
+        # glide tints too); everyone else glides from their raw cast-palette idle.
+        idle_for_synth = tinted_idle_src.get(uid, os.path.join(asset_dir, uid + '.png'))
+        map_sprite_tool.synth_mu_sheet(idle_for_synth,
                                        _donor_base(campaign, uid), src,
                                        y_nudge=nudge, verbose=verbose)
         mu.append((uid, slot, cls, src))
@@ -2235,7 +2282,8 @@ def inject_map_sprites(campaign, verbose=True):
         guest_mu.append((uid, slot, cls, committed))
 
     pointer_externs = []
-    _inject_idle_sprites(campaign, asset_dir, idle + guest_idle, pointer_externs, guest_bases)
+    _inject_idle_sprites(campaign, asset_dir, idle + guest_idle, pointer_externs, guest_bases,
+                         src_override=tinted_idle_src)
     _inject_mu_sprites(mu + guest_mu, pointer_externs)
     if pointer_externs:
         with open(UNIT_ICON_POINTER_H, 'a', encoding='utf-8') as f:
@@ -2245,8 +2293,10 @@ def inject_map_sprites(campaign, verbose=True):
     # Any cast with a custom sprite (idle and/or MU) wears the bespoke cast palette in
     # its own OBJ bank -- its sheet is drawn to the cast-palette indices, so it must be
     # viewed through that palette (decisions.md Art & Audio).
-    custom_slots = [slot for _, slot, _, _ in idle]
-    custom_slots += [slot for _, slot, _, _ in mu if slot not in custom_slots]
+    # Faction-tinted cast wear the side palette, not the cast override -> excluded here.
+    custom_slots = [slot for uid, slot, _, _ in idle if uid not in FACTION_TINTED_CAST]
+    custom_slots += [slot for uid, slot, _, _ in mu
+                     if uid not in FACTION_TINTED_CAST and slot not in custom_slots]
     if custom_slots:
         pal_png = os.path.join(asset_dir, 'cast_palette.png')
         if not os.path.isfile(pal_png):
@@ -2404,18 +2454,21 @@ def _donor_base(campaign, uid, guest_bases=None):
                  '(needed to read the SMS size from the decomp)' % (uid, uid))
 
 
-def _inject_idle_sprites(campaign, asset_dir, idle, pointer_externs, guest_bases=None):
-    """Wait-table slot + GetUnitSMSId override for each idle (<id>.png) asset."""
+def _inject_idle_sprites(campaign, asset_dir, idle, pointer_externs, guest_bases=None,
+                         src_override=None):
+    """Wait-table slot + GetUnitSMSId override for each idle (<id>.png) asset. `src_override`
+    ({uid: path}) supplies a pre-processed sheet (e.g. a faction-tinted unit's role-remapped
+    idle) in place of the raw map_sprites/<id>.png."""
+    src_override = src_override or {}
     wait_rows, incbin, overrides = [], [], []
     for uid, slot, class_enum, sms in idle:
+        raw = src_override.get(uid) or os.path.join(asset_dir, uid + '.png')
         # Frame size from the decomp wait table for the donor base -- not guessed.
         _, dfw, dfh = map_sprite_tool.donor_sms_geometry(
             _donor_base(campaign, uid, guest_bases))
-        macro, fw, fh, nframes = map_sprite_tool.sheet_info(
-            os.path.join(asset_dir, uid + '.png'), (dfw, dfh))
+        macro, fw, fh, nframes = map_sprite_tool.sheet_info(raw, (dfw, dfh))
         sym = 'unit_icon_wait_manchego_%s_sheet' % uid.replace('-', '_')
-        shutil.copyfile(os.path.join(asset_dir, uid + '.png'),
-                        os.path.join(WAIT_GFX_DIR, sym + '.png'))
+        shutil.copyfile(raw, os.path.join(WAIT_GFX_DIR, sym + '.png'))
         wait_rows.append('\t{0, %s, %s}, /* %d %s */' % (macro, sym, sms, uid))
         incbin += ['\t.global %s' % sym, '%s:' % sym,
                    '\t.incbin "graphics/unit_icon/wait/%s.4bpp.lz"' % sym,
@@ -3397,6 +3450,10 @@ def inject_prologue(campaign, verbose=True, montage=False):
     # not the host's. Point slot 0 at the host's card (recomposed in step 4a);
     # slot 0 is never loaded as a chapter, so only this menu metadata matters.
     settings['chapters'][PROLOGUE_CHAPTER_INDEX]['chapTitleId'] = host['chapTitleId']
+    # fadeToBlack=1: the intro ends on black, not a map fade-in (see _retarget_host_chapter) --
+    # our opening is a BG cutscene (the BeginningScene BACGs), so the vanilla map fade-in would
+    # FLASH the map first. Slot 1 shipped with fadeToBlack=0; set it so the prologue matches.
+    host['fadeToBlack'] = 1
     with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=2)
 
@@ -3848,22 +3905,32 @@ def _stage_beat(beat, fid, home, overrides=None):
 
 
 def _emit_scene_beats(lines, msg_ids, beats, fid, home, overrides=None,
-                      preloads=None, width=None):
+                      preloads=None, width=None, trailings=None):
     """Write one message per scenic beat (staging via _stage_beat, body via
     _script_to_message). width=None picks per beat: faceless-narration beats ride
     the opaque, auto-centered SOLOTEXTBOXSTART box (#58) wrapped at the on-map 28
     (42 overflows the centered box); faced beats use the full-screen scenic 42.
-    A fixed width (e.g. 42) overrides for scenes with no narration beats."""
+    A fixed width (e.g. 42) overrides for scenes with no narration beats.
+    `trailings` (parallel to beats) appends a raw text-code to a beat's body -- see
+    _script_to_message's `trailing` (the single-face-exit fade)."""
     overrides = overrides or [None] * len(beats)
     preloads = preloads or [None] * len(beats)
-    if not (len(overrides) == len(preloads) == len(beats)):
+    trailings = trailings or [None] * len(beats)
+    if not (len(overrides) == len(preloads) == len(trailings) == len(beats)):
         sys.exit('ERROR: scene staging lists out of step with its %d beats '
-                 '(%d overrides, %d preloads) for msgs %s' %
-                 (len(beats), len(overrides), len(preloads), msg_ids))
-    for msg_id, beat, override, preload in zip(msg_ids, beats, overrides, preloads):
-        w = width if width is not None else (28 if _beat_is_narration(beat) else 42)
+                 '(%d overrides, %d preloads, %d trailings) for msgs %s' %
+                 (len(beats), len(overrides), len(preloads), len(trailings), msg_ids))
+    for msg_id, beat, override, preload, trailing in zip(
+            msg_ids, beats, overrides, preloads, trailings):
+        # Faced scene beats render via _scenic_beat_calls -> Text() -> a TALK BUBBLE (PutTalkBubble),
+        # NOT a full-screen box -- and a bubble line over 29 tiles hits the unclamped x = 29 - width
+        # < 0 branch and overflows off the right edge (the ch03 crier "...pays fifty gold to whoever
+        # cle|" bug). So faced beats must wrap at the map-bubble 29 (the entrance line already does);
+        # narration keeps the 28 that fits the auto-centered SOLOTEXTBOXSTART.
+        w = width if width is not None else (28 if _beat_is_narration(beat) else 29)
         set_message_body(lines, msg_id, _script_to_message(
-            beat, _stage_beat(beat, fid, home, override), width=w, preload=preload))
+            beat, _stage_beat(beat, fid, home, override), width=w, preload=preload,
+            trailing=trailing))
 
 
 # Vendored tileset -> _register_tileset label stem. A chapter map's tileset comes
@@ -3924,6 +3991,13 @@ def _retarget_host_chapter(host_index, goal_slot, goal_type, goal_err, indices,
                         'objAnimId': 0, 'paletteAnimId': 0, 'changeLayerId': 0})
     host['goal'] = dict(goal)
     host['prepScreenNumber'] = chapter_number * 2
+    # fadeToBlack=1: the chapter INTRO ends on BLACK instead of fading the battle map in
+    # (ChapterIntro_LoopFadeToMap, chapterintrofx.c:916 -- fadeToBlack takes the SetDispEnable
+    # black branch, else it blends the map in). Our openings are BG cutscenes (the BeginningScene
+    # BACGs), so the vanilla map fade-in just FLASHES the map for a beat before the BACG. This is
+    # the vanilla mechanism for cutscene-opening chapters (slots 2/3 already ship with it; slot 4
+    # did not -> ch03's opening map flash). Set for every hosted chapter so none flash.
+    host['fadeToBlack'] = 1
     with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=2)
     return host
@@ -4661,7 +4735,9 @@ def inject_ch01(campaign, verbose=True):
         '    ENUN\n'
         '    LOAD1(0x1, UnitDef_088B440C) /* the company signs on at the Northlook */\n'
         '    ENUN\n'
-        '    FADU(16) /* reveal the trail map (cf. vanilla Ch4) */\n'
+        # NO FADU here: the shared prep prologue (EventScr_08591F64) fades to black itself before
+        # drawing Preparations, so revealing the freshly-LOMA'd map first only FLASHES it for a
+        # beat before prep blanks it. Vanilla prep chapters go straight into CALL(prep). Stay black.
         '    CALL(EventScr_08591FD8) /* preparations (PREP, event cmd 0x3E) */\n'
         '    ENUT(8)\n'
         '    EVBIT_T(7)\n'
@@ -4851,14 +4927,18 @@ def inject_ch01(campaign, verbose=True):
                  reinf['spawn_turn']))
 
 
-# Campaign event BGs, in slot order. Each rides a NEW gConvoBackgroundData index past
-# BG_BLANK (0x35); the 240x160 source PNG (tools/bg_to_fe8.py output, <=8 banks) lives in
-# campaigns/<c>/backgrounds/<stem>.png and make's generic bg rules build its bins. Only
-# slot 0x36 is free before BG_RANDOM (0x37); adding a 2nd BG must first relocate BG_RANDOM
-# (verify in-engine -- nothing must hardcode 0x37). (enum_name, source_stem, credit).
-CAMPAIGN_BG_SLOT0 = 0x36
+# Campaign event BGs, in slot order. Each rides a NEW gConvoBackgroundData index; the 240x160
+# source PNG (tools/bg_to_fe8.py output, <=8 banks) lives in campaigns/<c>/backgrounds/<stem>.png
+# and make's generic bg rules build its bins. The vanilla enum ENDS at BG_RANDOM (0x37, a
+# sentinel with no real BG). Rather than shove BG_RANDOM aside for each new BG (a per-BG hack
+# that caps at one), we APPEND campaign BGs PAST it starting at 0x38 -- the same "append into
+# free enum space, never disturb a vanilla slot" model as the appended enemy/class slots (0x80+)
+# -- so the range grows without limit. The two pre-0x38 gaps (0x36 free + 0x37 BG_RANDOM) get
+# harmless placeholder table rows so the table stays index==enum contiguous. (enum_name, stem, credit).
+CAMPAIGN_BG_SLOT0 = 0x38   # first campaign BG index -- PAST the vanilla BG_RANDOM sentinel (0x37)
 CAMPAIGN_BGS = [
-    ('BG_MS_TARGOS_WINTER', 'bg_TargosWinter', '{Zeldacrafter}'),  # ch02 ending: Targos at night
+    ('BG_MS_TARGOS_WINTER',   'bg_TargosWinter',   '{Zeldacrafter}'),  # ch02 ending: Targos at night
+    ('BG_MS_TERMALAINE_MINE', 'bg_TermalaineMine', '{FE7 rip}'),        # ch03 opening: the mine mouth
 ]
 
 
@@ -4871,11 +4951,12 @@ def inject_backgrounds(campaign, verbose=True):
     gbagfx/FETSATOOL rules build .feimg2.bin.lz / .fetsa2.bin / .gbapal at make time. The
     four patched decomp files are in PATCHED_DECOMP_FILES (restored from HEAD each build),
     so insert-before-anchor stays idempotent; the copied PNG + its stale bins are refreshed."""
-    if CAMPAIGN_BG_SLOT0 + len(CAMPAIGN_BGS) > 0x37:
-        sys.exit('ERROR: campaign BGs collide with BG_RANDOM (0x37); relocate it first')
     src_dir = os.path.join(REPO, 'campaigns', campaign, 'backgrounds')
-    enum_lines, table_rows, data_syms, externs = [], [], [], []
+    # slot(i) = CAMPAIGN_BG_SLOT0 + i, all PAST the BG_RANDOM sentinel (0x37). Assets (PNG copy,
+    # incbin syms, externs) are per-BG; the enum + table build handles the sentinel gap below.
+    by_slot, data_syms, externs = {}, [], []
     for i, (enum_name, stem, _credit) in enumerate(CAMPAIGN_BGS):
+        slot = CAMPAIGN_BG_SLOT0 + i
         src_png = os.path.join(src_dir, stem + '.png')
         if not os.path.isfile(src_png):
             sys.exit('ERROR: campaign BG source missing: %s' % src_png)
@@ -4885,8 +4966,7 @@ def inject_backgrounds(campaign, verbose=True):
                       '.fetsa2.bin.lz', '.gbapal'):
             if os.path.exists(dst_png[:-4] + stale):
                 os.remove(dst_png[:-4] + stale)
-        enum_lines.append('    %s = 0x%X,' % (enum_name, CAMPAIGN_BG_SLOT0 + i))
-        table_rows.append('\t{%s_tiles, %s_map, %s_palette},' % (stem, stem, stem))
+        by_slot[slot] = (enum_name, stem)
         externs.append('extern unsigned char %s_tiles[];\n'
                        'extern unsigned char %s_map[];\n'
                        'extern unsigned char %s_palette[];' % (stem, stem, stem))
@@ -4897,23 +4977,35 @@ def inject_backgrounds(campaign, verbose=True):
             '\t.incbin "graphics/bg/%(s)s.fetsa2.bin"\n'
             '\n\t.align 2, 0\n\t.global %(s)s_palette\n%(s)s_palette:\n'
             '\t.incbin "graphics/bg/%(s)s.gbapal"\n' % {'s': stem})
-    # 1. enum ids: insert just before BG_RANDOM (keeps the table index == enum value).
+    # 1. enum ids: campaign BGs live PAST BG_RANDOM (0x37) -> insert AFTER its line (keeps the
+    #    table index == enum value, and never renumbers the vanilla sentinel).
+    enum_lines = ['    %s = 0x%X,' % (by_slot[s][0], s) for s in sorted(by_slot)]
     with open(BACKGROUNDS_H, encoding='utf-8') as f:
         h = f.read()
-    if h.count('    BG_RANDOM') != 1:
-        sys.exit('ERROR: BG_RANDOM anchor not unique in %s' % BACKGROUNDS_H)
-    h = h.replace('    BG_RANDOM',
-                  '\n'.join(enum_lines) + '\n\n    BG_RANDOM', 1)
+    anchor = next((ln for ln in h.splitlines() if ln.strip().startswith('BG_RANDOM')), None)
+    if anchor is None or h.count(anchor) != 1:
+        sys.exit('ERROR: BG_RANDOM enum anchor not unique in %s' % BACKGROUNDS_H)
+    h = h.replace(anchor, anchor + '\n' + '\n'.join(enum_lines), 1)
     with open(BACKGROUNDS_H, 'w', encoding='utf-8') as f:
         f.write(h)
-    # 2. table rows: append after the last (bg_Blank) entry, before the closing brace.
-    tail = '\t{bg_Blank_tiles, bg_Blank_map, bg_Blank_palette},\n};'
+    # 2. table rows: append after bg_Blank (0x35) up to the highest campaign slot. Indices with
+    #    no campaign BG (the 0x36 gap + 0x37 BG_RANDOM) get a harmless bg_Blank placeholder row
+    #    so the table stays index==enum contiguous; BG_RANDOM never hits it (eventscr.c short-
+    #    circuits on `bgIndex == BG_RANDOM` before any table lookup).
+    placeholder = '\t{bg_Blank_tiles, bg_Blank_map, bg_Blank_palette},'
+    table_rows = []
+    for idx in range(0x36, max(by_slot) + 1):
+        if idx in by_slot:
+            s = by_slot[idx][1]
+            table_rows.append('\t{%s_tiles, %s_map, %s_palette},' % (s, s, s))
+        else:
+            table_rows.append('%s /* 0x%X: BG_RANDOM / gap placeholder (never drawn) */' % (placeholder, idx))
+    tail = placeholder + '\n};'
     with open(EVENTSCR2_C, encoding='utf-8') as f:
         c = f.read()
     if c.count(tail) != 1:
         sys.exit('ERROR: gConvoBackgroundData tail not in expected form in %s' % EVENTSCR2_C)
-    c = c.replace(tail, '\t{bg_Blank_tiles, bg_Blank_map, bg_Blank_palette},\n'
-                  + '\n'.join(table_rows) + '\n};', 1)
+    c = c.replace(tail, placeholder + '\n' + '\n'.join(table_rows) + '\n};', 1)
     with open(EVENTSCR2_C, 'w', encoding='utf-8') as f:
         f.write(c)
     # 3. externs: the table rows reference the data_bg symbols -- declare them in bg.h.
@@ -5183,7 +5275,8 @@ def inject_ch02(campaign, verbose=True):
          % CH02_HOST_INDEX)
         + recruit_load +
         '    ENUN\n'
-        '    FADU(16) /* reveal the battle map */\n'
+        # NO FADU here: the prep prologue (EventScr_08591F64) fades to black before drawing
+        # Preparations, so revealing the map first only FLASHES it. Stay black into CALL(prep).
         '    CALL(EventScr_08591FD8) /* preparations (PREP, event cmd 0x3E) -- cap 5 */\n'
         '    ENUT(8)\n'
         '    EVBIT_T(7)\n'
@@ -5336,7 +5429,10 @@ CH03_ITEM_IDS = {'iron-axe': 'ITEM_AXE_IRON', 'hand-axe': 'ITEM_AXE_HANDAXE',
 # ch01 recruit). Trex is NOT here -- he is a Colm-style TALK recruit placed GREEN on the map
 # (CH03_TREX_GREEN_POS), joining via CUSA when a party member talks to him (that CHAR talk +
 # its line ride the ch03 event/cutscene pass, #23 item 4). cast_available_at gives him ch04+ prep.
-CH03_TREX_GREEN_POS = (10, 6)   # mid-galleries: Trex sits green (unrecruited) until talked to
+CH03_TREX_GREEN_POS = (2, 4)    # Colm's tile: our map is a 1:1 17x16 retile of vanilla Ch3 (Borgo),
+                                # where green Colm walks to (2,4) on the upper-left ledge (spawns 0,5)
+                                # -- UnitDef_088B4718/REDA_088B456C. Trex mirrors the recruit, so he
+                                # stands green on the same ledge the party naturally reaches to Talk.
 # Two free vanilla Ch4 UnitDef tables (defined in events_udefs.c, referenced nowhere but
 # themselves -> safe to repurpose, like the enemy table 088B4A80): one holds Trex GREEN
 # (always LOADed, the on-map talk-recruit); the other is the DEBUG-BOOT party seed (the
@@ -5355,6 +5451,25 @@ CH03_PREP_SCRIPT = 'EventScr_08591FD8'   # shared Preparations call (event cmd 0
 CH03_TREX_TALK_SCRIPT = 'EventScr_089F199C'
 CH03_TREX_TALK_MSG = 0x9A5
 CH03_TREX_TALK_FLAG = 'EVFLAG_TMP(9)'
+# ch03 cutscene beats (#23 Cutscenes) ride the dead vanilla Ch4 cutscene-message block
+# 0x9A3..0x9B9 -- every id there is referenced ONLY by the Ch4 event scripts that inject_ch03
+# replaces (git-verified against the pristine ch4-eventscript.h) -> dead in our build. 0x9A3
+# (boss death) + 0x9A5 (talk) are already claimed above. BG: reuse the ch02 Targos-winter slot
+# for the Termalaine street (Nicolas 2026-07-04: vanilla-style BG reuse, no new slot; the two
+# mid-map beats play ON-MAP, no BG). The midmap RBG-execution beat reserves 0x9AF..0x9B1 for its
+# follow-up slice.
+CH03_OPENING_TOWN_BG = 'BG_MS_TARGOS_WINTER'      # beats A-B: the Termalaine street (crier, bounty, Wolfram)
+CH03_OPENING_MINE_BG = 'BG_MS_TERMALAINE_MINE'    # beats C-E: inside the mine (sign, Pinky's scout) -- swaps in after Wolfram's "we're going in"
+CH03_OPENING_CARD_MSG = 0x9A6
+# A crier/RBG · B Wolfram (town) -> BG swaps to the mine · C KOBOLDS-ONLY sign (#58 box, empty cave)
+# · D Pinky scouts out (fades away) · E Pinky returns ("it looked at me")
+CH03_OPENING_MSGS = (0x9A7, 0x9A8, 0x9A9, 0x9B2, 0x9B3)
+CH03_ENDING_BG = 'BG_MS_TARGOS_WINTER'
+CH03_ENDING_CARD_MSG = 0x9AA
+CH03_ENDING_MSGS = (0x9AB, 0x9AC, 0x9AD)    # A RBG bounty · B Trex negotiates his warren in · C Meesmickle button
+CH03_TREX_ENTRANCE_MSG = 0x9AE              # light turn-1 on-map beat (Pinky telegraph + RBG "little dragon")
+CH03_TREX_ENTRANCE_SCRIPT = 'EventScr_089F1B38'  # dead Ch4 Village script (its list ref is dropped by the host) -> Trex's light turn-1 entrance beat
+CH03_CRIER_FID = '[FID_VillagerYoungBoy]'   # the boy crying the bounty on his crate (book p.95; generic mug)
 CH4_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch4-eventinfo.h')
 CH4_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch4-eventscript.h')
 
@@ -5376,11 +5491,27 @@ def inject_ch03(campaign, boot=False, verbose=True):
     defeat quote + a minimal ending script (victory -> dev-placeholder landing until ch04 hosts).
     Trex's TALK RECRUIT (#23 item 2) stands GREEN in its own table; ANY core party member Talks
     to him -> the shared recruit script CUSA-flips him BLUE (the Colm/Neimi pattern -- one CHAR entry
-    per field candidate). DEFERRED (next passes): the opening/execution/entrance/ending CUTSCENES
-    (dialogue-pass, decoupled from the recruit) + chaining ch02->ch03; chests/doors; title-card art;
-    enemy/boss art."""
+    per field candidate). The OPENING (chapter_start, over the Targos-winter BG), Trex's light
+    turn-1 ENTRANCE (Colm pattern, on-map), and the ENDING (chapter_end, over the BG -> the
+    dev-placeholder landing) cutscenes are wired here. DEFERRED (follow-up passes): the midmap
+    RBG-EXECUTION beat (needs a Brute-miniboss defeat trigger); chaining ch02->ch03; chests/doors;
+    title-card art; enemy/boss art."""
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH03_CHAPTER_YAML)
+
+    # 0. Cutscene beat splits, from the locked chapter YAML (cf. inject_ch01/ch02). The
+    #    opening + ending play over the reused Targos-winter BG; trex_entrance is a LIGHT
+    #    on-map turn-1 beat (Colm's pattern). The midmap RBG-execution beat is a follow-up.
+    op_card, op_beats = _split_event_beats(chap, 'chapter_start', 'ch03 opening', CH03_OPENING_MSGS)
+    end_card, end_beats = _split_event_beats(chap, 'chapter_end', 'ch03 ending', CH03_ENDING_MSGS)
+    trex_entr = next(e for e in chap['events'] if e.get('trigger') == 'trex_entrance')['script']
+    # Speaker -> face: cast via PORTRAIT_MAP; narration faceless (opaque #58 box); the boy-crier
+    # rides a generic villager mug (his line names Speaker Masthew -- book p.93, Oarus Masthew).
+    cut_special = {'narration': None, 'boy-crier': CH03_CRIER_FID}
+    cut_fid = _make_fid(cut_special, 'ch03 unknown cutscene speaker')
+    # RBG anchors mid-right through the opening (the leader who answers): the beat-A crier
+    # two-shot + the beat-C Pinky/RBG flyover two-hander stage cleanly without face-flashing.
+    op_home = {'prof-rbg': '[OpenMidRight]'}
 
     # 1. Map: register the cave-interior tileset (first chapter to use it) + the painted
     #    layout, point slot 4 at them, and borrow slot 6's defeat_boss goal banner.
@@ -5467,8 +5598,14 @@ def inject_ch03(campaign, boot=False, verbose=True):
     #    CauseGameOverIfLordDies = AFEV on EVFLAG_GAMEOVER (the lord's flagged quote / lord-select hook).
     with open(CH4_EVENTINFO_H, encoding='utf-8') as f:
         info = f.read()
-    for name in ('EventListScr_Ch4_Turn', 'EventListScr_Ch4_Location'):
-        info = _replace_brace_block(info, name + '[] =', '{\n    END_MAIN\n}', CH4_EVENTINFO_H)
+    # Turn list: Trex's light entrance beat fires on turn 1 (player phase), the vanilla Colm
+    # turn-1 green-NPC idiom (cf. inject_ch02's turn-1 tutorial TURN). Location stays empty.
+    info = _replace_brace_block(
+        info, 'EventListScr_Ch4_Turn[] =',
+        '{\n    TURN(0x0, %s, 1, 0, FACTION_ID_BLUE)'
+        ' /* turn-1: Trex\'s light entrance (Colm pattern) */\n    END_MAIN\n}'
+        % CH03_TREX_ENTRANCE_SCRIPT, CH4_EVENTINFO_H)
+    info = _replace_brace_block(info, 'EventListScr_Ch4_Location[] =', '{\n    END_MAIN\n}', CH4_EVENTINFO_H)
     # Character events = the Trex talk-recruit (#23 item 2): the CHAR-per-candidate list.
     info = _replace_brace_block(info, 'EventListScr_Ch4_Character[] =', char_events, CH4_EVENTINFO_H)
     info = _replace_brace_block(
@@ -5483,32 +5620,108 @@ def inject_ch03(campaign, boot=False, verbose=True):
 
     with open(CH4_EVENTSCRIPT_H, encoding='utf-8') as f:
         script = f.read()
-    # Beginning scene = the vanilla prep-chapter shape (cf. inject_ch01/ch02): deploy the
-    # enemies + green Trex, then CALL Preparations (PREP reads the never-LOADed cap template
-    # UnitDef_Event_Ch4Ally for the cap + deploy_slots, fields the roster, force-deploys the
-    # lord). --ch03-boot additionally LOADs the armed party seed first, so PREP has a party to
-    # pick from a cold New Game (the real chain persists it from ch02 -- then this seed drops).
+    # Beginning scene = the vanilla prep-chapter shape (cf. inject_ch01/ch02) with a TWO-BG
+    # opening (Nicolas 2026-07-09 staging): beats A-B play over the Termalaine STREET (crier +
+    # bounty, then Wolfram's "we're going in"); on that line the BG CUTS to the mine interior --
+    # empty, no portraits -- for the KOBOLDS ONLY sign, then Pinky scouts (he fades OUT into the
+    # dark, an over-long tension pause holds on the empty cave, then he fades back in white-faced).
+    # Then LOMA rebuilds the battle map fresh, the enemies + green Trex LOAD, and CALL Preparations
+    # (PREP reads the never-LOADed cap template UnitDef_Event_Ch4Ally). --ch03-boot additionally
+    # LOADs the armed party seed first, so PREP has a party from a cold New Game.
+    labels = ['A -- the boy crier bawls the bounty; RBG takes the job (public mask up)',
+              'B -- Wolfram scents the tourmaline seam; "We\'re going in"',
+              'C -- the KOBOLDS ONLY sign (faceless #58 opaque box, empty cave)',
+              'D -- Pinky scouts ahead (he fades out into the dark after this)',
+              'E -- Pinky drops back white-faced; the grell looked at him']
+    # Split the beat calls around the BG cut: A-B over the town, C-E inside the mine.
+    town_calls = _scenic_beat_calls(CH03_OPENING_MSGS[:2], op_beats[:2], labels[:2])
+    sign_call = _scenic_beat_calls(CH03_OPENING_MSGS[2:3], op_beats[2:3], labels[2:3])   # SOLOTEXTBOXSTART sign
+    return_call = _scenic_beat_calls(CH03_OPENING_MSGS[4:5], op_beats[4:5], labels[4:5])  # Pinky returns
+    # Beat D (Pinky scouts) is RAW TEXTSTART/SHOW/END -- NOT the Text() macro, whose trailing
+    # REMA fades ALL portraits (why RBG used to vanish for the pause). No REMA here: RBG's face
+    # persists (Pinky's own portrait fades at the beat's end via a trailing [ClearFace] in the
+    # message body -- see CH03_OPENING_TRAILINGS). The over-long STAL(90) then holds on RBG alone
+    # (he watches the dark; Nicolas 2026-07-10). Beat E's Text() re-opens with TEXTSTART, which
+    # equals the still-active TEXTSTART type -> Event1A_TEXTSTART skips its face-clear, so RBG
+    # carries through un-reloaded (TalkLoadFace early-returns on the occupied slot -- no reflicker)
+    # while Pinky fades back in white-faced. Its trailing REMA then clears both into the FADI.
+    scout_raw = ('    TEXTSTART\n'
+                 '    TEXTSHOW(0x%X) /* %s */\n'
+                 '    TEXTEND\n' % (CH03_OPENING_MSGS[3], labels[3]))
     seed_load = ('    LOAD1(0x1, %s) /* boot: found an armed party so PREP can pick (--ch03-boot) */\n'
                  '    ENUN\n' % CH03_BOOT_SEED_SYMBOL) if boot else ''
     begin = ('{\n'
-             '    LOAD1(0x1, UnitDef_088B4A80) /* the vanilla-Ch3-parity enemies */\n    ENUN\n'
+             '    MUSC(SONG_TENSION)\n'
+             '    REMOVEPORTRAITS\n'
+             '    BACG(%s) /* Termalaine street (town BG) */\n'
+             '    FADU(16)\n'
+             '    BROWNBOXTEXT(0x%X, 8, 8) /* "Termalaine" location card */\n'
+             % (CH03_OPENING_TOWN_BG, CH03_OPENING_CARD_MSG)
+             + town_calls +
+             '    REMA /* clear the town portraits before the cut */\n'
+             '    FADI(16) /* fade the street out */\n'
+             # BACG (EventShowTextBgDirect) only DECOMPRESSES a new BG when activeTextType is
+             # REMOVEPORTRAITS/_1A22 (eventscr.c:1316) -- every other mode returns EVC_ERROR and
+             # loads nothing. The town Text() beats above expand to TEXTSTART, which left
+             # activeTextType == TEXTSTART, so a bare 2nd BACG was a no-op (stale town BG stayed
+             # in VRAM). Re-arm the load mode first -- the vanilla multi-BG idiom (ch17a: every
+             # BACG rides a REMOVEPORTRAITS-mode scene). Faded to black, so no visible pop.
+             '    REMOVEPORTRAITS /* re-arm BACG BG-load mode (Text() beats reset it to TEXTSTART) */\n'
+             '    BACG(%s) /* CUT to the mine interior -- empty, no PCs */\n'
+             '    FADU(16)\n'
+             % CH03_OPENING_MINE_BG
+             + sign_call            # the KOBOLDS ONLY sign over the empty cave (#58 opaque box)
+             + scout_raw +          # Pinky scouts: "I'll look ahead" / RBG / "Straight back!" (RAW, no REMA)
+             '    STAL(90) /* over-long tension pause -- Pinky winged off, RBG holds at the mouth */\n'
+             + return_call +        # Pinky fades back in, white-faced: "it looked at me" / RBG "Form up"
+             '    FADI(16) /* fade the mine cutscene out */\n'
+             '    SVAL(EVT_SLOT_B, 0x0) /* map camera origin for the reload */\n'
+             '    LOMA(0x%X) /* RestartBattleMap -- build the ch03 map fresh (cf. inject_ch02) */\n'
+             % CH03_HOST_INDEX
+             + '    LOAD1(0x1, UnitDef_088B4A80) /* the vanilla-Ch3-parity enemies */\n    ENUN\n'
              + seed_load +
              '    LOAD1(0x1, %s) /* Trex -- green talk-recruit (Colm-style) */\n    ENUN\n'
+             # NO FADU here: the shared prep prologue (EventScr_08591F64) fades to black itself
+             # before drawing Preparations, so revealing the freshly-LOMA'd battle map first only
+             # FLASHES it for a beat before prep blanks it again. Vanilla prep chapters (ch10a/ch13a)
+             # go straight from the cutscene into CALL(prep) -- the map is first shown after Fight!,
+             # never before prep. Stay black (the cutscene FADI above) straight into prep.
              '    CALL(%s) /* preparations (PREP, event cmd 0x3E) -- cap 9, lord force-deployed */\n'
              '    ENUT(8)\n'
              '    EVBIT_T(7)\n'
              '    ENDA\n}' % (CH03_TREX_GREEN_SYMBOL, CH03_PREP_SCRIPT))
     script = _replace_brace_block(script, 'EventScr_Ch4_BeginningScene[] =', begin, CH4_EVENTSCRIPT_H)
-    # DefeatBoss ending (the script the Misc AFEV runs on the grell's death). MINIMAL for now:
-    # victory sting -> fade -> the dev-placeholder landing (RBG-by-the-campfire, then back to title),
-    # exactly as ch02's ending parks until its next chapter is hosted. ch04 isn't hosted yet, so the
-    # rich ending cutscene (the reframed beats) rides the dialogue-pass (#23 Cutscenes) + the chaining
-    # pass (#23 item 3) that swaps this dev landing for MNC2 -> ch04.
+    # DefeatBoss ending (the script the Misc AFEV runs on the grell's death): victory sting ->
+    # fade the mine out -> the ENDING cutscene over the reused Targos-winter BG (RBG takes the
+    # bounty; Trex negotiates his warren into the town, which frees him to leave with the party;
+    # Meesmickle's deadpan button) -> the dev-placeholder landing (RBG-by-the-campfire, then back
+    # to title). ch04 isn't hosted yet, so the LANDING parks on the placeholder exactly as ch02's
+    # ending does; the chaining pass (#23) swaps that dev landing for MNC2 -> ch04.
+    end_text_calls = _scenic_beat_calls(
+        CH03_ENDING_MSGS, end_beats,
+        ['A -- RBG collects the Masthew bounty; the gems a "gratuity"',
+         'B -- Trex negotiates his kobolds into the town, then asks to join the party',
+         'C -- Meesmickle deadpan button (his one line of the chapter)'])
     ending = ('{\n    MUSC(SONG_VICTORY)\n'
               '    FADI(16) /* fade the mine out */\n'
+              '    REMOVEPORTRAITS\n'
+              '    BACG(%s) /* Termalaine square (reused Targos-winter BG) */\n'
+              '    FADU(16)\n'
+              '    BROWNBOXTEXT(0x%X, 8, 8) /* "Termalaine" location card */\n'
+              % (CH03_ENDING_BG, CH03_ENDING_CARD_MSG)
+              + end_text_calls +
+              '    FADI(16) /* fade the square out into the dev-placeholder landing */\n'
               + dev_placeholder_scene() +
               '    ENDA\n}')
     script = _replace_brace_block(script, CH03_ENDING_SCRIPT + '[] =', ending, CH4_EVENTSCRIPT_H)
+    # Trex's LIGHT entrance beat (Colm's turn-1 green-NPC pattern): a dead Ch4 Village script,
+    # rewritten to show Pinky's telegraph ("He waved at me!") + RBG's warm "little dragon" over
+    # the map. Fired by the turn-1 TURN entry (step 3). All of Trex's substance rides the TALK.
+    script = _replace_brace_block(
+        script, CH03_TREX_ENTRANCE_SCRIPT + '[] =',
+        '{\n    TEXTSHOW(0x%X) /* Trex entrance: Pinky telegraph + RBG "little dragon" */\n'
+        '    TEXTEND\n    REMA\n    EVBIT_T(7)\n    ENDA\n}' % CH03_TREX_ENTRANCE_MSG,
+        CH4_EVENTSCRIPT_H)
     # Trex talk-recruit script (#23 item 2): repurpose the dead Ch4 Turn-2 green script symbol
     # -> show Trex's migrated talk line then CUSA green Trex to blue. Every CHAR entry (step 3)
     # points here, so ANY core party member's talk runs it (the vanilla Colm/Neimi shape).
@@ -5517,43 +5730,54 @@ def inject_ch03(campaign, boot=False, verbose=True):
     with open(CH4_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
         f.write(script)
 
-    # 4. Texts: chapter title (status/prep banner) + the grell's death quote. The grell has no
-    #    portrait yet (#23 Art), so its line renders FACELESS (stage business, (open, None)) -- a
-    #    reframe-neutral shriek, so it's safe to wire ahead of the cutscene dialogue-pass. Body from
-    #    the chapter YAML (single source of truth); asterisks are the YAML's stage-direction marks.
-    grell = next(e for e in chap['enemy_units'] if e.get('is_boss'))
-    shriek = grell['death_quote'].strip().strip('*').strip()
-    shriek = shriek[0].upper() + shriek[1:] if shriek else shriek
+    # 4. Texts: chapter title (status/prep banner). The grell's death quote was CUT (Nicolas): it
+    #    has no portrait, so the faceless line rendered boxless + unreadable -- the DefeatBoss win now
+    #    fires silently off the grell's flagged gDefeatTalkList entry (step 5, .msg = 0).
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
     set_message_body(lines, host['chapTitleTextId'], name_message_body(chap['title']))
-    set_message_body(lines, CH03_BOSS_DEATH_MSG, _script_to_message(
-        [{'grell': shriek}], {'grell': ('[OpenMidRight]', None)}))
     # Trex talk-recruit body (#23 item 2): his migrated pitch (chapter YAML talk_recruit event,
     # single source of truth), faced on the Rennac slot. One speaker -> one [OpenX] block with
     # page breaks; the recruit script (EventScr_089F199C) TEXTSHOWs it before the CUSA.
     talk = next(e for e in chap['events'] if e.get('trigger') == 'talk_recruit')['script']
     set_message_body(lines, CH03_TREX_TALK_MSG, _script_to_message(
         talk, {trex_uid: ('[OpenMidRight]', _fid_tag(tslot))}))
+    # Cutscene beats (#23 Cutscenes): the opening + ending scenic beats over the Targos-winter BG
+    # (location card + one message per beat, staged via _emit_scene_beats) and Trex's light on-map
+    # entrance line (map-bubble wrap 29). Speakers resolve through cut_fid (cast busts + the crier
+    # mug + faceless narration). RBG anchors mid-right in the opening + entrance (op_home).
+    set_message_body(lines, CH03_OPENING_CARD_MSG, name_message_body(op_card))
+    # Beat D (Pinky scouts, index 3) fades ONLY Pinky at its end so RBG holds through the STAL(90)
+    # pause (Nicolas 2026-07-10). Pinky sits at the _stage_beat default podium ([OpenMidLeft] --
+    # op_home anchors only prof-rbg, to [OpenMidRight]); the trailing [ClearFace] there fades his
+    # portrait out, RBG's untouched. Pairs with scout_raw (no trailing REMA) in the event script.
+    op_trailings = [None, None, None, '[OpenMidLeft][ClearFace]', None]
+    _emit_scene_beats(lines, CH03_OPENING_MSGS, op_beats, cut_fid, op_home,
+                      trailings=op_trailings)
+    set_message_body(lines, CH03_ENDING_CARD_MSG, name_message_body(end_card))
+    _emit_scene_beats(lines, CH03_ENDING_MSGS, end_beats, cut_fid, {})
+    set_message_body(lines, CH03_TREX_ENTRANCE_MSG, _script_to_message(
+        trex_entr, _stage_beat(trex_entr, cut_fid, op_home), width=29))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 
-    # 5. The grell's flagged defeat quote -> head of gDefeatTalkList (first-match scan wins, so this
-    #    head entry keys the DefeatBoss win to the grell's raw pid; no vanilla 0xb7 entry to shadow).
-    #    .flag = EVFLAG_DEFEAT_BOSS is what fires the win (CA_BOSS alone sets nothing -- eventinfo.c
-    #    SetPidDefeatedFlag runs for ANY unit with a matching gDefeatTalkList entry on death).
+    # 5. The grell's flagged gDefeatTalkList entry keys the DefeatBoss win to its raw pid (first-match
+    #    scan wins; no vanilla 0xb7 entry to shadow). .flag = EVFLAG_DEFEAT_BOSS is what fires the win.
+    #    .msg = 0: NO death quote (the grell has no portrait, so the faceless line rendered boxless +
+    #    unreadable; Nicolas cut it). The engine still sets the flag -- DisplayDefeatTalkForPid only
+    #    shows the quote `if (ent->msg != 0)` but SetPidDefeatedFlag runs regardless (eventinfo.c:595).
     quote = ('    {\n'
-             '        .pid     = %s, /* grell (ch03 boss) death quote sets the DefeatBoss flag */\n'
+             '        .pid     = %s, /* grell (ch03 boss): silent defeat -> DefeatBoss flag, no quote */\n'
              '        .route   = CHAPTER_MODE_ANY,\n'
              '        .chapter = CHAPTER_L_4, /* ch03 is hosted on chapter slot 4 */\n'
              '        .flag    = EVFLAG_DEFEAT_BOSS,\n'
-             '        .msg     = 0x%X, /* faceless shriek body (grell death_quote, step 4) */\n'
-             '    },' % (CH03_BOSS_PID, CH03_BOSS_DEATH_MSG))
+             '        .msg     = 0, /* no death quote (faceless -> unreadable; removed) */\n'
+             '    },' % CH03_BOSS_PID)
     _prepend_defeat_quote(quote)
 
     if verbose:
         print('  ch03 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; defeat_boss goal + '
-              'DefeatBoss(grell) WIN wired, PREP deploy cap %d%s + %d enemies (grell@14,1); rich cutscenes deferred'
+              'DefeatBoss(grell) WIN wired, PREP deploy cap %d%s + %d enemies (grell@14,1); opening/entrance/ending cutscenes wired (midmap deferred)'
               % (obj_idx, pal_idx, cfg_idx, layout_idx, CH03_HOST_INDEX, len(cap_rows),
                  ' (boot-seeded party)' if boot else '', len(enemies)))
 
@@ -5800,6 +6024,19 @@ def inject_battle_platforms(campaign, verbose=True):
     rough_arr = 'CONST_DATA s8 BanimTerrainGround_Tileset15[] = {%s\n};\n\n' % rough_body
     dt = dt.replace('CONST_DATA s8 BanimTerrainGroundDefault[] = {',
                     rough_arr + 'CONST_DATA s8 BanimTerrainGroundDefault[] = {', 1)
+    # Tileset16 = CAVE (ch03 Termalaine mine). Unlike snow, this uses EXISTING VANILLA platforms:
+    # the mine floor -> siroyuka1 (the vanilla neutral STONE ground, battle_terrain_table[20], so
+    # ground value 21) and rock walls/cliffs -> gake1 (table[4], value 5). No PNG/append/FE-Repo
+    # pull needed. NOTE the vanilla convention is value == table_index + 1 (the consumer subtracts
+    # 1); do NOT copy the snow base+offset idiom here.
+    def _cave_body(default_body):
+        return _re.sub(
+            r'\[TERRAIN_(\w+)\]\s*=\s*-?\d+,',
+            lambda mm: '[TERRAIN_%s] = %d,' % (mm.group(1), 5 if mm.group(1) in _PLAT_ROUGH else 21),
+            default_body)
+    cave_arr = 'CONST_DATA s8 BanimTerrainGround_Tileset16[] = {%s\n};\n\n' % _cave_body(m.group(2))
+    dt = dt.replace('CONST_DATA s8 BanimTerrainGroundDefault[] = {',
+                    cave_arr + 'CONST_DATA s8 BanimTerrainGroundDefault[] = {', 1)
     with open(DATA_TERRAINS_C, 'w', encoding='utf-8') as f:
         f.write(dt)
 
@@ -5808,6 +6045,7 @@ def inject_battle_platforms(campaign, verbose=True):
         vh = f.read()
     vh = vh.replace('extern CONST_DATA s8 BanimTerrainGround_Tileset01[];',
                     'extern CONST_DATA s8 BanimTerrainGround_Tileset15[];\n'
+                    'extern CONST_DATA s8 BanimTerrainGround_Tileset16[];\n'
                     'extern CONST_DATA s8 BanimTerrainGround_Tileset01[];', 1)
     with open(VARIABLES_H, 'w', encoding='utf-8') as f:
         f.write(vh)
@@ -5816,6 +6054,7 @@ def inject_battle_platforms(campaign, verbose=True):
     bp = bp.replace(
         '    case 0:\n    default:\n        return BanimTerrainGroundDefault[terrain];',
         '    case 0x15:\n        return BanimTerrainGround_Tileset15[terrain];\n\n'
+        '    case 0x16:\n        return BanimTerrainGround_Tileset16[terrain];\n\n'
         '    case 0:\n    default:\n        return BanimTerrainGroundDefault[terrain];', 1)
     with open(BANIM_BATTLEPARSE_C, 'w', encoding='utf-8') as f:
         f.write(bp)
@@ -5824,6 +6063,7 @@ def inject_battle_platforms(campaign, verbose=True):
     with open(CHAPTER_SETTINGS_JSON_PLAT, encoding='utf-8') as f:
         cs = _json.load(f)
     cs['chapters'][2]['battleTileSet'] = 0x15
+    cs['chapters'][CH03_HOST_INDEX]['battleTileSet'] = 0x16  # ch03 cave -> siroyuka1 stone (Tileset16)
     with open(CHAPTER_SETTINGS_JSON_PLAT, 'w', encoding='utf-8') as f:
         _json.dump(cs, f, indent=2)
 
@@ -5831,6 +6071,7 @@ def inject_battle_platforms(campaign, verbose=True):
         print('  %d platforms -> battle_terrain_table[%d..%d] (FE-Repo {Cynon}, F2E)'
               % (len(BATTLE_PLATFORMS), base, base + len(BATTLE_PLATFORMS) - 1))
         print('  terrain->ground: Default=snow-open (Snowdrift); Tileset15=snow-rough; Ch1->0x15')
+        print('  Tileset16=CAVE (vanilla siroyuka1 stone / gake1 rock); ch03->0x16')
 
 
 def main():
