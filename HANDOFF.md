@@ -4,7 +4,27 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-07-11 #3, VSCode/remote — ⭐ CH03 CHESTS + ch02 RED-GEM FIX on `feat/23-ch03-chests` (WIP, pushed, NOT yet a PR). main @ recordchain #155 merged. CURRENT BRANCH = `feat/23-ch03-chests`; check it out to continue.):**
+> **Last session (2026-07-11 #4, VSCode/remote — ⭐ CH03 DOORS wired + BOTH chests & doors IN-ENGINE VERIFIED on `feat/23-ch03-chests` (WIP, pushed @ `66b6d5b`, NOT yet a PR — pink Tourmaline icon is the last in-scope item before the PR). CURRENT BRANCH = `feat/23-ch03-chests`.):**
+> **⭐ CH03 DOORS DONE + VERIFIED IN-ENGINE.** The 3 vanilla Ch3 doors (`Door_(6,10)/(10,5)/(2,3)`) are wired as
+> thief/key doors that **open to the passable floor tile DIRECTLY BELOW the door cell** (Nicolas's answer: "the tile
+> directly adjacent and below it") — read off the painted `.mar` at build time (`_read_map_metatile`, drift-proof,
+> no hand-copied tile numbers). On the committed map that's 572/626/492 (road / stairs-down / road, all passable).
+> **Doors ride the SAME per-chapter MapChange array as the chests** — `GetMapChangeIdAt` matches by POSITION, so
+> `Chest()`/`Door_()` coexist in one `MS_Ch03MapChanges` (ids 0-3 chests → shared 17→29; ids 4-6 doors → per-door
+> below-tile). Generalized `_inject_ch03_chest_map_changes` → **`_inject_ch03_tile_changes`** with a pure
+> `_ch03_tile_changes_asm` builder + `_read_map_metatile` reader (6 new unit tests, 81 total green). Authored as a
+> `doors:` position list in the ch03 YAML. Committed `9907324`.
+> **⭐⭐ BOTH CHESTS & DOORS NOW VERIFIED IN-ENGINE (closes the handoff's #1 pending item).** Two new PASS/FAIL
+> scenarios read `gBmMapBaseTiles` ground truth (`gBmMapBaseTiles` is a ROM-`.data` pointer @ **0x085AF5DC** →
+> the EWRAM `sBmBaseTilesPool` row array, never reassigned — read the ROM pointer, index the rows; the layout-guess
+> at gBmMapUnit+0x20 was WRONG, cost one probe): **`ch03door`** (hand a unit a Door Key, drive Door → tile flips
+> 3248→1968 = 812→492<<2) and **`ch03chest`** (Chest Key, teleport onto the (6,3) chest, drive Chest → tile flips
+> 68→116 = 17→29 **AND the Iron Lance lands in inventory**). Both PASS. The menu is `[Door/Chest, Item, Wait]` with
+> the weapon stripped, so the special command is row 0 (deterministic). Committed `66b6d5b`. ADR in `decisions.md`.
+> **REMAINING in-scope on this branch before PR: the pink Tourmaline icon** (palette-1 repaint + `DrawIcon` bank-bump
+> hook — full plan in the prior block below). Then title-card + load-test scenarios can be a follow-up branch.
+>
+> **Prior session (2026-07-11 #3, VSCode/remote — ⭐ CH03 CHESTS + ch02 RED-GEM FIX on `feat/23-ch03-chests`):**
 > **ch02 RED-GEM BUG FIXED (Nicolas caught it in the chain GIF — the Red Gem was still gifted in ch02).** Root cause =
 > the gift was declared in THREE places that drifted: the ch02 YAML `green_allies[].gift: hand-axe` (CORRECT, per the
 > ch02↔ch03 swap ADR) but a hardcoded `CH02_CHWINGA` Python tuple **and** a duplicate `charm_gifts.gifts` YAML block both
@@ -302,7 +322,9 @@ ADR: `decisions.md` §Distribution.
   - logic/stability: `win|gameover|ch01win|clear|clear_ch01|smoke|smoke_ch01|fuzz`
   - **ch3 (#23):** `PT_HOST_CHAPTER=4 run.sh mapshot` (map+units) · **`ch03prep`** (Preparations opens → Fight!
     fields 9 at the deploy_slots, Trex green) · **`ch03win`** (kill grell → assert `EVFLAG_DEFEAT_BOSS` → ending) ·
-    **`ch03talk`** (Trex green→blue via Talk) · **`koboldview`** (pull off-camera enemies next to the party) — all on
+    **`ch03talk`** (Trex green→blue via Talk) · **`ch03door`** (Door Key → open → tile flips to the below-cell) ·
+    **`ch03chest`** (Chest Key → open the (6,3) chest → tile flips 17→29 + Iron Lance granted) ·
+    **`koboldview`** (pull off-camera enemies next to the party) — all on
     a `make CH03BOOT=1` ROM (macOS: apply the `build.sh` shebang-fix loop first). `bootToMap` drives through PREP.
   - **LLM commander (#63):** `llm` — needs the sidecar running (`llm_player.py serve`; see run.sh header).
   - **ch2 (#22):** `ch02` · `smoke_ch02` · `clear_ch02` (all load a `ch02start` checkpoint).
@@ -403,12 +425,14 @@ how-to for the host machinery = `docs/adding-a-chapter.md`.**
 - **✅ DONE (PR #154, MERGED) — Chain ch02→ch03:** ch02's ending `MNC2(0x4)`s into ch03; `inject_ch03(boot=False)`
   hosted in every non-boot build (persistent ch02 party feeds PREP, seed dropped). Verified in-engine (`clear_ch02`
   lands on ch03, chapter=4). ch03's OWN ending still parks on the dev-placeholder until ch04 hosts. `decisions.md` Ch3-chains ADR.
-- **🔨 IN PROGRESS — Chests + Tourmaline (`feat/23-ch03-chests`, WIP branch, pushed, not PR'd):** 4 chests wired at
-  vanilla Borgo coords with the FF5-navy `17→29` open flip (builds+links clean, **in-engine verify PENDING**); the ch02
-  Red-Gem→Hand-Axe swap FIXED + verified; Tourmaline NAME done; pink icon + doors remain. **Full detail in the top block.**
+- **✅ DONE — Chests + Doors (`feat/23-ch03-chests`, WIP branch, pushed @ `66b6d5b`, not PR'd):** 4 chests + 3 doors
+  wired in ONE `MS_Ch03MapChanges` array (chests share the FF5-navy `17→29` flip; each door opens to the passable
+  floor tile directly below it, Nicolas's rule). **BOTH VERIFIED IN-ENGINE** (`ch03door` + `ch03chest` PASS — tile
+  flips + Iron Lance grant read from `gBmMapBaseTiles`). ch02 Red-Gem→Hand-Axe swap FIXED + verified; Tourmaline NAME
+  done. **Full detail in the top block + `decisions.md` Ch3 chests/doors ADR.** Only the pink icon remains on this branch.
 - **⭐ REMAINING (unchecked on #23):**
-  1. **Chests/doors** — chest wiring done (verify in-engine next); **DOORS need an open-door metatile** (top block); Trex opens, key-droppers back up.
-  2. **Tourmaline pink icon** — palette-1 repaint + `DrawIcon` bank-bump hook (top block).
+  1. ✅ **Chests/doors — DONE + in-engine verified** (top block). Trex (thief) opens without keys; the key-dropper kobolds back up.
+  2. **Tourmaline pink icon** — palette-1 repaint + `DrawIcon` bank-bump hook (top block). **← the last in-scope item before the PR.**
   3. **Title-card** (replace the vanilla slot-4 **"Za'ha Woods"** placeholder that shows at chapter start) — **couple this
      with the opening map-flash fix** (both are the same `gProcScr_ChapterIntro` sequence). + full load-test scenarios
      `ch03`/`smoke_ch03`/`clear_ch03` (the `ch03prep`/`ch03win`/`ch03talk`/`koboldview`/`enemycheck` scenarios seed these;
