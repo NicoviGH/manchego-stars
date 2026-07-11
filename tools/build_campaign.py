@@ -5374,8 +5374,8 @@ def inject_ch02(campaign, verbose=True):
         % (CH02_ENDING_BG, CH02_ENDING_CARD_MSG)
         + end_text_calls +
         '    FADI(16) /* fade the town out */\n'
-        + dev_placeholder_scene() +     # ch03 not hosted yet -> dev landing, then title
-        '    ENDA\n}', CH3_EVENTSCRIPT_H)
+        '    MNC2(0x%X) /* -> ch03 "The Termalaine Mine", hosted on chapter slot 4 (inject_ch03) */\n'
+        '    ENDA\n}' % CH03_HOST_INDEX, CH3_EVENTSCRIPT_H)
     with open(CH3_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
         f.write(script)
 
@@ -5556,9 +5556,10 @@ def inject_ch03(campaign, boot=False, verbose=True):
     Deploy = the vanilla prep-chapter idiom (cf. inject_ch01/inject_ch02): a never-LOADed
     deploy-cap template (UnitDef_Event_Ch4Ally, sized to cast_available_at(3) over the YAML
     deploy_slots) + a Preparations CALL that fields the roster (the lord force-deployed).
-    `boot` (the --ch03-boot debug path, New Game straight to slot 4) additionally LOADs an
-    ARMED party seed so PREP has a party to pick from -- ch03 has no prior chapter to found one
-    yet (item 3 chains ch02->ch03, at which point the party persists and the seed drops).
+    The real ch02->ch03 chain calls this with boot=False: ch02's ending MNC2(0x4) lands here
+    and the party that PERSISTS from ch02 feeds PREP (main() hosts ch03 in every non-boot build).
+    `boot` (the --ch03-boot debug path, New Game straight to slot 4) instead LOADs an ARMED party
+    seed so PREP has a party to pick from from a COLD New Game -- a standalone-playtest crutch only.
 
     The DefeatBoss(grell) WIN is wired: Misc DefeatBoss AFEV + the grell's flagged (EVFLAG_DEFEAT_BOSS)
     defeat quote + a minimal ending script (victory -> dev-placeholder landing until ch04 hosts).
@@ -5569,7 +5570,8 @@ def inject_ch03(campaign, boot=False, verbose=True):
     dev-placeholder landing) cutscenes are wired here, as is the mid-map RBG-EXECUTION beat: the
     Icewind Brute rides a unique miniboss pid + a silent flagged defeat quote, and a Misc AFEV fires
     the on-map execution cutscene once on its death (the mirror of the boss WIN). DEFERRED (follow-up
-    passes): chaining ch02->ch03; chests/doors; title-card art; enemy/boss art."""
+    passes): chests/doors; title-card art; enemy/boss art; ch03's own ending still parks on the
+    dev-placeholder until ch04 hosts (then it MNC2s onward like this chapter's ch02->ch03 chain)."""
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH03_CHAPTER_YAML)
 
@@ -6287,18 +6289,25 @@ def main():
         print('chapter 2 (#22):')
         inject_ch02(args.campaign)  # hosts slot 3; ch01's ending MNC2(0x3) lands here
         inject_ch02_chwinga_faces(args.campaign)  # green chwinga bust + Mote/Rime/Glimmer names
+        print('chapter 3 (#23):')
         if args.ch03_boot:
             print('CH03 BOOT (playtest: New Game -> Termalaine Mine, party + foes deployed):')
-            inject_ch03(args.campaign, boot=True)  # slot 4 host + PREP deploy; New Game reroutes 0 -> 4
+            inject_ch03(args.campaign, boot=True)  # slot 4 host + armed party seed; New Game reroutes 0 -> 4
             _configure_boot(CH03_HOST_INDEX)
-        elif args.test_chapter:
-            print('TEST CHAPTER (playtest: New Game -> Ch1 sandbox, cast deployed):')
-            inject_test_chapter(args.campaign, lord_boot=args.lord_boot)   # slot 1 sandbox, in place of the prologue
-            _configure_boot(TEST_CHAPTER_INDEX)  # sandbox never montages
         else:
-            print('prologue (New Game target):')
-            inject_prologue(args.campaign, montage=args.montage)
-            _configure_boot(PROLOGUE_HOST_INDEX, montage=args.montage)
+            # Host ch03 on slot 4 for the real ch02->ch03 chain: ch02's ending MNC2(0x4) lands
+            # here, and PREP is fed by the party that PERSISTS from ch02 (no armed seed -- that
+            # is the --ch03-boot cold-start crutch above). Hosted in the sandbox build too so
+            # ch02's MNC2(0x4) never points at an unhosted slot.
+            inject_ch03(args.campaign, boot=False)
+            if args.test_chapter:
+                print('TEST CHAPTER (playtest: New Game -> Ch1 sandbox, cast deployed):')
+                inject_test_chapter(args.campaign, lord_boot=args.lord_boot)   # slot 1 sandbox, in place of the prologue
+                _configure_boot(TEST_CHAPTER_INDEX)  # sandbox never montages
+            else:
+                print('prologue (New Game target):')
+                inject_prologue(args.campaign, montage=args.montage)
+                _configure_boot(PROLOGUE_HOST_INDEX, montage=args.montage)
         print('death quotes (#6):')
         inject_pc_death_quotes(args.campaign)
     print('done. Run `make` to compile the ROM.')
