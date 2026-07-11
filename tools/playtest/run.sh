@@ -43,6 +43,10 @@
 #                    record / recordch01trail / recordch02map / recordch02combat drive gameplay
 #                    (boot, unit moves, combat) -- different tools, not duplication.
 #   recordending  -- the ch01 "Rolling Cheddar" outro cutscene (frames tagged "end"); preset over recordscene
+#   recordchain   -- the ch02 -> ch03 CHAIN (#23): routs ch02 at top speed off ch02start, fires the win,
+#                    then records the ch02 ending -> MNC2(0x4) -> ch03 opening -> PREP (frames "chain").
+#                      tools/playtest/run.sh recordchain
+#                      tools/playtest/make_gif.py recordchain chain --name ch02-ch03-chain --open
 #   recordprep    -- the Preparations + Pick Units deploy screen (frames "prep")
 #   recordrbg     -- RBG's custom battle anim ("rbg"); loads the rbgch01 checkpoint
 #   recordanim    -- ANY cast member's battle anim on a `make TESTCH=1` ROM: New Game boots
@@ -164,7 +168,7 @@ case "$SCENARIO" in
     recordfix)    BUILDER=ckpt_prep;      CKPT=prep ;;
     recordrbg)    BUILDER=ckpt_rbgch01;   CKPT=rbgch01 ;;
     # ch02 (#22) scenarios LOAD the ch02start state (the real ch00->ch01->ch02 chain, paid once).
-    ch02|smoke_ch02|clear_ch02|ch02baxby|recordch02map|recordch02combat|recordch02ending) BUILDER=ckpt_ch02start; CKPT=ch02start ;;
+    ch02|smoke_ch02|clear_ch02|ch02baxby|recordch02map|recordch02combat|recordch02ending|recordchain) BUILDER=ckpt_ch02start; CKPT=ch02start ;;
     # recordch02intro needs its OWN checkpoint (ckpt_ch02intro, harness.lua) saved just BEFORE the
     # ch02 opening plays -- ckpt_ch02start is captured at turn 1, after the opening is already over.
     recordch02intro) BUILDER=ckpt_ch02intro; CKPT=ch02intro ;;
