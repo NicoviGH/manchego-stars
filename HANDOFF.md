@@ -4,9 +4,34 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-07-10, desktop→remote — Ch3 CUTSCENE POLISH pass on `feat/23-ch03-cutscenes`. Committed `1bd8e26`
-> + pushed (NO PR yet). Opening GIF at `docs/demo/ch03-opening.gif` — GitHub blob renders it inline. TWO items still
-> OPEN: the opening MAP FLASH + the Pinky-scout staging — a fresh instance should take those next.):**
+> **Last session (2026-07-10 #2, VSCode — closed BOTH open ⭐ items on `feat/23-ch03-cutscenes` (still NO PR).
+> New commits `091254d`, `c57c421`, `4acda80`. Next instance: open the PR, or take a remaining ch03 cutscene item
+> below.):**
+> **⭐ OPEN #2 (PINKY SCOUT STAGING) — FIXED (`c57c421`, verified in-engine + Nicolas watched GIF).** Only **Pinky**
+> now fades out; **RBG holds** at the mine mouth through the `STAL(90)` pause, then Pinky fades back in for "It looked
+> at me." ROOT: the `Text(msg)` macro (`Convo_Helpers.h`) = `TEXTSTART TEXTSHOW TEXTEND REMA` — the trailing `REMA`
+> clears ALL faces, so RBG vanished. FIX: author beat D **raw** (`TEXTSTART/TEXTSHOW/TEXTEND`, no REMA) and fade only
+> Pinky via a trailing **`[OpenMidLeft][ClearFace]`** in his message body (scene.c:894 `StartFaceFadeOut` on the active
+> podium). RBG persists because beat E's `Text()` re-opens with `TEXTSTART` == the still-active type → `Event1A_TEXTSTART`
+> **skips its face-clear** (`subcode == proc->activeTextType`, eventscr.c) and `TalkLoadFace` early-returns on the occupied
+> slot (no reflicker). New reusable **`trailing`/`trailings`** hook on `_script_to_message`/`_emit_scene_beats`. ADR in
+> `decisions.md` (Operational Gotchas → cutscene faces). **No event-level single-face-remove exists** — only `REMA` (all)
+> and `FACE_SHOW`/`EvtDisplayFace` (add one); the per-face fade-out is a message text-code, not an opcode.
+> **⭐ OPEN #1 (OPENING MAP FLASH) — RESOLVED as NOT-A-BUG (Nicolas confirmed via proof GIF).** An **every-game-frame**
+> capture of the intro (`PT_SHOTEVERY=1`) shows the transition is clean: "Za'ha Woods" title card → fade → **solid black
+> holds** → the Termalaine street fades up. The cave map **never appears**. The prior "map fades in for ~4 frames
+> (frames 289-292)" was the **title-card fade itself** misidentified — at `shotEvery=4`, files 289-292 = game frames
+> ~1156-1168 = exactly the title-card frames. Mechanism: `fadeToBlack=1` enables the map BG LAYERS, but the ch03 battle
+> map isn't built until the BeginningScene's `LOMA` (runs AFTER the cutscene), so the layers are EMPTY → black, nothing
+> to flash. Proof GIF `docs/demo/ch03-intro-noflash.gif` (`4acda80`). **RESIDUAL:** the real ch02→ch03 CHAIN isn't wired,
+> so if that path pre-loads the cave map into VRAM before the intro it COULD flash (the debug boot can't exercise it) —
+> **re-verify the intro when the chain lands.** The "Za'ha Woods" placeholder card is the separate title-card item.
+> **CRIER GIF REGENERATED (`091254d`):** `docs/demo/ch03-opening.gif` now shows the committed crier textbox wrap fix
+> (the bounty line wraps inside the bubble, no right-edge overflow) + the fixed Pinky staging. `make_gif.py` still writes
+> only to `map-review/` — copy to `docs/demo/` + push to share (GitHub blob renders GIFs inline; mobile too).
+>
+> **Prior session (2026-07-10 #1, desktop→remote — Ch3 CUTSCENE POLISH pass on `feat/23-ch03-cutscenes`. Committed `1bd8e26`
+> + pushed (NO PR yet).):**
 > **BG SWAP FIXED** (the prior session's ⭐ blocker): `BACG` (`EventShowTextBgDirect`, eventscr.c:1316) only DECOMPRESSES
 > a new BG when `proc->activeTextType` is `REMOVEPORTRAITS`/`_1A22`; the town `Text()` beats left it in `TEXTSTART`, so the
 > 2nd `BACG(mine)` was a silent no-op (stale town stayed in VRAM). Fix = re-arm with `REMOVEPORTRAITS` before the 2nd BACG
@@ -39,20 +64,6 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 > faster + lossless via `PT_FPS=240` (screenshots fire per game-frame regardless of wall-clock speed).
 > **RESOLVED (not bugs):** Trex's red-caped map sprite = his recruited PC-blue palette (Nicolas confirmed appropriate);
 > vanilla FE8 has **no "X joined" popup** (Colm recruit = TEXTSHOW→CUSA, verified) — an add would be non-vanilla.
->
-> **⭐ OPEN #1 — the OPENING MAP FLASH (fresh instance: this next).** After the placeholder "Za'ha Woods" title card the
-> **chapter map fades in for ~4 frames** (recordch03open frames 289-292) before the town `BACG`. Root: `BmMain_StartIntroFx`
-> (bm.c label 0) → `gProcScr_ChapterIntro` → `ChapterIntro_BeginFadeToMap`/`LoopFadeToMap` reveals the map BEFORE
-> `CallBeginningEvents` (the BeginningScene) runs. **`fadeToBlack=1` did NOT fix it** (I set it on all hosted slots — it
-> matches ch01/ch02, but `SetDispEnable(1,1,1,0,0)` keeps the map LAYERS on; it only skips the fade *animation*). Needs a
-> TARGETED engine hook to keep the map layer OFF during the intro (let the BeginningScene own the first reveal), OR it may
-> be **CH03BOOT-debug-specific** (ch01/ch02 with `fadeToBlack=1` don't flash in their chained flow; unverifiable until the
-> ch02→ch03 chain is wired). Likely BUNDLE with title-card #4 (same intro sequence — the "Za'ha Woods" card is the same
-> unauthored placeholder). Nicolas wants it fixed **systemically** (all chapters). fadeToBlack is committed but inert.
-> **⭐ OPEN #2 — PINKY SCOUT STAGING.** Nicolas: when Pinky scouts, only **Pinky** fades out; **RBG STAYS** waiting at the
-> cave mouth (currently BOTH vanish — each `Text()` beat auto-`REMA`s all portraits). Needs `FACE_SHOW` (`EvtDisplayFace`)
-> to hold RBG's portrait through the `STAL(90)` pause — low-level face control our scene helpers don't expose. Focused
-> scene-authoring task (get the slot/config right; `FACE_SHOW` is barely used in vanilla).
 >
 > **Prior session (2026-07-09 #3, desktop — Ch3 REAL PREP DEPLOY wired + verified; PR #151 MERGED):**
 > **#23 item 3 DONE — the ch03 party picks in via Preparations** (the vanilla ch01/ch02 flow), replacing the
