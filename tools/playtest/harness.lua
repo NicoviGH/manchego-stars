@@ -3421,6 +3421,65 @@ scenarios.ch03door = function()
         DY, DX, pre, post))
 end
 
+-- CH03CHEST (#23 chests/doors): prove the chest tile-change + item grant in-engine. Boot to the ch03
+-- map, hand a deployed unit a Chest Key (strip its weapon -> menu is [Chest, Item, Wait], Chest at row
+-- 0), teleport it ONTO the (6,3) chest tile (chests open from the tile, not adjacent -- TERRAIN_CHEST_FULL),
+-- drive Chest, and assert (a) gBmMapBaseTiles[3][6] flips 17<<2 -> 29<<2 (closed FF5 chest -> open) AND
+-- (b) the chest's Iron Lance lands in the opener's inventory. Run: PT_HOST_CHAPTER=4 run.sh ch03chest
+-- (needs a CH03BOOT=1 ROM). Shares the MS_Ch03MapChanges array + code path with ch03door.
+scenarios.ch03chest = function()
+    if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
+    local CX, CY = 6, 3
+    local CLOSED, OPEN_T = 17 * 4, 29 * 4     -- FF5 navy chest: closed 17 / open 29, metatile<<2
+    local IRON_LANCE = 0x14                    -- the (6,3) chest's Iron Lance (ch03 YAML)
+    local pre = baseTile(CX, CY)
+    log(string.format("chest (%d,%d) tile before = %d (want closed %d)", CX, CY, pre, CLOSED))
+    if pre ~= CLOSED then
+        return result("FAIL", string.format(
+            "chest (%d,%d) reads %d, not the closed-chest tile %d -- placement/addr wrong", CX, CY, pre, CLOSED))
+    end
+    local u
+    for i = 0, 23 do
+        local c = unitAt(SYM.gUnitArrayBlue, i)
+        if c and (c.state & 0x9) == 0 and c.x ~= 0xFF then u = c break end
+    end
+    if not u then return result("FAIL", "no deployed blue unit to open the chest") end
+    -- Chest Key in slot 0 (0x69, 1 use), zero the rest -> no weapon (no Attack) + free slots for the loot.
+    emu:write16(u.addr + 0x1E, 0x69 | (0x01 << 8))
+    for s = 1, 4 do emu:write16(u.addr + 0x1E + s * 2, 0) end
+    -- Chests open from ON the tile: teleport the opener onto (6,3) (vacate old tile, occupy the chest).
+    if mapUnitAt(CX, CY) ~= 0 then return result("FAIL", "the (6,3) chest tile is already occupied") end
+    setMapUnit(u.x, u.y, 0)
+    local grid = 1  -- blue army slot-1 grid marker isn't needed; any non-zero registers occupancy
+    emu:write8(u.addr + 0x10, CX); emu:write8(u.addr + 0x11, CY)
+    setMapUnit(CX, CY, grid)
+    shot("ch03chest-before")
+    waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
+    if not moveUnit(CX, CY, CX, CY) then
+        shot("ch03chest-no-menu")
+        return result("FAIL", "could not open the opener's command menu on the chest tile")
+    end
+    wait(20); shot("ch03chest-menu")
+    press(K.A, 4); wait(40)   -- Chest (row 0); the open animation + item pop-up plays
+    for _ = 1, 8 do press(K.A, 3); wait(20) end   -- clear the "got Iron Lance" fanfare/textbox
+    local flipped = waitFor(function() return baseTile(CX, CY) == OPEN_T end, 400, true)
+    wait(20); shot("ch03chest-after")
+    local post = baseTile(CX, CY)
+    -- Re-find the opener (its array index is stable; read items[0..4] for the loot).
+    local got = false
+    for s = 0, 4 do if (ru16(u.addr + 0x1E + s * 2) & 0xFF) == IRON_LANCE then got = true break end end
+    log(string.format("chest (%d,%d) tile after = %d (want %d); iron-lance in inventory = %s",
+        CX, CY, post, OPEN_T, tostring(got)))
+    if not flipped then
+        return result("FAIL", string.format("chest tile did not flip: stayed %d (want %d)", post, OPEN_T))
+    end
+    if not got then
+        return result("FAIL", "chest opened (tile flipped) but the Iron Lance did not land in the opener's inventory")
+    end
+    return result("PASS", string.format(
+        "Chest opened: tile flipped %d -> %d (17->29) AND the Iron Lance was granted (#23)", pre, post))
+end
+
 -- KOBOLDVIEW (#23 art): pull the enemy kobolds ON-SCREEN next to the party so their reskinned
 -- map sprites are visible (the roster deploys off-camera at the enemy tiles). Teleports the first
 -- few red brigand generics (pid 0xaa) to tiles around braulo's spawn and screenshots. No combat.
