@@ -359,9 +359,12 @@ events:
       - narration: "It lunges at Pinky. Claws meet metal — a screech of sparks, no blood."
       - beat_break: A3       # the Brute's shock — the reveal lands on HIM (faced, his own mug)
       - kobold-brute: "You— you not soft! What ARE you—?!"
-      - beat_break: B        # RBG levels the Fonduedler — someone went for his son; the pun-professor
-                             # warmth is gone. The cold act, delivered with a pleasant pun (lore/prof-rbg.md:
-                             # the dark side shows in what he DOES, not a changed register).
+      - beat_break: B        # RBG levels the Fonduedler — someone went for his son. First the mask
+                             # DROPS to plain protective fury (no pun — lore/prof-rbg.md: with/about
+                             # Pinky the grandiosity + puns fall away), THEN the pun returns for the
+                             # cold act itself (the dark side shows in what he DOES). Both RBG -> one
+                             # beat, two pages (Nicolas 2026-07-11: a line before the kill line).
+      - prof-rbg: "Don't touch him."
       - prof-rbg: "Say cheese."
       - beat_break: B2       # ACTION line — auto-box: the SHOT + the kill, explicit (Nicolas 2026-07-11:
                              # make it clear RBG shoots and kills, not just the quip).
@@ -371,10 +374,11 @@ events:
       - pinky: "...Father! You saved me!"
       - prof-rbg: "Always, my boy. Always."
       - beat_break: C        # ── C: Wolfram (comic reset — oblivious, ate ore through all of it) ──
-      # (The senses come first; he names the metal before he notices the room. Trimmed to the
-      #  punchline so the deflation lands — the "…Did I miss something?" beat is the scene's
-      #  quotable button, Nicolas 2026-07-11. lore/wolfram.md.)
-      - wolfram: "Silver, under the copper. Nice."
+      # (The senses come first; he names the mineral before he notices the room. It's TOURMALINE —
+      #  the mine's whole prize, the seam he scented at the mouth in the opening (Nicolas 2026-07-11:
+      #  tourmaline is setting-true, not generic copper/silver). Trimmed to the punchline so the
+      #  deflation lands — the "…Did I miss something?" beat is the scene's quotable button. lore/wolfram.md.)
+      - wolfram: "Tourmaline. I could taste it from the tunnel mouth."
       - wolfram: "...Did I miss something?"
       # (Trex is NOT in this beat — his entrance + recruit are DECOUPLED below.)
 
