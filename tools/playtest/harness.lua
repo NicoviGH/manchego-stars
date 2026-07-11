@@ -3969,14 +3969,22 @@ scenarios.recordch03midmap = function()
         if not b or isDead(b) then return false end
         pokeFrail(b); b = red(0xb6)
         local lgrid = mapUnitAt(leader.x, leader.y)
-        for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
-            local tx, ty = b.x + d[1], b.y + d[2]
-            if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0 then
-                setMapUnit(leader.x, leader.y, 0)
-                emu:write8(leader.addr + 0x10, tx); emu:write8(leader.addr + 0x11, ty)
-                setMapUnit(tx, ty, lgrid)
-                leader = blue(0x01)
-                return true
+        -- Prefer a PASSABLE (walkable) adjacent tile so the leader stands on real mine FLOOR (the
+        -- stone battle platform), exactly like actual play -- an impassable wall/pillar tile is a
+        -- rough terrain and would film the leader on the rock platform instead (Nicolas 2026-07-11).
+        for _, passableOnly in ipairs({ true, false }) do
+            for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+                local tx, ty = b.x + d[1], b.y + d[2]
+                if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0
+                   and (not passableOnly or not IMPASSABLE_TERRAIN[terrainAt(tx, ty)]) then
+                    setMapUnit(leader.x, leader.y, 0)
+                    emu:write8(leader.addr + 0x10, tx); emu:write8(leader.addr + 0x11, ty)
+                    setMapUnit(tx, ty, lgrid)
+                    leader = blue(0x01)
+                    log(string.format("leader parked at (%d,%d) terrain=%d (brute@%d,%d terrain=%d)",
+                        tx, ty, terrainAt(tx, ty), b.x, b.y, terrainAt(b.x, b.y)))
+                    return true
+                end
             end
         end
         return false
