@@ -580,8 +580,11 @@ GUEST_PORTRAIT_MAP = {
     # ch03 mid-map RBG-execution beat: the Icewind Brute's snarl now has a mug (Nicolas supplied the
     # ref, 2026-07-11). It rides the vanilla Caellach slot -- a brutish Grado general absent from our
     # ch00-08, referenced nowhere else -> collision-free. Bust = ref_to_bust of the HD kobold-brute
-    # ref (flipped to FE8 screen-left, crop 20,90,1970,1710, no sharpen). Cutscene-only (the Brute is
-    # a raw-pid enemy 0xb6; its death quote is silent, so FID_Caellach appears ONLY in the midmap line).
+    # ref (flipped to FE8 screen-left, crop 20,90,1970,1710, --zoom 0.70, no sharpen). The zoom is
+    # load-bearing: at 1.0 the leftward snout tip fell in FE8's top-left DEAD CORNER (portrait_tool
+    # clipped_mask: 408 painted px dropped, the whole nose); 0.70 adds enough top headroom that the
+    # snout ships fully intact (0 clipped px -- verified via clipped_mask). Cutscene-only (the Brute
+    # is a raw-pid enemy 0xb6; its death quote is silent, so FID_Caellach appears ONLY in the midmap line).
     'kobold-brute':   'Caellach',
 }
 
