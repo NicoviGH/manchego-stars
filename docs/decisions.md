@@ -2007,6 +2007,21 @@ BG0/1, and `CallLordSelectMenu` sets `SetDispEnable(1,1,0,1,1)` (BG2/map OFF). A
 `FADI`→`LOMA(host)` (`RestartBattleMap` rebuilds the map BG VRAM that `BACG` clobbered — cf. ch13a;
 plain `RemoveBGIfNeeded` is for chapter *transitions*)→DISA/LOAD→`FADU`→PREP.
 
+**ON-MAP (no-BG) event-script cutscenes anchor the talk bubble to a FACE, not a unit** (the ch03
+mid-map RBG-execution beat — a mid-battle Misc `AFEV`, no `BACG`). Over a `BACG` the text is a
+full-screen window; on the bare map it's a `PutTalkBubble` speech bubble, and the bubble anchors to
+the on-screen face podium (`[OpenX][LoadFace]`). So a **faced** beat renders fine wherever the camera
+is, but a **faceless** line (no `[OpenX]`) has no anchor — in a Misc `AFEV`/`TURN` script there is no
+talking unit either — so the bubble lands off the tilemap and only a sliver shows. Two rules fall out
+(`_beat_is_faceless` routes them): (1) a faceless on-map line must ride the opaque **auto-centered**
+box (`SVAL(EVT_SLOT_B, 0xFF00FF)`→`SOLOTEXTBOXSTART`), which needs no anchor; (2) **never mix a faced
+and a faceless speaker in one on-map beat** — the faceless half drags the shared bubble off-screen and
+mis-wraps the faced half (Marty + the mugless Brute did exactly this). Split them into separate beats
+(each `Text()`'s trailing `REMA` clears faces, so none bleed across — a bare `TEXTSHOW` chain without
+it left Pinky's face up under Wolfram). Cleanest fix when a speaker recurs: **give it a mug** — the
+Brute got one on the collision-free Caellach guest slot (`GUEST_PORTRAIT_MAP`), turning its beat into
+a normal faced bubble. Verified in-engine (`recordch03midmap`, 2026-07-11).
+
 **Transitions: keep the FADE (vanilla-flavored).** Vanilla never reuses one podium for different
 *people* — each speaker gets their own slot (≤4), faces fade in once, `REMA` clears between messages
 (`[ClearFace]` is in 0/119 vanilla scripts); the in-place swap (`sub_80066E0`) is vanilla but only
@@ -2132,6 +2147,19 @@ session state. `HANDOFF.md` points here._
   clear-bot/`findBoss()` (reads `CA_BOSS`) can't target it — so a per-boss load-test must reach it by
   pid+tile (`ch03win`: teleport the grell to the lord and strike), and a future `clear_chNN` needs either a
   `CA_BOSS` character entry for the boss or a pid-targeted bot. Verified in-engine (`ch03win`, 2026-07-07).
+- **A mid-map death-triggered cutscene (miniboss) = the same silent-flagged-quote idiom + a tmp-flag `AFEV`,
+  NOT `DefeatBoss`.** ch03's RBG-execution beat fires when the *Icewind Brute* dies (not the boss). Recipe
+  (mirror of the win, keyed to a temporary flag so the chapter continues): (1) give the miniboss a **unique
+  raw pid** distinct from the shared generic AND the boss (ch03 Brute = `0xb6`, sibling of the grell's `0xb7`;
+  `0xB0–0xB9` are unnamed → no name/face leak), so its flagged quote keys the trigger to it alone — reusing the
+  generic `0xaa` would fire on *any* trash mob's death; (2) a **silent** (`.msg = 0`) `gDefeatTalkList` entry
+  `(pid, CHAPTER_L_N, EVFLAG_TMP(a))` — `SetPidDefeatedFlag` sets the flag with no portrait to render;
+  (3) a Misc `AFEV(EVFLAG_TMP(b), midmap_script, EVFLAG_TMP(a))` — `EvCheck01_AFEV` runs the script when flag
+  `a` is set and marks itself done with the **ent-flag `b`** (set AFTER the script's `ENDA`), so it fires
+  **exactly once** (an ent-flag of `0` would re-fire every turn once `a` is set). The vanilla ch1 idiom
+  (`AFEV(EVFLAG_TMP(7), …, EVFLAG_DEFEAT_BOSS)`). Data-driven via a per-enemy `is_miniboss:` YAML flag +
+  `build_campaign.midmap_minibosses`/`flag_defeat_quote`/`midmap_afev`. Verified in-engine (`ch03midmap`:
+  kill the Brute → `EVFLAG_TMP(10)` → the AFEV runs the 3 on-map beats → `EVFLAG_TMP(11)` → chapter continues).
 - **Don't reuse a playtest checkpoint across an injection/build change** — only across pure graphics-byte
   swaps. Checkpoints are ROM-hash-stamped in `tools/playtest/states/` (gitignored); delete `.ss`/`.romhash`
   to force a rebuild. (A battle-anim frame change IS a build change → re-record from a fresh ROM.)

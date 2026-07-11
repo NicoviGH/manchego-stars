@@ -165,6 +165,10 @@ enemy_units:
     name: "Icewind Brute"
     count: 1                    # vanilla brigand @ (14,6) L3 steel-axe (the grell's nearest enforcer)
     positions: [[14, 6]]
+    is_miniboss: true           # the mid-map RBG-execution trigger (#23 item 1): a unique raw pid
+                                # (CH03_BRUTE_MINIBOSS_PID) + a silent flagged gDefeatTalkList entry;
+                                # its death fires the on-map execution cutscene (Misc AFEV). Combat
+                                # stays parity Brigand — this only keys the death event to it.
     class: brigand              # parity engine reads this (Brigand base — steel axe + stats)
     deploy_class: brigand-brute # …but DEPLOYS on the Lizardzerker-brute reskin sprite (campaign.yaml
                                 # kobold-brute → CLASS_MNC_LIZARDZERKER_BRUTE): the big enforcer reads
@@ -322,53 +326,61 @@ events:
       - prof-rbg: "Form up."
   - trigger: midmap   # fires on the BRUTE's DEFEAT (the mid-gallery miniboss) — a defeat-triggered
                       # death cutscene. The "good cop / bad cop" routine collapses into the boss's
-                      # death beat: Marty's mercy fails, the beaten Brute makes one last lunge at
-                      # Pinky, RBG delivers the kill. Keeps the parity roster intact (real combat
+                      # death beat: Pinky reaches out to the beaten Brute, it lunges at HIM, and
+                      # RBG delivers the kill. Keeps the parity roster intact (real combat
                       # kill, not a cutscene-removal). The Brute = the kobold-steel "Icewind Brute"
                       # slot; flag it the miniboss + position it mid-galleries at units/objective wiring.
     type: cutscene
     ea_file: events/ch03-rbg-execution.ea
     description: >
-      Mid-map signature beat, fires on the Brute miniboss's defeat. The "good cop /
-      bad cop" routine fails: Marty (the diplomat) tries mercy on the beaten Brute; it
-      lunges at Pinky instead (claws ring off the homunculus — no harm) and RBG, whose
-      one warmth is his son, executes it at gunpoint (rbg_kobold_execution) — pleasant
-      pun, cold act. Pinky reads it innocently as rescue (he doesn't see the rest);
-      RBG's warmth seeds beat 3 + the finale Wish. Wolfram's ore-snacking gag deflates
-      it (wolfram_ore_snacking — he obliviously missed the whole thing). This beat is now
-      RBG's ALONE: Trex's entrance + recruit are DECOUPLED into their own events below
-      (2026-07-09, Nicolas — Colm-style light entrance + everything in the Talk; it fixes an
-      ordering bug and de-crams this cutscene). WINGS DROPPED (Nicolas 2026-07-09: not in
-      Trex's portrait or map sprite, so cut from the fiction — see lore/trex.md). Voice:
-      lore/{prof-rbg,marty,wolfram,pinky}.md. LOCKED 2026-06-26, RE-PASSED 2026-07-09
-      (dialogue-pass, co-written with Nicolas). PENDING: eventscript + Brute-defeat trigger
-      + Darmo/kobold mugs + motion review.
-    script:                     # LOCKED 2026-06-26, RE-PASSED 2026-07-09 (dialogue pass, co-written with Nicolas)
-      # ── A: the routine fails (the Brute, beaten, makes his last move) ──
-      # (The Brute is beaten — down at the back of the gallery, his packmates dead around
-      #  him, the party closing in. Marty crouches to its level; Pinky drifts in, kind.
-      #  Marty coughs a soft puff of spores so it can hear him — his rapport-spore gag.)
-      - marty: "Easy, friend. It's over. No one else has to be hurt."
-      # (The Brute ignores him — fixes on the smallest, softest-looking of them and lunges
-      #  with the last of its strength, claws for Pinky's throat. They meet metal in a
-      #  screech of sparks: Pinky is RBG's homunculus construct (lore/pinky.md). It reels back.)
+      Mid-map signature beat, fires on the Brute miniboss's defeat. Pinky — the smallest,
+      softest-looking of the party — drifts in to help the beaten Brute; it lunges at HIM
+      instead (claws ring off the homunculus — no harm) and RBG, whose one warmth is his
+      son, executes it at gunpoint (rbg_kobold_execution) — pleasant pun, cold act, the
+      shot shown on its own action line. Pinky reads it innocently as rescue (he doesn't
+      see the rest); RBG's warmth seeds the finale Wish. Wolfram's ore-snacking gag deflates
+      it (he obliviously missed the whole thing). RESTAGED 2026-07-11 (Nicolas): Pinky speaks
+      the opening instead of Marty (so the Brute lashing at Pinky lands + RBG's kill is
+      motivated); two faceless ACTION boxes (the attack, the shot) make the beats read;
+      Wolfram trimmed to the punchline. This beat is RBG's ALONE: Trex's entrance + recruit
+      are DECOUPLED into their own events below. The Brute now has a mug (Caellach guest
+      slot). Voice: lore/{prof-rbg,wolfram,pinky,narration}.md. RE-PASSED 2026-07-11
+      (dialogue-pass, co-written with Nicolas). Wired: eventscript + Brute-defeat trigger + mug.
+    script:                     # LOCKED 2026-06-26, RE-PASSED 2026-07-11 (dialogue pass, co-written with Nicolas)
+      # ── A: Pinky reaches out to the beaten Brute — naive kindness that triggers the lunge ──
+      # (The Brute is beaten at the back of the gallery, his packmates dead around him. Pinky —
+      #  the smallest and softest-looking — drifts in close to help, earnest and unafraid; his
+      #  reaching hand is what the Brute goes for. Pinky, not Marty, speaks AND is the target, so
+      #  RBG's kill lands (Nicolas 2026-07-11: Marty's diplomat plea didn't fit). lore/pinky.md.)
+      - pinky: "You're hurt. Don't be scared — nobody else has to fight. Here—"
+      - beat_break: A2       # ACTION line — faceless auto-centered box (like the KOBOLDS ONLY sign):
+                             # the Brute lunges at Pinky and the claws ring off metal (Pinky is RBG's
+                             # homunculus construct). Shows the attack + the "he's not soft" reveal.
+      - narration: "It lunges at Pinky. Claws meet metal — a screech of sparks, no blood."
+      - beat_break: A3       # the Brute's shock — the reveal lands on HIM (faced, his own mug)
       - kobold-brute: "You— you not soft! What ARE you—?!"
-      - beat_break: B
-      # ── B: the shot (someone went for his son; the pun-professor warmth is gone) ──
-      # (It does not matter to RBG that the claws found nothing. One crack; the Brute drops
-      #  for good. He lowers the smoking Fonduedler — no professor left in his face.)
+      - beat_break: B        # RBG levels the Fonduedler — someone went for his son. First the mask
+                             # DROPS to plain protective fury (no pun — lore/prof-rbg.md: with/about
+                             # Pinky the grandiosity + puns fall away), THEN the pun returns for the
+                             # cold act itself (the dark side shows in what he DOES). Both RBG -> one
+                             # beat, two pages (Nicolas 2026-07-11: a line before the kill line).
+      - prof-rbg: "Don't touch him."
       - prof-rbg: "Say cheese."
+      - beat_break: B2       # ACTION line — auto-box: the SHOT + the kill, explicit (Nicolas 2026-07-11:
+                             # make it clear RBG shoots and kills, not just the quip).
+      - narration: "The Fonduedler cracks once. The Brute drops, and does not move."
+      - beat_break: B3       # RBG turns to his son — warmth floods back for him alone (seeds the finale
+                             # Wish). Pinky reads the whole thing innocently as a rescue.
       - pinky: "...Father! You saved me!"
-      # (RBG turns to the boy, and the warmth floods back — for him alone. Seeds beat 3's
-      #  "Nothing down there is taking you from me" and the finale Wish.)
       - prof-rbg: "Always, my boy. Always."
-      - beat_break: C
-      # ── C: Wolfram (comic reset — he missed all of it) ──
-      # (Across the gallery, oblivious, Wolfram lowers a fistful of ore he's been chewing.
-      #  The senses come first; he names the metal before he notices the room — lore/wolfram.md.)
-      - wolfram: "Copper, tin... a touch of silver. Good ore."
-      - wolfram: "...Did something happen?"
-      # (Trex is NOT in this beat anymore — his entrance + recruit are DECOUPLED below.)
+      - beat_break: C        # ── C: Wolfram (comic reset — oblivious, ate ore through all of it) ──
+      # (He's been CHEWING a fistful of it through the whole execution — the senses/taste come first,
+      #  casual metal-eating gag (lore/wolfram.md). It's TOURMALINE, the mine's whole prize, the seam
+      #  he scented at the mouth in the opening (Nicolas 2026-07-11: tourmaline is setting-true, and he
+      #  should be tasting/enjoying it). The "…Did I miss something?" beat is the scene's quotable button.)
+      - wolfram: "Mm. This tourmaline tastes incredible."
+      - wolfram: "...Did I miss something?"
+      # (Trex is NOT in this beat — his entrance + recruit are DECOUPLED below.)
 
   # ── Trex: a Colm-style on-map TALK recruit — DECOUPLED from the RBG-execution beat
   #    (2026-07-09, Nicolas). Vanilla Colm's entrance is a LIGHT turn-1 green-NPC beat (one
