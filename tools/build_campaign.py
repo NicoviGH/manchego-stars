@@ -2181,6 +2181,18 @@ def _inject_cast_palette(palette_u16, char_slots):
     _inject_palette_bank_hook()
 
 
+# Cast members rendered through the SIDE (faction) palette -- green as an NPC, then the
+# standard blue PLAYER palette once recruited -- instead of the bespoke cast OBJ palette.
+# Their custom SHAPE still ships (SMS + MU overrides), but the sheet is remapped onto the
+# donor class's standard SMS role layout (cf. enemy reskins / the ch02 chwinga) and the
+# unit is kept OUT of gMapPaletteOverride, so GetUnitSpritePalette falls through to the
+# faction switch and tints it per side. Needed for a unit that CHANGES faction colour in
+# play: Trex stands GREEN, then the talk-recruit CUSA flips him to the BLUE player palette
+# (#23). A charId-keyed cast override is unconditional -- it would pin one colour, so a
+# green Trex would wrongly render in his blue player palette (Nicolas, 2026-07-10).
+FACTION_TINTED_CAST = frozenset({'trex'})
+
+
 def inject_map_sprites(campaign, verbose=True):
     """Give cast members a custom overworld sprite distinct from their class.
 
@@ -2215,10 +2227,35 @@ def inject_map_sprites(campaign, verbose=True):
     # unit keeps its custom sprite instead of reverting to the stock class one (idle-only
     # decision -- map_sprite_tool.synth_mu_sheet). Synthesized sheets go to a temp dir so
     # no derived asset lands in the working tree; the single source of truth is the idle.
+    # Faction-tinted cast (Trex): remap the cast-palette idle + committed walk onto the
+    # donor class's standard SMS role layout so the faction switch tints them (green NPC ->
+    # blue player on recruit). Same remap as enemy reskins, using the donor WAIT sheet's
+    # palette for BOTH sheets so idle/walk share role indices. Temp dir -> no derived asset
+    # in the tree (single source of truth stays map_sprites/<id>.png).
+    tinted_idle_src, tinted_mu_src, tint_tmp = {}, {}, None
+    for uid, slot, cls, sms in idle:
+        if uid not in FACTION_TINTED_CAST:
+            continue
+        if tint_tmp is None:
+            tint_tmp = tempfile.mkdtemp(prefix='manchego_tint_')
+        donor_png = os.path.join(WAIT_GFX_DIR,
+                                 'unit_icon_wait_%s_sheet.png' % _donor_base(campaign, uid))
+        r_idle = os.path.join(tint_tmp, uid + '.png')
+        map_sprite_tool.remap_sms_palette(os.path.join(asset_dir, uid + '.png'), donor_png, r_idle)
+        tinted_idle_src[uid] = r_idle
+        committed_mu = os.path.join(asset_dir, uid + '_mu.png')
+        if os.path.isfile(committed_mu):
+            r_mu = os.path.join(tint_tmp, uid + '_mu.png')
+            map_sprite_tool.remap_sms_palette(committed_mu, donor_png, r_mu)
+            tinted_mu_src[uid] = r_mu
+
     mu, mu_tmp = [], None
     for uid, slot, cls, sms in idle:
+        if uid in tinted_mu_src:                     # faction-tinted committed walk (remapped)
+            mu.append((uid, slot, cls, tinted_mu_src[uid]))
+            continue
         committed = os.path.join(asset_dir, uid + '_mu.png')
-        if os.path.isfile(committed):
+        if uid not in FACTION_TINTED_CAST and os.path.isfile(committed):
             mu.append((uid, slot, cls, committed))
             continue
         if mu_tmp is None:
@@ -2226,7 +2263,10 @@ def inject_map_sprites(campaign, verbose=True):
         src = os.path.join(mu_tmp, uid + '_mu.png')
         nudge = ((load_unit(campaign, uid).get('art') or {}).get('map_sprite') or {}).get(
             'glide_nudge', 0)
-        map_sprite_tool.synth_mu_sheet(os.path.join(asset_dir, uid + '.png'),
+        # A tinted unit with no committed walk glides from its REMAPPED role idle (so the
+        # glide tints too); everyone else glides from their raw cast-palette idle.
+        idle_for_synth = tinted_idle_src.get(uid, os.path.join(asset_dir, uid + '.png'))
+        map_sprite_tool.synth_mu_sheet(idle_for_synth,
                                        _donor_base(campaign, uid), src,
                                        y_nudge=nudge, verbose=verbose)
         mu.append((uid, slot, cls, src))
@@ -2242,7 +2282,8 @@ def inject_map_sprites(campaign, verbose=True):
         guest_mu.append((uid, slot, cls, committed))
 
     pointer_externs = []
-    _inject_idle_sprites(campaign, asset_dir, idle + guest_idle, pointer_externs, guest_bases)
+    _inject_idle_sprites(campaign, asset_dir, idle + guest_idle, pointer_externs, guest_bases,
+                         src_override=tinted_idle_src)
     _inject_mu_sprites(mu + guest_mu, pointer_externs)
     if pointer_externs:
         with open(UNIT_ICON_POINTER_H, 'a', encoding='utf-8') as f:
@@ -2252,8 +2293,10 @@ def inject_map_sprites(campaign, verbose=True):
     # Any cast with a custom sprite (idle and/or MU) wears the bespoke cast palette in
     # its own OBJ bank -- its sheet is drawn to the cast-palette indices, so it must be
     # viewed through that palette (decisions.md Art & Audio).
-    custom_slots = [slot for _, slot, _, _ in idle]
-    custom_slots += [slot for _, slot, _, _ in mu if slot not in custom_slots]
+    # Faction-tinted cast wear the side palette, not the cast override -> excluded here.
+    custom_slots = [slot for uid, slot, _, _ in idle if uid not in FACTION_TINTED_CAST]
+    custom_slots += [slot for uid, slot, _, _ in mu
+                     if uid not in FACTION_TINTED_CAST and slot not in custom_slots]
     if custom_slots:
         pal_png = os.path.join(asset_dir, 'cast_palette.png')
         if not os.path.isfile(pal_png):
@@ -2411,18 +2454,21 @@ def _donor_base(campaign, uid, guest_bases=None):
                  '(needed to read the SMS size from the decomp)' % (uid, uid))
 
 
-def _inject_idle_sprites(campaign, asset_dir, idle, pointer_externs, guest_bases=None):
-    """Wait-table slot + GetUnitSMSId override for each idle (<id>.png) asset."""
+def _inject_idle_sprites(campaign, asset_dir, idle, pointer_externs, guest_bases=None,
+                         src_override=None):
+    """Wait-table slot + GetUnitSMSId override for each idle (<id>.png) asset. `src_override`
+    ({uid: path}) supplies a pre-processed sheet (e.g. a faction-tinted unit's role-remapped
+    idle) in place of the raw map_sprites/<id>.png."""
+    src_override = src_override or {}
     wait_rows, incbin, overrides = [], [], []
     for uid, slot, class_enum, sms in idle:
+        raw = src_override.get(uid) or os.path.join(asset_dir, uid + '.png')
         # Frame size from the decomp wait table for the donor base -- not guessed.
         _, dfw, dfh = map_sprite_tool.donor_sms_geometry(
             _donor_base(campaign, uid, guest_bases))
-        macro, fw, fh, nframes = map_sprite_tool.sheet_info(
-            os.path.join(asset_dir, uid + '.png'), (dfw, dfh))
+        macro, fw, fh, nframes = map_sprite_tool.sheet_info(raw, (dfw, dfh))
         sym = 'unit_icon_wait_manchego_%s_sheet' % uid.replace('-', '_')
-        shutil.copyfile(os.path.join(asset_dir, uid + '.png'),
-                        os.path.join(WAIT_GFX_DIR, sym + '.png'))
+        shutil.copyfile(raw, os.path.join(WAIT_GFX_DIR, sym + '.png'))
         wait_rows.append('\t{0, %s, %s}, /* %d %s */' % (macro, sym, sms, uid))
         incbin += ['\t.global %s' % sym, '%s:' % sym,
                    '\t.incbin "graphics/unit_icon/wait/%s.4bpp.lz"' % sym,
