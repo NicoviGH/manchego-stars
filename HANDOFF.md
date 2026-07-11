@@ -5,8 +5,13 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
 > **Last session (2026-07-10 #2, VSCode — closed BOTH open ⭐ items on `feat/23-ch03-cutscenes` (still NO PR).
-> New commits `091254d`, `c57c421`, `4acda80`. Next instance: open the PR, or take a remaining ch03 cutscene item
-> below.):**
+> New commits `091254d`, `c57c421`, `4acda80`, `c426fd7`.):**
+> **⭐ NEXT (fresh instance): SHOW NICOLAS GREEN TREX + the talk-recruit.** Trex's green-NPC standing sprite and the
+> green→Talk→blue flip are **verified in-engine (`ch03talk` PASS) but have NEVER been shown to Nicolas** — no committed
+> GIF (he flagged this 2026-07-10). The recorder already exists: `PT_HOST_CHAPTER=4 tools/playtest/run.sh recordch03talk`
+> on the CH03BOOT ROM (`make CH03BOOT=1`; apply the build.sh shebang loop first on macOS) → `tools/playtest/make_gif.py
+> recordch03talk ch03talk --name ch03-trex-recruit` → copy to `docs/demo/` + push (GitHub blob renders inline) → SHOW
+> him. Then (only if he OKs) open the PR / take a remaining item below.
 > **⭐ OPEN #2 (PINKY SCOUT STAGING) — FIXED (`c57c421`, verified in-engine + Nicolas watched GIF).** Only **Pinky**
 > now fades out; **RBG holds** at the mine mouth through the `STAL(90)` pause, then Pinky fades back in for "It looked
 > at me." ROOT: the `Text(msg)` macro (`Convo_Helpers.h`) = `TEXTSTART TEXTSHOW TEXTEND REMA` — the trailing `REMA`
