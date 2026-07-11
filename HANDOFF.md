@@ -4,7 +4,42 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-07-10 #3, VSCode — ⭐ PR #152 SQUASH-MERGED; `feat/23-ch03-cutscenes` DONE & deleted. main @ `f0d77bd`.):**
+> **Last session (2026-07-11, VSCode/remote — ⭐ PR #153 SQUASH-MERGED; `feat/23-ch03-midmap-execution` DONE & deleted. main @ `8dbbce8`.):**
+> **THE MID-MAP RBG-EXECUTION BEAT (#23 item 1) IS WIRED, RESTAGED LIVE WITH NICOLAS, + THE BRUTE GOT A MUG.** The
+> Icewind Brute (`kobold-steel`) is now a **mid-map MINIBOSS**: a unique raw pid **`0xb6`** (clean sibling of the grell's
+> `0xb7`; `0xB0-0xB9` are unnamed gaps → no name/face leak, distinct from the shared generic `0xaa`) + a **silent flagged
+> `gDefeatTalkList` entry** sets `EVFLAG_TMP(10)` on its death; a Misc **`AFEV(EVFLAG_TMP(11), midmap, EVFLAG_TMP(10))`**
+> fires the on-map cutscene ONCE (ent-flag = one-shot guard) and the chapter CONTINUES — the mirror of the grell's
+> DefeatBoss WIN, keyed to a tmp flag not the win flag. Data-driven via a per-enemy **`is_miniboss:`** YAML flag +
+> `build_campaign.midmap_minibosses`/`flag_defeat_quote`/`midmap_afev` (the grell quote refactored onto the shared
+> `flag_defeat_quote` builder). **7-beat scene (restaged live w/ Nicolas):** Pinky reaches out (Brute preloaded on-screen
+> so you see who he's talking to) → [action box: it lunges, claws ring off metal] → Brute "you not soft?!" → RBG "Don't
+> touch him. Say cheese." → [action box: the Fonduedler cracks, the Brute drops] → Pinky/RBG two-hander → Wolfram's
+> TOURMALINE button ("Mm. This tourmaline tastes incredible. …Did I miss something?").
+> **⭐ ON-MAP CUTSCENE RENDERING — the hard-won lesson (ADR `decisions.md` §Multi-speaker cutscene faces):** on the bare
+> map (no `BACG`) text is a `PutTalkBubble` that anchors to the SPEAKING FACE. A FACED beat renders anywhere; a FACELESS
+> line (no `[OpenX]`) in a Misc AFEV has NO anchor → renders OFF the tilemap (only a sliver shows). So a faceless on-map
+> line MUST ride the opaque AUTO-CENTERED box (`SVAL(EVT_SLOT_B,0xFF00FF)`→`SOLOTEXTBOXSTART`, routed by new
+> `_beat_is_faceless`); NEVER mix a faced + faceless speaker in ONE on-map beat (mis-wraps + drags off-screen); each
+> `Text()`'s trailing `REMA` clears faces so none bleed across beats. Cleanest fix for a recurring mugless NPC = **give it
+> a mug** (turns its beat into a normal faced bubble).
+> **BRUTE MUG:** Nicolas's HD ref (`References/NPCs/Kobold Brute HD.png`) → `ref_to_bust` (flipped screen-left,
+> **`--zoom 0.70`** to clear FE8's top-left DEAD CORNER — at 1.0 the leftward snout was clipped; `portrait_tool.clipped_mask`
+> = 0 px at 0.70) → the collision-free **Caellach** guest slot (`GUEST_PORTRAIT_MAP`; Caellach is a brutish Grado general
+> absent from ch00-08). Tried the **Pixelated** ref too (Nicolas asked to compare): it resists — solid bg + dark outlines
+> matching the border frame won't auto-key, and re-pixelating already-pixel-art muddies it → **HD wins** (comparison PNG in
+> `docs/demo/ch03-brute-hd-vs-pixelated.png`). **DEAD-CORNER rule:** always check `--zoom` against `clipped_mask` for a
+> ref whose subject reaches a top corner (snouts/hats/horns) — it's a known FE8 constraint.
+> **`recordch03midmap` PASS/FAIL scenario + recorder** (kill the Brute → assert `EVFLAG_TMP(10)`+`(11)`, chapter continues).
+> Recorder gotchas learned: holds each page 70f + a ROBUST **8-frame** A (short `press(A,3)` under-registers at 240fps →
+> the tail clipped); parks the leader on a **PASSABLE floor tile** (`terrainAt`/`IMPASSABLE_TERRAIN`) so the battle anim
+> films on STONE, not the rock platform of an unoccupied WALL tile (a recording artifact Nicolas caught — game was always
+> fine). `ch03win` un-regressed after the quote refactor. 75 unit tests green.
+> **NEXT (unchecked #23):** the ch02→ch03 CHAIN (then drop the `--ch03-boot` seed) · chests/doors · title-card + full
+> `ch03`/`smoke_ch03`/`clear_ch03` load-test scenarios. Enemy map-sprite/battle-anim ART still open (Brute has a MUG now,
+> not a battle anim). Delivery to Nicolas-on-mobile = commit GIF/PNG to `docs/demo/` + push → GitHub blob URL.
+>
+> **Prior session (2026-07-10 #3, VSCode — PR #152 SQUASH-MERGED; `feat/23-ch03-cutscenes` DONE & deleted. main @ `f0d77bd`.):**
 > **SHOWED NICOLAS GREEN TREX + FIXED THE PALETTE + MERGED THE WHOLE CUTSCENE CHUNK.** Recorded the recruit GIF
 > (`docs/demo/ch03-trex-recruit.gif`) → Nicolas flagged Trex rendered in his **blue PLAYER cast palette, not green**.
 > **ROOT:** a custom cast map sprite's charId sits in `gMapPaletteOverride`, which `GetUnitSpritePalette` honours
@@ -18,8 +53,8 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 > recruit; `remap_sms_palette` `overrides=` knob corrects a wrong role). **PR #152** (all 11 cutscene-chunk commits: opening/
 > entrance/ending wired, BG swap, both flashes, BGs, cave platform, Trex→(2,4), mogall quote, Pinky staging, recorders,
 > green-Trex fix) → CI green (353 tests, drift clean, verify_text 3404/0) → **squash-merged + branch deleted.**
-> **⭐ NEXT: the midmap RBG-EXECUTION beat** (first unchecked #23 item — see REMAINING below), or ch02→ch03 chain / chests /
-> title-card. **NOTE for the midmap beat:** the `trailing`/`trailings` face-fade hook (per-face fade via a message text-code,
+> **(NEXT at the time — the midmap RBG-EXECUTION beat — is now DONE, PR #153; see the top block + REMAINING below.)**
+> **NOTE (still useful):** the `trailing`/`trailings` face-fade hook (per-face fade via a message text-code,
 > since no event-level single-face-remove opcode exists — only `REMA` clears all) + the `REMOVEPORTRAITS`-re-arm-before-BACG
 > BG-swap idiom are both LANDED and reusable; ADRs in `decisions.md` (Operational Gotchas → cutscene faces).
 >
@@ -255,7 +290,7 @@ ch03 recruit, added to #65**.
 + 3 descaled frames, one feature-flow branch per unit (or small batch), `custom_unit` issue template.
 - **Deferred polish (tracked):** braulo's white swing-arc weapon-trail → **#91**; goblin enemy class-level anim → **#90**.
 
-### Content — Ch3 "The Termalaine Mine" (#23) — HOSTED + WIN + SPRITES + DIALOGUE + RECRUIT + PREP-DEPLOY + CUTSCENES-DONE (PR #152 merged); midmap/chain/chests/title/art remain
+### Content — Ch3 "The Termalaine Mine" (#23) — HOSTED + WIN + SPRITES + DIALOGUE + RECRUIT + PREP-DEPLOY + ALL-CUTSCENES-DONE (incl. midmap RBG-execution, PR #153); chain/chests/title/enemy-art remain
 Vanilla-FE8-Ch3 reskin as Termalaine's kobold-overrun tourmaline mine. Teaching goal = the **thief**
 (Trex = our Colm). Decisions: `decisions.md` → Ch3 ADR (four deviations + **item 4 = Defeat Boss**) + the
 ch03 YAML `design_notes` (2026-07-06 narrative reframe). **Live build checklist = #23 (the source of truth);
@@ -299,18 +334,17 @@ how-to for the host machinery = `docs/adding-a-chapter.md`.**
   ✅ **opening map-flash** resolved NOT-a-bug (proof GIF; cave map never appears — re-verify when the ch02→ch03 chain lands).
   ✅ **GREEN-TREX PALETTE FIXED** (`FACTION_TINTED_CAST` — green NPC → blue player; see top block + `decisions.md` Art & Audio).
   ✅ **drivers un-regressed** (`moveUnit` retry; `ch03prep`/`ch03talk`/`ch03win` PASS). ✅ recorders + `make_gif` ffmpeg fast path.
-- **REMAINING (unchecked on #23):**
-  1. **⭐ NEXT — the midmap RBG-EXECUTION beat**
-     (RBG guns down the beaten Brute + Wolfram's ore gag — **Nicolas confirmed KEEP it**, RBG-only, Trex-free). Midmap needs
-     a Brute-**miniboss unique pid** (like the grell's 0xb7, not the shared 0xaa) + a **flagged-defeat AFEV** trigger
-     (`AFEV(trigger, midmap_script, tmp_flag)` fired by a gDefeatTalkList entry on the Brute's death — mirror the
-     grell's DefeatBoss wiring) + a kobold-brute mug (or faceless like the grell). Msg ids reserved 0x9AF–0x9B1.
-  2. **Chain ch02→ch03** — point ch02's ending `MNC2(0x4)` at ch03 (drop the ch02 dev-placeholder landing); replace
+- **✅ DONE — the midmap RBG-EXECUTION beat (PR #153, merged):** the Icewind Brute is a mid-map miniboss (unique raw pid
+  `0xb6` + a silent flagged `gDefeatTalkList` entry → `EVFLAG_TMP(10)` → a Misc `AFEV(EVFLAG_TMP(11), midmap, EVFLAG_TMP(10))`
+  fires the on-map cutscene once, chapter continues). 7-beat restage + the Brute's custom mug (Caellach guest slot, zoom 0.70).
+  See the top block for the full detail + the on-map-cutscene-rendering ADR.
+- **⭐ REMAINING (unchecked on #23):**
+  1. **⭐ NEXT — Chain ch02→ch03** — point ch02's ending `MNC2(0x4)` at ch03 (drop the ch02 dev-placeholder landing); replace
      the ch03 minimal DefeatBoss ending with the real ending cutscene once ch04 hosts (or park like ch02 until then).
      **When this lands, drop the `--ch03-boot` armed party seed** — call `inject_ch03(boot=False)` in the real chain
      so the persistent ch02 party feeds PREP (the `boot=` param + the seed table are already in place for this).
-  3. **Chests/doors** — per-chest **`17→29` TILECHANGE**; Trex opens, key-droppers back up.
-  4. **Title-card** (replace the vanilla slot-4 **"Za'ha Woods"** placeholder that shows at chapter start) — **couple this
+  2. **Chests/doors** — per-chest **`17→29` TILECHANGE**; Trex opens, key-droppers back up.
+  3. **Title-card** (replace the vanilla slot-4 **"Za'ha Woods"** placeholder that shows at chapter start) — **couple this
      with the opening map-flash fix** (both are the same `gProcScr_ChapterIntro` sequence). + full load-test scenarios
      `ch03`/`smoke_ch03`/`clear_ch03` (the `ch03prep`/`ch03win`/`ch03talk`/`koboldview`/`enemycheck` scenarios seed these;
      a fair-play `clear_ch03` needs a `CA_BOSS` grell or a pid-targeted bot).
