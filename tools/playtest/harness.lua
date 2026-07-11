@@ -2928,7 +2928,7 @@ end
 -- top speed); ch02 / smoke_ch02 / clear_ch02 LOAD it so each is fast. Char/class/item ids from
 -- the decomp + the ch02 build (CH02_CHWINGA / CH02_ITEM_IDS in tools/build_campaign.py).
 local CH02_CHWINGA_PIDS = { 0xCA, 0xC9, 0xC8 }   -- DARA/KLIMT/MANSEL = Mote/Rime/Glimmer (green)
-local CH02_CHARMS = { 0x76, 0x6D, 0x6E }         -- Red Gem / Elixir / Pure Water (the gifts)
+local CH02_CHARMS = { 0x28, 0x6D, 0x6E }         -- Hand Axe / Elixir / Pure Water (Mote's Red Gem moved to ch03's chest, #23)
 local CLASS_ARCHER = 0x19                          -- the fliers-vs-bows debut enemy (CH02_CLASS_IDS)
 local CH02_CHAPTER = 3                             -- ch02 hosts on chapter slot 3 (ch01 -> MNC2(0x3))
 local CH03_CHAPTER = 4                             -- ch03 hosts on chapter slot 4 (ch02 ending -> MNC2(0x4))

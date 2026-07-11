@@ -326,18 +326,20 @@ CH02_CLASS_IDS = {'brigand': 'CLASS_BRIGAND', 'archer': 'CLASS_ARCHER',
                   'pegasus_knight': 'CLASS_PEGASUS_KNIGHT'}   # chwinga chassis (balance match to Ross+Garcia)
 CH02_ITEM_IDS = {'iron-axe': 'ITEM_AXE_IRON', 'steel-axe': 'ITEM_AXE_STEEL',
                  'iron-bow': 'ITEM_BOW_IRON', 'vulnerary': 'ITEM_VULNERARY',
-                 'slim-lance': 'ITEM_LANCE_SLIM',
+                 'slim-lance': 'ITEM_LANCE_SLIM', 'hand-axe': 'ITEM_AXE_HANDAXE',
                  'red-gem': 'ITEM_REDGEM', 'elixir': 'ITEM_ELIXIR', 'pure-water': 'ITEM_PUREWATER'}
 CH02_GENERIC_PID = '0x8e'    # vanilla slot-3 generic-minion charIndex (autolevelled trash)
 # The three GREEN chwinga (protect layer): each rides a distinct minor vanilla NPC slot so
 # its survival is individually trackable via CHECK_ALIVE at the ending scene. Slots are
 # collision-free (absent from our ch00-08); their map sprite + portrait + name-text
 # (Mote/Rime/Glimmer) are the art checkpoint (#38/#39) -- placeholder vanilla faces meanwhile.
-# (yaml_id, vanilla character slot, charm-gift item the survivor delivers)
+# (yaml_id, vanilla character slot). The charm-gift each survivor delivers is NOT stored here --
+# it is read from the chapter YAML's green_allies[].gift (single source of truth; the ch02<->ch03
+# reward swap lives in the YAML, so a hardcoded copy here silently drifted once -- #23).
 CH02_CHWINGA = (
-    ('chwinga-mote',    'DARA',   'red-gem'),
-    ('chwinga-rime',    'KLIMT',  'elixir'),
-    ('chwinga-glimmer', 'MANSEL', 'pure-water'),
+    ('chwinga-mote',    'DARA'),
+    ('chwinga-rime',    'KLIMT'),
+    ('chwinga-glimmer', 'MANSEL'),
 )
 # The chwinga wear Sclorbo's chwinga map sprite (he is one), recoloured by the green NPC
 # faction palette -- identical green triplets (Nicolas 2026-06-24). Build-time derived from
@@ -2404,7 +2406,7 @@ def _inject_ch02_chwinga_sprites(campaign, verbose=True):
 
     # The three NPC slots all override onto the one shared chwinga slot/sheet. Insert at
     # the front of each table (linear scan; chwinga charIds are distinct from cast slots).
-    slots = [slot for _, slot, _ in CH02_CHWINGA]
+    slots = [slot for _, slot in CH02_CHWINGA]
     _insert_table_head(UNIT_ICON_WAIT_C, 'gMapSpriteOverride[]',
                        ''.join('\tCHARACTER_%s, %d,\n' % (s.upper(), sms) for s in slots))
     _insert_table_head(UNIT_ICON_MOVE_C, 'gMuImgOverride[]',
@@ -2450,13 +2452,13 @@ def inject_ch02_chwinga_faces(campaign, verbose=True):
     by_id = {g['id']: g for g in chap['deployment']['green_allies']}
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
-    for uid, slot, _gift in CH02_CHWINGA:
+    for uid, slot in CH02_CHWINGA:
         set_message_body(lines, vanilla_name_text_id(slot),
                          name_message_body(display_name(by_id[uid])))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     if verbose:
-        names = ', '.join(display_name(by_id[uid]) for uid, _, _ in CH02_CHWINGA)
+        names = ', '.join(display_name(by_id[uid]) for uid, _ in CH02_CHWINGA)
         print('  chwinga faces -> %s (shared green bust + names: %s)'
               % (', '.join(CH02_CHWINGA_PORTRAIT_SLOT.values()), names))
 
@@ -5234,15 +5236,24 @@ def inject_ch02(campaign, verbose=True):
     #     matches CH02_CHWINGA). autolevel leans on the class curve (bases = tuning
     #     checkpoint).
     chwinga_by_id = {g['id']: g for g in chap['deployment']['green_allies']}
+    # The charm-gift is authored in the YAML (green_allies[].gift) -- the single source of truth
+    # for the ch02<->ch03 reward swap. Validate every gift resolves + the id sets agree, so a YAML
+    # edit that adds/renames a gift fails loudly here instead of silently shipping the wrong item.
+    for uid, _slot in CH02_CHWINGA:
+        g = chwinga_by_id.get(uid)
+        if not g or 'gift' not in g:
+            sys.exit('ERROR: ch02 chwinga %s missing from deployment.green_allies or has no gift' % uid)
+        if g['gift'] not in CH02_ITEM_IDS:
+            sys.exit('ERROR: ch02 chwinga %s gift %r not in CH02_ITEM_IDS' % (uid, g['gift']))
     chwinga = [_ally_unit_entry(None, slot,
                                 CH02_CLASS_IDS[chwinga_by_id[uid]['class']],
                                 chwinga_by_id[uid]['level'],
                                 chwinga_by_id[uid]['position'][0],
                                 chwinga_by_id[uid]['position'][1],
-                                lance, ' /* chwinga %s (%s) */' % (uid, gift),
+                                lance, ' /* chwinga %s (gift: %s) */' % (uid, chwinga_by_id[uid]['gift']),
                                 allegiance='GREEN', autolevel=True,
                                 ai=CH02_AI['cautious'])
-               for uid, slot, gift in CH02_CHWINGA]
+               for uid, slot in CH02_CHWINGA]
 
     # 2c. RED reinforcements (088B4758) -- vanilla 088B4470 mix: one L2 + one L3, turn 3.
     reinforce = [_enemy_unit_entry(CH02_GENERIC_PID, brig, lv, True, x, y, axe,
@@ -5361,8 +5372,8 @@ def inject_ch02(campaign, verbose=True):
         '    BEQ(0x%X, EVT_SLOT_C, EVT_SLOT_0) /* fell -> forfeit its own charm */\n'
         '    GIVEITEMTO(CHAR_EVT_PLAYER_LEADER)\n'
         'LABEL(0x%X)\n'
-        % (CH02_ITEM_IDS[gift], uid, slot.upper(), 0x30 + i, 0x30 + i)
-        for i, (uid, slot, gift) in enumerate(CH02_CHWINGA))
+        % (CH02_ITEM_IDS[chwinga_by_id[uid]['gift']], uid, slot.upper(), 0x30 + i, 0x30 + i)
+        for i, (uid, slot) in enumerate(CH02_CHWINGA))
     script = _replace_brace_block(
         script, 'EventScr_Ch3_EndingScene[] =',
         '{\n    MUSC(SONG_VICTORY)\n'

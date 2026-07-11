@@ -251,16 +251,14 @@ reinforcements:
 # ── Rewards (no chest — vanilla Ch2 has none) ─────────────────────────────────────
 # Vanilla Ch2's loot = three VILLAGE GIFTS (Red Gem / Elixir / Pure Water) + one enemy
 # vulnerary drop. Reward ADR (decisions.md §"Reward/item budget"): ch02 parity = FE8 Ch2
-# = gems + premium consumables, NO boosters/promos. We deliver the three gifts 1:1 as the
-# chwinga charm-gifts (per-survivor, see green_allies above), and the enemy drop is the
-# chardalyn-scavenger's vulnerary. No on-map chest (vanilla Ch2 has none).
+# = gems + premium consumables, NO boosters/promos. We deliver the gifts as the chwinga
+# charm-gifts (per-survivor) — but with the ch02↔ch03 reward swap: Mote's slot gives a Hand
+# Axe (vanilla Ch2's Red Gem moved to ch03's gem-mine chest), Rime = Elixir, Glimmer = Pure
+# Water. The enemy drop is the chardalyn-scavenger's vulnerary. No on-map chest (vanilla has none).
+# The gift item lives in ONE place — green_allies[].gift above — which the build reads directly.
 chests: []
 charm_gifts:
-  note: "Each SURVIVING chwinga gifts its charm at chapter end (gated on the per-unit survival flag)."
-  gifts:                             # 1:1 with vanilla Ch2's three village gifts
-    - { from: chwinga-mote,    item: red-gem,    hex: "0x76" }
-    - { from: chwinga-rime,    item: elixir,     hex: "0x6D" }
-    - { from: chwinga-glimmer, item: pure-water, hex: "0x6E" }
+  note: "Each SURVIVING chwinga gifts its charm at chapter end (gated on the per-unit survival flag); the item is authored per-unit in green_allies[].gift."
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
 events:
