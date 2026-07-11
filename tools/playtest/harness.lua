@@ -3714,6 +3714,57 @@ scenarios.clear_ch02 = function()
     result("PASS", "ch02 routed + chained into ch03; all 3 chwinga charms delivered (CHECK_ALIVE -> GIVEITEMTO)")
 end
 
+-- recordchain: a REVIEW GIF of the ch02 -> ch03 chain in motion (#23 chaining pass). Loads the
+-- ch02start checkpoint, routs the raiders at top speed (same deterministic rout as clear_ch02),
+-- fires the DefeatAll win, then records the ch02 ending -> MNC2(0x4) -> ch03 opening -> Preparations
+-- as normal-speed motion frames (recordCutscene from the current position, no reload). Turn the
+-- frames into a GIF with: tools/playtest/make_gif.py recordchain chain --name ch02-ch03-chain
+scenarios.recordchain = function()
+    wait(30)
+    if not loadState("ch02start") then return result("FAIL", "no ch02start checkpoint (run.sh builds it)") end
+    wait(90)
+    pokeFastConfig()
+    local start = chapter()
+    local function advanced() return chapter() ~= start or procActive(SYM.gProcScr_TitleScreen) end
+    local routed = false
+    for t = 1, 12 do
+        if advanced() then break end
+        waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
+        wait(60)
+        protectChwinga()   -- keep the chwinga alive so all 3 charm-gifts play in the ending
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+        end
+        for i = 0, 7 do
+            if advanced() or #liveEnemies() == 0 then break end
+            local u = unitAt(SYM.gUnitArrayBlue, i)
+            if u and not isDead(u) and (u.state & 0x2) == 0 then
+                local mn, mx = unitAttackRange(u)
+                if mn and teleportToFiringTile(u, mn, mx) then
+                    u = blue(u.charId)
+                    if u and moveUnit(u.x, u.y, u.x, u.y) then
+                        chooseAttack(u.addr)
+                        waitFor(function() return faction() == 0 and not menuOpen()
+                            and not procActive(SYM.gProc_ekrBattle) end, 600)
+                    end
+                end
+            end
+        end
+        log(string.format("recordchain rout turn %d: liveEnemies=%d chapter=%d", t, #liveEnemies(), chapter()))
+        if #liveEnemies() == 0 then routed = true; break end
+        if advanced() then break end
+        if runEnemyPhase(CH02_PARK) == "gameover" then
+            return result("FAIL", string.format("game over on turn %d -- party lost before the chain", t)) end
+    end
+    if not (routed or advanced()) then return result("FAIL", "could not rout ch02 -- no chain to record") end
+    if routed and not advanced() then endTurn() end   -- fire the DefeatAll win -> the ending auto-plays
+    -- Record the ending -> MNC2(0x4) -> ch03 opening -> PREP from HERE (no state reload). Normal speed
+    -- so the text/fades animate for the GIF; A-mash to advance beats; stop when ch03 Preparations opens.
+    return recordCutscene{ tag = "chain", until_ = "prep", speed = "normal",
+                           pressEvery = 24, shotEvery = 3, maxFrames = 9000 }
+end
+
 -- ---- ch02 demo GIFs (#22 review): showcase the chapter on a phone via committed GIFs.
 -- make_gif.py turns the tagged frames into a GIF; commit to docs/demo/ + push (GitHub renders
 -- GIFs inline on mobile). Workflow:
