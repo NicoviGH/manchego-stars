@@ -2931,6 +2931,7 @@ local CH02_CHWINGA_PIDS = { 0xCA, 0xC9, 0xC8 }   -- DARA/KLIMT/MANSEL = Mote/Rim
 local CH02_CHARMS = { 0x76, 0x6D, 0x6E }         -- Red Gem / Elixir / Pure Water (the gifts)
 local CLASS_ARCHER = 0x19                          -- the fliers-vs-bows debut enemy (CH02_CLASS_IDS)
 local CH02_CHAPTER = 3                             -- ch02 hosts on chapter slot 3 (ch01 -> MNC2(0x3))
+local CH03_CHAPTER = 4                             -- ch03 hosts on chapter slot 4 (ch02 ending -> MNC2(0x4))
 local CH02_PARK = { x = 0, y = 0 }                -- NW corner end-turn tile (15x15 map; deploy is row 3+)
 
 -- Directed ch01 seize (the generic clear-bot is too slow to seize ch01's 25x16 map reliably):
@@ -3690,21 +3691,27 @@ scenarios.clear_ch02 = function()
     shot("clear-ch02-routed")
     log(string.format("rout=%s; ending the turn to fire the DefeatAll win check", tostring(routed)))
     -- Routed: force the phase-end DefeatAll check, then FINE-GRAINED poll the ending scene so the
-    -- charm-gifts (CHECK_ALIVE -> GIVEITEMTO) are captured before the ch03 placeholder/title clears
-    -- the convoy/inventory. (Coarse polling skipped the charm window last time.)
+    -- charm-gifts (CHECK_ALIVE -> GIVEITEMTO) are captured before the MNC2(0x4) chain reloads into
+    -- ch03 (slot 4) and PREP re-picks the convoy/inventory. (Coarse polling skipped the charm window.)
+    -- The ch02->ch03 chain (#23) replaced the old dev-placeholder->title landing: the ending now
+    -- MNC2s straight into ch03, so we A-mash through it until chapter() == 4 (ch03), not the title.
     if routed and not advanced() then endTurn() end
+    local reachedCh03 = false
     for _ = 1, 1200 do
         snapCharms()
-        if #best >= 3 then break end
-        if procActive(SYM.gProcScr_TitleScreen) then snapCharms(); break end
+        if chapter() == CH03_CHAPTER then reachedCh03 = true; snapCharms(); break end
+        if procActive(SYM.gProcScr_TitleScreen) then snapCharms(); break end  -- fallback: chain broken -> old landing
         press(K.A, 2); wait(8)
     end
     shot("clear-ch02-ending")
-    log(string.format("charms delivered: %d/3", #best))
+    log(string.format("charms delivered: %d/3; reached ch03=%s (chapter=%d)",
+        #best, tostring(reachedCh03), chapter()))
     if #best < 3 then
         return result("FAIL", string.format(
             "ch02 charm-gift broken: only %d/3 chwinga charms reached the leader/convoy", #best)) end
-    result("PASS", "ch02 routed + chained; all 3 chwinga charms delivered (CHECK_ALIVE -> GIVEITEMTO)")
+    if not reachedCh03 then
+        return result("FAIL", "ch02->ch03 chain broken: ending did not MNC2 into ch03 (slot 4)") end
+    result("PASS", "ch02 routed + chained into ch03; all 3 chwinga charms delivered (CHECK_ALIVE -> GIVEITEMTO)")
 end
 
 -- ---- ch02 demo GIFs (#22 review): showcase the chapter on a phone via committed GIFs.

@@ -693,6 +693,20 @@ deviation). The book's Gem Mine map remains flavor reference; the rejected block
 for the record.
 _Decided: 2026-07-04 (Nicolas, mobile session — ruling on the #23 pending decision)._
 
+**Ch3 chains off ch02's ending (`MNC2(0x4)`); the party persists, no armed seed.**
+ch02's ending scene now `MNC2(0x4)`s straight into ch03 (hosted on chapter slot 4 by
+`inject_ch03`), replacing the dev-placeholder→title landing it parked on while ch03 was
+unbuilt (the placeholder pattern is unchanged — ch03's *own* ending still parks on it until
+ch04 hosts). Two coupled moves in `build_campaign.main()`: (a) `inject_ch03` is now called in
+**every non-boot build** (hosted alongside inject_ch02, in the sandbox build too, so ch02's
+`MNC2(0x4)` never points at an unhosted slot); (b) it's called with **`boot=False`** — the
+party that persists from ch02 feeds ch03's Preparations, so the `--ch03-boot` **armed party
+seed** (`UnitDef_088B47E4`, LOAD1'd only under boot) is a standalone-playtest crutch only, not
+part of the real chain. Verified in-engine by `clear_ch02`, which now A-mashes the ch02 ending
+until `chapter() == 4` (ch03) and FAILs if the chain doesn't land — the ch02→ch03 analogue of
+the `reachCh02Map` `MNC2(0x3)` proof.
+_Decided: 2026-07-11 (CLAUDE, #23 item 1 — chaining pass)._
+
 **Two healers, differentiated by donor (same move as the shamans).** Sclorbo and Basil are both
 Priests, so they get *distinct* vanilla donor lines to avoid stat-twins: **Sclorbo → Moulder** (the
 durable "war-priest": HP70/Def25, balanced, accurate) and **Basil → Natasha** (the frail "mage-healer":
@@ -885,7 +899,8 @@ portraits + name-text (`Mote/Rime/Glimmer`) over the DARA/KLIMT/MANSEL placehold
 Vellynne's cutscene bust (#19 — placeholder `FID_Ismaire` face meanwhile); the chardalyn map-sprite
 reskin (vanilla brigand sprite for now); the "Chapter 2" title-card glyphs (atlas lacks C/W/d/m); and
 the in-game load-test. The chapter builds green, decodes clean (`verify_text` 0 runaway), holds
-difficulty parity, and chains ch01 → ch02 → dev placeholder (ch03 unhosted).
+difficulty parity, and chains ch01 → ch02 → ch03 (`MNC2(0x4)`; see the Ch3-chains ADR above —
+the ch02 ending's original dev-placeholder landing was retired when ch03 landed).
 _Implemented: 2026-06-22 (CLAUDE; content track — host wiring + cutscenes, build-green). Reground
 2026-06-22 (CLAUDE) — vanilla-Ch2 enemy parity (chardalyn berserkers), 3 green chwinga + per-unit
 soft-fail charm-gifts, sled dropped._
