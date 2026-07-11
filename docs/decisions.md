@@ -1644,6 +1644,24 @@ His **cast-palette** sheet is remapped onto his SMS base's (`Civilian_F1`) stand
 one shared SMS slot + glide MU sheet serve all three identical NPC slots. Injected by
 `build_campaign._inject_ch02_chwinga_sprites` (inside `inject_map_sprites`, which owns the override tables).
 
+**A cast member that CHANGES faction colour (green NPC → blue player on recruit) is faction-tinted, not
+cast-palette-pinned (`FACTION_TINTED_CAST`, #23, 2026-07-10).** Trex is a Colm-style talk recruit: he stands GREEN,
+then a `CUSA` flips his faction to blue on Talk. He shipped with a custom cast map sprite, so his charId landed in
+`gMapPaletteOverride` — and `GetUnitSpritePalette` honours that override **unconditionally**, pinning his one bespoke
+(blue player) cast palette regardless of faction. Result: a green-faction Trex still drew blue (Nicolas caught it in
+the recruit GIF). A charId-keyed cast override simply cannot follow a faction change. Fix = generalise the chwinga /
+enemy-reskin logic to a cast member: the `FACTION_TINTED_CAST` set (`build_campaign`) routes his sheet through
+`remap_sms_palette` onto his donor class's (`Thief`) standard SMS **role layout** and keeps his charId **OUT of**
+`gMapPaletteOverride`, so `GetUnitSpritePalette` falls through to the faction switch. His custom winged-kobold **shape**
+still ships — the SMS + MU overrides (`gMapSpriteOverride`) are retained — only the palette is now side-driven: green
+as an NPC, then the standard blue player bank once recruited. Idle + committed walk are both remapped with the donor
+WAIT palette so they share role indices (no derived asset: temp dir; single source stays `map_sprites/trex.png`).
+Trade-off accepted (Nicolas, 2026-07-10: "reads more blue than green, but I'll take it"): faction tinting gives the
+class's standard green/blue ramps, not a hand-tuned green — the bespoke cast palette and faction tinting are mutually
+exclusive for one sheet (a role-layout sheet is what lets *either* faction palette land correctly). If a role reads
+wrong, `remap_sms_palette`'s `overrides={src_idx: std_idx}` knob corrects it. This is the pattern for **any** future
+recruit with a custom sprite (talk or green-start): add its uid to `FACTION_TINTED_CAST`.
+
 **Pick a sprite already drawn in the standard SMS palette.** The first attempt (BoW "Goblin Spearman") had its own
 9-colour palette, so nearest-mapping it to the standard layout collapsed it to a dark, unreadable blob (and a remap-target
 bug — matching to the *player* palette while the unit displays under the *enemy* palette — turned its red pixels green by

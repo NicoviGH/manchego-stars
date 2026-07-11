@@ -4,39 +4,26 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-07-10 #2, VSCode — closed BOTH open ⭐ items on `feat/23-ch03-cutscenes` (still NO PR).
-> New commits `091254d`, `c57c421`, `4acda80`, `c426fd7`.):**
-> **⭐ NEXT (fresh instance): SHOW NICOLAS GREEN TREX + the talk-recruit.** Trex's green-NPC standing sprite and the
-> green→Talk→blue flip are **verified in-engine (`ch03talk` PASS) but have NEVER been shown to Nicolas** — no committed
-> GIF (he flagged this 2026-07-10). The recorder already exists: `PT_HOST_CHAPTER=4 tools/playtest/run.sh recordch03talk`
-> on the CH03BOOT ROM (`make CH03BOOT=1`; apply the build.sh shebang loop first on macOS) → `tools/playtest/make_gif.py
-> recordch03talk ch03talk --name ch03-trex-recruit` → copy to `docs/demo/` + push (GitHub blob renders inline) → SHOW
-> him. Then (only if he OKs) open the PR / take a remaining item below.
-> **⭐ OPEN #2 (PINKY SCOUT STAGING) — FIXED (`c57c421`, verified in-engine + Nicolas watched GIF).** Only **Pinky**
-> now fades out; **RBG holds** at the mine mouth through the `STAL(90)` pause, then Pinky fades back in for "It looked
-> at me." ROOT: the `Text(msg)` macro (`Convo_Helpers.h`) = `TEXTSTART TEXTSHOW TEXTEND REMA` — the trailing `REMA`
-> clears ALL faces, so RBG vanished. FIX: author beat D **raw** (`TEXTSTART/TEXTSHOW/TEXTEND`, no REMA) and fade only
-> Pinky via a trailing **`[OpenMidLeft][ClearFace]`** in his message body (scene.c:894 `StartFaceFadeOut` on the active
-> podium). RBG persists because beat E's `Text()` re-opens with `TEXTSTART` == the still-active type → `Event1A_TEXTSTART`
-> **skips its face-clear** (`subcode == proc->activeTextType`, eventscr.c) and `TalkLoadFace` early-returns on the occupied
-> slot (no reflicker). New reusable **`trailing`/`trailings`** hook on `_script_to_message`/`_emit_scene_beats`. ADR in
-> `decisions.md` (Operational Gotchas → cutscene faces). **No event-level single-face-remove exists** — only `REMA` (all)
-> and `FACE_SHOW`/`EvtDisplayFace` (add one); the per-face fade-out is a message text-code, not an opcode.
-> **⭐ OPEN #1 (OPENING MAP FLASH) — RESOLVED as NOT-A-BUG (Nicolas confirmed via proof GIF).** An **every-game-frame**
-> capture of the intro (`PT_SHOTEVERY=1`) shows the transition is clean: "Za'ha Woods" title card → fade → **solid black
-> holds** → the Termalaine street fades up. The cave map **never appears**. The prior "map fades in for ~4 frames
-> (frames 289-292)" was the **title-card fade itself** misidentified — at `shotEvery=4`, files 289-292 = game frames
-> ~1156-1168 = exactly the title-card frames. Mechanism: `fadeToBlack=1` enables the map BG LAYERS, but the ch03 battle
-> map isn't built until the BeginningScene's `LOMA` (runs AFTER the cutscene), so the layers are EMPTY → black, nothing
-> to flash. Proof GIF `docs/demo/ch03-intro-noflash.gif` (`4acda80`). **RESIDUAL:** the real ch02→ch03 CHAIN isn't wired,
-> so if that path pre-loads the cave map into VRAM before the intro it COULD flash (the debug boot can't exercise it) —
-> **re-verify the intro when the chain lands.** The "Za'ha Woods" placeholder card is the separate title-card item.
-> **CRIER GIF REGENERATED (`091254d`):** `docs/demo/ch03-opening.gif` now shows the committed crier textbox wrap fix
-> (the bounty line wraps inside the bubble, no right-edge overflow) + the fixed Pinky staging. `make_gif.py` still writes
-> only to `map-review/` — copy to `docs/demo/` + push to share (GitHub blob renders GIFs inline; mobile too).
+> **Last session (2026-07-10 #3, VSCode — ⭐ PR #152 SQUASH-MERGED; `feat/23-ch03-cutscenes` DONE & deleted. main @ `f0d77bd`.):**
+> **SHOWED NICOLAS GREEN TREX + FIXED THE PALETTE + MERGED THE WHOLE CUTSCENE CHUNK.** Recorded the recruit GIF
+> (`docs/demo/ch03-trex-recruit.gif`) → Nicolas flagged Trex rendered in his **blue PLAYER cast palette, not green**.
+> **ROOT:** a custom cast map sprite's charId sits in `gMapPaletteOverride`, which `GetUnitSpritePalette` honours
+> **unconditionally** — so it pinned one palette regardless of faction; a green-faction Trex still drew blue. **FIX**
+> (the chwinga/enemy-reskin logic generalised to a cast member): new **`FACTION_TINTED_CAST`** set in `build_campaign`
+> remaps his sheet onto the `Thief` donor's standard SMS role layout and keeps his charId **OUT of** `gMapPaletteOverride`,
+> so the faction switch tints him — **green NPC → blue player on the recruit CUSA**. Custom shape kept (SMS+MU overrides
+> retained). Data-verified: `RENNAC` gone from `gMapPaletteOverride`, still in `gMapSpriteOverride` (SMS 116), injected
+> wait sheet carries the Thief donor palette. Nicolas: "reads more blue than green, but I'll take it — the conversion
+> works." **ADR in `decisions.md` → Art & Audio** (the `FACTION_TINTED_CAST` pattern; use it for any future custom-sprite
+> recruit; `remap_sms_palette` `overrides=` knob corrects a wrong role). **PR #152** (all 11 cutscene-chunk commits: opening/
+> entrance/ending wired, BG swap, both flashes, BGs, cave platform, Trex→(2,4), mogall quote, Pinky staging, recorders,
+> green-Trex fix) → CI green (353 tests, drift clean, verify_text 3404/0) → **squash-merged + branch deleted.**
+> **⭐ NEXT: the midmap RBG-EXECUTION beat** (first unchecked #23 item — see REMAINING below), or ch02→ch03 chain / chests /
+> title-card. **NOTE for the midmap beat:** the `trailing`/`trailings` face-fade hook (per-face fade via a message text-code,
+> since no event-level single-face-remove opcode exists — only `REMA` clears all) + the `REMOVEPORTRAITS`-re-arm-before-BACG
+> BG-swap idiom are both LANDED and reusable; ADRs in `decisions.md` (Operational Gotchas → cutscene faces).
 >
-> **Prior session (2026-07-10 #1, desktop→remote — Ch3 CUTSCENE POLISH pass on `feat/23-ch03-cutscenes`. Committed `1bd8e26`
-> + pushed (NO PR yet).):**
+> **Prior session (2026-07-10 #1+#2, desktop→remote+VSCode — Ch3 CUTSCENE POLISH on `feat/23-ch03-cutscenes` (now merged via #152)):**
 > **BG SWAP FIXED** (the prior session's ⭐ blocker): `BACG` (`EventShowTextBgDirect`, eventscr.c:1316) only DECOMPRESSES
 > a new BG when `proc->activeTextType` is `REMOVEPORTRAITS`/`_1A22`; the town `Text()` beats left it in `TEXTSTART`, so the
 > 2nd `BACG(mine)` was a silent no-op (stale town stayed in VRAM). Fix = re-arm with `REMOVEPORTRAITS` before the 2nd BACG
@@ -268,7 +255,7 @@ ch03 recruit, added to #65**.
 + 3 descaled frames, one feature-flow branch per unit (or small batch), `custom_unit` issue template.
 - **Deferred polish (tracked):** braulo's white swing-arc weapon-trail → **#91**; goblin enemy class-level anim → **#90**.
 
-### Content — Ch3 "The Termalaine Mine" (#23) — HOSTED + WIN + SPRITES + DIALOGUE + RECRUIT + PREP-DEPLOY + CUTSCENES-WIRED (⭐ WIP: opening BG-swap not rendering); midmap/chain/chests/title/art remain
+### Content — Ch3 "The Termalaine Mine" (#23) — HOSTED + WIN + SPRITES + DIALOGUE + RECRUIT + PREP-DEPLOY + CUTSCENES-DONE (PR #152 merged); midmap/chain/chests/title/art remain
 Vanilla-FE8-Ch3 reskin as Termalaine's kobold-overrun tourmaline mine. Teaching goal = the **thief**
 (Trex = our Colm). Decisions: `decisions.md` → Ch3 ADR (four deviations + **item 4 = Defeat Boss**) + the
 ch03 YAML `design_notes` (2026-07-06 narrative reframe). **Live build checklist = #23 (the source of truth);
@@ -303,18 +290,17 @@ how-to for the host machinery = `docs/adding-a-chapter.md`.**
   party ARMED from `CLASS_LOADOUT`). Trex moved to his own green table (`UnitDef_088B49CC`); `--ch03-boot` LOADs an
   armed seed (`UnitDef_088B47E4`); new `inject_ch03(boot=)` param (chaining pass omits the seed). `bootToMap` is
   PREP-aware. Verified: `ch03prep` PASS; flow in `docs/demo/ch03-prep-{menu,fielded}.png`.
-- **CUTSCENES — largely DONE (branch `feat/23-ch03-cutscenes` @ `1bd8e26`, pushed, NO PR yet):**
+- **CUTSCENES — ✅ DONE & MERGED (PR #152, main @ `f0d77bd`):**
   ✅ opening / Trex turn-1 entrance / ending wired + rendering; ✅ Wolfram/narration width fix; ✅ BG-append infra.
-  ✅ **town→mine BG SWAP FIXED** (REMOVEPORTRAITS re-arm before the 2nd BACG — see top block). ✅ **prep map-flash fixed**
-  (ch01/ch02/ch03). ✅ **crier text overflow fixed** (faced beats wrap 29). ✅ **BGs** (town de-padded + both zoomed ~7.7%,
-  right-edge black gone; cave = FE7-native mine-mouth). ✅ **cave battle platform** (siroyuka1 stone). ✅ **Trex→(2,4)**
-  (Colm's tile). ✅ **mogall death quote removed** (silent win). ✅ **drivers un-regressed** (`moveUnit` retry;
-  `ch03prep`/`ch03talk`/`ch03win` PASS). ✅ recorders (`recordch03talk`/`win`/`mapfull`) + `make_gif` ffmpeg fast path.
-  ⛔ **STILL OPEN (fresh instance):** (1) the **opening MAP FLASH** (chapter-intro reveals the map ~4 frames before the
-  town BACG; `fadeToBlack` did NOT fix it — needs an engine hook or bundle with title-card #4); (2) **Pinky-scout staging**
-  (only Pinky fades, RBG stays — needs `FACE_SHOW`). Full detail in the top session block.
+  ✅ **town→mine BG SWAP FIXED** (REMOVEPORTRAITS re-arm before the 2nd BACG). ✅ **prep map-flash fixed** (ch01/ch02/ch03).
+  ✅ **crier text overflow fixed** (faced beats wrap 29). ✅ **BGs** (town de-padded + both zoomed ~7.7%, right-edge black
+  gone; cave = FE7-native mine-mouth). ✅ **cave battle platform** (siroyuka1 stone). ✅ **Trex→(2,4)** (Colm's tile).
+  ✅ **mogall death quote removed** (silent win). ✅ **Pinky-scout staging** (only Pinky fades, RBG holds — `trailing` hook).
+  ✅ **opening map-flash** resolved NOT-a-bug (proof GIF; cave map never appears — re-verify when the ch02→ch03 chain lands).
+  ✅ **GREEN-TREX PALETTE FIXED** (`FACTION_TINTED_CAST` — green NPC → blue player; see top block + `decisions.md` Art & Audio).
+  ✅ **drivers un-regressed** (`moveUnit` retry; `ch03prep`/`ch03talk`/`ch03win` PASS). ✅ recorders + `make_gif` ffmpeg fast path.
 - **REMAINING (unchecked on #23):**
-  1. **⭐ NEXT — the OPENING MAP FLASH + Pinky-scout staging** (the two ⛔ above), then the **midmap RBG-EXECUTION beat**
+  1. **⭐ NEXT — the midmap RBG-EXECUTION beat**
      (RBG guns down the beaten Brute + Wolfram's ore gag — **Nicolas confirmed KEEP it**, RBG-only, Trex-free). Midmap needs
      a Brute-**miniboss unique pid** (like the grell's 0xb7, not the shared 0xaa) + a **flagged-defeat AFEV** trigger
      (`AFEV(trigger, midmap_script, tmp_flag)` fired by a gDefeatTalkList entry on the Brute's death — mirror the
