@@ -4,7 +4,22 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-07-11, VSCode/remote — ⭐ PR #153 SQUASH-MERGED; `feat/23-ch03-midmap-execution` DONE & deleted. main @ `8dbbce8`.):**
+> **Last session (2026-07-11 #2, VSCode/remote — ⭐ CH02→CH03 CHAIN wired; PR #154 OPEN (awaiting Nicolas's merge), `feat/23-chain-ch02-ch03`.):**
+> **THE CAMPAIGN NOW FLOWS ch02 → ch03.** ch02's ending `MNC2(0x4)`s straight into ch03 (slot 4), retiring the
+> dev-placeholder→title landing it parked on while ch03 was unbuilt. Two coupled moves in `build_campaign.main()`:
+> (a) **`inject_ch03` now runs in EVERY non-boot build** (hosted alongside `inject_ch02`, and in the `--test-chapter`
+> sandbox too, so ch02's `MNC2(0x4)` never points at an unhosted slot); (b) it's called with **`boot=False`** — the
+> party that PERSISTS from ch02 feeds ch03's PREP, so the **`--ch03-boot` armed party seed** (`UnitDef_088B47E4`,
+> `LOAD1`'d only under boot) is now a standalone-playtest crutch ONLY, not the real chain. **ch03's OWN ending still
+> parks on the dev-placeholder until ch04 hosts** (placeholder pattern unchanged; only ch02's landing moved). **VERIFIED
+> IN-ENGINE:** `clear_ch02` now A-mashes the ch02 ending until `chapter()==4` (ch03) and FAILs if the chain doesn't land
+> (the ch02→ch03 analogue of `reachCh02Map`'s `MNC2(0x3)` proof) → **PASS: `reached ch03=true (chapter=4)`, 3/3 chwinga
+> charms still delivered** through the ending before the reload. `make` green; `verify_text` 3404/0; 75 unit tests +
+> drift + inject-order guards clean. ADR in `decisions.md` (Ch3-chains). **#23 chain sub-item checked.**
+> **NEXT (unchecked #23):** chests/doors (`17→29` TILECHANGE, Trex opens) · title-card art (couple w/ the opening
+> map-flash) · full `ch03`/`smoke_ch03`/`clear_ch03` load-test scenarios. Enemy map-sprite/battle-anim ART still open.
+>
+> **Prior session (2026-07-11 #1, VSCode/remote — ⭐ PR #153 SQUASH-MERGED; `feat/23-ch03-midmap-execution` DONE & deleted. main @ `8dbbce8`.):**
 > **THE MID-MAP RBG-EXECUTION BEAT (#23 item 1) IS WIRED, RESTAGED LIVE WITH NICOLAS, + THE BRUTE GOT A MUG.** The
 > Icewind Brute (`kobold-steel`) is now a **mid-map MINIBOSS**: a unique raw pid **`0xb6`** (clean sibling of the grell's
 > `0xb7`; `0xB0-0xB9` are unnamed gaps → no name/face leak, distinct from the shared generic `0xaa`) + a **silent flagged
@@ -338,13 +353,13 @@ how-to for the host machinery = `docs/adding-a-chapter.md`.**
   `0xb6` + a silent flagged `gDefeatTalkList` entry → `EVFLAG_TMP(10)` → a Misc `AFEV(EVFLAG_TMP(11), midmap, EVFLAG_TMP(10))`
   fires the on-map cutscene once, chapter continues). 7-beat restage + the Brute's custom mug (Caellach guest slot, zoom 0.70).
   See the top block for the full detail + the on-map-cutscene-rendering ADR.
+- **✅ DONE — Chain ch02→ch03 (PR #154, OPEN — awaiting Nicolas's merge):** ch02's ending `MNC2(0x4)`s into ch03;
+  `inject_ch03(boot=False)` hosted in every non-boot build (persistent ch02 party feeds PREP, seed dropped). Verified
+  in-engine (`clear_ch02` lands on ch03, chapter=4). ch03's OWN ending still parks on the dev-placeholder until ch04
+  hosts (replace with the real ending cutscene then). See the top block + `decisions.md` Ch3-chains ADR.
 - **⭐ REMAINING (unchecked on #23):**
-  1. **⭐ NEXT — Chain ch02→ch03** — point ch02's ending `MNC2(0x4)` at ch03 (drop the ch02 dev-placeholder landing); replace
-     the ch03 minimal DefeatBoss ending with the real ending cutscene once ch04 hosts (or park like ch02 until then).
-     **When this lands, drop the `--ch03-boot` armed party seed** — call `inject_ch03(boot=False)` in the real chain
-     so the persistent ch02 party feeds PREP (the `boot=` param + the seed table are already in place for this).
-  2. **Chests/doors** — per-chest **`17→29` TILECHANGE**; Trex opens, key-droppers back up.
-  3. **Title-card** (replace the vanilla slot-4 **"Za'ha Woods"** placeholder that shows at chapter start) — **couple this
+  1. **Chests/doors** — per-chest **`17→29` TILECHANGE**; Trex opens, key-droppers back up.
+  2. **Title-card** (replace the vanilla slot-4 **"Za'ha Woods"** placeholder that shows at chapter start) — **couple this
      with the opening map-flash fix** (both are the same `gProcScr_ChapterIntro` sequence). + full load-test scenarios
      `ch03`/`smoke_ch03`/`clear_ch03` (the `ch03prep`/`ch03win`/`ch03talk`/`koboldview`/`enemycheck` scenarios seed these;
      a fair-play `clear_ch03` needs a `CA_BOSS` grell or a pid-targeted bot).
