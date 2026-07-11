@@ -130,6 +130,7 @@ enemy_class_reskins:
 # (Marty's druidic ration; everyone shares one consumable name).
 item_names:
   ITEM_VULNERARY: "Goodberry"
+  ITEM_REDGEM: "Tourmaline"     # Termalaine's signature gem (ch03 chest); mechanics = Red Gem (2,500g sell), #23
 
 # Item icon overrides: swap a vanilla item's 16x16 icon for a campaign asset under
 # item_icons/<name>.4bpp (build wiring = build_campaign.inject_item_icons, which resolves
