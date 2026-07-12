@@ -326,18 +326,20 @@ CH02_CLASS_IDS = {'brigand': 'CLASS_BRIGAND', 'archer': 'CLASS_ARCHER',
                   'pegasus_knight': 'CLASS_PEGASUS_KNIGHT'}   # chwinga chassis (balance match to Ross+Garcia)
 CH02_ITEM_IDS = {'iron-axe': 'ITEM_AXE_IRON', 'steel-axe': 'ITEM_AXE_STEEL',
                  'iron-bow': 'ITEM_BOW_IRON', 'vulnerary': 'ITEM_VULNERARY',
-                 'slim-lance': 'ITEM_LANCE_SLIM',
+                 'slim-lance': 'ITEM_LANCE_SLIM', 'hand-axe': 'ITEM_AXE_HANDAXE',
                  'red-gem': 'ITEM_REDGEM', 'elixir': 'ITEM_ELIXIR', 'pure-water': 'ITEM_PUREWATER'}
 CH02_GENERIC_PID = '0x8e'    # vanilla slot-3 generic-minion charIndex (autolevelled trash)
 # The three GREEN chwinga (protect layer): each rides a distinct minor vanilla NPC slot so
 # its survival is individually trackable via CHECK_ALIVE at the ending scene. Slots are
 # collision-free (absent from our ch00-08); their map sprite + portrait + name-text
 # (Mote/Rime/Glimmer) are the art checkpoint (#38/#39) -- placeholder vanilla faces meanwhile.
-# (yaml_id, vanilla character slot, charm-gift item the survivor delivers)
+# (yaml_id, vanilla character slot). The charm-gift each survivor delivers is NOT stored here --
+# it is read from the chapter YAML's green_allies[].gift (single source of truth; the ch02<->ch03
+# reward swap lives in the YAML, so a hardcoded copy here silently drifted once -- #23).
 CH02_CHWINGA = (
-    ('chwinga-mote',    'DARA',   'red-gem'),
-    ('chwinga-rime',    'KLIMT',  'elixir'),
-    ('chwinga-glimmer', 'MANSEL', 'pure-water'),
+    ('chwinga-mote',    'DARA'),
+    ('chwinga-rime',    'KLIMT'),
+    ('chwinga-glimmer', 'MANSEL'),
 )
 # The chwinga wear Sclorbo's chwinga map sprite (he is one), recoloured by the green NPC
 # faction palette -- identical green triplets (Nicolas 2026-06-24). Build-time derived from
@@ -1050,6 +1052,68 @@ def inject_item_icons(campaign, verbose=True):
         shutil.copyfile(src, os.path.join(DECOMP, rel))
         if verbose:
             print('  %-18s -> %s' % (item_enum, rel))
+
+
+def _bgr555(hexstr):
+    """'#rrggbb' -> a 15-bit BGR555 halfword (FE8 .agbpal / GBA palette format)."""
+    h = hexstr.lstrip('#')
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return (r >> 3) | ((g >> 3) << 5) | ((b >> 3) << 10)
+
+
+def _item_icon_pal1_bytes(colors):
+    """16 '#rrggbb' colors -> a 32-byte BGR555 blob (one 16-colour item-icon palette bank)."""
+    if len(colors) != 16:
+        sys.exit('ERROR: item_icon_pal1.palette must have exactly 16 colors (got %d)' % len(colors))
+    return b''.join(struct.pack('<H', _bgr555(c)) for c in colors)
+
+
+def _pal1_icon_ids(campaign):
+    """The iconIds (gItemData.iconId) of the campaign's item_icon_pal1.icons, sorted."""
+    cfg = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
+    with open(cfg, encoding='utf-8') as f:
+        pal1 = (yaml.safe_load(f) or {}).get('item_icon_pal1') or {}
+    return sorted(item_icon_id(e) for e in (pal1.get('icons') or []))
+
+
+def _ms_pal1_iconids_asm(ids):
+    """gMSPal1IconIds[] -- the iconIds the DrawIcon hook bank-bumps to pal 1, 0xFFFF-terminated
+    (no valid iconId is 0xFFFF). The generic hook (engine_hooks._patch_draw_icon_pal1) externs it."""
+    lines = ['', '/* Manchego Stars item icons that draw from pal 1 (#23): the generic DrawIcon',
+             '   hook (engine_hooks._patch_draw_icon_pal1) bank-bumps these iconIds to pal 1. */',
+             '\t.align 2, 0', '\t.global gMSPal1IconIds', 'gMSPal1IconIds:']
+    lines += ['\t.hword %d' % i for i in ids]
+    lines.append('\t.hword 0xFFFF')
+    return '\n'.join(lines)
+
+
+def inject_item_icon_pal1(campaign, verbose=True):
+    """Wire the campaign's pal-1 item icons (#23): repaint FE8's 2nd, vanilla-unused item-icon
+    palette (bank 1, loaded adjacent by LoadIconPalettes) with item_icon_pal1.palette, and emit
+    gMSPal1IconIds[] -- the iconIds the generic DrawIcon hook bank-bumps to pal 1 so they draw
+    from a colour pal 0 lacks (e.g. the pink Tourmaline). inject_item_icons already swapped the
+    icon TILES; this adds the palette + the id list. No-op when no item_icon_pal1 is declared."""
+    cfg = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
+    with open(cfg, encoding='utf-8') as f:
+        pal1 = (yaml.safe_load(f) or {}).get('item_icon_pal1') or {}
+    if not pal1:
+        if verbose:
+            print('  (no item_icon_pal1 declared)')
+        return
+    # Repaint bank 1 (bytes 32..63); bank 0 (the shared pal 0) is left byte-for-byte intact.
+    palpath = os.path.join(DECOMP, 'graphics', 'item_icon', 'item_icon_palette.agbpal')
+    with open(palpath, 'rb') as f:
+        raw = bytearray(f.read())
+    if len(raw) < 64:
+        raw.extend(b'\x00' * (64 - len(raw)))
+    raw[32:64] = _item_icon_pal1_bytes(pal1['palette'])
+    with open(palpath, 'wb') as f:
+        f.write(raw)
+    ids = _pal1_icon_ids(campaign)
+    with open(CONST_MAPS_S, 'a', encoding='utf-8') as f:
+        f.write(_ms_pal1_iconids_asm(ids) + '\n')
+    if verbose:
+        print('  pal 1 repainted; gMSPal1IconIds = %s' % ids)
 
 
 def inject_item_names(campaign, verbose=True):
@@ -2404,7 +2468,7 @@ def _inject_ch02_chwinga_sprites(campaign, verbose=True):
 
     # The three NPC slots all override onto the one shared chwinga slot/sheet. Insert at
     # the front of each table (linear scan; chwinga charIds are distinct from cast slots).
-    slots = [slot for _, slot, _ in CH02_CHWINGA]
+    slots = [slot for _, slot in CH02_CHWINGA]
     _insert_table_head(UNIT_ICON_WAIT_C, 'gMapSpriteOverride[]',
                        ''.join('\tCHARACTER_%s, %d,\n' % (s.upper(), sms) for s in slots))
     _insert_table_head(UNIT_ICON_MOVE_C, 'gMuImgOverride[]',
@@ -2450,13 +2514,13 @@ def inject_ch02_chwinga_faces(campaign, verbose=True):
     by_id = {g['id']: g for g in chap['deployment']['green_allies']}
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
-    for uid, slot, _gift in CH02_CHWINGA:
+    for uid, slot in CH02_CHWINGA:
         set_message_body(lines, vanilla_name_text_id(slot),
                          name_message_body(display_name(by_id[uid])))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     if verbose:
-        names = ', '.join(display_name(by_id[uid]) for uid, _, _ in CH02_CHWINGA)
+        names = ', '.join(display_name(by_id[uid]) for uid, _ in CH02_CHWINGA)
         print('  chwinga faces -> %s (shared green bust + names: %s)'
               % (', '.join(CH02_CHWINGA_PORTRAIT_SLOT.values()), names))
 
@@ -5234,15 +5298,24 @@ def inject_ch02(campaign, verbose=True):
     #     matches CH02_CHWINGA). autolevel leans on the class curve (bases = tuning
     #     checkpoint).
     chwinga_by_id = {g['id']: g for g in chap['deployment']['green_allies']}
+    # The charm-gift is authored in the YAML (green_allies[].gift) -- the single source of truth
+    # for the ch02<->ch03 reward swap. Validate every gift resolves + the id sets agree, so a YAML
+    # edit that adds/renames a gift fails loudly here instead of silently shipping the wrong item.
+    for uid, _slot in CH02_CHWINGA:
+        g = chwinga_by_id.get(uid)
+        if not g or 'gift' not in g:
+            sys.exit('ERROR: ch02 chwinga %s missing from deployment.green_allies or has no gift' % uid)
+        if g['gift'] not in CH02_ITEM_IDS:
+            sys.exit('ERROR: ch02 chwinga %s gift %r not in CH02_ITEM_IDS' % (uid, g['gift']))
     chwinga = [_ally_unit_entry(None, slot,
                                 CH02_CLASS_IDS[chwinga_by_id[uid]['class']],
                                 chwinga_by_id[uid]['level'],
                                 chwinga_by_id[uid]['position'][0],
                                 chwinga_by_id[uid]['position'][1],
-                                lance, ' /* chwinga %s (%s) */' % (uid, gift),
+                                lance, ' /* chwinga %s (gift: %s) */' % (uid, chwinga_by_id[uid]['gift']),
                                 allegiance='GREEN', autolevel=True,
                                 ai=CH02_AI['cautious'])
-               for uid, slot, gift in CH02_CHWINGA]
+               for uid, slot in CH02_CHWINGA]
 
     # 2c. RED reinforcements (088B4758) -- vanilla 088B4470 mix: one L2 + one L3, turn 3.
     reinforce = [_enemy_unit_entry(CH02_GENERIC_PID, brig, lv, True, x, y, axe,
@@ -5361,8 +5434,8 @@ def inject_ch02(campaign, verbose=True):
         '    BEQ(0x%X, EVT_SLOT_C, EVT_SLOT_0) /* fell -> forfeit its own charm */\n'
         '    GIVEITEMTO(CHAR_EVT_PLAYER_LEADER)\n'
         'LABEL(0x%X)\n'
-        % (CH02_ITEM_IDS[gift], uid, slot.upper(), 0x30 + i, 0x30 + i)
-        for i, (uid, slot, gift) in enumerate(CH02_CHWINGA))
+        % (CH02_ITEM_IDS[chwinga_by_id[uid]['gift']], uid, slot.upper(), 0x30 + i, 0x30 + i)
+        for i, (uid, slot) in enumerate(CH02_CHWINGA))
     script = _replace_brace_block(
         script, 'EventScr_Ch3_EndingScene[] =',
         '{\n    MUSC(SONG_VICTORY)\n'
@@ -5475,9 +5548,16 @@ CH03_CLASS_IDS = {'mogall': 'CLASS_MOGALL', 'brigand': 'CLASS_BLST_KILLER_EMPTY'
                   'brigand-brute': 'CLASS_MNC_LIZARDZERKER_BRUTE'}
 CH03_ITEM_IDS = {'iron-axe': 'ITEM_AXE_IRON', 'hand-axe': 'ITEM_AXE_HANDAXE',
                  'steel-axe': 'ITEM_AXE_STEEL', 'iron-sword': 'ITEM_SWORD_IRON',
+                 'iron-lance': 'ITEM_LANCE_IRON', 'javelin': 'ITEM_LANCE_JAVELIN',
                  'iron-bow': 'ITEM_BOW_IRON', 'evil-eye': 'ITEM_MONSTER_EVILEYE',
+                 'red-gem': 'ITEM_REDGEM',
                  'pure-water': 'ITEM_PUREWATER', 'antitoxin': 'ITEM_ANTITOXIN',
                  'door-key': 'ITEM_DOORKEY', 'chest-key': 'ITEM_CHESTKEY'}
+# The FF5 navy chest metatile in the cave-interior tileset (retile.py): closed 17 / open 29.
+# gBmMapBaseTiles stores metatile<<2 (compile_layout: .mar = metatile<<5, mar_to_map >>3, so
+# the loaded tile = metatile<<2), so the open-chest tile a MapChange writes is 29<<2 (#23).
+CH03_CHEST_CLOSED_TILE = 17
+CH03_CHEST_OPEN_TILE = 29
 # Left-entrance floor tiles (verified walkable on the painted .mar, clear of enemy tiles) --
 # the party deploys here statically (fast-boot; the real PREP flow lands with deploy_slots + cutscenes).
 # 9 tiles = the ch03 field roster (cast_available_at(3) = the 8 founding party + Baxby, the
@@ -5545,6 +5625,81 @@ CH03_MIDMAP_MSGS = (0x9AF, 0x9B0, 0x9B1, 0x9B4, 0x9B5, 0x9B6, 0x9B7)
 CH03_CRIER_FID = '[FID_VillagerYoungBoy]'   # the boy crying the bounty on his crate (book p.95; generic mug)
 CH4_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch4-eventinfo.h')
 CH4_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch4-eventscript.h')
+
+
+def _read_map_metatile(maps_dir, stem, x, y):
+    """Return the metatile index painted at (x, y) on a compiled .mar layout. compile_layout
+    stores each cell as metatile<<5 with no header (map_tileset_tool), row-major over the
+    width from the paired .json -- so reading the door's OPEN tile off the map itself tracks
+    any re-retile (no hand-copied tile numbers to drift)."""
+    with open(os.path.join(maps_dir, stem + '.json'), encoding='utf-8') as f:
+        w = json.load(f)['width']
+    with open(os.path.join(maps_dir, stem + '.mar'), 'rb') as f:
+        mar = f.read()
+    return struct.unpack_from('<H', mar, (y * w + x) * 2)[0] >> 5
+
+
+def _ch03_tile_changes_asm(chests, doors):
+    """Pure: the MS_Ch03MapChanges ASM block for the ch03 chest + door tile-changes (#23).
+
+    FE8 flips a tile on loot/open via a per-chapter MapChange array: opening a chest runs
+    CallChestOpeningEvent(GetMapChangeIdAt(x, y), item) and opening a door runs
+    CallTileChangeEvent(GetMapChangeIdAt(x, y)) (eventinfo.c) -- both find the change whose
+    1x1 region covers the tile and write its tiles into gBmMapBaseTiles. GetMapChangeIdAt
+    matches by POSITION, so chests and doors share ONE array; ids only need to stay unique.
+
+    chests = [(x, y), ...]        -- all open to the shared FF5 navy chest tile (17->29).
+    doors  = [(x, y, open_metatile), ...] -- each opens to its OWN below-cell floor tile
+             (Nicolas 2026-07-11: an opened door becomes the passable tile directly below it).
+
+    struct MapChange { s8 id; u8 xOrigin, yOrigin, xSize, ySize; u8 pad[3]; const void* data; }
+    (12 B; data at 0x08). Tile data is metatile<<2 (the gBmMapBaseTiles encoding). The array
+    terminates on id < 0. The caller registers MS_Ch03MapChanges as a fresh gChapterDataAssetTable
+    word and points the host slot's map.changeLayerId at it."""
+    lines = ['', '/* Manchego Stars ch03 tile-changes (#23): flip FF5 navy chest %d->%d on loot;'
+             ' open each door to the floor tile directly below it */'
+             % (CH03_CHEST_CLOSED_TILE, CH03_CHEST_OPEN_TILE),
+             '\t.align 2, 0', '\t.global MS_Ch03MapChanges', 'MS_Ch03MapChanges:']
+    tiles = ['MS_Ch03ChestOpenTile:',
+             '\t.hword %d /* %d << 2 (open chest metatile) */'
+             % (CH03_CHEST_OPEN_TILE << 2, CH03_CHEST_OPEN_TILE)]
+    mid = 0
+    for x, y in chests:
+        lines.append('\t.byte %d, %d, %d, 1, 1, 0, 0, 0\n\t.word MS_Ch03ChestOpenTile'
+                     % (mid, x, y))
+        mid += 1
+    for di, (x, y, open_metatile) in enumerate(doors):
+        sym = 'MS_Ch03DoorOpenTile_%d' % di
+        lines.append('\t.byte %d, %d, %d, 1, 1, 0, 0, 0\n\t.word %s' % (mid, x, y, sym))
+        tiles.append('%s:\n\t.hword %d /* %d << 2 (open door -> floor below) */'
+                     % (sym, open_metatile << 2, open_metatile))
+        mid += 1
+    lines.append('\t.byte -1, 0, 0, 0, 0, 0, 0, 0 /* terminator (id < 0) */\n\t.word 0')
+    return '\n'.join(lines + tiles)
+
+
+def _inject_ch03_tile_changes(chap, maps_dir, host_index):
+    """Author the ch03 chest + door tile-changes + point slot `host_index` at them (#23).
+
+    Emits MS_Ch03MapChanges (chests then doors -- see _ch03_tile_changes_asm), registers it as
+    a fresh gChapterDataAssetTable word, and sets the host slot's map.changeLayerId to that index
+    (GetChapterMapChangesPointer -> gChapterDataAssetTable[changeLayerId], chapterdata.c). Each
+    door's open tile is read off the painted map (the metatile directly below the door cell)."""
+    chests = [(c['position'][0], c['position'][1]) for c in chap.get('chests', [])]
+    doors = [(d['position'][0], d['position'][1],
+              _read_map_metatile(maps_dir, CH03_LAYOUT[1], d['position'][0], d['position'][1] + 1))
+             for d in chap.get('doors', [])]
+    block = _ch03_tile_changes_asm(chests, doors)
+    with open(CONST_MAPS_S, 'a', encoding='utf-8') as f:
+        f.write(block + '\n')
+    idx = _append_asm_table_words(ASSET_TABLE_S, 'gChapterDataAssetTable',
+                                  ['MS_Ch03MapChanges'])
+    with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
+        settings = json.load(f)
+    settings['chapters'][host_index]['map']['changeLayerId'] = idx
+    with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
+        json.dump(settings, f, indent=2)
+    return idx
 
 
 def inject_ch03(campaign, boot=False, verbose=True):
@@ -5693,7 +5848,20 @@ def inject_ch03(campaign, boot=False, verbose=True):
         '{\n    TURN(0x0, %s, 1, 0, FACTION_ID_BLUE)'
         ' /* turn-1: Trex\'s light entrance (Colm pattern) */\n    END_MAIN\n}'
         % CH03_TREX_ENTRANCE_SCRIPT, CH4_EVENTINFO_H)
-    info = _replace_brace_block(info, 'EventListScr_Ch4_Location[] =', '{\n    END_MAIN\n}', CH4_EVENTINFO_H)
+    # Location = the mine chests + doors (#23). Each Chest(item, x, y) makes its tile openable
+    # (IsThereClosedChestAt reads this list) and gives the item; each Door_(x, y) makes its tile a
+    # thief/key door (TILE_COMMAND_DOOR, script=1 -> CallTileChangeEvent). The paired
+    # MS_Ch03MapChanges entry (step 6b) flips the chest 17->29 on loot / the door to the floor tile
+    # below it on open. Coords + items from the YAML (vanilla Ch3 Borgo 1:1; (8,3) = the Tourmaline,
+    # the ch02<->ch03 swap).
+    loc_events = '{\n' + ''.join(
+        '    Chest(%s, %d, %d) /* %s */\n'
+        % (CH03_ITEM_IDS[c['contents'][0]['id']], c['position'][0], c['position'][1],
+           c['contents'][0]['id'])
+        for c in chap['chests']) + ''.join(
+        '    Door_(%d, %d)\n' % (d['position'][0], d['position'][1])
+        for d in chap.get('doors', [])) + '    END_MAIN\n}'
+    info = _replace_brace_block(info, 'EventListScr_Ch4_Location[] =', loc_events, CH4_EVENTINFO_H)
     # Character events = the Trex talk-recruit (#23 item 2): the CHAR-per-candidate list.
     info = _replace_brace_block(info, 'EventListScr_Ch4_Character[] =', char_events, CH4_EVENTINFO_H)
     # Misc = the win/lose machinery + the mid-map RBG-execution AFEV. DefeatBoss(ending) fires on
@@ -5712,6 +5880,11 @@ def inject_ch03(campaign, boot=False, verbose=True):
     info = _replace_brace_block(info, 'EventListScr_Ch4_Tutorial[] =', '{\n    END_MAIN\n}', CH4_EVENTINFO_H)
     with open(CH4_EVENTINFO_H, 'w', encoding='utf-8') as f:
         f.write(info)
+
+    # 3b. Tile-changes: pair each Chest()/Door_() location event above with a MapChange -- flips the
+    #     FF5 navy chest 17->29 on loot, and each door to the floor tile below it on open (must run
+    #     AFTER _retarget_host_chapter zeroed the slot's changeLayerId in step 1).
+    _inject_ch03_tile_changes(chap, maps_dir, CH03_HOST_INDEX)
 
     with open(CH4_EVENTSCRIPT_H, encoding='utf-8') as f:
         script = f.read()
@@ -6255,12 +6428,15 @@ def main():
         print('  banim (#65): combat anim lookup -> GetBattleAnimationId_WithUnique (per-character _u25)')
         engine_hooks._patch_banim_palette_custom_guard()
         print('  banim (#65): GetBanimPalette -> custom (appended) banims keep own palette (RBG cyan fix)')
+        engine_hooks._patch_draw_icon_pal1()
+        print('  item icons (#23): DrawIcon bank-bumps gMSPal1IconIds to item palette 1 (pink Tourmaline)')
         print('names:')
         inject_names(args.campaign)
         print('item names:')
         inject_item_names(args.campaign)
         print('item icons:')
         inject_item_icons(args.campaign)
+        inject_item_icon_pal1(args.campaign)
         print('characters:')
         patch_character_data(args.campaign)
         print('portrait geometry:')

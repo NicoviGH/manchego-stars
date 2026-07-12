@@ -4,7 +4,87 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-07-11 #2, VSCode/remote — ⭐ CH02→CH03 CHAIN wired; PR #154 OPEN (awaiting Nicolas's merge), `feat/23-chain-ch02-ch03`.):**
+> **Last session (2026-07-11 #4, VSCode/remote — ⭐ CH03 DOORS + PINK TOURMALINE ICON, all IN-ENGINE VERIFIED. TWO stacked PRs open awaiting Nicolas's merge: #156 `feat/23-ch03-chests` (chests+doors) and #157 `feat/23-tourmaline-icon` (icon, base=#156). Merge #156 then #157. CURRENT BRANCH = `feat/23-tourmaline-icon`.):**
+> **⭐ PINK TOURMALINE ICON DONE + VERIFIED IN-ENGINE (PR #157).** FE8 item icons all share pal 0 (no pink, no
+> free index), but `LoadIconPalettes` loads a 2nd, vanilla-UNUSED icon palette adjacent → free to repaint. Route:
+> (a) `inject_item_icons` swaps the icon TILES (reuse the Red Gem gem shape, Nicolas-approved); (b) new
+> `inject_item_icon_pal1` repaints pal 1 (rose-pink) in `item_icon_palette.agbpal` + emits `gMSPal1IconIds[]`;
+> (c) new generic engine hook **`_patch_draw_icon_pal1`** bank-bumps those iconIds in `DrawIcon` (`OamPalBase |= 0x1000`
+> → the adjacent reserved slot). Boundary-clean (mechanism agnostic; id 136 lives in `campaign.yaml item_icon_pal1`);
+> registered in `check.py` guards. **VERIFIED `run.sh ch03tourmaline`:** Tourmaline renders PINK in the Item menu,
+> Blue Gem + Goodberry (pal 0) untouched — no collateral (`docs/demo/ch03-tourmaline-icon-ingame.png`). 5 new tests
+> (86 total green); make + verify_text 3404/0 + drift/guards clean. ADR in `decisions.md`. Committed `e9ef7fc`.
+> **DELIVERY LESSON (Nicolas asked): STOP using `"$(cat <<'EOF' ...)"` for commit/PR bodies** — a heredoc nested in
+> `$(...)` gets its `)` mis-scanned when the body has parens (`(#23)`), erroring `no closing ")"`. Use `git commit -F file`
+> / `gh pr create --body-file file` (write the body with the Write tool first). Applied for the rest of the session.
+> **⭐ CH03 DOORS (PR #156) — wired + both chests & doors IN-ENGINE VERIFIED (detail below in this block).**
+> **⭐ CH03 DOORS DONE + VERIFIED IN-ENGINE.** The 3 vanilla Ch3 doors (`Door_(6,10)/(10,5)/(2,3)`) are wired as
+> thief/key doors that **open to the passable floor tile DIRECTLY BELOW the door cell** (Nicolas's answer: "the tile
+> directly adjacent and below it") — read off the painted `.mar` at build time (`_read_map_metatile`, drift-proof,
+> no hand-copied tile numbers). On the committed map that's 572/626/492 (road / stairs-down / road, all passable).
+> **Doors ride the SAME per-chapter MapChange array as the chests** — `GetMapChangeIdAt` matches by POSITION, so
+> `Chest()`/`Door_()` coexist in one `MS_Ch03MapChanges` (ids 0-3 chests → shared 17→29; ids 4-6 doors → per-door
+> below-tile). Generalized `_inject_ch03_chest_map_changes` → **`_inject_ch03_tile_changes`** with a pure
+> `_ch03_tile_changes_asm` builder + `_read_map_metatile` reader (6 new unit tests, 81 total green). Authored as a
+> `doors:` position list in the ch03 YAML. Committed `9907324`.
+> **⭐⭐ BOTH CHESTS & DOORS NOW VERIFIED IN-ENGINE (closes the handoff's #1 pending item).** Two new PASS/FAIL
+> scenarios read `gBmMapBaseTiles` ground truth (`gBmMapBaseTiles` is a ROM-`.data` pointer @ **0x085AF5DC** →
+> the EWRAM `sBmBaseTilesPool` row array, never reassigned — read the ROM pointer, index the rows; the layout-guess
+> at gBmMapUnit+0x20 was WRONG, cost one probe): **`ch03door`** (hand a unit a Door Key, drive Door → tile flips
+> 3248→1968 = 812→492<<2) and **`ch03chest`** (Chest Key, teleport onto the (6,3) chest, drive Chest → tile flips
+> 68→116 = 17→29 **AND the Iron Lance lands in inventory**). Both PASS. The menu is `[Door/Chest, Item, Wait]` with
+> the weapon stripped, so the special command is row 0 (deterministic). Committed `66b6d5b`. ADR in `decisions.md`.
+> **REMAINING in-scope on this branch before PR: the pink Tourmaline icon** (palette-1 repaint + `DrawIcon` bank-bump
+> hook — full plan in the prior block below). Then title-card + load-test scenarios can be a follow-up branch.
+>
+> **Prior session (2026-07-11 #3, VSCode/remote — ⭐ CH03 CHESTS + ch02 RED-GEM FIX on `feat/23-ch03-chests`):**
+> **ch02 RED-GEM BUG FIXED (Nicolas caught it in the chain GIF — the Red Gem was still gifted in ch02).** Root cause =
+> the gift was declared in THREE places that drifted: the ch02 YAML `green_allies[].gift: hand-axe` (CORRECT, per the
+> ch02↔ch03 swap ADR) but a hardcoded `CH02_CHWINGA` Python tuple **and** a duplicate `charm_gifts.gifts` YAML block both
+> still said `red-gem` — and the build emitted the stale tuple. **FIX (single source of truth):** `inject_ch02` now reads
+> the gift from `green_allies[].gift` (with a build-time guard that every gift resolves + ids match); dropped the tuple's
+> gift field + the duplicate `charm_gifts` block; harness `CH02_CHARMS` 0x76→**0x28** (Hand Axe). **VERIFIED IN-ENGINE:**
+> `clear_ch02` PASS — Mote now gifts **Hand Axe / Elixir / Pure Water**; Red Gem freed for ch03. Committed `5f54a34`.
+> **⭐ CH03 CHESTS WIRED (#23 — BUILDS + LINKS CLEAN; IN-ENGINE VERIFY PENDING).** 4 chests at the **vanilla Ch3 Borgo
+> coords 1:1** (pulled from `git -C fireemblem8u show HEAD:src/events/ch3-eventinfo.h`): `Chest(ITEM_LANCE_IRON,6,3)`,
+> `Chest(ITEM_SWORD_IRON,10,3)`, `Chest(ITEM_LANCE_JAVELIN,6,12)`, **`Chest(ITEM_REDGEM,8,3)`** — (8,3) is vanilla's
+> Hand-Axe tile = our **Tourmaline** (the swap is coordinate-perfect). Positions authored in the ch03 YAML `chests:`;
+> emitted into `EventListScr_Ch4_Location[]`. **The 17→29 open flip** (Nicolas's vendored FF5 navy chest: closed metatile
+> 17 / open 29, painted at G3/I3/K3/G12): new helper `_inject_ch03_chest_map_changes` writes **`MS_Ch03ChestMapChanges`**
+> asm to `const_data_chapter_maps.s` (one 1×1 `MapChange` per chest, tile = **29<<2 = 116**), registers it as a fresh
+> `gChapterDataAssetTable` word, and sets slot-4 `changeLayerId=246`. Committed `598f0ce`.
+> **⭐⭐ THE DECODED FE8 CHEST/DOOR MECHANISM (reference — don't re-derive):** `Chest(item,x,y)`/`Door_(x,y)` (Main_Code_Helpers.h)
+> are Location tile-commands; `IsThereClosedChestAt` reads the Location list. Open flow: `ActionPick` (bmusemind.c) →
+> `StartAvailableChestTileEvent` → `StartAvailableTileEvent` → `TILE_COMMAND_CHEST` → **`CallChestOpeningEvent(GetMapChangeIdAt(x,y), item)`**
+> (gives item + applies the tilechange); doors → `CallTileChangeEvent(GetMapChangeIdAt(x,y))` + `SetFlag`. `struct MapChange`
+> (types.h) = `{s8 id; u8 xOrigin,yOrigin,xSize,ySize; u8 pad[3]; const void* data(→u16 tiles);}` (12 B, list terminated
+> by id<0). **`GetMapChangeIdAt(x,y)` auto-finds the change whose region covers the tile — position-matched, no id wiring.**
+> `GetChapterMapChangesPointer(ch) = gChapterDataAssetTable[chapterStruct.map.changeLayerId]`. **TILE ENCODING:**
+> `gBmMapBaseTiles` holds `metatile<<2` (.mar = metatile<<5, `mar_to_map` >>3 → <<2; confirmed vs vanilla `Ch3MapChanges`
+> 2616=654<<2). So an open metatile N → tile `N<<2`.
+> **TOURMALINE ITEM (ITEM_REDGEM reskin, Nicolas asked).** NAME **done** (`campaign.yaml item_names: ITEM_REDGEM: "Tourmaline"`
+> via `inject_item_names`, the Goodberry=Vulnerary precedent). **PINK ICON = IN PROGRESS via the palette-1 route (Nicolas
+> was RIGHT to push):** FE8 item icons share ONE palette (pal 0, bank `0x4000`) — **no per-item palette field** in `ItemData`;
+> all draws hardcode `0x4000` (bmitem.c:416+). Pal 0 has **no pink** + every index is used by 75-224 icons (no free slot).
+> **BUT a 2nd item palette (pal 1) is loaded at bank `0x5000`** (`bm.c:592 LoadIconPalettes(4)`) and is **UNUSED by item
+> icons → free to repaint.** **PLAN:** (a) repaint pal 1 (2nd 16-color pal in `graphics/item_icon/item_icon_palette.agbpal`)
+> with a pink gem gradient; (b) author `campaigns/.../item_icons/tourmaline.png` (16×16 mode-P) on pal-1's pink indices +
+> `campaign.yaml item_icons: ITEM_REDGEM: tourmaline`; (c) ONE generic hook in `tools/inject/engine_hooks.py` patching
+> `DrawIcon` (icon.c:94 `u16 Tile = GetIconTileIndex(IconIndex) + OamPalBase;`) to `OamPalBase |= 0x1000` (→ bank 5 = pal 1)
+> for icon-ids in a small campaign-injected list; **tourmaline icon-id = 136** (`item_icon_id('ITEM_REDGEM')`) goes in it.
+> Boundary-clean (generic mechanism + campaign-data id list); register the hook in `check.py` guards. Zero collateral on
+> other items. (Earlier dead-ends: recolour within pal 0 → reads brown/taupe, no real pink; no globally-free pal-0 index.)
+> **DOORS — OPEN QUESTION (blocker):** doors need an **open-door metatile** for their tilechange — `ch03-retile.py:39`
+> maps the CLOSED door → tile 812 and notes "813+814 = double" but designates no single OPEN-door tile. **ASK Nicolas /
+> find the open-door tile in the cave-interior tileset, or make an opened door become a passable floor tile.** Then
+> `Door_(x,y)` at vanilla coords (6,10)/(10,5)/(2,3) + a MapChange to the open tile (reuse the chest map-change mechanism).
+> Doors gate the chest rooms in Borgo → needed for real-play reachability (chests are verifiable via teleport regardless).
+> **NEXT (priority):** (1) **verify chests in-engine** — a new scenario (or extend `ch03talk`): teleport Trex onto a chest
+> → open → assert the item lands in inventory/convoy AND `gBmMapBaseTiles` flips 17→29. (2) **pink Tourmaline icon** via the
+> palette-1 hook above. (3) **doors** (needs the open-door tile). Then PR `feat/23-ch03-chests`. `make`/`verify_text`/tests
+> green through all commits so far.
+>
+> **Prior session (2026-07-11 #2, VSCode/remote — ⭐ CH02→CH03 CHAIN wired; PR #154 SQUASH-MERGED; `recordchain` PR #155 SQUASH-MERGED; `feat/23-chain-ch02-ch03` deleted. main advanced.):**
 > **THE CAMPAIGN NOW FLOWS ch02 → ch03.** ch02's ending `MNC2(0x4)`s straight into ch03 (slot 4), retiring the
 > dev-placeholder→title landing it parked on while ch03 was unbuilt. Two coupled moves in `build_campaign.main()`:
 > (a) **`inject_ch03` now runs in EVERY non-boot build** (hosted alongside `inject_ch02`, and in the `--test-chapter`
@@ -255,7 +335,9 @@ ADR: `decisions.md` §Distribution.
   - logic/stability: `win|gameover|ch01win|clear|clear_ch01|smoke|smoke_ch01|fuzz`
   - **ch3 (#23):** `PT_HOST_CHAPTER=4 run.sh mapshot` (map+units) · **`ch03prep`** (Preparations opens → Fight!
     fields 9 at the deploy_slots, Trex green) · **`ch03win`** (kill grell → assert `EVFLAG_DEFEAT_BOSS` → ending) ·
-    **`ch03talk`** (Trex green→blue via Talk) · **`koboldview`** (pull off-camera enemies next to the party) — all on
+    **`ch03talk`** (Trex green→blue via Talk) · **`ch03door`** (Door Key → open → tile flips to the below-cell) ·
+    **`ch03chest`** (Chest Key → open the (6,3) chest → tile flips 17→29 + Iron Lance granted) ·
+    **`koboldview`** (pull off-camera enemies next to the party) — all on
     a `make CH03BOOT=1` ROM (macOS: apply the `build.sh` shebang-fix loop first). `bootToMap` drives through PREP.
   - **LLM commander (#63):** `llm` — needs the sidecar running (`llm_player.py serve`; see run.sh header).
   - **ch2 (#22):** `ch02` · `smoke_ch02` · `clear_ch02` (all load a `ch02start` checkpoint).
@@ -353,13 +435,18 @@ how-to for the host machinery = `docs/adding-a-chapter.md`.**
   `0xb6` + a silent flagged `gDefeatTalkList` entry → `EVFLAG_TMP(10)` → a Misc `AFEV(EVFLAG_TMP(11), midmap, EVFLAG_TMP(10))`
   fires the on-map cutscene once, chapter continues). 7-beat restage + the Brute's custom mug (Caellach guest slot, zoom 0.70).
   See the top block for the full detail + the on-map-cutscene-rendering ADR.
-- **✅ DONE — Chain ch02→ch03 (PR #154, OPEN — awaiting Nicolas's merge):** ch02's ending `MNC2(0x4)`s into ch03;
-  `inject_ch03(boot=False)` hosted in every non-boot build (persistent ch02 party feeds PREP, seed dropped). Verified
-  in-engine (`clear_ch02` lands on ch03, chapter=4). ch03's OWN ending still parks on the dev-placeholder until ch04
-  hosts (replace with the real ending cutscene then). See the top block + `decisions.md` Ch3-chains ADR.
+- **✅ DONE (PR #154, MERGED) — Chain ch02→ch03:** ch02's ending `MNC2(0x4)`s into ch03; `inject_ch03(boot=False)`
+  hosted in every non-boot build (persistent ch02 party feeds PREP, seed dropped). Verified in-engine (`clear_ch02`
+  lands on ch03, chapter=4). ch03's OWN ending still parks on the dev-placeholder until ch04 hosts. `decisions.md` Ch3-chains ADR.
+- **✅ DONE — Chests + Doors (`feat/23-ch03-chests`, WIP branch, pushed @ `66b6d5b`, not PR'd):** 4 chests + 3 doors
+  wired in ONE `MS_Ch03MapChanges` array (chests share the FF5-navy `17→29` flip; each door opens to the passable
+  floor tile directly below it, Nicolas's rule). **BOTH VERIFIED IN-ENGINE** (`ch03door` + `ch03chest` PASS — tile
+  flips + Iron Lance grant read from `gBmMapBaseTiles`). ch02 Red-Gem→Hand-Axe swap FIXED + verified; Tourmaline NAME
+  done. **Full detail in the top block + `decisions.md` Ch3 chests/doors ADR.** Only the pink icon remains on this branch.
 - **⭐ REMAINING (unchecked on #23):**
-  1. **Chests/doors** — per-chest **`17→29` TILECHANGE**; Trex opens, key-droppers back up.
-  2. **Title-card** (replace the vanilla slot-4 **"Za'ha Woods"** placeholder that shows at chapter start) — **couple this
+  1. ✅ **Chests/doors — DONE + in-engine verified** (top block). Trex (thief) opens without keys; the key-dropper kobolds back up.
+  2. ✅ **Tourmaline pink icon — DONE + in-engine verified** (PR #157, stacked on #156; `ch03tourmaline` scenario). pal-1 repaint + `DrawIcon` bank-bump hook.
+  3. **Title-card** (replace the vanilla slot-4 **"Za'ha Woods"** placeholder that shows at chapter start) — **couple this
      with the opening map-flash fix** (both are the same `gProcScr_ChapterIntro` sequence). + full load-test scenarios
      `ch03`/`smoke_ch03`/`clear_ch03` (the `ch03prep`/`ch03win`/`ch03talk`/`koboldview`/`enemycheck` scenarios seed these;
      a fair-play `clear_ch03` needs a `CA_BOSS` grell or a pid-targeted bot).

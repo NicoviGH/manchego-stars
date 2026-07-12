@@ -247,20 +247,34 @@ enemy_units:
 # gift, and ch02's Red Gem moves here. Net wealth + item set across ch02+ch03 = vanilla; only
 # the location of the two items swaps. Thematic: it's a famous gem mine, and Trex opens the seam.
 # Trex (recruited mid-map) is the intended opener; the two key-dropper kobolds are the backup.
+# Positions = vanilla FE8 Ch3 (Borgo) chest tiles 1:1 (our map is a Borgo retile); the FF5 navy
+# chest tile (closed 17) is painted at each. (8,3) held vanilla's Hand Axe — now the Tourmaline
+# (Red Gem), the ch02↔ch03 swap; the other three keep vanilla's item at vanilla's tile.
 chests:
-  - position: tbd               # the mine tools — reflavored basic gear (book M1 Tool Room: "racks of picks and hammers")
+  - position: [6, 3]            # the mine tools — reflavored basic gear (book M1 Tool Room: "racks of picks and hammers")
     contents:
-      - id: iron-lance          # a miner's drill-spear
-  - position: tbd
+      - id: iron-lance          # a miner's drill-spear (vanilla Chest(ITEM_LANCE_IRON, 6, 3))
+  - position: [10, 3]
     contents:
-      - id: iron-sword          # a cutting tool
-  - position: tbd
+      - id: iron-sword          # a cutting tool (vanilla Chest(ITEM_SWORD_IRON, 10, 3))
+  - position: [6, 12]
     contents:
-      - id: javelin             # a throwing pick (vanilla Ch3's off-on-its-own chest)
-  - position: tbd               # the deep seam, near the lair — Trex's signature pop
+      - id: javelin             # a throwing pick (vanilla Ch3's off-on-its-own chest @ (6,12))
+  - position: [8, 3]            # vanilla's Hand Axe tile — the deep-seam Tourmaline (ch02↔ch03 swap)
     contents:
       - id: red-gem             # a pink Tourmaline — Termalaine's signature gem (2,500g sell). DEVIATION: see ADR.
         flavor: "a fist-sized rose-pink tourmaline, the best seam in the mine"
+
+# ── Doors (thief lesson): gate the mine's inner galleries ────────────────────
+# Positions = vanilla FE8 Ch3 (Borgo) door tiles 1:1 (our map is a Borgo retile); the closed
+# single-door metatile (812) is painted at each. A thief (Trex) or a Door Key opens one; on open
+# the tile flips to the passable floor tile DIRECTLY BELOW the door (Nicolas 2026-07-11 — "the
+# tile directly adjacent and below it"), read off the painted map so it tracks any re-retile.
+# (10,5) opens onto the stairs down; (6,10)/(2,3) onto gallery road. Doors make the thief matter.
+doors:
+  - position: [6, 10]           # vanilla Ch3 Door_(6, 10) — the lower gallery
+  - position: [10, 5]           # vanilla Ch3 Door_(10, 5) — gates the stairs down
+  - position: [2, 3]            # vanilla Ch3 Door_(2, 3)  — the upper-left room
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
 # Beat PLACEMENT only — final dialogue is written via the dialogue-pass skill (voice bibles +

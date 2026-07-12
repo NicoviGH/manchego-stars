@@ -707,5 +707,86 @@ class Ch03MidmapExecution(unittest.TestCase):
                          [False, True, True, False, True, False, False])   # A3 (Brute) faceless w/o a mug
 
 
+class Ch03TileChanges(unittest.TestCase):
+    """The ch03 chest + door tile-changes (#23): one MapChange array flips each chest's
+    FF5 navy tile 17->29 on loot and opens each door to the floor tile DIRECTLY BELOW it
+    (Nicolas 2026-07-11 -- 'use the tile directly adjacent and below it'). GetMapChangeIdAt
+    matches by POSITION, so chests + doors coexist in one array; ids just stay unique."""
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+    STEM = bc.CH03_LAYOUT[1]
+    MAPS = os.path.join(bc.REPO, 'campaigns', 'rime-of-the-frostmaiden', 'maps')
+
+    def test_reads_the_painted_metatile_at_a_cell(self):
+        # The retile paints the FF5 navy chest (metatile 17) at (6,3); the .mar stores
+        # metatile<<5, so the reader must decode 17 back out.
+        self.assertEqual(bc._read_map_metatile(self.MAPS, self.STEM, 6, 3), 17)
+
+    def test_door_open_tile_is_the_metatile_directly_below(self):
+        # Vanilla Ch3 doors sit at (6,10)/(10,5)/(2,3); the open tile = the cell one row down
+        # on the COMMITTED (hand-painted) map -- road tiles (572/492) + the stairs down (626),
+        # all passable, so the opened door lets the party through.
+        below = [bc._read_map_metatile(self.MAPS, self.STEM, x, y + 1)
+                 for (x, y) in [(6, 10), (10, 5), (2, 3)]]
+        self.assertEqual(below, [572, 626, 492])
+
+    def test_asm_emits_one_change_per_chest_then_per_door_with_unique_ids(self):
+        asm = bc._ch03_tile_changes_asm([(6, 3), (8, 3)], [(6, 10, 98), (2, 3, 66)])
+        ids = [int(l.split(',')[0].split()[1]) for l in asm.splitlines()
+               if l.strip().startswith('.byte') and 'terminator' not in l]
+        self.assertEqual(ids, [0, 1, 2, 3])   # 2 chests then 2 doors, contiguous + unique
+        self.assertIn('.byte -1', asm)        # id<0 terminator closes the array
+
+    def test_asm_chests_share_the_open_chest_tile_word(self):
+        asm = bc._ch03_tile_changes_asm([(6, 3), (8, 3)], [])
+        self.assertEqual(asm.count('.word MS_Ch03ChestOpenTile'), 2)
+        self.assertIn('.hword %d' % (bc.CH03_CHEST_OPEN_TILE << 2), asm)
+
+    def test_asm_each_door_gets_its_own_below_tile_word(self):
+        asm = bc._ch03_tile_changes_asm([], [(6, 10, 98), (10, 5, 302)])
+        self.assertIn('.word MS_Ch03DoorOpenTile_0', asm)
+        self.assertIn('.word MS_Ch03DoorOpenTile_1', asm)
+        self.assertIn('.hword %d' % (98 << 2), asm)     # open metatile stored as metatile<<2
+        self.assertIn('.hword %d' % (302 << 2), asm)
+
+    def test_asm_carries_the_door_cell_coords(self):
+        asm = bc._ch03_tile_changes_asm([], [(6, 10, 98)])
+        self.assertIn('.byte 0, 6, 10, 1, 1, 0, 0, 0', asm)   # id 0 at (x=6, y=10), 1x1 region
+
+
+class ItemIconPal1(unittest.TestCase):
+    """The pink-Tourmaline pal-1 route (#23): FE8's item icons all share pal 0 (no pink), but
+    LoadIconPalettes loads a 2nd, unused icon palette adjacent -- free to repaint. build_campaign
+    repaints it + emits gMSPal1IconIds[] (the iconIds that bank-bump to pal 1); the generic DrawIcon
+    hook consults that array."""
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def test_bgr555_packs_5bit_channels(self):
+        self.assertEqual(bc._bgr555('#000000'), 0)
+        self.assertEqual(bc._bgr555('#ffffff'), 0x7FFF)          # 31|31<<5|31<<10
+        self.assertEqual(bc._bgr555('#ff0000'), 0x001F)          # red in low 5 bits
+        self.assertEqual(bc._bgr555('#0000ff'), 0x7C00)          # blue in high 5 bits
+
+    def test_pal1_palette_is_16_bgr555_entries(self):
+        colors = ['#000000'] * 16
+        b = bc._item_icon_pal1_bytes(colors)
+        self.assertEqual(len(b), 32)                             # 16 colors x 2 bytes
+        self.assertEqual(b, b'\x00' * 32)
+
+    def test_pal1_palette_rejects_wrong_length(self):
+        with self.assertRaises(SystemExit):
+            bc._item_icon_pal1_bytes(['#000000'] * 15)
+
+    def test_redgem_resolves_to_pal1_icon_id_136(self):
+        # ITEM_REDGEM (the Tourmaline) is the campaign's one pal-1 icon; its iconId is 136.
+        self.assertEqual(bc._pal1_icon_ids(self.CAMPAIGN), [136])
+
+    def test_iconids_asm_lists_ids_then_terminator(self):
+        asm = bc._ms_pal1_iconids_asm([136, 5])
+        self.assertIn('.global gMSPal1IconIds', asm)
+        self.assertIn('.hword 136', asm)
+        self.assertIn('.hword 5', asm)
+        self.assertIn('.hword 0xFFFF', asm)                     # terminator (no valid iconId is 0xFFFF)
+
+
 if __name__ == '__main__':
     unittest.main()

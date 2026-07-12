@@ -130,6 +130,7 @@ enemy_class_reskins:
 # (Marty's druidic ration; everyone shares one consumable name).
 item_names:
   ITEM_VULNERARY: "Goodberry"
+  ITEM_REDGEM: "Tourmaline"     # Termalaine's signature gem (ch03 chest); mechanics = Red Gem (2,500g sell), #23
 
 # Item icon overrides: swap a vanilla item's 16x16 icon for a campaign asset under
 # item_icons/<name>.4bpp (build wiring = build_campaign.inject_item_icons, which resolves
@@ -138,6 +139,20 @@ item_names:
 # FE8's shared item-icon palette via tools/item_icon_tool.py (blueberry_grid, design L2).
 item_icons:
   ITEM_VULNERARY: goodberry
+  ITEM_REDGEM: tourmaline        # the pink Tourmaline gem (#23) -- draws from pal 1 (item_icon_pal1 below)
+
+# Item icons that draw from the SECOND item palette (pal 1, bank 0x5000) instead of the
+# shared pal 0. FE8's LoadIconPalettes loads TWO icon palettes adjacent, but no vanilla
+# icon uses the 2nd -- so it's free to repaint for a colour pal 0 lacks (pal 0 has no pink;
+# the Tourmaline needs one). build_campaign.inject_item_icon_pal1 repaints pal 1 with
+# `palette` and emits gMSPal1IconIds[] (the resolved iconIds); the generic DrawIcon hook
+# (engine_hooks._patch_draw_icon_pal1) bank-bumps those iconIds to pal 1 (OamPalBase |= 0x1000).
+# palette: 16 BGR-quantised entries; index 0 = the vanilla transparent placeholder.
+item_icon_pal1:
+  icons: [ITEM_REDGEM]
+  palette: ["#c0f8c8", "#ffffff", "#f4d4e2", "#cf8ea8", "#6b2a4f", "#ffe0ef", "#e876ac",
+            "#d85f9a", "#b0447e", "#f0a8c8", "#8a325e", "#c088c0", "#7a2450", "#f7b9d8",
+            "#b0447e", "#f7b9d8"]
 
 # D&D content sources (frozen snapshots committed at data/)
 data_sources:
