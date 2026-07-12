@@ -1252,6 +1252,35 @@ screen keeps vanilla's "Defeat O'Neill") from the chapter YAML. Extend the glyph
 per new chapter title.
 _Decided: 2026-06-09_
 
+**A spawn-node story chapter needs the no-world-map title fallback, not just a recomposed card.**
+Writing `chap_title_<chapTitleId>.png` is necessary but **not sufficient** for a chapter whose
+host slot maps to a world-map monster-spawn node. Both the intro banner (`chapterintrofx*`) and
+the Status screen (`uichapterstatus`) read the title via **`GetChapterTitleWM`** (`chapter_title.c`),
+which returns a **skirmish-name card** (`0x46 + i`) when the node is in `gWMMonsterSpawnLocations`
+*and* `GetNextUnclearedNode(&gGMData) != unk`. Vanilla only takes that branch on a postgame revisit;
+during a story playthrough the node is the next uncleared one, so it returns `chapTitleId`. Our build
+has **no world map** (see the `GetBattleMapKind` STORY fallback below), so `gGMData` node states are
+never populated → the branch always fires. ch01/ch02 escaped it only because their slots' nodes aren't
+spawn locations; **ch03 hosts vanilla slot 4 = `WM_NODE_ZahaWoods` (the first spawn node)**, so it
+rendered "Za'ha Woods" over its own card until fixed. Fix = a campaign-agnostic engine hook
+(`_patch_chapter_title_wm_fallback`, sibling to the battle-map-kind fallback) neutering the guard so
+`GetChapterTitleWM` always returns the ROM `chapTitleId`. Verified in-engine (`PT_HOST_CHAPTER=4
+run.sh titlecard` → `docs/demo/ch03-title-card-ingame.png`). **Separately** the Status *objective*
+still leaks the vanilla boss ("Defeat Saar") — ch03's `statusObjectiveTextId` isn't set yet (a distinct
+goal-block field, tracked as ch03 polish, not the title-card image).
+_Decided: 2026-07-11_
+
+**Every decomp file an engine hook patches must be registered in `PATCHED_DECOMP_FILES`.**
+`restore_vanilla_sources()` git-restores exactly that list to vanilla before re-injecting. A
+**non-idempotent** hook (one whose guard hard-exits when the source isn't in vanilla form, e.g. the
+pal-1 `DrawIcon` hook on `src/icon.c`) breaks the *second* build if its file is unregistered — the
+first build patches it, the next build's guard rejects the already-patched form. The ch03 pink-icon
+slice shipped `icon.c` (+ the repainted `item_icon_palette.agbpal` / `item_icon_red_gem.png`) unregistered;
+it built once in-session but a fresh session's rebuild died on `DrawIcon not in expected vanilla form`.
+Registered them retroactively. Idempotent `.replace()`-only patches (e.g. `titlescreen.c`) self-heal and
+don't strictly need it, but register anyway for a clean restore each build.
+_Decided: 2026-07-11_
+
 **Seize-map legibility: the seize tile must read as a seize point and the boss sits on it — a level-design checkpoint**
 Vanilla FE8 doesn't *prompt* a seize. The goal window for `GOAL_TYPE_SEIZE` prints a static
 label and returns with no counter ([player_interface.c:1585-1592](../blob/main/fireemblem8u/src/player_interface.c#L1585-L1592)); the actual teaching is **spatial** — the Seize command is tile-gated to a

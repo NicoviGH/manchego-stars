@@ -4,7 +4,35 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-07-11 #4, VSCode/remote — ⭐ CH03 LOOT SLICE COMPLETE: chests + doors + pink Tourmaline icon, all IN-ENGINE VERIFIED and MERGED TO MAIN. Nothing pending; `main` @ `877bba4`. CURRENT BRANCH = `main`.):**
+> **Last session (2026-07-11 #5, VSCode/remote — ⭐ CH03 TITLE CARD done + IN-ENGINE VERIFIED, on branch `feat/23-ch03-title-card` (PR open). Also fixed a build-blocker + a title engine bug found en route.):**
+> **⭐ CH03 TITLE CARD "Ch.3: The Termalaine Mine" DONE + VERIFIED IN-ENGINE.** Two-part fix (a plain
+> `_write_chapter_title_card` — the ch01/ch02 precedent — was NOT enough here):
+> (a) **Atlas + card:** extended `gen_chapter_title.py` with `Ch.3:` (cut from vanilla card 3
+> "Bandits of Borgo", cols 19–53) + capital **`M`** (card 16 "Madness", cols 120–131, word-initial =
+> clean edge); `inject_ch03` now calls `_write_chapter_title_card(host, 'Ch.3: '+title)` (writes
+> `chap_title_4.png`, host slot 4's `chapTitleId`).
+> (b) **⭐ THE REAL BLOCKER — a no-world-map engine fallback.** Writing card 4 alone rendered nothing:
+> both the intro banner (`chapterintrofx*`) and the Status screen (`uichapterstatus`) read the title via
+> **`GetChapterTitleWM`** (`chapter_title.c`), which returns a **skirmish-name card** (`0x46+i`) when the
+> chapter's node is in `gWMMonsterSpawnLocations` AND `GetNextUnclearedNode(&gGMData) != unk`. We have NO
+> world map → `gGMData` node states never populated → the branch always fires. **ch03 hosts vanilla slot
+> 4 = `WM_NODE_ZahaWoods` (the FIRST spawn node)** → it showed "**Za'ha Woods**" over its own card.
+> ch01/ch02 escaped only because their slots' nodes aren't spawn locations. Fix = a campaign-agnostic hook
+> **`_patch_chapter_title_wm_fallback`** (sibling to the `GetBattleMapKind` STORY fallback) neutering the
+> guard (`if (0)`; the dead loop body still refs `i`/`unk` so `-Werror` stays happy) → always returns the
+> ROM `chapTitleId`. Registered in `check.py` guards + `PATCHED_DECOMP_FILES`. **VERIFIED:
+> `PT_HOST_CHAPTER=4 run.sh titlecard` → banner reads "Ch.3: The Termalaine Mine"** (`docs/demo/ch03-title-card-ingame.png`).
+> **⭐ FIXED A BUILD-BLOCKER (pre-existing loot-slice bug):** the pal-1 `DrawIcon` hook patches `src/icon.c`
+> but the loot slice never added it (or the repainted `item_icon_palette.agbpal` / `item_icon_red_gem.png`)
+> to `PATCHED_DECOMP_FILES`. `DrawIcon`'s guard is NON-idempotent (hard-exits if not vanilla), so the FIRST
+> rebuild in a fresh session died on `DrawIcon not in expected vanilla form`. Registered all three → restores
+> clean each build. **Regression-checked:** `ch03tourmaline` (pink icon) + `ch03win` both still PASS.
+> **REMAINING on #23:** the `ch03`/`smoke_ch03`/`clear_ch03` load-test scenarios (the last unchecked item)
+> + the "**Defeat Saar**" status-objective leak (`statusObjectiveTextId` unset — a separate goal-block field,
+> NOT the title-card image) + enemy battle-anim ART. `make check` clean, `verify_text` 3404/0, 86 tests green.
+> **DELIVERY:** `docs/demo/ch03-title-card-ingame.png` committed for Nicolas-on-mobile.
+>
+> **Prior session (2026-07-11 #4, VSCode/remote — ⭐ CH03 LOOT SLICE COMPLETE: chests + doors + pink Tourmaline icon, all IN-ENGINE VERIFIED and MERGED TO MAIN. Nothing pending; `main` @ `877bba4`. CURRENT BRANCH = `main`.):**
 > **✅ ALL MERGED** — PR #157 (chests + doors + icon; #156 was folded into it and closed to avoid a stacked squash) +
 > PR #158 (the pal-1 extension ADR). Remaining #23 = title-card + `smoke_ch03`/`clear_ch03` load-tests only (below).
 > **⭐ PINK TOURMALINE ICON DONE + VERIFIED IN-ENGINE.** FE8 item icons all share pal 0 (no pink, no free index),
@@ -391,7 +419,7 @@ ch03 recruit, added to #65**.
 + 3 descaled frames, one feature-flow branch per unit (or small batch), `custom_unit` issue template.
 - **Deferred polish (tracked):** braulo's white swing-arc weapon-trail → **#91**; goblin enemy class-level anim → **#90**.
 
-### Content — Ch3 "The Termalaine Mine" (#23) — HOSTED + WIN + SPRITES + DIALOGUE + RECRUIT + PREP-DEPLOY + CUTSCENES + CHAIN + CHESTS + DOORS + TOURMALINE ICON all DONE & merged; only TITLE-CARD + load-test scenarios + enemy battle-anim ART remain
+### Content — Ch3 "The Termalaine Mine" (#23) — HOSTED + WIN + SPRITES + DIALOGUE + RECRUIT + PREP-DEPLOY + CUTSCENES + CHAIN + CHESTS + DOORS + TOURMALINE ICON + TITLE-CARD all DONE (title-card on branch `feat/23-ch03-title-card`, PR open); only load-test scenarios + "Defeat Saar" objective leak + enemy battle-anim ART remain
 Vanilla-FE8-Ch3 reskin as Termalaine's kobold-overrun tourmaline mine. Teaching goal = the **thief**
 (Trex = our Colm). Decisions: `decisions.md` → Ch3 ADR (four deviations + **item 4 = Defeat Boss**) + the
 ch03 YAML `design_notes` (2026-07-06 narrative reframe). **Live build checklist = #23 (the source of truth);
@@ -447,11 +475,18 @@ how-to for the host machinery = `docs/adding-a-chapter.md`.**
   rule); the pink Tourmaline icon via the pal-1 route. **ALL THREE VERIFIED IN-ENGINE** (`ch03door`/`ch03chest`/`ch03tourmaline`
   PASS — tile flips + Iron Lance grant + pink icon read from ground truth). ch02 Red-Gem→Hand-Axe swap FIXED + verified;
   Tourmaline NAME done. **Detail in the top block + `decisions.md` (Ch3 chests/doors array ADR + pal-1 icon ADR).**
-- **⭐ REMAINING (unchecked on #23) — the last two items before ch03 is fully buttoned up:**
-  1. **Title-card** (replace the vanilla slot-4 **"Za'ha Woods"** placeholder that shows at chapter start) — **couple this
-     with the opening map-flash fix** (both are the same `gProcScr_ChapterIntro` sequence).
-  2. **Full load-test scenarios** `ch03`/`smoke_ch03`/`clear_ch03` (the `ch03prep`/`ch03win`/`ch03talk`/`koboldview`/`enemycheck`
-     scenarios seed these; a fair-play `clear_ch03` needs a `CA_BOSS` grell or a pid-targeted bot).
+- **✅ DONE (branch `feat/23-ch03-title-card`, PR open) — Title card.** "Ch.3: The Termalaine Mine" composed
+  from vanilla glyphs; needed the no-world-map `_patch_chapter_title_wm_fallback` engine hook (slot 4 =
+  `WM_NODE_ZahaWoods` spawn node → `GetChapterTitleWM` leaked the "Za'ha Woods" skirmish name). Verified
+  in-engine (`titlecard`). Also fixed the `icon.c` `PATCHED_DECOMP_FILES` build-blocker en route. See the top block.
+- **⭐ REMAINING (unchecked on #23) — the last items before ch03 is fully buttoned up:**
+  1. **Full load-test scenarios** `ch03`/`smoke_ch03`/`clear_ch03` (the `ch03prep`/`ch03win`/`ch03talk`/`koboldview`/`enemycheck`
+     scenarios seed these; a fair-play `clear_ch03` needs a `CA_BOSS` grell or a pid-targeted bot). `scenarios.ch03`
+     (entry assertions) already exists; `smoke_ch03` = mirror `smoke_ch01` (bootToMap→smokeDrive); `clear_ch03` follows
+     the `clear_ch02` deterministic-completion precedent (the grell has no `CA_BOSS` so the generic clear-bot can't
+     target it — pid-target 0xb7).
+  2. **"Defeat Saar" status-objective leak** — ch03's `statusObjectiveTextId` isn't set, so the Status screen shows
+     the vanilla Ch4 boss name. Separate goal-block field (NOT the title-card image); set it from the ch03 YAML.
   - **Optional polish:** the recruit talk renders in the **map speech bubble** (no portrait box), canonical for
     on-map CHAR talks — switch to the full portrait box if Nicolas wants Trex's bust to show on recruit.
 - **Cutscene BGs (updated 2026-07-10):** real BGs vendored/authored — `bg_TargosWinter` (town, {Zeldacrafter}, de-padded +

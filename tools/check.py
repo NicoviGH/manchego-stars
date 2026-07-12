@@ -381,6 +381,10 @@ def check_engine_guards_present(fail):
              'the out-of-bounds terrain-name read guard'),
             ('_patch_battle_map_kind_fallback',
              'the no-world-map STORY fallback for slot-2+ chapters'),
+            ('_patch_chapter_title_wm_fallback',
+             'the no-world-map chapter-title fallback (GetChapterTitleWM -> ROM chapTitleId); '
+             'without it a story chapter on a spawn-node slot (e.g. ch03 = Za\'ha Woods) '
+             'renders the WM skirmish name instead of its own title card'),
             ('_inject_lord_select_engine',
              'the #42 lord-select mechanic (GetPid / force-deploy / Seize / game-over '
              'keyed to the chosen lead)'),

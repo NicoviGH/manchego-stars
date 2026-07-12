@@ -27,6 +27,7 @@ EVENTINFO_C = os.path.join(DECOMP, 'src', 'eventinfo.c')
 PREP_SALLYCURSOR_C = os.path.join(DECOMP, 'src', 'prep_sallycursor.c')
 BANIM_EFXHIT_C = os.path.join(DECOMP, 'src', 'banim-efxhit.c')
 ICON_C = os.path.join(DECOMP, 'src', 'icon.c')
+CHAPTER_TITLE_C = os.path.join(DECOMP, 'src', 'chapter_title.c')
 LORDFLOOR_APPLIED_FLAG = 0xFA
 
 
@@ -279,6 +280,38 @@ def _patch_battle_map_kind_fallback():
                '       story chapter (vanilla only reached this via WM skirmishes). */\n'
                '    return BATTLEMAP_KIND_STORY;')
     with open(WORLDMAP_PATH_C, 'w', encoding='utf-8') as f:
+        f.write(text.replace(orig, patched, 1))
+
+
+def _patch_chapter_title_wm_fallback():
+    """A story chapter's title banner is always its ROM chapTitleId card, never a
+    world-map skirmish name.
+
+    GetChapterTitleWM (chapter_title.c) -- the source for both the chapter-intro
+    banner (chapterintrofx*) AND the map Status screen (uichapterstatus) -- returns
+    the skirmish name card (0x46 + i) when the chapter's node is a monster-spawn
+    location AND `GetNextUnclearedNode(&gGMData) != unk`. Vanilla only takes that
+    branch on a postgame revisit; during a story playthrough the node IS the next
+    uncleared one, so the branch is skipped and it returns chapTitleId. Our campaign
+    has no world map (see _patch_battle_map_kind_fallback), so gGMData's node states
+    are never populated -> GetNextUnclearedNode never matches -> every story chapter
+    whose slot maps to a spawn node (e.g. ch03 hosts vanilla slot 4 = WM_NODE_ZahaWoods,
+    the first spawn location) renders the "Za'ha Woods" skirmish name instead of its
+    own "Ch.3: ..." card. Slots whose node isn't a spawn location (ch01/ch02) escaped
+    it by luck. Campaign-agnostic hardening: neuter the guard so the WM/monster-spawn
+    branch never fires and the function always returns the ROM chapTitleId. (The dead
+    loop body still references `i`/`unk`, so no unused-variable warning.)
+    """
+    with open(CHAPTER_TITLE_C, encoding='utf-8') as f:
+        text = f.read()
+    orig = ('    if ((chapterData->chapterStateBits & PLAY_FLAG_POSTGAME) || '
+            'GetNextUnclearedNode(&gGMData) != unk)')
+    if text.count(orig) != 1:
+        sys.exit('ERROR: GetChapterTitleWM guard not in expected vanilla form in %s'
+                 % CHAPTER_TITLE_C)
+    patched = ('    if (0) /* MS: no world map -> the title is always the ROM chapTitleId\n'
+               '             (never a WM skirmish name for a spawn-node story chapter) */')
+    with open(CHAPTER_TITLE_C, 'w', encoding='utf-8') as f:
         f.write(text.replace(orig, patched, 1))
 
 
