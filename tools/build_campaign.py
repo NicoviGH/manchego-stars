@@ -6042,6 +6042,12 @@ def inject_ch03(campaign, boot=False, verbose=True):
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
     set_message_body(lines, host['chapTitleTextId'], name_message_body(chap['title']))
+    # The borrowed slot-6 defeat_boss goal block still points its Status-screen objective at
+    # vanilla's "Defeat Saar" -- rewrite it as "Defeat <boss fe_name>" (the prologue precedent;
+    # the goal WINDOW banner is a static "Defeat boss" by goal type, so only this text leaks).
+    ch03_boss = next(e for e in chap['enemy_units'] if e.get('is_boss'))
+    set_message_body(lines, host['goal']['statusObjectiveTextId'],
+                     name_message_body('Defeat ' + (ch03_boss.get('fe_name') or ch03_boss['name'])))
     # Trex talk-recruit body (#23 item 2): his migrated pitch (chapter YAML talk_recruit event,
     # single source of truth), faced on the Rennac slot. One speaker -> one [OpenX] block with
     # page breaks; the recruit script (EventScr_089F199C) TEXTSHOWs it before the CUSA.

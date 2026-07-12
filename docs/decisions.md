@@ -1265,9 +1265,12 @@ spawn locations; **ch03 hosts vanilla slot 4 = `WM_NODE_ZahaWoods` (the first sp
 rendered "Za'ha Woods" over its own card until fixed. Fix = a campaign-agnostic engine hook
 (`_patch_chapter_title_wm_fallback`, sibling to the battle-map-kind fallback) neutering the guard so
 `GetChapterTitleWM` always returns the ROM `chapTitleId`. Verified in-engine (`PT_HOST_CHAPTER=4
-run.sh titlecard` → `docs/demo/ch03-title-card-ingame.png`). **Separately** the Status *objective*
-still leaks the vanilla boss ("Defeat Saar") — ch03's `statusObjectiveTextId` isn't set yet (a distinct
-goal-block field, tracked as ch03 polish, not the title-card image).
+run.sh titlecard` → `docs/demo/ch03-title-card-ingame.png`). **Separately**, the borrowed slot-6
+defeat_boss goal block leaked its Status *objective* text ("Defeat Saar", vanilla Ch6's boss) because
+inject_ch03 set `chapTitleTextId` but not `statusObjectiveTextId` — now set to `'Defeat '+<boss fe_name>`
+("Defeat Grell"), the prologue precedent (the goal WINDOW banner is a static "Defeat boss" by goal type, so
+only the Status-objective text leaked). ch03 load-tests `smoke_ch03`/`clear_ch03` added (mirror ch02;
+`clear_ch03` routs via real combat, wiring-not-balance, since the grell has no `CA_BOSS`).
 _Decided: 2026-07-11_
 
 **Every decomp file an engine hook patches must be registered in `PATCHED_DECOMP_FILES`.**

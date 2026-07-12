@@ -27,9 +27,18 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 > to `PATCHED_DECOMP_FILES`. `DrawIcon`'s guard is NON-idempotent (hard-exits if not vanilla), so the FIRST
 > rebuild in a fresh session died on `DrawIcon not in expected vanilla form`. Registered all three → restores
 > clean each build. **Regression-checked:** `ch03tourmaline` (pink icon) + `ch03win` both still PASS.
-> **REMAINING on #23:** the `ch03`/`smoke_ch03`/`clear_ch03` load-test scenarios (the last unchecked item)
-> + the "**Defeat Saar**" status-objective leak (`statusObjectiveTextId` unset — a separate goal-block field,
-> NOT the title-card image) + enemy battle-anim ART. `make check` clean, `verify_text` 3404/0, 86 tests green.
+> **⭐ ALSO FIXED "Defeat Saar" + ADDED the load-test scenarios (Nicolas: "fix the issues and continue").**
+> **(a) "Defeat Grell" objective:** inject_ch03 borrowed slot-6's defeat_boss goal block but never set its
+> `statusObjectiveTextId`, so the Status screen leaked vanilla Ch6's "Defeat Saar". Now sets it to
+> `'Defeat '+<boss fe_name>` (the prologue precedent; the goal WINDOW banner is a static "Defeat boss" by
+> goal type, so only this text leaked). Verified: the status objective now reads **"Defeat Grell"**.
+> **(b) `smoke_ch03` + `clear_ch03`** (mirror ch02; both `PT_HOST_CHAPTER=4`, CH03BOOT=1). `smoke_ch03` =
+> bootToMap→smokeDrive (stability net; PASS = clean terminal, no soft-lock). `clear_ch03` = deterministic
+> rout via REAL combat (the grell has no `CA_BOSS` so the generic clear-bot can't target it — clear_ch02
+> precedent, wiring-not-balance): frail+harmless all foes, teleport party units onto firing tiles, the
+> grell's death raises `EVFLAG_DEFEAT_BOSS` → assert the DefeatBoss win + ending fired. **Both PASS in-engine.**
+> `scenarios.ch03` (entry assertions) already existed. **#23 is now down to enemy battle-anim ART only.**
+> `make check` clean, `verify_text` 3404/0, 86 tests green, lua parse OK.
 > **DELIVERY:** `docs/demo/ch03-title-card-ingame.png` committed for Nicolas-on-mobile.
 >
 > **Prior session (2026-07-11 #4, VSCode/remote — ⭐ CH03 LOOT SLICE COMPLETE: chests + doors + pink Tourmaline icon, all IN-ENGINE VERIFIED and MERGED TO MAIN. Nothing pending; `main` @ `877bba4`. CURRENT BRANCH = `main`.):**
@@ -369,6 +378,9 @@ ADR: `decisions.md` §Distribution.
     **`ch03talk`** (Trex green→blue via Talk) · **`ch03door`** (Door Key → open → tile flips to the below-cell) ·
     **`ch03chest`** (Chest Key → open the (6,3) chest → tile flips 17→29 + Iron Lance granted) ·
     **`ch03tourmaline`** (give a unit the Tourmaline → open the Item menu → the pink pal-1 icon renders) ·
+    **`smoke_ch03`** (stability net: boot→idle-drive, catch a crash/soft-lock) · **`clear_ch03`** (rout via real
+    combat → the grell's death fires `EVFLAG_DEFEAT_BOSS` → assert the DefeatBoss win + ending) · **`titlecard`**
+    (open Status → the "Ch.3: The Termalaine Mine" banner + "Defeat Grell" objective render) ·
     **`koboldview`** (pull off-camera enemies next to the party) — all on
     a `make CH03BOOT=1` ROM (macOS: apply the `build.sh` shebang-fix loop first). `bootToMap` drives through PREP.
   - **LLM commander (#63):** `llm` — needs the sidecar running (`llm_player.py serve`; see run.sh header).
@@ -479,14 +491,12 @@ how-to for the host machinery = `docs/adding-a-chapter.md`.**
   from vanilla glyphs; needed the no-world-map `_patch_chapter_title_wm_fallback` engine hook (slot 4 =
   `WM_NODE_ZahaWoods` spawn node → `GetChapterTitleWM` leaked the "Za'ha Woods" skirmish name). Verified
   in-engine (`titlecard`). Also fixed the `icon.c` `PATCHED_DECOMP_FILES` build-blocker en route. See the top block.
-- **⭐ REMAINING (unchecked on #23) — the last items before ch03 is fully buttoned up:**
-  1. **Full load-test scenarios** `ch03`/`smoke_ch03`/`clear_ch03` (the `ch03prep`/`ch03win`/`ch03talk`/`koboldview`/`enemycheck`
-     scenarios seed these; a fair-play `clear_ch03` needs a `CA_BOSS` grell or a pid-targeted bot). `scenarios.ch03`
-     (entry assertions) already exists; `smoke_ch03` = mirror `smoke_ch01` (bootToMap→smokeDrive); `clear_ch03` follows
-     the `clear_ch02` deterministic-completion precedent (the grell has no `CA_BOSS` so the generic clear-bot can't
-     target it — pid-target 0xb7).
-  2. **"Defeat Saar" status-objective leak** — ch03's `statusObjectiveTextId` isn't set, so the Status screen shows
-     the vanilla Ch4 boss name. Separate goal-block field (NOT the title-card image); set it from the ch03 YAML.
+- **✅ DONE (same branch `feat/23-ch03-title-card`, PR #160) — objective leak + load-test scenarios.**
+  "Defeat Saar" → **"Defeat Grell"** (inject_ch03 now sets `statusObjectiveTextId`); `smoke_ch03` + `clear_ch03`
+  added (mirror ch02) — both PASS in-engine. See the top block.
+- **⭐ REMAINING (unchecked on #23):** enemy battle-anim ART only (kobold grunts / brute / skirmisher / slinger /
+  svirfneblin / Trex battle anims — art-blocked, need Nicolas's Gemini poses per the #65 pipeline). Map sprites
+  are all done; these are the combat animations. Everything else on #23 is complete.
   - **Optional polish:** the recruit talk renders in the **map speech bubble** (no portrait box), canonical for
     on-map CHAR talks — switch to the full portrait box if Nicolas wants Trex's bust to show on recruit.
 - **Cutscene BGs (updated 2026-07-10):** real BGs vendored/authored — `bg_TargosWinter` (town, {Zeldacrafter}, de-padded +

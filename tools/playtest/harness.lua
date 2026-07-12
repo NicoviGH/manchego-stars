@@ -3660,6 +3660,84 @@ scenarios.ch03 = function()
         "ch03 entered: %d blue (incl Baxby), Trex green talk-recruit on the map", deployed))
 end
 
+-- smoke_ch03: stability net on the ch03 map (#23) -- boot the CH03BOOT map (bootToMap drives
+-- through PREP) and idle-drive to a clean terminal, catching a crash/soft-lock on load or during
+-- the opening/entrance/midmap cutscenes. Mirrors smoke_ch01/smoke_ch02.
+-- Run: PT_HOST_CHAPTER=4 tools/playtest/run.sh smoke_ch03 (needs a CH03BOOT=1 ROM).
+scenarios.smoke_ch03 = function()
+    if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
+    return smokeDrive(chapter())
+end
+
+-- clear_ch03: the completability + DefeatBoss-win proof (#23), mirroring clear_ch02. The grell
+-- (pid 0xb7) rides a raw charIndex with NO CA_BOSS, so the generic clear-bot (findBoss scans
+-- CA_BOSS) can't target it -- like clear_ch02 this is a DETERMINISTIC rout via REAL combat that
+-- proves the win->ending WIRING, not ch03 balance (that's the difficulty gate + the human pacing
+-- pass). Each player phase: frail+harmless every foe (1 HP, no counter power) and teleport a party
+-- unit onto a firing tile of each live enemy to one-shot it -- the kill goes through the death hook
+-- that fires the flagged-defeat check (a raw US_DEAD poke would NOT). Routing the map kills the
+-- grell, which raises EVFLAG_DEFEAT_BOSS -> the chapter ends. PASS = the DefeatBoss win fired
+-- (flag set AND the chapter advanced off the host slot). Run: PT_HOST_CHAPTER=4 run.sh clear_ch03.
+scenarios.clear_ch03 = function()
+    if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
+    pokeFastConfig()
+    if not red(0xb7) then return result("FAIL", "grell (pid 0xb7) not on the ch03 map") end
+    local start = chapter()
+    -- won = the DefeatBoss flag is set OR the chapter has advanced (the ending ran). A title-screen
+    -- WITHOUT an advance would be a game-over (loss), so guard that separately as a FAIL below.
+    local function won() return eventFlag(2) or chapter() ~= start end
+    local routed = false
+    for t = 1, 12 do
+        if won() then break end
+        waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
+        wait(60)
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+        end
+        for i = 0, 15 do
+            if won() or #liveEnemies() == 0 then break end
+            local u = unitAt(SYM.gUnitArrayBlue, i)
+            if u and not isDead(u) and (u.state & 0x2) == 0 then
+                local mn, mx = unitAttackRange(u)
+                if mn and teleportToFiringTile(u, mn, mx) then
+                    u = unitAt(SYM.gUnitArrayBlue, i)   -- refresh after the teleport relocates it
+                    if u and moveUnit(u.x, u.y, u.x, u.y) then
+                        chooseAttack(u.addr)
+                        waitFor(function() return faction() == 0 and not menuOpen()
+                            and not procActive(SYM.gProc_ekrBattle) end, 600)   -- let the kill resolve
+                    end
+                end
+            end
+        end
+        local g = red(0xb7)
+        log(string.format("clear_ch03 turn %d: liveEnemies=%d grell=%s EVFLAG_DEFEAT_BOSS=%s chapter=%d",
+            t, #liveEnemies(), (g and not isDead(g)) and "alive" or "dead",
+            tostring(eventFlag(2)), chapter()))
+        if #liveEnemies() == 0 then routed = true end
+        if won() then break end
+        if gameOverActive() then shot("clear-ch03-gameover")
+            return result("FAIL", string.format("game over on turn %d -- party lost", t)) end
+        if runEnemyPhase() == "gameover" then shot("clear-ch03-gameover")
+            return result("FAIL", string.format("game over on the enemy phase, turn %d", t)) end
+    end
+    shot("clear-ch03-routed")
+    -- The DefeatBoss flag is set AFTER the (silent) grell defeat quote resolves; then the Misc
+    -- AFEV runs the ending -> dev-placeholder -> title (ch04 isn't hosted). Poll the flag, then let
+    -- the ending play out WITHOUT mashing A (mashing hits "Press START" -> a spurious New Game).
+    local flagged = waitFor(function() return eventFlag(2) end, 3600, true)
+    log(string.format("clear_ch03: routed=%s EVFLAG_DEFEAT_BOSS(2)=%s chapter=%d (host=%d)",
+        tostring(routed), tostring(eventFlag(2)), chapter(), HOST_CHAPTER))
+    if not flagged then
+        shot("clear-ch03-no-flag")
+        return result("FAIL", "grell never died / EVFLAG_DEFEAT_BOSS never set (DefeatBoss win did not fire)")
+    end
+    wait(240)
+    shot("clear-ch03-ending")
+    result("PASS", string.format(
+        "ch03 cleared: grell routed -> EVFLAG_DEFEAT_BOSS set -> DefeatBoss ending ran (chapter=%d)", chapter()))
+end
+
 -- ch02: entry assertions on the ch02 map (mirrors scenarios.ch01). The 3 green chwinga are on
 -- the field, the party deploys to the cap, and the archer + boss are present.
 scenarios.ch02 = function()
