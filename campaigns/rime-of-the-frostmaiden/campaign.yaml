@@ -148,6 +148,8 @@ item_icons:
 # `palette` and emits gMSPal1IconIds[] (the resolved iconIds); the generic DrawIcon hook
 # (engine_hooks._patch_draw_icon_pal1) bank-bumps those iconIds to pal 1 (OamPalBase |= 0x1000).
 # palette: 16 BGR-quantised entries; index 0 = the vanilla transparent placeholder.
+# TO EXTEND (another custom-coloured item; or a 3rd/4th icon palette when pal 1's 16 colours run out):
+# see docs/decisions.md -> "A campaign item icon can use a colour pal 0 lacks" (the authoritative record).
 item_icon_pal1:
   icons: [ITEM_REDGEM]
   palette: ["#c0f8c8", "#ffffff", "#f4d4e2", "#cf8ea8", "#6b2a4f", "#ffe0ef", "#e876ac",

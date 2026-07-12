@@ -741,7 +741,20 @@ in-engine (`run.sh ch03tourmaline`): the Tourmaline renders **pink** in the Item
 + Goodberry (pal 0) are untouched — no collateral. Reusable for any future item needing an off-pal-0
 colour. `gBmMapBaseTiles`-style note: item icons draw via BG tilemap entries, so the +0x1000 targets
 the BG palette nibble; the same bump works for OBJ draws (attr2 palette bits are also 12-15).
-_Decided: 2026-07-11 (Nicolas — go pink, "you were right to push"; CLAUDE — pal-1 route, #23)._
+
+**Extending it — append, and add palettes freely (Nicolas 2026-07-11).** To give another item a
+custom colour: (1) paint its colours onto SPARE `item_icon_pal1.palette` indices (the Tourmaline uses
+~6 of pal 1's 16), (2) author `item_icons/<name>.png` on those indices + add it to `item_icons`,
+(3) add its `ITEM_*` to `item_icon_pal1.icons`. No code changes — `inject_item_icon_pal1` + the hook
+already read the list. **When pal 1's 16 shared colours aren't enough, DO NOT treat it as a ceiling —
+just load more icon palettes.** FE8 currently loads two (`LoadIconPalettes` → `ApplyPalettes(.., 2)`);
+bump that count, add a bank (or banks) to `item_icon_palette.agbpal`, and let the hook select the right
+one (each extra palette is another `+0x1000` step — pal 2 = `|= 0x2000`, pal 3 = `|= 0x3000`, …). Adding
+a 3rd/4th/Nth icon palette is a routine, sanctioned extension, not a barrier: scale to however many
+distinct-colour custom items the campaign needs. (Authoritative record; the `campaign.yaml item_icon_pal1`
+comment points here rather than restating it.)
+_Decided: 2026-07-11 (Nicolas — go pink, "you were right to push", + "bump to three or however many we
+need"; CLAUDE — pal-1 route + the scale-by-adding-palettes extension, #23)._
 
 **Two healers, differentiated by donor (same move as the shamans).** Sclorbo and Basil are both
 Priests, so they get *distinct* vanilla donor lines to avoid stat-twins: **Sclorbo → Moulder** (the
