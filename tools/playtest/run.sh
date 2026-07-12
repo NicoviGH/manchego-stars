@@ -16,6 +16,10 @@
 #   clear | clear_ch01   -- greedy clear-bot plays to a win (#60)
 #   clear_ch02           -- rout ch02 (DefeatAll) keeping the chwinga alive, then verify all 3
 #                           chwinga charm-gifts (CHECK_ALIVE -> GIVEITEMTO) reach leader/convoy (#22)
+#   smoke_ch03           -- stability net on ch03 (#23; PT_HOST_CHAPTER=4, needs CH03BOOT=1):
+#                           boot -> idle-drive, catching a crash/soft-lock on load or in the cutscenes
+#   clear_ch03           -- rout ch03 via real combat (#23; PT_HOST_CHAPTER=4, CH03BOOT=1): the grell's
+#                           death raises EVFLAG_DEFEAT_BOSS -> assert the DefeatBoss win + ending fired
 #   fuzz  | fuzz_ch01    -- SEEDED random-input soak (#49); set PT_SEED=N (default 1) to
 #                           pick the seed; a FAIL prints the seed so PT_SEED=N replays it
 #   llm                  -- LLM-player commander on the prologue (#63): the harness
@@ -199,7 +203,7 @@ case "$SCENARIO" in record*) FPS=60; VSYNC=1; DEADLINE_S=300 ;; esac
 # wall-clock on the sidecar EVERY turn (18 turns x 90s handshake budget), and a --record run
 # against a slow local model legitimately uses it -- so its deadline covers the harness's own
 # worst case instead of killing a healthy run.
-case "$SCENARIO" in smoke*|fuzz*|clear_ch02|recordch02ending) DEADLINE_S=600 ;; llm) DEADLINE_S=2100 ;; esac
+case "$SCENARIO" in smoke*|fuzz*|clear_ch02|clear_ch03|recordch02ending) DEADLINE_S=600 ;; llm) DEADLINE_S=2100 ;; esac
 # PT_FPS overrides the rate. 60fps+videoSync is only needed to capture smooth cutscene
 # FADES; verification captures of static text/boxes (sign, death quote) read fine at top
 # speed, so `PT_FPS=240 ... recordfix` runs ~4x faster.

@@ -34,6 +34,7 @@ WORDS = {
     'of':        (0, 125, 138),
     'Ch.1:':     (1, 57, 91),   # "Ch.1: Escape!" -- vanilla's own chapter prefix
     'Ch.2:':     (2, 40, 74),   # "Ch.2: The Protected" -- vanilla's own chapter prefix
+    'Ch.3:':     (3, 19, 53),   # "Ch.3: The Bandits of Borgo" -- vanilla's own chapter prefix
     'The':       (0, 74, 96),
 }
 
@@ -46,6 +47,7 @@ LETTERS = {
     'C': (87, 42, 51),          # "Creature" -- leading C (clean, no left neighbor)
     'D': (10, 78, 87),
     'I': (9, 87, 93),
+    'M': (16, 120, 131),        # "Madness" -- word-initial M (clean left edge)
     'T': (9, 119, 128),         # "Trap!"
     'W': (7, 138, 150),         # "War" -- the W (W+a kern in source; cut before 'a')
     'a': (9, 110, 117),
