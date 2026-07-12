@@ -128,3 +128,16 @@ supports:
     affinity: fire
   - partner: prof-rbg
     affinity: thunder
+
+# ── Battle Animation ──────────────────────────────────────────────────────────
+# Recipe: key magenta -> alpha, then python3 tools/descale_battleframe.py (adaptive palette, no --flat)
+battle_anim:
+  clone_from: knight
+  motion: melee
+  cadence: lance
+  abbr: wolfram
+  frames:
+    - wolfram/ready.png
+    - wolfram/windup.png
+    - wolfram/peak.png
+
