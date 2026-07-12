@@ -4,20 +4,24 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-07-11 #4, VSCode/remote — ⭐ CH03 DOORS + PINK TOURMALINE ICON, all IN-ENGINE VERIFIED. TWO stacked PRs open awaiting Nicolas's merge: #156 `feat/23-ch03-chests` (chests+doors) and #157 `feat/23-tourmaline-icon` (icon, base=#156). Merge #156 then #157. CURRENT BRANCH = `feat/23-tourmaline-icon`.):**
-> **⭐ PINK TOURMALINE ICON DONE + VERIFIED IN-ENGINE (PR #157).** FE8 item icons all share pal 0 (no pink, no
-> free index), but `LoadIconPalettes` loads a 2nd, vanilla-UNUSED icon palette adjacent → free to repaint. Route:
+> **Last session (2026-07-11 #4, VSCode/remote — ⭐ CH03 LOOT SLICE COMPLETE: chests + doors + pink Tourmaline icon, all IN-ENGINE VERIFIED and MERGED TO MAIN. Nothing pending; `main` @ `877bba4`. CURRENT BRANCH = `main`.):**
+> **✅ ALL MERGED** — PR #157 (chests + doors + icon; #156 was folded into it and closed to avoid a stacked squash) +
+> PR #158 (the pal-1 extension ADR). Remaining #23 = title-card + `smoke_ch03`/`clear_ch03` load-tests only (below).
+> **⭐ PINK TOURMALINE ICON DONE + VERIFIED IN-ENGINE.** FE8 item icons all share pal 0 (no pink, no free index),
+> but `LoadIconPalettes` loads a 2nd, vanilla-UNUSED icon palette adjacent → free to repaint. Route:
 > (a) `inject_item_icons` swaps the icon TILES (reuse the Red Gem gem shape, Nicolas-approved); (b) new
 > `inject_item_icon_pal1` repaints pal 1 (rose-pink) in `item_icon_palette.agbpal` + emits `gMSPal1IconIds[]`;
 > (c) new generic engine hook **`_patch_draw_icon_pal1`** bank-bumps those iconIds in `DrawIcon` (`OamPalBase |= 0x1000`
 > → the adjacent reserved slot). Boundary-clean (mechanism agnostic; id 136 lives in `campaign.yaml item_icon_pal1`);
 > registered in `check.py` guards. **VERIFIED `run.sh ch03tourmaline`:** Tourmaline renders PINK in the Item menu,
-> Blue Gem + Goodberry (pal 0) untouched — no collateral (`docs/demo/ch03-tourmaline-icon-ingame.png`). 5 new tests
-> (86 total green); make + verify_text 3404/0 + drift/guards clean. ADR in `decisions.md`. Committed `e9ef7fc`.
+> Blue Gem + Goodberry (pal 0) untouched — no collateral (`docs/demo/ch03-tourmaline-icon-ingame.png`). ADRs in
+> `decisions.md` (the pal-1 route + **its extension: to add another custom-coloured item just APPEND; when pal 1's 16
+> shared colours run out, load MORE icon palettes — `LoadIconPalettes` count++, another `.agbpal` bank, hook selects
+> via `|= 0x2000/0x3000/…` — a routine extension, "bump to three or however many we need" (Nicolas), NOT a ceiling**).
 > **DELIVERY LESSON (Nicolas asked): STOP using `"$(cat <<'EOF' ...)"` for commit/PR bodies** — a heredoc nested in
 > `$(...)` gets its `)` mis-scanned when the body has parens (`(#23)`), erroring `no closing ")"`. Use `git commit -F file`
-> / `gh pr create --body-file file` (write the body with the Write tool first). Applied for the rest of the session.
-> **⭐ CH03 DOORS (PR #156) — wired + both chests & doors IN-ENGINE VERIFIED (detail below in this block).**
+> / `gh pr create --body-file file` (write the body first, or pipe a plain heredoc to `-F -`). Applied for the rest of the session.
+> **⭐ CH03 DOORS + CHESTS — wired + both IN-ENGINE VERIFIED (detail below in this block).**
 > **⭐ CH03 DOORS DONE + VERIFIED IN-ENGINE.** The 3 vanilla Ch3 doors (`Door_(6,10)/(10,5)/(2,3)`) are wired as
 > thief/key doors that **open to the passable floor tile DIRECTLY BELOW the door cell** (Nicolas's answer: "the tile
 > directly adjacent and below it") — read off the painted `.mar` at build time (`_read_map_metatile`, drift-proof,
@@ -33,9 +37,8 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 > at gBmMapUnit+0x20 was WRONG, cost one probe): **`ch03door`** (hand a unit a Door Key, drive Door → tile flips
 > 3248→1968 = 812→492<<2) and **`ch03chest`** (Chest Key, teleport onto the (6,3) chest, drive Chest → tile flips
 > 68→116 = 17→29 **AND the Iron Lance lands in inventory**). Both PASS. The menu is `[Door/Chest, Item, Wait]` with
-> the weapon stripped, so the special command is row 0 (deterministic). Committed `66b6d5b`. ADR in `decisions.md`.
-> **REMAINING in-scope on this branch before PR: the pink Tourmaline icon** (palette-1 repaint + `DrawIcon` bank-bump
-> hook — full plan in the prior block below). Then title-card + load-test scenarios can be a follow-up branch.
+> the weapon stripped, so the special command is row 0 (deterministic). ADR in `decisions.md` (chests/doors share ONE
+> `MS_Ch03MapChanges` array). New scenarios `ch03door`/`ch03chest`/`ch03tourmaline` live in `harness.lua` (need `CH03BOOT=1`).
 >
 > **Prior session (2026-07-11 #3, VSCode/remote — ⭐ CH03 CHESTS + ch02 RED-GEM FIX on `feat/23-ch03-chests`):**
 > **ch02 RED-GEM BUG FIXED (Nicolas caught it in the chain GIF — the Red Gem was still gifted in ch02).** Root cause =
@@ -337,6 +340,7 @@ ADR: `decisions.md` §Distribution.
     fields 9 at the deploy_slots, Trex green) · **`ch03win`** (kill grell → assert `EVFLAG_DEFEAT_BOSS` → ending) ·
     **`ch03talk`** (Trex green→blue via Talk) · **`ch03door`** (Door Key → open → tile flips to the below-cell) ·
     **`ch03chest`** (Chest Key → open the (6,3) chest → tile flips 17→29 + Iron Lance granted) ·
+    **`ch03tourmaline`** (give a unit the Tourmaline → open the Item menu → the pink pal-1 icon renders) ·
     **`koboldview`** (pull off-camera enemies next to the party) — all on
     a `make CH03BOOT=1` ROM (macOS: apply the `build.sh` shebang-fix loop first). `bootToMap` drives through PREP.
   - **LLM commander (#63):** `llm` — needs the sidecar running (`llm_player.py serve`; see run.sh header).
@@ -387,7 +391,7 @@ ch03 recruit, added to #65**.
 + 3 descaled frames, one feature-flow branch per unit (or small batch), `custom_unit` issue template.
 - **Deferred polish (tracked):** braulo's white swing-arc weapon-trail → **#91**; goblin enemy class-level anim → **#90**.
 
-### Content — Ch3 "The Termalaine Mine" (#23) — HOSTED + WIN + SPRITES + DIALOGUE + RECRUIT + PREP-DEPLOY + ALL-CUTSCENES-DONE (incl. midmap RBG-execution, PR #153); chain/chests/title/enemy-art remain
+### Content — Ch3 "The Termalaine Mine" (#23) — HOSTED + WIN + SPRITES + DIALOGUE + RECRUIT + PREP-DEPLOY + CUTSCENES + CHAIN + CHESTS + DOORS + TOURMALINE ICON all DONE & merged; only TITLE-CARD + load-test scenarios + enemy battle-anim ART remain
 Vanilla-FE8-Ch3 reskin as Termalaine's kobold-overrun tourmaline mine. Teaching goal = the **thief**
 (Trex = our Colm). Decisions: `decisions.md` → Ch3 ADR (four deviations + **item 4 = Defeat Boss**) + the
 ch03 YAML `design_notes` (2026-07-06 narrative reframe). **Live build checklist = #23 (the source of truth);
@@ -438,18 +442,16 @@ how-to for the host machinery = `docs/adding-a-chapter.md`.**
 - **✅ DONE (PR #154, MERGED) — Chain ch02→ch03:** ch02's ending `MNC2(0x4)`s into ch03; `inject_ch03(boot=False)`
   hosted in every non-boot build (persistent ch02 party feeds PREP, seed dropped). Verified in-engine (`clear_ch02`
   lands on ch03, chapter=4). ch03's OWN ending still parks on the dev-placeholder until ch04 hosts. `decisions.md` Ch3-chains ADR.
-- **✅ DONE — Chests + Doors (`feat/23-ch03-chests`, WIP branch, pushed @ `66b6d5b`, not PR'd):** 4 chests + 3 doors
-  wired in ONE `MS_Ch03MapChanges` array (chests share the FF5-navy `17→29` flip; each door opens to the passable
-  floor tile directly below it, Nicolas's rule). **BOTH VERIFIED IN-ENGINE** (`ch03door` + `ch03chest` PASS — tile
-  flips + Iron Lance grant read from `gBmMapBaseTiles`). ch02 Red-Gem→Hand-Axe swap FIXED + verified; Tourmaline NAME
-  done. **Full detail in the top block + `decisions.md` Ch3 chests/doors ADR.** Only the pink icon remains on this branch.
-- **⭐ REMAINING (unchecked on #23):**
-  1. ✅ **Chests/doors — DONE + in-engine verified** (top block). Trex (thief) opens without keys; the key-dropper kobolds back up.
-  2. ✅ **Tourmaline pink icon — DONE + in-engine verified** (PR #157, stacked on #156; `ch03tourmaline` scenario). pal-1 repaint + `DrawIcon` bank-bump hook.
-  3. **Title-card** (replace the vanilla slot-4 **"Za'ha Woods"** placeholder that shows at chapter start) — **couple this
-     with the opening map-flash fix** (both are the same `gProcScr_ChapterIntro` sequence). + full load-test scenarios
-     `ch03`/`smoke_ch03`/`clear_ch03` (the `ch03prep`/`ch03win`/`ch03talk`/`koboldview`/`enemycheck` scenarios seed these;
-     a fair-play `clear_ch03` needs a `CA_BOSS` grell or a pid-targeted bot).
+- **✅ DONE + MERGED (PR #157) — Chests + Doors + Tourmaline icon:** 4 chests + 3 doors wired in ONE `MS_Ch03MapChanges`
+  array (chests share the FF5-navy `17→29` flip; each door opens to the passable floor tile directly below it, Nicolas's
+  rule); the pink Tourmaline icon via the pal-1 route. **ALL THREE VERIFIED IN-ENGINE** (`ch03door`/`ch03chest`/`ch03tourmaline`
+  PASS — tile flips + Iron Lance grant + pink icon read from ground truth). ch02 Red-Gem→Hand-Axe swap FIXED + verified;
+  Tourmaline NAME done. **Detail in the top block + `decisions.md` (Ch3 chests/doors array ADR + pal-1 icon ADR).**
+- **⭐ REMAINING (unchecked on #23) — the last two items before ch03 is fully buttoned up:**
+  1. **Title-card** (replace the vanilla slot-4 **"Za'ha Woods"** placeholder that shows at chapter start) — **couple this
+     with the opening map-flash fix** (both are the same `gProcScr_ChapterIntro` sequence).
+  2. **Full load-test scenarios** `ch03`/`smoke_ch03`/`clear_ch03` (the `ch03prep`/`ch03win`/`ch03talk`/`koboldview`/`enemycheck`
+     scenarios seed these; a fair-play `clear_ch03` needs a `CA_BOSS` grell or a pid-targeted bot).
   - **Optional polish:** the recruit talk renders in the **map speech bubble** (no portrait box), canonical for
     on-map CHAR talks — switch to the full portrait box if Nicolas wants Trex's bust to show on recruit.
 - **Cutscene BGs (updated 2026-07-10):** real BGs vendored/authored — `bg_TargosWinter` (town, {Zeldacrafter}, de-padded +
