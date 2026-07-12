@@ -4,7 +4,20 @@ The **single** live-state doc (one trunk, feature-flow — no per-lane handoffs)
 `git log --oneline -20` + closed issues, not here. **Backlog** → GitHub issues. **Decisions** →
 `docs/decisions.md`. **Operating instructions** → `CLAUDE.md`. Run `/handoff` to refresh this file in place.
 
-> **Last session (2026-07-11 #4, VSCode/remote — ⭐ CH03 DOORS wired + BOTH chests & doors IN-ENGINE VERIFIED on `feat/23-ch03-chests` (WIP, pushed @ `66b6d5b`, NOT yet a PR — pink Tourmaline icon is the last in-scope item before the PR). CURRENT BRANCH = `feat/23-ch03-chests`.):**
+> **Last session (2026-07-11 #4, VSCode/remote — ⭐ CH03 DOORS + PINK TOURMALINE ICON, all IN-ENGINE VERIFIED. TWO stacked PRs open awaiting Nicolas's merge: #156 `feat/23-ch03-chests` (chests+doors) and #157 `feat/23-tourmaline-icon` (icon, base=#156). Merge #156 then #157. CURRENT BRANCH = `feat/23-tourmaline-icon`.):**
+> **⭐ PINK TOURMALINE ICON DONE + VERIFIED IN-ENGINE (PR #157).** FE8 item icons all share pal 0 (no pink, no
+> free index), but `LoadIconPalettes` loads a 2nd, vanilla-UNUSED icon palette adjacent → free to repaint. Route:
+> (a) `inject_item_icons` swaps the icon TILES (reuse the Red Gem gem shape, Nicolas-approved); (b) new
+> `inject_item_icon_pal1` repaints pal 1 (rose-pink) in `item_icon_palette.agbpal` + emits `gMSPal1IconIds[]`;
+> (c) new generic engine hook **`_patch_draw_icon_pal1`** bank-bumps those iconIds in `DrawIcon` (`OamPalBase |= 0x1000`
+> → the adjacent reserved slot). Boundary-clean (mechanism agnostic; id 136 lives in `campaign.yaml item_icon_pal1`);
+> registered in `check.py` guards. **VERIFIED `run.sh ch03tourmaline`:** Tourmaline renders PINK in the Item menu,
+> Blue Gem + Goodberry (pal 0) untouched — no collateral (`docs/demo/ch03-tourmaline-icon-ingame.png`). 5 new tests
+> (86 total green); make + verify_text 3404/0 + drift/guards clean. ADR in `decisions.md`. Committed `e9ef7fc`.
+> **DELIVERY LESSON (Nicolas asked): STOP using `"$(cat <<'EOF' ...)"` for commit/PR bodies** — a heredoc nested in
+> `$(...)` gets its `)` mis-scanned when the body has parens (`(#23)`), erroring `no closing ")"`. Use `git commit -F file`
+> / `gh pr create --body-file file` (write the body with the Write tool first). Applied for the rest of the session.
+> **⭐ CH03 DOORS (PR #156) — wired + both chests & doors IN-ENGINE VERIFIED (detail below in this block).**
 > **⭐ CH03 DOORS DONE + VERIFIED IN-ENGINE.** The 3 vanilla Ch3 doors (`Door_(6,10)/(10,5)/(2,3)`) are wired as
 > thief/key doors that **open to the passable floor tile DIRECTLY BELOW the door cell** (Nicolas's answer: "the tile
 > directly adjacent and below it") — read off the painted `.mar` at build time (`_read_map_metatile`, drift-proof,
@@ -432,7 +445,7 @@ how-to for the host machinery = `docs/adding-a-chapter.md`.**
   done. **Full detail in the top block + `decisions.md` Ch3 chests/doors ADR.** Only the pink icon remains on this branch.
 - **⭐ REMAINING (unchecked on #23):**
   1. ✅ **Chests/doors — DONE + in-engine verified** (top block). Trex (thief) opens without keys; the key-dropper kobolds back up.
-  2. **Tourmaline pink icon** — palette-1 repaint + `DrawIcon` bank-bump hook (top block). **← the last in-scope item before the PR.**
+  2. ✅ **Tourmaline pink icon — DONE + in-engine verified** (PR #157, stacked on #156; `ch03tourmaline` scenario). pal-1 repaint + `DrawIcon` bank-bump hook.
   3. **Title-card** (replace the vanilla slot-4 **"Za'ha Woods"** placeholder that shows at chapter start) — **couple this
      with the opening map-flash fix** (both are the same `gProcScr_ChapterIntro` sequence). + full load-test scenarios
      `ch03`/`smoke_ch03`/`clear_ch03` (the `ch03prep`/`ch03win`/`ch03talk`/`koboldview`/`enemycheck` scenarios seed these;
