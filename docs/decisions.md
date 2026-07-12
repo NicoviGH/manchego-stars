@@ -725,6 +725,24 @@ door proof covers both. `gBmMapBaseTiles` is a ROM-`.data` pointer (objdump `g O
 EWRAM `sBmBaseTilesPool` row array, never reassigned — read the pointer from ROM, then index the rows.
 _Decided: 2026-07-11 (Nicolas — open-door tile rule; CLAUDE — shared-array wiring, #23 chests/doors)._
 
+**A campaign item icon can use a colour pal 0 lacks, via the 2nd (unused) item palette.**
+FE8 item icons all share ONE 16-colour palette (pal 0) — there's no per-item palette field, and pal 0
+has no pink + no globally-free index (every index is used by some co-displayed icon). So the pink
+Tourmaline (`ITEM_REDGEM` reskin, Nicolas) can't be done by recolouring pal 0. BUT `LoadIconPalettes`
+loads **two** icon palettes adjacent (`ApplyPalettes(item_icon_palette[0], Dest, 2)`), and **no vanilla
+icon uses the 2nd** — so pal 1 is a reserved, collision-free slot free to repaint. The mechanism:
+(a) `inject_item_icons` swaps the icon TILES (the gem shape, reused from the Red Gem) as usual;
+(b) `inject_item_icon_pal1` repaints pal 1 (bank 1 of `item_icon_palette.agbpal`) with a rose-pink
+gradient and emits `gMSPal1IconIds[]` (the iconIds that opt in); (c) the generic engine hook
+`_patch_draw_icon_pal1` makes `DrawIcon` bank-bump any iconId in that array (`OamPalBase |= 0x1000`
+→ the adjacent palette slot). Boundary-clean: the mechanism is campaign-agnostic (reads an injected
+array), the specific id (136) lives in campaign data (`campaign.yaml item_icon_pal1`). Verified
+in-engine (`run.sh ch03tourmaline`): the Tourmaline renders **pink** in the Item menu while Blue Gem
++ Goodberry (pal 0) are untouched — no collateral. Reusable for any future item needing an off-pal-0
+colour. `gBmMapBaseTiles`-style note: item icons draw via BG tilemap entries, so the +0x1000 targets
+the BG palette nibble; the same bump works for OBJ draws (attr2 palette bits are also 12-15).
+_Decided: 2026-07-11 (Nicolas — go pink, "you were right to push"; CLAUDE — pal-1 route, #23)._
+
 **Two healers, differentiated by donor (same move as the shamans).** Sclorbo and Basil are both
 Priests, so they get *distinct* vanilla donor lines to avoid stat-twins: **Sclorbo → Moulder** (the
 durable "war-priest": HP70/Def25, balanced, accurate) and **Basil → Natasha** (the frail "mage-healer":

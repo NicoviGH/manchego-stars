@@ -3480,6 +3480,64 @@ scenarios.ch03chest = function()
         "Chest opened: tile flipped %d -> %d (17->29) AND the Iron Lance was granted (#23)", pre, post))
 end
 
+-- CH03TOURMALINE (#23 art): SHOW the pink Tourmaline icon in-engine. Give a deployed unit the
+-- Tourmaline (ITEM_REDGEM, drawn from pal 1 via the DrawIcon hook) alongside pal-0 gems (Blue Gem,
+-- Vulnerary/Goodberry) so the shot proves BOTH the pink renders AND the pal-0 items are unaffected.
+-- All three are non-weapons, so the command menu is [Item, Wait] -- Item at row 0. Run:
+-- PT_HOST_CHAPTER=4 tools/playtest/run.sh ch03tourmaline (needs a CH03BOOT=1 ROM).
+scenarios.ch03tourmaline = function()
+    if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
+    local u
+    for i = 0, 23 do
+        local c = unitAt(SYM.gUnitArrayBlue, i)
+        if c and (c.state & 0x9) == 0 and c.x ~= 0xFF then u = c break end
+    end
+    if not u then return result("FAIL", "no deployed unit to hold the Tourmaline") end
+    -- items[0..2] = Tourmaline (0x76, pal 1), Blue Gem (0x75, pal 0), Goodberry/Vulnerary (0x6C, pal 0).
+    emu:write16(u.addr + 0x1E + 0, 0x76 | (0x01 << 8))
+    emu:write16(u.addr + 0x1E + 2, 0x75 | (0x01 << 8))
+    emu:write16(u.addr + 0x1E + 4, 0x6C | (0x01 << 8))
+    for s = 3, 4 do emu:write16(u.addr + 0x1E + s * 2, 0) end
+    -- Relocate to an ISOLATED floor tile (no orthogonally-adjacent ally) so the command menu is just
+    -- [Item, Wait] -- otherwise a nearby deployed unit adds Rescue at row 0 and A opens the wrong submenu.
+    local function terr(x, y) return ru8(ru32(ru32(SYM.gBmMapTerrain) + y * 4) + x) end
+    local FLOOR = { [0x01] = true, [0x02] = true, [0x17] = true, [0x2a] = true, [0x2d] = true }
+    local grid = mapUnitAt(u.x, u.y)
+    local moved = false
+    for y = 1, 14 do
+        for x = 1, 15 do
+            if FLOOR[terr(x, y)] and mapUnitAt(x, y) == 0
+                and mapUnitAt(x - 1, y) == 0 and mapUnitAt(x + 1, y) == 0
+                and mapUnitAt(x, y - 1) == 0 and mapUnitAt(x, y + 1) == 0 then
+                setMapUnit(u.x, u.y, 0)
+                emu:write8(u.addr + 0x10, x); emu:write8(u.addr + 0x11, y)
+                setMapUnit(x, y, grid)
+                log(string.format("relocated the holder to the isolated tile (%d,%d)", x, y))
+                moved = true
+                break
+            end
+        end
+        if moved then break end
+    end
+    if not moved then return result("FAIL", "no isolated floor tile found to open a clean Item menu") end
+    u = unitAt(SYM.gUnitArrayBlue, 0) and u   -- addr stable
+    waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
+    local ux, uy = ru8(u.addr + 0x10), ru8(u.addr + 0x11)
+    if not moveUnit(ux, uy, ux, uy) then
+        shot("ch03tourmaline-no-menu")
+        return result("FAIL", "could not open the command menu")
+    end
+    wait(20); shot("ch03tourmaline-cmdmenu")
+    press(K.A, 4); wait(40)            -- Item (row 0, no weapon) -> inventory list with icons
+    shot("ch03tourmaline-inventory")   -- the money shot: Tourmaline (pink) above two pal-0 items
+    -- Data-side confirm: the item is really in slot 0 (the pixels are the deliverable; assert the item).
+    local held = ru16(u.addr + 0x1E) & 0xFF
+    if held ~= 0x76 then
+        return result("FAIL", string.format("Tourmaline not in slot 0 (got 0x%02X)", held))
+    end
+    return result("PASS", "Tourmaline (ITEM_REDGEM) held + Item menu opened -- see ch03tourmaline-inventory.png for the pink icon")
+end
+
 -- KOBOLDVIEW (#23 art): pull the enemy kobolds ON-SCREEN next to the party so their reskinned
 -- map sprites are visible (the roster deploys off-camera at the enemy tiles). Teleports the first
 -- few red brigand generics (pid 0xaa) to tiles around braulo's spawn and screenshots. No combat.

@@ -397,7 +397,10 @@ def check_engine_guards_present(fail):
             ('_inject_crit_d20_flourish',
              'the #11 nat-20 crit flourish (a d20 pops on the SpellFx layer at the '
              'crit-flash teardown) -- the d20, the whole D&D thesis, would silently '
-             'vanish from crits')):
+             'vanish from crits'),
+            ('_patch_draw_icon_pal1',
+             'the #23 item-icon pal-1 hook (DrawIcon bank-bumps gMSPal1IconIds to item '
+             'palette 1); without it the pink Tourmaline silently reverts to pal-0 colours')):
         if ('def %s(' % fn) not in eh:
             fail.append('engine hook %s() not DEFINED in tools/inject/engine_hooks.py '
                         '-- would silently drop %s (see docs/decisions.md)' % (fn, mechanic))

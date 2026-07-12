@@ -753,5 +753,40 @@ class Ch03TileChanges(unittest.TestCase):
         self.assertIn('.byte 0, 6, 10, 1, 1, 0, 0, 0', asm)   # id 0 at (x=6, y=10), 1x1 region
 
 
+class ItemIconPal1(unittest.TestCase):
+    """The pink-Tourmaline pal-1 route (#23): FE8's item icons all share pal 0 (no pink), but
+    LoadIconPalettes loads a 2nd, unused icon palette adjacent -- free to repaint. build_campaign
+    repaints it + emits gMSPal1IconIds[] (the iconIds that bank-bump to pal 1); the generic DrawIcon
+    hook consults that array."""
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def test_bgr555_packs_5bit_channels(self):
+        self.assertEqual(bc._bgr555('#000000'), 0)
+        self.assertEqual(bc._bgr555('#ffffff'), 0x7FFF)          # 31|31<<5|31<<10
+        self.assertEqual(bc._bgr555('#ff0000'), 0x001F)          # red in low 5 bits
+        self.assertEqual(bc._bgr555('#0000ff'), 0x7C00)          # blue in high 5 bits
+
+    def test_pal1_palette_is_16_bgr555_entries(self):
+        colors = ['#000000'] * 16
+        b = bc._item_icon_pal1_bytes(colors)
+        self.assertEqual(len(b), 32)                             # 16 colors x 2 bytes
+        self.assertEqual(b, b'\x00' * 32)
+
+    def test_pal1_palette_rejects_wrong_length(self):
+        with self.assertRaises(SystemExit):
+            bc._item_icon_pal1_bytes(['#000000'] * 15)
+
+    def test_redgem_resolves_to_pal1_icon_id_136(self):
+        # ITEM_REDGEM (the Tourmaline) is the campaign's one pal-1 icon; its iconId is 136.
+        self.assertEqual(bc._pal1_icon_ids(self.CAMPAIGN), [136])
+
+    def test_iconids_asm_lists_ids_then_terminator(self):
+        asm = bc._ms_pal1_iconids_asm([136, 5])
+        self.assertIn('.global gMSPal1IconIds', asm)
+        self.assertIn('.hword 136', asm)
+        self.assertIn('.hword 5', asm)
+        self.assertIn('.hword 0xFFFF', asm)                     # terminator (no valid iconId is 0xFFFF)
+
+
 if __name__ == '__main__':
     unittest.main()

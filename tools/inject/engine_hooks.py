@@ -26,6 +26,7 @@ DATA_EVENT_TRIGGER_C = os.path.join(DECOMP, 'src', 'data_event_trigger.c')
 EVENTINFO_C = os.path.join(DECOMP, 'src', 'eventinfo.c')
 PREP_SALLYCURSOR_C = os.path.join(DECOMP, 'src', 'prep_sallycursor.c')
 BANIM_EFXHIT_C = os.path.join(DECOMP, 'src', 'banim-efxhit.c')
+ICON_C = os.path.join(DECOMP, 'src', 'icon.c')
 LORDFLOOR_APPLIED_FLAG = 0xFA
 
 
@@ -210,6 +211,46 @@ def _patch_terrain_name_guard():
         sys.exit('ERROR: GetTerrainName not in expected vanilla form in %s' % BMMAP_C)
     with open(BMMAP_C, 'w', encoding='utf-8') as f:
         f.write(text.replace(orig, guarded, 1))
+
+
+def _patch_draw_icon_pal1():
+    """Let a campaign item icon draw from item palette 1 (a colour pal 0 lacks).
+
+    FE8's item icons all share ONE 16-colour palette (pal 0). LoadIconPalettes actually loads
+    TWO icon palettes adjacent, but no vanilla icon uses the 2nd -- so it's free for a colour
+    pal 0 can't provide (our pink Tourmaline). Campaign-agnostic mechanism: DrawIcon bank-bumps
+    any iconId listed in the injected gMSPal1IconIds[] (built by build_campaign.inject_item_icon_pal1,
+    which also repaints pal 1) -- adding 0x1000 to the tile's palette nibble selects the adjacent,
+    reserved palette slot, so it's collision-free. Boundary-clean: the specific ids live in campaign
+    data (gMSPal1IconIds), never here. Declarations precede statements (agbcc is C89)."""
+    with open(ICON_C, encoding='utf-8') as f:
+        text = f.read()
+    if '#include "hardware.h"' not in text:
+        sys.exit('ERROR: icon.c not in expected form (no hardware.h include) for the pal-1 hook')
+    text = text.replace(
+        '#include "hardware.h"',
+        '#include "hardware.h"\n\n'
+        '/* MS (#23): iconIds that draw from item palette 1 (built by inject_item_icon_pal1). */\n'
+        'extern const u16 gMSPal1IconIds[];', 1)
+    orig = ('    } else {\n'
+            '        u16 Tile = GetIconTileIndex(IconIndex) + OamPalBase;')
+    if orig not in text:
+        sys.exit('ERROR: DrawIcon not in expected vanilla form in %s' % ICON_C)
+    patched = ('    } else {\n'
+               '        u16 Tile;\n'
+               '        /* MS (#23): icons in gMSPal1IconIds draw from pal 1 (a colour pal 0 lacks,\n'
+               '           e.g. the pink Tourmaline). LoadIconPalettes loads pal 1 adjacent + unused,\n'
+               '           so bumping the palette nibble (+0x1000) is collision-free. */\n'
+               '        const u16* msPal1 = gMSPal1IconIds;\n'
+               '        while (*msPal1 != 0xFFFF) {\n'
+               '            if (*msPal1++ == IconIndex) {\n'
+               '                OamPalBase |= 0x1000;\n'
+               '                break;\n'
+               '            }\n'
+               '        }\n'
+               '        Tile = GetIconTileIndex(IconIndex) + OamPalBase;')
+    with open(ICON_C, 'w', encoding='utf-8') as f:
+        f.write(text.replace(orig, patched, 1))
 
 
 def _patch_battle_map_kind_fallback():

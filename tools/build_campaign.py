@@ -1054,6 +1054,68 @@ def inject_item_icons(campaign, verbose=True):
             print('  %-18s -> %s' % (item_enum, rel))
 
 
+def _bgr555(hexstr):
+    """'#rrggbb' -> a 15-bit BGR555 halfword (FE8 .agbpal / GBA palette format)."""
+    h = hexstr.lstrip('#')
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return (r >> 3) | ((g >> 3) << 5) | ((b >> 3) << 10)
+
+
+def _item_icon_pal1_bytes(colors):
+    """16 '#rrggbb' colors -> a 32-byte BGR555 blob (one 16-colour item-icon palette bank)."""
+    if len(colors) != 16:
+        sys.exit('ERROR: item_icon_pal1.palette must have exactly 16 colors (got %d)' % len(colors))
+    return b''.join(struct.pack('<H', _bgr555(c)) for c in colors)
+
+
+def _pal1_icon_ids(campaign):
+    """The iconIds (gItemData.iconId) of the campaign's item_icon_pal1.icons, sorted."""
+    cfg = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
+    with open(cfg, encoding='utf-8') as f:
+        pal1 = (yaml.safe_load(f) or {}).get('item_icon_pal1') or {}
+    return sorted(item_icon_id(e) for e in (pal1.get('icons') or []))
+
+
+def _ms_pal1_iconids_asm(ids):
+    """gMSPal1IconIds[] -- the iconIds the DrawIcon hook bank-bumps to pal 1, 0xFFFF-terminated
+    (no valid iconId is 0xFFFF). The generic hook (engine_hooks._patch_draw_icon_pal1) externs it."""
+    lines = ['', '/* Manchego Stars item icons that draw from pal 1 (#23): the generic DrawIcon',
+             '   hook (engine_hooks._patch_draw_icon_pal1) bank-bumps these iconIds to pal 1. */',
+             '\t.align 2, 0', '\t.global gMSPal1IconIds', 'gMSPal1IconIds:']
+    lines += ['\t.hword %d' % i for i in ids]
+    lines.append('\t.hword 0xFFFF')
+    return '\n'.join(lines)
+
+
+def inject_item_icon_pal1(campaign, verbose=True):
+    """Wire the campaign's pal-1 item icons (#23): repaint FE8's 2nd, vanilla-unused item-icon
+    palette (bank 1, loaded adjacent by LoadIconPalettes) with item_icon_pal1.palette, and emit
+    gMSPal1IconIds[] -- the iconIds the generic DrawIcon hook bank-bumps to pal 1 so they draw
+    from a colour pal 0 lacks (e.g. the pink Tourmaline). inject_item_icons already swapped the
+    icon TILES; this adds the palette + the id list. No-op when no item_icon_pal1 is declared."""
+    cfg = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
+    with open(cfg, encoding='utf-8') as f:
+        pal1 = (yaml.safe_load(f) or {}).get('item_icon_pal1') or {}
+    if not pal1:
+        if verbose:
+            print('  (no item_icon_pal1 declared)')
+        return
+    # Repaint bank 1 (bytes 32..63); bank 0 (the shared pal 0) is left byte-for-byte intact.
+    palpath = os.path.join(DECOMP, 'graphics', 'item_icon', 'item_icon_palette.agbpal')
+    with open(palpath, 'rb') as f:
+        raw = bytearray(f.read())
+    if len(raw) < 64:
+        raw.extend(b'\x00' * (64 - len(raw)))
+    raw[32:64] = _item_icon_pal1_bytes(pal1['palette'])
+    with open(palpath, 'wb') as f:
+        f.write(raw)
+    ids = _pal1_icon_ids(campaign)
+    with open(CONST_MAPS_S, 'a', encoding='utf-8') as f:
+        f.write(_ms_pal1_iconids_asm(ids) + '\n')
+    if verbose:
+        print('  pal 1 repainted; gMSPal1IconIds = %s' % ids)
+
+
 def inject_item_names(campaign, verbose=True):
     """Rename vanilla items globally from campaign.yaml `item_names:` (ITEM enum ->
     display name). FE8 keeps a single name per item id, so a reflavored consumable
@@ -6366,12 +6428,15 @@ def main():
         print('  banim (#65): combat anim lookup -> GetBattleAnimationId_WithUnique (per-character _u25)')
         engine_hooks._patch_banim_palette_custom_guard()
         print('  banim (#65): GetBanimPalette -> custom (appended) banims keep own palette (RBG cyan fix)')
+        engine_hooks._patch_draw_icon_pal1()
+        print('  item icons (#23): DrawIcon bank-bumps gMSPal1IconIds to item palette 1 (pink Tourmaline)')
         print('names:')
         inject_names(args.campaign)
         print('item names:')
         inject_item_names(args.campaign)
         print('item icons:')
         inject_item_icons(args.campaign)
+        inject_item_icon_pal1(args.campaign)
         print('characters:')
         patch_character_data(args.campaign)
         print('portrait geometry:')
