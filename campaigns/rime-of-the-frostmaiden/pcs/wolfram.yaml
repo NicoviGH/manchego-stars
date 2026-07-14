@@ -130,7 +130,12 @@ supports:
     affinity: thunder
 
 # ── Battle Animation ──────────────────────────────────────────────────────────
-# Recipe: key magenta -> alpha, then python3 tools/descale_battleframe.py (adaptive palette, no --flat)
+# Frames regenerate from "Battle Anims/Wolfram Battle Anim Sprites/Wolfram{Idle,Windup,Action}_alpha.png"
+# with: --body 44 --sharpen 1.6 --thin-outline. Like Braulo, Wolfram is a deliberately large
+# frontline unit. The 4-connected thin ring gives the downscaled silhouette the same light edge
+# accepted for RBG without the bulky full exterior outline, while stronger presharpening retains
+# the face, hammer, and shield detail.
+# Adaptive palette only (no --flat): Wolfram's cool, neutral colours exceed the crab-tuned warm spec.
 battle_anim:
   clone_from: knight
   motion: melee
@@ -140,4 +145,3 @@ battle_anim:
     - wolfram/ready.png
     - wolfram/windup.png
     - wolfram/peak.png
-
