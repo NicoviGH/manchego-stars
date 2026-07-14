@@ -5,10 +5,10 @@ live in `CLAUDE.md`; issue scope and backlog live in GitHub.
 
 ## Current state
 
-- Branch: `feat/65-wolfram-banim`; remote PR #161 is pushed at `f2f638e`.
-- The Tourmaline palette correction is separately merged as PR #162 (`f9ed1cc`); #161 was rebased
-  onto it, so it will not reintroduce that palette commit.
-- Current focus: battle-animation visual review for RBG and Wolfram.
+- Battle-animation review for RBG and Wolfram is complete in PR #161.
+- The Tourmaline palette correction is separately merged as PR #162 (`f9ed1cc`); #161 is based on
+  that work and does not reintroduce the palette change.
+- Current focus: choose the next character for battle-animation review.
 - Before a context rollover, warn Nicolas, refresh this file, and begin a fresh instance. Do not rely
   on automatic context compaction as the handoff mechanism.
 
@@ -18,13 +18,11 @@ live in `CLAUDE.md`; issue scope and backlog live in GitHub.
 
 - **RBG:** regenerated the three frames from the supplied source art with
   `--body 38 --noflip --thin-outline`. This is the requested middle ground between no added outline
-  and the prior heavy full-outline result. GitHub review GIF:
-  `docs/demo/rbg-anim.gif`.
+  and the prior heavy full-outline result.
 - **Wolfram:** regenerated the three frames from the supplied alpha masters with
   `--body 44 --sharpen 1.6 --thin-outline`. Body 44 matches Braulo's deliberately large NPC-enemy
   scale; the RBG-style 4-connected ring restores the silhouette without the heavy full outline.
-  The TESTCH ROM and `PT_CHAR=wolfram recordanim` both passed. GitHub review GIF:
-  `docs/demo/wolfram-anim.gif`.
+  The TESTCH ROM and `PT_CHAR=wolfram recordanim` both passed.
 - Both use the existing per-character `_u25` battle-animation path. `PT_CHAR=prof-rbg recordanim`
   and `PT_CHAR=wolfram recordanim` passed after regeneration.
 - Per-unit source paths and recipes are recorded in
@@ -34,7 +32,8 @@ live in `CLAUDE.md`; issue scope and backlog live in GitHub.
 ### Demo cleanup
 
 - Removed the 382-file local `review/` archive and pruned 20 unlinked `docs/demo` artifacts from
-  #161. The branch now retains only six document-linked demos plus the current RBG/Wolfram GIFs.
+  #161. The temporary RBG/Wolfram review GIFs were also removed before merge; retain only
+  document-linked demos in `docs/demo/`.
 - `make_gif.py` now writes to `docs/demo/` for feature-branch review; other transient renderers write
   under `/tmp/manchego-stars-review`. Remove review GIFs before merge unless a live document links them.
 - Deleted the stale remote `feat/23-ch03-chests` branch (closed PR #156; its work landed through #157).
@@ -69,18 +68,14 @@ apart from the intentionally preserved local-only files below.
 Other working-tree state:
 
 - `fireemblem8u` is dirty from injected/generated build artifacts. Never commit its submodule pointer.
-- `tools/key_magenta.py` is untracked user/scratch tooling; leave it alone unless explicitly asked.
-- `.agents/` and `skills-lock.json` are the local project handoff/superpowers skill setup created this
-  session; leave them uncommitted unless Nicolas asks to version them.
+- Other untracked local/session files are intentionally not versioned; leave them alone unless
+  Nicolas explicitly asks to version or remove them.
 
 ## Next steps
 
-1. Review `docs/demo/wolfram-anim.gif` against `docs/demo/rbg-anim.gif` in PR #161.
-2. If either needs revision, regenerate all three frames, build/capture it, overwrite its matching
-   `docs/demo` GIF, verify, and commit to #161.
-3. If art is accepted, remove both review GIFs before merging #161 unless a live document deliberately
-   links one as durable evidence.
-4. Before any additional custom item palette, audit a free live BG bank in every target UI context.
+1. Select the next character for battle-animation review. Create its short-lived feature branch and
+   keep review GIFs in `docs/demo/` only while the feature branch is under review.
+2. Before any additional custom item palette, audit a free live BG bank in every target UI context.
    The GBA has exactly 16 BG palette banks (0-15); adding a source palette does not create a 17th live
    bank.
 
