@@ -923,7 +923,7 @@ No on-map chest and `gold_reward: 0` — vanilla Ch2 has neither (the gifts ARE 
 diff (our `.mar` vs vanilla `Ch2Map`, terrain bytes off each tileset's `.bin`) differs on **2 of 225
 cells** (the two village tiles). So positions are authored on the built `.mar`'s walkable tiles
 (plains/forest), verified in-bounds. Two real traps: (1) author against the committed **`.mar`**, NOT
-`map-review/*-layout.json` — that review grid disagrees with the build on ~5 cells; (2) positions echo
+an ephemeral editor-export grid — that review grid disagrees with the build on ~5 cells; (2) positions echo
 vanilla Ch2's geography (boss/archer/Bone east, the lone Vulnerary-dropper on vanilla's SW `(6,10)`
 tile, chwinga + party NW) but stay on distinct walkable cells — vanilla stacks several units on shared
 spawn tiles via REDA entry-paths, which our `redaCount: 0` direct placement can't. (The parity the gate
@@ -1226,9 +1226,9 @@ drive (cf. `recordending`'s copy of `ch01win`) and swap the fast win-wait for
 until `chapter()` advances). Then assemble + show:
 `tools/playtest/make_gif.py <scenario> <tag> --name <basename> --open` (PIL; `--fps`
 controls read pace — **~6 fps for text-heavy scenes Nicolas needs to read**, 12 for quick
-motion; `--scale` nearest-upscales the 240×160 frame; `--open` saves to `map-review/`,
-gitignored, and opens in Safari since Preview paginates GIFs and inline renders aren't
-visible to Nicolas — [[feedback_sharing_visual_drafts]]).
+motion; `--scale` nearest-upscales the 240×160 frame; the default output is `docs/demo/` on the
+feature branch for GitHub review, and must be pruned before merge unless a live document retains it
+as evidence — [[feedback_sharing_visual_drafts]]).
 _Decided: 2026-06-17 (#21 ending review)._
 
 **Chapter title cards are IMAGES, recomposed from vanilla glyphs.**
@@ -1621,7 +1621,7 @@ _Decided: 2026-06-26_
 **Event backgrounds (`BACG`): vendored winter CGs, injected as NEW `gConvoBackgroundData` slots**
 Cutscene backdrops are `gConvoBackgroundData[]` (eventscr2.c) `{tiles, map, palette}` triples, 240×160,
 4bpp with up to **8 sixteen-colour sub-palettes** (one per 8×8 tile = 128 colours). We vendor winter
-backdrops from the FE-Repo (catalogued in `map-review/iwd-bg-library.md`; the Icewind Dale set is rich)
+backdrops from the FE-Repo (the Icewind Dale set is rich)
 and add each as an **additive new slot** past `BG_BLANK` (0x35) — never reskin a vanilla entry.
 - **Pipeline:** `tools/bg_to_fe8.py` (any image → 240×160, GBA-5bit, tile-banked mode-P PNG; greedy ≤8
   banks) → `inject_backgrounds` copies it to `graphics/bg/`, appends the enum id (backgrounds.h),
@@ -1780,7 +1780,7 @@ the item's tracked `.png` source under `graphics/item_icon/`, which gbagfx compi
 id/iconId from `data_items.c` and the icon's source file from `data_item_icon.s`'s incbin order — never hardcoded. The icon is
 authored from FE8's **shared item-icon palette** (one fixed 16-colour bank for all item icons) via `tools/item_icon_tool.py`
 (`blueberry_grid`, design "L2": blue body, dark five-point calyx button, green branch rooted in the button's centre, single
-left leaf — iterated with Nicolas, renders in `map-review/goodberry-icon/`). Authoring in the shared palette means the icon
+left leaf — iterated with Nicolas). Authoring in the shared palette means the icon
 needs no recolour; a vendored fruit icon would have had to be re-indexed to that palette anyway, so generated-via-tooling was
 simpler than sourcing from the FE-Repo.
 _Decided: 2026-06-16; shipped for the Goodberry (#21), `make` green + `verify_text` 3404/0 + `ch01win` PASS + in-ROM icon render._
@@ -2116,8 +2116,8 @@ a normal faced bubble. Verified in-engine (`recordch03midmap`, 2026-07-11).
 (`[ClearFace]` is in 0/119 vanilla scripts); the in-place swap (`sub_80066E0`) is vanilla but only
 for one character's *expression* change. So for our one-podium roll-call the `[ClearFace]` fade
 ("one leaves, next arrives") fits vanilla's grammar; a swap would morph one face into another.
-_Decided 2026-06-16 with Nicolas across four motion reviews (`map-review/ch01-beat1-northlook.gif`,
-`run.sh recordch01`): Sclorbo shows his Ross face; Marty's spore-cough is a parenthetical (FE8 has
+_Decided 2026-06-16 with Nicolas across four motion reviews (`run.sh recordch01`): Sclorbo shows
+his Ross face; Marty's spore-cough is a parenthetical (FE8 has
 no cutscene particle FX); Pinky (Neimi) appears beside RBG at his intro; lord-select confirm reads
 "lead the party." `make` green, `verify_text` 3404/0, playtests PASS (ch00 win/gameover, ch01 entry,
 ch01win). #21._
@@ -2205,8 +2205,9 @@ session state. `HANDOFF.md` points here._
 - **Battle-anim frames are a hard 3** (ready/windup/peak; script refs frames 0/1/2; `build_battle_anim`
   rejects any other count). The "march" is faked by the per-donor sound/shake cadence + a single engine
   OAM lunge (`MELEE_LUNGE_DX` −40 on peak), not extra art frames.
-- **`make_gif.py` writes only to `map-review/` (gitignored).** To share with Nicolas, copy the GIF to
-  `docs/demo/` and commit — otherwise the GitHub blob stays stale.
+- **`make_gif.py` writes to `docs/demo/` on the active feature branch.** Show that committed GIF
+  in the GitHub PR; remove it before merge once the review is complete, unless a live document
+  deliberately links to it as durable evidence. Do not accumulate local review archives.
 - **Event BGs: vendored winter CGs → NEW `gConvoBackgroundData` slots, additive** (`bg_to_fe8.py` →
   `inject_backgrounds`). **Color index 0 is TRANSPARENT** — using it for a real colour → black holes;
   `bg_to_fe8.py` reserves it. **Only slot 0x36 is free before `BG_RANDOM` (0x37).** Verify event BGs

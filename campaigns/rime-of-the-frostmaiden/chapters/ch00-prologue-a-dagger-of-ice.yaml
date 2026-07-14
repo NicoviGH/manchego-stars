@@ -47,7 +47,7 @@ narrative: >
 
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
-  file: maps/ch00-prologue.mar     # compiled winter layout (authored in map-review/editor.html)
+  file: maps/ch00-prologue.mar     # compiled winter layout (authored in /tmp/manchego-stars-review/editor.html)
   tileset: snowy-bern              # community winter tileset (#41)
   size: "15×10"                    # vanilla Prologue scale
   description: >
@@ -55,7 +55,7 @@ map:
     chokepoint), framed by impassable peaks, opening to a snow basin in the SE where the
     fight plays out. Built as a winter RESKIN of the vanilla FE8 Prologue layout ("The
     Fall of Renais") — same proven shape, snow-graphiced — then hand-tuned in the browser
-    tile editor (map-review/editor.html). See [[manchego-stars-winter-reskin]].
+    tile editor (/tmp/manchego-stars-review/editor.html). See [[manchego-stars-winter-reskin]].
 
 # ── Objective ──────────────────────────────────────────────────────────────────
 objective:

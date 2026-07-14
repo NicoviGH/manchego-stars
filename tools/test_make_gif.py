@@ -32,6 +32,9 @@ def sprite_clip(n=20, size=(240, 160)):
 
 @unittest.skipUnless(HAVE_PIL, 'PIL not installed')
 class TestEncodeGif(unittest.TestCase):
+    def test_default_output_targets_committed_demo_directory(self):
+        self.assertEqual(mg.DEFAULT_OUT, os.path.join(mg.REPO, 'docs', 'demo'))
+
     def test_static_background_clip_uses_delta_and_shrinks(self):
         frames = sprite_clip()
         data, how = mg.encode_gif(frames, 83)

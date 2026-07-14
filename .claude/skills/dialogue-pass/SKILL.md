@@ -90,10 +90,10 @@ alternative lines, Nicolas decides whether the lock reopens.
   `python3 tools/verify_text.py` (0 runaway).
 - In-game review with Nicolas as MOTION, not stills (decided 2026-06-10): run
   `tools/playtest/run.sh record`, assemble the captured frames into GIFs
-  (dedupe identical frames, ~83ms/frame, 2x nearest-neighbor), drop them in
-  `map-review/`, and `open -a Safari` them (Preview paginates GIFs). Static
-  screenshots mislead -- they catch the typewriter mid-stroke. Show before
-  committing; wait for his OK.
+  (dedupe identical frames, ~83ms/frame, 2x nearest-neighbor), commit them in
+  `docs/demo/` on the feature branch, and show the GitHub PR. Static screenshots
+  mislead -- they catch the typewriter mid-stroke. Once the feature is accepted,
+  remove the review artifact before merge unless a live document links to it.
 - Message-encoding gotchas (the hard-won ones, full trace in
   `tools/build_campaign.py` `_script_to_message`): on-map bubble lines wrap at
   29 chars, NOT Text_BG's ~42; every non-terminal [A] must be [LF]-followed

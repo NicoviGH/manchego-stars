@@ -193,8 +193,9 @@ else:
         if w is not None: resolved[i]=w
     # prologue-era hand overrides apply only to the original PrologueMap session
     _isproto = LAYOUT=='PrologueMap'
-    remap={int(k):v for k,v in json.load(open(os.path.join(ROOT,'map-review/_remap.json'))).items()} if _isproto and os.path.exists(os.path.join(ROOT,'map-review/_remap.json')) else {}
-    manual=json.load(open(os.path.join(ROOT,'map-review/_manual.json'))) if _isproto and os.path.exists(os.path.join(ROOT,'map-review/_manual.json')) else {}
+    scratch=os.path.join('/tmp', 'manchego-stars-review')
+    remap={int(k):v for k,v in json.load(open(os.path.join(scratch,'_remap.json'))).items()} if _isproto and os.path.exists(os.path.join(scratch,'_remap.json')) else {}
+    manual=json.load(open(os.path.join(scratch,'_manual.json'))) if _isproto and os.path.exists(os.path.join(scratch,'_manual.json')) else {}
     def lbl(i): x,y=i%W,i//W; return '%s%d'%(chr(ord('A')+x),y+1)
     grid=[]
     for i in range(W*H):
@@ -445,7 +446,7 @@ out=(HTML.replace('__W__',str(W)).replace('__H__',str(H)).replace('__ACOLS__',st
 # TNAME keys must be numeric in JS object -> emit as numbers
 out=out.replace(json.dumps({str(k):v for k,v in TNAME.items()}),
                 '{'+','.join('%d:%s'%(k,json.dumps(v)) for k,v in TNAME.items())+'}')
-path=os.path.join(ROOT,'map-review',OUT_HTML)
+path=os.path.join(ROOT,'review',OUT_HTML)
 os.makedirs(os.path.dirname(path),exist_ok=True)
 open(path,'w').write(out)
 print('wrote',path,'(%d KB)'%(len(out)//1024))
@@ -453,10 +454,10 @@ print('wrote',path,'(%d KB)'%(len(out)//1024))
 # Dump the auto-reskinned starting grid as an importable layout JSON (so the faithful
 # winter reskin can be compiled/rendered immediately, before any hand-painting), and
 # render a PNG preview of it so the starting point is visible without opening the editor.
-start_json=os.path.join(ROOT,'map-review',DOWNLOAD)
+start_json=os.path.join(ROOT,'review',DOWNLOAD)
 json.dump({'tileset':TILESET,'width':W,'height':H,'grid':grid},open(start_json,'w'))
 print('wrote starting layout',start_json)
 from map_tileset_tool import render_grid
-png=os.path.join(ROOT,'map-review',os.path.splitext(os.path.basename(OUT_HTML))[0]+'-start.png')
+png=os.path.join(ROOT,'review',os.path.splitext(os.path.basename(OUT_HTML))[0]+'-start.png')
 render_grid(win,[grid[r*W:(r+1)*W] for r in range(H)],png,zoom=4)
 print('rendered start preview',png)
