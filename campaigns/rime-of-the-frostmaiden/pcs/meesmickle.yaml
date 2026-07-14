@@ -108,6 +108,19 @@ inventory:
 # skills (Nicolas's call, 2026-05-29: vanilla classes only, nothing extra: no timed
 # buffs/debuffs, no special movement, no procs).
 
+# ── Battle Animation ──────────────────────────────────────────────────────────
+# Meesmickle's poses share one artist-set source canvas.  The shipped frames preserve that
+# relative placement via a single common crop/BOX descale; no per-pose feet re-anchoring.
+# Shaman's vanilla dark-magic cadence provides the held charge and Flux spell effect.
+battle_anim:
+  clone_from: shaman
+  motion: magic
+  abbr: mees_sh1
+  frames:
+    - meesmickle/ready.png
+    - meesmickle/windup.png
+    - meesmickle/peak.png
+
 signature_moment:
   chapter: ch09-revels-end   # post-MVP (Act II opener — roadmap.md Ch 9, the prison break)
   description: >

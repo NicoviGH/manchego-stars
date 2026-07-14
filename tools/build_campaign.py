@@ -2767,6 +2767,7 @@ def enemy_class_reskins(campaign):
 # ranged donors, which never run a melee body.
 BANIM_DONORS = {
     'archer': ('CLASS_ARCHER',       '0x0100 | ITYPE_BOW',   'ranged', None),
+    'shaman': ('CLASS_SHAMAN',       '0x0100 | ITYPE_DARK',  'magic',  None),
     'pirate': ('CLASS_PIRATE',       '0x0100 | ITYPE_AXE',   'melee',  'axe'),
     'knight': ('CLASS_ARMOR_KNIGHT', '0x0100 | ITYPE_LANCE', 'melee',  'lance'),
 }
@@ -2840,8 +2841,12 @@ def _banim_palette(frame_imgs):
     pal = [(0, 0, 0)]
     for im in frame_imgs:
         for cnt, rgba in im.getcolors(1 << 24):
-            if rgba[3] > 0 and rgba[:3] not in pal:
-                pal.append(rgba[:3])
+            rgb = rgba[:3]
+            # OBJ palette index 0 is transparent even when its BGR555 colour is black.
+            # Retain an opaque black as a duplicate at index 1+ rather than mapping it
+            # to that transparent slot.
+            if rgba[3] > 0 and (rgb not in pal or (rgb == pal[0] and pal.count(rgb) == 1)):
+                pal.append(rgb)
     return pal
 
 

@@ -10,6 +10,8 @@ import re
 import sys
 import unittest
 
+from PIL import Image
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_campaign as bc
 from inject import engine_hooks as eh
@@ -98,6 +100,14 @@ class DonorMaps(unittest.TestCase):
         self.assertEqual(bc.STAT_DONOR['meesmickle'], 'CHARACTER_KNOLL')   # rank donor
         self.assertEqual(bc.GROWTH_DONOR['marty'], 'CHARACTER_KNOLL')
         self.assertEqual(bc.GROWTH_DONOR['meesmickle'], 'CHARACTER_EWAN')
+
+
+class BattleAnimPalette(unittest.TestCase):
+    def test_opaque_black_gets_a_nontransparent_palette_index(self):
+        frame = Image.new('RGBA', (8, 8), (0, 0, 0, 255))
+        palette = bc._banim_palette([frame])
+        self.assertEqual(palette[0], (0, 0, 0))
+        self.assertEqual(palette[1], (0, 0, 0))
 
 
 class TrexRecruitCast(unittest.TestCase):
@@ -445,6 +455,15 @@ class CharacterUniqueBanim(unittest.TestCase):
         self.assertIn('ITYPE_LANCE', wtype)
         self.assertEqual(motion, 'melee')
         self.assertEqual(cadence, 'lance')
+
+    def test_shaman_donor_maps_to_dark_static_cast_cadence(self):
+        # Meesmickle's vanilla Shaman donor retains Flux/Dark binding and its stationary
+        # incantation; it is not an Archer bow draw with a recoloured projectile.
+        donor_class, wtype, motion, cadence = bc.BANIM_DONORS['shaman']
+        self.assertEqual(donor_class, 'CLASS_SHAMAN')
+        self.assertIn('ITYPE_DARK', wtype)
+        self.assertEqual(motion, 'magic')
+        self.assertIsNone(cadence)
 
     def test_every_melee_donor_names_a_known_cadence(self):
         from ref_to_battleframe import _MELEE_CADENCE

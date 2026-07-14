@@ -269,6 +269,15 @@ class TestEmitMotionS(unittest.TestCase):
         # the one OBJ in frame 0 right: attr0=0x0, attr1=0x4000, attr2=0, dx=-8, dy=-8
         self.assertIn("banim_frame_oam 0x0, 0x4000, 0x0, -8, -8", s)
 
+    def test_magic_cadence_charges_without_archer_bow_audio(self):
+        s = rb.emit_motion_s("mees_mg1", self._frames(), motion="magic")
+        body = s.split("banim_mees_mg1_mode_attack_range:")[1].split(
+            "\nbanim_mees_mg1_mode_")[0]
+        self.assertIn("banim_code_sound_elec_charge", body)
+        self.assertNotIn("banim_code_sound_pull_bow", body)
+        self.assertIn("banim_code_call_spell_anim", body)
+        self.assertGreaterEqual(body.count("banim_mees_mg1_sheet_1"), 2)
+
 
 class TestMeleeMotionS(unittest.TestCase):
     """The melee cadence (FE8 Pirate axe study): lunge in, swing, hit on contact, return.

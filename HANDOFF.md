@@ -5,10 +5,11 @@ live in `CLAUDE.md`; issue scope and backlog live in GitHub.
 
 ## Current state
 
-- Battle-animation review for RBG and Wolfram is complete in PR #161.
+- Battle-animation review for RBG and Wolfram is complete in PR #161. Meesmickle's Shaman-based
+  animation is complete on `feat/65-meesmickle-battle-animation`, pending its close-out PR.
 - The Tourmaline palette correction is separately merged as PR #162 (`f9ed1cc`); #161 is based on
   that work and does not reintroduce the palette change.
-- Current focus: choose the next character for battle-animation review.
+- Current focus: merge Meesmickle, then choose the next character for battle-animation review.
 - Before a context rollover, warn Nicolas, refresh this file, and begin a fresh instance. Do not rely
   on automatic context compaction as the handoff mechanism.
 
@@ -28,6 +29,11 @@ live in `CLAUDE.md`; issue scope and backlog live in GitHub.
 - Per-unit source paths and recipes are recorded in
   `campaigns/rime-of-the-frostmaiden/pcs/prof-rbg.yaml` and `pcs/wolfram.yaml`. The pipeline is
   `tools/descale_battleframe.py`; read the YAML comment before regenerating a frame.
+- **Meesmickle:** added a per-character Shaman/Flux battle animation (`mees_sh1`) using the supplied
+  idle, wind-up, and cast poses. The final frames use a shared 14-colour GBA palette, face the enemy,
+  preserve the source poses' relative alignment, and use the Shaman magic cadence. The vanilla
+  Shaman's visual charge is baked into its many actor frames; Meesmickle instead holds the supplied
+  wind-up pose with the charge sound before Flux. Nicolas accepted that limitation for this pass.
 
 ### Demo cleanup
 
@@ -53,17 +59,18 @@ live in `CLAUDE.md`; issue scope and backlog live in GitHub.
 
 ## Verification
 
-- `make TESTCH=1 CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba` -> PASS (latest Wolfram frames).
-- `PT_CHAR=wolfram tools/playtest/run.sh recordanim` -> PASS (141 captured frames; class `0x9`).
-- `python3 -m unittest tools.test_make_gif tools.test_build_campaign` -> 93 tests passed.
+- TESTCH ROM link -> PASS with the final Meesmickle archive.
+- `PT_CHAR=meesmickle tools/playtest/run.sh recordanim` -> PASS (248 captured frames; class `0x2D`).
+- `python3 tools/test_descale_battleframe.py` plus
+  `python3 -m unittest tools/test_ref_to_battleframe.py tools/test_build_campaign.py` -> 134 tests passed.
 - `make check` -> `drift check: clean`.
 - `PT_HOST_CHAPTER=4 tools/playtest/run.sh ch03tourmaline` -> PASS.
 - `git diff --check` -> clean.
 
 ## Working tree - do not lose or revert
 
-All RBG/Wolfram animation and demo-cleanup work is committed and pushed to #161. The tree is clean
-apart from the intentionally preserved local-only files below.
+All Meesmickle source, pipeline, and animation changes are committed and pushed on
+`feat/65-meesmickle-battle-animation`. The temporary review GIF is pruned before merge.
 
 Other working-tree state:
 
@@ -83,8 +90,9 @@ Other working-tree state:
 
 ```sh
 # Battle-animation capture (requires a TESTCH ROM)
+PT_CHAR=meesmickle tools/playtest/run.sh recordanim
+tools/playtest/make_gif.py recordanim meesmickle --name meesmickle-anim --open
 PT_CHAR=wolfram tools/playtest/run.sh recordanim
-tools/playtest/make_gif.py recordanim wolfram --name wolfram-anim --open
 PT_CHAR=prof-rbg tools/playtest/run.sh recordanim
 
 # Tourmaline visual regression (requires CH03BOOT ROM)

@@ -273,6 +273,17 @@ def _mode_body(abbr, kind, motion="ranged", cadence="axe"):
     """Emit one mode's script lines for the 3-beat (Ready/Wind-up/Peak) fake."""
     if motion == "melee":
         return _melee_mode_body(abbr, kind, cadence)
+    if motion == "magic" and kind == "attack":
+        # Shaman (banim_sham_mg1) settles, then lingers in a stationary charge before
+        # releasing the spell. The Flux effect, not a painted projectile, owns the impact.
+        return ["\tbanim_code_start_attack_1", "\tbanim_code_start_attack_2",
+                _frame_cmd(abbr, 1, 0), _frame_cmd(abbr, 6, 0),
+                _frame_cmd(abbr, 5, 1), _frame_cmd(abbr, 13, 1),
+                "\tbanim_code_sound_elec_charge", _frame_cmd(abbr, 18, 1),
+                _frame_cmd(abbr, 3, 2), "\tbanim_code_call_spell_anim",
+                _frame_cmd(abbr, 1, 2), "\tbanim_code_wait_hp_deplete",
+                "\tbanim_code_start_opposite_turn", _frame_cmd(abbr, 3, 0),
+                "\tbanim_code_end_dodge", "\tbanim_code_end_mode"]
     if kind == "attack":   # draw (0->1 held) -> peak (2) + loose arrow -> recover
         return ["\tbanim_code_start_attack_1", "\tbanim_code_start_attack_2",
                 _frame_cmd(abbr, 3, 0), "\tbanim_code_sound_pull_bow",
