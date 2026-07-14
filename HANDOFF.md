@@ -6,10 +6,10 @@ live in `CLAUDE.md`; issue scope and backlog live in GitHub.
 ## Current state
 
 - Battle-animation review for RBG and Wolfram is complete in PR #161. Meesmickle's Shaman-based
-  animation is complete on `feat/65-meesmickle-battle-animation`, pending its close-out PR.
+  animation is merged in PR #163 (`1cd65bd`).
 - The Tourmaline palette correction is separately merged as PR #162 (`f9ed1cc`); #161 is based on
   that work and does not reintroduce the palette change.
-- Current focus: merge Meesmickle, then choose the next character for battle-animation review.
+- Current focus: choose the next character for battle-animation review.
 - Before a context rollover, warn Nicolas, refresh this file, and begin a fresh instance. Do not rely
   on automatic context compaction as the handoff mechanism.
 
@@ -34,6 +34,9 @@ live in `CLAUDE.md`; issue scope and backlog live in GitHub.
   preserve the source poses' relative alignment, and use the Shaman magic cadence. The vanilla
   Shaman's visual charge is baked into its many actor frames; Meesmickle instead holds the supplied
   wind-up pose with the charge sound before Flux. Nicolas accepted that limitation for this pass.
+- The reusable review-loop lessons are recorded in `docs/decisions.md`: distinguish donor actor art
+  from engine effects, preview the final GBA palette before packing, preserve opaque black outside
+  OBJ index 0, and defer the 1,507-entry archive rebuild until a candidate is selected.
 
 ### Demo cleanup
 
@@ -69,8 +72,8 @@ live in `CLAUDE.md`; issue scope and backlog live in GitHub.
 
 ## Working tree - do not lose or revert
 
-All Meesmickle source, pipeline, and animation changes are committed and pushed on
-`feat/65-meesmickle-battle-animation`. The temporary review GIF is pruned before merge.
+All Meesmickle source, pipeline, and animation changes are merged in PR #163. Its remote feature
+branch and temporary review GIF are pruned.
 
 Other working-tree state:
 
