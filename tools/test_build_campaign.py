@@ -12,6 +12,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_campaign as bc
+from inject import engine_hooks as eh
 
 # Read the COMMITTED decomp, not the working tree -- the build overwrites donor portrait
 # slots (Gilliam/Neimi/Moulder/Vanessa), so a working-tree read would be non-hermetic.
@@ -753,11 +754,11 @@ class Ch03TileChanges(unittest.TestCase):
         self.assertIn('.byte 0, 6, 10, 1, 1, 0, 0, 0', asm)   # id 0 at (x=6, y=10), 1x1 region
 
 
-class ItemIconPal1(unittest.TestCase):
-    """The pink-Tourmaline pal-1 route (#23): FE8's item icons all share pal 0 (no pink), but
-    LoadIconPalettes loads a 2nd, unused icon palette adjacent -- free to repaint. build_campaign
-    repaints it + emits gMSPal1IconIds[] (the iconIds that bank-bump to pal 1); the generic DrawIcon
-    hook consults that array."""
+class ItemIconPal2(unittest.TestCase):
+    """Custom-coloured icons append a third source palette and draw from reserved BG bank 15.
+
+    The two vanilla banks are shared UI state and must never be repainted; text can use bank 5.
+    """
     CAMPAIGN = 'rime-of-the-frostmaiden'
 
     def test_bgr555_packs_5bit_channels(self):
@@ -766,26 +767,53 @@ class ItemIconPal1(unittest.TestCase):
         self.assertEqual(bc._bgr555('#ff0000'), 0x001F)          # red in low 5 bits
         self.assertEqual(bc._bgr555('#0000ff'), 0x7C00)          # blue in high 5 bits
 
-    def test_pal1_palette_is_16_bgr555_entries(self):
+    def test_pal2_palette_is_16_bgr555_entries(self):
         colors = ['#000000'] * 16
-        b = bc._item_icon_pal1_bytes(colors)
+        b = bc._item_icon_pal2_bytes(colors)
         self.assertEqual(len(b), 32)                             # 16 colors x 2 bytes
         self.assertEqual(b, b'\x00' * 32)
 
-    def test_pal1_palette_rejects_wrong_length(self):
+    def test_pal2_palette_rejects_wrong_length(self):
         with self.assertRaises(SystemExit):
-            bc._item_icon_pal1_bytes(['#000000'] * 15)
+            bc._item_icon_pal2_bytes(['#000000'] * 15)
 
-    def test_redgem_resolves_to_pal1_icon_id_136(self):
-        # ITEM_REDGEM (the Tourmaline) is the campaign's one pal-1 icon; its iconId is 136.
-        self.assertEqual(bc._pal1_icon_ids(self.CAMPAIGN), [136])
+    def test_pal2_appends_third_bank_without_repainting_vanilla_banks(self):
+        vanilla = bytearray(range(64))
+        out = bc._append_item_icon_pal2(vanilla, ['#000000'] * 16)
+        self.assertEqual(out[:64], vanilla)
+        self.assertEqual(out[64:], b'\x00' * 32)
+
+    def test_redgem_resolves_to_pal2_icon_id_136(self):
+        # ITEM_REDGEM (the Tourmaline) is the campaign's one custom-palette icon; its iconId is 136.
+        self.assertEqual(bc._pal2_icon_ids(self.CAMPAIGN), [136])
 
     def test_iconids_asm_lists_ids_then_terminator(self):
-        asm = bc._ms_pal1_iconids_asm([136, 5])
-        self.assertIn('.global gMSPal1IconIds', asm)
+        asm = bc._ms_pal2_iconids_asm([136, 5])
+        self.assertIn('.global gMSPal2IconIds', asm)
         self.assertIn('.hword 136', asm)
         self.assertIn('.hword 5', asm)
         self.assertIn('.hword 0xFFFF', asm)                     # terminator (no valid iconId is 0xFFFF)
+
+    def test_hook_loads_custom_bank_fifteen_without_changing_vanilla_load(self):
+        source = ('#include "hardware.h"\n\n'
+                  'void LoadIconPalettes(u32 Dest)\n'
+                  '{\n'
+                  '    ApplyPalettes(item_icon_palette[0], Dest, 2);\n'
+                  '}\n\n'
+                  'void DrawIcon(int IconIndex, int TileX, int TileY, int TILEREF)\n'
+                  '{\n'
+                  '    if (TILEREF == 0xFFFF) {\n'
+                  '    } else {\n'
+                  '        u16 Tile = GetIconTileIndex(IconIndex) + OamPalBase;\n'
+                  '    }\n'
+                  '}\n')
+        out = eh._patch_draw_icon_pal2_text(source)
+        self.assertIn('ApplyPalettes(item_icon_palette[0], Dest, 2);', out)
+        self.assertNotIn('ApplyPalette(item_icon_palette[2], 15);\n}', out)
+        self.assertIn('gMSPal2IconIds', out)
+        self.assertIn('(OamPalBase & 0xF000) == 0x4000', out)
+        self.assertIn('ApplyPalette(item_icon_palette[2], 15);', out)
+        self.assertIn('OamPalBase = (OamPalBase & 0x0FFF) | 0xF000;', out)
 
 
 if __name__ == '__main__':

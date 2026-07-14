@@ -139,18 +139,15 @@ item_names:
 # FE8's shared item-icon palette via tools/item_icon_tool.py (blueberry_grid, design L2).
 item_icons:
   ITEM_VULNERARY: goodberry
-  ITEM_REDGEM: tourmaline        # the pink Tourmaline gem (#23) -- draws from pal 1 (item_icon_pal1 below)
+  ITEM_REDGEM: tourmaline        # the pink Tourmaline gem (#23) -- draws from custom pal 2 (below)
 
-# Item icons that draw from the SECOND item palette (pal 1, bank 0x5000) instead of the
-# shared pal 0. FE8's LoadIconPalettes loads TWO icon palettes adjacent, but no vanilla
-# icon uses the 2nd -- so it's free to repaint for a colour pal 0 lacks (pal 0 has no pink;
-# the Tourmaline needs one). build_campaign.inject_item_icon_pal1 repaints pal 1 with
-# `palette` and emits gMSPal1IconIds[] (the resolved iconIds); the generic DrawIcon hook
-# (engine_hooks._patch_draw_icon_pal1) bank-bumps those iconIds to pal 1 (OamPalBase |= 0x1000).
+# Custom-coloured item icons use an additive THIRD source palette. Vanilla banks 0 and 1 remain
+# unchanged; the build appends this 16-colour bank and the engine routes these standard item icons
+# from BG palette bank 4 to reserved bank 15. This avoids bank 5, which normal UI text can use.
 # palette: 16 BGR-quantised entries; index 0 = the vanilla transparent placeholder.
-# TO EXTEND (another custom-coloured item; or a 3rd/4th icon palette when pal 1's 16 colours run out):
-# see docs/decisions.md -> "A campaign item icon can use a colour pal 0 lacks" (the authoritative record).
-item_icon_pal1:
+# More custom colours can share this bank. Adding another bank requires a fresh BG-palette collision
+# audit; see docs/decisions.md -> "A campaign item icon can use a colour pal 0 lacks".
+item_icon_pal2:
   icons: [ITEM_REDGEM]
   palette: ["#c0f8c8", "#ffffff", "#f4d4e2", "#cf8ea8", "#6b2a4f", "#ffe0ef", "#e876ac",
             "#d85f9a", "#b0447e", "#f0a8c8", "#8a325e", "#c088c0", "#7a2450", "#f7b9d8",

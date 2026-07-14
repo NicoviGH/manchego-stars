@@ -725,36 +725,29 @@ door proof covers both. `gBmMapBaseTiles` is a ROM-`.data` pointer (objdump `g O
 EWRAM `sBmBaseTilesPool` row array, never reassigned — read the pointer from ROM, then index the rows.
 _Decided: 2026-07-11 (Nicolas — open-door tile rule; CLAUDE — shared-array wiring, #23 chests/doors)._
 
-**A campaign item icon can use a colour pal 0 lacks, via the 2nd (unused) item palette.**
-FE8 item icons all share ONE 16-colour palette (pal 0) — there's no per-item palette field, and pal 0
-has no pink + no globally-free index (every index is used by some co-displayed icon). So the pink
-Tourmaline (`ITEM_REDGEM` reskin, Nicolas) can't be done by recolouring pal 0. BUT `LoadIconPalettes`
-loads **two** icon palettes adjacent (`ApplyPalettes(item_icon_palette[0], Dest, 2)`), and **no vanilla
-icon uses the 2nd** — so pal 1 is a reserved, collision-free slot free to repaint. The mechanism:
-(a) `inject_item_icons` swaps the icon TILES (the gem shape, reused from the Red Gem) as usual;
-(b) `inject_item_icon_pal1` repaints pal 1 (bank 1 of `item_icon_palette.agbpal`) with a rose-pink
-gradient and emits `gMSPal1IconIds[]` (the iconIds that opt in); (c) the generic engine hook
-`_patch_draw_icon_pal1` makes `DrawIcon` bank-bump any iconId in that array (`OamPalBase |= 0x1000`
-→ the adjacent palette slot). Boundary-clean: the mechanism is campaign-agnostic (reads an injected
-array), the specific id (136) lives in campaign data (`campaign.yaml item_icon_pal1`). Verified
-in-engine (`run.sh ch03tourmaline`): the Tourmaline renders **pink** in the Item menu while Blue Gem
-+ Goodberry (pal 0) are untouched — no collateral. Reusable for any future item needing an off-pal-0
-colour. `gBmMapBaseTiles`-style note: item icons draw via BG tilemap entries, so the +0x1000 targets
-the BG palette nibble; the same bump works for OBJ draws (attr2 palette bits are also 12-15).
+**A campaign item icon can use a colour pal 0 lacks, via an additive third item palette.**
+FE8 item icons share a 16-colour pal 0, which has no pink and no globally-free colour index. The pink
+Tourmaline (`ITEM_REDGEM` reskin, Nicolas) therefore cannot recolour pal 0. The earlier assumption that
+the second source icon palette could be repainted was wrong: `LoadIconPalettes` places it in BG bank 5,
+which regular map/UI text can also use. Repainting it made that text pink.
 
-**Extending it — append, and add palettes freely (Nicolas 2026-07-11).** To give another item a
-custom colour: (1) paint its colours onto SPARE `item_icon_pal1.palette` indices (the Tourmaline uses
-~6 of pal 1's 16), (2) author `item_icons/<name>.png` on those indices + add it to `item_icons`,
-(3) add its `ITEM_*` to `item_icon_pal1.icons`. No code changes — `inject_item_icon_pal1` + the hook
-already read the list. **When pal 1's 16 shared colours aren't enough, DO NOT treat it as a ceiling —
-just load more icon palettes.** FE8 currently loads two (`LoadIconPalettes` → `ApplyPalettes(.., 2)`);
-bump that count, add a bank (or banks) to `item_icon_palette.agbpal`, and let the hook select the right
-one (each extra palette is another `+0x1000` step — pal 2 = `|= 0x2000`, pal 3 = `|= 0x3000`, …). Adding
-a 3rd/4th/Nth icon palette is a routine, sanctioned extension, not a barrier: scale to however many
-distinct-colour custom items the campaign needs. (Authoritative record; the `campaign.yaml item_icon_pal1`
-comment points here rather than restating it.)
-_Decided: 2026-07-11 (Nicolas — go pink, "you were right to push", + "bump to three or however many we
-need"; CLAUDE — pal-1 route + the scale-by-adding-palettes extension, #23)._
+The corrected mechanism keeps both vanilla source banks byte-for-byte intact: (a) `inject_item_icons`
+still swaps the Red Gem tiles; (b) `inject_item_icon_pal2` **appends** a third 16-colour source bank at
+bytes 64–95 of `item_icon_palette.agbpal` and emits `gMSPal2IconIds[]`; (c) the generic
+`_patch_draw_icon_pal2` hook leaves FE8's normal `ApplyPalettes(..., Dest, 2)` load alone. When an
+opted-in icon is drawn with normal item-UI base bank 4, it copies source bank 2 into reserved BG bank 15
+at draw time and replaces that icon's palette nibble with bank 15. The draw-time copy matters: earlier UI
+initialisation can overwrite a loader-time copy. Other icon callers retain their vanilla base.
+
+The palette-bank assertion in `run.sh ch03tourmaline` proves bank 5 remains vanilla (`0x7FDE` at index 1)
+while bank 15 carries the custom palette (`0x7FFF`), and audits the active BG tilemaps so bank 15 is used
+only by Tourmaline's four icon tiles. The accompanying screenshot proves the floor and text retain their
+normal colours while Tourmaline is pink. More custom colours can share `item_icon_pal2`. The GBA has only
+16 BG palette banks (0–15), so a further distinct palette is not an append-only live-memory change: it
+requires a new BG-bank reservation and runtime collision audit in every relevant UI context. The cast
+palette is an OBJ palette (bank 11), not a BG palette, so an item icon cannot point to it directly.
+_Revised: 2026-07-14 (Nicolas — observed pink text; Codex — additive source bank, draw-time BG bank-15
+route, and active-tilemap regression check; supersedes the 2026-07-11 pal-1 assumption)._
 
 **Two healers, differentiated by donor (same move as the shamans).** Sclorbo and Basil are both
 Priests, so they get *distinct* vanilla donor lines to avoid stat-twins: **Sclorbo → Moulder** (the

@@ -408,12 +408,12 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         'src/banim-efxhit.c', 'data/data_banim.s',
                         # Goodberry (#21): vulnerary icon swapped by inject_item_icons
                         'graphics/item_icon/item_icon_vulnerary.png',
-                        # pink Tourmaline (#23): the pal-1 icon route -- inject_item_icons
-                        # reskins the Red Gem tiles, inject_item_icon_pal1 repaints icon
-                        # palette 1, and the _patch_draw_icon_pal1 engine hook bank-bumps
-                        # those iconIds in DrawIcon. icon.c's hook is NON-idempotent (its
+                        # pink Tourmaline (#23): the additive pal-2 icon route -- inject_item_icons
+                        # reskins the Red Gem tiles, inject_item_icon_pal2 appends its icon
+                        # palette, and the _patch_draw_icon_pal2 engine hook routes those iconIds
+                        # to reserved BG bank 15. The icon/header hooks are NON-idempotent (their
                         # guard hard-exits on a non-vanilla form), so it MUST restore each build.
-                        'src/icon.c', 'graphics/item_icon/item_icon_palette.agbpal',
+                        'src/icon.c', 'include/icon.h', 'graphics/item_icon/item_icon_palette.agbpal',
                         'graphics/item_icon/item_icon_red_gem.png',
                         'data/const_data_unit_icon_wait.s', 'data/const_data_unit_icon_move.s',
                         'include/unit_icon_pointer.h',
@@ -1073,59 +1073,66 @@ def _bgr555(hexstr):
     return (r >> 3) | ((g >> 3) << 5) | ((b >> 3) << 10)
 
 
-def _item_icon_pal1_bytes(colors):
+def _item_icon_pal2_bytes(colors):
     """16 '#rrggbb' colors -> a 32-byte BGR555 blob (one 16-colour item-icon palette bank)."""
     if len(colors) != 16:
-        sys.exit('ERROR: item_icon_pal1.palette must have exactly 16 colors (got %d)' % len(colors))
+        sys.exit('ERROR: item_icon_pal2.palette must have exactly 16 colors (got %d)' % len(colors))
     return b''.join(struct.pack('<H', _bgr555(c)) for c in colors)
 
 
-def _pal1_icon_ids(campaign):
-    """The iconIds (gItemData.iconId) of the campaign's item_icon_pal1.icons, sorted."""
+def _append_item_icon_pal2(raw, colors):
+    """Append the custom icon palette after FE8's two vanilla banks, without altering either."""
+    if len(raw) < 64:
+        sys.exit('ERROR: item_icon_palette.agbpal has %d bytes; expected two vanilla banks' % len(raw))
+    out = bytearray(raw)
+    if len(out) < 96:
+        out.extend(b'\x00' * (96 - len(out)))
+    out[64:96] = _item_icon_pal2_bytes(colors)
+    return out
+
+
+def _pal2_icon_ids(campaign):
+    """The iconIds (gItemData.iconId) of the campaign's item_icon_pal2.icons, sorted."""
     cfg = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
     with open(cfg, encoding='utf-8') as f:
-        pal1 = (yaml.safe_load(f) or {}).get('item_icon_pal1') or {}
-    return sorted(item_icon_id(e) for e in (pal1.get('icons') or []))
+        pal2 = (yaml.safe_load(f) or {}).get('item_icon_pal2') or {}
+    return sorted(item_icon_id(e) for e in (pal2.get('icons') or []))
 
 
-def _ms_pal1_iconids_asm(ids):
-    """gMSPal1IconIds[] -- the iconIds the DrawIcon hook bank-bumps to pal 1, 0xFFFF-terminated
-    (no valid iconId is 0xFFFF). The generic hook (engine_hooks._patch_draw_icon_pal1) externs it."""
-    lines = ['', '/* Manchego Stars item icons that draw from pal 1 (#23): the generic DrawIcon',
-             '   hook (engine_hooks._patch_draw_icon_pal1) bank-bumps these iconIds to pal 1. */',
-             '\t.align 2, 0', '\t.global gMSPal1IconIds', 'gMSPal1IconIds:']
+def _ms_pal2_iconids_asm(ids):
+    """gMSPal2IconIds[] -- iconIds the DrawIcon hook routes from BG bank 4 to reserved bank 15.
+    The 0xFFFF terminator is outside the valid icon-id range."""
+    lines = ['', '/* Manchego Stars item icons that draw from custom palette 2 (#23). */',
+             '\t.align 2, 0', '\t.global gMSPal2IconIds', 'gMSPal2IconIds:']
     lines += ['\t.hword %d' % i for i in ids]
     lines.append('\t.hword 0xFFFF')
     return '\n'.join(lines)
 
 
-def inject_item_icon_pal1(campaign, verbose=True):
-    """Wire the campaign's pal-1 item icons (#23): repaint FE8's 2nd, vanilla-unused item-icon
-    palette (bank 1, loaded adjacent by LoadIconPalettes) with item_icon_pal1.palette, and emit
-    gMSPal1IconIds[] -- the iconIds the generic DrawIcon hook bank-bumps to pal 1 so they draw
-    from a colour pal 0 lacks (e.g. the pink Tourmaline). inject_item_icons already swapped the
-    icon TILES; this adds the palette + the id list. No-op when no item_icon_pal1 is declared."""
+def inject_item_icon_pal2(campaign, verbose=True):
+    """Wire custom-coloured item icons (#23) through an additive third source palette.
+
+    The two vanilla banks stay byte-for-byte intact. This appends item_icon_pal2.palette and emits
+    gMSPal2IconIds[]; the generic DrawIcon hook routes those standard item icons from BG bank 4 to
+    the dedicated custom bank 15. No-op when no item_icon_pal2 is declared.
+    """
     cfg = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
     with open(cfg, encoding='utf-8') as f:
-        pal1 = (yaml.safe_load(f) or {}).get('item_icon_pal1') or {}
-    if not pal1:
+        pal2 = (yaml.safe_load(f) or {}).get('item_icon_pal2') or {}
+    if not pal2:
         if verbose:
-            print('  (no item_icon_pal1 declared)')
+            print('  (no item_icon_pal2 declared)')
         return
-    # Repaint bank 1 (bytes 32..63); bank 0 (the shared pal 0) is left byte-for-byte intact.
     palpath = os.path.join(DECOMP, 'graphics', 'item_icon', 'item_icon_palette.agbpal')
     with open(palpath, 'rb') as f:
         raw = bytearray(f.read())
-    if len(raw) < 64:
-        raw.extend(b'\x00' * (64 - len(raw)))
-    raw[32:64] = _item_icon_pal1_bytes(pal1['palette'])
     with open(palpath, 'wb') as f:
-        f.write(raw)
-    ids = _pal1_icon_ids(campaign)
+        f.write(_append_item_icon_pal2(raw, pal2['palette']))
+    ids = _pal2_icon_ids(campaign)
     with open(CONST_MAPS_S, 'a', encoding='utf-8') as f:
-        f.write(_ms_pal1_iconids_asm(ids) + '\n')
+        f.write(_ms_pal2_iconids_asm(ids) + '\n')
     if verbose:
-        print('  pal 1 repainted; gMSPal1IconIds = %s' % ids)
+        print('  custom palette appended; gMSPal2IconIds = %s' % ids)
 
 
 def inject_item_names(campaign, verbose=True):
@@ -6453,15 +6460,15 @@ def main():
         print('  banim (#65): combat anim lookup -> GetBattleAnimationId_WithUnique (per-character _u25)')
         engine_hooks._patch_banim_palette_custom_guard()
         print('  banim (#65): GetBanimPalette -> custom (appended) banims keep own palette (RBG cyan fix)')
-        engine_hooks._patch_draw_icon_pal1()
-        print('  item icons (#23): DrawIcon bank-bumps gMSPal1IconIds to item palette 1 (pink Tourmaline)')
+        engine_hooks._patch_draw_icon_pal2()
+        print('  item icons (#23): DrawIcon routes gMSPal2IconIds from BG bank 4 to custom bank 15')
         print('names:')
         inject_names(args.campaign)
         print('item names:')
         inject_item_names(args.campaign)
         print('item icons:')
         inject_item_icons(args.campaign)
-        inject_item_icon_pal1(args.campaign)
+        inject_item_icon_pal2(args.campaign)
         print('characters:')
         patch_character_data(args.campaign)
         print('portrait geometry:')
