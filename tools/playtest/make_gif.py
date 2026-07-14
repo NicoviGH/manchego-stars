@@ -11,8 +11,8 @@ Standard workflow (the recording capability, so it isn't re-derived each time):
     tools/playtest/make_gif.py recordending end \\      # frames tagged "end" -> a GIF
         --name ch01-ending-rolling-cheddar --open
 
-`--open` saves under map-review/ and opens in Safari (Preview paginates GIFs; Safari
-plays them -- Nicolas can't see inline renders, see [[feedback_sharing_visual_drafts]]).
+By default, the GIF is written under docs/demo/ so it can be committed on the
+current feature branch and reviewed in the GitHub PR.
 
 Args:
   scenario   the run.sh scenario name (its frames live in /tmp/playtest-<scenario>/)
@@ -21,7 +21,7 @@ Options:
   --name N   output basename (default: <scenario>-<tag>)
   --fps F    playback frames/sec (default 12)
   --scale S  integer upscale of the 240x160 GBA frame (default 2)
-  --out DIR  output dir (default: <repo>/map-review)
+  --out DIR  output dir (default: <repo>/docs/demo)
   --mp4      encode an H.264 .mp4 via ffmpeg instead of a .gif (smaller, no
              quantization artifacts; good for LOCAL viewing). NOTE: a committed
              .mp4 does NOT render inline on GitHub (web or mobile) -- it is a
@@ -40,6 +40,7 @@ import sys
 from PIL import Image
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+DEFAULT_OUT = os.path.join(REPO, 'docs', 'demo')
 
 
 def collect_frames(shotdir, tag):
@@ -175,7 +176,7 @@ def main(argv):
     ap.add_argument('--name')
     ap.add_argument('--fps', type=float, default=12.0)
     ap.add_argument('--scale', type=int, default=2)
-    ap.add_argument('--out', default=os.path.join(REPO, 'map-review'))
+    ap.add_argument('--out', default=DEFAULT_OUT)
     ap.add_argument('--mp4', action='store_true',
                     help='encode an H.264 .mp4 via ffmpeg instead of a .gif '
                          '(smaller, no quantization artifacts)')

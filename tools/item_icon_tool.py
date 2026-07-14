@@ -100,7 +100,7 @@ def render(blob, out_png, scale=16):
 def blueberry_grid():
     """The shipped Goodberry: a blue berry with a dark five-point calyx button, a green
     branch rooted in the button's centre, and a single rounded leaf to the left
-    (design "L2", chosen 2026-06-16; iterated with Nicolas, map-review/goodberry-icon)."""
+    (design "L2", chosen 2026-06-16; iterated with Nicolas)."""
     B, RIM = 7, 14            # body, dark rim
     SHADOW, SHEEN = 8, 9      # lower-right shadow band, low-left sheen
     STEM, LEAF, LEAFDK = 10, 10, 4   # green stem + leaf, dark-green leaf edge

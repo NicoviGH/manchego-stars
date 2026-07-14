@@ -105,7 +105,7 @@ geometry regardless of which slot hosts it (ch03 repaints vanilla Ch3 "Borgo" bu
 # macOS: apply the decomp shebang fix first (tools/build.sh does it; or the sed loop from it)
 make CAMPAIGN=rime-of-the-frostmaiden CH03BOOT=1 fireemblem8.gba   # re-injects + compiles
 PT_HOST_CHAPTER=4 tools/playtest/run.sh mapshot                    # New Game -> map, screenshots it
-open map-review/... # or copy the /tmp/playtest-<scenario>/*-map-loaded.png
+open /tmp/playtest-<scenario>/*-map-loaded.png
 ```
 
 `mapshot` (harness.lua) = the generic "boot to the map and screenshot the deployed field" scenario;

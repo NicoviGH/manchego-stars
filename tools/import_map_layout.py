@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Import an editor-exported layout JSON -> compile to the decomp .mar/.json pair in
-campaigns/.../maps/ and render a confirmation preview to map-review/.
+campaigns/.../maps/ and render a confirmation preview under /tmp/.
 
 Usage: import_map_layout.py <map-stem> [src-json]
 e.g.   import_map_layout.py ch01-the-iron-trail ~/Downloads/ch01-layout.json
@@ -39,5 +39,7 @@ compile_layout(grid, out_bin, stem, tileset=tileset)
 print('compiled', out_bin, f'({W}x{H}, tileset {tileset})')
 
 win=_tileset_from_dir(os.path.join(mapdir,f'tilesets/{tileset}'))
-prev=render_grid(win, grid, os.path.join(ROOT,f'map-review/{stem}-painted.png'), zoom=4)
+scratch=os.path.join('/tmp', 'manchego-stars-review')
+os.makedirs(scratch, exist_ok=True)
+prev=render_grid(win, grid, os.path.join(scratch, f'{stem}-painted.png'), zoom=4)
 print('rendered preview', prev, '; imported from', src)

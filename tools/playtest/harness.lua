@@ -4076,8 +4076,8 @@ scenarios.recordchain = function()
 end
 
 -- ---- ch02 demo GIFs (#22 review): showcase the chapter on a phone via committed GIFs.
--- make_gif.py turns the tagged frames into a GIF; commit to docs/demo/ + push (GitHub renders
--- GIFs inline on mobile). Workflow:
+-- make_gif.py turns the tagged frames into a GIF under docs/demo/; commit it on the feature branch
+-- for GitHub review (and prune it before merge unless a live doc links it). Workflow:
 --   tools/playtest/run.sh recordch02intro && tools/playtest/make_gif.py recordch02intro intro --name ch02-opening
 --   tools/playtest/run.sh recordch02map   && tools/playtest/make_gif.py recordch02map   map   --name ch02-map
 

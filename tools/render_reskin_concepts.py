@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Render vanilla FE8 fields-tileset layouts through snowy-bern as winter-reskin
-concept previews (map-review/). Divergent metatiles (terrain mismatch between the
+concept previews (/tmp/manchego-stars-review). Divergent metatiles (terrain mismatch between the
 two tilesets) are ironed out with the same neighbor/mode substitution the layout
 editor uses, so the preview reads as a finished winter map, not a glitch sheet."""
 import sys, os, struct, collections
@@ -53,7 +53,7 @@ def render(layout_name, out_png, zoom=4):
     print(f'{layout_name}: {W}x{H} -> {out_png}')
 
 if __name__ == '__main__':
-    outdir = os.path.join(ROOT, 'map-review/21-iron-trail')
+    outdir = os.path.join('/tmp', 'manchego-stars-review', '21-iron-trail')
     os.makedirs(outdir, exist_ok=True)
     for name, slug in [('Ch1Map', 'a-vanilla-ch1-escape'),
                        ('Ch13EirikaMap', 'b-ch13-fluorspar-wide-trail'),

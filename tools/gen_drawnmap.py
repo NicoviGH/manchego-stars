@@ -13,7 +13,7 @@ Gemini Magvel-style repaint, and the purchased hand-drawn ten-towns maps.
 Pipeline per source: crop (3:2) -> Lanczos to 240x160 -> erase the source's
 own lettering (it never survives the downscale; median filter melts thin
 strokes) -> re-letter with a 3x5 micro-caps font -> per-tile 4-row palette
-quantization.  Default run writes review PNGs to map-review/; --emit writes
+quantization. Default runs write transient preview PNGs under /tmp; --emit writes
 the locked pair (EMIT) into campaigns/.../events/ as preview PNG + the raw
 4bpp/tsa/gbapal trio that build_campaign incbins (make LZ-compresses).
 """
@@ -540,7 +540,7 @@ def emit_final():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--out', default=os.path.join(REPO, 'map-review/43-tour-map'))
+    ap.add_argument('--out', default=os.path.join('/tmp', 'manchego-stars-review', '43-tour-map'))
     ap.add_argument('--only', help='comma list of draft keys to regenerate')
     ap.add_argument('--emit', action='store_true',
                     help='write the locked pair as campaign assets')
