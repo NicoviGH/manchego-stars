@@ -5,10 +5,9 @@ live in `CLAUDE.md`; issue scope and backlog live in GitHub.
 
 ## Current state
 
-- Branch: `feat/65-wolfram-banim`; remote PR branch is `91300d8` (Wolfram-only).
-- The Tourmaline palette correction merged separately as PR #162 (`f9ed1cc`). The local checkout still
-  has the pre-split palette commit `a16c193` above the Wolfram commit; rebase it onto `origin/main`
-  before the next push to #161. The current animation visual pass remains uncommitted.
+- Branch: `feat/65-wolfram-banim`; remote PR #161 is pushed at `f2f638e`.
+- The Tourmaline palette correction is separately merged as PR #162 (`f9ed1cc`); #161 was rebased
+  onto it, so it will not reintroduce that palette commit.
 - Current focus: battle-animation visual review for RBG and Wolfram.
 - Before a context rollover, warn Nicolas, refresh this file, and begin a fresh instance. Do not rely
   on automatic context compaction as the handoff mechanism.
@@ -32,6 +31,14 @@ live in `CLAUDE.md`; issue scope and backlog live in GitHub.
   `campaigns/rime-of-the-frostmaiden/pcs/prof-rbg.yaml` and `pcs/wolfram.yaml`. The pipeline is
   `tools/descale_battleframe.py`; read the YAML comment before regenerating a frame.
 
+### Demo cleanup
+
+- Removed the 382-file local `review/` archive and pruned 20 unlinked `docs/demo` artifacts from
+  #161. The branch now retains only six document-linked demos plus the current RBG/Wolfram GIFs.
+- `make_gif.py` now writes to `docs/demo/` for feature-branch review; other transient renderers write
+  under `/tmp/manchego-stars-review`. Remove review GIFs before merge unless a live document links them.
+- Deleted the stale remote `feat/23-ch03-chests` branch (closed PR #156; its work landed through #157).
+
 ### Tourmaline palette correction
 
 - The old approach reused a live palette bank and visibly recoloured map terrain/text. It is replaced.
@@ -49,20 +56,15 @@ live in `CLAUDE.md`; issue scope and backlog live in GitHub.
 
 - `make TESTCH=1 CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba` -> PASS (latest Wolfram frames).
 - `PT_CHAR=wolfram tools/playtest/run.sh recordanim` -> PASS (141 captured frames; class `0x9`).
-- `python3 -m unittest tools.test_build_campaign` -> 88 tests passed.
+- `python3 -m unittest tools.test_make_gif tools.test_build_campaign` -> 93 tests passed.
 - `make check` -> `drift check: clean`.
 - `PT_HOST_CHAPTER=4 tools/playtest/run.sh ch03tourmaline` -> PASS.
 - `git diff --check` -> clean.
 
 ## Working tree - do not lose or revert
 
-Modified current-session work:
-
-- `campaigns/rime-of-the-frostmaiden/battle_anims/{prof-rbg,wolfram}/*.png`
-- `campaigns/rime-of-the-frostmaiden/{campaign.yaml,pcs/prof-rbg.yaml,pcs/wolfram.yaml}`
-- `tools/build_campaign.py`, `tools/check.py`, `tools/inject/engine_hooks.py`,
-  `tools/playtest/harness.lua`, `tools/test_build_campaign.py`
-- `docs/decisions.md` and this handoff.
+All RBG/Wolfram animation and demo-cleanup work is committed and pushed to #161. The tree is clean
+apart from the intentionally preserved local-only files below.
 
 Other working-tree state:
 
@@ -73,12 +75,11 @@ Other working-tree state:
 
 ## Next steps
 
-1. Review `docs/demo/wolfram-anim.gif` against `docs/demo/rbg-anim.gif` in PR #161;
-   prune both before merge unless a live document deliberately links them.
-2. If art is accepted, decide whether these current changes belong in one #65 commit/PR; do not include
-   unrelated palette work unless its scope is explicitly included.
-3. Before pushing #161 again, rebase the local branch onto `origin/main` so its already-merged palette
-   commit is not reintroduced.
+1. Review `docs/demo/wolfram-anim.gif` against `docs/demo/rbg-anim.gif` in PR #161.
+2. If either needs revision, regenerate all three frames, build/capture it, overwrite its matching
+   `docs/demo` GIF, verify, and commit to #161.
+3. If art is accepted, remove both review GIFs before merging #161 unless a live document deliberately
+   links one as durable evidence.
 4. Before any additional custom item palette, audit a free live BG bank in every target UI context.
    The GBA has exactly 16 BG palette banks (0-15); adding a source palette does not create a 17th live
    bank.
@@ -88,7 +89,7 @@ Other working-tree state:
 ```sh
 # Battle-animation capture (requires a TESTCH ROM)
 PT_CHAR=wolfram tools/playtest/run.sh recordanim
-tools/playtest/make_gif.py recordanim wolfram --name wolfram-anim-thin-outline-review --open
+tools/playtest/make_gif.py recordanim wolfram --name wolfram-anim --open
 PT_CHAR=prof-rbg tools/playtest/run.sh recordanim
 
 # Tourmaline visual regression (requires CH03BOOT ROM)
