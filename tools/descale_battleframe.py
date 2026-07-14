@@ -58,7 +58,7 @@ def _opaque_pixels(frames):
     return out
 
 
-def _shared_palette(frames):
+def _shared_palette(frames, reserved=()):
     """One <=MAX_COLOURS palette over every frame's opaque pixels, with a true outline
     black RESERVED as entry 0 so the silhouette edge snaps to a clean dark line (the
     adaptive-only palette dropped black, washing the outline out). Returns (pal_img, ink)."""
@@ -70,8 +70,14 @@ def _shared_palette(frames):
         strip.paste(f.convert("RGB"), (x, 0), f.getchannel("A").point(
             lambda v: 255 if v >= ALPHA_CUT else 0))
         x += f.width
-    adaptive = strip.quantize(colors=MAX_COLOURS - 1, method=Image.MEDIANCUT)
+    # Tiny details (a silver clasp, an eye glint) otherwise lose the frequency contest
+    # against a character's large costume areas.  Reserve their source swatches first.
     cols = [ink]
+    for colour in reserved:
+        if colour not in cols and len(cols) < MAX_COLOURS:
+            cols.append(colour)
+    adaptive = strip.quantize(colors=max(1, MAX_COLOURS - len(cols)),
+                              method=Image.MEDIANCUT)
     for i in range(0, len(adaptive.getpalette()), 3):
         c = tuple(adaptive.getpalette()[i:i + 3])
         if c not in cols and len(cols) <= MAX_COLOURS:
@@ -80,6 +86,13 @@ def _shared_palette(frames):
     flat = [v for c in cols for v in c]
     pal.putpalette(flat + [0] * (768 - len(flat)))
     return pal, ink
+
+
+def _load_rgba(source):
+    """Accept a path (the CLI) or an already-created test image."""
+    if isinstance(source, Image.Image):
+        return source.convert("RGBA")
+    return Image.open(source).convert("RGBA")
 
 
 def _dilate4(a):
@@ -205,7 +218,7 @@ def descale(srcs, body_h, flip, sharpen=0.0, outline=True, thin_outline=False, f
     """srcs: {beat: path}. Returns {beat: RGBA frame} on a shared canvas + palette."""
     raws = {}
     for beat, path in srcs.items():
-        im = Image.open(path).convert("RGBA")
+        im = _load_rgba(path)
         if flip:
             im = im.transpose(Image.FLIP_LEFT_RIGHT)
         raws[beat] = _presharpen(im, sharpen)
@@ -251,6 +264,52 @@ def descale(srcs, body_h, flip, sharpen=0.0, outline=True, thin_outline=False, f
     return snapped
 
 
+def descale_locked_layout(srcs, body_h, flip, sharpen=0.0, outline=True,
+                          thin_outline=False, reserved=()):
+    """Descale poses that an artist positioned together on the same source canvas.
+
+    Unlike ``descale``, this deliberately does not alpha-crop or feet-anchor individual
+    poses.  It scales every full source canvas with one factor and takes one shared crop,
+    retaining the exact relative movement supplied in the artwork.
+    """
+    raws = {}
+    for beat, source in srcs.items():
+        im = _load_rgba(source)
+        if flip:
+            im = im.transpose(Image.FLIP_LEFT_RIGHT)
+        raws[beat] = _presharpen(im, sharpen)
+
+    sizes = {im.size for im in raws.values()}
+    if len(sizes) != 1:
+        raise ValueError("locked-layout frames must share one source canvas size")
+    ready_box = _alpha_bbox(raws["ready"])
+    if ready_box is None:
+        raise ValueError("ready frame has no opaque pixels")
+    factor = body_h / (ready_box[3] - ready_box[1])
+    boxes = [_alpha_bbox(im) for im in raws.values()]
+    if any(box is None for box in boxes):
+        raise ValueError("locked-layout frame has no opaque pixels")
+    common = (min(box[0] for box in boxes), min(box[1] for box in boxes),
+              max(box[2] for box in boxes), max(box[3] for box in boxes))
+    scaled_size = (max(1, round((common[2] - common[0]) * factor)),
+                   max(1, round((common[3] - common[1]) * factor)))
+    canvas_size = tuple((n + 7) // 8 * 8 for n in scaled_size)
+
+    canvases = {}
+    for beat, im in raws.items():
+        # Same crop and resize in every branch: no per-pose origin can drift.
+        crop = im.crop(common).resize(scaled_size, Image.BOX)
+        cv = Image.new("RGBA", canvas_size, (0, 0, 0, 0))
+        cv.alpha_composite(crop, (0, 0))
+        canvases[beat] = _crisp(cv)
+
+    pal, ink = _shared_palette(list(canvases.values()), reserved=reserved)
+    snapped = {beat: _snap(cv, pal) for beat, cv in canvases.items()}
+    if outline:
+        snapped = {beat: _outline(im, ink, thin_outline) for beat, im in snapped.items()}
+    return snapped
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("out_dir")
@@ -263,6 +322,10 @@ def main():
                     help="skip the re-stroked silhouette outline")
     ap.add_argument("--thin-outline", action="store_true",
                     help="4-connected (lighter) outline instead of the 8-connected ring")
+    ap.add_argument("--locked-layout", action="store_true",
+                    help="retain the source frames' relative positions; use one shared crop")
+    ap.add_argument("--reserve", action="append", default=[], metavar="R,G,B",
+                    help="keep a small accent colour in the shared palette; may repeat")
     ap.add_argument("--flat", nargs="?", const="", default=None,
                     help="curated family palette; optional spec 'red:3,orange:3,grey:2,brown:3'"
                          " (default = 2 shades per family)")
@@ -273,7 +336,14 @@ def main():
     if a.flat is not None:
         flat = (tuple((n, int(k)) for n, k in (p.split(":") for p in a.flat.split(",")))
                 if a.flat else True)
-    out = descale(srcs, a.body, not a.noflip, a.sharpen, a.outline, a.thin_outline, flat)
+    reserved = tuple(tuple(int(v) for v in colour.split(",")) for colour in a.reserve)
+    fn = descale_locked_layout if a.locked_layout else descale
+    kwargs = dict(sharpen=a.sharpen, outline=a.outline, thin_outline=a.thin_outline)
+    if a.locked_layout:
+        kwargs["reserved"] = reserved
+    else:
+        kwargs["flat"] = flat
+    out = fn(srcs, a.body, not a.noflip, **kwargs)
     for beat, im in out.items():
         p = os.path.join(a.out_dir, beat + ".png")
         im.save(p)
