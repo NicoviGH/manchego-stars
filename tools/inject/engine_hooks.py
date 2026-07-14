@@ -27,6 +27,7 @@ EVENTINFO_C = os.path.join(DECOMP, 'src', 'eventinfo.c')
 PREP_SALLYCURSOR_C = os.path.join(DECOMP, 'src', 'prep_sallycursor.c')
 BANIM_EFXHIT_C = os.path.join(DECOMP, 'src', 'banim-efxhit.c')
 ICON_C = os.path.join(DECOMP, 'src', 'icon.c')
+ICON_H = os.path.join(DECOMP, 'include', 'icon.h')
 CHAPTER_TITLE_C = os.path.join(DECOMP, 'src', 'chapter_title.c')
 LORDFLOOR_APPLIED_FLAG = 0xFA
 
@@ -214,44 +215,70 @@ def _patch_terrain_name_guard():
         f.write(text.replace(orig, guarded, 1))
 
 
-def _patch_draw_icon_pal1():
-    """Let a campaign item icon draw from item palette 1 (a colour pal 0 lacks).
+def _patch_draw_icon_pal2_text(text):
+    """Pure icon.c transform for the additive custom item palette hook.
 
-    FE8's item icons all share ONE 16-colour palette (pal 0). LoadIconPalettes actually loads
-    TWO icon palettes adjacent, but no vanilla icon uses the 2nd -- so it's free for a colour
-    pal 0 can't provide (our pink Tourmaline). Campaign-agnostic mechanism: DrawIcon bank-bumps
-    any iconId listed in the injected gMSPal1IconIds[] (built by build_campaign.inject_item_icon_pal1,
-    which also repaints pal 1) -- adding 0x1000 to the tile's palette nibble selects the adjacent,
-    reserved palette slot, so it's collision-free. Boundary-clean: the specific ids live in campaign
-    data (gMSPal1IconIds), never here. Declarations precede statements (agbcc is C89)."""
-    with open(ICON_C, encoding='utf-8') as f:
-        text = f.read()
+    LoadIconPalettes preserves the vanilla two-bank load everywhere. DrawIcon loads source palette 2
+    into reserved BG bank 15 only while drawing an opted-in standard item icon, after the caller has
+    initialized its own UI palettes. Callers using other palette bases retain their vanilla selection.
+    """
     if '#include "hardware.h"' not in text:
-        sys.exit('ERROR: icon.c not in expected form (no hardware.h include) for the pal-1 hook')
+        sys.exit('ERROR: icon.c not in expected form (no hardware.h include) for the pal-2 hook')
     text = text.replace(
         '#include "hardware.h"',
         '#include "hardware.h"\n\n'
-        '/* MS (#23): iconIds that draw from item palette 1 (built by inject_item_icon_pal1). */\n'
-        'extern const u16 gMSPal1IconIds[];', 1)
+        '/* MS (#23): iconIds that draw from the additive custom item palette. */\n'
+        'extern const u16 gMSPal2IconIds[];', 1)
+    load_orig = ('void LoadIconPalettes(u32 Dest)\n'
+                 '{\n'
+                 '    ApplyPalettes(item_icon_palette[0], Dest, 2);\n'
+                 '}')
+    load_patched = load_orig
+    if load_orig not in text:
+        sys.exit('ERROR: LoadIconPalettes not in expected vanilla form in %s' % ICON_C)
+    text = text.replace(load_orig, load_patched, 1)
     orig = ('    } else {\n'
             '        u16 Tile = GetIconTileIndex(IconIndex) + OamPalBase;')
     if orig not in text:
         sys.exit('ERROR: DrawIcon not in expected vanilla form in %s' % ICON_C)
     patched = ('    } else {\n'
                '        u16 Tile;\n'
-               '        /* MS (#23): icons in gMSPal1IconIds draw from pal 1 (a colour pal 0 lacks,\n'
-               '           e.g. the pink Tourmaline). LoadIconPalettes loads pal 1 adjacent + unused,\n'
-               '           so bumping the palette nibble (+0x1000) is collision-free. */\n'
-               '        const u16* msPal1 = gMSPal1IconIds;\n'
-               '        while (*msPal1 != 0xFFFF) {\n'
-               '            if (*msPal1++ == IconIndex) {\n'
-               '                OamPalBase |= 0x1000;\n'
+               '        const u16* msPal2 = gMSPal2IconIds;\n'
+               '        /* MS (#23): only the normal item-UI base (BG bank 4) can move to the\n'
+               "           dedicated custom bank 15. Loading here follows the caller's UI setup. */\n"
+               '        while (*msPal2 != 0xFFFF) {\n'
+               '            if (*msPal2++ == IconIndex) {\n'
+               '                if ((OamPalBase & 0xF000) == 0x4000) {\n'
+               '                    ApplyPalette(item_icon_palette[2], 15);\n'
+               '                    OamPalBase = (OamPalBase & 0x0FFF) | 0xF000;\n'
+               '                }\n'
                '                break;\n'
                '            }\n'
                '        }\n'
                '        Tile = GetIconTileIndex(IconIndex) + OamPalBase;')
+    return text.replace(orig, patched, 1)
+
+
+def _patch_draw_icon_pal2():
+    """Append a custom item palette without repurposing the two vanilla icon palettes.
+
+    The palette asset grows from two to three source banks. An opted-in standard item icon loads the
+    custom source into reserved BG bank 15 after the UI's own palette setup; the stock banks remain at
+    4/5. Campaign-specific icon ids live in gMSPal2IconIds, not in this hook.
+    """
+    with open(ICON_C, encoding='utf-8') as f:
+        text = f.read()
     with open(ICON_C, 'w', encoding='utf-8') as f:
-        f.write(text.replace(orig, patched, 1))
+        f.write(_patch_draw_icon_pal2_text(text))
+
+    with open(ICON_H, encoding='utf-8') as f:
+        header = f.read()
+    orig = 'extern const u16 item_icon_palette[2][16]; // Item Icon Palette'
+    patched = 'extern const u16 item_icon_palette[3][16]; // Item Icon Palette + custom bank'
+    if orig not in header:
+        sys.exit('ERROR: icon.h not in expected vanilla form for the pal-2 hook')
+    with open(ICON_H, 'w', encoding='utf-8') as f:
+        f.write(header.replace(orig, patched, 1))
 
 
 def _patch_battle_map_kind_fallback():

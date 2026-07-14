@@ -454,6 +454,9 @@ local function bootToMap()
         press(i % 2 == 0 and K.A or K.START, 4)
         wait(26)
     end
+    log(string.format("boot stuck: chapter=%d host=%d faction=0x%02X turn=%d blue0=%s prep=%s",
+        chapter(), HOST_CHAPTER, faction(), turn(), tostring(unitAt(SYM.gUnitArrayBlue, 0) ~= nil),
+        tostring(procActive(SYM.gProcScr_SALLYCURSOR))))
     shot("boot-stuck")
     return false
 end
@@ -3481,7 +3484,7 @@ scenarios.ch03chest = function()
 end
 
 -- CH03TOURMALINE (#23 art): SHOW the pink Tourmaline icon in-engine. Give a deployed unit the
--- Tourmaline (ITEM_REDGEM, drawn from pal 1 via the DrawIcon hook) alongside pal-0 gems (Blue Gem,
+-- Tourmaline (ITEM_REDGEM, drawn from reserved BG bank 15 via the DrawIcon hook) alongside pal-0 gems (Blue Gem,
 -- Vulnerary/Goodberry) so the shot proves BOTH the pink renders AND the pal-0 items are unaffected.
 -- All three are non-weapons, so the command menu is [Item, Wait] -- Item at row 0. Run:
 -- PT_HOST_CHAPTER=4 tools/playtest/run.sh ch03tourmaline (needs a CH03BOOT=1 ROM).
@@ -3493,7 +3496,7 @@ scenarios.ch03tourmaline = function()
         if c and (c.state & 0x9) == 0 and c.x ~= 0xFF then u = c break end
     end
     if not u then return result("FAIL", "no deployed unit to hold the Tourmaline") end
-    -- items[0..2] = Tourmaline (0x76, pal 1), Blue Gem (0x75, pal 0), Goodberry/Vulnerary (0x6C, pal 0).
+    -- items[0..2] = Tourmaline (0x76, custom pal), Blue Gem (0x75, pal 0), Goodberry/Vulnerary (0x6C, pal 0).
     emu:write16(u.addr + 0x1E + 0, 0x76 | (0x01 << 8))
     emu:write16(u.addr + 0x1E + 2, 0x75 | (0x01 << 8))
     emu:write16(u.addr + 0x1E + 4, 0x6C | (0x01 << 8))
@@ -3530,6 +3533,40 @@ scenarios.ch03tourmaline = function()
     wait(20); shot("ch03tourmaline-cmdmenu")
     press(K.A, 4); wait(40)            -- Item (row 0, no weapon) -> inventory list with icons
     shot("ch03tourmaline-inventory")   -- the money shot: Tourmaline (pink) above two pal-0 items
+    -- Diagnostic for the custom-bank reservation: inventory remains over the battle map, so inspect
+    -- every enabled BG tilemap's palette nibbles before selecting a dedicated icon bank.
+    local dispcnt = ru16(0x04000000)
+    for bg = 0, 3 do
+        if (dispcnt & (1 << (8 + bg))) ~= 0 then
+            local cnt = ru16(0x04000008 + bg * 2)
+            local blocks = ({1, 2, 2, 4})[(cnt >> 14) + 1]
+            local base = 0x06000000 + (((cnt >> 8) & 0x1F) * 0x800)
+            local used = {}
+            for i = 0, blocks * 1024 - 1 do
+                local bank = ru16(base + i * 2) >> 12
+                used[bank] = (used[bank] or 0) + 1
+            end
+            local banks = {}
+            for bank = 0, 15 do if used[bank] then banks[#banks + 1] = bank end end
+            log(string.format("item-menu BG%d palette banks: %s", bg, table.concat(banks, ",")))
+            -- The custom 16x16 icon itself occupies four BG0 tilemap entries. Any additional
+            -- bank-15 entries mean another screen element shares the reservation.
+            if (used[15] or 0) > 4 then
+                return result("FAIL", string.format(
+                    "reserved custom palette bank 15 has %d entries on BG%d (want the Tourmaline's 4 only)",
+                    used[15], bg))
+            end
+        end
+    end
+    -- LoadIconPalettes(4) must preserve vanilla bank 5 (whose second colour is 0x7FDE) and load
+    -- the custom Tourmaline palette in reserved bank 15 (second colour = white, 0x7FFF). The old destructive
+    -- path repainted bank 5, which made regular map/UI text pink.
+    local pal5_second = ru16(0x05000000 + 5 * 32 + 2)
+    local pal15_second = ru16(0x05000000 + 15 * 32 + 2)
+    if pal5_second ~= 0x7FDE or pal15_second ~= 0x7FFF then
+        return result("FAIL", string.format(
+            "item palette banks wrong (bank5[1]=0x%04X, bank15[1]=0x%04X)", pal5_second, pal15_second))
+    end
     -- Data-side confirm: the item is really in slot 0 (the pixels are the deliverable; assert the item).
     local held = ru16(u.addr + 0x1E) & 0xFF
     if held ~= 0x76 then
