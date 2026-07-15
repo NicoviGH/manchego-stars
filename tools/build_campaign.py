@@ -393,6 +393,12 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         # (data_classes.c already listed); the AnimConf's extern decl
                         'src/banim_data.c', 'include/banim_pointer.h',
                         'src/data_banimconf.c', 'include/ekrbattle.h',
+                        # #165 caster-scoped spell-palette tint (green Dark magic): the
+                        # _patch_banim_spell_palette_tint hook patches these two TUs (the
+                        # GetBanimSpellPaletteTint lookup + StartSpellAnimation seam in
+                        # efxmagic; the green recolour + palette-copy wrap in ekrutils);
+                        # ekrbattle.h (the enum/struct/table extern) is listed above.
+                        'src/banim-efxmagic.c', 'src/banim-ekrutils.c',
                         'linker_script_banim.txt',
                         # #65 M-B (character-unique anims, no class slot): the per-character
                         # config table gets the AnimConf appended; the combat-lookup engine
