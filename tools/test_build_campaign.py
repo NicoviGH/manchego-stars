@@ -582,53 +582,54 @@ class BattleSpellPaletteTint(unittest.TestCase):
         self.assertIn('{ CHARACTER_SETH, ITYPE_DARK, BANIM_SPELL_TINT_GREEN },', out)
         self.assertIn('{ 0, 0, BANIM_SPELL_TINT_NONE },', out)
 
-    def test_engine_hook_uses_the_existing_spell_lifecycle_state_for_tint(self):
+    def test_engine_hook_records_the_tint_in_the_dedicated_global(self):
         src = ('void StartSpellAnimation(struct Anim *anim)\n'
                '{\n'
                '    s16 index = gEkrSpellAnimIndex[GetAnimPosition(anim)];\n'
                '}\n')
         self.assertTrue(hasattr(eh, '_spell_palette_tint_start'))
         out = eh._spell_palette_tint_start(src)
-        self.assertIn('gEfxSpellAnimExists = GetBanimSpellPaletteTint(anim);', out)
-        self.assertLess(out.index('s16 index'), out.index('gEfxSpellAnimExists'))
+        self.assertIn('gMSSpellTint = GetBanimSpellPaletteTint(anim);', out)
+        self.assertLess(out.index('s16 index'), out.index('gMSSpellTint'))
 
-    def test_engine_hook_preserves_a_configured_tint_when_spell_begins(self):
-        src = ('void SpellFx_Begin(void)\n'
-               '{\n'
-               '    gEfxSpellAnimExists = true;\n'
-               '}\n')
-        self.assertTrue(hasattr(eh, '_spell_palette_tint_begin'))
-        out = eh._spell_palette_tint_begin(src)
-        self.assertIn('if (gEfxSpellAnimExists != BANIM_SPELL_TINT_GREEN)', out)
-        self.assertIn('gEfxSpellAnimExists = true;', out)
-
-    def test_engine_hook_reuses_writable_spell_state_without_a_new_global(self):
-        """The tint lives in the existing EWRAM lifecycle flag, never in ROM."""
-        with open(eh.BANIM_EKRBATTLE_H, encoding='utf-8') as f:
-            header_before = f.read()
-        with open(eh.BANIM_EFXMAGIC_C, encoding='utf-8') as f:
-            magic_before = f.read()
-        with open(eh.BANIM_EKRUTILS_C, encoding='utf-8') as f:
-            utils_before = f.read()
+    def test_tint_rides_a_dedicated_overlay_global_leaving_the_lifecycle_flag_vanilla(self):
+        """The tint rides its own EWRAM_OVERLAY(banim) global; gEfxSpellAnimExists stays vanilla."""
+        patched = ('BANIM_EKRBATTLE_H', 'BANIM_EFXMAGIC_C', 'BANIM_EKRUTILS_C',
+                   'BANIM_EKRBATTLE_C', 'BANIM_EKRDISPUP_C')
+        before = {name: open(getattr(eh, name), encoding='utf-8').read() for name in patched}
 
         try:
             eh._patch_banim_spell_palette_tint()
             with open(eh.BANIM_EKRBATTLE_H, encoding='utf-8') as f:
                 header = f.read()
+            with open(eh.BANIM_EKRBATTLE_C, encoding='utf-8') as f:
+                battle = f.read()
             with open(eh.BANIM_EKRUTILS_C, encoding='utf-8') as f:
                 utils = f.read()
-            self.assertNotIn('extern u8 gBanimSpellPaletteTint;', header)
-            self.assertNotIn('u8 gBanimSpellPaletteTint', utils)
+            with open(eh.BANIM_EKRDISPUP_C, encoding='utf-8') as f:
+                dispup = f.read()
+            # A dedicated global, declared beside the proven-writable lifecycle flag.
+            self.assertIn('extern u8 gMSSpellTint;', header)
+            self.assertIn('EWRAM_OVERLAY(banim) u8 gMSSpellTint = BANIM_SPELL_TINT_NONE;', battle)
+            # The abandoned transient global is gone everywhere (the plural
+            # gBanimSpellPaletteTints table is the legitimate data symbol).
+            self.assertIsNone(re.search(r'gBanimSpellPaletteTint\b', header))
+            self.assertIsNone(re.search(r'gBanimSpellPaletteTint\b', utils))
+            # SpellFx_Begin's lifecycle flag is untouched (no tint guard smuggled in).
+            begin = utils[utils.index('void SpellFx_Begin'):]
+            begin = begin[:begin.index('void SpellFx_Finish')]
+            self.assertIn('gEfxSpellAnimExists = true;', begin)
+            self.assertNotIn('BANIM_SPELL_TINT', begin)
+            # The palette copy reads the dedicated global, not the lifecycle flag.
             palette_copy = utils[utils.index('static void BanimSpellPaletteCopy'):]
-            self.assertIn('if (gEfxSpellAnimExists != BANIM_SPELL_TINT_GREEN)', palette_copy)
-            self.assertNotIn('gBanimSpellPaletteTint', palette_copy)
+            self.assertIn('if (gMSSpellTint != BANIM_SPELL_TINT_GREEN)', palette_copy)
+            self.assertNotIn('gEfxSpellAnimExists', palette_copy)
+            # Teardown clears the tint beside the vanilla lifecycle reset.
+            self.assertIn('gMSSpellTint = BANIM_SPELL_TINT_NONE;', dispup)
         finally:
-            with open(eh.BANIM_EKRBATTLE_H, 'w', encoding='utf-8') as f:
-                f.write(header_before)
-            with open(eh.BANIM_EFXMAGIC_C, 'w', encoding='utf-8') as f:
-                f.write(magic_before)
-            with open(eh.BANIM_EKRUTILS_C, 'w', encoding='utf-8') as f:
-                f.write(utils_before)
+            for name, text in before.items():
+                with open(getattr(eh, name), 'w', encoding='utf-8') as f:
+                    f.write(text)
 
 
 class BattlePlatformTerrain(unittest.TestCase):
