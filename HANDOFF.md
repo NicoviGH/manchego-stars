@@ -9,7 +9,10 @@ live in `CLAUDE.md`; issue scope and backlog live in GitHub.
   animation is merged in PR #163 (`1cd65bd`).
 - The Tourmaline palette correction is separately merged as PR #162 (`f9ed1cc`); #161 is based on
   that work and does not reintroduce the palette change.
-- Current focus: choose the next character for battle-animation review.
+- Marty's approved Shaman battle animation and character-scoped green Dark-magic palette treatment
+  are complete in PR #166.
+- Current focus after #166: either prototype the deferred Marty/Meesmickle charge-pose glow as a
+  separate feature or select the next character for battle-animation review.
 - Before a context rollover, warn Nicolas, refresh this file, and begin a fresh instance. Do not rely
   on automatic context compaction as the handoff mechanism.
 
@@ -37,6 +40,14 @@ live in `CLAUDE.md`; issue scope and backlog live in GitHub.
 - The reusable review-loop lessons are recorded in `docs/decisions.md`: distinguish donor actor art
   from engine effects, preview the final GBA palette before packing, preserve opaque black outside
   OBJ index 0, and defer the 1,507-entry archive rebuild until a candidate is selected.
+- **Marty:** added a per-character Shaman battle animation (`mart_sh1`) from the supplied ready,
+  charge, and cast art. Nicolas approved the 39-pixel-height candidate with the restored cap spots
+  and face-pixel contrast. Marty's YAML declares a green tint for `ITYPE_DARK`, so all of his Dark
+  tome visuals use the treatment while Meesmickle and every other caster remain vanilla. The final
+  TESTCH capture visibly rendered the green charge/Flux effect in mGBA.
+- The tint's generated lookup table is immutable campaign data. Its transient id reuses the existing
+  writable spell-effect lifecycle state; the rejected standalone flag landed in ROM or a discarded
+  EWRAM section. The durable rationale and `0/1/2` lifecycle contract are in `docs/decisions.md`.
 
 ### Demo cleanup
 
@@ -45,6 +56,7 @@ live in `CLAUDE.md`; issue scope and backlog live in GitHub.
   document-linked demos in `docs/demo/`.
 - `make_gif.py` now writes to `docs/demo/` for feature-branch review; other transient renderers write
   under `/tmp/manchego-stars-review`. Remove review GIFs before merge unless a live document links them.
+- The approved Marty in-game GIF was shown on PR #166 and pruned before merge.
 - Deleted the stale remote `feat/23-ch03-chests` branch (closed PR #156; its work landed through #157).
 
 ### Tourmaline palette correction
@@ -69,11 +81,17 @@ live in `CLAUDE.md`; issue scope and backlog live in GitHub.
 - `make check` -> `drift check: clean`.
 - `PT_HOST_CHAPTER=4 tools/playtest/run.sh ch03tourmaline` -> PASS.
 - `git diff --check` -> clean.
+- `python3 -m unittest tools.test_build_campaign.BattleSpellPaletteTint` -> 5 tests passed.
+- `PT_CHAR=marty tools/playtest/run.sh recordanim` -> PASS (248 captured frames; class `0x2D`);
+  the approved capture visibly includes green charge and Flux palettes.
 
 ## Working tree - do not lose or revert
 
 All Meesmickle source, pipeline, and animation changes are merged in PR #163. Its remote feature
 branch and temporary review GIF are pruned.
+
+Marty's source frames, data-driven spell tint, tests, and durable decision record are in PR #166;
+its temporary review GIF is pruned from the merge tree.
 
 Other working-tree state:
 
@@ -83,9 +101,11 @@ Other working-tree state:
 
 ## Next steps
 
-1. Select the next character for battle-animation review. Create its short-lived feature branch and
-   keep review GIFs in `docs/demo/` only while the feature branch is under review.
-2. Before any additional custom item palette, audit a free live BG bank in every target UI context.
+1. After #165 is squash-merged, optionally prototype the deferred charge-pose glow/flicker for Marty
+   and Meesmickle as a separate feature; do not assume vanilla Shaman charge art is an engine effect.
+2. Otherwise select the next character for battle-animation review. Create its short-lived feature
+   branch and keep review GIFs in `docs/demo/` only while the feature branch is under review.
+3. Before any additional custom item palette, audit a free live BG bank in every target UI context.
    The GBA has exactly 16 BG palette banks (0-15); adding a source palette does not create a 17th live
    bank.
 
@@ -95,6 +115,7 @@ Other working-tree state:
 # Battle-animation capture (requires a TESTCH ROM)
 PT_CHAR=meesmickle tools/playtest/run.sh recordanim
 tools/playtest/make_gif.py recordanim meesmickle --name meesmickle-anim --open
+PT_CHAR=marty tools/playtest/run.sh recordanim
 PT_CHAR=wolfram tools/playtest/run.sh recordanim
 PT_CHAR=prof-rbg tools/playtest/run.sh recordanim
 
