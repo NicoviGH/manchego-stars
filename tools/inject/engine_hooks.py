@@ -17,6 +17,9 @@ from inject.decomp import (
 BANIM_EKRBATTLEINTRO_C = os.path.join(DECOMP, 'src', 'banim-ekrbattleintro.c')
 BANIM_EKRMAIN_C = os.path.join(DECOMP, 'src', 'banim-ekrmain.c')
 BANIM_DATA_C = os.path.join(DECOMP, 'src', 'banim_data.c')
+BANIM_EFXMAGIC_C = os.path.join(DECOMP, 'src', 'banim-efxmagic.c')
+BANIM_EKRUTILS_C = os.path.join(DECOMP, 'src', 'banim-ekrutils.c')
+BANIM_EKRBATTLE_H = os.path.join(DECOMP, 'include', 'ekrbattle.h')
 BMCAMADJUST_C = os.path.join(DECOMP, 'src', 'bmcamadjust.c')
 BMMAP_C = os.path.join(DECOMP, 'src', 'bmmap.c')
 WORLDMAP_PATH_C = os.path.join(DECOMP, 'src', 'worldmap_path.c')
@@ -111,6 +114,155 @@ def _patch_banim_palette_custom_guard():
                  % BANIM_EKRMAIN_C)
     with open(BANIM_EKRMAIN_C, 'w', encoding='utf-8') as f:
         f.write(out)
+
+
+def _spell_palette_tint_start(text):
+    """Encode the current caster's tint in the existing spell-effect state."""
+    line = '    s16 index = gEkrSpellAnimIndex[GetAnimPosition(anim)];\n'
+    # This decomp targets C89: keep all local declarations before executable
+    # statements in StartSpellAnimation.
+    injected = line + '    gEfxSpellAnimExists = GetBanimSpellPaletteTint(anim);\n'
+    if injected in text:
+        return text
+    text = text.replace('    gBanimSpellPaletteTint = GetBanimSpellPaletteTint(anim);\n', '', 1)
+    return text.replace(line, injected, 1)
+
+
+def _spell_palette_tint_begin(text):
+    """Do not overwrite the green-tint sentinel when the effect starts."""
+    line = '    gEfxSpellAnimExists = true;\n'
+    injected = ('    if (gEfxSpellAnimExists != BANIM_SPELL_TINT_GREEN)\n'
+                '        gEfxSpellAnimExists = true;\n')
+    if injected in text:
+        return text
+    return text.replace(line, injected, 1)
+
+
+def _spell_palette_tint_finish(text):
+    """Migrate prior builds away from the discarded transient global."""
+    return text.replace('    gBanimSpellPaletteTint = BANIM_SPELL_TINT_NONE;\n', '', 1)
+
+
+def _patch_banim_spell_palette_tint():
+    """Add a data-driven, caster-scoped spell-palette tint seam.
+
+    Campaign data appends character/weapon-type rows. The engine activates the matching
+    tint only for that spell dispatch, recolors spell BG/OBJ palette uploads, and clears it
+    with the existing SpellFx lifecycle. Normal effects and every unconfigured combatant
+    remain vanilla.
+    """
+    with open(BANIM_EKRBATTLE_H, encoding='utf-8') as f:
+        header = f.read()
+    if 'struct BanimSpellPaletteTint' not in header:
+        anchor = 'enum ekr_hit_identifer {'
+        decl = ('enum BanimSpellPaletteTintId {\n'
+                '    BANIM_SPELL_TINT_NONE = 0,\n'
+                '    BANIM_SPELL_TINT_GREEN = 2,\n'
+                '};\n\n'
+                'struct BanimSpellPaletteTint {\n'
+                '    u8 character;\n'
+                '    u8 weapon_type;\n'
+                '    u8 tint;\n'
+                '};\n\n'
+                'extern CONST_DATA struct BanimSpellPaletteTint gBanimSpellPaletteTints[];\n\n')
+        if anchor not in header:
+            sys.exit('ERROR: spell palette tint header anchor missing in %s' % BANIM_EKRBATTLE_H)
+        with open(BANIM_EKRBATTLE_H, 'w', encoding='utf-8') as f:
+            f.write(header.replace(anchor, decl + anchor, 1))
+    else:
+        header = header.replace('    BANIM_SPELL_TINT_NONE,\n'
+                                '    BANIM_SPELL_TINT_GREEN,\n',
+                                '    BANIM_SPELL_TINT_NONE = 0,\n'
+                                '    BANIM_SPELL_TINT_GREEN = 2,\n', 1)
+        header = header.replace('extern u8 gBanimSpellPaletteTint;\n', '', 1)
+        with open(BANIM_EKRBATTLE_H, 'w', encoding='utf-8') as f:
+            f.write(header)
+
+    with open(BANIM_EFXMAGIC_C, encoding='utf-8') as f:
+        magic = f.read()
+    for old_decl in (
+        'EWRAM_OVERLAY(banim) u8 gBanimSpellPaletteTint = BANIM_SPELL_TINT_NONE;\n\n',
+        'EWRAM_DATA u8 gBanimSpellPaletteTint = BANIM_SPELL_TINT_NONE;\n\n',
+    ):
+        magic = magic.replace(old_decl, '', 1)
+    if 'GetBanimSpellPaletteTint(struct Anim *anim)' not in magic:
+        anchor = 'CONST_DATA SpellAnimFunc gEkrSpellAnimLut[] = {'
+        support = ('static u8 GetBanimSpellPaletteTint(struct Anim *anim)\n'
+                   '{\n'
+                   '    struct BattleUnit *bu;\n'
+                   '    const struct BanimSpellPaletteTint *it;\n\n'
+                   '    if (GetAnimPosition(anim) == EKR_POS_L)\n'
+                   '        bu = gpEkrBattleUnitLeft;\n'
+                   '    else\n'
+                   '        bu = gpEkrBattleUnitRight;\n\n'
+                   '    for (it = gBanimSpellPaletteTints; it->character != 0; it++) {\n'
+                   '        if (it->character == bu->unit.pCharacterData->number\n'
+                   '            && it->weapon_type == GetItemType(bu->weaponBefore))\n'
+                   '            return it->tint;\n'
+                   '    }\n\n'
+                   '    return BANIM_SPELL_TINT_NONE;\n'
+                   '}\n\n')
+        if anchor not in magic:
+            sys.exit('ERROR: spell palette tint magic anchor missing in %s' % BANIM_EFXMAGIC_C)
+        magic = magic.replace('#include "bmlib.h"', '#include "bmlib.h"\n#include "bmbattle.h"', 1)
+        magic = magic.replace(anchor, support + anchor, 1)
+    magic = _spell_palette_tint_start(magic)
+    if 'gEfxSpellAnimExists = GetBanimSpellPaletteTint(anim);' not in magic:
+        sys.exit('ERROR: StartSpellAnimation seam missing in %s' % BANIM_EFXMAGIC_C)
+    with open(BANIM_EFXMAGIC_C, 'w', encoding='utf-8') as f:
+        f.write(magic)
+
+    with open(BANIM_EKRUTILS_C, encoding='utf-8') as f:
+        utils = f.read()
+    for old_decl in (
+        'EWRAM_OVERLAY(banim) u8 gBanimSpellPaletteTint = BANIM_SPELL_TINT_NONE;\n',
+        'EWRAM_DATA u8 gBanimSpellPaletteTint = BANIM_SPELL_TINT_NONE;\n',
+        'u8 gBanimSpellPaletteTint = BANIM_SPELL_TINT_NONE;\n',
+        'u8 gBanimSpellPaletteTint;\n',
+    ):
+        utils = utils.replace(old_decl, '', 1)
+    utils = _spell_palette_tint_begin(utils)
+    utils = _spell_palette_tint_finish(utils)
+    utils = utils.replace('if (gBanimSpellPaletteTint == BANIM_SPELL_TINT_NONE)',
+                          'if (gEfxSpellAnimExists != BANIM_SPELL_TINT_GREEN)', 1)
+    if 'BanimSpellPaletteCopy' not in utils:
+        anchor = 'void SpellFx_RegisterObjGfx(const u16 * img, u32 size)\n'
+        support = ('static u16 BanimSpellTintGreen(u16 color)\n'
+                   '{\n'
+                   '    int r = color & 0x1F;\n'
+                   '    int g = (color >> 5) & 0x1F;\n'
+                   '    int b = (color >> 10) & 0x1F;\n'
+                   '    int high = r;\n'
+                   '    int low = r;\n\n'
+                   '    if (g > high) high = g;\n'
+                   '    if (b > high) high = b;\n'
+                   '    if (g < low) low = g;\n'
+                   '    if (b < low) low = b;\n'
+                   '    if (high - low < 3)\n'
+                   '        return color;\n\n'
+                   '    return (low + (high - low) / 4)\n'
+                   '        | (high << 5)\n'
+                   '        | ((low + (high - low) / 6) << 10);\n'
+                   '}\n\n'
+                   'static void BanimSpellPaletteCopy(const u16 *src, u16 *dst, u32 size)\n'
+                   '{\n'
+                   '    u32 i;\n\n'
+                   '    if (gEfxSpellAnimExists != BANIM_SPELL_TINT_GREEN) {\n'
+                   '        CpuFastCopy(src, dst, size);\n'
+                   '        return;\n'
+                   '    }\n\n'
+                   '    for (i = 0; i < size / sizeof(u16); i++)\n'
+                   '        dst[i] = BanimSpellTintGreen(src[i]);\n'
+                   '}\n\n')
+        if anchor not in utils:
+            sys.exit('ERROR: spell palette copy anchor missing in %s' % BANIM_EKRUTILS_C)
+        utils = utils.replace(anchor, support + anchor, 1)
+        utils = utils.replace('    CpuFastCopy(pal, PAL_OBJ(OBJPAL_BANIM_SPELL_OBJ), size);\n',
+                              '    BanimSpellPaletteCopy(pal, PAL_OBJ(OBJPAL_BANIM_SPELL_OBJ), size);\n', 1)
+        utils = utils.replace('    CpuFastCopy(pal, PAL_BG(OBJPAL_BANIM_SPELL_BG), size);\n',
+                              '    BanimSpellPaletteCopy(pal, PAL_BG(OBJPAL_BANIM_SPELL_BG), size);\n', 1)
+    with open(BANIM_EKRUTILS_C, 'w', encoding='utf-8') as f:
+        f.write(utils)
 
 
 def _patch_player_start_cursor_guard():

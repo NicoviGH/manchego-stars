@@ -118,6 +118,22 @@ inventory:
 # skills (Nicolas's call, 2026-05-29: vanilla classes only, nothing extra: no timed
 # buffs/debuffs, no special movement, no procs).
 
+# ── Battle Animation ──────────────────────────────────────────────────────────
+# The artist authored all three poses on one canvas; retain that shared layout during
+# descale. Shaman supplies the charge cadence. Marty alone tints every Dark-tome
+# battle effect green; it is visual flavor, not a mechanical spell change.
+battle_anim:
+  clone_from: shaman
+  motion: magic
+  abbr: mart_sh1
+  frames:
+    - marty/ready.png
+    - marty/windup.png
+    - marty/peak.png
+  spell_palette_tint:
+    weapon_type: dark
+    color: green
+
 signature_moment:
   chapter: ch06-the-maer-monster
   description: >

@@ -2800,6 +2800,24 @@ def banim_unique_append(text, conf_sym):
     return text[:bs] + block.rstrip() + '\n    %s,\n' % conf_sym + text[be:], index
 
 
+def banim_spell_palette_tint_append(text, rows):
+    """Append the campaign-declared character/weapon spell-tint rows once."""
+    character_include = '#include "constants/characters.h"\n'
+    if character_include not in text:
+        anchor = '#include "constants/items.h"\n'
+        if anchor not in text:
+            raise ValueError('battle-animation data file is missing constants/items.h include')
+        text = text.replace(anchor, anchor + character_include, 1)
+    marker = 'gBanimSpellPaletteTints[]'
+    if marker in text:
+        return text
+    block = '\nCONST_DATA struct BanimSpellPaletteTint %s = {\n' % marker
+    for character, weapon_type, tint in rows:
+        block += '    { %s, %s, %s },\n' % (character, weapon_type, tint)
+    block += '    { 0, 0, BANIM_SPELL_TINT_NONE },\n};\n'
+    return text + block
+
+
 def banim_set_char_u25(block, index):
     """Set a character block's `._u25 = { index, index }` (#65 M-B), inserting after
     `.number` if absent, overwriting in place if already present (both promote states)."""
@@ -2864,6 +2882,30 @@ def units_with_battle_anim(campaign):
                 u = yaml.safe_load(f)
             if u and u.get('battle_anim'):
                 out.append((u.get('id', fn[:-5]), u))
+    return out
+
+
+def battle_spell_palette_tints(campaign):
+    """(character enum, weapon type, tint enum) rows declared by battle_anim YAML."""
+    tint_enums = {
+        'green': 'BANIM_SPELL_TINT_GREEN',
+    }
+    type_enums = {
+        'dark': 'ITYPE_DARK',
+    }
+    out = []
+    for uid, unit in units_with_battle_anim(campaign):
+        tint = unit['battle_anim'].get('spell_palette_tint')
+        if not tint:
+            continue
+        try:
+            weapon_type = type_enums[tint['weapon_type']]
+            color = tint_enums[tint['color']]
+            slot = PORTRAIT_MAP[uid]
+        except KeyError as e:
+            sys.exit('ERROR: battle_anim %s spell_palette_tint: unsupported %s' %
+                     (uid, e))
+        out.append((char_symbol(slot), weapon_type, color))
     return out
 
 
@@ -2990,6 +3032,15 @@ def inject_battle_anims(campaign, verbose=True):
         if verbose:
             print('  %-14s = banim %s (animId 0x%X); _u25[%d] -> %s on char %s (%s)'
                   % (uid, abbr, anim_id, u25, new_conf, slot, wtype))
+
+    tint_rows = battle_spell_palette_tints(campaign)
+    if tint_rows:
+        with open(BANIMCONFUNK_C, encoding='utf-8') as f:
+            tint_text = f.read()
+        with open(BANIMCONFUNK_C, 'w', encoding='utf-8') as f:
+            f.write(banim_spell_palette_tint_append(tint_text, tint_rows))
+        if verbose:
+            print('  spell palette tints: %d character/weapon row(s)' % len(tint_rows))
 
 
 def _class_field_symbol(class_enum, field):
@@ -6465,6 +6516,8 @@ def main():
         print('  banim (#65): combat anim lookup -> GetBattleAnimationId_WithUnique (per-character _u25)')
         engine_hooks._patch_banim_palette_custom_guard()
         print('  banim (#65): GetBanimPalette -> custom (appended) banims keep own palette (RBG cyan fix)')
+        engine_hooks._patch_banim_spell_palette_tint()
+        print('  banim (#165): character/weapon spell palettes support campaign-declared tints')
         engine_hooks._patch_draw_icon_pal2()
         print('  item icons (#23): DrawIcon routes gMSPal2IconIds from BG bank 4 to custom bank 15')
         print('names:')

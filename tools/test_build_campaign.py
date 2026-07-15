@@ -558,6 +558,79 @@ class CharacterUniqueBanim(unittest.TestCase):
                          'something else')
 
 
+class BattleSpellPaletteTint(unittest.TestCase):
+    """Per-character spell visuals remain data, not campaign-specific engine code."""
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def test_marty_green_tint_is_scoped_to_all_of_his_dark_tomes(self):
+        self.assertTrue(hasattr(bc, 'battle_spell_palette_tints'))
+        rows = bc.battle_spell_palette_tints(self.CAMPAIGN)
+        self.assertEqual(rows, [
+            ('CHARACTER_SETH', 'ITYPE_DARK', 'BANIM_SPELL_TINT_GREEN'),
+        ])
+
+    def test_tint_rows_append_a_terminated_campaign_data_table(self):
+        src = ('#include "constants/items.h"\n'
+               'CONST_DATA struct BattleAnimDef * gUnitSpecificBanimConfigs[] = {\n'
+               '    NULL,\n};\n')
+        self.assertTrue(hasattr(bc, 'banim_spell_palette_tint_append'))
+        out = bc.banim_spell_palette_tint_append(
+            src, [('CHARACTER_SETH', 'ITYPE_DARK', 'BANIM_SPELL_TINT_GREEN')])
+        self.assertIn('CONST_DATA struct BanimSpellPaletteTint gBanimSpellPaletteTints[]', out)
+        self.assertIn('#include "constants/characters.h"', out)
+        self.assertIn('{ CHARACTER_SETH, ITYPE_DARK, BANIM_SPELL_TINT_GREEN },', out)
+        self.assertIn('{ 0, 0, BANIM_SPELL_TINT_NONE },', out)
+
+    def test_engine_hook_uses_the_existing_spell_lifecycle_state_for_tint(self):
+        src = ('void StartSpellAnimation(struct Anim *anim)\n'
+               '{\n'
+               '    s16 index = gEkrSpellAnimIndex[GetAnimPosition(anim)];\n'
+               '}\n')
+        self.assertTrue(hasattr(eh, '_spell_palette_tint_start'))
+        out = eh._spell_palette_tint_start(src)
+        self.assertIn('gEfxSpellAnimExists = GetBanimSpellPaletteTint(anim);', out)
+        self.assertLess(out.index('s16 index'), out.index('gEfxSpellAnimExists'))
+
+    def test_engine_hook_preserves_a_configured_tint_when_spell_begins(self):
+        src = ('void SpellFx_Begin(void)\n'
+               '{\n'
+               '    gEfxSpellAnimExists = true;\n'
+               '}\n')
+        self.assertTrue(hasattr(eh, '_spell_palette_tint_begin'))
+        out = eh._spell_palette_tint_begin(src)
+        self.assertIn('if (gEfxSpellAnimExists != BANIM_SPELL_TINT_GREEN)', out)
+        self.assertIn('gEfxSpellAnimExists = true;', out)
+
+    def test_engine_hook_reuses_writable_spell_state_without_a_new_global(self):
+        """The tint lives in the existing EWRAM lifecycle flag, never in ROM."""
+        with open(eh.BANIM_EKRBATTLE_H, encoding='utf-8') as f:
+            header_before = f.read()
+        with open(eh.BANIM_EFXMAGIC_C, encoding='utf-8') as f:
+            magic_before = f.read()
+        with open(eh.BANIM_EKRUTILS_C, encoding='utf-8') as f:
+            utils_before = f.read()
+
+        try:
+            eh._patch_banim_spell_palette_tint()
+            with open(eh.BANIM_EKRBATTLE_H, encoding='utf-8') as f:
+                header = f.read()
+            with open(eh.BANIM_EKRUTILS_C, encoding='utf-8') as f:
+                utils = f.read()
+            self.assertNotIn('extern u8 gBanimSpellPaletteTint;', header)
+            self.assertNotIn('u8 gBanimSpellPaletteTint', utils)
+            palette_copy = utils[utils.index('static void BanimSpellPaletteCopy'):]
+            self.assertIn('if (gEfxSpellAnimExists != BANIM_SPELL_TINT_GREEN)', palette_copy)
+            self.assertNotIn('gBanimSpellPaletteTint', palette_copy)
+        finally:
+            with open(eh.BANIM_EKRBATTLE_H, 'w', encoding='utf-8') as f:
+                f.write(header_before)
+            with open(eh.BANIM_EFXMAGIC_C, 'w', encoding='utf-8') as f:
+                f.write(magic_before)
+            with open(eh.BANIM_EKRUTILS_C, 'w', encoding='utf-8') as f:
+                f.write(utils_before)
+
+
 class BattlePlatformTerrain(unittest.TestCase):
     """Terrain category -> snow ground index (#65). base = first vendored ground slot;
     offsets 0=Snowdrift, 1=Snow Uneven (rough), 2=Ice."""
