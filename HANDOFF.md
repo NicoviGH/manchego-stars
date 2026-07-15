@@ -9,8 +9,10 @@ live in `CLAUDE.md`; issue scope and backlog live in GitHub.
   animation is merged in PR #163 (`1cd65bd`).
 - The Tourmaline palette correction is separately merged as PR #162 (`f9ed1cc`); #161 is based on
   that work and does not reintroduce the palette change.
-- Current focus: close out Marty's approved Shaman battle animation and character-scoped green
-  Dark-magic palette treatment on `feat/165-marty-green-flux`.
+- Marty's approved Shaman battle animation and character-scoped green Dark-magic palette treatment
+  are complete in PR #166.
+- Current focus after #166: either prototype the deferred Marty/Meesmickle charge-pose glow as a
+  separate feature or select the next character for battle-animation review.
 - Before a context rollover, warn Nicolas, refresh this file, and begin a fresh instance. Do not rely
   on automatic context compaction as the handoff mechanism.
 
@@ -54,6 +56,7 @@ live in `CLAUDE.md`; issue scope and backlog live in GitHub.
   document-linked demos in `docs/demo/`.
 - `make_gif.py` now writes to `docs/demo/` for feature-branch review; other transient renderers write
   under `/tmp/manchego-stars-review`. Remove review GIFs before merge unless a live document links them.
+- The approved Marty in-game GIF was shown on PR #166 and pruned before merge.
 - Deleted the stale remote `feat/23-ch03-chests` branch (closed PR #156; its work landed through #157).
 
 ### Tourmaline palette correction
@@ -87,6 +90,9 @@ live in `CLAUDE.md`; issue scope and backlog live in GitHub.
 All Meesmickle source, pipeline, and animation changes are merged in PR #163. Its remote feature
 branch and temporary review GIF are pruned.
 
+Marty's source frames, data-driven spell tint, tests, and durable decision record are in PR #166;
+its temporary review GIF is pruned from the merge tree.
+
 Other working-tree state:
 
 - `fireemblem8u` is dirty from injected/generated build artifacts. Never commit its submodule pointer.
@@ -109,6 +115,7 @@ Other working-tree state:
 # Battle-animation capture (requires a TESTCH ROM)
 PT_CHAR=meesmickle tools/playtest/run.sh recordanim
 tools/playtest/make_gif.py recordanim meesmickle --name meesmickle-anim --open
+PT_CHAR=marty tools/playtest/run.sh recordanim
 PT_CHAR=wolfram tools/playtest/run.sh recordanim
 PT_CHAR=prof-rbg tools/playtest/run.sh recordanim
 
