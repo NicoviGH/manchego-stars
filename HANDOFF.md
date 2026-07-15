@@ -5,18 +5,40 @@ live in `CLAUDE.md`; issue scope and backlog live in GitHub.
 
 ## Current state
 
-- Battle-animation review for RBG and Wolfram is complete in PR #161. Meesmickle's Shaman-based
-  animation is merged in PR #163 (`1cd65bd`).
-- The Tourmaline palette correction is separately merged as PR #162 (`f9ed1cc`); #161 is based on
-  that work and does not reintroduce the palette change.
-- Marty's approved Shaman battle animation and character-scoped green Dark-magic palette treatment
-  are complete in PR #166.
-- Current focus after #166: either prototype the deferred Marty/Meesmickle charge-pose glow as a
-  separate feature or select the next character for battle-animation review.
+- **Battle anims** (Codex session): RBG/Wolfram (#161), Meesmickle (#163), Marty + green Dark magic
+  (#166), Tourmaline palette fix (#162) — all merged. Detail in "Prior session" below.
+- **⭐ NEXT-INSTANCE SEQUENCE (do in this order — see "Next steps"):**
+  1. **Merge PR #167** — registers the #166 spell-tint hook in the check.py guard tuple + adds its two
+     patched TUs (`banim-efxmagic.c`/`banim-ekrutils.c`) to `PATCHED_DECOMP_FILES`. Two standards gaps
+     Codex missed (icon.c-class latent bug). Verified: rebuild from vanilla green, 95 tests, check.py clean.
+  2. **Do #168** — the deeper spell-tint refactor (Stages 1–4: drop dead migration shims → replace the
+     `gEfxSpellAnimExists` overload with a dedicated `gMSSpellTint` global → honest enum → docs/tests).
+     Nicolas wants it now (no tech debt). Full staged checklist + findings rationale on the issue.
+  3. **Resume ch04/ch05 re-basing** — full brainstorm + decomp data captured on **#24** (ch04) and
+     **#25** (ch05). Pending 3 confirms from Nicolas (A-vs-B / ch04 chests / ch05 fog — the interrupted
+     AskUserQuestion). Direction: Option B (ch04←Ch11 Creeping Darkness, ch05←Ch11 Phantom Ship), parity
+     ch04→FE8 Ch4 & ch05→FE8 Ch5, economy/recruit twins Ch4/Ch5.
+  4. Queued: **#138** config-driven `inject_chapter(descriptor)` (incremental; YAML `host:` block —
+     approved direction, paused for the ch04/ch05 design). Then next battle anim / #29 world map.
 - Before a context rollover, warn Nicolas, refresh this file, and begin a fresh instance. Do not rely
   on automatic context compaction as the handoff mechanism.
 
-## This session
+## This session (2026-07-15, Opus — review, fixes, planning; no chapter code shipped)
+
+- **Reviewed Codex's #166** (green Dark magic). Feature is good (data-driven, boundary-clean, works
+  in-engine) but missed two of our registration conventions → fixed in **PR #167** (open, awaiting
+  Nicolas's merge). Also digested the implementation and filed the deeper cleanup as **#168** (Nicolas
+  asked for the plan; wants it done now). Key critique: the `gEfxSpellAnimExists` overload is
+  verified-safe today but an unenforced landmine, and a dedicated global is reachable (vanilla's own
+  `gEfxSpellAnimExists` is a working `EWRAM_OVERLAY(banim)` global).
+- **ch04/ch05 re-basing brainstorm** — in flight, captured on #24/#25 (see sequence above). Confirmed
+  from the decomp: vanilla Ch4 is NOT fog; the Ch11 pair (Creeping Darkness / Phantom Ship) are the
+  only fog+monster chapters. `parity_reference` drives the difficulty gate independently of
+  `fe8_base_map`, so "Ch11 theme, Ch4/Ch5 pressure" is supported.
+- Earlier this session (already merged): ch03 title card + "Defeat Grell" objective + smoke/clear_ch03
+  load-tests (**#160**) — ch03 (#23) is now down to enemy battle-anim art only.
+
+## Prior session (Codex — battle animations)
 
 ### Battle animations
 
@@ -99,15 +121,23 @@ Other working-tree state:
 - Other untracked local/session files are intentionally not versioned; leave them alone unless
   Nicolas explicitly asks to version or remove them.
 
-## Next steps
+## Next steps (ordered — the live sequence for the next instance)
 
-1. After #165 is squash-merged, optionally prototype the deferred charge-pose glow/flicker for Marty
-   and Meesmickle as a separate feature; do not assume vanilla Shaman charge art is an engine effect.
-2. Otherwise select the next character for battle-animation review. Create its short-lived feature
-   branch and keep review GIFs in `docs/demo/` only while the feature branch is under review.
-3. Before any additional custom item palette, audit a free live BG bank in every target UI context.
-   The GBA has exactly 16 BG palette banks (0-15); adding a source palette does not create a 17th live
-   bank.
+1. **Merge PR #167** (spell-tint hook registration — guard + `PATCHED_DECOMP_FILES`). CI green; it's a
+   pure standards fix, no feature change. Nicolas merges (self-merge classifier blocks Claude).
+2. **#168 — refactor the #165 spell-palette-tint** (Nicolas: do now, don't accumulate debt). One
+   feature-flow branch off main after #167. Stages 1–4 on the issue; Stage 2 (de-overload → dedicated
+   `gMSSpellTint`) is the only real risk (linker placement) — gated by `PT_CHAR=marty recordanim` green
+   Flux in-engine. Skip the spec doc (repo convention); record the superseding ADR in `decisions.md`.
+3. **Resume the ch04/ch05 re-basing** (#24 + #25). First get Nicolas's 3 confirms (A-vs-B / ch04 chests /
+   ch05 fog), then: curate FE8 Ch4 **and** Ch5 in `difficulty.py PARITY_REFERENCE_UDEFS`, re-base the two
+   seed YAMLs (`fe8_base_map` → Ch11 pair; `parity_reference` → Ch4 / Ch5), tune rosters via
+   `make difficulty` to the low band edge, update `decisions.md` + `CHAPTERS.md`. Still `status: planned`
+   seed work (sets targets; the map/event build happens at each slice, M3).
+4. Then **#138** (config-driven `inject_chapter`, incremental — approved direction) / next battle anim /
+   #29 world map.
+- Standing art-palette rule: before any additional custom item palette, audit a free live BG bank in
+  every target UI context (16 BG banks 0–15; a source palette does not create a 17th live bank).
 
 ## Quick commands
 

@@ -398,6 +398,10 @@ def check_engine_guards_present(fail):
              'the #65 GetBanimPalette guard (a custom appended banim keeps its OWN palette); '
              'without it a custom-anim unit on an archer/sniper class mis-loads the vanilla bow '
              'palette -- the RBG cyan mis-render'),
+            ('_patch_banim_spell_palette_tint',
+             'the #165 caster-scoped spell-palette tint seam (data-driven green Dark magic); '
+             'without it Marty\'s Flux (and any future tinted tome) silently reverts to the '
+             'vanilla spell palette'),
             ('_inject_crit_d20_flourish',
              'the #11 nat-20 crit flourish (a d20 pops on the SpellFx layer at the '
              'crit-flash teardown) -- the d20, the whole D&D thesis, would silently '
