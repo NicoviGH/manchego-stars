@@ -12,7 +12,8 @@
 # so the two Priests won't be stat-twins in-ROM even though this file shows the same class
 # baseline Sclorbo's shipped YAML does.
 # NOT yet wired into build_campaign (inert until the recruit wiring lands: free slot + recruit
-# logic + portrait + map sprite + a STAT_DONOR entry).
+# logic + injection wiring + a STAT_DONOR entry). The ART is shipped (portrait, map sprites,
+# battle-anim frames — see `art:` below); wiring it in is ch05-slice work (#25).
 
 id: basil
 name: Basil
@@ -70,7 +71,34 @@ recruit:
   chapter: ch05-the-elven-tomb
   via: story
 
-# ── Art (reskin lever: stock chassis, custom skin) ───────────────────────────
+# ── Art (SHIPPED 2026-07-16 — Oddish-sourced, Nicolas's direction) ───────────
+# All three parts are adopted Pokémon sprite work, NOT generated art (Nicolas's call):
+# map + battle come from the PMD SpriteCollab repository's official CHUNSOFT
+# Explorers-of-Sky sheets (github.com/PMDCollab/SpriteCollab, sprite/0043 = Oddish);
+# the portrait comes from the FireRed/LeafGreen Oddish battle sprite (PokeAPI
+# sprites archive, generation-iii/firered-leafgreen/43.png). Credits: CREDITS.md.
+# Pipeline & constraints ADR: docs/decisions.md §Art & Audio
+# "Adopting non-FE sprite sources (Basil/Oddish, 2026-07-16)".
 art:
-  approach: custom            # potted goodberry shrub over the Priest chassis; bust + map sprite TBD (#19/#38)
+  approach: adopted           # Oddish sprites reskinned to Basil, not drawn/generated
   staff_flavor: "heals by handing out Goodberries (cosmetic skin on a vanilla heal staff)"
+  portrait:                   # campaigns/.../portraits/basil.png (+_preview) — APPROVED 2026-07-16
+    source: data/portraits/basil.png          # gen3 FRLG 64x64 battle sprite (leaves fully rendered)
+    chain: quantize-15 -> ffmpeg hqx=2 -> place scale 1.0 (no resize) -> palette-lock, 16-entry palette
+    deadzone: verified clean (portrait_tool.py preview; top 48 rows only draw x=16..80)
+    static: true              # no mouth flap / blink, like the other custom busts
+  map_sprite:                 # SHIPPED (map_sprites/basil{,_mu}.png); palette applied by Nicolas
+    base: Cyclops             # geometry donor ONLY: {3 frames, UNIT_ICON_SIZE_16x32} wait-table row
+    footprint: 16x32          # PMD frames are 14-20px tall -> native fit in the tall class (no rescale)
+    idle_frames: PMD Idle-Anim S row f0/f1/f3, bottom-anchored
+    walk_frames: PMD Walk-Anim W/S/N rows, 8->5 downsample [0,2,3,5,6]; side faces left
+    palette: shared cast palette; index map chosen in map_sprite_swapper (--idle-frame-h 32)
+  battle_anim_frames:         # frames SHIPPED (battle_anims/basil/{ready,windup,peak}.png);
+                              # injection PENDING ch05 recruit wiring (#25) — needs a 'priest'
+                              # BANIM_DONORS row (staff/heal donor; NOT shaman: Basil heals)
+                              # before a live `battle_anim:` block can be declared here.
+    source: PMD Charge-Anim W f0 (ready), Shoot-Anim W f3 (windup), Shoot-Anim W f5 (peak)
+    facing: left (W row native — matches Marty/FE8 player side)
+    scale: 1.5x via ffmpeg hqx=3 then exact half downscale (Nicolas's pick over native/2x)
+    canvas: 64x48 shared, frames aligned by PMD *-Shadow.png ground centroid at (32,44)
+    palette: one shared <=14-color quantize across all three frames

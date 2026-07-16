@@ -47,15 +47,16 @@ def _sheet(path, fw, fh):
 
 
 class Doc:
-    def __init__(self, idle_path, walk_path, pal_path):
+    def __init__(self, idle_path, walk_path, pal_path, idle_fh=16):
         self.idle_path, self.walk_path, self.pal_path = idle_path, walk_path, pal_path
+        self.idle_fh = idle_fh
         pal = Image.open(pal_path).getpalette()[:48]
         self.palette = [[pal[3 * i], pal[3 * i + 1], pal[3 * i + 2]] for i in range(16)]
 
     def data(self):
         return {
             'palette': self.palette,
-            'idle': _sheet(self.idle_path, 16, 16),
+            'idle': _sheet(self.idle_path, 16, self.idle_fh),
             'walk': _sheet(self.walk_path, 32, 32),
             'walkDirs': WALK_DIRS,
             'names': {'idle': os.path.basename(self.idle_path),
@@ -264,6 +265,8 @@ def main():
     ap.add_argument('walk', nargs='?')
     ap.add_argument('palette', nargs='?')
     ap.add_argument('--trex', action='store_true', help='shortcut for the Trex sheets')
+    ap.add_argument('--idle-frame-h', type=int, default=16, choices=(16, 32),
+                    help='idle frame height (16x16 or 16x32 SMS class)')
     ap.add_argument('--port', type=int, default=8760)
     ap.add_argument('--no-browser', action='store_true')
     args = ap.parse_args()
@@ -276,7 +279,7 @@ def main():
             sys.exit('usage: map_sprite_swapper.py <idle.png> <walk.png> <cast_palette.png>\n'
                      '       map_sprite_swapper.py --trex')
         idle, walk, pal = args.idle, args.walk, args.palette
-    DOC = Doc(idle, walk, pal)
+    DOC = Doc(idle, walk, pal, idle_fh=args.idle_frame_h)
     srv = HTTPServer(('127.0.0.1', args.port), Handler)
     url = 'http://127.0.0.1:%d/' % args.port
     print('map-sprite swapper: %s  (Ctrl-C to stop)' % url)
