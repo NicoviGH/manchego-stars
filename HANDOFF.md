@@ -8,13 +8,15 @@ Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-co
 
 - **Parity/difficulty engine is now three-dimensional** (`tools/difficulty.py`, all read from HEAD):
   1. **Enemy pressure** (existing) — threat/slot + clear-load/slot vs the `parity_reference` twin.
-  2. **Item economy** (#170, merged #172) — `vanilla_economy()` extracts the twin's chests / gifts
-     (villages/houses + conditional clear rewards) / shops, valued from `data_items.c`; printed as
-     `ITEM-ECONOMY PARITY`. `chapter_economy()` reads ours from YAML.
-  3. **Battlefield dynamics** (#171, merged #174) — convertibles (CHAR-macro targets, e.g. Ch5's
-     Joshua) + reinforcement timing (`TurnEventPlayer` waves) auto-detected; printed as an ADDITIVE
-     `BATTLEFIELD DYNAMICS` section (static verdict/gate untouched). Our YAML: `convertible:` /
-     `arrives_turn:` on enemy_units.
+  2. **Item economy** (#170, merged #172; **drops added #176, merged #178**) — `vanilla_economy()`
+     extracts the twin's chests / gifts (villages/houses + conditional clear rewards) / shops / enemy
+     **drops** (a red unit flagged `.itemDrop` drops its LAST item, folded into `total_gold`), valued
+     from `data_items.c`; printed as `ITEM-ECONOMY PARITY`. `chapter_economy()` reads ours from YAML.
+  3. **Battlefield dynamics** (#171, merged #174; **area/zone reinforcements added #177, merged #178**)
+     — convertibles (CHAR-macro targets, e.g. Ch5's Joshua) + reinforcement timing auto-detected:
+     `TurnEventPlayer` AND raw `TURN(…,FACTION_BLUE)` waves, plus flag-gated / `AREA`-triggered
+     zone-entry spawns (Ch4 now reads 16 line + 7 reinf). Printed as an ADDITIVE `BATTLEFIELD DYNAMICS`
+     section (static verdict/gate untouched). Our YAML: `convertible:` / `arrives_turn:` on enemy_units.
   - `make difficulty CH=chNN` now shows all three. Everything reads via `vanilla_decomp_text`
     (`git show HEAD:`) — **immune to the working-tree injection** (our ch03 is injected into the Ch4
     host slot; hand-reading the tree there reports our chests as vanilla Ch4's — the bug that started
@@ -27,28 +29,25 @@ Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-co
   gated in-engine (`PT_CHAR=marty recordanim`).
 - **ch03** (#23) remains down to enemy battle-anim art only (unchanged this session).
 
-## This session (2026-07-16, Opus — engine hardening + ch04/ch05 design lock)
+## This session (2026-07-16, Opus — closed engine parity gaps #176 + #177)
 
-- Merged **#167** (spell-tint hook registration) → did **#168** as **#169** (de-overload to `gMSSpellTint`;
-  full build + verify_text 3404/0 + recordanim green Flux confirmed by data: 3.51% green px in the cast
-  windows vs ~0.6% idle baseline).
-- **Corrected a real error, mid-design:** claimed vanilla Ch4 had "4 chests incl. a Red Gem (~6,220g)"
-  — WRONG, that was our injected ch03 in the Ch4 host slot read from the working tree. True Ch4 =
-  **2 villages / one Iron Axe / ~270g / 0 chests** (the original brainstorm was right). Retracted on #24.
-  This motivated #170 (the tool reads HEAD, can't make that mistake).
-- Built **#170 + #171** (engine dimensions above), TDD, both merged.
-- **Locked ch04/ch05** (#175) — see decisions.md. The design conversation is fully captured there;
-  the settled shape:
-  - **ch04 = our FE8 Ch4** (Ancient Horrors) 1:1 — Rout, retiled snowy forest, **fog ON** (the hunt,
-    a config flag not a map feature), lean ~270g, **wolf-pack parley** (Marty→Lupin), **Trex as the fog
-    scout** (Thief +5 vision — fits Ch4's actual gimmick, the monster-debut). **No chest-race** (foreign
-    to Ch4).
-  - **ch05 = our FE8 Ch5** (The Empire's Reach) 1:1 — DefeatBoss(Ravisin), retile Ch5's **open spread
-    field** as an open-air tomb depression (NOT a corridor — keep spread reward-sites + cavalry lanes),
-    **no fog**. Rebuilds Ch5's two set-pieces: **Basil→Sahnar chaperone** (Natasha→Joshua; donors match
-    exactly) and the **eruption** (`EARTHQUAKE`/`TILECHANGE`, injected) raiding spread reliquaries
-    (the village-race). Ch5-magnitude economy + elven store; first chapter at the Ch5 reward tier.
-- Filed engine follow-up gaps **#176** (economy drops) + **#177** (area-triggered reinforcements).
+- **Closed both parity-engine v1 gaps** (PR **#178**, squash-merged; ADR in decisions.md
+  "Parity-engine v1 gaps closed"). TDD; 174/0 tests, `make check` clean, parity gate green.
+  - **#176 (economy drops):** `vanilla_unit_defs` captures the `.itemDrop` bit; a flagged red unit
+    drops its LAST item (`US_DROP_ITEM`, the final inventory slot per `statscreen.c:726`). New
+    `vanilla_drops()` values each via `item_gold_value`; `vanilla_economy` folds a `drops` channel into
+    `total_gold` + the print. Ch4/Ch5 twins carry NONE (lock unchanged); Ch2 Vulnerary / Ch3 keys /
+    Ch13 crests now counted.
+  - **#177 (area/zone reinforcements):** `_vanilla_reinforcement_turns` matched only the
+    `TurnEventPlayer` macro. It now also reads the raw `TURN(…,FACTION_BLUE)` expansion, and treats any
+    temp-flag-gated turn event (or `AREA`/`AFEV` script that LOADs a force) as a zone-entry reinforcement
+    (`_ZONE_ENTRY_TURN`, > turn 1). Ch4 "Ancient Horrors" now reads 16 line + 7 reinforcements
+    (3 Bonewalkers turn-2 + 4 Revenants zone-entry); Ch5's 2/6/8 detection unchanged.
+- **Fixed a pre-existing CI blocker** (same PR): `HANDOFF.md` references `tools/key_magenta.py`, an
+  intentionally-untracked local tool — `check.py`'s tool-ref drift guard reddened on EVERY PR in CI
+  (committed files only) while passing locally (file present). Gitignored it, matching check.py's
+  documented "gitignored target = declared artifact" exception (like `symbols.lua`). Was broken on
+  `main`, unrelated to #176/#177.
 
 ## Why we dropped the Ch11 map-borrow (so it isn't re-litigated)
 
@@ -61,22 +60,22 @@ chapter maps 1:1 to its numeric FE8 twin (map + parity) and the theme is layered
 
 1. **Build the ch04 / ch05 slices** (M3, the main line). Per-chapter vertical slice on #24 / #25.
    Author the map (Tiled retile of vanilla Ch4 / Ch5 per the map-authoring pipeline) + roster + events,
-   tuned against the now-machine-checkable targets via `make difficulty`. When authoring the roster,
-   **tag enemy_units with `fe_base` weapons, `convertible:` (Sahnar), and `arrives_turn:` (eruption
-   waves)** so the engine models them (right now the seeds show "0 enemies" = unmodeled weapons).
-   Also wire the Lupin/Sahnar/Basil `STAT_DONOR`s so `make difficulty` fields the true ch05 party
-   (they're currently invisible to it — a known lever, not headroom).
-2. **Engine parity fidelity: #176 + #177** — do before/alongside the slice tuning so the bars are
-   complete (drops; area/zone-triggered reinforcements like Ch4's). Both well-specced on the issues.
-3. **#138** config-driven `inject_chapter(descriptor)` (incremental; YAML `host:` block — approved
+   tuned against the now-machine-checkable targets via `make difficulty` (the engine bars are complete
+   now — enemy pressure + economy incl. drops #176 + dynamics incl. area/zone reinf #177). When authoring
+   the roster, **tag enemy_units with `fe_base` weapons, `convertible:` (Sahnar), `arrives_turn:` (eruption
+   waves), and `item_drop:` where a twin drops one** so the engine models them (right now the seeds show
+   "0 enemies" = unmodeled weapons). Also wire the Lupin/Sahnar/Basil `STAT_DONOR`s so `make difficulty`
+   fields the true ch05 party (they're currently invisible to it — a known lever, not headroom).
+2. **#138** config-driven `inject_chapter(descriptor)` (incremental; YAML `host:` block — approved
    direction, paused for the ch04/ch05 design).
-4. Then next battle anim / **#29** world map.
+3. Then next battle anim / **#29** world map.
 
 ## Working tree - do not lose or revert
 
 - `fireemblem8u` is dirty from injected/generated build artifacts. **Never commit its submodule pointer.**
-- Untracked local/session files (`.agents/`, `AGENTS.md`, `skills-lock.json`, `tools/key_magenta.py`)
-  are intentionally not versioned; leave them alone unless Nicolas asks.
+- Untracked local/session files (`.agents/`, `AGENTS.md`, `skills-lock.json`) are intentionally not
+  versioned; leave them alone unless Nicolas asks. `tools/key_magenta.py` is now **gitignored** (#178)
+  so it no longer trips the CI drift guard.
 - Everything from this session is merged to `main`; no dangling local branches.
 
 ## Quick commands
