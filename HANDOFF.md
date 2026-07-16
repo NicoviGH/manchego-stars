@@ -27,7 +27,10 @@ Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-co
 - **Spell-palette tint** finished: dedicated `gMSSpellTint` overlay global replaced the
   `gEfxSpellAnimExists` overload (#168, merged #169), after #167 registered the hook. Green Flux
   gated in-engine (`PT_CHAR=marty recordanim`).
-- **ch03** (#23) remains down to enemy battle-anim art only (unchanged this session).
+- **ch03** (#23) is **functionally complete** — down to enemy battle-anim art only. (Corrected a
+  stale #23 checklist this session: **Real PREP deploy** and the **"Defeat Saar" objective leak** are
+  already wired in `inject_ch03` — see the #23 2026-07-16 comment. The remaining kobold combat anims
+  are tracked in **#90**.)
 
 ## This session (2026-07-16, Opus — closed engine parity gaps #176 + #177)
 
@@ -48,6 +51,23 @@ Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-co
   (committed files only) while passing locally (file present). Gitignored it, matching check.py's
   documented "gitignored target = declared artifact" exception (like `symbols.lua`). Was broken on
   `main`, unrelated to #176/#177.
+- **Scoped #90 (enemy battle-anim import) via brainstorm** — Nicolas chose to clear ch3 before ch4,
+  and ch3's only remaining work is the kobold combat anims. Design of record is captured in the
+  **#90 2026-07-16 comment** (retitled: now the shared pipeline for ch1 imps + ch3 kobolds). No code
+  written — implementation is the next session's job (see Next steps #1).
+
+## NEXT SESSION — start here: #90 enemy battle-anim import (clears ch3)
+
+Full grounded design is in the **#90 2026-07-16 comment** (read it first — it has the technical
+findings so you don't re-derive). Summary: build a new importer (`feditor_to_banim.py`, under tools/) — parse a vendored FE-Repo
+FEditor `.txt` + frame PNGs → decomp banim assets, reusing `ref_to_battleframe`'s emitters; command→
+`banim_code_*` macro table — the vocabulary already exists in `include/banim_code.inc`) + a class-level
+`AnimConf` binding in `build_campaign` driven by a new `battle_anim:` on `enemy_class_reskins`
+(`ClassData.pBattleAnimDef`). **Decision = full FEditor import (not the faked-3-pose shortcut).**
+**FIRST STEP: vendor the real Lenh "Lizard Brigand Wildling" anim from Klokinator/FE-Repo and inspect
+its actual packaging BEFORE building the parser.** Prove on kobold-grunt Wildling → in-engine ch03
+capture (`CH03BOOT=1 PT_HOST_CHAPTER=4`) → show Nicolas → then Lizardzerker → then ch1 fire imp.
+Svirfneblin stays vanilla; slinger = map-sprite only. TDD; `feat/90-…` branch; ADR (no spec doc).
 
 ## Why we dropped the Ch11 map-borrow (so it isn't re-litigated)
 
@@ -58,7 +78,10 @@ chapter maps 1:1 to its numeric FE8 twin (map + parity) and the theme is layered
 
 ## Next steps (priority order)
 
-1. **Build the ch04 / ch05 slices** (M3, the main line). Per-chapter vertical slice on #24 / #25.
+1. **#90 enemy battle-anim import — clears ch3 (Nicolas: finish ch3 before ch4).** See the
+   "NEXT SESSION — start here" block above + the #90 2026-07-16 design comment. Prove on the
+   kobold-grunt Wildling, then Lizardzerker, then the ch1 fire imp.
+2. **Build the ch04 / ch05 slices** (M3, the main line). Per-chapter vertical slice on #24 / #25.
    Author the map (Tiled retile of vanilla Ch4 / Ch5 per the map-authoring pipeline) + roster + events,
    tuned against the now-machine-checkable targets via `make difficulty` (the engine bars are complete
    now — enemy pressure + economy incl. drops #176 + dynamics incl. area/zone reinf #177). When authoring
@@ -66,9 +89,9 @@ chapter maps 1:1 to its numeric FE8 twin (map + parity) and the theme is layered
    waves), and `item_drop:` where a twin drops one** so the engine models them (right now the seeds show
    "0 enemies" = unmodeled weapons). Also wire the Lupin/Sahnar/Basil `STAT_DONOR`s so `make difficulty`
    fields the true ch05 party (they're currently invisible to it — a known lever, not headroom).
-2. **#138** config-driven `inject_chapter(descriptor)` (incremental; YAML `host:` block — approved
+3. **#138** config-driven `inject_chapter(descriptor)` (incremental; YAML `host:` block — approved
    direction, paused for the ch04/ch05 design).
-3. Then next battle anim / **#29** world map.
+4. Then **#29** world map.
 
 ## Working tree - do not lose or revert
 
