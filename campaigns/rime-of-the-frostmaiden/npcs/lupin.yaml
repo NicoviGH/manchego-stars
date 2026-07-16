@@ -76,3 +76,28 @@ art:
     zoom: 1.0                         # full frame; the wide crop already clears the dead corners (0 px clipped)
     hand_pass: lupin_darken.py        # ref ink is warm charcoal; deepen outline/eyes/glasses to true black
     credit: "TotalityDesigns (Redbubble) — see CREDITS.md"
+  # ── Map sprite (SHIPPED 2026-07-16) — adopted Lycanroc, Nicolas's direction ──
+  # map_sprites/lupin.png (wait) + lupin_mu.png (MU walk), indexed on the cast palette.
+  # Source: "Rockruff & Lycanroc Overworlds" by princess-phoenix (DeviantArt, CC-BY 3.0) —
+  # the Midday Lycanroc form (quadruped wolf, 4-direction 4-frame overworld walk). Credits: CREDITS.md.
+  # Build recipe (tools/-driven, no generated art):
+  #   1. Extract Midday BLUE variant (sheet 8x16 of 32px; rows 4-7 = Midday, cols 4-7 = blue):
+  #      down=row4, left=row5, right=row6, up=row7.
+  #   2. Recolor to the cast GREY ramp by luminance (indices [1,2,3,11,4]) — matches Lupin's
+  #      grey portrait fur (portraits/lupin.png). No hue kept; the source blue/pink drop to grey.
+  #   3. Hand-draw GLASSES per frame, anchored to the detected eye (the source's green eye-dot,
+  #      which tracks the head-bob): style = bold hipster frame raised +1px, OPAQUE white lens
+  #      (cast idx4), near-black frame (cast idx1), dark pupil dot (cast idx2). On down + both
+  #      sides; the UP (back) run has no face, so no glasses. Nicolas approved this exact spec.
+  map_sprite:
+    base: Gwyllgi             # geometry token ONLY: {3 frames, UNIT_ICON_SIZE_32x32} wait-table
+                              # row (unit_icon_wait_data.c // 77) — FE8's own dire-wolf, apt AND
+                              # correct geometry. NOT the visible sprite. Class stays Cavalier.
+    footprint: 32x32          # quadruped ~27px wide -> needs the 32x32 monster size class
+    wait: down-idle bob, frames [0,1,2]                    # lupin.png  = 32x96  (3x 32x32)
+    mu: side[0-4]=left walk, down[5-9], up[10-14] (no glasses); each run frames [0,1,2,3,0]
+        # lupin_mu.png = 32x480 (15x 32x32); right = engine H-flip of the side run
+    palette: cast             # cast_palette.png; grey ramp + glasses idx1/2/4
+    credit: "princess-phoenix (DeviantArt, CC-BY 3.0); see CREDITS.md"
+  # Battle anim still deferred (#39). PMD SpriteCollab has Lycanroc (#0745) with a full side-view
+  # anim set (Attack/Charge/Shoot) if we want a matching-style battle anim later — rides #90's pipeline.
