@@ -37,6 +37,18 @@ Source: **[Klokinator/FE-Repo](https://github.com/Klokinator/FE-Repo)** (communi
 
 (Each FE-Repo asset folder ships a `CREDITS.txt` — copy its exact line here when we lock the asset.)
 
+## Pokémon-sourced assets (Basil the goodberry shrub — Oddish)
+Basil's entire sprite kit adopts **Oddish** (Pokémon #43) art; private non-commercial use, same
+footing as the FE8 base game itself. Recheck before any wider distribution.
+
+| Asset | Used for | Origin | Source |
+|---|---|---|---|
+| PMD *Explorers of Sky* Oddish animation sheets (Idle/Walk/Charge/Shoot + Shadow) | Basil map sprites (`map_sprites/basil{,_mu}.png`, recoloured onto the cast palette) + battle-anim frames (`battle_anims/basil/`, 1.5x hqx) | © **Nintendo / Creatures / GAME FREAK / Spike Chunsoft** (official game rips, credited `CHUNSOFT` in the repo) | [PMDCollab/SpriteCollab](https://github.com/PMDCollab/SpriteCollab) `sprite/0043` |
+| Oddish FireRed/LeafGreen battle sprite | Basil portrait (`portraits/basil.png`, hq2x + 16-colour fit; source vendored at `data/portraits/basil.png`) | © **Nintendo / Creatures / GAME FREAK** | [PokeAPI/sprites](https://github.com/PokeAPI/sprites) `generation-iii/firered-leafgreen/43.png` |
+
+(The PMD SpriteCollab fan-made emotion portraits were evaluated but NOT shipped — the shipped
+portrait derives from the official FRLG sprite only.)
+
 ### Map tilesets (used as-is; the shared snow tileset for the MVP)
 | Asset | Used for | Authors | Source | License |
 |---|---|---|---|---|
