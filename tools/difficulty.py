@@ -708,6 +708,7 @@ def report(campaign, ch):
               % (num, ref))
 
     _print_pressure(_chapter_pressure(chap))
+    _print_economy(chap)
 
 
 def _chapter_pressure(chap, band=0.25):
@@ -758,6 +759,162 @@ def _print_pressure(p):
              ol, v['load_ratio'], v['load']))
     print('  verdict: %s' % ('PARITY (within band)' if v['verdict'] == 'OK'
                              else 'OFF-PARITY -- threat %s, clear-load %s' % (v['threat'], v['load'])))
+
+
+# ── Item-economy parity (#170) ──────────────────────────────────────────────────
+# The vanilla twin's payout, read from HEAD via bc.vanilla_decomp_text -- NEVER the working
+# tree, which the build injects our own chapters into (reading the tree by hand once had our
+# ch03 chests reported as vanilla Ch4's). Same ground-truth discipline as the enemy rosters:
+# chests + village/house gifts + shops, valued from data_items.c. Drops are a documented v1
+# gap (the curated Ch4/Ch5 twins carry none) -- see #170.
+
+# parity_reference -> the decomp chapter file stem whose event data carries its economy.
+PARITY_REFERENCE_ECON = {
+    'FE8 Prologue': 'prologue', 'FE8 Ch1': 'ch1', 'FE8 Ch2': 'ch2', 'FE8 Ch3': 'ch3',
+    'FE8 Ch4': 'ch4', 'FE8 Ch5': 'ch5', 'FE8 Ch6': 'ch6', 'FE8 Ch13': 'ch13a',
+}
+
+_ITEM_VALUES = None
+_ITEM_IDS = None
+
+
+def _item_gold_values():
+    """ITEM_x enum -> buy gold (costPerUse * maxUses) from vanilla data_items.c (HEAD). A
+    gem/booster's value is that product; sell is ~half. Cached (one decomp read)."""
+    global _ITEM_VALUES
+    if _ITEM_VALUES is None:
+        text = bc.vanilla_decomp_text('src/data_items.c')
+        _ITEM_VALUES = {}
+        for m in re.finditer(r'\[(ITEM_\w+)\]\s*=\s*\{(.*?)\n\s*\},', text, re.S):
+            body = m.group(2)
+            cpu = re.search(r'\.costPerUse\s*=\s*(\d+)', body)
+            uses = re.search(r'\.maxUses\s*=\s*(\d+)', body)
+            _ITEM_VALUES[m.group(1)] = ((int(cpu.group(1)) if cpu else 0)
+                                        * (int(uses.group(1)) if uses else 1))
+    return _ITEM_VALUES
+
+
+def item_gold_value(item_enum):
+    """Buy-gold of a vanilla ITEM_x enum (0 if unknown or valueless)."""
+    return _item_gold_values().get(item_enum, 0)
+
+
+def _item_id_to_enum():
+    """Numeric item id -> ITEM_x enum, from vanilla constants/items.h (HEAD). Village/house
+    GIVEITEMTO gifts name their item by numeric id (SVAL), so we resolve id -> enum -> value."""
+    global _ITEM_IDS
+    if _ITEM_IDS is None:
+        text = bc.vanilla_decomp_text('include/constants/items.h')
+        _ITEM_IDS = {}
+        val = -1
+        for line in text.splitlines():
+            s = line.strip()
+            if not s.startswith('ITEM_'):
+                continue
+            m = re.match(r'(ITEM_\w+)\s*(?:=\s*(0x[0-9a-fA-F]+|\d+))?', s)
+            if not m:
+                continue
+            val = int(m.group(2), 0) if m.group(2) else val + 1
+            _ITEM_IDS[val] = m.group(1)
+    return _ITEM_IDS
+
+
+def _shoplist_items(shoplist_text, list_sym):
+    """The ITEM_x enums a ShopList_ array stocks (ITEM_NONE terminator dropped)."""
+    m = re.search(re.escape(list_sym) + r'\[\]\s*=\s*\{(.*?)\}', shoplist_text, re.S)
+    if not m:
+        return []
+    return [it for it in re.findall(r'ITEM_\w+', m.group(1)) if it != 'ITEM_NONE']
+
+
+def _gift_items(eventscript_text):
+    """Every item handed out in the chapter script: for each GIVEITEMTO, the nearest preceding
+    SVAL(EVT_SLOT_3, <id>) sets its item. Catches village/house gifts AND conditional/clear
+    rewards given outside a Village macro (e.g. Ch5's all-villages-saved Guiding Ring, handed to
+    the leader). Returns the ITEM_x enums. An event village that only spawns a unit (SVAL to a
+    different slot, no GIVEITEMTO) contributes nothing, as it should."""
+    id2e = _item_id_to_enum()
+    out = []
+    for g in re.finditer(r'GIVEITEMTO', eventscript_text):
+        pre = re.findall(r'SVAL\(EVT_SLOT_3,\s*(0x[0-9a-fA-F]+|\d+)\)',
+                         eventscript_text[:g.start()])
+        if pre:
+            enum = id2e.get(int(pre[-1], 0))
+            if enum:
+                out.append(enum)
+    return out
+
+
+def vanilla_economy(parity_ref):
+    """The vanilla twin's item economy, read from HEAD: chests, gifts (villages/houses/clear
+    rewards), and shops, each valued in buy-gold. None if the reference has no mapped economy
+    source (#170). Delivery context (# of villages/houses) is kept for the vehicle story."""
+    stem = PARITY_REFERENCE_ECON.get(parity_ref)
+    if stem is None:
+        return None
+    info = bc.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
+    script = bc.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
+    shoptext = bc.vanilla_decomp_text('src/events_shoplist.c')
+    chests = [(it, item_gold_value(it)) for it in re.findall(r'Chest\((ITEM_\w+)', info)]
+    gifts = [(it, item_gold_value(it)) for it in _gift_items(script)]
+    shops = [(sym, _shoplist_items(shoptext, sym))
+             for sym in re.findall(r'(?:Armory|Vendor)\(\s*(\w+)', info)]
+    total = sum(v for _, v in chests) + sum(v for _, v in gifts)
+    return {'reference': parity_ref, 'chests': chests, 'gifts': gifts, 'shops': shops,
+            'n_villages': len(re.findall(r'Village\(', info)),
+            'n_houses': len(re.findall(r'House\(', info)), 'total_gold': total}
+
+
+def chapter_economy(chap):
+    """Our chapter's declared economy from its YAML: explicit gold + item ids by vehicle.
+    Campaign item ids aren't valued here (they aren't vanilla enums) -- the vanilla bar is the
+    gold target; ours is listed alongside for a same-glance compare."""
+    gold = 0
+    gifts, chests, drops = [], [], []
+    for v in chap.get('villages') or []:
+        for r in v.get('visit_reward') or []:
+            if r.get('id') == 'gold':
+                gold += int(r.get('amount') or 0)
+            elif r.get('id'):
+                gifts.append(r['id'])
+    for c in chap.get('chests') or []:
+        for it in c.get('contents') or []:
+            if it.get('id'):
+                chests.append(it['id'])
+    for ed in chap.get('enemy_units') or []:
+        if ed.get('item_drop'):
+            drops.append(ed['item_drop'])
+    pc = chap.get('post_chapter') or {}
+    gold += int(pc.get('gold_reward') or 0)
+    shops = list(pc.get('available_shops') or chap.get('available_shops') or [])
+    return {'gold': gold, 'gifts': gifts, 'chests': chests, 'drops': drops, 'shops': shops}
+
+
+def _print_economy(chap):
+    ref = chap.get('parity_reference')
+    van = vanilla_economy(ref)
+    print('\n-- ITEM-ECONOMY PARITY (vs %s) [from HEAD, not the injected worktree] '
+          % (ref or '?') + '-' * 6)
+    if van is None:
+        print('  (no mapped vanilla economy for %r -- skipped)' % ref)
+    else:
+        def fmt(pairs):
+            return ', '.join('%s %dg' % (it.replace('ITEM_', ''), v)
+                             for it, v in pairs) or 'none'
+        print('  vanilla %-11s ~%dg total in gifts+chests' % (ref, van['total_gold']))
+        print('    chests: %s' % fmt(van['chests']))
+        print('    gifts:  %s  (via %d village/%d house + clear rewards)'
+              % (fmt(van['gifts']), van['n_villages'], van['n_houses']))
+        print('    shops:  %s' % (', '.join('%s (%d items)'
+              % (s.replace('ShopList_Event_', ''), len(items))
+              for s, items in van['shops']) or 'none'))
+    ours = chapter_economy(chap)
+    parts = ['%dg declared' % ours['gold']]
+    for label in ('chests', 'gifts', 'drops', 'shops'):
+        if ours[label]:
+            parts.append('%s[%s]' % (label, ', '.join(map(str, ours[label]))))
+    print('  ours:   %s' % ' · '.join(parts))
+    print('  (advisory target: match the twin\'s magnitude + delivery vehicle; not a hard gate)')
 
 
 def curve_gate_failures(rows):

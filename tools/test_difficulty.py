@@ -589,5 +589,70 @@ class LordFloorSolver(unittest.TestCase):
         self.assertFalse(f.reached)
 
 
+class ItemEconomy(unittest.TestCase):
+    """Vanilla twin economy is extracted from HEAD (#170) -- never the working tree, which the
+    build injects our own chapters into. These lock the HEAD-verified numbers so the class of
+    bug that had our ch03 chests reported as vanilla Ch4's can't recur silently."""
+
+    def test_item_gold_value_from_head(self):
+        self.assertEqual(df.item_gold_value('ITEM_AXE_IRON'), 270)
+        self.assertEqual(df.item_gold_value('ITEM_GUIDINGRING'), 10000)
+        self.assertEqual(df.item_gold_value('ITEM_BOOSTER_DEF'), 8000)
+        self.assertEqual(df.item_gold_value('ITEM_TORCH'), 500)
+        self.assertEqual(df.item_gold_value('ITEM_REDGEM'), 5000)
+        self.assertEqual(df.item_gold_value('ITEM_NOT_A_REAL_ITEM'), 0)
+
+    def test_ch4_is_lean_two_villages_no_chests(self):
+        # The bug fixture: vanilla Ch4 is 2 villages / one Iron Axe (~270g) / ZERO chests.
+        # (The worktree's ch4 slot may hold our injected ch03 chests -- reading HEAD ignores them.)
+        e = df.vanilla_economy('FE8 Ch4')
+        self.assertEqual(e['total_gold'], 270)
+        self.assertEqual(e['chests'], [])
+        self.assertEqual(e['gifts'], [('ITEM_AXE_IRON', 270)])
+        self.assertEqual(e['shops'], [])
+        self.assertEqual(e['n_villages'], 2)
+
+    def test_ch5_gifts_include_the_clear_reward_and_two_shops(self):
+        # ~27,760g: the Guiding Ring is a clear reward handed to the leader OUTSIDE any Village
+        # macro -- the gift scan must still catch it (else we under-count by the biggest item).
+        e = df.vanilla_economy('FE8 Ch5')
+        self.assertEqual(e['total_gold'], 27760)
+        self.assertEqual(e['chests'], [])
+        gift_items = dict(e['gifts'])
+        self.assertEqual(gift_items['ITEM_GUIDINGRING'], 10000)
+        self.assertEqual(gift_items['ITEM_BOOSTER_DEF'], 8000)
+        self.assertEqual(gift_items['ITEM_BOOSTER_SKL'], 8000)
+        self.assertEqual(gift_items['ITEM_SWORD_ARMORSLAYER'], 1260)
+        self.assertEqual(len(e['shops']), 2)          # Armory + Vendor
+        self.assertEqual(e['n_villages'], 4)
+
+    def test_ch3_chests_are_read_from_head(self):
+        # Vanilla Ch3 (Borgo) is a 4-chest chapter -- proves chest extraction, distinct from the
+        # gift/village path, and that the reader isn't confusing vehicles.
+        e = df.vanilla_economy('FE8 Ch3')
+        chest_items = [i for i, _ in e['chests']]
+        self.assertEqual(len(e['chests']), 4)
+        self.assertIn('ITEM_LANCE_JAVELIN', chest_items)
+        self.assertEqual(e['gifts'], [])
+
+    def test_unmapped_reference_returns_none(self):
+        self.assertIsNone(df.vanilla_economy('FE8 Ch99'))
+
+    def test_chapter_economy_reads_our_declared_yaml(self):
+        chap = {
+            'villages': [{'visit_reward': [{'id': 'gold', 'amount': 150},
+                                           {'id': 'vulnerary'}]}],
+            'chests': [{'contents': [{'id': 'red-gem'}]}],
+            'enemy_units': [{'id': 'k', 'item_drop': 'chest-key'}],
+            'post_chapter': {'gold_reward': 200, 'available_shops': ['termalaine']},
+        }
+        ours = df.chapter_economy(chap)
+        self.assertEqual(ours['gold'], 350)               # 150 village + 200 post
+        self.assertEqual(ours['gifts'], ['vulnerary'])
+        self.assertEqual(ours['chests'], ['red-gem'])
+        self.assertEqual(ours['drops'], ['chest-key'])
+        self.assertEqual(ours['shops'], ['termalaine'])
+
+
 if __name__ == '__main__':
     unittest.main()
