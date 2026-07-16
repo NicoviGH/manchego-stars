@@ -2,7 +2,10 @@
 # Chapter index: docs/CHAPTERS.md (generated from this file). Rationale: docs/decisions.md.
 # Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
 # Canon: Rime of the Frostmaiden pp.80-83 (the Elven Tomb, Ravisin, Sahnar the mummy).
-# This is the DefeatBoss half of FE8 Ch4 "Ancient Horrors" — the forest/DefeatAll half is ch04.
+# This is our FE8 Ch5 "The Empire's Reach" 1:1 (ch04 is our FE8 Ch4). See decisions.md
+# "ch04 and ch05 each map 1:1 to their numeric FE8 twin": we retile Ch5's spread-village
+# field as an open-air elven-tomb depression and emulate its two set-pieces — the
+# Natasha→Joshua escort (here: Basil→Sahnar) and the village-raid race (here: the eruption).
 
 id: ch05-the-elven-tomb
 title: "The Elven Tomb"
@@ -12,8 +15,9 @@ status: planned                # brainstorm SEED, NOT authoritative: enemy roste
                                # (brainstorming skill digests this). Exempt from the parity gate until then.
 milestone: M3
 cadence: first_boss             # see docs/CHAPTERS.md — 🟥
-fe8_base_map: "FE8 Ch4 — Ancient Horrors"           # the DefeatBoss half (boss in a contained arena)
-parity_reference: "FE8 Ch4"   # #48 enemy-pressure parity bar — Ancient Horrors — DefeatBoss half
+fe8_base_map: "FE8 Ch5 — The Empire's Reach"        # retiled: Ch5's spread field → open-air tomb depression
+parity_reference: "FE8 Ch5"   # #48 enemy-pressure + reward parity bar — The Empire's Reach (1:1)
+                              # (first chapter at the FE8-Ch5 reward tier: stat-boosters + a promotion item unlock here)
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
@@ -30,42 +34,70 @@ narrative: >
 map:
   file: maps/ch05-elven-tomb.tmx
   tileset: tomb-interior        # elven temple/tomb; FEUniverse temple tileset, arctic palette
-  size: "22×18"
+  size: "~15×20"                # retile of FE8 Ch5's field (TBD at slice build) — NOT a corridor
+  # DESIGN CONSTRAINT (decisions.md): retile Ch5's OPEN spread-village field, not an enclosed
+  # ship/corridor. Keep the two features that make Ch5 play like Ch5:
+  #  (1) reward-sites SPREAD to the corners (Ch5 villages sat at ~(5,1)(5,6)(12,10)(12,19)) so the
+  #      party must SPLIT and race — here they're elven reliquary niches the eruption raids;
+  #  (2) OPEN lanes so our mounted units (Baxby, Lupin) matter (a corridor neuters cavalry).
   description: >
-    The elven tomb (canon map 1.15). A snowy circular depression: the moon dial
-    at center (E5), a marble gazebo with the brazier (E3) to one side, and the
-    sarcophagus ringed by crystal pillars (E4) on the eastern berm. Ravisin holds
-    the depression with the cornered white moose; vine-blight guardians clog the
-    approaches. Crystal pillars and statues are the cover/chokepoints.
+    An open-air elven tomb — a snowy sunken depression ringed by crystal pillars and
+    statues (cover/chokepoints), NOT a claustrophobic crypt. The moon dial sits at
+    center, the gazebo brazier to one side, the sarcophagus on the eastern berm.
+    Ravisin holds the central depression with the cornered white moose; vine-blight
+    guardians clog the approaches. Elven reliquary niches are spread to the map's edges
+    (the reward-sites the eruption's undead race to desecrate). Open lanes between the
+    pillars keep cavalry relevant.
 
 # ── Objective ──────────────────────────────────────────────────────────────────
 objective:
   type: defeat_boss                      # our FIRST clean boss kill (objective rotation — see decisions.md)
   description: "Defeat Ravisin, the frost druid (her guardians and the moose needn't all fall)"
   secondary:
-    - type: brazier_puzzle
+    - type: talk_recruit
       description: >
-        Open the sarcophagus to free Sahnar: gather a twig, a pinecone, and a
-        feather on the map and bring them to the gazebo brazier (E3) to kindle it.
-        Optional but the only way to recruit the mummy.
+        Recruit Sahnar the Joshua way (this IS Ch5's memorable beat). Sahnar rises as
+        a HOSTILE guardian — a fast, crit-threat Myrmidon mummy (killing-edge, Joshua's
+        exact donor) — and the only way to flip him is to walk fragile BASIL up to him
+        to Talk (Basil is our Natasha: her exact donor, a frail Priest). So you must
+        chaperone a weak healer across the depression to the deadly duelist, clearing a
+        safe pocket first — the escort-recruit that defines how you play Ch5. Optional;
+        flip him and he fights the back half (recruit swing ~+0.9 kills/round, #171).
+    - type: brazier_flavor
+      description: >
+        The gazebo brazier (silver flame) is the narrative beat that WAKES Sahnar from
+        the sarcophagus at the eruption — optional atmosphere, not the recruit gate
+        (superseded by the chaperone Talk above; see decisions.md).
 
 win_condition: boss_defeated
 lose_condition: all_player_units_defeated
 
 difficulty_note: >
-  Our first real boss. Ravisin is a vanilla FE8 Druid — heavy dark-magic damage
-  (FE MAG vs RES) at 1-2 range — so squishy/low-RES units must respect her threat
-  range. The cornered white moose is a hard-hitting beast that charges; the
-  vine-blights are slow chip damage. Keep it a clean kill-the-boss objective so
-  the druid is the climax. Lean generous: the pillars give cover to bait her out.
+  Our first real boss, tuned to the FE8 Ch5 bar (steepest yet: threat/slot ~10.3,
+  clear-load/slot ~5.15 static — but see the DYNAMICS below, which the #171 engine now
+  models). Ravisin is a vanilla FE8 Druid — heavy dark-magic (FE MAG vs RES) at 1-2
+  range — so squishy/low-RES units must respect her threat range; the pillars give cover
+  to bait her out. Two Ch5 dynamics do the real work and pay the difficulty DOWN so we
+  can afford the tension:
+    - CONVERTIBLE Sahnar (the Joshua flip): a hostile crit-Myrmidon until Basil Talks
+      him, then a +0.9 kills/round ally for the back half. Self-balancing risk→advantage.
+    - REINFORCEMENT eruption: undead arrive over turns (arrives_turn), not a turn-1 alpha —
+      so the turn-1 threat reads well below the static 10.3.
+    - Untapped headroom: Lupin (+1.0) is a clean all-chapter combatant the static party
+      number (6.27) omits; Basil is the fragile recruiter, not a fighter.
+  No fog — the tension is the escort + the eruption race, not obscured vision. Keep it a
+  clean DefeatBoss so Ravisin is the climax.
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
   note: >
     Deployable pool by Ch5: 7 PCs + Pinky + Baxby (Cav) + Trex (Thief) + Lupin
-    (beast-Cav) + Sahnar (Myr, recruited here) + Basil (Priest, recruited here).
-    Only the pack-dressing direwolves stay non-combat. deploy_limit caps the field
-    to vanilla parity (TBD this pass). Positions set in Tiled.
+    (beast-Cav, won in ch04 — a clean all-chapter combatant, +1.0 kills/round the static
+    party number omits). Basil (Priest) is present from the start as the fragile RECRUITER
+    (must be fielded and protected to Talk Sahnar — the Natasha role), NOT a fighter.
+    Sahnar is NOT in the starting field — he rises mid-combat as a HOSTILE convertible
+    (the Joshua flip) and joins only once Basil Talks him. deploy_limit caps the field to
+    FE8-Ch5 parity (TBD this pass). Positions set in Tiled.
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
 enemy_units:
@@ -108,17 +140,13 @@ enemy_units:
     ai_pattern: aggressive
     # boss-chapter pacing bump (6 -> 9 enemies; decisions 2026-06-06)
 
-# ── Brazier Puzzle (FE8-native: gather offerings → light the brazier → door opens) ──
-# Canon RotFM p.82-83 needs a twig, pinecone, feather, AND a severed humanoid hand;
-# we drop the hand for our lighter tone — three offerings is enough to kindle it.
-brazier_puzzle:
-  offerings: [twig, pinecone, feather]   # scattered on the map as pickups (chest/terrain events)
-  brazier_tile: E3              # the marble gazebo; bring all three here to kindle the silver flame
-  result: sarcophagus_opens     # opens E4 → frees Sahnar (recruit). Optional, never gates chapter clear.
-  note: >
-    Implemented with vanilla terrain/events — the offerings are map items and the
-    brazier is a tile that fires the sarcophagus-open event once all three are
-    delivered. No simultaneous-positioning mechanic (FE8 has none).
+# ── Sahnar's sarcophagus (RETIRED the 3-offering fetch-puzzle) ────────────────────
+# Superseded 2026-07-15: the recruit is now the Basil→Sahnar chaperone Talk (the Joshua beat,
+# above), which "affects how you play the level" the way vanilla Ch5's Natasha→Joshua does — a
+# stronger hook than a fetch-quest that competes for turns. The brazier survives only as the
+# narrative WAKE beat: the eruption cracks the sarcophagus and Sahnar rises HOSTILE (a silver
+# flame flavor moment), then Basil must reach him to flip him. Canon RotFM p.82-83's offerings
+# (twig/pinecone/feather; we already dropped the severed hand) become set-dressing, not a gate.
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
 events:
@@ -128,13 +156,21 @@ events:
     description: >
       The trail ends at the tomb; Ravisin reveals herself and her awakened beasts,
       naming Auril. The cornered white moose snorts at her side. Battle begins.
-  - trigger: brazier_kindled
-    type: cutscene
-    ea_file: events/ch05-sarcophagus.ea
+  - trigger: eruption_turn        # scripted turn (~2/3/5, the Ch5 wave cadence) — EARTHQUAKE/TILECHANGE
+    type: scripted_event
+    ea_file: events/ch05-eruption.ea
     description: >
-      All three offerings delivered → the brazier's silver flame opens the
-      sarcophagus. Sahnar the moon-elf mummy animates (smells faintly of pumpkin
-      spice) and offers to serve his liberators, curious about modern druids.
+      The tomb floor breaks (Phantom-Ship EARTHQUAKE + sequential TILECHANGE): undead
+      REINFORCEMENTS erupt over turns and race the party for the spread reliquary
+      reward-sites (the Ch5 village-raid, in undead dress). The same quake cracks the
+      sarcophagus — Sahnar the moon-elf mummy rises, HOSTILE, a fast crit-Myrmidon
+      guardian (smells faintly of pumpkin spice). He flips only when Basil reaches him.
+  - trigger: sahnar_talk          # Basil (Natasha-donor) Talks the risen Sahnar (Joshua-donor)
+    type: dialogue
+    ea_file: events/ch05-sahnar-recruit.ea
+    description: >
+      Basil chaperoned safely to Sahnar → he flips to the party, curious about modern
+      druids and eager to serve his liberators. The escort-recruit (Ch5's Joshua beat).
   - trigger: chapter_end
     type: cutscene
     ea_file: events/ch05-ending.ea
@@ -144,10 +180,29 @@ events:
       coast toward Bremen — where, Ravisin's dying words hint, another of her
       awakened beasts still terrorizes a town.
 
+# ── Economy (FE8 Ch5 parity — the party's power-spike chapter) ────────────────────
+# Ch5's real economy (verified from HEAD via the #170 extractor): ~27,760g across 4 village
+# gifts + 2 shops — Guiding Ring 10,000 + Dracoshield 8,000 (Def) + Secret Book 8,000 (Skl)
+# + Armorslayer 1,260 + Torch 500, plus an Armory + Vendor. We MATCH the magnitude and the
+# delivery channels (this is the first chapter at the FE8-Ch5 reward tier — §Reward budget):
+economy:
+  reward_sites:                  # the "villages" of Ch5, retiled as elven reliquary niches spread to the
+                                 # map edges; the eruption's undead race to desecrate them (save-all bonus).
+    - gift: booster-def          # ≈ Ch5 Dracoshield (+Def) — first stat-booster in the campaign
+    - gift: booster-skl          # ≈ Ch5 Secret Book (+Skl)
+    - gift: armorslayer          # ≈ Ch5 Armorslayer (effective vs the vine-blight/armor guardians)
+    - gift: torch                # ≈ Ch5 Torch (flavored an elven everburning lamp)
+  elven_store:                   # ≈ Ch5's Armory + Vendor — an ancient elven quartermaster's reliquary
+    armory: true                 #   the party requisitions (narrative: the tomb kept its stores)
+    vendor: true
+  save_all_bonus: crest-of-cold-iron   # ≈ Ch5's Guiding Ring (save-all-villages reward). NOTE: the crest
+                                 # is ALSO Ravisin's narrative drop (Chekhov's promo relic) — keep the drop;
+                                 # the save-all bonus is the mechanical echo of the Guiding-Ring condition.
+
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
   gold_reward: 350
-  available_shops: [lonelywood]
+  available_shops: [elven-reliquary]   # the in-tomb elven store (Armory + Vendor); see economy block
   units_available_to_recruit:
     - id: sahnar                         # Myrmidon (sword duelist); see npcs/sahnar.yaml
       description: "Sahnar, the reawakened moon-elf mummy (recruited by lighting the brazier). Playable Myrmidon."
@@ -159,9 +214,18 @@ post_chapter:
   unlocks_chapter: ch06-the-maer-monster
 
 design_notes: >
-  Our first clean boss kill (DefeatBoss). Ravisin is the canonical frost druid and
-  the villain thread tying the white moose (ch04) → this tomb → Messie (ch06): she
-  awakened them all. She drops the LOCKED 'crest of cold iron' (the promotion
-  Chekhov's gun for the Ch8→9 seam). The brazier puzzle is optional and the only
-  way to recruit Sahnar. Basil joins as our second healer (Priest) — the goodberry
-  shrub as a literal heal-staff unit (LOCKED 2026-06-20).
+  Our FE8 Ch5 (The Empire's Reach) 1:1 — DefeatBoss, retiling Ch5's open spread field as an
+  elven-tomb depression and emulating its two memorable set-pieces (decisions.md 2026-07-15):
+    - The Natasha→Joshua escort → BASIL (Natasha-donor Priest) chaperoned to Talk SAHNAR
+      (Joshua-donor Myrmidon), who rises as a hostile crit-threat and flips on the Talk. The
+      donors were chosen for exactly this; the escort defines how you play the map.
+    - The village-raid race → the Phantom-Ship ERUPTION (injected EARTHQUAKE/TILECHANGE)
+      spawns undead over turns that raid the spread elven-reliquary reward-sites; securing all
+      earns the crest (our Guiding-Ring save-all echo).
+  Ravisin is the canonical frost druid and the villain thread tying the white moose (ch04) →
+  this tomb → Messie (ch06): she awakened them all. She still DROPS the LOCKED 'crest of cold
+  iron' (the promotion Chekhov's gun for the Ch8→9 seam) — its narrative role; the save-all
+  bonus is the mechanical echo, not a replacement. Basil joins as our second healer (Priest) —
+  the goodberry shrub as a literal heal-staff unit (LOCKED 2026-06-20). No fog: the tension is
+  the escort + eruption race, not vision. Map + roster build at the slice; targets checked via
+  `make difficulty` (economy #170 + convertible/reinforcement dynamics #171).
