@@ -659,6 +659,19 @@ Both stay `status: planned` seeds — this sets the targets; the map + events bu
 against the twin via `make difficulty` (economy #170 + recruit/reinforcement dynamics #171 now modeled).
 _Decided: 2026-07-15 (Nicolas + CLAUDE). Supersedes the earlier "split old Ch4 into two Ch4-parity halves"
 framing and the brainstormed Ch11-map-borrow (issues #24/#25) — both retired._
+
+**Parity-engine v1 gaps closed (#176 economy drops, #177 area-triggered reinforcements).** Two channels the
+first cut of the extractors punted on, both read from HEAD like the rest: (1) **enemy drops** — a red unit
+flagged `.itemDrop` drops its **last** inventory item on death (`US_DROP_ITEM`, the final slot per
+`statscreen.c:726`); `vanilla_economy` now values it as a `drops` channel folded into `total_gold` (the Ch4/Ch5
+lock twins carry none, so the lock is unchanged, but Ch2's Vulnerary / Ch3's keys / Ch13's crests now count).
+(2) **area/zone-triggered reinforcements** — `_vanilla_reinforcement_turns` matched only the `TurnEventPlayer`
+macro, so it missed Ch4 "Ancient Horrors"' waves: a turn-2 Bonewalker pack written as a raw
+`TURN(…, FACTION_BLUE)` and a Revenant pack behind a temp-flag-gated `TURN` that an `AREA(…)` trigger arms on
+zone-entry. It now also reads the raw-`TURN` expansion, treats any **flag-gated** turn event (and any `AREA`/
+`AFEV` script that LOADs a force) as a reinforcement, and models zone-entry arrivals as `_ZONE_ENTRY_TURN`
+(> 1, so they leave the turn-1 line) — Ch4 reads 16 line + 7 reinforcements, Ch5's 2/6/8 detection unchanged.
+_Decided: 2026-07-16 (CLAUDE; TDD). Closes the v1 scope noted on #170/#171._
 Worked example — **ch02 (parity FE8 Ch2):** gems + premium consumables only (vanilla Ch2's village
 gifts) + a regular armory + one enemy consumable drop; **no boosters, no promos.** The three chwinga
 "charms" are those gifts — **Elixir / Pure Water / Hand Axe** (the Hand Axe stands in for vanilla's
