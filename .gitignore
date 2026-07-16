@@ -39,6 +39,8 @@ campaigns/*/map_sprites/.base/
 /references
 tools/emulator/
 tools/playtest/symbols.lua
+# local session scratch tool (HANDOFF references it; intentionally unversioned)
+tools/key_magenta.py
 # mGBA save-state checkpoints (per-ROM-build, regenerated) -- inline comments don't work
 # in .gitignore, so this must be on its own line
 tools/playtest/states/
