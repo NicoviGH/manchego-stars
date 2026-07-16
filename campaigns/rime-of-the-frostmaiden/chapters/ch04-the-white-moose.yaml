@@ -2,8 +2,10 @@
 # Chapter index: docs/CHAPTERS.md (generated from this file). Rationale: docs/decisions.md.
 # Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
 # Canon: Rime of the Frostmaiden pp.78-82 (Lonelywood; "The White Moose"; the forest;
-# the wolf pack). This is the DefeatAll/monster-debut half of FE8 Ch4 "Ancient Horrors";
-# the boss half (Ravisin in the tomb) is ch05.
+# the wolf pack). This is our FE8 Ch4 "Ancient Horrors" 1:1 — a Rout, retiled as the fogbound
+# White-Moose hunt (ch05 is our FE8 Ch5). See decisions.md "ch04 and ch05 each map 1:1 to
+# their numeric FE8 twin": we keep Ch4's map + parity and layer fog on top, rather than
+# borrowing the Ch11 fog maps (fog is a config flag, not a map feature).
 
 id: ch04-the-white-moose
 title: "The White Moose"
@@ -13,8 +15,8 @@ status: planned                # brainstorm SEED, NOT authoritative: enemy roste
                                # (brainstorming skill digests this). Exempt from the parity gate until then.
 milestone: M3
 cadence: monster_debut          # see docs/CHAPTERS.md — 🟨 fog-of-war forest hunt (tone shift to monsters)
-fe8_base_map: "FE8 Ch4 — Ancient Horrors"           # the DefeatAll/monster-debut half
-parity_reference: "FE8 Ch4"   # #48 enemy-pressure parity bar — Ancient Horrors — DefeatAll/monster-debut half
+fe8_base_map: "FE8 Ch4 — Ancient Horrors"           # retiled 1:1 as the snowy hunt forest
+parity_reference: "FE8 Ch4"   # #48 enemy-pressure + reward parity bar — Ancient Horrors (1:1)
 
 # Onboarding parity (see docs/ONBOARDING.md + the dialogue-pass parity step): concepts
 # making their FIRST campaign appearance here, and how WE deliver the vanilla heads-up.
@@ -258,9 +260,14 @@ signature_moments:
     trigger: marty_direwolf_parley       # SECONDARY beat — see pcs/marty.yaml (primary is ch06)
 
 design_notes: >
-  The monster-debut/tone-shift beat, split off from the old fused Ch4 so the tomb
-  (ch05) can be a clean boss. Fog of war is the single teaching idea — an FE8-native
-  way to render 'the moose is hard to spot.' The wolf-pack parley is Marty's
-  secondary signature and the chapter's mercy/recruit hook (Lupin → sled NPC). The
-  moose is a scripted lure to ch05, never killable here (canon: it's cornered at
-  the tomb). Villain thread: Ravisin awakened the wolves, the moose, and Messie.
+  Our FE8 Ch4 (Ancient Horrors) 1:1 — a monster Rout, retiled as the fog hunt. Fog of
+  war is the single added teaching idea (Ch4 itself isn't fog) — an FE8-native way to
+  render 'the moose is hard to spot.' The wolf-pack parley is Marty's secondary
+  signature and the chapter's mercy/recruit hook (Lupin → sled NPC). The moose is a
+  scripted lure to ch05, never killable here (canon: it's cornered at the tomb).
+  Economy stays Ch4-lean (~270g, one Iron Axe village, 0 chests — verified from HEAD).
+  DELIBERATELY no thief/chest-race: chests are foreign to Ch4, and a loot race would
+  fight the hunt for focus. Trex earns his debut spotlight the way the chapter's own
+  gimmick wants — as the FOG SCOUT: a Thief sees +5 tiles in fog (GetUnitFogViewRange),
+  so Trex is the one who actually spots the moose and the wolves. Villain thread:
+  Ravisin awakened the wolves, the moose, and Messie.

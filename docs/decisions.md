@@ -626,6 +626,39 @@ Placement follows the **parity_reference, not our chapter number** — our 8-cha
 not "chapter N's." This is the item analogue of the recruit budget; per-chapter loot is authored in the
 chapter YAML (the data is the doc). Consistent with the promotion seam (Ch8→9): our MVP chapters
 (parity ≤ Ch13) sit below the Master-Seal threshold (Ch15a), so promotions stay deferred to Revel's End.
+
+**ch04 and ch05 each map 1:1 to their numeric FE8 twin (map AND parity); theme is layered, not borrowed.**
+ch04 = our FE8 Ch4 (Ancient Horrors); ch05 = our FE8 Ch5 (The Empire's Reach). Each retiles its twin's
+map and takes that twin as its `parity_reference`, so terrain, difficulty, and economy all track one
+vanilla chapter. We considered borrowing the FE8 **Ch11 pair** (Creeping Darkness / Phantom Ship) as
+`fe8_base_map` for their fog + monster theme, and **rejected it**: fog is a per-chapter config flag
+(`chapterVisionRange`), the dark/monster look is our own custom tileset + injected roster, and ch05's
+eruption is an injectable event (`EARTHQUAKE`/`TILECHANGE`) — none of which live in a map's *layout*.
+Borrowing Ch11's layout would cost the one thing a base map actually gives (the terrain), and Phantom
+Ship's enclosed corridor in particular fights FE8 Ch5's defining feature: villages spread to the corners
+that force a two-front race. So we keep the twins' maps and layer the theme on top.
+
+- **ch04 (Ancient Horrors twin)** — Rout; retiled snowy forest; **fog ON** (`chapterVisionRange`) as the
+  White-Moose hunt (our added mechanic — vanilla Ch4 isn't fog); lean **~270g** economy (Ch4 = 2 villages,
+  one Iron Axe, 0 chests — verified from HEAD by the #170 economy extractor, correcting a brainstorm that
+  mis-read our injected ch03 chests as vanilla Ch4's). Hooks: the **wolf-pack parley** (Marty Talks Lupin)
+  and **Trex as the fog scout** (Thief +5 fog vision). **No thief/chest-race** — foreign to Ch4 (no chests);
+  Trex earns his spotlight as the one who can see in the hunt, which fits the chapter's actual gimmick.
+- **ch05 (The Empire's Reach twin)** — DefeatBoss (Ravisin); retile Ch5's spread-village field as an
+  **open-air elven-tomb depression** (crypt tileset + crystal pillars — keep the open spread-site skeleton,
+  dress it as a ruin); **no fog** (mood from art, not vision). Emulates Ch5's two set-pieces: (a) the
+  **Natasha→Joshua escort** becomes **Basil (Natasha-donor Priest) chaperoned to Talk Sahnar (Joshua-donor
+  Myrmidon)** — a convertible crit-threat you neutralize by recruiting; (b) the **village-raid race**
+  becomes the **Phantom-Ship eruption** (injected `EARTHQUAKE`/`TILECHANGE`) spawning undead that raid
+  **spread reward-sites** (elven reliquaries), with the **crest-of-cold-iron** (promotion relic) as the
+  save-all reward — our Guiding Ring. Ch5-magnitude economy incl. the **elven store** (Armory + Vendor);
+  ch05 is the first chapter at/above the FE8-Ch5 reward tier, so stat-boosters + a promotion item unlock
+  here (per §Reward budget above).
+
+Both stay `status: planned` seeds — this sets the targets; the map + events build at each slice, checked
+against the twin via `make difficulty` (economy #170 + recruit/reinforcement dynamics #171 now modeled).
+_Decided: 2026-07-15 (Nicolas + CLAUDE). Supersedes the earlier "split old Ch4 into two Ch4-parity halves"
+framing and the brainstormed Ch11-map-borrow (issues #24/#25) — both retired._
 Worked example — **ch02 (parity FE8 Ch2):** gems + premium consumables only (vanilla Ch2's village
 gifts) + a regular armory + one enemy consumable drop; **no boosters, no promos.** The three chwinga
 "charms" are those gifts — **Elixir / Pure Water / Hand Axe** (the Hand Axe stands in for vanilla's
