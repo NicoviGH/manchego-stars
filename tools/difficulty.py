@@ -265,9 +265,11 @@ def _brace_entries(body):
 
 def vanilla_unit_defs(text, array_name):
     """Parse `CONST_DATA struct UnitDefinition <array_name>[] = { ... };` from decomp text
-    into a list of per-entry dicts (charIndex, classIndex, level, allegiance, items). The
-    trailing `{ 0 }` terminator (no .classIndex) is skipped. `charIndex` is the named
-    character enum for allies/bosses (a numeric token for generics, None if absent)."""
+    into a list of per-entry dicts (charIndex, classIndex, level, allegiance, itemDrop, items).
+    The trailing `{ 0 }` terminator (no .classIndex) is skipped. `charIndex` is the named
+    character enum for allies/bosses (a numeric token for generics, None if absent). `itemDrop`
+    is the `.itemDrop = 1` bit -- when set, the unit drops its LAST item on death (US_DROP_ITEM,
+    statscreen.c:726), the enemy-drop channel the economy reads (#176)."""
     s, e = bc._find_brace_block(text, array_name + '[]', '<udef:%s>' % array_name)
     body = text[s + 1:e - 1]
     out = []
@@ -284,6 +286,7 @@ def vanilla_unit_defs(text, array_name):
             'classIndex': cls.group(1),
             'level': int(lvl.group(1)) if lvl else 1,
             'allegiance': alg.group(1) if alg else None,
+            'itemDrop': bool(re.search(r'\.itemDrop\s*=\s*1', block)),
             'items': [t.strip() for t in items.group(1).split(',') if t.strip()]
                      if items else [],
         })
@@ -766,8 +769,9 @@ def _print_pressure(p):
 # The vanilla twin's payout, read from HEAD via bc.vanilla_decomp_text -- NEVER the working
 # tree, which the build injects our own chapters into (reading the tree by hand once had our
 # ch03 chests reported as vanilla Ch4's). Same ground-truth discipline as the enemy rosters:
-# chests + village/house gifts + shops, valued from data_items.c. Drops are a documented v1
-# gap (the curated Ch4/Ch5 twins carry none) -- see #170.
+# chests + village/house gifts + shops + enemy drops, valued from data_items.c. (#170 shipped
+# the first three; #176 added the drop channel -- a red unit flagged .itemDrop drops its last
+# item; the curated Ch4/Ch5 twins carry none, but Ch2/Ch3/Ch6/Ch13 do.)
 
 # parity_reference -> the decomp chapter file stem (shared by the economy #170 and the
 # battlefield-dynamics #171 extractors -- both read that chapter's event data from HEAD).
@@ -847,10 +851,31 @@ def _gift_items(eventscript_text):
     return out
 
 
+def vanilla_drops(parity_ref):
+    """The vanilla twin's enemy DROPS, read from HEAD: for each red unit flagged `.itemDrop`
+    in the chapter's curated UnitDefinition arrays, its LAST item (US_DROP_ITEM drops the final
+    inventory slot -- statscreen.c:726), valued in buy-gold. None if the reference isn't curated;
+    [] if it carries no drops (the Ch4/Ch5 lock twins). The channel #170 v1 skipped (#176)."""
+    spec = PARITY_REFERENCE_UDEFS.get(parity_ref)
+    if spec is None:
+        return None
+    relpath, arrays = spec
+    text = bc.vanilla_decomp_text(relpath)
+    out = []
+    for array_name in arrays:
+        for d in vanilla_unit_defs(text, array_name):
+            if d['allegiance'] != 'FACTION_ID_RED' or not d['itemDrop'] or not d['items']:
+                continue
+            item = d['items'][-1]
+            out.append((item, item_gold_value(item)))
+    return out
+
+
 def vanilla_economy(parity_ref):
     """The vanilla twin's item economy, read from HEAD: chests, gifts (villages/houses/clear
-    rewards), and shops, each valued in buy-gold. None if the reference has no mapped economy
-    source (#170). Delivery context (# of villages/houses) is kept for the vehicle story."""
+    rewards), shops, and enemy drops, each valued in buy-gold. None if the reference has no
+    mapped economy source (#170/#176). Delivery context (# of villages/houses) is kept for the
+    vehicle story."""
     stem = PARITY_REFERENCE_STEM.get(parity_ref)
     if stem is None:
         return None
@@ -859,11 +884,12 @@ def vanilla_economy(parity_ref):
     shoptext = bc.vanilla_decomp_text('src/events_shoplist.c')
     chests = [(it, item_gold_value(it)) for it in re.findall(r'Chest\((ITEM_\w+)', info)]
     gifts = [(it, item_gold_value(it)) for it in _gift_items(script)]
+    drops = vanilla_drops(parity_ref) or []
     shops = [(sym, _shoplist_items(shoptext, sym))
              for sym in re.findall(r'(?:Armory|Vendor)\(\s*(\w+)', info)]
-    total = sum(v for _, v in chests) + sum(v for _, v in gifts)
-    return {'reference': parity_ref, 'chests': chests, 'gifts': gifts, 'shops': shops,
-            'n_villages': len(re.findall(r'Village\(', info)),
+    total = sum(v for _, v in chests) + sum(v for _, v in gifts) + sum(v for _, v in drops)
+    return {'reference': parity_ref, 'chests': chests, 'gifts': gifts, 'drops': drops,
+            'shops': shops, 'n_villages': len(re.findall(r'Village\(', info)),
             'n_houses': len(re.findall(r'House\(', info)), 'total_gold': total}
 
 
@@ -903,10 +929,11 @@ def _print_economy(chap):
         def fmt(pairs):
             return ', '.join('%s %dg' % (it.replace('ITEM_', ''), v)
                              for it, v in pairs) or 'none'
-        print('  vanilla %-11s ~%dg total in gifts+chests' % (ref, van['total_gold']))
+        print('  vanilla %-11s ~%dg total in gifts+chests+drops' % (ref, van['total_gold']))
         print('    chests: %s' % fmt(van['chests']))
         print('    gifts:  %s  (via %d village/%d house + clear rewards)'
               % (fmt(van['gifts']), van['n_villages'], van['n_houses']))
+        print('    drops:  %s  (enemy .itemDrop -- last item)' % fmt(van['drops']))
         print('    shops:  %s' % (', '.join('%s (%d items)'
               % (s.replace('ShopList_Event_', ''), len(items))
               for s, items in van['shops']) or 'none'))
@@ -945,14 +972,61 @@ def _vanilla_convertible_chars(stem):
         r'CHAR\([^,]+,\s*\w+,\s*CHARACTER_\w+,\s*(CHARACTER_\w+)\)', info)}
 
 
+# A reinforcement that arrives on ZONE-ENTRY (a monster-hunt / room-breach trigger) rather than
+# on a fixed turn -- Ch4 "Ancient Horrors"' Revenant wave. Modeled as an arrival > turn 1 so it
+# lands in the reinforcement split, not the turn-1 line; the exact value is immaterial to the
+# metric (dynamic_pressure only splits on turn == 1 vs > 1). #177.
+_ZONE_ENTRY_TURN = 2
+
+
+def _is_flag_gated(eid):
+    """A turn/area event with a temp-flag condition (EVFLAG_TMP(n) etc.) only fires once that
+    flag is set mid-map -- so a flag-gated turn event is a triggered reinforcement, not a fixed
+    turn-1 spawn. `0` / EVFLAG_NONE mean unconditional."""
+    return eid.strip() not in ('0', 'EVFLAG_NONE')
+
+
+def _player_turn_events(info):
+    """Yield (eid, script_sym, turn) for each PLAYER-phase turn event -- both the TurnEventPlayer
+    macro (Ch5's waves) and its raw `TURN(eid, scr, turn, end, FACTION_BLUE)` expansion (Ch4's
+    wave). Enemy/green-phase TURN(...) entries (allies, NPC spawns) are excluded."""
+    for m in re.finditer(r'TurnEventPlayer\(\s*([^,]+?)\s*,\s*(\w+)\s*,\s*(\d+)\s*\)', info):
+        yield m.group(1), m.group(2), int(m.group(3))
+    for m in re.finditer(r'(?<![A-Za-z_])TURN\(\s*([^,]+?)\s*,\s*(\w+)\s*,\s*(\d+)\s*,'
+                         r'\s*\d+\s*,\s*(FACTION_\w+)\s*\)', info):
+        if 'BLUE' in m.group(4):
+            yield m.group(1), m.group(2), int(m.group(3))
+
+
+def _area_event_scripts(info):
+    """The event scripts a zone/area trigger runs -- AREA (zone-entry) and AFEV (flag) entries.
+    A unit array these LOAD is a zone-triggered reinforcement (#177). (Ch4's AREA sets the flag
+    its gated TURN reads, so the load is caught there too -- this also covers chapters whose AREA
+    script loads the array directly.)"""
+    return [m.group(1) for m in re.finditer(r'(?:AREA|AFEV)\(\s*[^,]+?\s*,\s*(\w+)', info)]
+
+
 def _vanilla_reinforcement_turns(stem):
-    """{UnitDef array -> arrival turn} for the enemy arrays a TurnEventPlayer script loads."""
+    """{UnitDef array -> arrival turn} for enemy arrays that are NOT on the field at turn 1:
+    player-phase turn events past turn 1 (Ch5's 2/6/8 waves), plus area/zone-triggered spawns --
+    a temp-flag-gated turn event or an AREA load (Ch4 "Ancient Horrors"' Revenant wave), which
+    arrive on zone-entry and are modeled as _ZONE_ENTRY_TURN (#177). Turn-1 unconditional events
+    (the initial line force) contribute nothing."""
     info = bc.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
     script = bc.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
     out = {}
-    for m in re.finditer(r'TurnEventPlayer\(\s*\d+,\s*(\w+),\s*(\d+)\)', info):
-        for arr in re.findall(r'UnitDef_\w+', _event_block(script, m.group(1))):
-            out[arr] = int(m.group(2))
+    for eid, scr, turn in _player_turn_events(info):
+        if _is_flag_gated(eid):
+            arrival = _ZONE_ENTRY_TURN     # only fires once an area trigger sets its flag
+        elif turn > 1:
+            arrival = turn
+        else:
+            continue                       # unconditional turn-1 event = the initial line
+        for arr in re.findall(r'UnitDef_\w+', _event_block(script, scr)):
+            out[arr] = arrival
+    for scr in _area_event_scripts(info):  # an AREA/AFEV script that loads a force directly
+        for arr in re.findall(r'UnitDef_\w+', _event_block(script, scr)):
+            out.setdefault(arr, _ZONE_ENTRY_TURN)
     return out
 
 

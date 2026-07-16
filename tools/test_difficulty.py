@@ -269,13 +269,40 @@ CONST_DATA struct UnitDefinition UnitDef_Test[] = {
 """
 
 
+_UDEF_DROP_SNIPPET = """
+CONST_DATA struct UnitDefinition UnitDef_Drop[] = {
+    {
+        .charIndex = 0x8e,
+        .classIndex = CLASS_BRIGAND,
+        .allegiance = FACTION_ID_RED,
+        .level = 3,
+        .itemDrop = 1,
+        .items = {
+            ITEM_AXE_IRON,
+            ITEM_VULNERARY,
+        },
+    },
+    {
+        .charIndex = 0x8f,
+        .classIndex = CLASS_FIGHTER,
+        .allegiance = FACTION_ID_RED,
+        .level = 2,
+        .items = {
+            ITEM_AXE_IRON,
+        },
+    },
+    { 0 },
+};
+"""
+
+
 class VanillaUnitDefParser(unittest.TestCase):
     def test_parses_each_entry_class_level_allegiance_items(self):
         defs = df.vanilla_unit_defs(_UDEF_SNIPPET, 'UnitDef_Test')
         self.assertEqual(len(defs), 3)           # the { 0 } terminator is skipped
         self.assertEqual(defs[0], {'charIndex': 'CHARACTER_BREGUET',
                                    'classIndex': 'CLASS_ARMOR_KNIGHT', 'level': 4,
-                                   'allegiance': 'FACTION_ID_RED',
+                                   'allegiance': 'FACTION_ID_RED', 'itemDrop': False,
                                    'items': ['ITEM_LANCE_IRON']})
         self.assertEqual(defs[1]['classIndex'], 'CLASS_SOLDIER')
         self.assertEqual(defs[1]['items'], ['ITEM_LANCE_IRON', 'ITEM_VULNERARY'])
@@ -286,6 +313,13 @@ class VanillaUnitDefParser(unittest.TestCase):
         defs = df.vanilla_unit_defs(_UDEF_SNIPPET, 'UnitDef_Test')
         self.assertEqual(defs[0]['charIndex'], 'CHARACTER_BREGUET')
         self.assertEqual(defs[2]['charIndex'], 'CHARACTER_EIRIKA')
+
+    def test_captures_item_drop_bit(self):
+        # #176: a unit flagged .itemDrop = 1 drops its LAST item (US_DROP_ITEM, the final
+        # inventory slot -- statscreen.c:726). Units without the flag read itemDrop False.
+        defs = df.vanilla_unit_defs(_UDEF_DROP_SNIPPET, 'UnitDef_Drop')
+        self.assertTrue(defs[0]['itemDrop'])
+        self.assertFalse(defs[1]['itemDrop'])
 
 
 class VanillaEnemies(unittest.TestCase):
@@ -638,6 +672,33 @@ class ItemEconomy(unittest.TestCase):
     def test_unmapped_reference_returns_none(self):
         self.assertIsNone(df.vanilla_economy('FE8 Ch99'))
 
+    def test_vanilla_drops_reads_the_last_item_of_each_flagged_red_unit(self):
+        # #176: vanilla Ch2's brigand carries { Iron Axe, Vulnerary } with .itemDrop set,
+        # so it drops the Vulnerary (the last slot), valued in buy-gold (300g).
+        drops = df.vanilla_drops('FE8 Ch2')
+        self.assertEqual(drops, [('ITEM_VULNERARY', 300)])
+
+    def test_vanilla_drops_uncurated_reference_is_none(self):
+        self.assertIsNone(df.vanilla_drops('FE8 Ch99'))
+
+    def test_ch2_economy_counts_the_vulnerary_drop_in_total(self):
+        # The drop channel #170 v1 skipped: it must show under `drops` AND lift total_gold.
+        e = df.vanilla_economy('FE8 Ch2')
+        self.assertEqual(e['drops'], [('ITEM_VULNERARY', 300)])
+        self.assertIn(300, [v for _, v in e['drops']])
+        self.assertGreaterEqual(e['total_gold'], 300)   # drops fold into the payout magnitude
+
+    def test_ch3_economy_reports_its_key_drops(self):
+        # Vanilla Ch3's two brigands drop a Door Key (50g) and a Chest Key (300g).
+        drops = dict(df.vanilla_economy('FE8 Ch3')['drops'])
+        self.assertEqual(drops.get('ITEM_DOORKEY'), 50)
+        self.assertEqual(drops.get('ITEM_CHESTKEY'), 300)
+
+    def test_ch4_ch5_twins_have_no_drops(self):
+        # The lock twins carry zero enemy drops -- the v1 gap didn't affect the ch04/ch05 lock.
+        self.assertEqual(df.vanilla_economy('FE8 Ch4')['drops'], [])
+        self.assertEqual(df.vanilla_economy('FE8 Ch5')['drops'], [])
+
     def test_chapter_economy_reads_our_declared_yaml(self):
         chap = {
             'villages': [{'visit_reward': [{'id': 'gold', 'amount': 150},
@@ -673,6 +734,23 @@ class BattlefieldDynamics(unittest.TestCase):
         self.assertEqual(len(g['convertibles']), 1)        # Joshua
         self.assertEqual(len(g['reinforcements']), 6)      # the turn 2/6/8 arrays
         self.assertEqual(sum(len(g[k]) for k in g), 23)    # still the full 23-unit force
+
+    def test_ch4_detects_area_and_timed_reinforcements(self):
+        # #177: Ch4 "Ancient Horrors" spawns via non-TurnEventPlayer triggers the v1 missed --
+        # a turn-2 Bonewalker wave (raw TURN(..., FACTION_BLUE)) and a zone-entry Revenant wave
+        # (a temp-flag-gated TURN set by an AREA trigger). Both must read as arriving after turn 1.
+        turns = df._vanilla_reinforcement_turns('ch4')
+        self.assertEqual(set(turns), {'UnitDef_088B4C88', 'UnitDef_088B4C24'})
+        self.assertEqual(turns['UnitDef_088B4C88'], 2)     # the timed Bonewalker wave
+        self.assertTrue(all(t > 1 for t in turns.values()))
+
+    def test_ch4_groups_split_the_seven_reinforcements(self):
+        # 16 turn-1 line + (3 Bonewalkers + 4 Revenants) reinforcements = the full 23-monster force.
+        g = df.vanilla_enemy_groups('FE8 Ch4')
+        self.assertEqual(len(g['line']), 16)
+        self.assertEqual(len(g['reinforcements']), 7)
+        self.assertEqual(len(g['convertibles']), 0)
+        self.assertEqual(sum(len(g[k]) for k in g), 23)
 
     def test_dynamic_threat_below_static_for_a_reinforced_chapter(self):
         g = df.vanilla_enemy_groups('FE8 Ch5')
