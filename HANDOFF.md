@@ -31,8 +31,20 @@ Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-co
   stale #23 checklist this session: **Real PREP deploy** and the **"Defeat Saar" objective leak** are
   already wired in `inject_ch03` — see the #23 2026-07-16 comment. The remaining kobold combat anims
   are tracked in **#90**.)
+- **Basil's art kit is SHIPPED** (#179, merged 2026-07-16): portrait + SMS/MU map sprites +
+  battle-anim frames, all adopted from Oddish sprite art (PMD SpriteCollab / gen3 FRLG — pipeline
+  ADR in decisions.md "Adopting non-FE sprite sources"). His build **wiring** (slot, Natasha
+  STAT_DONOR, injection, a `priest` staff/heal BANIM_DONORS row — NOT shaman) is a checklist on the
+  ch05 slice **#25**; a live `battle_anim:` block in basil.yaml waits on that donor row.
 
-## This session (2026-07-16, Opus — closed engine parity gaps #176 + #177)
+## This session (2026-07-16, Fable — Basil/Oddish art kit, parallel art branch)
+
+- Full detail on PR **#179** + the #25 checklist comment. Reusable bits: PMD SpriteCollab is the
+  side-view sprite goldmine (8-direction sheets; W row faces left = FE8 player side); ffmpeg ships
+  hqx/xbr pixel-art rescalers; `map_sprite_swapper.py` grew `--idle-frame-h 32` for 16×32 idle
+  sheets. Full pipeline + gotchas: decisions.md §Art & Audio ADR.
+
+## Prior session (2026-07-16, Opus — closed engine parity gaps #176 + #177)
 
 - **Closed both parity-engine v1 gaps** (PR **#178**, squash-merged; ADR in decisions.md
   "Parity-engine v1 gaps closed"). TDD; 174/0 tests, `make check` clean, parity gate green.
