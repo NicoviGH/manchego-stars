@@ -709,6 +709,7 @@ def report(campaign, ch):
 
     _print_pressure(_chapter_pressure(chap))
     _print_economy(chap)
+    _print_dynamics(chap)
 
 
 def _chapter_pressure(chap, band=0.25):
@@ -768,8 +769,9 @@ def _print_pressure(p):
 # chests + village/house gifts + shops, valued from data_items.c. Drops are a documented v1
 # gap (the curated Ch4/Ch5 twins carry none) -- see #170.
 
-# parity_reference -> the decomp chapter file stem whose event data carries its economy.
-PARITY_REFERENCE_ECON = {
+# parity_reference -> the decomp chapter file stem (shared by the economy #170 and the
+# battlefield-dynamics #171 extractors -- both read that chapter's event data from HEAD).
+PARITY_REFERENCE_STEM = {
     'FE8 Prologue': 'prologue', 'FE8 Ch1': 'ch1', 'FE8 Ch2': 'ch2', 'FE8 Ch3': 'ch3',
     'FE8 Ch4': 'ch4', 'FE8 Ch5': 'ch5', 'FE8 Ch6': 'ch6', 'FE8 Ch13': 'ch13a',
 }
@@ -849,7 +851,7 @@ def vanilla_economy(parity_ref):
     """The vanilla twin's item economy, read from HEAD: chests, gifts (villages/houses/clear
     rewards), and shops, each valued in buy-gold. None if the reference has no mapped economy
     source (#170). Delivery context (# of villages/houses) is kept for the vehicle story."""
-    stem = PARITY_REFERENCE_ECON.get(parity_ref)
+    stem = PARITY_REFERENCE_STEM.get(parity_ref)
     if stem is None:
         return None
     info = bc.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
@@ -915,6 +917,152 @@ def _print_economy(chap):
             parts.append('%s[%s]' % (label, ', '.join(map(str, ours[label]))))
     print('  ours:   %s' % ' · '.join(parts))
     print('  (advisory target: match the twin\'s magnitude + delivery vehicle; not a hard gate)')
+
+
+# ── Battlefield dynamics (#171): recruit-flips + reinforcement timing ────────────
+# The static bar counts every enemy as a turn-1 kill. Two vanilla set-pieces break that: a
+# CONVERTIBLE enemy (Joshua/Sahnar) you recruit rather than grind, and REINFORCEMENTS that
+# arrive over turns instead of alpha-striking. Both auto-detected from HEAD for the twin (CHAR
+# macro targets / TurnEventPlayer-loaded arrays) and read from `convertible`/`arrives_turn` in
+# our YAML. Additive view: the static ENEMY-PRESSURE verdict is unchanged (so already-locked
+# chapters don't shift) -- this shows, alongside it, what that static proxy can't see.
+
+CONVERT_CLEAR_DISCOUNT = 0.5   # a convertible is neutralized by recruiting, not ground down;
+                               # still part clear-load for the risk window before the flip.
+
+
+def _event_block(script_text, sym):
+    """The body of a CONST_DATA EventListScr <sym>[] = { ... }; block ('' if absent)."""
+    m = re.search(re.escape(sym) + r'\[\]\s*=\s*\{(.*?)\n\};', script_text, re.S)
+    return m.group(1) if m else ''
+
+
+def _vanilla_convertible_chars(stem):
+    """CHARACTER_ enums that are recruitable enemies (a CHAR macro's target) in the twin --
+    they flip to allies, so they aren't a kill the player must make."""
+    info = bc.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
+    return {m.group(1) for m in re.finditer(
+        r'CHAR\([^,]+,\s*\w+,\s*CHARACTER_\w+,\s*(CHARACTER_\w+)\)', info)}
+
+
+def _vanilla_reinforcement_turns(stem):
+    """{UnitDef array -> arrival turn} for the enemy arrays a TurnEventPlayer script loads."""
+    info = bc.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
+    script = bc.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
+    out = {}
+    for m in re.finditer(r'TurnEventPlayer\(\s*\d+,\s*(\w+),\s*(\d+)\)', info):
+        for arr in re.findall(r'UnitDef_\w+', _event_block(script, m.group(1))):
+            out[arr] = int(m.group(2))
+    return out
+
+
+def _entry_combatants(ed):
+    """The Combatants for one enemy_units entry (count/composition expanded, weapon-filtered)."""
+    if 'composition' in ed and 'class' not in ed:
+        level = ed.get('level', 1)
+        name = ed.get('id', ed.get('name', 'enemy'))
+        by_class = ed.get('inventory_by_class', {})
+        units = [_one_enemy('%s-%s' % (name, cls), cls, level,
+                            _weapon_for([{'id': w} for w in by_class.get(cls, [])]))
+                 for cls in ed.get('composition', [])]
+    else:
+        units = enemy_combatants(ed) * int(ed.get('count', 1))
+    return [u for u in units if u.weapon is not None]
+
+
+def chapter_enemy_groups(chap):
+    """Our force split by battlefield role (#171): line (turn-1 must-kill), reinforcements
+    (arrives_turn > 1), convertibles (recruitable). Each a Combatant list."""
+    g = {'line': [], 'reinforcements': [], 'convertibles': []}
+    for ed in chap.get('enemy_units', []):
+        units = _entry_combatants(ed)
+        if ed.get('convertible'):
+            g['convertibles'].extend(units)
+        elif int(ed.get('arrives_turn', 1) or 1) > 1:
+            g['reinforcements'].extend(units)
+        else:
+            g['line'].extend(units)
+    return g
+
+
+def vanilla_enemy_groups(parity_ref):
+    """Vanilla twin force split by role, with convertibles (CHAR targets) and reinforcement
+    turns (TurnEventPlayer-loaded arrays) auto-detected from HEAD. None if uncurated."""
+    spec = PARITY_REFERENCE_UDEFS.get(parity_ref)
+    if spec is None:
+        return None
+    relpath, arrays = spec
+    stem = PARITY_REFERENCE_STEM.get(parity_ref)
+    conv_chars = _vanilla_convertible_chars(stem) if stem else set()
+    reinf_turns = _vanilla_reinforcement_turns(stem) if stem else {}
+    text = bc.vanilla_decomp_text(relpath)
+    g = {'line': [], 'reinforcements': [], 'convertibles': []}
+    for arr in arrays:
+        turn = reinf_turns.get(arr, 1)
+        for i, d in enumerate(vanilla_unit_defs(text, arr)):
+            if d['allegiance'] != 'FACTION_ID_RED':
+                continue
+            weapon = _weapon_from_item_enums(d['items'])
+            if weapon is None:
+                continue
+            u = _enemy_from_enum('%s#%d' % (arr, i), d['classIndex'], d['level'], weapon)
+            if d['charIndex'] in conv_chars:
+                g['convertibles'].append(u)
+            elif turn > 1:
+                g['reinforcements'].append(u)
+            else:
+                g['line'].append(u)
+    return g
+
+
+def dynamic_pressure(groups, deploy_cap, yardstick=YARDSTICK):
+    """Pressure honoring battlefield dynamics (#171): turn-1 threat counts only units on the
+    field at the start (line + convertibles), NOT reinforcements; clear-load counts the full
+    line + all reinforcements + a discounted convertible (you mostly recruit it, not grind it).
+    Returns (threat/slot, clear-load/slot)."""
+    cap = max(1, deploy_cap)
+    present = groups['line'] + groups['convertibles']
+    threat = sum(fc.damage_per_round(e, yardstick) for e in present) / cap
+    clear = (sum(fc.rounds_to_kill(yardstick, e) for e in groups['line'])
+             + sum(fc.rounds_to_kill(yardstick, e) for e in groups['reinforcements'])
+             + CONVERT_CLEAR_DISCOUNT
+             * sum(fc.rounds_to_kill(yardstick, e) for e in groups['convertibles'])) / cap
+    return threat, clear
+
+
+def recruit_swing(groups):
+    """Post-flip ally throughput a chapter's convertibles add if recruited (kills/round, capped
+    1/unit vs the line+reinforcements) -- the 'advantage' half of risk-turned-advantage."""
+    line = groups['line'] + groups['reinforcements']
+    if not line:
+        return 0.0
+    return sum(min(1.0, max((fc.kills_per_round(c, e) for e in line), default=0.0))
+               for c in groups['convertibles'])
+
+
+def _print_dynamics(chap):
+    ref = chap.get('parity_reference')
+    ours = chapter_enemy_groups(chap)
+    van = vanilla_enemy_groups(ref)
+    cap = chapter_deploy_limit(chap, len(ROSTER))
+    dyn = (ours['reinforcements'] or ours['convertibles']
+           or (van and (van['reinforcements'] or van['convertibles'])))
+    if not dyn:
+        return   # nothing dynamic here -- keep the report quiet
+    print('\n-- BATTLEFIELD DYNAMICS (#171 -- what the static bar can\'t see) ' + '-' * 9)
+
+    def row(tag, g):
+        dt, dc = dynamic_pressure(g, cap)
+        print('  %-8s line %2d · reinf %2d · convertible %d  ->  threat/slot %.1f (turn-1) · '
+              'clear-load/slot %.1f' % (tag, len(g['line']), len(g['reinforcements']),
+                                        len(g['convertibles']), dt, dc))
+        if g['convertibles']:
+            print('           convertible x%.1f in clear-load · recruit swing +%.2f kills/round if flipped'
+                  % (CONVERT_CLEAR_DISCOUNT, recruit_swing(g)))
+    if van:
+        row('vanilla', van)
+    row('ours', ours)
+    print('  (additive -- the ENEMY-PRESSURE verdict above is still the static all-turn-1 bar)')
 
 
 def curve_gate_failures(rows):
