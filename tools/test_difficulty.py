@@ -654,5 +654,69 @@ class ItemEconomy(unittest.TestCase):
         self.assertEqual(ours['shops'], ['termalaine'])
 
 
+class BattlefieldDynamics(unittest.TestCase):
+    """Recruit-flips + reinforcement timing (#171), auto-detected from HEAD for the twin and
+    read from our YAML. The static bar counts every enemy as a turn-1 kill; these model the two
+    vanilla set-pieces (convertible enemies, timed reinforcements) it can't see."""
+
+    # -- vanilla auto-detection --
+    def test_vanilla_convertible_from_char_macro(self):
+        self.assertEqual(df._vanilla_convertible_chars('ch5'), {'CHARACTER_JOSHUA'})
+        self.assertEqual(df._vanilla_convertible_chars('ch4'), set())
+
+    def test_vanilla_reinforcement_turns_from_turn_events(self):
+        turns = df._vanilla_reinforcement_turns('ch5')     # bandit waves on 2 / 6 / 8
+        self.assertEqual(sorted(turns.values()), [2, 6, 8])
+
+    def test_ch5_groups_split_joshua_and_the_waves(self):
+        g = df.vanilla_enemy_groups('FE8 Ch5')
+        self.assertEqual(len(g['convertibles']), 1)        # Joshua
+        self.assertEqual(len(g['reinforcements']), 6)      # the turn 2/6/8 arrays
+        self.assertEqual(sum(len(g[k]) for k in g), 23)    # still the full 23-unit force
+
+    def test_dynamic_threat_below_static_for_a_reinforced_chapter(self):
+        g = df.vanilla_enemy_groups('FE8 Ch5')
+        allf = g['line'] + g['reinforcements'] + g['convertibles']
+        self.assertLess(df.dynamic_pressure(g, 10)[0], df.enemy_pressure(allf, 10)[0])
+
+    # -- pure metric, hand oracle --
+    def test_reinforcements_excluded_from_turn1_threat_kept_in_clearload(self):
+        line = [combatant('l', pow_=5)]
+        reinf = [combatant('r', pow_=5)]
+        g = {'line': line, 'reinforcements': reinf, 'convertibles': []}
+        dt, dc = df.dynamic_pressure(g, 1)
+        self.assertAlmostEqual(dt, df.enemy_pressure(line, 1)[0])          # reinf not turn-1
+        self.assertAlmostEqual(dc, df.enemy_pressure(line + reinf, 1)[1])  # but still cleared
+
+    def test_convertible_is_present_threat_but_discounted_clearload(self):
+        line = [combatant('l', pow_=5)]
+        conv = [combatant('c', pow_=5)]
+        g = {'line': line, 'reinforcements': [], 'convertibles': conv}
+        dt, dc = df.dynamic_pressure(g, 1)
+        self.assertAlmostEqual(dt, df.enemy_pressure(line + conv, 1)[0])   # on the field turn 1
+        exp = (df.enemy_pressure(line, 1)[1]
+               + df.CONVERT_CLEAR_DISCOUNT * df.enemy_pressure(conv, 1)[1])
+        self.assertAlmostEqual(dc, exp)                                    # recruit, don't grind
+
+    def test_recruit_swing_positive_when_the_convertible_can_fight(self):
+        g = {'line': [combatant('l', hp=10, dfc=0)], 'reinforcements': [],
+             'convertibles': [combatant('c', pow_=20, spd=20, weapon='iron-sword')]}
+        self.assertGreater(df.recruit_swing(g), 0)
+
+    # -- our-side YAML flags --
+    def test_chapter_groups_read_convertible_and_arrives_turn(self):
+        chap = {'enemy_units': [
+            {'id': 'a', 'class': 'fighter', 'level': 1, 'count': 2,
+             'inventory': [{'id': 'iron-axe'}]},
+            {'id': 'r', 'class': 'soldier', 'level': 1, 'count': 3,
+             'inventory': [{'id': 'iron-lance'}], 'arrives_turn': 4},
+            {'id': 'c', 'class': 'myrmidon', 'level': 1, 'count': 1,
+             'inventory': [{'id': 'iron-sword'}], 'convertible': {'by': 'basil'}},
+        ]}
+        g = df.chapter_enemy_groups(chap)
+        self.assertEqual((len(g['line']), len(g['reinforcements']), len(g['convertibles'])),
+                         (2, 3, 1))
+
+
 if __name__ == '__main__':
     unittest.main()
