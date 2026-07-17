@@ -214,7 +214,8 @@ def _presharpen(im, amount):
     return out
 
 
-def descale(srcs, body_h, flip, sharpen=0.0, outline=True, thin_outline=False, flat=False):
+def descale(srcs, body_h, flip, sharpen=0.0, outline=True, thin_outline=False, flat=False,
+            reserved=()):
     """srcs: {beat: path}. Returns {beat: RGBA frame} on a shared canvas + palette."""
     raws = {}
     for beat, path in srcs.items():
@@ -257,7 +258,7 @@ def descale(srcs, body_h, flip, sharpen=0.0, outline=True, thin_outline=False, f
     if flat:
         pal, ink = _flat_palette(cvs, flat if isinstance(flat, tuple) else FLAT_SPEC)
     else:
-        pal, ink = _shared_palette(cvs)
+        pal, ink = _shared_palette(cvs, reserved)
     snapped = {beat: _snap(cv, pal) for beat, cv in canvases.items()}
     if outline:
         snapped = {beat: _outline(im, ink, thin_outline) for beat, im in snapped.items()}
@@ -343,6 +344,7 @@ def main():
         kwargs["reserved"] = reserved
     else:
         kwargs["flat"] = flat
+        kwargs["reserved"] = reserved
     out = fn(srcs, a.body, not a.noflip, **kwargs)
     for beat, im in out.items():
         p = os.path.join(a.out_dir, beat + ".png")
