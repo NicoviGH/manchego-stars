@@ -27,10 +27,16 @@ Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-co
 - **Spell-palette tint** finished: dedicated `gMSSpellTint` overlay global replaced the
   `gEfxSpellAnimExists` overload (#168, merged #169), after #167 registered the hook. Green Flux
   gated in-engine (`PT_CHAR=marty recordanim`).
-- **ch03** (#23) is **functionally complete** — down to enemy battle-anim art only. (Corrected a
-  stale #23 checklist this session: **Real PREP deploy** and the **"Defeat Saar" objective leak** are
-  already wired in `inject_ch03` — see the #23 2026-07-16 comment. The remaining kobold combat anims
-  are tracked in **#90**.)
+- **ch03** (#23) is **complete** — the enemy battle-anim art (the last gap) landed via **#90**.
+  (Earlier: corrected a stale #23 checklist — **Real PREP deploy** + the **"Defeat Saar" objective
+  leak** are already wired in `inject_ch03`, see the #23 2026-07-16 comment.)
+- **Enemy battle-anim import pipeline SHIPPED (#90, 2026-07-17):** reskinned enemy CLASSES now animate
+  as real FE-native community anims in the close-up (not just the map sprite). `tools/feditor_to_banim.py`
+  imports an FEditor `.txt` + frame PNGs → decomp banim; `build_campaign.inject_enemy_class_battle_anims`
+  binds it per-class via `ClassData.pBattleAnimDef` (driven by a `battle_anim:` block on
+  `enemy_class_reskins`). Wired: kobold-grunt (Wildling), kobold-blade/brute (Lizardzerker), both fire-imp
+  goblins (Goblin Spearman, native palette). ADR in decisions.md "Imported enemy battle anims". Testing is
+  unified on TESTCH: the sandbox deploys one hostile per reskin slot; `PT_CHAR=<name> recordenemy` baits it.
 - **Basil's art kit is SHIPPED** (#179, merged 2026-07-16): portrait + SMS/MU map sprites +
   battle-anim frames, all adopted from Oddish sprite art (PMD SpriteCollab / gen3 FRLG — pipeline
   ADR in decisions.md "Adopting non-FE sprite sources"). His build **wiring** (slot, Natasha

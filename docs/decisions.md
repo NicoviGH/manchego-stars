@@ -1689,6 +1689,46 @@ Meesmickle exposed four rules that apply to every remaining custom battle animat
   per-preview step or start it before the user approves the packed-pixel preview.
 _Decided: 2026-07-14 (Meesmickle review + in-engine close-out, PR #163)_
 
+**Imported enemy battle anims: transcribe a REAL community animation, bind per-CLASS (#90)**
+Where PCs get a FAKED 3-pose anim on a per-character `_u25` (above), reskinned ENEMY *classes*
+(kobolds, fire imps) that carry a custom map sprite but animate vanilla in the close-up get a
+REAL, FE-native community animation imported *whole* and bound at the class via
+`ClassData.pBattleAnimDef` (generic enemies have no unique character id, so `_u25` can't apply).
+`tools/feditor_to_banim.py` parses an FEditor "For Each Frame" `.txt` + its per-frame PNGs into the
+decomp banim shape, reusing `ref_to_battleframe`'s OBJ tiler; `build_campaign.inject_enemy_class_battle_anims`
+clones the donor class's `AnimConf`, repoints each weapon animId, and points the reskin clone class's
+`.pBattleAnimDef` at it (additive; the donor class + its AnimConf stay byte-vanilla). Driven by a
+`battle_anim:` block on each `enemy_class_reskins` entry (source dir + per-weapon `{dir,txt,abbr,wtypes}`;
+`wtypes` match the donor AnimConf verbatim; optional `recolor:`). Off-by-one shared with #65: AnimConf
+`.index` = animId + 1.
+
+The non-obvious findings (so the next importer doesn't re-derive them):
+- **The author's OAM is NOT shipped.** The pack's `.bin` is FEditor's Java project blob; the `.dmp` is
+  only the compiled SCRIPT (it *references* OAM by offset but doesn't contain it). FEBuilder regenerates
+  the tile placements from the frame PNGs at insert — so re-tiling the PNGs (what we do) is the required
+  step, not reinvention. And we can't use FEBuilder itself: it's a Windows GUI that byte-patches a built
+  ROM, whereas we emit decomp source the build compiles.
+- **FEditor bakes a palette SWATCH into the top rows of every frame PNG** (the 16 colours as a strip).
+  Left in, it tiles as a floating garbage strip AND inflates the sprite bbox — which shoved the OAM origin
+  ~30px sideways (to the sprite edge) and off vertically. Strip the top rows; then anchor at the FE8 sprite
+  pivot (`w/2, h*5/8` of the CLEAN bbox — the engine origin, learned from vanilla `banm_ax1` OAM, feet below).
+- **Battle palettes have 4 faction banks** (`BANIMPAL_RED=1` for enemies). A community anim ships ONE native
+  (often ally-looking) palette across all banks, so an always-hostile reskin needs a recolor into the enemy
+  bank (`enemy_red_recolor`: faction-blue clothing → red ramp). Goblins kept their native palette (Nicolas).
+- **Quantize to GBA BGR555 before counting palette colours.** Two 8-bit PNG colours that round to the same
+  5-bit value ARE one colour on hardware; without quantizing, a hardware-15-colour anim (Lizardzerker) spuriously
+  overflowed the 15-slot budget.
+- **FEditor `.txt` carries `#` comments** (a "delete # on import" header AND inline notes on mode headers /
+  command lines); strip everything after `#` per line, and read the mode number by regex.
+
+Sources (F2U/F2E, credited in each `_vendored/*/CREDITS.md`): Lizard Wildling {Lenh} → kobold-grunt;
+Lizardzerker {Seliost1} → kobold-blade (sword) + kobold-brute (axe); Goblin Spearman {Battle of Wesnoth,
+scripted Norikins} → both fire-imp goblins (lance-only, so ALL weapon slots point at the one spear anim —
+the axe fighter swings a spear too). Testing is unified on the TESTCH sandbox: it deploys one hostile of
+every `enemy_class_reskins` slot, and `recordenemy` (PT_CHAR=<name>) baits any into a counter to capture its
+anim — the enemy analogue of `recordanim` for the PC cast (the ch03-specific `recordkobold` was retired).
+_Decided: 2026-07-17 (kobolds + fire imps, PR #90)_
+
 **Character-scoped spell colours are campaign data; the tint rides a dedicated overlay global (#165, #168)**
 Marty's `battle_anim.spell_palette_tint` declares a character + weapon-type match in YAML, so one
 row covers every Dark tome he can wield without naming Marty in engine code or changing the tome's

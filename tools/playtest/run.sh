@@ -62,6 +62,13 @@
 #                      tools/playtest/make_gif.py recordanim braulo --name braulo-anim --open
 #                    A staff-only unit (sclorbo) FAILs cleanly: no attack = no combat anim.
 #                    Build TESTCH=1 first. (recordrbgtest is the back-compat alias for RBG.)
+#   recordenemy   -- the ENEMY analogue of recordanim on the SAME TESTCH sandbox (#90): a
+#                    reskinned enemy CLASS's battle anim. The sandbox deploys one hostile of
+#                    each enemy_class_reskins slot; a harmless player baits the chosen foe into
+#                    a counter-attack. Pick with PT_CHAR=<name|classid> (default kobold-grunt):
+#                    kobold-grunt kobold-blade kobold-brute. Build TESTCH=1 first, e.g.:
+#                      PT_CHAR=kobold-grunt tools/playtest/run.sh recordenemy
+#                      tools/playtest/make_gif.py recordenemy kobold-grunt --name kobold-anim
 #   recordch01trail / recordlord / recordlordfast / recordch01 / recordopening /
 #   record / scenes / scenesch01 / bootobserve -- other scenes (no checkpoint: these
 #   replay their full lead-in at 60fps, so they are the slowest captures)

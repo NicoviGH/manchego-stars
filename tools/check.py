@@ -249,6 +249,8 @@ INJECTION_ORDER = [
      'lord floor anchors on lord-select\'s LordSelect_GetPid'),
     ('inject_map_sprites', 'inject_enemy_class_reskins',
      'reskins consume the SMS ids map-sprite injection creates'),
+    ('inject_enemy_class_reskins', 'inject_enemy_class_battle_anims',
+     'the class battle-anim binds .pBattleAnimDef on the reskin clone classes'),
     ('inject_enemy_class_reskins', 'inject_ch01',
      "ch01's goblin grunts ride the reskinned clone classes"),
     ('inject_winter_tileset', 'inject_ch01',

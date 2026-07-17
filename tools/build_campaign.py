@@ -37,6 +37,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import portrait_tool  # noqa: E402
 import map_sprite_tool  # noqa: E402
 import ref_to_battleframe  # noqa: E402  faked-battle-anim asset generator (#65)
+import feditor_to_banim  # noqa: E402  FEditor->decomp battle-anim importer (#90)
 import gen_chapter_title  # noqa: E402
 import gen_subtitle_cards  # noqa: E402
 from PIL import Image  # noqa: E402
@@ -1529,6 +1530,20 @@ TEST_SPAWN_POSITIONS = [(5, 4), (7, 4), (9, 4), (11, 4),
                         (5, 6), (7, 6), (9, 6), (11, 6),
                         (13, 5), (13, 7)]   # 9th/10th: the recruits Trex + Baxby (now classed cast)
 
+# The TESTCH sandbox doubles as the SINGLE battle-anim test bench: it deploys one hostile of
+# every enemy_class_reskins slot as a foe (a row south of the cast), so `recordenemy` can bait
+# any reskinned class into a counter and capture its anim -- the enemy analogue of `recordanim`
+# for the PC cast (no chapter-specific setup, all animations tested from one New Game). Iron
+# loadout by the reskin's BASE weapon type so the foe can actually attack/counter (anims are
+# weapon-keyed); a ranged option too, to exercise the thrown/ranged modes.
+CLASS_RESKIN_FOE_WEAPON = {
+    'CLASS_BRIGAND':   ['ITEM_AXE_IRON', 'ITEM_AXE_HANDAXE'],
+    'CLASS_FIGHTER':   ['ITEM_AXE_IRON', 'ITEM_AXE_HANDAXE'],
+    'CLASS_MERCENARY': ['ITEM_SWORD_IRON'],
+    'CLASS_SOLDIER':   ['ITEM_LANCE_IRON', 'ITEM_LANCE_JAVELIN'],
+}
+SANDBOX_FOE_POSITIONS = [(4, 9), (6, 9), (8, 9), (10, 9), (12, 9), (14, 9), (16, 9)]
+
 
 def _cut_boot_intro(montage=False):
     """Cut the pre-map boot sequences so a fresh boot lands on the title and New Game
@@ -1904,6 +1919,34 @@ def _lord_select_event_seq(bg_const, explainer_msg):
         % (bg_const, explainer_msg))
 
 
+def _sandbox_foe_roster(campaign):
+    """A UnitDefinition[] body deploying one hostile of each enemy_class_reskins slot, so the
+    TESTCH sandbox is the single battle-anim bench (`recordenemy` baits any of them). Generic
+    autolevel monsters (charIndex 0x80), FACTION_ID_RED, HOLD ai so they stay put to be baited,
+    iron loadout by the reskin's BASE weapon type. A reskin whose base has no mapped weapon is
+    skipped (never a foe)."""
+    entries = []
+    for rk, (x, y) in zip(enemy_class_reskins(campaign), SANDBOX_FOE_POSITIONS):
+        weapon = CLASS_RESKIN_FOE_WEAPON.get(rk['base'])
+        if not weapon:
+            continue
+        entries.append(
+            '    {\n'
+            '        .charIndex = 0x80,\n'                 # generic autolevel monster slot
+            '        .classIndex = %s,\n'                  # the reskin's clone class (its sprite+anim)
+            '        .leaderCharIndex = 0x80,\n'
+            '        .autolevel = 1,\n'
+            '        .allegiance = FACTION_ID_RED,\n'
+            '        .level = 3,\n'
+            '        .xPosition = %d,\n'
+            '        .yPosition = %d,\n'
+            '        .redaCount = 0,\n'
+            '        .items = { %s },\n'
+            '        .ai = {0x3, 0x3, 0x9, 0x20},\n'       # attack in place, never move -> baitable
+            '    },' % (rk['slot'], x, y, ', '.join(weapon)))
+    return '{\n' + '\n'.join(entries) + '\n    { 0 },\n}'
+
+
 def inject_test_chapter(campaign, verbose=True, lord_boot=False):
     """Rewrite Ch1's ally roster to our classed cast and disable Ch1 tutorials."""
     # Build the cast roster in PORTRAIT_MAP order, skipping name-only units (no class).
@@ -1945,6 +1988,12 @@ def inject_test_chapter(campaign, verbose=True, lord_boot=False):
         udefs = f.read()
     udefs = _replace_brace_block(
         udefs, 'UnitDef_Event_Ch1Ally[] =', roster, CH1_UDEFS_H)
+    # Make the sandbox the single battle-anim bench: replace the Ch1 foe roster with one
+    # hostile of every enemy_class_reskins slot (the begin scene already LOAD1s this symbol),
+    # so `recordenemy` can capture any reskinned class's anim without a chapter-specific setup.
+    foes = _sandbox_foe_roster(campaign)
+    udefs = _replace_brace_block(
+        udefs, 'UnitDef_Event_Ch1Enemy[] =', foes, CH1_UDEFS_H)
     with open(CH1_UDEFS_H, 'w', encoding='utf-8') as f:
         f.write(udefs)
 
@@ -1998,6 +2047,9 @@ def inject_test_chapter(campaign, verbose=True, lord_boot=False):
         for unit_id, slot, class_enum, _ in units:
             print('  %-10s -> Ch1 ally (%s as %s)'
                   % (unit_id, slot, class_enum.replace('CLASS_', '')))
+        foe_classes = [rk['slot'].replace('CLASS_', '') for rk in enemy_class_reskins(campaign)
+                       if rk['base'] in CLASS_RESKIN_FOE_WEAPON]
+        print('  sandbox foes (recordenemy bench): %s' % ', '.join(foe_classes))
         print('  Ch1 stripped to sandbox; boot attract + Magvel intro cut; '
               'New Game boots into Ch1')
 
@@ -3063,6 +3115,20 @@ def _class_field_symbol(class_enum, field):
     return m.group(1)
 
 
+def set_class_field_symbol(text, class_enum, field, symbol):
+    """Repoint a symbol-valued class field (e.g. .pBattleAnimDef = AnimConf_X) IN PLACE,
+    within only [class_enum - 1]'s block. Returns the new text; errors if the field is
+    absent. The class-level enemy battle-anim path (#90): a reskin clone's cloned body carries
+    the base class's .pBattleAnimDef; this repoints it at the imported class-level AnimConf,
+    leaving every sibling class (including the vanilla donor) byte-unchanged."""
+    bs, be = _find_brace_block(text, '[%s - 1]' % class_enum, CLASSES_C)
+    block = text[bs:be]
+    new, n = re.subn(r'(\.%s\s*=\s*)\w+' % field, r'\g<1>' + symbol, block, count=1)
+    if n == 0:
+        sys.exit('ERROR: .%s not found in gClassData[%s]' % (field, class_enum))
+    return text[:bs] + new + text[be:]
+
+
 def class_enum_insert(text, name, value):
     """Insert `NAME = 0xVALUE,` into the class enum after the last numeric-valued CLASS_
     entry (idempotent). Extends the vanilla 0x7F tail so an enemy reskin can ride a class
@@ -3237,6 +3303,138 @@ def inject_enemy_class_reskins(campaign, verbose=True):
         with open(UNIT_ICON_POINTER_H, 'a', encoding='utf-8') as f:
             f.write('\n/* Manchego Stars enemy class reskin sprites (#21) */\n'
                     + '\n'.join(pointer_externs) + '\n')
+
+
+# --- Class-level imported battle animations (#90) --------------------------------
+# Reskinned enemy CLASSES carry a custom map sprite (inject_enemy_class_reskins) but animate
+# as their vanilla donor (Brigand/Soldier/...) in the battle close-up. This imports a real
+# FE-native community animation (feditor_to_banim) and binds it at the CLASS via
+# ClassData.pBattleAnimDef -- the generic-enemy analogue of the PC per-character _u25 path.
+# Additive + reversible: the imported anims append banim_data[] rows; a PRIVATE class-level
+# AnimConf (a clone of the donor's, weapon entries repointed) is appended and the reskin clone
+# class's .pBattleAnimDef points at it. The donor class + its AnimConf stay byte-vanilla.
+
+
+# Named enemy-faction palette passes a `battle_anim: {recolor: <name>}` may select. Kept a
+# registry (not free-form) so the campaign YAML stays declarative and the transforms are tested.
+BANIM_RECOLORS = {
+    'enemy_red': feditor_to_banim.enemy_red_recolor,
+}
+
+
+def _write_imported_banim_assets(abbr, res, uid):
+    """Write one imported anim's assets into the decomp and register it: motion.s + per-frame
+    sheet PNGs + agbpal (step 1), the linker block (2), and the banim_data[] row + pointer
+    externs (3). Returns the new animId. Shared shape with the faked path (inject_battle_anims
+    steps 1-3); only the asset SOURCE differs (transcribed FEditor vs faked 3-pose)."""
+    with open(os.path.join(BANIM_DATA_DIR, 'banim_%s_motion.s' % abbr), 'w',
+              encoding='utf-8') as f:
+        f.write(res['motion_s'])
+    for i, sheet in enumerate(res['sheets']):
+        sheet.save(os.path.join(BANIM_GFX_DIR, 'banim_%s_sheet_%d.png' % (abbr, i)))
+    with open(os.path.join(BANIM_GFX_DIR, 'banim_%s.agbpal' % abbr), 'wb') as f:
+        f.write(res['pal'])
+
+    block = (['graphics/banim/banim_%s_sheet_%d.4bpp.lz' % (abbr, i)
+              for i in range(len(res['sheets']))]
+             + ['graphics/banim/banim_%s.agbpal.lz' % abbr,
+                'data/banim/banim_%s_oam_l.bin.lz' % abbr,
+                'data/banim/banim_%s_oam_r.bin.lz' % abbr,
+                'data/banim/banim_%s_motion.o|.data.script>lz' % abbr,
+                'data/banim/banim_%s_modes.bin' % abbr])
+    with open(BANIM_LINKER, 'a', encoding='utf-8') as f:
+        f.write('\n# Manchego Stars imported battle anim (#90): %s\n' % uid)
+        f.write('\n'.join(block) + '\n')
+
+    with open(BANIM_DATA_C, encoding='utf-8') as f:
+        text = f.read()
+    text, anim_id = banim_append_row(text, abbr)
+    with open(BANIM_DATA_C, 'w', encoding='utf-8') as f:
+        f.write(text)
+    with open(BANIM_POINTER_H, 'a', encoding='utf-8') as f:
+        f.write('// battle animation 0x%X (Manchego Stars #90: %s)\n' % (anim_id, uid))
+        for sym, ty in [('modes_bin', 'int'), ('motion_o', 'char'),
+                        ('oam_r_bin', 'char'), ('oam_l_bin', 'char'), ('agbpal', 'char')]:
+            f.write('extern %s banim_%s_%s;\n' % (ty, abbr, sym))
+    return anim_id
+
+
+def inject_enemy_class_battle_anims(campaign, verbose=True):
+    """Import + class-bind a battle animation for every enemy_class_reskins entry carrying a
+    `battle_anim:` block (#90). MUST run after inject_enemy_class_reskins (the reskin clone
+    class it repoints must already exist).
+
+    campaign.yaml (on a reskin entry):
+        battle_anim:
+          source: wildling               # dir under engine/battle_anims/_vendored/
+          weapons:                        # one per weapon-mode the donor AnimConf keys
+            - {dir: axe,     txt: Axe.txt,     abbr: kgru_ax, wtypes: ["0x0100 | ITYPE_AXE"]}
+            - {dir: handaxe, txt: Handaxe.txt, abbr: kgru_ha,
+               wtypes: ["ITEM_AXE_HANDAXE", "ITEM_AXE_TOMAHAWK", "ITEM_AXE_HATCHET"]}
+            - {dir: unarmed, txt: Unarmed.txt, abbr: kgru_un, wtypes: ["0x0100 | ITYPE_ITEM"]}
+    Each `wtypes` literal must match an entry in the donor class's AnimConf verbatim (they are
+    repointed by literal). A class's weapons share ONE palette (same creature, one colour set).
+
+    !! OFF-BY-ONE (as in inject_battle_anims): the AnimConf `.index` is animId + 1
+       (GetBattleAnimationId returns idx - 1). Encode anim_id + 1."""
+    reskins = [r for r in enemy_class_reskins(campaign) if r.get('battle_anim')]
+    if not reskins:
+        if verbose:
+            print('  (no class battle_anim blocks declared)')
+        return
+    os.makedirs(BANIM_DATA_DIR, exist_ok=True)
+    os.makedirs(BANIM_GFX_DIR, exist_ok=True)
+    vendored = os.path.join(REPO, 'engine', 'battle_anims', '_vendored')
+
+    for rk in reskins:
+        ba = rk['battle_anim']
+        src_dir = os.path.join(vendored, ba['source'])
+        weapons = ba['weapons']
+        # Optional enemy-faction palette pass: a community anim ships its NATIVE (often
+        # ally-blue) palette, but a reskin is always hostile, so recolour to the enemy ramp
+        # (the engine reads agbpal bank BANIMPAL_RED for enemies). `recolor:` names a
+        # feditor_to_banim recolour fn; absent -> the anim keeps its native colours.
+        recolor = BANIM_RECOLORS[ba['recolor']] if ba.get('recolor') else None
+
+        # Import each weapon-mode anim -> a new animId; collect (wtype, animId) repoints. Each
+        # anim carries its OWN agbpal (the engine loads a battle sprite's palette per-animation),
+        # so weapons keep their native <=15-colour set -- the same creature's body reads
+        # consistently across them without forcing all weapons into one shared 16-colour bank.
+        repoints = []
+        for w in weapons:
+            wdir = os.path.join(src_dir, w['dir'])
+            res = feditor_to_banim.build_import(w['abbr'], os.path.join(wdir, w['txt']), wdir,
+                                                recolor=recolor)
+            anim_id = _write_imported_banim_assets(w['abbr'], res, rk['id'])
+            for wt in w['wtypes']:
+                repoints.append((wt, anim_id))
+            if verbose:
+                print('  %-16s = import %s (animId 0x%X, %d frame(s))'
+                      % (rk['id'], w['abbr'], anim_id, len(res['sheets'])))
+
+        # A private class-level AnimConf = clone of the donor's, each weapon entry repointed.
+        base_conf = _class_field_symbol(rk['base'], 'pBattleAnimDef')
+        new_conf = 'AnimConf_%s' % rk['id'].replace('-', '_')
+        with open(BANIMCONF_C, encoding='utf-8') as f:
+            conf = f.read()
+        first_wt, first_id = repoints[0]
+        conf = banim_clone_conf(conf, base_conf, new_conf, first_wt, first_id + 1)
+        for wt, aid in repoints[1:]:
+            conf = banim_repoint_conf(conf, new_conf, wt, aid + 1)
+        with open(BANIMCONF_C, 'w', encoding='utf-8') as f:
+            f.write(conf)
+        with open(BANIM_EKRBATTLE_H, 'a', encoding='utf-8') as f:
+            f.write('extern CONST_DATA struct BattleAnimDef %s[]; /* Manchego Stars #90 */\n'
+                    % new_conf)
+
+        # Point the reskin clone class's .pBattleAnimDef at the new class-level AnimConf.
+        with open(CLASSES_C, encoding='utf-8') as f:
+            ctext = f.read()
+        ctext = set_class_field_symbol(ctext, rk['slot'], 'pBattleAnimDef', new_conf)
+        with open(CLASSES_C, 'w', encoding='utf-8') as f:
+            f.write(ctext)
+        if verbose:
+            print('  %-16s = %s bound on %s' % (rk['id'], new_conf, rk['slot']))
 
 
 # --- Map tileset + layout (#40/#41) ----------------------------------------------
@@ -5621,9 +5819,10 @@ CH03_ENDING_SCRIPT = 'EventScr_089F19F8'
 CH03_AI = {'aggressive': '{0x0, 0x0, 0x1, 0x0}',   # pursue/charge
            'defensive':  '{0x3, 0x3, 0x9, 0x20}'}  # attack in place, never move (hold the galleries)
 # Brigand kobolds ride the Lizard-Wildling reskin slot (inject_enemy_class_reskins clones
-# CLASS_BRIGAND -> CLASS_BLST_KILLER_EMPTY with the lizard SMS; combat stays brigand). Grell =
-# vanilla Mogall; blade = Mercenary (Lizardzerker slot lands next); archer/thief stay vanilla.
-CH03_CLASS_IDS = {'mogall': 'CLASS_MOGALL', 'brigand': 'CLASS_BLST_KILLER_EMPTY',
+# CLASS_BRIGAND -> CLASS_BRG_LIZARD_WILDLING, an appended class id, with the lizard SMS;
+# combat stays brigand). Grell = vanilla Mogall; blade = Mercenary (Lizardzerker slot lands
+# next); archer/thief stay vanilla.
+CH03_CLASS_IDS = {'mogall': 'CLASS_MOGALL', 'brigand': 'CLASS_BRG_LIZARD_WILDLING',
                   'mercenary': 'CLASS_MNC_LIZARDZERKER', 'archer': 'CLASS_ARCHER',
                   'thief': 'CLASS_THIEF',
                   # the steel brute: a Brigand (parity) that DEPLOYS on the Lizardzerker
@@ -6544,6 +6743,8 @@ def main():
         inject_map_sprites(args.campaign)
         print('enemy class reskins (#21):')
         inject_enemy_class_reskins(args.campaign)  # after map sprites (SMS ids), before ch01
+        print('enemy class battle anims (#90):')
+        inject_enemy_class_battle_anims(args.campaign)  # after reskins (binds the clone class)
         print('battle anims (#65):')
         inject_battle_anims(args.campaign)
         print('winter tileset:')

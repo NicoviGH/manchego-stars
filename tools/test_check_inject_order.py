@@ -24,6 +24,7 @@ def main():
     engine_hooks._inject_lord_floor_engine()
     inject_map_sprites(c)
     inject_enemy_class_reskins(c)
+    inject_enemy_class_battle_anims(c)
     inject_winter_tileset(c)
     inject_ch01(c)
     if test:

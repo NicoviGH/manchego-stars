@@ -435,6 +435,17 @@ class BattleAnimInjection(unittest.TestCase):
         self.assertIn('struct BattleAnimDef AnimConf_rbg_ar1[] =', new)
         self.assertIn('.wtype = 0x0100 | ITYPE_BOW, .index = 0xC9', new)
 
+    def test_set_class_field_symbol_repoints_only_that_class(self):
+        # The class-level enemy-anim path (#90): point a reskin clone's .pBattleAnimDef at a
+        # new class-level AnimConf, leaving sibling classes' anim binding untouched.
+        text = ('    [CLASS_A - 1] = {\n        .number = CLASS_A,\n'
+                '        .pBattleAnimDef = AnimConf_old,\n    },\n'
+                '    [CLASS_B - 1] = {\n        .pBattleAnimDef = AnimConf_keep,\n    },\n')
+        new = bc.set_class_field_symbol(text, 'CLASS_A', 'pBattleAnimDef', 'AnimConf_new')
+        self.assertIn('[CLASS_A - 1] = {\n        .number = CLASS_A,\n'
+                      '        .pBattleAnimDef = AnimConf_new,', new)
+        self.assertIn('.pBattleAnimDef = AnimConf_keep', new)   # CLASS_B untouched
+
 
 class CharacterUniqueBanim(unittest.TestCase):
     """Per-character battle anims (#65 M-B): the scalable, no-class-slot path. A unit's

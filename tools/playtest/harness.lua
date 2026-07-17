@@ -2863,7 +2863,9 @@ end
 
 scenarios.recordrbg = function()
     local RBG = RBG_PID
-    local CLONE_NUMBER = 0x6C   -- CLASS_BLST_KILLER_EMPTY (the Archer-clone class)
+    -- RBG deploys as its PLAIN vanilla class + a per-character _u25 anim (the clone-class
+    -- path was retired in #65 M-B); this scenario just captures the shot, so class is logged
+    -- for eyeballing, not asserted.
     wait(30) -- let the core settle past boot before loading
     if not loadState("rbgch01") then
         return result("FAIL", "no rbgch01 checkpoint (run.sh builds it)") end
@@ -2871,7 +2873,7 @@ scenarios.recordrbg = function()
     local rbg = blue(RBG)
     if not rbg then return result("FAIL", "RBG not on the field after load") end
     local cls = ru8(ru32(rbg.addr + 0x04) + 0x04) -- pClassData->number
-    log(string.format("RBG at (%d,%d) class=0x%X (want 0x%X clone), firing", rbg.x, rbg.y, cls, CLONE_NUMBER))
+    log(string.format("RBG at (%d,%d) class=0x%X, firing", rbg.x, rbg.y, cls))
     shot("rbg-deploy")
     local fired = captureAttack(rbg.addr, "rbg"); shot("rbg-after")
     if not fired then
@@ -2919,6 +2921,90 @@ end
 scenarios.recordrbgtest = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end
     return captureCharAnim("rbg")
+end
+
+-- RECORDENEMY (#90): capture a reskinned ENEMY class's battle anim on the SAME TESTCH sandbox
+-- the PC cast is captured on (`recordanim`) -- one bench for every battle animation, no
+-- chapter-specific boot. inject_test_chapter deploys one hostile of each enemy_class_reskins
+-- slot as a foe; the money shot is the ATTACK swing, which a defender never plays, so a HARMLESS
+-- (pow 0) player attacks the chosen foe at melee -> it survives and COUNTER-attacks, and
+-- captureAttack shoots the whole battle. Needs `make TESTCH=1`. Pick the foe with PT_CHAR
+-- (default kobold-grunt); the map keys the campaign.yaml enemy_class_reskins slot class ids.
+local RESKIN_ENEMY_CLASS = {
+    ["kobold-grunt"]   = 0x82,   -- CLASS_BRG_LIZARD_WILDLING
+    ["kobold-blade"]   = 0x80,   -- CLASS_MNC_LIZARDZERKER
+    ["kobold-brute"]   = 0x81,   -- CLASS_MNC_LIZARDZERKER_BRUTE
+    ["goblin-soldier"] = 0x6A,   -- CLASS_BLST_REGULAR_EMPTY (fire imp, lance)
+    ["goblin-fighter"] = 0x6B,   -- CLASS_BLST_LONG_EMPTY (fire imp, axe)
+}
+scenarios.recordenemy = function()
+    if not bootToMap() then return result("FAIL", "never reached the sandbox map") end
+    wait(60); pokeAnimsOn()
+    local sel = (PLAYTEST_CHAR and PLAYTEST_CHAR ~= "") and PLAYTEST_CHAR or "kobold-grunt"
+    local want = RESKIN_ENEMY_CLASS[sel] or tonumber(sel)
+    if not want then
+        return result("FAIL", "unknown enemy '" .. sel .. "' -- one of: "
+            .. "kobold-grunt kobold-blade kobold-brute, or a raw class id (e.g. 0x82)") end
+    local function classOf(u) return ru8(ru32(u.addr + 0x04) + 0x04) end
+    -- the chosen reskinned foe
+    local foe
+    for i = 0, 23 do
+        local r = unitAt(SYM.gUnitArrayRed, i)
+        if r and not isDead(r) and classOf(r) == want then foe = r; break end
+    end
+    if not foe then
+        return result("FAIL", string.format(
+            "no live foe of class 0x%X in the sandbox (build with `make TESTCH=1`)", want)) end
+    -- a live melee player unit to bait it
+    local pl
+    for i = 0, 15 do
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u and not isDead(u) then
+            local mn = unitAttackRange(u)
+            if mn == 1 then pl = u; break end
+        end
+    end
+    if not pl then return result("FAIL", "no live melee player unit to bait the foe") end
+    -- All live foe tiles: the sandbox packs several reskins in a row, so we must place the
+    -- player on a tile orthogonally adjacent to ONLY the target -- otherwise captureAttack's
+    -- cursor can land on a neighbouring foe (e.g. the sword Lizardzerker next to the axe grunt)
+    -- and we'd capture the WRONG class's anim.
+    local foeTiles = {}
+    for i = 0, 23 do
+        local r = unitAt(SYM.gUnitArrayRed, i)
+        if r and not isDead(r) then foeTiles[r.x .. "," .. r.y] = true end
+    end
+    local grid = mapUnitAt(pl.x, pl.y)
+    local placed = false
+    for _, d in ipairs({ {0,-1}, {0,1}, {1,0}, {-1,0} }) do   -- prefer up/down (fewer row-neighbours)
+        local tx, ty = foe.x + d[1], foe.y + d[2]
+        if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0 then
+            local clean = true                                -- no OTHER foe orthogonally adjacent
+            for _, n in ipairs({ {1,0}, {-1,0}, {0,1}, {0,-1} }) do
+                local nx, ny = tx + n[1], ty + n[2]
+                if not (nx == foe.x and ny == foe.y) and foeTiles[nx .. "," .. ny] then
+                    clean = false; break
+                end
+            end
+            if clean then
+                setMapUnit(pl.x, pl.y, 0)
+                emu:write8(pl.addr + 0x10, tx); emu:write8(pl.addr + 0x11, ty)
+                setMapUnit(tx, ty, grid)
+                pl.x, pl.y = tx, ty
+                placed = true; break
+            end
+        end
+    end
+    if not placed then return result("FAIL", "no tile adjacent to ONLY the target foe") end
+    pokeHarmless(pl)                       -- pow 0: the player's hit can't kill -> the foe counters
+    log(string.format("baiting %s (class 0x%X) at (%d,%d) with player at (%d,%d)",
+        sel, want, foe.x, foe.y, pl.x, pl.y))
+    if not moveUnit(pl.x, pl.y, pl.x, pl.y) then
+        return result("FAIL", "action menu never opened on the firing tile") end
+    shot(sel .. "-deploy")
+    local fired = captureAttack(pl.addr, sel); shot(sel .. "-after")
+    if not fired then return result("FAIL", "captureAttack never reached combat") end
+    return result("PASS", string.format("%s anim captured (baited class 0x%X counter)", sel, want))
 end
 
 
