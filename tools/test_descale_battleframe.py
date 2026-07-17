@@ -35,5 +35,24 @@ class LockedLayoutDescaleTest(unittest.TestCase):
                       [tuple(pal.getpalette()[i:i + 3]) for i in range(0, 48, 3)])
 
 
+class AdaptiveReserveTest(unittest.TestCase):
+    def test_descale_threads_reserved_accent_into_adaptive_palette(self):
+        """A tiny accent (Rootis's orange nose) survives the near-monochrome frame only
+        because the adaptive path now forwards --reserve to _shared_palette. Without the
+        thread it loses the frequency contest against the blue/white body and quantizes out."""
+        nose = (240, 110, 55)
+        body = Image.new('RGBA', (40, 40), (0, 0, 0, 0))
+        body.paste((205, 210, 225, 255), (8, 4, 32, 36))     # big pale-blue snowman body
+        body.paste(nose, (18, 18, 22, 21))                   # a handful of carrot pixels
+
+        out = db.descale(
+            {'ready': body, 'windup': body, 'peak': body},
+            body_h=32, flip=False, outline=False, reserved=(nose,),
+        )
+
+        colours = {px for px in out['ready'].convert('RGBA').getdata() if px[3] != 0}
+        self.assertIn(nose + (255,), colours)
+
+
 if __name__ == '__main__':
     unittest.main()

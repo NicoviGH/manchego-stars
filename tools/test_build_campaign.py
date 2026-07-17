@@ -476,6 +476,16 @@ class CharacterUniqueBanim(unittest.TestCase):
         self.assertEqual(motion, 'magic')
         self.assertIsNone(cadence)
 
+    def test_mage_donor_maps_to_anima_static_cast_cadence(self):
+        # Rootis (frost snowman) rides his OWN class -- CLASS_MAGE, Anima -- not the shaman:
+        # the private AnimConf must repoint the ITYPE_ANIMA slot so the custom anim binds to
+        # the tome he actually wields. Same stationary magic cadence as the shaman donor.
+        donor_class, wtype, motion, cadence = bc.BANIM_DONORS['mage']
+        self.assertEqual(donor_class, 'CLASS_MAGE')
+        self.assertIn('ITYPE_ANIMA', wtype)
+        self.assertEqual(motion, 'magic')
+        self.assertIsNone(cadence)
+
     def test_every_melee_donor_names_a_known_cadence(self):
         from ref_to_battleframe import _MELEE_CADENCE
         for name, (_dc, _wt, motion, cadence) in bc.BANIM_DONORS.items():
@@ -574,12 +584,13 @@ class BattleSpellPaletteTint(unittest.TestCase):
 
     CAMPAIGN = 'rime-of-the-frostmaiden'
 
-    def test_marty_green_tint_is_scoped_to_all_of_his_dark_tomes(self):
+    def test_caster_tints_are_scoped_to_each_caster_and_weapon_type(self):
+        # Marty's green tint covers all his Dark tomes; Rootis's blue (ice flavor) covers
+        # all his Anima tomes. Each is character+weapon-type scoped -- no engine name-check.
         self.assertTrue(hasattr(bc, 'battle_spell_palette_tints'))
         rows = bc.battle_spell_palette_tints(self.CAMPAIGN)
-        self.assertEqual(rows, [
-            ('CHARACTER_SETH', 'ITYPE_DARK', 'BANIM_SPELL_TINT_GREEN'),
-        ])
+        self.assertIn(('CHARACTER_SETH', 'ITYPE_DARK', 'BANIM_SPELL_TINT_GREEN'), rows)
+        self.assertIn(('CHARACTER_VANESSA', 'ITYPE_ANIMA', 'BANIM_SPELL_TINT_BLUE'), rows)
 
     def test_tint_rows_append_a_terminated_campaign_data_table(self):
         src = ('#include "constants/items.h"\n'
@@ -631,9 +642,11 @@ class BattleSpellPaletteTint(unittest.TestCase):
             begin = begin[:begin.index('void SpellFx_Finish')]
             self.assertIn('gEfxSpellAnimExists = true;', begin)
             self.assertNotIn('BANIM_SPELL_TINT', begin)
-            # The palette copy reads the dedicated global, not the lifecycle flag.
+            # The palette copy reads the dedicated global, not the lifecycle flag, and
+            # dispatches per tint id (NONE = passthrough, BLUE = ice recolor, else green).
             palette_copy = utils[utils.index('static void BanimSpellPaletteCopy'):]
-            self.assertIn('if (gMSSpellTint != BANIM_SPELL_TINT_GREEN)', palette_copy)
+            self.assertIn('if (gMSSpellTint == BANIM_SPELL_TINT_NONE)', palette_copy)
+            self.assertIn('BANIM_SPELL_TINT_BLUE', palette_copy)
             self.assertNotIn('gEfxSpellAnimExists', palette_copy)
             # Teardown clears the tint beside the vanilla lifecycle reset.
             self.assertIn('gMSSpellTint = BANIM_SPELL_TINT_NONE;', dispup)
