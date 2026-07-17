@@ -50,9 +50,7 @@ Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-co
   `pBattleAnimDef`. Wired all 5 reskins (grunt/blade/brute + 2 goblins). 22 TDD tests. Also: **landed
   the stranded Braulo refresh** (`feat/braulo-battle-art-refresh` was never merged → the build showed
   the old Braulo; now on main `ee48b63`), re-slotted kobold-grunt to its own appended class, unified
-  battle-anim testing on TESTCH (`recordenemy`).
-- **Cleanup leftover:** `feat/braulo-battle-art-refresh` is merged but still checked out in a worktree
-  at `/private/tmp/manchego-stars-braulo-battle-art` — safe to `git worktree remove` anytime.
+  battle-anim testing on TESTCH (`recordenemy`). The stranded branch + its worktree are cleaned up.
 
 ## Prior session (2026-07-16, Fable — Basil/Oddish art kit, parallel art branch)
 
@@ -120,9 +118,7 @@ chapter maps 1:1 to its numeric FE8 twin (map + parity) and the theme is layered
 - Untracked local/session files (`.agents/`, `AGENTS.md`, `skills-lock.json`) are intentionally not
   versioned; leave them alone unless Nicolas asks. `tools/key_magenta.py` is now **gitignored** (#178)
   so it no longer trips the CI drift guard.
-- Everything is merged to `main` (pushed). One leftover: `feat/braulo-battle-art-refresh` is merged
-  but still checked out at worktree `/private/tmp/manchego-stars-braulo-battle-art` (`git worktree
-  remove` to clean).
+- Everything is merged to `main` (pushed); no dangling local branches or worktrees from this session.
 
 ## Quick commands
 
