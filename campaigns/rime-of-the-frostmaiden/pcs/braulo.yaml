@@ -44,13 +44,15 @@ art:
       - red recolour into the shared cast palette
 
 # ── Battle Animation (faked donor-prime, #65 Milestone B) ────────────────────────
-# Anchor-swinging crab brute on the Pirate axe cadence (his FE class). Source poses:
-# ready/windup = "Battle Anims/Braulo Battle/Braulo{Ready,Windup}.png"; peak =
-# "Battle Anims/BrauloAction2.png" (revised action pose, replaced the original
-# Braulo Battle/BrauloAction.png). FE frames rebuilt by tools/descale_battleframe.py:
-#   --body 44 --sharpen 1.8 --thin-outline --flat "red:3,orange:3,grey:2,brown:3"
+# Anchor-swinging crab brute on the Pirate axe cadence (his FE class). Source poses are the
+# transparent PNG set in "Battle Anims/Braulo Battle Anims 3" (the user-cleaned action peak
+# replaces its original Action_3 file). FE frames rebuilt from that alpha art by
+# tools/descale_battleframe.py with:
+#   --body 44 --sharpen 2.0 --thin-outline --flat "red:3,orange:2,grey:3,brown:2"
 # (flip to FE-left; ~44px body = vanilla scale so he sits centred on the platform, a touch
-# bigger than a 33px Pirate as the crab bruiser; flat family palette + 1px outline).
+# bigger than a 33px Pirate as the crab bruiser; RBG-style 4-connected outline). The art pass
+# then pins the ready silhouette to 46px, aligns the peak torso leftward, and lowers its feet to
+# the ready baseline on a shared 80x72 canvas; the anchor is allowed to extend below the feet.
 # The melee cadence reproduces the vanilla Pirate's LUNGE: build_battle_anim bakes a per-beat
 # forward OAM step (MELEE_LUNGE_DX, peak dx ~-40 like gBanim frame-2), and _melee_mode_body
 # HOLDS that lunged peak through the hit then eases back -- so he steps INTO the swing instead
