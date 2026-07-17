@@ -42,8 +42,30 @@ Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-co
   ADR in decisions.md "Adopting non-FE sprite sources"). His build **wiring** (slot, Natasha
   STAT_DONOR, injection, a `priest` staff/heal BANIM_DONORS row — NOT shaman) is a checklist on the
   ch05 slice **#25**; a live `battle_anim:` block in basil.yaml waits on that donor row.
+- **Lupin + Sahnar art SHIPPED** (#181, merged 2026-07-17):
+  - **Lupin** (ch04) — direwolf **map sprite** (stand + walk) from the Midday **Lycanroc** overworld
+    sheet (princess-phoenix, CC-BY 3.0), recolored to the cast grey ramp to match his portrait, with
+    **hand-drawn hipster glasses** tracked to the eye across every walk frame. `base: Gwyllgi` geometry.
+    Battle anim NOT done — deferred, source = **PMD SpriteCollab Lycanroc #0745** (pointer on #24).
+  - **Sahnar** (ch05) — hooded **spectral-skeleton** blademaster (the "mummy" was dropped: no elegant
+    mummy art exists anywhere, only skeletal undead — skeleton reads cleaner + the trio matches).
+    **Portrait** = Glaceo "Skeleton (Assassin)" bust (hood recolored to the map cloak slate); **map
+    sprite** = Alexsplode "Specter" (cast-palette slate, spectral glow dropped). Battle anim decided
+    (Alexsplode's matching Specter sword anim, **native palette — do not recolor**) but deferred (#25).
+  - Both recruits' build **wiring** (slot, STAT_DONOR, injection, live `battle_anim:`) is ch04/ch05-slice
+    work (#24/#25), same scoping as Basil. Pipeline learnings: decisions.md "Adopting sprites, part 2".
 
-## This session (2026-07-17, Opus — #90 enemy battle anims SHIPPED, ch03 complete)
+## This session (2026-07-17, Fable→Opus — Lupin + Sahnar recruit art)
+
+- **#181 shipped** (squash `9792bb6`, merged): Lupin direwolf map sprite (Lycanroc + hand-drawn glasses)
+  + Sahnar spectral-skeleton portrait + map sprite. Detail above + on #24/#25. Reusable learnings in
+  decisions.md "Adopting sprites, part 2": DeviantArt oEmbed for signed image URLs; hand-drawn details
+  anchored to a detected eye pixel so they track the walk-bob; the community has NO mummy (only skeletal
+  undead) so spectral-skeleton is the cohesive route; palette-lock the portrait robe to the map sprite's
+  *dominant* cloak shade; keep adopted battle anims in their native palette. Both deferred battle anims
+  now ride the #90 import pipeline.
+
+## Prior session (2026-07-17, Opus — #90 enemy battle anims SHIPPED, ch03 complete)
 
 - **#90 shipped** (squash `35666c3`, pushed; ADR "Imported enemy battle anims"). New
   `tools/feditor_to_banim.py` imports FEditor community anims → decomp banim; class-bound via
