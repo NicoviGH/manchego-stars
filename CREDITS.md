@@ -34,6 +34,9 @@ Source: **[Klokinator/FE-Repo](https://github.com/Klokinator/FE-Repo)** (communi
 | `Chocobo Rider (F) Lance` map sprite (stand + walk) | Baxby the axe-beak map-sprite base (rider + lance stripped, recolored to a snowy tundra axe-beak; hand-reskinned by Nicolas in `tools/map_sprite_editor.py`) | **SkidMarc25** | no tag in filename — recheck before distribution |
 | `{Cynon} Battle Platforms` — Snowdrift, Snow Uneven Ground (Light), Ice Flat | battle-anim ground platforms for the snow chapters (vendored at `campaigns/.../platforms/`, injected into `battle_terrain_table` + the terrain→ground remap by `inject_battle_platforms`, #65); Snowdrift twilight-cooled | **Cynon** | F2E (pack title: "All F2E") |
 | `Assorted CGs {Zeldacrafter}` — Snowy Village | Targos ch02-ending event background (frozen Ten-Towns street at nightfall; cropped to 240×160 + FE8-banked by `tools/bg_to_fe8.py`, injected as a new `gConvoBackgroundData` slot by `inject_backgrounds`, #22) | **Zeldacrafter** | F2E (folder tag `{Zeldacrafter}`; source is a Tales of Berseria scene — recheck before distribution) |
+| `Skeleton (Assassin)` portrait | Sahnar the spectral-skeleton blademaster — bust (hooded skeletal assassin; red hood recolored to the cast slate cloak; vendored at `campaigns/.../portraits/vendor/`) | **Glaceo** | F2E |
+| `Bonewalker (U) Specter` map sprite (stand + walk) | Sahnar map sprite base (cast-palette slate recolor, spectral glow dropped) | **Alexsplode** | F2E |
+| `[Skeleton-Custom] Specter` battle animation (sword) | Sahnar battle anim — DECIDED, injection deferred (#39/#90); native palette, not yet vendored (source pointer in `npcs/sahnar.yaml`) | **Alexsplode** | F2E |
 
 (Each FE-Repo asset folder ships a `CREDITS.txt` — copy its exact line here when we lock the asset.)
 
