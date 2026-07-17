@@ -34,12 +34,17 @@ Source: **[Klokinator/FE-Repo](https://github.com/Klokinator/FE-Repo)** (communi
 | `Chocobo Rider (F) Lance` map sprite (stand + walk) | Baxby the axe-beak map-sprite base (rider + lance stripped, recolored to a snowy tundra axe-beak; hand-reskinned by Nicolas in `tools/map_sprite_editor.py`) | **SkidMarc25** | no tag in filename — recheck before distribution |
 | `{Cynon} Battle Platforms` — Snowdrift, Snow Uneven Ground (Light), Ice Flat | battle-anim ground platforms for the snow chapters (vendored at `campaigns/.../platforms/`, injected into `battle_terrain_table` + the terrain→ground remap by `inject_battle_platforms`, #65); Snowdrift twilight-cooled | **Cynon** | F2E (pack title: "All F2E") |
 | `Assorted CGs {Zeldacrafter}` — Snowy Village | Targos ch02-ending event background (frozen Ten-Towns street at nightfall; cropped to 240×160 + FE8-banked by `tools/bg_to_fe8.py`, injected as a new `gConvoBackgroundData` slot by `inject_backgrounds`, #22) | **Zeldacrafter** | F2E (folder tag `{Zeldacrafter}`; source is a Tales of Berseria scene — recheck before distribution) |
+| `Skeleton (Assassin)` portrait | Sahnar the spectral-skeleton blademaster — bust (hooded skeletal assassin; red hood recolored to the cast slate cloak; vendored at `campaigns/.../portraits/vendor/`) | **Glaceo** | F2E |
+| `Bonewalker (U) Specter` map sprite (stand + walk) | Sahnar map sprite base (cast-palette slate recolor, spectral glow dropped) | **Alexsplode** | F2E |
+| `[Skeleton-Custom] Specter` battle animation (sword) | Sahnar battle anim — DECIDED, injection deferred (#39/#90); native palette, not yet vendored (source pointer in `npcs/sahnar.yaml`) | **Alexsplode** | F2E |
 
 (Each FE-Repo asset folder ships a `CREDITS.txt` — copy its exact line here when we lock the asset.)
 
-## Pokémon-sourced assets (Basil the goodberry shrub — Oddish)
-Basil's entire sprite kit adopts **Oddish** (Pokémon #43) art; private non-commercial use, same
-footing as the FE8 base game itself. Recheck before any wider distribution.
+## Pokémon-sourced assets (adopted sprite art)
+Some cast sprites adopt Pokémon art, reskinned onto our cast palette; private non-commercial use,
+same footing as the FE8 base game itself. Recheck before any wider distribution.
+
+**Basil the goodberry shrub — Oddish (#43):**
 
 | Asset | Used for | Origin | Source |
 |---|---|---|---|
@@ -48,6 +53,15 @@ footing as the FE8 base game itself. Recheck before any wider distribution.
 
 (The PMD SpriteCollab fan-made emotion portraits were evaluated but NOT shipped — the shipped
 portrait derives from the official FRLG sprite only.)
+
+**Lupin the direwolf — Lycanroc (#745):**
+
+| Asset | Used for | Origin | Source |
+|---|---|---|---|
+| "Rockruff & Lycanroc Overworlds" sprite sheet (Midday form, 4-direction walk) | Lupin map sprites (`map_sprites/lupin{,_mu}.png`, recoloured to the cast grey ramp + hand-drawn glasses) | fan art by **princess-phoenix**, derived from © **Nintendo / Creatures / GAME FREAK** designs | [princess-phoenix, DeviantArt](https://www.deviantart.com/princess-phoenix/art/Rockruff-and-Lycanroc-Overworlds-722268380) — **CC-BY 3.0** ("feel free to use these in any of your pokemon projects!") |
+
+(Lupin's *portrait* is separate — the TotalityDesigns hipster-wolf ref, credited above under community/AI art.
+Battle anim deferred; PMD SpriteCollab has Lycanroc `sprite/0745` in the same style for later.)
 
 ### Map tilesets (used as-is; the shared snow tileset for the MVP)
 | Asset | Used for | Authors | Source | License |

@@ -60,6 +60,39 @@ recruit:
   chapter: ch05-the-elven-tomb
   via: story                # light the moonlight brazier to open the sarcophagus
 
-# ── Art (reskin lever: stock chassis, custom skin) ───────────────────────────
+# ── Art (SHIPPED 2026-07-17 — spectral-skeleton direction, Nicolas's call) ────
+# Direction change from the design-record "mummy": the FE + broader sprite community has NO
+# elegant mummy bust/anim — only skeletal undead. Rather than generate custom art, Sahnar became
+# a hooded SKELETAL revenant blademaster (still the reawakened-elf beat; skeleton reads cleaner
+# than a green zombie and everything MATCHES across the trio). Decision + sweep: docs/decisions.md
+# §Art & Audio "Adopting non-FE sprite sources".
 art:
-  approach: custom            # moon-elf mummy over the Myrmidon chassis; bust + map sprite TBD (#19/#38)
+  approach: adopted           # community skeletal-undead assets reskinned to the cast palette; no generation
+  portrait:                   # portraits/sahnar.png (+_preview) — APPROVED 2026-07-17
+    source: "portraits/vendor/Skeleton Assassin {Glaceo} [F2E].png"   # FE-Repo hooded skeletal assassin bust
+    recipe: >
+      crop the 96x80 main frame from the 128x112 mug; recolor the red hood/cloak to the map
+      sprite's exact slate ramp (deep shadow -> dark slate bulk -> slate highlight, matching
+      map_sprites/sahnar.png cloak idx1+idx10); key the green bg to transparent; quantize <=15
+      colours. Skull/bone left as-is (already matches the sprite bone). Deadzone verified clean.
+    static: true              # no mouth-flap / blink, like the other custom busts
+    credit: "Glaceo (FE-Repo, F2E); see CREDITS.md"
+  map_sprite:                 # SHIPPED (map_sprites/sahnar{,_mu}.png); palette applied by Nicolas
+    base: Bonewalker/Specter  # 16x16 SMS + 32x480 MU, adopted from the Specter overworld sprite
+    source: "Bonewalker (U) Specter {Alexsplode} — FE-Repo Map Sprites/Monsters - Basic Types"
+    recipe: >
+      cast-palette match (bone -> tan/white/grey, cloak -> dark slate idx1+idx10, spectral cyan
+      glow dropped for a solid-skeleton read); final index swaps applied by Nicolas in
+      map_sprite_swapper. Validates UNIT_ICON_SIZE_16x16 x3 (SMS) + 32x32 x15 (MU).
+    palette: cast
+    credit: "Alexsplode (FE-Repo, F2E); see CREDITS.md"
+  battle_anim:                # DECIDED but injection DEFERRED (needs the #90 FE-anim import pipeline)
+    source: "[Skeleton-Custom] [U] Specter {Alexsplode} — FE-Repo Battle Animations/Monsters - Basic Types/1. Sword"
+    plan: >
+      adopt the Specter sword battle animation in its NATIVE palette (Nicolas: it's polished/
+      consistent on its own — do NOT recolor it to the cloak; the skull + spectral glow are the
+      throughline). Matched pair with the map sprite (both Alexsplode). Wire via the #90 import
+      pipeline when it lands; until then this is a source pointer, not vendored (re-fetch on pickup).
+    credit: "Alexsplode (FE-Repo, F2E); see CREDITS.md"
+  # NOTE: still inert in build_campaign — recruit wiring (slot, Joshua STAT_DONOR, injection) is
+  # ch05-slice work (#25/#19), same scoping as Basil and Lupin. This branch lands the ART only.
