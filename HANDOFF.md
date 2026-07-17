@@ -43,7 +43,18 @@ Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-co
   STAT_DONOR, injection, a `priest` staff/heal BANIM_DONORS row — NOT shaman) is a checklist on the
   ch05 slice **#25**; a live `battle_anim:` block in basil.yaml waits on that donor row.
 
-## This session (2026-07-16, Fable — Basil/Oddish art kit, parallel art branch)
+## This session (2026-07-17, Opus — #90 enemy battle anims SHIPPED, ch03 complete)
+
+- **#90 shipped** (squash `35666c3`, pushed; ADR "Imported enemy battle anims"). New
+  `tools/feditor_to_banim.py` imports FEditor community anims → decomp banim; class-bound via
+  `pBattleAnimDef`. Wired all 5 reskins (grunt/blade/brute + 2 goblins). 22 TDD tests. Also: **landed
+  the stranded Braulo refresh** (`feat/braulo-battle-art-refresh` was never merged → the build showed
+  the old Braulo; now on main `ee48b63`), re-slotted kobold-grunt to its own appended class, unified
+  battle-anim testing on TESTCH (`recordenemy`).
+- **Cleanup leftover:** `feat/braulo-battle-art-refresh` is merged but still checked out in a worktree
+  at `/private/tmp/manchego-stars-braulo-battle-art` — safe to `git worktree remove` anytime.
+
+## Prior session (2026-07-16, Fable — Basil/Oddish art kit, parallel art branch)
 
 - Full detail on PR **#179** + the #25 checklist comment. Reusable bits: PMD SpriteCollab is the
   side-view sprite goldmine (8-direction sheets; W row faces left = FE8 player side); ffmpeg ships
@@ -69,23 +80,18 @@ Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-co
   (committed files only) while passing locally (file present). Gitignored it, matching check.py's
   documented "gitignored target = declared artifact" exception (like `symbols.lua`). Was broken on
   `main`, unrelated to #176/#177.
-- **Scoped #90 (enemy battle-anim import) via brainstorm** — Nicolas chose to clear ch3 before ch4,
-  and ch3's only remaining work is the kobold combat anims. Design of record is captured in the
-  **#90 2026-07-16 comment** (retitled: now the shared pipeline for ch1 imps + ch3 kobolds). No code
-  written — implementation is the next session's job (see Next steps #1).
+- **Scoped #90 (enemy battle-anim import) via brainstorm** — design of record was the #90 2026-07-16
+  comment; **implemented + shipped 2026-07-17** (see this-session note above).
 
-## NEXT SESSION — start here: #90 enemy battle-anim import (clears ch3)
+## NEXT SESSION — start here: ch04 / ch05 vertical slices (M3, the main line)
 
-Full grounded design is in the **#90 2026-07-16 comment** (read it first — it has the technical
-findings so you don't re-derive). Summary: build a new importer (`feditor_to_banim.py`, under tools/) — parse a vendored FE-Repo
-FEditor `.txt` + frame PNGs → decomp banim assets, reusing `ref_to_battleframe`'s emitters; command→
-`banim_code_*` macro table — the vocabulary already exists in `include/banim_code.inc`) + a class-level
-`AnimConf` binding in `build_campaign` driven by a new `battle_anim:` on `enemy_class_reskins`
-(`ClassData.pBattleAnimDef`). **Decision = full FEditor import (not the faked-3-pose shortcut).**
-**FIRST STEP: vendor the real Lenh "Lizard Brigand Wildling" anim from Klokinator/FE-Repo and inspect
-its actual packaging BEFORE building the parser.** Prove on kobold-grunt Wildling → in-engine ch03
-capture (`CH03BOOT=1 PT_HOST_CHAPTER=4`) → show Nicolas → then Lizardzerker → then ch1 fire imp.
-Svirfneblin stays vanilla; slinger = map-sprite only. TDD; `feat/90-…` branch; ADR (no spec doc).
+ch03 is complete and #90 (enemy battle anims) shipped, so the main line is now the **ch04/ch05
+slices** — see "Next steps" #1 below for the full brief. In short: author each chapter's map (Tiled
+retile of its vanilla FE8 twin), roster, and events, tuned against `make difficulty` (all three engine
+bars — enemy pressure + economy + dynamics — are complete). Per-chapter vertical slice on **#24 / #25**.
+Both chapters are `status: planned` seeds today (targets set, no built roster). Basil's art is shipped
+but his build **wiring** is a checklist on the ch05 slice **#25** (needs a `priest` staff/heal
+BANIM_DONORS row — NOT shaman — before his `battle_anim:` block goes live).
 
 ## Why we dropped the Ch11 map-borrow (so it isn't re-litigated)
 
@@ -96,10 +102,7 @@ chapter maps 1:1 to its numeric FE8 twin (map + parity) and the theme is layered
 
 ## Next steps (priority order)
 
-1. **#90 enemy battle-anim import — clears ch3 (Nicolas: finish ch3 before ch4).** See the
-   "NEXT SESSION — start here" block above + the #90 2026-07-16 design comment. Prove on the
-   kobold-grunt Wildling, then Lizardzerker, then the ch1 fire imp.
-2. **Build the ch04 / ch05 slices** (M3, the main line). Per-chapter vertical slice on #24 / #25.
+1. **Build the ch04 / ch05 slices** (M3, the main line). Per-chapter vertical slice on #24 / #25.
    Author the map (Tiled retile of vanilla Ch4 / Ch5 per the map-authoring pipeline) + roster + events,
    tuned against the now-machine-checkable targets via `make difficulty` (the engine bars are complete
    now — enemy pressure + economy incl. drops #176 + dynamics incl. area/zone reinf #177). When authoring
@@ -107,9 +110,9 @@ chapter maps 1:1 to its numeric FE8 twin (map + parity) and the theme is layered
    waves), and `item_drop:` where a twin drops one** so the engine models them (right now the seeds show
    "0 enemies" = unmodeled weapons). Also wire the Lupin/Sahnar/Basil `STAT_DONOR`s so `make difficulty`
    fields the true ch05 party (they're currently invisible to it — a known lever, not headroom).
-3. **#138** config-driven `inject_chapter(descriptor)` (incremental; YAML `host:` block — approved
+2. **#138** config-driven `inject_chapter(descriptor)` (incremental; YAML `host:` block — approved
    direction, paused for the ch04/ch05 design).
-4. Then **#29** world map.
+3. Then **#29** world map.
 
 ## Working tree - do not lose or revert
 
@@ -117,7 +120,9 @@ chapter maps 1:1 to its numeric FE8 twin (map + parity) and the theme is layered
 - Untracked local/session files (`.agents/`, `AGENTS.md`, `skills-lock.json`) are intentionally not
   versioned; leave them alone unless Nicolas asks. `tools/key_magenta.py` is now **gitignored** (#178)
   so it no longer trips the CI drift guard.
-- Everything from this session is merged to `main`; no dangling local branches.
+- Everything is merged to `main` (pushed). One leftover: `feat/braulo-battle-art-refresh` is merged
+  but still checked out at worktree `/private/tmp/manchego-stars-braulo-battle-art` (`git worktree
+  remove` to clean).
 
 ## Quick commands
 
