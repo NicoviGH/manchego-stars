@@ -403,6 +403,12 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         # (the enum/struct/table + gMSSpellTint extern) is listed above.
                         'src/banim-efxmagic.c', 'src/banim-ekrutils.c',
                         'src/banim-ekrbattle.c', 'src/banim-ekrdispup.c',
+                        # #183 per-caster charge flash: the _patch_banim_charge_flash hook adds
+                        # the pulse proc + arm in banim-efxmisc, arms it from the existing
+                        # elec-charge command (case 40) in banim-main, and declares the arm in
+                        # efxbattle.h. The gMSChargeFlashes table rides data_banimconfunk.c
+                        # (listed below); the struct/extern ride ekrbattle.h (listed above).
+                        'src/banim-efxmisc.c', 'src/banim-main.c', 'include/efxbattle.h',
                         'linker_script_banim.txt',
                         # #65 M-B (character-unique anims, no class slot): the per-character
                         # config table gets the AnimConf appended; the combat-lookup engine
@@ -2880,6 +2886,28 @@ def banim_spell_palette_tint_append(text, rows):
     return text + block
 
 
+def banim_charge_flash_append(text, rows):
+    """Append the campaign-declared per-caster charge-flash rows once (#183).
+
+    Each row is (character, weapon_type, target_bgr555) -- the caster's own sprite pulses
+    toward `target_bgr555` on the wind-up beat. The colour rides as a raw BGR555 u16 so the
+    engine blends toward any hue without a per-colour enum. Zero-character row terminates."""
+    character_include = '#include "constants/characters.h"\n'
+    if character_include not in text:
+        anchor = '#include "constants/items.h"\n'
+        if anchor not in text:
+            raise ValueError('battle-animation data file is missing constants/items.h include')
+        text = text.replace(anchor, anchor + character_include, 1)
+    marker = 'gMSChargeFlashes[]'
+    if marker in text:
+        return text
+    block = '\nCONST_DATA struct BanimChargeFlash %s = {\n' % marker
+    for character, weapon_type, target in rows:
+        block += '    { %s, %s, %s },\n' % (character, weapon_type, target)
+    block += '    { 0, 0, 0 },\n};\n'
+    return text + block
+
+
 def banim_set_char_u25(block, index):
     """Set a character block's `._u25 = { index, index }` (#65 M-B), inserting after
     `.number` if absent, overwriting in place if already present (both promote states)."""
@@ -2970,6 +2998,42 @@ def battle_spell_palette_tints(campaign):
             sys.exit('ERROR: battle_anim %s spell_palette_tint: unsupported %s' %
                      (uid, e))
         out.append((char_symbol(slot), weapon_type, color))
+    return out
+
+
+# Per-caster charge-flash colours (#183): the sprite pulses toward this hue on the wind-up
+# beat. Each caster's identity colour; blended additively (a wash), so any hue works.
+CHARGE_FLASH_RGB = {
+    'blue':   (120, 205, 255),   # ice (Rootis)
+    'green':  (110, 255, 120),   # (Marty)
+    'purple': (200, 120, 255),   # (Meesmickle)
+}
+
+
+def charge_flash_target(color):
+    """A named charge-flash colour -> its BGR555 hex string (the blend target)."""
+    r, g, b = CHARGE_FLASH_RGB[color]
+    return '0x%04X' % ((r >> 3) | ((g >> 3) << 5) | ((b >> 3) << 10))
+
+
+def battle_charge_flashes(campaign):
+    """(character, weapon_type, target_bgr555) rows from battle_anim `charge_flash` blocks.
+
+    The weapon type is the caster's DONOR weapon type (the flash arms for whatever tome the
+    faked anim is bound to), so a `charge_flash` block only needs a colour."""
+    out = []
+    for uid, unit in units_with_battle_anim(campaign):
+        flash = unit['battle_anim'].get('charge_flash')
+        if not flash:
+            continue
+        try:
+            donor = BANIM_DONORS[unit['battle_anim']['clone_from']]
+            target = charge_flash_target(flash['color'])
+            slot = PORTRAIT_MAP[uid]
+        except KeyError as e:
+            sys.exit('ERROR: battle_anim %s charge_flash: unsupported %s' % (uid, e))
+        weapon_type = donor[1].split('|')[-1].strip()   # '0x0100 | ITYPE_ANIMA' -> 'ITYPE_ANIMA'
+        out.append((char_symbol(slot), weapon_type, target))
     return out
 
 
@@ -3105,6 +3169,15 @@ def inject_battle_anims(campaign, verbose=True):
             f.write(banim_spell_palette_tint_append(tint_text, tint_rows))
         if verbose:
             print('  spell palette tints: %d character/weapon row(s)' % len(tint_rows))
+
+    flash_rows = battle_charge_flashes(campaign)
+    if flash_rows:
+        with open(BANIMCONFUNK_C, encoding='utf-8') as f:
+            flash_text = f.read()
+        with open(BANIMCONFUNK_C, 'w', encoding='utf-8') as f:
+            f.write(banim_charge_flash_append(flash_text, flash_rows))
+        if verbose:
+            print('  charge flashes (#183): %d caster(s) pulse on the wind-up beat' % len(flash_rows))
 
 
 def _class_field_symbol(class_enum, field):
@@ -6729,6 +6802,8 @@ def main():
         print('  banim (#65): GetBanimPalette -> custom (appended) banims keep own palette (RBG cyan fix)')
         engine_hooks._patch_banim_spell_palette_tint()
         print('  banim (#165): character/weapon spell palettes support campaign-declared tints')
+        engine_hooks._patch_banim_charge_flash()
+        print('  banim (#183): casters pulse their signature colour on the wind-up charge beat')
         engine_hooks._patch_draw_icon_pal2()
         print('  item icons (#23): DrawIcon routes gMSPal2IconIds from BG bank 4 to custom bank 15')
         print('names:')

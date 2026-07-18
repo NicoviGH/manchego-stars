@@ -656,6 +656,67 @@ class BattleSpellPaletteTint(unittest.TestCase):
                     f.write(text)
 
 
+class BattleChargeFlash(unittest.TestCase):
+    """Per-caster charge flash (#183): the caster's own sprite pulses toward a signature
+    colour on the wind-up beat. Colour + character binding stay data, not engine code."""
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def test_flash_rows_append_a_terminated_table_with_bgr555_targets(self):
+        # The generated table carries the target colour as a raw BGR555 u16 so the engine
+        # blends toward it directly -- no per-colour enum needed for any hue.
+        src = ('#include "constants/items.h"\n'
+               'CONST_DATA struct BattleAnimDef * gUnitSpecificBanimConfigs[] = {\n'
+               '    NULL,\n};\n')
+        self.assertTrue(hasattr(bc, 'banim_charge_flash_append'))
+        out = bc.banim_charge_flash_append(
+            src, [('CHARACTER_VANESSA', 'ITYPE_ANIMA', '0x7E6F')])
+        self.assertIn('CONST_DATA struct BanimChargeFlash gMSChargeFlashes[]', out)
+        self.assertIn('#include "constants/characters.h"', out)
+        self.assertIn('{ CHARACTER_VANESSA, ITYPE_ANIMA, 0x7E6F },', out)
+        self.assertIn('{ 0, 0, 0 },', out)   # zero-character terminator
+
+    def test_named_colour_resolves_to_a_bgr555_hex_target(self):
+        # 'blue' is Rootis's ice hue (120,205,255) -> 5-bit per channel, packed BGR555.
+        self.assertTrue(hasattr(bc, 'charge_flash_target'))
+        self.assertEqual(bc.charge_flash_target('blue'), '0x7F2F')
+
+    def test_charge_flashes_are_scoped_per_caster_with_bgr555_colour(self):
+        # Each caster's charge_flash: {color} -> one character+weapon-scoped row, the weapon
+        # type derived from the donor (Rootis mage/anima; Marty & Meesmickle shaman/dark).
+        self.assertTrue(hasattr(bc, 'battle_charge_flashes'))
+        rows = bc.battle_charge_flashes(self.CAMPAIGN)
+        self.assertIn(('CHARACTER_VANESSA', 'ITYPE_ANIMA', bc.charge_flash_target('blue')), rows)
+        self.assertIn(('CHARACTER_SETH', 'ITYPE_DARK', bc.charge_flash_target('green')), rows)
+        self.assertIn(('CHARACTER_GILLIAM', 'ITYPE_DARK', bc.charge_flash_target('purple')), rows)
+
+    def test_hook_arms_the_flash_from_the_existing_charge_command(self):
+        """The pulse is armed by the elec-charge command ALREADY in the magic body (case 40),
+        so the donor-matched animation script is never altered. Injects the lookup + proc."""
+        self.assertTrue(hasattr(eh, '_patch_banim_charge_flash'))
+        patched = ('BANIM_EKRBATTLE_H', 'BANIM_EFXMISC_C', 'BANIM_MAIN_C')
+        before = {name: open(getattr(eh, name), encoding='utf-8').read() for name in patched}
+        try:
+            eh._patch_banim_charge_flash()
+            header = open(eh.BANIM_EKRBATTLE_H, encoding='utf-8').read()
+            efxmisc = open(eh.BANIM_EFXMISC_C, encoding='utf-8').read()
+            main = open(eh.BANIM_MAIN_C, encoding='utf-8').read()
+            # data contract: a per-character/weapon table of BGR555 targets.
+            self.assertIn('struct BanimChargeFlash', header)
+            self.assertIn('gMSChargeFlashes[]', header)
+            # the arm reads the CURRENT attacker (character + weapon), like the spell tint.
+            self.assertIn('void MSChargeFlashArm(struct Anim *anim)', efxmisc)
+            self.assertIn('GetItemType(bu->weaponBefore)', efxmisc)
+            # armed from the existing start-attack command (case 0x07) -- no motion.s change,
+            # and ~one settle beat before the wind-up arm-raise.
+            self.assertIn('MSChargeFlashArm(anim)', main)
+            self.assertIn('case 0x07:', main)
+        finally:
+            for name, text in before.items():
+                with open(getattr(eh, name), 'w', encoding='utf-8') as f:
+                    f.write(text)
+
+
 class BattlePlatformTerrain(unittest.TestCase):
     """Terrain category -> snow ground index (#65). base = first vendored ground slot;
     offsets 0=Snowdrift, 1=Snow Uneven (rough), 2=Ice."""

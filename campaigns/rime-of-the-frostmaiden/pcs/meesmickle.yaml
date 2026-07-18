@@ -120,6 +120,8 @@ battle_anim:
     - meesmickle/ready.png
     - meesmickle/windup.png
     - meesmickle/peak.png
+  charge_flash:               # #183: his sprite pulses purple on the wind-up/charge beat
+    color: purple             # weapon type derived from the donor (shaman/dark)
 
 signature_moment:
   chapter: ch09-revels-end   # post-MVP (Act II opener — roadmap.md Ch 9, the prison break)
