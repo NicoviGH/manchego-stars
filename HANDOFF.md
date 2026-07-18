@@ -164,20 +164,39 @@ Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-co
 - **Scoped #90 (enemy battle-anim import) via brainstorm** — design of record was the #90 2026-07-16
   comment; **implemented + shipped 2026-07-17** (see this-session note above).
 
-## NEXT SESSION — start here: ch04 MAP (step 2), then ch05 slice (M3, the main line)
+## NEXT SESSION — start here: Sclorbo + Pinky battle anims (the last 2 PC cast anims)
 
-**ch04 roster is now grounded (step 1 done, PR #186 — merge it first).** Per the new tiered-difficulty
-flow (decisions.md §Combat), the next step is **ch04's MAP (step 2): the Tiled retile of vanilla Ch4**,
-honouring the `placement_directives` now in `ch04-the-white-moose.yaml` (cluster the will-o'-wisps into
-one crossfire pocket, tree-gate the approach, deep tank, later reinforcement waves, near-woods parley
-pack). Then **re-run the spatial check** — feed the placed map's positions/AI/terrain to an LLM analyst
-(the ch04 experiment brief is the template: `scratchpad/ch4_facts_brief.md`), adjust placement *or*
-roster (the loop is bidirectional), and only then build+play for the real difficulty read. Two ch04
-events-layer decisions are still open (see this-session note): parley behavior + teaching the parley.
+Nicolas's pick for the next instance (2026-07-18): finish the PC battle animations. **6 of 8 PCs are
+done** (braulo, marty, meesmickle, prof-rbg, wolfram, rootis); **sclorbo + pinky remain**, and both push
+the faked-anim pipeline in NEW directions — so **brainstorm each first** (superpowers:brainstorming),
+then TDD + in-engine `recordanim` gate, same flow as Rootis (#184) and the charge flash (#183). The
+reusable pipeline: faked 3-pose `battle_anim:` block (`clone_from` donor · `motion` · `abbr` · `frames`)
+→ `descale_battleframe.py` from hi-res poses → `inject_battle_anims` (per-character `_u25`); details in
+`inject_battle_anims` docstring + decisions.md "A caster clones from its OWN class".
 
-ch05 is the same shape but not started (`status: planned`, roster still 8-enemy seed / unmodeled —
-same grounding pass ch04 just had). Basil's build **wiring** is a checklist on the ch05 slice **#25**
-(needs a `priest` staff/heal BANIM_DONORS row — NOT shaman — before his `battle_anim:` block goes live).
+- **Sclorbo — HEALER, a NEW caster type.** He's a **staff user** (ITYPE_STAFF heal/mend), not an attack
+  caster, so the current `BANIM_DONORS` (archer/shaman/pirate/knight/mage) has no fit — he needs a NEW
+  **priest/cleric staff donor** (`CLASS_PRIEST`-ish, ITYPE_STAFF, a heal/staff motion cadence). **This is
+  the SAME donor Basil (ch05, #25) is blocked on** ("a `priest` staff/heal BANIM_DONORS row — NOT
+  shaman"), so build it once, both use it. Study the vanilla priest heal `motion.s` first (as the
+  shaman-charge was studied for magic): does a staff/heal anim even have a wind-up "attack" beat to hang
+  3 poses on, or its own cadence? **The #183 pulse/charge-flash may apply** — e.g. a healing "gather"
+  glow on the staff-raise via a `charge_flash: {color}` block (Nicolas's idea); the kernel is reusable
+  (decisions.md "Per-caster charge flash", armed from an existing banim command — pick the staff analogue
+  of `case 0x07`).
+- **Pinky — FLIER with more complex motion (may need MORE THAN 3 frames).** The faked pipeline is a
+  **HARD 3 frames** (`build_battle_anim` rejects other counts — decisions.md Operational Gotchas). A
+  flier's hover/swoop reads poorly as 3 static poses, so Pinky likely needs EITHER (a) the pipeline
+  **extended to N frames** (a real `ref_to_battleframe`/motion.s enhancement — the frame count is baked
+  into the mode bodies today), OR (b) **importing a real community flier anim whole** via the #90
+  `feditor_to_banim.py` pipeline (built for enemy CLASSES bound per-class; a PC flier would ride the
+  per-character `_u25` path instead — effectively merging the two pipelines). Decide in the brainstorm.
+  Check her map-sprite/portrait status (#38 / `pinky.yaml`) before starting.
+
+**Parallel main line (Nicolas's own ch04 work, separate branch/worktree — see Working tree):** ch04 MAP
+(step 2) then ch05 slice (M3). ch04 roster is grounded (#186); next is the Tiled retile of vanilla Ch4
+per the `placement_directives`, then the spatial check + build/play (tiered-difficulty flow, decisions.md
+§Combat). ch05 not started (`status: planned`, 8-enemy seed / unmodeled). Detail in Next steps below.
 
 ## Why we dropped the Ch11 map-borrow (so it isn't re-litigated)
 
@@ -188,9 +207,12 @@ chapter maps 1:1 to its numeric FE8 twin (map + parity) and the theme is layered
 
 ## Next steps (priority order)
 
-1. **Build the ch04 / ch05 slices** (M3, the main line). Per-chapter vertical slice on #24 / #25,
-   run through the tiered-difficulty flow (decisions.md §Combat): roster ballpark → map+placement →
-   spatial check → play → lock.
+1. **Sclorbo + Pinky battle anims** (Nicolas's pick for the next instance — the 2 remaining PC anims).
+   Brainstorm each first; both extend the pipeline (Sclorbo = new staff/heal donor, shared with Basil;
+   Pinky = flier, likely >3 frames or a real-anim import). Full brief in "NEXT SESSION — start here".
+2. **Build the ch04 / ch05 slices** (M3, the main line — Nicolas's parallel ch04 work). Per-chapter
+   vertical slice on #24 / #25, run through the tiered-difficulty flow (decisions.md §Combat): roster
+   ballpark → map+placement → spatial check → play → lock.
    - **ch04: roster GROUNDED (PR #186).** Next = the **map** (step 2) per its `placement_directives`,
      then the spatial check + build/play. Two open events decisions (parley behavior + teaching it).
    - **ch05: not started.** Same grounding pass ch04 just had — tag enemy_units with `fe_base`
@@ -198,17 +220,19 @@ chapter maps 1:1 to its numeric FE8 twin (map + parity) and the theme is layered
      drops one (right now the seed shows "0 enemies" = unmodeled). Also wire the Lupin/Sahnar/Basil
      `STAT_DONOR`s so `make difficulty` fields the true ch05 party (currently invisible to it — a
      known lever, not headroom).
-2. **#138** config-driven `inject_chapter(descriptor)` (incremental; YAML `host:` block — approved
+3. **#138** config-driven `inject_chapter(descriptor)` (incremental; YAML `host:` block — approved
    direction, paused for the ch04/ch05 design).
-3. Then **#29** world map.
+4. Then **#29** world map.
 
 ## Working tree - do not lose or revert
 
 - `fireemblem8u` is dirty from injected/generated build artifacts. **Never commit its submodule pointer.**
 - Untracked local/session files (`.agents/`, `AGENTS.md`, `skills-lock.json`) are intentionally not
-  versioned; leave them alone unless Nicolas asks. `tools/key_magenta.py` is now **gitignored** (#178)
-  so it no longer trips the CI drift guard.
-- Everything is merged to `main` (pushed); no dangling local branches or worktrees from this session.
+  versioned; leave them alone unless Nicolas asks. `tools/key_magenta.py` is **gitignored** (#178).
+- **Nicolas's parallel ch04 work is live: branch `feat/24-ch04-roster-grounding` + worktree
+  `worktree-ch04-map` (the ch04 MAP step). Leave both alone** — they are his in-progress ch04 map/slice
+  work, not stale. The charge-flash session's own branches are all squash-merged and deleted.
+- Everything from the charge-flash session (#183) is merged to `main` (pushed); CI green.
 
 ## Quick commands
 
