@@ -86,24 +86,25 @@ C06
 1 p- Pinky_000.png
 C0D
 ~~~
-/// - Mode 7               #Dodge Melee Attack (bank upward)
-C02                               #Start of dodge
-1 p- Pinky_000.png
+/// - Mode 7               #Dodge Melee Attack (a SMALL hop near home)
+# Use jump (001, just above idle), NOT apex/mid — those sit up at the far attack-arc
+# position, so a dodge that reused them teleported Pinky up-left and bounced (the "jaggedly
+# comes back up and stays in a mid-jump frame" bug). A flier dodge is a quick little hop.
+C02                               #Start of dodge (engine also shifts him back)
+1 p- Pinky_000.png                #idle
 C0E                               #Start of dodging frames
-3 p- Pinky_003.png                #rise out of the way
-1 p- Pinky_002.png
+4 p- Pinky_001.png                #small hop up (near home) — NOT the attack apex
 C01                               #NOP
-3 p- Pinky_003.png
+3 p- Pinky_000.png                #settle back to idle
 C0D
 ~~~
-/// - Mode 8               #Dodge Ranged Attack
+/// - Mode 8               #Dodge Ranged Attack (same small hop)
 C02
 1 p- Pinky_000.png
 C0E
-3 p- Pinky_003.png
-1 p- Pinky_002.png
+4 p- Pinky_001.png
 C01
-3 p- Pinky_003.png
+3 p- Pinky_000.png
 C0D
 ~~~
 /// - Mode 9               #Equipped with Melee Weapon (stand)
