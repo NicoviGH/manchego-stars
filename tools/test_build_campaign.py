@@ -705,9 +705,10 @@ class BattleChargeFlash(unittest.TestCase):
             # the arm reads the CURRENT attacker (character + weapon), like the spell tint.
             self.assertIn('void MSChargeFlashArm(struct Anim *anim)', efxmisc)
             self.assertIn('GetItemType(bu->weaponBefore)', efxmisc)
-            # armed from the existing elec-charge command (case 40) -- no motion.s change.
+            # armed from the existing start-attack command (case 0x07) -- no motion.s change,
+            # and ~one settle beat before the wind-up arm-raise.
             self.assertIn('MSChargeFlashArm(anim)', main)
-            self.assertIn('case 40:', main)
+            self.assertIn('case 0x07:', main)
         finally:
             for name, text in before.items():
                 with open(getattr(eh, name), 'w', encoding='utf-8') as f:

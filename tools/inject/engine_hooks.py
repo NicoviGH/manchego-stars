@@ -285,7 +285,7 @@ def _patch_banim_spell_palette_tint():
 # A raised cosine (0 -> peak -> 0) repeated `_CHARGE_FLASH_THROBS` times -- matching the
 # approved multi-pulse mockup, NOT a single throb. Peak ~0.72 (23/32); starts and ends at 0
 # (clean restore). Precomputed so the engine needs no sin(); index by the proc timer.
-_CHARGE_FLASH_FRAMES = 40
+_CHARGE_FLASH_FRAMES = 54
 _CHARGE_FLASH_THROBS = 3
 def _charge_flash_sine_lut():
     import math
@@ -383,6 +383,8 @@ def _patch_banim_charge_flash():
             '    u16 *pal;\n'
             '    int i;\n'
             '    int pos = GetAnimPosition(anim);\n\n'
+            '    if (Proc_Find(ProcScr_msChargeFlash) != NULL)\n'
+            '        return;   /* one pulse per attack -- armed once at start-attack (case 0x07) */\n\n'
             '    if (pos == EKR_POS_L) {\n'
             '        bu = gpEkrBattleUnitLeft;\n'
             '        pal = PAL_OBJ(0x7);\n'
@@ -411,19 +413,22 @@ def _patch_banim_charge_flash():
         with open(BANIM_EFXMISC_C, 'w', encoding='utf-8') as f:
             f.write(efx)
 
-    # 4. arm from the existing elec-charge command (case 40) -- NO motion.s change.
+    # 4. arm from the existing start-attack command (case 0x07) -- NO motion.s change. This is
+    #    ~one settle beat before the wind-up arm-raise (Nicolas: "start when he raises his arms,
+    #    or a tiny bit sooner"), vs the elec-charge marker which fires ~18 ticks too late. The arm
+    #    self-guards (Proc_Find) so the skill-flag re-entry in case 0x07 spawns exactly one pulse.
     with open(BANIM_MAIN_C, encoding='utf-8') as f:
         main = f.read()
     if 'MSChargeFlashArm(anim)' not in main:
-        anchor = '                case 40:\n                case 41:\n'
+        anchor = ('                case 0x07:\n'
+                  '                    if (GetRoundFlagByAnim(anim) & ANIM_ROUND_SURE_SHOT) {\n')
         if anchor not in main:
-            sys.exit('ERROR: charge-flash case-40 anchor missing in %s' % BANIM_MAIN_C)
-        armed = ('                case 40:\n'
+            sys.exit('ERROR: charge-flash case-0x07 anchor missing in %s' % BANIM_MAIN_C)
+        armed = ('                case 0x07:\n'
                  '                    if (GetAISLayerId(anim) == 0)\n'
-                 '                        MSChargeFlashArm(anim);\n'
-                 '                    /* MS #183: arm the per-caster charge flash, then fall'
-                 ' through to the SE */\n'
-                 '                case 41:\n')
+                 '                        MSChargeFlashArm(anim);   /* MS #183: sync the charge'
+                 ' flash to start-attack (just before the arm-raise) */\n'
+                 '                    if (GetRoundFlagByAnim(anim) & ANIM_ROUND_SURE_SHOT) {\n')
         main = main.replace(anchor, armed, 1)
         with open(BANIM_MAIN_C, 'w', encoding='utf-8') as f:
             f.write(main)
