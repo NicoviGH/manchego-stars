@@ -55,7 +55,24 @@ Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-co
   - Both recruits' build **wiring** (slot, STAT_DONOR, injection, live `battle_anim:`) is ch04/ch05-slice
     work (#24/#25), same scoping as Basil. Pipeline learnings: decisions.md "Adopting sprites, part 2".
 
-## This session (2026-07-17, Opus — ch04 roster grounded + tiered-difficulty ADR)
+## This session (2026-07-18, Opus — per-caster charge flash SHIPPED, #183)
+
+- **#183 shipped** (squash `5a0ed1e`, merged; ADR in decisions.md "Per-caster charge flash"). Each custom
+  caster's sprite pulses its signature colour on the wind-up beat — **Rootis blue · Marty green ·
+  Meesmickle purple** — validated in-engine (`recordanim`), all approved. One YAML line per caster
+  (`charge_flash: {color}`); a new colour = one line in `CHARGE_FLASH_RGB`.
+- **Reusable engine kernel (see ADR — copy for any per-caster actor-visual effect):** arm from an
+  EXISTING banim command (`start-attack`, `case 0x07` in `banim-main.c`) so the donor-matched animation
+  is untouched; a raised-cosine LUT ramps from 0 so the pulse blooms on the arm-raise; identify the
+  attacker via `gpEkrBattleUnitLeft/Right` + `GetItemType`; pulse the actor OBJ palette
+  `PAL_OBJ(0x7/0x9)` from a `PROC_REPEAT` proc, restore at the end. Timing = `_CHARGE_FLASH_FRAMES/_THROBS`.
+- **Two build gotchas the ADR pins (cost a rebuild each):** a new hook-target file MUST be in
+  `PATCHED_DECOMP_FILES` (else the injection guard skips re-injection and stale code persists); and **no
+  `.bss` statics in banim TUs** (mutable state lives in the proc struct, not a `static` global).
+- **A flash is a WASH toward a bright colour, not a hue-transform** — a caster already near the hue
+  barely shifts. All 6 PCs with anims now also have a charge tell if configured (3 casters wired).
+
+## Prior session (2026-07-17, Opus — ch04 roster grounded + tiered-difficulty ADR)
 
 - **ch04 roster grounded (step 1 of the ch04 slice #24; PR #186 open, feat/24-ch04-roster-grounding).**
   The seed's 8 unmodeled enemies → a 23-unit force (16 line + 7 reinf) mirroring the vanilla Ch4 twin.
