@@ -55,7 +55,29 @@ Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-co
   - Both recruits' build **wiring** (slot, STAT_DONOR, injection, live `battle_anim:`) is ch04/ch05-slice
     work (#24/#25), same scoping as Basil. Pipeline learnings: decisions.md "Adopting sprites, part 2".
 
-## This session (2026-07-17, Fable→Opus — Lupin + Sahnar recruit art)
+## This session (2026-07-17, Opus — Rootis frost-mage battle anim SHIPPED)
+
+- **#184 shipped** (squash `74b8252`, merged; ADR in decisions.md "A caster clones from its OWN class;
+  the spell tint is the flavour lever, not the donor"). Rootis's faked 3-pose caster anim (frost snowman)
+  + icy-blue spell. Key decisions, reusable for the next caster:
+  - **`clone_from` = the unit's OWN class, picked by weapon type.** New `mage` donor (`CLASS_MAGE`,
+    ITYPE_ANIMA); the private `_u25` AnimConf repoints the ANIMA slot, so the anim binds to the tome the
+    unit actually wields. Marty/Meesmickle's shaman (dark) donor would miss an Anima mage.
+  - **Element = colour-only spell tint, NOT a spell-proc swap.** Kept the vanilla red Fire projectile and
+    added `BANIM_SPELL_TINT_BLUE` + `BanimSpellTintBlue` (blue-dominant, green mid → cyan-white frost),
+    scoped to his Anima tomes via `spell_palette_tint` — same seam as Marty's green Flux. Declined the
+    real Fimbulvetr blizzard (oversized for a basic tome). **Reviewed the regular red spell in-engine
+    BEFORE tinting** — never bundle a colour change with the first anim review.
+  - **Descale:** threaded `--reserve` through the ADAPTIVE palette path (was locked-layout only) so
+    Rootis's orange carrot nose survives quantization in his near-monochrome blue/white frame. Row-1
+    look (thin outline, no sharpen, `--body 40`) chosen via an A/B ladder. Recipe in `rootis.yaml`.
+  - Verified in-engine (`recordanim`, class 0x25, `_u25[23]`); 99 tests green, `check.py` clean.
+- **New backlog: #183** — per-caster charge-flash effect (Marty green · Rootis blue · Meesmickle purple),
+  a visible charge tell on the magic wind-up beat, reusing this per-caster colour scoping. Seed only —
+  brainstorm when picked up. **6 of 8 PCs now have battle anims** (braulo, marty, meesmickle, prof-rbg,
+  wolfram, rootis); sclorbo + pinky remain.
+
+## Prior session (2026-07-17, Fable→Opus — Lupin + Sahnar recruit art)
 
 - **#181 shipped** (squash `9792bb6`, merged): Lupin direwolf map sprite (Lycanroc + hand-drawn glasses)
   + Sahnar spectral-skeleton portrait + map sprite. Detail above + on #24/#25. Reusable learnings in
