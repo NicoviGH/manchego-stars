@@ -16,6 +16,9 @@ from inject.decomp import (
 # side appends its rows (build_campaign.py inject_battle_anims).
 BANIM_EKRBATTLEINTRO_C = os.path.join(DECOMP, 'src', 'banim-ekrbattleintro.c')
 BANIM_EKRMAIN_C = os.path.join(DECOMP, 'src', 'banim-ekrmain.c')
+BANIM_MAIN_C = os.path.join(DECOMP, 'src', 'banim-main.c')
+BANIM_EFXMISC_C = os.path.join(DECOMP, 'src', 'banim-efxmisc.c')
+EFXBATTLE_H = os.path.join(DECOMP, 'include', 'efxbattle.h')
 BANIM_DATA_C = os.path.join(DECOMP, 'src', 'banim_data.c')
 BANIM_EFXMAGIC_C = os.path.join(DECOMP, 'src', 'banim-efxmagic.c')
 BANIM_EKRUTILS_C = os.path.join(DECOMP, 'src', 'banim-ekrutils.c')
@@ -276,6 +279,150 @@ def _patch_banim_spell_palette_tint():
         dispup = dispup.replace(anchor, anchor + reset, 1)
         with open(BANIM_EKRDISPUP_C, 'w', encoding='utf-8') as f:
             f.write(dispup)
+
+
+# One smooth throb (0 -> peak -> 0) over 40 frames, as a fixed-point wash factor out of 32.
+# Peak ~0.72 (23/32). Precomputed so the engine needs no sin(); index by the proc timer.
+_CHARGE_FLASH_FRAMES = 40
+def _charge_flash_sine_lut():
+    import math
+    peak = 23
+    return [int(round(math.sin(math.pi * i / _CHARGE_FLASH_FRAMES) * peak))
+            for i in range(_CHARGE_FLASH_FRAMES + 1)]
+
+
+def _patch_banim_charge_flash():
+    """Per-caster charge flash (#183): the caster's OWN battle sprite pulses toward a signature
+    colour on the wind-up beat, WITHOUT altering the donor-matched animation script.
+
+    Armed by the elec-charge command (0x28, `case 40`) ALREADY present in the faked magic body
+    -- so no motion.s change. The arm looks up the current attacker (character + equipped weapon
+    type) in the campaign-declared gMSChargeFlashes table; a configured caster spawns a proc that
+    snapshots its OBJ palette and blends it toward the target BGR555 by a precomputed sine each
+    frame, restoring it when the throb completes (bleeding into the cast). Vanilla casters hit the
+    same command, find no row, and are byte-unchanged. Character binding + colour live in data."""
+    # 1. data contract in the banim header (beside the spell-tint struct).
+    with open(BANIM_EKRBATTLE_H, encoding='utf-8') as f:
+        header = f.read()
+    if 'struct BanimChargeFlash' not in header:
+        anchor = 'enum ekr_hit_identifer {'
+        decl = ('struct BanimChargeFlash {\n'
+                '    u8 character;\n'
+                '    u8 weapon_type;\n'
+                '    u16 target;   /* BGR555 blend target */\n'
+                '};\n\n'
+                'extern CONST_DATA struct BanimChargeFlash gMSChargeFlashes[];\n\n')
+        if anchor not in header:
+            sys.exit('ERROR: charge-flash header anchor missing in %s' % BANIM_EKRBATTLE_H)
+        with open(BANIM_EKRBATTLE_H, 'w', encoding='utf-8') as f:
+            f.write(header.replace(anchor, decl + anchor, 1))
+
+    # 2. the extern arm prototype, beside the vanilla flash effect.
+    with open(EFXBATTLE_H, encoding='utf-8') as f:
+        efxh = f.read()
+    if 'MSChargeFlashArm' not in efxh:
+        anchor = 'void NewEfxFlashFX(struct Anim * anim);\n'
+        if anchor not in efxh:
+            sys.exit('ERROR: charge-flash efxbattle.h anchor missing in %s' % EFXBATTLE_H)
+        with open(EFXBATTLE_H, 'w', encoding='utf-8') as f:
+            f.write(efxh.replace(anchor, anchor + 'void MSChargeFlashArm(struct Anim * anim);\n', 1))
+
+    # 3. the blend helper + pulse proc + arm, beside the vanilla flash effect handler.
+    with open(BANIM_EFXMISC_C, encoding='utf-8') as f:
+        efx = f.read()
+    if 'MSChargeFlashArm' not in efx:
+        lut = ', '.join(str(v) for v in _charge_flash_sine_lut())
+        support = (
+            'static const u8 sMSChargeFlashSine[%d] = { %s };\n\n'
+            'static u16 MSChargeBlend(u16 base, u16 target, int f)\n'
+            '{\n'
+            '    int r = base & 0x1F;\n'
+            '    int g = (base >> 5) & 0x1F;\n'
+            '    int b = (base >> 10) & 0x1F;\n'
+            '    r += ((target & 0x1F) - r) * f / 32;\n'
+            '    g += (((target >> 5) & 0x1F) - g) * f / 32;\n'
+            '    b += (((target >> 10) & 0x1F) - b) * f / 32;\n'
+            '    return r | (g << 5) | (b << 10);\n'
+            '}\n\n'
+            'struct ProcMSChargeFlash {\n'
+            '    PROC_HEADER;\n'
+            '    int timer;\n'
+            '    u16 target;\n'
+            '    u16 *pal;\n'
+            '    u16 saved[16];   /* snapshot of the actor palette (no .bss statics allowed here) */\n'
+            '};\n\n'
+            'void MSChargeFlashMain(struct ProcMSChargeFlash *proc);\n\n'
+            'CONST_DATA struct ProcCmd ProcScr_msChargeFlash[] = {\n'
+            '    PROC_NAME("msChargeFlash"),\n'
+            '    PROC_REPEAT(MSChargeFlashMain),\n'
+            '    PROC_END,\n'
+            '};\n\n'
+            'void MSChargeFlashMain(struct ProcMSChargeFlash *proc)\n'
+            '{\n'
+            '    int i;\n'
+            '    int f = sMSChargeFlashSine[proc->timer];\n\n'
+            '    for (i = 0; i < 16; i++)\n'
+            '        proc->pal[i] = MSChargeBlend(proc->saved[i], proc->target, f);\n'
+            '    EnablePaletteSync();\n\n'
+            '    if (++proc->timer > %d) {\n'
+            '        for (i = 0; i < 16; i++)\n'
+            '            proc->pal[i] = proc->saved[i];\n'
+            '        EnablePaletteSync();\n'
+            '        Proc_Break(proc);\n'
+            '    }\n'
+            '}\n\n'
+            'void MSChargeFlashArm(struct Anim *anim)\n'
+            '{\n'
+            '    struct BattleUnit *bu;\n'
+            '    const struct BanimChargeFlash *it;\n'
+            '    struct ProcMSChargeFlash *proc;\n'
+            '    u16 *pal;\n'
+            '    int i;\n'
+            '    int pos = GetAnimPosition(anim);\n\n'
+            '    if (pos == EKR_POS_L) {\n'
+            '        bu = gpEkrBattleUnitLeft;\n'
+            '        pal = PAL_OBJ(0x7);\n'
+            '    } else {\n'
+            '        bu = gpEkrBattleUnitRight;\n'
+            '        pal = PAL_OBJ(0x9);\n'
+            '    }\n\n'
+            '    for (it = gMSChargeFlashes; it->character != 0; it++) {\n'
+            '        if (it->character == bu->unit.pCharacterData->number\n'
+            '            && it->weapon_type == GetItemType(bu->weaponBefore)) {\n'
+            '            proc = Proc_Start(ProcScr_msChargeFlash, PROC_TREE_3);\n'
+            '            proc->timer = 0;\n'
+            '            proc->target = it->target;\n'
+            '            proc->pal = pal;\n'
+            '            for (i = 0; i < 16; i++)\n'
+            '                proc->saved[i] = pal[i];\n'
+            '            return;\n'
+            '        }\n'
+            '    }\n'
+            '}\n\n'
+            % (_CHARGE_FLASH_FRAMES + 1, lut, _CHARGE_FLASH_FRAMES))
+        anchor = '/**\n * C51: banim_code_flash_white\n */\n'
+        if anchor not in efx:
+            sys.exit('ERROR: charge-flash efxmisc anchor missing in %s' % BANIM_EFXMISC_C)
+        efx = efx.replace(anchor, support + anchor, 1)
+        with open(BANIM_EFXMISC_C, 'w', encoding='utf-8') as f:
+            f.write(efx)
+
+    # 4. arm from the existing elec-charge command (case 40) -- NO motion.s change.
+    with open(BANIM_MAIN_C, encoding='utf-8') as f:
+        main = f.read()
+    if 'MSChargeFlashArm(anim)' not in main:
+        anchor = '                case 40:\n                case 41:\n'
+        if anchor not in main:
+            sys.exit('ERROR: charge-flash case-40 anchor missing in %s' % BANIM_MAIN_C)
+        armed = ('                case 40:\n'
+                 '                    if (GetAISLayerId(anim) == 0)\n'
+                 '                        MSChargeFlashArm(anim);\n'
+                 '                    /* MS #183: arm the per-caster charge flash, then fall'
+                 ' through to the SE */\n'
+                 '                case 41:\n')
+        main = main.replace(anchor, armed, 1)
+        with open(BANIM_MAIN_C, 'w', encoding='utf-8') as f:
+            f.write(main)
 
 
 def _patch_player_start_cursor_guard():

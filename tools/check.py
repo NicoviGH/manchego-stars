@@ -404,6 +404,10 @@ def check_engine_guards_present(fail):
              'the #165 caster-scoped spell-palette tint seam (data-driven green Dark magic); '
              'without it Marty\'s Flux (and any future tinted tome) silently reverts to the '
              'vanilla spell palette'),
+            ('_patch_banim_charge_flash',
+             'the #183 per-caster charge flash (the caster\'s sprite pulses its signature '
+             'colour on the wind-up beat, armed from the existing elec-charge command); '
+             'without it the casters silently lose their charge tell'),
             ('_inject_crit_d20_flourish',
              'the #11 nat-20 crit flourish (a d20 pops on the SpellFx layer at the '
              'crit-flash teardown) -- the d20, the whole D&D thesis, would silently '

@@ -134,6 +134,8 @@ battle_anim:
   spell_palette_tint:
     weapon_type: anima        # every Anima tome Rootis wields casts icy-blue
     color: blue
+  charge_flash:               # #183: his sprite pulses icy-blue on the wind-up/charge beat
+    color: blue               # weapon type derived from the donor (mage/anima)
 
 signature_moment:
   chapter: tbd               # NICOLAS TO RECALL — not in the DM notes
