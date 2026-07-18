@@ -55,7 +55,29 @@ Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-co
   - Both recruits' build **wiring** (slot, STAT_DONOR, injection, live `battle_anim:`) is ch04/ch05-slice
     work (#24/#25), same scoping as Basil. Pipeline learnings: decisions.md "Adopting sprites, part 2".
 
-## This session (2026-07-17, Opus — Rootis frost-mage battle anim SHIPPED)
+## This session (2026-07-17, Opus — ch04 roster grounded + tiered-difficulty ADR)
+
+- **ch04 roster grounded (step 1 of the ch04 slice #24; PR #186 open, feat/24-ch04-roster-grounding).**
+  The seed's 8 unmodeled enemies → a 23-unit force (16 line + 7 reinf) mirroring the vanilla Ch4 twin.
+  Hybrid palette (decisions.md): `mauthedoog` wolves (parley pack, `convertible`) + vanilla
+  `bonewalker-bow`/`mogall`/`entoumbed` for banshees/wisps/tank; weapons via `inventory.fe_base`,
+  reinforcements via `arrives_turn`, one `item_drop`. `make difficulty CH=ch04` → PARITY (threat/slot
+  8.1 x1.12, clear-load 2.9 x1.23; turn-1 clear-load ties vanilla 2.3 after the parley discount).
+- **New ADR (decisions.md §Combat): difficulty is checked in fidelity tiers** — roster ballpark
+  (`make difficulty`, aspatial) → author map+placement → **spatial check** → runtime play → lock; the
+  roster↔map loop is **bidirectional**. The spatial check = deterministic facts fed to an LLM
+  **analyst**, NOT an LLM playing the game (LLMs play FE badly; they read facts well). Validated by a
+  Haiku analyst that reproduced the tool's verdict on vanilla Ch4, *found the Mogall crossfire cluster
+  the aspatial tool can't see*, and flagged terrain as the #1 missing input. YAGNI: no
+  reachability-metric extractor until its absence is felt.
+- **ch04 `placement_directives`** written into the map notes (cluster wisps, tree-gate the crossfire,
+  deep tank, later waves, near-woods parley pack) — waiting for the map step (step 2).
+- **STILL OPEN (events layer, on #24):** (1) parley behavior — green-and-fight (current
+  `convertible: true`, matches Nicolas's "turn the tide") vs green-and-leave; (2) teaching the player
+  Marty can Talk to parley the wolves (onboarding beat). Both are map/events decisions, not roster.
+- Also cleaned up 4 stale worktrees (squash-merged, remotes gone) at session start.
+
+## Prior session (2026-07-17, Opus — Rootis frost-mage battle anim SHIPPED)
 
 - **#184 shipped** (squash `74b8252`, merged; ADR in decisions.md "A caster clones from its OWN class;
   the spell tint is the flavour lever, not the donor"). Rootis's faked 3-pose caster anim (frost snowman)
@@ -125,15 +147,20 @@ Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-co
 - **Scoped #90 (enemy battle-anim import) via brainstorm** — design of record was the #90 2026-07-16
   comment; **implemented + shipped 2026-07-17** (see this-session note above).
 
-## NEXT SESSION — start here: ch04 / ch05 vertical slices (M3, the main line)
+## NEXT SESSION — start here: ch04 MAP (step 2), then ch05 slice (M3, the main line)
 
-ch03 is complete and #90 (enemy battle anims) shipped, so the main line is now the **ch04/ch05
-slices** — see "Next steps" #1 below for the full brief. In short: author each chapter's map (Tiled
-retile of its vanilla FE8 twin), roster, and events, tuned against `make difficulty` (all three engine
-bars — enemy pressure + economy + dynamics — are complete). Per-chapter vertical slice on **#24 / #25**.
-Both chapters are `status: planned` seeds today (targets set, no built roster). Basil's art is shipped
-but his build **wiring** is a checklist on the ch05 slice **#25** (needs a `priest` staff/heal
-BANIM_DONORS row — NOT shaman — before his `battle_anim:` block goes live).
+**ch04 roster is now grounded (step 1 done, PR #186 — merge it first).** Per the new tiered-difficulty
+flow (decisions.md §Combat), the next step is **ch04's MAP (step 2): the Tiled retile of vanilla Ch4**,
+honouring the `placement_directives` now in `ch04-the-white-moose.yaml` (cluster the will-o'-wisps into
+one crossfire pocket, tree-gate the approach, deep tank, later reinforcement waves, near-woods parley
+pack). Then **re-run the spatial check** — feed the placed map's positions/AI/terrain to an LLM analyst
+(the ch04 experiment brief is the template: `scratchpad/ch4_facts_brief.md`), adjust placement *or*
+roster (the loop is bidirectional), and only then build+play for the real difficulty read. Two ch04
+events-layer decisions are still open (see this-session note): parley behavior + teaching the parley.
+
+ch05 is the same shape but not started (`status: planned`, roster still 8-enemy seed / unmodeled —
+same grounding pass ch04 just had). Basil's build **wiring** is a checklist on the ch05 slice **#25**
+(needs a `priest` staff/heal BANIM_DONORS row — NOT shaman — before his `battle_anim:` block goes live).
 
 ## Why we dropped the Ch11 map-borrow (so it isn't re-litigated)
 
@@ -144,14 +171,16 @@ chapter maps 1:1 to its numeric FE8 twin (map + parity) and the theme is layered
 
 ## Next steps (priority order)
 
-1. **Build the ch04 / ch05 slices** (M3, the main line). Per-chapter vertical slice on #24 / #25.
-   Author the map (Tiled retile of vanilla Ch4 / Ch5 per the map-authoring pipeline) + roster + events,
-   tuned against the now-machine-checkable targets via `make difficulty` (the engine bars are complete
-   now — enemy pressure + economy incl. drops #176 + dynamics incl. area/zone reinf #177). When authoring
-   the roster, **tag enemy_units with `fe_base` weapons, `convertible:` (Sahnar), `arrives_turn:` (eruption
-   waves), and `item_drop:` where a twin drops one** so the engine models them (right now the seeds show
-   "0 enemies" = unmodeled weapons). Also wire the Lupin/Sahnar/Basil `STAT_DONOR`s so `make difficulty`
-   fields the true ch05 party (they're currently invisible to it — a known lever, not headroom).
+1. **Build the ch04 / ch05 slices** (M3, the main line). Per-chapter vertical slice on #24 / #25,
+   run through the tiered-difficulty flow (decisions.md §Combat): roster ballpark → map+placement →
+   spatial check → play → lock.
+   - **ch04: roster GROUNDED (PR #186).** Next = the **map** (step 2) per its `placement_directives`,
+     then the spatial check + build/play. Two open events decisions (parley behavior + teaching it).
+   - **ch05: not started.** Same grounding pass ch04 just had — tag enemy_units with `fe_base`
+     weapons, `convertible:` (Sahnar), `arrives_turn:` (eruption waves), `item_drop:` where a twin
+     drops one (right now the seed shows "0 enemies" = unmodeled). Also wire the Lupin/Sahnar/Basil
+     `STAT_DONOR`s so `make difficulty` fields the true ch05 party (currently invisible to it — a
+     known lever, not headroom).
 2. **#138** config-driven `inject_chapter(descriptor)` (incremental; YAML `host:` block — approved
    direction, paused for the ch04/ch05 design).
 3. Then **#29** world map.
