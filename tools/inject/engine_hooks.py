@@ -281,13 +281,17 @@ def _patch_banim_spell_palette_tint():
             f.write(dispup)
 
 
-# One smooth throb (0 -> peak -> 0) over 40 frames, as a fixed-point wash factor out of 32.
-# Peak ~0.72 (23/32). Precomputed so the engine needs no sin(); index by the proc timer.
+# Several smooth throbs over the charge window, as a fixed-point wash factor out of 32.
+# A raised cosine (0 -> peak -> 0) repeated `_CHARGE_FLASH_THROBS` times -- matching the
+# approved multi-pulse mockup, NOT a single throb. Peak ~0.72 (23/32); starts and ends at 0
+# (clean restore). Precomputed so the engine needs no sin(); index by the proc timer.
 _CHARGE_FLASH_FRAMES = 40
+_CHARGE_FLASH_THROBS = 3
 def _charge_flash_sine_lut():
     import math
     peak = 23
-    return [int(round(math.sin(math.pi * i / _CHARGE_FLASH_FRAMES) * peak))
+    return [int(round((0.5 - 0.5 * math.cos(
+                2 * math.pi * _CHARGE_FLASH_THROBS * i / _CHARGE_FLASH_FRAMES)) * peak))
             for i in range(_CHARGE_FLASH_FRAMES + 1)]
 
 
