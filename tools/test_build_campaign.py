@@ -524,7 +524,7 @@ class CharacterUniqueBanim(unittest.TestCase):
         cfg = {'clone_from': 'pegasus',
                'import': {'txt': 'Pinky.txt', 'frames_dir': '.'}}
         res = bc.build_unit_battle_anim(cfg, anim_dir, 'pinky', 'melee', 'lance')
-        self.assertEqual(len(res['sheets']), 6)          # six distinct swoop frames
+        self.assertEqual(len(res['sheets']), 7)          # six swoop frames + a dodge frame
         self.assertIn('banim_pinky_script', res['motion_s'])
         self.assertEqual(len(res['pal']), 128)           # same agbpal shape as the faked path
 

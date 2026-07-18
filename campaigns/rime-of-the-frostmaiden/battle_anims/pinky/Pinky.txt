@@ -86,23 +86,23 @@ C06
 1 p- Pinky_000.png
 C0D
 ~~~
-/// - Mode 7               #Dodge Melee Attack (a SMALL hop near home)
-# Use jump (001, just above idle), NOT apex/mid — those sit up at the far attack-arc
-# position, so a dodge that reused them teleported Pinky up-left and bounced (the "jaggedly
-# comes back up and stays in a mid-jump frame" bug). A flier dodge is a quick little hop.
+/// - Mode 7               #Dodge Melee Attack (hop BACK, timed to the strike)
+# Pinky_006 = the jump art placed UP + BACK (away from the foe). NOT the attack-launch jump
+# (001, which leans toward the foe) and NOT apex/mid (which teleport up the attack arc). Brace
+# on idle while the foe lunges IN, then hop back AS it strikes -> a properly-timed flier dodge.
 C02                               #Start of dodge (engine also shifts him back)
 1 p- Pinky_000.png                #idle
-C0E                               #Start of dodging frames
-4 p- Pinky_001.png                #small hop up (near home) — NOT the attack apex
+C0E                               #Start of dodging frames — the engine syncs the strike HERE
+4 p- Pinky_006.png                #hop UP + BACK right at the strike (vanilla dodge cadence)
 C01                               #NOP
-3 p- Pinky_000.png                #settle back to idle
+3 p- Pinky_000.png                #drop back to idle
 C0D
 ~~~
-/// - Mode 8               #Dodge Ranged Attack (same small hop)
+/// - Mode 8               #Dodge Ranged Attack (same back-hop)
 C02
 1 p- Pinky_000.png
 C0E
-4 p- Pinky_001.png
+4 p- Pinky_006.png
 C01
 3 p- Pinky_000.png
 C0D

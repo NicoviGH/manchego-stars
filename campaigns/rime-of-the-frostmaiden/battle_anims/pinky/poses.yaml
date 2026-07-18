@@ -33,3 +33,7 @@ poses:                     # name / source crop (.src) / arc offset (dx = LEFT-n
   - {name: apex,   src: .src/4_apex.png,   dx: -22,  dy: 48}   # high point of the dive-from-above
   - {name: dive,   src: .src/5_dive.png,   dx: -40,  dy: 28}   # dropping onto the foe
   - {name: impact, src: .src/6_impact.png, dx: -54,  dy:  6}   # strike AT the foe (~56px away), no overshoot
+  # Dodge frame (Pinky_006): the jump art placed UP + BACK (away from the foe = POSITIVE dx,
+  # since the foe is to his left). The attack-launch jump (001) leans toward the foe, so a dodge
+  # can't reuse it — it would lurch forward into the strike. Same hop height, opposite direction.
+  - {name: dodge,  src: .src/2_jump.png,   dx:  14,  dy: 20}   # hop back (used by dodge modes 7/8)
