@@ -682,11 +682,13 @@ class BattleChargeFlash(unittest.TestCase):
         self.assertEqual(bc.charge_flash_target('blue'), '0x7F2F')
 
     def test_charge_flashes_are_scoped_per_caster_with_bgr555_colour(self):
-        # Rootis's YAML charge_flash: {color: blue} -> one character+weapon-scoped row.
+        # Each caster's charge_flash: {color} -> one character+weapon-scoped row, the weapon
+        # type derived from the donor (Rootis mage/anima; Marty & Meesmickle shaman/dark).
         self.assertTrue(hasattr(bc, 'battle_charge_flashes'))
         rows = bc.battle_charge_flashes(self.CAMPAIGN)
-        self.assertIn(('CHARACTER_VANESSA', 'ITYPE_ANIMA', bc.charge_flash_target('blue')),
-                      rows)
+        self.assertIn(('CHARACTER_VANESSA', 'ITYPE_ANIMA', bc.charge_flash_target('blue')), rows)
+        self.assertIn(('CHARACTER_SETH', 'ITYPE_DARK', bc.charge_flash_target('green')), rows)
+        self.assertIn(('CHARACTER_GILLIAM', 'ITYPE_DARK', bc.charge_flash_target('purple')), rows)
 
     def test_hook_arms_the_flash_from_the_existing_charge_command(self):
         """The pulse is armed by the elec-charge command ALREADY in the magic body (case 40),

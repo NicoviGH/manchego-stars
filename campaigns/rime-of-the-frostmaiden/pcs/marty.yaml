@@ -133,6 +133,8 @@ battle_anim:
   spell_palette_tint:
     weapon_type: dark
     color: green
+  charge_flash:               # #183: his sprite pulses green on the wind-up/charge beat
+    color: green              # matches his green Flux; weapon type derived from the donor (shaman/dark)
 
 signature_moment:
   chapter: ch06-the-maer-monster
