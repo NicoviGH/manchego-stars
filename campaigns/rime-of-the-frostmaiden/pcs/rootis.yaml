@@ -109,6 +109,32 @@ inventory:
 # skills (Nicolas's call, 2026-05-29: vanilla classes only, nothing extra: no timed
 # buffs/debuffs, no special movement, no procs).
 
+# ── Battle Animation (faked 3-pose, #65) ──────────────────────────────────────
+# Frost snowman-mage. clone_from: MAGE (his own class, Anima) -- NOT shaman: the private
+# AnimConf repoints the ITYPE_ANIMA slot (Mage's AnimConf_088AF220 leads with anima), so the
+# custom anim binds to the tome he actually wields. Magic cadence = settle -> charge-hold ->
+# release, matching his three concept poses (arms low -> both frost-hands overhead -> thrust-cast).
+# Descale recipe (data-is-the-doc; re-run to regenerate -- read before guessing flags):
+#   descale_battleframe.py <out> ready=RootisIdle.png windup=RootisCharge.png peak=RootisCast.png
+#     --body 40 --thin-outline --reserve 240,110,55
+#   Adaptive palette (blue/white -- NOT --flat, which is warm/crab-tuned); the orange carrot
+#   nose is RESERVED (would otherwise quantize away in the near-all-blue frame). Row-1 look
+#   (thin outline, no sharpen) chosen 2026-07-17. Hi-res masters: references/Battle Anims/Rootis
+#   Battle Anim/. The ICE element is COLOUR-ONLY flavor -- no blizzard: the spell_palette_tint
+#   recolours his Anima (Fire) spell to icy blue in-engine (same seam as Marty's green Flux),
+#   leaving the tome's stats/mechanics vanilla. Regular red spell was reviewed first, then tinted.
+battle_anim:
+  clone_from: mage
+  motion: magic
+  abbr: root_mg1
+  frames:
+    - rootis/ready.png
+    - rootis/windup.png
+    - rootis/peak.png
+  spell_palette_tint:
+    weapon_type: anima        # every Anima tome Rootis wields casts icy-blue
+    color: blue
+
 signature_moment:
   chapter: tbd               # NICOLAS TO RECALL — not in the DM notes
   description: >

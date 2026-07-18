@@ -2829,6 +2829,7 @@ def enemy_class_reskins(campaign):
 BANIM_DONORS = {
     'archer': ('CLASS_ARCHER',       '0x0100 | ITYPE_BOW',   'ranged', None),
     'shaman': ('CLASS_SHAMAN',       '0x0100 | ITYPE_DARK',  'magic',  None),
+    'mage':   ('CLASS_MAGE',         '0x0100 | ITYPE_ANIMA', 'magic',  None),
     'pirate': ('CLASS_PIRATE',       '0x0100 | ITYPE_AXE',   'melee',  'axe'),
     'knight': ('CLASS_ARMOR_KNIGHT', '0x0100 | ITYPE_LANCE', 'melee',  'lance'),
 }
@@ -2950,9 +2951,11 @@ def battle_spell_palette_tints(campaign):
     """(character enum, weapon type, tint enum) rows declared by battle_anim YAML."""
     tint_enums = {
         'green': 'BANIM_SPELL_TINT_GREEN',
+        'blue': 'BANIM_SPELL_TINT_BLUE',
     }
     type_enums = {
         'dark': 'ITYPE_DARK',
+        'anima': 'ITYPE_ANIMA',
     }
     out = []
     for uid, unit in units_with_battle_anim(campaign):
