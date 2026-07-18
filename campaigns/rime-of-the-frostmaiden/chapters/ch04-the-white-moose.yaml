@@ -54,6 +54,16 @@ map:
     cover and break sightlines; a few clearings open the view. The wolf pack
     prowls the near woods; spectral banshees haunt the deep woods. The white moose
     darts between clearings and flees off the northeast (tomb-side) edge.
+  # PLACEMENT DIRECTIVES (step 2 of the difficulty flow — decisions.md "checked in fidelity tiers").
+  # Derived 2026-07-17 from an LLM-analyst read of vanilla Ch4's OWN spatial structure (the twin we
+  # retile): Ch4's difficulty lives in a ranged-magic crossfire pocket + a tank tax, gated by terrain.
+  # Honour these when laying out the .tmx, then re-check with the analyst on the placed map:
+  placement_directives:
+    - "CLUSTER the 4 will-o'-wisps (mogall) into ONE ranged-crossfire pocket — do NOT scatter them. That pocket IS the chapter's difficulty (it maps Ch4's Mogall cluster)."
+    - "GATE the crossfire with tree cover: place forest tiles on the approach to the wisp pocket so squishies (rootis/marty/meesmickle/pinky) can close under blocked line-of-sight. Terrain is what turns 'brutal' into 'fair' — the analyst's #1 lever."
+    - "Sit the Bone-Thing (entoumbed) DEEP, in/beside the wisp pocket, so killing the tank costs turns UNDER ranged fire (Ch4's 'tank tax' tension)."
+    - "Push the reinforcement waves a touch late for lean-generous: wave 1 turn 2-3, wave 2 (east-edge banshees) turn 3-4 — waves that land mid-engagement 'leave no margin.'"
+    - "Keep the wolf pack in the NEAR woods, reachable early, so the Marty parley (removes 6 wolves) is an available pressure-valve BEFORE the deep-woods crossfire — the structural mitigation for the squishy-under-ranged-fire edge."
 
 # ── Objective ──────────────────────────────────────────────────────────────────
 objective:
@@ -87,26 +97,95 @@ deployment:
     wolves). Baxby (sled) is a non-combat NPC. Positions set in Tiled.
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
+# Grounded 2026-07-17 against the FE8 Ch4 bar (16 line + 7 reinf, threat/slot 7.2,
+# clear-load/slot 2.3). Hybrid palette (decisions.md): mauthedoog for the wolf pack (the
+# one fiction-driven swap), vanilla monster classes reused for the rest. Counts mirror the
+# vanilla twin's three arrays 1:1 so the pressure math lands near the bar; levels tuned via
+# `make difficulty CH=ch04`. Six line-wolves are `convertible` (Marty's pack parley).
 enemy_units:
-  - id: dire-wolf
+  # ── Near-woods wolf pack (the parley targets) ──────────────────────────────
+  - id: awakened-wolf
     name: "Awakened Wolf"
-    count: 5                    # canon wolf pack = 1d4+4
-    class: mauthedoog           # CLASS_MAUTHEDOOG (FE8 beast); reskinned as Ravisin's awakened wolves
-    level: 4
+    fe_name: "Wolf"
+    count: 6                    # canon pack (1d4+4); Marty's Talk flips the WHOLE pack green
+    class: mauthedoog           # CLASS_MAUTHEDOOG — the FE8 wolf/dog beast (Ravisin's awakened pack)
+    level: 2
+    autolevel: true
+    inventory:
+      - id: beast-bite
+        fe_base: rotten-claw    # modeled beast bite (vanilla monster-fodder weapon)
     damage_type: piercing       # flavor label only
     ai_pattern: aggressive
+    convertible: true           # #171 — the pack parley (Marty). Present/hostile turn 1, but you
+                                # recruit rather than grind it: models the clear-load discount.
     parley:
       by: marty                 # Marty's Talk flips the whole pack to allied (green)
       result: become_allied
       recruits_npc: lupin       # the leader; joins the sled team as a non-combat NPC
-  - id: banshee
+  # ── Deep-woods banshees (ranged phantom arrows) ────────────────────────────
+  - id: forest-banshee
+    name: "Forest Banshee"
+    count: 5
+    class: bonewalker-bow       # CLASS_BONEWALKER_BOW — dedicated bow-skeleton; reskin = phantom-arrow wraith
+    level: 2
+    autolevel: true
+    inventory:
+      - id: phantom-bow
+        fe_base: iron-bow       # ranged (no melee counter) — punishes units caught out of cover
+    damage_type: dark           # flavor label only
+    ai_pattern: defensive       # haunt the deep woods
+  # ── Will-o'-wisps (ranged magic — the fog's spectral lights) ───────────────
+  - id: will-o-wisp
+    name: "Will-o'-Wisp"
+    count: 4
+    class: mogall               # CLASS_MOGALL — floating eye; Evil Eye = ranged magic (hits RES)
+    level: 1
+    autolevel: true
+    inventory:
+      - id: evil-eye
+        fe_base: evil-eye
+    damage_type: dark           # flavor label only
+    ai_pattern: defensive
+  # ── The bone-thing (one heavy awakened brute — Lupin's 'bone-trees') ───────
+  - id: bone-thing
+    name: "Bone-Thing"
+    count: 1
+    class: entoumbed            # CLASS_ENTOUMBED — armored zombie; tanky melee anchor
+    level: 2
+    autolevel: true
+    inventory:
+      - id: fetid-claw
+        fe_base: fetid-claw     # heavier monster claw
+    damage_type: bludgeoning    # flavor label only
+    ai_pattern: defensive
+  # ── Reinforcement wave 1: a second pack out of the fog (turn 2) ────────────
+  - id: awakened-wolf-reinf
+    name: "Awakened Wolf"
+    fe_name: "Wolf"
+    count: 4
+    class: mauthedoog
+    level: 2
+    autolevel: true
+    arrives_turn: 2             # #177 — arrives over turns, not a turn-1 alpha
+    inventory:
+      - id: beast-bite
+        fe_base: rotten-claw
+    item_drop: vulnerary        # one dropper (mirrors vanilla Ch4's dropping revenant)
+    damage_type: piercing
+    ai_pattern: aggressive
+  # ── Reinforcement wave 2: deep-woods banshee ambush (turn 3) ───────────────
+  - id: forest-banshee-reinf
     name: "Forest Banshee"
     count: 3
-    class: bonewalker           # FE8 monster class with a bow; reskinned as a phantom-arrow wraith
-    weapon: short-bow           # ranged phantom arrows (vanilla bow — no counter at melee)
-    level: 5
-    damage_type: dark           # flavor label only
-    ai_pattern: defensive       # haunt the deep woods; punish units caught in the open
+    class: bonewalker-bow
+    level: 2
+    autolevel: true
+    arrives_turn: 3
+    inventory:
+      - id: phantom-bow
+        fe_base: iron-bow
+    damage_type: dark
+    ai_pattern: defensive
 
 # ── Scripted neutral (the quarry) ────────────────────────────────────────────────
 neutral_units:
