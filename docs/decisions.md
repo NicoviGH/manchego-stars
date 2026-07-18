@@ -1740,6 +1740,45 @@ every `enemy_class_reskins` slot, and `recordenemy` (PT_CHAR=<name>) baits any i
 anim — the enemy analogue of `recordanim` for the PC cast (the ch03-specific `recordkobold` was retired).
 _Decided: 2026-07-17 (kobolds + fire imps, PR #90)_
 
+**A PC flier rides the IMPORT pipeline (N frames) bound per-CHARACTER (Pinky, #90→PC)**
+The faked 3-pose path (`_u25`, above) can't carry a flier: a hover-and-swoop needs real motion, not
+three static poses. So Pinky (the army's flier — **he/him**, RBG's homunculus son) is the first PC to
+merge the two pipelines: his anim is a REAL N-frame animation transcribed by `feditor_to_banim` (the #90
+enemy path) but bound per-CHARACTER via `_u25` (not per-class). `build_unit_battle_anim` is the seam — a
+`battle_anim.import: {txt, frames_dir}` block builds via `feditor_to_banim.build_import`; anything else
+(a `frames:` list) builds the faked 3-pose. Both return the identical `{sheets, pal, motion_s}` shape, so
+the per-character binding (clone donor AnimConf → append banim row → `gUnitSpecificBanimConfigs` → set the
+char's `_u25`) is byte-for-byte the same either way. The donor is a new `pegasus` `BANIM_DONORS` row
+(`CLASS_PEGASUS_KNIGHT`, `ITYPE_LANCE`) — it only supplies the AnimConf to clone + the lance slot to
+repoint; `motion`/`cadence` are unused on the import path (the `.txt` owns the cadence).
+
+`tools/poses_to_feditor.py` is the art bridge: hi-res poses → the 248×160 FEditor frames the importer
+eats. It is the INVERSE of `descale_battleframe.py` — descale PINS the feet so the body never moves
+between beats (right for a foot unit's static poses); a flier wants the OPPOSITE, so each pose sits at its
+own spot on a shared canvas and the per-frame shift BECOMES the on-screen motion. The arc lives in a
+`poses.yaml` manifest (one uniform downscale for every frame + per-pose `dx/dy`).
+
+The non-obvious findings (a flier is fussier than a foot unit — the next one will hit these):
+- **Facing:** flip source to screen-left (whole-cast convention; `descale` flips by default) AND make the
+  dive/impact `dx` NEGATIVE — a left-facing unit strikes toward a foe on its left (like the melee lunge).
+  Un-flipped, he faced away and moon-walked.
+- **Scale + the ear-clip:** Pinky is the roster's SMALLEST (idle ~27×31, under the mages' 32×39). His ear
+  clipped FLAT in-engine at larger sizes — not an OBJ-budget or a source crop, but his long **tail dragged
+  the `w/2, h*5/8` anchor DOWN toward the feet, lifting the whole sprite into the arena's top clip line**
+  (tail-less units don't). Shrinking him dropped the ear-tip clear. (If a future tailed/tall unit clips,
+  the real fix is a body-based anchor, not just shrinking.)
+- **Arc = vanilla, not the layout sketch.** Trace the DONOR's real on-screen path (rise high → dive → strike
+  at melee range ~56px), not a directional mock-up. My first arc followed the concept-art layout literally
+  and the impact sailed *past* the foe.
+- **Flyback ≠ the attack reversed.** Playing the dive pose backward moon-walks (the pose points the wrong
+  way for the travel). The return bounces UP into the upright hover pose and glides home.
+- **Linger like vanilla.** Hold the apex (the hover) and the impact/swirl long (≈16 / ≈15 ticks); a flier
+  that darts through every beat reads cheap. Vanilla lingers at the peak and the strike.
+
+Tuned entirely on the TESTCH `recordanim` capture (class 0x48); `PT_CHAR=pinky`. No lance is drawn — a
+body-slam dive, matching his lanceless map sprite.
+_Decided: 2026-07-18 (Pinky, PR #TBD)_
+
 **Character-scoped spell colours are campaign data; the tint rides a dedicated overlay global (#165, #168)**
 Marty's `battle_anim.spell_palette_tint` declares a character + weapon-type match in YAML, so one
 row covers every Dark tome he can wield without naming Marty in engine code or changing the tome's

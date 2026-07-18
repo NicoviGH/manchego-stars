@@ -90,6 +90,22 @@ inventory:
     fe_base: vulnerary
     uses: 3
 
+# ── Battle Animation ──────────────────────────────────────────────────────────
+# Pinky is the army's flier, and a flier's hover-and-swoop can't be faked from 3 static
+# poses (the #65 path) -- so his anim is a real N-frame swoop IMPORTED via feditor_to_banim
+# (the #90 enemy-anim pipeline) but bound per-CHARACTER via _u25 (build_unit_battle_anim's
+# import branch; the enemy path binds per-class). Six Gemini poses -> FE8 frames by
+# tools/poses_to_feditor.py (see battle_anims/pinky/poses.yaml for the arc); the swoop cadence
+# (launch -> apex -> dive -> impact -> reverse-cycle return, wing-flap sfx) lives in Pinky.txt.
+# `clone_from: pegasus` supplies the CLASS_PEGASUS_KNIGHT AnimConf to clone + the ITYPE_LANCE
+# slot to repoint. No lance is drawn -- a body-slam dive, matching his lanceless map sprite.
+battle_anim:
+  clone_from: pegasus
+  abbr: pinky
+  import:
+    txt: pinky/Pinky.txt
+    frames_dir: pinky
+
 # ── Endgame beat (scripted story event, not a gameplay mechanic) ───────────────
 # At the campaign finale, RBG spends a Wish charge from Luck E. Cheese (see pcs/prof-rbg.yaml
 # inventory `story_only`) to turn Pinky from a homunculus into a true living being.

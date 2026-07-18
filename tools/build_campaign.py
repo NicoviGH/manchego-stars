@@ -2838,7 +2838,38 @@ BANIM_DONORS = {
     'mage':   ('CLASS_MAGE',         '0x0100 | ITYPE_ANIMA', 'magic',  None),
     'pirate': ('CLASS_PIRATE',       '0x0100 | ITYPE_AXE',   'melee',  'axe'),
     'knight': ('CLASS_ARMOR_KNIGHT', '0x0100 | ITYPE_LANCE', 'melee',  'lance'),
+    # Pinky (the flier) -- his anim is an IMPORTED N-frame swoop (feditor_to_banim, #90), so
+    # `motion`/`cadence` here are unused (the motion.s comes from the .txt); the donor only
+    # supplies the AnimConf to clone + the ITYPE_LANCE slot to repoint for her per-character
+    # _u25. A flier's hover-and-dive can't be faked from 3 static poses (decisions.md).
+    'pegasus': ('CLASS_PEGASUS_KNIGHT', '0x0100 | ITYPE_LANCE', 'melee', 'lance'),
 }
+
+
+def build_unit_battle_anim(cfg, anim_dir, abbr, motion, cadence):
+    """Build a unit's battle-anim assets, returning {"sheets", "pal", "motion_s"}.
+
+    Two sources, ONE asset shape (so the injector's binding is identical either way):
+    - `import: {txt, frames_dir}` -> a real N-frame FE-native animation transcribed by
+      feditor_to_banim (#90). Used when 3 faked poses can't carry the motion -- e.g. Pinky's
+      flier swoop (launch/apex/dive/return). The `.txt` owns the cadence; each frame's canvas
+      position is the on-screen motion. This is the enemy #90 path bound per-CHARACTER, not
+      per-class.
+    - else `frames: [...]` -> the faked 3-pose generator (ref_to_battleframe, #65), whose mode
+      bodies are built from the donor's `motion`/`cadence`.
+    """
+    imp = cfg.get('import')
+    if imp:
+        txt = os.path.join(anim_dir, imp['txt'])
+        frames_dir = os.path.join(anim_dir, imp.get('frames_dir')
+                                  or os.path.dirname(imp['txt']))
+        return feditor_to_banim.build_import(abbr, txt, frames_dir)
+    from PIL import Image
+    frame_imgs = [Image.open(os.path.join(anim_dir, p)).convert('RGBA')
+                  for p in cfg['frames']]
+    palette = _banim_palette(frame_imgs)
+    return ref_to_battleframe.build_battle_anim(abbr, frame_imgs, palette, motion=motion,
+                                                cadence=cadence or 'axe')
 
 
 def banim_append_row(text, abbr):
@@ -3060,7 +3091,6 @@ def inject_battle_anims(campaign, verbose=True):
        idx - 1). Get it wrong and a PURPLE DRAGON renders instead of the unit.
     Decisions/rationale: decisions.md (Art & Audio, the per-character _u25 call).
     """
-    from PIL import Image
     units = units_with_battle_anim(campaign)
     if not units:
         if verbose:
@@ -3079,11 +3109,7 @@ def inject_battle_anims(campaign, verbose=True):
         motion = cfg.get('motion', motion)            # YAML may override the donor default
         cadence = cfg.get('cadence', cadence)         # ...and its melee cadence
         abbr = cfg.get('abbr') or (uid.replace('-', '').replace('prof', '')[:5] + '_ar1')
-        frame_imgs = [Image.open(os.path.join(anim_dir, p)).convert('RGBA')
-                      for p in cfg['frames']]
-        palette = _banim_palette(frame_imgs)
-        res = ref_to_battleframe.build_battle_anim(abbr, frame_imgs, palette, motion=motion,
-                                                   cadence=cadence or 'axe')
+        res = build_unit_battle_anim(cfg, anim_dir, abbr, motion, cadence)
 
         # 1. assets into the decomp (motion.s, per-frame sheet PNGs, agbpal blob)
         with open(os.path.join(BANIM_DATA_DIR, 'banim_%s_motion.s' % abbr), 'w',
