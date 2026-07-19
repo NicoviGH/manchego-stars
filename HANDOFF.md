@@ -20,9 +20,10 @@ Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-co
 - **Per-caster charge flash** (#183): each caster's sprite pulses its signature colour on the wind-up beat
   (Rootis blue · Marty green · Meesmickle purple). One YAML line per caster; reusable engine kernel in
   ADR "Per-caster charge flash".
-- **PC battle anims — 7 of 8 DONE** (braulo, marty, meesmickle, prof-rbg, wolfram, rootis, **pinky**);
-  **only Sclorbo remains** (the healer). Faked 3-pose casters ride `inject_battle_anims` (per-character
-  `_u25`); the flier (Pinky) rides the N-frame IMPORT path (below).
+- **PC battle anims — 8 of 8 DONE** (braulo, marty, meesmickle, prof-rbg, wolfram, rootis, pinky,
+  **sclorbo**). ALL PC cast anims shipped. Faked 3-pose casters ride `inject_battle_anims` (per-character
+  `_u25`); the flier (Pinky) rides the N-frame IMPORT path (below). Sclorbo (the healer, #191) added the
+  reusable **BISHOP dual-slot donor** (staff heal + light attack from one anim) that **Basil (#25) reuses**.
 - **Recruit art (ch04/ch05)** shipped as portraits + map sprites: **Basil** (Oddish, #179), **Lupin**
   (direwolf/Lycanroc + glasses) + **Sahnar** (spectral-skeleton) (#181). Their build *wiring* (slot,
   STAT_DONOR, injection, live `battle_anim:`) is ch04/ch05-slice work (#24/#25). Basil's battle anim is
@@ -72,23 +73,15 @@ Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-co
   facts fed to an LLM analyst, not an LLM playing FE). `placement_directives` written into the ch04 map notes.
 - **2026-07-16 (#178):** closed both parity-engine v1 gaps (economy drops #176 + area/zone reinforcements #177).
 
-## NEXT SESSION — start here: Sclorbo battle anim (the LAST PC cast anim)
+## NEXT SESSION — start here: ch04 / ch05 slices (all PC anims now done)
 
-7 of 8 PC anims are done; **only Sclorbo remains.** Brainstorm first (superpowers:brainstorming), then
-TDD + in-engine `recordanim` gate — same flow as Rootis (#184) / Pinky (#190).
+**Sclorbo shipped (#191, merged) — the last PC battle anim.** ADR in `decisions.md`
+("A HEALER (staff caster) rides ONE anim…"). The reusable **BISHOP dual-slot donor** (staff heal + light
+attack from one clone) is now what **Basil (ch05, #25) plugs into** — give Basil a `battle_anim:` block with
+`clone_from: bishop` (+ his frames) when his ch05 slice is built; no new donor work needed. Note the healer
+capture path added to `recordanim` (`captureHealerAnim`) for any future staff unit.
 
-- **Sclorbo — HEALER, a NEW caster type.** A **staff user** (ITYPE_STAFF heal/mend), so the current
-  `BANIM_DONORS` (archer/shaman/pirate/knight/mage/**pegasus**) has no fit — he needs a NEW
-  **priest/cleric staff donor** (`CLASS_PRIEST`-ish, ITYPE_STAFF, a heal/staff cadence). **This is the
-  SAME donor Basil (ch05, #25) is blocked on** — build it once, both use it. Study the vanilla priest heal
-  `motion.s` FIRST (as the shaman-charge was studied): does a staff/heal anim have a wind-up "attack" beat to
-  hang 3 poses on, or its own cadence? **The #183 charge-flash may apply** — a healing "gather" glow on the
-  staff-raise via a `charge_flash: {color}` block (armed from the staff analogue of `case 0x07`).
-- Two anim pipelines are now available to reuse: the faked 3-pose path (`inject_battle_anims`) and the
-  N-frame import path (`build_unit_battle_anim` import branch + `poses_to_feditor.py`, #190) if 3 poses
-  won't carry the heal motion. Check Sclorbo's map-sprite/portrait status before starting.
-
-**Parallel main line (Nicolas's own ch04 work — see Working tree):** ch04 MAP (step 2) then ch05 slice (M3).
+**Main line (ch04/ch05):** ch04 MAP (step 2) then ch05 slice (M3).
 ch04 roster grounded; next = the Tiled retile of vanilla Ch4 per the `placement_directives`, then the spatial
 check + build/play (tiered-difficulty flow). Two open ch04 events decisions: parley behavior (green-and-fight
 vs green-and-leave) + teaching the player Marty can Talk to parley the wolves. ch05 not started (`status:
@@ -96,11 +89,11 @@ planned`, 8-enemy seed unmodeled — needs the same grounding pass ch04 got, + w
 
 ## Next steps (priority order)
 
-1. **Sclorbo battle anim** (the last PC anim; new priest/staff donor, shared with Basil). Brief above.
-2. **Build the ch04 / ch05 slices** (M3 — Nicolas's parallel line). Per-chapter vertical slice on #24/#25,
-   through the tiered-difficulty flow. ch04 = the map step next; ch05 = the grounding pass.
-3. **#138** config-driven `inject_chapter(descriptor)` (YAML `host:` block — approved, paused for ch04/ch05).
-4. Then **#29** world map.
+1. **Build the ch04 / ch05 slices** (M3). Per-chapter vertical slice on #24/#25, through the
+   tiered-difficulty flow. ch04 = the map step next; ch05 = the grounding pass (+ wire Basil's
+   `battle_anim: {clone_from: bishop}` — donor now exists, #191).
+2. **#138** config-driven `inject_chapter(descriptor)` (YAML `host:` block — approved, paused for ch04/ch05).
+3. Then **#29** world map.
 
 ## Working tree - do not lose or revert
 
