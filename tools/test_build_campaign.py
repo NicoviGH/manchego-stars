@@ -652,10 +652,11 @@ class BattleSpellPaletteTint(unittest.TestCase):
 
     def test_sclorbo_cyan_tint_covers_both_staff_and_light_via_weapon_types_list(self):
         # Sclorbo's spell_palette_tint declares `weapon_types: [staff, light]` (a list) --
-        # one row per weapon type, both cyan (reusing BANIM_SPELL_TINT_BLUE, the frost tint).
+        # one row per weapon type, both his DEDICATED flame cyan (bright equal G+B), NOT the
+        # blue-dominant frost tint Rootis uses.
         rows = bc.battle_spell_palette_tints(self.CAMPAIGN)
-        self.assertIn(('CHARACTER_ROSS', 'ITYPE_STAFF', 'BANIM_SPELL_TINT_BLUE'), rows)
-        self.assertIn(('CHARACTER_ROSS', 'ITYPE_LIGHT', 'BANIM_SPELL_TINT_BLUE'), rows)
+        self.assertIn(('CHARACTER_ROSS', 'ITYPE_STAFF', 'BANIM_SPELL_TINT_CYAN'), rows)
+        self.assertIn(('CHARACTER_ROSS', 'ITYPE_LIGHT', 'BANIM_SPELL_TINT_CYAN'), rows)
 
     def test_tint_rows_append_a_terminated_campaign_data_table(self):
         src = ('#include "constants/items.h"\n'
@@ -708,11 +709,17 @@ class BattleSpellPaletteTint(unittest.TestCase):
             self.assertIn('gEfxSpellAnimExists = true;', begin)
             self.assertNotIn('BANIM_SPELL_TINT', begin)
             # The palette copy reads the dedicated global, not the lifecycle flag, and
-            # dispatches per tint id (NONE = passthrough, BLUE = ice recolor, else green).
+            # dispatches per tint id (NONE = passthrough, BLUE = ice recolor, CYAN = flame
+            # cyan, else green).
             palette_copy = utils[utils.index('static void BanimSpellPaletteCopy'):]
             self.assertIn('if (gMSSpellTint == BANIM_SPELL_TINT_NONE)', palette_copy)
             self.assertIn('BANIM_SPELL_TINT_BLUE', palette_copy)
+            self.assertIn('BANIM_SPELL_TINT_CYAN', palette_copy)
             self.assertNotIn('gEfxSpellAnimExists', palette_copy)
+            # The dedicated flame-cyan tint function exists and pins BOTH green and blue high
+            # (distinct from the blue-dominant BanimSpellTintBlue).
+            self.assertIn('static u16 BanimSpellTintCyan(u16 color)', utils)
+            self.assertIn('BANIM_SPELL_TINT_CYAN = 3,', header)
             # Teardown clears the tint beside the vanilla lifecycle reset.
             self.assertIn('gMSSpellTint = BANIM_SPELL_TINT_NONE;', dispup)
         finally:

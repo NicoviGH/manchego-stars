@@ -3022,7 +3022,7 @@ def battle_spell_palette_tints(campaign):
     tint_enums = {
         'green': 'BANIM_SPELL_TINT_GREEN',
         'blue': 'BANIM_SPELL_TINT_BLUE',
-        'cyan': 'BANIM_SPELL_TINT_BLUE',   # reuse the frost tint as Sclorbo's flame cyan (#191)
+        'cyan': 'BANIM_SPELL_TINT_CYAN',   # Sclorbo's flame cyan -- bright equal G+B (#191)
     }
     type_enums = {
         'dark': 'ITYPE_DARK',
