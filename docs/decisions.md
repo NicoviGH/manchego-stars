@@ -1775,9 +1775,30 @@ The non-obvious findings (a flier is fussier than a foot unit — the next one w
 - **Linger like vanilla.** Hold the apex (the hover) and the impact/swirl long (≈16 / ≈15 ticks); a flier
   that darts through every beat reads cheap. Vanilla lingers at the peak and the strike.
 
+**Dodge timing is synced by `wait_hp_deplete`, and the trigger is in the SCRIPT, not on screen.** The dodge
+(Mode 7/8) fought us hardest; the durable rules:
+- `wait_hp_deplete` (`0x85000001`, the FEditor `C01` "NOP") is NOT a NOP — it PAUSES the animation until the
+  attacker's hit resolves (the beat the MISS fires). Frames placed BEFORE it fire early (at `start_dodge`);
+  frames AFTER it fire AT the resolution. Vanilla hops at `start_dodge` (before the wait) → reads early for a
+  big hop. Put the hop AFTER `wait_hp_deplete` to sync it to the miss.
+- A flier dodge needs its OWN frame: `Pinky_006` = the jump art placed BACK (`+dx`, mirror of the forward
+  launch). Reusing `apex`/`mid` teleports him up the attack arc; reusing the launch jump lunges him forward
+  INTO the strike.
+- To hold the dodge "back" for the whole thrust (hop at full lance-extension, land as the enemy retracts),
+  HOLD the back-frame across many ticks (a grounded beat after the wait to reach full extension, then ~50
+  ticks on `Pinky_006`). Sub-frame timing is tuned by the durations, verified against the Soldier's
+  lance-reach in the capture — read the TRIGGER (lance fully out / retracting), don't chase the on-screen
+  "MISS" text (Nicolas).
+
+**Process cost worth remembering (see decisions Operational Gotchas + [[feedback_check_precedent_before_inventing]]):**
+a `recordanim` capture interleaves MULTIPLE combat beats (attack 1 · enemy counter/dodge · attack 2 on a
+double) — I burned many rebuilds analyzing the WRONG frames (Pinky's 2nd-attack swoop mislabeled as the
+dodge). ALWAYS identify which beat a frame window is FIRST (attacker moves toward the foe; defender dodges
+away), and render an UNCROPPED full-combat GIF for review so cropping can't mislead.
+
 Tuned entirely on the TESTCH `recordanim` capture (class 0x48); `PT_CHAR=pinky`. No lance is drawn — a
 body-slam dive, matching his lanceless map sprite.
-_Decided: 2026-07-18 (Pinky, PR #TBD)_
+_Decided: 2026-07-18 (Pinky, PR #190)_
 
 **Character-scoped spell colours are campaign data; the tint rides a dedicated overlay global (#165, #168)**
 Marty's `battle_anim.spell_palette_tint` declares a character + weapon-type match in YAML, so one
