@@ -501,6 +501,27 @@ class CharacterUniqueBanim(unittest.TestCase):
         self.assertEqual(donor_class, 'CLASS_PEGASUS_KNIGHT')
         self.assertIn('ITYPE_LANCE', wtype)
 
+    def test_bishop_donor_binds_staff_and_light_to_one_anim(self):
+        donor_class, wtype, motion, cadence = bc.BANIM_DONORS['bishop']
+        self.assertEqual(donor_class, 'CLASS_BISHOP')
+        self.assertEqual(motion, 'magic')
+        self.assertEqual(wtype, ['0x0100 | ITYPE_STAFF', '0x0100 | ITYPE_LIGHT'])
+        # A Bishop-shaped AnimConf fixture: STAFF + LIGHT both at the vanilla index 0x82.
+        src = ('CONST_DATA struct BattleAnimDef AnimConf_SRC[] = {\n'
+               '    { .wtype = 0x0100 | ITYPE_STAFF, .index = 0x0082, },\n'
+               '    { .wtype = 0x0100 | ITYPE_LIGHT, .index = 0x0082, },\n'
+               '    { 0 }\n};\n')
+        wtypes = wtype if isinstance(wtype, list) else [wtype]
+        out = bc.banim_clone_conf(src, 'AnimConf_SRC', 'AnimConf_NEW', wtypes[0], 0x99 + 1)
+        for wt in wtypes[1:]:
+            out = bc.banim_repoint_conf(out, 'AnimConf_NEW', wt, 0x99 + 1)
+        # Source table is left byte-vanilla (isolation).
+        self.assertIn('AnimConf_SRC[] = {\n    { .wtype = 0x0100 | ITYPE_STAFF, .index = 0x0082, }', out)
+        # New clone has BOTH slots repointed to 0x9A.
+        new_block = out.split('AnimConf_NEW[] =', 1)[1]
+        self.assertIn('.wtype = 0x0100 | ITYPE_STAFF, .index = 0x9A', new_block)
+        self.assertIn('.wtype = 0x0100 | ITYPE_LIGHT, .index = 0x9A', new_block)
+
     def test_faked_battle_anim_builder_uses_the_three_pose_generator(self):
         # A block with `frames:` (no import) builds via ref_to_battleframe (the #65 faked path).
         from PIL import Image
@@ -623,10 +644,19 @@ class BattleSpellPaletteTint(unittest.TestCase):
     def test_caster_tints_are_scoped_to_each_caster_and_weapon_type(self):
         # Marty's green tint covers all his Dark tomes; Rootis's blue (ice flavor) covers
         # all his Anima tomes. Each is character+weapon-type scoped -- no engine name-check.
+        # Both still declare a single `weapon_type:` (not the list form) -- must keep working.
         self.assertTrue(hasattr(bc, 'battle_spell_palette_tints'))
         rows = bc.battle_spell_palette_tints(self.CAMPAIGN)
         self.assertIn(('CHARACTER_SETH', 'ITYPE_DARK', 'BANIM_SPELL_TINT_GREEN'), rows)
         self.assertIn(('CHARACTER_VANESSA', 'ITYPE_ANIMA', 'BANIM_SPELL_TINT_BLUE'), rows)
+
+    def test_sclorbo_cyan_tint_covers_both_staff_and_light_via_weapon_types_list(self):
+        # Sclorbo's spell_palette_tint declares `weapon_types: [staff, light]` (a list) --
+        # one row per weapon type, both his DEDICATED flame cyan (bright equal G+B), NOT the
+        # blue-dominant frost tint Rootis uses.
+        rows = bc.battle_spell_palette_tints(self.CAMPAIGN)
+        self.assertIn(('CHARACTER_ROSS', 'ITYPE_STAFF', 'BANIM_SPELL_TINT_CYAN'), rows)
+        self.assertIn(('CHARACTER_ROSS', 'ITYPE_LIGHT', 'BANIM_SPELL_TINT_CYAN'), rows)
 
     def test_tint_rows_append_a_terminated_campaign_data_table(self):
         src = ('#include "constants/items.h"\n'
@@ -679,11 +709,17 @@ class BattleSpellPaletteTint(unittest.TestCase):
             self.assertIn('gEfxSpellAnimExists = true;', begin)
             self.assertNotIn('BANIM_SPELL_TINT', begin)
             # The palette copy reads the dedicated global, not the lifecycle flag, and
-            # dispatches per tint id (NONE = passthrough, BLUE = ice recolor, else green).
+            # dispatches per tint id (NONE = passthrough, BLUE = ice recolor, CYAN = flame
+            # cyan, else green).
             palette_copy = utils[utils.index('static void BanimSpellPaletteCopy'):]
             self.assertIn('if (gMSSpellTint == BANIM_SPELL_TINT_NONE)', palette_copy)
             self.assertIn('BANIM_SPELL_TINT_BLUE', palette_copy)
+            self.assertIn('BANIM_SPELL_TINT_CYAN', palette_copy)
             self.assertNotIn('gEfxSpellAnimExists', palette_copy)
+            # The dedicated flame-cyan tint function exists and pins BOTH green and blue high
+            # (distinct from the blue-dominant BanimSpellTintBlue).
+            self.assertIn('static u16 BanimSpellTintCyan(u16 color)', utils)
+            self.assertIn('BANIM_SPELL_TINT_CYAN = 3,', header)
             # Teardown clears the tint beside the vanilla lifecycle reset.
             self.assertIn('gMSSpellTint = BANIM_SPELL_TINT_NONE;', dispup)
         finally:
@@ -700,31 +736,56 @@ class BattleChargeFlash(unittest.TestCase):
 
     def test_flash_rows_append_a_terminated_table_with_bgr555_targets(self):
         # The generated table carries the target colour as a raw BGR555 u16 so the engine
-        # blends toward it directly -- no per-colour enum needed for any hue.
+        # blends toward it directly -- no per-colour enum needed for any hue. Rows are
+        # (character, weapon_type, target, waveform); 0 = pulse (the existing 3-throb LUT).
         src = ('#include "constants/items.h"\n'
                'CONST_DATA struct BattleAnimDef * gUnitSpecificBanimConfigs[] = {\n'
                '    NULL,\n};\n')
         self.assertTrue(hasattr(bc, 'banim_charge_flash_append'))
         out = bc.banim_charge_flash_append(
-            src, [('CHARACTER_VANESSA', 'ITYPE_ANIMA', '0x7E6F')])
+            src, [('CHARACTER_VANESSA', 'ITYPE_ANIMA', '0x7E6F', 0)])
         self.assertIn('CONST_DATA struct BanimChargeFlash gMSChargeFlashes[]', out)
         self.assertIn('#include "constants/characters.h"', out)
-        self.assertIn('{ CHARACTER_VANESSA, ITYPE_ANIMA, 0x7E6F },', out)
-        self.assertIn('{ 0, 0, 0 },', out)   # zero-character terminator
+        self.assertIn('{ CHARACTER_VANESSA, ITYPE_ANIMA, 0x7E6F, 0 },', out)
+        self.assertIn('{ 0, 0, 0, 0 },', out)   # zero-character terminator
+
+    def test_flash_row_carries_the_build_waveform(self):
+        # waveform=1 (build) rides the same row shape -- Sclorbo's slow single-swell glow.
+        src = ('#include "constants/items.h"\n'
+               'CONST_DATA struct BattleAnimDef * gUnitSpecificBanimConfigs[] = {\n'
+               '    NULL,\n};\n')
+        out = bc.banim_charge_flash_append(
+            src, [('CHARACTER_ROSS', 'ITYPE_STAFF', '0x6F63', 1)])
+        self.assertIn('{ CHARACTER_ROSS, ITYPE_STAFF, 0x6F63, 1 },', out)
 
     def test_named_colour_resolves_to_a_bgr555_hex_target(self):
         # 'blue' is Rootis's ice hue (120,205,255) -> 5-bit per channel, packed BGR555.
         self.assertTrue(hasattr(bc, 'charge_flash_target'))
         self.assertEqual(bc.charge_flash_target('blue'), '0x7F2F')
 
+    def test_cyan_colour_resolves_to_sclorbos_flame_bgr555_target(self):
+        # Sclorbo's confirmed flame cyan: RGB(31,219,219) -> BGR555 0x6F63.
+        self.assertEqual(bc.charge_flash_target('cyan'), '0x6F63')
+
     def test_charge_flashes_are_scoped_per_caster_with_bgr555_colour(self):
         # Each caster's charge_flash: {color} -> one character+weapon-scoped row, the weapon
         # type derived from the donor (Rootis mage/anima; Marty & Meesmickle shaman/dark).
+        # The three existing casters have no `waveform` in YAML -> default 0 (pulse), the
+        # byte-identical existing LUT.
         self.assertTrue(hasattr(bc, 'battle_charge_flashes'))
         rows = bc.battle_charge_flashes(self.CAMPAIGN)
-        self.assertIn(('CHARACTER_VANESSA', 'ITYPE_ANIMA', bc.charge_flash_target('blue')), rows)
-        self.assertIn(('CHARACTER_SETH', 'ITYPE_DARK', bc.charge_flash_target('green')), rows)
-        self.assertIn(('CHARACTER_GILLIAM', 'ITYPE_DARK', bc.charge_flash_target('purple')), rows)
+        self.assertIn(('CHARACTER_VANESSA', 'ITYPE_ANIMA', bc.charge_flash_target('blue'), 0), rows)
+        self.assertIn(('CHARACTER_SETH', 'ITYPE_DARK', bc.charge_flash_target('green'), 0), rows)
+        self.assertIn(('CHARACTER_GILLIAM', 'ITYPE_DARK', bc.charge_flash_target('purple'), 0), rows)
+
+    def test_sclorbos_list_donor_emits_one_build_row_per_weapon_type(self):
+        # Sclorbo's bishop donor's wtype is a LIST (['...ITYPE_STAFF', '...ITYPE_LIGHT']) --
+        # the charge_flash must arm on BOTH the Heal staff and the post-promo Light tome,
+        # each row carrying his cyan target + waveform=1 (build, a single slow swell).
+        rows = bc.battle_charge_flashes(self.CAMPAIGN)
+        cyan = bc.charge_flash_target('cyan')
+        self.assertIn(('CHARACTER_ROSS', 'ITYPE_STAFF', cyan, 1), rows)
+        self.assertIn(('CHARACTER_ROSS', 'ITYPE_LIGHT', cyan, 1), rows)
 
     def test_hook_arms_the_flash_from_the_existing_charge_command(self):
         """The pulse is armed by the elec-charge command ALREADY in the magic body (case 40),
@@ -737,12 +798,24 @@ class BattleChargeFlash(unittest.TestCase):
             header = open(eh.BANIM_EKRBATTLE_H, encoding='utf-8').read()
             efxmisc = open(eh.BANIM_EFXMISC_C, encoding='utf-8').read()
             main = open(eh.BANIM_MAIN_C, encoding='utf-8').read()
-            # data contract: a per-character/weapon table of BGR555 targets.
+            # data contract: a per-character/weapon table of BGR555 targets + a waveform pick.
             self.assertIn('struct BanimChargeFlash', header)
             self.assertIn('gMSChargeFlashes[]', header)
+            self.assertIn('u8 waveform;', header)
             # the arm reads the CURRENT attacker (character + weapon), like the spell tint.
             self.assertIn('void MSChargeFlashArm(struct Anim *anim)', efxmisc)
             self.assertIn('GetItemType(bu->weaponBefore)', efxmisc)
+            # two LUTs: the vanilla 3-throb pulse (byte-identical) and a new single-swell build.
+            self.assertIn('static const u8 sMSChargeFlashSine[55] = { 0, 1, 3, 6, 10, 13, 17, '
+                          '20, 22, 23, 22, 20, 17, 13, 10, 6, 3, 1, 0, 1, 3, 6, 10, 13, 17, 20, '
+                          '22, 23, 22, 20, 17, 13, 10, 6, 3, 1, 0, 1, 3, 6, 10, 13, 17, 20, 22, '
+                          '23, 22, 20, 17, 13, 10, 6, 3, 1, 0 };', efxmisc)
+            self.assertIn('static const u8 sMSChargeFlashBuild[55]', efxmisc)
+            # proc + arm pick the LUT per-row via a waveform field.
+            self.assertIn('proc->waveform', efxmisc)
+            self.assertIn('it->waveform', efxmisc)
+            self.assertIn('proc->waveform ? sMSChargeFlashBuild[proc->timer] : '
+                          'sMSChargeFlashSine[proc->timer]', efxmisc)
             # armed from the existing start-attack command (case 0x07) -- no motion.s change,
             # and ~one settle beat before the wind-up arm-raise.
             self.assertIn('MSChargeFlashArm(anim)', main)

@@ -2674,6 +2674,43 @@ local function pokeAnimsOn() -- full battle anims + viewable speed (undo winCh00
     local a = SYM.gPlaySt + 0x40
     emu:write32(a, (ru32(a) & ~(3 << 17)) & ~(1 << 7)) -- animationType 0 (anims ON), gameSpeed normal
 end
+-- Shoot frames across ANY combat that runs through gProc_ekrBattle -- attack, heal-cast, or
+-- defend all funnel through the same proc, so this ONE loop serves all three capture paths
+-- (#191 pulled it out of captureAttack so captureHeal/captureDefend can reuse it verbatim
+-- instead of re-deriving it). Success = the battle proc actually ran AND real ANIM frames were
+-- captured -- robust whether the actor survives, dies in the counter, or kills + triggers a
+-- level-up that outlasts the budget. A stall before combat starts never sets sawAnim -> FAIL.
+--
+-- A talky foe (boss taunt / per-PC line) raises an in-battle QUOTE box during gProc_ekrBattle
+-- (ProcScr_BattleEventEngine) that WAITS for A and would otherwise eat the whole budget before
+-- the attack draws -- the bug that made every recordanim GIF show only the quote, never the
+-- hit/damage. So: tap A WHILE the quote box is up to dismiss it (it only blocks here, the pure
+-- anim takes no input), and screenshot ONLY when no quote box is up -- those are the real
+-- draw/fire/impact/HP-drain frames. Never tap during the pure anim (that would skip it); the
+-- quote-proc gate guarantees we only press while a text box holds.
+--
+-- doneFn (optional) is an early-stop signal checked only OUTSIDE combat, e.g. the actor's own
+-- "finished acting" flag for an attacker/caster, or "control is back with the player" for a
+-- defender that has no such flag of its own to poll.
+local function shootCombatFrames(tag, doneFn)
+    local sawCombat, sawAnim = false, false
+    for f = 1, 900 do
+        local inCombat = procActive(SYM.gProc_ekrBattle)
+        if inCombat then sawCombat = true
+        elseif sawCombat then break end                        -- combat played and finished
+        if doneFn and doneFn() and not inCombat then break end
+        if procActive(SYM.ProcScr_BattleEventEngine) then
+            press(K.A, 2)                                      -- advance/dismiss the quote box
+        elseif inCombat then
+            sawAnim = true
+            if f % 3 == 0 then shot(tag) end                   -- the actual attack anim
+        end
+        yield()
+    end
+    wait(30)
+    return sawAnim
+end
+
 -- Drive the open action menu through Attack -> weapon -> target -> combat, shooting
 -- frames across the battle anim. RETURNS whether combat actually started -- the caller
 -- MUST check it; a stall on the menu is a FAIL, not a silent PASS (#65).
@@ -2695,34 +2732,7 @@ local function captureAttack(actorAddr, tag) -- like chooseAttack but shoot fram
         if combatLive() then break end
         press(K.RIGHT); wait(8)       -- A didn't commit -> cycle to the next in-range target
     end
-    -- Shoot through the anim. Success = the battle proc (gProc_ekrBattle) actually ran AND we
-    -- captured real ANIM frames -- robust whether the attacker survives, dies in the counter, or
-    -- kills + triggers a level-up that outlasts the budget. A stall on the menu never starts the
-    -- proc, so sawAnim stays false -> FAIL.
-    --
-    -- A talky foe (boss taunt / per-PC line) raises an in-battle QUOTE box during gProc_ekrBattle
-    -- (ProcScr_BattleEventEngine) that WAITS for A and would otherwise eat the whole budget before
-    -- the attack draws -- the bug that made every recordanim GIF show only the quote, never the
-    -- hit/damage. So: tap A WHILE the quote box is up to dismiss it (it only blocks here, the pure
-    -- anim takes no input), and screenshot ONLY when no quote box is up -- those are the real
-    -- draw/fire/impact/HP-drain frames. Never tap during the pure anim (that would skip it); the
-    -- quote-proc gate guarantees we only press while a text box holds.
-    local sawCombat, sawAnim = false, false
-    for f = 1, 900 do
-        local inCombat = procActive(SYM.gProc_ekrBattle)
-        if inCombat then sawCombat = true
-        elseif sawCombat then break end                        -- combat played and finished
-        if (ru32(actorAddr + 0x0C) & 0x2) ~= 0 and not inCombat then break end  -- actor acted
-        if procActive(SYM.ProcScr_BattleEventEngine) then
-            press(K.A, 2)                                      -- advance/dismiss the quote box
-        elseif inCombat then
-            sawAnim = true
-            if f % 3 == 0 then shot(tag) end                   -- the actual attack anim
-        end
-        yield()
-    end
-    wait(30)
-    return sawAnim
+    return shootCombatFrames(tag, function() return (ru32(actorAddr + 0x0C) & 0x2) ~= 0 end)
 end
 local RBG_PID = 0x05           -- CHARACTER_MOULDER (RBG's slot), lord-select menu index 4
 
@@ -2787,7 +2797,10 @@ local function setMapUnit(x, y, v) emu:write8(mapUnitRow(y) + x, v) end
 -- bow at exactly 2). Returns true if relocated.
 local function teleportToFiringTile(u, mn, mx)
     local grid = mapUnitAt(u.x, u.y)        -- this unit's id in the grid (preserves faction bits)
-    if grid == 0 then return false end       -- not tracked where we think -> don't risk it
+    if grid == 0 then
+        log(string.format("  teleportToFiringTile: (%d,%d) not tracked in gBmMapUnit -- bailing", u.x, u.y))
+        return false
+    end
     for _, e in ipairs(liveEnemies()) do
         for r = mx, mn, -1 do
             for dx = -r, r do
@@ -2802,6 +2815,51 @@ local function teleportToFiringTile(u, mn, mx)
                         return true
                     end
                 end
+            end
+        end
+    end
+    log(string.format("  teleportToFiringTile: no free tile within [%d,%d] of any of %d live enemies", mn, mx, #liveEnemies()))
+    return false
+end
+
+-- Live blue units (excluding `excludePid`) as unitAt() tables, mirroring liveEnemies -- used by
+-- the heal capture (#191) to find a wounded-ally target for a staff user.
+local function liveAllies(excludePid)
+    local out = {}
+    for i = 0, 7 do
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u and not isDead(u) and u.charId ~= excludePid then out[#out + 1] = u end
+    end
+    return out
+end
+
+-- Halve the HP of the first other live ally so Heal has a valid (wounded) target (#191). Returns
+-- the wounded unit, or nil if the healer has no other live ally in the sandbox.
+local function woundAnAlly(healerPid)
+    for _, a in ipairs(liveAllies(healerPid)) do
+        local maxhp = ru8(a.addr + 0x12)
+        emu:write8(a.addr + 0x13, math.max(1, math.floor(maxhp / 2)))
+        return a
+    end
+    return nil
+end
+
+-- Like teleportToFiringTile but relocates u onto a free tile adjacent (range exactly 1) to one
+-- of `targets` (live ALLY units, not enemies) -- stages the heal capture: put the staff user
+-- within Heal's range of a wounded teammate. Same grid-write structure as teleportToFiringTile
+-- (#191); kept separate because the search set is allies, not liveEnemies().
+local function teleportAdjacentTo(u, targets)
+    local grid = mapUnitAt(u.x, u.y)
+    if grid == 0 then return false end
+    for _, t in ipairs(targets) do
+        for _, d in ipairs({ { 0, -1 }, { 0, 1 }, { 1, 0 }, { -1, 0 } }) do
+            local tx, ty = t.x + d[1], t.y + d[2]
+            if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0 then
+                setMapUnit(u.x, u.y, 0)
+                emu:write8(u.addr + 0x10, tx); emu:write8(u.addr + 0x11, ty)
+                setMapUnit(tx, ty, grid)
+                log(string.format("  teleported to (%d,%d) [adjacent to ally (%d,%d)]", tx, ty, t.x, t.y))
+                return true
             end
         end
     end
@@ -2881,9 +2939,95 @@ scenarios.recordrbg = function()
     return result("PASS", string.format("RBG bow shot captured (class 0x%X)", cls))
 end
 
+-- Heal-cast capture (#191): the action menu is already open, positioned in Heal range of a
+-- wounded ally. For a staff-only unit "Staff" sits at menu row 1 where "Attack" normally would,
+-- and the staff list works exactly like the weapon list -- one A drills in, the Heal staff is
+-- the sole/first entry -- so captureAttack's drill-in + target-confirm-cycle + frame-capture
+-- shape applies completely unchanged; this wrapper just names the call for the heal path.
+local function captureHeal(actorAddr, tag)
+    return captureAttack(actorAddr, tag)
+end
+
+local TESTCH_PARK_TILE = { x = 24, y = 15 } -- empty far corner of the TESTCH sandbox's ch1 map
+                                             -- (same corner CH01_PARK reuses later for the real ch01 seize)
+
+-- Defend/dodge capture (#191): ride out the enemy phase watching gProc_ekrBattle, screenshotting
+-- with the SAME shootCombatFrames loop as captureAttack/captureHeal -- but there is no menu to
+-- drive and no actor-exhaustion flag to poll (the defender never acts), so stop once combat has
+-- played and finished, or once control returns to the player with nothing having happened. The
+-- caller decides whether a miss here is fatal (it isn't -- best-effort).
+local function captureDefend(tag)
+    if not endTurn(TESTCH_PARK_TILE) then return false end
+    if not waitFor(function() return faction() ~= 0 end, 300) then return false end
+    return shootCombatFrames(tag, function() return faction() == 0 end)
+end
+
+-- captureCharAnim's dispatch target when the cast member has no attack weapon (a staff-only
+-- healer -- currently just Sclorbo, #191). Captures BOTH halves of the healer's battle anim:
+--   1. heal-cast -- wound another ally, teleport the healer adjacent, open the menu, Heal them.
+--   2. defend    -- full-heal the healer, neuter every live foe's pow, teleport him adjacent to
+--                   one, end the turn, and let the enemy phase hit him (idle/dodge, no counter).
+-- PASS requires the heal-cast to have animated; the defend is best-effort (logged, not fatal) --
+-- e.g. no free tile next to a live enemy is a sandbox-composition problem, not a regression here.
+local function captureHealerAnim(name, pid, cls)
+    local u = blue(pid)
+    local ally = woundAnAlly(pid)
+    if not ally then
+        return result("FAIL", name .. " has no other live ally to wound/heal (sandbox composition)") end
+    log(string.format("%s: wounded ally char 0x%X at (%d,%d) to heal", name, ally.charId, ally.x, ally.y))
+    if not teleportAdjacentTo(u, { ally }) then shot(name .. "-heal-noshot")
+        return result("FAIL", name .. " never got adjacent to the wounded ally") end
+    u = blue(pid)
+    if not moveUnit(u.x, u.y, u.x, u.y) then shot(name .. "-heal-nomenu")
+        return result("FAIL", name .. " action menu never opened next to the wounded ally") end
+    shot(name .. "-heal-deploy")
+    local healed = captureHeal(u.addr, name .. "-heal")
+    shot(name .. "-heal-after")
+    if not healed then
+        return result("FAIL", string.format("captureHeal never reached combat for %s (class 0x%X)", name, cls)) end
+    log(name .. ": heal-cast captured; staging the defend")
+
+    local defended = false
+    -- The heal-cast leaves the healer with US_HIDDEN (bmunit.c UnitBeginAction) still set for a
+    -- few frames after combat ends -- it clears once MoveActiveUnit finalizes his post-battle
+    -- position, which RefreshUnitsOnBmMap (bmmap.c) needs to re-place him in gBmMapUnit. A
+    -- second raw teleport (below) reads mapUnitAt(u.x,u.y) as this unit's own grid id first --
+    -- attempted too early it reads 0 (still hidden, not yet re-placed) and teleportToFiringTile
+    -- bails, so wait for the bit to clear first (#191).
+    local US_HIDDEN = 1
+    waitFor(function()
+        local uu = blue(pid)
+        return uu and (uu.state & US_HIDDEN) == 0
+    end, 180)
+    u = blue(pid)
+    if u and not isDead(u) then
+        emu:write8(u.addr + 0x13, ru8(u.addr + 0x12))  -- full heal: survive whatever hits him
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) then pokeHarmless(r) end  -- no death risk from any attacker
+        end
+        if teleportToFiringTile(u, 1, 1) then
+            shot(name .. "-defend-deploy")
+            defended = captureDefend(name .. "-defend")
+            shot(name .. "-defend-after")
+        else
+            log(name .. ": no free tile adjacent to a live enemy -- defend can't be staged")
+        end
+    else
+        log(name .. ": no longer live after the heal -- defend can't be staged")
+    end
+    if not defended then
+        log(name .. ": defend NOT captured (best-effort; heal-cast alone is a PASS)")
+    end
+
+    return result("PASS", string.format(
+        "%s heal-cast captured (class 0x%X); defend %s", name, cls, defended and "captured" or "NOT captured"))
+end
+
 -- Capture one cast member's battle anim on the TESTCH sandbox: find its deployed unit, read
 -- its weapon reach, drive it to fire, and shoot frames tagged with its id (so make_gif picks
--- them up per character). The verdict is honest -- combat must actually start.
+-- them up per character). Staff-only units (no attack weapon) dispatch to captureHealerAnim
+-- instead (#191). The verdict is honest -- combat must actually start.
 local function captureCharAnim(name)
     local pid = CAST[name]
     if not pid then
@@ -2895,8 +3039,8 @@ local function captureCharAnim(name)
     local cls = ru8(ru32(u.addr + 0x04) + 0x04)
     local mn, mx = unitAttackRange(u)
     if not mn then
-        return result("FAIL", string.format(
-            "%s has no attack weapon (staff/healer, class 0x%X) -- no combat anim to capture", name, cls)) end
+        return captureHealerAnim(name, pid, cls)
+    end
     log(string.format("%s at (%d,%d) class=0x%X weapon-range %d-%d", name, u.x, u.y, cls, mn, mx))
     if not positionForShot(pid) then shot(name .. "-noshot")
         return result("FAIL", name .. " never reached firing position") end

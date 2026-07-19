@@ -2843,6 +2843,11 @@ BANIM_DONORS = {
     # supplies the AnimConf to clone + the ITYPE_LANCE slot to repoint for her per-character
     # _u25. A flier's hover-and-dive can't be faked from 3 static poses (decisions.md).
     'pegasus': ('CLASS_PEGASUS_KNIGHT', '0x0100 | ITYPE_LANCE', 'melee', 'lance'),
+    # Sclorbo (the army's first healer, Priest->Bishop). Cloning the BISHOP AnimConf gives
+    # BOTH a STAFF slot (drives the MVP: heal-cast + defense as a Priest) and a LIGHT slot
+    # (the post-promotion attack). Both slots repoint to his ONE custom animId; call_spell_anim
+    # resolves heal-efx vs light-efx from the equipped item at runtime. Basil (#25) reuses this.
+    'bishop': ('CLASS_BISHOP', ['0x0100 | ITYPE_STAFF', '0x0100 | ITYPE_LIGHT'], 'magic', None),
 }
 
 
@@ -2918,11 +2923,13 @@ def banim_spell_palette_tint_append(text, rows):
 
 
 def banim_charge_flash_append(text, rows):
-    """Append the campaign-declared per-caster charge-flash rows once (#183).
+    """Append the campaign-declared per-caster charge-flash rows once (#183, #191 waveform).
 
-    Each row is (character, weapon_type, target_bgr555) -- the caster's own sprite pulses
-    toward `target_bgr555` on the wind-up beat. The colour rides as a raw BGR555 u16 so the
-    engine blends toward any hue without a per-colour enum. Zero-character row terminates."""
+    Each row is (character, weapon_type, target_bgr555, waveform) -- the caster's own sprite
+    pulses toward `target_bgr555` on the wind-up beat, using LUT `waveform` (0 = pulse, the
+    existing 3-throb throb; 1 = build, a single slow swell). The colour rides as a raw BGR555
+    u16 so the engine blends toward any hue without a per-colour enum. Zero-character row
+    terminates."""
     character_include = '#include "constants/characters.h"\n'
     if character_include not in text:
         anchor = '#include "constants/items.h"\n'
@@ -2933,9 +2940,9 @@ def banim_charge_flash_append(text, rows):
     if marker in text:
         return text
     block = '\nCONST_DATA struct BanimChargeFlash %s = {\n' % marker
-    for character, weapon_type, target in rows:
-        block += '    { %s, %s, %s },\n' % (character, weapon_type, target)
-    block += '    { 0, 0, 0 },\n};\n'
+    for character, weapon_type, target, waveform in rows:
+        block += '    { %s, %s, %s, %d },\n' % (character, weapon_type, target, waveform)
+    block += '    { 0, 0, 0, 0 },\n};\n'
     return text + block
 
 
@@ -3007,14 +3014,21 @@ def units_with_battle_anim(campaign):
 
 
 def battle_spell_palette_tints(campaign):
-    """(character enum, weapon type, tint enum) rows declared by battle_anim YAML."""
+    """(character enum, weapon type, tint enum) rows declared by battle_anim YAML.
+
+    A block declares either a single `weapon_type:` (one row -- Marty/Rootis, unchanged) or a
+    `weapon_types:` LIST (one row per type -- Sclorbo's staff + light both cyan). If neither key
+    is present, auto-emit a row for each of the donor's bound weapon types."""
     tint_enums = {
         'green': 'BANIM_SPELL_TINT_GREEN',
         'blue': 'BANIM_SPELL_TINT_BLUE',
+        'cyan': 'BANIM_SPELL_TINT_CYAN',   # Sclorbo's flame cyan -- bright equal G+B (#191)
     }
     type_enums = {
         'dark': 'ITYPE_DARK',
         'anima': 'ITYPE_ANIMA',
+        'staff': 'ITYPE_STAFF',
+        'light': 'ITYPE_LIGHT',
     }
     out = []
     for uid, unit in units_with_battle_anim(campaign):
@@ -3022,13 +3036,21 @@ def battle_spell_palette_tints(campaign):
         if not tint:
             continue
         try:
-            weapon_type = type_enums[tint['weapon_type']]
+            if 'weapon_types' in tint:
+                wtypes = [type_enums[w] for w in tint['weapon_types']]
+            elif 'weapon_type' in tint:
+                wtypes = [type_enums[tint['weapon_type']]]
+            else:
+                donor = BANIM_DONORS[unit['battle_anim']['clone_from']]
+                donor_wtypes = donor[1] if isinstance(donor[1], list) else [donor[1]]
+                wtypes = [w.split('|')[-1].strip() for w in donor_wtypes]
             color = tint_enums[tint['color']]
             slot = PORTRAIT_MAP[uid]
         except KeyError as e:
             sys.exit('ERROR: battle_anim %s spell_palette_tint: unsupported %s' %
                      (uid, e))
-        out.append((char_symbol(slot), weapon_type, color))
+        for weapon_type in wtypes:
+            out.append((char_symbol(slot), weapon_type, color))
     return out
 
 
@@ -3038,6 +3060,7 @@ CHARGE_FLASH_RGB = {
     'blue':   (120, 205, 255),   # ice (Rootis)
     'green':  (110, 255, 120),   # (Marty)
     'purple': (200, 120, 255),   # (Meesmickle)
+    'cyan':   (31, 219, 219),    # flame cyan (Sclorbo, #191, Nicolas-approved -> BGR555 0x6F63)
 }
 
 
@@ -3048,10 +3071,15 @@ def charge_flash_target(color):
 
 
 def battle_charge_flashes(campaign):
-    """(character, weapon_type, target_bgr555) rows from battle_anim `charge_flash` blocks.
+    """(character, weapon_type, target_bgr555, waveform) rows from battle_anim `charge_flash`
+    blocks. waveform: 0 = pulse (default, the existing 3-throb LUT), 1 = build (a single slow
+    swell), from `charge_flash.waveform: 'pulse'|'build'`.
 
     The weapon type is the caster's DONOR weapon type (the flash arms for whatever tome the
-    faked anim is bound to), so a `charge_flash` block only needs a colour."""
+    faked anim is bound to), so a `charge_flash` block only needs a colour. A donor's weapon
+    type may be a single string (one row) or a LIST (e.g. Sclorbo's bishop donor -- staff +
+    light) -- emit one row per weapon type so the glow arms on every bound tome/staff."""
+    waveform_ids = {'pulse': 0, 'build': 1}
     out = []
     for uid, unit in units_with_battle_anim(campaign):
         flash = unit['battle_anim'].get('charge_flash')
@@ -3060,11 +3088,14 @@ def battle_charge_flashes(campaign):
         try:
             donor = BANIM_DONORS[unit['battle_anim']['clone_from']]
             target = charge_flash_target(flash['color'])
+            waveform = waveform_ids[flash.get('waveform', 'pulse')]
             slot = PORTRAIT_MAP[uid]
         except KeyError as e:
             sys.exit('ERROR: battle_anim %s charge_flash: unsupported %s' % (uid, e))
-        weapon_type = donor[1].split('|')[-1].strip()   # '0x0100 | ITYPE_ANIMA' -> 'ITYPE_ANIMA'
-        out.append((char_symbol(slot), weapon_type, target))
+        donor_wtypes = donor[1] if isinstance(donor[1], list) else [donor[1]]
+        for wtype_literal in donor_wtypes:
+            weapon_type = wtype_literal.split('|')[-1].strip()   # '0x0100 | ITYPE_ANIMA' -> 'ITYPE_ANIMA'
+            out.append((char_symbol(slot), weapon_type, target, waveform))
     return out
 
 
@@ -3158,7 +3189,10 @@ def inject_battle_anims(campaign, verbose=True):
         #     (vanilla archer bow .index 0x26 -> animId 0x25). So encode anim_id + 1.
         with open(BANIMCONF_C, encoding='utf-8') as f:
             conf = f.read()
-        conf = banim_clone_conf(conf, src_conf, new_conf, wtype, anim_id + 1)
+        wtypes = wtype if isinstance(wtype, list) else [wtype]
+        conf = banim_clone_conf(conf, src_conf, new_conf, wtypes[0], anim_id + 1)
+        for wt in wtypes[1:]:
+            conf = banim_repoint_conf(conf, new_conf, wt, anim_id + 1)
         with open(BANIMCONF_C, 'w', encoding='utf-8') as f:
             f.write(conf)
         with open(BANIM_EKRBATTLE_H, 'a', encoding='utf-8') as f:

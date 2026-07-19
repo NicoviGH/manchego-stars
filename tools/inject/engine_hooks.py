@@ -150,6 +150,7 @@ def _patch_banim_spell_palette_tint():
                 '    BANIM_SPELL_TINT_NONE = 0,\n'
                 '    BANIM_SPELL_TINT_GREEN = 1,\n'
                 '    BANIM_SPELL_TINT_BLUE = 2,\n'
+                '    BANIM_SPELL_TINT_CYAN = 3,\n'
                 '};\n\n'
                 'struct BanimSpellPaletteTint {\n'
                 '    u8 character;\n'
@@ -244,6 +245,26 @@ def _patch_banim_spell_palette_tint():
                    '        | ((low + (high - low) / 2) << 5)\n'
                    '        | (high << 10);\n'
                    '}\n\n'
+                   # Flame cyan: red suppressed, GREEN and BLUE both pinned to the highlight so
+                   # the tint reads as a bright equal-green-blue cyan (RGB 31,219,219), not the
+                   # blue-dominant navy-ice of BanimSpellTintBlue.
+                   'static u16 BanimSpellTintCyan(u16 color)\n'
+                   '{\n'
+                   '    int r = color & 0x1F;\n'
+                   '    int g = (color >> 5) & 0x1F;\n'
+                   '    int b = (color >> 10) & 0x1F;\n'
+                   '    int high = r;\n'
+                   '    int low = r;\n\n'
+                   '    if (g > high) high = g;\n'
+                   '    if (b > high) high = b;\n'
+                   '    if (g < low) low = g;\n'
+                   '    if (b < low) low = b;\n'
+                   '    if (high - low < 3)\n'
+                   '        return color;\n\n'
+                   '    return (low + (high - low) / 6)\n'
+                   '        | (high << 5)\n'
+                   '        | (high << 10);\n'
+                   '}\n\n'
                    'static void BanimSpellPaletteCopy(const u16 *src, u16 *dst, u32 size)\n'
                    '{\n'
                    '    u32 i;\n\n'
@@ -254,6 +275,8 @@ def _patch_banim_spell_palette_tint():
                    '    for (i = 0; i < size / sizeof(u16); i++) {\n'
                    '        if (gMSSpellTint == BANIM_SPELL_TINT_BLUE)\n'
                    '            dst[i] = BanimSpellTintBlue(src[i]);\n'
+                   '        else if (gMSSpellTint == BANIM_SPELL_TINT_CYAN)\n'
+                   '            dst[i] = BanimSpellTintCyan(src[i]);\n'
                    '        else\n'
                    '            dst[i] = BanimSpellTintGreen(src[i]);\n'
                    '    }\n'
@@ -295,6 +318,18 @@ def _charge_flash_sine_lut():
             for i in range(_CHARGE_FLASH_FRAMES + 1)]
 
 
+# A single slow swell over the SAME window (#191, waveform=1 'build'): one raised-cosine
+# hump (0 -> peak -> 0), no repeats -- a slow building glow rather than multiple pulses, for
+# a caster whose YAML opts into it. Same frame count as the pulse LUT so the shared proc
+# timer bound (`> _CHARGE_FLASH_FRAMES`) needs no per-waveform special-casing.
+_CHARGE_FLASH_BUILD_PEAK = 26
+def _charge_flash_build_lut():
+    import math
+    peak = _CHARGE_FLASH_BUILD_PEAK
+    return [int(round((0.5 - 0.5 * math.cos(2 * math.pi * i / _CHARGE_FLASH_FRAMES)) * peak))
+            for i in range(_CHARGE_FLASH_FRAMES + 1)]
+
+
 def _patch_banim_charge_flash():
     """Per-caster charge flash (#183): the caster's OWN battle sprite pulses toward a signature
     colour on the wind-up beat, WITHOUT altering the donor-matched animation script.
@@ -314,6 +349,7 @@ def _patch_banim_charge_flash():
                 '    u8 character;\n'
                 '    u8 weapon_type;\n'
                 '    u16 target;   /* BGR555 blend target */\n'
+                '    u8 waveform;  /* 0 = pulse (3-throb), 1 = build (single slow swell) */\n'
                 '};\n\n'
                 'extern CONST_DATA struct BanimChargeFlash gMSChargeFlashes[];\n\n')
         if anchor not in header:
@@ -336,8 +372,11 @@ def _patch_banim_charge_flash():
         efx = f.read()
     if 'MSChargeFlashArm' not in efx:
         lut = ', '.join(str(v) for v in _charge_flash_sine_lut())
+        build_lut = ', '.join(str(v) for v in _charge_flash_build_lut())
         support = (
             'static const u8 sMSChargeFlashSine[%d] = { %s };\n\n'
+            '/* #191: a single slow swell (waveform=1), vs the 3-throb pulse above (waveform=0). */\n'
+            'static const u8 sMSChargeFlashBuild[%d] = { %s };\n\n'
             'static u16 MSChargeBlend(u16 base, u16 target, int f)\n'
             '{\n'
             '    int r = base & 0x1F;\n'
@@ -353,6 +392,7 @@ def _patch_banim_charge_flash():
             '    int timer;\n'
             '    u16 target;\n'
             '    u16 *pal;\n'
+            '    u8 waveform;     /* 0 = pulse, 1 = build -- which LUT to index (#191) */\n'
             '    u16 saved[16];   /* snapshot of the actor palette (no .bss statics allowed here) */\n'
             '};\n\n'
             'void MSChargeFlashMain(struct ProcMSChargeFlash *proc);\n\n'
@@ -364,7 +404,7 @@ def _patch_banim_charge_flash():
             'void MSChargeFlashMain(struct ProcMSChargeFlash *proc)\n'
             '{\n'
             '    int i;\n'
-            '    int f = sMSChargeFlashSine[proc->timer];\n\n'
+            '    int f = proc->waveform ? sMSChargeFlashBuild[proc->timer] : sMSChargeFlashSine[proc->timer];\n\n'
             '    for (i = 0; i < 16; i++)\n'
             '        proc->pal[i] = MSChargeBlend(proc->saved[i], proc->target, f);\n'
             '    EnablePaletteSync();\n\n'
@@ -399,13 +439,14 @@ def _patch_banim_charge_flash():
             '            proc->timer = 0;\n'
             '            proc->target = it->target;\n'
             '            proc->pal = pal;\n'
+            '            proc->waveform = it->waveform;\n'
             '            for (i = 0; i < 16; i++)\n'
             '                proc->saved[i] = pal[i];\n'
             '            return;\n'
             '        }\n'
             '    }\n'
             '}\n\n'
-            % (_CHARGE_FLASH_FRAMES + 1, lut, _CHARGE_FLASH_FRAMES))
+            % (_CHARGE_FLASH_FRAMES + 1, lut, _CHARGE_FLASH_FRAMES + 1, build_lut, _CHARGE_FLASH_FRAMES))
         anchor = '/**\n * C51: banim_code_flash_white\n */\n'
         if anchor not in efx:
             sys.exit('ERROR: charge-flash efxmisc anchor missing in %s' % BANIM_EFXMISC_C)
