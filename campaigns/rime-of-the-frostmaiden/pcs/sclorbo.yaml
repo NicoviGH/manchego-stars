@@ -124,6 +124,22 @@ inventory:
 # skills (Nicolas's call, 2026-05-29: vanilla classes only, nothing extra: no timed
 # buffs/debuffs, no special movement, no procs).
 
+# ── Battle animation (faked 3-pose, #191) ─────────────────────────────────────
+# Sclorbo is the army's first HEALER (Priest base → Bishop). Cloning the BISHOP donor binds
+# BOTH the staff slot (heal-cast + defense pre-promo — restorative staves render in the arena)
+# and the light slot (post-promotion attack) to ONE custom anim; call_spell_anim resolves
+# heal-efx vs light-efx from the equipped item at cast time. Style-A frames descaled to Marty
+# height (--body 44). No charge_flash / no spell tint yet — both are defined AFTER capturing
+# this next to the vanilla Priest/Bishop anims (decisions.md ADR). Basil (#25) reuses this donor.
+battle_anim:
+  clone_from: bishop
+  motion: magic
+  abbr: sclr_st1
+  frames:
+    - sclorbo/ready.png
+    - sclorbo/windup.png
+    - sclorbo/peak.png
+
 signature_moment:
   chapter: tbd               # NICOLAS TO RECALL — not in the DM notes
   description: >
