@@ -94,20 +94,24 @@ C02                               #dodge_to_back
 1 p- Pinky_000.png                #idle
 C0E                               #start_dodge
 1 p- Pinky_000.png                #STAY GROUNDED at start_dodge (vanilla hops HERE = too early)
-C01                               #wait_hp_deplete — PAUSES until the hit resolves (the MISS fires here)
-3 p- Pinky_006.png                #hop back the instant the miss lands (synced by the wait)
-2 p- Pinky_006.png                #airborne through it
-2 p- Pinky_000.png                #land
+C01                               #wait_hp_deplete — PAUSES until the hit resolves
+13 p- Pinky_000.png               #a beat until the lance is FULLY extended
+18 p- Pinky_006.png               #HOP BACK at full extension...
+18 p- Pinky_006.png               #...and STAY back while the lance is held out...
+15 p- Pinky_006.png               #...until the goblin starts pulling the lance back
+2 p- Pinky_000.png                #then drop to idle
 C0D                               #end_dodge
 ~~~
-/// - Mode 8               #Dodge Ranged Attack (hop AFTER the resolution)
+/// - Mode 8               #Dodge Ranged Attack (hop at full extension, hold until retract)
 C02
 1 p- Pinky_000.png
 C0E
 1 p- Pinky_000.png
 C01
-3 p- Pinky_006.png
-2 p- Pinky_006.png
+13 p- Pinky_000.png
+18 p- Pinky_006.png
+18 p- Pinky_006.png
+15 p- Pinky_006.png
 2 p- Pinky_000.png
 C0D
 ~~~
