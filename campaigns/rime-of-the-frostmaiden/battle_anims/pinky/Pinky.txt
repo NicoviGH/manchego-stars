@@ -90,21 +90,23 @@ C0D
 # Pinky_006 = the jump art placed UP + BACK (away from the foe). NOT the attack-launch jump
 # (001, which leans toward the foe) and NOT apex/mid (which teleport up the attack arc). Brace
 # on idle while the foe lunges IN, then hop back AS it strikes -> a properly-timed flier dodge.
-C02                               #Start of dodge (engine also shifts him back)
+C02                               #dodge_to_back
 1 p- Pinky_000.png                #idle
-C0E                               #Start of dodging frames — the engine syncs the strike HERE
-6 p- Pinky_006.png                #recoil straight BACK at the strike (held long enough to read)
-C01                               #NOP
-3 p- Pinky_000.png                #back to idle
-C0D
+C0E                               #start_dodge
+3 p- Pinky_006.png                #hop BACK (already airborne going into the sync)
+1 p- Pinky_006.png                #hold the hop
+C01                               #wait_hp_deplete — the ENGINE syncs the hit-resolution (the MISS) HERE
+3 p- Pinky_006.png                #STAY hopped THROUGH the miss moment, then land (mirrors vanilla pekf)
+C0D                               #end_dodge
 ~~~
-/// - Mode 8               #Dodge Ranged Attack (same back recoil)
+/// - Mode 8               #Dodge Ranged Attack (same, synced to the resolution)
 C02
 1 p- Pinky_000.png
 C0E
-6 p- Pinky_006.png
+3 p- Pinky_006.png
+1 p- Pinky_006.png
 C01
-3 p- Pinky_000.png
+3 p- Pinky_006.png
 C0D
 ~~~
 /// - Mode 9               #Equipped with Melee Weapon (stand)
