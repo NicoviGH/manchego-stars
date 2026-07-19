@@ -1,0 +1,148 @@
+#######################################################
+# Pinky (pekf-flavour) Lance — imported flier swoop (#90 pipeline, per-character _u25).
+# Frames: 000 idle · 001 jump · 002 mid · 003 apex(ears) · 004 dive · 005 impact(swirl).
+# The attack is a swoop: launch -> rise -> apex hold -> DIVE onto the foe (impact = hit) ->
+# reverse-cycle home (the fly-back, mirroring vanilla pekf's wing-flap return). No lance is
+# drawn (a body-slam dive, matching his lanceless map sprite). Frame position on the shared
+# canvas IS the motion (see poses.yaml); durations tuned from banim_pekf_sp1 on the recordanim
+# review. When importing to FEditorAdv delete # and after each line.
+#######################################################
+/// - Mode 1               #Melee Animation (the swoop)
+C03                               #Start attack; needs 07 right after.
+C07                               #Start attack; needs 03 right before.
+1 p- Pinky_000.png                #idle / ready (ANCHOR frame — must appear first)
+C25                               #wing flap (launch)
+3 p- Pinky_001.png                #initial jump
+4 p- Pinky_002.png                #mid-jump rise
+16 p- Pinky_003.png               #apex, ears extended — LINGER at the hover (vanilla lingers here)
+C25                               #wing flap (tip into the dive)
+4 p- Pinky_004.png                #dive-bomb toward the foe
+6 p- Pinky_005.png                #impact + swirl READS before the hit spark lands
+C1A                               #Normal hit (lands on impact)
+C04                               #Prepare HP depletion (animate return to standing)
+C1F                               #Play hit SFE
+9 p- Pinky_005.png                #LINGER on the impact/swirl through + past the hit flash
+C25                               #wing flap (push off the hit)
+4 p- Pinky_003.png                #BOUNCE UP into the hover (ears up) — NOT the dive pose reversed
+3 p- Pinky_002.png                #arc back down toward home
+C25                               #wing flap
+3 p- Pinky_001.png                #descending home
+C06                               #Begin opponent's turn; next code 0D.
+4 p- Pinky_000.png                #settle home
+C0D                               #End of dodge animation (preceded by 06).
+~~~
+/// - Mode 3               #Melee Critical Animation
+C03
+C07
+1 p- Pinky_000.png
+C25
+3 p- Pinky_001.png
+3 p- Pinky_002.png
+16 p- Pinky_003.png               #apex — linger at the hover
+C25
+4 p- Pinky_004.png
+5 p- Pinky_005.png
+C0A                               #Critical hit
+C04
+C1F
+9 p- Pinky_005.png                #linger on impact/swirl
+C25
+4 p- Pinky_003.png                #bounce up into the hover (not the dive reversed)
+3 p- Pinky_002.png
+C25
+3 p- Pinky_001.png
+C06
+4 p- Pinky_000.png
+C0D
+~~~
+/// - Mode 5               #Ranged Animation (javelin — flies out, throws, returns)
+C03
+C07
+2 p- Pinky_000.png
+C25
+3 p- Pinky_003.png                #rise
+3 p- Pinky_004.png                #thrust forward
+C05                               #Call the equipped weapon's spell (thrown lance)
+1 p- Pinky_005.png
+C06
+3 p- Pinky_003.png
+2 p- Pinky_000.png
+C0D
+~~~
+/// - Mode 6               #Ranged Critical Animation
+C03
+C07
+1 p- Pinky_000.png
+C25
+2 p- Pinky_003.png
+2 p- Pinky_004.png
+2 p- Pinky_003.png
+2 p- Pinky_004.png
+C05
+1 p- Pinky_005.png
+C0A                               #Critical hit
+C06
+2 p- Pinky_003.png
+1 p- Pinky_000.png
+C0D
+~~~
+/// - Mode 7               #Dodge Melee Attack (hop BACK, timed to the strike)
+# Pinky_006 = the jump art placed UP + BACK (away from the foe). NOT the attack-launch jump
+# (001, which leans toward the foe) and NOT apex/mid (which teleport up the attack arc). Brace
+# on idle while the foe lunges IN, then hop back AS it strikes -> a properly-timed flier dodge.
+C02                               #dodge_to_back
+1 p- Pinky_000.png                #idle
+C0E                               #start_dodge
+1 p- Pinky_000.png                #STAY GROUNDED at start_dodge (vanilla hops HERE = too early)
+C01                               #wait_hp_deplete — PAUSES until the hit resolves
+13 p- Pinky_000.png               #a beat until the lance is FULLY extended
+18 p- Pinky_006.png               #HOP BACK at full extension...
+18 p- Pinky_006.png               #...and STAY back while the lance is held out...
+15 p- Pinky_006.png               #...until the goblin starts pulling the lance back
+2 p- Pinky_000.png                #then drop to idle
+C0D                               #end_dodge
+~~~
+/// - Mode 8               #Dodge Ranged Attack (hop at full extension, hold until retract)
+C02
+1 p- Pinky_000.png
+C0E
+1 p- Pinky_000.png
+C01
+13 p- Pinky_000.png
+18 p- Pinky_006.png
+18 p- Pinky_006.png
+15 p- Pinky_006.png
+2 p- Pinky_000.png
+C0D
+~~~
+/// - Mode 9               #Equipped with Melee Weapon (stand)
+1 p- Pinky_000.png
+C01
+~~~
+/// - Mode 10               #Standing motions
+1 p- Pinky_000.png
+C01
+~~~
+/// - Mode 11               #Equipped with Ranged weapon (stand)
+1 p- Pinky_000.png
+C01
+~~~
+/// - Mode 12               #Attack Missed Animation (swoop, no contact)
+C03
+C07
+1 p- Pinky_000.png
+C25
+3 p- Pinky_001.png
+3 p- Pinky_002.png
+14 p- Pinky_003.png               #apex — linger at the hover
+C25
+4 p- Pinky_004.png
+3 p- Pinky_005.png
+2 p- Pinky_005.png
+C06
+3 p- Pinky_003.png
+3 p- Pinky_001.png
+4 p- Pinky_000.png
+C0D
+~~~
+/// - End of animation

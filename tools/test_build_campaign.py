@@ -492,6 +492,42 @@ class CharacterUniqueBanim(unittest.TestCase):
             if motion == 'melee':
                 self.assertIn(cadence, _MELEE_CADENCE, name)
 
+    def test_pegasus_donor_maps_to_pegasus_knight_lance(self):
+        # Pinky (the flier) rides CLASS_PEGASUS_KNIGHT with a lance -- the donor supplies the
+        # _u25 AnimConf to clone and the ITYPE_LANCE weapon slot to repoint at her IMPORTED
+        # swoop. motion/cadence are unused on the import path (the motion.s comes from the
+        # .txt) but stay valid so the melee-cadence invariant above holds.
+        donor_class, wtype, motion, cadence = bc.BANIM_DONORS['pegasus']
+        self.assertEqual(donor_class, 'CLASS_PEGASUS_KNIGHT')
+        self.assertIn('ITYPE_LANCE', wtype)
+
+    def test_faked_battle_anim_builder_uses_the_three_pose_generator(self):
+        # A block with `frames:` (no import) builds via ref_to_battleframe (the #65 faked path).
+        from PIL import Image
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            for nm in ('r', 'w', 'p'):
+                Image.new('RGBA', (24, 24), (200, 40, 40, 255)).save(
+                    os.path.join(d, nm + '.png'))
+            cfg = {'clone_from': 'knight',
+                   'frames': ['r.png', 'w.png', 'p.png']}
+            res = bc.build_unit_battle_anim(cfg, d, 'testu', 'melee', 'lance')
+        self.assertEqual(len(res['sheets']), 3)          # faked = exactly 3 poses
+        self.assertIn('banim_testu_script', res['motion_s'])
+
+    def test_imported_battle_anim_builder_reads_txt_and_frames(self):
+        # A block with `import:` builds via feditor_to_banim (the #90 N-frame path), bound
+        # per-character. Exercised against Pinky's real committed swoop assets -- the ONLY new
+        # seam vs the shipped enemy import (which binds per-CLASS).
+        anim_dir = os.path.join(bc.REPO, 'campaigns', 'rime-of-the-frostmaiden',
+                                'battle_anims', 'pinky')
+        cfg = {'clone_from': 'pegasus',
+               'import': {'txt': 'Pinky.txt', 'frames_dir': '.'}}
+        res = bc.build_unit_battle_anim(cfg, anim_dir, 'pinky', 'melee', 'lance')
+        self.assertEqual(len(res['sheets']), 7)          # six swoop frames + a dodge frame
+        self.assertIn('banim_pinky_script', res['motion_s'])
+        self.assertEqual(len(res['pal']), 128)           # same agbpal shape as the faked path
+
     def test_unique_append_returns_next_index_and_appends_the_symbol(self):
         new, idx = bc.banim_unique_append(self.CONFIGS, 'AnimConf_brau_ax1')
         self.assertEqual(idx, 3)                       # NULL + 2 existing -> new is index 3

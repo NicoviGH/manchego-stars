@@ -1,0 +1,39 @@
+# pinky/poses.yaml — arc manifest for tools/poses_to_feditor.py (Pinky's imported flier anim).
+#
+# Pinky is the army's flier; his battle anim is a real N-frame swoop imported via
+# feditor_to_banim (#90 pipeline) bound to his per-character _u25 (NOT the faked 3-pose path).
+# Six hi-res Gemini poses -> FE8-scale FEditor frames on ONE shared canvas: each pose's canvas
+# position (relative to the idle/anchor frame) BECOMES the on-screen motion when the importer
+# tiles them against a single anchor. So this manifest IS the swoop path.
+#
+# FACING: flip=true mirrors the source to FE8-canonical SCREEN-LEFT facing (the whole cast's
+# convention). A left-facing unit's foe is to his LEFT, so the swoop travels LEFT -> the dive/
+# impact dx are NEGATIVE (like ref_to_battleframe's melee lunge).
+#
+# ARC (matches VANILLA pekf, not my earlier rainbow): the pegasus RISES high then DIVES onto the
+# foe at melee range and STRIKES THERE. The foe sits ~56px to the left of the idle, so impact
+# lands at dx -56 (on the foe, not sailing past). Steep rise (dive-from-above), modest forward.
+# Return flight reverse-cycles these (Pinky.txt). offset = (dx LEFT-negative, dy UP) in FE8 px.
+#
+# SIZE: Pinky is the SMALLEST unit on the roster. target_h sets his whole silhouette (ears +
+# tail); at 30 his BODY is clearly the littlest (mages render ~32x39) AND the ear-tip clears the
+# battle-sprite ceiling (it was clipping flat at 36). Tune on the recordanim review:
+#     python3 tools/poses_to_feditor.py campaigns/rime-of-the-frostmaiden/battle_anims/pinky
+
+canvas: [248, 160]         # FEditor "For Each Frame" canvas (matches the vendored #90 anims)
+flip: true                 # mirror source to screen-left facing (cast convention); dx signs match
+home: [150, 120]           # idle body-centre — right side + low, so the leftward dive has room
+target_h: 30               # idle silhouette height in FE8 px (ONE uniform downscale for ALL frames,
+                           # so the ears grow but body scale is constant). Smallest unit on the roster.
+abbr: pinky                # frame stem -> Pinky_000.png .. Pinky_005.png
+poses:                     # name / source crop (.src) / arc offset (dx = LEFT-negative toward foe, dy UP)
+  - {name: idle,   src: .src/1_idle.png,   dx:   0,  dy:  0}
+  - {name: jump,   src: .src/2_jump.png,   dx:  -6,  dy: 16}
+  - {name: mid,    src: .src/3_mid.png,    dx: -14,  dy: 34}
+  - {name: apex,   src: .src/4_apex.png,   dx: -22,  dy: 48}   # high point of the dive-from-above
+  - {name: dive,   src: .src/5_dive.png,   dx: -40,  dy: 28}   # dropping onto the foe
+  - {name: impact, src: .src/6_impact.png, dx: -54,  dy:  6}   # strike AT the foe (~56px away), no overshoot
+  # Dodge frame (Pinky_006): the MIRROR of the launch jump. The launch (001) hops forward+up
+  # (dx -6, dy 16 -> toward the foe); the dodge hops BACKWARD at the SAME height (dx +18, dy 16
+  # -> away from the foe on his left). Per Nicolas: "same height, just backwards." Same jump art.
+  - {name: dodge,  src: .src/2_jump.png,   dx:  18,  dy: 16}   # back-hop, mirror of the launch (dodge modes 7/8)
