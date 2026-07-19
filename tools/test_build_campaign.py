@@ -644,10 +644,18 @@ class BattleSpellPaletteTint(unittest.TestCase):
     def test_caster_tints_are_scoped_to_each_caster_and_weapon_type(self):
         # Marty's green tint covers all his Dark tomes; Rootis's blue (ice flavor) covers
         # all his Anima tomes. Each is character+weapon-type scoped -- no engine name-check.
+        # Both still declare a single `weapon_type:` (not the list form) -- must keep working.
         self.assertTrue(hasattr(bc, 'battle_spell_palette_tints'))
         rows = bc.battle_spell_palette_tints(self.CAMPAIGN)
         self.assertIn(('CHARACTER_SETH', 'ITYPE_DARK', 'BANIM_SPELL_TINT_GREEN'), rows)
         self.assertIn(('CHARACTER_VANESSA', 'ITYPE_ANIMA', 'BANIM_SPELL_TINT_BLUE'), rows)
+
+    def test_sclorbo_cyan_tint_covers_both_staff_and_light_via_weapon_types_list(self):
+        # Sclorbo's spell_palette_tint declares `weapon_types: [staff, light]` (a list) --
+        # one row per weapon type, both cyan (reusing BANIM_SPELL_TINT_BLUE, the frost tint).
+        rows = bc.battle_spell_palette_tints(self.CAMPAIGN)
+        self.assertIn(('CHARACTER_ROSS', 'ITYPE_STAFF', 'BANIM_SPELL_TINT_BLUE'), rows)
+        self.assertIn(('CHARACTER_ROSS', 'ITYPE_LIGHT', 'BANIM_SPELL_TINT_BLUE'), rows)
 
     def test_tint_rows_append_a_terminated_campaign_data_table(self):
         src = ('#include "constants/items.h"\n'

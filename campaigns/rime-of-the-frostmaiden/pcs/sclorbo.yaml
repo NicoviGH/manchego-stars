@@ -130,10 +130,11 @@ inventory:
 # and the light slot (post-promotion attack) to ONE custom anim; call_spell_anim resolves
 # heal-efx vs light-efx from the equipped item at cast time. Style-A frames descaled to Marty
 # height (--body 44). Basil (#25) reuses this donor.
-# charge_flash (#191): his flame-cyan identity colour, confirmed RGB(31,219,219) = BGR555
-# 0x6F63. `waveform: build` is a SINGLE slow swell (not the shared 3-throb pulse the other
-# casters use) -- "slow building glow instead of multiple pulses" (Nicolas). No spell tint
-# yet -- defined next, alongside this capture (decisions.md ADR).
+# charge_flash + spell_palette_tint (#191): his flame-cyan identity colour, confirmed
+# RGB(31,219,219) = BGR555 0x6F63. `waveform: build` is a SINGLE slow swell (not the shared
+# 3-throb pulse the other casters use) -- "slow building glow instead of multiple pulses"
+# (Nicolas). weapon_types covers BOTH his bound tomes (the bishop donor is a list-donor: staff
+# for Heal pre-promo, light for the post-promo attack) so the glow/tint arm on either.
 battle_anim:
   clone_from: bishop
   motion: magic
@@ -145,6 +146,9 @@ battle_anim:
   charge_flash:
     color: cyan
     waveform: build
+  spell_palette_tint:
+    weapon_types: [staff, light]   # heal (pre-promo) + Light (post-promo) both cyan
+    color: cyan
 
 signature_moment:
   chapter: tbd               # NICOLAS TO RECALL — not in the DM notes

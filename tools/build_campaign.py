@@ -3014,14 +3014,21 @@ def units_with_battle_anim(campaign):
 
 
 def battle_spell_palette_tints(campaign):
-    """(character enum, weapon type, tint enum) rows declared by battle_anim YAML."""
+    """(character enum, weapon type, tint enum) rows declared by battle_anim YAML.
+
+    A block declares either a single `weapon_type:` (one row -- Marty/Rootis, unchanged) or a
+    `weapon_types:` LIST (one row per type -- Sclorbo's staff + light both cyan). If neither key
+    is present, auto-emit a row for each of the donor's bound weapon types."""
     tint_enums = {
         'green': 'BANIM_SPELL_TINT_GREEN',
         'blue': 'BANIM_SPELL_TINT_BLUE',
+        'cyan': 'BANIM_SPELL_TINT_BLUE',   # reuse the frost tint as Sclorbo's flame cyan (#191)
     }
     type_enums = {
         'dark': 'ITYPE_DARK',
         'anima': 'ITYPE_ANIMA',
+        'staff': 'ITYPE_STAFF',
+        'light': 'ITYPE_LIGHT',
     }
     out = []
     for uid, unit in units_with_battle_anim(campaign):
@@ -3029,13 +3036,21 @@ def battle_spell_palette_tints(campaign):
         if not tint:
             continue
         try:
-            weapon_type = type_enums[tint['weapon_type']]
+            if 'weapon_types' in tint:
+                wtypes = [type_enums[w] for w in tint['weapon_types']]
+            elif 'weapon_type' in tint:
+                wtypes = [type_enums[tint['weapon_type']]]
+            else:
+                donor = BANIM_DONORS[unit['battle_anim']['clone_from']]
+                donor_wtypes = donor[1] if isinstance(donor[1], list) else [donor[1]]
+                wtypes = [w.split('|')[-1].strip() for w in donor_wtypes]
             color = tint_enums[tint['color']]
             slot = PORTRAIT_MAP[uid]
         except KeyError as e:
             sys.exit('ERROR: battle_anim %s spell_palette_tint: unsupported %s' %
                      (uid, e))
-        out.append((char_symbol(slot), weapon_type, color))
+        for weapon_type in wtypes:
+            out.append((char_symbol(slot), weapon_type, color))
     return out
 
 
