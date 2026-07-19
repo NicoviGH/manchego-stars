@@ -501,6 +501,27 @@ class CharacterUniqueBanim(unittest.TestCase):
         self.assertEqual(donor_class, 'CLASS_PEGASUS_KNIGHT')
         self.assertIn('ITYPE_LANCE', wtype)
 
+    def test_bishop_donor_binds_staff_and_light_to_one_anim(self):
+        donor_class, wtype, motion, cadence = bc.BANIM_DONORS['bishop']
+        self.assertEqual(donor_class, 'CLASS_BISHOP')
+        self.assertEqual(motion, 'magic')
+        self.assertEqual(wtype, ['0x0100 | ITYPE_STAFF', '0x0100 | ITYPE_LIGHT'])
+        # A Bishop-shaped AnimConf fixture: STAFF + LIGHT both at the vanilla index 0x82.
+        src = ('CONST_DATA struct BattleAnimDef AnimConf_SRC[] = {\n'
+               '    { .wtype = 0x0100 | ITYPE_STAFF, .index = 0x0082, },\n'
+               '    { .wtype = 0x0100 | ITYPE_LIGHT, .index = 0x0082, },\n'
+               '    { 0 }\n};\n')
+        wtypes = wtype if isinstance(wtype, list) else [wtype]
+        out = bc.banim_clone_conf(src, 'AnimConf_SRC', 'AnimConf_NEW', wtypes[0], 0x99 + 1)
+        for wt in wtypes[1:]:
+            out = bc.banim_repoint_conf(out, 'AnimConf_NEW', wt, 0x99 + 1)
+        # Source table is left byte-vanilla (isolation).
+        self.assertIn('AnimConf_SRC[] = {\n    { .wtype = 0x0100 | ITYPE_STAFF, .index = 0x0082, }', out)
+        # New clone has BOTH slots repointed to 0x9A.
+        new_block = out.split('AnimConf_NEW[] =', 1)[1]
+        self.assertIn('.wtype = 0x0100 | ITYPE_STAFF, .index = 0x9A', new_block)
+        self.assertIn('.wtype = 0x0100 | ITYPE_LIGHT, .index = 0x9A', new_block)
+
     def test_faked_battle_anim_builder_uses_the_three_pose_generator(self):
         # A block with `frames:` (no import) builds via ref_to_battleframe (the #65 faked path).
         from PIL import Image

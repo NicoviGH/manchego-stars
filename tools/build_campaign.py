@@ -2843,6 +2843,11 @@ BANIM_DONORS = {
     # supplies the AnimConf to clone + the ITYPE_LANCE slot to repoint for her per-character
     # _u25. A flier's hover-and-dive can't be faked from 3 static poses (decisions.md).
     'pegasus': ('CLASS_PEGASUS_KNIGHT', '0x0100 | ITYPE_LANCE', 'melee', 'lance'),
+    # Sclorbo (the army's first healer, Priest->Bishop). Cloning the BISHOP AnimConf gives
+    # BOTH a STAFF slot (drives the MVP: heal-cast + defense as a Priest) and a LIGHT slot
+    # (the post-promotion attack). Both slots repoint to his ONE custom animId; call_spell_anim
+    # resolves heal-efx vs light-efx from the equipped item at runtime. Basil (#25) reuses this.
+    'bishop': ('CLASS_BISHOP', ['0x0100 | ITYPE_STAFF', '0x0100 | ITYPE_LIGHT'], 'magic', None),
 }
 
 
@@ -3158,7 +3163,10 @@ def inject_battle_anims(campaign, verbose=True):
         #     (vanilla archer bow .index 0x26 -> animId 0x25). So encode anim_id + 1.
         with open(BANIMCONF_C, encoding='utf-8') as f:
             conf = f.read()
-        conf = banim_clone_conf(conf, src_conf, new_conf, wtype, anim_id + 1)
+        wtypes = wtype if isinstance(wtype, list) else [wtype]
+        conf = banim_clone_conf(conf, src_conf, new_conf, wtypes[0], anim_id + 1)
+        for wt in wtypes[1:]:
+            conf = banim_repoint_conf(conf, new_conf, wt, anim_id + 1)
         with open(BANIMCONF_C, 'w', encoding='utf-8') as f:
             f.write(conf)
         with open(BANIM_EKRBATTLE_H, 'a', encoding='utf-8') as f:
