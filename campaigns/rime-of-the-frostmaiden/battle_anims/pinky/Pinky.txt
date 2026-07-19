@@ -93,16 +93,16 @@ C0D
 C02                               #Start of dodge (engine also shifts him back)
 1 p- Pinky_000.png                #idle
 C0E                               #Start of dodging frames — the engine syncs the strike HERE
-4 p- Pinky_006.png                #hop UP + BACK right at the strike (vanilla dodge cadence)
+6 p- Pinky_006.png                #recoil straight BACK at the strike (held long enough to read)
 C01                               #NOP
-3 p- Pinky_000.png                #drop back to idle
+3 p- Pinky_000.png                #back to idle
 C0D
 ~~~
-/// - Mode 8               #Dodge Ranged Attack (same back-hop)
+/// - Mode 8               #Dodge Ranged Attack (same back recoil)
 C02
 1 p- Pinky_000.png
 C0E
-4 p- Pinky_006.png
+6 p- Pinky_006.png
 C01
 3 p- Pinky_000.png
 C0D
