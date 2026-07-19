@@ -721,31 +721,56 @@ class BattleChargeFlash(unittest.TestCase):
 
     def test_flash_rows_append_a_terminated_table_with_bgr555_targets(self):
         # The generated table carries the target colour as a raw BGR555 u16 so the engine
-        # blends toward it directly -- no per-colour enum needed for any hue.
+        # blends toward it directly -- no per-colour enum needed for any hue. Rows are
+        # (character, weapon_type, target, waveform); 0 = pulse (the existing 3-throb LUT).
         src = ('#include "constants/items.h"\n'
                'CONST_DATA struct BattleAnimDef * gUnitSpecificBanimConfigs[] = {\n'
                '    NULL,\n};\n')
         self.assertTrue(hasattr(bc, 'banim_charge_flash_append'))
         out = bc.banim_charge_flash_append(
-            src, [('CHARACTER_VANESSA', 'ITYPE_ANIMA', '0x7E6F')])
+            src, [('CHARACTER_VANESSA', 'ITYPE_ANIMA', '0x7E6F', 0)])
         self.assertIn('CONST_DATA struct BanimChargeFlash gMSChargeFlashes[]', out)
         self.assertIn('#include "constants/characters.h"', out)
-        self.assertIn('{ CHARACTER_VANESSA, ITYPE_ANIMA, 0x7E6F },', out)
-        self.assertIn('{ 0, 0, 0 },', out)   # zero-character terminator
+        self.assertIn('{ CHARACTER_VANESSA, ITYPE_ANIMA, 0x7E6F, 0 },', out)
+        self.assertIn('{ 0, 0, 0, 0 },', out)   # zero-character terminator
+
+    def test_flash_row_carries_the_build_waveform(self):
+        # waveform=1 (build) rides the same row shape -- Sclorbo's slow single-swell glow.
+        src = ('#include "constants/items.h"\n'
+               'CONST_DATA struct BattleAnimDef * gUnitSpecificBanimConfigs[] = {\n'
+               '    NULL,\n};\n')
+        out = bc.banim_charge_flash_append(
+            src, [('CHARACTER_ROSS', 'ITYPE_STAFF', '0x6F63', 1)])
+        self.assertIn('{ CHARACTER_ROSS, ITYPE_STAFF, 0x6F63, 1 },', out)
 
     def test_named_colour_resolves_to_a_bgr555_hex_target(self):
         # 'blue' is Rootis's ice hue (120,205,255) -> 5-bit per channel, packed BGR555.
         self.assertTrue(hasattr(bc, 'charge_flash_target'))
         self.assertEqual(bc.charge_flash_target('blue'), '0x7F2F')
 
+    def test_cyan_colour_resolves_to_sclorbos_flame_bgr555_target(self):
+        # Sclorbo's confirmed flame cyan: RGB(31,219,219) -> BGR555 0x6F63.
+        self.assertEqual(bc.charge_flash_target('cyan'), '0x6F63')
+
     def test_charge_flashes_are_scoped_per_caster_with_bgr555_colour(self):
         # Each caster's charge_flash: {color} -> one character+weapon-scoped row, the weapon
         # type derived from the donor (Rootis mage/anima; Marty & Meesmickle shaman/dark).
+        # The three existing casters have no `waveform` in YAML -> default 0 (pulse), the
+        # byte-identical existing LUT.
         self.assertTrue(hasattr(bc, 'battle_charge_flashes'))
         rows = bc.battle_charge_flashes(self.CAMPAIGN)
-        self.assertIn(('CHARACTER_VANESSA', 'ITYPE_ANIMA', bc.charge_flash_target('blue')), rows)
-        self.assertIn(('CHARACTER_SETH', 'ITYPE_DARK', bc.charge_flash_target('green')), rows)
-        self.assertIn(('CHARACTER_GILLIAM', 'ITYPE_DARK', bc.charge_flash_target('purple')), rows)
+        self.assertIn(('CHARACTER_VANESSA', 'ITYPE_ANIMA', bc.charge_flash_target('blue'), 0), rows)
+        self.assertIn(('CHARACTER_SETH', 'ITYPE_DARK', bc.charge_flash_target('green'), 0), rows)
+        self.assertIn(('CHARACTER_GILLIAM', 'ITYPE_DARK', bc.charge_flash_target('purple'), 0), rows)
+
+    def test_sclorbos_list_donor_emits_one_build_row_per_weapon_type(self):
+        # Sclorbo's bishop donor's wtype is a LIST (['...ITYPE_STAFF', '...ITYPE_LIGHT']) --
+        # the charge_flash must arm on BOTH the Heal staff and the post-promo Light tome,
+        # each row carrying his cyan target + waveform=1 (build, a single slow swell).
+        rows = bc.battle_charge_flashes(self.CAMPAIGN)
+        cyan = bc.charge_flash_target('cyan')
+        self.assertIn(('CHARACTER_ROSS', 'ITYPE_STAFF', cyan, 1), rows)
+        self.assertIn(('CHARACTER_ROSS', 'ITYPE_LIGHT', cyan, 1), rows)
 
     def test_hook_arms_the_flash_from_the_existing_charge_command(self):
         """The pulse is armed by the elec-charge command ALREADY in the magic body (case 40),
@@ -758,12 +783,24 @@ class BattleChargeFlash(unittest.TestCase):
             header = open(eh.BANIM_EKRBATTLE_H, encoding='utf-8').read()
             efxmisc = open(eh.BANIM_EFXMISC_C, encoding='utf-8').read()
             main = open(eh.BANIM_MAIN_C, encoding='utf-8').read()
-            # data contract: a per-character/weapon table of BGR555 targets.
+            # data contract: a per-character/weapon table of BGR555 targets + a waveform pick.
             self.assertIn('struct BanimChargeFlash', header)
             self.assertIn('gMSChargeFlashes[]', header)
+            self.assertIn('u8 waveform;', header)
             # the arm reads the CURRENT attacker (character + weapon), like the spell tint.
             self.assertIn('void MSChargeFlashArm(struct Anim *anim)', efxmisc)
             self.assertIn('GetItemType(bu->weaponBefore)', efxmisc)
+            # two LUTs: the vanilla 3-throb pulse (byte-identical) and a new single-swell build.
+            self.assertIn('static const u8 sMSChargeFlashSine[55] = { 0, 1, 3, 6, 10, 13, 17, '
+                          '20, 22, 23, 22, 20, 17, 13, 10, 6, 3, 1, 0, 1, 3, 6, 10, 13, 17, 20, '
+                          '22, 23, 22, 20, 17, 13, 10, 6, 3, 1, 0, 1, 3, 6, 10, 13, 17, 20, 22, '
+                          '23, 22, 20, 17, 13, 10, 6, 3, 1, 0 };', efxmisc)
+            self.assertIn('static const u8 sMSChargeFlashBuild[55]', efxmisc)
+            # proc + arm pick the LUT per-row via a waveform field.
+            self.assertIn('proc->waveform', efxmisc)
+            self.assertIn('it->waveform', efxmisc)
+            self.assertIn('proc->waveform ? sMSChargeFlashBuild[proc->timer] : '
+                          'sMSChargeFlashSine[proc->timer]', efxmisc)
             # armed from the existing start-attack command (case 0x07) -- no motion.s change,
             # and ~one settle beat before the wind-up arm-raise.
             self.assertIn('MSChargeFlashArm(anim)', main)
