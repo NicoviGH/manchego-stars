@@ -20,6 +20,7 @@ import map_tileset_tool as mt  # noqa: E402
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CAVE = os.path.join(REPO, 'campaigns/rime-of-the-frostmaiden/maps/tilesets/cave-interior')
 DEMO = os.path.join(REPO, 'docs/demo/ch03-mineshaft-tileset-demo.png')
+DECOMP = os.path.join(REPO, 'fireemblem8u')
 
 
 def _object_png(path, px=None, palette=None):
@@ -101,6 +102,44 @@ class TestTmxGrid(unittest.TestCase):
             p = os.path.join(d, 't.tmx')
             open(p, 'w').write(self.TMX)
             self.assertEqual(mt.tmx_grid(p), [[27, 0], [3, 672]])
+
+
+class TestPreservedTerrainVariants(unittest.TestCase):
+    class TargetTerrain:
+        def __init__(self, terrain_by_metatile):
+            self.terrain_by_metatile = terrain_by_metatile
+
+        def terrain(self, metatile):
+            return self.terrain_by_metatile[metatile]
+
+    def test_requires_every_protected_source_metatile(self):
+        with self.assertRaisesRegex(ValueError, r'metatile 11.*\(1, 0\)'):
+            mt.preserved_terrain_targets(
+                [10, 11], bytes([0] * 10 + [0x0c, 0x0c]),
+                self.TargetTerrain({100: 0x0c}),
+                {'map': {'10': 100}, 'preserve_terrain_variants': [0x0c]}, 2)
+
+    def test_rejects_a_mapped_target_with_wrong_terrain(self):
+        with self.assertRaisesRegex(ValueError, r'target metatile 100.*terrain 0x01'):
+            mt.preserved_terrain_targets(
+                [10], bytes([0] * 10 + [0x0c]),
+                self.TargetTerrain({100: 0x01}),
+                {'map': {'10': 100}, 'preserve_terrain_variants': [0x0c]}, 1)
+
+    def test_returns_exact_per_cell_targets(self):
+        self.assertEqual(
+            mt.preserved_terrain_targets(
+                [10, 10, 11], bytes([0] * 10 + [0x0c, 0x0c]),
+                self.TargetTerrain({100: 0x0c, 101: 0x0c}),
+                {'map': {'10': 100, '11': 101},
+                 'preserve_terrain_variants': [0x0c]}, 3),
+            {0: 100, 1: 100, 2: 101})
+
+    def test_reads_vanilla_layout_and_its_terrain(self):
+        width, height, cells, terrain = mt.vanilla_layout_data(DECOMP, 'PrologueMap')
+        self.assertEqual((width, height), (15, 10))
+        self.assertEqual(len(cells), width * height)
+        self.assertIn(0x0c, terrain)
 
 
 class TestVendoredCaveInterior(unittest.TestCase):
