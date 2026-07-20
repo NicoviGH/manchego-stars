@@ -16,7 +16,8 @@ import sys, os, struct, collections, json, io, base64
 ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # repo root (worktree-aware)
 DEC=os.path.join(ROOT,'fireemblem8u')
 sys.path.insert(0, os.path.join(ROOT,'tools'))
-from map_tileset_tool import _tileset_from_dir, Tileset
+from map_tileset_tool import (_tileset_from_dir, preserved_terrain_targets,
+                              render_grid, Tileset, vanilla_layout_data)
 from PIL import Image
 
 KNOWN_FLAGS={'--tileset','--blank','--fill','--ref','--vanilla'}
@@ -46,35 +47,6 @@ else:
     DOWNLOAD=ARGS[2] if len(ARGS)>2 else 'prologue-layout.json'
     SEED_ARG=ARGS[3] if len(ARGS)>3 else None
 
-def _vanilla_tileconfig_bin(dec, layout):
-    """Resolve the vanilla TileConfiguration a decomp map layout is authored against,
-    from the decomp's own asset table + chapter settings (both committed source, so
-    available whenever the reskin flow's other DEC reads are). Ch1Map/Ch2Map ride
-    TileConfiguration1, but Ch3Map+ ride 2/3/... -- reading the terrain table by the
-    wrong config misclassifies ~80% of a map's metatiles. Falls back to config 1 with a
-    warning if it can't be resolved (the tileset-1 layouts the reskin flow shipped on)."""
-    import re
-    default = os.path.join(dec, 'graphics/map/TileConfiguration1.bin')
-    try:
-        names = []
-        with open(os.path.join(dec, 'data/data_8B363C.s')) as f:
-            for line in f:
-                mo = re.match(r'\s*\.word\s+(\w+)', line)
-                if mo:
-                    names.append(mo.group(1))
-        layout_idx = names.index(layout)
-        settings = json.load(open(os.path.join(dec, 'src/data/chapter_settings.json')))
-        for ch in settings['chapters']:
-            mp = ch.get('map') or {}
-            if mp.get('mainLayerId') == layout_idx:
-                return os.path.join(dec, 'graphics/map', names[mp['tileConfigId']] + '.bin')
-    except (OSError, ValueError, KeyError, IndexError):
-        pass
-    sys.stderr.write('WARN: could not resolve vanilla tile config for %r; '
-                     'using TileConfiguration1\n' % layout)
-    return default
-
-
 def _asset_names(dec):
     import re
     names=[]
@@ -83,6 +55,16 @@ def _asset_names(dec):
             mo=re.match(r'\s*\.word\s+(\w+)',line)
             if mo: names.append(mo.group(1))
     return names
+
+
+def _gbagfx(dec):
+    """Return the decomp converter, building that standalone host tool if absent."""
+    import subprocess
+    tool_dir=os.path.join(dec,'tools/gbagfx')
+    executable=os.path.join(tool_dir,'gbagfx')
+    if not os.path.exists(executable):
+        subprocess.run(['make','-C',tool_dir],check=True)
+    return executable
 
 
 def _walkable_terrains(dec):
@@ -127,43 +109,35 @@ def _render_vanilla_layout(dec, layout):
     g=os.path.join(dec,'graphics/map')
     def ensure(src,dst):
         if not os.path.exists(dst):
-            subprocess.run([os.path.join(dec,'tools/gbagfx/gbagfx'),src,dst],check=True)
+            subprocess.run([_gbagfx(dec),src,dst],check=True)
     ensure(os.path.join(g,obj+'.png'), os.path.join(g,obj+'.4bpp'))
     ensure(os.path.join(g,pal+'.pal'), os.path.join(g,pal+'.gbapal'))
     ts=Tileset(os.path.join(g,obj+'.4bpp'),os.path.join(g,pal+'.gbapal'),os.path.join(g,cfg+'.bin'))
-    lay=open(os.path.join(g,'layout',layout+'.bin'),'rb').read()
-    w,h=lay[0],lay[1]
-    cells=[struct.unpack_from('<H',lay,2+j*2)[0]//4 for j in range(w*h)]
+    w,h,cells,_=vanilla_layout_data(dec,layout)
     img=Image.new('RGB',(w*16,h*16))
     for j,m in enumerate(cells): img.paste(ts.metatile_image(m),((j%w)*16,(j//w)*16))
     return img,w,h
 
 
 win=_tileset_from_dir(os.path.join(ROOT,'campaigns/rime-of-the-frostmaiden/maps/tilesets',TILESET))
+RETILE_MODE='custom' if BLANK else 'vanilla'
+EXPORT_META={'retile_mode':RETILE_MODE}
+if not BLANK:
+    EXPORT_META['vanilla_layout']=LAYOUT
+PROTECTED_TARGETS={}
 if BLANK:
     # Custom canvas on a vendored tileset (#40): no vanilla layout to derive from.
     W,H=(int(v) for v in BLANK.lower().split('x'))
     FILL=int(FLAGS.get('--fill','0'))
     grid=[FILL]*(W*H)
 else:
-    # `van` is consulted ONLY for .terrain(m) (the vanilla terrain table of the layout's OWN
-    # tileset config -- resolved per-layout, since Ch3Map+ ride TileConfiguration2/3/... not 1)
-    # to decide which reskinned cells diverge; its gfx/pal are never rendered. The decomp's raw
-    # vanilla gfx (ObjectType*.4bpp / MapPalette*.gbapal) are build-only artifacts and may be
-    # absent, so we feed the winter gfx/pal (irrelevant) alongside the real vanilla config.
-    SNOW=os.path.join(ROOT,'campaigns/rime-of-the-frostmaiden/maps/tilesets/snowy-bern')
-    van=Tileset(os.path.join(SNOW,'snowy-bern.4bpp'),
-                os.path.join(SNOW,'snowy-bern.gbapal'),
-                _vanilla_tileconfig_bin(DEC, LAYOUT))
-    lay=open(os.path.join(DEC,f'graphics/map/layout/{LAYOUT}.bin'),'rb').read()
-    W,H=lay[0],lay[1]
-    cells=[struct.unpack_from('<H',lay,2+i*2)[0]//4 for i in range(W*H)]
+    W,H,cells,source_terrain=vanilla_layout_data(DEC,LAYOUT)
 
     # current final grid (base iron-out + remap + manual)  -> editor starting point
-    def divergent(m): return win.terrain(m)!=van.terrain(m)
+    def divergent(m): return win.terrain(m)!=source_terrain[m]
     modec=collections.defaultdict(collections.Counter)
     for m in cells:
-        if not divergent(m): modec[van.terrain(m)][m]+=1
+        if not divergent(m): modec[source_terrain[m]][m]+=1
     MODE={t:c.most_common(1)[0][0] for t,c in modec.items()}
     FB={0x01:6,0x0c:192,0x10:568,0x12:418,0x13:2}
     resolved=[0]*(W*H)
@@ -171,14 +145,14 @@ else:
         for x in range(W):
             m=cells[y*W+x]
             if not divergent(m): resolved[y*W+x]=m; continue
-            vt=van.terrain(m); nb=collections.Counter()
+            vt=source_terrain[m]; nb=collections.Counter()
             for dy in(-1,0,1):
                 for dx in(-1,0,1):
                     if dx==0 and dy==0: continue
                     nx,ny=x+dx,y+dy
                     if 0<=nx<W and 0<=ny<H:
                         nm=cells[ny*W+nx]
-                        if not divergent(nm) and van.terrain(nm)==vt: nb[nm]+=1
+                        if not divergent(nm) and source_terrain[nm]==vt: nb[nm]+=1
             resolved[y*W+x]=nb.most_common(1)[0][0] if nb else MODE.get(vt,FB.get(vt,m))
     # Learned reskin: Nicolas's hand-retiles (reskin-learned.json) override the naive auto-reskin
     # for any vanilla metatile he's already taught, so each new chapter inherits his conventions
@@ -191,6 +165,14 @@ else:
     for i in range(W*H):
         w=_learned.get(str(cells[i]))
         if w is not None: resolved[i]=w
+    if TILESET=='snowy-bern':
+        try:
+            PROTECTED_TARGETS=preserved_terrain_targets(
+                cells,source_terrain,win,_learned_json,W)
+        except ValueError as error:
+            sys.exit('ERROR: %s'%error)
+        for cell,target in PROTECTED_TARGETS.items():
+            resolved[cell]=target
     # prologue-era hand overrides apply only to the original PrologueMap session
     _isproto = LAYOUT=='PrologueMap'
     scratch=os.path.join('/tmp', 'manchego-stars-review')
@@ -219,6 +201,14 @@ if SEED_MAR:
                  %(sj.get('tileset','snowy-bern'),TILESET))
     grid=[struct.unpack_from('<H',seed,i*2)[0]>>5 for i in range(W*H)]
     print('seeded editable grid from',SEED_MAR)
+
+forest_errors=[]
+for cell,expected in PROTECTED_TARGETS.items():
+    if grid[cell]!=expected:
+        forest_errors.append('forest sequence at (%d, %d) is tile %d; expected tile %d'
+                             %(cell%W,cell//W,grid[cell],expected))
+if forest_errors:
+    sys.exit('ERROR: %s'%'; '.join(forest_errors))
 
 # atlas image: 32 cols x 32 rows of 16px tiles (clean, contiguous)
 ACOLS=32; AROWS=32
@@ -265,7 +255,7 @@ else:
     import subprocess
     def _ensure_built(src, dst):
         if not os.path.exists(dst):
-            subprocess.run([os.path.join(DEC,'tools/gbagfx/gbagfx'), src, dst], check=True)
+            subprocess.run([_gbagfx(DEC), src, dst], check=True)
     _ensure_built(os.path.join(DEC,'graphics/map/ObjectType1.png'),  os.path.join(DEC,'graphics/map/ObjectType1.4bpp'))
     _ensure_built(os.path.join(DEC,'graphics/map/MapPalette1.pal'),  os.path.join(DEC,'graphics/map/MapPalette1.gbapal'))
     vanart=Tileset(os.path.join(DEC,'graphics/map/ObjectType1.4bpp'),
@@ -350,6 +340,7 @@ const atlas=new Image(); atlas.src="data:image/png;base64,__ATLAS__";
 const vanref=new Image(); vanref.src="data:image/png;base64,__VANREF__";
 const MC=48, PC=34, PCOLS=16, DC=22;
 const DEMO=__DEMO__, DW=__DW__, DH=__DH__;
+const EXPORT_META=__EXPORT_META__;
 const map=document.getElementById('map'), mx=map.getContext('2d');
 const ref=document.getElementById('ref'), rx=ref.getContext('2d');
 const pal=document.getElementById('pal'), px=pal.getContext('2d');
@@ -423,7 +414,7 @@ window.onkeydown=e=>{
  if(e.key==='g'){const g=document.getElementById('grid');g.checked=!g.checked;showGrid=g.checked;drawMap();drawRef(-1);}
 };
 document.getElementById('export').onclick=()=>{
- const js=JSON.stringify({tileset:'__TILESET__',width:W,height:H,grid:GRID});
+ const js=JSON.stringify({...EXPORT_META,tileset:'__TILESET__',width:W,height:H,grid:GRID});
  const ta=document.getElementById('out');ta.style.display='block';ta.value=js;
  const b=new Blob([js],{type:'application/json'});const a=document.createElement('a');
  a.href=URL.createObjectURL(b);a.download='__DOWNLOAD__';a.click();
@@ -440,6 +431,7 @@ out=(HTML.replace('__W__',str(W)).replace('__H__',str(H)).replace('__ACOLS__',st
      .replace('__PAL__',json.dumps(PAL)).replace('__TNAME__',json.dumps({str(k):v for k,v in TNAME.items()}))
      .replace('__ATLAS__',ATLAS).replace('__VANREF__',VANREF)
      .replace('__DEMO__',json.dumps(DEMO)).replace('__DW__',str(DW_DEMO)).replace('__DH__',str(DH_DEMO))
+     .replace('__EXPORT_META__',json.dumps(EXPORT_META))
      .replace('__WALK__',json.dumps(_walkable_terrains(DEC)))
      .replace('__DOWNLOAD__',DOWNLOAD).replace('__TITLE__',LAYOUT)
      .replace('__TILESET__',TILESET))
@@ -455,9 +447,9 @@ print('wrote',path,'(%d KB)'%(len(out)//1024))
 # winter reskin can be compiled/rendered immediately, before any hand-painting), and
 # render a PNG preview of it so the starting point is visible without opening the editor.
 start_json=os.path.join(ROOT,'review',DOWNLOAD)
-json.dump({'tileset':TILESET,'width':W,'height':H,'grid':grid},open(start_json,'w'))
+start_payload=dict(EXPORT_META,tileset=TILESET,width=W,height=H,grid=grid)
+json.dump(start_payload,open(start_json,'w'))
 print('wrote starting layout',start_json)
-from map_tileset_tool import render_grid
 png=os.path.join(ROOT,'review',os.path.splitext(os.path.basename(OUT_HTML))[0]+'-start.png')
 render_grid(win,[grid[r*W:(r+1)*W] for r in range(H)],png,zoom=4)
 print('rendered start preview',png)
