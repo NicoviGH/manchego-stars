@@ -4664,19 +4664,38 @@ def talk_recruit_char_entries(recruiters, target, flag, script):
                    for r in recruiters)
 
 
-def talk_recruit_script(msg_id, target):
-    """The shared Colm-style talk-recruit script (cf. vanilla EventScr_Ch3_Talk_NeimiColm):
-    show the migrated talk line, CUSA the green `target` to BLUE (EvtChangeFaction), set the
-    map-event visibility evbit, end. MUSS/STAL are trimmed -- the line rides the map talk
-    window, not a fanfare."""
+def talk_recruit_script(msg_id, target, pre_script=''):
+    """The shared talk-recruit script (cf. vanilla EventScr_Ch3_Talk_NeimiColm): show the
+    migrated talk line, then CUSA `target` to BLUE (EvtChangeFaction), set the map-event
+    visibility evbit, end. MUSS/STAL are trimmed -- the line rides the map talk window, not a
+    fanfare. Faction-agnostic: a GREEN bystander (Trex/Basil) and a RED parley (Lupin/Sahnar)
+    both end at BLUE via this one CUSA. `pre_script` is spliced in AFTER the talk line and
+    BEFORE the CUSA -- a red parley passes the pack table-swap (DISA the generics + LOAD1 the
+    green allies) there, so the whole outcome still rides the single recruit path."""
     return ('{\n'
             '    TEXTSTART\n'
             '    TEXTSHOW(0x%X)\n'
             '    TEXTEND\n'
-            '    REMA\n'
-            '    CUSA(%s) /* green -> blue: the talk recruits the target */\n'
-            '    EVBIT_T(7)\n'
-            '    ENDA\n}' % (msg_id, target))
+            '    REMA\n' % msg_id
+            + pre_script
+            + '    CUSA(%s) /* -> blue: the talk recruits the target */\n'
+              '    EVBIT_T(7)\n'
+              '    ENDA\n}' % target)
+
+
+def talk_recruit_wiring(recruiters, target, flag, script_symbol, msg_id, pre_script=''):
+    """Assemble the reusable on-map talk-recruit event wiring (ch03 Trex / ch04 Lupin / ch05
+    Basil+Sahnar). Returns (char_events, talk_script):
+      char_events -- the EventListScr_..._Character body: one CHAR(flag, script, recruiter,
+        target) per `recruiters` entry (talk_recruit_char_entries). ch03 passes the whole
+        field roster (talk_recruiters -- "any party member"); ch04 passes a single recruiter
+        (the YAML parley.by, e.g. Marty) -- same machinery, caller picks the recruiter set.
+      talk_script -- the shared talk script (talk_recruit_script) whose CUSA flips `target`
+        BLUE, with `pre_script` spliced in before the CUSA (the red parley's pack table-swap).
+    Both flavours share ONE flow instead of a per-chapter green/red copy."""
+    char_events = ('{\n' + talk_recruit_char_entries(recruiters, target, flag, script_symbol)
+                   + '    END_MAIN\n}')
+    return char_events, talk_recruit_script(msg_id, target, pre_script=pre_script)
 
 
 def midmap_minibosses(chap):
@@ -4713,11 +4732,14 @@ def midmap_afev(guard_flag, script, watch_flag):
 
 
 def _ally_unit_entry(leader, slot, class_enum, level, x, y, items, comment,
-                     allegiance='BLUE', autolevel=False, ai=None):
+                     allegiance='BLUE', autolevel=False, ai=None, char=None):
     """One non-RED UnitDefinition row (events_udefs.c) for a chapter join/deploy/
     green-ally table. leader=None omits the leaderCharIndex field; autolevel/ai
-    toggle their optional lines (GREEN allies use all three)."""
-    fields = ['.charIndex = CHARACTER_%s,%s' % (slot.upper(), comment),
+    toggle their optional lines (GREEN allies use all three). `char` overrides the
+    charIndex with a raw pid (a generic green pack shares one pid); default derives it
+    from the named cast `slot`."""
+    charref = char if char is not None else 'CHARACTER_%s' % slot.upper()
+    fields = ['.charIndex = %s,%s' % (charref, comment),
               '.classIndex = %s,' % class_enum]
     if leader:
         fields.append('.leaderCharIndex = %s,' % leader)
@@ -4778,6 +4800,41 @@ def _enemy_unit_entry(char, class_enum, level, autolevel, x, y, items, ai, comme
                        level, x, y,
                        '        .itemDrop = 1,\n' if itemdrop else '',
                        items, ai))
+
+
+# The cleared gForceDeploymentList terminator (engine_hooks hook 6). Campaign injection inserts
+# per-chapter force-deploy entries BEFORE it -- "any future per-chapter forced unit is added our
+# way, not via the vanilla by-slot table" (engine_hooks docstring).
+_FORCE_DEPLOY_TERMINATOR = '    {-1, 0, 0},\n}'
+
+
+def _force_deployment_entries(pids, host_index):
+    """Pure: the ForceDeploymentEnt rows force-deploying each `pid` in chapter slot `host_index`
+    on ANY route (0xFF). This is vanilla's own data-driven force-deploy path (eventinfo.c's
+    IsCharacterForceDeployed_ scans gForceDeploymentList by {pid, route, chapter}); our lord-
+    select hook cleared vanilla's by-slot entries but KEPT the scan for exactly this. No new
+    engine code -- a unit besides the chosen lead is fielded purely by adding a data row."""
+    return ''.join('    {%s, 0xFF, %d}, /* MS force-deploy in chapter slot %d */\n'
+                   % (pid, host_index, host_index) for pid in pids)
+
+
+def _force_deploy_units(pids, host_index):
+    """Insert `pids` into gForceDeploymentList (data_event_trigger.c) as force-deployed in
+    chapter slot `host_index`. Additive (inserts before the cleared-list terminator), so
+    multiple chapters can each force-deploy their own units. Runs AFTER _inject_lord_select_engine
+    cleared the table (main() order). Idempotency: data_event_trigger.c is restored + re-cleared
+    each build, so entries never accumulate across builds."""
+    if not pids:
+        return
+    with open(engine_hooks.DATA_EVENT_TRIGGER_C, encoding='utf-8') as f:
+        text = f.read()
+    if text.count(_FORCE_DEPLOY_TERMINATOR) != 1:
+        sys.exit('ERROR: gForceDeploymentList not in the expected cleared form (engine_hooks '
+                 'hook 6) -- cannot add a per-chapter force-deploy entry')
+    text = text.replace(_FORCE_DEPLOY_TERMINATOR,
+                        _force_deployment_entries(pids, host_index) + _FORCE_DEPLOY_TERMINATOR, 1)
+    with open(engine_hooks.DATA_EVENT_TRIGGER_C, 'w', encoding='utf-8') as f:
+        f.write(text)
 
 
 def _prepend_defeat_quote(quote):
@@ -6121,6 +6178,17 @@ CH04_AI = {
     'aggressive': '{0x0, 0x0, 0x1, 0x0}',
     'defensive': '{0x3, 0x3, 0x9, 0x20}',
 }
+# Stage 2b -- the turn-2 wolf-pack reveal + Marty->Lupin parley (issue #24). Lupin rides the
+# collision-free Duessel identity slot (Stage 2a); placed RED as the pack leader, Marty's Talk
+# CUSAs him blue and table-swaps the generics for a green NPC pack. All four symbols/ids below
+# are DEAD vanilla Ch5 slots -- unreachable once inject_ch04 blanks the Ch5 event lists, so we
+# repurpose them (the same idiom ch03 uses for its dead-Ch4 block; each verified free by grep).
+CH04_GREEN_PACK_SYMBOL = 'UnitDef_088B5860'   # dead Ch5 unit table -> the green Lycanroc allies
+CH04_LUPIN_TALK_SCRIPT = 'EventScr_089F2340'  # dead Ch5 script -> the parley event
+CH04_LUPIN_TALK_MSG = 0x9BA                    # dead Ch5 text slot -> stub parley line (Stage 4 finalizes)
+CH04_LUPIN_TALK_FLAG = 'EVFLAG_TMP(9)'         # one-shot recruit flag (ch03's Colm-CHAR idiom)
+CH04_GREEN_WOLF_PID = '0xcd'                    # generic green-ally pid: the whole pack shares it
+                                               # (uncontrolled NPCs; don't count for Rout)
 
 
 def ch04_enemy_rows(chap, arrives_turn=None):
@@ -6152,6 +6220,84 @@ def ch04_enemy_rows(chap, arrives_turn=None):
                 ' /* %s -- %s */' % (enemy['id'], enemy['name']),
                 itemdrop=is_dropper))
     return rows
+
+
+def _ch04_reveal_wave(chap):
+    """The turn-2 convertible pack -- the Mauthe Doog wave Marty parleys (its YAML `parley`
+    block). By convention its FIRST authored tile is the pack LEADER (-> Lupin, placed red);
+    the remaining tiles are the generic wolves (DISA'd + green-swapped on the parley)."""
+    wave = next((e for e in chap['enemy_units']
+                 if e.get('arrives_turn') == 2 and e.get('parley')), None)
+    if wave is None:
+        sys.exit('ERROR: ch04 has no turn-2 convertible (parley) wave')
+    return wave
+
+
+def _ch04_wave_pack_kit(wave):
+    """(class_enum, ai, items) for a ch04 enemy wave -- shared by the generic reds and the
+    green swap-in so both track the wave's authored class/inventory (no drift)."""
+    cls = CH04_CLASS_IDS[wave['class']]
+    ai = CH04_AI[wave.get('ai_pattern', 'defensive')]
+    items = [CH04_ITEM_IDS[i.get('fe_base') or i['id']] for i in wave.get('inventory', [])]
+    return cls, ai, ', '.join(items) or '0'
+
+
+def ch04_turn2_reveal_rows(chap, lupin):
+    """The turn-2 wolf-pack reveal wave: the convertible Mauthe Doog pack with its LEADER tile
+    reassigned to Lupin (red, his CHARACTER_ slot pid, Cavalier under the hood). 5 generic
+    Mauthe Doogs + Lupin = 6 -- holds the turn-2 parity count (ch04_enemy_rows still reports 6
+    for the difficulty read; the split is injector-side only). Marty's parley DISA-clears the 5
+    generics + swaps in the green pack, then CUSAs Lupin blue. `lupin` = an on_map_talk_recruits row.
+    Lupin is placed at his YAML level, NOT autolevelled -- his stats persist through the CUSA, so
+    he joins as the intended fresh Cavalier (a deliberately weak hostile that telegraphs "talk, don't kill")."""
+    wave = _ch04_reveal_wave(chap)
+    cls, ai, items = _ch04_wave_pack_kit(wave)
+    pid = CH04_MONSTER_PIDS[wave['class']]
+    leader_pos, generic_pos = wave['positions'][0], wave['positions'][1:]
+    _uid, slot, class_enum, deploy_class, level = lupin
+    lupin_row = _enemy_unit_entry(
+        char_symbol(slot), deploy_class, level, False,
+        leader_pos[0], leader_pos[1], ', '.join(CLASS_LOADOUT[class_enum]),
+        CH04_AI['aggressive'], ' /* lupin -- hostile pack leader (red; Marty parleys him blue) */')
+    generics = [_enemy_unit_entry(
+        pid, cls, int(wave['level']), bool(wave.get('autolevel')), x, y, items, ai,
+        ' /* %s -- %s (generic pack) */' % (wave['id'], wave['name']))
+        for x, y in generic_pos]
+    return [lupin_row] + generics
+
+
+def ch04_green_pack_rows(chap):
+    """The green Lycanroc NPC allies loaded when Marty parleys the pack: 5 GREEN wolves on the
+    5 generic (non-leader) tiles of the reveal wave. Uncontrolled NPCs (they don't count for
+    Rout); only Lupin (the CUSA target) becomes a PC. The whole pack shares one generic pid
+    (CH04_GREEN_WOLF_PID). Class stays the wave's (Mauthe Doog) as the Stage-2 placeholder --
+    the green Lycanroc map sprite reskin is Stage 3 art."""
+    wave = _ch04_reveal_wave(chap)
+    cls, _ai, _items = _ch04_wave_pack_kit(wave)
+    return [_ally_unit_entry(
+        None, None, cls, int(wave['level']), x, y, '0',
+        ' /* green Lycanroc ally (parley outcome; sprite = Stage 3 art) */',
+        allegiance='GREEN', char=CH04_GREEN_WOLF_PID)
+        for x, y in wave['positions'][1:]]
+
+
+def ch04_parley_pre_script(pack_pid, pack_size, green_symbol):
+    """The pack table-swap spliced into the parley talk script BEFORE the CUSA: DISA the shared-
+    pid generic Mauthe Doogs one at a time (EvtRemoveUnit clears the FIRST valid match, so
+    `pack_size` repeats clear the whole pack -- verified in the decomp), then LOAD1 the green
+    Lycanroc NPC allies at the same tiles. A *shape* change faction-conversion alone can't do."""
+    disa = ''.join('    DISA(%s) /* clear generic Mauthe Doog %d/%d */\n'
+                   % (pack_pid, i + 1, pack_size) for i in range(pack_size))
+    return (disa + '    LOAD1(0x1, %s) /* swap in the green Lycanroc pack (NPC allies) */\n'
+            '    ENUN\n' % green_symbol)
+
+
+def ch04_parley_recruiters(campaign, chap):
+    """ch04's parley recruiter set = ONLY the YAML parley.by speaker (Nicolas 2026-07-21: Marty
+    specifically, NOT ch03's any-party-member -- the reveal cutscene centres Marty's creature
+    diplomacy). Data-driven from the convertible wave's parley block; returns the CHARACTER_ symbol."""
+    by = (_ch04_reveal_wave(chap).get('parley') or {})['by']
+    return [char_symbol(PORTRAIT_MAP[by])]
 
 
 def _read_map_metatile(maps_dir, stem, x, y):
@@ -6324,13 +6470,14 @@ def inject_ch03(campaign, boot=False, verbose=True):
         leader, tslot, tdce, tlv, tx, ty, '0',
         ' /* trex -- green talk-recruit (Colm-style; CUSA on talk, #23 item 2) */',
         allegiance='GREEN') + '\n    { 0 },\n}'
-    # Trex talk-recruit (#23 item 2): ONE CHAR entry per core-party candidate (talker = ANY
-    # core party member -> the ch03 field roster), all -> the shared recruit script (CUSA flips
-    # green Trex blue). FE8's multi-recruiter idiom (cf. vanilla ch14a Rennac). Trex rides Rennac.
+    # Trex talk-recruit (#23 item 2): the shared talk-recruit wiring (talk_recruit_wiring, reused
+    # by ch04/ch05). Recruiter set = ANY core party member (the ch03 field roster) -> ONE CHAR
+    # entry each, all pointing at the shared recruit script (CUSA flips green Trex blue). FE8's
+    # multi-recruiter idiom (cf. vanilla ch14a Rennac). No pre_script: Trex is a plain green recruit.
     trex_char = char_symbol(tslot)
-    char_events = ('{\n' + talk_recruit_char_entries(
-        talk_recruiters(campaign, chap['chapter_number']),
-        trex_char, CH03_TREX_TALK_FLAG, CH03_TREX_TALK_SCRIPT) + '    END_MAIN\n}')
+    char_events, trex_talk_script = talk_recruit_wiring(
+        talk_recruiters(campaign, chap['chapter_number']), trex_char,
+        CH03_TREX_TALK_FLAG, CH03_TREX_TALK_SCRIPT, CH03_TREX_TALK_MSG)
 
     enemies = []
     for e in chap['enemy_units']:
@@ -6521,7 +6668,7 @@ def inject_ch03(campaign, boot=False, verbose=True):
     # -> show Trex's migrated talk line then CUSA green Trex to blue. Every CHAR entry (step 3)
     # points here, so ANY core party member's talk runs it (the vanilla Colm/Neimi shape).
     script = _replace_brace_block(script, CH03_TREX_TALK_SCRIPT + '[] =',
-                                  talk_recruit_script(CH03_TREX_TALK_MSG, trex_char), CH4_EVENTSCRIPT_H)
+                                  trex_talk_script, CH4_EVENTSCRIPT_H)
     # Midmap RBG-execution beat (#23 item 1): the Misc AFEV runs this on the Brute's death. Plays
     # ON-MAP (no BACG -- the chapter continues on the same battle map). Each beat renders by whether
     # it has a face (_beat_is_faceless): FACED beats ride a map talk bubble via Text() (TEXTSTART..REMA
@@ -6629,10 +6776,13 @@ def inject_ch03(campaign, boot=False, verbose=True):
 
 def inject_ch04(campaign, boot=False, verbose=True):
     """Host Ch4 "The White Moose" (#24) on slot 5 with its approved snowy map and
-    vanilla-named monster force. This pass intentionally wires the combat slice only:
-    fog, PREP/deployment, 10 line enemies, the turn-2 wolf-pack reveal (6) and turn-3
-    reinforcements (7), Rout, and a direct debug boot. The wolf parley and authored
-    scenes remain their own follow-up behavior.
+    vanilla-named monster force: fog, PREP/deployment, 10 line enemies, the turn-2
+    wolf-pack reveal (6) and turn-3 reinforcements (7), Rout, and a direct debug boot.
+
+    Stage 2b wires the Marty->Lupin PARLEY (the pack leader is Lupin, placed red among the
+    turn-2 wave; Marty's Talk table-swaps the 5 generic Mauthe Doogs for a green Lycanroc NPC
+    pack and CUSAs Lupin blue -- the shared talk-recruit flow, reused from ch03). The reveal
+    cutscene (Stage 2c) and authored scenes / final dialogue (Stage 4) remain follow-ups.
 
     Run after inject_ch03 in campaign order. After both hosts are injected,
     chain_ch03_to_ch04 advances the real campaign path.
@@ -6674,9 +6824,16 @@ def inject_ch04(campaign, boot=False, verbose=True):
     seed = '{\n' + '\n'.join(seed_rows) + '\n    { 0 },\n}'
 
     initial_rows = ch04_enemy_rows(chap)
-    turn2_rows = ch04_enemy_rows(chap, arrives_turn=2)
     turn3_rows = ch04_enemy_rows(chap, arrives_turn=3)
-    if [len(initial_rows), len(turn2_rows), len(turn3_rows)] != [10, 6, 7]:
+    # Stage 2b -- the turn-2 wolf-pack reveal: the convertible Mauthe Doog wave with its leader
+    # tile reassigned to Lupin (red, CHARACTER_DUESSEL). 5 generic Mauthe Doogs + Lupin = 6, so
+    # ch04_enemy_rows still reports 6 for the difficulty read (parity held); the split is here.
+    lupin = next(r for r in on_map_talk_recruits(campaign, chap['chapter_number'])
+                 if r[0] == 'lupin')
+    turn2_rows = ch04_turn2_reveal_rows(chap, lupin)
+    green_pack_rows = ch04_green_pack_rows(chap)
+    if [len(initial_rows), len(ch04_enemy_rows(chap, arrives_turn=2)),
+            len(turn3_rows)] != [10, 6, 7]:
         sys.exit('ERROR: ch04 realigned roster must stay 10 line + 6 turn-2 reveal + 7 turn-3')
 
     def table(rows):
@@ -6688,20 +6845,44 @@ def inject_ch04(campaign, boot=False, verbose=True):
             ('UnitDef_Event_Ch5Ally', ally),
             (CH04_INITIAL_ENEMY_SYMBOL, table(initial_rows)),
             (CH04_TURN2_SYMBOL, table(turn2_rows)),
+            (CH04_GREEN_PACK_SYMBOL, table(green_pack_rows)),
             (CH04_TURN3_SYMBOL, table(turn3_rows)),
             (CH04_BOOT_SEED_SYMBOL, seed)):
         udefs = _replace_brace_block(udefs, symbol + '[] =', body, EVENTS_UDEFS_C)
     with open(EVENTS_UDEFS_C, 'w', encoding='utf-8') as f:
         f.write(udefs)
 
+    # The Marty->Lupin parley (Stage 2b): the shared talk-recruit wiring (talk_recruit_wiring),
+    # recruiter = Marty ONLY (ch04_parley_recruiters, data-driven from parley.by; Nicolas
+    # 2026-07-21). The talk script's pre_script table-swaps the pack -- DISA the 5 generic Mauthe
+    # Doogs (shared pid, cleared one-by-one) + LOAD1 the green Lycanroc NPC allies -- then CUSA
+    # flips Lupin blue. One flow with ch03's green Trex; the parley IS the recruit.
+    parley_pre = ch04_parley_pre_script(
+        CH04_MONSTER_PIDS[_ch04_reveal_wave(chap)['class']], len(green_pack_rows),
+        CH04_GREEN_PACK_SYMBOL)
+    parley_recruiters = ch04_parley_recruiters(campaign, chap)
+    lupin_char_events, lupin_talk_script = talk_recruit_wiring(
+        parley_recruiters, char_symbol(lupin[1]),
+        CH04_LUPIN_TALK_FLAG, CH04_LUPIN_TALK_SCRIPT, CH04_LUPIN_TALK_MSG,
+        pre_script=parley_pre)
+    # Force-deploy the parley recruiter(s): the parley is gated on Marty specifically (unlike
+    # ch03's any-party-member talk), so benching Marty would miss the recruit. Field him via
+    # vanilla's per-chapter ForceDeploymentEnt data path -- no new engine code (harmless if the
+    # player chose Marty as lord: the lord check already force-deploys him). Nicolas 2026-07-21.
+    _force_deploy_units(parley_recruiters, CH04_HOST_INDEX)
+
     with open(CH5_EVENTINFO_H, encoding='utf-8') as f:
         info = f.read()
     info = _replace_brace_block(
         info, 'EventListScr_Ch5_Turn[] =',
-        '{\n    TurnEventPlayer(0, EventScr_089F22A4, 2) /* turn-2 reveal: six Mauthe Doogs */\n'
+        '{\n    TurnEventPlayer(0, EventScr_089F22A4, 2)'
+        ' /* turn-2 reveal: 5 Mauthe Doogs + Lupin (red pack leader) */\n'
         '    TurnEventPlayer(0, EventScr_089F22EC, 3) /* turn-3 reinf: revenant + bonewalker packs */\n'
         '    END_MAIN\n}', CH5_EVENTINFO_H)
-    for symbol in ('EventListScr_Ch5_Character', 'EventListScr_Ch5_Location',
+    # Character = the Marty->Lupin parley CHAR list (Stage 2b); the rest stay empty.
+    info = _replace_brace_block(info, 'EventListScr_Ch5_Character[] =',
+                                lupin_char_events, CH5_EVENTINFO_H)
+    for symbol in ('EventListScr_Ch5_Location',
                    'EventListScr_Ch5_SelectUnit', 'EventListScr_Ch5_SelectDestination',
                    'EventListScr_Ch5_UnitMove', 'EventListScr_Ch5_Tutorial'):
         info = _replace_brace_block(info, symbol + '[] =',
@@ -6729,12 +6910,17 @@ def inject_ch04(campaign, boot=False, verbose=True):
         script, 'EventScr_Ch5_BeginningScene[] =', beginning, CH5_EVENTSCRIPT_H)
     script = _replace_brace_block(
         script, 'EventScr_089F22A4[] =',
-        '{\n    LOAD1(0x1, %s)\n    ENUN\n    ENDA\n}' % CH04_TURN2_SYMBOL,
+        '{\n    LOAD1(0x1, %s) /* turn-2 reveal: 5 Mauthe Doogs + red Lupin */\n'
+        '    ENUN\n    ENDA\n}' % CH04_TURN2_SYMBOL,
         CH5_EVENTSCRIPT_H)
     script = _replace_brace_block(
         script, 'EventScr_089F22EC[] =',
         '{\n    LOAD1(0x1, %s)\n    ENUN\n    ENDA\n}' % CH04_TURN3_SYMBOL,
         CH5_EVENTSCRIPT_H)
+    # The Marty->Lupin parley script (Stage 2b): repurpose a dead Ch5 script -> table-swap the
+    # pack (DISA the generics + LOAD1 the green allies) then CUSA Lupin blue (built above).
+    script = _replace_brace_block(
+        script, CH04_LUPIN_TALK_SCRIPT + '[] =', lupin_talk_script, CH5_EVENTSCRIPT_H)
     script = _replace_brace_block(
         script, CH04_ENDING_SCRIPT + '[] =',
         '{\n    MUSC(SONG_VICTORY)\n    FADI(16)\n' + dev_placeholder_scene() +
@@ -6746,15 +6932,22 @@ def inject_ch04(campaign, boot=False, verbose=True):
         lines = f.read().split('\n')
     set_message_body(lines, host['chapTitleTextId'], name_message_body(chap['title']))
     set_message_body(lines, host['goal']['statusObjectiveTextId'], name_message_body('Rout enemy'))
+    # Lupin's parley talk line (Stage 2b stub -- provisional in-voice line; the ch04 dialogue-pass
+    # finalizes it + the reveal cutscene in Stage 4). Faced on Lupin's Duessel-slot bust.
+    set_message_body(lines, CH04_LUPIN_TALK_MSG, _script_to_message(
+        [{'lupin': 'Steady food beats proud starving. The pack pulls your sled. '
+          'Feed them well, mushroom.'}],
+        {'lupin': ('[OpenMidRight]', _fid_tag(lupin[1]))}))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     _write_chapter_title_card(host, 'Ch.4: ' + chap['title'])
 
     if verbose:
         print('  ch04 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; '
-              'fog 3, DefeatAll, PREP cap %d%s, enemies 10 + 6(t2 reveal) + 7(t3)'
+              'fog 3, DefeatAll, PREP cap %d%s, enemies 10 + 6(t2 reveal: 5 Doog + red Lupin) + 7(t3); '
+              'Marty->Lupin parley (DISA %d + green pack + CUSA)'
               % (obj_idx, pal_idx, cfg_idx, layout_idx, CH04_HOST_INDEX, len(cap_rows),
-                 ' (boot-seeded party)' if boot else ''))
+                 ' (boot-seeded party)' if boot else '', len(green_pack_rows)))
 
 
 def chain_ch03_to_ch04():

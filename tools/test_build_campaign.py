@@ -268,6 +268,35 @@ class TalkRecruitWiring(unittest.TestCase):
         self.assertTrue(s.rstrip().endswith('ENDA\n}') or s.rstrip().endswith('ENDA'))
 
 
+class SharedTalkRecruitWiring(unittest.TestCase):
+    """The faction-parameterized on-map talk-recruit assembly reused by ch03 (green Trex),
+    ch04 (red Lupin), and ch05 (green Basil + red Sahnar). ONE flow: a CHAR-per-recruiter
+    list -> a shared talk script whose CUSA flips the target BLUE. A red parley splices a
+    `pre_script` (the pack table-swap) in BEFORE the CUSA, so it rides the same recruit path."""
+
+    def test_talk_script_splices_pre_script_before_cusa(self):
+        s = bc.talk_recruit_script(0x9BA, 'CHARACTER_DUESSEL', pre_script='    DISA(0xb3)\n')
+        self.assertGreater(s.index('DISA(0xb3)'), s.index('TEXTSHOW(0x9BA)'))  # after the talk line
+        self.assertLess(s.index('DISA(0xb3)'), s.index('CUSA(CHARACTER_DUESSEL)'))  # before the join
+
+    def test_talk_script_without_pre_script_is_backward_compatible(self):
+        # ch03's green recruit passes no pre_script -- the script stays exactly as before.
+        s = bc.talk_recruit_script(0x9A5, 'CHARACTER_RENNAC')
+        self.assertNotIn('DISA', s)
+        self.assertIn('CUSA(CHARACTER_RENNAC)', s)
+
+    def test_wiring_bundles_the_char_list_and_the_talk_script(self):
+        char_events, script = bc.talk_recruit_wiring(
+            ['CHARACTER_SETH'], 'CHARACTER_DUESSEL', 'EVFLAG_TMP(9)',
+            'EventScr_089F2340', 0x9BA, pre_script='    DISA(0xb3)\n')
+        self.assertEqual(char_events.count('CHAR('), 1)
+        self.assertIn('CHAR(EVFLAG_TMP(9), EventScr_089F2340, CHARACTER_SETH, '
+                      'CHARACTER_DUESSEL)', char_events)
+        self.assertTrue(char_events.rstrip().endswith('END_MAIN\n}'))
+        self.assertIn('CUSA(CHARACTER_DUESSEL)', script)
+        self.assertIn('DISA(0xb3)', script)
+
+
 class Ch03PrepDeploy(unittest.TestCase):
     """Ch03 real PREP deploy (#23 item 3): the field roster picks in via Preparations,
     exactly like ch01/ch02 -- a never-LOADed deploy-cap template (UnitDef_Event_Ch4Ally)
@@ -1105,6 +1134,63 @@ class Ch04RuntimeHost(unittest.TestCase):
         self.assertEqual(len(bc.ch04_enemy_rows(chap)), 10)
         self.assertEqual(len(bc.ch04_enemy_rows(chap, arrives_turn=2)), 6)
         self.assertEqual(len(bc.ch04_enemy_rows(chap, arrives_turn=3)), 7)
+
+    # -- Stage 2b: the turn-2 wolf-pack reveal + the Marty->Lupin parley (table-swap) -------
+    def _lupin(self):
+        return next(r for r in bc.on_map_talk_recruits(self.CAMPAIGN, 4) if r[0] == 'lupin')
+
+    def _reveal_positions(self):
+        return bc._ch04_reveal_wave(self._chap())['positions']
+
+    def test_turn2_reveal_is_five_generic_wolves_plus_lupin_red_leader(self):
+        # The pack leader tile becomes Lupin (red, CHARACTER_DUESSEL, Cavalier under the hood);
+        # the other 5 stay generic Mauthe Doogs. 5 + Lupin = 6 -> holds the turn-2 parity count.
+        rows = bc.ch04_turn2_reveal_rows(self._chap(), self._lupin())
+        joined = '\n'.join(rows)
+        self.assertEqual(len(rows), 6)
+        self.assertEqual(joined.count('CLASS_MAUTHEDOOG'), 5)
+        self.assertEqual(joined.count('CHARACTER_DUESSEL'), 1)
+        self.assertIn('CLASS_CAVALIER', joined)
+        self.assertEqual(joined.count('FACTION_ID_RED'), 6)   # all hostile until the parley
+        lx, ly = self._reveal_positions()[0]                  # Lupin sits on the leader tile
+        self.assertIn('.charIndex = CHARACTER_DUESSEL,', joined)
+        self.assertRegex(joined, r'CHARACTER_DUESSEL,[^{]*?\.xPosition = %d,' % lx)
+
+    def test_turn2_reveal_holds_the_difficulty_parity_count(self):
+        # The YAML wave stays 6 for the difficulty read (make difficulty CH=ch04); the
+        # 5-generics-plus-Lupin split is injector-side only, so parity is unchanged.
+        self.assertEqual(len(bc.ch04_enemy_rows(self._chap(), arrives_turn=2)), 6)
+        self.assertEqual(len(bc.ch04_turn2_reveal_rows(self._chap(), self._lupin())), 6)
+
+    def test_green_pack_swaps_five_green_wolves_onto_the_generic_tiles(self):
+        rows = bc.ch04_green_pack_rows(self._chap())
+        joined = '\n'.join(rows)
+        self.assertEqual(len(rows), 5)
+        self.assertEqual(joined.count('FACTION_ID_GREEN'), 5)
+        self.assertNotIn('CHARACTER_DUESSEL', joined)   # Lupin isn't one of the generics
+        for x, y in self._reveal_positions()[1:]:        # the 5 non-leader tiles
+            self.assertIn('.xPosition = %d,\n        .yPosition = %d,' % (x, y), joined)
+
+    def test_parley_pre_script_disas_the_pack_then_loads_the_green_allies(self):
+        pre = bc.ch04_parley_pre_script('0xb3', 5, bc.CH04_GREEN_PACK_SYMBOL)
+        self.assertEqual(pre.count('DISA(0xb3)'), 5)     # clear the 5 generics one at a time
+        self.assertIn('LOAD1(0x1, %s)' % bc.CH04_GREEN_PACK_SYMBOL, pre)
+        self.assertLess(pre.rindex('DISA(0xb3)'), pre.index('LOAD1'))   # DISA before the swap-in
+
+    def test_parley_recruiter_is_marty_only(self):
+        # Nicolas 2026-07-21: ch04's talker is Marty specifically, NOT ch03's any-party-member.
+        # Data-driven from the convertible wave's parley.by; Marty rides the Seth slot.
+        self.assertEqual(bc.ch04_parley_recruiters(self.CAMPAIGN, self._chap()),
+                         ['CHARACTER_SETH'])
+
+    def test_parley_recruiter_is_force_deployed_in_the_chapter_slot(self):
+        # A Marty-ONLY parley must force-deploy Marty so benching him can't miss the recruit
+        # (Nicolas 2026-07-21). Vanilla's per-chapter ForceDeploymentEnt path, no new engine
+        # code: {pid, route=ANY(0xFF), chapter=host slot}. Redundant-but-harmless if the player
+        # chose Marty as lord (IsCharacterForceDeployed_ already returns true for the lead).
+        entries = bc._force_deployment_entries(
+            bc.ch04_parley_recruiters(self.CAMPAIGN, self._chap()), bc.CH04_HOST_INDEX)
+        self.assertIn('{CHARACTER_SETH, 0xFF, %d}' % bc.CH04_HOST_INDEX, entries)
 
     def test_roster_uses_the_vanilla_monster_classes_and_weapons(self):
         rows = '\n'.join(bc.ch04_enemy_rows(self._chap()) +
