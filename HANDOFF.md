@@ -23,7 +23,13 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   0xaa + melee `CLASS_BONEWALKER` pid 0xac / iron sword+lance; wave guard 16/4/3→10/6/7), village→Iron
   Axe, `difficulty_note`/`placement_directives` rewritten for the reveal, roster/spatial/dropper tests
   repinned. `make` + unit tests + `make check` + `git diff --check` all GREEN; parity holds (×1.15/×1.19,
-  parley-path clear-load 2.5≈2.6).** Resume point = Stage 2 (see NEXT).
+  parley-path clear-load 2.5≈2.6).** **Stage 2a is now also DONE and committed (`8f2f784`): the reusable
+  recruit-faction foundation + Lupin wired into the cast.** New `recruit_initial_faction(unit)` —
+  GREEN (Colm/Trex/Basil) vs RED (Joshua/Lupin/Sahnar), opt-in via YAML `recruit.initial_faction`; Lupin
+  rides the collision-free `Duessel` identity slot (STAT_DONOR = Kyle), recruited during ch04 so he's on
+  the field from ch05 (ch04 deploy stays 10); death-quote id `0x974` + provisional in-voice line +
+  a cast-wide death-quote coverage test. 198 tests / build / `verify_text` / `make check` all GREEN.
+  Resume point = the next Stage-2 increment (see NEXT).
 - **Parity/difficulty engine is three-dimensional** (`tools/difficulty.py`, all from HEAD): enemy
   pressure + item economy (#170/#172; drops #176/#178) + battlefield dynamics (convertibles + reinforcement
   timing #171/#174; area/zone #177/#178). `make difficulty CH=chNN` shows all three.
@@ -35,19 +41,26 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 - **Recruit art shipped** (portraits + map sprites): Basil/Oddish (#179), Lupin + Sahnar (#181). Their
   build *wiring* (slot, STAT_DONOR, live `battle_anim:`) is ch04/ch05-slice work (#24/#25).
 
-## This session (2026-07-21, Opus — landed #193, reconciled + hosted the ch04 combat slice)
+## This session (2026-07-21 cont'd, Opus — Stage 1b to green, Stage 2 design + Stage 2a)
 
-- **#193 landed** (PR #194 squash-merged, CI green) after audit: strong regression coverage (forest
-  counts + exact mapping + sha256-pinned non-forest cells), correct `.bin`→`.mar` format migration.
-- **ch04 committed + rebased onto #193** as one clean commit (`df3183b`). #193 and ch04 were sibling
-  branches that had both edited the map tooling / `reskin-learned.json` / `decisions.md`; reconciliation
-  took #193's forest machinery + reskin-learned (superset), kept both ADRs and both test suites, and
-  ported ch04's `review_output` (preview-beside-editor) onto #193's map editor.
-- **Two agent-discipline learnings recorded in `decisions.md`** (so Codex finds them too):
-  (1) *feature-flow only works if each feature LANDS before the next starts* — the parallel-unmerged-branch
-  post-mortem that explains the recurring rebase; (2) an Operational Gotcha: **a `git` subprocess inside a
-  git hook resolves against the outer repo unless you strip `GIT_*`** (this bit us — flipped `core.bare`
-  and wrote a corrupt commit; fixed in `_vanilla_decomp_text` + the map-tileset test fixture).
+- **Stage 1b landed** (`cef0419`) — `inject_ch04` wired to the twin-realigned roster (see Current state).
+- **HANDOFF reconciled** (`25f18e1`) — the branch's `HANDOFF.md` predated the `14c5466` clean refresh and
+  would have regressed live state on merge; synced it to current. **Both copies (main tree + the
+  `ch04-map` worktree) are now byte-identical — keep them in sync (a branch copy silently regresses live
+  state on merge).**
+- **Stage 2 design brainstormed + LOCKED, recorded on issue #24** (2026-07-21 comment). Key calls:
+  Lupin recruits **Joshua-style** (`CUSA` red→blue, keeps his shipped grey-glasses sprite — the visibly-
+  intelligent leader among the ugly pack); the **generic pack table-swaps** (Mauthe Doog → green Lycanroc
+  NPCs, a shape change `CUSA` can't do); wolves become **green NPC allies**, only Lupin becomes a **PC**;
+  turn-2 reveal cutscene rides the existing turn-2 `LOAD1`. **Everything is built REUSABLE — ch05 reuses
+  both flavours (Basil green→blue, Sahnar red→blue).**
+- **Engine facts VERIFIED in the decomp** (not assumed): `DISA(pid)` clears the *first valid* unit, so
+  repeated `DISA` on the shared generic pid clears the whole pack → **no distinct-PID work**; red→blue
+  recruit = `CUSA` (vanilla Joshua/Marisa — `ch10a` Gerik→Marisa, `src/eventscr.c:3348`); the turn-2
+  cutscene-beside-`LOAD1` shape is vanilla Ch4 `EventScr_089F199C`.
+- **Stage 2a landed** (`8f2f784`) — the reusable recruit-faction foundation + Lupin cast wiring (see
+  Current state). **Reuse-debt filed on #24:** auto-allocate death-quote msg ids from a free pool so new
+  recruits need only YAML (the manual `PC_DEATH_QUOTE_MSGS` slot-vetting is a smell).
 
 ## NEXT SESSION — start here: finish the ch04 slice (`feat/24-ch04-map`)
 
@@ -55,15 +68,24 @@ Design is LOCKED (2026-07-21). **Read issue #24's 2026-07-21 comment for the ful
 checklist**, and the `docs/decisions.md` ch04 ADR (both authoritative). Work in the
 `.claude/worktrees/ch04-map` worktree. The staged build, `Closes #24`:
 
-1. ~~**Stage 1b — `inject_ch04` wiring to GREEN.**~~ **DONE, committed `cef0419`** (details in Current state
-   above). All required checks green; parity holds. **Resume at Stage 2.**
-2. **Stage 2 — parley/convert + reveal cutscene (RESUME HERE):** Marty→Lupin `Talk` → table-swap (clear red pack + load
-   green Lycanroc pack + Lupin red→grey) + the turn-2 reveal cutscene.
-3. **Stage 3 — art:** green Lycanroc pack map sprite (princess-phoenix source + green palette, no glasses) +
-   Lupin red/grey palettes.
+1. ~~**Stage 1b — `inject_ch04` wiring to GREEN.**~~ **DONE (`cef0419`).**
+2. **Stage 2 — parley/convert + reveal cutscene (IN PROGRESS).**
+   - ~~Stage 2a — reusable recruit-faction foundation + Lupin cast wiring.~~ **DONE (`8f2f784`).**
+   - **Stage 2b — RESUME HERE: place Lupin RED on the ch04 map + the Marty→Lupin parley.** Extract the
+     recruit-assembly out of `inject_ch03` (currently inline ~L6294–6308: green table + `talk_recruiters` +
+     `talk_recruit_char_entries` + `talk_recruit_script`'s `CUSA`) into a **shared, faction-parameterized
+     function** ch03/ch04/ch05 all call (use `recruit_initial_faction`). Then ch04: emit Lupin as a RED
+     enemy leader with pid `CHARACTER_DUESSEL` among the turn-2 wave (make the pack **5 generic Mauthe
+     Doogs + Lupin = 6**, holding the turn-2 parity count — re-check `make difficulty CH=ch04`); wire the
+     parley `CHAR(flag, script, <recruiters>, CHARACTER_DUESSEL)` into `EventListScr_Ch5_Character`; the
+     script = `DISA`×5 (clear generic pack) + `LOAD1` green Lycanroc NPC table + `ENUN` + `CUSA(lupin)`.
+   - **Stage 2c — turn-2 reveal cutscene** riding the existing turn-2 `LOAD1` (stub lines; real dialogue in Stage 4).
+3. **Stage 3 — art:** green Lycanroc pack map sprite via the pipeline (princess-phoenix source + green
+   palette, no glasses). **Render Lupin hostile/recruited + the pack for Nicolas to finalize the palette
+   (red-tint vs grey) before committing art** (show-before-committing).
 4. **Stage 4 — scenes** (off the ch03 template): Lonelywood opening, moose-flees, real ending (replace
-   `dev_placeholder_scene()`).
-5. **Stage 5 — spatial check + `--ch04-boot` playtest** → confirm parity in-engine → open the PR.
+   `dev_placeholder_scene()`); finalize Lupin's death line + all ch04 text via the **`dialogue-pass`** skill.
+5. **Stage 5 — spatial check + `--ch04-boot` playtest** → confirm parity in-engine → open the PR (`Closes #24`).
 
 Then: **#138** config-driven `inject_chapter(descriptor)` (approved, paused for ch04/ch05); **ch05** (#25)
 grounding pass (apply the same verify-against-twin roster check); **#29** world map.
@@ -75,11 +97,15 @@ grounding pass (apply the same verify-against-twin roster check); **#29** world 
   `git -C fireemblem8u restore src/data/chapter_settings.json data/data_8B363C.s`.
 - Untracked local/session files (`.agents/`, `AGENTS.md`, `skills-lock.json`) are intentionally not
   versioned; leave them alone. `tools/key_magenta.py` is **gitignored** (#178).
-- `feat/24-ch04-map` (pushed) carries the ch04 slice — in progress, not stale. The old
-  `feat/24-ch04-roster-grounding` branch is superseded (retire it). The realigned
-  `ch04-the-white-moose.yaml` + the ch04 `docs/decisions.md` ADR are now **committed and build-green**
-  (Stage 1b, `cef0419`) — no longer loose in the worktree. `review/` there is untracked session output
-  (leave it; do not commit).
+- `feat/24-ch04-map` (worktree `.claude/worktrees/ch04-map`) carries the ch04 slice. Session commits:
+  `cef0419` (Stage 1b) → `25f18e1` (HANDOFF sync) → `8f2f784` (Stage 2a). **All committed and build-green;
+  no loose uncommitted work.** Push before ending if not already pushed. `review/` in the worktree is
+  untracked session output (leave it; do not commit). The old `feat/24-ch04-roster-grounding` branch is
+  superseded (retire it).
+- **DESIGN FOR REUSE (Nicolas, emphatic).** Every new component is built reusable — the game is long and
+  re-deriving wastes time/tokens. Extend the existing refactored machinery (the recruit/faction helpers),
+  don't write per-chapter one-offs. ch05 reuses green→blue (Basil) + red→blue (Sahnar). Add slots/pids as
+  needed rather than shoehorn into "available" ones.
 
 ## Quick commands
 
