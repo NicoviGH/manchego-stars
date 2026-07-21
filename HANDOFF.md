@@ -29,7 +29,18 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   rides the collision-free `Duessel` identity slot (STAT_DONOR = Kyle), recruited during ch04 so he's on
   the field from ch05 (ch04 deploy stays 10); death-quote id `0x974` + provisional in-voice line +
   a cast-wide death-quote coverage test. 198 tests / build / `verify_text` / `make check` all GREEN.
-  Resume point = the next Stage-2 increment (see NEXT).
+  **Stage 2b is now also DONE and committed (`dbf86c6`): the Marty→Lupin PARLEY on the shared
+  talk-recruit flow.** Extracted `talk_recruit_wiring` out of `inject_ch03` (faction-parameterized;
+  ch03 green Trex rides it, ch04 red Lupin + ch05 Basil/Sahnar reuse it — a red parley splices a
+  `pre_script` pack-swap before the shared `CUSA`). ch04 turn-2 reveal = the convertible wave's leader
+  tile → **Lupin red** (`CHARACTER_DUESSEL`, Cavalier, YAML level, NOT autolevelled) + **5 generic
+  Mauthe Doogs** = 6 (parity held; `ch04_enemy_rows` still reports 6 for difficulty). **Recruiter =
+  Marty ONLY** (data-driven from `parley.by`, not ch03's any-party-member — Nicolas 2026-07-21); `Talk`
+  → `DISA`×5 + `LOAD1` green Lycanroc NPC pack (Mauthe Doog **placeholder class until Stage-3 art**) +
+  `CUSA` Lupin blue. **Marty is force-deployed in ch04** via vanilla's per-chapter `ForceDeploymentEnt`
+  data path (`_force_deploy_units`; `{CHARACTER_SETH,0xFF,5}`) — **no new engine code**. 207 tests /
+  `make CH04BOOT` / `make difficulty CH=ch04` PARITY (×1.15/×1.19, parley 2.5≈2.6) / `verify_text` /
+  `make check` / `git diff --check` all GREEN. Resume point = **Stage 2c** (reveal cutscene; see NEXT).
 - **Parity/difficulty engine is three-dimensional** (`tools/difficulty.py`, all from HEAD): enemy
   pressure + item economy (#170/#172; drops #176/#178) + battlefield dynamics (convertibles + reinforcement
   timing #171/#174; area/zone #177/#178). `make difficulty CH=chNN` shows all three.
@@ -61,6 +72,18 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 - **Stage 2a landed** (`8f2f784`) — the reusable recruit-faction foundation + Lupin cast wiring (see
   Current state). **Reuse-debt filed on #24:** auto-allocate death-quote msg ids from a free pool so new
   recruits need only YAML (the manual `PC_DEATH_QUOTE_MSGS` slot-vetting is a smell).
+- **Stage 2b landed** (`dbf86c6`) — the Marty→Lupin parley on the shared talk-recruit flow + Marty
+  force-deploy (see Current state). Two calls locked with Nicolas: **talker = Marty only** (not ch03's
+  any-party-member), and **force-deploy the sole recruiter** via vanilla's `ForceDeploymentEnt` data
+  path (no new engine code — the lord-select hook cleared vanilla's by-slot entries but kept the scan
+  for exactly this). Stub parley line — real dialogue is Stage 4.
+- **BUILD-SPEED optimization dispatched to a background subagent** (own worktree, branch
+  `feat/build-speed-idempotent-injection` off `dbf86c6`). ROM rebuilds take ~3 min even with no campaign
+  change because `build_campaign.py` rewrites decomp source + graphics every build (mtimes change → make
+  recompiles/recompresses; ~540/1752 steps are banim LZ compression; no ccache; agbcc is slow). The
+  subagent is prototyping **idempotent injection** (`_write_if_changed` — skip writes when bytes are
+  identical) and MUST prove the ROM stays byte-identical. **Pending review — do NOT merge its branch
+  without checking the diff + the byte-identical proof + measured speedup.**
 
 ## NEXT SESSION — start here: finish the ch04 slice (`feat/24-ch04-map`)
 
@@ -71,15 +94,12 @@ checklist**, and the `docs/decisions.md` ch04 ADR (both authoritative). Work in 
 1. ~~**Stage 1b — `inject_ch04` wiring to GREEN.**~~ **DONE (`cef0419`).**
 2. **Stage 2 — parley/convert + reveal cutscene (IN PROGRESS).**
    - ~~Stage 2a — reusable recruit-faction foundation + Lupin cast wiring.~~ **DONE (`8f2f784`).**
-   - **Stage 2b — RESUME HERE: place Lupin RED on the ch04 map + the Marty→Lupin parley.** Extract the
-     recruit-assembly out of `inject_ch03` (currently inline ~L6294–6308: green table + `talk_recruiters` +
-     `talk_recruit_char_entries` + `talk_recruit_script`'s `CUSA`) into a **shared, faction-parameterized
-     function** ch03/ch04/ch05 all call (use `recruit_initial_faction`). Then ch04: emit Lupin as a RED
-     enemy leader with pid `CHARACTER_DUESSEL` among the turn-2 wave (make the pack **5 generic Mauthe
-     Doogs + Lupin = 6**, holding the turn-2 parity count — re-check `make difficulty CH=ch04`); wire the
-     parley `CHAR(flag, script, <recruiters>, CHARACTER_DUESSEL)` into `EventListScr_Ch5_Character`; the
-     script = `DISA`×5 (clear generic pack) + `LOAD1` green Lycanroc NPC table + `ENUN` + `CUSA(lupin)`.
-   - **Stage 2c — turn-2 reveal cutscene** riding the existing turn-2 `LOAD1` (stub lines; real dialogue in Stage 4).
+   - ~~Stage 2b — place Lupin RED + the Marty→Lupin parley + Marty force-deploy.~~ **DONE (`dbf86c6`).**
+   - **Stage 2c — RESUME HERE: the turn-2 reveal cutscene.** Ride the existing turn-2 `LOAD1`
+     (`EventScr_089F22A4`, which already LOADs the reveal table): vanilla Ch4 `EventScr_089F199C` shape
+     (`LOAD1…ENUN…CAMERA…TEXTSHOW`) — pack bursts from NW fog → Lupin commands them → Marty flags the
+     parley. The cutscene IS the parley teaching. **Stub lines now; real dialogue in Stage 4.** (The ch04
+     YAML already carries the beats: `unit_reaches_zone`/`chapter_start` events.)
 3. **Stage 3 — art:** green Lycanroc pack map sprite via the pipeline (princess-phoenix source + green
    palette, no glasses). **Render Lupin hostile/recruited + the pack for Nicolas to finalize the palette
    (red-tint vs grey) before committing art** (show-before-committing).
@@ -98,10 +118,13 @@ grounding pass (apply the same verify-against-twin roster check); **#29** world 
 - Untracked local/session files (`.agents/`, `AGENTS.md`, `skills-lock.json`) are intentionally not
   versioned; leave them alone. `tools/key_magenta.py` is **gitignored** (#178).
 - `feat/24-ch04-map` (worktree `.claude/worktrees/ch04-map`) carries the ch04 slice. Session commits:
-  `cef0419` (Stage 1b) → `25f18e1` (HANDOFF sync) → `8f2f784` (Stage 2a). **All committed and build-green;
-  no loose uncommitted work.** Push before ending if not already pushed. `review/` in the worktree is
-  untracked session output (leave it; do not commit). The old `feat/24-ch04-roster-grounding` branch is
-  superseded (retire it).
+  `cef0419` (Stage 1b) → `25f18e1` (HANDOFF sync) → `8f2f784` (Stage 2a) → `12eb352` (HANDOFF) →
+  `dbf86c6` (Stage 2b). **All committed and build-green; no loose uncommitted work** (besides this
+  HANDOFF refresh). Push before ending if not already pushed. `review/` in the worktree is untracked
+  session output (leave it; do not commit). The old `feat/24-ch04-roster-grounding` branch is superseded.
+- **Build-speed subagent worktree/branch `feat/build-speed-idempotent-injection` is IN FLIGHT** (see This
+  session). It builds independently; leave its worktree alone. Review its diff + byte-identical ROM proof
+  before merging — do not blind-merge a build-system change.
 - **DESIGN FOR REUSE (Nicolas, emphatic).** Every new component is built reusable — the game is long and
   re-deriving wastes time/tokens. Extend the existing refactored machinery (the recruit/faction helpers),
   don't write per-chapter one-offs. ch05 reuses green→blue (Basil) + red→blue (Sahnar). Add slots/pids as
