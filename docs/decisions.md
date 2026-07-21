@@ -327,6 +327,30 @@ file seam — **stand**: worktrees are now ephemeral-per-feature, and the file s
 feature-flow keeps.
 _Decided: 2026-06-24 (Nicolas — chose feature-flow + PRs; codified from the "not my job" design review)_
 
+**Feature-flow only works if each feature LANDS before the next starts — parallel unmerged lines on
+shared files are what force a rebase every time you come back.** Symptom (2026-07-21): two sibling
+branches off `main` — #193 (winter forest fidelity) and the ch04 map slice — were open at once, one a
+committed-but-PR-less branch, the other **uncommitted WIP left in its worktree**. Both edited the same
+cross-cutting "hot" files (`tools/gen_map_editor.py`, `tools/map_tileset_tool.py`,
+`campaigns/.../maps/reskin-learned.json`, and `docs/decisions.md` — every ADR appends near the same
+line), and both **independently re-derived** the same vanilla-layout `.bin`→`.mar` reader under
+different function names. `main` then moved underneath the stale WIP, and integrating them cost a full
+conflict-resolving rebase. The rebase is the *symptom*; the discipline that prevents it:
+
+- **Land each feature end-to-end before starting or resuming the next** (commit → PR → CI → squash-merge
+  → delete branch), especially anything touching shared tooling / JSON / `decisions.md`.
+- **Never leave a worktree dirty across a session boundary** — at minimum commit a checkpoint on the
+  feature branch so `main` can't strand it. Long `HANDOFF.md` "do not lose or revert" lists are the smell
+  that this rule is being broken.
+- **Reuse, don't re-derive** — grep for an existing helper before writing a new one; two branches solving
+  one problem two ways guarantees both wasted work and a merge conflict.
+- **Append new ADRs at the END of their section**, not mid-file, so two branches don't insert at the same
+  line and collide.
+
+This is the operational half of the feature-flow ADR above (which settled the *structure*); this settles
+how it must be *practiced* by any agent (Claude or Codex) picking work up across sessions.
+_Decided: 2026-07-21 (post-mortem of the #193 / ch04 parallel-branch rebase)._
+
 **Boot decision localized; bows need a min-range in playtest targeting (the first feature-flow feature).**
 The boot cut + New-Game redirect were decided in BOTH `inject_prologue` and `inject_test_chapter` (the
 duplication the Coordination ADR cites). Localized to one `_configure_boot(target, montage)` owner called
@@ -2581,6 +2605,15 @@ _Decided: 2026-07-05 (CLAUDE; pipeline track. #125, closed not-planned — no co
 _Moved here from `HANDOFF.md` 2026-07-02 (audit): these are durable engineering constraints, not
 session state. `HANDOFF.md` points here._
 
+- **A `git` subprocess run inside a git hook resolves against the OUTER repo unless you strip `GIT_*`.**
+  Git exports `GIT_DIR`/`GIT_INDEX_FILE`/`GIT_WORK_TREE` while a hook runs (pre-commit drift → `check.py`
+  → the `test_*.py` suite). Any tool or **test fixture** that then shells out to `git` — `git -C <dir> …`,
+  a throwaway `git init`/`commit` in a tempdir, `_vanilla_decomp_text`'s `git show HEAD:` — has its
+  `-C`/cwd **overridden** by the ambient `GIT_DIR` and silently operates on the real repo. On 2026-07-21
+  this flipped `core.bare=true` on the live repo and wrote a corrupt commit before it was caught. **Always
+  pass a sanitized env** — `{k: v for k, v in os.environ.items() if not k.startswith('GIT_')}` — to any
+  `git` subprocess that must target a specific repo, and add `-c core.hooksPath=/dev/null` to fixture
+  commits so they can't re-enter the outer hook. Fixed in `_vanilla_decomp_text` + `test_map_tileset.py`.
 - **Per-unit descale recipe is recorded in the unit YAML comment** (data-is-the-doc) — read it before
   regenerating; don't guess flags. Swapping ONE pose still requires re-descaling the **whole 3-frame set
   together** (shared palette recompute shifts the other two — that's correct, not a bug).
