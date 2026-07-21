@@ -269,6 +269,8 @@ PC_DEATH_QUOTE_MSGS = {
     'pinky':      0x958,
     'trex':       0x965,
     'baxby':      0x93E,
+    'lupin':      0x974,   # dead vanilla slot (no TEXTSHOW/.msg ref). TODO(#24): auto-allocate
+                           # death-quote ids from a free pool so new recruits need only YAML.
 }
 # Dev placeholder -- the reusable "next chapter isn't built yet" landing. A chapter whose
 # `unlocks_chapter` target isn't hosted yet ends HERE instead of MNC2'ing onto an unbuilt
@@ -539,6 +541,7 @@ STAT_DONOR = {
     'pinky':      'CHARACTER_VANESSA',   # Pegasus Knight
     'trex':       'CHARACTER_COLM',      # Thief (ch03 recruit) -- vanilla starter thief donor
     'baxby':      'CHARACTER_FRANZ',     # Cavalier (ch01 recruit) -- fresh-cavalier growth runway
+    'lupin':      'CHARACTER_KYLE',      # Cavalier (ch04 red->blue parley recruit); Kyle = stat ref only
 }
 GROWTH_FIELDS = ('growthHP', 'growthPow', 'growthSkl', 'growthSpd',
                  'growthDef', 'growthRes', 'growthLck')
@@ -584,6 +587,12 @@ PORTRAIT_MAP = {
     # green->blue JOIN trigger is wired separately (pairs with the #23 mid-map cutscene); here
     # he is a real deployable unit so his vendored custom sprite renders in his cast colours.
     'trex':       'Rennac',
+    # ch04 recruit Lupin (npcs/lupin.yaml) -- a classed Cavalier (the wolf IS the mount), so a
+    # full cast member like Trex. Unlike Trex he starts RED (the hostile pack's leader) and is
+    # won by Marty's Talk -> CUSA red->blue (the vanilla Joshua pattern), see recruit.initial_faction.
+    # Rides the vanilla Duessel slot (a Great Knight absent from our ch00-08, referenced nowhere
+    # else -> collision-free); his stat line references Kyle (STAT_DONOR), his identity is Duessel.
+    'lupin':      'Duessel',
 }
 
 # Prologue cold-open guests ride vanilla character slots outside PORTRAIT_MAP
@@ -1538,7 +1547,7 @@ CLASS_LOADOUT = {
 # cast reads spaced out toward the middle for the look-test. Roster fills in order.
 TEST_SPAWN_POSITIONS = [(5, 4), (7, 4), (9, 4), (11, 4),
                         (5, 6), (7, 6), (9, 6), (11, 6),
-                        (13, 5), (13, 7)]   # 9th/10th: the recruits Trex + Baxby (now classed cast)
+                        (13, 5), (13, 7), (13, 3)]   # 9th-11th: recruits Trex + Baxby + Lupin
 
 # The TESTCH sandbox doubles as the SINGLE battle-anim test bench: it deploys one hostile of
 # every enemy_class_reskins slot as a foe (a row south of the cast), so `recordenemy` can bait
@@ -4520,6 +4529,22 @@ def recruit_chapter_number(campaign, unit):
     if not rec:
         return None
     return _load_chapter_yaml(campaign, rec + '.yaml')['chapter_number']
+
+
+def recruit_initial_faction(unit):
+    """The faction an on-map talk recruit is PLACED as before it joins -- the reusable
+    discriminator between the two recruit flavours (both end at BLUE via CUSA on talk):
+      GREEN (default) -- a neutral bystander recruited in place (Colm/Neimi; our Trex, Basil).
+      RED             -- a hostile unit talked down mid-fight (vanilla Joshua/Marisa; our
+                         Lupin, Sahnar), opt-in via the unit YAML `recruit.initial_faction: red`.
+    Returns the FE8 event faction token ('GREEN'|'RED'). Keeps the recruit path faction-
+    parameterized so every chapter reuses ONE flow instead of a bespoke green/red copy."""
+    faction = (unit.get('recruit') or {}).get('initial_faction', 'green')
+    token = str(faction).upper()
+    if token not in ('GREEN', 'RED'):
+        sys.exit('ERROR: %s recruit.initial_faction must be green or red, got %r'
+                 % (unit.get('id', '?'), faction))
+    return token
 
 
 def _classed_cast(campaign, available_at=None):

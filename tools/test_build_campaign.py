@@ -130,10 +130,10 @@ class TrexRecruitCast(unittest.TestCase):
 
     def test_thief_loadout_and_testch_covers_the_whole_cast(self):
         # inject_test_chapter needs a Thief loadout + one spawn tile per classed cast
-        # member (10 now: 8 founding + Baxby + Trex); both would sys.exit otherwise.
+        # member (11 now: 8 founding + Baxby + Trex + Lupin); both would sys.exit otherwise.
         self.assertIn('CLASS_THIEF', bc.CLASS_LOADOUT)
         allcast, _ = bc._classed_cast(self.CAMPAIGN)   # available_at=None -> everyone
-        self.assertEqual(len(allcast), 10)
+        self.assertEqual(len(allcast), 11)
         self.assertGreaterEqual(len(bc.TEST_SPAWN_POSITIONS), len(allcast))
         # ch03's blue field roster = cast_available_at(3); its PREP deploy tiles must cover it.
         field, _ = bc._classed_cast(self.CAMPAIGN, available_at=3)
@@ -144,6 +144,14 @@ class TrexRecruitCast(unittest.TestCase):
         self.assertIn('trex', bc.PC_DEATH_QUOTE_MSGS)
         unit = bc.load_unit(self.CAMPAIGN, 'trex')
         self.assertTrue(unit.get('death_quote'))
+
+    def test_every_classed_cast_member_has_a_death_quote(self):
+        # #6 requires a msg id + a quote line per deployable cast member; inject_pc_death_quotes
+        # sys.exits otherwise (a build break). This guards every recruit, incl. future ch05 ones.
+        for uid, _slot, _cls, _sms in bc.classed_cast(self.CAMPAIGN):
+            self.assertIn(uid, bc.PC_DEATH_QUOTE_MSGS, '%s needs a death-quote msg id' % uid)
+            self.assertTrue(bc.load_unit(self.CAMPAIGN, uid).get('death_quote'),
+                            '%s needs a death_quote line' % uid)
 
 
 class RecruitAvailability(unittest.TestCase):
@@ -1057,6 +1065,22 @@ class Ch04RuntimeHost(unittest.TestCase):
             'src/events/ch5-eventscript.h',
             'graphics/chap_title/chap_title_5.png',
         }.issubset(set(bc.PATCHED_DECOMP_FILES)))
+
+    def test_lupin_is_a_red_on_map_talk_recruit(self):
+        # ch04's parley recruit (Joshua-style red->blue). The recruit path is faction-
+        # parameterized and reused: Trex/Basil start GREEN, Lupin/Sahnar start RED. Lupin
+        # rides a collision-free identity slot (his stat donor stays Kyle).
+        recruits = bc.on_map_talk_recruits(self.CAMPAIGN, self._chap()['chapter_number'])
+        lupin = [r for r in recruits if r[0] == 'lupin']
+        self.assertEqual(len(lupin), 1, "Lupin should be ch04's on-map talk recruit")
+        self.assertEqual(lupin[0][1], 'Duessel')
+        self.assertEqual(
+            bc.recruit_initial_faction(bc.load_unit(self.CAMPAIGN, 'lupin')), 'RED')
+
+    def test_recruit_initial_faction_defaults_green(self):
+        # Trex (and future Basil) are the green->blue path; RED is opt-in via recruit.initial_faction.
+        self.assertEqual(
+            bc.recruit_initial_faction(bc.load_unit(self.CAMPAIGN, 'trex')), 'GREEN')
 
     def test_host_and_deployment_match_the_approved_ch04_shape(self):
         chap = self._chap()

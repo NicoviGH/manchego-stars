@@ -16,6 +16,8 @@
 
 id: lupin
 name: Lupin
+# Provisional death line (blunt pack-pragmatist voice); finalized in the Stage-4 ch04 dialogue-pass.
+death_quote: "The pack... runs on without me. See them to the far side -- that was the whole of the bargain."
 
 # D&D flavor (from the DM notes): the leader of the direwolf pack in the White Moose forest
 # — "wears glasses and has the ability to speak"; Marty talks the pack into joining, and
@@ -64,6 +66,7 @@ recruited_via: "story — Marty talks the direwolf pack into the sled team (Ch4)
 recruit:
   chapter: ch04-the-white-moose
   via: story
+  initial_faction: red    # Joshua-style: placed RED (the hostile pack's leader), Marty's Talk CUSAs him blue
 
 # ── Art (reskin lever: stock chassis, custom skin) ───────────────────────────
 art:
