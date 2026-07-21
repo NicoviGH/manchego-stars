@@ -6189,6 +6189,11 @@ CH04_LUPIN_TALK_MSG = 0x9BA                    # dead Ch5 text slot -> stub parl
 CH04_LUPIN_TALK_FLAG = 'EVFLAG_TMP(9)'         # one-shot recruit flag (ch03's Colm-CHAR idiom)
 CH04_GREEN_WOLF_PID = '0xcd'                    # generic green-ally pid: the whole pack shares it
                                                # (uncontrolled NPCs; don't count for Rout)
+# Stage 2c -- the turn-2 REVEAL cutscene rides the existing turn-2 TurnEvent script (it already
+# LOADs the reveal table). Two dead Ch5 text slots for the stub beats (Stage 4 finalizes dialogue).
+CH04_REVEAL_SCRIPT = 'EventScr_089F22A4'        # turn-2 TurnEventPlayer script (reused)
+CH04_REVEAL_MSGS = (0x9BB, 0x9BC)               # Lupin command + Marty parley-flag (stubs)
+CH04_REVEAL_CAMERA = (2, 2)                      # centre on the NW pack cluster
 
 
 def ch04_enemy_rows(chap, arrives_turn=None):
@@ -6298,6 +6303,32 @@ def ch04_parley_recruiters(campaign, chap):
     diplomacy). Data-driven from the convertible wave's parley block; returns the CHARACTER_ symbol."""
     by = (_ch04_reveal_wave(chap).get('parley') or {})['by']
     return [char_symbol(PORTRAIT_MAP[by])]
+
+
+def ch04_reveal_cutscene_script(reveal_symbol, lupin_char, beat_msgs, camera_xy):
+    """The turn-2 wolf-pack REVEAL cutscene (Stage 2c), riding the existing turn-2 LOAD1 (the
+    vanilla Ch4 EventScr_089F199C shape: CAMERA2 -> STAL -> LOAD1/ENUN -> MUSC -> CUMO_CHAR ->
+    STAL -> TEXT beats -> EVBIT_T). ON-MAP (no BACG -- the chapter continues on the battle map):
+    pan to the NW fog, burst the pack in, focus Lupin (the commander -- intelligence shown by
+    ACTION), then the beats PLANT the parley (Lupin commands; Marty reads it and flags "talk to
+    it" -- the cutscene IS the parley teaching). `beat_msgs` = (lupin_command, marty_flag). Stub
+    lines now; Stage 4 finalizes the dialogue via the dialogue-pass skill."""
+    cx, cy = camera_xy
+    beats = ''.join('    TEXTSTART\n    TEXTSHOW(0x%X)\n    TEXTEND\n    REMA\n' % m
+                    for m in beat_msgs)
+    return ('{\n'
+            '    CAMERA2(%d, %d) /* pan to the NW fog where the pack bursts */\n'
+            '    STAL(15)\n'
+            '    LOAD1(0x1, %s) /* turn-2 reveal: 5 Mauthe Doogs + red Lupin */\n'
+            '    ENUN\n'
+            '    MUSC(SONG_TENSION)\n'
+            '    CUMO_CHAR(%s) /* focus the pack leader -- Lupin commands (intelligence by ACTION) */\n'
+            '    STAL(45)\n'
+            '    CURE\n'
+            % (cx, cy, reveal_symbol, lupin_char)
+            + beats +
+            '    EVBIT_T(7)\n'
+            '    ENDA\n}')
 
 
 def _read_map_metatile(maps_dir, stem, x, y):
@@ -6781,8 +6812,9 @@ def inject_ch04(campaign, boot=False, verbose=True):
 
     Stage 2b wires the Marty->Lupin PARLEY (the pack leader is Lupin, placed red among the
     turn-2 wave; Marty's Talk table-swaps the 5 generic Mauthe Doogs for a green Lycanroc NPC
-    pack and CUSAs Lupin blue -- the shared talk-recruit flow, reused from ch03). The reveal
-    cutscene (Stage 2c) and authored scenes / final dialogue (Stage 4) remain follow-ups.
+    pack and CUSAs Lupin blue -- the shared talk-recruit flow, reused from ch03). Stage 2c wires
+    the turn-2 REVEAL cutscene (rides the turn-2 LOAD1: pan to the NW fog, focus Lupin, stub
+    beats plant the parley). Authored scenes / final dialogue (Stage 4) remain a follow-up.
 
     Run after inject_ch03 in campaign order. After both hosts are injected,
     chain_ch03_to_ch04 advances the real campaign path.
@@ -6908,10 +6940,12 @@ def inject_ch04(campaign, boot=False, verbose=True):
                  '    ENDA\n}' % CH04_PREP_SCRIPT)
     script = _replace_brace_block(
         script, 'EventScr_Ch5_BeginningScene[] =', beginning, CH5_EVENTSCRIPT_H)
+    # Turn-2 REVEAL cutscene (Stage 2c): the same TurnEvent script that LOADs the reveal wave
+    # now also stages it -- camera to the NW fog, focus Lupin, stub beats plant the parley.
     script = _replace_brace_block(
-        script, 'EventScr_089F22A4[] =',
-        '{\n    LOAD1(0x1, %s) /* turn-2 reveal: 5 Mauthe Doogs + red Lupin */\n'
-        '    ENUN\n    ENDA\n}' % CH04_TURN2_SYMBOL,
+        script, CH04_REVEAL_SCRIPT + '[] =',
+        ch04_reveal_cutscene_script(CH04_TURN2_SYMBOL, char_symbol(lupin[1]),
+                                    CH04_REVEAL_MSGS, CH04_REVEAL_CAMERA),
         CH5_EVENTSCRIPT_H)
     script = _replace_brace_block(
         script, 'EventScr_089F22EC[] =',
@@ -6938,6 +6972,17 @@ def inject_ch04(campaign, boot=False, verbose=True):
         [{'lupin': 'Steady food beats proud starving. The pack pulls your sled. '
           'Feed them well, mushroom.'}],
         {'lupin': ('[OpenMidRight]', _fid_tag(lupin[1]))}))
+    # Turn-2 reveal cutscene beats (Stage 2c stubs -- provisional in-voice lines; Stage 4
+    # dialogue-pass finalizes). Lupin commands the pack (faced, pack side = mid-right); Marty
+    # reads it cross-field and FLAGS the parley -- the beat that teaches "talk to the leader"
+    # (faced, party side = mid-left). Marty rides the Seth slot.
+    reveal_lupin, reveal_marty = CH04_REVEAL_MSGS
+    set_message_body(lines, reveal_lupin, _script_to_message(
+        [{'lupin': 'Hold! Nobody feeds until I say. ...Those three walking meals brought '
+          'friends.'}], {'lupin': ('[OpenMidRight]', _fid_tag(lupin[1]))}))
+    set_message_body(lines, reveal_marty, _script_to_message(
+        [{'marty': "That big one's giving orders -- it's THINKING. Don't loose an arrow! "
+          'Let me talk to it.'}], {'marty': ('[OpenMidLeft]', _fid_tag(PORTRAIT_MAP['marty']))}))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     _write_chapter_title_card(host, 'Ch.4: ' + chap['title'])
@@ -6945,7 +6990,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
     if verbose:
         print('  ch04 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; '
               'fog 3, DefeatAll, PREP cap %d%s, enemies 10 + 6(t2 reveal: 5 Doog + red Lupin) + 7(t3); '
-              'Marty->Lupin parley (DISA %d + green pack + CUSA)'
+              'turn-2 reveal cutscene + Marty->Lupin parley (DISA %d + green pack + CUSA)'
               % (obj_idx, pal_idx, cfg_idx, layout_idx, CH04_HOST_INDEX, len(cap_rows),
                  ' (boot-seeded party)' if boot else '', len(green_pack_rows)))
 

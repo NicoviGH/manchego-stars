@@ -1183,6 +1183,20 @@ class Ch04RuntimeHost(unittest.TestCase):
         self.assertEqual(bc.ch04_parley_recruiters(self.CAMPAIGN, self._chap()),
                          ['CHARACTER_SETH'])
 
+    def test_reveal_cutscene_pans_loads_focuses_lupin_and_plants_the_parley(self):
+        # Stage 2c: the turn-2 reveal rides the existing LOAD1 (vanilla EventScr_089F199C shape):
+        # pan to the NW fog, burst the pack in, focus Lupin (the commander), then stub beats plant
+        # the parley (Lupin commands; Marty flags "talk to it"). Real dialogue is Stage 4.
+        s = bc.ch04_reveal_cutscene_script('UnitDef_088B5798', 'CHARACTER_DUESSEL',
+                                           (0x9BB, 0x9BC), (2, 2))
+        self.assertIn('CAMERA2(2, 2)', s)
+        self.assertIn('LOAD1(0x1, UnitDef_088B5798)', s)   # the pack still bursts in
+        self.assertIn('CUMO_CHAR(CHARACTER_DUESSEL)', s)   # focus the commander
+        self.assertIn('TEXTSHOW(0x9BB)', s)                # Lupin commands
+        self.assertIn('TEXTSHOW(0x9BC)', s)                # Marty flags the parley
+        self.assertLess(s.index('LOAD1'), s.index('CUMO_CHAR'))   # load before the focus/beats
+        self.assertTrue(s.rstrip().endswith('EVBIT_T(7)\n    ENDA\n}'))  # marked done
+
     def test_parley_recruiter_is_force_deployed_in_the_chapter_slot(self):
         # A Marty-ONLY parley must force-deploy Marty so benching him can't miss the recruit
         # (Nicolas 2026-07-21). Vanilla's per-chapter ForceDeploymentEnt path, no new engine
