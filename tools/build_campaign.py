@@ -6067,19 +6067,27 @@ CH5_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch5-eventinfo.h')
 CH5_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch5-eventscript.h')
 CH04_CLASS_IDS = {
     'mauthedoog': 'CLASS_MAUTHEDOOG',
+    'revenant': 'CLASS_REVENANT',
+    'bonewalker': 'CLASS_BONEWALKER',
     'bonewalker-bow': 'CLASS_BONEWALKER_BOW',
     'mogall': 'CLASS_MOGALL',
     'entoumbed': 'CLASS_ENTOUMBED',
 }
 CH04_ITEM_IDS = {
     'rotten-claw': 'ITEM_MONSTER_ROTTENCLW',
+    'iron-sword': 'ITEM_SWORD_IRON',
+    'iron-lance': 'ITEM_LANCE_IRON',
     'iron-bow': 'ITEM_BOW_IRON',
     'evil-eye': 'ITEM_MONSTER_EVILEYE',
     'fetid-claw': 'ITEM_MONSTER_FETIDCLW',
     'vulnerary': 'ITEM_VULNERARY',
 }
+# Vanilla Ch4 generic-monster charIds (read from events_udefs.s HEAD): the melee Revenant
+# pack uses 0xaa, the melee Bonewalker pack 0xac -- the twin's own line/pack fodder pids.
 CH04_MONSTER_PIDS = {
     'mauthedoog': '0xb3',
+    'revenant': '0xaa',
+    'bonewalker': '0xac',
     'bonewalker-bow': '0xad',
     'mogall': '0xb7',
     'entoumbed': '0xab',
@@ -6597,8 +6605,9 @@ def inject_ch03(campaign, boot=False, verbose=True):
 def inject_ch04(campaign, boot=False, verbose=True):
     """Host Ch4 "The White Moose" (#24) on slot 5 with its approved snowy map and
     vanilla-named monster force. This pass intentionally wires the combat slice only:
-    fog, PREP/deployment, 16 line enemies, turn-2/3 reinforcements, Rout, and a direct
-    debug boot. The wolf parley and authored scenes remain their own follow-up behavior.
+    fog, PREP/deployment, 10 line enemies, the turn-2 wolf-pack reveal (6) and turn-3
+    reinforcements (7), Rout, and a direct debug boot. The wolf parley and authored
+    scenes remain their own follow-up behavior.
 
     Run after inject_ch03 in campaign order. After both hosts are injected,
     chain_ch03_to_ch04 advances the real campaign path.
@@ -6642,8 +6651,8 @@ def inject_ch04(campaign, boot=False, verbose=True):
     initial_rows = ch04_enemy_rows(chap)
     turn2_rows = ch04_enemy_rows(chap, arrives_turn=2)
     turn3_rows = ch04_enemy_rows(chap, arrives_turn=3)
-    if [len(initial_rows), len(turn2_rows), len(turn3_rows)] != [16, 4, 3]:
-        sys.exit('ERROR: ch04 approved roster must stay 16 line + 4 turn-2 + 3 turn-3')
+    if [len(initial_rows), len(turn2_rows), len(turn3_rows)] != [10, 6, 7]:
+        sys.exit('ERROR: ch04 realigned roster must stay 10 line + 6 turn-2 reveal + 7 turn-3')
 
     def table(rows):
         return '{\n' + '\n'.join(rows) + '\n    { 0 },\n}'
@@ -6664,8 +6673,8 @@ def inject_ch04(campaign, boot=False, verbose=True):
         info = f.read()
     info = _replace_brace_block(
         info, 'EventListScr_Ch5_Turn[] =',
-        '{\n    TurnEventPlayer(0, EventScr_089F22A4, 2) /* four Mauthe Doogs */\n'
-        '    TurnEventPlayer(0, EventScr_089F22EC, 3) /* three Bonewalkers */\n'
+        '{\n    TurnEventPlayer(0, EventScr_089F22A4, 2) /* turn-2 reveal: six Mauthe Doogs */\n'
+        '    TurnEventPlayer(0, EventScr_089F22EC, 3) /* turn-3 reinf: revenant + bonewalker packs */\n'
         '    END_MAIN\n}', CH5_EVENTINFO_H)
     for symbol in ('EventListScr_Ch5_Character', 'EventListScr_Ch5_Location',
                    'EventListScr_Ch5_SelectUnit', 'EventListScr_Ch5_SelectDestination',
@@ -6684,7 +6693,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
     seed_load = ('    LOAD1(0x1, %s) /* --ch04-boot: found an armed party */\n'
                  '    ENUN\n' % CH04_BOOT_SEED_SYMBOL) if boot else ''
     beginning = ('{\n'
-                 '    LOAD1(0x1, %s) /* approved turn-1 force: 16 monsters */\n'
+                 '    LOAD1(0x1, %s) /* approved turn-1 force: 10 monsters (reveal opens monsters-only) */\n'
                  '    ENUN\n' % CH04_INITIAL_ENEMY_SYMBOL
                  + seed_load +
                  '    CALL(%s) /* preparations: pick 9 of 10; lord force-deployed */\n'
@@ -6718,7 +6727,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
 
     if verbose:
         print('  ch04 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; '
-              'fog 3, DefeatAll, PREP cap %d%s, enemies 16 + 4(t2) + 3(t3)'
+              'fog 3, DefeatAll, PREP cap %d%s, enemies 10 + 6(t2 reveal) + 7(t3)'
               % (obj_idx, pal_idx, cfg_idx, layout_idx, CH04_HOST_INDEX, len(cap_rows),
                  ' (boot-seeded party)' if boot else ''))
 

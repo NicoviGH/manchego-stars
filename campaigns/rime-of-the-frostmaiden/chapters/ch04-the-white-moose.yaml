@@ -49,19 +49,22 @@ map:
   fog_of_war: true              # vanilla FE fog — the hunt gimmick: the white hide is hard to spot
   description: >
     Dense, snowbound forest under fog of war (limited vision). Tree tiles give
-    avoid on the approach; a few clearings expose the party. The wolf pack
-    prowls the near woods; Bonewalkers haunt the deep woods. The white moose
+    avoid on the approach; a few clearings expose the party. Monsters hold the
+    deep woods at the start — a Mogall crossfire pocket, Revenants and melee
+    Bonewalkers; the wolf pack bursts from the NW fog on turn 2. The white moose
     darts between clearings and flees off the northeast (tomb-side) edge.
   # PLACEMENT DIRECTIVES (step 2 of the difficulty flow — decisions.md "checked in fidelity tiers").
-  # Derived 2026-07-17 from an LLM-analyst read of vanilla Ch4's OWN spatial structure (the twin we
-  # retile): Ch4's difficulty lives in a ranged-magic crossfire pocket + a tank tax, gated by terrain.
-  # Honour these when laying out the .tmx, then re-check with the analyst on the placed map:
+  # Realigned 2026-07-21 to the LOCKED reveal design: ch04 OPENS monsters-only, the wolf pack bursts
+  # from the NW fog on turn 2, and the Marty->Lupin parley is the tide-turner. Derived from an
+  # LLM-analyst read of vanilla Ch4's OWN spatial structure (the twin we retile): Ch4's difficulty
+  # lives in a ranged-magic crossfire pocket + a tank tax, gated by terrain. Honour these when laying
+  # out the .tmx, then re-check with the analyst on the placed map:
   placement_directives:
-    - "CLUSTER the 4 Mogalls into ONE ranged-crossfire pocket — do NOT scatter them. That pocket IS the chapter's difficulty (it maps Ch4's vanilla Mogall cluster)."
+    - "CLUSTER the 4 Mogalls into ONE ranged-crossfire pocket in the SE/deep woods — do NOT scatter them. That pocket IS the chapter's difficulty (it maps Ch4's vanilla Mogall cluster) and it's what the turn-1 monsters-only opening advances into."
     - "GATE the Mogall crossfire with tree cover: forest avoid on the approach lets squishies (rootis/marty/meesmickle/pinky) close more safely before entering the pocket. Terrain is what turns 'brutal' into 'fair' — the analyst's #1 lever."
     - "Sit the Entombed DEEP, in/beside the Mogall pocket, so killing the tank costs turns UNDER ranged fire (Ch4's 'tank tax' tension)."
-    - "Push the reinforcement waves a touch late for lean-generous: wave 1 turn 2-3, wave 2 (east-edge Bonewalkers) turn 3-4 — waves that land mid-engagement 'leave no margin.'"
-    - "Keep the wolf pack in the NEAR woods, reachable early, so the Marty parley (removes 6 wolves) is an available pressure-valve BEFORE the deep-woods crossfire — the structural mitigation for the squishy-under-ranged-fire edge."
+    - "Spawn the turn-2 wolf pack at the NW fog edge, BESIDE the party's deploy flank — the reveal has to land in the party's face (Lupin commanding wolves; Marty reads it cross-field) AND keep Marty able to reach Lupin so the parley valve is actually usable."
+    - "Land the turn-3 reinforcements (revenant + bonewalker packs) mid-engagement from the E/deep edge — waves that arrive while the party is committed to the Mogall pocket 'leave no margin' (the raw no-parley tax that the wolves turn back)."
 
 # ── Objective ──────────────────────────────────────────────────────────────────
 objective:
@@ -83,10 +86,15 @@ lose_condition: all_player_units_defeated
 
 difficulty_note: >
   First monster map and first fog-of-war map — the single new idea is the fog
-  (the hunt). Beasts are melee-only and read clearly once spotted; the Bonewalkers
-  are ranged (phantom arrows) and punish careless advances out of cover. The
-  parley is the pressure valve: talking the wolves down with Marty roughly halves
-  the fight, so a careful or merciful party has an easier time. Lean generous.
+  (the hunt). The map OPENS monsters-only: a clustered Mogall crossfire pocket
+  (ranged magic vs RES) plus melee Revenants and Bonewalkers (iron sword/lance),
+  the whole line mirroring vanilla Ch4's own force 1:1. The difficulty model is
+  "the wolves turn the tide": the raw, no-parley fight sits ABOVE vanilla (the
+  tax), and the turn-2 wolf-pack reveal + Marty->Lupin parley discounts it back to
+  dead-on vanilla on the played path (verified: static ×1.15 threat / ×1.19
+  clear-load; parley-path clear-load 2.5 ≈ vanilla's 2.6). Not "lean generous" —
+  the house target is measured vanilla parity; generosity lives in the recruit and
+  the mercy, not in a softened fight.
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
@@ -106,106 +114,132 @@ deployment:
     Pick Units fields 9 of the 10 available units; the chosen lord is force-deployed.
     Marty SHOULD be deployed because his Talk parleys the Mauthe Doog pack.
 
-# ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
-# Grounded 2026-07-17 against the FE8 Ch4 bar (16 line + 7 reinf, threat/slot 7.2,
-# clear-load/slot 2.3). Hybrid palette (decisions.md): mauthedoog for the wolf pack (the
-# one fiction-driven swap), vanilla monster classes reused for the rest. Counts mirror the
-# vanilla twin's three arrays 1:1 so the pressure math lands near the bar; levels tuned via
-# `make difficulty CH=ch04`. Six line-wolves are `convertible` (Marty's pack parley).
+# ── Enemy Units — mirror of vanilla FE8 Ch4 "Ancient Horrors" ────────────────────
+# REALIGNED 2026-07-21 to the twin, verified against fireemblem8u events_udefs.c
+# (UnitDef_088B4A80 line + 088B4C24 Revenant pack + 088B4C88 Bonewalker pack): vanilla Ch4 =
+#   Mogall×4 · Revenant×12 · Bonewalker×6 (MELEE, iron sword/lance) · Entombed×1  = 23.
+# The prior roster had DRIFTED — it picked classes to match the D&D monsters (bonewalker-BOW
+# "phantom wraiths", no Revenants at all) instead of Ch4's FE8 classes. Corrected: FE is the
+# spine (decisions.md); we mirror the twin's classes/levels/weapons. The ONE deliberate
+# divergence is narrative — 6 of the twin's melee Revenants become the convertible Mauthe Doog
+# pack (the Marty parley). Levels/counts confirmed with `make difficulty CH=ch04`.
 enemy_units:
-  # ── Near-woods wolf pack (the parley targets) ──────────────────────────────
-  - id: mauthedoog
-    name: "Mauthe Doog"
-    fe_name: "Mauthe Doog"
-    count: 6                    # canon pack (1d4+4); Marty's Talk flips the WHOLE pack green
-    positions: [[1,4],[2,7],[3,10],[5,8],[7,9],[11,4]]
-    class: mauthedoog           # CLASS_MAUTHEDOOG — the FE8 wolf/dog beast (Ravisin's awakened pack)
-    level: 2
-    autolevel: true
-    inventory:
-      - id: beast-bite
-        fe_base: rotten-claw    # modeled beast bite (vanilla monster-fodder weapon)
-    damage_type: piercing       # flavor label only
-    ai_pattern: aggressive
-    convertible: true           # #171 — the pack parley (Marty). Present/hostile turn 1, but you
-                                # recruit rather than grind it: models the clear-load discount.
-    parley:
-      by: marty                 # Marty's Talk flips the whole pack to allied (green)
-      result: become_allied
-      recruits_npc: lupin       # the leader; joins the sled team as a non-combat NPC
-  # ── Deep-woods Bonewalkers (ranged bows) ────────────────────────────
-  - id: bonewalker
-    name: "Bonewalker"
-    fe_name: "Bonewalker"
-    count: 5
-    positions: [[1,14],[5,13],[8,14],[10,12],[11,14]]
-    class: bonewalker-bow       # CLASS_BONEWALKER_BOW — dedicated bow-skeleton; reskin = phantom-arrow wraith
-    level: 2
-    autolevel: true
-    inventory:
-      - id: phantom-bow
-        fe_base: iron-bow       # ranged (no melee counter) — punishes units caught out of cover
-    damage_type: dark           # flavor label only
-    ai_pattern: defensive       # haunt the deep woods
-  # ── Mogalls (ranged magic — recurring after the ch03 grell boss) ───────────────
+  # ══ TURN-1 LINE (monsters only, 10) — the reveal opens on these ═══════════════
+  # ── Mogalls ×4 (ranged magic) — clustered = the crossfire pocket (chapter's difficulty) ──
   - id: mogall
     name: "Mogall"
     fe_name: "Mogall"
     count: 4
     positions: [[11,6],[13,7],[12,8],[13,11]]
     class: mogall               # CLASS_MOGALL — floating eye; Evil Eye = ranged magic (hits RES)
-    level: 1
+    level: 1                    # vanilla Ch4 Mogalls: L1×3 + L2×1 → L1 representative
     autolevel: true
     inventory:
       - id: evil-eye
         fe_base: evil-eye
     damage_type: dark           # flavor label only
     ai_pattern: defensive
-  # ── Entombed (one heavy awakened brute — Lupin's 'bone-trees') ───────
+  # ── Revenants ×2 (melee zombies) — vanilla Ch4's core fodder; the tough end of the line ──
+  - id: revenant
+    name: "Revenant"
+    fe_name: "Revenant"
+    count: 2
+    positions: [[9,9],[10,10]]
+    class: revenant             # CLASS_REVENANT — the FE8 melee zombie (vanilla Ch4's staple)
+    level: 3                    # the 2 highest-level line Revenants (twin has L1..3)
+    autolevel: true
+    inventory:
+      - id: rotten-claw
+        fe_base: rotten-claw    # ITEM_MONSTER_ROTTENCLW — vanilla Revenant claw
+    damage_type: bludgeoning    # flavor label only
+    ai_pattern: aggressive
+  # ── Bonewalkers ×3 (MELEE, iron sword) — vanilla Ch4 Bonewalkers are melee, not bows ──
+  - id: bonewalker
+    name: "Bonewalker"
+    fe_name: "Bonewalker"
+    count: 3
+    positions: [[1,14],[5,13],[8,14]]
+    class: bonewalker           # CLASS_BONEWALKER — MELEE skeleton (iron sword/lance), per the twin
+    level: 3                    # vanilla line Bonewalkers L2/3/3 → L3 representative
+    autolevel: true
+    inventory:
+      - id: iron-sword
+        fe_base: iron-sword     # ITEM_SWORD_IRON — vanilla Ch4 line Bonewalker weapon
+    damage_type: slashing       # flavor label only
+    ai_pattern: aggressive
+  # ── Entombed ×1 (tanky melee brute) — vanilla Ch4 DOES field one Entombed (L1) ──
   - id: entoumbed
     name: "Entombed"
     fe_name: "Entombed"
     count: 1
     positions: [[13,13]]
-    class: entoumbed            # CLASS_ENTOUMBED — armored zombie; tanky melee anchor
-    level: 2
+    class: entoumbed            # CLASS_ENTOUMBED — armored zombie; tanky melee anchor (twin: 1× L1)
+    level: 1                    # matches the twin's lone Entombed
     autolevel: true
     inventory:
       - id: fetid-claw
-        fe_base: fetid-claw     # heavier monster claw
+        fe_base: fetid-claw     # ITEM_MONSTER_FETIDCLW — vanilla Entombed claw
     damage_type: bludgeoning    # flavor label only
     ai_pattern: defensive
-  # ── Reinforcement wave 1: a second pack out of the fog (turn 2) ────────────
-  - id: mauthedoog-reinf
+  # ══ TURN-2 REVEAL: the convertible wolf pack (6) ═════════════════════════════
+  # Flow (Nicolas 2026-07-21): ch04 OPENS monsters-only (above); on turn 2 the pack bursts from the
+  # NW fog beside the party — Lupin commands them (intelligence shown by ACTION), Marty reads it
+  # cross-field and flags the parley. The reveal cutscene IS the teaching. These 6 are the fiction
+  # swap for 6 of the twin's melee Revenants (same role: weak melee fodder), retimed to the reveal
+  # and made convertible. NW spawn keeps Marty able to reach Lupin (the valve); parley-path
+  # clear-load is verified against the twin via `make difficulty`.
+  - id: mauthedoog
     name: "Mauthe Doog"
     fe_name: "Mauthe Doog"
-    count: 4
-    positions: [[0,0],[2,0],[0,2],[2,1]]
-    class: mauthedoog
+    count: 6                    # canon pack (1d4+4); Marty's Talk flips the WHOLE pack (→ green Lycanrocs)
+    positions: [[0,0],[2,0],[0,2],[2,1],[1,0],[0,1]]   # NW fog edge, beside the party's deploy flank
+    class: mauthedoog           # CLASS_MAUTHEDOOG — the FE8 wolf/dog beast (Ravisin's awakened pack)
     level: 2
     autolevel: true
-    arrives_turn: 2             # #177 — arrives over turns, not a turn-1 alpha
+    arrives_turn: 2             # the reveal wave — monsters-only until the pack drops (turn 2)
     inventory:
       - id: beast-bite
-        fe_base: rotten-claw
-    item_drop: vulnerary        # one dropper (mirrors vanilla Ch4's dropping revenant)
-    damage_type: piercing
+        fe_base: rotten-claw    # modeled beast bite (same claw class as the Revenants they replace)
+    damage_type: piercing       # flavor label only
     ai_pattern: aggressive
-  # ── Reinforcement wave 2: deep-woods Bonewalker ambush (turn 3) ───────────────
+    convertible: true           # #171 — the pack parley (Marty). Convertible REINFORCEMENT: arrives
+                                # turn 2 then recruited rather than ground down (the clear-load discount).
+    parley:
+      by: marty                 # Marty's Talk flips the whole pack to allied (green Lycanrocs)
+      result: become_allied
+      recruits_npc: lupin       # the bespectacled leader; joins the sled, deployable in ch05
+  # ══ TURN-3 REINFORCEMENTS (7) — mirror the twin's two packs ══════════════════
+  # ── Revenant pack ×4 (melee) — vanilla Ch4's area-triggered Revenant wave (one drops a Vulnerary) ──
+  - id: revenant-reinf
+    name: "Revenant"
+    fe_name: "Revenant"
+    count: 4
+    positions: [[13,9],[14,8],[10,12],[11,14]]
+    class: revenant
+    level: 2                    # vanilla Revenant pack: all L2
+    autolevel: true
+    arrives_turn: 3
+    inventory:
+      - id: rotten-claw
+        fe_base: rotten-claw
+    item_drop: vulnerary        # the twin's dropping Revenant (ITEM_VULNERARY, last-slot drop)
+    damage_type: bludgeoning
+    ai_pattern: aggressive
+  # ── Bonewalker pack ×3 (MELEE, iron lance) — vanilla Ch4's turn-2 Bonewalker pack ──
   - id: bonewalker-reinf
     name: "Bonewalker"
     fe_name: "Bonewalker"
     count: 3
-    positions: [[13,9],[14,8],[14,6]]
-    class: bonewalker-bow
-    level: 2
+    positions: [[14,6],[13,5],[14,11]]
+    class: bonewalker
+    level: 2                    # vanilla Bonewalker pack: L1/1/2 → L2 representative
     autolevel: true
     arrives_turn: 3
     inventory:
-      - id: phantom-bow
-        fe_base: iron-bow
-    damage_type: dark
-    ai_pattern: defensive
+      - id: iron-lance
+        fe_base: iron-lance     # ITEM_LANCE_IRON — vanilla Ch4 pack Bonewalker weapon
+    damage_type: piercing
+    ai_pattern: aggressive
 
 # ── Scripted neutral (the quarry) ────────────────────────────────────────────────
 neutral_units:
@@ -220,11 +254,14 @@ neutral_units:
 villages:
   - id: lonelywood
     visit_reward:
-      - id: gold
-        amount: 150
-      - id: vulnerary           # the Speaker's hospitality (a 'Goodberry'-flavored consumable)
+      - id: iron-axe           # mirrors the twin: vanilla Ch4's item village hands out an Iron Axe
         amount: 1
-    note: "Speaker Nimsy Huddle (ancient, hard of hearing) shelters the party overnight (chapter-start cutscene)."
+    note: >
+      Speaker Nimsy Huddle (ancient, hard of hearing) shelters the party overnight
+      (chapter-start cutscene). Reward realigned 2026-07-21 to the twin's delivery
+      vehicle: vanilla Ch4's two villages = a recruit (Lute; our Lupin parley covers
+      it) + an Iron Axe. Ch4-lean economy (no gold, no chest) — the Iron Axe IS the
+      village's whole material gift.
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
 events:

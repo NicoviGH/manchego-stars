@@ -1070,28 +1070,37 @@ class Ch04RuntimeHost(unittest.TestCase):
     def test_player_facing_enemy_names_stay_vanilla(self):
         chap = self._chap()
         self.assertEqual({e['name'] for e in chap['enemy_units']},
-                         {'Mauthe Doog', 'Bonewalker', 'Mogall', 'Entombed'})
+                         {'Mauthe Doog', 'Revenant', 'Bonewalker', 'Mogall', 'Entombed'})
         self.assertEqual([e['name'] for e in chap['enemy_units']],
                          [e['fe_name'] for e in chap['enemy_units']])
 
-    def test_roster_splits_16_line_4_turn2_3_turn3(self):
+    def test_roster_splits_10_line_6_turn2_reveal_7_turn3(self):
+        # Realigned 2026-07-21 to the vanilla-Ch4 twin: 10 monsters-only line, the turn-2
+        # wolf-pack reveal (6), and two turn-3 reinforcement packs (revenant 4 + bonewalker 3).
         chap = self._chap()
-        self.assertEqual(len(bc.ch04_enemy_rows(chap)), 16)
-        self.assertEqual(len(bc.ch04_enemy_rows(chap, arrives_turn=2)), 4)
-        self.assertEqual(len(bc.ch04_enemy_rows(chap, arrives_turn=3)), 3)
+        self.assertEqual(len(bc.ch04_enemy_rows(chap)), 10)
+        self.assertEqual(len(bc.ch04_enemy_rows(chap, arrives_turn=2)), 6)
+        self.assertEqual(len(bc.ch04_enemy_rows(chap, arrives_turn=3)), 7)
 
     def test_roster_uses_the_vanilla_monster_classes_and_weapons(self):
         rows = '\n'.join(bc.ch04_enemy_rows(self._chap()) +
                          bc.ch04_enemy_rows(self._chap(), arrives_turn=2) +
                          bc.ch04_enemy_rows(self._chap(), arrives_turn=3))
+        # The twin's own classes/weapons: Mogall (evil eye), melee Revenant (rotten claw),
+        # melee Bonewalker (iron sword line / iron lance pack), Entombed (fetid claw), plus
+        # the Mauthe Doog fiction swap. NOT the drifted bow-skeleton "phantom arrows".
         for token in ('CLASS_MAUTHEDOOG', 'ITEM_MONSTER_ROTTENCLW',
-                      'CLASS_BONEWALKER_BOW', 'ITEM_BOW_IRON',
+                      'CLASS_REVENANT',
+                      'CLASS_BONEWALKER', 'ITEM_SWORD_IRON', 'ITEM_LANCE_IRON',
                       'CLASS_MOGALL', 'ITEM_MONSTER_EVILEYE',
                       'CLASS_ENTOUMBED', 'ITEM_MONSTER_FETIDCLW'):
             self.assertIn(token, rows)
+        for retired in ('CLASS_BONEWALKER_BOW', 'ITEM_BOW_IRON'):
+            self.assertNotIn(retired, rows)
 
     def test_reinforcement_vulnerary_has_exactly_one_dropper(self):
-        rows = '\n'.join(bc.ch04_enemy_rows(self._chap(), arrives_turn=2))
+        # The dropping Revenant is the turn-3 area wave (mirrors vanilla Ch4's dropping revenant).
+        rows = '\n'.join(bc.ch04_enemy_rows(self._chap(), arrives_turn=3))
         self.assertEqual(rows.count('.itemDrop = 1'), 1)
         self.assertEqual(rows.count('ITEM_VULNERARY'), 1)
 

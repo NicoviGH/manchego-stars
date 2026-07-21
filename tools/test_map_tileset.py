@@ -387,27 +387,34 @@ class TestCh04MapAndRosterPlacement(unittest.TestCase):
         )
 
         enemies = {unit['id']: unit for unit in chapter['enemy_units']}
+        # Realigned 2026-07-21 to the vanilla-Ch4 twin (see the ch04 ADR): the turn-1 line is
+        # monsters-only (mogall + melee revenant + melee bonewalker + entombed); `mauthedoog` is now
+        # the turn-2 NW-fog reveal pack, and the turn-3 reinforcements mirror the twin's two packs.
         expected = {
-            'mauthedoog': (
-                'Mauthe Doog',
-                [[1, 4], [2, 7], [3, 10], [5, 8], [7, 9], [11, 4]],
-            ),
-            'bonewalker': (
-                'Bonewalker',
-                [[1, 14], [5, 13], [8, 14], [10, 12], [11, 14]],
-            ),
             'mogall': (
                 'Mogall',
                 [[11, 6], [13, 7], [12, 8], [13, 11]],
             ),
+            'revenant': (
+                'Revenant',
+                [[9, 9], [10, 10]],
+            ),
+            'bonewalker': (
+                'Bonewalker',
+                [[1, 14], [5, 13], [8, 14]],
+            ),
             'entoumbed': ('Entombed', [[13, 13]]),
-            'mauthedoog-reinf': (
+            'mauthedoog': (
                 'Mauthe Doog',
-                [[0, 0], [2, 0], [0, 2], [2, 1]],
+                [[0, 0], [2, 0], [0, 2], [2, 1], [1, 0], [0, 1]],
+            ),
+            'revenant-reinf': (
+                'Revenant',
+                [[13, 9], [14, 8], [10, 12], [11, 14]],
             ),
             'bonewalker-reinf': (
                 'Bonewalker',
-                [[13, 9], [14, 8], [14, 6]],
+                [[14, 6], [13, 5], [14, 11]],
             ),
         }
         for unit_id, (name, positions) in expected.items():
