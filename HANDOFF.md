@@ -1,120 +1,94 @@
 # Handoff - Manchego Stars live state
 
 `HANDOFF.md` is live state only. Settled decisions live in `docs/decisions.md`; operating rules
-live in `CLAUDE.md`; issue scope and backlog live in GitHub. Before a context rollover, warn
-Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-compaction.
+live in `CLAUDE.md`/`AGENTS.md`; issue scope and backlog live in GitHub. Before a context rollover,
+warn Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-compaction.
 
 ## Current state
 
-- **Parity/difficulty engine is three-dimensional** (`tools/difficulty.py`, all read from HEAD):
-  enemy pressure + **item economy** (#170/#172; drops #176/#178) + **battlefield dynamics**
-  (convertibles + reinforcement timing; #171/#174; area/zone #177/#178). `make difficulty CH=chNN`
-  shows all three, via `vanilla_decomp_text` (`git show HEAD:`) — immune to the working-tree injection.
-- **ch04/ch05 design LOCKED** (#175; ADR "ch04 and ch05 each map 1:1…"). Each chapter maps 1:1 to its
-  numeric FE8 twin (map + parity); theme layered on top. Both `status: planned` seeds; build at M3.
-- **Spell-palette tint** shipped: dedicated `gMSSpellTint` overlay global (#168/#169). Green Flux etc.
-- **ch03** (#23) complete (enemy battle-anim art was the last gap, via #90).
-- **Enemy battle-anim import pipeline** (#90): reskinned enemy CLASSES animate as real FE-native
-  community anims. `tools/feditor_to_banim.py` imports FEditor `.txt` + PNGs → decomp banim;
-  `inject_enemy_class_battle_anims` binds per-class via `pBattleAnimDef`. ADR "Imported enemy battle anims".
-- **Per-caster charge flash** (#183): each caster's sprite pulses its signature colour on the wind-up beat
-  (Rootis blue · Marty green · Meesmickle purple). One YAML line per caster; reusable engine kernel in
-  ADR "Per-caster charge flash".
-- **PC battle anims — 8 of 8 DONE** (braulo, marty, meesmickle, prof-rbg, wolfram, rootis, pinky,
-  **sclorbo**). ALL PC cast anims shipped. Faked 3-pose casters ride `inject_battle_anims` (per-character
-  `_u25`); the flier (Pinky) rides the N-frame IMPORT path (below). Sclorbo (the healer, #191) added the
-  reusable **BISHOP dual-slot donor** (staff heal + light attack from one anim) that **Basil (#25) reuses**.
-- **Recruit art (ch04/ch05)** shipped as portraits + map sprites: **Basil** (Oddish, #179), **Lupin**
-  (direwolf/Lycanroc + glasses) + **Sahnar** (spectral-skeleton) (#181). Their build *wiring* (slot,
-  STAT_DONOR, injection, live `battle_anim:`) is ch04/ch05-slice work (#24/#25). Basil's battle anim is
-  blocked on the SAME priest/staff donor Sclorbo needs (below). Deferred battle anims ride the #90 path.
+- **Winter forest fidelity is an invariant (#193, merged `6a538bc`).** Snowy Bern retiles preserve the
+  vanilla artists' forest sequences: the learned per-metatile map in `reskin-learned.json` is the sole
+  authority, `gen_map_editor.py` refuses to generate on an unmapped forest variant, and
+  `import_map_layout.py` re-checks every protected cell. Ch00–Ch02 backfilled. ADR: "Winter retiles
+  preserve the vanilla artists' forest sequences…".
+- **ch04 "The White Moose" (#24, branch `feat/24-ch04-map`, worktree `.claude/worktrees/ch04-map`) — combat host built; REDESIGNED 2026-07-21 into a full chapter.**
+  `inject_ch04` hosts Ch4 on the vanilla Ch5 slot (15×15 snowy retile, fog 3, PREP 9-of-10, DefeatAll,
+  `--ch04-boot`, `chain_ch03_to_ch04`). **This session redesigned the chapter around the wolf-parley
+  REVEAL, adopted the "wolves turn the tide" difficulty model (raw fight above vanilla; parley discounts
+  it back to dead-on vanilla — static ×1.15/×1.19, parley-path clear-load 2.5≈2.6), and REALIGNED the
+  roster to mirror the vanilla-Ch4 twin 1:1** (Mogall×4·Revenant×12·melee Bonewalker×6·Entombed×1;
+  the prior roster had drifted to D&D-monster-matched classes). Full design + staged checklist:
+  **issue #24's 2026-07-21 comment** + `docs/decisions.md` ADR (on the branch). **Stage 1b is now DONE
+  and committed (`cef0419`): `inject_ch04` wired to the realigned roster (added `CLASS_REVENANT` pid
+  0xaa + melee `CLASS_BONEWALKER` pid 0xac / iron sword+lance; wave guard 16/4/3→10/6/7), village→Iron
+  Axe, `difficulty_note`/`placement_directives` rewritten for the reveal, roster/spatial/dropper tests
+  repinned. `make` + unit tests + `make check` + `git diff --check` all GREEN; parity holds (×1.15/×1.19,
+  parley-path clear-load 2.5≈2.6).** Resume point = Stage 2 (see NEXT).
+- **Parity/difficulty engine is three-dimensional** (`tools/difficulty.py`, all from HEAD): enemy
+  pressure + item economy (#170/#172; drops #176/#178) + battlefield dynamics (convertibles + reinforcement
+  timing #171/#174; area/zone #177/#178). `make difficulty CH=chNN` shows all three.
+- **PC battle anims — 8 of 8 DONE** (braulo, marty, meesmickle, prof-rbg, wolfram, rootis, pinky, sclorbo).
+  Sclorbo (#191) added the reusable **BISHOP dual-slot donor** (staff heal + light attack) that
+  **Basil (ch05, #25) plugs into** (`battle_anim: {clone_from: bishop}` — no new donor work).
+- **Enemy battle-anim import pipeline** (#90) + **per-caster charge flash** (#183) shipped; spell-palette
+  tint (#168/#169) shipped. ch03 (#23) complete.
+- **Recruit art shipped** (portraits + map sprites): Basil/Oddish (#179), Lupin + Sahnar (#181). Their
+  build *wiring* (slot, STAT_DONOR, live `battle_anim:`) is ch04/ch05-slice work (#24/#25).
 
-## This session (2026-07-18, Opus — Pinky flier battle anim SHIPPED, #190)
+## This session (2026-07-21, Opus — landed #193, reconciled + hosted the ch04 combat slice)
 
-- **#190 shipped** (squash `a51faf7`, merged; ADR in decisions.md "A PC flier rides the IMPORT pipeline").
-  Pinky (the army's flier — **he/him**, RBG's homunculus son) gets a real **6-frame swoop**: launch →
-  apex (ears out) → dive-bomb onto the foe (lanceless body-slam + pink impact swirl) → fly home.
-- **New seam — merged the two banim pipelines:** a PC can now ride the #90 N-frame IMPORT path
-  (`feditor_to_banim.build_import`) but bind **per-CHARACTER via `_u25`** (the enemy path binds
-  per-class). `build_unit_battle_anim` dispatches on a `battle_anim.import: {txt, frames_dir}` block;
-  both sources return the identical `{sheets,pal,motion_s}` shape so the binding is unchanged. New
-  `pegasus` `BANIM_DONORS` row (`CLASS_PEGASUS_KNIGHT`, ITYPE_LANCE). This is the model for any PC whose
-  motion can't be faked from 3 static poses.
-- **New tool `tools/poses_to_feditor.py`:** hi-res poses → FEditor 248×160 frames. INVERSE of
-  `descale_battleframe` — descale PINS the feet (kills inter-frame motion); this places each pose on a
-  shared canvas so the per-frame shift BECOMES the on-screen motion. Arc lives in a `poses.yaml` manifest.
-- **Reusable learnings (full list in the ADR):**
-  - **Facing:** flip source to screen-left (cast convention) AND negate the dx signs (a left-facing unit
-    strikes toward a foe on its left).
-  - **Ear-clip:** his tail dragged the `w/2,h*5/8` anchor down → the ear-tip hit the arena's top clip line;
-    shrinking him (idle ~27×31, the roster's smallest) cleared it. Future tailed/tall unit → body-based anchor.
-  - **Arc = the DONOR's real on-screen path** (rise → dive → strike at melee range ~56px), NOT the concept
-    layout (which overshot past the foe).
-  - **Dodge timing is script-synced, not on-screen:** `wait_hp_deplete` (`C01`, `0x85000001`) is NOT a NOP —
-    it PAUSES until the hit resolves. Put the hop AFTER it to fire at the miss (vanilla hops before → early);
-    then HOLD the back-frame across the enemy's lance-extension (hop at full extension, land at retract).
-  - **Process cost (recorded in memory + ADR):** a `recordanim` capture interleaves attack 1 · counter/dodge ·
-    attack 2 (double) — I burned ~10 rebuilds analyzing the WRONG frames (2nd-attack swoop read as "the dodge").
-    ALWAYS identify which beat a window is first (attacker → foe; defender → away); render UNCROPPED full-combat
-    GIFs for review. And GitHub caches raw GIFs by URL — cache-bust with fresh filenames.
-- Showcase GIF: `docs/demo/pinky-full-combat.gif`. 245 tests green, `check.py`/`verify_text`/`git diff --check` clean.
+- **#193 landed** (PR #194 squash-merged, CI green) after audit: strong regression coverage (forest
+  counts + exact mapping + sha256-pinned non-forest cells), correct `.bin`→`.mar` format migration.
+- **ch04 committed + rebased onto #193** as one clean commit (`df3183b`). #193 and ch04 were sibling
+  branches that had both edited the map tooling / `reskin-learned.json` / `decisions.md`; reconciliation
+  took #193's forest machinery + reskin-learned (superset), kept both ADRs and both test suites, and
+  ported ch04's `review_output` (preview-beside-editor) onto #193's map editor.
+- **Two agent-discipline learnings recorded in `decisions.md`** (so Codex finds them too):
+  (1) *feature-flow only works if each feature LANDS before the next starts* — the parallel-unmerged-branch
+  post-mortem that explains the recurring rebase; (2) an Operational Gotcha: **a `git` subprocess inside a
+  git hook resolves against the outer repo unless you strip `GIT_*`** (this bit us — flipped `core.bare`
+  and wrote a corrupt commit; fixed in `_vanilla_decomp_text` + the map-tileset test fixture).
 
-## Prior sessions (condensed — full detail in decisions.md ADRs + the PRs)
+## NEXT SESSION — start here: finish the ch04 slice (`feat/24-ch04-map`)
 
-- **2026-07-18 (#183):** per-caster charge flash shipped (Marty green · Rootis blue · Meesmickle purple).
-  Reusable kernel: arm from an EXISTING banim command, raised-cosine LUT, pulse the actor OBJ palette from a
-  `PROC_REPEAT` proc. Gotchas: new hook-target file MUST be in `PATCHED_DECOMP_FILES`; no `.bss` statics in banim TUs.
-- **2026-07-17 (#184):** Rootis frost-mage anim. `clone_from` = the unit's OWN class (new `mage` donor);
-  element = colour-only spell tint, not a proc swap; `--reserve` threaded through the adaptive palette path.
-- **2026-07-17 (#90):** enemy battle-anim import pipeline (kobolds/goblins) + landed the stranded Braulo refresh.
-- **2026-07-17 (#181):** Lupin + Sahnar recruit art. **2026-07-16 (#179):** Basil/Oddish art kit.
-- **2026-07-17 (#186, CLOSED):** ch04 roster grounded (23-unit force mirroring the vanilla Ch4 twin) +
-  the tiered-difficulty ADR (roster ballpark → map+placement → spatial check → play → lock; spatial check =
-  facts fed to an LLM analyst, not an LLM playing FE). `placement_directives` written into the ch04 map notes.
-- **2026-07-16 (#178):** closed both parity-engine v1 gaps (economy drops #176 + area/zone reinforcements #177).
+Design is LOCKED (2026-07-21). **Read issue #24's 2026-07-21 comment for the full design + staged
+checklist**, and the `docs/decisions.md` ch04 ADR (both authoritative). Work in the
+`.claude/worktrees/ch04-map` worktree. The staged build, `Closes #24`:
 
-## NEXT SESSION — start here: ch04 / ch05 slices (all PC anims now done)
+1. ~~**Stage 1b — `inject_ch04` wiring to GREEN.**~~ **DONE, committed `cef0419`** (details in Current state
+   above). All required checks green; parity holds. **Resume at Stage 2.**
+2. **Stage 2 — parley/convert + reveal cutscene (RESUME HERE):** Marty→Lupin `Talk` → table-swap (clear red pack + load
+   green Lycanroc pack + Lupin red→grey) + the turn-2 reveal cutscene.
+3. **Stage 3 — art:** green Lycanroc pack map sprite (princess-phoenix source + green palette, no glasses) +
+   Lupin red/grey palettes.
+4. **Stage 4 — scenes** (off the ch03 template): Lonelywood opening, moose-flees, real ending (replace
+   `dev_placeholder_scene()`).
+5. **Stage 5 — spatial check + `--ch04-boot` playtest** → confirm parity in-engine → open the PR.
 
-**Sclorbo shipped (#191, merged) — the last PC battle anim.** ADR in `decisions.md`
-("A HEALER (staff caster) rides ONE anim…"). The reusable **BISHOP dual-slot donor** (staff heal + light
-attack from one clone) is now what **Basil (ch05, #25) plugs into** — give Basil a `battle_anim:` block with
-`clone_from: bishop` (+ his frames) when his ch05 slice is built; no new donor work needed. Note the healer
-capture path added to `recordanim` (`captureHealerAnim`) for any future staff unit.
-
-**Main line (ch04/ch05):** ch04 MAP (step 2) then ch05 slice (M3).
-ch04 roster grounded; next = the Tiled retile of vanilla Ch4 per the `placement_directives`, then the spatial
-check + build/play (tiered-difficulty flow). Two open ch04 events decisions: parley behavior (green-and-fight
-vs green-and-leave) + teaching the player Marty can Talk to parley the wolves. ch05 not started (`status:
-planned`, 8-enemy seed unmodeled — needs the same grounding pass ch04 got, + wire Lupin/Sahnar/Basil STAT_DONORs).
-
-## Next steps (priority order)
-
-1. **Build the ch04 / ch05 slices** (M3). Per-chapter vertical slice on #24/#25, through the
-   tiered-difficulty flow. ch04 = the map step next; ch05 = the grounding pass (+ wire Basil's
-   `battle_anim: {clone_from: bishop}` — donor now exists, #191).
-2. **#138** config-driven `inject_chapter(descriptor)` (YAML `host:` block — approved, paused for ch04/ch05).
-3. Then **#29** world map.
+Then: **#138** config-driven `inject_chapter(descriptor)` (approved, paused for ch04/ch05); **ch05** (#25)
+grounding pass (apply the same verify-against-twin roster check); **#29** world map.
 
 ## Working tree - do not lose or revert
 
 - `fireemblem8u` is dirty from injected/generated build artifacts. **Never commit its submodule pointer.**
+  To run the map/forest tests cleanly after a build, restore the injected decomp files:
+  `git -C fireemblem8u restore src/data/chapter_settings.json data/data_8B363C.s`.
 - Untracked local/session files (`.agents/`, `AGENTS.md`, `skills-lock.json`) are intentionally not
   versioned; leave them alone. `tools/key_magenta.py` is **gitignored** (#178).
-- **Nicolas's parallel ch04 work is live: branch `feat/24-ch04-roster-grounding` + worktree
-  `.claude/worktrees/ch04-map` (locked, the ch04 MAP step). Leave both alone** — in-progress, not stale.
-  (PR #186 is closed; the roster grounding merged/superseded — verify with Nicolas before touching.)
-- The Pinky session's branch (`feat/pinky-battle-anim`, #190) is squash-merged and deleted. Everything is
-  on `main` (pushed); CI green.
+- `feat/24-ch04-map` (pushed) carries the ch04 slice — in progress, not stale. The old
+  `feat/24-ch04-roster-grounding` branch is superseded (retire it). The realigned
+  `ch04-the-white-moose.yaml` + the ch04 `docs/decisions.md` ADR are now **committed and build-green**
+  (Stage 1b, `cef0419`) — no longer loose in the worktree. `review/` there is untracked session output
+  (leave it; do not commit).
 
 ## Quick commands
 
 ```sh
 # Parity/difficulty read (all from HEAD)
-make difficulty CH=ch05            # or ch04, etc.
+make difficulty CH=ch04
 
-# Battle-animation capture (requires a `make TESTCH=1` ROM)
-PT_CHAR=marty tools/playtest/run.sh recordanim          # PC anim; PT_CHAR=<id>
-tools/playtest/make_gif.py recordanim marty --name X    # frames -> review GIF (fresh name = cache-bust)
+# ch04 fast-boot playtest build (New Game -> White Moose forest, party + foes deployed)
+make CAMPAIGN=rime-of-the-frostmaiden CH04BOOT=1 fireemblem8.gba -j$(nproc)
 
 # Required before claiming a change is finished
 python3 -m unittest tools.test_build_campaign tools.test_difficulty
