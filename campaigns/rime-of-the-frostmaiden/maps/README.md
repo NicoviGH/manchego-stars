@@ -76,10 +76,14 @@ way; its test-map render is pinned pixel-exact against
 1. Drop the tileset sources in `tilesets/<name>/` (see **Add a tileset** above, if new).
 2. Author a layout in the browser editor (`tools/gen_map_editor.py`):
    - **Reskin flow** (winter chapters): `gen_map_editor.py <VanillaLayout> out.html <dl.json>`
-     seeds a winter-reskinned vanilla layout, vanilla map in the reference pane.
+     seeds a winter-reskinned vanilla layout, vanilla map in the reference pane. Vanilla forest
+     sequences are automatic and strict: an unmapped source variant stops generation, exports retain
+     their vanilla source, and import rechecks every protected cell before compiling. See the
+     [forest-preservation ADR](../../../docs/decisions.md#winter-retiles-preserve-the-vanilla-artists-forest-sequences-as-a-strict-generation-and-import-invariant).
    - **Custom-canvas flow** (#40, ch03+): `gen_map_editor.py --tileset=<name> --blank=WxH
      [--fill=N] [--ref=book-map.png] out.html <dl.json>` starts a blank canvas on a vendored
      tileset, with any reference image (e.g. the flattened book-map blockout) in the pane.
+     Custom canvases explicitly stamp custom retile mode and are exempt from the vanilla-source check.
      A trailing `seed.mar` arg resumes an existing layout in either flow.
    - Export downloads a layout JSON (stamped with its tileset); `import_map_layout.py`
      compiles it to `<map>.mar` + `<map>.json` and renders a preview on that tileset.

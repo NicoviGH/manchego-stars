@@ -19,6 +19,7 @@ each = metatile_index * 4 (verified across vanilla Prologue/Ch1/Ch5X maps).
 
 import json
 import os
+import re
 import struct
 import sys
 
@@ -143,6 +144,77 @@ def _tileset_from_dir(d):
     return Tileset(os.path.join(d, name + '.4bpp'),
                    os.path.join(d, name + '.gbapal'),
                    os.path.join(d, name + '.bin'))
+
+
+def _asset_names(decomp_root):
+    names = []
+    with open(os.path.join(decomp_root, 'data/data_8B363C.s')) as source:
+        for line in source:
+            match = re.match(r'\s*\.word\s+(\w+)', line)
+            if match:
+                names.append(match.group(1))
+    return names
+
+
+def _vanilla_tileconfig_path(decomp_root, layout_name):
+    """Return the tile config selected by a vanilla layout's chapter settings."""
+    default = os.path.join(decomp_root, 'graphics/map/TileConfiguration1.bin')
+    try:
+        names = _asset_names(decomp_root)
+        layout_id = names.index(layout_name)
+        with open(os.path.join(decomp_root, 'src/data/chapter_settings.json')) as source:
+            settings = json.load(source)
+        for chapter in settings['chapters']:
+            map_data = chapter.get('map') or {}
+            if map_data.get('mainLayerId') == layout_id:
+                return os.path.join(decomp_root, 'graphics/map',
+                                    names[map_data['tileConfigId']] + '.bin')
+    except (OSError, ValueError, KeyError, IndexError):
+        pass
+    sys.stderr.write('WARN: could not resolve vanilla tile config for %r; '
+                     'using TileConfiguration1\n' % layout_name)
+    return default
+
+
+def vanilla_layout_data(decomp_root, layout_name):
+    """Return a vanilla layout's dimensions, metatiles, and own terrain table."""
+    layout_dir = os.path.join(decomp_root, 'graphics/map/layout')
+    with open(os.path.join(layout_dir, layout_name + '.json')) as source:
+        layout_info = json.load(source)
+    width, height = layout_info['width'], layout_info['height']
+    with open(os.path.join(layout_dir, layout_name + '.mar'), 'rb') as source:
+        layout = source.read()
+    cells = [struct.unpack_from('<H', layout, cell * 2)[0] >> 5
+             for cell in range(width * height)]
+    with open(_vanilla_tileconfig_path(decomp_root, layout_name), 'rb') as source:
+        terrain = source.read()[8192:]
+    return width, height, cells, terrain
+
+
+def preserved_terrain_targets(source_cells, source_terrain, target_tileset, rules, width):
+    """Map protected source-terrain cells, rejecting incomplete or invalid variants."""
+    protected = rules['preserve_terrain_variants']
+    targets = {}
+    errors = []
+    for cell, source_metatile in enumerate(source_cells):
+        terrain = source_terrain[source_metatile]
+        if terrain not in protected:
+            continue
+        target = rules['map'].get(str(source_metatile))
+        x, y = cell % width, cell // width
+        if target is None:
+            errors.append('metatile %d at (%d, %d) has protected terrain 0x%02x '
+                          'but no mapping' % (source_metatile, x, y, terrain))
+            continue
+        target_terrain = target_tileset.terrain(target)
+        if target_terrain != terrain:
+            errors.append('target metatile %d at (%d, %d) has terrain 0x%02x; '
+                          'expected 0x%02x' % (target, x, y, target_terrain, terrain))
+            continue
+        targets[cell] = target
+    if errors:
+        raise ValueError('; '.join(errors))
+    return targets
 
 
 # ── FEBuilder/FE-Repo tileset import (#40) ────────────────────────────────────────
