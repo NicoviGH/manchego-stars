@@ -27,6 +27,8 @@ def main():
     inject_enemy_class_battle_anims(c)
     inject_winter_tileset(c)
     inject_ch01(c)
+    inject_ch03(c)
+    inject_ch04(c)
     if test:
         inject_test_chapter(c)
     else:
@@ -62,6 +64,16 @@ class TestOrderViolations(unittest.TestCase):
         order[a], order[b] = order[b], order[a]
         msgs = check._injection_order_violations(order)
         self.assertTrue(any('inject_ch01 must run before inject_prologue' in m
+                            for m in msgs))
+
+    def test_ch04_runs_after_the_previous_chapter_host(self):
+        self.assertTrue(any(a == 'inject_ch03' and b == 'inject_ch04'
+                            for a, b, _why in check.INJECTION_ORDER))
+        order = self.good_order()
+        a, b = order.index('inject_ch03'), order.index('inject_ch04')
+        order[a], order[b] = order[b], order[a]
+        msgs = check._injection_order_violations(order)
+        self.assertTrue(any('inject_ch03 must run before inject_ch04' in m
                             for m in msgs))
 
     def test_renamed_step_screams_instead_of_silently_passing(self):

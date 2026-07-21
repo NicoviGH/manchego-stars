@@ -259,6 +259,8 @@ INJECTION_ORDER = [
      'the prologue map registers against the tileset asset-table labels'),
     ('inject_ch01', 'inject_prologue',
      'inject_prologue overwrites the slot-1 Seize goal template inject_ch01 copies'),
+    ('inject_ch03', 'inject_ch04',
+     'chapter hosts are injected in campaign order; ch04 borrows ch02\'s stable Rout goal'),
 ]
 
 

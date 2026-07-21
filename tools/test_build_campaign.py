@@ -1041,6 +1041,66 @@ class Ch03TileChanges(unittest.TestCase):
         self.assertIn('.byte 0, 6, 10, 1, 1, 0, 0, 0', asm)   # id 0 at (x=6, y=10), 1x1 region
 
 
+class Ch04RuntimeHost(unittest.TestCase):
+    """Ch04's first playable host: approved 23-unit vanilla-monster roster, snowy map,
+    fog, prep cap, and turn-based reinforcement split. D&D identities stay narrative
+    grounding; the player-facing unit names remain the vanilla FE8 monster names."""
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH04_CHAPTER_YAML)
+
+    def test_every_ch04_decomp_output_is_restored_before_reinjection(self):
+        self.assertTrue({
+            'src/events/ch5-eventinfo.h',
+            'src/events/ch5-eventscript.h',
+            'graphics/chap_title/chap_title_5.png',
+        }.issubset(set(bc.PATCHED_DECOMP_FILES)))
+
+    def test_host_and_deployment_match_the_approved_ch04_shape(self):
+        chap = self._chap()
+        self.assertEqual(bc.CH04_HOST_INDEX, 5)
+        self.assertEqual(bc.CH04_GOAL_DONOR, bc.CH02_HOST_INDEX)
+        self.assertEqual(chap['deployment']['deploy_limit'], 9)
+        self.assertEqual(len(chap['deployment']['deploy_slots']), 9)
+        cast, _ = bc._classed_cast(self.CAMPAIGN, available_at=4)
+        self.assertEqual(len(cast), 10)  # pick 9; Trex has joined after ch03
+
+    def test_player_facing_enemy_names_stay_vanilla(self):
+        chap = self._chap()
+        self.assertEqual({e['name'] for e in chap['enemy_units']},
+                         {'Mauthe Doog', 'Bonewalker', 'Mogall', 'Entombed'})
+        self.assertEqual([e['name'] for e in chap['enemy_units']],
+                         [e['fe_name'] for e in chap['enemy_units']])
+
+    def test_roster_splits_16_line_4_turn2_3_turn3(self):
+        chap = self._chap()
+        self.assertEqual(len(bc.ch04_enemy_rows(chap)), 16)
+        self.assertEqual(len(bc.ch04_enemy_rows(chap, arrives_turn=2)), 4)
+        self.assertEqual(len(bc.ch04_enemy_rows(chap, arrives_turn=3)), 3)
+
+    def test_roster_uses_the_vanilla_monster_classes_and_weapons(self):
+        rows = '\n'.join(bc.ch04_enemy_rows(self._chap()) +
+                         bc.ch04_enemy_rows(self._chap(), arrives_turn=2) +
+                         bc.ch04_enemy_rows(self._chap(), arrives_turn=3))
+        for token in ('CLASS_MAUTHEDOOG', 'ITEM_MONSTER_ROTTENCLW',
+                      'CLASS_BONEWALKER_BOW', 'ITEM_BOW_IRON',
+                      'CLASS_MOGALL', 'ITEM_MONSTER_EVILEYE',
+                      'CLASS_ENTOUMBED', 'ITEM_MONSTER_FETIDCLW'):
+            self.assertIn(token, rows)
+
+    def test_reinforcement_vulnerary_has_exactly_one_dropper(self):
+        rows = '\n'.join(bc.ch04_enemy_rows(self._chap(), arrives_turn=2))
+        self.assertEqual(rows.count('.itemDrop = 1'), 1)
+        self.assertEqual(rows.count('ITEM_VULNERARY'), 1)
+
+    def test_ch04_title_card_has_a_complete_vanilla_glyph_atlas(self):
+        card = bc.gen_chapter_title.compose_title('Ch.4: The White Moose')
+        self.assertEqual(card.size, (256, 16))
+        self.assertIsNotNone(card.getbbox())
+
+
 class ItemIconPal2(unittest.TestCase):
     """Custom-coloured icons append a third source palette and draw from reserved BG bank 15.
 

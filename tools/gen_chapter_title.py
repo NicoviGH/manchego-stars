@@ -35,6 +35,7 @@ WORDS = {
     'Ch.1:':     (1, 57, 91),   # "Ch.1: Escape!" -- vanilla's own chapter prefix
     'Ch.2:':     (2, 40, 74),   # "Ch.2: The Protected" -- vanilla's own chapter prefix
     'Ch.3:':     (3, 19, 53),   # "Ch.3: The Bandits of Borgo" -- vanilla's own chapter prefix
+    'Ch.4:':     (4, 31, 66),   # "Ch.4: Ancient Horrors" -- vanilla's own chapter prefix
     'The':       (0, 74, 96),
 }
 
@@ -55,12 +56,15 @@ LETTERS = {
     'd': (10, 144, 152),        # "Blade" -- the d (d+e kern in source; cut before 'e')
     'e': (0, 58, 64),
     'g': (0, 44, 52),
+    'h': (0, 83, 90),          # "The" -- isolated middle glyph
     'i': (0, 168, 172),         # "Renais"
     'l': (0, 35, 39),           # "Prologue" (second ascender)
     'm': (7, 100, 110),         # "Victims" -- the m
     'n': (0, 155, 161),         # "Renais"
     'o': (0, 29, 34),           # "Prologue" (first o; 34 starts the l ascender)
     'r': (0, 23, 29),
+    's': (0, 172, 179),         # "Renais" -- terminal s (clean right edge)
+    't': (10, 117, 123),        # "Distant" -- terminal t (clean right edge)
 }
 
 # Pixels inside a glyph's cut that belong to a kerned neighbor in the source

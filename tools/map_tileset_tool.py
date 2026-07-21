@@ -215,6 +215,49 @@ def preserved_terrain_targets(source_cells, source_terrain, target_tileset, rule
     if errors:
         raise ValueError('; '.join(errors))
     return targets
+def _vanilla_decomp_text(dec, relative_path):
+    """Read committed vanilla source, not build-injected worktree output."""
+    import subprocess
+    # Strip inherited GIT_* vars (GIT_DIR/GIT_INDEX_FILE/GIT_WORK_TREE) so `git -C dec`
+    # resolves against dec's own repo. Otherwise, when this runs inside a git hook
+    # (e.g. the pre-commit drift check), the ambient GIT_DIR would override -C and
+    # point HEAD at the outer repo -- silently falling back to the dirty worktree.
+    env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+    try:
+        return subprocess.check_output(
+            ['git', '-C', dec, 'show', 'HEAD:' + relative_path],
+            stderr=subprocess.DEVNULL,
+            text=True,
+            env=env,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        with open(os.path.join(dec, relative_path)) as f:
+            return f.read()
+
+
+def vanilla_layout_tileset_assets(dec, layout):
+    """Return the object, palette, and tile-config assets assigned to ``layout``.
+
+    Asset-table proximity is not authoritative: some layouts reuse an earlier
+    tileset instead of the nearest assets in gChapterDataAssetTable. Read both
+    sources from vanilla HEAD because campaign injection dirties the decomp.
+    """
+    import re
+    names = []
+    for line in _vanilla_decomp_text(dec, 'data/data_8B363C.s').splitlines():
+        match = re.match(r'\s*\.word\s+(\w+)', line)
+        if match:
+            names.append(match.group(1))
+    layout_idx = names.index(layout)
+    settings = json.loads(_vanilla_decomp_text(
+        dec, 'src/data/chapter_settings.json'))
+    for chapter in settings['chapters']:
+        chapter_map = chapter.get('map') or {}
+        if chapter_map.get('mainLayerId') == layout_idx:
+            return (names[chapter_map['obj1Id']],
+                    names[chapter_map['paletteId']],
+                    names[chapter_map['tileConfigId']])
+    raise ValueError('no chapter settings use vanilla layout %r' % layout)
 
 
 # ── FEBuilder/FE-Repo tileset import (#40) ────────────────────────────────────────
