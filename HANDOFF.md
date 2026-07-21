@@ -38,9 +38,13 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   Marty ONLY** (data-driven from `parley.by`, not ch03's any-party-member — Nicolas 2026-07-21); `Talk`
   → `DISA`×5 + `LOAD1` green Lycanroc NPC pack (Mauthe Doog **placeholder class until Stage-3 art**) +
   `CUSA` Lupin blue. **Marty is force-deployed in ch04** via vanilla's per-chapter `ForceDeploymentEnt`
-  data path (`_force_deploy_units`; `{CHARACTER_SETH,0xFF,5}`) — **no new engine code**. 207 tests /
-  `make CH04BOOT` / `make difficulty CH=ch04` PARITY (×1.15/×1.19, parley 2.5≈2.6) / `verify_text` /
-  `make check` / `git diff --check` all GREEN. Resume point = **Stage 2c** (reveal cutscene; see NEXT).
+  data path (`_force_deploy_units`; `{CHARACTER_SETH,0xFF,5}`) — **no new engine code**. **Stage 2c is
+  now also DONE and committed (`2253cec`): the turn-2 REVEAL cutscene.** The turn-2 TurnEvent script that
+  LOADs the reveal wave now also STAGES it in one script (vanilla `EventScr_089F199C` shape: `CAMERA2` NW
+  fog → `LOAD1`/`ENUN` → `MUSC` → `CUMO_CHAR` Lupin → 2 faced stub beats → `EVBIT_T`); the beats plant the
+  parley (Lupin commands; Marty flags "talk to it"). Stub lines + `SONG_TENSION` — **Stage 4 finalizes**.
+  **Stage 2 is COMPLETE.** 208 tests / `make CH04BOOT` / `verify_text` / `make check` / `git diff --check`
+  all GREEN. Resume point = **Stage 3** (art — needs Nicolas's palette sign-off; see NEXT).
 - **Parity/difficulty engine is three-dimensional** (`tools/difficulty.py`, all from HEAD): enemy
   pressure + item economy (#170/#172; drops #176/#178) + battlefield dynamics (convertibles + reinforcement
   timing #171/#174; area/zone #177/#178). `make difficulty CH=chNN` shows all three.
@@ -92,17 +96,14 @@ checklist**, and the `docs/decisions.md` ch04 ADR (both authoritative). Work in 
 `.claude/worktrees/ch04-map` worktree. The staged build, `Closes #24`:
 
 1. ~~**Stage 1b — `inject_ch04` wiring to GREEN.**~~ **DONE (`cef0419`).**
-2. **Stage 2 — parley/convert + reveal cutscene (IN PROGRESS).**
+2. ~~**Stage 2 — parley/convert + reveal cutscene.**~~ **COMPLETE.**
    - ~~Stage 2a — reusable recruit-faction foundation + Lupin cast wiring.~~ **DONE (`8f2f784`).**
    - ~~Stage 2b — place Lupin RED + the Marty→Lupin parley + Marty force-deploy.~~ **DONE (`dbf86c6`).**
-   - **Stage 2c — RESUME HERE: the turn-2 reveal cutscene.** Ride the existing turn-2 `LOAD1`
-     (`EventScr_089F22A4`, which already LOADs the reveal table): vanilla Ch4 `EventScr_089F199C` shape
-     (`LOAD1…ENUN…CAMERA…TEXTSHOW`) — pack bursts from NW fog → Lupin commands them → Marty flags the
-     parley. The cutscene IS the parley teaching. **Stub lines now; real dialogue in Stage 4.** (The ch04
-     YAML already carries the beats: `unit_reaches_zone`/`chapter_start` events.)
-3. **Stage 3 — art:** green Lycanroc pack map sprite via the pipeline (princess-phoenix source + green
-   palette, no glasses). **Render Lupin hostile/recruited + the pack for Nicolas to finalize the palette
-   (red-tint vs grey) before committing art** (show-before-committing).
+   - ~~Stage 2c — turn-2 reveal cutscene (stub lines).~~ **DONE (`2253cec`).**
+3. **Stage 3 — RESUME HERE — art:** green Lycanroc pack map sprite via the pipeline (princess-phoenix
+   source + green palette, no glasses) to replace the Stage-2 **placeholder** (green pack currently rides
+   `CLASS_MAUTHEDOOG` + generic pid `0xcd`). **Render Lupin hostile/recruited + the pack for Nicolas to
+   finalize the palette before committing art** (show-before-committing).
 4. **Stage 4 — scenes** (off the ch03 template): Lonelywood opening, moose-flees, real ending (replace
    `dev_placeholder_scene()`); finalize Lupin's death line + all ch04 text via the **`dialogue-pass`** skill.
 5. **Stage 5 — spatial check + `--ch04-boot` playtest** → confirm parity in-engine → open the PR (`Closes #24`).
@@ -119,8 +120,9 @@ grounding pass (apply the same verify-against-twin roster check); **#29** world 
   versioned; leave them alone. `tools/key_magenta.py` is **gitignored** (#178).
 - `feat/24-ch04-map` (worktree `.claude/worktrees/ch04-map`) carries the ch04 slice. Session commits:
   `cef0419` (Stage 1b) → `25f18e1` (HANDOFF sync) → `8f2f784` (Stage 2a) → `12eb352` (HANDOFF) →
-  `dbf86c6` (Stage 2b). **All committed and build-green; no loose uncommitted work** (besides this
-  HANDOFF refresh). Push before ending if not already pushed. `review/` in the worktree is untracked
+  `dbf86c6` (Stage 2b) → `a717794` (HANDOFF) → `2253cec` (Stage 2c). **All committed and build-green; no
+  loose uncommitted work** (besides this HANDOFF refresh). Push before ending if not already pushed.
+  `review/` in the worktree is untracked
   session output (leave it; do not commit). The old `feat/24-ch04-roster-grounding` branch is superseded.
 - **Build-speed subagent worktree/branch `feat/build-speed-idempotent-injection` is IN FLIGHT** (see This
   session). It builds independently; leave its worktree alone. Review its diff + byte-identical ROM proof
