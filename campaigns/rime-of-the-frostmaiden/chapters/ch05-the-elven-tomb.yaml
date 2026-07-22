@@ -73,20 +73,24 @@ win_condition: boss_defeated
 lose_condition: all_player_units_defeated
 
 difficulty_note: >
-  Our first real boss, tuned to the FE8 Ch5 bar (steepest yet: threat/slot ~10.3,
-  clear-load/slot ~5.15 static — but see the DYNAMICS below, which the #171 engine now
-  models). Ravisin is a vanilla FE8 Druid — heavy dark-magic (FE MAG vs RES) at 1-2
-  range — so squishy/low-RES units must respect her threat range; the pillars give cover
-  to bait her out. Two Ch5 dynamics do the real work and pay the difficulty DOWN so we
-  can afford the tension:
+  Our first real boss. Roster GROUNDED 2026-07-22 (#25) to the FE8 Ch5 bar — verdict
+  PARITY (within band): threat/slot 12.3 (x1.19) · clear-load/slot 4.2 (x0.81), on a force
+  that mirrors the twin's structure (line 16 · reinf 6 · convertible 1). Note our undead
+  reskins are individually GLASSIER than vanilla Ch5's living soldiers (they die fast to the
+  parity yardstick), so clear-load sits at the band's low edge and the durability spine is
+  the fast beasts (frost-wolves/barrow-hounds, high Spd) + the armored bone-wardens, NOT the
+  fragile revenant/mogall fodder. Ravisin is a vanilla FE8 Druid — heavy dark-magic (FE MAG
+  vs RES) at 1-2 range — so squishy/low-RES units must respect her threat range; the pillars
+  give cover to bait her out. Two Ch5 dynamics do the real work and pay the STATIC bar DOWN:
     - CONVERTIBLE Sahnar (the Joshua flip): a hostile crit-Myrmidon until Basil Talks
-      him, then a +0.9 kills/round ally for the back half. Self-balancing risk→advantage.
+      him, then a +1.0 kills/round ally for the back half. Self-balancing risk→advantage.
     - REINFORCEMENT eruption: undead arrive over turns (arrives_turn), not a turn-1 alpha —
-      so the turn-1 threat reads well below the static 10.3.
+      so the turn-1 threat reads 9.0 (≈ vanilla's 8.1), well below the static 12.3.
     - Untapped headroom: Lupin (+1.0) is a clean all-chapter combatant the static party
       number (6.27) omits; Basil is the fragile recruiter, not a fighter.
   No fog — the tension is the escort + the eruption race, not obscured vision. Keep it a
-  clean DefeatBoss so Ravisin is the climax.
+  clean DefeatBoss so Ravisin is the climax. (Playtest remains the arbiter; the static bar
+  is a proxy — spatial check + `--ch05-boot` playtest still owed at the build slice.)
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
@@ -99,8 +103,18 @@ deployment:
     (the Joshua flip) and joins only once Basil Talks him. deploy_limit caps the field to
     FE8-Ch5 parity (TBD this pass). Positions set in Tiled.
 
-# ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
+# ── Enemy Units (vanilla FE — grounded to FE8-Ch5 parity, #25) ────────────────────
+# Grounding pass (2026-07-22): the seed's 9 unmodeled enemies become a parity-grounded
+# force mirroring the vanilla Ch5 twin's STRUCTURE — 16 line + 6 eruption reinforcements
+# + 1 convertible (Sahnar, the Joshua flip) — matching vanilla Ch5's line 16 · reinf 6 ·
+# convertible 1. Every enemy's weapon is modeled via `inventory.fe_base` (so none is DROPPED
+# from the parity read); eruption waves tagged `arrives_turn` (#177); Sahnar tagged
+# `convertible` (#171, which the tool counts ahead of arrives_turn). Tuned to the FE8-Ch5
+# band via `make difficulty CH=ch05`. Hybrid palette (decisions.md): vanilla undead classes
+# throughout (the tomb), gwyllgi/mauthedoog the fiction-driven beast swaps. No item drops —
+# the vanilla Ch5 twin carries none (rewards ride reward_sites + the save-all crest).
 enemy_units:
+  # ── The boss: Ravisin, frost druid (holds the central depression) ───────────
   - id: ravisin
     name: "Ravisin"
     is_boss: true
@@ -108,6 +122,9 @@ enemy_units:
     class: druid                # vanilla FE8 Druid (baseRanks: Anima D, Dark C, Staff E)
     level: 7
     weapon: flux-tome           # FE8 Flux (Dark) — the Druid's class-native tome; flavored "Killing Frost"
+    inventory:
+      - id: killing-frost
+        fe_base: flux           # FE8 Flux — dark magic (FE MAG vs RES) at 1-2 range
     damage_type: cold           # flavor label only
     ai_pattern: hold_position
     death_quote: "Auril… I gave you everything…"
@@ -115,30 +132,125 @@ enemy_units:
       - id: crest-of-cold-iron  # FORESHADOW: locked promotion relic (see decisions.md — the promotion seam)
         is_key_item: true
         locked: true            # unusable in MVP; pays off at the Ch8→9 promotion seam
+  # ── The cornered white moose (awakened beast-boss, makes its stand) ─────────
   - id: white-moose
     name: "The White Moose"
     is_boss: true               # awakened beast-boss, cornered here (canon: tomb area E6)
     count: 1
     class: gwyllgi              # CLASS_GWYLLGI (FE8 beast) stand-in quadruped; TODO custom "moose" art (#38/#39) so it reads as an elk, not a wolf
     level: 6
+    inventory:
+      - id: antlers-and-hooves
+        fe_base: rotten-claw    # modeled beast attack (vanilla monster weapon)
     damage_type: bludgeoning    # flavor label only ("antlers/hooves")
     ai_pattern: aggressive
     death_quote: "*a final, almost-human bellow*"
+  # ── Vine-blight guardians (clog the approaches to the depression) ───────────
   - id: vine-blight
     name: "Vine Blight"
-    count: 5
+    count: 4
     class: revenant             # FE8 monster class (shambling zombie); reskinned as Ravisin's awakened plants
     level: 5
+    autolevel: true
+    inventory:
+      - id: strangling-vines
+        fe_base: rotten-claw
     damage_type: bludgeoning    # flavor label only
     ai_pattern: defensive       # clog the approaches to the depression
+  # ── Bone-wardens (armored elven tomb-sentinels — the durable anchor) ────────
+  - id: bone-warden
+    name: "Bone Warden"
+    count: 4
+    class: entoumbed            # CLASS_ENTOUMBED — armored zombie; high Def/HP tomb-guardian anchor
+    level: 6
+    autolevel: true
+    inventory:
+      - id: warden-claw
+        fe_base: rotten-claw    # a durable WALL, not a hitter — low-mt so it grinds turns, not HP
+    damage_type: bludgeoning    # flavor label only
+    ai_pattern: defensive       # hold the pillars/chokepoints of the depression
+  # ── Frostbitten wolves (Ravisin's awakened pack — fast, hard to pin) ────────
   - id: frost-wolf
-    name: "Frostbitten Wolf"    # a remnant of Ravisin's pack that followed her to the tomb
-    count: 2
-    class: mauthedoog           # CLASS_MAUTHEDOOG (FE8 beast)
-    level: 5
+    name: "Frostbitten Wolf"    # the pack that followed Ravisin to the tomb; the durability spine
+    count: 4
+    class: mauthedoog           # CLASS_MAUTHEDOOG (FE8 beast) — high Spd, so it grinds real turns to clear
+    level: 6
+    autolevel: true
+    inventory:
+      - id: frost-bite
+        fe_base: rotten-claw
     damage_type: piercing       # flavor label only
     ai_pattern: aggressive
-    # boss-chapter pacing bump (6 -> 9 enemies; decisions 2026-06-06)
+  # ── Grave-wisps (ranged magic — the tomb's floating spirits, hit RES) ───────
+  - id: grave-wisp
+    name: "Grave Wisp"
+    count: 2
+    class: mogall               # CLASS_MOGALL — floating eye; Evil Eye = ranged magic (hits RES)
+    level: 5
+    autolevel: true
+    inventory:
+      - id: evil-eye
+        fe_base: evil-eye       # ranged magic — squishy/low-RES units must respect its reach
+    damage_type: cold           # flavor label only
+    ai_pattern: defensive
+  # ── ERUPTION reinforcements (#177): undead erupt over turns 2/3/5 and race the ─
+  #    spread reliquary reward-sites (the Ch5 village-raid, in undead dress) ──────
+  - id: entombed-brute
+    name: "Entombed Brute"
+    count: 2
+    class: entoumbed            # CLASS_ENTOUMBED — armored zombie; the heavy bruiser erupts first
+    level: 6
+    autolevel: true
+    arrives_turn: 2             # the eruption's first wave, not a turn-1 alpha
+    inventory:
+      - id: grave-claw
+        fe_base: fetid-claw     # heavier monster claw — the one real hitter of the eruption
+    damage_type: bludgeoning    # flavor label only
+    ai_pattern: aggressive
+  - id: risen-archer
+    name: "Risen Archer"
+    count: 2
+    class: bonewalker-bow       # CLASS_BONEWALKER_BOW — ranged skeleton; punishes units out of cover
+    level: 5
+    autolevel: true
+    arrives_turn: 3
+    inventory:
+      - id: risen-bow
+        fe_base: iron-bow
+    damage_type: piercing       # flavor label only
+    ai_pattern: aggressive
+  - id: barrow-hound
+    name: "Barrow Hound"
+    count: 2
+    class: mauthedoog           # CLASS_MAUTHEDOOG — skeletal grave-hound; fast, races the far niches
+    level: 6
+    autolevel: true
+    arrives_turn: 5             # the last wave races the far reliquary reward-sites
+    inventory:
+      - id: gnashing-jaws
+        fe_base: rotten-claw
+    damage_type: piercing       # flavor label only
+    ai_pattern: aggressive
+  # ── CONVERTIBLE (#171): Sahnar rises HOSTILE at the eruption; Basil's Talk flips him ─
+  - id: sahnar
+    name: "Sahnar"
+    count: 1
+    class: myrmidon             # Joshua's exact class/donor — a fast, crit-threat sword duelist
+    level: 6
+    arrives_turn: 2             # rises when the quake cracks the sarcophagus (the eruption WAKE)
+    inventory:
+      - id: killing-edge
+        fe_base: killing-edge   # Joshua's killing-edge (30 crit) — the fragile-escort tension
+    damage_type: slashing       # flavor label only
+    ai_pattern: aggressive
+    convertible: true           # #171 — the Joshua flip. Hostile crit-Myrmidon until fragile BASIL
+                                # chaperones across to Talk him; then a +~0.9 kills/round back-half ally.
+    parley:
+      by: basil                 # the Natasha-donor Priest, walked up under escort to Talk him
+      result: become_allied
+      recruits_npc: sahnar      # joins as a playable Myrmidon (npcs/sahnar.yaml)
+    # roster grounded 2026-07-22 to FE8-Ch5 parity: 16 line + 6 eruption reinf + 1 convertible
+    # (supersedes the 2026-06-06 boss-chapter 6→9 bump).
 
 # ── Sahnar's sarcophagus (RETIRED the 3-offering fetch-puzzle) ────────────────────
 # Superseded 2026-07-15: the recruit is now the Basil→Sahnar chaperone Talk (the Joshua beat,
