@@ -1,74 +1,68 @@
-# Sahnar — the reawakened moon-elf mummy (ch05 recruit) — Lore & Voice
+# Sahnar — the reawakened elven royal (ch05 recruit) — Lore & Voice
 
-> **DRAFT — Phase 0 of the ch05 dialogue pass (2026-07-23). Co-written with Nicolas;
-> NOT locked until he red-pens the §Voice.** ch05 "The Elven Tomb" recruit — the Joshua
+> **DRAFT — Phase 0 of the ch05 dialogue pass. Co-written with Nicolas; §Voice calibration
+> awaits red-pen. Canon-corrected 2026-07-23 (RotFM): Sahnar is FEMALE (she/her), ancient
+> elven royalty, awake and aware for millennia.** ch05 "The Elven Tomb" recruit — the Joshua
 > beat. Mechanics in [`chapters/ch05-the-elven-tomb.yaml`](../chapters/ch05-the-elven-tomb.yaml)
-> (Myrmidon, killing-edge; rises HOSTILE at the eruption, flips when Basil Talks him) and
-> [`npcs/sahnar.yaml`](../npcs/sahnar.yaml). Canon: *Rime of the Frostmaiden* pp.82-83
-> (Sahnar, the mummy of the Elven Tomb, chaotic good).
+> (Myrmidon, killing-edge; rises HOSTILE — bound by Ravisin — and flips when **Basil** Talks
+> her) and [`npcs/sahnar.yaml`](../npcs/sahnar.yaml). The Joshua donor is mechanics-only, so
+> her gender is free of it; the shipped hooded-wraith art reads androgynous (sanity-check at
+> the slice).
 
 ## Concept
 
-An ancient **moon-elf** laid to rest in the tomb an age ago and bound as its guardian —
-a duelist and a scholar of the *old* druidcraft, from back when elves and the wild kept
-faith with each other. He is chaotic **good**: he guards out of honour, not zealotry. He
-is the deliberate opposite of Ravisin — where she is a raw, aggrieved believer, Sahnar is
-**courtly, dry, and unbothered by his own death.** Ravisin's magic rouses him wrong, so he
-rises swinging (a guardian's reflex, not malice); what turns him is **Basil** — living
-proof the old green craft still grows — walked up under escort to reach him.
+An **elven royal** from a people so old the Rime is younger than her tomb — a princess and a
+duelist, laid to rest here an age ago and bound as the tomb's guardian. The horror of her is
+this: she was **not asleep.** She has been **awake and aware for millennia** — conscious,
+alone, in the dark, the whole time — and she frames that unimaginable ordeal flatly, as the
+**purpose the gods set her.** She endured it. That endurance is the whole of her.
 
-- **Wants:** to see what the wild became while he slept; to serve, on his own terms, the
-  people who woke him kindly. He is *curious* before he is anything else.
-- **The turn (Basil's Talk):** he doesn't yield to force — he yields to a *goodberry
-  shrub with a name*. The old druids are gone; here is one of their small green makings,
-  cared for. That is enough. "You kept one of the old green things alive. Then I am on the
-  wrong side of this blade."
-- **Running gag (keep light):** he faintly smells of **pumpkin spice** — the embalming,
-  or the season, nobody's sure; he is politely mortified to be told.
+She is also **the living proof of Marty's covenant** ([`marty.md`](marty.md) §The spore
+covenant): a soul frozen *out* of the cycle — denied her return to the earth, held conscious
+for thousands of years — which is the one thing the spore-druid names unforgivable. Ravisin
+doesn't merely raise her; she seizes a mind that already survived the worst and binds it to
+serve. What frees her is **Basil**, walked up under escort, breaking that hold.
+
+- **Wants:** now that she's loose — to see what the world became while she kept her long watch;
+  and, given a cause worth a sword, to *spend* her freedom rather than lie back down. She
+  chooses "not yet." (That choice is hers — see the Marty reconciliation in `marty.md`.)
+- **The turn (Basil's Talk):** she is bound, conscious, straining against Ravisin's grip. A
+  small green kindness — one of the old druid-makings, tended and *named* — reaches her, and
+  the hold breaks. She comes back to herself.
 
 ## Voice
 
-**Courtly, archaic-but-warm, a duelist's economy, wry about the grave.** He speaks like
-someone with excellent manners and four hundred years of perspective, to whom most
-disasters are *small*. Not a brooding undead; not a zealot; not a modern quipster. The
-menace, while hostile, is **cold formality** — the manners of a blade. Once flipped, the
-same voice warms into dry delight at a world full of new things.
+**Stoic, courtly, composed over an ordeal you cannot fathom.** Royal bearing without swagger;
+a duelist's economy; a mind with millennia of quiet behind every word. She does not rage and
+she does not grieve aloud — she has had a very long time to be past both. Calm, formal, a
+little dry: the composure *is* the depth. Not a brooding undead; not a zealot; not a modern
+quipster.
 
-**The register split (hostile → allied), one voice, two temperatures**
-- **Hostile:** clipped, formal, a guardian reciting a duty. "The tomb is closed. Turn back,
-  or be turned." He announces the measure before he cuts — courteous even in threat.
-- **Allied:** the same courtesy, now curious and dry. He asks more than he tells; he is
-  delighted by small living things and unimpressed by large dead ones (himself included).
+**Two temperatures, one voice (bound → freed):**
+- **Bound (hostile):** clipped, formal — a guardian's duty spoken through gritted will, and
+  underneath it the real Sahnar straining against Ravisin's hold. She warns before she cuts;
+  even seized, her manners hold.
+- **Freed (allied):** the same calm, now her own — dry, curious, quietly amazed the world went
+  on without her. She asks more than she tells.
 
 **Diction rules**
-- **Archaic-courtly, not stiff:** "Well met." "You fight passably, for the living." Old
-  cadence, but he *lands* — no thee/thou fog.
-- **Duelist's metaphors:** the measure, footwork, the edge, the opening. He reads a room
-  the way he reads a guard.
-- **Dry about death:** he is a mummy and knows it; the joke is his *composure*, never
-  gore. "I have been asleep a long while. My apologies for the dust."
-- **Scholar of the OLD druids → curious about the NEW:** his throughline is wanting to
-  *learn* — he keeps asking Marty/Basil what the wild is like now. This is why he joins.
-- **Device (budget: one/scene):** **understatement** — the ancient who calls a catastrophe
-  "a poor morning." Use once; twice is a tic.
+- **Courtly and formal, never fog.** Old cadence, but she *lands* — no thee/thou.
+- **Composure over the ordeal, not complaint.** She names the millennia once, flatly, and
+  moves on ("I have kept a long watch"). The understatement is the horror — she never begs it.
+- **Duelist's economy:** the measure, the edge, footwork; she reads a room like a guard.
+- **A dry, distant wit** — a woman for whom most disasters are, by now, small. Sparing; her
+  humor is quiet, never a quip.
+- **Device (budget one/scene):** understatement — the ancient who calls a horror "a long night."
 
-**Calibration lines (draft — for Nicolas's red-pen; not yet used in any beat)**
-- (hostile) "The tomb is closed. I have kept it four hundred years. I can keep it past
-  supper."
-- (hostile → the measure) "You have courage and no footwork. Come, then. Mind the edge."
-- (the turn, on Basil) "A green thing, tended, with a name. …The old craft is not dead,
-  then. Neither, it seems, am I. Put up your guard — I am yours."
-- (allied, dry) "Four centuries asleep, and the first face I see is a mushroom selling me
-  a drink. The world has improved."
-- (allied, curious) "Show me what the wild is now. I have a great deal of catching up —
-  and, apparently, a faint smell of pumpkin to explain."
+**Calibration lines (draft — for red-pen; not yet used in any beat)**
+- (bound, hostile) "The tomb is closed. I have kept it longer than your tongue has had words. …Turn back."
+- (bound, straining against Ravisin) "She holds the blade — not the hand. …Run, if you're wise. I cannot."
+- (freed by Basil) "A green thing. Tended. *Named*. …The old craft still grows. Then I am not the last of it — and not, it seems, hers."
+- (freed, dry) "Millennia in the dark, and the first face I meet is a mushroom. …The world has grown strange. Good."
+- (freed, choosing to walk on) "I could lie back down. …Not yet. There's a cold out there that wants answering."
 
-**Banned:** modern slang; brooding-goth-undead moping ("so cold… so alone…"); horror-mummy
-gore/shambling; zealotry (that's Ravisin — he is her opposite); thee/thou archaism-fog;
-overusing the pumpkin gag (once a scene, a garnish, never the meal); naming ch06+ beats.
-
-## Open question for Nicolas
-- **How hostile is the rise, really?** Two readings: (a) a *bound* guardian, cold and
-  dutiful, no personal malice (my default above); (b) briefly *confused/wrathful* — woken
-  wrong by Ravisin's frost, lashing out before Basil steadies him. (a) is more dignified;
-  (b) gives Basil's Talk more to rescue. Pick one before his beats lock.
+**Banned:** modern slang; brooding-undead moping ("so cold, so alone…"); horror-mummy
+gore/shambling; zealotry (that is Ravisin — Sahnar carries no such certainty); thee/thou fog;
+loud grief or rage (millennia past both); a pity-play out of the ordeal (she *endured* it —
+she does not ask to be pitied); an anti-human crusade (cut 2026-07-23 as unnecessary — she
+holds no vendetta).

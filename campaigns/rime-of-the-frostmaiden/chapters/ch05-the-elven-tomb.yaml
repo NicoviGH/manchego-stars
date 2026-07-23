@@ -86,7 +86,7 @@ difficulty_note: >
   RES) at 1-2 range — so squishy/low-RES units must respect her threat range; the pillars give
   cover to bait her out. Two Ch5 dynamics do the real work and pay the STATIC bar DOWN:
     - CONVERTIBLE Sahnar (the Joshua flip): a hostile crit-Myrmidon until Basil Talks
-      him, then a +1.0 kills/round ally for the back half. Self-balancing risk→advantage.
+      her, then a +1.0 kills/round ally for the back half. Self-balancing risk→advantage.
     - REINFORCEMENT eruption: the dead arrive over turns (arrives_turn), not a turn-1 alpha —
       so the turn-1 threat reads 9.9 (≈ vanilla's 8.1), below the static 12.5.
     - Untapped headroom: Lupin (+1.0) is a clean all-chapter combatant the static party
@@ -106,8 +106,8 @@ deployment:
     (beast-Cav, won in ch04 — a clean all-chapter combatant, +1.0 kills/round the static
     party number omits). Basil (Priest) is present from the start as the fragile RECRUITER
     (must be fielded and protected to Talk Sahnar — the Natasha role), NOT a fighter.
-    Sahnar is NOT in the starting field — he rises mid-combat as a HOSTILE convertible
-    (the Joshua flip) and joins only once Basil Talks him. With deploy_limit 9 and a pool
+    Sahnar is NOT in the starting field — she rises mid-combat as a HOSTILE convertible
+    (the Joshua flip) and joins only once Basil Talks her. With deploy_limit 9 and a pool
     of 10 (7 PCs + Pinky + Baxby + Trex + Lupin, minus Basil-as-recruiter tradeoffs), the
     player leaves one unit home — a real cut for a boss chapter. Positions set in Tiled.
 
@@ -293,7 +293,7 @@ enemy_units:
     skin:
       look: "skeletal elven archer"
       source: "FE-Repo: Battle Animations/Monsters - Basic Types/[Skeleton-Reskin] [U] Wight Sniper by DATonDemand"
-  # ── CONVERTIBLE (#171): Sahnar rises HOSTILE at the eruption; Basil's Talk flips him ─
+  # ── CONVERTIBLE (#171): Sahnar rises HOSTILE at the eruption; Basil's Talk flips her ─
   - id: sahnar
     name: "Sahnar"
     count: 1
@@ -306,9 +306,9 @@ enemy_units:
     damage_type: slashing       # flavor label only
     ai_pattern: aggressive
     convertible: true           # #171 — the Joshua flip. Hostile crit-Myrmidon until fragile BASIL
-                                # chaperones across to Talk him; then a +~0.9 kills/round back-half ally.
+                                # chaperones across to Talk her; then a +~0.9 kills/round back-half ally.
     parley:
-      by: basil                 # the Natasha-donor Priest, walked up under escort to Talk him
+      by: basil                 # the Natasha-donor Priest, walked up under escort to Talk her
       result: become_allied
       recruits_npc: sahnar      # joins as a playable Myrmidon (npcs/sahnar.yaml)
     skin:                       # the moon-elf mummy; already art-planned (#25 issue thread)
@@ -346,8 +346,8 @@ events:
     type: dialogue
     ea_file: events/ch05-sahnar-recruit.ea
     description: >
-      Basil chaperoned safely to Sahnar → he flips to the party, curious about modern
-      druids and eager to serve his liberators. The escort-recruit (Ch5's Joshua beat).
+      Basil chaperoned safely to Sahnar → she flips to the party, curious about modern
+      druids and eager to serve her liberators. The escort-recruit (Ch5's Joshua beat).
   - trigger: chapter_end
     type: cutscene
     ea_file: events/ch05-ending.ea
@@ -382,7 +382,7 @@ post_chapter:
   available_shops: [elven-reliquary]   # the in-tomb elven store (Armory + Vendor); see economy block
   units_available_to_recruit:
     - id: sahnar                         # Myrmidon (sword duelist); see npcs/sahnar.yaml
-      description: "Sahnar, the reawakened moon-elf mummy (recruited by lighting the brazier). Playable Myrmidon."
+      description: "Sahnar (she/her), the reawakened elven royal — a moon-elf mummy, recruited via Basil's Talk (the Joshua beat). Playable Myrmidon."
     - id: basil                          # Priest — 2nd healer (LOCKED 2026-06-20); see npcs/basil.yaml
       description: >
         Basil, the sentient goodberry shrub — now a PLAYABLE healer (Priest). His

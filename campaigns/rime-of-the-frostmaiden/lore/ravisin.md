@@ -13,28 +13,30 @@ The frost druid who guards the elven tomb — and the villain thread of Act I. I
 name she has been **awakening** the wild things to drive the loggers off the ice: the
 white moose (ch04), the direwolf pack (Lupin's kin), and — out in Maer Dualdon — Messie
 (ch06). To her these are not monsters; they are the wild *woken up*, made to fight back
-against axes and hearth-fires. She is a true believer of the desperate kind
-(`frostmaiden-voices.md` §Children of Auril): *worship is the only redemption*, sacrifice
-is devotion, and she has sacrificed everything — her name, her warmth, her old self — to a
-goddess who has never once answered her.
+against axes and hearth-fires. She is a true believer — and a **certain** one
+(`frostmaiden-voices.md` §Children of Auril): worship is the only mercy, the warm world is a
+sickness, and the winter is the cure. She is not wounded and she is not searching — she is
+**right**, and everyone who lights a hearth is wrong. She gave up her name and her warmth to
+the Frostmaiden the way you'd give up a fever.
 
-- **Wants:** the winter to reclaim the wood; the wild to wake; Auril to *see* her.
-- **The hollow core (spend only at death):** the goddess is silent. Ravisin gave
-  everything and got frost for it — and she cannot admit the altar is empty. Her death
-  line is the one time it shows: `"Auril… I gave you everything…"` (locked in the YAML).
+- **Wants:** the winter to reclaim the wood; the wild to wake; the warm world to kneel or
+  freeze. Not Auril's *notice* — Auril's *victory*.
+- **The death line** (`"Auril… I gave you everything…"`, locked in the YAML) is **not a
+  lament.** It's a zealot's last offering — proud, certain to the end that the cold was worth
+  it. Play it as devotion, never as regret.
 
 ## Voice
 
-**Fervent, aggrieved, tender to the wild and cold to people.** Where Sephek is serene,
-unhurried, and *amused* by his enemies, Ravisin is raw and rising — a preacher who
-grieves. She loves the beasts she wakes and speaks to them gently; she scorns the party
-as the disease (warmth, steel, roofs, fire). The menace is in her conviction, not in
-calm. She believes, to her marrow, that she is the merciful one.
+**Fervent, certain, tender to the wild and cold to people.** Where Sephek is serene,
+unhurried, and *amused* by his enemies, Ravisin is raw and *rising* — a **preacher, not a
+mourner**. She loves the beasts she wakes and gentles them; she scorns the party as the
+disease (warmth, steel, roofs, fire). The menace is her total conviction. She believes, to
+her marrow, that the frost is a kindness and she is the merciful one — and she has never once
+doubted it.
 
-**The Sephek line (do not blur it):** Sephek drops contractions for Auril and never
-raises his voice; Ravisin *can* rise, curses the axe and the hearth by name, and her
-reverence for Auril is shot through with ache. He is the smug executioner; she is the
-abandoned devotee.
+**The Sephek line (do not blur it):** Sephek drops contractions for Auril and never raises his
+voice; Ravisin *can* rise, and curses the axe and the hearth by name. He is the smug
+executioner; she is the **true believer** — fervent, sure, unwavering.
 
 **Diction rules**
 - **Druid-nature imagery**, not liturgy: the thaw, the roots, the wood, the wild, the
@@ -59,8 +61,11 @@ abandoned devotee.
 - "The wood was hers before your grandfathers put an axe to it. I am only giving it back."
 - (death, locked) "Auril… I gave you everything…"
 
-**Banned:** Sephek's serenity/amusement (she is not calm and she is not amused —
-she *aches*); cackling/cartoon villainy; cruelty for its own sake (she believes every
-frost is a kindness); modern slang; naming Messie or the ch06/later beats outright (her
-dying words only *hint* toward Bremen — the hook, never the map); flat "worship your
-goddess" liturgy with no nature under it.
+**Banned:** **any pathos — grief, self-pity, a wound, an "unanswering goddess" ache, a tragic
+or sympathetic frame. She is the antagonist, not a victim; the Frostmaiden is the big bad and
+Ravisin is *glad* to serve. She is never mourned (see `marty.md` — he names her sin, never
+eulogizes her).** Sephek's serene amusement (she is not calm and not amused — she is
+*certain*); cackling/cartoon villainy; cruelty for its own sake (she believes every frost is a
+kindness); modern slang; naming Messie or the ch06/later beats outright (her dying words only
+*hint* toward Bremen — the hook, never the map); flat "worship your goddess" liturgy with no
+nature under it.

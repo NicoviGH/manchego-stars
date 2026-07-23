@@ -27,9 +27,9 @@ and it's *Basil*, not a blade, that turns the old duelist.
 - **Wants:** sun, water, and for everyone to be fed and unhurt. That's the whole list.
 - **Love-language is feeding** (the campaign's "feed them" motif — cf. Lupin's pack, ch04):
   a berry offered *is* Basil saying he cares. He heals by feeding.
-- **Why he turns Sahnar:** he isn't afraid of the sword; he offers the scary dead man a
+- **Why he turns Sahnar:** he isn't afraid of the sword; he offers the scary dead queen a
   berry. A living green thing, tended and kind, is the proof the old craft still grows —
-  and that undoes four centuries of Sahnar's guard.
+  and that reaches Sahnar where a blade never could, through her long, bound watch.
 
 ## Voice — **LOCKED: Groot-flavored, but self-sufficient** (Nicolas, 2026-07-23)
 
@@ -56,7 +56,7 @@ is a schmoozing mushroom with patter and an angle; where Marty *sells*, Basil *o
 **Calibration lines (draft — for Nicolas's red-pen; not yet used in any beat)**
 - (found / accepting the name) "A pot. A name. …Basil." → "I will grow. For you."
 - (healing in battle) "Hurt. Here. Eat." / "Eat. Grow. Stay."
-- (refusing Ravisin as she rips Sahnar up — his breaking point) "No. Not him. …I won't."
+- (refusing Ravisin as she rips Sahnar up — his breaking point) "No. Not her. …I won't."
 - (the Sahnar turn — **carries the recruit alone**, offering the berry to the bound mummy)
   "She hurt you. You are not hers. …Wake up. I have you. Eat."
 - (to Marty, on their two ways of winning people) "You sell. I feed. …Same."
