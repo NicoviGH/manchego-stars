@@ -47,7 +47,9 @@ map:
     Ravisin holds the central depression with the cornered white moose; risen elven
     tomb-guardians (spear-guards, sentinels) clog the approaches. Elven reliquary niches are
     spread to the map's edges (the reward-sites the eruption's dead race to desecrate). Open
-    lanes between the pillars keep cavalry relevant.
+    lanes between the pillars keep cavalry relevant. ENTRANCE = an open elven GATEWAY (a worn
+    arch / standing stones at the rim), descending a stair into the open-air hollow — NOT a
+    door into an enclosed crypt (ch04's "worked door" reads as this gateway).
 
 # ── Objective ──────────────────────────────────────────────────────────────────
 objective:
@@ -322,17 +324,47 @@ enemy_units:
 # above), which "affects how you play the level" the way vanilla Ch5's Natasha→Joshua does — a
 # stronger hook than a fetch-quest that competes for turns. The brazier survives only as the
 # narrative WAKE beat: the eruption cracks the sarcophagus and Sahnar rises HOSTILE (a silver
-# flame flavor moment), then Basil must reach him to flip him. Canon RotFM p.82-83's offerings
+# flame flavor moment), then Basil must reach her to flip her. Canon RotFM p.82-83's offerings
 # (twig/pinecone/feather; we already dropped the severed hand) become set-dressing, not a gate.
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
 events:
   - trigger: chapter_start
-    type: cutscene
-    ea_file: events/ch05-opening.ea
+    type: cutscene                    # Cutscene 1 — PRE-MAP (Text_BG). Picks up ch04's thread; NO Ravisin
+    ea_file: events/ch05-opening.ea   #   reveal (she stays silent, saved for the eruption).
     description: >
-      The trail ends at the tomb; Ravisin reveals herself and raises the tomb's elven
-      dead, naming Auril. The cornered white moose snorts at her side. Battle begins.
+      The party crests the ridge to an iced elven GATEWAY of standing stones (open arch, not a
+      door) and the moonlit sunken hollow beyond — the open-air tomb. Lupin reads the moose's
+      trail here (ch04 payoff); Marty senses a FAMILIAR death-craft and trails off (the
+      two-druids hook, left unspoken); Pinky spots the cornered moose. Then the map loads.
+      LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas). Hand-boxed to GBA width
+      (~29-30 ch/line, 2 lines/box); [A]/[LF] encoding is a text-insertion detail (ROM-gated).
+    script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
+      # (Night. An iced elven gateway of standing stones — open arch, no roof, no door — and
+      #  beyond it the ground falls into a wide moonlit hollow: the open-air tomb. The moose's
+      #  trail leads down into it.)
+      - lupin: "The trail leads here. ...It came home."
+      - marty: "...This magic is familiar..."               # trails off — the hook, never explained here
+      - pinky: "Father, I see it! The moose--in the hollow."
+      - pinky: "...It's not running. Why isn't it running?!"
+  - trigger: map_opening              # Cutscene 2 — ON-MAP, before player phase (bubbles ≤29 ch/line)
+    type: cutscene
+    ea_file: events/ch05-basil-joins.ea
+    description: >
+      Party deployed at the stair-foot; the moose at bay; Ravisin a SILENT frost-robed figure at
+      center among the risen dead (shown on the map, never narrated). Basil — a GREEN ally shrub —
+      trundles up, cracks the tourist joke, notices LUPIN (a fellow awoken creature, now free),
+      and the thought dawns → he asks to be brought to Sahnar and JOINS (green → player unit). His
+      "she lost her way" line on Ravisin is DEFERRED to the eruption (once she's formally
+      introduced). LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas). Hand-boxed to GBA
+      width. Wiring: Basil enters green, converts to a player unit on the join.
+    script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
+      # (A goodberry shrub — GREEN — trundles up through the snow toward the party.)
+      - basil: "Oh! Tourists. In the tomb. ...We don't get many."
+      # (Basil notices Lupin — a wolf Ravisin awakened, now traveling free with the party.)
+      - basil: "...Wolf. You're hers. Awoken. But you're free? With them?"
+      # (The thought dawns; Basil turns to the party and JOINS — green → the party's colors.)
+      - basil: "...I wonder. Sahnar. ...She needs me. Take me to her?"
   - trigger: eruption_turn        # scripted turn (~2/3/5, the Ch5 wave cadence) — EARTHQUAKE/TILECHANGE
     type: scripted_event
     ea_file: events/ch05-eruption.ea
