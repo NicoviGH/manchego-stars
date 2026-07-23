@@ -76,7 +76,28 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   `--ch05-boot` playtest (tier-4), and the **enemy_class_reskins wiring + FE-Repo imports** (the art
   track) — all need the ROM/build, so NOT this environment.
 
-## NEXT SESSION — start here: finish the ch04 slice (`feat/24-ch04-map`)
+## NEXT SESSION — start here (this branch `claude/mobile-app-token-context-u2psep`, ROM-free): ch05 DIALOGUE PASS
+
+The ch05 roster is **fully settled** (do NOT re-litigate — see above; PARITY, deploy_limit 9, skins spec'd,
+wolves cut). The next ROM-free step is the **dialogue pass** for ch05's 4 beats. **Invoke the `dialogue-pass`
+skill** and follow it (it's co-written WITH Nicolas, never solo: bring 2–3 labelled variants per beat, he
+curates, lock each beat into the chapter YAML `script:` block — the ch04 pattern).
+
+- **Read first:** the `dialogue-pass` skill; `lore/frostmaiden-voices.md`; the ch05 YAML `events:` (the 4
+  beats) + its characterization notes; ch04's locked `script:` blocks as the format model.
+- **Phase 0 (do this first):** three speakers have **no Voice doc** — write `lore/ravisin.md`, `lore/sahnar.md`,
+  `lore/basil.md` (Voice section + quirks + sample lines) WITH Nicolas, grounded in `frostmaiden-voices.md` +
+  RotFM pp.80–83 + the YAML (Ravisin: Auril-zealot, "I gave you everything"; Sahnar: chaotic-good moon-elf
+  mummy, curious about modern druids, faint pumpkin-spice; Basil: sentient goodberry shrub → Priest). Bring
+  drafts for red-pen. The skill requires a speaker's Voice section before their lines.
+- **The 4 beats (story order):** `ch05-opening` (Ravisin reveal + raises the dead + moose) → `ch05-eruption`
+  (quake, undead erupt, sarcophagus cracks, Sahnar rises HOSTILE) → `ch05-sahnar-recruit` (Basil Talks him →
+  flip) → `ch05-ending` (Ravisin falls, repot/name Basil, turn toward Bremen / ch06 Messie hook).
+- **Length discipline (skill):** GBA 2-line boxes; ending ≤ ~10 lines; narration cards ≤ 25 words.
+- **DoD:** locked scripts land in `ch05-the-elven-tomb.yaml` with `LOCKED <date>` tags, `python3
+  tools/verify_text.py` is ROM-gated (runs on the Mac when the `.ea` is assembled), commit ROM-free.
+
+## PARALLEL THREAD (ROM-gated, Nicolas's Mac): finish the ch04 slice (`feat/24-ch04-map`)
 
 The combat slice is hosted and builds; it is **not** a complete chapter. To finish and PR-merge #24:
 
