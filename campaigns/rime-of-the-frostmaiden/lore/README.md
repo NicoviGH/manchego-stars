@@ -33,6 +33,11 @@ flavor isn't lost to git history. **None of them drive gameplay** — every lore
   [`../npcs/pepperjack.yaml`](../npcs/pepperjack.yaml), [`../npcs/brie.yaml`](../npcs/brie.yaml)).
 - [`trex.md`](trex.md) — the Ch3 recruit (winged kobold thief), with a **§Voice**
   (unit: [`../npcs/trex.yaml`](../npcs/trex.yaml)).
+- [`ravisin.md`](ravisin.md) — ch05 boss (frost druid); [`sahnar.md`](sahnar.md) — ch05
+  recruit (moon-elf mummy, the Joshua beat); [`basil.md`](basil.md) — ch05 recruit
+  (goodberry-shrub Priest, the Natasha beat). Each has a **§Voice**. **DRAFT (Phase 0,
+  2026-07-23)** — §Voice pending Nicolas's red-pen; units:
+  [`../npcs/sahnar.yaml`](../npcs/sahnar.yaml), [`../npcs/basil.yaml`](../npcs/basil.yaml).
 - [`hlin-trollbane.md`](hlin-trollbane.md), [`scramsax.md`](scramsax.md),
   [`sephek-kaltro.md`](sephek-kaltro.md) — prologue guests/boss, each with a **§Voice**
   (diction rules, calibration lines, banned list) consumed by the `dialogue-pass` skill.
