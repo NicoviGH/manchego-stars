@@ -44,10 +44,10 @@ map:
     An open-air elven tomb — a snowy sunken depression ringed by crystal pillars and
     statues (cover/chokepoints), NOT a claustrophobic crypt. The moon dial sits at
     center, the gazebo brazier to one side, the sarcophagus on the eastern berm.
-    Ravisin holds the central depression with the cornered white moose; vine-blight
-    guardians clog the approaches. Elven reliquary niches are spread to the map's edges
-    (the reward-sites the eruption's undead race to desecrate). Open lanes between the
-    pillars keep cavalry relevant.
+    Ravisin holds the central depression with the cornered white moose; risen elven
+    tomb-guardians (spear-guards, sentinels) clog the approaches. Elven reliquary niches are
+    spread to the map's edges (the reward-sites the eruption's dead race to desecrate). Open
+    lanes between the pillars keep cavalry relevant.
 
 # ── Objective ──────────────────────────────────────────────────────────────────
 objective:
@@ -73,19 +73,22 @@ win_condition: boss_defeated
 lose_condition: all_player_units_defeated
 
 difficulty_note: >
-  Our first real boss. Roster GROUNDED 2026-07-22 (#25) to the FE8 Ch5 bar — verdict
-  PARITY (within band): threat/slot 12.3 (x1.19) · clear-load/slot 4.2 (x0.81), on a force
-  that mirrors the twin's structure (line 16 · reinf 6 · convertible 1). Note our undead
-  reskins are individually GLASSIER than vanilla Ch5's living soldiers (they die fast to the
-  parity yardstick), so clear-load sits at the band's low edge and the durability spine is
-  the fast beasts (frost-wolves/barrow-hounds, high Spd) + the armored bone-wardens, NOT the
-  fragile revenant/mogall fodder. Ravisin is a vanilla FE8 Druid — heavy dark-magic (FE MAG
-  vs RES) at 1-2 range — so squishy/low-RES units must respect her threat range; the pillars
-  give cover to bait her out. Two Ch5 dynamics do the real work and pay the STATIC bar DOWN:
+  Our first real boss. Roster GROUNDED (rev.2, 2026-07-23, #25) to the FE8 Ch5 bar — verdict
+  PARITY (within band): threat/slot 12.5 (x1.21) · clear-load/slot 5.0 (x0.97, ≈ vanilla's
+  5.2), on a force that mirrors the twin's structure (line 16 · reinf 6 · convertible 1). The
+  force is RISEN ELVEN GUARDIANS on the vanilla FE8 infantry classes (Soldier/Fighter/Mercenary/
+  Archer/Armor-Knight/Myrmidon), skinned undead — the ch01 "vanilla class, our skin" pattern.
+  Because the stats ARE living-class stats, clear-load parity comes for free: the earlier
+  glassy problem (undead monster classes get doubled → die in 1 round; decisions.md) doesn't
+  arise, and the Armor-Knight Frost-Sentinels are the Def-sink the monster palette couldn't
+  produce. Threat sits a touch hot (x1.21) — fine for "our first real boss," and the DYNAMICS
+  below pay the static bar down. Ravisin is a vanilla FE8 Druid — heavy dark-magic (FE MAG vs
+  RES) at 1-2 range — so squishy/low-RES units must respect her threat range; the pillars give
+  cover to bait her out. Two Ch5 dynamics do the real work and pay the STATIC bar DOWN:
     - CONVERTIBLE Sahnar (the Joshua flip): a hostile crit-Myrmidon until Basil Talks
       him, then a +1.0 kills/round ally for the back half. Self-balancing risk→advantage.
-    - REINFORCEMENT eruption: undead arrive over turns (arrives_turn), not a turn-1 alpha —
-      so the turn-1 threat reads 9.0 (≈ vanilla's 8.1), well below the static 12.3.
+    - REINFORCEMENT eruption: the dead arrive over turns (arrives_turn), not a turn-1 alpha —
+      so the turn-1 threat reads 9.9 (≈ vanilla's 8.1), below the static 12.5.
     - Untapped headroom: Lupin (+1.0) is a clean all-chapter combatant the static party
       number (6.27) omits; Basil is the fragile recruiter, not a fighter.
   No fog — the tension is the escort + the eruption race, not obscured vision. Keep it a
@@ -104,15 +107,25 @@ deployment:
     FE8-Ch5 parity (TBD this pass). Positions set in Tiled.
 
 # ── Enemy Units (vanilla FE — grounded to FE8-Ch5 parity, #25) ────────────────────
-# Grounding pass (2026-07-22): the seed's 9 unmodeled enemies become a parity-grounded
-# force mirroring the vanilla Ch5 twin's STRUCTURE — 16 line + 6 eruption reinforcements
-# + 1 convertible (Sahnar, the Joshua flip) — matching vanilla Ch5's line 16 · reinf 6 ·
-# convertible 1. Every enemy's weapon is modeled via `inventory.fe_base` (so none is DROPPED
-# from the parity read); eruption waves tagged `arrives_turn` (#177); Sahnar tagged
-# `convertible` (#171, which the tool counts ahead of arrives_turn). Tuned to the FE8-Ch5
-# band via `make difficulty CH=ch05`. Hybrid palette (decisions.md): vanilla undead classes
-# throughout (the tomb), gwyllgi/mauthedoog the fiction-driven beast swaps. No item drops —
-# the vanilla Ch5 twin carries none (rewards ride reward_sites + the save-all crest).
+# Grounding pass rev.2 (2026-07-23): the force is now RISEN ELVEN TOMB-GUARDIANS on the
+# vanilla FE8 infantry classes (Soldier/Fighter/Mercenary/Archer/Armor-Knight/Myrmidon) —
+# the same "vanilla class, our skin" pattern ch01 uses (goblin-skinned Soldiers/Fighters,
+# campaign.yaml `enemy_class_reskins`). Two payoffs:
+#   1. PARITY BY CONSTRUCTION — living-class stats ARE the vanilla Ch5 twin's stats, so the
+#      glassy monster-class problem (mogall/revenant get doubled → die in 1 round; decisions.md
+#      "undead reskins read glassy") simply doesn't arise. The Armor-Knight is the Def-sink the
+#      undead palette couldn't produce.
+#   2. STORY SEPARATION FROM CH04 — ch04 is the BEAST chapter (the wolf hunt, Marty's parley).
+#      ch05 is the TOMB: the dead, not more wolves. Ravisin awakened the living in ch04; here she
+#      has raised the DEAD (an escalation). Wolves are CUT (2026-07-23, Nicolas). The lone beast
+#      is the White Moose — the ch04 quarry finally cornered (payoff, not a repeat).
+# Structure preserved: 16 line + 6 eruption reinf + 1 convertible (Sahnar) = vanilla's line 16 ·
+# reinf 6 · convertible 1. Weapons modeled via `inventory.fe_base`; eruption tagged
+# `arrives_turn` (#177); Sahnar `convertible` (#171). No item drops — the Ch5 twin carries none.
+# Per-unit `skin:` = the intended reskin for the ART track (build-slice: rides
+# `enemy_class_reskins` in campaign.yaml + inject_enemy_class_battle_anims). `source:
+# palette_swap` = frost/pale recolour of the vanilla frame (no FE-Repo undead anim in that
+# weapon mode); a "FE-Repo: …" source = a borrowable custom anim (all [U] free-to-use).
 enemy_units:
   # ── The boss: Ravisin, frost druid (holds the central depression) ───────────
   - id: ravisin
@@ -128,16 +141,19 @@ enemy_units:
     damage_type: cold           # flavor label only
     ai_pattern: hold_position
     death_quote: "Auril… I gave you everything…"
+    skin:                       # Ravisin has authored boss art already; frost-druid palette
+      look: "Ravisin, frost druid (existing boss portrait + Druid class art)"
+      source: authored
     drops:
       - id: crest-of-cold-iron  # FORESHADOW: locked promotion relic (see decisions.md — the promotion seam)
         is_key_item: true
         locked: true            # unusable in MVP; pays off at the Ch8→9 promotion seam
-  # ── The cornered white moose (awakened beast-boss, makes its stand) ─────────
+  # ── The cornered white moose (the LONE beast — ch04 quarry, cornered boss) ───
   - id: white-moose
     name: "The White Moose"
     is_boss: true               # awakened beast-boss, cornered here (canon: tomb area E6)
     count: 1
-    class: gwyllgi              # CLASS_GWYLLGI (FE8 beast) stand-in quadruped; TODO custom "moose" art (#38/#39) so it reads as an elk, not a wolf
+    class: gwyllgi              # CLASS_GWYLLGI (FE8 beast) stand-in quadruped
     level: 6
     inventory:
       - id: antlers-and-hooves
@@ -145,92 +161,131 @@ enemy_units:
     damage_type: bludgeoning    # flavor label only ("antlers/hooves")
     ai_pattern: aggressive
     death_quote: "*a final, almost-human bellow*"
-  # ── Vine-blight guardians (clog the approaches to the depression) ───────────
-  - id: vine-blight
-    name: "Vine Blight"
-    count: 4
-    class: revenant             # FE8 monster class (shambling zombie); reskinned as Ravisin's awakened plants
+    skin:                       # the one beast; closes YAML TODO #38/#39 (read as elk, not wolf)
+      look: "the White Moose — a great pale elk"
+      source: "FE-Repo: Battle Animations/Monsters - Basic Types/[Wolf-Base] [U] Gwyllgi Vanilla (frost repal → elk)"
+  # ── Risen spear-guard (SOLDIER, lance) — the tomb's rank-and-file dead ───────
+  - id: risen-spear
+    name: "Risen Spear-Guard"
+    count: 5
+    class: soldier              # CLASS_SOLDIER (vanilla Ch5's core infantry) — parity backbone
     level: 5
     autolevel: true
     inventory:
-      - id: strangling-vines
-        fe_base: rotten-claw
-    damage_type: bludgeoning    # flavor label only
-    ai_pattern: defensive       # clog the approaches to the depression
-  # ── Bone-wardens (armored elven tomb-sentinels — the durable anchor) ────────
-  - id: bone-warden
-    name: "Bone Warden"
-    count: 4
-    class: entoumbed            # CLASS_ENTOUMBED — armored zombie; high Def/HP tomb-guardian anchor
-    level: 6
-    autolevel: true
-    inventory:
-      - id: warden-claw
-        fe_base: rotten-claw    # a durable WALL, not a hitter — low-mt so it grinds turns, not HP
-    damage_type: bludgeoning    # flavor label only
-    ai_pattern: defensive       # hold the pillars/chokepoints of the depression
-  # ── Frostbitten wolves (Ravisin's awakened pack — fast, hard to pin) ────────
-  - id: frost-wolf
-    name: "Frostbitten Wolf"    # the pack that followed Ravisin to the tomb; the durability spine
-    count: 4
-    class: mauthedoog           # CLASS_MAUTHEDOOG (FE8 beast) — high Spd, so it grinds real turns to clear
-    level: 6
-    autolevel: true
-    inventory:
-      - id: frost-bite
-        fe_base: rotten-claw
+      - id: elven-spear
+        fe_base: iron-lance
     damage_type: piercing       # flavor label only
-    ai_pattern: aggressive
-  # ── Grave-wisps (ranged magic — the tomb's floating spirits, hit RES) ───────
-  - id: grave-wisp
-    name: "Grave Wisp"
-    count: 2
-    class: mogall               # CLASS_MOGALL — floating eye; Evil Eye = ranged magic (hits RES)
+    ai_pattern: defensive       # hold the approaches to the depression
+    skin:
+      look: "risen elven spear-guard, frost-pale"
+      source: palette_swap      # vanilla Soldier frame, frost/pale palette (no FE-Repo lance-skeleton)
+  # ── Tomb-reavers (FIGHTER, axe) — the heavier risen dead ─────────────────────
+  - id: tomb-reaver
+    name: "Tomb Reaver"
+    count: 3
+    class: fighter              # CLASS_FIGHTER (axe infantry; Fighters not Brigands — no peak pathing)
     level: 5
     autolevel: true
     inventory:
-      - id: evil-eye
-        fe_base: evil-eye       # ranged magic — squishy/low-RES units must respect its reach
-    damage_type: cold           # flavor label only
-    ai_pattern: defensive
-  # ── ERUPTION reinforcements (#177): undead erupt over turns 2/3/5 and race the ─
-  #    spread reliquary reward-sites (the Ch5 village-raid, in undead dress) ──────
-  - id: entombed-brute
-    name: "Entombed Brute"
+      - id: rusted-greataxe
+        fe_base: iron-axe
+    damage_type: slashing       # flavor label only
+    ai_pattern: aggressive
+    skin:
+      look: "risen elven axe-reaver, frost-pale"
+      source: palette_swap      # vanilla Fighter frame, frost/pale palette
+  # ── Crypt-blades (MERCENARY, sword) — the elite risen swordsmen (real skeleton anim) ─
+  - id: crypt-blade
+    name: "Crypt Blade"
     count: 2
-    class: entoumbed            # CLASS_ENTOUMBED — armored zombie; the heavy bruiser erupts first
+    class: mercenary            # CLASS_MERCENARY (sword) — Spd ~5-6, a clean non-doubled threat
     level: 6
+    autolevel: true
+    inventory:
+      - id: bone-sword
+        fe_base: iron-sword
+    damage_type: slashing       # flavor label only
+    ai_pattern: aggressive
+    skin:
+      look: "skeletal elven blade"
+      source: "FE-Repo: Battle Animations/Monsters - Basic Types/[Skeleton-Base] [U] Bonewalker (one arm, sword) by Alexsplode"
+  # ── Bone-archers (ARCHER, bow) — ranged skeletons (real skeleton-bow anim) ────
+  - id: bone-archer
+    name: "Bone Archer"
+    count: 2
+    class: archer               # CLASS_ARCHER (bow) — punishes units caught out of cover
+    level: 5
+    autolevel: true
+    inventory:
+      - id: elven-longbow
+        fe_base: iron-bow
+    damage_type: piercing       # flavor label only
+    ai_pattern: defensive
+    skin:
+      look: "skeletal elven archer"
+      source: "FE-Repo: Battle Animations/Monsters - Basic Types/[Skeleton-Reskin] [U] Wight Sniper by DATonDemand"
+  # ── Frost-sentinels (ARMOR-KNIGHT, lance) — the DEF-SINK vanilla had, we lacked ─
+  - id: frost-sentinel
+    name: "Frost Sentinel"
+    count: 2
+    class: armor-knight         # CLASS_ARMOR_KNIGHT — high Def/HP; the ice-locked guardian anchor
+    level: 6
+    autolevel: true
+    inventory:
+      - id: frostbound-lance
+        fe_base: iron-lance
+    damage_type: piercing       # flavor label only
+    ai_pattern: hold_position   # ancient sentinels; hold the pillars, never chase
+    skin:
+      look: "ice-locked elven sentinel (frozen armor, not a skeleton)"
+      source: palette_swap      # vanilla Armor-Knight frame, frost palette — reads better than bone here
+  # ── ERUPTION reinforcements (#177): the dead erupt over turns 2/3/5 and race the ─
+  #    spread reliquary reward-sites (the Ch5 village-raid, in undead dress) ──────
+  - id: risen-spear-reinf
+    name: "Risen Spear-Guard"
+    count: 2
+    class: soldier
+    level: 5
     autolevel: true
     arrives_turn: 2             # the eruption's first wave, not a turn-1 alpha
     inventory:
-      - id: grave-claw
-        fe_base: fetid-claw     # heavier monster claw — the one real hitter of the eruption
-    damage_type: bludgeoning    # flavor label only
+      - id: elven-spear
+        fe_base: iron-lance
+    damage_type: piercing       # flavor label only
     ai_pattern: aggressive
-  - id: risen-archer
-    name: "Risen Archer"
+    skin:
+      look: "risen elven spear-guard, frost-pale"
+      source: palette_swap
+  - id: tomb-reaver-reinf
+    name: "Tomb Reaver"
     count: 2
-    class: bonewalker-bow       # CLASS_BONEWALKER_BOW — ranged skeleton; punishes units out of cover
+    class: fighter
     level: 5
     autolevel: true
     arrives_turn: 3
     inventory:
-      - id: risen-bow
-        fe_base: iron-bow
-    damage_type: piercing       # flavor label only
+      - id: rusted-greataxe
+        fe_base: iron-axe
+    damage_type: slashing       # flavor label only
     ai_pattern: aggressive
-  - id: barrow-hound
-    name: "Barrow Hound"
+    skin:
+      look: "risen elven axe-reaver, frost-pale"
+      source: palette_swap
+  - id: bone-archer-reinf
+    name: "Bone Archer"
     count: 2
-    class: mauthedoog           # CLASS_MAUTHEDOOG — skeletal grave-hound; fast, races the far niches
-    level: 6
+    class: archer
+    level: 5
     autolevel: true
     arrives_turn: 5             # the last wave races the far reliquary reward-sites
     inventory:
-      - id: gnashing-jaws
-        fe_base: rotten-claw
+      - id: elven-longbow
+        fe_base: iron-bow
     damage_type: piercing       # flavor label only
     ai_pattern: aggressive
+    skin:
+      look: "skeletal elven archer"
+      source: "FE-Repo: Battle Animations/Monsters - Basic Types/[Skeleton-Reskin] [U] Wight Sniper by DATonDemand"
   # ── CONVERTIBLE (#171): Sahnar rises HOSTILE at the eruption; Basil's Talk flips him ─
   - id: sahnar
     name: "Sahnar"
@@ -249,8 +304,11 @@ enemy_units:
       by: basil                 # the Natasha-donor Priest, walked up under escort to Talk him
       result: become_allied
       recruits_npc: sahnar      # joins as a playable Myrmidon (npcs/sahnar.yaml)
-    # roster grounded 2026-07-22 to FE8-Ch5 parity: 16 line + 6 eruption reinf + 1 convertible
-    # (supersedes the 2026-06-06 boss-chapter 6→9 bump).
+    skin:                       # the moon-elf mummy; already art-planned (#25 issue thread)
+      look: "Sahnar, hooded spectral moon-elf mummy"
+      source: "FE-Repo: Battle Animations/Monsters - Basic Types/[Skeleton-Custom] [U] Specter by Alexsplode (native palette)"
+    # roster grounded 2026-07-23 (rev.2) to FE8-Ch5 parity: 16 line + 6 eruption reinf + 1 convertible
+    # (supersedes the 2026-06-06 boss-chapter 6→9 bump and the 2026-07-22 undead-monster-class rev.1).
 
 # ── Sahnar's sarcophagus (RETIRED the 3-offering fetch-puzzle) ────────────────────
 # Superseded 2026-07-15: the recruit is now the Basil→Sahnar chaperone Talk (the Joshua beat,
@@ -266,8 +324,8 @@ events:
     type: cutscene
     ea_file: events/ch05-opening.ea
     description: >
-      The trail ends at the tomb; Ravisin reveals herself and her awakened beasts,
-      naming Auril. The cornered white moose snorts at her side. Battle begins.
+      The trail ends at the tomb; Ravisin reveals herself and raises the tomb's elven
+      dead, naming Auril. The cornered white moose snorts at her side. Battle begins.
   - trigger: eruption_turn        # scripted turn (~2/3/5, the Ch5 wave cadence) — EARTHQUAKE/TILECHANGE
     type: scripted_event
     ea_file: events/ch05-eruption.ea
@@ -302,7 +360,7 @@ economy:
                                  # map edges; the eruption's undead race to desecrate them (save-all bonus).
     - gift: booster-def          # ≈ Ch5 Dracoshield (+Def) — first stat-booster in the campaign
     - gift: booster-skl          # ≈ Ch5 Secret Book (+Skl)
-    - gift: armorslayer          # ≈ Ch5 Armorslayer (effective vs the vine-blight/armor guardians)
+    - gift: armorslayer          # ≈ Ch5 Armorslayer (now doubly apt — effective vs the Armor-Knight Frost-Sentinels)
     - gift: torch                # ≈ Ch5 Torch (flavored an elven everburning lamp)
   elven_store:                   # ≈ Ch5's Armory + Vendor — an ancient elven quartermaster's reliquary
     armory: true                 #   the party requisitions (narrative: the tomb kept its stores)
@@ -341,3 +399,11 @@ design_notes: >
   the goodberry shrub as a literal heal-staff unit (LOCKED 2026-06-20). No fog: the tension is
   the escort + eruption race, not vision. Map + roster build at the slice; targets checked via
   `make difficulty` (economy #170 + convertible/reinforcement dynamics #171).
+  ENEMY IDENTITY (rev.2, 2026-07-23): the force is RISEN ELVEN TOMB-GUARDIANS on vanilla FE8
+  infantry classes, skinned undead (the ch01 "vanilla class, our skin" pattern via
+  enemy_class_reskins). This keeps ch05 the TOMB (the dead) and OFF ch04's turf (the wolf hunt):
+  wolves are CUT, the lone beast is the cornered White Moose (ch04 payoff). Living-class stats
+  also mean clear-load parity is free (no glassy monster-class doubling; decisions.md). Per-unit
+  `skin:` names the intended FE-Repo asset (sword/bow guardians = real skeleton anims; lance/axe/
+  armor = frost palette-swaps) for the build-slice art track. The wolf ANIMS I scouted (Gwyllgi
+  repals, Hellhounds) are logged for CH04's beast pack — see issue #24.

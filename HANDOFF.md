@@ -43,25 +43,32 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   git hook resolves against the outer repo unless you strip `GIT_*`** (this bit us — flipped `core.bare`
   and wrote a corrupt commit; fixed in `_vanilla_decomp_text` + the map-tileset test fixture).
 
-## This session (2026-07-22, Opus — ch05 roster grounded, ROM-free web session)
+## This session (2026-07-22→23, Opus — ch05 roster grounded, ROM-free web session)
 
 - **Environment note:** ran in a Linux web container — the base ROM lives on Nicolas's Mac and
   isn't committed, so ROM builds / `verify_text` / mGBA playtests are OFF the table here. Chose
   ROM-free work: **`make difficulty` is explicitly ROM-free** (reads YAML + decomp `HEAD`), so the
   tier-1 roster-grounding loop runs fine. (One-time container setup: `pip install pillow pyyaml
   numpy`; `git submodule update --init --depth 1 fireemblem8u`.) Branch: `claude/mobile-app-token-context-u2psep`.
-- **ch05 "The Elven Tomb" roster GROUNDED to FE8-Ch5 parity (#25, tier-1 of the difficulty flow).**
-  The seed's 9 unmodeled enemies → a 23-unit force mirroring the vanilla Ch5 structure: **16 line +
-  6 eruption reinf + 1 convertible (Sahnar)** — matching vanilla's line 16 · reinf 6 · convertible 1
-  exactly. Weapons modeled via `inventory.fe_base`; eruption waves `arrives_turn` (#177); Sahnar
-  `convertible` (#171). **Verdict PARITY:** threat/slot 12.3 (x1.19) · clear-load/slot 4.2 (x0.81),
-  turn-1 threat 9.0 (≈ vanilla 8.1), recruit swing +1.00. New ADR in `decisions.md`: undead reskins
-  read GLASSY vs the parity yardstick (it doubles Spd ≤ 4), so clear-load parity comes from fast
-  beasts (`mauthedoog`/`gwyllgi`) + armored walls (`entoumbed`), NOT slow `mogall`/`revenant` fodder
-  or more levels — expect the same recomposition on ch06/ch08. `status: planned` unchanged (flips to
-  active only at the Lock, tier-5, per the flow). 188 tests + `make check` + schema tests all green.
+- **ch05 "The Elven Tomb" roster GROUNDED to FE8-Ch5 parity — rev.2 (#25, tier-1).** The force is now
+  **RISEN ELVEN TOMB-GUARDIANS on the vanilla FE8 infantry classes** (Soldier/Fighter/Mercenary/Archer/
+  Armor-Knight/Myrmidon), skinned undead — the ch01 "vanilla class, our skin" (`enemy_class_reskins`)
+  pattern. **Parity by construction** (living-class stats = the twin's stats): **verdict PARITY,
+  threat/slot 12.5 (x1.21) · clear-load/slot 5.0 (x0.97, ≈ vanilla 5.2)** — better-centered than rev.1.
+  Structure kept: 16 line + 6 eruption reinf + 1 convertible (Sahnar). **WOLVES CUT** (Nicolas: ch04 is
+  the beast chapter; the lone beast here is the White-Moose boss = ch04 payoff). Each enemy carries a
+  `skin:` field naming the intended FE-Repo asset (sword/bow = real skeleton anims Bonewalker/Specter/
+  Wight-Sniper; lance/axe/armor = frost palette-swaps). `decisions.md` ADR refined: the real glassy fix
+  is a SKIN divorce (undead skins on infantry classes), not a beast-spine composition fight — generalises
+  to ch06/ch08. `status: planned` unchanged (flips to active only at the Lock, tier-5). 209 tests +
+  `make check` + schema all green.
+- **rev.1 (2026-07-22, superseded):** undead MONSTER classes (revenant/mogall/entoumbed + beasts) tuned
+  to PARITY at clear-load x0.81 (band edge) — fought the "glassy" doubling problem. Replaced by rev.2.
+- **Wolf/beast FE-Repo anims scouted → logged on issue #24** (ch04's pack + Lupin): Gwyllgi repals,
+  Hellhounds, Wolf reskins, Wolf-Knight (mounted). So the ch04 branch finds them.
 - **Still owed for ch05 (later tiers):** map + placement (tier-2), spatial analyst check (tier-3),
-  `--ch05-boot` playtest (tier-4) — all need the ROM/build, so NOT this environment.
+  `--ch05-boot` playtest (tier-4), and the **enemy_class_reskins wiring + FE-Repo imports** (the art
+  track) — all need the ROM/build, so NOT this environment.
 
 ## NEXT SESSION — start here: finish the ch04 slice (`feat/24-ch04-map`)
 
