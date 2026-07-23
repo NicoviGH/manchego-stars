@@ -177,8 +177,9 @@ enemy_units:
     damage_type: piercing       # flavor label only
     ai_pattern: defensive       # hold the approaches to the depression
     skin:
-      look: "risen elven spear-guard, frost-pale"
-      source: palette_swap      # vanilla Soldier frame, frost/pale palette (no FE-Repo lance-skeleton)
+      look: "skeletal elven spear-guard"
+      source: "FE-Repo: Battle Animations/Infantry - (Lnc) Soldiers, Halberdiers/[Custom Halb] [U] Skeleberdier (skeleton lance; frost-repal)"
+      fallback: palette_swap    # if the import slips: frost-pale vanilla Soldier frame
   # ── Tomb-reavers (FIGHTER, axe) — the heavier risen dead ─────────────────────
   - id: tomb-reaver
     name: "Tomb Reaver"
@@ -254,8 +255,9 @@ enemy_units:
     damage_type: piercing       # flavor label only
     ai_pattern: aggressive
     skin:
-      look: "risen elven spear-guard, frost-pale"
-      source: palette_swap
+      look: "skeletal elven spear-guard"
+      source: "FE-Repo: Battle Animations/Infantry - (Lnc) Soldiers, Halberdiers/[Custom Halb] [U] Skeleberdier (skeleton lance; frost-repal)"
+      fallback: palette_swap
   - id: tomb-reaver-reinf
     name: "Tomb Reaver"
     count: 2

@@ -64,8 +64,12 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   `make check` + schema all green.
 - **rev.1 (2026-07-22, superseded):** undead MONSTER classes (revenant/mogall/entoumbed + beasts) tuned
   to PARITY at clear-load x0.81 (band edge) — fought the "glassy" doubling problem. Replaced by rev.2.
-- **Wolf/beast FE-Repo anims scouted → logged on issue #24** (ch04's pack + Lupin): Gwyllgi repals,
-  Hellhounds, Wolf reskins, Wolf-Knight (mounted). So the ch04 branch finds them.
+- **FE-Repo scouting COMPLETE → `docs/fe-repo-scouting.md`** (new). Key finding: undead humanoid anims
+  live on monster/sword/bow/magic frames; **lance/axe/armored undead are a gap → frost palette-swaps**
+  (one lance exception: `Skeleberdier`). ch05 skins sourced (Skeleberdier/Bonewalker/Wight-Sniper/
+  Specter/Gwyllgi + palette-swaps). Cross-chapter: wolf/beast anims **logged on issue #24** (ch04 pack +
+  Lupin); **ch06 Messie has NO off-the-shelf sea-monster** (custom/substitute needed — flagged); ch08
+  ice-troll → `Yetizerker`; undead casters (Skeleton Druid, Necromancer) exist if any chapter wants one.
 - **Still owed for ch05 (later tiers):** map + placement (tier-2), spatial analyst check (tier-3),
   `--ch05-boot` playtest (tier-4), and the **enemy_class_reskins wiring + FE-Repo imports** (the art
   track) — all need the ROM/build, so NOT this environment.
