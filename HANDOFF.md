@@ -43,7 +43,7 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   git hook resolves against the outer repo unless you strip `GIT_*`** (this bit us — flipped `core.bare`
   and wrote a corrupt commit; fixed in `_vanilla_decomp_text` + the map-tileset test fixture).
 
-## This session (2026-07-22→23, Opus — ch05 roster grounded, ROM-free web session)
+## This session (2026-07-22→23, Opus — ch05 roster grounded + dialogue foundation + opening locked, ROM-free web session)
 
 - **Environment note:** ran in a Linux web container — the base ROM lives on Nicolas's Mac and
   isn't committed, so ROM builds / `verify_text` / mGBA playtests are OFF the table here. Chose
@@ -75,27 +75,46 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 - **Still owed for ch05 (later tiers):** map + placement (tier-2), spatial analyst check (tier-3),
   `--ch05-boot` playtest (tier-4), and the **enemy_class_reskins wiring + FE-Repo imports** (the art
   track) — all need the ROM/build, so NOT this environment.
+- **PROTOCOL CLEANUP (2026-07-23):** work moved off the session branch onto **`feat/25-ch05-content`**
+  (proper feature branch) with **draft PR #196 → `main`** (references #25, does NOT close it). Issue #25
+  body corrected (stale brazier puzzle → real design) + progress comment posted. The old
+  `claude/mobile-app-token-context-u2psep` remote branch is an orphaned dup the proxy blocked me from
+  deleting (403 on ref-delete) — **kill it from the GitHub UI**.
+- **ch05 DIALOGUE foundation + OPENING done (co-written with Nicolas).** Voice bibles finalized & hardened:
+  **Ravisin** (certain, unsympathetic zealot — **pathos is BANNED in her bible; do NOT re-soften/mourn her**,
+  it kept creeping back), **Sahnar** (canon-corrected: **she/her**, elven royalty, awake-for-millennia;
+  bound-but-conscious, freed by Basil — no anti-human crusade), **Basil** (Groot-flavored but self-sufficient;
+  canonically Ravisin's own shrub), **Marty** (the "spore covenant" in `marty.md` — composter vs taxidermist;
+  it *resolves* the still-undead-Sahnar recruit instead of contradicting it). **OPENING LOCKED** in the ch05
+  YAML as TWO cutscenes (vanilla rhythm): `chapter_start` pre-map (ch04 thread; Lupin/Marty/Pinky; Ravisin
+  SILENT, saved) + `map_opening` on-map (Basil joins green→blue via the wolf-realization → asks for Sahnar).
+  Craft learnings folded into the `dialogue-pass` skill (people-talking-not-mood-narration; draft BOXED).
 
-## NEXT SESSION — start here (this branch `claude/mobile-app-token-context-u2psep`, ROM-free): ch05 DIALOGUE PASS
+## NEXT SESSION — start here (branch `feat/25-ch05-content`, draft PR #196, ROM-free): ch05 ERUPTION beat
 
-The ch05 roster is **fully settled** (do NOT re-litigate — see above; PARITY, deploy_limit 9, skins spec'd,
-wolves cut). The next ROM-free step is the **dialogue pass** for ch05's 4 beats. **Invoke the `dialogue-pass`
-skill** and follow it (it's co-written WITH Nicolas, never solo: bring 2–3 labelled variants per beat, he
-curates, lock each beat into the chapter YAML `script:` block — the ch04 pattern).
+Roster settled AND opening locked (do NOT re-litigate either — see above). Continue the **dialogue pass** on
+the remaining 3 beats via the `dialogue-pass` skill (co-written WITH Nicolas; bring **BOXED** variants only
+where there's a real fork; he curates; lock into the YAML `script:` blocks).
 
-- **Read first:** the `dialogue-pass` skill; `lore/frostmaiden-voices.md`; the ch05 YAML `events:` (the 4
-  beats) + its characterization notes; ch04's locked `script:` blocks as the format model.
-- **Phase 0 (do this first):** three speakers have **no Voice doc** — write `lore/ravisin.md`, `lore/sahnar.md`,
-  `lore/basil.md` (Voice section + quirks + sample lines) WITH Nicolas, grounded in `frostmaiden-voices.md` +
-  RotFM pp.80–83 + the YAML (Ravisin: Auril-zealot, "I gave you everything"; Sahnar: chaotic-good moon-elf
-  mummy, curious about modern druids, faint pumpkin-spice; Basil: sentient goodberry shrub → Priest). Bring
-  drafts for red-pen. The skill requires a speaker's Voice section before their lines.
-- **The 4 beats (story order):** `ch05-opening` (Ravisin reveal + raises the dead + moose) → `ch05-eruption`
-  (quake, undead erupt, sarcophagus cracks, Sahnar rises HOSTILE) → `ch05-sahnar-recruit` (Basil Talks him →
-  flip) → `ch05-ending` (Ravisin falls, repot/name Basil, turn toward Bremen / ch06 Messie hook).
-- **Length discipline (skill):** GBA 2-line boxes; ending ≤ ~10 lines; narration cards ≤ 25 words.
-- **DoD:** locked scripts land in `ch05-the-elven-tomb.yaml` with `LOCKED <date>` tags, `python3
-  tools/verify_text.py` is ROM-gated (runs on the Mac when the `.ea` is assembled), commit ROM-free.
+- **Read first:** the `dialogue-pass` skill (now carries the box-first + people-talking checks); the four
+  finalized voice bibles (`lore/ravisin.md`, `sahnar.md`, `basil.md`, `marty.md` §spore covenant); the ch05
+  YAML `events:` (opening locked; eruption/recruit/ending next).
+- **BEAT 2 — the eruption (`ch05-eruption`), the loaded one:** it all converges. Ravisin's **first words**
+  (hardened, pathos-free — certain, not aching); she **rips Sahnar up** (bound-but-conscious, against her will)
+  as a desperate power-play, and the lesser dead erupt (reinforcements, arrives_turn 2/3/5). **Basil's break**
+  — his innocent love for the witch dies ("No. Not her."), and his DEFERRED "she's a druid… she lost her way"
+  lands here against what she's doing. **Marty's covenant** fires, quietly (he goes silent in violence): "She
+  should be earth by now… you've kept her frozen, halfway home."
+- **BEAT 3 — Sahnar recruit (`ch05-sahnar-recruit`):** Basil, escorted across, Talks/frees the bound Sahnar
+  (the Joshua flip); she comes back to herself, chooses "not yet," joins.
+- **BEAT 4 — ending (`ch05-ending`):** Ravisin falls **proud, not repentant** (her banned list); the party
+  repots/names/adopts Basil (villain's-pet → party's-heart); turn toward Bremen (the ch06 Messie hook —
+  hinted, Ravisin never named).
+- **Guardrails (twice-flagged this session):** Ravisin is NEVER softened or mourned (Basil's kindness ≠ the
+  story pitying her); she stays Auril's, the big bad. Draft BOXED (~29–30 ch/line, on-map ≤29) from the first
+  pass — not prose.
+- **DoD:** locked scripts → `script:` blocks in the ch05 YAML with `LOCKED <date>`; commit ROM-free on
+  `feat/25-ch05-content` (feeds PR #196). `verify_text` + `.ea` assembly are ROM-gated (Nicolas's Mac).
 
 ## PARALLEL THREAD (ROM-gated, Nicolas's Mac): finish the ch04 slice (`feat/24-ch04-map`)
 

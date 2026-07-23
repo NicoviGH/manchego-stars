@@ -52,9 +52,13 @@ silently strip it. So, before locking beats:
 
 1. Bring **2–3 variant lines** per beat. Label what each variant trades off
    (e.g. "menace vs. brevity"). Nicolas picks or mixes; he owns voice.
-2. Stay inside the budget: boss taunt ≤ 4 lines / 1 screen; opening exchange ≤ ~8
-   boxes; ending beat ≤ ~10 lines; narration card 2–5 lines ≤ ~25 words; quote msgs
-   1–2 lines. Cut before adding.
+2. **Draft BOXED, never as prose** (2026-07-23 learning — prose-length lines read as
+   wordy and hide the real A-press pacing). Write every line as GBA boxes from the first
+   pass: **2 lines per box, ~29–30 chars/line** (on-map bubbles wrap at 29; cutscene
+   Text_BG ~42), `...` holds, `--` interrupts, one A-press per box — and show it *boxed*
+   to Nicolas, not as paragraphs. Stay inside the budget: boss taunt ≤ 4 lines / 1 screen;
+   opening exchange ≤ ~8 boxes; ending beat ≤ ~10 lines; narration card 2–5 lines ≤ ~25
+   words; quote msgs 1–2 lines. Cut before adding.
 3. Check every line against the speaker's banned list and calibration samples.
 4. Lock a beat before moving to the next; record locked text in the chapter YAML
    (or issue #43 for montage slots that lack wiring).
@@ -63,7 +67,15 @@ silently strip it. So, before locking beats:
 
 Compliance isn't quality — a line can pass every budget and banned list and still be
 flat. Judge the writing itself, and grade honestly: "functional" is a finding, not a
-pass. Checks, in order of weight:
+pass.
+
+**The master test (2026-07-23 learning — this is what fixed "dry"): people talking, not
+mood-narration.** A line that *describes the atmosphere* ("she wakes the sad things,"
+"nothing walks back out") is dead, however evocative. Every box is a PERSON — reacting,
+joking, needling, asking — never the scene narrating itself. The dread rides in on a
+concrete, in-character line (Basil *cheerfully*: "She sings to the dead ones. …I grow her
+berries."), not portentous grimdark. If a line could be a stage direction, cut it. Then the
+finer checks, in order of weight:
 
 1. **Cover-the-name test** — could only THIS speaker say it this way? A line any
    soldier/narrator could deliver is a flag, even if it breaks no rule.
