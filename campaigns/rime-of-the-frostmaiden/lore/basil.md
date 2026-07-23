@@ -1,7 +1,8 @@
 # Basil — the sentient goodberry shrub (ch05 recruit) — Lore & Voice
 
-> **DRAFT — Phase 0 of the ch05 dialogue pass (2026-07-23). Co-written with Nicolas;
-> NOT locked until he red-pens the §Voice — esp. the verbalness fork below.** ch05 "The
+> **DRAFT — Phase 0 of the ch05 dialogue pass (2026-07-23). Co-written with Nicolas.
+> Verbalness fork RESOLVED (Groot-flavored + self-sufficient); origin (Ravisin's shrub)
+> approved; calibration lines still await red-pen.** ch05 "The
 > Elven Tomb" recruit — the Natasha beat (fragile healer the party escorts). Mechanics in
 > [`chapters/ch05-the-elven-tomb.yaml`](../chapters/ch05-the-elven-tomb.yaml) (Priest;
 > Goodberries = the cosmetic skin on a vanilla heal staff; the in-fiction source of the
@@ -30,41 +31,40 @@ and it's *Basil*, not a blade, that turns the old duelist.
   berry. A living green thing, tended and kind, is the proof the old craft still grows —
   and that undoes four centuries of Sahnar's guard.
 
-## Voice — **PENDING a fork Nicolas must pick (see below)**
+## Voice — **LOCKED: Groot-flavored, but self-sufficient** (Nicolas, 2026-07-23)
 
-Whichever fork wins, the throughline is: **earnest, simple, nurturing, unarmored sincerity.**
-Basil is the one character with *no* edge — he says the kind true thing plainly. He is NOT
-Marty: Marty is a schmoozing mushroom with patter and an angle; Basil has no patter and no
-angle. Where Marty *sells*, Basil *offers*.
+**Terse, plain, few-word speech — but a *full* mind underneath.** Basil is **awakened, not
+simple-minded**: he understands everything; he just says it in few, uncomplicated words. The
+charm (and the poignancy) is the **gap between how little he says and how much he means** — a
+three-word line can land harder than a paragraph. Crucially he is **self-sufficient**: he
+carries his own beats, including the Sahnar recruit — **no translator crutch** (that was the
+rejected Fork B). Throughline: **earnest, nurturing, no edge at all.** He is NOT Marty — Marty
+is a schmoozing mushroom with patter and an angle; where Marty *sells*, Basil *offers*.
 
-### The fork (pick before any Basil beat locks)
-- **Fork A — Basil speaks, simply.** Short, earnest declaratives; present-tense; growth/weather
-  metaphors from a plant's short life (sun, rain, roots, seasons, "you look thirsty"). Childlike
-  but not stupid — fresh-sprouted wisdom. *Most flexible for the escort/recruit dialogue.*
-- **Fork B — Basil barely speaks (or not at all); the party reads him.** A Groot-style constraint:
-  he says a word or two (or rustles), and Marty/RBG interpret. Charming, but it makes him hard to
-  carry the Sahnar-recruit beat, so B likely needs a party-member translator on the field.
-
-My default below is **Fork A**; the calibration lines are written for it. If Nicolas wants B,
-the recruit beat re-routes through Marty.
-
-**Diction rules (Fork A)**
-- **Simple, present-tense declaratives.** "You are bleeding. Here. Eat." No subordinate-clause
-  sprawl.
-- **Plant/care metaphors from a short green life:** sun, rain, roots, the frost, growing toward
-  the light. He understands the world as *tending*.
+**Diction rules**
+- **Spare and plain.** Usually 2–5 words. Present tense. Plain nouns and verbs; almost no
+  adjectives; **no subordinate clauses.** Fragments are fine — often better.
+- **Spare words ≠ small mind.** The economy is a plant learning to speak, not a simpleton. A
+  short line should carry real weight; let the silence around it do work.
 - **Feeding = affection.** He offers food as comfort, greeting, and love — the berry is the line.
-- **No guile, no irony, no sarcasm.** He means everything. His comedy is his *literalness*, never
-  a wink.
-- **Device (budget: one/scene):** the **offered berry / small kindness** as the recurring beat —
-  the gesture is his rhetoric. Once a scene.
+- **Plant-logic, lightly:** sun, rain, roots, frost, growing. He reads the world as *tending*.
+- **No guile, irony, or sarcasm.** He means every word. His comedy is his *literalness*, never a
+  wink.
+- **Device (budget: one/scene):** the **offered berry / small kindness** — the gesture is his
+  rhetoric. Once a scene.
 
-**Calibration lines (Fork A draft — for Nicolas's red-pen; not yet used in any beat)**
-- (found/named) "You gave me a pot. And a name. …I will grow you so many berries."
-- (healing in battle) "Hold still. You will feel the sun again. Eat."
-- (the Sahnar turn, offering the berry to a hostile mummy) "You look so tired. Four hundred
-  years is a long winter. Here — it's sweet. You don't have to guard anymore."
-- (gentle, to Marty) "You talk to make friends. I feed them. …Both are good."
+**Calibration lines (draft — for Nicolas's red-pen; not yet used in any beat)**
+- (found / accepting the name) "A pot. A name. …Basil." → "I will grow. For you."
+- (healing in battle) "Hurt. Here. Eat." / "Eat. Grow. Stay."
+- (refusing Ravisin as she rips Sahnar up — his breaking point) "No. Not him. …I won't."
+- (the Sahnar turn — **carries the recruit alone**, offering the berry to the bound mummy)
+  "She hurt you. You are not hers. …Wake up. I have you. Eat."
+- (to Marty, on their two ways of winning people) "You sell. I feed. …Same."
+
+**Banned:** needing a party-member to translate for him (rejected — he stands on his own);
+writing him **simple-minded** (spare speech, full soul — never dumb); long or winding sentences;
+subordinate clauses; cutesy baby-talk / "hehe" overload; modern slang; any edge (sarcasm,
+menace — he has none); a literal "I am Basil" Groot-quote gimmick unless Nicolas asks for it.
 
 **Banned:** cutesy baby-talk / overload of "hehe"s; modern slang; sarcasm, menace, or any edge
 (he has none); long winding sentences (he's simple, not verbose); making him *dumb* — he is
