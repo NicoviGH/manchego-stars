@@ -55,7 +55,9 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   Armor-Knight/Myrmidon), skinned undead — the ch01 "vanilla class, our skin" (`enemy_class_reskins`)
   pattern. **Parity by construction** (living-class stats = the twin's stats): **verdict PARITY,
   threat/slot 12.5 (x1.21) · clear-load/slot 5.0 (x0.97, ≈ vanilla 5.2)** — better-centered than rev.1.
-  Structure kept: 16 line + 6 eruption reinf + 1 convertible (Sahnar). **WOLVES CUT** (Nicolas: ch04 is
+  Structure kept: 16 line + 6 eruption reinf + 1 convertible (Sahnar). **`deploy_limit: 9`** set —
+  the difficulty-driven value (vanilla FE8 Ch5's 9 slots, fe8-pacing §1b; NOT map-tile-driven — the map
+  is painted to fit); verdict unchanged (ratio is cap-invariant). **WOLVES CUT** (Nicolas: ch04 is
   the beast chapter; the lone beast here is the White-Moose boss = ch04 payoff). Each enemy carries a
   `skin:` field naming the intended FE-Repo asset (sword/bow = real skeleton anims Bonewalker/Specter/
   Wight-Sniper; lance/axe/armor = frost palette-swaps). `decisions.md` ADR refined: the real glassy fix

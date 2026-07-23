@@ -97,14 +97,19 @@ difficulty_note: >
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
+  deploy_limit: 9              # = vanilla FE8 Ch5's 9 player slots (fe8-pacing-reference.md §1b,
+                               # decomp-verified). A DIFFICULTY lever, not a map count — the field
+                               # size is set by parity, and the map is painted to provide 9 start
+                               # tiles (decisions.md §Field parity). Grounds the /slot parity read.
   note: >
     Deployable pool by Ch5: 7 PCs + Pinky + Baxby (Cav) + Trex (Thief) + Lupin
     (beast-Cav, won in ch04 — a clean all-chapter combatant, +1.0 kills/round the static
     party number omits). Basil (Priest) is present from the start as the fragile RECRUITER
     (must be fielded and protected to Talk Sahnar — the Natasha role), NOT a fighter.
     Sahnar is NOT in the starting field — he rises mid-combat as a HOSTILE convertible
-    (the Joshua flip) and joins only once Basil Talks him. deploy_limit caps the field to
-    FE8-Ch5 parity (TBD this pass). Positions set in Tiled.
+    (the Joshua flip) and joins only once Basil Talks him. With deploy_limit 9 and a pool
+    of 10 (7 PCs + Pinky + Baxby + Trex + Lupin, minus Basil-as-recruiter tradeoffs), the
+    player leaves one unit home — a real cut for a boss chapter. Positions set in Tiled.
 
 # ── Enemy Units (vanilla FE — grounded to FE8-Ch5 parity, #25) ────────────────────
 # Grounding pass rev.2 (2026-07-23): the force is now RISEN ELVEN TOMB-GUARDIANS on the
