@@ -10,14 +10,19 @@
 
 ## Concept
 
-A small **sentient goodberry shrub** the party finds in the tomb — a little green life left
-over from the old druidcraft (kin, in a way, to whatever Ravisin twists). They repot him,
-name him **Basil**, and he becomes their second healer: he grows Goodberries and hands them
-out, which is every heal-staff and Vulnerary the party drinks. He is **guileless, gentle,
-and growing** — literally, over the campaign. He is the heart: no guile, no agenda, just
-the urge to feed and mend the people around him. As the fragile recruiter he must be walked
-into danger to reach Sahnar — and it's *Basil*, not a blade, that turns the old duelist.
+A small **sentient goodberry shrub** — and, in canon, **Ravisin's own**: her awakened
+companion, kept at the druid's side so she always has goodberries to hand (RotFM). So Basil
+is the **villain's gentle pet, made kind** — the one soft thing a grieving zealot keeps
+close. When Ravisin falls, the party takes him in: repot him, name him **Basil**, and he
+becomes their second healer — he grows Goodberries and hands them out, which is every
+heal-staff and Vulnerary the party drinks. He is **guileless, gentle, and growing**
+(literally, over the campaign): no guile, no agenda, just the urge to feed and mend the
+people around him. As the fragile recruiter he must be walked into danger to reach Sahnar —
+and it's *Basil*, not a blade, that turns the old duelist.
 
+- **The arc:** Ravisin's shrub → the party's heart. Made by the old druidcraft, kept by its
+  coldest servant; in the party's hands the same green magic just *feeds people*. He is living
+  proof it didn't have to serve the winter. (Approved flavor, 2026-07-23, Nicolas.)
 - **Wants:** sun, water, and for everyone to be fed and unhurt. That's the whole list.
 - **Love-language is feeding** (the campaign's "feed them" motif — cf. Lupin's pack, ch04):
   a berry offered *is* Basil saying he cares. He heals by feeding.
@@ -70,3 +75,12 @@ naïve and wise, not foolish.
    off it.
 2. **Does Basil name himself or accept the name?** (Draft: the party names him; he *accepts* it,
    which is his first act of personhood — a small, good beat.)
+3. **When does he leave Ravisin?** The new origin raises a timing question the ch05 YAML is
+   currently inconsistent on: deployment says Basil is a starting player unit (the recruiter who
+   Talks Sahnar), but the *ending* beat says the party "finds/repots/names" him after the fight.
+   If he's Ravisin's, he can't be both. Likeliest fix: he's her gentle non-combatant at the
+   fight's start, **defects early** (he won't fight; the party shelters him), then Talks Sahnar,
+   then is formally adopted at the end. Settle before the opening/ending beats lock.
+4. **Does Basil grieve Ravisin?** He was hers. When she falls there's a poignant option — the
+   gentle pet mourning the cold woman who kept him fed. Powerful, but risks muddying "helping the
+   town is heroic." Your call whether to touch it or leave him simply relieved.
