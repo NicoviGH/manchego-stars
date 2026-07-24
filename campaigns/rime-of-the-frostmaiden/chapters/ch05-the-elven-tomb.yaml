@@ -373,8 +373,10 @@ events:
       The tomb floor breaks (Phantom-Ship EARTHQUAKE + sequential TILECHANGE): undead
       REINFORCEMENTS erupt over turns and race the party for the spread reliquary
       reward-sites (the Ch5 village-raid, in undead dress). The same quake cracks the
-      sarcophagus — Sahnar the moon-elf mummy rises, HOSTILE, a fast crit-Myrmidon
-      guardian (smells faintly of pumpkin spice). He flips only when Basil reaches him.
+      sarcophagus — and Ravisin SEIZES Sahnar, the tomb's ancient guardian, who has been
+      undead and awake for millennia (she puppets a bound soul; she does NOT reanimate a
+      fresh corpse — see lore/sahnar.md). Sahnar walks HOSTILE, a fast crit-Myrmidon
+      (smells faintly of pumpkin spice). She flips only when Basil reaches her.
   - trigger: sahnar_talk          # Basil (Natasha-donor) Talks the risen Sahnar (Joshua-donor)
     type: dialogue
     ea_file: events/ch05-sahnar-recruit.ea

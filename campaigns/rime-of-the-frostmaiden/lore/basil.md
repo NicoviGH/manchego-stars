@@ -13,8 +13,9 @@
 
 A small **sentient goodberry shrub** — and, in canon, **Ravisin's own**: her awakened
 companion, kept at the druid's side so she always has goodberries to hand (RotFM). So Basil
-is the **villain's gentle pet, made kind** — the one soft thing a grieving zealot keeps
-close. When Ravisin falls, the party takes him in: repot him, name him **Basil**, and he
+is the **villain's gentle pet, made kind** — the one soft thing the cold woman keeps
+close. (Not "a grieving zealot": `ravisin.md` bans grief/pathos for her outright — she keeps
+him because a druid wants goodberries to hand, not because she is lonely.) When Ravisin falls, the party takes him in: repot him, name him **Basil**, and he
 becomes their second healer — he grows Goodberries and hands them out, which is every
 heal-staff and Vulnerary the party drinks. He is **guileless, gentle, and growing**
 (literally, over the campaign): no guile, no agenda, just the urge to feed and mend the
@@ -64,23 +65,18 @@ is a schmoozing mushroom with patter and an angle; where Marty *sells*, Basil *o
 **Banned:** needing a party-member to translate for him (rejected — he stands on his own);
 writing him **simple-minded** (spare speech, full soul — never dumb); long or winding sentences;
 subordinate clauses; cutesy baby-talk / "hehe" overload; modern slang; any edge (sarcasm,
-menace — he has none); a literal "I am Basil" Groot-quote gimmick unless Nicolas asks for it.
-
-**Banned:** cutesy baby-talk / overload of "hehe"s; modern slang; sarcasm, menace, or any edge
-(he has none); long winding sentences (he's simple, not verbose); making him *dumb* — he is
-naïve and wise, not foolish.
+menace — he has none); a literal "I am Basil" Groot-quote gimmick unless Nicolas asks for it;
+**grieving or mourning Ravisin** (`ravisin.md`: she is never mourned — see Q4 below).
 
 ## Open questions for Nicolas
-1. **The verbalness fork (A vs B)** above — the load-bearing decision; everything downstream keys
-   off it.
+1. ~~**The verbalness fork (A vs B)**~~ — **RESOLVED 2026-07-23:** Groot-flavored + self-sufficient
+   (see §Voice header).
 2. **Does Basil name himself or accept the name?** (Draft: the party names him; he *accepts* it,
    which is his first act of personhood — a small, good beat.)
-3. **When does he leave Ravisin?** The new origin raises a timing question the ch05 YAML is
-   currently inconsistent on: deployment says Basil is a starting player unit (the recruiter who
-   Talks Sahnar), but the *ending* beat says the party "finds/repots/names" him after the fight.
-   If he's Ravisin's, he can't be both. Likeliest fix: he's her gentle non-combatant at the
-   fight's start, **defects early** (he won't fight; the party shelters him), then Talks Sahnar,
-   then is formally adopted at the end. Settle before the opening/ending beats lock.
-4. **Does Basil grieve Ravisin?** He was hers. When she falls there's a poignant option — the
-   gentle pet mourning the cold woman who kept him fed. Powerful, but risks muddying "helping the
-   town is heroic." Your call whether to touch it or leave him simply relieved.
+3. ~~**When does he leave Ravisin?**~~ — **RESOLVED 2026-07-23 by the locked ch05 opening:** he is
+   a **GREEN ally** on the map from the start (not Ravisin's unit, not a starting player unit), and
+   **converts to a player unit on the `map_opening` join** when he asks to be taken to Sahnar. The
+   `chapter_end` beat is then the *adoption* (repot + name), not the discovery.
+4. ~~**Does Basil grieve Ravisin?**~~ — **RESOLVED: no.** `ravisin.md`'s banned list settles it —
+   she is never mourned or softened, and Basil's kindness must not read as the story pitying her.
+   Play him **relieved**, not bereaved.
