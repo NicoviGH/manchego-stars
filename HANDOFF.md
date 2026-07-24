@@ -43,7 +43,109 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   git hook resolves against the outer repo unless you strip `GIT_*`** (this bit us — flipped `core.bare`
   and wrote a corrupt commit; fixed in `_vanilla_decomp_text` + the map-tileset test fixture).
 
-## NEXT SESSION — start here: finish the ch04 slice (`feat/24-ch04-map`)
+## This session (2026-07-22→23, Opus — ch05 roster grounded + dialogue foundation + opening locked, ROM-free web session)
+
+- **Environment note:** ran in a Linux web container — the base ROM lives on Nicolas's Mac and
+  isn't committed, so ROM builds / `verify_text` / mGBA playtests are OFF the table here. Chose
+  ROM-free work: **`make difficulty` is explicitly ROM-free** (reads YAML + decomp `HEAD`), so the
+  tier-1 roster-grounding loop runs fine. (One-time container setup: `pip install pillow pyyaml
+  numpy`; `git submodule update --init --depth 1 fireemblem8u`.) Branch: `claude/mobile-app-token-context-u2psep`.
+- **ch05 "The Elven Tomb" roster GROUNDED to FE8-Ch5 parity — rev.2 (#25, tier-1).** The force is now
+  **RISEN ELVEN TOMB-GUARDIANS on the vanilla FE8 infantry classes** (Soldier/Fighter/Mercenary/Archer/
+  Armor-Knight/Myrmidon), skinned undead — the ch01 "vanilla class, our skin" (`enemy_class_reskins`)
+  pattern. **Parity by construction** (living-class stats = the twin's stats): **verdict PARITY,
+  threat/slot 12.5 (x1.21) · clear-load/slot 5.0 (x0.97, ≈ vanilla 5.2)** — better-centered than rev.1.
+  Structure kept: 16 line + 6 eruption reinf + 1 convertible (Sahnar). **`deploy_limit: 9`** set —
+  the difficulty-driven value (vanilla FE8 Ch5's 9 slots, fe8-pacing §1b; NOT map-tile-driven — the map
+  is painted to fit); verdict unchanged (ratio is cap-invariant). **WOLVES CUT** (Nicolas: ch04 is
+  the beast chapter; the lone beast here is the White-Moose boss = ch04 payoff). Each enemy carries a
+  `skin:` field naming the intended FE-Repo asset (sword/bow = real skeleton anims Bonewalker/Specter/
+  Wight-Sniper; lance/axe/armor = frost palette-swaps). `decisions.md` ADR refined: the real glassy fix
+  is a SKIN divorce (undead skins on infantry classes), not a beast-spine composition fight — generalises
+  to ch06/ch08. `status: planned` unchanged (flips to active only at the Lock, tier-5). 209 tests +
+  `make check` + schema all green.
+- **rev.1 (2026-07-22, superseded):** undead MONSTER classes (revenant/mogall/entoumbed + beasts) tuned
+  to PARITY at clear-load x0.81 (band edge) — fought the "glassy" doubling problem. Replaced by rev.2.
+- **FE-Repo scouting COMPLETE → `docs/fe-repo-scouting.md`** (new). Key finding: undead humanoid anims
+  live on monster/sword/bow/magic frames; **lance/axe/armored undead are a gap → frost palette-swaps**
+  (one lance exception: `Skeleberdier`). ch05 skins sourced (Skeleberdier/Bonewalker/Wight-Sniper/
+  Specter/Gwyllgi + palette-swaps). Cross-chapter: wolf/beast anims **logged on issue #24** (ch04 pack +
+  Lupin); **ch06 Messie has NO off-the-shelf sea-monster** (custom/substitute needed — flagged); ch08
+  ice-troll → `Yetizerker`; undead casters (Skeleton Druid, Necromancer) exist if any chapter wants one.
+- **Still owed for ch05 (later tiers):** map + placement (tier-2), spatial analyst check (tier-3),
+  `--ch05-boot` playtest (tier-4), and the **enemy_class_reskins wiring + FE-Repo imports** (the art
+  track) — all need the ROM/build, so NOT this environment.
+- **PROTOCOL CLEANUP (2026-07-23):** work moved off the session branch onto **`feat/25-ch05-content`**
+  (proper feature branch) with **draft PR #196 → `main`** (references #25, does NOT close it). Issue #25
+  body corrected (stale brazier puzzle → real design) + progress comment posted. The old
+  `claude/mobile-app-token-context-u2psep` remote branch is an orphaned dup the proxy blocked me from
+  deleting (403 on ref-delete) — **kill it from the GitHub UI**.
+- **ch05 DIALOGUE foundation + OPENING done (co-written with Nicolas).** Voice bibles finalized & hardened:
+  **Ravisin** (certain, unsympathetic zealot — **pathos is BANNED in her bible; do NOT re-soften/mourn her**,
+  it kept creeping back), **Sahnar** (canon-corrected: **she/her**, elven royalty, awake-for-millennia;
+  bound-but-conscious, freed by Basil — no anti-human crusade), **Basil** (Groot-flavored but self-sufficient;
+  canonically Ravisin's own shrub), **Marty** (the "spore covenant" in `marty.md` — composter vs taxidermist;
+  it *resolves* the still-undead-Sahnar recruit instead of contradicting it). **OPENING LOCKED** in the ch05
+  YAML as TWO cutscenes (vanilla rhythm): `chapter_start` pre-map (ch04 thread; Lupin/Marty/Pinky; Ravisin
+  SILENT, saved) + `map_opening` on-map (Basil joins green→blue via the wolf-realization → asks for Sahnar).
+  Craft learnings folded into the `dialogue-pass` skill (people-talking-not-mood-narration; draft BOXED).
+- **Ravisin RE-CENTERED on Auril (4th fix).** Her bible kept sliding back to a loggers-grudge/revenge plot;
+  now rewritten so her motive is **Auril's cosmic winter, full stop** (acolyte snuffing warmth for the
+  goddess; loggers = incidental warmth), with grudge/grievance/revenge added to her banned list. Then started
+  **BEAT 2 (the eruption)** — structure agreed but **lines not landing yet** (see NEXT). Fixed a consistency
+  bug in passing: Ravisin **SEIZES** the already-undead Sahnar, she does NOT reanimate her (sahnar.md/marty.md/
+  narrative aligned).
+
+## NEXT SESSION — start here (branch `feat/25-ch05-content`, draft PR #196, ROM-free): ch05 ERUPTION beat
+
+Roster settled AND opening locked (do NOT re-litigate either — see above). Continue the **dialogue pass** on
+the remaining 3 beats via the `dialogue-pass` skill (co-written WITH Nicolas; bring **BOXED** variants only
+where there's a real fork; he curates; lock into the YAML `script:` blocks).
+
+- **Read first:** the `dialogue-pass` skill (now carries the box-first + people-talking checks); the four
+  finalized voice bibles (`lore/ravisin.md`, `sahnar.md`, `basil.md`, `marty.md` §spore covenant); the ch05
+  YAML `events:` (opening locked; eruption/recruit/ending next).
+- **BEAT 2 — the eruption (`ch05-eruption`) — IN PROGRESS; lines NOT landing (this is why we handed off).**
+  Structure agreed with Nicolas: keep it **Ravisin-FORWARD**. She's pressed, escalates, and **SEIZES the
+  tomb's ancient guardian Sahnar** — who is ALREADY undead (awake millennia), so she *puppets an existing
+  bound soul*, she does NOT reanimate a fresh corpse. The lesser dead rouse as reinforcements (arrives_turn
+  2/3/5). **Sahnar gets NO line — a body Ravisin takes; do NOT spotlight her** (Nicolas: "don't draw more
+  attention to Sahnar"). **Basil's break + Marty's covenant are PULLED OUT** of this beat to keep it hers —
+  at most one small quiet Basil beat; Marty's covenant likely moves to the recruit.
+  - **Ravisin's DOCTRINE (use this — research-grounded):** the **purification / "blight"** doctrine. Warm
+    humanity is **the blight / sickness / fever**; Auril's winter is the **cure / cleansing / salvation**
+    (the world was clean-white-still once; warmth is the corruption); she **cleanses, does not kill**.
+    ⚠️ Community DM-note finding: the book Ravisin's rich material is almost ALL **sister-revenge/grief** (a
+    guide literally says she's grief-driven "rather than ideological commitment to Auril") — which we CUT.
+    Blight/cure/cleanse is the strongest Auril-only vein; do NOT re-import grief.
+  - **The lore drop (her job in the beat):** she's **one of Auril's legion; the cold outlasts her** — killing
+    her ends nothing. Keep it GENERIC so the player connects it themselves to the prologue frost-druid
+    **Sephek Kaltro** (Auril's servant who escaped; recurring Act-II villain — the Children-of-Auril thread is
+    ALREADY seeded, not a new "Circle of Winter" to invent). Build it to ECHO Sephek's line *"You cut the ice…
+    not the cold that made it…"* → e.g. "you cut one servant, not the cold behind it," "you cannot kill a season."
+  - **THE OPEN PROBLEM:** every Ravisin line so far reads **FLAT** to Nicolas — doctrine *statements*, not a
+    person. Theme is right, craft isn't. Next instance: make her **LIVE** — concrete frost imagery (steaming
+    breath, fever, the clean white world, one flake of the storm) + her **chilling sincerity** (she thinks
+    she's being *merciful*: "I don't hate you — one doesn't hate a sickness"), people-talking not
+    doctrine-narration. Bring OPTIONS, iterate, Nicolas curates. REJECTED so far (all too flat): "warm things
+    / her things dead," "you are the blight / the winter is the cure / I cleanse," "you cut one servant / her
+    hands are legion."
+  - **Pitfall:** do NOT have her reference **fire** the party carries — nobody wields fire and **Rootis is a
+    snow/cold sorcerer**. Frame the party as **warm / alive** (breath, blood-heat, fever), never fire-bearers.
+- **BEAT 3 — Sahnar recruit (`ch05-sahnar-recruit`):** Basil, escorted across, Talks/frees the bound Sahnar
+  (the Joshua flip); she comes back to herself, chooses "not yet," joins.
+- **BEAT 4 — ending (`ch05-ending`):** Ravisin falls **proud, not repentant** (her banned list); the party
+  repots/names/adopts Basil (villain's-pet → party's-heart); turn toward Bremen (the ch06 Messie hook —
+  hinted, Ravisin never named).
+- **Guardrails (flagged 3× this session — do NOT re-break):** Ravisin's motive is **Auril's cosmic winter,
+  full stop** — she's the Frostmaiden's acolyte snuffing warmth for the goddess. **NO loggers-grudge, NO
+  grievance/revenge, NO grief, NO tragic/sympathetic framing** (all banned in `ravisin.md`); the loggers are
+  incidental warmth, never a wronged party. She's never softened or mourned (Basil's kindness ≠ the story
+  pitying her). Draft BOXED (~29–30 ch/line, on-map ≤29) from the first pass — not prose.
+- **DoD:** locked scripts → `script:` blocks in the ch05 YAML with `LOCKED <date>`; commit ROM-free on
+  `feat/25-ch05-content` (feeds PR #196). `verify_text` + `.ea` assembly are ROM-gated (Nicolas's Mac).
+
+## PARALLEL THREAD (ROM-gated, Nicolas's Mac): finish the ch04 slice (`feat/24-ch04-map`)
 
 The combat slice is hosted and builds; it is **not** a complete chapter. To finish and PR-merge #24:
 

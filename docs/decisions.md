@@ -567,6 +567,14 @@ _Decided: 2026-06-18 (Nicolas; difficulty analysis session — supersedes the op
 **The tier-3 spatial check = deterministic facts fed to an LLM *analyst* — NOT an LLM *playing* the game.** LLMs are weak at exact grid-tactical *execution* (tile-counting, threat-range math, turn-order) — so an LLM playing the chapter to measure difficulty produces noisy numbers that measure "how badly the bot plays," not the chapter. But an LLM reading *pre-computed* spatial facts and producing a *qualitative* read (where's the danger, what's the trap, is the terrain fair) is in its wheelhouse. Division of labor: **code computes the hard facts; the LLM reads them.** Use the analyst for structure, never for hard numbers (it can't simulate — in validation it self-contradicted on turn-count). Validated 2026-07-17: a **Haiku** analyst, given only vanilla Ch4's placements/AI/stats (chapter name withheld), independently reproduced `make difficulty`'s verdict (ranged-magic-on-squishies is the sharp edge), *found the Mogall crossfire cluster the aspatial tool can't see*, and correctly flagged terrain as the #1 missing input. **YAGNI:** the analyst reads raw coordinates well enough that we are **not** building a reachability/threat-per-turn metric extractor until we feel its absence during real map authoring.
 _Decided: 2026-07-17 (Nicolas + CLAUDE; ch04 roster-grounding session — Nicolas pushed on "the model ignores terrain/AI/positioning," validated by the Ch4 analyst experiment)_
 
+**Corollary — our undead reskins read GLASSY against the parity yardstick, so match clear-load with high-Spd beasts + armored walls, not more fodder or more levels.**
+The parity yardstick doubles any enemy with Spd ≤ 4 (Spd 8, iron-sword), which halves its clear-load. Our tomb-flavored undead lean on the slowest FE8 monster classes — `mogall` (Spd ~0–4) and `revenant` (Spd ~1–2) — which get doubled and die in ~1 round no matter their HP/Def, so a force built from them lands high on *threat* but far under vanilla's *clear-load* (the living-soldier twins aren't doubled). Adding levels barely helps (those classes' Spd never clears the threshold) and adding armor (`entoumbed`, Spd ~2) helps only via lower threat, not durability. The lever that actually raises clear-load is composition: the durability spine must be the **fast beasts** (`mauthedoog`/`gwyllgi`, Spd ≥ 10 — never doubled, real rounds-to-kill) plus a few **armored walls** (`entoumbed`, low-threat), with the doubled `mogall`/`revenant` fodder thinned to a garnish. Applied to ch05 (16 undead line + 6 eruption reinf + 1 convertible) this reached PARITY at threat x1.19 · clear-load x0.81 (band's low edge). Expect the same recomposition on the undead-heavy chapters ahead (ch06 Messie, ch08). The static bar is still just a proxy — playtest is the arbiter.
+_Decided: 2026-07-22 (CLAUDE; ch05 roster-grounding, #25 — tier-1 of the flow above, ROM-free web session)_
+
+**Refinement (2026-07-23) — the RIGHT fix for the glassy problem is a SKIN divorce, not a composition fight: put undead skins on vanilla INFANTRY classes (the ch01 pattern), and reserve beasts for chapters where beasts are on-story.**
+The corollary above is correct physics but its *recommendation* (lean the spine on beasts) was a crutch. The clean fix — adopted for ch05 rev.2 — is the one Nicolas pushed: keep the vanilla FE8 twin's **living-class stats** (Soldier/Fighter/Mercenary/Archer/Armor-Knight/Myrmidon) and **reskin them undead** via `enemy_class_reskins` (exactly how ch01 ships "Vanilla Ch1 enemy table, goblin-skinned"). Then clear-load parity is *free* (living classes aren't doubled; the Armor-Knight is the Def-sink the monster palette couldn't produce) and there is no glassy fight. ch05 rev.2 (risen elven guardians on infantry classes + the lone White-Moose boss) landed threat x1.21 · **clear-load x0.97** — better-centered than rev.1's x0.81. Two further reasons this beats the beast-spine crutch: (1) **narrative variety** — ch04 IS the beast/wolf chapter (the hunt, Marty's parley); reusing wolves in ch05 makes it "ch04 indoors," so ch05's dead-tomb identity requires *not* leaning on beasts (wolves CUT; the moose stays as the ch04-quarry payoff); (2) it generalises — ch06 (Messie) and ch08 get their own on-story skins over vanilla-parity classes rather than a monster-class recomposition each time. Asset note (FE-Repo, all [U]): undead **sword/bow** skeleton anims exist off-the-shelf (Bonewalker/Specter/Stalfos, Wight Sniper); **lance/axe/armored** undead humanoids do not → those slots use frost/pale palette-swaps of the vanilla frame (an ice-locked sentinel reads better than a bone-knight anyway). The static bar is still a proxy — playtest is the arbiter.
+_Decided: 2026-07-23 (Nicolas + CLAUDE; ch05 roster rev.2, #25 — "divorce skin from class; don't refight parity per chapter")_
+
 **Recruit budget: the roster tracks vanilla's field-growth curve to a ~16–18 pool — NOT capped at Ch5.**
 The binding *field* size is `deploy_limit` = vanilla chapter N's deploy-slot count (§Field parity;
 table in `fe8-pacing-reference.md` §1b). That curve, [decomp]-verified through Ch14a, **climbs and
@@ -2397,6 +2405,25 @@ curation at every level, never accepted wholesale). Voice bibles live as **§Voi
 rules, calibration lines, banned list; `lore/narration.md` holds the card/crawl/tour register + vanilla pacing
 budgets measured from the decomp). Workflow + budgets + insertion gates: `.claude/skills/dialogue-pass/SKILL.md`.
 _Decided: 2026-06-09 (community research: FEU writing threads, DM voice guides, Dramatron CHI'23)._
+
+**Dialogue-pass craft learnings (2026-07-23, ch05 opening) — folded into the skill's Craft check.**
+Two failure modes surfaced hard while writing ch05 and are now first-class checks in
+`.claude/skills/dialogue-pass/SKILL.md`: (1) **people talking, not mood-narration** — the #1 cause of
+"dry"; a line that *describes atmosphere* ("she wakes the sad things") is dead even when evocative, so
+every box must be a person reacting/joking/asking, with dread carried by a concrete in-character line;
+(2) **draft BOXED, not prose** — prose-length lines read wordy and hide the A-press pacing, so lines are
+hand-boxed (2 lines, ~29–30 ch; on-map ≤29) from the first pass and shown boxed. Also: **canon research
+in the ROM-free web env** — the RotFM PDF lives on Nicolas's Mac, so fill canon gaps from online
+actual-play recaps + the Forgotten Realms wiki (this caught Sahnar's real identity: female, elven royalty,
+awake-and-aware for millennia). Verify against Nicolas's table, which outranks book canon for our version.
+_Decided: 2026-07-23 (ch05 opening dialogue pass, ROM-free web session)._
+
+**ch05 opening uses the vanilla two-scene rhythm: a focused PRE-MAP cutscene + an ON-MAP opening scene.**
+`chapter_start` (Text_BG) carries the ch04 thread and mood (party descends the gateway into the open-air
+hollow; Lupin/Marty/Pinky; Ravisin stays SILENT — saved for the eruption); then the map loads and a
+`map_opening` on-map scene brings the enemies into view and Basil (a green ally) joins. More dynamic than
+one talking-heads cutscene, and it's what FE8 does. Villain reveal is *earned* at the eruption (she acts,
+she doesn't monologue at the door). _Decided: 2026-07-23 (ch05 opening, with Nicolas)._
 **In-engine dialogue review is motion, not stills:** `tools/playtest/run.sh record` captures every 5th frame
 through both scenes; deduped GIFs (opened in Safari) are what Nicolas signs off before art-visible text commits —
 static screenshots catch the typewriter mid-stroke and false-alarm as cut-off text. _Decided: 2026-06-10 with

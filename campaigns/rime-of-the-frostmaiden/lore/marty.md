@@ -57,6 +57,36 @@ than fight it. (Interview with Nicolas — Marty's own player — 2026-06-10.)
 menace or gloating about his powers, robot/telepath-speak ("MY SPORES TRANSMIT…"),
 breaking the cheerfulness even mid-carnage.
 
+## The spore covenant (death & the cycle) — ch05+ villain foil
+
+Marty is a **Circle of Spores** druid, so necromancy is *native* to him — his spores reclaim
+the dead into new growth (Fungal Infestation / Animate Dead, below). His covenant is therefore
+**not** "undeath is wrong." It is: **the dead should return to the earth, freely and at their
+own pace** — go down, feed roots, become the next green thing. The one unforgivable thing is
+death held *out* of the cycle **by force** — frozen, bound, preserved forever, denied the ground.
+
+That makes him the exact opposite number of **Ravisin** (ch05) and the **Frostmaiden** herself:
+Auril's endless rime is *preservation* — a whole world frozen out of the cycle, nothing ever
+rotting, nothing ever returning. **Two necromancers, opposite covenants: the composter vs. the
+taxidermist.**
+
+- **Seeded at the ch05 eruption:** when Ravisin **seizes and puppets Sahnar** (an already-undead
+  guardian held frozen for ages — NOT a fresh corpse she raises), Marty names the sin as a druid —
+  *quietly* (he goes silent when violence starts), with no revulsion at the undeath, only at the
+  *binding*: a soul that should have returned to the earth an age ago, made a puppet instead.
+  (Exact line TBD in the beat; may move to the recruit beat — the covenant is: the dead belong to
+  the earth, *freely* — not frozen, not enslaved.)
+- **Sahnar is the covenant's proof** (`sahnar.md`): awake and frozen out of the cycle for
+  millennia — the fate Marty condemns, made flesh. Freeing her (the recruit) undoes exactly that,
+  so **recruiting a still-undead Sahnar is not a contradiction — it's the covenant in action.**
+  Marty objects to the *force/frost*, never the condition; a freed soul choosing her own pace
+  (Sahnar: "not yet") is her right — and a growing thing's right to grow at its own rate is the
+  one thing Marty holds sacred.
+- **Ravisin is NOT mourned.** Marty names the sin; he never eulogizes the sinner — no benediction,
+  no "sister," no grief for her (she is Auril's, and the big bad). See `ravisin.md` banned list.
+
+_Decided: 2026-07-23 (Nicolas + CLAUDE; ch05 dialogue pass — the "two druids, two deaths" thread)_
+
 ## Ability Fantasies (flavor only — not game mechanics)
 
 These are the D&D abilities Marty the Merry Mushroom had on paper, kept as flavor names and story beats.
