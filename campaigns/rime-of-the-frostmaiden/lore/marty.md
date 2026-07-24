@@ -70,9 +70,12 @@ Auril's endless rime is *preservation* — a whole world frozen out of the cycle
 rotting, nothing ever returning. **Two necromancers, opposite covenants: the composter vs. the
 taxidermist.**
 
-- **Seeded at the ch05 eruption:** when Ravisin rips Sahnar up, Marty names the sin as a druid —
+- **Seeded at the ch05 eruption:** when Ravisin **seizes and puppets Sahnar** (an already-undead
+  guardian held frozen for ages — NOT a fresh corpse she raises), Marty names the sin as a druid —
   *quietly* (he goes silent when violence starts), with no revulsion at the undeath, only at the
-  freezing: "She should be earth by now. …You've kept her frozen — halfway home."
+  *binding*: a soul that should have returned to the earth an age ago, made a puppet instead.
+  (Exact line TBD in the beat; may move to the recruit beat — the covenant is: the dead belong to
+  the earth, *freely* — not frozen, not enslaved.)
 - **Sahnar is the covenant's proof** (`sahnar.md`): awake and frozen out of the cycle for
   millennia — the fate Marty condemns, made flesh. Freeing her (the recruit) undoes exactly that,
   so **recruiting a still-undead Sahnar is not a contradiction — it's the covenant in action.**

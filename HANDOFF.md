@@ -89,6 +89,12 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   YAML as TWO cutscenes (vanilla rhythm): `chapter_start` pre-map (ch04 thread; Lupin/Marty/Pinky; Ravisin
   SILENT, saved) + `map_opening` on-map (Basil joins green→blue via the wolf-realization → asks for Sahnar).
   Craft learnings folded into the `dialogue-pass` skill (people-talking-not-mood-narration; draft BOXED).
+- **Ravisin RE-CENTERED on Auril (4th fix).** Her bible kept sliding back to a loggers-grudge/revenge plot;
+  now rewritten so her motive is **Auril's cosmic winter, full stop** (acolyte snuffing warmth for the
+  goddess; loggers = incidental warmth), with grudge/grievance/revenge added to her banned list. Then started
+  **BEAT 2 (the eruption)** — structure agreed but **lines not landing yet** (see NEXT). Fixed a consistency
+  bug in passing: Ravisin **SEIZES** the already-undead Sahnar, she does NOT reanimate her (sahnar.md/marty.md/
+  narrative aligned).
 
 ## NEXT SESSION — start here (branch `feat/25-ch05-content`, draft PR #196, ROM-free): ch05 ERUPTION beat
 
@@ -99,12 +105,33 @@ where there's a real fork; he curates; lock into the YAML `script:` blocks).
 - **Read first:** the `dialogue-pass` skill (now carries the box-first + people-talking checks); the four
   finalized voice bibles (`lore/ravisin.md`, `sahnar.md`, `basil.md`, `marty.md` §spore covenant); the ch05
   YAML `events:` (opening locked; eruption/recruit/ending next).
-- **BEAT 2 — the eruption (`ch05-eruption`), the loaded one:** it all converges. Ravisin's **first words**
-  (hardened, pathos-free — certain, not aching); she **rips Sahnar up** (bound-but-conscious, against her will)
-  as a desperate power-play, and the lesser dead erupt (reinforcements, arrives_turn 2/3/5). **Basil's break**
-  — his innocent love for the witch dies ("No. Not her."), and his DEFERRED "she's a druid… she lost her way"
-  lands here against what she's doing. **Marty's covenant** fires, quietly (he goes silent in violence): "She
-  should be earth by now… you've kept her frozen, halfway home."
+- **BEAT 2 — the eruption (`ch05-eruption`) — IN PROGRESS; lines NOT landing (this is why we handed off).**
+  Structure agreed with Nicolas: keep it **Ravisin-FORWARD**. She's pressed, escalates, and **SEIZES the
+  tomb's ancient guardian Sahnar** — who is ALREADY undead (awake millennia), so she *puppets an existing
+  bound soul*, she does NOT reanimate a fresh corpse. The lesser dead rouse as reinforcements (arrives_turn
+  2/3/5). **Sahnar gets NO line — a body Ravisin takes; do NOT spotlight her** (Nicolas: "don't draw more
+  attention to Sahnar"). **Basil's break + Marty's covenant are PULLED OUT** of this beat to keep it hers —
+  at most one small quiet Basil beat; Marty's covenant likely moves to the recruit.
+  - **Ravisin's DOCTRINE (use this — research-grounded):** the **purification / "blight"** doctrine. Warm
+    humanity is **the blight / sickness / fever**; Auril's winter is the **cure / cleansing / salvation**
+    (the world was clean-white-still once; warmth is the corruption); she **cleanses, does not kill**.
+    ⚠️ Community DM-note finding: the book Ravisin's rich material is almost ALL **sister-revenge/grief** (a
+    guide literally says she's grief-driven "rather than ideological commitment to Auril") — which we CUT.
+    Blight/cure/cleanse is the strongest Auril-only vein; do NOT re-import grief.
+  - **The lore drop (her job in the beat):** she's **one of Auril's legion; the cold outlasts her** — killing
+    her ends nothing. Keep it GENERIC so the player connects it themselves to the prologue frost-druid
+    **Sephek Kaltro** (Auril's servant who escaped; recurring Act-II villain — the Children-of-Auril thread is
+    ALREADY seeded, not a new "Circle of Winter" to invent). Build it to ECHO Sephek's line *"You cut the ice…
+    not the cold that made it…"* → e.g. "you cut one servant, not the cold behind it," "you cannot kill a season."
+  - **THE OPEN PROBLEM:** every Ravisin line so far reads **FLAT** to Nicolas — doctrine *statements*, not a
+    person. Theme is right, craft isn't. Next instance: make her **LIVE** — concrete frost imagery (steaming
+    breath, fever, the clean white world, one flake of the storm) + her **chilling sincerity** (she thinks
+    she's being *merciful*: "I don't hate you — one doesn't hate a sickness"), people-talking not
+    doctrine-narration. Bring OPTIONS, iterate, Nicolas curates. REJECTED so far (all too flat): "warm things
+    / her things dead," "you are the blight / the winter is the cure / I cleanse," "you cut one servant / her
+    hands are legion."
+  - **Pitfall:** do NOT have her reference **fire** the party carries — nobody wields fire and **Rootis is a
+    snow/cold sorcerer**. Frame the party as **warm / alive** (breath, blood-heat, fever), never fire-bearers.
 - **BEAT 3 — Sahnar recruit (`ch05-sahnar-recruit`):** Basil, escorted across, Talks/frees the bound Sahnar
   (the Joshua flip); she comes back to herself, chooses "not yet," joins.
 - **BEAT 4 — ending (`ch05-ending`):** Ravisin falls **proud, not repentant** (her banned list); the party
