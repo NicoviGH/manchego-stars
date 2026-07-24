@@ -9,18 +9,22 @@
 
 ## Concept
 
-The frost druid who guards the elven tomb — and the villain thread of Act I. In Auril's
-name she has been **awakening** the wild things to drive the loggers off the ice: the
-white moose (ch04), the direwolf pack (Lupin's kin), and — out in Maer Dualdon — Messie
-(ch06). To her these are not monsters; they are the wild *woken up*, made to fight back
-against axes and hearth-fires. She is a true believer — and a **certain** one
-(`frostmaiden-voices.md` §Children of Auril): worship is the only mercy, the warm world is a
-sickness, and the winter is the cure. She is not wounded and she is not searching — she is
-**right**, and everyone who lights a hearth is wrong. She gave up her name and her warmth to
-the Frostmaiden the way you'd give up a fever.
+The frost druid who guards the elven tomb — and the villain thread of Act I. She is an
+**acolyte of Auril, the Frostmaiden**, and her devotion is total and *cosmic*: Auril's
+endless rime is meant to claim the whole world in ice, and Ravisin's one work is to help it
+come. She **awakens** the wild and **raises the frozen dead** as the goddess's instruments —
+the white moose (ch04), the direwolf pack (Lupin's kin), Messie out in Maer Dualdon (ch06),
+the tomb's own dead — turning the land itself to Auril's purpose. What she wants is to **put
+out the last fires**: the hearths, the forges, the warm little settlements clinging to the
+ice, so the cold can reign *complete*. The Ten-Towns and their loggers are **not a grudge** —
+they're just the nearest warmth to snuff. She is a true believer, and a **certain** one
+(`frostmaiden-voices.md` §Children of Auril): worship is the only mercy, warmth is a sickness,
+and the winter is the cure. She is not wounded and not searching — she is **right**, and
+everything that still burns is wrong. She gave her name and her warmth to the Frostmaiden the
+way you'd give up a fever.
 
-- **Wants:** the winter to reclaim the wood; the wild to wake; the warm world to kneel or
-  freeze. Not Auril's *notice* — Auril's *victory*.
+- **Wants:** Auril's winter to claim the world; every fire put out; the warm and the living
+  frozen into the goddess's dominion. Not Auril's *notice* — Auril's *victory*.
 - **The death line** (`"Auril… I gave you everything…"`, locked in the YAML) is **not a
   lament.** It's a zealot's last offering — proud, certain to the end that the cold was worth
   it. Play it as devotion, never as regret.
@@ -42,9 +46,10 @@ executioner; she is the **true believer** — fervent, sure, unwavering.
 - **Druid-nature imagery**, not liturgy: the thaw, the roots, the wood, the wild, the
   beasts as her woken children. Auril is "the Frostmaiden," "her winter," "the cold that
   cleans."
-- **Names the enemy concretely:** axes, saws, hearth-fires, the loggers' roofs. Unlike
-  Sephek (who never lets a fire-word pass), Ravisin *hates* fire out loud — warmth is the
-  rot she means to freeze away.
+- **The enemy is WARMTH, named concretely:** fires, hearths, forges, the smoke of a warm
+  roof. Unlike Sephek (who never lets a fire-word pass), Ravisin *hates* fire out loud —
+  warmth is the sickness she serves Auril to freeze away. (Fire, not people: she'd snuff a
+  hermit's candle as gladly as a town — it isn't a vendetta, it's the goddess's work.)
 - **Reframes "monster" as "awake":** everything under a roof or beside a fire is asleep;
   she wakes it. This is her core rhetorical move.
 - **Tender register for beasts, scornful for people** — the same voice, two temperatures.
@@ -54,16 +59,19 @@ executioner; she is the **true believer** — fervent, sure, unwavering.
   ("axes… fires… roofs…"). Use it once; twice is a tic.
 
 **Calibration lines (draft — for Nicolas's red-pen; not yet used in any beat)**
-- "The moose was dying when I found it — a hide full of your arrows. I gave it the winter,
-  and it *rose*. That is mercy. You brought more arrows."
-- "You call them monsters. I call them awake. Everything sleeps under your roofs, beside
-  your fires. She woke me, too."
-- "The wood was hers before your grandfathers put an axe to it. I am only giving it back."
+- "The moose was dying in the warm. I gave it the winter, and it *rose* — cold, and clean,
+  and hers. That is mercy. You bring it fire."
+- "You call them monsters. I call them awake. Everything sleeps beside a fire. …The
+  Frostmaiden woke me. Now I wake the world."
+- "The cold had this world once. It will have it again. I only bring it home to her."
 - (death, locked) "Auril… I gave you everything…"
 
 **Banned:** **any pathos — grief, self-pity, a wound, an "unanswering goddess" ache, a tragic
-or sympathetic frame. She is the antagonist, not a victim; the Frostmaiden is the big bad and
-Ravisin is *glad* to serve. She is never mourned (see `marty.md` — he names her sin, never
+or sympathetic frame. AND any GRUDGE / GRIEVANCE / REVENGE framing — no "the loggers wronged
+the wild," no "you brought arrows," no reclaiming-stolen-land vendetta. Her motive is AURIL's
+cosmic winter, FULL STOP; the loggers/Ten-Towns are incidental warmth to snuff, never a
+wronged party she avenges. She is the antagonist, not a victim; the Frostmaiden is the big bad
+and Ravisin is *glad* to serve. She is never mourned (see `marty.md` — he names her sin, never
 eulogizes her).** Sephek's serene amusement (she is not calm and not amused — she is
 *certain*); cackling/cartoon villainy; cruelty for its own sake (she believes every frost is a
 kindness); modern slang; naming Messie or the ch06/later beats outright (her dying words only

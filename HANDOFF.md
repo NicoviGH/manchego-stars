@@ -110,9 +110,11 @@ where there's a real fork; he curates; lock into the YAML `script:` blocks).
 - **BEAT 4 — ending (`ch05-ending`):** Ravisin falls **proud, not repentant** (her banned list); the party
   repots/names/adopts Basil (villain's-pet → party's-heart); turn toward Bremen (the ch06 Messie hook —
   hinted, Ravisin never named).
-- **Guardrails (twice-flagged this session):** Ravisin is NEVER softened or mourned (Basil's kindness ≠ the
-  story pitying her); she stays Auril's, the big bad. Draft BOXED (~29–30 ch/line, on-map ≤29) from the first
-  pass — not prose.
+- **Guardrails (flagged 3× this session — do NOT re-break):** Ravisin's motive is **Auril's cosmic winter,
+  full stop** — she's the Frostmaiden's acolyte snuffing warmth for the goddess. **NO loggers-grudge, NO
+  grievance/revenge, NO grief, NO tragic/sympathetic framing** (all banned in `ravisin.md`); the loggers are
+  incidental warmth, never a wronged party. She's never softened or mourned (Basil's kindness ≠ the story
+  pitying her). Draft BOXED (~29–30 ch/line, on-map ≤29) from the first pass — not prose.
 - **DoD:** locked scripts → `script:` blocks in the ch05 YAML with `LOCKED <date>`; commit ROM-free on
   `feat/25-ch05-content` (feeds PR #196). `verify_text` + `.ea` assembly are ROM-gated (Nicolas's Mac).
 

@@ -21,14 +21,15 @@ parity_reference: "FE8 Ch5"   # #48 enemy-pressure + reward parity bar — The E
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
-  The white moose's trail ends at an ancient elven tomb on a wooded slope — the
-  refuge of Ravisin, the frost druid who has been awakening beasts to terrorize
-  the loggers in Auril's name (the same druid who awakened Messie out in Maer
-  Dualdon). Cornered at last, the moose makes its stand beside her. Ravisin fights
-  to the death for her goddess. Among the crystal pillars the party finds a
-  sealed sarcophagus, kindles the gazebo brazier to open it, and frees Sahnar — a
-  chaotic-good moon-elf mummy who joins them, eager to learn about modern druids.
-  They also rescue a sentient goodberry shrub, repot it, and name it Basil.
+  The white moose's trail ends at an ancient elven tomb — the refuge of Ravisin, an
+  acolyte of Auril who awakens the wild and raises the frozen dead to serve the
+  Frostmaiden's endless winter, snuffing every warm hearth clinging to the ice (the
+  same druid who awakened Messie, out in Maer Dualdon). Cornered at last, the moose
+  makes its stand beside her, and Ravisin fights to the death for her goddess. When
+  she tears the tomb open she rips up its guardian — Sahnar, an ancient elven royal
+  held frozen and conscious for millennia — to serve as her puppet; the party frees
+  her by chaperoning the goodberry shrub, Basil, across to Talk her. They repot and
+  name Basil, and turn down the coast toward Bremen.
 
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
