@@ -766,6 +766,69 @@ def _print_pressure(p):
                              else 'OFF-PARITY -- threat %s, clear-load %s' % (v['threat'], v['load'])))
 
 
+# ── Terrain (#25) ───────────────────────────────────────────────────────────────
+# Every metric here already takes a `terrain_avoid`; nothing ever passed one, so every
+# reading silently assumed open ground. FE8's own numbers (bmbattle.c):
+#     battleAvoidRate = battleSpeed*2 + terrainAvoid + lck
+#     battleDefense   = terrainDefense + unit.def
+# and the bonuses are a PER-CLASS lookup (fliers ignore forests) indexed by terrain id:
+#     gBmMapTerrain[y][x] = gTilesetTerrainLookup[gBmMapBaseTiles[y][x] >> 2]
+# We model the Common (foot) tables -- the yardstick is a foot unit. All read from the
+# decomp at HEAD, so this is ROM-free: for a 1:1 retile the vanilla layout IS our layout.
+
+_TERRAIN_CACHE = {}
+
+
+def _terrain_tables():
+    """(id->name, name->avoid, name->defense) parsed from the decomp at HEAD."""
+    if 'tables' not in _TERRAIN_CACHE:
+        ids = {int(v, 16): k for k, v in re.findall(
+            r'(TERRAIN_\w+)\s*=\s*(0x[0-9A-Fa-f]+)',
+            bc.vanilla_decomp_text('include/constants/terrains.h'))}
+        text = bc.vanilla_decomp_text('src/data_terrains.c')
+
+        def table(name):
+            i = text.find('s8 %s[] = {' % name)
+            return {k: int(v) for k, v in re.findall(
+                r'\[(TERRAIN_\w+)\]\s*=\s*(-?\d+)', text[i:text.find('};', i)])}
+        _TERRAIN_CACHE['tables'] = (ids, table('TerrainTable_Avo_Common'),
+                                    table('TerrainTable_Def_Common'))
+    return _TERRAIN_CACHE['tables']
+
+
+def terrain_bonus(terrain_name):
+    """(avoid, defense) a foot unit gains on `terrain_name` (e.g. 'TERRAIN_THRONE')."""
+    _ids, avo, dfn = _terrain_tables()
+    key = str(terrain_name or '').upper()
+    if key and not key.startswith('TERRAIN_'):
+        key = 'TERRAIN_' + key
+    return avo.get(key, 0), dfn.get(key, 0)
+
+
+def vanilla_terrain_at(layout_name, x, y):
+    """The TERRAIN_* name of a tile on a vanilla map layout, or None if unreadable."""
+    try:
+        import map_tileset_tool as mtt
+        key = ('layout', layout_name)
+        if key not in _TERRAIN_CACHE:
+            _TERRAIN_CACHE[key] = mtt.vanilla_layout_data(bc.DECOMP, layout_name)
+        w, h, cells, terrain = _TERRAIN_CACHE[key]
+        if not (0 <= x < w and 0 <= y < h):
+            return None
+        ids, _avo, _dfn = _terrain_tables()
+        return ids.get(terrain[cells[y * w + x]])
+    except Exception:                        # missing layout/tileset -- degrade to open ground
+        return None
+
+
+def on_terrain(combatant, terrain_name):
+    """`combatant` as it fights while standing on `terrain_name`: terrain Defense folded
+    into df (FE8 adds it to battleDefense). The avoid half is passed separately to the
+    metrics, which already accept a `terrain_avoid`."""
+    avo, dfn = terrain_bonus(terrain_name)
+    return dataclasses.replace(combatant, df=combatant.df + dfn), avo
+
+
 # ── Per-unit ROLE check (#25 post-mortem) ───────────────────────────────────────
 # The parity verdict above is an AGGREGATE: threat/slot sums the whole force and divides by
 # the deploy cap, so a single monstrous unit dissolves into the average and a boss that dies
@@ -784,38 +847,41 @@ def role_findings(chap, parity_ref):
     for ed in chap.get('enemy_units', []):
         for c in enemy_combatants(ed):
             ours.append((ed.get('id') or c.name, bool(ed.get('is_boss')), c,
-                         bool(ed.get('convertible'))))
+                         bool(ed.get('convertible')), ed.get('tile_terrain')))
     if not ours:
         return []
     out = []
     van_threat = max(fc.damage_per_round(e, YARDSTICK) for e in van)
     van_tank = max(fc.rounds_to_kill(YARDSTICK, e) for e in van)
-    for uid, _is_boss, c, conv in ours:
+    for uid, _is_boss, c, conv, _tile in ours:
         t = fc.damage_per_round(c, YARDSTICK)
         if van_threat > 0 and t > van_threat * 1.25:
             out.append('%s threat %.1f is %.1fx the %s ceiling (%.1f)%s'
                        % (uid, t, t / van_threat, parity_ref, van_threat,
                           ' -- convertible, so the player can neutralize it without fighting'
                           if conv else ' -- no vanilla unit hits that hard'))
-    bosses = [(uid, c) for uid, is_boss, c, _ in ours if is_boss]
+    bosses = [(uid, c, tile) for uid, is_boss, c, _, tile in ours if is_boss]
     # A convertible is recruited/neutralized rather than ground down, so it out-hitting the
     # boss is a deliberate "avoid me" hazard, not a role inversion -- don't flag it as one.
-    line = [(uid, c) for uid, is_boss, c, conv in ours if not is_boss and not conv]
-    for uid, b in bosses:
+    line = [(uid, c) for uid, is_boss, c, conv, _ in ours if not is_boss and not conv]
+    for uid, b, tile in bosses:
         bt = fc.damage_per_round(b, YARDSTICK)
         harder = [n for n, c in line if fc.damage_per_round(c, YARDSTICK) > bt]
         if harder:
             out.append('boss %s (threat %.1f) is out-threatened by %d non-boss unit(s): %s'
                        % (uid, bt, len(harder), ', '.join(harder[:4])))
-        bk = fc.rounds_to_kill(YARDSTICK, b)
+        # Fight the boss on the tile it actually holds (declared `tile_terrain:`).
+        b_on, b_avo = on_terrain(b, tile)
+        bk = fc.rounds_to_kill(YARDSTICK, b_on, b_avo)
+        where = (' on %s (+%d avo/+%d def)' % ((tile,) + terrain_bonus(tile))) if tile else ''
         if van_tank > 0 and bk < van_tank * 0.5:
-            out.append("boss %s takes %.1f rounds to kill; %s's tankiest unit takes %.1f -- "
-                       'the climax may fold too fast (terrain/bodyguards not modeled)'
-                       % (uid, bk, parity_ref, van_tank))
+            out.append("boss %s takes %.1f rounds to kill%s; %s's tankiest unit takes %.1f -- "
+                       'the climax may fold too fast (bodyguards not modeled)'
+                       % (uid, bk, where, parity_ref, van_tank))
     if len(bosses) > 1:
         out.append('%d units flagged is_boss (%s) -- only the objective target should be a boss; '
                    'use a miniboss/convertible role for the others'
-                   % (len(bosses), ', '.join(n for n, _ in bosses)))
+                   % (len(bosses), ', '.join(n for n, _c, _t in bosses)))
     return out
 
 

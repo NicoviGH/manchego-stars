@@ -148,13 +148,18 @@ enemy_units:
         fe_base: flux           # FE8 Flux — dark magic (FE MAG vs RES) at 1-2 range
     damage_type: cold           # flavor label only
     ai_pattern: hold_position   # = vanilla Saar's GuardTileAI posture (decomp: .ai {GuardTileAI,0x9,0x20})
-    boss_tile: moon_dial        # she holds the moon dial at the centre — the THRONE analogue (ch01
-                                # precedent: Breguet on the gate, +20avo/+3def). Wiring at the map slice.
-    # BOSS-ARCHETYPE NOTE (2026-07-23): Ravisin is a CASTER boss, not a wall. Vanilla Ch5's Saar is
-    # an Armor-Knight wall (Def 11 → 2 dmg/hit → 12.9 rounds to kill); a Druid has Def 5 and CANNOT
-    # reach that at any level or terrain (L11 on +30 avoid is still only 4.8). So the wall is
-    # DISTRIBUTED: the Armor-Knight `frost-sentinel` bodyguards (rtk 5.8 each) are the armour the
-    # party must chew through to reach her — the approach is the slog, she is the payoff.
+    boss_tile: moon_dial        # she holds the moon dial at the centre — retiled as a dais
+    tile_terrain: throne        # TERRAIN_THRONE (+30 avo/+3 def) — read by `make difficulty`
+    # BOSS-ARCHETYPE NOTE (2026-07-23, terrain-verified): Ravisin is a CASTER boss, not a wall.
+    # Vanilla Ch5's Saar is an Armor-Knight wall — Def 11 → 2 dmg/hit → 12.9 rounds to kill — and
+    # (checked in the decomp, NOT assumed) he stands on TERRAIN_ROAD: his wall is 100% class Def,
+    # ZERO terrain. A Druid has Def 5 and cannot reach that at any level (L11 open ground = 3.3).
+    # So we buy the climax two ways, and neither pretends to be Saar:
+    #   - the THRONE tile takes her from 2.9 -> 6.8 rounds (about half Saar, but past "folds instantly");
+    #   - the wall is DISTRIBUTED into the Armor-Knight `frost-sentinel` bodyguards (5.8 rounds
+    #     each, ~11.7 for the pair) placed on the approach — the armour is the slog, she is the payoff.
+    # NB this gives our boss MORE terrain help than vanilla's boss gets; it is a deliberate
+    # compensation for the class gap, not a mirror of Ch5.
     death_quote: "Auril… I gave you everything…"
     skin:                       # Ravisin has authored boss art already; frost-druid palette
       look: "Ravisin, frost druid (existing boss portrait + Druid class art)"
