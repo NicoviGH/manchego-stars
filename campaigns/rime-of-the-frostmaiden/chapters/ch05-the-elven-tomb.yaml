@@ -147,7 +147,14 @@ enemy_units:
       - id: killing-frost
         fe_base: flux           # FE8 Flux — dark magic (FE MAG vs RES) at 1-2 range
     damage_type: cold           # flavor label only
-    ai_pattern: hold_position
+    ai_pattern: hold_position   # = vanilla Saar's GuardTileAI posture (decomp: .ai {GuardTileAI,0x9,0x20})
+    boss_tile: moon_dial        # she holds the moon dial at the centre — the THRONE analogue (ch01
+                                # precedent: Breguet on the gate, +20avo/+3def). Wiring at the map slice.
+    # BOSS-ARCHETYPE NOTE (2026-07-23): Ravisin is a CASTER boss, not a wall. Vanilla Ch5's Saar is
+    # an Armor-Knight wall (Def 11 → 2 dmg/hit → 12.9 rounds to kill); a Druid has Def 5 and CANNOT
+    # reach that at any level or terrain (L11 on +30 avoid is still only 4.8). So the wall is
+    # DISTRIBUTED: the Armor-Knight `frost-sentinel` bodyguards (rtk 5.8 each) are the armour the
+    # party must chew through to reach her — the approach is the slog, she is the payoff.
     death_quote: "Auril… I gave you everything…"
     skin:                       # Ravisin has authored boss art already; frost-druid palette
       look: "Ravisin, frost druid (existing boss portrait + Druid class art)"
@@ -156,10 +163,18 @@ enemy_units:
       - id: crest-of-cold-iron  # FORESHADOW: locked promotion relic (see decisions.md — the promotion seam)
         is_key_item: true
         locked: true            # unusable in MVP; pays off at the Ch8→9 promotion seam
-  # ── The cornered white moose (the LONE beast — ch04 quarry, cornered boss) ───
+  # ── The cornered white moose (the LONE beast — ch04 quarry) ─────────────────
+  # ROLE FIX 2026-07-23: was `is_boss: true`, which INVERTED the chapter's climax — at
+  # threat 14.1 it out-threatened Ravisin (8.4) 1.7x and was 2.2x the vanilla Ch5 ceiling
+  # (6.3), so the "boss" was a speed bump next to it. Level nerfs don't help (gwyllgi is
+  # Spd 14, doubles everything: even L2 = 11.8). So it keeps its terror and changes ROLE:
+  # a NAMED MINIBOSS (vanilla Ch5 precedent: CHARACTER_BANDIT_CH5, a named non-boss threat)
+  # that is CONVERTIBLE — killing Ravisin breaks her hold and it stops fighting. The player
+  # chooses: grind a 4.3-round, 14-threat monster, or push the objective and it walks away.
+  # Rewards going for the throat and pays off the ending beat ("her hold on the moose breaks").
   - id: white-moose
     name: "The White Moose"
-    is_boss: true               # awakened beast-boss, cornered here (canon: tomb area E6)
+    is_miniboss: true           # named, dangerous, NOT the win condition (objective = Ravisin)
     count: 1
     class: gwyllgi              # CLASS_GWYLLGI (FE8 beast) stand-in quadruped
     level: 6
@@ -168,6 +183,10 @@ enemy_units:
         fe_base: rotten-claw    # modeled beast attack (vanilla monster weapon)
     damage_type: bludgeoning    # flavor label only ("antlers/hooves")
     ai_pattern: aggressive
+    convertible: true           # #171 — neutralized by killing Ravisin, not by grinding it down
+    parley:
+      by: ravisin_death         # her hold breaks when she falls
+      result: become_neutral    # it stops fighting and quits the field (never joins the party)
     death_quote: "*a final, almost-human bellow*"
     skin:                       # the one beast; closes YAML TODO #38/#39 (read as elk, not wolf)
       look: "the White Moose — a great pale elk"
@@ -245,6 +264,9 @@ enemy_units:
         fe_base: iron-lance
     damage_type: piercing       # flavor label only
     ai_pattern: hold_position   # ancient sentinels; hold the pillars, never chase
+    role: boss_bodyguard        # the DISTRIBUTED wall (see ravisin's boss-archetype note): our
+                                # Saar-analogue armour. Place them BETWEEN the party and the moon
+                                # dial so reaching Ravisin costs what reaching Saar costs.
     skin:
       look: "ice-locked elven sentinel (frozen armor, not a skeleton)"
       source: palette_swap      # vanilla Armor-Knight frame, frost palette — reads better than bone here

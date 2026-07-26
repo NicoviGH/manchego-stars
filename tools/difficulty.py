@@ -711,6 +711,7 @@ def report(campaign, ch):
               % (num, ref))
 
     _print_pressure(_chapter_pressure(chap))
+    print_role_findings(chap, chap.get('parity_reference'))
     _print_economy(chap)
     _print_dynamics(chap)
 
@@ -763,6 +764,69 @@ def _print_pressure(p):
              ol, v['load_ratio'], v['load']))
     print('  verdict: %s' % ('PARITY (within band)' if v['verdict'] == 'OK'
                              else 'OFF-PARITY -- threat %s, clear-load %s' % (v['threat'], v['load'])))
+
+
+# ── Per-unit ROLE check (#25 post-mortem) ───────────────────────────────────────
+# The parity verdict above is an AGGREGATE: threat/slot sums the whole force and divides by
+# the deploy cap, so a single monstrous unit dissolves into the average and a boss that dies
+# in three rounds never shows up at all. ch05 shipped a "PARITY (within band)" force in which
+# the white moose out-threatened the boss 1.7x and sat 2.2x above the vanilla twin's scariest
+# unit -- invisible to every number we printed. These checks compare the EXTREMES unit-to-unit
+# instead, which is what catches a role inversion.
+
+def role_findings(chap, parity_ref):
+    """Per-unit role warnings: outlier threat vs the twin's ceiling, and a boss that is not
+    the chapter's real centre of gravity. Returns a list of strings (empty == clean)."""
+    van = vanilla_enemies(parity_ref)
+    if not van:
+        return []
+    ours = []
+    for ed in chap.get('enemy_units', []):
+        for c in enemy_combatants(ed):
+            ours.append((ed.get('id') or c.name, bool(ed.get('is_boss')), c,
+                         bool(ed.get('convertible'))))
+    if not ours:
+        return []
+    out = []
+    van_threat = max(fc.damage_per_round(e, YARDSTICK) for e in van)
+    van_tank = max(fc.rounds_to_kill(YARDSTICK, e) for e in van)
+    for uid, _is_boss, c, conv in ours:
+        t = fc.damage_per_round(c, YARDSTICK)
+        if van_threat > 0 and t > van_threat * 1.25:
+            out.append('%s threat %.1f is %.1fx the %s ceiling (%.1f)%s'
+                       % (uid, t, t / van_threat, parity_ref, van_threat,
+                          ' -- convertible, so the player can neutralize it without fighting'
+                          if conv else ' -- no vanilla unit hits that hard'))
+    bosses = [(uid, c) for uid, is_boss, c, _ in ours if is_boss]
+    # A convertible is recruited/neutralized rather than ground down, so it out-hitting the
+    # boss is a deliberate "avoid me" hazard, not a role inversion -- don't flag it as one.
+    line = [(uid, c) for uid, is_boss, c, conv in ours if not is_boss and not conv]
+    for uid, b in bosses:
+        bt = fc.damage_per_round(b, YARDSTICK)
+        harder = [n for n, c in line if fc.damage_per_round(c, YARDSTICK) > bt]
+        if harder:
+            out.append('boss %s (threat %.1f) is out-threatened by %d non-boss unit(s): %s'
+                       % (uid, bt, len(harder), ', '.join(harder[:4])))
+        bk = fc.rounds_to_kill(YARDSTICK, b)
+        if van_tank > 0 and bk < van_tank * 0.5:
+            out.append("boss %s takes %.1f rounds to kill; %s's tankiest unit takes %.1f -- "
+                       'the climax may fold too fast (terrain/bodyguards not modeled)'
+                       % (uid, bk, parity_ref, van_tank))
+    if len(bosses) > 1:
+        out.append('%d units flagged is_boss (%s) -- only the objective target should be a boss; '
+                   'use a miniboss/convertible role for the others'
+                   % (len(bosses), ', '.join(n for n, _ in bosses)))
+    return out
+
+
+def print_role_findings(chap, parity_ref):
+    findings = role_findings(chap, parity_ref)
+    print('\n-- PER-UNIT ROLE CHECK (what the per-slot averages hide) ' + '-' * 12)
+    if not findings:
+        print('  clean -- no threat outliers, boss is the chapter\'s hardest hitter')
+        return
+    for f in findings:
+        print('  WARN: %s' % f)
 
 
 # ── Item-economy parity (#170) ──────────────────────────────────────────────────

@@ -796,5 +796,70 @@ class BattlefieldDynamics(unittest.TestCase):
                          (2, 3, 1))
 
 
+class RoleCheck(unittest.TestCase):
+    """The per-unit role check (#25 post-mortem): the aggregate parity verdict hides a
+    single monstrous unit and a boss that folds, because threat/slot averages both away."""
+
+    REF = 'FE8 Ch5'
+
+    def _chap(self, units):
+        return {'enemy_units': units}
+
+    def test_clean_roster_has_no_findings(self):
+        """A Saar-shaped boss (armour wall, modest threat) over ordinary line units --
+        the profile the vanilla twin actually fields."""
+        chap = self._chap([
+            {'id': 'grunt', 'class': 'soldier', 'level': 5, 'count': 6,
+             'inventory': [{'id': 'iron-lance', 'fe_base': 'iron-lance'}]},
+            {'id': 'boss', 'class': 'armor-knight', 'level': 8, 'is_boss': True,
+             'inventory': [{'id': 'slim-lance', 'fe_base': 'slim-lance'}]},
+        ])
+        self.assertEqual(df.role_findings(chap, self.REF), [])
+
+    def test_flags_a_boss_out_threatened_by_a_line_unit(self):
+        chap = self._chap([
+            {'id': 'monster', 'class': 'gwyllgi', 'level': 6,
+             'inventory': [{'id': 'claw', 'fe_base': 'rotten-claw'}]},
+            {'id': 'boss', 'class': 'druid', 'level': 7, 'is_boss': True,
+             'inventory': [{'id': 'flux', 'fe_base': 'flux'}]},
+        ])
+        found = df.role_findings(chap, self.REF)
+        self.assertTrue(any('out-threatened' in f and 'monster' in f for f in found), found)
+
+    def test_convertible_outlier_is_not_a_role_inversion(self):
+        """A convertible is neutralized rather than ground down, so out-hitting the boss
+        is a deliberate 'avoid me' hazard -- the ch05 white moose."""
+        chap = self._chap([
+            {'id': 'moose', 'class': 'gwyllgi', 'level': 6, 'convertible': True,
+             'inventory': [{'id': 'claw', 'fe_base': 'rotten-claw'}]},
+            {'id': 'boss', 'class': 'druid', 'level': 7, 'is_boss': True,
+             'inventory': [{'id': 'flux', 'fe_base': 'flux'}]},
+        ])
+        found = df.role_findings(chap, self.REF)
+        self.assertFalse(any('out-threatened' in f for f in found), found)
+        self.assertTrue(any('moose' in f and 'convertible' in f for f in found), found)
+
+    def test_flags_a_boss_that_folds_far_faster_than_the_twins_wall(self):
+        chap = self._chap([
+            {'id': 'boss', 'class': 'druid', 'level': 7, 'is_boss': True,
+             'inventory': [{'id': 'flux', 'fe_base': 'flux'}]},
+        ])
+        self.assertTrue(any('rounds to kill' in f for f in df.role_findings(chap, self.REF)))
+
+    def test_flags_more_than_one_boss(self):
+        chap = self._chap([
+            {'id': 'a', 'class': 'armor-knight', 'level': 8, 'is_boss': True,
+             'inventory': [{'id': 'iron-lance', 'fe_base': 'iron-lance'}]},
+            {'id': 'b', 'class': 'armor-knight', 'level': 8, 'is_boss': True,
+             'inventory': [{'id': 'iron-lance', 'fe_base': 'iron-lance'}]},
+        ])
+        self.assertTrue(any('flagged is_boss' in f for f in df.role_findings(chap, self.REF)))
+
+    def test_uncurated_reference_yields_no_findings(self):
+        chap = self._chap([{'id': 'x', 'class': 'soldier', 'level': 1,
+                            'inventory': [{'id': 'iron-lance', 'fe_base': 'iron-lance'}]}])
+        self.assertEqual(df.role_findings(chap, 'FE8 ChNope'), [])
+
+
 if __name__ == '__main__':
     unittest.main()
