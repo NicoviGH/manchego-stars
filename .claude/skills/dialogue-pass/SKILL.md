@@ -25,6 +25,11 @@ beats → lines, human curates every level). Decided 2026-06-09 (docs/decisions.
    settle them with Nicolas before drafting any line.
 4. **Vanilla pacing benchmark** for the slot being written (decomp,
    `fireemblem8u/src/events/*-eventscript.h` + `texts/texts.txt`).
+   **Writing a VILLAIN? Read `references/fe8-register.md` first** — the FE8 script's own
+   villain habits distilled from that corpus (direct address + insult-names, relish, dark
+   irony, theatrical announcement, `...` pacing) with verbatim calibration quotes and an
+   archetype table to check a new villain against so ours don't converge. Ground the voice
+   in what the game shipped; don't invent a register.
 5. **Onboarding catalog + coverage:** `docs/ONBOARDING.md` (generated) +
    `campaigns/.../onboarding-catalog.yaml` (what vanilla teaches, the channel, the decomp
    citation) and the prior chapters' `introduces:` ledger — for the tutorial-parity check below.

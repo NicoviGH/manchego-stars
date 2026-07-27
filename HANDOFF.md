@@ -165,14 +165,12 @@ YAML `script:` blocks).
     "you grew things once, now nothing grows"), which is *why* every character sounded identical.
     (b) But over-correcting into flat declaratives produced **monotone** — the rejected calm pass. Vary
     rhythm and temperature; let lines surprise.
-  - **RESEARCH DONE — how FE8 villains actually speak** (pulled from `fireemblem8u/texts/texts.txt`; do not
-    redo this). Valter: *"Ha ha… She's a ripe little peach… I can feel my blood rushing at the thought. This
-    might be fun after all."* / *"You will call me the Moonstone. I'll save you worthless dogs from your own
-    incompetence. **You'll thank me later.**"* Riev: *"Like rats in a sack, as they say. Heh heh heh…"*
-    Selena: *"What idiotic wretches you are… Prepare yourselves to be destroyed utterly!"* **The pattern:**
-    they address the party DIRECTLY with an insult-name (dogs/wretches/rats), they RELISH it, they use dark
-    irony (Valter frames butchery as a favour — that is Ravisin's "frost is mercy" belief with swagger
-    instead of a sermon), they announce what's coming, short sentences, heavy `…`.
+  - **RESEARCH DONE, and SAVED — do not redo it.** The FE8 villain register (direct address + insult-names,
+    relish, dark irony, theatrical announcement, `…` pacing) is distilled from the decomp corpus into
+    **`.claude/skills/dialogue-pass/references/fe8-register.md`**, with verbatim calibration quotes and an
+    archetype table. The `dialogue-pass` skill points at it from §Inputs and `lore/frostmaiden-voices.md`
+    cross-links it. Key move for Ravisin: Valter's *"You'll thank me later"* — a mercy-doctrine lands as
+    **swagger, not sermon**.
   - **LAST VERSION ON THE TABLE (untested — we diverted to mechanics before Nicolas ruled on it).** One
     strong idea instead of a safe one: **she loves the things she wakes like her own children and treats
     living people as weather** — warm to the dead, absent to the living; defectors don't anger her, she's
