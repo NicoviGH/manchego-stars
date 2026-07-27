@@ -360,8 +360,77 @@ enemy_units:
 # (twig/pinecone/feather; we already dropped the severed hand) become set-dressing, not a gate.
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
+# SCENE MAP — ch05 mirrors vanilla FE8 Ch5's scene anatomy 1:1 (DECIDED 2026-07-23, Nicolas).
+# Not a length target: we copy the SLOTS and what each one does, and pick each beat's register
+# and box count while writing it. Read the twin's own scenes with:
+#     python3 tools/vanilla_scene.py ch5 [SceneFragment]
+# Anatomy + measured budgets: .claude/skills/dialogue-pass/references/scene-pacing.md
+#
+#   vanilla        job in Ch5                          ours
+#   ─────────────  ──────────────────────────────────  ────────────────────────────────────
+#   9BB  (10)      the two RECRUITS meet, pre-battle    Basil + Sahnar in the dark
+#   9BC  (17)      boss gets ORDERS from a superior     Sephek Kaltro → Ravisin
+#   9BD  ( 7)      subordinate shows DOUBT (foreshadow) Basil quietly questions Ravisin
+#   9BE  (19)      party ARRIVES; the PLACE             the ridge + the tomb seen
+#   9BF  ( 7)      party notices the commotion          the dead stirring, at distance
+#   9C0  ( 9)      stakes turn LETHAL                   Ravisin sets the guardians on them
+#   9C1  ( 2)      party REACTS                         short party beat
+#   9C2  ( 8)      recruit reaches party; BATTLE        Basil joins → battle
+#   9C3  (12)      recruit's OWN scene (Joshua)         Sahnar bound in the sarcophagus
+#   9C4  ( 4)      other recruit's beat before Talk     Basil, before the escort
+#   9C5  ( 3)      mid-battle ESCALATION                the eruption
+#   9C6  ( 1)      one-line beat                        (spare — Basil or Lupin)
+#   9C7  ( 1)      BOSS TAUNT — one box                 Ravisin taunt
+#   9C8  ( 1)      BOSS DEATH — one box                 Ravisin's locked death quote
+#   9C9  (34)      ENDING exposition                    Ravisin falls → Bremen hook
+#
+# NOTE ON 9BC: vanilla's orders come from GLEN (a superior officer), never from Vigarde --
+# so ours come from SEPHEK, not Auril. `lore/frostmaiden-voices.md` keeps the Frostmaiden
+# OFF the page ("commands through frost giants and winter wolves"). Sephek is the prologue
+# boss who rimed over and escaped: his return makes the Children of Auril concrete, earns
+# Ravisin's "she has other hands" drop, and re-arms him for his Act-II death.
 events:
+  # ── 9BB — the two RECRUITS meet, before the party ever arrives ────────────────
+  - trigger: prologue_scene
+    slot: "vanilla 9BB"
+    type: cutscene
+    ea_file: events/ch05-basil-sahnar.ea
+    status: unwritten
+    description: >
+      Basil keeps the sleeping guardian company. Sahnar has been AWAKE in that sarcophagus for
+      millennia (never asleep — see npcs/sahnar.yaml), so they can talk through the stone: the
+      gentle shrub and the imprisoned queen, the only two kind things in a frost druid's tomb.
+      Establishes BOTH recruits before either is a unit — vanilla spends 10 A-presses on the
+      Joshua/Natasha meet-cute for exactly this reason — and it is why Basil later begs the
+      party to free her: she is his friend, not a quest object.
+  # ── 9BC — the boss gets her ORDERS from a superior (never from the big bad) ────
+  - trigger: prologue_scene
+    slot: "vanilla 9BC"
+    type: cutscene
+    ea_file: events/ch05-sephek-orders.ea
+    status: unwritten
+    description: >
+      SEPHEK KALTRO returns (the prologue boss who rimed over and escaped) and gives Ravisin
+      her orders in Auril's name — vanilla's Glen→Saar scene, our Children-of-Auril made
+      concrete. Auril herself stays OFF the page (frostmaiden-voices.md). Pays off the
+      prologue, earns Ravisin's "she has other hands" drop later in the chapter, and re-arms
+      Sephek for his Act-II death. Voice: sephek-kaltro.md (serene, liturgical, pitying —
+      never raises his voice) against ravisin.md (fervent, certain).
+  # ── 9BD — a subordinate shows DOUBT (foreshadows their own arc) ────────────────
+  - trigger: prologue_scene
+    slot: "vanilla 9BD"
+    type: cutscene
+    ea_file: events/ch05-basil-doubt.ea
+    status: unwritten
+    description: >
+      Ravisin + Basil after Sephek leaves: Basil gently questions her (the sleeper, the cold)
+      and she brushes him off without a thought — she cannot imagine the shrub has a will.
+      Vanilla's Cormag/Glen beat, and it plants Basil's defection an hour before it happens.
+      Keep Ravisin UNSOFTENED (ravisin.md banned list): fond of her creations the way one is
+      fond of a tool, never wounded, never mourned.
+  # ── 9BE — the party ARRIVES; the PLACE ────────────────────────────────────────
   - trigger: chapter_start
+    slot: "vanilla 9BE"
     type: cutscene                    # Cutscene 1 — PRE-MAP (Text_BG). Picks up ch04's thread; NO Ravisin
     ea_file: events/ch05-opening.ea   #   reveal (she stays silent, saved for the eruption).
     description: >
@@ -379,7 +448,38 @@ events:
       - marty: "...This magic is familiar..."               # trails off — the hook, never explained here
       - pinky: "Father, I see it! The moose--in the hollow."
       - pinky: "...It's not running. Why isn't it running?!"
+  # ── 9BF — the party NOTICES the commotion ─────────────────────────────────────
+  - trigger: chapter_start
+    slot: "vanilla 9BF"
+    type: cutscene
+    ea_file: events/ch05-opening.ea
+    status: unwritten
+    description: >
+      Still pre-map, straight off the beat above: from the rim they see the hollow STIR — shapes
+      standing up among the statues. Vanilla's "what's that commotion" hinge, which turns the
+      approach into an alarm. Ravisin is visible and SILENT throughout.
+  # ── 9C0 — the stakes turn LETHAL ──────────────────────────────────────────────
+  - trigger: chapter_start
+    slot: "vanilla 9C0"
+    type: cutscene
+    ea_file: events/ch05-opening.ea
+    status: unwritten
+    description: >
+      Ravisin sets her guardians on them without a word (vanilla spends 9 A-presses on Natasha
+      being run down by soldiers, to make the danger real before a single unit moves). This is
+      the beat that says: no parley, no bargain, they will be killed here.
+  # ── 9C1 — the party REACTS (short) ────────────────────────────────────────────
+  - trigger: chapter_start
+    slot: "vanilla 9C1"
+    type: cutscene
+    ea_file: events/ch05-opening.ea
+    status: unwritten
+    description: >
+      Two boxes, no more (vanilla's is exactly 2). Somebody in the party names what they are
+      looking at. Candidate voices: Meesmickle (dry, it is his job), Braulo (flat), Wolfram.
+  # ── 9C2 — the recruit reaches the party; BATTLE ───────────────────────────────
   - trigger: map_opening              # Cutscene 2 — ON-MAP, before player phase (bubbles ≤29 ch/line)
+    slot: "vanilla 9C2"
     type: cutscene
     ea_file: events/ch05-basil-joins.ea
     description: >
@@ -397,7 +497,30 @@ events:
       - basil: "...Wolf. You're hers. Awoken. But you're free? With them?"
       # (The thought dawns; Basil turns to the party and JOINS — green → the party's colors.)
       - basil: "...I wonder. Sahnar. ...She needs me. Take me to her?"
+  # ── 9C3 — the RECRUIT'S OWN scene (vanilla gives Joshua 12 A-presses) ─────────
+  - trigger: midmap
+    slot: "vanilla 9C3"
+    type: cutscene
+    ea_file: events/ch05-sahnar-alone.ea
+    status: unwritten
+    description: >
+      SAHNAR alone in the sarcophagus while the battle runs above her — awake, bound, and
+      composed after millennia of it (lore/sahnar.md: stoic, courtly, never asks to be pitied).
+      Vanilla gives Joshua a whole scene of his own before you fight him — his coin, "I don't
+      like fighting women" — so the recruit is a person first and a red unit second. This is
+      that, and it is the ONLY place the player meets Sahnar before she walks hostile.
+  # ── 9C4 — the other recruit's beat, just before the Talk ──────────────────────
+  - trigger: before_sahnar_talk
+    slot: "vanilla 9C4"
+    type: dialogue
+    ea_file: events/ch05-basil-before.ea
+    status: unwritten
+    description: >
+      Four boxes at most (vanilla's Natasha prayer is 4). Basil, mid-escort, steeling himself —
+      he is about to walk up to a bound queen with a killing edge. His voice is spare (2-5
+      words); the fear should show in what he does not say.
   - trigger: eruption_turn        # scripted turn (~2/3/5, the Ch5 wave cadence) — EARTHQUAKE/TILECHANGE
+    slot: "vanilla 9C5"
     type: scripted_event
     ea_file: events/ch05-eruption.ea
     description: >
@@ -409,12 +532,31 @@ events:
       fresh corpse — see lore/sahnar.md). Sahnar walks HOSTILE, a fast crit-Myrmidon
       (smells faintly of pumpkin spice). She flips only when Basil reaches her.
   - trigger: sahnar_talk          # Basil (Natasha-donor) Talks the risen Sahnar (Joshua-donor)
+    slot: "vanilla 9C6"
     type: dialogue
     ea_file: events/ch05-sahnar-recruit.ea
     description: >
-      Basil chaperoned safely to Sahnar → she flips to the party, curious about modern
-      druids and eager to serve her liberators. The escort-recruit (Ch5's Joshua beat).
+      Basil chaperoned safely to Sahnar → Ravisin's hold BREAKS and she comes back to herself,
+      curious about modern druids and choosing to walk on ("not yet") rather than lie back
+      down. The escort-recruit (Ch5's Joshua beat).
+  # ── 9C7 — BOSS TAUNT. One box. Vanilla's Saar taunt is ONE A-press. ──────────
+  - trigger: boss_battle
+    slot: "vanilla 9C7"
+    type: quote
+    status: unwritten
+    description: >
+      Ravisin's battle quote when a player unit engages her. ONE BOX — vanilla's whole boss
+      taunt is "Enemy of the empire! Death's too good for you!" and nothing else. Her weight
+      comes from the 9BC orders scene, not from talking on the field.
+  # ── 9C8 — BOSS DEATH. One box. Already locked. ───────────────────────────────
+  - trigger: boss_death
+    slot: "vanilla 9C8"
+    type: quote
+    description: >
+      LOCKED: "Auril… I gave you everything…" — play it as a zealot's last OFFERING, proud and
+      certain, never as regret (ravisin.md bans pathos). One box, matching vanilla's Saar.
   - trigger: chapter_end
+    slot: "vanilla 9C9"
     type: cutscene
     ea_file: events/ch05-ending.ea
     description: >
