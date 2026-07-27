@@ -15,9 +15,13 @@ A small **sentient goodberry shrub** — and, in canon, **Ravisin's own**: her a
 companion, kept at the druid's side so she always has goodberries to hand (RotFM). So Basil
 is the **villain's gentle pet, made kind** — the one soft thing the cold woman keeps
 close. (Not "a grieving zealot": `ravisin.md` bans grief/pathos for her outright — she keeps
-him because a druid wants goodberries to hand, not because she is lonely.) When Ravisin falls, the party takes him in: repot him, name him **Basil**, and he
-becomes their second healer — he grows Goodberries and hands them out, which is every
-heal-staff and Vulnerary the party drinks. He is **guileless, gentle, and growing**
+him because a druid wants goodberries to hand, not because she is lonely.) **He is already
+called Basil** — he introduces himself, and nobody in the party ever calls him anything else
+(LOCKED 2026-07-23, Nicolas: no "unnamed shrub" phase, no naming ceremony — the party naming
+him would have contradicted the locked opening, where he speaks as `basil:` from his first
+line). Where the name came from is deliberately unexplained. When Ravisin falls the party
+takes him in — they **repot him**, and he becomes their second healer, growing Goodberries
+and handing them out, which is every heal-staff and Vulnerary the party drinks. He is **guileless, gentle, and growing**
 (literally, over the campaign): no guile, no agenda, just the urge to feed and mend the
 people around him. As the fragile recruiter he must be walked into danger to reach Sahnar —
 and it's *Basil*, not a blade, that turns the old duelist.
@@ -55,7 +59,7 @@ is a schmoozing mushroom with patter and an angle; where Marty *sells*, Basil *o
   rhetoric. Once a scene.
 
 **Calibration lines (draft — for Nicolas's red-pen; not yet used in any beat)**
-- (found / accepting the name) "A pot. A name. …Basil." → "I will grow. For you."
+- (adopted at the end — repotted, not renamed) "A pot. …Mine?" → "I will grow. For you."
 - (healing in battle) "Hurt. Here. Eat." / "Eat. Grow. Stay."
 - (refusing Ravisin as she rips Sahnar up — his breaking point) "No. Not her. …I won't."
 - (the Sahnar turn — **carries the recruit alone**, offering the berry to the bound mummy)
@@ -71,12 +75,13 @@ menace — he has none); a literal "I am Basil" Groot-quote gimmick unless Nicol
 ## Open questions for Nicolas
 1. ~~**The verbalness fork (A vs B)**~~ — **RESOLVED 2026-07-23:** Groot-flavored + self-sufficient
    (see §Voice header).
-2. **Does Basil name himself or accept the name?** (Draft: the party names him; he *accepts* it,
-   which is his first act of personhood — a small, good beat.)
+2. ~~**Does Basil name himself or accept the name?**~~ — **RESOLVED 2026-07-23 (Nicolas): neither.
+   He is simply Basil from his first line.** No unnamed phase, no naming beat; the origin of the
+   name is left unexplained. Simpler, and it matches the locked opening.
 3. ~~**When does he leave Ravisin?**~~ — **RESOLVED 2026-07-23 by the locked ch05 opening:** he is
    a **GREEN ally** on the map from the start (not Ravisin's unit, not a starting player unit), and
    **converts to a player unit on the `map_opening` join** when he asks to be taken to Sahnar. The
-   `chapter_end` beat is then the *adoption* (repot + name), not the discovery.
+   `chapter_end` beat is then the *adoption* (repotting him), not the discovery or a naming.
 4. ~~**Does Basil grieve Ravisin?**~~ — **RESOLVED: no.** `ravisin.md`'s banned list settles it —
    she is never mourned or softened, and Basil's kindness must not read as the story pitying her.
    Play him **relieved**, not bereaved.

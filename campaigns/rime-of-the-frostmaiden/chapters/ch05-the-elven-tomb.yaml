@@ -28,8 +28,8 @@ narrative: >
   makes its stand beside her, and Ravisin fights to the death for her goddess. When
   she tears the tomb open she seizes its guardian — Sahnar, an ancient elven royal
   held frozen and conscious for millennia — and puppets her against the party; the party frees
-  her by chaperoning the goodberry shrub, Basil, across to Talk her. They repot and
-  name Basil, and turn down the coast toward Bremen.
+  her by chaperoning the goodberry shrub, Basil, across to Talk her. They repot Basil
+  and take him along, and turn down the coast toward Bremen.
 
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
@@ -418,9 +418,10 @@ events:
     type: cutscene
     ea_file: events/ch05-ending.ea
     description: >
-      Ravisin falls; her hold on the moose breaks. The party finds the goodberry
-      shrub, repots it, and names it Basil. With Sahnar in tow they turn down the
-      coast toward Bremen — where, Ravisin's dying words hint, another of her
+      Ravisin falls; her hold on the moose breaks. The party adopts Basil — they
+      REPOT him (he is already called Basil and joined on the map; there is no
+      discovery and no naming beat, LOCKED 2026-07-23). With Sahnar in tow they turn
+      down the coast toward Bremen — where, Ravisin's dying words hint, another of her
       awakened beasts still terrorizes a town.
 
 # ── Economy (FE8 Ch5 parity — the party's power-spike chapter) ────────────────────
