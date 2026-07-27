@@ -23,8 +23,12 @@ beats → lines, human curates every level). Decided 2026-06-09 (docs/decisions.
    pacing claims. Minor NPCs never get a full bible.
 3. **Beat outline:** the chapter YAML `events:` descriptions. If beats aren't settled,
    settle them with Nicolas before drafting any line.
-4. **Vanilla pacing benchmark** for the slot being written (decomp,
-   `fireemblem8u/src/events/*-eventscript.h` + `texts/texts.txt`).
+4. **Vanilla pacing benchmark** for the slot being written — run
+   **`python3 tools/vanilla_scene.py <ch> [SceneFragment]`** to print the twin's scenes as
+   boxed dialogue with box counts (decomp `src/events/*-eventscript.h` + `texts/texts.txt`).
+   Measured budgets + where our chapters sit: **`references/scene-pacing.md`**. Headline:
+   vanilla spends **45–100 boxes** on an opening/ending cutscene but keeps a **mid-battle
+   escalation to ~3 boxes** — story goes in the bookend scenes, in-map beats are a punch.
    **Writing a VILLAIN? Read `references/fe8-register.md` first** — the FE8 script's own
    villain habits distilled from that corpus (direct address + insult-names, relish, dark
    irony, theatrical announcement, `...` pacing) with verbatim calibration quotes and an
