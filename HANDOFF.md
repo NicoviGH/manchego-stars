@@ -95,12 +95,42 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   **BEAT 2 (the eruption)** — structure agreed but **lines not landing yet** (see NEXT). Fixed a consistency
   bug in passing: Ravisin **SEIZES** the already-undead Sahnar, she does NOT reanimate her (sahnar.md/marty.md/
   narrative aligned).
+- **DIFFICULTY-ENGINE work (2026-07-23) — a boss-role post-mortem that grew three tools.** Triggered by
+  Nicolas asking how the ch05 boss inversion slipped past a PARITY verdict:
+  1. **PER-UNIT ROLE CHECK** (`role_findings`, printed by `make difficulty`): the aggregate averages a
+     monster away and never compares the boss to anything. Now flags threat outliers vs the twin's ceiling,
+     a boss out-threatened by its own line, a boss that folds faster than half the twin's boss, and >1
+     `is_boss`. Convertibles are exempt from the inversion check (neutralized, not ground down).
+     **ch04 verified CLEAN by it** — its extremes track vanilla Ch4 and, like its twin, it fields no boss.
+  2. **TERRAIN wired** (§Terrain): FE8's own `TerrainTable_Avo/Def_Common` + terrain enum parsed from HEAD,
+     tile→terrain via `map_tileset_tool.vanilla_layout_data()`. A unit declares `tile_terrain:`. Killed two
+     of my assumptions: `GuardTileAI` means "don't chase," NOT "on a throne" (Saar stands on plain
+     `TERRAIN_ROAD` — his wall is 100% class Def), and `.xPosition` is a SPAWN point (`.redas` walks a unit
+     to its real post; Saar spawns (13,0), posts (13,1)).
+  3. **BOSS PERSONAL LINES** (`personal:` / `vanilla_personal_line`): FE8 bosses are walls because of a
+     personal stat line (Saar = Armor Knight **plus** HP+13/Def+2/…), not their class. Scoped to the role
+     check **on both sides** — putting it in the aggregate shifted every curated baseline (**ch02 briefly
+     fell out of band; caught via `git stash`, reverted — ch02 itself is fine, just sits on the ±25% edge**)
+     and made a Def-13 boss undentable. `vanilla_boss_bar()` falls back to class base **per boss**.
+  ch05 outcomes: **moose → named miniboss + convertible** (killing Ravisin breaks her hold; its 14-threat is
+  now an "avoid me" hazard, and gwyllgi can't be nerfed — Spd 14 doubles even at L2); **Ravisin gets a
+  `personal:` line** (HP+15/Def+5 → ~13.4 rounds = Saar's bar) so she stays a Druid with Flux and her art —
+  **FE8 has no tanky mage class** (best magic Def is 5) and the FE-Repo shares art, not class definitions;
+  **throne DROPPED** (personal Def + terrain stack to undentable — one lever, not two) and the **frost-sentinels
+  REMOVED** with it (Nicolas: redundant once she carries her own fight).
+- **COMPOSITION lesson (bit twice, now an ADR).** Both the sentinels and a crypt-blade 2→4 bump were "tune the
+  count to move the number" — vanilla Ch5 fields **one** Mercenary and its only Armor Knight **is the boss**.
+  Fixed: the mix now matches Ch5 exactly on Soldier 6 / Archer 3 / Mercenary 1 / Myrmidon 1, axe block 10 of 23
+  (~43% vs vanilla's ~48%) — **Ch5 is an axe-heavy map and the weapon triangle is invisible to the per-slot
+  averages.** Parity improved doing it: **x1.11 threat / x0.84 clear-load.** All six chapters PARITY; 226 tests.
 
 ## NEXT SESSION — start here (branch `feat/25-ch05-content`, draft PR #196, ROM-free): ch05 ERUPTION beat
 
-Roster settled AND opening locked (do NOT re-litigate either — see above). Continue the **dialogue pass** on
-the remaining 3 beats via the `dialogue-pass` skill (co-written WITH Nicolas; bring **BOXED** variants only
-where there's a real fork; he curates; lock into the YAML `script:` blocks).
+**Roster is CLOSED (rev.3), opening is LOCKED, and the difficulty engine work is DONE — do not re-litigate
+any of it** (see above; all six chapters PARITY, 226 tests green). The only ch05 work left in this environment
+is **dialogue**. Continue the **dialogue pass** on the remaining 3 beats via the `dialogue-pass` skill
+(co-written WITH Nicolas; bring **BOXED** variants only where there's a real fork; he curates; lock into the
+YAML `script:` blocks).
 
 - **Read first:** the `dialogue-pass` skill (now carries the box-first + people-talking checks); the four
   finalized voice bibles (`lore/ravisin.md`, `sahnar.md`, `basil.md`, `marty.md` §spore covenant); the ch05
@@ -123,13 +153,35 @@ where there's a real fork; he curates; lock into the YAML `script:` blocks).
     **Sephek Kaltro** (Auril's servant who escaped; recurring Act-II villain — the Children-of-Auril thread is
     ALREADY seeded, not a new "Circle of Winter" to invent). Build it to ECHO Sephek's line *"You cut the ice…
     not the cold that made it…"* → e.g. "you cut one servant, not the cold behind it," "you cannot kill a season."
-  - **THE OPEN PROBLEM:** every Ravisin line so far reads **FLAT** to Nicolas — doctrine *statements*, not a
-    person. Theme is right, craft isn't. Next instance: make her **LIVE** — concrete frost imagery (steaming
-    breath, fever, the clean white world, one flake of the storm) + her **chilling sincerity** (she thinks
-    she's being *merciful*: "I don't hate you — one doesn't hate a sickness"), people-talking not
-    doctrine-narration. Bring OPTIONS, iterate, Nicolas curates. REJECTED so far (all too flat): "warm things
-    / her things dead," "you are the blight / the winter is the cure / I cleanse," "you cut one servant / her
-    hands are legion."
+  - **THE OPEN PROBLEM — Ravisin's lines keep reading FLAT.** Theme is right, craft isn't. Several rounds
+    were rejected; the pattern in all of them was **doctrine STATEMENTS and one flat emotional temperature**,
+    not a person. REJECTED so far: "warm things / her things dead"; "you are the blight / the winter is the
+    cure / I cleanse"; "you cut one servant / her hands are legion"; and a calm-monotone pass ("Easy now.
+    It's only people." / "Others came before you." / "Elves keep their dead close." / "Winter is patient.")
+    which Nicolas called terrible — *"where did all the interesting go."*
+  - **⚠️ TWO CRAFT RULES LEARNED THE HARD WAY (both now in the skill; obey them from line one):**
+    (a) **No contrasting clichés** — no "not X, but Y", no then/now antithesis, no defining by negation. My
+    whole Ravisin voice had been built on it ("that's not life, it's fever" / "I don't kill, I cleanse" /
+    "you grew things once, now nothing grows"), which is *why* every character sounded identical.
+    (b) But over-correcting into flat declaratives produced **monotone** — the rejected calm pass. Vary
+    rhythm and temperature; let lines surprise.
+  - **RESEARCH DONE — how FE8 villains actually speak** (pulled from `fireemblem8u/texts/texts.txt`; do not
+    redo this). Valter: *"Ha ha… She's a ripe little peach… I can feel my blood rushing at the thought. This
+    might be fun after all."* / *"You will call me the Moonstone. I'll save you worthless dogs from your own
+    incompetence. **You'll thank me later.**"* Riev: *"Like rats in a sack, as they say. Heh heh heh…"*
+    Selena: *"What idiotic wretches you are… Prepare yourselves to be destroyed utterly!"* **The pattern:**
+    they address the party DIRECTLY with an insult-name (dogs/wretches/rats), they RELISH it, they use dark
+    irony (Valter frames butchery as a favour — that is Ravisin's "frost is mercy" belief with swagger
+    instead of a sermon), they announce what's coming, short sentences, heavy `…`.
+  - **LAST VERSION ON THE TABLE (untested — we diverted to mechanics before Nicolas ruled on it).** One
+    strong idea instead of a safe one: **she loves the things she wakes like her own children and treats
+    living people as weather** — warm to the dead, absent to the living; defectors don't anger her, she's
+    *fond* of them, which is worse. Sample beats: grooming the moose mid-battle (*"Hold still, love. You've
+    ice in your ear."*), hospitably telling the party *"Come down. Mind the steps."*, greeting Lupin as
+    *"My finest voice, that one."* and patting away his name with *"You always did wander."*, calling Basil
+    *"my little garden. Come here."*, raising an army with *"…Up you get."*, and buttoning on *"Come along,
+    children."* Nicolas's own suggested opener — **"so you followed my moose home"** — should survive in
+    some form.
   - **Pitfall:** do NOT have her reference **fire** the party carries — nobody wields fire and **Rootis is a
     snow/cold sorcerer**. Frame the party as **warm / alive** (breath, blood-heat, fever), never fire-bearers.
 - **BEAT 3 — Sahnar recruit (`ch05-sahnar-recruit`):** Basil, escorted across, Talks/frees the bound Sahnar

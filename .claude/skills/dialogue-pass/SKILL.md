@@ -69,6 +69,17 @@ Compliance isn't quality — a line can pass every budget and banned list and st
 flat. Judge the writing itself, and grade honestly: "functional" is a finding, not a
 pass.
 
+**Hard rule — NO CONTRASTING CLICHÉS (2026-07-23, Nicolas).** Never build a line on the
+"not [X], but [Y]" / "not just [X], rather [Y]" formula, a false dichotomy, or a then/now
+antithesis; never define something by first saying what it is *not*. **State what IS,
+directly.** Offenders that got cut from ch05: *"That's not life. It's fever."* · *"I don't
+kill. I cleanse."* · *"You grew things once… now nothing grows."* · *"They feed me. You never
+did."* This is a TIC, not a style — once it's in your ear every character starts sounding
+identical, and it was the single biggest cause of flat ch05 dialogue. **But do not
+over-correct into flat declaratives either:** a scene of same-temperature statements reads as
+monotone (a calm-Ravisin pass was rejected as "where did all the interesting go"). Vary
+rhythm and heat; let lines surprise.
+
 **The master test (2026-07-23 learning — this is what fixed "dry"): people talking, not
 mood-narration.** A line that *describes the atmosphere* ("she wakes the sad things,"
 "nothing walks back out") is dead, however evocative. Every box is a PERSON — reacting,
