@@ -46,7 +46,7 @@ map:
     statues (cover/chokepoints), NOT a claustrophobic crypt. The moon dial sits at
     center, the gazebo brazier to one side, the sarcophagus on the eastern berm.
     Ravisin holds the central depression with the cornered white moose; risen elven
-    tomb-guardians (spear-guards, sentinels) clog the approaches. Elven reliquary niches are
+    tomb-guardians (spear-guards, axe-reavers) clog the approaches. Elven reliquary niches are
     spread to the map's edges (the reward-sites the eruption's dead race to desecrate). Open
     lanes between the pillars keep cavalry relevant. ENTRANCE = an open elven GATEWAY (a worn
     arch / standing stones at the rim), descending a stair into the open-air hollow — NOT a
@@ -61,11 +61,12 @@ objective:
       description: >
         Recruit Sahnar the Joshua way (this IS Ch5's memorable beat). Sahnar rises as
         a HOSTILE guardian — a fast, crit-threat Myrmidon mummy (killing-edge, Joshua's
-        exact donor) — and the only way to flip him is to walk fragile BASIL up to him
-        to Talk (Basil is our Natasha: her exact donor, a frail Priest). So you must
-        chaperone a weak healer across the depression to the deadly duelist, clearing a
-        safe pocket first — the escort-recruit that defines how you play Ch5. Optional;
-        flip him and he fights the back half (recruit swing ~+0.9 kills/round, #171).
+        exact donor), seized and puppeted by Ravisin — and the only way to free her is to
+        walk fragile BASIL up to her to Talk (Basil is our Natasha: her exact donor, a
+        frail Priest). So you must chaperone a weak healer across the depression to the
+        deadly duelist, clearing a safe pocket first — the escort-recruit that defines how
+        you play Ch5. Optional; free her and she fights the back half (recruit swing
+        ~+1.0 kills/round, #171).
     - type: brazier_flavor
       description: >
         The gazebo brazier (silver flame) is the narrative beat that WAKES Sahnar from
@@ -76,22 +77,26 @@ win_condition: boss_defeated
 lose_condition: all_player_units_defeated
 
 difficulty_note: >
-  Our first real boss. Roster GROUNDED (rev.2, 2026-07-23, #25) to the FE8 Ch5 bar — verdict
-  PARITY (within band): threat/slot 12.5 (x1.21) · clear-load/slot 5.0 (x0.97, ≈ vanilla's
-  5.2), on a force that mirrors the twin's structure (line 16 · reinf 6 · convertible 1). The
-  force is RISEN ELVEN GUARDIANS on the vanilla FE8 infantry classes (Soldier/Fighter/Mercenary/
-  Archer/Armor-Knight/Myrmidon), skinned undead — the ch01 "vanilla class, our skin" pattern.
-  Because the stats ARE living-class stats, clear-load parity comes for free: the earlier
-  glassy problem (undead monster classes get doubled → die in 1 round; decisions.md) doesn't
-  arise, and the Armor-Knight Frost-Sentinels are the Def-sink the monster palette couldn't
-  produce. Threat sits a touch hot (x1.21) — fine for "our first real boss," and the DYNAMICS
-  below pay the static bar down. Ravisin is a vanilla FE8 Druid — heavy dark-magic (FE MAG vs
-  RES) at 1-2 range — so squishy/low-RES units must respect her threat range; the pillars give
-  cover to bait her out. Two Ch5 dynamics do the real work and pay the STATIC bar DOWN:
+  Our first real boss. Roster GROUNDED (rev.3, 2026-07-23, #25) to the FE8 Ch5 bar — verdict
+  PARITY (within band): threat/slot 12.7 (x1.11) · clear-load/slot 4.8 (x0.84); ours reads
+  line 15 · reinf 6 · convertible 2 against the twin's 16/6/1 (the extra convertible is the
+  white moose, neutralized by killing Ravisin rather than ground down). The force is RISEN
+  ELVEN GUARDIANS on vanilla FE8 infantry classes, skinned undead — the ch01 "vanilla class,
+  our skin" pattern. Because the stats ARE living-class stats, clear-load parity comes for
+  free: the earlier glassy problem (undead monster classes get doubled → die in 1 round;
+  decisions.md) doesn't arise.
+  COMPOSITION tracks the twin, not just the totals (2026-07-23): Soldier 6, Archer 3,
+  Mercenary 1, Myrmidon 1 match Ch5 exactly, and the axe block is 10 of 23 (~43%) against
+  vanilla's 11 (~48%, its 6 Brigands + 5 Fighters) — Ch5 is an AXE-HEAVY map and that shapes
+  the weapon triangle the player actually plays against, which the per-slot averages can't see.
+  Ravisin is a vanilla FE8 Druid — heavy dark-magic (FE MAG vs RES) at 1-2 range — so
+  squishy/low-RES units must respect her threat range; the pillars give cover to bait her out.
+  She carries a PERSONAL boss line (see her entry) putting her at ~13.4 rounds to kill, the
+  vanilla Saar bar. Two Ch5 dynamics do the real work and pay the STATIC bar DOWN:
     - CONVERTIBLE Sahnar (the Joshua flip): a hostile crit-Myrmidon until Basil Talks
       her, then a +1.0 kills/round ally for the back half. Self-balancing risk→advantage.
     - REINFORCEMENT eruption: the dead arrive over turns (arrives_turn), not a turn-1 alpha —
-      so the turn-1 threat reads 9.9 (≈ vanilla's 8.1), below the static 12.5.
+      so the turn-1 threat reads 9.9 (≈ vanilla's 9.0), below the static 12.7.
     - Untapped headroom: Lupin (+1.0) is a clean all-chapter combatant the static party
       number (6.27) omits; Basil is the fragile recruiter, not a fighter.
   No fog — the tension is the escort + the eruption race, not obscured vision. Keep it a
@@ -205,7 +210,7 @@ enemy_units:
   # ── Risen spear-guard (SOLDIER, lance) — the tomb's rank-and-file dead ───────
   - id: risen-spear
     name: "Risen Spear-Guard"
-    count: 5
+    count: 4                    # +2 reinf = 6 total, matching the vanilla twin's 6 Soldiers
     class: soldier              # CLASS_SOLDIER (vanilla Ch5's core infantry) — parity backbone
     level: 5
     autolevel: true
@@ -221,7 +226,11 @@ enemy_units:
   # ── Tomb-reavers (FIGHTER, axe) — the heavier risen dead ─────────────────────
   - id: tomb-reaver
     name: "Tomb Reaver"
-    count: 3
+    count: 8                    # 3 -> 8: vanilla Ch5 is AXE-HEAVY (6 Brigands + 5 Fighters = 11 of
+                                # 23, ~48%), which shapes the weapon triangle the player actually
+                                # plays against. We field Fighters for the whole axe block — the
+                                # ch01 precedent (Fighters not Brigands, so nothing pathfinds over
+                                # peaks) — rather than splitting the two classes.
     class: fighter              # CLASS_FIGHTER (axe infantry; Fighters not Brigands — no peak pathing)
     level: 5
     autolevel: true
@@ -236,9 +245,11 @@ enemy_units:
   # ── Crypt-blades (MERCENARY, sword) — the elite risen swordsmen (real skeleton anim) ─
   - id: crypt-blade
     name: "Crypt Blade"
-    count: 4                    # 2 -> 4 when the frost-sentinels were removed: the Mercenary is
-                                # our most DURABLE non-armour guardian (3.2 rounds each at modest
-                                # threat), so it carries the clear-load the sentinels used to.
+    count: 1                    # matches the vanilla twin exactly (Ch5 fields ONE Mercenary).
+                                # Briefly ran at 4 to recover the clear-load the removed
+                                # sentinels carried — the same "tune the number, not the
+                                # composition" error, corrected 2026-07-23: the shortfall goes
+                                # to AXE guardians instead, because Ch5 is an axe-heavy map.
     class: mercenary            # CLASS_MERCENARY (sword) — Spd ~5-6, a clean non-doubled threat
     level: 6
     autolevel: true
@@ -253,7 +264,7 @@ enemy_units:
   # ── Bone-archers (ARCHER, bow) — ranged skeletons (real skeleton-bow anim) ────
   - id: bone-archer
     name: "Bone Archer"
-    count: 2
+    count: 1                    # +2 reinf = 3 total, matching the vanilla twin's 3 Archers
     class: archer               # CLASS_ARCHER (bow) — punishes units caught out of cover
     level: 5
     autolevel: true
@@ -422,7 +433,8 @@ economy:
                                  # map edges; the eruption's undead race to desecrate them (save-all bonus).
     - gift: booster-def          # ≈ Ch5 Dracoshield (+Def) — first stat-booster in the campaign
     - gift: booster-skl          # ≈ Ch5 Secret Book (+Skl)
-    - gift: armorslayer          # ≈ Ch5 Armorslayer (now doubly apt — effective vs the Armor-Knight Frost-Sentinels)
+    - gift: armorslayer          # ≈ Ch5 Armorslayer (vanilla's answer to its Armor-Knight boss;
+                                 #   ours has no armour to slay, so it reads as a plain strong sword)
     - gift: torch                # ≈ Ch5 Torch (flavored an elven everburning lamp)
   elven_store:                   # ≈ Ch5's Armory + Vendor — an ancient elven quartermaster's reliquary
     armory: true                 #   the party requisitions (narrative: the tomb kept its stores)
