@@ -872,6 +872,48 @@ class RoleCheck(unittest.TestCase):
         self.assertEqual(df.role_findings(chap, 'FE8 ChNope'), [])
 
 
+class PersonalBossLine(unittest.TestCase):
+    """FE8's own boss mechanism: a named boss is class base PLUS a personal line (Saar is an
+    Armor Knight *plus* HP+13/Def+2/...). Modeled in the role check on BOTH sides -- and
+    deliberately NOT in the aggregate, where adding it shifts every curated baseline."""
+
+    REF = 'FE8 Ch5'
+
+    def test_reads_a_vanilla_boss_line(self):
+        line = df.vanilla_personal_line('CHARACTER_SAAR')
+        self.assertEqual((line['baseHP'], line['baseDef']), (13, 2))
+
+    def test_generic_charindex_has_no_line(self):
+        self.assertEqual(df.vanilla_personal_line('0x80'), {})
+        self.assertEqual(df.vanilla_personal_line(None), {})
+
+    def test_aggregate_stays_class_base_only(self):
+        """Personal lines must not leak into enemy_combatants -- that is what keeps ours and
+        the vanilla reference on the same footing (and keeps a Def-13 boss from reading inf)."""
+        plain = {'id': 'b', 'class': 'druid', 'level': 7,
+                 'inventory': [{'id': 'flux', 'fe_base': 'flux'}]}
+        withline = dict(plain, personal={'baseHP': 15, 'baseDef': 5})
+        self.assertEqual(df.enemy_combatants(plain)[0].hp,
+                         df.enemy_combatants(withline)[0].hp)
+
+    def test_personal_line_lifts_the_boss_in_the_role_check(self):
+        plain = {'id': 'boss', 'class': 'druid', 'level': 7, 'is_boss': True,
+                 'inventory': [{'id': 'flux', 'fe_base': 'flux'}]}
+        self.assertTrue(any('rounds' in f for f in df.role_findings({'enemy_units': [plain]},
+                                                                   self.REF)))
+        strong = dict(plain, personal={'baseHP': 15, 'baseDef': 5})
+        found = df.role_findings({'enemy_units': [strong]}, self.REF)
+        self.assertFalse(any('fold too fast' in f for f in found), found)
+
+    def test_stacking_terrain_onto_a_boss_line_is_flagged(self):
+        """Personal Def and terrain stack; together they can make a boss undentable."""
+        boss = {'id': 'boss', 'class': 'druid', 'level': 7, 'is_boss': True,
+                'tile_terrain': 'throne', 'personal': {'baseHP': 15, 'baseDef': 5},
+                'inventory': [{'id': 'flux', 'fe_base': 'flux'}]}
+        found = df.role_findings({'enemy_units': [boss]}, self.REF)
+        self.assertTrue(any('cannot be damaged' in f for f in found), found)
+
+
 class Terrain(unittest.TestCase):
     """Terrain read from the decomp at HEAD (ROM-free): FE8's own Common (foot) tables and
     the vanilla map layouts. For a 1:1 retile the vanilla layout IS our layout."""

@@ -149,17 +149,23 @@ enemy_units:
     damage_type: cold           # flavor label only
     ai_pattern: hold_position   # = vanilla Saar's GuardTileAI posture (decomp: .ai {GuardTileAI,0x9,0x20})
     boss_tile: moon_dial        # she holds the moon dial at the centre — retiled as a dais
-    tile_terrain: throne        # TERRAIN_THRONE (+30 avo/+3 def) — read by `make difficulty`
-    # BOSS-ARCHETYPE NOTE (2026-07-23, terrain-verified): Ravisin is a CASTER boss, not a wall.
-    # Vanilla Ch5's Saar is an Armor-Knight wall — Def 11 → 2 dmg/hit → 12.9 rounds to kill — and
-    # (checked in the decomp, NOT assumed) he stands on TERRAIN_ROAD: his wall is 100% class Def,
-    # ZERO terrain. A Druid has Def 5 and cannot reach that at any level (L11 open ground = 3.3).
-    # So we buy the climax two ways, and neither pretends to be Saar:
-    #   - the THRONE tile takes her from 2.9 -> 6.8 rounds (about half Saar, but past "folds instantly");
-    #   - the wall is DISTRIBUTED into the Armor-Knight `frost-sentinel` bodyguards (5.8 rounds
-    #     each, ~11.7 for the pair) placed on the approach — the armour is the slog, she is the payoff.
-    # NB this gives our boss MORE terrain help than vanilla's boss gets; it is a deliberate
-    # compensation for the class gap, not a mirror of Ch5.
+                                # (flavour + AI anchor; NO terrain bonus, see below)
+    personal:                   # FE8's OWN boss mechanism — a named boss is class base + a
+      baseHP: 15                # personal line. Vanilla Saar is an Armor Knight *plus*
+      baseDef: 5                # HP+13/Pow+6/Skl+5/Spd+3/Def+2/Res+3/Lck+4; that line is most
+      basePow: 4                # of why he reads as a wall. This puts Ravisin at ~13 rounds to
+      baseSkl: 3                # kill — Saar's bar — while she stays a Druid with Flux and her
+      baseRes: 3                # existing art. Zero art cost, no custom class, pure vanilla.
+      baseLck: 3
+    # BOSS-ARCHETYPE NOTE (2026-07-23, decomp-verified — supersedes the throne/bodyguard fix):
+    # FE8 has NO tanky mage class (best magic Def is 5: Sage/Mage-Knight/Gorgon, all 10% Def
+    # growth), so swapping her class can't work. But the class was never the reason vanilla
+    # bosses are walls — the PERSONAL LINE is. Saar also stands on TERRAIN_ROAD (checked, not
+    # assumed): his wall is 100% class+personal, ZERO terrain. So:
+    #   - NO throne tile. Personal Def and terrain STACK: HP+15/Def+5 on a throne makes her
+    #     undentable by the parity yardstick (inf). One lever, not two.
+    #   - NO armour bodyguards. With a real boss line the `frost-sentinel` scaffolding is
+    #     redundant (removed 2026-07-23, Nicolas) — the boss carries her own fight.
     death_quote: "Auril… I gave you everything…"
     skin:                       # Ravisin has authored boss art already; frost-druid palette
       look: "Ravisin, frost druid (existing boss portrait + Druid class art)"
@@ -230,7 +236,9 @@ enemy_units:
   # ── Crypt-blades (MERCENARY, sword) — the elite risen swordsmen (real skeleton anim) ─
   - id: crypt-blade
     name: "Crypt Blade"
-    count: 2
+    count: 4                    # 2 -> 4 when the frost-sentinels were removed: the Mercenary is
+                                # our most DURABLE non-armour guardian (3.2 rounds each at modest
+                                # threat), so it carries the clear-load the sentinels used to.
     class: mercenary            # CLASS_MERCENARY (sword) — Spd ~5-6, a clean non-doubled threat
     level: 6
     autolevel: true
@@ -257,24 +265,9 @@ enemy_units:
     skin:
       look: "skeletal elven archer"
       source: "FE-Repo: Battle Animations/Monsters - Basic Types/[Skeleton-Reskin] [U] Wight Sniper by DATonDemand"
-  # ── Frost-sentinels (ARMOR-KNIGHT, lance) — the DEF-SINK vanilla had, we lacked ─
-  - id: frost-sentinel
-    name: "Frost Sentinel"
-    count: 2
-    class: armor-knight         # CLASS_ARMOR_KNIGHT — high Def/HP; the ice-locked guardian anchor
-    level: 6
-    autolevel: true
-    inventory:
-      - id: frostbound-lance
-        fe_base: iron-lance
-    damage_type: piercing       # flavor label only
-    ai_pattern: hold_position   # ancient sentinels; hold the pillars, never chase
-    role: boss_bodyguard        # the DISTRIBUTED wall (see ravisin's boss-archetype note): our
-                                # Saar-analogue armour. Place them BETWEEN the party and the moon
-                                # dial so reaching Ravisin costs what reaching Saar costs.
-    skin:
-      look: "ice-locked elven sentinel (frozen armor, not a skeleton)"
-      source: palette_swap      # vanilla Armor-Knight frame, frost palette — reads better than bone here
+  # (The Armor-Knight `frost-sentinel` pair was REMOVED 2026-07-23. They existed only as a
+  #  distributed wall to compensate for a squishy caster boss; once Ravisin carries a real
+  #  personal boss line she holds her own fight, and they were redundant scaffolding.)
   # ── ERUPTION reinforcements (#177): the dead erupt over turns 2/3/5 and race the ─
   #    spread reliquary reward-sites (the Ch5 village-raid, in undead dress) ──────
   - id: risen-spear-reinf

@@ -128,17 +128,50 @@ def _enemy_class_enum(token):
     return 'CLASS_' + str(token).upper().replace('-', '_')
 
 
-def _enemy_from_enum(name, class_enum, level, weapon):
-    """One Combatant: class base autoleveled to `level`, wielding `weapon`. The vanilla
-    enemy stat path -- generics AND named bosses alike are modeled off class base (so ours
-    and the vanilla reference resolve on the same footing; a boss's personal line is the
-    dynamic playtest's concern, not this static pressure proxy)."""
+# A named boss is NOT just its class: FE8 layers a personal stat line on top (Saar is an
+# Armor Knight *plus* HP+13/Pow+6/Skl+5/Spd+3/Def+2/Res+3/Lck+4 -- that line is most of why a
+# boss reads as a wall). This used to be skipped on both sides, which kept the comparison
+# honest but understated every boss; now it is modeled on BOTH sides, so `personal` on one of
+# our units is measured against the vanilla boss's real line rather than its naked class.
+_PERSONAL_FIELDS = (('baseHP', 'hp'), ('basePow', 'pow'), ('baseSkl', 'skl'),
+                    ('baseSpd', 'spd'), ('baseDef', 'df'), ('baseRes', 'res'),
+                    ('baseLck', 'lck'), ('baseCon', 'con'))
+
+
+def vanilla_personal_line(char_enum):
+    """The personal base stats a named vanilla character carries on top of its class.
+    {} for generics (a numeric charIndex token) or an unknown name."""
+    if not char_enum or not str(char_enum).startswith('CHARACTER_'):
+        return {}
+    try:
+        return bc.donor_base_stats(_characters_text(), char_enum)
+    except Exception:
+        return {}
+
+
+def _apply_personal(combatant, personal):
+    """Fold a personal stat line (decomp `base*` names, or our YAML's short names) into a
+    Combatant. Missing/zero fields are no-ops, so a generic is untouched."""
+    if not personal:
+        return combatant
+    delta = {}
+    for decomp_name, field in _PERSONAL_FIELDS:
+        v = personal.get(decomp_name, personal.get(field, 0)) or 0
+        if v:
+            delta[field] = getattr(combatant, field) + int(v)
+    return dataclasses.replace(combatant, **delta) if delta else combatant
+
+
+def _enemy_from_enum(name, class_enum, level, weapon, personal=None):
+    """One Combatant: class base autoleveled to `level`, wielding `weapon`, plus any
+    personal boss line (see above). Generics carry no personal line, so they are unchanged."""
     stats = autolevel(_class_base(class_enum), _class_growths(class_enum), int(level))
-    return _stats_to_combatant(name, stats, weapon, CLASS_TAGS.get(class_enum, frozenset()))
+    c = _stats_to_combatant(name, stats, weapon, CLASS_TAGS.get(class_enum, frozenset()))
+    return _apply_personal(c, personal)
 
 
-def _one_enemy(name, class_token, level, weapon):
-    return _enemy_from_enum(name, _enemy_class_enum(class_token), level, weapon)
+def _one_enemy(name, class_token, level, weapon, personal=None):
+    return _enemy_from_enum(name, _enemy_class_enum(class_token), level, weapon, personal)
 
 
 def enemy_combatants(enemy_def):
@@ -148,6 +181,8 @@ def enemy_combatants(enemy_def):
     `composition` (with per-class weapons in `inventory_by_class`)."""
     level = enemy_def.get('level', 1)
     name = enemy_def.get('id', enemy_def.get('name', 'enemy'))
+    # NB `personal:` is intentionally NOT applied here -- the aggregate stays class-base on
+    # both sides (see vanilla_enemies). role_findings() applies it for the boss comparison.
     if 'class' in enemy_def:
         return [_one_enemy(name, enemy_def['class'], level,
                            _weapon_for(enemy_def.get('inventory')))]
@@ -319,9 +354,57 @@ def vanilla_enemies(parity_ref):
             weapon = _weapon_from_item_enums(d['items'])
             if weapon is None:
                 continue
+            # NB class base only -- personal boss lines are deliberately excluded from the
+            # AGGREGATE parity metric so both sides resolve on the same footing (adding them
+            # here shifts every curated baseline and can make a boss undentable -> inf
+            # clear-load). The role check below models them, on both sides, where the
+            # boss-vs-boss question actually lives.
             out.append(_enemy_from_enum('%s#%d' % (array_name, i),
                                         d['classIndex'], d['level'], weapon))
     return out
+
+
+def vanilla_named_bosses(parity_ref, with_personal=True):
+    """The twin's NAMED units as (name, Combatant). Used only by the role check -- see the
+    note in vanilla_enemies about keeping the aggregate class-base-only."""
+    spec = PARITY_REFERENCE_UDEFS.get(parity_ref)
+    if spec is None:
+        return []
+    relpath, arrays = spec
+    text = bc.vanilla_decomp_text(relpath)
+    out = []
+    for array_name in arrays:
+        for d in vanilla_unit_defs(text, array_name):
+            ch = d.get('charIndex')
+            if d['allegiance'] != 'FACTION_ID_RED' or not str(ch or '').startswith('CHARACTER_'):
+                continue
+            weapon = _weapon_from_item_enums(d['items'])
+            if weapon is None:
+                continue
+            out.append((ch.replace('CHARACTER_', '').title(),
+                        _enemy_from_enum(ch, d['classIndex'], d['level'], weapon,
+                                         vanilla_personal_line(ch) if with_personal else None)))
+    return out
+
+
+def vanilla_boss_bar(parity_ref):
+    """(name, rounds-to-kill, used_personal) for the twin's toughest named boss. Prefers the
+    real article (class + personal line); falls back to class-base-only when that boss is
+    undentable by the fixed yardstick -- Saar at Def 13 exactly matches the yardstick's attack,
+    which says more about the yardstick being a weak average unit (the chapter hands you an
+    Armorslayer for exactly this) than about the boss. (None, 0.0, True) when uncurated."""
+    base = {n: fc.rounds_to_kill(YARDSTICK, c)
+            for n, c in vanilla_named_bosses(parity_ref, with_personal=False)}
+    rows = []
+    for n, c in vanilla_named_bosses(parity_ref, with_personal=True):
+        val = fc.rounds_to_kill(YARDSTICK, c)
+        if val == float('inf'):                  # fall back PER BOSS, not all-or-nothing:
+            val, used = base.get(n, 0.0), False  # one undentable boss must not hand the bar
+        else:                                    # to a weaker named unit that happens to be
+            used = True                          # dentable (Ch5's bandit vs Saar).
+        if val and val != float('inf'):
+            rows.append((n, val, used))
+    return max(rows, key=lambda r: r[1]) if rows else (None, 0.0, True)
 
 
 def vanilla_projection(parity_ref, deploy_cap):
@@ -843,8 +926,10 @@ def role_findings(chap, parity_ref):
     van = vanilla_enemies(parity_ref)
     if not van:
         return []
-    ours = []
+    ours, personal_by_id = [], {}
     for ed in chap.get('enemy_units', []):
+        if ed.get('personal'):
+            personal_by_id[ed.get('id')] = ed['personal']
         for c in enemy_combatants(ed):
             ours.append((ed.get('id') or c.name, bool(ed.get('is_boss')), c,
                          bool(ed.get('convertible')), ed.get('tile_terrain')))
@@ -870,14 +955,24 @@ def role_findings(chap, parity_ref):
         if harder:
             out.append('boss %s (threat %.1f) is out-threatened by %d non-boss unit(s): %s'
                        % (uid, bt, len(harder), ', '.join(harder[:4])))
-        # Fight the boss on the tile it actually holds (declared `tile_terrain:`).
-        b_on, b_avo = on_terrain(b, tile)
+        # Boss durability is measured boss-to-boss WITH personal lines on both sides (FE8's
+        # own boss mechanism), on the tile each actually holds. The aggregate above stays
+        # class-base-only; this is the one place the real article is compared.
+        b_on, b_avo = on_terrain(_apply_personal(b, personal_by_id.get(uid)), tile)
         bk = fc.rounds_to_kill(YARDSTICK, b_on, b_avo)
         where = (' on %s (+%d avo/+%d def)' % ((tile,) + terrain_bonus(tile))) if tile else ''
-        if van_tank > 0 and bk < van_tank * 0.5:
+        bar_name, bar, bar_personal = vanilla_boss_bar(parity_ref)
+        if bk == float('inf'):
+            out.append('boss %s%s cannot be damaged by the parity yardstick at all -- '
+                       'terrain and a personal line are stacking too far' % (uid, where))
+        elif bar > 0 and bk < bar * 0.5:
+            out.append("boss %s takes %.1f rounds to kill%s; %s's boss (%s) takes %.1f%s "
+                       '-- the climax may fold too fast'
+                       % (uid, bk, where, parity_ref, bar_name, bar,
+                          '' if bar_personal else ' (class base; its own line is undentable here)'))
+        elif not bar and van_tank > 0 and bk < van_tank * 0.5:
             out.append("boss %s takes %.1f rounds to kill%s; %s's tankiest unit takes %.1f -- "
-                       'the climax may fold too fast (bodyguards not modeled)'
-                       % (uid, bk, where, parity_ref, van_tank))
+                       'the climax may fold too fast' % (uid, bk, where, parity_ref, van_tank))
     if len(bosses) > 1:
         out.append('%d units flagged is_boss (%s) -- only the objective target should be a boss; '
                    'use a miniboss/convertible role for the others'
