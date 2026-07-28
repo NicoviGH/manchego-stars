@@ -502,13 +502,35 @@ events:
     slot: "vanilla 9BD"
     type: cutscene
     ea_file: events/ch05-basil-doubt.ea
-    status: unwritten
     description: >
-      Ravisin + Basil after Sephek leaves: Basil gently questions her (the sleeper, the cold)
-      and she brushes him off without a thought — she cannot imagine the shrub has a will.
-      Vanilla's Cormag/Glen beat, and it plants Basil's defection an hour before it happens.
-      Keep Ravisin UNSOFTENED (ravisin.md banned list): fond of her creations the way one is
-      fond of a tool, never wounded, never mourned.
+      Ravisin + Basil, alone after Sephek leaves. She appraises the warrior she has just been
+      given leave to use; Basil asks after her — his friend, though he never says so — and is
+      shut down and handed a chore.
+      MINED SKELETON — vanilla MSG_9BD (Cormag + Glen, 7 boxes). NB the DOUBT there belongs to
+      the SUPERIOR, not the subordinate: Glen reflects on the zeal he has just watched, lets a
+      crack show ("if only I could hold such conviction in the righteousness of our emperor"),
+      Cormag notices and asks ("Something troubling you, Brother?"), and Glen deflects ("No...
+      Pay no mind to me") then changes the subject to logistics ("From here, we ride northeast,
+      back to the fort"), and Cormag assents ("Very well"). Read it with
+      `python3 tools/vanilla_scene.py ch5`.
+      Our swap: Ravisin CANNOT doubt (ravisin.md banned list), so the shape is kept and the
+      content inverted — she makes an oblique remark, Basil misreads it as feeling, and her
+      deflection reveals there was never any feeling to read. She has always KNOWN Sahnar is
+      under that stone (consistent with 9BC's "...The elf?"); what damns her is that she walked
+      past a thousand times and only valued her once someone else pointed. Basil never reveals
+      that he knows Sahnar — that stays his secret for the recruit to spend.
+      LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas).
+    script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
+      # (The tomb, after Sephek has gone. Ravisin looking toward the sarcophagus on the berm.)
+      - ravisin: "A queen's blade. I have walked past that stone a thousand times."
+      - ravisin: "It never once occurred to me she might be of use."
+      # (Basil knows exactly who is under that stone. He cannot say so.)
+      - basil: "...What will you do with her?"
+      - ravisin: "It's not your concern."
+      - ravisin: "Come. There is work before dawn."
+      # ("MY berries" — they were never his to give; cf. 9BB, where he hands them out freely.)
+      - ravisin: "Prepare my berries."
+      - basil: "...Yes."
   # ── 9BE — the party ARRIVES; the PLACE ────────────────────────────────────────
   - trigger: chapter_start
     slot: "vanilla 9BE"
