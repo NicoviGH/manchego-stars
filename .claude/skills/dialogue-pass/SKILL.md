@@ -76,7 +76,10 @@ silently strip it. So, before locking beats:
    words; quote msgs 1–2 lines. Cut before adding.
 3. Check every line against the speaker's banned list and calibration samples.
 4. Lock a beat before moving to the next; record locked text in the chapter YAML
-   (or issue #43 for montage slots that lack wiring).
+   (or issue #43 for montage slots that lack wiring). **Then update the chapter's GitHub
+   tracker in the same breath** — the issue comment that lists which beats are written and
+   what's next, plus the PR description if it has drifted. Do not wait to be asked: a stale
+   tracker is how the handoff gets heavy and how Nicolas loses sight of what's in flight.
 
 ## Craft check (run on every draft AND every review pass)
 
