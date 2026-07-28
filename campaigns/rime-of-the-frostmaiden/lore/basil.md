@@ -36,27 +36,32 @@ and it's *Basil*, not a blade, that turns the old duelist.
   berry. A living green thing, tended and kind, is the proof the old craft still grows —
   and that reaches Sahnar where a blade never could, through her long, bound watch.
 
-## Voice — **LOCKED: Groot-flavored, but self-sufficient** (Nicolas, 2026-07-23)
+## Voice — **REVISED 2026-07-23 after the 9BB write. Corpus twin: EWAN (of Ewan/Saleh).**
 
-**Terse, plain, few-word speech — but a *full* mind underneath.** Basil is **awakened, not
-simple-minded**: he understands everything; he just says it in few, uncomplicated words. The
-charm (and the poignancy) is the **gap between how little he says and how much he means** — a
-three-word line can land harder than a paragraph. Crucially he is **self-sufficient**: he
-carries his own beats, including the Sahnar recruit — **no translator crutch** (that was the
-rejected Fork B). Throughline: **earnest, nurturing, no edge at all.** He is NOT Marty — Marty
-is a schmoozing mushroom with patter and an angle; where Marty *sells*, Basil *offers*.
+> The earlier spec here said "usually 2–5 words, no subordinate clauses." **It was wrong and it
+> is retired.** In practice it made Basil read as *slow* — jokes landed at his expense and the
+> scene read as haiku rather than talk. Nicolas: "it makes Basil sound unintelligent."
+
+**Warm, eager, and he TUMBLES.** When something matters to him he spills — several sentences in
+one turn, interrupting himself, doubling back, arguing with a "no" before it arrives. Read
+**Ewan** in the Ewan/Saleh supports: *"No way. I wanna be just like you. Why would I go study
+somewhere else? Wait— you've gotta go out on a mission again, don't you! Take me with you!"*
+That's the register. He is **awakened, not simple-minded** — the plainness is a kind heart with
+no guile, never a small mind. He is **self-sufficient**: he carries his own beats, including the
+Sahnar recruit — **no translator crutch**. He is NOT Marty — where Marty *sells*, Basil *offers*.
 
 **Diction rules**
-- **Spare and plain.** Usually 2–5 words. Present tense. Plain nouns and verbs; almost no
-  adjectives; **no subordinate clauses.** Fragments are fine — often better.
-- **Spare words ≠ small mind.** The economy is a plant learning to speak, not a simpleton. A
-  short line should carry real weight; let the silence around it do work.
-- **Feeding = affection.** He offers food as comfort, greeting, and love — the berry is the line.
+- **Runs on when he cares.** Long turns, stacked short sentences, self-interruption ("—and
+  then—", "Wait—"). Answers a question and keeps going. Short lines are for when he's *hurt*.
+- **He says the feeling out loud.** No coy subtext: "I'm worried." "I counted them." "I wish I
+  could share my berries with her." Plain sincerity is his whole charm.
+- **Concrete and countable.** He notices numbers and specifics — three arrows, six days, which
+  stone the sun cleared. Attention is how he loves.
+- **Feeding = affection.** Offering food is comfort, greeting, and love.
 - **Plant-logic, lightly:** sun, rain, roots, frost, growing. He reads the world as *tending*.
-- **No guile, irony, or sarcasm.** He means every word. His comedy is his *literalness*, never a
-  wink.
-- **Device (budget: one/scene):** the **offered berry / small kindness** — the gesture is his
-  rhetoric. Once a scene.
+- **No guile, irony, or sarcasm.** He means every word.
+- **Never write his lines as epigrams.** If a line sounds quotable, it is probably wrong for
+  him — see `.claude/skills/dialogue-pass/references/natural-speech.md`.
 
 **Calibration lines (draft — for Nicolas's red-pen; not yet used in any beat)**
 - (adopted at the end — repotted, not renamed) "A pot. …Mine?" → "I will grow. For you."

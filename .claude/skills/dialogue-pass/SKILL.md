@@ -59,6 +59,12 @@ silently strip it. So, before locking beats:
 
 ## Drafting loop (per beat, WITH Nicolas — never solo)
 
+0. **MANDATORY FIRST — mine the corpus, then write. Never draft from instinct.**
+   Read **`references/natural-speech.md`** and do its Step 0: find the vanilla scene that
+   already solves this scene's problem (`python3 tools/vanilla_scene.py <ch> [Fragment]`), and
+   for a two-hander find the *relationship* twin among FE8's ~217 two-character scenes — the
+   supports. ch05's 9BB burned a dozen drafts writing from instinct; two Ewan/Saleh supports
+   fixed it in one pass. Skipping this step is what produces stilted dialogue, every time.
 1. Bring **2–3 variant lines** per beat. Label what each variant trades off
    (e.g. "menace vs. brevity"). Nicolas picks or mixes; he owns voice.
 2. **Draft BOXED, never as prose** (2026-07-23 learning — prose-length lines read as
@@ -88,6 +94,13 @@ identical, and it was the single biggest cause of flat ch05 dialogue. **But do n
 over-correct into flat declaratives either:** a scene of same-temperature statements reads as
 monotone (a calm-Ravisin pass was rejected as "where did all the interesting go"). Vary
 rhythm and heat; let lines surprise.
+
+**Epigram disease (2026-07-23 — the single most common failure).** If every line is a polished
+artifact that lands one beat and hands off, the scene reads as poetry, not talk. **Vanilla is
+redundant and inefficient and that is why it sounds human** — characters apologise twice, say
+the same thing four ways, interrupt themselves. Turns are LOPSIDED (two words answered by
+forty), the eager character RUNS ON, and feelings are stated PLAINLY rather than buried in
+subtext. Full diagnosis + the corpus-mining method: **`references/natural-speech.md`**.
 
 **The master test (2026-07-23 learning — this is what fixed "dry"): people talking, not
 mood-narration.** A line that *describes the atmosphere* ("she wakes the sad things,"
