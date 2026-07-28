@@ -395,14 +395,51 @@ events:
     slot: "vanilla 9BB"
     type: cutscene
     ea_file: events/ch05-basil-sahnar.ea
-    status: unwritten
     description: >
-      Basil keeps the sleeping guardian company. Sahnar has been AWAKE in that sarcophagus for
-      millennia (never asleep — see npcs/sahnar.yaml), so they can talk through the stone: the
-      gentle shrub and the imprisoned queen, the only two kind things in a frost druid's tomb.
-      Establishes BOTH recruits before either is a unit — vanilla spends 10 A-presses on the
-      Joshua/Natasha meet-cute for exactly this reason — and it is why Basil later begs the
-      party to free her: she is his friend, not a quest object.
+      Basil visits the sarcophagus, as he does. Sahnar has been AWAKE in there for millennia
+      (never asleep — npcs/sahnar.yaml), so they talk through the stone: the gentle shrub and
+      the imprisoned queen, the only two kind things in a frost druid's tomb. Establishes BOTH
+      recruits before either is a unit — vanilla spends 10 A-presses on the Joshua/Natasha
+      meet-cute for exactly this reason — and it is why Basil later begs the party to free her:
+      she is his friend, not a quest object. Their SECOND scene is the recruit (9C6), which is
+      where the weight lands, so this one stays a window rather than a thesis.
+      Ravisin is damned entirely in REPORTED SPEECH ("she said it would still run") and never
+      diagnosed by Sahnar — Basil's doubt stays his own. Sahnar knows only what Basil tells her;
+      she has no other window on the world. LOCKED 2026-07-23 (dialogue-pass, co-written with
+      Nicolas). 16 boxes; the closing aside is hand-matched to Joshua's 3-box / 5-line cadence.
+    script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
+      # (The tomb's eastern berm, before the party arrives. A frost-furred sarcophagus half-sunk
+      #  in snow. A goodberry shrub hurries up on root-feet — he walks; he is not potted.)
+      - basil: "Sahnar! Sahnar, the moose came back, the white one, it came back tonight--"
+      - basil: "--and it's hurt. There are arrows in it. Three of them, in the shoulder. I counted."
+      # (Sahnar's voice comes from inside the stone.)
+      - sahnar: "....Basil."
+      - basil: >-
+          She didn't take them out. I waited and I thought she was going to, and she just
+          looked at it and said it would still run, and then she went inside.
+      - basil: >-
+          I gave it berries. It wouldn't eat them. I put them right where it could reach
+          and it wouldn't eat them.
+      - basil: "Why wouldn't she take them out? She made it. She made it, so why--"
+      - sahnar: "I don't know."
+      - basil: "...You always know things."
+      - sahnar: "I know old things. I have never known why she does anything."
+      - basil: >-
+          ...I'm going to ask her again tomorrow. About the arrows. She might say yes
+          if I ask her properly.
+      - sahnar: "...She might."
+      - basil: >-
+          You could ask her! She'd listen to you, you're older than she is, you're older
+          than everything--
+      - sahnar: "......"
+      - sahnar: "Don't worry about me, little one."
+      - basil: "...All right."
+      - sahnar: "Go on, now. She'll want you before dawn."
+      # (He goes. A few steps on root-feet. Then stops and looks back. The closing aside is
+      #  Joshua's MSG_9BB shape beat for beat: observation -> wish -> resolve, 3 boxes/5 lines.)
+      - basil: "...And there she stays."
+      - basil: "I wish I could share my berries with her."
+      - basil: "One day I'll give her one."
   # ── 9BC — the boss gets her ORDERS from a superior (never from the big bad) ────
   - trigger: prologue_scene
     slot: "vanilla 9BC"
