@@ -445,7 +445,6 @@ events:
     slot: "vanilla 9BC"
     type: cutscene
     ea_file: events/ch05-sephek-orders.ea
-    status: unwritten
     description: >
       SEPHEK KALTRO returns (the prologue boss who rimed over and escaped) and gives Ravisin
       her orders in Auril's name — vanilla's Glen→Saar scene, our Children-of-Auril made
@@ -468,6 +467,36 @@ events:
       Saar seat) — so her fervour is an over-vow answering his cool bookkeeping, and box 15's
       warning is where "she has other hands" enters the chapter. The permission beat is what
       sanctions the eruption's SEIZURE of Sahnar on-screen before it happens.
+      LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas). NB the intelligence briefed is
+      the PARTY (a company working the Ten-Towns, asking after the cold) — NOT the moose; neither
+      of these two would spare a thought for a beast. Auril is named in reverent epithet ("the
+      Frostmaiden") and never appears.
+    script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
+      # (Somewhere in the tomb, before the party arrives. Sephek Kaltro — the prologue's
+      #  frost-druid executioner, who rimed over and vanished — has come to give orders.)
+      - sephek: "Ravisin. ...You have kept the wood well."
+      - sephek: "I bring the Frostmaiden's will."
+      - sephek: >-
+          There is a company moving through the Ten-Towns. They take work in every
+          town they pass.
+      - sephek: "They have been asking after the cold. Where it comes from. Who serves it."
+      - sephek: "They are to be stopped here."
+      - ravisin: "...They will be."
+      - sephek: "One more thing."
+      - sephek: "I have met them myself. On the ice, at the crossing."
+      - sephek: >-
+          Do not take them lightly. They are warmer than they look, and they do not frighten.
+      # (The permission beat — vanilla's "do we have permission to execute her?" seat. This is
+      #  what SANCTIONS the eruption: Ravisin seizes Sahnar under orders, not on a whim.)
+      - sephek: "If they press you, you have leave to wake the warrior. The one under the stone."
+      - ravisin: "...The elf?"
+      - sephek: "She was a queen's blade once. She will serve well enough."
+      - ravisin: "Then it is done. The wood will take them, and the winter will keep them."
+      - sephek: >-
+          The Frostmaiden is watching this place, Ravisin. ...See that she is pleased
+          with what she finds.
+      - sephek: "That is all."
+      - ravisin: "...It will be done, according to her grand design."
   # ── 9BD — a subordinate shows DOUBT (foreshadows their own arc) ────────────────
   - trigger: prologue_scene
     slot: "vanilla 9BD"
