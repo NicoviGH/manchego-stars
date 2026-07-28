@@ -453,6 +453,21 @@ events:
       prologue, earns Ravisin's "she has other hands" drop later in the chapter, and re-arms
       Sephek for his Act-II death. Voice: sephek-kaltro.md (serene, liturgical, pitying —
       never raises his voice) against ravisin.md (fervent, certain).
+      MINED SKELETON — vanilla MSG_9BC's own beat order (17 boxes, Glen 12 / Saar 5, heavily
+      LOPSIDED; the superior talks, the subordinate answers short). Read it with
+      `python3 tools/vanilla_scene.py ch5`. Beat for beat:
+        (1) superior greets by rank + a courtesy;  (2) "I bring orders from His Majesty" —
+        authority ATTRIBUTED, big bad off-page;  (3-4) order one, spread over two redundant
+        boxes;  (5) subordinate assents, short;  (6) "One more thing..." — its own A-press;
+        (7-9) order two, bigger and nastier, plus a licence to be brutal ("tear this town
+        apart");  (10-11) the subordinate ASKS PERMISSION to go further ("permission to
+        execute her?");  (12) superior grants after a `...` beat;  (13-14) subordinate
+        OVER-VOWS in zealot's language;  (15-16) superior closes with a benediction that is
+        also a warning ("be sure his trust is not misplaced") + "That is all.";  (17) assent.
+      Our mapping: Sephek is the measured superior, RAVISIN is the zealot subordinate (the
+      Saar seat) — so her fervour is an over-vow answering his cool bookkeeping, and box 15's
+      warning is where "she has other hands" enters the chapter. The permission beat is what
+      sanctions the eruption's SEIZURE of Sahnar on-screen before it happens.
   # ── 9BD — a subordinate shows DOUBT (foreshadows their own arc) ────────────────
   - trigger: prologue_scene
     slot: "vanilla 9BD"
