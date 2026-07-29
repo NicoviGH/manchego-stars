@@ -64,8 +64,9 @@ objective:
         a HOSTILE guardian — a fast, crit-threat Myrmidon mummy (killing-edge, Joshua's
         exact donor), WOKEN by Ravisin and fighting of her own will in the belief that she is
         finally doing her duty — and the only way to turn her is to walk fragile BASIL up to her
-        to Talk (Basil is our Natasha: her exact donor, a frail Priest), because only he can tell
-        her what she is actually defending. So you must chaperone a weak healer across the depression to the
+        to Talk (Basil is our Natasha: her exact donor, a frail Priest). Only he can turn her,
+        because she does not weigh his argument — she RECOGNISES him (9C6: her purpose holds,
+        her enemy resolves). So you must chaperone a weak healer across the depression to the
         deadly duelist, clearing a safe pocket first — the escort-recruit that defines how
         you play Ch5. Optional; free her and she fights the back half (recruit swing
         ~+1.0 kills/round, #171).
@@ -370,29 +371,48 @@ enemy_units:
 #     python3 tools/vanilla_scene.py ch5 [SceneFragment]
 # Anatomy + measured budgets: .claude/skills/dialogue-pass/references/scene-pacing.md
 #
-#   vanilla        job in Ch5                          ours
-#   ─────────────  ──────────────────────────────────  ────────────────────────────────────
-#   9BB  (10)      the two RECRUITS meet, pre-battle    Basil + Sahnar in the dark
-#   9BC  (17)      boss gets ORDERS from a superior     Sephek Kaltro → Ravisin
-#   9BD  ( 7)      subordinate shows DOUBT (foreshadow) Basil quietly questions Ravisin
-#   9BE  (19)      party ARRIVES; the PLACE             the ridge + the tomb seen
-#   9BF  ( 7)      party notices the commotion          the dead stirring, at distance
-#   9C0  ( 9)      stakes turn LETHAL                   Ravisin sets the guardians on them
-#   9C1  ( 2)      party REACTS                         short party beat
-#   9C2  ( 8)      recruit reaches party; BATTLE        Basil joins → battle
-#   9C3  (12)      recruit's OWN scene (Joshua)         Sahnar alone in the sarcophagus
-#   9C4  ( 4)      other recruit's beat before Talk     CUT -- see the slot below
-#   9C5  ( 3)      mid-battle ESCALATION                the eruption
-#   9C6  (32)      TALK-RECRUIT scene (= 0x9CC)         Basil Talks Sahnar -- the payoff
-#   9C7  ( 1)      BOSS TAUNT — one box                 Ravisin taunt
-#   9C8  ( 1)      BOSS DEATH — one box                 Ravisin's locked death quote
-#   9C9  (34)      ENDING exposition                    Ravisin falls → Bremen hook
+#   vanilla        channel   job in Ch5                          ours
+#   ─────────────  ────────  ──────────────────────────────────  ──────────────────────────
+#   9BA  (27)      Text_BG   scene-setter: the TOWN              (not adopted -- our place
+#                                                                 beat is 9BE)
+#   9BB  (10)      on-map    the two RECRUITS meet, pre-battle    Basil + Sahnar in the dark
+#   9BC  (17)      Text_BG   boss gets ORDERS from a superior     Sephek Kaltro → Ravisin
+#   9BD  ( 7)      Text_BG   subordinate shows DOUBT (foreshadow) Basil questions Ravisin
+#   9BE  (19)      on-map    party ARRIVES; the PLACE             the ridge + the tomb seen
+#   9BF  ( 7)      on-map    party notices the commotion          the dead stirring, distant
+#   9C0  ( 9)      on-map    stakes turn LETHAL                   Ravisin sets them on us
+#   9C1  ( 2)      on-map    party REACTS                         short party beat
+#   9C2  ( 8)      on-map    recruit reaches party; BATTLE        Basil joins → battle
+#   9C3  (12)      on-map    recruit's OWN scene (Joshua)         Sahnar in the sarcophagus
+#   9C4  ( 4)      on-map    other recruit's beat before Talk     CUT -- see the slot below
+#   ══ everything above is ONE pre-map event list; everything below is triggered ══
+#   9C5  ( 3)      on-map    mid-battle ESCALATION                the eruption
+#   9C6  (32)      on-map    TALK-RECRUIT scene (= 0x9CC)         Basil Talks Sahnar (payoff)
+#   9C7  ( 1)      quote     BOSS TAUNT — one box                 Ravisin taunt
+#   9C8  ( 1)      quote     BOSS DEATH — one box                 Ravisin's locked death quote
+#   9C9  (34)      on-map    ENDING exposition                    Ravisin falls → Bremen hook
+#
+# TRIGGERS ARE INHERITED WITH THE ANATOMY (corrected 2026-07-29, Nicolas caught it).
+# 9BA-9C4 are ELEVEN messages inside ONE event list, `EventScr_Ch5_BeginningScene`, played
+# start to finish BEFORE the map loads. They are not separately-triggered scenes, so there is
+# no ordering to design between them and nothing can interleave: our 9C3 (Sahnar sealed in the
+# dark) cannot race our 9C5 (the sarcophagus cracking), because 9C3 is over before the player
+# ever takes a turn. Only three things below it carry real triggers, exactly as vanilla wires
+# them: 9C5 = a mid-battle turn event (`EventScr_089F22A4`), 9C6 = a Talk
+# (`EventScr_089F2270`), 9C9 = `EventScr_Ch5_EndingScene`.
+# CHANNEL drives the LINE WIDTH we hand-box to: on-map bubbles wrap at 29 chars, Text_BG at
+# ~42. Vanilla puts the two command scenes on a backdrop because they happen elsewhere -- which
+# is why our 9BC/9BD (Sephek's briefing, Ravisin's errand) are backdrop scenes too.
 #
 # SLOT-ID CAVEAT (2026-07-29): the left column is our NAMING convention, not a decomp citation
-# throughout. 9BB-9C5 and 9C9 are real ch5-eventscript.h ids; 9C6/9C7/9C8 appear NOWHERE in the
+# throughout. 9BA-9C5 and 9C9 are real ch5-eventscript.h ids; 9C6/9C7/9C8 appear NOWHERE in the
 # decomp -- we coined them for the recruit and the two boss quotes. The recruit's actual vanilla
 # twin is 0x9CC (Joshua's Talk scene, 32 boxes, EventScr_089F2270); the boss quotes live in
 # eventinfo, not eventscript. Mine 0x9CC -- not "0x9C6" -- when writing our 9C6.
+# `vanilla_scene.py` used to read TEXTSHOW only and so HID every Text_BG scene -- it reported
+# this opening as 8 messages / 71 boxes when it is 11 / 98, with 9BC and 9BD missing entirely.
+# Fixed 2026-07-29; the tool now prints each message's id and channel. If a mined beat looks
+# absent from a scene, suspect the miner before concluding vanilla lacks it.
 # NOTE ON 9BC: vanilla's orders come from GLEN (a superior officer), never from Vigarde --
 # so ours come from SEPHEK, not Auril. `lore/frostmaiden-voices.md` keeps the Frostmaiden
 # OFF the page ("commands through frost giants and winter wolves"). Sephek is the prologue
@@ -400,7 +420,7 @@ enemy_units:
 # Ravisin's "she has other hands" drop, and re-arms him for his Act-II death.
 events:
   # ── 9BB — the two RECRUITS meet, before the party ever arrives ────────────────
-  - trigger: prologue_scene
+  - trigger: chapter_start       # opening event list, message 2 of 11 -- see TRIGGERS note
     slot: "vanilla 9BB"
     type: cutscene
     ea_file: events/ch05-basil-sahnar.ea
@@ -450,7 +470,7 @@ events:
       - basil: "I wish I could share my berries with her."
       - basil: "One day I'll give her one."
   # ── 9BC — the boss gets her ORDERS from a superior (never from the big bad) ────
-  - trigger: prologue_scene
+  - trigger: chapter_start       # opening event list, Text_BG backdrop (happens elsewhere)
     slot: "vanilla 9BC"
     type: cutscene
     ea_file: events/ch05-sephek-orders.ea
@@ -507,7 +527,7 @@ events:
       - sephek: "That is all."
       - ravisin: "...It will be done, according to her grand design."
   # ── 9BD — a subordinate shows DOUBT (foreshadows their own arc) ────────────────
-  - trigger: prologue_scene
+  - trigger: chapter_start       # opening event list, Text_BG backdrop (happens elsewhere)
     slot: "vanilla 9BD"
     type: cutscene
     ea_file: events/ch05-basil-doubt.ea
@@ -590,7 +610,7 @@ events:
       Two boxes, no more (vanilla's is exactly 2). Somebody in the party names what they are
       looking at. Candidate voices: Meesmickle (dry, it is his job), Braulo (flat), Wolfram.
   # ── 9C2 — the recruit reaches the party; BATTLE ───────────────────────────────
-  - trigger: map_opening              # Cutscene 2 — ON-MAP, before player phase (bubbles ≤29 ch/line)
+  - trigger: chapter_start       # opening event list, ON-MAP (bubbles ≤29 ch/line)
     slot: "vanilla 9C2"
     type: cutscene
     ea_file: events/ch05-basil-joins.ea
@@ -610,7 +630,7 @@ events:
       # (The thought dawns; Basil turns to the party and JOINS — green → the party's colors.)
       - basil: "...I wonder. Sahnar. ...She needs me. Take me to her?"
   # ── 9C3 — the RECRUIT'S OWN scene (vanilla gives Joshua 12 A-presses) ─────────
-  - trigger: midmap
+  - trigger: chapter_start       # opening event list, LAST message -- still before player phase
     slot: "vanilla 9C3"
     type: cutscene
     ea_file: events/ch05-sahnar-alone.ea
@@ -663,6 +683,27 @@ events:
       fresh corpse, and does NOT puppet her — see lore/sahnar.md). Sahnar walks HOSTILE of her
       own will, believing the party are the intruders she was left for; a fast crit-Myrmidon
       (smells faintly of pumpkin spice). She flips only when Basil reaches her.
+      DIALOGUE BUDGET — 3 boxes, the twin's exact spend (`EventScr_089F22A4`, the bandits who
+      join the fight mid-map). The structural rule taken from it: **the ARRIVING FORCE speaks
+      and the party never reacts.** Vanilla gives Eirika and Seth not one line here. So these
+      boxes belong to Ravisin and Sahnar. (Phantom Ship's quake beat does the opposite —
+      Ephraim reacts to it — but Ch11b is only our THEME base for the EARTHQUAKE/TILECHANGE
+      mechanism; Ch5 is the parity twin and wins the shape.) Either way both twins agree the
+      SPECTACLE lives in the event macros, never in the prose: nobody describes the horror.
+      This is also Ravisin's FIRST SPOKEN LINE in the chapter proper — 9C2 stages her as a
+      silent frost-robed figure at center, and what breaks the silence is her spending the
+      permission Sephek granted in 9BC ("the one under the stone" is his phrase, handed back).
+      Sahnar's single box is the SETUP for 9C6's first line: she says the rote guardian line in
+      full here, then at the recruit starts it again and stops at "Far enough. The tomb is--"
+      because she has seen Basil. The interruption only lands because this box exists.
+      LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 3 boxes.
+    script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
+      # (EARTHQUAKE_START + sequential TILECHANGE; the dead come up across the hollow.
+      #  Then LOAD1 — the sarcophagus cracks.)
+      - ravisin: "Rise. The Frostmaiden has need of you."
+      # (9BC callback: Sephek's exact words, spent.)
+      - ravisin: "...And the one under the stone. Her too."
+      - sahnar: "The tomb is closed. Turn back."
   - trigger: sahnar_talk          # Basil (Natasha-donor) Talks the risen Sahnar (Joshua-donor)
     slot: "9C6 (ours; vanilla twin 0x9CC)"   # NOT a decomp id -- see the SLOT-ID CAVEAT above
     type: dialogue
