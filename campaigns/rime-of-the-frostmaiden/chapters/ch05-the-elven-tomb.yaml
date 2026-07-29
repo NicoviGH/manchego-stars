@@ -664,7 +664,7 @@ events:
       own will, believing the party are the intruders she was left for; a fast crit-Myrmidon
       (smells faintly of pumpkin spice). She flips only when Basil reaches her.
   - trigger: sahnar_talk          # Basil (Natasha-donor) Talks the risen Sahnar (Joshua-donor)
-    slot: "vanilla 9C6"
+    slot: "9C6 (ours; vanilla twin 0x9CC)"   # NOT a decomp id -- see the SLOT-ID CAVEAT above
     type: dialogue
     ea_file: events/ch05-sahnar-recruit.ea
     description: >
@@ -711,7 +711,7 @@ events:
       - basil: "...Can I give you a berry now?"
   # ── 9C7 — BOSS TAUNT. One box. Vanilla's Saar taunt is ONE A-press. ──────────
   - trigger: boss_battle
-    slot: "vanilla 9C7"
+    slot: "9C7 (ours; boss quotes live in eventinfo)"
     type: quote
     status: unwritten
     description: >
@@ -720,7 +720,7 @@ events:
       comes from the 9BC orders scene, not from talking on the field.
   # ── 9C8 — BOSS DEATH. One box. Already locked. ───────────────────────────────
   - trigger: boss_death
-    slot: "vanilla 9C8"
+    slot: "9C8 (ours; boss quotes live in eventinfo)"
     type: quote
     description: >
       LOCKED: "Auril… I gave you everything…" — play it as a zealot's last OFFERING, proud and
