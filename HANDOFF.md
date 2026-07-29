@@ -43,7 +43,7 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   git hook resolves against the outer repo unless you strip `GIT_*`** (this bit us — flipped `core.bare`
   and wrote a corrupt commit; fixed in `_vanilla_decomp_text` + the map-tileset test fixture).
 
-## This session (2026-07-22→23, Opus — ch05: roster, engine work, dialogue foundation; ROM-free web session)
+## This session (2026-07-22→29, Opus — ch05 roster, engine work, dialogue; ROM-free web sessions)
 
 **All ch05 detail lives on issue #25** (the live tracker comment) and in the chapter YAML — not here.
 Summary only:
@@ -51,10 +51,11 @@ Summary only:
 - **Environment:** Linux web container. The base ROM lives on Nicolas's Mac and isn't committed, so ROM
   builds / `verify_text` / mGBA playtests are OFF the table. `make difficulty` IS ROM-free. One-time
   container setup: `pip install pillow pyyaml numpy`; `git submodule update --init --depth 1 fireemblem8u`.
-- **Protocol cleanup:** work moved onto **`feat/25-ch05-content`** with **draft PR #196**. Issue #25's stale
-  body corrected. The orphaned `claude/mobile-app-token-context-u2psep` remote branch needs deleting from
-  the GitHub UI (the proxy 403s on ref-delete).
-- **ch05 roster CLOSED** (rev.3, PARITY) and **3 of 15 dialogue slots locked**. → **issue #25**.
+- **Protocol cleanup:** work moved onto **`feat/25-ch05-content`** with **draft PR #196** (body + title
+  current as of `e4798e9`). The orphaned `claude/mobile-app-token-context-u2psep` remote branch still
+  needs deleting from the GitHub UI (the proxy 403s on ref-delete).
+- **ch05 roster CLOSED** (rev.3, PARITY) and **6 of 15 dialogue slots locked** (9BB/9BC/9BD/9BE/9C2/9C3).
+  → **issue #25**.
 - **Difficulty engine gained three tools** (all ROM-free, all tested): a **per-unit role check**
   (`role_findings` — the aggregate averages a monster away and never compares the boss to anything;
   ch04 verified clean by it), **terrain wiring** (§Terrain — FE8's own tables + vanilla layouts), and
@@ -63,7 +64,10 @@ Summary only:
   scenes as boxed dialogue with counts.
 - **Craft law recorded** (binding in the `dialogue-pass` skill): mine the corpus BEFORE writing
   (`references/natural-speech.md`, `fe8-register.md`, `scene-pacing.md`); epigram disease; no contrasting
-  clichés; draft boxed. ADRs in `decisions.md`.
+  clichés; draft boxed; tracker upkeep is part of the lock step. ADRs in `decisions.md`.
+- **Sahnar is MISLED, not seized** (2026-07-29, reconciled repo-wide) — Ravisin wakes her and lets her
+  draw the wrong conclusion; she fights of her own will, and Basil turns her by telling her the truth.
+  Her voice's two temperatures are now misled → turned; Marty's covenant names the *keeping*.
 
 ## NEXT SESSION — start here (branch `feat/25-ch05-content`, draft PR #196, ROM-free)
 
@@ -72,13 +76,14 @@ live ch05 tracker** (settled decisions, the 15-slot scene map, which beats are w
 
 1. **Invoke the `dialogue-pass` skill and DO ITS STEP 0** — mine the corpus before writing a line. This is
    mandatory, not advice: 9BB burned a dozen drafts written from instinct.
-2. **Next beat: 9BC — Sephek Kaltro gives Ravisin her orders.** Two composed zealots; first real use of
-   `references/fe8-register.md`. Then 9C6 (the recruit), which pays off 9BB's "One day I'll give her one."
+2. **Next beat: 9C4 — Basil steeling himself mid-escort** (vanilla's 4-box Natasha prayer). Then **9C6,
+   the recruit** — the chapter's payoff, owed by BOTH 9BB's "One day I'll give her one" and 9C3's
+   certainty. Remaining after that: 9BF / 9C0 / 9C1 / 9C5 / 9C7 / 9C9.
 3. **Guardrails that broke repeatedly — do not re-break:** Ravisin's motive is Auril's cosmic winter, full
    stop (no grudge/grief/revenge/pathos — banned in her bible); she is never softened or mourned. Sahnar
-   knows only what Basil tells her. Draft BOXED (~29–30 ch/line, on-map ≤29).
+   knows only what Basil tells her, and is misled rather than bound. Draft BOXED (~29–30 ch/line, on-map ≤29).
 4. **DoD:** locked scripts → `script:` blocks in the ch05 YAML with `LOCKED <date>`; update the #25 tracker
-   comment; commit ROM-free on `feat/25-ch05-content`.
+   comment AND the PR body in the same breath; commit ROM-free on `feat/25-ch05-content`.
 
 ## PARALLEL THREAD (ROM-gated, Nicolas's Mac): finish the ch04 slice (`feat/24-ch04-map`)
 
@@ -114,8 +119,12 @@ make difficulty CH=ch04
 # ch04 fast-boot playtest build (New Game -> White Moose forest, party + foes deployed)
 make CAMPAIGN=rime-of-the-frostmaiden CH04BOOT=1 fireemblem8.gba -j$(nproc)
 
-# Required before claiming a change is finished
-python3 -m unittest tools.test_build_campaign tools.test_difficulty
+# Required before claiming a change is finished (468 tests; `tools/` isn't a package,
+# so unittest discover can't find them -- expand the glob)
+python3 -m unittest $(ls tools/test_*.py | sed 's|/|.|;s|\.py||' | tr '\n' ' ')
 make check
 git diff --check
+# A test/build run dirties the fireemblem8u submodule with INJECTED artifacts
+# (e.g. engine_hooks' MSChargeFlashArm decl). Restore, never commit:
+git -C fireemblem8u status --short   # then: git -C fireemblem8u restore <files>
 ```
