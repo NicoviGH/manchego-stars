@@ -668,9 +668,47 @@ events:
     type: dialogue
     ea_file: events/ch05-sahnar-recruit.ea
     description: >
-      Basil chaperoned safely to Sahnar → Ravisin's hold BREAKS and she comes back to herself,
-      curious about modern druids and choosing to walk on ("not yet") rather than lie back
-      down. The escort-recruit (Ch5's Joshua beat).
+      THE CHAPTER'S PAYOFF. Basil chaperoned safely to Sahnar → she turns and joins. The
+      escort-recruit (Ch5's Joshua beat, twin `EventScr_089F2270`, 32 boxes; ours is 16 — the
+      relationship was already built in 9BB, so this scene only has to turn her).
+      The turn is NOT an argument won and NOT a rescue. Its mechanism, beat for beat off the
+      twin: RECOGNITION → duty stated flatly → the other pleads → the recruit turns on
+      something of their OWN (Joshua's coin comes up tails; Sahnar's 9C3 line "I was given a
+      purpose" comes back over) → flip. Basil brings two proofs and no philosophy: (1) one of
+      Ravisin's own creatures broke free, pack and all, "all it took was knowing they had a
+      choice"; (2) the tomb's real desecrator is the witch herself. So Sahnar's purpose does
+      NOT break — she keeps it, and her ENEMY resolves. She was misled, never bound.
+      Written by Nicolas; boxed to GBA width here. Deliberate, do not "fix":
+        · "...Basil?" is her exact first line from 9BB — the recognition IS the word. No
+          introduction, no explanation; he never has to say who he is.
+        · The wolf stays GENERIC ("a wolf", "his whole pack", "travelers") — Sahnar has no way
+          to know Lupin, and 9BB established she knows only what Basil tells her.
+        · "child" → "little one" is an ARC: cold while she is still the summoned guardian,
+          then 9BB's name for him the moment she comes back to herself.
+        · The scene ENDS on Basil's berry question, unanswered — 9BB's "One day I'll give her
+          one" left open on purpose, going into the fight.
+      LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 16 boxes, Sahnar 8 / Basil 8.
+    script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
+      # (Basil is walked the last few steps under escort. Her killing edge is up.)
+      - sahnar: "Far enough. The tomb is--"
+      - sahnar: "......"
+      - sahnar: "...Basil?"
+      - basil: "Sahnar! I can't believe you're free!"
+      - sahnar: "I am not free, child. I was summoned to fulfill my purpose."
+      - basil: "That's actually why I'm here... Some of her creatures broke free."
+      - sahnar: "...What?"
+      - basil: "A wolf. Him and his whole pack. They're out there now, with travelers."
+      - basil: >-
+          All it took was knowing they had a choice... That we have a choice...
+      - sahnar: "......"
+      - sahnar: "My purpose... is to defend this tomb..."
+      - basil: "From who? Your people are long gone..."
+      - basil: "The witch has lost her way. She's disturbing the dead..."
+      # (The turn: the purpose holds, the enemy resolves.)
+      - sahnar: "Then my purpose has not changed. Only my true enemy has been revealed."
+      - sahnar: "...Thank you, little one."
+      # (Last box before gameplay resumes. She never answers.)
+      - basil: "...Can I give you a berry now?"
   # ── 9C7 — BOSS TAUNT. One box. Vanilla's Saar taunt is ONE A-press. ──────────
   - trigger: boss_battle
     slot: "vanilla 9C7"

@@ -22,17 +22,21 @@ covenant): a soul frozen *out* of the cycle — denied her return to the earth, 
 for thousands of years — which is the one thing the spore-druid names unforgivable. Ravisin
 doesn't puppet her — she WAKES her and lets her draw the wrong conclusion, which is worse:
 Sahnar spends herself on the wrong enemy of her own free will. What turns her is **Basil**,
-walked up under escort, telling her what she is actually defending.
+walked up under escort, naming who is really desecrating this tomb.
 
 - **Wants:** now that she's loose — to see what the world became while she kept her long watch;
   and, given a cause worth a sword, to *spend* her freedom rather than lie back down. She
   chooses "not yet." (That choice is hers — see the Marty reconciliation in `marty.md`.)
-- **The turn (Basil's Talk):** she is NOT bound — she fights believing she is finally doing
-  her duty, and only Basil can tell her what she is actually defending. A
-  small green kindness — one of the old druid-makings, tended and *named* — reaches her, and
-  the belief gives. She comes back to herself. Her solo scene (9C3) is built to make this a
-  **revelation, not a rescue**: she ends it certain of her purpose, so the recruit lands as
-  the moment that certainty is answered.
+- **The turn (Basil's Talk, 9C6):** she is NOT bound, so there is no hold to break and nothing
+  to rescue her from. **Her purpose does not break — her ENEMY resolves.** Basil brings two
+  proofs and no philosophy: one of Ravisin's own creatures walked free, pack and all ("all it
+  took was knowing they had a choice"), and the thing actually desecrating this tomb is the
+  witch. Sahnar keeps the purpose she was given and turns it around: *"Then my purpose has not
+  changed. Only my true enemy has been revealed."* Her solo scene (9C3) is built to set this
+  up — she ends it certain, so the recruit is a **revelation, not a rescue**.
+- **Why Basil and nobody else:** she does not weigh his argument, she recognises *him*. Seeing
+  the little berry bush she has only ever heard through stone is what buys him the hearing;
+  anyone else gets the killing edge. That is the whole reason 9BB exists.
 
 ## Voice
 
