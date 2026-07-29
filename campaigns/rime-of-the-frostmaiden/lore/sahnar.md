@@ -17,12 +17,9 @@ this: she was **not asleep.** She has been **awake and aware for millennia** —
 alone, in the dark, the whole time — and she frames that unimaginable ordeal flatly, as the
 **purpose the gods set her.** She endured it. That endurance is the whole of her.
 
-She is also **the living proof of Marty's covenant** ([`marty.md`](marty.md) §The spore
-covenant): a soul frozen *out* of the cycle — denied her return to the earth, held conscious
-for thousands of years — which is the one thing the spore-druid names unforgivable. Ravisin
-doesn't puppet her — she WAKES her and lets her draw the wrong conclusion, which is worse:
-Sahnar spends herself on the wrong enemy of her own free will. What turns her is **Basil**,
-walked up under escort, naming who is really desecrating this tomb.
+Ravisin doesn't puppet her — she WAKES her and lets her draw the wrong conclusion, which is
+worse: Sahnar spends herself on the wrong enemy of her own free will. What turns her is
+**Basil**, walked up under escort, naming who is really desecrating this tomb.
 
 - **Wants:** now that she's loose — to see what the world became while she kept her long watch;
   and, given a cause worth a sword, to *spend* her freedom rather than lie back down. She
