@@ -362,9 +362,11 @@ enemy_units:
 # (twig/pinecone/feather; we already dropped the severed hand) become set-dressing, not a gate.
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
-# SCENE MAP — ch05 mirrors vanilla FE8 Ch5's scene anatomy 1:1 (DECIDED 2026-07-23, Nicolas).
-# Not a length target: we copy the SLOTS and what each one does, and pick each beat's register
-# and box count while writing it. Read the twin's own scenes with:
+# SCENE MAP — ch05 follows vanilla FE8 Ch5's scene anatomy slot-for-slot (DECIDED 2026-07-23,
+# Nicolas), with 9C4 CUT (2026-07-29) — so 14 of 15, not a literal 1:1. The anatomy is a
+# CHECKLIST, not a quota: a slot whose job is already done elsewhere gets cut rather than filled.
+# Not a length target either: we copy the SLOTS and what each one does, and pick each beat's
+# register and box count while writing it. Read the twin's own scenes with:
 #     python3 tools/vanilla_scene.py ch5 [SceneFragment]
 # Anatomy + measured budgets: .claude/skills/dialogue-pass/references/scene-pacing.md
 #
@@ -378,14 +380,19 @@ enemy_units:
 #   9C0  ( 9)      stakes turn LETHAL                   Ravisin sets the guardians on them
 #   9C1  ( 2)      party REACTS                         short party beat
 #   9C2  ( 8)      recruit reaches party; BATTLE        Basil joins → battle
-#   9C3  (12)      recruit's OWN scene (Joshua)         Sahnar bound in the sarcophagus
-#   9C4  ( 4)      other recruit's beat before Talk     Basil, before the escort
+#   9C3  (12)      recruit's OWN scene (Joshua)         Sahnar alone in the sarcophagus
+#   9C4  ( 4)      other recruit's beat before Talk     CUT -- see the slot below
 #   9C5  ( 3)      mid-battle ESCALATION                the eruption
-#   9C6  ( 1)      one-line beat                        (spare — Basil or Lupin)
+#   9C6  (32)      TALK-RECRUIT scene (= 0x9CC)         Basil Talks Sahnar -- the payoff
 #   9C7  ( 1)      BOSS TAUNT — one box                 Ravisin taunt
 #   9C8  ( 1)      BOSS DEATH — one box                 Ravisin's locked death quote
 #   9C9  (34)      ENDING exposition                    Ravisin falls → Bremen hook
 #
+# SLOT-ID CAVEAT (2026-07-29): the left column is our NAMING convention, not a decomp citation
+# throughout. 9BB-9C5 and 9C9 are real ch5-eventscript.h ids; 9C6/9C7/9C8 appear NOWHERE in the
+# decomp -- we coined them for the recruit and the two boss quotes. The recruit's actual vanilla
+# twin is 0x9CC (Joshua's Talk scene, 32 boxes, EventScr_089F2270); the boss quotes live in
+# eventinfo, not eventscript. Mine 0x9CC -- not "0x9C6" -- when writing our 9C6.
 # NOTE ON 9BC: vanilla's orders come from GLEN (a superior officer), never from Vigarde --
 # so ours come from SEPHEK, not Auril. `lore/frostmaiden-voices.md` keeps the Frostmaiden
 # OFF the page ("commands through frost giants and winter wolves"). Sephek is the prologue
@@ -630,16 +637,19 @@ events:
       - sahnar: "No one ever came. I stopped counting somewhere in the middle."
       - sahnar: "...Well. Something has come now."
       - sahnar: "I will defend this tomb. It is my purpose."
-  # ── 9C4 — the other recruit's beat, just before the Talk ──────────────────────
-  - trigger: before_sahnar_talk
-    slot: "vanilla 9C4"
-    type: dialogue
-    ea_file: events/ch05-basil-before.ea
-    status: unwritten
-    description: >
-      Four boxes at most (vanilla's Natasha prayer is 4). Basil, mid-escort, steeling himself —
-      he is about to walk up to a bound queen with a killing edge. His voice is spare (2-5
-      words); the fear should show in what he does not say.
+  # ── 9C4 — CUT 2026-07-29 (Nicolas). Slot deliberately left empty. ─────────────
+  # Was: "Basil, mid-escort, steeling himself" — vanilla's 4-box Natasha prayer (MSG_9C4),
+  # which she spends psyching herself up to walk into danger and talk somebody down.
+  # CUT because its only real job was to plant the berry ahead of the recruit, and 9BB
+  # ALREADY plants it: "One day I'll give her one." Re-planting it one slot before the
+  # payoff would have spent the setup twice and made 9C6 read as its own echo. The seven
+  # slots of silence between 9BB and 9C6 are doing the work instead.
+  # Drafted and rejected at the same sitting: three variants (berry / scared-going-anyway /
+  # "little one"), all four boxes, all bubble-legal. Nothing salvageable is owed forward —
+  # Basil's fear now lives inside the recruit scene itself, where it costs him something.
+  # NB the old description here carried `basil.md`'s RETIRED "voice is spare (2-5 words)"
+  # spec (retired 2026-07-23: it made him read as slow — his corpus twin is Ewan). Do not
+  # resurrect it if this slot is ever refilled.
   - trigger: eruption_turn        # scripted turn (~2/3/5, the Ch5 wave cadence) — EARTHQUAKE/TILECHANGE
     slot: "vanilla 9C5"
     type: scripted_event
