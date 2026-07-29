@@ -568,8 +568,12 @@ events:
     description: >
       The party crests the ridge to an iced elven GATEWAY of standing stones (open arch, not a
       door) and the moonlit sunken hollow beyond — the open-air tomb. Lupin reads the moose's
-      trail here (ch04 payoff); Marty senses a FAMILIAR death-craft and trails off (the
-      two-druids hook, left unspoken); Pinky spots the cornered moose. Then the map loads.
+      trail here (ch04 payoff); Marty senses a familiar death-craft and trails off; Pinky spots
+      the cornered moose. Then 9BF picks the thread up.
+      NB Marty's "...This magic is familiar..." was originally planted to seed a Marty/Ravisin
+      villain-foil thread that is now RETIRED (decisions.md 2026-07-29). The line STAYS: a
+      spore druid recognising another druid's death-craft needs no thread to be legible, and it
+      is what makes him the one who reads this place. It just no longer owes a payoff.
       LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas). Hand-boxed to GBA width
       (~29-30 ch/line, 2 lines/box); [A]/[LF] encoding is a text-insertion detail (ROM-gated).
     script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
@@ -764,8 +768,13 @@ events:
     slot: "9C8 (ours; boss quotes live in eventinfo)"
     type: quote
     description: >
-      LOCKED: "Auril… I gave you everything…" — play it as a zealot's last OFFERING, proud and
-      certain, never as regret (ravisin.md bans pathos). One box, matching vanilla's Saar.
+      Play it as a zealot's last OFFERING, proud and certain, never as regret (ravisin.md bans
+      pathos). One box, matching vanilla's Saar. The text was settled 2026-07-23 but sat in this
+      description as prose for six days while the tracker counted it locked — a `script:` block
+      is what "locked" means; prose in a description is a note.
+      LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 1 box.
+    script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
+      - ravisin: "Auril... I gave you everything..."
   - trigger: chapter_end
     slot: "vanilla 9C9"
     type: cutscene
