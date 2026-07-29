@@ -430,26 +430,16 @@ enemy_units:
 # Ravisin's "she has other hands" drop, and re-arms him for his Act-II death.
 events:
   # ── 9BB — the two RECRUITS meet, before the party ever arrives ────────────────
-  # ── 0x9BA — vanilla's opening scene-setter. NOT YET REVIEWED WITH NICOLAS. ────
-  - trigger: chapter_start       # opening event list, message 1 of 11
-    slot: "vanilla 0x9BA"
-    type: cutscene
-    status: needs_review           # CLAUDE assumed "not adopted"; Nicolas has never ruled on it
-    description: >
-      Vanilla's THREE-box cold open, before anything else in the chapter: "Well, well. There's an
-      arena in this town." / "Perfect. My pocket's feeling a bit light." / "Say, is that a cleric?
-      It is! And a gorgeous one at that." Joshua, alone, wanting two things — money and that
-      cleric — and both wants pay off later (the arena in his 0x9C3 solo, the cleric in 0x9BB and
-      again at the 0x9CC recruit). It is the cheapest characterisation in the chapter: three boxes
-      that make the recruit a person with appetites before he is a unit.
-      "No arena" is SETTLED and is not CLAUDE's call to make or unmake: decisions.md §Economy,
-      decided May 2026 — FE8's arena is removed and Wolfram's Forge fills the spend-gold-to-get-
-      stronger role. What CLAUDE decided on its own authority was that the SLOT goes with it, and
-      that is the part under review, because the slot's job survives without an arena: a recruit
-      states what they want, out loud, before they are a unit.
-      DECIDE WHEN WE GET HERE: does Basil (or Sahnar) get a three-box cold open stating a want?
-      Counter-argument on the record: our 0x9BB already opens mid-sentence with Basil rushing in,
-      so we may be deliberately starting in motion and this slot is genuinely surplus.
+  # ── 0x9BA — RELOCATED into 0x9BE as the Wolfram/Forge seed (Nicolas, 2026-07-29) ──
+  #  Vanilla's 3-box cold open is Joshua wanting two things (arena money, that cleric), both of
+  #  which pay off later. We have NO arena -- settled, decisions.md §Economy May 2026, Wolfram's
+  #  Forge took its role -- so the slot is repurposed rather than dropped: WOLFRAM finds the
+  #  tomb's dead elven forge and offers to light it. Same job as the twin (a character states a
+  #  want out loud, and it pays off later), and it finally gives the Forge an on-screen origin
+  #  instead of a one-line ADR. It sits INSIDE 0x9BE because 0x9BE is already the scene where
+  #  each character reads the place through their own lens -- Lupin the tracks, Marty the magic,
+  #  Pinky the moose -- so Wolfram reading the METAL belongs in that sequence, not beside it.
+  #  See 0x9BE's script and the FORGE TUTORIAL slot below.
   - trigger: chapter_start       # opening event list, message 2 of 11 -- see TRIGGERS note
     slot: "vanilla 0x9BB"
     type: cutscene
@@ -604,13 +594,26 @@ events:
       villain-foil thread that is now RETIRED (decisions.md 2026-07-29). The line STAYS: a
       spore druid recognising another druid's death-craft needs no thread to be legible, and it
       is what makes him the one who reads this place. It just no longer owes a payoff.
-      LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas). Hand-boxed to GBA width
-      (~29-30 ch/line, 2 lines/box); [A]/[LF] encoding is a text-insertion detail (ROM-gated).
+      REOPENED + RELOCKED 2026-07-29: vanilla's 0x9BA slot was folded in here as WOLFRAM's Forge
+      seed (Nicolas's call). The scene's shape is "each character reads this place by what they
+      personally notice", so Wolfram reading the metal is the same beat as Lupin reading tracks;
+      he goes before Marty so the dread and Pinky's alarm stay adjacent and Pinky keeps the last
+      word (his unanswered question is 0x9BF's opening thread). 8 boxes now, against the twin's
+      combined 3 + 19 = 22, so still well inside budget.
+      LOCKED 2026-07-23, extended 2026-07-29 (dialogue-pass, co-written with Nicolas). Hand-boxed
+      to GBA width (~29-30 ch/line, 2 lines/box); [A]/[LF] encoding is ROM-gated.
     script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
       # (Night. An iced elven gateway of standing stones — open arch, no roof, no door — and
       #  beyond it the ground falls into a wide moonlit hollow: the open-air tomb. The moose's
       #  trail leads down into it.)
       - lupin: "The trail leads here. ...It came home."
+      # (0x9BA relocated here, 2026-07-29: Wolfram reads the place the way the others do -- by
+      #  what he can sense. Senses FIRST, then names it (wolfram.md diction rule). This is the
+      #  Forge's on-screen origin; the mechanics get taught separately, see the FORGE TUTORIAL.)
+      - wolfram: "...Hold on. *(sniffs)* Charcoal. Slag."
+      - wolfram: "There's a forge down there. Elven. Cold about four thousand years."
+      - wolfram: "Give me a fire and a night. I'll put an edge on everything you own."
+      - wolfram: "...And there's floor enough to swing it. Come find me if you want the practice."
       - marty: "...This magic is familiar..."               # trails off — the hook, never explained here
       - pinky: "Father, I see it! The moose--in the hollow."
       - pinky: "...It's not running. Why isn't it running?!"
@@ -621,20 +624,35 @@ events:
     ea_file: events/ch05-opening.ea
     status: unwritten
     description: >
-      Still pre-map, straight off the beat above: from the rim they see the hollow STIR — shapes
-      standing up among the statues. Vanilla's "what's that commotion" hinge, which turns the
-      approach into an alarm. Ravisin is visible and SILENT throughout.
-  # ── 9C0 — the stakes turn LETHAL ──────────────────────────────────────────────
+      Picks up Pinky's unanswered "why isn't it running?!" from 0x9BE. 7 boxes in the twin.
+      CORRECTED 2026-07-29: this slot previously said the party watches the hollow STIR and shapes
+      stand up. WRONG — that put a rising here AND at 0x9C5. Vanilla's 0x9BF/0x9C0/0x9C1 have
+      nothing to do with reinforcements; the guardians are ALREADY UP, and these beats are where
+      the game STAGES them in front of the player.
+      How vanilla actually paces it, and we should copy this: LOAD1(Saar + 6) fires BETWEEN 0x9BF
+      and 0x9C0, then SONG_RAID starts, then 0x9C0 plays, then LOAD1(9 more). The boxes are timed
+      to an army walking onto the board. The party's own 7 boxes are: two finishing the previous
+      conversation without resolving it, an interruption, then three deciding to go look. They are
+      PASSIVE throughout — they overhear and react; they never act.
+      OPEN: what interrupts. Vanilla's is overheard SPEECH (soldiers dragging Natasha off). Our
+      guardians are mute, Basil does not arrive until 0x9C2, and Ravisin speaking here would spend
+      the silence 0x9C5 is built on. Leading candidate: the party overhears BASIL below, pleading
+      about the moose — which is what 0x9BB established him doing, and it hands 0x9C0 its own nine
+      boxes naturally (Ravisin answering him, the party watching unseen).
   - trigger: chapter_start
     slot: "vanilla 0x9C0"
     type: cutscene
     ea_file: events/ch05-opening.ea
     status: unwritten
     description: >
-      Ravisin sets her guardians on them without a word (vanilla spends 9 A-presses on Natasha
-      being run down by soldiers, to make the danger real before a single unit moves). This is
-      the beat that says: no parley, no bargain, they will be killed here.
-  # ── 9C1 — the party REACTS (short) ────────────────────────────────────────────
+      9 boxes in the twin, and the single most important fact about them: THE PARTY IS ABSENT FOR
+      ALL NINE. Vanilla plays the incident itself — captors and victim — and the stakes go lethal
+      on the captors' own lips ("We've been ordered to execute you if you offer any resistance").
+      The victim is NATASHA, who is Basil's exact donor.
+      CORRECTED 2026-07-29: this slot previously said "Ravisin sets her guardians on them without
+      a word", which is both a rising (see 0x9BF) and the wrong shape — it makes the party the
+      target of a scene they are supposed to be eavesdropping on.
+      This is also where LOAD1 puts the second wave of the line force on the board (see 0x9BF).
   - trigger: chapter_start
     slot: "vanilla 0x9C1"
     type: cutscene
@@ -721,6 +739,27 @@ events:
       slot's only job — the twin's four boxes are about the errand and about fear, not about a
       gift. RESTORED HERE AS needs_review because the cut rests on an approval CLAUDE cannot
       evidence, and Nicolas has said he does not recall making these calls. Nicolas's call.
+  # ── 0x9D5/0x9D6 — the FORGE's systemic tutorial. Vanilla teaches the arena HERE, in Ch5. ──
+  - trigger: forge_tile_visited   # flag-gated, like vanilla's own arena tutorial
+    slot: "vanilla 0x9D5 + 0x9D6"
+    type: tutorial
+    status: unwritten
+    description: >
+      The Forge is the ARENA under the hood (Nicolas, 2026-07-29), and vanilla teaches the arena
+      in THIS chapter, so tutorial parity is owed here and not deferred. The twin is a flag-gated
+      pair: 0x9D5 is one box naming the thing ("There's an [red]arena[/red] here."), 0x9D6 is five
+      boxes of pure mechanics — one-on-one matches, win pays TWICE the entry fee, a loss means
+      that unit "will not be able to fight in any future battles", and press B quickly to concede
+      (lose the fee, keep the unit). Note vanilla puts the escape hatch in the tutorial, not in
+      the fiction: a player who reads this knows how to bail.
+      CHANNEL, per the onboarding C-hybrid: this is a DRY SYSTEMIC lesson (a wager, a payout
+      multiplier, a permadeath risk, a panic button), so it rides vanilla-style tutorial boxes —
+      NOT Wolfram's dialogue. His 0x9BE beat is the narrative seed and deliberately states no
+      numbers; splitting them is what keeps his voice from turning into a rules manual.
+      OWED WHEN WRITTEN: an `introduces:` entry for the forge/wager mechanic + rerun
+      `gen_onboarding_index.py` (the concept debuts once, and `test_onboarding.py` gates it).
+      OPEN: whether the Forge also does gear upgrades, which the vanilla arena does NOT do. If it
+      does, that half has no vanilla twin to mine and needs its own teaching beat.
   - trigger: eruption_turn        # scripted turn (~2/3/5, the Ch5 wave cadence) — EARTHQUAKE/TILECHANGE
     slot: "vanilla 0x9C5"
     type: scripted_event
@@ -747,22 +786,27 @@ events:
       Sahnar's single box is the SETUP for 9C6's first line: she says the rote guardian line in
       full here, then at the recruit starts it again and stops at "Far enough. The tomb is--"
       because she has seen Basil. The interruption only lands because this box exists.
-      REOPENED 2026-07-29: never approved. CLAUDE asked "want me to lock 9C5?", Nicolas replied
-      with a different question, and CLAUDE committed it as locked anyway. It is a DRAFT.
-      Two things to settle before it can lock:
-        (a) THE DOUBLE-RISING. 0x9BF and 0x9C0 currently also describe the dead getting up, so
-            as written the player watches them rise pre-map and then watches Ravisin summon them
-            again here. Vanilla's 0x9BF/0x9C0/0x9C1 have NOTHING to do with reinforcements (the
-            party overhears soldiers dragging Natasha off), and its 0x9C5 bandits are the FIRST
-            escalation. Whichever way this resolves, the dead may rise exactly once.
-        (b) Whether Ravisin speaks here at all. Giving her these boxes follows the twin (the
-            arriving force announces itself; vanilla gives Eirika and Seth no lines) and pays off
-            9BC's granted permission -- but it is also her first line in the party's presence,
-            and 0x9C0 may want that instead.
-    status: draft_awaiting_review
-    draft_script:                     # DRAFT -- not locked. See REOPENED note above.
-      # (EARTHQUAKE_START + sequential TILECHANGE; the dead come up across the hollow.
+      RESOLVED 2026-07-29 (Nicolas): there was never a double-rising to design around. The line
+      force is ALREADY STANDING when the party arrives — staged onto the board by LOAD1 across
+      0x9BF/0x9C0 exactly as vanilla walks Saar's command on, so nothing "rises" in the opening.
+      This beat is Ravisin SUMMONING MORE, in response to the party proving stronger than she
+      allowed for. That is vanilla's escalation logic (its bandits arrive because the fight is
+      going long) and it pays Sephek's 9BC warning twice: he told her not to take them lightly,
+      and here she stops doing so.
+      Hence the opening box: the summoning has to read as a RESPONSE, not a schedule. Without it
+      the beat plays as a timed event and the player never learns their own pressure caused it.
+      TWIN = EventScr_089F22A4, 3 boxes, and its structural rule is that the ARRIVING FORCE
+      speaks while the party never reacts (vanilla gives Eirika and Seth no lines). Both twins
+      agree the SPECTACLE lives in the event macros, never in the prose.
+      Sahnar's single box sets up the recruit: she says the rote guardian line in full here, so
+      that starting it again at 0x9CC and stopping — "Far enough. The tomb is--" — has something
+      to break from.
+      LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 4 boxes.
+    script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
+      # (EARTHQUAKE_START + sequential TILECHANGE; the floor breaks and more dead come up.
       #  Then LOAD1 — the sarcophagus cracks.)
+      # (The response beat: her own line force is losing.)
+      - ravisin: "...They've come further than I allowed for."
       - ravisin: "Rise. The Frostmaiden has need of you."
       # (9BC callback: Sephek's exact words, spent.)
       - ravisin: "...And the one under the stone. Her too."
