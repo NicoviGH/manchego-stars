@@ -373,24 +373,28 @@ enemy_units:
 #
 #   vanilla        channel   job in Ch5                          ours
 #   ─────────────  ────────  ──────────────────────────────────  ──────────────────────────
-#   9BA  (27)      Text_BG   scene-setter: the TOWN              (not adopted -- our place
-#                                                                 beat is 9BE)
-#   9BB  (10)      on-map    the two RECRUITS meet, pre-battle    Basil + Sahnar in the dark
-#   9BC  (17)      Text_BG   boss gets ORDERS from a superior     Sephek Kaltro → Ravisin
-#   9BD  ( 7)      Text_BG   subordinate shows DOUBT (foreshadow) Basil questions Ravisin
-#   9BE  (19)      on-map    party ARRIVES; the PLACE             the ridge + the tomb seen
-#   9BF  ( 7)      on-map    party notices the commotion          the dead stirring, distant
-#   9C0  ( 9)      on-map    stakes turn LETHAL                   Ravisin sets them on us
-#   9C1  ( 2)      on-map    party REACTS                         short party beat
-#   9C2  ( 8)      on-map    recruit reaches party; BATTLE        Basil joins → battle
-#   9C3  (12)      on-map    recruit's OWN scene (Joshua)         Sahnar in the sarcophagus
-#   9C4  ( 4)      on-map    other recruit's beat before Talk     CUT -- see the slot below
-#   ══ everything above is ONE pre-map event list; everything below is triggered ══
-#   9C5  ( 3)      on-map    mid-battle ESCALATION                the eruption
-#   9C6  (32)      on-map    TALK-RECRUIT scene (= 0x9CC)         Basil Talks Sahnar (payoff)
-#   9C7  ( 1)      quote     BOSS TAUNT — one box                 Ravisin taunt
-#   9C8  ( 1)      quote     BOSS DEATH — one box                 Ravisin's locked death quote
-#   9C9  (34)      on-map    ENDING exposition                    Ravisin falls → Bremen hook
+#   0x9BA ( 3)     Text_BG   scene-setter: the arena/town        NOT ADOPTED (no arena; our
+#                                                                 place beat is 9BE)
+#   0x9BB (10)     on-map    the two RECRUITS meet, pre-battle   Basil + Sahnar through stone
+#   0x9BC (17)     Text_BG   boss gets ORDERS from a superior    Sephek Kaltro → Ravisin
+#   0x9BD ( 7)     Text_BG   subordinate shows DOUBT             Ravisin appraises the blade
+#   0x9BE (19)     on-map    party ARRIVES; the PLACE            the ridge + the tomb seen
+#   0x9BF ( 7)     on-map    thread ends; party OVERHEARS        the hollow starts moving
+#   0x9C0 ( 9)     on-map    stakes turn LETHAL, party ABSENT    (see slot -- open question)
+#   0x9C1 ( 2)     on-map    party REACTS: two questions         short party beat
+#   0x9C2 ( 8)     on-map    recruit reaches party; BATTLE       Basil joins → battle
+#   0x9C3 (12)     on-map    recruit's OWN scene (Joshua)        Sahnar in the sarcophagus
+#   0x9C4 ( 4)     on-map    other recruit's beat before Talk    CUT -- see the slot below
+#   ══ everything above is ONE pre-map event list (98 boxes); below is triggered ══
+#   0x9C5 ( 3)     on-map    mid-battle ESCALATION               the eruption
+#   0x9CC (32)     on-map    TALK-RECRUIT scene                  Basil Talks Sahnar (payoff)
+#   0x9C6 ( 1)     quote     ESCORT-NPC death quote (Natasha)    Basil's death quote
+#   0x9C7 ( 1)     quote     BOSS TAUNT — one box                Ravisin taunt
+#   0x9C8 ( 1)     quote     BOSS DEATH — one box                Ravisin's death quote
+#   0x9C9 (34)     on-map    ENDING exposition                   Ravisin falls → Bremen hook
+#   0x9CA (24)     on-map    ENDING variant: "if she died"       NOT ADOPTED (same exposition,
+#                                                                 escort-died branch)
+#   0x9CB (16)     on-map    ENDING coda: a villager thanks you  (undecided -- see 9C9)
 #
 # TRIGGERS ARE INHERITED WITH THE ANATOMY (corrected 2026-07-29, Nicolas caught it).
 # 9BA-9C4 are ELEVEN messages inside ONE event list, `EventScr_Ch5_BeginningScene`, played
@@ -404,11 +408,17 @@ enemy_units:
 # ~42. Vanilla puts the two command scenes on a backdrop because they happen elsewhere -- which
 # is why our 9BC/9BD (Sephek's briefing, Ravisin's errand) are backdrop scenes too.
 #
-# SLOT-ID CAVEAT (2026-07-29): the left column is our NAMING convention, not a decomp citation
-# throughout. 9BA-9C5 and 9C9 are real ch5-eventscript.h ids; 9C6/9C7/9C8 appear NOWHERE in the
-# decomp -- we coined them for the recruit and the two boss quotes. The recruit's actual vanilla
-# twin is 0x9CC (Joshua's Talk scene, 32 boxes, EventScr_089F2270); the boss quotes live in
-# eventinfo, not eventscript. Mine 0x9CC -- not "0x9C6" -- when writing our 9C6.
+# SLOT-ID CAVEAT (2026-07-29, CORRECTED same day): Ch5's messages live in TWO places, and an
+# eventscript-only grep sees just one -- which produced a wrong caveat here (that 9C6/9C7/9C8
+# "appear NOWHERE in the decomp"). They do. The authoritative map:
+#   ch5-eventscript.h  0x9BA-0x9C4 (the one opening list) - 0x9C5 (mid-battle)
+#                      0x9CC (the Talk recruit, EventScr_089F2270) - 0x9C9/0x9CA/0x9CB (ending)
+#   data_battlequotes.c  0x9C6 = NATASHA's ch5 death quote (pid CHARACTER_NATASHA, no flag)
+#                        0x9C7 = Saar BATTLE taunt (EVFLAG_BATTLE_QUOTES)
+#                        0x9C8 = Saar DEATH quote (EVFLAG_DEFEAT_BOSS)
+# So "9C6" was a BAD label for our recruit: the real 0x9C6 is a death quote. Our recruit is
+# 0x9CC and is now labelled so. And 0x9C6 gives us a slot we had not accounted for at all --
+# Natasha is BASIL's donor, so Basil owes a chapter-specific death quote too (see his slot).
 # `vanilla_scene.py` used to read TEXTSHOW only and so HID every Text_BG scene -- it reported
 # this opening as 8 messages / 71 boxes when it is 11 / 98, with 9BC and 9BD missing entirely.
 # Fixed 2026-07-29; the tool now prints each message's id and channel. If a mined beat looks
@@ -709,7 +719,8 @@ events:
       - ravisin: "...And the one under the stone. Her too."
       - sahnar: "The tomb is closed. Turn back."
   - trigger: sahnar_talk          # Basil (Natasha-donor) Talks the risen Sahnar (Joshua-donor)
-    slot: "9C6 (ours; vanilla twin 0x9CC)"   # NOT a decomp id -- see the SLOT-ID CAVEAT above
+    slot: "vanilla 0x9CC"          # the Talk recruit. Was mislabelled "9C6" until 2026-07-29;
+                                   # the real 0x9C6 is Natasha's death quote. See SLOT-ID CAVEAT.
     type: dialogue
     ea_file: events/ch05-sahnar-recruit.ea
     description: >
@@ -755,8 +766,23 @@ events:
       # (Last box before gameplay resumes. She never answers.)
       - basil: "...Can I give you a berry now?"
   # ── 9C7 — BOSS TAUNT. One box. Vanilla's Saar taunt is ONE A-press. ──────────
+  # ── 0x9C6 — the ESCORT's death quote. One box. Found 2026-07-29, previously unaccounted. ──
+  - trigger: unit_death
+    slot: "vanilla 0x9C6"          # data_battlequotes.c, pid CHARACTER_NATASHA, no flag
+    type: quote
+    status: unwritten
+    description: >
+      BASIL's chapter-specific death quote. Vanilla Ch5 gives one to NATASHA and to nobody else
+      on the map except the boss — not even to Joshua — because she is the ESCORT the chapter is
+      built around, and losing her is the failure the player must feel. Basil is her exact donor
+      and holds exactly that role here, so he inherits the slot.
+      The twin: "I can't let myself die here..... Someone has to hear my tale....." — she dies
+      still reaching for her one errand, which is what makes it land.
+      Ours has a sharper version of the same available, and it is the whole reason 9BB exists:
+      Basil dies with the berry still undelivered. ONE box. Do not spend it on pathos about
+      himself; spend it on Sahnar, whom the player now knows he was walking toward.
   - trigger: boss_battle
-    slot: "9C7 (ours; boss quotes live in eventinfo)"
+    slot: "vanilla 0x9C7"          # data_battlequotes.c, EVFLAG_BATTLE_QUOTES
     type: quote
     status: unwritten
     description: >
@@ -765,16 +791,23 @@ events:
       comes from the 9BC orders scene, not from talking on the field.
   # ── 9C8 — BOSS DEATH. One box. Already locked. ───────────────────────────────
   - trigger: boss_death
-    slot: "9C8 (ours; boss quotes live in eventinfo)"
+    slot: "vanilla 0x9C8"          # data_battlequotes.c, EVFLAG_DEFEAT_BOSS
     type: quote
     description: >
       Play it as a zealot's last OFFERING, proud and certain, never as regret (ravisin.md bans
-      pathos). One box, matching vanilla's Saar. The text was settled 2026-07-23 but sat in this
-      description as prose for six days while the tracker counted it locked — a `script:` block
-      is what "locked" means; prose in a description is a note.
+      pathos). One box. TWIN = Saar's own 0x9C8, "Emperor Vigarde..... Glory to His....Majesty
+      .....": a dying soldier's SALUTE — name the liege, then glorify. No accounting, no
+      reproach; the last thing he does is praise. The earlier draft ("Auril... I gave you
+      everything...") drifted off that shape twice over — it read as an invoice rather than a
+      salute, putting Ravisin at the centre of her own death instead of her goddess, and it was
+      the ONLY place in the whole chapter the goddess's proper name appeared. Everywhere else
+      she is the reverent epithet ("the Frostmaiden": 9BC twice, 9C5 once) and never appears, so
+      a one-box death quote was the worst possible spot for a first-and-only lore drop
+      (Nicolas, 2026-07-29). "The winter is yours" is a HANDOFF, which is truer to a chapter
+      where killing her does not stop the cold.
       LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 1 box.
     script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
-      - ravisin: "Auril... I gave you everything..."
+      - ravisin: "Frostmaiden... the winter is yours..."
   - trigger: chapter_end
     slot: "vanilla 9C9"
     type: cutscene
