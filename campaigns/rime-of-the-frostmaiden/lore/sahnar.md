@@ -4,8 +4,8 @@
 > awaits red-pen. Canon-corrected 2026-07-23 (RotFM): Sahnar is FEMALE (she/her), ancient
 > elven royalty, awake and aware for millennia.** ch05 "The Elven Tomb" recruit — the Joshua
 > beat. Mechanics in [`chapters/ch05-the-elven-tomb.yaml`](../chapters/ch05-the-elven-tomb.yaml)
-> (Myrmidon, killing-edge; rises HOSTILE — bound by Ravisin — and flips when **Basil** Talks
-> her) and [`npcs/sahnar.yaml`](../npcs/sahnar.yaml). The Joshua donor is mechanics-only, so
+> (Myrmidon, killing-edge; rises HOSTILE — woken by Ravisin and misled, never bound — and flips
+> when **Basil** Talks her) and [`npcs/sahnar.yaml`](../npcs/sahnar.yaml). The Joshua donor is mechanics-only, so
 > her gender is free of it; the shipped hooded-wraith art reads androgynous (sanity-check at
 > the slice).
 
@@ -20,15 +20,19 @@ alone, in the dark, the whole time — and she frames that unimaginable ordeal f
 She is also **the living proof of Marty's covenant** ([`marty.md`](marty.md) §The spore
 covenant): a soul frozen *out* of the cycle — denied her return to the earth, held conscious
 for thousands of years — which is the one thing the spore-druid names unforgivable. Ravisin
-doesn't merely raise her; she seizes a mind that already survived the worst and binds it to
-serve. What frees her is **Basil**, walked up under escort, breaking that hold.
+doesn't puppet her — she WAKES her and lets her draw the wrong conclusion, which is worse:
+Sahnar spends herself on the wrong enemy of her own free will. What turns her is **Basil**,
+walked up under escort, telling her what she is actually defending.
 
 - **Wants:** now that she's loose — to see what the world became while she kept her long watch;
   and, given a cause worth a sword, to *spend* her freedom rather than lie back down. She
   chooses "not yet." (That choice is hers — see the Marty reconciliation in `marty.md`.)
-- **The turn (Basil's Talk):** she is bound, conscious, straining against Ravisin's grip. A
+- **The turn (Basil's Talk):** she is NOT bound — she fights believing she is finally doing
+  her duty, and only Basil can tell her what she is actually defending. A
   small green kindness — one of the old druid-makings, tended and *named* — reaches her, and
-  the hold breaks. She comes back to herself.
+  the belief gives. She comes back to herself. Her solo scene (9C3) is built to make this a
+  **revelation, not a rescue**: she ends it certain of her purpose, so the recruit lands as
+  the moment that certainty is answered.
 
 ## Voice
 
@@ -38,12 +42,12 @@ she does not grieve aloud — she has had a very long time to be past both. Calm
 little dry: the composure *is* the depth. Not a brooding undead; not a zealot; not a modern
 quipster.
 
-**Two temperatures, one voice (bound → freed):**
-- **Bound (hostile):** clipped, formal — a guardian's duty spoken through gritted will, and
-  underneath it the real Sahnar straining against Ravisin's hold. She warns before she cuts;
-  even seized, her manners hold.
-- **Freed (allied):** the same calm, now her own — dry, curious, quietly amazed the world went
-  on without her. She asks more than she tells.
+**Two temperatures, one voice (misled → turned):**
+- **Misled (hostile):** clipped, formal — a guardian doing her duty at last, and *certain* of
+  it. Nothing strains underneath; that is the point. She warns before she cuts, because after
+  four thousand years the manners are all she kept.
+- **Turned (allied):** the same calm, now aimed at the truth — dry, curious, quietly amazed the
+  world went on without her. She asks more than she tells.
 
 **Diction rules**
 - **Courtly and formal, never fog.** Old cadence, but she *lands* — no thee/thou.
@@ -55,11 +59,11 @@ quipster.
 - **Device (budget one/scene):** understatement — the ancient who calls a horror "a long night."
 
 **Calibration lines (draft — for red-pen; not yet used in any beat)**
-- (bound, hostile) "The tomb is closed. I have kept it longer than your tongue has had words. …Turn back."
-- (bound, straining against Ravisin) "She holds the blade — not the hand. …Run, if you're wise. I cannot."
-- (freed by Basil) "A green thing. Tended. *Named*. …The old craft still grows. Then I am not the last of it — and not, it seems, hers."
-- (freed, dry) "Millennia in the dark, and the first face I meet is a mushroom. …The world has grown strange. Good."
-- (freed, choosing to walk on) "I could lie back down. …Not yet. There's a cold out there that wants answering."
+- (misled, hostile) "The tomb is closed. I have kept it longer than your tongue has had words. …Turn back."
+- (misled, certain) "I was given a purpose. …You are standing in it."
+- (turned by Basil) "A green thing. Tended. *Named*. …The old craft still grows. Then I am not the last of it — and not, it seems, hers."
+- (turned, dry) "Millennia in the dark, and the first face I meet is a mushroom. …The world has grown strange. Good."
+- (turned, choosing to walk on) "I could lie back down. …Not yet. There's a cold out there that wants answering."
 
 **Banned:** modern slang; brooding-undead moping ("so cold, so alone…"); horror-mummy
 gore/shambling; zealotry (that is Ravisin — Sahnar carries no such certainty); thee/thou fog;

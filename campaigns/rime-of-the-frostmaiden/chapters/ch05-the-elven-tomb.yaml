@@ -26,9 +26,10 @@ narrative: >
   Frostmaiden's endless winter, snuffing every warm hearth clinging to the ice (the
   same druid who awakened Messie, out in Maer Dualdon). Cornered at last, the moose
   makes its stand beside her, and Ravisin fights to the death for her goddess. When
-  she tears the tomb open she seizes its guardian — Sahnar, an ancient elven royal
-  held frozen and conscious for millennia — and puppets her against the party; the party frees
-  her by chaperoning the goodberry shrub, Basil, across to Talk her. They repot Basil
+  she tears the tomb open she WAKES its guardian — Sahnar, an ancient elven royal left
+  awake and watching for millennia — who comes willingly, believing the party are the
+  intruders she was left to stop. She is MISLED, not puppeted. The party turn her by
+  chaperoning the goodberry shrub, Basil, across to tell her the truth. They repot Basil
   and take him along, and turn down the coast toward Bremen.
 
 # ── Map ────────────────────────────────────────────────────────────────────────
@@ -61,9 +62,10 @@ objective:
       description: >
         Recruit Sahnar the Joshua way (this IS Ch5's memorable beat). Sahnar rises as
         a HOSTILE guardian — a fast, crit-threat Myrmidon mummy (killing-edge, Joshua's
-        exact donor), seized and puppeted by Ravisin — and the only way to free her is to
-        walk fragile BASIL up to her to Talk (Basil is our Natasha: her exact donor, a
-        frail Priest). So you must chaperone a weak healer across the depression to the
+        exact donor), WOKEN by Ravisin and fighting of her own will in the belief that she is
+        finally doing her duty — and the only way to turn her is to walk fragile BASIL up to her
+        to Talk (Basil is our Natasha: her exact donor, a frail Priest), because only he can tell
+        her what she is actually defending. So you must chaperone a weak healer across the depression to the
         deadly duelist, clearing a safe pocket first — the escort-recruit that defines how
         you play Ch5. Optional; free her and she fights the back half (recruit swing
         ~+1.0 kills/round, #171).
@@ -466,7 +468,7 @@ events:
       Our mapping: Sephek is the measured superior, RAVISIN is the zealot subordinate (the
       Saar seat) — so her fervour is an over-vow answering his cool bookkeeping, and box 15's
       warning is where "she has other hands" enters the chapter. The permission beat is what
-      sanctions the eruption's SEIZURE of Sahnar on-screen before it happens.
+      sanctions the eruption's WAKING of Sahnar on-screen before it happens.
       LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas). NB the intelligence briefed is
       the PARTY (a company working the Ten-Towns, asking after the cold) — NOT the moose; neither
       of these two would spare a thought for a beast. Auril is named in reverent epithet ("the
@@ -487,7 +489,7 @@ events:
       - sephek: >-
           Do not take them lightly. They are warmer than they look, and they do not frighten.
       # (The permission beat — vanilla's "do we have permission to execute her?" seat. This is
-      #  what SANCTIONS the eruption: Ravisin seizes Sahnar under orders, not on a whim.)
+      #  what SANCTIONS the eruption: Ravisin wakes Sahnar under orders, not on a whim.)
       - sephek: "If they press you, you have leave to wake the warrior. The one under the stone."
       - ravisin: "...The elf?"
       - sephek: "She was a queen's blade once. She will serve well enough."
@@ -605,13 +607,29 @@ events:
     slot: "vanilla 9C3"
     type: cutscene
     ea_file: events/ch05-sahnar-alone.ea
-    status: unwritten
     description: >
-      SAHNAR alone in the sarcophagus while the battle runs above her — awake, bound, and
-      composed after millennia of it (lore/sahnar.md: stoic, courtly, never asks to be pitied).
-      Vanilla gives Joshua a whole scene of his own before you fight him — his coin, "I don't
-      like fighting women" — so the recruit is a person first and a red unit second. This is
-      that, and it is the ONLY place the player meets Sahnar before she walks hostile.
+      SAHNAR alone in the sarcophagus — awake, composed after millennia of it (lore/sahnar.md:
+      stoic, courtly, never asks to be pitied). Vanilla gives Joshua a whole scene of his own
+      before you fight him — his coin, his luck, spoken to nobody — so the recruit is a person
+      first and a red unit second. This is that, and it is the ONLY place the player meets
+      Sahnar before she walks hostile.
+      Constraints that shaped it, all Nicolas's: NO battle noise reaches her (she is under
+      stone and the fight is not hers yet — she registers only that something has come);
+      SELF-DIRECTED, like Joshua's, not addressed to Basil or anyone; NO proper nouns (name-drops
+      from her age never pay off in our story); and her purpose was GIVEN to her by the gods,
+      never chosen — the researched lore, not a martyr's bargain. She ends BELIEVING she will
+      defend this tomb, which is what makes 9C6 a revelation rather than a rescue: Basil does
+      not free a prisoner, he tells her what she is actually defending.
+      LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 6 boxes.
+    script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
+      # (Inside the sarcophagus. Dark. No sound from above reaches her — she feels the arrival
+      #  the way old stone feels a footfall. She speaks to nobody, as Joshua does in MSG_9C3.)
+      - sahnar: "...Someone has come."
+      - sahnar: "Four thousand years, and someone has finally come."
+      - sahnar: "...I was given a purpose. To defend this tomb."
+      - sahnar: "No one ever came. I stopped counting somewhere in the middle."
+      - sahnar: "...Well. Something has come now."
+      - sahnar: "I will defend this tomb. It is my purpose."
   # ── 9C4 — the other recruit's beat, just before the Talk ──────────────────────
   - trigger: before_sahnar_talk
     slot: "vanilla 9C4"
@@ -630,9 +648,10 @@ events:
       The tomb floor breaks (Phantom-Ship EARTHQUAKE + sequential TILECHANGE): undead
       REINFORCEMENTS erupt over turns and race the party for the spread reliquary
       reward-sites (the Ch5 village-raid, in undead dress). The same quake cracks the
-      sarcophagus — and Ravisin SEIZES Sahnar, the tomb's ancient guardian, who has been
-      undead and awake for millennia (she puppets a bound soul; she does NOT reanimate a
-      fresh corpse — see lore/sahnar.md). Sahnar walks HOSTILE, a fast crit-Myrmidon
+      sarcophagus — and Ravisin WAKES Sahnar, the tomb's ancient guardian, who has been
+      undead and awake for millennia (she WAKES a watching guardian; she does NOT reanimate a
+      fresh corpse, and does NOT puppet her — see lore/sahnar.md). Sahnar walks HOSTILE of her
+      own will, believing the party are the intruders she was left for; a fast crit-Myrmidon
       (smells faintly of pumpkin spice). She flips only when Basil reaches her.
   - trigger: sahnar_talk          # Basil (Natasha-donor) Talks the risen Sahnar (Joshua-donor)
     slot: "vanilla 9C6"
