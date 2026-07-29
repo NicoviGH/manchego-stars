@@ -68,9 +68,10 @@ Summary only:
 - **Sahnar is MISLED, not seized** (2026-07-29, reconciled repo-wide) — Ravisin wakes her and lets her
   draw the wrong conclusion; she fights of her own will, and Basil turns her by telling her the truth.
   Her voice's two temperatures are now misled → turned.
-- **Marty's "spore covenant" is RETIRED** (2026-07-29) — a ch05 villain-foil thread we drifted
-  away from while writing and never used in a beat. Cut from `marty.md`, registered in
-  `check.py` `DEAD_CONCEPTS`. His voice is `lore/marty.md` §Voice, full stop.
+- **Marty's ch05 villain-foil thread is RETIRED** (2026-07-29) — we drifted away from it while
+  writing and never used it in a beat. Cut from `marty.md`, phrases registered in `check.py`
+  `DEAD_CONCEPTS` (so the lint will reject them — see `decisions.md`). His voice is
+  `lore/marty.md` §Voice, full stop.
 
 ## NEXT SESSION — start here (branch `feat/25-ch05-content`, draft PR #196, ROM-free)
 
