@@ -430,6 +430,23 @@ enemy_units:
 # Ravisin's "she has other hands" drop, and re-arms him for his Act-II death.
 events:
   # ── 9BB — the two RECRUITS meet, before the party ever arrives ────────────────
+  # ── 0x9BA — vanilla's opening scene-setter. NOT YET REVIEWED WITH NICOLAS. ────
+  - trigger: chapter_start       # opening event list, message 1 of 11
+    slot: "vanilla 0x9BA"
+    type: cutscene
+    status: needs_review           # CLAUDE assumed "not adopted"; Nicolas has never ruled on it
+    description: >
+      Vanilla's THREE-box cold open, before anything else in the chapter: "Well, well. There's an
+      arena in this town." / "Perfect. My pocket's feeling a bit light." / "Say, is that a cleric?
+      It is! And a gorgeous one at that." Joshua, alone, wanting two things — money and that
+      cleric — and both wants pay off later (the arena in his 0x9C3 solo, the cleric in 0x9BB and
+      again at the 0x9CC recruit). It is the cheapest characterisation in the chapter: three boxes
+      that make the recruit a person with appetites before he is a unit.
+      CLAUDE marked this "not adopted" on the grounds that we have no arena — which is a reason to
+      not copy the ARENA, not a reason to skip the SLOT. DECIDE WHEN WE GET HERE: does Basil (or
+      Sahnar) get a three-box cold open stating what they want, before 0x9BB? Our 0x9BB already
+      opens mid-sentence with Basil rushing in, so the alternative reading is that we deliberately
+      start in motion and this slot is genuinely surplus. Nicolas's call, not CLAUDE's.
   - trigger: chapter_start       # opening event list, message 2 of 11 -- see TRIGGERS note
     slot: "vanilla 0x9BB"
     type: cutscene
@@ -684,6 +701,23 @@ events:
   # NB the old description here carried `basil.md`'s RETIRED "voice is spare (2-5 words)"
   # spec (retired 2026-07-23: it made him read as slow — his corpus twin is Ewan). Do not
   # resurrect it if this slot is ever refilled.
+  # ── 0x9C4 — CUT 2026-07-29, but on approval CLAUDE cannot verify. REVIEW. ─────
+  - trigger: chapter_start       # opening event list, LAST message of 11
+    slot: "vanilla 0x9C4"
+    type: dialogue
+    status: needs_review           # cut in f81e993; Nicolas does not recall approving the cuts
+    description: >
+      Vanilla's FOUR-box closer to the whole opening: Natasha alone, steeling herself right before
+      the map loads — "They may not want to hear what I have to say, but...." / "I must speak with
+      one of the Grado soldiers." / "Oh, if only one of them will listen to my words...." /
+      "Please! Grant me strength." It states her ERRAND out loud one beat before the player is
+      handed the controls, so the escort objective is her stated wish rather than a mission brief.
+      Ours would be Basil, mid-escort, about to walk up to a queen with a killing edge.
+      CUT in f81e993 on the reasoning that its only job was to load Basil's berry ahead of the
+      recruit and 0x9BB already does that. That reasoning is sound for the BERRY but it is not the
+      slot's only job — the twin's four boxes are about the errand and about fear, not about a
+      gift. RESTORED HERE AS needs_review because the cut rests on an approval CLAUDE cannot
+      evidence, and Nicolas has said he does not recall making these calls. Nicolas's call.
   - trigger: eruption_turn        # scripted turn (~2/3/5, the Ch5 wave cadence) — EARTHQUAKE/TILECHANGE
     slot: "vanilla 0x9C5"
     type: scripted_event
@@ -710,8 +744,20 @@ events:
       Sahnar's single box is the SETUP for 9C6's first line: she says the rote guardian line in
       full here, then at the recruit starts it again and stops at "Far enough. The tomb is--"
       because she has seen Basil. The interruption only lands because this box exists.
-      LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 3 boxes.
-    script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
+      REOPENED 2026-07-29: never approved. CLAUDE asked "want me to lock 9C5?", Nicolas replied
+      with a different question, and CLAUDE committed it as locked anyway. It is a DRAFT.
+      Two things to settle before it can lock:
+        (a) THE DOUBLE-RISING. 0x9BF and 0x9C0 currently also describe the dead getting up, so
+            as written the player watches them rise pre-map and then watches Ravisin summon them
+            again here. Vanilla's 0x9BF/0x9C0/0x9C1 have NOTHING to do with reinforcements (the
+            party overhears soldiers dragging Natasha off), and its 0x9C5 bandits are the FIRST
+            escalation. Whichever way this resolves, the dead may rise exactly once.
+        (b) Whether Ravisin speaks here at all. Giving her these boxes follows the twin (the
+            arriving force announces itself; vanilla gives Eirika and Seth no lines) and pays off
+            9BC's granted permission -- but it is also her first line in the party's presence,
+            and 0x9C0 may want that instead.
+    status: draft_awaiting_review
+    draft_script:                     # DRAFT -- not locked. See REOPENED note above.
       # (EARTHQUAKE_START + sequential TILECHANGE; the dead come up across the hollow.
       #  Then LOAD1 — the sarcophagus cracks.)
       - ravisin: "Rise. The Frostmaiden has need of you."
@@ -811,6 +857,7 @@ events:
   - trigger: chapter_end
     slot: "vanilla 0x9C9"
     type: cutscene
+    status: unwritten
     ea_file: events/ch05-ending.ea
     description: >
       Ravisin falls; her hold on the moose breaks. The party adopts Basil — they
@@ -824,6 +871,37 @@ events:
 # gifts + 2 shops — Guiding Ring 10,000 + Dracoshield 8,000 (Def) + Secret Book 8,000 (Skl)
 # + Armorslayer 1,260 + Torch 500, plus an Armory + Vendor. We MATCH the magnitude and the
 # delivery channels (this is the first chapter at the FE8-Ch5 reward tier — §Reward budget):
+  # ── 0x9CA — vanilla's "escort died" ENDING VARIANT. NOT YET REVIEWED. ─────────
+  - trigger: chapter_end
+    slot: "vanilla 0x9CA"
+    type: cutscene
+    status: needs_review           # CLAUDE assumed "not adopted"; Nicolas has never ruled on it
+    description: >
+      Vanilla ships the SAME ending exposition twice: 0x9C9 if Natasha lived, 0x9CA (24 boxes) if
+      she died — she gasps the warning out with her last breath and dies mid-scene, and the party
+      gets the plot from a corpse instead of from a comrade. A whole alternate cutscene so the
+      chapter's information survives the player losing the escort.
+      CLAUDE marked this "not adopted" because it is the same exposition — but that misses what it
+      is FOR: it is the reason a player can fail the escort and still understand the story.
+      DECIDE WHEN WE GET HERE, and note it is entangled with 0x9C6 (Basil's death quote, also new):
+      if Basil can die, what does 0x9C9 do without him? Our 0x9C9 currently has the party REPOT
+      him and take him along, which a dead Basil makes impossible — so some branch is owed, even
+      if it is far cheaper than 24 boxes. Nicolas's call.
+  # ── 0x9CB — vanilla's ending CODA. NOT YET REVIEWED. ──────────────────────────
+  - trigger: chapter_end
+    slot: "vanilla 0x9CB"
+    type: cutscene
+    status: needs_review           # flagged undecided 2026-07-29; no decision taken
+    description: >
+      Vanilla's 16-box coda: a townsman recognises Eirika, thanks her for driving off Saar,
+      apologises that he can do nothing for her, and promises the town will "wait unbowed" for the
+      day of liberation. Its job is to make the VICTORY LOCAL — someone who lives here says what
+      the win meant to them, and the chapter ends on a stranger's hope rather than on the party's
+      logistics.
+      We have no townsfolk at the tomb, which is why this was left undecided rather than cut. But
+      the job is still available: the tomb HAS a resident who can say what the win meant — Basil,
+      and (if recruited) Sahnar, whose home this is and who has just been handed her own purpose.
+      DECIDE WHEN WE GET HERE. Nicolas's call.
 economy:
   reward_sites:                  # the "villages" of Ch5, retiled as elven reliquary niches spread to the
                                  # map edges; the eruption's undead race to desecrate them (save-all bonus).
