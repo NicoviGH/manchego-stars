@@ -431,7 +431,7 @@ enemy_units:
 events:
   # ── 9BB — the two RECRUITS meet, before the party ever arrives ────────────────
   - trigger: chapter_start       # opening event list, message 2 of 11 -- see TRIGGERS note
-    slot: "vanilla 9BB"
+    slot: "vanilla 0x9BB"
     type: cutscene
     ea_file: events/ch05-basil-sahnar.ea
     description: >
@@ -481,7 +481,7 @@ events:
       - basil: "One day I'll give her one."
   # ── 9BC — the boss gets her ORDERS from a superior (never from the big bad) ────
   - trigger: chapter_start       # opening event list, Text_BG backdrop (happens elsewhere)
-    slot: "vanilla 9BC"
+    slot: "vanilla 0x9BC"
     type: cutscene
     ea_file: events/ch05-sephek-orders.ea
     description: >
@@ -538,7 +538,7 @@ events:
       - ravisin: "...It will be done, according to her grand design."
   # ── 9BD — a subordinate shows DOUBT (foreshadows their own arc) ────────────────
   - trigger: chapter_start       # opening event list, Text_BG backdrop (happens elsewhere)
-    slot: "vanilla 9BD"
+    slot: "vanilla 0x9BD"
     type: cutscene
     ea_file: events/ch05-basil-doubt.ea
     description: >
@@ -572,7 +572,7 @@ events:
       - basil: "...Yes."
   # ── 9BE — the party ARRIVES; the PLACE ────────────────────────────────────────
   - trigger: chapter_start
-    slot: "vanilla 9BE"
+    slot: "vanilla 0x9BE"
     type: cutscene                    # Cutscene 1 — PRE-MAP (Text_BG). Picks up ch04's thread; NO Ravisin
     ea_file: events/ch05-opening.ea   #   reveal (she stays silent, saved for the eruption).
     description: >
@@ -596,7 +596,7 @@ events:
       - pinky: "...It's not running. Why isn't it running?!"
   # ── 9BF — the party NOTICES the commotion ─────────────────────────────────────
   - trigger: chapter_start
-    slot: "vanilla 9BF"
+    slot: "vanilla 0x9BF"
     type: cutscene
     ea_file: events/ch05-opening.ea
     status: unwritten
@@ -606,7 +606,7 @@ events:
       approach into an alarm. Ravisin is visible and SILENT throughout.
   # ── 9C0 — the stakes turn LETHAL ──────────────────────────────────────────────
   - trigger: chapter_start
-    slot: "vanilla 9C0"
+    slot: "vanilla 0x9C0"
     type: cutscene
     ea_file: events/ch05-opening.ea
     status: unwritten
@@ -616,7 +616,7 @@ events:
       the beat that says: no parley, no bargain, they will be killed here.
   # ── 9C1 — the party REACTS (short) ────────────────────────────────────────────
   - trigger: chapter_start
-    slot: "vanilla 9C1"
+    slot: "vanilla 0x9C1"
     type: cutscene
     ea_file: events/ch05-opening.ea
     status: unwritten
@@ -625,7 +625,7 @@ events:
       looking at. Candidate voices: Meesmickle (dry, it is his job), Braulo (flat), Wolfram.
   # ── 9C2 — the recruit reaches the party; BATTLE ───────────────────────────────
   - trigger: chapter_start       # opening event list, ON-MAP (bubbles ≤29 ch/line)
-    slot: "vanilla 9C2"
+    slot: "vanilla 0x9C2"
     type: cutscene
     ea_file: events/ch05-basil-joins.ea
     description: >
@@ -645,7 +645,7 @@ events:
       - basil: "...I wonder. Sahnar. ...She needs me. Take me to her?"
   # ── 9C3 — the RECRUIT'S OWN scene (vanilla gives Joshua 12 A-presses) ─────────
   - trigger: chapter_start       # opening event list, LAST message -- still before player phase
-    slot: "vanilla 9C3"
+    slot: "vanilla 0x9C3"
     type: cutscene
     ea_file: events/ch05-sahnar-alone.ea
     description: >
@@ -685,7 +685,7 @@ events:
   # spec (retired 2026-07-23: it made him read as slow — his corpus twin is Ewan). Do not
   # resurrect it if this slot is ever refilled.
   - trigger: eruption_turn        # scripted turn (~2/3/5, the Ch5 wave cadence) — EARTHQUAKE/TILECHANGE
-    slot: "vanilla 9C5"
+    slot: "vanilla 0x9C5"
     type: scripted_event
     ea_file: events/ch05-eruption.ea
     description: >
@@ -809,7 +809,7 @@ events:
     script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
       - ravisin: "Frostmaiden... the winter is yours..."
   - trigger: chapter_end
-    slot: "vanilla 9C9"
+    slot: "vanilla 0x9C9"
     type: cutscene
     ea_file: events/ch05-ending.ea
     description: >
