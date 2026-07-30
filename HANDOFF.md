@@ -43,43 +43,39 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   git hook resolves against the outer repo unless you strip `GIT_*`** (this bit us — flipped `core.bare`
   and wrote a corrupt commit; fixed in `_vanilla_decomp_text` + the map-tileset test fixture).
 
-## This session (2026-07-22→29, Opus — ch05 dialogue: 12 of 16 slots locked; ROM-free web sessions)
+## This session (2026-07-22→30, Opus — ch05 dialogue COMPLETE; ROM-free web sessions)
 
 **All ch05 detail lives on issue #25** (the live tracker comment) and in the chapter YAML.
-Settled decisions from this session are in `docs/decisions.md`; craft/mining rules are in the
-`dialogue-pass` skill; voice rules are in the bibles. Live state only, below.
+Settled decisions are in `docs/decisions.md`; craft/mining rules are in the `dialogue-pass`
+skill; voice rules are in the bibles. Live state only, below.
 
 - **Environment:** Linux web container. The base ROM lives on Nicolas's Mac and isn't committed, so ROM
   builds / `verify_text` / mGBA playtests are OFF the table. `make difficulty` IS ROM-free. One-time
   container setup: `pip install pillow pyyaml numpy`; `git submodule update --init --depth 1 fireemblem8u`.
-- **Work is on `feat/25-ch05-content`, draft PR #196** (body + title current). ch05 roster CLOSED
-  (rev.3, PARITY); dialogue **12 of 16 slots locked, 88 boxes**, and the pre-map opening is COMPLETE
-  (60 boxes / 7 slots vs the twin's 98).
+- **Work is on `feat/25-ch05-content`, draft PR #196.** ch05 roster CLOSED (rev.3, PARITY).
+  **DIALOGUE IS COMPLETE — 15 slots, 125 boxes, every slot locked**, including both ending
+  branches. Nothing in ch05 is awaiting a red-pen.
 - **Orphaned remote branch `claude/mobile-app-token-context-u2psep` still needs deleting from the
   GitHub UI** — the proxy 403s on ref-delete. (Nicolas's chore; nothing depends on it.)
 
-## This session (2026-07-30, Opus — the ch05 ENDING BLOCK is drafted; all 16 slots have text)
+## NEXT SESSION — ch05 is now ROM-GATED work (Nicolas's Mac)
 
-All four remaining slots written in one pass, mined first (`vanilla_scene.py ch5 EndingScene`).
-They are **DRAFTS, not LOCKED** — `status: draft` on each, awaiting Nicolas's red-pen. Everything
-else about them (why each choice, what it pays off) is on the slot in the chapter YAML.
+Dialogue is done. Everything remaining for ch05 needs the base ROM, so it cannot start in a web
+container:
 
-| slot | ours | twin | state |
-|---|---|---|---|
-| `0x9C9` | 25 boxes (19 without the conditional) | 34 | draft — the lived ending |
-| `0x9CA` | 18 boxes | 24 | **ADOPTED** (was `needs_review`) — the Basil-died branch |
-| `0x9C6` | 1 box | 1 | draft — Basil's death quote (+2 alternates recorded on the slot) |
-| `0x9CB` | — | 16 | **FOLDED into `0x9C9`**; no slot. Where each of its 3 jobs landed is on the slot. |
+1. **Text insertion** — `script:` blocks → `texts/texts.txt` via `set_message_body`; msg ids read
+   from the decomp, never hardcoded. Odd-length strings pad with `[.]`. Then `make` green +
+   `python3 tools/verify_text.py` (0 runaway).
+2. **Map + placement** (tier 2) → **spatial check** (tier 3) → **`--ch05-boot` playtest** (tier 4)
+   → Lock. `status: planned` keeps ch05 exempt from the parity CI gate until then.
+3. **`enemy_class_reskins` wiring + FE-Repo imports** (the art track), and Basil/Sahnar
+   STAT_DONORs.
+4. **Two wiring notes the dialogue leaves owed:** the arena tile must exist for the
+   `forge_tile_visited` tutorial to fire, and **0x9C9's berry exchange needs a skip** for players
+   who never recruited Sahnar (boxes 6–11).
 
-Two ADRs in `docs/decisions.md` §Story & Dialogue: vanilla's escort-died ending is the same
-scene's **back half** (one changed line, closing box verbatim) so the branch is cheap; and a
-recruit-gated block goes **mid-scene, never on the button**.
-
-**NEXT:** Nicolas's red-pen on the four drafts → flip `status: draft` → `LOCKED <date>`.
-Then the one open parity gap: **`criticals` is in `onboarding-catalog.yaml` and claimed by no
-chapter's `introduces:` ledger**, and vanilla teaches Talk-recruit + criticals in *this* chapter
-(7 boxes, tied to Joshua — `scene-pacing.md` §Tutorial-parity). Sahnar is the same killing-edge
-crit-Myrmidon. That heads-up is owed here and is not written.
+**If picking up ROM-free work instead:** the ch04 slice (`feat/24-ch04-map`) still needs its wolf
+parley + Marty-Talk teaching and an authored ending — see PARALLEL THREAD below.
 
 ## PARALLEL THREAD (ROM-gated, Nicolas's Mac): finish the ch04 slice (`feat/24-ch04-map`)
 
