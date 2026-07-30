@@ -15,13 +15,9 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   `deploy_limit 9`. #25 stays OPEN: map + placement, text insertion → `verify_text`, `--ch05-boot`
   playtest, `enemy_class_reskins` + FE-Repo imports, and Basil/Sahnar STAT_DONORs are all still
   owed — and all now buildable.
-- **The no-Lupin branch is TEXT-COMPLETE and WIRING-INCOMPLETE, across two chapters.** Lupin's
-  recruit is gated on ch04's `parley: by: marty`, and ch04's difficulty model explicitly prices a
-  no-parley path — so six beats addressed a unit that may not exist, including **ch04's closing
-  button** and **ch05's opening line**. Every line is chosen and sits in a `no_lupin_fallback:`
-  block (anchored to the text it replaces, not just an index); **no conditional is built yet.**
-  ch04: `chapter_end` boxes 1+3. ch05: `0x9BE` box 1, `0x9C2` box 2, `0x9CC` box 8, `0x9C9` box 16,
-  `0x9CA` box 3. Real scope on both slices — neither chapter is done without it.
+- **The no-Lupin branch is TEXT-COMPLETE and WIRING-INCOMPLETE.** Tracked as checklists on
+  **#24** (ch04's two beats + the shared branch mechanism) and **#25** (ch05's five). Not
+  restated here — issues are the backlog.
 - **Winter forest fidelity is an invariant (#193, merged `6a538bc`).** Snowy Bern retiles preserve
   the vanilla artists' forest sequences: the learned per-metatile map in `reskin-learned.json` is
   the sole authority, `gen_map_editor.py` refuses to generate on an unmapped forest variant, and
@@ -105,10 +101,10 @@ STAT_DONORs, the five no-Lupin conditionals) on #25; **#138** config-driven
   state on merge.** The ch05 merge did exactly that — main's copy came back describing ch04 as a
   "WIP checkpoint", four stages out of date, while the main tree held a newer uncommitted refresh.
   Reconciled here. **Before merging any branch, diff its `HANDOFF.md` against main's.**
-- **Build-speed branch `feat/build-speed-idempotent-injection` is IN FLIGHT** (worktree
-  `.claude/worktrees/agent-a5830560b594da84f`), prototyping idempotent injection
-  (`_write_if_changed`) so a no-change rebuild stops taking ~3 min. **Review its diff + a
-  byte-identical ROM proof + a measured speedup before merging — never blind-merge a build change.**
+- **Build-speed branch `feat/build-speed-idempotent-injection` (`0f28f49`)** — the work sat
+  UNCOMMITTED in worktree `.claude/worktrees/agent-a5830560b594da84f` for 9 days; committed
+  2026-07-30 so it can't be lost. Wired, 5 tests green, **unverified**. Merge gates are on
+  **#24**. Finish it BEFORE wrapping the ch04 slice — it pays for itself across Stages 3-5.
 
 ## Quick commands
 
