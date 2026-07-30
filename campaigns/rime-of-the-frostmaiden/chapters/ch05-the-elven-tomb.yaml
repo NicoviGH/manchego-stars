@@ -424,9 +424,9 @@ enemy_units:
 #   0x9C7 ( 1)     quote     BOSS TAUNT — one box                Ravisin taunt
 #   0x9C8 ( 1)     quote     BOSS DEATH — one box                Ravisin's death quote
 #   0x9C9 (34)     on-map    ENDING exposition                   Ravisin falls → Bremen hook
-#   0x9CA (24)     on-map    ENDING variant: "if she died"       NOT ADOPTED (same exposition,
-#                                                                 escort-died branch)
-#   0x9CB (16)     on-map    ENDING coda: a villager thanks you  (undecided -- see 9C9)
+#                                                                 (+ conditional Sahnar block)
+#   0x9CA (24)     on-map    ENDING variant: "if she died"       ADOPTED -- the Basil-died branch
+#   0x9CB (16)     on-map    ENDING coda: a villager thanks you  FOLDED into 0x9C9 (no slot)
 #
 # TRIGGERS ARE INHERITED WITH THE ANATOMY (corrected 2026-07-29, Nicolas caught it).
 # 9BA-9C4 are ELEVEN messages inside ONE event list, `EventScr_Ch5_BeginningScene`, played
@@ -933,7 +933,7 @@ events:
   - trigger: unit_death
     slot: "vanilla 0x9C6"          # data_battlequotes.c, pid CHARACTER_NATASHA, no flag
     type: quote
-    status: unwritten
+    status: draft                  # DRAFT 2026-07-30 — awaiting Nicolas's red-pen, then LOCKED
     description: >
       BASIL's chapter-specific death quote. Vanilla Ch5 gives one to NATASHA and to nobody else
       on the map except the boss — not even to Joshua — because she is the ESCORT the chapter is
@@ -944,6 +944,22 @@ events:
       Ours has a sharper version of the same available, and it is the whole reason 9BB exists:
       Basil dies with the berry still undelivered. ONE box. Do not spend it on pathos about
       himself; spend it on Sahnar, whom the player now knows he was walking toward.
+      TWO CONSTRAINTS the draft is built to satisfy, both easy to break by "improving" it:
+        · It must read the same whether he dies BEFORE or AFTER the recruit. "Sahnar's still
+          waiting" is wrong once she is a party member; the berry is undelivered either way.
+        · It must not duplicate his LAST WORDS in 0x9CA, which are also about the berry. The
+          quote is him still holding it; 0x9CA is him handing the errand to someone else
+          ("Tell her I had one for her"). Same object, two different failures.
+      Hurt Basil goes SHORT — basil.md: he runs on when he cares, and the short lines are for
+      when he's hurt. The self-interruption is the one piece of his register that survives.
+      DRAFT 2026-07-30 (dialogue-pass). 1 box. Two alternates recorded below for the red-pen.
+    script:                           # DRAFT 2026-07-30 — NOT locked; Nicolas's red-pen owed
+      - basil: "But I haven't-- I still have her berry..."
+    # Alternates drafted at the same sitting, kept so they don't get re-derived:
+    #   (b) "Oh. ...I was almost there."       — the errand, not the object; quieter, less
+    #        specific, and it loses the 9BB thread the slot exists to pay.
+    #   (c) "Wait-- I'm not finished--"        — purest Basil-interrupted, but it could be any
+    #        dying character; fails the cover-the-name test.
   - trigger: boss_battle
     slot: "vanilla 0x9C7"          # data_battlequotes.c, EVFLAG_BATTLE_QUOTES
     type: quote
@@ -983,57 +999,187 @@ events:
   - trigger: chapter_end
     slot: "vanilla 0x9C9"
     type: cutscene
-    status: unwritten
+    status: draft                  # DRAFT 2026-07-30 — awaiting Nicolas's red-pen, then LOCKED
     ea_file: events/ch05-ending.ea
     description: >
-      Ravisin falls; her hold on the moose breaks. The party adopts Basil — they
-      REPOT him (he is already called Basil and joined on the map; there is no
-      discovery and no naming beat, LOCKED 2026-07-23). With Sahnar in tow they turn
-      down the coast toward Bremen — where, Ravisin's dying words hint, another of her
-      awakened beasts still terrorizes a town.
+      Ravisin falls; her hold on the moose breaks. The party adopts Basil — they REPOT him (he
+      is already called Basil and joined on the map; there is no discovery and no naming beat,
+      LOCKED 2026-07-23). They turn down the coast toward Bremen, where Ravisin woke something
+      in the lake.
+      MINED SKELETON — vanilla MSG_9C9 (34 boxes, `EventScr_Ch5_EndingScene`, ON-MAP so bubbles
+      wrap at 29). Its beat order, which ours follows: (1) two boxes of aftermath before anyone
+      does business; (2) the ESCORT is thanked and becomes the scene's centre; (3) the party asks
+      her a question and she TELLS THEM THE PLOT — the escort, not a party member, carries the
+      chapter's forward information; (4) the party deliberates in front of her (Eirika asks Seth,
+      Seth is cautious, they resolve anyway); (5) a closing box that makes the win provisional
+      ("her story chills me to the bone. I pray it is false").
+      WHO SITS IN WHICH SEAT: Natasha → BASIL (he is her donor and holds her role all chapter, so
+      he inherits the information too — and that is WHY 0x9CA has to exist). Eirika → BRAULO (he
+      speaks when a decision has to be made, then the party follows). Seth → split between
+      PROF-RBG (who knows where Bremen is; he makes inquiries everywhere) and MARTY (the reason
+      to go that isn't money). Meesmickle is DELIBERATELY ABSENT — he already spent his one line
+      of the chapter on 0x9C4, and his bible is explicit that a few perfect quips beat a speaking
+      role.
+      BASIL CAN CARRY THIS AND SAHNAR CANNOT: Sahnar is optional (no recruit, no scene) and has
+      been under a stone for four thousand years — she has no way to know about a lake. Basil is
+      Ravisin's own attendant and reports what he HEARD her say, which is also how 9BB damns her
+      ("she said it would still run"). Villains condemn themselves in reported speech.
+      THE THREE PAYOFFS THIS SCENE COLLECTS, none of them announced:
+        · Pinky asked "why isn't it running?" in 0x9C4 and gets his answer here — it runs.
+        · 9BB's "I gave it berries. It wouldn't eat them." resolves in one clause: it'll eat now.
+        · 9BD's "Prepare my berries" is how Basil says he is relieved, without one word of pity
+          for Ravisin (basil.md Q4: play him relieved, never bereaved).
+      SEPHEK: Basil never names him and does not know what he saw. He reports a man who came
+      before the party did, gave her the orders, and WASN'T WEARING A COAT — which the player has
+      met (ch00) and the party can place. This is also the "she has other hands" drop that
+      `sephek-kaltro.md` says ch05 owes, landed as Basil circling back at the end with the worst
+      thing he remembers ("the Frostmaiden has many hands"), which is his register: he doubles
+      back mid-turn.
+      0x9CB IS FOLDED IN HERE, per the decision on that slot — the coda's job is that the win
+      lands on someone who LIVES here, and the residents are Basil (the hollow is the only place
+      he has ever been) and, if recruited, Sahnar. Vanilla's townsman apologises that he can do
+      nothing and stays behind; ours can do something, and comes.
+      THE SAHNAR BLOCK IS CONDITIONAL (6 boxes, flag-gated on the 0x9CC recruit) and is placed
+      MID-SCENE on purpose: excising it must not touch the scene's shape or its last box. It is
+      the same mechanism vanilla already uses one slot later (0x9C9 vs 0x9CA is a branch on the
+      escort's death), one act earlier. It exists to pay the question 0x9CC deliberately left
+      hanging — "...Can I give you a berry now?" — and no other scene can.
+      LAST BOX: Braulo commits, flatly, in one A-press. Vanilla ends its ending on dread; ours
+      puts the dread one box earlier, in Basil's mouth, so the chapter closes on the party moving
+      rather than on a mood.
+      DRAFT 2026-07-30 (dialogue-pass). 25 boxes with the Sahnar block, 19 without; twin is 34.
+    script:                           # DRAFT 2026-07-30 — NOT locked; Nicolas's red-pen owed
+      # (The hollow. Ravisin down in the snow at the moon dial. The cold goes ordinary. Across
+      #  the depression the white moose lifts its head and finds nothing holding it.)
+      # (0x9C4's question, answered a whole chapter later. Pinky asked; Pinky gets it.)
+      - pinky: "Father, look-- it's running!"
+      # (9BB's "I gave it berries. It wouldn't eat them." resolved in one clause.)
+      - basil: "It's going home. ...It'll eat now."
+      # (How Basil says he is relieved. 9BD's chore, ended. No pity for her, none owed.)
+      - basil: "...I don't have to prepare her berries."
+      # (Marty's opening move is always hospitality.)
+      - marty: "No. You don't. ...Come with us instead."
+      - prof-rbg: "Um, actually-- he'll want soil, not snow. I've a spare crucible."
+      - basil: "A pot. ...Mine?"
+      - basil: >-
+          I've been in this ground my whole life, I didn't know you could just-- ...Yes.
+          Yes. I'll grow. For you.
+      # ── CONDITIONAL BLOCK: plays ONLY if Sahnar was recruited (0x9CC). Cut cleanly ──
+      # ── otherwise; nothing above or below it depends on it. ────────────────────────
+      - sahnar: "...They gave you a pot."
+      - basil: "They gave me a pot! There's soil in it and everything--"
+      - basil: "--oh. Oh, wait. Wait, I've been saving-- here."
+      # (He works a berry loose and holds it up. 0x9CC's unanswered question, answered.)
+      - sahnar: "......"
+      - sahnar: "I have not eaten in four thousand years."
+      - sahnar: "...Give it here."
+      # ── END CONDITIONAL BLOCK ──────────────────────────────────────────────────────
+      # (Braulo does the asking, as Eirika does. Her death quote handed the winter on; he heard it.)
+      - braulo: "Her last words. ...Was she the only one?"
+      - basil: "...No. A man came, before you did."
+      # (Sephek, unnamed and un-understood. The player met him in ch00.)
+      - basil: "He gave her the orders. ...He wasn't wearing a coat."
+      - basil: >-
+          And there's another one. In the water, down the coast, by the fishing town-- she
+          woke something in the lake. She was pleased with it.
+      - prof-rbg: "Um, actually-- that would be Bremen. They fish that lake to eat."
+      # (Braulo's justice is fair dealing; unpaid work is the thing he says out loud. This is
+      #  also the seed of ch07, where the party goes expecting to be paid and is not.)
+      - braulo: "Nobody's hired us for a lake."
+      - marty: "Then we'll be a pleasant surprise."
+      - braulo: "A town with no boats has coin and a reason to spend it."
+      # (Basil doubles back with the worst thing he remembers -- the "other hands" drop
+      #  sephek-kaltro.md says this chapter owes. Reported speech; she damns herself.)
+      - basil: "...She used to say the Frostmaiden has many hands."
+      - braulo: "Then it isn't finished. We go down the coast."
 
+  # ── 0x9CA — vanilla's "escort died" ENDING VARIANT. ADOPTED 2026-07-30. ───────
+  - trigger: chapter_end
+    slot: "vanilla 0x9CA"
+    type: cutscene
+    status: draft                  # ADOPTED 2026-07-30; DRAFT script awaiting Nicolas's red-pen
+    ea_file: events/ch05-ending-basil-lost.ea
+    description: >
+      ADOPTED (2026-07-30), reversing CLAUDE's earlier "not adopted" — which read it as duplicate
+      exposition and missed what it is FOR: it is the reason a player can fail the escort and
+      still understand the story. Vanilla ships its ending twice so the plot survives the loss.
+      MINED — and the mining is the whole finding, because it shows how CHEAP the branch is meant
+      to be. Vanilla's 0x9CA (24 boxes) is not a second scene; it is 0x9C9's back half with a
+      different delivery bolted on the front:
+        · the same facts arrive in FRAGMENTS, interrupted by the party telling her to stop
+          talking ("Stop, you mustn't speak....."), so the player gets less and feels the loss;
+        · she dies mid-scene and someone says so flatly ("....She's dead.");
+        · then the deliberation runs NEARLY VERBATIM from 0x9C9, with exactly ONE line changed
+          to mark what was lost — "If she had lived, we might have learned more, but...." — and
+          the closing box repeated word for word.
+      Ours does the same, at the same discount: 18 boxes against 0x9C9's 25, and the last four
+      boxes are 0x9C9's own, with Braulo's final box carrying the one changed clause.
+      THE CONCEIT IS INHERITED WHOLESALE. Natasha's map death is deferred to the cutscene — she
+      is mortally wounded there, whenever she actually fell. Basil is a broken shrub in the snow
+      still talking, whether he went down on turn 2 or turn 12. It reads better for a plant than
+      it does for a person.
+      WHAT THE LOSS COSTS, deliberately: no repot, no pot, no berry. If Basil died before the
+      Talk, Sahnar was never recruited (he is the only one who can turn her); if he died after,
+      she is a party member. Either way she does NOT speak here — see the note below.
+      NOT NESTED (2026-07-30): no second conditional for a recruited Sahnar over the body. One
+      box from her would be the strongest line in the chapter, and it is deliberately not taken,
+      because vanilla's own death branch is a straight line — it exists to carry information, not
+      to be dramatised, and doubling the conditionals doubles the wiring for a scene most players
+      never see. Recorded rather than dropped: it is cheap to add later if Nicolas wants it.
+      PINKY'S MOOSE PAYOFF SURVIVES THE BRANCH. It is the one thing from 0x9C9 that must not be
+      lost here — Basil asks whether it got away, and hearing that it did is the last good thing
+      that happens to him.
+      DRAFT 2026-07-30 (dialogue-pass). 18 boxes; twin is 24.
+    script:                           # DRAFT 2026-07-30 — NOT locked; Nicolas's red-pen owed
+      # (The hollow. Ravisin down. Basil is in the snow where he fell, root-feet turned up,
+      #  broken through. The party has gathered. He is still talking.)
+      - basil: "......"
+      - marty: "Easy. Easy, friend. Don't--"
+      - basil: "The moose. Did it-- did it go?"
+      - pinky: "It's running, Basil. It's running."
+      - basil: "...Good. It'll eat now."
+      # (The plot, in fragments, exactly as vanilla delivers it here.)
+      - basil: "There's another one. In the water."
+      - braulo: "Save it."
+      - basil: "Down the coast. By the fishing town. She woke it."
+      - basil: "She was so pleased with-- ...she has many hands."
+      - marty: "Basil."
+      # (Not the berry itself -- 0x9C6 already spent that. This is the errand handed on.)
+      - basil: "...Is she still in there? The one under the stone?"
+      - marty: "......"
+      - basil: "...Tell her I had one for her."
+      - basil: "......"
+      - prof-rbg: "...He's gone."
+      # (From here it is 0x9C9's back half, near-verbatim, as vanilla does it.)
+      - prof-rbg: "...The fishing town would be Bremen."
+      - braulo: "Nobody's hired us for a lake."
+      # (The ONE changed line, in vanilla's own place: what the loss cost the party in facts.)
+      - braulo: "If he'd lived we'd know more. It isn't finished. We go down the coast."
+  # ── 0x9CB — vanilla's ending CODA. FOLDED INTO 0x9C9 (2026-07-30). No separate slot. ──
+  # Vanilla's 16-box coda: a townsman recognises Eirika, thanks her for driving off Saar,
+  # apologises that he can do nothing for her, and promises the town will "wait unbowed" for the
+  # day of liberation. Its job is to make the VICTORY LOCAL — someone who LIVES here says what the
+  # win meant, so the chapter ends on a resident's hope rather than on the party's logistics.
+  # DECIDED (Nicolas, 2026-07-29): not dropped, folded into the post-battle scenes rather than
+  # staged as a separate coda — no inventing a village at a tomb. EXECUTED 2026-07-30 in 0x9C9,
+  # and here is where each of the coda's three jobs actually landed, so nobody re-opens the slot
+  # looking for them:
+  #   (1) a RESIDENT says what the win meant  -> Basil's "...I don't have to prepare her berries."
+  #       The hollow is the only place he has ever been; that line is the whole coda in one box.
+  #   (2) the resident's own future           -> the repot. Vanilla's townsman apologises that he
+  #       can do nothing and stays behind to wait; ours can do something, and comes along. The
+  #       coda INVERTED is the strongest use of it available to us.
+  #   (3) a second resident, if earned        -> the conditional Sahnar block. Her home, her tomb,
+  #       her purpose handed back to her one scene earlier — and it is where the berry finally
+  #       gets eaten. Gated on the recruit, so the coda's warmth is something the player wins.
+  # Nothing is owed forward. Do NOT restore this as a slot.
 # ── Economy (FE8 Ch5 parity — the party's power-spike chapter) ────────────────────
 # Ch5's real economy (verified from HEAD via the #170 extractor): ~27,760g across 4 village
 # gifts + 2 shops — Guiding Ring 10,000 + Dracoshield 8,000 (Def) + Secret Book 8,000 (Skl)
 # + Armorslayer 1,260 + Torch 500, plus an Armory + Vendor. We MATCH the magnitude and the
 # delivery channels (this is the first chapter at the FE8-Ch5 reward tier — §Reward budget):
-  # ── 0x9CA — vanilla's "escort died" ENDING VARIANT. NOT YET REVIEWED. ─────────
-  - trigger: chapter_end
-    slot: "vanilla 0x9CA"
-    type: cutscene
-    status: needs_review           # CLAUDE assumed "not adopted"; Nicolas has never ruled on it
-    description: >
-      Vanilla ships the SAME ending exposition twice: 0x9C9 if Natasha lived, 0x9CA (24 boxes) if
-      she died — she gasps the warning out with her last breath and dies mid-scene, and the party
-      gets the plot from a corpse instead of from a comrade. A whole alternate cutscene so the
-      chapter's information survives the player losing the escort.
-      CLAUDE marked this "not adopted" because it is the same exposition — but that misses what it
-      is FOR: it is the reason a player can fail the escort and still understand the story.
-      PLAN (Nicolas, 2026-07-29): write this TOGETHER with 0x9C9 and 0x9C6 as one unit of work,
-      mining vanilla first to see how it actually handles the branch. Nicolas may have approved
-      dropping this earlier — neither of us can evidence it, so it stays open until written.
-      They are one problem: 0x9C9 as drafted has the party REPOT Basil and take him along, which a
-      dead Basil makes impossible, and 0x9C6 is the quote that fires when he dies. Writing the
-      lived ending in isolation is what would silently strand the other two.
-  # ── 0x9CB — vanilla's ending CODA. NOT YET REVIEWED. ──────────────────────────
-  - trigger: chapter_end
-    slot: "vanilla 0x9CB"
-    type: cutscene
-    status: needs_review           # flagged undecided 2026-07-29; no decision taken
-    description: >
-      Vanilla's 16-box coda: a townsman recognises Eirika, thanks her for driving off Saar,
-      apologises that he can do nothing for her, and promises the town will "wait unbowed" for the
-      day of liberation. Its job is to make the VICTORY LOCAL — someone who lives here says what
-      the win meant to them, and the chapter ends on a stranger's hope rather than on the party's
-      logistics.
-      We have no townsfolk at the tomb, but the JOB is still available: the tomb has residents who
-      can say what the win meant — Basil, and (if recruited) Sahnar, whose home this is and who has
-      just been handed her own purpose.
-      DECIDED (Nicolas, 2026-07-29): NOT dropped. Fold it into the POST-BATTLE scenes rather than
-      staging it as a separate coda — so the chapter still ends on what the win meant to someone
-      who lives here, without inventing a village at a tomb.
 economy:
-  reward_sites:                  # the "villages" of Ch5, retiled as elven reliquary niches spread to the
+  reward_sites:                # the "villages" of Ch5, retiled as elven reliquary niches spread to the
                                  # map edges; the eruption's undead race to desecrate them (save-all bonus).
     - gift: booster-def          # ≈ Ch5 Dracoshield (+Def) — first stat-booster in the campaign
     - gift: booster-skl          # ≈ Ch5 Secret Book (+Skl)

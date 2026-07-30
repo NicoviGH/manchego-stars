@@ -39,8 +39,19 @@ is a *punch*, not a scene. An enemy announcing a turn of the battle gets ~3 boxe
 
 | ours | ch00 | ch01 | ch02 | ch03 | ch04 | ch05 |
 |---|---|---|---|---|---|---|
-| opening | 10 | 29 | 10 | 14 | 8 | **7** (4 pre-map + 3 on-map) |
-| ending | 6 | 22 | 11 | 7 | 3 | *unwritten* |
+| opening | 10 | 29 | 10 | 14 | 8 | **60 boxes / 7 slots** (twin 98) |
+| ending | 6 | 22 | 11 | 7 | 3 | **25 boxes** (twin 34) |
+
+> ch05 is measured in BOXES against the twin's boxes, which is the honest unit; the older columns
+> count script lines. Its ending runs at ~74% of the twin — far closer than our usual 10–25%,
+> because a boss chapter's ending has to carry the recruit payoff, the adoption, and the next
+> chapter's hook in one scene.
+
+**The alternate "escort died" ending is a RE-DELIVERY, not a rewrite.** Vanilla's `0x9CA` (24
+boxes) is `0x9C9`'s back half with one line changed to price the loss and the closing box repeated
+verbatim; only the front — how the information arrives, and who is left to react — is new. Write
+the lived ending, then re-deliver it. Full mining in `docs/decisions.md` §Story & Dialogue
+("Vanilla's 'if the escort died' cutscene is the same scene's BACK HALF").
 
 **We run at roughly 10–25% of the vanilla twin's cutscene length, and ch05 is our leanest yet.**
 That is a real, quantified gap — not necessarily wrong (our register is terser and our cast

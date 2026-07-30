@@ -58,26 +58,28 @@ Settled decisions from this session are in `docs/decisions.md`; craft/mining rul
 - **Orphaned remote branch `claude/mobile-app-token-context-u2psep` still needs deleting from the
   GitHub UI** — the proxy 403s on ref-delete. (Nicolas's chore; nothing depends on it.)
 
-## NEXT SESSION — the ENDING BLOCK (branch `feat/25-ch05-content`, draft PR #196, ROM-free)
+## This session (2026-07-30, Opus — the ch05 ENDING BLOCK is drafted; all 16 slots have text)
 
-**Read [issue #25](https://github.com/NicoviGH/manchego-stars/issues/25) first — its latest comment is
-the live ch05 tracker.** Then **invoke the `dialogue-pass` skill and DO ITS STEP 0.**
+All four remaining slots written in one pass, mined first (`vanilla_scene.py ch5 EndingScene`).
+They are **DRAFTS, not LOCKED** — `status: draft` on each, awaiting Nicolas's red-pen. Everything
+else about them (why each choice, what it pays off) is on the slot in the chapter YAML.
 
-**Everything left is ONE unit of work — Nicolas's call: write it together, mine vanilla first.**
-Writing the lived ending alone would silently strand the other three:
+| slot | ours | twin | state |
+|---|---|---|---|
+| `0x9C9` | 25 boxes (19 without the conditional) | 34 | draft — the lived ending |
+| `0x9CA` | 18 boxes | 24 | **ADOPTED** (was `needs_review`) — the Basil-died branch |
+| `0x9C6` | 1 box | 1 | draft — Basil's death quote (+2 alternates recorded on the slot) |
+| `0x9CB` | — | 16 | **FOLDED into `0x9C9`**; no slot. Where each of its 3 jobs landed is on the slot. |
 
-| slot | twin | job |
-|---|---|---|
-| `0x9C9` | 34 boxes | the ending — Ravisin falls, her hold on the moose breaks, the party **repots Basil**, turn down the coast toward Bremen |
-| `0x9CA` | 24 boxes | vanilla's same exposition **if the escort DIED**. `needs_review` |
-| `0x9C6` | 1 box | **Basil's death quote** (vanilla gives one to the escort and to nobody else on the map but the boss) |
-| `0x9CB` | 16 boxes | villager coda. **DECIDED: fold into the post-battle scenes** so the win lands on a resident |
+Two ADRs in `docs/decisions.md` §Story & Dialogue: vanilla's escort-died ending is the same
+scene's **back half** (one changed line, closing box verbatim) so the branch is cheap; and a
+recruit-gated block goes **mid-scene, never on the button**.
 
-**The knot:** `0x9C9` as drafted has the party repot Basil, which a dead Basil makes impossible.
-Vanilla solved it with a whole alternate cutscene. Decide how cheap our branch can be.
-
-**DoD:** locked scripts → `script:` blocks in the ch05 YAML with `LOCKED <date>`; update the #25
-tracker comment AND the PR body in the same breath; commit ROM-free on `feat/25-ch05-content`.
+**NEXT:** Nicolas's red-pen on the four drafts → flip `status: draft` → `LOCKED <date>`.
+Then the one open parity gap: **`criticals` is in `onboarding-catalog.yaml` and claimed by no
+chapter's `introduces:` ledger**, and vanilla teaches Talk-recruit + criticals in *this* chapter
+(7 boxes, tied to Joshua — `scene-pacing.md` §Tutorial-parity). Sahnar is the same killing-edge
+crit-Myrmidon. That heads-up is owed here and is not written.
 
 ## PARALLEL THREAD (ROM-gated, Nicolas's Mac): finish the ch04 slice (`feat/24-ch04-map`)
 
