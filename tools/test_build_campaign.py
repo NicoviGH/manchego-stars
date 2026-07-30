@@ -5,6 +5,7 @@ These pin the donor-inheritance primitives the difficulty engine and the charact
 patcher share, against real vanilla values read from fireemblem8u/src/data_characters.c.
 Run:  python3 tools/test_build_campaign.py
 """
+import hashlib
 import os
 import re
 import sys
@@ -1101,6 +1102,62 @@ class ItemIconPal2(unittest.TestCase):
         self.assertIn('(OamPalBase & 0xF000) == 0x4000', out)
         self.assertIn('ApplyPalette(item_icon_palette[2], 15);', out)
         self.assertIn('OamPalBase = (OamPalBase & 0x0FFF) | 0xF000;', out)
+
+
+class IdempotentInjectionMtimes(unittest.TestCase):
+    """The warm-rebuild speed-up: rewind mtimes only for byte-identical files, so
+    `make` skips unchanged targets while the ROM stays bit-identical (#build-speed)."""
+
+    def _tmpfile(self, data=b'hello'):
+        import tempfile
+        fd, path = tempfile.mkstemp()
+        self.addCleanup(lambda: os.path.exists(path) and os.remove(path))
+        with os.fdopen(fd, 'wb') as f:
+            f.write(data)
+        return path
+
+    def test_snapshot_records_mtime_and_hash(self):
+        p = self._tmpfile(b'abc')
+        snap = bc._snapshot_mtimes([p])
+        self.assertIn(p, snap)
+        mtime_ns, digest = snap[p]
+        self.assertEqual(mtime_ns, os.stat(p).st_mtime_ns)
+        self.assertEqual(digest, hashlib.sha1(b'abc').digest())
+
+    def test_snapshot_skips_missing_files(self):
+        # A path that does not exist is simply not tracked (no raise).
+        self.assertEqual(bc._snapshot_mtimes(['/no/such/file/xyz']), {})
+
+    def test_rewinds_mtime_when_content_unchanged(self):
+        # Rewriting a file with IDENTICAL bytes normally bumps mtime; the rewind
+        # must restore the snapshot mtime so make treats the target as up to date.
+        p = self._tmpfile(b'same-bytes')
+        snap = bc._snapshot_mtimes([p])
+        os.utime(p, ns=(snap[p][0] + 5_000_000_000, snap[p][0] + 5_000_000_000))
+        with open(p, 'wb') as f:          # rewrite identical content (new mtime)
+            f.write(b'same-bytes')
+        self.assertNotEqual(os.stat(p).st_mtime_ns, snap[p][0])
+        n = bc._rewind_unchanged_mtimes(snap)
+        self.assertEqual(n, 1)
+        self.assertEqual(os.stat(p).st_mtime_ns, snap[p][0])
+
+    def test_does_not_rewind_when_content_changed(self):
+        # A genuinely changed file KEEPS its fresh mtime, so make rebuilds it.
+        p = self._tmpfile(b'original')
+        snap = bc._snapshot_mtimes([p])
+        with open(p, 'wb') as f:
+            f.write(b'CHANGED')
+        changed_mtime = os.stat(p).st_mtime_ns
+        n = bc._rewind_unchanged_mtimes(snap)
+        self.assertEqual(n, 0)
+        self.assertEqual(os.stat(p).st_mtime_ns, changed_mtime)  # not rewound
+
+    def test_footprint_lists_modified_and_untracked_sources(self):
+        # The footprint comes from `git status` on the decomp: an mtime rewind is only
+        # meaningful for files git already sees as part of the injection (source, not
+        # the .gitignored build outputs). Just assert it returns decomp-rooted paths.
+        for p in bc._decomp_footprint():
+            self.assertTrue(p.startswith(bc.DECOMP), p)
 
 
 if __name__ == '__main__':
