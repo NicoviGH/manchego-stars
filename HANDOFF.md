@@ -97,10 +97,10 @@ STAT_DONORs, the five no-Lupin conditionals) on #25; **#138** config-driven
   `git -C fireemblem8u restore src/data/chapter_settings.json data/data_8B363C.s`.
 - Untracked local/session files (`.agents/`, `AGENTS.md`, `skills-lock.json`) are intentionally not
   versioned; leave them alone. `tools/key_magenta.py` is **gitignored** (#178).
-- **HANDOFF lives in the main tree AND in every worktree, and a branch copy silently regresses live
-  state on merge.** The ch05 merge did exactly that — main's copy came back describing ch04 as a
-  "WIP checkpoint", four stages out of date, while the main tree held a newer uncommitted refresh.
-  Reconciled here. **Before merging any branch, diff its `HANDOFF.md` against main's.**
+- **HANDOFF.md is authored on `main` ONLY** — gated by `check.py check_handoff_only_on_main`
+  since 2026-07-30. A branch may leave it untouched or sync it to main's tip; it may not
+  author its own. If the guard fires: `git checkout main -- HANDOFF.md` on the branch.
+  Refresh HANDOFF on main *after* a merge. ADR in `decisions.md` §Working Conventions.
 - **Build-speed branch `feat/build-speed-idempotent-injection` (`0f28f49`)** — the work sat
   UNCOMMITTED in worktree `.claude/worktrees/agent-a5830560b594da84f` for 9 days; committed
   2026-07-30 so it can't be lost. Wired, 5 tests green, **unverified**. Merge gates are on
