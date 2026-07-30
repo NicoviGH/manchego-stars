@@ -919,11 +919,20 @@ events:
   - trigger: boss_battle
     slot: "vanilla 0x9C7"          # data_battlequotes.c, EVFLAG_BATTLE_QUOTES
     type: quote
-    status: unwritten
     description: >
-      Ravisin's battle quote when a player unit engages her. ONE BOX — vanilla's whole boss
-      taunt is "Enemy of the empire! Death's too good for you!" and nothing else. Her weight
-      comes from the 9BC orders scene, not from talking on the field.
+      Ravisin's battle quote when a player unit engages her. ONE BOX — vanilla's whole boss taunt
+      is "Enemy of the empire! Death's too good for you!" and nothing else. Her weight comes from
+      the 9BC orders scene, not from talking on the field.
+      Ours is the twin with one word swapped (Nicolas, 2026-07-29): empire -> Frostmaiden. That is
+      the entire change, and it is the right size of change. The line already does what her
+      register needs — direct address plus an insult-name, then contempt — and swapping the
+      allegiance is what makes it hers. "Frostmaiden" is the reverent epithet used everywhere else
+      in the chapter (9BC twice, 9C5 once); Auril is never named (see 9C8).
+      Note it is contempt, not grievance: she is not owed anything and is not avenging anything,
+      which keeps it clear of her bible's banned grudge/revenge framing.
+      LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 1 box.
+    script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
+      - ravisin: "Enemy of the Frostmaiden! Death's too good for you!"
   # ── 9C8 — BOSS DEATH. One box. Already locked. ───────────────────────────────
   - trigger: boss_death
     slot: "vanilla 0x9C8"          # data_battlequotes.c, EVFLAG_DEFEAT_BOSS
