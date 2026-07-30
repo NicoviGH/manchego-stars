@@ -373,6 +373,29 @@ events:
       - lupin: >-
           There. Old elf-stones — and the bone-trees just past. The trail goes in.
           ...Everything she wakes comes home to her, eventually.
+    no_lupin_fallback:            # DRAFT 2026-07-30 (Nicolas) — the locked script above is unchanged
+      boxes: [1, 3]               #   and still plays whenever the parley HAPPENED.
+      reason: >-
+        Lupin's recruit is gated on this chapter's own `parley: by: marty`, and the difficulty
+        model explicitly prices a no-parley path ("the raw, no-parley fight sits ABOVE vanilla") —
+        so a player can clear ch04 having killed the pack, and then TWO OF THIS SCENE'S THREE
+        BOXES have no speaker, including the chapter's closing button. That is a hard break, not a
+        soft one, which is why this branch exists at all.
+        Box 1's job (read the trail) goes to PINKY: his ch04 opening beat is FAILING to see
+        through the fog ("I can't see past three trees!"), so finding it once the fog thins pays
+        that off, and it hands the no-parley path a single substitute tracker it can carry into
+        ch05's 0x9BE rather than a patchwork of stand-ins.
+        Box 3's job is the destination PLUS the chapter's only Ravisin seed. Lupin owns that dread
+        because she woke him; nobody else can claim it, so the fallback does not try — MEESMICKLE
+        takes it flat and dry instead, and the unease comes from the place rather than from a
+        speaker's history with her. Marty's box 2 is unchanged in both branches.
+      script:
+        - pinky: >-
+            Father! From up high-- tracks. Northeast, big ones, and they don't wander.
+            It knew where it was going.
+        - meesmickle: >-
+            Standing stones and a bone orchard. ...Of course the trail goes in.
+            It always goes in.
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
