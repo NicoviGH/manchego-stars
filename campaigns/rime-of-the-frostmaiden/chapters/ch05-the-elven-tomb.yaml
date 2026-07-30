@@ -758,15 +758,14 @@ events:
       line is aimed at the universe's timing rather than at Pinky.
       RAVISIN STAYS SILENT through this. The fight begins on the quarry's terms, not hers; her
       first words on the map are the eruption (0x9C5).
-      STILL OPEN, and NOT resolved by using this slot: whether Basil gets a steeling-himself beat
-      of his own somewhere (the twin's actual content). It has no home now — do not assume it was
-      decided against, only that it is not here.
+      Basil's steeling-himself beat — the twin's actual content — is CUT (Nicolas, 2026-07-29).
+      Not deferred, not homeless: cut. His nerve is not a beat this chapter needs stated, and 0x9BB
+      already establishes what he is walking toward.
       LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 2 boxes.
     script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
       # (The hollow. The moose stands at bay among the standing dead. Nothing has moved.)
       - pinky: "...It's not running. Why isn't it running?!"
-      # (The moose throws its head back and BELLOWS -- then breaks, the same motion as the ch04
-      #  clearing, and comes straight at them.)
+      # (The moose throws its head back and BELLOWS -- then breaks and comes straight at them.)
       - meesmickle: "You had to ask?"
       # (Cue battle. -> PREP -> turn 1.)
   # ── 0x9D5/0x9D6 — the FORGE's systemic tutorial. Vanilla teaches the arena HERE, in Ch5. ──
