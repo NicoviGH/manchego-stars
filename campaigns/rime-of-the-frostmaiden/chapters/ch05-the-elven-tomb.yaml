@@ -407,7 +407,8 @@ enemy_units:
 #   0x9C1 ( 2)     on-map    party REACTS: two questions         CUT -- engine, unneeded here
 #   0x9C2 ( 8)     on-map    recruit reaches party; BATTLE       Basil joins → battle
 #   0x9C3 (12)     on-map    recruit's OWN scene (Joshua)        Sahnar in the sarcophagus
-#   0x9C4 ( 4)     on-map    other recruit's beat before Talk    CUT -- see the slot below
+#   0x9C4 ( 4)     on-map    other recruit's beat before Talk    the MOOSE triggers the fight
+#                                                                 (position reused, not content)
 #   ══ everything above is ONE pre-map event list (98 boxes); below is triggered ══
 #   0x9C5 ( 3)     on-map    mid-battle ESCALATION               the eruption
 #   0x9CC (32)     on-map    TALK-RECRUIT scene                  Basil Talks Sahnar (payoff)
@@ -625,8 +626,11 @@ events:
       seed (Nicolas's call). The scene's shape is "each character reads this place by what they
       personally notice", so Wolfram reading the metal is the same beat as Lupin reading tracks;
       he goes before Marty so the dread and Pinky's alarm stay adjacent and Pinky keeps the last
-      word (his unanswered question is 0x9BF's opening thread). 8 boxes now, against the twin's
-      combined 3 + 19 = 22, so still well inside budget.
+      word. 7 boxes now, against the twin's combined 3 + 19 = 22, so well inside budget.
+      Pinky's "...It's not running. Why isn't it running?!" MOVED to the 0x9C4 trigger beat
+      (Nicolas, 2026-07-29) — it is the setup for a joke, and a setup fifteen boxes from its
+      punchline is not a setup. He keeps the spotting line, which is the right note to end an
+      arrival scene on: the party has found what it came for.
       LOCKED 2026-07-23, extended 2026-07-29 (dialogue-pass, co-written with Nicolas). Hand-boxed
       to GBA width (~29-30 ch/line, 2 lines/box); [A]/[LF] encoding is ROM-gated.
     script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
@@ -650,7 +654,6 @@ events:
       - wolfram: "...This was a training arena. I can get it up and running."
       - marty: "...This magic is familiar..."               # trails off — the hook, never explained here
       - pinky: "Father, I see it! The moose--in the hollow."
-      - pinky: "...It's not running. Why isn't it running?!"
   # ── 0x9BF + 0x9C0 — CUT 2026-07-29 (Nicolas). 16 boxes buying nothing. ────────
   #  Vanilla's pair is the party OVERHEARING an incident and deciding to investigate. Its three
   #  jobs, and why each is already done or unavailable here:
@@ -733,23 +736,39 @@ events:
   # NB the old description here carried `basil.md`'s RETIRED "voice is spare (2-5 words)"
   # spec (retired 2026-07-23: it made him read as slow — his corpus twin is Ewan). Do not
   # resurrect it if this slot is ever refilled.
-  # ── 0x9C4 — CUT 2026-07-29, but on approval CLAUDE cannot verify. REVIEW. ─────
-  - trigger: chapter_start       # opening event list, LAST message of 11
+  # ── 0x9C4 — the LAST beat before the map: the moose triggers the fight ────────
+  - trigger: chapter_start       # opening event list, LAST message
     slot: "vanilla 0x9C4"
-    type: dialogue
-    status: needs_review           # cut in f81e993; Nicolas does not recall approving the cuts
+    type: cutscene
+    ea_file: events/ch05-opening.ea
     description: >
-      Vanilla's FOUR-box closer to the whole opening: Natasha alone, steeling herself right before
-      the map loads — "They may not want to hear what I have to say, but...." / "I must speak with
-      one of the Grado soldiers." / "Oh, if only one of them will listen to my words...." /
-      "Please! Grant me strength." It states her ERRAND out loud one beat before the player is
-      handed the controls, so the escort objective is her stated wish rather than a mission brief.
-      Ours would be Basil, mid-escort, about to walk up to a queen with a killing edge.
-      CUT in f81e993 on the reasoning that its only job was to load Basil's berry ahead of the
-      recruit and 0x9BB already does that. That reasoning is sound for the BERRY but it is not the
-      slot's only job — the twin's four boxes are about the errand and about fear, not about a
-      gift. RESTORED HERE AS needs_review because the cut rests on an approval CLAUDE cannot
-      evidence, and Nicolas has said he does not recall making these calls. Nicolas's call.
+      Vanilla's 0x9C4 is Natasha alone, steeling herself, four boxes, immediately before the map
+      loads — the escort stating her errand so the objective is her wish rather than a brief.
+      We use the POSITION and not the content (Nicolas, 2026-07-29): this is where the fight
+      starts, and it starts because the MOOSE does something.
+      Structure is a setup/punchline across a wordless action, which is why Pinky's question moved
+      here out of 0x9BE — a setup fifteen boxes from its punchline is not a setup:
+        Pinky asks why it isn't running -> the moose bellows and charges -> Meesmickle answers the
+        question sideways -> battle.
+      THE MOOSE CANNOT SPEAK. ch04 established it as a "mute white ghost" and locked that
+      2026-07-03, so the middle beat is pure stage direction. Its motion is also a ch04 PAYOFF
+      inverted: in ch04's `moose_sighted` it breaks from a clearing and bolts AWAY. Here it breaks
+      the same way and comes at them, because this time it is cornered and Ravisin holds it.
+      Meesmickle is the right voice — dry, one sentence, "a wit, not a bully" (his bible), and the
+      line is aimed at the universe's timing rather than at Pinky.
+      RAVISIN STAYS SILENT through this. The fight begins on the quarry's terms, not hers; her
+      first words on the map are the eruption (0x9C5).
+      STILL OPEN, and NOT resolved by using this slot: whether Basil gets a steeling-himself beat
+      of his own somewhere (the twin's actual content). It has no home now — do not assume it was
+      decided against, only that it is not here.
+      LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 2 boxes.
+    script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
+      # (The hollow. The moose stands at bay among the standing dead. Nothing has moved.)
+      - pinky: "...It's not running. Why isn't it running?!"
+      # (The moose throws its head back and BELLOWS -- then breaks, the same motion as the ch04
+      #  clearing, and comes straight at them.)
+      - meesmickle: "You had to ask?"
+      # (Cue battle. -> PREP -> turn 1.)
   # ── 0x9D5/0x9D6 — the FORGE's systemic tutorial. Vanilla teaches the arena HERE, in Ch5. ──
   - trigger: forge_tile_visited   # flag-gated, like vanilla's own arena tutorial
     slot: "vanilla 0x9D5 + 0x9D6"
