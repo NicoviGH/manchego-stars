@@ -26,6 +26,20 @@ beats → lines, human curates every level). Decided 2026-06-09 (docs/decisions.
 4. **Vanilla pacing benchmark** for the slot being written — run
    **`python3 tools/vanilla_scene.py <ch> [SceneFragment]`** to print the twin's scenes as
    boxed dialogue with box counts (decomp `src/events/*-eventscript.h` + `texts/texts.txt`).
+   **A chapter's messages live in TWO places and TWO channels — check both, or you will
+   conclude vanilla lacks a beat it has:**
+   - `*-eventscript.h` carries the scenes, in **two channels**: `TEXTSHOW` (on-map, units
+     staged by `LOAD1`, bubbles wrap at **29** chars) and `Text_BG(BG_*, id)` (a still
+     backdrop, wraps **~42**). The channel sets the width you hand-box to, and vanilla uses
+     the backdrop for scenes that happen ELSEWHERE (Ch5's Grado command scenes) — so it also
+     tells you where a scene is set. `vanilla_scene.py` prints id + channel per message
+     (regression-guarded by `tools/test_vanilla_scene.py`; it once matched `TEXTSHOW` only
+     and hid Ch5's two backdrop scenes, under-reporting an 11-message opening as 8).
+   - `data_battlequotes.c` carries the **boss taunt, boss death quote, and any
+     chapter-specific unit death quote** — these are NOT in the eventscript at all. Ch5's
+     `0x9C6`/`0x9C7`/`0x9C8` live here, and `0x9C6` is the ESCORT's death quote, which is
+     easy to mistake for a scene id. Grep both files before claiming an id is unused.
+   - **If a mined beat looks absent, suspect the miner before concluding vanilla lacks it.**
    Measured budgets + where our chapters sit: **`references/scene-pacing.md`**. Headline:
    vanilla spends **45–100 boxes** on an opening/ending cutscene but keeps a **mid-battle
    escalation to ~3 boxes** — story goes in the bookend scenes, in-map beats are a punch.

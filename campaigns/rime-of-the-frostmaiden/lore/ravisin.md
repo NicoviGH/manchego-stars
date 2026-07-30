@@ -25,9 +25,20 @@ way you'd give up a fever.
 
 - **Wants:** Auril's winter to claim the world; every fire put out; the warm and the living
   frozen into the goddess's dominion. Not Auril's *notice* — Auril's *victory*.
-- **The death line** (`"Auril… I gave you everything…"`, locked in the YAML) is **not a
+- **The death line** (`"Frostmaiden… the winter is yours…"`, locked in the ch05 YAML) is **not a
   lament.** It's a zealot's last offering — proud, certain to the end that the cold was worth
-  it. Play it as devotion, never as regret.
+  it. Play it as devotion, never as regret. Its twin is Saar's own death quote, a dying
+  soldier's SALUTE: name the liege, then glorify. An earlier draft (`"Auril… I gave you
+  everything…"`) failed that twice — it read as an invoice, putting Ravisin at the centre of her
+  own death instead of her goddess, and it broke the naming rule below. "The winter is yours" is
+  a HANDOFF, which is truer to a chapter where killing her does not stop the cold.
+- **HARD RULE: "Auril" is never spoken aloud, by anyone, ever.** In dialogue she is only the
+  reverent epithet — "the Frostmaiden," "her winter," "the cold that cleans." The name may
+  appear in prose, YAML descriptions and these bibles; it may not appear in a `script:` block.
+  Reason: our story never pays the name off, so its only appearances would be lore-drops in
+  places too small to carry them — which is exactly how it went wrong (it was, briefly, the
+  goddess's SOLE proper-name drop in ch05, sitting in a one-box death quote). Checked
+  2026-07-29: 9BC ×2, 9C5 ×1 and 9C7 all use the epithet.
 
 ## Voice
 

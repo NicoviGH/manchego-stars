@@ -2725,6 +2725,20 @@ _Decided: 2026-07-29 (Nicolas + CLAUDE; ch05 dialogue pass — retiring the "two
 _Moved here from `HANDOFF.md` 2026-07-02 (audit): these are durable engineering constraints, not
 session state. `HANDOFF.md` points here._
 
+- **A chapter's message text lives in TWO decomp files, in TWO channels — a partial scan reads as
+  proof that vanilla lacks a beat.** `src/events/<ch>-eventscript.h` holds the scenes, mixing
+  `TEXTSHOW` (on-map, units staged by `LOAD1`, bubbles wrap at 29 chars) with
+  `Text_BG(BG_*, id)` (a still backdrop, ~42 chars) — and vanilla uses the backdrop for scenes set
+  ELSEWHERE, so the channel also tells you where a scene happens. Separately,
+  `src/data_battlequotes.c` holds boss taunts, boss death quotes and chapter-specific unit death
+  quotes, which appear in **no** eventscript. Both traps fired on ch05: `vanilla_scene.py` matched
+  `TEXTSHOW` only and reported Ch5's 11-message opening as 8, hiding the exact two backdrop scenes
+  our 9BC/9BD are modelled on; and a caveat was written claiming `0x9C6`/`0x9C7`/`0x9C8` "appear
+  nowhere in the decomp" when all three are battle-quote entries — `0x9C6` being the escort's death
+  quote, which then turned out to be a slot we owed Basil. Grep **both** files before concluding an
+  id is unused, and prefer the tool (now channel-aware, guarded by `tools/test_vanilla_scene.py`).
+  _Recorded: 2026-07-29 (ch05 dialogue pass)._
+
 - **A `git` subprocess run inside a git hook resolves against the OUTER repo unless you strip `GIT_*`.**
   Git exports `GIT_DIR`/`GIT_INDEX_FILE`/`GIT_WORK_TREE` while a hook runs (pre-commit drift → `check.py`
   → the `test_*.py` suite). Any tool or **test fixture** that then shells out to `git` — `git -C <dir> …`,
