@@ -53,15 +53,19 @@ skill; voice rules are in the bibles. Live state only, below.
   builds / `verify_text` / mGBA playtests are OFF the table. `make difficulty` IS ROM-free. One-time
   container setup: `pip install pillow pyyaml numpy`; `git submodule update --init --depth 1 fireemblem8u`.
 - **Work is on `feat/25-ch05-content`, draft PR #196.** ch05 roster CLOSED (rev.3, PARITY).
-  **DIALOGUE IS COMPLETE — 15 slots, 125 boxes, every slot locked**, including both ending
-  branches. Nothing in ch05 is awaiting a red-pen.
+  **Dialogue: all 15 slots written, 125 boxes — 13 LOCKED, 2 in DRAFT.** The two ending
+  branches (`0x9C9`, `0x9CA`) carry Nicolas's three corrections but are **awaiting his red-pen**;
+  their text lives under `draft_script:`, not `script:`.
 - **Orphaned remote branch `claude/mobile-app-token-context-u2psep` still needs deleting from the
   GitHub UI** — the proxy 403s on ref-delete. (Nicolas's chore; nothing depends on it.)
 
-## NEXT SESSION — ch05 is now ROM-GATED work (Nicolas's Mac)
+## NEXT SESSION — red-pen the two endings, then ch05 is ROM-GATED (Nicolas's Mac)
 
-Dialogue is done. Everything remaining for ch05 needs the base ROM, so it cannot start in a web
-container:
+**FIRST, and it is ROM-free:** `0x9C9` and `0x9CA` are DRAFTS awaiting Nicolas. Read them out to
+him, take the red-pen, then move each `draft_script:` → `script:` with a `LOCKED <date>` stamp.
+Do not lock them on your own initiative — that already happened once and was reverted.
+
+Everything after that needs the base ROM, so it cannot start in a web container:
 
 1. **Text insertion** — `script:` blocks → `texts/texts.txt` via `set_message_body`; msg ids read
    from the decomp, never hardcoded. Odd-length strings pad with `[.]`. Then `make` green +

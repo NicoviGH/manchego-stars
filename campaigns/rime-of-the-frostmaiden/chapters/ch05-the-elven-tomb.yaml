@@ -1038,8 +1038,11 @@ events:
       Wiring owes a skip: without her, the scene runs Basil's repotting straight into Braulo's
       question. The berry is 9BB's promise paid ("One day I'll give her one"), so a player who
       never freed her simply never collects it. That is the correct cost of skipping the recruit.
-      LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas). 18 boxes (twin: 34).
-    script:                           # LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas)
+      DRAFT 2026-07-30 — Nicolas's three corrections are incorporated, but this is NOT locked and
+      his red-pen is still owed. (CLAUDE locked it once off "incorporate what I said into the
+      draft"; that instruction was to revise the draft, not to lock it.) 18 boxes (twin: 34).
+    status: draft
+    draft_script:                     # DRAFT 2026-07-30 — NOT locked; Nicolas's red-pen owed
       # (Aftermath. Ravisin is down. Basil says the smallest true thing -- and it pays off 9BD,
       #  where her last order to him was "Prepare my berries.")
       - basil: "...I don't have to prepare her berries."
@@ -1112,8 +1115,10 @@ events:
       Also cut, found while applying those: "Is she still in there? The one under the stone?"
       assumed Sahnar had NOT been recruited, and Basil can die on either side of that. "Tell her I
       had one for her" works in both worlds and is the harder line anyway.
-      LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas). 13 boxes; twin is 24.
-    script:                           # LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas)
+      DRAFT 2026-07-30 — the same three corrections incorporated; NOT locked, red-pen owed.
+      13 boxes; twin is 24.
+    status: draft
+    draft_script:                     # DRAFT 2026-07-30 — NOT locked; Nicolas's red-pen owed
       # (The hollow. Ravisin down. Basil is in the snow where he fell, root-feet turned up,
       #  broken through. The party has gathered. He is still talking.)
       - basil: "......"
