@@ -598,6 +598,71 @@ def _git(args):
         return ''
 
 
+# ── HANDOFF may only be authored on main (2026-07-30) ──────────────────────────
+# HANDOFF.md describes GLOBAL live state, but it is a tracked repo-root file, so every
+# branch and worktree gets a private copy that stops describing the project and starts
+# describing "the project as this branch last saw it". Merge the branch and its stale copy
+# overwrites main's. That is not hypothetical: the ch05 merge (2026-07-30) put ch04 back to
+# a "WIP checkpoint" four committed stages out of date, and the only reason it surfaced was
+# that `git pull` refused to clobber an unrelated local edit.
+#
+# It had already been caught once, on 2026-07-21, and the mitigation was a HANDOFF note
+# saying "keep the copies in sync". Nine days later it failed. Remembering is not a control,
+# so this is the control: a branch may not INVENT its own HANDOFF.
+#
+# Two states pass, and the second is what makes the rule livable:
+#   * UNTOUCHED  -- the branch never edited HANDOFF (git's 3-way merge then keeps main's
+#     version, so main advancing while the branch is open is harmless and must not fail);
+#   * SYNCED     -- the branch's copy is byte-identical to main's tip, which is the ideal
+#     state for a worktree, since people read HANDOFF where they are working.
+# Anything else is a branch carrying live state it does not own.
+
+HANDOFF_FILE = 'HANDOFF.md'
+
+
+def _handoff_branch_state():
+    """('ok', '') | ('diverged', detail) | ('unknown', reason) for HANDOFF.md on this branch.
+
+    'unknown' (shallow clone, detached HEAD, no origin/main) never fails the build -- a guard
+    that cannot see the base must not invent a violation."""
+    branch = os.environ.get('GITHUB_HEAD_REF', '') or _git(['rev-parse', '--abbrev-ref', 'HEAD'])
+    if branch in ('main', 'master', 'HEAD', ''):
+        return 'ok', ''
+    base_ref = os.environ.get('GITHUB_BASE_REF', '') or 'main'
+    main_ref = next((r for r in ('origin/' + base_ref, base_ref)
+                     if _git(['rev-parse', '--verify', '--quiet', r])), '')
+    if not main_ref:
+        return 'unknown', 'no %s ref in this clone' % base_ref
+    base = _git(['merge-base', 'HEAD', main_ref])
+    if not base:
+        return 'unknown', 'no merge-base with %s (shallow clone?)' % main_ref
+    staged = [l for l in _git(['diff', '--cached', '--name-only']).splitlines() if l.strip()]
+    edited = (HANDOFF_FILE in staged
+              or HANDOFF_FILE in _diff_names(base))
+    if not edited:
+        return 'ok', ''                                  # UNTOUCHED
+    if not _git(['diff', '--name-only', main_ref, 'HEAD', '--', HANDOFF_FILE]) and not staged:
+        return 'ok', ''                                  # SYNCED to main's tip
+    if HANDOFF_FILE in staged:
+        return 'diverged', 'staged for commit on `%s`' % branch
+    return 'diverged', ('committed on `%s` and it differs from %s'
+                        % (branch, main_ref))
+
+
+def check_handoff_only_on_main(fail):
+    """HANDOFF.md is live state and live state is global -- author it on main, never on a
+    feature branch. See the block comment above for the incident this encodes."""
+    state, detail = _handoff_branch_state()
+    if state == 'diverged':
+        fail.append(
+            '%s %s. Live state is global and belongs on main -- a branch copy silently '
+            'overwrites main\'s when it merges (this cost us ch04\'s state on 2026-07-30). '
+            'Fix: `git checkout main -- %s` on the branch, and refresh HANDOFF on main after '
+            'the merge instead.' % (HANDOFF_FILE, detail, HANDOFF_FILE))
+    elif state == 'unknown':
+        print('  note: HANDOFF branch guard skipped -- %s' % detail)
+
+
 def _lane_of(name):
     if 'content' in name:
         return 'content'
@@ -667,7 +732,8 @@ def main():
                   check_tool_refs_exist, check_no_dead_concepts,
                   check_generated_indexes_fresh, check_engine_guards_present,
                   check_engine_campaign_agnostic,
-                  check_save_layout_stable, check_lane_ownership):
+                  check_save_layout_stable, check_handoff_only_on_main,
+                  check_lane_ownership):
         check(fail)
     if fail:
         print('DRIFT (%d):' % len(fail))
