@@ -1102,24 +1102,29 @@ events:
       PINKY'S MOOSE PAYOFF SURVIVES THE BRANCH. It is the one thing from 0x9C9 that must not be
       lost here — Basil asks whether it got away, and hearing that it did is the last good thing
       that happens to him.
-      DRAFT 2026-07-30 (dialogue-pass). 18 boxes; twin is 24.
-    script:                           # DRAFT 2026-07-30 — NOT locked; Nicolas's red-pen owed
+      Nicolas's two 0x9C9 corrections apply here identically, because this IS that ending:
+        · NO MOOSE. It is convertible, so the player may have killed it; the draft had Basil ask
+          "did it go?" and Pinky answer that it runs. Cut, same rule as 0x9C9.
+        · The hook is the MONSTER only. "...she has many hands" is cut — it framed the lake
+          creature as another Child of Auril when per ch06 it is another of Ravisin's victims,
+          which would have poisoned ch06's talk-her-down option a chapter early. Basil now reports
+          only the order he heard her give.
+      Also cut, found while applying those: "Is she still in there? The one under the stone?"
+      assumed Sahnar had NOT been recruited, and Basil can die on either side of that. "Tell her I
+      had one for her" works in both worlds and is the harder line anyway.
+      LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas). 13 boxes; twin is 24.
+    script:                           # LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas)
       # (The hollow. Ravisin down. Basil is in the snow where he fell, root-feet turned up,
       #  broken through. The party has gathered. He is still talking.)
       - basil: "......"
       - marty: "Easy. Easy, friend. Don't--"
-      - basil: "The moose. Did it-- did it go?"
-      - pinky: "It's running, Basil. It's running."
-      - basil: "...Good. It'll eat now."
       # (The plot, in fragments, exactly as vanilla delivers it here.)
       - basil: "There's another one. In the water."
       - braulo: "Save it."
       - basil: "Down the coast. By the fishing town. She woke it."
-      - basil: "She was so pleased with-- ...she has many hands."
+      - basil: "She told it to sink the boats. She was so pleased with--"
       - marty: "Basil."
       # (Not the berry itself -- 0x9C6 already spent that. This is the errand handed on.)
-      - basil: "...Is she still in there? The one under the stone?"
-      - marty: "......"
       - basil: "...Tell her I had one for her."
       - basil: "......"
       - prof-rbg: "...He's gone."
@@ -1127,7 +1132,7 @@ events:
       - prof-rbg: "...The fishing town would be Bremen."
       - braulo: "Nobody's hired us for a lake."
       # (The ONE changed line, in vanilla's own place: what the loss cost the party in facts.)
-      - braulo: "If he'd lived we'd know more. It isn't finished. We go down the coast."
+      - braulo: "If he'd lived we'd know more. ...We go down the coast."
   # ── 0x9CB — vanilla's ending CODA. FOLDED INTO 0x9C9 (2026-07-30). No separate slot. ──
   # Vanilla's 16-box coda: a townsman recognises Eirika, thanks her for driving off Saar,
   # apologises that he can do nothing for her, and promises the town will "wait unbowed" for the
