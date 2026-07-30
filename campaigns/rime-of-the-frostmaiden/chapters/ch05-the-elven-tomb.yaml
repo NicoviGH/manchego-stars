@@ -221,7 +221,9 @@ enemy_units:
   # a NAMED MINIBOSS (vanilla Ch5 precedent: CHARACTER_BANDIT_CH5, a named non-boss threat)
   # that is CONVERTIBLE — killing Ravisin breaks her hold and it stops fighting. The player
   # chooses: grind a 4.3-round, 14-threat monster, or push the objective and it walks away.
-  # Rewards going for the throat and pays off the ending beat ("her hold on the moose breaks").
+  # Rewards going for the throat: the moose walking away IS the payoff, on the map, in play.
+  # NB the ending (0x9C9) must never mention the moose -- being convertible means the player can
+  # simply kill it, so no cutscene may assume it survived (Nicolas, 2026-07-30).
   - id: white-moose
     name: "The White Moose"
     is_miniboss: true           # named, dangerous, NOT the win condition (objective = Ravisin)
@@ -999,20 +1001,17 @@ events:
   - trigger: chapter_end
     slot: "vanilla 0x9C9"
     type: cutscene
-    status: draft                  # DRAFT 2026-07-30 — awaiting Nicolas's red-pen, then LOCKED
     ea_file: events/ch05-ending.ea
     description: >
-      Ravisin falls; her hold on the moose breaks. The party adopts Basil — they REPOT him (he
-      is already called Basil and joined on the map; there is no discovery and no naming beat,
-      LOCKED 2026-07-23). They turn down the coast toward Bremen, where Ravisin woke something
-      in the lake.
+      Ravisin falls. The party adopts Basil — they REPOT him (he is already called Basil and
+      joined on the map; there is no discovery and no naming beat, LOCKED 2026-07-23). They turn
+      down the coast toward Bremen, where Ravisin woke something in the lake.
       MINED SKELETON — vanilla MSG_9C9 (34 boxes, `EventScr_Ch5_EndingScene`, ON-MAP so bubbles
-      wrap at 29). Its beat order, which ours follows: (1) two boxes of aftermath before anyone
-      does business; (2) the ESCORT is thanked and becomes the scene's centre; (3) the party asks
-      her a question and she TELLS THEM THE PLOT — the escort, not a party member, carries the
-      chapter's forward information; (4) the party deliberates in front of her (Eirika asks Seth,
-      Seth is cautious, they resolve anyway); (5) a closing box that makes the win provisional
-      ("her story chills me to the bone. I pray it is false").
+      wrap at 29). Its beat order, which ours follows: (1) aftermath before anyone does business;
+      (2) the ESCORT is thanked and becomes the scene's centre; (3) the party asks her a question
+      and she TELLS THEM THE PLOT — the escort, not a party member, carries the chapter's forward
+      information; (4) the party deliberates in front of her; (5) a closing box that turns the win
+      into the next journey.
       WHO SITS IN WHICH SEAT: Natasha → BASIL (he is her donor and holds her role all chapter, so
       he inherits the information too — and that is WHY 0x9CA has to exist). Eirika → BRAULO (he
       speaks when a decision has to be made, then the party follows). Seth → split between
@@ -1024,75 +1023,49 @@ events:
       been under a stone for four thousand years — she has no way to know about a lake. Basil is
       Ravisin's own attendant and reports what he HEARD her say, which is also how 9BB damns her
       ("she said it would still run"). Villains condemn themselves in reported speech.
-      THE THREE PAYOFFS THIS SCENE COLLECTS, none of them announced:
-        · Pinky asked "why isn't it running?" in 0x9C4 and gets his answer here — it runs.
-        · 9BB's "I gave it berries. It wouldn't eat them." resolves in one clause: it'll eat now.
-        · 9BD's "Prepare my berries" is how Basil says he is relieved, without one word of pity
-          for Ravisin (basil.md Q4: play him relieved, never bereaved).
-      SEPHEK: Basil never names him and does not know what he saw. He reports a man who came
-      before the party did, gave her the orders, and WASN'T WEARING A COAT — which the player has
-      met (ch00) and the party can place. This is also the "she has other hands" drop that
-      `sephek-kaltro.md` says ch05 owes, landed as Basil circling back at the end with the worst
-      thing he remembers ("the Frostmaiden has many hands"), which is his register: he doubles
-      back mid-turn.
-      0x9CB IS FOLDED IN HERE, per the decision on that slot — the coda's job is that the win
-      lands on someone who LIVES here, and the residents are Basil (the hollow is the only place
-      he has ever been) and, if recruited, Sahnar. Vanilla's townsman apologises that he can do
-      nothing and stays behind; ours can do something, and comes.
-      THE SAHNAR BLOCK IS CONDITIONAL (6 boxes, flag-gated on the 0x9CC recruit) and is placed
-      MID-SCENE on purpose: excising it must not touch the scene's shape or its last box. It is
-      the same mechanism vanilla already uses one slot later (0x9C9 vs 0x9CA is a branch on the
-      escort's death), one act earlier. It exists to pay the question 0x9CC deliberately left
-      hanging — "...Can I give you a berry now?" — and no other scene can.
-      LAST BOX: Braulo commits, flatly, in one A-press. Vanilla ends its ending on dread; ours
-      puts the dread one box earlier, in Basil's mouth, so the chapter closes on the party moving
-      rather than on a mood.
-      DRAFT 2026-07-30 (dialogue-pass). 25 boxes with the Sahnar block, 19 without; twin is 34.
-    script:                           # DRAFT 2026-07-30 — NOT locked; Nicolas's red-pen owed
-      # (The hollow. Ravisin down in the snow at the moon dial. The cold goes ordinary. Across
-      #  the depression the white moose lifts its head and finds nothing holding it.)
-      # (0x9C4's question, answered a whole chapter later. Pinky asked; Pinky gets it.)
-      - pinky: "Father, look-- it's running!"
-      # (9BB's "I gave it berries. It wouldn't eat them." resolved in one clause.)
-      - basil: "It's going home. ...It'll eat now."
-      # (How Basil says he is relieved. 9BD's chore, ended. No pity for her, none owed.)
+      NO MOOSE (Nicolas, 2026-07-30). The moose is a CONVERTIBLE miniboss — the player may simply
+      kill it — so the ending cannot assume it survived, and an earlier draft opened on it running
+      home. Cutting it costs two payoffs that were moose-dependent (Pinky's "why isn't it
+      running?" from 0x9C4, and 9BB's "it wouldn't eat them"); they are forfeit, not relocated.
+      Do not reinstate them: a beat the player can delete is not a beat the ending can rest on.
+      THE BREMEN HOOK IS ABOUT THE MONSTER, NOTHING ELSE (Nicolas, 2026-07-30). An earlier draft
+      routed it through Sephek and closed on "the Frostmaiden has many hands", which implies the
+      lake creature is another Child of Auril. IT IS NOT. Per ch06 it is Messie, an AWAKENED
+      plesiosaur — woken by Ravisin exactly as the wolves and the moose were, and ORDERED to sink
+      the boats. It is another of her victims, and ch06 lets Marty talk her down. So the hook says
+      only what Basil heard: she woke a thing in the water and told it what to do.
+      SAHNAR IS OPTIONAL — the berry exchange (boxes 6-11) can only play if she was recruited.
+      Wiring owes a skip: without her, the scene runs Basil's repotting straight into Braulo's
+      question. The berry is 9BB's promise paid ("One day I'll give her one"), so a player who
+      never freed her simply never collects it. That is the correct cost of skipping the recruit.
+      LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas). 18 boxes (twin: 34).
+    script:                           # LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas)
+      # (Aftermath. Ravisin is down. Basil says the smallest true thing -- and it pays off 9BD,
+      #  where her last order to him was "Prepare my berries.")
       - basil: "...I don't have to prepare her berries."
-      # (Marty's opening move is always hospitality.)
       - marty: "No. You don't. ...Come with us instead."
       - prof-rbg: "Um, actually-- he'll want soil, not snow. I've a spare crucible."
       - basil: "A pot. ...Mine?"
       - basil: >-
-          I've been in this ground my whole life, I didn't know you could just-- ...Yes.
-          Yes. I'll grow. For you.
-      # ── CONDITIONAL BLOCK: plays ONLY if Sahnar was recruited (0x9CC). Cut cleanly ──
-      # ── otherwise; nothing above or below it depends on it. ────────────────────────
+          I've been in this ground my whole life, I didn't know you could just-- ...Yes. Yes.
+          I'll grow. For you.
+      # (ONLY IF SAHNAR WAS RECRUITED -- see the note above. 9BB's promise, paid.)
       - sahnar: "...They gave you a pot."
       - basil: "They gave me a pot! There's soil in it and everything--"
       - basil: "--oh. Oh, wait. Wait, I've been saving-- here."
-      # (He works a berry loose and holds it up. 0x9CC's unanswered question, answered.)
       - sahnar: "......"
       - sahnar: "I have not eaten in four thousand years."
-      - sahnar: "...Give it here."
-      # ── END CONDITIONAL BLOCK ──────────────────────────────────────────────────────
-      # (Braulo does the asking, as Eirika does. Her death quote handed the winter on; he heard it.)
-      - braulo: "Her last words. ...Was she the only one?"
-      - basil: "...No. A man came, before you did."
-      # (Sephek, unnamed and un-understood. The player met him in ch00.)
-      - basil: "He gave her the orders. ...He wasn't wearing a coat."
-      - basil: >-
-          And there's another one. In the water, down the coast, by the fishing town-- she
-          woke something in the lake. She was pleased with it.
+      # (A queen thanks him. She is four thousand years past grabbing at anything, and using his
+      #  NAME rather than "little one" is the whole distance she has travelled since 9BB.)
+      - sahnar: "...Thank you, Basil."
+      # (The escort carries the plot, exactly as Natasha does in the twin.)
+      - braulo: "You served her. What else did she do?"
+      - basil: "...There's something in the water. Down the coast, by the fishing town."
+      - basil: "She woke it. Like she woke the wolves. ...She told it to sink the boats."
       - prof-rbg: "Um, actually-- that would be Bremen. They fish that lake to eat."
-      # (Braulo's justice is fair dealing; unpaid work is the thing he says out loud. This is
-      #  also the seed of ch07, where the party goes expecting to be paid and is not.)
       - braulo: "Nobody's hired us for a lake."
       - marty: "Then we'll be a pleasant surprise."
-      - braulo: "A town with no boats has coin and a reason to spend it."
-      # (Basil doubles back with the worst thing he remembers -- the "other hands" drop
-      #  sephek-kaltro.md says this chapter owes. Reported speech; she damns herself.)
-      - basil: "...She used to say the Frostmaiden has many hands."
-      - braulo: "Then it isn't finished. We go down the coast."
-
+      - braulo: "A town with no boats has coin and a reason to spend it. ...We go down the coast."
   # ── 0x9CA — vanilla's "escort died" ENDING VARIANT. ADOPTED 2026-07-30. ───────
   - trigger: chapter_end
     slot: "vanilla 0x9CA"
