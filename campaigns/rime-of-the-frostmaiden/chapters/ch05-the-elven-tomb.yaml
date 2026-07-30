@@ -646,35 +646,39 @@ events:
     ea_file: events/ch05-opening.ea
     status: unwritten
     description: >
-      Picks up Pinky's unanswered "why isn't it running?!" from 0x9BE. 7 boxes in the twin.
-      CORRECTED 2026-07-29: this slot previously said the party watches the hollow STIR and shapes
-      stand up. WRONG — that put a rising here AND at 0x9C5. Vanilla's 0x9BF/0x9C0/0x9C1 have
-      nothing to do with reinforcements; the guardians are ALREADY UP, and these beats are where
-      the game STAGES them in front of the player.
-      How vanilla actually paces it, and we should copy this: LOAD1(Saar + 6) fires BETWEEN 0x9BF
-      and 0x9C0, then SONG_RAID starts, then 0x9C0 plays, then LOAD1(9 more). The boxes are timed
-      to an army walking onto the board. The party's own 7 boxes are: two finishing the previous
-      conversation without resolving it, an interruption, then three deciding to go look. They are
-      PASSIVE throughout — they overhear and react; they never act.
-      OPEN: what interrupts. Vanilla's is overheard SPEECH (soldiers dragging Natasha off). Our
-      guardians are mute, Basil does not arrive until 0x9C2, and Ravisin speaking here would spend
-      the silence 0x9C5 is built on. Leading candidate: the party overhears BASIL below, pleading
-      about the moose — which is what 0x9BB established him doing, and it hands 0x9C0 its own nine
-      boxes naturally (Ravisin answering him, the party watching unseen).
+      DELIBERATE DIVERGENCE from the twin (Nicolas, 2026-07-29). Vanilla's 0x9BF/0x9C0 are the
+      party OVERHEARING an incident and deciding to investigate — soldiers hauling Natasha off —
+      and that machinery exists to MANUFACTURE A MOTIVE: Eirika's people are travellers passing
+      through Serafew with no reason to fight anyone, so the stumble IS the motivation engine.
+      We do not need it. Our party has tracked the moose since ch04 and arrives on purpose; 0x9BE
+      already ends with Pinky looking straight at the quarry. Copying the stumble would convert a
+      deliberate hunt into an accident.
+      It would also have damaged a LOCKED scene: Basil's 0x9C2 opener is "Oh! Tourists. In the
+      tomb. ...We don't get many." That only works if the party has never laid eyes on him. Nine
+      boxes of watching him get bullied first would turn a surprise into surveillance and kill the
+      obliviousness the joke runs on.
+      WHAT THE SLOT STILL OWES IS MECHANICAL. This is where vanilla runs LOAD1 to walk Saar's
+      command onto the board (then nine more after 0x9C0), with the boxes PACED to units
+      appearing. That job does not go away — our guardians have to be staged too, and they are
+      ALREADY STANDING when the party arrives (nothing rises before the eruption; see 0x9C5).
+      So: the party goes DOWN, on purpose, and the descent is what reveals the hollow's tenants.
+      7 boxes in the twin. Picks up Pinky's unanswered "why isn't it running?!" from 0x9BE.
+      RAVISIN IS SEEN AND NOT HEARD here and through 0x9C0 — 0x9C2 stages her as "a silent
+      frost-robed figure at centre" and the eruption is built on that silence breaking. Her not
+      answering is the point; it makes 0x9C1's two questions land on a figure who won't reply.
   - trigger: chapter_start
     slot: "vanilla 0x9C0"
     type: cutscene
     ea_file: events/ch05-opening.ea
     status: unwritten
     description: >
-      9 boxes in the twin, and the single most important fact about them: THE PARTY IS ABSENT FOR
-      ALL NINE. Vanilla plays the incident itself — captors and victim — and the stakes go lethal
-      on the captors' own lips ("We've been ordered to execute you if you offer any resistance").
-      The victim is NATASHA, who is Basil's exact donor.
-      CORRECTED 2026-07-29: this slot previously said "Ravisin sets her guardians on them without
-      a word", which is both a rising (see 0x9BF) and the wrong shape — it makes the party the
-      target of a scene they are supposed to be eavesdropping on.
-      This is also where LOAD1 puts the second wave of the line force on the board (see 0x9BF).
+      9 boxes in the twin, where the party is ABSENT for all nine and the stakes turn lethal on
+      the captors' own lips. We diverge (see 0x9BF): our party is present and the stakes turn
+      lethal by being SHOWN, not reported — they came for one wounded animal and the hollow is
+      full of standing dead. This is where LOAD1 puts the second wave of the line force on the
+      board, so the count landing IS the beat.
+      Vanilla's victim here is NATASHA, who is Basil's donor — but Basil's own reveal is 0x9C2
+      and must stay a surprise, so he does NOT appear in this slot.
   - trigger: chapter_start
     slot: "vanilla 0x9C1"
     type: cutscene
