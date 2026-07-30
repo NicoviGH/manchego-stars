@@ -19,14 +19,29 @@ import re
 import sys
 import os
 
-DEC = 'fireemblem8u'
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import build_campaign as bc                                          # noqa: E402
+
+DEC = bc.DECOMP
+
+
+def _decomp_text(relpath):
+    """Vanilla (HEAD) text of a decomp file -- NEVER the working tree.
+
+    The build patches `texts/texts.txt` in place (it is the first entry in
+    `build_campaign.PATCHED_DECOMP_FILES`), so after any `make` the on-disk file holds OUR
+    injected campaign text under vanilla's own MSG ids. Reading it directly would make this
+    tool report our own lines back as the vanilla pacing benchmark -- the exact failure
+    `bc.vanilla_decomp_text` exists to prevent, and the one `difficulty.py` warns about beside
+    its own reads. A miner that under-reports is bad; one that reports our text as vanilla's
+    is worse, because it reads as independent evidence."""
+    return bc.vanilla_decomp_text(relpath)
 
 
 def load_messages():
-    """MSG id (int) -> raw body text."""
-    path = os.path.join(DEC, 'texts', 'texts.txt')
+    """MSG id (int) -> raw body text, from the decomp at HEAD."""
     out, cur, buf = {}, None, []
-    for line in open(path, encoding='utf-8', errors='replace'):
+    for line in _decomp_text('texts/texts.txt').splitlines(keepends=True):
         m = re.match(r'##\s*MSG_([0-9A-Fa-f]+)', line)
         if m:
             if cur is not None:
@@ -73,12 +88,15 @@ MSG_CALL = re.compile(r'TEXTSHOW\((0x[0-9A-Fa-f]+)\)'
                       r'|Text_BG\(\s*(\w+)\s*,\s*(0x[0-9A-Fa-f]+)\s*\)')
 
 
-def scene_text_ids(path, name_fragment=None):
+def scene_text_ids(path, name_fragment=None, src=None):
     """[(scene_name, [(msg_id, channel), ...])] in source order.
 
     channel is 'map' for an on-map TEXTSHOW, else the BG_* backdrop name.
+    `src` overrides reading `path` from disk -- main() passes the HEAD text, because
+    eventscript headers are patched in place by the build too (ch1/ch2/ch3/prologue are in
+    `PATCHED_DECOMP_FILES` today, and ch5's slot is where inject_ch04 hosts our Ch4).
     """
-    src = open(path, encoding='utf-8').read()
+    src = open(path, encoding='utf-8').read() if src is None else src
     out = []
     for m in re.finditer(r'CONST_DATA EventListScr (\w+)\[\] = \{(.*?)\n\};', src, re.S):
         name, body = m.group(1), m.group(2)
@@ -99,8 +117,9 @@ def main():
     ch = sys.argv[1] if len(sys.argv) > 1 else 'ch5'
     frag = sys.argv[2] if len(sys.argv) > 2 else None
     msgs = load_messages()
-    path = os.path.join(DEC, 'src', 'events', '%s-eventscript.h' % ch)
-    for name, ids in scene_text_ids(path, frag):
+    relpath = 'src/events/%s-eventscript.h' % ch
+    path = os.path.join(DEC, relpath)
+    for name, ids in scene_text_ids(path, frag, src=_decomp_text(relpath)):
         print('=' * 72)
         print(name, '  (%d message(s))' % len(ids))
         print('=' * 72)

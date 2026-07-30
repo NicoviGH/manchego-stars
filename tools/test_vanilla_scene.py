@@ -66,5 +66,45 @@ class VanillaSceneChannels(unittest.TestCase):
         self.assertEqual([m for m, _c in scenes['EventScr_089F2270']], [0x9CC])
 
 
+@unittest.skipUnless(os.path.isfile(CH5), 'fireemblem8u submodule not checked out')
+class MessageBodiesComeFromHead(unittest.TestCase):
+    """The bodies are read at HEAD, never from the working tree.
+
+    `texts/texts.txt` is the FIRST entry in `build_campaign.PATCHED_DECOMP_FILES` -- the build
+    rewrites it in place with OUR campaign text under vanilla's own MSG ids. A miner that
+    opened it directly would hand our own lines back as the vanilla pacing benchmark, which is
+    worse than under-reporting because it reads as independent evidence. Found reviewing
+    PR #196, where the tool shipped reading the working tree; these two tests are the guard.
+    """
+
+    def test_bodies_do_not_come_from_the_working_tree(self):
+        """Deterministic: make any working-tree read of texts.txt fail, and still succeed."""
+        import builtins
+        import vanilla_scene
+        real_open = builtins.open
+
+        def guarded(path, *a, **kw):
+            if 'texts.txt' in str(path):
+                raise AssertionError('load_messages() read the working tree, not HEAD')
+            return real_open(path, *a, **kw)
+
+        builtins.open = guarded
+        try:
+            msgs = vanilla_scene.load_messages()
+        finally:
+            builtins.open = real_open
+        self.assertGreater(len(msgs), 3000)
+
+    def test_the_body_it_returns_is_vanillas(self):
+        """MSG_9BB is vanilla's Joshua/Natasha meet-cute -- the slot ch05's 0x9BB replaces.
+
+        If this ever returns OUR text, the miner is reading a built tree.
+        """
+        import vanilla_scene
+        body = vanilla_scene.load_messages()[0x9BB]
+        self.assertIn('FID_Natasha', body)
+        self.assertNotIn('Sahnar', body)
+
+
 if __name__ == '__main__':
     unittest.main()
