@@ -1569,9 +1569,44 @@ _Decided: 2026-05-30_
 Armory = weapon shop. Vendor = item shop. FE8 world-map shop system preserved.
 _Decided: May 2026_
 
-**No arena**
-FE8's arena is removed. Wolfram's Forge fills the "spend gold to get stronger" role.
-_Decided: May 2026_
+**~~No arena~~ — SUPERSEDED 2026-07-29. The arena is KEPT, and it keeps its name.**
+Original decision (May 2026): "FE8's arena is removed. Wolfram's Forge fills the 'spend gold to
+get stronger' role." The role was identified correctly — the arena *is* spend-gold-to-get-stronger
+— but the **label was wrong, and the label did the damage.** Calling the replacement a *Forge*
+promises gear-smithing, which the arena mechanic cannot do (it wagers gold on single combat and
+pays double; it never touches equipment). Writing ch05 surfaced this: the seed scene had Wolfram
+offering to put an edge on the party's weapons, i.e. a mechanic we do not have and are not
+building.
+
+So: **FE8's arena stays, mechanically untouched, and stays called an arena in-game.** No new
+mechanic, no rename for the player to learn, and vanilla's own tutorial text becomes reusable
+nearly verbatim. What changes is only the fiction around it:
+
+- **ch05's tomb is an arena that a tomb was later built into — and this is CANON, not our
+  invention.** RotFM's Elven Tomb: *"An amphitheater was built for **Orem** to tell the other elves
+  of his ascension and return, and when he eventually died the place was refashioned into his
+  tomb."* Nicolas remembered this from the Sahnar research and was right; CLAUDE initially recorded
+  it as unevidenced after grepping the repo instead of actually verifying, which is not
+  verification. Our own map description had also arrived at the shape independently — "a snowy
+  sunken depression ringed by crystal pillars and statues… the moon dial sits at center" is
+  amphitheatre geometry. So the venue is canon and the geometry already matched it.
+  **Caveat, ours not canon's:** the amphitheatre was built for ORATORY — Orem addressing his
+  people — not for combat. Reading it as a training floor (blade-chips in the stone) is our layer
+  on top. Defensible for a people who escaped the giant empire of Ostoria and would drill, but it
+  is an extension, and Wolfram's lines should not assert combat as the venue's original purpose.
+- **Wolfram opens it, and ch05 is the ORIGIN, not the only instance.** He finds it by metal-sense —
+  the floor is full of blade-chips left by centuries of sparring — and gets it usable; afterwards
+  he can set one up wherever the party camps, so arenas recur as they do in vanilla. The entry fee
+  is his materials.
+- **He is the right owner** even though he is a smith: his established function is reading a place
+  by what he can sense (`0x9BE`), his bible has him never backing down from a fight, and he is the
+  one character whose flavor explains why a four-thousand-year-old anything can be made to work
+  again. Getting it running is his; what it does once running is vanilla's arena.
+- The permadeath stake finally has a reason rather than being an abstract bet: the niches still
+  hold the place's champions, and a unit that loses does not come back out.
+
+Wolfram had also gone under-used — this gives him an on-screen role the campaign was missing.
+_Decided: May 2026; superseded 2026-07-29 (Nicolas + CLAUDE, ch05 dialogue pass)._
 
 **Gold availability follows vanilla FE8 — no per-chapter clear bonus**
 FE8 grants gold only from in-map sources, never a flat "chapter cleared" stipend

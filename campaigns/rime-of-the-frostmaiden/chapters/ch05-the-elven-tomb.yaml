@@ -46,6 +46,15 @@ map:
     An open-air elven tomb — a snowy sunken depression ringed by crystal pillars and
     statues (cover/chokepoints), NOT a claustrophobic crypt. The moon dial sits at
     center, the gazebo brazier to one side, the sarcophagus on the eastern berm.
+    IT WAS AN AMPHITHEATRE FIRST — CANON, verified 2026-07-29. RotFM: the site was built
+    as an amphitheatre so Orem could tell the elves of his ascension, and was refashioned
+    into his tomb when he died (lore/sahnar.md §Source canon). Not invented to justify an
+    arena tile: the geometry above is already amphitheatre-shaped (a sunken bowl, rings of
+    pillars and statues, a dial at the focus), so our shape matched the canon before we
+    knew the canon. Wolfram finds it by metal-sense in 0x9BE; decisions.md §Economy carries
+    the full call. CAVEAT: canon's amphitheatre was for ORATORY, not combat — reading the
+    floor as a training ground is OUR layer, so Wolfram must not assert fighting as its
+    original purpose.
     Ravisin holds the central depression with the cornered white moose; risen elven
     tomb-guardians (spear-guards, axe-reavers) clog the approaches. Elven reliquary niches are
     spread to the map's edges (the reward-sites the eruption's dead race to desecrate). Open
@@ -433,10 +442,14 @@ events:
   # ── 0x9BA — RELOCATED into 0x9BE as the Wolfram/Forge seed (Nicolas, 2026-07-29) ──
   #  Vanilla's 3-box cold open is Joshua wanting two things (arena money, that cleric), both of
   #  which pay off later. We have NO arena -- settled, decisions.md §Economy May 2026, Wolfram's
-  #  Forge took its role -- so the slot is repurposed rather than dropped: WOLFRAM finds the
-  #  tomb's dead elven forge and offers to light it. Same job as the twin (a character states a
-  #  want out loud, and it pays off later), and it finally gives the Forge an on-screen origin
-  #  instead of a one-line ADR. It sits INSIDE 0x9BE because 0x9BE is already the scene where
+  #  Forge took its role -- EXCEPT that ADR is now superseded (decisions.md §Economy, 2026-07-29):
+  #  the arena is KEPT and keeps its name, because the "Forge" label promised gear-smithing the
+  #  arena cannot do. So the slot is repurposed rather than dropped: WOLFRAM finds, by metal-sense,
+  #  that this place was an ARENA before a tomb was built into it -- the floor is full of
+  #  blade-chips from centuries of sparring -- and offers to make it usable. Same job as the twin
+  #  (a character states a want out loud, and it pays off later); it gives the arena an on-screen
+  #  origin; and it gives Wolfram a role the campaign had left him out of.
+  #  It sits INSIDE 0x9BE because 0x9BE is already the scene where
   #  each character reads the place through their own lens -- Lupin the tracks, Marty the magic,
   #  Pinky the moose -- so Wolfram reading the METAL belongs in that sequence, not beside it.
   #  See 0x9BE's script and the FORGE TUTORIAL slot below.
@@ -610,10 +623,11 @@ events:
       # (0x9BA relocated here, 2026-07-29: Wolfram reads the place the way the others do -- by
       #  what he can sense. Senses FIRST, then names it (wolfram.md diction rule). This is the
       #  Forge's on-screen origin; the mechanics get taught separately, see the FORGE TUTORIAL.)
-      - wolfram: "...Hold on. *(sniffs)* Charcoal. Slag."
-      - wolfram: "There's a forge down there. Elven. Cold about four thousand years."
-      - wolfram: "Give me a fire and a night. I'll put an edge on everything you own."
-      - wolfram: "...And there's floor enough to swing it. Come find me if you want the practice."
+      - wolfram: "...Hold on. *(sniffs)* Iron. Bronze. Something older I can't name."
+      - wolfram: "It's in the stone. Chips of blade-metal. Thousands of them."
+      - wolfram: "They fought here for years to leave that much behind."
+      # (He names the mechanic in-world. NO gear promise -- the arena does not touch equipment.)
+      - wolfram: "...It's an arena. Give me a night, I'll have it fit to use."
       - marty: "...This magic is familiar..."               # trails off — the hook, never explained here
       - pinky: "Father, I see it! The moose--in the hollow."
       - pinky: "...It's not running. Why isn't it running?!"
@@ -745,8 +759,10 @@ events:
     type: tutorial
     status: unwritten
     description: >
-      The Forge is the ARENA under the hood (Nicolas, 2026-07-29), and vanilla teaches the arena
-      in THIS chapter, so tutorial parity is owed here and not deferred. The twin is a flag-gated
+      It IS the arena and it KEEPS THE NAME (decisions.md §Economy, superseded 2026-07-29), so
+      vanilla's own tutorial text is reusable nearly verbatim -- the player learns one word, the
+      word the game already uses. Vanilla teaches the arena in THIS chapter, so tutorial parity is
+      owed here and not deferred. The twin is a flag-gated
       pair: 0x9D5 is one box naming the thing ("There's an [red]arena[/red] here."), 0x9D6 is five
       boxes of pure mechanics — one-on-one matches, win pays TWICE the entry fee, a loss means
       that unit "will not be able to fight in any future battles", and press B quickly to concede
@@ -758,8 +774,11 @@ events:
       numbers; splitting them is what keeps his voice from turning into a rules manual.
       OWED WHEN WRITTEN: an `introduces:` entry for the forge/wager mechanic + rerun
       `gen_onboarding_index.py` (the concept debuts once, and `test_onboarding.py` gates it).
-      OPEN: whether the Forge also does gear upgrades, which the vanilla arena does NOT do. If it
-      does, that half has no vanilla twin to mine and needs its own teaching beat.
+      RESOLVED 2026-07-29: no gear upgrades. That was the "Forge" label leaking a mechanic we do
+      not have; Wolfram's 0x9BE lines promise practice and nothing else.
+      FLAVOR HOOK available in the tutorial box: the niches still hold this place's champions, so
+      the unit fights one of them. That is why a loss is permanent -- vanilla's abstract wager gets
+      a reason without changing a single rule.
   - trigger: eruption_turn        # scripted turn (~2/3/5, the Ch5 wave cadence) — EARTHQUAKE/TILECHANGE
     slot: "vanilla 0x9C5"
     type: scripted_event

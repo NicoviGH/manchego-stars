@@ -12,10 +12,27 @@
 ## Concept
 
 An **elven royal** from a people so old the Rime is younger than her tomb — a princess and a
-duelist, laid to rest here an age ago and bound as the tomb's guardian. The horror of her is
+duelist, laid to rest here an age ago and set as the tomb's guardian. The horror of her is
 this: she was **not asleep.** She has been **awake and aware for millennia** — conscious,
 alone, in the dark, the whole time — and she frames that unimaginable ordeal flatly, as the
 **purpose the gods set her.** She endured it. That endurance is the whole of her.
+
+**Source canon (RotFM, verified 2026-07-29 — recorded here because it kept getting re-derived
+from memory and once got mis-called as unevidenced):**
+- She is the **twin sister of Orem**, a great chieftain, who is the one actually buried in the
+  tomb proper. Her charge is **her brother's** resting place.
+- Their people are **snow elves** who had been **slaves of the giant empire of Ostoria** and
+  escaped, settling where the Ten-Towns would later stand.
+- Orem was elevated: the elf god **Corellon Larethian** took him to **Arvandor**, the elven divine
+  realm. The site was built as an **amphitheatre so Orem could tell the elves of his ascension and
+  return**, and was **refashioned into his tomb when he died.** So: the venue was an arena first
+  and a tomb second — which is why our arena belongs here (decisions.md §Economy).
+- This is what grounds her purpose being **GIVEN, never chosen** — a god took her brother, and she
+  was set to keep what he left. Do not write her as having volunteered; it turns her into a martyr
+  and it is not what happened.
+- **Off-page on purpose:** Orem, Ostoria, Corellon and Arvandor are all NAME-DROPS our story never
+  pays off, so they stay out of her dialogue (Nicolas, cutting them from 9C3 drafts). They are here
+  to keep her motive straight for the writer, not to be spoken.
 
 Ravisin doesn't puppet her — she WAKES her and lets her draw the wrong conclusion, which is
 worse: Sahnar spends herself on the wrong enemy of her own free will. What turns her is
