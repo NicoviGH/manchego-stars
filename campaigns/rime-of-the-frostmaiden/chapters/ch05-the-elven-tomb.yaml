@@ -119,6 +119,18 @@ difficulty_note: >
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
+  prep_screen: true            # STANDING PROTOCOL since ch01, not a per-chapter call and NOT a
+                               # divergence: decisions.md "How the deploy cap + prep screen are
+                               # actually wired" (2026-06-10) -- "the cap is the parity; Pick Units
+                               # only chooses which PCs fill it". Vanilla Ch5 has no PREP macro and
+                               # force-deploys its nine; we field the same NINE and let the player
+                               # pick them. Mechanism: CALL(EventScr_08591FD8) (the shared
+                               # CLEAN/PREP/CLEAN script) at the end of the beginning scene; the cap
+                               # is the ally UnitDefinition table's entry count.
+                               # Do NOT consult `hasPrepScreen` in chapter_settings.json to answer
+                               # this -- that field is DEAD (FE7 leftover, chapterdata.h:37) and
+                               # reads false for every chapter, including ones that plainly have
+                               # prep. It is registered in check.py DEAD_CONCEPTS for that reason.
   deploy_limit: 9              # = vanilla FE8 Ch5's 9 player slots (fe8-pacing-reference.md §1b,
                                # decomp-verified). A DIFFICULTY lever, not a map count — the field
                                # size is set by parity, and the map is painted to provide 9 start
@@ -639,46 +651,21 @@ events:
       - marty: "...This magic is familiar..."               # trails off — the hook, never explained here
       - pinky: "Father, I see it! The moose--in the hollow."
       - pinky: "...It's not running. Why isn't it running?!"
-  # ── 9BF — the party NOTICES the commotion ─────────────────────────────────────
-  - trigger: chapter_start
-    slot: "vanilla 0x9BF"
-    type: cutscene
-    ea_file: events/ch05-opening.ea
-    status: unwritten
-    description: >
-      DELIBERATE DIVERGENCE from the twin (Nicolas, 2026-07-29). Vanilla's 0x9BF/0x9C0 are the
-      party OVERHEARING an incident and deciding to investigate — soldiers hauling Natasha off —
-      and that machinery exists to MANUFACTURE A MOTIVE: Eirika's people are travellers passing
-      through Serafew with no reason to fight anyone, so the stumble IS the motivation engine.
-      We do not need it. Our party has tracked the moose since ch04 and arrives on purpose; 0x9BE
-      already ends with Pinky looking straight at the quarry. Copying the stumble would convert a
-      deliberate hunt into an accident.
-      It would also have damaged a LOCKED scene: Basil's 0x9C2 opener is "Oh! Tourists. In the
-      tomb. ...We don't get many." That only works if the party has never laid eyes on him. Nine
-      boxes of watching him get bullied first would turn a surprise into surveillance and kill the
-      obliviousness the joke runs on.
-      WHAT THE SLOT STILL OWES IS MECHANICAL. This is where vanilla runs LOAD1 to walk Saar's
-      command onto the board (then nine more after 0x9C0), with the boxes PACED to units
-      appearing. That job does not go away — our guardians have to be staged too, and they are
-      ALREADY STANDING when the party arrives (nothing rises before the eruption; see 0x9C5).
-      So: the party goes DOWN, on purpose, and the descent is what reveals the hollow's tenants.
-      7 boxes in the twin. Picks up Pinky's unanswered "why isn't it running?!" from 0x9BE.
-      RAVISIN IS SEEN AND NOT HEARD here and through 0x9C0 — 0x9C2 stages her as "a silent
-      frost-robed figure at centre" and the eruption is built on that silence breaking. Her not
-      answering is the point; it makes 0x9C1's two questions land on a figure who won't reply.
-  - trigger: chapter_start
-    slot: "vanilla 0x9C0"
-    type: cutscene
-    ea_file: events/ch05-opening.ea
-    status: unwritten
-    description: >
-      9 boxes in the twin, where the party is ABSENT for all nine and the stakes turn lethal on
-      the captors' own lips. We diverge (see 0x9BF): our party is present and the stakes turn
-      lethal by being SHOWN, not reported — they came for one wounded animal and the hollow is
-      full of standing dead. This is where LOAD1 puts the second wave of the line force on the
-      board, so the count landing IS the beat.
-      Vanilla's victim here is NATASHA, who is Basil's donor — but Basil's own reveal is 0x9C2
-      and must stay a surprise, so he does NOT appear in this slot.
+  # ── 0x9BF + 0x9C0 — CUT 2026-07-29 (Nicolas). 16 boxes buying nothing. ────────
+  #  Vanilla's pair is the party OVERHEARING an incident and deciding to investigate. Its three
+  #  jobs, and why each is already done or unavailable here:
+  #    (1) introduce the recruit-to-be by showing her in danger -> Basil introduces HIMSELF in
+  #        0x9C2, which is better; watching him bullied first would turn "Oh! Tourists. ...We
+  #        don't get many." from a surprise into surveillance and kill the joke;
+  #    (2) establish the enemy as lethal in their own words -> we came here to fight, so there is
+  #        nothing to establish;
+  #    (3) hand the party a moral reason to join a war that is not theirs -> ours have tracked the
+  #        moose since ch04 and arrive on purpose. Vanilla needed the stumble as a MOTIVATION
+  #        ENGINE (Eirika's people are travellers with no cause); borrowing it would convert a
+  #        deliberate hunt into an accident.
+  #  The slots' only other job was mechanical -- LOAD1 staging the guardians -- and staging needs
+  #  no dialogue. 0x9C1 SURVIVES the cut (2 boxes): without it nobody in the party ever
+  #  acknowledges sixteen standing dead while the player is looking right at them.
   - trigger: chapter_start
     slot: "vanilla 0x9C1"
     type: cutscene

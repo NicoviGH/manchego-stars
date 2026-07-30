@@ -56,6 +56,12 @@ DEAD_CONCEPTS = [
     # can't creep back into his character. Marty's voice is lore/marty.md Voice, full stop.
     r'spore covenant', r'composter vs\.? the taxidermist',
     r'two necromancers, opposite covenants',
+    # NOT registered here: `hasPrepScreen`. It IS a dead field (FE7 leftover, chapterdata.h:37 --
+    # false for every chapter, including ones that plainly have prep) and citing it as evidence is
+    # exactly the mistake that produced a bogus "our prep is a divergence" claim on 2026-07-29.
+    # But `build_campaign.py` already documents it as dead in the docstring a reader would hit
+    # first, and DEAD_CONCEPTS would flag that warning too -- a guard that rejects its own warning
+    # is worse than none. The durable fix is a pointer in CLAUDE.md's Source-of-Truth table.
 ]
 
 # Hand-written source whose comments carry doctrine -- the same drift surface as
