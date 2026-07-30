@@ -375,6 +375,9 @@ events:
           ...Everything she wakes comes home to her, eventually.
     no_lupin_fallback:            # DRAFT 2026-07-30 (Nicolas) — the locked script above is unchanged
       boxes: [1, 3]               #   and still plays whenever the parley HAPPENED.
+      replaces:                   # anchored to the text, so an index cannot silently drift
+        - "Your ghost left a trail after all."
+        - "There. Old elf-stones — and the bone-trees just past."
       reason: >-
         Lupin's recruit is gated on this chapter's own `parley: by: marty`, and the difficulty
         model explicitly prices a no-parley path ("the raw, no-parley fight sits ABOVE vanilla") —
