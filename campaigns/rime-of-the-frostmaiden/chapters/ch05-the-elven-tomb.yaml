@@ -19,6 +19,14 @@ fe8_base_map: "FE8 Ch5 — The Empire's Reach"        # retiled: Ch5's spread fi
 parity_reference: "FE8 Ch5"   # #48 enemy-pressure + reward parity bar — The Empire's Reach (1:1)
                               # (first chapter at the FE8-Ch5 reward tier: stat-boosters + a promotion item unlock here)
 
+introduces:
+  - concept: arena-wager         # the arena mechanic — DEBUT (decisions.md §Economy, superseded
+                                 # 2026-07-29: the arena is KEPT and keeps its name; Wolfram opens it)
+    coverage: both               # tutorial boxes for the rules + Wolfram's 0x9BE seed for the fiction
+    where: "Wolfram finds the buried arena in 0x9BE and offers to make it usable; the flag-gated
+      tutorial (0x9D5 + 0x9D6, vanilla verbatim) fires when a unit visits the arena tile"
+    status: active
+
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
   The white moose's trail ends at an ancient elven tomb — the refuge of Ravisin, an
@@ -772,7 +780,6 @@ events:
   - trigger: forge_tile_visited   # flag-gated, like vanilla's own arena tutorial
     slot: "vanilla 0x9D5 + 0x9D6"
     type: tutorial
-    status: unwritten
     description: >
       It IS the arena and it KEEPS THE NAME (decisions.md §Economy, superseded 2026-07-29), so
       vanilla's own tutorial text is reusable nearly verbatim -- the player learns one word, the
@@ -791,9 +798,30 @@ events:
       `gen_onboarding_index.py` (the concept debuts once, and `test_onboarding.py` gates it).
       RESOLVED 2026-07-29: no gear upgrades. That was the "Forge" label leaking a mechanic we do
       not have; Wolfram's 0x9BE lines promise practice and nothing else.
-      FLAVOR HOOK available in the tutorial box: the niches still hold this place's champions, so
-      the unit fights one of them. That is why a loss is permanent -- vanilla's abstract wager gets
-      a reason without changing a single rule.
+      TEXT = VANILLA'S, VERBATIM, and that is the finding rather than a shortcut. Because we kept
+      the arena's mechanic AND its name, there is nothing left to reflavour: every clause is a rule
+      (fee, doubling, permanent loss, the B-button concede) and rules are identical. Rewriting them
+      could only introduce drift. The tutorial voice is the GAME's, not a character's — unattributed
+      and red-highlighted — so it also carries no campaign flavour to update. The one thing we owe
+      is that it fires on OUR arena tile, which Wolfram opened in 0x9BE.
+      Deliberately NOT added: a flavour clause about the niches holding this place's champions. It
+      would explain why a loss is permanent, but vanilla's tutorial boxes carry zero fiction and
+      mixing the two is how a rules box stops reading as authoritative. If that fiction is wanted
+      it belongs in Wolfram's mouth, not here.
+      Note vanilla puts the ESCAPE HATCH in the tutorial rather than in the fiction — a player who
+      reads this knows how to bail. Keep that; it is the most player-respecting box of the five.
+      LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 6 boxes (1 + 5), = the twin.
+    script:                           # LOCKED 2026-07-29 -- vanilla MSG_9D5 + MSG_9D6, verbatim.
+      # (Unattributed tutorial voice, not a character. [ToggleRed] marks the highlighted terms in
+      #  vanilla; the markup is a text-insertion detail, ROM-gated.)
+      # -- MSG_9D5, 1 box: name the thing.
+      - tutorial: "There's an [red]arena[/red] here."
+      # -- MSG_9D6, 5 boxes: the rules, one per A-press.
+      - tutorial: "Arenas play host to [red]one-on-one combat matches[/red]."
+      - tutorial: "If you win a match, you'll earn [red]twice the amount of the entry fee[/red]."
+      - tutorial: "If you lose, however, that unit [red]will not be able to fight in any future battles[/red]."
+      - tutorial: "If your HP drops near zero in a fight, [red]press the B Button quickly[/red] to concede."
+      - tutorial: "You'll lose your entry fee, but you'll save your unit to fight again."
   - trigger: eruption_turn        # scripted turn (~2/3/5, the Ch5 wave cadence) — EARTHQUAKE/TILECHANGE
     slot: "vanilla 0x9C5"
     type: scripted_event

@@ -154,3 +154,15 @@ concepts:
     vanilla_when: "Once supports are unlocked"
     vanilla_text: "(support conversations grant combat bonuses to nearby paired units)"
     citation: "decomp sweep TBD"
+
+  - id: arena-wager
+    concept: "Arena: wager gold on one-on-one combat; win doubles the fee, a loss is permanent"
+    vanilla_channel: tutorial
+    vanilla_when: "FE8 Ch5 — the arena tutorial fires on the arena tile (flag-gated)"
+    vanilla_text: "There's an arena here. / Arenas play host to one-on-one combat matches. If you
+      win a match, you'll earn twice the amount of the entry fee. If you lose, however, that unit
+      will not be able to fight in any future battles. If your HP drops near zero in a fight, press
+      the B Button quickly to concede. You'll lose your entry fee, but you'll save your unit to
+      fight again."
+    citation: "MSG_9D5 (1 box) + MSG_9D6 (5 boxes), EventScr_089F23B4 in ch5-eventscript.h"
+
