@@ -795,6 +795,12 @@ events:
       and here she stops doing so.
       Hence the opening box: the summoning has to read as a RESPONSE, not a schedule. Without it
       the beat plays as a timed event and the player never learns their own pressure caused it.
+      Nicolas's revision 2026-07-29 does that better than CLAUDE's draft did, three ways: she
+      CREDITS SEPHEK by name, so 9BC's warning pays off out of the mouth of the person who
+      brushed it aside; "the dead will rise to meet them" is a commander's order rather than the
+      liturgy of "the Frostmaiden has need of you" (she is named plenty elsewhere and does not
+      need a third mention); and "the BLADE under the stone" keeps Sahnar as inventory, echoing
+      9BD where Ravisin appraises her as exactly that.
       TWIN = EventScr_089F22A4, 3 boxes, and its structural rule is that the ARRIVING FORCE
       speaks while the party never reacts (vanilla gives Eirika and Seth no lines). Both twins
       agree the SPECTACLE lives in the event macros, never in the prose.
@@ -805,11 +811,13 @@ events:
     script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
       # (EARTHQUAKE_START + sequential TILECHANGE; the floor breaks and more dead come up.
       #  Then LOAD1 — the sarcophagus cracks.)
-      # (The response beat: her own line force is losing.)
-      - ravisin: "...They've come further than I allowed for."
-      - ravisin: "Rise. The Frostmaiden has need of you."
-      # (9BC callback: Sephek's exact words, spent.)
-      - ravisin: "...And the one under the stone. Her too."
+      # (The response beat: her line force is losing, and she says WHOSE warning was right --
+      #  9BC's briefing pays off by name, from the mouth of the person who dismissed it.)
+      - ravisin: "Sephek was right. ...They've come further than I expected."
+      - ravisin: "No matter. The dead will rise to meet them."
+      # (9BC callback: "the warrior... the one under the stone", now spent. "BLADE" not "one" --
+      #  she appraised Sahnar as a blade in 9BD and still thinks of her as inventory.)
+      - ravisin: "...And the blade under the stone. Her too."
       - sahnar: "The tomb is closed. Turn back."
   - trigger: sahnar_talk          # Basil (Natasha-donor) Talks the risen Sahnar (Joshua-donor)
     slot: "vanilla 0x9CC"          # the Talk recruit. Was mislabelled "9C6" until 2026-07-29;
