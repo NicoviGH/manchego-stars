@@ -625,14 +625,17 @@ events:
       # (0x9BA relocated here, 2026-07-29: Wolfram reads the place the way the others do -- by
       #  what he can sense. Senses FIRST, then names it (wolfram.md diction rule). This is the
       #  Forge's on-screen origin; the mechanics get taught separately, see the FORGE TUTORIAL.)
-      # (Senses first, then the name (wolfram.md). He deduces ONLY what the metal supports:
-      #  chips struck off edges means blades met here. He does not know who, or why, or that
-      #  anyone trained -- "this was an arena" is his INFERENCE, not the narrator's fact.)
+      # (Senses first, then the name (wolfram.md). He deduces ONLY from the metal, and never
+      #  claims a who or a when. "TRAINING arena" is a read a metallurgist can actually make
+      #  from the WEAR PATTERN: a battle leaves bodies and broken weapons, while thousands of
+      #  small chips spread evenly through a floor means repeated, sustained, non-lethal
+      #  contact. It is still his inference, not the narrator's fact -- canon built this place
+      #  for oratory (lore/sahnar.md §Source canon) and he is a smith, not a historian.)
       - wolfram: "...Hold on. *(sniffs)* Iron. Bronze. Something older I can't name."
       - wolfram: "It's in the stone. Chips of it all through the floor. Blade metal."
       - wolfram: "Struck off edges. There was fighting here -- a great deal of it."
       # (He names the mechanic in-world. NO gear promise -- the arena does not touch equipment.)
-      - wolfram: "...This was an arena. Give me a night, I'll have it fit to use."
+      - wolfram: "...This was a training arena. I can get it up and running."
       - marty: "...This magic is familiar..."               # trails off — the hook, never explained here
       - pinky: "Father, I see it! The moose--in the hollow."
       - pinky: "...It's not running. Why isn't it running?!"
