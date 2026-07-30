@@ -23,8 +23,31 @@ beats → lines, human curates every level). Decided 2026-06-09 (docs/decisions.
    pacing claims. Minor NPCs never get a full bible.
 3. **Beat outline:** the chapter YAML `events:` descriptions. If beats aren't settled,
    settle them with Nicolas before drafting any line.
-4. **Vanilla pacing benchmark** for the slot being written (decomp,
-   `fireemblem8u/src/events/*-eventscript.h` + `texts/texts.txt`).
+4. **Vanilla pacing benchmark** for the slot being written — run
+   **`python3 tools/vanilla_scene.py <ch> [SceneFragment]`** to print the twin's scenes as
+   boxed dialogue with box counts (decomp `src/events/*-eventscript.h` + `texts/texts.txt`).
+   **A chapter's messages live in TWO places and TWO channels — check both, or you will
+   conclude vanilla lacks a beat it has:**
+   - `*-eventscript.h` carries the scenes, in **two channels**: `TEXTSHOW` (on-map, units
+     staged by `LOAD1`, bubbles wrap at **29** chars) and `Text_BG(BG_*, id)` (a still
+     backdrop, wraps **~42**). The channel sets the width you hand-box to, and vanilla uses
+     the backdrop for scenes that happen ELSEWHERE (Ch5's Grado command scenes) — so it also
+     tells you where a scene is set. `vanilla_scene.py` prints id + channel per message
+     (regression-guarded by `tools/test_vanilla_scene.py`; it once matched `TEXTSHOW` only
+     and hid Ch5's two backdrop scenes, under-reporting an 11-message opening as 8).
+   - `data_battlequotes.c` carries the **boss taunt, boss death quote, and any
+     chapter-specific unit death quote** — these are NOT in the eventscript at all. Ch5's
+     `0x9C6`/`0x9C7`/`0x9C8` live here, and `0x9C6` is the ESCORT's death quote, which is
+     easy to mistake for a scene id. Grep both files before claiming an id is unused.
+   - **If a mined beat looks absent, suspect the miner before concluding vanilla lacks it.**
+   Measured budgets + where our chapters sit: **`references/scene-pacing.md`**. Headline:
+   vanilla spends **45–100 boxes** on an opening/ending cutscene but keeps a **mid-battle
+   escalation to ~3 boxes** — story goes in the bookend scenes, in-map beats are a punch.
+   **Writing a VILLAIN? Read `references/fe8-register.md` first** — the FE8 script's own
+   villain habits distilled from that corpus (direct address + insult-names, relish, dark
+   irony, theatrical announcement, `...` pacing) with verbatim calibration quotes and an
+   archetype table to check a new villain against so ours don't converge. Ground the voice
+   in what the game shipped; don't invent a register.
 5. **Onboarding catalog + coverage:** `docs/ONBOARDING.md` (generated) +
    `campaigns/.../onboarding-catalog.yaml` (what vanilla teaches, the channel, the decomp
    citation) and the prior chapters' `introduces:` ledger — for the tutorial-parity check below.
@@ -50,20 +73,59 @@ silently strip it. So, before locking beats:
 
 ## Drafting loop (per beat, WITH Nicolas — never solo)
 
+0. **MANDATORY FIRST — mine the corpus, then write. Never draft from instinct.**
+   Read **`references/natural-speech.md`** and do its Step 0: find the vanilla scene that
+   already solves this scene's problem (`python3 tools/vanilla_scene.py <ch> [Fragment]`), and
+   for a two-hander find the *relationship* twin among FE8's ~217 two-character scenes — the
+   supports. ch05's 9BB burned a dozen drafts writing from instinct; two Ewan/Saleh supports
+   fixed it in one pass. Skipping this step is what produces stilted dialogue, every time.
 1. Bring **2–3 variant lines** per beat. Label what each variant trades off
    (e.g. "menace vs. brevity"). Nicolas picks or mixes; he owns voice.
-2. Stay inside the budget: boss taunt ≤ 4 lines / 1 screen; opening exchange ≤ ~8
-   boxes; ending beat ≤ ~10 lines; narration card 2–5 lines ≤ ~25 words; quote msgs
-   1–2 lines. Cut before adding.
+2. **Draft BOXED, never as prose** (2026-07-23 learning — prose-length lines read as
+   wordy and hide the real A-press pacing). Write every line as GBA boxes from the first
+   pass: **2 lines per box, ~29–30 chars/line** (on-map bubbles wrap at 29; cutscene
+   Text_BG ~42), `...` holds, `--` interrupts, one A-press per box — and show it *boxed*
+   to Nicolas, not as paragraphs. Stay inside the budget: boss taunt ≤ 4 lines / 1 screen;
+   opening exchange ≤ ~8 boxes; ending beat ≤ ~10 lines; narration card 2–5 lines ≤ ~25
+   words; quote msgs 1–2 lines. Cut before adding.
 3. Check every line against the speaker's banned list and calibration samples.
 4. Lock a beat before moving to the next; record locked text in the chapter YAML
-   (or issue #43 for montage slots that lack wiring).
+   (or issue #43 for montage slots that lack wiring). **Then update the chapter's GitHub
+   tracker in the same breath** — the issue comment that lists which beats are written and
+   what's next, plus the PR description if it has drifted. Do not wait to be asked: a stale
+   tracker is how the handoff gets heavy and how Nicolas loses sight of what's in flight.
 
 ## Craft check (run on every draft AND every review pass)
 
 Compliance isn't quality — a line can pass every budget and banned list and still be
 flat. Judge the writing itself, and grade honestly: "functional" is a finding, not a
-pass. Checks, in order of weight:
+pass.
+
+**Hard rule — NO CONTRASTING CLICHÉS (2026-07-23, Nicolas).** Never build a line on the
+"not [X], but [Y]" / "not just [X], rather [Y]" formula, a false dichotomy, or a then/now
+antithesis; never define something by first saying what it is *not*. **State what IS,
+directly.** Offenders that got cut from ch05: *"That's not life. It's fever."* · *"I don't
+kill. I cleanse."* · *"You grew things once… now nothing grows."* · *"They feed me. You never
+did."* This is a TIC, not a style — once it's in your ear every character starts sounding
+identical, and it was the single biggest cause of flat ch05 dialogue. **But do not
+over-correct into flat declaratives either:** a scene of same-temperature statements reads as
+monotone (a calm-Ravisin pass was rejected as "where did all the interesting go"). Vary
+rhythm and heat; let lines surprise.
+
+**Epigram disease (2026-07-23 — the single most common failure).** If every line is a polished
+artifact that lands one beat and hands off, the scene reads as poetry, not talk. **Vanilla is
+redundant and inefficient and that is why it sounds human** — characters apologise twice, say
+the same thing four ways, interrupt themselves. Turns are LOPSIDED (two words answered by
+forty), the eager character RUNS ON, and feelings are stated PLAINLY rather than buried in
+subtext. Full diagnosis + the corpus-mining method: **`references/natural-speech.md`**.
+
+**The master test (2026-07-23 learning — this is what fixed "dry"): people talking, not
+mood-narration.** A line that *describes the atmosphere* ("she wakes the sad things,"
+"nothing walks back out") is dead, however evocative. Every box is a PERSON — reacting,
+joking, needling, asking — never the scene narrating itself. The dread rides in on a
+concrete, in-character line (Basil *cheerfully*: "She sings to the dead ones. …I grow her
+berries."), not portentous grimdark. If a line could be a stage direction, cut it. Then the
+finer checks, in order of weight:
 
 1. **Cover-the-name test** — could only THIS speaker say it this way? A line any
    soldier/narrator could deliver is a flag, even if it breaks no rule.

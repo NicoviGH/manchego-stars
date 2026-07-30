@@ -43,7 +43,45 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   git hook resolves against the outer repo unless you strip `GIT_*`** (this bit us — flipped `core.bare`
   and wrote a corrupt commit; fixed in `_vanilla_decomp_text` + the map-tileset test fixture).
 
-## NEXT SESSION — start here: finish the ch04 slice (`feat/24-ch04-map`)
+## This session (2026-07-22→30, Opus — ch05 dialogue COMPLETE; ROM-free web sessions)
+
+**All ch05 detail lives on issue #25** (the live tracker comment) and in the chapter YAML.
+Settled decisions are in `docs/decisions.md`; craft/mining rules are in the `dialogue-pass`
+skill; voice rules are in the bibles. Live state only, below.
+
+- **Environment:** Linux web container. The base ROM lives on Nicolas's Mac and isn't committed, so ROM
+  builds / `verify_text` / mGBA playtests are OFF the table. `make difficulty` IS ROM-free. One-time
+  container setup: `pip install pillow pyyaml numpy`; `git submodule update --init --depth 1 fireemblem8u`.
+- **Work is on `feat/25-ch05-content`, draft PR #196.** ch05 roster CLOSED (rev.3, PARITY).
+  **Dialogue: all 15 slots written, 125 boxes — 13 LOCKED, 2 in DRAFT.** The two ending
+  branches (`0x9C9`, `0x9CA`) carry Nicolas's three corrections but are **awaiting his red-pen**;
+  their text lives under `draft_script:`, not `script:`.
+- **Orphaned remote branch `claude/mobile-app-token-context-u2psep` still needs deleting from the
+  GitHub UI** — the proxy 403s on ref-delete. (Nicolas's chore; nothing depends on it.)
+
+## NEXT SESSION — red-pen the two endings, then ch05 is ROM-GATED (Nicolas's Mac)
+
+**FIRST, and it is ROM-free:** `0x9C9` and `0x9CA` are DRAFTS awaiting Nicolas. Read them out to
+him, take the red-pen, then move each `draft_script:` → `script:` with a `LOCKED <date>` stamp.
+Do not lock them on your own initiative — that already happened once and was reverted.
+
+Everything after that needs the base ROM, so it cannot start in a web container:
+
+1. **Text insertion** — `script:` blocks → `texts/texts.txt` via `set_message_body`; msg ids read
+   from the decomp, never hardcoded. Odd-length strings pad with `[.]`. Then `make` green +
+   `python3 tools/verify_text.py` (0 runaway).
+2. **Map + placement** (tier 2) → **spatial check** (tier 3) → **`--ch05-boot` playtest** (tier 4)
+   → Lock. `status: planned` keeps ch05 exempt from the parity CI gate until then.
+3. **`enemy_class_reskins` wiring + FE-Repo imports** (the art track), and Basil/Sahnar
+   STAT_DONORs.
+4. **Two wiring notes the dialogue leaves owed:** the arena tile must exist for the
+   `forge_tile_visited` tutorial to fire, and **0x9C9's berry exchange needs a skip** for players
+   who never recruited Sahnar (boxes 6–11).
+
+**If picking up ROM-free work instead:** the ch04 slice (`feat/24-ch04-map`) still needs its wolf
+parley + Marty-Talk teaching and an authored ending — see PARALLEL THREAD below.
+
+## PARALLEL THREAD (ROM-gated, Nicolas's Mac): finish the ch04 slice (`feat/24-ch04-map`)
 
 The combat slice is hosted and builds; it is **not** a complete chapter. To finish and PR-merge #24:
 
@@ -77,8 +115,12 @@ make difficulty CH=ch04
 # ch04 fast-boot playtest build (New Game -> White Moose forest, party + foes deployed)
 make CAMPAIGN=rime-of-the-frostmaiden CH04BOOT=1 fireemblem8.gba -j$(nproc)
 
-# Required before claiming a change is finished
-python3 -m unittest tools.test_build_campaign tools.test_difficulty
+# Required before claiming a change is finished (468 tests; `tools/` isn't a package,
+# so unittest discover can't find them -- expand the glob)
+python3 -m unittest $(ls tools/test_*.py | sed 's|/|.|;s|\.py||' | tr '\n' ' ')
 make check
 git diff --check
+# A test/build run dirties the fireemblem8u submodule with INJECTED artifacts
+# (e.g. engine_hooks' MSChargeFlashArm decl). Restore, never commit:
+git -C fireemblem8u status --short   # then: git -C fireemblem8u restore <files>
 ```

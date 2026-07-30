@@ -20,6 +20,11 @@ grounding. Per-town quest NPCs are pulled to canon **when we stage that chapter*
    (~30 chars/visual line to fit the box), `...` holds, `--` interrupts, dry fragments, a beat
    before the punch. Model line (our Hlin): *"No blood, either. Shards and frost. That's all
    he left."*
+   → For **villains**, the corpus register is distilled in
+   [`.claude/skills/dialogue-pass/references/fe8-register.md`](../../../.claude/skills/dialogue-pass/references/fe8-register.md):
+   direct address + insult-names, relish, dark irony ("You'll thank me later"), theatrical
+   announcement — plus verbatim calibration quotes and an archetype table to check a new
+   villain against so ours don't collide.
 2. **Frostmaiden voice (the content).** Each NPC's canon diction, below. The book's read-aloud
    text sets the *narration/atmosphere* register; the appendix stat blocks
    (personality/ideal/bond/flaw) set *character*.

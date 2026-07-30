@@ -51,6 +51,17 @@ DEAD_CONCEPTS = [
     r'clone_into',                     # #65 clone-class approach -> per-character _u25
     r'tileset_stem\s*=',               # _register_chapter_map reads the layout's stamp
     r'BATTLE_FOLLOWUP_THRESHOLD',      # misnomer; real: BATTLE_FOLLOWUP_SPEED_THRESHOLD
+    # Marty's "spore covenant" (2026-07-29): a ch05 villain-foil thread we drifted away
+    # from while writing the chapter and never actually used in a beat. Retired so it
+    # can't creep back into his character. Marty's voice is lore/marty.md Voice, full stop.
+    r'spore covenant', r'composter vs\.? the taxidermist',
+    r'two necromancers, opposite covenants',
+    # NOT registered here: `hasPrepScreen`. It IS a dead field (FE7 leftover, chapterdata.h:37 --
+    # false for every chapter, including ones that plainly have prep) and citing it as evidence is
+    # exactly the mistake that produced a bogus "our prep is a divergence" claim on 2026-07-29.
+    # But `build_campaign.py` already documents it as dead in the docstring a reader would hit
+    # first, and DEAD_CONCEPTS would flag that warning too -- a guard that rejects its own warning
+    # is worse than none. The durable fix is a pointer in CLAUDE.md's Source-of-Truth table.
 ]
 
 # Hand-written source whose comments carry doctrine -- the same drift surface as
