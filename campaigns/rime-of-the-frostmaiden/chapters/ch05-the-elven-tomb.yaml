@@ -402,9 +402,9 @@ enemy_units:
 #   0x9BC (17)     Text_BG   boss gets ORDERS from a superior    Sephek Kaltro → Ravisin
 #   0x9BD ( 7)     Text_BG   subordinate shows DOUBT             Ravisin appraises the blade
 #   0x9BE (19)     on-map    party ARRIVES; the PLACE            the ridge + the tomb seen
-#   0x9BF ( 7)     on-map    thread ends; party OVERHEARS        the hollow starts moving
-#   0x9C0 ( 9)     on-map    stakes turn LETHAL, party ABSENT    (see slot -- open question)
-#   0x9C1 ( 2)     on-map    party REACTS: two questions         short party beat
+#   0x9BF ( 7)     on-map    thread ends; party OVERHEARS        CUT -- see the note below
+#   0x9C0 ( 9)     on-map    stakes turn LETHAL, party ABSENT    CUT -- vanilla's motivation
+#   0x9C1 ( 2)     on-map    party REACTS: two questions         CUT -- engine, unneeded here
 #   0x9C2 ( 8)     on-map    recruit reaches party; BATTLE       Basil joins → battle
 #   0x9C3 (12)     on-map    recruit's OWN scene (Joshua)        Sahnar in the sarcophagus
 #   0x9C4 ( 4)     on-map    other recruit's beat before Talk    CUT -- see the slot below
@@ -664,16 +664,14 @@ events:
   #        ENGINE (Eirika's people are travellers with no cause); borrowing it would convert a
   #        deliberate hunt into an accident.
   #  The slots' only other job was mechanical -- LOAD1 staging the guardians -- and staging needs
-  #  no dialogue. 0x9C1 SURVIVES the cut (2 boxes): without it nobody in the party ever
-  #  acknowledges sixteen standing dead while the player is looking right at them.
-  - trigger: chapter_start
-    slot: "vanilla 0x9C1"
-    type: cutscene
-    ea_file: events/ch05-opening.ea
-    status: unwritten
-    description: >
-      Two boxes, no more (vanilla's is exactly 2). Somebody in the party names what they are
-      looking at. Candidate voices: Meesmickle (dry, it is his job), Braulo (flat), Wolfram.
+  #  no dialogue.
+  #  0x9C1 IS CUT TOO (Nicolas, 2026-07-29) -- the whole overhear-and-react block goes, which was
+  #  his original call; CLAUDE argued to keep its 2 boxes and was overruled. Recorded consequence:
+  #  NOBODY IN THE PARTY EVER ACKNOWLEDGES the sixteen standing dead, and the player is looking
+  #  right at them. That is a real gap, not a neutral saving. It is also cheap to close later
+  #  WITHOUT restoring a slot: the moose-trigger beat (0x9C4's position, still unwritten) is the
+  #  last thing before the map and can absorb one clause of acknowledgement if we want it. Do not
+  #  reopen this as a slot -- fold it there or leave it.
   # ── 9C2 — the recruit reaches the party; BATTLE ───────────────────────────────
   - trigger: chapter_start       # opening event list, ON-MAP (bubbles ≤29 ch/line)
     slot: "vanilla 0x9C2"
