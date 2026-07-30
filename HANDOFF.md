@@ -43,7 +43,7 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   git hook resolves against the outer repo unless you strip `GIT_*`** (this bit us — flipped `core.bare`
   and wrote a corrupt commit; fixed in `_vanilla_decomp_text` + the map-tileset test fixture).
 
-## This session (2026-07-22→29, Opus — ch05 roster, engine work, dialogue; ROM-free web sessions)
+## This session (2026-07-22→29, Opus — ch05 dialogue: 12 of 16 slots locked; ROM-free web sessions)
 
 **All ch05 detail lives on issue #25** (the live tracker comment) and in the chapter YAML — not here.
 Summary only:
@@ -51,43 +51,63 @@ Summary only:
 - **Environment:** Linux web container. The base ROM lives on Nicolas's Mac and isn't committed, so ROM
   builds / `verify_text` / mGBA playtests are OFF the table. `make difficulty` IS ROM-free. One-time
   container setup: `pip install pillow pyyaml numpy`; `git submodule update --init --depth 1 fireemblem8u`.
-- **Protocol cleanup:** work moved onto **`feat/25-ch05-content`** with **draft PR #196** (body + title
-  current as of `e4798e9`). The orphaned `claude/mobile-app-token-context-u2psep` remote branch still
-  needs deleting from the GitHub UI (the proxy 403s on ref-delete).
-- **ch05 roster CLOSED** (rev.3, PARITY) and **6 of 15 dialogue slots locked** (9BB/9BC/9BD/9BE/9C2/9C3).
-  → **issue #25**.
+- **Protocol:** work is on **`feat/25-ch05-content`**, **draft PR #196**. The orphaned
+  `claude/mobile-app-token-context-u2psep` remote branch still needs deleting from the GitHub UI
+  (the proxy 403s on ref-delete).
+- **ch05 roster CLOSED** (rev.3, PARITY). **Dialogue: 12 of 16 slots locked, 88 boxes written.** The whole
+  PRE-MAP OPENING IS DONE — 60 boxes across 7 slots vs the twin's 98. → **issue #25**.
 - **Difficulty engine gained three tools** (all ROM-free, all tested): a **per-unit role check**
   (`role_findings` — the aggregate averages a monster away and never compares the boss to anything;
   ch04 verified clean by it), **terrain wiring** (§Terrain — FE8's own tables + vanilla layouts), and
-  **boss personal stat lines** (scoped to the role check on BOTH sides; putting them in the aggregate
-  shifted every curated baseline). New tool **`tools/vanilla_scene.py`** prints any vanilla chapter's
-  scenes as boxed dialogue with counts.
-- **Craft law recorded** (binding in the `dialogue-pass` skill): mine the corpus BEFORE writing
-  (`references/natural-speech.md`, `fe8-register.md`, `scene-pacing.md`); epigram disease; no contrasting
-  clichés; draft boxed; tracker upkeep is part of the lock step. ADRs in `decisions.md`.
-- **Sahnar is MISLED, not seized** (2026-07-29, reconciled repo-wide) — Ravisin wakes her and lets her
-  draw the wrong conclusion; she fights of her own will, and Basil turns her by telling her the truth.
-  Her voice's two temperatures are now misled → turned.
-- **Marty's ch05 villain-foil thread is RETIRED** (2026-07-29) — we drifted away from it while
-  writing and never used it in a beat. Cut from `marty.md`, phrases registered in `check.py`
-  `DEAD_CONCEPTS` (so the lint will reject them — see `decisions.md`). His voice is
-  `lore/marty.md` §Voice, full stop.
+  **boss personal stat lines** (scoped to the role check on BOTH sides).
+- **`tools/vanilla_scene.py` had a real bug, now fixed** — it matched `TEXTSHOW` only and silently dropped
+  every `Text_BG` scene, reporting FE8 Ch5's opening as 8 messages/71 boxes when it is **11/98**, with
+  0x9BC and 0x9BD (the two scenes our 9BC/9BD are modelled on) missing entirely. It now walks both
+  channels and prints each message's id + channel. **If a mined beat looks absent, suspect the miner.**
+- **Slot ids are a two-file problem.** `ch5-eventscript.h` holds 0x9BA–0x9C5, 0x9CC, 0x9C9–0x9CB;
+  `data_battlequotes.c` holds 0x9C6 (Natasha's death quote), 0x9C7 (Saar taunt), 0x9C8 (Saar death).
+  The recruit is **0x9CC**, never "9C6".
+- **The arena is BACK** (`decisions.md` §Economy, "No arena" superseded 2026-07-29). Same mechanic, same
+  in-game name, so vanilla's tutorial is reusable verbatim. **Wolfram** opens it (0x9BE) — the tomb was an
+  **amphitheatre before it was a tomb, which is CANON** (verified; `lore/sahnar.md` §Source canon).
+- **Craft law recorded** (binding in the `dialogue-pass` skill): mine the corpus BEFORE writing; epigram
+  disease; no contrasting clichés; draft boxed; tracker upkeep is part of the lock step.
+- **Two threads RETIRED so they stop steering characters:** Marty's villain-foil "covenant" (never reached
+  a beat) and Basil's steeling-himself beat. Sahnar is **MISLED, not seized** — reconciled repo-wide.
 
-## NEXT SESSION — start here (branch `feat/25-ch05-content`, draft PR #196, ROM-free)
+## NEXT SESSION — the ENDING BLOCK (branch `feat/25-ch05-content`, draft PR #196, ROM-free)
 
 **Read [issue #25](https://github.com/NicoviGH/manchego-stars/issues/25) first — its latest comment is the
-live ch05 tracker** (settled decisions, the 15-slot scene map, which beats are written, what's next).
+live ch05 tracker.** Then **invoke the `dialogue-pass` skill and DO ITS STEP 0** (mine the corpus before
+writing a line — mandatory, not advice: 9BB burned a dozen drafts written from instinct).
 
-1. **Invoke the `dialogue-pass` skill and DO ITS STEP 0** — mine the corpus before writing a line. This is
-   mandatory, not advice: 9BB burned a dozen drafts written from instinct.
-2. **Next beat: 9C4 — Basil steeling himself mid-escort** (vanilla's 4-box Natasha prayer). Then **9C6,
-   the recruit** — the chapter's payoff, owed by BOTH 9BB's "One day I'll give her one" and 9C3's
-   certainty. Remaining after that: 9BF / 9C0 / 9C1 / 9C5 / 9C7 / 9C9.
-3. **Guardrails that broke repeatedly — do not re-break:** Ravisin's motive is Auril's cosmic winter, full
-   stop (no grudge/grief/revenge/pathos — banned in her bible); she is never softened or mourned. Sahnar
-   knows only what Basil tells her, and is misled rather than bound. Draft BOXED (~29–30 ch/line, on-map ≤29).
-4. **DoD:** locked scripts → `script:` blocks in the ch05 YAML with `LOCKED <date>`; update the #25 tracker
-   comment AND the PR body in the same breath; commit ROM-free on `feat/25-ch05-content`.
+**Everything left is ONE chunky unit of work — Nicolas's explicit call: write it together, mine vanilla
+first.** They are entangled, and writing the lived ending alone would silently strand the other two:
+
+| slot | twin | job |
+|---|---|---|
+| `0x9C9` | 34 boxes | the ending — Ravisin falls, her hold on the moose breaks, the party **repots Basil**, turn down the coast toward Bremen |
+| `0x9CA` | 24 boxes | vanilla's **same exposition if the escort DIED**. `needs_review` |
+| `0x9C6` | 1 box | **Basil's death quote** (Natasha's twin — vanilla gives one to the escort and to nobody else on the map but the boss) |
+| `0x9CB` | 16 boxes | villager coda. **DECIDED: not dropped — fold into the post-battle scenes**, so the win still lands on a resident (Basil, or a freed Sahnar) |
+
+**The knot:** 0x9C9 as drafted has the party repot Basil and take him along, which a dead Basil makes
+impossible. Vanilla solved it with a whole alternate cutscene. Decide how cheap our branch can be.
+
+**Guardrails that broke repeatedly — do not re-break:**
+- Ravisin's motive is Auril's cosmic winter, full stop (no grudge/grief/revenge/pathos — banned in her
+  bible); she is never softened and never mourned. **Auril is never named** — reverent epithet only
+  ("the Frostmaiden"); 9C8 was rewritten for exactly this.
+- Sahnar knows only what Basil tells her; she is misled, never bound. Orem/Ostoria/Corellon/Arvandor stay
+  OFF the page (name-drops our story never pays off).
+- Draft **BOXED** (~29–30 ch/line on-map, Text_BG ~42), and run
+  `python3 tools/vanilla_scene.py ch5` for the twin's real counts.
+- **Do not re-derive settled things from the decomp.** `CLAUDE.md`'s Source-of-Truth table now has a
+  prep/deploy-cap row because this session got that wrong (prep from ch01 is protocol; the CAP is the
+  parity; `hasPrepScreen` is a dead FE7 leftover, false everywhere).
+
+**DoD:** locked scripts → `script:` blocks in the ch05 YAML with `LOCKED <date>`; update the #25 tracker
+comment AND the PR body in the same breath; commit ROM-free on `feat/25-ch05-content`.
 
 ## PARALLEL THREAD (ROM-gated, Nicolas's Mac): finish the ch04 slice (`feat/24-ch04-map`)
 
