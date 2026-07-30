@@ -23,9 +23,20 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
+# A git subprocess started INSIDE a git hook resolves against the OUTER repo: git exports
+# GIT_DIR / GIT_INDEX_FILE / GIT_WORK_TREE while pre-commit runs, and those override cwd.
+# Without this, the throwaway fixtures below ran `init` / `config` / `add` / `commit`
+# against the REAL repo -- on 2026-07-30 that flipped core.bare=true, overwrote user.name /
+# user.email with the fixture's, and left HANDOFF.md staged mid-commit. Exactly the failure
+# docs/decisions.md "Operational Gotchas" already records from 2026-07-21. Strip the ambient
+# GIT_* vars, target the repo with -C (not cwd), and disable hooks so a fixture commit can
+# never re-enter the outer pre-commit.
+_GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+
+
 def _run(repo, *args):
-    subprocess.run(['git'] + list(args), cwd=repo, check=True,
-                   capture_output=True)
+    subprocess.run(['git', '-C', repo, '-c', 'core.hooksPath=/dev/null'] + list(args),
+                   check=True, capture_output=True, env=_GIT_ENV)
 
 
 def _commit(repo, path, body, msg):

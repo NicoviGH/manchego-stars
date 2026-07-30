@@ -24,8 +24,14 @@ class VanillaSceneChannels(unittest.TestCase):
     def setUp(self):
         import vanilla_scene
         self.vs = vanilla_scene
-        scenes = dict(vanilla_scene.scene_text_ids(CH5))
-        self.opening = scenes['EventScr_Ch5_BeginningScene']
+        # Mine HEAD, exactly as main() does -- NOT the on-disk file. ch5-eventscript.h is
+        # where inject_ch04 hosts our Ch4, so after any `make CH04BOOT=1` the working-tree
+        # copy has no Ch5 scenes at all and this suite errors on a missing scene name. That
+        # is the same trap the tool itself was fixed for (46f8b12): a test that reads the
+        # built tree is measuring our injection, not vanilla.
+        self.scenes = dict(vanilla_scene.scene_text_ids(
+            CH5, src=vanilla_scene._decomp_text('src/events/ch5-eventscript.h')))
+        self.opening = self.scenes['EventScr_Ch5_BeginningScene']
 
     def test_beginning_scene_has_all_eleven_messages(self):
         """0x9BA-0x9C4 inclusive. A TEXTSHOW-only scan finds 8 of these."""
@@ -61,9 +67,11 @@ class VanillaSceneChannels(unittest.TestCase):
         ch05 leans on this: 0x9BA-0x9C4 is ONE pre-map list (so nothing in it can
         interleave), while 0x9C5 and 0x9CC carry real triggers.
         """
-        scenes = dict(self.vs.scene_text_ids(CH5))
-        self.assertEqual([m for m, _c in scenes['EventScr_089F22A4']], [0x9C5])
-        self.assertEqual([m for m, _c in scenes['EventScr_089F2270']], [0x9CC])
+        # setUp's HEAD-mined scenes, not the working tree: EventScr_089F22A4 is the very
+        # slot inject_ch04 repurposes for its turn-2 reveal cutscene, so on a built tree
+        # this would assert against OUR script and report vanilla's 0x9C5 as ch04's stubs.
+        self.assertEqual([m for m, _c in self.scenes['EventScr_089F22A4']], [0x9C5])
+        self.assertEqual([m for m, _c in self.scenes['EventScr_089F2270']], [0x9CC])
 
 
 @unittest.skipUnless(os.path.isfile(CH5), 'fireemblem8u submodule not checked out')

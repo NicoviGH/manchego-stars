@@ -2894,6 +2894,15 @@ session state. `HANDOFF.md` points here._
   pass a sanitized env** — `{k: v for k, v in os.environ.items() if not k.startswith('GIT_')}` — to any
   `git` subprocess that must target a specific repo, and add `-c core.hooksPath=/dev/null` to fixture
   commits so they can't re-enter the outer hook. Fixed in `_vanilla_decomp_text` + `test_map_tileset.py`.
+  **It recurred on 2026-07-30** in `test_check_handoff.py` — a new fixture, written the obvious way
+  (`subprocess.run(['git', ...], cwd=repo)`), which under pre-commit ran its throwaway `init`/`config`/
+  `add`/`commit` against the live repo: `core.bare` flipped to `true`, `user.name`/`user.email` were
+  overwritten with the fixture's `t`/`t@t`, and `HANDOFF.md` was left staged mid-commit (surfacing as a
+  bogus HANDOFF-guard violation, which is what led back to it). `cwd=` is NOT a defence — the ambient
+  `GIT_DIR` beats it. So: **any new test that shells out to `git` must go through a sanitized-env helper**
+  — target the repo with `-C`, pass `env=` stripped of `GIT_*`, and add `-c core.hooksPath=/dev/null`. Verify
+  it by running the fixture with `GIT_DIR` pointed at a decoy repo and asserting the decoy is untouched;
+  the pre-fix helper corrupts the decoy, the fixed one doesn't.
 - **Per-unit descale recipe is recorded in the unit YAML comment** (data-is-the-doc) — read it before
   regenerating; don't guess flags. Swapping ONE pose still requires re-descaling the **whole 3-frame set
   together** (shared palette recompute shifts the other two — that's correct, not a bug).
