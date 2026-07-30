@@ -65,11 +65,12 @@ def render(body):
         f = FID.search(chunk)
         if f:
             speaker = f.group(1)
-        txt = chunk
-        txt = FID.sub('', txt)
-        txt = re.sub(r'\[ToggleMouthMove\]', '', txt)
-        txt = re.sub(r'\[ToggleSmile\]', '', txt)
-        txt = re.sub(r'\[(Open|Close|Move|Clear|Load|Break|CR|STc|Sound|Wait)\w*\]', '', txt)
+        # ORDER IS LOAD-BEARING: the codes that carry MEANING are turned into their characters
+        # first ([LF] is a real line break, [.] a real period, [A] the box break we must detect),
+        # and only then does the catch-all sweep the rest. Naming individual staging codes here
+        # is redundant -- [OpenLeft], [ToggleSmile] and friends all fall to `\[[^\]]*\]` below,
+        # and an explicit list silently rots as new codes appear in the decomp.
+        txt = FID.sub('', chunk)                       # speaker already captured above
         txt = txt.replace('[.]', '.').replace('[LF]', '\n').replace('[X]', '')
         boxbreak = '[A]' in txt
         txt = txt.replace('[A]', '')

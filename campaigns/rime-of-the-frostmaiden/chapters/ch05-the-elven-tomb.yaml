@@ -664,8 +664,9 @@ events:
       - wolfram: "...This was a training arena. I can get it up and running."
       - marty: "...This magic is familiar..."               # trails off — the hook, never explained here
       - pinky: "Father, I see it! The moose--in the hollow."
-    no_lupin_fallback:                # DRAFT 2026-07-30 (Nicolas) — the locked script above is
-      box: 1                          #   unchanged and still plays whenever the parley HAPPENED.
+    no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas, L3) — WIRING NOT BUILT.
+      box: 1                          #   The locked script above is unchanged and still plays
+                                      #   whenever the ch04 parley HAPPENED.
       replaces: "The trail leads here. ...It came home."
       reason: >-
         Box 1 is the FIRST LINE OF THE CHAPTER and it is Lupin's, so a no-parley player opens ch05
@@ -717,8 +718,9 @@ events:
       - basil: "...Wolf. You're hers. Awoken. But you're free? With them?"
       # (The thought dawns; Basil turns to the party and JOINS — green → the party's colors.)
       - basil: "...I wonder. Sahnar. ...She needs me. Take me to her?"
-    no_lupin_fallback:                # DRAFT 2026-07-30 (Nicolas, L4 v1) — the locked script above
-      box: 2                          #   is unchanged and still plays whenever Lupin WAS recruited.
+    no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas, L4) — WIRING NOT BUILT.
+      box: 2                          #   The locked script above is unchanged and still plays
+                                      #   whenever Lupin WAS recruited.
       replaces: "...Wolf. You're hers. Awoken. But you're free? With them?"
       reason: >-
         ch04's Lupin recruit is gated on `parley: by: marty`, and the ch04 difficulty model
@@ -954,8 +956,9 @@ events:
       - sahnar: "...Thank you, little one."
       # (Last box before gameplay resumes. She never answers.)
       - basil: "...Can I give you a berry now?"
-    no_lupin_fallback:                # DRAFT 2026-07-30 (Nicolas) — locked script above is unchanged
-      box: 8                          #   and still plays whenever Lupin WAS recruited.
+    no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas, L5) — WIRING NOT BUILT.
+      box: 8                          #   The locked script above is unchanged and still plays
+                                      #   whenever Lupin WAS recruited.
       replaces: "A wolf. Him and his whole pack. They're out there now, with travelers."
       reason: >-
         Box 8 is PROOF #1 — the evidence that turns Sahnar — and it is a wolf the player may never
@@ -975,7 +978,7 @@ events:
   - trigger: unit_death
     slot: "vanilla 0x9C6"          # data_battlequotes.c, pid CHARACTER_NATASHA, no flag
     type: quote
-    status: draft                  # DRAFT 2026-07-30 — awaiting Nicolas's red-pen, then LOCKED
+    status: locked                 # LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas)
     description: >
       BASIL's chapter-specific death quote. Vanilla Ch5 gives one to NATASHA and to nobody else
       on the map except the boss — not even to Joshua — because she is the ESCORT the chapter is
@@ -994,8 +997,9 @@ events:
           ("Tell her I had one for her"). Same object, two different failures.
       Hurt Basil goes SHORT — basil.md: he runs on when he cares, and the short lines are for
       when he's hurt. The self-interruption is the one piece of his register that survives.
-      DRAFT 2026-07-30 (dialogue-pass). 1 box. Two alternates recorded below for the red-pen.
-    script:                           # DRAFT 2026-07-30 — NOT locked; Nicolas's red-pen owed
+      LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas) — Nicolas kept v0 on review:
+      the 9BB thread carries the pronoun. 1 box. Two alternates recorded below.
+    script:                           # LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas)
       - basil: "But I haven't-- I still have her berry..."
     # Alternates drafted at the same sitting, kept so they don't get re-derived:
     #   (b) "Oh. ...I was almost there."       — the errand, not the object; quieter, less
@@ -1078,11 +1082,10 @@ events:
       Wiring owes a skip: without her, the scene runs Basil's repotting straight into Braulo's
       question. The berry is 9BB's promise paid ("One day I'll give her one"), so a player who
       never freed her simply never collects it. That is the correct cost of skipping the recruit.
-      DRAFT 2026-07-30 — Nicolas's three corrections are incorporated, but this is NOT locked and
-      his red-pen is still owed. (CLAUDE locked it once off "incorporate what I said into the
-      draft"; that instruction was to revise the draft, not to lock it.) 18 boxes (twin: 34).
-    status: draft
-    draft_script:                     # DRAFT rev.2 2026-07-30 — Nicolas's red-pen applied; NOT locked
+      LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas) after two red-pen passes.
+      19 boxes (twin: 34).
+    status: locked
+    script:                           # LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas)
       # (Aftermath. Ravisin is down. Basil says the smallest true thing -- and it pays off 9BD,
       #  where her last order to him was "Prepare my berries.")
       - basil: "I don't have to make berries for her anymore..."
@@ -1127,8 +1130,9 @@ events:
       #  arithmetic -- stage direction: a glint in his eye. The greed and the grin are the same
       #  instinct, so the money never has to be said out loud.)
       - braulo: "Aye, it is time we meet this beastie."
-    no_lupin_fallback:                # DRAFT 2026-07-30 (Nicolas, L6 v1) — draft_script above is
-      box: 16                         #   unchanged and still plays whenever Lupin WAS recruited.
+    no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas, L6) — WIRING NOT BUILT.
+      box: 16                         #   The locked script above is unchanged and still plays
+                                      #   whenever Lupin WAS recruited.
       replaces: "She woke it. Like she woke the wolves. ...She told it to sink the boats."
       reason: >-
         "Like she woke the wolves" names a recruit the player may never have made. The fallback
@@ -1179,10 +1183,10 @@ events:
       Also cut, found while applying those: "Is she still in there? The one under the stone?"
       assumed Sahnar had NOT been recruited, and Basil can die on either side of that. "Tell her I
       had one for her" works in both worlds and is the harder line anyway.
-      DRAFT 2026-07-30 — the same three corrections incorporated; NOT locked, red-pen owed.
-      13 boxes; twin is 24.
-    status: draft                     # ADOPTED 2026-07-30; DRAFT script awaiting Nicolas's red-pen
-    draft_script:                     # DRAFT rev.2 2026-07-30 — Nicolas's red-pen applied; NOT locked
+      LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas) after two red-pen passes.
+      10 boxes; twin is 24.
+    status: locked                    # ADOPTED + LOCKED 2026-07-30 after two red-pen passes
+    script:                           # LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas)
       # (The hollow. Ravisin down. Basil is in the snow where he fell, root-feet turned up,
       #  broken through. The party has gathered. He is still talking.)
       - basil: "......"
@@ -1210,8 +1214,9 @@ events:
       # (CUT 2026-07-30 (Nicolas): "Nobody's hired us for a lake" -- out of BOTH endings. See 0x9C9.)
       # (The ONE changed line, in vanilla's own place: what the loss cost the party in facts.)
       - braulo: "If he'd lived we'd know more. ...We go down the coast."
-    no_lupin_fallback:                # DRAFT 2026-07-30 — draft_script above is unchanged and still
-      box: 3                          #   plays whenever Lupin WAS recruited.
+    no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas) — WIRING NOT BUILT.
+      box: 3                          #   The locked script above is unchanged and still plays
+                                      #   whenever Lupin WAS recruited.
       replaces: "The moose, the wolf.. they were not alone.."
       reason: >-
         Same gate as 0x9C9 box 14: "the wolf" names an optional recruit. Only that clause moves —

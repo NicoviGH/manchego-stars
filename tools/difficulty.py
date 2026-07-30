@@ -156,7 +156,7 @@ def _apply_personal(combatant, personal):
         return combatant
     delta = {}
     for decomp_name, field in _PERSONAL_FIELDS:
-        v = personal.get(decomp_name, personal.get(field, 0)) or 0
+        v = personal.get(decomp_name) or personal.get(field) or 0
         if v:
             delta[field] = getattr(combatant, field) + int(v)
     return dataclasses.replace(combatant, **delta) if delta else combatant
@@ -949,6 +949,10 @@ def role_findings(chap, parity_ref):
     # A convertible is recruited/neutralized rather than ground down, so it out-hitting the
     # boss is a deliberate "avoid me" hazard, not a role inversion -- don't flag it as one.
     line = [(uid, c) for uid, is_boss, c, conv, _ in ours if not is_boss and not conv]
+    # Hoisted: the twin's bar is a property of the REFERENCE, not of our boss, and computing it
+    # walks the decomp twice (once with personal lines, once without). Inside the loop that was
+    # two full scans per boss for an answer that cannot change between iterations.
+    bar_name, bar, bar_personal = vanilla_boss_bar(parity_ref)
     for uid, b, tile in bosses:
         bt = fc.damage_per_round(b, YARDSTICK)
         harder = [n for n, c in line if fc.damage_per_round(c, YARDSTICK) > bt]
@@ -961,7 +965,6 @@ def role_findings(chap, parity_ref):
         b_on, b_avo = on_terrain(_apply_personal(b, personal_by_id.get(uid)), tile)
         bk = fc.rounds_to_kill(YARDSTICK, b_on, b_avo)
         where = (' on %s (+%d avo/+%d def)' % ((tile,) + terrain_bonus(tile))) if tile else ''
-        bar_name, bar, bar_personal = vanilla_boss_bar(parity_ref)
         if bk == float('inf'):
             out.append('boss %s%s cannot be damaged by the parity yardstick at all -- '
                        'terrain and a personal line are stacking too far' % (uid, where))
