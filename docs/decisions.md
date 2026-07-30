@@ -1591,9 +1591,12 @@ nearly verbatim. What changes is only the fiction around it:
   sunken depression ringed by crystal pillars and statues… the moon dial sits at center" is
   amphitheatre geometry. So the venue is canon and the geometry already matched it.
   **Caveat, ours not canon's:** the amphitheatre was built for ORATORY — Orem addressing his
-  people — not for combat. Reading it as a training floor (blade-chips in the stone) is our layer
-  on top. Defensible for a people who escaped the giant empire of Ostoria and would drill, but it
-  is an extension, and Wolfram's lines should not assert combat as the venue's original purpose.
+  people — not for combat. So the arena reading is carried as **Wolfram's inference, never the
+  narrator's fact**: he senses chips struck off blade edges in the floor and concludes blades met
+  here. That much the evidence supports. He does not know who fought, why, or that anyone trained
+  — he is a smith, not a historian, and the same rule we applied to RBG (don't make him a history
+  professor) applies here. Framing it as his deduction is what lets our arena and the canon both
+  stand without either overwriting the other.
 - **Wolfram opens it, and ch05 is the ORIGIN, not the only instance.** He finds it by metal-sense —
   the floor is full of blade-chips left by centuries of sparring — and gets it usable; afterwards
   he can set one up wherever the party camps, so arenas recur as they do in vanilla. The entry fee

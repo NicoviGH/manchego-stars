@@ -52,9 +52,11 @@ map:
     arena tile: the geometry above is already amphitheatre-shaped (a sunken bowl, rings of
     pillars and statues, a dial at the focus), so our shape matched the canon before we
     knew the canon. Wolfram finds it by metal-sense in 0x9BE; decisions.md §Economy carries
-    the full call. CAVEAT: canon's amphitheatre was for ORATORY, not combat — reading the
-    floor as a training ground is OUR layer, so Wolfram must not assert fighting as its
-    original purpose.
+    the full call. CAVEAT: canon's amphitheatre was built for ORATORY. Wolfram calling it
+    an arena is an INFERENCE from the only evidence he has — chips struck off blade edges,
+    therefore blades met here — and he is a smith, not a historian. He never claims to know
+    who fought, why, or that anyone trained. Keeping it his deduction rather than the
+    narrator's assertion is what lets our arena and the canon both stand.
     Ravisin holds the central depression with the cornered white moose; risen elven
     tomb-guardians (spear-guards, axe-reavers) clog the approaches. Elven reliquary niches are
     spread to the map's edges (the reward-sites the eruption's dead race to desecrate). Open
@@ -623,11 +625,14 @@ events:
       # (0x9BA relocated here, 2026-07-29: Wolfram reads the place the way the others do -- by
       #  what he can sense. Senses FIRST, then names it (wolfram.md diction rule). This is the
       #  Forge's on-screen origin; the mechanics get taught separately, see the FORGE TUTORIAL.)
+      # (Senses first, then the name (wolfram.md). He deduces ONLY what the metal supports:
+      #  chips struck off edges means blades met here. He does not know who, or why, or that
+      #  anyone trained -- "this was an arena" is his INFERENCE, not the narrator's fact.)
       - wolfram: "...Hold on. *(sniffs)* Iron. Bronze. Something older I can't name."
-      - wolfram: "It's in the stone. Chips of blade-metal. Thousands of them."
-      - wolfram: "They fought here for years to leave that much behind."
+      - wolfram: "It's in the stone. Chips of it all through the floor. Blade metal."
+      - wolfram: "Struck off edges. There was fighting here -- a great deal of it."
       # (He names the mechanic in-world. NO gear promise -- the arena does not touch equipment.)
-      - wolfram: "...It's an arena. Give me a night, I'll have it fit to use."
+      - wolfram: "...This was an arena. Give me a night, I'll have it fit to use."
       - marty: "...This magic is familiar..."               # trails off — the hook, never explained here
       - pinky: "Father, I see it! The moose--in the hollow."
       - pinky: "...It's not running. Why isn't it running?!"
