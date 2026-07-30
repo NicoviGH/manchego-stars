@@ -6,121 +6,118 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 
 ## Current state
 
-- **Winter forest fidelity is an invariant (#193, merged `6a538bc`).** Snowy Bern retiles preserve the
-  vanilla artists' forest sequences: the learned per-metatile map in `reskin-learned.json` is the sole
-  authority, `gen_map_editor.py` refuses to generate on an unmapped forest variant, and
-  `import_map_layout.py` re-checks every protected cell. Ch00–Ch02 backfilled. ADR: "Winter retiles
-  preserve the vanilla artists' forest sequences…".
-- **ch04 "The White Moose" combat slice is hosted (#24, branch `feat/24-ch04-map`, pushed, NOT merged).**
-  `inject_ch04` hosts Ch4 1:1 on the vanilla Ch5 slot: 15×15 snowy retile (vanilla geometry + forest
-  sequences preserved), roster grounded to real FE8 monster classes (Mauthe Doog / Bonewalker-bow /
-  Mogall / Entombed), fog 3, PREP (9 of 10), DefeatAll/Rout, 16 line + 4(t2) + 3(t3) reinforcements,
-  `--ch04-boot` fast-boot, `chain_ch03_to_ch04`. Borrows Super Fields' Snag family into Snowy Bern's
-  empty slots (ADR). **Full ROM build green; 230 tests + `check.py` clean.** This is a WIP checkpoint —
-  see NEXT.
-- **Parity/difficulty engine is three-dimensional** (`tools/difficulty.py`, all from HEAD): enemy
-  pressure + item economy (#170/#172; drops #176/#178) + battlefield dynamics (convertibles + reinforcement
-  timing #171/#174; area/zone #177/#178). `make difficulty CH=chNN` shows all three.
-- **PC battle anims — 8 of 8 DONE** (braulo, marty, meesmickle, prof-rbg, wolfram, rootis, pinky, sclorbo).
-  Sclorbo (#191) added the reusable **BISHOP dual-slot donor** (staff heal + light attack) that
-  **Basil (ch05, #25) plugs into** (`battle_anim: {clone_from: bishop}` — no new donor work).
-- **Enemy battle-anim import pipeline** (#90) + **per-caster charge flash** (#183) shipped; spell-palette
-  tint (#168/#169) shipped. ch03 (#23) complete.
-- **Recruit art shipped** (portraits + map sprites): Basil/Oddish (#179), Lupin + Sahnar (#181). Their
-  build *wiring* (slot, STAT_DONOR, live `battle_anim:`) is ch04/ch05-slice work (#24/#25).
+- **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
+  The ch05 sessions ran in a Linux web container without the base ROM, and everything needing one
+  got parked as "ROM-gated". That was a *where*, not a permanent class — the whole parked list is
+  now actionable.
+- **ch05 "The Elven Tomb" (#25) — DIALOGUE COMPLETE AND MERGED** (PR #196, squash `3164bcf`).
+  15 slots, all `status: locked`, no `draft_script:` left in the chapter. Roster CLOSED at PARITY,
+  `deploy_limit 9`. #25 stays OPEN: map + placement, text insertion → `verify_text`, `--ch05-boot`
+  playtest, `enemy_class_reskins` + FE-Repo imports, and Basil/Sahnar STAT_DONORs are all still
+  owed — and all now buildable.
+- **The no-Lupin branch is TEXT-COMPLETE and WIRING-INCOMPLETE, across two chapters.** Lupin's
+  recruit is gated on ch04's `parley: by: marty`, and ch04's difficulty model explicitly prices a
+  no-parley path — so six beats addressed a unit that may not exist, including **ch04's closing
+  button** and **ch05's opening line**. Every line is chosen and sits in a `no_lupin_fallback:`
+  block (anchored to the text it replaces, not just an index); **no conditional is built yet.**
+  ch04: `chapter_end` boxes 1+3. ch05: `0x9BE` box 1, `0x9C2` box 2, `0x9CC` box 8, `0x9C9` box 16,
+  `0x9CA` box 3. Real scope on both slices — neither chapter is done without it.
+- **Winter forest fidelity is an invariant (#193, merged `6a538bc`).** Snowy Bern retiles preserve
+  the vanilla artists' forest sequences: the learned per-metatile map in `reskin-learned.json` is
+  the sole authority, `gen_map_editor.py` refuses to generate on an unmapped forest variant, and
+  `import_map_layout.py` re-checks every protected cell. Ch00–Ch02 backfilled.
+- **ch04 "The White Moose" (#24, branch `feat/24-ch04-map`, worktree `.claude/worktrees/ch04-map`)
+  — combat host built; REDESIGNED 2026-07-21 into a full chapter. Stage 2 COMPLETE.**
+  `inject_ch04` hosts Ch4 on the vanilla Ch5 slot (15×15 snowy retile, fog 3, PREP 9-of-10,
+  DefeatAll, `--ch04-boot`, `chain_ch03_to_ch04`), built around the wolf-parley REVEAL on the
+  "wolves turn the tide" difficulty model (raw fight above vanilla; the parley discounts it back to
+  dead-on vanilla — static ×1.15/×1.19, parley-path clear-load 2.5≈2.6), with the roster mirroring
+  the vanilla-Ch4 twin 1:1. Full design + staged checklist: **issue #24's 2026-07-21 comment** +
+  the `docs/decisions.md` ch04 ADR (on the branch), both authoritative. Committed stages:
+  - `cef0419` **Stage 1b** — `inject_ch04` wired to the twin-realigned roster.
+  - `8f2f784` **Stage 2a** — reusable `recruit_initial_faction(unit)` (GREEN Colm/Trex/Basil vs RED
+    Joshua/Lupin/Sahnar, opt-in via YAML `recruit.initial_faction`) + Lupin cast wiring on the
+    collision-free `Duessel` slot (STAT_DONOR = Kyle).
+  - `dbf86c6` **Stage 2b** — `talk_recruit_wiring` extracted out of `inject_ch03`
+    (faction-parameterized; ch03 green Trex, ch04 red Lupin, ch05 Basil/Sahnar all ride it) + the
+    Marty→Lupin parley + Marty force-deployed via vanilla's `ForceDeploymentEnt` data path.
+  - `2253cec` **Stage 2c** — the turn-2 REVEAL cutscene (stub lines; Stage 4 finalizes).
+  - `3286d4a` — the no-Lupin fallback for the ending scene (text only, see above).
+- **Parity/difficulty engine is four-dimensional now** (`tools/difficulty.py`, all read from HEAD):
+  enemy pressure + item economy (#170/#172, drops #176/#178) + battlefield dynamics (convertibles +
+  reinforcement timing #171/#174, area/zone #177/#178) + **per-unit ROLE check and terrain (#25)**.
+  The role check exists because the aggregate hid a real inversion: ch05 read "PARITY (within band)"
+  while the white moose out-threatened the boss 1.7×. `make difficulty CH=chNN` shows all of it.
+- **PC battle anims — 8 of 8 DONE** (braulo, marty, meesmickle, prof-rbg, wolfram, rootis, pinky,
+  sclorbo). Sclorbo (#191) added the reusable **BISHOP dual-slot donor** that **Basil (ch05) plugs
+  into** (`battle_anim: {clone_from: bishop}` — no new donor work).
+- **Enemy battle-anim import pipeline** (#90) + **per-caster charge flash** (#183) shipped;
+  spell-palette tint (#168/#169) shipped. ch03 (#23) complete.
+- **Recruit art shipped** (portraits + map sprites): Basil/Oddish (#179), Lupin + Sahnar (#181).
+  Their build *wiring* (slot, STAT_DONOR, live `battle_anim:`) is ch04/ch05-slice work.
 
-## This session (2026-07-21, Opus — landed #193, reconciled + hosted the ch04 combat slice)
+## This session (2026-07-30, Opus — ch05 red-penned, locked, merged)
 
-- **#193 landed** (PR #194 squash-merged, CI green) after audit: strong regression coverage (forest
-  counts + exact mapping + sha256-pinned non-forest cells), correct `.bin`→`.mar` format migration.
-- **ch04 committed + rebased onto #193** as one clean commit (`df3183b`). #193 and ch04 were sibling
-  branches that had both edited the map tooling / `reskin-learned.json` / `decisions.md`; reconciliation
-  took #193's forest machinery + reskin-learned (superset), kept both ADRs and both test suites, and
-  ported ch04's `review_output` (preview-beside-editor) onto #193's map editor.
-- **Two agent-discipline learnings recorded in `decisions.md`** (so Codex finds them too):
-  (1) *feature-flow only works if each feature LANDS before the next starts* — the parallel-unmerged-branch
-  post-mortem that explains the recurring rebase; (2) an Operational Gotcha: **a `git` subprocess inside a
-  git hook resolves against the outer repo unless you strip `GIT_*`** (this bit us — flipped `core.bare`
-  and wrote a corrupt commit; fixed in `_vanilla_decomp_text` + the map-tileset test fixture).
+- **Both endings red-penned with Nicolas over two passes, then LOCKED, then merged.** `0x9C9` is 19
+  boxes, `0x9CA` 10, `0x9C6` 1. Wolfram (not RBG) repots Basil out of an elven helm salvaged from
+  the arena he opened in `0x9BE`; RBG takes the told-you-so that pays ch02's locked "my rats whisper
+  coin off Bremen"; the coin objection left both endings; Braulo closes on appetite, not arithmetic.
+- **`vanilla_scene.py` was mining the WORKING TREE, not HEAD** (fix `46f8b12`). `texts/texts.txt` is
+  the first entry in `PATCHED_DECOMP_FILES`, so after any `make` the vanilla pacing benchmark would
+  hand our own injected lines back as vanilla's. Proven, not theorised: the tree's copy is
+  +501/−1387 against HEAD. **Every "vanilla says…" number mined on a built tree before this fix is
+  suspect** — re-mine before citing one. Test coverage had followed the bug (five tests on
+  `scene_text_ids`, none on `load_messages`); two added and verified non-vacuous.
+- **Three review nits cleared**: `vanilla_boss_bar()` hoisted out of the per-boss loop; `render()`
+  no longer enumerates staging codes (proven behaviour-identical over all 3403 messages);
+  `_apply_personal` short-circuits.
+- **Branches pruned**: `feat/25-ch05-content` (merged) and the orphaned
+  `claude/mobile-app-token-context-u2psep` — verified a strict ancestor of the ch05 branch first, so
+  nothing was lost. The ch05 worktree is removed.
 
-## This session (2026-07-22→30, Opus — ch05 dialogue COMPLETE; ROM-free web sessions)
+## NEXT SESSION — close out ch04 (`feat/24-ch04-map`)
 
-**All ch05 detail lives on issue #25** (the live tracker comment) and in the chapter YAML.
-Settled decisions are in `docs/decisions.md`; craft/mining rules are in the `dialogue-pass`
-skill; voice rules are in the bibles. Live state only, below.
+Design is LOCKED. **Read issue #24's 2026-07-21 comment** + the `docs/decisions.md` ch04 ADR (both
+on the branch). Work in `.claude/worktrees/ch04-map`. `Closes #24`:
 
-- **Environment:** Linux web container. The base ROM lives on Nicolas's Mac and isn't committed, so ROM
-  builds / `verify_text` / mGBA playtests are OFF the table. `make difficulty` IS ROM-free. One-time
-  container setup: `pip install pillow pyyaml numpy`; `git submodule update --init --depth 1 fireemblem8u`.
-- **Work is on `feat/25-ch05-content`, draft PR #196.** ch05 roster CLOSED (rev.3, PARITY).
-  **Dialogue: all 15 slots written, 125 boxes — 13 LOCKED, 2 in DRAFT.** The two ending
-  branches (`0x9C9`, `0x9CA`) carry Nicolas's three corrections but are **awaiting his red-pen**;
-  their text lives under `draft_script:`, not `script:`.
-- **Orphaned remote branch `claude/mobile-app-token-context-u2psep` still needs deleting from the
-  GitHub UI** — the proxy 403s on ref-delete. (Nicolas's chore; nothing depends on it.)
+1. ~~Stage 1b / Stage 2a / 2b / 2c~~ — **DONE**, see Current state.
+2. **Stage 3 — RESUME HERE — art:** green Lycanroc pack map sprite via the pipeline
+   (princess-phoenix source + green palette, no glasses) to replace the Stage-2 **placeholder**
+   (the green pack currently rides `CLASS_MAUTHEDOOG` + generic pid `0xcd`). **Render Lupin
+   hostile/recruited + the pack and show Nicolas to sign off the palette before committing art.**
+3. **Stage 4 — scenes** (off the ch03 template): Lonelywood opening, moose-flees, real ending
+   (replace `dev_placeholder_scene()`); finalize Lupin's death line + all ch04 text via
+   `dialogue-pass`. **Includes wiring the no-Lupin fallback for `chapter_end` boxes 1+3.**
+4. **Stage 5 — spatial check + `--ch04-boot` playtest** → confirm parity in-engine → PR.
 
-## NEXT SESSION — red-pen the two endings, then ch05 is ROM-GATED (Nicolas's Mac)
-
-**FIRST, and it is ROM-free:** `0x9C9` and `0x9CA` are DRAFTS awaiting Nicolas. Read them out to
-him, take the red-pen, then move each `draft_script:` → `script:` with a `LOCKED <date>` stamp.
-Do not lock them on your own initiative — that already happened once and was reverted.
-
-Everything after that needs the base ROM, so it cannot start in a web container:
-
-1. **Text insertion** — `script:` blocks → `texts/texts.txt` via `set_message_body`; msg ids read
-   from the decomp, never hardcoded. Odd-length strings pad with `[.]`. Then `make` green +
-   `python3 tools/verify_text.py` (0 runaway).
-2. **Map + placement** (tier 2) → **spatial check** (tier 3) → **`--ch05-boot` playtest** (tier 4)
-   → Lock. `status: planned` keeps ch05 exempt from the parity CI gate until then.
-3. **`enemy_class_reskins` wiring + FE-Repo imports** (the art track), and Basil/Sahnar
-   STAT_DONORs.
-4. **Two wiring notes the dialogue leaves owed:** the arena tile must exist for the
-   `forge_tile_visited` tutorial to fire, and **0x9C9's berry exchange needs a skip** for players
-   who never recruited Sahnar (boxes 6–11).
-
-**If picking up ROM-free work instead:** the ch04 slice (`feat/24-ch04-map`) still needs its wolf
-parley + Marty-Talk teaching and an authored ending — see PARALLEL THREAD below.
-
-## PARALLEL THREAD (ROM-gated, Nicolas's Mac): finish the ch04 slice (`feat/24-ch04-map`)
-
-The combat slice is hosted and builds; it is **not** a complete chapter. To finish and PR-merge #24:
-
-1. **Wolf parley + Marty-Talk teaching** — the two open events decisions in `ch04-the-white-moose.yaml`:
-   parley behavior (green-and-fight vs green-and-leave) and teaching the player Marty can Talk to parley
-   the Mauthe Doog pack (Lupin recruits as a non-combat NPC). `inject_ch04` currently wires combat only.
-2. **Authored ending scene** — currently a `dev_placeholder_scene()`; write the real ch04→ch05 hand-off.
-3. **Tiered-difficulty spatial check + playtest** — run the analyst pass on the placed map, then play the
-   `--ch04-boot` build, then lock. Then open the PR (`Closes #24`).
-4. Wire Basil/Lupin/Sahnar STAT_DONORs when their ch04/ch05 slices need them.
-
-Then: **#138** config-driven `inject_chapter(descriptor)` (approved, paused for ch04/ch05); **ch05** (#25)
-grounding pass; **#29** world map.
+Then: **ch05's now-unblocked build work** (map, placement, text insertion, playtest, reskins,
+STAT_DONORs, the five no-Lupin conditionals) on #25; **#138** config-driven
+`inject_chapter(descriptor)` (approved, paused for ch04/ch05); **#29** world map.
 
 ## Working tree - do not lose or revert
 
-- `fireemblem8u` is dirty from injected/generated build artifacts. **Never commit its submodule pointer.**
-  To run the map/forest tests cleanly after a build, restore the injected decomp files:
+- `fireemblem8u` is dirty from injected/generated build artifacts. **Never commit its submodule
+  pointer.** To run the map/forest tests cleanly after a build, restore the injected decomp files:
   `git -C fireemblem8u restore src/data/chapter_settings.json data/data_8B363C.s`.
 - Untracked local/session files (`.agents/`, `AGENTS.md`, `skills-lock.json`) are intentionally not
   versioned; leave them alone. `tools/key_magenta.py` is **gitignored** (#178).
-- `feat/24-ch04-map` (pushed) carries the ch04 combat slice — in progress, not stale. The old
-  `feat/24-ch04-roster-grounding` branch is superseded (retire it).
+- **HANDOFF lives in the main tree AND in every worktree, and a branch copy silently regresses live
+  state on merge.** The ch05 merge did exactly that — main's copy came back describing ch04 as a
+  "WIP checkpoint", four stages out of date, while the main tree held a newer uncommitted refresh.
+  Reconciled here. **Before merging any branch, diff its `HANDOFF.md` against main's.**
+- **Build-speed branch `feat/build-speed-idempotent-injection` is IN FLIGHT** (worktree
+  `.claude/worktrees/agent-a5830560b594da84f`), prototyping idempotent injection
+  (`_write_if_changed`) so a no-change rebuild stops taking ~3 min. **Review its diff + a
+  byte-identical ROM proof + a measured speedup before merging — never blind-merge a build change.**
 
 ## Quick commands
 
 ```sh
-# Parity/difficulty read (all from HEAD)
-make difficulty CH=ch04
+make difficulty CH=ch04                    # parity/difficulty read (all from HEAD)
+make CAMPAIGN=rime-of-the-frostmaiden CH04BOOT=1 fireemblem8.gba -j$(nproc)   # ch04 fast-boot
 
-# ch04 fast-boot playtest build (New Game -> White Moose forest, party + foes deployed)
-make CAMPAIGN=rime-of-the-frostmaiden CH04BOOT=1 fireemblem8.gba -j$(nproc)
-
-# Required before claiming a change is finished (468 tests; `tools/` isn't a package,
-# so unittest discover can't find them -- expand the glob)
-python3 -m unittest $(ls tools/test_*.py | sed 's|/|.|;s|\.py||' | tr '\n' ' ')
+# Required before claiming a change is finished
+python3 -m unittest discover -s tools -p 'test_*.py'
 make check
 git diff --check
-# A test/build run dirties the fireemblem8u submodule with INJECTED artifacts
-# (e.g. engine_hooks' MSChargeFlashArm decl). Restore, never commit:
-git -C fireemblem8u status --short   # then: git -C fireemblem8u restore <files>
 ```
