@@ -2069,6 +2069,41 @@ exclusive for one sheet (a role-layout sheet is what lets *either* faction palet
 wrong, `remap_sms_palette`'s `overrides={src_idx: std_idx}` knob corrects it. This is the pattern for **any** future
 recruit with a custom sprite (talk or green-start): add its uid to `FACTION_TINTED_CAST`.
 
+**When the RECRUITED look is the bespoke sheet, faction-tinting is the wrong tool — give the unit a
+PRE-RECRUIT variant instead (`pre_recruit_roles`, #24, 2026-07-30).** Lupin is the same shape of problem as
+Trex (placed RED as the wolf pack's leader, `CUSA`'d over by Marty's parley) but the opposite requirement:
+Nicolas's call is **red while hostile, the finalized grey once recruited** — "only his colours change upon
+recruitment". `FACTION_TINTED_CAST` can't do that; it trades the bespoke palette away, so he'd join as
+standard **blue**. Leaving him in `gMapPaletteOverride` can't either: that override is unconditional, so a
+hostile Lupin renders grey — and FE reads grey as *already acted*. A single sheet can't serve both, because
+the cast palette's index roles are not the standard palette's (his grey ramp lands on cast 1/2/3/4/11, which
+under the enemy palette gives dark maroon, pink-grey, near-white and **bright green** at 11), and there is no
+spare cast-palette entry to redefine — all 16 are in use across the cast sheets. So the unit gets **two
+sheets**: the committed cast one, and a standard-palette one **derived at build time** by remapping cast
+indices to SMS roles (`art.map_sprite.pre_recruit_roles`, `_remap_indices`) — no committed derived asset, so
+every pixel edit to the cast sheet flows into the pre-recruit look automatically. `gPreRecruitVariant`
+(charId → SMS id + MU sheet) is consulted by all three per-character override hooks **only while
+`UNIT_FACTION != FACTION_BLUE`**: sprite and walk return the variant, and the palette hook *skips* the purple
+bank so `GetUnitSpritePalette` falls through to the faction switch. Empty table == exactly vanilla. Note an
+explicit ROLE map is required, not `remap_sms_palette`'s nearest-RGB: a grey ramp nearest-matched against a
+coloured palette collapses onto the constant entries and the unit barely changes colour by side. One
+limitation, accepted: an index serving two roles can't be split (Lupin's cast 2 is body shadow *and* the
+glasses pupil, so the pupil goes dark-red with the shading — invisible at 32×32). This is the pattern for a
+recruit whose joined look is its bespoke art; `FACTION_TINTED_CAST` remains right when the joined look may be
+the side's standard blue.
+_Decided: 2026-07-30_
+
+**A luminance recolour can collide two ROLES on one index — check the roles, not just the ramp (#24).**
+Lupin's map sprite lost its inner-ear wedges, and it read as a drawing mistake in the hand-drawn glasses pass.
+It wasn't: the shape was intact in all 18 frames. The recolour that moved the source onto the cast grey ramp
+landed the inner-ear pink (`b2629c`, luma 128) and the light body fur (`719ac1`, luma 146) on the **same**
+cast index 3, so the ears were painted body-colour. Caught by Nicolas comparing against the pack sprite, whose
+map sent that pink to a pale index. Recovered by re-deriving the 10 px/frame from the source colour and
+setting them to cast 11. **After any luminance-driven remap, list the source colours that share a target index
+and check none of them are different features** — a ramp can look perfectly graded and still have eaten a
+detail.
+_Recorded: 2026-07-30_
+
 **Pick a sprite already drawn in the standard SMS palette.** The first attempt (BoW "Goblin Spearman") had its own
 9-colour palette, so nearest-mapping it to the standard layout collapsed it to a dark, unreadable blob (and a remap-target
 bug — matching to the *player* palette while the unit displays under the *enemy* palette — turned its red pixels green by

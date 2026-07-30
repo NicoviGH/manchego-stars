@@ -35,10 +35,15 @@ MS = os.path.join(REPO, 'campaigns', 'rime-of-the-frostmaiden', 'map_sprites')
 WALK_DIRS = {'down': [5, 6, 7, 8, 9], 'side': [0, 1, 2, 3, 4], 'up': [10, 11, 12, 13, 14]}
 
 
-def _sheet(path, fw, fh):
+def _sheet(path, fh):
+    """Slice a single-column indexed sheet into fh-tall frames. The frame WIDTH is the
+    image width -- SMS sheets stack frames vertically, so a 32-wide idle (the 32x32
+    monster size class: Lupin, Sahnar) must not be read as 16-wide or every frame
+    interleaves half-rows."""
     im = Image.open(path)
     if im.mode != 'P':
         sys.exit('ERROR: %s is mode %s; expected an indexed (mode P) sheet' % (path, im.mode))
+    fw = im.width
     n = im.height // fh
     data = list(im.getdata())
     per = fw * fh
@@ -56,8 +61,8 @@ class Doc:
     def data(self):
         return {
             'palette': self.palette,
-            'idle': _sheet(self.idle_path, 16, self.idle_fh),
-            'walk': _sheet(self.walk_path, 32, 32),
+            'idle': _sheet(self.idle_path, self.idle_fh),
+            'walk': _sheet(self.walk_path, 32),
             'walkDirs': WALK_DIRS,
             'names': {'idle': os.path.basename(self.idle_path),
                       'walk': os.path.basename(self.walk_path)},

@@ -7,7 +7,9 @@ Run:  python3 tools/test_build_campaign.py
 """
 import os
 import re
+import shutil
 import sys
+import tempfile
 import unittest
 
 from PIL import Image
@@ -1171,6 +1173,32 @@ class Ch04RuntimeHost(unittest.TestCase):
         for x, y in self._reveal_positions()[1:]:        # the 5 non-leader tiles
             self.assertIn('.xPosition = %d,\n        .yPosition = %d,' % (x, y), joined)
 
+    def test_green_pack_wears_the_lycanroc_class_not_the_red_pack_s(self):
+        # Stage 3: the parley is an ugly->handsome upgrade as well as a faction flip, so the
+        # green allies must NOT share CLASS_MAUTHEDOOG with the red pack still on the field.
+        joined = '\n'.join(bc.ch04_green_pack_rows(self._chap()))
+        self.assertEqual(joined.count(bc.CH04_GREEN_PACK_CLASS), 5)
+        self.assertNotIn('CLASS_MAUTHEDOOG', joined)
+        # ...and the red pack it replaces is still the vanilla doog (the visible contrast).
+        self.assertIn('CLASS_MAUTHEDOOG',
+                      '\n'.join(bc.ch04_enemy_rows(self._chap(), arrives_turn=2)))
+
+    def test_lycanroc_pack_reskin_is_declared_and_clones_the_doog(self):
+        rk = [r for r in bc.enemy_class_reskins(self.CAMPAIGN) if r['id'] == 'lycanroc-pack']
+        self.assertEqual(len(rk), 1, 'campaign.yaml must declare the lycanroc-pack reskin')
+        rk = rk[0]
+        self.assertEqual(rk['base'], 'CLASS_MAUTHEDOOG')     # stats/anim ride along -> parity
+        self.assertEqual(rk['slot'], bc.CH04_GREEN_PACK_CLASS)
+        self.assertEqual(str(rk['frame']), '32x32')          # 32x32 quadruped on a 16x32 doog
+        self.assertEqual(rk['sprite'], 'lycanroc-pack')
+        for suffix in ('.png', '_mu.png'):
+            self.assertTrue(os.path.isfile(os.path.join(
+                bc.REPO, 'campaigns', self.CAMPAIGN, 'map_sprites',
+                rk['sprite'] + suffix)), 'missing map_sprites/%s%s' % (rk['sprite'], suffix))
+        # Appended class ids must stay unique (0x80/0x81/0x82 are ch03's).
+        ids = [r['slot_id'] for r in bc.enemy_class_reskins(self.CAMPAIGN) if r.get('slot_id')]
+        self.assertEqual(len(ids), len(set(ids)))
+
     def test_parley_pre_script_disas_the_pack_then_loads_the_green_allies(self):
         pre = bc.ch04_parley_pre_script('0xb3', 5, bc.CH04_GREEN_PACK_SYMBOL)
         self.assertEqual(pre.count('DISA(0xb3)'), 5)     # clear the 5 generics one at a time
@@ -1298,3 +1326,66 @@ class ItemIconPal2(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class PreRecruitVariant(unittest.TestCase):
+    """A cast member on the field BEFORE he joins you (ch04's Lupin: red as the pack's
+    leader, the finalized grey once Marty's parley brings him over).
+
+    The failure this guards is the Trex bug's sibling: a charId-keyed cast-palette
+    override is unconditional, so without the faction check Lupin renders in his bespoke
+    grey while he is an ENEMY -- and FE reads grey as "already acted".
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def test_lupin_declares_pre_recruit_roles_covering_every_index_he_uses(self):
+        roles = bc.pre_recruit_roles(self.CAMPAIGN, 'lupin')
+        self.assertIsNotNone(roles, 'lupin.yaml must declare art.map_sprite.pre_recruit_roles')
+        ms = os.path.join(bc.REPO, 'campaigns', self.CAMPAIGN, 'map_sprites')
+        for stem in ('lupin.png', 'lupin_mu.png'):
+            used = {v for v in Image.open(os.path.join(ms, stem)).getdata() if v}
+            self.assertTrue(used <= set(roles), '%s uses undeclared cast indices %s'
+                            % (stem, sorted(used - set(roles))))
+        # The body must land on the faction ramp (7-10) -- that is what makes him read red.
+        self.assertTrue({roles[2], roles[3]} & set(range(7, 11)),
+                        'no body index on the faction ramp: he would not change colour by side')
+
+    def test_a_plain_cast_member_has_no_variant(self):
+        self.assertIsNone(bc.pre_recruit_roles(self.CAMPAIGN, 'braulo'))
+
+    def test_remap_indices_rewrites_by_role_and_rejects_an_undeclared_index(self):
+        tmp = tempfile.mkdtemp(prefix='prv_')
+        try:
+            src, out = os.path.join(tmp, 's.png'), os.path.join(tmp, 'o.png')
+            pal = os.path.join(tmp, 'p.png')
+            for path, data in ((src, [0, 1, 3, 11]), (pal, list(range(16)))):
+                im = Image.new('P', (len(data), 1))
+                im.putpalette([0, 0, 0] * 16)
+                im.putdata(data)
+                im.save(path)
+            bc._remap_indices(src, {1: 15, 3: 9, 11: 13}, pal, out)
+            self.assertEqual(list(Image.open(out).getdata()), [0, 15, 9, 13])
+            with self.assertRaises(SystemExit) as cm:          # index 11 not declared
+                bc._remap_indices(src, {1: 15, 3: 9}, pal, out)
+            self.assertIn('11', str(cm.exception))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_every_override_hook_consults_the_variant_before_the_cast_override(self):
+        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'), encoding='utf-8').read()
+        self.assertIn('gPreRecruitVariant', src)
+        # The lookup is gated on faction: a JOINED unit must fall through to the cast look.
+        self.assertIn('UNIT_FACTION(%s) != FACTION_BLUE', bc._pre_recruit_lookup('%s'))
+        for expr in ('unit', 'proc->unit'):
+            self.assertIn('gPreRecruitVariant', bc._pre_recruit_lookup(expr))
+        # Sprite + walk return the variant; the palette instead SKIPS the purple bank so
+        # GetUnitSpritePalette falls through to the faction switch.
+        self.assertIn('return prv->smsId;', src)
+        self.assertIn('return prv->muImg;', src)
+        self.assertIn('if (prv == 0) {', src)
+
+    def test_the_lookup_is_c89_declarations_first(self):
+        # agbcc (GCC 2.95.1) rejects mid-block declarations; CLAUDE.md coding conventions.
+        body = [ln.strip() for ln in bc._pre_recruit_lookup('unit').splitlines() if ln.strip()]
+        self.assertTrue(body[0].startswith('struct PreRecruitVariant * prv'))
+        self.assertNotIn('//', bc._pre_recruit_lookup('unit'))

@@ -58,7 +58,7 @@ portrait derives from the official FRLG sprite only.)
 
 | Asset | Used for | Origin | Source |
 |---|---|---|---|
-| "Rockruff & Lycanroc Overworlds" sprite sheet (Midday form, 4-direction walk) | Lupin map sprites (`map_sprites/lupin{,_mu}.png`, recoloured to the cast grey ramp + hand-drawn glasses) | fan art by **princess-phoenix**, derived from © **Nintendo / Creatures / GAME FREAK** designs | [princess-phoenix, DeviantArt](https://www.deviantart.com/princess-phoenix/art/Rockruff-and-Lycanroc-Overworlds-722268380) — **CC-BY 3.0** ("feel free to use these in any of your pokemon projects!") |
+| "Rockruff & Lycanroc Overworlds" sprite sheet (Midday form, 4-direction walk) | Lupin map sprites (`map_sprites/lupin{,_mu}.png`, recoloured to the cast grey ramp + hand-drawn glasses) **and ch04's parleyed wolf pack** (`map_sprites/lycanroc-pack{,_mu}.png` — the same Midday frames without glasses, indexed to FE8's standard SMS roles so the green NPC palette colours them) | fan art by **princess-phoenix**, derived from © **Nintendo / Creatures / GAME FREAK** designs | [princess-phoenix, DeviantArt](https://www.deviantart.com/princess-phoenix/art/Rockruff-and-Lycanroc-Overworlds-722268380) — **CC-BY 3.0** ("feel free to use these in any of your pokemon projects!") |
 
 (Lupin's *portrait* is separate — the TotalityDesigns hipster-wolf ref, credited above under community/AI art.
 Battle anim deferred; PMD SpriteCollab has Lycanroc `sprite/0745` in the same style for later.)

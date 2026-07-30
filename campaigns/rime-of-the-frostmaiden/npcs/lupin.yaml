@@ -92,6 +92,14 @@ art:
   #      which tracks the head-bob): style = bold hipster frame raised +1px, OPAQUE white lens
   #      (cast idx4), near-black frame (cast idx1), dark pupil dot (cast idx2). On down + both
   #      sides; the UP (back) run has no face, so no glasses. Nicolas approved this exact spec.
+  #   4. Two 2026-07-30 corrections (Nicolas, Stage-3 review):
+  #      * The side run's glasses TEMPLE ARM was 1px; extended to 3px (x10-x12 on the lens row).
+  #      * The INNER-EAR wedges had gone missing -- not deleted by the glasses pass: step 2's
+  #        luminance recolour landed the source's inner-ear pink (b2629c) and its light body
+  #        fur (719ac1) on the SAME cast index 3, so the wedges were painted body-colour. The
+  #        10 px/frame (x12-13 + x18-19, y12-15 on the down frames) are now cast idx11, light
+  #        grey. Lesson for the next luminance recolour: check for two *roles* colliding on
+  #        one index, not just that the ramp looks right.
   map_sprite:
     base: Gwyllgi             # geometry token ONLY: {3 frames, UNIT_ICON_SIZE_32x32} wait-table
                               # row (unit_icon_wait_data.c // 77) — FE8's own dire-wolf, apt AND
@@ -102,5 +110,19 @@ art:
         # lupin_mu.png = 32x480 (15x 32x32); right = engine H-flip of the side run
     palette: cast             # cast_palette.png; grey ramp + glasses idx1/2/4
     credit: "princess-phoenix (DeviantArt, CC-BY 3.0); see CREDITS.md"
+    # ── Pre-recruit look (Nicolas, 2026-07-30): RED while he leads the pack, the grey
+    # sheet above once Marty's parley brings him over -- "only his colours change upon
+    # recruitment". He is placed red (recruit.initial_faction), and a charId-keyed cast
+    # palette override is unconditional, so without this he would render grey as an enemy
+    # (the Trex bug) -- and FE reads grey as "already acted". Faction-tinting him instead
+    # (FACTION_TINTED_CAST) would make him BLUE once recruited, losing the finalized grey.
+    # So: a second, standard-palette sheet, worn only while he is not on the player side.
+    # It is DERIVED AT BUILD TIME from lupin{,_mu}.png by remapping cast indices to the
+    # standard SMS roles below -- no committed derived asset, so every pixel edit to the
+    # grey sheet flows into the red one automatically. Body rides the faction ramp (7/9);
+    # mane + glasses lens stay the constant grey/white pair, matching the pack's treatment.
+    # Note idx2 is BOTH body shadow and the glasses pupil, so the pupil goes dark-red with
+    # the shading -- a pure index map cannot separate them, and at 32x32 it doesn't read.
+    pre_recruit_roles: {1: 15, 2: 7, 3: 9, 11: 13, 4: 14}
   # Battle anim still deferred (#39). PMD SpriteCollab has Lycanroc (#0745) with a full side-view
   # anim set (Attack/Charge/Shoot) if we want a matching-style battle anim later — rides #90's pipeline.

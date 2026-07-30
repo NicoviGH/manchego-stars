@@ -2133,15 +2133,21 @@ def _inject_sms_override_hook():
             '    if (!(unit->state & US_IN_BALLISTA))\n'
             '        return unit->pClassData->SMSId;\n')
     hooked = (
-        'extern unsigned short gMapSpriteOverride[];\n\n'
+        'extern unsigned short gMapSpriteOverride[];\n'
+        + PRE_RECRUIT_STRUCT
+        + 'extern struct PreRecruitVariant gPreRecruitVariant[];\n\n'
         'int GetUnitSMSId(struct Unit* unit) {\n'
         '    if (!(unit->state & US_IN_BALLISTA)) {\n'
         '        /* Campaign per-character map-sprite override (build-injected; the\n'
         '         * table is empty in vanilla). Lets a cast member wear a custom\n'
         '         * overworld sprite its stock class -- and any enemy of that class\n'
-        '         * -- does not. */\n'
+        '         * -- does not. A cast member who has not JOINED yet wears his\n'
+        '         * pre-recruit sheet instead (drawn for his side\'s palette). */\n'
         '        const unsigned short * mso = gMapSpriteOverride;\n'
         '        int charId = UNIT_CHAR_ID(unit);\n'
+        + _pre_recruit_lookup('unit', '        ')
+        + '        if (prv != 0)\n'
+        '            return prv->smsId;\n'
         '        while (*mso != 0xFFFF) {\n'
         '            if (mso[0] == charId)\n'
         '                return mso[1];\n'
@@ -2202,14 +2208,21 @@ def _inject_mu_override_hook():
             '}\n')
     hooked = (
         'struct CharMuImg { unsigned short charId; const void * img; };\n'
-        'extern struct CharMuImg gMuImgOverride[];\n\n'
+        'extern struct CharMuImg gMuImgOverride[];\n'
+        + PRE_RECRUIT_STRUCT
+        + 'extern struct PreRecruitVariant gPreRecruitVariant[];\n\n'
         'const void * GetMuImg(struct MuProc * proc)\n'
         '{\n'
         '    /* Campaign per-character MU (hover/walk) sprite override (build-injected;\n'
-        '     * empty in vanilla). Reuses the class motion script -- graphics only. */\n'
+        '     * empty in vanilla). Reuses the class motion script -- graphics only. The\n'
+        '     * pre-recruit walk takes precedence while the unit has not joined you, so\n'
+        '     * moving does not flip him back to his recruited colours. */\n'
         '    if (proc->unit) {\n'
         '        struct CharMuImg * it = gMuImgOverride;\n'
         '        int charId = UNIT_CHAR_ID(proc->unit);\n'
+        + _pre_recruit_lookup('proc->unit', '        ')
+        + '        if (prv != 0)\n'
+        '            return prv->muImg;\n'
         '        while (it->charId != 0) {\n'
         '            if (it->charId == charId)\n'
         '                return it->img;\n'
@@ -2284,18 +2297,26 @@ def _inject_palette_bank_hook():
                 '{\n'
                 '    switch (UNIT_FACTION(unit)) {\n')
     gsp_hooked = (
-        'extern unsigned short gMapPaletteOverride[];\n\n'
+        'extern unsigned short gMapPaletteOverride[];\n'
+        + PRE_RECRUIT_STRUCT
+        + 'extern struct PreRecruitVariant gPreRecruitVariant[];\n\n'
         'int GetUnitSpritePalette(const struct Unit * unit)\n'
         '{\n'
         '    /* Campaign per-character map-palette override (build-injected; empty in\n'
         '     * vanilla). Custom cast wear a bespoke palette in the purple bank so the\n'
-        '     * shared player (blue) palette stays untouched. */\n'
+        '     * shared player (blue) palette stays untouched -- but a cast member who\n'
+        '     * has not JOINED yet must read as his SIDE (FE colours an enemy red), so\n'
+        '     * he skips the override and falls through to the faction switch, wearing\n'
+        '     * the pre-recruit sheet drawn for those standard palettes. */\n'
         '    const unsigned short * mp = gMapPaletteOverride;\n'
         '    int charId = UNIT_CHAR_ID(unit);\n'
-        '    while (*mp != 0xFFFF) {\n'
-        '        if (*mp == charId)\n'
-        '            return OBJPAL_UNITSPRITE_PURPLE;\n'
-        '        mp++;\n'
+        + _pre_recruit_lookup('unit')
+        + '    if (prv == 0) {\n'
+        '        while (*mp != 0xFFFF) {\n'
+        '            if (*mp == charId)\n'
+        '                return OBJPAL_UNITSPRITE_PURPLE;\n'
+        '            mp++;\n'
+        '        }\n'
         '    }\n'
         '    switch (UNIT_FACTION(unit)) {\n')
     if gsp_orig not in text:
@@ -2470,6 +2491,9 @@ def inject_map_sprites(campaign, verbose=True):
     _inject_idle_sprites(campaign, asset_dir, idle + guest_idle, pointer_externs, guest_bases,
                          src_override=tinted_idle_src)
     _inject_mu_sprites(mu + guest_mu, pointer_externs)
+    # Second look for a cast member who is on the field BEFORE he joins you (appends its
+    # own wait rows, so it must follow the cast/guest rows that name their own SMS ids).
+    _inject_pre_recruit_variants(campaign, idle, pointer_externs, verbose=verbose)
     if pointer_externs:
         with open(UNIT_ICON_POINTER_H, 'a', encoding='utf-8') as f:
             f.write('\n/* Manchego Stars custom map sprites (#38) */\n'
@@ -2518,6 +2542,121 @@ def _insert_table_head(path, decl, rows_text):
     text = text[:m.end()] + rows_text + text[m.end():]
     with open(path, 'w', encoding='utf-8') as f:
         f.write(text)
+
+
+# --- pre-recruit variant: a cast member who is on the field before he joins you ---------
+# A charId-keyed cast override is UNCONDITIONAL, so a cast member placed on a hostile/NPC
+# side renders in his bespoke cast palette regardless -- the Trex bug (decisions.md Art &
+# Audio). FACTION_TINTED_CAST solves it by giving up the cast palette entirely, which is
+# right when the joined look may be the side's standard blue. It is NOT right when the
+# joined look IS the bespoke sheet (Lupin: red as the pack's leader, the finalized grey
+# once recruited). So: a SECOND sheet in the standard SMS role layout, worn only while the
+# unit is not on the player side, derived at build time from the cast sheet by an index
+# remap (art.map_sprite.pre_recruit_roles) -- single source of truth stays the cast sheet.
+# The engine picks between them in the three per-character override hooks below.
+PRE_RECRUIT_STRUCT = ('struct PreRecruitVariant { unsigned short charId; '
+                      'unsigned short smsId; const void * muImg; };\n')
+
+
+def _pre_recruit_lookup(unit_expr, indent='    '):
+    """C (agbcc/C89: declarations first) resolving `unit_expr` to its pre-recruit variant
+    row, or NULL when the unit has joined / has no variant."""
+    i = indent
+    return (i + 'struct PreRecruitVariant * prv = 0;\n'
+            + i + 'if (UNIT_FACTION(%s) != FACTION_BLUE) {\n' % unit_expr
+            + i + '    struct PreRecruitVariant * it = gPreRecruitVariant;\n'
+            + i + '    int prvChar = UNIT_CHAR_ID(%s);\n' % unit_expr
+            + i + '    while (it->charId != 0) {\n'
+            + i + '        if (it->charId == prvChar) {\n'
+            + i + '            prv = it;\n'
+            + i + '            break;\n'
+            + i + '        }\n'
+            + i + '        it++;\n'
+            + i + '    }\n'
+            + i + '}\n')
+
+
+def pre_recruit_roles(campaign, uid):
+    """{cast index: standard SMS role index} for a unit that stands on a non-player side
+    before it joins, or None. Declared in the unit YAML (art.map_sprite.pre_recruit_roles)."""
+    ms = ((load_unit(campaign, uid).get('art') or {}).get('map_sprite') or {})
+    roles = ms.get('pre_recruit_roles')
+    return {int(k): int(v) for k, v in roles.items()} if roles else None
+
+
+def _inject_pre_recruit_variants(campaign, idle, pointer_externs, verbose=True):
+    """Emit the pre-recruit (not-yet-joined) sheets + gPreRecruitVariant for every cast
+    member declaring `pre_recruit_roles`. Runs inside inject_map_sprites, which owns the
+    override tables; the table is always emitted (empty == vanilla behaviour)."""
+    rows = []
+    for uid, slot, _cls, _sms in idle:
+        roles = pre_recruit_roles(campaign, uid)
+        if not roles:
+            continue
+        asset_dir = os.path.join(REPO, 'campaigns', campaign, 'map_sprites')
+        donor = _donor_base(campaign, uid)
+        _, dfw, dfh = map_sprite_tool.donor_sms_geometry(donor)
+        sym = 'unit_icon_wait_manchego_%s_pre_sheet' % uid.replace('-', '_')
+        move_sym = 'unit_icon_move_manchego_%s_pre_sheet' % uid.replace('-', '_')
+        wait_png = os.path.join(WAIT_GFX_DIR, sym + '.png')
+        move_png = os.path.join(MOVE_GFX_DIR, move_sym + '.png')
+        donor_png = os.path.join(WAIT_GFX_DIR, 'unit_icon_wait_%s_sheet.png' % donor)
+        for src, dst in ((uid + '.png', wait_png), (uid + '_mu.png', move_png)):
+            src = os.path.join(asset_dir, src)
+            if not os.path.isfile(src):
+                sys.exit('ERROR: %s declares pre_recruit_roles but has no map_sprites/%s'
+                         % (uid, os.path.basename(src)))
+            _remap_indices(src, roles, donor_png, dst)
+        map_sprite_tool.validate_mu_sheet(move_png)
+        macro, _, _, _ = map_sprite_tool.sheet_info(wait_png, (dfw, dfh))
+
+        sms = _wait_table_len()
+        _append_table_rows(UNIT_ICON_WAIT_C, 'unit_icon_wait_table[]',
+                           ['\t{0, %s, %s}, // %d %s (pre-recruit)' % (macro, sym, sms, uid)])
+        with open(UNIT_ICON_WAIT_S, 'a', encoding='utf-8') as f:
+            f.write('\n/* Manchego Stars pre-recruit idle sprite: %s (#24) */\n'
+                    '\t.global %s\n%s:\n\t.incbin "graphics/unit_icon/wait/%s.4bpp.lz"\n'
+                    '\t.align 2, 0\n' % (uid, sym, sym, sym))
+        with open(UNIT_ICON_MOVE_S, 'a', encoding='utf-8') as f:
+            f.write('\n/* Manchego Stars pre-recruit hover/walk (MU) sprite: %s (#24) */\n'
+                    '\t.global %s\n%s:\n\t.incbin "graphics/unit_icon/move/%s.4bpp.lz"\n'
+                    '\t.align 2, 0\n' % (uid, move_sym, move_sym, move_sym))
+        pointer_externs += ['extern char %s[];' % sym, 'extern char %s[];' % move_sym]
+        rows.append('\t{CHARACTER_%s, %d, %s},' % (slot.upper(), sms, move_sym))
+        if verbose:
+            print('  %-12s -> pre-recruit sheet (SMS %d) worn until he joins you' % (uid, sms))
+
+    with open(UNIT_ICON_MOVE_C, encoding='utf-8') as f:
+        move_c = f.read()
+    move_c += ('\n/* injected: pre-recruit (not-yet-joined) map sprites -- a cast member on a\n'
+               ' * hostile/NPC side wears THIS standard-palette sheet under his side\'s\n'
+               ' * faction colour instead of the bespoke cast palette. charId 0 terminates;\n'
+               ' * an empty table is exactly vanilla behaviour. */\n'
+               + PRE_RECRUIT_STRUCT
+               + 'struct PreRecruitVariant gPreRecruitVariant[] = {\n'
+               + ('\n'.join(rows) + '\n' if rows else '') + '\t{0, 0, 0}\n};\n')
+    with open(UNIT_ICON_MOVE_C, 'w', encoding='utf-8') as f:
+        f.write(move_c)
+
+
+def _remap_indices(src_path, roles, palette_png, out_path):
+    """Rewrite an indexed sheet's pixel INDICES through `roles` (index -> index), saving it
+    under `palette_png`'s palette. Index 0 (transparent) is fixed. Unlike
+    map_sprite_tool.remap_sms_palette this is an explicit ROLE map, not nearest-RGB: the
+    cast sheets are a grey ramp, and nearest-RGB against a coloured standard palette
+    collapses them onto the constant/secondary entries (a grey Lupin barely changes colour
+    by faction). Every non-zero index present must be declared."""
+    im = Image.open(src_path)
+    if im.mode != 'P':
+        sys.exit('ERROR: %s is mode %s; expected an indexed (mode P) sheet' % (src_path, im.mode))
+    missing = sorted({v for v in im.getdata() if v and v not in roles})
+    if missing:
+        sys.exit('ERROR: %s uses cast index/indices %s with no pre_recruit_roles entry'
+                 % (os.path.basename(src_path), ', '.join(str(m) for m in missing)))
+    out = Image.new('P', im.size)
+    out.putpalette(map_sprite_tool._read_palette(palette_png))
+    out.putdata([0 if v == 0 else roles[v] for v in im.getdata()])
+    out.save(out_path)
 
 
 def _inject_ch02_chwinga_sprites(campaign, verbose=True):
@@ -6189,6 +6328,9 @@ CH04_LUPIN_TALK_MSG = 0x9BA                    # dead Ch5 text slot -> stub parl
 CH04_LUPIN_TALK_FLAG = 'EVFLAG_TMP(9)'         # one-shot recruit flag (ch03's Colm-CHAR idiom)
 CH04_GREEN_WOLF_PID = '0xcd'                    # generic green-ally pid: the whole pack shares it
                                                # (uncontrolled NPCs; don't count for Rout)
+CH04_GREEN_PACK_CLASS = 'CLASS_MTD_LYCANROC_PACK'  # campaign.yaml enemy_class_reskins: a Mauthe
+                                               # Doog clone wearing the Lycanroc map sprite, so
+                                               # the parleyed pack is visibly not the red one
 # Stage 2c -- the turn-2 REVEAL cutscene rides the existing turn-2 TurnEvent script (it already
 # LOADs the reveal table). Two dead Ch5 text slots for the stub beats (Stage 4 finalizes dialogue).
 CH04_REVEAL_SCRIPT = 'EventScr_089F22A4'        # turn-2 TurnEventPlayer script (reused)
@@ -6275,13 +6417,16 @@ def ch04_green_pack_rows(chap):
     """The green Lycanroc NPC allies loaded when Marty parleys the pack: 5 GREEN wolves on the
     5 generic (non-leader) tiles of the reveal wave. Uncontrolled NPCs (they don't count for
     Rout); only Lupin (the CUSA target) becomes a PC. The whole pack shares one generic pid
-    (CH04_GREEN_WOLF_PID). Class stays the wave's (Mauthe Doog) as the Stage-2 placeholder --
-    the green Lycanroc map sprite reskin is Stage 3 art."""
+    (CH04_GREEN_WOLF_PID).
+
+    They ride CH04_GREEN_PACK_CLASS -- a Mauthe Doog clone carrying the Lycanroc map sprite
+    (campaign.yaml enemy_class_reskins) -- NOT the wave's own class: the red pack is still
+    wearing CLASS_MAUTHEDOOG, and the parley is meant to read as an ugly->handsome upgrade as
+    well as a faction flip. Cloned stats mean the parity read is unchanged either way."""
     wave = _ch04_reveal_wave(chap)
-    cls, _ai, _items = _ch04_wave_pack_kit(wave)
     return [_ally_unit_entry(
-        None, None, cls, int(wave['level']), x, y, '0',
-        ' /* green Lycanroc ally (parley outcome; sprite = Stage 3 art) */',
+        None, None, CH04_GREEN_PACK_CLASS, int(wave['level']), x, y, '0',
+        ' /* green Lycanroc ally (the parley outcome) */',
         allegiance='GREEN', char=CH04_GREEN_WOLF_PID)
         for x, y in wave['positions'][1:]]
 
