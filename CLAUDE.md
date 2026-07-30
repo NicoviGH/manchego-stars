@@ -14,11 +14,25 @@ The data is the doc — facts live in exactly one place, and indexes are generat
 | Settled design decisions (combat, triangle, economy, class mapping, promotion seam) | `docs/decisions.md` |
 | Generic 5e→FE engine conversion | `docs/rules-mapping.md` |
 | Adding a unit's art / battle anim / platform | the **`inject_battle_anims` / `inject_battle_platforms` docstrings** (how) + `decisions.md` Art & Audio (why) + the **`custom_unit` issue template** (checklist) |
+| Borrowable enemy reskin art (what the FE-Repo has) | **`docs/fe-repo-scouting.md`** (scouting log) + per-unit `skin:` fields in chapter YAML + `campaign.yaml` `enemy_class_reskins` |
 | Hosting a new chapter (map → slot → deploy → win → boot) | **`docs/adding-a-chapter.md`** (the repeatable runbook) + `inject_ch03` (lean reference impl) |
+| Prep screen / deploy cap / force-deployment | `decisions.md` → "How the deploy cap + prep screen are actually wired" + `inject_ch01`'s docstring. **Prep from ch01 on is standing protocol — the CAP is the parity, Pick Units only chooses which PCs fill it. Never re-derive this from the decomp, and never from `hasPrepScreen` (dead FE7 leftover, false everywhere).** |
 | FE8 cadence/reward grounding | `docs/fe8-pacing-reference.md` |
 | Post-MVP (Act II–V) plan | `docs/roadmap.md` |
 | Vision / architecture / phased roadmap | `docs/PRD.md` |
 | Work backlog | **GitHub issues** (milestones M0–M4) |
+
+## The decomp answers "what does vanilla do." It never answers "what do WE do."
+
+For any question about our own conventions — prep, deploy caps, objectives, economy, class
+mapping, art pipeline — **read `docs/decisions.md` first and cite the ADR.** Reaching into
+`fireemblem8u/` to re-derive a settled call produces confident wrong answers, because vanilla's
+data describes vanilla: it has no idea what we decided to diverge on, and some of its fields are
+dead weight the decomp itself flags as unused. (Live example, and why this section exists: a
+session "discovered" from `hasPrepScreen` that our prep screen was a divergence. That field is an
+FE7 leftover, false for every chapter including ones that plainly have prep — and prep from ch01
+has been standing protocol since 2026-06-10, where the *cap* is the parity.) If `decisions.md` is
+silent, ask; don't infer it from the ROM.
 
 ## Session Start Checklist
 

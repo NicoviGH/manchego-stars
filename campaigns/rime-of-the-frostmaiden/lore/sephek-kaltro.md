@@ -7,6 +7,15 @@
 > when the back-half DM notes land (see `docs/decisions.md` §Story → Sephek arc). He is **distinct
 > from Ravisin** (the ch05 frost-druid boss); ch02 plants his first breadcrumb (Rootis IDs his
 > kill at Targos). Death-reveal imagery still reserved — see "Imagery budget" below.
+>
+> **He APPEARS IN CH05 (decided 2026-07-23, Nicolas).** ch05 mirrors vanilla Ch5's scene
+> anatomy 1:1, and vanilla's boss receives his orders from a *superior officer* (Glen → Saar),
+> never from the big bad. Sephek fills that slot: he arrives, gives **Ravisin** her orders in
+> Auril's name, and leaves — keeping the Frostmaiden off the page as `frostmaiden-voices.md`
+> requires. It makes the **Children of Auril** concrete (the player has now *seen* a second
+> hand), earns Ravisin's "she has other hands" drop later in that chapter, and re-arms him for
+> his Act-II death. He does NOT fight in ch05. Slot + brief: `ch05-the-elven-tomb.yaml`
+> §SCENE MAP, "vanilla 9BC".
 
 ## Concept
 

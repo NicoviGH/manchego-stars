@@ -19,16 +19,26 @@ fe8_base_map: "FE8 Ch5 — The Empire's Reach"        # retiled: Ch5's spread fi
 parity_reference: "FE8 Ch5"   # #48 enemy-pressure + reward parity bar — The Empire's Reach (1:1)
                               # (first chapter at the FE8-Ch5 reward tier: stat-boosters + a promotion item unlock here)
 
+introduces:
+  - concept: arena-wager         # the arena mechanic — DEBUT (decisions.md §Economy, superseded
+                                 # 2026-07-29: the arena is KEPT and keeps its name; Wolfram opens it)
+    coverage: both               # tutorial boxes for the rules + Wolfram's 0x9BE seed for the fiction
+    where: "Wolfram finds the buried arena in 0x9BE and offers to make it usable; the flag-gated
+      tutorial (0x9D5 + 0x9D6, vanilla verbatim) fires when a unit visits the arena tile"
+    status: active
+
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
-  The white moose's trail ends at an ancient elven tomb on a wooded slope — the
-  refuge of Ravisin, the frost druid who has been awakening beasts to terrorize
-  the loggers in Auril's name (the same druid who awakened Messie out in Maer
-  Dualdon). Cornered at last, the moose makes its stand beside her. Ravisin fights
-  to the death for her goddess. Among the crystal pillars the party finds a
-  sealed sarcophagus, kindles the gazebo brazier to open it, and frees Sahnar — a
-  chaotic-good moon-elf mummy who joins them, eager to learn about modern druids.
-  They also rescue a sentient goodberry shrub, repot it, and name it Basil.
+  The white moose's trail ends at an ancient elven tomb — the refuge of Ravisin, an
+  acolyte of Auril who awakens the wild and raises the frozen dead to serve the
+  Frostmaiden's endless winter, snuffing every warm hearth clinging to the ice (the
+  same druid who awakened Messie, out in Maer Dualdon). Cornered at last, the moose
+  makes its stand beside her, and Ravisin fights to the death for her goddess. When
+  she tears the tomb open she WAKES its guardian — Sahnar, an ancient elven royal left
+  awake and watching for millennia — who comes willingly, believing the party are the
+  intruders she was left to stop. She is MISLED, not puppeted. The party turn her by
+  chaperoning the goodberry shrub, Basil, across to tell her the truth. They repot Basil
+  and take him along, and turn down the coast toward Bremen.
 
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
@@ -44,10 +54,23 @@ map:
     An open-air elven tomb — a snowy sunken depression ringed by crystal pillars and
     statues (cover/chokepoints), NOT a claustrophobic crypt. The moon dial sits at
     center, the gazebo brazier to one side, the sarcophagus on the eastern berm.
-    Ravisin holds the central depression with the cornered white moose; vine-blight
-    guardians clog the approaches. Elven reliquary niches are spread to the map's edges
-    (the reward-sites the eruption's undead race to desecrate). Open lanes between the
-    pillars keep cavalry relevant.
+    IT WAS AN AMPHITHEATRE FIRST — CANON, verified 2026-07-29. RotFM: the site was built
+    as an amphitheatre so Orem could tell the elves of his ascension, and was refashioned
+    into his tomb when he died (lore/sahnar.md §Source canon). Not invented to justify an
+    arena tile: the geometry above is already amphitheatre-shaped (a sunken bowl, rings of
+    pillars and statues, a dial at the focus), so our shape matched the canon before we
+    knew the canon. Wolfram finds it by metal-sense in 0x9BE; decisions.md §Economy carries
+    the full call. CAVEAT: canon's amphitheatre was built for ORATORY. Wolfram calling it
+    an arena is an INFERENCE from the only evidence he has — chips struck off blade edges,
+    therefore blades met here — and he is a smith, not a historian. He never claims to know
+    who fought, why, or that anyone trained. Keeping it his deduction rather than the
+    narrator's assertion is what lets our arena and the canon both stand.
+    Ravisin holds the central depression with the cornered white moose; risen elven
+    tomb-guardians (spear-guards, axe-reavers) clog the approaches. Elven reliquary niches are
+    spread to the map's edges (the reward-sites the eruption's dead race to desecrate). Open
+    lanes between the pillars keep cavalry relevant. ENTRANCE = an open elven GATEWAY (a worn
+    arch / standing stones at the rim), descending a stair into the open-air hollow — NOT a
+    door into an enclosed crypt (ch04's "worked door" reads as this gateway).
 
 # ── Objective ──────────────────────────────────────────────────────────────────
 objective:
@@ -58,11 +81,14 @@ objective:
       description: >
         Recruit Sahnar the Joshua way (this IS Ch5's memorable beat). Sahnar rises as
         a HOSTILE guardian — a fast, crit-threat Myrmidon mummy (killing-edge, Joshua's
-        exact donor) — and the only way to flip him is to walk fragile BASIL up to him
-        to Talk (Basil is our Natasha: her exact donor, a frail Priest). So you must
-        chaperone a weak healer across the depression to the deadly duelist, clearing a
-        safe pocket first — the escort-recruit that defines how you play Ch5. Optional;
-        flip him and he fights the back half (recruit swing ~+0.9 kills/round, #171).
+        exact donor), WOKEN by Ravisin and fighting of her own will in the belief that she is
+        finally doing her duty — and the only way to turn her is to walk fragile BASIL up to her
+        to Talk (Basil is our Natasha: her exact donor, a frail Priest). Only he can turn her,
+        because she does not weigh his argument — she RECOGNISES him (9C6: her purpose holds,
+        her enemy resolves). So you must chaperone a weak healer across the depression to the
+        deadly duelist, clearing a safe pocket first — the escort-recruit that defines how
+        you play Ch5. Optional; free her and she fights the back half (recruit swing
+        ~+1.0 kills/round, #171).
     - type: brazier_flavor
       description: >
         The gazebo brazier (silver flame) is the narrative beat that WAKES Sahnar from
@@ -73,34 +99,82 @@ win_condition: boss_defeated
 lose_condition: all_player_units_defeated
 
 difficulty_note: >
-  Our first real boss, tuned to the FE8 Ch5 bar (steepest yet: threat/slot ~10.3,
-  clear-load/slot ~5.15 static — but see the DYNAMICS below, which the #171 engine now
-  models). Ravisin is a vanilla FE8 Druid — heavy dark-magic (FE MAG vs RES) at 1-2
-  range — so squishy/low-RES units must respect her threat range; the pillars give cover
-  to bait her out. Two Ch5 dynamics do the real work and pay the difficulty DOWN so we
-  can afford the tension:
+  Our first real boss. Roster GROUNDED (rev.3, 2026-07-23, #25) to the FE8 Ch5 bar — verdict
+  PARITY (within band): threat/slot 12.7 (x1.11) · clear-load/slot 4.8 (x0.84); ours reads
+  line 15 · reinf 6 · convertible 2 against the twin's 16/6/1 (the extra convertible is the
+  white moose, neutralized by killing Ravisin rather than ground down). The force is RISEN
+  ELVEN GUARDIANS on vanilla FE8 infantry classes, skinned undead — the ch01 "vanilla class,
+  our skin" pattern. Because the stats ARE living-class stats, clear-load parity comes for
+  free: the earlier glassy problem (undead monster classes get doubled → die in 1 round;
+  decisions.md) doesn't arise.
+  COMPOSITION tracks the twin, not just the totals (2026-07-23): Soldier 6, Archer 3,
+  Mercenary 1, Myrmidon 1 match Ch5 exactly, and the axe block is 10 of 23 (~43%) against
+  vanilla's 11 (~48%, its 6 Brigands + 5 Fighters) — Ch5 is an AXE-HEAVY map and that shapes
+  the weapon triangle the player actually plays against, which the per-slot averages can't see.
+  Ravisin is a vanilla FE8 Druid — heavy dark-magic (FE MAG vs RES) at 1-2 range — so
+  squishy/low-RES units must respect her threat range; the pillars give cover to bait her out.
+  She carries a PERSONAL boss line (see her entry) putting her at ~13.4 rounds to kill, the
+  vanilla Saar bar. Two Ch5 dynamics do the real work and pay the STATIC bar DOWN:
     - CONVERTIBLE Sahnar (the Joshua flip): a hostile crit-Myrmidon until Basil Talks
-      him, then a +0.9 kills/round ally for the back half. Self-balancing risk→advantage.
-    - REINFORCEMENT eruption: undead arrive over turns (arrives_turn), not a turn-1 alpha —
-      so the turn-1 threat reads well below the static 10.3.
+      her, then a +1.0 kills/round ally for the back half. Self-balancing risk→advantage.
+    - REINFORCEMENT eruption: the dead arrive over turns (arrives_turn), not a turn-1 alpha —
+      so the turn-1 threat reads 9.9 (≈ vanilla's 9.0), below the static 12.7.
     - Untapped headroom: Lupin (+1.0) is a clean all-chapter combatant the static party
       number (6.27) omits; Basil is the fragile recruiter, not a fighter.
   No fog — the tension is the escort + the eruption race, not obscured vision. Keep it a
-  clean DefeatBoss so Ravisin is the climax.
+  clean DefeatBoss so Ravisin is the climax. (Playtest remains the arbiter; the static bar
+  is a proxy — spatial check + `--ch05-boot` playtest still owed at the build slice.)
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
+  prep_screen: true            # STANDING PROTOCOL since ch01, not a per-chapter call and NOT a
+                               # divergence: decisions.md "How the deploy cap + prep screen are
+                               # actually wired" (2026-06-10) -- "the cap is the parity; Pick Units
+                               # only chooses which PCs fill it". Vanilla Ch5 has no PREP macro and
+                               # force-deploys its nine; we field the same NINE and let the player
+                               # pick them. Mechanism: CALL(EventScr_08591FD8) (the shared
+                               # CLEAN/PREP/CLEAN script) at the end of the beginning scene; the cap
+                               # is the ally UnitDefinition table's entry count.
+                               # Do NOT consult `hasPrepScreen` in chapter_settings.json to answer
+                               # this -- that field is DEAD (FE7 leftover, chapterdata.h:37) and
+                               # reads false for every chapter, including ones that plainly have
+                               # prep. It is registered in check.py DEAD_CONCEPTS for that reason.
+  deploy_limit: 9              # = vanilla FE8 Ch5's 9 player slots (fe8-pacing-reference.md §1b,
+                               # decomp-verified). A DIFFICULTY lever, not a map count — the field
+                               # size is set by parity, and the map is painted to provide 9 start
+                               # tiles (decisions.md §Field parity). Grounds the /slot parity read.
   note: >
     Deployable pool by Ch5: 7 PCs + Pinky + Baxby (Cav) + Trex (Thief) + Lupin
     (beast-Cav, won in ch04 — a clean all-chapter combatant, +1.0 kills/round the static
     party number omits). Basil (Priest) is present from the start as the fragile RECRUITER
     (must be fielded and protected to Talk Sahnar — the Natasha role), NOT a fighter.
-    Sahnar is NOT in the starting field — he rises mid-combat as a HOSTILE convertible
-    (the Joshua flip) and joins only once Basil Talks him. deploy_limit caps the field to
-    FE8-Ch5 parity (TBD this pass). Positions set in Tiled.
+    Sahnar is NOT in the starting field — she rises mid-combat as a HOSTILE convertible
+    (the Joshua flip) and joins only once Basil Talks her. With deploy_limit 9 and a pool
+    of 10 (7 PCs + Pinky + Baxby + Trex + Lupin, minus Basil-as-recruiter tradeoffs), the
+    player leaves one unit home — a real cut for a boss chapter. Positions set in Tiled.
 
-# ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
+# ── Enemy Units (vanilla FE — grounded to FE8-Ch5 parity, #25) ────────────────────
+# Grounding pass rev.2 (2026-07-23): the force is now RISEN ELVEN TOMB-GUARDIANS on the
+# vanilla FE8 infantry classes (Soldier/Fighter/Mercenary/Archer/Armor-Knight/Myrmidon) —
+# the same "vanilla class, our skin" pattern ch01 uses (goblin-skinned Soldiers/Fighters,
+# campaign.yaml `enemy_class_reskins`). Two payoffs:
+#   1. PARITY BY CONSTRUCTION — living-class stats ARE the vanilla Ch5 twin's stats, so the
+#      glassy monster-class problem (mogall/revenant get doubled → die in 1 round; decisions.md
+#      "undead reskins read glassy") simply doesn't arise. The Armor-Knight is the Def-sink the
+#      undead palette couldn't produce.
+#   2. STORY SEPARATION FROM CH04 — ch04 is the BEAST chapter (the wolf hunt, Marty's parley).
+#      ch05 is the TOMB: the dead, not more wolves. Ravisin awakened the living in ch04; here she
+#      has raised the DEAD (an escalation). Wolves are CUT (2026-07-23, Nicolas). The lone beast
+#      is the White Moose — the ch04 quarry finally cornered (payoff, not a repeat).
+# Structure preserved: 16 line + 6 eruption reinf + 1 convertible (Sahnar) = vanilla's line 16 ·
+# reinf 6 · convertible 1. Weapons modeled via `inventory.fe_base`; eruption tagged
+# `arrives_turn` (#177); Sahnar `convertible` (#171). No item drops — the Ch5 twin carries none.
+# Per-unit `skin:` = the intended reskin for the ART track (build-slice: rides
+# `enemy_class_reskins` in campaign.yaml + inject_enemy_class_battle_anims). `source:
+# palette_swap` = frost/pale recolour of the vanilla frame (no FE-Repo undead anim in that
+# weapon mode); a "FE-Repo: …" source = a borrowable custom anim (all [U] free-to-use).
 enemy_units:
+  # ── The boss: Ravisin, frost druid (holds the central depression) ───────────
   - id: ravisin
     name: "Ravisin"
     is_boss: true
@@ -108,89 +182,1079 @@ enemy_units:
     class: druid                # vanilla FE8 Druid (baseRanks: Anima D, Dark C, Staff E)
     level: 7
     weapon: flux-tome           # FE8 Flux (Dark) — the Druid's class-native tome; flavored "Killing Frost"
+    inventory:
+      - id: killing-frost
+        fe_base: flux           # FE8 Flux — dark magic (FE MAG vs RES) at 1-2 range
     damage_type: cold           # flavor label only
-    ai_pattern: hold_position
+    ai_pattern: hold_position   # = vanilla Saar's GuardTileAI posture (decomp: .ai {GuardTileAI,0x9,0x20})
+    boss_tile: moon_dial        # she holds the moon dial at the centre — retiled as a dais
+                                # (flavour + AI anchor; NO terrain bonus, see below)
+    personal:                   # FE8's OWN boss mechanism — a named boss is class base + a
+      baseHP: 15                # personal line. Vanilla Saar is an Armor Knight *plus*
+      baseDef: 5                # HP+13/Pow+6/Skl+5/Spd+3/Def+2/Res+3/Lck+4; that line is most
+      basePow: 4                # of why he reads as a wall. This puts Ravisin at ~13 rounds to
+      baseSkl: 3                # kill — Saar's bar — while she stays a Druid with Flux and her
+      baseRes: 3                # existing art. Zero art cost, no custom class, pure vanilla.
+      baseLck: 3
+    # BOSS-ARCHETYPE NOTE (2026-07-23, decomp-verified — supersedes the throne/bodyguard fix):
+    # FE8 has NO tanky mage class (best magic Def is 5: Sage/Mage-Knight/Gorgon, all 10% Def
+    # growth), so swapping her class can't work. But the class was never the reason vanilla
+    # bosses are walls — the PERSONAL LINE is. Saar also stands on TERRAIN_ROAD (checked, not
+    # assumed): his wall is 100% class+personal, ZERO terrain. So:
+    #   - NO throne tile. Personal Def and terrain STACK: HP+15/Def+5 on a throne makes her
+    #     undentable by the parity yardstick (inf). One lever, not two.
+    #   - NO armour bodyguards. With a real boss line the `frost-sentinel` scaffolding is
+    #     redundant (removed 2026-07-23, Nicolas) — the boss carries her own fight.
     death_quote: "Auril… I gave you everything…"
+    skin:                       # Ravisin has authored boss art already; frost-druid palette
+      look: "Ravisin, frost druid (existing boss portrait + Druid class art)"
+      source: authored
     drops:
       - id: crest-of-cold-iron  # FORESHADOW: locked promotion relic (see decisions.md — the promotion seam)
         is_key_item: true
         locked: true            # unusable in MVP; pays off at the Ch8→9 promotion seam
+  # ── The cornered white moose (the LONE beast — ch04 quarry) ─────────────────
+  # ROLE FIX 2026-07-23: was `is_boss: true`, which INVERTED the chapter's climax — at
+  # threat 14.1 it out-threatened Ravisin (8.4) 1.7x and was 2.2x the vanilla Ch5 ceiling
+  # (6.3), so the "boss" was a speed bump next to it. Level nerfs don't help (gwyllgi is
+  # Spd 14, doubles everything: even L2 = 11.8). So it keeps its terror and changes ROLE:
+  # a NAMED MINIBOSS (vanilla Ch5 precedent: CHARACTER_BANDIT_CH5, a named non-boss threat)
+  # that is CONVERTIBLE — killing Ravisin breaks her hold and it stops fighting. The player
+  # chooses: grind a 4.3-round, 14-threat monster, or push the objective and it walks away.
+  # Rewards going for the throat: the moose walking away IS the payoff, on the map, in play.
+  # NB the ending (0x9C9) must never mention the moose -- being convertible means the player can
+  # simply kill it, so no cutscene may assume it survived (Nicolas, 2026-07-30).
   - id: white-moose
     name: "The White Moose"
-    is_boss: true               # awakened beast-boss, cornered here (canon: tomb area E6)
+    is_miniboss: true           # named, dangerous, NOT the win condition (objective = Ravisin)
     count: 1
-    class: gwyllgi              # CLASS_GWYLLGI (FE8 beast) stand-in quadruped; TODO custom "moose" art (#38/#39) so it reads as an elk, not a wolf
+    class: gwyllgi              # CLASS_GWYLLGI (FE8 beast) stand-in quadruped
     level: 6
+    inventory:
+      - id: antlers-and-hooves
+        fe_base: rotten-claw    # modeled beast attack (vanilla monster weapon)
     damage_type: bludgeoning    # flavor label only ("antlers/hooves")
     ai_pattern: aggressive
+    convertible: true           # #171 — neutralized by killing Ravisin, not by grinding it down
+    parley:
+      by: ravisin_death         # her hold breaks when she falls
+      result: become_neutral    # it stops fighting and quits the field (never joins the party)
     death_quote: "*a final, almost-human bellow*"
-  - id: vine-blight
-    name: "Vine Blight"
-    count: 5
-    class: revenant             # FE8 monster class (shambling zombie); reskinned as Ravisin's awakened plants
+    skin:                       # the one beast; closes YAML TODO #38/#39 (read as elk, not wolf)
+      look: "the White Moose — a great pale elk"
+      source: "FE-Repo: Battle Animations/Monsters - Basic Types/[Wolf-Base] [U] Gwyllgi Vanilla (frost repal → elk)"
+  # ── Risen spear-guard (SOLDIER, lance) — the tomb's rank-and-file dead ───────
+  - id: risen-spear
+    name: "Risen Spear-Guard"
+    count: 4                    # +2 reinf = 6 total, matching the vanilla twin's 6 Soldiers
+    class: soldier              # CLASS_SOLDIER (vanilla Ch5's core infantry) — parity backbone
     level: 5
-    damage_type: bludgeoning    # flavor label only
-    ai_pattern: defensive       # clog the approaches to the depression
-  - id: frost-wolf
-    name: "Frostbitten Wolf"    # a remnant of Ravisin's pack that followed her to the tomb
+    autolevel: true
+    inventory:
+      - id: elven-spear
+        fe_base: iron-lance
+    damage_type: piercing       # flavor label only
+    ai_pattern: defensive       # hold the approaches to the depression
+    skin:
+      look: "skeletal elven spear-guard"
+      source: "FE-Repo: Battle Animations/Infantry - (Lnc) Soldiers, Halberdiers/[Custom Halb] [U] Skeleberdier (skeleton lance; frost-repal)"
+      fallback: palette_swap    # if the import slips: frost-pale vanilla Soldier frame
+  # ── Tomb-reavers (FIGHTER, axe) — the heavier risen dead ─────────────────────
+  - id: tomb-reaver
+    name: "Tomb Reaver"
+    count: 8                    # 3 -> 8: vanilla Ch5 is AXE-HEAVY (6 Brigands + 5 Fighters = 11 of
+                                # 23, ~48%), which shapes the weapon triangle the player actually
+                                # plays against. We field Fighters for the whole axe block — the
+                                # ch01 precedent (Fighters not Brigands, so nothing pathfinds over
+                                # peaks) — rather than splitting the two classes.
+    class: fighter              # CLASS_FIGHTER (axe infantry; Fighters not Brigands — no peak pathing)
+    level: 5
+    autolevel: true
+    inventory:
+      - id: rusted-greataxe
+        fe_base: iron-axe
+    damage_type: slashing       # flavor label only
+    ai_pattern: aggressive
+    skin:
+      look: "risen elven axe-reaver, frost-pale"
+      source: palette_swap      # vanilla Fighter frame, frost/pale palette
+  # ── Crypt-blades (MERCENARY, sword) — the elite risen swordsmen (real skeleton anim) ─
+  - id: crypt-blade
+    name: "Crypt Blade"
+    count: 1                    # matches the vanilla twin exactly (Ch5 fields ONE Mercenary).
+                                # Briefly ran at 4 to recover the clear-load the removed
+                                # sentinels carried — the same "tune the number, not the
+                                # composition" error, corrected 2026-07-23: the shortfall goes
+                                # to AXE guardians instead, because Ch5 is an axe-heavy map.
+    class: mercenary            # CLASS_MERCENARY (sword) — Spd ~5-6, a clean non-doubled threat
+    level: 6
+    autolevel: true
+    inventory:
+      - id: bone-sword
+        fe_base: iron-sword
+    damage_type: slashing       # flavor label only
+    ai_pattern: aggressive
+    skin:
+      look: "skeletal elven blade"
+      source: "FE-Repo: Battle Animations/Monsters - Basic Types/[Skeleton-Base] [U] Bonewalker (one arm, sword) by Alexsplode"
+  # ── Bone-archers (ARCHER, bow) — ranged skeletons (real skeleton-bow anim) ────
+  - id: bone-archer
+    name: "Bone Archer"
+    count: 1                    # +2 reinf = 3 total, matching the vanilla twin's 3 Archers
+    class: archer               # CLASS_ARCHER (bow) — punishes units caught out of cover
+    level: 5
+    autolevel: true
+    inventory:
+      - id: elven-longbow
+        fe_base: iron-bow
+    damage_type: piercing       # flavor label only
+    ai_pattern: defensive
+    skin:
+      look: "skeletal elven archer"
+      source: "FE-Repo: Battle Animations/Monsters - Basic Types/[Skeleton-Reskin] [U] Wight Sniper by DATonDemand"
+  # (The Armor-Knight `frost-sentinel` pair was REMOVED 2026-07-23. They existed only as a
+  #  distributed wall to compensate for a squishy caster boss; once Ravisin carries a real
+  #  personal boss line she holds her own fight, and they were redundant scaffolding.)
+  # ── ERUPTION reinforcements (#177): the dead erupt over turns 2/3/5 and race the ─
+  #    spread reliquary reward-sites (the Ch5 village-raid, in undead dress) ──────
+  - id: risen-spear-reinf
+    name: "Risen Spear-Guard"
     count: 2
-    class: mauthedoog           # CLASS_MAUTHEDOOG (FE8 beast)
+    class: soldier
     level: 5
+    autolevel: true
+    arrives_turn: 2             # the eruption's first wave, not a turn-1 alpha
+    inventory:
+      - id: elven-spear
+        fe_base: iron-lance
     damage_type: piercing       # flavor label only
     ai_pattern: aggressive
-    # boss-chapter pacing bump (6 -> 9 enemies; decisions 2026-06-06)
+    skin:
+      look: "skeletal elven spear-guard"
+      source: "FE-Repo: Battle Animations/Infantry - (Lnc) Soldiers, Halberdiers/[Custom Halb] [U] Skeleberdier (skeleton lance; frost-repal)"
+      fallback: palette_swap
+  - id: tomb-reaver-reinf
+    name: "Tomb Reaver"
+    count: 2
+    class: fighter
+    level: 5
+    autolevel: true
+    arrives_turn: 3
+    inventory:
+      - id: rusted-greataxe
+        fe_base: iron-axe
+    damage_type: slashing       # flavor label only
+    ai_pattern: aggressive
+    skin:
+      look: "risen elven axe-reaver, frost-pale"
+      source: palette_swap
+  - id: bone-archer-reinf
+    name: "Bone Archer"
+    count: 2
+    class: archer
+    level: 5
+    autolevel: true
+    arrives_turn: 5             # the last wave races the far reliquary reward-sites
+    inventory:
+      - id: elven-longbow
+        fe_base: iron-bow
+    damage_type: piercing       # flavor label only
+    ai_pattern: aggressive
+    skin:
+      look: "skeletal elven archer"
+      source: "FE-Repo: Battle Animations/Monsters - Basic Types/[Skeleton-Reskin] [U] Wight Sniper by DATonDemand"
+  # ── CONVERTIBLE (#171): Sahnar rises HOSTILE at the eruption; Basil's Talk flips her ─
+  - id: sahnar
+    name: "Sahnar"
+    count: 1
+    class: myrmidon             # Joshua's exact class/donor — a fast, crit-threat sword duelist
+    level: 6
+    arrives_turn: 2             # rises when the quake cracks the sarcophagus (the eruption WAKE)
+    inventory:
+      - id: killing-edge
+        fe_base: killing-edge   # Joshua's killing-edge (30 crit) — the fragile-escort tension
+    damage_type: slashing       # flavor label only
+    ai_pattern: aggressive
+    convertible: true           # #171 — the Joshua flip. Hostile crit-Myrmidon until fragile BASIL
+                                # chaperones across to Talk her; then a +~0.9 kills/round back-half ally.
+    parley:
+      by: basil                 # the Natasha-donor Priest, walked up under escort to Talk her
+      result: become_allied
+      recruits_npc: sahnar      # joins as a playable Myrmidon (npcs/sahnar.yaml)
+    skin:                       # the moon-elf mummy; already art-planned (#25 issue thread)
+      look: "Sahnar, hooded spectral moon-elf mummy"
+      source: "FE-Repo: Battle Animations/Monsters - Basic Types/[Skeleton-Custom] [U] Specter by Alexsplode (native palette)"
+    # roster grounded 2026-07-23 (rev.2) to FE8-Ch5 parity: 16 line + 6 eruption reinf + 1 convertible
+    # (supersedes the 2026-06-06 boss-chapter 6→9 bump and the 2026-07-22 undead-monster-class rev.1).
 
 # ── Sahnar's sarcophagus (RETIRED the 3-offering fetch-puzzle) ────────────────────
 # Superseded 2026-07-15: the recruit is now the Basil→Sahnar chaperone Talk (the Joshua beat,
 # above), which "affects how you play the level" the way vanilla Ch5's Natasha→Joshua does — a
 # stronger hook than a fetch-quest that competes for turns. The brazier survives only as the
 # narrative WAKE beat: the eruption cracks the sarcophagus and Sahnar rises HOSTILE (a silver
-# flame flavor moment), then Basil must reach him to flip him. Canon RotFM p.82-83's offerings
+# flame flavor moment), then Basil must reach her to flip her. Canon RotFM p.82-83's offerings
 # (twig/pinecone/feather; we already dropped the severed hand) become set-dressing, not a gate.
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
+# SCENE MAP — ch05 follows vanilla FE8 Ch5's scene anatomy slot-for-slot (DECIDED 2026-07-23,
+# Nicolas), with 9C4 CUT (2026-07-29) — so 14 of 15, not a literal 1:1. The anatomy is a
+# CHECKLIST, not a quota: a slot whose job is already done elsewhere gets cut rather than filled.
+# Not a length target either: we copy the SLOTS and what each one does, and pick each beat's
+# register and box count while writing it. Read the twin's own scenes with:
+#     python3 tools/vanilla_scene.py ch5 [SceneFragment]
+# Anatomy + measured budgets: .claude/skills/dialogue-pass/references/scene-pacing.md
+#
+#   vanilla        channel   job in Ch5                          ours
+#   ─────────────  ────────  ──────────────────────────────────  ──────────────────────────
+#   0x9BA ( 3)     Text_BG   scene-setter: the arena/town        NOT ADOPTED (no arena; our
+#                                                                 place beat is 9BE)
+#   0x9BB (10)     on-map    the two RECRUITS meet, pre-battle   Basil + Sahnar through stone
+#   0x9BC (17)     Text_BG   boss gets ORDERS from a superior    Sephek Kaltro → Ravisin
+#   0x9BD ( 7)     Text_BG   subordinate shows DOUBT             Ravisin appraises the blade
+#   0x9BE (19)     on-map    party ARRIVES; the PLACE            the ridge + the tomb seen
+#   0x9BF ( 7)     on-map    thread ends; party OVERHEARS        CUT -- see the note below
+#   0x9C0 ( 9)     on-map    stakes turn LETHAL, party ABSENT    CUT -- vanilla's motivation
+#   0x9C1 ( 2)     on-map    party REACTS: two questions         CUT -- engine, unneeded here
+#   0x9C2 ( 8)     on-map    recruit reaches party; BATTLE       Basil joins → battle
+#   0x9C3 (12)     on-map    recruit's OWN scene (Joshua)        Sahnar in the sarcophagus
+#   0x9C4 ( 4)     on-map    other recruit's beat before Talk    the MOOSE triggers the fight
+#                                                                 (position reused, not content)
+#   ══ everything above is ONE pre-map event list (98 boxes); below is triggered ══
+#   0x9C5 ( 3)     on-map    mid-battle ESCALATION               the eruption
+#   0x9CC (32)     on-map    TALK-RECRUIT scene                  Basil Talks Sahnar (payoff)
+#   0x9C6 ( 1)     quote     ESCORT-NPC death quote (Natasha)    Basil's death quote
+#   0x9C7 ( 1)     quote     BOSS TAUNT — one box                Ravisin taunt
+#   0x9C8 ( 1)     quote     BOSS DEATH — one box                Ravisin's death quote
+#   0x9C9 (34)     on-map    ENDING exposition                   Ravisin falls → Bremen hook
+#                                                                 (+ conditional Sahnar block)
+#   0x9CA (24)     on-map    ENDING variant: "if she died"       ADOPTED -- the Basil-died branch
+#   0x9CB (16)     on-map    ENDING coda: a villager thanks you  FOLDED into 0x9C9 (no slot)
+#
+# TRIGGERS ARE INHERITED WITH THE ANATOMY (corrected 2026-07-29, Nicolas caught it).
+# 9BA-9C4 are ELEVEN messages inside ONE event list, `EventScr_Ch5_BeginningScene`, played
+# start to finish BEFORE the map loads. They are not separately-triggered scenes, so there is
+# no ordering to design between them and nothing can interleave: our 9C3 (Sahnar sealed in the
+# dark) cannot race our 9C5 (the sarcophagus cracking), because 9C3 is over before the player
+# ever takes a turn. Only three things below it carry real triggers, exactly as vanilla wires
+# them: 9C5 = a mid-battle turn event (`EventScr_089F22A4`), 9C6 = a Talk
+# (`EventScr_089F2270`), 9C9 = `EventScr_Ch5_EndingScene`.
+# CHANNEL drives the LINE WIDTH we hand-box to: on-map bubbles wrap at 29 chars, Text_BG at
+# ~42. Vanilla puts the two command scenes on a backdrop because they happen elsewhere -- which
+# is why our 9BC/9BD (Sephek's briefing, Ravisin's errand) are backdrop scenes too.
+#
+# SLOT-ID CAVEAT (2026-07-29, CORRECTED same day): Ch5's messages live in TWO places, and an
+# eventscript-only grep sees just one -- which produced a wrong caveat here (that 9C6/9C7/9C8
+# "appear NOWHERE in the decomp"). They do. The authoritative map:
+#   ch5-eventscript.h  0x9BA-0x9C4 (the one opening list) - 0x9C5 (mid-battle)
+#                      0x9CC (the Talk recruit, EventScr_089F2270) - 0x9C9/0x9CA/0x9CB (ending)
+#   data_battlequotes.c  0x9C6 = NATASHA's ch5 death quote (pid CHARACTER_NATASHA, no flag)
+#                        0x9C7 = Saar BATTLE taunt (EVFLAG_BATTLE_QUOTES)
+#                        0x9C8 = Saar DEATH quote (EVFLAG_DEFEAT_BOSS)
+# So "9C6" was a BAD label for our recruit: the real 0x9C6 is a death quote. Our recruit is
+# 0x9CC and is now labelled so. And 0x9C6 gives us a slot we had not accounted for at all --
+# Natasha is BASIL's donor, so Basil owes a chapter-specific death quote too (see his slot).
+# `vanilla_scene.py` used to read TEXTSHOW only and so HID every Text_BG scene -- it reported
+# this opening as 8 messages / 71 boxes when it is 11 / 98, with 9BC and 9BD missing entirely.
+# Fixed 2026-07-29; the tool now prints each message's id and channel. If a mined beat looks
+# absent from a scene, suspect the miner before concluding vanilla lacks it.
+# NOTE ON 9BC: vanilla's orders come from GLEN (a superior officer), never from Vigarde --
+# so ours come from SEPHEK, not Auril. `lore/frostmaiden-voices.md` keeps the Frostmaiden
+# OFF the page ("commands through frost giants and winter wolves"). Sephek is the prologue
+# boss who rimed over and escaped: his return makes the Children of Auril concrete, earns
+# Ravisin's "she has other hands" drop, and re-arms him for his Act-II death.
 events:
+  # ── 9BB — the two RECRUITS meet, before the party ever arrives ────────────────
+  # ── 0x9BA — RELOCATED into 0x9BE as the Wolfram/Forge seed (Nicolas, 2026-07-29) ──
+  #  Vanilla's 3-box cold open is Joshua wanting two things (arena money, that cleric), both of
+  #  which pay off later. We have NO arena -- settled, decisions.md §Economy May 2026, Wolfram's
+  #  Forge took its role -- EXCEPT that ADR is now superseded (decisions.md §Economy, 2026-07-29):
+  #  the arena is KEPT and keeps its name, because the "Forge" label promised gear-smithing the
+  #  arena cannot do. So the slot is repurposed rather than dropped: WOLFRAM finds, by metal-sense,
+  #  that this place was an ARENA before a tomb was built into it -- the floor is full of
+  #  blade-chips from centuries of sparring -- and offers to make it usable. Same job as the twin
+  #  (a character states a want out loud, and it pays off later); it gives the arena an on-screen
+  #  origin; and it gives Wolfram a role the campaign had left him out of.
+  #  It sits INSIDE 0x9BE because 0x9BE is already the scene where
+  #  each character reads the place through their own lens -- Lupin the tracks, Marty the magic,
+  #  Pinky the moose -- so Wolfram reading the METAL belongs in that sequence, not beside it.
+  #  See 0x9BE's script and the FORGE TUTORIAL slot below.
+  - trigger: chapter_start       # opening event list, message 2 of 11 -- see TRIGGERS note
+    slot: "vanilla 0x9BB"
+    type: cutscene
+    ea_file: events/ch05-basil-sahnar.ea
+    description: >
+      Basil visits the sarcophagus, as he does. Sahnar has been AWAKE in there for millennia
+      (never asleep — npcs/sahnar.yaml), so they talk through the stone: the gentle shrub and
+      the imprisoned queen, the only two kind things in a frost druid's tomb. Establishes BOTH
+      recruits before either is a unit — vanilla spends 10 A-presses on the Joshua/Natasha
+      meet-cute for exactly this reason — and it is why Basil later begs the party to free her:
+      she is his friend, not a quest object. Their SECOND scene is the recruit (9C6), which is
+      where the weight lands, so this one stays a window rather than a thesis.
+      Ravisin is damned entirely in REPORTED SPEECH ("she said it would still run") and never
+      diagnosed by Sahnar — Basil's doubt stays his own. Sahnar knows only what Basil tells her;
+      she has no other window on the world. LOCKED 2026-07-23 (dialogue-pass, co-written with
+      Nicolas). 16 boxes; the closing aside is hand-matched to Joshua's 3-box / 5-line cadence.
+    script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
+      # (The tomb's eastern berm, before the party arrives. A frost-furred sarcophagus half-sunk
+      #  in snow. A goodberry shrub hurries up on root-feet — he walks; he is not potted.)
+      - basil: "Sahnar! Sahnar, the moose came back, the white one, it came back tonight--"
+      - basil: "--and it's hurt. There are arrows in it. Three of them, in the shoulder. I counted."
+      # (Sahnar's voice comes from inside the stone.)
+      - sahnar: "....Basil."
+      - basil: >-
+          She didn't take them out. I waited and I thought she was going to, and she just
+          looked at it and said it would still run, and then she went inside.
+      - basil: >-
+          I gave it berries. It wouldn't eat them. I put them right where it could reach
+          and it wouldn't eat them.
+      - basil: "Why wouldn't she take them out? She made it. She made it, so why--"
+      - sahnar: "I don't know."
+      - basil: "...You always know things."
+      - sahnar: "I know old things. I have never known why she does anything."
+      - basil: >-
+          ...I'm going to ask her again tomorrow. About the arrows. She might say yes
+          if I ask her properly.
+      - sahnar: "...She might."
+      - basil: >-
+          You could ask her! She'd listen to you, you're older than she is, you're older
+          than everything--
+      - sahnar: "......"
+      - sahnar: "Don't worry about me, little one."
+      - basil: "...All right."
+      - sahnar: "Go on, now. She'll want you before dawn."
+      # (He goes. A few steps on root-feet. Then stops and looks back. The closing aside is
+      #  Joshua's MSG_9BB shape beat for beat: observation -> wish -> resolve, 3 boxes/5 lines.)
+      - basil: "...And there she stays."
+      - basil: "I wish I could share my berries with her."
+      - basil: "One day I'll give her one."
+  # ── 9BC — the boss gets her ORDERS from a superior (never from the big bad) ────
+  - trigger: chapter_start       # opening event list, Text_BG backdrop (happens elsewhere)
+    slot: "vanilla 0x9BC"
+    type: cutscene
+    ea_file: events/ch05-sephek-orders.ea
+    description: >
+      SEPHEK KALTRO returns (the prologue boss who rimed over and escaped) and gives Ravisin
+      her orders in Auril's name — vanilla's Glen→Saar scene, our Children-of-Auril made
+      concrete. Auril herself stays OFF the page (frostmaiden-voices.md). Pays off the
+      prologue, earns Ravisin's "she has other hands" drop later in the chapter, and re-arms
+      Sephek for his Act-II death. Voice: sephek-kaltro.md (serene, liturgical, pitying —
+      never raises his voice) against ravisin.md (fervent, certain).
+      MINED SKELETON — vanilla MSG_9BC's own beat order (17 boxes, Glen 12 / Saar 5, heavily
+      LOPSIDED; the superior talks, the subordinate answers short). Read it with
+      `python3 tools/vanilla_scene.py ch5`. Beat for beat:
+        (1) superior greets by rank + a courtesy;  (2) "I bring orders from His Majesty" —
+        authority ATTRIBUTED, big bad off-page;  (3-4) order one, spread over two redundant
+        boxes;  (5) subordinate assents, short;  (6) "One more thing..." — its own A-press;
+        (7-9) order two, bigger and nastier, plus a licence to be brutal ("tear this town
+        apart");  (10-11) the subordinate ASKS PERMISSION to go further ("permission to
+        execute her?");  (12) superior grants after a `...` beat;  (13-14) subordinate
+        OVER-VOWS in zealot's language;  (15-16) superior closes with a benediction that is
+        also a warning ("be sure his trust is not misplaced") + "That is all.";  (17) assent.
+      Our mapping: Sephek is the measured superior, RAVISIN is the zealot subordinate (the
+      Saar seat) — so her fervour is an over-vow answering his cool bookkeeping, and box 15's
+      warning is where "she has other hands" enters the chapter. The permission beat is what
+      sanctions the eruption's WAKING of Sahnar on-screen before it happens.
+      LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas). NB the intelligence briefed is
+      the PARTY (a company working the Ten-Towns, asking after the cold) — NOT the moose; neither
+      of these two would spare a thought for a beast. Auril is named in reverent epithet ("the
+      Frostmaiden") and never appears.
+    script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
+      # (Somewhere in the tomb, before the party arrives. Sephek Kaltro — the prologue's
+      #  frost-druid executioner, who rimed over and vanished — has come to give orders.)
+      - sephek: "Ravisin. ...You have kept the wood well."
+      - sephek: "I bring the Frostmaiden's will."
+      - sephek: >-
+          There is a company moving through the Ten-Towns. They take work in every
+          town they pass.
+      - sephek: "They have been asking after the cold. Where it comes from. Who serves it."
+      - sephek: "They are to be stopped here."
+      - ravisin: "...They will be."
+      - sephek: "One more thing."
+      - sephek: "I have met them myself. On the ice, at the crossing."
+      - sephek: >-
+          Do not take them lightly. They are warmer than they look, and they do not frighten.
+      # (The permission beat — vanilla's "do we have permission to execute her?" seat. This is
+      #  what SANCTIONS the eruption: Ravisin wakes Sahnar under orders, not on a whim.)
+      - sephek: "If they press you, you have leave to wake the warrior. The one under the stone."
+      - ravisin: "...The elf?"
+      - sephek: "She was a queen's blade once. She will serve well enough."
+      - ravisin: "Then it is done. The wood will take them, and the winter will keep them."
+      - sephek: >-
+          The Frostmaiden is watching this place, Ravisin. ...See that she is pleased
+          with what she finds.
+      - sephek: "That is all."
+      - ravisin: "...It will be done, according to her grand design."
+  # ── 9BD — a subordinate shows DOUBT (foreshadows their own arc) ────────────────
+  - trigger: chapter_start       # opening event list, Text_BG backdrop (happens elsewhere)
+    slot: "vanilla 0x9BD"
+    type: cutscene
+    ea_file: events/ch05-basil-doubt.ea
+    description: >
+      Ravisin + Basil, alone after Sephek leaves. She appraises the warrior she has just been
+      given leave to use; Basil asks after her — his friend, though he never says so — and is
+      shut down and handed a chore.
+      MINED SKELETON — vanilla MSG_9BD (Cormag + Glen, 7 boxes). NB the DOUBT there belongs to
+      the SUPERIOR, not the subordinate: Glen reflects on the zeal he has just watched, lets a
+      crack show ("if only I could hold such conviction in the righteousness of our emperor"),
+      Cormag notices and asks ("Something troubling you, Brother?"), and Glen deflects ("No...
+      Pay no mind to me") then changes the subject to logistics ("From here, we ride northeast,
+      back to the fort"), and Cormag assents ("Very well"). Read it with
+      `python3 tools/vanilla_scene.py ch5`.
+      Our swap: Ravisin CANNOT doubt (ravisin.md banned list), so the shape is kept and the
+      content inverted — she makes an oblique remark, Basil misreads it as feeling, and her
+      deflection reveals there was never any feeling to read. She has always KNOWN Sahnar is
+      under that stone (consistent with 9BC's "...The elf?"); what damns her is that she walked
+      past a thousand times and only valued her once someone else pointed. Basil never reveals
+      that he knows Sahnar — that stays his secret for the recruit to spend.
+      LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas).
+    script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
+      # (The tomb, after Sephek has gone. Ravisin looking toward the sarcophagus on the berm.)
+      - ravisin: "A queen's blade. I have walked past that stone a thousand times."
+      - ravisin: "It never once occurred to me she might be of use."
+      # (Basil knows exactly who is under that stone. He cannot say so.)
+      - basil: "...What will you do with her?"
+      - ravisin: "It's not your concern."
+      - ravisin: "Come. There is work before dawn."
+      # ("MY berries" — they were never his to give; cf. 9BB, where he hands them out freely.)
+      - ravisin: "Prepare my berries."
+      - basil: "...Yes."
+  # ── 9BE — the party ARRIVES; the PLACE ────────────────────────────────────────
   - trigger: chapter_start
+    slot: "vanilla 0x9BE"
+    type: cutscene                    # Cutscene 1 — PRE-MAP (Text_BG). Picks up ch04's thread; NO Ravisin
+    ea_file: events/ch05-opening.ea   #   reveal (she stays silent, saved for the eruption).
+    description: >
+      The party crests the ridge to an iced elven GATEWAY of standing stones (open arch, not a
+      door) and the moonlit sunken hollow beyond — the open-air tomb. Lupin reads the moose's
+      trail here (ch04 payoff); Marty senses a familiar death-craft and trails off; Pinky spots
+      the cornered moose. Then 9BF picks the thread up.
+      NB Marty's "...This magic is familiar..." was originally planted to seed a Marty/Ravisin
+      villain-foil thread that is now RETIRED (decisions.md 2026-07-29). The line STAYS: a
+      spore druid recognising another druid's death-craft needs no thread to be legible, and it
+      is what makes him the one who reads this place. It just no longer owes a payoff.
+      REOPENED + RELOCKED 2026-07-29: vanilla's 0x9BA slot was folded in here as WOLFRAM's Forge
+      seed (Nicolas's call). The scene's shape is "each character reads this place by what they
+      personally notice", so Wolfram reading the metal is the same beat as Lupin reading tracks;
+      he goes before Marty so the dread and Pinky's alarm stay adjacent and Pinky keeps the last
+      word. 7 boxes now, against the twin's combined 3 + 19 = 22, so well inside budget.
+      Pinky's "...It's not running. Why isn't it running?!" MOVED to the 0x9C4 trigger beat
+      (Nicolas, 2026-07-29) — it is the setup for a joke, and a setup fifteen boxes from its
+      punchline is not a setup. He keeps the spotting line, which is the right note to end an
+      arrival scene on: the party has found what it came for.
+      LOCKED 2026-07-23, extended 2026-07-29 (dialogue-pass, co-written with Nicolas). Hand-boxed
+      to GBA width (~29-30 ch/line, 2 lines/box); [A]/[LF] encoding is ROM-gated.
+    script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
+      # (Night. An iced elven gateway of standing stones — open arch, no roof, no door — and
+      #  beyond it the ground falls into a wide moonlit hollow: the open-air tomb. The moose's
+      #  trail leads down into it.)
+      - lupin: "The trail leads here. ...It came home."
+      # (0x9BA relocated here, 2026-07-29: Wolfram reads the place the way the others do -- by
+      #  what he can sense. Senses FIRST, then names it (wolfram.md diction rule). This is the
+      #  Forge's on-screen origin; the mechanics get taught separately, see the FORGE TUTORIAL.)
+      # (Senses first, then the name (wolfram.md). He deduces ONLY from the metal, and never
+      #  claims a who or a when. "TRAINING arena" is a read a metallurgist can actually make
+      #  from the WEAR PATTERN: a battle leaves bodies and broken weapons, while thousands of
+      #  small chips spread evenly through a floor means repeated, sustained, non-lethal
+      #  contact. It is still his inference, not the narrator's fact -- canon built this place
+      #  for oratory (lore/sahnar.md §Source canon) and he is a smith, not a historian.)
+      - wolfram: "...Hold on. *(sniffs)* Iron. Bronze. Something older I can't name."
+      - wolfram: "It's in the stone. Chips of it all through the floor. Blade metal."
+      - wolfram: "Struck off edges. There was fighting here -- a great deal of it."
+      # (He names the mechanic in-world. NO gear promise -- the arena does not touch equipment.)
+      - wolfram: "...This was a training arena. I can get it up and running."
+      - marty: "...This magic is familiar..."               # trails off — the hook, never explained here
+      - pinky: "Father, I see it! The moose--in the hollow."
+    no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas, L3) — WIRING NOT BUILT.
+      box: 1                          #   The locked script above is unchanged and still plays
+                                      #   whenever the ch04 parley HAPPENED.
+      replaces: "The trail leads here. ...It came home."
+      reason: >-
+        Box 1 is the FIRST LINE OF THE CHAPTER and it is Lupin's, so a no-parley player opens ch05
+        on a speaker who is not there. PINKY takes it, continuing the tracking thread from ch04's
+        own no-Lupin fallback — so the branch reads as one substitution rather than a patchwork of
+        stand-ins. He also already closes this scene ("Father, I see it! The moose--in the
+        hollow."), which gives him its bookends and keeps the arrival framed as the boy finding
+        things his father can use.
+      script:
+        - pinky: "The tracks stop here, Father. ...It came home."
+  # ── 0x9BF + 0x9C0 — CUT 2026-07-29 (Nicolas). 16 boxes buying nothing. ────────
+  #  Vanilla's pair is the party OVERHEARING an incident and deciding to investigate. Its three
+  #  jobs, and why each is already done or unavailable here:
+  #    (1) introduce the recruit-to-be by showing her in danger -> Basil introduces HIMSELF in
+  #        0x9C2, which is better; watching him bullied first would turn "Oh! Tourists. ...We
+  #        don't get many." from a surprise into surveillance and kill the joke;
+  #    (2) establish the enemy as lethal in their own words -> we came here to fight, so there is
+  #        nothing to establish;
+  #    (3) hand the party a moral reason to join a war that is not theirs -> ours have tracked the
+  #        moose since ch04 and arrive on purpose. Vanilla needed the stumble as a MOTIVATION
+  #        ENGINE (Eirika's people are travellers with no cause); borrowing it would convert a
+  #        deliberate hunt into an accident.
+  #  The slots' only other job was mechanical -- LOAD1 staging the guardians -- and staging needs
+  #  no dialogue.
+  #  0x9C1 IS CUT TOO (Nicolas, 2026-07-29) -- the whole overhear-and-react block goes, which was
+  #  his original call; CLAUDE argued to keep its 2 boxes and was overruled. Recorded consequence:
+  #  NOBODY IN THE PARTY EVER ACKNOWLEDGES the sixteen standing dead, and the player is looking
+  #  right at them. That is a real gap, not a neutral saving. It is also cheap to close later
+  #  WITHOUT restoring a slot: the moose-trigger beat (0x9C4's position, still unwritten) is the
+  #  last thing before the map and can absorb one clause of acknowledgement if we want it. Do not
+  #  reopen this as a slot -- fold it there or leave it.
+  # ── 9C2 — the recruit reaches the party; BATTLE ───────────────────────────────
+  - trigger: chapter_start       # opening event list, ON-MAP (bubbles ≤29 ch/line)
+    slot: "vanilla 0x9C2"
+    type: cutscene
+    ea_file: events/ch05-basil-joins.ea
+    description: >
+      Party deployed at the stair-foot; the moose at bay; Ravisin a SILENT frost-robed figure at
+      center among the risen dead (shown on the map, never narrated). Basil — a GREEN ally shrub —
+      trundles up, cracks the tourist joke, notices LUPIN (a fellow awoken creature, now free),
+      and the thought dawns → he asks to be brought to Sahnar and JOINS (green → player unit). His
+      "she lost her way" line on Ravisin is DEFERRED to the eruption (once she's formally
+      introduced). LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas). Hand-boxed to GBA
+      width. Wiring: Basil enters green, converts to a player unit on the join.
+    script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
+      # (A goodberry shrub — GREEN — trundles up through the snow toward the party.)
+      - basil: "Oh! Tourists. In the tomb. ...We don't get many."
+      # (Basil notices Lupin — a wolf Ravisin awakened, now traveling free with the party.)
+      - basil: "...Wolf. You're hers. Awoken. But you're free? With them?"
+      # (The thought dawns; Basil turns to the party and JOINS — green → the party's colors.)
+      - basil: "...I wonder. Sahnar. ...She needs me. Take me to her?"
+    no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas, L4) — WIRING NOT BUILT.
+      box: 2                          #   The locked script above is unchanged and still plays
+                                      #   whenever Lupin WAS recruited.
+      replaces: "...Wolf. You're hers. Awoken. But you're free? With them?"
+      reason: >-
+        ch04's Lupin recruit is gated on `parley: by: marty`, and the ch04 difficulty model
+        explicitly prices a no-parley path — so a player can reach ch05 with no wolf on the field
+        and box 2 has no referent. The fallback moves Basil's trigger from Lupin to the PARTY
+        ITSELF: everyone he has ever met belonged to her, so people who belong to nobody are the
+        whole revelation. Arguably the purer version — it needs no other unit to exist.
+        Boxes 1 and 3 are unchanged in both branches.
+      script:
+        - basil: "...You're none of hers. Not one of you. You just-- came here. On your own."
+  # ── 9C3 — the RECRUIT'S OWN scene (vanilla gives Joshua 12 A-presses) ─────────
+  - trigger: chapter_start       # opening event list, LAST message -- still before player phase
+    slot: "vanilla 0x9C3"
+    type: cutscene
+    ea_file: events/ch05-sahnar-alone.ea
+    description: >
+      SAHNAR alone in the sarcophagus — awake, composed after millennia of it (lore/sahnar.md:
+      stoic, courtly, never asks to be pitied). Vanilla gives Joshua a whole scene of his own
+      before you fight him — his coin, his luck, spoken to nobody — so the recruit is a person
+      first and a red unit second. This is that, and it is the ONLY place the player meets
+      Sahnar before she walks hostile.
+      Constraints that shaped it, all Nicolas's: NO battle noise reaches her (she is under
+      stone and the fight is not hers yet — she registers only that something has come);
+      SELF-DIRECTED, like Joshua's, not addressed to Basil or anyone; NO proper nouns (name-drops
+      from her age never pay off in our story); and her purpose was GIVEN to her by the gods,
+      never chosen — the researched lore, not a martyr's bargain. She ends BELIEVING she will
+      defend this tomb, which is what makes 9C6 a revelation rather than a rescue: Basil does
+      not free a prisoner, he tells her what she is actually defending.
+      LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 6 boxes.
+    script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
+      # (Inside the sarcophagus. Dark. No sound from above reaches her — she feels the arrival
+      #  the way old stone feels a footfall. She speaks to nobody, as Joshua does in MSG_9C3.)
+      - sahnar: "...Someone has come."
+      - sahnar: "Four thousand years, and someone has finally come."
+      - sahnar: "...I was given a purpose. To defend this tomb."
+      - sahnar: "No one ever came. I stopped counting somewhere in the middle."
+      - sahnar: "...Well. Something has come now."
+      - sahnar: "I will defend this tomb. It is my purpose."
+  # ── 9C4 — CUT 2026-07-29 (Nicolas). Slot deliberately left empty. ─────────────
+  # Was: "Basil, mid-escort, steeling himself" — vanilla's 4-box Natasha prayer (MSG_9C4),
+  # which she spends psyching herself up to walk into danger and talk somebody down.
+  # CUT because its only real job was to plant the berry ahead of the recruit, and 9BB
+  # ALREADY plants it: "One day I'll give her one." Re-planting it one slot before the
+  # payoff would have spent the setup twice and made 9C6 read as its own echo. The seven
+  # slots of silence between 9BB and 9C6 are doing the work instead.
+  # Drafted and rejected at the same sitting: three variants (berry / scared-going-anyway /
+  # "little one"), all four boxes, all bubble-legal. Nothing salvageable is owed forward —
+  # Basil's fear now lives inside the recruit scene itself, where it costs him something.
+  # NB the old description here carried `basil.md`'s RETIRED "voice is spare (2-5 words)"
+  # spec (retired 2026-07-23: it made him read as slow — his corpus twin is Ewan). Do not
+  # resurrect it if this slot is ever refilled.
+  # ── 0x9C4 — the LAST beat before the map: the moose triggers the fight ────────
+  - trigger: chapter_start       # opening event list, LAST message
+    slot: "vanilla 0x9C4"
     type: cutscene
     ea_file: events/ch05-opening.ea
     description: >
-      The trail ends at the tomb; Ravisin reveals herself and her awakened beasts,
-      naming Auril. The cornered white moose snorts at her side. Battle begins.
+      Vanilla's 0x9C4 is Natasha alone, steeling herself, four boxes, immediately before the map
+      loads — the escort stating her errand so the objective is her wish rather than a brief.
+      We use the POSITION and not the content (Nicolas, 2026-07-29): this is where the fight
+      starts, and it starts because the MOOSE does something.
+      Structure is a setup/punchline across a wordless action, which is why Pinky's question moved
+      here out of 0x9BE — a setup fifteen boxes from its punchline is not a setup:
+        Pinky asks why it isn't running -> the moose bellows and charges -> Meesmickle answers the
+        question sideways -> battle.
+      THE MOOSE CANNOT SPEAK. ch04 established it as a "mute white ghost" and locked that
+      2026-07-03, so the middle beat is pure stage direction. Its motion is also a ch04 PAYOFF
+      inverted: in ch04's `moose_sighted` it breaks from a clearing and bolts AWAY. Here it breaks
+      the same way and comes at them, because this time it is cornered and Ravisin holds it.
+      Meesmickle is the right voice — dry, one sentence, "a wit, not a bully" (his bible), and the
+      line is aimed at the universe's timing rather than at Pinky.
+      RAVISIN STAYS SILENT through this. The fight begins on the quarry's terms, not hers; her
+      first words on the map are the eruption (0x9C5).
+      Basil's steeling-himself beat — the twin's actual content — is CUT (Nicolas, 2026-07-29).
+      Not deferred, not homeless: cut. His nerve is not a beat this chapter needs stated, and 0x9BB
+      already establishes what he is walking toward.
+      LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 2 boxes.
+    script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
+      # (The hollow. The moose stands at bay among the standing dead. Nothing has moved.)
+      - pinky: "...It's not running. Why isn't it running?!"
+      # (The moose throws its head back and BELLOWS -- then breaks and comes straight at them.)
+      - meesmickle: "You had to ask?"
+      # (Cue battle. -> PREP -> turn 1.)
+  # ── 0x9D5/0x9D6 — the FORGE's systemic tutorial. Vanilla teaches the arena HERE, in Ch5. ──
+  - trigger: forge_tile_visited   # flag-gated, like vanilla's own arena tutorial
+    slot: "vanilla 0x9D5 + 0x9D6"
+    type: tutorial
+    description: >
+      It IS the arena and it KEEPS THE NAME (decisions.md §Economy, superseded 2026-07-29), so
+      vanilla's own tutorial text is reusable nearly verbatim -- the player learns one word, the
+      word the game already uses. Vanilla teaches the arena in THIS chapter, so tutorial parity is
+      owed here and not deferred. The twin is a flag-gated
+      pair: 0x9D5 is one box naming the thing ("There's an [red]arena[/red] here."), 0x9D6 is five
+      boxes of pure mechanics — one-on-one matches, win pays TWICE the entry fee, a loss means
+      that unit "will not be able to fight in any future battles", and press B quickly to concede
+      (lose the fee, keep the unit). Note vanilla puts the escape hatch in the tutorial, not in
+      the fiction: a player who reads this knows how to bail.
+      CHANNEL, per the onboarding C-hybrid: this is a DRY SYSTEMIC lesson (a wager, a payout
+      multiplier, a permadeath risk, a panic button), so it rides vanilla-style tutorial boxes —
+      NOT Wolfram's dialogue. His 0x9BE beat is the narrative seed and deliberately states no
+      numbers; splitting them is what keeps his voice from turning into a rules manual.
+      OWED WHEN WRITTEN: an `introduces:` entry for the forge/wager mechanic + rerun
+      `gen_onboarding_index.py` (the concept debuts once, and `test_onboarding.py` gates it).
+      RESOLVED 2026-07-29: no gear upgrades. That was the "Forge" label leaking a mechanic we do
+      not have; Wolfram's 0x9BE lines promise practice and nothing else.
+      TEXT = VANILLA'S, VERBATIM, and that is the finding rather than a shortcut. Because we kept
+      the arena's mechanic AND its name, there is nothing left to reflavour: every clause is a rule
+      (fee, doubling, permanent loss, the B-button concede) and rules are identical. Rewriting them
+      could only introduce drift. The tutorial voice is the GAME's, not a character's — unattributed
+      and red-highlighted — so it also carries no campaign flavour to update. The one thing we owe
+      is that it fires on OUR arena tile, which Wolfram opened in 0x9BE.
+      Deliberately NOT added: a flavour clause about the niches holding this place's champions. It
+      would explain why a loss is permanent, but vanilla's tutorial boxes carry zero fiction and
+      mixing the two is how a rules box stops reading as authoritative. If that fiction is wanted
+      it belongs in Wolfram's mouth, not here.
+      Note vanilla puts the ESCAPE HATCH in the tutorial rather than in the fiction — a player who
+      reads this knows how to bail. Keep that; it is the most player-respecting box of the five.
+      LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 6 boxes (1 + 5), = the twin.
+    script:                           # LOCKED 2026-07-29 -- vanilla MSG_9D5 + MSG_9D6, verbatim.
+      # (Unattributed tutorial voice, not a character. [ToggleRed] marks the highlighted terms in
+      #  vanilla; the markup is a text-insertion detail, ROM-gated.)
+      # -- MSG_9D5, 1 box: name the thing.
+      - tutorial: "There's an [red]arena[/red] here."
+      # -- MSG_9D6, 5 boxes: the rules, one per A-press.
+      - tutorial: "Arenas play host to [red]one-on-one combat matches[/red]."
+      - tutorial: "If you win a match, you'll earn [red]twice the amount of the entry fee[/red]."
+      - tutorial: "If you lose, however, that unit [red]will not be able to fight in any future battles[/red]."
+      - tutorial: "If your HP drops near zero in a fight, [red]press the B Button quickly[/red] to concede."
+      - tutorial: "You'll lose your entry fee, but you'll save your unit to fight again."
   - trigger: eruption_turn        # scripted turn (~2/3/5, the Ch5 wave cadence) — EARTHQUAKE/TILECHANGE
+    slot: "vanilla 0x9C5"
     type: scripted_event
     ea_file: events/ch05-eruption.ea
     description: >
       The tomb floor breaks (Phantom-Ship EARTHQUAKE + sequential TILECHANGE): undead
       REINFORCEMENTS erupt over turns and race the party for the spread reliquary
       reward-sites (the Ch5 village-raid, in undead dress). The same quake cracks the
-      sarcophagus — Sahnar the moon-elf mummy rises, HOSTILE, a fast crit-Myrmidon
-      guardian (smells faintly of pumpkin spice). He flips only when Basil reaches him.
+      sarcophagus — and Ravisin WAKES Sahnar, the tomb's ancient guardian, who has been
+      undead and awake for millennia (she WAKES a watching guardian; she does NOT reanimate a
+      fresh corpse, and does NOT puppet her — see lore/sahnar.md). Sahnar walks HOSTILE of her
+      own will, believing the party are the intruders she was left for; a fast crit-Myrmidon
+      (smells faintly of pumpkin spice). She flips only when Basil reaches her.
+      DIALOGUE BUDGET — 3 boxes, the twin's exact spend (`EventScr_089F22A4`, the bandits who
+      join the fight mid-map). The structural rule taken from it: **the ARRIVING FORCE speaks
+      and the party never reacts.** Vanilla gives Eirika and Seth not one line here. So these
+      boxes belong to Ravisin and Sahnar. (Phantom Ship's quake beat does the opposite —
+      Ephraim reacts to it — but Ch11b is only our THEME base for the EARTHQUAKE/TILECHANGE
+      mechanism; Ch5 is the parity twin and wins the shape.) Either way both twins agree the
+      SPECTACLE lives in the event macros, never in the prose: nobody describes the horror.
+      This is also Ravisin's FIRST SPOKEN LINE in the chapter proper — 9C2 stages her as a
+      silent frost-robed figure at center, and what breaks the silence is her spending the
+      permission Sephek granted in 9BC ("the one under the stone" is his phrase, handed back).
+      Sahnar's single box is the SETUP for 9C6's first line: she says the rote guardian line in
+      full here, then at the recruit starts it again and stops at "Far enough. The tomb is--"
+      because she has seen Basil. The interruption only lands because this box exists.
+      RESOLVED 2026-07-29 (Nicolas): there was never a double-rising to design around. The line
+      force is ALREADY STANDING when the party arrives — staged onto the board by LOAD1 across
+      0x9BF/0x9C0 exactly as vanilla walks Saar's command on, so nothing "rises" in the opening.
+      This beat is Ravisin SUMMONING MORE, in response to the party proving stronger than she
+      allowed for. That is vanilla's escalation logic (its bandits arrive because the fight is
+      going long) and it pays Sephek's 9BC warning twice: he told her not to take them lightly,
+      and here she stops doing so.
+      Hence the opening box: the summoning has to read as a RESPONSE, not a schedule. Without it
+      the beat plays as a timed event and the player never learns their own pressure caused it.
+      Nicolas's revision 2026-07-29 does that better than CLAUDE's draft did, three ways: she
+      CREDITS SEPHEK by name, so 9BC's warning pays off out of the mouth of the person who
+      brushed it aside; "the dead will rise to meet them" is a commander's order rather than the
+      liturgy of "the Frostmaiden has need of you" (she is named plenty elsewhere and does not
+      need a third mention); and "the BLADE under the stone" keeps Sahnar as inventory, echoing
+      9BD where Ravisin appraises her as exactly that.
+      TWIN = EventScr_089F22A4, 3 boxes, and its structural rule is that the ARRIVING FORCE
+      speaks while the party never reacts (vanilla gives Eirika and Seth no lines). Both twins
+      agree the SPECTACLE lives in the event macros, never in the prose.
+      Sahnar's single box sets up the recruit: she says the rote guardian line in full here, so
+      that starting it again at 0x9CC and stopping — "Far enough. The tomb is--" — has something
+      to break from.
+      LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 4 boxes.
+    script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
+      # (EARTHQUAKE_START + sequential TILECHANGE; the floor breaks and more dead come up.
+      #  Then LOAD1 — the sarcophagus cracks.)
+      # (The response beat: her line force is losing, and she says WHOSE warning was right --
+      #  9BC's briefing pays off by name, from the mouth of the person who dismissed it.)
+      - ravisin: "Sephek was right. ...They've come further than I expected."
+      - ravisin: "No matter. The dead will rise to meet them."
+      # (9BC callback: "the warrior... the one under the stone", now spent. "BLADE" not "one" --
+      #  she appraised Sahnar as a blade in 9BD and still thinks of her as inventory.)
+      - ravisin: "...And the blade under the stone. Her too."
+      - sahnar: "The tomb is closed. Turn back."
   - trigger: sahnar_talk          # Basil (Natasha-donor) Talks the risen Sahnar (Joshua-donor)
+    slot: "vanilla 0x9CC"          # the Talk recruit. Was mislabelled "9C6" until 2026-07-29;
+                                   # the real 0x9C6 is Natasha's death quote. See SLOT-ID CAVEAT.
     type: dialogue
     ea_file: events/ch05-sahnar-recruit.ea
     description: >
-      Basil chaperoned safely to Sahnar → he flips to the party, curious about modern
-      druids and eager to serve his liberators. The escort-recruit (Ch5's Joshua beat).
+      THE CHAPTER'S PAYOFF. Basil chaperoned safely to Sahnar → she turns and joins. The
+      escort-recruit (Ch5's Joshua beat, twin `EventScr_089F2270`, 32 boxes; ours is 16 — the
+      relationship was already built in 9BB, so this scene only has to turn her).
+      The turn is NOT an argument won and NOT a rescue. Its mechanism, beat for beat off the
+      twin: RECOGNITION → duty stated flatly → the other pleads → the recruit turns on
+      something of their OWN (Joshua's coin comes up tails; Sahnar's 9C3 line "I was given a
+      purpose" comes back over) → flip. Basil brings two proofs and no philosophy: (1) one of
+      Ravisin's own creatures broke free, pack and all, "all it took was knowing they had a
+      choice"; (2) the tomb's real desecrator is the witch herself. So Sahnar's purpose does
+      NOT break — she keeps it, and her ENEMY resolves. She was misled, never bound.
+      Written by Nicolas; boxed to GBA width here. Deliberate, do not "fix":
+        · "...Basil?" is her exact first line from 9BB — the recognition IS the word. No
+          introduction, no explanation; he never has to say who he is.
+        · The wolf stays GENERIC ("a wolf", "his whole pack", "travelers") — Sahnar has no way
+          to know Lupin, and 9BB established she knows only what Basil tells her.
+        · "child" → "little one" is an ARC: cold while she is still the summoned guardian,
+          then 9BB's name for him the moment she comes back to herself.
+        · The scene ENDS on Basil's berry question, unanswered — 9BB's "One day I'll give her
+          one" left open on purpose, going into the fight.
+      LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 16 boxes, Sahnar 8 / Basil 8.
+    script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
+      # (Basil is walked the last few steps under escort. Her killing edge is up.)
+      - sahnar: "Far enough. The tomb is--"
+      - sahnar: "......"
+      - sahnar: "...Basil?"
+      - basil: "Sahnar! I can't believe you're free!"
+      - sahnar: "I am not free, child. I was summoned to fulfill my purpose."
+      - basil: "That's actually why I'm here... Some of her creatures broke free."
+      - sahnar: "...What?"
+      - basil: "A wolf. Him and his whole pack. They're out there now, with travelers."
+      - basil: >-
+          All it took was knowing they had a choice... That we have a choice...
+      - sahnar: "......"
+      - sahnar: "My purpose... is to defend this tomb..."
+      - basil: "From who? Your people are long gone..."
+      - basil: "The witch has lost her way. She's disturbing the dead..."
+      # (The turn: the purpose holds, the enemy resolves.)
+      - sahnar: "Then my purpose has not changed. Only my true enemy has been revealed."
+      - sahnar: "...Thank you, little one."
+      # (Last box before gameplay resumes. She never answers.)
+      - basil: "...Can I give you a berry now?"
+    no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas, L5) — WIRING NOT BUILT.
+      box: 8                          #   The locked script above is unchanged and still plays
+                                      #   whenever Lupin WAS recruited.
+      replaces: "A wolf. Him and his whole pack. They're out there now, with travelers."
+      reason: >-
+        Box 8 is PROOF #1 — the evidence that turns Sahnar — and it is a wolf the player may never
+        have recruited (ch04's parley is optional). Without him the proof changes SHAPE: it stops
+        being evidence someone else already walked free and becomes Basil's argument that the two
+        of THEM could. `lore/sahnar.md` supports the swap — "she does not weigh his argument, she
+        recognises HIM" — so the scene still turns on Basil rather than on the wolf.
+        Box 9 ("All it took was knowing they had a choice... That we have a choice...") is
+        unchanged in both branches; its "we" already includes him.
+        OPEN: box 6 is kept at v0 (Nicolas), but "SOME of her creatures broke free" asserts a
+        plural this branch has no evidence for — the wolf is the only other one. One word ("One
+        of her creatures") closes it; flagged rather than changed, because v0 was an explicit pick.
+      script:
+        - basil: "There is nothing holding us here... We could go free as well."
+  # ── 9C7 — BOSS TAUNT. One box. Vanilla's Saar taunt is ONE A-press. ──────────
+  # ── 0x9C6 — the ESCORT's death quote. One box. Found 2026-07-29, previously unaccounted. ──
+  - trigger: unit_death
+    slot: "vanilla 0x9C6"          # data_battlequotes.c, pid CHARACTER_NATASHA, no flag
+    type: quote
+    status: locked                 # LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas)
+    description: >
+      BASIL's chapter-specific death quote. Vanilla Ch5 gives one to NATASHA and to nobody else
+      on the map except the boss — not even to Joshua — because she is the ESCORT the chapter is
+      built around, and losing her is the failure the player must feel. Basil is her exact donor
+      and holds exactly that role here, so he inherits the slot.
+      The twin: "I can't let myself die here..... Someone has to hear my tale....." — she dies
+      still reaching for her one errand, which is what makes it land.
+      Ours has a sharper version of the same available, and it is the whole reason 9BB exists:
+      Basil dies with the berry still undelivered. ONE box. Do not spend it on pathos about
+      himself; spend it on Sahnar, whom the player now knows he was walking toward.
+      TWO CONSTRAINTS the draft is built to satisfy, both easy to break by "improving" it:
+        · It must read the same whether he dies BEFORE or AFTER the recruit. "Sahnar's still
+          waiting" is wrong once she is a party member; the berry is undelivered either way.
+        · It must not duplicate his LAST WORDS in 0x9CA, which are also about the berry. The
+          quote is him still holding it; 0x9CA is him handing the errand to someone else
+          ("Tell her I had one for her"). Same object, two different failures.
+      Hurt Basil goes SHORT — basil.md: he runs on when he cares, and the short lines are for
+      when he's hurt. The self-interruption is the one piece of his register that survives.
+      LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas) — Nicolas kept v0 on review:
+      the 9BB thread carries the pronoun. 1 box. Two alternates recorded below.
+    script:                           # LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas)
+      - basil: "But I haven't-- I still have her berry..."
+    # Alternates drafted at the same sitting, kept so they don't get re-derived:
+    #   (b) "Oh. ...I was almost there."       — the errand, not the object; quieter, less
+    #        specific, and it loses the 9BB thread the slot exists to pay.
+    #   (c) "Wait-- I'm not finished--"        — purest Basil-interrupted, but it could be any
+    #        dying character; fails the cover-the-name test.
+  - trigger: boss_battle
+    slot: "vanilla 0x9C7"          # data_battlequotes.c, EVFLAG_BATTLE_QUOTES
+    type: quote
+    description: >
+      Ravisin's battle quote when a player unit engages her. ONE BOX — vanilla's whole boss taunt
+      is "Enemy of the empire! Death's too good for you!" and nothing else. Her weight comes from
+      the 9BC orders scene, not from talking on the field.
+      Ours is the twin with one word swapped (Nicolas, 2026-07-29): empire -> Frostmaiden. That is
+      the entire change, and it is the right size of change. The line already does what her
+      register needs — direct address plus an insult-name, then contempt — and swapping the
+      allegiance is what makes it hers. "Frostmaiden" is the reverent epithet used everywhere else
+      in the chapter (9BC twice, 9C5 once); Auril is never named (see 9C8).
+      Note it is contempt, not grievance: she is not owed anything and is not avenging anything,
+      which keeps it clear of her bible's banned grudge/revenge framing.
+      LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 1 box.
+    script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
+      - ravisin: "Enemy of the Frostmaiden! Death's too good for you!"
+  # ── 9C8 — BOSS DEATH. One box. Already locked. ───────────────────────────────
+  - trigger: boss_death
+    slot: "vanilla 0x9C8"          # data_battlequotes.c, EVFLAG_DEFEAT_BOSS
+    type: quote
+    description: >
+      Play it as a zealot's last OFFERING, proud and certain, never as regret (ravisin.md bans
+      pathos). One box. TWIN = Saar's own 0x9C8, "Emperor Vigarde..... Glory to His....Majesty
+      .....": a dying soldier's SALUTE — name the liege, then glorify. No accounting, no
+      reproach; the last thing he does is praise. The earlier draft ("Auril... I gave you
+      everything...") drifted off that shape twice over — it read as an invoice rather than a
+      salute, putting Ravisin at the centre of her own death instead of her goddess, and it was
+      the ONLY place in the whole chapter the goddess's proper name appeared. Everywhere else
+      she is the reverent epithet ("the Frostmaiden": 9BC twice, 9C5 once) and never appears, so
+      a one-box death quote was the worst possible spot for a first-and-only lore drop
+      (Nicolas, 2026-07-29). "The winter is yours" is a HANDOFF, which is truer to a chapter
+      where killing her does not stop the cold.
+      LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 1 box.
+    script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
+      - ravisin: "Frostmaiden... the winter is yours..."
   - trigger: chapter_end
+    slot: "vanilla 0x9C9"
     type: cutscene
     ea_file: events/ch05-ending.ea
     description: >
-      Ravisin falls; her hold on the moose breaks. The party finds the goodberry
-      shrub, repots it, and names it Basil. With Sahnar in tow they turn down the
-      coast toward Bremen — where, Ravisin's dying words hint, another of her
-      awakened beasts still terrorizes a town.
-
+      Ravisin falls. The party adopts Basil — they REPOT him (he is already called Basil and
+      joined on the map; there is no discovery and no naming beat, LOCKED 2026-07-23). They turn
+      down the coast toward Bremen, where Ravisin woke something in the lake.
+      MINED SKELETON — vanilla MSG_9C9 (34 boxes, `EventScr_Ch5_EndingScene`, ON-MAP so bubbles
+      wrap at 29). Its beat order, which ours follows: (1) aftermath before anyone does business;
+      (2) the ESCORT is thanked and becomes the scene's centre; (3) the party asks her a question
+      and she TELLS THEM THE PLOT — the escort, not a party member, carries the chapter's forward
+      information; (4) the party deliberates in front of her; (5) a closing box that turns the win
+      into the next journey.
+      WHO SITS IN WHICH SEAT: Natasha → BASIL (he is her donor and holds her role all chapter, so
+      he inherits the information too — and that is WHY 0x9CA has to exist). Eirika → BRAULO (he
+      speaks when a decision has to be made, then the party follows). Seth → split between
+      PROF-RBG (who knows where Bremen is; he makes inquiries everywhere) and MARTY (the reason
+      to go that isn't money). Meesmickle is DELIBERATELY ABSENT — he already spent his one line
+      of the chapter on 0x9C4, and his bible is explicit that a few perfect quips beat a speaking
+      role.
+      BASIL CAN CARRY THIS AND SAHNAR CANNOT: Sahnar is optional (no recruit, no scene) and has
+      been under a stone for four thousand years — she has no way to know about a lake. Basil is
+      Ravisin's own attendant and reports what he HEARD her say, which is also how 9BB damns her
+      ("she said it would still run"). Villains condemn themselves in reported speech.
+      NO MOOSE (Nicolas, 2026-07-30). The moose is a CONVERTIBLE miniboss — the player may simply
+      kill it — so the ending cannot assume it survived, and an earlier draft opened on it running
+      home. Cutting it costs two payoffs that were moose-dependent (Pinky's "why isn't it
+      running?" from 0x9C4, and 9BB's "it wouldn't eat them"); they are forfeit, not relocated.
+      Do not reinstate them: a beat the player can delete is not a beat the ending can rest on.
+      THE BREMEN HOOK IS ABOUT THE MONSTER, NOTHING ELSE (Nicolas, 2026-07-30). An earlier draft
+      routed it through Sephek and closed on "the Frostmaiden has many hands", which implies the
+      lake creature is another Child of Auril. IT IS NOT. Per ch06 it is Messie, an AWAKENED
+      plesiosaur — woken by Ravisin exactly as the wolves and the moose were, and ORDERED to sink
+      the boats. It is another of her victims, and ch06 lets Marty talk her down. So the hook says
+      only what Basil heard: she woke a thing in the water and told it what to do.
+      SAHNAR IS OPTIONAL — the berry exchange (boxes 6-11) can only play if she was recruited.
+      Wiring owes a skip: without her, the scene runs Basil's repotting straight into Braulo's
+      question. The berry is 9BB's promise paid ("One day I'll give her one"), so a player who
+      never freed her simply never collects it. That is the correct cost of skipping the recruit.
+      LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas) after two red-pen passes.
+      19 boxes (twin: 34).
+    status: locked
+    script:                           # LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas)
+      # (Aftermath. Ravisin is down. Basil says the smallest true thing -- and it pays off 9BD,
+      #  where her last order to him was "Prepare my berries.")
+      - basil: "I don't have to make berries for her anymore..."
+      - marty: "No. You don't. ...Come with us instead."
+      # (The pot is WOLFRAM's, not RBG's (Nicolas, 2026-07-30): the metallurgist repairs one out of
+      #  an old elven helm from the ARENA -- the place he himself opened in 9BE, so the salvage is
+      #  his own locked beat paying off ("Chips of it all through the floor. Blade metal.").
+      #  Nicolas's line, split at his own ellipsis: 96 chars runs to 4 lines on-map.
+      #  He offers a HELM and BASIL is the one who calls it a pot, which is why the next box lands.)
+      - wolfram: "I found some old elven helmets at the arena..."
+      - wolfram: "...it's great metal, I can repair it to hold soil..."
+      - basil: "A pot. ...Mine?"
+      # (Nicolas's line, split across two A-presses: on-map bubbles wrap at 29 and the whole
+      #  sentence runs to 5 lines. The split also gives "...into your cause?" its own button.)
+      - basil: "I don't have much to offer, but what I can I offer willingly,"
+      - basil: "if you'll accept a goodberry bush into your cause?"
+      # (ONLY IF SAHNAR WAS RECRUITED -- see the note above. 9BB's promise, paid.)
+      - sahnar: "...They gave you a pot."
+      - basil: "They gave me a pot! There's soil in it and everything--"
+      - basil: "--oh. Oh, wait. Wait, I've been saving-- here."
+      - sahnar: "......"
+      - sahnar: "I have not eaten in four thousand years."
+      # (A queen thanks him. She is four thousand years past grabbing at anything, and using his
+      #  NAME rather than "little one" is the whole distance she has travelled since 9BB.)
+      - sahnar: "...Thank you, Basil."
+      # (The escort carries the plot, exactly as Natasha does in the twin.)
+      - braulo: "You served her. What else did she do?"
+      - basil: "...There's something in the water. Down the coast, by the fishing town."
+      # (LUPIN-GATED -- see the NO-LUPIN FALLBACK note below. Recruited: the wolves. Not: himself.)
+      - basil: "She woke it. Like she woke the wolves. ...She told it to sink the boats."
+      - prof-rbg: "Um, actually-- that would be Bremen. They fish that lake to eat."
+      # (Nicolas, 2026-07-30: RBG takes the told-you-so, which his bible says is what "Um,
+      #  actually--" is FOR. It pays ch02's LOCKED ending line -- "My rats whisper coin off
+      #  Bremen -- some lake-beast, 'Messie,' swamping boats" -- so the party is not discovering
+      #  Bremen here, it is finally listening. Basil's report is the corroboration.)
+      - prof-rbg: "My rats mentioned this monster back in Targos..."
+      # (CUT 2026-07-30 (Nicolas): Braulo's "Nobody's hired us for a lake" and Marty's "Then we'll
+      #  be a pleasant surprise." The coin objection goes out of BOTH endings -- with RBG's rats
+      #  already pricing Bremen two chapters ago, having Braulo re-derive the money was the party
+      #  arguing itself into a job it had already been offered.)
+      # (Nicolas's closer, 2026-07-30. Braulo commits on APPETITE rather than on the coin
+      #  arithmetic -- stage direction: a glint in his eye. The greed and the grin are the same
+      #  instinct, so the money never has to be said out loud.)
+      - braulo: "Aye, it is time we meet this beastie."
+    no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas, L6) — WIRING NOT BUILT.
+      box: 16                         #   The locked script above is unchanged and still plays
+                                      #   whenever Lupin WAS recruited.
+      replaces: "She woke it. Like she woke the wolves. ...She told it to sink the boats."
+      reason: >-
+        "Like she woke the wolves" names a recruit the player may never have made. The fallback
+        puts the comparison in Basil's own mouth about HIMSELF, which is the harder line and needs
+        no other unit to exist. Worth revisiting whether this should simply be unbranched — it
+        would delete a branch point and, on the page, it reads stronger in both worlds.
+      script:
+        - basil: "She woke it. Like she woke me. ...She told it to sink the boats."
+  # ── 0x9CA — vanilla's "escort died" ENDING VARIANT. ADOPTED 2026-07-30. ───────
+  - trigger: chapter_end
+    slot: "vanilla 0x9CA"
+    type: cutscene
+    ea_file: events/ch05-ending-basil-lost.ea
+    description: >
+      ADOPTED (2026-07-30), reversing CLAUDE's earlier "not adopted" — which read it as duplicate
+      exposition and missed what it is FOR: it is the reason a player can fail the escort and
+      still understand the story. Vanilla ships its ending twice so the plot survives the loss.
+      MINED — and the mining is the whole finding, because it shows how CHEAP the branch is meant
+      to be. Vanilla's 0x9CA (24 boxes) is not a second scene; it is 0x9C9's back half with a
+      different delivery bolted on the front:
+        · the same facts arrive in FRAGMENTS, interrupted by the party telling her to stop
+          talking ("Stop, you mustn't speak....."), so the player gets less and feels the loss;
+        · she dies mid-scene and someone says so flatly ("....She's dead.");
+        · then the deliberation runs NEARLY VERBATIM from 0x9C9, with exactly ONE line changed
+          to mark what was lost — "If she had lived, we might have learned more, but...." — and
+          the closing box repeated word for word.
+      Ours does the same, at the same discount: 13 boxes against 0x9C9's 18, and the closing run
+      is 0x9C9's own, with Braulo's final box carrying the one changed clause.
+      THE CONCEIT IS INHERITED WHOLESALE. Natasha's map death is deferred to the cutscene — she
+      is mortally wounded there, whenever she actually fell. Basil is a broken shrub in the snow
+      still talking, whether he went down on turn 2 or turn 12. It reads better for a plant than
+      it does for a person.
+      WHAT THE LOSS COSTS, deliberately: no repot, no pot, no berry. If Basil died before the
+      Talk, Sahnar was never recruited (he is the only one who can turn her); if he died after,
+      she is a party member. Either way she does NOT speak here — see the note below.
+      NOT NESTED (2026-07-30): no second conditional for a recruited Sahnar over the body. One
+      box from her would be the strongest line in the chapter, and it is deliberately not taken,
+      because vanilla's own death branch is a straight line — it exists to carry information, not
+      to be dramatised, and doubling the conditionals doubles the wiring for a scene most players
+      never see. Recorded rather than dropped: it is cheap to add later if Nicolas wants it.
+      Nicolas's two 0x9C9 corrections apply here identically, because this IS that ending:
+        · NO MOOSE. It is convertible, so the player may have killed it; the draft had Basil ask
+          "did it go?" and Pinky answer that it runs. Cut, same rule as 0x9C9.
+        · The hook is the MONSTER only. "...she has many hands" is cut — it framed the lake
+          creature as another Child of Auril when per ch06 it is another of Ravisin's victims,
+          which would have poisoned ch06's talk-her-down option a chapter early. Basil now reports
+          only the order he heard her give.
+      Also cut, found while applying those: "Is she still in there? The one under the stone?"
+      assumed Sahnar had NOT been recruited, and Basil can die on either side of that. "Tell her I
+      had one for her" works in both worlds and is the harder line anyway.
+      LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas) after two red-pen passes.
+      10 boxes; twin is 24.
+    status: locked                    # ADOPTED + LOCKED 2026-07-30 after two red-pen passes
+    script:                           # LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas)
+      # (The hollow. Ravisin down. Basil is in the snow where he fell, root-feet turned up,
+      #  broken through. The party has gathered. He is still talking.)
+      - basil: "......"
+      - marty: "Easy. Easy, friend. Don't--"
+      # (Nicolas's line, 2026-07-30, split across two A-presses -- 84 chars runs to 4 lines on-map,
+      #  and splitting it lets BRAULO interrupt mid-report, which is vanilla's own conceit here:
+      #  the facts arrive in fragments, through the party telling him to stop talking.
+      #  LUPIN-GATED -- "the wolf" needs the fallback below. "The moose" does NOT: Basil is
+      #  listing who she WOKE, not who survived, so a player who killed it loses nothing.)
+      - basil: "The moose, the wolf.. they were not alone.."
+      - braulo: "Don't. ...Save your strength."
+      - basil: "...In the water... near the fishing town..."
+      # (Nicolas cut "She told it to sink the boats" AND Marty's "Basil." (2026-07-30). The
+      #  DEGRADED INFORMATION is the branch's whole point -- in this ending the party never learns
+      #  what the thing was ordered to do, only that it is there. That is the loss, priced in
+      #  facts. Cutting Marty's name-call also leaves Braulo as the scene's ONLY interruption,
+      #  so Basil's last two boxes run without anyone reaching for him.)
+      # (Not the berry errand -- 0x9C6 still holds that. This is the healer's own failure, and it
+      #  is universal rather than about Sahnar, so it does not collide with the death quote.)
+      - basil: "...I couldn't make enough berries..."
+      - basil: "......"
+      - prof-rbg: "...He's gone."
+      # (From here it is 0x9C9's back half, near-verbatim, as vanilla does it.)
+      - prof-rbg: "...The fishing town would be Bremen."
+      # (CUT 2026-07-30 (Nicolas): "Nobody's hired us for a lake" -- out of BOTH endings. See 0x9C9.)
+      # (The ONE changed line, in vanilla's own place: what the loss cost the party in facts.)
+      - braulo: "If he'd lived we'd know more. ...We go down the coast."
+    no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas) — WIRING NOT BUILT.
+      box: 3                          #   The locked script above is unchanged and still plays
+                                      #   whenever Lupin WAS recruited.
+      replaces: "The moose, the wolf.. they were not alone.."
+      reason: >-
+        Same gate as 0x9C9 box 14: "the wolf" names an optional recruit. Only that clause moves —
+        "the moose" stays in BOTH branches, because Basil is listing who she WOKE, not who
+        survived, so a player who killed the moose loses nothing here. Parallel to 0x9C9's
+        fallback, Basil substitutes himself.
+      script:
+        - basil: "The moose, and me.. we were not alone.."
+  # ── 0x9CB — vanilla's ending CODA. FOLDED INTO 0x9C9 (2026-07-30). No separate slot. ──
+  # Vanilla's 16-box coda: a townsman recognises Eirika, thanks her for driving off Saar,
+  # apologises that he can do nothing for her, and promises the town will "wait unbowed" for the
+  # day of liberation. Its job is to make the VICTORY LOCAL — someone who LIVES here says what the
+  # win meant, so the chapter ends on a resident's hope rather than on the party's logistics.
+  # DECIDED (Nicolas, 2026-07-29): not dropped, folded into the post-battle scenes rather than
+  # staged as a separate coda — no inventing a village at a tomb. EXECUTED 2026-07-30 in 0x9C9,
+  # and here is where each of the coda's three jobs actually landed, so nobody re-opens the slot
+  # looking for them:
+  #   (1) a RESIDENT says what the win meant  -> Basil's "...I don't have to prepare her berries."
+  #       The hollow is the only place he has ever been; that line is the whole coda in one box.
+  #   (2) the resident's own future           -> the repot. Vanilla's townsman apologises that he
+  #       can do nothing and stays behind to wait; ours can do something, and comes along. The
+  #       coda INVERTED is the strongest use of it available to us.
+  #   (3) a second resident, if earned        -> the conditional Sahnar block. Her home, her tomb,
+  #       her purpose handed back to her one scene earlier — and it is where the berry finally
+  #       gets eaten. Gated on the recruit, so the coda's warmth is something the player wins.
+  # Nothing is owed forward. Do NOT restore this as a slot.
 # ── Economy (FE8 Ch5 parity — the party's power-spike chapter) ────────────────────
 # Ch5's real economy (verified from HEAD via the #170 extractor): ~27,760g across 4 village
 # gifts + 2 shops — Guiding Ring 10,000 + Dracoshield 8,000 (Def) + Secret Book 8,000 (Skl)
 # + Armorslayer 1,260 + Torch 500, plus an Armory + Vendor. We MATCH the magnitude and the
 # delivery channels (this is the first chapter at the FE8-Ch5 reward tier — §Reward budget):
 economy:
-  reward_sites:                  # the "villages" of Ch5, retiled as elven reliquary niches spread to the
+  reward_sites:                # the "villages" of Ch5, retiled as elven reliquary niches spread to the
                                  # map edges; the eruption's undead race to desecrate them (save-all bonus).
     - gift: booster-def          # ≈ Ch5 Dracoshield (+Def) — first stat-booster in the campaign
     - gift: booster-skl          # ≈ Ch5 Secret Book (+Skl)
-    - gift: armorslayer          # ≈ Ch5 Armorslayer (effective vs the vine-blight/armor guardians)
+    - gift: armorslayer          # ≈ Ch5 Armorslayer (vanilla's answer to its Armor-Knight boss;
+                                 #   ours has no armour to slay, so it reads as a plain strong sword)
     - gift: torch                # ≈ Ch5 Torch (flavored an elven everburning lamp)
   elven_store:                   # ≈ Ch5's Armory + Vendor — an ancient elven quartermaster's reliquary
     armory: true                 #   the party requisitions (narrative: the tomb kept its stores)
@@ -205,7 +1269,7 @@ post_chapter:
   available_shops: [elven-reliquary]   # the in-tomb elven store (Armory + Vendor); see economy block
   units_available_to_recruit:
     - id: sahnar                         # Myrmidon (sword duelist); see npcs/sahnar.yaml
-      description: "Sahnar, the reawakened moon-elf mummy (recruited by lighting the brazier). Playable Myrmidon."
+      description: "Sahnar (she/her), the reawakened elven royal — a moon-elf mummy, recruited via Basil's Talk (the Joshua beat). Playable Myrmidon."
     - id: basil                          # Priest — 2nd healer (LOCKED 2026-06-20); see npcs/basil.yaml
       description: >
         Basil, the sentient goodberry shrub — now a PLAYABLE healer (Priest). His
@@ -229,3 +1293,11 @@ design_notes: >
   the goodberry shrub as a literal heal-staff unit (LOCKED 2026-06-20). No fog: the tension is
   the escort + eruption race, not vision. Map + roster build at the slice; targets checked via
   `make difficulty` (economy #170 + convertible/reinforcement dynamics #171).
+  ENEMY IDENTITY (rev.2, 2026-07-23): the force is RISEN ELVEN TOMB-GUARDIANS on vanilla FE8
+  infantry classes, skinned undead (the ch01 "vanilla class, our skin" pattern via
+  enemy_class_reskins). This keeps ch05 the TOMB (the dead) and OFF ch04's turf (the wolf hunt):
+  wolves are CUT, the lone beast is the cornered White Moose (ch04 payoff). Living-class stats
+  also mean clear-load parity is free (no glassy monster-class doubling; decisions.md). Per-unit
+  `skin:` names the intended FE-Repo asset (sword/bow guardians = real skeleton anims; lance/axe/
+  armor = frost palette-swaps) for the build-slice art track. The wolf ANIMS I scouted (Gwyllgi
+  repals, Hellhounds) are logged for CH04's beast pack — see issue #24.

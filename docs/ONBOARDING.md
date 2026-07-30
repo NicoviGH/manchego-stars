@@ -38,6 +38,7 @@ the tutorial never sees it) · `dialogue` = mandatory story line, shown to every
 | ballista-siege — Siege/ballista emplacements fire from long range; a unit mans them | tutorial | — *(pending)* |
 | promotion-master-seal — Master Seal promotes a unit to its advanced class (player picks the branch) | tutorial | — *(pending)* |
 | supports — Support conversations build bonuses between paired units | dialogue | — *(pending)* |
+| arena-wager — Arena: wager gold on one-on-one combat; win doubles the fee, a loss is permanent | tutorial | Ch 5 — both (active) |
 
 ## Pending coverage
 

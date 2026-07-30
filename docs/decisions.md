@@ -41,6 +41,21 @@ _Decided: 2026-06-04 (supersedes the PRD's TS toolchain plan); 2026-06-09 (Ruby 
 `build_campaign.py` writes our content directly into the `fireemblem8u` working tree at build time — `graphics/portrait/` (busts), `texts/texts.txt` (names/dialogue), `src/data_characters.c` (class/stats), and `src/events/<ch>-event*.h` (chapters) — then `make` compiles it. No Event Assembler / ColorzCore / `.ea` buildfiles. This is the "make a hack directly from the fireemblem8u decomp" path (FEU thread 17428). Generated files are reproducible artifacts: restore vanilla with `git -C fireemblem8u checkout <path>`.
 _Decided: 2026-06-04 (supersedes the PRD's Event Assembler plan; retires the `tools/build-events.ts` idea)_
 
+**Injection is idempotent: a byte-identical re-emit rewinds the file's mtime, so `make` skips it.**
+Because injection rewrites the decomp's own sources every build (above), and `restore_vanilla_sources`
+re-`git checkout`s them, every touched file's mtime moved on every build — and `make` keys off mtime, not
+content. A no-change rebuild therefore paid the full ~354-TU cascade from restored widely-included headers
+plus the serial `data_banim.o` link over 1752 assets. `build_campaign` now snapshots the previous build's
+injection footprint (content sha1 + `mtime_ns`) before injecting and rewinds the mtime of every file whose
+bytes come out **identical**. Only mtime is written, and only on unchanged content, so the ROM cannot move.
+**Measured on the ch04 branch (CH04BOOT, `-j`):** warm rebuild **188s → 28s** (6.7×); clean build 232s
+without vs 236s with, and all of {clean-without, warm-without, warm-with ×2, clean-with} produced the same
+ROM `sha256 dc1c56bf…`. The risk this design carries is that a wrong content-check would be invisible to
+`make` (stale objects, silently), so it is also proved from the other side: changing one line of real
+content (a `death_quote`) moved the ROM sha and left that file un-rewound (482 → 481), and reverting it
+returned the ROM to `dc1c56bf…` exactly. Re-run those two gates if the footprint logic is ever touched.
+_Decided: 2026-07-30 (#24; written 2026-07-21, merged only once the ROM gates could run on the Mac)_
+
 **No SRD/Open5e pull.** PC data is authored from the players' D&D Beyond JSON (`data/pc-sheets/`); D&D is flavor-only over vanilla FE combat (see FE-strictness below). No SRD downloader, no `srd-snapshot.json`, no homebrew engine classes — the cast use stock FE8 classes (see Class Mapping).
 _Decided: 2026-06-04_
 
@@ -198,6 +213,29 @@ no update ever propagated. These conventions keep a single source of truth.
 - *Settled decisions & rationale* → this file (`decisions.md`).
 - *Per-chapter facts* → chapter YAML → generated `CHAPTERS.md`. *Unit facts* → unit YAML → `CLASSES.md`.
 - *Work backlog* → GitHub issues (milestones M0–M4).
+
+**HANDOFF.md is authored on `main` only (2026-07-30).** Gated by
+`check.py check_handoff_only_on_main`; a branch may leave it untouched or sync it to main's
+tip, but may not author its own. Refresh it on main *after* a merge, never on the branch.
+
+*Why it needed a gate rather than a habit.* HANDOFF describes **global** live state, but it
+is a tracked repo-root file — so every branch and worktree gets a private copy that quietly
+stops describing the project and starts describing *the project as that branch last saw it*.
+Merge the branch and the stale copy overwrites main's. With one short-lived branch at a time
+this never surfaced: every HANDOFF commit before 2026-07-21 landed on main. Two long-lived
+parallel branches (ch04 and ch05, nine days) made divergence certain, and the last merge won
+regardless of which copy was newer. The ch05 merge put ch04 back to a "WIP checkpoint" four
+committed stages out of date; it was only caught because `git pull` refused to clobber an
+unrelated local edit.
+
+This is the same root cause as *"feature-flow only works if each feature LANDS before the
+next starts"* (below), showing up in a file instead of a rebase — and it had **already been
+caught once**, on 2026-07-21, with the mitigation "keep the copies in sync". That is a
+memory, not a control, and it failed nine days later. Hence a check: the guard passes the
+two states that are actually safe (untouched — git's 3-way merge keeps main's version; or
+byte-identical to main's tip, the ideal state for a worktree people read HANDOFF in) and
+fails only a branch carrying live state it does not own. It reports *skipped* rather than
+*violated* when it cannot see a base, because a guard that cries wolf gets bypassed.
 - *Live state* → the single **`HANDOFF.md`** (one trunk, feature-flow — the per-track handoffs were retired 2026-06-24); `/handoff` refreshes it in place. Keep it lean: live Now/Next + gotchas + pointers, no per-session history (that's `git log` + closed issues). *Vision/pitch* → `PRD.md` (no specifics that live elsewhere).
 - `CLAUDE.md` is lean **operating instructions + pointers**, not a fact store (a bloated CLAUDE.md gets ignored). If a fact belongs in two docs, one of them should link instead.
 
@@ -326,6 +364,30 @@ always in that track's worktree"). The two ADRs above — worktree isolation and
 file seam — **stand**: worktrees are now ephemeral-per-feature, and the file seam is the hard invariant
 feature-flow keeps.
 _Decided: 2026-06-24 (Nicolas — chose feature-flow + PRs; codified from the "not my job" design review)_
+
+**Feature-flow only works if each feature LANDS before the next starts — parallel unmerged lines on
+shared files are what force a rebase every time you come back.** Symptom (2026-07-21): two sibling
+branches off `main` — #193 (winter forest fidelity) and the ch04 map slice — were open at once, one a
+committed-but-PR-less branch, the other **uncommitted WIP left in its worktree**. Both edited the same
+cross-cutting "hot" files (`tools/gen_map_editor.py`, `tools/map_tileset_tool.py`,
+`campaigns/.../maps/reskin-learned.json`, and `docs/decisions.md` — every ADR appends near the same
+line), and both **independently re-derived** the same vanilla-layout `.bin`→`.mar` reader under
+different function names. `main` then moved underneath the stale WIP, and integrating them cost a full
+conflict-resolving rebase. The rebase is the *symptom*; the discipline that prevents it:
+
+- **Land each feature end-to-end before starting or resuming the next** (commit → PR → CI → squash-merge
+  → delete branch), especially anything touching shared tooling / JSON / `decisions.md`.
+- **Never leave a worktree dirty across a session boundary** — at minimum commit a checkpoint on the
+  feature branch so `main` can't strand it. Long `HANDOFF.md` "do not lose or revert" lists are the smell
+  that this rule is being broken.
+- **Reuse, don't re-derive** — grep for an existing helper before writing a new one; two branches solving
+  one problem two ways guarantees both wasted work and a merge conflict.
+- **Append new ADRs at the END of their section**, not mid-file, so two branches don't insert at the same
+  line and collide.
+
+This is the operational half of the feature-flow ADR above (which settled the *structure*); this settles
+how it must be *practiced* by any agent (Claude or Codex) picking work up across sessions.
+_Decided: 2026-07-21 (post-mortem of the #193 / ch04 parallel-branch rebase)._
 
 **Boot decision localized; bows need a min-range in playtest targeting (the first feature-flow feature).**
 The boot cut + New-Game redirect were decided in BOTH `inject_prologue` and `inject_test_chapter` (the
@@ -542,6 +604,30 @@ _Decided: 2026-06-18 (Nicolas; difficulty analysis session — supersedes the op
 
 **The tier-3 spatial check = deterministic facts fed to an LLM *analyst* — NOT an LLM *playing* the game.** LLMs are weak at exact grid-tactical *execution* (tile-counting, threat-range math, turn-order) — so an LLM playing the chapter to measure difficulty produces noisy numbers that measure "how badly the bot plays," not the chapter. But an LLM reading *pre-computed* spatial facts and producing a *qualitative* read (where's the danger, what's the trap, is the terrain fair) is in its wheelhouse. Division of labor: **code computes the hard facts; the LLM reads them.** Use the analyst for structure, never for hard numbers (it can't simulate — in validation it self-contradicted on turn-count). Validated 2026-07-17: a **Haiku** analyst, given only vanilla Ch4's placements/AI/stats (chapter name withheld), independently reproduced `make difficulty`'s verdict (ranged-magic-on-squishies is the sharp edge), *found the Mogall crossfire cluster the aspatial tool can't see*, and correctly flagged terrain as the #1 missing input. **YAGNI:** the analyst reads raw coordinates well enough that we are **not** building a reachability/threat-per-turn metric extractor until we feel its absence during real map authoring.
 _Decided: 2026-07-17 (Nicolas + CLAUDE; ch04 roster-grounding session — Nicolas pushed on "the model ignores terrain/AI/positioning," validated by the Ch4 analyst experiment)_
+
+**Per-unit ROLES are checked separately from force parity — the per-slot averages hide a monstrous outlier and a boss that folds.**
+`threat/slot` sums the whole force and divides by the deploy cap, so a single terrifying unit dissolves into the average and the boss's own durability never appears at all. ch05 passed "PARITY (within band)" while the White Moose out-threatened the boss **1.7×** and sat **2.2× above the vanilla twin's scariest unit** — invisible to every number we printed, because we only ever compared *force to force*, never unit to unit. `difficulty.py role_findings()` now compares the **extremes** against the twin (threat outliers >1.25× its ceiling; a boss out-threatened by a line unit; a boss whose rounds-to-kill is <½ the twin's tankiest; >1 `is_boss`), and prints them under PER-UNIT ROLE CHECK. A `convertible` is exempt from the inversion check — it's neutralized rather than ground down, so out-hitting the boss is a deliberate "avoid me" hazard. **ch04 verified clean** against this (its extremes track vanilla Ch4: 5.0 vs 5.5 threat, and like its twin it fields no boss at all).
+Two class facts came out of the ch05 fix and generalise: **(1) a caster boss can never be an armour wall** — vanilla Saar's 12.9 rounds-to-kill comes from Def 11 (2 damage a hit); a Druid has Def 5 and can't reach that at *any* level or terrain (L11 on +30 avoid is still 4.8), so the wall must be **distributed into armoured bodyguards** the party chews through to reach her; **(2) some classes can't be tuned down** — `gwyllgi` is Spd 14 and doubles the yardstick, so the moose is ~2× the vanilla ceiling even at L2. When stats can't fix it, fix the **role**: the moose became a named miniboss + convertible (killing Ravisin breaks her hold), which keeps it terrifying and makes avoiding it the tactical reward for pushing the objective.
+Also learned: **for a 1:1 retile the spatial layer is NOT gated on the ROM.** Vanilla `.xPosition`/`.yPosition`/`.ai` (Saar is `GuardTileAI`) live in the decomp and are readable ROM-free. **Terrain is now wired** (`difficulty.py` §Terrain): FE8's own `TerrainTable_Avo_Common`/`_Def_Common` and the terrain enum are parsed from HEAD, and `map_tileset_tool.vanilla_layout_data()` gives tile→terrain for any vanilla layout, so `terrain_at(x,y)` is a decomp read. A chapter unit declares `tile_terrain:` and the role check fights it on that tile (`battleAvoidRate = spd*2 + terrainAvoid + lck`, `battleDefense = terrainDefense + def`; the Common/foot tables, since the yardstick is a foot unit). Note `.xPosition` is a SPAWN point — a unit's `.redas` may walk it to its real post (Saar spawns (13,0), posts (13,1)); read the REDA destination, not the spawn.
+**Match the twin's CLASS MIX, not just its totals — the weapon triangle is invisible to the per-slot averages.**
+Hitting `threat/slot` and `clear-load/slot` says nothing about *what the player is actually fighting*. ch05 passed parity while fielding **zero** axe units against vanilla Ch5's **eleven** (6 Brigands + 5 Fighters, ~48% of its force) — so the triangle maths a player experiences was completely different from the twin's, and no printed number could see it. Worse, the divergence came from tuning *counts* to recover a metric: two Armor-Knight "frost sentinels" invented to fix clear-load (vanilla Ch5's only Armor Knight **is the boss** — it fields no armour grunts), and then, after removing them, a Mercenary bumped 2→4 (vanilla fields **one**). Both were "what moves the number," not "what does the twin field." The rule: **derive composition from the twin's class breakdown first, then tune levels/weapons to land the metrics** — never invent units the twin doesn't field to close a gap. ch05 now matches Ch5 exactly on Soldier 6 / Archer 3 / Mercenary 1 / Myrmidon 1 with the axe block at 10 of 23 (~43%), and parity *improved* doing it (x1.11 / x0.84). Fighters carry the whole axe block rather than splitting Brigand/Fighter — the ch01 precedent (Fighters so nothing pathfinds over peaks).
+_Decided: 2026-07-23 (Nicolas + CLAUDE; "were the sentinels based on Ch5's enemy count?" — they were not)_
+
+**A boss is class base PLUS a personal stat line — that, not the class, is why FE8 bosses are walls.**
+`CHARACTER_SAAR` is an Armor Knight *plus* HP+13/Pow+6/Skl+5/Spd+3/Def+2/Res+3/Lck+4. This retires the whole "find a tanky mage class" search: **FE8 has none** (best magic Def is 5 — Sage/Mage-Knight/Gorgon, all 10% Def growth), and the FE-Repo shares *art*, not portable class definitions (a class is just a table row each hack sets itself; our own pipeline already clones and rewrites classes). So Ravisin stays a Druid with Flux and her existing art and simply gets a `personal:` line (HP+15/Def+5 → ~13.4 rounds, Saar's bar). **Zero art cost, no custom class.**
+Scope matters: personal lines are modeled **only in the role check, on both sides** — putting them in the AGGREGATE parity metric shifted every curated baseline (ch02 fell out of band) and made a Def-13 boss undentable, so the aggregate deliberately stays class-base-only on both sides. Two traps found while wiring it: **(1) personal Def and terrain STACK** — HP+15/Def+5 on a throne makes her undentable (`inf`), so it's one lever, not two (the throne is dropped, and the armour bodyguards with it — with a real boss line they were redundant scaffolding, so `frost-sentinel` was removed and `crypt-blade` 2→4 carries the clear-load); **(2) the yardstick's attack is exactly 13, so Saar-with-line takes 0 damage** — the bar therefore falls back to his class-base 12.92 **per boss**, never all-or-nothing (an undentable Saar must not hand the "bar" to Ch5's weaker dentable bandit). That undentability says more about the yardstick being a weak average unit than about the boss — the chapter hands the player an Armorslayer for exactly this.
+_Decided: 2026-07-23 (Nicolas + CLAUDE; "why can't Ravisin just be a different class?")_
+
+**Two assumptions this killed, both checked instead of guessed:** (1) **`GuardTileAI` does not mean "on a throne"** — it means "don't chase." Saar's post is plain `TERRAIN_ROAD`, so his 12.9-round wall is **100% class Defense, zero terrain**; the earlier claim that terrain widened the boss gap was wrong. (2) Terrain can't rescue a caster: a throne (+30 avo/+3 def) takes Ravisin from 2.9 → 6.8 rounds — past "folds instantly," still about half of Saar. Hence the split fix: throne **plus** distributed armour (two Armor-Knight bodyguards ≈ 11.7 rounds on the approach). This deliberately gives our boss *more* terrain help than vanilla's boss gets, compensating for Druid Def 5 vs Armor Def 11 — a documented departure, not a mirror. (Anchor regressions pin both reads: Ch5 Joshua stands on `TERRAIN_ARENA_REGULAR` — canon — and Saar on `TERRAIN_ROAD`.)
+_Decided: 2026-07-23 (Nicolas + CLAUDE; ch05 boss-role post-mortem — "how did this slip past us?")_
+
+**Corollary — our undead reskins read GLASSY against the parity yardstick, so match clear-load with high-Spd beasts + armored walls, not more fodder or more levels.**
+The parity yardstick doubles any enemy with Spd ≤ 4 (Spd 8, iron-sword), which halves its clear-load. Our tomb-flavored undead lean on the slowest FE8 monster classes — `mogall` (Spd ~0–4) and `revenant` (Spd ~1–2) — which get doubled and die in ~1 round no matter their HP/Def, so a force built from them lands high on *threat* but far under vanilla's *clear-load* (the living-soldier twins aren't doubled). Adding levels barely helps (those classes' Spd never clears the threshold) and adding armor (`entoumbed`, Spd ~2) helps only via lower threat, not durability. The lever that actually raises clear-load is composition: the durability spine must be the **fast beasts** (`mauthedoog`/`gwyllgi`, Spd ≥ 10 — never doubled, real rounds-to-kill) plus a few **armored walls** (`entoumbed`, low-threat), with the doubled `mogall`/`revenant` fodder thinned to a garnish. Applied to ch05 (16 undead line + 6 eruption reinf + 1 convertible) this reached PARITY at threat x1.19 · clear-load x0.81 (band's low edge). Expect the same recomposition on the undead-heavy chapters ahead (ch06 Messie, ch08). The static bar is still just a proxy — playtest is the arbiter.
+_Decided: 2026-07-22 (CLAUDE; ch05 roster-grounding, #25 — tier-1 of the flow above, ROM-free web session)_
+
+**Refinement (2026-07-23) — the RIGHT fix for the glassy problem is a SKIN divorce, not a composition fight: put undead skins on vanilla INFANTRY classes (the ch01 pattern), and reserve beasts for chapters where beasts are on-story.**
+The corollary above is correct physics but its *recommendation* (lean the spine on beasts) was a crutch. The clean fix — adopted for ch05 rev.2 — is the one Nicolas pushed: keep the vanilla FE8 twin's **living-class stats** (Soldier/Fighter/Mercenary/Archer/Armor-Knight/Myrmidon) and **reskin them undead** via `enemy_class_reskins` (exactly how ch01 ships "Vanilla Ch1 enemy table, goblin-skinned"). Then clear-load parity is *free* (living classes aren't doubled; the Armor-Knight is the Def-sink the monster palette couldn't produce) and there is no glassy fight. ch05 rev.2 (risen elven guardians on infantry classes + the lone White-Moose boss) landed threat x1.21 · **clear-load x0.97** — better-centered than rev.1's x0.81. Two further reasons this beats the beast-spine crutch: (1) **narrative variety** — ch04 IS the beast/wolf chapter (the hunt, Marty's parley); reusing wolves in ch05 makes it "ch04 indoors," so ch05's dead-tomb identity requires *not* leaning on beasts (wolves CUT; the moose stays as the ch04-quarry payoff); (2) it generalises — ch06 (Messie) and ch08 get their own on-story skins over vanilla-parity classes rather than a monster-class recomposition each time. Asset note (FE-Repo, all [U]): undead **sword/bow** skeleton anims exist off-the-shelf (Bonewalker/Specter/Stalfos, Wight Sniper); **lance/axe/armored** undead humanoids do not → those slots use frost/pale palette-swaps of the vanilla frame (an ice-locked sentinel reads better than a bone-knight anyway). The static bar is still a proxy — playtest is the arbiter.
+_Decided: 2026-07-23 (Nicolas + CLAUDE; ch05 roster rev.2, #25 — "divorce skin from class; don't refight parity per chapter")_
 
 **Recruit budget: the roster tracks vanilla's field-growth curve to a ~16–18 pool — NOT capped at Ch5.**
 The binding *field* size is `deploy_limit` = vanilla chapter N's deploy-slot count (§Field parity;
@@ -1535,9 +1621,49 @@ _Decided: 2026-05-30_
 Armory = weapon shop. Vendor = item shop. FE8 world-map shop system preserved.
 _Decided: May 2026_
 
-**No arena**
-FE8's arena is removed. Wolfram's Forge fills the "spend gold to get stronger" role.
-_Decided: May 2026_
+**~~No arena~~ — SUPERSEDED 2026-07-29. The arena is KEPT, and it keeps its name.**
+Original decision (May 2026): "FE8's arena is removed. Wolfram's Forge fills the 'spend gold to
+get stronger' role." The role was identified correctly — the arena *is* spend-gold-to-get-stronger
+— but the **label was wrong, and the label did the damage.** Calling the replacement a *Forge*
+promises gear-smithing, which the arena mechanic cannot do (it wagers gold on single combat and
+pays double; it never touches equipment). Writing ch05 surfaced this: the seed scene had Wolfram
+offering to put an edge on the party's weapons, i.e. a mechanic we do not have and are not
+building.
+
+So: **FE8's arena stays, mechanically untouched, and stays called an arena in-game.** No new
+mechanic, no rename for the player to learn, and vanilla's own tutorial text becomes reusable
+nearly verbatim. What changes is only the fiction around it:
+
+- **ch05's tomb is an arena that a tomb was later built into — and this is CANON, not our
+  invention.** RotFM's Elven Tomb: *"An amphitheater was built for **Orem** to tell the other elves
+  of his ascension and return, and when he eventually died the place was refashioned into his
+  tomb."* Nicolas remembered this from the Sahnar research and was right; CLAUDE initially recorded
+  it as unevidenced after grepping the repo instead of actually verifying, which is not
+  verification. Our own map description had also arrived at the shape independently — "a snowy
+  sunken depression ringed by crystal pillars and statues… the moon dial sits at center" is
+  amphitheatre geometry. So the venue is canon and the geometry already matched it.
+  **Caveat, ours not canon's:** the amphitheatre was built for ORATORY — Orem addressing his
+  people — not for combat. So the arena reading is carried as **Wolfram's inference, never the
+  narrator's fact**: he senses chips struck off blade edges in the floor and concludes blades met
+  here, and reads it as a TRAINING floor. Both are things the wear pattern can actually tell a
+  metallurgist: a battle leaves bodies and broken weapons, whereas thousands of small chips spread
+  evenly through a floor means repeated, sustained, non-lethal contact. He never claims a who or a
+  when. It stays his deduction rather than the narrator's assertion — he is a smith, not a
+  historian, the same rule we applied to RBG (don't make him a history professor) — and that is
+  what lets our arena and the canon both stand without either overwriting the other.
+- **Wolfram opens it, and ch05 is the ORIGIN, not the only instance.** He finds it by metal-sense —
+  the floor is full of blade-chips left by centuries of sparring — and gets it usable; afterwards
+  he can set one up wherever the party camps, so arenas recur as they do in vanilla. The entry fee
+  is his materials.
+- **He is the right owner** even though he is a smith: his established function is reading a place
+  by what he can sense (`0x9BE`), his bible has him never backing down from a fight, and he is the
+  one character whose flavor explains why a four-thousand-year-old anything can be made to work
+  again. Getting it running is his; what it does once running is vanilla's arena.
+- The permadeath stake finally has a reason rather than being an abstract bet: the niches still
+  hold the place's champions, and a unit that loses does not come back out.
+
+Wolfram had also gone under-used — this gives him an on-screen role the campaign was missing.
+_Decided: May 2026; superseded 2026-07-29 (Nicolas + CLAUDE, ch05 dialogue pass)._
 
 **Gold availability follows vanilla FE8 — no per-chapter clear bonus**
 FE8 grants gold only from in-map sources, never a flat "chapter cleared" stipend
@@ -2434,6 +2560,34 @@ curation at every level, never accepted wholesale). Voice bibles live as **§Voi
 rules, calibration lines, banned list; `lore/narration.md` holds the card/crawl/tour register + vanilla pacing
 budgets measured from the decomp). Workflow + budgets + insertion gates: `.claude/skills/dialogue-pass/SKILL.md`.
 _Decided: 2026-06-09 (community research: FEU writing threads, DM voice guides, Dramatron CHI'23)._
+
+**MINE THE CORPUS BEFORE WRITING A LINE — this is now step 0 of the drafting loop, not advice.**
+ch05's Basil/Sahnar scene burned a dozen rejected drafts written from instinct; **two Ewan/Saleh support conversations fixed it in a single pass.** FE8 ships ~40k lines and we were cherry-picking six quotes and then guessing. The method (`.claude/skills/dialogue-pass/references/natural-speech.md`, wired as SKILL.md drafting-loop step 0): read the twin chapter's scenes with `tools/vanilla_scene.py`, and for a two-hander find the **relationship twin** among FE8's ~217 two-character scenes — its **support conversations** are the game's intimate two-handers and the closest form to most of our scenes. Pick the pair whose *dynamic* matches (eager student + reserved mentor → Ewan/Saleh) and read all of them.
+The diagnosis it produced — **"epigram disease," our single most common dialogue failure**: every line polished into an artifact that lands one beat and hands off, which reads as poetry rather than talk. **Vanilla is redundant and inefficient and that is precisely why it sounds human** (Joshua and Natasha both apologise twice; she says four things that all mean "I'm leaving"). Four laws follow: turns are **lopsided** (two words answered by forty); the eager character **runs on and interrupts himself**; characters **say the feeling plainly** instead of burying it in subtext; reserve reads as **brevity and plain complete sentences**, never as an ellipsis on every line. Corollary applied to `basil.md`: the "2–5 words, no subordinate clauses" spec was retired — it made him read as slow rather than gentle.
+_Decided: 2026-07-23 (Nicolas + CLAUDE; ch05 9BB — "you have the entire game's dialogue and you're not writing like it")_
+
+**Villain voice is grounded in FE8's own script, and contrasting clichés are banned.**
+Two more craft rules in `.claude/skills/dialogue-pass/SKILL.md`. (1) **No "not X, but Y"** — no antithesis, no then/now contrast, no defining by negation; state what IS. It is a *tic*, not a style: once it is in your ear every character sounds identical, and it was the single biggest cause of flat ch05 dialogue (*"that's not life, it's fever"*, *"I don't kill, I cleanse"*). But over-correcting into uniform flat declaratives reads as **monotone** — vary rhythm and temperature. (2) **Ground villains in the decomp corpus** (`fireemblem8u/texts/texts.txt`), not invention: FE8 villains address the party directly with an insult-name (dogs/wretches/rats), *relish* it, and use dark irony — Valter's *"I'll save you worthless dogs from your own incompetence. You'll thank me later"* is the shape a mercy-doctrine should take (swagger, not sermon).
+_Decided: 2026-07-23 (Nicolas + CLAUDE; ch05 eruption beat)._
+
+**Dialogue-pass craft learnings (2026-07-23, ch05 opening) — folded into the skill's Craft check.**
+Two failure modes surfaced hard while writing ch05 and are now first-class checks in
+`.claude/skills/dialogue-pass/SKILL.md`: (1) **people talking, not mood-narration** — the #1 cause of
+"dry"; a line that *describes atmosphere* ("she wakes the sad things") is dead even when evocative, so
+every box must be a person reacting/joking/asking, with dread carried by a concrete in-character line;
+(2) **draft BOXED, not prose** — prose-length lines read wordy and hide the A-press pacing, so lines are
+hand-boxed (2 lines, ~29–30 ch; on-map ≤29) from the first pass and shown boxed. Also: **canon research
+in the ROM-free web env** — the RotFM PDF lives on Nicolas's Mac, so fill canon gaps from online
+actual-play recaps + the Forgotten Realms wiki (this caught Sahnar's real identity: female, elven royalty,
+awake-and-aware for millennia). Verify against Nicolas's table, which outranks book canon for our version.
+_Decided: 2026-07-23 (ch05 opening dialogue pass, ROM-free web session)._
+
+**ch05 opening uses the vanilla two-scene rhythm: a focused PRE-MAP cutscene + an ON-MAP opening scene.**
+`chapter_start` (Text_BG) carries the ch04 thread and mood (party descends the gateway into the open-air
+hollow; Lupin/Marty/Pinky; Ravisin stays SILENT — saved for the eruption); then the map loads and a
+`map_opening` on-map scene brings the enemies into view and Basil (a green ally) joins. More dynamic than
+one talking-heads cutscene, and it's what FE8 does. Villain reveal is *earned* at the eruption (she acts,
+she doesn't monologue at the door). _Decided: 2026-07-23 (ch05 opening, with Nicolas)._
 **In-engine dialogue review is motion, not stills:** `tools/playtest/run.sh record` captures every 5th frame
 through both scenes; deduped GIFs (opened in Safari) are what Nicolas signs off before art-visible text commits —
 static screenshots catch the typewriter mid-stroke and false-alarm as cut-off text. _Decided: 2026-06-10 with
@@ -2637,11 +2791,109 @@ _Decided: 2026-07-05 (CLAUDE; pipeline track. #125, closed not-planned — no co
 
 ---
 
+**Marty's "spore covenant" is retired — a thread that reads well in a bible and never reached a beat**
+
+Written 2026-07-23 during the ch05 dialogue pass: Marty as Ravisin's opposite number ("two
+necromancers, opposite covenants: the composter vs. the taxidermist"), the dead owed a free return
+to the earth, the sin being death held out of the cycle by force. It was a genuinely tidy idea and
+it survived three weeks purely because it lived in `marty.md` rather than in a scene.
+
+It never reached one. It carried an explicit IOU — *"exact line TBD in the beat; may move to the
+recruit beat"* — and both candidate beats then locked without it. 9C5 gives the PARTY no lines at
+all (vanilla Ch5's escalation is the arriving force speaking, and we took that shape); 9C6 turns
+on Sahnar RECOGNISING Basil, not on anyone naming a sin over her. Nicolas's call, and correct:
+*"it was an idea we silently moved away from… remove it so it doesn't mess with his character
+later."*
+
+The general lesson, which is why this is an ADR and not a quiet delete: **a bible section with an
+open "line TBD" is a liability, not an asset.** It is unwritten dialogue stored where voice
+guidance lives, so every future writer reads it as settled character and writes toward it. A voice
+bible should describe how someone talks; a thread that needs a scene to exist belongs in the
+chapter YAML's slot description, where it dies with the slot if the slot is cut.
+
+Retired phrases are in `check.py` `DEAD_CONCEPTS`, so the drift lint rejects them in docs and
+hand-written comments. Sahnar's ordeal no longer needs a second druid to mean something: she is a
+soul held awake under stone, which is legible on its own.
+
+_Decided: 2026-07-29 (Nicolas + CLAUDE; ch05 dialogue pass — retiring the "two druids" thread)._
+
+---
+
+**Vanilla's "if the escort died" cutscene is the same scene's BACK HALF — so our branch is cheap**
+
+FE8 Ch5 ships its ending twice: `0x9C9` (34 boxes) if Natasha lives, `0x9CA` (24) if she dies.
+The obvious read is "a whole alternate cutscene", and that read is what made an earlier pass mark
+ours *not adopted* — it looked like duplicate exposition for a case most players never hit.
+
+Mining it says otherwise. `0x9CA` is not a second scene. Its front is a different DELIVERY of the
+same facts — fragments, interrupted by the party telling her to stop talking, then a flat
+"....She's dead." — and its back is `0x9C9`'s deliberation running near-verbatim, with **exactly
+one line changed** to price the loss (*"If she had lived, we might have learned more, but…."*) and
+the closing box repeated word for word. The branch costs the delivery, not the scene.
+
+So the rule for any chapter with an escort who can die: **the alternate ending is a re-delivery,
+not a rewrite.** Write the lived one, then change how the information arrives and who is left to
+react — and keep the last boxes shared, because that is what makes the two endings feel like one
+chapter. ch05's pair sits at 25 / 18 boxes on this pattern.
+
+The structural consequence that is easy to miss: it is the ESCORT who carries the chapter's forward
+information, not a party member. That is *why* the branch has to exist, and it is also the reason
+the escort's death is a real failure rather than a lost unit. Ours puts the ch06 hook in Basil's
+mouth for the same reason — Sahnar is optional and cannot carry mandatory plot, and no party member
+was standing in the tomb listening to Ravisin talk.
+
+_Decided: 2026-07-30 (CLAUDE; ch05 ending block — adopting `0x9CA`, mined from `EventScr_Ch5_EndingScene`)._
+
+---
+
+**A recruit-gated scene block goes MID-scene, never on the button**
+
+ch05's ending pays the question `0x9CC` deliberately left hanging (*"...Can I give you a berry
+now?"*) — but only if the player actually did the escort, so the block is flag-gated on the
+recruit. The placement rule that came out of writing it: **a conditional block belongs where
+excising it cannot touch the scene's shape or its last box.**
+
+Put it at the end and the scene has two different buttons, one of which most players never see, and
+the closing beat stops being something you can write to. Put it in the middle and the scene reads
+as one thing with a chamber in it — the surrounding beats carry the structure, and the conditional
+carries the reward. Cutting it costs six boxes of warmth and nothing else.
+
+This is not a new mechanism: `0x9C9` vs `0x9CA` is already a branch on the escort's death, one slot
+later. We are reusing FE8's own conditional-ending wiring one act earlier, for a reward rather than
+a failure.
+
+_Decided: 2026-07-30 (CLAUDE; ch05 `0x9C9` Sahnar block)._
+
+---
+
 ## Operational Gotchas (durable)
 
 _Moved here from `HANDOFF.md` 2026-07-02 (audit): these are durable engineering constraints, not
 session state. `HANDOFF.md` points here._
 
+- **A chapter's message text lives in TWO decomp files, in TWO channels — a partial scan reads as
+  proof that vanilla lacks a beat.** `src/events/<ch>-eventscript.h` holds the scenes, mixing
+  `TEXTSHOW` (on-map, units staged by `LOAD1`, bubbles wrap at 29 chars) with
+  `Text_BG(BG_*, id)` (a still backdrop, ~42 chars) — and vanilla uses the backdrop for scenes set
+  ELSEWHERE, so the channel also tells you where a scene happens. Separately,
+  `src/data_battlequotes.c` holds boss taunts, boss death quotes and chapter-specific unit death
+  quotes, which appear in **no** eventscript. Both traps fired on ch05: `vanilla_scene.py` matched
+  `TEXTSHOW` only and reported Ch5's 11-message opening as 8, hiding the exact two backdrop scenes
+  our 9BC/9BD are modelled on; and a caveat was written claiming `0x9C6`/`0x9C7`/`0x9C8` "appear
+  nowhere in the decomp" when all three are battle-quote entries — `0x9C6` being the escort's death
+  quote, which then turned out to be a slot we owed Basil. Grep **both** files before concluding an
+  id is unused, and prefer the tool (now channel-aware, guarded by `tools/test_vanilla_scene.py`).
+  _Recorded: 2026-07-29 (ch05 dialogue pass)._
+
+- **A `git` subprocess run inside a git hook resolves against the OUTER repo unless you strip `GIT_*`.**
+  Git exports `GIT_DIR`/`GIT_INDEX_FILE`/`GIT_WORK_TREE` while a hook runs (pre-commit drift → `check.py`
+  → the `test_*.py` suite). Any tool or **test fixture** that then shells out to `git` — `git -C <dir> …`,
+  a throwaway `git init`/`commit` in a tempdir, `_vanilla_decomp_text`'s `git show HEAD:` — has its
+  `-C`/cwd **overridden** by the ambient `GIT_DIR` and silently operates on the real repo. On 2026-07-21
+  this flipped `core.bare=true` on the live repo and wrote a corrupt commit before it was caught. **Always
+  pass a sanitized env** — `{k: v for k, v in os.environ.items() if not k.startswith('GIT_')}` — to any
+  `git` subprocess that must target a specific repo, and add `-c core.hooksPath=/dev/null` to fixture
+  commits so they can't re-enter the outer hook. Fixed in `_vanilla_decomp_text` + `test_map_tileset.py`.
 - **Per-unit descale recipe is recorded in the unit YAML comment** (data-is-the-doc) — read it before
   regenerating; don't guess flags. Swapping ONE pose still requires re-descaling the **whole 3-frame set
   together** (shared palette recompute shifts the other two — that's correct, not a bug).

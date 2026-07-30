@@ -796,5 +796,156 @@ class BattlefieldDynamics(unittest.TestCase):
                          (2, 3, 1))
 
 
+class RoleCheck(unittest.TestCase):
+    """The per-unit role check (#25 post-mortem): the aggregate parity verdict hides a
+    single monstrous unit and a boss that folds, because threat/slot averages both away."""
+
+    REF = 'FE8 Ch5'
+
+    def _chap(self, units):
+        return {'enemy_units': units}
+
+    def test_clean_roster_has_no_findings(self):
+        """A Saar-shaped boss (armour wall, modest threat) over ordinary line units --
+        the profile the vanilla twin actually fields."""
+        chap = self._chap([
+            {'id': 'grunt', 'class': 'soldier', 'level': 5, 'count': 6,
+             'inventory': [{'id': 'iron-lance', 'fe_base': 'iron-lance'}]},
+            {'id': 'boss', 'class': 'armor-knight', 'level': 8, 'is_boss': True,
+             'inventory': [{'id': 'slim-lance', 'fe_base': 'slim-lance'}]},
+        ])
+        self.assertEqual(df.role_findings(chap, self.REF), [])
+
+    def test_flags_a_boss_out_threatened_by_a_line_unit(self):
+        chap = self._chap([
+            {'id': 'monster', 'class': 'gwyllgi', 'level': 6,
+             'inventory': [{'id': 'claw', 'fe_base': 'rotten-claw'}]},
+            {'id': 'boss', 'class': 'druid', 'level': 7, 'is_boss': True,
+             'inventory': [{'id': 'flux', 'fe_base': 'flux'}]},
+        ])
+        found = df.role_findings(chap, self.REF)
+        self.assertTrue(any('out-threatened' in f and 'monster' in f for f in found), found)
+
+    def test_convertible_outlier_is_not_a_role_inversion(self):
+        """A convertible is neutralized rather than ground down, so out-hitting the boss
+        is a deliberate 'avoid me' hazard -- the ch05 white moose."""
+        chap = self._chap([
+            {'id': 'moose', 'class': 'gwyllgi', 'level': 6, 'convertible': True,
+             'inventory': [{'id': 'claw', 'fe_base': 'rotten-claw'}]},
+            {'id': 'boss', 'class': 'druid', 'level': 7, 'is_boss': True,
+             'inventory': [{'id': 'flux', 'fe_base': 'flux'}]},
+        ])
+        found = df.role_findings(chap, self.REF)
+        self.assertFalse(any('out-threatened' in f for f in found), found)
+        self.assertTrue(any('moose' in f and 'convertible' in f for f in found), found)
+
+    def test_flags_a_boss_that_folds_far_faster_than_the_twins_wall(self):
+        chap = self._chap([
+            {'id': 'boss', 'class': 'druid', 'level': 7, 'is_boss': True,
+             'inventory': [{'id': 'flux', 'fe_base': 'flux'}]},
+        ])
+        self.assertTrue(any('rounds to kill' in f for f in df.role_findings(chap, self.REF)))
+
+    def test_flags_more_than_one_boss(self):
+        chap = self._chap([
+            {'id': 'a', 'class': 'armor-knight', 'level': 8, 'is_boss': True,
+             'inventory': [{'id': 'iron-lance', 'fe_base': 'iron-lance'}]},
+            {'id': 'b', 'class': 'armor-knight', 'level': 8, 'is_boss': True,
+             'inventory': [{'id': 'iron-lance', 'fe_base': 'iron-lance'}]},
+        ])
+        self.assertTrue(any('flagged is_boss' in f for f in df.role_findings(chap, self.REF)))
+
+    def test_boss_on_a_throne_is_not_flagged_as_folding(self):
+        """Terrain is read from the declared tile: a Druid folds in 2.9 rounds on open
+        ground but survives 6.8 on a throne (+30 avo/+3 def), clearing the threshold."""
+        squishy = {'id': 'boss', 'class': 'druid', 'level': 7, 'is_boss': True,
+                   'inventory': [{'id': 'flux', 'fe_base': 'flux'}]}
+        self.assertTrue(any('rounds to kill' in f
+                            for f in df.role_findings(self._chap([squishy]), self.REF)))
+        throned = dict(squishy, tile_terrain='throne')
+        self.assertFalse(any('rounds to kill' in f
+                             for f in df.role_findings(self._chap([throned]), self.REF)))
+
+    def test_uncurated_reference_yields_no_findings(self):
+        chap = self._chap([{'id': 'x', 'class': 'soldier', 'level': 1,
+                            'inventory': [{'id': 'iron-lance', 'fe_base': 'iron-lance'}]}])
+        self.assertEqual(df.role_findings(chap, 'FE8 ChNope'), [])
+
+
+class PersonalBossLine(unittest.TestCase):
+    """FE8's own boss mechanism: a named boss is class base PLUS a personal line (Saar is an
+    Armor Knight *plus* HP+13/Def+2/...). Modeled in the role check on BOTH sides -- and
+    deliberately NOT in the aggregate, where adding it shifts every curated baseline."""
+
+    REF = 'FE8 Ch5'
+
+    def test_reads_a_vanilla_boss_line(self):
+        line = df.vanilla_personal_line('CHARACTER_SAAR')
+        self.assertEqual((line['baseHP'], line['baseDef']), (13, 2))
+
+    def test_generic_charindex_has_no_line(self):
+        self.assertEqual(df.vanilla_personal_line('0x80'), {})
+        self.assertEqual(df.vanilla_personal_line(None), {})
+
+    def test_aggregate_stays_class_base_only(self):
+        """Personal lines must not leak into enemy_combatants -- that is what keeps ours and
+        the vanilla reference on the same footing (and keeps a Def-13 boss from reading inf)."""
+        plain = {'id': 'b', 'class': 'druid', 'level': 7,
+                 'inventory': [{'id': 'flux', 'fe_base': 'flux'}]}
+        withline = dict(plain, personal={'baseHP': 15, 'baseDef': 5})
+        self.assertEqual(df.enemy_combatants(plain)[0].hp,
+                         df.enemy_combatants(withline)[0].hp)
+
+    def test_personal_line_lifts_the_boss_in_the_role_check(self):
+        plain = {'id': 'boss', 'class': 'druid', 'level': 7, 'is_boss': True,
+                 'inventory': [{'id': 'flux', 'fe_base': 'flux'}]}
+        self.assertTrue(any('rounds' in f for f in df.role_findings({'enemy_units': [plain]},
+                                                                   self.REF)))
+        strong = dict(plain, personal={'baseHP': 15, 'baseDef': 5})
+        found = df.role_findings({'enemy_units': [strong]}, self.REF)
+        self.assertFalse(any('fold too fast' in f for f in found), found)
+
+    def test_stacking_terrain_onto_a_boss_line_is_flagged(self):
+        """Personal Def and terrain stack; together they can make a boss undentable."""
+        boss = {'id': 'boss', 'class': 'druid', 'level': 7, 'is_boss': True,
+                'tile_terrain': 'throne', 'personal': {'baseHP': 15, 'baseDef': 5},
+                'inventory': [{'id': 'flux', 'fe_base': 'flux'}]}
+        found = df.role_findings({'enemy_units': [boss]}, self.REF)
+        self.assertTrue(any('cannot be damaged' in f for f in found), found)
+
+
+class Terrain(unittest.TestCase):
+    """Terrain read from the decomp at HEAD (ROM-free): FE8's own Common (foot) tables and
+    the vanilla map layouts. For a 1:1 retile the vanilla layout IS our layout."""
+
+    def test_bonus_matches_fe8_tables(self):
+        self.assertEqual(df.terrain_bonus('TERRAIN_THRONE'), (30, 3))
+        self.assertEqual(df.terrain_bonus('throne'), (30, 3))       # bare name accepted
+        self.assertEqual(df.terrain_bonus('TERRAIN_GATE_CASTLE'), (20, 3))
+        self.assertEqual(df.terrain_bonus('forest'), (20, 1))
+        self.assertEqual(df.terrain_bonus('road'), (0, 0))
+
+    def test_unknown_terrain_is_open_ground(self):
+        self.assertEqual(df.terrain_bonus('TERRAIN_NOPE'), (0, 0))
+        self.assertEqual(df.terrain_bonus(None), (0, 0))
+
+    def test_on_terrain_folds_defense_and_returns_avoid(self):
+        base = combatant('x', dfc=5)
+        moved, avo = df.on_terrain(base, 'throne')
+        self.assertEqual((moved.df, avo), (8, 30))
+        same, avo0 = df.on_terrain(base, None)
+        self.assertEqual((same.df, avo0), (5, 0))
+
+    def test_reads_vanilla_ch5_tiles(self):
+        """Anchors: Ch5's Joshua stands in the arena (canon), and the boss Saar's post is
+        plain ROAD -- his 12.9-round wall is all class Defense, no terrain."""
+        self.assertEqual(df.vanilla_terrain_at('Ch5Map', 12, 6), 'TERRAIN_ARENA_REGULAR')
+        self.assertEqual(df.vanilla_terrain_at('Ch5Map', 13, 1), 'TERRAIN_ROAD')
+
+    def test_off_map_and_missing_layout_degrade_to_none(self):
+        self.assertIsNone(df.vanilla_terrain_at('Ch5Map', 999, 999))
+        self.assertIsNone(df.vanilla_terrain_at('NoSuchMap', 0, 0))
+
+
 if __name__ == '__main__':
     unittest.main()

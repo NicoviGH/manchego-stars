@@ -23,6 +23,7 @@ Milestones B+ (characters, chapter, dialogue codegen) hang off the same CLI.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -487,6 +488,72 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         'src/prep_sallycursor.c'] + [
                         'graphics/op_subtitle/OpSubtitle_%02d.png' % i
                         for i in range(gen_subtitle_cards.CARD_COUNT)]
+
+
+# --- warm-rebuild acceleration: idempotent injection ---------------------------
+# The injection re-emits (very nearly) byte-identical decomp sources every build,
+# but the plain writes -- and restore_vanilla_sources' `git checkout` -- bump each
+# touched file's mtime. `make` keys off mtime, so it recompiles the translation
+# unit AND re-runs the expensive graphics compression / serial banim link even when
+# the CONTENT is unchanged from the last build. The dominant costs are the ~354-TU
+# recompile cascade from restored widely-included headers (variables.h, ekrbattle.h,
+# classes.h) and the serial `arm_compressing_linker.py` rebuild of data_banim.o
+# (1752 assets) whenever any banim sheet/motion/agbpal mtime moves.
+#
+# Fix: snapshot the previous build's injection footprint (content hash + mtime) up
+# front, and once injection finishes, rewind the mtime of every file whose bytes are
+# byte-for-byte identical. `make` then treats those targets as up to date. This is
+# purely an mtime optimisation -- a file is rewound ONLY when its content is
+# unchanged, so the compiled ROM is bit-identical. See docs/decisions.md (Build).
+
+def _decomp_footprint():
+    """Absolute paths git reports as modified/untracked under the decomp -- i.e. the
+    previous build's injection footprint (source files; the .o/.lz/.4bpp build
+    outputs are .gitignored, so they are excluded). Never raises: a git hiccup just
+    yields an empty snapshot, which preserves correctness and only skips the speed-up."""
+    try:
+        out = subprocess.run(
+            ['git', '-C', DECOMP, 'status', '--porcelain', '-z', '-uall'],
+            check=True, capture_output=True).stdout
+    except (subprocess.SubprocessError, OSError):
+        return []
+    paths = []
+    for rec in out.split(b'\0'):
+        # porcelain -z record: 'XY <path>' (rename records carry a trailing NUL-
+        # separated old path, which harmlessly resolves to a real file too).
+        if len(rec) > 3:
+            paths.append(os.path.join(
+                DECOMP, rec[3:].decode('utf-8', 'surrogateescape')))
+    return paths
+
+
+def _snapshot_mtimes(paths):
+    """{abs_path: (mtime_ns, sha1_digest)} for each existing regular file in `paths`."""
+    snap = {}
+    for p in paths:
+        try:
+            st = os.stat(p)
+            with open(p, 'rb') as f:
+                snap[p] = (st.st_mtime_ns, hashlib.sha1(f.read()).digest())
+        except OSError:
+            pass  # missing / directory / unreadable -> just don't track it
+    return snap
+
+
+def _rewind_unchanged_mtimes(snap):
+    """Rewind the mtime of every snapshotted file whose bytes are unchanged, so make
+    skips its (redundant) recompile/recompression. Returns the count rewound. Only
+    ever touches mtime, and only for byte-identical content -- never file bytes."""
+    n = 0
+    for p, (mtime_ns, digest) in snap.items():
+        try:
+            with open(p, 'rb') as f:
+                if hashlib.sha1(f.read()).digest() == digest:
+                    os.utime(p, ns=(mtime_ns, mtime_ns))
+                    n += 1
+        except OSError:
+            pass
+    return n
 
 
 def restore_vanilla_sources():
@@ -7481,6 +7548,9 @@ def main():
         sys.exit('ERROR: --ch03-boot and --ch04-boot are mutually exclusive')
 
     print('build_campaign: injecting "%s" into %s' % (args.campaign, DECOMP))
+    # Snapshot the previous build's injection footprint BEFORE we touch anything, so
+    # we can rewind mtimes for whatever comes out byte-identical (fast warm rebuilds).
+    _mtime_snapshot = _snapshot_mtimes(_decomp_footprint())
     print('portraits:')
     inject_portraits(args.campaign)
     if not args.portraits_only:
@@ -7567,6 +7637,10 @@ def main():
                 _configure_boot(PROLOGUE_HOST_INDEX, montage=args.montage)
         print('death quotes (#6):')
         inject_pc_death_quotes(args.campaign)
+    rewound = _rewind_unchanged_mtimes(_mtime_snapshot)
+    if rewound:
+        print('idempotent injection: rewound %d unchanged file(s) -> make skips them'
+              % rewound)
     print('done. Run `make` to compile the ROM.')
 
 
