@@ -126,12 +126,11 @@ STAT_DONORs, the five no-Lupin conditionals) on #25; **#138** config-driven
   since 2026-07-30. A branch may leave it untouched or sync it to main's tip; it may not
   author its own. If the guard fires: `git checkout main -- HANDOFF.md` on the branch.
   Refresh HANDOFF on main *after* a merge. ADR in `decisions.md` §Working Conventions.
-- **`.git/config` IS CURRENTLY DAMAGED — please repair it.** On 2026-07-30 `test_check_handoff.py`'s
-  git fixture ran against the LIVE repo from inside pre-commit (the `GIT_*` footgun below), leaving:
-  `core.bare=true`, `user.name=t`, `user.email=t@t`. Committing still works and every commit so far
-  is correctly authored, but the next one would be attributed to `t <t@t>`. The classifier blocks
-  `git config` writes, so run this by hand:
-  `git config --local core.bare false && git config --local user.name "Nicolas" && git config --local user.email "nicolas.vivas94@gmail.com"`
+- **If `.git/config` ever shows `core.bare=true` or a `t`/`t@t` identity, a git-shelling test escaped
+  its fixture** — that is the signature. It happened on 2026-07-30 (repaired; the cause is fixed
+  below). `core.bare=true` makes the main tree refuse `git add` with "must be run in a work tree".
+  Repair: `git config --local core.bare false`, `user.name "Nicolas"`,
+  `user.email "nicolas.vivas94@gmail.com"`.
 - **The `GIT_*`-in-a-hook footgun recurred and is now fixed on both sides** (`497d8a2`): a test
   fixture written the obvious way (`subprocess.run(['git', …], cwd=repo)`) is NOT isolated —
   git exports `GIT_DIR`/`GIT_INDEX_FILE`/`GIT_WORK_TREE` during a hook and they beat `cwd`. Any new
