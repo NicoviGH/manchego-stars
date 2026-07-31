@@ -26,8 +26,8 @@ geometry regardless of which slot hosts it (ch03 repaints vanilla Ch3 "Borgo" bu
 
 ## Recipe (mirror `inject_ch03`)
 
-1. **Module constants** — add a `CHNN_*` block next to the others (host index, layout
-   `(asset_label, maps_stem)` tuple, chapter YAML name, tileset, goal donor, boss/generic PIDs,
+1. **Module constants** — add a `CHNN_*` block next to the others (host index, **event group
+   symbol** (step 4), layout `(asset_label, maps_stem)` tuple, chapter YAML name, tileset, goal donor, boss/generic PIDs,
    `CHNN_AI` byte-vectors, `CHNN_CLASS_IDS` / `CHNN_ITEM_IDS` dicts mapping our YAML ids → decomp
    enums, spawn positions, and the `ChM_EVENTINFO_H` / `ChM_EVENTSCRIPT_H` path constants for the
    host slot's vanilla `M = N` symbols).
@@ -41,10 +41,24 @@ geometry regardless of which slot hosts it (ch03 repaints vanilla Ch3 "Borgo" bu
    `(obj_idx, pal_idx, cfg_idx, layout_idx)`. Reads the layout `.json`'s `tileset` stamp.
 
 4. **Retarget the host slot + pick a goal donor** —
-   `host = _retarget_host_chapter(CHNN_HOST_INDEX, GOAL_DONOR, '<goal_type>', err, indices, chapter_number)`.
-   It points the slot's map at `indices`, **copies vanilla slot `GOAL_DONOR`'s goal banner** (asserting
-   its `windowDataType == goal_type`), and sets `prepScreenNumber = chapter_number * 2`. Pick a donor
-   slot whose goal type matches and that our injectors don't overwrite:
+   `host = _retarget_host_chapter(CHNN_HOST_INDEX, GOAL_DONOR, '<goal_type>', err, indices, chapter_number, CHNN_EVENT_GROUP)`.
+   It points the slot's map at `indices`, **repoints the slot's `mapEventDataId` at `CHNN_EVENT_GROUP`**,
+   **copies vanilla slot `GOAL_DONOR`'s goal banner** (asserting its `windowDataType == goal_type`),
+   and sets `prepScreenNumber = chapter_number * 2`.
+
+   **`CHNN_EVENT_GROUP` is the `ChapterEventGroup` symbol your injector fills, and you must name it
+   — never assume the slot already points there.** Vanilla's slot index tracks the chapter number
+   only up to 4: FE8 inserts chapter 5X at **slot 5**, so from there the two diverge (slot 5 ships
+   pointing at `Ch5XEvents`, while a chapter hosted there writes its events into `Ch5EventData`).
+   This fails *silently and totally*: retargeting the map ids alone is enough to make the chapter
+   look right, so the slot presents YOUR map while running the host slot's roster and scripts —
+   foreign units on coordinates off your footprint, no party deployed, no PREP. Cost when it bit
+   ch04: a whole session chasing a "harness soft-lock" that was only the cursor initialising onto
+   an undeployed unit's off-map sentinel. Resolve the symbol → index with
+   `_asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', ...)`; `HostChapterEventGroup`
+   in `tools/test_build_campaign.py` pins it.
+
+   Pick a donor slot whose goal type matches and that our injectors don't overwrite:
 
    | Goal | `windowDataType` | Clean donor slots (vanilla, post-inject) |
    |---|---|---|
