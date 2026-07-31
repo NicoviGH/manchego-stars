@@ -63,6 +63,18 @@ portrait derives from the official FRLG sprite only.)
 (Lupin's *portrait* is separate — the TotalityDesigns hipster-wolf ref, credited above under community/AI art.
 Battle anim deferred; PMD SpriteCollab has Lycanroc `sprite/0745` in the same style for later.)
 
+**The White Moose — Wyrdeer (#899):**
+
+| Asset | Used for | Origin | Source |
+|---|---|---|---|
+| "Wyrdeer - full sprite" sheet (mainline layout: front/back battle sprites, icons, palette ramps, 4-direction × 4-frame overworld walk at 32×32) | The White Moose **map sprite** (`map_sprites/white-moose{,_mu}.png`, indexed to the cast palette + canon blood staining) and **portrait** (`portraits/white-moose.png`, full-creature bust from the 96×96 front cell). Used in ch04 (scripted neutral quarry) and ch05 (miniboss). | fan art by **Anarlaurendil**, derived from © **Nintendo / Creatures / GAME FREAK** designs | [Anarlaurendil, DeviantArt](https://www.deviantart.com/anarlaurendil/art/Wyrdeer-full-sprite-889409543) — **CC BY-SA 3.0**; original vendored at `campaigns/.../portraits/vendor/` |
+
+(Chosen over an FE-Repo reskin because the repo has **no elk/deer/stag art at all** — only wolves/hounds and
+horse-bodied centaurs — and a repainted hound would read as one of ch04's own wolves. See
+`docs/fe-repo-scouting.md`. The blood staining follows the book plate, *Rime of the Frostmaiden* p.81.
+Battle anim still owed for ch05 (#25); PMD SpriteCollab has Wyrdeer `sprite/0899` — **CC BY-NC 4.0** —
+whose `RearUp`/`Attack`/`Charge` supply the three poses `inject_battle_anims` needs.)
+
 ### Map tilesets (used as-is; the shared snow tileset for the MVP)
 | Asset | Used for | Authors | Source | License |
 |---|---|---|---|---|

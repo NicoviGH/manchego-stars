@@ -47,7 +47,8 @@ halberdier (`Skeleberdier`).
 | armored undead | ❌ | palette-swap the vanilla Armor-Knight/General (frost "sentinel") |
 | zombie | ✅ | `Monsters - Basic Types/[Zombie-Base] Revenant`, `Entombed +Ranged`, `[Zombie-Custom] Gore` |
 | undead caster | ✅ | `Magi - Dark-Type/[T3 Dark Druid-Reskin] Skeleton Druid`, `[T3 Necromancer-*] …`, `[T2 Summoner-Reskin] Plague Doctor / Warlock` |
-| beasts (wolves/hounds/elk) | ✅✅ | `Monsters - Basic Types/[Wolf-Base] Gwyllgi` (+repals), `Hellhound`, `[Wolf-Reskin] Wolf`, `Winged Cerberus/Vampirehound`, `Wolfskin` |
+| beasts — **wolves/hounds only** | ✅✅ | `Monsters - Basic Types/[Wolf-Base] Gwyllgi` (+repals), `Hellhound`, `[Wolf-Reskin] Wolf`, `Winged Cerberus/Vampirehound`, `Wolfskin` |
+| **elk / deer / stag / moose** | ❌ | **none — verified 2026-07-31** against the full directory listings of `Battle Animations/Monsters - Basic Types` and `Map Sprites/Monsters - Basic Types` (not the tree API, which truncates). Every quadruped there is a wolf/hound or a centaur (`Tarvos`/`Maelduin`, horse-bodied + humanoid torso). This row previously read "wolves/hounds/**elk**" and listed only wolves — that wording is what produced ch04/ch05's "Gwyllgi repal → elk" plan, i.e. a repainted HOUND for the campaign's title creature. Superseded: the White Moose adopts **Wyrdeer** (see `chapters/ch04-the-white-moose.yaml` → `art:`). |
 | mounted undead / death-knight | ❌ | none; nearest = `Mounted - …/[Wolf-Variant] Wolf Knight` (mounted wolf) |
 | sea monster / plesiosaur | ❌ | none (`Monsters - Dragons and Special` has only a `Mermaid`) |
 
@@ -61,7 +62,12 @@ Authoritative per-unit choices are the `skin:` fields in `chapters/ch05-the-elve
 - `bone-archer` (Archer/bow) → **Wight Sniper** skeleton
 - `frost-sentinel` (Armor-Knight) → frost palette-swap ("ice-locked elven sentinel") — the Def-anchor
 - `sahnar` (Myrmidon) → **Specter** (already planned, #25 thread)
-- `white-moose` (Gwyllgi) → **Gwyllgi** repal (the lone beast; closes YAML TODO #38/#39)
+- `white-moose` (Gwyllgi) → **SUPERSEDED 2026-07-31.** Was "Gwyllgi repal"; the FE-Repo has no elk
+  art (see the availability table above), and a repainted hound reads wrong beside ch04's actual
+  wolf pack. Now **Wyrdeer**-sourced: map sprite + portrait from Anarlaurendil's DeviantArt sheet
+  (CC BY-SA 3.0, shipped — `chapters/ch04-the-white-moose.yaml` → `art:`); the ch05 BATTLE ANIM is
+  still owed and should come from **PMD SpriteCollab `sprite/0899`** (`RearUp`/`Attack`/`Charge`
+  give the three `ready`/`windup`/`peak` poses `inject_battle_anims` wants — CC BY-NC 4.0)
 - `ravisin` (Druid) → authored frost-druid art (alt if ever wanted: `Skeleton Druid`)
 - Map sprites (SMS) for each: the parallel `Map Sprites/Monsters - Basic Types` (skeleton/zombie) or a palette-swap.
 

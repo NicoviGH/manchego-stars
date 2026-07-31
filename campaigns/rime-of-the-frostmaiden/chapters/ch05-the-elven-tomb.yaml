@@ -235,14 +235,29 @@ enemy_units:
         fe_base: rotten-claw    # modeled beast attack (vanilla monster weapon)
     damage_type: bludgeoning    # flavor label only ("antlers/hooves")
     ai_pattern: aggressive
-    convertible: true           # #171 — neutralized by killing Ravisin, not by grinding it down
-    parley:
-      by: ravisin_death         # her hold breaks when she falls
-      result: become_neutral    # it stops fighting and quits the field (never joins the party)
+    convertible: true           # #171 — a difficulty-model flag, NOT a fiction: `difficulty.py`
+                                # reads it to exempt the unit from the role-inversion check and to
+                                # apply CONVERT_CLEAR_DISCOUNT (0.5) to clear-load. Both are correct
+                                # here because the objective is defeat_boss: the player can win
+                                # WITHOUT ever fighting the moose, so it is never ground down.
+                                # It is NOT recruitable and never changes faction — it is a plain
+                                # enemy you may simply choose to ignore.
+                                # CORRECTED 2026-07-31 (Nicolas): this previously carried a
+                                # `parley: by: ravisin_death -> become_neutral` block, which
+                                # promised an on-screen conversion the chapter can never show —
+                                # win_condition is boss_defeated, so the map ENDS the moment
+                                # Ravisin falls and there is no post-death state to convert into.
     death_quote: "*a final, almost-human bellow*"
     skin:                       # the one beast; closes YAML TODO #38/#39 (read as elk, not wolf)
       look: "the White Moose — a great pale elk"
-      source: "FE-Repo: Battle Animations/Monsters - Basic Types/[Wolf-Base] [U] Gwyllgi Vanilla (frost repal → elk)"
+      # SHIPPED 2026-07-31: map sprite + portrait adopt **Wyrdeer** (Anarlaurendil, DeviantArt,
+      # CC BY-SA 3.0) — see chapters/ch04-the-white-moose.yaml `art:` for the full recipe and for
+      # why it rides the CAST palette rather than the faction-tinted standard SMS one. The earlier
+      # "Gwyllgi frost repal" plan is retired: the FE-Repo has NO elk art (docs/fe-repo-scouting.md).
+      source: "DeviantArt: 'Wyrdeer - full sprite' by Anarlaurendil (CC BY-SA 3.0)"
+      battle_anim_todo: "PMD SpriteCollab sprite/0899 (Wyrdeer) — RearUp/Attack/Charge supply the
+        three ready/windup/peak poses inject_battle_anims wants (CC BY-NC 4.0). Still owed (#25);
+        ch04 needs no anim (the moose never engages there)."
   # ── Risen spear-guard (SOLDIER, lance) — the tomb's rank-and-file dead ───────
   - id: risen-spear
     name: "Risen Spear-Guard"
