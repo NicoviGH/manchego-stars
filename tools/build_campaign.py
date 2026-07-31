@@ -2625,20 +2625,23 @@ PRE_RECRUIT_STRUCT = ('struct PreRecruitVariant { unsigned short charId; '
                       'unsigned short smsId; const void * muImg; };\n')
 
 
-def _pre_recruit_lookup(unit_expr, indent='    '):
+def _pre_recruit_lookup(unit_expr, indent='    ', char_var='charId'):
     """C (agbcc/C89: declarations first) resolving `unit_expr` to its pre-recruit variant
-    row, or NULL when the unit has joined / has no variant."""
+    row, or NULL when the unit has joined / has no variant.
+
+    `char_var` names an int the CALLER has already set to the unit's charId -- all three
+    override hooks compute one for their own table scan, so the lookup reuses it rather
+    than recomputing UNIT_CHAR_ID into a second local."""
     i = indent
     return (i + 'struct PreRecruitVariant * prv = 0;\n'
             + i + 'if (UNIT_FACTION(%s) != FACTION_BLUE) {\n' % unit_expr
-            + i + '    struct PreRecruitVariant * it = gPreRecruitVariant;\n'
-            + i + '    int prvChar = UNIT_CHAR_ID(%s);\n' % unit_expr
-            + i + '    while (it->charId != 0) {\n'
-            + i + '        if (it->charId == prvChar) {\n'
-            + i + '            prv = it;\n'
+            + i + '    struct PreRecruitVariant * prvIt = gPreRecruitVariant;\n'
+            + i + '    while (prvIt->charId != 0) {\n'
+            + i + '        if (prvIt->charId == %s) {\n' % char_var
+            + i + '            prv = prvIt;\n'
             + i + '            break;\n'
             + i + '        }\n'
-            + i + '        it++;\n'
+            + i + '        prvIt++;\n'
             + i + '    }\n'
             + i + '}\n')
 
@@ -2721,7 +2724,7 @@ def _remap_indices(src_path, roles, palette_png, out_path):
         sys.exit('ERROR: %s uses cast index/indices %s with no pre_recruit_roles entry'
                  % (os.path.basename(src_path), ', '.join(str(m) for m in missing)))
     out = Image.new('P', im.size)
-    out.putpalette(map_sprite_tool._read_palette(palette_png))
+    out.putpalette(map_sprite_tool.read_palette(palette_png))
     out.putdata([0 if v == 0 else roles[v] for v in im.getdata()])
     out.save(out_path)
 
