@@ -121,8 +121,11 @@ def sheet_info(path, expect=None):
     return SMS_SIZES[(fw, fh)], fw, fh, h // fh
 
 
-def _read_palette(path):
-    """Load cast_palette.png -> a flat 16*3 RGB palette list (index 0 = transparent)."""
+def read_palette(path):
+    """Load an indexed PNG's palette -> a flat 16*3 RGB list (index 0 = transparent).
+
+    Public: build_campaign and map_sprite_editor both read palettes this way, so the
+    leading underscore was misdescribing it as module-private."""
     im = Image.open(path)
     if im.mode != 'P':
         sys.exit('ERROR: %s must be indexed (mode P) to define the cast palette' % path)
@@ -169,7 +172,7 @@ def recolour(base_path, palette_path, out_path, overrides=None):
                  % (base_path, im.mode))
     src_pal = im.getpalette() or []
 
-    cast = _read_palette(palette_path)
+    cast = read_palette(palette_path)
     cast_rgb = [tuple(cast[3 * i:3 * i + 3]) for i in range(16)]
 
     # Build donor-index -> cast-index map. Index 0 is the engine's transparent slot in
@@ -224,7 +227,7 @@ def remap_sms_palette(src_path, donor_palette_png, out_path, overrides=None):
     if im.mode != 'P':
         sys.exit('ERROR: %s is mode %s; expected an indexed (mode P) sheet' % (src_path, im.mode))
     src_pal = im.getpalette() or []
-    tgt = _read_palette(donor_palette_png)
+    tgt = read_palette(donor_palette_png)
     tgt_rgb = [tuple(tgt[3 * i:3 * i + 3]) for i in range(16)]
 
     remap = {0: 0}
@@ -465,7 +468,7 @@ def grid(sheet_path, out_path, frame=0, scale=28):
 def palette_chart(palette_path, out_path):
     """Swatch chart of the 16 cast indices (number + RGB + colour block) so a called-out
     index is unambiguous. Index 0 is the transparent slot."""
-    pal = _read_palette(palette_path)
+    pal = read_palette(palette_path)
     rowh, w = 36, 320
     canvas = Image.new('RGB', (w, rowh * 16), (30, 30, 30))
     d = ImageDraw.Draw(canvas)

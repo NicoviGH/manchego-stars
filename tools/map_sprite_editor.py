@@ -41,7 +41,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import map_sprite_tool  # noqa: E402  (sheet_info + _read_palette)
+import map_sprite_tool  # noqa: E402  (sheet_info + read_palette)
 from PIL import Image  # noqa: E402
 
 # FE8 standing idle, straight from src/bmudisp.c: GetGameClock() % 72 picks frames
@@ -81,7 +81,7 @@ class Doc:
             sys.exit('ERROR: %s is %dx%d but donor %s is %dx%d'
                      % (sheet_path, w, h, src, self.fw, self.fh))
         self.n = h // self.fh
-        flat = map_sprite_tool._read_palette(palette_path)
+        flat = map_sprite_tool.read_palette(palette_path)
         self.palette = [flat[i * 3:i * 3 + 3] for i in range(16)]
         data = list(im.getdata())
         self.frames = [data[f * self.fw * self.fh:(f + 1) * self.fw * self.fh]

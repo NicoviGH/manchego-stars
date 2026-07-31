@@ -1446,3 +1446,27 @@ class PreRecruitVariant(unittest.TestCase):
         body = [ln.strip() for ln in bc._pre_recruit_lookup('unit').splitlines() if ln.strip()]
         self.assertTrue(body[0].startswith('struct PreRecruitVariant * prv'))
         self.assertNotIn('//', bc._pre_recruit_lookup('unit'))
+
+    def test_the_lookup_reuses_the_caller_s_charId_and_shadows_nothing(self):
+        """Every hook already computes the charId for its own table scan, and GetMuImg
+        walks its override table with a cursor called `it` -- so the lookup must not
+        recompute UNIT_CHAR_ID into a second local, nor name its cursor `it`."""
+        c = bc._pre_recruit_lookup('proc->unit')
+        self.assertIn('prvIt->charId == charId', c)
+        self.assertEqual(c.count('UNIT_CHAR_ID'), 0, 'charId is the caller\'s to compute')
+        self.assertNotIn(' it ', c)
+        self.assertNotIn('it++', c.replace('prvIt++', ''))
+        # Callers with a differently-named charId can say so.
+        self.assertIn('prvIt->charId == cid', bc._pre_recruit_lookup('unit', char_var='cid'))
+
+    def test_every_hook_defines_charId_before_the_lookup_uses_it(self):
+        """C89 + the reuse above: `int charId = ...` must precede the emitted lookup in
+        each of the three hooks, or the generated source will not compile."""
+        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'), encoding='utf-8').read()
+        for fn in ('_inject_sms_override_hook', '_inject_mu_override_hook',
+                   '_inject_palette_bank_hook'):
+            body = src[src.index('def %s(' % fn):]
+            body = body[:body.index('\ndef ')]
+            self.assertLess(body.index('int charId = UNIT_CHAR_ID'),
+                            body.index('_pre_recruit_lookup('),
+                            '%s must set charId before the pre-recruit lookup' % fn)
