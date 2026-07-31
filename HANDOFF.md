@@ -26,27 +26,18 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   decomp file whose bytes come out identical, so `make` skips it: warm rebuild **188s → 28s**, ROM
   byte-identical across clean-without / warm-without / warm-with / clean-with. Both gates the commit
   demanded are in `docs/decisions.md` (Engine & Tech Stack) with the numbers and the staleness proof.
-- **ch04 "The White Moose" (#24, branch `feat/24-ch04-map`, worktree `.claude/worktrees/ch04-map`)
-  — combat host built; REDESIGNED 2026-07-21 into a full chapter. Stage 3 COMPLETE.**
-  `inject_ch04` hosts Ch4 on the vanilla Ch5 slot (15×15 snowy retile, fog 3, PREP 9-of-10,
-  DefeatAll, `--ch04-boot`, `chain_ch03_to_ch04`), built around the wolf-parley REVEAL on the
-  "wolves turn the tide" difficulty model (raw fight above vanilla; the parley discounts it back to
-  dead-on vanilla — static ×1.15/×1.19, parley-path clear-load 2.5≈2.6), with the roster mirroring
-  the vanilla-Ch4 twin 1:1. Full design + staged checklist: **issue #24's 2026-07-21 comment** +
-  the `docs/decisions.md` ch04 ADR (on the branch), both authoritative. Committed stages:
-  - `cef0419` **Stage 1b** — `inject_ch04` wired to the twin-realigned roster.
-  - `8f2f784` **Stage 2a** — reusable `recruit_initial_faction(unit)` (GREEN Colm/Trex/Basil vs RED
-    Joshua/Lupin/Sahnar, opt-in via YAML `recruit.initial_faction`) + Lupin cast wiring on the
-    collision-free `Duessel` slot (STAT_DONOR = Kyle).
-  - `dbf86c6` **Stage 2b** — `talk_recruit_wiring` extracted out of `inject_ch03`
-    (faction-parameterized; ch03 green Trex, ch04 red Lupin, ch05 Basil/Sahnar all ride it) + the
-    Marty→Lupin parley + Marty force-deployed via vanilla's `ForceDeploymentEnt` data path.
-  - `2253cec` **Stage 2c** — the turn-2 REVEAL cutscene (stub lines; Stage 4 finalizes).
-  - `3286d4a` — the no-Lupin fallback for the ending scene (text only, see above).
-  - `8cdb904` **Stage 3 — the wolf art, signed off.** The parleyed pack rides its own appended
-    class `CLASS_MTD_LYCANROC_PACK` (0x83, a Mauthe Doog clone → parity untouched) wearing a
-    glasses-less Lycanroc sheet; the red pack keeps `CLASS_MAUTHEDOOG`, so the swap reads as an
-    upgrade, not a recolour. Lupin needed a **new reusable mechanism** — see below.
+- **ch04 "The White Moose" (#24) — Stages 1–3 MERGED (`00b66f4`); Stage 4 is next.** `inject_ch04`
+  hosts Ch4 on the vanilla Ch5 slot (15×15 snowy retile, fog 3, PREP 9-of-10, DefeatAll,
+  `--ch04-boot`, `chain_ch03_to_ch04`), built around the wolf-parley REVEAL on the "wolves turn the
+  tide" difficulty model (raw fight above vanilla; the parley discounts it back to dead-on vanilla —
+  static ×1.15/×1.19, parley-path clear-load 2.5≈2.6), with the roster mirroring the vanilla-Ch4
+  twin 1:1. What's built: the twin-realigned roster; `recruit_initial_faction` + Lupin on the
+  collision-free `Duessel` slot (STAT_DONOR Kyle); `talk_recruit_wiring` extracted out of
+  `inject_ch03` (faction-parameterized — ch03 green Trex, ch04 red Lupin, ch05 Basil/Sahnar all ride
+  it); the Marty→Lupin parley with Marty force-deployed via vanilla's `ForceDeploymentEnt` data
+  path; the turn-2 reveal cutscene (stub lines); and the art. Design + the live checklist:
+  **issue #24** (authoritative) + the `docs/decisions.md` ch04 ADR. The ending still lands on
+  `dev_placeholder_scene()`.
 - **Parity/difficulty engine is four-dimensional now** (`tools/difficulty.py`, all read from HEAD):
   enemy pressure + item economy (#170/#172, drops #176/#178) + battlefield dynamics (convertibles +
   reinforcement timing #171/#174, area/zone #177/#178) + **per-unit ROLE check and terrain (#25)**.
@@ -98,18 +89,23 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   `claude/mobile-app-token-context-u2psep` — verified a strict ancestor of the ch05 branch first, so
   nothing was lost. The ch05 worktree is removed.
 
-## NEXT SESSION — close out ch04 (`feat/24-ch04-map`)
+## NEXT SESSION — close out ch04 (Stage 4, then 5)
 
-Design is LOCKED. **Read issue #24's 2026-07-21 comment** + the `docs/decisions.md` ch04 ADR (both
-on the branch). Work in `.claude/worktrees/ch04-map`. `Closes #24`:
+Design is LOCKED. **Read issue #24** (its checklist is the backlog) + the `docs/decisions.md` ch04
+ADR. Stages 1–3 are merged, so start from a fresh branch off `main` (`feat/24-ch04-scenes`) and its
+own worktree — no ch04 branch or worktree survives the merge.
 
-1. ~~Stage 1b / 2a / 2b / 2c / 3~~ — **DONE**, see Current state.
-2. **Stage 4 — RESUME HERE — scenes** (off the ch03 template): Lonelywood opening, moose-flees,
-   real ending (replace `dev_placeholder_scene()`); finalize Lupin's death line + all ch04 text via
+1. **Stage 4 — scenes** (off the ch03 template): Lonelywood opening, moose-flees, real ending
+   (replace `dev_placeholder_scene()`); finalize Lupin's death line + all ch04 text via
    `dialogue-pass`. **Includes wiring the no-Lupin fallback for `chapter_end` boxes 1+3.**
    Mine vanilla's pacing with `tools/vanilla_scene.py` — it (and now its tests) read HEAD, so the
    numbers are trustworthy on a built tree.
-3. **Stage 5 — spatial check + `--ch04-boot` playtest** → confirm parity in-engine → PR.
+2. **Stage 5 — spatial check + `--ch04-boot` playtest** → confirm parity in-engine → PR
+   (`Closes #24`).
+
+Three guards from the #198 review are checklisted on #24 and are NOT optional polish — the
+message-id uniqueness one must land **before** ch05's text insertion (#25), or a double-claim
+overwrites silently and stays green.
 
 Then: **ch05's now-unblocked build work** (map, placement, text insertion, playtest, reskins,
 STAT_DONORs, the five no-Lupin conditionals) on #25; **#138** config-driven
@@ -137,8 +133,9 @@ STAT_DONORs, the five no-Lupin conditionals) on #25; **#138** config-driven
   git-shelling test must use a sanitized-env helper (`-C <repo>`, `env` stripped of `GIT_*`,
   `-c core.hooksPath=/dev/null`); `check.py:_git` now does the same. `decisions.md` Operational
   Gotchas has the recipe and how to prove it against a decoy repo.
-- **The build-speed work is MERGED** (#197 / `06b2fc6`); branch and its worktree
-  `.claude/worktrees/agent-a5830560b594da84f` are stale and can be removed.
+- **No branches or worktrees are outstanding.** `origin` is `main` alone and `.claude/worktrees/`
+  is empty — everything from 2026-07-30 is merged (#197 build-speed, #198 ch04 Stages 1–3, #199
+  review cleanups). Start the next feature on a fresh branch + worktree off `main`.
 
 ## Quick commands
 
