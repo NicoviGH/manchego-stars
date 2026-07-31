@@ -4502,6 +4502,43 @@ scenarios.recordch03open = function()
     return recordCutscene({ tag = "ch03open", until_ = "prep", pressEvery = 90 })
 end
 
+-- recordch04open: the ch04 OPENING in motion (#24 Stage 4) -- the two-BG Lonelywood scene:
+-- beat A in Speaker Nimsy Huddle's cottage over the vanilla House1 hearth, then the CUT to the
+-- fogged forest edge for Pinky's fog-of-war heads-up. The second BACG rides a REMOVEPORTRAITS
+-- re-arm, and the podium anchors are what keep Nimsy from fading herself out mid-scene -- both
+-- are things only MOTION shows. Fresh CH04BOOT New Game (no checkpoint), up to Preparations.
+-- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh recordch04open (needs a CH04BOOT=1 ROM).
+scenarios.recordch04open = function()
+    return recordCutscene({ tag = "ch04open", until_ = "prep", pressEvery = 90 })
+end
+
+-- recordch04reveal: the turn-2 wolf-pack REVEAL cutscene in motion (#24 Stage 2c/4) -- the
+-- camera pans to the NW fog, the pack bursts in on LOAD1, CUMO focuses Lupin commanding it,
+-- and the two beats plant the parley. Unlike the opening this one fires MID-CHAPTER, so the
+-- lead-up is driven (boot -> prep -> idle turn 1) and the recorder picks up at the turn-2
+-- player phase. Terminal = the event engine has let go and control is back.
+-- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh recordch04reveal (needs a CH04BOOT=1 ROM).
+scenarios.recordch04reveal = function()
+    if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
+    waitFor(function()
+        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
+    end, 900, true)
+    if not endTurn() then return result("FAIL", "could not end turn 1") end
+    -- Ride turn 1's enemy phase out inside the RECORDER rather than runEnemyPhase: that helper
+    -- taps A every 50 frames to clear quotes, which would also punch through the reveal's own
+    -- text beats before the camera work finishes. The terminal is turn 2 with the event engine
+    -- let go and control handed back -- i.e. the cutscene has run to its EVBIT_T.
+    local sawTurn2 = false
+    return recordCutscene({
+        tag = "ch04reveal", maxFrames = 5400, pressEvery = 90,
+        until_ = function()
+            if turn() >= 2 then sawTurn2 = true end
+            return sawTurn2 and faction() == 0 and not menuOpen()
+                and not procActive(SYM.ProcScr_StdEventEngine)
+        end,
+    })
+end
+
 -- recordch03talk: the Trex TALK-RECRUIT in motion (#23 Cutscenes) -- green Trex standing on the
 -- ch03 map, a party member Talks to him, the migrated bounty dialogue plays, and the CUSA flips
 -- him GREEN -> BLUE (cast OBJ palette). Same park-adjacent dance as the ch03talk PASS/FAIL test,
