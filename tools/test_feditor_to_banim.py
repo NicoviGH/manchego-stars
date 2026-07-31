@@ -94,6 +94,50 @@ class TestModeTable(unittest.TestCase):
         self.assertEqual(slots[11], 12)  # miss             <- mode 12
 
 
+class TestHpDepleteArming(unittest.TestCase):
+    """An imported mode that SWINGS must arm the HP depletion (#24).
+
+    C01 `banim_code_wait_hp_deplete` "freezes if no HP depletion is occurring/has occurred"
+    (banim_code.inc), and every vanilla dodge/stand mode waits bare on C01 -- so the unit an
+    unarmed attack starves is the OPPONENT, not the attacker. Community scripts really do
+    ship this hole: the vendored Pinky.txt's mode 12 was C03 C07 C25 C25 C06 C0D, and the
+    first Mauthe Doog to dodge her counter hung ch04's turn 4 (gBanimDoneFlag [0]=0 [1]=1).
+    """
+
+    def _script(self, mode12_cmds):
+        head = "".join("/// - Mode %d\n1 p- f.png\n~~~\n" % n
+                       for n in (1, 3, 5, 6, 7, 8, 9, 10, 11))
+        return head + "/// - Mode 12\n" + "".join(
+            "%s\n" % c for c in mode12_cmds) + "1 p- f.png\n~~~\n"
+
+    def test_rejects_an_attacking_mode_that_arms_nothing(self):
+        # exactly the shipped-broken Pinky shape: opens the attack, never arms, hands back
+        anim = fb.parse_feditor(self._script(["C03", "C07", "C25", "C06", "C0D"]))
+        with self.assertRaises(ValueError) as cm:
+            fb.validate_hp_deplete_arming(anim)
+        self.assertIn("mode 12", str(cm.exception))
+
+    def test_accepts_melee_arming_via_prepare_hp_deplete(self):
+        anim = fb.parse_feditor(self._script(["C03", "C07", "C04", "C06", "C0D"]))
+        fb.validate_hp_deplete_arming(anim)      # C04 -- must not raise
+
+    def test_accepts_ranged_arming_via_call_spell_anim(self):
+        anim = fb.parse_feditor(self._script(["C03", "C07", "C05", "C06", "C0D"]))
+        fb.validate_hp_deplete_arming(anim)      # C05 -- must not raise
+
+    def test_ignores_defending_modes_which_never_open_an_attack(self):
+        # a dodge/stand mode (no C03) legitimately waits bare -- the attacker armed it
+        anim = fb.parse_feditor(self._script(["C02", "C0E", "C01", "C0D"]))
+        fb.validate_hp_deplete_arming(anim)      # must not raise
+
+    def test_emit_motion_s_enforces_it(self):
+        # the guard rides the single choke point every import goes through
+        anim = fb.parse_feditor(self._script(["C03", "C07", "C25", "C06", "C0D"]))
+        frames = [{"oam_l": [], "oam_r": []} for _ in fb.unique_frames(anim)]
+        with self.assertRaises(ValueError):
+            fb.emit_motion_s("bad_an1", anim, frames)
+
+
 class TestEmitLines(unittest.TestCase):
     def test_command_is_raw_0x85_escape(self):
         # C1A (hit_normal, 0x8500001A) emitted as the byte-exact raw escape.

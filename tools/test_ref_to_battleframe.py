@@ -282,10 +282,11 @@ class TestEmitMotionS(unittest.TestCase):
 class TestMeleeMotionS(unittest.TestCase):
     """The melee cadence (FE8 Pirate axe study): lunge in, swing, hit on contact, return.
 
-    Differs from the ranged (archer) cadence cloned for RBG: NO projectile
-    (call_spell_anim); the hit is banim_code_hit_normal on the swing-through; the unit
-    lunges (start_attack_1/2 + start_opposite_turn) and dodges BACKWARD (dodge_to_back); and
-    a melee unit cannot strike at range, so attack_range just holds the ready frame.
+    Differs from the ranged (archer) cadence cloned for RBG: the CLOSE modes carry no
+    projectile (call_spell_anim); the hit is banim_code_hit_normal on the swing-through; and
+    the unit lunges (start_attack_1/2 + start_opposite_turn) and dodges BACKWARD
+    (dodge_to_back). The RANGE modes do throw, because our melee loadouts carry a thrown
+    option (Hand Axe / Javelin) -- see test_melee_at_range_throws_instead_of_striking.
     """
 
     def _frames(self):
@@ -319,11 +320,17 @@ class TestMeleeMotionS(unittest.TestCase):
         s = rb.emit_motion_s("brau_an1", self._frames(), motion="melee")
         self.assertIn("banim_code_dodge_to_back", self._mode(s, "dodge_close"))
 
-    def test_melee_cannot_strike_at_range(self):
+    def test_melee_at_range_throws_instead_of_striking(self):
+        # A melee unit DOES reach these modes -- CLASS_PIRATE ships a Hand Axe and
+        # CLASS_ARMOR_KNIGHT/PEGASUS a Javelin -- so the slot runs the vanilla Armor Knight's
+        # thrown shape: the weapon's own projectile connects (call_spell_anim), never a melee
+        # contact. It used to hold the ready frame and wait on C01 with nothing armed, which
+        # soft-locks the moment the axe is actually thrown (#24).
         s = rb.emit_motion_s("brau_an1", self._frames(), motion="melee")
         body = self._mode(s, "attack_range")
-        self.assertNotIn("banim_code_start_attack_1", body)     # no lunge
-        self.assertNotIn("banim_code_hit_normal", body)         # no hit at range
+        self.assertIn("banim_code_call_spell_anim", body)       # the thrown weapon
+        self.assertNotIn("banim_code_hit_normal", body)         # no melee contact at range
+        self.assertNotIn("banim_code_prepare_hp_deplete", body)  # the projectile arms it
 
     def test_lance_cadence_uses_armored_thrust_not_axe_swing(self):
         # Knight (Armor Knight, decomp banim_armm_sp1) lance cadence: heavy armored steps +
@@ -358,6 +365,81 @@ class TestMeleeMotionS(unittest.TestCase):
         s = rb.emit_motion_s("rbg_ar1", self._frames())         # no motion= -> ranged
         self.assertIn("banim_code_call_spell_anim", s)
         self.assertNotIn("banim_code_dodge_to_back", s)
+
+
+class TestHpDepleteArming(unittest.TestCase):
+    """An ATTACKING mode must arm the HP depletion before it waits on one (#24).
+
+    The decomp states the hazard on the macro itself (include/banim_code.inc): C01
+    `banim_code_wait_hp_deplete` -- "Wait for HP to deplete (FREEZES if no HP depletion is
+    occurring/has occurred)". A DEFENDING mode (dodge/stand) may wait bare, because the
+    attacker's script armed the depletion; that is what vanilla's own dodge_close and stand
+    modes do. An ATTACKING mode has to arm its own, and every vanilla donor we clone does:
+    the melee pair (banim_pirm_ax1, banim_armm_sp1) issue `banim_code_prepare_hp_deplete` in
+    attack_close AND attack_miss, and the ranged/magic pair (banim_arcm_ar1, banim_sham_mg1)
+    arm via `banim_code_call_spell_anim` -- including in their miss modes.
+
+    Shipped as ch04's turn-4 soft-lock: Braulo's faked Pirate anim missed a counter-attack,
+    ran attack_miss, and wedged the whole proc tree with gBanimDoneFlag stuck at [0, 0] and
+    both anims flagged ANIM_BIT3_C01_BLOCKING_IN_BATTLE.
+    """
+
+    # The attack half of _MODE_ORDER: the slots the engine runs for the unit that is SWINGING.
+    ATTACK_MODES = ["attack_close", "attack_close_back", "attack_close_critical",
+                    "attack_close_critical_back", "attack_range",
+                    "attack_range_critical", "attack_miss"]
+    ARMING = ("banim_code_prepare_hp_deplete", "banim_code_call_spell_anim")
+    # Every cadence the faked generator can emit (donor -> emit_motion_s kwargs).
+    CADENCES = [("brau_an1", {"motion": "melee"}),
+                ("wolf_ln1", {"motion": "melee", "cadence": "lance"}),
+                ("rbg_ar1", {}),
+                ("mees_mg1", {"motion": "magic"})]
+
+    def _frames(self):
+        e0 = [{"attr0": 0, "attr1": 0x4000, "attr2": 0, "dx": -8, "dy": -8}]
+        return [{"oam_r": e0, "oam_l": rb.mirror_oam(e0)} for _ in range(3)]
+
+    def _mode(self, s, abbr, name):
+        after = s.split("banim_%s_mode_%s:" % (abbr, name))[1]
+        return after.split("\nbanim_%s_mode_" % abbr)[0]
+
+    def test_every_attacking_mode_arms_a_depletion(self):
+        # NOT "arms it before its own wait": the starved unit is usually the OTHER one. Every
+        # vanilla dodge/stand mode waits bare on C01 and relies on the ATTACKER having armed a
+        # depletion, so an attacking mode must arm one even when it never waits itself and even
+        # when nothing connects. Both halves of that bit ch04 (#24).
+        for abbr, kwargs in self.CADENCES:
+            s = rb.emit_motion_s(abbr, self._frames(), **kwargs)
+            for name in self.ATTACK_MODES:
+                body = self._mode(s, abbr, name)
+                self.assertTrue(
+                    any(arm in body for arm in self.ARMING),
+                    "%s mode %s swings without arming a depletion (no prepare_hp_deplete / "
+                    "call_spell_anim) -- the opponent's dodge blocks on C01 forever and "
+                    "soft-locks the chapter" % (abbr, name))
+
+    def test_arming_precedes_its_own_wait(self):
+        # The self-consistent half: where a mode DOES wait, the arming has to come first.
+        for abbr, kwargs in self.CADENCES:
+            s = rb.emit_motion_s(abbr, self._frames(), **kwargs)
+            for name in self.ATTACK_MODES:
+                body = self._mode(s, abbr, name)
+                if "banim_code_wait_hp_deplete" not in body:
+                    continue
+                before = body.split("banim_code_wait_hp_deplete")[0]
+                self.assertTrue(
+                    any(arm in before for arm in self.ARMING),
+                    "%s mode %s waits on C01 before anything arms a depletion" % (abbr, name))
+
+    def test_defending_modes_may_wait_bare_like_vanilla(self):
+        # The other half of the contract: dodge/stand DON'T arm (vanilla's dodge_close is
+        # exactly dodge_to_back / start_dodge / wait_hp_deplete / end_dodge / end_mode). This
+        # pins the asymmetry so a future "fix" doesn't sprinkle prepare_hp_deplete everywhere.
+        s = rb.emit_motion_s("brau_an1", self._frames(), motion="melee")
+        for name in ("dodge_close", "stand_close", "stand"):
+            body = self._mode(s, "brau_an1", name)
+            self.assertIn("banim_code_wait_hp_deplete", body)
+            self.assertNotIn("banim_code_prepare_hp_deplete", body)
 
 
 class TestMeleeLunge(unittest.TestCase):

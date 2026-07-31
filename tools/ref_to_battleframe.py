@@ -196,10 +196,15 @@ def _mode_order(motion):
     """The 12 modes in banim-table order, with the kind picked for `motion`.
 
     The engine's mode ORDER is fixed; only each mode's body kind varies. A melee unit
-    can't strike at range, so its attack_range/_critical modes hold the ready frame
-    (kind "stand") instead of running the lunge-and-swing (cadence: FE8 Pirate axe)."""
+    still reaches its attack_range modes, because our melee loadouts carry a THROWN
+    option (CLASS_PIRATE ships a Hand Axe, CLASS_ARMOR_KNIGHT/PEGASUS a Javelin), so
+    those slots run the "throw" body -- the vanilla Armor Knight's thrown shape, whose
+    projectile arms the HP depletion (banim_armm_sp1's attack_range: cadence sounds ->
+    call_spell_anim -> wait_hp_deplete). They used to hold the ready frame (kind "stand"),
+    which waits on C01 with nothing armed and soft-locks the moment the axe is thrown --
+    the same defect that froze ch04 through attack_miss (#24)."""
     if motion == "melee":
-        return [(n, "stand" if n.startswith("attack_range") else k)
+        return [(n, "throw" if n.startswith("attack_range") else k)
                 for n, k in _MODE_ORDER]
     return list(_MODE_ORDER)
 
@@ -255,14 +260,32 @@ def _melee_mode_body(abbr, kind, cadence="axe"):
                 "\tbanim_code_start_dodge", _frame_cmd(abbr, 3, 1),
                 "\tbanim_code_wait_hp_deplete", _frame_cmd(abbr, 3, 0),
                 "\tbanim_code_end_dodge", "\tbanim_code_end_mode"]
-    if kind == "stand":    # hold the ready frame (also melee's "attack at range")
+    if kind == "throw":    # thrown weapon (Hand Axe / Javelin): the projectile lands the hit,
+        # so call_spell_anim arms the depletion instead of prepare_hp_deplete + hit_normal.
+        # Shape mirrors the vanilla Armor Knight's own thrown mode (banim_armm_sp1
+        # attack_range): wind up on the cadence, release, wait, hand the turn back.
+        return ["\tbanim_code_start_attack_1", "\tbanim_code_start_attack_2",
+                _frame_cmd(abbr, 1, 0)] + c["windup"] + [
+                _frame_cmd(abbr, 20, 1)] + c["swing"] + [
+                _frame_cmd(abbr, 3, 2),
+                "\tbanim_code_call_spell_anim", _frame_cmd(abbr, 1, 2),
+                "\tbanim_code_wait_hp_deplete", "\tbanim_code_start_opposite_turn",
+                _frame_cmd(abbr, 3, 0)] + c["back"] + [_frame_cmd(abbr, 3, 0),
+                "\tbanim_code_end_dodge", "\tbanim_code_end_mode"]
+    if kind == "stand":    # hold the ready frame (the DEFENDING modes)
         return [_frame_cmd(abbr, 1, 0), "\tbanim_code_wait_hp_deplete",
                 "\tbanim_code_end_mode"]
-    # miss: lunge and swing through, hold the forward beat (like the hit), but no contact lands
+    # miss: lunge and swing through, hold the forward beat (like the hit), but no contact lands.
+    # prepare_hp_deplete is NOT optional just because nothing connects: C01 (wait_hp_deplete)
+    # "freezes if no HP depletion is occurring/has occurred" (banim_code.inc), so the miss has to
+    # arm the routine exactly like the hit does -- both vanilla melee donors keep it in
+    # attack_miss and drop only hit_normal (banim_pirm_ax1 / banim_armm_sp1). Omitting it
+    # soft-locked ch04 on turn 4 (#24).
     return ["\tbanim_code_start_attack_1", "\tbanim_code_start_attack_2",
             _frame_cmd(abbr, 1, 0)] + c["windup"] + [
             _frame_cmd(abbr, 20, 1)] + c["swing"] + [
             _frame_cmd(abbr, 3, 2),
+            "\tbanim_code_prepare_hp_deplete",
             _frame_cmd(abbr, 4, 2),                                 # hold forward (matches the hit beat)
             "\tbanim_code_wait_hp_deplete", "\tbanim_code_start_opposite_turn",
             _frame_cmd(abbr, 3, 0), _frame_cmd(abbr, 3, 0), "\tbanim_code_end_dodge",
@@ -273,6 +296,13 @@ def _mode_body(abbr, kind, motion="ranged", cadence="axe"):
     """Emit one mode's script lines for the 3-beat (Ready/Wind-up/Peak) fake."""
     if motion == "melee":
         return _melee_mode_body(abbr, kind, cadence)
+    # A ranged/magic MISS still looses the arrow or casts the spell -- it simply doesn't
+    # connect -- so vanilla reuses the attack body verbatim (banim_arcm_ar1 and banim_sham_mg1
+    # attack_miss are their attack modes, call_spell_anim and all). That projectile is also
+    # what arms the depletion the DEFENDER's dodge waits on, so a miss that skipped it left
+    # the dodger blocked on C01 forever (#24).
+    if kind == "miss":
+        kind = "attack"
     if motion == "magic" and kind == "attack":
         # Shaman (banim_sham_mg1) settles, then lingers in a stationary charge before
         # releasing the spell. The Flux effect, not a painted projectile, owns the impact.

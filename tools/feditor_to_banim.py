@@ -100,6 +100,39 @@ def mode_table_slots(anim):
     return slots
 
 
+# Command codes the arming contract is written in (banim_code.inc; a Cxx line IS the low byte).
+_C_START_ATTACK_1 = 0x03      # banim_code_start_attack_1 -- heads any mode that SWINGS
+_C_PREPARE_HP_DEPLETE = 0x04  # banim_code_prepare_hp_deplete -- arms the depletion (melee)
+_C_CALL_SPELL_ANIM = 0x05     # banim_code_call_spell_anim -- arms it via the projectile (ranged)
+
+
+def validate_hp_deplete_arming(anim):
+    """Reject an import whose ATTACKING mode never arms the HP-depletion routine (#24).
+
+    C01 `banim_code_wait_hp_deplete` "freezes if no HP depletion is occurring/has occurred"
+    (fireemblem8u/include/banim_code.inc). The unit that gets starved is usually the OTHER
+    one: every vanilla dodge/stand mode waits bare on C01 and relies on the ATTACKER's script
+    having armed a depletion with C04 (melee) or C05 (a projectile). So a mode that opens with
+    C03 must contain one of them -- whether or not it waits itself, and even when nothing
+    connects, which is exactly the case a community author is most likely to skip.
+
+    Community sources DO get this wrong: the vendored Pinky.txt shipped a mode 12 of
+    C03 C07 C25 C25 C06 C0D, and the first monster to dodge her counter hung ch04's turn 4
+    with gBanimDoneFlag stuck at [0, 1]. Validated at import so a bad script fails the BUILD
+    instead of one unlucky combat 20 minutes into a playtest.
+    """
+    for mode, insns in anim.modes.items():
+        codes = [i.code for i in insns if isinstance(i, Cmd)]
+        if _C_START_ATTACK_1 not in codes:
+            continue        # a dodge/stand mode: the attacker arms the depletion, not this one
+        if _C_PREPARE_HP_DEPLETE in codes or _C_CALL_SPELL_ANIM in codes:
+            continue
+        raise ValueError(
+            "FEditor mode %d attacks (C03) but never arms the HP depletion (no C04 / C05): "
+            "the opposing dodge/stand mode blocks on C01 forever and soft-locks the chapter"
+            % mode)
+
+
 def emit_command(cmd):
     """A FEditor `Cxx` command -> the byte-exact raw `banim_code_85 0xXX` escape.
 
@@ -132,6 +165,7 @@ def emit_motion_s(abbr, anim, frames):
     table (slot i -> mode i+1, with the auto-handled 2 & 4 pointing at their 1 & 3 siblings).
     Byte-shape identical to ref_to_battleframe.emit_motion_s so the same banim build links it.
     """
+    validate_hp_deplete_arming(anim)
     files = unique_frames(anim)
     findex = {f: i for i, f in enumerate(files)}
 

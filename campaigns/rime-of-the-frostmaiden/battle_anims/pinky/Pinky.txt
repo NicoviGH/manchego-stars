@@ -139,6 +139,12 @@ C25
 4 p- Pinky_004.png
 3 p- Pinky_005.png
 2 p- Pinky_005.png
+C04                               #prepare_hp_deplete — REQUIRED even though nothing connects:
+                                  #the DEFENDER's dodge waits on C01 for the depletion THIS mode
+                                  #arms, and C01 "freezes if no HP depletion is occurring/has
+                                  #occurred" (banim_code.inc). Missing here in the community
+                                  #source; its absence soft-locked ch04 on turn 4 (#24). Placed
+                                  #exactly where modes 1/3 put it: after contact, before C06.
 C06
 3 p- Pinky_003.png
 3 p- Pinky_001.png

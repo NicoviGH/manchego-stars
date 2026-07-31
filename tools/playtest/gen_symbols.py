@@ -66,6 +66,26 @@ WANTED = [
     'gProc_ekrBattle',          # proc script: the on-map battle (EKR) animation engine
                                 # (src/banim-ekrbattle.c). A live instance == a combat is
                                 # actually animating -> used to confirm an attack committed.
+    'gBattleActor',             # struct BattleUnit (include/bmbattle.h): the attacking side of
+                                # the combat being resolved/animated. unit at +0x00,
+                                # terrainId +0x55, weapon +0x48. Names WHO is on screen when a
+                                # battle animation freezes.
+    'gBattleTarget',            # struct BattleUnit: the defending side of that same combat.
+    'gBanimTerrain',            # u8[2] terrain ids the battle animation resolved for the two
+                                # sides (POS_L/POS_R; src/banim-ekrbattleintro.c). These are what
+                                # GetBanimTerrainGround/GetBanimBackgroundIndex are indexed with.
+    'gBanimDoneFlag',           # u32[2] -- the EXACT soft-lock condition. ekrBattleInRoundIdle
+                                # (src/banim-ekrbattle.c) spins until both sides' flags are set,
+                                # so a battle anim that never signals done wedges the whole proc
+                                # tree. Which of the two is 0 names the side that hung.
+    'gEkrDistanceType',         # s16 -- CLOSE/FAR/FARFAR/PROMOTION (enum in include/ekrbattle.h);
+                                # picks which round-type family the anim scripts must supply.
+    'gAnims',                   # struct Anim *[4] (include/anime.h). [0]/[2] are the two combat
+                                # anims; currentRoundType +0x12 and state/state2/state3 say which
+                                # round each side thinks it is playing.
+    'gpEkrBattleUnitLeft',      # struct BattleUnit * -- the LEFT screen side of the animation
+    'gpEkrBattleUnitRight',     # struct BattleUnit * -- ...and the RIGHT. Which one maps to the
+                                # actor depends on faction, so print both to read a freeze.
 ]
 
 

@@ -523,6 +523,103 @@ local function procFingerprint()
     return fp
 end
 
+-- ---- freeze report: name WHAT is stuck, not just THAT something is (#24).
+-- A soft-lock is never a stopped CPU -- it is the proc scheduler still running while one
+-- proc stops advancing. The proc pool carries its own diagnosis (include/proc.h): scrCur
+-- is the script command it sits on, lockCnt is the wait semaphore (nonzero = blocked by a
+-- child//other proc that never released it), sleepTime is a timed wait, and proc_name is
+-- the PROC_NAME string. Sampling the pool TWICE across a gap separates "this proc is
+-- frozen" from "the whole scheduler is spinning", which is the first fork in the diagnosis.
+local PROC_STRIDE = 0x6C
+local function readCStr(addr, maxLen)
+    if addr == 0 then return nil end
+    local out = {}
+    for i = 0, (maxLen or 24) - 1 do
+        local c = ru8(addr + i)
+        if c == 0 or c < 0x20 or c > 0x7E then break end
+        out[#out + 1] = string.char(c)
+    end
+    if #out == 0 then return nil end
+    return table.concat(out)
+end
+
+-- Every live proc as a stable one-line signature, keyed by pool index.
+local function procPool()
+    local pool = {}
+    for i = 0, 63 do
+        local a = SYM.sProcArray + i * PROC_STRIDE
+        local scr = ru32(a)
+        if scr ~= 0 then
+            pool[i] = {
+                script = scr,
+                scrCur = ru32(a + 0x04),
+                idleCb = ru32(a + 0x0C),
+                name = readCStr(ru32(a + 0x10)),
+                sleep = rs16(a + 0x24),
+                mark = ru8(a + 0x26),
+                flags = ru8(a + 0x27),
+                lock = ru8(a + 0x28),
+            }
+        end
+    end
+    return pool
+end
+
+local function procLine(i, p, prev)
+    -- scrCur as an offset from the script head: the exact PROC_* command it sits on.
+    local step = (p.scrCur >= p.script) and ((p.scrCur - p.script) // 12) or -1
+    local moved = ""
+    if prev then
+        moved = (prev.scrCur == p.scrCur and prev.sleep == p.sleep and prev.lock == p.lock)
+            and " FROZEN" or " moving"
+    end
+    return string.format(
+        "  [%02d] %-22s scr=%08X cmd#%-3d idle=%08X sleep=%-4d mark=%-3d flags=%02X lock=%d%s",
+        i, p.name or "(unnamed)", p.script, step, p.idleCb, p.sleep, p.mark, p.flags, p.lock, moved)
+end
+
+-- The BattleUnit pair the engine is resolving/animating right now.
+local function battleSide(base)
+    if base == nil or base == 0 then return "(null)" end
+    local chptr = ru32(base)
+    if chptr == 0 then return "(none)" end
+    return string.format("pid=0x%02X class=0x%02X hp=%d at(%d,%d) terrain=0x%02X weapon=0x%02X",
+        ru8(chptr + 4), ru8(ru32(base + 4) + 4), ru8(base + 0x13),
+        ru8(base + 0x10), ru8(base + 0x11), ru8(base + 0x55), ru16(base + 0x48) & 0xFF)
+end
+
+-- Dump everything that localizes a freeze. Sampled twice, `gap` frames apart.
+local function freezeReport(tag, gap)
+    local before = procPool()
+    wait(gap or 90)
+    local after = procPool()
+    log(string.format("== FREEZE REPORT (%s) ch=%d turn=%d faction=0x%02X ==",
+        tag, chapter(), turn(), faction()))
+    log(string.format("  battleActor: %s", battleSide(SYM.gBattleActor)))
+    log(string.format("  battleTarget: %s", battleSide(SYM.gBattleTarget)))
+    log(string.format("  gBanimTerrain: L=0x%02X R=0x%02X   ekrBattle=%s",
+        ru8(SYM.gBanimTerrain), ru8(SYM.gBanimTerrain + 1),
+        tostring(procActive(SYM.gProc_ekrBattle))))
+    -- The wait condition itself: ekrBattleInRoundIdle spins until BOTH done flags are set.
+    log(string.format("  gBanimDoneFlag: [0]=%d [1]=%d   gEkrDistanceType=%d",
+        ru32(SYM.gBanimDoneFlag), ru32(SYM.gBanimDoneFlag + 4), rs16(SYM.gEkrDistanceType)))
+    log(string.format("  ekrBattleUnit: left=%s", battleSide(ru32(SYM.gpEkrBattleUnitLeft))))
+    log(string.format("  ekrBattleUnit: right=%s", battleSide(ru32(SYM.gpEkrBattleUnitRight))))
+    for i = 0, 3 do
+        local an = ru32(SYM.gAnims + i * 4)
+        if an ~= 0 then
+            log(string.format("  gAnims[%d]=%08X roundType=0x%02X state=%04X state2=%04X "
+                .. "state3=%04X nextRound=%d timer=%d scr=%08X (+%d) queue=%d",
+                i, an, ru8(an + 0x12), ru16(an), ru16(an + 0x0C), ru16(an + 0x10),
+                ru16(an + 0x0E), rs16(an + 0x06), ru32(an + 0x20),
+                ru32(an + 0x20) - ru32(an + 0x24), ru8(an + 0x14)))
+        end
+    end
+    for i = 0, 63 do
+        if after[i] then log(procLine(i, after[i], before[i])) end
+    end
+end
+
 -- ---- greedy clear-bot (#60): real-combat chapter completion. Generic boss detection
 -- (no hardcoded char ids) + the pure pickTarget core; the scenario owns the driving.
 local CLEARBOT = dofile(PLAYTEST_DIR .. "/clearbot.lua")
@@ -632,7 +729,16 @@ local function smokeDrive(startChapter)
     local snaps = {}
     log(string.format("smoke: chapter %d, budget %d turns, softlock %d frames",
         startChapter, budgetTurns, cfg.softlock_frames))
+    -- Trace every turn/phase transition: a freeze report is only readable next to the
+    -- phase it happened in ("turn 4 enemy phase" vs "turn 4 player phase").
+    local lastPhase = nil
     for _ = 1, 100000 do
+        local phase = string.format("t%d/f%02X", turn(), faction())
+        if phase ~= lastPhase then
+            log(string.format("phase -> turn %d faction 0x%02X (hpsum %d)",
+                turn(), faction(), hpSum()))
+            lastPhase = phase
+        end
         local over = gameOverActive()
         local won = (not over) and chapter() ~= startChapter and chapter() ~= 0
         snaps[#snaps + 1] = {
@@ -652,7 +758,9 @@ local function smokeDrive(startChapter)
         elseif v.state == "TERMINAL_LOSS" then
             shot("smoke-loss"); return result("PASS", "clean loss -- " .. v.why)
         elseif v.state == "SOFTLOCK" then
-            shot("smoke-softlock"); return result("FAIL", "soft-lock -- " .. v.why)
+            shot("smoke-softlock")
+            freezeReport("smoke soft-lock")
+            return result("FAIL", "soft-lock -- " .. v.why)
         end
         if turn() > budgetTurns then
             shot("smoke-budget")
