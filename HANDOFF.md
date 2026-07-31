@@ -16,17 +16,27 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   exactly the authored `deploy_slots`, the 10-unit monsters-only opening loads in its authored
   positions, turns advance and enemy phases resolve. ADR in `decisions.md` (Operational Gotchas);
   the runbook step is in `docs/adding-a-chapter.md`.
-- **ch04's remaining defect: a turn-4 SOFT-LOCK inside an enemy-phase battle animation**
-  (Revenant / Rotten Claw vs Wolfram). State freezes at f020279 and never resumes — confirmed over
-  66k further frames, so it is not a slow fog phase. Only reachable now that ch04's own units load.
-  Separate root cause from #200; **this is the next debugging task.** Checklisted on #24.
-- **`feat/24-ch04-scenes` is OUTSTANDING and needs a rebase onto the new `main`.** Three commits,
-  pushed, no PR: the Wyrdeer moose art, Stage 4's authored scenes (Lonelywood opening, parley,
+- **ch04's turn-4 SOFT-LOCK is FIXED (#201, merged `47b3631`); `smoke_ch04` PASSes.** Turn 4's
+  enemy phase now completes and the chapter runs on to a clean terminal. Root cause was NOT the
+  recorded lead: the pair was **Lupin (Duessel/Cavalier) vs Braulo (Eirika/Pirate)**, not
+  Revenant-vs-Wolfram, and `battleTileSet 0x15` was irrelevant (ch01 already ships it). The rule —
+  **an attacking banim mode must ARM the HP depletion (C04 melee / C05 projectile), because the
+  unit it starves is the OPPONENT**: vanilla dodge/stand modes wait bare on C01, which "freezes if
+  no HP depletion is occurring/has occurred". Broken in four places (faked melee miss, faked melee
+  `attack_range*`, faked ranged/magic miss, and the vendored `Pinky.txt` mode 12 — the community
+  source itself omitted C04). ADR in `decisions.md` (Art & Audio); the importer now FAILS THE BUILD
+  on an unarmed attacking mode.
+- **`feat/24-ch04-scenes` is rebased onto the new `main` and force-pushed (`4968487`), still no
+  PR.** Three commits: the Wyrdeer moose art, Stage 4's authored scenes (Lonelywood opening, parley,
   moose-flees, the branched ending + `variant_beat`), and the `smoke_ch04` stability net. That work
   is good and was never reset — it simply could never run, because ch04 wasn't executing its own
   events. **`smoke_ch04`'s commit message records a WRONG lead** (blaming a party unit on the
   harness's hardcoded `EMPTY_TILE (2,2)`); instrumenting `endTurn` proved (2,2) empty and the cursor
   pinned off-map at y=18 — the real cause was #200. Don't re-follow that lead.
+- **Debugging a freeze now starts with `freezeReport`** (`harness.lua`, fires on any SOFTLOCK
+  verdict): it dumps the proc pool (`proc_name` / `proc_scrCur` / `proc_lockCnt` — the pool carries
+  its own diagnosis) plus `gBanimDoneFlag`, `gEkrDistanceType` and every `gAnims[]` round type. One
+  run names the stuck SIDE and ROUND instead of "it froze".
 - **ch05 "The Elven Tomb" (#25) — DIALOGUE COMPLETE AND MERGED** (PR #196, squash `3164bcf`).
   15 slots, all `status: locked`, no `draft_script:` left. Roster CLOSED at PARITY, `deploy_limit 9`.
   #25 stays OPEN: map + placement, text insertion → `verify_text`, `--ch05-boot` playtest,
@@ -88,22 +98,25 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 - **`vanilla_scene.py` was mining the WORKING TREE, not HEAD** (fix `46f8b12`). **Every "vanilla
   says…" number mined on a built tree before that fix is suspect** — re-mine before citing one.
 
-## NEXT SESSION — ch04's turn-4 soft-lock, then close out the slice
+## NEXT SESSION — open the scenes PR, then close out the slice
 
 **Read issue #24** (its checklist is the backlog) + the `docs/decisions.md` ch04 ADR.
+The chapter now BOOTS, PLAYS and survives its own enemy phases — both blockers (#200, #201) are
+merged, so what is left is content review, not debugging.
 
-1. **Debug the turn-4 battle-animation soft-lock** (fresh context recommended — it is a different
-   domain: battle anims, platforms, monster classes). Repro:
+1. **Open `feat/24-ch04-scenes`'s PR** (already rebased + force-pushed, 3 commits). Its scenes have
+   still never been *watched* — the chapter couldn't execute its own events until #200 and would
+   freeze on turn 4 until #201. Drive them with
    `make CAMPAIGN=rime-of-the-frostmaiden CH04BOOT=1 fireemblem8.gba -j$(nproc)` then
-   `PT_HOST_CHAPTER=5 tools/playtest/run.sh smoke_ch04` **on the rebased scenes branch** (that is
-   where `smoke_ch04` lives). Freeze is a Revenant (Rotten Claw, pid `0xaa`) vs Wolfram exchange;
-   all ch04 classes are plain vanilla monster classes with no `skin:`. Worth checking early:
-   `battleTileSet 0x15` on slot 5 vs what monster combat expects.
-2. **Rebase `feat/24-ch04-scenes` onto `main`** and open its PR — the scenes have still never been
-   seen running, because the chapter wasn't executing its own events until #200.
-3. **Stage 5** — spatial check + `--ch04-boot` playtest → confirm parity in-engine → PR
+   `PT_HOST_CHAPTER=5 tools/playtest/run.sh smoke_ch04`.
+2. **Stage 5** — spatial check + `--ch04-boot` playtest → confirm parity in-engine → PR
    (`Closes #24`). The remaining #198-review guard (message-id uniqueness) must land **before**
    ch05's text insertion (#25), or a double-claim overwrites silently and stays green.
+3. **Look-test the two art-visible banim changes from #201** — a ranged MISS now looses the arrow
+   (vanilla behaviour) instead of holding a still frame, and a melee unit at RANGE now throws
+   instead of standing. Neither is exercised by a default `recordanim` (it positions from
+   `items[0]`, so Braulo captures his melee swing); showing them needs a weapon-slot knob on
+   `captureCharAnim` and a forced miss. The close-range attack anims are confirmed unchanged.
 
 Then: **ch05's now-unblocked build work** (map, placement, text insertion, playtest, reskins,
 STAT_DONORs, the five no-Lupin conditionals) on #25; **#138** config-driven
