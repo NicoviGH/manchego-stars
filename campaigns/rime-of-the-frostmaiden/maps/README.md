@@ -44,9 +44,37 @@ so it dropped in with no grit / Map Hacking Suite recompile:
 - `SnowyBern.mapchip_config` → `snowy-bern.bin` (raw, as-is)
 - `SnowyBernObj.bin` (GBA-LZ 4bpp) → decompressed to `snowy-bern.4bpp`
 
+Ch4 adds one deliberate cross-tileset exception: Super Fields' two-tile **Snag**
+family is adapted into Snowy Bern's matching empty metatile slots **8** and **35**
+(terrain `0x33`). The graphics occupy unreferenced slots 260–265 and render through
+Snowy Bern's native palette bank **4**, producing the approved readable brown snag
+without altering the rest of the tileset. An earlier bank-5 transfer was rejected: it
+interpreted the same pixel indices through the wrong colors, turning the wood gold and
+introducing green grass. No other Super Fields art is mixed into Snowy Bern.
+
 `build_campaign.inject_winter_tileset()` registers it as asset-table entries
 `ObjectTypeSnow` / `MapPaletteSnow` / `TileConfigurationSnow` and repoints the **test chapter**
 (the `inject_test_chapter` target) at it, so `make` + New Game load-tests the tileset in-engine.
+
+## Intact tileset alternatives
+
+`tilesets/snowy-fields/` is **N426's Snow variant of Fields + Customs**, vendored intact
+from FE-Repo. It provides a second coherent winter visual language with native Snag /
+Bridge Snag terrain, expanded forests, and Fields-style buildings. It is an on-hand
+alternative, not a replacement for `snowy-bern`, and is deliberately not registered in
+`build_campaign.py` until a chapter selects the complete tileset.
+
+- `Fields + Customs - Tileset.mapchip_config` → `snowy-fields.bin`
+- `Fields + Customs - Tileset Object Palette (Snow) {N426}.png` →
+  `snowy-fields.4bpp` + `snowy-fields.gbapal`
+
+The bundled source-family credits are copied to `tilesets/snowy-fields/CREDITS.txt`;
+the project credit entry is in `/CREDITS.md`.
+
+The Snag family comes from **FE8 Fields Remaster / Super Fields**, but that complete
+green-grass tileset is deliberately **not** retained as an alternate. Only the two
+approved Snag metatiles live in-tree, adapted to Snowy Bern's own palette bank 4.
+Its source-family credit is recorded in `/CREDITS.md`.
 
 ## Add a tileset (#40)
 

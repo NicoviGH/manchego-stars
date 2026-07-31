@@ -8,7 +8,9 @@ Run:  python3 tools/test_build_campaign.py
 import hashlib
 import os
 import re
+import shutil
 import sys
+import tempfile
 import unittest
 
 from PIL import Image
@@ -131,10 +133,10 @@ class TrexRecruitCast(unittest.TestCase):
 
     def test_thief_loadout_and_testch_covers_the_whole_cast(self):
         # inject_test_chapter needs a Thief loadout + one spawn tile per classed cast
-        # member (10 now: 8 founding + Baxby + Trex); both would sys.exit otherwise.
+        # member (11 now: 8 founding + Baxby + Trex + Lupin); both would sys.exit otherwise.
         self.assertIn('CLASS_THIEF', bc.CLASS_LOADOUT)
         allcast, _ = bc._classed_cast(self.CAMPAIGN)   # available_at=None -> everyone
-        self.assertEqual(len(allcast), 10)
+        self.assertEqual(len(allcast), 11)
         self.assertGreaterEqual(len(bc.TEST_SPAWN_POSITIONS), len(allcast))
         # ch03's blue field roster = cast_available_at(3); its PREP deploy tiles must cover it.
         field, _ = bc._classed_cast(self.CAMPAIGN, available_at=3)
@@ -145,6 +147,14 @@ class TrexRecruitCast(unittest.TestCase):
         self.assertIn('trex', bc.PC_DEATH_QUOTE_MSGS)
         unit = bc.load_unit(self.CAMPAIGN, 'trex')
         self.assertTrue(unit.get('death_quote'))
+
+    def test_every_classed_cast_member_has_a_death_quote(self):
+        # #6 requires a msg id + a quote line per deployable cast member; inject_pc_death_quotes
+        # sys.exits otherwise (a build break). This guards every recruit, incl. future ch05 ones.
+        for uid, _slot, _cls, _sms in bc.classed_cast(self.CAMPAIGN):
+            self.assertIn(uid, bc.PC_DEATH_QUOTE_MSGS, '%s needs a death-quote msg id' % uid)
+            self.assertTrue(bc.load_unit(self.CAMPAIGN, uid).get('death_quote'),
+                            '%s needs a death_quote line' % uid)
 
 
 class RecruitAvailability(unittest.TestCase):
@@ -259,6 +269,35 @@ class TalkRecruitWiring(unittest.TestCase):
         self.assertIn('TEXTSHOW(0x9A5)', s)
         self.assertIn('CUSA(CHARACTER_RENNAC)', s)
         self.assertTrue(s.rstrip().endswith('ENDA\n}') or s.rstrip().endswith('ENDA'))
+
+
+class SharedTalkRecruitWiring(unittest.TestCase):
+    """The faction-parameterized on-map talk-recruit assembly reused by ch03 (green Trex),
+    ch04 (red Lupin), and ch05 (green Basil + red Sahnar). ONE flow: a CHAR-per-recruiter
+    list -> a shared talk script whose CUSA flips the target BLUE. A red parley splices a
+    `pre_script` (the pack table-swap) in BEFORE the CUSA, so it rides the same recruit path."""
+
+    def test_talk_script_splices_pre_script_before_cusa(self):
+        s = bc.talk_recruit_script(0x9BA, 'CHARACTER_DUESSEL', pre_script='    DISA(0xb3)\n')
+        self.assertGreater(s.index('DISA(0xb3)'), s.index('TEXTSHOW(0x9BA)'))  # after the talk line
+        self.assertLess(s.index('DISA(0xb3)'), s.index('CUSA(CHARACTER_DUESSEL)'))  # before the join
+
+    def test_talk_script_without_pre_script_is_backward_compatible(self):
+        # ch03's green recruit passes no pre_script -- the script stays exactly as before.
+        s = bc.talk_recruit_script(0x9A5, 'CHARACTER_RENNAC')
+        self.assertNotIn('DISA', s)
+        self.assertIn('CUSA(CHARACTER_RENNAC)', s)
+
+    def test_wiring_bundles_the_char_list_and_the_talk_script(self):
+        char_events, script = bc.talk_recruit_wiring(
+            ['CHARACTER_SETH'], 'CHARACTER_DUESSEL', 'EVFLAG_TMP(9)',
+            'EventScr_089F2340', 0x9BA, pre_script='    DISA(0xb3)\n')
+        self.assertEqual(char_events.count('CHAR('), 1)
+        self.assertIn('CHAR(EVFLAG_TMP(9), EventScr_089F2340, CHARACTER_SETH, '
+                      'CHARACTER_DUESSEL)', char_events)
+        self.assertTrue(char_events.rstrip().endswith('END_MAIN\n}'))
+        self.assertIn('CUSA(CHARACTER_DUESSEL)', script)
+        self.assertIn('DISA(0xb3)', script)
 
 
 class Ch03PrepDeploy(unittest.TestCase):
@@ -1042,6 +1081,188 @@ class Ch03TileChanges(unittest.TestCase):
         self.assertIn('.byte 0, 6, 10, 1, 1, 0, 0, 0', asm)   # id 0 at (x=6, y=10), 1x1 region
 
 
+class Ch04RuntimeHost(unittest.TestCase):
+    """Ch04's first playable host: approved 23-unit vanilla-monster roster, snowy map,
+    fog, prep cap, and turn-based reinforcement split. D&D identities stay narrative
+    grounding; the player-facing unit names remain the vanilla FE8 monster names."""
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH04_CHAPTER_YAML)
+
+    def test_every_ch04_decomp_output_is_restored_before_reinjection(self):
+        self.assertTrue({
+            'src/events/ch5-eventinfo.h',
+            'src/events/ch5-eventscript.h',
+            'graphics/chap_title/chap_title_5.png',
+        }.issubset(set(bc.PATCHED_DECOMP_FILES)))
+
+    def test_lupin_is_a_red_on_map_talk_recruit(self):
+        # ch04's parley recruit (Joshua-style red->blue). The recruit path is faction-
+        # parameterized and reused: Trex/Basil start GREEN, Lupin/Sahnar start RED. Lupin
+        # rides a collision-free identity slot (his stat donor stays Kyle).
+        recruits = bc.on_map_talk_recruits(self.CAMPAIGN, self._chap()['chapter_number'])
+        lupin = [r for r in recruits if r[0] == 'lupin']
+        self.assertEqual(len(lupin), 1, "Lupin should be ch04's on-map talk recruit")
+        self.assertEqual(lupin[0][1], 'Duessel')
+        self.assertEqual(
+            bc.recruit_initial_faction(bc.load_unit(self.CAMPAIGN, 'lupin')), 'RED')
+
+    def test_recruit_initial_faction_defaults_green(self):
+        # Trex (and future Basil) are the green->blue path; RED is opt-in via recruit.initial_faction.
+        self.assertEqual(
+            bc.recruit_initial_faction(bc.load_unit(self.CAMPAIGN, 'trex')), 'GREEN')
+
+    def test_host_and_deployment_match_the_approved_ch04_shape(self):
+        chap = self._chap()
+        self.assertEqual(bc.CH04_HOST_INDEX, 5)
+        self.assertEqual(bc.CH04_GOAL_DONOR, bc.CH02_HOST_INDEX)
+        self.assertEqual(chap['deployment']['deploy_limit'], 9)
+        self.assertEqual(len(chap['deployment']['deploy_slots']), 9)
+        cast, _ = bc._classed_cast(self.CAMPAIGN, available_at=4)
+        self.assertEqual(len(cast), 10)  # pick 9; Trex has joined after ch03
+
+    def test_player_facing_enemy_names_stay_vanilla(self):
+        chap = self._chap()
+        self.assertEqual({e['name'] for e in chap['enemy_units']},
+                         {'Mauthe Doog', 'Revenant', 'Bonewalker', 'Mogall', 'Entombed'})
+        self.assertEqual([e['name'] for e in chap['enemy_units']],
+                         [e['fe_name'] for e in chap['enemy_units']])
+
+    def test_roster_splits_10_line_6_turn2_reveal_7_turn3(self):
+        # Realigned 2026-07-21 to the vanilla-Ch4 twin: 10 monsters-only line, the turn-2
+        # wolf-pack reveal (6), and two turn-3 reinforcement packs (revenant 4 + bonewalker 3).
+        chap = self._chap()
+        self.assertEqual(len(bc.ch04_enemy_rows(chap)), 10)
+        self.assertEqual(len(bc.ch04_enemy_rows(chap, arrives_turn=2)), 6)
+        self.assertEqual(len(bc.ch04_enemy_rows(chap, arrives_turn=3)), 7)
+
+    # -- Stage 2b: the turn-2 wolf-pack reveal + the Marty->Lupin parley (table-swap) -------
+    def _lupin(self):
+        return next(r for r in bc.on_map_talk_recruits(self.CAMPAIGN, 4) if r[0] == 'lupin')
+
+    def _reveal_positions(self):
+        return bc._ch04_reveal_wave(self._chap())['positions']
+
+    def test_turn2_reveal_is_five_generic_wolves_plus_lupin_red_leader(self):
+        # The pack leader tile becomes Lupin (red, CHARACTER_DUESSEL, Cavalier under the hood);
+        # the other 5 stay generic Mauthe Doogs. 5 + Lupin = 6 -> holds the turn-2 parity count.
+        rows = bc.ch04_turn2_reveal_rows(self._chap(), self._lupin())
+        joined = '\n'.join(rows)
+        self.assertEqual(len(rows), 6)
+        self.assertEqual(joined.count('CLASS_MAUTHEDOOG'), 5)
+        self.assertEqual(joined.count('CHARACTER_DUESSEL'), 1)
+        self.assertIn('CLASS_CAVALIER', joined)
+        self.assertEqual(joined.count('FACTION_ID_RED'), 6)   # all hostile until the parley
+        lx, ly = self._reveal_positions()[0]                  # Lupin sits on the leader tile
+        self.assertIn('.charIndex = CHARACTER_DUESSEL,', joined)
+        self.assertRegex(joined, r'CHARACTER_DUESSEL,[^{]*?\.xPosition = %d,' % lx)
+
+    def test_turn2_reveal_holds_the_difficulty_parity_count(self):
+        # The YAML wave stays 6 for the difficulty read (make difficulty CH=ch04); the
+        # 5-generics-plus-Lupin split is injector-side only, so parity is unchanged.
+        self.assertEqual(len(bc.ch04_enemy_rows(self._chap(), arrives_turn=2)), 6)
+        self.assertEqual(len(bc.ch04_turn2_reveal_rows(self._chap(), self._lupin())), 6)
+
+    def test_green_pack_swaps_five_green_wolves_onto_the_generic_tiles(self):
+        rows = bc.ch04_green_pack_rows(self._chap())
+        joined = '\n'.join(rows)
+        self.assertEqual(len(rows), 5)
+        self.assertEqual(joined.count('FACTION_ID_GREEN'), 5)
+        self.assertNotIn('CHARACTER_DUESSEL', joined)   # Lupin isn't one of the generics
+        for x, y in self._reveal_positions()[1:]:        # the 5 non-leader tiles
+            self.assertIn('.xPosition = %d,\n        .yPosition = %d,' % (x, y), joined)
+
+    def test_green_pack_wears_the_lycanroc_class_not_the_red_pack_s(self):
+        # Stage 3: the parley is an ugly->handsome upgrade as well as a faction flip, so the
+        # green allies must NOT share CLASS_MAUTHEDOOG with the red pack still on the field.
+        joined = '\n'.join(bc.ch04_green_pack_rows(self._chap()))
+        self.assertEqual(joined.count(bc.CH04_GREEN_PACK_CLASS), 5)
+        self.assertNotIn('CLASS_MAUTHEDOOG', joined)
+        # ...and the red pack it replaces is still the vanilla doog (the visible contrast).
+        self.assertIn('CLASS_MAUTHEDOOG',
+                      '\n'.join(bc.ch04_enemy_rows(self._chap(), arrives_turn=2)))
+
+    def test_lycanroc_pack_reskin_is_declared_and_clones_the_doog(self):
+        rk = [r for r in bc.enemy_class_reskins(self.CAMPAIGN) if r['id'] == 'lycanroc-pack']
+        self.assertEqual(len(rk), 1, 'campaign.yaml must declare the lycanroc-pack reskin')
+        rk = rk[0]
+        self.assertEqual(rk['base'], 'CLASS_MAUTHEDOOG')     # stats/anim ride along -> parity
+        self.assertEqual(rk['slot'], bc.CH04_GREEN_PACK_CLASS)
+        self.assertEqual(str(rk['frame']), '32x32')          # 32x32 quadruped on a 16x32 doog
+        self.assertEqual(rk['sprite'], 'lycanroc-pack')
+        for suffix in ('.png', '_mu.png'):
+            self.assertTrue(os.path.isfile(os.path.join(
+                bc.REPO, 'campaigns', self.CAMPAIGN, 'map_sprites',
+                rk['sprite'] + suffix)), 'missing map_sprites/%s%s' % (rk['sprite'], suffix))
+        # Appended class ids must stay unique (0x80/0x81/0x82 are ch03's).
+        ids = [r['slot_id'] for r in bc.enemy_class_reskins(self.CAMPAIGN) if r.get('slot_id')]
+        self.assertEqual(len(ids), len(set(ids)))
+
+    def test_parley_pre_script_disas_the_pack_then_loads_the_green_allies(self):
+        pre = bc.ch04_parley_pre_script('0xb3', 5, bc.CH04_GREEN_PACK_SYMBOL)
+        self.assertEqual(pre.count('DISA(0xb3)'), 5)     # clear the 5 generics one at a time
+        self.assertIn('LOAD1(0x1, %s)' % bc.CH04_GREEN_PACK_SYMBOL, pre)
+        self.assertLess(pre.rindex('DISA(0xb3)'), pre.index('LOAD1'))   # DISA before the swap-in
+
+    def test_parley_recruiter_is_marty_only(self):
+        # Nicolas 2026-07-21: ch04's talker is Marty specifically, NOT ch03's any-party-member.
+        # Data-driven from the convertible wave's parley.by; Marty rides the Seth slot.
+        self.assertEqual(bc.ch04_parley_recruiters(self.CAMPAIGN, self._chap()),
+                         ['CHARACTER_SETH'])
+
+    def test_reveal_cutscene_pans_loads_focuses_lupin_and_plants_the_parley(self):
+        # Stage 2c: the turn-2 reveal rides the existing LOAD1 (vanilla EventScr_089F199C shape):
+        # pan to the NW fog, burst the pack in, focus Lupin (the commander), then stub beats plant
+        # the parley (Lupin commands; Marty flags "talk to it"). Real dialogue is Stage 4.
+        s = bc.ch04_reveal_cutscene_script('UnitDef_088B5798', 'CHARACTER_DUESSEL',
+                                           (0x9BB, 0x9BC), (2, 2))
+        self.assertIn('CAMERA2(2, 2)', s)
+        self.assertIn('LOAD1(0x1, UnitDef_088B5798)', s)   # the pack still bursts in
+        self.assertIn('CUMO_CHAR(CHARACTER_DUESSEL)', s)   # focus the commander
+        self.assertIn('TEXTSHOW(0x9BB)', s)                # Lupin commands
+        self.assertIn('TEXTSHOW(0x9BC)', s)                # Marty flags the parley
+        self.assertLess(s.index('LOAD1'), s.index('CUMO_CHAR'))   # load before the focus/beats
+        self.assertTrue(s.rstrip().endswith('EVBIT_T(7)\n    ENDA\n}'))  # marked done
+
+    def test_parley_recruiter_is_force_deployed_in_the_chapter_slot(self):
+        # A Marty-ONLY parley must force-deploy Marty so benching him can't miss the recruit
+        # (Nicolas 2026-07-21). Vanilla's per-chapter ForceDeploymentEnt path, no new engine
+        # code: {pid, route=ANY(0xFF), chapter=host slot}. Redundant-but-harmless if the player
+        # chose Marty as lord (IsCharacterForceDeployed_ already returns true for the lead).
+        entries = bc._force_deployment_entries(
+            bc.ch04_parley_recruiters(self.CAMPAIGN, self._chap()), bc.CH04_HOST_INDEX)
+        self.assertIn('{CHARACTER_SETH, 0xFF, %d}' % bc.CH04_HOST_INDEX, entries)
+
+    def test_roster_uses_the_vanilla_monster_classes_and_weapons(self):
+        rows = '\n'.join(bc.ch04_enemy_rows(self._chap()) +
+                         bc.ch04_enemy_rows(self._chap(), arrives_turn=2) +
+                         bc.ch04_enemy_rows(self._chap(), arrives_turn=3))
+        # The twin's own classes/weapons: Mogall (evil eye), melee Revenant (rotten claw),
+        # melee Bonewalker (iron sword line / iron lance pack), Entombed (fetid claw), plus
+        # the Mauthe Doog fiction swap. NOT the drifted bow-skeleton "phantom arrows".
+        for token in ('CLASS_MAUTHEDOOG', 'ITEM_MONSTER_ROTTENCLW',
+                      'CLASS_REVENANT',
+                      'CLASS_BONEWALKER', 'ITEM_SWORD_IRON', 'ITEM_LANCE_IRON',
+                      'CLASS_MOGALL', 'ITEM_MONSTER_EVILEYE',
+                      'CLASS_ENTOUMBED', 'ITEM_MONSTER_FETIDCLW'):
+            self.assertIn(token, rows)
+        for retired in ('CLASS_BONEWALKER_BOW', 'ITEM_BOW_IRON'):
+            self.assertNotIn(retired, rows)
+
+    def test_reinforcement_vulnerary_has_exactly_one_dropper(self):
+        # The dropping Revenant is the turn-3 area wave (mirrors vanilla Ch4's dropping revenant).
+        rows = '\n'.join(bc.ch04_enemy_rows(self._chap(), arrives_turn=3))
+        self.assertEqual(rows.count('.itemDrop = 1'), 1)
+        self.assertEqual(rows.count('ITEM_VULNERARY'), 1)
+
+    def test_ch04_title_card_has_a_complete_vanilla_glyph_atlas(self):
+        card = bc.gen_chapter_title.compose_title('Ch.4: The White Moose')
+        self.assertEqual(card.size, (256, 16))
+        self.assertIsNotNone(card.getbbox())
+
+
 class ItemIconPal2(unittest.TestCase):
     """Custom-coloured icons append a third source palette and draw from reserved BG bank 15.
 
@@ -1162,3 +1383,66 @@ class IdempotentInjectionMtimes(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class PreRecruitVariant(unittest.TestCase):
+    """A cast member on the field BEFORE he joins you (ch04's Lupin: red as the pack's
+    leader, the finalized grey once Marty's parley brings him over).
+
+    The failure this guards is the Trex bug's sibling: a charId-keyed cast-palette
+    override is unconditional, so without the faction check Lupin renders in his bespoke
+    grey while he is an ENEMY -- and FE reads grey as "already acted".
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def test_lupin_declares_pre_recruit_roles_covering_every_index_he_uses(self):
+        roles = bc.pre_recruit_roles(self.CAMPAIGN, 'lupin')
+        self.assertIsNotNone(roles, 'lupin.yaml must declare art.map_sprite.pre_recruit_roles')
+        ms = os.path.join(bc.REPO, 'campaigns', self.CAMPAIGN, 'map_sprites')
+        for stem in ('lupin.png', 'lupin_mu.png'):
+            used = {v for v in Image.open(os.path.join(ms, stem)).getdata() if v}
+            self.assertTrue(used <= set(roles), '%s uses undeclared cast indices %s'
+                            % (stem, sorted(used - set(roles))))
+        # The body must land on the faction ramp (7-10) -- that is what makes him read red.
+        self.assertTrue({roles[2], roles[3]} & set(range(7, 11)),
+                        'no body index on the faction ramp: he would not change colour by side')
+
+    def test_a_plain_cast_member_has_no_variant(self):
+        self.assertIsNone(bc.pre_recruit_roles(self.CAMPAIGN, 'braulo'))
+
+    def test_remap_indices_rewrites_by_role_and_rejects_an_undeclared_index(self):
+        tmp = tempfile.mkdtemp(prefix='prv_')
+        try:
+            src, out = os.path.join(tmp, 's.png'), os.path.join(tmp, 'o.png')
+            pal = os.path.join(tmp, 'p.png')
+            for path, data in ((src, [0, 1, 3, 11]), (pal, list(range(16)))):
+                im = Image.new('P', (len(data), 1))
+                im.putpalette([0, 0, 0] * 16)
+                im.putdata(data)
+                im.save(path)
+            bc._remap_indices(src, {1: 15, 3: 9, 11: 13}, pal, out)
+            self.assertEqual(list(Image.open(out).getdata()), [0, 15, 9, 13])
+            with self.assertRaises(SystemExit) as cm:          # index 11 not declared
+                bc._remap_indices(src, {1: 15, 3: 9}, pal, out)
+            self.assertIn('11', str(cm.exception))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_every_override_hook_consults_the_variant_before_the_cast_override(self):
+        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'), encoding='utf-8').read()
+        self.assertIn('gPreRecruitVariant', src)
+        # The lookup is gated on faction: a JOINED unit must fall through to the cast look.
+        self.assertIn('UNIT_FACTION(%s) != FACTION_BLUE', bc._pre_recruit_lookup('%s'))
+        for expr in ('unit', 'proc->unit'):
+            self.assertIn('gPreRecruitVariant', bc._pre_recruit_lookup(expr))
+        # Sprite + walk return the variant; the palette instead SKIPS the purple bank so
+        # GetUnitSpritePalette falls through to the faction switch.
+        self.assertIn('return prv->smsId;', src)
+        self.assertIn('return prv->muImg;', src)
+        self.assertIn('if (prv == 0) {', src)
+
+    def test_the_lookup_is_c89_declarations_first(self):
+        # agbcc (GCC 2.95.1) rejects mid-block declarations; CLAUDE.md coding conventions.
+        body = [ln.strip() for ln in bc._pre_recruit_lookup('unit').splitlines() if ln.strip()]
+        self.assertTrue(body[0].startswith('struct PreRecruitVariant * prv'))
+        self.assertNotIn('//', bc._pre_recruit_lookup('unit'))

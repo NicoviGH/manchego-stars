@@ -270,6 +270,8 @@ INJECTION_ORDER = [
      'the prologue map registers against the tileset asset-table labels'),
     ('inject_ch01', 'inject_prologue',
      'inject_prologue overwrites the slot-1 Seize goal template inject_ch01 copies'),
+    ('inject_ch03', 'inject_ch04',
+     'chapter hosts are injected in campaign order; ch04 borrows ch02\'s stable Rout goal'),
 ]
 
 
@@ -590,9 +592,17 @@ def _lane_violations(lane, changed_files):
 
 
 def _git(args):
+    """Run git against REPO. `cwd=` alone is NOT enough: git exports GIT_DIR /
+    GIT_INDEX_FILE / GIT_WORK_TREE while a hook runs, and those OVERRIDE cwd -- so under
+    pre-commit this inspected whatever repo invoked the hook rather than REPO. Harmless
+    while they are the same repo, but it made the guard untestable (a fixture repo was
+    silently ignored in favour of the real one) and it is the documented footgun in
+    docs/decisions.md "Operational Gotchas". Target REPO with -C and a stripped env."""
     import subprocess
     try:
-        r = subprocess.run(['git'] + args, cwd=REPO, capture_output=True, text=True)
+        env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+        r = subprocess.run(['git', '-C', REPO] + args, capture_output=True, text=True,
+                           env=env)
         return r.stdout.strip()
     except Exception:
         return ''

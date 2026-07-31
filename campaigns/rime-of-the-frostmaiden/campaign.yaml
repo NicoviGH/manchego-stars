@@ -171,6 +171,40 @@ enemy_class_reskins:
         - {dir: handaxe, txt: Handaxe.txt, abbr: kbru_ha,
            wtypes: ["ITEM_AXE_HANDAXE", "ITEM_AXE_TOMAHAWK", "ITEM_AXE_HATCHET"]}
         - {dir: unarmed, txt: Unarmed.txt, abbr: kbru_un, wtypes: ["0x0100 | ITYPE_ITEM"]}
+  # Ch4 (#24): the wolves Marty's parley wins over. The RED pack are vanilla Mauthe Doogs;
+  # the parley table-swaps them for GREEN allies of THIS class, so the one move does the
+  # faction flip AND the ugly->handsome upgrade (the whole point of the beat). It therefore
+  # needs its own class rather than reskinning CLASS_MAUTHEDOOG, which the hostile pack is
+  # still wearing. Clones Mauthe Doog, so stats/anim ride along unchanged and the parity
+  # read is untouched; `frame` because the Lycanroc is a 32x32 quadruped on a 16x32 doog.
+  # Map-sprite only -- a wolf battle anim is logged on #24 (FE-Repo Gwyllgi/Hellhound line)
+  # and these are uncontrolled green NPCs, so they rarely swing.
+  # Build recipe for map_sprites/lycanroc-pack{,_mu}.png (same source as Lupin's, whose own
+  # recipe + credit live in npcs/lupin.yaml; re-fetch the sheet via the DeviantArt oEmbed
+  # endpoint -- the raw wixmp URL 401s):
+  #   1. Sheet is 8 cols x 16 rows of 32px. Midday Lycanroc = rows 4-7 (down/left/right/up).
+  #      Cols 0-3 = the NORMAL brown variant -- this pack. (Cols 4-7 are the shiny blue one
+  #      Lupin was built from, which is why he and his wolves are the same animal.)
+  #   2. wait = 32x96, down-idle bob: row 4, frames 0,1,2.
+  #      mu   = 32x480, side row5 / down row4 / up row7, each [0,1,2,3,0]; right = engine H-flip.
+  #      No glasses -- those are Lupin's alone, and they are what makes him readable as the
+  #      one intelligent wolf worth talking to.
+  #   3. Authored DIRECTLY in the standard SMS palette (the Mauthedoog wait sheet's), so the
+  #      build's remap_sms_palette pass is an identity and the GREEN NPC palette does the
+  #      colouring. Source RGB -> standard index, by role (Nicolas picked body-on-the-ramp,
+  #      vanilla Gwyllgi's idiom, over faction-mane-on-brown-body, vanilla Mauthe Doog's):
+  #        body    c7a28d->9  8d7466->8  65544a->7  413833->7
+  #        mane    ffffff->14 b8b5af->13            (constant white/grey: stays white in
+  #                                                  every faction, so green reads as fur)
+  #        head    504f4e->7  4b453f->7  2a2725->15
+  #        detail  101010->15 (outline)  b2629c->6 (inner-ear wedges)  808080->13
+  #        eyes    5caaee/5581c5/5892d6 -> 12       (yellow in every faction, cf. Gwyllgi)
+  - id: lycanroc-pack
+    base: CLASS_MAUTHEDOOG
+    slot: CLASS_MTD_LYCANROC_PACK
+    slot_id: 0x83
+    sprite: lycanroc-pack
+    frame: 32x32
 
 # Item name overrides: rename a vanilla item's in-game text globally (build wiring =
 # build_campaign.inject_item_names, which rewrites gItemData[].nameTextId's message).

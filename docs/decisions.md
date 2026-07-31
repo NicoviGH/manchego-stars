@@ -757,6 +757,20 @@ against the twin via `make difficulty` (economy #170 + recruit/reinforcement dyn
 _Decided: 2026-07-15 (Nicolas + CLAUDE). Supersedes the earlier "split old Ch4 into two Ch4-parity halves"
 framing and the brainstormed Ch11-map-borrow (issues #24/#25) — both retired._
 
+**ch04 "The White Moose" (#24) — reveal-flow, "the wolves turn the tide" difficulty, and roster mirrored to the twin.** Building the ch04 slice settled three things:
+- **Flow — the reveal.** ch04 OPENS monsters-only (the ranged Mogall crossfire pocket = the difficulty); on **turn 2 the wolf pack bursts from the NW fog** beside the party — Lupin commands them (intelligence shown by ACTION), Marty reads it cross-field and flags the parley. **The reveal cutscene IS the parley teaching** (no separate tutorial — it plants the idea at the moment of decision). Retiming the pack from the turn-1 line to a reveal reshapes the curve to peak mid-fight; total pressure is unchanged.
+- **Difficulty model — "the wolves turn the tide."** Target = **dead-on vanilla on the PLAYED (parley) path**, not a softened bar. So the raw no-parley fight sits ABOVE vanilla (the tax for refusing the mechanic), and the parley discounts it back to vanilla: verified **static ×1.15 threat / ×1.19 clear-load (PARITY, above ×1.0 intentionally)** with **parley-path clear-load 2.5 ≈ vanilla's 2.6** (`make difficulty CH=ch04`). This retires the stale "lean generous" framing: the house target is measured vanilla parity (via the three-dimensional `tools/difficulty.py`); generosity means rewards/recruits/exp, **never softened OR hardened enemies** — lord-select already swings party throughput, so above-vanilla enemies would compound into "harder than an already-hard base game."
+- **Roster mirrors vanilla Ch4 1:1.** Vanilla Ch4 = **Mogall×4 · Revenant×12 · Bonewalker×6 (MELEE, iron sword/lance) · Entombed×1 = 23** (verified against `events_udefs.c` UnitDef_088B4A80 line + 088B4C24 Revenant pack + 088B4C88 Bonewalker pack). Our prior roster had **drifted** to D&D-monster-matched classes (bonewalker-BOW "phantom wraiths", Entombed brute, **zero Revenants**). Corrected to the twin's FE8 classes/levels/weapons; the one deliberate divergence is narrative — 6 of the twin's melee Revenants become the convertible Mauthe Doog pack.
+
+**Principle (general, applies to every chapter): verify a chapter's data against its FE8 twin before trusting the YAML.** Our own data files can carry accidental drift (as ch04's roster did). Read the twin's `events_udefs.c` arrays and diff class/level/weapon counts. Divergence from vanilla is legitimate only when **purposeful** — it helps us better match vanilla's *felt* difficulty given our different party, or it's narrative (the wolf pack) — never when it's accidental drift. No drift-guard tooling (Nicolas's call, 2026-07-21) — just the verify-first reflex. ch03 (hosted) and planned ch05 should get the same twin-diff when next touched.
+_Decided: 2026-07-21 (Nicolas + CLAUDE, ch04 slice #24). Supersedes the ch04 YAML's earlier "lean generous" `difficulty_note` and the 2026-07-17 D&D-matched roster grounding._
+
+**ch04 Stage 2b — the Marty→Lupin parley rides ONE shared talk-recruit flow (reused from ch03).** The green (Trex) and red (Lupin) recruits are the *same* flow — a CHAR-per-recruiter list → a shared talk script whose `CUSA` flips the target BLUE — extracted from `inject_ch03` into `talk_recruit_wiring` (which ch05's Basil/Sahnar reuse). The only red-specific piece is a **`pre_script`** spliced into the talk script *before* the `CUSA`: ch04's **pack table-swap** — `DISA` the 5 shared-pid generic Mauthe Doogs (EvtRemoveUnit clears the first valid match, so 5 repeats clear the pack — no distinct PIDs) then `LOAD1` a green Lycanroc NPC pack at the same tiles. A *shape* change faction-conversion alone can't do; only Lupin (the `CUSA` target) becomes a PC, the pack stays uncontrolled GREEN (no Rout count). Placement: Lupin is the **red pack leader** on the turn-2 wave's first tile (`CHARACTER_DUESSEL`, Cavalier, his YAML level, **not** autolevelled so his stats persist through the `CUSA` into a fresh recruit). The YAML wave stays `count: 6` so `make difficulty` still reads 6 turn-2 hostiles (parity held); the **5-generics-+-Lupin split is injector-side only**. Two deliberate departures from ch03: (1) **talker = Marty ONLY**, not any-party-member (Nicolas 2026-07-21 — the reveal centres Marty's creature diplomacy), data-driven from the wave's `parley.by`; (2) the green pack shares one generic pid (`0xcd`) and rides `CLASS_MAUTHEDOOG` as a **Stage-2 placeholder** until the green Lycanroc map-sprite reskin (Stage 3). Because the parley is Marty-gated, **Marty is force-deployed in ch04** so benching him can't miss the recruit — via vanilla's own per-chapter `ForceDeploymentEnt` data path (`{pid, route=ANY, chapter=slot}`, scanned by `IsCharacterForceDeployed_`), which the lord-select hook (#42) cleared of vanilla's by-slot entries but kept the scan for *exactly* this ("added our way, not the by-slot table"). **No new engine code** — a non-lord unit is fielded purely by adding a data row (harmless if the player *chose* Marty as lead: the lord check already force-deploys him). The reusable helper `_force_deploy_units(pids, host_index)` is where ch05 hooks a Marty-style gated recruiter.
+_Decided: 2026-07-21 (Nicolas + CLAUDE, ch04 slice #24, Stage 2b)._
+
+**ch04 Stage 2c — the reveal cutscene reuses the turn-2 TurnEvent script (load + stage as one).** Following vanilla Ch4's `EventScr_089F199C` shape, the turn-2 script that already `LOAD1`s the reveal wave *also* stages it in ONE script (`CAMERA2` to the NW fog → `LOAD1`/`ENUN` → `MUSC` → `CUMO_CHAR` Lupin → stub beats → `EVBIT_T`), rather than a separate cutscene script — that's how vanilla does a reinforcement-with-scene. On-map (no `BACG`); the beats are faced map bubbles (`_script_to_message`) on Lupin (Duessel) + Marty (Seth). Two beats plant the parley: Lupin commands the pack (shows intelligence) and Marty flags "talk to it" — the cutscene *is* the parley teaching (no separate tutorial). **Stub lines + `SONG_TENSION` placeholder; Stage 4 finalizes dialogue + music via the dialogue-pass skill.** Dead Ch5 slots `EventScr_089F22A4` (reused) + msgs `0x9BB`/`0x9BC`.
+_Decided: 2026-07-21 (Nicolas + CLAUDE, ch04 slice #24, Stage 2c)._
+
 **Parity-engine v1 gaps closed (#176 economy drops, #177 area-triggered reinforcements).** Two channels the
 first cut of the extractors punted on, both read from HEAD like the rest: (1) **enemy drops** — a red unit
 flagged `.itemDrop` drops its **last** inventory item on death (`US_DROP_ITEM`, the final slot per
@@ -2181,6 +2195,41 @@ exclusive for one sheet (a role-layout sheet is what lets *either* faction palet
 wrong, `remap_sms_palette`'s `overrides={src_idx: std_idx}` knob corrects it. This is the pattern for **any** future
 recruit with a custom sprite (talk or green-start): add its uid to `FACTION_TINTED_CAST`.
 
+**When the RECRUITED look is the bespoke sheet, faction-tinting is the wrong tool — give the unit a
+PRE-RECRUIT variant instead (`pre_recruit_roles`, #24, 2026-07-30).** Lupin is the same shape of problem as
+Trex (placed RED as the wolf pack's leader, `CUSA`'d over by Marty's parley) but the opposite requirement:
+Nicolas's call is **red while hostile, the finalized grey once recruited** — "only his colours change upon
+recruitment". `FACTION_TINTED_CAST` can't do that; it trades the bespoke palette away, so he'd join as
+standard **blue**. Leaving him in `gMapPaletteOverride` can't either: that override is unconditional, so a
+hostile Lupin renders grey — and FE reads grey as *already acted*. A single sheet can't serve both, because
+the cast palette's index roles are not the standard palette's (his grey ramp lands on cast 1/2/3/4/11, which
+under the enemy palette gives dark maroon, pink-grey, near-white and **bright green** at 11), and there is no
+spare cast-palette entry to redefine — all 16 are in use across the cast sheets. So the unit gets **two
+sheets**: the committed cast one, and a standard-palette one **derived at build time** by remapping cast
+indices to SMS roles (`art.map_sprite.pre_recruit_roles`, `_remap_indices`) — no committed derived asset, so
+every pixel edit to the cast sheet flows into the pre-recruit look automatically. `gPreRecruitVariant`
+(charId → SMS id + MU sheet) is consulted by all three per-character override hooks **only while
+`UNIT_FACTION != FACTION_BLUE`**: sprite and walk return the variant, and the palette hook *skips* the purple
+bank so `GetUnitSpritePalette` falls through to the faction switch. Empty table == exactly vanilla. Note an
+explicit ROLE map is required, not `remap_sms_palette`'s nearest-RGB: a grey ramp nearest-matched against a
+coloured palette collapses onto the constant entries and the unit barely changes colour by side. One
+limitation, accepted: an index serving two roles can't be split (Lupin's cast 2 is body shadow *and* the
+glasses pupil, so the pupil goes dark-red with the shading — invisible at 32×32). This is the pattern for a
+recruit whose joined look is its bespoke art; `FACTION_TINTED_CAST` remains right when the joined look may be
+the side's standard blue.
+_Decided: 2026-07-30_
+
+**A luminance recolour can collide two ROLES on one index — check the roles, not just the ramp (#24).**
+Lupin's map sprite lost its inner-ear wedges, and it read as a drawing mistake in the hand-drawn glasses pass.
+It wasn't: the shape was intact in all 18 frames. The recolour that moved the source onto the cast grey ramp
+landed the inner-ear pink (`b2629c`, luma 128) and the light body fur (`719ac1`, luma 146) on the **same**
+cast index 3, so the ears were painted body-colour. Caught by Nicolas comparing against the pack sprite, whose
+map sent that pink to a pale index. Recovered by re-deriving the 10 px/frame from the source colour and
+setting them to cast 11. **After any luminance-driven remap, list the source colours that share a target index
+and check none of them are different features** — a ramp can look perfectly graded and still have eaten a
+detail.
+_Recorded: 2026-07-30_
+
 **Pick a sprite already drawn in the standard SMS palette.** The first attempt (BoW "Goblin Spearman") had its own
 9-colour palette, so nearest-mapping it to the standard layout collapsed it to a dark, unreadable blob (and a remap-target
 bug — matching to the *player* palette while the unit displays under the *enemy* palette — turned its red pixels green by
@@ -2297,6 +2346,18 @@ Custom canvases with no vanilla source are exempt. A deliberate forest-compositi
 map-design decision, not a quiet override of this guard. The mapping data is authoritative; tools and
 tests consume it rather than carrying a second mapping table. Issue #193.
 _Decided: 2026-07-20 with Nicolas (approved after Ch00–Ch02 before/after review)._
+
+**Tilesets stay coherent; Snowy Bern may borrow only Super Fields' complete Snag family.**
+Snowy Bern remains the shared winter art direction, including Ch4's forest retile. Keep the whole N426
+Snow / Fields + Customs set vendored intact as a coherent winter alternative; do not retain the complete
+green-grass Super Fields default as an alternate, and do not casually mix either set's tiles into Snowy
+Bern. The one approved exception is the functional Snag family Snowy Bern lacks: copy Super Fields
+metatiles 8 and 35 pixel-exact into Snowy Bern's matching empty slots, preserve terrain `0x33` and the
+readable brown silhouette, and use otherwise-unused Snowy Bern graphic capacity so existing art is
+untouched. The approved transfer renders through Snowy Bern's native **palette bank 4**; assigning the
+donor pixels to bank 5 was the washed/gold/green failure and is explicitly rejected. Match vanilla Snag
+placement (Ch4 E9 uses metatile 35), just as the winter forest variants match vanilla's original sequences.
+_Decided: 2026-07-20 with Nicolas (#24)._
 
 **Adopting non-FE sprite sources (Basil/Oddish)**
 Basil's whole kit (portrait, SMS+MU map sprites, battle-anim frames) adopts **Oddish** sprite art
@@ -2833,6 +2894,15 @@ session state. `HANDOFF.md` points here._
   pass a sanitized env** — `{k: v for k, v in os.environ.items() if not k.startswith('GIT_')}` — to any
   `git` subprocess that must target a specific repo, and add `-c core.hooksPath=/dev/null` to fixture
   commits so they can't re-enter the outer hook. Fixed in `_vanilla_decomp_text` + `test_map_tileset.py`.
+  **It recurred on 2026-07-30** in `test_check_handoff.py` — a new fixture, written the obvious way
+  (`subprocess.run(['git', ...], cwd=repo)`), which under pre-commit ran its throwaway `init`/`config`/
+  `add`/`commit` against the live repo: `core.bare` flipped to `true`, `user.name`/`user.email` were
+  overwritten with the fixture's `t`/`t@t`, and `HANDOFF.md` was left staged mid-commit (surfacing as a
+  bogus HANDOFF-guard violation, which is what led back to it). `cwd=` is NOT a defence — the ambient
+  `GIT_DIR` beats it. So: **any new test that shells out to `git` must go through a sanitized-env helper**
+  — target the repo with `-C`, pass `env=` stripped of `GIT_*`, and add `-c core.hooksPath=/dev/null`. Verify
+  it by running the fixture with `GIT_DIR` pointed at a decoy repo and asserting the decoy is untouched;
+  the pre-fix helper corrupts the decoy, the fixed one doesn't.
 - **Per-unit descale recipe is recorded in the unit YAML comment** (data-is-the-doc) — read it before
   regenerating; don't guess flags. Swapping ONE pose still requires re-descaling the **whole 3-frame set
   together** (shared palette recompute shifts the other two — that's correct, not a bug).
