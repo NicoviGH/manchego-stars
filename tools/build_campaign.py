@@ -6455,11 +6455,17 @@ CH04_MOOSE_SYMBOL = 'UnitDef_088B58D8'          # dead Ch5 unit table (reference
 CH04_MOOSE_PID = '0xce'                         # its own pid (DISA targets it, and it alone)
 CH04_MOOSE_GUARD_FLAG = 'EVFLAG_TMP(10)'        # AREA one-shot guard (must differ from the talk flag)
 CH04_MOOSE_CLASS = 'CLASS_GWYLLGI'              # geometry token: the 32x32 quadruped wait row
+CH04_MOOSE_MOV_TABLE = 'TerrainTable_MovCost_AnimalT2Normal'   # the Gwyllgi's own cost row
 # Where the party first SEES it: the mid-map clearing, on the tomb-side (NE) half of the 15x15
 # map, so the sighting points at the exit it then bolts for.
 CH04_MOOSE_POS = (11, 4)
 CH04_MOOSE_AREA = (8, 2, 14, 7)                 # AREA(x1, y1, x2, y2) -- the clearing it watches from
-CH04_MOOSE_FLEE_TO = (14, 0)                    # the NE (tomb-side) edge tile it escapes off
+# The tomb-side EDGE tile it escapes off. It was (14, 0) -- the literal NE corner -- and that
+# soft-locked the chapter: the corner is TERRAIN_PLAINS but a wall of TERRAIN_CLIFF seals the
+# whole NE pocket off from the clearing, so the MOVE waited forever on a path that cannot be
+# walked (see assert_scripted_move_reachable, which now fails the BUILD on this). (14, 5) is the
+# most north-east tile on the map edge the moose can actually reach from its clearing.
+CH04_MOOSE_FLEE_TO = (14, 5)
 
 
 # ── Message-id ownership across hosted chapters (#198 review, issue #24) ────────
@@ -6571,9 +6577,25 @@ def ch04_moose_script(unit_symbol, pid, msg, flee_to):
     The moose is LOADed by this script rather than at chapter start: under fog it would
     otherwise sit invisible on the map for several turns and could be attacked, and it is
     uncatchable by design (canon). Sighting it and losing it is the whole beat.
+
+    PLAYER-ONLY, and that guard is not optional. The AREA that fires this lives in the Misc
+    list, and FE8 polls that list at the end of EVERY unit's action -- playerphase.c and
+    cp_perform.c both PROC_CALL_2(RunPotentialWaitEvents) -- while EvCheck0B_AREA (eventinfo.c)
+    tests gActiveUnit's position with NO faction check. The clearing is where the turn-1 monster
+    line stands, so unguarded, a Revenant ending its move there plays RBG's "After it!" to an
+    empty clearing on turn 1. Caught in-engine, not by reading: `recordch04reveal` filmed it
+    firing during turn 1's ENEMY phase with no blue unit anywhere in the rect.
+
+    An early ENDA would not be enough either: StartEventFromInfo SetFlag()s the AREA's one-shot
+    BEFORE it CallEvent()s the script, so bailing out would spend the beat forever. Vanilla
+    already ships the whole answer as EventScr_UnTriggerIfNotFaction (eventcall.h; ch13b/ch15b
+    use it exactly this way) -- it clears the TRIGGERED event id, re-arming the AREA, and ENDBs
+    the entire event rather than just its own frame.
     """
     fx, fy = flee_to
     return ('{\n'
+            '    SVAL(EVT_SLOT_2, FACTION_ID_BLUE) /* only the PARTY sights the quarry */\n'
+            '    CALL(EventScr_UnTriggerIfNotFaction) /* a monster wandered in: re-arm, abort */\n'
             '    LOAD1(0x1, %s) /* the white moose, neutral -- sighted, never fought */\n'
             '    ENUN\n'
             '    CAMERA2(%d, %d)\n'
@@ -6763,6 +6785,94 @@ def _read_map_metatile(maps_dir, stem, x, y):
     with open(os.path.join(maps_dir, stem + '.mar'), 'rb') as f:
         mar = f.read()
     return struct.unpack_from('<H', mar, (y * w + x) * 2)[0] >> 5
+
+
+TERRAIN_TABLE_OFFSET = 8192     # a tile config is 8192 B TSA + 1024 B terrain (map_tileset_tool)
+
+
+def _map_terrain_grid(maps_dir, stem):
+    """(width, height, terrain[y][x]) for a painted chapter layout, resolved through its OWN
+    tileset's terrain table. Reads the campaign tileset asset, not the decomp's copy of it --
+    ours is the committed source, the decomp's is the untracked artifact injection writes."""
+    with open(os.path.join(maps_dir, stem + '.json'), encoding='utf-8') as f:
+        meta = json.load(f)
+    width, tileset = meta['width'], meta.get('tileset', WINTER_TILESET)
+    with open(os.path.join(maps_dir, 'tilesets', tileset, tileset + '.bin'), 'rb') as f:
+        terrain = f.read()[TERRAIN_TABLE_OFFSET:]
+    with open(os.path.join(maps_dir, stem + '.mar'), 'rb') as f:
+        mar = f.read()
+    height = len(mar) // 2 // width
+    return width, height, [
+        [terrain[struct.unpack_from('<H', mar, (y * width + x) * 2)[0] >> 5]
+         for x in range(width)] for y in range(height)]
+
+
+def _class_terrain_move_costs(table):
+    """One class's terrain movement-cost row, indexed by terrain id (entry <= 0 = the class may
+    not enter that terrain), read from the decomp at HEAD -- data_terrains.c is a PATCHED file,
+    so the working tree is not the vanilla answer.
+
+    The rows are DESIGNATED initializers keyed by name (`[TERRAIN_FOREST] = 2`), not a positional
+    list, so they must be resolved through the terrain enum. Reading them positionally silently
+    produces a table that is wrong in a way that still looks plausible -- every terrain walkable,
+    because the names themselves carry digits (TERRAIN_C_ROOM_09, TERRAIN_TILE_2E) that a naive
+    number scan picks up as costs."""
+    text = vanilla_decomp_text('src/data_terrains.c')
+    match = re.search(r'\b%s\[\]\s*=\s*\{(.*?)\};' % re.escape(table), text, re.S)
+    if not match:
+        sys.exit('ERROR: no movement-cost table %s in the decomp' % table)
+    ids = {name: int(value, 0) for name, value in re.findall(
+        r'(TERRAIN_[A-Z0-9_]+)\s*=\s*(0[xX][0-9A-Fa-f]+|\d+)',
+        vanilla_decomp_text('include/constants/terrains.h'))}
+    costs = [-1] * (max(ids.values()) + 1)   # a terrain the row omits stays impassable
+    for name, value in re.findall(r'\[(TERRAIN_[A-Z0-9_]+)\]\s*=\s*(-?\d+)', match.group(1)):
+        costs[ids[name]] = int(value)
+    return costs
+
+
+def reachable_tiles(terrain, costs, start):
+    """The set of tiles a unit with `costs` can WALK to from `start` (4-neighbour flood fill,
+    the engine's own rule: costs[terrain] < 0 means it may not enter)."""
+    height, width = len(terrain), len(terrain[0])
+    seen, queue = {start}, [start]
+    while queue:
+        x, y = queue.pop()
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nx, ny = x + dx, y + dy
+            if (0 <= nx < width and 0 <= ny < height and (nx, ny) not in seen
+                    and costs[terrain[ny][nx]] > 0):
+                seen.add((nx, ny))
+                queue.append((nx, ny))
+    return seen
+
+
+def assert_scripted_move_reachable(maps_dir, stem, start, dest, mov_table, who):
+    """A scripted MOVE(...)+ENUN to a tile its unit cannot WALK to NEVER RETURNS: the event
+    engine waits on a path that does not exist and the chapter hangs, with the unit standing
+    exactly where it was. Nothing upstream catches it -- the destination can be perfectly good
+    terrain, `make` stays green, and the beat only wedges the game when it actually fires.
+
+    Found the hard way (ch04 #24 Stage 4): the white moose flees to the map's NE corner, which
+    is TERRAIN_PLAINS and looks fine, but is sealed off from its own clearing by a wall of
+    TERRAIN_CLIFF. The sighting soft-locked the chapter the first time a party unit triggered
+    it -- and `smoke_ch04` stayed green throughout, because an idling party never walks into the
+    clearing to trigger it.
+
+    So: flood-fill the map with the unit's class movement-cost row and reject any destination
+    outside the region reachable from where the script loads it.
+    """
+    _, _, terrain = _map_terrain_grid(maps_dir, stem)
+    costs = _class_terrain_move_costs(mov_table)
+    reachable = reachable_tiles(terrain, costs, start)
+    if dest not in reachable:
+        north_east = sorted(reachable, key=lambda t: (t[1] - t[0]))[0]
+        sys.exit(
+            'ERROR: %s cannot walk from %s to %s on %s -- the MOVE would hang the chapter.\n'
+            '       destination terrain is 0x%02X (cost %d); it is simply cut off from the '
+            'start.\n'
+            '       most north-east tile it CAN reach: %s'
+            % (who, start, dest, stem, terrain[dest[1]][dest[0]],
+               costs[terrain[dest[1]][dest[0]]], north_east))
 
 
 def _ch03_tile_changes_asm(chests, doors):
@@ -7338,6 +7448,9 @@ def inject_ch04(campaign, boot=False, verbose=True):
         None, 'white-moose', CH04_MOOSE_CLASS, 1, mx, my, '0',
         ' /* the white moose -- scripted quarry, never fought (canon: uncatchable) */',
         allegiance='GREEN', char=CH04_MOOSE_PID)
+    # Its escape has to be WALKABLE or the flee beat hangs the chapter (see the assertion).
+    assert_scripted_move_reachable(maps_dir, CH04_LAYOUT[1], CH04_MOOSE_POS,
+                                   CH04_MOOSE_FLEE_TO, CH04_MOOSE_MOV_TABLE, 'the white moose')
 
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:
         udefs = f.read()

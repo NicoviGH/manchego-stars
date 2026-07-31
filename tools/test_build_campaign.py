@@ -1653,6 +1653,40 @@ class Ch04Stage4Scenes(unittest.TestCase):
         self.assertLess(s.index('MOVE(0x0, 0xce, 14, 0)'), s.index('DISA(0xce)'))
         self.assertTrue(s.rstrip().endswith('ENDA\n}'))
 
+    def test_the_moose_beat_is_guarded_to_the_party_before_it_loads_anything(self):
+        """FE8 polls the Misc list after EVERY unit's action (playerphase.c AND cp_perform.c),
+        and EvCheck0B_AREA tests gActiveUnit with no faction check -- so an unguarded AREA over
+        the clearing fires for a Revenant on turn 1. Filmed happening (recordch04reveal).
+
+        The guard must come FIRST: everything after it loads the moose, seizes the camera and
+        talks. And it must be the un-trigger form, not a bare ENDA -- StartEventFromInfo sets
+        the AREA's one-shot flag before calling the script, so aborting without re-arming spends
+        the beat forever."""
+        s = bc.ch04_moose_script('UnitDef_X', '0xce', 0x9C0, (14, 0))
+        self.assertIn('SVAL(EVT_SLOT_2, FACTION_ID_BLUE)', s)
+        self.assertLess(s.index('CALL(EventScr_UnTriggerIfNotFaction)'),
+                        s.index('LOAD1(0x1, UnitDef_X)'))
+
+    def test_the_moose_can_actually_walk_to_the_tile_it_flees_to(self):
+        """A scripted MOVE to an unwalkable tile never returns -- the event engine waits on a
+        path that does not exist and the chapter hangs. The authored flee tile must be inside
+        the region the moose can reach from its own clearing."""
+        maps = os.path.join(bc.REPO, 'campaigns', 'rime-of-the-frostmaiden', 'maps')
+        _, _, terrain = bc._map_terrain_grid(maps, bc.CH04_LAYOUT[1])
+        costs = bc._class_terrain_move_costs(bc.CH04_MOOSE_MOV_TABLE)
+        reachable = bc.reachable_tiles(terrain, costs, bc.CH04_MOOSE_POS)
+        self.assertIn(bc.CH04_MOOSE_FLEE_TO, reachable)
+
+    def test_the_old_ne_corner_flee_tile_is_rejected(self):
+        """Pins the actual trap, not just today's answer: (14, 0) is TERRAIN_PLAINS and looks
+        like a fine destination, but a cliff wall seals the NE pocket off from the clearing.
+        Good terrain is NOT the test -- connectivity is."""
+        maps = os.path.join(bc.REPO, 'campaigns', 'rime-of-the-frostmaiden', 'maps')
+        _, _, terrain = bc._map_terrain_grid(maps, bc.CH04_LAYOUT[1])
+        costs = bc._class_terrain_move_costs(bc.CH04_MOOSE_MOV_TABLE)
+        self.assertGreater(costs[terrain[0][14]], 0, 'the NE corner is walkable terrain')
+        self.assertNotIn((14, 0), bc.reachable_tiles(terrain, costs, bc.CH04_MOOSE_POS))
+
     def test_the_moose_never_speaks(self):
         """Locked as a mute white ghost in ch04, re-locked in ch05: the only voice in the
         beat is the party's."""

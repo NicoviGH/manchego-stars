@@ -2926,6 +2926,43 @@ session state. `HANDOFF.md` points here._
   arrays in-engine (data, not screenshots — the map is genuinely yours, so pixels mislead) and by
   resolving the slot's `mapEventDataId` through `gChapterDataAssetTable`.
 
+- **A scripted `MOVE` to good terrain still hangs the chapter if the unit cannot WALK there —
+  connectivity is the test, not the tile.** `MOVE(...)` + `ENUN` waits on a path; when none
+  exists the event engine never returns and the chapter freezes with the unit standing where it
+  loaded. ch04's white moose fled to `(14, 0)`, the map's NE corner: `TERRAIN_PLAINS`, cost 1,
+  entirely reasonable-looking — and sealed off from its own clearing by a wall of
+  `TERRAIN_CLIFF`. `make` was green, the map was correct, and the beat wedged the game the first
+  time a party unit triggered it. `assert_scripted_move_reachable` now fails the BUILD on it: it
+  flood-fills the map's terrain (resolved through the layout's own tileset table, read from the
+  **campaign** asset — the decomp's copy is the untracked artifact injection writes) with the
+  unit's class movement-cost row, and names the nearest legal destination in the error. Two traps
+  live inside that check: the cost rows in `data_terrains.c` are **designated initializers keyed
+  by terrain NAME**, so reading them positionally yields a plausible-looking table where
+  everything is walkable (the names carry digits — `TERRAIN_C_ROOM_09`, `TERRAIN_TILE_2E` — that a
+  naive number scan eats as costs); and `data_terrains.c` is a PATCHED file, so it must be read
+  at HEAD through `vanilla_decomp_text`. Covered by `ch04moose` (in-engine, both halves) and two
+  unit tests — one pinning today's tile, one pinning that the OLD corner is walkable-but-cut-off,
+  because "is it good terrain" is exactly the check that passes while the game hangs.
+  _Recorded: 2026-07-31 (ch04 #24 Stage 4)._
+
+- **An `AREA` event is not "a player unit steps here" — it is "whichever unit last acted is
+  standing here," and a bare abort spends the one-shot forever.** FE8 polls the Misc event list at
+  the end of EVERY unit's action — `playerphase.c` and `cp_perform.c` (the AI mover) both
+  `PROC_CALL_2(RunPotentialWaitEvents)` — and `EvCheck0B_AREA` (`eventinfo.c`) tests
+  `gActiveUnit`'s position with **no faction check**. So an AREA drawn over ground the enemy also
+  walks fires on the ENEMY phase: ch04's moose-sighting rect `(8,2)-(14,7)` is exactly where the
+  turn-1 monster line stands, and a Revenant ending its move there played RBG's "After it!" to an
+  empty clearing on turn 1. The second half of the trap is `StartEventFromInfo`, which
+  `SetFlag(info->flag)`s the AREA's one-shot **before** it `CallEvent`s the script — so guarding
+  with an early `ENDA` still burns the beat permanently. Vanilla ships the whole answer:
+  `SVAL(EVT_SLOT_2, FACTION_ID_BLUE)` + `CALL(EventScr_UnTriggerIfNotFaction)` (`eventcall.h`;
+  ch13b/ch15b use it verbatim), which clears the *triggered* event id — re-arming the AREA — and
+  `ENDB`s the whole event rather than just its own frame. Put the guard FIRST, before any `LOAD1`
+  or camera seize. **How it was caught matters more than the fix: by filming it**
+  (`recordch04reveal`), not by reading the script — the wiring is correct FE8 in isolation, and
+  `smoke_ch04` stayed green throughout, because a beat firing at the wrong moment is not a
+  soft-lock. _Recorded: 2026-07-31 (ch04 #24 Stage 4)._
+
 - **A chapter's message text lives in TWO decomp files, in TWO channels — a partial scan reads as
   proof that vanilla lacks a beat.** `src/events/<ch>-eventscript.h` holds the scenes, mixing
   `TEXTSHOW` (on-map, units staged by `LOAD1`, bubbles wrap at 29 chars) with

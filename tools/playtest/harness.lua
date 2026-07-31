@@ -4502,6 +4502,96 @@ scenarios.recordch03open = function()
     return recordCutscene({ tag = "ch03open", until_ = "prep", pressEvery = 90 })
 end
 
+-- ch04moose: the moose-sighting AREA is PLAYER-ONLY, and still fires for the party (#24).
+-- Both halves, because the guard's failure modes point opposite ways:
+--   1. idle turn 1 -- after the monsters have moved, the moose must NOT have loaded. FE8 polls
+--      the Misc list at the end of EVERY unit's action (playerphase.c AND cp_perform.c) and
+--      EvCheck0B_AREA reads gActiveUnit with no faction check, so an unguarded AREA over the
+--      clearing plays RBG's "After it!" to nobody on turn 1 -- and burns the one-shot.
+--   2. then walk a party unit INTO the clearing -- the moose must load, hold, and be gone.
+-- The move is a REAL move (moveUnit), not a position poke: the AREA is checked when an action
+-- ENDS, so a teleported unit would never trigger it and the test would pass vacuously.
+-- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04moose (needs a CH04BOOT=1 ROM).
+scenarios.ch04moose = function()
+    local MOOSE_PID = 0xce
+    local X1, Y1, X2, Y2 = 8, 2, 14, 7   -- CH04_MOOSE_AREA
+    local function moose() return findUnit(SYM.gUnitArrayGreen, 12, MOOSE_PID) end
+    if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
+    pokeFastConfig()
+    if moose() then return result("FAIL", "the moose is on the map at chapter start") end
+    waitFor(function()
+        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
+    end, 900, true)
+
+    -- 1. the negative half: idle a whole turn, monsters move, nobody of ours is in the clearing.
+    if runEnemyPhase() ~= "player" then
+        shot("ch04moose-no-turn2")
+        return result("FAIL", "turn 1 never handed control back")
+    end
+    if moose() then
+        shot("ch04moose-fired-on-enemy-phase")
+        return result("FAIL", "the moose beat fired on the ENEMY phase -- the AREA is unguarded")
+    end
+    log("ch04moose: turn 1's enemy phase did NOT trigger the sighting (guard holds)")
+
+    -- 2. the positive half: MARCH the party into the clearing. marchToward drives the game's
+    -- own movement map and finishes on Wait, so this is a real action end (the AREA is checked
+    -- when an action ENDS -- a position poke would never trigger it and would pass vacuously).
+    -- The clearing is 4+ tiles off the deploy flank, so allow a few turns to close.
+    local CX, CY = 11, 4                 -- the clearing's middle
+    local function anyoneInClearing()
+        for i = 0, 7 do
+            local u = unitAt(SYM.gUnitArrayBlue, i)
+            if u and not isDead(u) and u.x >= X1 and u.x <= X2 and u.y >= Y1 and u.y <= Y2 then
+                return true
+            end
+        end
+        return false
+    end
+    for t = 2, 6 do
+        waitFor(function() return faction() == 0 and not menuOpen() end, 900, true)
+        for i = 0, 7 do
+            if moose() then break end
+            local u = unitAt(SYM.gUnitArrayBlue, i)
+            if u and not isDead(u) and (u.state & 0x2) == 0 then
+                marchToward(u, CX, CY, 14, 14)
+                waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
+            end
+        end
+        if moose() then break end
+        if anyoneInClearing() then
+            shot("ch04moose-never-fired")
+            return result("FAIL", string.format(
+                "turn %d: a party unit stands in the clearing and the sighting never fired", t))
+        end
+        log(string.format("ch04moose: turn %d, still closing on the clearing", t))
+        if runEnemyPhase() ~= "player" then
+            shot("ch04moose-lost")
+            return result("FAIL", "the party did not survive to reach the clearing")
+        end
+    end
+    if not moose() then
+        shot("ch04moose-unreachable")
+        return result("FAIL", "the party never reached the clearing within the turn budget")
+    end
+    shot("ch04moose-sighted")
+    -- ...and it is uncatchable by design: the beat must not leave it standing there. Poll in
+    -- slices with a heartbeat log, so a run that stops here says WHICH kind of stop it was: no
+    -- heartbeats at all means the emulator wedged, ticking heartbeats mean the beat really is
+    -- leaving the moose standing on the map.
+    local cleared = false
+    for i = 1, 12 do
+        if waitFor(function() return moose() == nil end, 150, true) then cleared = true break end
+        log(string.format("ch04moose: moose still on the map %d frames after the sighting", i * 150))
+    end
+    if not cleared then
+        freezeReport("ch04moose-disa")
+        shot("ch04moose-still-there")
+        return result("FAIL", "the moose loaded but was never DISA'd -- it can be attacked")
+    end
+    return result("PASS", "the sighting is player-only: skipped the enemy phase, fired for the party")
+end
+
 -- recordch04open: the ch04 OPENING in motion (#24 Stage 4) -- the two-BG Lonelywood scene:
 -- beat A in Speaker Nimsy Huddle's cottage over the vanilla House1 hearth, then the CUT to the
 -- fogged forest edge for Pinky's fog-of-war heads-up. The second BACG rides a REMOVEPORTRAITS
