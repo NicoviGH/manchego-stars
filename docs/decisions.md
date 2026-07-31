@@ -2871,6 +2871,22 @@ _Decided: 2026-07-30 (CLAUDE; ch05 `0x9C9` Sahnar block)._
 _Moved here from `HANDOFF.md` 2026-07-02 (audit): these are durable engineering constraints, not
 session state. `HANDOFF.md` points here._
 
+- **A host slot's index stops tracking the chapter number at 5, and a hosted chapter must name the
+  `ChapterEventGroup` it fills** (2026-07-31, ch04 #24). FE8 inserts chapter 5X at **slot 5**, so
+  `chapter_settings.json` slot 5 ships with `mapEventDataId` → `Ch5XEvents` while a chapter hosted
+  there writes its events into the `Ch5*` symbols (`Ch5EventData`). Slots 1–4 are correct only by
+  the coincidence that index == chapter number there. `_retarget_host_chapter` therefore takes a
+  mandatory `event_group` and repoints `mapEventDataId` itself, so map and events stay ONE decision;
+  `HostChapterEventGroup` in `tools/test_build_campaign.py` pins both the trap and the repoint.
+  **Why this one is worth a durable entry: it fails silently and totally.** Retargeting the map ids
+  alone makes the chapter *look* injected — correct `gBmMapSize`, correct tileset, correct goal
+  banner — while the slot runs the host's roster and scripts underneath. The observable symptoms all
+  point away from the cause: foreign units on coordinates off your footprint, a party that never
+  deploys, no PREP, and a cursor initialised onto an undeployed unit's `x=255` sentinel, which
+  presents as the *playtest harness* wedging. Diagnose it by reading `gBmMapSize` and the live unit
+  arrays in-engine (data, not screenshots — the map is genuinely yours, so pixels mislead) and by
+  resolving the slot's `mapEventDataId` through `gChapterDataAssetTable`.
+
 - **A chapter's message text lives in TWO decomp files, in TWO channels — a partial scan reads as
   proof that vanilla lacks a beat.** `src/events/<ch>-eventscript.h` holds the scenes, mixing
   `TEXTSHOW` (on-map, units staged by `LOAD1`, bubbles wrap at 29 chars) with

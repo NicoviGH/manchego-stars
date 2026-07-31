@@ -30,6 +30,10 @@ WANTED = [
     'sProcArray',               # proc pool: 64 x 0x6C (src/proc.c)
     'gBmMapMovement',           # u8** move-cost map, valid while a unit is selected
                                 # (include/bmmap.h; < 120 = reachable)
+    'gBmMapSize',               # struct Vec2 {s16 x, y} -- the LIVE map's tile dimensions
+                                # (include/bmmap.h). The harness must not assume a footprint:
+                                # ch04's 15x15 is smaller than the maps the drive loop was
+                                # first written against.
     'gBmMapUnit',               # u8** tile->unit grid (include/bmmap.h): gBmMapUnit[y][x] is the
                                 # on-tile unit id the engine uses for cursor selection. Relocating
                                 # a unit must update THIS, not just its xPos/yPos.

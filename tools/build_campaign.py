@@ -171,6 +171,7 @@ CH3_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch3-eventinfo.h')
 CH3_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch3-eventscript.h')
 EVENTS_UDEFS_C = os.path.join(DECOMP, 'src', 'events_udefs.c')
 CH01_HOST_INDEX = 2          # CHAPTER_L_2 -- the prologue ending's MNC2(0x2) target
+CH01_EVENT_GROUP = 'Ch2Events'   # the ChapterEventGroup this injector fills (see _retarget_host_chapter)
 CH01_LAYOUT = ('Ch01IronTrailMap', 'ch01-the-iron-trail')  # (asset label, maps/ stem)
 CH01_CHAPTER_YAML = 'ch01-the-iron-trail.yaml'
 CH01_BOSS_SLOT = 'BREGUET'   # vanilla Ch1's boss slot: CA_BOSS + hand-authored
@@ -301,6 +302,7 @@ CH01_LORDSEL_BG = 'BG_DARKLING_WOODS'
 # Seize(14,1) is dropped, so CountRedUnits() drives the rout win; CauseGameOverIfLordDies
 # already sits in EventListScr_Ch3_Misc.
 CH02_HOST_INDEX = 3          # CHAPTER_L_3 -- ch01's ending MNC2(0x3) target
+CH02_EVENT_GROUP = 'Ch3Events'   # the ChapterEventGroup this injector fills (see _retarget_host_chapter)
 CH02_LAYOUT = ('Ch02ColdWelcomeMap', 'ch02-cold-welcome')  # (asset label, maps/ stem)
 CH02_CHAPTER_YAML = 'ch02-cold-welcome.yaml'
 CH02_BOSS_SLOT = 'BAZBA'      # vanilla Ch3's boss slot -- Halvar mirror (custom bust #19 later)
@@ -4698,13 +4700,21 @@ def _register_chapter_map(maps_dir, layout, comment):
 
 
 def _retarget_host_chapter(host_index, goal_slot, goal_type, goal_err, indices,
-                           chapter_number):
+                           chapter_number, event_group):
     """Point host chapter slot `host_index` (chapter_settings.json) at a registered
     map (`indices` from _register_chapter_map) and copy vanilla slot `goal_slot`'s
     goal template (checked against windowDataType `goal_type`, else sys.exit(goal_err)).
     The prep-screen header reads "Chapter NN" from prepScreenNumber, not the slot
     index. It is a double-wide glyph index: vanilla slots carry exactly 2 * chapter
-    number (slot1=2, slot2=4, ... both ch5 and ch5x = 10). Returns the host dict."""
+    number (slot1=2, slot2=4, ... both ch5 and ch5x = 10). Returns the host dict.
+
+    `event_group` is the ChapterEventGroup SYMBOL the caller's injector fills, and it is
+    mandatory because the slot's own mapEventDataId cannot be trusted to name it: FE8
+    inserts chapter 5X at slot 5, so from there on the slot index stops tracking the
+    chapter number (slot 5 -> Ch5XEvents, while ch04's events live in Ch5EventData).
+    Retargeting only the map ids is enough to make the chapter LOOK right, so a wrong
+    event group fails silently and totally -- the slot presents our map while running the
+    host slot's roster and scripts. Repointing it here keeps map and events one decision."""
     obj_idx, pal_idx, cfg_idx, layout_idx = indices
     with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
         settings = json.load(f)
@@ -4715,6 +4725,8 @@ def _retarget_host_chapter(host_index, goal_slot, goal_type, goal_err, indices,
     host['map'].update({'obj1Id': obj_idx, 'obj2Id': 0, 'paletteId': pal_idx,
                         'tileConfigId': cfg_idx, 'mainLayerId': layout_idx,
                         'objAnimId': 0, 'paletteAnimId': 0, 'changeLayerId': 0})
+    host['mapEventDataId'] = _asm_table_word_index(
+        ASSET_TABLE_S, 'gChapterDataAssetTable', event_group)
     host['goal'] = dict(goal)
     host['prepScreenNumber'] = chapter_number * 2
     # fadeToBlack=1: the chapter INTRO ends on BLACK instead of fading the battle map in
@@ -5182,7 +5194,7 @@ def inject_ch01(campaign, verbose=True):
         CH01_HOST_INDEX, 1, 'seize',
         'ERROR: slot 1 goal is not the vanilla Seize template -- '
         'inject_ch01 must run BEFORE inject_prologue',
-        indices, chap['chapter_number'])
+        indices, chap['chapter_number'], CH01_EVENT_GROUP)
 
     # 2. Rosters (events_udefs.c). Four tables, all reusing vanilla Ch2 symbols so no
     #    extern surgery is needed (scripts/eventinfo already declare them):
@@ -5923,7 +5935,7 @@ def inject_ch02(campaign, verbose=True):
         CH02_HOST_INDEX, 4, 'defeat_all',
         'ERROR: slot 4 goal is not the vanilla defeat_all template '
         '(needed as the ch02 DefeatAll donor)',
-        indices, chap['chapter_number'])
+        indices, chap['chapter_number'], CH02_EVENT_GROUP)
 
     # 2. Rosters (events_udefs.c). Four tables, reusing vanilla Ch3 symbols (already
     #    declared in eventcall.h, so no extern surgery):
@@ -6232,6 +6244,7 @@ def inject_ch02(campaign, verbose=True):
 #    "Bandits of Borgo", so the roster/positions mirror vanilla Ch3 1:1). Uses the vanilla
 #    "Ch4" decomp symbol set (host index N -> ChN symbols, cf. ch02 on slot 3 = Ch3 symbols).
 CH03_HOST_INDEX = 4
+CH03_EVENT_GROUP = 'Ch4Events'   # the ChapterEventGroup this injector fills (see _retarget_host_chapter)
 CH03_LAYOUT = ('Ch03TermalaineMineMap', 'ch03-the-termalaine-mine')  # (asset label, maps/ stem)
 CH03_CHAPTER_YAML = 'ch03-the-termalaine-mine.yaml'
 CH03_TILESET = 'cave-interior'   # stem 'Cave' (TILESET_STEMS); first chapter to use it -> self-registers
@@ -6345,6 +6358,12 @@ CH4_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch4-eventscript.h')
 # reinforcement pressure shape. The D&D creatures ground the encounter fiction, but
 # player-facing units deliberately keep their vanilla FE8 monster identities/names.
 CH04_HOST_INDEX = 5
+# The ChapterEventGroup this injector fills. NOT derivable from the slot index: vanilla's
+# slot index tracks the chapter number only up to 4, because FE8 inserts chapter 5X at
+# slot 5. So slot 5 ships pointing at Ch5XEvents, and every ch04 event below is written
+# into the Ch5* symbols -- _retarget_host_chapter repoints the slot or the chapter runs
+# 5X's roster and scripts underneath our map.
+CH04_EVENT_GROUP = 'Ch5EventData'
 CH04_LAYOUT = ('Ch04LonelywoodForestMap', 'ch04-lonelywood-forest')
 CH04_CHAPTER_YAML = 'ch04-the-white-moose.yaml'
 CH04_GOAL_DONOR = CH02_HOST_INDEX  # ch02 is already hosted with the stable DefeatAll/Rout goal
@@ -6679,7 +6698,7 @@ def inject_ch03(campaign, boot=False, verbose=True):
     host = _retarget_host_chapter(
         CH03_HOST_INDEX, CH03_GOAL_DONOR, 'defeat_boss',
         'ERROR: slot %d goal is not the vanilla defeat_boss template (ch03 DefeatBoss donor)'
-        % CH03_GOAL_DONOR, indices, chap['chapter_number'])
+        % CH03_GOAL_DONOR, indices, chap['chapter_number'], CH03_EVENT_GROUP)
 
     # 2. Rosters (events_udefs.c, vanilla Ch4 symbols):
     #    - UnitDef_Event_Ch4Ally: the deploy-cap TEMPLATE = THE CAP. NEVER LOADed; PREP reads
@@ -7044,7 +7063,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
         CH04_HOST_INDEX, CH04_GOAL_DONOR, 'defeat_all',
         'ERROR: hosted ch02 slot %d is not the stable defeat_all goal donor for ch04'
         % CH04_GOAL_DONOR,
-        indices, chap['chapter_number'])
+        indices, chap['chapter_number'], CH04_EVENT_GROUP)
 
     # Fog is chapter state, not painted-map data. Battle terrain 0x15 is the shared
     # snowy rough platform family already used by the winter overworld chapters.

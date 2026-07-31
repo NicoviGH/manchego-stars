@@ -374,9 +374,33 @@ local function marchToward(u, tx, ty, maxx, maxy)
     return false
 end
 
-local EMPTY_TILE = { x = 2, y = 2 } -- far from both rosters on ch00
+-- gBmMapUnit[y][x] -- the engine's tile->unit grid (u8**, indexed like gBmMapMovement). It,
+-- not the unit's xPos/yPos, is what cursor-selection reads, so a relocate must update both.
+local function mapUnitRow(y) return ru32(ru32(SYM.gBmMapUnit) + y * 4) end
+local function mapUnitAt(x, y) return ru8(mapUnitRow(y) + x) end
+local function setMapUnit(x, y, v) emu:write8(mapUnitRow(y) + x, v) end
+
+-- The live map's tile dimensions (struct Vec2 gBmMapSize) -- never assume a footprint.
+local function mapSize() return rs16(SYM.gBmMapSize), rs16(SYM.gBmMapSize + 2) end
+
+-- A tile with NO unit on it, resolved against the live map. endTurn presses A to open the
+-- map menu, and A on an occupied tile SELECTS that unit instead -- no menu, so the turn can
+-- never be ended. A hardcoded tile cannot express this: (2,2) was empty on ch00 but is a
+-- deploy slot on ch04, which is also the smallest map so far. Reads the engine's own
+-- tile->unit grid (what cursor-selection itself consults), so green/NPC bodies count too.
+local function emptyTile()
+    local w, h = mapSize()
+    for y = 0, h - 1 do
+        for x = 0, w - 1 do
+            if mapUnitAt(x, y) == 0 then return { x = x, y = y } end
+        end
+    end
+    return nil
+end
+
 local function endTurn(tile)
-    tile = tile or EMPTY_TILE
+    tile = tile or emptyTile()
+    if not tile then log("  endTurn: no empty tile on this map"); return false end
     cursorTo(tile.x, tile.y)
     press(K.A)
     if not waitFor(menuOpen, 40) then press(K.B); return false end
@@ -2781,12 +2805,6 @@ local function reachRbgCh01()
     if not rbg then return false, "RBG not on the field after lord-select" end
     return rbg
 end
-
--- gBmMapUnit[y][x] -- the engine's tile->unit grid (u8**, indexed like gBmMapMovement). It,
--- not the unit's xPos/yPos, is what cursor-selection reads, so a relocate must update both.
-local function mapUnitRow(y) return ru32(ru32(SYM.gBmMapUnit) + y * 4) end
-local function mapUnitAt(x, y) return ru8(mapUnitRow(y) + x) end
-local function setMapUnit(x, y, v) emu:write8(mapUnitRow(y) + x, v) end
 
 -- Relocate the unit straight onto a free tile within [mn,mx] of a live enemy, so a unit that
 -- SPAWNS far from the fight doesn't have to march across the map (6 phases can't cross it -- a

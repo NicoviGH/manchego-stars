@@ -6,6 +6,7 @@ patcher share, against real vanilla values read from fireemblem8u/src/data_chara
 Run:  python3 tools/test_build_campaign.py
 """
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -1261,6 +1262,88 @@ class Ch04RuntimeHost(unittest.TestCase):
         card = bc.gen_chapter_title.compose_title('Ch.4: The White Moose')
         self.assertEqual(card.size, (256, 16))
         self.assertIsNotNone(card.getbbox())
+
+
+class HostChapterEventGroup(unittest.TestCase):
+    """A hosted chapter must RUN the ChapterEventGroup its injector fills.
+
+    Vanilla's slot index tracks the chapter number only up to 4: FE8 inserts chapter 5X
+    at slot 5, so slot 5's mapEventDataId resolves to Ch5XEvents while inject_ch04 writes
+    every event into Ch5EventData. Retargeting a host slot rewrites the MAP ids, and the
+    map ids alone are enough to make the chapter look right -- so the failure is silent
+    and total: the slot presents OUR 15x15 map while running 5X's roster and scripts
+    (24 foreign reds off the footprint, the party never deployed, the cursor initialised
+    onto an off-map sentinel). Naming the event group is therefore mandatory, not optional.
+    """
+
+    TABLE = 'gChapterDataAssetTable'
+
+    def _vanilla_index(self, symbol):
+        """`symbol`'s index in the COMMITTED asset table (our injectors only append, so
+        vanilla indices are stable -- but read HEAD anyway, never the built tree)."""
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'asset_table.s')
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(bc.vanilla_decomp_text('data/data_8B363C.s'))
+            return bc._asm_table_word_index(path, self.TABLE, symbol)
+
+    def _retarget(self, host_index, event_group):
+        """Run _retarget_host_chapter against a throwaway copy of vanilla's settings."""
+        vanilla = json.loads(bc.vanilla_decomp_text('src/data/chapter_settings.json'))
+        donor = 3
+        goal_type = vanilla['chapters'][donor]['goal']['windowDataType']
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'chapter_settings.json')
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(vanilla, f)
+            original = bc.CHAPTER_SETTINGS_JSON
+            bc.CHAPTER_SETTINGS_JSON = path
+            try:
+                return bc._retarget_host_chapter(
+                    host_index, donor, goal_type, 'unreachable in this test',
+                    (0, 0, 0, 0), 4, event_group=event_group)
+            finally:
+                bc.CHAPTER_SETTINGS_JSON = original
+
+    def test_slot_five_is_chapter_5x_not_chapter_5(self):
+        # The trap itself, pinned against vanilla so a decomp bump can't quietly move it.
+        vanilla = json.loads(bc.vanilla_decomp_text('src/data/chapter_settings.json'))
+        self.assertEqual(vanilla['chapters'][bc.CH04_HOST_INDEX]['mapEventDataId'],
+                         self._vanilla_index('Ch5XEvents'))
+        self.assertNotEqual(self._vanilla_index('Ch5XEvents'),
+                            self._vanilla_index(bc.CH04_EVENT_GROUP))
+
+    def test_ch04_host_slot_is_repointed_off_ch5x_onto_its_own_event_group(self):
+        host = self._retarget(bc.CH04_HOST_INDEX, bc.CH04_EVENT_GROUP)
+        self.assertEqual(host['mapEventDataId'],
+                         self._vanilla_index(bc.CH04_EVENT_GROUP))
+
+    def test_every_hosted_chapter_names_the_event_group_it_fills(self):
+        # The earlier slots were correct only because slot index == chapter number there;
+        # they are now explicit, so the next hosted chapter cannot inherit the coincidence.
+        for host_index, group in (
+                (bc.CH01_HOST_INDEX, bc.CH01_EVENT_GROUP),
+                (bc.CH02_HOST_INDEX, bc.CH02_EVENT_GROUP),
+                (bc.CH03_HOST_INDEX, bc.CH03_EVENT_GROUP),
+                (bc.CH04_HOST_INDEX, bc.CH04_EVENT_GROUP)):
+            host = self._retarget(host_index, group)
+            self.assertEqual(host['mapEventDataId'], self._vanilla_index(group),
+                             'host slot %d must run %s' % (host_index, group))
+
+    def test_making_it_explicit_moves_ch04_alone(self):
+        """ch01-ch03 must be byte-identical after the repoint -- they were already right,
+        so naming the group is a no-op there and the ONLY behaviour change is slot 5."""
+        vanilla = json.loads(bc.vanilla_decomp_text('src/data/chapter_settings.json'))
+        for host_index, group in ((bc.CH01_HOST_INDEX, bc.CH01_EVENT_GROUP),
+                                  (bc.CH02_HOST_INDEX, bc.CH02_EVENT_GROUP),
+                                  (bc.CH03_HOST_INDEX, bc.CH03_EVENT_GROUP)):
+            self.assertEqual(vanilla['chapters'][host_index]['mapEventDataId'],
+                             self._vanilla_index(group),
+                             'slot %d already ran %s -- the repoint must not move it'
+                             % (host_index, group))
+        self.assertNotEqual(vanilla['chapters'][bc.CH04_HOST_INDEX]['mapEventDataId'],
+                            self._vanilla_index(bc.CH04_EVENT_GROUP),
+                            'ch04 is the one slot the repoint actually changes')
 
 
 class ItemIconPal2(unittest.TestCase):
