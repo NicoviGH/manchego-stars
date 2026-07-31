@@ -4062,6 +4062,16 @@ scenarios.smoke_ch03 = function()
     return smokeDrive(chapter())
 end
 
+-- smoke_ch04: stability net on the ch04 map (#24 Stage 5) -- boot the CH04BOOT map (bootToMap
+-- drives through the two-BG Lonelywood opening and PREP) and idle-drive to a clean terminal.
+-- This is the net for the Stage 4 cutscene wiring specifically: a second BACG that fails to
+-- re-arm its load mode, or a branch that never converges, shows up here as a soft-lock.
+-- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh smoke_ch04 (needs a CH04BOOT=1 ROM).
+scenarios.smoke_ch04 = function()
+    if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
+    return smokeDrive(chapter())
+end
+
 -- clear_ch03: the completability + DefeatBoss-win proof (#23), mirroring clear_ch02. The grell
 -- (pid 0xb7) rides a raw charIndex with NO CA_BOSS, so the generic clear-bot (findBoss scans
 -- CA_BOSS) can't target it -- like clear_ch02 this is a DETERMINISTIC rout via REAL combat that
