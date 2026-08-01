@@ -23,6 +23,7 @@
 #   smoke_ch04           -- stability net on ch04 (#24; PT_HOST_CHAPTER=5, needs CH04BOOT=1)
 #   recordch04open       -- the two-BG Lonelywood opening in motion (#24; PT_HOST_CHAPTER=5, CH04BOOT=1)
 #   recordch04reveal     -- the turn-2 wolf-pack reveal cutscene in motion (same ROM/host)
+#   recordch04parley     -- Marty's Talk on the wolf pack + the green swap, in motion
 #   ch04moose            -- the moose sighting is PLAYER-only: assert it skips the enemy phase
 #                           and still fires when the party walks into the clearing (same ROM/host)
 #   fuzz  | fuzz_ch01    -- SEEDED random-input soak (#49); set PT_SEED=N (default 1) to

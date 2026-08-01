@@ -4654,6 +4654,208 @@ scenarios.ch04sprites = function()
     return result("PASS", "Lupin is on the map as a red unit -- see the log for the roster")
 end
 
+-- recordch04parley: Marty's Talk on the wolf pack, in motion (#24 Stage 5) -- the chapter's
+-- mercy/recruit hook and Marty's secondary signature beat. Films the whole exchange, then the
+-- table swap: the five generic Mauthe Doogs are DISA'd, the green Lycanroc pack LOADs in their
+-- place, and Lupin CUSAs red -> blue. The pack arrives on turn 2, so the lead-up is driven
+-- (boot -> prep -> idle turn 1) before the recruiter is parked next to the leader.
+-- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh recordch04parley (needs a CH04BOOT=1 ROM).
+scenarios.recordch04parley = function()
+    local LUPIN, MARTY = 0x1D, 0x02        -- CHARACTER_DUESSEL / CHARACTER_SETH (Marty's slot)
+    local function redLupin() return findUnit(SYM.gUnitArrayRed, 24, LUPIN) end
+    local function blueLupin() return findUnit(SYM.gUnitArrayBlue, 20, LUPIN) end
+    if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
+    waitFor(function()
+        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
+    end, 900, true)
+    -- The pack (and Lupin) only exist from turn 2.
+    if not endTurn() then return result("FAIL", "could not end turn 1") end
+    if not waitFor(function() return turn() >= 2 and redLupin() ~= nil end, 5400) then
+        shot("ch04parley-no-pack")
+        return result("FAIL", "the wolf pack never arrived on turn 2")
+    end
+    waitFor(function()
+        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
+    end, 3600, true)
+    local marty = blue(MARTY)
+    if not marty then return result("FAIL", "Marty (0x02) is not deployed -- he owns the Talk") end
+    -- Park Marty orthogonally adjacent to Lupin. setMapUnit keeps the engine's tile->unit grid
+    -- in sync, so Talk-adjacency reads immediately with no phase cycle (the ch03talk trick) --
+    -- the point here is filming the SCENE, not pathing a cavalier across a fog map.
+    local lup = redLupin()
+    local grid, parked = mapUnitAt(marty.x, marty.y), false
+    for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+        local tx, ty = lup.x + d[1], lup.y + d[2]
+        if tx >= 0 and ty >= 0 and mapUnitAt(tx, ty) == 0 then
+            setMapUnit(marty.x, marty.y, 0)
+            emu:write8(marty.addr + 0x10, tx); emu:write8(marty.addr + 0x11, ty)
+            setMapUnit(tx, ty, grid)
+            parked = true
+            break
+        end
+    end
+    if not parked then return result("FAIL", "no free tile adjacent to Lupin to park Marty") end
+    pokeNormalConfig()
+    marty = blue(MARTY)
+    -- Strip Marty's weapons (struct Unit items[5] @ +0x1E, bmunit.h) so the command menu does
+    -- NOT offer Attack. ch03's talk driver could take row 0 blind because Trex is GREEN; Lupin
+    -- is a RED adjacent enemy, so row 0 there is Attack -- the first run of this scenario duly
+    -- filmed Marty duelling the wolf he is supposed to be talking to.
+    for k = 0, 4 do emu:write16(marty.addr + 0x1E + k * 2, 0) end
+    if not cursorTo(marty.x, marty.y) then return result("FAIL", "cursor could not reach Marty") end
+    -- Find Talk by trying rows and verifying by OUTCOME. The menu's contents depend on what is
+    -- adjacent, so its shape is not a constant we get to assume -- and the obvious signal is a
+    -- trap: ProcScr_StdEventEngine is live during ALL normal map/turn event processing (its own
+    -- comment in this file says so), so "an event proc woke up" cannot mean "the Talk started".
+    -- Lupin flipping blue is the only unambiguous evidence, so drive each row until it happens.
+    -- Marty's weapons are gone, so no row can start combat; the worst a wrong row does is spend
+    -- his action, which we recover by cycling a phase and re-parking him.
+    local function parkNextTo()
+        local l, m = redLupin(), blue(MARTY)
+        if not l or not m then return false end
+        local g = mapUnitAt(m.x, m.y)
+        for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+            local tx, ty = l.x + d[1], l.y + d[2]
+            if tx >= 0 and ty >= 0 and mapUnitAt(tx, ty) == 0 then
+                setMapUnit(m.x, m.y, 0)
+                emu:write8(m.addr + 0x10, tx); emu:write8(m.addr + 0x11, ty)
+                setMapUnit(tx, ty, g)
+                return true
+            end
+        end
+        return false
+    end
+    for row = 0, 5 do
+        if blueLupin() then break end
+        local m = blue(MARTY)
+        if not m or (m.state & 0x2) ~= 0 then       -- acted: give him a fresh turn, re-park
+            runEnemyPhase()
+            waitFor(function() return faction() == 0 and not menuOpen() end, 900, true)
+            if not parkNextTo() then break end
+            m = blue(MARTY)
+        end
+        if not m or not cursorTo(m.x, m.y) then break end
+        local opened = false
+        for _ = 1, 10 do
+            if menuOpen() then opened = true break end
+            press(K.A); if waitFor(menuOpen, 14) then opened = true break end
+        end
+        if not opened then return result("FAIL", "no command menu for Marty") end
+        for _ = 1, row do press(K.DOWN, 3) end
+        press(K.A, 4)
+        for i = 1, 900 do                           -- the full five-turn exchange, if this is it
+            if i % 3 == 0 then shot("ch04parley") end
+            if blueLupin() then break end
+            if i % 16 == 0 then press(K.A, 3) end
+            yield()
+        end
+        if blueLupin() then
+            log(string.format("ch04parley: Talk is command-menu row %d", row))
+            break
+        end
+        press(K.B); wait(10)                        -- not it -- back out and try the next row
+    end
+    if not blueLupin() then
+        shot("ch04parley-no-cusa")
+        return result("FAIL", "Lupin never flipped blue (the CUSA did not fire)")
+    end
+    -- The CUSA changes his FACTION; the standing sprite only redraws to the party palette on a
+    -- RefreshUnitSprites (phase transition). Cycle one phase, then linger on the green pack.
+    runEnemyPhase()
+    for f = 1, 90 do if f % 3 == 0 then shot("ch04parley") end yield() end
+    local greens = 0
+    for i = 0, 11 do
+        local u = unitAt(SYM.gUnitArrayGreen, i)
+        if u and not isDead(u) then greens = greens + 1 end
+    end
+    return result("PASS", string.format(
+        "parley filmed: Lupin is blue and the pack came over green (%d green units)", greens))
+end
+
+-- clear_ch04 / clear_ch04_parley: the WIN, and both arms of the branched ending (#24 Stage 5).
+-- ch04 is DefeatAll, and its ending is CHECK_EVENTID'd on the parley flag -- so the two runs
+-- exercise genuinely different endings, not the same scene twice:
+--   clear_ch04         -- rout the pack too; the no-Lupin FALLBACK ending (Pinky reads the trail,
+--                         Meesmickle takes the dread). This is the path the difficulty model
+--                         explicitly prices, and the one whose boxes had no speaker before #24.
+--   clear_ch04_parley  -- parley first, THEN rout; the authored Lupin ending.
+-- Like clear_ch02/clear_ch03 this is a DETERMINISTIC rout through REAL combat (frail + harmless
+-- every foe, then teleport onto a firing tile and one-shot it) -- it proves the win -> ending
+-- WIRING, not ch04 balance. Kills go through the death hook; a raw US_DEAD poke would not.
+-- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh clear_ch04 (needs a CH04BOOT=1 ROM).
+local function clearCh04(parley)
+    local tag = parley and "clear-ch04-parley" or "clear-ch04"
+    if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
+    pokeFastConfig()
+    -- LIFT THE FOG for the duration of the rout. FE8 refuses to target a unit standing on a
+    -- fogged tile (bmtarget.c gates every pick on gBmMapFog), so a clear-bot on a fog map can
+    -- only kill what it happens to see -- the first run of this scenario stalled at 10 live
+    -- enemies after 16 turns for exactly that reason. gPlaySt.chapterVisionRange (types.h +0x0D,
+    -- "0 means no fog") is the engine's own switch. This scenario exists to prove the
+    -- win -> ending WIRING, not to play the hunt honestly, so lifting fog is the same class of
+    -- shortcut as pokeFrail/pokeHarmless. The fog itself is covered by ch04moose and smoke_ch04.
+    emu:write8(SYM.gPlaySt + 0x0D, 0)
+    local start = chapter()
+    local function won() return chapter() ~= start end
+    if parley then
+        if not scenarios.recordch04parley then return result("FAIL", "parley driver missing") end
+    end
+    for t = 1, 16 do
+        if won() then break end
+        waitFor(function() return faction() == 0 and not menuOpen()
+            and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+        end
+        for i = 0, 19 do
+            if won() or #liveEnemies() == 0 then break end
+            local u = unitAt(SYM.gUnitArrayBlue, i)
+            if u and not isDead(u) and (u.state & 0x2) == 0 then
+                local mn, mx = unitAttackRange(u)
+                if mn and teleportToFiringTile(u, mn, mx) then
+                    u = unitAt(SYM.gUnitArrayBlue, i)
+                    if u and moveUnit(u.x, u.y, u.x, u.y) then
+                        chooseAttack(u.addr)
+                        waitFor(function() return faction() == 0 and not menuOpen()
+                            and not procActive(SYM.gProc_ekrBattle) end, 600)
+                    end
+                end
+            end
+        end
+        log(string.format("%s turn %d: liveEnemies=%d chapter=%d", tag, t, #liveEnemies(), chapter()))
+        if won() then break end
+        if gameOverActive() then shot(tag .. "-gameover")
+            return result("FAIL", string.format("game over on turn %d -- party lost", t)) end
+        if #liveEnemies() == 0 then break end
+        if runEnemyPhase() == "gameover" then shot(tag .. "-gameover")
+            return result("FAIL", "game over on the enemy phase") end
+    end
+    shot(tag .. "-routed")
+    -- DefeatAll fires once the last red dies; then the branched ending plays over its BG and
+    -- chains to the dev placeholder (ch05 is not hosted yet). Film it WITHOUT mashing A past
+    -- the end -- a stray press on "Press START" starts a spurious New Game (the clear_ch03
+    -- lesson). Shoot densely so the ending is reviewable as motion.
+    local ended = false
+    for f = 1, 5400 do
+        if f % 4 == 0 then shot(tag) end
+        if f % 90 == 0 then press(K.A, 3) end
+        if won() then ended = true break end
+        yield()
+    end
+    log(string.format("%s: liveEnemies=%d chapter=%d (host=%d)",
+        tag, #liveEnemies(), chapter(), HOST_CHAPTER))
+    if not ended then
+        shot(tag .. "-no-ending")
+        return result("FAIL", "routed but the DefeatAll ending never advanced off the host slot")
+    end
+    return result("PASS", string.format(
+        "ch04 cleared (%s path) -> DefeatAll ending ran -> chapter=%d",
+        parley and "parley" or "no-parley", chapter()))
+end
+
+scenarios.clear_ch04 = function() return clearCh04(false) end
+
 -- recordch04open: the ch04 OPENING in motion (#24 Stage 4) -- the two-BG Lonelywood scene:
 -- beat A in Speaker Nimsy Huddle's cottage over the vanilla House1 hearth, then the CUT to the
 -- fogged forest edge for Pinky's fog-of-war heads-up. The second BACG rides a REMOVEPORTRAITS
