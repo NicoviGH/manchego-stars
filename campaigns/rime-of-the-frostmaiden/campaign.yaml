@@ -171,12 +171,13 @@ enemy_class_reskins:
         - {dir: handaxe, txt: Handaxe.txt, abbr: kbru_ha,
            wtypes: ["ITEM_AXE_HANDAXE", "ITEM_AXE_TOMAHAWK", "ITEM_AXE_HATCHET"]}
         - {dir: unarmed, txt: Unarmed.txt, abbr: kbru_un, wtypes: ["0x0100 | ITYPE_ITEM"]}
-  # Ch4 (#24): the wolves Marty's parley wins over. The RED pack are vanilla Mauthe Doogs;
-  # the parley table-swaps them for GREEN allies of THIS class, so the one move does the
-  # faction flip AND the ugly->handsome upgrade (the whole point of the beat). It therefore
-  # needs its own class rather than reskinning CLASS_MAUTHEDOOG, which the hostile pack is
-  # still wearing. Clones Mauthe Doog, so stats/anim ride along unchanged and the parity
-  # read is untouched; `frame` because the Lycanroc is a 32x32 quadruped on a 16x32 doog.
+  # Ch4 (#24): the wolves Marty's parley wins over. DECLARED BUT NOT YET WORN (#203, Nicolas
+  # 2026-08-01): the parley now converts the pack IN PLACE, and CUSN changes a unit's faction,
+  # not its class -- so the allies stay Mauthe Doogs in the green NPC palette, and the
+  # ugly->handsome upgrade waits on a class-remap hook. The accepted trade-off buys the thing
+  # the reload could not: the ally count scales with how many wolves you spared. Kept declared
+  # so the hook has its slot and sprite ready. Clones Mauthe Doog, so stats/anim ride along
+  # unchanged and the parity read is untouched; `frame` because it is a 32x32 quadruped.
   # Map-sprite only -- a wolf battle anim is logged on #24 (FE-Repo Gwyllgi/Hellhound line)
   # and these are uncontrolled green NPCs, so they rarely swing.
   # Build recipe for map_sprites/lycanroc-pack{,_mu}.png (same source as Lupin's, whose own

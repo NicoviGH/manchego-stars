@@ -275,8 +275,8 @@ class TalkRecruitWiring(unittest.TestCase):
 class SharedTalkRecruitWiring(unittest.TestCase):
     """The faction-parameterized on-map talk-recruit assembly reused by ch03 (green Trex),
     ch04 (red Lupin), and ch05 (green Basil + red Sahnar). ONE flow: a CHAR-per-recruiter
-    list -> a shared talk script whose CUSA flips the target BLUE. A red parley splices a
-    `pre_script` (the pack table-swap) in BEFORE the CUSA, so it rides the same recruit path."""
+    list -> a shared talk script whose CUSA flips the target BLUE. A group parley splices a
+    `pre_script` (its conversion sweep) in BEFORE the CUSA, so it rides the same recruit path."""
 
     def test_talk_script_splices_pre_script_before_cusa(self):
         s = bc.talk_recruit_script(0x9BA, 'CHARACTER_DUESSEL', pre_script='    DISA(0xb3)\n')
@@ -1139,7 +1139,7 @@ class Ch04RuntimeHost(unittest.TestCase):
         self.assertEqual(len(bc.ch04_enemy_rows(chap, arrives_turn=2)), 6)
         self.assertEqual(len(bc.ch04_enemy_rows(chap, arrives_turn=3)), 7)
 
-    # -- Stage 2b: the turn-2 wolf-pack reveal + the Marty->Lupin parley (table-swap) -------
+    # -- Stage 2b: the turn-2 wolf-pack reveal + the Marty->Lupin parley (in-place) ---------
     def _lupin(self):
         return next(r for r in bc.on_map_talk_recruits(self.CAMPAIGN, 4) if r[0] == 'lupin')
 
@@ -1166,24 +1166,35 @@ class Ch04RuntimeHost(unittest.TestCase):
         self.assertEqual(len(bc.ch04_enemy_rows(self._chap(), arrives_turn=2)), 6)
         self.assertEqual(len(bc.ch04_turn2_reveal_rows(self._chap(), self._lupin())), 6)
 
-    def test_green_pack_swaps_five_green_wolves_onto_the_generic_tiles(self):
-        rows = bc.ch04_green_pack_rows(self._chap())
-        joined = '\n'.join(rows)
-        self.assertEqual(len(rows), 5)
-        self.assertEqual(joined.count('FACTION_ID_GREEN'), 5)
-        self.assertNotIn('CHARACTER_DUESSEL', joined)   # Lupin isn't one of the generics
-        for x, y in self._reveal_positions()[1:]:        # the 5 non-leader tiles
-            self.assertIn('.xPosition = %d,\n        .yPosition = %d,' % (x, y), joined)
+    def test_each_generic_wolf_gets_its_own_pid(self):
+        # CUSN and CHECK_ALIVE both resolve a pid through GetUnitFromCharId, which returns the
+        # FIRST match scanning blue->green->red. Five wolves sharing one pid can therefore only
+        # ever be converted ONCE (the second CUSN re-finds the wolf it just turned green), which
+        # is why the parley had to reload a table instead. One pid each makes them addressable.
+        rows = bc.ch04_turn2_reveal_rows(self._chap(), self._lupin())
+        pids = re.findall(r'\.charIndex = (\w+),', '\n'.join(rows))
+        self.assertEqual(len(pids), 6)
+        self.assertEqual(len(set(pids)), 6, 'every wolf needs its own pid: %s' % pids)
+        self.assertEqual([p for p in pids if p != 'CHARACTER_DUESSEL'],
+                         list(bc.CH04_PACK_PIDS))
 
-    def test_green_pack_wears_the_lycanroc_class_not_the_red_pack_s(self):
-        # Stage 3: the parley is an ugly->handsome upgrade as well as a faction flip, so the
-        # green allies must NOT share CLASS_MAUTHEDOOG with the red pack still on the field.
-        joined = '\n'.join(bc.ch04_green_pack_rows(self._chap()))
-        self.assertEqual(joined.count(bc.CH04_GREEN_PACK_CLASS), 5)
-        self.assertNotIn('CLASS_MAUTHEDOOG', joined)
-        # ...and the red pack it replaces is still the vanilla doog (the visible contrast).
-        self.assertIn('CLASS_MAUTHEDOOG',
-                      '\n'.join(bc.ch04_enemy_rows(self._chap(), arrives_turn=2)))
+    def test_the_pack_pids_are_interchangeable_generic_monster_slots(self):
+        # Splitting the shared pid must not change what the wolves ARE. Each new pid is a
+        # vanilla generic-monster character entry carrying the same generic name text id and
+        # the same (zeroed) personal bases as the doog slot the pack used to share; the wolf's
+        # CLASS comes from the unit definition, not the character entry (bmunit.c:697).
+        def entry(pid):
+            m = re.search(r'\[%s - 1\] = \{(.*?)\n    \},' % pid, VANILLA, re.S)
+            self.assertIsNotNone(m, 'no vanilla character entry for %s' % pid)
+            return dict(re.findall(r'\.(\w+)\s*=\s*(\w+),', m.group(1)))
+        doog = entry('0xb3')
+        self.assertEqual(doog['nameTextId'], '0x255')       # the generic-monster name slot
+        for pid in bc.CH04_PACK_PIDS:
+            e = entry(pid)
+            self.assertEqual(e['number'], pid)              # the slot is itself, not an alias
+            for field in [f for f in doog if f not in ('number', 'defaultClass')]:
+                self.assertEqual(e[field], doog[field],
+                                 '%s.%s differs from the doog slot' % (pid, field))
 
     def test_lycanroc_pack_reskin_is_declared_and_clones_the_doog(self):
         rk = [r for r in bc.enemy_class_reskins(self.CAMPAIGN) if r['id'] == 'lycanroc-pack']
@@ -1201,11 +1212,30 @@ class Ch04RuntimeHost(unittest.TestCase):
         ids = [r['slot_id'] for r in bc.enemy_class_reskins(self.CAMPAIGN) if r.get('slot_id')]
         self.assertEqual(len(ids), len(set(ids)))
 
-    def test_parley_pre_script_disas_the_pack_then_loads_the_green_allies(self):
-        pre = bc.ch04_parley_pre_script('0xb3', 5, bc.CH04_GREEN_PACK_SYMBOL)
-        self.assertEqual(pre.count('DISA(0xb3)'), 5)     # clear the 5 generics one at a time
-        self.assertIn('LOAD1(0x1, %s)' % bc.CH04_GREEN_PACK_SYMBOL, pre)
-        self.assertLess(pre.rindex('DISA(0xb3)'), pre.index('LOAD1'))   # DISA before the swap-in
+    def test_the_parley_converts_each_wolf_where_it_stands(self):
+        # No DISA + LOAD1: clearing the pack and reloading its table put the wolves back on
+        # their SPAWN tiles (they teleported home mid-fight) and resurrected any the player had
+        # already killed. CUSN flips the unit in place, so the pack stays where it is.
+        pre = bc.convert_survivors_green(('0xb3', '0xb4'), 0x40, 'wolf')
+        self.assertNotIn('DISA', pre)
+        self.assertNotIn('LOAD1', pre)
+        self.assertIn('CUSN(0xb3)', pre)
+        self.assertIn('CUSN(0xb4)', pre)
+
+    def test_a_wolf_killed_before_the_parley_is_skipped_not_converted(self):
+        # UnitKill WIPES a non-blue slot (pCharacterData = NULL, bmunit.c:988) and a CUSN on an
+        # unresolvable pid returns EVC_ERROR rather than no-op'ing the way DISA/KILL do
+        # (eventscr.c:3317) -- so a bare sweep breaks in exactly the kill-then-parley case this
+        # is meant to reward. Each CUSN sits behind its own CHECK_ALIVE, jumping its own label.
+        pre = bc.convert_survivors_green(('0xb3', '0xb4'), 0x40, 'wolf')
+        for pid in ('0xb3', '0xb4'):
+            self.assertLess(pre.index('CHECK_ALIVE(%s)' % pid), pre.index('CUSN(%s)' % pid))
+        labels = re.findall(r'LABEL\((0x[0-9A-F]+)\)', pre)
+        self.assertEqual(labels, ['0x40', '0x41'])          # one skip target per wolf
+        self.assertEqual(re.findall(r'BEQ\((0x[0-9A-F]+)', pre), labels)
+        # ...and the BEQ jumps PAST its own conversion, not past the whole sweep.
+        self.assertLess(pre.index('CUSN(0xb3)'), pre.index('LABEL(0x40)'))
+        self.assertLess(pre.index('LABEL(0x40)'), pre.index('CHECK_ALIVE(0xb4)'))
 
     def test_parley_recruiter_is_marty_only(self):
         # Nicolas 2026-07-21: ch04's talker is Marty specifically, NOT ch03's any-party-member.
@@ -1630,19 +1660,30 @@ class Ch04Stage4Scenes(unittest.TestCase):
         with self.assertRaises(SystemExit):
             bc.assert_message_ids_unique({'ch04': (0x9BB,), 'ch05': (0x9BB,)})
 
-    def test_the_parley_pid_is_the_convertible_wave_s_alone(self):
-        bc.assert_parley_pid_unique(self.chap, bc._ch04_reveal_wave(self.chap))
+    def test_the_shipped_pack_pids_are_the_packs_alone(self):
+        bc.assert_pack_pids_addressable(self.chap, bc.CH04_PACK_PIDS)
 
-    def test_a_second_wave_sharing_the_parley_class_is_rejected(self):
-        """DISA clears the FIRST unit matching a pid, so a wave reusing the parleyed class
-        would have units silently removed by Marty's parley -- with the difficulty read
-        still looking correct."""
-        chap = dict(self.chap)
-        wave = bc._ch04_reveal_wave(chap)
-        chap['enemy_units'] = list(chap['enemy_units']) + [
-            {'id': 'late-doogs', 'class': wave['class'], 'positions': [[0, 0]]}]
+    def test_a_pack_pid_reused_by_another_wave_is_rejected(self):
+        """CUSN converts the FIRST unit matching a pid, so a pack pid shared with another wave
+        would turn one of ITS units green on Marty's parley -- with the difficulty read still
+        looking correct."""
         with self.assertRaises(SystemExit):
-            bc.assert_parley_pid_unique(chap, wave)
+            bc.assert_pack_pids_addressable(
+                self.chap, bc.CH04_PACK_PIDS[:-1] + (bc.CH04_MONSTER_PIDS['revenant'],))
+
+    def test_two_wolves_sharing_a_pid_is_rejected(self):
+        """The defect this replaces (#203): a repeated pid is unaddressable -- the second CUSN
+        re-finds the wolf the first one already turned green."""
+        dupe = (bc.CH04_PACK_PIDS[0],) + bc.CH04_PACK_PIDS[:-1]
+        with self.assertRaises(SystemExit):
+            bc.assert_pack_pids_addressable(self.chap, dupe)
+
+    def test_a_pack_pid_colliding_with_the_moose_is_rejected(self):
+        """The moose is a scripted neutral its own DISA targets; a pack pid landing on it
+        would parley the quarry."""
+        with self.assertRaises(SystemExit):
+            bc.assert_pack_pids_addressable(
+                self.chap, bc.CH04_PACK_PIDS[:-1] + (bc.CH04_MOOSE_PID,))
 
     # ── the moose beat ─────────────────────────────────────────────────────────
     def test_the_moose_is_loaded_shown_and_removed_in_one_beat(self):

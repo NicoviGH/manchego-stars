@@ -191,7 +191,7 @@ enemy_units:
   - id: mauthedoog
     name: "Mauthe Doog"
     fe_name: "Mauthe Doog"
-    count: 6                    # canon pack (1d4+4); Marty's Talk flips the WHOLE pack (→ green Lycanrocs)
+    count: 6                    # canon pack (1d4+4); Marty's Talk flips every wolf still ALIVE
     # NW fog edge, beside the party's deploy flank. positions[0] is the LEADER (Lupin) tile.
     # It was [0,0] — the map corner — and that made him INVISIBLE in his own reveal: under fog
     # every other pack tile sits in the party's vision (3) but [0,0] is Manhattan 4 from the
@@ -215,7 +215,9 @@ enemy_units:
     convertible: true           # #171 — the pack parley (Marty). Convertible REINFORCEMENT: arrives
                                 # turn 2 then recruited rather than ground down (the clear-load discount).
     parley:
-      by: marty                 # Marty's Talk flips the whole pack to allied (green Lycanrocs)
+      by: marty                 # Marty's Talk flips the surviving wolves to allied, where they
+                                # stand. Kill some first and you get that many fewer allies —
+                                # talking EARLY is the reward (#203, Nicolas 2026-08-01).
       result: become_allied
       recruits_npc: lupin       # the bespectacled leader; joins the sled, deployable in ch05
   # ══ TURN-3 REINFORCEMENTS (7) — mirror the twin's two packs ══════════════════
