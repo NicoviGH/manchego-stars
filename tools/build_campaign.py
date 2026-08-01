@@ -5094,8 +5094,8 @@ def talk_recruit_script(msg_id, target, pre_script=''):
     visibility evbit, end. MUSS/STAL are trimmed -- the line rides the map talk window, not a
     fanfare. Faction-agnostic: a GREEN bystander (Trex/Basil) and a RED parley (Lupin/Sahnar)
     both end at BLUE via this one CUSA. `pre_script` is spliced in AFTER the talk line and
-    BEFORE the CUSA -- a red parley passes the pack table-swap (DISA the generics + LOAD1 the
-    green allies) there, so the whole outcome still rides the single recruit path."""
+    BEFORE the CUSA -- a group parley passes its own conversion sweep there (ch04: the wolf
+    pack, convert_survivors_green), so the whole outcome still rides the single recruit path."""
     return ('{\n'
             '    TEXTSTART\n'
             '    TEXTSHOW(0x%X)\n'
@@ -5115,7 +5115,7 @@ def talk_recruit_wiring(recruiters, target, flag, script_symbol, msg_id, pre_scr
         field roster (talk_recruiters -- "any party member"); ch04 passes a single recruiter
         (the YAML parley.by, e.g. Marty) -- same machinery, caller picks the recruiter set.
       talk_script -- the shared talk script (talk_recruit_script) whose CUSA flips `target`
-        BLUE, with `pre_script` spliced in before the CUSA (the red parley's pack table-swap).
+        BLUE, with `pre_script` spliced in before the CUSA (the red parley's pack conversion).
     Both flavours share ONE flow instead of a per-chapter green/red copy."""
     char_events = ('{\n' + talk_recruit_char_entries(recruiters, target, flag, script_symbol)
                    + '    END_MAIN\n}')
@@ -6623,18 +6623,30 @@ CH04_AI = {
 }
 # Stage 2b -- the turn-2 wolf-pack reveal + Marty->Lupin parley (issue #24). Lupin rides the
 # collision-free Duessel identity slot (Stage 2a); placed RED as the pack leader, Marty's Talk
-# CUSAs him blue and table-swaps the generics for a green NPC pack. All four symbols/ids below
+# CUSAs him blue and CUSNs the surviving generics green where they stand. The symbols/ids below
 # are DEAD vanilla Ch5 slots -- unreachable once inject_ch04 blanks the Ch5 event lists, so we
 # repurpose them (the same idiom ch03 uses for its dead-Ch4 block; each verified free by grep).
-CH04_GREEN_PACK_SYMBOL = 'UnitDef_088B5860'   # dead Ch5 unit table -> the green Lycanroc allies
 CH04_LUPIN_TALK_SCRIPT = 'EventScr_089F2340'  # dead Ch5 script -> the parley event
 CH04_LUPIN_TALK_MSG = 0x9BA                    # dead Ch5 text slot -> stub parley line (Stage 4 finalizes)
 CH04_LUPIN_TALK_FLAG = 'EVFLAG_TMP(9)'         # one-shot recruit flag (ch03's Colm-CHAR idiom)
-CH04_GREEN_WOLF_PID = '0xcd'                    # generic green-ally pid: the whole pack shares it
-                                               # (uncontrolled NPCs; don't count for Rout)
+# One pid PER generic wolf (#203). The pack used to share 0xb3, which made it unaddressable:
+# CUSN and CHECK_ALIVE both resolve through GetUnitFromCharId (first match, scanning blue ->
+# green -> red), so a second CUSN on a shared pid re-finds the wolf the first one just turned
+# green -- which is why the parley had to DISA the pack and reload a green table on its SPAWN
+# tiles. These five are the unnamed generic-monster gaps flanking the doog slot (0xB0..0xB9,
+# the same band ch03's Brute/grell draw from): zero name/face/quote, personal bases and growths
+# byte-identical to 0xb3's, and the wolf's CLASS comes from the unit definition (bmunit.c:697),
+# so the split is invisible in play. Guarded by assert_pack_pids_addressable.
+CH04_PACK_PIDS = ('0xb0', '0xb1', '0xb2', '0xb4', '0xb5')
+CH04_PARLEY_LABEL_BASE = 0x40   # one skip label per wolf; the talk script has no other labels
 CH04_GREEN_PACK_CLASS = 'CLASS_MTD_LYCANROC_PACK'  # campaign.yaml enemy_class_reskins: a Mauthe
-                                               # Doog clone wearing the Lycanroc map sprite, so
-                                               # the parleyed pack is visibly not the red one
+                                               # Doog clone wearing the Lycanroc map sprite.
+                                               # DECLARED BUT UNWORN since #203: converting the
+                                               # pack in place flips its FACTION, not its class,
+                                               # so the greens stay Mauthe Doogs in the NPC
+                                               # palette. Kept for the class-remap hook that
+                                               # will dress them later (Nicolas's accepted
+                                               # trade-off, 2026-08-01).
 # Stage 2c -- the turn-2 REVEAL cutscene rides the existing turn-2 TurnEvent script (it already
 # LOADs the reveal table). Two dead Ch5 text slots for the stub beats (Stage 4 finalizes dialogue).
 CH04_REVEAL_SCRIPT = 'EventScr_089F22A4'        # turn-2 TurnEventPlayer script (reused)
@@ -6791,6 +6803,32 @@ def branch_on_flag(flag, if_set, if_clear, label_base=0):
             + 'LABEL(0x%X)\n' % b)
 
 
+def convert_survivors_green(pids, label_base, what):
+    """Flip each named unit GREEN where it stands, skipping any that is already dead.
+
+    The group-parley primitive (ch04's wolf pack): one CHECK_ALIVE-guarded CUSN per pid, so
+    the conversion is IN PLACE -- no DISA + LOAD1, which would teleport the group back to its
+    spawn tiles and resurrect anyone the player had already killed.
+
+    The guard is not optional. `UnitKill` WIPES a non-blue unit's slot (pCharacterData = NULL,
+    bmunit.c:988), and `Event34_MessWithUnitState` gives only DISA/KILL the graceful path --
+    a CUSN on an unresolvable pid returns EVC_ERROR (eventscr.c:3317). So a bare sweep breaks
+    in exactly the kill-then-parley case. CHECK_ALIVE is safe on a wiped slot (eventscr.c:3212:
+    missing -> slot C = 0) and is already ch02's per-chwinga idiom.
+
+    Falling out of that: the ally count SCALES WITH SURVIVORS for free -- CUSN can only convert
+    what still exists, so killing two wolves before talking costs you two allies (#203).
+    `label_base` offsets the per-unit skip labels so several sweeps can share one script.
+    """
+    return ''.join(
+        '    CHECK_ALIVE(%s)\n'
+        '    BEQ(0x%X, EVT_SLOT_C, EVT_SLOT_0) /* %s %d/%d already dead -> nothing to convert */\n'
+        '    CUSN(%s) /* -> green, where it stands */\n'
+        'LABEL(0x%X)\n'
+        % (pid, label_base + i, what, i + 1, len(pids), pid, label_base + i)
+        for i, pid in enumerate(pids))
+
+
 def ch04_moose_script(unit_symbol, pid, msg, flee_to):
     """The moose-flees beat: the quarry is sighted in a clearing, then simply gone.
 
@@ -6876,7 +6914,7 @@ def ch04_enemy_rows(chap, arrives_turn=None):
 def _ch04_reveal_wave(chap):
     """The turn-2 convertible pack -- the Mauthe Doog wave Marty parleys (its YAML `parley`
     block). By convention its FIRST authored tile is the pack LEADER (-> Lupin, placed red);
-    the remaining tiles are the generic wolves (DISA'd + green-swapped on the parley)."""
+    the remaining tiles are the generic wolves (CUSN'd green in place on the parley)."""
     wave = next((e for e in chap['enemy_units']
                  if e.get('arrives_turn') == 2 and e.get('parley')), None)
     if wave is None:
@@ -6885,8 +6923,11 @@ def _ch04_reveal_wave(chap):
 
 
 def _ch04_wave_pack_kit(wave):
-    """(class_enum, ai, items) for a ch04 enemy wave -- shared by the generic reds and the
-    green swap-in so both track the wave's authored class/inventory (no drift)."""
+    """(class_enum, ai, items) for a ch04 enemy wave, read from its authored YAML (no drift).
+
+    The pack keeps this kit through the parley: CUSN changes a unit's FACTION, nothing else,
+    so the converted wolves fight on with the same class, items and (aggressive) AI -- which
+    is the point, since "the wolves turn the tide" is what the parley buys."""
     cls = CH04_CLASS_IDS[wave['class']]
     ai = CH04_AI[wave.get('ai_pattern', 'defensive')]
     items = [CH04_ITEM_IDS[i.get('fe_base') or i['id']] for i in wave.get('inventory', [])]
@@ -6897,14 +6938,20 @@ def ch04_turn2_reveal_rows(chap, lupin):
     """The turn-2 wolf-pack reveal wave: the convertible Mauthe Doog pack with its LEADER tile
     reassigned to Lupin (red, his CHARACTER_ slot pid, Cavalier under the hood). 5 generic
     Mauthe Doogs + Lupin = 6 -- holds the turn-2 parity count (ch04_enemy_rows still reports 6
-    for the difficulty read; the split is injector-side only). Marty's parley DISA-clears the 5
-    generics + swaps in the green pack, then CUSAs Lupin blue. `lupin` = an on_map_talk_recruits row.
+    for the difficulty read; the split is injector-side only). Marty's parley CUSNs the surviving
+    generics green in place, then CUSAs Lupin blue. `lupin` = an on_map_talk_recruits row.
     Lupin is placed at his YAML level, NOT autolevelled -- his stats persist through the CUSA, so
-    he joins as the intended fresh Cavalier (a deliberately weak hostile that telegraphs "talk, don't kill")."""
+    he joins as the intended fresh Cavalier (a deliberately weak hostile that telegraphs "talk, don't kill").
+
+    Each generic takes its OWN pid (CH04_PACK_PIDS, in tile order) -- the parley addresses them
+    one at a time, and a shared pid can only ever be found once (#203)."""
     wave = _ch04_reveal_wave(chap)
     cls, ai, items = _ch04_wave_pack_kit(wave)
-    pid = CH04_MONSTER_PIDS[wave['class']]
     leader_pos, generic_pos = wave['positions'][0], wave['positions'][1:]
+    if len(generic_pos) != len(CH04_PACK_PIDS):
+        sys.exit('ERROR: ch04 pack is %d generics but CH04_PACK_PIDS has %d pids -- the '
+                 'parley converts BY PID, so every wolf needs one'
+                 % (len(generic_pos), len(CH04_PACK_PIDS)))
     _uid, slot, class_enum, deploy_class, level = lupin
     lupin_row = _enemy_unit_entry(
         char_symbol(slot), deploy_class, level, False,
@@ -6912,59 +6959,41 @@ def ch04_turn2_reveal_rows(chap, lupin):
         CH04_AI['aggressive'], ' /* lupin -- hostile pack leader (red; Marty parleys him blue) */')
     generics = [_enemy_unit_entry(
         pid, cls, int(wave['level']), bool(wave.get('autolevel')), x, y, items, ai,
-        ' /* %s -- %s (generic pack) */' % (wave['id'], wave['name']))
-        for x, y in generic_pos]
+        ' /* %s %d/%d -- %s (generic pack; own pid so the parley can convert it) */'
+        % (wave['id'], i + 1, len(generic_pos), wave['name']))
+        for i, (pid, (x, y)) in enumerate(zip(CH04_PACK_PIDS, generic_pos))]
     return [lupin_row] + generics
 
 
-def ch04_green_pack_rows(chap):
-    """The green Lycanroc NPC allies loaded when Marty parleys the pack: 5 GREEN wolves on the
-    5 generic (non-leader) tiles of the reveal wave. Uncontrolled NPCs (they don't count for
-    Rout); only Lupin (the CUSA target) becomes a PC. The whole pack shares one generic pid
-    (CH04_GREEN_WOLF_PID).
+def assert_pack_pids_addressable(chap, pack_pids):
+    """Guard (#198 review, re-aimed by #203): every wolf the parley converts must be reachable
+    by its own pid, and by nobody else's.
 
-    They ride CH04_GREEN_PACK_CLASS -- a Mauthe Doog clone carrying the Lycanroc map sprite
-    (campaign.yaml enemy_class_reskins) -- NOT the wave's own class: the red pack is still
-    wearing CLASS_MAUTHEDOOG, and the parley is meant to read as an ugly->handsome upgrade as
-    well as a faction flip. Cloned stats mean the parity read is unchanged either way."""
-    wave = _ch04_reveal_wave(chap)
-    return [_ally_unit_entry(
-        None, None, CH04_GREEN_PACK_CLASS, int(wave['level']), x, y, '0',
-        ' /* green Lycanroc ally (the parley outcome) */',
-        allegiance='GREEN', char=CH04_GREEN_WOLF_PID)
-        for x, y in wave['positions'][1:]]
-
-
-def assert_parley_pid_unique(chap, wave):
-    """Guard (#198 review): the parley's DISA sweep must own its pid outright.
-
-    `ch04_parley_pre_script` emits DISA(pid) once per pack member, and EvtRemoveUnit clears
-    the FIRST unit matching that pid. That is correct ONLY while the parleyed wave's class is
-    the sole holder of the pid in the chapter -- a second wave reusing the class would have
-    units silently deleted by Marty's parley, with the difficulty read still looking right.
-    Nothing misbehaves today (mauthedoog appears exactly once); this keeps it that way.
+    CUSN and CHECK_ALIVE resolve through GetUnitFromCharId, which returns the FIRST unit
+    matching a pid. So two failures are silent, and both leave the difficulty read looking
+    correct: a pid repeated WITHIN the pack is unaddressable (the second CUSN re-finds the wolf
+    the first turned green -- the original #203 defect), and a pid shared with anything else
+    ch04 places converts that unit instead.
     """
-    cls = wave['class']
-    others = [e['id'] for e in chap.get('enemy_units', [])
-              if e is not wave and e.get('class') == cls]
-    if others:
-        sys.exit('ERROR: ch04 parley pid collision -- the convertible wave %r shares '
-                 'class %r with %s, so its DISA sweep would silently remove their units. '
-                 'Give the parleyed wave its own class/pid.'
-                 % (wave['id'], cls, ', '.join(repr(o) for o in others)))
-
-
-def ch04_parley_pre_script(pack_pid, pack_size, green_symbol):
-    """The pack table-swap spliced into the parley talk script BEFORE the CUSA: DISA the shared-
-    pid generic Mauthe Doogs one at a time (EvtRemoveUnit clears the FIRST valid match, so
-    `pack_size` repeats clear the whole pack -- verified in the decomp), then LOAD1 the green
-    Lycanroc NPC allies at the same tiles. A *shape* change faction-conversion alone can't do.
-
-    The pid must be the wave's alone -- see assert_parley_pid_unique, called by inject_ch04."""
-    disa = ''.join('    DISA(%s) /* clear generic Mauthe Doog %d/%d */\n'
-                   % (pack_pid, i + 1, pack_size) for i in range(pack_size))
-    return (disa + '    LOAD1(0x1, %s) /* swap in the green Lycanroc pack (NPC allies) */\n'
-            '    ENUN\n' % green_symbol)
+    dupes = sorted({p for p in pack_pids if list(pack_pids).count(p) > 1})
+    if dupes:
+        sys.exit('ERROR: ch04 pack pids repeat (%s) -- CUSN finds the FIRST match, so the '
+                 'second wolf on a shared pid can never be converted. Give each its own.'
+                 % ', '.join(dupes))
+    # Every OTHER pid ch04 puts on the map. The reveal wave is skipped: its class pid feeds the
+    # difficulty read only (ch04_enemy_rows), because the pack itself is placed by
+    # ch04_turn2_reveal_rows on these very pack_pids.
+    wave = _ch04_reveal_wave(chap)
+    elsewhere = {CH04_MOOSE_PID: 'the white moose'}
+    for enemy in chap.get('enemy_units', []):
+        pid = CH04_MONSTER_PIDS.get(enemy.get('class'))
+        if pid and enemy is not wave:
+            elsewhere.setdefault(pid, 'the %r wave' % enemy['id'])
+    clashes = ['%s (%s)' % (p, elsewhere[p]) for p in pack_pids if p in elsewhere]
+    if clashes:
+        sys.exit('ERROR: ch04 pack pid collision -- %s. Marty\'s parley would convert that '
+                 'unit instead of the wolf. Draw the pack from the free 0xB0..0xB9 band.'
+                 % ', '.join(clashes))
 
 
 def ch04_parley_recruiters(campaign, chap):
@@ -7569,8 +7598,8 @@ def inject_ch04(campaign, boot=False, verbose=True):
     wolf-pack reveal (6) and turn-3 reinforcements (7), Rout, and a direct debug boot.
 
     Stage 2b wires the Marty->Lupin PARLEY (the pack leader is Lupin, placed red among the
-    turn-2 wave; Marty's Talk table-swaps the 5 generic Mauthe Doogs for a green Lycanroc NPC
-    pack and CUSAs Lupin blue -- the shared talk-recruit flow, reused from ch03). Stage 2c wires
+    turn-2 wave; Marty's Talk CUSNs each SURVIVING generic Mauthe Doog green where it stands
+    and CUSAs Lupin blue -- the shared talk-recruit flow, reused from ch03). Stage 2c wires
     the turn-2 REVEAL cutscene (rides the turn-2 LOAD1: pan to the NW fog, focus Lupin, stub
     beats plant the parley).
 
@@ -7658,7 +7687,6 @@ def inject_ch04(campaign, boot=False, verbose=True):
     lupin = next(r for r in on_map_talk_recruits(campaign, chap['chapter_number'])
                  if r[0] == 'lupin')
     turn2_rows = ch04_turn2_reveal_rows(chap, lupin)
-    green_pack_rows = ch04_green_pack_rows(chap)
     if [len(initial_rows), len(ch04_enemy_rows(chap, arrives_turn=2)),
             len(turn3_rows)] != [10, 6, 7]:
         sys.exit('ERROR: ch04 realigned roster must stay 10 line + 6 turn-2 reveal + 7 turn-3')
@@ -7684,7 +7712,6 @@ def inject_ch04(campaign, boot=False, verbose=True):
             ('UnitDef_Event_Ch5Ally', ally),
             (CH04_INITIAL_ENEMY_SYMBOL, table(initial_rows)),
             (CH04_TURN2_SYMBOL, table(turn2_rows)),
-            (CH04_GREEN_PACK_SYMBOL, table(green_pack_rows)),
             (CH04_TURN3_SYMBOL, table(turn3_rows)),
             (CH04_MOOSE_SYMBOL, table([moose_row])),
             (CH04_BOOT_SEED_SYMBOL, seed)):
@@ -7694,13 +7721,13 @@ def inject_ch04(campaign, boot=False, verbose=True):
 
     # The Marty->Lupin parley (Stage 2b): the shared talk-recruit wiring (talk_recruit_wiring),
     # recruiter = Marty ONLY (ch04_parley_recruiters, data-driven from parley.by; Nicolas
-    # 2026-07-21). The talk script's pre_script table-swaps the pack -- DISA the 5 generic Mauthe
-    # Doogs (shared pid, cleared one-by-one) + LOAD1 the green Lycanroc NPC allies -- then CUSA
-    # flips Lupin blue. One flow with ch03's green Trex; the parley IS the recruit.
-    parley_pre = ch04_parley_pre_script(
-        CH04_MONSTER_PIDS[_ch04_reveal_wave(chap)['class']], len(green_pack_rows),
-        CH04_GREEN_PACK_SYMBOL)
-    assert_parley_pid_unique(chap, _ch04_reveal_wave(chap))   # #198 review guard
+    # 2026-07-21). The talk script's pre_script turns the pack GREEN WHERE IT STANDS -- one
+    # CHECK_ALIVE-guarded CUSN per wolf (#203) -- then CUSA flips Lupin blue. One flow with
+    # ch03's green Trex; the parley IS the recruit. Because CUSN can only convert wolves that
+    # are still alive, the ally count scales with survivors: talking EARLY is the reward.
+    parley_pre = convert_survivors_green(
+        CH04_PACK_PIDS, CH04_PARLEY_LABEL_BASE, 'Mauthe Doog')
+    assert_pack_pids_addressable(chap, CH04_PACK_PIDS)   # #198 review guard, re-aimed by #203
     parley_recruiters = ch04_parley_recruiters(campaign, chap)
     lupin_char_events, lupin_talk_script = talk_recruit_wiring(
         parley_recruiters, char_symbol(lupin[1]),
@@ -7801,8 +7828,8 @@ def inject_ch04(campaign, boot=False, verbose=True):
         script, 'EventScr_089F22EC[] =',
         '{\n    LOAD1(0x1, %s)\n    ENUN\n    ENDA\n}' % CH04_TURN3_SYMBOL,
         CH5_EVENTSCRIPT_H)
-    # The Marty->Lupin parley script (Stage 2b): repurpose a dead Ch5 script -> table-swap the
-    # pack (DISA the generics + LOAD1 the green allies) then CUSA Lupin blue (built above).
+    # The Marty->Lupin parley script (Stage 2b): repurpose a dead Ch5 script -> convert the
+    # surviving pack green in place, then CUSA Lupin blue (built above).
     script = _replace_brace_block(
         script, CH04_LUPIN_TALK_SCRIPT + '[] =', lupin_talk_script, CH5_EVENTSCRIPT_H)
     # The moose-flees beat (Stage 4): fired by the Misc AREA when a unit reaches the tomb-side
@@ -7892,9 +7919,9 @@ def inject_ch04(campaign, boot=False, verbose=True):
     if verbose:
         print('  ch04 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; '
               'fog 3, DefeatAll, PREP cap %d%s, enemies 10 + 6(t2 reveal: 5 Doog + red Lupin) + 7(t3); '
-              'turn-2 reveal cutscene + Marty->Lupin parley (DISA %d + green pack + CUSA)'
+              'turn-2 reveal cutscene + Marty->Lupin parley (%d guarded CUSN in place + CUSA)'
               % (obj_idx, pal_idx, cfg_idx, layout_idx, CH04_HOST_INDEX, len(cap_rows),
-                 ' (boot-seeded party)' if boot else '', len(green_pack_rows)))
+                 ' (boot-seeded party)' if boot else '', len(CH04_PACK_PIDS)))
         print('  ch04 scenes: opening (2 BGs, %d+%d lines) + full parley (%d) + moose-flees '
               '(AREA %d,%d..%d,%d) + ending (%d boxes, branched: Lupin / no-parley)'
               % (len(op_beats[0]), len(op_beats[1]), len(talk), mx1, my1, mx2, my2,

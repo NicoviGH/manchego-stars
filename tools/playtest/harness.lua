@@ -4715,8 +4715,24 @@ end
 -- clear_ch04_parley (which needs the flag set before routing), so the row search, the re-parking
 -- and the outcome check exist once (#204). Assumes the map is already booted and turn 1 is live.
 --   opts.shots  -- frame-tag to screenshot into while the exchange plays; nil films nothing
--- Returns true once Lupin is blue, or false plus a reason string.
+-- Returns false plus a reason string, or true plus (nil, pack) once Lupin is blue -- where
+-- `pack` is { before, after }: the wolves' tiles going into the Talk and coming out of it.
 local CH04_LUPIN_PID, CH04_MARTY_PID = 0x1D, 0x02   -- CHARACTER_DUESSEL / CHARACTER_SETH
+-- The five generic wolves, one pid each (build_campaign.CH04_PACK_PIDS -- #203). They used to
+-- share 0xb3, which is exactly why the parley could not convert them one at a time.
+local CH04_PACK_PIDS = { [0xb0] = true, [0xb1] = true, [0xb2] = true, [0xb4] = true, [0xb5] = true }
+
+-- Where the pack is standing, keyed by pid: { [pid] = {x, y} } over one faction array. One pid
+-- per wolf is what makes this readable at all, and it is how the parley's two claims are checked
+-- from DATA -- how many came over (count) and that each converted where it stood (tiles).
+local function ch04PackTiles(array, slots)
+    local at = {}
+    for i = 0, slots - 1 do
+        local u = unitAt(array, i)
+        if u and not isDead(u) and CH04_PACK_PIDS[u.charId] then at[u.charId] = { u.x, u.y } end
+    end
+    return at
+end
 local function ch04Parley(opts)
     opts = opts or {}
     local LUPIN, MARTY = CH04_LUPIN_PID, CH04_MARTY_PID
@@ -4784,6 +4800,10 @@ local function ch04Parley(opts)
         end
         return false
     end
+    -- Where the pack stands going IN. Sampled after the parking, before the Talk: no enemy or
+    -- green phase runs between here and the conversion, so any tile that changes changed
+    -- because of the parley itself.
+    local packBefore = ch04PackTiles(SYM.gUnitArrayRed, 24)
     for row = 0, 5 do
         if blueLupin() then break end
         local m = blue(MARTY)
@@ -4818,47 +4838,69 @@ local function ch04Parley(opts)
         snap()
         return false, "Lupin never flipped blue (the CUSA did not fire)"
     end
+    -- Read the converted pack HERE, while the tiles still mean something: the phase cycle below
+    -- hands the greens their own turn, and an aggressive ally that walks off to fight would
+    -- look exactly like a wolf the parley had relocated.
+    local info = { before = packBefore, after = ch04PackTiles(SYM.gUnitArrayGreen, 20) }
     -- The CUSA changes his FACTION; the standing sprite only redraws to the party palette on a
     -- RefreshUnitSprites (phase transition). Cycle one phase, then linger on the green pack.
     runEnemyPhase()
     for f = 1, 90 do if f % 3 == 0 then snap() end yield() end
-    return true
+    return true, nil, info
 end
 
--- The live green (allied NPC) count -- after the parley this is the Lycanroc pack that came over.
-local function greenCount()
+-- The wolves that came over: live units in the GREEN array wearing a pack pid. Counting the pack
+-- by pid rather than counting the whole green array keeps the white moose (a scripted green
+-- neutral) out of the tally -- and one pid per wolf is what makes that possible (#203).
+local function greenPackCount()
     local n = 0
-    for i = 0, 11 do
-        local u = unitAt(SYM.gUnitArrayGreen, i)
-        if u and not isDead(u) then n = n + 1 end
-    end
+    for _ in pairs(ch04PackTiles(SYM.gUnitArrayGreen, 20)) do n = n + 1 end   -- gUnitArrayGreen[20]
     return n
 end
 
 -- recordch04parley: Marty's Talk on the wolf pack, in motion (#24 Stage 5) -- the chapter's
 -- mercy/recruit hook and Marty's secondary signature beat. Films the whole exchange, then the
--- table swap: the five generic Mauthe Doogs are DISA'd, the green Lycanroc pack LOADs in their
--- place, and Lupin CUSAs red -> blue. The pack arrives on turn 2, so the lead-up is driven
--- (boot -> prep -> idle turn 1) before the recruiter is parked next to the leader.
+-- conversion: each surviving Mauthe Doog is CUSN'd GREEN WHERE IT STANDS, and Lupin CUSAs
+-- red -> blue. The pack arrives on turn 2, so the lead-up is driven (boot -> prep -> idle
+-- turn 1) before the recruiter is parked next to the leader.
+--
+-- It also ASSERTS the "where it stands" half of #203 from data rather than from the film: the
+-- pack's tiles are read before the Talk and again after, and a wolf that moved means the old
+-- clear-and-reload is back (it put the pack down on its SPAWN tiles, teleporting it home
+-- mid-fight). No enemy phase runs in between, so nothing else can move them.
 -- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh recordch04parley (needs a CH04BOOT=1 ROM).
 scenarios.recordch04parley = function()
     if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
     pokeNormalConfig()          -- reading speed: this scenario exists to be WATCHED
-    local ok, why = ch04Parley({ shots = "ch04parley" })
+    local ok, why, pack = ch04Parley({ shots = "ch04parley" })
     if not ok then return result("FAIL", why) end
+    for pid, xy in pairs(pack.before) do
+        local now = pack.after[pid]
+        if not now then
+            return result("FAIL", string.format(
+                "wolf 0x%02X was red at (%d,%d) but never arrived in the green array", pid, xy[1], xy[2]))
+        end
+        log(string.format("  wolf 0x%02X: red (%d,%d) -> green (%d,%d)", pid, xy[1], xy[2], now[1], now[2]))
+        if now[1] ~= xy[1] or now[2] ~= xy[2] then
+            return result("FAIL", string.format(
+                "wolf 0x%02X moved on the parley: (%d,%d) -> (%d,%d). The pack must convert "
+                .. "where it stands, not reload onto its spawn tiles", pid, xy[1], xy[2], now[1], now[2]))
+        end
+    end
     return result("PASS", string.format(
-        "parley filmed: Lupin is blue and the pack came over green (%d green units)", greenCount()))
+        "parley filmed: Lupin is blue and %d wolves came over green, each on its own tile",
+        greenPackCount()))
 end
 
--- ch04packmath (#24 Stage 5 question): does mercy pay the same after you have already shot at the
--- pack? The parley DISA(0xb3)s the generic Mauthe Doogs and LOAD1s a FIXED five-wolf green table,
--- so on paper killing wolves first still yields five allies -- which would mean the recruit is
--- worth the same whether you talked on sight or ground half the pack down first. That is a real
--- balance question (the difficulty model prices the parley path as a clear-load discount), and it
--- is only answerable in-engine. Kill KILL of them, parley, count the greens.
+-- ch04packmath: the REGRESSION GATE for "parleying early is the reward" (#203). It began as a
+-- question -- does mercy pay the same after you have already shot at the pack? -- and the answer
+-- was yes: the old parley DISA'd the generics and LOAD1'd a FIXED five-wolf green table, so the
+-- dead wolves came back and shooting first cost nothing. In-place conversion answers it the other
+-- way for free: CUSN can only convert wolves that still exist. Kill KILL of them, parley, and the
+-- green count must be exactly the number left standing.
 -- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04packmath (needs a CH04BOOT=1 ROM).
 scenarios.ch04packmath = function()
-    local PACK_PID, KILL = 0xb3, 2      -- the convertible generics; Lupin (0x1D) is separate
+    local KILL = 2      -- generic wolves to shoot before talking; Lupin (0x1D) is not one
     if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
     pokeFastConfig()
     waitFor(function() return faction() == 0 and not menuOpen()
@@ -4888,20 +4930,20 @@ scenarios.ch04packmath = function()
         local n = 0
         for i = 0, 23 do
             local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) and r.charId == PACK_PID then n = n + 1 end
+            if r and not isDead(r) and CH04_PACK_PIDS[r.charId] then n = n + 1 end
         end
         return n
     end
     local function firstWolf()
         for i = 0, 23 do
             local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) and r.charId == PACK_PID then return r end
+            if r and not isDead(r) and CH04_PACK_PIDS[r.charId] then return r end
         end
         return nil
     end
     local spawned = packAlive()
-    log(string.format("ch04packmath: %d generic wolves (pid 0x%02X) on the field at turn 2",
-        spawned, PACK_PID))
+    log(string.format("ch04packmath: %d generic wolves (one pid each) on the field at turn 2",
+        spawned))
     if spawned == 0 then return result("FAIL", "the wolf pack never arrived on turn 2") end
     -- Shoot KILL of them. Marty (the recruiter) is skipped -- he owns the Talk.
     local killed = 0
@@ -4937,16 +4979,21 @@ scenarios.ch04packmath = function()
     local left = packAlive()
     local ok, why = ch04Parley()
     if not ok then return result("FAIL", "parley after the kills: " .. why) end
-    local greens = greenCount()
+    local greens = greenPackCount()
     log(string.format("ch04packmath: %d killed, %d generics left, parley -> %d GREEN allies",
         killed, left, greens))
     shot("ch04packmath")
-    -- Not a pass/fail on balance -- it ANSWERS the question, and states which way.
+    -- The gate: the allies you get are the wolves you did not kill. More than that means the
+    -- pack is being reloaded from a table again (the #203 defect); fewer means a CUSN is not
+    -- landing -- and a CUSN on a wiped slot is EVC_ERROR, so check the guard before the pids.
+    if greens ~= left then
+        return result("FAIL", string.format(
+            "killed %d of %d wolves, %d left standing, but the parley yielded %d green allies "
+            .. "-- the ally count must scale with survivors", killed, spawned, left, greens))
+    end
     return result("PASS", string.format(
-        "killed %d of %d wolves first, then parleyed -> %d green allies (%s)",
-        killed, spawned, greens,
-        greens > left and "LOAD1 brings the FULL table back -- the dead wolves return"
-                      or "the green pack scales with who survived"))
+        "killed %d of %d wolves first, then parleyed -> %d green allies: mercy scales with "
+        .. "who survived, so talking early is the reward", killed, spawned, greens))
 end
 
 -- attackprobe (#204): WHY a clear-bot's blind Attack press lands on the wrong command row. The
@@ -5068,7 +5115,7 @@ local function clearCh04(parley)
             return result("FAIL", "parley arm: " .. why)
         end
         log(string.format("%s: Lupin is blue, %d green pack members -- routing for the AUTHORED ending",
-            tag, greenCount()))
+            tag, greenPackCount()))
     end
     for t = 1, 16 do
         if won() then break end

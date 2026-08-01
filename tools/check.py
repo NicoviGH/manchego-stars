@@ -56,6 +56,11 @@ DEAD_CONCEPTS = [
     # can't creep back into his character. Marty's voice is lore/marty.md Voice, full stop.
     r'spore covenant', r'composter vs\.? the taxidermist',
     r'two necromancers, opposite covenants',
+    # retired by #203 (2026-08-01): ch04's parley converts the wolf pack IN PLACE -- one
+    # CHECK_ALIVE-guarded CUSN per wolf -- so there is no clear-and-reload to describe, and
+    # the green allies are Mauthe Doogs in the NPC palette, not a Lycanroc table.
+    r'pack table[- ]swaps?', r'table[- ]swaps? the (?:\d+ |five )?generic',
+    r'green Lycanroc (?:NPC )?(?:pack|all(?:y|ies))',
     # NOT registered here: `hasPrepScreen`. It IS a dead field (FE7 leftover, chapterdata.h:37 --
     # false for every chapter, including ones that plainly have prep) and citing it as evidence is
     # exactly the mistake that produced a bogus "our prep is a divergence" claim on 2026-07-29.
