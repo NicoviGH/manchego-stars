@@ -38,16 +38,15 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   anim and fights as a stock red Cavalier; **#207** hosted chapters share vanilla's goal message ids,
   so ch02 and ch04 overwrite each other's objective text TODAY; **#208** the locked reveal dialogue
   still lives in `build_campaign.py`.
-- **ONE DECISION IS WAITING ON NICOLAS — the ch04 pack math (#24).** Confirmed in-engine
-  (`ch04packmath`, `c194347`): kill 2 of the 5 generic wolves, then parley, and the pack still
-  comes over **5 green**. `LOAD1` brings the full table back — **the dead wolves return**, so
-  shooting half the pack and talking after pays exactly the same as talking on sight. That is a
-  DESIGN call, not a defect, and nothing was changed. It matters because the difficulty model
-  prices the parley path as a clear-load discount and that discount is currently unconditional.
-  Options on the issue: (1) leave it — "the pack comes over as a unit", forgiving for the
-  friend-group audience; (2) scale the green table to survivors so mercy-on-sight is strictly
-  better; (3) gate the parley on an intact pack (harshest). Re-check any choice with
-  `ch04packmath`.
+- **DECIDED (Nicolas, 2026-08-01) and it folds into #203 — parleying EARLY must be a reward.**
+  `ch04packmath` (`c194347`) confirmed in-engine that killing 2 of the 5 generic wolves and then
+  parleying still yields **5 green allies**: `LOAD1` brings the full table back, so the dead wolves
+  return and shooting first costs nothing. Nicolas chose "scale to survivors"; he also chose #203's
+  in-place conversion. **Those are the same fix** — `CUSN` can only convert wolves that still
+  exist, so in-place conversion scales to survivors for free, with no table-scaling code.
+  Accepted trade-off: the pack keeps `CLASS_MAUTHEDOOG` (wolf sprite) in the green NPC palette
+  instead of upgrading to `CLASS_MTD_LYCANROC_PACK`; the sprite upgrade can be added later as a
+  class-remap hook without redoing the conversion work.
 - **#24's review block was STALE, not incomplete** — three boxes were done in #202 and never
   ticked (checked and ticked 2026-08-01): the no-parley speaker-coverage test
   (`test_the_no_parley_path_has_a_speaker_for_every_box`) exists and passes; message-id uniqueness
@@ -163,7 +162,15 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 issues, not from this file** — #203/#205-#208 each carry their own diagnosis so none of it has to
 be re-derived.
 
-1. **#203 the pack conversion** — visible in the shipped parley GIF, and fully diagnosed.
+1. **#203 the pack conversion — DESIGNED AND GROUNDED, ready to implement.** The full design is a
+   comment on #203 (2026-08-01); do not re-derive it. Headline: distinct pids + a **`CHECK_ALIVE`-
+   guarded `CUSN` per wolf**, replacing the DISA + `LOAD1` swap entirely. The guard is NOT optional
+   — `UnitKill` (`bmunit.c:988`) WIPES a non-blue unit's slot (`pCharacterData = NULL`), and a
+   `CUSN` on an unresolvable pid returns **`EVC_ERROR`** rather than no-op'ing the way `DISA`/`KILL`
+   do (`eventscr.c:3317`), so a bare five-`CUSN` sweep breaks in exactly the kill-then-parley case
+   this is meant to reward. `CHECK_ALIVE` is safe on a wiped slot and is already ch02's idiom.
+   Gate: `ch04packmath` must go from 5 greens to **3**, and `recordch04parley` must show the pack
+   flip green WHERE IT STANDS.
 2. **#205 the village** — ch04 currently has no material reward at all.
 3. **#207 the goal-id collision** — it is corrupting ch02's objective text right now, and it is
    cross-chapter, so it grows with every rout chapter added.
