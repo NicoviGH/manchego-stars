@@ -307,13 +307,21 @@ end
 
 -- Action menu with an enemy in range: Attack is first. A -> weapon list
 -- (first weapon) -> A -> target (sole in-range target) -> A -> combat.
-local function chooseAttack(actorAddr)
+-- CALLER BEWARE: row 0 is Attack only when the engine has a target. With none it is Item, and
+-- these three blind presses Use a healing item at full HP instead (#204) -- check the engine's
+-- own grid first (canAttackFromHere).
+-- `stopWhen` is an optional second exit for the combat wait. A kill that ENDS the chapter starts
+-- the win event on the spot, which can keep the actor from ever being greyed out -- so without it
+-- this waits the full 1200 frames tapping A, mashing straight through the ending a capture run
+-- exists to film (#204).
+local function chooseAttack(actorAddr, stopWhen)
     press(K.A); wait(20)
     press(K.A); wait(20)
     press(K.A)
     -- combat (with battle anims) ends when the actor is greyed out
     local done = waitFor(function()
         return (ru32(actorAddr + 0x0C) & 0x2) ~= 0 -- US_UNSELECTABLE
+            or (stopWhen ~= nil and stopWhen())
     end, 1200, true)
     wait(30)
     return done
@@ -2927,13 +2935,15 @@ local function teleportToFiringTile(u, mn, mx)
         log(string.format("  teleportToFiringTile: (%d,%d) not tracked in gBmMapUnit -- bailing", u.x, u.y))
         return false
     end
+    local mw, mh = mapSize()   -- the LIVE footprint: a hardcoded 25x16 parks units off a 15x15
+                               -- map (ch04), where the cursor can never reach them (#204)
     for _, e in ipairs(liveEnemies()) do
         for r = mx, mn, -1 do
             for dx = -r, r do
                 local ady = r - math.abs(dx)
                 for _, dy in ipairs(ady == 0 and { 0 } or { ady, -ady }) do
                     local tx, ty = e.x + dx, e.y + dy
-                    if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0 then
+                    if tx >= 0 and tx < mw and ty >= 0 and ty < mh and mapUnitAt(tx, ty) == 0 then
                         setMapUnit(u.x, u.y, 0)                 -- vacate the old tile
                         emu:write8(u.addr + 0x10, tx); emu:write8(u.addr + 0x11, ty)
                         setMapUnit(tx, ty, grid)                -- occupy the new tile
@@ -2946,6 +2956,52 @@ local function teleportToFiringTile(u, mn, mx)
     end
     log(string.format("  teleportToFiringTile: no free tile within [%d,%d] of any of %d live enemies", mn, mx, #liveEnemies()))
     return false
+end
+
+-- True when the ENGINE would offer this unit an Attack row from its current tile: a hostile sits
+-- within [mn,mx] of it in gBmMapUnit. The clear-bot must ask this before pressing, because
+-- chooseAttack presses command-menu row 0 blind and row 0 is Attack only when a target exists
+-- (otherwise Item -- see clearbot.lua gridHostileInReach and #204).
+local function canAttackFromHere(u, mn, mx)
+    local w, h = mapSize()
+    return CLEARBOT.gridHostileInReach(function(x, y)
+        if x < 0 or x >= w or y < 0 or y >= h then return nil end
+        return mapUnitAt(x, y)
+    end, u.x, u.y, mn, mx)
+end
+
+-- Turn fog OFF for a clear-bot run -- GRID AND ALL (#204). Zeroing gPlaySt.chapterVisionRange
+-- disables bmtarget.c's targeting gate, but it does NOT put the enemies on the map: the tile->unit
+-- grid is written by RefreshUnitsOnBmMap (bmmap.c), which skips a red standing in fog and files it
+-- under gBmMapHidden instead. Until the engine's next refresh, gBmMapUnit therefore holds NO reds
+-- at all -- every enemy unattackable, every tile they stand on reading "free". So lift the fog and
+-- then force one RefreshEntityBmMaps by spending a single unit's Wait (MapMain_ResumeFromAction,
+-- bmio.c); the refresh also refills gBmMapFog itself (BmMapFill(gBmMapFog, !visionRange)), so the
+-- fog map needs no poking. Returns the number of live reds now ON the grid -- 0 means it did not
+-- take, and the caller must not go on to swing at enemies the engine cannot see.
+local function liftFogOntoTheGrid()
+    emu:write8(SYM.gPlaySt + 0x0D, 0)
+    local onGrid = function()
+        local n = 0
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) and mapUnitAt(r.x, r.y) ~= 0 then n = n + 1 end
+        end
+        return n
+    end
+    for i = 0, 19 do
+        if onGrid() > 0 then break end
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u and not isDead(u) and (u.state & 0x2) == 0 then
+            if moveUnit(u.x, u.y, u.x, u.y) then
+                chooseWait()
+                waitFor(function() return faction() == 0 and not menuOpen() end, 300)
+            end
+        end
+    end
+    local n = onGrid()
+    log(string.format("  fog lifted: %d live reds now on gBmMapUnit", n))
+    return n
 end
 
 -- Live blue units (excluding `excludePid`) as unitAt() tables, mirroring liveEnemies -- used by
@@ -4654,31 +4710,35 @@ scenarios.ch04sprites = function()
     return result("PASS", "Lupin is on the map as a red unit -- see the log for the roster")
 end
 
--- recordch04parley: Marty's Talk on the wolf pack, in motion (#24 Stage 5) -- the chapter's
--- mercy/recruit hook and Marty's secondary signature beat. Films the whole exchange, then the
--- table swap: the five generic Mauthe Doogs are DISA'd, the green Lycanroc pack LOADs in their
--- place, and Lupin CUSAs red -> blue. The pack arrives on turn 2, so the lead-up is driven
--- (boot -> prep -> idle turn 1) before the recruiter is parked next to the leader.
--- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh recordch04parley (needs a CH04BOOT=1 ROM).
-scenarios.recordch04parley = function()
-    local LUPIN, MARTY = 0x1D, 0x02        -- CHARACTER_DUESSEL / CHARACTER_SETH (Marty's slot)
+-- ch04Parley(opts) -- drive Marty's Talk on the wolf pack: the chapter's mercy/recruit hook and
+-- the switch that picks which ENDING plays. Shared by recordch04parley (which films it) and
+-- clear_ch04_parley (which needs the flag set before routing), so the row search, the re-parking
+-- and the outcome check exist once (#204). Assumes the map is already booted and turn 1 is live.
+--   opts.shots  -- frame-tag to screenshot into while the exchange plays; nil films nothing
+-- Returns true once Lupin is blue, or false plus a reason string.
+local CH04_LUPIN_PID, CH04_MARTY_PID = 0x1D, 0x02   -- CHARACTER_DUESSEL / CHARACTER_SETH
+local function ch04Parley(opts)
+    opts = opts or {}
+    local LUPIN, MARTY = CH04_LUPIN_PID, CH04_MARTY_PID
     local function redLupin() return findUnit(SYM.gUnitArrayRed, 24, LUPIN) end
     local function blueLupin() return findUnit(SYM.gUnitArrayBlue, 20, LUPIN) end
-    if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
+    local function snap() if opts.shots then shot(opts.shots) end end
     waitFor(function()
         return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
     end, 900, true)
     -- The pack (and Lupin) only exist from turn 2.
-    if not endTurn() then return result("FAIL", "could not end turn 1") end
+    if turn() < 2 then
+        if not endTurn() then return false, "could not end turn 1" end
+    end
     if not waitFor(function() return turn() >= 2 and redLupin() ~= nil end, 5400) then
-        shot("ch04parley-no-pack")
-        return result("FAIL", "the wolf pack never arrived on turn 2")
+        snap()
+        return false, "the wolf pack never arrived on turn 2"
     end
     waitFor(function()
         return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
     end, 3600, true)
     local marty = blue(MARTY)
-    if not marty then return result("FAIL", "Marty (0x02) is not deployed -- he owns the Talk") end
+    if not marty then return false, "Marty (0x02) is not deployed -- he owns the Talk" end
     -- Park Marty orthogonally adjacent to Lupin. setMapUnit keeps the engine's tile->unit grid
     -- in sync, so Talk-adjacency reads immediately with no phase cycle (the ch03talk trick) --
     -- the point here is filming the SCENE, not pathing a cavalier across a fog map.
@@ -4694,15 +4754,14 @@ scenarios.recordch04parley = function()
             break
         end
     end
-    if not parked then return result("FAIL", "no free tile adjacent to Lupin to park Marty") end
-    pokeNormalConfig()
+    if not parked then return false, "no free tile adjacent to Lupin to park Marty" end
     marty = blue(MARTY)
     -- Strip Marty's weapons (struct Unit items[5] @ +0x1E, bmunit.h) so the command menu does
     -- NOT offer Attack. ch03's talk driver could take row 0 blind because Trex is GREEN; Lupin
     -- is a RED adjacent enemy, so row 0 there is Attack -- the first run of this scenario duly
     -- filmed Marty duelling the wolf he is supposed to be talking to.
     for k = 0, 4 do emu:write16(marty.addr + 0x1E + k * 2, 0) end
-    if not cursorTo(marty.x, marty.y) then return result("FAIL", "cursor could not reach Marty") end
+    if not cursorTo(marty.x, marty.y) then return false, "cursor could not reach Marty" end
     -- Find Talk by trying rows and verifying by OUTCOME. The menu's contents depend on what is
     -- adjacent, so its shape is not a constant we get to assume -- and the obvious signal is a
     -- trap: ProcScr_StdEventEngine is live during ALL normal map/turn event processing (its own
@@ -4740,11 +4799,11 @@ scenarios.recordch04parley = function()
             if menuOpen() then opened = true break end
             press(K.A); if waitFor(menuOpen, 14) then opened = true break end
         end
-        if not opened then return result("FAIL", "no command menu for Marty") end
+        if not opened then return false, "no command menu for Marty" end
         for _ = 1, row do press(K.DOWN, 3) end
         press(K.A, 4)
         for i = 1, 900 do                           -- the full five-turn exchange, if this is it
-            if i % 3 == 0 then shot("ch04parley") end
+            if i % 3 == 0 then snap() end
             if blueLupin() then break end
             if i % 16 == 0 then press(K.A, 3) end
             yield()
@@ -4756,20 +4815,112 @@ scenarios.recordch04parley = function()
         press(K.B); wait(10)                        -- not it -- back out and try the next row
     end
     if not blueLupin() then
-        shot("ch04parley-no-cusa")
-        return result("FAIL", "Lupin never flipped blue (the CUSA did not fire)")
+        snap()
+        return false, "Lupin never flipped blue (the CUSA did not fire)"
     end
     -- The CUSA changes his FACTION; the standing sprite only redraws to the party palette on a
     -- RefreshUnitSprites (phase transition). Cycle one phase, then linger on the green pack.
     runEnemyPhase()
-    for f = 1, 90 do if f % 3 == 0 then shot("ch04parley") end yield() end
-    local greens = 0
+    for f = 1, 90 do if f % 3 == 0 then snap() end yield() end
+    return true
+end
+
+-- The live green (allied NPC) count -- after the parley this is the Lycanroc pack that came over.
+local function greenCount()
+    local n = 0
     for i = 0, 11 do
         local u = unitAt(SYM.gUnitArrayGreen, i)
-        if u and not isDead(u) then greens = greens + 1 end
+        if u and not isDead(u) then n = n + 1 end
     end
+    return n
+end
+
+-- recordch04parley: Marty's Talk on the wolf pack, in motion (#24 Stage 5) -- the chapter's
+-- mercy/recruit hook and Marty's secondary signature beat. Films the whole exchange, then the
+-- table swap: the five generic Mauthe Doogs are DISA'd, the green Lycanroc pack LOADs in their
+-- place, and Lupin CUSAs red -> blue. The pack arrives on turn 2, so the lead-up is driven
+-- (boot -> prep -> idle turn 1) before the recruiter is parked next to the leader.
+-- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh recordch04parley (needs a CH04BOOT=1 ROM).
+scenarios.recordch04parley = function()
+    if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
+    pokeNormalConfig()          -- reading speed: this scenario exists to be WATCHED
+    local ok, why = ch04Parley({ shots = "ch04parley" })
+    if not ok then return result("FAIL", why) end
     return result("PASS", string.format(
-        "parley filmed: Lupin is blue and the pack came over green (%d green units)", greens))
+        "parley filmed: Lupin is blue and the pack came over green (%d green units)", greenCount()))
+end
+
+-- attackprobe (#204): WHY a clear-bot's blind Attack press lands on the wrong command row. The
+-- clear-bot's chooseAttack assumes command-menu row 0 is Attack; when the engine sees no target
+-- it is Item instead, and the bot Uses a vulnerary at full HP forever. This probe stages ONE
+-- unit's attack on the CURRENT host chapter and dumps the DATA that decides that row -- the live
+-- vision range, every red with the grid id and fog byte under it, and the 5x5 gBmMapUnit window
+-- around the firing tile -- then photographs the open menu, which says outright whether an
+-- Attack row exists. Chapter-agnostic: it reads whatever map bootToMap lands on.
+-- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh attackprobe
+scenarios.attackprobe = function()
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    pokeFastConfig()
+    emu:write8(SYM.gPlaySt + 0x0D, 0)   -- lift fog, exactly as the clear-bot does
+    waitFor(function() return faction() == 0 and not menuOpen()
+        and not procActive(SYM.ProcScr_StdEventEngine) end, 900, true)
+    local w, h = mapSize()
+    local fogAt = function(x, y) return ru8(ru32(ru32(SYM.gBmMapFog) + y * 4) + x) end
+    log(string.format("map=%dx%d turn=%d visionRange=%d (0 = fog off)",
+        w, h, turn(), ru8(SYM.gPlaySt + 0x0D)))
+    for i = 0, 23 do
+        local r = unitAt(SYM.gUnitArrayRed, i)
+        if r and not isDead(r) then
+            pokeFrail(r); pokeHarmless(r)
+            log(string.format("  red[%02d] char=0x%02X at (%d,%d) hp=%d grid=0x%02X fog=%d",
+                i, r.charId, r.x, r.y, r.hp, mapUnitAt(r.x, r.y), fogAt(r.x, r.y)))
+        end
+    end
+    -- The lift the clear-bot actually uses. It reports how many reds reached the grid, which is
+    -- the whole diagnosis: 0 means the engine cannot see a single enemy, whatever the unit array
+    -- says, and no tile on this map will offer an Attack row.
+    if liftFogOntoTheGrid() == 0 then
+        return result("FAIL", "fog lifted but NO red reached gBmMapUnit -- nothing is attackable")
+    end
+    -- blue[0] may have spent its action triggering the refresh; take the first unit that still
+    -- has one AND carries a weapon.
+    local u, mn, mx
+    for i = 0, 19 do
+        local c = unitAt(SYM.gUnitArrayBlue, i)
+        if c and not isDead(c) and (c.state & 0x2) == 0 then
+            local a, b = unitAttackRange(c)
+            if a then u, mn, mx = c, a, b break end
+        end
+    end
+    if not u then return result("FAIL", "no armed, unexhausted blue unit left to probe with") end
+    log(string.format("probing with char=0x%02X at (%d,%d) reach=[%d,%d] grid=0x%02X",
+        u.charId, u.x, u.y, mn, mx, mapUnitAt(u.x, u.y)))
+    if not teleportToFiringTile(u, mn, mx) then
+        return result("FAIL", "no firing tile within reach of any live enemy")
+    end
+    u = findUnit(SYM.gUnitArrayBlue, 20, u.charId)   -- refresh: the teleport relocated it
+    if not u then return result("FAIL", "the probed unit vanished from the blue array") end
+    log(string.format("engine offers an Attack row from (%d,%d): %s", u.x, u.y,
+        tostring(canAttackFromHere(u, mn, mx))))
+    for dy = -2, 2 do
+        local row = {}
+        for dx = -2, 2 do
+            local x, y = u.x + dx, u.y + dy
+            row[#row + 1] = (x >= 0 and x < w and y >= 0 and y < h)
+                and string.format("%02X", mapUnitAt(x, y)) or "--"
+        end
+        log(string.format("  grid y=%2d (x=%d..%d): %s", u.y + dy, u.x - 2, u.x + 2,
+            table.concat(row, " ")))
+    end
+    if not moveUnit(u.x, u.y, u.x, u.y) then
+        shot("attackprobe-nomenu")
+        return result("FAIL", string.format(
+            "command menu never opened on firing tile (%d,%d)", u.x, u.y))
+    end
+    wait(30)
+    shot("attackprobe-menu")
+    return result("PASS", string.format(
+        "command menu open on (%d,%d) -- read attackprobe-menu for the Attack row", u.x, u.y))
 end
 
 -- clear_ch04 / clear_ch04_parley: the WIN, and both arms of the branched ending (#24 Stage 5).
@@ -4787,18 +4938,38 @@ local function clearCh04(parley)
     local tag = parley and "clear-ch04-parley" or "clear-ch04"
     if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
     pokeFastConfig()
-    -- LIFT THE FOG for the duration of the rout. FE8 refuses to target a unit standing on a
-    -- fogged tile (bmtarget.c gates every pick on gBmMapFog), so a clear-bot on a fog map can
-    -- only kill what it happens to see -- the first run of this scenario stalled at 10 live
-    -- enemies after 16 turns for exactly that reason. gPlaySt.chapterVisionRange (types.h +0x0D,
-    -- "0 means no fog") is the engine's own switch. This scenario exists to prove the
-    -- win -> ending WIRING, not to play the hunt honestly, so lifting fog is the same class of
-    -- shortcut as pokeFrail/pokeHarmless. The fog itself is covered by ch04moose and smoke_ch04.
-    emu:write8(SYM.gPlaySt + 0x0D, 0)
+    -- LIFT THE FOG for the duration of the rout, and make it reach the GRID (#204). Fog does two
+    -- separate things to a clear-bot: bmtarget.c refuses to target a unit on a fogged tile, AND
+    -- RefreshUnitsOnBmMap leaves a fogged red out of gBmMapUnit entirely. Zeroing the vision range
+    -- alone only fixes the first -- which is why this scenario still stalled at 10 live enemies for
+    -- 16 turns after that "fix". liftFogOntoTheGrid does both and reports what landed. This
+    -- scenario exists to prove the win -> ending WIRING, not to play the hunt honestly, so lifting
+    -- fog is the same class of shortcut as pokeFrail/pokeHarmless. The fog itself is covered by
+    -- ch04moose and smoke_ch04.
+    waitFor(function() return faction() == 0 and not menuOpen()
+        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    if liftFogOntoTheGrid() == 0 then
+        shot(tag .. "-fog-stuck")
+        return result("FAIL", "fog lifted but no enemy reached gBmMapUnit -- nothing is attackable")
+    end
     local start = chapter()
-    local function won() return chapter() ~= start end
+    -- ch05 is not hosted, so ch04's ending chains into dev_placeholder_scene(), whose MNTS(0x0)
+    -- lands on the TITLE -- the chapter index never changes. Gating the win on chapter() alone
+    -- therefore FAILs a run that ended perfectly (#204); the title is the terminal here, exactly
+    -- as clear_ch02 treats it. A game-over also reaches the title, so that stays checked first.
+    local function won() return chapter() ~= start or procActive(SYM.gProcScr_TitleScreen) end
+    -- The PARLEY arm: Marty talks the pack down FIRST, which raises the recruit flag the ending's
+    -- CHECK_EVENTID reads -- so the rout that follows lands on the AUTHORED Lupin ending instead of
+    -- the no-Lupin fallback. Same rout either way; the flag is the whole difference between the two
+    -- scenes, which is why both arms are worth running (#204).
     if parley then
-        if not scenarios.recordch04parley then return result("FAIL", "parley driver missing") end
+        local ok, why = ch04Parley()
+        if not ok then
+            shot(tag .. "-no-parley")
+            return result("FAIL", "parley arm: " .. why)
+        end
+        log(string.format("%s: Lupin is blue, %d green pack members -- routing for the AUTHORED ending",
+            tag, greenCount()))
     end
     for t = 1, 16 do
         if won() then break end
@@ -4808,17 +4979,45 @@ local function clearCh04(parley)
             local r = unitAt(SYM.gUnitArrayRed, i)
             if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
         end
+        -- Stage-by-stage logging (#204): a clear-bot that stalls must say WHICH stage failed --
+        -- no weapon / no firing tile / no command menu / no kill. The first run of this scenario
+        -- reported only "liveEnemies=10" for 16 turns, which named none of them.
+        local mw, mh = mapSize()
+        log(string.format("%s iter %d: gameTurn=%d map=%dx%d liveEnemies=%d",
+            tag, t, turn(), mw, mh, #liveEnemies()))
         for i = 0, 19 do
             if won() or #liveEnemies() == 0 then break end
             local u = unitAt(SYM.gUnitArrayBlue, i)
             if u and not isDead(u) and (u.state & 0x2) == 0 then
                 local mn, mx = unitAttackRange(u)
-                if mn and teleportToFiringTile(u, mn, mx) then
+                if not mn then
+                    log(string.format("  blue[%d] pid=0x%02X (%d,%d): no weapon in slot 0 -- skipped",
+                        i, u.charId, u.x, u.y))
+                elseif not teleportToFiringTile(u, mn, mx) then
+                    log(string.format("  blue[%d] pid=0x%02X (%d,%d): no firing tile [%d,%d]",
+                        i, u.charId, u.x, u.y, mn, mx))
+                elseif not canAttackFromHere(unitAt(SYM.gUnitArrayBlue, i), mn, mx) then
+                    -- The engine's grid, not the unit array, decides whether row 0 is Attack.
+                    -- Pressing anyway opens Item and Uses a vulnerary at full HP (#204).
                     u = unitAt(SYM.gUnitArrayBlue, i)
-                    if u and moveUnit(u.x, u.y, u.x, u.y) then
-                        chooseAttack(u.addr)
-                        waitFor(function() return faction() == 0 and not menuOpen()
-                            and not procActive(SYM.gProc_ekrBattle) end, 600)
+                    log(string.format("  blue[%d] pid=0x%02X on (%d,%d): no hostile in [%d,%d] on "
+                        .. "gBmMapUnit -- NOT pressing Attack", i, u.charId, u.x, u.y, mn, mx))
+                else
+                    u = unitAt(SYM.gUnitArrayBlue, i)
+                    if not (u and moveUnit(u.x, u.y, u.x, u.y)) then
+                        log(string.format("  blue[%d] pid=0x%02X: command menu never opened", i, u.charId))
+                    else
+                        local before = #liveEnemies()
+                        chooseAttack(u.addr, function() return #liveEnemies() == 0 end)
+                        -- Break the settle the moment the kill empties the map: DefeatAll fires
+                        -- on that death and the ending starts playing at once, so a blind
+                        -- 600-frame wait here spends the victory fanfare and half the treeline
+                        -- scene before the capture loop below gets its first frame (#204).
+                        waitFor(function() return #liveEnemies() == 0
+                            or (faction() == 0 and not menuOpen()
+                                and not procActive(SYM.gProc_ekrBattle)) end, 600)
+                        log(string.format("  blue[%d] pid=0x%02X attacked from (%d,%d): liveEnemies %d -> %d",
+                            i, u.charId, u.x, u.y, before, #liveEnemies()))
                     end
                 end
             end
@@ -4835,12 +5034,13 @@ local function clearCh04(parley)
     -- DefeatAll fires once the last red dies; then the branched ending plays over its BG and
     -- chains to the dev placeholder (ch05 is not hosted yet). Film it WITHOUT mashing A past
     -- the end -- a stray press on "Press START" starts a spurious New Game (the clear_ch03
-    -- lesson). Shoot densely so the ending is reviewable as motion.
+    -- lesson), and the run then films ch04's OPENING under the ending's name. So stop pressing
+    -- the moment the title is up, and stop the loop with it. Shoot densely: motion is the point.
     local ended = false
     for f = 1, 5400 do
         if f % 4 == 0 then shot(tag) end
-        if f % 90 == 0 then press(K.A, 3) end
         if won() then ended = true break end
+        if f % 90 == 0 then press(K.A, 3) end
         yield()
     end
     log(string.format("%s: liveEnemies=%d chapter=%d (host=%d)",
@@ -4855,6 +5055,7 @@ local function clearCh04(parley)
 end
 
 scenarios.clear_ch04 = function() return clearCh04(false) end
+scenarios.clear_ch04_parley = function() return clearCh04(true) end
 
 -- recordch04open: the ch04 OPENING in motion (#24 Stage 4) -- the two-BG Lonelywood scene:
 -- beat A in Speaker Nimsy Huddle's cottage over the vanilla House1 hearth, then the CUT to the

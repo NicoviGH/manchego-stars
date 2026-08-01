@@ -53,6 +53,34 @@ function M.pickTarget(reachable, enemies, prefs)
     return nil
 end
 
+-- FE8 writes the UNIT INDEX into gBmMapUnit (bmmap.c RefreshUnitsOnBmMap): 1..0x7F for blue and
+-- green, FACTION_RED + 1 (0x81) and up for red/purple. So a grid byte above FACTION_RED is a
+-- hostile standing on that tile.
+local FACTION_RED = 0x80
+
+-- True when the engine's tile->unit GRID holds a hostile within [minRange, maxRange] of (x,y) --
+-- i.e. when the engine would offer an Attack row to a unit standing there. `gridAt(x, y)` returns
+-- the grid byte, or nil off-map.
+--
+-- Deliberately the grid and NOT the unit array (#204): RefreshUnitsOnBmMap SKIPS a red standing in
+-- fog, writing it to gBmMapHidden instead, so the unit array can report ten live enemies while
+-- gBmMapUnit holds none of them. A clear-bot that trusts the array then teleports "adjacent" to a
+-- foe the engine cannot see, gets a command menu with no Attack row, and its blind row-0 press
+-- opens ITEM -- Using a vulnerary at full HP, forever, with the enemy count never moving.
+function M.gridHostileInReach(gridAt, x, y, minRange, maxRange)
+    for dx = -maxRange, maxRange do
+        local slack = maxRange - math.abs(dx)
+        for dy = -slack, slack do
+            local d = math.abs(dx) + math.abs(dy)
+            if d >= minRange then
+                local id = gridAt(x + dx, y + dy)
+                if id and id > FACTION_RED then return true end
+            end
+        end
+    end
+    return false
+end
+
 local function tileKey(x, y) return x .. "," .. y end
 
 -- Off-field sentinel: a tile the BFS never reached must score worse than ANY real

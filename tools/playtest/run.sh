@@ -21,6 +21,15 @@
 #   clear_ch03           -- rout ch03 via real combat (#23; PT_HOST_CHAPTER=4, CH03BOOT=1): the grell's
 #                           death raises EVFLAG_DEFEAT_BOSS -> assert the DefeatBoss win + ending fired
 #   smoke_ch04           -- stability net on ch04 (#24; PT_HOST_CHAPTER=5, needs CH04BOOT=1)
+#   clear_ch04           -- rout ch04 (DefeatAll) and film the NO-LUPIN fallback ending (#204;
+#                           PT_HOST_CHAPTER=5, CH04BOOT=1): Pinky reads the trail, Meesmickle
+#                           takes the dread. Lifts the fog onto the unit GRID first -- see
+#                           liftFogOntoTheGrid in harness.lua for why zeroing vision is not enough
+#   clear_ch04_parley    -- the same rout, but Marty parleys FIRST, so the ending's CHECK_EVENTID
+#                           branches to the AUTHORED Lupin scene instead (same ROM/host)
+#   attackprobe          -- diagnostic: why a clear-bot's blind Attack press lands on the wrong
+#                           command row. Dumps vision range, every red's grid id + fog byte, the
+#                           5x5 gBmMapUnit window, and photographs the open menu. Any hosted map
 #   recordch04open       -- the two-BG Lonelywood opening in motion (#24; PT_HOST_CHAPTER=5, CH04BOOT=1)
 #   recordch04reveal     -- the turn-2 wolf-pack reveal cutscene in motion (same ROM/host)
 #   recordch04parley     -- Marty's Talk on the wolf pack + the green swap, in motion
