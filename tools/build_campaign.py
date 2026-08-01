@@ -6408,10 +6408,16 @@ def inject_ch02(campaign, verbose=True):
                      name_message_body(display_name(halvar)))
     set_message_body(lines, vanilla_name_text_id(CH02_MINIBOSS_SLOT),
                      name_message_body(display_name(grukk)))
+    # VANILLA'S OWN WORDING, restored 2026-07-31 (Nicolas: "it should never have been altered
+    # in the first place"). FE8 never prints "rout" as an objective -- its whole objective
+    # vocabulary is Defeat enemy / Defeat boss / Defeat all monsters / Seize gate / Seize throne
+    # / Survive, and the game's only uses of the word are "Route +/-" on the world map and
+    # "en route" in prose. "Rout" is FE *community* vocabulary, and importing it also overran a
+    # window vanilla had sized for its own words.
     set_message_body(lines, host['goal']['statusObjectiveTextId'],
-                     name_message_body('Defeat all foes'))
+                     name_message_body('Defeat all monsters'))
     set_message_body(lines, host['goal']['windowTextId'],
-                     goal_window_body('Rout enemy'))
+                     goal_window_body('Defeat enemy'))
     set_message_body(lines, CH02_OPENING_CARD_MSG, name_message_body(op_card))
     _emit_scene_beats(lines, CH02_OPENING_MSGS, op_beats, cut_fid, op_home)
     # Turn-1 fliers-vs-bows tutorial: one portrait box per line (RBG, then Pinky), Text_BG 42-wrap.
@@ -7841,7 +7847,9 @@ def inject_ch04(campaign, boot=False, verbose=True):
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
     set_message_body(lines, host['chapTitleTextId'], name_message_body(chap['title']))
-    set_message_body(lines, host['goal']['statusObjectiveTextId'], name_message_body('Rout enemy'))
+    # Vanilla's own wording (see the ch02 note): FE8 prints "Defeat", never "rout".
+    set_message_body(lines, host['goal']['statusObjectiveTextId'],
+                     name_message_body('Defeat all monsters'))
     # Stage 4 -- the FULL locked parley (was a one-line stub of its closing beat). Five turns,
     # Lupin/Marty alternating: the count-off, Marty's spore-puff opener, the BIRD retort, the
     # goodberry pack-math, and Lupin doing the arithmetic out loud. Marty sits mid-left (party
