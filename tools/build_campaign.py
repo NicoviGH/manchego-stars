@@ -4022,6 +4022,43 @@ def _asm_table_word_index(path, table_label, word_label):
     sys.exit('ERROR: .word %r not found under %r in %s' % (word_label, table_label, path))
 
 
+    # A tileset .gbapal is TWO sets of five banks, not ten independent ones. DisplayBmTile
+# (bmmap.c) draws a VISIBLE tile from BG palette bank 6 and a FOGGED tile from bank 11,
+# and UnpackChapterMapPalette loads our ten banks at BG 6..15 -- so banks 0-4 are the lit
+# set and banks 5-9 are its fog copy. A vendored community tileset routinely recolours only
+# the lit half, because most maps never turn fog on: Snowy Bern's lit half is winter and its
+# fog half is still vanilla Bern, which is why ch04's fogged tiles showed the grass we
+# winterized away (Nicolas, 2026-07-31). Derive the fog half from OUR lit half rather than
+# trusting the vendor's.
+#
+# `haze` is the lerp-toward-white factor. Vanilla authors each tileset's fog half by hand and
+# the direction depends on the setting -- its outdoor palette hazes WHITE (MapPalette1: median
+# k = 0.5 measured across all five bank pairs) while interior palettes darken instead. Snow
+# under fog is the outdoor case.
+TILESET_FOG_HAZE = {'snowy-bern': 0.5}
+FOG_BANK_OFFSET = 5             # banks 0-4 lit -> banks 5-9 fog
+
+
+def derive_fog_banks(palette, haze):
+    """Return `palette` (a 320 B .gbapal) with its fog half rebuilt from its lit half.
+
+    Pure, so it is unit-testable without a build. Each lit colour is lerped toward white in
+    BGR555 space; index 0 is the transparent/backdrop entry and is carried across untouched
+    so the fog copy keeps the same key colour."""
+    out = bytearray(palette)
+    for bank in range(FOG_BANK_OFFSET):
+        for i in range(16):
+            lit = struct.unpack_from('<H', palette, bank * 32 + i * 2)[0]
+            if i == 0:
+                fog = lit
+            else:
+                ch = [(lit >> s) & 31 for s in (0, 5, 10)]
+                ch = [min(31, int(round(c + (31 - c) * haze))) for c in ch]
+                fog = ch[0] | (ch[1] << 5) | (ch[2] << 10)
+            struct.pack_into('<H', out, (bank + FOG_BANK_OFFSET) * 32 + i * 2, fog)
+    return bytes(out)
+
+
 def _register_tileset(campaign, tileset, label_stem, comment):
     """Copy a vendored tileset's 3 pieces (maps/tilesets/<tileset>/, the
     map_tileset_tool import format) into the decomp, register their incbins in
@@ -4036,9 +4073,22 @@ def _register_tileset(campaign, tileset, label_stem, comment):
         ('TileConfiguration%s' % label_stem, 'bin', 'bin.lz'),
     ]
     incbin = ['\n/* %s */' % comment]
+    haze = TILESET_FOG_HAZE.get(tileset)
     for label, src_ext, inc_ext in assets:
-        shutil.copyfile(os.path.join(ts_dir, '%s.%s' % (tileset, src_ext)),
-                        os.path.join(MAP_GFX_DIR, '%s.%s' % (label, src_ext)))
+        src = os.path.join(ts_dir, '%s.%s' % (tileset, src_ext))
+        dst = os.path.join(MAP_GFX_DIR, '%s.%s' % (label, src_ext))
+        if src_ext == 'gbapal' and haze is not None:
+            # Rebuild the fog half from our winterized lit half (see TILESET_FOG_HAZE).
+            # Derived at build time, so the vendored .gbapal stays the one source of truth
+            # and a future repaint of the lit banks carries into fog for free. Only the COPY
+            # changes -- the incbin/label registration below still has to happen, or the
+            # asset table references a symbol nothing defines.
+            with open(src, 'rb') as f:
+                pal = f.read()
+            with open(dst, 'wb') as f:
+                f.write(derive_fog_banks(pal, haze))
+        else:
+            shutil.copyfile(src, dst)
         incbin += ['\t.align 2, 0', '\t.global %s' % label, '%s:' % label,
                    '\t.incbin "graphics/map/%s.%s"' % (label, inc_ext)]
     with open(CONST_MAPS_S, 'a', encoding='utf-8') as f:
@@ -5936,6 +5986,12 @@ CAMPAIGN_BG_SLOT0 = 0x38   # first campaign BG index -- PAST the vanilla BG_RAND
 CAMPAIGN_BGS = [
     ('BG_MS_TARGOS_WINTER',   'bg_TargosWinter',   '{Zeldacrafter}'),  # ch02 ending: Targos at night
     ('BG_MS_TERMALAINE_MINE', 'bg_TermalaineMine', '{FE7 rip}'),        # ch03 opening: the mine mouth
+    # ch04 opening beat B: the fogged forest edge. NOT a vendored import and not new tile art --
+    # vanilla's own bg_Plain_1 TILES under a winter palette. The BG "fog" variants (_Fog, _Sunset,
+    # _Night) are palette swaps of one image, which is why BG_PLAIN_1_FOG is a green summer meadow
+    # under white haze and read wrong in a snowbound chapter. Additive slot, so vanilla's BG is
+    # untouched and still available. Approved by Nicolas 2026-07-31 over BG_TREES.
+    ('BG_MS_LONELYWOOD_FOG',  'bg_LonelywoodFog',  '{vanilla FE8 bg_Plain_1, winter palette}'),
 ]
 
 
@@ -6595,7 +6651,10 @@ CH04_ENDING_NO_LUPIN_MSG = 0x9C2                # chapter_end, no-parley path (P
 # old-lady generic mug -- both DECIDED 2026-07-04 (Nicolas): in-ROM, so no vendored asset, no
 # injection, no credit line. Beat B plays over a fogged plain (the scout who cannot see).
 CH04_OPENING_COTTAGE_BG = 'BG_HOUSE'            # vanilla House1 -- Nimsy's hearth
-CH04_OPENING_FOREST_BG = 'BG_PLAIN_1_FOG'       # the forest edge under fog (Pinky's beat)
+CH04_OPENING_FOREST_BG = 'BG_MS_LONELYWOOD_FOG'  # the forest edge under fog (Pinky's beat) --
+                                               # vanilla's bg_Plain_1 tiles on a winter palette
+                                               # (BG_PLAIN_1_FOG is a GREEN meadow; the vanilla
+                                               # "_FOG" variants are palette swaps, not art)
 CH04_ENDING_BG = 'BG_FOREST'                    # dusk at the treeline; the sled at the ridge
 CH04_NIMSY_FID = '[FID_VillagerOldWoman]'       # vanilla generic (textdefs.txt 0x5F)
 # The moose: a scripted NEUTRAL that is sighted once and gone. It rides its own dead Ch5 slots.
@@ -6619,12 +6678,14 @@ SCRIPTED_NEUTRAL_SPRITES = (
 # map, so the sighting points at the exit it then bolts for.
 CH04_MOOSE_POS = (11, 4)
 CH04_MOOSE_AREA = (8, 2, 14, 7)                 # AREA(x1, y1, x2, y2) -- the clearing it watches from
-# The tomb-side EDGE tile it escapes off. It was (14, 0) -- the literal NE corner -- and that
-# soft-locked the chapter: the corner is TERRAIN_PLAINS but a wall of TERRAIN_CLIFF seals the
-# whole NE pocket off from the clearing, so the MOVE waited forever on a path that cannot be
-# walked (see assert_scripted_move_reachable, which now fails the BUILD on this). (14, 5) is the
-# most north-east tile on the map edge the moose can actually reach from its clearing.
-CH04_MOOSE_FLEE_TO = (14, 5)
+# The EDGE tile it escapes off. Direction is AWAY FROM THE PARTY, who deploy on the NW flank --
+# Nicolas 2026-07-31: "I don't care about the direction, I want it to be away from the party; the
+# southeast corner makes most sense." So the quarry breaks for the far corner and is gone.
+# It was (14, 0) -- the literal NE corner -- and that SOFT-LOCKED the chapter: the corner is
+# TERRAIN_PLAINS but a wall of TERRAIN_CLIFF seals the whole NE pocket off from the clearing, so
+# the MOVE waited forever on a path that cannot be walked. assert_scripted_move_reachable now
+# fails the BUILD on any such destination, and it passes on this one.
+CH04_MOOSE_FLEE_TO = (14, 14)
 
 
 # ── Message-id ownership across hosted chapters (#198 review, issue #24) ────────

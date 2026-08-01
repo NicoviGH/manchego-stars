@@ -38,7 +38,7 @@ narrative: >
   goodberries for the pack's help (one berry is a full day's nourishment, RAW —
   the end of winter hunger), meat on feast-days. Reined in alongside Baxby, the
   pack joins the sled. The white moose itself never speaks and stays just out of
-  reach, fleeing deeper — and Lupin noses its trail northeast, to the door of an
+  reach, fleeing deeper — and Lupin noses its trail southeast, to the door of an
   ancient elven tomb.
 
 # ── Map ────────────────────────────────────────────────────────────────────────
@@ -52,7 +52,7 @@ map:
     avoid on the approach; a few clearings expose the party. Monsters hold the
     deep woods at the start — a Mogall crossfire pocket, Revenants and melee
     Bonewalkers; the wolf pack bursts from the NW fog on turn 2. The white moose
-    darts between clearings and flees off the northeast (tomb-side) edge.
+    darts between clearings and flees off the southeast (tomb-side) edge.
   # PLACEMENT DIRECTIVES (step 2 of the difficulty flow — decisions.md "checked in fidelity tiers").
   # Realigned 2026-07-21 to the LOCKED reveal design: ch04 OPENS monsters-only, the wolf pack bursts
   # from the NW fog on turn 2, and the Marty->Lupin parley is the tide-turner. Derived from an
@@ -260,7 +260,7 @@ neutral_units:
                                 # matching ch05's entry for the SAME creature. Was `wolf`, which
                                 # drifted from ch05 and predates the Wyrdeer art below.
     behavior: flee
-    flees_to: northeast_edge    # the tomb-side exit; its escape ends the hunt → ch05
+    flees_to: southeast_edge    # the tomb-side exit; its escape ends the hunt → ch05
     note: "Awakened spy-beast serving Ravisin; uncatchable here by design."
     # ── Art (SHIPPED 2026-07-31, Nicolas's direction: Wyrdeer) ──────────────────
     # The book plate (p.81, "The dreaded white moose of Lonelywood is no one's prey") is a
@@ -389,14 +389,14 @@ events:
     type: scripted_event
     ea_file: events/ch04-moose-flees.ea
     description: >
-      The white moose breaks from a clearing and bolts for the northeast edge.
+      The white moose breaks from a clearing and bolts for the southeast edge.
       The party can't run it down — it escapes toward the elven tomb, baiting the
       hunt onward. LOCKED 2026-07-03 (dialogue-pass): mute white ghost — the moose
       NEVER speaks; the awakened lore is carried solely by Lupin's ending line.
       PENDING: eventscript + scripted flee path + motion review.
     script:                     # LOCKED 2026-07-03 (dialogue pass, co-written with Nicolas)
       # (A shape in the fog ahead: the white moose, huge and still in the clearing,
-      #  watching them. A heartbeat — then it turns and is simply gone, silent, northeast.)
+      #  watching them. A heartbeat — then it turns and is simply gone, silent, southeast.)
       - prof-rbg: "After it!"
   - trigger: chapter_end
     type: cutscene
@@ -414,7 +414,7 @@ events:
       #  beside the axe-beak like they've pulled all their lives. Only Lupin stays out of
       #  the traces, nose down in the snow.)
       - lupin: >-
-          Your ghost left a trail after all. Northeast — long strides, no panic.
+          Your ghost left a trail after all. Southeast — long strides, no panic.
           It ran like something that knows where home is.
       # (Marty starts down the harness line, handing out berries — the deal honored.)
       - marty: "Then we'll walk it home. After supper, friends."
@@ -444,7 +444,7 @@ events:
         speaker's history with her. Marty's box 2 is unchanged in both branches.
       script:
         - pinky: >-
-            Father! From up high-- tracks. Northeast, big ones, and they don't wander.
+            Father! From up high-- tracks. Southeast, big ones, and they don't wander.
             It knew where it was going.
         - meesmickle: >-
             Standing stones and a bone orchard. ...Of course the trail goes in.
