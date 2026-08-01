@@ -7,30 +7,41 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 ## Current state
 
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
-- **ch04 "The White Moose" (#24) — its scenes have now been WATCHED, and that is what mattered.**
-  The chapter booted (#200) and stopped soft-locking (#201) in the previous session; this one
-  filmed the beats and found **six defects that `smoke_ch04` could never see**, because an idling
-  party never triggers them and a beat firing at the wrong moment is not a soft-lock. All six are
-  fixed and merged (`d14ee84`), each behind a guard that fails the BUILD rather than a playtest:
-  the moose sighting firing for MONSTERS (AREA has no faction check); the moose then HANGING the
-  chapter on a cliff-sealed flee tile; the moose rendering as a stock hound (its art was declared,
-  committed, and injected by nobody); Lupin rendering as NOTHING (correct at every layer, standing
-  on the one pack tile outside fog vision); fogged map tiles showing summer grass; and the goal
-  banner overflowing. Three beat GIFs are in `docs/demo/`.
+- **ch04 "The White Moose" (#24) — BOTH ENDINGS ARE NOW FILMED (#204, `5caa322`).** The chapter
+  booted (#200), stopped soft-locking (#201), had its scenes watched and six defects fixed (`d14ee84`);
+  this session made it actually WINNABLE by a bot and filmed the branch that ends it.
+  `clear_ch04` had sat at 10 live enemies for 16 turns with zero kills, and **the previous session's
+  fog fix was applied at the wrong layer**. Fog does TWO things: `bmtarget.c` gates target-picking on
+  `chapterVisionRange` (which zeroing does re-open), but `RefreshUnitsOnBmMap` (`bmmap.c`) is what
+  writes units into `gBmMapUnit`, and it **SKIPS a red standing in fog**, filing it under
+  `gBmMapHidden`. Nothing recomputes that grid on a memory poke, so every enemy was simply absent
+  from the map: no Attack row in the command menu, and the bot's blind row-0 press opened **ITEM**
+  and Used a Goodberry at full HP, forever. The turn never ended either — `endTurn` kept finding
+  that item menu already open. ADR in `decisions.md` §Operational Gotchas.
 - **The method is the transferable part: read DATA, not frames.** `ch04sprites` prints the unit
   arrays, `gBmMapFog`, `gUnitSpriteSlots[]` and the SMS VRAM cursors — that one scenario separated
   "wrong sprite" from "never injected" from "never drawn" in a single run, after cropped frames had
-  twice pointed the wrong way. `assert_scripted_move_reachable`, `assert_declared_map_sprites_injected`
-  and `goal_window_body` now catch those three classes at build time.
-- **ch04 is NOT finished. Six issues carry the rest**: **#203** the parley re-loads the pack on its
+  twice pointed the wrong way. **`attackprobe` (new, any hosted chapter) is the same trick for "why
+  won't the bot attack"**: it printed every red at `grid=0x00` while `blue[0]` read `grid=0x01`, then
+  proved one Wait action put all ten back. `assert_scripted_move_reachable`,
+  `assert_declared_map_sprites_injected` and `goal_window_body` catch three earlier classes at build time.
+- **`clear_ch04` -> the no-Lupin FALLBACK ending; `clear_ch04_parley` (newly registered — it was
+  documented but never existed) -> the AUTHORED Lupin ending.** GIFs in `docs/demo/`
+  (`ch04-ending-no-lupin.gif`, `ch04-ending-lupin.gif`). The fallback's substitute speakers are
+  confirmed in-engine (Pinky reads the trail, Meesmickle takes the dread), ticking three boxes on
+  #24's wolf block. The parley driver is now shared by `recordch04parley` and the clear arm.
+- **ch04 is NOT finished. Five issues carry the rest**: **#203** the parley re-loads the pack on its
   spawn tiles instead of converting it in place (diagnosed: five generics share one pid, and
   `GetUnitFromCharId` returns the first match scanning blue->green->red, so repeated `CUSN` re-finds
-  the wolf already converted — the fix is distinct pids); **#204** `clear_ch04` never routs, so
-  **neither ending branch has been filmed**; **#205** the village is unbuilt and ch04's Iron Axe is
-  unobtainable, leaving the chapter with no material reward; **#206** Lupin has no battle anim and
-  fights as a stock red Cavalier; **#207** hosted chapters share vanilla's goal message ids, so ch02
-  and ch04 overwrite each other's objective text TODAY; **#208** the locked reveal dialogue still
-  lives in `build_campaign.py`.
+  the wolf already converted — the fix is distinct pids); **#205** the village is unbuilt and ch04's
+  Iron Axe is unobtainable, leaving the chapter with no material reward; **#206** Lupin has no battle
+  anim and fights as a stock red Cavalier; **#207** hosted chapters share vanilla's goal message ids,
+  so ch02 and ch04 overwrite each other's objective text TODAY; **#208** the locked reveal dialogue
+  still lives in `build_campaign.py`.
+- **Two gaps #204 did NOT close, both flagged on #24**: nothing yet *gates* the no-parley path's
+  speaker coverage against drift (the runs prove it today, a test does not); and the `LOAD1`
+  five-wolf question is still open — the parley run killed no pack member first, so it does not
+  test whether a partly-killed pack still yields five allies.
 - **#206 is DECIDED and scoped up (Nicolas, 2026-08-01): do Lupin's battle anim AND Baxby's.**
   Baxby has the same defect for the same reason — he rides a Cavalier slot so the axe-beak can be
   mounted, and he is not among the eight finished PC anims, so the giant bird also fights as a man
@@ -56,7 +67,35 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   deferral from a silent one; their wiring is #25 work.
 
 
-## This session (2026-07-31/08-01, Opus — the scenes got watched)
+## This session (2026-08-01, Opus — ch04 became winnable, and both endings got filmed)
+
+- **#204 closed (PR #209).** One root cause explained every symptom: the fog was never lifted off
+  the unit GRID. See Current state above and the `decisions.md` ADR.
+- **The fix ships four guards, not one**, because the same path held three more traps that produce
+  the identical "bot parks somewhere useless" symptom:
+  - `liftFogOntoTheGrid` zeroes the vision range, forces ONE `RefreshEntityBmMaps` by spending a
+    unit's Wait, and **reports how many reds reached the grid** — 0 now fails the run loudly
+    instead of grinding 16 turns.
+  - `clearbot.gridHostileInReach` (pure, unit-tested) makes the bot decide from the ENGINE'S grid
+    rather than the unit array, and it is checked BEFORE pressing. **This is the same class that
+    bit the ch03 talk driver last session** (row 0 is Attack only when a target exists); it can no
+    longer happen silently.
+  - `teleportToFiringTile` uses the live `mapSize()` — it hardcoded 25x16 and parked units off
+    ch04's 15x15 map, where the cursor can never reach them.
+  - `chooseAttack` takes an optional `stopWhen`: a kill that ENDS the chapter starts the win event
+    on the spot and the actor may never grey out, so the old 1200-frame wait A-mashed straight
+    through the ending the run existed to film.
+- **A win gate must match the chapter's real terminal.** `clear_ch04` demanded `chapter() ~= start`,
+  which an unhosted ch05 can never satisfy: ch04's ending chains into `dev_placeholder_scene()`
+  whose `MNTS(0x0)` lands on the TITLE. It was FAILing runs that had ended perfectly. `clear_ch02`
+  already had the right idiom (`or procActive(gProcScr_TitleScreen)`) — precedent beat invention.
+  Corollary re-learned: **never A-mash at the title** — it starts a spurious New Game, and the run
+  then films the chapter's OPENING under the ending's name.
+- **`clear_ch02`/`clear_ch03` are unaffected** by the shared changes: `stopWhen` defaults to nil
+  (identical behaviour), and on a 25x16 map `mapSize()` bounds are byte-identical to the old
+  hardcoded ones. `recordch04parley` re-run and still PASSes after its driver was extracted.
+
+## Previous session (2026-07-31/08-01, Opus — the scenes got watched)
 
 - **Filmed the opening, the turn-2 reveal and the wolf parley** (`recordch04open`,
   `recordch04reveal`, `recordch04parley`), plus `ch04moose`, `ch04sprites` and `clear_ch04`.
@@ -97,24 +136,22 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 - **`vanilla_scene.py` was mining the WORKING TREE, not HEAD** (fix `46f8b12`). **Every "vanilla
   says…" number mined on a built tree before that fix is suspect** — re-mine before citing one.
 
-## NEXT SESSION — finish ch04's slice; the beats that remain are the ones that end it
+## NEXT SESSION — finish ch04's slice; the win and both endings are done
 
-`main` is clean and green; `feat/24-ch04-scenes` is merged and deleted. **Start from the issues,
-not from this file** — #203-#208 each carry their own diagnosis so none of it has to be re-derived.
+`main` is clean and green; `feat/204-clear-ch04-rout` is merged and deleted. **Start from the
+issues, not from this file** — #203/#205-#208 each carry their own diagnosis so none of it has to
+be re-derived.
 
-1. **#204 `clear_ch04`** first: it blocks BOTH endings, the last unwatched beats, and one of them
-   (the no-Lupin fallback) is the path the difficulty model explicitly prices. Fog is already
-   handled (`bmtarget.c` gates targeting on `gBmMapFog`; the scenario zeroes
-   `chapterVisionRange`), and that did NOT fix it — instrument `teleportToFiringTile` /
-   `chooseAttack` next.
-2. **#203 the pack conversion** — visible in the shipped parley GIF, and fully diagnosed.
-3. **#205 the village** — ch04 currently has no material reward at all.
-4. **#207 the goal-id collision** — it is corrupting ch02's objective text right now, and it is
+1. **#203 the pack conversion** — visible in the shipped parley GIF, and fully diagnosed.
+2. **#205 the village** — ch04 currently has no material reward at all.
+3. **#207 the goal-id collision** — it is corrupting ch02's objective text right now, and it is
    cross-chapter, so it grows with every rout chapter added.
-5. **#206 Lupin + Baxby battle anims** — decided and wanted; start with Lupin's free Mauthe Doog
+4. **#206 Lupin + Baxby battle anims** — decided and wanted; start with Lupin's free Mauthe Doog
    donor to prove the per-character binding, then Baxby.
-6. Then **#208**, and re-record the opening + reveal on the fixed ROM (winter BG, visible Lupin,
+5. Then **#208**, and re-record the opening + reveal on the fixed ROM (winter BG, visible Lupin,
    winterized fog).
+6. The two #204 leftovers on #24: a test that gates the no-parley path's speaker coverage, and the
+   `LOAD1` five-wolf question (kill pack members BEFORE the parley, then count greens).
 
 Then: **ch05's build work** on #25; **#138** config-driven `inject_chapter(descriptor)`; **#29**
 world map.
@@ -129,7 +166,7 @@ world map.
   artifact, not a regression.)
 - **No outstanding branches.** `.claude/worktrees/` is empty. Merged: #197 build-speed, #198 ch04
   Stages 1–3, #199 review cleanups, #200 the host-slot fix, #201 the banim arming fix, #202 the
-  ch04 scenes + the six defects above.
+  ch04 scenes + the six defects above, #209 the ch04 rout + both endings (#204).
 - Untracked local/session files (`.agents/`, `AGENTS.md`, `skills-lock.json`) are intentionally not
   versioned; leave them alone. `tools/key_magenta.py` is **gitignored** (#178).
 - **HANDOFF.md is authored on `main` ONLY** — gated by `check.py check_handoff_only_on_main`.
@@ -154,6 +191,9 @@ make difficulty CH=ch04                    # parity/difficulty read (all from HE
 PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04sprites   # WHO is on the map: unit arrays, fog, SMS slots
 PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04moose     # the sighting is player-only, both halves
 PT_HOST_CHAPTER=5 tools/playtest/run.sh recordch04parley  # the wolf parley, in motion
+PT_HOST_CHAPTER=5 tools/playtest/run.sh clear_ch04        # rout -> the NO-LUPIN fallback ending
+PT_HOST_CHAPTER=5 tools/playtest/run.sh clear_ch04_parley # parley, rout -> the AUTHORED ending
+PT_HOST_CHAPTER=5 tools/playtest/run.sh attackprobe   # why the bot won't attack: grid, fog, the menu
 make CAMPAIGN=rime-of-the-frostmaiden CH04BOOT=1 fireemblem8.gba -j$(nproc)   # ch04 fast-boot
 PT_HOST_CHAPTER=5 tools/playtest/run.sh smoke_ch04                            # ch04 stability net
 
