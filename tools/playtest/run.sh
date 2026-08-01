@@ -27,6 +27,9 @@
 #                           liftFogOntoTheGrid in harness.lua for why zeroing vision is not enough
 #   clear_ch04_parley    -- the same rout, but Marty parleys FIRST, so the ending's CHECK_EVENTID
 #                           branches to the AUTHORED Lupin scene instead (same ROM/host)
+#   ch04packmath         -- the Stage 5 balance question: kill 2 of the 5 generic wolves, THEN
+#                           parley, and count the green allies. Answers whether LOAD1 brings the
+#                           full five-wolf table back regardless of who died (it does)
 #   attackprobe          -- diagnostic: why a clear-bot's blind Attack press lands on the wrong
 #                           command row. Dumps vision range, every red's grid id + fog byte, the
 #                           5x5 gBmMapUnit window, and photographs the open menu. Any hosted map

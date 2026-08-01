@@ -4850,6 +4850,105 @@ scenarios.recordch04parley = function()
         "parley filmed: Lupin is blue and the pack came over green (%d green units)", greenCount()))
 end
 
+-- ch04packmath (#24 Stage 5 question): does mercy pay the same after you have already shot at the
+-- pack? The parley DISA(0xb3)s the generic Mauthe Doogs and LOAD1s a FIXED five-wolf green table,
+-- so on paper killing wolves first still yields five allies -- which would mean the recruit is
+-- worth the same whether you talked on sight or ground half the pack down first. That is a real
+-- balance question (the difficulty model prices the parley path as a clear-load discount), and it
+-- is only answerable in-engine. Kill KILL of them, parley, count the greens.
+-- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04packmath (needs a CH04BOOT=1 ROM).
+scenarios.ch04packmath = function()
+    local PACK_PID, KILL = 0xb3, 2      -- the convertible generics; Lupin (0x1D) is separate
+    if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
+    pokeFastConfig()
+    waitFor(function() return faction() == 0 and not menuOpen()
+        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    if liftFogOntoTheGrid() == 0 then
+        return result("FAIL", "fog lifted but no enemy reached gBmMapUnit")
+    end
+    -- The pack only exists from turn 2. Wait for LUPIN, not merely for the turn counter: it ticks
+    -- the moment the player phase ends, well before the reveal event LOAD1s the wave (waiting on
+    -- the counter alone found an empty field).
+    if not endTurn() then return result("FAIL", "could not end turn 1") end
+    if not waitFor(function()
+        return turn() >= 2 and findUnit(SYM.gUnitArrayRed, 24, CH04_LUPIN_PID) ~= nil
+    end, 5400) then
+        return result("FAIL", "the wolf pack never arrived on turn 2")
+    end
+    waitFor(function() return faction() == 0 and not menuOpen()
+        and not procActive(SYM.ProcScr_StdEventEngine) end, 3600, true)
+    for i = 0, 23 do
+        local r = unitAt(SYM.gUnitArrayRed, i)
+        if r and not isDead(r) then
+            log(string.format("  red[%02d] char=0x%02X at (%d,%d)%s", i, r.charId, r.x, r.y,
+                r.charId == CH04_LUPIN_PID and "   <- LUPIN" or ""))
+        end
+    end
+    local function packAlive()
+        local n = 0
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) and r.charId == PACK_PID then n = n + 1 end
+        end
+        return n
+    end
+    local function firstWolf()
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) and r.charId == PACK_PID then return r end
+        end
+        return nil
+    end
+    local spawned = packAlive()
+    log(string.format("ch04packmath: %d generic wolves (pid 0x%02X) on the field at turn 2",
+        spawned, PACK_PID))
+    if spawned == 0 then return result("FAIL", "the wolf pack never arrived on turn 2") end
+    -- Shoot KILL of them. Marty (the recruiter) is skipped -- he owns the Talk.
+    local killed = 0
+    for _ = 1, KILL do
+        local wolf = firstWolf()
+        if not wolf then break end
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+        end
+        wolf = firstWolf()
+        for i = 0, 19 do
+            local u = unitAt(SYM.gUnitArrayBlue, i)
+            if u and not isDead(u) and (u.state & 0x2) == 0 and u.charId ~= CH04_MARTY_PID then
+                local mn, mx = unitAttackRange(u)
+                if mn and mn <= 1 and teleportAdjacentTo(u, { wolf }) then
+                    u = unitAt(SYM.gUnitArrayBlue, i)
+                    if u and canAttackFromHere(u, mn, mx) and moveUnit(u.x, u.y, u.x, u.y) then
+                        local was = packAlive()
+                        chooseAttack(u.addr)
+                        waitFor(function() return faction() == 0 and not menuOpen()
+                            and not procActive(SYM.gProc_ekrBattle) end, 600)
+                        if packAlive() < was then killed = killed + 1 end
+                        break
+                    end
+                end
+            end
+        end
+    end
+    log(string.format("ch04packmath: killed %d of %d generics -- %d left standing before the parley",
+        killed, spawned, packAlive()))
+    if killed == 0 then return result("FAIL", "could not kill a single pack wolf before the parley") end
+    local left = packAlive()
+    local ok, why = ch04Parley()
+    if not ok then return result("FAIL", "parley after the kills: " .. why) end
+    local greens = greenCount()
+    log(string.format("ch04packmath: %d killed, %d generics left, parley -> %d GREEN allies",
+        killed, left, greens))
+    shot("ch04packmath")
+    -- Not a pass/fail on balance -- it ANSWERS the question, and states which way.
+    return result("PASS", string.format(
+        "killed %d of %d wolves first, then parleyed -> %d green allies (%s)",
+        killed, spawned, greens,
+        greens > left and "LOAD1 brings the FULL table back -- the dead wolves return"
+                      or "the green pack scales with who survived"))
+end
+
 -- attackprobe (#204): WHY a clear-bot's blind Attack press lands on the wrong command row. The
 -- clear-bot's chooseAttack assumes command-menu row 0 is Attack; when the engine sees no target
 -- it is Item instead, and the bot Uses a vulnerary at full HP forever. This probe stages ONE
