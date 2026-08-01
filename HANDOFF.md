@@ -7,51 +7,40 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 ## Current state
 
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
-- **ch04 "The White Moose" (#24) — BOTH ENDINGS ARE NOW FILMED (#204, `5caa322`).** The chapter
-  booted (#200), stopped soft-locking (#201), had its scenes watched and six defects fixed (`d14ee84`);
-  this session made it actually WINNABLE by a bot and filmed the branch that ends it.
-  `clear_ch04` had sat at 10 live enemies for 16 turns with zero kills, and **the previous session's
-  fog fix was applied at the wrong layer**. Fog does TWO things: `bmtarget.c` gates target-picking on
-  `chapterVisionRange` (which zeroing does re-open), but `RefreshUnitsOnBmMap` (`bmmap.c`) is what
-  writes units into `gBmMapUnit`, and it **SKIPS a red standing in fog**, filing it under
-  `gBmMapHidden`. Nothing recomputes that grid on a memory poke, so every enemy was simply absent
-  from the map: no Attack row in the command menu, and the bot's blind row-0 press opened **ITEM**
-  and Used a Goodberry at full HP, forever. The turn never ended either — `endTurn` kept finding
-  that item menu already open. ADR in `decisions.md` §Operational Gotchas.
-- **The method is the transferable part: read DATA, not frames.** `ch04sprites` prints the unit
-  arrays, `gBmMapFog`, `gUnitSpriteSlots[]` and the SMS VRAM cursors — that one scenario separated
-  "wrong sprite" from "never injected" from "never drawn" in a single run, after cropped frames had
-  twice pointed the wrong way. **`attackprobe` (new, any hosted chapter) is the same trick for "why
-  won't the bot attack"**: it printed every red at `grid=0x00` while `blue[0]` read `grid=0x01`, then
-  proved one Wait action put all ten back. `assert_scripted_move_reachable`,
-  `assert_declared_map_sprites_injected` and `goal_window_body` catch three earlier classes at build time.
-- **`clear_ch04` -> the no-Lupin FALLBACK ending; `clear_ch04_parley` (newly registered — it was
-  documented but never existed) -> the AUTHORED Lupin ending.** GIFs in `docs/demo/`
-  (`ch04-ending-no-lupin.gif`, `ch04-ending-lupin.gif`). The fallback's substitute speakers are
-  confirmed in-engine (Pinky reads the trail, Meesmickle takes the dread), ticking three boxes on
-  #24's wolf block. The parley driver is now shared by `recordch04parley` and the clear arm.
-- **ch04 is NOT finished. Five issues carry the rest**: **#203** the parley re-loads the pack on its
-  spawn tiles instead of converting it in place (diagnosed: five generics share one pid, and
-  `GetUnitFromCharId` returns the first match scanning blue->green->red, so repeated `CUSN` re-finds
-  the wolf already converted — the fix is distinct pids); **#205** the village is unbuilt and ch04's
-  Iron Axe is unobtainable, leaving the chapter with no material reward; **#206** Lupin has no battle
-  anim and fights as a stock red Cavalier; **#207** hosted chapters share vanilla's goal message ids,
-  so ch02 and ch04 overwrite each other's objective text TODAY; **#208** the locked reveal dialogue
-  still lives in `build_campaign.py`.
-- **DECIDED (Nicolas, 2026-08-01) and it folds into #203 — parleying EARLY must be a reward.**
-  `ch04packmath` (`c194347`) confirmed in-engine that killing 2 of the 5 generic wolves and then
-  parleying still yields **5 green allies**: `LOAD1` brings the full table back, so the dead wolves
-  return and shooting first costs nothing. Nicolas chose "scale to survivors"; he also chose #203's
-  in-place conversion. **Those are the same fix** — `CUSN` can only convert wolves that still
-  exist, so in-place conversion scales to survivors for free, with no table-scaling code.
-  Accepted trade-off: the pack keeps `CLASS_MAUTHEDOOG` (wolf sprite) in the green NPC palette
-  instead of upgrading to `CLASS_MTD_LYCANROC_PACK`; the sprite upgrade can be added later as a
-  class-remap hook without redoing the conversion work.
+- **ch04 "The White Moose" (#24) — THE PARLEY NOW CONVERTS THE PACK IN PLACE (#203, `6624364`).**
+  The chapter booted (#200), stopped soft-locking (#201), had its scenes watched and six defects
+  fixed (`d14ee84`), became winnable with both endings filmed (#204), and this session made mercy
+  mean something: Marty's Talk runs one **`CHECK_ALIVE`-guarded `CUSN` per wolf** instead of
+  `DISA` + `LOAD1`, so the pack turns green **where it stands** and **the ally count scales with
+  survivors** — kill two of five, get three. The old reload put the pack back on its SPAWN tiles
+  and resurrected the dead ones, so shooting first cost nothing.
+- **The guard is the load-bearing part, and the decomp says why.** `UnitKill` (`bmunit.c:988`)
+  WIPES a non-blue unit's slot (`pCharacterData = NULL`), and a `CUSN` on an unresolvable pid
+  returns **`EVC_ERROR`** — only `DISA`/`KILL` get the graceful no-op (`eventscr.c:3317`). A bare
+  five-`CUSN` sweep would therefore break in exactly the kill-then-parley case the change exists
+  to reward. Distinct pids are the other half: `GetUnitFromCharId` returns the FIRST match
+  scanning blue→green→red, so a shared pid can only ever be converted once. `CH04_PACK_PIDS`
+  draws five from the unnamed generic band `0xB0..0xB9`; a test pins their character entries as
+  byte-identical to the `0xb3` slot they replaced. ADR in `decisions.md`.
+- **`ch04packmath` is now a GATE, not a question** (kill 2 → must yield 3 greens), and
+  `recordch04parley` asserts the "where it stands" half from the unit arrays — tiles read before
+  the Talk and again right after the conversion, deliberately BEFORE the phase cycle hands the new
+  greens a turn of their own (an aggressive ally walking off to fight looks exactly like a
+  relocated wolf). `assert_parley_pid_unique` → `assert_pack_pids_addressable`, guarding the SET.
+- **Accepted trade-off (Nicolas, 2026-08-01): the pack keeps `CLASS_MAUTHEDOOG`** in the green NPC
+  palette — `CUSN` flips faction, not class. The `lycanroc-pack` reskin stays **declared but
+  unworn** in `campaign.yaml` for a later class-remap hook; noted on #24 so the ticked Stage-3 art
+  box does not read as "visible in play".
+- **ch04 is NOT finished. Four issues carry the rest**: **#205** the village is unbuilt and ch04's
+  Iron Axe is unobtainable, leaving the chapter with no material reward; **#206** Lupin and Baxby
+  have no battle anims and fight as stock Cavaliers; **#207** hosted chapters share vanilla's goal
+  message ids, so ch02 and ch04 overwrite each other's objective text TODAY; **#208** the locked
+  reveal dialogue still lives in `build_campaign.py`.
 - **#24's review block was STALE, not incomplete** — three boxes were done in #202 and never
   ticked (checked and ticked 2026-08-01): the no-parley speaker-coverage test
   (`test_the_no_parley_path_has_a_speaker_for_every_box`) exists and passes; message-id uniqueness
   is enforced at build time by `assert_message_ids_unique()` from `main()`; and the parley wave's
-  pid is guarded by `assert_parley_pid_unique`. **Scope note that keeps #207 alive:** the id guard
+  pid is guarded (now `assert_pack_pids_addressable`, #203). **Scope note that keeps #207 alive:** the id guard
   covers scene/talk/card ids only — the goal/objective ids come from the host slot's vanilla
   chapter data and are NOT in `HOSTED_CHAPTER_MESSAGE_IDS`, which is exactly #207.
 - **#206 is DECIDED and scoped up (Nicolas, 2026-08-01): do Lupin's battle anim AND Baxby's.**
@@ -61,9 +50,6 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   vanilla anim IS a wolf); Baxby likely needs an FE-Repo import. Per-character binding already
   exists (`pcs/pinky.yaml` `_u25`), so neither needs a new class. **Basil and Sahnar stay ch05
   work (#25)** — not part of this.
-- **One decision still Nicolas's**: whether #203's in-place conversion may drop the green Lycanroc
-  class upgrade (in-place `CUSN` changes faction, not class, so the pack would stay Mauthe Doogs
-  wearing the green NPC palette).
 - **ch05 "The Elven Tomb" (#25) — DIALOGUE COMPLETE AND MERGED** (PR #196). 15 slots, all
   `status: locked`. Still owed: map + placement, text insertion → `verify_text`, `--ch05-boot`
   playtest, `enemy_class_reskins` + FE-Repo imports, Basil/Sahnar STAT_DONORs, and the five
@@ -79,7 +65,32 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   deferral from a silent one; their wiring is #25 work.
 
 
-## This session (2026-08-01, Opus — ch04 became winnable, and both endings got filmed)
+## This session (2026-08-01, Opus — mercy started costing something)
+
+- **#203 closed (PR #211).** The whole design was already on the issue and was NOT re-derived —
+  worth repeating as a habit: a grounded design comment is worth more than a fresh investigation,
+  and the session went straight to TDD from it.
+- **The three decomp facts are the transferable part**, because two of them only bite in the case
+  you are trying to reward: a shared pid can be found only once (`GetUnitFromCharId`, first match
+  blue→green→red); `UnitKill` WIPES a non-blue slot; and `CUSN` on an unresolvable pid is
+  `EVC_ERROR`, not a no-op — DISA/KILL are the only graceful ones. Kill a wolf, then parley, and a
+  bare sweep errors the event engine. `CHECK_ALIVE` per unit is ch02's chwinga idiom, reused.
+- **A NameError in `inject_ch04` survived a green unit suite** — `len(green_pack_rows)` in a
+  verbose print. The injector's end-to-end path is not unit-tested; `make` is what catches it. Run
+  the BUILD before believing a refactor of `inject_*` is done.
+- **The gates now assert instead of reporting.** `ch04packmath` was written last session to ANSWER
+  a balance question; it printed either answer as PASS. It is now the regression gate (kill 2 →
+  must be 3 greens). A scenario that can only report is one nobody notices regressing.
+- **Verify the claim, not the neighbourhood** — `recordch04parley`'s new in-place assertion had to
+  sample the pack's tiles BEFORE the post-parley phase cycle, because that cycle hands the new
+  greens their own turn and an aggressive ally walking off to fight is indistinguishable from a
+  wolf the parley relocated. The check would have been a coin flip a few lines later.
+- **Counting the right thing needed the same fix as converting the right thing**: `greenCount()`
+  counted the whole green array (the white moose is green too). One pid per wolf made
+  `greenPackCount()` possible — the fix for the mechanism paid for the fix to its measurement.
+- Re-recorded `docs/demo/ch04-wolf-parley.gif`: the committed one still filmed the retired swap.
+
+## Previous session (2026-08-01, Opus — ch04 became winnable, and both endings got filmed)
 
 - **#204 closed (PR #209).** One root cause explained every symptom: the fog was never lifted off
   the unit GRID. See Current state above and the `decisions.md` ADR.
@@ -156,29 +167,24 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 - **`vanilla_scene.py` was mining the WORKING TREE, not HEAD** (fix `46f8b12`). **Every "vanilla
   says…" number mined on a built tree before that fix is suspect** — re-mine before citing one.
 
-## NEXT SESSION — finish ch04's slice; the win and both endings are done
+## NEXT SESSION — finish ch04's slice; the parley, the win and both endings are done
 
-`main` is clean and green; `feat/204-clear-ch04-rout` is merged and deleted. **Start from the
-issues, not from this file** — #203/#205-#208 each carry their own diagnosis so none of it has to
-be re-derived.
+`main` is clean and green; `feat/203-parley-in-place` is merged and deleted. **Start from the
+issues, not from this file** — #205-#208 each carry their own diagnosis so none of it has to be
+re-derived.
 
-1. **#203 the pack conversion — DESIGNED AND GROUNDED, ready to implement.** The full design is a
-   comment on #203 (2026-08-01); do not re-derive it. Headline: distinct pids + a **`CHECK_ALIVE`-
-   guarded `CUSN` per wolf**, replacing the DISA + `LOAD1` swap entirely. The guard is NOT optional
-   — `UnitKill` (`bmunit.c:988`) WIPES a non-blue unit's slot (`pCharacterData = NULL`), and a
-   `CUSN` on an unresolvable pid returns **`EVC_ERROR`** rather than no-op'ing the way `DISA`/`KILL`
-   do (`eventscr.c:3317`), so a bare five-`CUSN` sweep breaks in exactly the kill-then-parley case
-   this is meant to reward. `CHECK_ALIVE` is safe on a wiped slot and is already ch02's idiom.
-   Gate: `ch04packmath` must go from 5 greens to **3**, and `recordch04parley` must show the pack
-   flip green WHERE IT STANDS.
-2. **#205 the village** — ch04 currently has no material reward at all.
-3. **#207 the goal-id collision** — it is corrupting ch02's objective text right now, and it is
+1. **#205 the village** — ch04 has no material reward at all right now: `inject_ch04` blanks
+   `EventListScr_Ch5_Location`, and that list is where `VILL` entries live, so the authored
+   Lonelywood village (and its Iron Axe, the chapter's *whole* material gift under a deliberately
+   gold-free, chest-free economy) is unreachable. ch02's `House(0x0, EventScr_Ch2_Village1, x, y)`
+   + `HouseEvent(msg, bg)` shape is the precedent to copy; check the result against
+   `make difficulty CH=ch04`, which already prices the axe into the item-economy read.
+2. **#207 the goal-id collision** — it is corrupting ch02's objective text right now, and it is
    cross-chapter, so it grows with every rout chapter added.
-4. **#206 Lupin + Baxby battle anims** — decided and wanted; start with Lupin's free Mauthe Doog
+3. **#206 Lupin + Baxby battle anims** — decided and wanted; start with Lupin's free Mauthe Doog
    donor to prove the per-character binding, then Baxby.
-5. Then **#208**, and re-record the opening + reveal on the fixed ROM (winter BG, visible Lupin,
+4. Then **#208**, and re-record the opening + reveal on the fixed ROM (winter BG, visible Lupin,
    winterized fog).
-Nothing is blocked on the pack-math decision above — it is Nicolas's to make whenever.
 
 Then: **ch05's build work** on #25; **#138** config-driven `inject_chapter(descriptor)`; **#29**
 world map.
@@ -193,7 +199,8 @@ world map.
   artifact, not a regression.)
 - **No outstanding branches.** `.claude/worktrees/` is empty. Merged: #197 build-speed, #198 ch04
   Stages 1–3, #199 review cleanups, #200 the host-slot fix, #201 the banim arming fix, #202 the
-  ch04 scenes + the six defects above, #209 the ch04 rout + both endings (#204).
+  ch04 scenes + the six defects above, #209 the ch04 rout + both endings (#204), #211 the in-place
+  pack conversion (#203).
 - Untracked local/session files (`.agents/`, `AGENTS.md`, `skills-lock.json`) are intentionally not
   versioned; leave them alone. `tools/key_magenta.py` is **gitignored** (#178).
 - **HANDOFF.md is authored on `main` ONLY** — gated by `check.py check_handoff_only_on_main`.
@@ -221,7 +228,7 @@ PT_HOST_CHAPTER=5 tools/playtest/run.sh recordch04parley  # the wolf parley, in 
 PT_HOST_CHAPTER=5 tools/playtest/run.sh clear_ch04        # rout -> the NO-LUPIN fallback ending
 PT_HOST_CHAPTER=5 tools/playtest/run.sh clear_ch04_parley # parley, rout -> the AUTHORED ending
 PT_HOST_CHAPTER=5 tools/playtest/run.sh attackprobe   # why the bot won't attack: grid, fog, the menu
-PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04packmath  # kill 2 wolves, THEN parley -> how many greens?
+PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04packmath  # GATE: kill 2 wolves, parley -> must be 3 greens
 make CAMPAIGN=rime-of-the-frostmaiden CH04BOOT=1 fireemblem8.gba -j$(nproc)   # ch04 fast-boot
 PT_HOST_CHAPTER=5 tools/playtest/run.sh smoke_ch04                            # ch04 stability net
 
