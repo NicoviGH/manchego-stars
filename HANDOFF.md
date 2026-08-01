@@ -38,10 +38,23 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   anim and fights as a stock red Cavalier; **#207** hosted chapters share vanilla's goal message ids,
   so ch02 and ch04 overwrite each other's objective text TODAY; **#208** the locked reveal dialogue
   still lives in `build_campaign.py`.
-- **Two gaps #204 did NOT close, both flagged on #24**: nothing yet *gates* the no-parley path's
-  speaker coverage against drift (the runs prove it today, a test does not); and the `LOAD1`
-  five-wolf question is still open — the parley run killed no pack member first, so it does not
-  test whether a partly-killed pack still yields five allies.
+- **ONE DECISION IS WAITING ON NICOLAS — the ch04 pack math (#24).** Confirmed in-engine
+  (`ch04packmath`, `c194347`): kill 2 of the 5 generic wolves, then parley, and the pack still
+  comes over **5 green**. `LOAD1` brings the full table back — **the dead wolves return**, so
+  shooting half the pack and talking after pays exactly the same as talking on sight. That is a
+  DESIGN call, not a defect, and nothing was changed. It matters because the difficulty model
+  prices the parley path as a clear-load discount and that discount is currently unconditional.
+  Options on the issue: (1) leave it — "the pack comes over as a unit", forgiving for the
+  friend-group audience; (2) scale the green table to survivors so mercy-on-sight is strictly
+  better; (3) gate the parley on an intact pack (harshest). Re-check any choice with
+  `ch04packmath`.
+- **#24's review block was STALE, not incomplete** — three boxes were done in #202 and never
+  ticked (checked and ticked 2026-08-01): the no-parley speaker-coverage test
+  (`test_the_no_parley_path_has_a_speaker_for_every_box`) exists and passes; message-id uniqueness
+  is enforced at build time by `assert_message_ids_unique()` from `main()`; and the parley wave's
+  pid is guarded by `assert_parley_pid_unique`. **Scope note that keeps #207 alive:** the id guard
+  covers scene/talk/card ids only — the goal/objective ids come from the host slot's vanilla
+  chapter data and are NOT in `HOSTED_CHAPTER_MESSAGE_IDS`, which is exactly #207.
 - **#206 is DECIDED and scoped up (Nicolas, 2026-08-01): do Lupin's battle anim AND Baxby's.**
   Baxby has the same defect for the same reason — he rides a Cavalier slot so the axe-beak can be
   mounted, and he is not among the eight finished PC anims, so the giant bird also fights as a man
@@ -94,6 +107,14 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 - **`clear_ch02`/`clear_ch03` are unaffected** by the shared changes: `stopWhen` defaults to nil
   (identical behaviour), and on a 25x16 map `mapSize()` bounds are byte-identical to the old
   hardcoded ones. `recordch04parley` re-run and still PASSes after its driver was extracted.
+- **Then swept #24's remaining review block and found it STALE rather than open** (see Current
+  state) — worth repeating as a habit: before building a checklist item, grep for the guard; three
+  of four were already shipped. The fourth needed a new scenario (`ch04packmath`) and produced the
+  pack-math finding above.
+- **`turn()` is NOT the signal that a turn's reinforcements exist.** It ticks the moment the player
+  phase ends, well before the reveal event `LOAD1`s the wave, so `waitFor(turn() >= 2)` finds an
+  empty field. Wait for a UNIT from the wave (`recordch04parley` waits for Lupin) — the same
+  verify-by-outcome rule that fixed the Talk-row search.
 
 ## Previous session (2026-07-31/08-01, Opus — the scenes got watched)
 
@@ -150,8 +171,7 @@ be re-derived.
    donor to prove the per-character binding, then Baxby.
 5. Then **#208**, and re-record the opening + reveal on the fixed ROM (winter BG, visible Lupin,
    winterized fog).
-6. The two #204 leftovers on #24: a test that gates the no-parley path's speaker coverage, and the
-   `LOAD1` five-wolf question (kill pack members BEFORE the parley, then count greens).
+Nothing is blocked on the pack-math decision above — it is Nicolas's to make whenever.
 
 Then: **ch05's build work** on #25; **#138** config-driven `inject_chapter(descriptor)`; **#29**
 world map.
@@ -194,6 +214,7 @@ PT_HOST_CHAPTER=5 tools/playtest/run.sh recordch04parley  # the wolf parley, in 
 PT_HOST_CHAPTER=5 tools/playtest/run.sh clear_ch04        # rout -> the NO-LUPIN fallback ending
 PT_HOST_CHAPTER=5 tools/playtest/run.sh clear_ch04_parley # parley, rout -> the AUTHORED ending
 PT_HOST_CHAPTER=5 tools/playtest/run.sh attackprobe   # why the bot won't attack: grid, fog, the menu
+PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04packmath  # kill 2 wolves, THEN parley -> how many greens?
 make CAMPAIGN=rime-of-the-frostmaiden CH04BOOT=1 fireemblem8.gba -j$(nproc)   # ch04 fast-boot
 PT_HOST_CHAPTER=5 tools/playtest/run.sh smoke_ch04                            # ch04 stability net
 
