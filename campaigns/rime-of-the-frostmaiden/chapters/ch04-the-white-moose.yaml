@@ -192,7 +192,17 @@ enemy_units:
     name: "Mauthe Doog"
     fe_name: "Mauthe Doog"
     count: 6                    # canon pack (1d4+4); Marty's Talk flips the WHOLE pack (→ green Lycanrocs)
-    positions: [[0,0],[2,0],[0,2],[2,1],[1,0],[0,1]]   # NW fog edge, beside the party's deploy flank
+    # NW fog edge, beside the party's deploy flank. positions[0] is the LEADER (Lupin) tile.
+    # It was [0,0] — the map corner — and that made him INVISIBLE in his own reveal: under fog
+    # every other pack tile sits in the party's vision (3) but [0,0] is Manhattan 4 from the
+    # nearest deploy slot [2,2], so the engine never drew him and CUMO_CHAR focused empty snow
+    # (verified in-engine: `ch04sprites` prints fog(0,0)=0 against 1..6 for the rest).
+    # [2,1] is the best-lit pack tile AND the closest to the party, which is also what this
+    # wave's own directive asks for — the reveal landing in the party's face, with Marty able
+    # to reach Lupin so the parley valve is usable. Same six tiles, so the difficulty read is
+    # unchanged; only WHO stands where moves. Nicolas approved 2026-07-31, with the standing
+    # caveat that the spatial/difficulty pass must take the new leader tile into account.
+    positions: [[2,1],[2,0],[0,2],[0,0],[1,0],[0,1]]
     class: mauthedoog           # CLASS_MAUTHEDOOG — the FE8 wolf/dog beast (Ravisin's awakened pack)
     level: 2
     autolevel: true

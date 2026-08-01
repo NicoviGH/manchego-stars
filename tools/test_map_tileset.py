@@ -404,9 +404,13 @@ class TestCh04MapAndRosterPlacement(unittest.TestCase):
                 [[1, 14], [5, 13], [8, 14]],
             ),
             'entoumbed': ('Entombed', [[13, 13]]),
+            # The pack's FOOTPRINT is what mirrors vanilla Ch4; the ORDER is ours, because
+            # positions[0] is the leader (Lupin) tile. He moved [0,0] -> [2,1]: at [0,0] he
+            # sat outside the party's fog vision and was never drawn in his own reveal.
+            # Compared as a set below, with the leader pinned separately.
             'mauthedoog': (
                 'Mauthe Doog',
-                [[0, 0], [2, 0], [0, 2], [2, 1], [1, 0], [0, 1]],
+                [[2, 1], [2, 0], [0, 2], [0, 0], [1, 0], [0, 1]],
             ),
             'revenant-reinf': (
                 'Revenant',
@@ -420,8 +424,17 @@ class TestCh04MapAndRosterPlacement(unittest.TestCase):
         for unit_id, (name, positions) in expected.items():
             unit = enemies[unit_id]
             self.assertEqual(name, unit['name'])
-            self.assertEqual(positions, unit['positions'])
+            if unit_id == 'mauthedoog':
+                # Footprint = vanilla's; order = ours (positions[0] is the leader's tile).
+                self.assertCountEqual(positions, unit['positions'])
+            else:
+                self.assertEqual(positions, unit['positions'])
             self.assertEqual(unit['count'], len(unit['positions']))
+
+        # The pack LEADER must stand where the party can actually see him when the reveal
+        # fires -- an unseen unit is not drawn, so a leader outside fog vision makes his own
+        # cutscene focus empty snow (verified in-engine by the `ch04sprites` scenario).
+        self.assertEqual([2, 1], enemies['mauthedoog']['positions'][0])
 
         map_dir = os.path.join(
             REPO, 'campaigns/rime-of-the-frostmaiden/maps')

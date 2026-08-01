@@ -78,6 +78,10 @@ art:
     static: true              # no mouth-flap / blink, like the other custom busts
     credit: "Glaceo (FE-Repo, F2E); see CREDITS.md"
   map_sprite:                 # SHIPPED (map_sprites/sahnar{,_mu}.png); palette applied by Nicolas
+    wiring: pending           # art SHIPPED; injection waits on the ch05 recruit
+                              # wiring (#25). Explicit so assert_declared_map_sprites_
+                              # injected can tell a tracked deferral from a unit that
+                              # silently renders its stock class sprite.
     base: Bonewalker/Specter  # 16x16 SMS + 32x480 MU, adopted from the Specter overworld sprite
     source: "Bonewalker (U) Specter {Alexsplode} — FE-Repo Map Sprites/Monsters - Basic Types"
     recipe: >

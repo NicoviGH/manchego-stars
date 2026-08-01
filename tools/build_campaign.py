@@ -817,6 +817,27 @@ def vanilla_name_text_id(slot):
     sys.exit('ERROR: could not find nameTextId for %s in %s' % (marker, CHARACTERS_C))
 
 
+GOAL_WINDOW_MAX_CHARS = 12      # vanilla's own widest: 'Defeat enemy' / 'Seize throne'
+
+
+def goal_window_body(text):
+    """A goal-WINDOW string, width-checked against vanilla's budget.
+
+    The on-map objective window does not wrap or clip gracefully: a string past its width
+    runs the last glyph off the right border and drops its tail onto the row below (Nicolas
+    spotted the severed 'y' of an injected 'Rout the enemy', 14 chars). FE8 never risks it --
+    every vanilla goal-window string fits in 12: Survive(7), Defeat boss(11), Defeat enemy(12),
+    Seize gate(10), Seize throne(12). Measured across every chapter's `goal.windowTextId`, so
+    the budget is the SHIPPED corpus rather than a guess.
+    """
+    if len(text) > GOAL_WINDOW_MAX_CHARS:
+        sys.exit('ERROR: goal-window text %r is %d chars; the window fits %d '
+                 '(vanilla\'s widest are "Defeat enemy" / "Seize throne"). It would spill '
+                 'its last glyph past the border and wrap the tail underneath.'
+                 % (text, len(text), GOAL_WINDOW_MAX_CHARS))
+    return name_message_body(text)
+
+
 def name_message_body(name):
     """Format a name as a terminated FE8 message, matching vanilla's convention.
 
@@ -2435,17 +2456,20 @@ def _inject_palette_bank_hook():
         f.write(prep)
 
 
-def _inject_cast_palette(palette_u16, char_slots):
+def _inject_cast_palette(palette_u16, char_slots, extra_char_ids=()):
     """Emit gCastMapPalette (the bespoke 16-colour bank) + gMapPaletteOverride (the
     charIds that wear it, 0xFFFF-terminated) into the kept .data file, then patch the
-    bmudisp palette hooks. char_slots = portrait-slot names (-> CHARACTER_<SLOT>)."""
+    bmudisp palette hooks. char_slots = portrait-slot names (-> CHARACTER_<SLOT>);
+    extra_char_ids = RAW charId literals for units with no portrait slot (scripted
+    neutrals, which wear this palette precisely because they never change faction)."""
     with open(UNIT_ICON_WAIT_C, encoding='utf-8') as f:
         wait_c = f.read()
     if 'constants/characters.h' not in wait_c:
         wait_c = wait_c.replace('#include "unit_icon_data.h"',
                                 '#include "unit_icon_data.h"\n#include "constants/characters.h"', 1)
     pal = ', '.join('0x%04X' % c for c in palette_u16)
-    ov = '\n'.join('\tCHARACTER_%s,' % s.upper() for s in char_slots)
+    ov = '\n'.join(['\tCHARACTER_%s,' % s.upper() for s in char_slots]
+                   + ['\t%s,' % c for c in extra_char_ids])
     wait_c += ('\n/* injected: bespoke cast map-sprite palette (loaded into the purple OBJ\n'
                ' * bank) + the charIds that wear it (0xFFFF-terminated). Non-const so they\n'
                ' * share unit_icon_wait_table\'s kept .data section. */\n'
@@ -2563,6 +2587,11 @@ def inject_map_sprites(campaign, verbose=True):
     # Second look for a cast member who is on the field BEFORE he joins you (appends its
     # own wait rows, so it must follow the cast/guest rows that name their own SMS ids).
     _inject_pre_recruit_variants(campaign, idle, pointer_externs, verbose=verbose)
+    # Scripted neutrals (ch04's white moose): custom art on a unit that is not cast, so
+    # classed_cast never sees it. Must follow the cast/guest passes -- it appends its own
+    # wait rows and reaches into the override tables those passes emit.
+    neutral_ids = _inject_scripted_neutral_sprites(campaign, asset_dir, pointer_externs,
+                                                   verbose=verbose)
     if pointer_externs:
         with open(UNIT_ICON_POINTER_H, 'a', encoding='utf-8') as f:
             f.write('\n/* Manchego Stars custom map sprites (#38) */\n'
@@ -2575,17 +2604,25 @@ def inject_map_sprites(campaign, verbose=True):
     custom_slots = [slot for uid, slot, _, _ in idle if uid not in FACTION_TINTED_CAST]
     custom_slots += [slot for uid, slot, _, _ in mu
                      if uid not in FACTION_TINTED_CAST and slot not in custom_slots]
-    if custom_slots:
+    if custom_slots or neutral_ids:
         pal_png = os.path.join(asset_dir, 'cast_palette.png')
         if not os.path.isfile(pal_png):
             sys.exit('ERROR: custom map sprites need campaigns/%s/map_sprites/cast_palette.png'
                      % campaign)
-        _inject_cast_palette(_read_cast_palette(pal_png), custom_slots)
+        # Scripted neutrals join the override by RAW charId -- they have no portrait slot.
+        _inject_cast_palette(_read_cast_palette(pal_png), custom_slots,
+                             extra_char_ids=[cid for _, cid, _ in neutral_ids])
 
     # ch02 green chwinga: reskin minor NPC slots with Sclorbo's chwinga map sprite, tinted
     # by the green faction palette (no bespoke palette -- they're green faction). Runs here
     # because inject_map_sprites owns the gMapSpriteOverride / gMuImgOverride tables.
     _inject_ch02_chwinga_sprites(campaign, verbose=verbose)
+
+    # Everything declared + committed must have landed in one of the passes above.
+    assert_declared_map_sprites_injected(campaign, {uid for uid, _, _, _ in idle + guest_idle}
+                                         | {uid for uid, _, _, _ in mu + guest_mu}
+                                         | {uid for uid, _, _ in neutral_ids}
+                                         | {CH02_CHWINGA_SPRITE_SRC})
 
     if verbose:
         guest_uids = {uid for uid, _, _, _ in guest_idle}
@@ -2729,6 +2766,122 @@ def _remap_indices(src_path, roles, palette_png, out_path):
     out.putpalette(map_sprite_tool.read_palette(palette_png))
     out.putdata([0 if v == 0 else roles[v] for v in im.getdata()])
     out.save(out_path)
+
+
+def declared_map_sprite_units(campaign):
+    """Every campaign unit that DECLARES custom map-sprite art -- cast (pcs/npcs YAML) and
+    chapter-level scripted neutrals alike -- as {id: where-it-was-declared}."""
+    declared = {}
+    root = os.path.join(REPO, 'campaigns', campaign)
+    for sub in ('pcs', 'npcs'):
+        d = os.path.join(root, sub)
+        if not os.path.isdir(d):
+            continue
+        for name in sorted(os.listdir(d)):
+            if not name.endswith('.yaml'):
+                continue
+            with open(os.path.join(d, name), encoding='utf-8') as f:
+                unit = yaml.safe_load(f) or {}
+            ms = (unit.get('art') or {}).get('map_sprite')
+            if ms and (ms or {}).get('wiring') != 'pending':
+                declared[unit.get('id') or name[:-5]] = '%s/%s' % (sub, name)
+    chapters = os.path.join(root, 'chapters')
+    for name in sorted(os.listdir(chapters)):
+        if not name.endswith('.yaml'):
+            continue
+        with open(os.path.join(chapters, name), encoding='utf-8') as f:
+            chap = yaml.safe_load(f) or {}
+        for key in ('neutral_units', 'green_units'):
+            for unit in (chap.get(key) or []):
+                if ((unit.get('art') or {}).get('map_sprite')) and unit.get('id'):
+                    declared[unit['id']] = 'chapters/%s (%s)' % (name, key)
+    return declared
+
+
+def assert_declared_map_sprites_injected(campaign, wired):
+    """Custom map art that is DECLARED and COMMITTED must actually get wired, or the unit
+    silently wears its stock class sprite and nothing anywhere complains.
+
+    That is precisely how ch04's white moose shipped: a full `art:` block on the chapter YAML,
+    two committed Wyrdeer sheets, and an injector that only ever walked PORTRAIT_MAP -- so the
+    chapter's title creature rendered as CLASS_GWYLLGI's stock hound. There was no error to
+    read, because nothing tried and failed; nothing tried at all. A missing ASSET stays a
+    no-op (art lands before wiring, deliberately) -- what fails here is art that exists on
+    disk and is described in YAML, yet ends up in no sprite table.
+
+    Art routinely lands one slice AHEAD of its wiring (Basil/Sahnar shipped with #179/#181;
+    their wiring is #25 ch05 work). That deferral is legitimate, but it has to be WRITTEN
+    DOWN or this guard cannot tell it from the moose -- so say `wiring: pending` on the unit's
+    map_sprite block and name the issue there.
+    """
+    asset_dir = os.path.join(REPO, 'campaigns', campaign, 'map_sprites')
+    missing = sorted(
+        (uid, where) for uid, where in declared_map_sprite_units(campaign).items()
+        if os.path.isfile(os.path.join(asset_dir, uid + '.png')) and uid not in wired)
+    if missing:
+        sys.exit('ERROR: these units declare art.map_sprite and ship map_sprites/<id>.png, '
+                 'but no injector wired them -- they would render their stock class sprite:\n'
+                 + '\n'.join('       %-16s declared in %s' % (uid, where) for uid, where in missing)
+                 + '\n       Cast go in PORTRAIT_MAP; scripted neutrals in '
+                   'SCRIPTED_NEUTRAL_SPRITES.')
+
+
+def _inject_scripted_neutral_sprites(campaign, asset_dir, pointer_externs, verbose=True):
+    """Map sprites for SCRIPTED NEUTRALS -- units that stand on a map wearing our own art but
+    are NOT cast members (no PORTRAIT_MAP slot, no bust/stat/prep wiring), so `classed_cast`
+    never sees them and `inject_map_sprites` used to walk straight past their assets.
+
+    That gap is how ch04's white moose shipped: its Wyrdeer sheets and a full `art:` block
+    were committed on the chapter YAML, nothing read them, and the engine fell back to
+    CLASS_GWYLLGI's stock hound -- a green dog standing in for the chapter's title creature.
+    Nothing failed; the art was simply never asked for. `assert_declared_map_sprites_injected`
+    now closes that door.
+
+    They wear the CAST palette, not the faction one, which is the whole reason they can't ride
+    the chwinga path: a scripted neutral never changes faction, and the green NPC palette turns
+    index 3 pale-green and index 11 blue -- a green-tinted animal with green blood. Keyed by a
+    RAW charId (a pid the injector allocated), not a portrait-slot name.
+    """
+    neutral_ids = []
+    for uid, char_id, donor in SCRIPTED_NEUTRAL_SPRITES:
+        idle_png = os.path.join(asset_dir, uid + '.png')
+        if not os.path.isfile(idle_png):
+            continue
+        mu_png = os.path.join(asset_dir, uid + '_mu.png')
+        if not os.path.isfile(mu_png):
+            sys.exit('ERROR: scripted neutral %s needs a committed map_sprites/%s_mu.png '
+                     '(hover/walk sheet; neutrals have no synth path -- synth_mu_sheet reads '
+                     'the unit YAML, which a chapter-level neutral has none of)' % (uid, uid))
+        map_sprite_tool.validate_mu_sheet(mu_png)
+        _, dfw, dfh = map_sprite_tool.donor_sms_geometry(donor)
+        macro, _, _, _ = map_sprite_tool.sheet_info(idle_png, (dfw, dfh))
+        stem = uid.replace('-', '_')
+        wait_sym = 'unit_icon_wait_manchego_%s_sheet' % stem
+        move_sym = 'unit_icon_move_manchego_%s_sheet' % stem
+        shutil.copyfile(idle_png, os.path.join(WAIT_GFX_DIR, wait_sym + '.png'))
+        shutil.copyfile(mu_png, os.path.join(MOVE_GFX_DIR, move_sym + '.png'))
+        sms = _wait_table_len()
+        _append_table_rows(UNIT_ICON_WAIT_C, 'unit_icon_wait_table[]',
+                           ['\t{0, %s, %s}, // %d %s (scripted neutral)'
+                            % (macro, wait_sym, sms, uid)])
+        with open(UNIT_ICON_WAIT_S, 'a', encoding='utf-8') as f:
+            f.write('\n/* Manchego Stars scripted-neutral idle sprite: %s (#24) */\n'
+                    '\t.global %s\n%s:\n\t.incbin "graphics/unit_icon/wait/%s.4bpp.lz"\n'
+                    '\t.align 2, 0\n' % (uid, wait_sym, wait_sym, wait_sym))
+        with open(UNIT_ICON_MOVE_S, 'a', encoding='utf-8') as f:
+            f.write('\n/* Manchego Stars scripted-neutral hover/walk (MU) sprite: %s (#24) */\n'
+                    '\t.global %s\n%s:\n\t.incbin "graphics/unit_icon/move/%s.4bpp.lz"\n'
+                    '\t.align 2, 0\n' % (uid, move_sym, move_sym, move_sym))
+        pointer_externs += ['extern char %s[];' % wait_sym, 'extern char %s[];' % move_sym]
+        _insert_table_head(UNIT_ICON_WAIT_C, 'gMapSpriteOverride[]',
+                           '\t%s, %d,\n' % (char_id, sms))
+        _insert_table_head(UNIT_ICON_MOVE_C, 'gMuImgOverride[]',
+                           '\t{%s, %s},\n' % (char_id, move_sym))
+        neutral_ids.append((uid, char_id, sms))
+        if verbose:
+            print('  %-12s -> scripted-neutral idle SMS %d + MU (charId %s, cast palette)'
+                  % (uid, sms, char_id))
+    return neutral_ids
 
 
 def _inject_ch02_chwinga_sprites(campaign, verbose=True):
@@ -5679,7 +5832,7 @@ def inject_ch01(campaign, verbose=True):
     set_message_body(lines, host['goal']['statusObjectiveTextId'],
                      name_message_body('Seize camp'))
     set_message_body(lines, host['goal']['windowTextId'],
-                     name_message_body('Seize camp'))
+                     goal_window_body('Seize camp'))
     chief.setdefault('id', 'goblin-chief')
     # Izobai (boss, her custom bust on the Breguet slot): turn-1 taunt + death quote,
     # both from the chapter YAML (lore/izobai.md voice). She/her throughout.
@@ -6202,7 +6355,7 @@ def inject_ch02(campaign, verbose=True):
     set_message_body(lines, host['goal']['statusObjectiveTextId'],
                      name_message_body('Defeat all foes'))
     set_message_body(lines, host['goal']['windowTextId'],
-                     name_message_body('Rout the enemy'))
+                     goal_window_body('Rout enemy'))
     set_message_body(lines, CH02_OPENING_CARD_MSG, name_message_body(op_card))
     _emit_scene_beats(lines, CH02_OPENING_MSGS, op_beats, cut_fid, op_home)
     # Turn-1 fliers-vs-bows tutorial: one portrait box per line (RBG, then Pinky), Text_BG 42-wrap.
@@ -6456,6 +6609,12 @@ CH04_MOOSE_PID = '0xce'                         # its own pid (DISA targets it, 
 CH04_MOOSE_GUARD_FLAG = 'EVFLAG_TMP(10)'        # AREA one-shot guard (must differ from the talk flag)
 CH04_MOOSE_CLASS = 'CLASS_GWYLLGI'              # geometry token: the 32x32 quadruped wait row
 CH04_MOOSE_MOV_TABLE = 'TerrainTable_MovCost_AnimalT2Normal'   # the Gwyllgi's own cost row
+# Scripted NEUTRALS carrying custom map art (see _inject_scripted_neutral_sprites): units that
+# stand on a map wearing our own sprite without being cast members, so classed_cast never sees
+# them. (campaign asset id, raw charId, donor base for the wait-row GEOMETRY only).
+SCRIPTED_NEUTRAL_SPRITES = (
+    ('white-moose', CH04_MOOSE_PID, 'Gwyllgi'),
+)
 # Where the party first SEES it: the mid-map clearing, on the tomb-side (NE) half of the 15x15
 # map, so the sighting points at the exit it then bolts for.
 CH04_MOOSE_POS = (11, 4)

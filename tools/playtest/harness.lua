@@ -4637,9 +4637,10 @@ scenarios.ch04sprites = function()
     -- Fog: a unit the player cannot SEE is not drawn, which is indistinguishable from a
     -- broken map sprite. Print the fog state of every pack tile.
     local fogRow = function(y) return ru32(ru32(SYM.gBmMapFog) + y * 4) end
+    local lup = findUnit(SYM.gUnitArrayRed, 24, LUPIN)
     for _, t in ipairs({ {0,0}, {1,0}, {2,0}, {0,1}, {2,1}, {0,2} }) do
         log(string.format("  fog(%d,%d) = %d%s", t[1], t[2], ru8(fogRow(t[2]) + t[1]),
-            (t[1] == 0 and t[2] == 0) and "   <- Lupin's tile" or ""))
+            (lup and lup.x == t[1] and lup.y == t[2]) and "   <- Lupin's tile" or ""))
     end
     for _, id in ipairs({ 107, 109, 110, 115, 117, 119, 124 }) do
         local slot = ru8(SYM.gUnitSpriteSlots + id)

@@ -88,6 +88,10 @@ art:
     deadzone: verified clean (portrait_tool.py preview; top 48 rows only draw x=16..80)
     static: true              # no mouth flap / blink, like the other custom busts
   map_sprite:                 # SHIPPED (map_sprites/basil{,_mu}.png); palette applied by Nicolas
+    wiring: pending           # art SHIPPED; injection waits on the ch05 recruit
+                              # wiring (#25). Explicit so assert_declared_map_sprites_
+                              # injected can tell a tracked deferral from a unit that
+                              # silently renders its stock class sprite.
     base: Cyclops             # geometry donor ONLY: {3 frames, UNIT_ICON_SIZE_16x32} wait-table row
     footprint: 16x32          # PMD frames are 14-20px tall -> native fit in the tall class (no rescale)
     idle_frames: PMD Idle-Anim S row f0/f1/f3, bottom-anchored
