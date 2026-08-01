@@ -4592,6 +4592,67 @@ scenarios.ch04moose = function()
     return result("PASS", "the sighting is player-only: skipped the enemy phase, fired for the party")
 end
 
+-- ch04sprites: WHO is actually standing in the turn-2 pack, read from the unit arrays rather
+-- than judged off a 240x160 frame (a custom map sprite under a faction palette is exactly the
+-- thing that gets misread from pixels). Logs every red unit's charId + tile after the reveal
+-- wave lands, so "Lupin is not wearing his Lycanroc" can be separated from "Lupin is not on
+-- the map at all". Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04sprites (CH04BOOT=1 ROM).
+scenarios.ch04sprites = function()
+    local LUPIN = 0x1D                  -- CHARACTER_DUESSEL (Lupin's identity slot)
+    if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
+    waitFor(function()
+        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
+    end, 900, true)
+    if not endTurn() then return result("FAIL", "could not end turn 1") end
+    if not waitFor(function() return turn() >= 2 end, 5400) then
+        return result("FAIL", "turn 2 never began")
+    end
+    waitFor(function()
+        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
+    end, 3600, true)
+    -- Camera + a known blue unit calibrate tile -> screen, so the crop of Lupin's tile is
+    -- computed rather than eyeballed.
+    log(string.format("  camera px (%d,%d)", ru16(SYM.gBmSt + 0x0C), ru16(SYM.gBmSt + 0x0E)))
+    local found = false
+    for i = 0, 23 do
+        local u = unitAt(SYM.gUnitArrayRed, i)
+        if u and not isDead(u) then
+            log(string.format("  red[%02d] char=0x%02X at (%d,%d)%s",
+                i, u.charId, u.x, u.y, u.charId == LUPIN and "   <- LUPIN" or ""))
+            if u.charId == LUPIN then found = true end
+        end
+    end
+    for i = 0, 7 do
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u and not isDead(u) then
+            log(string.format("  blue[%02d] char=0x%02X at (%d,%d)", i, u.charId, u.x, u.y))
+        end
+    end
+    -- The map-sprite VRAM cache. gUnitSpriteSlots[id] == 0xFF means that sprite was never
+    -- allocated on this map; a real slot means it was, and any invisibility is downstream.
+    -- 32x32 sprites cost 4 slots each out of a 0x40 space shared with the 16x16 sprites
+    -- growing down from the other end, so a monster-heavy map can simply run out.
+    log(string.format("  sms cursors: 32x=%d  16x=%d",
+        ru8(SYM.gSMS32xGfxIndexCounter), ru8(SYM.gSMS16xGfxIndexCounter)))
+    -- Fog: a unit the player cannot SEE is not drawn, which is indistinguishable from a
+    -- broken map sprite. Print the fog state of every pack tile.
+    local fogRow = function(y) return ru32(ru32(SYM.gBmMapFog) + y * 4) end
+    for _, t in ipairs({ {0,0}, {1,0}, {2,0}, {0,1}, {2,1}, {0,2} }) do
+        log(string.format("  fog(%d,%d) = %d%s", t[1], t[2], ru8(fogRow(t[2]) + t[1]),
+            (t[1] == 0 and t[2] == 0) and "   <- Lupin's tile" or ""))
+    end
+    for _, id in ipairs({ 107, 109, 110, 115, 117, 119, 124 }) do
+        local slot = ru8(SYM.gUnitSpriteSlots + id)
+        log(string.format("  gUnitSpriteSlots[%d] = %s", id,
+            slot == 0xFF and "0xFF (NEVER ALLOCATED)" or tostring(slot)))
+    end
+    shot("ch04sprites-pack")
+    if not found then
+        return result("FAIL", "no unit with Lupin's charId (0x1D) in the red array on turn 2")
+    end
+    return result("PASS", "Lupin is on the map as a red unit -- see the log for the roster")
+end
+
 -- recordch04open: the ch04 OPENING in motion (#24 Stage 4) -- the two-BG Lonelywood scene:
 -- beat A in Speaker Nimsy Huddle's cottage over the vanilla House1 hearth, then the CUT to the
 -- fogged forest edge for Pinky's fog-of-war heads-up. The second BACG rides a REMOVEPORTRAITS

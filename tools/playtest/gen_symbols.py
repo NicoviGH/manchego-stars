@@ -40,6 +40,18 @@ WANTED = [
     'gBmMapTerrain',            # u8** terrain-id grid (include/bmmap.h): gBmMapTerrain[y][x] is the
                                 # TERRAIN_* id, used to build a passability map for the clear-bot's
                                 # BFS march-to-boss (#60).
+    'gUnitSpriteSlots',         # u8[0xD0] (src/bmudisp.c): the per-SMS-id VRAM slot cache.
+                                # 0xFF = that sprite has NOT been allocated this map. Distinguishes
+                                # "the engine never asked for our custom sprite" from "it asked and
+                                # the 32x32 VRAM budget was exhausted".
+    'gSMS32xGfxIndexCounter',   # the 32x32 map-sprite VRAM cursor (src/bmudisp.c). Grows UP from 0
+                                # in steps of 4 while gSMS16xGfxIndexCounter grows DOWN from 0x3F --
+                                # the two share one 0x40 slot space, so enough distinct 32x32
+                                # sprites on one map starves the later ones.
+    'gSMS16xGfxIndexCounter',   # the 16x16 counterpart, for the same reason.
+    'gBmMapFog',                # u8** fog map (include/bmmap.h): non-zero = the player can SEE
+                                # that tile this turn. A red unit standing on a zero tile is not
+                                # drawn at all -- which looks exactly like a broken map sprite.
     'gChapterFlagBits',         # event flags < 100, bit (flag-1) (src/eventinfo.c)
     'gPermanentFlagBits',       # event flags > 100, bit (flag-101)
     'ProcScr_GameOverScreen',   # proc script: game-over screen active
