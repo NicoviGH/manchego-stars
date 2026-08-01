@@ -195,6 +195,44 @@ do
     end
     check(engaged, true, "walled-camp march: a unit reaches attack range within 6 turns")
 end
+-- gridHostileInReach (#204): the clear-bot must decide from the ENGINE'S tile->unit grid, not
+-- from the unit array. A red the grid does not know about is not attackable, and pressing the
+-- command menu's row 0 anyway lands on Item.
+do
+    -- gridAt over a sparse {["x,y"] = byte} table; nil off-map.
+    local function gridOf(t)
+        return function(x, y)
+            if x < 0 or x > 14 or y < 0 or y > 14 then return nil end
+            return t[x .. "," .. y] or 0
+        end
+    end
+
+    check(C.gridHostileInReach(gridOf({ ["6,5"] = 0x81 }), 5, 5, 1, 1), true,
+        "hostile adjacent ON THE GRID -> attackable")
+
+    -- The #204 regression: the unit array says an enemy is at (6,5), but it stands in fog so
+    -- RefreshUnitsOnBmMap never wrote it to gBmMapUnit. There is no Attack row.
+    check(C.gridHostileInReach(gridOf({}), 5, 5, 1, 1), false,
+        "enemy absent from the grid (fogged) -> NOT attackable")
+
+    check(C.gridHostileInReach(gridOf({ ["6,5"] = 0x01 }), 5, 5, 1, 1), false,
+        "a BLUE id on the grid is not a hostile")
+    check(C.gridHostileInReach(gridOf({ ["6,5"] = 0x41 }), 5, 5, 1, 1), false,
+        "a GREEN id on the grid is not a hostile")
+
+    -- A bow cannot fire at an adjacent foe: min range 2.
+    check(C.gridHostileInReach(gridOf({ ["6,5"] = 0x81 }), 5, 5, 2, 2), false,
+        "bow: hostile at range 1 is out of [2,2]")
+    check(C.gridHostileInReach(gridOf({ ["7,5"] = 0x81 }), 5, 5, 2, 2), true,
+        "bow: hostile at range 2 is attackable")
+
+    -- Diagonals count as range 2 (Manhattan), and the map edge must not throw.
+    check(C.gridHostileInReach(gridOf({ ["1,1"] = 0x81 }), 0, 0, 1, 2), true,
+        "diagonal hostile is at Manhattan 2")
+    check(C.gridHostileInReach(gridOf({}), 0, 0, 1, 2), false,
+        "off-map probes at the corner are safe")
+end
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else

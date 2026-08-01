@@ -3052,6 +3052,23 @@ session state. `HANDOFF.md` points here._
 - **Additive, never global** (content art): clone classes / new terrain/banim/BG slots; never edit a shared
   vanilla one in place.
 - **Engine hooks live in `tools/inject/engine_hooks.py`** (guarded by `check_engine_guards_present`).
+- **Turning fog OFF takes TWO steps: the vision range AND a map refresh** (2026-08-01, #204). Fog
+  does two independent things, and zeroing `gPlaySt.chapterVisionRange` only undoes one of them.
+  `bmtarget.c` gates target-picking on the vision range, so zeroing it does re-open targeting — but
+  `RefreshUnitsOnBmMap` (`bmmap.c`) is what writes units into the tile→unit grid `gBmMapUnit`, and it
+  **skips a red standing in fog entirely**, filing it under `gBmMapHidden` with `US_BIT9` instead.
+  Nothing recomputes that grid on a memory poke, so until the engine's next `RefreshEntityBmMaps`
+  the enemies are simply *not on the map*: `gBmMapUnit` holds none of them no matter what the unit
+  array says. Any refresh fixes it — one unit's action (`MapMain_ResumeFromAction`) or a phase change
+  is enough, and the refresh also refills `gBmMapFog` itself (`BmMapFill(gBmMapFog, !visionRange)`),
+  so the fog map never needs poking. **Why this is worth a durable entry: every symptom points at the
+  wrong layer.** `clear_ch04` sat at 10 live enemies for 16 turns with zero kills; the enemies were
+  visibly on screen, the unit array listed all ten with correct coordinates, and the vision range
+  read 0 — so fog looked handled. What actually happened is that the clear-bot teleported "adjacent"
+  to foes the engine could not see, got a command menu with **no Attack row**, and its blind row-0
+  press opened **Item** and Used a Goodberry at full HP, forever. The lesson generalises past fog:
+  **the grid, not the unit array, is what the engine acts on** — so a bot must decide from
+  `gBmMapUnit` (`clearbot.gridHostileInReach`) and never assume command-menu row 0 is Attack.
 - **New decomp patch target → add it to `PATCHED_DECOMP_FILES`**, or the build is non-idempotent.
 - **Vanilla decomp reads go through `build_campaign.vanilla_decomp_text()` (HEAD)**, never the worktree.
 - **`make`-green can't prove apply timing OR rendering** — `tools/playtest/` is the dynamic arbiter. Needs a
