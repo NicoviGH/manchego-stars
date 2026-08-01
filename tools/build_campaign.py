@@ -817,6 +817,27 @@ def vanilla_name_text_id(slot):
     sys.exit('ERROR: could not find nameTextId for %s in %s' % (marker, CHARACTERS_C))
 
 
+GOAL_WINDOW_MAX_CHARS = 12      # vanilla's own widest: 'Defeat enemy' / 'Seize throne'
+
+
+def goal_window_body(text):
+    """A goal-WINDOW string, width-checked against vanilla's budget.
+
+    The on-map objective window does not wrap or clip gracefully: a string past its width
+    runs the last glyph off the right border and drops its tail onto the row below (Nicolas
+    spotted the severed 'y' of an injected 'Rout the enemy', 14 chars). FE8 never risks it --
+    every vanilla goal-window string fits in 12: Survive(7), Defeat boss(11), Defeat enemy(12),
+    Seize gate(10), Seize throne(12). Measured across every chapter's `goal.windowTextId`, so
+    the budget is the SHIPPED corpus rather than a guess.
+    """
+    if len(text) > GOAL_WINDOW_MAX_CHARS:
+        sys.exit('ERROR: goal-window text %r is %d chars; the window fits %d '
+                 '(vanilla\'s widest are "Defeat enemy" / "Seize throne"). It would spill '
+                 'its last glyph past the border and wrap the tail underneath.'
+                 % (text, len(text), GOAL_WINDOW_MAX_CHARS))
+    return name_message_body(text)
+
+
 def name_message_body(name):
     """Format a name as a terminated FE8 message, matching vanilla's convention.
 
@@ -2435,17 +2456,20 @@ def _inject_palette_bank_hook():
         f.write(prep)
 
 
-def _inject_cast_palette(palette_u16, char_slots):
+def _inject_cast_palette(palette_u16, char_slots, extra_char_ids=()):
     """Emit gCastMapPalette (the bespoke 16-colour bank) + gMapPaletteOverride (the
     charIds that wear it, 0xFFFF-terminated) into the kept .data file, then patch the
-    bmudisp palette hooks. char_slots = portrait-slot names (-> CHARACTER_<SLOT>)."""
+    bmudisp palette hooks. char_slots = portrait-slot names (-> CHARACTER_<SLOT>);
+    extra_char_ids = RAW charId literals for units with no portrait slot (scripted
+    neutrals, which wear this palette precisely because they never change faction)."""
     with open(UNIT_ICON_WAIT_C, encoding='utf-8') as f:
         wait_c = f.read()
     if 'constants/characters.h' not in wait_c:
         wait_c = wait_c.replace('#include "unit_icon_data.h"',
                                 '#include "unit_icon_data.h"\n#include "constants/characters.h"', 1)
     pal = ', '.join('0x%04X' % c for c in palette_u16)
-    ov = '\n'.join('\tCHARACTER_%s,' % s.upper() for s in char_slots)
+    ov = '\n'.join(['\tCHARACTER_%s,' % s.upper() for s in char_slots]
+                   + ['\t%s,' % c for c in extra_char_ids])
     wait_c += ('\n/* injected: bespoke cast map-sprite palette (loaded into the purple OBJ\n'
                ' * bank) + the charIds that wear it (0xFFFF-terminated). Non-const so they\n'
                ' * share unit_icon_wait_table\'s kept .data section. */\n'
@@ -2563,6 +2587,11 @@ def inject_map_sprites(campaign, verbose=True):
     # Second look for a cast member who is on the field BEFORE he joins you (appends its
     # own wait rows, so it must follow the cast/guest rows that name their own SMS ids).
     _inject_pre_recruit_variants(campaign, idle, pointer_externs, verbose=verbose)
+    # Scripted neutrals (ch04's white moose): custom art on a unit that is not cast, so
+    # classed_cast never sees it. Must follow the cast/guest passes -- it appends its own
+    # wait rows and reaches into the override tables those passes emit.
+    neutral_ids = _inject_scripted_neutral_sprites(campaign, asset_dir, pointer_externs,
+                                                   verbose=verbose)
     if pointer_externs:
         with open(UNIT_ICON_POINTER_H, 'a', encoding='utf-8') as f:
             f.write('\n/* Manchego Stars custom map sprites (#38) */\n'
@@ -2575,17 +2604,25 @@ def inject_map_sprites(campaign, verbose=True):
     custom_slots = [slot for uid, slot, _, _ in idle if uid not in FACTION_TINTED_CAST]
     custom_slots += [slot for uid, slot, _, _ in mu
                      if uid not in FACTION_TINTED_CAST and slot not in custom_slots]
-    if custom_slots:
+    if custom_slots or neutral_ids:
         pal_png = os.path.join(asset_dir, 'cast_palette.png')
         if not os.path.isfile(pal_png):
             sys.exit('ERROR: custom map sprites need campaigns/%s/map_sprites/cast_palette.png'
                      % campaign)
-        _inject_cast_palette(_read_cast_palette(pal_png), custom_slots)
+        # Scripted neutrals join the override by RAW charId -- they have no portrait slot.
+        _inject_cast_palette(_read_cast_palette(pal_png), custom_slots,
+                             extra_char_ids=[cid for _, cid, _ in neutral_ids])
 
     # ch02 green chwinga: reskin minor NPC slots with Sclorbo's chwinga map sprite, tinted
     # by the green faction palette (no bespoke palette -- they're green faction). Runs here
     # because inject_map_sprites owns the gMapSpriteOverride / gMuImgOverride tables.
     _inject_ch02_chwinga_sprites(campaign, verbose=verbose)
+
+    # Everything declared + committed must have landed in one of the passes above.
+    assert_declared_map_sprites_injected(campaign, {uid for uid, _, _, _ in idle + guest_idle}
+                                         | {uid for uid, _, _, _ in mu + guest_mu}
+                                         | {uid for uid, _, _ in neutral_ids}
+                                         | {CH02_CHWINGA_SPRITE_SRC})
 
     if verbose:
         guest_uids = {uid for uid, _, _, _ in guest_idle}
@@ -2729,6 +2766,122 @@ def _remap_indices(src_path, roles, palette_png, out_path):
     out.putpalette(map_sprite_tool.read_palette(palette_png))
     out.putdata([0 if v == 0 else roles[v] for v in im.getdata()])
     out.save(out_path)
+
+
+def declared_map_sprite_units(campaign):
+    """Every campaign unit that DECLARES custom map-sprite art -- cast (pcs/npcs YAML) and
+    chapter-level scripted neutrals alike -- as {id: where-it-was-declared}."""
+    declared = {}
+    root = os.path.join(REPO, 'campaigns', campaign)
+    for sub in ('pcs', 'npcs'):
+        d = os.path.join(root, sub)
+        if not os.path.isdir(d):
+            continue
+        for name in sorted(os.listdir(d)):
+            if not name.endswith('.yaml'):
+                continue
+            with open(os.path.join(d, name), encoding='utf-8') as f:
+                unit = yaml.safe_load(f) or {}
+            ms = (unit.get('art') or {}).get('map_sprite')
+            if ms and (ms or {}).get('wiring') != 'pending':
+                declared[unit.get('id') or name[:-5]] = '%s/%s' % (sub, name)
+    chapters = os.path.join(root, 'chapters')
+    for name in sorted(os.listdir(chapters)):
+        if not name.endswith('.yaml'):
+            continue
+        with open(os.path.join(chapters, name), encoding='utf-8') as f:
+            chap = yaml.safe_load(f) or {}
+        for key in ('neutral_units', 'green_units'):
+            for unit in (chap.get(key) or []):
+                if ((unit.get('art') or {}).get('map_sprite')) and unit.get('id'):
+                    declared[unit['id']] = 'chapters/%s (%s)' % (name, key)
+    return declared
+
+
+def assert_declared_map_sprites_injected(campaign, wired):
+    """Custom map art that is DECLARED and COMMITTED must actually get wired, or the unit
+    silently wears its stock class sprite and nothing anywhere complains.
+
+    That is precisely how ch04's white moose shipped: a full `art:` block on the chapter YAML,
+    two committed Wyrdeer sheets, and an injector that only ever walked PORTRAIT_MAP -- so the
+    chapter's title creature rendered as CLASS_GWYLLGI's stock hound. There was no error to
+    read, because nothing tried and failed; nothing tried at all. A missing ASSET stays a
+    no-op (art lands before wiring, deliberately) -- what fails here is art that exists on
+    disk and is described in YAML, yet ends up in no sprite table.
+
+    Art routinely lands one slice AHEAD of its wiring (Basil/Sahnar shipped with #179/#181;
+    their wiring is #25 ch05 work). That deferral is legitimate, but it has to be WRITTEN
+    DOWN or this guard cannot tell it from the moose -- so say `wiring: pending` on the unit's
+    map_sprite block and name the issue there.
+    """
+    asset_dir = os.path.join(REPO, 'campaigns', campaign, 'map_sprites')
+    missing = sorted(
+        (uid, where) for uid, where in declared_map_sprite_units(campaign).items()
+        if os.path.isfile(os.path.join(asset_dir, uid + '.png')) and uid not in wired)
+    if missing:
+        sys.exit('ERROR: these units declare art.map_sprite and ship map_sprites/<id>.png, '
+                 'but no injector wired them -- they would render their stock class sprite:\n'
+                 + '\n'.join('       %-16s declared in %s' % (uid, where) for uid, where in missing)
+                 + '\n       Cast go in PORTRAIT_MAP; scripted neutrals in '
+                   'SCRIPTED_NEUTRAL_SPRITES.')
+
+
+def _inject_scripted_neutral_sprites(campaign, asset_dir, pointer_externs, verbose=True):
+    """Map sprites for SCRIPTED NEUTRALS -- units that stand on a map wearing our own art but
+    are NOT cast members (no PORTRAIT_MAP slot, no bust/stat/prep wiring), so `classed_cast`
+    never sees them and `inject_map_sprites` used to walk straight past their assets.
+
+    That gap is how ch04's white moose shipped: its Wyrdeer sheets and a full `art:` block
+    were committed on the chapter YAML, nothing read them, and the engine fell back to
+    CLASS_GWYLLGI's stock hound -- a green dog standing in for the chapter's title creature.
+    Nothing failed; the art was simply never asked for. `assert_declared_map_sprites_injected`
+    now closes that door.
+
+    They wear the CAST palette, not the faction one, which is the whole reason they can't ride
+    the chwinga path: a scripted neutral never changes faction, and the green NPC palette turns
+    index 3 pale-green and index 11 blue -- a green-tinted animal with green blood. Keyed by a
+    RAW charId (a pid the injector allocated), not a portrait-slot name.
+    """
+    neutral_ids = []
+    for uid, char_id, donor in SCRIPTED_NEUTRAL_SPRITES:
+        idle_png = os.path.join(asset_dir, uid + '.png')
+        if not os.path.isfile(idle_png):
+            continue
+        mu_png = os.path.join(asset_dir, uid + '_mu.png')
+        if not os.path.isfile(mu_png):
+            sys.exit('ERROR: scripted neutral %s needs a committed map_sprites/%s_mu.png '
+                     '(hover/walk sheet; neutrals have no synth path -- synth_mu_sheet reads '
+                     'the unit YAML, which a chapter-level neutral has none of)' % (uid, uid))
+        map_sprite_tool.validate_mu_sheet(mu_png)
+        _, dfw, dfh = map_sprite_tool.donor_sms_geometry(donor)
+        macro, _, _, _ = map_sprite_tool.sheet_info(idle_png, (dfw, dfh))
+        stem = uid.replace('-', '_')
+        wait_sym = 'unit_icon_wait_manchego_%s_sheet' % stem
+        move_sym = 'unit_icon_move_manchego_%s_sheet' % stem
+        shutil.copyfile(idle_png, os.path.join(WAIT_GFX_DIR, wait_sym + '.png'))
+        shutil.copyfile(mu_png, os.path.join(MOVE_GFX_DIR, move_sym + '.png'))
+        sms = _wait_table_len()
+        _append_table_rows(UNIT_ICON_WAIT_C, 'unit_icon_wait_table[]',
+                           ['\t{0, %s, %s}, // %d %s (scripted neutral)'
+                            % (macro, wait_sym, sms, uid)])
+        with open(UNIT_ICON_WAIT_S, 'a', encoding='utf-8') as f:
+            f.write('\n/* Manchego Stars scripted-neutral idle sprite: %s (#24) */\n'
+                    '\t.global %s\n%s:\n\t.incbin "graphics/unit_icon/wait/%s.4bpp.lz"\n'
+                    '\t.align 2, 0\n' % (uid, wait_sym, wait_sym, wait_sym))
+        with open(UNIT_ICON_MOVE_S, 'a', encoding='utf-8') as f:
+            f.write('\n/* Manchego Stars scripted-neutral hover/walk (MU) sprite: %s (#24) */\n'
+                    '\t.global %s\n%s:\n\t.incbin "graphics/unit_icon/move/%s.4bpp.lz"\n'
+                    '\t.align 2, 0\n' % (uid, move_sym, move_sym, move_sym))
+        pointer_externs += ['extern char %s[];' % wait_sym, 'extern char %s[];' % move_sym]
+        _insert_table_head(UNIT_ICON_WAIT_C, 'gMapSpriteOverride[]',
+                           '\t%s, %d,\n' % (char_id, sms))
+        _insert_table_head(UNIT_ICON_MOVE_C, 'gMuImgOverride[]',
+                           '\t{%s, %s},\n' % (char_id, move_sym))
+        neutral_ids.append((uid, char_id, sms))
+        if verbose:
+            print('  %-12s -> scripted-neutral idle SMS %d + MU (charId %s, cast palette)'
+                  % (uid, sms, char_id))
+    return neutral_ids
 
 
 def _inject_ch02_chwinga_sprites(campaign, verbose=True):
@@ -3869,6 +4022,43 @@ def _asm_table_word_index(path, table_label, word_label):
     sys.exit('ERROR: .word %r not found under %r in %s' % (word_label, table_label, path))
 
 
+    # A tileset .gbapal is TWO sets of five banks, not ten independent ones. DisplayBmTile
+# (bmmap.c) draws a VISIBLE tile from BG palette bank 6 and a FOGGED tile from bank 11,
+# and UnpackChapterMapPalette loads our ten banks at BG 6..15 -- so banks 0-4 are the lit
+# set and banks 5-9 are its fog copy. A vendored community tileset routinely recolours only
+# the lit half, because most maps never turn fog on: Snowy Bern's lit half is winter and its
+# fog half is still vanilla Bern, which is why ch04's fogged tiles showed the grass we
+# winterized away (Nicolas, 2026-07-31). Derive the fog half from OUR lit half rather than
+# trusting the vendor's.
+#
+# `haze` is the lerp-toward-white factor. Vanilla authors each tileset's fog half by hand and
+# the direction depends on the setting -- its outdoor palette hazes WHITE (MapPalette1: median
+# k = 0.5 measured across all five bank pairs) while interior palettes darken instead. Snow
+# under fog is the outdoor case.
+TILESET_FOG_HAZE = {'snowy-bern': 0.5}
+FOG_BANK_OFFSET = 5             # banks 0-4 lit -> banks 5-9 fog
+
+
+def derive_fog_banks(palette, haze):
+    """Return `palette` (a 320 B .gbapal) with its fog half rebuilt from its lit half.
+
+    Pure, so it is unit-testable without a build. Each lit colour is lerped toward white in
+    BGR555 space; index 0 is the transparent/backdrop entry and is carried across untouched
+    so the fog copy keeps the same key colour."""
+    out = bytearray(palette)
+    for bank in range(FOG_BANK_OFFSET):
+        for i in range(16):
+            lit = struct.unpack_from('<H', palette, bank * 32 + i * 2)[0]
+            if i == 0:
+                fog = lit
+            else:
+                ch = [(lit >> s) & 31 for s in (0, 5, 10)]
+                ch = [min(31, int(round(c + (31 - c) * haze))) for c in ch]
+                fog = ch[0] | (ch[1] << 5) | (ch[2] << 10)
+            struct.pack_into('<H', out, (bank + FOG_BANK_OFFSET) * 32 + i * 2, fog)
+    return bytes(out)
+
+
 def _register_tileset(campaign, tileset, label_stem, comment):
     """Copy a vendored tileset's 3 pieces (maps/tilesets/<tileset>/, the
     map_tileset_tool import format) into the decomp, register their incbins in
@@ -3883,9 +4073,22 @@ def _register_tileset(campaign, tileset, label_stem, comment):
         ('TileConfiguration%s' % label_stem, 'bin', 'bin.lz'),
     ]
     incbin = ['\n/* %s */' % comment]
+    haze = TILESET_FOG_HAZE.get(tileset)
     for label, src_ext, inc_ext in assets:
-        shutil.copyfile(os.path.join(ts_dir, '%s.%s' % (tileset, src_ext)),
-                        os.path.join(MAP_GFX_DIR, '%s.%s' % (label, src_ext)))
+        src = os.path.join(ts_dir, '%s.%s' % (tileset, src_ext))
+        dst = os.path.join(MAP_GFX_DIR, '%s.%s' % (label, src_ext))
+        if src_ext == 'gbapal' and haze is not None:
+            # Rebuild the fog half from our winterized lit half (see TILESET_FOG_HAZE).
+            # Derived at build time, so the vendored .gbapal stays the one source of truth
+            # and a future repaint of the lit banks carries into fog for free. Only the COPY
+            # changes -- the incbin/label registration below still has to happen, or the
+            # asset table references a symbol nothing defines.
+            with open(src, 'rb') as f:
+                pal = f.read()
+            with open(dst, 'wb') as f:
+                f.write(derive_fog_banks(pal, haze))
+        else:
+            shutil.copyfile(src, dst)
         incbin += ['\t.align 2, 0', '\t.global %s' % label, '%s:' % label,
                    '\t.incbin "graphics/map/%s.%s"' % (label, inc_ext)]
     with open(CONST_MAPS_S, 'a', encoding='utf-8') as f:
@@ -5679,7 +5882,7 @@ def inject_ch01(campaign, verbose=True):
     set_message_body(lines, host['goal']['statusObjectiveTextId'],
                      name_message_body('Seize camp'))
     set_message_body(lines, host['goal']['windowTextId'],
-                     name_message_body('Seize camp'))
+                     goal_window_body('Seize camp'))
     chief.setdefault('id', 'goblin-chief')
     # Izobai (boss, her custom bust on the Breguet slot): turn-1 taunt + death quote,
     # both from the chapter YAML (lore/izobai.md voice). She/her throughout.
@@ -5783,6 +5986,12 @@ CAMPAIGN_BG_SLOT0 = 0x38   # first campaign BG index -- PAST the vanilla BG_RAND
 CAMPAIGN_BGS = [
     ('BG_MS_TARGOS_WINTER',   'bg_TargosWinter',   '{Zeldacrafter}'),  # ch02 ending: Targos at night
     ('BG_MS_TERMALAINE_MINE', 'bg_TermalaineMine', '{FE7 rip}'),        # ch03 opening: the mine mouth
+    # ch04 opening beat B: the fogged forest edge. NOT a vendored import and not new tile art --
+    # vanilla's own bg_Plain_1 TILES under a winter palette. The BG "fog" variants (_Fog, _Sunset,
+    # _Night) are palette swaps of one image, which is why BG_PLAIN_1_FOG is a green summer meadow
+    # under white haze and read wrong in a snowbound chapter. Additive slot, so vanilla's BG is
+    # untouched and still available. Approved by Nicolas 2026-07-31 over BG_TREES.
+    ('BG_MS_LONELYWOOD_FOG',  'bg_LonelywoodFog',  '{vanilla FE8 bg_Plain_1, winter palette}'),
 ]
 
 
@@ -6199,10 +6408,16 @@ def inject_ch02(campaign, verbose=True):
                      name_message_body(display_name(halvar)))
     set_message_body(lines, vanilla_name_text_id(CH02_MINIBOSS_SLOT),
                      name_message_body(display_name(grukk)))
+    # VANILLA'S OWN WORDING, restored 2026-07-31 (Nicolas: "it should never have been altered
+    # in the first place"). FE8 never prints "rout" as an objective -- its whole objective
+    # vocabulary is Defeat enemy / Defeat boss / Defeat all monsters / Seize gate / Seize throne
+    # / Survive, and the game's only uses of the word are "Route +/-" on the world map and
+    # "en route" in prose. "Rout" is FE *community* vocabulary, and importing it also overran a
+    # window vanilla had sized for its own words.
     set_message_body(lines, host['goal']['statusObjectiveTextId'],
-                     name_message_body('Defeat all foes'))
+                     name_message_body('Defeat all monsters'))
     set_message_body(lines, host['goal']['windowTextId'],
-                     name_message_body('Rout the enemy'))
+                     goal_window_body('Defeat enemy'))
     set_message_body(lines, CH02_OPENING_CARD_MSG, name_message_body(op_card))
     _emit_scene_beats(lines, CH02_OPENING_MSGS, op_beats, cut_fid, op_home)
     # Turn-1 fliers-vs-bows tutorial: one portrait box per line (RBG, then Pinky), Text_BG 42-wrap.
@@ -6426,6 +6641,206 @@ CH04_REVEAL_SCRIPT = 'EventScr_089F22A4'        # turn-2 TurnEventPlayer script 
 CH04_REVEAL_MSGS = (0x9BB, 0x9BC)               # Lupin command + Marty parley-flag (stubs)
 CH04_REVEAL_CAMERA = (2, 2)                      # centre on the NW pack cluster
 
+# ── Stage 4: the authored scenes ────────────────────────────────────────────────
+# MESSAGE IDS: ch04 is hosted on slot 5, so it OWNS vanilla Ch5's whole message block
+# (0x9BA-0x9CC) -- every id below is a dead Ch5 slot, freed when inject_ch04 blanks the Ch5
+# event lists. ch05's YAML labels its beats "vanilla 0x9BB" etc., but those are ANATOMY
+# references mined from its FE8 twin, NOT ids it may claim: ch05 will host on its own slot and
+# take that slot's block. `_assert_message_ids_unique` (below) enforces this at build time --
+# see the #198 review note on issue #24.
+CH04_OPENING_CARD_MSG = 0x9BD                   # "Lonelywood" location card
+CH04_OPENING_MSGS = (0x9BE, 0x9BF)              # A Nimsy's cottage · B the forest-edge fog beat
+CH04_MOOSE_MSG = 0x9C0                          # the moose breaks and bolts -- RBG "After it!"
+CH04_ENDING_MSG = 0x9C1                         # chapter_end, parley path (Lupin reads the trail)
+CH04_ENDING_NO_LUPIN_MSG = 0x9C2                # chapter_end, no-parley path (Pinky/Meesmickle)
+# Scene BGs. The cottage is vanilla FE8's House1 hearth interior and Nimsy rides the vanilla
+# old-lady generic mug -- both DECIDED 2026-07-04 (Nicolas): in-ROM, so no vendored asset, no
+# injection, no credit line. Beat B plays over a fogged plain (the scout who cannot see).
+CH04_OPENING_COTTAGE_BG = 'BG_HOUSE'            # vanilla House1 -- Nimsy's hearth
+CH04_OPENING_FOREST_BG = 'BG_MS_LONELYWOOD_FOG'  # the forest edge under fog (Pinky's beat) --
+                                               # vanilla's bg_Plain_1 tiles on a winter palette
+                                               # (BG_PLAIN_1_FOG is a GREEN meadow; the vanilla
+                                               # "_FOG" variants are palette swaps, not art)
+CH04_ENDING_BG = 'BG_FOREST'                    # dusk at the treeline; the sled at the ridge
+CH04_NIMSY_FID = '[FID_VillagerOldWoman]'       # vanilla generic (textdefs.txt 0x5F)
+# The moose: a scripted NEUTRAL that is sighted once and gone. It rides its own dead Ch5 slots.
+CH04_MOOSE_SCRIPT = 'EventScr_089F2270'         # dead Ch5 script (vanilla's Natasha/Joshua Talk;
+                                                #   its only ref is the Ch5 Character list, which
+                                                #   inject_ch04 replaces) -> the moose-flees beat
+CH04_MOOSE_SYMBOL = 'UnitDef_088B58D8'          # dead Ch5 unit table (referenced only from
+                                                #   EventScr_089F2304, a Ch5 reinforcement script
+                                                #   whose Turn entry we drop) -> the neutral moose
+CH04_MOOSE_PID = '0xce'                         # its own pid (DISA targets it, and it alone)
+CH04_MOOSE_GUARD_FLAG = 'EVFLAG_TMP(10)'        # AREA one-shot guard (must differ from the talk flag)
+CH04_MOOSE_CLASS = 'CLASS_GWYLLGI'              # geometry token: the 32x32 quadruped wait row
+CH04_MOOSE_MOV_TABLE = 'TerrainTable_MovCost_AnimalT2Normal'   # the Gwyllgi's own cost row
+# Scripted NEUTRALS carrying custom map art (see _inject_scripted_neutral_sprites): units that
+# stand on a map wearing our own sprite without being cast members, so classed_cast never sees
+# them. (campaign asset id, raw charId, donor base for the wait-row GEOMETRY only).
+SCRIPTED_NEUTRAL_SPRITES = (
+    ('white-moose', CH04_MOOSE_PID, 'Gwyllgi'),
+)
+# Where the party first SEES it: the mid-map clearing, on the tomb-side (NE) half of the 15x15
+# map, so the sighting points at the exit it then bolts for.
+CH04_MOOSE_POS = (11, 4)
+CH04_MOOSE_AREA = (8, 2, 14, 7)                 # AREA(x1, y1, x2, y2) -- the clearing it watches from
+# The EDGE tile it escapes off. Direction is AWAY FROM THE PARTY, who deploy on the NW flank --
+# Nicolas 2026-07-31: "I don't care about the direction, I want it to be away from the party; the
+# southeast corner makes most sense." So the quarry breaks for the far corner and is gone.
+# It was (14, 0) -- the literal NE corner -- and that SOFT-LOCKED the chapter: the corner is
+# TERRAIN_PLAINS but a wall of TERRAIN_CLIFF seals the whole NE pocket off from the clearing, so
+# the MOVE waited forever on a path that cannot be walked. assert_scripted_move_reachable now
+# fails the BUILD on any such destination, and it passes on this one.
+CH04_MOOSE_FLEE_TO = (14, 14)
+
+
+# ── Message-id ownership across hosted chapters (#198 review, issue #24) ────────
+# Each hosted chapter writes text into DEAD message slots belonging to the vanilla chapter it
+# hosts ON -- ch03 sits on slot 4 and takes vanilla Ch4's block, ch04 sits on slot 5 and takes
+# vanilla Ch5's. Two chapters claiming one id is a SILENT failure: `verify_text` decodes what
+# it finds and checks for runaway text, not for who owns a slot, so the second writer simply
+# overwrites the first and the build stays green.
+#
+# That is not hypothetical. ch05's YAML labels its beats `slot: "vanilla 0x9BB"` / `"0x9BC"`,
+# which are ANATOMY references mined from its FE8 twin -- but the same field means a LITERAL id
+# a few lines away (`"vanilla 0x9C6" # data_battlequotes.c, pid CHARACTER_NATASHA`), and ch04
+# writes real text into 0x9BB/0x9BC right now. ch05's text insertion is still owed (#25), so
+# this guard lands FIRST, deliberately.
+HOSTED_CHAPTER_MESSAGE_IDS = {
+    'ch03': (CH03_BOSS_DEATH_MSG,        # reserved: the grell's quote was CUT (msg=0) but the
+                                         # slot stays ch03's, so nothing else may take it
+             CH03_TREX_TALK_MSG, CH03_OPENING_CARD_MSG, *CH03_OPENING_MSGS,
+             CH03_ENDING_CARD_MSG, *CH03_ENDING_MSGS, CH03_TREX_ENTRANCE_MSG,
+             *CH03_MIDMAP_MSGS),
+    'ch04': (CH04_LUPIN_TALK_MSG, *CH04_REVEAL_MSGS, CH04_OPENING_CARD_MSG,
+             *CH04_OPENING_MSGS, CH04_MOOSE_MSG, CH04_ENDING_MSG,
+             CH04_ENDING_NO_LUPIN_MSG),
+}
+
+
+def assert_message_ids_unique(claims=None):
+    """Guard: no two hosted chapters may claim the same message id.
+
+    Called from main() before any injector runs, so a collision fails the BUILD rather than
+    shipping a chapter whose text was quietly overwritten by the next one. Add a chapter's
+    block to HOSTED_CHAPTER_MESSAGE_IDS when it starts hosting -- that registry is the
+    declaration of ownership, and this is what makes it binding.
+    """
+    owner = {}
+    for chapter, ids in sorted((claims if claims is not None
+                                else HOSTED_CHAPTER_MESSAGE_IDS).items()):
+        for mid in ids:
+            if mid in owner:
+                sys.exit('ERROR: message id 0x%X is claimed by BOTH %s and %s. Hosted '
+                         'chapters take their host slot\'s dead message block -- pick ids '
+                         'from the block %s actually owns (see HOSTED_CHAPTER_MESSAGE_IDS).'
+                         % (mid, owner[mid], chapter, chapter))
+            owner[mid] = chapter
+    return owner
+
+
+def variant_beat(beat, fallback, err_label):
+    """Splice a scene's `no_lupin_fallback`-style variant over its locked beat.
+
+    A chapter YAML declares the fallback as `boxes:` (1-based indices), `replaces:` (the
+    OPENING TEXT of each box it stands in for) and a `script:` of the substitute lines --
+    one per box, in the same order. The `replaces:` anchors exist so an index cannot
+    silently drift: we assert each named box still starts with its anchor before swapping,
+    and hard-fail if the locked script has been re-ordered underneath the fallback.
+
+    Returns a new beat, same length as `beat`, with the named boxes replaced and every
+    other box (e.g. ch04's Marty box 2, unchanged in both branches) carried through.
+
+    Reused by ch05's five conditional scenes (#25) -- one mechanism, not two.
+    """
+    boxes, anchors = fallback['boxes'], fallback['replaces']
+    subs = fallback['script']
+    if not (len(boxes) == len(anchors) == len(subs)):
+        sys.exit('ERROR: %s: fallback declares %d boxes, %d replaces, %d script lines '
+                 '-- all three must agree' % (err_label, len(boxes), len(anchors), len(subs)))
+    out = list(beat)
+    for idx, anchor, sub in zip(boxes, anchors, subs):
+        if not 1 <= idx <= len(beat):
+            sys.exit('ERROR: %s: fallback box %d is outside the %d-box scene'
+                     % (err_label, idx, len(beat)))
+        (_, text), = beat[idx - 1].items()
+        if not _fe_dialogue_text(text).startswith(_fe_dialogue_text(anchor)[:40]):
+            sys.exit('ERROR: %s: fallback box %d anchored to %r but that box now reads %r '
+                     '-- the locked script moved; re-anchor the fallback'
+                     % (err_label, idx, anchor[:40], text[:40]))
+        out[idx - 1] = sub
+    return out
+
+
+def branch_on_flag(flag, if_set, if_clear, label_base=0):
+    """A vanilla-shaped event branch: run `if_set` when `flag` is set, else `if_clear`.
+
+    The FE8 idiom (cf. ch19a's ending, which picks its text by CHECK_EVENTID + CHECK_ALIVE):
+    CHECK_EVENTID leaves the flag in slot C, BEQ jumps when it equals slot 0 (clear), and both
+    arms converge on a shared LABEL. `label_base` offsets the two labels so several branches
+    can coexist in one script without colliding.
+    """
+    a, b = label_base, label_base + 1
+    return ('    CHECK_EVENTID(%s)\n'
+            '    BEQ(0x%X, EVT_SLOT_C, EVT_SLOT_0) /* flag clear -> the fallback arm */\n'
+            % (flag, a)
+            + if_set
+            + '    GOTO(0x%X)\n'
+              'LABEL(0x%X)\n' % (b, a)
+            + if_clear
+            + 'LABEL(0x%X)\n' % b)
+
+
+def ch04_moose_script(unit_symbol, pid, msg, flee_to):
+    """The moose-flees beat: the quarry is sighted in a clearing, then simply gone.
+
+    Locked staging (chapter YAML, 2026-07-03): "A shape in the fog ahead: the white moose,
+    huge and still in the clearing, watching them. A heartbeat -- then it turns and is simply
+    gone, silent, northeast." So: pan to it, hold (the heartbeat), RBG's one line, then MOVE it
+    off the tomb-side edge and DISA it. It never speaks -- locked as a mute white ghost, and
+    ch05 re-locks that -- so the only voice here is RBG's.
+
+    The moose is LOADed by this script rather than at chapter start: under fog it would
+    otherwise sit invisible on the map for several turns and could be attacked, and it is
+    uncatchable by design (canon). Sighting it and losing it is the whole beat.
+
+    PLAYER-ONLY, and that guard is not optional. The AREA that fires this lives in the Misc
+    list, and FE8 polls that list at the end of EVERY unit's action -- playerphase.c and
+    cp_perform.c both PROC_CALL_2(RunPotentialWaitEvents) -- while EvCheck0B_AREA (eventinfo.c)
+    tests gActiveUnit's position with NO faction check. The clearing is where the turn-1 monster
+    line stands, so unguarded, a Revenant ending its move there plays RBG's "After it!" to an
+    empty clearing on turn 1. Caught in-engine, not by reading: `recordch04reveal` filmed it
+    firing during turn 1's ENEMY phase with no blue unit anywhere in the rect.
+
+    An early ENDA would not be enough either: StartEventFromInfo SetFlag()s the AREA's one-shot
+    BEFORE it CallEvent()s the script, so bailing out would spend the beat forever. Vanilla
+    already ships the whole answer as EventScr_UnTriggerIfNotFaction (eventcall.h; ch13b/ch15b
+    use it exactly this way) -- it clears the TRIGGERED event id, re-arming the AREA, and ENDBs
+    the entire event rather than just its own frame.
+    """
+    fx, fy = flee_to
+    return ('{\n'
+            '    SVAL(EVT_SLOT_2, FACTION_ID_BLUE) /* only the PARTY sights the quarry */\n'
+            '    CALL(EventScr_UnTriggerIfNotFaction) /* a monster wandered in: re-arm, abort */\n'
+            '    LOAD1(0x1, %s) /* the white moose, neutral -- sighted, never fought */\n'
+            '    ENUN\n'
+            '    CAMERA2(%d, %d)\n'
+            '    MUSS(SONG_TENSION)\n'
+            '    CUMO_CHAR(%s) /* the shape in the fog: huge, still, watching */\n'
+            '    STAL(75) /* the heartbeat -- hold on it before it breaks */\n'
+            '    CURE\n'
+            '    TEXTSTART\n'
+            '    TEXTSHOW(0x%X) /* RBG: "After it!" */\n'
+            '    TEXTEND\n'
+            '    REMA\n'
+            '    MOVE(0x0, %s, %d, %d) /* bolts for the tomb-side (NE) edge */\n'
+            '    ENUN\n'
+            '    DISA(%s) /* ...and is simply gone */\n'
+            '    MURE(0x2) /* restore the map BGM (MURE takes a fade speed -- cf. ch12a/ch15a) */\n'
+            '    EVBIT_T(7)\n'
+            '    ENDA\n}'
+            % (unit_symbol, fx, fy, pid, msg, pid, fx, fy, pid))
+
 
 def ch04_enemy_rows(chap, arrives_turn=None):
     """Build one Ch04 UnitDefinition row per authored position for a deployment wave.
@@ -6520,11 +6935,32 @@ def ch04_green_pack_rows(chap):
         for x, y in wave['positions'][1:]]
 
 
+def assert_parley_pid_unique(chap, wave):
+    """Guard (#198 review): the parley's DISA sweep must own its pid outright.
+
+    `ch04_parley_pre_script` emits DISA(pid) once per pack member, and EvtRemoveUnit clears
+    the FIRST unit matching that pid. That is correct ONLY while the parleyed wave's class is
+    the sole holder of the pid in the chapter -- a second wave reusing the class would have
+    units silently deleted by Marty's parley, with the difficulty read still looking right.
+    Nothing misbehaves today (mauthedoog appears exactly once); this keeps it that way.
+    """
+    cls = wave['class']
+    others = [e['id'] for e in chap.get('enemy_units', [])
+              if e is not wave and e.get('class') == cls]
+    if others:
+        sys.exit('ERROR: ch04 parley pid collision -- the convertible wave %r shares '
+                 'class %r with %s, so its DISA sweep would silently remove their units. '
+                 'Give the parleyed wave its own class/pid.'
+                 % (wave['id'], cls, ', '.join(repr(o) for o in others)))
+
+
 def ch04_parley_pre_script(pack_pid, pack_size, green_symbol):
     """The pack table-swap spliced into the parley talk script BEFORE the CUSA: DISA the shared-
     pid generic Mauthe Doogs one at a time (EvtRemoveUnit clears the FIRST valid match, so
     `pack_size` repeats clear the whole pack -- verified in the decomp), then LOAD1 the green
-    Lycanroc NPC allies at the same tiles. A *shape* change faction-conversion alone can't do."""
+    Lycanroc NPC allies at the same tiles. A *shape* change faction-conversion alone can't do.
+
+    The pid must be the wave's alone -- see assert_parley_pid_unique, called by inject_ch04."""
     disa = ''.join('    DISA(%s) /* clear generic Mauthe Doog %d/%d */\n'
                    % (pack_pid, i + 1, pack_size) for i in range(pack_size))
     return (disa + '    LOAD1(0x1, %s) /* swap in the green Lycanroc pack (NPC allies) */\n'
@@ -6575,6 +7011,94 @@ def _read_map_metatile(maps_dir, stem, x, y):
     with open(os.path.join(maps_dir, stem + '.mar'), 'rb') as f:
         mar = f.read()
     return struct.unpack_from('<H', mar, (y * w + x) * 2)[0] >> 5
+
+
+TERRAIN_TABLE_OFFSET = 8192     # a tile config is 8192 B TSA + 1024 B terrain (map_tileset_tool)
+
+
+def _map_terrain_grid(maps_dir, stem):
+    """(width, height, terrain[y][x]) for a painted chapter layout, resolved through its OWN
+    tileset's terrain table. Reads the campaign tileset asset, not the decomp's copy of it --
+    ours is the committed source, the decomp's is the untracked artifact injection writes."""
+    with open(os.path.join(maps_dir, stem + '.json'), encoding='utf-8') as f:
+        meta = json.load(f)
+    width, tileset = meta['width'], meta.get('tileset', WINTER_TILESET)
+    with open(os.path.join(maps_dir, 'tilesets', tileset, tileset + '.bin'), 'rb') as f:
+        terrain = f.read()[TERRAIN_TABLE_OFFSET:]
+    with open(os.path.join(maps_dir, stem + '.mar'), 'rb') as f:
+        mar = f.read()
+    height = len(mar) // 2 // width
+    return width, height, [
+        [terrain[struct.unpack_from('<H', mar, (y * width + x) * 2)[0] >> 5]
+         for x in range(width)] for y in range(height)]
+
+
+def _class_terrain_move_costs(table):
+    """One class's terrain movement-cost row, indexed by terrain id (entry <= 0 = the class may
+    not enter that terrain), read from the decomp at HEAD -- data_terrains.c is a PATCHED file,
+    so the working tree is not the vanilla answer.
+
+    The rows are DESIGNATED initializers keyed by name (`[TERRAIN_FOREST] = 2`), not a positional
+    list, so they must be resolved through the terrain enum. Reading them positionally silently
+    produces a table that is wrong in a way that still looks plausible -- every terrain walkable,
+    because the names themselves carry digits (TERRAIN_C_ROOM_09, TERRAIN_TILE_2E) that a naive
+    number scan picks up as costs."""
+    text = vanilla_decomp_text('src/data_terrains.c')
+    match = re.search(r'\b%s\[\]\s*=\s*\{(.*?)\};' % re.escape(table), text, re.S)
+    if not match:
+        sys.exit('ERROR: no movement-cost table %s in the decomp' % table)
+    ids = {name: int(value, 0) for name, value in re.findall(
+        r'(TERRAIN_[A-Z0-9_]+)\s*=\s*(0[xX][0-9A-Fa-f]+|\d+)',
+        vanilla_decomp_text('include/constants/terrains.h'))}
+    costs = [-1] * (max(ids.values()) + 1)   # a terrain the row omits stays impassable
+    for name, value in re.findall(r'\[(TERRAIN_[A-Z0-9_]+)\]\s*=\s*(-?\d+)', match.group(1)):
+        costs[ids[name]] = int(value)
+    return costs
+
+
+def reachable_tiles(terrain, costs, start):
+    """The set of tiles a unit with `costs` can WALK to from `start` (4-neighbour flood fill,
+    the engine's own rule: costs[terrain] < 0 means it may not enter)."""
+    height, width = len(terrain), len(terrain[0])
+    seen, queue = {start}, [start]
+    while queue:
+        x, y = queue.pop()
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nx, ny = x + dx, y + dy
+            if (0 <= nx < width and 0 <= ny < height and (nx, ny) not in seen
+                    and costs[terrain[ny][nx]] > 0):
+                seen.add((nx, ny))
+                queue.append((nx, ny))
+    return seen
+
+
+def assert_scripted_move_reachable(maps_dir, stem, start, dest, mov_table, who):
+    """A scripted MOVE(...)+ENUN to a tile its unit cannot WALK to NEVER RETURNS: the event
+    engine waits on a path that does not exist and the chapter hangs, with the unit standing
+    exactly where it was. Nothing upstream catches it -- the destination can be perfectly good
+    terrain, `make` stays green, and the beat only wedges the game when it actually fires.
+
+    Found the hard way (ch04 #24 Stage 4): the white moose flees to the map's NE corner, which
+    is TERRAIN_PLAINS and looks fine, but is sealed off from its own clearing by a wall of
+    TERRAIN_CLIFF. The sighting soft-locked the chapter the first time a party unit triggered
+    it -- and `smoke_ch04` stayed green throughout, because an idling party never walks into the
+    clearing to trigger it.
+
+    So: flood-fill the map with the unit's class movement-cost row and reject any destination
+    outside the region reachable from where the script loads it.
+    """
+    _, _, terrain = _map_terrain_grid(maps_dir, stem)
+    costs = _class_terrain_move_costs(mov_table)
+    reachable = reachable_tiles(terrain, costs, start)
+    if dest not in reachable:
+        north_east = sorted(reachable, key=lambda t: (t[1] - t[0]))[0]
+        sys.exit(
+            'ERROR: %s cannot walk from %s to %s on %s -- the MOVE would hang the chapter.\n'
+            '       destination terrain is 0x%02X (cost %d); it is simply cut off from the '
+            'start.\n'
+            '       most north-east tile it CAN reach: %s'
+            % (who, start, dest, stem, terrain[dest[1]][dest[0]],
+               costs[terrain[dest[1]][dest[0]]], north_east))
 
 
 def _ch03_tile_changes_asm(chests, doors):
@@ -7048,13 +7572,50 @@ def inject_ch04(campaign, boot=False, verbose=True):
     turn-2 wave; Marty's Talk table-swaps the 5 generic Mauthe Doogs for a green Lycanroc NPC
     pack and CUSAs Lupin blue -- the shared talk-recruit flow, reused from ch03). Stage 2c wires
     the turn-2 REVEAL cutscene (rides the turn-2 LOAD1: pan to the NW fog, focus Lupin, stub
-    beats plant the parley). Authored scenes / final dialogue (Stage 4) remain a follow-up.
+    beats plant the parley).
+
+    Stage 4 wires the AUTHORED SCENES, all off the locked chapter YAML:
+      * the LONELYWOOD OPENING -- a two-BG scene (Nimsy's cottage over vanilla House1, cut to
+        the fogged forest edge for Pinky's fog-of-war heads-up), then LOMA + prep;
+      * the full five-turn PARLEY text (was a one-line stub of its closing beat);
+      * the MOOSE-FLEES beat -- a Misc AREA over the tomb-side clearing loads the quarry, holds
+        on it, and bolts it off the NE edge (it never speaks: locked mute in ch04 and ch05);
+      * the REAL ENDING, replacing dev_placeholder_scene() -- and BRANCHED, because Lupin's
+        recruit is optional: CHECK_EVENTID on the parley flag picks between the locked scene and
+        the no-Lupin variant whose boxes 1/3 go to Pinky and Meesmickle.
+    The reveal cutscene's own two beats are still stubs pending a dialogue-pass.
 
     Run after inject_ch03 in campaign order. After both hosts are injected,
     chain_ch03_to_ch04 advances the real campaign path.
     """
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH04_CHAPTER_YAML)
+
+    # 0. Stage 4 -- the authored scenes, split out of the locked chapter YAML (cf. inject_ch03).
+    #    The opening splits on its one beat_break (A the cottage / B the forest edge); the moose
+    #    beat and the ending carry no location_card, so card_required=False.
+    op_card, op_beats = _split_event_beats(chap, 'chapter_start', 'ch04 opening',
+                                           CH04_OPENING_MSGS)
+    _, moose_beats = _split_event_beats(chap, 'moose_sighted', 'ch04 moose-flees',
+                                        (CH04_MOOSE_MSG,), card_required=False)
+    _, end_beats = _split_event_beats(chap, 'chapter_end', 'ch04 ending',
+                                      (CH04_ENDING_MSG,), card_required=False)
+    # The no-Lupin branch: the SAME scene with boxes 1 and 3 swapped (Marty's box 2 rides through
+    # unchanged). Anchored to the text it replaces, so a re-ordered locked script fails loudly
+    # rather than silently mis-swapping -- see variant_beat.
+    end_event = next(e for e in chap['events'] if e.get('trigger') == 'chapter_end')
+    end_beat_no_lupin = variant_beat(end_beats[0], end_event['no_lupin_fallback'],
+                                     'ch04 ending no-Lupin fallback')
+    # Speaker -> face. Nimsy rides the VANILLA old-lady generic mug (Nicolas 2026-07-04: it ships
+    # in the base ROM, so no vendored asset and no credit line); everyone else is cast.
+    cut_fid = _make_fid({'nimsy': CH04_NIMSY_FID}, 'ch04 unknown cutscene speaker')
+    # Podiums for the cottage scene. RBG opens it and Nimsy answers him, so BOTH are anchored --
+    # she to her own podium, not the shared mid-left. Without that she is the only speaker who
+    # alternates with the party (RBG -> Nimsy -> Marty -> Nimsy -> Meesmickle), and the LRU
+    # podium manager fades her out and back in twice: the quest-giver flickers through her own
+    # scene. Four distinct podiums = the face budget exactly, so nothing is evicted.
+    op_home = {'prof-rbg': '[OpenMidRight]', 'nimsy': '[OpenFarRight]',
+               'meesmickle': '[OpenFarLeft]'}
 
     indices = _register_chapter_map(
         maps_dir, CH04_LAYOUT, 'Manchego Stars ch04 Lonelywood forest layout (#24)')
@@ -7105,6 +7666,18 @@ def inject_ch04(campaign, boot=False, verbose=True):
     def table(rows):
         return '{\n' + '\n'.join(rows) + '\n    { 0 },\n}'
 
+    # The white moose: a lone scripted NEUTRAL (green), on its own pid so the flee beat's DISA
+    # can only ever take it. Its Wyrdeer map sprite rides the cast palette via gMapPaletteOverride
+    # (it never changes faction) -- see the chapter YAML's `art:` block.
+    mx, my = CH04_MOOSE_POS
+    moose_row = _ally_unit_entry(
+        None, 'white-moose', CH04_MOOSE_CLASS, 1, mx, my, '0',
+        ' /* the white moose -- scripted quarry, never fought (canon: uncatchable) */',
+        allegiance='GREEN', char=CH04_MOOSE_PID)
+    # Its escape has to be WALKABLE or the flee beat hangs the chapter (see the assertion).
+    assert_scripted_move_reachable(maps_dir, CH04_LAYOUT[1], CH04_MOOSE_POS,
+                                   CH04_MOOSE_FLEE_TO, CH04_MOOSE_MOV_TABLE, 'the white moose')
+
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:
         udefs = f.read()
     for symbol, body in (
@@ -7113,6 +7686,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
             (CH04_TURN2_SYMBOL, table(turn2_rows)),
             (CH04_GREEN_PACK_SYMBOL, table(green_pack_rows)),
             (CH04_TURN3_SYMBOL, table(turn3_rows)),
+            (CH04_MOOSE_SYMBOL, table([moose_row])),
             (CH04_BOOT_SEED_SYMBOL, seed)):
         udefs = _replace_brace_block(udefs, symbol + '[] =', body, EVENTS_UDEFS_C)
     with open(EVENTS_UDEFS_C, 'w', encoding='utf-8') as f:
@@ -7126,6 +7700,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
     parley_pre = ch04_parley_pre_script(
         CH04_MONSTER_PIDS[_ch04_reveal_wave(chap)['class']], len(green_pack_rows),
         CH04_GREEN_PACK_SYMBOL)
+    assert_parley_pid_unique(chap, _ch04_reveal_wave(chap))   # #198 review guard
     parley_recruiters = ch04_parley_recruiters(campaign, chap)
     lupin_char_events, lupin_talk_script = talk_recruit_wiring(
         parley_recruiters, char_symbol(lupin[1]),
@@ -7153,10 +7728,17 @@ def inject_ch04(campaign, boot=False, verbose=True):
                    'EventListScr_Ch5_UnitMove', 'EventListScr_Ch5_Tutorial'):
         info = _replace_brace_block(info, symbol + '[] =',
                                     '{\n    END_MAIN\n}', CH5_EVENTINFO_H)
+    # Misc = win/lose + the moose sighting. AREA fires once when a player unit steps into the
+    # tomb-side clearing (guarded by its own tmp flag, the vanilla one-shot idiom, cf. ch1's
+    # AREA) -- the quarry is seen and lost in the same beat.
+    mx1, my1, mx2, my2 = CH04_MOOSE_AREA
     info = _replace_brace_block(
         info, 'EventListScr_Ch5_Misc[] =',
-        '{\n    DefeatAll(%s)\n    CauseGameOverIfLordDies\n    END_MAIN\n}'
-        % CH04_ENDING_SCRIPT, CH5_EVENTINFO_H)
+        '{\n    DefeatAll(%s)\n'
+        '    AREA(%s, %s, %d, %d, %d, %d) /* the white moose is sighted, and bolts */\n'
+        '    CauseGameOverIfLordDies\n    END_MAIN\n}'
+        % (CH04_ENDING_SCRIPT, CH04_MOOSE_GUARD_FLAG, CH04_MOOSE_SCRIPT,
+           mx1, my1, mx2, my2), CH5_EVENTINFO_H)
     with open(CH5_EVENTINFO_H, 'w', encoding='utf-8') as f:
         f.write(info)
 
@@ -7164,10 +7746,44 @@ def inject_ch04(campaign, boot=False, verbose=True):
         script = f.read()
     seed_load = ('    LOAD1(0x1, %s) /* --ch04-boot: found an armed party */\n'
                  '    ENUN\n' % CH04_BOOT_SEED_SYMBOL) if boot else ''
+    # Stage 4 -- the LONELYWOOD OPENING, a two-BG scene (the ch03 shape). Beat A plays in
+    # Speaker Nimsy Huddle's cottage over vanilla's House1 hearth; the deaf-Speaker gag resolves
+    # through Marty's rapport spores and Meesmickle takes the job. Then the BG CUTS to the forest
+    # edge for beat B, where Pinky's line delivers the fog-of-war heads-up (onboarding parity, in
+    # voice) and buttons into gameplay. Both beats are LOCKED (dialogue-pass, 2026-07-03).
+    op_calls_a = _scenic_beat_calls(CH04_OPENING_MSGS[:1], op_beats[:1],
+                                    ['A -- Nimsy\'s cottage: the moose problem; Marty\'s spores '
+                                     'cut through the deafness; Meesmickle takes the job'])
+    op_calls_b = _scenic_beat_calls(CH04_OPENING_MSGS[1:], op_beats[1:],
+                                    ['B -- the forest edge: Pinky flew up and the fog looked back '
+                                     '(introduces: fog-of-war)'])
     beginning = ('{\n'
-                 '    LOAD1(0x1, %s) /* approved turn-1 force: 10 monsters (reveal opens monsters-only) */\n'
-                 '    ENUN\n' % CH04_INITIAL_ENEMY_SYMBOL
+                 '    MUSC(SONG_TENSION)\n'
+                 '    REMOVEPORTRAITS\n'
+                 '    BACG(%s) /* Nimsy Huddle\'s cottage -- vanilla House1 hearth interior */\n'
+                 '    FADU(16)\n'
+                 '    BROWNBOXTEXT(0x%X, 8, 8) /* "Lonelywood" location card */\n'
+                 % (CH04_OPENING_COTTAGE_BG, CH04_OPENING_CARD_MSG)
+                 + op_calls_a +
+                 '    REMA /* clear the cottage portraits before the cut */\n'
+                 '    FADI(16)\n'
+                 # BACG only decompresses a new BG while activeTextType is REMOVEPORTRAITS/_1A22
+                 # (eventscr.c:1316); the Text() beats above left it at TEXTSTART, so a bare second
+                 # BACG would be a no-op and the cottage would stay in VRAM. Re-arm the load mode
+                 # first -- the vanilla multi-BG idiom, and exactly the ch03 opening's fix.
+                 '    REMOVEPORTRAITS /* re-arm BACG BG-load mode (Text() reset it to TEXTSTART) */\n'
+                 '    BACG(%s) /* CUT to the forest edge, fog hanging between the trees */\n'
+                 '    FADU(16)\n' % CH04_OPENING_FOREST_BG
+                 + op_calls_b +
+                 '    FADI(16) /* fade the forest edge out */\n'
+                 '    SVAL(EVT_SLOT_B, 0x0) /* map camera origin for the reload */\n'
+                 '    LOMA(0x%X) /* RestartBattleMap -- build the ch04 map fresh (cf. inject_ch03) */\n'
+                 % CH04_HOST_INDEX
+                 + '    LOAD1(0x1, %s) /* approved turn-1 force: 10 monsters (reveal opens monsters-only) */\n'
+                   '    ENUN\n' % CH04_INITIAL_ENEMY_SYMBOL
                  + seed_load +
+                 # NO FADU: the shared prep prologue fades to black itself before drawing
+                 # Preparations, so revealing the freshly-LOMA'd map here only flashes it.
                  '    CALL(%s) /* preparations: pick 9 of 10; lord force-deployed */\n'
                  '    ENUT(8)\n'
                  '    EVBIT_T(7)\n'
@@ -7189,23 +7805,59 @@ def inject_ch04(campaign, boot=False, verbose=True):
     # pack (DISA the generics + LOAD1 the green allies) then CUSA Lupin blue (built above).
     script = _replace_brace_block(
         script, CH04_LUPIN_TALK_SCRIPT + '[] =', lupin_talk_script, CH5_EVENTSCRIPT_H)
+    # The moose-flees beat (Stage 4): fired by the Misc AREA when a unit reaches the tomb-side
+    # clearing. Loads the moose, holds on it, RBG's one line, then it bolts NE and is gone.
     script = _replace_brace_block(
-        script, CH04_ENDING_SCRIPT + '[] =',
-        '{\n    MUSC(SONG_VICTORY)\n    FADI(16)\n' + dev_placeholder_scene() +
-        '    ENDA\n}', CH5_EVENTSCRIPT_H)
+        script, CH04_MOOSE_SCRIPT + '[] =',
+        ch04_moose_script(CH04_MOOSE_SYMBOL, CH04_MOOSE_PID, CH04_MOOSE_MSG,
+                          CH04_MOOSE_FLEE_TO), CH5_EVENTSCRIPT_H)
+    # The REAL ENDING (Stage 4), replacing the dev-placeholder landing: dusk at the treeline, the
+    # pack in harness beside Baxby, Lupin noses the moose's trail to the tomb door and drops the
+    # chapter's one Ravisin seed. Then MNC2 onward -- ch05 is not hosted yet, so it still lands on
+    # the dev placeholder, exactly as ch03's ending did until ch04 hosted.
+    #
+    # BRANCHED on the parley flag: Lupin's recruit is gated on Marty's Talk, and the difficulty
+    # model explicitly prices a no-parley clear -- so on that path two of this scene's three boxes
+    # have no speaker, including the chapter's closing button. CHECK_EVENTID on the recruit flag
+    # picks the variant (branch_on_flag; the vanilla ch19a-ending idiom). Plays over a BG rather
+    # than on-map ON PURPOSE: a faced on-map beat rides a talk bubble anchored to a speaking UNIT,
+    # and with deploy 9-of-10 the fallback's speakers (Pinky, Meesmickle) can be benched -- over a
+    # BG the full-screen window needs no anchor.
+    end_scene = (
+        '    REMOVEPORTRAITS\n'
+        '    BACG(%s) /* dusk at the treeline; the sled at the ridge */\n'
+        '    FADU(16)\n' % CH04_ENDING_BG)
+    ending = ('{\n    MUSC(SONG_VICTORY)\n'
+              '    FADI(16) /* fade the forest out */\n'
+              + end_scene
+              + branch_on_flag(
+                  CH04_LUPIN_TALK_FLAG,
+                  '    Text(0x%X) /* parleyed: Lupin reads the trail + the Ravisin seed */\n'
+                  % CH04_ENDING_MSG,
+                  '    Text(0x%X) /* no parley: Pinky reads the trail, Meesmickle takes the dread */\n'
+                  % CH04_ENDING_NO_LUPIN_MSG)
+              + '    FADI(16) /* fade the treeline out into the dev-placeholder landing */\n'
+              + dev_placeholder_scene()
+              + '    ENDA\n}')
+    script = _replace_brace_block(
+        script, CH04_ENDING_SCRIPT + '[] =', ending, CH5_EVENTSCRIPT_H)
     with open(CH5_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
         f.write(script)
 
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
     set_message_body(lines, host['chapTitleTextId'], name_message_body(chap['title']))
-    set_message_body(lines, host['goal']['statusObjectiveTextId'], name_message_body('Rout enemy'))
-    # Lupin's parley talk line (Stage 2b stub -- provisional in-voice line; the ch04 dialogue-pass
-    # finalizes it + the reveal cutscene in Stage 4). Faced on Lupin's Duessel-slot bust.
+    # Vanilla's own wording (see the ch02 note): FE8 prints "Defeat", never "rout".
+    set_message_body(lines, host['goal']['statusObjectiveTextId'],
+                     name_message_body('Defeat all monsters'))
+    # Stage 4 -- the FULL locked parley (was a one-line stub of its closing beat). Five turns,
+    # Lupin/Marty alternating: the count-off, Marty's spore-puff opener, the BIRD retort, the
+    # goodberry pack-math, and Lupin doing the arithmetic out loud. Marty sits mid-left (party
+    # side), Lupin mid-right (pack side), so the exchange stages as a two-shot.
+    talk = next(e for e in chap['events'] if e.get('trigger') == 'unit_reaches_zone')['script']
     set_message_body(lines, CH04_LUPIN_TALK_MSG, _script_to_message(
-        [{'lupin': 'Steady food beats proud starving. The pack pulls your sled. '
-          'Feed them well, mushroom.'}],
-        {'lupin': ('[OpenMidRight]', _fid_tag(lupin[1]))}))
+        talk, {'lupin': ('[OpenMidRight]', _fid_tag(lupin[1])),
+               'marty': ('[OpenMidLeft]', _fid_tag(PORTRAIT_MAP['marty']))}))
     # Turn-2 reveal cutscene beats (Stage 2c stubs -- provisional in-voice lines; Stage 4
     # dialogue-pass finalizes). Lupin commands the pack (faced, pack side = mid-right); Marty
     # reads it cross-field and FLAGS the parley -- the beat that teaches "talk to the leader"
@@ -7217,6 +7869,22 @@ def inject_ch04(campaign, boot=False, verbose=True):
     set_message_body(lines, reveal_marty, _script_to_message(
         [{'marty': "That big one's giving orders -- it's THINKING. Don't loose an arrow! "
           'Let me talk to it.'}], {'marty': ('[OpenMidLeft]', _fid_tag(PORTRAIT_MAP['marty']))}))
+    # Stage 4 scene bodies. The opening + both endings play over a BG (full-screen window, wrap
+    # 42); the moose beat is ON-MAP, so it wraps at the map-bubble 29 (a wider line hits
+    # PutTalkBubble's unclamped right-side branch and runs off the tilemap -- the ch03 crier bug).
+    set_message_body(lines, CH04_OPENING_CARD_MSG, name_message_body(op_card))
+    _emit_scene_beats(lines, CH04_OPENING_MSGS, op_beats, cut_fid, op_home, width=42)
+    _emit_scene_beats(lines, (CH04_MOOSE_MSG,), moose_beats, cut_fid, {}, width=29)
+    # Both endings stage as a two-shot: the trail-reader holds mid-right, Marty answers from
+    # mid-left. Lupin already owns mid-right in the parley, so he keeps it here; on the no-parley
+    # path PINKY inherits both the podium and the job (his opening beat was failing to see
+    # through the fog, so finding the trail once it thins pays that off). Without these anchors
+    # every box defaults to mid-left and each speaker fades the last one out mid-scene.
+    end_home = {'lupin': '[OpenMidRight]', 'pinky': '[OpenMidRight]',
+                'meesmickle': '[OpenFarLeft]'}
+    _emit_scene_beats(lines, (CH04_ENDING_MSG,), end_beats, cut_fid, end_home, width=42)
+    _emit_scene_beats(lines, (CH04_ENDING_NO_LUPIN_MSG,), [end_beat_no_lupin],
+                      cut_fid, end_home, width=42)
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     _write_chapter_title_card(host, 'Ch.4: ' + chap['title'])
@@ -7227,6 +7895,10 @@ def inject_ch04(campaign, boot=False, verbose=True):
               'turn-2 reveal cutscene + Marty->Lupin parley (DISA %d + green pack + CUSA)'
               % (obj_idx, pal_idx, cfg_idx, layout_idx, CH04_HOST_INDEX, len(cap_rows),
                  ' (boot-seeded party)' if boot else '', len(green_pack_rows)))
+        print('  ch04 scenes: opening (2 BGs, %d+%d lines) + full parley (%d) + moose-flees '
+              '(AREA %d,%d..%d,%d) + ending (%d boxes, branched: Lupin / no-parley)'
+              % (len(op_beats[0]), len(op_beats[1]), len(talk), mx1, my1, mx2, my2,
+                 len(end_beats[0])))
 
 
 def chain_ch03_to_ch04():
@@ -7631,6 +8303,10 @@ def main():
         inject_title_screen(args.campaign)
         print('event backgrounds (#22):')
         inject_backgrounds(args.campaign)  # vendored winter BGs -> new gConvoBackgroundData slots
+        # Ownership gate (#198 review): fail the build BEFORE any injector writes text if two
+        # hosted chapters claim one message id -- a double-claim is otherwise silent, since
+        # verify_text checks runaway text, not who owns a slot.
+        assert_message_ids_unique()
         print('chapter 1 (#21):')
         inject_ch01(args.campaign)  # MUST precede inject_prologue (vanilla goal read)
         inject_northlook_bitey()    # 'Ol Bitey over the tavern hearth (Beat 1 set dressing)

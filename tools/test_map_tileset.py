@@ -20,6 +20,7 @@ import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import map_tileset_tool as mt  # noqa: E402
+import build_campaign as bc  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CAVE = os.path.join(REPO, 'campaigns/rime-of-the-frostmaiden/maps/tilesets/cave-interior')
@@ -285,6 +286,57 @@ class TestLearnedWinterReskin(unittest.TestCase):
         self.assertTrue(all(vanilla_terrain[cells[i]] == 0x0C for i in changed))
 
 
+class TestFogHalfOfTheTilesetPalette(unittest.TestCase):
+    """A tileset .gbapal is two sets of five banks: DisplayBmTile (bmmap.c) draws a visible
+    tile from BG bank 6 and a fogged tile from bank 11, and UnpackChapterMapPalette loads the
+    ten banks at BG 6..15. So banks 0-4 are lit and 5-9 are the fog copy -- and a vendored
+    tileset that only recoloured the lit half puts the ORIGINAL season back on screen the
+    moment fog turns on (ch04, #24)."""
+
+    def _banks(self, pal):
+        import struct
+        return [[struct.unpack_from('<H', pal, b * 32 + i * 2)[0] for i in range(16)]
+                for b in range(len(pal) // 32)]
+
+    def _greenish(self, colour):
+        r, g, b = colour & 31, (colour >> 5) & 31, (colour >> 10) & 31
+        return g > r + 2 and g > b + 2
+
+    def _snow_palette(self):
+        path = os.path.join(REPO, 'campaigns/rime-of-the-frostmaiden/maps/tilesets/'
+                                  'snowy-bern/snowy-bern.gbapal')
+        with open(path, 'rb') as f:
+            return f.read()
+
+    def test_the_vendored_fog_half_is_still_green(self):
+        """Pins the trap, not just the fix: the asset we vendor really does ship a summer fog
+        half, so deriving it is necessary rather than defensive."""
+        banks = self._banks(self._snow_palette())
+        lit = sum(self._greenish(c) for b in banks[:5] for c in b)
+        fog = sum(self._greenish(c) for b in banks[5:] for c in b)
+        self.assertEqual(0, lit, 'the LIT half is winterized')
+        self.assertGreater(fog, 0, 'the vendored FOG half is not')
+
+    def test_derived_fog_half_carries_the_winter_lit_half(self):
+        derived = bc.derive_fog_banks(self._snow_palette(),
+                                      bc.TILESET_FOG_HAZE['snowy-bern'])
+        banks = self._banks(derived)
+        self.assertEqual(0, sum(self._greenish(c) for b in banks[5:] for c in b))
+        # Fog is a HAZE, not a repaint: every fog colour is lighter than its lit twin, and
+        # index 0 (the transparent/backdrop entry) is carried across untouched.
+        for b in range(5):
+            self.assertEqual(banks[b][0], banks[b + 5][0])
+            for i in range(1, 16):
+                lit, fog = banks[b][i], banks[b + 5][i]
+                for shift in (0, 5, 10):
+                    self.assertGreaterEqual((fog >> shift) & 31, (lit >> shift) & 31)
+
+    def test_lit_half_is_untouched(self):
+        pal = self._snow_palette()
+        derived = bc.derive_fog_banks(pal, bc.TILESET_FOG_HAZE['snowy-bern'])
+        self.assertEqual(pal[:5 * 32], derived[:5 * 32])
+
+
 class TestVendoredCaveInterior(unittest.TestCase):
     """The committed cave-interior pieces (#40; FE-Repo, Cynon, Gray palette)."""
 
@@ -404,9 +456,13 @@ class TestCh04MapAndRosterPlacement(unittest.TestCase):
                 [[1, 14], [5, 13], [8, 14]],
             ),
             'entoumbed': ('Entombed', [[13, 13]]),
+            # The pack's FOOTPRINT is what mirrors vanilla Ch4; the ORDER is ours, because
+            # positions[0] is the leader (Lupin) tile. He moved [0,0] -> [2,1]: at [0,0] he
+            # sat outside the party's fog vision and was never drawn in his own reveal.
+            # Compared as a set below, with the leader pinned separately.
             'mauthedoog': (
                 'Mauthe Doog',
-                [[0, 0], [2, 0], [0, 2], [2, 1], [1, 0], [0, 1]],
+                [[2, 1], [2, 0], [0, 2], [0, 0], [1, 0], [0, 1]],
             ),
             'revenant-reinf': (
                 'Revenant',
@@ -420,8 +476,17 @@ class TestCh04MapAndRosterPlacement(unittest.TestCase):
         for unit_id, (name, positions) in expected.items():
             unit = enemies[unit_id]
             self.assertEqual(name, unit['name'])
-            self.assertEqual(positions, unit['positions'])
+            if unit_id == 'mauthedoog':
+                # Footprint = vanilla's; order = ours (positions[0] is the leader's tile).
+                self.assertCountEqual(positions, unit['positions'])
+            else:
+                self.assertEqual(positions, unit['positions'])
             self.assertEqual(unit['count'], len(unit['positions']))
+
+        # The pack LEADER must stand where the party can actually see him when the reveal
+        # fires -- an unseen unit is not drawn, so a leader outside fog vision makes his own
+        # cutscene focus empty snow (verified in-engine by the `ch04sprites` scenario).
+        self.assertEqual([2, 1], enemies['mauthedoog']['positions'][0])
 
         map_dir = os.path.join(
             REPO, 'campaigns/rime-of-the-frostmaiden/maps')

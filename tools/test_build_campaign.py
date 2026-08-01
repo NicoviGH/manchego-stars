@@ -1553,3 +1553,145 @@ class PreRecruitVariant(unittest.TestCase):
             self.assertLess(body.index('int charId = UNIT_CHAR_ID'),
                             body.index('_pre_recruit_lookup('),
                             '%s must set charId before the pre-recruit lookup' % fn)
+
+
+class Ch04Stage4Scenes(unittest.TestCase):
+    """The ch04 authored-scene machinery (#24 Stage 4) + the two #198-review guards."""
+
+    def setUp(self):
+        import yaml
+        with open(os.path.join(bc.REPO, 'campaigns', 'rime-of-the-frostmaiden',
+                               'chapters', 'ch04-the-white-moose.yaml'), encoding='utf-8') as f:
+            self.chap = yaml.safe_load(f)
+        self.end_event = next(e for e in self.chap['events']
+                              if e.get('trigger') == 'chapter_end')
+
+    # ── the no-Lupin branch ────────────────────────────────────────────────────
+    def test_the_no_parley_path_has_a_speaker_for_every_box(self):
+        """The reason this branch exists: a player can clear ch04 having killed the pack,
+        and then two of the ending's three boxes have no speaker -- including the chapter's
+        closing button. Every box must be voiced on BOTH paths (#24 checklist)."""
+        _, beats = bc._split_event_beats(self.chap, 'chapter_end', 'end',
+                                         (bc.CH04_ENDING_MSG,), card_required=False)
+        locked = beats[0]
+        fallback = bc.variant_beat(locked, self.end_event['no_lupin_fallback'], 'test')
+        self.assertEqual(len(fallback), len(locked))
+        for i, box in enumerate(fallback, 1):
+            (speaker, text), = box.items()
+            self.assertTrue(speaker and text.strip(), 'box %d has no speaker/text' % i)
+        self.assertNotIn('lupin', [next(iter(b)) for b in fallback],
+                         'the no-parley path must never put Lupin on stage')
+
+    def test_the_unchanged_box_rides_through_both_branches(self):
+        """Only boxes 1 and 3 are replaced; Marty's box 2 is the same line on both paths."""
+        _, beats = bc._split_event_beats(self.chap, 'chapter_end', 'end',
+                                         (bc.CH04_ENDING_MSG,), card_required=False)
+        fallback = bc.variant_beat(beats[0], self.end_event['no_lupin_fallback'], 'test')
+        self.assertEqual(beats[0][1], fallback[1])
+        self.assertEqual(next(iter(fallback[1])), 'marty')
+
+    def test_a_drifted_anchor_fails_loudly_instead_of_mis_swapping(self):
+        """`replaces:` anchors exist so a re-ordered locked script cannot silently swap the
+        wrong box. Reversing the scene must abort, not quietly produce nonsense."""
+        _, beats = bc._split_event_beats(self.chap, 'chapter_end', 'end',
+                                         (bc.CH04_ENDING_MSG,), card_required=False)
+        with self.assertRaises(SystemExit):
+            bc.variant_beat(list(reversed(beats[0])),
+                            self.end_event['no_lupin_fallback'], 'test')
+
+    def test_the_fallback_declaration_is_internally_consistent(self):
+        fb = self.end_event['no_lupin_fallback']
+        self.assertEqual(len(fb['boxes']), len(fb['replaces']))
+        self.assertEqual(len(fb['boxes']), len(fb['script']))
+
+    def test_the_branch_emits_both_arms_and_converges(self):
+        """branch_on_flag is the vanilla ch19a idiom: CHECK_EVENTID -> BEQ to the fallback
+        arm, the set-arm GOTOs past it, and both converge on a shared LABEL."""
+        c = bc.branch_on_flag('EVFLAG_TMP(9)', '    SET\n', '    CLEAR\n')
+        self.assertIn('CHECK_EVENTID(EVFLAG_TMP(9))', c)
+        self.assertIn('BEQ(0x0, EVT_SLOT_C, EVT_SLOT_0)', c)
+        self.assertLess(c.index('SET'), c.index('LABEL(0x0)'))
+        self.assertLess(c.index('LABEL(0x0)'), c.index('CLEAR'))
+        self.assertLess(c.index('CLEAR'), c.index('LABEL(0x1)'))
+        # label_base keeps concurrent branches from colliding
+        self.assertIn('LABEL(0x4)', bc.branch_on_flag('F', '', '', label_base=4))
+
+    # ── #198 review guards ─────────────────────────────────────────────────────
+    def test_hosted_chapters_do_not_share_message_ids(self):
+        owner = bc.assert_message_ids_unique()
+        self.assertEqual(owner[bc.CH04_ENDING_MSG], 'ch04')
+        # ch04 owns vanilla Ch5's block because it is hosted on slot 5
+        for mid in bc.HOSTED_CHAPTER_MESSAGE_IDS['ch04']:
+            self.assertTrue(0x9BA <= mid <= 0x9CC, 'ch04 id 0x%X is outside its host block' % mid)
+
+    def test_a_double_claimed_message_id_fails_the_build(self):
+        """The failure this guard exists for: verify_text checks runaway text, not slot
+        ownership, so a second writer overwrites the first and the build stays green."""
+        with self.assertRaises(SystemExit):
+            bc.assert_message_ids_unique({'ch04': (0x9BB,), 'ch05': (0x9BB,)})
+
+    def test_the_parley_pid_is_the_convertible_wave_s_alone(self):
+        bc.assert_parley_pid_unique(self.chap, bc._ch04_reveal_wave(self.chap))
+
+    def test_a_second_wave_sharing_the_parley_class_is_rejected(self):
+        """DISA clears the FIRST unit matching a pid, so a wave reusing the parleyed class
+        would have units silently removed by Marty's parley -- with the difficulty read
+        still looking correct."""
+        chap = dict(self.chap)
+        wave = bc._ch04_reveal_wave(chap)
+        chap['enemy_units'] = list(chap['enemy_units']) + [
+            {'id': 'late-doogs', 'class': wave['class'], 'positions': [[0, 0]]}]
+        with self.assertRaises(SystemExit):
+            bc.assert_parley_pid_unique(chap, wave)
+
+    # ── the moose beat ─────────────────────────────────────────────────────────
+    def test_the_moose_is_loaded_shown_and_removed_in_one_beat(self):
+        """It is uncatchable by design: it must never be left on the map to be attacked."""
+        s = bc.ch04_moose_script('UnitDef_X', '0xce', 0x9C0, (14, 0))
+        self.assertLess(s.index('LOAD1(0x1, UnitDef_X)'), s.index('TEXTSHOW(0x9C0)'))
+        self.assertLess(s.index('TEXTSHOW(0x9C0)'), s.index('MOVE(0x0, 0xce, 14, 0)'))
+        self.assertLess(s.index('MOVE(0x0, 0xce, 14, 0)'), s.index('DISA(0xce)'))
+        self.assertTrue(s.rstrip().endswith('ENDA\n}'))
+
+    def test_the_moose_beat_is_guarded_to_the_party_before_it_loads_anything(self):
+        """FE8 polls the Misc list after EVERY unit's action (playerphase.c AND cp_perform.c),
+        and EvCheck0B_AREA tests gActiveUnit with no faction check -- so an unguarded AREA over
+        the clearing fires for a Revenant on turn 1. Filmed happening (recordch04reveal).
+
+        The guard must come FIRST: everything after it loads the moose, seizes the camera and
+        talks. And it must be the un-trigger form, not a bare ENDA -- StartEventFromInfo sets
+        the AREA's one-shot flag before calling the script, so aborting without re-arming spends
+        the beat forever."""
+        s = bc.ch04_moose_script('UnitDef_X', '0xce', 0x9C0, (14, 0))
+        self.assertIn('SVAL(EVT_SLOT_2, FACTION_ID_BLUE)', s)
+        self.assertLess(s.index('CALL(EventScr_UnTriggerIfNotFaction)'),
+                        s.index('LOAD1(0x1, UnitDef_X)'))
+
+    def test_the_moose_can_actually_walk_to_the_tile_it_flees_to(self):
+        """A scripted MOVE to an unwalkable tile never returns -- the event engine waits on a
+        path that does not exist and the chapter hangs. The authored flee tile must be inside
+        the region the moose can reach from its own clearing."""
+        maps = os.path.join(bc.REPO, 'campaigns', 'rime-of-the-frostmaiden', 'maps')
+        _, _, terrain = bc._map_terrain_grid(maps, bc.CH04_LAYOUT[1])
+        costs = bc._class_terrain_move_costs(bc.CH04_MOOSE_MOV_TABLE)
+        reachable = bc.reachable_tiles(terrain, costs, bc.CH04_MOOSE_POS)
+        self.assertIn(bc.CH04_MOOSE_FLEE_TO, reachable)
+
+    def test_the_old_ne_corner_flee_tile_is_rejected(self):
+        """Pins the actual trap, not just today's answer: (14, 0) is TERRAIN_PLAINS and looks
+        like a fine destination, but a cliff wall seals the NE pocket off from the clearing.
+        Good terrain is NOT the test -- connectivity is."""
+        maps = os.path.join(bc.REPO, 'campaigns', 'rime-of-the-frostmaiden', 'maps')
+        _, _, terrain = bc._map_terrain_grid(maps, bc.CH04_LAYOUT[1])
+        costs = bc._class_terrain_move_costs(bc.CH04_MOOSE_MOV_TABLE)
+        self.assertGreater(costs[terrain[0][14]], 0, 'the NE corner is walkable terrain')
+        self.assertNotIn((14, 0), bc.reachable_tiles(terrain, costs, bc.CH04_MOOSE_POS))
+
+    def test_the_moose_never_speaks(self):
+        """Locked as a mute white ghost in ch04, re-locked in ch05: the only voice in the
+        beat is the party's."""
+        _, beats = bc._split_event_beats(self.chap, 'moose_sighted', 'moose',
+                                         (bc.CH04_MOOSE_MSG,), card_required=False)
+        speakers = [next(iter(b)) for b in beats[0]]
+        self.assertNotIn('white-moose', speakers)
+        self.assertNotIn('moose', speakers)

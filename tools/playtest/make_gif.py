@@ -43,18 +43,30 @@ REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 DEFAULT_OUT = os.path.join(REPO, 'docs', 'demo')
 
 
+def shot_no(path):
+    """The harness's global shot counter, parsed off a `NN-<tag>.png` frame name."""
+    head = os.path.basename(path).split('-', 1)[0]
+    return int(head) if head.isdigit() else -1
+
+
 def collect_frames(shotdir, tag):
     """Frames are `NN-<tag>.png`; NN is the harness's global shot counter. Sort
     NUMERICALLY on it -- the counter's zero padding (%02d) runs out at 99 while a
     record run shoots hundreds of frames, so a lexical sort would splice '100-'
     before '99-' and scramble the capture order mid-scene."""
-
-    def shot_no(path):
-        head = os.path.basename(path).split('-', 1)[0]
-        return int(head) if head.isdigit() else -1
-
     return sorted((f for f in glob.glob(os.path.join(shotdir, '*.png'))
                    if tag in os.path.basename(f).split('-', 1)[-1]), key=shot_no)
+
+
+def trim_frames(frames, lo, hi):
+    """Keep the frames whose shot number is within [lo, hi] (either bound optional).
+
+    A no-checkpoint recording (recordch03open, recordch04open) replays its whole
+    lead-in, so hundreds of frames of logos, title and Select Mode land in front of
+    the scene. Committed docs/demo GIFs live in git history forever, so trimming the
+    dead head/tail is worth doing at assembly time rather than shipping it."""
+    return [f for f in frames
+            if (lo is None or shot_no(f) >= lo) and (hi is None or shot_no(f) <= hi)]
 
 
 def mp4_cmd(in_pattern, out, fps, scale):
@@ -177,6 +189,10 @@ def main(argv):
     ap.add_argument('--fps', type=float, default=12.0)
     ap.add_argument('--scale', type=int, default=2)
     ap.add_argument('--out', default=DEFAULT_OUT)
+    ap.add_argument('--from-shot', type=int, dest='from_shot',
+                    help='drop frames numbered below this shot (trims a boot lead-in)')
+    ap.add_argument('--to-shot', type=int, dest='to_shot',
+                    help='drop frames numbered above this shot (trims a fade-out tail)')
     ap.add_argument('--mp4', action='store_true',
                     help='encode an H.264 .mp4 via ffmpeg instead of a .gif '
                          '(smaller, no quantization artifacts)')
@@ -194,6 +210,10 @@ def main(argv):
     frames = collect_frames(shotdir, a.tag)
     if not frames:
         sys.exit('ERROR: no frames matching tag %r in %s' % (a.tag, shotdir))
+    if a.from_shot is not None or a.to_shot is not None:
+        frames = trim_frames(frames, a.from_shot, a.to_shot)
+        if not frames:
+            sys.exit('ERROR: --from-shot/--to-shot trimmed every frame')
 
     name = a.name or ('%s-%s' % (a.scenario, a.tag or 'all'))
     os.makedirs(a.out, exist_ok=True)

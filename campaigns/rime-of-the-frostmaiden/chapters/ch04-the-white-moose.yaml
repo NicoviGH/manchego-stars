@@ -38,7 +38,7 @@ narrative: >
   goodberries for the pack's help (one berry is a full day's nourishment, RAW —
   the end of winter hunger), meat on feast-days. Reined in alongside Baxby, the
   pack joins the sled. The white moose itself never speaks and stays just out of
-  reach, fleeing deeper — and Lupin noses its trail northeast, to the door of an
+  reach, fleeing deeper — and Lupin noses its trail southeast, to the door of an
   ancient elven tomb.
 
 # ── Map ────────────────────────────────────────────────────────────────────────
@@ -52,7 +52,7 @@ map:
     avoid on the approach; a few clearings expose the party. Monsters hold the
     deep woods at the start — a Mogall crossfire pocket, Revenants and melee
     Bonewalkers; the wolf pack bursts from the NW fog on turn 2. The white moose
-    darts between clearings and flees off the northeast (tomb-side) edge.
+    darts between clearings and flees off the southeast (tomb-side) edge.
   # PLACEMENT DIRECTIVES (step 2 of the difficulty flow — decisions.md "checked in fidelity tiers").
   # Realigned 2026-07-21 to the LOCKED reveal design: ch04 OPENS monsters-only, the wolf pack bursts
   # from the NW fog on turn 2, and the Marty->Lupin parley is the tide-turner. Derived from an
@@ -192,7 +192,17 @@ enemy_units:
     name: "Mauthe Doog"
     fe_name: "Mauthe Doog"
     count: 6                    # canon pack (1d4+4); Marty's Talk flips the WHOLE pack (→ green Lycanrocs)
-    positions: [[0,0],[2,0],[0,2],[2,1],[1,0],[0,1]]   # NW fog edge, beside the party's deploy flank
+    # NW fog edge, beside the party's deploy flank. positions[0] is the LEADER (Lupin) tile.
+    # It was [0,0] — the map corner — and that made him INVISIBLE in his own reveal: under fog
+    # every other pack tile sits in the party's vision (3) but [0,0] is Manhattan 4 from the
+    # nearest deploy slot [2,2], so the engine never drew him and CUMO_CHAR focused empty snow
+    # (verified in-engine: `ch04sprites` prints fog(0,0)=0 against 1..6 for the rest).
+    # [2,1] is the best-lit pack tile AND the closest to the party, which is also what this
+    # wave's own directive asks for — the reveal landing in the party's face, with Marty able
+    # to reach Lupin so the parley valve is usable. Same six tiles, so the difficulty read is
+    # unchanged; only WHO stands where moves. Nicolas approved 2026-07-31, with the standing
+    # caveat that the spatial/difficulty pass must take the new leader tile into account.
+    positions: [[2,1],[2,0],[0,2],[0,0],[1,0],[0,1]]
     class: mauthedoog           # CLASS_MAUTHEDOOG — the FE8 wolf/dog beast (Ravisin's awakened pack)
     level: 2
     autolevel: true
@@ -245,10 +255,50 @@ enemy_units:
 neutral_units:
   - id: white-moose
     name: "The White Moose"
-    class: wolf                 # placeholder beast sprite; never engages — scripted movement only
+    fe_name: "White Moose"
+    class: gwyllgi              # CLASS_GWYLLGI — geometry token only (32x32 quadruped wait row),
+                                # matching ch05's entry for the SAME creature. Was `wolf`, which
+                                # drifted from ch05 and predates the Wyrdeer art below.
     behavior: flee
-    flees_to: northeast_edge    # the tomb-side exit; its escape ends the hunt → ch05
+    flees_to: southeast_edge    # the tomb-side exit; its escape ends the hunt → ch05
     note: "Awakened spy-beast serving Ravisin; uncatchable here by design."
+    # ── Art (SHIPPED 2026-07-31, Nicolas's direction: Wyrdeer) ──────────────────
+    # The book plate (p.81, "The dreaded white moose of Lonelywood is no one's prey") is a
+    # gaunt WHITE ELK with a huge blood-streaked rack. The FE-Repo has NO elk/deer/stag art
+    # at all — its `beasts` row lists only wolves/hounds — so the earlier "Gwyllgi repal"
+    # plan would have put a repainted HOUND on screen in the one chapter whose wolf pack is
+    # already on screen. Adopted Wyrdeer instead (the campaign's third Pokémon-sourced
+    # sprite, after Basil/Oddish and Lupin/Lycanroc). Credits: CREDITS.md.
+    art:
+      source: "'Wyrdeer - full sprite' by Anarlaurendil (DeviantArt, CC BY-SA 3.0)"
+      vendored: "portraits/vendor/Wyrdeer - full sprite {Anarlaurendil} [CC BY-SA 3.0].png"
+      # Re-fetch via the DeviantArt oEmbed endpoint if ever needed — the raw wixmp URL 401s
+      # without the token (same trick as Lupin's Lycanroc sheet; see npcs/lupin.yaml).
+      palette: cast             # cast_palette.png, via gMapPaletteOverride — see below
+      map_sprite:
+        wait: map_sprites/white-moose.png      # 32x96  — down-idle bob, frames [0,1,2]
+        mu:   map_sprites/white-moose_mu.png   # 32x480 — side[0-4]/down[5-9]/up[10-14],
+                                               #          each [0,1,2,3,0]; right = engine H-flip
+        # Sheet geometry: the vendored sheet's overworld block starts at y=195, 32x32 frames
+        # on a 32px pitch from x=1; GREY variant = cols 0-3; rows = down/left/right/up.
+        # Role map (source RGB -> cast index), by ROLE not luminance (cf. the Lupin inner-ear
+        # lesson — a luminance ramp collides two roles on one index):
+        #   outline 000000,211b18 -> 1   shadow 463d4f,493459,464649,564941 -> 2
+        #   mid     a49aa8,808087,655d6d -> 3    light c5bdc5,afafb9 -> 11
+        #   white   f7f7ff,ffffff,d5d5de,dbd0e5 -> 4
+        #   antler  eed594 -> 5 (tan)   a18c72 + muzzle 47170c,b44908 -> 8 (brown)
+        #   blood   -> 6 (#cf2026); a few dipped tines + a smear UNDER the muzzle
+      portrait: portraits/white-moose.png       # 96x80, full-creature framing (Nicolas's pick
+                                                # of 3; 0 px in the 96x96->96x80 dead zone)
+      # WHY THE CAST PALETTE, NOT THE STANDARD SMS ONE: the moose NEVER changes faction (a
+      # scripted neutral here, a plain enemy in ch05), so it has no reason to be faction-tinted
+      # — and the standard palette actively breaks it. Verified against
+      # graphics/unit_icon/palette/*.agbpal: only indices 0 and 13 are constant across the
+      # faction palettes, index 3 goes pale-GREEN under `npc`, and index 11 (the only red) is
+      # GREEN under `enemy` / BLUE under `npc`. So a standard-palette moose would be a
+      # green-tinted animal with green blood. On the cast bank via gMapPaletteOverride
+      # (unconditional, charId-keyed) it wears one palette everywhere, with five real body
+      # tones (4/11/3/2/1) and a true red (6) — no new palette entries needed.
 
 # ── Village ───────────────────────────────────────────────────────────────────────
 villages:
@@ -339,14 +389,14 @@ events:
     type: scripted_event
     ea_file: events/ch04-moose-flees.ea
     description: >
-      The white moose breaks from a clearing and bolts for the northeast edge.
+      The white moose breaks from a clearing and bolts for the southeast edge.
       The party can't run it down — it escapes toward the elven tomb, baiting the
       hunt onward. LOCKED 2026-07-03 (dialogue-pass): mute white ghost — the moose
       NEVER speaks; the awakened lore is carried solely by Lupin's ending line.
       PENDING: eventscript + scripted flee path + motion review.
     script:                     # LOCKED 2026-07-03 (dialogue pass, co-written with Nicolas)
       # (A shape in the fog ahead: the white moose, huge and still in the clearing,
-      #  watching them. A heartbeat — then it turns and is simply gone, silent, northeast.)
+      #  watching them. A heartbeat — then it turns and is simply gone, silent, southeast.)
       - prof-rbg: "After it!"
   - trigger: chapter_end
     type: cutscene
@@ -364,7 +414,7 @@ events:
       #  beside the axe-beak like they've pulled all their lives. Only Lupin stays out of
       #  the traces, nose down in the snow.)
       - lupin: >-
-          Your ghost left a trail after all. Northeast — long strides, no panic.
+          Your ghost left a trail after all. Southeast — long strides, no panic.
           It ran like something that knows where home is.
       # (Marty starts down the harness line, handing out berries — the deal honored.)
       - marty: "Then we'll walk it home. After supper, friends."
@@ -394,7 +444,7 @@ events:
         speaker's history with her. Marty's box 2 is unchanged in both branches.
       script:
         - pinky: >-
-            Father! From up high-- tracks. Northeast, big ones, and they don't wander.
+            Father! From up high-- tracks. Southeast, big ones, and they don't wander.
             It knew where it was going.
         - meesmickle: >-
             Standing stones and a bone orchard. ...Of course the trail goes in.
