@@ -4715,7 +4715,8 @@ end
 -- clear_ch04_parley (which needs the flag set before routing), so the row search, the re-parking
 -- and the outcome check exist once (#204). Assumes the map is already booted and turn 1 is live.
 --   opts.shots  -- frame-tag to screenshot into while the exchange plays; nil films nothing
--- Returns true once Lupin is blue, or false plus a reason string.
+-- Returns false plus a reason string, or true plus (nil, pack) once Lupin is blue -- where
+-- `pack` is { before, after }: the wolves' tiles going into the Talk and coming out of it.
 local CH04_LUPIN_PID, CH04_MARTY_PID = 0x1D, 0x02   -- CHARACTER_DUESSEL / CHARACTER_SETH
 -- The five generic wolves, one pid each (build_campaign.CH04_PACK_PIDS -- #203). They used to
 -- share 0xb3, which is exactly why the parley could not convert them one at a time.
@@ -4899,7 +4900,7 @@ end
 -- green count must be exactly the number left standing.
 -- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04packmath (needs a CH04BOOT=1 ROM).
 scenarios.ch04packmath = function()
-    local KILL = 2      -- the convertible generics; Lupin (0x1D) is separate
+    local KILL = 2      -- generic wolves to shoot before talking; Lupin (0x1D) is not one
     if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
     pokeFastConfig()
     waitFor(function() return faction() == 0 and not menuOpen()
