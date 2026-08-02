@@ -1384,7 +1384,8 @@ class HostChapterEventGroup(unittest.TestCase):
             try:
                 return bc._retarget_host_chapter(
                     host_index, donor, goal_type, 'unreachable in this test',
-                    (0, 0, 0, 0), 4, event_group=event_group)
+                    (0, 0, 0, 0), 4, event_group=event_group,
+                    goal_text_ids=(0x9C4, 0x9C5))
             finally:
                 bc.CHAPTER_SETTINGS_JSON = original
 
@@ -1700,6 +1701,37 @@ class Ch04Stage4Scenes(unittest.TestCase):
         self.assertIn('LABEL(0x4)', bc.branch_on_flag('F', '', '', label_base=4))
 
     # ── #198 review guards ─────────────────────────────────────────────────────
+    def test_every_hosted_chapter_declares_its_own_goal_ids(self):
+        """#207: the goal window + status-objective strings are message ids like any other, but
+        they arrive by INHERITANCE -- `_retarget_host_chapter` copies a donor slot's goal
+        wholesale. ch04's donor is ch02's host slot, which inject_ch02 has already rewritten, so
+        ch04 inherited ch02's ids and the two wrote over each other (last injector wins).
+        Declaring them makes the existing uniqueness guard binding."""
+        pairs = {'ch01': (bc.CH01_GOAL_WINDOW_MSG, bc.CH01_GOAL_STATUS_MSG),
+                 'ch02': (bc.CH02_GOAL_WINDOW_MSG, bc.CH02_GOAL_STATUS_MSG),
+                 'ch03': (bc.CH03_GOAL_WINDOW_MSG, bc.CH03_GOAL_STATUS_MSG),
+                 'ch04': (bc.CH04_GOAL_WINDOW_MSG, bc.CH04_GOAL_STATUS_MSG)}
+        flat = [mid for ids in pairs.values() for mid in ids]
+        self.assertEqual(len(flat), len(set(flat)),
+                         'two hosted chapters share a goal id: %s' % pairs)
+
+    def test_the_goal_ids_are_registered_so_the_guard_binds(self):
+        owner = bc.assert_message_ids_unique()
+        self.assertEqual('ch04', owner[bc.CH04_GOAL_WINDOW_MSG])
+        self.assertEqual('ch04', owner[bc.CH04_GOAL_STATUS_MSG])
+
+    def test_ch04_takes_its_goal_ids_from_the_block_it_owns(self):
+        """ch04 hosts on slot 5, so it owns vanilla Ch5's dead 0x9BA-0x9CC block. Its goal ids
+        must come from THERE, not from whatever its donor slot happened to hold."""
+        for mid in (bc.CH04_GOAL_WINDOW_MSG, bc.CH04_GOAL_STATUS_MSG):
+            self.assertTrue(0x9BA <= mid <= 0x9CC,
+                            'ch04 goal id 0x%X is outside its host block' % mid)
+
+    def test_two_chapters_sharing_a_goal_id_fail_the_build(self):
+        with self.assertRaises(SystemExit):
+            bc.assert_message_ids_unique({'ch02': (bc.CH02_GOAL_WINDOW_MSG,),
+                                          'ch04': (bc.CH02_GOAL_WINDOW_MSG,)})
+
     def test_hosted_chapters_do_not_share_message_ids(self):
         owner = bc.assert_message_ids_unique()
         self.assertEqual(owner[bc.CH04_ENDING_MSG], 'ch04')
