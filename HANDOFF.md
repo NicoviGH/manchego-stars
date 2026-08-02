@@ -49,9 +49,25 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   DRAFT` in the chapter YAML — it needs a dialogue pass with Nicolas; and vanilla house metatile
   **804 is deliberately left unmapped** in `reskin-learned.json` (nothing ships broken — our ch01 map
   is a 25x16 custom map, not a `Ch1Map` retile — and a loud rejection beats inventing a tile).
-- **ch04 is NOT finished. Two issues carry the rest**: **#206** Lupin and Baxby have no battle
-  anims and fight as stock Cavaliers; **#208** the locked reveal dialogue still lives in
-  `build_campaign.py`.
+- **The snag falls into a bridge, and the Iron Axe finally has a job (#214, `d656aaf`).** Vanilla
+  Ch4's village hands the axe over as the TOOL for chopping the snag at (4,8) into a crossing over
+  the river at (4,9) — snags are natively attackable (`bmtrick.c` auto-adds a 20 HP obstacle), and
+  only the MapChange was missing because `_retarget_host_chapter` zeroes `changeLayerId`. Vanilla's
+  visited-village door flip came along in the same array. The ch03 chest/door emitter was
+  GENERALISED (`map_changes_asm` + `_inject_tile_changes`), not copied.
+- **The trap that cost a rebuild: a DECLARED terrain is not a PAINTED tile.** snowy-bern carries
+  `TERRAIN_BRIDGE_SNAG` on metatile 36 but never painted it — using it put a BLACK SQUARE in the
+  river while every terrain byte read correctly and the in-engine gate PASSED. Only looking at the
+  frame caught it. `_snowy_metatile_for` now skips blank metatiles and fails loudly. **Corollary to
+  "verify via data, not pixels": data proves a change FUNCTIONS, pixels prove it LOOKS like
+  anything. A tile swap needs both.**
+- **The village line is vanilla's `MSG_9B5` 1:1** (Nicolas 2026-08-02) — it is the tutorial for the
+  snag, and the placeholder flavour line it replaced threw the function away.
+- **#208 done in the same PR**: the turn-2 reveal's LOCKED dialogue moved out of
+  `build_campaign.py` into the chapter YAML as a `wolf_pack_reveal` event (3 boxes per speaker, the
+  2026-07-31 pass — the stubs only ever carried 1).
+- **ch04's slice is now down to work that NEEDS NICOLAS**: **#206** (Lupin + Baxby battle anims —
+  he is running the Gemini art himself) and **the second village's line** (see below).
 - **#24's review block was STALE, not incomplete** — three boxes were done in #202 and never
   ticked (checked and ticked 2026-08-01): the no-parley speaker-coverage test
   (`test_the_no_parley_path_has_a_speaker_for_every_box`) exists and passes; message-id uniqueness
@@ -215,15 +231,26 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 - **`vanilla_scene.py` was mining the WORKING TREE, not HEAD** (fix `46f8b12`). **Every "vanilla
   says…" number mined on a built tree before that fix is suspect** — re-mine before citing one.
 
-## NEXT SESSION — ch04's slice is down to TWO issues, and #206 is the visible one
+## NEXT SESSION — ch04's slice is down to work that needs Nicolas
 
-`main` is clean and green; the #203, #205 and #207 branches are merged and deleted. **Start from the issues** — each carries its own diagnosis.
+`main` is clean and green; the #203, #205, #207 and #214/#208 branches are merged and deleted. **Start from the issues** — each carries its own diagnosis.
 
-1. **#206 Lupin + Baxby battle anims** — decided and wanted; start with Lupin's free Mauthe Doog
-   donor to prove the per-character binding, then Baxby.
-2. **#208** the locked reveal dialogue, and re-record the opening + reveal on the fixed ROM.
-3. **#205's two follow-ups** (above): the DRAFT village line needs a dialogue pass; metatile 804
-   stays unmapped until someone picks its snowy-bern house tile.
+1. **#206 Lupin + Baxby battle anims — NICOLAS IS RUNNING THE GEMINI ART.** Decided 2026-08-02:
+   Gemini-generated for BOTH, same pipeline as the eight finished PC anims. Ruled out with
+   evidence (on the issue): PMD SpriteCollab's Lycanroc `sprite/0745` is real and complete but is
+   dungeon-sprite art — 72x80 frames holding a ~37x28 chibi — so it reads as a different game next
+   to our FE8-scale anims. Vanilla `CLASS_MAUTHEDOOG`'s anim and the FE-Repo wolf line
+   (`docs/fe-repo-scouting.md`) remain fallbacks but give Lupin no glasses.
+2. **The SECOND village at (1,11) has no line and no reward.** Its tile is visitable-capable but
+   unwired, so FE8 offers no Visit (no location event -> `MENU_NOTSHOWN`) — the player just sees a
+   cottage they cannot enter. **Vanilla's second village is PURE Lute recruit dialogue** (`9B2`/
+   `9B3`/`9B4`, three variants by visitor, zero lore) so there is NOTHING to copy: whatever goes
+   there is ours to write. Nicolas wants "at least a lore drop or a hint" — needs a dialogue pass.
+3. **#205's other follow-up**: vanilla house metatile **804 is deliberately unmapped** in
+   `reskin-learned.json`; the terrain guard will reject a `Ch1Map` import until someone picks its
+   snowy-bern house tile. Nothing ships broken (our ch01 map is a 25x16 custom map).
+4. Re-record the opening + reveal on the fixed ROM (winter BG, visible Lupin, winterized fog, and
+   now the real 3-box reveal dialogue).
 
 Then: **ch05's build work** on #25; **#138** config-driven `inject_chapter(descriptor)`; **#29**
 world map.
@@ -240,7 +267,7 @@ world map.
   Stages 1–3, #199 review cleanups, #200 the host-slot fix, #201 the banim arming fix, #202 the
   ch04 scenes + the six defects above, #209 the ch04 rout + both endings (#204), #211 the in-place
   pack conversion (#203), #212 the Lonelywood village (#205), #213 the per-chapter goal ids
-  (#207).
+  (#207), #215 the snag->bridge + the reveal dialogue (#214, #208).
 - Untracked local/session files (`.agents/`, `AGENTS.md`, `skills-lock.json`, `map-review/`,
   `review/`) are intentionally not versioned; leave them alone. `map-review/` is the render
   scratch Nicolas opens in Preview (see the sharing-visual-drafts habit) — deliverable art goes to
@@ -272,6 +299,7 @@ PT_HOST_CHAPTER=5 tools/playtest/run.sh clear_ch04_parley # parley, rout -> the 
 PT_HOST_CHAPTER=5 tools/playtest/run.sh attackprobe   # why the bot won't attack: grid, fog, the menu
 PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04packmath  # GATE: kill 2 wolves, parley -> must be 3 greens
 PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04village   # GATE: visit (8,2) -> the Iron Axe changes hands
+PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04snag      # GATE: chop the snag -> (4,9) becomes a bridge
 make CAMPAIGN=rime-of-the-frostmaiden CH04BOOT=1 fireemblem8.gba -j$(nproc)   # ch04 fast-boot
 PT_HOST_CHAPTER=5 tools/playtest/run.sh smoke_ch04                            # ch04 stability net
 
