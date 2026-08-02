@@ -50,9 +50,10 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   **804 is deliberately left unmapped** in `reskin-learned.json` (nothing ships broken — our ch01 map
   is a 25x16 custom map, not a `Ch1Map` retile — and a loud rejection beats inventing a tile).
 - **ch04 is NOT finished. Three issues carry the rest**: **#206** Lupin and Baxby have no battle
-  anims and fight as stock Cavaliers; **#207** hosted chapters share vanilla's goal message ids, so
-  ch02 and ch04 overwrite each other's objective text TODAY; **#208** the locked reveal dialogue
-  still lives in `build_campaign.py`.
+  anims and fight as stock Cavaliers; **#207** ch02 and ch04 share BOTH goal message ids
+  (verified 2026-08-01, see the issue comment) — **latent, not live**: both write the same strings
+  today, so nothing is visibly corrupted; **#208** the locked reveal dialogue still lives in
+  `build_campaign.py`.
 - **#24's review block was STALE, not incomplete** — three boxes were done in #202 and never
   ticked (checked and ticked 2026-08-01): the no-parley speaker-coverage test
   (`test_the_no_parley_path_has_a_speaker_for_every_box`) exists and passes; message-id uniqueness
@@ -205,8 +206,15 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 `main` is clean and green; `feat/203-parley-in-place` and `feat/205-lonelywood-village` are merged
 and deleted. **Start from the issues** — each carries its own diagnosis.
 
-1. **#207 the goal-id collision** — it is corrupting ch02's objective text RIGHT NOW and grows with
-   every rout chapter. The issue carries the full fix: give each hosted chapter its own
+1. **#207 the goal-id collision** — **investigated 2026-08-01; findings are a comment on the issue
+   and correct the original diagnosis in two ways.** It is NOT live corruption: ch02 and ch04 do
+   share both goal ids (`windowTextId` 0x19E, `statusObjectiveTextId` 0x1A6), but both write the
+   same strings, so the last writer agrees with the first. The cause is ours, not vanilla's id
+   pooling — `CH04_GOAL_DONOR = CH02_HOST_INDEX`, and by the time `inject_ch04` runs, `inject_ch02`
+   has already rewritten slot 3, so ch04 inherits ch02's ids wholesale. ch01/ch03 are clean. It
+   fires the moment the wordings diverge or a third `defeat_all` chapter wants its own text.
+   **Measure goal ids by RUNNING the injector** — HEAD and the working tree both lie here.
+   The issue carries the full fix: give each hosted chapter its own
    goal-window + status-objective ids out of the dead block it already owns, repoint the host
    slot's `goal.windowTextId`/`statusObjectiveTextId` (same shape as `_retarget_host_chapter`
    repointing `mapEventDataId`), and extend `assert_message_ids_unique` to cover the INHERITED
