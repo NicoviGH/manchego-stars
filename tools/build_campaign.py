@@ -172,6 +172,14 @@ CH3_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch3-eventscript.h')
 EVENTS_UDEFS_C = os.path.join(DECOMP, 'src', 'events_udefs.c')
 CH01_HOST_INDEX = 2          # CHAPTER_L_2 -- the prologue ending's MNC2(0x2) target
 CH01_EVENT_GROUP = 'Ch2Events'   # the ChapterEventGroup this injector fills (see _retarget_host_chapter)
+# The goal WINDOW + status-objective strings are message ids, and hosted chapters used to inherit
+# them from whatever donor slot `_retarget_host_chapter` copied -- which silently shared them
+# between chapters (#207). Every hosted chapter now DECLARES its pair, so `assert_message_ids_unique`
+# can bind on them. ch01/ch02/ch03 keep the ids their donors already gave them (measured by running
+# the injector -- HEAD and the working tree both lie about post-injection goal ids); only ch04 had
+# to move, because its donor IS ch02's host slot.
+CH01_GOAL_WINDOW_MSG = 0x19F     # vanilla slot 1's seize window ("Seize camp" is ours)
+CH01_GOAL_STATUS_MSG = 0x1A3
 CH01_LAYOUT = ('Ch01IronTrailMap', 'ch01-the-iron-trail')  # (asset label, maps/ stem)
 CH01_CHAPTER_YAML = 'ch01-the-iron-trail.yaml'
 CH01_BOSS_SLOT = 'BREGUET'   # vanilla Ch1's boss slot: CA_BOSS + hand-authored
@@ -303,6 +311,8 @@ CH01_LORDSEL_BG = 'BG_DARKLING_WOODS'
 # already sits in EventListScr_Ch3_Misc.
 CH02_HOST_INDEX = 3          # CHAPTER_L_3 -- ch01's ending MNC2(0x3) target
 CH02_EVENT_GROUP = 'Ch3Events'   # the ChapterEventGroup this injector fills (see _retarget_host_chapter)
+CH02_GOAL_WINDOW_MSG = 0x19E     # vanilla slot 4's defeat_all window
+CH02_GOAL_STATUS_MSG = 0x1A6
 CH02_LAYOUT = ('Ch02ColdWelcomeMap', 'ch02-cold-welcome')  # (asset label, maps/ stem)
 CH02_CHAPTER_YAML = 'ch02-cold-welcome.yaml'
 CH02_BOSS_SLOT = 'BAZBA'      # vanilla Ch3's boss slot -- Halvar mirror (custom bust #19 later)
@@ -4903,7 +4913,7 @@ def _register_chapter_map(maps_dir, layout, comment):
 
 
 def _retarget_host_chapter(host_index, goal_slot, goal_type, goal_err, indices,
-                           chapter_number, event_group):
+                           chapter_number, event_group, goal_text_ids):
     """Point host chapter slot `host_index` (chapter_settings.json) at a registered
     map (`indices` from _register_chapter_map) and copy vanilla slot `goal_slot`'s
     goal template (checked against windowDataType `goal_type`, else sys.exit(goal_err)).
@@ -4917,7 +4927,10 @@ def _retarget_host_chapter(host_index, goal_slot, goal_type, goal_err, indices,
     chapter number (slot 5 -> Ch5XEvents, while ch04's events live in Ch5EventData).
     Retargeting only the map ids is enough to make the chapter LOOK right, so a wrong
     event group fails silently and totally -- the slot presents our map while running the
-    host slot's roster and scripts. Repointing it here keeps map and events one decision."""
+    host slot's roster and scripts. Repointing it here keeps map and events one decision.
+
+    `goal_text_ids` = (windowTextId, statusObjectiveTextId) the chapter OWNS. They override the
+    donor's, which are shared across vanilla slots and were being inherited (#207)."""
     obj_idx, pal_idx, cfg_idx, layout_idx = indices
     with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
         settings = json.load(f)
@@ -4931,6 +4944,11 @@ def _retarget_host_chapter(host_index, goal_slot, goal_type, goal_err, indices,
     host['mapEventDataId'] = _asm_table_word_index(
         ASSET_TABLE_S, 'gChapterDataAssetTable', event_group)
     host['goal'] = dict(goal)
+    # The donor's goal carries the donor's TEXT ids, and vanilla points many slots at one string
+    # -- so copying it wholesale makes two hosted chapters write over each other's objective
+    # (#207). ch04's donor is even ch02's own host slot. The caller declares its pair and it wins
+    # here, alongside the map and event ids, so all three stay ONE decision.
+    host['goal']['windowTextId'], host['goal']['statusObjectiveTextId'] = goal_text_ids
     host['prepScreenNumber'] = chapter_number * 2
     # fadeToBlack=1: the chapter INTRO ends on BLACK instead of fading the battle map in
     # (ChapterIntro_LoopFadeToMap, chapterintrofx.c:916 -- fadeToBlack takes the SetDispEnable
@@ -5397,7 +5415,8 @@ def inject_ch01(campaign, verbose=True):
         CH01_HOST_INDEX, 1, 'seize',
         'ERROR: slot 1 goal is not the vanilla Seize template -- '
         'inject_ch01 must run BEFORE inject_prologue',
-        indices, chap['chapter_number'], CH01_EVENT_GROUP)
+        indices, chap['chapter_number'], CH01_EVENT_GROUP,
+        (CH01_GOAL_WINDOW_MSG, CH01_GOAL_STATUS_MSG))
 
     # 2. Rosters (events_udefs.c). Four tables, all reusing vanilla Ch2 symbols so no
     #    extern surgery is needed (scripts/eventinfo already declare them):
@@ -6144,7 +6163,8 @@ def inject_ch02(campaign, verbose=True):
         CH02_HOST_INDEX, 4, 'defeat_all',
         'ERROR: slot 4 goal is not the vanilla defeat_all template '
         '(needed as the ch02 DefeatAll donor)',
-        indices, chap['chapter_number'], CH02_EVENT_GROUP)
+        indices, chap['chapter_number'], CH02_EVENT_GROUP,
+        (CH02_GOAL_WINDOW_MSG, CH02_GOAL_STATUS_MSG))
 
     # 2. Rosters (events_udefs.c). Four tables, reusing vanilla Ch3 symbols (already
     #    declared in eventcall.h, so no extern surgery):
@@ -6460,6 +6480,8 @@ def inject_ch02(campaign, verbose=True):
 #    "Ch4" decomp symbol set (host index N -> ChN symbols, cf. ch02 on slot 3 = Ch3 symbols).
 CH03_HOST_INDEX = 4
 CH03_EVENT_GROUP = 'Ch4Events'   # the ChapterEventGroup this injector fills (see _retarget_host_chapter)
+CH03_GOAL_WINDOW_MSG = 0x19D     # vanilla slot 6's defeat_boss window
+CH03_GOAL_STATUS_MSG = 0x1A7
 CH03_LAYOUT = ('Ch03TermalaineMineMap', 'ch03-the-termalaine-mine')  # (asset label, maps/ stem)
 CH03_CHAPTER_YAML = 'ch03-the-termalaine-mine.yaml'
 CH03_TILESET = 'cave-interior'   # stem 'Cave' (TILESET_STEMS); first chapter to use it -> self-registers
@@ -6581,7 +6603,10 @@ CH04_HOST_INDEX = 5
 CH04_EVENT_GROUP = 'Ch5EventData'
 CH04_LAYOUT = ('Ch04LonelywoodForestMap', 'ch04-lonelywood-forest')
 CH04_CHAPTER_YAML = 'ch04-the-white-moose.yaml'
-CH04_GOAL_DONOR = CH02_HOST_INDEX  # ch02 is already hosted with the stable DefeatAll/Rout goal
+CH04_GOAL_DONOR = CH02_HOST_INDEX  # ch02 is already hosted with the stable DefeatAll/Rout goal.
+                                   # It donates the goal TYPE only -- the text ids come from
+                                   # CH04_GOAL_*_MSG, because inheriting this slot's is what made
+                                   # ch02 and ch04 write over each other's objective (#207).
 CH04_INITIAL_ENEMY_SYMBOL = 'UnitDef_088B56F8'
 CH04_TURN2_SYMBOL = 'UnitDef_088B5798'
 CH04_TURN3_SYMBOL = 'UnitDef_088B5914'
@@ -6710,6 +6735,12 @@ CH04_MOOSE_AREA = (9, 2, 14, 7)                 # AREA(x1, y1, x2, y2) -- the cl
 CH04_VILLAGE_SCRIPT = 'EventScr_089F231C'       # dead Ch5 script (verified free at HEAD)
 CH04_VILLAGE_MSG = 0x9C3                        # dead Ch5 text slot (next free in ch04's block)
 CH04_VILLAGE_BG = 'BG_NORMAL_VILLAGE'           # vanilla's own village BG, as ch02 uses
+# ch04's goal strings (#207). Its goal donor is ch02's HOST slot, which inject_ch02 has already
+# rewritten by the time inject_ch04 runs -- so ch04 inherited ch02's window AND status ids and the
+# two wrote over each other (last injector wins; they happened to agree, which is why nothing
+# looked broken). These come out of ch04's own dead Ch5 block instead.
+CH04_GOAL_WINDOW_MSG = 0x9C4                    # dead Ch5 text slot -> the on-map goal banner
+CH04_GOAL_STATUS_MSG = 0x9C5                    # dead Ch5 text slot -> the Status-screen objective
 # The EDGE tile it escapes off. Direction is AWAY FROM THE PARTY, who deploy on the NW flank --
 # Nicolas 2026-07-31: "I don't care about the direction, I want it to be away from the party; the
 # southeast corner makes most sense." So the quarry breaks for the far corner and is gone.
@@ -6737,10 +6768,15 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
                                          # slot stays ch03's, so nothing else may take it
              CH03_TREX_TALK_MSG, CH03_OPENING_CARD_MSG, *CH03_OPENING_MSGS,
              CH03_ENDING_CARD_MSG, *CH03_ENDING_MSGS, CH03_TREX_ENTRANCE_MSG,
-             *CH03_MIDMAP_MSGS),
+             *CH03_MIDMAP_MSGS, CH03_GOAL_WINDOW_MSG, CH03_GOAL_STATUS_MSG),
     'ch04': (CH04_LUPIN_TALK_MSG, *CH04_REVEAL_MSGS, CH04_OPENING_CARD_MSG,
              *CH04_OPENING_MSGS, CH04_MOOSE_MSG, CH04_ENDING_MSG,
-             CH04_ENDING_NO_LUPIN_MSG, CH04_VILLAGE_MSG),
+             CH04_ENDING_NO_LUPIN_MSG, CH04_VILLAGE_MSG,
+             CH04_GOAL_WINDOW_MSG, CH04_GOAL_STATUS_MSG),
+    # Goal ids only -- ch01/ch02 predate the per-chapter block registry, but their goal strings
+    # still have to be unique against every other hosted chapter (#207).
+    'ch01': (CH01_GOAL_WINDOW_MSG, CH01_GOAL_STATUS_MSG),
+    'ch02': (CH02_GOAL_WINDOW_MSG, CH02_GOAL_STATUS_MSG),
 }
 
 
@@ -7333,7 +7369,8 @@ def inject_ch03(campaign, boot=False, verbose=True):
     host = _retarget_host_chapter(
         CH03_HOST_INDEX, CH03_GOAL_DONOR, 'defeat_boss',
         'ERROR: slot %d goal is not the vanilla defeat_boss template (ch03 DefeatBoss donor)'
-        % CH03_GOAL_DONOR, indices, chap['chapter_number'], CH03_EVENT_GROUP)
+        % CH03_GOAL_DONOR, indices, chap['chapter_number'], CH03_EVENT_GROUP,
+        (CH03_GOAL_WINDOW_MSG, CH03_GOAL_STATUS_MSG))
 
     # 2. Rosters (events_udefs.c, vanilla Ch4 symbols):
     #    - UnitDef_Event_Ch4Ally: the deploy-cap TEMPLATE = THE CAP. NEVER LOADed; PREP reads
@@ -7735,7 +7772,8 @@ def inject_ch04(campaign, boot=False, verbose=True):
         CH04_HOST_INDEX, CH04_GOAL_DONOR, 'defeat_all',
         'ERROR: hosted ch02 slot %d is not the stable defeat_all goal donor for ch04'
         % CH04_GOAL_DONOR,
-        indices, chap['chapter_number'], CH04_EVENT_GROUP)
+        indices, chap['chapter_number'], CH04_EVENT_GROUP,
+        (CH04_GOAL_WINDOW_MSG, CH04_GOAL_STATUS_MSG))
 
     # Fog is chapter state, not painted-map data. Battle terrain 0x15 is the shared
     # snowy rough platform family already used by the winter overworld chapters.
@@ -7970,9 +8008,13 @@ def inject_ch04(campaign, boot=False, verbose=True):
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
     set_message_body(lines, host['chapTitleTextId'], name_message_body(chap['title']))
-    # Vanilla's own wording (see the ch02 note): FE8 prints "Defeat", never "rout".
+    # Vanilla's own wording (see the ch02 note): FE8 prints "Defeat", never "rout". ch04 owns
+    # both strings now (#207) -- it used to write only the status line and inherit ch02's window,
+    # which is precisely the sharing that made the two chapters overwrite each other.
     set_message_body(lines, host['goal']['statusObjectiveTextId'],
                      name_message_body('Defeat all monsters'))
+    set_message_body(lines, host['goal']['windowTextId'],
+                     goal_window_body('Defeat enemy'))
     # Stage 4 -- the FULL locked parley (was a one-line stub of its closing beat). Five turns,
     # Lupin/Marty alternating: the count-off, Marty's spore-puff opener, the BIRD retort, the
     # goodberry pack-math, and Lupin doing the arithmetic out loud. Marty sits mid-left (party
