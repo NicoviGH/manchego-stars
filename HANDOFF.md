@@ -49,10 +49,8 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   DRAFT` in the chapter YAML — it needs a dialogue pass with Nicolas; and vanilla house metatile
   **804 is deliberately left unmapped** in `reskin-learned.json` (nothing ships broken — our ch01 map
   is a 25x16 custom map, not a `Ch1Map` retile — and a loud rejection beats inventing a tile).
-- **ch04 is NOT finished. Three issues carry the rest**: **#206** Lupin and Baxby have no battle
-  anims and fight as stock Cavaliers; **#207** ch02 and ch04 share BOTH goal message ids
-  (verified 2026-08-01, see the issue comment) — **latent, not live**: both write the same strings
-  today, so nothing is visibly corrupted; **#208** the locked reveal dialogue still lives in
+- **ch04 is NOT finished. Two issues carry the rest**: **#206** Lupin and Baxby have no battle
+  anims and fight as stock Cavaliers; **#208** the locked reveal dialogue still lives in
   `build_campaign.py`.
 - **#24's review block was STALE, not incomplete** — three boxes were done in #202 and never
   ticked (checked and ticked 2026-08-01): the no-parley speaker-coverage test
@@ -123,6 +121,22 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   counted the whole green array (the white moose is green too). One pid per wolf made
   `greenPackCount()` possible — the fix for the mechanism paid for the fix to its measurement.
 - Re-recorded `docs/demo/ch04-wolf-parley.gif`: the committed one still filmed the retired swap.
+- **#207 closed (PR #213) — and the investigation corrected the issue twice.** ch04 inherited
+  ch02's goal window AND status ids because `_retarget_host_chapter` copies the donor's whole
+  `goal` block and **ch04's donor IS ch02's host slot**, already rewritten by then. The cause was
+  ours, not vanilla's id pooling (ch01/ch03 were clean), and nothing was visibly corrupted: both
+  chapters write the same strings, so the last writer agreed with the first. Every hosted chapter
+  now DECLARES its pair, `_retarget_host_chapter` overrides the donor's, and both ids are
+  registered so `assert_message_ids_unique` binds on them. Only ch04 moved (`0x9C4`/`0x9C5`).
+- **Post-injection goal ids cannot be read from HEAD or the working tree.** HEAD is pre-copy
+  vanilla; the working tree is whatever the last build or `git restore` left. **Run the injector
+  and read the result** — this cost two wrong readings in one session.
+- **A playtest FAIL is not automatically a regression: check which ROM it ran on.** `clear_ch02`
+  failed on the `CH04BOOT=1` fast-boot ROM, which jumps straight into ch04, so ch02's map is
+  unreachable by construction. Rebuilt without the flag it PASSes.
+- **`check.py` is ~22s on a CLEAN tree and ~4min on a freshly-built one** (measured). That is the
+  documented restore-the-injected-files workflow, not a regression — restore
+  `src/data/chapter_settings.json data/data_8B363C.s` before running it or committing.
 
 ## Previous session (2026-08-01, Opus — ch04 became winnable, and both endings got filmed)
 
@@ -201,29 +215,14 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 - **`vanilla_scene.py` was mining the WORKING TREE, not HEAD** (fix `46f8b12`). **Every "vanilla
   says…" number mined on a built tree before that fix is suspect** — re-mine before citing one.
 
-## NEXT SESSION — ch04's slice is down to three issues
+## NEXT SESSION — ch04's slice is down to TWO issues, and #206 is the visible one
 
-`main` is clean and green; `feat/203-parley-in-place` and `feat/205-lonelywood-village` are merged
-and deleted. **Start from the issues** — each carries its own diagnosis.
+`main` is clean and green; the #203, #205 and #207 branches are merged and deleted. **Start from the issues** — each carries its own diagnosis.
 
-1. **#207 the goal-id collision** — **investigated 2026-08-01; findings are a comment on the issue
-   and correct the original diagnosis in two ways.** It is NOT live corruption: ch02 and ch04 do
-   share both goal ids (`windowTextId` 0x19E, `statusObjectiveTextId` 0x1A6), but both write the
-   same strings, so the last writer agrees with the first. The cause is ours, not vanilla's id
-   pooling — `CH04_GOAL_DONOR = CH02_HOST_INDEX`, and by the time `inject_ch04` runs, `inject_ch02`
-   has already rewritten slot 3, so ch04 inherits ch02's ids wholesale. ch01/ch03 are clean. It
-   fires the moment the wordings diverge or a third `defeat_all` chapter wants its own text.
-   **Measure goal ids by RUNNING the injector** — HEAD and the working tree both lie here.
-   The issue carries the full fix: give each hosted chapter its own
-   goal-window + status-objective ids out of the dead block it already owns, repoint the host
-   slot's `goal.windowTextId`/`statusObjectiveTextId` (same shape as `_retarget_host_chapter`
-   repointing `mapEventDataId`), and extend `assert_message_ids_unique` to cover the INHERITED
-   goal ids. Guard and fix must land together or the build breaks. **The window is 12 chars**
-   (`goal_window_body()` enforces it).
-2. **#206 Lupin + Baxby battle anims** — decided and wanted; start with Lupin's free Mauthe Doog
+1. **#206 Lupin + Baxby battle anims** — decided and wanted; start with Lupin's free Mauthe Doog
    donor to prove the per-character binding, then Baxby.
-3. **#208** the locked reveal dialogue, and re-record the opening + reveal on the fixed ROM.
-4. **#205's two follow-ups** (above): the DRAFT village line needs a dialogue pass; metatile 804
+2. **#208** the locked reveal dialogue, and re-record the opening + reveal on the fixed ROM.
+3. **#205's two follow-ups** (above): the DRAFT village line needs a dialogue pass; metatile 804
    stays unmapped until someone picks its snowy-bern house tile.
 
 Then: **ch05's build work** on #25; **#138** config-driven `inject_chapter(descriptor)`; **#29**
@@ -240,7 +239,8 @@ world map.
 - **No outstanding branches.** `.claude/worktrees/` is empty. Merged: #197 build-speed, #198 ch04
   Stages 1–3, #199 review cleanups, #200 the host-slot fix, #201 the banim arming fix, #202 the
   ch04 scenes + the six defects above, #209 the ch04 rout + both endings (#204), #211 the in-place
-  pack conversion (#203), #212 the Lonelywood village (#205).
+  pack conversion (#203), #212 the Lonelywood village (#205), #213 the per-chapter goal ids
+  (#207).
 - Untracked local/session files (`.agents/`, `AGENTS.md`, `skills-lock.json`) are intentionally not
   versioned; leave them alone. `tools/key_magenta.py` is **gitignored** (#178).
 - **HANDOFF.md is authored on `main` ONLY** — gated by `check.py check_handoff_only_on_main`.
