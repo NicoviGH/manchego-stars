@@ -241,8 +241,10 @@ world map.
   ch04 scenes + the six defects above, #209 the ch04 rout + both endings (#204), #211 the in-place
   pack conversion (#203), #212 the Lonelywood village (#205), #213 the per-chapter goal ids
   (#207).
-- Untracked local/session files (`.agents/`, `AGENTS.md`, `skills-lock.json`) are intentionally not
-  versioned; leave them alone. `tools/key_magenta.py` is **gitignored** (#178).
+- Untracked local/session files (`.agents/`, `AGENTS.md`, `skills-lock.json`, `map-review/`,
+  `review/`) are intentionally not versioned; leave them alone. `map-review/` is the render
+  scratch Nicolas opens in Preview (see the sharing-visual-drafts habit) — deliverable art goes to
+  `docs/demo/` and is COMMITTED so he can view it on GitHub. `tools/key_magenta.py` is **gitignored** (#178).
 - **HANDOFF.md is authored on `main` ONLY** — gated by `check.py check_handoff_only_on_main`.
   A branch may leave it untouched or sync it to main's tip; it may not author its own. If the guard
   fires: `git checkout main -- HANDOFF.md` on the branch. Refresh HANDOFF on main *after* a merge.
