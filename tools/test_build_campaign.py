@@ -1237,6 +1237,59 @@ class Ch04RuntimeHost(unittest.TestCase):
         self.assertLess(pre.index('CUSN(0xb3)'), pre.index('LABEL(0x40)'))
         self.assertLess(pre.index('LABEL(0x40)'), pre.index('CHECK_ALIVE(0xb4)'))
 
+    # -- #205: vanilla Ch4's villages, restored -------------------------------------------
+    def _maps_dir(self):
+        return os.path.join(bc.REPO, 'campaigns', self.CAMPAIGN, 'maps')
+
+    def test_the_village_the_yaml_declares_sits_on_a_visitable_tile(self):
+        """The guard #205 needed from the content side. FE8 offers Visit only on village/house
+        terrain (bmmenu.c:735), so a `villages:` entry whose tile is scenery is a reward that
+        silently does not exist -- which is exactly what shipped, because the snowy reskin had
+        mapped vanilla's village metatile onto ruins."""
+        bc.assert_village_tiles_visitable(self._chap(), self._maps_dir(), bc.CH04_LAYOUT[1])
+
+    def test_a_village_declared_on_scenery_fails_the_build(self):
+        chap = dict(self._chap())
+        chap['villages'] = [{'id': 'nowhere', 'tile': [7, 7],
+                             'visit_reward': [{'id': 'iron-axe'}]}]
+        with self.assertRaises(SystemExit):
+            bc.assert_village_tiles_visitable(chap, self._maps_dir(), bc.CH04_LAYOUT[1])
+
+    def test_ch04_wires_its_village_where_vanilla_ch4_did(self):
+        # vanilla Ch4: Village(0, EventScr_089F1BD8, 8, 2) -- the ITEM village (the other, at
+        # (1,11), is vanilla's recruit village, whose role the Lupin parley took over).
+        body = bc.ch04_location_events(self._chap())
+        self.assertIn('Village(0, %s, 8, 2)' % bc.CH04_VILLAGE_SCRIPT, body)
+        self.assertTrue(body.rstrip().endswith('END_MAIN\n}'))
+
+    def test_the_village_hands_the_visitor_the_authored_reward(self):
+        # vanilla's own shape (EventScr_089F1BD8): one text box over the village BG, then
+        # SVAL the item into slot 3 and GIVEITEMTO the unit that visited.
+        s = bc.ch04_village_script(0x9C3, 'ITEM_AXE_IRON')
+        self.assertIn('Text_BG(%s, 0x9C3)' % bc.CH04_VILLAGE_BG, s)
+        self.assertLess(s.index('Text_BG'), s.index('SVAL(EVT_SLOT_3, ITEM_AXE_IRON)'))
+        self.assertLess(s.index('SVAL(EVT_SLOT_3, ITEM_AXE_IRON)'),
+                        s.index('GIVEITEMTO(CHAR_EVT_ACTIVE_UNIT)'))
+
+    def test_the_reward_item_is_read_from_the_chapter_yaml(self):
+        """#208's lesson applied early: the village's reward and its line are CONTENT, so they
+        live in the chapter YAML and the injector reads them."""
+        village = self._chap()['villages'][0]
+        self.assertEqual('iron-axe', village['visit_reward'][0]['id'])
+        self.assertEqual('ITEM_AXE_IRON', bc.CH04_ITEM_IDS['iron-axe'])
+        self.assertTrue(village.get('visit_text'), 'the village needs a line to show')
+
+    def test_the_moose_sighting_area_does_not_cover_a_village_doorstep(self):
+        """Vanilla's AREA was (0,9)-(14,14) and touched neither village; ours is authored, and
+        its first draft started exactly on the axe village's tile -- so stepping up to visit
+        would have fired the sighting cutscene instead."""
+        x1, y1, x2, y2 = bc.CH04_MOOSE_AREA
+        for village in self._chap()['villages']:
+            vx, vy = village['tile']
+            self.assertFalse(x1 <= vx <= x2 and y1 <= vy <= y2,
+                             'the moose AREA covers the %r village at (%d,%d)'
+                             % (village['id'], vx, vy))
+
     def test_parley_recruiter_is_marty_only(self):
         # Nicolas 2026-07-21: ch04's talker is Marty specifically, NOT ch03's any-party-member.
         # Data-driven from the convertible wave's parley.by; Marty rides the Seth slot.
