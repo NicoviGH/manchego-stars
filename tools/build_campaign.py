@@ -8095,17 +8095,15 @@ def inject_ch04(campaign, boot=False, verbose=True):
     set_message_body(lines, CH04_LUPIN_TALK_MSG, _script_to_message(
         talk, {'lupin': ('[OpenMidRight]', _fid_tag(lupin[1])),
                'marty': ('[OpenMidLeft]', _fid_tag(PORTRAIT_MAP['marty']))}))
-    # Turn-2 reveal cutscene beats (Stage 2c stubs -- provisional in-voice lines; Stage 4
-    # dialogue-pass finalizes). Lupin commands the pack (faced, pack side = mid-right); Marty
-    # reads it cross-field and FLAGS the parley -- the beat that teaches "talk to the leader"
-    # (faced, party side = mid-left). Marty rides the Seth slot.
-    reveal_lupin, reveal_marty = CH04_REVEAL_MSGS
-    set_message_body(lines, reveal_lupin, _script_to_message(
-        [{'lupin': 'Hold! Nobody feeds until I say. ...Those three walking meals brought '
-          'friends.'}], {'lupin': ('[OpenMidRight]', _fid_tag(lupin[1]))}))
-    set_message_body(lines, reveal_marty, _script_to_message(
-        [{'marty': "That big one's giving orders -- it's THINKING. Don't loose an arrow! "
-          'Let me talk to it.'}], {'marty': ('[OpenMidLeft]', _fid_tag(PORTRAIT_MAP['marty']))}))
+    # Turn-2 reveal cutscene beats -- LOCKED text, read from the chapter YAML like every other
+    # ch04 scene (#208; they were Python literals left over from the Stage 2c stubs). Lupin
+    # commands the pack from the pack side (mid-right); Marty reads it cross-field from the party
+    # side (mid-left) and FLAGS the parley -- the beat that teaches "talk to the leader".
+    # ON-MAP, so it wraps at the map-bubble 29 like the moose beat, not the BG scenes' 42.
+    _, reveal_beats = _split_event_beats(chap, 'wolf_pack_reveal', 'ch04 turn-2 reveal',
+                                         msg_ids=CH04_REVEAL_MSGS, card_required=False)
+    _emit_scene_beats(lines, CH04_REVEAL_MSGS, reveal_beats, cut_fid,
+                      {'lupin': '[OpenMidRight]', 'marty': '[OpenMidLeft]'}, width=29)
     # Stage 4 scene bodies. The opening + both endings play over a BG (full-screen window, wrap
     # 42); the moose beat is ON-MAP, so it wraps at the map-bubble 29 (a wider line hits
     # PutTalkBubble's unclamped right-side branch and runs off the tilemap -- the ch03 crier bug).

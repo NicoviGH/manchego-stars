@@ -403,6 +403,26 @@ events:
           All winter. ...Meat on feast-days, of course.
       # (Lupin is silent a moment — running the math. It isn't close.)
       - lupin: "Steady food beats proud starving. The pack pulls your sled. Feed them well, mushroom."
+  - trigger: wolf_pack_reveal
+    type: scripted_event
+    description: >
+      Turn 2: the pack bursts from the NW fog beside the party's flank and Lupin COMMANDS it —
+      intelligence shown by action, not stated. Marty reads it cross-field and flags the parley,
+      which is the whole teaching of the scene: talk to the leader, don't shoot it. Plays ON-MAP
+      (no BG) over the same TurnEvent script that LOADs the wave, following vanilla Ch4's own
+      mid-battle arrival shape (EventScr_089F199C). Staging: Lupin holds mid-RIGHT (the pack
+      side), Marty mid-LEFT (the party side).
+      LOCKED 2026-07-31 (dialogue-pass, co-written with Nicolas); moved out of build_campaign.py
+      into the chapter YAML 2026-08-02 (#208) so every ch04 scene has ONE home.
+    script:                     # LOCKED 2026-07-31 (dialogue pass, co-written with Nicolas)
+      # (Six shapes come out of the white, low and fast — then stop dead, as one, on a word.)
+      - lupin: "Hold! Hold. Nobody eats until I say so."
+      - lupin: "Count them. Ten. And they brought steel."
+      - lupin: "Four on the flank, two with me. Go wide."
+      - beat_break: B           # Marty, across the field, delighted rather than afraid
+      - marty: "Oh! Oh, that one's giving ORDERS."
+      - marty: "It's thinking. Please don't shoot it."
+      - marty: "Let me go and say hello."
   - trigger: moose_sighted
     type: scripted_event
     ea_file: events/ch04-moose-flees.ea
