@@ -305,9 +305,20 @@ neutral_units:
 # ── Village ───────────────────────────────────────────────────────────────────────
 villages:
   - id: lonelywood
+    tile: [8, 2]               # vanilla Ch4's ITEM village, kept where the twin put it:
+                               # `Village(0, EventScr_089F1BD8, 8, 2)`. The retile preserved the
+                               # cottage but mapped its door onto ruins terrain, so FE8 never
+                               # offered Visit and the axe was unobtainable (#205). Guarded now by
+                               # assert_village_tiles_visitable. The twin's OTHER village (1,11) is
+                               # its recruit village — the Lupin parley covers that role, so its
+                               # cottage stands unwired.
     visit_reward:
       - id: iron-axe           # mirrors the twin: vanilla Ch4's item village hands out an Iron Axe
         amount: 1
+    visit_text: >              # DRAFT — pending a dialogue pass with Nicolas.
+      Take it. My husband cut wood with that, and the wood's still
+      standing and he isn't. Better it swings at something that
+      deserves it.
     note: >
       Speaker Nimsy Huddle (ancient, hard of hearing) shelters the party overnight
       (chapter-start cutscene). Reward realigned 2026-07-21 to the twin's delivery

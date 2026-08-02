@@ -6603,6 +6603,7 @@ CH04_ITEM_IDS = {
     'iron-sword': 'ITEM_SWORD_IRON',
     'iron-lance': 'ITEM_LANCE_IRON',
     'iron-bow': 'ITEM_BOW_IRON',
+    'iron-axe': 'ITEM_AXE_IRON',        # the Lonelywood village's reward (#205)
     'evil-eye': 'ITEM_MONSTER_EVILEYE',
     'fetid-claw': 'ITEM_MONSTER_FETIDCLW',
     'vulnerary': 'ITEM_VULNERARY',
@@ -6695,7 +6696,20 @@ SCRIPTED_NEUTRAL_SPRITES = (
 # Where the party first SEES it: the mid-map clearing, on the tomb-side (NE) half of the 15x15
 # map, so the sighting points at the exit it then bolts for.
 CH04_MOOSE_POS = (11, 4)
-CH04_MOOSE_AREA = (8, 2, 14, 7)                 # AREA(x1, y1, x2, y2) -- the clearing it watches from
+CH04_MOOSE_AREA = (9, 2, 14, 7)                 # AREA(x1, y1, x2, y2) -- the clearing it watches from.
+                                                # Starts at x=9, NOT x=8: (8,2) is the village
+                                                # doorstep (#205), and an AREA covering it fires the
+                                                # sighting the moment a unit steps up to visit.
+                                                # Vanilla's own AREA (0,9)-(14,14) touched neither
+                                                # village. Guarded by a test over `villages:`.
+# The Lonelywood village (#205). Vanilla Ch4 hands its Iron Axe over at (8,2) --
+# `Village(0, EventScr_089F1BD8, 8, 2)` -- and we keep both the tile and the script shape. WHICH
+# village and WHAT it gives are read from the chapter YAML: a village's reward and its line are
+# content, and putting them here is the mistake #208 exists to undo. The twin's other village
+# (1,11) is its RECRUIT village; the Marty->Lupin parley took that role, so it stands unwired.
+CH04_VILLAGE_SCRIPT = 'EventScr_089F231C'       # dead Ch5 script (verified free at HEAD)
+CH04_VILLAGE_MSG = 0x9C3                        # dead Ch5 text slot (next free in ch04's block)
+CH04_VILLAGE_BG = 'BG_NORMAL_VILLAGE'           # vanilla's own village BG, as ch02 uses
 # The EDGE tile it escapes off. Direction is AWAY FROM THE PARTY, who deploy on the NW flank --
 # Nicolas 2026-07-31: "I don't care about the direction, I want it to be away from the party; the
 # southeast corner makes most sense." So the quarry breaks for the far corner and is gone.
@@ -6726,7 +6740,7 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
              *CH03_MIDMAP_MSGS),
     'ch04': (CH04_LUPIN_TALK_MSG, *CH04_REVEAL_MSGS, CH04_OPENING_CARD_MSG,
              *CH04_OPENING_MSGS, CH04_MOOSE_MSG, CH04_ENDING_MSG,
-             CH04_ENDING_NO_LUPIN_MSG),
+             CH04_ENDING_NO_LUPIN_MSG, CH04_VILLAGE_MSG),
 }
 
 
@@ -6827,6 +6841,66 @@ def convert_survivors_green(pids, label_base, what):
         'LABEL(0x%X)\n'
         % (pid, label_base + i, what, i + 1, len(pids), pid, label_base + i)
         for i, pid in enumerate(pids))
+
+
+def ch04_village_script(msg, item):
+    """A village visit, in vanilla Ch4's own shape (EventScr_089F1BD8): one text box over the
+    village BG, then the reward into the visitor's hands.
+
+    `SVAL(EVT_SLOT_3, item)` + `GIVEITEMTO(CHAR_EVT_ACTIVE_UNIT)` is the engine's give-an-item
+    idiom -- slot 3 carries the item id and the ACTIVE unit is the one who walked in, so the axe
+    lands on the visitor (overflowing to the convoy if their pack is full), not on a fixed pid.
+    """
+    return ('{\n'
+            '    MUSI\n'
+            '    Text_BG(%s, 0x%X)\n'
+            '    MUNO\n'
+            '    CALL(EventScr_RemoveBGIfNeeded)\n'
+            '    SVAL(EVT_SLOT_3, %s)\n'
+            '    GIVEITEMTO(CHAR_EVT_ACTIVE_UNIT)\n'
+            '    EVBIT_T(7)\n'
+            '    ENDA\n}' % (CH04_VILLAGE_BG, msg, item))
+
+
+def ch04_location_events(chap):
+    """ch04's Location list: one `Village` per authored village, at the tile the chapter YAML
+    names. Vanilla Ch4 wires two; ours wires the ITEM village only, because the parley took the
+    recruit village's job (see the CH04_VILLAGE_* block).
+
+    `Village(eid, scr, x, y)` expands to VILL + a LOCA on the tile ABOVE (EAstdlib), which is how
+    FE8 lets a unit standing north of the door trigger it -- so the door tile is the anchor, not
+    the whole building."""
+    return ('{\n' + ''.join(
+        '    Village(0, %s, %d, %d) /* %s -- %s */\n'
+        % (CH04_VILLAGE_SCRIPT, v['tile'][0], v['tile'][1], v['id'],
+           CH04_ITEM_IDS[v['visit_reward'][0]['id']])
+        for v in chap.get('villages', [])) + '    END_MAIN\n}')
+
+
+def assert_village_tiles_visitable(chap, maps_dir, stem):
+    """Guard (#205): a village the YAML declares must stand on terrain FE8 will let a unit visit.
+
+    `CanUnitVisit`/the Visit menu item (bmmenu.c:735) checks the TERRAIN under the unit before it
+    ever looks at the location event -- HOUSE, INN, RUINS_VILLAGE or VILLAGE_REGULAR -- so a
+    `Village()` entry on scenery is a reward that silently does not exist. That is precisely what
+    shipped: the snowy reskin mapped vanilla's village metatile onto ruins, the map still drew a
+    cottage, and ch04's only material reward was unobtainable for the whole slice.
+    """
+    width, height, terrain = _map_terrain_grid(maps_dir, stem)
+    ids = terrain_ids()
+    visitable = {ids[name] for name in
+                 ('TERRAIN_HOUSE', 'TERRAIN_INN', 'TERRAIN_RUINS_VILLAGE',
+                  'TERRAIN_VILLAGE_REGULAR')}
+    for village in chap.get('villages', []):
+        x, y = village['tile']
+        if not (0 <= x < width and 0 <= y < height):
+            sys.exit('ERROR: village %r is at (%d, %d), off the %dx%d %s map'
+                     % (village['id'], x, y, width, height, stem))
+        if terrain[y][x] not in visitable:
+            sys.exit('ERROR: village %r at (%d, %d) stands on terrain 0x%02x -- FE8 offers Visit '
+                     'only on house/inn/village terrain (bmmenu.c), so its reward is '
+                     'unobtainable. Paint a village tile there (#205).'
+                     % (village['id'], x, y, terrain[y][x]))
 
 
 def ch04_moose_script(unit_symbol, pid, msg, flee_to):
@@ -7043,6 +7117,14 @@ def _read_map_metatile(maps_dir, stem, x, y):
 
 
 TERRAIN_TABLE_OFFSET = 8192     # a tile config is 8192 B TSA + 1024 B terrain (map_tileset_tool)
+
+
+def terrain_ids():
+    """{TERRAIN_NAME: id} from the decomp's own enum at HEAD -- so a terrain is named, never a
+    bare number, and the names track the decomp rather than a copy of it."""
+    return {name: int(value, 0) for name, value in re.findall(
+        r'(TERRAIN_[A-Z0-9_]+)\s*=\s*(0[xX][0-9A-Fa-f]+|\d+)',
+        vanilla_decomp_text('include/constants/terrains.h'))}
 
 
 def _map_terrain_grid(maps_dir, stem):
@@ -7750,8 +7832,14 @@ def inject_ch04(campaign, boot=False, verbose=True):
     # Character = the Marty->Lupin parley CHAR list (Stage 2b); the rest stay empty.
     info = _replace_brace_block(info, 'EventListScr_Ch5_Character[] =',
                                 lupin_char_events, CH5_EVENTINFO_H)
-    for symbol in ('EventListScr_Ch5_Location',
-                   'EventListScr_Ch5_SelectUnit', 'EventListScr_Ch5_SelectDestination',
+    # Location = the villages (#205). Vanilla Ch4's Location list is two `Village` entries; ours
+    # keeps the ITEM one at the same tile (the parley took the recruit one's job). Blanking this
+    # list is what made ch04's Iron Axe unobtainable -- and the map's door tile had ALSO lost its
+    # village terrain in the reskin, so both halves had to come back.
+    assert_village_tiles_visitable(chap, maps_dir, CH04_LAYOUT[1])
+    info = _replace_brace_block(info, 'EventListScr_Ch5_Location[] =',
+                                ch04_location_events(chap), CH5_EVENTINFO_H)
+    for symbol in ('EventListScr_Ch5_SelectUnit', 'EventListScr_Ch5_SelectDestination',
                    'EventListScr_Ch5_UnitMove', 'EventListScr_Ch5_Tutorial'):
         info = _replace_brace_block(info, symbol + '[] =',
                                     '{\n    END_MAIN\n}', CH5_EVENTINFO_H)
@@ -7832,6 +7920,14 @@ def inject_ch04(campaign, boot=False, verbose=True):
     # surviving pack green in place, then CUSA Lupin blue (built above).
     script = _replace_brace_block(
         script, CH04_LUPIN_TALK_SCRIPT + '[] =', lupin_talk_script, CH5_EVENTSCRIPT_H)
+    # The village visit (#205): vanilla Ch4's own give-an-item shape, with the line and the
+    # reward read from the chapter YAML.
+    village = chap['villages'][0]
+    script = _replace_brace_block(
+        script, CH04_VILLAGE_SCRIPT + '[] =',
+        ch04_village_script(CH04_VILLAGE_MSG,
+                            CH04_ITEM_IDS[village['visit_reward'][0]['id']]),
+        CH5_EVENTSCRIPT_H)
     # The moose-flees beat (Stage 4): fired by the Misc AREA when a unit reaches the tomb-side
     # clearing. Loads the moose, holds on it, RBG's one line, then it bolts NE and is gone.
     script = _replace_brace_block(
@@ -7912,6 +8008,12 @@ def inject_ch04(campaign, boot=False, verbose=True):
     _emit_scene_beats(lines, (CH04_ENDING_MSG,), end_beats, cut_fid, end_home, width=42)
     _emit_scene_beats(lines, (CH04_ENDING_NO_LUPIN_MSG,), [end_beat_no_lupin],
                       cut_fid, end_home, width=42)
+    # The village line (#205) -- Nimsy herself, on her own doorstep, wearing the vanilla old-lady
+    # mug the opening already gave her. Plays over BG_NORMAL_VILLAGE (full-screen window), so it
+    # wraps at 42 like the other BG scenes rather than the on-map bubble's 29.
+    set_message_body(lines, CH04_VILLAGE_MSG, _script_to_message(
+        [{'nimsy': ' '.join(village['visit_text'].split())}],
+        {'nimsy': ('[OpenMidLeft]', CH04_NIMSY_FID)}, width=42))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     _write_chapter_title_card(host, 'Ch.4: ' + chap['title'])

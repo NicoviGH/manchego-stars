@@ -11,6 +11,7 @@ committed review render (docs/demo/ch03-mineshaft-tileset-demo.png) pixel-exact.
 import hashlib
 import json
 import os
+import re
 import struct
 import sys
 import tempfile
@@ -423,7 +424,78 @@ class TestSnowyBernBorrowedSnags(unittest.TestCase):
         )
 
 
+class TestVisitableTerrainSurvivesTheReskin(unittest.TestCase):
+    """A retile may restyle a village; it may not stop it being a village.
+
+    `bmmenu.c:735` shows Visit only when the unit stands on HOUSE / INN / RUINS_VILLAGE /
+    VILLAGE_REGULAR terrain -- a `Village()` location event alone is not enough. So a reskin
+    that maps a village metatile onto scenery silently deletes the reward, and nothing else
+    in the pipeline notices: the map still compiles, renders and plays. That is exactly how
+    ch04 lost both of vanilla Ch4's villages (#205).
+    """
+
+    VISITABLE = {'TERRAIN_HOUSE', 'TERRAIN_INN',
+                 'TERRAIN_RUINS_VILLAGE', 'TERRAIN_VILLAGE_REGULAR'}
+
+    def setUp(self):
+        maps = os.path.join(REPO, 'campaigns/rime-of-the-frostmaiden/maps')
+        with open(os.path.join(maps, 'reskin-learned.json')) as f:
+            self.rules = json.load(f)
+        # The snowy-bern retile family (Prologue/Ch1/Ch2/Ch4) all source TileConfiguration1,
+        # so one source terrain table governs every entry in the learned map.
+        with open(os.path.join(REPO, 'fireemblem8u/graphics/map/TileConfiguration1.bin'),
+                  'rb') as f:
+            self.vanilla_terrain = f.read()[8192:]
+        with open(os.path.join(maps, 'tilesets/snowy-bern/snowy-bern.bin'), 'rb') as f:
+            self.snow_terrain = f.read()[8192:]
+        self.names = {int(value, 0): name for name, value in re.findall(
+            r'(TERRAIN_[A-Z0-9_]+)\s*=\s*(0[xX][0-9A-Fa-f]+|\d+)',
+            bc.vanilla_decomp_text('include/constants/terrains.h'))}
+
+    def test_a_visitable_tile_stays_visitable_through_the_learned_map(self):
+        broken = []
+        for source, target in self.rules['map'].items():
+            source_name = self.names.get(self.vanilla_terrain[int(source)])
+            if source_name not in self.VISITABLE:
+                continue
+            target_name = self.names.get(self.snow_terrain[int(target)])
+            if target_name != source_name:
+                broken.append('%s (%s) -> %s (%s)'
+                              % (source, source_name, target, target_name))
+        self.assertEqual([], broken,
+                         'the reskin turns a visitable tile into scenery: %s' % broken)
+
+    def test_visitable_terrain_is_protected_from_a_future_retile(self):
+        """The guard, not just the instance: `preserved_terrain_targets` rejects a mapping
+        whose target terrain differs from the source's, but only for terrains listed here.
+        Forest alone (#193) let ch04's villages through."""
+        protected = {self.names.get(t) for t in self.rules['preserve_terrain_variants']}
+        self.assertTrue(self.VISITABLE <= protected,
+                        'unprotected visitable terrain: %s' % (self.VISITABLE - protected))
+
+
 class TestCh04MapAndRosterPlacement(unittest.TestCase):
+    def test_the_compiled_map_is_visitable_where_vanilla_put_its_villages(self):
+        """The retile may restyle vanilla Ch4's two villages; it may not un-village them.
+        Vanilla Ch4 wires `Village(0, ..., 1, 11)` and `Village(0, ..., 8, 2)`, and Visit is
+        offered only on visitable terrain (bmmenu.c:735), so these two tiles decide whether
+        ch04's Iron Axe exists at all (#205)."""
+        maps = os.path.join(REPO, 'campaigns/rime-of-the-frostmaiden/maps')
+        with open(os.path.join(maps, 'ch04-lonelywood-forest.json')) as f:
+            width = json.load(f)['width']
+        with open(os.path.join(maps, 'ch04-lonelywood-forest.mar'), 'rb') as f:
+            mar = f.read()
+        tileset = mt._tileset_from_dir(os.path.join(maps, 'tilesets/snowy-bern'))
+        names = {int(value, 0): name for name, value in re.findall(
+            r'(TERRAIN_[A-Z0-9_]+)\s*=\s*(0[xX][0-9A-Fa-f]+|\d+)',
+            bc.vanilla_decomp_text('include/constants/terrains.h'))}
+        for x, y in ((8, 2), (1, 11)):
+            metatile = struct.unpack_from('<H', mar, (y * width + x) * 2)[0] >> 5
+            self.assertEqual('TERRAIN_VILLAGE_REGULAR',
+                             names.get(tileset.terrain(metatile)),
+                             'ch04 (%d,%d) is metatile %d -- not a village tile'
+                             % (x, y, metatile))
+
     def test_approved_layout_and_vanilla_named_roster_follow_ch4_path(self):
         chapter_path = os.path.join(
             REPO, 'campaigns/rime-of-the-frostmaiden/chapters',
@@ -496,8 +568,13 @@ class TestCh04MapAndRosterPlacement(unittest.TestCase):
             raw = f.read()
         cells = [struct.unpack_from('<H', raw, i)[0] >> 5
                  for i in range(0, len(raw), 2)]
+        # Snapshot of the approved layout. Re-pinned 2026-08-01 (#205): the two village
+        # doors at (8,2) and (1,11) were metatile 994 (RUINS_REGULAR) and are now 898
+        # (VILLAGE_REGULAR) -- the reskin had mapped vanilla's village tile onto scenery,
+        # which silently deleted both of vanilla Ch4's villages. Two cells changed, nothing
+        # else; the per-tile assertion above is the one that states the intent.
         self.assertEqual(
-            'cb4551562830618fe089e2186a9b540cffdaa38b08b91618759893a6f8502d54',
+            'c2c4ad7052242d2b731b7ad169fa8a29a0c680a0b48868134ff48dffb1d330b3',
             hashlib.sha256(struct.pack('<225H', *cells)).hexdigest(),
         )
         bern = mt._tileset_from_dir(SNOWY_BERN)

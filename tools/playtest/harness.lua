@@ -4996,6 +4996,77 @@ scenarios.ch04packmath = function()
         .. "who survived, so talking early is the reward", killed, spawned, greens))
 end
 
+-- ch04village (#205): does the Lonelywood village actually hand over its Iron Axe?
+-- It did not, for the whole slice, and NOTHING looked wrong: the map drew a cottage, the chapter
+-- compiled and played. FE8 gates the Visit menu item on the TERRAIN under the unit (bmmenu.c:735)
+-- before it ever consults the location event, and the snowy reskin had mapped vanilla's village
+-- metatile onto ruins. So this checks the two halves that must BOTH hold -- a visitable tile and a
+-- wired Village() entry -- by the only evidence that settles it: the axe is in the party's hands
+-- afterwards and was not before.
+-- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04village (needs a CH04BOOT=1 ROM).
+scenarios.ch04village = function()
+    local VILLAGE_X, VILLAGE_Y, IRON_AXE = 8, 2, 0x1F
+    if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
+    pokeFastConfig()
+    waitFor(function() return faction() == 0 and not menuOpen()
+        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    local function axes()
+        local n = 0
+        for _, id in ipairs(collectedItems()) do if id == IRON_AXE then n = n + 1 end end
+        return n
+    end
+    local before = axes()
+    log(string.format("ch04village: %d Iron Axe(s) in the party before visiting", before))
+    -- Park a unit ON the village tile. setMapUnit keeps the engine's tile->unit grid in sync, so
+    -- the Visit check reads the new position immediately (the ch03talk/parley trick).
+    local u
+    for i = 0, 19 do
+        local c = unitAt(SYM.gUnitArrayBlue, i)
+        if c and not isDead(c) and (c.state & 0x2) == 0 then u = c break end
+    end
+    if not u then return result("FAIL", "no unexhausted blue unit to visit with") end
+    local grid = mapUnitAt(u.x, u.y)
+    setMapUnit(u.x, u.y, 0)
+    emu:write8(u.addr + 0x10, VILLAGE_X); emu:write8(u.addr + 0x11, VILLAGE_Y)
+    setMapUnit(VILLAGE_X, VILLAGE_Y, grid)
+    u = unitAt(SYM.gUnitArrayBlue, 0)
+    if not cursorTo(VILLAGE_X, VILLAGE_Y) then return result("FAIL", "cursor could not reach the village") end
+    if not moveUnit(VILLAGE_X, VILLAGE_Y, VILLAGE_X, VILLAGE_Y) then
+        return result("FAIL", "could not select the unit standing on the village")
+    end
+    -- Find Visit by OUTCOME, not by assuming a row: the command menu's shape depends on what is
+    -- adjacent, and guessing row 0 is what filmed Marty duelling the wolf he meant to talk to.
+    for row = 0, 5 do
+        if axes() > before then break end
+        if not menuOpen() then
+            if not cursorTo(VILLAGE_X, VILLAGE_Y) then break end
+            if not moveUnit(VILLAGE_X, VILLAGE_Y, VILLAGE_X, VILLAGE_Y) then break end
+        end
+        for _ = 1, row do press(K.DOWN, 3) end
+        press(K.A, 4)
+        for i = 1, 420 do
+            if axes() > before then break end
+            if i % 16 == 0 then press(K.A, 3) end
+            yield()
+        end
+        if axes() > before then
+            log(string.format("ch04village: Visit is command-menu row %d", row))
+            break
+        end
+        press(K.B); wait(10)
+    end
+    shot("ch04village")
+    local after = axes()
+    if after <= before then
+        return result("FAIL", string.format(
+            "visited (%d,%d) but the party still holds %d Iron Axe(s) -- the village handed over "
+            .. "nothing (check the tile's terrain AND the Village() entry)",
+            VILLAGE_X, VILLAGE_Y, after))
+    end
+    return result("PASS", string.format(
+        "the Lonelywood village handed over its Iron Axe: %d -> %d in the party", before, after))
+end
+
 -- attackprobe (#204): WHY a clear-bot's blind Attack press lands on the wrong command row. The
 -- clear-bot's chooseAttack assumes command-menu row 0 is Attack; when the engine sees no target
 -- it is Item instead, and the bot Uses a vulnerary at full HP forever. This probe stages ONE
