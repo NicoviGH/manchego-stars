@@ -5067,6 +5067,76 @@ scenarios.ch04village = function()
         "the Lonelywood village handed over its Iron Axe: %d -> %d in the party", before, after))
 end
 
+-- ch04snag (#214): the Iron Axe's whole purpose. Vanilla Ch4's village hands you the axe to chop
+-- a snag into a bridge, and the retile kept the snag at (4,8) with the river at (4,9). Snags are
+-- natively attackable -- bmtrick.c auto-adds a 20 HP TRAP_OBSTACLE on every TERRAIN_SNAG tile --
+-- but the BRIDGE half is a MapChange the chapter has to register, and hosted chapters get their
+-- changeLayerId zeroed. So this asserts the payoff by TERRAIN, which is what actually decides
+-- whether a unit can cross: (4,9) is impassable river before, and a crossing after.
+-- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04snag (needs a CH04BOOT=1 ROM).
+scenarios.ch04snag = function()
+    local SNAG_X, SNAG_Y = 4, 8
+    local CROSS_X, CROSS_Y = 4, 9        -- the river row the trunk falls across
+    -- TERRAIN_BRIDGE_REGULAR (constants/terrains.h). NOT BRIDGE_SNAG: snowy-bern declares that
+    -- terrain on an unpainted metatile, so using it put a black square in the river with a
+    -- perfectly correct terrain byte. The crossing uses the bridge art this map already lays
+    -- over this river (#214).
+    local T_CROSSING = 19
+    if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
+    pokeFastConfig()
+    waitFor(function() return faction() == 0 and not menuOpen()
+        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    log(string.format("ch04snag: before -- snag(%d,%d) terrain=0x%02X  crossing(%d,%d) terrain=0x%02X",
+        SNAG_X, SNAG_Y, terrainAt(SNAG_X, SNAG_Y), CROSS_X, CROSS_Y, terrainAt(CROSS_X, CROSS_Y)))
+    if terrainAt(CROSS_X, CROSS_Y) == T_CROSSING then
+        return result("FAIL", "the crossing is already a bridge before the snag was touched")
+    end
+    -- Any armed unit will do; the axe is the fiction, not a requirement (a snag is an obstacle
+    -- and takes damage from anything that can reach it).
+    local u
+    for i = 0, 19 do
+        local c = unitAt(SYM.gUnitArrayBlue, i)
+        if c and not isDead(c) and (c.state & 0x2) == 0 and unitAttackRange(c) then u = c break end
+    end
+    if not u then return result("FAIL", "no armed blue unit to swing at the snag") end
+    -- Park adjacent to the snag and hit it until the obstacle dies. Its HP is the trap's `extra`,
+    -- so the only signal that matters is the TERRAIN flipping underneath.
+    for swing = 1, 12 do
+        if terrainAt(CROSS_X, CROSS_Y) == T_CROSSING then break end
+        local m = findUnit(SYM.gUnitArrayBlue, 20, u.charId)
+        if not m then break end
+        if (m.state & 0x2) ~= 0 then
+            runEnemyPhase()
+            waitFor(function() return faction() == 0 and not menuOpen() end, 900, true)
+            m = findUnit(SYM.gUnitArrayBlue, 20, u.charId)
+            if not m then break end
+        end
+        local grid = mapUnitAt(m.x, m.y)
+        setMapUnit(m.x, m.y, 0)
+        emu:write8(m.addr + 0x10, SNAG_X); emu:write8(m.addr + 0x11, SNAG_Y - 1)
+        setMapUnit(SNAG_X, SNAG_Y - 1, grid)
+        m = findUnit(SYM.gUnitArrayBlue, 20, u.charId)
+        if not cursorTo(m.x, m.y) then break end
+        if moveUnit(m.x, m.y, m.x, m.y) then
+            chooseAttack(m.addr)
+            waitFor(function() return faction() == 0 and not menuOpen()
+                and not procActive(SYM.gProc_ekrBattle) end, 900)
+        end
+        log(string.format("  swing %d: crossing terrain=0x%02X", swing, terrainAt(CROSS_X, CROSS_Y)))
+    end
+    shot("ch04snag")
+    local after = terrainAt(CROSS_X, CROSS_Y)
+    log(string.format("ch04snag: after -- snag(%d,%d) terrain=0x%02X  crossing(%d,%d) terrain=0x%02X",
+        SNAG_X, SNAG_Y, terrainAt(SNAG_X, SNAG_Y), CROSS_X, CROSS_Y, after))
+    if after ~= T_CROSSING then
+        return result("FAIL", string.format(
+            "the snag broke but (%d,%d) is terrain 0x%02X, not a crossing (0x%02X) -- the "
+            .. "MapChange did not apply", CROSS_X, CROSS_Y, after, T_CROSSING))
+    end
+    return result("PASS", string.format(
+        "the snag fell: (%d,%d) is now a bridge -- the river is crossable", CROSS_X, CROSS_Y))
+end
+
 -- attackprobe (#204): WHY a clear-bot's blind Attack press lands on the wrong command row. The
 -- clear-bot's chooseAttack assumes command-menu row 0 is Attack; when the engine sees no target
 -- it is Item instead, and the bot Uses a vulnerary at full HP forever. This probe stages ONE

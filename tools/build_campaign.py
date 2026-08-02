@@ -6735,6 +6735,22 @@ CH04_MOOSE_AREA = (9, 2, 14, 7)                 # AREA(x1, y1, x2, y2) -- the cl
 CH04_VILLAGE_SCRIPT = 'EventScr_089F231C'       # dead Ch5 script (verified free at HEAD)
 CH04_VILLAGE_MSG = 0x9C3                        # dead Ch5 text slot (next free in ch04's block)
 CH04_VILLAGE_BG = 'BG_NORMAL_VILLAGE'           # vanilla's own village BG, as ch02 uses
+# The snag (#214) -- the Iron Axe's whole purpose. Vanilla Ch4's item village hands the axe over
+# to chop this into a bridge, and the retile kept the geometry: (4,8) is the snag, (4,9) the river
+# it falls across, (4,10) the far bank. Snags are natively attackable (bmtrick.c auto-adds a 20 HP
+# TRAP_OBSTACLE on every TERRAIN_SNAG tile); what needs authoring is the MapChange that
+# UpdateObstacleFromBattle applies when it breaks. Region + tile ROLES copied from vanilla's own
+# Ch4MapChanges id 1 -- plains / BRIDGE_SNAG / plains -- resolved to snowy-bern metatiles at build
+# time so a re-retile cannot leave a stale tile number here.
+CH04_SNAG_POS = (4, 8)
+CH04_SNAG_SIZE = (1, 3)
+# The crossing is BRIDGE_REGULAR, not BRIDGE_SNAG. snowy-bern *declares* BRIDGE_SNAG (metatile
+# 36) but never painted it -- the tile is a single flat colour, and using it put a BLACK SQUARE in
+# the river (caught by looking at the frame; the terrain byte was perfectly correct, so no amount
+# of data-checking would have found it). Metatile 2 is the bridge this very map already lays over
+# this very river at (4,12), so the fallen trunk reads as a crossing that belongs here.
+CH04_SNAG_TERRAIN = ('TERRAIN_PLAINS', 'TERRAIN_BRIDGE_REGULAR', 'TERRAIN_PLAINS')
+CH04_SNAG_BRIDGE_TILE = 2       # preferred metatile for the crossing (see above)
 # ch04's goal strings (#207). Its goal donor is ch02's HOST slot, which inject_ch02 has already
 # rewritten by the time inject_ch04 runs -- so ch04 inherited ch02's window AND status ids and the
 # two wrote over each other (last injector wins; they happened to agree, which is why nothing
@@ -6937,6 +6953,54 @@ def assert_village_tiles_visitable(chap, maps_dir, stem):
                      'only on house/inn/village terrain (bmmenu.c), so its reward is '
                      'unobtainable. Paint a village tile there (#205).'
                      % (village['id'], x, y, terrain[y][x]))
+
+
+def _is_blank_metatile(tileset, metatile):
+    """True if a metatile is a single flat colour -- i.e. DECLARED in the terrain table but never
+    painted. snowy-bern has one of these on TERRAIN_BRIDGE_SNAG, and writing it into a map change
+    put a black square in the river while every terrain byte read correctly (#214)."""
+    return len(set(tileset.metatile_image(metatile).convert('RGB').getdata())) <= 1
+
+
+def _snowy_metatile_for(tileset, terrain_name, prefer=None):
+    """The lowest PAINTED metatile carrying `terrain_name` (or `prefer` if it qualifies).
+
+    Map-change tiles are chosen by the TERRAIN they must produce, not copied as numbers: the
+    reskin renumbers everything, so a hardcoded metatile is a stale tile waiting to happen (#205
+    is the whole cautionary tale). Blank metatiles are skipped -- a tileset can carry a terrain id
+    on an unpainted tile, and the terrain byte alone reads as correct while the map shows a hole.
+    Fails loudly if the tileset cannot express the terrain with real art."""
+    want = terrain_ids()[terrain_name]
+    if prefer is not None and tileset.terrain(prefer) == want:
+        return prefer
+    for m in range(1024):
+        if tileset.terrain(m) == want and not _is_blank_metatile(tileset, m):
+            return m
+    sys.exit('ERROR: the tileset has no PAINTED metatile carrying %s -- a map change needs one '
+             '(a declared-but-unpainted tile renders as a solid block)' % terrain_name)
+
+
+def ch04_map_changes(chap, maps_dir):
+    """ch04's tile flips (#214): the snag falling into a crossing, and each visited village
+    closing its door.
+
+    Returns the `map_changes_asm` change list. Both are vanilla Ch4's own changes, kept at
+    vanilla's positions (our retile preserved them) but resolved to OUR tileset's metatiles by
+    terrain. Without the village entry a visited village stays looking un-visited, which vanilla
+    never does."""
+    import map_tileset_tool as mt
+    tileset = mt._tileset_from_dir(os.path.join(maps_dir, 'tilesets', WINTER_TILESET))
+    x, y = CH04_SNAG_POS
+    w, h = CH04_SNAG_SIZE
+    changes = [(x, y, w, h,
+                [_snowy_metatile_for(tileset, t, prefer=CH04_SNAG_BRIDGE_TILE)
+                 for t in CH04_SNAG_TERRAIN],
+                'the snag falls -> a crossing at (%d, %d)' % (x, y + 1))]
+    changes += [(v['tile'][0], v['tile'][1], 1, 1,
+                 [_snowy_metatile_for(tileset, 'TERRAIN_VILLAGE_CLOSED')],
+                 '%s visited' % v['id'])
+                for v in chap.get('villages', [])]
+    return changes
 
 
 def ch04_moose_script(unit_symbol, pid, msg, flee_to):
@@ -7248,43 +7312,52 @@ def assert_scripted_move_reachable(maps_dir, stem, start, dest, mov_table, who):
                costs[terrain[dest[1]][dest[0]]], north_east))
 
 
-def _ch03_tile_changes_asm(chests, doors):
-    """Pure: the MS_Ch03MapChanges ASM block for the ch03 chest + door tile-changes (#23).
+def map_changes_asm(symbol, changes):
+    """The per-chapter MapChange array, for any chapter that flips tiles (#23 ch03 chests/doors,
+    #214 ch04's snag + visited village).
 
-    FE8 flips a tile on loot/open via a per-chapter MapChange array: opening a chest runs
-    CallChestOpeningEvent(GetMapChangeIdAt(x, y), item) and opening a door runs
-    CallTileChangeEvent(GetMapChangeIdAt(x, y)) (eventinfo.c) -- both find the change whose
-    1x1 region covers the tile and write its tiles into gBmMapBaseTiles. GetMapChangeIdAt
-    matches by POSITION, so chests and doors share ONE array; ids only need to stay unique.
+    FE8 flips tiles through a per-chapter MapChange array: a chest runs
+    CallChestOpeningEvent(GetMapChangeIdAt(x, y), item), a door CallTileChangeEvent(...)
+    (eventinfo.c), and a destroyed obstacle -- a SNAG -- ApplyMapChangesById(GetMapChangeIdAt(...))
+    from UpdateObstacleFromBattle (bmbattle.c). All three find the change whose region covers the
+    tile and write its tiles into gBmMapBaseTiles. Lookup is by POSITION, so one array serves every
+    kind and ids only need to stay unique.
 
-    chests = [(x, y), ...]        -- all open to the shared FF5 navy chest tile (17->29).
-    doors  = [(x, y, open_metatile), ...] -- each opens to its OWN below-cell floor tile
-             (Nicolas 2026-07-11: an opened door becomes the passable tile directly below it).
+    `changes` = [(x, y, w, h, [metatile, ...], why), ...] in ROW-MAJOR order per region.
 
     struct MapChange { s8 id; u8 xOrigin, yOrigin, xSize, ySize; u8 pad[3]; const void* data; }
     (12 B; data at 0x08). Tile data is metatile<<2 (the gBmMapBaseTiles encoding). The array
-    terminates on id < 0. The caller registers MS_Ch03MapChanges as a fresh gChapterDataAssetTable
-    word and points the host slot's map.changeLayerId at it."""
-    lines = ['', '/* Manchego Stars ch03 tile-changes (#23): flip FF5 navy chest %d->%d on loot;'
-             ' open each door to the floor tile directly below it */'
-             % (CH03_CHEST_CLOSED_TILE, CH03_CHEST_OPEN_TILE),
-             '\t.align 2, 0', '\t.global MS_Ch03MapChanges', 'MS_Ch03MapChanges:']
-    tiles = ['MS_Ch03ChestOpenTile:',
-             '\t.hword %d /* %d << 2 (open chest metatile) */'
-             % (CH03_CHEST_OPEN_TILE << 2, CH03_CHEST_OPEN_TILE)]
-    mid = 0
-    for x, y in chests:
-        lines.append('\t.byte %d, %d, %d, 1, 1, 0, 0, 0\n\t.word MS_Ch03ChestOpenTile'
-                     % (mid, x, y))
-        mid += 1
-    for di, (x, y, open_metatile) in enumerate(doors):
-        sym = 'MS_Ch03DoorOpenTile_%d' % di
-        lines.append('\t.byte %d, %d, %d, 1, 1, 0, 0, 0\n\t.word %s' % (mid, x, y, sym))
-        tiles.append('%s:\n\t.hword %d /* %d << 2 (open door -> floor below) */'
-                     % (sym, open_metatile << 2, open_metatile))
-        mid += 1
+    terminates on id < 0. The caller registers `symbol` as a fresh gChapterDataAssetTable word and
+    points the host slot's map.changeLayerId at it (_inject_tile_changes)."""
+    lines = ['', '/* Manchego Stars %s */' % symbol,
+             '\t.align 2, 0', '\t.global %s' % symbol, '%s:' % symbol]
+    blobs = []
+    for mid, (x, y, w, h, tiles, why) in enumerate(changes):
+        if len(tiles) != w * h:
+            sys.exit('ERROR: map change %d at (%d, %d) is %dx%d but carries %d tiles'
+                     % (mid, x, y, w, h, len(tiles)))
+        sym = '%s_tiles_%d' % (symbol, mid)
+        lines.append('\t.byte %d, %d, %d, %d, %d, 0, 0, 0 /* %s */\n\t.word %s'
+                     % (mid, x, y, w, h, why, sym))
+        blobs.append('%s:\n%s' % (sym, '\n'.join(
+            '\t.hword %d /* metatile %d */' % (m << 2, m) for m in tiles)))
     lines.append('\t.byte -1, 0, 0, 0, 0, 0, 0, 0 /* terminator (id < 0) */\n\t.word 0')
-    return '\n'.join(lines + tiles)
+    return '\n'.join(lines + blobs)
+
+
+def _inject_tile_changes(symbol, changes, host_index):
+    """Emit `changes` as `symbol`, register it in gChapterDataAssetTable and point host slot
+    `host_index` at it (GetChapterMapChangesPointer -> gChapterDataAssetTable[changeLayerId],
+    chapterdata.c). Must run AFTER _retarget_host_chapter, which zeroes changeLayerId."""
+    with open(CONST_MAPS_S, 'a', encoding='utf-8') as f:
+        f.write(map_changes_asm(symbol, changes) + '\n')
+    idx = _append_asm_table_words(ASSET_TABLE_S, 'gChapterDataAssetTable', [symbol])
+    with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
+        settings = json.load(f)
+    settings['chapters'][host_index]['map']['changeLayerId'] = idx
+    with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
+        json.dump(settings, f, indent=2)
+    return idx
 
 
 def _inject_ch03_tile_changes(chap, maps_dir, host_index):
@@ -7294,21 +7367,17 @@ def _inject_ch03_tile_changes(chap, maps_dir, host_index):
     a fresh gChapterDataAssetTable word, and sets the host slot's map.changeLayerId to that index
     (GetChapterMapChangesPointer -> gChapterDataAssetTable[changeLayerId], chapterdata.c). Each
     door's open tile is read off the painted map (the metatile directly below the door cell)."""
-    chests = [(c['position'][0], c['position'][1]) for c in chap.get('chests', [])]
-    doors = [(d['position'][0], d['position'][1],
-              _read_map_metatile(maps_dir, CH03_LAYOUT[1], d['position'][0], d['position'][1] + 1))
-             for d in chap.get('doors', [])]
-    block = _ch03_tile_changes_asm(chests, doors)
-    with open(CONST_MAPS_S, 'a', encoding='utf-8') as f:
-        f.write(block + '\n')
-    idx = _append_asm_table_words(ASSET_TABLE_S, 'gChapterDataAssetTable',
-                                  ['MS_Ch03MapChanges'])
-    with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
-        settings = json.load(f)
-    settings['chapters'][host_index]['map']['changeLayerId'] = idx
-    with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
-        json.dump(settings, f, indent=2)
-    return idx
+    changes = [(c['position'][0], c['position'][1], 1, 1, [CH03_CHEST_OPEN_TILE],
+                'chest %d -> %d on loot' % (CH03_CHEST_CLOSED_TILE, CH03_CHEST_OPEN_TILE))
+               for c in chap.get('chests', [])]
+    # An opened door becomes the passable tile directly BELOW it (Nicolas 2026-07-11), read off
+    # the painted map so a re-retile cannot leave a hand-copied tile number behind.
+    changes += [(d['position'][0], d['position'][1], 1, 1,
+                 [_read_map_metatile(maps_dir, CH03_LAYOUT[1],
+                                     d['position'][0], d['position'][1] + 1)],
+                 'door opens to the floor below')
+                for d in chap.get('doors', [])]
+    return _inject_tile_changes('MS_Ch03MapChanges', changes, host_index)
 
 
 def inject_ch03(campaign, boot=False, verbose=True):
@@ -7877,6 +7946,9 @@ def inject_ch04(campaign, boot=False, verbose=True):
     assert_village_tiles_visitable(chap, maps_dir, CH04_LAYOUT[1])
     info = _replace_brace_block(info, 'EventListScr_Ch5_Location[] =',
                                 ch04_location_events(chap), CH5_EVENTINFO_H)
+    # Tile flips (#214): the snag falls into a crossing (the Iron Axe's whole purpose) and each
+    # visited village closes its door. Must run AFTER _retarget_host_chapter zeroed changeLayerId.
+    _inject_tile_changes('MS_Ch04MapChanges', ch04_map_changes(chap, maps_dir), CH04_HOST_INDEX)
     for symbol in ('EventListScr_Ch5_SelectUnit', 'EventListScr_Ch5_SelectDestination',
                    'EventListScr_Ch5_UnitMove', 'EventListScr_Ch5_Tutorial'):
         info = _replace_brace_block(info, symbol + '[] =',
@@ -8023,17 +8095,15 @@ def inject_ch04(campaign, boot=False, verbose=True):
     set_message_body(lines, CH04_LUPIN_TALK_MSG, _script_to_message(
         talk, {'lupin': ('[OpenMidRight]', _fid_tag(lupin[1])),
                'marty': ('[OpenMidLeft]', _fid_tag(PORTRAIT_MAP['marty']))}))
-    # Turn-2 reveal cutscene beats (Stage 2c stubs -- provisional in-voice lines; Stage 4
-    # dialogue-pass finalizes). Lupin commands the pack (faced, pack side = mid-right); Marty
-    # reads it cross-field and FLAGS the parley -- the beat that teaches "talk to the leader"
-    # (faced, party side = mid-left). Marty rides the Seth slot.
-    reveal_lupin, reveal_marty = CH04_REVEAL_MSGS
-    set_message_body(lines, reveal_lupin, _script_to_message(
-        [{'lupin': 'Hold! Nobody feeds until I say. ...Those three walking meals brought '
-          'friends.'}], {'lupin': ('[OpenMidRight]', _fid_tag(lupin[1]))}))
-    set_message_body(lines, reveal_marty, _script_to_message(
-        [{'marty': "That big one's giving orders -- it's THINKING. Don't loose an arrow! "
-          'Let me talk to it.'}], {'marty': ('[OpenMidLeft]', _fid_tag(PORTRAIT_MAP['marty']))}))
+    # Turn-2 reveal cutscene beats -- LOCKED text, read from the chapter YAML like every other
+    # ch04 scene (#208; they were Python literals left over from the Stage 2c stubs). Lupin
+    # commands the pack from the pack side (mid-right); Marty reads it cross-field from the party
+    # side (mid-left) and FLAGS the parley -- the beat that teaches "talk to the leader".
+    # ON-MAP, so it wraps at the map-bubble 29 like the moose beat, not the BG scenes' 42.
+    _, reveal_beats = _split_event_beats(chap, 'wolf_pack_reveal', 'ch04 turn-2 reveal',
+                                         msg_ids=CH04_REVEAL_MSGS, card_required=False)
+    _emit_scene_beats(lines, CH04_REVEAL_MSGS, reveal_beats, cut_fid,
+                      {'lupin': '[OpenMidRight]', 'marty': '[OpenMidLeft]'}, width=29)
     # Stage 4 scene bodies. The opening + both endings play over a BG (full-screen window, wrap
     # 42); the moose beat is ON-MAP, so it wraps at the map-bubble 29 (a wider line hits
     # PutTalkBubble's unclamped right-side branch and runs off the tilemap -- the ch03 crier bug).

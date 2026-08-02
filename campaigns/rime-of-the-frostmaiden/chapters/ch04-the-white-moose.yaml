@@ -315,10 +315,15 @@ villages:
     visit_reward:
       - id: iron-axe           # mirrors the twin: vanilla Ch4's item village hands out an Iron Axe
         amount: 1
-    visit_text: >              # DRAFT — pending a dialogue pass with Nicolas.
-      Take it. My husband cut wood with that, and the wood's still
-      standing and he isn't. Better it swings at something that
-      deserves it.
+    # VANILLA 1:1 (Nicolas 2026-08-02) — vanilla Ch4's own MSG_9B5, the tutorial for the snag
+    # gimmick. Not flavour: the Iron Axe IS the tool, and this line is what teaches the player
+    # that the snag at (4,8) can be chopped into a bridge. "South of here" is accurate for our
+    # map (the village stands at (8,2)).
+    visit_text: >
+      Do you see that old snag to the south of here?
+      Bet it would make a handy bridge if you could knock it over.
+      Take a weapon to it and give it a few good whacks. That should do it.
+      Here, take this and give it a try. It ought to do the trick.
     note: >
       Speaker Nimsy Huddle (ancient, hard of hearing) shelters the party overnight
       (chapter-start cutscene). Reward realigned 2026-07-21 to the twin's delivery
@@ -398,6 +403,26 @@ events:
           All winter. ...Meat on feast-days, of course.
       # (Lupin is silent a moment — running the math. It isn't close.)
       - lupin: "Steady food beats proud starving. The pack pulls your sled. Feed them well, mushroom."
+  - trigger: wolf_pack_reveal
+    type: scripted_event
+    description: >
+      Turn 2: the pack bursts from the NW fog beside the party's flank and Lupin COMMANDS it —
+      intelligence shown by action, not stated. Marty reads it cross-field and flags the parley,
+      which is the whole teaching of the scene: talk to the leader, don't shoot it. Plays ON-MAP
+      (no BG) over the same TurnEvent script that LOADs the wave, following vanilla Ch4's own
+      mid-battle arrival shape (EventScr_089F199C). Staging: Lupin holds mid-RIGHT (the pack
+      side), Marty mid-LEFT (the party side).
+      LOCKED 2026-07-31 (dialogue-pass, co-written with Nicolas); moved out of build_campaign.py
+      into the chapter YAML 2026-08-02 (#208) so every ch04 scene has ONE home.
+    script:                     # LOCKED 2026-07-31 (dialogue pass, co-written with Nicolas)
+      # (Six shapes come out of the white, low and fast — then stop dead, as one, on a word.)
+      - lupin: "Hold! Hold. Nobody eats until I say so."
+      - lupin: "Count them. Ten. And they brought steel."
+      - lupin: "Four on the flank, two with me. Go wide."
+      - beat_break: B           # Marty, across the field, delighted rather than afraid
+      - marty: "Oh! Oh, that one's giving ORDERS."
+      - marty: "It's thinking. Please don't shoot it."
+      - marty: "Let me go and say hello."
   - trigger: moose_sighted
     type: scripted_event
     ea_file: events/ch04-moose-flees.ea
