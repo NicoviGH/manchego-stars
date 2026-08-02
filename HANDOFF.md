@@ -150,9 +150,10 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 - **A playtest FAIL is not automatically a regression: check which ROM it ran on.** `clear_ch02`
   failed on the `CH04BOOT=1` fast-boot ROM, which jumps straight into ch04, so ch02's map is
   unreachable by construction. Rebuilt without the flag it PASSes.
-- **`check.py` is ~22s on a CLEAN tree and ~4min on a freshly-built one** (measured). That is the
-  documented restore-the-injected-files workflow, not a regression — restore
-  `src/data/chapter_settings.json data/data_8B363C.s` before running it or committing.
+- **Three durable gotchas from this session are now in `decisions.md` §Operational Gotchas**, not
+  here: a failing playtest may be the WRONG ROM (a `CH04BOOT=1` build cannot reach ch02's map);
+  comments inside a YAML folded scalar are CONTENT; and `check.py` is ~22s clean vs ~4min on a
+  freshly-built tree (restore `src/data/chapter_settings.json data/data_8B363C.s` first).
 
 ## Previous session (2026-08-01, Opus — ch04 became winnable, and both endings got filmed)
 

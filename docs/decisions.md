@@ -2922,6 +2922,24 @@ _Decided: 2026-07-30 (CLAUDE; ch05 `0x9C9` Sahnar block)._
 _Moved here from `HANDOFF.md` 2026-07-02 (audit): these are durable engineering constraints, not
 session state. `HANDOFF.md` points here._
 
+- **A failing playtest may be the wrong ROM, not a regression** (2026-08-02, #207). `clear_ch02`
+  FAILed with "never reached the map" during a goal-id change — on a `CH04BOOT=1` fast-boot ROM,
+  which jumps New Game straight into ch04, so ch02's map is unreachable by construction. Rebuilt
+  without the flag it PASSes. **Before believing a scenario failure, check which ROM it ran on:**
+  the boot flags are per-chapter, and a scenario for an earlier chapter cannot pass on a later
+  chapter's fast-boot build. The same applies in reverse to `PT_HOST_CHAPTER`.
+- **Comments inside a YAML folded scalar are CONTENT, not comments** (2026-08-02, #214). Authoring
+  a chapter's `visit_text: >` with `#` lines indented underneath silently folded them into the
+  string, and the chapter YAML then failed to load for every test that reads it. Comments belong
+  ABOVE the key. Cheap to hit, instant to diagnose once seen — the parse error names the file, not
+  the line.
+- **`tools/check.py` is ~22s on a clean tree and ~4 minutes on a freshly BUILT one** (measured
+  2026-08-02). `check_tests_pass` runs each `tools/test_*.py` as its own process, and the heavy
+  ones re-read the injected decomp. The pre-commit hook runs the same thing, so a commit right
+  after `make` can appear to hang. **Restore the injected decomp files first** —
+  `git -C fireemblem8u restore src/data/chapter_settings.json data/data_8B363C.s` — which is the
+  same restore `test_winter_forest_backfill` needs anyway. Not a regression; just know it.
+
 - **A host slot's index stops tracking the chapter number at 5, and a hosted chapter must name the
   `ChapterEventGroup` it fills** (2026-07-31, ch04 #24). FE8 inserts chapter 5X at **slot 5**, so
   `chapter_settings.json` slot 5 ships with `mapEventDataId` → `Ch5XEvents` while a chapter hosted
