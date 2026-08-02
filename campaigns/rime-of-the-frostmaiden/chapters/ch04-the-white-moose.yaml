@@ -315,10 +315,15 @@ villages:
     visit_reward:
       - id: iron-axe           # mirrors the twin: vanilla Ch4's item village hands out an Iron Axe
         amount: 1
-    visit_text: >              # DRAFT — pending a dialogue pass with Nicolas.
-      Take it. My husband cut wood with that, and the wood's still
-      standing and he isn't. Better it swings at something that
-      deserves it.
+    # VANILLA 1:1 (Nicolas 2026-08-02) — vanilla Ch4's own MSG_9B5, the tutorial for the snag
+    # gimmick. Not flavour: the Iron Axe IS the tool, and this line is what teaches the player
+    # that the snag at (4,8) can be chopped into a bridge. "South of here" is accurate for our
+    # map (the village stands at (8,2)).
+    visit_text: >
+      Do you see that old snag to the south of here?
+      Bet it would make a handy bridge if you could knock it over.
+      Take a weapon to it and give it a few good whacks. That should do it.
+      Here, take this and give it a try. It ought to do the trick.
     note: >
       Speaker Nimsy Huddle (ancient, hard of hearing) shelters the party overnight
       (chapter-start cutscene). Reward realigned 2026-07-21 to the twin's delivery

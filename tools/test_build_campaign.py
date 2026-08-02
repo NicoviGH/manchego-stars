@@ -1058,28 +1058,39 @@ class Ch03TileChanges(unittest.TestCase):
                  for (x, y) in [(6, 10), (10, 5), (2, 3)]]
         self.assertEqual(below, [572, 626, 492])
 
+    def _asm(self, chests, doors):
+        """ch03's own change list, through the shared emitter (#214 generalised it out of a
+        ch03-only helper). chests -> the FF5 open-chest tile; doors -> their below-cell floor."""
+        changes = [(x, y, 1, 1, [bc.CH03_CHEST_OPEN_TILE], 'chest') for x, y in chests]
+        changes += [(x, y, 1, 1, [tile], 'door') for x, y, tile in doors]
+        return bc.map_changes_asm('MS_Ch03MapChanges', changes)
+
     def test_asm_emits_one_change_per_chest_then_per_door_with_unique_ids(self):
-        asm = bc._ch03_tile_changes_asm([(6, 3), (8, 3)], [(6, 10, 98), (2, 3, 66)])
+        asm = self._asm([(6, 3), (8, 3)], [(6, 10, 98), (2, 3, 66)])
         ids = [int(l.split(',')[0].split()[1]) for l in asm.splitlines()
                if l.strip().startswith('.byte') and 'terminator' not in l]
         self.assertEqual(ids, [0, 1, 2, 3])   # 2 chests then 2 doors, contiguous + unique
         self.assertIn('.byte -1', asm)        # id<0 terminator closes the array
 
-    def test_asm_chests_share_the_open_chest_tile_word(self):
-        asm = bc._ch03_tile_changes_asm([(6, 3), (8, 3)], [])
-        self.assertEqual(asm.count('.word MS_Ch03ChestOpenTile'), 2)
-        self.assertIn('.hword %d' % (bc.CH03_CHEST_OPEN_TILE << 2), asm)
+    def test_asm_chests_carry_the_open_chest_tile(self):
+        asm = self._asm([(6, 3), (8, 3)], [])
+        self.assertEqual(asm.count('.hword %d' % (bc.CH03_CHEST_OPEN_TILE << 2)), 2)
 
     def test_asm_each_door_gets_its_own_below_tile_word(self):
-        asm = bc._ch03_tile_changes_asm([], [(6, 10, 98), (10, 5, 302)])
-        self.assertIn('.word MS_Ch03DoorOpenTile_0', asm)
-        self.assertIn('.word MS_Ch03DoorOpenTile_1', asm)
+        asm = self._asm([], [(6, 10, 98), (10, 5, 302)])
         self.assertIn('.hword %d' % (98 << 2), asm)     # open metatile stored as metatile<<2
         self.assertIn('.hword %d' % (302 << 2), asm)
+        self.assertEqual(asm.count('MS_Ch03MapChanges_tiles_'), 4)   # 2 defs + 2 refs
 
     def test_asm_carries_the_door_cell_coords(self):
-        asm = bc._ch03_tile_changes_asm([], [(6, 10, 98)])
+        asm = self._asm([], [(6, 10, 98)])
         self.assertIn('.byte 0, 6, 10, 1, 1, 0, 0, 0', asm)   # id 0 at (x=6, y=10), 1x1 region
+
+    def test_a_region_whose_tile_count_disagrees_with_its_size_is_rejected(self):
+        """The failure mode this guards: a 1x3 snag region carrying one tile writes garbage
+        into gBmMapBaseTiles for the other two cells."""
+        with self.assertRaises(SystemExit):
+            bc.map_changes_asm('MS_X', [(4, 8, 1, 3, [6], 'short')])
 
 
 class Ch04RuntimeHost(unittest.TestCase):
@@ -1241,6 +1252,10 @@ class Ch04RuntimeHost(unittest.TestCase):
     def _maps_dir(self):
         return os.path.join(bc.REPO, 'campaigns', self.CAMPAIGN, 'maps')
 
+    def _bern(self):
+        import map_tileset_tool as mt
+        return mt._tileset_from_dir(os.path.join(self._maps_dir(), 'tilesets', 'snowy-bern'))
+
     def test_the_village_the_yaml_declares_sits_on_a_visitable_tile(self):
         """The guard #205 needed from the content side. FE8 offers Visit only on village/house
         terrain (bmmenu.c:735), so a `villages:` entry whose tile is scenery is a reward that
@@ -1289,6 +1304,65 @@ class Ch04RuntimeHost(unittest.TestCase):
             self.assertFalse(x1 <= vx <= x2 and y1 <= vy <= y2,
                              'the moose AREA covers the %r village at (%d,%d)'
                              % (village['id'], vx, vy))
+
+    # -- #214: the snag -> bridge, and the visited-village tile ---------------------------
+    def test_map_changes_emit_one_region_per_change(self):
+        """The reusable emitter (ch03's chests/doors, ch04's snag): FE8 finds a change by
+        POSITION (GetMapChangeIdAt), so ids only need to stay unique, and each region carries
+        its own tile data as metatile<<2 -- the gBmMapBaseTiles encoding."""
+        asm = bc.map_changes_asm('MS_TestChanges', [
+            (4, 8, 1, 3, [6, 36, 6], 'the snag falls'),
+            (8, 2, 1, 1, [32], 'village visited'),
+        ])
+        self.assertIn('MS_TestChanges:', asm)
+        self.assertIn('\t.byte 0, 4, 8, 1, 3, 0, 0, 0', asm)     # 1 wide x 3 tall at (4,8)
+        self.assertIn('\t.byte 1, 8, 2, 1, 1, 0, 0, 0', asm)     # 1x1 at (8,2)
+        self.assertIn('.hword %d' % (36 << 2), asm)               # tiles are metatile<<2
+        self.assertIn('.byte -1,', asm)                           # terminator (id < 0)
+
+    def test_the_snag_becomes_a_crossing_where_the_river_runs(self):
+        """The Iron Axe's whole purpose (#214). Vanilla Ch4 puts the snag at (4,8) 1x3 and
+        replaces it with plains / BRIDGE_SNAG / plains, so the trunk falls across the river at
+        (4,9). Our retile kept that geometry, so the crossing lands where it should."""
+        changes = bc.ch04_map_changes(self._chap(), self._maps_dir())
+        snag = [c for c in changes if (c[0], c[1]) == bc.CH04_SNAG_POS]
+        self.assertEqual(len(snag), 1, 'ch04 must register exactly one snag change')
+        x, y, w, h, tiles, _why = snag[0]
+        self.assertEqual((w, h), (1, 3))
+        ids = bc.terrain_ids()
+        tileset = self._bern()
+        self.assertEqual(ids['TERRAIN_BRIDGE_REGULAR'], tileset.terrain(tiles[1]),
+                         'the middle cell (the river row) must become a crossing')
+        # ...and every tile it writes must be PAINTED. snowy-bern declares BRIDGE_SNAG on an
+        # unpainted metatile; using it left a black square in the river with a perfectly correct
+        # terrain byte, which no data check would have caught (#214).
+        for m in tiles:
+            self.assertFalse(bc._is_blank_metatile(tileset, m),
+                             'map change writes blank metatile %d' % m)
+
+    def test_the_snag_change_covers_the_tile_that_is_actually_a_snag(self):
+        """Pins the trap rather than today's answer: the engine adds the obstacle on the
+        TERRAIN_SNAG tile (bmtrick.c) and looks the change up by that position, so a change
+        authored a row off breaks silently -- the snag stays hittable and nothing happens."""
+        width, height, terrain = bc._map_terrain_grid(self._maps_dir(), bc.CH04_LAYOUT[1])
+        x, y = bc.CH04_SNAG_POS
+        self.assertEqual(bc.terrain_ids()['TERRAIN_SNAG'], terrain[y][x])
+
+    def test_a_visited_village_stops_looking_unvisited(self):
+        changes = bc.ch04_map_changes(self._chap(), self._maps_dir())
+        village = self._chap()['villages'][0]['tile']
+        door = [c for c in changes if [c[0], c[1]] == village]
+        self.assertEqual(len(door), 1)
+        self.assertEqual(bc.terrain_ids()['TERRAIN_VILLAGE_CLOSED'],
+                         self._bern().terrain(door[0][4][0]))
+
+    def test_the_village_line_is_vanillas_own_snag_tutorial(self):
+        """Nicolas 2026-08-02: copy vanilla 1:1. The line exists to teach the snag gimmick and
+        hand over the tool -- a flavour line throws the function away."""
+        text = ' '.join(self._chap()['villages'][0]['visit_text'].split())
+        self.assertIn('snag', text)
+        self.assertIn('bridge', text)
+        self.assertNotIn('husband', text)   # the placeholder draft this replaces
 
     def test_parley_recruiter_is_marty_only(self):
         # Nicolas 2026-07-21: ch04's talker is Marty specifically, NOT ch03's any-party-member.
