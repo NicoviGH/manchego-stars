@@ -31,11 +31,28 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   palette — `CUSN` flips faction, not class. The `lycanroc-pack` reskin stays **declared but
   unworn** in `campaign.yaml` for a later class-remap hook; noted on #24 so the ticked Stage-3 art
   box does not read as "visible in play".
-- **ch04 is NOT finished. Four issues carry the rest**: **#205** the village is unbuilt and ch04's
-  Iron Axe is unobtainable, leaving the chapter with no material reward; **#206** Lupin and Baxby
-  have no battle anims and fight as stock Cavaliers; **#207** hosted chapters share vanilla's goal
-  message ids, so ch02 and ch04 overwrite each other's objective text TODAY; **#208** the locked
-  reveal dialogue still lives in `build_campaign.py`.
+- **The Lonelywood village is BUILT and the Iron Axe is obtainable (#205, `52b17aa`)** — and it was
+  TWO bugs, each hiding the other. FE8 gates the Visit menu item on the TERRAIN under the unit
+  (`bmmenu.c:735`) *before* it consults the location event, and the snowy reskin had mapped
+  vanilla's village metatile **872 -> 994 (RUINS_REGULAR)**; its own neighbours (`871->897`,
+  `873->899`) show the intent was **898**, the only VILLAGE_REGULAR tile in the tileset and the one
+  ch01/ch02 already use. On top of that `inject_ch04` blanked `EventListScr_Ch5_Location`. Neither
+  half was visible: the cottage still DREW correctly (identical 3x3 stamp to Targos's houses).
+- **The fix is a rule, not a tile.** `preserve_terrain_variants` was `[12]` (forest only, #193), so
+  `preserved_terrain_targets` never checked villages; it now protects all four visitable terrains,
+  and a retile that changes one FAILS THE IMPORT. Re-applying that guarantee to the committed grid
+  corrected exactly two cells (a 4-byte `.mar` diff). Content-side, `assert_village_tiles_visitable`
+  rejects a `villages:` entry standing on scenery. **Placement is vanilla's** (Nicolas: "we copied
+  vanilla ch 4, just copy that"): `Village(0, ..., 8, 2)` = the axe; `(1,11)` is the twin's RECRUIT
+  village, whose role the parley took, so that cottage stands unwired.
+- **Open follow-ups from #205, both small:** the village's line is MINE and marked `visit_text:
+  DRAFT` in the chapter YAML — it needs a dialogue pass with Nicolas; and vanilla house metatile
+  **804 is deliberately left unmapped** in `reskin-learned.json` (nothing ships broken — our ch01 map
+  is a 25x16 custom map, not a `Ch1Map` retile — and a loud rejection beats inventing a tile).
+- **ch04 is NOT finished. Three issues carry the rest**: **#206** Lupin and Baxby have no battle
+  anims and fight as stock Cavaliers; **#207** hosted chapters share vanilla's goal message ids, so
+  ch02 and ch04 overwrite each other's objective text TODAY; **#208** the locked reveal dialogue
+  still lives in `build_campaign.py`.
 - **#24's review block was STALE, not incomplete** — three boxes were done in #202 and never
   ticked (checked and ticked 2026-08-01): the no-parley speaker-coverage test
   (`test_the_no_parley_path_has_a_speaker_for_every_box`) exists and passes; message-id uniqueness
@@ -65,7 +82,23 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   deferral from a silent one; their wiring is #25 work.
 
 
-## This session (2026-08-01, Opus — mercy started costing something)
+## This session (2026-08-01, Opus — mercy started costing something, and ch04 got its reward)
+
+- **#205 closed (PR #212): read the SOURCE before designing.** I had rendered the map, measured
+  walk-costs from the deploy zone and built a three-option placement picker — and vanilla Ch4's own
+  Location list answered all of it in two lines (`Village(0, ..., 1, 11)` / `Village(0, ..., 8, 2)`),
+  at the exact two tiles the retile had preserved. Nicolas: "You're overthinking this, we copied
+  vanilla ch 4 just copy that." The map is a retile of its twin, so the twin owns placement.
+- **A working-tree read sent me the wrong way first.** `fireemblem8u/src/events/ch4-eventinfo.h`
+  shows chests+doors — because inject_ch03 hosts on slot 4 and had overwritten it. HEAD shows the
+  two villages. This is the documented `vanilla_scene.py` trap, hit again: **read decomp event data
+  through `git show HEAD:`, never the built tree.**
+- **Two wrong hypotheses, both killed by data, in the same investigation**: "the door is one
+  metatile off" (right, but I abandoned it after a full-map render made the buildings look like
+  ruins), then "they're deliberate ruins" (wrong — ch02's working house is the IDENTICAL 3x3 stamp).
+  A 21-of-256-pixel diff settled it. **Eyes lose to `ImageChops.difference` every time.**
+
+## Previous session (2026-08-01, Opus — mercy started costing something)
 
 - **#203 closed (PR #211).** The whole design was already on the issue and was NOT re-derived —
   worth repeating as a habit: a grounded design comment is worth more than a fresh investigation,
@@ -167,24 +200,23 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 - **`vanilla_scene.py` was mining the WORKING TREE, not HEAD** (fix `46f8b12`). **Every "vanilla
   says…" number mined on a built tree before that fix is suspect** — re-mine before citing one.
 
-## NEXT SESSION — finish ch04's slice; the parley, the win and both endings are done
+## NEXT SESSION — ch04's slice is down to three issues
 
-`main` is clean and green; `feat/203-parley-in-place` is merged and deleted. **Start from the
-issues, not from this file** — #205-#208 each carry their own diagnosis so none of it has to be
-re-derived.
+`main` is clean and green; `feat/203-parley-in-place` and `feat/205-lonelywood-village` are merged
+and deleted. **Start from the issues** — each carries its own diagnosis.
 
-1. **#205 the village** — ch04 has no material reward at all right now: `inject_ch04` blanks
-   `EventListScr_Ch5_Location`, and that list is where `VILL` entries live, so the authored
-   Lonelywood village (and its Iron Axe, the chapter's *whole* material gift under a deliberately
-   gold-free, chest-free economy) is unreachable. ch02's `House(0x0, EventScr_Ch2_Village1, x, y)`
-   + `HouseEvent(msg, bg)` shape is the precedent to copy; check the result against
-   `make difficulty CH=ch04`, which already prices the axe into the item-economy read.
-2. **#207 the goal-id collision** — it is corrupting ch02's objective text right now, and it is
-   cross-chapter, so it grows with every rout chapter added.
-3. **#206 Lupin + Baxby battle anims** — decided and wanted; start with Lupin's free Mauthe Doog
+1. **#207 the goal-id collision** — it is corrupting ch02's objective text RIGHT NOW and grows with
+   every rout chapter. The issue carries the full fix: give each hosted chapter its own
+   goal-window + status-objective ids out of the dead block it already owns, repoint the host
+   slot's `goal.windowTextId`/`statusObjectiveTextId` (same shape as `_retarget_host_chapter`
+   repointing `mapEventDataId`), and extend `assert_message_ids_unique` to cover the INHERITED
+   goal ids. Guard and fix must land together or the build breaks. **The window is 12 chars**
+   (`goal_window_body()` enforces it).
+2. **#206 Lupin + Baxby battle anims** — decided and wanted; start with Lupin's free Mauthe Doog
    donor to prove the per-character binding, then Baxby.
-4. Then **#208**, and re-record the opening + reveal on the fixed ROM (winter BG, visible Lupin,
-   winterized fog).
+3. **#208** the locked reveal dialogue, and re-record the opening + reveal on the fixed ROM.
+4. **#205's two follow-ups** (above): the DRAFT village line needs a dialogue pass; metatile 804
+   stays unmapped until someone picks its snowy-bern house tile.
 
 Then: **ch05's build work** on #25; **#138** config-driven `inject_chapter(descriptor)`; **#29**
 world map.
@@ -200,7 +232,7 @@ world map.
 - **No outstanding branches.** `.claude/worktrees/` is empty. Merged: #197 build-speed, #198 ch04
   Stages 1–3, #199 review cleanups, #200 the host-slot fix, #201 the banim arming fix, #202 the
   ch04 scenes + the six defects above, #209 the ch04 rout + both endings (#204), #211 the in-place
-  pack conversion (#203).
+  pack conversion (#203), #212 the Lonelywood village (#205).
 - Untracked local/session files (`.agents/`, `AGENTS.md`, `skills-lock.json`) are intentionally not
   versioned; leave them alone. `tools/key_magenta.py` is **gitignored** (#178).
 - **HANDOFF.md is authored on `main` ONLY** — gated by `check.py check_handoff_only_on_main`.
@@ -229,6 +261,7 @@ PT_HOST_CHAPTER=5 tools/playtest/run.sh clear_ch04        # rout -> the NO-LUPIN
 PT_HOST_CHAPTER=5 tools/playtest/run.sh clear_ch04_parley # parley, rout -> the AUTHORED ending
 PT_HOST_CHAPTER=5 tools/playtest/run.sh attackprobe   # why the bot won't attack: grid, fog, the menu
 PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04packmath  # GATE: kill 2 wolves, parley -> must be 3 greens
+PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04village   # GATE: visit (8,2) -> the Iron Axe changes hands
 make CAMPAIGN=rime-of-the-frostmaiden CH04BOOT=1 fireemblem8.gba -j$(nproc)   # ch04 fast-boot
 PT_HOST_CHAPTER=5 tools/playtest/run.sh smoke_ch04                            # ch04 stability net
 
