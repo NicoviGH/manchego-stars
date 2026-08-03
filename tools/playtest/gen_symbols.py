@@ -21,6 +21,8 @@ WANTED = [
     'gUnitArrayRed',            # enemy units
     'gUnitArrayGreen',          # green (ally/NPC) units (include/bmunit.h) -- the ch02 chwinga
                                 # protect layer rides this array (FACTION_ID_GREEN).
+    'gUnitLookup',              # struct Unit *[0xC0] (include/bmunit.h): exact live unit-id
+                                # resolution for the cursor's gBmMapUnit entry.
     'gConvoyItemArray',         # the convoy (extern u16[]; include/variables.h). Low byte of
                                 # each entry is the item id -- where an overflow charm-gift lands.
     'gConvoyItemCount',         # u8 count of live convoy entries (include/bmcontainer.h).
@@ -56,6 +58,43 @@ WANTED = [
     'gPermanentFlagBits',       # event flags > 100, bit (flag-101)
     'ProcScr_GameOverScreen',   # proc script: game-over screen active
     'sProc_Menu',               # proc script: a menu is open
+    'sProc_MenuMain',           # live MenuProc after sProc_Menu jumps to its input loop
+    'Menu_OnIdle',              # exact standard-menu input callback
+    'ProcScr_GameEarlyStartUI', # boot health/safety + publisher sequence
+    'gProcScr_GameControl',     # root owner; alone means a passive boot transition
+    'GameIntroHealthSafetyWaitButton', # exact health/safety input wait
+    'Title_IDLE',               # exact title-screen input callback
+    'ProcScr_SaveMenu',         # save/New Game menu
+    'SameMenu_CtrlLoop',        # exact save-menu input callback
+    'SaveMenu_SaveSlotSelectLoop', # exact New Game save-slot input callback
+    'ProcScr_NewGameDifficultySelect', # New Game difficulty menu
+    'DifficultySelect_Loop_KeyHandler', # exact difficulty input callback
+    'gProcScr_ChapterIntro',    # chapter-title animation owner
+    'ProcScr_ChapterIntro_KeyListen', # chapter-title skip-input child
+    'ChapterIntro_KeyListen_Loop', # exact chapter-title input callback
+    'gProcScr_TalkWaitForInput', # dialogue waits for a real player key
+    'TalkWaitForInput_OnIdle',  # exact dialogue input callback
+    'ProcScr_AtMenu',           # preparations main-menu owner
+    'ProcScr_PrepMenu',         # live semantic preparations command list
+    'PrepMenu_CtrlLoop',        # exact preparations input callback
+    'PrepScreenMenu_OnStartPress', # main preparations Fight action
+    'PrepScreenMenu_OnBPress',  # main preparations Check Map shortcut (never an exit)
+    'PrepScreenMenu_OnPickUnits', # live semantic Pick Units effect
+    'PrepMapMenu_OnStartPress', # View Map menu START callback (distinguishes the detour)
+    'PrepMapMenu_OnBPress',     # View Map menu B callback
+    'ProcPrepUnit_Idle',        # Pick Units input callback
+    'gProcScr_PlayerPhase',     # player map state owner
+    'PlayerPhase_MainIdle',     # empty/unit cursor input
+    'PlayerPhase_RangeDisplayIdle', # selected unit + movement range input
+    'PlayerPhase_WaitForUnitMovement', # movement animation/commit wait
+    'sProcScr_BMXFADE',         # PlayerPhase_MainIdle suppresses A while this map-fade proc exists
+    'gProcScr_TargetSelection', # live semantic map-target selector
+    'TargetSelection_Loop',     # exact target-selector input callback
+    'gSelectInfo_Attack',       # distinguishes attack targets from other selectors
+    'gSelectInfo_Talk',         # distinguishes Talk targets from other selectors
+    'gProcScr_BKSEL',           # passive battle-forecast panel owner; SelectTargetProc, not
+                                # this display proc, owns the target-confirmation input
+    'BattleForecast_LoopDisplay', # exact stable forecast display callback (still no legal input)
     'gProcScr_ChapterStatusScreen',  # proc script: map-menu Status screen, which
                                 # draws the chapter title card (src/uichapterstatus.c)
     'gProcScr_SALLYCURSOR',     # proc script: the preparations screen
