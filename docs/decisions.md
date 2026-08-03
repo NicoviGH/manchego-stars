@@ -1996,6 +1996,21 @@ the ground → land on the foe), and `descale_battleframe` deliberately PINS the
 - **Trap worth naming: a unit's SLOT is `PORTRAIT_MAP`, its STATS are `STAT_DONOR`, and they differ.** Lupin
   is Duessel (0x1D) wearing Kyle's growths (0x11). Taking the donor for the slot put `PT_CHAR=lupin` on a
   unit that is not on the map; the injector's own output is what caught it.
+
+**Two process rules the same session earned, because both cost a rebuild:**
+- **The approved render recipe is RECORDED — read it before sizing a new anim.** Every shipped unit
+  carries its own in its YAML (`--body 38..44`, `--thin-outline`, `--sharpen 0..2.0`: RBG 38, Rootis 40,
+  Braulo/Wolfram/Sclorbo 44) and the rationale is in this file. Deriving a body height from first
+  principles instead re-opens a question Nicolas already closed — *"we've done so many animations, you
+  should have checked I approved the in game render quality and dimensions."*
+- **Show new sprite art at 1:1 AND zoomed, beside already-approved siblings.** A lone
+  nearest-neighbour blow-up of a *correctly sized* FE8 sprite reads as "horribly pixelized"; the
+  comparison row is what makes the scale judgeable at all. (Stills → Preview, motion → Safari.)
+- **The division of labour that worked, and is the default for this kind of detail:** Nicolas paints,
+  the pipeline is built around him. Two generated attempts at the spectacles both lost to five minutes
+  of his hand-painting, and his simplification of the plumbing — *"you could pass me the images in the
+  state they are ready to go in game, no re-render needed"* — is why the frames, not a diff, are the
+  committed artifact.
 _Decided: 2026-08-02 (Lupin, #206)_
 
 **Every ATTACKING banim mode must ARM the HP depletion — the unit it starves is the OPPONENT (#24)**
@@ -2968,6 +2983,19 @@ _Decided: 2026-07-30 (CLAUDE; ch05 `0x9C9` Sahnar block)._
 _Moved here from `HANDOFF.md` 2026-07-02 (audit): these are durable engineering constraints, not
 session state. `HANDOFF.md` points here._
 
+- **A scan bound is a property of the ENGINE, never of the current content** (2026-08-02, #206).
+  `harness.lua`'s `blue()` searched **8** unit slots — correct back when the cast *was* 8 — so
+  `recordanim` reported "lupin not deployed" for a wolf standing on the map, and the first
+  instinct was to go hunting in the ROM. The TESTCH sandbox deploys 11 now. Bounds come from the
+  decomp (`bmunit.h`: `blue[62]` / `red[50]` / `green[20]`). Any array walk sized to today's
+  roster is a bug with a delay fuse.
+- **A human's hand-edit of a GENERATED artifact must be the source of truth, or be replayable —
+  otherwise it will be regenerated away** (2026-08-02, #206). Lupin's hand-painted spectacles
+  nearly died twice in one session, from two directions: the frames were re-rendered underneath
+  them (palette change), and the editor's sheet — being *derived from* those frames — was rebuilt
+  on every open. Both routes are guarded now (`hand_painted:` + `prepare_sheet` keeping an
+  existing sheet), but the general shape recurs anywhere a pipeline has a manual step: name which
+  file is authoritative, and make every generator that could overwrite it refuse or replay.
 - **A failing playtest may be the wrong ROM, not a regression** (2026-08-02, #207). `clear_ch02`
   FAILed with "never reached the map" during a goal-id change — on a `CH04BOOT=1` fast-boot ROM,
   which jumps New Game straight into ch04, so ch02's map is unreachable by construction. Rebuilt

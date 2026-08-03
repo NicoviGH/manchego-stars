@@ -72,14 +72,10 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   `feditor_to_banim`, Pinky's), not the faked 3-pose one, because a quadruped's attack **is travel**
   and `descale_battleframe` deliberately pins the feet. `recordanim PT_CHAR=lupin` **PASS**:
   coil → leap → jaws on the Soldier → kill (`docs/demo/lupin-anim.gif`).
-- **The glasses are the thing that cannot be generated, and that is now measured.** `sharpen`
-  rescues detail at or above one shrink cell and makes anything FINER slightly *worse* (the unsharp
-  halo brightens exactly the neighbours the box filter averages back in) — pinned in
-  `test_poses_to_feditor.TestSharpen`. Lupin's spectacles land ~4x3 px, so **Nicolas paints them at
-  final size** (`tools/banim_paint.py` → `map_sprite_editor --frame WxH`), the same call his MAP
-  sprite already made. `poses.yaml` carries `hand_painted: true`; `poses_to_feditor` refuses to
-  re-render without `--force`, and `banim_paint edit` KEEPS an existing sheet (both routes to
-  destroying the paint nearly fired in one session).
+- **His spectacles are HAND-PAINTED by Nicolas** at final size (`tools/banim_paint.py`) and the
+  frames are the deliverable — `poses.yaml` carries `hand_painted: true`, so `poses_to_feditor`
+  refuses to re-render them without `--force`. Why they can't be generated, and the two guards that
+  keep them: `decisions.md` §Art & Audio + §Operational Gotchas.
 - **ch04's slice is now down to work that NEEDS NICOLAS**: **#206's remaining half** (Baxby's
   axe-beak) and **the second village's line** (see below).
 - **#24's review block was STALE, not incomplete** — three boxes were done in #202 and never
@@ -116,37 +112,16 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 
 ## This session (2026-08-02, Opus — the wolf stopped fighting as a horseman)
 
-- **#206's Lupin half closed (PR #216, `5c20321`).** See Current state. The three transferable
-  facts, because Baxby needs all of them:
-- **A capability the pipeline was MISSING, not a Lupin problem: the imported path never
-  re-stroked the outline.** The faked 3-pose path always has; an area-average downscale eats a
-  drawn outline, so Lupin first read as a grey blob beside the eight finished anims and I nearly
-  concluded the ART was wrong. `outline`/`sharpen`/`reserve` are opt-in on the manifest and Pinky's
-  shipped frames re-render byte-identical (verified, not assumed).
-- **I sized him from first principles when the sizes were already APPROVED and recorded.** Nicolas:
-  *"we've done so many animations, you should have checked I approved the in game render quality
-  and dimensions."* The per-unit recipes live in the unit YAMLs (`--body 38..44`, `--thin-outline`,
-  `--sharpen 0..2.0`) and in `decisions.md`. **Read them before touching a new one.**
-- **A lone nearest-neighbour blow-up of a correctly-sized FE8 sprite reads as "horribly
-  pixelized".** Show 1:1 AND zoomed, beside already-approved siblings — the comparison is what makes
-  the scale judgeable. (PNG → Preview, GIF → Safari, both `open`ed for him.)
-- **The division of labour that actually worked: Nicolas paints, I build the pipe.** He asked for
-  it (*"would you be willing to let me hand paint the glasses"*), and it beat both of my attempts
-  at generating them. He also cut my first design down — I had built a diff/overlay so a re-render
-  could carry the paint; *"you could pass me the images in the state they are ready to go in game,
-  no re-render needed"* was simpler and right.
-- **Then I nearly destroyed his painting twice, from two different directions.** Re-rendering the
-  frames for the palette change (his work survived only in the saved sheet, carried across by
-  colour); and `edit` rebuilding the sheet FROM the frames on every open. Both are closed by
-  guards now — but the lesson is the general one: **anything derived from a generated artifact
-  will be regenerated, so a human's edit must either be the source of truth or be replayable.**
-- **A stale scan bound masqueraded as a content bug for one whole rebuild.** `recordanim` said
-  "lupin not deployed" for a wolf standing on the map: `blue()` searched **8** unit slots, correct
-  back when the cast WAS 8. Bounds now come from the decomp (`bmunit.h`: blue[62]/red[50]).
-  **A scan bound is a property of the engine, never of the current content.**
-- **`PORTRAIT_MAP` is the SLOT, `STAT_DONOR` is the STATS, and for Lupin they differ** (Duessel
-  0x1D wearing Kyle's growths). Taking the donor for the slot pointed the harness at a unit that
-  is not on the map. The injector's own output caught it — read what the tool prints.
+- **#206's Lupin half closed (PR #216, `5c20321`); Baxby's is open.** State above, the full ADR in
+  `decisions.md` §Art & Audio ("Lupin's wolf pounce"), what Baxby reuses on issue #206.
+- **The durable lessons are in `decisions.md`, not here** — the ADR carries the pipeline ones
+  (outline/sharpen/reserve, the measured sharpen limit, hand-painted frames, the slot-vs-donor
+  trap) plus the two process rules it earned (read the approved per-unit render recipe before
+  sizing; show art 1:1 beside approved siblings). §Operational Gotchas gained two more: a scan
+  bound belongs to the engine, not the roster; and a hand-edit of a generated artifact must be
+  authoritative or replayable.
+- **Still unfilmed for Lupin:** the dodge (modes 7/8 — he one-shot the Soldier, so nothing
+  countered) and the lance/unarmed slots (repointed in the same AnimConf, correct by construction).
 
 ## Previous session (2026-08-01, Opus — mercy started costing something, and ch04 got its reward)
 
@@ -288,11 +263,10 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 `main` is clean and green; the #203, #205, #207 and #214/#208 branches are merged and deleted. **Start from the issues** — each carries its own diagnosis.
 
 1. **#206 BAXBY's axe-beak — NICOLAS RUNS THE GEMINI ART, the pipeline is now built.** Lupin
-   shipped (`5c20321`); Baxby is the same problem on the same class. Hand him a pose sheet →
+   shipped (`5c20321`); Baxby is the same problem on the same class, so the route is:
    `split_pose_sheet` → a `poses.yaml` arc → `banim_paint` for any final-size detail → the
-   `cavalier` donor row → `PT_CHAR=baxby recordanim`. He needs a `CAST` entry in `harness.lua`
-   (his slot is `CHARACTER_FORDE` — read it off **PORTRAIT_MAP, never STAT_DONOR**; taking the
-   donor put `PT_CHAR=lupin` on a unit that was not on the map).
+   `cavalier` donor row → a `CAST` entry in `harness.lua` → `PT_CHAR=baxby recordanim`.
+   Reuse notes on issue #206; the pipeline rules are in `decisions.md` §Art & Audio.
 2. **The SECOND village at (1,11) has no line and no reward.** Its tile is visitable-capable but
    unwired, so FE8 offers no Visit (no location event -> `MENU_NOTSHOWN`) — the player just sees a
    cottage they cannot enter. **Vanilla's second village is PURE Lute recruit dialogue** (`9B2`/
