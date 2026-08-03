@@ -61,7 +61,10 @@ portrait derives from the official FRLG sprite only.)
 | "Rockruff & Lycanroc Overworlds" sprite sheet (Midday form, 4-direction walk) | Lupin map sprites (`map_sprites/lupin{,_mu}.png`, recoloured to the cast grey ramp + hand-drawn glasses) **and ch04's parleyed wolf pack** (`map_sprites/lycanroc-pack{,_mu}.png` — the same Midday frames without glasses, indexed to FE8's standard SMS roles so the green NPC palette colours them) | fan art by **princess-phoenix**, derived from © **Nintendo / Creatures / GAME FREAK** designs | [princess-phoenix, DeviantArt](https://www.deviantart.com/princess-phoenix/art/Rockruff-and-Lycanroc-Overworlds-722268380) — **CC-BY 3.0** ("feel free to use these in any of your pokemon projects!") |
 
 (Lupin's *portrait* is separate — the TotalityDesigns hipster-wolf ref, credited above under community/AI art.
-Battle anim deferred; PMD SpriteCollab has Lycanroc `sprite/0745` in the same style for later.)
+His *battle anim* is separate again — Gemini-generated poses, disclosed below. PMD SpriteCollab's
+Lycanroc `sprite/0745` was evaluated and RULED OUT for it: real and complete, but dungeon-sprite
+art (72x80 frames holding a ~37x28 chibi), so it reads as a different game beside our FE8-scale
+anims.)
 
 **The White Moose — Wyrdeer (#899):**
 
@@ -97,6 +100,12 @@ whose `RearUp`/`Attack`/`Charge` supply the three poses `inject_battle_anims` ne
 - **PC/cast portraits** are AI-generated (Google **Gemini / "Nano Banana"**) from reference art, then hand-fitted and indexed into FE8 portraits via our bust pipeline (`tools/ref_to_bust.py`, `tools/portrait_tool.py`). To be disclosed as AI-assisted per community norms.
 - **Baxby the axe-beak portrait** — the reference is the **axe-beak illustration from *Rime of the Frostmaiden*** (© Wizards of the Coast), modified with Google **Gemini** (prompt-run by Nicolas), then fitted/indexed via the bust pipeline (`tools/ref_to_bust.py --crop 780,18,1920,940 --flip-h --zoom 0.88`). Disclose as both AI-assisted and WotC-derived.
 - **Lupin the direwolf portrait** — the reference is **"Hipster Wolf Head With Glasses"** by **TotalityDesigns** (Redbubble listing; found image supplied by Nicolas, 2026-07-03 — private non-commercial use, recheck before any wider distribution; original vendored at `campaigns/.../portraits/vendor/`), fitted/indexed via the bust pipeline (`tools/ref_to_bust.py --crop " -206,0,1033,1032" --zoom 1.0` + the `portraits/lupin_darken.py` ink-deepening pass). Not AI-generated.
+- **Lupin the direwolf BATTLE ANIM** (`campaigns/.../battle_anims/lupin/`) — four hi-res poses (idle /
+  windup / lunge / hit) generated with Google **Gemini** (prompt-run by Nicolas, 2026-08-02), matched to
+  his existing portrait and map sprite; split + de-shadowed by `tools/split_pose_sheet.py`, downscaled and
+  arranged into the pounce by `tools/poses_to_feditor.py`. **His spectacles are hand-painted by Nicolas at
+  FE8 scale** (`tools/banim_paint.py`) — they are ~4x3 px after the shrink and no generated pass carries
+  them. Disclose as AI-assisted.
 - **Tour drawn-map A** (`events/tour-map-a-dale.*`) is a Gemini repaint of the book's regional Icewind Dale map (Magvel-style restyle, prompt-run by Nicolas), then converted/re-lettered by `tools/gen_drawnmap.py`.
 
 ## Our work

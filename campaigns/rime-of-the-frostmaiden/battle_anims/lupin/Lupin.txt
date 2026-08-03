@@ -1,0 +1,172 @@
+#######################################################
+# Lupin (mdg_at1-flavour) Sword/Lance — imported wolf pounce (#90 pipeline, per-character _u25).
+# Frames: 000 idle · 001 windup(coil) · 002 lunge(airborne) · 003 hit(jaws on the foe) · 004 dodge.
+# The attack is a POUNCE: coil -> leave the ground -> land the bite ON the foe -> push off and
+# settle home. Frame position on the shared canvas IS the motion (see poses.yaml).
+#
+# CADENCE + SOUND are read off FE8's OWN WOLF, `banim_mdg_at1` (CLASS_MAUTHEDOOG, banim 0xB0 —
+# the anim the rest of Lupin's pack fights as), not invented and not copied from the Cavalier
+# donor: a horse's gallop-and-thrust is the wrong rhythm for a beast that leaps. From it:
+#   * C5A `sound_mauthedoog_1` opens the attack, C5B `..._2` fires just before contact, and
+#     C5D `..._3` twice on the recovery. Lupin therefore SOUNDS like his own pack.
+#   * C20 `sound_hit_eliwood_promoted_durandal` is the impact SFX vanilla pairs with the bite.
+#   * `prepare_hp_deplete` (C04) sits BEFORE the hit and `wait_hp_deplete` (C01) after it.
+#   * `attack_miss` is the attack body with ONLY the hit code + impact SFX removed — C04 and C01
+#     stay. Dropping C04 there is what soft-locked ch04 on turn 4 (#24 / decisions.md).
+# Vanilla's run-up alternates two frames a dozen times because it HAS a run cycle; we have one
+# airborne pose, so the weight goes into a LINGER on the coil instead ("linger like vanilla" —
+# the Pinky lesson). Durations tuned on the recordanim review.
+# When importing to FEditorAdv delete # and after each line.
+#######################################################
+/// - Mode 1               #Melee Animation (the pounce)
+C03                               #Start attack; needs 07 right after.
+C07                               #Start attack; needs 03 right before.
+1 p- Lupin_000.png                #idle / ready (ANCHOR frame — must appear first)
+C5A                               #the pack's own growl opens the lunge (vanilla mdg_at1)
+10 p- Lupin_001.png               #COIL — haunches loaded, snarling. Linger: this is the wind-up
+5 p- Lupin_002.png                #off the ground, mid-flight
+C5B                               #the snarl vanilla fires just before contact
+C04                               #Prepare HP depletion (must precede the hit)
+5 p- Lupin_003.png                #jaws land ON the foe — reads BEFORE the hit spark
+C20                               #impact SFX (vanilla's pairing for the bite)
+C1A                               #Normal hit
+9 p- Lupin_003.png                #LINGER on the bite through + past the hit flash
+C01                               #wait_hp_deplete — hold until the damage resolves
+4 p- Lupin_002.png                #push off the foe, back through the air
+C5D                               #wolf recovery
+3 p- Lupin_001.png                #land crouched
+C06                               #Begin opponent's turn; next code 0D.
+5 p- Lupin_000.png                #settle home
+C0D                               #End of dodge animation (preceded by 06).
+~~~
+/// - Mode 3               #Melee Critical Animation
+C03
+C07
+1 p- Lupin_000.png
+C5A
+12 p- Lupin_001.png               #coil LONGER on a crit — the extra beat is the tell
+5 p- Lupin_002.png
+C5B
+C04
+4 p- Lupin_003.png
+C20
+C0A                               #Critical hit
+10 p- Lupin_003.png               #linger on the bite
+C01
+4 p- Lupin_002.png
+C5D
+3 p- Lupin_001.png
+C06
+5 p- Lupin_000.png
+C0D
+~~~
+/// - Mode 5               #Ranged Animation
+# A wolf has nothing to throw. He rides a Cavalier's AnimConf, so a JAVELIN would land here --
+# never in ch04/ch05 (his loadout is Iron Sword + Iron Lance), but an unarmed mode that armed
+# nothing would freeze the opponent's dodge, so this is the melee pounce, whole.
+C03
+C07
+1 p- Lupin_000.png
+C5A
+10 p- Lupin_001.png
+5 p- Lupin_002.png
+C5B
+C04
+5 p- Lupin_003.png
+C20
+C1A
+9 p- Lupin_003.png
+C01
+4 p- Lupin_002.png
+C5D
+3 p- Lupin_001.png
+C06
+5 p- Lupin_000.png
+C0D
+~~~
+/// - Mode 6               #Ranged Critical Animation
+C03
+C07
+1 p- Lupin_000.png
+C5A
+12 p- Lupin_001.png
+5 p- Lupin_002.png
+C5B
+C04
+4 p- Lupin_003.png
+C20
+C0A
+10 p- Lupin_003.png
+C01
+4 p- Lupin_002.png
+C5D
+3 p- Lupin_001.png
+C06
+5 p- Lupin_000.png
+C0D
+~~~
+/// - Mode 7               #Dodge Melee Attack (duck + hop back, timed to the strike)
+# Lupin_004 = the COIL art placed BACK. Timing is Pinky's, tuned in-engine (decisions.md): the
+# hop goes AFTER wait_hp_deplete so it syncs to the MISS, not to start_dodge — frames before C01
+# fire early and read as a flinch at nothing. Held across the whole thrust: a beat to let the
+# weapon reach full extension, then hold back until it starts retracting.
+C02                               #dodge_to_back
+1 p- Lupin_000.png                #idle
+C0E                               #start_dodge
+1 p- Lupin_000.png                #STAY GROUNDED at start_dodge (vanilla hops HERE = too early)
+C01                               #wait_hp_deplete — PAUSES until the hit resolves
+13 p- Lupin_000.png               #a beat until the weapon is FULLY extended
+18 p- Lupin_004.png               #DUCK AND HOP BACK at full extension...
+18 p- Lupin_004.png               #...and STAY back while the weapon is held out...
+15 p- Lupin_004.png               #...until the foe starts pulling it back
+2 p- Lupin_000.png                #then drop to idle
+C0D                               #end_dodge
+~~~
+/// - Mode 8               #Dodge Ranged Attack (same shape as melee)
+C02
+1 p- Lupin_000.png
+C0E
+1 p- Lupin_000.png
+C01
+13 p- Lupin_000.png
+18 p- Lupin_004.png
+18 p- Lupin_004.png
+15 p- Lupin_004.png
+2 p- Lupin_000.png
+C0D
+~~~
+/// - Mode 9               #Equipped with Melee Weapon (stand)
+1 p- Lupin_000.png
+C01
+~~~
+/// - Mode 10               #Standing motions
+1 p- Lupin_000.png
+C01
+~~~
+/// - Mode 11               #Equipped with Ranged weapon (stand)
+1 p- Lupin_000.png
+C01
+~~~
+/// - Mode 12               #Attack Missed Animation (the pounce, no contact)
+# Vanilla mdg_at1's own attack_miss = its attack body with ONLY the hit code and impact SFX
+# dropped. C04 STAYS: the DEFENDER's dodge waits on C01 for the depletion this mode arms, and
+# C01 "freezes if no HP depletion is occurring/has occurred" (banim_code.inc). Its absence is
+# what soft-locked ch04 on turn 4 (#24).
+C03
+C07
+1 p- Lupin_000.png
+C5A
+10 p- Lupin_001.png
+5 p- Lupin_002.png
+C5B
+C04                               #prepare_hp_deplete — REQUIRED even though nothing connects
+5 p- Lupin_003.png                #jaws snap shut on air
+C01
+4 p- Lupin_002.png
+C5D
+3 p- Lupin_001.png
+C06
+5 p- Lupin_000.png
+C0D
+~~~
+/// - End of animation

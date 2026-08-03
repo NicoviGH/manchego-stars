@@ -3235,6 +3235,15 @@ BANIM_DONORS = {
     # (the post-promotion attack). Both slots repoint to his ONE custom animId; call_spell_anim
     # resolves heal-efx vs light-efx from the equipped item at runtime. Basil (#25) reuses this.
     'bishop': ('CLASS_BISHOP', ['0x0100 | ITYPE_STAFF', '0x0100 | ITYPE_LIGHT'], 'magic', None),
+    # Lupin (the beast-cavalier) -- his anim is an IMPORTED N-frame POUNCE (feditor_to_banim, #90),
+    # so `motion`/`cadence` are unused (the .txt owns them, and its cadence is read off FE8's own
+    # wolf `banim_mdg_at1`, not off this donor). The donor supplies the AnimConf to clone; ALL
+    # THREE of the Cavalier's weapon slots are repointed, because every slot left vanilla is a
+    # slot where the wolf renders as A MAN ON A HORSE -- which is the whole defect in #206.
+    # ITYPE_ITEM is the unarmed/item entry, reachable whenever he holds no weapon. Baxby (#206's
+    # other half, the axe-beak) is the same class and reuses this row.
+    'cavalier': ('CLASS_CAVALIER', ['0x0100 | ITYPE_SWORD', '0x0100 | ITYPE_LANCE',
+                                    '0x0100 | ITYPE_ITEM'], 'melee', 'lance'),
 }
 
 

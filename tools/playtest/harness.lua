@@ -119,8 +119,12 @@ local function findUnit(base, count, charId)
     end
     return nil
 end
-local function blue(charId) return findUnit(SYM.gUnitArrayBlue, 8, charId) end
-local function red(charId) return findUnit(SYM.gUnitArrayRed, 24, charId) end
+-- Array bounds are the DECOMP's, not the roster size of the day (bmunit.h: blue[62] /
+-- red[50] / green[20]). `blue` searched 8 for as long as the cast WAS 8; the TESTCH sandbox
+-- now deploys 11, so `PT_CHAR=lupin` reported "not deployed" for a unit that was standing on
+-- the map. A scan bound is a property of the engine, never of the current content.
+local function blue(charId) return findUnit(SYM.gUnitArrayBlue, 62, charId) end
+local function red(charId) return findUnit(SYM.gUnitArrayRed, 50, charId) end
 local function isDead(u) return u == nil or (u.state & US_DEAD) ~= 0 end
 
 -- A unit's attack reach from its equipped (items[0]) weapon, via gItemData (include/bmitem.h:
@@ -2884,6 +2888,11 @@ local CAST = {
     braulo = 0x01, marty = 0x02, meesmickle = 0x03, wolfram = 0x04,
     ['prof-rbg'] = 0x05, rootis = 0x06, sclorbo = 0x07, pinky = 0x08,
     rbg = 0x05,  -- alias for prof-rbg (the #65 first mover)
+    -- The recruits ride vanilla slots further down the table: Lupin the beast-cavalier is
+    -- CHARACTER_DUESSEL. Read it off PORTRAIT_MAP, NOT off STAT_DONOR -- his stats come from
+    -- Kyle (0x11) and his SLOT from Duessel (0x1D), and taking the donor for the slot puts
+    -- `PT_CHAR=lupin` on a unit that is not on the map.
+    lupin = 0x1D,
 }
 
 -- Shared lead-up for the RBG demo: win the prologue, lord-select RBG into ch01,
@@ -3214,7 +3223,7 @@ local function captureCharAnim(name)
     local pid = CAST[name]
     if not pid then
         return result("FAIL", "unknown cast id '" .. tostring(name) .. "' -- set PT_CHAR to one of: "
-            .. "braulo marty meesmickle wolfram prof-rbg rootis sclorbo pinky") end
+            .. "braulo marty meesmickle wolfram prof-rbg rootis sclorbo pinky lupin") end
     wait(60); pokeAnimsOn()
     local u = blue(pid)
     if not u then return result("FAIL", name .. " not deployed -- build the ROM with `make TESTCH=1`") end
