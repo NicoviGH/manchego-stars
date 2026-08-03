@@ -1,0 +1,187 @@
+#######################################################
+# Baxby (bae_at1-flavour) Sword/Lance — imported axe-beak charge (#90 pipeline, per-character _u25).
+# Frames: 000 idle · 001 stride(near) · 002 stride(far) · 003 hit(beak on the foe) · 004 dodge.
+# The attack is a CHARGE: two strides across the gap -> the beak lands -> back up to home on foot.
+# Frame position on the shared canvas IS the motion (see poses.yaml).
+#
+# CADENCE IS READ OFF `banim_bae_at1` (the Bael, FE8's ground-charging monster), not off the
+# Cavalier donor and not off Lupin's wolf. A Bael crosses the screen ON ITS LEGS and walks BACK
+# afterwards, which is exactly an axe-beak's shape of attack; a wolf's pounce leaves the ground
+# and a horse's gallop-and-thrust is the very thing #206 exists to stop looking like. From it:
+#   * a STEP sound fires on each stride of the run-up, and again on the way home;
+#   * the approach ends on a LONG hold — the beat where the animal is committed but has not
+#     struck — and that hold is what the crit lengthens;
+#   * recovery walks BACKWARD through the run frames rather than snapping home.
+#
+# SOUND: NO HORSE SOUNDS ANYWHERE, deliberately. `sound_step_light_horse_*` and `sound_horse_neigh`
+# are right there and would fit a Cavalier's rhythm perfectly — and would re-create the exact defect
+# this animation exists to remove (a giant bird that sounds like a man on a horse). So:
+#   * C1B `sound_step_heavy_quick` — a heavy two-legged footfall, one per stride.
+#   * C42 `sound_axe_swing_long` — the beak coming round. He is an AXE-beak; the swing of a big
+#     blade is the closest thing in the vanilla bank to what that head does, and it is the same
+#     slot Bael punctuates with `sound_bael_1`/`_2` (a voice we do not have for a bird — vanilla's
+#     only bird sound, C48, is the bard's SONGBIRD, which would read as comedy here).
+#   * C21 `sound_hit_eliwood_promoted` — Bael's own impact SFX, not the wolf's C20.
+# The cry is the one judgement here that cannot be checked by eye — confirm it by EAR on the bench.
+#
+# `attack_miss` is the attack body with ONLY the hit code + impact SFX removed — C04 and C01 STAY.
+# Dropping C04 there is what soft-locked ch04 on turn 4 (#24 / decisions.md).
+# When importing to FEditorAdv delete # and after each line.
+#######################################################
+/// - Mode 1               #Melee Animation (the charge)
+C03                               #Start attack; needs 07 right after.
+C07                               #Start attack; needs 03 right before.
+1 p- Baxby_000.png                #idle / ready (ANCHOR frame — must appear first)
+C1B                               #heavy footfall: he breaks into the run
+4 p- Baxby_001.png                #first stride, off his mark
+C1B                               #second footfall
+4 p- Baxby_002.png                #second stride, most of the gap crossed
+C42                               #the beak swings round (his axe, such as it is)
+C04                               #Prepare HP depletion (must precede the hit)
+4 p- Baxby_003.png                #beak lands ON the foe — reads BEFORE the hit spark
+C21                               #impact SFX (Bael's, the ground charger's)
+C1A                               #Normal hit
+8 p- Baxby_003.png                #LINGER on the strike through + past the hit flash
+C01                               #wait_hp_deplete — hold until the damage resolves
+4 p- Baxby_002.png                #pull the beak out and give ground...
+C1B                               #...on foot, the way he came (Bael walks home too)
+4 p- Baxby_001.png
+C06                               #Begin opponent's turn; next code 0D.
+5 p- Baxby_000.png                #settle home, upright again
+C0D                               #End of dodge animation (preceded by 06).
+~~~
+/// - Mode 3               #Melee Critical Animation
+C03
+C07
+1 p- Baxby_000.png
+C1B
+4 p- Baxby_001.png
+C1B
+9 p- Baxby_002.png                #HOLD committed-but-not-struck — the extra beat is the crit tell
+C42
+C04
+3 p- Baxby_003.png                #and then the beak arrives faster than on a normal hit
+C21
+C0A                               #Critical hit
+10 p- Baxby_003.png               #linger on the strike
+C01
+4 p- Baxby_002.png
+C1B
+4 p- Baxby_001.png
+C06
+5 p- Baxby_000.png
+C0D
+~~~
+/// - Mode 5               #Ranged Animation
+# A bird has nothing to throw. He rides a Cavalier's AnimConf, so a JAVELIN would land here --
+# not in his ch01+ kit (Iron Sword + Iron Lance, CLASS_LOADOUT), but an unarmed mode that armed
+# nothing would freeze the opponent's dodge, so this is the melee charge, whole.
+C03
+C07
+1 p- Baxby_000.png
+C1B
+4 p- Baxby_001.png
+C1B
+4 p- Baxby_002.png
+C42
+C04
+4 p- Baxby_003.png
+C21
+C1A
+8 p- Baxby_003.png
+C01
+4 p- Baxby_002.png
+C1B
+4 p- Baxby_001.png
+C06
+5 p- Baxby_000.png
+C0D
+~~~
+/// - Mode 6               #Ranged Critical Animation
+C03
+C07
+1 p- Baxby_000.png
+C1B
+4 p- Baxby_001.png
+C1B
+9 p- Baxby_002.png
+C42
+C04
+3 p- Baxby_003.png
+C21
+C0A
+10 p- Baxby_003.png
+C01
+4 p- Baxby_002.png
+C1B
+4 p- Baxby_001.png
+C06
+5 p- Baxby_000.png
+C0D
+~~~
+/// - Mode 7               #Dodge Melee Attack (rock back, timed to the strike)
+# Baxby_004 = the IDLE art placed BACK. Timing is Pinky's, tuned in-engine (decisions.md): the
+# move goes AFTER wait_hp_deplete so it syncs to the MISS, not to start_dodge — frames before C01
+# fire early and read as a flinch at nothing. Held across the whole thrust: a beat to let the
+# weapon reach full extension, then hold back until it starts retracting.
+C02                               #dodge_to_back
+1 p- Baxby_000.png                #idle
+C0E                               #start_dodge
+1 p- Baxby_000.png                #STAY PUT at start_dodge (vanilla moves HERE = too early)
+C01                               #wait_hp_deplete — PAUSES until the hit resolves
+13 p- Baxby_000.png               #a beat until the weapon is FULLY extended
+18 p- Baxby_004.png               #ROCK BACK out of reach at full extension...
+18 p- Baxby_004.png               #...and STAY back while the weapon is held out...
+15 p- Baxby_004.png               #...until the foe starts pulling it back
+2 p- Baxby_000.png                #then drop to idle
+C0D                               #end_dodge
+~~~
+/// - Mode 8               #Dodge Ranged Attack (same shape as melee)
+C02
+1 p- Baxby_000.png
+C0E
+1 p- Baxby_000.png
+C01
+13 p- Baxby_000.png
+18 p- Baxby_004.png
+18 p- Baxby_004.png
+15 p- Baxby_004.png
+2 p- Baxby_000.png
+C0D
+~~~
+/// - Mode 9               #Equipped with Melee Weapon (stand)
+1 p- Baxby_000.png
+C01
+~~~
+/// - Mode 10               #Standing motions
+1 p- Baxby_000.png
+C01
+~~~
+/// - Mode 11               #Equipped with Ranged weapon (stand)
+1 p- Baxby_000.png
+C01
+~~~
+/// - Mode 12               #Attack Missed Animation (the charge, no contact)
+# Vanilla bae_at1's own attack_miss = its attack body with ONLY the hit code and impact SFX
+# dropped. C04 STAYS: the DEFENDER's dodge waits on C01 for the depletion this mode arms, and
+# C01 "freezes if no HP depletion is occurring/has occurred" (banim_code.inc). Its absence is
+# what soft-locked ch04 on turn 4 (#24).
+C03
+C07
+1 p- Baxby_000.png
+C1B
+4 p- Baxby_001.png
+C1B
+4 p- Baxby_002.png
+C42
+C04                               #prepare_hp_deplete — REQUIRED even though nothing connects
+4 p- Baxby_003.png                #the beak closes on air
+C01
+4 p- Baxby_002.png
+C1B
+4 p- Baxby_001.png
+C06
+5 p- Baxby_000.png
+C0D
+~~~
+/// - End of animation

@@ -121,6 +121,63 @@ def _patch_banim_palette_custom_guard():
         f.write(out)
 
 
+def _guard_banim_unique_pal_custom(text, first_custom_banim):
+    """Pure transform: stop FE8's per-CHARACTER battle palette from overwriting a CUSTOM
+    (appended) banim's own palette.
+
+    The second palette path, and the one that is invisible until a slot happens to collide.
+    Beyond the class-keyed redirect `_guard_banim_palette_custom` covers, FE8 carries a
+    per-character override keyed on character x CLASS: if `gAnimCharaPalConfig[pid][i]`
+    matches the unit's class, `gBanimUniquePal[pos]` is set, and UpdateBanimFrame then
+    LZ77s that palette OVER the one just loaded from the unit's own banim_data row.
+
+    For vanilla that is the point (Seth's personal Paladin colours). For a #65 unit it is a
+    silent repaint, because our cast wears vanilla character SLOTS: whenever a cast member's
+    slot is a character that vanilla gave a personal palette for the very class the unit
+    deploys as, the match fires and the custom palette is discarded. The sprite still draws
+    perfectly -- tiles, OAM, sheets and binding are all untouched -- and ONLY the colours are
+    wrong, which is what makes it so slow to find. Whether a given unit trips it is luck of
+    the slot, so one custom anim can ship correct while the next is repainted. The worked
+    case is in docs/decisions.md (Art & Audio, #206).
+
+    So: require the unit's banim id to be a VANILLA one before the character palette may
+    apply. Appended ids (>= first_custom_banim) keep the palette their own row carries, on
+    whichever side of the screen they are standing. Vanilla units are byte-unchanged.
+    Idempotent."""
+    for pos, valid in (('POS_L', 'valid_l'), ('POS_R', 'valid_r')):
+        orig = ('if (gAnimCharaPalConfig[pid][i] == jid && %s)' % valid)
+        guarded = ('if (gAnimCharaPalConfig[pid][i] == jid && %s'
+                   ' && gBanimIdx[%s] < 0x%X)' % (valid, pos, first_custom_banim))
+        if guarded in text:
+            continue                 # already guarded (idempotent)
+        if orig not in text:
+            return text              # unexpected vanilla form (caller asserts)
+        text = text.replace(orig, guarded, 1)
+    return text
+
+
+def _patch_banim_unique_pal_custom_guard():
+    """Keep a custom unit's OWN palette against the per-CHARACTER override (#206).
+
+    Third member of the #65 per-character set, after _patch_banim_character_unique (the anim
+    lookup) and _patch_banim_palette_custom_guard (the class-keyed palette redirect). This
+    one closes the character-keyed palette path -- see `_guard_banim_unique_pal_custom` for
+    why a correct sprite came out miscoloured. Campaign-agnostic: the condition is "is this
+    an appended banim", never "is this character X", so it covers every present and future
+    custom-anim unit whatever slot it lands on. Guarded here and asserted by check.py
+    check_engine_guards_present."""
+    with open(BANIM_EKRBATTLEINTRO_C, encoding='utf-8') as f:
+        text = f.read()
+    out = _guard_banim_unique_pal_custom(text, _vanilla_banim_count())
+    if out == text:
+        if 'gBanimIdx[POS_L] <' in text:
+            return  # already guarded (idempotent)
+        sys.exit('ERROR: the gAnimCharaPalConfig character-palette lookup is not in the '
+                 'expected vanilla form in %s' % BANIM_EKRBATTLEINTRO_C)
+    with open(BANIM_EKRBATTLEINTRO_C, 'w', encoding='utf-8') as f:
+        f.write(out)
+
+
 def _spell_palette_tint_start(text):
     """Record the current caster's tint in the dedicated spell-tint global."""
     line = '    s16 index = gEkrSpellAnimIndex[GetAnimPosition(anim)];\n'

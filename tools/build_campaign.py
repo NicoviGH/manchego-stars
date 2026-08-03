@@ -8516,6 +8516,9 @@ def main():
         print('  banim (#65): combat anim lookup -> GetBattleAnimationId_WithUnique (per-character _u25)')
         engine_hooks._patch_banim_palette_custom_guard()
         print('  banim (#65): GetBanimPalette -> custom (appended) banims keep own palette (RBG cyan fix)')
+        engine_hooks._patch_banim_unique_pal_custom_guard()
+        print('  banim (#206): the per-CHARACTER palette no longer overwrites a custom banim\'s own '
+              '(Baxby wore Forde\'s green)')
         engine_hooks._patch_banim_spell_palette_tint()
         print('  banim (#165): character/weapon spell palettes support campaign-declared tints')
         engine_hooks._patch_banim_charge_flash()

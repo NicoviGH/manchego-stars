@@ -1,0 +1,84 @@
+# baxby/poses.yaml — arc manifest for tools/poses_to_feditor.py (Baxby's axe-beak charge).
+#
+# Baxby is the army's other beast-cavalier; like Lupin he rides CLASS_CAVALIER so the mount
+# can BE the unit, and like Lupin he fought as a man on a horse until this existed (#206).
+# Same import path (feditor_to_banim, #90) bound to his per-character _u25, for the same
+# structural reason: his attack is TRAVEL — he runs the gap and lands the beak — and the
+# faked 3-pose path deliberately PINS the feet.
+#
+# SOURCE: `Battle Anims/Baxby Anim.png` (Gemini, Nicolas 2026-08-02) — three poses, idle /
+# stride / strike, split into .src/ by:
+#     python3 tools/split_pose_sheet.py <sheet>.png <this dir>/.src idle windup hit
+# That sheet CASCADES its poses diagonally: the boxes overlap on both axes with no gutter
+# anywhere, so the splitter grew a connectivity pass (and a per-pose ink mask, or each crop
+# tows a slice of its neighbour's feathers). No baked ground shadow on this one.
+#
+# WHERE A WOLF LEAPS, A BIRD RUNS. Lupin's arc leaves the ground; Baxby's never does — the
+# strike pose still has both feet planted mid-stride. So every frame here is GROUND-ALIGNED
+# (lift 0 throughout) and the motion is all forward travel. That also makes his middle pose
+# do double duty: it is a STRIDE, not a coil, so it is played TWICE at two positions as a
+# real run-up, which is how vanilla's own charging anims read (they alternate two frames
+# because they HAVE a run cycle — cf. the Lupin note about lingering instead).
+#
+# FACING: flip=true mirrors the source to FE8-canonical SCREEN-LEFT facing (cast convention).
+# A left-facing unit's foe is to his LEFT, so travel toward it is NEGATIVE dx.
+#
+# ARC, solved from geometry rather than eyeballed (placement is by BBOX CENTRE, and the three
+# poses are all different sizes):
+#     dx = w_pose/2 - w_idle/2 - advance      (advance = ground gained toward the foe)
+#     dy = (h_pose - h_idle)/2 + lift         (lift = 0 everywhere: the feet stay down)
+# The two numbers that are NOT free were measured off the cast's own approved, filmed anims:
+#   * THE FOE'S NEAR EDGE IS x≈73 — Lupin's snout lands at 74, Pinky's dive at 72. Baxby's
+#     impact star is placed on it (the star's centre, not its outer ray: the ray is the
+#     flash, the centre is the contact).
+#   * A GROUNDED MOUNT'S GROUND LINE IS y=141 (Lupin's idle bottom). `home` is derived from
+#     it, so Baxby stands on the same platform line as the wolf rather than floating.
+# Authored intent, in `advance` terms:
+#     stride_a   advance 18   he has left home, first stride of the charge
+#     stride_b   advance 40   same art, further across — the run-up reads as travel
+#     hit        advance 63   beak on the foe, star centred on his near edge
+#     dodge      advance -20  the charge aborted: rock back onto the heels (see below)
+# At target_h 50 that solves to the dx/dy below, with the downscaled poses measuring
+# idle 41x50, stride 60x47, hit 70x45.
+#
+# SIZE: target_h sets the whole silhouette. He is a MOUNT with no rider, like Lupin (42) —
+# but an axe-beak stands UPRIGHT where a wolf is long and low, so matching the wolf's number
+# would make the bird read small; height is the axis his bulk lives on. Rendered at 44/50/56
+# beside the approved siblings for Nicolas to pick (the recorded rule: the render recipe is
+# approved, never derived).
+#     python3 tools/poses_to_feditor.py campaigns/rime-of-the-frostmaiden/battle_anims/baxby
+
+canvas: [248, 160]         # FEditor "For Each Frame" canvas (matches the vendored #90 anims)
+flip: true                 # mirror source to screen-left facing (cast convention)
+home: [150, 116]           # idle body-centre; y = 141 - target_h/2 puts him on Lupin's ground line
+target_h: 50               # idle silhouette height in FE8 px (ONE uniform downscale for ALL frames).
+                           # NICOLAS'S PICK, 2026-08-02, from a 44/50/56 render beside Lupin and
+                           # Pinky: reads clearly bigger than the wolf (an axe-beak's bulk is in
+                           # HEIGHT where a wolf's is in length) without towering over Braulo's 46.
+outline: true              # re-stroke the silhouette after the shrink (Lupin's lesson: without
+                           # it an area-average downscale eats the drawn outline and the sprite
+                           # reads as a blob beside the finished cast). `--thin-outline` standard.
+sharpen: 1.6               # pre-unsharp before the area shrink — Wolfram's approved value, the
+                           # same one Lupin runs. Rescues EDGES (leg separation, feather banding);
+                           # does NOT rescue sub-cell detail, which comes out slightly worse
+                           # (measured, test_poses_to_feditor) — that is what hand-painting is for.
+reserve:                   # Baxby is a TAN bird, and unreserved the median-cut spends all 15
+                           # slots on one tan ramp (13 shades of it) — the saddle, the crest and
+                           # the eye vanish and he reads as a monochrome blob. These three are
+                           # sampled from the source art, not invented, and they cost nothing
+                           # real: 12 tans still carry the body. Where Lupin needed ONE reserved
+                           # colour to paint with, Baxby needs his colour IDENTITY reserved.
+  - [118,  84, 134]        # the saddle-bag purple (his gear, and the party's colour on him)
+  - [239, 235, 224]        # the head crest's white
+  - [239, 204, 148]        # the beak/talon gold, so the axe-beak separates from the plumage
+abbr: baxby                # frame stem -> Baxby_000.png .. Baxby_004.png
+poses:                     # name / source crop (.src) / arc offset (dx = LEFT-negative toward foe, dy UP)
+  - {name: idle,     src: .src/1_idle.png,   dx:   0,  dy:  0}   # ANCHOR: standing tall, alert
+  - {name: stride_a, src: .src/2_windup.png, dx:  -8,  dy: -2}   # first stride of the charge
+  - {name: stride_b, src: .src/2_windup.png, dx: -30,  dy: -2}   # same art, further across
+  - {name: hit,      src: .src/3_hit.png,    dx: -48,  dy: -2}   # beak on the foe; star at x≈73
+  # Dodge frame (Baxby_004): the IDLE art rocked BACK, per Nicolas's rule on Pinky's dodge
+  # ("same height, just backwards"). NOT the stride: a running pose slid backwards reads as a
+  # bird sprinting at the foe while sliding away from him. The idle is already the upright,
+  # weight-back shape, so backing it up reads as pulling the beak out of range.
+  - {name: dodge,    src: .src/1_idle.png,   dx:  20,  dy:  0}   # rock back (dodge modes 7/8)

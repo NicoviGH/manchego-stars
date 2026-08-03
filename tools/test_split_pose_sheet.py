@@ -73,6 +73,52 @@ class TestPoseBoxes(unittest.TestCase):
         box(im, 46, 10, 76, 50, (200, 200, 200))     # 6px internal gap, under `gap`
         self.assertEqual(sp.pose_boxes(im, gap=30), [(10, 10, 76, 50)])
 
+    def test_a_diagonal_cascade_splits_where_no_gutter_exists(self):
+        """Baxby's sheet (#206) CASCADES its poses diagonally: every column and every row
+        of the page holds ink, so there is no gutter anywhere and the whole sheet reads as
+        one pose. They are still separate blobs of INK -- split them on connectivity."""
+        im = sheet(200, 120)
+        box(im, 10, 10, 60, 100, (200, 200, 200))    # pose A, an L: the stem...
+        box(im, 10, 10, 150, 40, (200, 200, 200))    # ...and an arm reaching over pose B
+        box(im, 80, 60, 150, 100, (200, 200, 200))   # pose B, tucked under that arm
+        self.assertEqual(sp.pose_boxes(im),
+                         [(10, 10, 150, 100), (80, 60, 150, 100)])
+
+    def test_a_detached_fleck_joins_its_pose_instead_of_becoming_one(self):
+        """Generated art strews motion streaks and impact sparks AROUND a body without
+        touching it. They are that pose's art; only a blob within an order of magnitude of
+        the biggest body is another POSE."""
+        im = sheet(200, 120)
+        box(im, 10, 10, 60, 100, (200, 200, 200))
+        box(im, 10, 10, 150, 40, (200, 200, 200))
+        box(im, 80, 60, 150, 100, (200, 200, 200))
+        box(im, 160, 96, 172, 104, (255, 240, 120))  # a spark off pose B's leading edge
+        self.assertEqual(sp.pose_boxes(im),
+                         [(10, 10, 150, 100), (80, 60, 172, 104)])
+
+    def test_a_diagonal_cascade_splits_where_no_gutter_exists(self):
+        """Baxby's sheet (#206) CASCADES its poses diagonally: every column and every row
+        of the sheet holds ink, so there is no gutter anywhere and the whole page reads as
+        one pose. They are still separate blobs of INK -- split them on connectivity."""
+        im = sheet(200, 120)
+        box(im, 10, 10, 60, 100, (200, 200, 200))    # pose A, an L: stem...
+        box(im, 10, 10, 150, 40, (200, 200, 200))    # ...and an arm reaching over pose B
+        box(im, 80, 60, 150, 100, (200, 200, 200))   # pose B, tucked under the arm
+        self.assertEqual(sp.pose_boxes(im),
+                         [(10, 10, 150, 100), (80, 60, 150, 100)])
+
+    def test_a_detached_fleck_joins_its_pose_instead_of_becoming_one(self):
+        """Generated art strews motion streaks and impact sparks AROUND a body, not
+        touching it. They are that pose's art; only a blob within an order of magnitude
+        of the biggest body is another POSE."""
+        im = sheet(200, 120)
+        box(im, 10, 10, 60, 100, (200, 200, 200))
+        box(im, 10, 10, 150, 40, (200, 200, 200))
+        box(im, 80, 60, 150, 100, (200, 200, 200))
+        box(im, 160, 96, 172, 104, (255, 240, 120))  # a spark off pose B's leading edge
+        self.assertEqual(sp.pose_boxes(im),
+                         [(10, 10, 150, 100), (80, 60, 172, 104)])
+
 
 class TestKeyShadow(unittest.TestCase):
     """Drop the baked ground shadow without eating the sprite."""
@@ -133,6 +179,20 @@ class TestSplitSheet(unittest.TestCase):
         box(im, 5, 46, 45, 54, self.TEAL)            # its shadow, lower still
         (_, pose), = sp.split_sheet(im, ["idle"], shadow=self.TEAL, feather=0)
         self.assertEqual(pose.size, (30, 34))
+
+    def test_a_cascaded_pose_does_not_carry_its_neighbours_ink(self):
+        """When boxes OVERLAP, one pose's box contains a slice of the next one's art, so a
+        crop of the box alone tows the neighbour's feathers into the frame. Each pose keeps
+        only its OWN ink (and the flecks that were merged into it)."""
+        im = sheet(200, 120)
+        box(im, 10, 10, 60, 100, (200, 200, 200))    # pose A, an L: stem...
+        box(im, 10, 10, 150, 40, (200, 200, 200))    # ...and an arm over pose B
+        box(im, 80, 60, 150, 100, (30, 60, 90))      # pose B, a different colour
+        poses = dict(sp.split_sheet(im, ["a", "b"]))
+        a = poses["a"]
+        self.assertEqual(a.size, (140, 90))          # A's box, unchanged
+        self.assertEqual(a.getpixel((5, 5))[3], 255)      # A's own arm: kept
+        self.assertEqual(a.getpixel((100, 70))[3], 0)     # where B crosses A's box: gone
 
     def test_a_name_count_mismatch_is_rejected(self):
         im = sheet(200, 60)

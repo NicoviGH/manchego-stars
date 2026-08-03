@@ -2893,6 +2893,9 @@ local CAST = {
     -- Kyle (0x11) and his SLOT from Duessel (0x1D), and taking the donor for the slot puts
     -- `PT_CHAR=lupin` on a unit that is not on the map.
     lupin = 0x1D,
+    -- Baxby the axe-beak: SLOT = Forde (0x10), stats from Franz (0x11's neighbour, CHARACTER_FRANZ)
+    -- -- the same slot-vs-donor trap, so again this is PORTRAIT_MAP's value, not STAT_DONOR's.
+    baxby = 0x10,
 }
 
 -- Shared lead-up for the RBG demo: win the prologue, lord-select RBG into ch01,
@@ -3223,7 +3226,7 @@ local function captureCharAnim(name)
     local pid = CAST[name]
     if not pid then
         return result("FAIL", "unknown cast id '" .. tostring(name) .. "' -- set PT_CHAR to one of: "
-            .. "braulo marty meesmickle wolfram prof-rbg rootis sclorbo pinky lupin") end
+            .. "braulo marty meesmickle wolfram prof-rbg rootis sclorbo pinky lupin baxby") end
     wait(60); pokeAnimsOn()
     local u = blue(pid)
     if not u then return result("FAIL", name .. " not deployed -- build the ROM with `make TESTCH=1`") end
