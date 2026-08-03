@@ -5145,12 +5145,14 @@ scenarios.recordch04moose = function()
     return recordCutscene({
         tag = "ch04moose", maxFrames = 5400, pressEvery = 90,
         pre = function()
+            pokeFastConfig()
             if not bootToMap() then return end
             waitFor(function()
                 return faction() == 0 and not menuOpen()
                     and not procActive(SYM.ProcScr_StdEventEngine)
             end, 900, true)
             reachedIt = marchPartyToward(11, 4, 6, function() return moose() ~= nil end)
+            pokeNormalConfig()
         end,
         until_ = function()
             if not reachedIt then return false end     -- never triggered: fail loudly, don't stop early
