@@ -12,6 +12,11 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   actually run, and the exact next step so Claude can resume without re-deriving anything. Per
   Nicolas's request, Codex uses ordinary short-lived feature branches in this checkout, one at a
   time; **do not create worktrees unless Nicolas explicitly changes that instruction.**
+- **PR #219 is reviewed but NOT ready to merge.** Codex made no feature-code changes. At head
+  `232e915` GitHub reports the PR mergeable/CLEAN and both CI jobs green; the shared `ch04moose`
+  gate passes, but the new `recordch04moose` reproducibly fails at its 5,400-frame cap. The current
+  parley itself is sound: `recordch04parley` passes, Lupin changes faction, all five wolves convert
+  green, and every wolf remains on its pre-Talk tile. Exact evidence and next edits are below.
 - **ch04's ART IS COMPLETE — #206 is closed (PR #217, `b1de7ae`).** Baxby fights as an axe-beak and
   Lupin as a wolf; **every cast member now fights as itself**, none as someone else's class. What
   remains on ch04 is a short, fully-diagnosed list — **it lives on #24's checklist, not here.**
@@ -65,21 +70,22 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 
 **Everything below is on a GitHub issue with its own diagnosis. Start from the issues, not here.**
 
-1. **#24 (ch04 slice) — four items, all small and all diagnosed** in the 2026-08-03 close-out
-   comment: re-record the **parley** GIF (its run errored, `mGBA exited early`, so the committed
-   GIF is still the pre-anim one); fix **`recordch04moose`** (one-line-ish: `recordCutscene` sets
-   normal speed before `pre`, so the march never reaches the clearing in budget — `pokeFastConfig()`
-   at the top of `pre`, `pokeNormalConfig()` at the end); **answer Nicolas's wolf question from
-   DATA** (see below); and **write the second village's line**.
+1. **#24 / PR #219 — resume `feat/24-ch04-rerecord` and fix, do not merge as-is.** Add
+   `pokeFastConfig()` at the top of `recordch04moose.pre`, restore `pokeNormalConfig()` immediately
+   after the march and before capture, then require `recordch04moose` to PASS. Replace the stale
+   `docs/demo/ch04-wolf-parley.gif`: Codex's current-build `recordch04parley` run now PASSes, so the
+   earlier `mGBA exited early` condition did not reproduce. The wolf-relocation question is already
+   answered from data: all five retained their exact tiles. The second village's lore/hint line
+   still needs Nicolas + `dialogue-pass` as described below.
 2. **#218 — the whole cast's unit-list chibi portraits render solid BLACK.** New, spotted by
    Nicolas. The asset is fine (verified: 32×32, full 16-index spread), so it is the same *shape* as
    #206 — correct data, wrong render. Check whether the unit-list screen is a **third** palette
    path before assuming an injection offset.
-3. **Nicolas's open question, unanswered: "did the wolves respawn in the centre after the parley?"**
-   Do NOT answer from the film. `recordch04parley` already asserts it from data (each wolf's tile
-   before the Talk and after; fails if any moved, #203). The benign explanation is that converted
-   greens take their own turn immediately and walk off to fight — visually identical to relocation,
-   which is exactly why the assertion samples *before* the phase cycle. A clean passing run settles it.
+3. **Nicolas's wolf question is answered: they did NOT respawn or relocate during the parley.**
+   Codex's clean passing run sampled every wolf before the Talk and immediately after conversion:
+   `0xB0 (2,0)`, `0xB1 (0,2)`, `0xB2 (0,0)`, `0xB4 (1,0)`, and `0xB5 (0,1)` were unchanged. Nicolas
+   also watched Lupin change faction and the wolves turn green. Any later movement is their green
+   phase, not a conversion-time reload.
 4. **The second village at (1,11) is the only ch04 item needing NICOLAS.** Vanilla's second village
    is pure Lute recruit dialogue (zero lore), so **there is nothing to copy** — whatever goes there
    is ours. He wants "at least a lore drop or a hint". Mine the Frostmaiden book + the DM notes for
@@ -88,11 +94,28 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 
 Then: **ch05's build work** on #25; **#138** config-driven `inject_chapter(descriptor)`; **#29** world map.
 
-## Codex interlude (2026-08-03) — checkout bootstrapped, no feature work started
+## Codex interlude (2026-08-03) — checkout bootstrapped, PR #219 reviewed, no feature edits
 
-- Stayed on `main` at `d2aaeb6` (aligned with `origin/main`); no feature branch was checked out and
-  **PR #219 / `origin/feat/24-ch04-rerecord` was not changed**. Fetched remote refs and tag `v0.1.0`,
-  then initialized `fireemblem8u` at its recorded commit `d7c08478`.
+- Bootstrapped the checkout on `main`, then reviewed **PR #219** in place on
+  `feat/24-ch04-rerecord` at `232e915`; Codex did not edit or commit feature code. Returned to
+  `main` only to author this HANDOFF, per the main-only handoff guard.
+- GitHub state during review: mergeable `MERGEABLE`, merge state `CLEAN`, both `checks` and `build`
+  jobs SUCCESS, no reviews or unresolved threads. `git diff --check` passes. The three new GIFs
+  (`ch04-opening`, `ch04-wolf-reveal`, `ch04-ending-parley`) are valid 480x320 animations and passed
+  a contact-sheet visual spot-check; `ch04-wolf-parley.gif` was not replaced and is still stale.
+- Built a fresh `CH04BOOT=1` ROM successfully, then ran the targeted scenarios:
+  `ch04moose` **PASS**; `recordch04moose` **FAIL** at frame 9,979 with
+  `ch04moose cutscene never reached its end`; `recordch04parley` **PASS** at frame 5,994 with Lupin
+  blue/player-side and all five wolves green on their original tiles. The moose failure matches the
+  PR's own diagnosis: `recordCutscene` selects normal speed before `pre`, so the unfilmed setup march
+  needs an explicit fast/normal transition.
+- **New standing playtest constraint from Nicolas: no brute-force or random-looking menu input.**
+  `ch04Parley` currently tries command rows until the outcome changes; it happened to find Talk at
+  row 0 in the passing run, but that is not an acceptable general driver. FE8 exposes the semantic
+  live menu: scan `MenuProc.menuItems`, follow each `MenuItemProc.def`, and select Talk by
+  `MenuItemDef.overrideId == 0x5A`. Dialogue advancement should likewise be conditioned on the
+  relevant dialogue/event state rather than unconditional A cadence. Use that semantic pattern in
+  future playtests; do not call row probing "deterministic play" merely because it is reproducible.
 - Ran `tools/setup-toolchain.sh`: Homebrew dependencies, Python 3.12 dependencies, `agbcc`, the base
   ROM, portable decomp Python shebangs, and `core.hooksPath=tools/hooks` are ready. The setup script
   omits upstream's required helper-tool build, so Codex also ran `fireemblem8u/build_tools.sh` with
@@ -103,9 +126,10 @@ Then: **ch05's build work** on #25; **#138** config-driven `inject_chapter(descr
   messages with 0 runaway; `make check` reports `drift check: clean`; and `git diff --check` passes.
   Codex restored the two documented generated files before the static checks; build artifacts
   intentionally leave the submodule dirty and its pointer must not be committed.
-- Next feature step is unchanged: finish/merge **PR #219**, then continue #24/#218 from the ordered
-  list above. Use one ordinary `feat/<n>-slug` branch at a time; squash-merge and delete it before
-  starting the next.
+- Exact next step for Claude: switch to `feat/24-ch04-rerecord`, make the fast/normal moose-recorder
+  fix, replace the current-build wolf-parley GIF, rerun both targeted scenarios, then review/merge
+  **PR #219**. Continue #24/#218 only after that. Use one ordinary branch at a time; squash-merge
+  and delete it before starting the next.
 
 ## This session (2026-08-03, Opus — the bird stopped fighting as a horseman, and the palette had a second door)
 
@@ -149,9 +173,9 @@ Then: **ch05's build work** on #25; **#138** config-driven `inject_chapter(descr
 
 ## Working tree - do not lose or revert
 
-- **OPEN PR #219, branch `feat/24-ch04-rerecord`** — the three re-recorded GIFs, `recordch04moose`
-  (which **currently FAILS**, deliberately landed so the next session edits rather than re-derives
-  it) and the `marchPartyToward` extraction. `ch04moose` (the gate) PASSes. Merge it or build on it.
+- **OPEN PR #219, branch `feat/24-ch04-rerecord`, head `232e915`** — the three re-recorded GIFs,
+  `recordch04moose` (which **currently FAILS**) and the `marchPartyToward` extraction.
+  `ch04moose` PASSes and `recordch04parley` PASSes. **Build on it; do not merge it unchanged.**
 - `fireemblem8u` is dirty from injected/generated build artifacts. **Never commit its submodule
   pointer.** To run the map/forest tests cleanly after a build, restore the injected decomp files:
   `git -C fireemblem8u restore src/data/chapter_settings.json data/data_8B363C.s`.
