@@ -9,7 +9,7 @@ HARNESS = os.path.join(REPO, 'tools/playtest/harness.lua')
 
 
 class TestPlaytestHarness(unittest.TestCase):
-    def test_moose_recorder_fast_forwards_only_the_unfilmed_march(self):
+    def test_moose_recorder_wires_fast_setup_to_guaranteed_cleanup(self):
         with open(HARNESS, encoding='utf-8') as source:
             harness = source.read()
 
@@ -20,11 +20,11 @@ class TestPlaytestHarness(unittest.TestCase):
         fast = recorder.index('pokeFastConfig()')
         boot = recorder.index('bootToMap()')
         march = recorder.index('marchPartyToward(')
-        normal = recorder.index('pokeNormalConfig()')
-
         self.assertLess(fast, boot)
         self.assertLess(boot, march)
-        self.assertLess(march, normal)
+        self.assertIn('return false, "never reached the ch04 map"', recorder)
+        self.assertIn('return false, "party never triggered the moose sighting"', recorder)
+        self.assertIn('afterPre = pokeNormalConfig', recorder)
 
 
 if __name__ == '__main__':

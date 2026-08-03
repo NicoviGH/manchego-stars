@@ -1906,11 +1906,34 @@ class Ch04Stage4Scenes(unittest.TestCase):
     # ── the moose beat ─────────────────────────────────────────────────────────
     def test_the_moose_is_loaded_shown_and_removed_in_one_beat(self):
         """It is uncatchable by design: it must never be left on the map to be attacked."""
-        s = bc.ch04_moose_script('UnitDef_X', '0xce', 0x9C0, (14, 0))
+        s = bc.ch04_moose_script(
+            'UnitDef_X', '0xce', 0x9C0, (7, 4), ((9, 7), (9, 8), (14, 14)))
         self.assertLess(s.index('LOAD1(0x1, UnitDef_X)'), s.index('TEXTSHOW(0x9C0)'))
-        self.assertLess(s.index('TEXTSHOW(0x9C0)'), s.index('MOVE(0x0, 0xce, 14, 0)'))
-        self.assertLess(s.index('MOVE(0x0, 0xce, 14, 0)'), s.index('DISA(0xce)'))
+        self.assertLess(s.index('TEXTSHOW(0x9C0)'), s.index('MOVE_DEFINED(0xce)'))
+        self.assertLess(s.index('MOVE_DEFINED(0xce)'), s.index('DISA(0xce)'))
         self.assertTrue(s.rstrip().endswith('ENDA\n}'))
+
+    def test_the_moose_camera_stays_at_map_origin_not_centered_on_the_moose(self):
+        """A 15-tile map fills the viewport; centering on x=11 exposes wrapped map memory."""
+        s = bc.ch04_moose_script(
+            'UnitDef_X', '0xce', 0x9C0, (7, 4), ((9, 7), (9, 8), (14, 14)))
+        self.assertIn('CAMERA2(7, 4)', s)
+        self.assertNotIn('CAMERA2(11, 4)', s)
+        self.assertNotIn('CAMERA2(14, 14)', s)
+        moose = next(u for u in self.chap['neutral_units'] if u['id'] == 'white-moose')
+        self.assertEqual(tuple(moose['camera_at']), (7, 4))
+
+    def test_the_moose_uses_a_continuous_regular_move_queue_over_the_bridge(self):
+        """The route is authored: normal movement crosses the bridge before leaving southeast."""
+        route = ((9, 7), (9, 8), (14, 14))
+        s = bc.ch04_moose_script('UnitDef_X', '0xce', 0x9C0, (7, 4), route)
+        self.assertIn('MOVE_DEFINED(0xce)', s)
+        self.assertNotIn('MOVE(0x0, 0xce', s)
+        for x, y in route:
+            self.assertIn('SVAL(EVT_SLOT_1, 0x%X)' % ((y << 6) | x), s)
+
+        moose = next(u for u in self.chap['neutral_units'] if u['id'] == 'white-moose')
+        self.assertEqual(tuple(map(tuple, moose['flee_route'])), route)
 
     def test_the_moose_beat_is_guarded_to_the_party_before_it_loads_anything(self):
         """FE8 polls the Misc list after EVERY unit's action (playerphase.c AND cp_perform.c),
@@ -1921,7 +1944,8 @@ class Ch04Stage4Scenes(unittest.TestCase):
         talks. And it must be the un-trigger form, not a bare ENDA -- StartEventFromInfo sets
         the AREA's one-shot flag before calling the script, so aborting without re-arming spends
         the beat forever."""
-        s = bc.ch04_moose_script('UnitDef_X', '0xce', 0x9C0, (14, 0))
+        s = bc.ch04_moose_script(
+            'UnitDef_X', '0xce', 0x9C0, (7, 4), ((9, 7), (9, 8), (14, 14)))
         self.assertIn('SVAL(EVT_SLOT_2, FACTION_ID_BLUE)', s)
         self.assertLess(s.index('CALL(EventScr_UnTriggerIfNotFaction)'),
                         s.index('LOAD1(0x1, UnitDef_X)'))
@@ -1934,7 +1958,12 @@ class Ch04Stage4Scenes(unittest.TestCase):
         _, _, terrain = bc._map_terrain_grid(maps, bc.CH04_LAYOUT[1])
         costs = bc._class_terrain_move_costs(bc.CH04_MOOSE_MOV_TABLE)
         reachable = bc.reachable_tiles(terrain, costs, bc.CH04_MOOSE_POS)
-        self.assertIn(bc.CH04_MOOSE_FLEE_TO, reachable)
+        route = tuple(map(tuple, next(
+            u for u in self.chap['neutral_units'] if u['id'] == 'white-moose')['flee_route']))
+        for waypoint in route:
+            self.assertIn(waypoint, reachable)
+        self.assertEqual(route[-1], (14, 14))
+        self.assertEqual(route[:2], ((9, 7), (9, 8)))
 
     def test_the_old_ne_corner_flee_tile_is_rejected(self):
         """Pins the actual trap, not just today's answer: (14, 0) is TERRAIN_PLAINS and looks
