@@ -6728,7 +6728,7 @@ SCRIPTED_NEUTRAL_SPRITES = (
     ('white-moose', CH04_MOOSE_PID, 'Gwyllgi'),
 )
 # Where the party first SEES it: the mid-map clearing, on the tomb-side (NE) half of the 15x15
-# map, so the sighting points at the exit it then bolts for.
+# map. Its authored YAML route then crosses the east bridge and exits to the southeast.
 CH04_MOOSE_POS = (11, 4)
 CH04_MOOSE_AREA = (9, 2, 14, 7)                 # AREA(x1, y1, x2, y2) -- the clearing it watches from.
                                                 # Starts at x=9, NOT x=8: (8,2) is the village
@@ -6773,9 +6773,6 @@ CH04_GOAL_STATUS_MSG = 0x9C5                    # dead Ch5 text slot -> the Stat
 # TERRAIN_PLAINS but a wall of TERRAIN_CLIFF seals the whole NE pocket off from the clearing, so
 # the MOVE waited forever on a path that cannot be walked. assert_scripted_move_reachable now
 # fails the BUILD on any such destination, and it passes on this one.
-CH04_MOOSE_FLEE_TO = (14, 14)
-
-
 # ── Message-id ownership across hosted chapters (#198 review, issue #24) ────────
 # Each hosted chapter writes text into DEAD message slots belonging to the vanilla chapter it
 # hosts ON -- ch03 sits on slot 4 and takes vanilla Ch4's block, ch04 sits on slot 5 and takes
@@ -7012,14 +7009,14 @@ def ch04_map_changes(chap, maps_dir):
     return changes
 
 
-def ch04_moose_script(unit_symbol, pid, msg, flee_to):
+def ch04_moose_script(unit_symbol, pid, msg, camera_at, flee_route):
     """The moose-flees beat: the quarry is sighted in a clearing, then simply gone.
 
     Locked staging (chapter YAML, 2026-07-03): "A shape in the fog ahead: the white moose,
     huge and still in the clearing, watching them. A heartbeat -- then it turns and is simply
-    gone, silent, northeast." So: pan to it, hold (the heartbeat), RBG's one line, then MOVE it
-    off the tomb-side edge and DISA it. It never speaks -- locked as a mute white ghost, and
-    ch05 re-locks that -- so the only voice here is RBG's.
+    gone, silent, southeast." So: pan to it, hold (the heartbeat), RBG's one line, then move it
+    as a normal unit over the bridge and off the tomb-side edge before DISA. It never speaks --
+    locked as a mute white ghost, and ch05 re-locks that -- so the only voice here is RBG's.
 
     The moose is LOADed by this script rather than at chapter start: under fog it would
     otherwise sit invisible on the map for several turns and could be attacked, and it is
@@ -7039,13 +7036,28 @@ def ch04_moose_script(unit_symbol, pid, msg, flee_to):
     use it exactly this way) -- it clears the TRIGGERED event id, re-arming the AREA, and ENDBs
     the entire event rather than just its own frame.
     """
-    fx, fy = flee_to
+    cx, cy = camera_at
+    if not flee_route:
+        sys.exit('ERROR: the white moose needs at least one authored flee-route waypoint')
+    move = ['    SVAL(EVT_SLOT_D, 0x0) /* authored REDA route; one pair per waypoint */']
+    for x, y in flee_route:
+        move += [
+            '    SVAL(EVT_SLOT_1, 0x%X) /* (%d, %d), normal unit movement */'
+            % ((y << 6) | x, x, y),
+            '    SENQUEUE1',
+            '    SVAL(EVT_SLOT_1, 0x0)',
+            '    SENQUEUE1',
+        ]
+    move += [
+        '    MOVE_DEFINED(%s) /* continuous route over the bridge, then southeast */' % pid,
+        '    ENUN',
+    ]
     return ('{\n'
             '    SVAL(EVT_SLOT_2, FACTION_ID_BLUE) /* only the PARTY sights the quarry */\n'
             '    CALL(EventScr_UnTriggerIfNotFaction) /* a monster wandered in: re-arm, abort */\n'
             '    LOAD1(0x1, %s) /* the white moose, neutral -- sighted, never fought */\n'
             '    ENUN\n'
-            '    CAMERA2(%d, %d)\n'
+            '    CAMERA2(%d, %d) /* 15-tile map center: pin x=0, never show wrapped map memory */\n'
             '    MUSS(SONG_TENSION)\n'
             '    CUMO_CHAR(%s) /* the shape in the fog: huge, still, watching */\n'
             '    STAL(75) /* the heartbeat -- hold on it before it breaks */\n'
@@ -7054,13 +7066,12 @@ def ch04_moose_script(unit_symbol, pid, msg, flee_to):
             '    TEXTSHOW(0x%X) /* RBG: "After it!" */\n'
             '    TEXTEND\n'
             '    REMA\n'
-            '    MOVE(0x0, %s, %d, %d) /* bolts for the tomb-side (NE) edge */\n'
-            '    ENUN\n'
+            '%s\n'
             '    DISA(%s) /* ...and is simply gone */\n'
             '    MURE(0x2) /* restore the map BGM (MURE takes a fade speed -- cf. ch12a/ch15a) */\n'
             '    EVBIT_T(7)\n'
             '    ENDA\n}'
-            % (unit_symbol, fx, fy, pid, msg, pid, fx, fy, pid))
+            % (unit_symbol, cx, cy, pid, msg, '\n'.join(move), pid))
 
 
 def ch04_enemy_rows(chap, arrives_turn=None):
@@ -7900,9 +7911,13 @@ def inject_ch04(campaign, boot=False, verbose=True):
         None, 'white-moose', CH04_MOOSE_CLASS, 1, mx, my, '0',
         ' /* the white moose -- scripted quarry, never fought (canon: uncatchable) */',
         allegiance='GREEN', char=CH04_MOOSE_PID)
-    # Its escape has to be WALKABLE or the flee beat hangs the chapter (see the assertion).
-    assert_scripted_move_reachable(maps_dir, CH04_LAYOUT[1], CH04_MOOSE_POS,
-                                   CH04_MOOSE_FLEE_TO, CH04_MOOSE_MOV_TABLE, 'the white moose')
+    # Its authored bridge route has to be WALKABLE or MOVE_DEFINED + ENUN hangs the chapter.
+    moose_data = next(u for u in chap['neutral_units'] if u['id'] == 'white-moose')
+    moose_camera = tuple(moose_data['camera_at'])
+    moose_route = tuple(tuple(point) for point in moose_data['flee_route'])
+    for waypoint in moose_route:
+        assert_scripted_move_reachable(maps_dir, CH04_LAYOUT[1], CH04_MOOSE_POS,
+                                       waypoint, CH04_MOOSE_MOV_TABLE, 'the white moose')
 
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:
         udefs = f.read()
@@ -8052,7 +8067,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
     script = _replace_brace_block(
         script, CH04_MOOSE_SCRIPT + '[] =',
         ch04_moose_script(CH04_MOOSE_SYMBOL, CH04_MOOSE_PID, CH04_MOOSE_MSG,
-                          CH04_MOOSE_FLEE_TO), CH5_EVENTSCRIPT_H)
+                          moose_camera, moose_route), CH5_EVENTSCRIPT_H)
     # The REAL ENDING (Stage 4), replacing the dev-placeholder landing: dusk at the treeline, the
     # pack in harness beside Baxby, Lupin noses the moose's trail to the tomb door and drops the
     # chapter's one Ravisin seed. Then MNC2 onward -- ch05 is not hosted yet, so it still lands on

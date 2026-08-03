@@ -263,6 +263,11 @@ neutral_units:
                                 # drifted from ch05 and predates the Wyrdeer art below.
     behavior: flee
     flees_to: southeast_edge    # the tomb-side exit; its escape ends the hunt → ch05
+    camera_at: [7, 4]           # map-width center: pins the 15-tile map at x=0 while filming
+    flee_route:                 # normal FE8 movement, continuously routed over the east bridge
+      - [9, 7]                  # bridge tile
+      - [9, 8]                  # far bank; pins the crossing before the final southeast run
+      - [14, 14]                # exits the camera at the southeast map edge, then DISA
     note: "Awakened spy-beast serving Ravisin; uncatchable here by design."
     # ── Art (SHIPPED 2026-07-31, Nicolas's direction: Wyrdeer) ──────────────────
     # The book plate (p.81, "The dreaded white moose of Lonelywood is no one's prey") is a

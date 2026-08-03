@@ -18,6 +18,7 @@
 
 dofile(PLAYTEST_DIR .. "/symbols.lua")
 local Controller = dofile(PLAYTEST_DIR .. "/controller.lua")
+local Recorder = dofile(PLAYTEST_DIR .. "/recorder.lua")
 
 -- Struct offsets, from the decomp headers (stable; addresses are not):
 --   include/types.h  struct PlaySt: +0x0E chapterIndex, +0x0F faction
@@ -210,7 +211,7 @@ end
 -- GENERIC CUTSCENE RECORDER (record-tooling generalized 2026-07-09)
 -- Every dialogue-cutscene record* scenario is the SAME loop with different params:
 -- load a pre-built save-state, set text speed, take an optional pre-step, then
--- screenshot on a cadence while pressing A on a cadence, until a terminal proc (or a
+-- screenshot on a cadence while advancing observed dialogue waits, until a terminal proc (or a
 -- frame cap). `recordCutscene` is that loop; the `recordscene` scenario (far below)
 -- exposes it to PT_* env vars so ANY cutscene can be recorded with no new Lua, and the
 -- named recorders (recordch02intro, recordending) are one-line presets over it.
@@ -225,8 +226,10 @@ end
 --     speed      "normal" (typewriter + face fades animate; default) | "fast"
 --     maxFrames  safety cap (default 6000)
 --     shotEvery  screenshot cadence in frames (default 4)
---     pressEvery A-press cadence in frames (default 60; 0 = never press)
---     pre        optional fn run once after load, before the loop (e.g. press A to Seize)
+--     pressEvery legacy compatibility flag: >0 enables state-gated dialogue advance;
+--                0 disables it. Its numeric cadence is intentionally ignored.
+--     pre        optional fn run once after load, before the loop; return false, reason to fail
+--     afterPre   optional cleanup fn, guaranteed after pre returns or raises
 --     post       optional fn(reachedEnd) run once after the loop (e.g. a final "title" shot)
 local controllerState, guardedInput, freezeReport
 local function recordCutscene(o)
@@ -240,7 +243,14 @@ local function recordCutscene(o)
         wait(20)
     end
     if o.speed == "fast" then pokeFastConfig() else pokeNormalConfig() end
-    if o.pre then o.pre() end
+    if o.pre then
+        local preOk, preWhy = Recorder.runSetup(o.pre, o.afterPre)
+        if preOk == false then
+            return result("FAIL", tag .. " setup failed: " .. tostring(preWhy or "unknown failure"))
+        end
+    elseif o.afterPre then
+        o.afterPre()
+    end
     local startCh = chapter()
     local doneFn
     if type(o.until_) == "function" then doneFn = o.until_
@@ -250,12 +260,12 @@ local function recordCutscene(o)
     else doneFn = function() return false end end
     local maxFrames = o.maxFrames or 6000
     local shotEvery = o.shotEvery or 4
-    local pressEvery = (o.pressEvery ~= nil) and o.pressEvery or 60
+    local autoAdvanceDialogue = ((o.pressEvery ~= nil) and o.pressEvery or 60) > 0
     local reached, fr = false, 0
     while fr < maxFrames do
         fr = fr + 1
         if fr % shotEvery == 0 then shot(tag) end
-        if pressEvery > 0 and controllerState() == "dialogue_wait" then
+        if autoAdvanceDialogue and controllerState() == "dialogue_wait" then
             if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
                 return controllerState(after) ~= "dialogue_wait"
             end, 120) then
@@ -5110,6 +5120,63 @@ scenarios.recordch03open = function()
     return recordCutscene({ tag = "ch03open", until_ = "prep", pressEvery = 90 })
 end
 
+-- marchPartyToward: walk the party at (cx, cy) over up to `turns` player phases, stopping the
+-- moment `stop()` goes true. Shared by ch04moose (the GATE: does the AREA fire) and
+-- recordch04moose (the FILM: what the beat looks like), so the two can never disagree about how
+-- the clearing is reached. The move is a REAL move (marchToward drives the game's own movement
+-- map and finishes on Wait): an AREA is checked when an action ENDS, so a position poke would
+-- never trigger it. Returns true if `stop()` fired, false if the turn budget ran out.
+local function marchPartyToward(cx, cy, turns, stop, maxx, maxy)
+    for _ = 1, turns do
+        waitFor(function() return faction() == 0 and not menuOpen() end, 900, true)
+        for i = 0, 7 do
+            if stop() then return true end
+            local u = unitAt(SYM.gUnitArrayBlue, i)
+            if u and not isDead(u) and (u.state & 0x2) == 0 then
+                marchToward(u, cx, cy, maxx or 14, maxy or 14)
+                waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
+            end
+        end
+        if stop() then return true end
+        if runEnemyPhase() ~= "player" then return false end
+    end
+    return stop()
+end
+
+-- recordch04moose: the white-moose sighting in motion (#24) -- the party steps into the clearing,
+-- the moose loads, RBG calls it, and it bolts SOUTHEAST (away from the party, Nicolas's call) and
+-- is DISA'd. The march is the grind, so it runs in `pre` (unfilmed) and the recorder picks up the
+-- instant the moose exists; the terminal is the moose GONE, plus a tail so the flee isn't cut off.
+-- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh recordch04moose (needs a CH04BOOT=1 ROM).
+scenarios.recordch04moose = function()
+    local MOOSE_PID = 0xce
+    local function moose() return findUnit(SYM.gUnitArrayGreen, 12, MOOSE_PID) end
+    local reachedIt, goneFor = false, 0
+    return recordCutscene({
+        tag = "ch04moose", maxFrames = 5400, pressEvery = 90,
+        pre = function()
+            pokeFastConfig()
+            if not bootToMap() then return false, "never reached the ch04 map" end
+            if not waitFor(function()
+                return faction() == 0 and not menuOpen()
+                    and not procActive(SYM.ProcScr_StdEventEngine)
+            end, 900, true) then
+                return false, "ch04 map never became idle"
+            end
+            reachedIt = marchPartyToward(11, 4, 6, function() return moose() ~= nil end)
+            if not reachedIt then return false, "party never triggered the moose sighting" end
+            return true
+        end,
+        afterPre = pokeNormalConfig,
+        until_ = function()
+            if not reachedIt then return false end     -- never triggered: fail loudly, don't stop early
+            if moose() ~= nil then return false end
+            goneFor = goneFor + 1                      -- let the flee play out past the DISA
+            return goneFor > 60
+        end,
+    })
+end
+
 -- ch04moose: the moose-sighting AREA is PLAYER-ONLY, and still fires for the party (#24).
 -- Both halves, because the guard's failure modes point opposite ways:
 --   1. idle turn 1 -- after the monsters have moved, the moose must NOT have loaded. FE8 polls
@@ -5156,27 +5223,19 @@ scenarios.ch04moose = function()
         end
         return false
     end
-    for t = 2, 6 do
-        waitFor(function() return faction() == 0 and not menuOpen() end, 900, true)
-        for i = 0, 7 do
-            if moose() then break end
-            local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and not isDead(u) and (u.state & 0x2) == 0 then
-                marchToward(u, CX, CY, 14, 14)
-                waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
-            end
-        end
-        if moose() then break end
-        if anyoneInClearing() then
-            shot("ch04moose-never-fired")
-            return result("FAIL", string.format(
-                "turn %d: a party unit stands in the clearing and the sighting never fired", t))
-        end
-        log(string.format("ch04moose: turn %d, still closing on the clearing", t))
-        if runEnemyPhase() ~= "player" then
-            shot("ch04moose-lost")
-            return result("FAIL", "the party did not survive to reach the clearing")
-        end
+    -- The march itself is marchPartyToward (shared with recordch04moose, so the gate and the
+    -- film reach the clearing the same way). The check this scenario adds on top is the one
+    -- that makes a non-firing AREA legible: standing IN the clearing with no moose is a real
+    -- failure, while merely not having arrived yet is not.
+    -- Stop on the MOOSE only, never on "someone is in the clearing": the AREA is polled when an
+    -- action ENDS, so a unit standing on the tile is a state the beat has not answered yet, not
+    -- a verdict. Stopping there raced the event and failed a chapter that works. The
+    -- in-the-clearing check is the DIAGNOSTIC afterwards, once the budget really is spent.
+    marchPartyToward(CX, CY, 5, function() return moose() ~= nil end)
+    if not moose() and anyoneInClearing() then
+        shot("ch04moose-never-fired")
+        return result("FAIL",
+            "a party unit stands in the clearing and the sighting never fired")
     end
     if not moose() then
         shot("ch04moose-unreachable")
@@ -5264,7 +5323,7 @@ end
 
 -- ch04Parley(opts) -- drive Marty's Talk on the wolf pack: the chapter's mercy/recruit hook and
 -- the switch that picks which ENDING plays. Shared by recordch04parley (which films it) and
--- clear_ch04_parley (which needs the flag set before routing), so the row search, the re-parking
+-- clear_ch04_parley (which needs the flag set before routing), so semantic Talk selection, re-parking,
 -- and the outcome check exist once (#204). Assumes the map is already booted and turn 1 is live.
 --   opts.shots  -- frame-tag to screenshot into while the exchange plays; nil films nothing
 -- Returns false plus a reason string, or true plus (nil, pack) once Lupin is blue -- where
@@ -5866,10 +5925,9 @@ scenarios.recordch04reveal = function()
         return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
     end, 900, true)
     if not endTurn() then return result("FAIL", "could not end turn 1") end
-    -- Ride turn 1's enemy phase out inside the RECORDER rather than runEnemyPhase: that helper
-    -- taps A every 50 frames to clear quotes, which would also punch through the reveal's own
-    -- text beats before the camera work finishes. The terminal is turn 2 with the event engine
-    -- let go and control handed back -- i.e. the cutscene has run to its EVBIT_T.
+    -- Ride turn 1's enemy phase out inside the RECORDER so the reveal itself is captured. Both
+    -- paths now advance only an observed dialogue-input wait; the recorder additionally takes
+    -- dense frames until turn 2's event engine lets go at EVBIT_T.
     local sawTurn2 = false
     return recordCutscene({
         tag = "ch04reveal", maxFrames = 5400, pressEvery = 90,

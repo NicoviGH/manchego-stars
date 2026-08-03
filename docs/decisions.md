@@ -1423,7 +1423,7 @@ _Decided: 2026-08-03 (#220; supersedes timing/row-driven common harness mechanic
 executor limitation)_
 
 **Recording a cutscene as a review GIF (the standard way to show Nicolas motion).**
-The harness fast-forwards cutscenes (mashes A), so an assert scenario's screenshots land
+The harness fast-forwards non-recorded lead-up, so an assert scenario's screenshots can land
 on fades — to SEE a scene play, use a `record*` scenario: it drives the game to the
 scene, then captures PNG motion frames `NN-<tag>.png` into `/tmp/playtest-<scenario>/`.
 Existing: `recordending` (ch01 outro, tag `end`), `recordch01trail` (`trail`),
@@ -1431,14 +1431,17 @@ Existing: `recordending` (ch01 outro, tag `end`), `recordch01trail` (`trail`),
 add `scenarios.record<name>` that drives to it then captures; for an OUTRO, reuse the win
 drive (cf. `recordending`'s copy of `ch01win`) and swap the fast win-wait for
 `pokeNormalConfig()` (restores readable typewriter speed after the battle's
-`pokeFastConfig`) + a slow capture loop (`if fr%8==0 then shot; if fr%18==0 then press A`
-until `chapter()` advances). Then assemble + show:
+`pokeFastConfig`) + `recordCutscene`. Its old numeric `pressEvery` option is now only a
+compatibility switch: positive enables A **only while the controller observes FE8's dialogue-input
+wait**, and zero disables it; there is no timing cadence or fallback input. A recorder with an
+unfilmed `pre` step must return `false, reason` on failure and put configuration restoration in
+`afterPre`, whose setup/cleanup lifecycle is guaranteed and plain-Lua tested. Then assemble + show:
 `tools/playtest/make_gif.py <scenario> <tag> --name <basename> --open` (PIL; `--fps`
 controls read pace — **~6 fps for text-heavy scenes Nicolas needs to read**, 12 for quick
 motion; `--scale` nearest-upscales the 240×160 frame; the default output is `docs/demo/` on the
 feature branch for GitHub review, and must be pruned before merge unless a live document retains it
 as evidence — [[feedback_sharing_visual_drafts]]).
-_Decided: 2026-06-17 (#21 ending review)._
+_Decided: 2026-06-17 (#21 ending review); updated 2026-08-03 for the #220 controller contract and #219 recorder cleanup._
 
 **Chapter title cards are IMAGES, recomposed from vanilla glyphs.**
 FE8's intro/Status title banner is a 4bpp graphic (`chap_title_data[chapTitleId]`,
@@ -3162,6 +3165,21 @@ session state. `HANDOFF.md` points here._
   unit tests — one pinning today's tile, one pinning that the OLD corner is walkable-but-cut-off,
   because "is it good terrain" is exactly the check that passes while the game hangs.
   _Recorded: 2026-07-31 (ch04 #24 Stage 4)._
+
+- **A reachable endpoint does not define a staged escape — route and camera framing are authored
+  scene data.** A single `MOVE` from the white-moose clearing to `(14,14)` was technically reachable,
+  so FE8 legitimately chose its shortest path straight south; `CAMERA2(14,14)` then made `REMA`
+  restore the camera over the map boundary, exposing the engine's gray out-of-map tile grid behind
+  RBG's portrait. The intended beat is now explicit in the chapter YAML: `flee_route` crosses the east
+  bridge at `(9,7)`, reaches the far bank at `(9,8)`, and exits southeast at `(14,14)`. The injector
+  emits that as a vanilla REDA queue plus `MOVE_DEFINED`, preserving continuous normal-unit walking
+  between authored waypoints, and validates every waypoint as reachable. The 15-tile-wide map exactly
+  fills the GBA viewport, so centering `CAMERA2` on the moose at x=11 scrolls past the real right edge
+  and renders wrapped map memory. The YAML therefore authors `camera_at: [7,4]`, the map-width center
+  that pins camera x=0 while framing the clearing and bridge. Script tests pin the camera, queue, bridge
+  tiles, and endpoint; the motion GIF remains the
+  visual acceptance gate because reachability cannot judge composition.
+  _Recorded: 2026-08-03 (Nicolas + Codex, ch04 #24 / PR #219 visual review)._
 
 - **An `AREA` event is not "a player unit steps here" — it is "whichever unit last acted is
   standing here," and a bare abort spends the one-shot forever.** FE8 polls the Misc event list at
