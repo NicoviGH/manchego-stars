@@ -124,5 +124,27 @@ art:
     # Note idx2 is BOTH body shadow and the glasses pupil, so the pupil goes dark-red with
     # the shading -- a pure index map cannot separate them, and at 32x32 it doesn't read.
     pre_recruit_roles: {1: 15, 2: 7, 3: 9, 11: 13, 4: 14}
-  # Battle anim still deferred (#39). PMD SpriteCollab has Lycanroc (#0745) with a full side-view
-  # anim set (Attack/Charge/Shoot) if we want a matching-style battle anim later — rides #90's pipeline.
+
+# ── Battle anim (SHIPPED — #206) ─────────────────────────────────────────────
+# He rides a Cavalier so the wolf can BE the mount, and every Cavalier weapon slot left vanilla
+# renders him as a man on a horse — the defect #206 exists to fix, seen in-engine while filming
+# the ch04 parley. So all three of the donor's slots are repointed at this one custom anim
+# (BANIM_DONORS['cavalier']); the donor class and every generic Cavalier stay byte-vanilla,
+# because the binding is per-CHARACTER via `_u25` (decisions.md → Art & Audio).
+#
+# IMPORTED, not faked: a quadruped's attack IS travel — he coils, leaves the ground, and lands
+# on the foe — and the faked 3-pose path deliberately PINS the feet. Same call as Pinky's swoop.
+# Source poses + the arc + the size live in battle_anims/lupin/poses.yaml; the motion script and
+# its sound cadence live in Lupin.txt, read off FE8's own wolf (`banim_mdg_at1`, CLASS_MAUTHEDOOG
+# — the anim the rest of his pack fights as), so he sounds like the pack he leads.
+#
+# THE FRAMES ARE HAND-FINISHED. His spectacles come out ~4x3 px at FE8 body height and no
+# palette or sharpen setting recovers them, so Nicolas painted them at final size in the pixel
+# editor (tools/banim_paint.py) — the same call this file's MAP sprite already made above.
+# `poses.yaml` is marked `hand_painted: true`; re-rendering gives back a bare wolf.
+battle_anim:
+  clone_from: cavalier
+  abbr: lupin
+  import:
+    txt: lupin/Lupin.txt
+    frames_dir: lupin

@@ -809,6 +809,9 @@ def main():
     ap.add_argument('--mu', action='store_true',
                     help='edit a MU/walk sheet (32x32 frames); reference defaults to the '
                          'donor MOVE sheet')
+    ap.add_argument('--frame', default=None, metavar='WxH',
+                    help='explicit frame geometry, for a sheet with no decomp donor to read '
+                         'it from -- e.g. battle-anim frames (tools/banim_paint.py)')
     ap.add_argument('--port', type=int, default=8765)
     ap.add_argument('--no-browser', action='store_true')
     args = ap.parse_args()
@@ -828,8 +831,12 @@ def main():
         if not (args.sheet and args.palette):
             sys.exit('usage: map_sprite_editor.py <sheet.png> <cast_palette.png> --donor X\n'
                      '       map_sprite_editor.py <walk.png> <pal> --mu --donor X\n'
+                     '       map_sprite_editor.py <frames.png> <pal> --frame WxH\n'
                      '       map_sprite_editor.py --campaign <name>')
         ref, geom = args.reference, None
+        if args.frame:
+            gw, _, gh = args.frame.partition('x')
+            geom = (int(gw), int(gh))
         if args.mu:
             geom = (32, 32)  # MU/walk frame is the fixed 32x32 move-sprite OBJ size
             if not ref and args.donor:

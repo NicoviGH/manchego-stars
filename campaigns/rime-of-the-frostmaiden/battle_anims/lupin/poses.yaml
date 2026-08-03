@@ -1,0 +1,75 @@
+# lupin/poses.yaml — arc manifest for tools/poses_to_feditor.py (Lupin's imported wolf lunge).
+#
+# Lupin is the army's beast-cavalier; his battle anim is a real N-frame POUNCE imported via
+# feditor_to_banim (#90 pipeline) bound to his per-character _u25 (NOT the faked 3-pose path).
+# A quadruped's attack IS travel — he coils, leaves the ground and lands on the foe — and the
+# faked path deliberately PINS the feet so the body never moves between beats (that is what
+# makes it work for a standing swordsman and useless here). Same call as Pinky's swoop.
+#
+# SOURCE: `Battle Anims/Lupin Battle Anim/LupinFrames.png` (Gemini, Nicolas 2026-08-02) — four
+# poses on one sheet, each on a baked teal ground shadow. Split + de-shadowed into .src/ by:
+#     python3 tools/split_pose_sheet.py <sheet>.png <this dir>/.src idle windup lunge hit
+# The shadow must go: the battle screen draws its own platform, and an AIRBORNE pose would tow
+# a floating ellipse behind it.
+#
+# FACING: flip=true mirrors the source to FE8-canonical SCREEN-LEFT facing (the whole cast's
+# convention). A left-facing unit's foe is to his LEFT, so the pounce travels LEFT -> the
+# lunge/hit dx are NEGATIVE (like ref_to_battleframe's melee lunge).
+#
+# ARC (a wolf, not a flier): coil on the ground -> leave it -> land the bite AT the foe.
+# Placement is by BBOX CENTRE, and these four poses are all different sizes, so the numbers
+# below were solved from the geometry rather than eyeballed:
+#     dx = w_pose/2 - w_idle/2 - advance      (advance = how far the SNOUT gains, leftward)
+#     dy = (h_pose - h_idle)/2 + lift         (lift = how far the PAWS clear the idle ground line)
+# with the downscaled idle at 40x42. So `advance`/`lift` are the authored intent:
+#     windup  advance -2   lift 0    coil: paws planted, weight shifts BACK off the foe
+#     lunge   advance 26   lift 12   airborne, halfway across, still climbing
+#     hit     advance 56   lift 8    snout ON the foe (~76px left of home, cf. Pinky's 78)
+#     dodge   advance -18  lift 4    the coil hopped BACKWARD (see below)
+#
+# SIZE: target_h 42 sets the whole silhouette. He is a MOUNT with no rider, so height is the
+# wrong axis to match a human on: at 42 the standing idle is 40x42 (braulo 45x46, wolfram
+# 43x45 — the cast's bulkiest) while the pounce stretches to ~58 wide, which is where a dire
+# wolf's size actually reads. Tune on the recordanim review:
+#     python3 tools/poses_to_feditor.py campaigns/rime-of-the-frostmaiden/battle_anims/lupin
+
+canvas: [248, 160]         # FEditor "For Each Frame" canvas (matches the vendored #90 anims)
+flip: true                 # mirror source to screen-left facing (cast convention); dx signs match
+home: [150, 120]           # idle body-centre — right side + low, so the leftward pounce has room
+target_h: 42               # idle silhouette height in FE8 px (ONE uniform downscale for ALL frames,
+                           # so the tail grows but body scale is constant)
+outline: true              # re-stroke the silhouette in ink after the shrink (see the tool
+                           # docstring): the source's drawn outline averages clean away at this
+                           # factor, leaving a grey blob. `--thin-outline` is the cast standard.
+sharpen: 1.6               # pre-unsharp before the area shrink, Wolfram's approved value (the
+                           # cast runs 0-2.0). It rescues EDGES (leg separation, fur banding);
+                           # it does NOT rescue detail finer than one shrink cell -- measured,
+                           # sub-cell features come out slightly WORSE (test_poses_to_feditor).
+                           # That is why the glasses need the hand pass below, not more sharpen.
+hand_painted: true         # THE FRAMES ARE THE DELIVERABLE. Lupin's spectacles are ~4x3 px after
+                           # the shrink, with a frame stroke under a pixel, and no palette or
+                           # sharpen setting recovers them (measured — sub-cell detail comes out
+                           # slightly WORSE sharpened, test_poses_to_feditor). So they are PAINTED
+                           # BY HAND at final size (Nicolas, 2026-08-02) — the same call his MAP
+                           # sprite already made (npcs/lupin.yaml) — via
+                           #     python3 tools/banim_paint.py edit  <this dir>
+                           #     python3 tools/banim_paint.py apply <this dir>
+                           # and poses_to_feditor REFUSES to re-render over them without --force.
+                           # Re-rendering gives back a bare wolf: if the arc or the size is ever
+                           # retuned, the glasses have to be repainted.
+reserve:                   # a colour forced into the <=15 palette that the ART does not carry —
+  - [255, 255, 255]        # a TRUE WHITE to hand-paint the lens with (Nicolas, 2026-08-02). The
+                           # wolf's own lightest tone is an off-white ~(185,187,179), which reads
+                           # as fur, not glass. The median-cut only found 14 tones here, so this
+                           # costs nothing: it fills the slot that was sitting empty.
+abbr: lupin                # frame stem -> Lupin_000.png .. Lupin_004.png
+poses:                     # name / source crop (.src) / arc offset (dx = LEFT-negative toward foe, dy UP)
+  - {name: idle,   src: .src/1_idle.png,   dx:   0,  dy:  0}   # ANCHOR: standing, calm
+  - {name: windup, src: .src/2_windup.png, dx:   4,  dy: -5}   # the coil — snarl, haunches loaded
+  - {name: lunge,  src: .src/3_lunge.png,  dx: -22,  dy:  8}   # off the ground, mid-flight
+  - {name: hit,    src: .src/4_hit.png,    dx: -47,  dy:  6}   # full extension, jaws AT the foe
+  # Dodge frame (Lupin_004): the COIL, hopped backward. Per Nicolas's rule on Pinky's dodge
+  # ("same height, just backwards") — but a quadruped ducks rather than back-flaps, so this
+  # reuses the windup art rather than the lunge: a leaping pose slid backwards reads as a wolf
+  # running forward while sliding away from the foe.
+  - {name: dodge,  src: .src/2_windup.png, dx:  20,  dy:  0}   # duck + hop away (dodge modes 7/8)

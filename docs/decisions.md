@@ -1952,6 +1952,52 @@ Tuned entirely on the TESTCH `recordanim` capture (class 0x48); `PT_CHAR=pinky`.
 body-slam dive, matching his lanceless map sprite.
 _Decided: 2026-07-18 (Pinky, PR #190)_
 
+**Lupin's wolf pounce: the import path grows an OUTLINE, and the detail it cannot carry gets PAINTED (#206)**
+Lupin fought as a stock red Cavalier — a man on a horse — because he rides `CLASS_CAVALIER` so the wolf can
+*be* the mount. He takes the **imported** path (`poses_to_feditor` → `feditor_to_banim`, Pinky's), not the
+faked 3-pose one, for the same structural reason Pinky did: a quadruped's attack **is travel** (coil → leave
+the ground → land on the foe), and `descale_battleframe` deliberately PINS the feet.
+
+- **The donor repoints ALL THREE Cavalier weapon slots** (`BANIM_DONORS['cavalier']`: SWORD, LANCE and the
+  unarmed/`ITYPE_ITEM` entry). Any slot left vanilla is a slot where the wolf renders as a horseman, which
+  is the entire defect. His ch04 kit is Iron Sword + Iron Lance (`CLASS_LOADOUT`), so both fighting slots
+  are live. Baxby (#206's other half) is the same class and reuses the row.
+- **Cadence and sound are read off FE8's OWN WOLF, `banim_mdg_at1`** (`CLASS_MAUTHEDOOG`, banim 0xB0 — what
+  the rest of his pack fights as), NOT off the Cavalier donor: a gallop-and-thrust is the wrong rhythm for a
+  beast that leaps. That yields the wolf sound codes (C5A opens, C5B just before contact, C5D on recovery,
+  C20 the impact SFX), and it re-confirms the #24 rule from vanilla's own hand — its `attack_miss` is the
+  attack body with **only** the hit code and impact SFX removed; `prepare_hp_deplete` stays.
+- **Three OPT-IN manifest keys on the import path**, all defaulting off so Pinky's shipped frames re-render
+  byte-identical (verified): `outline: true` re-strokes the silhouette in the palette ink — the faked path
+  has always done this and the import path never did, which is why Lupin first read as a grey blob next to
+  the eight finished anims; `sharpen:` pre-unsharps before the area shrink (his 1.6 = Wolfram's approved
+  value); `reserve:` forces a colour into the ≤15-colour palette (the seam `descale --reserve` opened for
+  Rootis's carrot nose) — here a **true white** that the grey art does not contain, to paint a lens with.
+- **Measured, and it corrected the obvious guess: `sharpen` does not rescue small detail.** It rescues
+  detail at or above one shrink cell; anything FINER comes out slightly *worse*, because the unsharp halo
+  brightens exactly the neighbours the box filter then averages back in. Pinned in
+  `test_poses_to_feditor.TestSharpen`. So sub-cell features have no generated answer at all.
+- **Which is why the frames are HAND-PAINTED and are themselves the deliverable.** Lupin's spectacles land
+  ~4×3 px with a sub-pixel frame stroke — and they are the whole reason #206 chose generated art over the
+  FE-Repo wolf anims that were already free. Nicolas paints them at final size in the browser pixel editor
+  (`tools/banim_paint.py`, which hands `map_sprite_editor` one shared window of the 248×160 canvas via its
+  new `--frame WxH`), exactly as his MAP sprite already did. `poses.yaml` carries `hand_painted: true` and
+  `poses_to_feditor` then **refuses to re-render without `--force`**.
+- **Two ways that paint can be silently destroyed, both now closed.** (1) Re-rendering the frames — the
+  guard above. (2) Re-opening the editor: the sheet is scratch *derived from* the frames, so the naive
+  `edit` rebuilt it every run. Both nearly fired in one session (the frames were re-rendered mid-paint to
+  add the white; only the saved sheet still held the glasses, and they were carried across by colour).
+  `prepare_sheet` now KEEPS an existing sheet unless its shape changed or `--reset` is passed.
+- **`tools/split_pose_sheet.py`** turns one generated sheet into per-pose sources: reading order over a
+  GRID (not just a strip), and keying the baked ground shadow by **morphological reconstruction** — grey fur
+  lands within ~40 of that teal in RGB, so any flat colour key wide enough to catch the ellipse's own
+  gradient also eats the wolf. The shadow must go: the battle screen draws its own platform, and an
+  airborne pose would tow a floating blob.
+- **Trap worth naming: a unit's SLOT is `PORTRAIT_MAP`, its STATS are `STAT_DONOR`, and they differ.** Lupin
+  is Duessel (0x1D) wearing Kyle's growths (0x11). Taking the donor for the slot put `PT_CHAR=lupin` on a
+  unit that is not on the map; the injector's own output is what caught it.
+_Decided: 2026-08-02 (Lupin, #206)_
+
 **Every ATTACKING banim mode must ARM the HP depletion — the unit it starves is the OPPONENT (#24)**
 C01 `banim_code_wait_hp_deplete` (`0x85000001`) "freezes if no HP depletion is occurring/has occurred" —
 the decomp states the hazard on the macro itself (`include/banim_code.inc`). The non-obvious half is **who
