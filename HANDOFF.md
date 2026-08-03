@@ -66,8 +66,22 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 - **#208 done in the same PR**: the turn-2 reveal's LOCKED dialogue moved out of
   `build_campaign.py` into the chapter YAML as a `wolf_pack_reveal` event (3 boxes per speaker, the
   2026-07-31 pass — the stubs only ever carried 1).
-- **ch04's slice is now down to work that NEEDS NICOLAS**: **#206** (Lupin + Baxby battle anims —
-  he is running the Gemini art himself) and **the second village's line** (see below).
+- **LUPIN FIGHTS AS A WOLF (#206 half-done, `5c20321`).** Attack him instead of talking and ch04's
+  bespectacled direwolf fought as a stock red Cavalier — a man on a horse, the exact fight the
+  chapter's mercy hook exists to avert. He takes the **imported** path (`poses_to_feditor` →
+  `feditor_to_banim`, Pinky's), not the faked 3-pose one, because a quadruped's attack **is travel**
+  and `descale_battleframe` deliberately pins the feet. `recordanim PT_CHAR=lupin` **PASS**:
+  coil → leap → jaws on the Soldier → kill (`docs/demo/lupin-anim.gif`).
+- **The glasses are the thing that cannot be generated, and that is now measured.** `sharpen`
+  rescues detail at or above one shrink cell and makes anything FINER slightly *worse* (the unsharp
+  halo brightens exactly the neighbours the box filter averages back in) — pinned in
+  `test_poses_to_feditor.TestSharpen`. Lupin's spectacles land ~4x3 px, so **Nicolas paints them at
+  final size** (`tools/banim_paint.py` → `map_sprite_editor --frame WxH`), the same call his MAP
+  sprite already made. `poses.yaml` carries `hand_painted: true`; `poses_to_feditor` refuses to
+  re-render without `--force`, and `banim_paint edit` KEEPS an existing sheet (both routes to
+  destroying the paint nearly fired in one session).
+- **ch04's slice is now down to work that NEEDS NICOLAS**: **#206's remaining half** (Baxby's
+  axe-beak) and **the second village's line** (see below).
 - **#24's review block was STALE, not incomplete** — three boxes were done in #202 and never
   ticked (checked and ticked 2026-08-01): the no-parley speaker-coverage test
   (`test_the_no_parley_path_has_a_speaker_for_every_box`) exists and passes; message-id uniqueness
@@ -75,13 +89,15 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   pid is guarded (now `assert_pack_pids_addressable`, #203). **Scope note that keeps #207 alive:** the id guard
   covers scene/talk/card ids only — the goal/objective ids come from the host slot's vanilla
   chapter data and are NOT in `HOSTED_CHAPTER_MESSAGE_IDS`, which is exactly #207.
-- **#206 is DECIDED and scoped up (Nicolas, 2026-08-01): do Lupin's battle anim AND Baxby's.**
-  Baxby has the same defect for the same reason — he rides a Cavalier slot so the axe-beak can be
-  mounted, and he is not among the eight finished PC anims, so the giant bird also fights as a man
-  on a horse. Two animal mounts, one problem twice. Lupin has a free donor (`CLASS_MAUTHEDOOG`'s
-  vanilla anim IS a wolf); Baxby likely needs an FE-Repo import. Per-character binding already
-  exists (`pcs/pinky.yaml` `_u25`), so neither needs a new class. **Basil and Sahnar stay ch05
-  work (#25)** — not part of this.
+- **#206's remaining half is BAXBY, and Lupin's machinery is built for him.** Same defect, same
+  cause: he rides a Cavalier slot so the axe-beak can be mounted, so the giant bird also fights as
+  a man on a horse. He drops onto `BANIM_DONORS['cavalier']` (Lupin's row — it repoints ALL THREE
+  Cavalier weapon slots; any slot left vanilla is a slot that renders a horseman). Reusable:
+  `tools/split_pose_sheet.py` (one generated sheet → per-pose sources, grid-aware, baked ground
+  shadow keyed out), `poses_to_feditor`'s `outline`/`sharpen`/`reserve`, and `tools/banim_paint.py`
+  for anything that has to be drawn at final size. **Read his cadence off a vanilla anim that MOVES
+  the way the creature moves** — Lupin's came from FE8's own wolf `banim_mdg_at1`, not the Cavalier
+  donor's gallop; a bird wants a bird's. **Basil and Sahnar stay ch05 work (#25)** — not part of this.
 - **ch05 "The Elven Tomb" (#25) — DIALOGUE COMPLETE AND MERGED** (PR #196). 15 slots, all
   `status: locked`. Still owed: map + placement, text insertion → `verify_text`, `--ch05-boot`
   playtest, `enemy_class_reskins` + FE-Repo imports, Basil/Sahnar STAT_DONORs, and the five
@@ -91,13 +107,48 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 - Parity/difficulty engine is four-dimensional (`tools/difficulty.py`); `make difficulty CH=chNN`.
   **#24's spatial/difficulty pass must account for Lupin's leader tile moving `[0,0]` -> `[2,1]`**
   (Nicolas's condition on approving that swap).
-- **PC battle anims — 8 of 8 DONE** for the founding cast. Lupin is NOT among them (#206).
+- **PC battle anims — 8 of 8 for the founding cast, plus Lupin (#206, `5c20321`).** Baxby is the
+  only cast member still fighting as someone else's class.
 - **Recruit art shipped** (portraits + map sprites): Basil/Oddish (#179), Lupin + Sahnar (#181).
   Basil and Sahnar are marked `wiring: pending` in YAML so the new sprite guard can tell a tracked
   deferral from a silent one; their wiring is #25 work.
 
 
-## This session (2026-08-01, Opus — mercy started costing something, and ch04 got its reward)
+## This session (2026-08-02, Opus — the wolf stopped fighting as a horseman)
+
+- **#206's Lupin half closed (PR #216, `5c20321`).** See Current state. The three transferable
+  facts, because Baxby needs all of them:
+- **A capability the pipeline was MISSING, not a Lupin problem: the imported path never
+  re-stroked the outline.** The faked 3-pose path always has; an area-average downscale eats a
+  drawn outline, so Lupin first read as a grey blob beside the eight finished anims and I nearly
+  concluded the ART was wrong. `outline`/`sharpen`/`reserve` are opt-in on the manifest and Pinky's
+  shipped frames re-render byte-identical (verified, not assumed).
+- **I sized him from first principles when the sizes were already APPROVED and recorded.** Nicolas:
+  *"we've done so many animations, you should have checked I approved the in game render quality
+  and dimensions."* The per-unit recipes live in the unit YAMLs (`--body 38..44`, `--thin-outline`,
+  `--sharpen 0..2.0`) and in `decisions.md`. **Read them before touching a new one.**
+- **A lone nearest-neighbour blow-up of a correctly-sized FE8 sprite reads as "horribly
+  pixelized".** Show 1:1 AND zoomed, beside already-approved siblings — the comparison is what makes
+  the scale judgeable. (PNG → Preview, GIF → Safari, both `open`ed for him.)
+- **The division of labour that actually worked: Nicolas paints, I build the pipe.** He asked for
+  it (*"would you be willing to let me hand paint the glasses"*), and it beat both of my attempts
+  at generating them. He also cut my first design down — I had built a diff/overlay so a re-render
+  could carry the paint; *"you could pass me the images in the state they are ready to go in game,
+  no re-render needed"* was simpler and right.
+- **Then I nearly destroyed his painting twice, from two different directions.** Re-rendering the
+  frames for the palette change (his work survived only in the saved sheet, carried across by
+  colour); and `edit` rebuilding the sheet FROM the frames on every open. Both are closed by
+  guards now — but the lesson is the general one: **anything derived from a generated artifact
+  will be regenerated, so a human's edit must either be the source of truth or be replayable.**
+- **A stale scan bound masqueraded as a content bug for one whole rebuild.** `recordanim` said
+  "lupin not deployed" for a wolf standing on the map: `blue()` searched **8** unit slots, correct
+  back when the cast WAS 8. Bounds now come from the decomp (`bmunit.h`: blue[62]/red[50]).
+  **A scan bound is a property of the engine, never of the current content.**
+- **`PORTRAIT_MAP` is the SLOT, `STAT_DONOR` is the STATS, and for Lupin they differ** (Duessel
+  0x1D wearing Kyle's growths). Taking the donor for the slot pointed the harness at a unit that
+  is not on the map. The injector's own output caught it — read what the tool prints.
+
+## Previous session (2026-08-01, Opus — mercy started costing something, and ch04 got its reward)
 
 - **#205 closed (PR #212): read the SOURCE before designing.** I had rendered the map, measured
   walk-costs from the deploy zone and built a three-option placement picker — and vanilla Ch4's own
@@ -236,12 +287,12 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 
 `main` is clean and green; the #203, #205, #207 and #214/#208 branches are merged and deleted. **Start from the issues** — each carries its own diagnosis.
 
-1. **#206 Lupin + Baxby battle anims — NICOLAS IS RUNNING THE GEMINI ART.** Decided 2026-08-02:
-   Gemini-generated for BOTH, same pipeline as the eight finished PC anims. Ruled out with
-   evidence (on the issue): PMD SpriteCollab's Lycanroc `sprite/0745` is real and complete but is
-   dungeon-sprite art — 72x80 frames holding a ~37x28 chibi — so it reads as a different game next
-   to our FE8-scale anims. Vanilla `CLASS_MAUTHEDOOG`'s anim and the FE-Repo wolf line
-   (`docs/fe-repo-scouting.md`) remain fallbacks but give Lupin no glasses.
+1. **#206 BAXBY's axe-beak — NICOLAS RUNS THE GEMINI ART, the pipeline is now built.** Lupin
+   shipped (`5c20321`); Baxby is the same problem on the same class. Hand him a pose sheet →
+   `split_pose_sheet` → a `poses.yaml` arc → `banim_paint` for any final-size detail → the
+   `cavalier` donor row → `PT_CHAR=baxby recordanim`. He needs a `CAST` entry in `harness.lua`
+   (his slot is `CHARACTER_FORDE` — read it off **PORTRAIT_MAP, never STAT_DONOR**; taking the
+   donor put `PT_CHAR=lupin` on a unit that was not on the map).
 2. **The SECOND village at (1,11) has no line and no reward.** Its tile is visitable-capable but
    unwired, so FE8 offers no Visit (no location event -> `MENU_NOTSHOWN`) — the player just sees a
    cottage they cannot enter. **Vanilla's second village is PURE Lute recruit dialogue** (`9B2`/
@@ -264,7 +315,8 @@ world map.
   `git -C fireemblem8u restore src/data/chapter_settings.json data/data_8B363C.s`.
   (`test_winter_forest_backfill` fails on a built tree without this — it is the documented
   artifact, not a regression.)
-- **No outstanding branches.** `.claude/worktrees/` is empty. Merged: #197 build-speed, #198 ch04
+- **No outstanding branches.** `.claude/worktrees/` is empty. Merged: #216 Lupin's battle anim
+  (#206 half), #197 build-speed, #198 ch04
   Stages 1–3, #199 review cleanups, #200 the host-slot fix, #201 the banim arming fix, #202 the
   ch04 scenes + the six defects above, #209 the ch04 rout + both endings (#204), #211 the in-place
   pack conversion (#203), #212 the Lonelywood village (#205), #213 the per-chapter goal ids
@@ -301,6 +353,12 @@ PT_HOST_CHAPTER=5 tools/playtest/run.sh attackprobe   # why the bot won't attack
 PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04packmath  # GATE: kill 2 wolves, parley -> must be 3 greens
 PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04village   # GATE: visit (8,2) -> the Iron Axe changes hands
 PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04snag      # GATE: chop the snag -> (4,9) becomes a bridge
+
+make CAMPAIGN=rime-of-the-frostmaiden TESTCH=1 fireemblem8.gba -j$(nproc)   # the battle-anim bench
+PT_CHAR=lupin tools/playtest/run.sh recordanim        # any cast member's banim; then make_gif
+python3 tools/split_pose_sheet.py <sheet>.png <anim>/.src idle windup lunge hit   # sheet -> poses
+python3 tools/poses_to_feditor.py <anim_dir>          # poses.yaml -> the FEditor frames
+python3 tools/banim_paint.py edit|apply <anim_dir>    # hand-paint what the shrink cannot carry
 make CAMPAIGN=rime-of-the-frostmaiden CH04BOOT=1 fireemblem8.gba -j$(nproc)   # ch04 fast-boot
 PT_HOST_CHAPTER=5 tools/playtest/run.sh smoke_ch04                            # ch04 stability net
 
