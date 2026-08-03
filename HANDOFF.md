@@ -7,6 +7,11 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
 ## Current state
 
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
+- **Cross-agent continuity:** Nicolas uses Codex only between Claude sessions. Codex must leave an
+  explicit HANDOFF entry naming what it changed, the active branch/PR and commit state, verification
+  actually run, and the exact next step so Claude can resume without re-deriving anything. Per
+  Nicolas's request, Codex uses ordinary short-lived feature branches in this checkout, one at a
+  time; **do not create worktrees unless Nicolas explicitly changes that instruction.**
 - **ch04's ART IS COMPLETE — #206 is closed (PR #217, `b1de7ae`).** Baxby fights as an axe-beak and
   Lupin as a wolf; **every cast member now fights as itself**, none as someone else's class. What
   remains on ch04 is a short, fully-diagnosed list — **it lives on #24's checklist, not here.**
@@ -82,6 +87,25 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
    skill with him rather than drafting solo.
 
 Then: **ch05's build work** on #25; **#138** config-driven `inject_chapter(descriptor)`; **#29** world map.
+
+## Codex interlude (2026-08-03) — checkout bootstrapped, no feature work started
+
+- Stayed on `main` at `d2aaeb6` (aligned with `origin/main`); no feature branch was checked out and
+  **PR #219 / `origin/feat/24-ch04-rerecord` was not changed**. Fetched remote refs and tag `v0.1.0`,
+  then initialized `fireemblem8u` at its recorded commit `d7c08478`.
+- Ran `tools/setup-toolchain.sh`: Homebrew dependencies, Python 3.12 dependencies, `agbcc`, the base
+  ROM, portable decomp Python shebangs, and `core.hooksPath=tools/hooks` are ready. The setup script
+  omits upstream's required helper-tool build, so Codex also ran `fireemblem8u/build_tools.sh` with
+  the existing macOS SDK C++ include shim; `scaninc`, `jsonproc`, and the other native helpers now
+  exist locally. **No repository source was changed to patch that setup-script gap.**
+- Verification from this checkout: **619 Python tool tests pass**; the full campaign ROM build
+  (`make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba -j8`) passes; `verify_text` sweeps 3,404
+  messages with 0 runaway; `make check` reports `drift check: clean`; and `git diff --check` passes.
+  Codex restored the two documented generated files before the static checks; build artifacts
+  intentionally leave the submodule dirty and its pointer must not be committed.
+- Next feature step is unchanged: finish/merge **PR #219**, then continue #24/#218 from the ordered
+  list above. Use one ordinary `feat/<n>-slug` branch at a time; squash-merge and delete it before
+  starting the next.
 
 ## This session (2026-08-03, Opus — the bird stopped fighting as a horseman, and the palette had a second door)
 
