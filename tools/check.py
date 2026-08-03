@@ -418,6 +418,11 @@ def check_engine_guards_present(fail):
              'the #65 GetBanimPalette guard (a custom appended banim keeps its OWN palette); '
              'without it a custom-anim unit on an archer/sniper class mis-loads the vanilla bow '
              'palette -- the RBG cyan mis-render'),
+            ('_patch_banim_unique_pal_custom_guard',
+             'the #206 per-CHARACTER banim-palette guard (gAnimCharaPalConfig may not repaint '
+             'an appended banim); without it any cast member whose vanilla SLOT had a personal '
+             'palette for the class it deploys as is silently miscoloured -- Baxby, on Forde\'s '
+             'slot, wore Forde\'s green Cavalier palette over his own axe-beak one'),
             ('_patch_banim_spell_palette_tint',
              'the #165 caster-scoped spell-palette tint seam (data-driven green Dark magic); '
              'without it Marty\'s Flux (and any future tinted tome) silently reverts to the '

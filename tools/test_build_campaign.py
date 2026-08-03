@@ -676,6 +676,65 @@ class CharacterUniqueBanim(unittest.TestCase):
         self.assertEqual(eh._guard_banim_palette_custom('something else', 0xC9),
                          'something else')
 
+    # The SECOND palette path, and the one that cost a session (#206, Baxby). FE8 also carries
+    # a per-CHARACTER battle palette keyed on character x CLASS (gAnimCharaPalConfig), applied
+    # AFTER the anim's own palette is loaded -- so it silently overwrites it. A cast member on
+    # a vanilla slot whose character had a personal palette for that same class gets repainted:
+    # Baxby wears FORDE, whose row is [CLASS_CAVALIER -> 0x57], and Baxby IS a Cavalier, so his
+    # custom axe-beak palette was clobbered by Forde's green. Lupin escaped only by luck --
+    # Duessel's personal palettes are all magic classes.
+    UNIQPALFN = ('    pid = unit_bu1->pCharacterData->number - 1;\n'
+                 '    jid = unit_bu1->pClassData->number;\n\n'
+                 '    if (valid_l)\n'
+                 '        gBanimUniquePal[POS_L] = -1;\n\n'
+                 '    for (i = 0; i < 7; i++)\n'
+                 '    {\n'
+                 '        if (gAnimCharaPalConfig[pid][i] == jid && valid_l)\n'
+                 '        {\n'
+                 '            gBanimUniquePal[POS_L] = gAnimCharaPalIt[pid][i] - 1;\n'
+                 '            break;\n'
+                 '        }\n'
+                 '    }\n\n'
+                 '    pid = unit_bu2->pCharacterData->number - 1;\n'
+                 '    jid = unit_bu2->pClassData->number;\n\n'
+                 '    if (valid_r)\n'
+                 '        gBanimUniquePal[POS_R] = -1;\n\n'
+                 '    for (i = 0; i < 7; i++)\n'
+                 '    {\n'
+                 '        if (gAnimCharaPalConfig[pid][i] == jid && valid_r)\n'
+                 '        {\n'
+                 '            gBanimUniquePal[POS_R] = gAnimCharaPalIt[pid][i] - 1;\n'
+                 '            break;\n'
+                 '        }\n'
+                 '    }\n')
+
+    def test_unique_pal_guard_suppresses_the_character_palette_on_both_sides(self):
+        """A custom (appended) banim keeps its own palette wherever it is standing."""
+        from inject import engine_hooks as eh
+        out = eh._guard_banim_unique_pal_custom(self.UNIQPALFN, 0xC9)
+        self.assertIn('gAnimCharaPalConfig[pid][i] == jid && valid_l '
+                      '&& gBanimIdx[POS_L] < 0xC9', out)
+        self.assertIn('gAnimCharaPalConfig[pid][i] == jid && valid_r '
+                      '&& gBanimIdx[POS_R] < 0xC9', out)
+
+    def test_unique_pal_guard_leaves_vanilla_units_alone(self):
+        """A stock banim id is BELOW the threshold, so vanilla's character palette still
+        applies -- Seth keeps his personal Paladin colours."""
+        from inject import engine_hooks as eh
+        out = eh._guard_banim_unique_pal_custom(self.UNIQPALFN, 0xC9)
+        self.assertIn('gBanimUniquePal[POS_L] = gAnimCharaPalIt[pid][i] - 1;', out)
+        self.assertIn('gBanimUniquePal[POS_R] = gAnimCharaPalIt[pid][i] - 1;', out)
+
+    def test_unique_pal_guard_is_idempotent(self):
+        from inject import engine_hooks as eh
+        once = eh._guard_banim_unique_pal_custom(self.UNIQPALFN, 0xC9)
+        self.assertEqual(eh._guard_banim_unique_pal_custom(once, 0xC9), once)
+
+    def test_unique_pal_guard_noops_when_form_unexpected(self):
+        from inject import engine_hooks as eh
+        self.assertEqual(eh._guard_banim_unique_pal_custom('something else', 0xC9),
+                         'something else')
+
 
 class BattleSpellPaletteTint(unittest.TestCase):
     """Per-character spell visuals remain data, not campaign-specific engine code."""

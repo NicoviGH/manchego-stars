@@ -81,8 +81,30 @@ inventory:
     fe_weapon_type: Sword
     damage_type: slashing             # cosmetic
 
+# ── Battle animation (#206) ────────────────────────────────────────────────────
+# Baxby rides CLASS_CAVALIER so the axe-beak can BE a mounted playable unit, and until this
+# existed the vanilla Cavalier anim rendered him as a man on a horse — the same defect Lupin
+# had, on the same class. All three of the donor's weapon slots are repointed at this one
+# custom anim (BANIM_DONORS['cavalier']: SWORD, LANCE and the unarmed/ITYPE_ITEM entry — any
+# slot left vanilla is a slot where the bird is a horseman, and his kit above is Sword+Lance
+# so both fighting slots are live). The donor class and every generic Cavalier stay
+# byte-vanilla: the binding is per-CHARACTER via `_u25` (decisions.md → Art & Audio).
+#
+# IMPORTED, not faked: his attack IS travel — he runs the gap and lands the beak — and the
+# faked 3-pose path deliberately PINS the feet. Same call as Lupin's pounce and Pinky's swoop.
+# Source poses + the arc + the approved body height (50) live in battle_anims/baxby/poses.yaml;
+# the motion script and its sound cadence live in Baxby.txt, read off FE8's own ground charger
+# (`banim_bae_at1`, the Bael) — a creature that crosses on its LEGS and walks back — with every
+# horse sound deliberately left on the shelf.
+battle_anim:
+  clone_from: cavalier
+  abbr: baxby
+  import:
+    txt: baxby/Baxby.txt
+    frames_dir: baxby
+
 # ── Art ────────────────────────────────────────────────────────────────────────
-# Portrait + map sprite are DONE (committed). Battle anim deferred (#39).
+# Portrait + map sprite are DONE (committed). Battle anim: see battle_anim above (#206).
 art:
   approach: vendor-reskin
   render:                             # portraits/baxby.png — byte-reproducible bust
