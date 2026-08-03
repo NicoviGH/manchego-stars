@@ -61,6 +61,9 @@ DEAD_CONCEPTS = [
     # the green allies are Mauthe Doogs in the NPC palette, not a Lycanroc table.
     r'pack table[- ]swaps?', r'table[- ]swaps? the (?:\d+ |five )?generic',
     r'green Lycanroc (?:NPC )?(?:pack|all(?:y|ies))',
+    # retired by #220 (2026-08-03): common playtest mechanics are state-driven.
+    r'bootToMap.{0,40}alternat(?:e|es|ing).{0,12}(?:A.{0,3}START|START.{0,3}A)',
+    r'chooseAttack.{0,50}row 0 blind',
     # NOT registered here: `hasPrepScreen`. It IS a dead field (FE7 leftover, chapterdata.h:37 --
     # false for every chapter, including ones that plainly have prep) and citing it as evidence is
     # exactly the mistake that produced a bogus "our prep is a divergence" claim on 2026-07-29.
