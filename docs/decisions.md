@@ -1979,6 +1979,32 @@ session.
 - **Every future custom-anim unit is now covered**, which matters for #25: Basil and Sahnar's slots
   would each have needed this checked by hand otherwise.
 
+**Three pipeline rules the same unit earned:**
+- **A CASCADED pose sheet splits on ink, not on gutters.** The generator may lay its poses out
+  diagonally so their bounding boxes overlap on BOTH axes with no transparent column or row
+  anywhere — the gutter splitter then sees the whole page as one pose. `split_pose_sheet` now falls
+  through to connectivity inside each gutter cell, and two rules keep a pose whole: a blob under
+  `POSE_SHARE` of the biggest is that pose's own detached art (an impact spark's outer rays, a
+  motion streak) and is merged into the nearest pose by real ink distance, never dropped; and two
+  pose-sized blobs that merely sit within `gap` of each other are one pose (a raised paw across an
+  empty column, a shadow under the feet) — only OVERLAPPING blobs are separate poses. **The
+  non-obvious half is the per-pose ink MASK**: cascaded boxes intersect, so each crop contains a
+  slice of the next pose's art and cropping the box alone tows a neighbour's feathers into the
+  frame. Pixels below `ALPHA_ON` belong to no pose and are left exactly as they lie, which is what
+  keeps a gutter-separated sheet splitting byte-identically (pinned against the shipped sources).
+- **A subject with ONE dominant hue must reserve its identity colours.** The `<=15`-colour median
+  cut is area-weighted, so a tan bird spent every slot on one tan ramp (13 shades of it) and the
+  saddle, the crest and the eye vanished — he read as a monochrome blob. `reserve:` was built to
+  rescue a single colour the art lacked (a carrot nose, a lens to paint with); the general rule is
+  broader: **reserve the colours that carry IDENTITY, not the ones that carry volume**, sampled
+  from the source art rather than invented. Three reserved entries cost nothing real here — twelve
+  tans still carry the body.
+- **Read the arc's fixed points off already-approved anims.** A new unit's placement is not free
+  invention: the foe's near edge (x≈73) and a grounded mount's ground line (y=141) were MEASURED
+  off the shipped, filmed frames of two approved units, and everything else was solved from
+  geometry against them. Same discipline as the recorded body-height recipe — don't re-derive a
+  number the cast has already settled.
+
 **The debugging lesson, because it is the transferable part: SYMMETRY IS A HYPOTHESIS-KILLER, and
 the swap is what proved it.** Baxby's assets verified clean at every offline stage — palette bytes,
 sheet PNGs, PNG→4bpp round trip, sheet-packing collisions, OAM/`attr2` ranges, mode tables, frame
@@ -3021,6 +3047,13 @@ _Decided: 2026-07-30 (CLAUDE; ch05 `0x9C9` Sahnar block)._
 
 _Moved here from `HANDOFF.md` 2026-07-02 (audit): these are durable engineering constraints, not
 session state. `HANDOFF.md` points here._
+
+- **A render from the frame PNGs proves the ART; only the ROM proves the TILING and the PALETTE**
+  (2026-08-03, #206). A preview GIF built from `poses_to_feditor`'s output and the in-game sprite
+  are separated by a whole stage — the frames are chopped into 8x8 tiles, packed into sheets, and
+  described by an OAM list the engine reassembles in VRAM under a palette it chooses. So "the GIF
+  looks right but the ROM doesn't" is not a contradiction to explain away; it *localises* the fault
+  to that stage and rules out the art in one step. Read it as a bisect, not a mystery.
 
 - **A scan bound is a property of the ENGINE, never of the current content** (2026-08-02, #206).
   `harness.lua`'s `blue()` searched **8** unit slots — correct back when the cast *was* 8 — so
