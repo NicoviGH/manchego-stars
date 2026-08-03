@@ -17,6 +17,7 @@
 -- engine demands real combat (deaths must go through battle, not HP pokes).
 
 dofile(PLAYTEST_DIR .. "/symbols.lua")
+local Controller = dofile(PLAYTEST_DIR .. "/controller.lua")
 
 -- Struct offsets, from the decomp headers (stable; addresses are not):
 --   include/types.h  struct PlaySt: +0x0E chapterIndex, +0x0F faction
@@ -41,11 +42,16 @@ local LORDSEL_FLAG_BASE = 0xF0
 local CHAR_PINKY, CHAR_CHIEF = 0x08, 0x46 -- NEIMI slot / BREGUET slot (ch01 boss)
 
 local logfile = io.open(PLAYTEST_LOG, "w")
+local controllerFault
 local function log(s)
     logfile:write(string.format("[f%06d] %s\n", emu:currentFrame(), s))
     logfile:flush()
 end
 local function result(verdict, why)
+    if verdict == "PASS" and controllerFault then
+        verdict = "FAIL"
+        why = "controller fault: " .. controllerFault .. " (scenario reached: " .. why .. ")"
+    end
     log("RESULT: " .. verdict .. " -- " .. why)
 end
 local nshot = 0
@@ -68,6 +74,11 @@ end
 local K = C.GBA_KEY
 
 local function ru8(a) return emu:read8(a) end
+local function rs8(a)
+    local v = emu:read8(a)
+    if v >= 0x80 then v = v - 0x100 end
+    return v
+end
 local function ru16(a) return emu:read16(a) end
 local function ru32(a) return emu:read32(a) end
 local function rs16(a)
@@ -81,13 +92,23 @@ local function faction() return ru8(SYM.gPlaySt + 0x0F) end
 local function turn() return ru16(SYM.gPlaySt + 0x10) end
 local function cursor() return rs16(SYM.gBmSt + 0x14), rs16(SYM.gBmSt + 0x16) end
 
-local function procActive(scriptAddr)
+local function findProc(scriptAddr)
     for i = 0, 63 do
-        if ru32(SYM.sProcArray + i * 0x6C) == scriptAddr then return true end
+        local addr = SYM.sProcArray + i * 0x6C
+        if ru32(addr) == scriptAddr then return addr end
     end
-    return false
+    return nil
 end
-local function menuOpen() return procActive(SYM.sProc_Menu) end
+local function procActive(scriptAddr) return findProc(scriptAddr) ~= nil end
+local function anyMenuProc()
+    return findProc(SYM.sProc_MenuMain) or findProc(SYM.sProc_Menu)
+end
+local function activeMenuProc()
+    local addr = anyMenuProc()
+    if not addr or ru8(addr + 0x28) ~= 0 or (ru8(addr + 0x63) & 0xC4) ~= 0 then return nil end
+    return addr
+end
+local function menuOpen() return anyMenuProc() ~= nil end
 local function gameOverActive() return procActive(SYM.ProcScr_GameOverScreen) end
 
 -- Event flag state (src/eventinfo.c): < 100 chapter flag bit (flag-1),
@@ -207,6 +228,7 @@ end
 --     pressEvery A-press cadence in frames (default 60; 0 = never press)
 --     pre        optional fn run once after load, before the loop (e.g. press A to Seize)
 --     post       optional fn(reachedEnd) run once after the loop (e.g. a final "title" shot)
+local controllerState, guardedInput, freezeReport
 local function recordCutscene(o)
     o = o or {}
     local tag = o.tag or "scene"
@@ -233,7 +255,13 @@ local function recordCutscene(o)
     while fr < maxFrames do
         fr = fr + 1
         if fr % shotEvery == 0 then shot(tag) end
-        if pressEvery > 0 and fr % pressEvery == 0 then press(K.A, 4) end   -- advance the dialogue beats
+        if pressEvery > 0 and controllerState() == "dialogue_wait" then
+            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
+                return controllerState(after) ~= "dialogue_wait"
+            end, 120) then
+                return result("FAIL", tag .. " dialogue input postcondition failed")
+            end
+        end
         if doneFn() then reached = true break end
         yield()
     end
@@ -247,7 +275,7 @@ local function recordCutscene(o)
 end
 
 local function tileOccupied(x, y)
-    for _, base in ipairs({ SYM.gUnitArrayBlue, SYM.gUnitArrayRed }) do
+    for _, base in ipairs({ SYM.gUnitArrayBlue, SYM.gUnitArrayGreen, SYM.gUnitArrayRed }) do
         for i = 0, 23 do
             local u = unitAt(base, i)
             if u and not isDead(u) and u.x == x and u.y == y then return true end
@@ -256,79 +284,436 @@ local function tileOccupied(x, y)
     return false
 end
 
+-- Live map state used by both scenarios and the controller observer.
+local function mapUnitRow(y) return ru32(ru32(SYM.gBmMapUnit) + y * 4) end
+local function mapUnitAt(x, y) return ru8(mapUnitRow(y) + x) end
+local function setMapUnit(x, y, v) emu:write8(mapUnitRow(y) + x, v) end
+local function mapSize() return rs16(SYM.gBmMapSize), rs16(SYM.gBmMapSize + 2) end
+
+-- ---------------------------------------------------------------- state-driven controller
+-- Function pointers in Proc fields are Thumb pointers; nm emits the even symbol address.
+local function codeAddr(a) return a & 0xFFFFFFFE end
+local CALLBACK_NAMES = {
+    [SYM.GameIntroHealthSafetyWaitButton] = "health_safety_wait",
+    [SYM.Title_IDLE] = "title_idle",
+    [SYM.SameMenu_CtrlLoop] = "save_menu_input",
+    [SYM.SaveMenu_SaveSlotSelectLoop] = "save_slot_input",
+    [SYM.DifficultySelect_Loop_KeyHandler] = "difficulty_input",
+    [SYM.ChapterIntro_KeyListen_Loop] = "chapter_intro_input",
+    [SYM.TalkWaitForInput_OnIdle] = "talk_wait_input",
+    [SYM.Menu_OnIdle] = "menu_input",
+    [SYM.PrepMenu_CtrlLoop] = "prep_menu_input",
+    [SYM.ProcPrepUnit_Idle] = "prep_units_input",
+    [SYM.PlayerPhase_MainIdle] = "player_main_idle",
+    [SYM.PlayerPhase_RangeDisplayIdle] = "player_range_idle",
+    [SYM.PlayerPhase_WaitForUnitMovement] = "player_move_wait",
+    [SYM.TargetSelection_Loop] = "target_selection_input",
+    [SYM.BattleForecast_LoopDisplay] = "battle_forecast_display",
+}
+local PREP_CALLBACK_NAMES = {
+    [SYM.PrepScreenMenu_OnStartPress] = "prep_main_fight",
+    [SYM.PrepScreenMenu_OnBPress] = "prep_main_check_map",
+    [SYM.PrepScreenMenu_OnPickUnits] = "prep_pick_units",
+    [SYM.PrepMapMenu_OnStartPress] = "prep_map_fight",
+    [SYM.PrepMapMenu_OnBPress] = "prep_map_back",
+}
+local function callbackName(a, names)
+    if a == 0 then return nil end
+    a = codeAddr(a)
+    return (names or CALLBACK_NAMES)[a] or string.format("0x%08X", a)
+end
+local function observedProc(script, idleName)
+    local addr = findProc(script)
+    if not addr then return nil end
+    return { addr = addr, idle = idleName or callbackName(ru32(addr + 0x0C)) }
+end
+local function observeMenu(observation)
+    local addr = activeMenuProc()
+    if not addr then return end
+    local count = ru8(addr + 0x60)
+    if count == 0 or count > 11 then
+        observation.error = string.format("malformed MenuProc itemCount=%d", count)
+        return
+    end
+    local menuDef = ru32(addr + 0x30)
+    local menu = {
+        current = ru8(addr + 0x61), items = {},
+        on_b = menuDef ~= 0 and callbackName(ru32(menuDef + 0x18)) or nil,
+    }
+    if menu.current >= count then
+        observation.error = string.format("malformed MenuProc current=%d count=%d", menu.current, count)
+        return
+    end
+    for slot = 0, count - 1 do
+        local item = ru32(addr + 0x34 + slot * 4)
+        local def = item ~= 0 and ru32(item + 0x30) or 0
+        if item == 0 or def == 0 then
+            observation.error = string.format("malformed MenuProc item[%d]", slot)
+            return
+        end
+        menu.items[#menu.items + 1] = {
+            slot = slot,
+            override_id = ru8(def + 0x09),
+            availability = ru8(item + 0x3D),
+            on_selected = callbackName(ru32(def + 0x14)),
+        }
+    end
+    observation.menu = menu
+end
+local function observePrep(observation)
+    local addr = findProc(SYM.ProcScr_PrepMenu)
+    if not addr then return end
+    local count = ru8(addr + 0x2B)
+    if count == 0 or count > 8 then
+        observation.error = string.format("malformed ProcPrepMenu max_index=%d", count)
+        return
+    end
+    local prep = {
+        current = ru8(addr + 0x2A),
+        help_open = ru8(addr + 0x29) ~= 0,
+        items = {},
+        on_b = callbackName(ru32(addr + 0x58), PREP_CALLBACK_NAMES),
+        on_start = callbackName(ru32(addr + 0x5C), PREP_CALLBACK_NAMES),
+    }
+    if prep.current >= count then
+        observation.error = string.format("malformed ProcPrepMenu current=%d count=%d", prep.current, count)
+        return
+    end
+    for slot = 0, count - 1 do
+        local item = ru32(addr + 0x38 + slot * 4)
+        if item == 0 then
+            observation.error = string.format("malformed ProcPrepMenu cmd[%d]", slot)
+            return
+        end
+        prep.items[#prep.items + 1] = {
+            slot = slot,
+            effect = callbackName(ru32(item + 0x2C), PREP_CALLBACK_NAMES),
+            color = ru8(item + 0x38),
+            index = ru8(item + 0x39),
+        }
+    end
+    observation.prep = prep
+end
+local function observeTarget(observation)
+    local addr = findProc(SYM.gProcScr_TargetSelection)
+    if not addr then return end
+    local current = ru32(addr + 0x30)
+    local routines = ru32(addr + 0x2C)
+    if current == 0 then
+        observation.error = "malformed SelectTargetProc currentTarget=NULL"
+        return
+    end
+    local kind
+    if routines == SYM.gSelectInfo_Attack then kind = "attack"
+    elseif routines == SYM.gSelectInfo_Talk then kind = "talk"
+    else kind = string.format("0x%08X", routines) end
+    observation.target = {
+        kind = kind,
+        x = rs8(current), y = rs8(current + 1), uid = ru8(current + 2),
+        extra = ru8(current + 3), frozen = (ru8(addr + 0x34) & 0x40) ~= 0,
+    }
+end
+local function observedUnit(unitId)
+    if unitId == 0 or unitId >= 0xC0 then return nil end
+    local unit = ru32(SYM.gUnitLookup + unitId * 4)
+    if unit == 0 then return nil end
+    local character = ru32(unit)
+    local class = ru32(unit + 4)
+    return {
+        state = ru32(unit + 0x0C),
+        status = ru8(unit + 0x30) & 0xF,
+        attributes = (character ~= 0 and ru32(character + 0x28) or 0)
+            | (class ~= 0 and ru32(class + 0x28) or 0),
+    }
+end
+local function unitSelectKind(unitId, unit)
+    if unitId == 0 then return "no_unit" end
+    if not unit then return nil end
+    if (unitId & 0xC0) ~= faction() then return "no_control" end
+    if (unit.state & 0x2) ~= 0 or (unit.attributes & 0x100000) ~= 0 then return "turn_ended" end
+    if unit.status == 2 or unit.status == 4 then return "no_control" end
+    return "control"
+end
+local function observeController()
+    local observation = {
+        procs = {}, raw_procs = {},
+        world = { chapter = chapter(), faction = faction(), turn = turn(), host_chapter = HOST_CHAPTER },
+    }
+    for i = 0, 63 do
+        local addr = SYM.sProcArray + i * 0x6C
+        local script = ru32(addr)
+        if script ~= 0 then
+            observation.raw_procs[#observation.raw_procs + 1] = {
+                slot = i, script = script, idle = ru32(addr + 0x0C), lock = ru8(addr + 0x28),
+            }
+        end
+    end
+    local function put(name, value) if value then observation.procs[name] = value end end
+    put("game_control", observedProc(SYM.gProcScr_GameControl, "game_control_root"))
+    put("game_early_start", observedProc(SYM.ProcScr_GameEarlyStartUI))
+    put("title", observedProc(SYM.gProcScr_TitleScreen))
+    put("save_menu", observedProc(SYM.ProcScr_SaveMenu))
+    put("difficulty", observedProc(SYM.ProcScr_NewGameDifficultySelect))
+    local introKey = observedProc(SYM.ProcScr_ChapterIntro_KeyListen)
+    put("chapter_intro", introKey or observedProc(SYM.gProcScr_ChapterIntro))
+    put("talk_wait", observedProc(SYM.gProcScr_TalkWaitForInput))
+    local rawMenu = anyMenuProc()
+    put("menu", rawMenu and { addr = rawMenu, idle = callbackName(ru32(rawMenu + 0x0C)),
+        locked = ru8(rawMenu + 0x28) ~= 0, frozen = (ru8(rawMenu + 0x63) & 0x40) ~= 0,
+        ending = (ru8(rawMenu + 0x63) & 0x04) ~= 0,
+        doomed = (ru8(rawMenu + 0x63) & 0x80) ~= 0 })
+    put("at_menu", observedProc(SYM.ProcScr_AtMenu, "at_menu_idle"))
+    put("prep_menu", observedProc(SYM.ProcScr_PrepMenu))
+    put("sally", observedProc(SYM.gProcScr_SALLYCURSOR, "sally_idle"))
+    put("prep_units", observedProc(SYM.ProcScr_PrepUnitScreen))
+    put("map_fade", observedProc(SYM.sProcScr_BMXFADE, "map_fade"))
+    put("player_phase", observedProc(SYM.gProcScr_PlayerPhase))
+    put("target_selection", observedProc(SYM.gProcScr_TargetSelection))
+    put("battle_forecast", observedProc(SYM.gProcScr_BKSEL))
+    put("std_event", observedProc(SYM.ProcScr_StdEventEngine, "event_engine"))
+    put("battle", observedProc(SYM.gProc_ekrBattle, "battle_loop")
+        or observedProc(SYM.ProcScr_BattleEventEngine, "battle_event"))
+    observeMenu(observation)
+    observePrep(observation)
+    observeTarget(observation)
+    local x, y = cursor()
+    local w, h = mapSize()
+    if w > 0 and h > 0 and x >= 0 and y >= 0 and x < w and y < h then
+        local unit = mapUnitAt(x, y)
+        local rows = ru32(SYM.gBmMapMovement)
+        local reachable = false
+        if rows ~= 0 then
+            local row = ru32(rows + y * 4)
+            reachable = row ~= 0 and ru8(row + x) < 120
+        end
+        local unitFaction
+        if unit ~= 0 then
+            unitFaction = unit < 0x40 and "blue" or (unit < 0x80 and "green" or "red")
+        end
+        local unitData = observedUnit(unit)
+        local selectKind = unitSelectKind(unit, unitData)
+        if unit > 0 and unit < 0xC0 and not unitData then
+            observation.error = string.format("gBmMapUnit id 0x%02X has no gUnitLookup entry", unit)
+        end
+        observation.cursor = {
+            x = x, y = y, width = w, height = h, unit = unit,
+            unit_faction = unitFaction, unit_state = unitData and unitData.state or nil,
+            unit_status = unitData and unitData.status or nil,
+            unit_attributes = unitData and unitData.attributes or nil,
+            unit_select_kind = selectKind, unit_selectable = selectKind == "control",
+            reachable = reachable,
+        }
+    end
+    return observation
+end
+controllerState = function(observation)
+    local state, why = Controller.classify(observation or observeController())
+    return state, why
+end
+local function observationEvidence(observation)
+    local state, why = controllerState(observation)
+    local cursorPart = observation.cursor and string.format(" cursor=(%d,%d) unit=0x%02X",
+        observation.cursor.x, observation.cursor.y, observation.cursor.unit or 0) or ""
+    local menuPart = ""
+    if observation.menu then
+        local ids = {}
+        for _, item in ipairs(observation.menu.items) do ids[#ids + 1] = string.format("0x%02X", item.override_id) end
+        menuPart = string.format(" menu=[%s]@%d", table.concat(ids, ","), observation.menu.current)
+    end
+    return (state or ("unsupported:" .. tostring(why))) .. cursorPart .. menuPart
+end
+local function legalNames(actions)
+    local names = {}
+    for _, action in ipairs(actions or {}) do names[#names + 1] = action.intention end
+    return names
+end
+local function traceInput(before, actions, intention, key, expected, verdict, after)
+    local state, why = controllerState(before)
+    before.classification = state or "unsupported"
+    before.classification_error = why
+    after = after or before
+    local afterState, afterWhy = controllerState(after)
+    after.classification = afterState or "unsupported"
+    after.classification_error = afterWhy
+    if verdict == "pass" then
+        before.raw_procs = nil
+        after.raw_procs = nil
+    end
+    log(Controller.formatTrace({
+        state = state or "unsupported", legal = legalNames(actions), intention = intention,
+        input = key or "none", expected = expected, result = verdict,
+        before = before, after = after,
+    }))
+    if verdict:match("^fail:") then
+        controllerFault = controllerFault or (intention .. ": " .. verdict)
+    end
+end
+local function traceFailure(intention, expected, verdict, observation, tag)
+    observation = observation or observeController()
+    local actions = Controller.legalActions(observation)
+    traceInput(observation, actions, intention, "none", expected, verdict, observation)
+    shot(tag or "controller-failure")
+end
+guardedInput = function(intention, key, expected, predicate, frames)
+    local before = observeController()
+    local actions, why = Controller.legalActions(before)
+    local chosen = actions and Controller.findAction(actions, intention) or nil
+    if not chosen or chosen.key ~= key then
+        traceInput(before, actions, intention, "none", expected, "fail:not-legal:" .. tostring(why), before)
+        shot("controller-illegal-input")
+        return false
+    end
+    press(K[key], 3)
+    local after = observeController()
+    local passed = predicate(after, before)
+    for _ = 1, (frames or 60) do
+        if passed then break end
+        yield()
+        after = observeController()
+        passed = predicate(after, before)
+    end
+    traceInput(before, actions, intention, key, expected, passed and "pass" or "fail:postcondition", after)
+    if not passed then shot("controller-postcondition") end
+    return passed
+end
+local function selectSemantic(intention, expected, predicate, frames)
+    for _ = 1, 12 do
+        local observation = observeController()
+        local actions, why = Controller.legalActions(observation)
+        local wanted = actions and Controller.findAction(actions, intention) or nil
+        if not wanted then
+            traceInput(observation, actions, intention, "none", expected, "fail:not-legal:" .. tostring(why), observation)
+            shot("controller-command-missing")
+            return false
+        end
+        if wanted.key == "A" then return guardedInput(intention, "A", expected, predicate, frames) end
+        local count = observation.menu and #observation.menu.items or 0
+        if not wanted.target or count < 2 then
+            traceInput(observation, actions, intention, "none", expected, "fail:no-live-target", observation)
+            return false
+        end
+        local current = observation.menu.current
+        local down = (wanted.target - current) % count
+        local nav = down <= count - down and "menu_next" or "menu_previous"
+        local key = nav == "menu_next" and "DOWN" or "UP"
+        if not guardedInput(nav, key, "live menu selection changes", function(after)
+            return after.menu ~= nil and after.menu.current ~= current
+        end, 30) then return false end
+    end
+    traceFailure(intention, expected, "fail:menu-navigation-budget", nil,
+        "controller-menu-navigation")
+    return false
+end
+
 -- ---------------------------------------------------------------- UI driving
 local function cursorTo(tx, ty)
     for _ = 1, 120 do
         local cx, cy = cursor()
         if cx == tx and cy == ty then return true end
-        if cx < tx then press(K.RIGHT, 3)
-        elseif cx > tx then press(K.LEFT, 3)
-        elseif cy < ty then press(K.DOWN, 3)
-        else press(K.UP, 3) end
+        local intention, key
+        if cx < tx then intention, key = "cursor_right", "RIGHT"
+        elseif cx > tx then intention, key = "cursor_left", "LEFT"
+        elseif cy < ty then intention, key = "cursor_down", "DOWN"
+        else intention, key = "cursor_up", "UP" end
+        if not guardedInput(intention, key, string.format("cursor advances toward (%d,%d)", tx, ty),
+            function()
+                local nx, ny = cursor()
+                return nx ~= cx or ny ~= cy
+        end, 30) then return false end
     end
+    traceFailure("cursor_to", string.format("cursor reaches (%d,%d)", tx, ty),
+        "fail:cursor-navigation-budget", nil, "controller-cursor-navigation")
     return false
 end
 
 local function waitFor(pred, frames, tapA)
-    for f = 1, frames do
+    for _ = 1, frames do
         if pred() then return true end
-        -- advance any dialogue (death quotes etc. wait for A)
-        if tapA and f % 50 == 0 then press(K.A, 3) end
+        if tapA and controllerState() == "dialogue_wait" then
+            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
+                return controllerState(after) ~= "dialogue_wait"
+            end, 60) then return false end
+        else
+            yield()
+        end
+    end
+    return false
+end
+
+local function awaitControllerState(want, frames)
+    local last
+    for _ = 1, (frames or 300) do
+        last = observeController()
+        local state = controllerState(last)
+        if state == want then return true end
+        if state ~= "transition" then
+            traceFailure("await_state", want, "fail:unexpected-state:" .. tostring(state), last,
+                "controller-unexpected-state")
+            return false
+        end
         yield()
     end
+    traceFailure("await_state", want, "fail:state-timeout", last, "controller-state-timeout")
     return false
 end
 
 -- Select unit at (fx,fy), move to (tx,ty). True when the action menu opened.
 local function moveUnit(fx, fy, tx, ty)
+    if not awaitControllerState("player_map_idle", 300) then return false end
     if not cursorTo(fx, fy) then return false end
-    press(K.A)
-    wait(10) -- movement range now shown
-    if not cursorTo(tx, ty) then press(K.B); return false end
-    if fx == tx and fy == ty then
-        -- No-move (act in place): the single confirm-A gets EATEN while the move-range display is
-        -- still animating in when the cursor is already on the tile (no travel delay). Retry A until
-        -- the command menu actually opens, checking BEFORE each press so we never over-advance into
-        -- a menu row. (This is the ch03talk/ch03win/ch03prep driver-pacing regression -- a longer
-        -- opening left less settle time; the retry makes the no-move select robust.)
-        for _ = 1, 10 do
-            if menuOpen() then return true end
-            press(K.A); if waitFor(menuOpen, 14) then return true end
-        end
-        press(K.B); press(K.B); return false
-    end
-    press(K.A)
-    if waitFor(menuOpen, 40) then return true end
-    press(K.B); press(K.B)
-    return false
+    if not guardedInput("select_unit", "A", "PlayerPhase enters movement-range input", function(after)
+        return controllerState(after) == "unit_selected"
+    end, 120) then return false end
+    if not cursorTo(tx, ty) then return false end
+    return guardedInput("confirm_move", "A", "live unit command menu opens", function(after)
+        return controllerState(after) == "unit_command_menu"
+    end, 180)
 end
 
-local function chooseWait() -- action menu: Wait is last; UP wraps to it
-    press(K.UP)
-    press(K.A)
-    waitFor(function() return not menuOpen() end, 60)
+local function chooseWait()
+    return selectSemantic("wait", "Wait closes the unit command menu", function(after)
+        return after.menu == nil
+    end, 120)
 end
 
--- Action menu with an enemy in range: Attack is first. A -> weapon list
--- (first weapon) -> A -> target (sole in-range target) -> A -> combat.
--- CALLER BEWARE: row 0 is Attack only when the engine has a target. With none it is Item, and
--- these three blind presses Use a healing item at full HP instead (#204) -- check the engine's
--- own grid first (canAttackFromHere).
--- `stopWhen` is an optional second exit for the combat wait. A kill that ENDS the chapter starts
--- the win event on the spot, which can keep the actor from ever being greyed out -- so without it
--- this waits the full 1200 frames tapping A, mashing straight through the ending a capture run
--- exists to film (#204).
+local function chooseTalk()
+    if not selectSemantic("talk", "Talk opens its live target selector", function(after)
+        return controllerState(after) == "target_selection"
+            and after.target and after.target.kind == "talk"
+    end, 300) then return false end
+    return guardedInput("confirm_target", "A", "Talk reaches FE8's dialogue input wait", function(after)
+        return controllerState(after) == "dialogue_wait"
+    end, 600)
+end
+
+-- Select Attack, an enabled weapon, and the current engine-selected target from live semantic
+-- structures. `stopWhen` is an optional second exit for the combat wait. A kill that ENDS the
+-- chapter starts the win event on the spot, which can keep the actor from ever being greyed out.
+-- Dialogue advances only at TalkWaitForInput; a combat timeout fails closed without rescue input.
 local function chooseAttack(actorAddr, stopWhen)
-    press(K.A); wait(20)
-    press(K.A); wait(20)
-    press(K.A)
+    if not selectSemantic("attack", "Attack opens the live weapon menu", function(after)
+        return controllerState(after) == "weapon_menu"
+    end, 300) then return false end
+    if not selectSemantic("select_weapon", "weapon opens the live attack target selector", function(after)
+        return controllerState(after) == "target_selection"
+            and after.target and after.target.kind == "attack"
+    end, 300) then return false end
+    if not guardedInput("confirm_target", "A", "target selection starts the battle proc", function(after)
+        return after.procs.battle ~= nil
+    end, 300) then return false end
     -- combat (with battle anims) ends when the actor is greyed out
     local done = waitFor(function()
         return (ru32(actorAddr + 0x0C) & 0x2) ~= 0 -- US_UNSELECTABLE
             or (stopWhen ~= nil and stopWhen())
     end, 1200, true)
+    if not done then
+        traceFailure("await_combat", "actor becomes unavailable or scenario terminal fires",
+            "fail:combat-timeout", nil, "controller-combat-timeout")
+        freezeReport("controller combat timeout")
+        return false
+    end
     wait(30)
-    return done
+    return true
 end
 
 -- March a unit toward (tx,ty) using the game's own pathing: selecting the
@@ -340,60 +725,27 @@ local function reachCost(x, y)
 end
 local function marchToward(u, tx, ty, maxx, maxy)
     maxx, maxy = maxx or 14, maxy or 9 -- default = ch00 map; ch01 is 25x16
-    -- Select the unit. The A press can be eaten (phase-banner interlude still
-    -- animating), leaving a STALE movement map that reads cost 0 everywhere --
-    -- the scan would then "reach" any tile and the follow-up A on it opens the
-    -- map menu, whose UP-wrapped last entry is End (a wasted turn, the
-    -- ch01win bug). A real movement map always has unreachable tiles, so
-    -- demand some before trusting it.
-    local selected = false
-    for attempt = 1, 4 do
-        if not cursorTo(u.x, u.y) then return false end
-        press(K.A)
-        wait(12) -- selection computes the move-range map
-        if menuOpen() then press(K.B); wait(10); return false end -- unit exhausted
-        local unreachable = 0
-        for y = 0, maxy do
-            for x = 0, maxx do
-                if reachCost(x, y) >= 120 then unreachable = unreachable + 1 end
-            end
-        end
-        if unreachable > 0 then selected = true break end
-        log("  march: movement map stale (eaten A press?); reselecting")
-        press(K.B)
-        wait(40)
-    end
-    if selected then
-        local best, bestd = nil, 999
-        for y = 0, maxy do
-            for x = 0, maxx do
-                if reachCost(x, y) < 120 and not tileOccupied(x, y)
-                    and not (x == u.x and y == u.y) then
-                    local d = math.abs(tx - x) + math.abs(ty - y)
-                    if d < bestd then best, bestd = { x = x, y = y }, d end
-                end
-            end
-        end
-        if best and cursorTo(best.x, best.y) then
-            press(K.A)
-            if waitFor(menuOpen, 40) then
-                chooseWait()
-                return true
+    if not awaitControllerState("player_map_idle", 300) then return false end
+    if not cursorTo(u.x, u.y) then return false end
+    if not guardedInput("select_unit", "A", "PlayerPhase enters movement-range input", function(after)
+        return controllerState(after) == "unit_selected"
+    end, 120) then return false end
+    local best, bestd = nil, 999
+    for y = 0, maxy do
+        for x = 0, maxx do
+            if reachCost(x, y) < 120 and not tileOccupied(x, y)
+                and not (x == u.x and y == u.y) then
+                local d = math.abs(tx - x) + math.abs(ty - y)
+                if d < bestd then best, bestd = { x = x, y = y }, d end
             end
         end
     end
-    press(K.B); press(K.B)
-    return false
+    if not best or not cursorTo(best.x, best.y) then return false end
+    if not guardedInput("confirm_move", "A", "live unit command menu opens", function(after)
+        return controllerState(after) == "unit_command_menu"
+    end, 180) then return false end
+    return chooseWait()
 end
-
--- gBmMapUnit[y][x] -- the engine's tile->unit grid (u8**, indexed like gBmMapMovement). It,
--- not the unit's xPos/yPos, is what cursor-selection reads, so a relocate must update both.
-local function mapUnitRow(y) return ru32(ru32(SYM.gBmMapUnit) + y * 4) end
-local function mapUnitAt(x, y) return ru8(mapUnitRow(y) + x) end
-local function setMapUnit(x, y, v) emu:write8(mapUnitRow(y) + x, v) end
-
--- The live map's tile dimensions (struct Vec2 gBmMapSize) -- never assume a footprint.
-local function mapSize() return rs16(SYM.gBmMapSize), rs16(SYM.gBmMapSize + 2) end
 
 -- A tile with NO unit on it, resolved against the live map. endTurn presses A to open the
 -- map menu, and A on an occupied tile SELECTS that unit instead -- no menu, so the turn can
@@ -411,27 +763,41 @@ local function emptyTile()
 end
 
 local function endTurn(tile)
+    if not awaitControllerState("player_map_idle", 300) then return false end
     tile = tile or emptyTile()
-    if not tile then log("  endTurn: no empty tile on this map"); return false end
-    cursorTo(tile.x, tile.y)
-    press(K.A)
-    if not waitFor(menuOpen, 40) then press(K.B); return false end
-    press(K.UP) -- map menu: UP from the top wraps to End (last entry)
-    press(K.A)
-    return true
+    if not tile then
+        traceFailure("end_phase", "live map has an empty tile from which to open its menu",
+            "fail:no-empty-map-tile", nil, "controller-no-empty-tile")
+        return false
+    end
+    if not cursorTo(tile.x, tile.y) then return false end
+    if not guardedInput("open_map_menu", "A", "live map command menu opens", function(after)
+        return controllerState(after) == "map_command_menu"
+    end, 120) then return false end
+    return selectSemantic("end_phase", "End Phase leaves the player phase", function()
+        return faction() ~= 0
+    end, 900)
 end
 
 -- End turn, then ride out the enemy phase. Returns "gameover" the moment the
 -- game-over screen proc appears, "player" when control comes back, or nil.
 local function runEnemyPhase(tile)
     if not endTurn(tile) then return nil end
-    waitFor(function() return faction() ~= 0 end, 300)
-    for f = 1, 3600 do
+    for _ = 1, 3600 do
         if gameOverActive() then return "gameover" end
-        if faction() == 0 and not menuOpen() then return "player" end
-        if f % 50 == 0 then press(K.A, 3) end -- advance quotes/dialogue
-        yield()
+        if faction() == 0 and not menuOpen() and controllerState() == "player_map_idle" then
+            return "player"
+        end
+        if controllerState() == "dialogue_wait" then
+            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
+                return controllerState(after) ~= "dialogue_wait"
+            end, 60) then return nil end
+        else
+            yield()
+        end
     end
+    traceFailure("enemy_phase", "enemy phase reaches game over or returns player control",
+        "fail:phase-timeout", nil, "controller-enemy-phase-timeout")
     return nil
 end
 
@@ -450,50 +816,102 @@ end
 -- Drive OUT of the Preparations screen via Fight! (PrepScreenMenu_OnStartPress), if it is
 -- open. Real PREP chapters (ch03, #23 item 3) interpose Preparations between the beginning
 -- scene and the map; FE8 auto-fills deployment to the cap, so a plain Fight! fields the
--- roster. B first backs out of any submenu a boot keypress may have opened; A clears a stray
--- confirm. No-op (returns true) when no prep proc is up (the TESTCH sandbox / static boots).
--- Mirrors reachCh01Map's prep loop, shared for the fresh-boot ch03 scenarios.
+-- roster. No-op (returns true) when no prep proc is up (the TESTCH sandbox / static boots).
 local function driveThroughPrep()
-    if not procActive(SYM.gProcScr_SALLYCURSOR) then return true end
-    wait(180) -- let the preparations menu draw
-    shot("prep-menu")
-    for i = 1, 40 do
-        if not procActive(SYM.gProcScr_SALLYCURSOR) then break end
-        press(K.B, 4)
-        wait(10)
-        press(K.START, 4)
-        wait(40)
-        if i % 4 == 0 and procActive(SYM.gProcScr_SALLYCURSOR) then press(K.A, 4) wait(20) end
+    if not procActive(SYM.ProcScr_AtMenu) and not procActive(SYM.gProcScr_SALLYCURSOR) then return true end
+    if not awaitControllerState("prep_main", 900) then
+        local state, why = controllerState()
+        log("controller: preparations never reached main input: " .. tostring(state or why))
+        return false
     end
-    return waitFor(function()
-        return not procActive(SYM.gProcScr_SALLYCURSOR) and faction() == 0 and turn() >= 1
-    end, 1200)
+    shot("prep-menu")
+    return guardedInput("fight", "START", "main Preparations exits directly to chapter flow", function(after)
+        local state = controllerState(after)
+        return state ~= "prep_main" and state ~= "prep_map_menu" and state ~= "prep_pick_units"
+            and not procActive(SYM.ProcScr_AtMenu)
+            and not procActive(SYM.gProcScr_SALLYCURSOR)
+            and not procActive(SYM.ProcScr_PrepMenu)
+    end, 1800)
 end
 
-local function bootToMap()
-    log("booting to map (fresh save -> New Game)")
-    for i = 1, 120 do
-        -- Real PREP chapters (ch03) open Preparations before the map; Fight! into the phase.
-        if procActive(SYM.gProcScr_SALLYCURSOR) then
-            if not driveThroughPrep() then
-                shot("boot-prep-stuck")
+-- Execute at most one input for a recognized boot state. `nil` means the state is unsupported;
+-- false means a guarded input failed; true means one input passed or a transition yielded.
+local function advanceBootState(observation, state)
+    if state == "health_safety_wait" then
+        return guardedInput("continue", "A", "health/safety wait clears", function(after)
+            return controllerState(after) ~= "health_safety_wait"
+        end, 300)
+    elseif state == "title_idle" then
+        return guardedInput("new_game", "START", "title idle exits", function(after)
+            return controllerState(after) ~= "title_idle"
+        end, 600)
+    elseif state == "save_menu_input" then
+        return guardedInput("new_game", "A", "New Game leaves save-menu input", function(after)
+            return controllerState(after) ~= "save_menu_input"
+        end, 600)
+    elseif state == "save_slot_input" then
+        return guardedInput("select_save_slot", "A", "save-slot input clears", function(after)
+            return controllerState(after) ~= "save_slot_input"
+        end, 600)
+    elseif state == "difficulty_input" then
+        return guardedInput("confirm_difficulty", "A", "difficulty input clears", function(after)
+            return controllerState(after) ~= "difficulty_input"
+        end, 600)
+    elseif state == "chapter_intro_input" then
+        return guardedInput("continue_chapter_intro", "A", "chapter intro input clears", function(after)
+            return controllerState(after) ~= "chapter_intro_input"
+        end, 600)
+    elseif state == "dialogue_wait" then
+        return guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
+            return controllerState(after) ~= "dialogue_wait"
+        end, 120)
+    elseif state == "transition" then
+        yield()
+        return true
+    end
+    return nil
+end
+
+local function bootToMap(stopAtPrep)
+    log("booting to map with observed FE8 states")
+    for _ = 1, 12000 do
+        local observation = observeController()
+        local state, why = controllerState(observation)
+        if state == "player_map_idle" then
+            if inChapter() then
+                log(string.format("in chapter %d turn %d", chapter(), turn()))
+                shot("map-loaded")
+                return true
+            end
+            yield()
+        elseif state == "prep_main" then
+            if stopAtPrep then return true end
+            if not driveThroughPrep() then return false end
+        elseif state == "prep_map_menu" or state == "prep_pick_units" then
+            local actions = Controller.legalActions(observation)
+            traceInput(observation, actions, "boot", "none", "supported boot state", "fail:unsupported-prep-state", observation)
+            shot("boot-prep-unsupported")
+            return false
+        else
+            local advanced = advanceBootState(observation, state)
+            if advanced == true then
+                -- Continue observing; the next input must be independently legal.
+            elseif advanced == false then
                 return false
+            else
+            local actions = Controller.legalActions(observation)
+            traceInput(observation, actions, "boot", "none", "recognized boot state",
+                "fail:" .. tostring(why), observation)
+            shot("boot-unsupported")
+            return false
             end
         end
-        if inChapter() then
-            wait(120) -- let deploy events settle
-            press(K.B); press(K.B)
-            log(string.format("in chapter %d turn %d", chapter(), turn()))
-            shot("map-loaded")
-            return true
-        end
-        press(i % 2 == 0 and K.A or K.START, 4)
-        wait(26)
     end
     log(string.format("boot stuck: chapter=%d host=%d faction=0x%02X turn=%d blue0=%s prep=%s",
         chapter(), HOST_CHAPTER, faction(), turn(), tostring(unitAt(SYM.gUnitArrayBlue, 0) ~= nil),
         tostring(procActive(SYM.gProcScr_SALLYCURSOR))))
-    shot("boot-stuck")
+    traceFailure("boot", "recognized boot state reaches requested chapter",
+        "fail:boot-timeout", nil, "boot-stuck")
     return false
 end
 
@@ -601,7 +1019,7 @@ local function battleSide(base)
 end
 
 -- Dump everything that localizes a freeze. Sampled twice, `gap` frames apart.
-local function freezeReport(tag, gap)
+freezeReport = function(tag, gap)
     local before = procPool()
     wait(gap or 90)
     local after = procPool()
@@ -630,6 +1048,47 @@ local function freezeReport(tag, gap)
     for i = 0, 63 do
         if after[i] then log(procLine(i, after[i], before[i])) end
     end
+end
+
+-- CONTROLLER_TURN (#220): the compact live contract gate on the normal no-prep boot.
+-- It proves a real unit move closes through semantic Wait, then semantic End Phase reaches
+-- an enemy phase and returns to a fresh player turn. The scenario owns those assertions;
+-- move/menu/phase mechanics remain shared controller operations.
+scenarios.controller_turn = function()
+    if not bootToMap() then return result("FAIL", "controller did not reach the no-prep map") end
+    local actor
+    for i = 0, 61 do
+        local candidate = unitAt(SYM.gUnitArrayBlue, i)
+        if candidate and not isDead(candidate) and (candidate.state & 0xB) == 0
+            and candidate.x ~= 0xFF then
+            actor = candidate
+            break
+        end
+    end
+    if not actor then return result("FAIL", "no selectable blue unit on the live map") end
+    if not moveUnit(actor.x, actor.y, actor.x, actor.y) then
+        return result("FAIL", "controller could not move a live unit in place")
+    end
+    if not chooseWait() then return result("FAIL", "live unit menu did not expose semantic Wait") end
+    if not waitFor(function() return (ru32(actor.addr + 0x0C) & 0x2) ~= 0 end, 300) then
+        return result("FAIL", "Wait did not mark the acting unit unselectable")
+    end
+    for i = 0, 49 do
+        local enemy = unitAt(SYM.gUnitArrayRed, i)
+        if enemy and not isDead(enemy) then pokeHarmless(enemy) end
+    end
+    local beforeTurn = turn()
+    if runEnemyPhase() ~= "player" then
+        return result("FAIL", "semantic End Phase did not return from the enemy phase")
+    end
+    if faction() ~= 0 or turn() <= beforeTurn then
+        return result("FAIL", string.format(
+            "enemy-phase return postcondition failed (turn %d->%d faction=0x%02X)",
+            beforeTurn, turn(), faction()))
+    end
+    result("PASS", string.format(
+        "no-prep boot -> move -> semantic Wait -> semantic End Phase -> player turn %d",
+        turn()))
 end
 
 -- ---- greedy clear-bot (#60): real-combat chapter completion. Generic boss detection
@@ -702,29 +1161,28 @@ local function liveEnemies()
 end
 
 -- Select unit u and return the tiles it can move to this turn (cost < 120, free, plus its
--- own tile -- attack-from-here), leaving it selected with the move range shown. nil if the
--- unit is exhausted (selecting opened a menu) or the cursor never reached it. Reuses the
--- stale-move-map guard from marchToward (an eaten A press reads cost 0 everywhere).
+-- own tile -- attack-from-here), leaving it selected with the move range shown. Every input
+-- is controller-guarded; an invalid/stale movement map is a terminal mechanical failure.
 local function selectAndReach(u, maxx, maxy)
     maxx, maxy = maxx or 14, maxy or 9
-    for _ = 1, 4 do
-        if not cursorTo(u.x, u.y) then return nil end
-        press(K.A)
-        wait(12)
-        if menuOpen() then press(K.B); wait(10); return nil end
-        local reach, unreachable = {}, 0
-        for y = 0, maxy do
-            for x = 0, maxx do
-                if reachCost(x, y) >= 120 then
-                    unreachable = unreachable + 1
-                elseif (x == u.x and y == u.y) or not tileOccupied(x, y) then
-                    reach[#reach + 1] = { x = x, y = y }
-                end
+    if not awaitControllerState("player_map_idle", 300) then return nil end
+    if not cursorTo(u.x, u.y) then return nil end
+    if not guardedInput("select_unit", "A", "PlayerPhase enters movement-range input", function(after)
+        return controllerState(after) == "unit_selected"
+    end, 120) then return nil end
+    local reach, unreachable = {}, 0
+    for y = 0, maxy do
+        for x = 0, maxx do
+            if reachCost(x, y) >= 120 then
+                unreachable = unreachable + 1
+            elseif (x == u.x and y == u.y) or not tileOccupied(x, y) then
+                reach[#reach + 1] = { x = x, y = y }
             end
         end
-        if unreachable > 0 then return reach end   -- a real move map has unreachable tiles
-        press(K.B); wait(40)                        -- stale map (eaten A press); reselect
     end
+    if unreachable > 0 then return reach end
+    traceFailure("read_movement", "live movement map contains bounded unreachable tiles",
+        "fail:stale-movement-map", nil, "controller-stale-movement")
     return nil
 end
 
@@ -779,13 +1237,22 @@ local function smokeDrive(startChapter)
             return result("PASS", string.format(
                 "survived %d turns, no crash/soft-lock (no terminal)", budgetTurns))
         end
-        -- Drive one small step: idle the player phase (just end the turn); otherwise
-        -- nudge dialogue / phase interludes along. Sampling stays continuous so an
-        -- in-enemy-phase freeze is caught, not hidden inside a blocking phase call.
-        if faction() == 0 and not menuOpen() and turn() >= 1 then
-            endTurn()
+        -- Drive one semantic step. Enemy phases and event transitions receive no input;
+        -- dialogue advances only at TalkWaitForInput.
+        local observation = observeController()
+        local state, why = controllerState(observation)
+        if state == "player_map_idle" and faction() == 0 and turn() >= 1 then
+            if not endTurn() then return result("FAIL", "smoke could not end the player phase") end
+        elseif state == "dialogue_wait" then
+            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
+                return controllerState(after) ~= "dialogue_wait"
+            end, 120) then return result("FAIL", "smoke dialogue did not advance") end
+        elseif state == "transition" then
+            yield()
         else
-            press(K.A, 2)
+            traceFailure("smoke_drive", "player map, dialogue wait, or passive transition",
+                "fail:" .. tostring(why or state), observation, "smoke-unsupported")
+            return result("FAIL", "smoke reached unsupported controller state")
         end
         wait(8)
     end
@@ -817,15 +1284,24 @@ local function winCh00()
         -- adjacent tile next to the boss, then attack (steel sword, range 1)
         local tx, ty = sephek.x, sephek.y + 1
         if tileOccupied(tx, ty) then tx, ty = sephek.x - 1, sephek.y end
-        if moveUnit(scram.x, scram.y, tx, ty) then
-            shot("attacking-sephek")
-            chooseAttack(scram.addr)
+        if not moveUnit(scram.x, scram.y, tx, ty) then
+            result("FAIL", "could not reach Sephek through guarded movement")
+            return false
+        end
+        shot("attacking-sephek")
+        if not chooseAttack(scram.addr) then
+            result("FAIL", "combat did not reach its verified postcondition")
+            return false
         end
         if not isDead(red(CHAR_SEPHEK)) then
             log("Sephek alive after turn " .. t .. " (miss?); ending turn and retrying")
             local phase = runEnemyPhase()
             if phase == "gameover" then
                 result("FAIL", "unexpected game over in win run")
+                return false
+            end
+            if phase ~= "player" then
+                result("FAIL", "enemy phase did not return verified player control")
                 return false
             end
         end
@@ -835,6 +1311,8 @@ local function winCh00()
             local ended = waitFor(function() return chapter() ~= HOST_CHAPTER end, 3600, true)
             shot("after-boss-kill")
             if ended then return true end
+            traceFailure("win_ch00", "boss death advances beyond the hosted chapter",
+                "fail:chapter-advance-timeout", nil, "ch00-win-timeout")
             result("FAIL", "Sephek died but the chapter never ended")
             return false
         end
@@ -891,59 +1369,41 @@ local function reachCh01Map()
     if not waitFor(function() return chapter() == 2 end, 1800) then
         result("FAIL", "chapter slot 2 never loaded after the ch00 win"); return false
     end
-    log("in ch01 (chapter slot 2); clicking through the post-chapter save menu")
-    -- The post-chapter save menu sits between MNC2 and the ch01 beginning
-    -- scene: A-tap through the Beat-1 Northlook scene (#21, ~22 dialogue pages +
-    -- the lord-select prompt/menu/confirm) until the prep screen proc appears,
-    -- then stop -- further A's would toggle Pick Units entries.
-    local prep = false
-    for i = 1, 200 do
-        if procActive(SYM.gProcScr_SALLYCURSOR) then prep = true break end
-        if i % 12 == 0 then
-            shot(string.format("ch01-wait-%02d", i))
-            log(string.format("waiting: chapter=%d faction=0x%02X turn=%d",
-                chapter(), faction(), turn()))
-        end
-        press(K.A, 4)
-        wait(36)
-    end
-    if not prep then
-        shot("ch01-no-prep")
-        for i = 0, 63 do -- dump live procs for post-mortem (nm the addresses)
-            local a = SYM.sProcArray + i * 0x6C
-            local p = ru32(a)
-            if p ~= 0 then
-                -- EventEngineProc: +0x30 pEventStart, +0x38 pEventCurrent
-                log(string.format("proc[%02d] script=0x%08X evStart=0x%08X evCur=0x%08X",
-                    i, p, ru32(a + 0x30), ru32(a + 0x38)))
+    log("in ch01 (chapter slot 2); observing post-chapter flow to Preparations")
+    for _ = 1, 12000 do
+        local observation = observeController()
+        local state, why = controllerState(observation)
+        if state == "prep_main" then
+            shot("ch01-prep-menu")
+            if not driveThroughPrep() then
+                result("FAIL", "could not leave preparations via semantic Fight"); return false
+            end
+        elseif state == "player_map_idle" and faction() == 0 and turn() >= 1 then
+            wait(120)
+            shot("ch01-map")
+            return true
+        elseif state == "generic_menu" then
+            -- Scenario policy: choose the currently highlighted default lead. The controller
+            -- owns the live menu callback and guarded A; no row or candidate count is guessed.
+            if not guardedInput("select_current_menu_item", "A", "lead menu selection closes", function(after)
+                return after.menu == nil
+            end, 300) then
+                result("FAIL", "could not choose the highlighted lead"); return false
+            end
+        else
+            local advanced = advanceBootState(observation, state)
+            if advanced == false then return false end
+            if advanced == nil then
+                traceFailure("reach_ch01", "post-chapter flow reaches Preparations",
+                    "fail:" .. tostring(why or state), observation, "ch01-unsupported")
+                result("FAIL", "unsupported state before ch01 Preparations"); return false
             end
         end
-        result("FAIL", "prep screen never opened (PREP event cmd)"); return false
     end
-    wait(180) -- let the preparations menu draw
-    shot("ch01-prep-menu")
-    -- START = Fight! (PrepScreenMenu_OnStartPress). B first backs out of any
-    -- state a boot keypress may have left; A every few tries clicks through a
-    -- confirm if one appears.
-    for i = 1, 40 do
-        if not procActive(SYM.gProcScr_SALLYCURSOR) then break end
-        press(K.B, 4)
-        wait(10)
-        press(K.START, 4)
-        wait(40)
-        if i % 4 == 0 and procActive(SYM.gProcScr_SALLYCURSOR) then press(K.A, 4) wait(20) end
-    end
-    local fighting = waitFor(function()
-        return not procActive(SYM.gProcScr_SALLYCURSOR)
-            and faction() == 0 and turn() >= 1
-    end, 1200)
-    if not fighting then
-        shot("ch01-prep-stuck")
-        result("FAIL", "could not leave preparations via Fight!"); return false
-    end
-    wait(120) -- phase intro
-    shot("ch01-map")
-    return true
+    traceFailure("reach_ch01", "post-chapter flow reaches Preparations",
+        "fail:chapter-flow-timeout", nil, "ch01-no-prep")
+    result("FAIL", "prep screen never opened (PREP event cmd)")
+    return false
 end
 
 -- CH01: reach the ch01 map, then assert the entry invariants -- the ch00 guests left
@@ -1005,13 +1465,13 @@ end
 -- reach (boss-first via pickTarget, so bows/magic act at range), and attack from the reachable
 -- tile; else step to the reachable tile NEAREST the boss by path distance (`field`, BFS around
 -- walls) -- falling back to Manhattan toward `goal` only where the field is unreachable. GUARANTEES
--- it leaves no unit selected (commit via Attack/Wait, or back out with B).
+-- it commits through a semantic Attack/Wait. Mechanical failures terminate without rescue input.
 local function clearUnitAct(u, field, goal, blocked, claimed, maxx, maxy)
     -- thread the REAL map bounds through: selectAndReach defaults to a 15x10
     -- window, which clipped every reach list at x=14 on ch01's 25x16 map -- the
     -- probable root cause of the #60 stall at exactly (14,8)
     local reach = selectAndReach(u, maxx, maxy)
-    if not reach then return end                 -- exhausted/unreachable; nothing selected
+    if not reach then return nil, true end
     local mn, mx = unitAttackRange(u)
     local enemies = liveEnemies()
     local pick = mn and CLEARBOT.pickTarget(reach, enemies, { range = mx, min_range = mn }) or nil
@@ -1024,16 +1484,58 @@ local function clearUnitAct(u, field, goal, blocked, claimed, maxx, maxy)
                                           goal = goal, blocked = blocked,
                                           enemies = enemies })
     end
-    if tile and cursorTo(tile.x, tile.y) then
-        press(K.A)
-        if waitFor(menuOpen, 40) then
-            if pick then chooseAttack(u.addr) else chooseWait() end
-            if claimed then claimed[CLEARBOT.tileKey(tile.x, tile.y)] = true end
-            return tile
+    if not tile then
+        traceFailure("clear_policy", "clear policy chooses a reachable destination",
+            "fail:no-destination", nil, "controller-clear-no-destination")
+        return nil, true
+    end
+    if not cursorTo(tile.x, tile.y) then return tile, true end
+    if not guardedInput("confirm_move", "A", "live unit command menu opens", function(after)
+        return controllerState(after) == "unit_command_menu"
+    end, 180) then return tile, true end
+    local committed
+    if pick then committed = chooseAttack(u.addr) else committed = chooseWait() end
+    if not committed then return tile, true end
+    if claimed then claimed[CLEARBOT.tileKey(tile.x, tile.y)] = true end
+    return tile, false
+end
+
+local function cancelUnitActionMenu()
+    if not guardedInput("cancel_menu", "B", "unit menu returns to movement selection", function(after)
+        return controllerState(after) == "unit_selected"
+    end, 120) then return false end
+    return guardedInput("cancel_selection", "B", "movement selection returns to player map", function(after)
+        return controllerState(after) == "player_map_idle"
+    end, 120)
+end
+
+local function cancelToPlayerMap()
+    for _ = 1, 8 do
+        local observation = observeController()
+        local state = controllerState(observation)
+        if state == "player_map_idle" then return true end
+        if state == "unit_selected" then
+            if not guardedInput("cancel_selection", "B", "movement selection returns to player map",
+                function(after) return controllerState(after) == "player_map_idle" end, 120) then
+                return false
+            end
+        elseif state == "unit_command_menu" or state == "weapon_menu" or state == "generic_menu" then
+            if not guardedInput("cancel_menu", "B", "live menu closes one semantic level",
+                function(after) return after.menu == nil or controllerState(after) ~= state end, 120) then
+                return false
+            end
+        elseif state == "transition" then
+            yield()
+        else
+            traceFailure("cancel_to_map", "player map after semantic cancellation",
+                "fail:unsupported-cancel-state:" .. tostring(state), observation,
+                "controller-cancel-unsupported")
+            return false
         end
     end
-    press(K.B); press(K.B)                       -- never leave a unit selected
-    return tile, true                            -- true = the move DIDN'T commit
+    traceFailure("cancel_to_map", "player map after semantic cancellation",
+        "fail:cancel-budget", nil, "controller-cancel-timeout")
+    return false
 end
 
 local CH01_PARK = { x = 24, y = 15 } -- empty far corner; ch01 map is 25x16
@@ -1074,7 +1576,7 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
     for t = 1, budgetTurns do
         waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
         wait(60) -- let the player-phase banner finish (it eats key presses)
-        press(K.B); wait(6)   -- NUDGE unstick: clear any stray menu before driving
+        if not awaitControllerState("player_map_idle", 300) then return "stuck", t end
         local b = findBoss()
         local field = b and bossDistanceField(b, maxx, maxy) or nil
         local claimed = {}                       -- destinations committed this phase
@@ -1097,26 +1599,37 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
                     end
                     local tile, failed = clearUnitAct(u, field, b, blocked, claimed,
                                                       maxx, maxy)
-                    if failed and tile then
-                        -- decision was made but the move never committed: a
-                        -- MECHANICAL failure (cursor/menu), not a pathing one --
-                        -- the distinction the #60 stall logs couldn't see
-                        log(string.format("clear: unit (%d,%d) chose (%d,%d) but the "
-                            .. "move didn't commit", u.x, u.y, tile.x, tile.y))
+                    if failed then
+                        if tile then
+                            log(string.format("clear: unit (%d,%d) chose (%d,%d) but the "
+                                .. "move didn't commit", u.x, u.y, tile.x, tile.y))
+                        end
+                        return "stuck", t
                     end
                 elseif moveUnit(u.x, u.y, seizeTile.x, seizeTile.y) then
-                    -- boss dead, not yet won -> Seize. It tops the menu for a unit that can
-                    -- seize; for any other unit A just Waits, so we back out and try the next.
+                    -- Boss dead, not yet won: select semantic Seize when this unit owns it.
+                    -- A non-lead unit is cancelled through two independently legal B actions.
                     shot("clear-seize-try")
-                    press(K.A)
-                    if waitFor(won, 9000, true) then return "won", t end
-                    press(K.B); press(K.B)
+                    local actions = Controller.legalActions(observeController())
+                    if Controller.findAction(actions, "seize") then
+                        if not selectSemantic("seize", "Seize starts the chapter win event", function()
+                            return won() or procActive(SYM.ProcScr_StdEventEngine)
+                        end, 900) then return "stuck", t end
+                        if waitFor(won, 9000, true) then return "won", t end
+                        traceFailure("seize", "chapter advances after the Seize event",
+                            "fail:chapter-advance-timeout", nil, "controller-seize-timeout")
+                        return "stuck", t
+                    elseif not cancelUnitActionMenu() then
+                        return "stuck", t
+                    end
                 end
             end
         end
         if won() then return "won", t end
         if lost() then return "gameover", t end
-        if runEnemyPhase(park) == "gameover" then return "gameover", t end
+        local phase = runEnemyPhase(park)
+        if phase == "gameover" then return "gameover", t end
+        if phase ~= "player" then return "stuck", t end
         -- stall watchdog: bail cleanly if no progress (nearer the boss OR fewer foes) for 3 turns,
         -- instead of grinding the full budget on a wedged bot.
         local dist, enemies = nearestBossDist(field), #liveEnemies()
@@ -1237,7 +1750,7 @@ local function fuzzDrive(startChapter)
     local cfg = { softlock_frames = 2400, nudge_frames = 600 }
     local budgetFrames = 60000   -- ~250s wall at 240fps; comfortably under run.sh's deadline
     local snaps = {}
-    local startFrame, recoverStep = emu:currentFrame(), 0
+    local startFrame = emu:currentFrame()
     log(string.format("fuzz: chapter %d, SEED %d, budget %d frames, nudge %d, softlock %d "
         .. "(reproduce a FAIL with PT_SEED=%d)",
         startChapter, seed, budgetFrames, cfg.nudge_frames, cfg.softlock_frames, seed))
@@ -1249,15 +1762,12 @@ local function fuzzDrive(startChapter)
             return result("PASS", string.format(
                 "survived %d frames on seed %d, no crash/soft-lock", budgetFrames, seed))
         end
-        -- Off the battle map: a random Suspend can drop us to the title (a legit non-crash
-        -- state where the liveness key is frozen and B can't escape). Don't judge liveness
-        -- here -- drive the menus FORWARD back into play (START/A like bootToMap) and drop
-        -- the stale frozen history so re-entry doesn't instantly trip the soft-lock window.
+        -- A random Suspend can legitimately leave the battle map. That is a clean fuzz terminal;
+        -- never inject recovery inputs into an unrelated UI state.
         if not liveOnMap() then
-            snaps = {}
-            recoverStep = recoverStep + 1
-            press(recoverStep % 2 == 0 and K.A or K.START, 4)
-            wait(20)
+            shot("fuzz-left-map")
+            return result("PASS", string.format(
+                "left the battle map cleanly on seed %d, no crash/soft-lock", seed))
         else
             local over = gameOverActive()
             local won = (not over) and chapter() ~= startChapter and chapter() ~= 0
@@ -1314,7 +1824,7 @@ end
 -- and executes the returned orders with the existing primitives. The sidecar has
 -- already validated the orders against this exact board (validate_orders), so an
 -- illegal order arriving here means the board CHANGED under us (a kill freed a tile)
--- -- those just fail to commit and are logged, never soft-lock. Timeout / malformed
+-- -- those fail closed before any later order or phase input. Timeout / malformed
 -- response -> FAIL, like every brick.
 local JSONF = dofile(PLAYTEST_DIR .. "/json.lua")
 local LLMDIR = (type(PLAYTEST_LLMDIR) == "string" and PLAYTEST_LLMDIR) or "/tmp/playtest-llm-handshake"
@@ -1333,7 +1843,11 @@ local function llmExportBoard(objective, maxx, maxy)
             local reach = {}
             if canAct then
                 local r = selectAndReach(u, maxx, maxy)
-                press(K.B) wait(6)   -- deselect: the export must not leave a unit selected
+                if not r then return nil, "controller could not enumerate live movement" end
+                if r and not guardedInput("cancel_selection", "B",
+                    "board export returns movement selection to player map", function(after)
+                        return controllerState(after) == "player_map_idle"
+                    end, 120) then return nil, "controller could not close movement selection" end
                 if r then for _, t in ipairs(r) do reach[#reach + 1] = { t.x, t.y } end end
             end
             local mn, mx = unitAttackRange(u)
@@ -1386,17 +1900,6 @@ local function llmHandshake(n, req, timeoutSecs)
     return nil, "sidecar timeout waiting for resp-" .. n .. ".json (is llm_player.py serve running?)"
 end
 
--- Drain every open menu level (submenus -- weapon/item lists -- are ALSO sProc_Menu,
--- so a fixed two-B backout can strand a level), then one more B to drop a move-range
--- selection. Restores the harness invariant: never leave a unit selected.
-local function llmBackout()
-    for _ = 1, 6 do
-        if not menuOpen() then break end
-        press(K.B) wait(8)
-    end
-    press(K.B) wait(8)
-end
-
 -- Resolve an exported unit id back to a live unit: blue = charId, red = 1000+slot
 -- (generics share charIds; see llmExportBoard).
 local function llmUnitById(id)
@@ -1410,28 +1913,45 @@ end
 -- one whenever a single enemy is in range of the strike tile; multi-target
 -- disambiguation is an M3 refinement.
 local function llmExecOrder(o)
-    if type(o.unit) ~= "number" or type(o.move_to) ~= "table" then return false end
+    local function reject(why)
+        traceFailure("llm_order", "sidecar order remains legal in the live FE8 state",
+            "fail:" .. why, nil, "controller-llm-order-rejected")
+        return false
+    end
+    if type(o.unit) ~= "number" or type(o.move_to) ~= "table" then
+        return reject("malformed-order")
+    end
     local u = blue(o.unit)
-    if not u or isDead(u) or (u.state & 0x2) ~= 0 then return false end
+    if not u or isDead(u) or (u.state & 0x2) ~= 0 then return reject("unit-cannot-act") end
     -- the sidecar validated against the REQUEST board; re-check what can have changed
-    -- since (an earlier order killed the target) before blind-A driving the menu --
-    -- with no live target the action menu has no Attack entry and A/A/A would walk
-    -- into the Item submenu instead
+    -- since (an earlier order killed the target) before any UI input. With no live
+    -- target the order is rejected rather than replaced by an unrelated action.
     local action = o.action
     if action == "attack" then
         local tgt = llmUnitById(o.target)
-        if not tgt or isDead(tgt) then action = "wait" end
+        if not tgt or isDead(tgt) then return reject("attack-target-not-live") end
+    elseif action ~= "seize" and action ~= "wait" then
+        return reject("unsupported-action-" .. tostring(action))
     end
     if not moveUnit(u.x, u.y, o.move_to.x, o.move_to.y) then return false end
     if action == "attack" then
-        chooseAttack(u.addr)
+        if not chooseAttack(u.addr) then return false end
     elseif action == "seize" then
-        press(K.A) wait(30)   -- Seize tops the menu for a seize-capable unit on the tile
-        if menuOpen() then llmBackout() return false end   -- no Seize here: back out fully
-    else
-        chooseWait()          -- wait/staff: staff driving is an M3 refinement
+        local actions = Controller.legalActions(observeController())
+        if not Controller.findAction(actions, "seize") then
+            return reject("seize-not-legal")
+        end
+        if not selectSemantic("seize", "Seize starts the chapter win event", function()
+            return procActive(SYM.ProcScr_StdEventEngine) or chapter() ~= HOST_CHAPTER
+        end, 900) then return false end
+    elseif action == "wait" then
+        if not chooseWait() then return false end
     end
-    if menuOpen() then llmBackout() return false end
+    if menuOpen() then
+        traceFailure("llm_order", "committed order closes its live menu",
+            "fail:menu-remained-open", nil, "controller-llm-menu-open")
+        return false
+    end
     return true
 end
 
@@ -1446,10 +1966,12 @@ local function llmUntilAdvance(startChapter, objective, maxx, maxy, park)
     for t = 1, budgetTurns do
         waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
         wait(60)              -- let the player-phase banner finish (it eats key presses)
-        press(K.B) wait(6)    -- NUDGE unstick: clear any stray menu before driving
+        if not awaitControllerState("player_map_idle", 300) then return "controller state", t end
         n = n + 1
+        local board, exportWhy = llmExportBoard(objective, maxx, maxy)
+        if not board then return "controller export: " .. exportWhy, t end
         local req = { seed = seed, chapter = startChapter, turn = turn(), faction = "blue",
-                      board = llmExportBoard(objective, maxx, maxy) }
+                      board = board }
         local resp, why = llmHandshake(n, req)
         if not resp then return "handshake: " .. why, t end
         if resp.error then return "sidecar: " .. tostring(resp.error), t end
@@ -1463,11 +1985,14 @@ local function llmUntilAdvance(startChapter, objective, maxx, maxy, park)
                 log(string.format("llm: order for unit %s -> (%s,%s) did not commit",
                     tostring(o.unit), tostring(o.move_to and o.move_to.x),
                     tostring(o.move_to and o.move_to.y)))
+                return "controller order: " .. tostring(controllerFault or "rejected"), t
             end
         end
         if won() then return "won", t end
         if lost() then return "gameover", t end
-        if runEnemyPhase(park) == "gameover" then return "gameover", t end
+        local phase = runEnemyPhase(park)
+        if phase == "gameover" then return "gameover", t end
+        if phase ~= "player" then return "controller phase", t end
     end
     return "timeout", budgetTurns
 end
@@ -2331,10 +2856,17 @@ scenarios.recordlordfast = function()
     end
     -- title -> New Game -> sandbox -> BeginningScene runs the explainer + ASMCs CallLordSelectMenu
     local atPrep = false
-    for i = 1, 160 do
+    for _ = 1, 5000 do
         if menuOpen() then atPrep = true break end
-        press(i % 2 == 0 and K.A or K.START, 4)
-        wait(22)
+        local observation = observeController()
+        local state, why = controllerState(observation)
+        local advanced = advanceBootState(observation, state)
+        if advanced ~= true then
+            local actions = Controller.legalActions(observation)
+            traceInput(observation, actions, "recordlordfast_boot", "none", "lord selection menu",
+                "fail:" .. tostring(why or "guarded boot input"), observation)
+            break
+        end
     end
     if not atPrep then shot("lordfast-noprep")
         return result("FAIL", "lord-select prep never opened on the fast-boot") end
@@ -2713,18 +3245,14 @@ end
 -- is how a recomposed title gets eyeballed without a manual run.
 scenarios.titlecard = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end
-    for try = 1, 5 do
-        press(K.A)
-        if waitFor(menuOpen, 40) then break end
-        press(K.B); press(K.B) -- cursor was on a unit; nudge off and retry
-        press(K.DOWN, 3)
-        if try == 5 then return result("FAIL", "map menu never opened") end
-    end
-    press(K.DOWN) -- map menu: Unit, [Status], Options, Suspend, End
-    press(K.A)
-    local ok = waitFor(function()
+    local tile = emptyTile()
+    if not tile or not cursorTo(tile.x, tile.y) then return result("FAIL", "no reachable empty map tile") end
+    if not guardedInput("open_map_menu", "A", "live map command menu opens", function(after)
+        return controllerState(after) == "map_command_menu"
+    end, 120) then return result("FAIL", "map menu never opened") end
+    local ok = selectSemantic("status", "Status screen proc starts", function()
         return procActive(SYM.gProcScr_ChapterStatusScreen)
-    end, 120)
+    end, 240)
     wait(90) -- let the banner/turn/funds panes finish drawing
     shot("chapter-status")
     -- dump palette RAM (BG + OBJ banks): traces which palette row owns an
@@ -2970,10 +3498,9 @@ local function teleportToFiringTile(u, mn, mx)
     return false
 end
 
--- True when the ENGINE would offer this unit an Attack row from its current tile: a hostile sits
--- within [mn,mx] of it in gBmMapUnit. The clear-bot must ask this before pressing, because
--- chooseAttack presses command-menu row 0 blind and row 0 is Attack only when a target exists
--- (otherwise Item -- see clearbot.lua gridHostileInReach and #204).
+-- True when the ENGINE would offer this unit an Attack command from its current tile: a hostile
+-- sits within [mn,mx] of it in gBmMapUnit. The clear-bot asks first so its policy chooses Wait
+-- when Attack will not appear; chooseAttack independently resolves the live semantic command.
 local function canAttackFromHere(u, mn, mx)
     local w, h = mapSize()
     return CLEARBOT.gridHostileInReach(function(x, y)
@@ -3088,7 +3615,10 @@ local function positionForShot(pid)
         if not mn then return false end
         pokeAnimsOn()
         local reach = selectAndReach(u, 24, 15)
-        press(K.B); wait(10)  -- deselect; re-select to act
+        if reach and not guardedInput("cancel_selection", "B",
+            "firing-position probe returns to player map", function(after)
+                return controllerState(after) == "player_map_idle"
+            end, 120) then return false end
         if reach then
             local pick = CLEARBOT.pickTarget(reach, liveEnemies(), { range = mx, min_range = mn })
             if pick then
@@ -3375,7 +3905,11 @@ local function seizeCh01ToCh02()
     log(string.format("ch01 seize: chief frail on (%d,%d); marching the lord", goal.x, goal.y))
     for t = 1, 18 do
         if chapter() ~= 2 then return "won" end
-        waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
+        if not waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true) then
+            traceFailure("ch01_seize", "player phase returns before the next move",
+                "fail:player-phase-timeout", nil, "ch01-seize-phase-timeout")
+            return "controller"
+        end
         wait(100)   -- let the player-phase banner finish (it eats key presses)
         for i = 0, 23 do   -- the escort dies to the first counter and deals no damage
             local r = unitAt(SYM.gUnitArrayRed, i)
@@ -3386,21 +3920,38 @@ local function seizeCh01ToCh02()
         chief = red(CH01_CHIEF)
         if chief and not isDead(chief) then
             if math.abs(lord.x - chief.x) + math.abs(lord.y - chief.y) == 1 then
-                if moveUnit(lord.x, lord.y, lord.x, lord.y) then chooseAttack(lord.addr) end
+                if not moveUnit(lord.x, lord.y, lord.x, lord.y) then return "controller" end
+                if not chooseAttack(lord.addr) then return "controller" end
             else
-                marchToward(lord, goal.x, goal.y + 1, 24, 15)
+                if not marchToward(lord, goal.x, goal.y + 1, 24, 15) then return "controller" end
             end
         else
-            if moveUnit(lord.x, lord.y, goal.x, goal.y) then press(K.A) end   -- Seize tops the menu here
+            if moveUnit(lord.x, lord.y, goal.x, goal.y) then
+                local actions = Controller.legalActions(observeController())
+                if not Controller.findAction(actions, "seize") then
+                    traceFailure("seize", "live unit menu exposes semantic Seize",
+                        "fail:seize-not-legal", nil, "ch01-seize-missing")
+                    return "controller"
+                end
+                if not selectSemantic("seize", "Seize starts the ch01 win event", function()
+                    return procActive(SYM.ProcScr_StdEventEngine) or chapter() ~= 2
+                end, 900) then return "controller" end
+            else
+                return "controller"
+            end
             if waitFor(function() return chapter() ~= 2 end, 9000, true) then return "won" end
-            press(K.B); press(K.B)
+            traceFailure("seize", "ch01 advances after the Seize event",
+                "fail:chapter-advance-timeout", nil, "ch01-seize-timeout")
+            return "controller"
         end
-        if runEnemyPhase(CH01_PARK) == "gameover" then return "gameover" end
+        local phase = runEnemyPhase(CH01_PARK)
+        if phase == "gameover" then return "gameover" end
+        if phase ~= "player" then return "controller" end
     end
     return "timeout"
 end
 
--- Reach the ch02 map off the REAL chain: clear ch00, seize ch01, then A-mash through the ch01
+-- Reach the ch02 map off the REAL chain: clear ch00, seize ch01, then observe the ch01
 -- ending + ch02 opening cutscenes + prep onto the map. This is the chain (MNC2(0x3)) the load-test
 -- most needs to prove. Returns true once on the ch02 map (faction 0, turn >= 1).
 local function reachCh02Map()
@@ -3411,36 +3962,8 @@ local function reachCh02Map()
         status, chapter(), faction(), turn(), tostring(procActive(SYM.gProcScr_TitleScreen))))
     if status ~= "won" then
         result("FAIL", "ch01 seize did not complete (" .. status .. ") -- can't reach ch02"); return false end
-    -- A-mash the ch01 ending cutscene + post-chapter save menu (they gate the MNC2(0x3)
-    -- transition) until ch02 (slot 3) actually loads.
-    local loaded = false
-    for i = 1, 400 do
-        if chapter() == CH02_CHAPTER then loaded = true break end
-        if i % 20 == 0 then log(string.format("await ch02: chapter=%d faction=0x%02X turn=%d title=%s",
-            chapter(), faction(), turn(), tostring(procActive(SYM.gProcScr_TitleScreen)))) end
-        press(K.A, 4); wait(36)
-    end
-    if not loaded then
-        shot("ch02-never-loaded")
-        result("FAIL", "ch02 (slot 3) never loaded after the ch01 win"); return false end
-    log("in ch02 (slot 3); A-mashing the opening cutscene to the prep (Pick Units) screen")
-    -- The ch02 opening (title card + 3 beats) precedes prep. A-mash until Pick Units opens.
-    local prep = false
-    for i = 1, 400 do
-        if procActive(SYM.gProcScr_SALLYCURSOR) then prep = true break end
-        if i % 20 == 0 then log(string.format("ch02 wait prep: chapter=%d faction=0x%02X turn=%d",
-            chapter(), faction(), turn())) end
-        press(K.A, 4); wait(36)
-    end
-    if prep then
-        wait(180)
-        for i = 1, 40 do
-            if not procActive(SYM.gProcScr_SALLYCURSOR) then break end
-            press(K.B, 4); wait(10); press(K.START, 4); wait(40)
-            if i % 4 == 0 and procActive(SYM.gProcScr_SALLYCURSOR) then press(K.A, 4); wait(20) end
-        end
-    end
-    -- A-mash the beginning scene (+ turn-1 tutorial) until the map is fully LIVE: enemies loaded,
+    -- Observe the ending, save/lead menus, opening, Preparations, and turn-1 tutorial until the
+    -- map is fully LIVE: enemies loaded,
     -- the party deployed, player control, no cutscene. Units/enemies/green chwinga load here -- the
     -- earlier "faction 0 + turn 1" fired during the opening cutscene, before any of them existed.
     local function partyDeployed()
@@ -3448,24 +3971,41 @@ local function reachCh02Map()
             if u and (u.state & 0x9) == 0 and u.x ~= 0xFF then return true end end
         return false
     end
-    local onmap = false
-    for i = 1, 400 do
+    for _ = 1, 16000 do
         if chapter() == CH02_CHAPTER and faction() == 0 and turn() >= 1
             and unitAt(SYM.gUnitArrayRed, 0) ~= nil and partyDeployed()
             and not procActive(SYM.ProcScr_StdEventEngine) and not procActive(SYM.gProcScr_SALLYCURSOR)
-            and not menuOpen() then onmap = true break end
-        if i % 20 == 0 then log(string.format(
-            "await ch02 map: chapter=%d faction=0x%02X turn=%d red0=%s deployed=%s evt=%s",
-            chapter(), faction(), turn(), tostring(unitAt(SYM.gUnitArrayRed, 0) ~= nil),
-            tostring(partyDeployed()), tostring(procActive(SYM.ProcScr_StdEventEngine)))) end
-        press(K.A, 4); wait(36)
+            and not menuOpen() and controllerState() == "player_map_idle" then
+            wait(120)
+            shot("ch02-map")
+            return true
+        end
+        local observation = observeController()
+        local state, why = controllerState(observation)
+        if state == "prep_main" then
+            if not driveThroughPrep() then
+                result("FAIL", "could not leave ch02 Preparations via semantic Fight"); return false
+            end
+        elseif state == "generic_menu" then
+            -- Scenario policy: accept the live menu's highlighted default choice.
+            if not guardedInput("select_current_menu_item", "A", "lead menu selection closes",
+                function(after) return after.menu == nil end, 300) then
+                result("FAIL", "could not choose the highlighted ch02 lead"); return false
+            end
+        else
+            local advanced = advanceBootState(observation, state)
+            if advanced == false then return false end
+            if advanced == nil then
+                traceFailure("reach_ch02", "post-chapter flow reaches the live ch02 map",
+                    "fail:" .. tostring(why or state), observation, "ch02-unsupported")
+                result("FAIL", "unsupported state before the ch02 map"); return false
+            end
+        end
     end
-    if not onmap then
-        shot("ch02-map-not-live")
-        result("FAIL", "ch02 map never became live (party/enemies never loaded)"); return false end
-    wait(120)
-    shot("ch02-map")
-    return true
+    traceFailure("reach_ch02", "post-chapter flow reaches the live ch02 map",
+        "fail:chapter-flow-timeout", nil, "ch02-map-not-live")
+    result("FAIL", "ch02 map never became live (party/enemies never loaded)")
+    return false
 end
 
 -- ckpt_ch02start: build the ch02start checkpoint once (run.sh runs this at 240fps when the
@@ -3699,12 +4239,20 @@ scenarios.ch03talk = function()
         return result("FAIL", "could not open the recruiter's command menu")
     end
     wait(30); shot("ch03talk-menu")
-    press(K.A, 4); wait(50) -- top row = Talk (when adjacent to the recruitable green)
+    if not chooseTalk() then return result("FAIL", "live command menu did not expose a working Talk") end
     shot("ch03talk-dialogue-1") -- Trex's migrated talk lines rendering in-engine
-    for i = 1, 60 do        -- advance the talk line through to the CUSA, grabbing each page
+    local pages = 1
+    for _ = 1, 3600 do      -- advance only when FE8 exposes TalkWaitForInput
         if blueTrex() then break end
-        if i <= 4 then wait(30); shot(string.format("ch03talk-dialogue-p%d", i + 1)) end
-        press(K.A, 3); wait(20)
+        if controllerState() == "dialogue_wait" then
+            pages = pages + 1
+            if pages <= 5 then shot(string.format("ch03talk-dialogue-p%d", pages)) end
+            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
+                return controllerState(after) ~= "dialogue_wait"
+            end, 120) then return result("FAIL", "Talk dialogue input did not advance") end
+        else
+            yield()
+        end
     end
     wait(30); shot("ch03talk-after")
     for i = 0, 19 do -- dump the full blue roster so the flip is unambiguous
@@ -3726,15 +4274,7 @@ end
 -- Trex is NOT among them (he joins mid-map, green, via Talk). Run: PT_HOST_CHAPTER=4 run.sh
 -- ch03prep (needs a CH03BOOT=1 ROM). The boot LOADs an armed party seed so PREP has a roster.
 scenarios.ch03prep = function()
-    -- Boot toward the chapter; stop the moment Preparations opens (don't let a stray A field it).
-    local prep = false
-    for i = 1, 120 do
-        if procActive(SYM.gProcScr_SALLYCURSOR) then prep = true break end
-        if inChapter() then break end
-        press(i % 2 == 0 and K.A or K.START, 4)
-        wait(26)
-    end
-    if not prep then
+    if not bootToMap(true) or controllerState() ~= "prep_main" then
         shot("ch03prep-no-prep")
         return result("FAIL", "Preparations screen never opened (PREP CALL did not fire)")
     end
@@ -4826,68 +5366,25 @@ local function ch04Parley(opts)
         end
     end
     if not parked then return false, "no free tile adjacent to Lupin to park Marty" end
-    marty = blue(MARTY)
-    -- Strip Marty's weapons (struct Unit items[5] @ +0x1E, bmunit.h) so the command menu does
-    -- NOT offer Attack. ch03's talk driver could take row 0 blind because Trex is GREEN; Lupin
-    -- is a RED adjacent enemy, so row 0 there is Attack -- the first run of this scenario duly
-    -- filmed Marty duelling the wolf he is supposed to be talking to.
-    for k = 0, 4 do emu:write16(marty.addr + 0x1E + k * 2, 0) end
-    if not cursorTo(marty.x, marty.y) then return false, "cursor could not reach Marty" end
-    -- Find Talk by trying rows and verifying by OUTCOME. The menu's contents depend on what is
-    -- adjacent, so its shape is not a constant we get to assume -- and the obvious signal is a
-    -- trap: ProcScr_StdEventEngine is live during ALL normal map/turn event processing (its own
-    -- comment in this file says so), so "an event proc woke up" cannot mean "the Talk started".
-    -- Lupin flipping blue is the only unambiguous evidence, so drive each row until it happens.
-    -- Marty's weapons are gone, so no row can start combat; the worst a wrong row does is spend
-    -- his action, which we recover by cycling a phase and re-parking him.
-    local function parkNextTo()
-        local l, m = redLupin(), blue(MARTY)
-        if not l or not m then return false end
-        local g = mapUnitAt(m.x, m.y)
-        for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
-            local tx, ty = l.x + d[1], l.y + d[2]
-            if tx >= 0 and ty >= 0 and mapUnitAt(tx, ty) == 0 then
-                setMapUnit(m.x, m.y, 0)
-                emu:write8(m.addr + 0x10, tx); emu:write8(m.addr + 0x11, ty)
-                setMapUnit(tx, ty, g)
-                return true
-            end
-        end
-        return false
-    end
     -- Where the pack stands going IN. Sampled after the parking, before the Talk: no enemy or
     -- green phase runs between here and the conversion, so any tile that changes changed
     -- because of the parley itself.
     local packBefore = ch04PackTiles(SYM.gUnitArrayRed, 24)
-    for row = 0, 5 do
+    marty = blue(MARTY)
+    if not marty or not moveUnit(marty.x, marty.y, marty.x, marty.y) then
+        return false, "no live command menu for Marty"
+    end
+    if not chooseTalk() then return false, "Marty's live command menu did not expose Talk" end
+    for i = 1, 3600 do
+        if i % 3 == 0 then snap() end
         if blueLupin() then break end
-        local m = blue(MARTY)
-        if not m or (m.state & 0x2) ~= 0 then       -- acted: give him a fresh turn, re-park
-            runEnemyPhase()
-            waitFor(function() return faction() == 0 and not menuOpen() end, 900, true)
-            if not parkNextTo() then break end
-            m = blue(MARTY)
-        end
-        if not m or not cursorTo(m.x, m.y) then break end
-        local opened = false
-        for _ = 1, 10 do
-            if menuOpen() then opened = true break end
-            press(K.A); if waitFor(menuOpen, 14) then opened = true break end
-        end
-        if not opened then return false, "no command menu for Marty" end
-        for _ = 1, row do press(K.DOWN, 3) end
-        press(K.A, 4)
-        for i = 1, 900 do                           -- the full five-turn exchange, if this is it
-            if i % 3 == 0 then snap() end
-            if blueLupin() then break end
-            if i % 16 == 0 then press(K.A, 3) end
+        if controllerState() == "dialogue_wait" then
+            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
+                return controllerState(after) ~= "dialogue_wait"
+            end, 120) then return false, "parley dialogue input did not advance" end
+        else
             yield()
         end
-        if blueLupin() then
-            log(string.format("ch04parley: Talk is command-menu row %d", row))
-            break
-        end
-        press(K.B); wait(10)                        -- not it -- back out and try the next row
     end
     if not blueLupin() then
         snap()
@@ -5089,26 +5586,18 @@ scenarios.ch04village = function()
     if not moveUnit(VILLAGE_X, VILLAGE_Y, VILLAGE_X, VILLAGE_Y) then
         return result("FAIL", "could not select the unit standing on the village")
     end
-    -- Find Visit by OUTCOME, not by assuming a row: the command menu's shape depends on what is
-    -- adjacent, and guessing row 0 is what filmed Marty duelling the wolf he meant to talk to.
-    for row = 0, 5 do
+    if not selectSemantic("visit", "Visit starts the live location event", function(after)
+        return after.menu == nil
+    end, 600) then return result("FAIL", "live command menu did not expose Visit") end
+    for _ = 1, 3600 do
         if axes() > before then break end
-        if not menuOpen() then
-            if not cursorTo(VILLAGE_X, VILLAGE_Y) then break end
-            if not moveUnit(VILLAGE_X, VILLAGE_Y, VILLAGE_X, VILLAGE_Y) then break end
-        end
-        for _ = 1, row do press(K.DOWN, 3) end
-        press(K.A, 4)
-        for i = 1, 420 do
-            if axes() > before then break end
-            if i % 16 == 0 then press(K.A, 3) end
+        if controllerState() == "dialogue_wait" then
+            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
+                return controllerState(after) ~= "dialogue_wait"
+            end, 120) then return result("FAIL", "village dialogue input did not advance") end
+        else
             yield()
         end
-        if axes() > before then
-            log(string.format("ch04village: Visit is command-menu row %d", row))
-            break
-        end
-        press(K.B); wait(10)
     end
     shot("ch04village")
     local after = axes()
@@ -5192,9 +5681,8 @@ scenarios.ch04snag = function()
         "the snag fell: (%d,%d) is now a bridge -- the river is crossable", CROSS_X, CROSS_Y))
 end
 
--- attackprobe (#204): WHY a clear-bot's blind Attack press lands on the wrong command row. The
--- clear-bot's chooseAttack assumes command-menu row 0 is Attack; when the engine sees no target
--- it is Item instead, and the bot Uses a vulnerary at full HP forever. This probe stages ONE
+-- attackprobe (#204): regression diagnostic for the retired blind-Attack failure. When the engine
+-- saw no target, row 0 was Item and the old bot used a vulnerary at full HP forever. This stages ONE
 -- unit's attack on the CURRENT host chapter and dumps the DATA that decides that row -- the live
 -- vision range, every red with the grid id and fog byte under it, and the 5x5 gBmMapUnit window
 -- around the firing tile -- then photographs the open menu, which says outright whether an
@@ -5473,28 +5961,22 @@ scenarios.recordch03talk = function()
     -- 1. Frame GREEN Trex on his ledge before the talk.
     cursorTo(trex.x, trex.y)
     for f = 1, 60 do if f % 3 == 0 then shot("ch03talk") end yield() end
-    -- 2. Talk: open the recruiter's command menu (Talk = row 0) and film the migrated dialogue
-    --    through to the CUSA flip.
+    -- 2. Talk through the live semantic command and target selector, then film through CUSA.
     rec = blue(0x01)
     waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
-    -- Robust select-in-place (the confirm-A is eaten by the move-range anim when the cursor is
-    -- already near -- same fix as the grell attack): retry A until the command menu opens.
-    if not cursorTo(rec.x, rec.y) then return result("FAIL", "cursor could not reach the recruiter") end
-    press(K.A); wait(15)
-    local opened = false
-    for _ = 1, 10 do
-        if menuOpen() then opened = true break end
-        press(K.A); if waitFor(menuOpen, 14) then opened = true break end
+    if not moveUnit(rec.x, rec.y, rec.x, rec.y) then
+        return result("FAIL", "no command menu for the recruiter")
     end
-    if not opened then return result("FAIL", "no command menu for the recruiter") end
-    press(K.A, 4) -- Talk (row 0)
-    -- The migrated recruit dialogue is several pages; advance to the end-of-script CUSA. Budget
-    -- generously (the whole multi-page talk) and press A often enough to page past typewritering.
-    for i = 1, 1400 do
+    if not chooseTalk() then return result("FAIL", "semantic Talk did not reach dialogue input") end
+    -- The migrated recruit dialogue is several pages; advance only at TalkWaitForInput.
+    for i = 1, 3600 do
         if i % 3 == 0 then shot("ch03talk") end
         if blueTrex() then break end
-        if i % 16 == 0 then press(K.A, 3) end -- advance the dialogue pages
-        yield()
+        if controllerState() == "dialogue_wait" then
+            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
+                return controllerState(after) ~= "dialogue_wait"
+            end, 120) then return result("FAIL", "Talk dialogue input did not advance") end
+        else yield() end
     end
     if not blueTrex() then return result("FAIL", "Trex never flipped blue (CUSA did not fire)") end
     for f = 1, 40 do if f % 3 == 0 then shot("ch03talk") end yield() end -- linger on the flip
@@ -5505,7 +5987,9 @@ scenarios.recordch03talk = function()
     for f = 1, 24 do if f % 3 == 0 then shot("ch03talk") end yield() end
     runEnemyPhase() -- end turn -> enemy phase -> back to player: triggers the sprite refresh
     local bt = blueTrex()
-    if bt then cursorTo(bt.x, bt.y) else cursorTo(trex.x, trex.y) end
+    local framed
+    if bt then framed = cursorTo(bt.x, bt.y) else framed = cursorTo(trex.x, trex.y) end
+    if not framed then return result("FAIL", "could not frame Trex after the phase refresh") end
     for f = 1, 90 do if f % 3 == 0 then shot("ch03talk") end yield() end -- Trex now blue on the map
     return result("PASS", "ch03 talk-recruit recorded (green -> blue, sprite refreshed)")
 end

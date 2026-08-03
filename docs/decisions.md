@@ -411,7 +411,8 @@ archer present, surviving chwinga deliver charms) and *pacing* (judging the 5 cu
 The structural half is now machine-verified by the playtest harness; the pacing half is left a
 human-at-mGBA pass. **Reached via the REAL chain, not a ch02 sandbox** — a `TESTCH=2`-style boot
 would skip the `MNC2(0x3)` transition the load-test most needs to prove, so `reachCh02Map` clears
-ch00 + ch01 with the clear-bot and A-mashes through the ending→opening→prep onto the ch02 map. That
+ch00 + ch01 with the clear-bot and observes the ending→opening→prep chain onto the ch02 map through
+the state-driven controller. That
 deep chain is paid **once** into a `ch02start` save-state checkpoint (`ckpt_ch02start`, like
 `rbgch01`); `ch02` (entry assertions), `smoke_ch02` (soft-lock net), and `clear_ch02` load it. The
 3 green chwinga are kept alive during `clear_ch02` (direct HP/def poke) so the charm-gift path
@@ -1300,7 +1301,8 @@ inputs to surface the crashes/soft-locks those miss. Decisions:
   *driver* (liveness.lua stayed pure): **(1)** a random Suspend drops to the title screen — a legit non-crash
   state where the progress key is frozen and B can't escape; the driver detects "not on a live map"
   (`liveOnMap` = a blue unit loaded and not on the title proc; deliberately *not* `inChapter`, which is false
-  during a legit enemy phase) and drives the menus *forward* back into play instead of judging liveness.
+  during a legit enemy phase) and treats leaving the map as a clean fuzz terminal instead of judging
+  liveness or injecting recovery inputs into an unrelated screen.
   **(2)** the bot roams the cursor without ending a turn, so the smoke bot's progress key
   `{turn,faction,hpsum,procfp}` sits still on a *responsive* map; the fuzz driver instead feeds a
   **responsiveness fingerprint** (`fuzzFingerprint` folds the map cursor into the `procfp` field) so "no
@@ -1366,9 +1368,9 @@ Nicolas (2026-07-02) was cost-shy about the LLM-player; the happy medium is supp
   foes and staff targets allies (friendly-fire "attacks" would blind-A into the Trade/Item submenu); a unit
   the exporter gave no `range` (staff-only/weaponless) can target nothing; `seize` is gated on the board's
   objective (the export carries no goal tile). The Lua executor re-checks just the mid-phase deltas (target
-  died to an earlier order → downgrade to wait) and backs failed menus out with a full drain (submenus are
-  also `sProc_Menu`; a fixed two-B backout can strand a unit selected). Any live-policy failure (endpoint
-  down) still answers the harness with an `{error}` response — a fast diagnosable FAIL, not a 90s timeout;
+  died to an earlier order → reject before input) and stops on failed menus without rescue input. Any
+  live-policy failure (endpoint down) still answers the harness with an `{error}` response — a fast
+  diagnosable FAIL, not a 90s timeout;
   a replay-mode transcript miss does the same and exits non-zero — CI/replay stays closed-world.
 - **Exported unit ids: blue = charId (PCs are unique), red = 1000+slot** — generic enemies *share* a charId,
   so the slot disambiguates which brigand an attack order targets.
@@ -1376,11 +1378,49 @@ Nicolas (2026-07-02) was cost-shy about the LLM-player; the happy medium is supp
   JSON; encode writes sorted keys (deterministic bytes, mirroring the serializer doctrine), decode rejects
   trailing garbage (a truncated file must not half-parse into plausible orders). Unit-tested without mGBA
   (`test_json.lua`, 45 asserts) + a cross-language round trip (Lua req → Python sidecar → Lua resp) verified.
-- **M2 limitations (deliberate, → M3):** `chooseAttack` fires on the UI's *default* target (unambiguous
-  whenever one enemy is in range of the strike tile); staff orders execute as Wait. In-emulator prologue
+- **M2 limitations (deliberate, → M3):** staff orders fail closed as unsupported. Attack command/weapon/target
+  selection now runs through the state-driven controller below; choosing among multiple legal targets by
+  policy remains an M3 concern. In-emulator prologue
   replay needs local mGBA (CI has none — the platform rule); the protocol itself is fully unit-tested.
 _Decided: 2026-07-02 (CLAUDE; pipeline track. Epic #63 M2 + Nicolas's free-model direction; 23 new Python
 asserts + 45 Lua asserts in make test)_
+
+**Playtest controller contract = observe, classify, enumerate, guard one input, verify, trace (#220).**
+Timing and plausible-looking button sequences are not game-state evidence. The shared mGBA driver reads
+FE8U memory directly and turns exact Proc scripts/current callbacks plus live engine structures into a named
+state. Standard menus are actionable only when their Proc is unlocked, not frozen, and neither ending nor
+doomed; commands come from
+`MenuProc.menuItems[] -> MenuItemProc.def -> MenuItemDef.overrideId`. Preparations commands come from the
+live `ProcPrepMenu` items and callbacks. The minimum stable semantic ids are Talk `0x5A`, Wait `0x6B`, and
+End Phase `0x78`; existing shared paths also use semantic Attack/weapon/target, Seize, Visit, and Status
+where needed. Fight leaves the main Preparations menu through its live
+`PrepScreenMenu_OnStartPress`/START callback—never B/Check Map or the View Map menu. This agrees with the
+[official FE8 manual](https://www.nintendo.com/eu/media/downloads/games_8/emanuals/game_boy_advance_8/Manual_GameBoyAdvance_FireEmblemTheSacredStones_EN_DE_FR_ES_IT.pdf),
+but live decomp state is authoritative.
+
+The pure `tools/playtest/controller.lua` owns classification and legal-action enumeration. The mGBA-facing
+observer/driver in `harness.lua` may execute **one** input only when that action is legal in the current
+state; it then waits for a documented postcondition. Unknown, malformed, locked, frozen, or mismatched
+states fail closed without a recovery button. Dialogue A is legal only under
+`gProcScr_TalkWaitForInput` + `TalkWaitForInput_OnIdle`. Every attempted input emits a JSON transition record
+containing frame-adjacent before/after observations, prior state, legal intentions, chosen intention/key,
+expected postcondition, and verdict; failures retain the raw Proc inventory and produce a screenshot.
+Map selection mirrors `GetPlayerSelectKind` from live `gUnitLookup` state/status/attributes, and movement A
+requires both the engine movement map and an unoccupied `gBmMapUnit` tile. Unknown standard menus expose at
+most their currently highlighted enabled item, and only when its live `onSelected` callback exists; choosing
+that item is scenario policy, not a controller guess. Open Preparations help is passive and receives no input.
+
+Scenarios own goals, assertions, and deterministic policy; the controller owns reusable UI mechanics.
+Random actions remain confined to named fuzz scenarios. This does not require rewriting every historical
+chapter-specific recorder in one patch, but any path migrated to the controller may not reintroduce row
+guesses, cadence dialogue, or unrelated fallback inputs. The unlocked/not-frozen menu check was
+cross-checked against the CC0 portions of
+[GBA Fire Emblem for Screen Readers](https://github.com/StanHash/GBA-Fire-Embem-for-Screen-Readers);
+addresses remain generated from our ELF rather than copied. The same semantic observer is intentionally a
+future seam for replay, accessibility narration, dialogue transcript verification, target/forecast
+inspection, and external policies—those products are follow-ups, not controller responsibilities.
+_Decided: 2026-08-03 (#220; supersedes timing/row-driven common harness mechanics and #63 M2's blind Attack
+executor limitation)_
 
 **Recording a cutscene as a review GIF (the standard way to show Nicolas motion).**
 The harness fast-forwards cutscenes (mashes A), so an assert scenario's screenshots land
@@ -2796,8 +2836,10 @@ browns match; ≤220px lines, 24px pitch, block centered on (120,80); slide-disp
 clamped 240-360 frames). Index 0 is GBA-transparent → in-engine the cards read cream-on-black like vanilla, so the
 slate PNG background is a converter placeholder only. **Build modes:** default `make` keeps the straight-to-map dev
 boot; `MONTAGE=1 make` keeps `StartIntroMonologue` wired and re-renders the slides (distribution #37 must set it).
-Playtests pass under both: `bootToMap` alternates A/START so the crawl self-skips; `record` A-only boot captures it
-for GIF review. **Backdrop mural:** vanilla composites the slides over `Img_CommGameBgScreen` (the brown rune wall)
+The controller covers the default straight-to-map build. A `MONTAGE=1` automation must add the subtitle proc's
+explicit live skip-input state before pressing START; there is no cadence fallback. `record` captures the crawl
+for GIF review. **Backdrop mural:** vanilla composites
+the slides over `Img_CommGameBgScreen` (the brown rune wall)
 — a SHARED asset (shops, chapter-intro fx, ending details, mural_background), so it is never overwritten; instead
 opsubtitle.c is patched to montage-local `Img/Pal_MontageMural` symbols incbin'd in `data_opsubtitle.s`, fed by the
 book's ch1 opener painting (aurora over a snow-buried township, `campaigns/.../events/opening-mural.png`; build

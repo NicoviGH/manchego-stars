@@ -5,6 +5,7 @@ import json
 import os
 import re
 import struct
+import subprocess
 import unittest
 
 
@@ -40,17 +41,23 @@ def _metatiles(path):
     return indices
 
 
+def _vanilla_decomp_text(relative_path):
+    """Read committed vanilla input, not campaign-injected build output."""
+    env = {key: value for key, value in os.environ.items()
+           if not key.startswith('GIT_')}
+    return subprocess.check_output(
+        ['git', '-C', DECOMP, 'show', 'HEAD:' + relative_path],
+        encoding='utf-8', env=env)
+
+
 def _vanilla_config(layout):
     names = []
-    table = os.path.join(DECOMP, 'data/data_8B363C.s')
-    with open(table, encoding='utf-8') as source:
-        for line in source:
-            match = re.match(r'\s*\.word\s+(\w+)', line)
-            if match:
-                names.append(match.group(1))
+    for line in _vanilla_decomp_text('data/data_8B363C.s').splitlines():
+        match = re.match(r'\s*\.word\s+(\w+)', line)
+        if match:
+            names.append(match.group(1))
     layout_id = names.index(layout)
-    with open(os.path.join(DECOMP, 'src/data/chapter_settings.json'), encoding='utf-8') as source:
-        settings = json.load(source)
+    settings = json.loads(_vanilla_decomp_text('src/data/chapter_settings.json'))
     for chapter in settings['chapters']:
         map_data = chapter.get('map') or {}
         if map_data.get('mainLayerId') == layout_id:

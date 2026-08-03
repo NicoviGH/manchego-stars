@@ -5,6 +5,8 @@
 #
 # Logic scenarios (assert PASS/FAIL):  win | gameover | retreat | ch01win | titlecard
 #   also: ch01 (entry asserts) | ch01lord | lordfloor | goodberry | clearprobe
+#   controller_turn -- #220 controller contract: no-prep boot -> move -> semantic Wait ->
+#                      semantic End Phase -> verified enemy-phase return
 #   (harness.lua's `scenarios` table is the authoritative full list)
 #   ch02   -- ch2 (#22) ENTRY assertions off the ch02start checkpoint: 3 green chwinga on the
 #             field, party at the deploy cap, the archer (fliers-vs-bows debut) + boss present.
