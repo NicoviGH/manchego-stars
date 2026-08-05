@@ -4,9 +4,8 @@
 live in `CLAUDE.md`/`AGENTS.md`; issue scope and backlog live in GitHub. Before a context rollover,
 warn Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-05 (Opus) after merging #224 (#218). `main` = `f59fc28`, level with `origin/main`.
-**PR #226 (#225, the SMS-id ceiling guard) is open and awaiting CI** — merge it, then delete the
-branch; nothing else is in flight.
+Refreshed 2026-08-05 (Opus) after merging #224 (#218) and #226 (#225). `main` = `5e8c1cf`, level
+with `origin/main`, no open PRs, no live feature branch.
 
 ## Current state
 
@@ -60,7 +59,7 @@ branch; nothing else is in flight.
   donors). `PutUnitSprite` draws a 32x32 at `y-16`, so in the unit list's 16px row pitch their art
   reaches into the row above (visible on the fixed frames). Vanilla never hits this — no vanilla
   PLAYER unit is 32x32. Cosmetic only.
-- **The custom SMS id budget is nearly gone (#225 → PR #226).** `GetInfo` masks every id with `0x7F`,
+- **The custom SMS id budget is nearly gone — guarded, not raised (#225, PR #226).** `GetInfo` masks every id with `0x7F`,
   so an id ≥ 128 silently renders a VANILLA sprite — and the mask is NOT the array bound
   (`gUnitSpriteSlots` is `u8[0xD0]`), so nothing downstream can catch it. Vanilla ships 107 rows and
   `CUSTOM_SMS_BASE = 107` ⇒ the whole budget is ids **107–127**. **Live: 126 used, 2 left**, and
@@ -133,8 +132,7 @@ Then: **#29** world map.
 
 ## Working tree - do not lose or revert
 
-- **`main` is `f59fc28`, level with `origin/main`. One PR in flight: #226** (#225, the SMS-id
-  ceiling guard) on `feat/225-sms-id-ceiling-guard` — merge and delete the branch.
+- **No open PRs and no live feature branch.** `main` is `5e8c1cf`, level with `origin/main`.
 - `fireemblem8u` is dirty from injected/generated build artifacts. **Never commit its submodule
   pointer.** Restore the injected decomp files before `check.py`/the pre-commit hook so it runs in
   ~22s instead of ~4min: `git -C fireemblem8u restore src/data/chapter_settings.json data/data_8B363C.s`.
