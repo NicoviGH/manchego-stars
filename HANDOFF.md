@@ -4,8 +4,9 @@
 live in `CLAUDE.md`/`AGENTS.md`; issue scope and backlog live in GitHub. Before a context rollover,
 warn Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-05 (Opus) after merging #224 (#218), #226 (#225) and #229 (#227). `main` = `aad4f8b`,
-level with `origin/main`, no open PRs, no live feature branch.
+Refreshed 2026-08-05 (Opus) after merging #224 (#218), #226 (#225) and #229 (#227). `main` = `334256c`,
+level with `origin/main`, **no open PRs, no live feature branch, no stashes — nothing is in flight.**
+**Next task is #222 workstream 1 (the playtest matrix runner); jump to NEXT SESSION §1.**
 
 ## Current state
 
@@ -105,12 +106,36 @@ level with `origin/main`, no open PRs, no live feature branch.
 
 **Everything below is on a GitHub issue with its own diagnosis. Start from the issues, not here.**
 
-### 1. #222 workstream 1 ONLY — the playtest matrix runner
+### 1. #222 workstream 1 ONLY — the playtest matrix runner  ← START HERE, nothing in flight
 
-Codex's tooling epic. **Agreed scope: take workstream 1 (one command runs the live regression
-matrix, each ROM config built at most once, compact verdict table, artifacts on disk) and defer
+Codex's tooling epic. **Agreed scope: take workstream 1 only** (one command runs the live regression
+matrix, each ROM config built at most once, compact verdict table, artifacts on disk) **and defer
 workstreams 2–4** (state inspector, declarative scenario manifests, pre-build validation). ch05 will
-run that matrix repeatedly, which is what justifies buying it now.
+run that matrix repeatedly, which is what justifies buying it now. **Read #222 for the full scope and
+Definition of Done — it is current.** What the issue does NOT tell you, and a cold instance needs:
+
+- **`run.sh` does not build anything.** It hard-fails with `ROM not built; run make first`
+  (`tools/playtest/run.sh:143`). Building each configuration once is therefore *new* orchestration the
+  matrix runner owns, not something to refactor out of run.sh.
+- **The ROM configurations are `make` flags**, all via `tools/build_campaign.py`:
+  canonical (no flag), `TESTCH=1` (Ch1 sandbox: whole cast + one of each reskinned foe pre-deployed),
+  `CH03BOOT=1`, `CH04BOOT=1`, plus `LORDBOOT=1` / `MONTAGE=1`. Scenarios additionally need
+  `PT_HOST_CHAPTER` (1 / 4 / 5) and sometimes `PT_CHAR`, `PT_STATE`/`PT_TAG`/`PT_UNTIL`.
+- **Two thirds of the manifest already exists as bash `case` blocks in `run.sh`** — port these, do not
+  re-derive them: the scenario→checkpoint map (~lines 200–216), the FPS/vsync/deadline policy per
+  scenario class (`record*` = 60fps, everything else 240fps, with longer deadlines for
+  `smoke_*`/`fuzz_*`/`clear_ch02`), and the per-scenario doc comments naming each one's required ROM
+  flag + `PT_HOST_CHAPTER`.
+- **Checkpoints are ROM-hash-stamped** (`tools/playtest/states/<name>.ss` + `.romhash`, gitignored) and
+  auto-rebuilt when stale. So grouping by ROM configuration is not only about avoiding rebuilds —
+  **switching configuration invalidates every checkpoint**, and `ckpt_ch02start` replays the whole
+  ch00→ch01→ch02 chain to rebuild. Ordering scenarios badly makes a run dramatically slower.
+- **The scenario list is `harness.lua`'s `scenarios` table (~90 entries) — that is authoritative**, not
+  run.sh's header comment.
+- **Gotcha that will bite a multi-config runner immediately:** the decomp ships Linux `#!/bin/python3`
+  shebangs in `fireemblem8u/scripts/`, and **any `git checkout` inside the submodule reverts the macOS
+  normalisation**, so the next build dies on `bad interpreter`. `tools/build.sh` re-applies it
+  idempotently (see its comment); the matrix runner must do the same before each build.
 
 ### 2. ch05's build work (#25) — with #222 held open on purpose
 
@@ -153,9 +178,8 @@ Then: **#29** world map.
 
 ## Working tree - do not lose or revert
 
-- **No open PRs and no live feature branch.** `main` is `aad4f8b`, level with `origin/main`.
-- A stale `stash@{0}` ("ch04-session HANDOFF refresh", July) is superseded — ch04 shipped in #223.
-  Safe to drop; left alone because it is Nicolas's.
+- **No open PRs, no live feature branch, no stashes.** `main` is `334256c`, level with `origin/main`.
+  (The stale July `ch04-session HANDOFF refresh` stash was superseded by #223 and dropped 2026-08-05.)
 - `fireemblem8u` is dirty from injected/generated build artifacts. **Never commit its submodule
   pointer.** Restore the injected decomp files before `check.py`/the pre-commit hook so it runs in
   ~22s instead of ~4min: `git -C fireemblem8u restore src/data/chapter_settings.json data/data_8B363C.s`.
