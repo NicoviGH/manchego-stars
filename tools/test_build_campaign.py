@@ -1770,6 +1770,55 @@ if __name__ == '__main__':
     unittest.main()
 
 
+class CastPaletteBankSurvivesEveryRosterScreen(unittest.TestCase):
+    """The cast map-sprite palette lives in the purple OBJ bank (0x0B), which vanilla
+    treats as scratch: several screens call ApplyUnitSpritePalettes() and then
+    immediately ZERO that bank, because no vanilla unit renders from it. A zeroed
+    16-colour bank draws every index as colour 0 -- our cast come out as correctly
+    shaped BLACK SILHOUETTES (#218; the same failure was fixed once for Pick Units).
+
+    The idiom is spelled differently per screen (`PAL_OBJ(0x0B)` in prep_unitselect,
+    `gPaletteBuffer + 0x1B0` in unitlistscreen), so it must be listed per site rather
+    than grepped for -- hence PURPLE_BANK_BLANKERS, which is what these tests pin.
+    """
+
+    def test_every_known_blanker_names_a_real_decomp_site(self):
+        """Each entry must match the CURRENT vanilla source, read from HEAD -- the
+        working tree is a build artifact of our own injections."""
+        for path, orig, _ in bc.PURPLE_BANK_BLANKERS:
+            vanilla = bc.vanilla_decomp_text(os.path.relpath(path, bc.DECOMP))
+            self.assertIn(orig, vanilla,
+                          '%s no longer contains its purple-bank fill verbatim'
+                          % os.path.basename(path))
+
+    def test_the_unit_list_screen_is_covered(self):
+        """The regression this class exists for: the Character screen players open
+        constantly blanked the whole cast (#218)."""
+        sites = [os.path.basename(p) for p, _, _ in bc.PURPLE_BANK_BLANKERS]
+        self.assertIn('unitlistscreen.c', sites)
+        self.assertIn('prep_unitselect.c', sites)
+
+    def test_each_patch_drops_the_fill_and_keeps_the_palette_load(self):
+        """The fix is to delete the zeroing, NOT to reorder or re-load: whatever
+        ApplyUnitSpritePalettes just put in bank 0x0B is already correct."""
+        for path, orig, hooked in bc.PURPLE_BANK_BLANKERS:
+            where = os.path.basename(path)
+            self.assertIn('ApplyUnitSpritePalettes();', orig, where)
+            self.assertIn('ApplyUnitSpritePalettes();', hooked, where)
+            self.assertNotIn('CpuFastFill', hooked,
+                             '%s must DROP the fill, not re-spell it' % where)
+            self.assertIn('/*', hooked, '%s: say WHY the fill is gone' % where)
+
+    def test_the_hook_rejects_a_site_that_drifted(self):
+        """A decomp bump that reworks one of these screens must FAIL the build loudly,
+        not silently leave that screen's roster black."""
+        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
+                   encoding='utf-8').read()
+        body = src[src.index('def _drop_purple_bank_fills('):]
+        body = body[:body.index('\ndef ')]
+        self.assertIn('sys.exit', body)
+
+
 class PreRecruitVariant(unittest.TestCase):
     """A cast member on the field BEFORE he joins you (ch04's Lupin: red as the pack's
     leader, the finalized grey once Marty's parley brings him over).

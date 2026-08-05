@@ -82,6 +82,13 @@
 #                      tools/playtest/make_gif.py recordanim braulo --name braulo-anim --open
 #                    A staff-only unit (sclorbo) FAILs cleanly: no attack = no combat anim.
 #                    Build TESTCH=1 first. (recordrbgtest is the back-compat alias for RBG.)
+#   recordunitlist -- the map-menu "Unit" screen (Character list) on a `make TESTCH=1` ROM (#218):
+#                    boots straight into the Ch1 sandbox with the whole cast deployed, opens the
+#                    list semantically off gMapMenuItems[0] (overrideId 0x6E), shoots every page,
+#                    and dumps the SMS geometry + the shared 0x40-slot VRAM budget before/after.
+#                    FAILs if the two UseUnitSprite counters cross (later sprites overwrite earlier).
+#                      tools/playtest/run.sh recordunitlist
+#                      tools/playtest/make_gif.py recordunitlist unitlist --name unit-list
 #   recordenemy   -- the ENEMY analogue of recordanim on the SAME TESTCH sandbox (#90): a
 #                    reskinned enemy CLASS's battle anim. The sandbox deploys one hostile of
 #                    each enemy_class_reskins slot; a harmless player baits the chosen foe into

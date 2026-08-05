@@ -2372,6 +2372,20 @@ so a standard-palette sheet is the only way to add a custom sprite alongside the
 compare its 16-colour palette to `unit_icon_pal_player.agbpal` — exact match ⇒ guest path (no override); custom colours
 ⇒ it must be re-indexed to `cast_palette.png` and join the cast bank.
 
+**Loading the cast bank is only half the job — several vanilla screens BLANK it again (#218, 2026-08-05).**
+Bank `0xB` is free in vanilla precisely because nothing renders from it, and vanilla exploits that: a screen calls
+`ApplyUnitSpritePalettes()` and then immediately zeroes bank `0xB` as scratch cleanup. Harmless in vanilla; for us a
+zeroed 16-colour bank draws every index as colour 0, so the cast come out as **correctly shaped BLACK SILHOUETTES** —
+right sheet, right chr, right position, no colour. That is the signature to recognise: *shape correct, colour absent
+⇒ the bank was blanked, not the sprite mis-injected.* Every such site is listed in `build_campaign.PURPLE_BANK_BLANKERS`
+and deleted by `_drop_purple_bank_fills`, which `sys.exit`s if a site stops matching verbatim (a decomp bump must fail
+loudly, not silently blacken a roster). **The list is per-site and not a grep because the idiom is spelled differently
+on each screen**: `CpuFastFill(0, PAL_OBJ(0x0B), 0x20)` in `prep_unitselect.c` (Pick Units) but the raw
+`CpuFastFill(0, gPaletteBuffer + 0x1B0, PLTT_SIZE_4BPP)` in `unitlistscreen.c` (the Character list) — `0x1B0` is
+`0x100 + 0x0B*0x10`, the same bank by arithmetic. Missing that second spelling is exactly why the 2026-07 Pick Units
+fix did not generalise, and the Character screen — which players open constantly — stayed broken until #218.
+**Any new screen that draws cast map sprites goes in that table, not in a new hook.**
+
 **Enemy map sprites: clone the class into an unused slot, don't reskin the shared class (#21, 2026-06-16).**
 The cast's per-CHARACTER override is the wrong tool for ENEMIES: generic grunts share a pid (`0x80`), so there is no
 character to key on, and the cast bank forces the cast palette (enemies want their faction palette). Reskinning the
