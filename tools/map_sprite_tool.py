@@ -26,6 +26,7 @@ parallel to portrait injection.
 
 import os
 import re
+import subprocess
 import sys
 
 from PIL import Image, ImageDraw
@@ -49,12 +50,28 @@ MOVE_GFX_DECOMP = os.path.join(REPO, 'fireemblem8u', 'graphics', 'unit_icon', 'm
 MU_CELL = 32
 
 
+def _vanilla_wait_table():
+    """unit_icon_wait_data.c as COMMITTED (HEAD), not as it sits in the working tree.
+
+    The build rewrites that table -- it appends our custom rows and, since #227, reuses
+    dead vanilla rows in place. A donor's geometry is a fact about VANILLA, so reading the
+    mutated tree would either find our row's size macro or lose the donor symbol entirely
+    the moment its row is reclaimed."""
+    env = {k: v for k, v in os.environ.items()
+           if k not in ('GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX',
+                        'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY', 'GIT_NAMESPACE',
+                        'GIT_ALTERNATE_OBJECT_DIRECTORIES')}
+    return subprocess.check_output(
+        ['git', '-C', os.path.join(REPO, 'fireemblem8u'), 'show',
+         'HEAD:src/unit_icon_wait_data.c'], encoding='utf-8', env=env)
+
+
 def donor_sms_geometry(donor):
     """Authoritative (macro, frame_w, frame_h) for a donor map sprite, READ FROM THE
     DECOMP -- never inferred from PNG pixel dimensions (a 16x96 sheet is ambiguous:
     6x 16x16 vs 3x 16x32, and only the wait table says which). `donor` is the vanilla
     class/monster name = a unit's YAML art.map_sprite.base (e.g. 'Cyclops'), or the path
-    to its vanilla sheet. Source of truth: src/unit_icon_wait_data.c, e.g.
+    to its vanilla sheet. Source of truth: src/unit_icon_wait_data.c at HEAD, e.g.
     `{3, UNIT_ICON_SIZE_16x32, unit_icon_wait_Cyclops_sheet}`.
     """
     name = os.path.basename(donor)
@@ -62,16 +79,15 @@ def donor_sms_geometry(donor):
     if m:
         name = m.group(1)
     sym = 'unit_icon_wait_%s_sheet' % name
-    with open(WAIT_DATA_C, encoding='utf-8') as f:
-        for line in f:
-            if sym in line:
-                mm = re.search(r'UNIT_ICON_SIZE_(\d+)x(\d+)', line)
-                if not mm:
-                    sys.exit('ERROR: no UNIT_ICON_SIZE on the %s row of %s'
-                             % (sym, WAIT_DATA_C))
-                fw, fh = int(mm.group(1)), int(mm.group(2))
-                return SMS_SIZES[(fw, fh)], fw, fh
-    sys.exit('ERROR: donor %r (looked for %s) not in %s -- check the YAML '
+    for line in _vanilla_wait_table().splitlines():
+        if sym in line:
+            mm = re.search(r'UNIT_ICON_SIZE_(\d+)x(\d+)', line)
+            if not mm:
+                sys.exit('ERROR: no UNIT_ICON_SIZE on the %s row of %s (HEAD)'
+                         % (sym, WAIT_DATA_C))
+            fw, fh = int(mm.group(1)), int(mm.group(2))
+            return SMS_SIZES[(fw, fh)], fw, fh
+    sys.exit('ERROR: donor %r (looked for %s) not in %s at HEAD -- check the YAML '
              'art.map_sprite.base name' % (donor, sym, WAIT_DATA_C))
 
 

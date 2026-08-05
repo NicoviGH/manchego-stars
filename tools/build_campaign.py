@@ -23,6 +23,7 @@ Milestones B+ (characters, chapter, dialogue codegen) hang off the same CLI.
 """
 
 import argparse
+import glob
 import hashlib
 import json
 import os
@@ -2188,18 +2189,298 @@ def inject_test_chapter(campaign, verbose=True, lord_boot=False):
 # vanilla unit_icon_pal_player.agbpal.
 
 
+# --- SMS id allocation: reclaim dead vanilla rows before appending (#227) ---------
+# Vanilla assigns map sprites per CLASS -- 107 wait rows serve 127 classes, because classes
+# share (every Cavalier draws row 4). We assign per CHARACTER, so each custom cast member
+# needs its own row. That is the design. What was NOT the design is that CUSTOM_SMS_BASE
+# only ever APPENDED, leaving ~71 rows for classes this campaign can never field sitting
+# unused below it while we ran into the engine's 127-id ceiling (#225).
+#
+# So: allocate into those dead rows first, append only when they run out.
+#
+# The trap is that "no class points at it" is NOT the same as "unreferenced".
+# src/bmudisp.c RenderUnitSprites draws map OBJECTS by literal SMS id, no class involved:
+#   0x5B/0x5C/0x5D -- ballista trap sprites, picked by trap->extra 0x35/0x36/0x37
+#   0x66           -- trap type 0xD
+# A class-only scan calls all four free, and reusing one renders a cast member on any map
+# with a ballista. They are reserved, and a test re-derives this set from HEAD so a decomp
+# bump cannot leave the reservation stale.
+SMS_RESERVED_IDS = frozenset({0x5B, 0x5C, 0x5D, 0x66})
+
+
+def _vanilla_class_table():
+    """{CLASS_X: {'sms': id, 'promotion': CLASS_Y or None}} from the VANILLA class data.
+    Read from HEAD: the working tree's data_classes.c carries our own injected clones."""
+    out = {}
+    for name, body in re.findall(r'\[(CLASS_\w+) - 1\] = \{(.*?)\n    \},',
+                                 vanilla_decomp_text('src/data_classes.c'), re.S):
+        sms = re.search(r'\.SMSId\s*=\s*(0x[0-9A-Fa-f]+|\d+)', body)
+        if not sms:
+            continue
+        promo = re.search(r'\.promotion\s*=\s*(CLASS_\w+)', body)
+        out[name] = {'sms': int(sms.group(1), 0),
+                     'promotion': promo.group(1) if promo else None}
+    return out
+
+
+def sms_rows_for_classes(class_names):
+    """The wait rows a set of vanilla classes draws from."""
+    table = _vanilla_class_table()
+    return {table[c]['sms'] for c in class_names if c in table}
+
+
+def _promotion_branches():
+    """{CLASS_X: [both promotion targets]} from FE8's BRANCHING promotion table,
+    `gPromoJidLut[][2]` in src/classchg-data.c.
+
+    ClassData.promotion holds only ONE target and is NOT the whole story: FE8 lets the
+    player pick either branch (Myrmidon -> Assassin OR Swordmaster, Priest -> Bishop OR
+    Sage, Thief -> Assassin OR Rogue). Following `.promotion` alone under-counts what a
+    character can become, which would let us reuse the row of a class a PC can promote
+    into -- and then that promotion renders as somebody else (Nicolas, 2026-08-05: the
+    player should be able to class into any appropriate class, not only the one we
+    prescribe)."""
+    text = vanilla_decomp_text('src/classchg-data.c')
+    text = text[text.index('gPromoJidLut'):]
+    text = text[:text.index('};')]
+    return {src: re.findall(r'CLASS_\w+', targets)
+            for src, targets in re.findall(r'\[(CLASS_\w+)\]\s*=\s*\{([^}]*)\}', text)}
+
+
+def _campaign_seed_classes(campaign):
+    """Every vanilla class this campaign can put on screen, BEFORE promotions.
+
+    Deliberately over-broad -- it scans raw `CLASS_*` tokens out of all campaign YAML and
+    out of the event headers we author (which is where a world map names its units, #29) --
+    because a missed class means a reused row and a unit rendering as somebody else. A
+    false positive only costs us one reclaimable row."""
+    seed = set()
+    base = os.path.join(REPO, 'campaigns', campaign)
+    sources = glob.glob(os.path.join(base, '**', '*.yaml'), recursive=True)
+    sources += [os.path.join(DECOMP, p) for p in PATCHED_DECOMP_FILES
+                if p.startswith('src/events/')]
+    for path in sources:
+        try:
+            with open(path, encoding='utf-8') as f:
+                seed |= set(re.findall(r'CLASS_[A-Z0-9_]+', f.read()))
+        except (OSError, UnicodeDecodeError):
+            continue
+    for unit_id in PORTRAIT_MAP:
+        unit = load_unit(campaign, unit_id)
+        unit.setdefault('id', unit_id)
+        for enum in (class_enum_for(unit), deploy_class_for(unit)):
+            if enum:
+                seed.add(enum)
+    # Art donors are named by SHEET, not by CLASS_ enum (art.map_sprite.base: 'Cyclops'),
+    # so the token scan above misses them. Naming a vanilla class as a donor is a decent
+    # signal we might also field it, and reserving costs one row.
+    seed |= {'CLASS_' + name.upper() for name in _declared_donor_bases(campaign)}
+    return seed | SMS_RESERVED_CLASSES
+
+
+# Classes no PC holds yet but a future recruit plausibly could. Reserved by hand because
+# nothing in the data can infer "we might write this character later" (#227):
+#   BARD/DANCER  -- the cast already includes a bard in D&D terms
+#   MANAKETE*    -- Rime of the Frostmaiden has a white dragon (Arveiaturace), so keep the
+#                   WHOLE dragon family (the three are separate classes). CLASS_MANAKETE is
+#                   also the only class pointing at the shared `Blank` fallback row, so
+#                   reusing it would put a cast sprite on the fallback sprite
+SMS_RESERVED_CLASSES = frozenset({
+    'CLASS_BARD', 'CLASS_DANCER',
+    'CLASS_MANAKETE', 'CLASS_MANAKETE_2', 'CLASS_MANAKETE_MYRRH',
+})
+
+
+def _declared_donor_bases(campaign):
+    """Every `art.map_sprite.base` a campaign unit declares (vanilla sheet/class names)."""
+    out = set()
+    for path in glob.glob(os.path.join(REPO, 'campaigns', campaign, '**', '*.yaml'),
+                          recursive=True):
+        try:
+            with open(path, encoding='utf-8') as f:
+                data = yaml.safe_load(f)
+        except Exception:
+            continue
+
+        def walk(node):
+            if isinstance(node, dict):
+                ms = node.get('map_sprite')
+                if isinstance(ms, dict) and isinstance(ms.get('base'), str):
+                    out.add(ms['base'])
+                for v in node.values():
+                    walk(v)
+            elif isinstance(node, list):
+                for v in node:
+                    walk(v)
+        walk(data)
+    return out
+
+
+def sms_reachable_rows(campaign):
+    """Wait rows this campaign must not reuse.
+
+    CONSERVATIVE BY DECISION (Nicolas, 2026-08-05). The seed is not just the classes our
+    YAML names today -- it is **every class in FE8's promotion tree**, i.e. anything a
+    player unit could ever hold or become, whether or not this campaign fields it yet.
+
+    Why not just today's roster: the roster is not final. Chapters and recruits are still
+    being written, so a row that looks dead now can belong to a class a future PC holds --
+    and "we have characters we haven't recruited yet, so your list is by definition
+    incomplete" is not a bug that computation can fix. Reserving the whole player tree
+    costs ~30 reclaimable rows and removes the dependency on the roster being finished.
+    What is left over is genuinely un-playable: story-unique Magvel classes, the Demon
+    King, spent-ballista variants, Phantom, and civilians.
+    """
+    table = _vanilla_class_table()
+    branches = _promotion_branches()
+    player_tree = set(branches) | {t for v in branches.values() for t in v}
+    closure = {c for c in (_campaign_seed_classes(campaign) | player_tree) if c in table}
+    frontier = set(closure)
+    while frontier:
+        nxt = set()
+        for c in frontier:
+            # BOTH branches of gPromoJidLut, plus ClassData.promotion as a belt-and-braces
+            # fallback for anything the LUT does not list.
+            nxt |= {t for t in branches.get(c, []) if t in table}
+            if table[c]['promotion'] in table:
+                nxt.add(table[c]['promotion'])
+        nxt -= closure
+        closure |= nxt
+        frontier = nxt
+    return {table[c]['sms'] for c in closure}
+
+
+def sms_free_rows(campaign):
+    """Vanilla wait rows this campaign can safely reuse: unreachable by any class it can
+    field (after promotions) and not rendered by literal id. Recomputed every build -- if a
+    later chapter fields a Wyvern Rider, that row stops being free here rather than silently
+    rendering a PC as a wyvern."""
+    vanilla_rows = len(re.findall(r'UNIT_ICON_SIZE',
+                                  vanilla_decomp_text('src/unit_icon_wait_data.c')))
+    return (set(range(vanilla_rows)) - sms_reachable_rows(campaign)) - set(SMS_RESERVED_IDS)
+
+
+def allocate_sms_ids(campaign, count, verbose=False):
+    """`count` SMS ids: reclaimed vanilla rows first (ascending), then appended ids past the
+    end of the table. Appending stays subject to the engine ceiling (#225)."""
+    free = sorted(sms_free_rows(campaign))[:count]
+    ids = list(free)
+    limit = sms_id_max()
+    nxt = CUSTOM_SMS_BASE
+    while len(ids) < count:
+        if nxt > limit:
+            sys.exit('ERROR: out of SMS ids -- %d requested, %d reclaimable vanilla rows + '
+                     'ids %d..%d appended is all the engine can address (#225/#227).'
+                     % (count, len(free), CUSTOM_SMS_BASE, limit))
+        ids.append(nxt)
+        nxt += 1
+    if verbose and free:
+        sheets = re.findall(r'unit_icon_wait_(\w+?)_sheet',
+                            vanilla_decomp_text('src/unit_icon_wait_data.c'))
+        print('  reclaiming %d dead vanilla SMS row(s): %s'
+              % (len(free), ', '.join('%d (was %s)' % (i, sheets[i]) for i in free[:8])
+                 + (' ...' if len(free) > 8 else '')))
+    return ids
+
+
+# The build's live SMS id pool. Module state because the two injectors that spend it --
+# inject_map_sprites and inject_enemy_class_reskins -- are separate top-level passes called
+# in sequence from main(), with no shared context object to thread it through. Reset once
+# per build, before the first pass, so a re-run in the same process cannot double-spend.
+_SMS_POOL = None
+
+
+def sms_alloc_reset(campaign, verbose=False):
+    """Open a fresh SMS id pool for one build: every reclaimable vanilla row (ascending),
+    then the appended ids. Call once, before any sprite pass."""
+    global _SMS_POOL
+    free = sorted(sms_free_rows(campaign))
+    _SMS_POOL = {'free': list(free), 'next_append': CUSTOM_SMS_BASE, 'reclaimed': []}
+    if verbose:
+        print('  SMS id pool: %d reclaimable vanilla row(s) + ids %d..%d'
+              % (len(free), CUSTOM_SMS_BASE, sms_id_max()))
+
+
+def claim_sms_id():
+    """The next SMS id: a reclaimed dead vanilla row while any remain, else an appended id.
+    Claimed ONLY by a pass that is about to write the matching wait row, which is what keeps
+    ids and row indices in lockstep (allocating for a unit that never gets a row would shift
+    every later row off the id naming it)."""
+    if _SMS_POOL is None:
+        sys.exit('ERROR: SMS id claimed before sms_alloc_reset() -- the pool is per-build')
+    if _SMS_POOL['free']:
+        sms = _SMS_POOL['free'].pop(0)
+        _SMS_POOL['reclaimed'].append(sms)
+        return sms
+    sms = _SMS_POOL['next_append']
+    if sms > sms_id_max():
+        sys.exit('ERROR: out of SMS ids -- every reclaimable vanilla row is spent and the '
+                 'append range %d..%d is full. FE8 masks ids with 0x%X, so there is no id '
+                 '%d (#225/#227).' % (CUSTOM_SMS_BASE, sms_id_max(), sms_id_max(), sms))
+    _SMS_POOL['next_append'] = sms + 1
+    return sms
+
+
+def sms_alloc_report():
+    """What this build reclaimed and what is left, so reuse is legible in the build log
+    instead of invisible -- and so running low is visible BEFORE the build that runs out."""
+    if not _SMS_POOL:
+        return
+    got = _SMS_POOL['reclaimed']
+    if got:
+        sheets = re.findall(r'unit_icon_wait_(\w+?)_sheet',
+                            vanilla_decomp_text('src/unit_icon_wait_data.c'))
+        shown = ', '.join('%d (was %s)' % (i, sheets[i]) for i in got[:6])
+        print('  reclaimed %d dead vanilla SMS row(s): %s%s'
+              % (len(got), shown, ' ...' if len(got) > 6 else ''))
+    left = len(_SMS_POOL['free']) + max(0, sms_id_max() + 1 - _SMS_POOL['next_append'])
+    print('  SMS ids left: %d (%d reclaimable row(s) + %d appendable)%s'
+          % (left, len(_SMS_POOL['free']), max(0, sms_id_max() + 1 - _SMS_POOL['next_append']),
+             '  <-- NEARLY FULL' if left <= SMS_ID_LOW_WATER else ''))
+
+
+def _write_wait_row(sms_id, row):
+    """Put `row` at index `sms_id` of unit_icon_wait_table[].
+
+    A reclaimed id REPLACES the vanilla row living there; an appended id extends the table
+    and must land at exactly the index it names. Asserting that equality here is what makes
+    an id/row desync impossible rather than merely unlikely."""
+    with open(UNIT_ICON_WAIT_C, encoding='utf-8') as f:
+        lines = f.read().splitlines(keepends=True)
+    di, ci = _table_close_line(lines, 'unit_icon_wait_table[]')
+    body = [i for i in range(di + 1, ci) if lines[i].lstrip().startswith('{')]
+    if sms_id < len(body):
+        lines[body[sms_id]] = row + '\n'
+    else:
+        if sms_id != len(body):
+            sys.exit('ERROR: SMS row for id %d would land at index %d -- ids and wait-table '
+                     'row indices have desynced (#227)' % (sms_id, len(body)))
+        if sms_id > sms_id_max():
+            sys.exit('ERROR: SMS id %d is past the engine ceiling of %d (#225)'
+                     % (sms_id, sms_id_max()))
+        if '},' not in lines[ci - 1] and '}' in lines[ci - 1]:
+            lines[ci - 1] = re.sub(r'\}(\s*)(/[/*][^\n]*)?\n$', r'},\1\2\n',
+                                   lines[ci - 1], count=1)
+        lines[ci:ci] = [row + '\n']
+    with open(UNIT_ICON_WAIT_C, 'w', encoding='utf-8') as f:
+        f.write(''.join(lines))
+
+
 def classed_cast(campaign):
-    """Cast (PORTRAIT_MAP order) that carry an FE class, each paired with a stable
-    custom SMS id (CUSTOM_SMS_BASE + position). Name-only units are skipped. Ids are
-    position-based so a unit keeps the same id whether or not its sprite is authored."""
-    out, i = [], 0
+    """Cast (PORTRAIT_MAP order) that carry an FE class; name-only units are skipped.
+
+    The 4th tuple slot is a legacy None -- SMS ids are NOT assigned here. They used to be
+    (CUSTOM_SMS_BASE + position, for every classed member whether or not its sprite was
+    authored), which meant a classed member without art still burned an id while emitting
+    no wait row, shifting every later row off the id naming it. Ids are now claimed by the
+    pass that writes the matching row (claim_sms_id), so the two cannot drift (#227)."""
+    out = []
     for unit_id, slot in PORTRAIT_MAP.items():
         unit = load_unit(campaign, unit_id)
         unit.setdefault('id', unit_id)
         if class_enum_for(unit) is None:
             continue
-        out.append((unit_id, slot, class_enum_for(unit), CUSTOM_SMS_BASE + i))
-        i += 1
+        out.append((unit_id, slot, class_enum_for(unit), None))
     return out
 
 
@@ -2548,18 +2829,18 @@ def inject_map_sprites(campaign, verbose=True):
       * map_sprites/<id>_mu.png   -> HOVER/WALK (MU sheet, 32x480): a custom move sheet
         plus a GetMuImg per-character override (reuses the class motion script)."""
     asset_dir = os.path.join(REPO, 'campaigns', campaign, 'map_sprites')
-    cast = classed_cast(campaign)
-    idle = [(uid, slot, cls, sms) for (uid, slot, cls, sms) in cast
+    # An id is claimed only for a member that actually HAS a sheet, i.e. only where a wait
+    # row is about to be written -- see claim_sms_id (#227).
+    idle = [(uid, slot, cls, claim_sms_id()) for (uid, slot, cls, _) in classed_cast(campaign)
             if os.path.isfile(os.path.join(asset_dir, uid + '.png'))]
 
     # Cold-open guests (PROLOGUE_GUEST_SPRITES) get the same SMS/MU overrides but render
     # through FE8's standard player palette -- so they are kept out of custom_slots (no
-    # cast-palette override) below. Their SMS ids continue past the cast's so each guest's
-    # wait-table row lands at the index its id names (rows append after the cast's).
+    # cast-palette override) below.
     guest_idle, guest_bases = [], {}
     for uid, slot, cls, base in PROLOGUE_GUEST_SPRITES:
         if os.path.isfile(os.path.join(asset_dir, uid + '.png')):
-            guest_idle.append((uid, slot, cls, CUSTOM_SMS_BASE + len(idle) + len(guest_idle)))
+            guest_idle.append((uid, slot, cls, claim_sms_id()))
             guest_bases[uid] = base
 
     if not idle and not guest_idle:
@@ -2765,9 +3046,9 @@ def _inject_pre_recruit_variants(campaign, idle, pointer_externs, verbose=True):
         map_sprite_tool.validate_mu_sheet(move_png)
         macro, _, _, _ = map_sprite_tool.sheet_info(wait_png, (dfw, dfh))
 
-        sms = _wait_table_len()
-        _append_wait_rows(
-            ['\t{0, %s, %s}, // %d %s (pre-recruit)' % (macro, sym, sms, uid)])
+        sms = claim_sms_id()
+        _write_wait_row(sms,
+            '\t{0, %s, %s}, // %d %s (pre-recruit)' % (macro, sym, sms, uid))
         with open(UNIT_ICON_WAIT_S, 'a', encoding='utf-8') as f:
             f.write('\n/* Manchego Stars pre-recruit idle sprite: %s (#24) */\n'
                     '\t.global %s\n%s:\n\t.incbin "graphics/unit_icon/wait/%s.4bpp.lz"\n'
@@ -2906,9 +3187,9 @@ def _inject_scripted_neutral_sprites(campaign, asset_dir, pointer_externs, verbo
         move_sym = 'unit_icon_move_manchego_%s_sheet' % stem
         shutil.copyfile(idle_png, os.path.join(WAIT_GFX_DIR, wait_sym + '.png'))
         shutil.copyfile(mu_png, os.path.join(MOVE_GFX_DIR, move_sym + '.png'))
-        sms = _wait_table_len()
-        _append_wait_rows(
-            ['\t{0, %s, %s}, // %d %s (scripted neutral)' % (macro, wait_sym, sms, uid)])
+        sms = claim_sms_id()
+        _write_wait_row(sms,
+            '\t{0, %s, %s}, // %d %s (scripted neutral)' % (macro, wait_sym, sms, uid))
         with open(UNIT_ICON_WAIT_S, 'a', encoding='utf-8') as f:
             f.write('\n/* Manchego Stars scripted-neutral idle sprite: %s (#24) */\n'
                     '\t.global %s\n%s:\n\t.incbin "graphics/unit_icon/wait/%s.4bpp.lz"\n'
@@ -2959,9 +3240,9 @@ def _inject_ch02_chwinga_sprites(campaign, verbose=True):
     map_sprite_tool.synth_mu_sheet(role_idle, donor, move_png, verbose=False)
     macro, _, _, _ = map_sprite_tool.sheet_info(role_idle, (dfw, dfh))
 
-    sms = _wait_table_len()
-    _append_wait_rows(
-        ['\t{0, %s, %s}, // %d chwinga (green NPC)' % (macro, wait_sym, sms)])
+    sms = claim_sms_id()
+    _write_wait_row(sms,
+        '\t{0, %s, %s}, // %d chwinga (green NPC)' % (macro, wait_sym, sms))
     with open(UNIT_ICON_WAIT_S, 'a', encoding='utf-8') as f:
         f.write('\n/* Manchego Stars green chwinga idle sprite (#38) */\n'
                 '\t.global %s\n%s:\n\t.incbin "graphics/unit_icon/wait/%s.4bpp.lz"\n'
@@ -3063,14 +3344,15 @@ def _inject_idle_sprites(campaign, asset_dir, idle, pointer_externs, guest_bases
         macro, fw, fh, nframes = map_sprite_tool.sheet_info(raw, (dfw, dfh))
         sym = 'unit_icon_wait_manchego_%s_sheet' % uid.replace('-', '_')
         shutil.copyfile(raw, os.path.join(WAIT_GFX_DIR, sym + '.png'))
-        wait_rows.append('\t{0, %s, %s}, /* %d %s */' % (macro, sym, sms, uid))
+        wait_rows.append((sms, '\t{0, %s, %s}, /* %d %s */' % (macro, sym, sms, uid)))
         incbin += ['\t.global %s' % sym, '%s:' % sym,
                    '\t.incbin "graphics/unit_icon/wait/%s.4bpp.lz"' % sym,
                    '\t.align 2, 0']
         pointer_externs.append('extern char %s[];' % sym)
         overrides.append('\tCHARACTER_%s, %d,' % (slot.upper(), sms))
 
-    _append_wait_rows(wait_rows)
+    for sms, row in wait_rows:
+        _write_wait_row(sms, row)
     with open(UNIT_ICON_WAIT_S, 'a', encoding='utf-8') as f:
         f.write('\n/* Manchego Stars custom idle sprites (#38) */\n' + '\n'.join(incbin) + '\n')
 
@@ -3202,32 +3484,6 @@ def _sms_id_mask_bits():
 def sms_id_max():
     """Highest SMS id the engine can look up without wrapping (127 today)."""
     return (1 << _sms_id_mask_bits()) - 1
-
-
-def _append_wait_rows(rows, verbose=False):
-    """Append rows to unit_icon_wait_table[] -- the ONLY way any sprite pass may do so.
-
-    Enforces the engine's id ceiling (#225). `GetInfo` masks the id, so a row past the mask
-    does not crash or warn: the unit silently renders another class's sheet at that class's
-    size. The mask is not the array bound either (gUnitSpriteSlots is u8[0xD0], so ids
-    128-207 are perfectly valid slot-cache indices) -- nothing downstream can catch this,
-    which is why it has to be caught here, at the append."""
-    limit = sms_id_max()
-    first = _wait_table_len()                       # rows are 0-indexed BY SMS id
-    if first + len(rows) - 1 > limit:
-        over = [(first + i, r) for i, r in enumerate(rows) if first + i > limit]
-        named = ', '.join('id %d (%s)' % (i, _wait_row_label(r)) for i, r in over)
-        sys.exit('ERROR: custom map sprite would take SMS id past the engine ceiling of %d: '
-                 '%s.\nFE8 looks these up as unit_icon_wait_table[id & 0x%X], so id %d would '
-                 'silently draw VANILLA row %d instead. Free an id, or widen the GetInfo mask '
-                 'and audit every UseUnitSprite caller (#225).'
-                 % (limit, named, limit, over[0][0], over[0][0] & limit))
-    _append_table_rows(UNIT_ICON_WAIT_C, 'unit_icon_wait_table[]', rows)
-    left = limit - (_wait_table_len() - 1)
-    if verbose or left <= SMS_ID_LOW_WATER:
-        print('  SMS ids: %d used, %d left before the engine ceiling (%d)%s'
-              % (_wait_table_len(), left, limit,
-                 '  <-- NEARLY FULL' if left <= SMS_ID_LOW_WATER else ''))
 
 
 def _wait_row_label(row):
@@ -3895,9 +4151,9 @@ def inject_enemy_class_reskins(campaign, verbose=True):
                 os.path.join(WAIT_GFX_DIR, wait_sym + '.png'), (dfw, dfh))
             map_sprite_tool.validate_mu_sheet(os.path.join(MOVE_GFX_DIR, move_sym + '.png'))
 
-            sms_id = _wait_table_len()
-            _append_wait_rows(
-                ['\t{0, %s, %s}, // %d %s (reskin)' % (macro, wait_sym, sms_id, sprite)])
+            sms_id = claim_sms_id()
+            _write_wait_row(sms_id,
+                '\t{0, %s, %s}, // %d %s (reskin)' % (macro, wait_sym, sms_id, sprite))
             with open(UNIT_ICON_WAIT_S, 'a', encoding='utf-8') as f:
                 f.write('\n/* Manchego Stars enemy class reskin idle (#21) */\n'
                         '\t.global %s\n%s:\n'
@@ -8720,9 +8976,12 @@ def main():
         print('portrait geometry:')
         patch_portrait_geometry(args.campaign)
         print('map sprites:')
+        # One SMS id pool for the whole build -- both sprite passes below spend from it (#227).
+        sms_alloc_reset(args.campaign, verbose=True)
         inject_map_sprites(args.campaign)
         print('enemy class reskins (#21):')
         inject_enemy_class_reskins(args.campaign)  # after map sprites (SMS ids), before ch01
+        sms_alloc_report()
         print('enemy class battle anims (#90):')
         inject_enemy_class_battle_anims(args.campaign)  # after reskins (binds the clone class)
         print('battle anims (#65):')
