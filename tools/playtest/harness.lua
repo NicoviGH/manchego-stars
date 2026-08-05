@@ -5564,12 +5564,11 @@ scenarios.ch04packmath = function()
         .. "who survived, so talking early is the reward", killed, spawned, greens))
 end
 
--- Park an unexhausted blue unit on a village door, take Visit, and advance the line to its end.
--- Shared by ch04's two villages (#205, #24): the doors differ only in what SETTLES them -- an
--- item in the party's hands for the axe village, a closed door for the cottage whose reward is
--- its line -- so `done` is the caller's postcondition and this owns only the walking-in.
--- Returns ok, reason, spoke (whether the visit actually opened a text box at all).
-local function visitVillage(x, y, done)
+-- Park an unexhausted blue unit on a village door and take the Visit command, stopping the
+-- moment the location event starts. Split from the dialogue-advancing half so the RECORDER can
+-- own the filmed part: `openVillageVisit` is the unfilmed walk-in (a `pre`), the line itself is
+-- what the camera wants. Returns ok, reason.
+local function openVillageVisit(x, y)
     local u
     for i = 0, 19 do
         local c = unitAt(SYM.gUnitArrayBlue, i)
@@ -5589,6 +5588,17 @@ local function visitVillage(x, y, done)
     if not selectSemantic("visit", "Visit starts the live location event", function(after)
         return after.menu == nil
     end, 600) then return false, "live command menu did not expose Visit" end
+    return true
+end
+
+-- Walk in, then advance the line to its end. Shared by ch04's two villages (#205, #24): the
+-- doors differ only in what SETTLES them -- an item in the party's hands for the axe village, a
+-- closed door for the cottage whose reward is its line -- so `done` is the caller's
+-- postcondition and this owns only the getting-there.
+-- Returns ok, reason, spoke (whether the visit actually opened a text box at all).
+local function visitVillage(x, y, done)
+    local ok, why = openVillageVisit(x, y)
+    if not ok then return false, why end
     local spoke = false
     for _ = 1, 3600 do
         if done() then break end
@@ -5682,6 +5692,31 @@ scenarios.ch04cottage = function()
     return result("PASS", string.format(
         "the forest cottage at (%d,%d) offered Visit, played its line and shut behind you "
         .. "(terrain 0x%02X -> 0x%02X)", DOOR_X, DOOR_Y, before, after))
+end
+
+-- recordch04cottage (#24): the cottage's five boxes in MOTION, for review with Nicolas -- stills
+-- catch the typewriter mid-stroke, so a scene is reviewed as a GIF (decided 2026-06-10).
+-- The walk-in runs UNFILMED in `pre`, at FAST speed, handing back to normal before the event
+-- starts: recordCutscene sets speed BEFORE pre runs, so an unfilmed grind at real speed eats the
+-- frame budget before the beat begins (the recordch04moose lesson). The camera picks up at the
+-- first text box and stops when the door shuts.
+-- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh recordch04cottage (needs a CH04BOOT=1 ROM), then
+--   tools/playtest/make_gif.py recordch04cottage cottage --name ch04-forest-cottage --fps 14
+scenarios.recordch04cottage = function()
+    local DOOR_X, DOOR_Y, VILLAGE_CLOSED = 1, 11, 0x04
+    return recordCutscene({
+        tag = "cottage", speed = "normal", maxFrames = 3000,
+        pre = function()
+            pokeFastConfig()
+            if not bootToMap() then return false, "never reached the ch04 map" end
+            waitFor(function() return faction() == 0 and not menuOpen()
+                and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+            local ok, why = openVillageVisit(DOOR_X, DOOR_Y)
+            if not ok then return false, why end
+            pokeNormalConfig()   -- film the line at real speed
+        end,
+        until_ = function() return terrainAt(DOOR_X, DOOR_Y) == VILLAGE_CLOSED end,
+    })
 end
 
 -- ch04snag (#214): the Iron Axe's whole purpose. Vanilla Ch4's village hands you the axe to chop
