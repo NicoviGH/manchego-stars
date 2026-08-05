@@ -4,13 +4,15 @@
 live in `CLAUDE.md`/`AGENTS.md`; issue scope and backlog live in GitHub. Before a context rollover,
 warn Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-05 (Opus) after merging #223. `main` = `925aad9`, level with `origin/main`,
-no open PRs, no live feature branch.
+Refreshed 2026-08-05 (Opus) after merging #224 (#218). `main` = `f59fc28`, level with `origin/main`.
+**PR #226 (#225, the SMS-id ceiling guard) is open and awaiting CI** — merge it, then delete the
+branch; nothing else is in flight.
 
 ## Current state
 
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
-  Verified on this tree 2026-08-05: 631 Python tool tests pass, `make check` is `drift check: clean`.
+  Verified on this tree 2026-08-05: 641 Python tool tests pass, the 8 Lua harness suites pass,
+  `make check` is `drift check: clean`, and a full ROM build is green.
 - **Cross-agent continuity:** Nicolas uses Codex only between Claude sessions. Codex must leave an
   explicit HANDOFF entry naming what it changed, the active branch/PR and commit state, verification
   actually run, and the exact next step. Per Nicolas's request, Codex uses ordinary short-lived
@@ -44,6 +46,32 @@ no open PRs, no live feature branch.
   `status: locked`. Still owed: map + placement, text insertion → `verify_text`, `--ch05-boot`
   playtest, `enemy_class_reskins` + FE-Repo imports, Basil/Sahnar STAT_DONORs, and the five
   no-Lupin conditionals (they ride Stage 4's `variant_beat`, not a second mechanism).
+- **#218 is DONE and CLOSED** (PR #224, 2026-08-05). The Character list drew the whole cast as
+  correctly shaped BLACK SILHOUETTES: `UnitList_Init` calls `ApplyUnitSpritePalettes()` (which loads
+  our cast palette into purple OBJ bank `0x0B`) and then immediately **zeroes that bank** — the same
+  vanilla idiom already patched out of `prep_unitselect.c`, spelled `gPaletteBuffer + 0x1B0` instead
+  of `PAL_OBJ(0x0B)`, which is why the Pick Units fix never generalised. Both sites now live in
+  `build_campaign.PURPLE_BANK_BLANKERS`. **Signature worth memorising: shape correct + colour absent
+  ⇒ the bank was blanked, not the sprite mis-injected.** Nicolas's 32x32-vs-16x16 read and a VRAM
+  starvation theory were both measured and ruled out (sizes are declared correctly from donor
+  geometry; the counters land at 32x=26 vs 16x=57, 31 slots spare). ADR in `decisions.md` §Art & Audio.
+- **STILL OPEN from #218, and it is Nicolas's call, not a defect to fix unasked:** five cast members
+  legitimately declare `UNIT_ICON_SIZE_32x32` (Braulo, Wolfram, Meesmickle, Baxby, Lupin — monster
+  donors). `PutUnitSprite` draws a 32x32 at `y-16`, so in the unit list's 16px row pitch their art
+  reaches into the row above (visible on the fixed frames). Vanilla never hits this — no vanilla
+  PLAYER unit is 32x32. Cosmetic only.
+- **The custom SMS id budget is nearly gone (#225 → PR #226).** `GetInfo` masks every id with `0x7F`,
+  so an id ≥ 128 silently renders a VANILLA sprite — and the mask is NOT the array bound
+  (`gUnitSpriteSlots` is `u8[0xD0]`), so nothing downstream can catch it. Vanilla ships 107 rows and
+  `CUSTOM_SMS_BASE = 107` ⇒ the whole budget is ids **107–127**. **Live: 126 used, 2 left**, and
+  **ch05's Basil + Sahnar are exactly those two.** `_append_wait_rows` is now the only way to add a
+  wait row; it fails the build naming the id + unit, and prints headroom. Raising the ceiling for
+  real is deliberately NOT done — that means widening the mask and auditing every `UseUnitSprite` /
+  `StartUiSMS` / `StartWorldMapSMS` caller.
+- **`recordunitlist` is the new fast boot for roster screens** (#218). `tools/playtest/run.sh
+  recordunitlist` on a `make TESTCH=1` ROM opens the Character list ~30s from New Game, navigates
+  semantically off `gMapMenuItems[0]` (overrideId `0x6E`), shoots every page, and dumps SMS geometry
+  + the shared 0x40-slot VRAM budget on both sides. FAILs if the two `UseUnitSprite` counters cross.
 - **FE8 has TWO palette paths, and the second one is a recurring trap.** Beyond the class-keyed
   redirect in `GetBanimPalette`, a per-**CHARACTER** palette keyed on character × CLASS
   (`gAnimCharaPalConfig`) is applied **after** the anim's own palette loads and silently overwrites
@@ -57,47 +85,14 @@ no open PRs, no live feature branch.
 
 **Everything below is on a GitHub issue with its own diagnosis. Start from the issues, not here.**
 
-### 1. #218 — the unit-list MAP SPRITES
-
-**START FROM THE ISSUE — it is now clean.** Title and body both carry Nicolas's 2026-08-05
-correction (the screen draws **map sprites**, not chibi portraits; **do not chase a palette
-path**, that framing is withdrawn), and every decomp/tool pointer in it was re-verified against
-`HEAD` on 2026-08-05. His read: **some of our units are 32x32 where the table expects 16x16, so
-entries overlap.**
-
-The same grounding, duplicated here only so a cold instance can sanity-check the issue:
-
-- `src/unitlistscreen.c` draws rows via `PutUnitSprite(4, 8, 56 + i*16 + r8, ...)` — a **16px row
-  pitch** — after `ForceSyncUnitSpriteSheet()`.
-- `PutUnitSprite` (`src/bmudisp.c:1261`) switches on **`GetInfo(id).size`**: `UNIT_ICON_SIZE_16x16`
-  draws `gObject_16x16` at `y`; `16x32` draws at `y-16`; `32x32` draws `gObject_32x32` at
-  `x-8, y-16`. A 32x32 entry therefore bleeds a full 16px into the neighbouring row, and its chr
-  allocation is 4× a 16x16's.
-- Our wait sheets genuinely mix all three size classes (`campaigns/rime-of-the-frostmaiden/map_sprites/`):
-  **16x48** = 3×16x16 (marty, pinky, prof-rbg, rootis, sahnar, sclorbo, trex, hlin-trollbane);
-  **16x96** = ambiguous, 6×16x16 **or** 3×16x32 (basil, fire-imp, lizard-wildling, lizardzerker);
-  **32x96** = 3×32x32 (baxby, braulo, lupin, meesmickle, wolfram, white-moose, lycanroc-pack).
-- `tools/map_sprite_tool.py` already knows this ambiguity and says so at its line ~55: 16x96 fits
-  both, "**and only the wait table says which**" — the caller should pass `expect` from the decomp.
-  **That is the most likely defect site:** what size does our custom SMS slot (`CUSTOM_SMS_BASE =
-  107`+, `inject_map_sprites` in `tools/build_campaign.py:2505`) declare per unit, and does it match
-  the sheet's real geometry?
-
-**First move:** read what the injector writes into the wait/info table for each custom id and compare
-it against the sheet geometry above — a mismatch there explains a cast-wide failure (one oversize
-entry tramples the shared sheet region) far better than any per-unit asset defect. Then confirm
-in-engine rather than by reasoning ([[feedback_verify_in_engine]]): the unit list is a late screen,
-so **build a TESTCH-style fast boot straight to it** instead of grinding a playthrough per capture.
-Cast-wide, cosmetic, but a screen players open constantly.
-
-### 2. #222 workstream 1 ONLY — the playtest matrix runner
+### 1. #222 workstream 1 ONLY — the playtest matrix runner
 
 Codex's tooling epic. **Agreed scope: take workstream 1 (one command runs the live regression
 matrix, each ROM config built at most once, compact verdict table, artifacts on disk) and defer
 workstreams 2–4** (state inspector, declarative scenario manifests, pre-build validation). ch05 will
 run that matrix repeatedly, which is what justifies buying it now.
 
-### 3. ch05's build work (#25) — with #222 held open on purpose
+### 2. ch05's build work (#25) — with #222 held open on purpose
 
 **Nicolas's explicit instruction: carry #222 in mind while building ch05, and re-scope it from
 experience.** If a deferred workstream turns out to be what actually hurts, widen #222 and take it;
@@ -138,7 +133,8 @@ Then: **#29** world map.
 
 ## Working tree - do not lose or revert
 
-- **No open PRs and no live feature branch.** `main` is `fc1300e`, level with `origin/main`.
+- **`main` is `f59fc28`, level with `origin/main`. One PR in flight: #226** (#225, the SMS-id
+  ceiling guard) on `feat/225-sms-id-ceiling-guard` — merge and delete the branch.
 - `fireemblem8u` is dirty from injected/generated build artifacts. **Never commit its submodule
   pointer.** Restore the injected decomp files before `check.py`/the pre-commit hook so it runs in
   ~22s instead of ~4min: `git -C fireemblem8u restore src/data/chapter_settings.json data/data_8B363C.s`.
@@ -171,6 +167,7 @@ tools/playtest/make_gif.py <scenario> <tag> --name <out> --fps 14   # frames -> 
 
 make CAMPAIGN=rime-of-the-frostmaiden CH04BOOT=1 fireemblem8.gba -j$(nproc)   # ch04 fast-boot
 make CAMPAIGN=rime-of-the-frostmaiden TESTCH=1 fireemblem8.gba -j$(nproc)     # the battle-anim bench
+tools/playtest/run.sh recordunitlist                  # GATE: the Character list + the SMS budget
 PT_CHAR=baxby tools/playtest/run.sh recordanim        # any cast member's banim; then make_gif
 python3 tools/split_pose_sheet.py <sheet>.png <anim>/.src idle windup hit   # sheet -> poses
 python3 tools/poses_to_feditor.py <anim_dir>          # poses.yaml -> the FEditor frames
