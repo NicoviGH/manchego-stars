@@ -57,14 +57,15 @@ no open PRs, no live feature branch.
 
 **Everything below is on a GitHub issue with its own diagnosis. Start from the issues, not here.**
 
-### 1. #218 — the unit-list sprites (RETITLE IT: they are MAP SPRITES, not chibi portraits)
+### 1. #218 — the unit-list MAP SPRITES
 
-**Nicolas's correction, 2026-08-05, and it changes the diagnosis:** the Character/unit-list screen
-draws each unit's **map sprite**, not the chibi portrait the issue currently describes. His read is
-that **some of our units are 32x32 where the table expects 16x16, so entries overlap.** The decomp
-supports it — do not chase a "third palette path".
+**START FROM THE ISSUE — it is now clean.** Title and body both carry Nicolas's 2026-08-05
+correction (the screen draws **map sprites**, not chibi portraits; **do not chase a palette
+path**, that framing is withdrawn), and every decomp/tool pointer in it was re-verified against
+`HEAD` on 2026-08-05. His read: **some of our units are 32x32 where the table expects 16x16, so
+entries overlap.**
 
-Grounding already gathered (verify, don't re-derive):
+The same grounding, duplicated here only so a cold instance can sanity-check the issue:
 
 - `src/unitlistscreen.c` draws rows via `PutUnitSprite(4, 8, 56 + i*16 + r8, ...)` — a **16px row
   pitch** — after `ForceSyncUnitSpriteSheet()`.
