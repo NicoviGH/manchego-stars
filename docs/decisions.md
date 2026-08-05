@@ -1757,6 +1757,15 @@ our own consecutive builds. Non-SRD content (Artificer, Circle of Spores, homebr
 freely for this private distribution.
 _Decided: May 2026; reaffirmed private-only 2026-06-20 after the public-`.bps` evaluation (#59)_
 
+**Physical cartridges are the intended final hand-off — parked until the ROM is done (#228, 2026-08-05).**
+Nicolas plans to give each player a real GBA cartridge rather than only the private `.gba` link (repro shells from
+InsideGadgets). This does not change the decision above — a cart is the same private distribution in a nicer wrapper,
+one per player, handed over directly. Requirements and the hardware link live on **#228**; nothing is decidable until
+there is a finished ROM to flash, so it stays parked rather than scoped. The one non-obvious requirement worth
+recording here: the cart must have **working SRAM save hardware** (FE8 saves to SRAM), and one test cart must be
+flashed and played on real hardware before doing the rest — real-hardware timing is not mGBA, and our custom battle
+anims and palette work are exactly what can differ.
+
 **Permadeath: player choice via FE8's Casual/Classic toggle**
 The toggle ships as-is from vanilla FE8. In-fiction flavor for Casual retreats: "retreated to the sled" / "carried to safety by Baxby."
 _Decided: May 2026_
