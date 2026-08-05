@@ -4,25 +4,34 @@
 live in `CLAUDE.md`/`AGENTS.md`; issue scope and backlog live in GitHub. Before a context rollover,
 warn Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-05 (Opus) after reviewing Codex's merged work. `main` = `fc1300e`, level with
-`origin/main`, no open PRs, no live feature branch.
+Refreshed 2026-08-05 (Opus) after merging #223. `main` = `925aad9`, level with `origin/main`,
+no open PRs, no live feature branch.
 
 ## Current state
 
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
-  Verified on this tree 2026-08-05: 622 Python tool tests pass, `make check` is `drift check: clean`.
+  Verified on this tree 2026-08-05: 631 Python tool tests pass, `make check` is `drift check: clean`.
 - **Cross-agent continuity:** Nicolas uses Codex only between Claude sessions. Codex must leave an
   explicit HANDOFF entry naming what it changed, the active branch/PR and commit state, verification
   actually run, and the exact next step. Per Nicolas's request, Codex uses ordinary short-lived
   feature branches in this checkout, one at a time; **do not create worktrees unless Nicolas
   explicitly changes that instruction.**
-- **ch04 (#24) is BUILT, WON, FILMED — one authored line short of done.** The parley converts the
-  pack in place with allies scaling to survivors (#203); the Lonelywood village hands over the Iron
-  Axe (#205); the snag falls into a bridge (#214); goal ids are per-chapter (#207); the rout and both
-  endings are winnable and filmed (#204); every cast member fights as itself (#206). `make difficulty
-  CH=ch04` reads **PARITY**, no threat outliers, boss is the chapter's hardest hitter — so Nicolas's
-  standing condition on Lupin's leader tile moving `[0,0] → [2,1]` is **satisfied, not outstanding**.
-  The single remaining item is the second village's line (#24, reopened; step 1 below).
+- **ch04 (#24) is DONE and CLOSED** (PR #223, 2026-08-05). The parley converts the pack in place
+  with allies scaling to survivors (#203); both villages are wired and speak (#205, #24); the snag
+  falls into a bridge (#214); goal ids are per-chapter (#207); the rout and both endings are
+  winnable and filmed (#204); every cast member fights as itself (#206). `make difficulty CH=ch04`
+  reads **PARITY**, so Nicolas's standing condition on Lupin's leader tile moving `[0,0] → [2,1]`
+  is satisfied. The only ch04 thread still open is `dev_placeholder_scene()` terminating the
+  chapter, which is blocked on ch05 hosting (#25), not on ch04.
+- **Two rules came out of #223 and both generalise — full ADRs in `decisions.md`.** (1) **A
+  village's line is dialogue**, so `visit_text` is a LIST, one entry per GBA box; a flowed scalar
+  is rejected, not reflowed. It had been silently reflowing the axe village's *vanilla-1:1* text
+  from vanilla's four sentence-broken boxes into three that buttoned mid-sentence. (2) **A reused
+  vanilla BG is a CLIMATE CLAIM** — both villages were playing over `BG_NORMAL_VILLAGE`, a
+  temperate green town, in a snowbound fog chapter. Check every backdrop against the map it plays
+  over, never inherit it because the vanilla scene being copied used it. **`CH04_ENDING_BG` is
+  still vanilla `BG_FOREST` and has NOT been checked against that rule** — Nicolas was told; it is
+  his call, not a defect to fix unasked.
 - **The playtest driver is state-driven (#220 → PR #221).** `tools/playtest/controller.lua` is a PURE
   classifier + legal-action enumerator (observe → classify → enumerate → **one** guarded input →
   verify postcondition → JSON trace); `harness.lua` owns the mGBA-facing observer. Menus are read
@@ -48,22 +57,7 @@ Refreshed 2026-08-05 (Opus) after reviewing Codex's merged work. `main` = `fc130
 
 **Everything below is on a GitHub issue with its own diagnosis. Start from the issues, not here.**
 
-### 1. ch04's second village (#24, reopened) — the true last ch04 item
-
-The cottage at **(1,11)** is visitable-capable but unwired, so FE8 offers no Visit at all — the
-player sees a house they cannot enter. Vanilla's second village is pure Lute recruit dialogue
-(`9B2`/`9B3`/`9B4`, zero lore) and our Lupin parley already covers the recruit role, so **there is
-nothing to copy — whatever goes there is ours.** Nicolas wants "at least a lore drop or a hint".
-
-**Method, in order:** mine the Frostmaiden book + the DM notes for Lonelywood material FIRST
-(`decisions.md` → story sources of truth; the book scan is image-only, PDF page = printed + 1), read
-every speaker's voice bible and the roster, **then** run the `dialogue-pass` skill *with Nicolas* —
-do not draft solo and do not ask him what the sources already answer. Wiring mirrors #205/#212: a
-`villages:` entry whose door tile is visitable (guarded by `assert_village_tiles_visitable`). The
-reward can be the line alone — ch04's economy is deliberately Ch4-lean (~270g magnitude, one Iron
-Axe, no chests). Any text change means `python3 tools/verify_text.py` before claiming done.
-
-### 2. #218 — the unit-list sprites (RETITLE IT: they are MAP SPRITES, not chibi portraits)
+### 1. #218 — the unit-list sprites (RETITLE IT: they are MAP SPRITES, not chibi portraits)
 
 **Nicolas's correction, 2026-08-05, and it changes the diagnosis:** the Character/unit-list screen
 draws each unit's **map sprite**, not the chibi portrait the issue currently describes. His read is
@@ -95,14 +89,14 @@ in-engine rather than by reasoning ([[feedback_verify_in_engine]]): the unit lis
 so **build a TESTCH-style fast boot straight to it** instead of grinding a playthrough per capture.
 Cast-wide, cosmetic, but a screen players open constantly.
 
-### 3. #222 workstream 1 ONLY — the playtest matrix runner
+### 2. #222 workstream 1 ONLY — the playtest matrix runner
 
 Codex's tooling epic. **Agreed scope: take workstream 1 (one command runs the live regression
 matrix, each ROM config built at most once, compact verdict table, artifacts on disk) and defer
 workstreams 2–4** (state inspector, declarative scenario manifests, pre-build validation). ch05 will
 run that matrix repeatedly, which is what justifies buying it now.
 
-### 4. ch05's build work (#25) — with #222 held open on purpose
+### 3. ch05's build work (#25) — with #222 held open on purpose
 
 **Nicolas's explicit instruction: carry #222 in mind while building ch05, and re-scope it from
 experience.** If a deferred workstream turns out to be what actually hurts, widen #222 and take it;
@@ -168,6 +162,8 @@ PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04moose          # GATE: the sighting 
 PT_HOST_CHAPTER=5 tools/playtest/run.sh clear_ch04_parley  # parley, rout -> the AUTHORED ending
 PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04packmath       # GATE: kill 2 wolves, parley -> 3 greens
 PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04village        # GATE: visit (8,2) -> the Iron Axe
+PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04cottage        # GATE: visit (1,11) -> line plays, door shuts
+PT_HOST_CHAPTER=5 tools/playtest/run.sh recordch04cottage  # the cottage's 5 boxes, in motion
 PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04snag           # GATE: chop the snag -> (4,9) is a bridge
 tools/playtest/run.sh controller_turn                      # GATE: the #220 controller contract
 tools/playtest/make_gif.py <scenario> <tag> --name <out> --fps 14   # frames -> docs/demo/<out>.gif
