@@ -2372,6 +2372,21 @@ so a standard-palette sheet is the only way to add a custom sprite alongside the
 compare its 16-colour palette to `unit_icon_pal_player.agbpal` — exact match ⇒ guest path (no override); custom colours
 ⇒ it must be re-indexed to `cast_palette.png` and join the cast bank.
 
+**Custom SMS ids are capped at 127 by the engine, and the cap is enforced at the append (#225, 2026-08-05).**
+FE8 resolves every map sprite's geometry through a masked index — `#define GetInfo(id) (unit_icon_wait_table[(id) &
+((1<<7)-1)])` in `src/bmudisp.c`. An id ≥ 128 therefore reads a **vanilla** row: id 128 draws Ephraim Lord's sheet at
+Ephraim Lord's size class. It does not crash, does not warn, and fails no test — the unit simply renders as somebody
+else. Critically **the mask is not the array bound**: `gUnitSpriteSlots` is `u8[0xD0]` and `UNITSPRITE_MAX` is `0xD0`,
+so ids 128–207 remain valid *slot-cache* indices; nothing downstream can notice. Vanilla ships 107 rows and
+`CUSTOM_SMS_BASE = 107`, so the whole custom budget is **ids 107–127 — 21 sprites**, and every pass spends from it
+(cast idle, guests, pre-recruit variants, scripted neutrals, the chwinga reskin, `enemy_class_reskins`).
+So: **`_append_wait_rows` is the only way to add a wait row**, it `sys.exit`s naming the id and the unit that would
+overflow, and it prints the remaining headroom (loudly under `SMS_ID_LOW_WATER`). The ceiling itself is *read from the
+decomp* (`_sms_id_mask_bits` parses the `GetInfo` define out of HEAD) rather than hardcoded, so a decomp bump moves the
+guard with it instead of leaving a stale `127` behind. Going past 127 for real is a much larger job — widen or re-point
+the mask and audit every `UseUnitSprite` / `StartUiSMS` / `StartWorldMapSMS` caller — and is deliberately not done here.
+Live budget at the time of writing: **126 used, 2 left**; ch05's Basil + Sahnar are exactly those two.
+
 **Loading the cast bank is only half the job — several vanilla screens BLANK it again (#218, 2026-08-05).**
 Bank `0xB` is free in vanilla precisely because nothing renders from it, and vanilla exploits that: a screen calls
 `ApplyUnitSpritePalettes()` and then immediately zeroes bank `0xB` as scratch cleanup. Harmless in vanilla; for us a
