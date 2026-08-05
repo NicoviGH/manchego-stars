@@ -16,6 +16,7 @@ local MENU_BALLISTA_ATTACK = 0x50
 local MENU_TALK = 0x5A
 local MENU_VISIT = 0x5C
 local MENU_WAIT = 0x6B
+local MENU_UNIT_LIST = 0x6E
 local MENU_STATUS = 0x6F
 local MENU_END_PHASE = 0x78
 
@@ -226,6 +227,7 @@ function M.legalActions(observation)
         addMenuCommand(actions, observation, MENU_WAIT, "wait")
     elseif state == "map_command_menu" then
         addMenuNavigation(actions, observation)
+        addMenuCommand(actions, observation, MENU_UNIT_LIST, "unit_list")
         addMenuCommand(actions, observation, MENU_STATUS, "status")
         addMenuCommand(actions, observation, MENU_END_PHASE, "end_phase")
     elseif state == "weapon_menu" then

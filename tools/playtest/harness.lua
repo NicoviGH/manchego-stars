@@ -3886,6 +3886,113 @@ scenarios.recordenemy = function()
 end
 
 
+-- ================================================================ unit list / SMS budget (#218)
+-- The map-menu "Unit" screen (Character list) draws every roster unit's MAP SPRITE at a 16px
+-- row pitch (unitlistscreen.c: PutUnitSprite(4, 8, 56 + i*16 + r8, ...)). Two things can make
+-- that render wrong and only the ROM can tell them apart:
+--
+--   1. GEOMETRY -- PutUnitSprite (bmudisp.c) switches on unit_icon_wait_table[id].size and draws
+--      a 16x32 at y-16 and a 32x32 at (x-8, y-16). A 32x32 entry therefore reaches a full 16px
+--      into the row above, which no vanilla PLAYER unit ever does (vanilla's 32x32 sheets are
+--      monsters, and monsters are never on your roster).
+--   2. VRAM BUDGET -- UseUnitSprite hands out one shared 0x40-slot space: gSMS16xGfxIndexCounter
+--      walks DOWN from 0x3F one slot per 16x16, gSMS32xGfxIndexCounter walks UP from 0 by 2 per
+--      16x32 and 4 per 32x32. They are not checked against each other, so once they cross, later
+--      sprites overwrite earlier ones and the whole list goes wrong at once.
+--
+-- Both are read here, before and after the screen opens: the list allocates sprites for roster
+-- units that are NOT on the map, so it can push the counters well past what the map needed.
+local UNITLIST_ROWS = 6                -- visible rows per page (the draw loop's `i < 6`)
+local SMS_SLOT_SPACE = 0x40            -- ResetUnitSprites: 16x counter starts at 0x40-1, 32x at 0
+local SMS_SIZE_NAME = { [0] = "16x16", [1] = "16x32", [2] = "32x32" }
+
+-- unit_icon_wait_table[] is UnitIconWait {u16 pattern, u16 size, char *sheet} -- 8 bytes.
+local function smsSize(id) return ru16(SYM.unit_icon_wait_table + id * 8 + 2) end
+
+-- Everything UseUnitSprite has handed out so far, plus the two counters that ration it. A slot
+-- of 0xFF means "never allocated on this map"; anything else is a live chr index.
+local function dumpSmsBudget(when)
+    local c32 = ru32(SYM.gSMS32xGfxIndexCounter)
+    local c16 = ru32(SYM.gSMS16xGfxIndexCounter)
+    log(string.format("SMS budget %s: 32x counter=%d (grows up from 0), 16x counter=%d "
+        .. "(grows down from %d), headroom=%d slots%s",
+        when, c32, c16, SMS_SLOT_SPACE - 1, c16 - c32,
+        c32 >= c16 and "  <-- EXHAUSTED: the two counters have CROSSED" or ""))
+    local live = {}
+    for id = 0, 0xCF do
+        local slot = ru8(SYM.gUnitSpriteSlots + id)
+        if slot ~= 0xFF then
+            live[#live + 1] = string.format("%d(%s)@chr%d", id, SMS_SIZE_NAME[smsSize(id)] or "?", slot * 2)
+        end
+    end
+    log(string.format("SMS allocated %s (%d sprites): %s", when, #live, table.concat(live, " ")))
+    return c32, c16
+end
+
+-- RECORDUNITLIST (#218): open the Character list on a `make TESTCH=1` ROM -- New Game boots
+-- STRAIGHT into the Ch1 sandbox with the whole classed cast deployed, so the screen a player
+-- opens constantly is ~30s from boot instead of a playthrough per capture. Shoots every page
+-- of the roster and dumps the SMS geometry + VRAM budget on both sides of the transition.
+scenarios.recordunitlist = function()
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    wait(60)
+    local mapC32, mapC16 = dumpSmsBudget("on the map, before the list opens")
+
+    local tile = emptyTile()
+    if not tile then return result("FAIL", "live map has no empty tile to open its menu from") end
+    if not cursorTo(tile.x, tile.y) then return result("FAIL", "cursor never reached the empty tile") end
+    if not guardedInput("open_map_menu", "A", "live map command menu opens", function(after)
+        return controllerState(after) == "map_command_menu"
+    end, 120) then return result("FAIL", "the map command menu never opened") end
+    if not selectSemantic("unit_list", "the Character (unit list) screen starts", function()
+        return procActive(SYM.ProcScr_UnitListScreen_Field)
+    end, 300) then return result("FAIL", "the map menu's Unit command never reached the list screen") end
+
+    wait(90)                                   -- let the screen settle before the first frame
+    shot("unitlist-page1")
+    local listC32, listC16 = dumpSmsBudget("with the unit list open")
+
+    -- Walk the roster. Each DOWN is one input with a real postcondition (the highlighted row or
+    -- the scroll offset must move); when neither moves we are at the end of the list, not stuck.
+    local proc = findProc(SYM.ProcScr_UnitListScreen_Field)
+    if not proc then return result("FAIL", "the unit list proc vanished after it started") end
+    local allies = ru8(proc + 0x3A)
+    log(string.format("unit list: %d allies on the roster, %d visible rows per page",
+        allies, UNITLIST_ROWS))
+    local shots = 1
+    for _ = 1, allies + UNITLIST_ROWS do
+        local row, scroll = ru8(proc + 0x2C), ru8(proc + 0x38)
+        press(K.DOWN, 4); wait(10)
+        if ru8(proc + 0x2C) == row and ru8(proc + 0x38) == scroll then break end
+        shots = shots + 1
+        shot(string.format("unitlist-row%02d", shots))
+    end
+    wait(20); shot("unitlist-end")
+    dumpSmsBudget("after scrolling the whole roster")
+
+    -- The verdict is the BUDGET, which is a fact the ROM can state. How the pixels read is
+    -- Nicolas's call off the frames, so it is reported, never asserted.
+    local oversize = {}
+    for id = 107, 0xCF do
+        if ru8(SYM.gUnitSpriteSlots + id) ~= 0xFF and smsSize(id) == 2 then
+            oversize[#oversize + 1] = id
+        end
+    end
+    log(string.format("custom SMS ids drawn as 32x32 in a 16px-pitch list: %s",
+        #oversize > 0 and table.concat(oversize, ",") or "none"))
+    if listC32 >= listC16 then
+        return result("FAIL", string.format(
+            "SMS VRAM exhausted: the unit list drove the 32x counter to %d past the 16x counter at %d "
+            .. "(map alone reached %d/%d) -- later sprites overwrote earlier ones",
+            listC32, listC16, mapC32, mapC16))
+    end
+    return result("PASS", string.format(
+        "unit list captured in %d frames; SMS budget held (32x=%d < 16x=%d, %d slots spare); "
+        .. "%d custom id(s) draw 32x32 into a 16px row pitch",
+        shots, listC32, listC16, listC16 - listC32, #oversize))
+end
+
+
 -- ================================================================ ch02 load-test (#22)
 -- The structural half of the Ch2 "Cold Welcome" load-test: does ch02 LOAD off the real
 -- ch01->ch02 chain (MNC2(0x3)), not soft-lock, and is it winnable -- with the 3 GREEN chwinga

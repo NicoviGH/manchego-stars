@@ -120,6 +120,7 @@ UNIT_ICON_MOVE_S = os.path.join(DECOMP, 'data', 'const_data_unit_icon_move.s')
 MOVE_GFX_DIR = os.path.join(DECOMP, 'graphics', 'unit_icon', 'move')
 BMUDISP_C = os.path.join(DECOMP, 'src', 'bmudisp.c')
 PREP_UNITSELECT_C = os.path.join(DECOMP, 'src', 'prep_unitselect.c')
+UNITLISTSCREEN_C = os.path.join(DECOMP, 'src', 'unitlistscreen.c')
 # New-game boots straight into the test chapter (skip the vanilla prologue) so the
 # spawn is one "New Game" away. CHAPTER_L_1 = 0x01 (constants/chapters.h).
 TEST_CHAPTER_INDEX = 1
@@ -399,6 +400,9 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         'src/bmcamadjust.c',
                         'src/unit_icon_wait_data.c', 'src/unit_icon_move_data.c', 'src/mu.c',
                         'src/bmudisp.c', 'src/prep_unitselect.c',
+                        # #218: both roster screens that blank the purple OBJ bank
+                        # (PURPLE_BANK_BLANKERS); prep_unitselect.c is listed above
+                        'src/unitlistscreen.c',
                         # lord-select (#46): CallLordSelectMenu decl for eventscripts
                         'include/eventcall.h',
                         # enemy class reskins (#21): cloned goblin classes in gClassData;
@@ -2381,6 +2385,54 @@ def _read_cast_palette(path):
     return out[1:] + out[:1]
 
 
+# Screens that load the unit-sprite palettes and then immediately ZERO the purple OBJ bank
+# (0x0B). In vanilla that bank is scratch -- no vanilla unit renders from it -- but our custom
+# cast map sprites do, and a zeroed 16-colour bank draws every index as colour 0, so the cast
+# come out as correctly shaped BLACK SILHOUETTES (#218). Every entry is (file, exact vanilla
+# text, replacement); the fill is DELETED, never re-spelled, because ApplyUnitSpritePalettes
+# has already left the correct cast palette in the bank.
+#
+# This is a LIST and not a grep because the same idiom is spelled differently per screen --
+# `PAL_OBJ(0x0B)` in prep_unitselect, the raw `gPaletteBuffer + 0x1B0` (0x100 + 0x0B*0x10) in
+# unitlistscreen. Missing the second spelling is exactly how the Pick Units fix failed to
+# generalise to the Character screen. A new roster screen goes here, not in a new hook.
+PURPLE_BANK_BLANKERS = (
+    (PREP_UNITSELECT_C,                                  # PrepUnit_InitSMS -- Pick Units
+     '    ApplyUnitSpritePalettes();\n'
+     '    CpuFastFill(0, PAL_OBJ(0x0B), 0x20);\n',
+     '    ApplyUnitSpritePalettes();\n'
+     '    /* Manchego Stars: vanilla zeros the purple OBJ bank (0x0B) here -- unused in\n'
+     '     * vanilla prep -- but our custom cast map sprites render from it, so keep the\n'
+     '     * cast palette ApplyUnitSpritePalettes just loaded instead of blanking it\n'
+     '     * (else the roster goes black). */\n'),
+    (UNITLISTSCREEN_C,                                   # UnitList_Init -- the Character list
+     '    ApplyUnitSpritePalettes();\n'
+     '\n'
+     '    CpuFastFill(0, gPaletteBuffer + 0x1B0, PLTT_SIZE_4BPP);\n',
+     '    ApplyUnitSpritePalettes();\n'
+     '\n'
+     '    /* Manchego Stars (#218): same blanking as PrepUnit_InitSMS, spelled as a raw\n'
+     '     * gPaletteBuffer offset -- 0x1B0 == 0x100 + 0x0B*0x10 == OBJ bank 0x0B. The\n'
+     '     * unit list draws each row with PutUnitSprite, so zeroing the cast bank here\n'
+     '     * turned the whole roster into black silhouettes. */\n'),
+)
+
+
+def _drop_purple_bank_fills():
+    """Delete every vanilla "zero the purple OBJ bank" fill listed in PURPLE_BANK_BLANKERS.
+
+    Fails the build loudly if a site no longer matches verbatim: a decomp bump that reworks
+    one of these screens must not silently leave that screen's roster black."""
+    for path, orig, hooked in PURPLE_BANK_BLANKERS:
+        with open(path, encoding='utf-8') as f:
+            text = f.read()
+        if orig not in text:
+            sys.exit('ERROR: purple-bank (0x0B) fill not in expected form in %s -- the cast '
+                     'map-sprite palette would be blanked on that screen (#218)' % path)
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(text.replace(orig, hooked, 1))
+
+
 def _inject_palette_bank_hook():
     """Patch bmudisp.c so the custom cast share a bespoke palette in the campaign-unused
     purple OBJ bank (0xB / OBJPAL_UNITSPRITE_PURPLE), leaving the shared player palette
@@ -2389,7 +2441,10 @@ def _inject_palette_bank_hook():
         the faction switch. StartMu uses this too, so it covers idle + hover/walk; the
         grey "acted" tint is handled upstream in GetUnitDisplayedSpritePalette.
       * ApplyUnitSpritePalettes -- load gCastMapPalette into the purple bank (replacing
-        the single-player Light-Rune load; Light Rune is an unused DUMMY item)."""
+        the single-player Light-Rune load; Light Rune is an unused DUMMY item).
+
+    Loading the bank is only half the job: several screens blank it again right after.
+    _drop_purple_bank_fills (PURPLE_BANK_BLANKERS) is what keeps it loaded."""
     with open(BMUDISP_C, encoding='utf-8') as f:
         text = f.read()
 
@@ -2444,26 +2499,7 @@ def _inject_palette_bank_hook():
     with open(BMUDISP_C, 'w', encoding='utf-8') as f:
         f.write(text)
 
-    # prep_unitselect.c: PrepUnit_InitSMS loads the unit-sprite palettes (incl. our cast
-    # palette into the purple bank 0x0B) then immediately zeros bank 0x0B -- vanilla
-    # cleanup that's harmless there (no purple-faction units in prep) but blanks our
-    # custom cast map sprites to BLACK silhouettes on the Pick Units roster. Drop the
-    # fill: ApplyUnitSpritePalettes already left bank 0x0B holding the correct cast palette.
-    with open(PREP_UNITSELECT_C, encoding='utf-8') as f:
-        prep = f.read()
-    fill_orig = ('    ApplyUnitSpritePalettes();\n'
-                 '    CpuFastFill(0, PAL_OBJ(0x0B), 0x20);\n')
-    fill_hooked = ('    ApplyUnitSpritePalettes();\n'
-                   '    /* Manchego Stars: vanilla zeros the purple OBJ bank (0x0B) here --\n'
-                   '     * unused in vanilla prep -- but our custom cast map sprites render\n'
-                   '     * from it, so keep the cast palette ApplyUnitSpritePalettes just\n'
-                   '     * loaded instead of blanking it (else the roster goes black). */\n')
-    if fill_orig not in prep:
-        sys.exit('ERROR: PrepUnit_InitSMS purple-bank fill not in expected form in %s'
-                 % PREP_UNITSELECT_C)
-    prep = prep.replace(fill_orig, fill_hooked, 1)
-    with open(PREP_UNITSELECT_C, 'w', encoding='utf-8') as f:
-        f.write(prep)
+    _drop_purple_bank_fills()
 
 
 def _inject_cast_palette(palette_u16, char_slots, extra_char_ids=()):

@@ -105,6 +105,14 @@ WANTED = [
                                 # In a --montage build this carries the #43 lore crawl, so a
                                 # live instance == the montage opener actually played.
     'ProcScr_PrepUnitScreen',   # proc script: the prep "Pick Units" screen (deploy/bench).
+    'ProcScr_UnitListScreen_Field', # proc script: the map-menu "Unit" list, i.e. the Character
+                                # screen (src/unitlistscreen.c, started by StartUnitListScreenField
+                                # off gMapMenuItems[0], overrideId 0x6E). A live instance == the
+                                # unit list is actually on screen -> the #218 capture point.
+    'unit_icon_wait_table',     # UnitIconWait[] (include/unit_icon_data.h): {pattern, size, sheet}
+                                # per SMS id. `size` is the UNIT_ICON_SIZE_* PutUnitSprite switches
+                                # on, so reading it in-engine proves what the ROM believes about a
+                                # custom slot -- not what the injector meant to write (#218).
     'ProcScr_BmSupplyScreen',   # proc script: the in-map Supply (convoy) screen, opened by
                                 # the unit-menu Supply command (src/prep_itemsupply.c). A live
                                 # instance == a unit actually opened the convoy on the field.
