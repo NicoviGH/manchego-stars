@@ -13,6 +13,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 from PIL import Image
 
@@ -1768,6 +1769,97 @@ class IdempotentInjectionMtimes(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class CustomSmsIdsStayUnderTheEngineMask(unittest.TestCase):
+    """FE8 looks up a map sprite's geometry through a MASKED index:
+
+        #define GetInfo(id) (unit_icon_wait_table[(id) & ((1<<7)-1)])
+
+    so an SMS id >= 128 silently reads a VANILLA row -- id 128 draws Ephraim Lord's
+    sheet at Ephraim Lord's size class. It does not crash and it does not warn: the
+    unit just renders as somebody else. The mask is NOT the array bound either
+    (gUnitSpriteSlots is u8[0xD0] and ids 128-207 are valid slot-cache indices), which
+    is exactly why nothing else catches it (#225).
+
+    Our custom ids start at CUSTOM_SMS_BASE = 107, so the budget is small and finite.
+    """
+
+    def test_the_limit_is_read_from_the_decomp_not_hardcoded(self):
+        """Ground the ceiling in the engine that enforces it -- if a decomp bump widens
+        or narrows the mask, the guard must follow it rather than assert a stale 127."""
+        self.assertEqual(bc._sms_id_mask_bits(), 7)
+        self.assertEqual(bc.sms_id_max(), 127)
+
+    def test_the_mask_read_fails_loudly_if_the_define_moves(self):
+        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
+                   encoding='utf-8').read()
+        body = src[src.index('def _sms_id_mask_bits('):]
+        body = body[:body.index('\ndef ')]
+        self.assertIn('sys.exit', body)
+        self.assertIn('vanilla_decomp_text', body,
+                      'read the mask from HEAD -- the working tree is our own artifact')
+
+    def test_every_wait_table_append_goes_through_the_guarded_helper(self):
+        """A new sprite pass must not be able to append a row unguarded. The choke point
+        is _append_wait_rows; nothing else may append to unit_icon_wait_table[]."""
+        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
+                   encoding='utf-8').read()
+        helper = src[src.index('def _append_wait_rows('):]
+        helper = helper[:helper.index('\ndef ')]
+        outside = src.replace(helper, '')
+        self.assertNotIn('_append_table_rows(UNIT_ICON_WAIT_C', outside,
+                         'append wait rows via _append_wait_rows, not _append_table_rows')
+        self.assertIn('_append_table_rows(UNIT_ICON_WAIT_C', helper,
+                      'the helper is the one place allowed to do the raw append')
+        self.assertGreaterEqual(outside.count('_append_wait_rows('), 5,
+                                'all five sprite passes must route through the guard')
+
+    def test_the_guard_rejects_a_row_past_the_mask(self):
+        """The regression: overflowing must fail the BUILD, naming the id and the unit,
+        rather than shipping a sprite that renders as a vanilla class."""
+        tmp = tempfile.mkdtemp()
+        try:
+            path = os.path.join(tmp, 'unit_icon_wait_data.c')
+            rows = ''.join('\t{0, UNIT_ICON_SIZE_16x16, sheet_%d},\n' % i for i in range(128))
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write('UnitIconWait unit_icon_wait_table[] = {\n%s};\n' % rows)
+            with mock.patch.object(bc, 'UNIT_ICON_WAIT_C', path):
+                self.assertEqual(bc._wait_table_len(), 128)   # ids 0..127: exactly full
+                with self.assertRaises(SystemExit) as cm:
+                    bc._append_wait_rows(['\t{0, UNIT_ICON_SIZE_16x16, x}, // 128 basil'])
+            msg = str(cm.exception)
+            self.assertIn('128', msg, 'name the overflowing id')
+            self.assertIn('basil', msg, 'name the unit that overflowed')
+            self.assertIn('127', msg, 'state the ceiling')
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_the_guard_allows_the_last_usable_id(self):
+        """127 is usable -- an off-by-one here would cost us a sprite we own."""
+        tmp = tempfile.mkdtemp()
+        try:
+            path = os.path.join(tmp, 'unit_icon_wait_data.c')
+            rows = ''.join('\t{0, UNIT_ICON_SIZE_16x16, sheet_%d},\n' % i for i in range(127))
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write('UnitIconWait unit_icon_wait_table[] = {\n%s};\n' % rows)
+            with mock.patch.object(bc, 'UNIT_ICON_WAIT_C', path):
+                bc._append_wait_rows(['\t{0, UNIT_ICON_SIZE_16x16, x}, // 127 sahnar'])
+                self.assertEqual(bc._wait_table_len(), 128)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_the_remaining_headroom_is_reported_while_it_is_still_cheap_to_act_on(self):
+        """Two ids left is worth knowing BEFORE the build that spends them, so the
+        injector prints the headroom and says so loudly when it is nearly gone. (The
+        "does the live campaign fit" question is answered end-to-end by the guard
+        itself firing during a real build, which CI runs.)"""
+        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
+                   encoding='utf-8').read()
+        body = src[src.index('def _append_wait_rows('):]
+        body = body[:body.index('\ndef ')]
+        self.assertIn('SMS_ID_LOW_WATER', body)
+        self.assertIn('print(', body, 'report the headroom, do not only enforce it')
 
 
 class CastPaletteBankSurvivesEveryRosterScreen(unittest.TestCase):

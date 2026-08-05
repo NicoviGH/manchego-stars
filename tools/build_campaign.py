@@ -2766,8 +2766,8 @@ def _inject_pre_recruit_variants(campaign, idle, pointer_externs, verbose=True):
         macro, _, _, _ = map_sprite_tool.sheet_info(wait_png, (dfw, dfh))
 
         sms = _wait_table_len()
-        _append_table_rows(UNIT_ICON_WAIT_C, 'unit_icon_wait_table[]',
-                           ['\t{0, %s, %s}, // %d %s (pre-recruit)' % (macro, sym, sms, uid)])
+        _append_wait_rows(
+            ['\t{0, %s, %s}, // %d %s (pre-recruit)' % (macro, sym, sms, uid)])
         with open(UNIT_ICON_WAIT_S, 'a', encoding='utf-8') as f:
             f.write('\n/* Manchego Stars pre-recruit idle sprite: %s (#24) */\n'
                     '\t.global %s\n%s:\n\t.incbin "graphics/unit_icon/wait/%s.4bpp.lz"\n'
@@ -2907,9 +2907,8 @@ def _inject_scripted_neutral_sprites(campaign, asset_dir, pointer_externs, verbo
         shutil.copyfile(idle_png, os.path.join(WAIT_GFX_DIR, wait_sym + '.png'))
         shutil.copyfile(mu_png, os.path.join(MOVE_GFX_DIR, move_sym + '.png'))
         sms = _wait_table_len()
-        _append_table_rows(UNIT_ICON_WAIT_C, 'unit_icon_wait_table[]',
-                           ['\t{0, %s, %s}, // %d %s (scripted neutral)'
-                            % (macro, wait_sym, sms, uid)])
+        _append_wait_rows(
+            ['\t{0, %s, %s}, // %d %s (scripted neutral)' % (macro, wait_sym, sms, uid)])
         with open(UNIT_ICON_WAIT_S, 'a', encoding='utf-8') as f:
             f.write('\n/* Manchego Stars scripted-neutral idle sprite: %s (#24) */\n'
                     '\t.global %s\n%s:\n\t.incbin "graphics/unit_icon/wait/%s.4bpp.lz"\n'
@@ -2961,8 +2960,8 @@ def _inject_ch02_chwinga_sprites(campaign, verbose=True):
     macro, _, _, _ = map_sprite_tool.sheet_info(role_idle, (dfw, dfh))
 
     sms = _wait_table_len()
-    _append_table_rows(UNIT_ICON_WAIT_C, 'unit_icon_wait_table[]',
-                       ['\t{0, %s, %s}, // %d chwinga (green NPC)' % (macro, wait_sym, sms)])
+    _append_wait_rows(
+        ['\t{0, %s, %s}, // %d chwinga (green NPC)' % (macro, wait_sym, sms)])
     with open(UNIT_ICON_WAIT_S, 'a', encoding='utf-8') as f:
         f.write('\n/* Manchego Stars green chwinga idle sprite (#38) */\n'
                 '\t.global %s\n%s:\n\t.incbin "graphics/unit_icon/wait/%s.4bpp.lz"\n'
@@ -3071,7 +3070,7 @@ def _inject_idle_sprites(campaign, asset_dir, idle, pointer_externs, guest_bases
         pointer_externs.append('extern char %s[];' % sym)
         overrides.append('\tCHARACTER_%s, %d,' % (slot.upper(), sms))
 
-    _append_table_rows(UNIT_ICON_WAIT_C, 'unit_icon_wait_table[]', wait_rows)
+    _append_wait_rows(wait_rows)
     with open(UNIT_ICON_WAIT_S, 'a', encoding='utf-8') as f:
         f.write('\n/* Manchego Stars custom idle sprites (#38) */\n' + '\n'.join(incbin) + '\n')
 
@@ -3171,6 +3170,71 @@ def _wait_table_len():
         lines = f.read().splitlines()
     di, ci = _table_close_line(lines, 'unit_icon_wait_table[]')
     return sum(1 for i in range(di + 1, ci) if lines[i].lstrip().startswith('{'))
+
+
+# How close to the ceiling we let a build get before saying so out loud. Two is the number
+# that matters today: ch05's Basil + Sahnar are the last two ids (#225).
+SMS_ID_LOW_WATER = 4
+_SMS_MASK_BITS = None
+
+
+def _sms_id_mask_bits():
+    """Bit width of the mask the ENGINE applies to every SMS id, read from the decomp:
+
+        src/bmudisp.c:  #define GetInfo(id) (unit_icon_wait_table[(id) & ((1<<7)-1)])
+
+    Read from HEAD, never the working tree -- our injections are build artifacts. Grounding
+    the ceiling in the engine that enforces it means a decomp bump moves the guard with it
+    instead of leaving a stale literal behind."""
+    global _SMS_MASK_BITS
+    if _SMS_MASK_BITS is None:
+        m = re.search(r'#define\s+GetInfo\(id\)\s*\(unit_icon_wait_table\[\(id\)\s*&\s*'
+                      r'\(\(1\s*<<\s*(\d+)\)\s*-\s*1\)\]\)',
+                      vanilla_decomp_text('src/bmudisp.c'))
+        if not m:
+            sys.exit('ERROR: the GetInfo SMS-id mask is not in its expected form in '
+                     'src/bmudisp.c -- re-derive the custom SMS id ceiling before building '
+                     '(#225), an id past the mask silently renders a VANILLA sprite')
+        _SMS_MASK_BITS = int(m.group(1))
+    return _SMS_MASK_BITS
+
+
+def sms_id_max():
+    """Highest SMS id the engine can look up without wrapping (127 today)."""
+    return (1 << _sms_id_mask_bits()) - 1
+
+
+def _append_wait_rows(rows, verbose=False):
+    """Append rows to unit_icon_wait_table[] -- the ONLY way any sprite pass may do so.
+
+    Enforces the engine's id ceiling (#225). `GetInfo` masks the id, so a row past the mask
+    does not crash or warn: the unit silently renders another class's sheet at that class's
+    size. The mask is not the array bound either (gUnitSpriteSlots is u8[0xD0], so ids
+    128-207 are perfectly valid slot-cache indices) -- nothing downstream can catch this,
+    which is why it has to be caught here, at the append."""
+    limit = sms_id_max()
+    first = _wait_table_len()                       # rows are 0-indexed BY SMS id
+    if first + len(rows) - 1 > limit:
+        over = [(first + i, r) for i, r in enumerate(rows) if first + i > limit]
+        named = ', '.join('id %d (%s)' % (i, _wait_row_label(r)) for i, r in over)
+        sys.exit('ERROR: custom map sprite would take SMS id past the engine ceiling of %d: '
+                 '%s.\nFE8 looks these up as unit_icon_wait_table[id & 0x%X], so id %d would '
+                 'silently draw VANILLA row %d instead. Free an id, or widen the GetInfo mask '
+                 'and audit every UseUnitSprite caller (#225).'
+                 % (limit, named, limit, over[0][0], over[0][0] & limit))
+    _append_table_rows(UNIT_ICON_WAIT_C, 'unit_icon_wait_table[]', rows)
+    left = limit - (_wait_table_len() - 1)
+    if verbose or left <= SMS_ID_LOW_WATER:
+        print('  SMS ids: %d used, %d left before the engine ceiling (%d)%s'
+              % (_wait_table_len(), left, limit,
+                 '  <-- NEARLY FULL' if left <= SMS_ID_LOW_WATER else ''))
+
+
+def _wait_row_label(row):
+    """The unit a generated wait row names, for an error message. Rows carry a trailing
+    `// <id> <label>` / `/* <id> <label> */` comment written by the pass that emitted them."""
+    m = re.search(r'(?://|/\*)\s*\d+\s+([^*\n]+?)\s*(?:\*/)?$', row.strip())
+    return m.group(1).strip() if m else row.strip()
 
 
 def _move_table_len():
@@ -3832,8 +3896,8 @@ def inject_enemy_class_reskins(campaign, verbose=True):
             map_sprite_tool.validate_mu_sheet(os.path.join(MOVE_GFX_DIR, move_sym + '.png'))
 
             sms_id = _wait_table_len()
-            _append_table_rows(UNIT_ICON_WAIT_C, 'unit_icon_wait_table[]',
-                               ['\t{0, %s, %s}, // %d %s (reskin)' % (macro, wait_sym, sms_id, sprite)])
+            _append_wait_rows(
+                ['\t{0, %s, %s}, // %d %s (reskin)' % (macro, wait_sym, sms_id, sprite)])
             with open(UNIT_ICON_WAIT_S, 'a', encoding='utf-8') as f:
                 f.write('\n/* Manchego Stars enemy class reskin idle (#21) */\n'
                         '\t.global %s\n%s:\n'
