@@ -3128,8 +3128,11 @@ session state. `HANDOFF.md` points here._
   2026-08-02). `check_tests_pass` runs each `tools/test_*.py` as its own process, and the heavy
   ones re-read the injected decomp. The pre-commit hook runs the same thing, so a commit right
   after `make` can appear to hang. **Restore the injected decomp files first** —
-  `git -C fireemblem8u restore src/data/chapter_settings.json data/data_8B363C.s` — which is the
-  same restore `test_winter_forest_backfill` needs anyway. Not a regression; just know it.
+  `git -C fireemblem8u restore src/data/chapter_settings.json data/data_8B363C.s`. Not a
+  regression; just know it. (`test_winter_forest_backfill` no longer needs that restore to PASS:
+  since 2026-08-03 / #221 it reads its vanilla inputs through `git show HEAD:`, the same doctrine
+  as the event-data rule above. The remaining decomp-reading tests still read the working tree,
+  so the timing claim stands.)
 
 - **A host slot's index stops tracking the chapter number at 5, and a hosted chapter must name the
   `ChapterEventGroup` it fills** (2026-07-31, ch04 #24). FE8 inserts chapter 5X at **slot 5**, so

@@ -12,14 +12,19 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   actually run, and the exact next step so Claude can resume without re-deriving anything. Per
   Nicolas's request, Codex uses ordinary short-lived feature branches in this checkout, one at a
   time; **do not create worktrees unless Nicolas explicitly changes that instruction.**
-- **PR #219 is reviewed but NOT ready to merge.** Codex made no feature-code changes. At head
-  `232e915` GitHub reports the PR mergeable/CLEAN and both CI jobs green; the shared `ch04moose`
-  gate passes, but the new `recordch04moose` reproducibly fails at its 5,400-frame cap. The current
-  parley itself is sound: `recordch04parley` passes, Lupin changes faction, all five wolves convert
-  green, and every wolf remains on its pre-Talk tile. Exact evidence and next edits are below.
+- **ch04 (#24) is BUILT, WON, FILMED and CLOSED — one authored line excepted.** PR #219 and PR #221
+  are merged (`fd6f34a`, `3b64ffc`); `main` carries all of it. The only ch04 work left is **the
+  second village's line at (1,11)**, which needs Nicolas — #24 is reopened to hold it (item 3 below).
 - **ch04's ART IS COMPLETE — #206 is closed (PR #217, `b1de7ae`).** Baxby fights as an axe-beak and
-  Lupin as a wolf; **every cast member now fights as itself**, none as someone else's class. What
-  remains on ch04 is a short, fully-diagnosed list — **it lives on #24's checklist, not here.**
+  Lupin as a wolf; **every cast member now fights as itself**, none as someone else's class.
+- **The playtest driver is state-driven now (#220 → PR #221).** `tools/playtest/controller.lua` is a
+  PURE classifier/legal-action enumerator (observe → classify → enumerate → one guarded input →
+  verify postcondition → JSON trace); `harness.lua` owns the mGBA-facing observer. Menus are read
+  semantically (`MenuProc.menuItems[] → MenuItemProc.def → MenuItemDef.overrideId`; Talk `0x5A`,
+  Wait `0x6B`, End Phase `0x78`), dialogue A fires only under `gProcScr_TalkWaitForInput`, and an
+  unknown state **fails closed with no recovery button**. **Standing rule from Nicolas: no
+  brute-force, row-probing or cadence input in a scenario — reproducible is not the same as
+  justified.** Contract ADR in `decisions.md`; retired phrasings are in `check.py DEAD_CONCEPTS`.
 - **THE FIND OF THE SESSION, AND IT IS A TRAP THAT WILL RECUR: FE8 HAS A SECOND PALETTE PATH.**
   Beyond the class-keyed redirect in `GetBanimPalette` (the RBG cyan fix), there is a
   per-**CHARACTER** palette keyed on character × CLASS (`gAnimCharaPalConfig`), applied **after**
@@ -66,70 +71,59 @@ warn Nicolas, refresh this file, and begin a fresh instance — don't rely on au
   **#24's spatial/difficulty pass must account for Lupin's leader tile moving `[0,0]` -> `[2,1]`.**
 - **Winter forest fidelity is an invariant (#193).**
 
-## NEXT SESSION — close ch04 out, then ch05
+## NEXT SESSION — the chibi bug, then ch05
 
 **Everything below is on a GitHub issue with its own diagnosis. Start from the issues, not here.**
 
-1. **#24 / PR #219 — resume `feat/24-ch04-rerecord` and fix, do not merge as-is.** Add
-   `pokeFastConfig()` at the top of `recordch04moose.pre`, restore `pokeNormalConfig()` immediately
-   after the march and before capture, then require `recordch04moose` to PASS. Replace the stale
-   `docs/demo/ch04-wolf-parley.gif`: Codex's current-build `recordch04parley` run now PASSes, so the
-   earlier `mGBA exited early` condition did not reproduce. The wolf-relocation question is already
-   answered from data: all five retained their exact tiles. The second village's lore/hint line
-   still needs Nicolas + `dialogue-pass` as described below.
-2. **#218 — the whole cast's unit-list chibi portraits render solid BLACK.** New, spotted by
-   Nicolas. The asset is fine (verified: 32×32, full 16-index spread), so it is the same *shape* as
-   #206 — correct data, wrong render. Check whether the unit-list screen is a **third** palette
-   path before assuming an injection offset.
-3. **Nicolas's wolf question is answered: they did NOT respawn or relocate during the parley.**
-   Codex's clean passing run sampled every wolf before the Talk and immediately after conversion:
-   `0xB0 (2,0)`, `0xB1 (0,2)`, `0xB2 (0,0)`, `0xB4 (1,0)`, and `0xB5 (0,1)` were unchanged. Nicolas
-   also watched Lupin change faction and the wolves turn green. Any later movement is their green
-   phase, not a conversion-time reload.
-4. **The second village at (1,11) is the only ch04 item needing NICOLAS.** Vanilla's second village
-   is pure Lute recruit dialogue (zero lore), so **there is nothing to copy** — whatever goes there
-   is ours. He wants "at least a lore drop or a hint". Mine the Frostmaiden book + the DM notes for
-   Lonelywood material FIRST (`decisions.md` → story sources of truth), then run the `dialogue-pass`
-   skill with him rather than drafting solo.
+1. **#218 — the whole cast's unit-list chibi portraits render solid BLACK.** Spotted by Nicolas,
+   untouched so far. The asset is fine (verified: 32×32, full 16-index spread), so it is the same
+   *shape* as #206 — correct data, wrong render. Check whether the unit-list screen is a **third**
+   palette path before assuming an injection offset; the swap test (a vanilla character's chibi on
+   the same screen) localises it in one run.
+2. **ch05 "The Elven Tomb" (#25) — the build work.** Dialogue is merged; owed are map + placement,
+   text insertion → `verify_text`, `--ch05-boot` playtest, `enemy_class_reskins` + FE-Repo imports,
+   Basil/Sahnar STAT_DONORs, and the five no-Lupin conditionals. Hosting ch05 also retires ch04's
+   `dev_placeholder_scene()` terminator.
+3. **The second village at (1,11) — the one ch04 item that needs NICOLAS** (#24, reopened for it).
+   Vanilla's second village is pure Lute recruit dialogue (zero lore), so **there is nothing to
+   copy** — whatever goes there is ours. He wants "at least a lore drop or a hint". Mine the
+   Frostmaiden book + the DM notes for Lonelywood material FIRST (`decisions.md` → story sources of
+   truth), then run the `dialogue-pass` skill with him rather than drafting solo. Its cottage is
+   currently unwired, so FE8 offers no Visit at all.
 
-Then: **ch05's build work** on #25; **#138** config-driven `inject_chapter(descriptor)`; **#29** world map.
+Then: **#222** (Codex's playtest-tooling epic — matrix runner first, and it wants a decision about
+how much tooling to buy before ch05 rather than after); **#138** config-driven
+`inject_chapter(descriptor)`, which ch05's hosting is the natural forcing function for; **#29** world map.
 
-## Codex interlude (2026-08-03) — checkout bootstrapped, PR #219 reviewed, no feature edits
+## Answered, don't re-ask
 
-- Bootstrapped the checkout on `main`, then reviewed **PR #219** in place on
-  `feat/24-ch04-rerecord` at `232e915`; Codex did not edit or commit feature code. Returned to
-  `main` only to author this HANDOFF, per the main-only handoff guard.
-- GitHub state during review: mergeable `MERGEABLE`, merge state `CLEAN`, both `checks` and `build`
-  jobs SUCCESS, no reviews or unresolved threads. `git diff --check` passes. The three new GIFs
-  (`ch04-opening`, `ch04-wolf-reveal`, `ch04-ending-parley`) are valid 480x320 animations and passed
-  a contact-sheet visual spot-check; `ch04-wolf-parley.gif` was not replaced and is still stale.
-- Built a fresh `CH04BOOT=1` ROM successfully, then ran the targeted scenarios:
-  `ch04moose` **PASS**; `recordch04moose` **FAIL** at frame 9,979 with
-  `ch04moose cutscene never reached its end`; `recordch04parley` **PASS** at frame 5,994 with Lupin
-  blue/player-side and all five wolves green on their original tiles. The moose failure matches the
-  PR's own diagnosis: `recordCutscene` selects normal speed before `pre`, so the unfilmed setup march
-  needs an explicit fast/normal transition.
-- **New standing playtest constraint from Nicolas: no brute-force or random-looking menu input.**
-  `ch04Parley` currently tries command rows until the outcome changes; it happened to find Talk at
-  row 0 in the passing run, but that is not an acceptable general driver. FE8 exposes the semantic
-  live menu: scan `MenuProc.menuItems`, follow each `MenuItemProc.def`, and select Talk by
-  `MenuItemDef.overrideId == 0x5A`. Dialogue advancement should likewise be conditioned on the
-  relevant dialogue/event state rather than unconditional A cadence. Use that semantic pattern in
-  future playtests; do not call row probing "deterministic play" merely because it is reproducible.
-- Ran `tools/setup-toolchain.sh`: Homebrew dependencies, Python 3.12 dependencies, `agbcc`, the base
-  ROM, portable decomp Python shebangs, and `core.hooksPath=tools/hooks` are ready. The setup script
-  omits upstream's required helper-tool build, so Codex also ran `fireemblem8u/build_tools.sh` with
-  the existing macOS SDK C++ include shim; `scaninc`, `jsonproc`, and the other native helpers now
-  exist locally. **No repository source was changed to patch that setup-script gap.**
-- Verification from this checkout: **619 Python tool tests pass**; the full campaign ROM build
-  (`make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba -j8`) passes; `verify_text` sweeps 3,404
-  messages with 0 runaway; `make check` reports `drift check: clean`; and `git diff --check` passes.
-  Codex restored the two documented generated files before the static checks; build artifacts
-  intentionally leave the submodule dirty and its pointer must not be committed.
-- Exact next step for Claude: switch to `feat/24-ch04-rerecord`, make the fast/normal moose-recorder
-  fix, replace the current-build wolf-parley GIF, rerun both targeted scenarios, then review/merge
-  **PR #219**. Continue #24/#218 only after that. Use one ordinary branch at a time; squash-merge
-  and delete it before starting the next.
+- **The wolves do NOT respawn or relocate during the parley.** A clean `recordch04parley` run sampled
+  every wolf before the Talk and immediately after conversion: `0xB0 (2,0)`, `0xB1 (0,2)`,
+  `0xB2 (0,0)`, `0xB4 (1,0)`, `0xB5 (0,1)` — unchanged. Later movement is the greens' own phase.
+
+## Codex interlude (2026-08-03) — the state-driven controller (#221) + ch04's scenes re-filmed (#219)
+
+Both PRs are **merged into `main`**; their branches are deleted. Reviewed on 2026-08-05 (Opus):
+622 Python tool tests pass, `make check` is `drift check: clean`, and the two committed GIFs were
+frame-sampled — the moose exits over the bridge with no void/wrapped-memory edge, and the parley
+plays the real Marty/Lupin dialogue with the pack turning green.
+
+- **#221 (closes #220)** — `controller.lua` + the harness rewrite, contract ADR in `decisions.md`,
+  retired phrasings registered in `check.py DEAD_CONCEPTS`. Summary in Current state above.
+- **#219 (ch04 #24)** — the four scene GIFs re-recorded on the fixed ROM, plus `recordch04moose`
+  (now PASSing) and the `marchPartyToward` extraction shared with the `ch04moose` gate.
+  `recordCutscene` gained `pre` returning `false, reason` and an `afterPre` cleanup whose lifecycle
+  is plain-Lua tested (`recorder.lua`).
+- **The moose's escape is authored scene data now, not a reachable endpoint.** `camera_at: [7,4]`
+  (the 15-wide map exactly fills the viewport, so centring on the moose at x=11 renders wrapped map
+  memory) and `flee_route: [9,7] → [9,8] → [14,14]` emitted as a REDA queue + `MOVE_DEFINED`. ADR in
+  `decisions.md` §Operational Gotchas.
+- **`test_winter_forest_backfill` no longer needs the injected-file restore** — it reads its vanilla
+  inputs through `git show HEAD:`. The restore is still worth doing before `check.py` for speed.
+- **One gap this review found: #24 was closed with the second village's line still unwritten.** The
+  issue is reopened carrying exactly that item; everything else on ch04 is genuinely done.
+- Toolchain note from the bootstrap: `tools/setup-toolchain.sh` omits upstream's helper-tool build,
+  so a fresh checkout also needs `fireemblem8u/build_tools.sh` (`scaninc`, `jsonproc`). Not patched.
 
 ## This session (2026-08-03, Opus — the bird stopped fighting as a horseman, and the palette had a second door)
 
@@ -173,14 +167,10 @@ Then: **ch05's build work** on #25; **#138** config-driven `inject_chapter(descr
 
 ## Working tree - do not lose or revert
 
-- **OPEN PR #219, branch `feat/24-ch04-rerecord`, head `232e915`** — the three re-recorded GIFs,
-  `recordch04moose` (which **currently FAILS**) and the `marchPartyToward` extraction.
-  `ch04moose` PASSes and `recordch04parley` PASSes. **Build on it; do not merge it unchanged.**
+- **No open PRs and no live feature branch.** `main` is `fd6f34a`, level with `origin/main`.
 - `fireemblem8u` is dirty from injected/generated build artifacts. **Never commit its submodule
-  pointer.** To run the map/forest tests cleanly after a build, restore the injected decomp files:
-  `git -C fireemblem8u restore src/data/chapter_settings.json data/data_8B363C.s`.
-  (`test_winter_forest_backfill` fails on a built tree without this — it is the documented
-  artifact, not a regression, and the **pre-commit hook will block a commit on it**.)
+  pointer.** Restore the injected decomp files before `check.py`/the pre-commit hook so it runs in
+  ~22s instead of ~4min: `git -C fireemblem8u restore src/data/chapter_settings.json data/data_8B363C.s`.
 - Untracked local/session files (`.agents/`, `AGENTS.md`, `skills-lock.json`, `map-review/`,
   `review/`) are intentionally not versioned; leave them alone. `map-review/` is the render scratch
   Nicolas opens in Preview — deliverable art goes to `docs/demo/` and is COMMITTED so he can view
@@ -199,7 +189,7 @@ Then: **ch05's build work** on #25; **#138** config-driven `inject_chapter(descr
 ```sh
 make difficulty CH=ch04                    # parity/difficulty read (all from HEAD)
 PT_HOST_CHAPTER=5 tools/playtest/run.sh recordch04parley   # the wolf parley, in motion
-PT_HOST_CHAPTER=5 tools/playtest/run.sh recordch04moose    # the moose sighting (NEEDS THE SPEED FIX)
+PT_HOST_CHAPTER=5 tools/playtest/run.sh recordch04moose    # the moose sighting, in motion
 PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04moose          # GATE: the sighting is player-only
 PT_HOST_CHAPTER=5 tools/playtest/run.sh clear_ch04_parley  # parley, rout -> the AUTHORED ending
 PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04packmath       # GATE: kill 2 wolves, parley -> 3 greens
