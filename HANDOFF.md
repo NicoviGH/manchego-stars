@@ -54,11 +54,12 @@ with `origin/main`, no open PRs, no live feature branch.
   ⇒ the bank was blanked, not the sprite mis-injected.** Nicolas's 32x32-vs-16x16 read and a VRAM
   starvation theory were both measured and ruled out (sizes are declared correctly from donor
   geometry; the counters land at 32x=26 vs 16x=57, 31 slots spare). ADR in `decisions.md` §Art & Audio.
-- **STILL OPEN from #218, and it is Nicolas's call, not a defect to fix unasked:** five cast members
-  legitimately declare `UNIT_ICON_SIZE_32x32` (Braulo, Wolfram, Meesmickle, Baxby, Lupin — monster
-  donors). `PutUnitSprite` draws a 32x32 at `y-16`, so in the unit list's 16px row pitch their art
-  reaches into the row above (visible on the fixed frames). Vanilla never hits this — no vanilla
-  PLAYER unit is 32x32. Cosmetic only.
+- **The 32x32 row-pitch overlap is ACCEPTED — do not "fix" it (Nicolas, 2026-08-05).** Five cast
+  members legitimately declare `UNIT_ICON_SIZE_32x32` (Braulo, Wolfram, Meesmickle, Baxby, Lupin —
+  monster donors), and `PutUnitSprite` draws a 32x32 at `y-16`, so their art reaches into the row
+  above in the unit list's 16px pitch. Vanilla never hits it (no vanilla PLAYER unit is 32x32).
+  Nicolas looked at the fixed frames and called it fine; changing it would mean re-authoring those
+  five sheets down to 16x16 and losing the silhouettes. Recorded on #218 so it is not re-raised.
 - **The custom SMS id budget is nearly gone — guarded, not raised (#225, PR #226).** `GetInfo` masks every id with `0x7F`,
   so an id ≥ 128 silently renders a VANILLA sprite — and the mask is NOT the array bound
   (`gUnitSpriteSlots` is `u8[0xD0]`), so nothing downstream can catch it. Vanilla ships 107 rows and
@@ -67,6 +68,19 @@ with `origin/main`, no open PRs, no live feature branch.
   wait row; it fails the build naming the id + unit, and prints headroom. Raising the ceiling for
   real is deliberately NOT done — that means widening the mask and auditing every `UseUnitSprite` /
   `StartUiSMS` / `StartWorldMapSMS` caller.
+- **UNFILED HAZARD, found 2026-08-05 while re-reading the id allocator, and it lands squarely on
+  ch05: SMS ids and wait-table ROW INDICES are computed in two different places and nothing asserts
+  they agree.** `classed_cast` numbers ids positionally over **every** classed cast member — by
+  design, "so a unit keeps the same id whether or not its sprite is authored" — but
+  `_inject_idle_sprites` only emits a ROW for the ones that actually have a `<id>.png`. Today they
+  happen to agree (all 11 classed cast have art, verified), so the table is contiguous. **The first
+  classed cast member added WITHOUT a sprite silently shifts every later row one index below the id
+  that claims it** — the override table then points each unit at its neighbour's sheet. #225's
+  `_append_wait_rows` does NOT catch this: it guards the ceiling, not id↔index agreement. This is
+  the same missing invariant the ceiling bug came from (allocation and emission have no single
+  source of truth). Cheap to guard — the generated rows already carry their id in a trailing
+  comment, so the append can assert `declared id == actual index`. **Not filed as an issue yet;
+  Nicolas has been told.** ch05 adds Basil + Sahnar as classed cast, which is exactly the trigger.
 - **`recordunitlist` is the new fast boot for roster screens** (#218). `tools/playtest/run.sh
   recordunitlist` on a `make TESTCH=1` ROM opens the Character list ~30s from New Game, navigates
   semantically off `gMapMenuItems[0]` (overrideId `0x6E`), shoots every page, and dumps SMS geometry
