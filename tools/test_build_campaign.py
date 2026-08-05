@@ -1771,6 +1771,119 @@ if __name__ == '__main__':
     unittest.main()
 
 
+class SmsFreeListReclaimsDeadVanillaRows(unittest.TestCase):
+    """We assign map sprites per CHARACTER where vanilla assigns them per CLASS, so every
+    custom cast member needs its own wait row. That is the design. What was NOT the design
+    is that CUSTOM_SMS_BASE only ever appended, leaving ~71 vanilla rows -- classes this
+    campaign can never field, even after promotions -- sitting unused below it while we ran
+    into the engine's 127 ceiling (#227, follow-up to #225).
+
+    The dangerous part of reclaiming is that "unused" is not the same as "unreferenced":
+    src/bmudisp.c renders ballista/trap sprites by LITERAL id, with no class involved.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def test_the_trap_rendered_rows_are_reserved(self):
+        """RenderUnitSprites passes 0x5B/0x5C/0x5D (ballista traps, by trap->extra) and
+        0x66 (trap type 0xD) as literal SMS ids. No class points at them, so a class-only
+        reachability scan calls them free -- and reusing one renders a PC on any map with
+        a ballista. This is the #218 failure shape, so it is pinned here."""
+        for literal in (0x5B, 0x5C, 0x5D, 0x66):
+            self.assertIn(literal, bc.SMS_RESERVED_IDS,
+                          'SMS id 0x%02X is rendered by literal id in bmudisp.c' % literal)
+        self.assertEqual(bc.SMS_RESERVED_IDS & bc.sms_free_rows(self.CAMPAIGN), set(),
+                         'a reserved trap row was handed out as free')
+
+    def test_the_reserved_literals_still_exist_in_the_decomp(self):
+        """If a decomp bump changes which ids bmudisp renders by literal, the reservation
+        list is stale and silently wrong -- so it is checked against HEAD, not trusted."""
+        text = bc.vanilla_decomp_text('src/bmudisp.c')
+        found = {int(m, 16) for m in
+                 re.findall(r'(?:UseUnitSprite|GetInfo)\(0x([0-9A-Fa-f]+)\)', text)}
+        self.assertEqual(found, bc.SMS_RESERVED_IDS,
+                         'bmudisp.c literal SMS ids changed: %s vs reserved %s'
+                         % (sorted(found), sorted(bc.SMS_RESERVED_IDS)))
+
+    def test_a_class_we_field_is_never_free(self):
+        """The whole safety property: no row reachable by a class this campaign can field
+        may be reused."""
+        free = bc.sms_free_rows(self.CAMPAIGN)
+        reachable = bc.sms_reachable_rows(self.CAMPAIGN)
+        self.assertEqual(free & reachable, set(),
+                         'these rows are both free and reachable: %s'
+                         % sorted(free & reachable))
+
+    def test_both_promotion_branches_are_followed(self):
+        """FE8 lets the player pick EITHER branch (gPromoJidLut[][2]). ClassData.promotion
+        names only one, and following it alone missed Bishop, Ranger, Rogue, Summoner and
+        Wyvern Knight (F) -- rows a PC can promote into (Nicolas, 2026-08-05)."""
+        reachable = bc.sms_reachable_rows(self.CAMPAIGN)
+        for second_branch in ('CLASS_SWORDMASTER', 'CLASS_BISHOP', 'CLASS_RANGER',
+                              'CLASS_ROGUE', 'CLASS_SUMMONER'):
+            self.assertTrue(bc.sms_rows_for_classes([second_branch]) <= reachable,
+                            '%s is a reachable promotion branch; its row must not be free'
+                            % second_branch)
+
+    def test_the_whole_player_class_tree_is_reserved_not_just_todays_roster(self):
+        """The roster is NOT final -- there are characters we have not written yet, so a
+        row that looks dead today can belong to a future recruit's class. Reserve every
+        class a player unit could ever hold or become, not merely the ones in YAML now."""
+        reachable = bc.sms_reachable_rows(self.CAMPAIGN)
+        # Classes no current PC holds, from branches of the tree we do not field.
+        for unfielded in ('CLASS_WYVERN_RIDER', 'CLASS_TROUBADOUR', 'CLASS_MONK',
+                          'CLASS_JOURNEYMAN', 'CLASS_PUPIL'):
+            self.assertTrue(bc.sms_rows_for_classes([unfielded]) <= reachable,
+                            '%s is player-holdable; reserve it against a future recruit'
+                            % unfielded)
+
+    def test_hand_reserved_classes_are_never_free(self):
+        """Things no computation can infer: a bard/dancer recruit we have not written, and
+        Frostmaiden's white dragon."""
+        free = bc.sms_free_rows(self.CAMPAIGN)
+        self.assertEqual(bc.sms_rows_for_classes(bc.SMS_RESERVED_CLASSES) & free, set())
+
+    def test_a_declared_art_donor_is_never_free(self):
+        """Donors are named by SHEET (art.map_sprite.base: 'Cyclops'), so the CLASS_ token
+        scan misses them -- and naming a vanilla class as a donor is a fair signal we might
+        field it too."""
+        donors = bc._declared_donor_bases(self.CAMPAIGN)
+        self.assertIn('Cyclops', donors, 'fixture check: a donor base is declared')
+        free = bc.sms_free_rows(self.CAMPAIGN)
+        self.assertEqual(bc.sms_rows_for_classes(
+            {'CLASS_' + d.upper() for d in donors}) & free, set())
+
+    def test_reclaiming_actually_buys_us_room(self):
+        """The point of the exercise. Before #227 we had 2 ids of headroom, and the
+        conservative policy still has to beat that by an order of magnitude."""
+        self.assertGreater(len(bc.sms_free_rows(self.CAMPAIGN)), 12,
+                           'conservative reclaim should still free well over a dozen rows')
+
+    def test_the_free_list_is_computed_not_hardcoded(self):
+        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
+                   encoding='utf-8').read()
+        body = src[src.index('def sms_free_rows('):]
+        body = body[:body.index('\ndef ')]
+        self.assertIn('sms_reachable_rows(', body,
+                      'derive the free list from live reachability every build')
+        self.assertNotRegex(body, r'\[\s*\d+\s*,\s*\d+\s*,\s*\d+',
+                            'no hardcoded row list -- recompute it')
+
+    def test_allocation_prefers_free_rows_then_appends(self):
+        """Free rows first (they are the point), append as the fallback, and #225's
+        ceiling guard still owns the append path."""
+        free = sorted(bc.sms_free_rows(self.CAMPAIGN))
+        got = bc.allocate_sms_ids(self.CAMPAIGN, len(free) + 3)
+        self.assertEqual(got[:len(free)], free, 'free rows must be spent first, in order')
+        for extra in got[len(free):]:
+            self.assertGreaterEqual(extra, bc.CUSTOM_SMS_BASE,
+                                    'overflow past the free list must append, not wrap')
+        self.assertEqual(len(set(got)), len(got), 'allocation handed out a duplicate id')
+
+    def test_allocation_never_exceeds_the_engine_ceiling(self):
+        with self.assertRaises(SystemExit):
+            bc.allocate_sms_ids(self.CAMPAIGN, 400)
+
+
 class CustomSmsIdsStayUnderTheEngineMask(unittest.TestCase):
     """FE8 looks up a map sprite's geometry through a MASKED index:
 
@@ -1805,32 +1918,30 @@ class CustomSmsIdsStayUnderTheEngineMask(unittest.TestCase):
         is _append_wait_rows; nothing else may append to unit_icon_wait_table[]."""
         src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
                    encoding='utf-8').read()
-        helper = src[src.index('def _append_wait_rows('):]
-        helper = helper[:helper.index('\ndef ')]
-        outside = src.replace(helper, '')
-        self.assertNotIn('_append_table_rows(UNIT_ICON_WAIT_C', outside,
-                         'append wait rows via _append_wait_rows, not _append_table_rows')
-        self.assertIn('_append_table_rows(UNIT_ICON_WAIT_C', helper,
-                      'the helper is the one place allowed to do the raw append')
-        self.assertGreaterEqual(outside.count('_append_wait_rows('), 5,
-                                'all five sprite passes must route through the guard')
+        self.assertNotIn('_append_table_rows(UNIT_ICON_WAIT_C', src,
+                         'wait rows are placed by _write_wait_row, never blind-appended')
+        self.assertGreaterEqual(src.count('_write_wait_row('), 6,
+                                'all five sprite passes + the definition')
+
+    def _table(self, tmp, nrows):
+        path = os.path.join(tmp, 'unit_icon_wait_data.c')
+        rows = ''.join('\t{0, UNIT_ICON_SIZE_16x16, sheet_%d},\n' % i for i in range(nrows))
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write('UnitIconWait unit_icon_wait_table[] = {\n%s};\n' % rows)
+        return path
 
     def test_the_guard_rejects_a_row_past_the_mask(self):
-        """The regression: overflowing must fail the BUILD, naming the id and the unit,
-        rather than shipping a sprite that renders as a vanilla class."""
+        """The regression: overflowing must fail the BUILD, naming the id, rather than
+        shipping a sprite that renders as a vanilla class."""
         tmp = tempfile.mkdtemp()
         try:
-            path = os.path.join(tmp, 'unit_icon_wait_data.c')
-            rows = ''.join('\t{0, UNIT_ICON_SIZE_16x16, sheet_%d},\n' % i for i in range(128))
-            with open(path, 'w', encoding='utf-8') as f:
-                f.write('UnitIconWait unit_icon_wait_table[] = {\n%s};\n' % rows)
+            path = self._table(tmp, 128)                     # ids 0..127: exactly full
             with mock.patch.object(bc, 'UNIT_ICON_WAIT_C', path):
-                self.assertEqual(bc._wait_table_len(), 128)   # ids 0..127: exactly full
+                self.assertEqual(bc._wait_table_len(), 128)
                 with self.assertRaises(SystemExit) as cm:
-                    bc._append_wait_rows(['\t{0, UNIT_ICON_SIZE_16x16, x}, // 128 basil'])
+                    bc._write_wait_row(128, '\t{0, UNIT_ICON_SIZE_16x16, x}, // 128 basil')
             msg = str(cm.exception)
             self.assertIn('128', msg, 'name the overflowing id')
-            self.assertIn('basil', msg, 'name the unit that overflowed')
             self.assertIn('127', msg, 'state the ceiling')
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
@@ -1839,24 +1950,45 @@ class CustomSmsIdsStayUnderTheEngineMask(unittest.TestCase):
         """127 is usable -- an off-by-one here would cost us a sprite we own."""
         tmp = tempfile.mkdtemp()
         try:
-            path = os.path.join(tmp, 'unit_icon_wait_data.c')
-            rows = ''.join('\t{0, UNIT_ICON_SIZE_16x16, sheet_%d},\n' % i for i in range(127))
-            with open(path, 'w', encoding='utf-8') as f:
-                f.write('UnitIconWait unit_icon_wait_table[] = {\n%s};\n' % rows)
-            with mock.patch.object(bc, 'UNIT_ICON_WAIT_C', path):
-                bc._append_wait_rows(['\t{0, UNIT_ICON_SIZE_16x16, x}, // 127 sahnar'])
+            with mock.patch.object(bc, 'UNIT_ICON_WAIT_C', self._table(tmp, 127)):
+                bc._write_wait_row(127, '\t{0, UNIT_ICON_SIZE_16x16, x}, // 127 sahnar')
                 self.assertEqual(bc._wait_table_len(), 128)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_a_row_that_would_land_off_its_own_id_is_rejected(self):
+        """The id/row desync #227 closes: an appended row must land at exactly the index
+        its id names, or every later unit renders its neighbour's sheet."""
+        tmp = tempfile.mkdtemp()
+        try:
+            with mock.patch.object(bc, 'UNIT_ICON_WAIT_C', self._table(tmp, 50)):
+                with self.assertRaises(SystemExit) as cm:
+                    bc._write_wait_row(60, '\t{0, UNIT_ICON_SIZE_16x16, x}, // 60 gap')
+            self.assertIn('desync', str(cm.exception))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_a_reclaimed_row_is_replaced_in_place_not_appended(self):
+        """Reclaiming means overwriting the dead vanilla row, leaving the table length
+        unchanged -- if it appended instead, the id would name the wrong index."""
+        tmp = tempfile.mkdtemp()
+        try:
+            with mock.patch.object(bc, 'UNIT_ICON_WAIT_C', self._table(tmp, 107)) as path:
+                bc._write_wait_row(48, '\t{0, UNIT_ICON_SIZE_16x16, mine}, // 48 braulo')
+                self.assertEqual(bc._wait_table_len(), 107, 'table length must not grow')
+                with open(bc.UNIT_ICON_WAIT_C, encoding='utf-8') as f:
+                    body = [ln for ln in f.read().splitlines() if ln.lstrip().startswith('{')]
+                self.assertIn('braulo', body[48], 'row 48 must hold the new sprite')
+                self.assertIn('sheet_47', body[47], 'its neighbours must be untouched')
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_the_remaining_headroom_is_reported_while_it_is_still_cheap_to_act_on(self):
-        """Two ids left is worth knowing BEFORE the build that spends them, so the
-        injector prints the headroom and says so loudly when it is nearly gone. (The
-        "does the live campaign fit" question is answered end-to-end by the guard
-        itself firing during a real build, which CI runs.)"""
+        """Running low is worth knowing BEFORE the build that runs out, so the allocator
+        reports what is left and says so loudly when it is nearly gone."""
         src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
                    encoding='utf-8').read()
-        body = src[src.index('def _append_wait_rows('):]
+        body = src[src.index('def sms_alloc_report('):]
         body = body[:body.index('\ndef ')]
         self.assertIn('SMS_ID_LOW_WATER', body)
         self.assertIn('print(', body, 'report the headroom, do not only enforce it')

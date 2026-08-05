@@ -2381,6 +2381,37 @@ so a standard-palette sheet is the only way to add a custom sprite alongside the
 compare its 16-colour palette to `unit_icon_pal_player.agbpal` — exact match ⇒ guest path (no override); custom colours
 ⇒ it must be re-indexed to `cast_palette.png` and join the cast bank.
 
+**Custom map sprites RECLAIM dead vanilla wait rows instead of appending — conservatively (#227, 2026-08-05).**
+We were not out of SMS ids; we were wasting them. Vanilla assigns map sprites per **CLASS** (107 rows serve 127
+classes — every Cavalier draws row 4); we assign per **CHARACTER**, which is the design and is what makes the cast look
+custom. But `CUSTOM_SMS_BASE = 107` only ever *appended*, so 19 custom rows stacked on top of dozens of rows belonging
+to classes this campaign can never field. `claim_sms_id` now hands out **reclaimed rows first**, appending only as
+fallback; `_write_wait_row` places a row at exactly the index its id names (replacing in place when reclaimed) and
+`sys.exit`s otherwise — which also closes the id/row **desync** hazard, since ids are now claimed only by the pass
+about to write the row. All 19 custom sprites currently fit in reclaimed rows, leaving the whole 107–127 range spare.
+
+**The reclaim policy is deliberately conservative, and that is Nicolas's call, not an optimisation.** Reachability is
+seeded with **FE8's entire player promotion tree** — every class a player unit could ever hold or become — not merely
+the classes our YAML names today, *because the roster is not final*: "we have characters we haven't recruited yet, so
+your list is by definition incomplete." Reserving the whole tree costs ~30 reclaimable rows and removes the dependency
+on the cast being finished. Three further reservations exist because no computation can infer them:
+- **the four literal ids** `0x5B`/`0x5C`/`0x5D` (ballista traps, by `trap->extra`) and `0x66` (trap type `0xD`).
+  `RenderUnitSprites` draws these map OBJECTS by literal id with **no class involved**, so a class-only scan calls them
+  free and reusing one puts a cast member on any map with a ballista. This is the #218 failure shape exactly.
+- **declared art donors** (`art.map_sprite.base: 'Cyclops'`) — named by sheet, not by `CLASS_` enum, so the token scan
+  misses them, and naming a vanilla class as a donor is fair warning we might field it.
+- **`CLASS_BARD` / `CLASS_DANCER` / the three `MANAKETE` classes** — the cast already includes a bard in D&D terms, and
+  Frostmaiden has a white dragon (Arveiaturace). `CLASS_MANAKETE` is also the only class pointing at the shared `Blank`
+  fallback row.
+
+**Two traps found building this, both worth remembering.** (1) **`ClassData.promotion` is only ONE branch.** FE8's real
+branching table is `gPromoJidLut[][2]` (`src/classchg-data.c`): Myrmidon → Assassin *or* Swordmaster, Priest → Bishop
+*or* Sage, Thief → Assassin *or* Rogue. Following `.promotion` alone under-counted by five classes (Bishop, Ranger,
+Rogue, Summoner, Wyvern Knight F) — rows a PC can promote into. **The player picks either branch; reachability must
+close over both.** (2) **`donor_sms_geometry` was reading the MUTABLE working tree.** A donor's geometry is a fact about
+*vanilla*, so once we reuse a donor's row the lookup finds our macro — or loses the symbol outright. It reads
+`HEAD` now, like every other decomp read.
+
 **Custom SMS ids are capped at 127 by the engine, and the cap is enforced at the append (#225, 2026-08-05).**
 FE8 resolves every map sprite's geometry through a masked index — `#define GetInfo(id) (unit_icon_wait_table[(id) &
 ((1<<7)-1)])` in `src/bmudisp.c`. An id ≥ 128 therefore reads a **vanilla** row: id 128 draws Ephraim Lord's sheet at
