@@ -6750,12 +6750,20 @@ CH04_MOOSE_AREA = (9, 2, 14, 7)                 # AREA(x1, y1, x2, y2) -- the cl
 # Each village needs its OWN script and message slot -- two doors sharing one script show the
 # same line at both and run the give-item tail twice. Keyed by the YAML's village `id`, so a
 # third village is one row here plus one `villages:` entry.
+#
+# BACKDROP: both doors play over CH04_OPENING_FOREST_BG, our winterized fogged forest -- the very
+# art Pinky's opening beat B stands in. Vanilla's `BG_NORMAL_VILLAGE` is a TEMPERATE GREEN TOWN,
+# and during a village visit the backdrop is the entire screen, so ch04 was showing summer in a
+# snowbound fog chapter (Nicolas, 2026-08-05). It is the forest and not our snow-TOWN art
+# (BG_MS_TARGOS_WINTER) because there is no town on this map: both cottages are cabins standing
+# in the woods, and a visitor is outside one of them -- "if we're outside their cabin, just use
+# the bg you put behind pinky in his fog scene".
 CH04_VILLAGE_SLOTS = {
-    #  id                 event script          msg     mug
-    'lonelywood':     ('EventScr_089F231C', 0x9C3, CH04_NIMSY_FID),
+    #  id                 event script          msg     mug                  backdrop
+    'lonelywood':     ('EventScr_089F231C', 0x9C3, CH04_NIMSY_FID, CH04_OPENING_FOREST_BG),
     # The cottage's logger wears FID_VillagerMan3 -- the mug vanilla itself puts on the snag
     # village (MSG_9B5). It is free for us because our axe village reassigned that door to Nimsy.
-    'forest-cottage': ('EventScr_089F2170', 0x9C6, '[FID_VillagerMan3]'),
+    'forest-cottage': ('EventScr_089F2170', 0x9C6, '[FID_VillagerMan3]', CH04_OPENING_FOREST_BG),
 }
 # `EventScr_089F231C` is a dead Ch5 script (verified free at HEAD). `EventScr_089F2170` is vanilla
 # Ch5's OWN village script -- `Village(EVFLAG_TMP(8), .., 12, 10)` in ch5-eventinfo.h, its only
@@ -6763,9 +6771,8 @@ CH04_VILLAGE_SLOTS = {
 # 0x9C6 is the next free id in ch04's block (it hosts on slot 5, so it owns 0x9BA-0x9CC). ch05's
 # YAML labels beats "vanilla 0x9C6" -- those are ANATOMY references mined from its twin, not ids
 # it may claim; it will host on its own slot and take that block.
-CH04_VILLAGE_SCRIPT, CH04_VILLAGE_MSG, _ = CH04_VILLAGE_SLOTS['lonelywood']
-CH04_COTTAGE_SCRIPT, CH04_COTTAGE_MSG, _ = CH04_VILLAGE_SLOTS['forest-cottage']
-CH04_VILLAGE_BG = 'BG_NORMAL_VILLAGE'           # vanilla's own village BG, as ch02 uses
+CH04_VILLAGE_SCRIPT, CH04_VILLAGE_MSG = CH04_VILLAGE_SLOTS['lonelywood'][:2]
+CH04_COTTAGE_SCRIPT, CH04_COTTAGE_MSG = CH04_VILLAGE_SLOTS['forest-cottage'][:2]
 # The snag (#214) -- the Iron Axe's whole purpose. Vanilla Ch4's item village hands the axe over
 # to chop this into a bridge, and the retile kept the geometry: (4,8) is the snag, (4,9) the river
 # it falls across, (4,10) the far bank. Snags are natively attackable (bmtrick.c auto-adds a 20 HP
@@ -6923,7 +6930,7 @@ def convert_survivors_green(pids, label_base, what):
         for i, pid in enumerate(pids))
 
 
-def ch04_village_script(msg, item):
+def ch04_village_script(msg, item, bg):
     """A village visit, in vanilla Ch4's own shape (EventScr_089F1BD8): one text box over the
     village BG, then the reward into the visitor's hands.
 
@@ -6946,7 +6953,7 @@ def ch04_village_script(msg, item):
             '    CALL(EventScr_RemoveBGIfNeeded)\n'
             '%s'
             '    EVBIT_T(7)\n'
-            '    ENDA\n}' % (CH04_VILLAGE_BG, msg, give))
+            '    ENDA\n}' % (bg, msg, give))
 
 
 def village_reward_item(village):
@@ -8112,10 +8119,10 @@ def inject_ch04(campaign, boot=False, verbose=True):
     # reward read from the chapter YAML. One script per door -- the axe village hands the Iron Axe
     # over, the forest cottage pays in lore alone (Ch4-lean economy).
     for village in chap['villages']:
-        symbol, msg, _fid = CH04_VILLAGE_SLOTS[village['id']]
+        symbol, msg, _fid, bg = CH04_VILLAGE_SLOTS[village['id']]
         script = _replace_brace_block(
             script, symbol + '[] =',
-            ch04_village_script(msg, village_reward_item(village)), CH5_EVENTSCRIPT_H)
+            ch04_village_script(msg, village_reward_item(village), bg), CH5_EVENTSCRIPT_H)
     # The moose-flees beat (Stage 4): fired by the Misc AREA when a unit reaches the tomb-side
     # clearing. Loads the moose, holds on it, RBG's one line, then it bolts NE and is gone.
     script = _replace_brace_block(
@@ -8207,7 +8214,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
     # [OpenX] block with each entry's pages kept whole, so the authored beats survive as the
     # A-press breaks instead of being reflowed into wherever 42 columns happen to land.
     for village in chap['villages']:
-        _symbol, msg, fid = CH04_VILLAGE_SLOTS[village['id']]
+        _symbol, msg, fid, _bg = CH04_VILLAGE_SLOTS[village['id']]
         set_message_body(lines, msg, _script_to_message(
             [{'villager': box} for box in village_boxes(village)],
             {'villager': ('[OpenMidLeft]', fid)}, width=42))

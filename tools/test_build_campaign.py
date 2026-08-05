@@ -1339,8 +1339,8 @@ class Ch04RuntimeHost(unittest.TestCase):
     def test_the_village_hands_the_visitor_the_authored_reward(self):
         # vanilla's own shape (EventScr_089F1BD8): one text box over the village BG, then
         # SVAL the item into slot 3 and GIVEITEMTO the unit that visited.
-        s = bc.ch04_village_script(0x9C3, 'ITEM_AXE_IRON')
-        self.assertIn('Text_BG(%s, 0x9C3)' % bc.CH04_VILLAGE_BG, s)
+        s = bc.ch04_village_script(0x9C3, 'ITEM_AXE_IRON', bc.CH04_OPENING_FOREST_BG)
+        self.assertIn('Text_BG(%s, 0x9C3)' % bc.CH04_OPENING_FOREST_BG, s)
         self.assertLess(s.index('Text_BG'), s.index('SVAL(EVT_SLOT_3, ITEM_AXE_IRON)'))
         self.assertLess(s.index('SVAL(EVT_SLOT_3, ITEM_AXE_IRON)'),
                         s.index('GIVEITEMTO(CHAR_EVT_ACTIVE_UNIT)'))
@@ -1443,12 +1443,30 @@ class Ch04RuntimeHost(unittest.TestCase):
         # #24 asked for cannot see it (a double-claim overwrites silently and stays green).
         self.assertIn(bc.CH04_COTTAGE_MSG, bc.HOSTED_CHAPTER_MESSAGE_IDS['ch04'])
 
+    def test_each_village_plays_over_winter_art_not_vanillas_green_town(self):
+        """ch04 is a snowbound forest under fog, and `BG_NORMAL_VILLAGE` is vanilla's TEMPERATE
+        green town -- so the backdrop, which is the whole screen during a village visit, was
+        showing summer (Nicolas, 2026-08-05). Both doors take the fogged forest that Pinky's
+        opening beat already plays over: there is no TOWN on this map -- both cottages are
+        cabins standing in the same woods and the visitor is outside one of them (Nicolas: "if
+        we're outside their cabin, just use the bg you put behind pinky in his fog scene").
+        """
+        for name, slot in bc.CH04_VILLAGE_SLOTS.items():
+            self.assertNotEqual('BG_NORMAL_VILLAGE', slot[3],
+                                '%s is still on vanilla temperate art' % name)
+            self.assertEqual(bc.CH04_OPENING_FOREST_BG, slot[3],
+                             '%s should stand outside its cabin, in the fog' % name)
+
+    def test_a_village_script_plays_over_the_backdrop_it_is_given(self):
+        s = bc.ch04_village_script(0x9C6, None, 'BG_MS_LONELYWOOD_FOG')
+        self.assertIn('Text_BG(BG_MS_LONELYWOOD_FOG, 0x9C6)', s)
+
     def test_a_village_with_no_reward_hands_over_nothing(self):
         """ch04's economy is deliberately Ch4-lean (decisions.md): the Iron Axe is the whole
         material gift, so the cottage's reward IS its line. The script must drop the give-item
         tail rather than quietly hand over some default."""
-        s = bc.ch04_village_script(0x9C6, None)
-        self.assertIn('Text_BG(%s, 0x9C6)' % bc.CH04_VILLAGE_BG, s)
+        s = bc.ch04_village_script(0x9C6, None, bc.CH04_OPENING_FOREST_BG)
+        self.assertIn('Text_BG(%s, 0x9C6)' % bc.CH04_OPENING_FOREST_BG, s)
         self.assertNotIn('SVAL(EVT_SLOT_3', s)
         self.assertNotIn('GIVEITEMTO', s)
         self.assertIn('EVBIT_T(7)', s)      # still marks the visit, so the door shuts
