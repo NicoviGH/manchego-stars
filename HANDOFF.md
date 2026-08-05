@@ -65,9 +65,21 @@ with `origin/main`, no open PRs, no live feature branch.
   (`gUnitSpriteSlots` is `u8[0xD0]`), so nothing downstream can catch it. Vanilla ships 107 rows and
   `CUSTOM_SMS_BASE = 107` ⇒ the whole budget is ids **107–127**. **Live: 126 used, 2 left**, and
   **ch05's Basil + Sahnar are exactly those two.** `_append_wait_rows` is now the only way to add a
-  wait row; it fails the build naming the id + unit, and prints headroom. Raising the ceiling for
-  real is deliberately NOT done — that means widening the mask and auditing every `UseUnitSprite` /
-  `StartUiSMS` / `StartWorldMapSMS` caller.
+  wait row; it fails the build naming the id + unit, and prints headroom.
+  **But the ceiling is NOT why we are out of ids — measured 2026-08-05, and it corrects what #225's
+  PR said.** Vanilla assigns map sprites per **CLASS** (107 rows serve 127 classes; every Cavalier
+  shares row 4). We assign per **CHARACTER**, so each custom cast member needs its own row — that is
+  the design, and it is what makes the cast look custom. The problem is that `CUSTOM_SMS_BASE = 107`
+  only ever **APPENDS**: we never touch the rows below. **71 of vanilla's 107 rows are unreachable in
+  our ROM** — classes this campaign never fields even counting the full promotion closure (both
+  Lords, both Master Lords, every Wyvern class, Swordmaster/Assassin/Sniper/Ranger, Tent, Pontifex,
+  Queen, Prince…). So the table holds ~55 live rows in a 128-row space; we stacked 19 on top instead
+  of dropping them into 71 holes. **The cheap correct fix is to allocate from the free rows — pure
+  data, no engine change.** Widening the mask is the WRONG fix and also genuinely hard (bit 7 of an
+  SMS id is already load-bearing: all four `ApplyUnitSpriteImage*` do `id >> UNITSPRITE_ID_BITS`).
+  Reclaiming must be a **computed, checked free list** (recompute reachability each build and fail
+  loudly if a reclaimed row is later needed), never a hand-picked hardcoded list — and it needs a
+  check that nothing else indexes those rows (`StartWorldMapSMS`, link arena) before it is built.
 - **UNFILED HAZARD, found 2026-08-05 while re-reading the id allocator, and it lands squarely on
   ch05: SMS ids and wait-table ROW INDICES are computed in two different places and nothing asserts
   they agree.** `classed_cast` numbers ids positionally over **every** classed cast member — by
