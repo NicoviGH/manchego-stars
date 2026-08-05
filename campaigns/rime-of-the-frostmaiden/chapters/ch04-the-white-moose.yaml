@@ -314,9 +314,7 @@ villages:
                                # `Village(0, EventScr_089F1BD8, 8, 2)`. The retile preserved the
                                # cottage but mapped its door onto ruins terrain, so FE8 never
                                # offered Visit and the axe was unobtainable (#205). Guarded now by
-                               # assert_village_tiles_visitable. The twin's OTHER village (1,11) is
-                               # its recruit village — the Lupin parley covers that role, so its
-                               # cottage stands unwired.
+                               # assert_village_tiles_visitable.
     visit_reward:
       - id: iron-axe           # mirrors the twin: vanilla Ch4's item village hands out an Iron Axe
         amount: 1
@@ -324,17 +322,63 @@ villages:
     # gimmick. Not flavour: the Iron Axe IS the tool, and this line is what teaches the player
     # that the snag at (4,8) can be chopped into a bridge. "South of here" is accurate for our
     # map (the village stands at (8,2)).
-    visit_text: >
-      Do you see that old snag to the south of here?
-      Bet it would make a handy bridge if you could knock it over.
-      Take a weapon to it and give it a few good whacks. That should do it.
-      Here, take this and give it a try. It ought to do the trick.
+    # ONE ENTRY PER BOX — and these are vanilla's own four breaks. Flowed as a single scalar the
+    # text reflowed into THREE boxes buttoning mid-sentence ("a handy bridge if / you could knock
+    # it over"), i.e. 1:1 in words but not on screen (fixed #24).
+    visit_text:
+      - "Do you see that old snag to the south of here?"
+      - "Bet it would make a handy bridge if you could knock it over."
+      - "Take a weapon to it and give it a few good whacks. That should do it."
+      - "Here, take this and give it a try. It ought to do the trick."
     note: >
       Speaker Nimsy Huddle (ancient, hard of hearing) shelters the party overnight
       (chapter-start cutscene). Reward realigned 2026-07-21 to the twin's delivery
       vehicle: vanilla Ch4's two villages = a recruit (Lute; our Lupin parley covers
       it) + an Iron Axe. Ch4-lean economy (no gold, no chest) — the Iron Axe IS the
       village's whole material gift.
+
+  - id: forest-cottage
+    tile: [1, 11]              # vanilla Ch4's OTHER village — its Lute RECRUIT village
+                               # (`Village(0, ..., 1, 11)`), kept where the twin put it. The
+                               # Marty→Lupin parley took the recruit's JOB, so for the whole
+                               # slice this door stood on visitable terrain with no Location
+                               # entry: FE8 gates Visit on the location event, so the player saw
+                               # a cottage they could not enter (#24).
+    # NO visit_reward — the line IS the reward. ch04's economy is deliberately Ch4-lean (see the
+    # axe village's note): one Iron Axe, no gold, no chests. `ch04_village_script` drops the
+    # give-item tail when a village declares no reward.
+    #
+    # NOTHING TO COPY: vanilla's text here is pure Lute recruit dialogue (9B2/9B3/9B4, three
+    # variants by visitor, zero lore), and our recruit arrives by parley — so this line is ours.
+    # Nicolas asked for "at least a lore drop or a hint" (2026-08-03).
+    #
+    # WRITTEN 2026-08-05 (dialogue-pass, co-written with Nicolas — he assembled it from three
+    # sourced drafts). SOURCES, both previously unspent:
+    #   · DM notes (Lonelywood): "the frost druids did visit, but were largely ignored by
+    #     villagefolk" — the one canon beat the chapter never dramatised.
+    #   · Book p.80: Ravisin "won't rest until the forest is free of loggers"; she awakened the
+    #     moose, Messie and the wolves and "uses them to spy on settlements".
+    #   · Book p.79: Lonelywood's forest folk "value their privacy and are much less inclined to
+    #     welcome strangers into their meager dwellings" — hence a logger who talks through a
+    #     barred door and never opens it. That IS the staging.
+    # She is never NAMED: the ending owns the chapter's single Ravisin seed (review cut
+    # 2026-07-03 consolidated the dread there), so this is the setup, not a second seed.
+    # Register twin is vanilla's own lore village MSG_963 — a villager who names the local
+    # menace, repeats himself, and trails off. Form twin is MSG_9B5: one speaker, BG village.
+    # ONE ENTRY PER BOX; each is exactly two lines at the Text_BG wrap of 42.
+    visit_text:
+      - "I'll talk through the door, if it's all the same. Nothing personal."
+      - "Woman came to the cutting camps in autumn. White furs. Said put the axes down."
+      - "Foreman laughed her off. We all did. Told her the town eats what the woods pay."
+      - "She didn't argue. She walked off southeast. Smiling."
+      - "Beasts started talking that same tenday. ......You'll want to hurry."
+    note: >
+      A Lonelywood logger, boarded in at the forest's southwest edge — book p.79's
+      private forest folk, one voice texture (hoarse) and one quirk (won't open the
+      door), per lore/npc-bench.md. He wears FID_VillagerMan3, the mug vanilla itself
+      puts on its snag village. His line points SOUTHEAST, which is where the moose
+      flees and where ch05's tomb stands — the hint — without naming the stones that
+      Lupin reveals in the ending.
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
 events:

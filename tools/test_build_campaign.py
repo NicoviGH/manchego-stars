@@ -1418,10 +1418,77 @@ class Ch04RuntimeHost(unittest.TestCase):
     def test_the_village_line_is_vanillas_own_snag_tutorial(self):
         """Nicolas 2026-08-02: copy vanilla 1:1. The line exists to teach the snag gimmick and
         hand over the tool -- a flavour line throws the function away."""
-        text = ' '.join(self._chap()['villages'][0]['visit_text'].split())
+        text = ' '.join(bc.village_boxes(self._chap()['villages'][0]))
         self.assertIn('snag', text)
         self.assertIn('bridge', text)
         self.assertNotIn('husband', text)   # the placeholder draft this replaces
+
+    # -- #24: the SECOND village, vanilla Ch4's other cottage --------------------------------
+    def test_both_of_vanilla_ch4s_villages_are_wired(self):
+        """#24's last item. Vanilla Ch4 wires TWO villages -- Village(0, .., 8, 2) and
+        Village(0, .., 1, 11) -- and we shipped only the axe one. The cottage at (1,11) stood
+        on visitable terrain with no Location entry, so FE8 offered no Visit at all: the player
+        saw a house they could not enter."""
+        body = bc.ch04_location_events(self._chap())
+        self.assertIn('Village(0, %s, 8, 2)' % bc.CH04_VILLAGE_SCRIPT, body)
+        self.assertIn('Village(0, %s, 1, 11)' % bc.CH04_COTTAGE_SCRIPT, body)
+        self.assertTrue(body.rstrip().endswith('END_MAIN\n}'))
+
+    def test_each_village_owns_its_own_script_and_message_slot(self):
+        """Two doors sharing one script show the same line at both -- and, worse, run the
+        give-item tail twice."""
+        self.assertNotEqual(bc.CH04_VILLAGE_SCRIPT, bc.CH04_COTTAGE_SCRIPT)
+        self.assertNotEqual(bc.CH04_VILLAGE_MSG, bc.CH04_COTTAGE_MSG)
+        # ...and the new id has to join the ownership registry, or the uniqueness guard that
+        # #24 asked for cannot see it (a double-claim overwrites silently and stays green).
+        self.assertIn(bc.CH04_COTTAGE_MSG, bc.HOSTED_CHAPTER_MESSAGE_IDS['ch04'])
+
+    def test_a_village_with_no_reward_hands_over_nothing(self):
+        """ch04's economy is deliberately Ch4-lean (decisions.md): the Iron Axe is the whole
+        material gift, so the cottage's reward IS its line. The script must drop the give-item
+        tail rather than quietly hand over some default."""
+        s = bc.ch04_village_script(0x9C6, None)
+        self.assertIn('Text_BG(%s, 0x9C6)' % bc.CH04_VILLAGE_BG, s)
+        self.assertNotIn('SVAL(EVT_SLOT_3', s)
+        self.assertNotIn('GIVEITEMTO', s)
+        self.assertIn('EVBIT_T(7)', s)      # still marks the visit, so the door shuts
+
+    def test_a_village_line_is_authored_in_boxes_not_reflowed(self):
+        """A village line is dialogue: its A-press breaks are authored, not a side effect of
+        where a 42-column wrap happens to land. One YAML entry == one GBA box."""
+        for village in self._chap()['villages']:
+            for box in bc.village_boxes(village):
+                lines = bc._wrap_fe_lines(bc._fe_dialogue_text(box), 42)
+                self.assertLessEqual(len(lines), 2,
+                                     'box overflows its A-press in %r: %r'
+                                     % (village['id'], box))
+
+    def test_the_axe_villages_boxes_match_vanillas_own_four(self):
+        """Vanilla's MSG_9B5 is FOUR boxes, each broken on a sentence. Flowed as one scalar
+        ours reflowed to THREE and buttoned mid-sentence ("a handy bridge if / you could knock
+        it over") -- 1:1 in words but not on screen, which is not what 1:1 was asked for."""
+        boxes = bc.village_boxes(self._chap()['villages'][0])
+        self.assertEqual(4, len(boxes))
+        self.assertTrue(boxes[0].rstrip().endswith('south of here?'), boxes[0])
+        self.assertTrue(boxes[1].rstrip().endswith('knock it over.'), boxes[1])
+
+    def test_the_cottage_line_drops_the_lore_the_chapter_has_nowhere_else(self):
+        """The line's whole job (#24, Nicolas: "at least a lore drop or a hint"). Grounded in
+        the DM notes -- "the frost druids did visit, but were largely ignored by villagefolk"
+        -- and the book's Ravisin, who "won't rest until the forest is free of loggers". She
+        is never NAMED here: the ending owns the chapter's one Ravisin seed (2026-07-03 cut)."""
+        text = ' '.join(bc.village_boxes(self._chap()['villages'][1]))
+        self.assertIn('White furs', text)
+        self.assertIn('southeast', text)
+        self.assertNotIn('Ravisin', text)
+
+    def test_both_villages_close_their_doors_when_visited(self):
+        changes = bc.ch04_map_changes(self._chap(), self._maps_dir())
+        for village in self._chap()['villages']:
+            door = [c for c in changes if [c[0], c[1]] == village['tile']]
+            self.assertEqual(1, len(door), 'no door change for %r' % village['id'])
+            self.assertEqual(bc.terrain_ids()['TERRAIN_VILLAGE_CLOSED'],
+                             self._bern().terrain(door[0][4][0]))
 
     def test_parley_recruiter_is_marty_only(self):
         # Nicolas 2026-07-21: ch04's talker is Marty specifically, NOT ch03's any-party-member.

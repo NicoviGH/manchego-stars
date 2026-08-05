@@ -5564,6 +5564,46 @@ scenarios.ch04packmath = function()
         .. "who survived, so talking early is the reward", killed, spawned, greens))
 end
 
+-- Park an unexhausted blue unit on a village door, take Visit, and advance the line to its end.
+-- Shared by ch04's two villages (#205, #24): the doors differ only in what SETTLES them -- an
+-- item in the party's hands for the axe village, a closed door for the cottage whose reward is
+-- its line -- so `done` is the caller's postcondition and this owns only the walking-in.
+-- Returns ok, reason, spoke (whether the visit actually opened a text box at all).
+local function visitVillage(x, y, done)
+    local u
+    for i = 0, 19 do
+        local c = unitAt(SYM.gUnitArrayBlue, i)
+        if c and not isDead(c) and (c.state & 0x2) == 0 then u = c break end
+    end
+    if not u then return false, "no unexhausted blue unit to visit with" end
+    -- setMapUnit keeps the engine's tile->unit grid in sync, so the Visit check reads the new
+    -- position immediately (the ch03talk/parley trick).
+    local grid = mapUnitAt(u.x, u.y)
+    setMapUnit(u.x, u.y, 0)
+    emu:write8(u.addr + 0x10, x); emu:write8(u.addr + 0x11, y)
+    setMapUnit(x, y, grid)
+    if not cursorTo(x, y) then return false, "cursor could not reach the village" end
+    if not moveUnit(x, y, x, y) then
+        return false, "could not select the unit standing on the village"
+    end
+    if not selectSemantic("visit", "Visit starts the live location event", function(after)
+        return after.menu == nil
+    end, 600) then return false, "live command menu did not expose Visit" end
+    local spoke = false
+    for _ = 1, 3600 do
+        if done() then break end
+        if controllerState() == "dialogue_wait" then
+            spoke = true
+            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
+                return controllerState(after) ~= "dialogue_wait"
+            end, 120) then return false, "village dialogue input did not advance" end
+        else
+            yield()
+        end
+    end
+    return true, nil, spoke
+end
+
 -- ch04village (#205): does the Lonelywood village actually hand over its Iron Axe?
 -- It did not, for the whole slice, and NOTHING looked wrong: the map drew a cottage, the chapter
 -- compiled and played. FE8 gates the Visit menu item on the TERRAIN under the unit (bmmenu.c:735)
@@ -5585,36 +5625,8 @@ scenarios.ch04village = function()
     end
     local before = axes()
     log(string.format("ch04village: %d Iron Axe(s) in the party before visiting", before))
-    -- Park a unit ON the village tile. setMapUnit keeps the engine's tile->unit grid in sync, so
-    -- the Visit check reads the new position immediately (the ch03talk/parley trick).
-    local u
-    for i = 0, 19 do
-        local c = unitAt(SYM.gUnitArrayBlue, i)
-        if c and not isDead(c) and (c.state & 0x2) == 0 then u = c break end
-    end
-    if not u then return result("FAIL", "no unexhausted blue unit to visit with") end
-    local grid = mapUnitAt(u.x, u.y)
-    setMapUnit(u.x, u.y, 0)
-    emu:write8(u.addr + 0x10, VILLAGE_X); emu:write8(u.addr + 0x11, VILLAGE_Y)
-    setMapUnit(VILLAGE_X, VILLAGE_Y, grid)
-    u = unitAt(SYM.gUnitArrayBlue, 0)
-    if not cursorTo(VILLAGE_X, VILLAGE_Y) then return result("FAIL", "cursor could not reach the village") end
-    if not moveUnit(VILLAGE_X, VILLAGE_Y, VILLAGE_X, VILLAGE_Y) then
-        return result("FAIL", "could not select the unit standing on the village")
-    end
-    if not selectSemantic("visit", "Visit starts the live location event", function(after)
-        return after.menu == nil
-    end, 600) then return result("FAIL", "live command menu did not expose Visit") end
-    for _ = 1, 3600 do
-        if axes() > before then break end
-        if controllerState() == "dialogue_wait" then
-            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
-                return controllerState(after) ~= "dialogue_wait"
-            end, 120) then return result("FAIL", "village dialogue input did not advance") end
-        else
-            yield()
-        end
-    end
+    local ok, why = visitVillage(VILLAGE_X, VILLAGE_Y, function() return axes() > before end)
+    if not ok then return result("FAIL", why) end
     shot("ch04village")
     local after = axes()
     if after <= before then
@@ -5625,6 +5637,51 @@ scenarios.ch04village = function()
     end
     return result("PASS", string.format(
         "the Lonelywood village handed over its Iron Axe: %d -> %d in the party", before, after))
+end
+
+-- ch04cottage (#24): the SECOND village at (1,11), whose reward is its line.
+-- The shipped bug was not a bad reward, it was NO VISIT: the tile was visitable-capable but had
+-- no Location entry, and FE8 runs the village off that event -- so the player saw a cottage they
+-- could not enter. An item check cannot settle this one, so the evidence is the door itself:
+-- FE8 flips a visited village to TERRAIN_VILLAGE_CLOSED via the chapter's MapChange, which only
+-- happens if the Visit was offered AND its event ran to the end. The line having actually opened
+-- a text box is asserted separately, or a wired-but-empty message would pass on the door alone.
+-- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04cottage (needs a CH04BOOT=1 ROM).
+scenarios.ch04cottage = function()
+    local DOOR_X, DOOR_Y = 1, 11
+    local VILLAGE_REGULAR, VILLAGE_CLOSED = 0x03, 0x04
+    if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
+    pokeFastConfig()
+    waitFor(function() return faction() == 0 and not menuOpen()
+        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    local before = terrainAt(DOOR_X, DOOR_Y)
+    log(string.format("ch04cottage: door (%d,%d) terrain=0x%02X before visiting",
+        DOOR_X, DOOR_Y, before))
+    if before ~= VILLAGE_REGULAR then
+        return result("FAIL", string.format(
+            "(%d,%d) is terrain 0x%02X, not a visitable village (0x%02X) -- FE8 gates the Visit "
+            .. "menu item on the TERRAIN before it ever consults the location event (bmmenu.c)",
+            DOOR_X, DOOR_Y, before, VILLAGE_REGULAR))
+    end
+    local ok, why, spoke = visitVillage(DOOR_X, DOOR_Y, function()
+        return terrainAt(DOOR_X, DOOR_Y) == VILLAGE_CLOSED
+    end)
+    if not ok then return result("FAIL", why) end
+    shot("ch04cottage")
+    local after = terrainAt(DOOR_X, DOOR_Y)
+    if after ~= VILLAGE_CLOSED then
+        return result("FAIL", string.format(
+            "visited (%d,%d) but its terrain is still 0x%02X, not a closed village (0x%02X) -- "
+            .. "the visit event never ran to the end", DOOR_X, DOOR_Y, after, VILLAGE_CLOSED))
+    end
+    if not spoke then
+        return result("FAIL", string.format(
+            "the door at (%d,%d) closed but no text box ever opened -- the village is wired to "
+            .. "an empty message", DOOR_X, DOOR_Y))
+    end
+    return result("PASS", string.format(
+        "the forest cottage at (%d,%d) offered Visit, played its line and shut behind you "
+        .. "(terrain 0x%02X -> 0x%02X)", DOOR_X, DOOR_Y, before, after))
 end
 
 -- ch04snag (#214): the Iron Axe's whole purpose. Vanilla Ch4's village hands you the axe to chop

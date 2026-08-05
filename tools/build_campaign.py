@@ -6736,13 +6736,35 @@ CH04_MOOSE_AREA = (9, 2, 14, 7)                 # AREA(x1, y1, x2, y2) -- the cl
                                                 # sighting the moment a unit steps up to visit.
                                                 # Vanilla's own AREA (0,9)-(14,14) touched neither
                                                 # village. Guarded by a test over `villages:`.
-# The Lonelywood village (#205). Vanilla Ch4 hands its Iron Axe over at (8,2) --
-# `Village(0, EventScr_089F1BD8, 8, 2)` -- and we keep both the tile and the script shape. WHICH
-# village and WHAT it gives are read from the chapter YAML: a village's reward and its line are
-# content, and putting them here is the mistake #208 exists to undo. The twin's other village
-# (1,11) is its RECRUIT village; the Marty->Lupin parley took that role, so it stands unwired.
-CH04_VILLAGE_SCRIPT = 'EventScr_089F231C'       # dead Ch5 script (verified free at HEAD)
-CH04_VILLAGE_MSG = 0x9C3                        # dead Ch5 text slot (next free in ch04's block)
+# The Lonelywood villages (#205, #24). Vanilla Ch4 wires TWO -- `Village(0, EventScr_089F1BD8,
+# 8, 2)`, the Iron Axe, and `Village(0, .., 1, 11)`, its Lute RECRUIT village -- and we keep both
+# tiles and the script shape. WHICH village and WHAT it gives are read from the chapter YAML: a
+# village's reward and its line are content, and putting them here is the mistake #208 exists to
+# undo.
+#
+# The Marty->Lupin parley took the recruit village's JOB, so for the whole slice (1,11) stood on
+# visitable terrain with no Location entry -- FE8 offers Visit off the location event, so the
+# player saw a cottage they could not enter (#24). Vanilla's own text there is pure Lute recruit
+# dialogue (9B2/9B3/9B4, zero lore), so there was nothing to copy and the line is ours.
+#
+# Each village needs its OWN script and message slot -- two doors sharing one script show the
+# same line at both and run the give-item tail twice. Keyed by the YAML's village `id`, so a
+# third village is one row here plus one `villages:` entry.
+CH04_VILLAGE_SLOTS = {
+    #  id                 event script          msg     mug
+    'lonelywood':     ('EventScr_089F231C', 0x9C3, CH04_NIMSY_FID),
+    # The cottage's logger wears FID_VillagerMan3 -- the mug vanilla itself puts on the snag
+    # village (MSG_9B5). It is free for us because our axe village reassigned that door to Nimsy.
+    'forest-cottage': ('EventScr_089F2170', 0x9C6, '[FID_VillagerMan3]'),
+}
+# `EventScr_089F231C` is a dead Ch5 script (verified free at HEAD). `EventScr_089F2170` is vanilla
+# Ch5's OWN village script -- `Village(EVFLAG_TMP(8), .., 12, 10)` in ch5-eventinfo.h, its only
+# reference, and inject_ch04 replaces that whole Location list: a village script for a village.
+# 0x9C6 is the next free id in ch04's block (it hosts on slot 5, so it owns 0x9BA-0x9CC). ch05's
+# YAML labels beats "vanilla 0x9C6" -- those are ANATOMY references mined from its twin, not ids
+# it may claim; it will host on its own slot and take that block.
+CH04_VILLAGE_SCRIPT, CH04_VILLAGE_MSG, _ = CH04_VILLAGE_SLOTS['lonelywood']
+CH04_COTTAGE_SCRIPT, CH04_COTTAGE_MSG, _ = CH04_VILLAGE_SLOTS['forest-cottage']
 CH04_VILLAGE_BG = 'BG_NORMAL_VILLAGE'           # vanilla's own village BG, as ch02 uses
 # The snag (#214) -- the Iron Axe's whole purpose. Vanilla Ch4's item village hands the axe over
 # to chop this into a bridge, and the retile kept the geometry: (4,8) is the snag, (4,9) the river
@@ -6793,7 +6815,7 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
              *CH03_MIDMAP_MSGS, CH03_GOAL_WINDOW_MSG, CH03_GOAL_STATUS_MSG),
     'ch04': (CH04_LUPIN_TALK_MSG, *CH04_REVEAL_MSGS, CH04_OPENING_CARD_MSG,
              *CH04_OPENING_MSGS, CH04_MOOSE_MSG, CH04_ENDING_MSG,
-             CH04_ENDING_NO_LUPIN_MSG, CH04_VILLAGE_MSG,
+             CH04_ENDING_NO_LUPIN_MSG, CH04_VILLAGE_MSG, CH04_COTTAGE_MSG,
              CH04_GOAL_WINDOW_MSG, CH04_GOAL_STATUS_MSG),
     # Goal ids only -- ch01/ch02 predate the per-chapter block registry, but their goal strings
     # still have to be unique against every other hosted chapter (#207).
@@ -6908,30 +6930,62 @@ def ch04_village_script(msg, item):
     `SVAL(EVT_SLOT_3, item)` + `GIVEITEMTO(CHAR_EVT_ACTIVE_UNIT)` is the engine's give-an-item
     idiom -- slot 3 carries the item id and the ACTIVE unit is the one who walked in, so the axe
     lands on the visitor (overflowing to the convoy if their pack is full), not on a fixed pid.
+
+    `item` is None for a village whose reward IS its line -- ch04's economy is deliberately
+    Ch4-lean (decisions.md: one Iron Axe, no gold, no chests), so the forest cottage pays in
+    lore. That drops vanilla's give-item tail rather than handing over some default; the
+    EVBIT_T(7) visit flag stays either way, or the door never shuts behind you.
     """
+    give = ('' if item is None else
+            '    SVAL(EVT_SLOT_3, %s)\n'
+            '    GIVEITEMTO(CHAR_EVT_ACTIVE_UNIT)\n' % item)
     return ('{\n'
             '    MUSI\n'
             '    Text_BG(%s, 0x%X)\n'
             '    MUNO\n'
             '    CALL(EventScr_RemoveBGIfNeeded)\n'
-            '    SVAL(EVT_SLOT_3, %s)\n'
-            '    GIVEITEMTO(CHAR_EVT_ACTIVE_UNIT)\n'
+            '%s'
             '    EVBIT_T(7)\n'
-            '    ENDA\n}' % (CH04_VILLAGE_BG, msg, item))
+            '    ENDA\n}' % (CH04_VILLAGE_BG, msg, give))
+
+
+def village_reward_item(village):
+    """The FE item a village hands over, or None when its reward is the line alone."""
+    reward = village.get('visit_reward')
+    return CH04_ITEM_IDS[reward[0]['id']] if reward else None
+
+
+def village_boxes(village):
+    """A village's line, as the GBA boxes it was AUTHORED in -- one `visit_text` entry per
+    A-press.
+
+    Village text is dialogue, so its buttons belong on its beats. Flowed as a single scalar it
+    reflows wherever the 42-column wrap lands and buttons mid-sentence: the axe village's
+    "vanilla 1:1" text came out as THREE boxes breaking on "a handy bridge if / you could knock
+    it over", where vanilla's own MSG_9B5 is FOUR broken on its sentences -- 1:1 in words but
+    not on screen, which is not what 1:1 meant (Nicolas, 2026-08-02). A flowed scalar is
+    therefore rejected outright rather than silently reflowed.
+    """
+    text = village.get('visit_text')
+    if isinstance(text, str) or not text:
+        sys.exit('ERROR: village %r must author `visit_text` as a LIST -- one entry per GBA '
+                 'box. A flowed scalar reflows at the wrap width and puts the A-press breaks '
+                 'mid-sentence.' % village['id'])
+    return [' '.join(box.split()) for box in text]
 
 
 def ch04_location_events(chap):
     """ch04's Location list: one `Village` per authored village, at the tile the chapter YAML
-    names. Vanilla Ch4 wires two; ours wires the ITEM village only, because the parley took the
-    recruit village's job (see the CH04_VILLAGE_* block).
+    names, each running its OWN script (CH04_VILLAGE_SLOTS) -- two doors sharing one script show
+    the same line at both. Vanilla Ch4 wires two and so do we (#24).
 
     `Village(eid, scr, x, y)` expands to VILL + a LOCA on the tile ABOVE (EAstdlib), which is how
     FE8 lets a unit standing north of the door trigger it -- so the door tile is the anchor, not
     the whole building."""
     return ('{\n' + ''.join(
         '    Village(0, %s, %d, %d) /* %s -- %s */\n'
-        % (CH04_VILLAGE_SCRIPT, v['tile'][0], v['tile'][1], v['id'],
-           CH04_ITEM_IDS[v['visit_reward'][0]['id']])
+        % (CH04_VILLAGE_SLOTS[v['id']][0], v['tile'][0], v['tile'][1], v['id'],
+           village_reward_item(v) or 'the line is the reward')
         for v in chap.get('villages', [])) + '    END_MAIN\n}')
 
 
@@ -8054,14 +8108,14 @@ def inject_ch04(campaign, boot=False, verbose=True):
     # surviving pack green in place, then CUSA Lupin blue (built above).
     script = _replace_brace_block(
         script, CH04_LUPIN_TALK_SCRIPT + '[] =', lupin_talk_script, CH5_EVENTSCRIPT_H)
-    # The village visit (#205): vanilla Ch4's own give-an-item shape, with the line and the
-    # reward read from the chapter YAML.
-    village = chap['villages'][0]
-    script = _replace_brace_block(
-        script, CH04_VILLAGE_SCRIPT + '[] =',
-        ch04_village_script(CH04_VILLAGE_MSG,
-                            CH04_ITEM_IDS[village['visit_reward'][0]['id']]),
-        CH5_EVENTSCRIPT_H)
+    # The village visits (#205, #24): vanilla Ch4's own give-an-item shape, with the line and the
+    # reward read from the chapter YAML. One script per door -- the axe village hands the Iron Axe
+    # over, the forest cottage pays in lore alone (Ch4-lean economy).
+    for village in chap['villages']:
+        symbol, msg, _fid = CH04_VILLAGE_SLOTS[village['id']]
+        script = _replace_brace_block(
+            script, symbol + '[] =',
+            ch04_village_script(msg, village_reward_item(village)), CH5_EVENTSCRIPT_H)
     # The moose-flees beat (Stage 4): fired by the Misc AREA when a unit reaches the tomb-side
     # clearing. Loads the moose, holds on it, RBG's one line, then it bolts NE and is gone.
     script = _replace_brace_block(
@@ -8144,12 +8198,19 @@ def inject_ch04(campaign, boot=False, verbose=True):
     _emit_scene_beats(lines, (CH04_ENDING_MSG,), end_beats, cut_fid, end_home, width=42)
     _emit_scene_beats(lines, (CH04_ENDING_NO_LUPIN_MSG,), [end_beat_no_lupin],
                       cut_fid, end_home, width=42)
-    # The village line (#205) -- Nimsy herself, on her own doorstep, wearing the vanilla old-lady
-    # mug the opening already gave her. Plays over BG_NORMAL_VILLAGE (full-screen window), so it
-    # wraps at 42 like the other BG scenes rather than the on-map bubble's 29.
-    set_message_body(lines, CH04_VILLAGE_MSG, _script_to_message(
-        [{'nimsy': ' '.join(village['visit_text'].split())}],
-        {'nimsy': ('[OpenMidLeft]', CH04_NIMSY_FID)}, width=42))
+    # The village lines (#205, #24). The axe door is Nimsy herself, wearing the vanilla old-lady
+    # mug the opening already gave her; the forest cottage is a logger who never opens up, on
+    # vanilla's own snag-village mug. Both play over BG_NORMAL_VILLAGE (full-screen window), so
+    # they wrap at 42 like the other BG scenes rather than the on-map bubble's 29.
+    #
+    # One `visit_text` entry per BOX: consecutive turns by one speaker coalesce into a single
+    # [OpenX] block with each entry's pages kept whole, so the authored beats survive as the
+    # A-press breaks instead of being reflowed into wherever 42 columns happen to land.
+    for village in chap['villages']:
+        _symbol, msg, fid = CH04_VILLAGE_SLOTS[village['id']]
+        set_message_body(lines, msg, _script_to_message(
+            [{'villager': box} for box in village_boxes(village)],
+            {'villager': ('[OpenMidLeft]', fid)}, width=42))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     _write_chapter_title_card(host, 'Ch.4: ' + chap['title'])
