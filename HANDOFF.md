@@ -4,13 +4,13 @@
 live in `CLAUDE.md`/`AGENTS.md`; issue scope and backlog live in GitHub. Before a context rollover,
 warn Nicolas, refresh this file, and begin a fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-05 (Opus) after merging #224 (#218) and #226 (#225). `main` = `5e8c1cf`, level
-with `origin/main`, no open PRs, no live feature branch.
+Refreshed 2026-08-05 (Opus) after merging #224 (#218), #226 (#225) and #229 (#227). `main` = `aad4f8b`,
+level with `origin/main`, no open PRs, no live feature branch.
 
 ## Current state
 
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
-  Verified on this tree 2026-08-05: 641 Python tool tests pass, the 8 Lua harness suites pass,
+  Verified on this tree 2026-08-05: 654 Python tool tests pass, the 8 Lua harness suites pass,
   `make check` is `drift check: clean`, and a full ROM build is green.
 - **Cross-agent continuity:** Nicolas uses Codex only between Claude sessions. Codex must leave an
   explicit HANDOFF entry naming what it changed, the active branch/PR and commit state, verification
@@ -60,39 +60,34 @@ with `origin/main`, no open PRs, no live feature branch.
   above in the unit list's 16px pitch. Vanilla never hits it (no vanilla PLAYER unit is 32x32).
   Nicolas looked at the fixed frames and called it fine; changing it would mean re-authoring those
   five sheets down to 16x16 and losing the silhouettes. Recorded on #218 so it is not re-raised.
-- **The custom SMS id budget is nearly gone — guarded, not raised (#225, PR #226).** `GetInfo` masks every id with `0x7F`,
-  so an id ≥ 128 silently renders a VANILLA sprite — and the mask is NOT the array bound
-  (`gUnitSpriteSlots` is `u8[0xD0]`), so nothing downstream can catch it. Vanilla ships 107 rows and
-  `CUSTOM_SMS_BASE = 107` ⇒ the whole budget is ids **107–127**. **Live: 126 used, 2 left**, and
-  **ch05's Basil + Sahnar are exactly those two.** `_append_wait_rows` is now the only way to add a
-  wait row; it fails the build naming the id + unit, and prints headroom.
-  **But the ceiling is NOT why we are out of ids — measured 2026-08-05, and it corrects what #225's
-  PR said.** Vanilla assigns map sprites per **CLASS** (107 rows serve 127 classes; every Cavalier
-  shares row 4). We assign per **CHARACTER**, so each custom cast member needs its own row — that is
-  the design, and it is what makes the cast look custom. The problem is that `CUSTOM_SMS_BASE = 107`
-  only ever **APPENDS**: we never touch the rows below. **71 of vanilla's 107 rows are unreachable in
-  our ROM** — classes this campaign never fields even counting the full promotion closure (both
-  Lords, both Master Lords, every Wyvern class, Swordmaster/Assassin/Sniper/Ranger, Tent, Pontifex,
-  Queen, Prince…). So the table holds ~55 live rows in a 128-row space; we stacked 19 on top instead
-  of dropping them into 71 holes. **The cheap correct fix is to allocate from the free rows — pure
-  data, no engine change.** Widening the mask is the WRONG fix and also genuinely hard (bit 7 of an
-  SMS id is already load-bearing: all four `ApplyUnitSpriteImage*` do `id >> UNITSPRITE_ID_BITS`).
-  Reclaiming must be a **computed, checked free list** (recompute reachability each build and fail
-  loudly if a reclaimed row is later needed), never a hand-picked hardcoded list — and it needs a
-  check that nothing else indexes those rows (`StartWorldMapSMS`, link arena) before it is built.
-- **UNFILED HAZARD, found 2026-08-05 while re-reading the id allocator, and it lands squarely on
-  ch05: SMS ids and wait-table ROW INDICES are computed in two different places and nothing asserts
-  they agree.** `classed_cast` numbers ids positionally over **every** classed cast member — by
-  design, "so a unit keeps the same id whether or not its sprite is authored" — but
-  `_inject_idle_sprites` only emits a ROW for the ones that actually have a `<id>.png`. Today they
-  happen to agree (all 11 classed cast have art, verified), so the table is contiguous. **The first
-  classed cast member added WITHOUT a sprite silently shifts every later row one index below the id
-  that claims it** — the override table then points each unit at its neighbour's sheet. #225's
-  `_append_wait_rows` does NOT catch this: it guards the ceiling, not id↔index agreement. This is
-  the same missing invariant the ceiling bug came from (allocation and emission have no single
-  source of truth). Cheap to guard — the generated rows already carry their id in a trailing
-  comment, so the append can assert `declared id == actual index`. **Not filed as an issue yet;
-  Nicolas has been told.** ch05 adds Basil + Sahnar as classed cast, which is exactly the trigger.
+- **Map-sprite SMS ids: the ceiling is guarded AND the space is reclaimed (#225 + #227, both merged).**
+  `GetInfo` masks every id with `0x7F`, so an id ≥ 128 silently renders a VANILLA sprite, and the mask
+  is NOT the array bound (`gUnitSpriteSlots` is `u8[0xD0]`) so nothing downstream can catch it. We were
+  never short, though — vanilla assigns sprites per **CLASS** (107 rows serve 127 classes) while we
+  assign per **CHARACTER**, and `CUSTOM_SMS_BASE = 107` only ever APPENDED, stacking our rows on top of
+  dozens belonging to classes this campaign can never field. Now `claim_sms_id` hands out **reclaimed
+  dead rows first** and `_write_wait_row` places each row at exactly the index its id names (replacing
+  in place when reclaimed), failing the build otherwise — which also closed the id↔row **desync**
+  hazard, since ids are claimed only by the pass about to write the row. **Live: 17 of 19 sprites sit
+  in reclaimed rows; 19 ids of headroom, up from 2.** ch05's Basil + Sahnar are no longer the last two.
+  **Do NOT try to widen the mask** — bit 7 of an SMS id is already load-bearing (all four
+  `ApplyUnitSpriteImage*` do `id >> UNITSPRITE_ID_BITS`), and it is the wrong fix anyway.
+- **The reclaim policy is CONSERVATIVE by Nicolas's decision — do not "optimise" it for more rows.**
+  Reachability is seeded with FE8's **entire player promotion tree** (every class a player unit could
+  ever hold or become), not the classes our YAML names today, *because the roster is not final —
+  characters are still unrecruited, so any list built from today's YAML is incomplete by definition*.
+  Three reservations no computation can infer: the four **literal trap ids** (`0x5B`/`0x5C`/`0x5D`
+  ballistae, `0x66` trap type `0xD` — `RenderUnitSprites` draws these by literal id with NO class
+  involved, the #218 failure shape exactly); **declared art donors** (named by sheet, not `CLASS_`
+  enum); and **Bard / Dancer / the three Manakete classes** (the cast has a bard in D&D terms;
+  Frostmaiden has a white dragon; `CLASS_MANAKETE` is also the only class on the shared `Blank` row).
+  Full ADR in `decisions.md` §Art & Audio.
+- **Two decomp traps that will bite again (#227).** (1) **`ClassData.promotion` is only ONE branch** —
+  FE8's real branching table is `gPromoJidLut[][2]` (`src/classchg-data.c`); Myrmidon → Assassin OR
+  Swordmaster. Following `.promotion` alone under-counted by five classes. **The player picks either
+  branch; any "what can this unit become" question must close over both.** (2) **`donor_sms_geometry`
+  was reading the MUTABLE working tree** — a donor's geometry is a fact about VANILLA, so it reads
+  `HEAD` now, like every other decomp read.
 - **`recordunitlist` is the new fast boot for roster screens** (#218). `tools/playtest/run.sh
   recordunitlist` on a `make TESTCH=1` ROM opens the Character list ~30s from New Game, navigates
   semantically off `gMapMenuItems[0]` (overrideId `0x6E`), shoots every page, and dumps SMS geometry
@@ -158,7 +153,9 @@ Then: **#29** world map.
 
 ## Working tree - do not lose or revert
 
-- **No open PRs and no live feature branch.** `main` is `5e8c1cf`, level with `origin/main`.
+- **No open PRs and no live feature branch.** `main` is `aad4f8b`, level with `origin/main`.
+- A stale `stash@{0}` ("ch04-session HANDOFF refresh", July) is superseded — ch04 shipped in #223.
+  Safe to drop; left alone because it is Nicolas's.
 - `fireemblem8u` is dirty from injected/generated build artifacts. **Never commit its submodule
   pointer.** Restore the injected decomp files before `check.py`/the pre-commit hook so it runs in
   ~22s instead of ~4min: `git -C fireemblem8u restore src/data/chapter_settings.json data/data_8B363C.s`.
