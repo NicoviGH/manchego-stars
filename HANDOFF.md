@@ -6,18 +6,22 @@ deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; scope and ba
 issues. Before a context rollover, warn Nicolas, refresh this file, and start a fresh instance —
 don't rely on auto-compaction.
 
-Refreshed 2026-08-06 (Opus). `main` = `c489c56`, level with `origin/main`. **Nothing in flight —
-the three-PR stack LANDED (#237 → #239 → #240, merge commits, in order).** No branches, no stashes.
-Verified on merged `main`: `make test` exit 0 (40 suites), `make check` = `drift check: clean`,
-`git diff --check` clean. #236 and #232 auto-closed; **#138 and #238 stay open by design** — each
-got a first pass only (see NEXT SESSION §1–§2).
+Refreshed 2026-08-06 (Opus). `main` = `c5dec1d`, level with `origin/main`. **Nothing in flight —
+the three-PR stack LANDED (#237 → #239 → #240, merge commits, in order), and its code-review
+follow-up landed on top (#241 in PR #242, squashed).** No branches, no stashes. Verified on merged
+`main`: `make test` exit 0 (41 suites), `make check` = `drift check: clean`, `make matrix` =
+**14/14** (4m23s), `git diff --check` clean. #236, #232 and #241 closed; **#138 and #238 stay open
+by design** — each got a first pass only (see NEXT SESSION §2).
 
-**CI still never ran on any of it — a GitHub Actions major outage (incident opened 15:22 UTC
-2026-08-06), not our branches. Do not re-diagnose it; the evidence is a comment on #237.** Every run
-on `main` failed the same way, including doc-only commits: `The job was not acquired by Runner of
-type hosted`. Re-run with `gh run rerun 31125252344` once runners recover; local verification is a
-strict superset of what `checks.yml` does, so this blocked the merge button, not the evidence.
-**None of the three had a `/code-review` — that is user-triggered (`/code-review ultra <PR#>`).**
+**CI: read this before diagnosing anything red or missing.** The GitHub Actions outage (incident
+15:22 UTC 2026-08-06) partially lifted around 22:05 — `push: [main]` dispatches again, but
+`pull_request` did NOT for PR #242 (no run was ever created: not on push, not on open, not on a
+close/reopen nudge). **A missing check on a PR is that, not a broken branch.** The first real run
+after the outage, on the #240 merge, failed for a genuine reason — `build_campaign does not import:
+No module named 'PIL'` — which is what #241 fixed; `tools/test_hosts.py` now reproduces CI's
+dependency set locally, so that class fails on your machine instead. Local verification stays a
+strict superset of `checks.yml` (which never builds the ROM).
+**Nothing has had a `/code-review` since #242 — that is user-triggered (`/code-review ultra <PR#>`).**
 
 **Next in the agreed order: #238's second pass (NEXT SESSION §2), then ch05 (#25). Jump there.**
 
@@ -57,24 +61,33 @@ chapter runs on, so read this before building anything.
 
 Nicolas's standing question, answered with measurements so it is not re-litigated: **the new gates
 cost ~1.5s on `make check` (23.6s total) and +4% on `make matrix` (5m34s → 5m49s, almost all of it
-`ch01win` 28s → 40s because it now verifies instead of mashing A).** The real cost is not seconds —
+`ch01win` 28s → 40s because it now verifies instead of mashing A; the gate ran 4m23s warm on
+2026-08-06 after #241).** The real cost is not seconds —
 it is that a new FE8 input state must be CLASSIFIED before a scenario can drive it. ch05 will
 probably surface some. That work always existed; it used to be deferred into mystery failures.
 **If the stall detector ever false-positives, `TUNE.stallFrames` is the dial — do not remove it.**
 
 What it shipped, so the next instance can USE it instead of re-deriving it:
 
-- **A failing scenario now dumps its own diagnosis.** `tools/playtest/inspect_state.py`
-  has `render <log>` — the verdict, the rule that produced it, every rule rejected and
-  why, and the live procs named by exact symbol — and `diff <a> <b>` for the first divergence
-  between two runs. **Read that before rebuilding anything** — it is the whole point.
+- **A failing scenario dumps its own diagnosis, and `run.sh` now PRINTS it for you on a FAIL
+  (#241).** `tools/playtest/inspect_state.py render <log>` re-reads it later — the verdict, the rule
+  that produced it, every rule rejected and why, and the live procs named by exact symbol — and
+  `diff <a> <b>` gives the first divergence between two runs. **Read that before rebuilding
+  anything** — it is the whole point.
+- **Pure decisions belong in `controller.lua`, emulator driving in `harness.lua`.** The stall
+  detector (`Controller.stallWatch`) moved there for exactly that reason: it decides FAIL for whole
+  suites and `harness.lua` cannot be loaded outside mGBA, so it had no tests. Classification rule
+  ORDER is load-bearing (specific outranks general — `yes_no_choice` above `dialogue_wait` above
+  `std_event`) and is pinned by tests in `test_controller.lua`.
 - A verdict flagged `*** UNCLASSIFIED WAIT ***` means FE8 is waiting on something with no name yet.
   The fix is always the same four edits: `gen_symbols.py` WANTED, `CALLBACK_NAMES`,
   `observeController`, a `classify` rule — then let the SCENARIO choose the answer.
-- `harness.lua` has **exactly TWO free slots** against Lua's 200-local ceiling (measured: +2
-  compiles, +3 does not). Hang new helpers off an existing table (`INSPECT`, `TUNE`) rather than
-  adding a top-level `local` — crossing it stops the whole file loading and every scenario dies at
-  once. `check_lua_chunks_load` now fails the build on it in 0s.
+- `harness.lua` is against Lua's 200-local ceiling. **Never write the remaining margin down** — it
+  was prose in three files at once and wrong in all three within one PR (#241). `make check` prints
+  the measured number (`check_lua_local_headroom`) and fails at zero. Hang new helpers off an
+  existing table (`INSPECT`, `TUNE`), or put pure logic in `controller.lua` — it has a unit suite
+  and no ceiling, which is where the stall detector now lives. Crossing it stops the whole file
+  loading and every scenario dies at once; `check_lua_chunks_load` fails the build on it in 0s.
 
 ### 2. #238 second pass — the rest of the blind-press verdict scenarios
 
