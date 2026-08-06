@@ -40,9 +40,19 @@ awaiting CI + merge. Nothing else: no other branches, no stashes.
 
 ### 0. First: land PR #235 if it is still open
 
-The #232 playtest repairs, already verified live (gate 13/14). CI failed once on a GitHub Actions
-outage ("Service Unavailable" in *Set up job*, before anything ran) and was re-run — check it, merge,
-delete the branch, then refresh this file.
+The #232 playtest repairs, already verified live (gate 13/14) and locally green (all
+`tools/test_*.py`, 8 Lua suites, `make check`).
+
+**Its `checks` job is red on a GitHub Actions outage, not on our code** — do not re-diagnose it.
+Three attempts on 2026-08-06 all died in *Set up job*, before a single step ran, with two
+signatures: `Failed to resolve action download info. Error: Service Unavailable`, and
+`The job was not acquired by Runner of type hosted even after multiple attempts` (that one is
+cancelled at exactly 15m03s — GitHub's acquisition timeout, which is what makes it look like a
+suspiciously precise job timeout). The `build` job — which compiles the ROM and runs `make test` —
+**passes** on the same commits, so CI is not telling us anything about this branch.
+
+Re-run with `gh run rerun <id> --failed`. Once green: squash-merge, delete the branch, refresh this
+file. If Actions is still degraded, that is a judgement call for Nicolas, not a code fix.
 
 ### 1. #236 — the playtest state inspector  ← START HERE
 
