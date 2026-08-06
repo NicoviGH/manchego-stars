@@ -40,54 +40,23 @@ awaiting CI + merge. Nothing else: no other branches, no stashes.
 
 ### 0. First: land PR #235 if it is still open
 
-The #232 playtest repairs, already verified live (gate 13/14) and locally green (all
-`tools/test_*.py`, 8 Lua suites, `make check`).
-
-**Its `checks` job is red on a GitHub Actions outage, not on our code** — do not re-diagnose it.
-Three attempts on 2026-08-06 all died in *Set up job*, before a single step ran, with two
-signatures: `Failed to resolve action download info. Error: Service Unavailable`, and
-`The job was not acquired by Runner of type hosted even after multiple attempts` (that one is
-cancelled at exactly 15m03s — GitHub's acquisition timeout, which is what makes it look like a
-suspiciously precise job timeout). The `build` job — which compiles the ROM and runs `make test` —
-**passes** on the same commits, so CI is not telling us anything about this branch.
-
-Re-run with `gh run rerun <id> --failed`. Once green: squash-merge, delete the branch, refresh this
-file. If Actions is still degraded, that is a judgement call for Nicolas, not a code fix.
+The #232 playtest repairs — verified live (gate 13/14) and locally green. If its `checks` job is
+red, read the PR before re-diagnosing: on 2026-08-06 that was a GitHub Actions outage, not our code.
+Squash-merge, delete the branch, refresh this file.
 
 ### 1. #236 — the playtest state inspector  ← START HERE
 
-**#222 workstream 2, promoted out of "deferred" on evidence** (Nicolas, 2026-08-06: *"more
-observability makes sense if it will stop future iterations from burning compute"*). #231 made
-*running* the matrix cheap; diagnosing it is now the binding constraint. **Read #236 for scope and
-Definition of Done.** What it does not tell you:
-
-- **The concrete blocker is proc identity.** `freezeReport` names procs by nearest-preceding symbol,
-  so three distinct scripts all print as `E_FACE`. That is why #232's last failure is still open:
-  the dump cannot say which proc is waiting. Exact-match resolution, and an honest "unknown script"
-  when nothing matches, is worth more than any amount of extra formatting.
-- **`classify()` returning `transition` is the real blind spot.** Five of #232's six defects were
-  input waits nothing had a name for; each read as a passive transition and cost a full
-  build-and-run cycle to identify. Making "this is an UNCLASSIFIED wait, here is what it was
-  compared against" a visible output is the highest-value part of this issue.
-- **Reuse the controller observer.** `observeController()` already builds the state; the inspector
-  formats and diffs it. A second state model is explicitly out of scope (#222 guardrail).
-- **`ch01` is the acceptance case** — it parks in the Beat-1 Northlook cutscene with the event engine
-  live and no page wait ever classified. If the inspector cannot say what that scene wants, it has
-  not earned its keep; if it can, it closes the rest of #232. `reachCh01Map` is shared by
-  `smoke_ch01` / `clear_ch01` / `fuzz_ch01`, so this is four scenarios, not one.
+#222 workstream 2, promoted out of "deferred" on evidence (Nicolas, 2026-08-06). **Read #236** — it
+carries the scope, the Definition of Done, the acceptance case, and what is not obvious going in.
 
 ### 2. ch05's build work (#25) — with #222 still held open on purpose
 
 **Nicolas's standing instruction: carry #222 in mind while building ch05 and re-scope it from
-experience.** Workstream 2 has now been taken on exactly that basis; workstreams 3–4 (declarative
-scenario manifests, static chapter lint) remain deferred and want the same evidence test. **#138**
-(config-driven `inject_chapter(descriptor)`) is the natural forcing function to take *while* hosting
-ch05, not before.
+experience.** Workstream 2 was taken on exactly that basis; workstreams 3–4 remain deferred and want
+the same evidence test. **#138** is the natural forcing function to take *while* hosting ch05.
 
-**Adding ch05 to the playtest matrix is now a step in the runbook** (`docs/adding-a-chapter.md`
-step 11): declare `ch05boot` in `matrix.yaml` `rom_configs`, give every new scenario a row, and add a
-`ch05` suite so `make matrix SUITE=ch05` runs the chapter off one build. `check.py` fails the build
-if a scenario in `harness.lua` has no row, so this is enforced, not optional.
+ch05 also needs a `matrix.yaml` entry — `docs/adding-a-chapter.md` step 11 has the runbook, and
+`check.py` enforces it.
 
 Then: **#29** world map.
 
