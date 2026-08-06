@@ -1652,11 +1652,20 @@ scenarios.goodberry = function()
     result("PASS", "Goodberry item menu captured (see screenshots)")
 end
 
--- Reach the ch01 map: ride the ch00 win into chapter slot 2, A-tap through the
--- post-chapter save + Beat-1 scene to the prep screen, then Fight! into the phase.
--- Returns true once control is on the ch01 map; false (with its own FAIL logged)
--- otherwise. Shared by scenarios.ch01 (entry assertions) and scenarios.smoke_ch01.
-local function reachCh01Map()
+-- Reach ch01: ride the ch00 win into chapter slot 2, drive the post-chapter save + Beat-1
+-- scene + lord select on OBSERVED state, then Fight! into the phase. Returns true at the
+-- destination; false with its own FAIL logged otherwise.
+--
+-- opts.stopAtPrep  stop with Preparations open instead of driving through it
+-- opts.lord        "default" (accept the highlighted lead) | "last" (walk to the final
+--                  candidate -- Pinky -- so a NON-Braulo lord can be exercised)
+--
+-- One driver, three destinations (#238). reachPrep and reachPrepPinky used to be separate
+-- copies of this route on a blind A-cadence; a copy that mashes A cannot tell "the scene
+-- advanced" from "the input was swallowed", which is how ch01win rode straight through the
+-- lord-select Yes/No prompt that cost #232 three sessions.
+local function reachCh01(opts)
+    opts = opts or {}
     if not winCh00() then return false end
     if not waitFor(function() return chapter() == 2 end, 1800) then
         result("FAIL", "chapter slot 2 never loaded after the ch00 win"); return false
@@ -1678,6 +1687,7 @@ local function reachCh01Map()
         end
         if state == "prep_main" then
             shot("ch01-prep-menu")
+            if opts.stopAtPrep then return true end
             if not driveThroughPrep() then
                 result("FAIL", "could not leave preparations via semantic Fight"); return false
             end
@@ -1686,8 +1696,22 @@ local function reachCh01Map()
             shot("ch01-map")
             return true
         elseif state == "generic_menu" then
-            -- Scenario policy: choose the currently highlighted default lead. The controller
-            -- owns the live menu callback and guarded A; no row or candidate count is guessed.
+            -- Scenario policy: which lead to take. The controller owns the live menu
+            -- callback and the guarded input either way; no row is guessed and no
+            -- candidate count is assumed -- "last" walks the LIVE item list.
+            if opts.lord == "last" then
+                local rows = observation.menu and #observation.menu.items or 0
+                for _ = 1, rows - 1 do
+                    if not guardedInput("menu_next", "DOWN", "the lead menu selection moves",
+                        function(after, before)
+                            return after.menu ~= nil and before.menu ~= nil
+                                and after.menu.current ~= before.menu.current
+                        end, 60) then
+                        result("FAIL", "could not walk the lead menu to the last candidate")
+                        return false
+                    end
+                end
+            end
             if not guardedInput("select_current_menu_item", "A", "lead menu selection closes", function(after)
                 return after.menu == nil
             end, 300) then
@@ -1717,6 +1741,10 @@ local function reachCh01Map()
     result("FAIL", "prep screen never opened (PREP event cmd)")
     return false
 end
+
+-- The three destinations on that one route. Kept as named wrappers so every call site
+-- reads as an intention rather than an options table.
+local function reachCh01Map() return reachCh01() end
 
 -- CH01: reach the ch01 map, then assert the entry invariants -- the ch00 guests left
 -- the party (DISA), and the deployed count equals the 4-slot field-parity cap.
@@ -2341,41 +2369,14 @@ end
 -- ending scene -> MNC2 into the hosted ch02). (CH01_PARK is defined up by the
 -- clear-bot.)
 scenarios.ch01win = function()
-    if not winCh00() then return end
-    if not waitFor(function() return chapter() == 2 end, 1800) then
-        return result("FAIL", "chapter slot 2 never loaded after the ch00 win")
-    end
-    -- default-lord entry: A-taps ride the save menu + the Beat-1 Northlook scene
-    -- (#21, ~22 pages) + the lord prompt + lord menu (item 0 = Braulo) + [Yes]
-    -- confirm all the way to the prep screen
-    local prep = false
-    for i = 1, 200 do
-        if procActive(SYM.gProcScr_SALLYCURSOR) then prep = true break end
-        press(K.A, 4)
-        wait(36)
-    end
-    if not prep then
-        shot("ch01win-no-prep")
-        return result("FAIL", "prep screen never opened")
-    end
-    wait(180)
-    for i = 1, 40 do
-        if not procActive(SYM.gProcScr_SALLYCURSOR) then break end
-        press(K.B, 4)
-        wait(10)
-        press(K.START, 4)
-        wait(40)
-        if i % 4 == 0 and procActive(SYM.gProcScr_SALLYCURSOR) then press(K.A, 4) wait(20) end
-    end
-    if not waitFor(function()
-        return not procActive(SYM.gProcScr_SALLYCURSOR)
-            and faction() == 0 and turn() >= 1
-    end, 1200) then
-        shot("ch01win-prep-stuck")
-        return result("FAIL", "could not leave preparations via Fight!")
-    end
-    wait(120)
-    shot("ch01win-map")
+    -- Reaching the ch01 map is the SHARED semantic path (#238). This used to be 33 lines
+    -- of blind cadence -- an A-tap loop over the save prompt, the Beat-1 Northlook scene,
+    -- the lord prompt and the lord menu, then a B/START/A flail at Preparations. It
+    -- passed, but for the wrong reason: it mashed straight through the lord-select Yes/No
+    -- prompt that #232 spent three sessions on, verifying none of it. reachCh01Map drives
+    -- the same route on observed state and verified postconditions, so a state nothing can
+    -- classify now FAILS here instead of being papered over.
+    if not reachCh01Map() then return end
     pokeFastConfig() -- 10-goblin enemy phases: map combat + fast speed
     local chief = red(CHAR_CHIEF)
     if not chief then return result("FAIL", "chief not in the red array") end
@@ -2419,10 +2420,15 @@ scenarios.ch01win = function()
                     tostring(moved), b0.x, b0.y))
             end
         else
-            -- chief down: Braulo onto the seize tile; Seize tops the menu there
+            -- chief down: Braulo onto the seize tile, then Seize by its semantic id.
+            -- `press(K.A)` used to stand in for this on the assumption that Seize tops
+            -- the menu -- a guess about menu ORDER, which is exactly the class of thing
+            -- the controller reads from the live menu instead (#238).
             if moveUnit(braulo.x, braulo.y, goal.x, goal.y) then
                 shot("ch01win-seize-menu")
-                press(K.A) -- Seize
+                selectSemantic("seize", "Seize starts the chapter win event", function()
+                    return procActive(SYM.ProcScr_StdEventEngine) or chapter() ~= 2
+                end, 900)
             end
             -- generous budget: post-seize plays the full ending cutscene before
             -- MNC2 chains into the hosted ch02 (longer than the old 3600).
@@ -2451,52 +2457,24 @@ end
 -- the record* scenario at 60fps. The lead-up drivers are shared here so the checkpoint
 -- and a from-scratch run stay in lock-step.
 
--- Drive ch00 win -> ch01 prep screen OPEN (default-lord A-taps through the save menu +
--- the Beat-1 Northlook scene + lord select). true at the prep proc.
-local function reachPrep()
-    if not winCh00() then return false end
-    if not waitFor(function() return chapter() == 2 end, 1800) then return false end
-    for i = 1, 200 do
-        if procActive(SYM.gProcScr_SALLYCURSOR) then return true end
-        press(K.A, 4); wait(36)
-    end
-    return false
-end
+-- Drive ch00 win -> ch01 prep screen OPEN, default lord. true at the prep proc.
+local function reachPrep() return reachCh01({ stopAtPrep = true }) end
 
--- Like reachPrep, but PICK THE LAST lord candidate (Pinky, not the default Braulo)
--- at the lord-select menu before continuing to prep. Used to checkpoint a Pinky-as-lord
--- prep so the convoy/force-deploy lord-select fixes can be exercised for a NON-Braulo lord.
-local function reachPrepPinky()
-    if not winCh00() then return false end
-    if not waitFor(function() return chapter() == 2 end, 1800) then return false end
-    local atMenu = false
-    for i = 1, 200 do
-        if menuOpen() then atMenu = true break end          -- scenic lord-select menu
-        if procActive(SYM.gProcScr_SALLYCURSOR) then break end
-        press(K.A, 4); wait(36)
-    end
-    if not atMenu then return false end
-    wait(40)
-    for _ = 1, LORD_CANDIDATES - 1 do press(K.DOWN, 4); wait(8) end  -- walk to Pinky (last)
-    press(K.A, 4); wait(40)                                  -- pick
-    press(K.A, 4); wait(20)                                  -- [Yes] confirm
-    for i = 1, 80 do
-        if procActive(SYM.gProcScr_SALLYCURSOR) then return true end
-        press(K.A, 4); wait(36)
-    end
-    return false
-end
+-- Like reachPrep, but PICK THE LAST lord candidate (Pinky, not the default Braulo) so the
+-- convoy/force-deploy lord-select fixes can be exercised for a NON-Braulo lord. The walk
+-- to the last row now counts the LIVE menu instead of the LORD_CANDIDATES constant -- the
+-- old copy would silently pick the wrong lord the day the roster changed.
+local function reachPrepPinky() return reachCh01({ stopAtPrep = true, lord = "last" }) end
 
 -- From the open prep screen, leave via Fight! and grind (escort poked frail+harmless) to
 -- the seize-ready state: chief dead, Braulo moved ONTO the seize tile with its action
 -- menu open (Seize on top). Returns true there -- the caller presses A to Seize.
 local function leavePrepAndGrindToSeize()
     wait(180)
-    for i = 1, 40 do
-        if not procActive(SYM.gProcScr_SALLYCURSOR) then break end
-        press(K.B, 4); wait(10); press(K.START, 4); wait(40)
-        if i % 4 == 0 and procActive(SYM.gProcScr_SALLYCURSOR) then press(K.A, 4) wait(20) end
-    end
+    -- Leave via the live Fight callback. The B/START/A flail this replaces was guessing
+    -- at which key the prep screen would accept, and its `i % 4 == 0` A-press could
+    -- commit whatever happened to be under the cursor (#238).
+    if not driveThroughPrep() then return false end
     if not waitFor(function()
         return not procActive(SYM.gProcScr_SALLYCURSOR) and faction() == 0 and turn() >= 1
     end, 1200) then return false end
