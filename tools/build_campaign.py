@@ -51,6 +51,14 @@ from inject.decomp import (  # noqa: E402  shared decomp paths + patch primitive
     BATTLEQUOTES_C, BMUNIT_C, LORDSEL_FLAG_BASE,
     WEAPON_ITEM_ENUM, fe_item_enum)  # shared weapon<->ITEM map (used by inject_prologue)
 from inject import engine_hooks  # noqa: E402  campaign-agnostic engine C-source hooks
+# The host-slot registry. Stdlib-only and OWNED there so tools/check.py can lint it in the
+# CI job that has no Pillow; re-exported here so the constants read the same at every call
+# site below (#241).
+from inject.hosts import (  # noqa: E402,F401
+    PROLOGUE_CHAPTER_INDEX, PROLOGUE_HOST_INDEX, PROLOGUE_EVENT_GROUP,
+    CH01_HOST_INDEX, CH01_EVENT_GROUP, CH02_HOST_INDEX, CH02_EVENT_GROUP,
+    CH03_HOST_INDEX, CH03_EVENT_GROUP, CH04_HOST_INDEX, CH04_EVENT_GROUP,
+    HostedChapter, hosted_chapters, injector_chapters, undeclared_injectors)
 
 PORTRAIT_DIR = os.path.join(DECOMP, 'graphics', 'portrait')
 CHARACTERS_C = os.path.join(DECOMP, 'src', 'data_characters.c')
@@ -136,10 +144,7 @@ TEST_CHAPTER_INDEX = 1
 PROLOGUE_UDEFS_H = os.path.join(DECOMP, 'src', 'events', 'prologue-eventudefs.h')
 PROLOGUE_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'prologue-eventinfo.h')
 PROLOGUE_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'prologue-eventscript.h')
-PROLOGUE_CHAPTER_INDEX = 0   # CHAPTER_L_PROLOGUE -- the vanilla slot we configure then clone
-PROLOGUE_HOST_INDEX = 1      # CHAPTER_L_1 -- normal chapter slot we actually load (New Game
-                             # redirects 0 -> 1). The prologue slot has special engine paths
-                             # that break our stripped chapter; a normal slot does not.
+# PROLOGUE_CHAPTER_INDEX / PROLOGUE_HOST_INDEX / PROLOGUE_EVENT_GROUP: inject/hosts.py.
 # Cold-open guests ride vanilla character slots that are NOT in PORTRAIT_MAP, so their
 # names/portraits are free placeholders until custom art (see [[feedback_nicolas_not_an_artist]]).
 # Sephek rides the vanilla prologue boss slot (ONEILL) so he inherits its CA_BOSS
@@ -174,8 +179,7 @@ CH2_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch2-eventscript.h')
 CH3_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch3-eventinfo.h')
 CH3_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch3-eventscript.h')
 EVENTS_UDEFS_C = os.path.join(DECOMP, 'src', 'events_udefs.c')
-CH01_HOST_INDEX = 2          # CHAPTER_L_2 -- the prologue ending's MNC2(0x2) target
-CH01_EVENT_GROUP = 'Ch2Events'   # the ChapterEventGroup this injector fills (see _retarget_host_chapter)
+# CH01_HOST_INDEX / CH01_EVENT_GROUP: inject/hosts.py.
 # The goal WINDOW + status-objective strings are message ids, and hosted chapters used to inherit
 # them from whatever donor slot `_retarget_host_chapter` copied -- which silently shared them
 # between chapters (#207). Every hosted chapter now DECLARES its pair, so `assert_message_ids_unique`
@@ -313,8 +317,7 @@ CH01_LORDSEL_BG = 'BG_DARKLING_WOODS'
 # host goal is swapped to vanilla slot-4's defeat_all template and the vanilla Ch3
 # Seize(14,1) is dropped, so CountRedUnits() drives the rout win; CauseGameOverIfLordDies
 # already sits in EventListScr_Ch3_Misc.
-CH02_HOST_INDEX = 3          # CHAPTER_L_3 -- ch01's ending MNC2(0x3) target
-CH02_EVENT_GROUP = 'Ch3Events'   # the ChapterEventGroup this injector fills (see _retarget_host_chapter)
+# CH02_HOST_INDEX / CH02_EVENT_GROUP: inject/hosts.py.
 CH02_GOAL_WINDOW_MSG = 0x19E     # vanilla slot 4's defeat_all window
 CH02_GOAL_STATUS_MSG = 0x1A6
 CH02_LAYOUT = ('Ch02ColdWelcomeMap', 'ch02-cold-welcome')  # (asset label, maps/ stem)
@@ -6867,8 +6870,7 @@ def inject_ch02(campaign, verbose=True):
 # ── Ch3 "The Termalaine Mine" (#23): hosted on chapter slot 4 (repaint of vanilla Ch3
 #    "Bandits of Borgo", so the roster/positions mirror vanilla Ch3 1:1). Uses the vanilla
 #    "Ch4" decomp symbol set (host index N -> ChN symbols, cf. ch02 on slot 3 = Ch3 symbols).
-CH03_HOST_INDEX = 4
-CH03_EVENT_GROUP = 'Ch4Events'   # the ChapterEventGroup this injector fills (see _retarget_host_chapter)
+# CH03_HOST_INDEX / CH03_EVENT_GROUP: inject/hosts.py.
 CH03_GOAL_WINDOW_MSG = 0x19D     # vanilla slot 6's defeat_boss window
 CH03_GOAL_STATUS_MSG = 0x1A7
 CH03_LAYOUT = ('Ch03TermalaineMineMap', 'ch03-the-termalaine-mine')  # (asset label, maps/ stem)
@@ -6983,13 +6985,8 @@ CH4_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch4-eventscript.h')
 # preserves vanilla Ch4's 15x15 geometry, and the force preserves its 16 line + 7
 # reinforcement pressure shape. The D&D creatures ground the encounter fiction, but
 # player-facing units deliberately keep their vanilla FE8 monster identities/names.
-CH04_HOST_INDEX = 5
-# The ChapterEventGroup this injector fills. NOT derivable from the slot index: vanilla's
-# slot index tracks the chapter number only up to 4, because FE8 inserts chapter 5X at
-# slot 5. So slot 5 ships pointing at Ch5XEvents, and every ch04 event below is written
-# into the Ch5* symbols -- _retarget_host_chapter repoints the slot or the chapter runs
-# 5X's roster and scripts underneath our map.
-CH04_EVENT_GROUP = 'Ch5EventData'
+# CH04_HOST_INDEX / CH04_EVENT_GROUP: inject/hosts.py. The group is NOT derivable from the
+# slot index -- vanilla inserts chapter 5X at slot 5 -- and the registry says why.
 CH04_LAYOUT = ('Ch04LonelywoodForestMap', 'ch04-lonelywood-forest')
 CH04_CHAPTER_YAML = 'ch04-the-white-moose.yaml'
 CH04_GOAL_DONOR = CH02_HOST_INDEX  # ch02 is already hosted with the stable DefeatAll/Rout goal.
@@ -8239,48 +8236,6 @@ def inject_ch03(campaign, boot=False, verbose=True):
               'DefeatBoss(grell) WIN wired, PREP deploy cap %d%s + %d enemies (grell@14,1); opening/entrance/midmap/ending cutscenes wired'
               % (obj_idx, pal_idx, cfg_idx, layout_idx, CH03_HOST_INDEX, len(cap_rows),
                  ' (boot-seeded party)' if boot else '', len(enemies)))
-
-
-HostedChapter = collections.namedtuple(
-    'HostedChapter', 'name number host_index event_group')
-
-
-def hosted_chapters():
-    """Every chapter this build hosts, DISCOVERED from the module's own constants.
-
-    Declaring `CHNN_HOST_INDEX` + `CHNN_EVENT_GROUP` is what enrols a chapter -- there is
-    no list to remember to update. That is the whole point: the guard written after the
-    ch04 disaster (HostChapterEventGroup in tools/test_build_campaign.py) iterated a
-    hand-written tuple, so ch05 would have been the first chapter NOT covered by the very
-    test written to prevent that failure -- and ch05 hosts deeper into the divergence than
-    ch04 did, since vanilla's slot index stops tracking chapter number at 4 (#138).
-
-    Raises ValueError rather than sys.exit: the lints and tests that consume this need to
-    assert on the failure, not die inside it.
-    """
-    found, by_slot = [], {}
-    scope = globals()
-    for name in sorted(scope):
-        match = re.match(r'^(CH(\d+))_HOST_INDEX$', name)
-        if not match:
-            continue
-        prefix, number = match.group(1), int(match.group(2))
-        group = scope.get('%s_EVENT_GROUP' % prefix)
-        if group is None:
-            raise ValueError(
-                '%s_HOST_INDEX is declared with no %s_EVENT_GROUP. A hosted slot must NAME '
-                'the ChapterEventGroup its injector fills -- never assume the slot already '
-                'points there. Retargeting the map ids alone still makes the chapter LOOK '
-                'right while it runs the host slot\'s roster and scripts (see '
-                'docs/adding-a-chapter.md step 4).' % (prefix, prefix))
-        slot = scope[name]
-        if slot in by_slot:
-            raise ValueError(
-                'host slot %d is claimed by both %s and %s -- one chapter would overwrite '
-                'the other\'s events' % (slot, by_slot[slot], prefix))
-        by_slot[slot] = prefix
-        found.append(HostedChapter(prefix.lower(), number, slot, group))
-    return found
 
 
 def inject_ch04(campaign, boot=False, verbose=True):

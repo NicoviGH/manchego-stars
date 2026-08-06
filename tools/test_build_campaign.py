@@ -1574,51 +1574,37 @@ class HostedChapterEnumeration(unittest.TestCase):
     list does not extend: ch05 would have been the first chapter NOT covered by the very
     test written to prevent that class of failure -- and ch05 hosts deeper into the slot
     divergence than ch04 did, since vanilla's slot index stops tracking chapter number
-    at 4. Enumerating from the module's own constants closes that (#138).
+    at 4. Enumerating from the registry's constants closes that (#138).
+
+    The registry itself moved to inject/hosts.py so a CI job without Pillow can lint it;
+    its behaviour (collisions, missing groups, self-enrolment) is tested in tools/
+    test_hosts.py. What is asserted HERE is the seam: build_campaign re-exports it, and
+    every chapter this module injects is enrolled in it (#241).
     """
 
     def test_finds_every_currently_hosted_chapter(self):
         got = {c.name: c.host_index for c in bc.hosted_chapters()}
-        self.assertEqual(got, {'ch01': bc.CH01_HOST_INDEX, 'ch02': bc.CH02_HOST_INDEX,
+        self.assertEqual(got, {'prologue': bc.PROLOGUE_HOST_INDEX,
+                               'ch01': bc.CH01_HOST_INDEX, 'ch02': bc.CH02_HOST_INDEX,
                                'ch03': bc.CH03_HOST_INDEX, 'ch04': bc.CH04_HOST_INDEX})
 
     def test_each_entry_carries_the_event_group_its_injector_fills(self):
         groups = {c.name: c.event_group for c in bc.hosted_chapters()}
         self.assertEqual(groups['ch04'], bc.CH04_EVENT_GROUP)
         self.assertEqual(groups['ch01'], bc.CH01_EVENT_GROUP)
+        self.assertEqual(groups['prologue'], bc.PROLOGUE_EVENT_GROUP)
 
-    def test_it_is_ordered_by_chapter(self):
-        names = [c.name for c in bc.hosted_chapters()]
-        self.assertEqual(names, sorted(names))
+    def test_it_is_ordered_by_chapter_number(self):
+        """Not by name -- 'ch01' sorts before 'prologue', and a name sort against a
+        sorted() scan is a test that cannot fail."""
+        self.assertEqual([c.name for c in bc.hosted_chapters()],
+                         ['prologue', 'ch01', 'ch02', 'ch03', 'ch04'])
 
-    def test_a_new_chapter_enrolls_itself(self):
-        """The whole point: declaring CH05_* is enough to be covered."""
-        bc.CH05_HOST_INDEX, bc.CH05_EVENT_GROUP = 6, 'Ch6Events'
-        try:
-            entry = {c.name: c for c in bc.hosted_chapters()}['ch05']
-            self.assertEqual((entry.host_index, entry.event_group), (6, 'Ch6Events'))
-        finally:
-            del bc.CH05_HOST_INDEX, bc.CH05_EVENT_GROUP
-
-    def test_a_host_slot_without_an_event_group_fails_loudly(self):
-        """Naming the group is mandatory -- inheriting the slot-index coincidence is
-        exactly how ch04 shipped a chapter running another chapter's roster."""
-        bc.CH05_HOST_INDEX = 6
-        try:
-            with self.assertRaises(ValueError) as raised:
-                bc.hosted_chapters()
-            self.assertIn('CH05_EVENT_GROUP', str(raised.exception))
-        finally:
-            del bc.CH05_HOST_INDEX
-
-    def test_two_chapters_cannot_host_on_one_slot(self):
-        bc.CH05_HOST_INDEX, bc.CH05_EVENT_GROUP = bc.CH04_HOST_INDEX, 'Ch6Events'
-        try:
-            with self.assertRaises(ValueError) as raised:
-                bc.hosted_chapters()
-            self.assertIn('slot %d' % bc.CH04_HOST_INDEX, str(raised.exception))
-        finally:
-            del bc.CH05_HOST_INDEX, bc.CH05_EVENT_GROUP
+    def test_every_injector_in_this_module_is_enrolled(self):
+        """Discovery only covers a chapter that spells its constants right. An
+        inject_ch05 with a typo'd CH05_HOST_INDEX is silently unhosted, and every guard
+        built on the registry passes with one chapter fewer."""
+        self.assertEqual(bc.undeclared_injectors(), [])
 
 
 class HostChapterEventGroup(unittest.TestCase):

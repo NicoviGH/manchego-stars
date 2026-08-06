@@ -62,6 +62,18 @@ class ProcScripts(unittest.TestCase):
     def test_excludes_ordinary_functions(self):
         self.assertNotIn(0x0801C9E0, gs.proc_scripts(gs.parse_nm(NM)))
 
+    def test_excludes_functions_that_merely_mention_proc(self):
+        """The unanchored pattern pulled ~51 non-scripts into the table (Proc_Init,
+        Proc_Start, GetSpellAssocMapAnimProcScript...). Inert, but a proc-script table
+        whose entries are not proc scripts makes every reader check twice (#241)."""
+        nm = NM + ('08002c08 T Proc_Init\n'
+                   '08002d10 T Proc_Start\n'
+                   '0808f120 T GetSpellAssocMapAnimProcScript\n')
+        got = gs.proc_scripts(gs.parse_nm(nm))
+        for addr in (0x08002C08, 0x08002D10, 0x0808F120):
+            self.assertNotIn(addr, got)
+        self.assertEqual(got[0x085B1890], 'gProcScr_PlayerPhase')
+
     def test_excludes_ram_symbols(self):
         self.assertNotIn(0x0202BCF0, gs.proc_scripts(gs.parse_nm(NM)))
 

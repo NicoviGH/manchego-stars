@@ -131,18 +131,15 @@ local RULES = {
         end,
     },
     {
-        name = "dialogue_wait",
-        check = function(observation)
-            if idleIs(observation, "talk_wait", "talk_wait_input") then
-                return matched("dialogue_wait", "talk_wait in talk_wait_input")
-            end
-            return rejected(missIs(observation, "talk_wait", "talk_wait_input"))
-        end,
-    },
-    {
-        -- Ordered ABOVE the passive rules on purpose: this prompt runs INSIDE a live
-        -- event scene, so `std_event` would otherwise swallow it as a transition -- which
-        -- is exactly how ch01's lord-select prompt stayed invisible through #232.
+        -- Ordered ABOVE `dialogue_wait` and the passive rules on purpose, and that order is
+        -- pinned by tests. The prompt runs INSIDE a live event scene, so `std_event` would
+        -- swallow it as a transition -- which is how ch01's lord-select prompt stayed
+        -- invisible through #232. `dialogue_wait` is the subtler version of the same trap:
+        -- it would answer "press A", the choice's key handler would CONSUME that A, and the
+        -- prompt would be answered by accident with the run still green (#241 review).
+        -- General rule for this table: the more SPECIFIC state outranks the more general
+        -- one -- a live YesNoChoice in its key handler owns the A button, whatever else is
+        -- on screen.
         name = "yes_no_choice",
         check = function(observation)
             if not proc(observation, "yes_no") then return rejected("yes_no proc absent") end
@@ -154,6 +151,15 @@ local RULES = {
                 return matched("transition", "yes_no live with no observed choice")
             end
             return matched("yes_no_choice", "yes_no in its key handler")
+        end,
+    },
+    {
+        name = "dialogue_wait",
+        check = function(observation)
+            if idleIs(observation, "talk_wait", "talk_wait_input") then
+                return matched("dialogue_wait", "talk_wait in talk_wait_input")
+            end
+            return rejected(missIs(observation, "talk_wait", "talk_wait_input"))
         end,
     },
     {
@@ -344,6 +350,56 @@ function M.explain(observation)
         live_procs = live,
         unclassified_wait = state == "transition" and unclassified or false,
     }
+end
+
+-- The liveness proxy behind the stall detector. Every long-running FE8 proc is
+-- PROC_REPEAT -- ProcScr_StdEventEngine (event.c), gProcScr_TalkWaitForInput (scene.c),
+-- sProcScr_BMXFADE (bmxfade.c), gProcScr_YesNoChoice (cgtext.c) -- so scrCur/idleCb/
+-- lockCnt are constant for an ENTIRE scene and cannot show progress inside a callback.
+-- What the signature can see is churn: a proc entering or leaving the pool, and a
+-- sleepTime counting down (a timed wait IS progress, and excluding it made a proc mid-STAL
+-- look frozen -- INSPECT.snapshot's own `frozen` field already compared it, so the feature
+-- held two different definitions of "not moving"). #241.
+function M.procSignature(observation)
+    local raw = (observation or {}).raw_procs or {}
+    local parts = { tostring(#raw) }
+    for _, p in ipairs(raw) do
+        parts[#parts + 1] = string.format("%d:%08X:%08X:%08X:%d:%d",
+            p.slot, p.script, p.scr_cur, p.idle, p.lock, p.sleep or 0)
+    end
+    return table.concat(parts, ",")
+end
+
+-- A `transition` the classifier has no NAME for, holding a byte-identical proc pool, is
+-- not a slow scene -- it is an input wait nothing will ever send. #232's ch01 burned a
+-- 12000-iteration loop and then reported a timeout that named nothing.
+--
+-- Returns a per-loop closure: call it with each observation and its state, and act on the
+-- first non-nil return (the explanation, ready to snapshot). Pure and unit-tested here;
+-- the harness only wraps it with logging, because this is now the thing that decides FAIL
+-- for a whole suite and it lived where nothing could test it (#241).
+--
+-- `samples` counts CALLS, not frames. The harness drives one call per frame on the
+-- transition path, which is what makes TUNE.stallFrames read as frames -- add a wait to
+-- that branch and the tunable stops meaning what it says.
+function M.stallWatch(samples)
+    local signature, held = nil, 0
+    return function(observation, state)
+        if state ~= "transition" then signature, held = nil, 0 return nil end
+        local now = M.procSignature(observation)
+        if now ~= signature then signature, held = now, 1 return nil end
+        held = held + 1
+        if held < samples then return nil end
+        -- explain() sorts the live-proc list, so it is called ONCE per hold rather than on
+        -- every frame of a 36000-iteration loop.
+        local explanation = M.explain(observation)
+        signature, held = nil, 0
+        -- Only an UNCLASSIFIED transition can stall this way. A named one (a map fade, a
+        -- menu animating in) is a state we can already wait out, and arming on those would
+        -- trade a silent hang for a noisy false positive.
+        if not explanation.unclassified_wait then return nil end
+        return explanation
+    end
 end
 
 local function add(actions, intention, key, source, target)

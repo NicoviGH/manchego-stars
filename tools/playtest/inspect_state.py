@@ -5,8 +5,12 @@ that way, and where two runs first diverge (#236).
     tools/playtest/inspect_state.py render /tmp/playtest-ch01/playtest.log
     tools/playtest/inspect_state.py diff /tmp/accepted.log /tmp/playtest-ch01/playtest.log
 
+run.sh renders a failing run through this automatically; the commands above are for
+re-reading a log later, or diffing two runs.
+
 The harness emits the state; this names and formats it. Addresses resolve against
-symbols.json (written by gen_symbols.py after every make) by EXACT match -- idle callbacks
+symbols.json (written by gen_symbols.py, which run.sh invokes before every run -- `make`
+does NOT) by EXACT match -- idle callbacks
 are ordinary functions, ~35k of them, which is why the Lua side dumps raw addresses and
 the naming happens here. An address that matches no symbol is reported as unknown; a
 nearest-preceding guess is what made #232's freeze reports untrustworthy.
@@ -49,7 +53,16 @@ def parse_records(text):
 
 
 def load_symbols(path=SYMBOLS_JSON):
+    """The address -> symbol map, or {} with a WARNING.
+
+    Degrading silently is the one thing this must not do: every idle callback then renders
+    `unknown@0x...`, which is exactly what a genuinely unresolvable address looks like, and
+    the tool's whole contract is that an unknown is honest. gen_symbols.py runs from
+    run.sh, so anyone rendering an archived log on a fresh checkout hits this (#241)."""
     if not os.path.exists(path):
+        sys.stderr.write(
+            'WARNING: %s not found -- idle callbacks will render as unknown@0x... rather '
+            'than being named. Regenerate it: tools/playtest/gen_symbols.py\n' % path)
         return {}
     with open(path, encoding='utf-8') as f:
         raw = json.load(f)
@@ -60,7 +73,15 @@ def resolve(symbols, addr):
     """An address (hex string or int) as `Symbol(0x...)`, `none`, or an honest unknown."""
     if addr is None:
         return 'none'
-    value = addr if isinstance(addr, int) else int(str(addr), 16)
+    try:
+        value = addr if isinstance(addr, int) else int(str(addr), 16)
+    except ValueError:
+        # One malformed field must not kill the render: parse_records already treats a
+        # truncated log as ordinary input, and this is the same log (#241).
+        return 'unknown@%s' % addr
+    # ARM/THUMB function pointers carry bit 0. The Lua side masks it before logging, so
+    # this is belt-and-braces for any other caller handing us a raw pointer.
+    value &= ~1
     if value == 0:
         return 'none'
     name = symbols.get(value)
@@ -91,7 +112,7 @@ def _menu_line(menu):
         return '  menu:   -'
     items = ' '.join('0x%02X%s' % (i.get('override_id') or 0,
                                    '' if i.get('availability') == 1 else '(disabled)')
-                     for i in menu.get('items', []))
+                     for i in (menu.get('items') or []))
     return '  menu:   current=%s [%s] on_b=%s' % (
         menu.get('current'), items, menu.get('on_b') or '-')
 
@@ -212,15 +233,27 @@ def _read(path):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
-    parser.add_argument('--symbols', default=SYMBOLS_JSON,
+    # On BOTH the top-level parser and each subcommand: `render log --symbols X` is the
+    # order anyone types, and only the top-level form used to be accepted (#241).
+    symbols_flag = dict(default=SYMBOLS_JSON,
                         help='symbols.json from gen_symbols.py (default: alongside this tool)')
+    parser.add_argument('--symbols', **symbols_flag)
     sub = parser.add_subparsers(dest='command', required=True)
     render = sub.add_parser('render', help='human-readable state snapshots from a log')
     render.add_argument('log')
+    render.add_argument('--symbols', **symbols_flag)
     diff = sub.add_parser('diff', help='first semantic divergence between two runs')
     diff.add_argument('baseline')
     diff.add_argument('candidate')
+    diff.add_argument('--symbols', **symbols_flag)
     args = parser.parse_args(argv)
+
+    for path in [p for p in (getattr(args, 'log', None), getattr(args, 'baseline', None),
+                             getattr(args, 'candidate', None)) if p]:
+        if not os.path.exists(path):
+            # A diagnostic tool must not answer a typo with a traceback.
+            sys.stderr.write('no such log: %s\n' % path)
+            return 2
 
     if args.command == 'render':
         print(render_log(_read(args.log), load_symbols(args.symbols)))

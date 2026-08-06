@@ -14,7 +14,7 @@ Three outputs, one nm pass:
                 PROC_NAME("E_FACE"), and reuses "bmenu" and "E_config" three times
                 each -- which is why freeze reports could not say which proc was
                 waiting (#236, blocking #232).
-  symbols.json  every ROM code symbol, for inspect.py. Idle callbacks are ordinary
+  symbols.json  every ROM code symbol, for inspect_state.py. Idle callbacks are ordinary
                 functions (~35k of them): too many for a Lua table, so the Lua side
                 dumps raw addresses and the Python renderer names them.
 
@@ -38,10 +38,15 @@ OUT_JSON = os.path.join(HERE, 'symbols.json')
 ROM_START = 0x08000000
 ROM_END = 0x0A000000
 
-# Proc scripts are `struct ProcCmd[]` in ROM: gProcScr_*/ProcScr_*/sProcScr_* plus the
-# handful named sProc_*/gProc_*. Keying by address makes a stray non-script match inert
-# (nothing ever looks up its address), while a missed one degrades to an honest unknown.
-PROC_SCRIPT_RE = re.compile(r'ProcScr|^[a-z]?Proc_')
+# Proc scripts are `struct ProcCmd[]` in ROM: `ProcScr_X`, `gProcScr_X`, `sProcScr_X`, plus
+# the handful named `gProc_X` / `sProc_X`. Keying by address makes a stray match inert
+# (nothing looks up its address) while a missed one degrades to an honest unknown -- but
+# the table is also what a human reads to learn which proc is live, so it is ANCHORED:
+# unanchored, it also swept in proc.c's API (Proc_Init, Proc_Start, Proc_ForEach, ...) and
+# two getters whose names merely END in ProcScript -- 30 functions that are not proc
+# scripts (#241). A bare `Proc_` prefix is always a function; a script carries the g/s
+# storage-class letter.
+PROC_SCRIPT_RE = re.compile(r'^(?:[a-z]Proc_|[a-z]?ProcScr)')
 
 Symbol = namedtuple('Symbol', 'name type addr')
 
@@ -235,7 +240,7 @@ def _by_address(symbols):
 
 def proc_scripts(symbols):
     """Proc-script address -> exact symbol name."""
-    return _by_address([s for s in _rom_code(symbols) if PROC_SCRIPT_RE.search(s.name)])
+    return _by_address([s for s in _rom_code(symbols) if PROC_SCRIPT_RE.match(s.name)])
 
 
 def code_symbols(symbols):
