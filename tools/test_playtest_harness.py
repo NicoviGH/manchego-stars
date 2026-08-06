@@ -18,6 +18,24 @@ def _block(harness, start_marker, end_marker):
     return harness[start:harness.index(end_marker, start + len(start_marker))]
 
 
+class TestHarnessLoads(unittest.TestCase):
+    def test_harness_lua_compiles(self):
+        # #232, caught by Nicolas watching the run: harness.lua is ONE Lua chunk, and its
+        # main function sits near Lua's 200-local ceiling. A few new top-level constants
+        # pushed it over and the whole file stopped loading -- every scenario dies at once,
+        # and nothing in a source-text assertion notices. Compile it for real.
+        import shutil
+        import subprocess
+        lua = shutil.which('lua') or shutil.which('luac')
+        if not lua:
+            self.skipTest('no lua interpreter (brew install lua)')
+        probe = ('local f, err = loadfile(%r); if not f then io.stderr:write(err) '
+                 'os.exit(1) end' % HARNESS)
+        done = subprocess.run([lua, '-e', probe], capture_output=True)
+        self.assertEqual(done.returncode, 0,
+                         'harness.lua does not load: %s' % done.stderr.decode())
+
+
 class TestChooseAttackContract(unittest.TestCase):
     """#232. chooseAttack is the shared attack path -- every combat scenario in the
     campaign routes through it -- so both of its waits have to hold in every mode the
@@ -46,12 +64,12 @@ class TestChooseAttackContract(unittest.TestCase):
         # already won. The budget must clear the measurement with real margin, because
         # vanilla's worst cases (crit, double, level-up, promotion) are much longer.
         harness = _read_harness()
-        self.assertIn('local COMBAT_WAIT_FRAMES = ', harness)
-        budget = int(harness.split('local COMBAT_WAIT_FRAMES = ')[1].split('\n')[0])
+        self.assertIn('combatFrames = ', harness)
+        budget = int(harness.split('combatFrames = ')[1].split(',')[0])
         self.assertGreaterEqual(budget, 2400,
                                 'a budget this close to the measured 1238 will flake on '
                                 'any longer combat')
-        self.assertIn('end, COMBAT_WAIT_FRAMES, true)', harness,
+        self.assertIn('end, TUNE.combatFrames, true)', harness,
                       'the combat wait must use the named budget, not a literal')
 
     def test_win_ch00_gives_the_combat_wait_a_chapter_ending_escape(self):
@@ -82,6 +100,20 @@ class TestAwaitControllerState(unittest.TestCase):
                       'a caller that explicitly waits FOR dialogue must still get it')
         self.assertIn('fail:unexpected-state:', body,
                       'every other unexpected state must still fail closed')
+
+    def test_an_unwanted_screen_is_backed_out_of_and_the_recovery_is_traced(self):
+        # #232, Nicolas's call: one screen the driver cannot commit used to cost the whole
+        # remaining run. Backing out keeps the suite moving -- but it must be a legal
+        # enumerated cancel, it must be TRACED, and the allowance must be small, or it
+        # becomes the blanket rescue that hid five defects behind the old blind cadence.
+        body = _block(_read_harness(), 'local function awaitControllerState(',
+                      '\n-- Select unit at')
+        self.assertIn('cancel_target', body)
+        self.assertIn('cancel_menu', body)
+        self.assertIn('TUNE.stuckRecoveries', body, 'recovery must be bounded')
+        self.assertIn('"recovered"', body, 'every recovery must land in the trace')
+        self.assertIn('fail:unexpected-state:', body,
+                      'a screen that outlives the allowance must still fail closed')
 
     def test_the_budget_counts_stall_not_wall_clock(self):
         # #232. A wait for the map to become playable spans whole cutscenes, and no fixed
