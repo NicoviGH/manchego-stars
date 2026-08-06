@@ -2341,3 +2341,51 @@ class Ch04Stage4Scenes(unittest.TestCase):
         speakers = [next(iter(b)) for b in beats[0]]
         self.assertNotIn('white-moose', speakers)
         self.assertNotIn('moose', speakers)
+
+
+class DecompShebangsSurviveASubmoduleCheckout(unittest.TestCase):
+    """The decomp ships Linux `#!/bin/python3` shebangs that do not exist on macOS, and ANY
+    `git checkout` inside the submodule reverts the fix -- so the next build dies on
+    `bad interpreter`, minutes in, from a Makefile rule that looks unrelated.
+
+    tools/build.sh handled it, but CLAUDE.md documents plain `make`, which bypassed the
+    wrapper -- so the failure kept recurring. Every build runs build_campaign, so the fix
+    lives there now and this pins it.
+    """
+
+    def test_the_build_normalises_shebangs_before_injecting(self):
+        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
+                   encoding='utf-8').read()
+        body = src[src.index('def main():'):]
+        self.assertIn('normalise_decomp_shebangs(', body,
+                      'every build must re-apply the fix, not just tools/build.sh')
+
+    def test_it_rewrites_only_the_linux_shebang_and_is_idempotent(self):
+        tmp = tempfile.mkdtemp()
+        try:
+            scripts = os.path.join(tmp, 'scripts')
+            os.makedirs(scripts)
+            broken = os.path.join(scripts, 'gen.py')
+            fine = os.path.join(scripts, 'ok.py')
+            other = os.path.join(scripts, 'nohash.py')
+            with open(broken, 'w') as f:
+                f.write('#!/bin/python3\nprint(1)\n')
+            with open(fine, 'w') as f:
+                f.write('#!/usr/bin/env python3\nprint(2)\n')
+            with open(other, 'w') as f:
+                f.write('print(3)\n')
+            with mock.patch.object(bc, 'DECOMP', tmp), \
+                    mock.patch.object(bc.platform, 'system', lambda: 'Darwin'):
+                self.assertEqual(bc.normalise_decomp_shebangs(), 1)
+                self.assertEqual(bc.normalise_decomp_shebangs(), 0, 'must be idempotent')
+            self.assertTrue(open(broken).read().startswith('#!/usr/bin/env python3'))
+            self.assertEqual(open(broken).read().splitlines()[1], 'print(1)',
+                             'only the shebang line may change')
+            self.assertTrue(open(fine).read().startswith('#!/usr/bin/env python3'))
+            self.assertEqual(open(other).read(), 'print(3)\n')
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_it_is_a_no_op_off_macos(self):
+        with mock.patch.object(bc.platform, 'system', lambda: 'Linux'):
+            self.assertEqual(bc.normalise_decomp_shebangs(), 0)

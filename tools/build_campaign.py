@@ -27,6 +27,7 @@ import glob
 import hashlib
 import json
 import os
+import platform
 import re
 import shutil
 import struct
@@ -8897,6 +8898,40 @@ def inject_battle_platforms(campaign, verbose=True):
         print('  Tileset16=CAVE (vanilla siroyuka1 stone / gake1 rock); ch03->0x16')
 
 
+def normalise_decomp_shebangs(verbose=False):
+    """Rewrite the decomp's Linux `#!/bin/python3` shebangs for macOS. Idempotent.
+
+    fireemblem8u/scripts/ ships `#!/bin/python3`, which does not exist on macOS (and /bin is
+    SIP-protected, so it cannot be created). setup-toolchain.sh rewrites them once -- but ANY
+    `git checkout` inside the submodule reverts them: restore_vanilla_sources, a manual reset,
+    a branch switch, `git checkout -- .` after a build. The NEXT build then dies on
+    `bad interpreter: No such file or directory`, several minutes in, from a Makefile rule
+    that looks unrelated (tsa_generator.py on a BG image).
+
+    tools/build.sh already re-applies it, but the DOCUMENTED build command is plain `make`
+    (CLAUDE.md), which bypassed the wrapper -- so the failure kept recurring. Every build
+    runs this module via the Makefile, so doing it here closes the hole for good rather than
+    relying on remembering the wrapper."""
+    if platform.system() != 'Darwin':
+        return 0
+    fixed = 0
+    for path in glob.glob(os.path.join(DECOMP, 'scripts', '**', '*.py'), recursive=True):
+        try:
+            with open(path, encoding='utf-8') as f:
+                text = f.read()
+        except (OSError, UnicodeDecodeError):
+            continue
+        if not text.startswith('#!/bin/python3'):
+            continue
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write('#!/usr/bin/env python3' + text[len('#!/bin/python3'):])
+        fixed += 1
+    if fixed and verbose:
+        print('  normalised %d Linux #!/bin/python3 shebang(s) in fireemblem8u/scripts '
+              '(reverted by the last submodule checkout)' % fixed)
+    return fixed
+
+
 def main():
     ap = argparse.ArgumentParser(description='Inject campaign content into the decomp build.')
     ap.add_argument('--campaign', default='rime-of-the-frostmaiden')
@@ -8931,6 +8966,9 @@ def main():
         sys.exit('ERROR: --ch03-boot and --ch04-boot are mutually exclusive')
 
     print('build_campaign: injecting "%s" into %s' % (args.campaign, DECOMP))
+    # Before anything else: undo whatever the last submodule checkout did to the decomp's
+    # Linux shebangs, or this build dies minutes later on `bad interpreter`.
+    normalise_decomp_shebangs(verbose=True)
     # Snapshot the previous build's injection footprint BEFORE we touch anything, so
     # we can rewind mtimes for whatever comes out byte-identical (fast warm rebuilds).
     _mtime_snapshot = _snapshot_mtimes(_decomp_footprint())
