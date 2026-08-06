@@ -3273,6 +3273,38 @@ session state. `HANDOFF.md` points here._
   `run.sh` refuses a mismatch in 0s with the exact `make` line. So this should no longer be a
   judgement call — but `MX_SKIP_ROM_CHECK=1` disables the guard and puts you straight back here
   (which is exactly what happened once inside the session that built it).
+- **A proc's identity is its script ADDRESS, never its `PROC_NAME` string** (2026-08-06, #236).
+  Freeze reports named a proc from the string pointer at proc+0x10, and that string is not an
+  identity: the decomp gives `gProcScr_E_FACE` and `gProcScr_E_FACE_ExtraFrame` the same
+  `PROC_NAME("E_FACE")`, and reuses `"bmenu"` and `"E_config"` three times each. Live capture was
+  worse still — the field goes stale, so the proc actually running `gProcScr_Talk` printed as
+  `E_FACE`, `ProcScr_StdEventEngine` printed as `MAPTASK`, and `gProcScr_TalkSkipListener` printed
+  as `ekrBattleEnding`. `gen_symbols.py` now emits `procscr.lua` (952 script addresses → their
+  exact symbols) and `symbols.json` (every ROM code symbol, for `inspect_state.py` to name idle
+  callbacks). **Resolution is exact-match only, and an unmatched address prints
+  `unknown@0x…`** — silence beats a confident wrong name, which is what cost #232 its last failure.
+- **An unclassified `transition` must say what it rejected** (2026-08-06, #236). `classify()` is
+  an ordered rule table, and `explain()` runs the same rules to return the verdict *plus* every
+  rule considered and the predicate that failed. Five of #232's six defects were input waits
+  nothing had a name for; each read as a passive transition and cost a full build-and-run cycle
+  to identify. The classification is now the cheap half: `INSPECT.watch` arms only on an
+  *unclassified* transition holding a byte-identical proc pool, and dumps the snapshot the moment
+  the stall is provable.
+- **A loop budget must not be the thing that decides failure** (2026-08-06, #232/#236). `ch01`
+  stayed open for three sessions on a diagnosis that turned out to be wrong — "no page wait is
+  ever classified as `dialogue_wait`, so nothing advances it". The inspector disproved it in one
+  run: page waits were classified and advanced **74 times**, all passing, and the flow was still
+  advancing 263 frames before the old 12000-step cap expired. A cap that fires mid-scene reports
+  a timeout that names nothing, and a budget-bounded loop exits at the same frame whatever is on
+  screen — so the number looks like evidence and is not. Caps are now sized far above any real
+  scene (`TUNE.bootSteps`), and `INSPECT.watch` is the failure oracle.
+- **A Yes/No prompt inside a scene is its own input state** (2026-08-06, #232). With the above in
+  place the real `ch01` blocker took one run to name: `gProcScr_YesNoChoice` in
+  `YesNoChoice_Loop_KeyHandler` — lord select's "Will \<lead\> lead the party?". It runs *inside* a
+  live event scene, so the `std_event` passive rule swallowed it as a transition and nothing ever
+  answered. It is classified as `yes_no_choice` and ordered above the passive rules;
+  `currentChoice` (s16 @ +0x2A, `TALK_CHOICE_YES`=1/`NO`=2) decides which answer carries `A`, and
+  the *scenario* chooses the answer — the controller only says what is legal.
 - **Comments inside a YAML folded scalar are CONTENT, not comments** (2026-08-02, #214). Authoring
   a chapter's `visit_text: >` with `#` lines indented underneath silently folded them into the
   string, and the chapter YAML then failed to load for every test that reads it. Comments belong

@@ -105,8 +105,15 @@ def check_python_compiles(fail):
 
 
 def check_tests_pass(fail):
-    """Run the Python unit tests (tools/test_*.py). The combat math in fe_combat.py is
-    the difficulty engine's arbiter -- a silent regression there mis-grades every chapter."""
+    """Run the Python unit tests (tools/test_*.py AND tools/playtest/test_*.py). The combat
+    math in fe_combat.py is the difficulty engine's arbiter -- a silent regression there
+    mis-grades every chapter.
+
+    The playtest directory was outside this glob until 2026-08-06 (#236), so its Python
+    tests -- the pure formatting/diff logic that is supposed to keep the emulator out of
+    the loop -- ran only when someone invoked them by hand. `unittest discover -s tools`
+    does not reach them either (the directory is not an importable package), so the glob
+    is the only gate. Coverage nothing runs is not coverage."""
     import subprocess
     # Several tests read the FE8 decomp via `git -C fireemblem8u show HEAD:...`
     # (vanilla_decomp_text). When the submodule isn't checked out -- the lightweight CI
@@ -118,7 +125,8 @@ def check_tests_pass(fail):
         print('check_tests_pass: skipping unit tests (fireemblem8u submodule not checked '
               'out; the CI build job runs `make test`)')
         return
-    for t in sorted(glob.glob(os.path.join(REPO, 'tools', 'test_*.py'))):
+    for t in sorted(glob.glob(os.path.join(REPO, 'tools', 'test_*.py'))
+                    + glob.glob(os.path.join(REPO, 'tools', 'playtest', 'test_*.py'))):
         r = subprocess.run([sys.executable, t], capture_output=True, text=True)
         if r.returncode != 0:
             tail = (r.stderr or r.stdout).strip().splitlines()

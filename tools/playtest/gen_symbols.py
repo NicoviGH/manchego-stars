@@ -1,16 +1,49 @@
 #!/usr/bin/env python3
-"""Emit tools/playtest/symbols.lua from the built ELF.
+"""Emit the harness symbol tables from the built ELF.
 
 Run after every `make` (run.sh does this) -- BSS/EWRAM addresses shift when
 engine code changes, so the Lua harness must never hard-code them.
+
+Three outputs, one nm pass:
+
+  symbols.lua   the named symbols the harness reads/scans (SYM)
+  procscr.lua   every proc-script address -> its exact symbol (PROCSCR), so a live
+                proc is identified by SCRIPT ADDRESS instead of by the PROC_NAME
+                string at proc+0x10. Those strings are not unique -- the decomp
+                gives gProcScr_E_FACE and gProcScr_E_FACE_ExtraFrame both
+                PROC_NAME("E_FACE"), and reuses "bmenu" and "E_config" three times
+                each -- which is why freeze reports could not say which proc was
+                waiting (#236, blocking #232).
+  symbols.json  every ROM code symbol, for inspect.py. Idle callbacks are ordinary
+                functions (~35k of them): too many for a Lua table, so the Lua side
+                dumps raw addresses and the Python renderer names them.
+
+Resolution against these tables is EXACT-MATCH ONLY. An address that matches no
+symbol is reported as unknown; a nearest-preceding guess is worse than silence.
 """
+import json
 import os
+import re
 import subprocess
 import sys
+from collections import namedtuple
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ELF = os.path.join(REPO, 'fireemblem8u', 'fireemblem8.elf')
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'symbols.lua')
+HERE = os.path.dirname(os.path.abspath(__file__))
+OUT = os.path.join(HERE, 'symbols.lua')
+OUT_PROCSCR = os.path.join(HERE, 'procscr.lua')
+OUT_JSON = os.path.join(HERE, 'symbols.json')
+
+ROM_START = 0x08000000
+ROM_END = 0x0A000000
+
+# Proc scripts are `struct ProcCmd[]` in ROM: gProcScr_*/ProcScr_*/sProcScr_* plus the
+# handful named sProc_*/gProc_*. Keying by address makes a stray non-script match inert
+# (nothing ever looks up its address), while a missed one degrades to an honest unknown.
+PROC_SCRIPT_RE = re.compile(r'ProcScr|^[a-z]?Proc_')
+
+Symbol = namedtuple('Symbol', 'name type addr')
 
 # Symbols the harness reads/scans. Struct offsets live in harness.lua next to
 # the decomp header they came from.
@@ -78,6 +111,14 @@ WANTED = [
     'ChapterIntro_KeyListen_Loop', # exact chapter-title input callback
     'gProcScr_TalkWaitForInput', # dialogue waits for a real player key
     'TalkWaitForInput_OnIdle',  # exact dialogue input callback
+    'gProcScr_YesNoChoice',     # in-scene Yes/No prompt (src/cgtext.c). Distinct from the
+                                # page wait above: it runs INSIDE a live event scene, so
+                                # without it the scene reads as a passive std_event
+                                # transition and nothing ever answers -- ch01's lord-select
+                                # "Will <lead> lead the party?" parked here (#232/#236).
+    'YesNoChoice_Loop_KeyHandler', # exact Yes/No input callback. currentChoice is s16 at
+                                # +0x2A: TALK_CHOICE_YES = 1, TALK_CHOICE_NO = 2
+                                # (include/scene.h); A commits whichever is highlighted.
     'ProcScr_AtMenu',           # preparations main-menu owner
     'ProcScr_PrepMenu',         # live semantic preparations command list
     'PrepMenu_CtrlLoop',        # exact preparations input callback
@@ -152,18 +193,74 @@ WANTED = [
 ]
 
 
+def parse_nm(text):
+    """nm output -> Symbols. Undefined entries carry no address and are dropped."""
+    out = []
+    for line in text.splitlines():
+        parts = line.split()
+        if len(parts) != 3:
+            continue
+        try:
+            addr = int(parts[0], 16)
+        except ValueError:
+            continue
+        out.append(Symbol(parts[2], parts[1], addr))
+    return out
+
+
+def wanted_symbols(symbols, wanted):
+    """The named symbols, or KeyError naming every one the ELF does not have."""
+    found = {s.name: s.addr for s in symbols if s.name in set(wanted)}
+    missing = [w for w in wanted if w not in found]
+    if missing:
+        raise KeyError('symbols not found in ELF: %s' % ', '.join(missing))
+    return found
+
+
+def _rom_code(symbols):
+    return [s for s in symbols
+            if s.type in ('T', 't') and ROM_START <= s.addr < ROM_END]
+
+
+def _by_address(symbols):
+    # Aliases put two names on one address. Prefer the shorter (then lexically first)
+    # name so the table is deterministic across builds and reads as the canonical one.
+    out = {}
+    for s in symbols:
+        prev = out.get(s.addr)
+        if prev is None or (len(s.name), s.name) < (len(prev), prev):
+            out[s.addr] = s.name
+    return out
+
+
+def proc_scripts(symbols):
+    """Proc-script address -> exact symbol name."""
+    return _by_address([s for s in _rom_code(symbols) if PROC_SCRIPT_RE.search(s.name)])
+
+
+def code_symbols(symbols):
+    """Every ROM code address -> exact symbol name (idle callbacks live here)."""
+    return _by_address(_rom_code(symbols))
+
+
+def render_lua(varname, mapping):
+    lines = ['-- generated by gen_symbols.py from fireemblem8.elf; do not edit',
+             '%s = {' % varname]
+    for addr in sorted(mapping):
+        lines.append('    [0x%08X] = "%s",' % (addr, mapping[addr]))
+    lines.append('}')
+    return '\n'.join(lines) + '\n'
+
+
 def main():
     if not os.path.exists(ELF):
         sys.exit('ERROR: %s not built (run make first)' % ELF)
     nm = subprocess.run(['arm-none-eabi-nm', ELF], capture_output=True, text=True, check=True)
-    addrs = {}
-    for line in nm.stdout.splitlines():
-        parts = line.split()
-        if len(parts) == 3 and parts[2] in WANTED:
-            addrs[parts[2]] = int(parts[0], 16)
-    missing = [w for w in WANTED if w not in addrs]
-    if missing:
-        sys.exit('ERROR: symbols not found in ELF: %s' % ', '.join(missing))
+    symbols = parse_nm(nm.stdout)
+    try:
+        addrs = wanted_symbols(symbols, WANTED)
+    except KeyError as missing:
+        sys.exit('ERROR: %s' % missing.args[0])
     with open(OUT, 'w', encoding='utf-8') as f:
         f.write('-- generated by gen_symbols.py from fireemblem8.elf; do not edit\n')
         f.write('SYM = {\n')
@@ -171,6 +268,17 @@ def main():
             f.write('    %s = 0x%08X,\n' % (name, addrs[name]))
         f.write('}\n')
     print('wrote %s (%d symbols)' % (OUT, len(addrs)))
+
+    scripts = proc_scripts(symbols)
+    with open(OUT_PROCSCR, 'w', encoding='utf-8') as f:
+        f.write(render_lua('PROCSCR', scripts))
+    print('wrote %s (%d proc scripts)' % (OUT_PROCSCR, len(scripts)))
+
+    code = code_symbols(symbols)
+    with open(OUT_JSON, 'w', encoding='utf-8') as f:
+        json.dump({'code': {'0x%08X' % a: n for a, n in code.items()}}, f,
+                  indent=0, sort_keys=True)
+    print('wrote %s (%d code symbols)' % (OUT_JSON, len(code)))
 
 
 if __name__ == '__main__':

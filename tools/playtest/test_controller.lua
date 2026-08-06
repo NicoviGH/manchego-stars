@@ -361,6 +361,100 @@ for _, field in ipairs({ '"event":"transition"', '"state":"unit_command_menu"',
     check(trace:find(field, 1, true) ~= nil, true, "trace includes " .. field)
 end
 
+-- Yes/No choice (cgtext.c gProcScr_YesNoChoice). The lord-select prompt "Will Braulo lead
+-- the party?" rides this, and nothing classified it -- so ch01 parked on it for the whole
+-- of #232 while the event engine stayed live and read as a passive transition (#236 found
+-- it by name). currentChoice is TALK_CHOICE_YES/NO; A commits whichever is highlighted.
+local yesHighlighted = {
+    procs = proc("yes_no", "yes_no_input"),
+    choice = { current = "yes" },
+}
+classify(yesHighlighted, "yes_no_choice", "yes/no prompt in its key handler")
+local yes = action(yesHighlighted, "answer_yes")
+check(yes and yes.key, "A", "A commits the highlighted Yes")
+local no = action(yesHighlighted, "answer_no")
+check(no ~= nil, true, "No is legal, but not by pressing A")
+check(no and no.key, nil, "No must be selected before it can be committed")
+check(action(yesHighlighted, "select_no").key, "RIGHT", "RIGHT moves the choice to No")
+check(action(yesHighlighted, "cancel_choice").key, "B", "B cancels the prompt")
+
+local noHighlighted = {
+    procs = proc("yes_no", "yes_no_input"),
+    choice = { current = "no" },
+}
+check(action(noHighlighted, "answer_no").key, "A", "A commits the highlighted No")
+check(action(noHighlighted, "answer_yes").key, nil, "Yes is not committable while No is up")
+check(action(noHighlighted, "select_yes").key, "LEFT", "LEFT moves the choice back to Yes")
+
+-- The prompt animating in offers nothing, and says so by name.
+classify({ procs = proc("yes_no", "yes_no_fade"), choice = { current = "yes" } }, "transition",
+    "a yes/no prompt outside its key handler is passive")
+check(action({ procs = proc("yes_no", "yes_no_fade") }, "answer_yes"), nil,
+    "a passive yes/no prompt exposes no answer")
+
+-- A live event engine must not mask the prompt: the yes/no rule is evaluated first.
+classify({
+    procs = { std_event = { idle = "event_engine" }, yes_no = { idle = "yes_no_input" } },
+    choice = { current = "yes" },
+}, "yes_no_choice", "the yes/no prompt outranks the passive event engine")
+
+-- explain(): the same verdict, plus WHY. Every #232 defect but one was an input wait
+-- nothing had a name for; each read as a passive `transition` and cost a full
+-- build-and-run cycle to identify. An unclassified wait has to say what it rejected.
+local function reasonFor(explanation, rule)
+    for _, entry in ipairs(explanation.considered) do
+        if entry.rule == rule then return entry.reason end
+    end
+    return nil
+end
+
+local dialogue = C.explain({ procs = proc("talk_wait", "talk_wait_input") })
+check(dialogue.state, "dialogue_wait", "explain agrees with classify on a match")
+check(dialogue.matched, "dialogue_wait", "explain names the rule that matched")
+check(dialogue.error, nil, "a matched explanation carries no error")
+
+-- The ch01 acceptance case: a live event engine and nothing else, which classify calls
+-- `transition`. The explanation must name the proc that made it one, and show that the
+-- dialogue-wait rule was considered and why it was rejected.
+local scene = C.explain({
+    procs = { std_event = { idle = "event_engine", addr = 0x02024F00 } },
+    world = { chapter = 2, turn = 0, faction = 0 },
+})
+check(scene.state, "transition", "a live event engine still classifies as transition")
+check(scene.matched, "passive_proc", "explain names which rule produced the transition")
+check(scene.detail:find("std_event", 1, true) ~= nil, true,
+    "the transition detail names the live proc responsible")
+check(reasonFor(scene, "dialogue_wait"):find("talk_wait", 1, true) ~= nil, true,
+    "dialogue_wait rejection names the proc it looked for")
+check(reasonFor(scene, "menu"):find("absent", 1, true) ~= nil, true,
+    "menu rejection says the proc is absent")
+check(scene.unclassified_wait, true,
+    "a transition with no live input proc is flagged as an unclassified wait")
+check(#scene.live_procs, 1, "explain lists the live procs it saw")
+check(scene.live_procs[1].name, "std_event", "live proc entries carry their name")
+check(scene.live_procs[1].idle, "event_engine", "live proc entries carry their idle callback")
+
+-- A proc that IS live but in the wrong callback must say so -- "absent" and "present but
+-- not in its input callback" are different bugs and cost different fixes.
+local fadingMenu = C.explain({ procs = proc("menu", "menu_fade_in"), menu = { current = 0, items = {} } })
+check(fadingMenu.state, "transition", "a menu outside its input callback is a transition")
+check(fadingMenu.matched, "menu", "the menu rule owns that transition")
+check(fadingMenu.detail:find("menu_fade_in", 1, true) ~= nil, true,
+    "the detail names the callback the menu is actually sitting in")
+check(fadingMenu.unclassified_wait, false,
+    "a transition a rule explained is not an unclassified wait")
+
+-- A hard error explains itself the same way classify does.
+local broken = C.explain({ error = "malformed live menu", procs = proc("menu", "menu_input") })
+check(broken.state, nil, "explain fails closed on a malformed observation")
+check(broken.error, "malformed live menu", "explain preserves the observer rejection")
+
+-- Fallthrough: no rule matched at all.
+local unknown = C.explain({ procs = { mystery = { idle = "mystery_idle" } } })
+check(unknown.state, nil, "an unrecognised proc set fails closed")
+check(type(unknown.error), "string", "the fallthrough explains itself")
+check(#unknown.considered > 5, true, "the fallthrough reports every rule it rejected")
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests))
     os.exit(1)

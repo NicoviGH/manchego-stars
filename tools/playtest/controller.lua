@@ -52,96 +52,298 @@ local function menuKinds(observation)
     return unit, map, weapon
 end
 
+-- ---------------------------------------------------------------- classification rules
+-- Ordered rules, evaluated top to bottom. One rule list serves both classify() (the
+-- verdict) and explain() (the verdict PLUS what every earlier rule rejected and why),
+-- so the two can never drift apart. #232 spent a full build-and-run cycle per hypothesis
+-- because a `transition` verdict said nothing about what had been considered.
+--
+-- A rule returns exactly one of:
+--   matched(state, detail, unclassified)  this is the state; detail says how we know
+--   rejected(reason)                      not this state, and why -- the diagnostic payload
+--   unsupported(why)                      fail closed; the observation makes no sense
+--
+-- `unclassified` marks a transition matched purely on a proc EXISTING, without
+-- recognizing what it is currently waiting in. Those are the ones that hide an input
+-- wait nothing can advance -- ch01's Northlook scene is exactly this shape.
+local function matched(state, detail, unclassified)
+    return { state = state, detail = detail, unclassified = unclassified or false }
+end
+local function rejected(reason) return { reject = reason } end
+local function unsupported(why) return { error = why } end
+
+local function idleOf(observation, name)
+    local p = proc(observation, name)
+    return p and p.idle or nil
+end
+
+-- "absent" and "live but in another callback" are different bugs with different fixes,
+-- so the rejection has to distinguish them by name.
+local function missIs(observation, name, wanted)
+    local idle = idleOf(observation, name)
+    if idle == nil then return name .. " proc absent" end
+    return string.format("%s idle=%s, not %s", name, tostring(idle), wanted)
+end
+
+-- The boot/menu states that are identified by one proc sitting in one exact callback.
+local SIMPLE_INPUT_RULES = {
+    { rule = "health_safety_wait", proc = "game_early_start", idle = "health_safety_wait" },
+    { rule = "title_idle", proc = "title", idle = "title_idle" },
+    { rule = "save_menu_input", proc = "save_menu", idle = "save_menu_input" },
+    { rule = "save_slot_input", proc = "save_menu", idle = "save_slot_input" },
+    { rule = "difficulty_input", proc = "difficulty", idle = "difficulty_input" },
+    { rule = "chapter_intro_input", proc = "chapter_intro", idle = "chapter_intro_input" },
+}
+
+-- Procs that make the game passive without ever offering an input. A match here means
+-- "something is running and we have no name for what it wants" -- the blind spot.
+local PASSIVE_PROCS = { "talk_wait", "std_event", "battle_forecast", "battle" }
+local BOOT_PROCS = {
+    "game_control", "game_early_start", "title", "save_menu", "difficulty", "chapter_intro",
+    "talk_wait", "std_event", "map_fade", "battle_forecast", "battle", "at_menu", "sally",
+}
+
+local function anyLive(observation, names)
+    for _, name in ipairs(names) do
+        if proc(observation, name) then
+            return string.format("%s live (idle=%s)", name, tostring(idleOf(observation, name)))
+        end
+    end
+    return nil
+end
+
+local RULES = {
+    {
+        name = "observation",
+        check = function(observation)
+            if observation.error then return unsupported(observation.error) end
+            return rejected("the observer reported no malformed structure")
+        end,
+    },
+    {
+        name = "pre_boot",
+        check = function(observation)
+            if observation.world and observation.world.chapter == 0 and observation.world.turn == 0
+                and next(observation.procs or {}) == nil then
+                return matched("transition", "empty proc pool before FE8 startup")
+            end
+            return rejected("the proc pool is not empty, or the game is past startup")
+        end,
+    },
+    {
+        name = "dialogue_wait",
+        check = function(observation)
+            if idleIs(observation, "talk_wait", "talk_wait_input") then
+                return matched("dialogue_wait", "talk_wait in talk_wait_input")
+            end
+            return rejected(missIs(observation, "talk_wait", "talk_wait_input"))
+        end,
+    },
+    {
+        -- Ordered ABOVE the passive rules on purpose: this prompt runs INSIDE a live
+        -- event scene, so `std_event` would otherwise swallow it as a transition -- which
+        -- is exactly how ch01's lord-select prompt stayed invisible through #232.
+        name = "yes_no_choice",
+        check = function(observation)
+            if not proc(observation, "yes_no") then return rejected("yes_no proc absent") end
+            if not idleIs(observation, "yes_no", "yes_no_input") then
+                return matched("transition", string.format("yes_no idle=%s, not its key handler",
+                    tostring(idleOf(observation, "yes_no"))))
+            end
+            if not observation.choice then
+                return matched("transition", "yes_no live with no observed choice")
+            end
+            return matched("yes_no_choice", "yes_no in its key handler")
+        end,
+    },
+    {
+        name = "target_selection",
+        check = function(observation)
+            if not proc(observation, "target_selection") then
+                return rejected("target_selection proc absent")
+            end
+            if not idleIs(observation, "target_selection", "target_selection_input") then
+                return matched("transition", string.format("target_selection idle=%s, not its input loop",
+                    tostring(idleOf(observation, "target_selection"))))
+            end
+            if not observation.target then
+                return matched("transition", "target_selection live with no observed target")
+            end
+            if observation.target.frozen then
+                return matched("transition", "target_selection is frozen")
+            end
+            if observation.target.kind ~= "attack" and observation.target.kind ~= "talk" then
+                return unsupported("unsupported target selection kind")
+            end
+            return matched("target_selection", "target_selection in its input loop")
+        end,
+    },
+    {
+        name = "menu",
+        check = function(observation)
+            local menuProc = proc(observation, "menu")
+            if not menuProc then return rejected("menu proc absent") end
+            if not idleIs(observation, "menu", "menu_input") then
+                return matched("transition", string.format("menu idle=%s, not menu_input",
+                    tostring(menuProc.idle)))
+            end
+            for _, flag in ipairs({ "locked", "frozen", "ending", "doomed" }) do
+                if menuProc[flag] then
+                    return matched("transition", "menu is " .. flag)
+                end
+            end
+            if not observation.menu then
+                return matched("transition", "menu proc live with no observed menu structure")
+            end
+            local unit, map, weapon = menuKinds(observation)
+            if weapon and (unit or map) then
+                return unsupported("ambiguous standard menu mixes weapon and command items")
+            end
+            if unit and map then
+                return unsupported("ambiguous standard menu contains unit and map commands")
+            end
+            if weapon then return matched("weapon_menu", "menu offers weapon items") end
+            if unit then return matched("unit_command_menu", "menu offers unit commands") end
+            if map then return matched("map_command_menu", "menu offers map commands") end
+            local enabled = enabledMenuItems(observation)
+            local callbacks = #enabled > 0
+            for _, item in ipairs(enabled) do
+                if not item.on_selected then callbacks = false break end
+            end
+            if callbacks then return matched("generic_menu", "every enabled item has a callback") end
+            return unsupported("unsupported standard menu has no recognized semantic commands")
+        end,
+    },
+    {
+        name = "prep_units",
+        check = function(observation)
+            if not proc(observation, "prep_units") then return rejected("prep_units proc absent") end
+            if idleIs(observation, "prep_units", "prep_units_input") then
+                return matched("prep_pick_units", "prep_units in its input loop")
+            end
+            return matched("transition", string.format("prep_units idle=%s, not prep_units_input",
+                tostring(idleOf(observation, "prep_units"))))
+        end,
+    },
+    {
+        name = "prep_menu",
+        check = function(observation)
+            if not proc(observation, "prep_menu") then return rejected("prep_menu proc absent") end
+            if not idleIs(observation, "prep_menu", "prep_menu_input") then
+                return matched("transition", string.format("prep_menu idle=%s, not prep_menu_input",
+                    tostring(idleOf(observation, "prep_menu"))))
+            end
+            if not observation.prep then
+                return matched("transition", "prep_menu live with no observed prep structure")
+            end
+            if observation.prep.help_open then return matched("transition", "prep help window is open") end
+            if proc(observation, "at_menu") then return matched("prep_main", "at_menu owns the prep list") end
+            if proc(observation, "sally") then return matched("prep_map_menu", "sally owns the prep list") end
+            return unsupported("preparations menu has no recognized owner")
+        end,
+    },
+    {
+        name = "simple_input",
+        check = function(observation)
+            -- Two rules watch save_menu (New Game vs the between-chapters prompt), so the
+            -- same "absent" reason would otherwise be reported twice.
+            local misses, seen = {}, {}
+            for _, spec in ipairs(SIMPLE_INPUT_RULES) do
+                if idleIs(observation, spec.proc, spec.idle) then
+                    return matched(spec.rule, spec.proc .. " in " .. spec.idle)
+                end
+                local miss = missIs(observation, spec.proc, spec.idle)
+                if not seen[miss] then
+                    seen[miss] = true
+                    misses[#misses + 1] = miss
+                end
+            end
+            return rejected(table.concat(misses, "; "))
+        end,
+    },
+    {
+        name = "map_fade",
+        check = function(observation)
+            if proc(observation, "map_fade") then
+                return matched("transition", "map_fade is animating")
+            end
+            return rejected("map_fade proc absent")
+        end,
+    },
+    {
+        name = "passive_proc",
+        check = function(observation)
+            local live = anyLive(observation, PASSIVE_PROCS)
+            if live then return matched("transition", live, true) end
+            return rejected("no passive proc live (" .. table.concat(PASSIVE_PROCS, ", ") .. ")")
+        end,
+    },
+    {
+        name = "player_phase",
+        check = function(observation)
+            if not proc(observation, "player_phase") then return rejected("player_phase proc absent") end
+            if idleIs(observation, "player_phase", "player_main_idle") then
+                return matched("player_map_idle", "player_phase in player_main_idle")
+            end
+            if idleIs(observation, "player_phase", "player_range_idle") then
+                return matched("unit_selected", "player_phase in player_range_idle")
+            end
+            if idleIs(observation, "player_phase", "player_move_wait") then
+                return matched("unit_moving", "player_phase in player_move_wait")
+            end
+            return matched("transition", string.format("player_phase idle=%s is not a known callback",
+                tostring(idleOf(observation, "player_phase"))), true)
+        end,
+    },
+    {
+        name = "boot_proc",
+        check = function(observation)
+            local live = anyLive(observation, BOOT_PROCS)
+            if live then return matched("transition", live, true) end
+            return rejected("no boot-owner proc live")
+        end,
+    },
+}
+
+local function evaluate(observation)
+    local considered = {}
+    for _, rule in ipairs(RULES) do
+        local verdict = rule.check(observation)
+        if verdict.state then
+            return verdict.state, nil, considered, rule.name, verdict.detail, verdict.unclassified
+        end
+        if verdict.error then
+            return nil, verdict.error, considered, rule.name, nil, false
+        end
+        considered[#considered + 1] = { rule = rule.name, reason = verdict.reject }
+    end
+    return nil, "unsupported FE8 state", considered, nil, nil, false
+end
+
 function M.classify(observation)
+    local state, why = evaluate(observation or {})
+    return state, why
+end
+
+-- The same verdict, with the reasoning attached. Pure, so the emulator is never needed
+-- to answer "why did this read as a transition" (#236).
+function M.explain(observation)
     observation = observation or {}
-    if observation.error then return nil, observation.error end
-
-    if observation.world and observation.world.chapter == 0 and observation.world.turn == 0
-        and next(observation.procs or {}) == nil then
-        return "transition"
+    local state, why, considered, rule, detail, unclassified = evaluate(observation)
+    local live = {}
+    for name, p in pairs(observation.procs or {}) do
+        live[#live + 1] = { name = name, idle = p.idle, addr = p.addr }
     end
-
-    if idleIs(observation, "talk_wait", "talk_wait_input") then
-        return "dialogue_wait"
-    end
-
-    if proc(observation, "target_selection") then
-        if not idleIs(observation, "target_selection", "target_selection_input")
-            or not observation.target or observation.target.frozen then
-            return "transition"
-        end
-        if observation.target.kind ~= "attack" and observation.target.kind ~= "talk" then
-            return nil, "unsupported target selection kind"
-        end
-        return "target_selection"
-    end
-
-    if proc(observation, "menu") then
-        local menuProc = proc(observation, "menu")
-        if not idleIs(observation, "menu", "menu_input") or menuProc.locked or menuProc.frozen
-            or menuProc.ending or menuProc.doomed or not observation.menu then
-            return "transition"
-        end
-        local unit, map, weapon = menuKinds(observation)
-        if weapon and (unit or map) then return nil, "ambiguous standard menu mixes weapon and command items" end
-        if unit and map then return nil, "ambiguous standard menu contains unit and map commands" end
-        if weapon then return "weapon_menu" end
-        if unit then return "unit_command_menu" end
-        if map then return "map_command_menu" end
-        local enabled = enabledMenuItems(observation)
-        local callbacks = #enabled > 0
-        for _, item in ipairs(enabled) do
-            if not item.on_selected then callbacks = false break end
-        end
-        if callbacks then return "generic_menu" end
-        return nil, "unsupported standard menu has no recognized semantic commands"
-    end
-
-    if proc(observation, "prep_units") then
-        if idleIs(observation, "prep_units", "prep_units_input") then return "prep_pick_units" end
-        return "transition"
-    end
-
-    if proc(observation, "prep_menu") then
-        if not idleIs(observation, "prep_menu", "prep_menu_input") or not observation.prep then
-            return "transition"
-        end
-        if observation.prep.help_open then return "transition" end
-        if proc(observation, "at_menu") then return "prep_main" end
-        if proc(observation, "sally") then return "prep_map_menu" end
-        return nil, "preparations menu has no recognized owner"
-    end
-
-    if idleIs(observation, "game_early_start", "health_safety_wait") then
-        return "health_safety_wait"
-    end
-    if idleIs(observation, "title", "title_idle") then return "title_idle" end
-    if idleIs(observation, "save_menu", "save_menu_input") then return "save_menu_input" end
-    if idleIs(observation, "save_menu", "save_slot_input") then return "save_slot_input" end
-    if idleIs(observation, "difficulty", "difficulty_input") then return "difficulty_input" end
-    if idleIs(observation, "chapter_intro", "chapter_intro_input") then return "chapter_intro_input" end
-
-    if proc(observation, "map_fade") then return "transition" end
-
-    for _, name in ipairs({ "talk_wait", "std_event", "battle_forecast", "battle" }) do
-        if proc(observation, name) then return "transition" end
-    end
-
-    if proc(observation, "player_phase") then
-        if idleIs(observation, "player_phase", "player_main_idle") then return "player_map_idle" end
-        if idleIs(observation, "player_phase", "player_range_idle") then return "unit_selected" end
-        if idleIs(observation, "player_phase", "player_move_wait") then return "unit_moving" end
-        return "transition"
-    end
-
-    for _, name in ipairs({
-        "game_control", "game_early_start", "title", "save_menu", "difficulty", "chapter_intro",
-        "talk_wait", "std_event", "map_fade", "battle_forecast", "battle", "at_menu", "sally",
-    }) do
-        if proc(observation, name) then return "transition" end
-    end
-
-    return nil, "unsupported FE8 state"
+    table.sort(live, function(a, b) return a.name < b.name end)
+    return {
+        state = state,
+        error = why,
+        matched = rule,
+        detail = detail,
+        considered = considered,
+        live_procs = live,
+        unclassified_wait = state == "transition" and unclassified or false,
+    }
 end
 
 local function add(actions, intention, key, source, target)
@@ -207,6 +409,16 @@ function M.legalActions(observation)
         add(actions, "continue_chapter_intro", "A", "chapter_intro.chapter_intro_input")
     elseif state == "dialogue_wait" then
         add(actions, "advance_dialogue", "A", "talk_wait.talk_wait_input")
+    elseif state == "yes_no_choice" then
+        -- A commits whatever is highlighted (YesNoChoice_Loop_KeyHandler, cgtext.c), so
+        -- only the highlighted answer carries a key; the other is legal but must be
+        -- selected first. Same contract as a menu command that needs navigating to.
+        local current = observation.choice.current
+        add(actions, "answer_yes", current == "yes" and "A" or nil, "choice.current")
+        add(actions, "answer_no", current == "no" and "A" or nil, "choice.current")
+        if current == "no" then add(actions, "select_yes", "LEFT", "choice.current=no") end
+        if current == "yes" then add(actions, "select_no", "RIGHT", "choice.current=yes") end
+        add(actions, "cancel_choice", "B", "yes_no.cancel")
     elseif state == "prep_main" then
         if observation.prep.on_start == "prep_main_fight" then
             add(actions, "fight", "START", "prep.on_start")
@@ -314,6 +526,10 @@ local function jsonEncode(value)
     for _, key in ipairs(keys) do out[#out + 1] = jsonString(key) .. ":" .. jsonEncode(value[key]) end
     return "{" .. table.concat(out, ",") .. "}"
 end
+
+-- Deterministic (sorted-key) JSON. The trace format and the #236 inspector snapshot are
+-- the same wire format, so they share one encoder -- two would drift.
+M.encode = jsonEncode
 
 function M.formatTrace(record)
     return jsonEncode({
