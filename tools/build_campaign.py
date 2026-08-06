@@ -574,6 +574,28 @@ def _rewind_unchanged_mtimes(snap):
     return n
 
 
+BUILD_STAMP = os.path.join(REPO, '.build-config.json')
+
+
+def _stamp_build_config(campaign, flags):
+    """Record which boot flags produced the ROM now in the tree.
+
+    A playtest scenario is bound to a ROM configuration -- a CH04BOOT=1 build cannot
+    reach ch02's map -- and the most expensive failure mode in this repo is a scenario
+    that FAILs for the honest reason "you are running the wrong ROM". Nothing in the
+    .gba says how it was built, so record it here; tools/playtest/matrix.py reads this
+    and refuses the run instead of letting mGBA time out for 7 minutes.
+
+    Gitignored: it describes the working tree's build artifact, not the source."""
+    stamp = {'campaign': campaign,
+             'flags': {k: bool(v) for k, v in sorted(flags.items())}}
+    try:
+        with open(BUILD_STAMP, 'w') as fh:
+            json.dump(stamp, fh, indent=2)
+    except OSError as exc:      # never fail a build over the stamp
+        print('  (could not write %s: %s)' % (BUILD_STAMP, exc))
+
+
 def restore_vanilla_sources():
     # Restore explicitly from HEAD (not the index): `git checkout -- <file>` pulls from
     # the staging area, so a previously-staged patched file would survive and corrupt the
@@ -8960,6 +8982,11 @@ def main():
                          '"White Moose" snowy forest on slot 5 with an armed party, fog, '
                          'and the approved 16 + 4 + 3 vanilla-monster force.')
     args = ap.parse_args()
+    # Snapshot the flags AS PASSED, before --lord-boot implies --test-chapter below:
+    # the build stamp has to describe the `make` invocation, not the derived state.
+    _requested_flags = {'TESTCH': args.test_chapter, 'LORDBOOT': args.lord_boot,
+                        'MONTAGE': args.montage, 'CH03BOOT': args.ch03_boot,
+                        'CH04BOOT': args.ch04_boot}
     if args.lord_boot:
         args.test_chapter = True  # the fast-boot rides the sandbox
     if args.ch03_boot and args.ch04_boot:
@@ -9072,6 +9099,7 @@ def main():
     if rewound:
         print('idempotent injection: rewound %d unchanged file(s) -> make skips them'
               % rewound)
+    _stamp_build_config(args.campaign, _requested_flags)
     print('done. Run `make` to compile the ROM.')
 
 

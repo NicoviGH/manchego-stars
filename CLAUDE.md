@@ -16,6 +16,7 @@ The data is the doc — facts live in exactly one place, and indexes are generat
 | Adding a unit's art / battle anim / platform | the **`inject_battle_anims` / `inject_battle_platforms` docstrings** (how) + `decisions.md` Art & Audio (why) + the **`custom_unit` issue template** (checklist) |
 | Borrowable enemy reskin art (what the FE-Repo has) | **`docs/fe-repo-scouting.md`** (scouting log) + per-unit `skin:` fields in chapter YAML + `campaign.yaml` `enemy_class_reskins` |
 | Hosting a new chapter (map → slot → deploy → win → boot) | **`docs/adding-a-chapter.md`** (the repeatable runbook) + `inject_ch03` (lean reference impl) |
+| What a playtest scenario needs (ROM flag, host chapter, checkpoint, timing) | **`tools/playtest/matrix.yaml`** — the single source; `harness.lua` comments say what a scenario *proves*, not what it needs |
 | Prep screen / deploy cap / force-deployment | `decisions.md` → "How the deploy cap + prep screen are actually wired" + `inject_ch01`'s docstring. **Prep from ch01 on is standing protocol — the CAP is the parity, Pick Units only chooses which PCs fill it. Never re-derive this from the decomp, and never from `hasPrepScreen` (dead FE7 leftover, false everywhere).** |
 | FE8 cadence/reward grounding | `docs/fe8-pacing-reference.md` |
 | Post-MVP (Act II–V) plan | `docs/roadmap.md` |
@@ -138,7 +139,8 @@ file lean (operating instructions + pointers, not a fact store).
 |---|---|
 | `tools/build_campaign.py` | Inject campaign content (portraits, names, character class/stats) into the decomp before `make`. |
 | `tools/verify_text.py` | Decode message text from the built ROM (regression gate; no mGBA). |
-| `tools/playtest/run.sh win\|gameover\|retreat\|titlecard` | Automated in-emulator playtest of ch00 win/lose conditions + title-card capture (mGBA Lua scripting; memory-asserted PASS/FAIL). |
+| `tools/playtest/run.sh <scenario>` | Automated in-emulator playtest of ONE scenario (mGBA Lua scripting; memory-asserted PASS/FAIL). Takes the scenario's ROM flag, host chapter, checkpoint and timing from `tools/playtest/matrix.yaml`. |
+| `make matrix [SUITE=…]` | The live regression matrix (`tools/playtest/matrix.py`): builds each ROM configuration at most once, runs its scenarios, prints a verdict table. `SUITE=gate` (default), a chapter suite, or `all`. |
 | `tools/portrait_tool.py`, `tools/ref_to_bust.py` | Bust art pipeline (ref → indexed FE8 portrait). |
 | `tools/setup-toolchain.sh` | One-time macOS toolchain setup (brew deps, agbcc, python numpy/pillow/pyyaml). |
 

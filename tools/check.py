@@ -322,6 +322,68 @@ def check_injection_order(fail):
         _injection_call_sequence(open(path, encoding='utf-8').read())))
 
 
+def check_playtest_matrix(fail):
+    """tools/playtest/matrix.yaml is the single source of "what does this scenario
+    need" (ROM configuration, host chapter, checkpoint, timing) -- so it has to keep
+    describing harness.lua. A scenario added to the harness without a manifest row
+    would otherwise inherit the canonical/host-1 defaults silently and fail in mGBA
+    for a reason that has nothing to do with the change under test (#231)."""
+    sys.path.insert(0, os.path.join(REPO, 'tools', 'playtest'))
+    try:
+        import matrix as mx
+    except ImportError as exc:
+        fail.append('tools/playtest/matrix.py does not import (%s)' % exc)
+        return
+    try:
+        m = mx.Manifest.load()
+    except Exception as exc:                      # noqa: BLE001 -- report, don't crash the lint
+        fail.append('tools/playtest/matrix.yaml does not load (%s)' % exc)
+        return
+
+    harness = mx.harness_scenarios()
+    for name in sorted(harness - set(m.scenarios)):
+        fail.append('harness.lua defines scenario %s with no matrix.yaml row' % name)
+    for name in sorted(set(m.scenarios) - harness):
+        fail.append('matrix.yaml has a row for %s, which harness.lua no longer defines' % name)
+
+    for name in m.scenarios:
+        if name not in harness:
+            continue
+        try:
+            s = m.resolve(name)
+        except mx.ManifestError as exc:
+            fail.append('matrix.yaml: %s' % exc)
+            continue
+        # A checkpoint built under one ROM configuration is discarded as hash-stale by a
+        # consumer running under another -- an invisible double cost, so pin the pair.
+        if s.checkpoint and not s.dynamic_checkpoint:
+            builder = s.checkpoint_builder
+            if builder not in m.scenarios:
+                fail.append('matrix.yaml: %s wants checkpoint %s but %s is not a scenario'
+                            % (name, s.checkpoint, builder))
+            elif m.resolve(builder).rom != s.rom:
+                fail.append('matrix.yaml: %s (%s) and its builder %s (%s) disagree on the ROM'
+                            % (name, s.rom, builder, m.resolve(builder).rom))
+
+    for suite, members in sorted(m.suites.items()):
+        if not members:
+            fail.append('matrix.yaml: suite %s is empty' % suite)
+        for name in members:
+            if name not in m.scenarios:
+                fail.append('matrix.yaml: suite %s names unknown scenario %s' % (suite, name))
+                continue
+            s = m.resolve(name)
+            if s.kind == 'checkpoint':
+                fail.append('matrix.yaml: suite %s names %s, a checkpoint builder'
+                            % (suite, name))
+            if s.rom == 'any':
+                fail.append('matrix.yaml: suite %s names %s, which is chapter-generic '
+                            'and has no ROM of its own' % (suite, name))
+            if s.manual:
+                fail.append('matrix.yaml: suite %s names %s, which needs manual setup'
+                            % (suite, name))
+
+
 def check_tool_refs_exist(fail):
     """A doc or code comment naming tools/<x>.py|rb, or a docs/<x>.md path, must
     point at a file that exists -- dangling pointers are the cheapest-to-catch form
@@ -814,7 +876,7 @@ def main():
     fail = []
     for check in (check_python_compiles, check_tests_pass, check_yaml_parses,
                   check_chapter_status, check_chapter_deployment_schema,
-                  check_injection_order,
+                  check_injection_order, check_playtest_matrix,
                   check_tool_refs_exist, check_no_dead_concepts,
                   check_generated_indexes_fresh, check_engine_guards_present,
                   check_purple_bank_blankers_known,

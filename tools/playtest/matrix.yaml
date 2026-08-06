@@ -1,0 +1,354 @@
+# The playtest matrix manifest (#231) -- what every scenario in harness.lua needs.
+#
+# This is the SINGLE SOURCE of the scenario -> ROM-configuration / host-chapter /
+# checkpoint / timing table. Both consumers read it:
+#   * tools/playtest/run.sh          (one scenario, via `matrix.py resolve`)
+#   * tools/playtest/matrix.py run   (the grouped matrix)
+# `check.py check_playtest_matrix` proves it still describes harness.lua, so a new
+# scenario without a row here is a drift failure, not a silent default.
+#
+# Resolution order:  defaults  <  classes (in order, key by key)  <  the scenario's row.
+# That is a direct port of run.sh's `case "$SCENARIO"` statements, including the fact
+# that a later case only overrides the keys it names.
+
+defaults:
+  rom: canonical        # a key in rom_configs, or `any` for chapter-generic scenarios
+  host_chapter: 1       # PT_HOST_CHAPTER; run.sh's historical default
+  fps: 240              # top speed
+  vsync: 0
+  deadline: 420         # seconds before run.sh calls the run timed-out
+  kind: verdict         # verdict | record | checkpoint | diagnostic
+  manual: false         # true = never auto-selected (needs a human or a sidecar)
+
+# Checkpoint builders always ran at 240fps with a long deadline: ckpt_ch02start
+# replays the entire ch00 -> ch01 -> ch02 chain to mint one save state.
+checkpoint_deadline: 900
+
+# The ROM configurations, in the order the matrix builds them. Canonical first: it is
+# the cheapest to be wrong about and the one most scenarios share.
+rom_configs:
+  canonical: {}
+  testch:
+    TESTCH: 1
+  lordboot:
+    LORDBOOT: 1
+  montage:
+    MONTAGE: 1
+  ch03boot:
+    CH03BOOT: 1
+  ch04boot:
+    CH04BOOT: 1
+
+# Ported verbatim from run.sh's two timing `case` statements.
+classes:
+  - match: "record*"          # faithful motion for a review GIF
+    fps: 60
+    vsync: 1
+    deadline: 300
+  - match: "smoke*"           # a full chapter's lead-in plus a long soak
+    deadline: 600
+  - match: "fuzz*"
+    deadline: 600
+  - match: "clear_ch02"
+    deadline: 600
+  - match: "clear_ch03"
+    deadline: 600
+  - match: "recordch02ending" # routs the whole band before it films
+    deadline: 600
+  - match: "llm"              # 18 turns x a 90s sidecar handshake budget
+    deadline: 2100
+  - match: "ckpt_*"           # the auto-build path always used 240fps / 900s
+    kind: checkpoint
+    deadline: 900
+
+# Rows carry only what differs from the resolved defaults.
+scenarios:
+  controller_turn: {}                                  # the #220 controller contract
+  smoke: {}
+  win: {}
+  goodberry: {}
+  ch01: {}
+  smoke_ch01: {}
+  clearprobe: {}
+  clear: {}
+  clear_ch01: {}
+  fuzz: {}
+  fuzz_ch01: {}
+  llm:                                                 # needs the external sidecar
+    manual: true
+  ch01win: {}
+  ckpt_prep: {}
+  ckpt_lordpinky: {}
+  lordfloor: {}
+  ckpt_seize: {}
+  recordprep:
+    kind: record
+    checkpoint: prep
+  recordsupply:                                        # asserts bench/deploy/count/Supply
+    checkpoint: lordpinky
+  recordrescue:
+    kind: record
+    checkpoint: prep
+  recordtrade:
+    kind: record
+    checkpoint: prep
+  recordfix:
+    kind: record
+    checkpoint: prep
+  recordending:
+    kind: record
+    checkpoint: seize
+  recordch01trail:
+    kind: record
+  recordlord:
+    kind: record
+  recordlordfast:
+    rom: lordboot
+    kind: record
+  ch01lord: {}
+  scenesch01:
+    kind: record
+  recordch01:
+    kind: record
+  scenes:
+    kind: record
+  record:
+    kind: record
+  bootobserve:
+    kind: diagnostic
+  mapshot:                                             # "any hosted chapter" by design
+    rom: any
+    host_chapter: null
+    kind: diagnostic
+  mapfull:
+    rom: ch03boot
+    host_chapter: 4
+    kind: record
+  recordopening:
+    rom: montage
+    kind: record
+  titlecard: {}
+  gameover: {}
+  retreat: {}
+  ckpt_rbgch01: {}
+  recordrbg:
+    kind: record
+    checkpoint: rbgch01
+  recordanim:
+    rom: testch
+    kind: record
+  recordrbgtest:                                       # back-compat alias of recordanim
+    rom: testch
+    kind: record
+  recordenemy:
+    rom: testch
+    kind: record
+  recordunitlist:                                      # FAILs if the SMS counters cross
+    rom: testch
+  ckpt_ch02start: {}
+  ch03win:
+    rom: ch03boot
+    host_chapter: 4
+  ch03midmap:
+    rom: ch03boot
+    host_chapter: 4
+  ch03talk:
+    rom: ch03boot
+    host_chapter: 4
+  ch03prep:
+    rom: ch03boot
+    host_chapter: 4
+  ch03door:
+    rom: ch03boot
+    host_chapter: 4
+  ch03chest:
+    rom: ch03boot
+    host_chapter: 4
+  ch03tourmaline:
+    rom: ch03boot
+    host_chapter: 4
+  koboldview:                                          # #23 art-review probe
+    rom: ch03boot
+    host_chapter: 4
+    kind: diagnostic
+  lzview:
+    rom: ch03boot
+    host_chapter: 4
+    kind: diagnostic
+  enemycheck:
+    rom: ch03boot
+    host_chapter: 4
+    kind: diagnostic
+  ch03:
+    rom: ch03boot
+    host_chapter: 4
+  smoke_ch03:
+    rom: ch03boot
+    host_chapter: 4
+  smoke_ch04:
+    rom: ch04boot
+    host_chapter: 5
+  clear_ch03:
+    rom: ch03boot
+    host_chapter: 4
+  ch02:
+    checkpoint: ch02start
+  smoke_ch02:
+    checkpoint: ch02start
+  ch02baxby:
+    checkpoint: ch02start
+  clear_ch02:
+    checkpoint: ch02start
+  recordchain:
+    kind: record
+    checkpoint: ch02start
+  ckpt_ch02intro: {}
+  recordscene:                                         # PT_STATE names the checkpoint
+    kind: record
+    checkpoint: dynamic
+  recordch02intro:
+    kind: record
+    checkpoint: ch02intro
+  recordch03open:
+    rom: ch03boot
+    host_chapter: 4
+    kind: record
+  recordch04moose:
+    rom: ch04boot
+    host_chapter: 5
+    kind: record
+  ch04moose:
+    rom: ch04boot
+    host_chapter: 5
+  ch04sprites:
+    rom: ch04boot
+    host_chapter: 5
+    kind: diagnostic
+  recordch04parley:                                    # asserts the pack converts in place
+    rom: ch04boot
+    host_chapter: 5
+  ch04packmath:
+    rom: ch04boot
+    host_chapter: 5
+  ch04village:
+    rom: ch04boot
+    host_chapter: 5
+  ch04cottage:
+    rom: ch04boot
+    host_chapter: 5
+  recordch04cottage:
+    rom: ch04boot
+    host_chapter: 5
+    kind: record
+  ch04snag:
+    rom: ch04boot
+    host_chapter: 5
+  attackprobe:                                         # reads whatever map it lands on
+    rom: any
+    host_chapter: null
+    kind: diagnostic
+  clear_ch04:
+    rom: ch04boot
+    host_chapter: 5
+  clear_ch04_parley:
+    rom: ch04boot
+    host_chapter: 5
+  recordch04open:
+    rom: ch04boot
+    host_chapter: 5
+    kind: record
+  recordch04reveal:
+    rom: ch04boot
+    host_chapter: 5
+    kind: record
+  recordch03talk:
+    rom: ch03boot
+    host_chapter: 4
+    kind: record
+  recordch03win:
+    rom: ch03boot
+    host_chapter: 4
+    kind: record
+  recordch03midmap:
+    rom: ch03boot
+    host_chapter: 4
+    kind: record
+  recordch02map:
+    kind: record
+    checkpoint: ch02start
+  recordch02combat:
+    kind: record
+    checkpoint: ch02start
+  recordch02ending:
+    kind: record
+    checkpoint: ch02start
+
+# Named selections. `gate` is what must be green before a merge; the chapter suites are
+# what you run while working one chapter (each is a single ROM build). Everything else
+# is `--all` (every non-manual verdict scenario) or an explicit --scenarios list.
+suites:
+  # Deliberately tight: the controller contract, the ch00/ch01 spine, the SMS budget,
+  # and the current chapter. ch02/ch03 stay out because their checkpoints and routs
+  # cost more than a gate should -- run those with their chapter suite or --all.
+  gate:
+    - controller_turn
+    - win
+    - gameover
+    - retreat
+    - ch01
+    - ch01win
+    - lordfloor
+    - recordunitlist
+    - ch04moose
+    - ch04packmath
+    - ch04village
+    - ch04cottage
+    - ch04snag
+    - clear_ch04_parley
+
+  ch01:
+    - controller_turn
+    - win
+    - gameover
+    - retreat
+    - ch01
+    - ch01win
+    - ch01lord
+    - lordfloor
+    - clearprobe
+    - titlecard
+    - goodberry
+    - smoke_ch01
+    - clear_ch01
+
+  ch02:
+    - ch02
+    - ch02baxby
+    - smoke_ch02
+    - clear_ch02
+
+  ch03:
+    - ch03
+    - ch03prep
+    - ch03talk
+    - ch03door
+    - ch03chest
+    - ch03tourmaline
+    - ch03midmap
+    - ch03win
+    - smoke_ch03
+    - clear_ch03
+
+  ch04:
+    - ch04moose
+    - ch04packmath
+    - ch04village
+    - ch04cottage
+    - ch04snag
+    - recordch04parley
+    - smoke_ch04
+    - clear_ch04
+    - clear_ch04_parley
+
+  sandbox:
+    - recordunitlist
