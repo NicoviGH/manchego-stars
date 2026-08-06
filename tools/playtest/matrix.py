@@ -434,6 +434,21 @@ def _run_scenario(scenario, log_dir):
                    '/tmp/playtest-%s' % scenario.name, tail)
 
 
+RESULTS_NAME = 'results.json'
+
+
+def results_path(log_dir):
+    return os.path.join(log_dir, RESULTS_NAME)
+
+
+def clear_results(log_dir):
+    """Drop a previous run's verdict file so nothing can read it as this run's."""
+    try:
+        os.remove(results_path(log_dir))
+    except OSError:
+        pass
+
+
 def cmd_run(args):
     m = Manifest.load()
     names = m.select(suite=args.suite,
@@ -442,6 +457,11 @@ def cmd_run(args):
     groups = m.plan(names, rom=args.rom)
     log_dir = args.out
     os.makedirs(log_dir, exist_ok=True)
+    # A run takes minutes, so the verdict file is what everything downstream polls for.
+    # Leaving the last run's copy in place means a poller reads STALE verdicts the
+    # instant it starts -- and a crashed run leaves them there looking authoritative.
+    # (Same hazard run.sh already clears for the LLM handshake files.)
+    clear_results(log_dir)
 
     total = sum(len(g.scenarios) for g in groups)
     print('matrix: %d scenario(s) across %d ROM configuration(s) -> %s'
@@ -459,9 +479,9 @@ def cmd_run(args):
     if not report.ok:
         print('')
         print(render_failures(report))
-    with open(os.path.join(log_dir, 'results.json'), 'w') as fh:
+    with open(results_path(log_dir), 'w') as fh:
         json.dump(report.as_dict(), fh, indent=2)
-    print('results: %s' % os.path.join(log_dir, 'results.json'))
+    print('results: %s' % results_path(log_dir))
     return report.exit_code
 
 

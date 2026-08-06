@@ -65,6 +65,10 @@ WANTED = [
     'GameIntroHealthSafetyWaitButton', # exact health/safety input wait
     'Title_IDLE',               # exact title-screen input callback
     'ProcScr_SaveMenu',         # save/New Game menu
+    # The BETWEEN-CHAPTERS save prompt is a SECOND proc script (savemenu.c) sharing the
+    # same slot-select callback. Watching only ProcScr_SaveMenu left it unclassified, so
+    # the ch00 -> ch01 flow parked on it forever (#232).
+    'gProcScr_SaveMenuPostChapter',
     'SameMenu_CtrlLoop',        # exact save-menu input callback
     'SaveMenu_SaveSlotSelectLoop', # exact New Game save-slot input callback
     'ProcScr_NewGameDifficultySelect', # New Game difficulty menu
