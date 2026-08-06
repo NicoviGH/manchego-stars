@@ -31,6 +31,26 @@ local Recorder = dofile(PLAYTEST_DIR .. "/recorder.lua")
 --   src/proc.c sProcArray: 64 procs x 0x6C; +0x00 = proc_script
 local UNIT_SIZE = 0x48
 local US_DEAD = 4 -- include/bmunit.h (1 << 2)
+-- Harness tuning, in ONE table rather than one local apiece: harness.lua is a single Lua
+-- chunk and its main function sits near Lua's 200-local ceiling, so a handful of new
+-- top-level locals stops the WHOLE FILE loading and every scenario dies at once (#232).
+local TUNE = {
+    -- How many times one guarded input may be re-pressed into an unchanged, still-legal
+    -- state before failing closed. FE8 drops input during window fade-ins, so a single
+    -- press can be lost outright -- see guardedInput.
+    inputAttempts = 3,
+    -- Frames a RETRY waits. Only ever reached after the caller's own budget has already
+    -- elapsed, so this lengthens failures -- it never shortens a success.
+    retrySettle = 60,
+    -- How long one attack may take before the combat wait gives up. Measured: an
+    -- UNSKIPPED ch00 boss animation is 1238 frames, and vanilla's worst cases (crit, a
+    -- double, a level-up, a promotion) run well past that -- see chooseAttack.
+    combatFrames = 3600,
+    -- How many times a wait may back out of an unwanted screen before failing closed.
+    stuckRecoveries = 2,
+    -- A save slot takes TWO confirms; the prompt must be gone within this allowance.
+    saveConfirms = 4,
+}
 local CHAR_HLIN, CHAR_SCRAMSAX, CHAR_SEPHEK = 0x0D, 0x11, 0x68 -- NATASHA/KYLE/ONEILL slots
 -- prologue/sandbox host on chapter slot 1; a chapter load-test (e.g. --ch03-boot on slot 4)
 -- overrides via PT_HOST_CHAPTER so bootToMap/inChapter recognize the right slot.
@@ -462,7 +482,12 @@ local function observeController()
     put("game_control", observedProc(SYM.gProcScr_GameControl, "game_control_root"))
     put("game_early_start", observedProc(SYM.ProcScr_GameEarlyStartUI))
     put("title", observedProc(SYM.gProcScr_TitleScreen))
-    put("save_menu", observedProc(SYM.ProcScr_SaveMenu))
+    -- Two different proc scripts draw a save screen: the New Game one and the
+    -- between-chapters prompt. They share SaveMenu_SaveSlotSelectLoop, so classify()
+    -- needs no new state -- but watching only the first left the post-chapter prompt
+    -- invisible, and the ch00 -> ch01 flow sat on it until it timed out (#232).
+    put("save_menu", observedProc(SYM.ProcScr_SaveMenu)
+        or observedProc(SYM.gProcScr_SaveMenuPostChapter))
     put("difficulty", observedProc(SYM.ProcScr_NewGameDifficultySelect))
     local introKey = observedProc(SYM.ProcScr_ChapterIntro_KeyListen)
     put("chapter_intro", introKey or observedProc(SYM.gProcScr_ChapterIntro))
@@ -573,14 +598,37 @@ guardedInput = function(intention, key, expected, predicate, frames)
         shot("controller-illegal-input")
         return false
     end
-    press(K[key], 3)
-    local after = observeController()
-    local passed = predicate(after, before)
-    for _ = 1, (frames or 60) do
-        if passed then break end
-        yield()
+    -- FE8 drops input while a window is still animating in -- a battle forecast, a menu
+    -- fading up. A single press that lands in that window is simply LOST, and the wait
+    -- then burns its whole budget on a state nothing will ever move (#232: attacks that
+    -- never committed, and the run wedged in target_selection from then on). So re-press,
+    -- but only while this is still the SAME state offering the SAME legal action -- every
+    -- attempt is re-observed and re-authorised, and the postcondition is unchanged. That
+    -- is a bounded retry of one verified input, not the blind cadence #220 retired.
+    -- The FIRST attempt keeps the caller's whole budget, so every input that already
+    -- worked behaves exactly as before; a retry only happens where the old code had
+    -- already failed. (Getting this wrong -- splitting the budget across attempts -- made
+    -- the first press give up early and fire a second real action, which walked Marty off
+    -- his parley tile and broke ch04packmath.)
+    local budget = frames or 60
+    local after, passed = before, false
+    for attempt = 1, TUNE.inputAttempts do
+        press(K[key], 3)
         after = observeController()
         passed = predicate(after, before)
+        for _ = 1, (attempt == 1 and budget or TUNE.retrySettle) do
+            if passed then break end
+            yield()
+            after = observeController()
+            passed = predicate(after, before)
+        end
+        if passed or attempt == TUNE.inputAttempts then break end
+        -- Only retry into an unchanged, still-legal state; anything else means the input
+        -- DID land and the postcondition is simply wrong, which must stay a failure.
+        local now = observeController()
+        local nowActions = Controller.legalActions(now)
+        if controllerState(now) ~= controllerState(before) then break end
+        if not (nowActions and Controller.findAction(nowActions, intention)) then break end
     end
     traceInput(before, actions, intention, key, expected, passed and "pass" or "fail:postcondition", after)
     if not passed then shot("controller-postcondition") end
@@ -650,18 +698,59 @@ local function waitFor(pred, frames, tapA)
     return false
 end
 
+-- Wait until FE8 reaches `want`. `frames` bounds how long we tolerate NOTHING HAPPENING;
+-- it is not a wall-clock cap, because waiting for the map to become playable routinely
+-- spans a scene -- a chapter opening, a turn event -- and no fixed budget fits every
+-- cutscene (#232: the ch01 opening outran 300 frames, so ch01win/lordfloor logged a
+-- controller fault on a chapter they went on to clear). The event engine running is
+-- productive work, so it does not burn the budget; STALL_CEILING keeps a genuinely
+-- wedged engine failing closed here rather than at run.sh's wall-clock deadline.
+local STALL_CEILING = 40
 local function awaitControllerState(want, frames)
+    local budget = frames or 300
+    local idle, total, recoveries = 0, 0, 0
     local last
-    for _ = 1, (frames or 300) do
+    while idle < budget and total < budget * STALL_CEILING do
+        total = total + 1
         last = observeController()
         local state = controllerState(last)
         if state == want then return true end
-        if state ~= "transition" then
-            traceFailure("await_state", want, "fail:unexpected-state:" .. tostring(state), last,
-                "controller-unexpected-state")
-            return false
+        if not (last.procs and last.procs.std_event) then idle = idle + 1 end
+        -- Dialogue is never what a caller waits AT -- the targets are player_map_idle,
+        -- unit_selected or a menu -- and FE8 interleaves text with play constantly: a
+        -- turn event, a village line, a post-combat quote. Advancing it is a CLASSIFIED
+        -- state with a legal action, driven through the same guarded single input as
+        -- everything else, so this is the #220 contract, not the blind cadence #220
+        -- retired. Without it every ch01 flow bailed on the first line of text (#232).
+        if state == "dialogue_wait" and want ~= "dialogue_wait" then
+            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
+                return controllerState(after) ~= "dialogue_wait"
+            end, 60) then return false end
+        elseif state ~= "transition" then
+            -- Nicolas's call, and it is how studios keep a suite moving: if we are parked
+            -- somewhere the caller did not want, BACK OUT rather than die here -- a menu or
+            -- a target selector we cannot commit is recoverable, and one wedged screen used
+            -- to cost the entire remaining run (#232). This is not a blanket rescue: the
+            -- cancel is a legal enumerated action, every recovery is TRACED so a real defect
+            -- cannot hide behind it, and the allowance is small so a genuinely stuck screen
+            -- still fails closed. (A silent version of this is precisely what let five
+            -- defects sit unnoticed behind the old blind cadence.)
+            local cancel = Controller.findAction(Controller.legalActions(last), "cancel_menu")
+                or Controller.findAction(Controller.legalActions(last), "cancel_target")
+                or Controller.findAction(Controller.legalActions(last), "cancel_selection")
+            if cancel and recoveries < TUNE.stuckRecoveries then
+                recoveries = recoveries + 1
+                traceInput(last, Controller.legalActions(last), cancel.intention, cancel.key,
+                    "backing out of an unwanted " .. tostring(state), "recovered", last)
+                press(K[cancel.key], 3)
+            else
+                traceFailure("await_state", want, "fail:unexpected-state:" .. tostring(state), last,
+                    "controller-unexpected-state")
+                return false
+            end
+        else
+            yield()
         end
-        yield()
     end
     traceFailure("await_state", want, "fail:state-timeout", last, "controller-state-timeout")
     return false
@@ -708,14 +797,26 @@ local function chooseAttack(actorAddr, stopWhen)
         return controllerState(after) == "target_selection"
             and after.target and after.target.kind == "attack"
     end, 300) then return false end
-    if not guardedInput("confirm_target", "A", "target selection starts the battle proc", function(after)
-        return after.procs.battle ~= nil
+    -- Commit proof has to be mode-agnostic. procs.battle is gProc_ekrBattle, the battle
+    -- ANIMATION proc: a scenario that called pokeFastConfig() runs MAP combat, where it
+    -- never spawns, so requiring it alone fails an attack that in fact resolved (#232 --
+    -- it took out ch04packmath/ch04snag/clear_ch04 while the attacks all landed). The
+    -- target selector closing is the signal common to both modes; the combat wait below
+    -- is what proves the attack actually resolved, so this stays honest.
+    if not guardedInput("confirm_target", "A", "target selection commits the attack", function(after)
+        return after.procs.battle ~= nil or controllerState(after) ~= "target_selection"
     end, 300) then return false end
-    -- combat (with battle anims) ends when the actor is greyed out
+    -- Combat (with battle anims) ends when the actor is greyed out. The budget has to fit
+    -- an animation NOBODY IS SKIPPING: the old 1200 was sized when waitFor still mashed A
+    -- on a 50-frame cadence, which advanced the in-battle quote text. #220 retired that
+    -- cadence on principle, and the ch00 boss animation then measured 1238 frames -- 38
+    -- over, so every ch00/ch01 combat scenario timed out on a fight it had already won
+    -- (#232). Vanilla's real worst cases are far longer than one clean round (crit, a
+    -- double, a level-up, a promotion), so size this for those, not for the measurement.
     local done = waitFor(function()
         return (ru32(actorAddr + 0x0C) & 0x2) ~= 0 -- US_UNSELECTABLE
             or (stopWhen ~= nil and stopWhen())
-    end, 1200, true)
+    end, TUNE.combatFrames, true)
     if not done then
         traceFailure("await_combat", "actor becomes unavailable or scenario terminal fires",
             "fail:combat-timeout", nil, "controller-combat-timeout")
@@ -846,6 +947,36 @@ end
 
 -- Execute at most one input for a recognized boot state. `nil` means the state is unsupported;
 -- false means a guarded input failed; true means one input passed or a transition yielded.
+-- A save slot takes TWO confirms: A picks the slot, then a Save/Cancel bar appears and a
+-- second A commits it. Both presses are the same legal action on the same classified state
+-- (SaveMenu_SaveSlotSelectLoop stays the idle callback throughout), so one guardedInput
+-- cannot verify the first press -- there is no state change to check it against. Verify the
+-- OUTCOME instead: legality is re-checked before every press, the loop stops the instant the
+-- save menu is gone, and it fails closed if the prompt outlives the allowance. Bounded and
+-- outcome-verified, so this is not the blind cadence #220 retired.
+-- Without it the ch00 -> ch01 hand-off parked on the post-chapter prompt forever (#232).
+local function driveSaveSlot()
+    for _ = 1, TUNE.saveConfirms do
+        local observation = observeController()
+        if not observation.procs.save_menu then return true end
+        local actions = Controller.legalActions(observation)
+        local chosen = actions and Controller.findAction(actions, "select_save_slot") or nil
+        if not chosen or chosen.key ~= "A" then
+            traceInput(observation, actions, "select_save_slot", "none",
+                "the save prompt offers its slot-confirm input", "fail:not-legal", observation)
+            shot("controller-illegal-input")
+            return false
+        end
+        press(K.A, 3)
+        if waitFor(function() return observeController().procs.save_menu == nil end, 240) then
+            return true
+        end
+    end
+    traceFailure("select_save_slot", "the save prompt closes within its confirm allowance",
+        "fail:postcondition", nil, "controller-save-prompt")
+    return false
+end
+
 local function advanceBootState(observation, state)
     if state == "health_safety_wait" then
         return guardedInput("continue", "A", "health/safety wait clears", function(after)
@@ -860,9 +991,7 @@ local function advanceBootState(observation, state)
             return controllerState(after) ~= "save_menu_input"
         end, 600)
     elseif state == "save_slot_input" then
-        return guardedInput("select_save_slot", "A", "save-slot input clears", function(after)
-            return controllerState(after) ~= "save_slot_input"
-        end, 600)
+        return driveSaveSlot()
     elseif state == "difficulty_input" then
         return guardedInput("confirm_difficulty", "A", "difficulty input clears", function(after)
             return controllerState(after) ~= "difficulty_input"
@@ -1299,7 +1428,13 @@ local function winCh00()
             return false
         end
         shot("attacking-sephek")
-        if not chooseAttack(scram.addr) then
+        -- Stop on the OUTCOME, not on the actor. Sephek's death fires DefeatBoss on the
+        -- spot, so the chapter tears the map down and Scramsax never becomes
+        -- US_UNSELECTABLE -- the win succeeds and the combat wait times out anyway
+        -- (#232). chooseAttack takes stopWhen for exactly this case.
+        if not chooseAttack(scram.addr, function()
+            return isDead(red(CHAR_SEPHEK)) or chapter() ~= HOST_CHAPTER
+        end) then
             result("FAIL", "combat did not reach its verified postcondition")
             return false
         end

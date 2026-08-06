@@ -236,12 +236,19 @@ classify(attackTarget, "target_selection", "live attack target selector")
 a = action(attackTarget, "confirm_target")
 check(a and a.key, "A", "live unfrozen target can be confirmed")
 check(a and a.target, 0x81, "target confirmation records the live unit id")
+-- #232: a selector we cannot commit must be escapable, or a driver wedges in it for the
+-- rest of the run. B backs out to the command menu; enumerating it is what makes the
+-- recovery a legal observed action rather than a guessed key.
+a = action(attackTarget, "cancel_target")
+check(a and a.key, "B", "a live target selector can be backed out of")
+
 local frozenTarget = {
     procs = proc("target_selection", "target_selection_input"),
     target = { kind = "talk", x = 7, y = 5, uid = 0x41, frozen = true },
 }
 classify(frozenTarget, "transition", "frozen target selector is passive")
 check(action(frozenTarget, "confirm_target"), nil, "frozen target exposes no input")
+check(action(frozenTarget, "cancel_target"), nil, "a frozen selector exposes no escape either")
 
 -- The battle forecast is display-only. TargetSelection_Loop owns confirmation; the
 -- forecast's callbacks must be observed as passive transitions and never expose a

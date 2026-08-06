@@ -307,6 +307,23 @@ class VerdictParsing(unittest.TestCase):
         self.assertEqual(mx.parse_verdict(self.REAL_PASS, 1), 'FAIL')
 
 
+class StaleResults(unittest.TestCase):
+    """Regression: a run takes minutes and results.json is what everything downstream
+    polls for, so last run's copy must not survive into this one."""
+
+    def test_clearing_removes_a_previous_runs_verdicts(self):
+        import tempfile
+        d = tempfile.mkdtemp()
+        with open(mx.results_path(d), 'w') as fh:
+            fh.write('{"ok": true}')
+        mx.clear_results(d)
+        self.assertFalse(os.path.exists(mx.results_path(d)))
+
+    def test_clearing_an_empty_directory_is_not_an_error(self):
+        import tempfile
+        mx.clear_results(tempfile.mkdtemp())      # must not raise
+
+
 class WrongRomGuard(unittest.TestCase):
     """build_campaign stamps which flags built the ROM; a scenario bound to a different
     configuration must be refused in 0s rather than time out in mGBA."""

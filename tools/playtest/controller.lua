@@ -248,6 +248,10 @@ function M.legalActions(observation)
         end
     elseif state == "target_selection" then
         add(actions, "confirm_target", "A", "target.currentTarget", observation.target.uid)
+        -- B backs out of target selection to the command menu. Enumerating it is what
+        -- lets a driver RECOVER from a selector it cannot commit instead of wedging
+        -- there for the rest of the run (#232).
+        add(actions, "cancel_target", "B", "target.selection")
     elseif state == "player_map_idle" then
         addCursorActions(actions, observation.cursor)
         if observation.cursor then
