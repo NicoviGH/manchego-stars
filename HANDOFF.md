@@ -6,14 +6,23 @@ deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; scope and ba
 issues. Before a context rollover, warn Nicolas, refresh this file, and start a fresh instance —
 don't rely on auto-compaction.
 
-Refreshed 2026-08-06 (Opus). `main` = `52d054a`, level with `origin/main`.
-**IN FLIGHT: PR #237 (`feat/236-state-inspector`) — built, verified, NOT merged.** It closes #236
-and #232. `main` itself is clean; nothing else is open, no stashes.
-**Its CI never ran — a GitHub Actions major outage (incident opened 15:22 UTC 2026-08-06), not this
-branch. Do not re-diagnose it; the evidence is already a comment on the PR.** Every run on `main`
+Refreshed 2026-08-06 (Opus). `main` = `5db7878`, level with `origin/main`.
+**IN FLIGHT: THREE STACKED PRs, all built and verified, none merged. MERGE IN THIS ORDER:**
+
+| order | PR | branch | delivers |
+|---|---|---|---|
+| 1 | **#237** | `feat/236-state-inspector` | the state inspector. Closes #236 + #232, gate 13/14 → **14/14** |
+| 2 | **#239** | `feat/138-inject-chapter` | `hosted_chapters()` — the ch04 host-slot guard now covers ch05 |
+| 3 | **#240** | `feat/238-controller-contract` | the ch01 spine on the controller contract (#238, first pass) |
+
+Each is based on the one above it, so **merging out of order will produce a mess.** `main` itself is
+clean, no stashes. Squash-merge 1 → 2 → 3, delete branches, then refresh this file.
+**CI never ran on ANY of them — a GitHub Actions major outage (incident opened 15:22 UTC
+2026-08-06), not these branches. Do not re-diagnose it; the evidence is already a comment on #237.**
+Every run on `main`
 failed the same way, including doc-only commits: `The job was not acquired by Runner of type hosted`.
 Re-run with `gh run rerun 31125252344` once runners recover.
-**Next: land #237, then ch05 (#25). Jump to NEXT SESSION.**
+**Next: land all three, then ch05 (#25). Jump to NEXT SESSION.**
 
 ## Current state
 
@@ -24,9 +33,9 @@ Re-run with `gh run rerun 31125252344` once runners recover.
   configuration at most once and prints a verdict table. **`tools/playtest/matrix.yaml` is now the
   single source of what a scenario needs** — ROM flag, `PT_HOST_CHAPTER`, checkpoint, fps/deadline —
   and `check.py check_playtest_matrix` fails the build if a `harness.lua` scenario has no row.
-- **Gate status: 14/14 on `feat/236-state-inspector` — the first fully green gate** (verified live
-  2026-08-06, 3 builds, 5m34s). On `main` it is still 13/14 until #237 lands; `ch01` is the
-  difference. Local verification is a strict SUPERSET of what CI checks — `checks.yml` is a
+- **Gate status: 14/14 — the first fully green gate** (verified live 2026-08-06 on #237, and
+  again on #240 after the controller-contract migration). On `main` it is still 13/14 until #237
+  lands; `ch01` is the difference. Local verification is a strict SUPERSET of what CI checks — `checks.yml` is a
   deliberate lightweight drift guard that never builds the ROM — so an Actions outage blocks the
   merge button, not the evidence.
 - **Cross-agent continuity:** Nicolas uses Codex only between Claude sessions. Codex must leave an
@@ -45,11 +54,22 @@ Re-run with `gh run rerun 31125252344` once runners recover.
 
 **Start from the GitHub issue, not from here.** These notes only add what the issue does not say.
 
-### 1. Land PR #237 (#236 + #232)  ← START HERE
+### 1. Land the three stacked PRs, in order  ← START HERE
 
-Built and verified; only the merge is owed. Re-run CI (`gh run rerun 31125252344`), or merge on the
-local evidence if Actions is still out — see the header. Squash-merge, delete the branch, then
-refresh this file. It has had no `/code-review`; that is user-triggered (`/code-review ultra 237`).
+**#237 → #239 → #240.** All built and verified; only the merges are owed. Re-run CI
+(`gh run rerun 31125252344`), or merge on the local evidence if Actions is still out — see the
+header. None has had a `/code-review`; that is user-triggered (`/code-review ultra 237`).
+
+**Do not re-verify them.** `make matrix` was run green (14/14) on #237 and again on #240, `make
+test` and `make check` are clean on all three, and #239's canonical ROM is byte-identical to its
+pre-change baseline `42cd82360be3c186c60f9366d57c7608d3d83548`.
+
+Nicolas's standing question, answered with measurements so it is not re-litigated: **the new gates
+cost ~1.5s on `make check` (23.6s total) and +4% on `make matrix` (5m34s → 5m49s, almost all of it
+`ch01win` 28s → 40s because it now verifies instead of mashing A).** The real cost is not seconds —
+it is that a new FE8 input state must be CLASSIFIED before a scenario can drive it. ch05 will
+probably surface some. That work always existed; it used to be deferred into mystery failures.
+**If the stall detector ever false-positives, `TUNE.stallFrames` is the dial — do not remove it.**
 
 What it shipped, so the next instance can USE it instead of re-deriving it:
 
@@ -60,17 +80,37 @@ What it shipped, so the next instance can USE it instead of re-deriving it:
 - A verdict flagged `*** UNCLASSIFIED WAIT ***` means FE8 is waiting on something with no name yet.
   The fix is always the same four edits: `gen_symbols.py` WANTED, `CALLBACK_NAMES`,
   `observeController`, a `classify` rule — then let the SCENARIO choose the answer.
-- `harness.lua` is **at Lua's 200-local ceiling**. Adding one top-level `local` stops the entire
-  file loading and every scenario dies at once. Hang new helpers off an existing table (`INSPECT`,
-  `TUNE`); `lua -e 'assert(loadfile("tools/playtest/harness.lua"))'` catches it in 0s.
+- `harness.lua` has **exactly TWO free slots** against Lua's 200-local ceiling (measured: +2
+  compiles, +3 does not). Hang new helpers off an existing table (`INSPECT`, `TUNE`) rather than
+  adding a top-level `local` — crossing it stops the whole file loading and every scenario dies at
+  once. `check_lua_chunks_load` now fails the build on it in 0s (arrives with #239).
 
-### 2. ch05's build work (#25) — with #222 still held open on purpose
+### 2. #238 second pass — the rest of the blind-press verdict scenarios
 
-**Nicolas's standing instruction: carry #222 in mind while building ch05 and re-scope it from
-experience.** Workstream 2 (#236) was taken on exactly that basis and paid off — it closed #232 as a
-side effect and got the gate to 14/14. Workstreams 3–4 remain deferred and want the same evidence
-test; **re-scope them from what #236 actually taught**, which is owed and not yet done. **#138** is
-the natural forcing function to take *while* hosting ch05.
+#240 did `ch01win` and the shared ch01 route. **Still owed: `retreat`, `lordfloor`, `ch01lord`,
+`recordsupply`, and three `LORD_CANDIDATES` blind menu-walks at `harness.lua` 3122/3164/3211.**
+Scope from `matrix.yaml`'s `kind`, NEVER from the scenario name — `recordsupply` and
+`recordunitlist` are `kind: verdict` despite the prefix, and `recordunitlist` is in the gate.
+
+The acceptance test for this work is the bite test, not a green run: temporarily break a
+classification and confirm the scenario now FAILS. #240 proved it on `ch01win` — the same sabotage
+passed before the migration.
+
+### 3. ch05's build work (#25) — with #222 re-scoped and settled
+
+**#222 has been re-scoped from experience and approved (2026-08-06).** Workstream 3 is closed (its
+DoD was already met by #220 — only 13% of a median scenario is UI-driving) and replaced by **#238**;
+workstream 4 is consolidated into **#138**. The epic closes when #138 and #238 do.
+
+**#138 no longer gates ch05, and that correction matters for planning.** The host-slot facts were
+already module constants, and the guard that mattered shipped in #239. What remains of #138 is only
+the `inject_chapter(descriptor)` refactor — and measured, that is worth much less than it sounds:
+**of 2,209 LOC in `inject_ch01`–`ch04`, just 123 (6%) is the host skeleton a descriptor collapses**
+(~30 lines per chapter, already helper calls). The other 94% is per-chapter rosters, event scripts
+and scenes. Recommendation on the issue: close #138 after #239, or shrink it to the one real
+cleanup — ch03's bespoke `_inject_ch03_tile_changes` should migrate onto ch04's generic
+`_inject_tile_changes`. Byte-identical baseline for any such work:
+`42cd82360be3c186c60f9366d57c7608d3d83548`.
 
 ch05 also needs a `matrix.yaml` entry — `docs/adding-a-chapter.md` step 11 has the runbook, and
 `check.py` enforces it.
@@ -112,9 +152,10 @@ Parked, not scheduled: **#228** physical cartridges (after the ROM is done).
 
 ## Working tree - do not lose or revert
 
-- **One live branch: `feat/236-state-inspector` (PR #237), pushed and level with its remote.** No
-  stashes. `main` is `52d054a`, level with `origin/main`. Do not rebuild or re-verify #237 — the gate
-  was run green on it (14/14); only the merge is owed.
+- **Three live branches, stacked, all pushed and level with their remotes:**
+  `feat/236-state-inspector` (#237) → `feat/138-inject-chapter` (#239) →
+  `feat/238-controller-contract` (#240). No stashes. `main` is level with `origin/main`.
+  Do not rebuild or re-verify them — see NEXT SESSION §1 for what was already run green.
 - **Two more gitignored `gen_symbols.py` outputs** land next to `symbols.lua` once #237 is in:
   `procscr.lua` and `symbols.json`. Regenerated after every `make`; never commit them.
 - **`.build-config.json` (repo root, gitignored) records which boot flags built the ROM in the tree.**
