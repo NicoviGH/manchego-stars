@@ -10,8 +10,8 @@ Refreshed 2026-08-06 (Opus). `main` = `c5dec1d`, level with `origin/main`. **Not
 the three-PR stack LANDED (#237 → #239 → #240, merge commits, in order), and its code-review
 follow-up landed on top (#241 in PR #242, squashed).** No branches, no stashes. Verified on merged
 `main`: `make test` exit 0 (41 suites), `make check` = `drift check: clean`, `make matrix` =
-**14/14** (4m23s), `git diff --check` clean. #236, #232 and #241 closed; **#138 and #238 stay open
-by design** — each got a first pass only (see NEXT SESSION §2).
+**14/14** (4m23s), `git diff --check` clean. #236, #232, #241 and **#138** are closed (#138 on the
+measurement — see §3); **#238 stays open by design**, it got a first pass only (NEXT SESSION §2).
 
 **CI is GREEN again and the outage is over** — `checks` passed on `main` at `5d303eb` and on
 #242's branch head. The 2026-08-06 Actions incident (opened 15:22 UTC) drained slowly rather than
@@ -104,16 +104,16 @@ passed before the migration.
 
 **#222 has been re-scoped from experience and approved (2026-08-06).** Workstream 3 is closed (its
 DoD was already met by #220 — only 13% of a median scenario is UI-driving) and replaced by **#238**;
-workstream 4 is consolidated into **#138**. The epic closes when #138 and #238 do.
+workstream 4 was consolidated into #138, **which is now CLOSED (Nicolas, 2026-08-06)**. The epic
+closes when #238 does.
 
-**#138 no longer gates ch05, and that correction matters for planning.** The host-slot facts were
-already module constants, and the guard that mattered shipped in #239. What remains of #138 is only
-the `inject_chapter(descriptor)` refactor — and measured, that is worth much less than it sounds:
-**of 2,209 LOC in `inject_ch01`–`ch04`, just 123 (6%) is the host skeleton a descriptor collapses**
-(~30 lines per chapter, already helper calls). The other 94% is per-chapter rosters, event scripts
-and scenes. Recommendation on the issue (now that #239 has landed): close #138, or shrink it to the one real
-cleanup — ch03's bespoke `_inject_ch03_tile_changes` should migrate onto ch04's generic
-`_inject_tile_changes`. Byte-identical baseline for any such work:
+**Do not re-open the `inject_chapter(descriptor)` idea without new evidence — it was measured and
+rejected.** The guard that mattered shipped in #239 (and was hardened in #241), and of 2,209 LOC in
+`inject_ch01`–`ch04`, just **123 (6%)** is the host skeleton a descriptor would collapse — ~30 lines
+a chapter, already helper calls. The other 94% is per-chapter rosters, event scripts and scenes. The
+one real cleanup left inside it, deliberately not re-filed: ch03's bespoke
+`_inject_ch03_tile_changes` should migrate onto ch04's generic `_inject_tile_changes` — a ~20-line
+change that ch05's tile-change work sits next to anyway. Byte-identical baseline if you do it:
 `42cd82360be3c186c60f9366d57c7608d3d83548`.
 
 ch05 also needs a `matrix.yaml` entry — `docs/adding-a-chapter.md` step 11 has the runbook, and
