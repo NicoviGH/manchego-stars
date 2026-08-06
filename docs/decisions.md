@@ -3215,6 +3215,33 @@ _Decided: 2026-07-30 (CLAUDE; ch05 `0x9C9` Sahnar block)._
 _Moved here from `HANDOFF.md` 2026-07-02 (audit): these are durable engineering constraints, not
 session state. `HANDOFF.md` points here._
 
+- **`harness.lua` is ONE Lua chunk against a 200-local ceiling — new top-level `local`s can stop
+  the whole file loading** (2026-08-06, #232). Five new constants pushed the main function over
+  Lua's limit and `harness.lua` stopped parsing outright: every scenario dies at once, and no
+  source-text assertion notices, so a whole matrix run reported meaningless verdicts. Tuning lives
+  in the single `TUNE` table for this reason — add to it rather than declaring another top-level
+  local. `test_playtest_harness.py` now genuinely **compiles** the file, so `make test` catches it
+  before anything reaches the emulator; a `loadfile` check must ASSERT, since it returns `nil, err`
+  rather than raising (that is exactly how this slipped past a manual check).
+
+- **Removing a blind input cadence can break waits that were silently relying on it** (2026-08-06,
+  #232). #220 replaced cadence input with observed guarded input, which is right — but `waitFor`'s
+  50-frame A-mash had been *load-bearing*: it advanced in-battle quote text, blew through the
+  post-chapter save prompt, and re-sent presses FE8 drops during window fade-ins. Six waits had been
+  sized or written around it and broke silently, unnoticed for weeks because the ch00/ch01 scenarios
+  are not in the hand-run gate list and playtests have no CI. Two durable rules came out of it:
+  **size a budget for the un-skipped case** (the ch00 boss animation measures 1238 frames against
+  the old 1200 budget), and **prefer progress to wall-clock** — a running event engine is productive
+  work and must not burn a stall budget, with a ceiling so a wedged one still fails closed.
+
+- **A single guarded press can be LOST: FE8 drops input while a window animates in** (2026-08-06,
+  #232). A press swallowed by a battle-forecast fade meant the wait burned its whole budget on a
+  state nothing would move, and the run stayed wedged in `target_selection` for the rest of the
+  scenario. `guardedInput` re-presses, but only while the state and the legal action are unchanged,
+  and the FIRST attempt keeps the caller's whole budget so anything that already worked is
+  untouched. Splitting that budget across attempts is a real hazard, not a hypothetical: it makes
+  the first press give up early and fire a SECOND real action (it walked Marty off his parley tile).
+
 - **A render from the frame PNGs proves the ART; only the ROM proves the TILING and the PALETTE**
   (2026-08-03, #206). A preview GIF built from `poses_to_feditor`'s output and the in-game sprite
   are separated by a whole stage — the frames are chopped into 8x8 tiles, packed into sheets, and
