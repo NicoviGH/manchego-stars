@@ -271,9 +271,11 @@ end
 --     post       optional fn(reachedEnd) run once after the loop (e.g. a final "title" shot)
 local controllerState, guardedInput, freezeReport
 -- The #236 state inspector, as ONE table rather than three top-level locals: this file
--- is at Lua's 200-local ceiling for a main chunk, and crossing it stops the whole harness
--- loading (every scenario dies at once). Fields are assigned further down, next to the
--- proc-pool reader they build on.
+-- is against Lua's 200-local ceiling for a main chunk, and crossing it stops the whole
+-- harness loading (every scenario dies at once). Consolidating here bought back 2 slots,
+-- and 2 is all the headroom there is -- measured 2026-08-06, +2 top-level locals still
+-- compiles and +3 does not. `check_lua_chunks_load` now fails the build on it in 0s.
+-- Fields are assigned further down, next to the proc-pool reader they build on.
 local INSPECT = {}
 local function recordCutscene(o)
     o = o or {}
