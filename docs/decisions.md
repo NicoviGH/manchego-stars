@@ -444,6 +444,30 @@ _Decided: 2026-06-25 (CLAUDE; brainstormed-then-TDD; scope "full gate" — Nicol
 
 ---
 
+**A stack of PRs lands with MERGE COMMITS, and every child retargets to `main` BEFORE its parent's
+branch is deleted.** Squash-merge stays the default for the normal case (one feature, one branch off
+`main`). It is the wrong tool for a stack — each PR based on the one below it — because a squash
+collapses the parent into a *new* commit that is not in the child's history, so GitHub re-shows the
+parent's diff on the child and a rebase + force-push is owed between every merge. Merging with a
+merge commit keeps the parent's commits in history, so each child merges clean with no rebase at all
+(verified 2026-08-06 landing #237 → #239 → #240 back to back).
+
+The trap that is not obvious: **`gh pr merge --delete-branch` on the parent CLOSES any PR whose base
+is that branch.** GitHub does not retarget it, and a closed PR cannot be retargeted afterward
+(`Cannot change the base branch of a closed pull request`). The order that works:
+
+```sh
+gh pr edit <child> --base main     # retarget every child FIRST
+gh pr merge <parent> --merge --delete-branch
+```
+
+Recovery if a child is already closed this way: re-push the deleted base ref from its recorded tip
+(`git push origin <oldtip>:refs/heads/<branch>`), `gh pr reopen <child>`, retarget it to `main`,
+merge, then delete the restored ref. This is why the handoff records each branch tip.
+_Decided: 2026-08-06 (Nicolas — merge commits for the stack; the retarget-before-delete rule is from landing #237/#239/#240)_
+
+---
+
 ## Combat System
 
 > **2026-05-28 — Combat resolution reverted to vanilla FE.** The earlier "Hybrid

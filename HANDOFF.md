@@ -6,37 +6,20 @@ deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; scope and ba
 issues. Before a context rollover, warn Nicolas, refresh this file, and start a fresh instance —
 don't rely on auto-compaction.
 
-Refreshed 2026-08-06 (Opus). `main` = `5db7878`, level with `origin/main`.
-**IN FLIGHT: THREE STACKED PRs, all built and verified, none merged. MERGE IN THIS ORDER:**
+Refreshed 2026-08-06 (Opus). `main` = `c489c56`, level with `origin/main`. **Nothing in flight —
+the three-PR stack LANDED (#237 → #239 → #240, merge commits, in order).** No branches, no stashes.
+Verified on merged `main`: `make test` exit 0 (40 suites), `make check` = `drift check: clean`,
+`git diff --check` clean. #236 and #232 auto-closed; **#138 and #238 stay open by design** — each
+got a first pass only (see NEXT SESSION §1–§2).
 
-| order | PR | branch | delivers |
-|---|---|---|---|
-| 1 | **#237** | `feat/236-state-inspector` | the state inspector. Closes #236 + #232, gate 13/14 → **14/14** |
-| 2 | **#239** | `feat/138-inject-chapter` | `hosted_chapters()` — the ch04 host-slot guard now covers ch05 |
-| 3 | **#240** | `feat/238-controller-contract` | the ch01 spine on the controller contract (#238, first pass) |
+**CI still never ran on any of it — a GitHub Actions major outage (incident opened 15:22 UTC
+2026-08-06), not our branches. Do not re-diagnose it; the evidence is a comment on #237.** Every run
+on `main` failed the same way, including doc-only commits: `The job was not acquired by Runner of
+type hosted`. Re-run with `gh run rerun 31125252344` once runners recover; local verification is a
+strict superset of what `checks.yml` does, so this blocked the merge button, not the evidence.
+**None of the three had a `/code-review` — that is user-triggered (`/code-review ultra <PR#>`).**
 
-Each is based on the one above it, so **merging out of order will produce a mess.** `main` itself is
-clean, no stashes.
-
-**Squash-merging a stack needs a rebase between each step — do not skip it.** A squash collapses
-#237 into ONE new commit on `main` that is not in #239's history, so when GitHub retargets #239's
-base the PR re-shows #237's changes and can conflict. After each merge, rebase the next branch onto
-`main` and force-push (branch tips recorded so the old base is resolvable after deletion):
-
-```sh
-# after #237 merges (old base tip 2fe2d95):
-git rebase --onto main 2fe2d95 feat/138-inject-chapter && git push --force-with-lease
-# after #239 merges (old base tip 99f6337):
-git rebase --onto main 99f6337 feat/238-controller-contract && git push --force-with-lease
-```
-
-`feat/238-controller-contract` is `26479a9`. Then refresh this file.
-**CI never ran on ANY of them — a GitHub Actions major outage (incident opened 15:22 UTC
-2026-08-06), not these branches. Do not re-diagnose it; the evidence is already a comment on #237.**
-Every run on `main`
-failed the same way, including doc-only commits: `The job was not acquired by Runner of type hosted`.
-Re-run with `gh run rerun 31125252344` once runners recover.
-**Next: land all three, then ch05 (#25). Jump to NEXT SESSION.**
+**Next in the agreed order: #238's second pass (NEXT SESSION §2), then ch05 (#25). Jump there.**
 
 ## Current state
 
@@ -47,11 +30,10 @@ Re-run with `gh run rerun 31125252344` once runners recover.
   configuration at most once and prints a verdict table. **`tools/playtest/matrix.yaml` is now the
   single source of what a scenario needs** — ROM flag, `PT_HOST_CHAPTER`, checkpoint, fps/deadline —
   and `check.py check_playtest_matrix` fails the build if a `harness.lua` scenario has no row.
-- **Gate status: 14/14 — the first fully green gate** (verified live 2026-08-06 on #237, and
-  again on #240 after the controller-contract migration). On `main` it is still 13/14 until #237
-  lands; `ch01` is the difference. Local verification is a strict SUPERSET of what CI checks — `checks.yml` is a
-  deliberate lightweight drift guard that never builds the ROM — so an Actions outage blocks the
-  merge button, not the evidence.
+- **Gate status: 14/14 on `main` — the first fully green gate** (verified live 2026-08-06 on #237,
+  and again on #240 after the controller-contract migration; both are now merged, so `main` carries
+  it). Local verification is a strict SUPERSET of what CI checks — `checks.yml` is a deliberate
+  lightweight drift guard that never builds the ROM.
 - **Cross-agent continuity:** Nicolas uses Codex only between Claude sessions. Codex must leave an
   explicit HANDOFF entry naming what it changed, the active branch/PR and commit state, verification
   actually run, and the exact next step. Codex uses ordinary short-lived feature branches in this
@@ -68,15 +50,10 @@ Re-run with `gh run rerun 31125252344` once runners recover.
 
 **Start from the GitHub issue, not from here.** These notes only add what the issue does not say.
 
-### 1. Land the three stacked PRs, in order  ← START HERE
+### 1. What the landed stack gave you — USE it, don't re-derive it
 
-**#237 → #239 → #240.** All built and verified; only the merges are owed. Re-run CI
-(`gh run rerun 31125252344`), or merge on the local evidence if Actions is still out — see the
-header. None has had a `/code-review`; that is user-triggered (`/code-review ultra 237`).
-
-**Do not re-verify them.** `make matrix` was run green (14/14) on #237 and again on #240, `make
-test` and `make check` are clean on all three, and #239's canonical ROM is byte-identical to its
-pre-change baseline `42cd82360be3c186c60f9366d57c7608d3d83548`.
+The three PRs are merged; nothing is owed on them. What they shipped is the tooling the next
+chapter runs on, so read this before building anything.
 
 Nicolas's standing question, answered with measurements so it is not re-litigated: **the new gates
 cost ~1.5s on `make check` (23.6s total) and +4% on `make matrix` (5m34s → 5m49s, almost all of it
@@ -87,8 +64,8 @@ probably surface some. That work always existed; it used to be deferred into mys
 
 What it shipped, so the next instance can USE it instead of re-deriving it:
 
-- **A failing scenario now dumps its own diagnosis.** `inspect_state.py` (lands in `tools/playtest/`
-  with #237) has `render <log>` — the verdict, the rule that produced it, every rule rejected and
+- **A failing scenario now dumps its own diagnosis.** `tools/playtest/inspect_state.py`
+  has `render <log>` — the verdict, the rule that produced it, every rule rejected and
   why, and the live procs named by exact symbol — and `diff <a> <b>` for the first divergence
   between two runs. **Read that before rebuilding anything** — it is the whole point.
 - A verdict flagged `*** UNCLASSIFIED WAIT ***` means FE8 is waiting on something with no name yet.
@@ -97,7 +74,7 @@ What it shipped, so the next instance can USE it instead of re-deriving it:
 - `harness.lua` has **exactly TWO free slots** against Lua's 200-local ceiling (measured: +2
   compiles, +3 does not). Hang new helpers off an existing table (`INSPECT`, `TUNE`) rather than
   adding a top-level `local` — crossing it stops the whole file loading and every scenario dies at
-  once. `check_lua_chunks_load` now fails the build on it in 0s (arrives with #239).
+  once. `check_lua_chunks_load` now fails the build on it in 0s.
 
 ### 2. #238 second pass — the rest of the blind-press verdict scenarios
 
@@ -121,7 +98,7 @@ already module constants, and the guard that mattered shipped in #239. What rema
 the `inject_chapter(descriptor)` refactor — and measured, that is worth much less than it sounds:
 **of 2,209 LOC in `inject_ch01`–`ch04`, just 123 (6%) is the host skeleton a descriptor collapses**
 (~30 lines per chapter, already helper calls). The other 94% is per-chapter rosters, event scripts
-and scenes. Recommendation on the issue: close #138 after #239, or shrink it to the one real
+and scenes. Recommendation on the issue (now that #239 has landed): close #138, or shrink it to the one real
 cleanup — ch03's bespoke `_inject_ch03_tile_changes` should migrate onto ch04's generic
 `_inject_tile_changes`. Byte-identical baseline for any such work:
 `42cd82360be3c186c60f9366d57c7608d3d83548`.
@@ -166,11 +143,9 @@ Parked, not scheduled: **#228** physical cartridges (after the ROM is done).
 
 ## Working tree - do not lose or revert
 
-- **Three live branches, stacked, all pushed and level with their remotes:**
-  `feat/236-state-inspector` (#237) → `feat/138-inject-chapter` (#239) →
-  `feat/238-controller-contract` (#240). No stashes. `main` is level with `origin/main`.
-  Do not rebuild or re-verify them — see NEXT SESSION §1 for what was already run green.
-- **Two more gitignored `gen_symbols.py` outputs** land next to `symbols.lua` once #237 is in:
+- **No feature branches, no stashes.** `main` is level with `origin/main` at `c489c56`; the three
+  stacked branches were merged and deleted 2026-08-06.
+- **Two more gitignored `gen_symbols.py` outputs** sit next to `symbols.lua`:
   `procscr.lua` and `symbols.json`. Regenerated after every `make`; never commit them.
 - **`.build-config.json` (repo root, gitignored) records which boot flags built the ROM in the tree.**
   `build_campaign.py` writes it; the playtest tools read it to refuse a wrong-ROM run. Deleting it is
@@ -195,8 +170,7 @@ Parked, not scheduled: **#228** physical cartridges (after the ROM is done).
 make difficulty CH=ch04                    # parity/difficulty read (all from HEAD)
 
 # THE GATE, one command (#231): builds each ROM config at most once, ~4-6 min, verdict table
-# + results.json in /tmp/playtest-matrix. 14/14 green on feat/236-state-inspector (13/14 on main
-# until #237 lands -- ch01 is the difference).
+# + results.json in /tmp/playtest-matrix. 14/14 green on main.
 make matrix                                # SUITE=gate -- must be green before a merge
 make matrix SUITE=ch03                     # one CH03BOOT=1 build, every ch03 scenario
 make matrix SUITE=ch04                     # one CH04BOOT=1 build, every ch04 scenario
@@ -217,7 +191,7 @@ python3 tools/split_pose_sheet.py <sheet>.png <anim>/.src idle windup hit   # sh
 python3 tools/poses_to_feditor.py <anim_dir>          # poses.yaml -> the FEditor frames
 python3 tools/banim_paint.py edit|apply <anim_dir>    # hand-paint what the shrink cannot carry
 
-# Read a failed scenario's own diagnosis BEFORE rebuilding anything (#236; arrives with #237)
+# Read a failed scenario's own diagnosis BEFORE rebuilding anything (#236)
 #   inspect_state.py render /tmp/playtest-<scenario>/playtest.log
 #   inspect_state.py diff   /tmp/playtest-<good>/playtest.log /tmp/playtest-<bad>/playtest.log
 

@@ -98,6 +98,9 @@ Rationale + long form: `docs/decisions.md` → Coordination model. The operating
 - A task = a GitHub issue → short-lived `feat/<n>-slug` branch off `main` → PR → CI + `/code-review`
   → squash-merge → delete the branch. A feature may span engine + content — ownership lives on the
   PR + issue, not a file glob.
+- **A stack of PRs lands with `--merge`, not `--squash`, and every child is retargeted to `main`
+  (`gh pr edit <child> --base main`) BEFORE the parent's branch is deleted** — deleting a base branch
+  closes the PRs on it, and a closed PR can't be retargeted (`decisions.md` → stacked PRs).
 - **Concurrent agents each get their own worktree** (two ROM builds in one tree corrupt each other;
   a single writer may work the provisioned main tree — see `HANDOFF.md`).
 - **Engine/content invariant is a HARD gate** (the Boundary Rule above + the engine hooks in
