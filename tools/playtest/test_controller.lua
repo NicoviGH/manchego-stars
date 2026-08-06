@@ -398,6 +398,32 @@ classify({
     choice = { current = "yes" },
 }, "yes_no_choice", "the yes/no prompt outranks the passive event engine")
 
+-- RULE ORDER IS THE LOAD-BEARING PROPERTY of the table, and only one pairing was pinned.
+-- The dangerous one is talk_wait + yes_no: `dialogue_wait` says "press A", the choice
+-- handler CONSUMES that A, and the prompt is answered by accident with the run green --
+-- exactly #232, restored silently. The specific state outranks the general one.
+classify({
+    procs = { talk_wait = { idle = "talk_wait_input" }, yes_no = { idle = "yes_no_input" } },
+    choice = { current = "yes" },
+}, "yes_no_choice", "the yes/no prompt outranks a waiting text box")
+check(action({
+    procs = { talk_wait = { idle = "talk_wait_input" }, yes_no = { idle = "yes_no_input" } },
+    choice = { current = "yes" },
+}, "advance_dialogue"), nil, "a live choice withdraws the blind dialogue A")
+
+classify({
+    procs = { std_event = { idle = "event_engine" }, menu = { idle = "menu_input" } },
+    menu = { current = 0, items = {
+        { slot = 0, override_id = 0x7F, availability = 1, on_selected = 0x0800B1C0 } } },
+}, "generic_menu", "an open menu outranks the passive event engine")
+
+classify({
+    procs = { std_event = { idle = "event_engine" }, map_fade = { idle = "map_fade_loop" } },
+}, "transition", "map_fade and std_event agree it is a transition")
+check(C.explain({
+    procs = { std_event = { idle = "event_engine" }, map_fade = { idle = "map_fade_loop" } },
+}).matched, "map_fade", "the named fade owns the transition, not the catch-all passive rule")
+
 -- explain(): the same verdict, plus WHY. Every #232 defect but one was an input wait
 -- nothing had a name for; each read as a passive `transition` and cost a full
 -- build-and-run cycle to identify. An unclassified wait has to say what it rejected.
@@ -448,6 +474,83 @@ check(fadingMenu.unclassified_wait, false,
 local broken = C.explain({ error = "malformed live menu", procs = proc("menu", "menu_input") })
 check(broken.state, nil, "explain fails closed on a malformed observation")
 check(broken.error, "malformed live menu", "explain preserves the observer rejection")
+
+-- The other two rules that flag an unclassified wait. Both feed the stall detector, and
+-- only passive_proc was covered -- so a change that stopped flagging either would have
+-- disarmed the failure oracle on those states silently (#241).
+local bootGap = C.explain({ procs = proc("game_control", "game_control_root") })
+check(bootGap.matched, "boot_proc", "an unnamed boot owner is the boot_proc rule's transition")
+check(bootGap.unclassified_wait, true, "and it is flagged as an unclassified wait")
+
+local strangePhase = C.explain({ procs = proc("player_phase", "player_unknown_idle") })
+check(strangePhase.matched, "player_phase", "an unknown player_phase callback stays with its rule")
+check(strangePhase.unclassified_wait, true, "and is flagged -- it is a wait with no name yet")
+check(strangePhase.detail:find("player_unknown_idle", 1, true) ~= nil, true,
+    "the detail names the callback nobody has classified")
+
+-- ---------------------------------------------------------------- stall detection
+-- The failure ORACLE: it is what turns "the run ended" into "the run ended HERE, waiting
+-- on this". It lived in harness.lua, which cannot be loaded outside mGBA, so the most
+-- flake-prone component in the playtest stack had no tests at all (#241).
+local function rawProc(fields)
+    return {
+        slot = fields.slot or 3, script = fields.script or 0x085A7EF4,
+        scr_cur = fields.scr_cur or 0x085A7F00, idle = fields.idle or 0x08007CA0,
+        lock = fields.lock or 1, sleep = fields.sleep or 0,
+    }
+end
+
+local sceneObs = {
+    procs = { std_event = { idle = "event_engine" } },
+    raw_procs = { rawProc({}) },
+}
+
+local function feed(watch, observation, times)
+    local fired = nil
+    for _ = 1, times do fired = watch(observation, C.classify(observation)) end
+    return fired
+end
+
+local watch = C.stallWatch(3)
+check(feed(watch, sceneObs, 2), nil, "an unclassified wait under the hold is not a stall")
+check(feed(watch, sceneObs, 1) ~= nil, true, "an unclassified wait held long enough is a stall")
+check(C.stallWatch(3)(sceneObs, "player_map_idle"), nil, "a classified STATE never arms the watch")
+
+-- The PROC_REPEAT blindness this was written for: every long-running FE8 proc
+-- (ProcScr_StdEventEngine, TalkWaitForInput, BMXFADE, YesNoChoice) is PROC_REPEAT, so
+-- scrCur/idleCb/lockCnt are constant for a whole scene. A proc counting DOWN a timed
+-- wait is progress, and the old signature could not see it.
+local sleeping = C.stallWatch(3)
+check(feed(sleeping, sceneObs, 2), nil, "two identical samples")
+check(sleeping({ procs = sceneObs.procs, raw_procs = { rawProc({ sleep = 30 }) } },
+    "transition"), nil, "a proc counting down its sleep resets the hold")
+
+local growing = C.stallWatch(3)
+check(feed(growing, sceneObs, 2), nil, "two identical samples")
+check(growing({ procs = sceneObs.procs,
+    raw_procs = { rawProc({}), rawProc({ slot = 4 }) } }, "transition"), nil,
+    "a proc entering the pool resets the hold")
+
+local shrinking = C.stallWatch(2)
+check(shrinking({ procs = sceneObs.procs, raw_procs = { rawProc({}), rawProc({ slot = 4 }) } },
+    "transition"), nil, "first sample of a two-proc pool")
+check(shrinking(sceneObs, "transition"), nil, "a proc LEAVING the pool resets the hold too")
+
+-- A named transition is a state we can wait out; arming on it trades a silent hang for a
+-- noisy false FAIL, which is worse.
+local fade = { procs = proc("map_fade", "map_fade_loop"), raw_procs = { rawProc({}) } }
+check(feed(C.stallWatch(2), fade, 6), nil, "a CLASSIFIED transition (map_fade) never arms")
+
+local leaving = C.stallWatch(2)
+check(feed(leaving, sceneObs, 1), nil, "one sample")
+check(leaving({ procs = proc("talk_wait", "talk_wait_input") }, "dialogue_wait"), nil,
+    "leaving the transition state resets the hold")
+check(feed(leaving, sceneObs, 1), nil, "and the count starts over rather than firing early")
+
+local fired = feed(C.stallWatch(2), sceneObs, 2)
+check(fired ~= nil and fired.state, "transition", "the stall carries the explanation with it")
+check(fired ~= nil and fired.unclassified_wait, true,
+    "and that explanation is the one that says nothing has a name for this")
 
 -- Fallthrough: no rule matched at all.
 local unknown = C.explain({ procs = { mystery = { idle = "mystery_idle" } } })

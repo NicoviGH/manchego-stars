@@ -58,11 +58,13 @@ geometry regardless of which slot hosts it (ch03 repaints vanilla Ch3 "Borgo" bu
    `_asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', ...)`; `HostChapterEventGroup`
    in `tools/test_build_campaign.py` pins it.
 
-   **You get this guard for free — but only if you declare both constants.** `hosted_chapters()`
-   discovers chapters from `CHNN_HOST_INDEX` + `CHNN_EVENT_GROUP`, so writing the pair is what
-   enrols your chapter in the event-group check; there is no list to update. Declaring a host slot
-   without naming its event group fails `make check` in 0s, and so does two chapters claiming one
-   slot (#138).
+   **You get this guard for free, and you cannot forget to opt in.** Declare `CHNN_HOST_INDEX` +
+   `CHNN_EVENT_GROUP` in **`tools/inject/hosts.py`** (the registry — stdlib-only so CI can lint it
+   without Pillow; `build_campaign` re-exports both). `hosted_chapters()` discovers chapters from
+   that pair, so writing it is what enrols your chapter in the event-group check; there is no list
+   to update. `make check` fails in 0s on a host slot with no event group, on two chapters claiming
+   one slot (the prologue's slot 1 included), and — since #241 — on an `inject_chNN` that declares
+   nothing at all, which used to be silently unhosted (#138).
 
    Pick a donor slot whose goal type matches and that our injectors don't overwrite:
 

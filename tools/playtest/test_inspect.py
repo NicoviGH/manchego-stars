@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""Tests for tools/playtest/inspect.py -- the #236 state inspector's pure formatting and
-first-divergence logic. No emulator, no ROM, no ELF: the renderer is handed the symbol
+"""Tests for tools/playtest/inspect_state.py -- the #236 state inspector's pure formatting
+and first-divergence logic. No emulator, no ROM, no ELF: the renderer is handed the symbol
 table it resolves against. Run: python3 tools/playtest/test_inspect.py
 """
+import io
 import os
 import sys
+import tempfile
 import unittest
+import contextlib
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import inspect_state as ins
@@ -78,6 +81,67 @@ class ResolveSymbol(unittest.TestCase):
 
     def test_null_is_not_an_unknown_symbol(self):
         self.assertEqual(ins.resolve(SYMBOLS, '0x00000000'), 'none')
+
+    def test_a_thumb_pointer_resolves_to_its_function(self):
+        """ARM/THUMB pointers carry bit 0 set. The Lua side masks it today, so this is
+        correct only by convention -- and a raw pointer from any other caller would report
+        a confident `unknown` for a symbol we have (#241)."""
+        self.assertEqual(ins.resolve(SYMBOLS, '0x08007CA1'),
+                         'TalkWaitForInput_OnIdle(0x08007CA0)')
+
+    def test_a_malformed_address_is_reported_not_raised(self):
+        """parse_records tolerates a truncated log; the renderer must be equally tolerant
+        of one bad field, or a diagnostic tool dies on the run it exists to diagnose."""
+        self.assertEqual(ins.resolve(SYMBOLS, '0xZZZZ'), 'unknown@0xZZZZ')
+
+
+class SymbolTableIsMissing(unittest.TestCase):
+    """An unknown must mean "this address matches no symbol", never "nobody loaded the
+    symbols". Silently returning {} made every callback in the report read unknown@0x...,
+    indistinguishable from a real one (#241)."""
+
+    def test_it_says_so_on_stderr(self):
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            symbols = ins.load_symbols('/nonexistent/symbols.json')
+        self.assertEqual(symbols, {})
+        self.assertIn('gen_symbols.py', err.getvalue())
+
+    def test_a_present_table_warns_about_nothing(self):
+        fd, path = tempfile.mkstemp(suffix='.json')
+        self.addCleanup(os.unlink, path)
+        with os.fdopen(fd, 'w') as f:
+            f.write('{"code": {"0x08007CA0": "TalkWaitForInput_OnIdle"}}')
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            symbols = ins.load_symbols(path)
+        self.assertEqual(symbols, {0x08007CA0: 'TalkWaitForInput_OnIdle'})
+        self.assertEqual(err.getvalue(), '')
+
+
+class MenuWithoutItems(unittest.TestCase):
+    def test_a_null_items_list_renders(self):
+        """`items` present-but-null is what a truncated or in-between observation looks
+        like; `.get('items', [])` returns None there and the renderer blows up."""
+        self.assertIn('current=2', ins._menu_line({'current': 2, 'items': None}))
+
+
+class Cli(unittest.TestCase):
+    def test_symbols_may_follow_the_subcommand(self):
+        """`render log --symbols X` is the order anyone types; it was rejected because
+        --symbols only existed on the top-level parser."""
+        fd, log = tempfile.mkstemp(suffix='.log')
+        self.addCleanup(os.unlink, log)
+        with os.fdopen(fd, 'w') as f:
+            f.write('[f000001] {"event": "inspect", "tag": "t", "state": "transition"}\n')
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(ins.main(['render', log, '--symbols', '/nonexistent.json']), 0)
+
+    def test_a_missing_log_is_an_error_not_a_traceback(self):
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            self.assertEqual(ins.main(['render', '/nonexistent/playtest.log']), 2)
+        self.assertIn('/nonexistent/playtest.log', err.getvalue())
 
 
 class RenderInspect(unittest.TestCase):

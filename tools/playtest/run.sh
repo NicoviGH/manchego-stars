@@ -219,6 +219,17 @@ EOF
     cat "$log" 2>/dev/null || echo "(no log produced)"
     echo "----------------------------------------"
     echo "$VERDICT"
+    # A failing run renders its OWN diagnosis. The snapshot was already in the log as
+    # JSON, but reading it meant knowing to run inspect_state.py by hand -- and the point
+    # of #236 was that the next question after a FAIL should be "which proc do I classify",
+    # not "which hypothesis do I rebuild" (#241).
+    case "$VERDICT" in
+        *PASS*) ;;
+        *) if grep -q '"event":"inspect"\|"event": "inspect"' "$log" 2>/dev/null; then
+               echo "---------------- inspector ----------------"
+               python3 "$HERE/inspect_state.py" render "$log" || true
+           fi ;;
+    esac
     echo "artifacts: $out"
 }
 

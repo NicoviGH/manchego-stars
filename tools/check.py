@@ -24,6 +24,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -135,8 +136,18 @@ def check_tests_pass(fail):
                 os.path.relpath(t, REPO), tail[-1] if tail else 'see output'))
 
 
-LUA_CHUNKS = ('tools/playtest/harness.lua', 'tools/playtest/controller.lua',
-              'tools/playtest/clearbot.lua', 'tools/playtest/json.lua')
+# gen_symbols.py outputs, gitignored and absent in CI -- a gate that fails on a missing
+# generated file is a gate nobody can keep green.
+GENERATED_LUA = ('tools/playtest/symbols.lua', 'tools/playtest/procscr.lua')
+
+# DISCOVERED, not listed: harness.lua dofiles nine chunks and the hand-written tuple named
+# four, so a syntax error in recorder.lua or liveness.lua killed every scenario with this
+# gate green (#241). Same defect #138 closed for chapters -- a list you must remember to
+# update is not a gate.
+LUA_CHUNKS = tuple(sorted(
+    os.path.relpath(p, REPO)
+    for p in glob.glob(os.path.join(REPO, 'tools', 'playtest', '*.lua'))
+    if os.path.relpath(p, REPO) not in GENERATED_LUA))
 
 
 def lua_compile_error(path):
@@ -166,10 +177,10 @@ def check_lua_chunks_load(fail):
     invisible until mGBA loads it minutes later.
 
     The specific hazard is Lua's ceiling of 200 local variables per function. harness.lua
-    is one ~6,700-line main chunk with only TWO free slots (measured 2026-08-06: +2
-    top-level locals still compiles, +3 does not), so a routine edit can cross it -- and
-    crossing it kills every scenario simultaneously, a total outage rather than a single
-    red row. #236 crossed it and caught it only by hand.
+    is one ~6,700-line main chunk sitting AT that ceiling, so a routine edit can cross it
+    -- and crossing it kills every scenario simultaneously, a total outage rather than a
+    single red row. #236 crossed it and caught it only by hand. How much room is actually
+    left is MEASURED by check_lua_local_headroom below, never written down.
 
     loadfile COMPILES without executing, so the emulator globals the chunk needs at
     runtime (emu, SYM, PLAYTEST_*) are irrelevant here."""
@@ -183,29 +194,98 @@ def check_lua_chunks_load(fail):
             fail.append('%s does not compile: %s' % (rel, err))
 
 
+def lua_local_headroom(path, probe_max=8):
+    """How many more top-level `local`s `path` can take before it stops compiling.
+
+    Measured by appending them, because there is no way to ask Lua: the limit counts
+    what the compiler allocates, not what a regex can see (upvalues, `for` control
+    variables, locals inside the chunk's own blocks).
+    """
+    with open(path, encoding='utf-8') as f:
+        body = f.read()
+    for extra in range(probe_max + 1):
+        probe = body + '\n' + ''.join(
+            'local __headroom_probe%d = %d\n' % (i, i) for i in range(extra + 1))
+        fd, tmp = tempfile.mkstemp(suffix='.lua')
+        try:
+            with os.fdopen(fd, 'w') as f:
+                f.write(probe)
+            if lua_compile_error(tmp) is not None:
+                return extra
+        finally:
+            os.unlink(tmp)
+    return probe_max
+
+
+def check_lua_local_headroom(fail, paths=None):
+    """Report the REMAINING local slots in the playtest chunks, and fail at zero.
+
+    The margin used to be prose -- "two free slots", repeated in harness.lua, in this
+    file and in HANDOFF.md -- and it was wrong in all three places within one PR of being
+    written, because #240 spent a slot and updated no comment. A hand-maintained number
+    about a limit whose breach kills every scenario at once is the wrong shape, so it is
+    computed here and printed on every run (#241).
+
+    Zero is a build failure rather than a warning: at zero the next helper anyone adds
+    takes the whole harness down, and the fix (hang it off INSPECT/TUNE, or move logic to
+    controller.lua) is cheap only while it is still a choice."""
+    if shutil.which('lua') is None:
+        print('check_lua_local_headroom: skipping (no lua on PATH; brew install lua)')
+        return
+    for path in (paths or (os.path.join(REPO, 'tools/playtest/harness.lua'),)):
+        free = lua_local_headroom(path)
+        rel = os.path.relpath(path, REPO)
+        print('%s: %d top-level local slot(s) free of Lua\'s 200-local ceiling' % (rel, free))
+        if free == 0:
+            fail.append(
+                '%s has NO room under the 200-local ceiling -- the next top-level local '
+                'stops the whole chunk loading and every scenario dies at once. Hang the '
+                'new helper off an existing table (INSPECT, TUNE) or move it to '
+                'controller.lua.' % rel)
+
+
 def check_hosted_chapters_declared(fail):
     """Every hosted chapter must declare the ChapterEventGroup its injector fills, and no
     two may claim one host slot.
 
-    `build_campaign.hosted_chapters()` enforces both while DISCOVERING chapters from the
-    module's constants; this runs it early, without the decomp submodule, so a bad
+    `inject.hosts.hosted_chapters()` enforces both while DISCOVERING chapters from the
+    registry's constants; this runs it early, without the decomp submodule, so a bad
     declaration fails in 0s rather than at ROM-build time. The deeper check -- that the
     retargeted slot actually resolves to that group in the vanilla asset table -- lives in
     HostChapterEventGroup (tools/test_build_campaign.py), which needs the submodule.
 
     Why it is worth a rule at all: retargeting a host slot's MAP ids alone is enough to
     make a chapter look right while it runs the host slot's roster and scripts, so this
-    class of mistake is silent and total (docs/adding-a-chapter.md step 4)."""
+    class of mistake is silent and total (docs/adding-a-chapter.md step 4).
+
+    Imports inject.hosts, NEVER build_campaign: this job installs pyyaml and nothing else,
+    and build_campaign pulls in Pillow at module scope -- the first version of this lint
+    failed every push with "No module named 'PIL'", a red check naming the wrong problem.
+    Same rule check_purple_bank_blankers_known states for its own constants (#241)."""
     sys.path.insert(0, os.path.join(REPO, 'tools'))
     try:
-        import build_campaign
+        from inject import hosts
     except Exception as exc:                      # pragma: no cover - import guard
-        fail.append('build_campaign does not import: %s' % exc)
+        fail.append('inject.hosts does not import: %s' % exc)
         return
+    finally:
+        sys.path.remove(os.path.join(REPO, 'tools'))
     try:
-        build_campaign.hosted_chapters()
+        hosts.hosted_chapters()
     except ValueError as exc:
         fail.append('hosted chapters: %s' % exc)
+        return
+    try:
+        stranded = hosts.undeclared_injectors()
+    except (OSError, SyntaxError) as exc:         # pragma: no cover - source-read guard
+        fail.append('hosted chapters: cannot read build_campaign.py: %s' % exc)
+        return
+    if stranded:
+        fail.append(
+            'inject_%s exists but enrols nothing -- declare %s_HOST_INDEX + '
+            '%s_EVENT_GROUP in tools/inject/hosts.py, or every guard built on the registry '
+            'passes with one chapter fewer and no complaint'
+            % (stranded[0], stranded[0].upper(), stranded[0].upper()))
 
 
 def check_yaml_parses(fail):
@@ -957,7 +1037,7 @@ def check_lane_ownership(fail):
 def main():
     fail = []
     for check in (check_python_compiles, check_lua_chunks_load,
-                  check_hosted_chapters_declared,
+                  check_lua_local_headroom, check_hosted_chapters_declared,
                   check_tests_pass, check_yaml_parses,
                   check_chapter_status, check_chapter_deployment_schema,
                   check_injection_order, check_playtest_matrix,

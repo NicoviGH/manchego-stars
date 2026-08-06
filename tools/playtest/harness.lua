@@ -21,6 +21,10 @@ dofile(PLAYTEST_DIR .. "/symbols.lua")
 -- PROC_NAME string at proc+0x10 -- the decomp reuses those (E_FACE twice, bmenu three
 -- times), which is why freeze reports could not say which proc was waiting (#236).
 dofile(PLAYTEST_DIR .. "/procscr.lua")
+-- It is generated (gitignored, written by gen_symbols.py from the ELF), so a stale or
+-- half-written table is a total outage with a confusing error much later. Say so here.
+assert(type(PROCSCR) == "table" and next(PROCSCR) ~= nil,
+    "procscr.lua defined no PROCSCR table -- regenerate it: tools/playtest/gen_symbols.py")
 local Controller = dofile(PLAYTEST_DIR .. "/controller.lua")
 local Recorder = dofile(PLAYTEST_DIR .. "/recorder.lua")
 
@@ -272,9 +276,12 @@ end
 local controllerState, guardedInput, freezeReport
 -- The #236 state inspector, as ONE table rather than three top-level locals: this file
 -- is against Lua's 200-local ceiling for a main chunk, and crossing it stops the whole
--- harness loading (every scenario dies at once). Consolidating here bought back 2 slots,
--- and 2 is all the headroom there is -- measured 2026-08-06, +2 top-level locals still
--- compiles and +3 does not. `check_lua_chunks_load` now fails the build on it in 0s.
+-- harness loading (every scenario dies at once). Hang new helpers off an existing table
+-- (INSPECT, TUNE) or put the logic in controller.lua, which has a unit suite and no such
+-- ceiling. HOW MUCH ROOM IS LEFT IS NEVER WRITTEN DOWN HERE: `check.py
+-- check_lua_local_headroom` measures it and prints it on every `make check`, because the
+-- hand-maintained number said "two free slots" in three files at once and was wrong in
+-- all three within one PR (#241). `check_lua_chunks_load` fails the build on a crossing.
 -- Fields are assigned further down, next to the proc-pool reader they build on.
 local INSPECT = {}
 local function recordCutscene(o)
@@ -504,8 +511,11 @@ local function observeController()
                 -- liveness signal the stall detector keys on: a pool whose every proc holds
                 -- the same command, idle and lock for TUNE.stallFrames is not slow, it is
                 -- waiting for an input nothing will send (#236).
+                -- sleepTime (+0x24) is in there because those three fields are CONSTANT
+                -- under PROC_REPEAT -- which is how every long-running FE8 proc is written
+                -- -- so without it a proc counting down a timed wait reads as frozen (#241).
                 slot = i, script = script, scr_cur = ru32(addr + 0x04),
-                idle = ru32(addr + 0x0C), lock = ru8(addr + 0x28),
+                idle = ru32(addr + 0x0C), sleep = rs16(addr + 0x24), lock = ru8(addr + 0x28),
             }
         end
     end
@@ -693,18 +703,36 @@ local function selectSemantic(intention, expected, predicate, frames)
             return false
         end
         if wanted.key == "A" then return guardedInput(intention, "A", expected, predicate, frames) end
-        local count = observation.menu and #observation.menu.items or 0
-        if not wanted.target or count < 2 then
-            traceInput(observation, actions, intention, "none", expected, "fail:no-live-target", observation)
-            return false
+        -- A yes/no answer that is not highlighted moves with LEFT/RIGHT, not menu rows.
+        -- Without this, `answer_no` was advertised as legal-but-select-it-first and NO
+        -- driver could act on it -- the first scenario needing "No" would have failed on
+        -- fail:no-live-target with the contract technically correct (#241).
+        if intention == "answer_yes" or intention == "answer_no" then
+            local move = Controller.findAction(
+                actions, intention == "answer_no" and "select_no" or "select_yes")
+            if not (move and move.key) then
+                traceInput(observation, actions, intention, "none", expected,
+                    "fail:no-choice-navigation", observation)
+                return false
+            end
+            if not guardedInput(move.intention, move.key, "the live choice moves",
+                function(after)
+                    return after.choice ~= nil and after.choice.current ~= observation.choice.current
+                end, 30) then return false end
+        else
+            local count = observation.menu and #observation.menu.items or 0
+            if not wanted.target or count < 2 then
+                traceInput(observation, actions, intention, "none", expected, "fail:no-live-target", observation)
+                return false
+            end
+            local current = observation.menu.current
+            local down = (wanted.target - current) % count
+            local nav = down <= count - down and "menu_next" or "menu_previous"
+            local key = nav == "menu_next" and "DOWN" or "UP"
+            if not guardedInput(nav, key, "live menu selection changes", function(after)
+                return after.menu ~= nil and after.menu.current ~= current
+            end, 30) then return false end
         end
-        local current = observation.menu.current
-        local down = (wanted.target - current) % count
-        local nav = down <= count - down and "menu_next" or "menu_previous"
-        local key = nav == "menu_next" and "DOWN" or "UP"
-        if not guardedInput(nav, key, "live menu selection changes", function(after)
-            return after.menu ~= nil and after.menu.current ~= current
-        end, 30) then return false end
     end
     traceFailure(intention, expected, "fail:menu-navigation-budget", nil,
         "controller-menu-navigation")
@@ -1025,31 +1053,15 @@ local function driveSaveSlot()
     return false
 end
 
--- A `transition` the classifier has no name for, holding a byte-identical proc pool, is
--- not a slow scene -- it is an input wait nothing will ever send. #232's ch01 burned a
--- 12000-iteration loop and then reported a timeout that named nothing; this dumps the
--- inspector snapshot the moment the stall is provable, so the NEXT question is which
--- proc to classify rather than which hypothesis to rebuild for. Returns a per-loop
--- closure: call it with each observation, and act on the first true.
+-- The stall oracle: the DECISION lives in controller.lua (pure, unit-tested in
+-- test_controller.lua -- it decides FAIL for whole suites, so it may not live where
+-- nothing can load it), and this only reports it. Returns a per-loop closure: call it
+-- with each observation, and act on the first true.
 INSPECT.watch = function(what)
-    local signature, held = nil, 0
+    local stalled = Controller.stallWatch(TUNE.stallFrames)
     return function(observation, state)
-        if state ~= "transition" then signature, held = nil, 0 return false end
-        local explanation = Controller.explain(observation)
-        -- Only an UNCLASSIFIED transition can stall this way. A named one (a map fade, a
-        -- menu animating in) is a state we can already wait out, and arming on those
-        -- would trade a silent hang for a noisy false positive.
-        if not explanation.unclassified_wait then signature, held = nil, 0 return false end
-        local parts = {}
-        for _, p in ipairs(observation.raw_procs or {}) do
-            parts[#parts + 1] = string.format("%d:%08X:%08X:%08X:%d",
-                p.slot, p.script, p.scr_cur, p.idle, p.lock)
-        end
-        local now = table.concat(parts, ",")
-        if now ~= signature then signature, held = now, 0 return false end
-        held = held + 1
-        if held < TUNE.stallFrames then return false end
-        held = 0
+        local explanation = stalled(observation, state)
+        if not explanation then return false end
         log(string.format("STALL: %s held an unclassified wait for %d frames -- %s",
             what, TUNE.stallFrames, tostring(explanation.detail)))
         INSPECT.snapshot(what .. "-stall", explanation)
@@ -1094,7 +1106,10 @@ end
 local function bootToMap(stopAtPrep)
     log("booting to map with observed FE8 states")
     local stalled = INSPECT.watch("boot")
-    for _ = 1, 12000 do
+    -- TUNE.bootSteps, never a literal: a cap that expires mid-scene reports a timeout that
+    -- names nothing, which is how #232 stayed misdiagnosed for three sessions. The cap is
+    -- sized above any real scene and INSPECT.watch is what decides failure.
+    for _ = 1, TUNE.bootSteps do
         local observation = observeController()
         local state, why = controllerState(observation)
         if stalled(observation, state) then
@@ -1280,7 +1295,9 @@ freezeReport = function(tag, gap)
     for i = 0, 63 do
         if after[i] then log(procLine(i, after[i], before[i])) end
     end
-    INSPECT.snapshot(tag)
+    -- Hand over the pair sampled above: the report and the snapshot then describe the same
+    -- two moments, and the freeze costs one gap instead of two.
+    INSPECT.snapshot(tag, nil, { before = before, after = after })
 end
 
 -- ---- state inspector (#236): one machine-readable snapshot of what FE8 is doing.
@@ -1288,12 +1305,18 @@ end
 -- reasoning behind the classification, and pairs it with the raw proc inventory named by
 -- exact symbol. Rendered by tools/playtest/inspect_state.py, which resolves the idle-callback
 -- addresses (ordinary functions -- ~35k of them, too many for a Lua table) out of the ELF.
-INSPECT.snapshot = function(tag, explanation)
+-- `sampled` lets a caller that has ALREADY sampled the pool twice hand its pair over
+-- (freezeReport does): re-sampling costs another TUNE.inspectGap frames and reports a
+-- different moment than the report around it (#241).
+INSPECT.snapshot = function(tag, explanation, sampled)
     local observation = observeController()
     explanation = explanation or Controller.explain(observation)
-    local before = procPool()
-    wait(TUNE.inspectGap)
-    local after = procPool()
+    local before, after = (sampled or {}).before, (sampled or {}).after
+    if not (before and after) then
+        before = procPool()
+        wait(TUNE.inspectGap)
+        after = procPool()
+    end
     local procs = {}
     for i = 0, 63 do
         local p = after[i]
@@ -1674,8 +1697,12 @@ local function reachCh01(opts)
     -- The Beat-1 Northlook scene is 29 script lines -> 67 text pages, and at normal speed
     -- it costs ~170 frames a page. Nothing here is looked at, so set gameSpeed (gPlaySt
     -- +0x40 bit 7) and type it fast. Written inline, not as a helper: harness.lua is at
-    -- the 200-local ceiling, and one more top-level `local` stops the whole file loading.
-    -- Only gameSpeed -- animationType is left alone so winCh00's combat is unaffected.
+    -- the 200-local ceiling (check_lua_local_headroom prints what is actually left -- never
+    -- write that number down, it went stale in three places at once). Only gameSpeed --
+    -- animationType is left alone so winCh00's combat is unaffected.
+    -- DELIBERATELY NOT RESTORED: ckpt_prep/ckpt_lordpinky save AFTER this, so every record*
+    -- scenario loading them inherits fast text. That is what we want for capture runs, but
+    -- it IS a property of those checkpoints rather than an accident (#241).
     emu:write32(SYM.gPlaySt + 0x40, ru32(SYM.gPlaySt + 0x40) | (1 << 7))
     local stalled = INSPECT.watch("reach_ch01")
     for _ = 1, TUNE.bootSteps do
@@ -1691,10 +1718,17 @@ local function reachCh01(opts)
             if not driveThroughPrep() then
                 result("FAIL", "could not leave preparations via semantic Fight"); return false
             end
-        elseif state == "player_map_idle" and faction() == 0 and turn() >= 1 then
-            wait(120)
-            shot("ch01-map")
-            return true
+        elseif state == "player_map_idle" then
+            -- The map is up but the chapter has not handed the player turn 1 yet (opening
+            -- events still running). That is a WAIT, not an unsupported state -- bootToMap
+            -- yields on the same case, and falling through to advanceBootState here would
+            -- hard-FAIL a healthy run (#241).
+            if faction() == 0 and turn() >= 1 then
+                wait(120)
+                shot("ch01-map")
+                return true
+            end
+            yield()
         elseif state == "generic_menu" then
             -- Scenario policy: which lead to take. The controller owns the live menu
             -- callback and the guarded input either way; no row is guessed and no
@@ -1710,6 +1744,19 @@ local function reachCh01(opts)
                         result("FAIL", "could not walk the lead menu to the last candidate")
                         return false
                     end
+                end
+                -- Assert WHERE the walk landed. rows-1 presses reach the last candidate
+                -- only if the menu opened on row 0, which nothing guarantees, and FE8 menus
+                -- WRAP -- so being wrong picks a different lord and passes anyway. Nothing
+                -- downstream checks which lead was taken (ckpt_lordpinky just saves), so
+                -- without this the scenario's whole premise is unverified (#241).
+                local landed = observeController()
+                if not (landed.menu and landed.menu.current == rows - 1) then
+                    result("FAIL", string.format(
+                        "lead menu walk landed on row %s of %d, not the last candidate",
+                        tostring(landed.menu and landed.menu.current), rows))
+                    shot("ch01-lord-walk-lost")
+                    return false
                 end
             end
             if not guardedInput("select_current_menu_item", "A", "lead menu selection closes", function(after)
