@@ -3273,6 +3273,25 @@ session state. `HANDOFF.md` points here._
   `run.sh` refuses a mismatch in 0s with the exact `make` line. So this should no longer be a
   judgement call — but `MX_SKIP_ROM_CHECK=1` disables the guard and puts you straight back here
   (which is exactly what happened once inside the session that built it).
+- **A guard that lists what it covers stops covering things** (2026-08-06, #138). The
+  `HostChapterEventGroup` test was written after the ch04 disaster — a host slot retargeted by map
+  ids alone, presenting our map while running the host slot's roster — and it iterated a
+  hand-written tuple of `(HOST_INDEX, EVENT_GROUP)` pairs. It was correct and useless going
+  forward: **ch05 would have been the first chapter not covered by the very test written to prevent
+  its failure mode**, and ch05 hosts deeper into the divergence than ch04 did, because vanilla's
+  slot index stops tracking chapter number at 4. `build_campaign.hosted_chapters()` now DISCOVERS
+  chapters from `CHNN_HOST_INDEX` + `CHNN_EVENT_GROUP`, so declaring the constants is what enrols a
+  chapter; it refuses a host slot with no named event group, and refuses two chapters claiming one
+  slot. The general rule: **when a guard enumerates its subjects, derive the list from the data the
+  subjects are already made of — never restate it.** A hand-maintained list of what to check is a
+  second source of truth that silently drifts the moment someone adds the thing you were guarding.
+- **The host-slot facts were already data; the refactor was not what made them lintable**
+  (2026-08-06, #138). Worth recording because the epic's re-scope argued the opposite and was
+  wrong: `CHNN_HOST_INDEX` / `CHNN_EVENT_GROUP` / `CHNN_GOAL_DONOR` have been module constants all
+  along, so the lint never needed config-driven `inject_chapter(N)` to exist. Config-driven hosting
+  is still worth doing — 2,626 LOC across five per-chapter functions with a 15-helper shared spine —
+  but it is a *readability and repetition* argument, not a prerequisite for validation. Check what a
+  refactor actually unblocks before sequencing work behind it.
 - **A proc's identity is its script ADDRESS, never its `PROC_NAME` string** (2026-08-06, #236).
   Freeze reports named a proc from the string pointer at proc+0x10, and that string is not an
   identity: the decomp gives `gProcScr_E_FACE` and `gProcScr_E_FACE_ExtraFrame` the same

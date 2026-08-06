@@ -183,6 +183,31 @@ def check_lua_chunks_load(fail):
             fail.append('%s does not compile: %s' % (rel, err))
 
 
+def check_hosted_chapters_declared(fail):
+    """Every hosted chapter must declare the ChapterEventGroup its injector fills, and no
+    two may claim one host slot.
+
+    `build_campaign.hosted_chapters()` enforces both while DISCOVERING chapters from the
+    module's constants; this runs it early, without the decomp submodule, so a bad
+    declaration fails in 0s rather than at ROM-build time. The deeper check -- that the
+    retargeted slot actually resolves to that group in the vanilla asset table -- lives in
+    HostChapterEventGroup (tools/test_build_campaign.py), which needs the submodule.
+
+    Why it is worth a rule at all: retargeting a host slot's MAP ids alone is enough to
+    make a chapter look right while it runs the host slot's roster and scripts, so this
+    class of mistake is silent and total (docs/adding-a-chapter.md step 4)."""
+    sys.path.insert(0, os.path.join(REPO, 'tools'))
+    try:
+        import build_campaign
+    except Exception as exc:                      # pragma: no cover - import guard
+        fail.append('build_campaign does not import: %s' % exc)
+        return
+    try:
+        build_campaign.hosted_chapters()
+    except ValueError as exc:
+        fail.append('hosted chapters: %s' % exc)
+
+
 def check_yaml_parses(fail):
     import yaml
     for f in glob.glob(os.path.join(REPO, 'campaigns/**/*.yaml'), recursive=True):
@@ -932,6 +957,7 @@ def check_lane_ownership(fail):
 def main():
     fail = []
     for check in (check_python_compiles, check_lua_chunks_load,
+                  check_hosted_chapters_declared,
                   check_tests_pass, check_yaml_parses,
                   check_chapter_status, check_chapter_deployment_schema,
                   check_injection_order, check_playtest_matrix,

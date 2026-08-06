@@ -23,6 +23,7 @@ Milestones B+ (characters, chapter, dialogue codegen) hang off the same CLI.
 """
 
 import argparse
+import collections
 import glob
 import hashlib
 import json
@@ -8238,6 +8239,48 @@ def inject_ch03(campaign, boot=False, verbose=True):
               'DefeatBoss(grell) WIN wired, PREP deploy cap %d%s + %d enemies (grell@14,1); opening/entrance/midmap/ending cutscenes wired'
               % (obj_idx, pal_idx, cfg_idx, layout_idx, CH03_HOST_INDEX, len(cap_rows),
                  ' (boot-seeded party)' if boot else '', len(enemies)))
+
+
+HostedChapter = collections.namedtuple(
+    'HostedChapter', 'name number host_index event_group')
+
+
+def hosted_chapters():
+    """Every chapter this build hosts, DISCOVERED from the module's own constants.
+
+    Declaring `CHNN_HOST_INDEX` + `CHNN_EVENT_GROUP` is what enrols a chapter -- there is
+    no list to remember to update. That is the whole point: the guard written after the
+    ch04 disaster (HostChapterEventGroup in tools/test_build_campaign.py) iterated a
+    hand-written tuple, so ch05 would have been the first chapter NOT covered by the very
+    test written to prevent that failure -- and ch05 hosts deeper into the divergence than
+    ch04 did, since vanilla's slot index stops tracking chapter number at 4 (#138).
+
+    Raises ValueError rather than sys.exit: the lints and tests that consume this need to
+    assert on the failure, not die inside it.
+    """
+    found, by_slot = [], {}
+    scope = globals()
+    for name in sorted(scope):
+        match = re.match(r'^(CH(\d+))_HOST_INDEX$', name)
+        if not match:
+            continue
+        prefix, number = match.group(1), int(match.group(2))
+        group = scope.get('%s_EVENT_GROUP' % prefix)
+        if group is None:
+            raise ValueError(
+                '%s_HOST_INDEX is declared with no %s_EVENT_GROUP. A hosted slot must NAME '
+                'the ChapterEventGroup its injector fills -- never assume the slot already '
+                'points there. Retargeting the map ids alone still makes the chapter LOOK '
+                'right while it runs the host slot\'s roster and scripts (see '
+                'docs/adding-a-chapter.md step 4).' % (prefix, prefix))
+        slot = scope[name]
+        if slot in by_slot:
+            raise ValueError(
+                'host slot %d is claimed by both %s and %s -- one chapter would overwrite '
+                'the other\'s events' % (slot, by_slot[slot], prefix))
+        by_slot[slot] = prefix
+        found.append(HostedChapter(prefix.lower(), number, slot, group))
+    return found
 
 
 def inject_ch04(campaign, boot=False, verbose=True):

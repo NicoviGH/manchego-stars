@@ -1566,6 +1566,61 @@ class Ch04RuntimeHost(unittest.TestCase):
         self.assertIsNotNone(card.getbbox())
 
 
+class HostedChapterEnumeration(unittest.TestCase):
+    """Which chapters are hosted must be DISCOVERED, not listed by hand.
+
+    HostChapterEventGroup below is the guard written after the ch04 disaster, and it
+    iterated a hand-written tuple of (HOST_INDEX, EVENT_GROUP) pairs. A hand-written
+    list does not extend: ch05 would have been the first chapter NOT covered by the very
+    test written to prevent that class of failure -- and ch05 hosts deeper into the slot
+    divergence than ch04 did, since vanilla's slot index stops tracking chapter number
+    at 4. Enumerating from the module's own constants closes that (#138).
+    """
+
+    def test_finds_every_currently_hosted_chapter(self):
+        got = {c.name: c.host_index for c in bc.hosted_chapters()}
+        self.assertEqual(got, {'ch01': bc.CH01_HOST_INDEX, 'ch02': bc.CH02_HOST_INDEX,
+                               'ch03': bc.CH03_HOST_INDEX, 'ch04': bc.CH04_HOST_INDEX})
+
+    def test_each_entry_carries_the_event_group_its_injector_fills(self):
+        groups = {c.name: c.event_group for c in bc.hosted_chapters()}
+        self.assertEqual(groups['ch04'], bc.CH04_EVENT_GROUP)
+        self.assertEqual(groups['ch01'], bc.CH01_EVENT_GROUP)
+
+    def test_it_is_ordered_by_chapter(self):
+        names = [c.name for c in bc.hosted_chapters()]
+        self.assertEqual(names, sorted(names))
+
+    def test_a_new_chapter_enrolls_itself(self):
+        """The whole point: declaring CH05_* is enough to be covered."""
+        bc.CH05_HOST_INDEX, bc.CH05_EVENT_GROUP = 6, 'Ch6Events'
+        try:
+            entry = {c.name: c for c in bc.hosted_chapters()}['ch05']
+            self.assertEqual((entry.host_index, entry.event_group), (6, 'Ch6Events'))
+        finally:
+            del bc.CH05_HOST_INDEX, bc.CH05_EVENT_GROUP
+
+    def test_a_host_slot_without_an_event_group_fails_loudly(self):
+        """Naming the group is mandatory -- inheriting the slot-index coincidence is
+        exactly how ch04 shipped a chapter running another chapter's roster."""
+        bc.CH05_HOST_INDEX = 6
+        try:
+            with self.assertRaises(ValueError) as raised:
+                bc.hosted_chapters()
+            self.assertIn('CH05_EVENT_GROUP', str(raised.exception))
+        finally:
+            del bc.CH05_HOST_INDEX
+
+    def test_two_chapters_cannot_host_on_one_slot(self):
+        bc.CH05_HOST_INDEX, bc.CH05_EVENT_GROUP = bc.CH04_HOST_INDEX, 'Ch6Events'
+        try:
+            with self.assertRaises(ValueError) as raised:
+                bc.hosted_chapters()
+            self.assertIn('slot %d' % bc.CH04_HOST_INDEX, str(raised.exception))
+        finally:
+            del bc.CH05_HOST_INDEX, bc.CH05_EVENT_GROUP
+
+
 class HostChapterEventGroup(unittest.TestCase):
     """A hosted chapter must RUN the ChapterEventGroup its injector fills.
 
@@ -1624,14 +1679,15 @@ class HostChapterEventGroup(unittest.TestCase):
     def test_every_hosted_chapter_names_the_event_group_it_fills(self):
         # The earlier slots were correct only because slot index == chapter number there;
         # they are now explicit, so the next hosted chapter cannot inherit the coincidence.
-        for host_index, group in (
-                (bc.CH01_HOST_INDEX, bc.CH01_EVENT_GROUP),
-                (bc.CH02_HOST_INDEX, bc.CH02_EVENT_GROUP),
-                (bc.CH03_HOST_INDEX, bc.CH03_EVENT_GROUP),
-                (bc.CH04_HOST_INDEX, bc.CH04_EVENT_GROUP)):
-            host = self._retarget(host_index, group)
-            self.assertEqual(host['mapEventDataId'], self._vanilla_index(group),
-                             'host slot %d must run %s' % (host_index, group))
+        # Enumerated, NOT listed: a hand-written tuple would leave the next chapter
+        # uncovered by the guard written for exactly its failure (#138).
+        chapters = bc.hosted_chapters()
+        self.assertTrue(chapters, 'no hosted chapters discovered')
+        for chapter in chapters:
+            host = self._retarget(chapter.host_index, chapter.event_group)
+            self.assertEqual(host['mapEventDataId'], self._vanilla_index(chapter.event_group),
+                             '%s: host slot %d must run %s'
+                             % (chapter.name, chapter.host_index, chapter.event_group))
 
     def test_making_it_explicit_moves_ch04_alone(self):
         """ch01-ch03 must be byte-identical after the repoint -- they were already right,
