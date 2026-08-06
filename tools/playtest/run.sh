@@ -1,7 +1,21 @@
 #!/usr/bin/env bash
-# Run an automated playtest scenario in mGBA (headed, but fully scripted).
+# Run ONE automated playtest scenario in mGBA (headed, but fully scripted).
 #
 #   tools/playtest/run.sh <scenario> [--keep-open]
+#
+# For a GROUP of scenarios use the matrix runner instead -- it builds each ROM
+# configuration at most once and prints a verdict table:
+#
+#   make matrix                 # the merge gate
+#   make matrix SUITE=ch04      # every ch04 scenario, one build
+#   tools/playtest/matrix.py run --scenarios ch04moose,ch04snag
+#
+# WHAT A SCENARIO NEEDS -- its ROM configuration (`make` flag), its PT_HOST_CHAPTER,
+# its checkpoint, and its fps/vsync/deadline -- is declared in tools/playtest/matrix.yaml
+# and resolved here. So `run.sh ch04moose` sets PT_HOST_CHAPTER=5 by itself, and refuses
+# outright if the tree holds a ROM that cannot host it. Setting PT_HOST_CHAPTER or PT_FPS
+# by hand still overrides the manifest. The per-scenario notes below say what each one
+# PROVES; the flags they mention are documentation, not something you have to type.
 #
 # Logic scenarios (assert PASS/FAIL):  win | gameover | retreat | ch01win | titlecard
 #   also: ch01 (entry asserts) | ch01lord | lordfloor | goodberry | clearprobe
@@ -142,6 +156,20 @@ if [ ! -x "$APP" ]; then
 fi
 [ -f "$ROM" ] || { echo "ROM not built; run make first" >&2; exit 2; }
 
+# What this scenario needs -- ROM configuration, host chapter, checkpoint, fps/vsync/
+# deadline -- comes from tools/playtest/matrix.yaml, which is the single source of that
+# table (see matrix.py). run.sh owns "run ONE scenario in mGBA" and nothing else.
+MX_RESOLVED="$(python3 "$HERE/matrix.py" resolve "$SCENARIO")" || {
+    echo "run.sh: '$SCENARIO' has no row in tools/playtest/matrix.yaml" >&2; exit 2; }
+eval "$MX_RESOLVED"
+
+# The most expensive failure in this repo is a scenario that FAILs because the tree
+# holds the wrong ROM (a CH04BOOT=1 build cannot reach ch02's map). Refuse in 0s
+# instead of timing out in 7 minutes. MX_SKIP_ROM_CHECK=1 opts out.
+if [ -z "${MX_SKIP_ROM_CHECK:-}" ]; then
+    python3 "$HERE/matrix.py" check-rom "$SCENARIO" || exit 2
+fi
+
 python3 "$HERE/gen_symbols.py"
 pkill -9 -i mgba 2>/dev/null || true
 ROMHASH=$(shasum "$ROM" | cut -c1-12)
@@ -161,7 +189,7 @@ PLAYTEST_SHOTDIR = "$out"
 PLAYTEST_STATEDIR = "$STATE_DIR"
 PLAYTEST_SEED = "${PT_SEED:-1}"
 PLAYTEST_CHAR = "${PT_CHAR:-}"
-PLAYTEST_HOST_CHAPTER = ${PT_HOST_CHAPTER:-1}
+PLAYTEST_HOST_CHAPTER = ${PT_HOST_CHAPTER:-${MX_HOST_CHAPTER:-1}}
 PLAYTEST_LLMDIR = "$LLM_DIR"
 PLAYTEST_STATE = "${PT_STATE:-}"
 PLAYTEST_TAG = "${PT_TAG:-}"
@@ -194,30 +222,19 @@ EOF
     echo "artifacts: $out"
 }
 
-# Checkpoint dependency: a record scenario loads a save state built fast by a ckpt_*
-# scenario. Build it (240fps) if the state is missing or was made for a different ROM.
-BUILDER=""; CKPT=""
-case "$SCENARIO" in
-    recordending) BUILDER=ckpt_seize;     CKPT=seize ;;
-    recordprep)   BUILDER=ckpt_prep;      CKPT=prep ;;
-    recordsupply) BUILDER=ckpt_lordpinky; CKPT=lordpinky ;;
-    recordrescue) BUILDER=ckpt_prep;      CKPT=prep ;;
-    recordtrade)  BUILDER=ckpt_prep;      CKPT=prep ;;
-    recordfix)    BUILDER=ckpt_prep;      CKPT=prep ;;
-    recordrbg)    BUILDER=ckpt_rbgch01;   CKPT=rbgch01 ;;
-    # ch02 (#22) scenarios LOAD the ch02start state (the real ch00->ch01->ch02 chain, paid once).
-    ch02|smoke_ch02|clear_ch02|ch02baxby|recordch02map|recordch02combat|recordch02ending|recordchain) BUILDER=ckpt_ch02start; CKPT=ch02start ;;
-    # recordch02intro needs its OWN checkpoint (ckpt_ch02intro, harness.lua) saved just BEFORE the
-    # ch02 opening plays -- ckpt_ch02start is captured at turn 1, after the opening is already over.
-    recordch02intro) BUILDER=ckpt_ch02intro; CKPT=ch02intro ;;
-    # recordscene (generic cutscene recorder): PT_STATE names the checkpoint; its builder is
-    # ckpt_<PT_STATE> by convention (matches every ckpt_* above). e.g. PT_STATE=ch02intro.
-    recordscene) CKPT="${PT_STATE:?recordscene needs PT_STATE=<checkpoint> (e.g. PT_STATE=ch02intro)}"; BUILDER="ckpt_${PT_STATE}" ;;
-esac
+# Checkpoint dependency: a scenario may load a save state built fast by a ckpt_* scenario.
+# Build it (240fps) if the state is missing or was made for a different ROM. The
+# scenario -> checkpoint map lives in matrix.yaml; recordscene is the one dynamic case,
+# where PT_STATE names the checkpoint and its builder is ckpt_<PT_STATE> by convention.
+BUILDER="$MX_CHECKPOINT_BUILDER"; CKPT="$MX_CHECKPOINT"
+if [ -n "$MX_CHECKPOINT_DYNAMIC" ]; then
+    CKPT="${PT_STATE:?$SCENARIO needs PT_STATE=<checkpoint> (e.g. PT_STATE=ch02intro)}"
+    BUILDER="ckpt_${PT_STATE}"
+fi
 if [ -n "$BUILDER" ]; then
     if [ ! -f "$STATE_DIR/$CKPT.ss" ] || [ "$(cat "$STATE_DIR/$CKPT.romhash" 2>/dev/null || true)" != "$ROMHASH" ]; then
         echo "== checkpoint '$CKPT' missing/stale -> building at top speed (240fps) =="
-        run_mgba "$BUILDER" 240 0 900   # ch02start plays the whole ch00->ch01->ch02 chain
+        run_mgba "$BUILDER" 240 0 "$MX_CHECKPOINT_DEADLINE"  # ch02start plays the whole ch00->ch01->ch02 chain
         case "$VERDICT" in
             *PASS*) echo "$ROMHASH" > "$STATE_DIR/$CKPT.romhash" ;;
             *) echo "checkpoint build FAILED -- aborting"; exit 1 ;;
@@ -227,17 +244,9 @@ if [ -n "$BUILDER" ]; then
     fi
 fi
 
-# Main run: record* at 60fps (faithful motion); everything else at 240fps (top speed).
-# The checkpoint-backed record* scenarios (table above) skip the grind; the rest replay
-# their full lead-in and simply have to fit the record deadline.
-FPS=240; VSYNC=0; DEADLINE_S=420
-case "$SCENARIO" in record*) FPS=60; VSYNC=1; DEADLINE_S=300 ;; esac
-# smoke_* / fuzz_* / clear_ch02 play a full chapter (lead-in + a long soak) -> longer
-# wall. recordch02ending routs the whole band, so it needs the same headroom. llm waits
-# wall-clock on the sidecar EVERY turn (18 turns x 90s handshake budget), and a --record run
-# against a slow local model legitimately uses it -- so its deadline covers the harness's own
-# worst case instead of killing a healthy run.
-case "$SCENARIO" in smoke*|fuzz*|clear_ch02|clear_ch03|recordch02ending) DEADLINE_S=600 ;; llm) DEADLINE_S=2100 ;; esac
+# Rate + deadline also come from matrix.yaml (record* film at 60fps for faithful motion;
+# everything else runs at top speed; soaks and routs get a longer wall).
+FPS="$MX_FPS"; VSYNC="$MX_VSYNC"; DEADLINE_S="$MX_DEADLINE"
 # PT_FPS overrides the rate. 60fps+videoSync is only needed to capture smooth cutscene
 # FADES; verification captures of static text/boxes (sign, death quote) read fine at top
 # speed, so `PT_FPS=240 ... recordfix` runs ~4x faster.

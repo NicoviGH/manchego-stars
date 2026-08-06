@@ -44,6 +44,9 @@ tools/key_magenta.py
 # mGBA save-state checkpoints (per-ROM-build, regenerated) -- inline comments don't work
 # in .gitignore, so this must be on its own line
 tools/playtest/states/
+# which boot flags built the .gba currently in the tree (build_campaign writes it;
+# the playtest matrix reads it to refuse a wrong-ROM run) -- describes an artifact
+.build-config.json
 
 # battle-anim hand-paint scratch (tools/banim_paint.py) -- the painted FRAMES are what ships
 campaigns/*/battle_anims/*/.paint/

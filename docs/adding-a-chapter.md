@@ -113,6 +113,13 @@ geometry regardless of which slot hosts it (ch03 repaints vanilla Ch3 "Borgo" bu
     that calls the injector and `_configure_boot(CHNN_HOST_INDEX)` (New Game reroutes 0 → N), plus a
     `Makefile` `$(if $(CHNNBOOT),--chNN-boot)`.
 
+11. **Declare the new ROM configuration in `tools/playtest/matrix.yaml`** — add `chNNboot:
+    {CHNNBOOT: 1}` to `rom_configs`. Every scenario you then write for the chapter gets a row
+    (`rom: chNNboot`, `host_chapter: <slot>`), and the chapter gets a suite so `make matrix
+    SUITE=chNN` runs the lot off one build. `check.py check_playtest_matrix` fails the build if a
+    scenario in `harness.lua` has no row, so this is not optional bookkeeping — it is how
+    `run.sh chNNsomething` knows the flag and the host slot without you typing either.
+
 ## Load-test it (see the map with units)
 
 ```sh
@@ -122,8 +129,17 @@ PT_HOST_CHAPTER=4 tools/playtest/run.sh mapshot                    # New Game ->
 open /tmp/playtest-<scenario>/*-map-loaded.png
 ```
 
-`mapshot` (harness.lua) = the generic "boot to the map and screenshot the deployed field" scenario;
-`PT_HOST_CHAPTER=N` tells the harness which slot the fast-boot lands on (`inChapter` checks it).
+`mapshot` (harness.lua) = the generic "boot to the map and screenshot the deployed field" scenario.
+It is one of the two deliberately chapter-generic scenarios, so it is the one case where you still
+pass `PT_HOST_CHAPTER=N` by hand (`inChapter` checks it). Every chapter-specific scenario takes its
+host slot and its ROM flag from `matrix.yaml` instead — and `run.sh` refuses outright, in 0s, if the
+tree holds a ROM that cannot host it rather than failing seven minutes later for the wrong reason.
+
+Once the chapter has more than a couple of scenarios, drive them together:
+
+```sh
+make matrix SUITE=chNN     # one CHNNBOOT=1 build, every chNN scenario, one verdict table
+```
 
 ## Gotchas (learned the hard way)
 

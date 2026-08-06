@@ -29,7 +29,7 @@ export PATH := $(BREW_PY):$(PATH)
 endif
 endif
 
-.PHONY: all clean verify check test difficulty difficulty-gate
+.PHONY: all clean verify check test matrix difficulty difficulty-gate
 
 all: fireemblem8.gba
 
@@ -55,6 +55,22 @@ test:
 	@if command -v lua >/dev/null 2>&1; then \
 		for t in tools/playtest/test_*.lua; do echo "== $$t =="; lua $$t || exit 1; done; \
 	else echo "== skipping Lua playtest tests (no 'lua'; brew install lua) =="; fi
+
+# Live playtest matrix (#231): build each ROM configuration at most once, run its
+# scenarios in mGBA, print a verdict table. The scenario -> ROM/host/checkpoint/timing
+# table is tools/playtest/matrix.yaml.
+#   make matrix                 # SUITE=gate -- what must be green before a merge
+#   make matrix SUITE=ch04      # every ch04 scenario off one CH04BOOT=1 build
+#   make matrix SUITE=all       # every non-manual verdict scenario (long)
+# Artifacts + results.json land in /tmp/playtest-matrix; per-scenario screenshots and
+# logs stay in /tmp/playtest-<scenario>/ as before.
+SUITE ?= gate
+matrix:
+ifeq ($(strip $(SUITE)),all)
+	@python3 tools/playtest/matrix.py run --all
+else
+	@python3 tools/playtest/matrix.py run --suite $(SUITE)
+endif
 
 # Static per-chapter difficulty / vanilla-parity report (no ROM build, no mGBA).
 #   make difficulty CH=ch01     # one chapter's report
