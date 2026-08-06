@@ -6,9 +6,8 @@ deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; scope and ba
 issues. Before a context rollover, warn Nicolas, refresh this file, and start a fresh instance —
 don't rely on auto-compaction.
 
-Refreshed 2026-08-06 (Opus). `main` = `933fee0`, level with `origin/main`.
-**In flight: PR #235** (`fix/232-gate-failures`) — the #232 playtest repairs, rebased on `main`,
-awaiting CI + merge. Nothing else: no other branches, no stashes.
+Refreshed 2026-08-06 (Opus). `main` = `3acec66`, level with `origin/main`.
+**Nothing is in flight: no open PRs, no feature branches, no stashes** (`origin` has only `main`).
 **Next task is #236 — the playtest state inspector. Jump to NEXT SESSION.**
 
 ## Current state
@@ -37,12 +36,6 @@ awaiting CI + merge. Nothing else: no other branches, no stashes.
 ## NEXT SESSION — the agreed order (Nicolas, 2026-08-06)
 
 **Start from the GitHub issue, not from here.** These notes only add what the issue does not say.
-
-### 0. First: land PR #235 if it is still open
-
-The #232 playtest repairs — verified live (gate 13/14) and locally green. If its `checks` job is
-red, read the PR before re-diagnosing: on 2026-08-06 that was a GitHub Actions outage, not our code.
-Squash-merge, delete the branch, refresh this file.
 
 ### 1. #236 — the playtest state inspector  ← START HERE
 
@@ -90,9 +83,8 @@ Parked, not scheduled: **#228** physical cartridges (after the ROM is done).
 
 ## Working tree - do not lose or revert
 
-- **One open PR: #235** on `fix/232-gate-failures` (2 commits, rebased on `main`, verified live at
-  gate 13/14). No stashes. `main` is `933fee0`, level with `origin/main`. #234 was the same work and
-  is CLOSED — GitHub auto-closed it when #233's branch was deleted on merge; do not reopen it.
+- **No open PRs, no live feature branch, no stashes.** `main` is `3acec66`, level with
+  `origin/main`, and `origin` carries only `main`.
 - **`.build-config.json` (repo root, gitignored) records which boot flags built the ROM in the tree.**
   `build_campaign.py` writes it; the playtest tools read it to refuse a wrong-ROM run. Deleting it is
   harmless — an unknown stamp just disables the guard.
