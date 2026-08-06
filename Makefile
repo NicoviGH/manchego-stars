@@ -51,7 +51,7 @@ verify:
 # Run the Python unit tests (combat math + stat resolution + difficulty engine).
 # Also run by `make check` / CI / the pre-commit hook.
 test:
-	@for t in tools/test_*.py; do echo "== $$t =="; python3 $$t || exit 1; done
+	@for t in tools/test_*.py tools/playtest/test_*.py; do echo "== $$t =="; python3 $$t || exit 1; done
 	@if command -v lua >/dev/null 2>&1; then \
 		for t in tools/playtest/test_*.lua; do echo "== $$t =="; lua $$t || exit 1; done; \
 	else echo "== skipping Lua playtest tests (no 'lua'; brew install lua) =="; fi

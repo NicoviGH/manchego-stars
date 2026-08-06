@@ -39,6 +39,10 @@ campaigns/*/map_sprites/.base/
 /references
 tools/emulator/
 tools/playtest/symbols.lua
+# the other two gen_symbols.py outputs: exact proc-script names for the Lua side,
+# every ROM code symbol for inspect.py (#236). Regenerated after every make.
+tools/playtest/procscr.lua
+tools/playtest/symbols.json
 # local session scratch tool (HANDOFF references it; intentionally unversioned)
 tools/key_magenta.py
 # mGBA save-state checkpoints (per-ROM-build, regenerated) -- inline comments don't work

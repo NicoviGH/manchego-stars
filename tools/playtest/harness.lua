@@ -17,6 +17,10 @@
 -- engine demands real combat (deaths must go through battle, not HP pokes).
 
 dofile(PLAYTEST_DIR .. "/symbols.lua")
+-- PROCSCR: proc-script address -> exact symbol. Proc identity must never come from the
+-- PROC_NAME string at proc+0x10 -- the decomp reuses those (E_FACE twice, bmenu three
+-- times), which is why freeze reports could not say which proc was waiting (#236).
+dofile(PLAYTEST_DIR .. "/procscr.lua")
 local Controller = dofile(PLAYTEST_DIR .. "/controller.lua")
 local Recorder = dofile(PLAYTEST_DIR .. "/recorder.lua")
 
@@ -50,6 +54,20 @@ local TUNE = {
     stuckRecoveries = 2,
     -- A save slot takes TWO confirms; the prompt must be gone within this allowance.
     saveConfirms = 4,
+    -- Steps a boot/scene loop may take before it gives up. This must NOT be the thing
+    -- that decides failure: a cap that expires mid-scene reports a timeout naming nothing,
+    -- which is exactly how ch01 stayed open through #232 (it was still advancing dialogue
+    -- 263 frames before the old 12000-step cap ran out). INSPECT.watch is the failure oracle
+    -- -- it speaks in stallFrames -- so this only has to be larger than any real scene.
+    bootSteps = 36000,
+    -- Frames between the two proc-pool samples an inspector snapshot takes. One sample
+    -- cannot tell a frozen proc from a live one; two, a gap apart, can.
+    inspectGap = 90,
+    -- How long an UNCLASSIFIED transition may hold a byte-identical proc pool before the
+    -- inspector calls it a stalled input wait. 600 frames is 10s of wall clock at 60fps --
+    -- longer than any fade or animation, and far cheaper than the 12000-iteration boot
+    -- loop that used to time out saying nothing (#232 ch01, #236).
+    stallFrames = 600,
 }
 local CHAR_HLIN, CHAR_SCRAMSAX, CHAR_SEPHEK = 0x0D, 0x11, 0x68 -- NATASHA/KYLE/ONEILL slots
 -- prologue/sandbox host on chapter slot 1; a chapter load-test (e.g. --ch03-boot on slot 4)
@@ -252,6 +270,13 @@ end
 --     afterPre   optional cleanup fn, guaranteed after pre returns or raises
 --     post       optional fn(reachedEnd) run once after the loop (e.g. a final "title" shot)
 local controllerState, guardedInput, freezeReport
+-- The #236 state inspector, as ONE table rather than three top-level locals: this file
+-- is against Lua's 200-local ceiling for a main chunk, and crossing it stops the whole
+-- harness loading (every scenario dies at once). Consolidating here bought back 2 slots,
+-- and 2 is all the headroom there is -- measured 2026-08-06, +2 top-level locals still
+-- compiles and +3 does not. `check_lua_chunks_load` now fails the build on it in 0s.
+-- Fields are assigned further down, next to the proc-pool reader they build on.
+local INSPECT = {}
 local function recordCutscene(o)
     o = o or {}
     local tag = o.tag or "scene"
@@ -331,6 +356,7 @@ local CALLBACK_NAMES = {
     [SYM.DifficultySelect_Loop_KeyHandler] = "difficulty_input",
     [SYM.ChapterIntro_KeyListen_Loop] = "chapter_intro_input",
     [SYM.TalkWaitForInput_OnIdle] = "talk_wait_input",
+    [SYM.YesNoChoice_Loop_KeyHandler] = "yes_no_input",
     [SYM.Menu_OnIdle] = "menu_input",
     [SYM.PrepMenu_CtrlLoop] = "prep_menu_input",
     [SYM.ProcPrepUnit_Idle] = "prep_units_input",
@@ -474,7 +500,12 @@ local function observeController()
         local script = ru32(addr)
         if script ~= 0 then
             observation.raw_procs[#observation.raw_procs + 1] = {
-                slot = i, script = script, idle = ru32(addr + 0x0C), lock = ru8(addr + 0x28),
+                -- scrCur is the script command the proc sits on (include/proc.h). It is the
+                -- liveness signal the stall detector keys on: a pool whose every proc holds
+                -- the same command, idle and lock for TUNE.stallFrames is not slow, it is
+                -- waiting for an input nothing will send (#236).
+                slot = i, script = script, scr_cur = ru32(addr + 0x04),
+                idle = ru32(addr + 0x0C), lock = ru8(addr + 0x28),
             }
         end
     end
@@ -492,6 +523,20 @@ local function observeController()
     local introKey = observedProc(SYM.ProcScr_ChapterIntro_KeyListen)
     put("chapter_intro", introKey or observedProc(SYM.gProcScr_ChapterIntro))
     put("talk_wait", observedProc(SYM.gProcScr_TalkWaitForInput))
+    local yesNo = observedProc(SYM.gProcScr_YesNoChoice)
+    put("yes_no", yesNo)
+    if yesNo then
+        -- struct YesNoChoiceProc.currentChoice (include/cgtext.h): s16 @ +0x2A,
+        -- TALK_CHOICE_YES = 1 / TALK_CHOICE_NO = 2 (include/scene.h).
+        local choice = rs16(yesNo.addr + 0x2A)
+        observation.choice = {
+            current = (choice == 1 and "yes") or (choice == 2 and "no") or nil,
+            raw = choice,
+        }
+        if not observation.choice.current then
+            observation.error = string.format("malformed YesNoChoiceProc currentChoice=%d", choice)
+        end
+    end
     local rawMenu = anyMenuProc()
     put("menu", rawMenu and { addr = rawMenu, idle = callbackName(ru32(rawMenu + 0x0C)),
         locked = ru8(rawMenu + 0x28) ~= 0, frozen = (ru8(rawMenu + 0x63) & 0x40) ~= 0,
@@ -588,6 +633,9 @@ local function traceFailure(intention, expected, verdict, observation, tag)
     local actions = Controller.legalActions(observation)
     traceInput(observation, actions, intention, "none", expected, verdict, observation)
     shot(tag or "controller-failure")
+    -- Every terminal controller failure carries its inspector snapshot, so diagnosing one
+    -- costs a log read instead of another build-and-run cycle (#236).
+    INSPECT.snapshot(tag or "controller-failure")
 end
 guardedInput = function(intention, key, expected, predicate, frames)
     local before = observeController()
@@ -977,6 +1025,38 @@ local function driveSaveSlot()
     return false
 end
 
+-- A `transition` the classifier has no name for, holding a byte-identical proc pool, is
+-- not a slow scene -- it is an input wait nothing will ever send. #232's ch01 burned a
+-- 12000-iteration loop and then reported a timeout that named nothing; this dumps the
+-- inspector snapshot the moment the stall is provable, so the NEXT question is which
+-- proc to classify rather than which hypothesis to rebuild for. Returns a per-loop
+-- closure: call it with each observation, and act on the first true.
+INSPECT.watch = function(what)
+    local signature, held = nil, 0
+    return function(observation, state)
+        if state ~= "transition" then signature, held = nil, 0 return false end
+        local explanation = Controller.explain(observation)
+        -- Only an UNCLASSIFIED transition can stall this way. A named one (a map fade, a
+        -- menu animating in) is a state we can already wait out, and arming on those
+        -- would trade a silent hang for a noisy false positive.
+        if not explanation.unclassified_wait then signature, held = nil, 0 return false end
+        local parts = {}
+        for _, p in ipairs(observation.raw_procs or {}) do
+            parts[#parts + 1] = string.format("%d:%08X:%08X:%08X:%d",
+                p.slot, p.script, p.scr_cur, p.idle, p.lock)
+        end
+        local now = table.concat(parts, ",")
+        if now ~= signature then signature, held = now, 0 return false end
+        held = held + 1
+        if held < TUNE.stallFrames then return false end
+        held = 0
+        log(string.format("STALL: %s held an unclassified wait for %d frames -- %s",
+            what, TUNE.stallFrames, tostring(explanation.detail)))
+        INSPECT.snapshot(what .. "-stall", explanation)
+        return true
+    end
+end
+
 local function advanceBootState(observation, state)
     if state == "health_safety_wait" then
         return guardedInput("continue", "A", "health/safety wait clears", function(after)
@@ -1013,9 +1093,14 @@ end
 
 local function bootToMap(stopAtPrep)
     log("booting to map with observed FE8 states")
+    local stalled = INSPECT.watch("boot")
     for _ = 1, 12000 do
         local observation = observeController()
         local state, why = controllerState(observation)
+        if stalled(observation, state) then
+            result("FAIL", "boot parked on an unclassified wait (see the inspect snapshot)")
+            return false
+        end
         if state == "player_map_idle" then
             if inChapter() then
                 log(string.format("in chapter %d turn %d", chapter(), turn()))
@@ -1096,9 +1181,10 @@ end
 -- A soft-lock is never a stopped CPU -- it is the proc scheduler still running while one
 -- proc stops advancing. The proc pool carries its own diagnosis (include/proc.h): scrCur
 -- is the script command it sits on, lockCnt is the wait semaphore (nonzero = blocked by a
--- child//other proc that never released it), sleepTime is a timed wait, and proc_name is
--- the PROC_NAME string. Sampling the pool TWICE across a gap separates "this proc is
--- frozen" from "the whole scheduler is spinning", which is the first fork in the diagnosis.
+-- child//other proc that never released it), and sleepTime is a timed wait. Sampling the
+-- pool TWICE across a gap separates "this proc is frozen" from "the whole scheduler is
+-- spinning", which is the first fork in the diagnosis. Identity comes from the script
+-- ADDRESS via PROCSCR, never from the PROC_NAME string the decomp reuses (#236).
 local PROC_STRIDE = 0x6C
 local function readCStr(addr, maxLen)
     if addr == 0 then return nil end
@@ -1134,6 +1220,13 @@ local function procPool()
     return pool
 end
 
+-- Exact-match only. A script address that matches no symbol is reported as unknown:
+-- a confidently wrong name (the old PROC_NAME string, where three distinct scripts all
+-- read as "E_FACE") cost #232 its last failure, and silence would have been cheaper.
+INSPECT.scriptName = function(addr)
+    return PROCSCR[addr] or string.format("unknown@0x%08X", addr)
+end
+
 local function procLine(i, p, prev)
     -- scrCur as an offset from the script head: the exact PROC_* command it sits on.
     local step = (p.scrCur >= p.script) and ((p.scrCur - p.script) // 12) or -1
@@ -1143,8 +1236,8 @@ local function procLine(i, p, prev)
             and " FROZEN" or " moving"
     end
     return string.format(
-        "  [%02d] %-22s scr=%08X cmd#%-3d idle=%08X sleep=%-4d mark=%-3d flags=%02X lock=%d%s",
-        i, p.name or "(unnamed)", p.script, step, p.idleCb, p.sleep, p.mark, p.flags, p.lock, moved)
+        "  [%02d] %-34s cmd#%-3d idle=%08X sleep=%-4d mark=%-3d flags=%02X lock=%d%s",
+        i, INSPECT.scriptName(p.script), step, p.idleCb, p.sleep, p.mark, p.flags, p.lock, moved)
 end
 
 -- The BattleUnit pair the engine is resolving/animating right now.
@@ -1187,7 +1280,61 @@ freezeReport = function(tag, gap)
     for i = 0, 63 do
         if after[i] then log(procLine(i, after[i], before[i])) end
     end
+    INSPECT.snapshot(tag)
 end
+
+-- ---- state inspector (#236): one machine-readable snapshot of what FE8 is doing.
+-- The controller observer already builds the semantic state; this formats it, adds the
+-- reasoning behind the classification, and pairs it with the raw proc inventory named by
+-- exact symbol. Rendered by tools/playtest/inspect_state.py, which resolves the idle-callback
+-- addresses (ordinary functions -- ~35k of them, too many for a Lua table) out of the ELF.
+INSPECT.snapshot = function(tag, explanation)
+    local observation = observeController()
+    explanation = explanation or Controller.explain(observation)
+    local before = procPool()
+    wait(TUNE.inspectGap)
+    local after = procPool()
+    local procs = {}
+    for i = 0, 63 do
+        local p = after[i]
+        if p then
+            local prev = before[i]
+            procs[#procs + 1] = {
+                slot = i,
+                script = string.format("0x%08X", p.script),
+                script_name = INSPECT.scriptName(p.script),
+                -- The decomp's PROC_NAME string: colour only, never identity.
+                proc_name = p.name,
+                step = (p.scrCur >= p.script) and ((p.scrCur - p.script) // 12) or -1,
+                idle = string.format("0x%08X", codeAddr(p.idleCb)),
+                sleep = p.sleep, mark = p.mark, flags = p.flags, lock = p.lock,
+                frozen = prev ~= nil and prev.scrCur == p.scrCur and prev.sleep == p.sleep
+                    and prev.lock == p.lock,
+            }
+        end
+    end
+    -- raw_procs is the stall detector's signature source; the named inventory supersedes it.
+    observation.raw_procs = nil
+    log(Controller.encode({
+        event = "inspect",
+        tag = tag,
+        scenario = PLAYTEST_SCENARIO,
+        state = explanation.state or "unsupported",
+        classification_error = explanation.error,
+        matched_rule = explanation.matched,
+        detail = explanation.detail,
+        unclassified_wait = explanation.unclassified_wait,
+        considered = explanation.considered,
+        world = observation.world,
+        cursor = observation.cursor,
+        menu = observation.menu,
+        prep = observation.prep,
+        target = observation.target,
+        procs = procs,
+    }))
+    shot(tag)
+end
+
 
 -- CONTROLLER_TURN (#220): the compact live contract gate on the normal no-prep boot.
 -- It proves a real unit move closes through semantic Wait, then semantic End Phase reaches
@@ -1515,9 +1662,20 @@ local function reachCh01Map()
         result("FAIL", "chapter slot 2 never loaded after the ch00 win"); return false
     end
     log("in ch01 (chapter slot 2); observing post-chapter flow to Preparations")
-    for _ = 1, 12000 do
+    -- The Beat-1 Northlook scene is 29 script lines -> 67 text pages, and at normal speed
+    -- it costs ~170 frames a page. Nothing here is looked at, so set gameSpeed (gPlaySt
+    -- +0x40 bit 7) and type it fast. Written inline, not as a helper: harness.lua is at
+    -- the 200-local ceiling, and one more top-level `local` stops the whole file loading.
+    -- Only gameSpeed -- animationType is left alone so winCh00's combat is unaffected.
+    emu:write32(SYM.gPlaySt + 0x40, ru32(SYM.gPlaySt + 0x40) | (1 << 7))
+    local stalled = INSPECT.watch("reach_ch01")
+    for _ = 1, TUNE.bootSteps do
         local observation = observeController()
         local state, why = controllerState(observation)
+        if stalled(observation, state) then
+            result("FAIL", "ch01 parked on an unclassified wait (see the inspect snapshot)")
+            return false
+        end
         if state == "prep_main" then
             shot("ch01-prep-menu")
             if not driveThroughPrep() then
@@ -1534,6 +1692,15 @@ local function reachCh01Map()
                 return after.menu == nil
             end, 300) then
                 result("FAIL", "could not choose the highlighted lead"); return false
+            end
+        elseif state == "yes_no_choice" then
+            -- Lord select confirms the pick with "Will <lead> lead the party?". Same
+            -- scenario policy as the menu above -- accept the default -- and Yes is the
+            -- highlighted answer, so the controller offers it directly on A.
+            if not guardedInput("answer_yes", "A", "the yes/no prompt closes", function(after)
+                return after.procs.yes_no == nil
+            end, 300) then
+                result("FAIL", "could not answer the lord-select prompt"); return false
             end
         else
             local advanced = advanceBootState(observation, state)

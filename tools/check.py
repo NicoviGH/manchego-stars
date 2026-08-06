@@ -21,6 +21,7 @@ Exit 0 = clean, 1 = drift found. Run from the repo root.
 import glob
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -105,8 +106,15 @@ def check_python_compiles(fail):
 
 
 def check_tests_pass(fail):
-    """Run the Python unit tests (tools/test_*.py). The combat math in fe_combat.py is
-    the difficulty engine's arbiter -- a silent regression there mis-grades every chapter."""
+    """Run the Python unit tests (tools/test_*.py AND tools/playtest/test_*.py). The combat
+    math in fe_combat.py is the difficulty engine's arbiter -- a silent regression there
+    mis-grades every chapter.
+
+    The playtest directory was outside this glob until 2026-08-06 (#236), so its Python
+    tests -- the pure formatting/diff logic that is supposed to keep the emulator out of
+    the loop -- ran only when someone invoked them by hand. `unittest discover -s tools`
+    does not reach them either (the directory is not an importable package), so the glob
+    is the only gate. Coverage nothing runs is not coverage."""
     import subprocess
     # Several tests read the FE8 decomp via `git -C fireemblem8u show HEAD:...`
     # (vanilla_decomp_text). When the submodule isn't checked out -- the lightweight CI
@@ -118,12 +126,61 @@ def check_tests_pass(fail):
         print('check_tests_pass: skipping unit tests (fireemblem8u submodule not checked '
               'out; the CI build job runs `make test`)')
         return
-    for t in sorted(glob.glob(os.path.join(REPO, 'tools', 'test_*.py'))):
+    for t in sorted(glob.glob(os.path.join(REPO, 'tools', 'test_*.py'))
+                    + glob.glob(os.path.join(REPO, 'tools', 'playtest', 'test_*.py'))):
         r = subprocess.run([sys.executable, t], capture_output=True, text=True)
         if r.returncode != 0:
             tail = (r.stderr or r.stdout).strip().splitlines()
             fail.append('unit tests fail: %s (%s)' % (
                 os.path.relpath(t, REPO), tail[-1] if tail else 'see output'))
+
+
+LUA_CHUNKS = ('tools/playtest/harness.lua', 'tools/playtest/controller.lua',
+              'tools/playtest/clearbot.lua', 'tools/playtest/json.lua')
+
+
+def lua_compile_error(path):
+    """None if the chunk COMPILES, else the interpreter's message.
+
+    Two traps, both of which make this silently useless if you get them wrong:
+      * `loadfile` returns `nil, err`; it does not raise. The probe must test the
+        result explicitly or it exits 0 on a broken file and asserts nothing.
+      * the path goes in through the environment, not as an argv tail. `lua -e CODE
+        FILE` treats FILE as a script to *execute*, so the probe would run harness.lua
+        -- which fails on missing emulator globals and looks like a compile error.
+    """
+    env = dict(os.environ, LUA_CHUNK_PATH=path)
+    probe = ('local f, err = loadfile(os.getenv("LUA_CHUNK_PATH"))\n'
+             'if not f then io.stderr:write(tostring(err)) os.exit(1) end\n')
+    r = subprocess.run([shutil.which('lua') or 'lua', '-e', probe],
+                       capture_output=True, text=True, env=env)
+    if r.returncode == 0:
+        return None
+    detail = (r.stderr or r.stdout).strip().splitlines()
+    return detail[-1] if detail else 'unknown error'
+
+
+def check_lua_chunks_load(fail):
+    """The playtest Lua must COMPILE. Nothing else checks this: check_playtest_matrix
+    only parses harness.lua textually for scenario names, and a syntax/limit error is
+    invisible until mGBA loads it minutes later.
+
+    The specific hazard is Lua's ceiling of 200 local variables per function. harness.lua
+    is one ~6,700-line main chunk with only TWO free slots (measured 2026-08-06: +2
+    top-level locals still compiles, +3 does not), so a routine edit can cross it -- and
+    crossing it kills every scenario simultaneously, a total outage rather than a single
+    red row. #236 crossed it and caught it only by hand.
+
+    loadfile COMPILES without executing, so the emulator globals the chunk needs at
+    runtime (emu, SYM, PLAYTEST_*) are irrelevant here."""
+    if shutil.which('lua') is None:
+        # CI's lightweight `checks` job has no Lua, same reasoning as check_tests_pass.
+        print('check_lua_chunks_load: skipping (no lua on PATH; brew install lua)')
+        return
+    for rel in LUA_CHUNKS:
+        err = lua_compile_error(os.path.join(REPO, rel))
+        if err:
+            fail.append('%s does not compile: %s' % (rel, err))
 
 
 def check_yaml_parses(fail):
@@ -874,7 +931,8 @@ def check_lane_ownership(fail):
 
 def main():
     fail = []
-    for check in (check_python_compiles, check_tests_pass, check_yaml_parses,
+    for check in (check_python_compiles, check_lua_chunks_load,
+                  check_tests_pass, check_yaml_parses,
                   check_chapter_status, check_chapter_deployment_schema,
                   check_injection_order, check_playtest_matrix,
                   check_tool_refs_exist, check_no_dead_concepts,

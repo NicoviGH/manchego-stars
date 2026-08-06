@@ -141,6 +141,31 @@ Once the chapter has more than a couple of scenarios, drive them together:
 make matrix SUITE=chNN     # one CHNNBOOT=1 build, every chNN scenario, one verdict table
 ```
 
+## When a scenario fails, read the state before you rebuild
+
+Every terminal controller failure and every proven stall dumps an inspector snapshot into the log
+(#236). Read it first — it usually names the defect outright, and it costs no build:
+
+```sh
+tools/playtest/inspect_state.py render /tmp/playtest-<scenario>/playtest.log
+tools/playtest/inspect_state.py diff /tmp/playtest-<good>/playtest.log /tmp/playtest-<bad>/playtest.log
+```
+
+`render` prints the verdict, the rule that produced it, **every rule that was rejected and why**, and
+the live procs named by exact script symbol with their idle callbacks resolved. A verdict flagged
+`*** UNCLASSIFIED WAIT ***` means FE8 is waiting on something the controller has no name for: add
+the proc + its input callback to `gen_symbols.py`, `CALLBACK_NAMES`, `observeController` and a
+`classify` rule, and let the *scenario* decide the answer. That is the whole fix for a wait, and it
+is how ch01's lord-select Yes/No prompt was closed (#232).
+
+Two traps this replaces, both of which cost real sessions:
+
+- **Do not re-run a scenario to re-test a hypothesis the evidence already killed.** A budget-bounded
+  loop exits at the same frame no matter what is on screen, so an identical frame number proves
+  nothing. Instrument for the answer instead.
+- **A `transition` is not "nothing is happening".** It is the classifier saying it has no name for
+  this. The snapshot's `considered` list tells you what it looked for.
+
 ## Gotchas (learned the hard way)
 
 - **Tutorial-list terminator is per-chapter typed.** Slot 4's `EventListScr_ChM_Tutorial` is an
