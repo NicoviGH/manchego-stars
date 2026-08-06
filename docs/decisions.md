@@ -2439,7 +2439,11 @@ on each screen**: `CpuFastFill(0, PAL_OBJ(0x0B), 0x20)` in `prep_unitselect.c` (
 `CpuFastFill(0, gPaletteBuffer + 0x1B0, PLTT_SIZE_4BPP)` in `unitlistscreen.c` (the Character list) — `0x1B0` is
 `0x100 + 0x0B*0x10`, the same bank by arithmetic. Missing that second spelling is exactly why the 2026-07 Pick Units
 fix did not generalise, and the Character screen — which players open constantly — stayed broken until #218.
-**Any new screen that draws cast map sprites goes in that table, not in a new hook.**
+**Any new screen that draws cast map sprites goes in that table, not in a new hook.** Finding the second site by hand
+is not a strategy, so `check.py check_purple_bank_blankers_known` now greps the decomp **at HEAD** (the working tree has
+the fills patched out, so linting it would pass vacuously) for any literal bank-`0x0B` palette fill and fails the build
+unless that file is already in `PURPLE_BANK_BLANKERS`. A third screen — new, or arriving with a decomp bump — is now
+caught by CI instead of by a player noticing black silhouettes.
 
 **Enemy map sprites: clone the class into an unused slot, don't reskin the shared class (#21, 2026-06-16).**
 The cast's per-CHARACTER override is the wrong tool for ENEMIES: generic grunts share a pid (`0x80`), so there is no
@@ -2931,9 +2935,13 @@ step and reverts the montage sources → a no-opener ROM byte-identical to the t
 won't compile / stale-objects" bug for a whole session; it was never a compile problem). The montage flavour MUST be one
 command: `make MONTAGE=1`, wrapped as `tools/build.sh dist` (test = `tools/build.sh test`). A correct montage ROM's md5 is
 NOT the no-opener `142971e3`. Sanity check after a build: `grep -c "skip intro monologue" fireemblem8u/src/gamecontrol.c`
-= 0 for dist, 1 for test. Also: the decomp ships Linux `#!/bin/python3` shebangs that `setup-toolchain.sh` rewrites for
-macOS, but any `git checkout` inside the `fireemblem8u` submodule reverts them (`bad interpreter` on the next build);
-`build.sh` re-applies the fix idempotently. _Decided: 2026-06-17; root-caused + dist (with opener) GIF-verified end-to-end
+= 0 for dist, 1 for test. Also: the decomp ships Linux `#!/bin/python3` shebangs that do not exist on macOS, and any
+`git checkout` inside the `fireemblem8u` submodule reverts the fix — the next build then dies on `bad interpreter`,
+minutes in, from a Makefile rule that looks unrelated. `setup-toolchain.sh` and `build.sh` both rewrite them, but the
+DOCUMENTED build command is plain `make`, which bypassed both, so the failure kept recurring (three times in one session,
+2026-08-05). **`build_campaign.normalise_decomp_shebangs` now re-applies it idempotently on EVERY build** — the hole is
+closed at the one place every build passes through, rather than in wrappers a caller has to remember.
+_Decided: 2026-06-17; root-caused + dist (with opener) GIF-verified end-to-end
 (`run.sh recordopening`: title → New Game → lore crawl → Ten Towns tour → prologue map)._
 
 **World-map tour rides vanilla's drawn-map slot with two Icewind Dale backdrops, selected by a free mask bit.**

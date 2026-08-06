@@ -490,6 +490,65 @@ def _engine_name_hits(ids, text):
     return hits
 
 
+def check_purple_bank_blankers_known(fail):
+    """No vanilla screen may blank the cast map-sprite OBJ bank (0x0B) unnoticed.
+
+    #218: our custom cast render from purple OBJ bank 0x0B. Vanilla treats that bank as
+    scratch -- a screen calls ApplyUnitSpritePalettes() and then zeroes it, because nothing
+    of vanilla's own renders from there. A zeroed 16-colour bank draws every index as
+    colour 0, so the whole cast comes out as correctly shaped BLACK SILHOUETTES: right
+    sheet, right position, no colour.
+
+    We found two such screens by hand (Pick Units, then the Character list) and only found
+    the second because the first was reported as a bug -- they are spelled differently
+    (`PAL_OBJ(0x0B)` vs the raw `gPaletteBuffer + 0x1B0`, which is 0x100 + 0x0B*0x10). This
+    check closes that: every literal reference to bank 0x0B in a palette fill anywhere in
+    the decomp must be a site build_campaign.PURPLE_BANK_BLANKERS already patches out. A
+    third screen -- new, or arriving with a decomp bump -- fails here instead of silently
+    blackening a roster.
+    """
+    src_dir = os.path.join(REPO, 'fireemblem8u', 'src')
+    if not os.path.isdir(src_dir):
+        print('check_purple_bank_blankers_known: skipping (fireemblem8u submodule not '
+              'checked out)')
+        return
+    bc = open(os.path.join(REPO, 'tools', 'build_campaign.py'), encoding='utf-8').read()
+    # Which decomp files PURPLE_BANK_BLANKERS covers. Its entries are (PATH_CONST, orig,
+    # hooked), so read the constant names out of the tuple rather than importing
+    # build_campaign (which would pull in Pillow/yaml for a lint).
+    block = bc[bc.index('PURPLE_BANK_BLANKERS = ('):]
+    block = block[:block.index('\n)')]
+    known = {name.lower() for name in re.findall(r'^\s*\((\w+)_C,', block, re.M)}
+
+    # MUST read HEAD, not the working tree: the build patches these very fills out, so a
+    # post-build tree shows nothing and the check would pass vacuously. (Same doctrine as
+    # vanilla_decomp_text -- our decomp edits are build artifacts.)
+    import subprocess
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith('GIT_')}
+    # bank 0x0B, both spellings: PAL_OBJ(0x0B|0xB|11) and the raw gPaletteBuffer offset
+    # (0x1B0 == 0x100 + 0x0B*0x10).
+    pattern = (r'CpuFastFill\( *0, *(PAL_OBJ\( *(0x0?[Bb]|11) *\)'
+               r'|gPaletteBuffer \+ 0x1B0)')
+    r = subprocess.run(['git', '-C', os.path.join(REPO, 'fireemblem8u'), 'grep', '-nE',
+                        pattern, 'HEAD', '--', 'src'],
+                       capture_output=True, text=True, env=env)
+    if r.returncode not in (0, 1):                   # 1 == no matches, which is fine
+        fail.append('check_purple_bank_blankers_known: git grep failed: %s'
+                    % (r.stderr or '').strip())
+        return
+    for line in r.stdout.splitlines():
+        m = re.match(r'HEAD:src/(\w+)\.c:', line)
+        if not m:
+            continue
+        if m.group(1).lower() not in known:
+            fail.append(
+                'src/%s.c blanks the cast map-sprite OBJ bank 0x0B but is not in '
+                'build_campaign.PURPLE_BANK_BLANKERS -- the cast would render as black '
+                'silhouettes on that screen (#218). Add it there, do not silence this.'
+                % m.group(1))
+
+
 def check_engine_campaign_agnostic(fail):
     ids = _campaign_character_ids()
     if not ids:
@@ -758,6 +817,7 @@ def main():
                   check_injection_order,
                   check_tool_refs_exist, check_no_dead_concepts,
                   check_generated_indexes_fresh, check_engine_guards_present,
+                  check_purple_bank_blankers_known,
                   check_engine_campaign_agnostic,
                   check_save_layout_stable, check_handoff_only_on_main,
                   check_lane_ownership):
