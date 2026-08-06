@@ -16,7 +16,21 @@ Refreshed 2026-08-06 (Opus). `main` = `5db7878`, level with `origin/main`.
 | 3 | **#240** | `feat/238-controller-contract` | the ch01 spine on the controller contract (#238, first pass) |
 
 Each is based on the one above it, so **merging out of order will produce a mess.** `main` itself is
-clean, no stashes. Squash-merge 1 → 2 → 3, delete branches, then refresh this file.
+clean, no stashes.
+
+**Squash-merging a stack needs a rebase between each step — do not skip it.** A squash collapses
+#237 into ONE new commit on `main` that is not in #239's history, so when GitHub retargets #239's
+base the PR re-shows #237's changes and can conflict. After each merge, rebase the next branch onto
+`main` and force-push (branch tips recorded so the old base is resolvable after deletion):
+
+```sh
+# after #237 merges (old base tip 2fe2d95):
+git rebase --onto main 2fe2d95 feat/138-inject-chapter && git push --force-with-lease
+# after #239 merges (old base tip 99f6337):
+git rebase --onto main 99f6337 feat/238-controller-contract && git push --force-with-lease
+```
+
+`feat/238-controller-contract` is `26479a9`. Then refresh this file.
 **CI never ran on ANY of them — a GitHub Actions major outage (incident opened 15:22 UTC
 2026-08-06), not these branches. Do not re-diagnose it; the evidence is already a comment on #237.**
 Every run on `main`
