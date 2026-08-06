@@ -58,6 +58,12 @@ geometry regardless of which slot hosts it (ch03 repaints vanilla Ch3 "Borgo" bu
    `_asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', ...)`; `HostChapterEventGroup`
    in `tools/test_build_campaign.py` pins it.
 
+   **You get this guard for free — but only if you declare both constants.** `hosted_chapters()`
+   discovers chapters from `CHNN_HOST_INDEX` + `CHNN_EVENT_GROUP`, so writing the pair is what
+   enrols your chapter in the event-group check; there is no list to update. Declaring a host slot
+   without naming its event group fails `make check` in 0s, and so does two chapters claiming one
+   slot (#138).
+
    Pick a donor slot whose goal type matches and that our injectors don't overwrite:
 
    | Goal | `windowDataType` | Clean donor slots (vanilla, post-inject) |
