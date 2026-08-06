@@ -3268,6 +3268,11 @@ session state. `HANDOFF.md` points here._
   without the flag it PASSes. **Before believing a scenario failure, check which ROM it ran on:**
   the boot flags are per-chapter, and a scenario for an earlier chapter cannot pass on a later
   chapter's fast-boot build. The same applies in reverse to `PT_HOST_CHAPTER`.
+  **Mechanised since 2026-08-06 (#231/#232):** `build_campaign.py` stamps `.build-config.json` with
+  the flags that produced the ROM in the tree, `matrix.yaml` declares what each scenario needs, and
+  `run.sh` refuses a mismatch in 0s with the exact `make` line. So this should no longer be a
+  judgement call — but `MX_SKIP_ROM_CHECK=1` disables the guard and puts you straight back here
+  (which is exactly what happened once inside the session that built it).
 - **Comments inside a YAML folded scalar are CONTENT, not comments** (2026-08-02, #214). Authoring
   a chapter's `visit_text: >` with `#` lines indented underneath silently folded them into the
   string, and the chapter YAML then failed to load for every test that reads it. Comments belong
