@@ -13,14 +13,14 @@ follow-up landed on top (#241 in PR #242, squashed).** No branches, no stashes. 
 **14/14** (4m23s), `git diff --check` clean. #236, #232 and #241 closed; **#138 and #238 stay open
 by design** — each got a first pass only (see NEXT SESSION §2).
 
-**CI: read this before diagnosing anything red or missing.** The GitHub Actions outage (incident
-15:22 UTC 2026-08-06) partially lifted around 22:05 — `push: [main]` dispatches again, but
-`pull_request` did NOT for PR #242 (no run was ever created: not on push, not on open, not on a
-close/reopen nudge). **A missing check on a PR is that, not a broken branch.** The first real run
-after the outage, on the #240 merge, failed for a genuine reason — `build_campaign does not import:
-No module named 'PIL'` — which is what #241 fixed; `tools/test_hosts.py` now reproduces CI's
-dependency set locally, so that class fails on your machine instead. Local verification stays a
-strict superset of `checks.yml` (which never builds the ROM).
+**CI is GREEN again and the outage is over** — `checks` passed on `main` at `5d303eb` and on
+#242's branch head. The 2026-08-06 Actions incident (opened 15:22 UTC) drained slowly rather than
+all at once: events sat undispatched for up to ~40 minutes, so a PR with no check at all was the
+outage, not a broken branch — worth remembering before re-diagnosing one. The first real run after
+it lifted, on the #240 merge, failed for a genuine reason — `build_campaign does not import: No
+module named 'PIL'` — which is what #241 fixed; `tools/test_hosts.py` now reproduces CI's
+dependency set locally, so that whole class fails on your machine instead of on a runner. Local
+verification stays a strict superset of `checks.yml` (which never builds the ROM).
 **Nothing has had a `/code-review` since #242 — that is user-triggered (`/code-review ultra <PR#>`).**
 
 **Next in the agreed order: #238's second pass (NEXT SESSION §2), then ch05 (#25). Jump there.**
