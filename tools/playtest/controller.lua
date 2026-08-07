@@ -254,14 +254,40 @@ local RULES = {
         end,
     },
     {
+        -- The in-map convoy (ProcScr_BmSupplyScreen), opened by the unit menu's Supply
+        -- command. Above player_phase for the same reason as the unit list: the map is still
+        -- underneath it, and answering `player_map_idle` here offers cursor moves that go
+        -- nowhere.
+        name = "supply_screen",
+        check = function(observation)
+            if not proc(observation, "supply_screen") then
+                return rejected("supply_screen proc absent")
+            end
+            if not idleIs(observation, "supply_screen", "supply_input") then
+                return matched("transition", string.format("supply_screen idle=%s, not its key handler",
+                    tostring(idleOf(observation, "supply_screen"))))
+            end
+            return matched("supply_screen", "supply_screen in its key handler")
+        end,
+    },
+    {
         name = "prep_units",
         check = function(observation)
             if not proc(observation, "prep_units") then return rejected("prep_units proc absent") end
-            if idleIs(observation, "prep_units", "prep_units_input") then
-                return matched("prep_pick_units", "prep_units in its input loop")
+            if not idleIs(observation, "prep_units", "prep_units_input") then
+                return matched("transition", string.format("prep_units idle=%s, not prep_units_input",
+                    tostring(idleOf(observation, "prep_units"))))
             end
-            return matched("transition", string.format("prep_units idle=%s, not prep_units_input",
-                tostring(idleOf(observation, "prep_units"))))
+            if not observation.prep_units then
+                return matched("transition", "prep_units live with no observed list structure")
+            end
+            -- ProcPrepUnit_Idle gates its ENTIRE key handler on list_num_pre == list_num_cur:
+            -- while the list scrolls to a new row it reads nothing, so an input sent in that
+            -- window is lost and the driver goes on believing it landed.
+            if not observation.prep_units.settled then
+                return matched("transition", "the deploy list is scrolling to a new row")
+            end
+            return matched("prep_pick_units", "prep_units in its input loop")
         end,
     },
     {
@@ -518,6 +544,27 @@ function M.legalActions(observation)
                     "prep.command.index=0", item.slot)
             end
         end
+    elseif state == "prep_pick_units" then
+        -- ProcPrepUnit_Idle (prep_unitselect.c) walks a TWO-COLUMN list, and its bounds are
+        -- reproduced here rather than approximated: LEFT only from an odd index, RIGHT only
+        -- from an even one short of the end, UP/DOWN by two. A press outside those bounds
+        -- moves nothing at all -- so a driver that assumed a straight list would act on
+        -- whoever it was still parked on and report success.
+        local pick = observation.prep_units
+        if (pick.cursor & 1) == 1 then add(actions, "pick_left", "LEFT", "prep_units.column") end
+        if (pick.cursor & 1) == 0 and pick.cursor < pick.count - 1 then
+            add(actions, "pick_right", "RIGHT", "prep_units.column")
+        end
+        if pick.cursor - 2 >= 0 then add(actions, "pick_previous", "UP", "prep_units.row") end
+        if pick.cursor + 2 <= pick.count - 1 then
+            add(actions, "pick_next", "DOWN", "prep_units.row")
+        end
+        add(actions, "toggle_deploy", "A", "prep_units.cursor")
+        -- START only launches with someone deployed; on an empty field FE8 just buzzes.
+        if pick.deployed > 0 then add(actions, "fight", "START", "prep_units.deployed") end
+        add(actions, "cancel_pick", "B", "prep_units.on_b")
+    elseif state == "supply_screen" then
+        add(actions, "close_supply", "B", "supply_screen.on_b")
     elseif state == "unit_list_screen" then
         -- sub_809144C (unitlistscreen.c): DOWN/UP walk the roster, LEFT/RIGHT change page, A
         -- opens the highlighted unit's stat screen, B leaves. The roster index it moves is

@@ -373,6 +373,7 @@ local CALLBACK_NAMES = {
     [SYM.TargetSelection_Loop] = "target_selection_input",
     [SYM.BattleForecast_LoopDisplay] = "battle_forecast_display",
     [SYM.sub_8091AEC] = "unit_list_input",
+    [SYM.PrepItemSupply_Loop_GiveTakeKeyHandler] = "supply_input",
 }
 local PREP_CALLBACK_NAMES = {
     [SYM.PrepScreenMenu_OnStartPress] = "prep_main_fight",
@@ -556,7 +557,21 @@ local function observeController()
     put("at_menu", observedProc(SYM.ProcScr_AtMenu, "at_menu_idle"))
     put("prep_menu", observedProc(SYM.ProcScr_PrepMenu))
     put("sally", observedProc(SYM.gProcScr_SALLYCURSOR, "sally_idle"))
-    put("prep_units", observedProc(SYM.ProcScr_PrepUnitScreen))
+    local pickUnits = observedProc(SYM.ProcScr_PrepUnitScreen)
+    put("prep_units", pickUnits)
+    if pickUnits then
+        -- struct ProcPrepUnit (include/prepscreen.h). list_num_cur is where the cursor IS,
+        -- list_num_pre where it has settled -- ProcPrepUnit_Idle reads no keys at all while
+        -- they differ. count is the live roster length (gPrepUnitList.max_num, what
+        -- PrepGetUnitAmount returns), which is what bounds a RIGHT or DOWN off the end.
+        observation.prep_units = {
+            cursor = ru16(pickUnits.addr + 0x2E),
+            settled = ru16(pickUnits.addr + 0x2C) == ru16(pickUnits.addr + 0x2E),
+            deployed = ru8(pickUnits.addr + 0x29), cap = ru8(pickUnits.addr + 0x2A),
+            count = ru32(SYM.gPrepUnitList + 0x100),
+        }
+    end
+    put("supply_screen", observedProc(SYM.ProcScr_BmSupplyScreen))
     local unitList = observedProc(SYM.ProcScr_UnitListScreen_Field)
     put("unit_list", unitList)
     if unitList then
@@ -2759,41 +2774,78 @@ scenarios.recordsupply = function()
     if not loadState("lordpinky") then return result("FAIL", "no lordpinky checkpoint (run.sh builds it)") end
     wait(60)
     shot("supply")                                        -- prep main, Pinky as lord
-    press(K.A, 4); wait(60)                               -- enter Pick Units (single A from prep)
-    if not procActive(SYM.ProcScr_PrepUnitScreen) then
+    -- Enter Pick Units through the live prep command, not a bare A on the top row (#238).
+    if not awaitControllerState("prep_main", 600) then
+        shot("supply-no-prep"); return result("FAIL", "the prep main menu never took input") end
+    if not selectSemantic("pick_units", "the Pick Units deploy screen opens", function(after)
+        return after.procs.prep_units ~= nil
+    end, 300) then
         shot("supply-no-pickunits")
         return result("FAIL", "Pick Units screen never opened")
     end
+    if not awaitControllerState("prep_pick_units", 600) then
+        return result("FAIL", "the deploy list never reached its key handler") end
     shot("supply")
-    -- Pick Units 2-col list, cursor starts on Pinky (pos 0):
+    -- The deploy list is a TWO-COLUMN grid and the cursor starts on the lead (index 0):
     --   0 Pinky | 1 Braulo / 2 Marty | 3 Wolfram / 4 Mees | 5 RBG / 6 Rootis | 7 Sclorbo
-    -- Bench Braulo (pos 1): RIGHT to him, A only if he is currently deployed.
-    press(K.RIGHT, 4); wait(20)
-    if isDeployedInPrep(CHAR_BRAULO) then press(K.A, 4); wait(20) end
+    -- Bench Braulo (index 1): step RIGHT to him, then toggle only if he is deployed.
+    --
+    -- Every one of these moves used to be a blind press against that map of the roster. The
+    -- moves are now enumerated from the LIVE list -- the controller mirrors
+    -- ProcPrepUnit_Idle's own bounds -- so a RIGHT or DOWN that FE8 would refuse is not
+    -- offered at all, instead of silently leaving the cursor where it was and toggling
+    -- whoever happened to be under it.
+    local function pickStep(intention, key, where)
+        local at = observeController().prep_units
+        if not at then return false end
+        return guardedInput(intention, key, "the deploy cursor moves " .. where, function(after)
+            return after.prep_units ~= nil and after.prep_units.cursor ~= at.cursor
+        end, 60)
+    end
+    if not pickStep("pick_right", "RIGHT", "onto the second column") then
+        return result("FAIL", "could not step the deploy cursor onto Braulo's column") end
+    if isDeployedInPrep(CHAR_BRAULO) then
+        local before = countDeployedPrep()
+        if not guardedInput("toggle_deploy", "A", "Braulo leaves the deployed count", function()
+            return not isDeployedInPrep(CHAR_BRAULO) and countDeployedPrep() < before
+        end, 120) then return result("FAIL", "could not bench Braulo") end
+    end
     shot("supply")
-    -- Top up to 4 with non-Braulo units: walk down col 1 (RBG pos5, Sclorbo pos7) and
-    -- deploy benched ones until the cap is full. (Cursor is on Braulo/pos1.)
-    for _, downs in ipairs({2, 2}) do          -- pos1 -> pos5 (RBG); pos5 -> pos7 (Sclorbo)
+    -- Top up to 4 with non-Braulo units: walk down the second column (RBG at 5, Sclorbo at 7)
+    -- and deploy the benched ones until the cap is full.
+    for _ = 1, 2 do
         if countDeployedPrep() >= 4 then break end
-        for _ = 1, downs do press(K.DOWN, 4); wait(12) end
-        press(K.A, 4); wait(20)                -- deploy the (benched) unit here
+        for _ = 1, 2 do
+            if not pickStep("pick_next", "DOWN", "down a row") then
+                return result("FAIL", "could not walk the deploy list down a row") end
+        end
+        local before = countDeployedPrep()
+        if not guardedInput("toggle_deploy", "A", "the deployed count rises", function()
+            return countDeployedPrep() > before
+        end, 120) then return result("FAIL", "could not deploy the benched unit under the cursor") end
         shot("supply")
     end
     log(string.format("prep: brauloDeployed=%s deployedCount=%d",
         tostring(isDeployedInPrep(CHAR_BRAULO)), countDeployedPrep()))
-    -- Launch the chapter straight from Pick Units (START = Fight!).
-    press(K.START, 4); wait(40)
-    for i = 1, 30 do
-        if not procActive(SYM.gProcScr_SALLYCURSOR) and not procActive(SYM.ProcScr_PrepUnitScreen)
-           and faction() == 0 and turn() >= 1 then break end
-        press(K.A, 4); wait(30)
+    -- Launch straight from Pick Units. START is a legal action here only because someone is
+    -- deployed -- on an empty field FE8 just buzzes, and the old blind START could not tell
+    -- that apart from a launch, so it went on to A-mash at a screen that had not moved.
+    if not selectSemantic("fight", "Pick Units launches the chapter", function(after)
+        return after.procs.prep_units == nil
+    end, 600) then
+        shot("supply-no-launch")
+        return result("FAIL", "START did not launch the chapter from Pick Units")
+    end
+    if not awaitControllerState("player_map_idle", 900) then
+        shot("supply-no-map")
+        return result("FAIL", "never reached the player-phase map")
     end
     if not waitFor(function()
         return faction() == 0 and turn() >= 1
             and not procActive(SYM.gProcScr_SALLYCURSOR)
     end, 1200) then
         shot("supply-no-map")
-        return result("FAIL", "never reached the player-phase map")
+        return result("FAIL", "the map came up but turn 1 never began")
     end
     wait(120); shot("supply")                             -- the deployed field
     -- Map-side assertions: Braulo benched (not on field), Pinky deployed, exactly 4 out.
@@ -2817,15 +2869,27 @@ scenarios.recordsupply = function()
     pinky = blue(CHAR_PINKY_LORD)
     if moveUnit(pinky.x, pinky.y, pinky.x, pinky.y) then
         wait(40); shot("supply")                          -- Pinky's menu: Rescue/Item/Trade/Supply/Wait
-        -- Supply is row 3 (Rescue0 Item1 Trade2 Supply3 Wait4); cursor starts at row 0.
-        press(K.DOWN, 4); wait(12)
-        press(K.DOWN, 4); wait(12)
-        press(K.DOWN, 4); wait(12); shot("supply")        -- cursor on Supply
-        press(K.A, 4); wait(60)
-        usedSupply = procActive(SYM.ProcScr_BmSupplyScreen)
+        -- Resolve the live Supply command. Three blind DOWNs used to walk to "row 3 (Rescue0
+        -- Item1 Trade2 Supply3 Wait4)" -- a claim about which of Rescue and Trade happen to
+        -- be available, both of which depend on who is standing next to Pinky. Park an ally
+        -- beside her and the walk lands on Wait, the run opens no convoy, and the failure
+        -- reads as "Supply is broken" (#238).
+        usedSupply = selectSemantic("open_supply", "Supply opens the convoy screen", function(after)
+            return controllerState(after) == "supply_screen"
+        end, 300)
         shot("supply")                                    -- the convoy screen -> Pinky USING Supply
         log("pinky opened convoy=" .. tostring(usedSupply))
-        press(K.B, 4); wait(20); press(K.B, 4); wait(20)  -- back out of convoy + menu
+        if usedSupply then
+            -- Leave the convoy, then the unit menu, each on its own enumerated cancel. Two
+            -- blind B's could not tell those two levels apart: one too few left the run in
+            -- the convoy, one too many cancelled Pinky's move as well.
+            if not guardedInput("close_supply", "B", "the convoy screen closes", function(after)
+                return controllerState(after) ~= "supply_screen"
+            end, 300) then return result("FAIL", "could not leave the convoy screen") end
+            if not cancelToPlayerMap() then
+                return result("FAIL", "could not return to the map after the convoy")
+            end
+        end
     else
         shot("supply-no-menu")
     end
@@ -2834,8 +2898,20 @@ scenarios.recordsupply = function()
     for i = 0, 50 do
         local u = unitAt(SYM.gUnitArrayBlue, i)
         if u and u.charId ~= CHAR_PINKY_LORD and (u.state & 0x9) == 0 and u.x ~= 0xFF then
-            if moveUnit(u.x, u.y, u.x, u.y) then wait(40); shot("supply") end  -- no Supply row
-            press(K.B, 4); wait(20); press(K.B, 4); wait(20)
+            if moveUnit(u.x, u.y, u.x, u.y) then
+                wait(40); shot("supply")
+                -- The CONTRAST is the point of this half, so assert it rather than leaving
+                -- it to the screenshot: a non-lord's live command menu must offer no Supply
+                -- at all. The old code just backed out on two blind B's and asserted nothing.
+                if Controller.findAction(
+                    Controller.legalActions(observeController()), "open_supply") then
+                    return result("FAIL", string.format(
+                        "a non-lord (char 0x%02X) was offered the Supply command", u.charId))
+                end
+                if not cancelToPlayerMap() then
+                    return result("FAIL", "could not back out of the non-lord's command menu")
+                end
+            end
             break
         end
     end

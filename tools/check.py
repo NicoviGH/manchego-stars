@@ -546,6 +546,105 @@ def check_playtest_matrix(fail):
                             % (suite, name))
 
 
+# Functions in harness.lua that may hold a raw press() even though a verdict scenario can
+# reach them. Each is a deliberate exception with its own reason -- NOT a backlog.
+BLIND_PRESS_ALLOWED = {
+    # press() itself, and the two places the contract is IMPLEMENTED. guardedInput is the
+    # thing that re-observes, re-authorises and verifies; it has to press eventually.
+    'press': 'the emulator primitive every guarded input is built on',
+    'guardedInput': 'the guarded input itself -- this is where the contract presses',
+    'awaitControllerState': 'traced, enumerated cancel while backing out of an unwanted state',
+    # A save slot takes TWO confirms and SaveMenu_SaveSlotSelectLoop stays the idle callback
+    # across both, so the first press has no state change to be verified against. Legality is
+    # re-checked before every press and the loop stops on the OUTCOME (the prompt closing).
+    'driveSaveSlot': 'two confirms with no distinguishing postcondition; verified on the outcome',
+    # The fuzzer's whole purpose is unguarded, weighted-random input. Driving it through the
+    # controller would mean it could only ever send inputs the controller already calls legal,
+    # which is precisely the space a fuzzer exists to leave.
+    'fuzzDrive': 'random input IS the scenario -- guarding it would defeat the fuzzer',
+}
+
+_LUA_FUNC_DEF = re.compile(
+    r'^(?:local function (\w+)|scenarios\.(\w+) = function|(\w+) = function)', re.M)
+
+
+def _harness_functions(source):
+    """{name: (body, kind)} for every top-level function in harness.lua.
+
+    Attribution is by ENCLOSING FUNCTION, not by distance to the next `scenarios.X`.
+    Splitting on scenario definitions charges every intervening `local function` helper to
+    whichever scenario happens to sit above it -- which is how #238's own scope list came to
+    name `retreat` (0 presses of its own) and miss `reachRbgCh01` (8)."""
+    lines = source.split('\n')
+    marks = []
+    for i, line in enumerate(lines):
+        m = _LUA_FUNC_DEF.match(line)
+        if m:
+            name = m.group(1) or m.group(2) or m.group(3)
+            marks.append((i, name, 'scenario' if m.group(2) else 'helper'))
+    marks.append((len(lines), None, None))
+    out = {}
+    for (start, name, kind), (end, _, _) in zip(marks, marks[1:]):
+        body = '\n'.join(l for l in lines[start:end] if not l.strip().startswith('--'))
+        out[name] = (body, kind)
+    return out
+
+
+def _reaches(name, funcs, seen=None):
+    """Every harness function reachable from `name`, including itself."""
+    seen = seen if seen is not None else set()
+    if name in seen or name not in funcs:
+        return seen
+    seen.add(name)
+    body = funcs[name][0]
+    for callee in set(re.findall(r'\b(\w+)\s*\(', body)):
+        if callee in funcs and callee != name:
+            _reaches(callee, funcs, seen)
+    return seen
+
+
+def check_verdict_scenarios_are_guarded(fail):
+    """A scenario that produces a VERDICT may not drive the UI with a raw press().
+
+    A blind press cannot tell "the scene advanced" from "FE8 swallowed that input", so a
+    green run from one is not evidence -- ch01win rode straight through the very Yes/No
+    prompt that cost #232 three sessions, and passed. Every input a verdict scenario sends
+    now goes through guardedInput: observed state -> enumerated legal action -> verified
+    postcondition (#238).
+
+    Scope comes from matrix.yaml's `kind`, never from the scenario NAME: recordsupply and
+    recordunitlist are verdict scenarios despite the prefix, and recordunitlist is in the
+    gate suite. Capture (`record`) and `diagnostic` scenarios are out -- blind input is
+    harmless where nothing is asserted."""
+    sys.path.insert(0, os.path.join(REPO, 'tools', 'playtest'))
+    try:
+        import matrix as mx
+        m = mx.Manifest.load()
+    except Exception as exc:                      # noqa: BLE001 -- check_playtest_matrix reports it
+        return
+    with open(os.path.join(REPO, 'tools/playtest/harness.lua'), encoding='utf-8') as fh:
+        funcs = _harness_functions(fh.read())
+
+    for name in sorted(m.scenarios):
+        try:
+            if m.resolve(name).kind != 'verdict':
+                continue
+        except mx.ManifestError:
+            continue
+        if name not in funcs:
+            continue
+        for reached in sorted(_reaches(name, funcs)):
+            if reached in BLIND_PRESS_ALLOWED:
+                continue
+            count = len(re.findall(r'\bpress\(', funcs[reached][0]))
+            if count:
+                where = reached if reached == name else '%s (via %s)' % (reached, name)
+                fail.append(
+                    'verdict scenario %s drives the UI with %d raw press() call(s) in %s -- '
+                    'use guardedInput/selectSemantic, or classify the state it needs (#238)'
+                    % (name, count, where))
+
+
 def check_tool_refs_exist(fail):
     """A doc or code comment naming tools/<x>.py|rb, or a docs/<x>.md path, must
     point at a file that exists -- dangling pointers are the cheapest-to-catch form
@@ -1041,6 +1140,7 @@ def main():
                   check_tests_pass, check_yaml_parses,
                   check_chapter_status, check_chapter_deployment_schema,
                   check_injection_order, check_playtest_matrix,
+                  check_verdict_scenarios_are_guarded,
                   check_tool_refs_exist, check_no_dead_concepts,
                   check_generated_indexes_fresh, check_engine_guards_present,
                   check_purple_bank_blankers_known,

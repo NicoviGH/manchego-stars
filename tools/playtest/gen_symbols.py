@@ -155,6 +155,11 @@ WANTED = [
                                 # In a --montage build this carries the #43 lore crawl, so a
                                 # live instance == the montage opener actually played.
     'ProcScr_PrepUnitScreen',   # proc script: the prep "Pick Units" screen (deploy/bench).
+    'gPrepUnitList',            # struct PrepUnitList (include/prepscreen.h): units[0x40] then
+                                # max_num at +0x100 -- PrepGetUnitAmount(). It is what
+                                # ProcPrepUnit_Idle bounds its RIGHT/DOWN moves against, so
+                                # the controller reads the LIVE roster length instead of
+                                # assuming the deploy list's shape (#238).
     'ProcScr_UnitListScreen_Field', # proc script: the map-menu "Unit" list, i.e. the Character
                                 # screen (src/unitlistscreen.c, started by StartUnitListScreenField
                                 # off gMapMenuItems[0], overrideId 0x6E). A live instance == the
@@ -172,6 +177,11 @@ WANTED = [
     'ProcScr_BmSupplyScreen',   # proc script: the in-map Supply (convoy) screen, opened by
                                 # the unit-menu Supply command (src/prep_itemsupply.c). A live
                                 # instance == a unit actually opened the convoy on the field.
+    'PrepItemSupply_Loop_GiveTakeKeyHandler', # exact convoy input callback. B leaves it
+                                # (Proc_Goto 8); nothing else is ever wanted there, but it has
+                                # to be a NAMED state -- blind B's into an unclassified screen
+                                # cannot tell "the convoy closed" from "that also cancelled
+                                # the unit's move" (#238).
     'ProcScr_BattleEventEngine',# proc script: in-battle event engine (src/event.c). Runs
                                 # CallBattleQuoteEventInBattle -> the brief in-combat quotes
                                 # (per-PC DEATH quotes, boss taunts). A live instance == a

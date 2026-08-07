@@ -112,7 +112,62 @@ local prepView = {
 }
 classify(prepView, "prep_map_menu", "View Map preparations menu is distinct")
 check(action(prepView, "fight"), nil, "controller never exits prep through View Map")
-classify({ procs = proc("prep_units", "prep_units_input") }, "prep_pick_units", "Pick Units screen")
+-- The Pick Units deploy screen. Its legal moves are exactly the bounds ProcPrepUnit_Idle
+-- enforces on a TWO-COLUMN list (prep_unitselect.c): LEFT only from an odd index, RIGHT only
+-- from an even one that is not the last, and UP/DOWN by two. A scenario that pressed RIGHT or
+-- DOWN off the end of that grid moved nothing and then acted on whoever it was still sitting
+-- on -- which is how a bench/deploy walk can pick the wrong unit and stay green (#238).
+local pickUnits = {
+    procs = proc("prep_units", "prep_units_input"),
+    prep_units = { cursor = 0, settled = true, deployed = 1, count = 8 },
+}
+classify(pickUnits, "prep_pick_units", "Pick Units screen")
+a = action(pickUnits, "pick_right")
+check(a and a.key, "RIGHT", "an even index can cross to the second column")
+check(action(pickUnits, "pick_left"), nil, "...but the first column has nothing to its left")
+check(action(pickUnits, "pick_previous"), nil, "and the top row has nothing above it")
+a = action(pickUnits, "pick_next")
+check(a and a.key, "DOWN", "the row below is two indices on")
+a = action(pickUnits, "toggle_deploy")
+check(a and a.key, "A", "A benches or deploys whoever the cursor holds")
+a = action(pickUnits, "fight")
+check(a and a.key, "START", "START launches once at least one unit is deployed")
+
+local lastPick = {
+    procs = proc("prep_units", "prep_units_input"),
+    prep_units = { cursor = 7, settled = true, deployed = 4, count = 8 },
+}
+check(action(lastPick, "pick_right"), nil, "the last entry has nothing to its right")
+check(action(lastPick, "pick_next"), nil, "...and nothing below it")
+a = action(lastPick, "pick_left")
+check(a and a.key, "LEFT", "but an odd index can always step back a column")
+
+local emptyPick = {
+    procs = proc("prep_units", "prep_units_input"),
+    prep_units = { cursor = 0, settled = true, deployed = 0, count = 8 },
+}
+check(action(emptyPick, "fight"), nil, "START does not launch with an empty field")
+
+-- The whole key handler is gated on list_num_pre == list_num_cur: while the list scrolls to a
+-- new row FE8 reads no keys at all, so a press sent then is lost outright.
+local scrollingPick = {
+    procs = proc("prep_units", "prep_units_input"),
+    prep_units = { cursor = 4, settled = false, deployed = 2, count = 8 },
+}
+classify(scrollingPick, "transition", "a scrolling deploy list takes no input")
+check(action(scrollingPick, "toggle_deploy"), nil, "and offers none")
+
+-- The in-map convoy, opened by the unit menu's Supply command. Only ever entered to look and
+-- leave, so B is the whole contract -- but it has to be a NAMED state, because two blind B's
+-- into an unclassified screen cannot tell "the convoy closed" from "the second B also
+-- cancelled the unit's move".
+local supply = {
+    procs = { supply_screen = { idle = "supply_input" }, player_phase = { idle = "player_main_idle" } },
+}
+classify(supply, "supply_screen", "the map convoy outranks the map underneath it")
+a = action(supply, "close_supply")
+check(a and a.key, "B", "B leaves the convoy (PrepItemSupply_Loop_GiveTakeKeyHandler)")
+check(action(supply, "cursor_down"), nil, "and the map cursor is not offered while it is up")
 
 -- Standard menus expose semantic command IDs and enabled availability, never guessed rows.
 local unitMenu = {

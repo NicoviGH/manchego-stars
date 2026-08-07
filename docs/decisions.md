@@ -1519,6 +1519,47 @@ inspection, and external policies—those products are follow-ups, not controlle
 _Decided: 2026-08-03 (#220; supersedes timing/row-driven common harness mechanics and #63 M2's blind Attack
 executor limitation)_
 
+**A scenario that produces a VERDICT may not drive the UI with a raw `press` — enforced, not
+reviewed (#238).** #220 set the contract but migrated only the shared paths; the historical
+verdict scenarios kept their blind cadences, and a blind cadence makes a green run worthless as
+evidence. `ch01win` was the proof: it rode straight through the lord-select Yes/No prompt that
+cost #232 three sessions, mashing A at a prompt it never saw, and passed. `check.py
+check_verdict_scenarios_are_guarded` now fails the build on one, scoping from **`matrix.yaml`'s
+`kind`** and following harness.lua's call graph, with a small named allowlist
+(`BLIND_PRESS_ALLOWED`) carrying each exception's reason. `record`/`diagnostic` scenarios stay
+blind by design — nothing is asserted there, so nothing can pass for the wrong reason.
+
+Three lessons from the migration, all of which cost real evidence:
+
+- **Count presses by ENCLOSING FUNCTION, never by distance to the next `scenarios.X`.** Splitting
+  harness.lua on scenario definitions charges every intervening `local function` helper to
+  whichever scenario sits above it. #238's own scope list was built that way and was wrong in both
+  directions: it named `retreat` (which has none of its own) and missed `reachRbgCh01` (8) — a
+  fifth hand-rolled copy of the ch01 lead route nobody knew was there.
+- **A fixed press count is not a walk to a row.** FE8 menus WRAP, so `rows - 1` DOWNs land on the
+  last candidate only if the menu opened on row 0. Walk off the LIVE cursor, stop when it arrives,
+  and ASSERT where it landed — otherwise picking a different lord than the one the scenario names
+  passes silently.
+- **Watch the field the engine's key handler actually moves.** `recordunitlist` stopped its roster
+  walk on `unk_2c` (the on-screen row, which CLAMPS as the list scrolls under it) and `+0x38`
+  (untouched by the D-pad) instead of `unk_30`, so it could capture a fraction of the roster and
+  still report PASS.
+
+Newly classified for it, by the usual four-edit recipe (`gen_symbols.py` WANTED → `CALLBACK_NAMES`
+→ `observeController` → a `classify` rule): unit commands Chest `0x5D`, Door `0x5E`, Item `0x67`
+and Supply `0x69`; the map-menu **Character screen** (`ProcScr_UnitListScreen_Field`); the **Pick
+Units** deploy grid; and the in-map **convoy** (`ProcScr_BmSupplyScreen`). Two ordering rules came
+with them. The Character screen and the convoy sit **above `player_phase`** — the map is still in
+the proc pool underneath, and `player_map_idle` would offer cursor moves that go nowhere. And each
+of the three screens reports a **transition while its own scroll animates** (`unk_29` on the
+Character screen, `list_num_pre != list_num_cur` on Pick Units): FE8's key handler does not run in
+that window, so an input sent then is lost outright, and calling it an input state is how a press
+goes missing. Pick Units' legal moves mirror `ProcPrepUnit_Idle`'s TWO-COLUMN bounds exactly (LEFT
+only from an odd index, RIGHT only from an even one short of the end, UP/DOWN by two) — a press
+outside them moves nothing, and a driver that assumed a straight list would go on to act on
+whoever it was still parked on.
+_Decided: 2026-08-06 (#238; extends #220's contract from the shared paths to every verdict scenario)_
+
 **Recording a cutscene as a review GIF (the standard way to show Nicolas motion).**
 The harness fast-forwards non-recorded lead-up, so an assert scenario's screenshots can land
 on fades — to SEE a scene play, use a `record*` scenario: it drives the game to the
