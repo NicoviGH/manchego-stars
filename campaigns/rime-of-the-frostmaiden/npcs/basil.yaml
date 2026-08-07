@@ -98,9 +98,12 @@ art:
     walk_frames: PMD Walk-Anim W/S/N rows, 8->5 downsample [0,2,3,5,6]; side faces left
     palette: shared cast palette; index map chosen in map_sprite_swapper (--idle-frame-h 32)
   battle_anim_frames:         # frames SHIPPED (battle_anims/basil/{ready,windup,peak}.png);
-                              # injection PENDING ch05 recruit wiring (#25) — needs a 'priest'
-                              # BANIM_DONORS row (staff/heal donor; NOT shaman: Basil heals)
-                              # before a live `battle_anim:` block can be declared here.
+                              # injection PENDING ch05 recruit wiring (#25). NO new donor row is
+                              # needed: `clone_from: bishop` is the one to use (BANIM_DONORS
+                              # 'bishop' gives a STAFF slot for heal-cast plus a LIGHT slot for
+                              # after promotion, and its own comment names Basil as a reuser).
+                              # NOT shaman -- Basil heals. Corrected 2026-08-07; this block
+                              # previously claimed a 'priest' row had to be added first.
     source: PMD Charge-Anim W f0 (ready), Shoot-Anim W f3 (windup), Shoot-Anim W f5 (peak)
     facing: left (W row native — matches Marty/FE8 player side)
     scale: 1.5x via ffmpeg hqx=3 then exact half downscale (Nicolas's pick over native/2x)
