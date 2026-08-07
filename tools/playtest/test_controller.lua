@@ -242,24 +242,66 @@ local shutMenu = {
 }
 check(action(shutMenu, "open_door"), nil, "a disabled Door is not a legal action")
 
--- The item LIST and its Use/Equip/Trade/Discard submenu carry no command ids at all
--- (gItemMenuItems / gItemSubMenuItems, override 0x38+/0x34+), so they land on the generic
--- rule -- which is exactly right: the row is chosen by scenario policy, and the controller
--- only certifies that the highlighted row has a live on_selected callback to fire.
+-- The inventory list a unit's Item command opens (gItemSelectMenuItems, override 0x43-0x47).
+-- It needs its own state because MENU_DISABLED means something different here than it does
+-- on a command menu: ItemSelectMenu_Usability greys any item the unit cannot USE -- a weapon,
+-- a healing item at full HP -- but Menu_OnIdle's A path calls onSelected WITHOUT consulting
+-- availability, and ItemSelectMenu_Effect opens the Use/Equip/Trade/Discard submenu
+-- unconditionally. A greyed row is still a live row. Reading it as a command menu instead
+-- reported "unsupported standard menu has no recognized semantic commands" the moment every
+-- item happened to be unusable, which is Hlin's whole inventory at ch00 turn 1 (#238).
 local itemList = {
     procs = proc("menu", "menu_input"),
     menu = {
         current = 1,
+        on_b = "0x0802291C",
         items = {
-            { slot = 0, override_id = 0x38, availability = 1, on_selected = "0x08016A00" },
-            { slot = 1, override_id = 0x39, availability = 1, on_selected = "0x08016A40" },
+            { slot = 0, override_id = 0x43, availability = 2, on_selected = "0x080234E4" },
+            { slot = 1, override_id = 0x44, availability = 2, on_selected = "0x080234E4" },
         },
     },
 }
-classify(itemList, "generic_menu", "the inventory list is a generic callback menu")
-a = action(itemList, "select_current_menu_item")
-check(a and a.target, 1, "the inventory list commits the HIGHLIGHTED row, never an assumed one")
+classify(itemList, "item_list", "an inventory of unusable items is still an inventory")
+a = action(itemList, "select_item")
+check(a and a.target, 1, "the inventory commits the HIGHLIGHTED row, never an assumed one")
+check(a and a.key, "A", "a greyed row is selectable -- grey means unusable, not unreachable")
 check(action(itemList, "menu_next") ~= nil, true, "and the list can be walked to another row")
+a = action(itemList, "cancel_menu")
+check(a and a.key, "B", "B backs out of the inventory")
+
+-- FE8's "your inventory is full -- which item goes to the convoy" chooser
+-- (gSendToConvoyMenuItems, override 0x2A-0x2F; raised by ConvoyMenuProc_StarMenu whenever a
+-- unit is handed an item with no free slot). It is a MenuProc with no semantic command on it,
+-- so it fell through to generic_menu -- and a driver waiting for a scene to finish would sit
+-- behind it forever, because nothing advances until it is answered. The ch02 ending's third
+-- charm-gift raises exactly this, which is why clear_ch02's blind A-mash was load-bearing:
+-- the run's "3/3 charms delivered" verdict depended on a stray press resolving a prompt the
+-- scenario never knew was there (#238).
+local sendToConvoy = {
+    procs = { menu = { idle = "menu_input" }, std_event = { idle = "event_engine" } },
+    menu = {
+        current = 0,
+        items = {
+            { slot = 0, override_id = 0x2A, availability = 1, on_selected = "0x08022BEC" },
+            { slot = 1, override_id = 0x2B, availability = 1, on_selected = "0x08022BEC" },
+            { slot = 5, override_id = 0x2F, availability = 1, on_selected = "0x08022C40" },
+        },
+    },
+}
+classify(sendToConvoy, "send_to_convoy", "the inventory-full convoy chooser is its own state")
+a = action(sendToConvoy, "send_item")
+check(a and a.key, "A", "A sends the highlighted item to the convoy")
+check(a and a.target, 0, "...the HIGHLIGHTED one, not an assumed row")
+check(action(sendToConvoy, "menu_next") ~= nil, true, "and another slot can be chosen first")
+
+local usableItems = {
+    procs = proc("menu", "menu_input"),
+    menu = {
+        current = 0,
+        items = { { slot = 0, override_id = 0x43, availability = 1, on_selected = "0x080234E4" } },
+    },
+}
+classify(usableItems, "item_list", "...and so is an inventory of usable ones")
 
 -- The map-menu Character screen (ProcScr_UnitListScreen_Field). It is not a MenuProc at all
 -- -- it owns the whole screen and runs its own key handler -- so before it was named, a

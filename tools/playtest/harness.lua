@@ -67,6 +67,10 @@ local TUNE = {
     -- Frames between the two proc-pool samples an inspector snapshot takes. One sample
     -- cannot tell a frozen proc from a live one; two, a gap apart, can.
     inspectGap = 90,
+    -- Frames cancelToPlayerMap may spend watching a screen TEAR DOWN before it gives up.
+    -- Separate from the cancel count on purpose: a fading screen is progress, and a cap that
+    -- counts it is a cap that decides failure.
+    cancelFrames = 900,
     -- How long an UNCLASSIFIED transition may hold a byte-identical proc pool before the
     -- inspector calls it a stalled input wait. 600 frames is 10s of wall clock at 60fps --
     -- longer than any fade or animation, and far cheaper than the 12000-iteration boot
@@ -1702,7 +1706,7 @@ scenarios.goodberry = function()
     -- goblin and the blind press opens Attack and the capture silently shoots the wrong
     -- screen.
     if not selectSemantic("open_items", "the Item command opens Hlin's inventory", function(after)
-        return controllerState(after) == "generic_menu"
+        return controllerState(after) == "item_list"
     end, 120) then
         return result("FAIL", "Hlin's command menu offered no live Item command")
     end
@@ -1723,10 +1727,13 @@ scenarios.goodberry = function()
     wait(20)
     shot("goodberry-highlighted")
     -- Open the Use/Equip/Trade/Discard submenu on the HIGHLIGHTED item -- which also shows
-    -- its description. gItemSubMenuItems carry override ids 0x34-0x37 against the list's
-    -- 0x38+, so "a different menu is up" is a fact we can read rather than a wait to guess.
+    -- its description. gItemSubMenuItems carry override ids 0x34-0x37 against the inventory
+    -- rows' 0x43-0x47, so "a different menu is up" is a fact we can read rather than a wait
+    -- to guess. Note the Goodberry is GREYED at full HP (ItemSelectMenu_Usability returns
+    -- MENU_DISABLED for an item that cannot be used) -- and still opens its submenu, because
+    -- Menu_OnIdle's A path does not consult availability.
     local before = observeController().menu.items[1].override_id
-    if not selectSemantic("select_current_menu_item", "the Goodberry's item submenu opens",
+    if not guardedInput("select_item", "A", "the Goodberry's item submenu opens",
         function(after)
             return after.menu ~= nil and after.menu.items[1].override_id ~= before
         end, 120) then
@@ -1975,10 +1982,17 @@ local function cancelUnitActionMenu()
 end
 
 local function cancelToPlayerMap()
-    for _ = 1, 8 do
+    -- The budget counts CANCELS, not iterations. A transition here is a screen tearing itself
+    -- down -- the convoy's fade-out runs for hundreds of frames after its key handler lets go
+    -- -- and charging those to an 8-step loop made the CAP the thing that decided failure,
+    -- which is the trap #232 spent three sessions in. Transitions get their own frame ceiling
+    -- so a genuinely wedged screen still fails closed (#238).
+    local cancels, frames = 0, 0
+    while cancels < 8 and frames < TUNE.cancelFrames do
         local observation = observeController()
         local state = controllerState(observation)
         if state == "player_map_idle" then return true end
+        if state ~= "transition" then cancels = cancels + 1 end
         if state == "unit_selected" then
             if not guardedInput("cancel_selection", "B", "movement selection returns to player map",
                 function(after) return controllerState(after) == "player_map_idle" end, 120) then
@@ -1990,6 +2004,7 @@ local function cancelToPlayerMap()
                 return false
             end
         elseif state == "transition" then
+            frames = frames + 1
             yield()
         else
             traceFailure("cancel_to_map", "player map after semantic cancellation",
@@ -2839,7 +2854,10 @@ scenarios.recordsupply = function()
     -- Launch straight from Pick Units. START is a legal action here only because someone is
     -- deployed -- on an empty field FE8 just buzzes, and the old blind START could not tell
     -- that apart from a launch, so it went on to A-mash at a screen that had not moved.
-    if not selectSemantic("fight", "Pick Units launches the chapter", function(after)
+    -- guardedInput, not selectSemantic: selectSemantic navigates a menu to reach a row and
+    -- then presses A, and Fight is a START action with no row to walk to (it reported
+    -- fail:no-live-target). driveThroughPrep drives the main prep menu's Fight the same way.
+    if not guardedInput("fight", "START", "Pick Units launches the chapter", function(after)
         return after.procs.prep_units == nil
     end, 600) then
         shot("supply-no-launch")
@@ -2889,24 +2907,35 @@ scenarios.recordsupply = function()
         shot("supply")                                    -- the convoy screen -> Pinky USING Supply
         log("pinky opened convoy=" .. tostring(usedSupply))
         if usedSupply then
-            -- Leave the convoy, then the unit menu, each on its own enumerated cancel. Two
-            -- blind B's could not tell those two levels apart: one too few left the run in
-            -- the convoy, one too many cancelled Pinky's move as well.
+            -- Leave the convoy on its own enumerated cancel. Two blind B's stood in for this,
+            -- and the second had nothing to close: SupplyCommandEffect returns MENU_ACT_END,
+            -- so the unit menu is already gone by the time the convoy is up -- that press went
+            -- into the map. The postcondition is the convoy PROC being gone, not merely the
+            -- state changing: its key handler lets go while the screen is still fading out.
             if not guardedInput("close_supply", "B", "the convoy screen closes", function(after)
-                return controllerState(after) ~= "supply_screen"
-            end, 300) then return result("FAIL", "could not leave the convoy screen") end
-            if not cancelToPlayerMap() then
-                return result("FAIL", "could not return to the map after the convoy")
+                return after.procs.supply_screen == nil
+            end, 600) then return result("FAIL", "could not leave the convoy screen") end
+            if not awaitControllerState("player_map_idle", 600) then
+                return result("FAIL", "the map never came back after the convoy")
             end
         end
     else
         shot("supply-no-menu")
     end
-    -- Contrast: a NON-lord deployed unit's action menu has NO Supply row.
+    -- Contrast: a deployed unit that is neither the lead nor STANDING NEXT TO them has no
+    -- Supply row. The adjacency clause is not a detail -- SupplyUsability (bmmenu.c) returns
+    -- MENU_ENABLED for the lead OR for anyone IsAdjacentForSupply finds orthogonally beside
+    -- them, so "a non-lord has no Supply" is simply false for a neighbour, and asserting it
+    -- fails on a correct engine. This scenario's own comment claimed the stronger rule; the
+    -- first deployed non-lord turned out to spawn right next to Pinky, and the assertion
+    -- caught the CLAIM rather than a defect (#238).
     waitFor(function() return faction() == 0 and not menuOpen() end, 1500, true)
+    pinky = blue(CHAR_PINKY_LORD)
     for i = 0, 50 do
         local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and u.charId ~= CHAR_PINKY_LORD and (u.state & 0x9) == 0 and u.x ~= 0xFF then
+        local beside = pinky and u and math.abs(u.x - pinky.x) + math.abs(u.y - pinky.y) == 1
+        if u and u.charId ~= CHAR_PINKY_LORD and not beside
+            and (u.state & 0x9) == 0 and u.x ~= 0xFF then
             if moveUnit(u.x, u.y, u.x, u.y) then
                 wait(40); shot("supply")
                 -- The CONTRAST is the point of this half, so assert it rather than leaving
@@ -2915,7 +2944,8 @@ scenarios.recordsupply = function()
                 if Controller.findAction(
                     Controller.legalActions(observeController()), "open_supply") then
                     return result("FAIL", string.format(
-                        "a non-lord (char 0x%02X) was offered the Supply command", u.charId))
+                        "char 0x%02X is neither the lead nor beside them, but was offered Supply",
+                        u.charId))
                 end
                 if not cancelToPlayerMap() then
                     return result("FAIL", "could not back out of the non-lord's command menu")
@@ -5056,7 +5086,7 @@ scenarios.ch03tourmaline = function()
     -- observation rather than a staging assumption; the isolation stays, because the SHOT
     -- wants a clean two-item menu.
     if not selectSemantic("open_items", "the Item command opens the inventory list", function(after)
-        return controllerState(after) == "generic_menu"
+        return controllerState(after) == "item_list"
     end, 120) then
         return result("FAIL", "the command menu offered no live Item command to the holder")
     end
@@ -5551,25 +5581,39 @@ scenarios.clear_ch02 = function()
         snapCharms()
         if chapter() == CH03_CHAPTER then reachedCh03 = true; snapCharms(); break end
         if procActive(SYM.gProcScr_TitleScreen) then snapCharms(); break end  -- fallback: chain broken -> old landing
-        -- Advance the ending on the CLASSIFIED dialogue wait rather than on an A cadence
-        -- (#238). The cadence pressed A every 10 frames whatever was on screen, so it could
-        -- not tell "this page is waiting for me" from "this input is being swallowed" -- and
-        -- a scene that wedged just ran the cap out and reported a timeout naming nothing.
-        -- The charm poll rides the postcondition closure, so the sampling stays as
-        -- fine-grained as the charm window (CHECK_ALIVE -> GIVEITEMTO) needs it.
+        -- Drive the ending on OBSERVED state rather than an A cadence (#238). The cadence
+        -- pressed A every 10 frames whatever was on screen, so it could not tell "this page
+        -- is waiting for me" from "this input is being swallowed", and a scene that wedged
+        -- just ran the cap out and reported a timeout naming nothing.
+        --
+        -- advanceBootState, NOT a dialogue-only check: the ch02 -> ch03 chain is not one long
+        -- conversation. MNC2(0x4) runs the ending, then the post-chapter SAVE prompt, then
+        -- ch03's chapter-intro card -- three different classified input waits. Advancing only
+        -- dialogue_wait yielded forever at the save prompt, burned the whole step budget and
+        -- reported 2/3 charms on a chapter that had never left slot 3. This is the same
+        -- driver reachCh01 uses for the identical hand-off one chapter earlier.
         local observation = observeController()
         local state = controllerState(observation)
         if watchEnding(observation, state) then
             return result("FAIL", "the ch02 ending parked on an unclassified wait (see the snapshot)")
         end
-        if state == "dialogue_wait" then
-            if not guardedInput("advance_dialogue", "A", "the ending's dialogue wait clears",
-                function(after)
-                    snapCharms()
-                    return controllerState(after) ~= "dialogue_wait"
-                end, 120) then break end
+        snapCharms()
+        -- The third charm-gift lands on a FULL inventory, so FE8 raises its "which item goes
+        -- to the convoy" chooser and the whole chain stops until it is answered. Answering it
+        -- is scenario policy -- send whatever is highlighted; the charm reaching the leader OR
+        -- the convoy is what this scenario asserts either way. The old A-mash answered this
+        -- prompt by ACCIDENT, which is the only reason its "3/3 charms delivered" verdict was
+        -- reachable: a blind press was doing load-bearing work nothing had named (#238).
+        if state == "send_to_convoy" then
+            if not guardedInput("send_item", "A", "the convoy chooser closes", function(after)
+                return after.menu == nil or controllerState(after) ~= "send_to_convoy"
+            end, 300) then break end
         else
-            yield()
+            local advanced = advanceBootState(observation, state)
+            if advanced == false then break end
+            -- nil = a state it has no input for (the map is up mid-scene). Wait it out; the
+            -- step budget and the stall watch above bound this, never a tight spin.
+            if advanced == nil then yield() end
         end
     end
     shot("clear-ch02-ending")

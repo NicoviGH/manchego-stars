@@ -20,6 +20,12 @@ local MENU_DOOR = 0x5E
 local MENU_ITEM = 0x67
 local MENU_SUPPLY = 0x69
 local MENU_WAIT = 0x6B
+-- gSendToConvoyMenuItems: the inventory-full "which item goes to the convoy" chooser.
+local MENU_CONVOY_SEND_FIRST = 0x2A
+local MENU_CONVOY_SEND_LAST = 0x2F
+-- gItemSelectMenuItems: one row per inventory slot (menu_def.c).
+local MENU_ITEM_SLOT_FIRST = 0x43
+local MENU_ITEM_SLOT_LAST = 0x47
 local MENU_UNIT_LIST = 0x6E
 local MENU_STATUS = 0x6F
 local MENU_END_PHASE = 0x78
@@ -213,6 +219,25 @@ local RULES = {
             end
             if unit and map then
                 return unsupported("ambiguous standard menu contains unit and map commands")
+            end
+            -- Raised by ConvoyMenuProc_StarMenu when a unit is given an item with no free
+            -- slot. Nothing in the game advances until it is answered, so a driver that reads
+            -- it as an ordinary menu and waits for the scene to end waits forever.
+            for _, item in ipairs(observation.menu.items) do
+                if item.override_id >= MENU_CONVOY_SEND_FIRST
+                    and item.override_id <= MENU_CONVOY_SEND_LAST then
+                    return matched("send_to_convoy", "menu rows are convoy-send choices")
+                end
+            end
+            -- Checked against EVERY observed row, not just the enabled ones. uimenu.c builds a
+            -- MenuItemProc for anything that is not MENU_NOTSHOWN, so a row we can see is a
+            -- slot that holds an item -- and MENU_DISABLED here only means the unit cannot USE
+            -- it, not that A does nothing (Menu_OnIdle's A path never consults availability).
+            for _, item in ipairs(observation.menu.items) do
+                if item.override_id >= MENU_ITEM_SLOT_FIRST
+                    and item.override_id <= MENU_ITEM_SLOT_LAST then
+                    return matched("item_list", "menu rows are inventory slots")
+                end
             end
             if weapon then return matched("weapon_menu", "menu offers weapon items") end
             if unit then return matched("unit_command_menu", "menu offers unit commands") end
@@ -603,6 +628,20 @@ function M.legalActions(observation)
             if item.override_id >= MENU_WEAPON_FIRST and item.override_id <= MENU_WEAPON_LAST then
                 add(actions, "select_weapon", observation.menu.current == item.slot and "A" or nil,
                     string.format("menu.override_id=0x%02X", item.override_id), item.slot)
+            end
+        end
+    elseif state == "send_to_convoy" then
+        addMenuNavigation(actions, observation)
+        for _, item in ipairs(observation.menu.items) do
+            if observation.menu.current == item.slot then
+                add(actions, "send_item", "A", "menu.convoy_send_slot", item.slot)
+            end
+        end
+    elseif state == "item_list" then
+        addMenuNavigation(actions, observation)
+        for _, item in ipairs(observation.menu.items) do
+            if observation.menu.current == item.slot then
+                add(actions, "select_item", "A", "menu.item_slot", item.slot)
             end
         end
     elseif state == "generic_menu" then

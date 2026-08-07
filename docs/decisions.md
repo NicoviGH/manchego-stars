@@ -1545,10 +1545,39 @@ Three lessons from the migration, all of which cost real evidence:
   (untouched by the D-pad) instead of `unk_30`, so it could capture a fraction of the roster and
   still report PASS.
 
+**Two of these blind presses turned out to be LOAD-BEARING, and only running the scenarios
+found them.** Removing a cadence is not a no-op, and neither was worth a guess:
+
+- **`clear_ch02`'s A-mash was answering a prompt the scenario never knew existed.** The ch02
+  ending's third charm-gift lands on a full inventory, so FE8 raises
+  `gSendToConvoyMenuItems` — "which item goes to the convoy" — and the entire MNC2 chain
+  stops until it is answered. The mash resolved it by accident; drive the ending on observed
+  state without naming that prompt and the run sits behind it for its whole budget and reports
+  "2/3 charms" on a chapter that never left slot 3. That verdict's green had been resting on a
+  stray press. The chooser is now a classified `send_to_convoy` state.
+- **A scenario's own comment is not evidence.** `recordsupply` claimed "a NON-lord deployed
+  unit's action menu has NO Supply row". `SupplyUsability` (bmmenu.c) returns `MENU_ENABLED`
+  for the lead **or** for anyone `IsAdjacentForSupply` finds orthogonally beside them — so the
+  claim is false for a neighbour, and the first deployed non-lord spawns right next to Pinky.
+  The assertion caught the comment, not a defect. Contrast assertions have to be written
+  against the engine's rule, not the prose around them.
+
+Also: **a budget must not count the frames a screen spends TEARING DOWN.** `cancelToPlayerMap`
+looped eight times total, and the convoy's fade-out held a `transition` for far longer than
+that, so the cap decided the failure — the trap `docs/decisions.md` already records from #232.
+It now counts CANCELS, with a separate `TUNE.cancelFrames` ceiling for transitions.
+
 Newly classified for it, by the usual four-edit recipe (`gen_symbols.py` WANTED → `CALLBACK_NAMES`
 → `observeController` → a `classify` rule): unit commands Chest `0x5D`, Door `0x5E`, Item `0x67`
-and Supply `0x69`; the map-menu **Character screen** (`ProcScr_UnitListScreen_Field`); the **Pick
-Units** deploy grid; and the in-map **convoy** (`ProcScr_BmSupplyScreen`). Two ordering rules came
+and Supply `0x69`; the **inventory list** a unit's Item command opens (`gItemSelectMenuItems`,
+`0x43`–`0x47`); the **send-to-convoy chooser** (`gSendToConvoyMenuItems`, `0x2A`–`0x2F`); the
+map-menu **Character screen** (`ProcScr_UnitListScreen_Field`); the **Pick Units** deploy grid;
+and the in-map **convoy** (`ProcScr_BmSupplyScreen`). The inventory list needed its own state
+because `MENU_DISABLED` means something different there: `ItemSelectMenu_Usability` greys any
+item the unit cannot *use* — a weapon, a vulnerary at full HP — but `Menu_OnIdle`'s A path never
+consults availability and `ItemSelectMenu_Effect` opens the submenu regardless. A greyed row is
+still a live row; reading it as a command menu reported "unsupported standard menu" the moment
+every item happened to be unusable, which is Hlin's whole inventory at ch00 turn 1. Two ordering rules came
 with them. The Character screen and the convoy sit **above `player_phase`** — the map is still in
 the proc pool underneath, and `player_map_idle` would offer cursor moves that go nowhere. And each
 of the three screens reports a **transition while its own scroll animates** (`unk_29` on the
