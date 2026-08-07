@@ -588,7 +588,10 @@ def _harness_functions(source):
     marks.append((len(lines), None, None))
     out = {}
     for (start, name, kind), (end, _, _) in zip(marks, marks[1:]):
-        body = '\n'.join(l for l in lines[start:end] if not l.strip().startswith('--'))
+        # Strip trailing comments too, not just whole comment lines: `local x = 1 -- press(A)`
+        # otherwise trips the gate on prose. Lua has no string type that survives this
+        # naively, but no line in these files puts `--` inside a literal.
+        body = '\n'.join(l.split('--')[0] for l in lines[start:end])
         out[name] = (body, kind)
     return out
 
@@ -623,7 +626,7 @@ def check_verdict_scenarios_are_guarded(fail):
     try:
         import matrix as mx
         m = mx.Manifest.load()
-    except Exception as exc:                      # noqa: BLE001 -- check_playtest_matrix reports it
+    except Exception:                             # noqa: BLE001 -- check_playtest_matrix reports it
         return
     with open(os.path.join(REPO, 'tools/playtest/harness.lua'), encoding='utf-8') as fh:
         funcs = _harness_functions(fh.read())
@@ -634,7 +637,13 @@ def check_verdict_scenarios_are_guarded(fail):
                 continue
         except mx.ManifestError:
             continue
+        # A verdict scenario the harness no longer defines would otherwise drop out of this
+        # gate in silence -- renamed in Lua, still listed in the manifest, and never checked
+        # again. check_playtest_matrix reports the pairing separately; this refuses to pretend
+        # it reviewed something it could not find.
         if name not in funcs:
+            fail.append('verdict scenario %s has no function in harness.lua, so the '
+                        'blind-press gate cannot review it (#238)' % name)
             continue
         for reached in sorted(_reaches(name, funcs)):
             if reached in BLIND_PRESS_ALLOWED:
@@ -651,7 +660,10 @@ def check_verdict_scenarios_are_guarded(fail):
 # GBA address space. 0x04-0x07 are ARCHITECTURAL (MMIO, palette, VRAM, OAM) -- fixed by the
 # hardware, so a literal there is a constant, not a symbol. 0x02/0x03 (EWRAM/IWRAM) and
 # 0x08/0x09 (ROM) are where OUR symbols live, and those move on every engine change.
-_DRIFTING_ADDR = re.compile(r'0x0[2389][0-9A-Fa-f]{6}')
+# The leading zero is OPTIONAL: 0x8091AEC is the usual GBA shorthand, and it is literally the
+# form the decomp's own symbol names encode (sub_8091AEC). Requiring `0x0` would miss exactly
+# the spelling the next stale literal is most likely to be written in.
+_DRIFTING_ADDR = re.compile(r'0x0?[2389][0-9A-Fa-f]{6}\b')
 
 
 def check_no_hardcoded_symbol_addresses(fail):
@@ -666,8 +678,9 @@ def check_no_hardcoded_symbol_addresses(fail):
     A wrong address is the worst failure shape available here: it does not crash, it reads
     plausible garbage, and it indicts the feature instead of the harness.
 
-    symbols.lua is generated (it is nothing BUT addresses) and test_* files use fake ones as
-    fixtures, so both are exempt -- the same carve-outs the other scans use."""
+    symbols.lua and procscr.lua are GENERATED (they are nothing but addresses) and test_* files
+    use fake ones as fixtures, so all three are exempt -- the same carve-outs the other scans
+    use."""
     for path in sorted(glob.glob(os.path.join(REPO, 'tools/playtest/*.lua'))):
         name = os.path.basename(path)
         if name.startswith('test_') or name in ('symbols.lua', 'procscr.lua'):

@@ -20,8 +20,11 @@ local MENU_DOOR = 0x5E
 local MENU_ITEM = 0x67
 local MENU_SUPPLY = 0x69
 local MENU_WAIT = 0x6B
--- gSendToConvoyMenuItems: the inventory-full "which item goes to the convoy" chooser.
-local MENU_CONVOY_SEND_FIRST = 0x2A
+-- The two arms of ConvoyMenuProc_StarMenu (convoymenu.c), which is raised whenever a unit is
+-- handed an item it has no room for: gConvoyMenuItems (0x24-0x29) when the convoy is FULL,
+-- gSendToConvoyMenuItems (0x2A-0x2F) when it has room. Contiguous in menu_def.c, and they
+-- block the chapter identically, so they are one state.
+local MENU_CONVOY_SEND_FIRST = 0x24
 local MENU_CONVOY_SEND_LAST = 0x2F
 -- gItemSelectMenuItems: one row per inventory slot (menu_def.c).
 local MENU_ITEM_SLOT_FIRST = 0x43
@@ -270,8 +273,11 @@ local RULES = {
                 return matched("transition", "unit_list live with no observed list structure")
             end
             -- unk_29 selects which branch sub_8091AEC runs: 0 is the key handler, 1 and 2 are
-            -- the row/page scroll animating. FE8 reads no D-pad in that window, so a press
-            -- sent then is simply LOST -- the exact shape of failure #232 spent sessions on.
+            -- the row/page scroll animating, and 3 is sub_80917D8, the sort-column mode. Only
+            -- 0 reads the D-pad, so a press sent in 1 or 2 is simply LOST -- the exact shape of
+            -- failure #232 spent sessions on. 3 is a persistent INPUT state we deliberately do
+            -- not drive: nothing needs it, and legalActions refuses to offer the UP that opens
+            -- it, so a run should never arrive here (see unit_list_screen below).
             if observation.unit_list.scrolling then
                 return matched("transition", "the unit list is mid-scroll")
             end
@@ -596,8 +602,15 @@ function M.legalActions(observation)
         -- unk_30 -- NOT the on-screen row, which clamps while the list scrolls under it, so a
         -- driver that watched the row would stop believing it had reached the end of a list
         -- it was still halfway down.
-        add(actions, "list_next", "DOWN", "unit_list.row")
-        add(actions, "list_previous", "UP", "unit_list.row")
+        -- Bounded at BOTH ends off gUnknown_0200F158, the same field sub_809144C bounds
+        -- against -- and UP at row 0 is not merely a no-op: it sets unk_29 = 3, routing
+        -- sub_8091AEC into sub_80917D8 (the sort-column mode). The observer reports that as
+        -- `scrolling`, i.e. as a transition offering nothing, so advertising UP there hands a
+        -- driver an action that walks it into a screen with no enumerated way out, to sit
+        -- until the stall watch fires on a wait the controller itself caused.
+        local list = observation.unit_list
+        if list.row > 0 then add(actions, "list_previous", "UP", "unit_list.row") end
+        if list.row < list.count - 1 then add(actions, "list_next", "DOWN", "unit_list.row") end
         add(actions, "select_list_entry", "A", "unit_list.row")
         add(actions, "close_list", "B", "unit_list.on_b")
     elseif state == "unit_command_menu" then

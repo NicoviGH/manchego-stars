@@ -127,6 +127,11 @@ geometry regardless of which slot hosts it (ch03 repaints vanilla Ch3 "Borgo" bu
     SUITE=chNN` runs the lot off one build. `check.py check_playtest_matrix` fails the build if a
     scenario in `harness.lua` has no row, so this is not optional bookkeeping — it is how
     `run.sh chNNsomething` knows the flag and the host slot without you typing either.
+    The row's `kind` is load-bearing beyond timing: `check.py
+    check_verdict_scenarios_are_guarded` requires every `kind: verdict` scenario to drive the UI
+    through `guardedInput`/`selectSemantic`, never a raw `press` (#238). Capture scenarios are
+    `kind: record` and stay exempt — so set `kind` by what the scenario **asserts**, never by its
+    name prefix (`recordsupply` and `recordunitlist` are verdict scenarios).
 
 ## Load-test it (see the map with units)
 
@@ -166,13 +171,26 @@ the proc + its input callback to `gen_symbols.py`, `CALLBACK_NAMES`, `observeCon
 `classify` rule, and let the *scenario* decide the answer. That is the whole fix for a wait, and it
 is how ch01's lord-select Yes/No prompt was closed (#232).
 
-Two traps this replaces, both of which cost real sessions:
+**Naming a new state is not finished until the drivers know about it (#238).** A state that used to
+fall through to `generic_menu` was cancellable by `cancelToPlayerMap` and recoverable by
+`awaitControllerState`; giving it its own name silently takes that away. Wire its cancel in the same
+change. And enumerate a movement action only where the engine would actually move — the bounds
+belong in `controller.lua`, read off the same field the engine checks, not hand-rolled in the
+scenario.
+
+Three traps this replaces, all of which cost real sessions:
 
 - **Do not re-run a scenario to re-test a hypothesis the evidence already killed.** A budget-bounded
   loop exits at the same frame no matter what is on screen, so an identical frame number proves
   nothing. Instrument for the answer instead.
 - **A `transition` is not "nothing is happening".** It is the classifier saying it has no name for
   this. The snapshot's `considered` list tells you what it looked for.
+- **A scenario that fails before it presses anything is accusing the harness, not the chapter.**
+  ch03's doors and chests read as broken for as long as `baseTile` held a hard-coded address the
+  engine had grown past: both scenarios died on the tile READ, before any input, and said
+  "placement or gBmMapBaseTiles addr wrong". Check where in the scenario the verdict came from
+  before you go looking at the map data. `check_no_hardcoded_symbol_addresses` now makes that
+  particular version impossible — every address comes from `SYM` (#238).
 
 ## Gotchas (learned the hard way)
 

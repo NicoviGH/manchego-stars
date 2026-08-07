@@ -593,6 +593,10 @@ local function observeController()
             page = ru8(unitList.addr + 0x2F), count = ru8(SYM.gUnknown_0200F158),
             scrolling = ru8(unitList.addr + 0x29) ~= 0,
         }
+        -- screen_row and page are not read by controller.lua. They are kept because every
+        -- observation is written into the trace record, so they are what a failed roster walk
+        -- is diagnosed FROM -- "row moved but screen_row clamped" is the whole story of the
+        -- bug this replaced. Unused-by-the-classifier is not unused.
         -- allyCount (+0x3A) and deployedCount (+0x3B) are deliberately NOT observed. They are
         -- written by StartUnitListScreenPrepMenu only, so on this list they are whatever the
         -- proc slot held -- and an untrustworthy field in the observation is how the walk
@@ -853,9 +857,16 @@ local function awaitControllerState(want, frames)
             -- cannot hide behind it, and the allowance is small so a genuinely stuck screen
             -- still fails closed. (A silent version of this is precisely what let five
             -- defects sit unnoticed behind the old blind cadence.)
-            local cancel = Controller.findAction(Controller.legalActions(last), "cancel_menu")
-                or Controller.findAction(Controller.legalActions(last), "cancel_target")
-                or Controller.findAction(Controller.legalActions(last), "cancel_selection")
+            -- Every enumerated way OUT of a screen, including the ones #238 named. Leaving
+            -- close_supply/close_list off this list would mean a run that wandered into the
+            -- convoy or the Character screen could not recover from it, even though the
+            -- controller offers the exit.
+            local legal = Controller.legalActions(last)
+            local cancel = Controller.findAction(legal, "cancel_menu")
+                or Controller.findAction(legal, "cancel_target")
+                or Controller.findAction(legal, "cancel_selection")
+                or Controller.findAction(legal, "close_supply")
+                or Controller.findAction(legal, "close_list")
             if cancel and recoveries < TUNE.stuckRecoveries then
                 recoveries = recoveries + 1
                 traceInput(last, Controller.legalActions(last), cancel.intention, cancel.key,
@@ -1732,7 +1743,11 @@ scenarios.goodberry = function()
     -- to guess. Note the Goodberry is GREYED at full HP (ItemSelectMenu_Usability returns
     -- MENU_DISABLED for an item that cannot be used) -- and still opens its submenu, because
     -- Menu_OnIdle's A path does not consult availability.
-    local before = observeController().menu.items[1].override_id
+    local open = observeController().menu
+    if not (open and open.items[1]) then
+        return result("FAIL", "the inventory list closed before the Goodberry could be opened")
+    end
+    local before = open.items[1].override_id
     if not guardedInput("select_item", "A", "the Goodberry's item submenu opens",
         function(after)
             return after.menu ~= nil and after.menu.items[1].override_id ~= before
@@ -1998,9 +2013,22 @@ local function cancelToPlayerMap()
                 function(after) return controllerState(after) == "player_map_idle" end, 120) then
                 return false
             end
-        elseif state == "unit_command_menu" or state == "weapon_menu" or state == "generic_menu" then
+        elseif state == "unit_command_menu" or state == "weapon_menu" or state == "generic_menu"
+            or state == "item_list" or state == "send_to_convoy" then
+            -- item_list and send_to_convoy USED to classify as generic_menu, so naming them
+            -- would have quietly cost this function the ability to back out of either -- and
+            -- this is the recovery path #238 put behind ch01win's post-seize "menu surprise".
+            -- A new classified screen has to teach the drivers about itself in the same
+            -- change, or it narrows what the harness can escape from.
             if not guardedInput("cancel_menu", "B", "live menu closes one semantic level",
                 function(after) return after.menu == nil or controllerState(after) ~= state end, 120) then
+                return false
+            end
+        elseif state == "supply_screen" or state == "unit_list_screen" then
+            -- Full-screen states with their own B intention rather than a MenuProc cancel.
+            local leave = state == "supply_screen" and "close_supply" or "close_list"
+            if not guardedInput(leave, "B", "the full-screen state closes",
+                function(after) return controllerState(after) ~= state end, 300) then
                 return false
             end
         elseif state == "transition" then
@@ -2822,8 +2850,14 @@ scenarios.recordsupply = function()
     local function pickStep(intention, key, where)
         local at = observeController().prep_units
         if not at then return false end
+        -- SETTLED, not merely moved: ProcPrepUnit_Idle reads no keys while the list scrolls,
+        -- so returning on the cursor alone leaves the next guarded input to race the scroll
+        -- and fail its own legality pre-check. That it works today rests on press() costing
+        -- more frames than a 16px scroll at scroll_val=4 -- which holding L (8) or a roster
+        -- long enough to make ShouldPrepUnitMenuScroll true would take away.
         return guardedInput(intention, key, "the deploy cursor moves " .. where, function(after)
             return after.prep_units ~= nil and after.prep_units.cursor ~= at.cursor
+                and after.prep_units.settled
         end, 60)
     end
     if not pickStep("pick_right", "RIGHT", "onto the second column") then
@@ -2941,8 +2975,18 @@ scenarios.recordsupply = function()
                 -- The CONTRAST is the point of this half, so assert it rather than leaving
                 -- it to the screenshot: a non-lord's live command menu must offer no Supply
                 -- at all. The old code just backed out on two blind B's and asserted nothing.
-                if Controller.findAction(
-                    Controller.legalActions(observeController()), "open_supply") then
+                -- Assert the STATE first. legalActions returns nil when classify finds no
+                -- state, and findAction(nil, ...) is nil -- so without this, a fade, a menu
+                -- that never opened, or any state we cannot name reads as "Supply correctly
+                -- absent" and the scenario passes. That is green-for-the-wrong-reason inside
+                -- the assertion added to stop green-for-the-wrong-reason.
+                local menu = observeController()
+                if controllerState(menu) ~= "unit_command_menu" then
+                    return result("FAIL", string.format(
+                        "expected a live command menu for char 0x%02X, got %s",
+                        u.charId, tostring(controllerState(menu))))
+                end
+                if Controller.findAction(Controller.legalActions(menu), "open_supply") then
                     return result("FAIL", string.format(
                         "char 0x%02X is neither the lead nor beside them, but was offered Supply",
                         u.charId))
@@ -4403,7 +4447,10 @@ scenarios.recordunitlist = function()
         local row = at.unit_list.row
         if row >= listed.count - 1 then break end         -- the end of the roster, not a stall
         if not guardedInput("list_next", "DOWN", "the roster selection advances", function(after)
+            -- Settled for the same reason as the deploy walk: sub_809144C reads no D-pad
+            -- while unk_29 says the rows are still scrolling under the cursor.
             return after.unit_list ~= nil and after.unit_list.row ~= row
+                and not after.unit_list.scrolling
         end, 60) then
             return result("FAIL", string.format(
                 "the roster walk stalled on entry %d of %d", row, listed.count))
@@ -5623,11 +5670,14 @@ scenarios.clear_ch02 = function()
                 return after.menu == nil or controllerState(after) ~= "send_to_convoy"
             end, 300) then break end
         else
-            local advanced = advanceBootState(observation, state)
-            if advanced == false then break end
+            -- Named `drove`, not `advanced`: this scope already has an advanced() predicate
+            -- for "the chapter moved on", and shadowing it with a boolean would make a later
+            -- `if advanced() then` read as the check it looks like while calling a boolean.
+            local drove = advanceBootState(observation, state)
+            if drove == false then break end
             -- nil = a state it has no input for (the map is up mid-scene). Wait it out; the
             -- step budget and the stall watch above bound this, never a tight spin.
-            if advanced == nil then yield() end
+            if drove == nil then yield() end
         end
     end
     shot("clear-ch02-ending")
@@ -6607,6 +6657,11 @@ local function clearCh04(parley)
     -- the end -- a stray press on "Press START" starts a spurious New Game (the clear_ch03
     -- lesson), and the run then films ch04's OPENING under the ending's name. So stop pressing
     -- the moment the title is up, and stop the loop with it. Shoot densely: motion is the point.
+    -- NOTE: `f` counts ITERATIONS, not frames. It did before too, but every iteration was one
+    -- yield, so the two matched; an iteration can now carry a whole guarded input. The cap and
+    -- the screenshot cadence are therefore both looser than they read. That is fine for a
+    -- bounded recording -- won() is what ends this, never the cap -- but do not read 5400 as
+    -- a frame budget (#238).
     local ended = false
     for f = 1, 5400 do
         if f % 4 == 0 then shot(tag) end

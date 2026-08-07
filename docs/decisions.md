@@ -1562,6 +1562,28 @@ found them.** Removing a cadence is not a no-op, and neither was worth a guess:
   The assertion caught the comment, not a defect. Contrast assertions have to be written
   against the engine's rule, not the prose around them.
 
+**Naming a new state is not finished until the DRIVERS know about it.** Code review caught two
+instances on this branch. `item_list` and `send_to_convoy` had classified as `generic_menu`
+before they were named, so `cancelToPlayerMap` could back out of both; giving them their own
+states silently removed that — and that function is the recovery path #238 had just put behind
+`ch01win`'s post-seize menu surprise. `awaitControllerState`'s recovery had the same gap for
+`supply_screen`/`unit_list_screen`. **A classification change is a change to what the harness
+can escape from**, so a new state ships with its cancel wired in the same commit.
+
+**Enumerate a movement action only where the engine would actually move.** The Character
+screen's UP at row 0 is not a no-op: `sub_809144C` sets `unk_29 = 3`, routing into
+`sub_80917D8`, the sort-column mode — a persistent input state the observer reports as
+`scrolling`, i.e. as a transition offering nothing. Advertising UP there hands a driver an
+action that walks it somewhere it has no enumerated way out of, to sit until the stall watch
+fires on a wait the controller itself caused. Both ends of that walk are now bounded off
+`gUnknown_0200F158`, the same field the engine bounds against — the rule `prep_pick_units`
+already followed.
+
+**An absence assertion must assert the state first.** `legalActions` returns `nil` when
+`classify` finds no state, and `findAction(nil, …)` is `nil` — so "the command was not offered"
+and "we could not tell what was on screen" were indistinguishable. `recordsupply`'s contrast
+check now requires a live `unit_command_menu` before concluding Supply is absent.
+
 Also: **a budget must not count the frames a screen spends TEARING DOWN.** `cancelToPlayerMap`
 looped eight times total, and the convoy's fade-out held a `transition` for far longer than
 that, so the cap decided the failure — the trap `docs/decisions.md` already records from #232.

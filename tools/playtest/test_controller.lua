@@ -228,8 +228,13 @@ check(a and a.target, 2, "Item resolves from semantic id 0x67")
 a = action(fieldMenu, "open_supply")
 check(a and a.target, 3, "Supply resolves from semantic id 0x69")
 
--- Availability is read, never assumed: a locked door with no key is drawn but disabled, and
--- a driver that pressed its row anyway would sit on a command the engine ignores.
+-- Availability is read, never assumed. This pins a DELIBERATELY conservative choice rather
+-- than an engine behaviour: addMenuCommand filters on enabledMenuItems, so a MENU_DISABLED row
+-- is never offered as a command -- even though Menu_OnIdle would in fact fire its onSelected
+-- (it never consults availability; see the inventory list below, which relies on exactly that).
+-- No unit command actually greys today: DoorCommandUsability and its neighbours return only
+-- MENU_ENABLED or MENU_NOTSHOWN, and a NOTSHOWN row is not built at all (uimenu.c). So this
+-- guards the day one of them starts greying, and the fixture is synthetic on purpose.
 local shutMenu = {
     procs = proc("menu", "menu_input"),
     menu = {
@@ -289,6 +294,25 @@ local sendToConvoy = {
     },
 }
 classify(sendToConvoy, "send_to_convoy", "the inventory-full convoy chooser is its own state")
+
+-- ConvoyMenuProc_StarMenu has TWO arms off one call site: gSendToConvoyMenuItems (0x2A-0x2F)
+-- when the convoy has room, gConvoyMenuItems (0x24-0x29) when it is FULL. Both block the same
+-- way, so classifying only the first leaves the identical hang one branch over -- and it would
+-- not even trip the stall watch, which arms on UNCLASSIFIED transitions and this would read as
+-- a tidy generic_menu.
+local convoyFull = {
+    procs = { menu = { idle = "menu_input" }, std_event = { idle = "event_engine" } },
+    menu = {
+        current = 0,
+        items = {
+            { slot = 0, override_id = 0x24, availability = 1, on_selected = "0x08022B00" },
+            { slot = 5, override_id = 0x29, availability = 1, on_selected = "0x08022B40" },
+        },
+    },
+}
+classify(convoyFull, "send_to_convoy", "...and so is the convoy-FULL arm of the same call site")
+a = action(convoyFull, "send_item")
+check(a and a.key, "A", "which blocks the chapter identically and so is answered identically")
 a = action(sendToConvoy, "send_item")
 check(a and a.key, "A", "A sends the highlighted item to the convoy")
 check(a and a.target, 0, "...the HIGHLIGHTED one, not an assumed row")
@@ -315,10 +339,28 @@ local unitList = {
 classify(unitList, "unit_list_screen", "the Character screen outranks the map underneath it")
 check(action(unitList, "list_next") ~= nil, true, "the roster can be walked forward")
 check(action(unitList, "cursor_down"), nil, "and the map cursor is NOT offered while it is up")
-a = action(unitList, "list_previous")
-check(a and a.key, "UP", "...and backward")
 a = action(unitList, "close_list")
 check(a and a.key, "B", "B leaves the Character screen (sub_809144C)")
+
+-- The walk is bounded at BOTH ends, from the same field sub_809144C bounds against. UP at
+-- row 0 is not a no-op: it sets unk_29 = 3, which routes sub_8091AEC into sub_80917D8, the
+-- sort-column mode -- a persistent input state the observer reports as `scrolling`, i.e. as a
+-- transition offering nothing. Advertising UP there hands the driver an action that walks it
+-- into a screen it has no enumerated way out of, and it burns its budget until the stall
+-- watch fires on a wait the controller itself caused.
+check(action(unitList, "list_previous"), nil, "UP at row 0 is NOT offered -- it opens sort mode")
+local midList = {
+    procs = { unit_list = { idle = "unit_list_input" } },
+    unit_list = { row = 4, screen_row = 4, page = 0, count = 9, scrolling = false },
+}
+a = action(midList, "list_previous")
+check(a and a.key, "UP", "...but it is offered anywhere the row can actually move up")
+local lastList = {
+    procs = { unit_list = { idle = "unit_list_input" } },
+    unit_list = { row = 8, screen_row = 5, page = 0, count = 9, scrolling = false },
+}
+check(action(lastList, "list_next"), nil,
+    "and DOWN is not offered on the last entry (unk_30 < count-1 is the engine's own bound)")
 
 -- unk_29 != 0 is the page/row scroll animating, and its key handler does not run then. FE8
 -- DROPS input in that window, so calling it an input state is how a press goes missing.
