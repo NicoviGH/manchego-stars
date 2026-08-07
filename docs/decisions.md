@@ -130,6 +130,40 @@ old-vs-new injection into a clean submodule against the same mock base ROM diffs
 (byte-identical generated sources), full test suite + drift guard green.
 _Decided: 2026-07-02 (CLAUDE; audit 2.1/2.2 follow-through)_
 
+**A retile inherits vanilla's terrain; the tileset's terrain table is ours to author (#25).**
+A chapter that repaints a vanilla layout changes ART ONLY. Every cell keeps the terrain vanilla
+gave it, because terrain is what the map MEANS: move cost, avoid, defence, and which menu the
+engine offers. When a painted tile carries the wrong role, the fix is to author that metatile's
+terrain byte in OUR vendored copy of the tileset -- never to swap the tile, which silently
+overrides the map author's eye to chase a data problem. ch05 needed exactly three bytes
+(`port-or-town-winter` metatiles 943/976/1010, `WALL` -> `FENCE`).
+Enforced by `import_map_layout.validate_terrain_matches_vanilla`, which runs for EVERY tileset
+and fails the import naming the cells. Its predecessor `validate_vanilla_retile` only ever ran
+for `snowy-bern`, which is how ch05 drifted 11 cells `FENCE` -> `WALL` unnoticed: those two are
+identical in every table except `TerrainTable_MovCost_Fly*` (a fence is flyable, a wall is not),
+so the map would have quietly walled out Pinky, our only flier -- the ch04 unobtainable-village
+failure class exactly. A blank canvas driven from `--vanilla` now stamps `vanilla_layout` so the
+check has something to compare against.
+_Decided: 2026-08-07 (Nicolas: "we're re-tiling so just copy vanilla's terrains")_
+
+**A vanilla layout's tileset is resolved, never inferred from asset-table position (#25).**
+`gChapterDataAssetTable` groups a tileset's `ObjectType`/`MapPalette`/`TileConfiguration` before
+the layouts that ride it -- but only usually. FE8 inserts Ch5x at slot 5, so `Ch5Map` sits after
+tileset 3's group while riding tileset 2. A backward scan mis-resolves **54 of the vanilla
+layouts** (`Ch4Map` and `Ch5Map` among them) and renders correct geometry through the wrong art:
+authoritative-looking, and worse than no reference when a retile is being painted against it.
+Resolve through `chapter_settings.json` via `map_tileset_tool.vanilla_layout_tileset_assets`.
+Why this surfaced only at ch05: every earlier reskin (Prologue/Ch1/Ch2/Ch4) rides tileset 1, and
+ch03's `Ch3Map` sits immediately after tileset 2's group, so the scan happened to be right.
+_Decided: 2026-08-07 (CLAUDE; found painting ch05, fixed with 4 guard tests)_
+
+**A tileset's unused slots are declared by `TERRAIN_NONE`, not by a filler colour (#25).**
+The editor palette filtered unpaintable slots by probing for solid ORANGE, which is one
+tileset's convention: `port-or-town-winter` marks its 144 unused slots solid TEAL, so every one
+appeared as a brush. Terrain `0x00` is the tileset's own declaration and generalises
+(snowy-bern 96, snowy-fields 172, cave-interior 5). Verified no committed map paints one.
+_Decided: 2026-08-07 (CLAUDE)_
+
 **Tileset vendoring is a one-command import; Ch3's cave tileset is `cave-interior` (#40).**
 FEBuilder/FE-Repo tilesets need NO toolchain (no grit / Map Hacking Suite): the
 `.mapchip_config` is byte-identical to the decomp tile config (verified twice: Snowy Bern #41,
