@@ -3768,6 +3768,68 @@ session state. `HANDOFF.md` points here._
 - **Vanilla-only (monster/exotic) weapons belong in `difficulty.py`**, not `WEAPON_ITEM_ENUM`.
 - **Never a bare `make` for a shippable ROM** — `tools/build.sh` applies the decomp shebang fix; a bare
   `make` dies on the gfx tools on macOS (`decisions.md` §Distribution).
+- **The FE Wiki is a CROSS-REFERENCE, never an authority** (2026-08-07). The decomp stays the source
+  of truth for every FE8 claim (`CLAUDE.md`), but the wiki's per-chapter pages are worth a read when
+  mining a vanilla chapter, because they state things in a form that *prompts the question* the
+  decomp answers. Concretely: it says "village to the southeast → Dragonshield". The decomp says
+  `SVAL(EVT_SLOT_3, 0xe)` inside one of four separately-named scripts, and nothing in it invites you
+  to ask whether our pairing matches. That is exactly how ch05's swapped reliquary gifts were caught
+  — **wiki raised it, decomp settled it**, which is the only order that is ever correct.
+  **Fetching it:** the rendered page is blocked (403 to curl, 402 to WebFetch). Use the MediaWiki API:
+  ```sh
+  curl -sL -A "Mozilla/5.0" "https://fireemblem.fandom.com/api.php?action=parse\
+&page=The%20Empire%27s%20Reach&prop=wikitext&format=json&formatversion=2"
+  ```
+
+### Campaign rosters live in campaign-named symbols (2026-08-07, #25)
+
+**A chapter's unit tables are ours and are named `MS_ChNN*`** (`declare_unit_table`), appended to
+`events_udefs.c` with an extern in `eventcall.h` — both already restored from HEAD each build. We no
+longer block-overwrite whichever vanilla table the host slot's stripped cutscenes left unreferenced.
+
+Two reasons, and the second is what forced it:
+
+1. **The name lied.** ch04's moose rides a symbol our own source calls "dead Ch5 unit table". Reading
+   an injector meant carrying two unrelated offsets at once: *ours* (chapter N hosts on slot N+1,
+   because the prologue occupies a real, unnumbered slot — not renumberable, and invisible in play
+   since the prep header reads `prepScreenNumber`) and *FE8's* (it inserted Ch5x at slot 5, so from
+   slot 6 on the slot index and the vanilla symbol name disagree **in the base game**: slot 6 ships
+   `Ch5EventData`, slot 7 ships `Ch6Events`). Both offsets are now stated once, in the `CH05_*`
+   constant block, and nowhere else.
+2. **Squatting rations you to what the slot happens to free.** Slot 5 freed seven tables; slot 6
+   frees three, and ch05 needs seven. The alternative was borrowing Ch6's world-map *encounter*
+   rosters — storage from a system we merely hope never runs.
+
+Only the event-list symbols stay vanilla-named: `chapter_settings.json` resolves the
+`ChapterEventGroup` from them, so they are structural. They are named in one per-chapter dict.
+
+### Owning the symbol means owning the POINTER (2026-08-07, #25)
+
+**Declaring a roster table does not wire it — the engine reads the roster through the
+`ChapterEventGroup`.** `point_event_group_at` repoints `playerUnitsInNormal`/`InHard`, and
+`assert_event_group_roster` fails the build if it was not done.
+
+This shipped broken for one build and **had no symptom**: ch05 declared `MS_Ch05DeployCap`, nothing
+pointed at it, so slot 6 kept deploying `UnitDef_Event_Ch6Ally` — vanilla Ch6's start tiles, on a map
+whose geometry is vanilla Ch5's. The party appeared, PREP ran, the map drew, the load-test PASSed,
+and four units stood **inside walls**. It is the ally-table twin of the host-slot/event-group
+mis-target in `docs/adding-a-chapter.md` step 4, and it is invisible to every other gate.
+
+ch03/ch04 could not hit it, because overwriting the table the group already points at cannot break
+the link. Adopting campaign-owned symbols is what created the hazard, so it ships with its guard.
+
+**Corollary — placement is verified from unit POSITIONS, never from a frame** (`INSPECT.units`, added
+for this). A map sprite is drawn taller than its tile and offset upward, so a unit reads a row high,
+and the camera row has to be recovered before any pixel can be assigned a coordinate at all. Nicolas
+caught this one off a screenshot; confirming it took a memory dump.
+
+### A `CHAPTER_L_*` label is resolved by VALUE, never spelled from a number (2026-08-07, #25)
+
+`CHAPTER_L_5 = 0x06` and `CHAPTER_L_6 = 0x07` — the Ch5x insert again. Slot 6 is `CHAPTER_L_5`.
+For slots 1–4 the name matches the number, which is why four injectors hardcoded the literal and were
+right by accident. `chapter_label_constant(slot)` reads chapters.h. Guessing fails **silently**: a
+`gDefeatTalkList` entry keyed to the wrong `.chapter` never matches, so the boss dies, no flag is
+set, `DefeatBoss` never fires, and the chapter cannot be won, with nothing in the build to say why.
 
 ---
 
