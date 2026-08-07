@@ -15,7 +15,20 @@ local MENU_ATTACK = 0x4F
 local MENU_BALLISTA_ATTACK = 0x50
 local MENU_TALK = 0x5A
 local MENU_VISIT = 0x5C
+local MENU_CHEST = 0x5D
+local MENU_DOOR = 0x5E
+local MENU_ITEM = 0x67
+local MENU_SUPPLY = 0x69
 local MENU_WAIT = 0x6B
+-- The two arms of ConvoyMenuProc_StarMenu (convoymenu.c), which is raised whenever a unit is
+-- handed an item it has no room for: gConvoyMenuItems (0x24-0x29) when the convoy is FULL,
+-- gSendToConvoyMenuItems (0x2A-0x2F) when it has room. Contiguous in menu_def.c, and they
+-- block the chapter identically, so they are one state.
+local MENU_CONVOY_SEND_FIRST = 0x24
+local MENU_CONVOY_SEND_LAST = 0x2F
+-- gItemSelectMenuItems: one row per inventory slot (menu_def.c).
+local MENU_ITEM_SLOT_FIRST = 0x43
+local MENU_ITEM_SLOT_LAST = 0x47
 local MENU_UNIT_LIST = 0x6E
 local MENU_STATUS = 0x6F
 local MENU_END_PHASE = 0x78
@@ -46,7 +59,9 @@ local function menuKinds(observation)
         end
         if item.override_id == MENU_SEIZE or item.override_id == MENU_ATTACK
             or item.override_id == MENU_BALLISTA_ATTACK
-            or item.override_id == MENU_TALK or item.override_id == MENU_WAIT then unit = true end
+            or item.override_id == MENU_TALK or item.override_id == MENU_CHEST
+            or item.override_id == MENU_DOOR or item.override_id == MENU_ITEM
+            or item.override_id == MENU_SUPPLY or item.override_id == MENU_WAIT then unit = true end
         if item.override_id == MENU_END_PHASE then map = true end
     end
     return unit, map, weapon
@@ -208,6 +223,25 @@ local RULES = {
             if unit and map then
                 return unsupported("ambiguous standard menu contains unit and map commands")
             end
+            -- Raised by ConvoyMenuProc_StarMenu when a unit is given an item with no free
+            -- slot. Nothing in the game advances until it is answered, so a driver that reads
+            -- it as an ordinary menu and waits for the scene to end waits forever.
+            for _, item in ipairs(observation.menu.items) do
+                if item.override_id >= MENU_CONVOY_SEND_FIRST
+                    and item.override_id <= MENU_CONVOY_SEND_LAST then
+                    return matched("send_to_convoy", "menu rows are convoy-send choices")
+                end
+            end
+            -- Checked against EVERY observed row, not just the enabled ones. uimenu.c builds a
+            -- MenuItemProc for anything that is not MENU_NOTSHOWN, so a row we can see is a
+            -- slot that holds an item -- and MENU_DISABLED here only means the unit cannot USE
+            -- it, not that A does nothing (Menu_OnIdle's A path never consults availability).
+            for _, item in ipairs(observation.menu.items) do
+                if item.override_id >= MENU_ITEM_SLOT_FIRST
+                    and item.override_id <= MENU_ITEM_SLOT_LAST then
+                    return matched("item_list", "menu rows are inventory slots")
+                end
+            end
             if weapon then return matched("weapon_menu", "menu offers weapon items") end
             if unit then return matched("unit_command_menu", "menu offers unit commands") end
             if map then return matched("map_command_menu", "menu offers map commands") end
@@ -221,14 +255,70 @@ local RULES = {
         end,
     },
     {
+        -- Ordered ABOVE player_phase, and that order is load-bearing. The Character screen is
+        -- opened from the map menu DURING the player phase, so gProcScr_PlayerPhase is still
+        -- in the pool underneath it -- and the player_phase rule would answer
+        -- `player_map_idle`, advertising cursor moves for a map nothing can reach. It is not
+        -- a MenuProc either, so the menu rule never sees it: this is a whole screen with its
+        -- own key handler, and until it was named a scenario walking the roster was pressing
+        -- DOWN into a state the controller had no word for (#238).
+        name = "unit_list",
+        check = function(observation)
+            if not proc(observation, "unit_list") then return rejected("unit_list proc absent") end
+            if not idleIs(observation, "unit_list", "unit_list_input") then
+                return matched("transition", string.format("unit_list idle=%s, not its key handler",
+                    tostring(idleOf(observation, "unit_list"))))
+            end
+            if not observation.unit_list then
+                return matched("transition", "unit_list live with no observed list structure")
+            end
+            -- unk_29 selects which branch sub_8091AEC runs: 0 is the key handler, 1 and 2 are
+            -- the row/page scroll animating, and 3 is sub_80917D8, the sort-column mode. Only
+            -- 0 reads the D-pad, so a press sent in 1 or 2 is simply LOST -- the exact shape of
+            -- failure #232 spent sessions on. 3 is a persistent INPUT state we deliberately do
+            -- not drive: nothing needs it, and legalActions refuses to offer the UP that opens
+            -- it, so a run should never arrive here (see unit_list_screen below).
+            if observation.unit_list.scrolling then
+                return matched("transition", "the unit list is mid-scroll")
+            end
+            return matched("unit_list_screen", "unit_list in its key handler")
+        end,
+    },
+    {
+        -- The in-map convoy (ProcScr_BmSupplyScreen), opened by the unit menu's Supply
+        -- command. Above player_phase for the same reason as the unit list: the map is still
+        -- underneath it, and answering `player_map_idle` here offers cursor moves that go
+        -- nowhere.
+        name = "supply_screen",
+        check = function(observation)
+            if not proc(observation, "supply_screen") then
+                return rejected("supply_screen proc absent")
+            end
+            if not idleIs(observation, "supply_screen", "supply_input") then
+                return matched("transition", string.format("supply_screen idle=%s, not its key handler",
+                    tostring(idleOf(observation, "supply_screen"))))
+            end
+            return matched("supply_screen", "supply_screen in its key handler")
+        end,
+    },
+    {
         name = "prep_units",
         check = function(observation)
             if not proc(observation, "prep_units") then return rejected("prep_units proc absent") end
-            if idleIs(observation, "prep_units", "prep_units_input") then
-                return matched("prep_pick_units", "prep_units in its input loop")
+            if not idleIs(observation, "prep_units", "prep_units_input") then
+                return matched("transition", string.format("prep_units idle=%s, not prep_units_input",
+                    tostring(idleOf(observation, "prep_units"))))
             end
-            return matched("transition", string.format("prep_units idle=%s, not prep_units_input",
-                tostring(idleOf(observation, "prep_units"))))
+            if not observation.prep_units then
+                return matched("transition", "prep_units live with no observed list structure")
+            end
+            -- ProcPrepUnit_Idle gates its ENTIRE key handler on list_num_pre == list_num_cur:
+            -- while the list scrolls to a new row it reads nothing, so an input sent in that
+            -- window is lost and the driver goes on believing it landed.
+            if not observation.prep_units.settled then
+                return matched("transition", "the deploy list is scrolling to a new row")
+            end
+            return matched("prep_pick_units", "prep_units in its input loop")
         end,
     },
     {
@@ -485,6 +575,44 @@ function M.legalActions(observation)
                     "prep.command.index=0", item.slot)
             end
         end
+    elseif state == "prep_pick_units" then
+        -- ProcPrepUnit_Idle (prep_unitselect.c) walks a TWO-COLUMN list, and its bounds are
+        -- reproduced here rather than approximated: LEFT only from an odd index, RIGHT only
+        -- from an even one short of the end, UP/DOWN by two. A press outside those bounds
+        -- moves nothing at all -- so a driver that assumed a straight list would act on
+        -- whoever it was still parked on and report success.
+        local pick = observation.prep_units
+        if (pick.cursor & 1) == 1 then add(actions, "pick_left", "LEFT", "prep_units.column") end
+        if (pick.cursor & 1) == 0 and pick.cursor < pick.count - 1 then
+            add(actions, "pick_right", "RIGHT", "prep_units.column")
+        end
+        if pick.cursor - 2 >= 0 then add(actions, "pick_previous", "UP", "prep_units.row") end
+        if pick.cursor + 2 <= pick.count - 1 then
+            add(actions, "pick_next", "DOWN", "prep_units.row")
+        end
+        add(actions, "toggle_deploy", "A", "prep_units.cursor")
+        -- START only launches with someone deployed; on an empty field FE8 just buzzes.
+        if pick.deployed > 0 then add(actions, "fight", "START", "prep_units.deployed") end
+        add(actions, "cancel_pick", "B", "prep_units.on_b")
+    elseif state == "supply_screen" then
+        add(actions, "close_supply", "B", "supply_screen.on_b")
+    elseif state == "unit_list_screen" then
+        -- sub_809144C (unitlistscreen.c): DOWN/UP walk the roster, LEFT/RIGHT change page, A
+        -- opens the highlighted unit's stat screen, B leaves. The roster index it moves is
+        -- unk_30 -- NOT the on-screen row, which clamps while the list scrolls under it, so a
+        -- driver that watched the row would stop believing it had reached the end of a list
+        -- it was still halfway down.
+        -- Bounded at BOTH ends off gUnknown_0200F158, the same field sub_809144C bounds
+        -- against -- and UP at row 0 is not merely a no-op: it sets unk_29 = 3, routing
+        -- sub_8091AEC into sub_80917D8 (the sort-column mode). The observer reports that as
+        -- `scrolling`, i.e. as a transition offering nothing, so advertising UP there hands a
+        -- driver an action that walks it into a screen with no enumerated way out, to sit
+        -- until the stall watch fires on a wait the controller itself caused.
+        local list = observation.unit_list
+        if list.row > 0 then add(actions, "list_previous", "UP", "unit_list.row") end
+        if list.row < list.count - 1 then add(actions, "list_next", "DOWN", "unit_list.row") end
+        add(actions, "select_list_entry", "A", "unit_list.row")
+        add(actions, "close_list", "B", "unit_list.on_b")
     elseif state == "unit_command_menu" then
         addMenuNavigation(actions, observation)
         addMenuCommand(actions, observation, MENU_SEIZE, "seize")
@@ -492,6 +620,15 @@ function M.legalActions(observation)
         addMenuCommand(actions, observation, MENU_BALLISTA_ATTACK, "attack")
         addMenuCommand(actions, observation, MENU_TALK, "talk")
         addMenuCommand(actions, observation, MENU_VISIT, "visit")
+        -- The map-interaction and inventory commands. Each of these used to be reached by
+        -- pressing A on a row the scenario ASSUMED was top ("Door (row 0)"), which holds only
+        -- while the command's neighbours happen to be unavailable -- give the unit a talkable
+        -- ally or a chest on the same tile and the blind press fires the wrong command and
+        -- the run stays green (#238).
+        addMenuCommand(actions, observation, MENU_CHEST, "open_chest")
+        addMenuCommand(actions, observation, MENU_DOOR, "open_door")
+        addMenuCommand(actions, observation, MENU_ITEM, "open_items")
+        addMenuCommand(actions, observation, MENU_SUPPLY, "open_supply")
         addMenuCommand(actions, observation, MENU_WAIT, "wait")
     elseif state == "map_command_menu" then
         addMenuNavigation(actions, observation)
@@ -504,6 +641,20 @@ function M.legalActions(observation)
             if item.override_id >= MENU_WEAPON_FIRST and item.override_id <= MENU_WEAPON_LAST then
                 add(actions, "select_weapon", observation.menu.current == item.slot and "A" or nil,
                     string.format("menu.override_id=0x%02X", item.override_id), item.slot)
+            end
+        end
+    elseif state == "send_to_convoy" then
+        addMenuNavigation(actions, observation)
+        for _, item in ipairs(observation.menu.items) do
+            if observation.menu.current == item.slot then
+                add(actions, "send_item", "A", "menu.convoy_send_slot", item.slot)
+            end
+        end
+    elseif state == "item_list" then
+        addMenuNavigation(actions, observation)
+        for _, item in ipairs(observation.menu.items) do
+            if observation.menu.current == item.slot then
+                add(actions, "select_item", "A", "menu.item_slot", item.slot)
             end
         end
     elseif state == "generic_menu" then

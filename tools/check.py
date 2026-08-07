@@ -66,6 +66,9 @@ DEAD_CONCEPTS = [
     # retired by #220 (2026-08-03): common playtest mechanics are state-driven.
     r'bootToMap.{0,40}alternat(?:e|es|ing).{0,12}(?:A.{0,3}START|START.{0,3}A)',
     r'chooseAttack.{0,50}row 0 blind',
+    # retired by #238 (2026-08-06): the base-tiles grid comes from SYM like every other
+    # symbol. The literal it held drifted and made ch03's doors and chests read as broken.
+    r'GBMMAPBASETILES_ADDR',
     # NOT registered here: `hasPrepScreen`. It IS a dead field (FE7 leftover, chapterdata.h:37 --
     # false for every chapter, including ones that plainly have prep) and citing it as evidence is
     # exactly the mistake that produced a bogus "our prep is a divergence" claim on 2026-07-29.
@@ -544,6 +547,153 @@ def check_playtest_matrix(fail):
             if s.manual:
                 fail.append('matrix.yaml: suite %s names %s, which needs manual setup'
                             % (suite, name))
+
+
+# Functions in harness.lua that may hold a raw press() even though a verdict scenario can
+# reach them. Each is a deliberate exception with its own reason -- NOT a backlog.
+BLIND_PRESS_ALLOWED = {
+    # press() itself, and the two places the contract is IMPLEMENTED. guardedInput is the
+    # thing that re-observes, re-authorises and verifies; it has to press eventually.
+    'press': 'the emulator primitive every guarded input is built on',
+    'guardedInput': 'the guarded input itself -- this is where the contract presses',
+    'awaitControllerState': 'traced, enumerated cancel while backing out of an unwanted state',
+    # A save slot takes TWO confirms and SaveMenu_SaveSlotSelectLoop stays the idle callback
+    # across both, so the first press has no state change to be verified against. Legality is
+    # re-checked before every press and the loop stops on the OUTCOME (the prompt closing).
+    'driveSaveSlot': 'two confirms with no distinguishing postcondition; verified on the outcome',
+    # The fuzzer's whole purpose is unguarded, weighted-random input. Driving it through the
+    # controller would mean it could only ever send inputs the controller already calls legal,
+    # which is precisely the space a fuzzer exists to leave.
+    'fuzzDrive': 'random input IS the scenario -- guarding it would defeat the fuzzer',
+}
+
+_LUA_FUNC_DEF = re.compile(
+    r'^(?:local function (\w+)|scenarios\.(\w+) = function|(\w+) = function)', re.M)
+
+
+def _harness_functions(source):
+    """{name: (body, kind)} for every top-level function in harness.lua.
+
+    Attribution is by ENCLOSING FUNCTION, not by distance to the next `scenarios.X`.
+    Splitting on scenario definitions charges every intervening `local function` helper to
+    whichever scenario happens to sit above it -- which is how #238's own scope list came to
+    name `retreat` (0 presses of its own) and miss `reachRbgCh01` (8)."""
+    lines = source.split('\n')
+    marks = []
+    for i, line in enumerate(lines):
+        m = _LUA_FUNC_DEF.match(line)
+        if m:
+            name = m.group(1) or m.group(2) or m.group(3)
+            marks.append((i, name, 'scenario' if m.group(2) else 'helper'))
+    marks.append((len(lines), None, None))
+    out = {}
+    for (start, name, kind), (end, _, _) in zip(marks, marks[1:]):
+        # Strip trailing comments too, not just whole comment lines: `local x = 1 -- press(A)`
+        # otherwise trips the gate on prose. Lua has no string type that survives this
+        # naively, but no line in these files puts `--` inside a literal.
+        body = '\n'.join(l.split('--')[0] for l in lines[start:end])
+        out[name] = (body, kind)
+    return out
+
+
+def _reaches(name, funcs, seen=None):
+    """Every harness function reachable from `name`, including itself."""
+    seen = seen if seen is not None else set()
+    if name in seen or name not in funcs:
+        return seen
+    seen.add(name)
+    body = funcs[name][0]
+    for callee in set(re.findall(r'\b(\w+)\s*\(', body)):
+        if callee in funcs and callee != name:
+            _reaches(callee, funcs, seen)
+    return seen
+
+
+def check_verdict_scenarios_are_guarded(fail):
+    """A scenario that produces a VERDICT may not drive the UI with a raw press().
+
+    A blind press cannot tell "the scene advanced" from "FE8 swallowed that input", so a
+    green run from one is not evidence -- ch01win rode straight through the very Yes/No
+    prompt that cost #232 three sessions, and passed. Every input a verdict scenario sends
+    now goes through guardedInput: observed state -> enumerated legal action -> verified
+    postcondition (#238).
+
+    Scope comes from matrix.yaml's `kind`, never from the scenario NAME: recordsupply and
+    recordunitlist are verdict scenarios despite the prefix, and recordunitlist is in the
+    gate suite. Capture (`record`) and `diagnostic` scenarios are out -- blind input is
+    harmless where nothing is asserted."""
+    sys.path.insert(0, os.path.join(REPO, 'tools', 'playtest'))
+    try:
+        import matrix as mx
+        m = mx.Manifest.load()
+    except Exception:                             # noqa: BLE001 -- check_playtest_matrix reports it
+        return
+    with open(os.path.join(REPO, 'tools/playtest/harness.lua'), encoding='utf-8') as fh:
+        funcs = _harness_functions(fh.read())
+
+    for name in sorted(m.scenarios):
+        try:
+            if m.resolve(name).kind != 'verdict':
+                continue
+        except mx.ManifestError:
+            continue
+        # A verdict scenario the harness no longer defines would otherwise drop out of this
+        # gate in silence -- renamed in Lua, still listed in the manifest, and never checked
+        # again. check_playtest_matrix reports the pairing separately; this refuses to pretend
+        # it reviewed something it could not find.
+        if name not in funcs:
+            fail.append('verdict scenario %s has no function in harness.lua, so the '
+                        'blind-press gate cannot review it (#238)' % name)
+            continue
+        for reached in sorted(_reaches(name, funcs)):
+            if reached in BLIND_PRESS_ALLOWED:
+                continue
+            count = len(re.findall(r'\bpress\(', funcs[reached][0]))
+            if count:
+                where = reached if reached == name else '%s (via %s)' % (reached, name)
+                fail.append(
+                    'verdict scenario %s drives the UI with %d raw press() call(s) in %s -- '
+                    'use guardedInput/selectSemantic, or classify the state it needs (#238)'
+                    % (name, count, where))
+
+
+# GBA address space. 0x04-0x07 are ARCHITECTURAL (MMIO, palette, VRAM, OAM) -- fixed by the
+# hardware, so a literal there is a constant, not a symbol. 0x02/0x03 (EWRAM/IWRAM) and
+# 0x08/0x09 (ROM) are where OUR symbols live, and those move on every engine change.
+# The leading zero is OPTIONAL: 0x8091AEC is the usual GBA shorthand, and it is literally the
+# form the decomp's own symbol names encode (sub_8091AEC). Requiring `0x0` would miss exactly
+# the spelling the next stale literal is most likely to be written in.
+_DRIFTING_ADDR = re.compile(r'0x0?[2389][0-9A-Fa-f]{6}\b')
+
+
+def check_no_hardcoded_symbol_addresses(fail):
+    """The playtest Lua may not hard-code a ROM/EWRAM address. gen_symbols.py exists for
+    exactly this -- "BSS/EWRAM addresses shift when engine code changes, so the Lua harness
+    must never hard-code them" -- and one literal that slipped through proved the point: the
+    base-tiles grid was pinned at 0x085AF5DC, the engine grew, and that address came to hold
+    0x000004AB. ch03door and ch03chest then failed on their PRECONDITION, before driving a
+    single input, and read for months like broken doors and chests. Nothing was wrong with
+    the tile-change wiring (#238).
+
+    A wrong address is the worst failure shape available here: it does not crash, it reads
+    plausible garbage, and it indicts the feature instead of the harness.
+
+    symbols.lua and procscr.lua are GENERATED (they are nothing but addresses) and test_* files
+    use fake ones as fixtures, so all three are exempt -- the same carve-outs the other scans
+    use."""
+    for path in sorted(glob.glob(os.path.join(REPO, 'tools/playtest/*.lua'))):
+        name = os.path.basename(path)
+        if name.startswith('test_') or name in ('symbols.lua', 'procscr.lua'):
+            continue
+        with open(path, encoding='utf-8') as fh:
+            for n, line in enumerate(fh, 1):
+                if line.strip().startswith('--'):
+                    continue
+                for hit in _DRIFTING_ADDR.findall(line):
+                    fail.append('%s:%d hard-codes the ROM/EWRAM address %s -- read it from '
+                                'SYM (add it to gen_symbols.py WANTED); those addresses move '
+                                'on every engine change (#238)'
+                                % (os.path.relpath(path, REPO), n, hit))
 
 
 def check_tool_refs_exist(fail):
@@ -1041,6 +1191,8 @@ def main():
                   check_tests_pass, check_yaml_parses,
                   check_chapter_status, check_chapter_deployment_schema,
                   check_injection_order, check_playtest_matrix,
+                  check_verdict_scenarios_are_guarded,
+                  check_no_hardcoded_symbol_addresses,
                   check_tool_refs_exist, check_no_dead_concepts,
                   check_generated_indexes_fresh, check_engine_guards_present,
                   check_purple_bank_blankers_known,

@@ -112,7 +112,62 @@ local prepView = {
 }
 classify(prepView, "prep_map_menu", "View Map preparations menu is distinct")
 check(action(prepView, "fight"), nil, "controller never exits prep through View Map")
-classify({ procs = proc("prep_units", "prep_units_input") }, "prep_pick_units", "Pick Units screen")
+-- The Pick Units deploy screen. Its legal moves are exactly the bounds ProcPrepUnit_Idle
+-- enforces on a TWO-COLUMN list (prep_unitselect.c): LEFT only from an odd index, RIGHT only
+-- from an even one that is not the last, and UP/DOWN by two. A scenario that pressed RIGHT or
+-- DOWN off the end of that grid moved nothing and then acted on whoever it was still sitting
+-- on -- which is how a bench/deploy walk can pick the wrong unit and stay green (#238).
+local pickUnits = {
+    procs = proc("prep_units", "prep_units_input"),
+    prep_units = { cursor = 0, settled = true, deployed = 1, count = 8 },
+}
+classify(pickUnits, "prep_pick_units", "Pick Units screen")
+a = action(pickUnits, "pick_right")
+check(a and a.key, "RIGHT", "an even index can cross to the second column")
+check(action(pickUnits, "pick_left"), nil, "...but the first column has nothing to its left")
+check(action(pickUnits, "pick_previous"), nil, "and the top row has nothing above it")
+a = action(pickUnits, "pick_next")
+check(a and a.key, "DOWN", "the row below is two indices on")
+a = action(pickUnits, "toggle_deploy")
+check(a and a.key, "A", "A benches or deploys whoever the cursor holds")
+a = action(pickUnits, "fight")
+check(a and a.key, "START", "START launches once at least one unit is deployed")
+
+local lastPick = {
+    procs = proc("prep_units", "prep_units_input"),
+    prep_units = { cursor = 7, settled = true, deployed = 4, count = 8 },
+}
+check(action(lastPick, "pick_right"), nil, "the last entry has nothing to its right")
+check(action(lastPick, "pick_next"), nil, "...and nothing below it")
+a = action(lastPick, "pick_left")
+check(a and a.key, "LEFT", "but an odd index can always step back a column")
+
+local emptyPick = {
+    procs = proc("prep_units", "prep_units_input"),
+    prep_units = { cursor = 0, settled = true, deployed = 0, count = 8 },
+}
+check(action(emptyPick, "fight"), nil, "START does not launch with an empty field")
+
+-- The whole key handler is gated on list_num_pre == list_num_cur: while the list scrolls to a
+-- new row FE8 reads no keys at all, so a press sent then is lost outright.
+local scrollingPick = {
+    procs = proc("prep_units", "prep_units_input"),
+    prep_units = { cursor = 4, settled = false, deployed = 2, count = 8 },
+}
+classify(scrollingPick, "transition", "a scrolling deploy list takes no input")
+check(action(scrollingPick, "toggle_deploy"), nil, "and offers none")
+
+-- The in-map convoy, opened by the unit menu's Supply command. Only ever entered to look and
+-- leave, so B is the whole contract -- but it has to be a NAMED state, because two blind B's
+-- into an unclassified screen cannot tell "the convoy closed" from "the second B also
+-- cancelled the unit's move".
+local supply = {
+    procs = { supply_screen = { idle = "supply_input" }, player_phase = { idle = "player_main_idle" } },
+}
+classify(supply, "supply_screen", "the map convoy outranks the map underneath it")
+a = action(supply, "close_supply")
+check(a and a.key, "B", "B leaves the convoy (PrepItemSupply_Loop_GiveTakeKeyHandler)")
+check(action(supply, "cursor_down"), nil, "and the map cursor is not offered while it is up")
 
 -- Standard menus expose semantic command IDs and enabled availability, never guessed rows.
 local unitMenu = {
@@ -143,6 +198,178 @@ check(a and a.target, 4, "Seize resolves from semantic id 0x4E")
 a = action(unitMenu, "cancel_menu")
 check(a and a.key, "B", "standard menu cancellation comes from its live B callback")
 check(a and a.source, "menu.on_b=0x0804F000", "menu cancel records the live callback")
+
+-- The rest of gUnitActionMenuItems that our scenarios actually drive (menu_def.c). Each was
+-- being reached by pressing A on an assumed ROW -- "Door (row 0)", "Chest (row 0)", "Item
+-- (row 0, no weapon)" -- which is only true while the command's neighbours happen to be
+-- unavailable. Naming them makes the row an observation instead of an assumption (#238).
+local fieldMenu = {
+    procs = proc("menu", "menu_input"),
+    menu = {
+        current = 0,
+        items = {
+            { slot = 0, override_id = 0x5D, availability = 1 },  -- Chest
+            { slot = 1, override_id = 0x5E, availability = 1 },  -- Door
+            { slot = 2, override_id = 0x67, availability = 1 },  -- Item
+            { slot = 3, override_id = 0x69, availability = 1 },  -- Supply
+            { slot = 4, override_id = 0x6B, availability = 1 },  -- Wait
+        },
+    },
+}
+classify(fieldMenu, "unit_command_menu", "Chest/Door/Item/Supply are unit commands")
+a = action(fieldMenu, "open_chest")
+check(a and a.target, 0, "Chest resolves from semantic id 0x5D")
+check(a and a.key, "A", "the highlighted command carries its key")
+a = action(fieldMenu, "open_door")
+check(a and a.target, 1, "Door resolves from semantic id 0x5E")
+check(a and a.key, nil, "a command that is not highlighted must be selected first")
+a = action(fieldMenu, "open_items")
+check(a and a.target, 2, "Item resolves from semantic id 0x67")
+a = action(fieldMenu, "open_supply")
+check(a and a.target, 3, "Supply resolves from semantic id 0x69")
+
+-- Availability is read, never assumed. This pins a DELIBERATELY conservative choice rather
+-- than an engine behaviour: addMenuCommand filters on enabledMenuItems, so a MENU_DISABLED row
+-- is never offered as a command -- even though Menu_OnIdle would in fact fire its onSelected
+-- (it never consults availability; see the inventory list below, which relies on exactly that).
+-- No unit command actually greys today: DoorCommandUsability and its neighbours return only
+-- MENU_ENABLED or MENU_NOTSHOWN, and a NOTSHOWN row is not built at all (uimenu.c). So this
+-- guards the day one of them starts greying, and the fixture is synthetic on purpose.
+local shutMenu = {
+    procs = proc("menu", "menu_input"),
+    menu = {
+        current = 0,
+        items = {
+            { slot = 0, override_id = 0x5E, availability = 2 },  -- Door, greyed out
+            { slot = 1, override_id = 0x6B, availability = 1 },
+        },
+    },
+}
+check(action(shutMenu, "open_door"), nil, "a disabled Door is not a legal action")
+
+-- The inventory list a unit's Item command opens (gItemSelectMenuItems, override 0x43-0x47).
+-- It needs its own state because MENU_DISABLED means something different here than it does
+-- on a command menu: ItemSelectMenu_Usability greys any item the unit cannot USE -- a weapon,
+-- a healing item at full HP -- but Menu_OnIdle's A path calls onSelected WITHOUT consulting
+-- availability, and ItemSelectMenu_Effect opens the Use/Equip/Trade/Discard submenu
+-- unconditionally. A greyed row is still a live row. Reading it as a command menu instead
+-- reported "unsupported standard menu has no recognized semantic commands" the moment every
+-- item happened to be unusable, which is Hlin's whole inventory at ch00 turn 1 (#238).
+local itemList = {
+    procs = proc("menu", "menu_input"),
+    menu = {
+        current = 1,
+        on_b = "0x0802291C",
+        items = {
+            { slot = 0, override_id = 0x43, availability = 2, on_selected = "0x080234E4" },
+            { slot = 1, override_id = 0x44, availability = 2, on_selected = "0x080234E4" },
+        },
+    },
+}
+classify(itemList, "item_list", "an inventory of unusable items is still an inventory")
+a = action(itemList, "select_item")
+check(a and a.target, 1, "the inventory commits the HIGHLIGHTED row, never an assumed one")
+check(a and a.key, "A", "a greyed row is selectable -- grey means unusable, not unreachable")
+check(action(itemList, "menu_next") ~= nil, true, "and the list can be walked to another row")
+a = action(itemList, "cancel_menu")
+check(a and a.key, "B", "B backs out of the inventory")
+
+-- FE8's "your inventory is full -- which item goes to the convoy" chooser
+-- (gSendToConvoyMenuItems, override 0x2A-0x2F; raised by ConvoyMenuProc_StarMenu whenever a
+-- unit is handed an item with no free slot). It is a MenuProc with no semantic command on it,
+-- so it fell through to generic_menu -- and a driver waiting for a scene to finish would sit
+-- behind it forever, because nothing advances until it is answered. The ch02 ending's third
+-- charm-gift raises exactly this, which is why clear_ch02's blind A-mash was load-bearing:
+-- the run's "3/3 charms delivered" verdict depended on a stray press resolving a prompt the
+-- scenario never knew was there (#238).
+local sendToConvoy = {
+    procs = { menu = { idle = "menu_input" }, std_event = { idle = "event_engine" } },
+    menu = {
+        current = 0,
+        items = {
+            { slot = 0, override_id = 0x2A, availability = 1, on_selected = "0x08022BEC" },
+            { slot = 1, override_id = 0x2B, availability = 1, on_selected = "0x08022BEC" },
+            { slot = 5, override_id = 0x2F, availability = 1, on_selected = "0x08022C40" },
+        },
+    },
+}
+classify(sendToConvoy, "send_to_convoy", "the inventory-full convoy chooser is its own state")
+
+-- ConvoyMenuProc_StarMenu has TWO arms off one call site: gSendToConvoyMenuItems (0x2A-0x2F)
+-- when the convoy has room, gConvoyMenuItems (0x24-0x29) when it is FULL. Both block the same
+-- way, so classifying only the first leaves the identical hang one branch over -- and it would
+-- not even trip the stall watch, which arms on UNCLASSIFIED transitions and this would read as
+-- a tidy generic_menu.
+local convoyFull = {
+    procs = { menu = { idle = "menu_input" }, std_event = { idle = "event_engine" } },
+    menu = {
+        current = 0,
+        items = {
+            { slot = 0, override_id = 0x24, availability = 1, on_selected = "0x08022B00" },
+            { slot = 5, override_id = 0x29, availability = 1, on_selected = "0x08022B40" },
+        },
+    },
+}
+classify(convoyFull, "send_to_convoy", "...and so is the convoy-FULL arm of the same call site")
+a = action(convoyFull, "send_item")
+check(a and a.key, "A", "which blocks the chapter identically and so is answered identically")
+a = action(sendToConvoy, "send_item")
+check(a and a.key, "A", "A sends the highlighted item to the convoy")
+check(a and a.target, 0, "...the HIGHLIGHTED one, not an assumed row")
+check(action(sendToConvoy, "menu_next") ~= nil, true, "and another slot can be chosen first")
+
+local usableItems = {
+    procs = proc("menu", "menu_input"),
+    menu = {
+        current = 0,
+        items = { { slot = 0, override_id = 0x43, availability = 1, on_selected = "0x080234E4" } },
+    },
+}
+classify(usableItems, "item_list", "...and so is an inventory of usable ones")
+
+-- The map-menu Character screen (ProcScr_UnitListScreen_Field). It is not a MenuProc at all
+-- -- it owns the whole screen and runs its own key handler -- so before it was named, a
+-- scenario walking the roster pressed DOWN into a state the controller could not see, and
+-- the player_phase rule underneath was calling the same frames `player_map_idle` (#238).
+local unitList = {
+    procs = { player_phase = { idle = "player_main_idle" },
+              unit_list = { idle = "unit_list_input" } },
+    unit_list = { row = 0, screen_row = 0, page = 0, count = 9, scrolling = false },
+}
+classify(unitList, "unit_list_screen", "the Character screen outranks the map underneath it")
+check(action(unitList, "list_next") ~= nil, true, "the roster can be walked forward")
+check(action(unitList, "cursor_down"), nil, "and the map cursor is NOT offered while it is up")
+a = action(unitList, "close_list")
+check(a and a.key, "B", "B leaves the Character screen (sub_809144C)")
+
+-- The walk is bounded at BOTH ends, from the same field sub_809144C bounds against. UP at
+-- row 0 is not a no-op: it sets unk_29 = 3, which routes sub_8091AEC into sub_80917D8, the
+-- sort-column mode -- a persistent input state the observer reports as `scrolling`, i.e. as a
+-- transition offering nothing. Advertising UP there hands the driver an action that walks it
+-- into a screen it has no enumerated way out of, and it burns its budget until the stall
+-- watch fires on a wait the controller itself caused.
+check(action(unitList, "list_previous"), nil, "UP at row 0 is NOT offered -- it opens sort mode")
+local midList = {
+    procs = { unit_list = { idle = "unit_list_input" } },
+    unit_list = { row = 4, screen_row = 4, page = 0, count = 9, scrolling = false },
+}
+a = action(midList, "list_previous")
+check(a and a.key, "UP", "...but it is offered anywhere the row can actually move up")
+local lastList = {
+    procs = { unit_list = { idle = "unit_list_input" } },
+    unit_list = { row = 8, screen_row = 5, page = 0, count = 9, scrolling = false },
+}
+check(action(lastList, "list_next"), nil,
+    "and DOWN is not offered on the last entry (unk_30 < count-1 is the engine's own bound)")
+
+-- unk_29 != 0 is the page/row scroll animating, and its key handler does not run then. FE8
+-- DROPS input in that window, so calling it an input state is how a press goes missing.
+local scrollingList = {
+    procs = { unit_list = { idle = "unit_list_input" } },
+    unit_list = { row = 3, screen_row = 1, page = 0, count = 9, scrolling = true },
+}
+classify(scrollingList, "transition", "a scrolling Character screen takes no input")
+check(action(scrollingList, "list_next"), nil, "and offers none")
 
 local lockedMenu = {
     procs = { menu = { idle = "menu_input", locked = true, frozen = false } },

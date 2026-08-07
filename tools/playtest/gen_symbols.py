@@ -77,6 +77,16 @@ WANTED = [
     'gBmMapUnit',               # u8** tile->unit grid (include/bmmap.h): gBmMapUnit[y][x] is the
                                 # on-tile unit id the engine uses for cursor selection. Relocating
                                 # a unit must update THIS, not just its xPos/yPos.
+    'gBmMapBaseTiles',          # u16** metatile grid a chest/door tile-change writes
+                                # (ApplyMapChangesById, bmtrick.c). Unlike the other gBmMap*
+                                # grids this one lives in ROM .data and is never reassigned:
+                                # it holds a constant pointer to the sBmBaseTilesPool row
+                                # array in EWRAM. It was HARD-CODED in harness.lua and the
+                                # engine grew out from under it -- 0x085AF5DC held 0x000004AB
+                                # rather than the pool -- so ch03door/ch03chest failed on
+                                # their PRECONDITION, before pressing anything, and read as
+                                # broken doors and chests for as long as that lasted. Which
+                                # is the entire reason this file exists (#238).
     'gBmMapTerrain',            # u8** terrain-id grid (include/bmmap.h): gBmMapTerrain[y][x] is the
                                 # TERRAIN_* id, used to build a passability map for the clear-bot's
                                 # BFS march-to-boss (#60).
@@ -155,10 +165,27 @@ WANTED = [
                                 # In a --montage build this carries the #43 lore crawl, so a
                                 # live instance == the montage opener actually played.
     'ProcScr_PrepUnitScreen',   # proc script: the prep "Pick Units" screen (deploy/bench).
+    'gPrepUnitList',            # struct PrepUnitList (include/prepscreen.h): units[0x40] then
+                                # max_num at +0x100 -- PrepGetUnitAmount(). It is what
+                                # ProcPrepUnit_Idle bounds its RIGHT/DOWN moves against, so
+                                # the controller reads the LIVE roster length instead of
+                                # assuming the deploy list's shape (#238).
     'ProcScr_UnitListScreen_Field', # proc script: the map-menu "Unit" list, i.e. the Character
                                 # screen (src/unitlistscreen.c, started by StartUnitListScreenField
                                 # off gMapMenuItems[0], overrideId 0x6E). A live instance == the
                                 # unit list is actually on screen -> the #218 capture point.
+    'gUnknown_0200F158',        # u8: how many units the Character screen actually sorted into
+                                # its roster (src/unitlistscreen.c). This -- NOT the proc's own
+                                # allyCount -- is what sub_809144C bounds DOWN against, and it
+                                # is the only one of the two that a FIELD-mode list ever writes:
+                                # StartUnitListScreenField sets `mode` and nothing else, so
+                                # allyCount is left holding whatever was in the proc slot (#238).
+    'sub_8091AEC',              # the Character screen's PROC_REPEAT input loop
+                                # (src/unitlistscreen.c). Unnamed in the decomp, but it is the
+                                # exact callback that makes the list an INPUT state rather than
+                                # a screen that happens to be up -- and its unk_29 branch says
+                                # whether the row/page scroll is still animating, i.e. whether
+                                # a D-pad press would be read at all (#238).
     'unit_icon_wait_table',     # UnitIconWait[] (include/unit_icon_data.h): {pattern, size, sheet}
                                 # per SMS id. `size` is the UNIT_ICON_SIZE_* PutUnitSprite switches
                                 # on, so reading it in-engine proves what the ROM believes about a
@@ -166,6 +193,11 @@ WANTED = [
     'ProcScr_BmSupplyScreen',   # proc script: the in-map Supply (convoy) screen, opened by
                                 # the unit-menu Supply command (src/prep_itemsupply.c). A live
                                 # instance == a unit actually opened the convoy on the field.
+    'PrepItemSupply_Loop_GiveTakeKeyHandler', # exact convoy input callback. B leaves it
+                                # (Proc_Goto 8); nothing else is ever wanted there, but it has
+                                # to be a NAMED state -- blind B's into an unclassified screen
+                                # cannot tell "the convoy closed" from "that also cancelled
+                                # the unit's move" (#238).
     'ProcScr_BattleEventEngine',# proc script: in-battle event engine (src/event.c). Runs
                                 # CallBattleQuoteEventInBattle -> the brief in-combat quotes
                                 # (per-PC DEATH quotes, boss taunts). A live instance == a

@@ -1519,6 +1519,98 @@ inspection, and external policies—those products are follow-ups, not controlle
 _Decided: 2026-08-03 (#220; supersedes timing/row-driven common harness mechanics and #63 M2's blind Attack
 executor limitation)_
 
+**A scenario that produces a VERDICT may not drive the UI with a raw `press` — enforced, not
+reviewed (#238).** #220 set the contract but migrated only the shared paths; the historical
+verdict scenarios kept their blind cadences, and a blind cadence makes a green run worthless as
+evidence. `ch01win` was the proof: it rode straight through the lord-select Yes/No prompt that
+cost #232 three sessions, mashing A at a prompt it never saw, and passed. `check.py
+check_verdict_scenarios_are_guarded` now fails the build on one, scoping from **`matrix.yaml`'s
+`kind`** and following harness.lua's call graph, with a small named allowlist
+(`BLIND_PRESS_ALLOWED`) carrying each exception's reason. `record`/`diagnostic` scenarios stay
+blind by design — nothing is asserted there, so nothing can pass for the wrong reason.
+
+Three lessons from the migration, all of which cost real evidence:
+
+- **Count presses by ENCLOSING FUNCTION, never by distance to the next `scenarios.X`.** Splitting
+  harness.lua on scenario definitions charges every intervening `local function` helper to
+  whichever scenario sits above it. #238's own scope list was built that way and was wrong in both
+  directions: it named `retreat` (which has none of its own) and missed `reachRbgCh01` (8) — a
+  fifth hand-rolled copy of the ch01 lead route nobody knew was there.
+- **A fixed press count is not a walk to a row.** FE8 menus WRAP, so `rows - 1` DOWNs land on the
+  last candidate only if the menu opened on row 0. Walk off the LIVE cursor, stop when it arrives,
+  and ASSERT where it landed — otherwise picking a different lord than the one the scenario names
+  passes silently.
+- **Watch the field the engine's key handler actually moves.** `recordunitlist` stopped its roster
+  walk on `unk_2c` (the on-screen row, which CLAMPS as the list scrolls under it) and `+0x38`
+  (untouched by the D-pad) instead of `unk_30`, so it could capture a fraction of the roster and
+  still report PASS.
+
+**Two of these blind presses turned out to be LOAD-BEARING, and only running the scenarios
+found them.** Removing a cadence is not a no-op, and neither was worth a guess:
+
+- **`clear_ch02`'s A-mash was answering a prompt the scenario never knew existed.** The ch02
+  ending's third charm-gift lands on a full inventory, so FE8 raises
+  `gSendToConvoyMenuItems` — "which item goes to the convoy" — and the entire MNC2 chain
+  stops until it is answered. The mash resolved it by accident; drive the ending on observed
+  state without naming that prompt and the run sits behind it for its whole budget and reports
+  "2/3 charms" on a chapter that never left slot 3. That verdict's green had been resting on a
+  stray press. The chooser is now a classified `send_to_convoy` state.
+- **A scenario's own comment is not evidence.** `recordsupply` claimed "a NON-lord deployed
+  unit's action menu has NO Supply row". `SupplyUsability` (bmmenu.c) returns `MENU_ENABLED`
+  for the lead **or** for anyone `IsAdjacentForSupply` finds orthogonally beside them — so the
+  claim is false for a neighbour, and the first deployed non-lord spawns right next to Pinky.
+  The assertion caught the comment, not a defect. Contrast assertions have to be written
+  against the engine's rule, not the prose around them.
+
+**Naming a new state is not finished until the DRIVERS know about it.** Code review caught two
+instances on this branch. `item_list` and `send_to_convoy` had classified as `generic_menu`
+before they were named, so `cancelToPlayerMap` could back out of both; giving them their own
+states silently removed that — and that function is the recovery path #238 had just put behind
+`ch01win`'s post-seize menu surprise. `awaitControllerState`'s recovery had the same gap for
+`supply_screen`/`unit_list_screen`. **A classification change is a change to what the harness
+can escape from**, so a new state ships with its cancel wired in the same commit.
+
+**Enumerate a movement action only where the engine would actually move.** The Character
+screen's UP at row 0 is not a no-op: `sub_809144C` sets `unk_29 = 3`, routing into
+`sub_80917D8`, the sort-column mode — a persistent input state the observer reports as
+`scrolling`, i.e. as a transition offering nothing. Advertising UP there hands a driver an
+action that walks it somewhere it has no enumerated way out of, to sit until the stall watch
+fires on a wait the controller itself caused. Both ends of that walk are now bounded off
+`gUnknown_0200F158`, the same field the engine bounds against — the rule `prep_pick_units`
+already followed.
+
+**An absence assertion must assert the state first.** `legalActions` returns `nil` when
+`classify` finds no state, and `findAction(nil, …)` is `nil` — so "the command was not offered"
+and "we could not tell what was on screen" were indistinguishable. `recordsupply`'s contrast
+check now requires a live `unit_command_menu` before concluding Supply is absent.
+
+Also: **a budget must not count the frames a screen spends TEARING DOWN.** `cancelToPlayerMap`
+looped eight times total, and the convoy's fade-out held a `transition` for far longer than
+that, so the cap decided the failure — the trap `docs/decisions.md` already records from #232.
+It now counts CANCELS, with a separate `TUNE.cancelFrames` ceiling for transitions.
+
+Newly classified for it, by the usual four-edit recipe (`gen_symbols.py` WANTED → `CALLBACK_NAMES`
+→ `observeController` → a `classify` rule): unit commands Chest `0x5D`, Door `0x5E`, Item `0x67`
+and Supply `0x69`; the **inventory list** a unit's Item command opens (`gItemSelectMenuItems`,
+`0x43`–`0x47`); the **send-to-convoy chooser** (`gSendToConvoyMenuItems`, `0x2A`–`0x2F`); the
+map-menu **Character screen** (`ProcScr_UnitListScreen_Field`); the **Pick Units** deploy grid;
+and the in-map **convoy** (`ProcScr_BmSupplyScreen`). The inventory list needed its own state
+because `MENU_DISABLED` means something different there: `ItemSelectMenu_Usability` greys any
+item the unit cannot *use* — a weapon, a vulnerary at full HP — but `Menu_OnIdle`'s A path never
+consults availability and `ItemSelectMenu_Effect` opens the submenu regardless. A greyed row is
+still a live row; reading it as a command menu reported "unsupported standard menu" the moment
+every item happened to be unusable, which is Hlin's whole inventory at ch00 turn 1. Two ordering rules came
+with them. The Character screen and the convoy sit **above `player_phase`** — the map is still in
+the proc pool underneath, and `player_map_idle` would offer cursor moves that go nowhere. And each
+of the three screens reports a **transition while its own scroll animates** (`unk_29` on the
+Character screen, `list_num_pre != list_num_cur` on Pick Units): FE8's key handler does not run in
+that window, so an input sent then is lost outright, and calling it an input state is how a press
+goes missing. Pick Units' legal moves mirror `ProcPrepUnit_Idle`'s TWO-COLUMN bounds exactly (LEFT
+only from an odd index, RIGHT only from an even one short of the end, UP/DOWN by two) — a press
+outside them moves nothing, and a driver that assumed a straight list would go on to act on
+whoever it was still parked on.
+_Decided: 2026-08-06 (#238; extends #220's contract from the shared paths to every verdict scenario)_
+
 **Recording a cutscene as a review GIF (the standard way to show Nicolas motion).**
 The harness fast-forwards non-recorded lead-up, so an assert scenario's screenshots can land
 on fades — to SEE a scene play, use a `record*` scenario: it drives the game to the
