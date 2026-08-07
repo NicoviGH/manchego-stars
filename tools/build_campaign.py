@@ -5269,7 +5269,11 @@ def _emit_scene_beats(lines, msg_ids, beats, fid, home, overrides=None,
 # Vendored tileset -> _register_tileset label stem. A chapter map's tileset comes
 # from its layout .json (stamped by the editor-export/import pipeline), so the map
 # can never silently register against the wrong tileset's gfx/palette/terrain.
-TILESET_STEMS = {'snowy-bern': 'Snow', 'cave-interior': 'Cave'}
+# 'port-or-town-winter' is ch05's (#25). The stem is claimed here so _register_chapter_map
+# resolves it; the _register_tileset call that actually writes the asset entries lands with
+# inject_ch05, the same way 'Cave' rides inject_ch03.
+TILESET_STEMS = {'snowy-bern': 'Snow', 'cave-interior': 'Cave',
+                 'port-or-town-winter': 'PortTown'}
 
 
 def _register_chapter_map(maps_dir, layout, comment):

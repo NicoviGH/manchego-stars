@@ -1278,6 +1278,41 @@ economy:
                                  # is ALSO Ravisin's narrative drop (Chekhov's promo relic) — keep the drop;
                                  # the save-all bonus is the mechanical echo of the Guiding-Ring condition.
 
+# ── Reward sites (the "villages") ────────────────────────────────────────────────
+# WIRING for the economy block above. `economy.reward_sites` states the DESIGN; this states
+# what the build reads: a tile, and what visiting it hands over. Without this the gifts are
+# prose -- `difficulty.py:chapter_economy` counts only `villages[].visit_reward`, which is why
+# ch05 priced at 350g against the twin's ~27,760g while the gifts were "already decided".
+# TILES are vanilla Ch5's own village coordinates, preserved by the retile (the map carries
+# TERRAIN_VILLAGE_REGULAR on exactly these four -- see decisions.md, a retile inherits vanilla's
+# terrain). Placement is vanilla's, not ours, the same call as ch04's cottage.
+# `assert_village_tiles_visitable` rejects any of these standing on scenery.
+villages:
+  - id: reliquary-north            # vanilla Ch5 village ~(5,1)
+    tile: [5, 1]
+    visit_reward:
+      - id: booster-def            # = Ch5's Dracoshield (+Def). First stat-booster in the campaign.
+        amount: 1
+  - id: reliquary-west             # vanilla Ch5 village ~(5,6)
+    tile: [5, 6]
+    visit_reward:
+      - id: booster-skl            # = Ch5's Secret Book (+Skl)
+        amount: 1
+  - id: reliquary-east             # vanilla Ch5 village ~(12,10)
+    tile: [12, 10]
+    visit_reward:
+      - id: armorslayer            # = Ch5's Armorslayer. We field no armour, so it reads as a
+        amount: 1                  #   plain strong sword (see economy.reward_sites).
+  - id: reliquary-south            # vanilla Ch5 village ~(12,19)
+    tile: [12, 19]
+    visit_reward:
+      - id: torch                  # = Ch5's Torch, reflavoured an elven everburning lamp
+        amount: 1
+# NOTE: the save-all-four bonus (crest-of-cold-iron, standing in for Ch5's Guiding Ring) is NOT a
+# visit_reward -- it is handed out outside the Village macro, exactly as vanilla does it. Wired at
+# inject_ch05; `economy.save_all_bonus` is its declaration.
+# Each site still owes its visit_text (one entry per box, ch04's lesson) -- dialogue-pass work.
+
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
   gold_reward: 350

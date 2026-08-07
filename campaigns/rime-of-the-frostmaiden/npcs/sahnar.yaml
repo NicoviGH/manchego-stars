@@ -90,7 +90,11 @@ art:
       map_sprite_swapper. Validates UNIT_ICON_SIZE_16x16 x3 (SMS) + 32x32 x15 (MU).
     palette: cast
     credit: "Alexsplode (FE-Repo, F2E); see CREDITS.md"
-  battle_anim:                # DECIDED but injection DEFERRED (needs the #90 FE-anim import pipeline)
+  battle_anim:                # DECIDED; the art is not vendored yet, but nothing BLOCKS it.
+                              # Corrected 2026-08-07: this said "DEFERRED (needs the #90 FE-anim
+                              # import pipeline)". #90 is CLOSED -- feditor_to_banim shipped and
+                              # Pinky + Lupin already ride it. What is owed is re-fetching the
+                              # Specter anim and wiring it, not waiting on tooling.
     source: "[Skeleton-Custom] [U] Specter {Alexsplode} — FE-Repo Battle Animations/Monsters - Basic Types/1. Sword"
     plan: >
       adopt the Specter sword battle animation in its NATIVE palette (Nicolas: it's polished/

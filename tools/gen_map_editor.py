@@ -17,7 +17,8 @@ ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # repo root (w
 DEC=os.path.join(ROOT,'fireemblem8u')
 sys.path.insert(0, os.path.join(ROOT,'tools'))
 from map_tileset_tool import (_tileset_from_dir, preserved_terrain_targets,
-                              render_grid, Tileset, vanilla_layout_data)
+                              render_grid, Tileset, vanilla_layout_data,
+                              vanilla_layout_tileset_assets)
 from PIL import Image
 
 KNOWN_FLAGS={'--tileset','--blank','--fill','--ref','--vanilla'}
@@ -90,22 +91,17 @@ def _walkable_terrains(dec):
 
 def _render_vanilla_layout(dec, layout):
     """Render a vanilla FE8 map layout (e.g. Ch3Map) as a PIL image, using ITS OWN
-    tileset. gChapterDataAssetTable (data_8B363C.s) groups each tileset's ObjectType/
-    MapPalette/TileConfiguration right before the layouts that ride it, so resolve the
-    three by scanning BACKWARD from the layout for the nearest of each -- Ch3Map/Ch4Map
-    ride tileset 2, not 1, so hardcoding ObjectType1 would render garbage. The raw
-    .4bpp/.gbapal are build-only artifacts, so build any missing one with the decomp's
-    own gbagfx (authoritative palette). Returns (image, w, h)."""
+    tileset, resolved from chapter_settings.json via vanilla_layout_tileset_assets.
+
+    Asset-table PROXIMITY is not authoritative and must not be used: FE8 inserts Ch5x
+    at slot 5, so Ch5Map sits after tileset 3's group while still riding tileset 2, and
+    a backward scan renders it through Ch5x's castle interior. That mis-resolves 54 of
+    the vanilla layouts (Ch4Map and Ch5Map among them) -- shapes intact, art wrong,
+    which reads as a corrupt map rather than a lookup bug. The raw .4bpp/.gbapal are
+    build-only artifacts, so build any missing one with the decomp's own gbagfx
+    (authoritative palette). Returns (image, w, h)."""
     import subprocess
-    names=_asset_names(dec); i=names.index(layout)
-    obj=pal=cfg=None
-    for n in reversed(names[:i]):
-        if cfg is None and n.startswith('TileConfiguration'): cfg=n
-        elif pal is None and n.startswith('MapPalette'): pal=n
-        elif obj is None and n.startswith('ObjectType'): obj=n
-        if obj and pal and cfg: break
-    if not (obj and pal and cfg):
-        raise ValueError('could not resolve tileset assets for %r'%layout)
+    obj, pal, cfg = vanilla_layout_tileset_assets(dec, layout)
     g=os.path.join(dec,'graphics/map')
     def ensure(src,dst):
         if not os.path.exists(dst):
@@ -124,6 +120,12 @@ RETILE_MODE='custom' if BLANK else 'vanilla'
 EXPORT_META={'retile_mode':RETILE_MODE}
 if not BLANK:
     EXPORT_META['vanilla_layout']=LAYOUT
+elif VANILLA_REF:
+    # A blank canvas driven from --vanilla is still a RETILE: the cells stand where vanilla's
+    # stand and must keep vanilla's terrain (ch05's rule -- the tileset's terrain table is ours
+    # to author, the painted tiles are not ours to swap). Stamping the layout is what lets
+    # import_map_layout check that per cell; without it the check has nothing to compare to.
+    EXPORT_META['vanilla_layout']=VANILLA_REF
 PROTECTED_TARGETS={}
 if BLANK:
     # Custom canvas on a vendored tileset (#40): no vanilla layout to derive from.
@@ -159,9 +161,20 @@ else:
     # (villages, mountains, forests...) as the starting point instead of the smeared default.
     # Its target indices are metatiles in ONE tileset (the `tileset` stamp, snowy-bern) -- applying
     # them onto a different --tileset would map to unrelated cave/etc art, so gate on a match.
+    # Gate on BOTH ends. The target gate (below) stops snowy-bern indices landing on cave art.
+    # The SOURCE gate matters too and was missing: the keys are vanilla metatile ids, and a
+    # metatile id only means something within one vanilla tileset. Every reskin before ch05
+    # (Prologue/Ch1/Ch2/Ch4) rode TileConfiguration1, so the omission was invisible -- Ch5Map
+    # rides TileConfiguration2, where key 872 is not vanilla's village but unrelated art.
     _learned_path=os.path.join(ROOT,'campaigns/rime-of-the-frostmaiden/maps/reskin-learned.json')
     _learned_json=json.load(open(_learned_path)) if os.path.exists(_learned_path) else {}
-    _learned=_learned_json.get('map',{}) if _learned_json.get('tileset','snowy-bern')==TILESET else {}
+    _src_cfg=vanilla_layout_tileset_assets(DEC,LAYOUT)[2]
+    _src_ok=_learned_json.get('source_tileset','TileConfiguration1')==_src_cfg
+    _learned=(_learned_json.get('map',{})
+              if _learned_json.get('tileset','snowy-bern')==TILESET and _src_ok else {})
+    if not _src_ok:
+        print('NOTE: %s rides %s; the learned reskin was authored against %s -- not applied.'
+              % (LAYOUT,_src_cfg,_learned_json.get('source_tileset','TileConfiguration1')))
     for i in range(W*H):
         w=_learned.get(str(cells[i]))
         if w is not None: resolved[i]=w
@@ -252,18 +265,14 @@ if BLANK:
     else:
         vref=Image.new('RGB',(W*16,H*16),(28,30,36))
 else:
-    import subprocess
-    def _ensure_built(src, dst):
-        if not os.path.exists(dst):
-            subprocess.run([_gbagfx(DEC), src, dst], check=True)
-    _ensure_built(os.path.join(DEC,'graphics/map/ObjectType1.png'),  os.path.join(DEC,'graphics/map/ObjectType1.4bpp'))
-    _ensure_built(os.path.join(DEC,'graphics/map/MapPalette1.pal'),  os.path.join(DEC,'graphics/map/MapPalette1.gbapal'))
-    vanart=Tileset(os.path.join(DEC,'graphics/map/ObjectType1.4bpp'),
-                   os.path.join(DEC,'graphics/map/MapPalette1.gbapal'),
-                   os.path.join(DEC,'graphics/map/TileConfiguration1.bin'))
-    vref=Image.new('RGB',(W*16,H*16))
-    for i,m in enumerate(cells):
-        vref.paste(vanart.metatile_image(m),((i%W)*16,(i//W)*16))
+    # The layout's OWN tileset, resolved from chapter_settings.json -- never tileset 1.
+    # This pane used to hardcode ObjectType1/MapPalette1/TileConfiguration1, which is
+    # right only for the layouts that happen to ride tileset 1: Ch3Map/Ch5Map ride 2,
+    # so the reference rendered as coherent-but-wrong art. Painting a retile against a
+    # wrong reference is worse than having no reference, because it looks authoritative.
+    vref,_vw,_vh=_render_vanilla_layout(DEC,LAYOUT)
+    print('vanilla reference: %s (%dx%d) via %s'
+          % (LAYOUT,_vw,_vh,'/'.join(vanilla_layout_tileset_assets(DEC,LAYOUT))))
 vbuf=io.BytesIO(); vref.save(vbuf,'PNG'); VANREF=base64.b64encode(vbuf.getvalue()).decode()
 
 def nonempty(m): return any(struct.unpack_from('<H',win.cfg,m*8+s*2)[0]&0x3FF for s in range(4))
@@ -274,8 +283,15 @@ def is_filler(m):
     r,g,b=collections.Counter(d).most_common(1)[0][0]
     return r>180 and 90<g<190 and b<90
 TERR=[win.terrain(m) for m in range(1024)]
-# palette = real, paintable tiles only — drop empty + orange-filler slots that just clutter it
-PAL=[m for m in range(1024) if nonempty(m) and not is_filler(m)]
+# palette = real, paintable tiles only. Three filters, cheapest and most authoritative first:
+#   terrain 0x00 (TERRAIN_NONE) -- the TILESET's own "this slot is unused" declaration, and the
+#     only one that generalises. Port-or-Town marks 144 slots that way (solid teal, all four
+#     subtiles identical); snowy-bern 96. Verified against every committed map: no painted tile
+#     has terrain 0, so this never removes something we use.
+#   nonempty / is_filler -- older colour+subtile heuristics, kept because they catch slots that
+#     DO carry a terrain byte but hold no art.
+PAL=[m for m in range(1024)
+     if win.terrain(m) != 0x00 and nonempty(m) and not is_filler(m)]
 # friendly names for EVERY terrain id present (decomp's terrains.h ids, named for a winter map
 # so the unnamed "Tile 2C/2E/Stairs/Ruins" slots that actually hold frozen BUILDINGS read clearly)
 TNAME={0x00:'(empty)',0x01:'Snow ground',0x02:'Road / path',0x03:'Village (visit)',
