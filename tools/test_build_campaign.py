@@ -2555,3 +2555,73 @@ class EventGroupRosterPointer(unittest.TestCase):
                 self.skipTest('host slot not injected in this tree')
         bc.assert_event_group_roster(bc.CH05_EVENTINFO_H, bc.CH05_EVENT_GROUP,
                                      bc.CH05_ALLY_TABLE)
+
+
+class VillageGiftsInheritVanilla(unittest.TestCase):
+    """On a retile, WHICH gift sits on WHICH tile is vanilla's decision.
+
+    Worth a gate because the failure is invisible to every other one: swap two gifts and the
+    item set, the economy total and the parity verdict are all unchanged, while the chapter's
+    risk/reward inverts. ch05 shipped with booster-def and torch swapped -- the richest gift
+    ended up on the safest site, and the cheapest on the one the turn-2 raiders reach first."""
+
+    INFO = ('CONST_DATA EventListScr EventListScr_Ch5_Location[] = {\n'
+            '    Armory(ShopList_Event_Ch5Armory, 2, 1)\n'
+            '    Village(EVFLAG_TMP(8),  EventScr_A, 12, 10)\n'
+            '    Village(EVFLAG_TMP(9),  EventScr_B, 12, 19)\n'
+            '    END_MAIN\n};\n')
+    SCRIPT = ('CONST_DATA EventListScr EventScr_A[] = {\n'
+              '    SVAL(EVT_SLOT_3, 0xe)\n    GIVEITEMTO(CHAR_EVT_ACTIVE_UNIT)\n};\n'
+              'CONST_DATA EventListScr EventScr_B[] = {\n'
+              '    SVAL(EVT_SLOT_3, 0x60)\n    GIVEITEMTO(CHAR_EVT_ACTIVE_UNIT)\n};\n')
+    ITEMS = {'armorslayer': 'ITEM_SWORD_ARMORSLAYER', 'booster-def': 'ITEM_BOOSTER_DEF',
+             'torch': 'ITEM_TORCH'}
+
+    def _gifts(self):
+        return bc.vanilla_village_gifts('Ch5Map', self.INFO, self.SCRIPT)
+
+    def _chap(self, tile, gift):
+        return {'map': {'vanilla_layout': 'Ch5Map'},
+                'villages': [{'id': 'v', 'tile': list(tile),
+                              'visit_reward': [{'id': gift, 'amount': 1}]}]}
+
+    def test_it_reads_the_gift_out_of_the_village_script(self):
+        # the tile is in the Location list, the ITEM is a raw id inside the script it names --
+        # which is why it is easy to have the data and never actually look at it
+        self.assertEqual(self._gifts(),
+                         {(12, 10): 'ITEM_SWORD_ARMORSLAYER', (12, 19): 'ITEM_BOOSTER_DEF'})
+
+    def test_a_matching_gift_passes(self):
+        bc.assert_village_gifts_match_vanilla(
+            self._chap((12, 19), 'booster-def'), self.ITEMS, self._gifts())
+
+    def test_a_swapped_gift_is_refused(self):
+        with self.assertRaises(SystemExit) as caught:
+            bc.assert_village_gifts_match_vanilla(
+                self._chap((12, 19), 'torch'), self.ITEMS, self._gifts())
+        self.assertIn('vanilla_gift_divergence', str(caught.exception),
+                      'the error must name the escape hatch')
+
+    def test_a_declared_divergence_is_allowed(self):
+        chap = self._chap((12, 19), 'torch')
+        chap['villages'][0]['vanilla_gift_divergence'] = 'the tomb has no armoury tier yet'
+        bc.assert_village_gifts_match_vanilla(chap, self.ITEMS, self._gifts())
+
+    def test_a_site_vanilla_does_not_have_is_left_alone(self):
+        # a village we ADDED, not moved -- nothing to inherit
+        bc.assert_village_gifts_match_vanilla(
+            self._chap((3, 3), 'torch'), self.ITEMS, self._gifts())
+
+    def test_a_from_scratch_canvas_is_skipped(self):
+        chap = self._chap((12, 19), 'torch')
+        chap['map'] = {}                      # no vanilla_layout -> no vanilla to inherit
+        bc.assert_village_gifts_match_vanilla(chap, self.ITEMS, self._gifts())
+
+    def test_an_unmapped_reward_id_is_refused(self):
+        with self.assertRaises(SystemExit):
+            bc.assert_village_gifts_match_vanilla(
+                self._chap((12, 19), 'nonesuch'), self.ITEMS, self._gifts())
+
+    def test_the_live_ch05_villages_inherit_vanilla(self):
+        chap = bc._load_chapter_yaml('rime-of-the-frostmaiden', bc.CH05_CHAPTER_YAML)
+        bc.assert_village_gifts_match_vanilla(chap, bc.CH05_ITEM_IDS)

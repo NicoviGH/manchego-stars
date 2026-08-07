@@ -132,6 +132,18 @@ geometry regardless of which slot hosts it (ch03 repaints vanilla Ch3 "Borgo" bu
    - Lord-death loss is always `CauseGameOverIfLordDies` (fires on `EVFLAG_GAMEOVER`, set by the
      lord's flagged defeat quote / the `_inject_lord_select_engine` hook).
 
+7b. **Location events (villages, shops, chests, doors)** — anything the player *visits* lives in the
+   host slot's `Location` list. **Leaving that list empty makes every reward on the map
+   unobtainable while the map still draws it** — that is how ch04 shipped an unreachable Iron Axe,
+   and ch05 currently has four reliquary villages plus an armory and a vendor sitting on intact
+   tiles that nothing points at. Two guards, both cheap:
+   - `assert_village_tiles_visitable` — FE8 offers Visit only on house/inn/village terrain
+     (`bmmenu.c`), so a `Village()` on scenery is a reward that silently does not exist.
+   - `assert_village_gifts_match_vanilla` — on a retile, **which gift sits on which tile is
+     vanilla's** (`decisions.md` → "A retile inherits vanilla's GIFT PLACEMENT"). Swapping two
+     keeps the item set, the total and the parity verdict identical while inverting which site is
+     worth defending. Deliberate moves declare `vanilla_gift_divergence: <why>` on the village.
+
 8. **Title + names** — `set_message_body(lines, host['chapTitleTextId'], name_message_body(title))`;
    rename any vanilla boss slot's nameplate (`vanilla_name_text_id`) so it doesn't leak; compose the
    title-card image with `_write_chapter_title_card` (add `graphics/chap_title/chap_title_N.png` to

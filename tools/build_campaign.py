@@ -7693,6 +7693,84 @@ def assert_village_tiles_visitable(chap, maps_dir, stem):
                      % (village['id'], x, y, terrain[y][x]))
 
 
+def vanilla_village_gifts(layout, eventinfo=None, eventscript=None):
+    """{(x, y): ITEM_ enum} -- what vanilla hands out at each village on `layout`'s chapter.
+
+    Read from HEAD, like every other vanilla fact. The tile comes from the Location list's
+    `Village(flag, script, x, y)` entries; the ITEM is a RAW id inside that script's
+    `SVAL(EVT_SLOT_3, <id>)`, which is why it is easy to have and never look at.
+    """
+    stem = re.sub(r'Map$', '', layout).lower()          # Ch5Map -> ch5
+    if eventinfo is None:
+        eventinfo = _vanilla_decomp_text_at_head('src/events/%s-eventinfo.h' % stem)
+    if eventscript is None:
+        eventscript = _vanilla_decomp_text_at_head('src/events/%s-eventscript.h' % stem)
+    by_id = {int(v, 16): n for n, v in re.findall(
+        r'(ITEM_\w+)\s*=\s*(0x[0-9A-Fa-f]+)',
+        _vanilla_decomp_text_at_head('include/constants/items.h'))}
+    gifts = {}
+    for script, x, y in re.findall(
+            r'Village\(\s*[^,]+,\s*(\w+),\s*(\d+),\s*(\d+)\s*\)', eventinfo):
+        body = eventscript.split('EventListScr %s[] = {' % script, 1)
+        if len(body) < 2:
+            continue                                    # script lives elsewhere; nothing to read
+        match = re.search(r'SVAL\(EVT_SLOT_3,\s*(0x[0-9A-Fa-f]+|\d+)\)', body[1].split('};', 1)[0])
+        if match:
+            gifts[(int(x), int(y))] = by_id.get(int(match.group(1), 0))
+    return gifts
+
+
+def assert_village_gifts_match_vanilla(chap, item_ids, gifts=None):
+    """Guard (#25): on a RETILE, which gift sits on which tile is vanilla's decision.
+
+    A retile inherits vanilla's terrain (`validate_terrain_matches_vanilla`); this is the same
+    rule one layer up, for the rewards standing on that terrain. It is worth a gate because the
+    failure is invisible to every other one: swap two gifts and the item set is identical, the
+    economy total is identical, and `difficulty.py` counts the SET, not the tiles -- so the
+    parity read still says PARITY while the chapter's risk/reward is inverted.
+
+    That is exactly what ch05 shipped. `(12,19)` is the south-east site and the turn-2 eruption
+    pair spawns at `(14,16)/(14,15)`, right beside it: vanilla puts its RICHEST gift there
+    (Dracoshield, 8000g) and its cheapest at `(5,1)` (Torch, 500g), which sits behind the whole
+    enemy line. Ours had them swapped, paying the most for the safest errand in a chapter whose
+    structure IS the race for the reward-sites.
+
+    Deliberate divergence stays cheap -- a village may carry `vanilla_gift_divergence: <why>` and
+    is then skipped by name. The default is inheritance because exceptions are rarer than
+    re-deriving four placements every time (Nicolas, 2026-08-07).
+
+    Only runs for a chapter whose `map:` block names a `vanilla_layout:`; a from-scratch canvas
+    has no vanilla to inherit from.
+    """
+    layout = (chap.get('map') or {}).get('vanilla_layout')
+    if not layout:
+        return
+    if gifts is None:
+        gifts = vanilla_village_gifts(layout)
+    for village in chap.get('villages', []):
+        why = village.get('vanilla_gift_divergence')
+        if why:
+            continue
+        tile = tuple(village['tile'])
+        want = gifts.get(tile)
+        if want is None:
+            continue        # vanilla has no village on that tile -- a site we ADDED, not moved
+        reward = (village.get('visit_reward') or [{}])[0].get('id')
+        got = item_ids.get(reward)
+        if got is None:
+            sys.exit('ERROR: village %r gives %r, which is not in this chapter\'s item map -- '
+                     'add it to CHNN_ITEM_IDS so the gift can be checked and injected'
+                     % (village['id'], reward))
+        if got != want:
+            sys.exit(
+                'ERROR: village %r at (%d, %d) gives %s, but vanilla %s hands out %s there. On a '
+                'retile the gift PLACEMENT is vanilla\'s -- swapping two gifts keeps the item set '
+                'and the economy total identical (so the parity read still says PARITY) while '
+                'inverting which site is worth defending. If the move is deliberate, say so with '
+                '`vanilla_gift_divergence: <why>` on that village.'
+                % (village['id'], tile[0], tile[1], got, layout, want))
+
+
 def _is_blank_metatile(tileset, metatile):
     """True if a metatile is a single flat colour -- i.e. DECLARED in the terrain table but never
     painted. snowy-bern has one of these on TERRAIN_BRIDGE_SNAG, and writing it into a map change
@@ -8700,6 +8778,10 @@ def inject_ch04(campaign, boot=False, verbose=True):
     # list is what made ch04's Iron Axe unobtainable -- and the map's door tile had ALSO lost its
     # village terrain in the reskin, so both halves had to come back.
     assert_village_tiles_visitable(chap, maps_dir, CH04_LAYOUT[1])
+    # No-op today -- ch04's forest is a from-scratch canvas, so its `map:` block names no
+    # `vanilla_layout:` and there is no vanilla gift placement to inherit. Wired anyway so the
+    # rule travels with the chapter rather than with whoever remembers it (#25).
+    assert_village_gifts_match_vanilla(chap, CH04_ITEM_IDS)
     info = _replace_brace_block(info, 'EventListScr_Ch5_Location[] =',
                                 ch04_location_events(chap), CH5_EVENTINFO_H)
     # Tile flips (#214): the snag falls into a crossing (the Iron Axe's whole purpose) and each
@@ -8963,6 +9045,11 @@ def inject_ch05(campaign, boot=False, verbose=True):
     """
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH05_CHAPTER_YAML)
+    # A retile inherits vanilla's gift PLACEMENT, not just its terrain. Runs before anything is
+    # written: the failure it catches is invisible to the parity read (same items, same total,
+    # different tiles), so it has to be a gate rather than a review note.
+    assert_village_gifts_match_vanilla(chap, CH05_ITEM_IDS)
+    assert_village_tiles_visitable(chap, maps_dir, CH05_LAYOUT[1])
 
     # 1. Map: register the port-or-town-winter tileset (ch05 is its first user, so it
     #    self-registers -- the Cave/inject_ch03 idiom) and the painted layout, then point
