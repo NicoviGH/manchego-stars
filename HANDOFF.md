@@ -6,24 +6,19 @@ deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; scope and ba
 issues. Before a context rollover, warn Nicolas, refresh this file, and start a fresh instance —
 don't rely on auto-compaction.
 
-Refreshed 2026-08-06 (Opus). `main` = `c5dec1d`, level with `origin/main`. **Nothing in flight —
-the three-PR stack LANDED (#237 → #239 → #240, merge commits, in order), and its code-review
-follow-up landed on top (#241 in PR #242, squashed).** No branches, no stashes. Verified on merged
-`main`: `make test` exit 0 (41 suites), `make check` = `drift check: clean`, `make matrix` =
-**14/14** (4m23s), `git diff --check` clean. #236, #232, #241 and **#138** are closed (#138 on the
-measurement — see §3); **#238 stays open by design**, it got a first pass only (NEXT SESSION §2).
+Refreshed 2026-08-06 (Opus). `main` = `6ed2903`, level with `origin/main`. **Nothing in flight —
+#238 LANDED (PR #243, squashed) and closed, and with it the #222 epic.** No branches, no stashes.
+Verified on merged `main`: `make test` exit 0 (41 suites), `make check` = `drift check: clean`,
+`make matrix` = **14/14**, `git diff --check` clean, CI green (`build` + `checks`).
 
-**CI is GREEN again and the outage is over** — `checks` passed on `main` at `5d303eb` and on
-#242's branch head. The 2026-08-06 Actions incident (opened 15:22 UTC) drained slowly rather than
-all at once: events sat undispatched for up to ~40 minutes, so a PR with no check at all was the
-outage, not a broken branch — worth remembering before re-diagnosing one. The first real run after
-it lifted, on the #240 merge, failed for a genuine reason — `build_campaign does not import: No
-module named 'PIL'` — which is what #241 fixed; `tools/test_hosts.py` now reproduces CI's
-dependency set locally, so that whole class fails on your machine instead of on a runner. Local
-verification stays a strict superset of `checks.yml` (which never builds the ROM).
-**Nothing has had a `/code-review` since #242 — that is user-triggered (`/code-review ultra <PR#>`).**
+**#238 got a full code review before merge** (subagent, not `/code-review ultra` — that is
+user-triggered and has not run since #242). It found three real defects, all fixed in the branch;
+they are recorded in `decisions.md`, and the shape worth remembering is that **naming a new
+controller state silently narrows what the harness can escape from** — a state that used to fall
+through to `generic_menu` was cancellable, and giving it its own name takes that away unless the
+drivers are taught in the same change.
 
-**Next in the agreed order: #238's second pass (NEXT SESSION §2), then ch05 (#25). Jump there.**
+**Next: ch05 (#25). Jump there — the issue is the source, not this file.**
 
 ## Current state
 
@@ -34,10 +29,10 @@ verification stays a strict superset of `checks.yml` (which never builds the ROM
   configuration at most once and prints a verdict table. **`tools/playtest/matrix.yaml` is now the
   single source of what a scenario needs** — ROM flag, `PT_HOST_CHAPTER`, checkpoint, fps/deadline —
   and `check.py check_playtest_matrix` fails the build if a `harness.lua` scenario has no row.
-- **Gate status: 14/14 on `main` — the first fully green gate** (verified live 2026-08-06 on #237,
-  and again on #240 after the controller-contract migration; both are now merged, so `main` carries
-  it). Local verification is a strict SUPERSET of what CI checks — `checks.yml` is a deliberate
-  lightweight drift guard that never builds the ROM.
+- **Gate status: 14/14 on `main`** (re-verified 2026-08-06 after #243). Local verification is a
+  strict SUPERSET of what CI checks — `checks.yml` is a deliberate lightweight drift guard that
+  never builds the ROM. **A `BLOCKED` verdict is usually the `TESTCH` build race (#245), not the
+  scenario** — rebuild that ROM and rerun before diagnosing anything.
 - **Cross-agent continuity:** Nicolas uses Codex only between Claude sessions. Codex must leave an
   explicit HANDOFF entry naming what it changed, the active branch/PR and commit state, verification
   actually run, and the exact next step. Codex uses ordinary short-lived feature branches in this
@@ -50,21 +45,21 @@ verification stays a strict superset of `checks.yml` (which never builds the ROM
 - **ch01–ch04 are DONE and CLOSED.** ch04 shipped in #223; its one open thread was the placeholder
   terminator above, which is ch05's to retire.
 
-## NEXT SESSION — the agreed order (Nicolas, 2026-08-06)
+## NEXT SESSION — ch05 (#25)
 
 **Start from the GitHub issue, not from here.** These notes only add what the issue does not say.
 
-### 1. What the landed stack gave you — USE it, don't re-derive it
+### 1. What the playtest tooling gives you — USE it, don't re-derive it
 
-The three PRs are merged; nothing is owed on them. What they shipped is the tooling the next
-chapter runs on, so read this before building anything.
+#222 is closed; nothing is owed on it. What it shipped is the tooling ch05 runs on, so read this
+before building anything.
 
-Nicolas's standing question, answered with measurements so it is not re-litigated: **the new gates
-cost ~1.5s on `make check` (23.6s total) and +4% on `make matrix` (5m34s → 5m49s, almost all of it
-`ch01win` 28s → 40s because it now verifies instead of mashing A; the gate ran 4m23s warm on
-2026-08-06 after #241).** The real cost is not seconds —
-it is that a new FE8 input state must be CLASSIFIED before a scenario can drive it. ch05 will
-probably surface some. That work always existed; it used to be deferred into mystery failures.
+Nicolas's standing question, answered with measurements so it is not re-litigated: **the gates cost
+~1.5s on `make check` and a few percent on `make matrix` (4-6 min warm).** The real cost is not
+seconds — it is that a new FE8 input state must be CLASSIFIED before a scenario can drive it. #238
+surfaced six of them in one pass (the inventory list, the send-to-convoy chooser, the Character
+screen, the Pick Units grid, the in-map convoy, and four unit commands), and **ch05 will surface
+more**. That work always existed; it used to be deferred into mystery failures.
 **If the stall detector ever false-positives, `TUNE.stallFrames` is the dial — do not remove it.**
 
 What it shipped, so the next instance can USE it instead of re-deriving it:
@@ -89,26 +84,26 @@ What it shipped, so the next instance can USE it instead of re-deriving it:
   and no ceiling, which is where the stall detector now lives. Crossing it stops the whole file
   loading and every scenario dies at once; `check_lua_chunks_load` fails the build on it in 0s.
 
-### 2. #238 second pass — the rest of the blind-press verdict scenarios
+### 2. What #238 changed about writing a ch05 scenario
 
-#240 did `ch01win` and the shared ch01 route. **Still owed: `retreat`, `lordfloor`, `ch01lord`,
-`recordsupply`, and three `LORD_CANDIDATES` blind menu-walks at `harness.lua` 3122/3164/3211.**
-Scope from `matrix.yaml`'s `kind`, NEVER from the scenario name — `recordsupply` and
-`recordunitlist` are `kind: verdict` despite the prefix, and `recordunitlist` is in the gate.
+- **A `kind: verdict` scenario may not contain a raw `press`** — `check.py
+  check_verdict_scenarios_are_guarded` fails the build on one, following the call graph, so a press
+  hidden in a shared helper is caught at every verdict scenario that reaches it. Set `kind` by what
+  the scenario ASSERTS, never by its name prefix. `record`/`diagnostic` stay exempt by design.
+- **No hardcoded ROM/EWRAM addresses in the playtest Lua** —
+  `check_no_hardcoded_symbol_addresses`. ch03's doors and chests read as broken content for as
+  long as one stale literal survived; both scenarios died on a memory READ, before any input.
+- **Naming a new state is not finished until the drivers know about it.** A state that used to fall
+  through to `generic_menu` was cancellable by `cancelToPlayerMap` and recoverable by
+  `awaitControllerState`; giving it its own name takes that away. Wire its cancel in the same
+  change, and enumerate a movement action only where the engine would actually move.
+- **The acceptance test for a migration is the bite test, not a green run**: break a classification
+  and confirm the scenario now FAILS.
 
-The acceptance test for this work is the bite test, not a green run: temporarily break a
-classification and confirm the scenario now FAILS. #240 proved it on `ch01win` — the same sabotage
-passed before the migration.
+### 3. ch05's build work (#25)
 
-### 3. ch05's build work (#25) — with #222 re-scoped and settled
-
-**#222 has been re-scoped from experience and approved (2026-08-06).** Workstream 3 is closed (its
-DoD was already met by #220 — only 13% of a median scenario is UI-driving) and replaced by **#238**;
-workstream 4 was consolidated into #138, **which is now CLOSED (Nicolas, 2026-08-06)**. The epic
-closes when #238 does.
-
-**Do not re-open the `inject_chapter(descriptor)` idea without new evidence — it was measured and
-rejected.** The guard that mattered shipped in #239 (and was hardened in #241), and of 2,209 LOC in
+**#222 is CLOSED** (2026-08-06, on #138 + #238). **Do not re-open the `inject_chapter(descriptor)`
+idea without new evidence — it was measured and rejected.** The guard that mattered shipped in #239 (and was hardened in #241), and of 2,209 LOC in
 `inject_ch01`–`ch04`, just **123 (6%)** is the host skeleton a descriptor would collapse — ~30 lines
 a chapter, already helper calls. The other 94% is per-chapter rosters, event scripts and scenes. The
 one real cleanup left inside it, deliberately not re-filed: ch03's bespoke
@@ -120,6 +115,11 @@ ch05 also needs a `matrix.yaml` entry — `docs/adding-a-chapter.md` step 11 has
 `check.py` enforces it.
 
 Then: **#29** world map.
+
+Filed during #238, not scheduled: **#244** (five playtest scenarios failing outside the gate suite —
+`ch03win`/`clear_ch03` both report their own success and then fail on a combat timeout, which smells
+like a missing `chooseAttack` `stopWhen`) and **#245** (the `TESTCH` chap_title build race that
+blocked the gate twice in one session; retry the build before believing a `BLOCKED` verdict).
 
 Parked, not scheduled: **#228** physical cartridges (after the ROM is done).
 
@@ -149,6 +149,15 @@ Parked, not scheduled: **#228** physical cartridges (after the ROM is done).
 - **`turn()` is not the signal that a turn's reinforcements exist** — wait for a UNIT from the wave.
 - **An `AREA` fires when an action ENDS**, so "a unit is standing in the clearing" is not a verdict.
   Stop a march on the **outcome** (the moose exists); use position only as the after-the-fact diagnostic.
+- **A scenario that fails BEFORE it drives any input is accusing the harness, not the chapter.**
+  ch03's doors and chests read as broken content for as long as `baseTile` held a hardcoded address
+  the engine had grown past — both died on the tile READ. Check WHERE in the scenario the verdict
+  came from before you go looking at map data. `check_no_hardcoded_symbol_addresses` closes that
+  particular door; the habit is the general one.
+- **Removing a blind press can remove work nobody had NAMED.** `clear_ch02`'s A-mash was answering
+  an inventory-full send-to-convoy prompt that blocks the whole chapter chain; its "3/3 charms"
+  verdict had been resting on that stray press. Migrate a cadence and RUN the scenario — reading it
+  is not enough.
 - **A render from frame PNGs proves the ART; only the ROM proves the TILING and the PALETTE.**
 - **Comments inside a YAML folded scalar are CONTENT** — put them above the key.
 - **`tools/setup-toolchain.sh` omits upstream's helper-tool build** — a fresh checkout also needs
@@ -156,8 +165,8 @@ Parked, not scheduled: **#228** physical cartridges (after the ROM is done).
 
 ## Working tree - do not lose or revert
 
-- **No feature branches, no stashes.** `main` is level with `origin/main` at `c489c56`; the three
-  stacked branches were merged and deleted 2026-08-06.
+- **No feature branches, no stashes.** `main` is level with `origin/main` at `6ed2903`;
+  `feat/238-blind-press-second-pass` was squash-merged and deleted 2026-08-06.
 - **Two more gitignored `gen_symbols.py` outputs** sit next to `symbols.lua`:
   `procscr.lua` and `symbols.json`. Regenerated after every `make`; never commit them.
 - **`.build-config.json` (repo root, gitignored) records which boot flags built the ROM in the tree.**
