@@ -38,6 +38,8 @@ rom_configs:
     CH03BOOT: 1
   ch04boot:
     CH04BOOT: 1
+  ch05boot:
+    CH05BOOT: 1
 
 # Ported verbatim from run.sh's two timing `case` statements.
 classes:

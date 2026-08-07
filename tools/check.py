@@ -445,6 +445,9 @@ INJECTION_ORDER = [
      'inject_prologue overwrites the slot-1 Seize goal template inject_ch01 copies'),
     ('inject_ch03', 'inject_ch04',
      'chapter hosts are injected in campaign order; ch04 borrows ch02\'s stable Rout goal'),
+    ('inject_ch04', 'inject_ch05',
+     "chapter hosts are injected in campaign order; chain_ch04_to_ch05 rewrites ch04's "
+     'dev-placeholder landing, which inject_ch04 must have written first'),
 ]
 
 

@@ -50,6 +50,15 @@ CH04_HOST_INDEX = 5
 # and scripts underneath our map.
 CH04_EVENT_GROUP = 'Ch5EventData'
 
+CH05_HOST_INDEX = 6
+# Slot 6 SHIPS pointing at Ch5EventData -- the very group ch04 fills on slot 5. Leaving it
+# alone would not be "the slot already points somewhere sensible"; it would put two of our
+# chapters on one event group, and the second one to load would run the first one's roster
+# and scripts under its own map. From slot 6 on, vanilla's slot index leads the chapter
+# number by one (slot 5 is the inserted Ch5X), so slot N ships chapter N-1's group and the
+# retarget is mandatory for every chapter after this one too.
+CH05_EVENT_GROUP = 'Ch6Events'
+
 # --- discovery -------------------------------------------------------------------------
 
 HostedChapter = collections.namedtuple(

@@ -10,9 +10,10 @@
 id: ch05-the-elven-tomb
 title: "The Elven Tomb"
 chapter_number: 5
-status: planned                # brainstorm SEED, NOT authoritative: enemy roster/levels/beats are
-                               # re-grounded against vanilla + party data when the slice is reached
-                               # (brainstorming skill digests this). Exempt from the parity gate until then.
+status: active                 # the slice is reached: roster/levels re-grounded against vanilla Ch5
+                               # and the party (`make difficulty CH=ch05` = PARITY), dialogue LOCKED
+                               # (PR #196), map painted and hosted. Combat data here is authoritative
+                               # and IN the parity gate — no longer a seed.
 milestone: M3
 cadence: first_boss             # see docs/CHAPTERS.md — 🟥
 fe8_base_map: "FE8 Ch5 — The Empire's Reach"        # retiled: Ch5's spread field → open-air tomb depression
@@ -42,14 +43,21 @@ narrative: >
 
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
-  file: maps/ch05-elven-tomb.tmx
-  tileset: tomb-interior        # elven temple/tomb; FEUniverse temple tileset, arctic palette
-  size: "~15×20"                # retile of FE8 Ch5's field (TBD at slice build) — NOT a corridor
+  file: maps/ch05-the-elven-tomb.mar
+  tileset: port-or-town-winter  # vendored FE-Repo winter port/town chips (#25); stem 'PortTown'
+  size: "15×21"                 # 1:1 retile of the vanilla Ch5 layout — terrain drift vs vanilla: 0
+  vanilla_layout: Ch5Map        # what the retile repaints; a retile INHERITS vanilla's terrain
   # DESIGN CONSTRAINT (decisions.md): retile Ch5's OPEN spread-village field, not an enclosed
-  # ship/corridor. Keep the two features that make Ch5 play like Ch5:
-  #  (1) reward-sites SPREAD to the corners (Ch5 villages sat at ~(5,1)(5,6)(12,10)(12,19)) so the
-  #      party must SPLIT and race — here they're elven reliquary niches the eruption raids;
+  # ship/corridor. Both features that make Ch5 play like Ch5 survive the retile intact, because
+  # the terrain is vanilla's byte-for-byte:
+  #  (1) reward-sites SPREAD to the corners — the four VILLAGE_REGULAR tiles still sit at
+  #      (5,1) (5,6) (12,10) (12,19), so the party must SPLIT and race; here they are elven
+  #      reliquary niches the eruption's dead raid (see `villages:` below);
   #  (2) OPEN lanes so our mounted units (Baxby, Lupin) matter (a corridor neuters cavalry).
+  # The other named tiles vanilla put on this field and we inherit: ARMORY (2,1), VENDOR (6,10),
+  # and ARENA_REGULAR (12,6) — the arena tile the arena-wager debut above is wired to.
+  # Impassable is FENCE_REGULAR + TILE_2E (the pillar/statue rings); the two halves of the field
+  # meet at the open row-15 corridor and the four STAIRS at (1,14) (3,14) (9,14) (10,14).
   description: >
     An open-air elven tomb — a snowy sunken depression ringed by crystal pillars and
     statues (cover/chokepoints), NOT a claustrophobic crypt. The moon dial sits at
@@ -151,7 +159,22 @@ deployment:
     Sahnar is NOT in the starting field — she rises mid-combat as a HOSTILE convertible
     (the Joshua flip) and joins only once Basil Talks her. With deploy_limit 9 and a pool
     of 10 (7 PCs + Pinky + Baxby + Trex + Lupin, minus Basil-as-recruiter tradeoffs), the
-    player leaves one unit home — a real cut for a boss chapter. Positions set in Tiled.
+    player leaves one unit home — a real cut for a boss chapter.
+  deploy_slots:                # vanilla Ch5's OWN nine player start tiles (UnitDef_Event_Ch5Ally),
+                               # lifted 1:1 like every other placement on this retile. Vanilla
+                               # force-deploys exactly nine here and our cap is nine, so the tiles
+                               # and the cap agree without tuning either. They form the south
+                               # pocket (rows 16-19, x 3-7); the party leaves it through the row-15
+                               # corridor and the four stairs, which is the chapter's approach.
+    - [6, 17]                  # lord tile (vanilla Eirika's)
+    - [5, 18]
+    - [5, 16]
+    - [4, 19]
+    - [3, 16]
+    - [6, 19]
+    - [7, 18]
+    - [4, 17]
+    - [3, 18]
 
 # ── Enemy Units (vanilla FE — grounded to FE8-Ch5 parity, #25) ────────────────────
 # Grounding pass rev.2 (2026-07-23): the force is now RISEN ELVEN TOMB-GUARDIANS on the
@@ -174,11 +197,19 @@ deployment:
 # palette_swap` = frost/pale recolour of the vanilla frame (no FE-Repo undead anim in that
 # weapon mode); a "FE-Repo: …" source = a borrowable custom anim (all [U] free-to-use).
 enemy_units:
-  # ── The boss: Ravisin, frost druid (holds the central depression) ───────────
+  # ── The boss: Ravisin, frost druid (holds the northern rim) ─────────────────
+  # PLACEMENT, here and below: every line unit stands on one of vanilla Ch5's OWN sixteen
+  # fighting tiles, one-for-one. Vanilla parks its line off-field and walks it in via REDA,
+  # so the tile to lift is the REDA DESTINATION, not the .xPosition (which is a staging tile
+  # like (10,0) or (0,0) for seven different units). Same call as the reliquary sites and
+  # ch04's cottage: on a 1:1 retile the placement is vanilla's, not ours — which is also what
+  # keeps `make difficulty CH=ch05` measuring the twin it claims to.
   - id: ravisin
     name: "Ravisin"
     is_boss: true
     count: 1
+    positions: [[13, 1]]        # vanilla Saar's GuardTile destination (REDA_088B5540) — TERRAIN_ROAD,
+                                # which is what the boss-archetype note below already assumed
     class: druid                # vanilla FE8 Druid (baseRanks: Anima D, Dark C, Staff E)
     level: 7
     weapon: flux-tome           # FE8 Flux (Dark) — the Druid's class-native tome; flavored "Killing Frost"
@@ -228,6 +259,9 @@ enemy_units:
     name: "The White Moose"
     is_miniboss: true           # named, dangerous, NOT the win condition (objective = Ravisin)
     count: 1
+    positions: [[10, 0]]        # the north rim, penned against the top edge and inside Ravisin's
+                                # guard cluster — "cornered" as the map description has it, and the
+                                # one vanilla tile the player cannot reach without committing north
     class: gwyllgi              # CLASS_GWYLLGI (FE8 beast) stand-in quadruped
     level: 6
     inventory:
@@ -262,6 +296,8 @@ enemy_units:
   - id: risen-spear
     name: "Risen Spear-Guard"
     count: 4                    # +2 reinf = 6 total, matching the vanilla twin's 6 Soldiers
+    positions: [[11, 2], [13, 3], [9, 4], [9, 9]]   # vanilla's four Soldier destinations: two
+                                # screening Ravisin's rim, two holding the eastern lane
     class: soldier              # CLASS_SOLDIER (vanilla Ch5's core infantry) — parity backbone
     level: 5
     autolevel: true
@@ -282,6 +318,12 @@ enemy_units:
                                 # plays against. We field Fighters for the whole axe block — the
                                 # ch01 precedent (Fighters not Brigands, so nothing pathfinds over
                                 # peaks) — rather than splitting the two classes.
+    positions: [[10, 8], [8, 8], [7, 2], [0, 0], [4, 10], [0, 10], [3, 7], [5, 7]]
+                                # vanilla's five Fighter destinations, plus the three tiles vanilla
+                                # gave its extra Archer/Soldiers — the axe block absorbs them because
+                                # our roster shifted that shortfall to axes (see the count note).
+                                # The eight spread across BOTH approach lanes, so the axe pressure
+                                # the twin applies is applied wherever the party climbs out.
     class: fighter              # CLASS_FIGHTER (axe infantry; Fighters not Brigands — no peak pathing)
     level: 5
     autolevel: true
@@ -301,6 +343,7 @@ enemy_units:
                                 # sentinels carried — the same "tune the number, not the
                                 # composition" error, corrected 2026-07-23: the shortfall goes
                                 # to AXE guardians instead, because Ch5 is an axe-heavy map.
+    positions: [[3, 3]]         # vanilla's lone Mercenary destination — the western plains shelf
     class: mercenary            # CLASS_MERCENARY (sword) — Spd ~5-6, a clean non-doubled threat
     level: 6
     autolevel: true
@@ -316,6 +359,8 @@ enemy_units:
   - id: bone-archer
     name: "Bone Archer"
     count: 1                    # +2 reinf = 3 total, matching the vanilla twin's 3 Archers
+    positions: [[1, 7]]         # vanilla's western Archer destination — it covers the (1,14)/(3,14)
+                                # stairs, so the west climb is the one that costs the party arrows
     class: archer               # CLASS_ARCHER (bow) — punishes units caught out of cover
     level: 5
     autolevel: true
@@ -332,6 +377,12 @@ enemy_units:
   #  personal boss line she holds her own fight, and they were redundant scaffolding.)
   # ── ERUPTION reinforcements (#177): the dead erupt over turns 2/3/5 and race the ─
   #    spread reliquary reward-sites (the Ch5 village-raid, in undead dress) ──────
+  # SPAWN TILES are vanilla Ch5's own raider spawns — three pairs down the EAST edge, at
+  # (14,16)(14,15) · (14,8)(14,6) · (13,0)(14,1). Vanilla sends Brigands in on turns 2/6/8 to
+  # burn the villages; we send the risen dead in on our own 2/3/5 to desecrate the reliquaries.
+  # The tiles carry the structure that makes the race work and the turns are ours: the first
+  # pair lands BEHIND the party's south pocket, so the eruption is a threat you must turn to
+  # answer rather than one you advance into.
   - id: risen-spear-reinf
     name: "Risen Spear-Guard"
     count: 2
@@ -339,6 +390,7 @@ enemy_units:
     level: 5
     autolevel: true
     arrives_turn: 2             # the eruption's first wave, not a turn-1 alpha
+    positions: [[14, 16], [14, 15]]   # vanilla's turn-2 pair — the south-east edge, behind the party
     inventory:
       - id: elven-spear
         fe_base: iron-lance
@@ -355,6 +407,7 @@ enemy_units:
     level: 5
     autolevel: true
     arrives_turn: 3
+    positions: [[14, 8], [14, 6]]     # vanilla's mid-east pair — astride the eastern lane
     inventory:
       - id: rusted-greataxe
         fe_base: iron-axe
@@ -370,6 +423,9 @@ enemy_units:
     level: 5
     autolevel: true
     arrives_turn: 5             # the last wave races the far reliquary reward-sites
+    positions: [[13, 0], [14, 1]]     # vanilla's north-east pair — they arrive inside Ravisin's
+                                # rim, so the last wave reinforces the boss fight rather than
+                                # chasing the party that has already climbed past them
     inventory:
       - id: elven-longbow
         fe_base: iron-bow
@@ -385,6 +441,10 @@ enemy_units:
     class: myrmidon             # Joshua's exact class/donor — a fast, crit-threat sword duelist
     level: 6
     arrives_turn: 2             # rises when the quake cracks the sarcophagus (the eruption WAKE)
+    positions: [[12, 6]]        # Joshua's own tile in vanilla Ch5 — which is the ARENA tile (12,6).
+                                # Lifting it costs nothing and buys two things: she rises where the
+                                # amphitheatre canon says the blades met, and the escort distance
+                                # Basil must survive is measured against the twin's, not invented.
     inventory:
       - id: killing-edge
         fe_base: killing-edge   # Joshua's killing-edge (30 crit) — the fragile-escort tension

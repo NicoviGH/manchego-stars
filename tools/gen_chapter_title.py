@@ -36,22 +36,28 @@ WORDS = {
     'Ch.2:':     (2, 40, 74),   # "Ch.2: The Protected" -- vanilla's own chapter prefix
     'Ch.3:':     (3, 19, 53),   # "Ch.3: The Bandits of Borgo" -- vanilla's own chapter prefix
     'Ch.4:':     (4, 31, 66),   # "Ch.4: Ancient Horrors" -- vanilla's own chapter prefix
+    # img6 is "Ch.5: The Empire's Reach" -- vanilla Ch5's card, which is the chapter ch05
+    # is a 1:1 retile of AND the card our host slot (6) overwrites. Same source either way.
+    'Ch.5:':     (6, 18, 52),   # "Ch.5: The Empire's Reach" -- vanilla's own chapter prefix
     'The':       (0, 74, 96),
 }
 
 # Single letters. Sources: img0 "Prologue: The Fall of Renais",
 # img1 "Ch.1: Escape!", img4 "Ch.4: Ancient Horrors", img7 "Ch.6: Victims of War",
 # img9 "Ch.7: It's a Trap!" (lone 'a' word), img10 "Ch.9: Distant Blade",
-# img87 "Creature Campaign".
+# img87 "Creature Campaign", img6 "Ch.5: The Empire's Reach",
+# img11 "Ch.11: Revolt at Carcino", img16 "Ch.16: Ruled by Madness".
 LETTERS = {
     'A': (4, 71, 80),
     'C': (87, 42, 51),          # "Creature" -- leading C (clean, no left neighbor)
     'D': (10, 78, 87),
+    'E': (6, 82, 91),           # "Empire's" -- word-initial E (clean left edge)
     'I': (9, 87, 93),
     'M': (16, 120, 131),        # "Madness" -- word-initial M (clean left edge)
     'T': (9, 119, 128),         # "Trap!"
     'W': (7, 138, 150),         # "War" -- the W (W+a kern in source; cut before 'a')
     'a': (9, 110, 117),
+    'b': (16, 103, 110),        # "by" -- word-initial b (clean left edge)
     'c': (4, 88, 93),
     'd': (10, 144, 152),        # "Blade" -- the d (d+e kern in source; cut before 'e')
     'e': (0, 58, 64),
@@ -65,6 +71,7 @@ LETTERS = {
     'r': (0, 23, 29),
     's': (0, 172, 179),         # "Renais" -- terminal s (clean right edge)
     't': (10, 117, 123),        # "Distant" -- terminal t (clean right edge)
+    'v': (11, 85, 92),          # "Revolt" -- the v (e+v+o in source; cut between them)
 }
 
 # Pixels inside a glyph's cut that belong to a kerned neighbor in the source

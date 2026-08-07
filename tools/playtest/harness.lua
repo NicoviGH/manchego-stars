@@ -1361,6 +1361,28 @@ end
 -- `sampled` lets a caller that has ALREADY sampled the pool twice hand its pair over
 -- (freezeReport does): re-sampling costs another TUNE.inspectGap frames and reports a
 -- different moment than the report around it (#241).
+-- Every live unit's faction, charId and TILE. A screenshot proves units exist; only this
+-- proves WHERE, and the two disagree more often than they look like they could: FE8 draws a
+-- map sprite taller than its tile and offset upward, so a unit reads a row high, and the
+-- camera row has to be recovered before any pixel can be assigned a coordinate at all.
+-- Placement questions get answered from here, never off a frame (decisions.md: verify via
+-- data, not pixels). Hung off INSPECT because harness.lua sits at Lua's 200-local ceiling.
+INSPECT.units = function(tag)
+    local factions = { { "blue", SYM.gUnitArrayBlue, 62 }, { "green", SYM.gUnitArrayGreen, 20 },
+                       { "red", SYM.gUnitArrayRed, 50 } }
+    for _, f in ipairs(factions) do
+        local name, base, count = f[1], f[2], f[3]
+        for i = 0, count - 1 do
+            local u = unitAt(base, i)
+            if u and (u.state & US_DEAD) == 0 then
+                log(string.format(
+                    '{"event":"unit","tag":"%s","faction":"%s","char":"0x%02x",'
+                    .. '"x":%d,"y":%d,"hp":%d}', tag, name, u.charId, u.x, u.y, u.hp))
+            end
+        end
+    end
+end
+
 INSPECT.snapshot = function(tag, explanation, sampled)
     local observation = observeController()
     explanation = explanation or Controller.explain(observation)
@@ -3651,6 +3673,7 @@ end
 -- frames for a clean capture. Reusable smoke-look for every new chapter host.
 scenarios.mapshot = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end
+    INSPECT.units("mapshot")
     for i = 1, 6 do
         wait(20)
         shot(string.format("mapshot-%02d-ch%d-turn%d", i, chapter(), turn()))

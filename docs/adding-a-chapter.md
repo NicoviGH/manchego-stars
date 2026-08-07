@@ -18,7 +18,14 @@ chapter on the *next* slot so the previous chapter's ending `MNC2(0xN)` chains o
 | ch01 | 2 | `Ch2*` (`UnitDef_Event_Ch2Ally`, `EventListScr_Ch2_*`) | `CH01_HOST_INDEX` |
 | ch02 | 3 | `Ch3*` | `CH02_HOST_INDEX` |
 | ch03 | 4 | `Ch4*` (`UnitDef_Event_Ch4Ally`, `EventListScr_Ch4_*`, `EventScr_Ch4_BeginningScene`) | `CH03_HOST_INDEX` |
-| ch04 | 5 | `Ch5*` | `CH04_HOST_INDEX` (next) |
+| ch04 | 5 | `Ch5*` (slot 5 ships `Ch5XEvents` — retargeted to `Ch5EventData`) | `CH04_HOST_INDEX` |
+| ch05 | 6 | `Ch6*` event lists only; rosters are `MS_Ch05*` | `CH05_HOST_INDEX` |
+
+**From slot 6 on, the slot index and the vanilla symbol name disagree in the BASE GAME** (FE8
+inserted Ch5x at slot 5): slot 6 ships `Ch5EventData`, slot 7 ships `Ch6Events`. So slot N carries
+chapter N-1's names, and the retarget in step 4 is mandatory for every chapter from here — leaving it
+would put two of our chapters on one event group. Same trap in `chapters.h`: `CHAPTER_L_5 = 0x06`, so
+slot 6 is `CHAPTER_L_5` — resolve it with `chapter_label_constant(slot)`, never spell it from a number.
 
 The **map** and the **host slot** are decoupled: you register the painted map as new asset-table
 entries, then point the host slot's `map` block at them. The map can repaint *any* vanilla
@@ -78,14 +85,34 @@ geometry regardless of which slot hosts it (ch03 repaints vanilla Ch3 "Borgo" bu
    *event macro*: `Seize(x,y)` / `DefeatBoss(scr)` / `DefeatAll(scr)` in the host slot's `Misc`
    (or `Location`) event list, plus — for defeat-boss — a **flagged defeat quote** (see step 7).
 
-5. **Rosters** (`events_udefs.c`) — build with `_ally_unit_entry` / `_enemy_unit_entry` and drop
-   them into the host slot's tables via `_replace_brace_block`:
-   - Party → `UnitDef_Event_ChMAlly`. Fast-boot: deploy statically (`redaCount=0`) at authored
-     spawn tiles and `LOAD1` it directly (no PREP). Real flow: author `deployment.deploy_slots`
-     (== `deploy_limit` tiles) in the YAML and use `_deploy_cap_entries` + a `PREP` CALL.
-   - Enemies → the host slot's main `LOAD1` table (e.g. `UnitDef_088B4A80` for slot 4; find it in
-     the vanilla `EventScr_ChM_BeginningScene`). Boss rides a named `CHARACTER_*`/hex slot; generic
-     minions share the slot's generic PID (autolevelled). Positions/levels/items/AI from the YAML.
+5. **Rosters** — build rows with `_ally_unit_entry` / `_enemy_unit_entry`, then **declare your own
+   table** with `declare_unit_table('MS_ChNN<Role>', rows, comment)` and **point the event group at
+   it**: `point_event_group_at(info, CHNN_EVENT_GROUP, 'playerUnitsInNormal'|'playerUnitsInHard',
+   CHNN_ALLY_TABLE)`, then `assert_event_group_roster(...)`.
+
+   > **Declaring the table does not wire it, and forgetting the pointer has NO symptom.** ch05
+   > shipped one build where the group still named `UnitDef_Event_Ch6Ally`: the party deployed on
+   > vanilla Ch6's start tiles — another map's coordinates — with PREP running, the map drawn, the
+   > load-test PASSing, and four units standing inside walls. `assert_event_group_roster` now fails
+   > the build instead. Verify placement from `INSPECT.units` (in `mapshot`), never from a
+   > screenshot: FE8 draws a map sprite offset upward, so a unit reads a row high.
+
+   Do NOT block-overwrite a vanilla table the stripped cutscenes left free (the old ch01–ch04 idiom;
+   see `decisions.md` → "Campaign rosters live in campaign-named symbols"). Only the event-LIST
+   symbols stay vanilla-named, because `chapter_settings.json` resolves the group from them.
+
+   The roles each chapter needs (one `MS_ChNN*` table each):
+   - Party → `MS_ChNNDeployCap`, the never-LOADed cap template the group points at. Real flow:
+     author `deployment.deploy_slots` (== `deploy_limit` tiles) in the YAML and use
+     `_deploy_cap_entries` + a `PREP` CALL. Fast-boot additionally declares `MS_ChNNBootSeed` — the
+     same roster ARMED from `CLASS_LOADOUT` — and `LOAD1`s it so PREP has a party from a cold New
+     Game. (`deploy_slots` is not optional: `_deploy_cap_entries` sys.exits without it.)
+   - Enemies → `MS_ChNNLine`, `LOAD1`ed by the beginning scene, plus one `MS_ChNNWave<turn>` per
+     reinforcement wave (each needs its own table — one table cannot serve two turns). Boss and any
+     named unit take a UNIQUE pid so their flagged `gDefeatTalkList` entries key to them alone; the
+     rest share the slot's generic autolevelled PID. Positions/levels/items/AI from the YAML.
+   - A convertible/recruitable enemy gets its OWN table and pid even before its Talk is wired — a
+     shared pid is unaddressable, which is what #203 cost ch04's wolf pack.
 
 6. **Strip cutscenes** (`ChM_EVENTINFO_H` + `ChM_EVENTSCRIPT_H`) — empty `Turn`/`Character`/
    `Location` to `{ END_MAIN }`, set `Misc` to the win/lose machinery, empty `Tutorial` to
