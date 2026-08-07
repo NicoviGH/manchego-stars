@@ -6355,6 +6355,42 @@ scenarios.ch04village = function()
         "the Lonelywood village handed over its Iron Axe: %d -> %d in the party", before, after))
 end
 
+-- ch05village (#25): does the SOUTH reliquary at (12,19) actually hand over its Dracoshield?
+-- Two things this pins, both of which shipped wrong once. First the same failure ch04village
+-- exists for: ch05's Location list was EMPTY, so four villages plus an armory and a vendor sat on
+-- intact tiles that nothing pointed at -- a finished-looking map with unreachable rewards.
+-- Second, WHICH gift: (12,19) is the south-east site and the turn-2 eruption pair spawns beside
+-- it, so vanilla puts its richest gift here and its cheapest at (5,1); ours had them swapped,
+-- which no other gate can see (same item set, same total, parity still reads PARITY). Checking
+-- the Dracoshield specifically -- not "some item" -- is what makes that visible here too.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh ch05village (needs a CH05BOOT=1 ROM).
+scenarios.ch05village = function()
+    local VILLAGE_X, VILLAGE_Y, DRACOSHIELD = 12, 19, 0x60
+    if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
+    pokeFastConfig()
+    waitFor(function() return faction() == 0 and not menuOpen()
+        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    local function shields()
+        local n = 0
+        for _, id in ipairs(collectedItems()) do if id == DRACOSHIELD then n = n + 1 end end
+        return n
+    end
+    local before = shields()
+    log(string.format("ch05village: %d Dracoshield(s) in the party before visiting", before))
+    local ok, why = visitVillage(VILLAGE_X, VILLAGE_Y, function() return shields() > before end)
+    if not ok then return result("FAIL", why) end
+    shot("ch05village")
+    local after = shields()
+    if after <= before then
+        return result("FAIL", string.format(
+            "visited (%d,%d) but the party still holds %d Dracoshield(s) -- the reliquary handed "
+            .. "over nothing (check the tile's terrain AND the Village() entry)",
+            VILLAGE_X, VILLAGE_Y, after))
+    end
+    return result("PASS", string.format(
+        "the south reliquary handed over its Dracoshield: %d -> %d in the party", before, after))
+end
+
 -- ch04cottage (#24): the SECOND village at (1,11), whose reward is its line.
 -- The shipped bug was not a bad reward, it was NO VISIT: the tile was visitable-capable but had
 -- no Location entry, and FE8 runs the village off that event -- so the player saw a cottage they

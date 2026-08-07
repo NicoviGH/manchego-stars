@@ -1340,7 +1340,7 @@ class Ch04RuntimeHost(unittest.TestCase):
     def test_the_village_hands_the_visitor_the_authored_reward(self):
         # vanilla's own shape (EventScr_089F1BD8): one text box over the village BG, then
         # SVAL the item into slot 3 and GIVEITEMTO the unit that visited.
-        s = bc.ch04_village_script(0x9C3, 'ITEM_AXE_IRON', bc.CH04_OPENING_FOREST_BG)
+        s = bc.village_script(0x9C3, 'ITEM_AXE_IRON', bc.CH04_OPENING_FOREST_BG)
         self.assertIn('Text_BG(%s, 0x9C3)' % bc.CH04_OPENING_FOREST_BG, s)
         self.assertLess(s.index('Text_BG'), s.index('SVAL(EVT_SLOT_3, ITEM_AXE_IRON)'))
         self.assertLess(s.index('SVAL(EVT_SLOT_3, ITEM_AXE_IRON)'),
@@ -1459,14 +1459,14 @@ class Ch04RuntimeHost(unittest.TestCase):
                              '%s should stand outside its cabin, in the fog' % name)
 
     def test_a_village_script_plays_over_the_backdrop_it_is_given(self):
-        s = bc.ch04_village_script(0x9C6, None, 'BG_MS_LONELYWOOD_FOG')
+        s = bc.village_script(0x9C6, None, 'BG_MS_LONELYWOOD_FOG')
         self.assertIn('Text_BG(BG_MS_LONELYWOOD_FOG, 0x9C6)', s)
 
     def test_a_village_with_no_reward_hands_over_nothing(self):
         """ch04's economy is deliberately Ch4-lean (decisions.md): the Iron Axe is the whole
         material gift, so the cottage's reward IS its line. The script must drop the give-item
         tail rather than quietly hand over some default."""
-        s = bc.ch04_village_script(0x9C6, None, bc.CH04_OPENING_FOREST_BG)
+        s = bc.village_script(0x9C6, None, bc.CH04_OPENING_FOREST_BG)
         self.assertIn('Text_BG(%s, 0x9C6)' % bc.CH04_OPENING_FOREST_BG, s)
         self.assertNotIn('SVAL(EVT_SLOT_3', s)
         self.assertNotIn('GIVEITEMTO', s)
@@ -2625,3 +2625,73 @@ class VillageGiftsInheritVanilla(unittest.TestCase):
     def test_the_live_ch05_villages_inherit_vanilla(self):
         chap = bc._load_chapter_yaml('rime-of-the-frostmaiden', bc.CH05_CHAPTER_YAML)
         bc.assert_village_gifts_match_vanilla(chap, bc.CH05_ITEM_IDS)
+
+
+class CampaignOwnedEventScripts(unittest.TestCase):
+    """The script twin of campaign-owned unit tables. A host slot frees only the scripts its
+    stripped cutscenes stop referencing -- slot 6 leaves five, and ch05 needs three waves plus
+    one per village. Naming our own removes the budget, and MS_Ch05VisitSouth says what it runs
+    where EventScr_089F2AE4 says nothing."""
+
+    HEADER = 'extern CONST_DATA EventListScr EventScr_9EEA58[];\n'
+
+    def test_extern_is_added_once_and_is_idempotent(self):
+        once = bc.event_script_extern(self.HEADER, 'MS_Ch05VisitSouth', 'south reliquary')
+        twice = bc.event_script_extern(once, 'MS_Ch05VisitSouth', 'south reliquary')
+        self.assertEqual(once, twice)
+        self.assertEqual(twice.count('MS_Ch05VisitSouth[];'), 1)
+
+    def test_an_unprefixed_symbol_is_refused(self):
+        with self.assertRaises(SystemExit):
+            bc.event_script_extern(self.HEADER, 'EventScr_089F2AE4', 'squatting')
+
+    def test_a_declared_but_undefined_script_fails_the_build(self):
+        """declare_event_script APPENDS, while the injector rewrites the same file wholesale from
+        a copy read earlier -- so declaring before the bulk write silently discards every script.
+        It happened, and the only symptom was a link error naming the reference, not the loss."""
+        tmp = tempfile.mkdtemp()
+        try:
+            path = os.path.join(tmp, 'ch6-eventscript.h')
+            with open(path, 'w') as f:
+                f.write('CONST_DATA EventListScr MS_Ch05VisitNorth[] = {\n    ENDA\n};\n')
+            bc.assert_event_scripts_defined(path, ['MS_Ch05VisitNorth'])   # present -> quiet
+            with self.assertRaises(SystemExit) as caught:
+                bc.assert_event_scripts_defined(
+                    path, ['MS_Ch05VisitNorth', 'MS_Ch05VisitSouth'])
+            self.assertIn('MS_Ch05VisitSouth', str(caught.exception))
+            self.assertIn('AFTER', str(caught.exception), 'the error must name the ordering')
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+class LocationEventsAreBuiltFromTheYaml(unittest.TestCase):
+    """An empty Location list makes every reward on the map unobtainable while the map still
+    draws it -- ch04's unreachable Iron Axe, and ch05's four villages plus an armory and vendor."""
+
+    VILLAGES = [{'id': 'a', 'tile': [12, 19], 'visit_reward': [{'id': 'booster-def'}]},
+                {'id': 'b', 'tile': [5, 1]}]
+    SLOTS = {'a': 'MS_Ch05VisitSouth', 'b': 'MS_Ch05VisitNorth'}
+
+    def test_each_village_rides_its_own_script_at_its_own_tile(self):
+        body = bc.location_events(self.VILLAGES, self.SLOTS)
+        self.assertIn('Village(0, MS_Ch05VisitSouth, 12, 19)', body)
+        self.assertIn('Village(0, MS_Ch05VisitNorth, 5, 1)', body)
+        self.assertTrue(body.rstrip().endswith('END_MAIN\n}'))
+
+    def test_a_village_with_no_reward_says_so_rather_than_naming_an_item(self):
+        body = bc.location_events(self.VILLAGES, self.SLOTS)
+        self.assertIn('the line is the reward', body)
+
+    def test_shops_need_no_script_and_no_text(self):
+        body = bc.location_events([], {}, (('Armory', 'ShopList_Event_Ch5Armory', 2, 1),
+                                          ('Vendor', 'ShopList_Event_Ch5Vendor', 6, 10)))
+        self.assertIn('Armory(ShopList_Event_Ch5Armory, 2, 1)', body)
+        self.assertIn('Vendor(ShopList_Event_Ch5Vendor, 6, 10)', body)
+
+    def test_village_reward_item_uses_the_chapters_own_map(self):
+        """It used to close over CH04_ITEM_IDS, which made a shared helper silently ch04-only:
+        ch05's stat boosters are not in that dict, so the first reuser would die on a KeyError."""
+        village = {'id': 'a', 'visit_reward': [{'id': 'booster-def'}]}
+        self.assertEqual(bc.village_reward_item(village, {'booster-def': 'ITEM_BOOSTER_DEF'}),
+                         'ITEM_BOOSTER_DEF')
+        self.assertIsNone(bc.village_reward_item({'id': 'b'}, {}))
