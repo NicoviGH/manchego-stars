@@ -164,6 +164,12 @@ WANTED = [
                                 # screen (src/unitlistscreen.c, started by StartUnitListScreenField
                                 # off gMapMenuItems[0], overrideId 0x6E). A live instance == the
                                 # unit list is actually on screen -> the #218 capture point.
+    'gUnknown_0200F158',        # u8: how many units the Character screen actually sorted into
+                                # its roster (src/unitlistscreen.c). This -- NOT the proc's own
+                                # allyCount -- is what sub_809144C bounds DOWN against, and it
+                                # is the only one of the two that a FIELD-mode list ever writes:
+                                # StartUnitListScreenField sets `mode` and nothing else, so
+                                # allyCount is left holding whatever was in the proc slot (#238).
     'sub_8091AEC',              # the Character screen's PROC_REPEAT input loop
                                 # (src/unitlistscreen.c). Unnamed in the decomp, but it is the
                                 # exact callback that makes the list an INPUT state rather than

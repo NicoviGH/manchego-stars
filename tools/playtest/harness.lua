@@ -579,11 +579,20 @@ local function observeController()
         -- the key handler moves; unk_2c is only where that lands on screen, and it clamps
         -- while the list scrolls under it. unk_29 != 0 means a scroll is animating and
         -- sub_809144C is not running, so no D-pad press would be read.
+        -- `count` is gUnknown_0200F158, the number of units the screen actually sorted, and
+        -- it is what sub_809144C bounds DOWN against. The proc's OWN allyCount (+0x3A) is
+        -- deliberately not used: StartUnitListScreenField writes only `mode`, so on the
+        -- map-menu list that field holds whatever was in the proc slot -- it read 0 in the
+        -- TESTCH sandbox, and a roster walk sized off it stops before it starts (#238).
         observation.unit_list = {
             row = ru8(unitList.addr + 0x30), screen_row = ru8(unitList.addr + 0x2C),
-            page = ru8(unitList.addr + 0x2F), allies = ru8(unitList.addr + 0x3A),
-            deployed = ru8(unitList.addr + 0x3B), scrolling = ru8(unitList.addr + 0x29) ~= 0,
+            page = ru8(unitList.addr + 0x2F), count = ru8(SYM.gUnknown_0200F158),
+            scrolling = ru8(unitList.addr + 0x29) ~= 0,
         }
+        -- allyCount (+0x3A) and deployedCount (+0x3B) are deliberately NOT observed. They are
+        -- written by StartUnitListScreenPrepMenu only, so on this list they are whatever the
+        -- proc slot held -- and an untrustworthy field in the observation is how the walk
+        -- above came to be sized off a roster of "0".
     end
     put("map_fade", observedProc(SYM.sProcScr_BMXFADE, "map_fade"))
     put("player_phase", observedProc(SYM.gProcScr_PlayerPhase))
@@ -4349,22 +4358,35 @@ scenarios.recordunitlist = function()
         return result("FAIL", "the unit list never reached its key handler")
     end
     local listed = observeController().unit_list
-    log(string.format("unit list: %d allies on the roster, %d visible rows per page",
-        listed.allies, UNITLIST_ROWS))
+    log(string.format("unit list: %d units sorted onto the roster, %d visible rows per page",
+        listed.count, UNITLIST_ROWS))
+    -- A roster the screen reports as empty means the count is not being read from where the
+    -- engine keeps it. Fail rather than "walk" a zero-length list and report a green capture
+    -- of one frame -- which is exactly what the old allyCount read did.
+    if listed.count < 1 then
+        return result("FAIL", "the Character screen reports an empty roster")
+    end
     local shots = 1
-    for _ = 1, listed.allies + UNITLIST_ROWS do
+    for _ = 1, listed.count do
         local at = observeController()
         if not at.unit_list then break end
         local row = at.unit_list.row
-        if row >= listed.allies - 1 then break end        -- the end of the roster, not a stall
+        if row >= listed.count - 1 then break end         -- the end of the roster, not a stall
         if not guardedInput("list_next", "DOWN", "the roster selection advances", function(after)
             return after.unit_list ~= nil and after.unit_list.row ~= row
         end, 60) then
             return result("FAIL", string.format(
-                "the roster walk stalled on entry %d of %d", row, listed.allies))
+                "the roster walk stalled on entry %d of %d", row, listed.count))
         end
         shots = shots + 1
         shot(string.format("unitlist-row%02d", shots))
+    end
+    -- The capture is only worth anything if the walk actually reached the last entry.
+    local ended = observeController().unit_list
+    if not (ended and ended.row == listed.count - 1) then
+        return result("FAIL", string.format(
+            "the roster walk stopped on entry %s of %d without reaching the end",
+            tostring(ended and ended.row), listed.count))
     end
     wait(20); shot("unitlist-end")
     dumpSmsBudget("after scrolling the whole roster")
@@ -4386,7 +4408,7 @@ scenarios.recordunitlist = function()
             listC32, listC16, mapC32, mapC16))
     end
     return result("PASS", string.format(
-        "unit list captured in %d frames; SMS budget held (32x=%d < 16x=%d, %d slots spare); "
+        "walked the whole %d-entry roster; SMS budget held (32x=%d < 16x=%d, %d slots spare); "
         .. "%d custom id(s) draw 32x32 into a 16px row pitch",
         shots, listC32, listC16, listC16 - listC32, #oversize))
 end

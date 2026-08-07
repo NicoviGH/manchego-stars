@@ -268,7 +268,7 @@ check(action(itemList, "menu_next") ~= nil, true, "and the list can be walked to
 local unitList = {
     procs = { player_phase = { idle = "player_main_idle" },
               unit_list = { idle = "unit_list_input" } },
-    unit_list = { row = 0, screen_row = 0, page = 0, allies = 9, scrolling = false },
+    unit_list = { row = 0, screen_row = 0, page = 0, count = 9, scrolling = false },
 }
 classify(unitList, "unit_list_screen", "the Character screen outranks the map underneath it")
 check(action(unitList, "list_next") ~= nil, true, "the roster can be walked forward")
@@ -282,7 +282,7 @@ check(a and a.key, "B", "B leaves the Character screen (sub_809144C)")
 -- DROPS input in that window, so calling it an input state is how a press goes missing.
 local scrollingList = {
     procs = { unit_list = { idle = "unit_list_input" } },
-    unit_list = { row = 3, screen_row = 1, page = 0, allies = 9, scrolling = true },
+    unit_list = { row = 3, screen_row = 1, page = 0, count = 9, scrolling = true },
 }
 classify(scrollingList, "transition", "a scrolling Character screen takes no input")
 check(action(scrollingList, "list_next"), nil, "and offers none")
