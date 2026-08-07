@@ -4879,13 +4879,16 @@ scenarios.ch03prep = function()
 end
 
 -- gBmMapBaseTiles (u16**): the metatile grid a chest/door tile-change writes (ApplyMapChangesById,
--- bmtrick.c). Unlike the gBmMap* grids, this variable lives in FE8's ROM .data (objdump: `g O ROM`
--- at 0x085AF5DC) -- it's never reassigned, holding a constant pointer to the sBmBaseTilesPool row-
--- pointer array in EWRAM. So: read the pointer from ROM, index the row array, read the tile. The
--- scenario asserts the closed door reads 812<<2 first, validating this chain before the flip check.
-local GBMMAPBASETILES_ADDR = 0x085AF5DC
+-- bmtrick.c). Unlike the other gBmMap* grids this one lives in FE8's ROM .data and is never
+-- reassigned, holding a constant pointer to the sBmBaseTilesPool row-pointer array in EWRAM.
+-- So: read the pointer from ROM, index the row array, read the tile.
+--
+-- The address comes from SYM, never a literal. It WAS a literal (0x085AF5DC), the engine grew
+-- out from under it, and that address came to hold 0x000004AB -- so ch03door and ch03chest
+-- failed on their PRECONDITION, before driving any input, and read for all the world like
+-- broken doors and chests. Nothing about the tile-change wiring was wrong (#238).
 local function baseTile(x, y)
-    local grid = ru32(GBMMAPBASETILES_ADDR)   -- u16** value = &sBmBaseTilesPool
+    local grid = ru32(SYM.gBmMapBaseTiles)   -- u16** value = &sBmBaseTilesPool
     return ru16(ru32(grid + y * 4) + x * 2)
 end
 
@@ -5015,11 +5018,22 @@ scenarios.ch03chest = function()
         return result("FAIL", "the command menu offered no live Chest command on the chest tile")
     end
     local flipped = waitFor(function() return baseTile(CX, CY) == OPEN_T end, 400, true)
+    -- The two halves of "the chest opened" do NOT land on the same frame: the tile flips
+    -- first, and the Iron Lance arrives at the end of the grant sequence with its own fanfare
+    -- in between. So WAIT for the loot rather than reading the inventory the instant the tile
+    -- moves -- that raced, and reported a chest that had in fact opened as one that granted
+    -- nothing. (tapA advances the "got Iron Lance" box through the guarded dialogue input;
+    -- the eight blind A's this replaces papered over the race by taking ~160 frames.)
+    -- Re-find the opener (its array index is stable; read items[0..4] for the loot).
+    local function hasLance()
+        for s = 0, 4 do
+            if (ru16(u.addr + 0x1E + s * 2) & 0xFF) == IRON_LANCE then return true end
+        end
+        return false
+    end
+    local got = waitFor(hasLance, 400, true)
     wait(20); shot("ch03chest-after")
     local post = baseTile(CX, CY)
-    -- Re-find the opener (its array index is stable; read items[0..4] for the loot).
-    local got = false
-    for s = 0, 4 do if (ru16(u.addr + 0x1E + s * 2) & 0xFF) == IRON_LANCE then got = true break end end
     log(string.format("chest (%d,%d) tile after = %d (want %d); iron-lance in inventory = %s",
         CX, CY, post, OPEN_T, tostring(got)))
     if not flipped then

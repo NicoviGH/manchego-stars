@@ -77,6 +77,16 @@ WANTED = [
     'gBmMapUnit',               # u8** tile->unit grid (include/bmmap.h): gBmMapUnit[y][x] is the
                                 # on-tile unit id the engine uses for cursor selection. Relocating
                                 # a unit must update THIS, not just its xPos/yPos.
+    'gBmMapBaseTiles',          # u16** metatile grid a chest/door tile-change writes
+                                # (ApplyMapChangesById, bmtrick.c). Unlike the other gBmMap*
+                                # grids this one lives in ROM .data and is never reassigned:
+                                # it holds a constant pointer to the sBmBaseTilesPool row
+                                # array in EWRAM. It was HARD-CODED in harness.lua and the
+                                # engine grew out from under it -- 0x085AF5DC held 0x000004AB
+                                # rather than the pool -- so ch03door/ch03chest failed on
+                                # their PRECONDITION, before pressing anything, and read as
+                                # broken doors and chests for as long as that lasted. Which
+                                # is the entire reason this file exists (#238).
     'gBmMapTerrain',            # u8** terrain-id grid (include/bmmap.h): gBmMapTerrain[y][x] is the
                                 # TERRAIN_* id, used to build a passability map for the clear-bot's
                                 # BFS march-to-boss (#60).

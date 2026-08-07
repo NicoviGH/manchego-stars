@@ -66,6 +66,9 @@ DEAD_CONCEPTS = [
     # retired by #220 (2026-08-03): common playtest mechanics are state-driven.
     r'bootToMap.{0,40}alternat(?:e|es|ing).{0,12}(?:A.{0,3}START|START.{0,3}A)',
     r'chooseAttack.{0,50}row 0 blind',
+    # retired by #238 (2026-08-06): the base-tiles grid comes from SYM like every other
+    # symbol. The literal it held drifted and made ch03's doors and chests read as broken.
+    r'GBMMAPBASETILES_ADDR',
     # NOT registered here: `hasPrepScreen`. It IS a dead field (FE7 leftover, chapterdata.h:37 --
     # false for every chapter, including ones that plainly have prep) and citing it as evidence is
     # exactly the mistake that produced a bogus "our prep is a divergence" claim on 2026-07-29.
@@ -645,6 +648,41 @@ def check_verdict_scenarios_are_guarded(fail):
                     % (name, count, where))
 
 
+# GBA address space. 0x04-0x07 are ARCHITECTURAL (MMIO, palette, VRAM, OAM) -- fixed by the
+# hardware, so a literal there is a constant, not a symbol. 0x02/0x03 (EWRAM/IWRAM) and
+# 0x08/0x09 (ROM) are where OUR symbols live, and those move on every engine change.
+_DRIFTING_ADDR = re.compile(r'0x0[2389][0-9A-Fa-f]{6}')
+
+
+def check_no_hardcoded_symbol_addresses(fail):
+    """The playtest Lua may not hard-code a ROM/EWRAM address. gen_symbols.py exists for
+    exactly this -- "BSS/EWRAM addresses shift when engine code changes, so the Lua harness
+    must never hard-code them" -- and one literal that slipped through proved the point: the
+    base-tiles grid was pinned at 0x085AF5DC, the engine grew, and that address came to hold
+    0x000004AB. ch03door and ch03chest then failed on their PRECONDITION, before driving a
+    single input, and read for months like broken doors and chests. Nothing was wrong with
+    the tile-change wiring (#238).
+
+    A wrong address is the worst failure shape available here: it does not crash, it reads
+    plausible garbage, and it indicts the feature instead of the harness.
+
+    symbols.lua is generated (it is nothing BUT addresses) and test_* files use fake ones as
+    fixtures, so both are exempt -- the same carve-outs the other scans use."""
+    for path in sorted(glob.glob(os.path.join(REPO, 'tools/playtest/*.lua'))):
+        name = os.path.basename(path)
+        if name.startswith('test_') or name in ('symbols.lua', 'procscr.lua'):
+            continue
+        with open(path, encoding='utf-8') as fh:
+            for n, line in enumerate(fh, 1):
+                if line.strip().startswith('--'):
+                    continue
+                for hit in _DRIFTING_ADDR.findall(line):
+                    fail.append('%s:%d hard-codes the ROM/EWRAM address %s -- read it from '
+                                'SYM (add it to gen_symbols.py WANTED); those addresses move '
+                                'on every engine change (#238)'
+                                % (os.path.relpath(path, REPO), n, hit))
+
+
 def check_tool_refs_exist(fail):
     """A doc or code comment naming tools/<x>.py|rb, or a docs/<x>.md path, must
     point at a file that exists -- dangling pointers are the cheapest-to-catch form
@@ -1141,6 +1179,7 @@ def main():
                   check_chapter_status, check_chapter_deployment_schema,
                   check_injection_order, check_playtest_matrix,
                   check_verdict_scenarios_are_guarded,
+                  check_no_hardcoded_symbol_addresses,
                   check_tool_refs_exist, check_no_dead_concepts,
                   check_generated_indexes_fresh, check_engine_guards_present,
                   check_purple_bank_blankers_known,
