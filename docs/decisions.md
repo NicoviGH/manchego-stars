@@ -3768,6 +3768,18 @@ session state. `HANDOFF.md` points here._
 - **Vanilla-only (monster/exotic) weapons belong in `difficulty.py`**, not `WEAPON_ITEM_ENUM`.
 - **Never a bare `make` for a shippable ROM** — `tools/build.sh` applies the decomp shebang fix; a bare
   `make` dies on the gfx tools on macOS (`decisions.md` §Distribution).
+- **The FE Wiki is a CROSS-REFERENCE, never an authority** (2026-08-07). The decomp stays the source
+  of truth for every FE8 claim (`CLAUDE.md`), but the wiki's per-chapter pages are worth a read when
+  mining a vanilla chapter, because they state things in a form that *prompts the question* the
+  decomp answers. Concretely: it says "village to the southeast → Dragonshield". The decomp says
+  `SVAL(EVT_SLOT_3, 0xe)` inside one of four separately-named scripts, and nothing in it invites you
+  to ask whether our pairing matches. That is exactly how ch05's swapped reliquary gifts were caught
+  — **wiki raised it, decomp settled it**, which is the only order that is ever correct.
+  **Fetching it:** the rendered page is blocked (403 to curl, 402 to WebFetch). Use the MediaWiki API:
+  ```sh
+  curl -sL -A "Mozilla/5.0" "https://fireemblem.fandom.com/api.php?action=parse\
+&page=The%20Empire%27s%20Reach&prop=wikitext&format=json&formatversion=2"
+  ```
 
 ### Campaign rosters live in campaign-named symbols (2026-08-07, #25)
 
