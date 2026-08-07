@@ -15,6 +15,10 @@ local MENU_ATTACK = 0x4F
 local MENU_BALLISTA_ATTACK = 0x50
 local MENU_TALK = 0x5A
 local MENU_VISIT = 0x5C
+local MENU_CHEST = 0x5D
+local MENU_DOOR = 0x5E
+local MENU_ITEM = 0x67
+local MENU_SUPPLY = 0x69
 local MENU_WAIT = 0x6B
 local MENU_UNIT_LIST = 0x6E
 local MENU_STATUS = 0x6F
@@ -46,7 +50,9 @@ local function menuKinds(observation)
         end
         if item.override_id == MENU_SEIZE or item.override_id == MENU_ATTACK
             or item.override_id == MENU_BALLISTA_ATTACK
-            or item.override_id == MENU_TALK or item.override_id == MENU_WAIT then unit = true end
+            or item.override_id == MENU_TALK or item.override_id == MENU_CHEST
+            or item.override_id == MENU_DOOR or item.override_id == MENU_ITEM
+            or item.override_id == MENU_SUPPLY or item.override_id == MENU_WAIT then unit = true end
         if item.override_id == MENU_END_PHASE then map = true end
     end
     return unit, map, weapon
@@ -218,6 +224,33 @@ local RULES = {
             end
             if callbacks then return matched("generic_menu", "every enabled item has a callback") end
             return unsupported("unsupported standard menu has no recognized semantic commands")
+        end,
+    },
+    {
+        -- Ordered ABOVE player_phase, and that order is load-bearing. The Character screen is
+        -- opened from the map menu DURING the player phase, so gProcScr_PlayerPhase is still
+        -- in the pool underneath it -- and the player_phase rule would answer
+        -- `player_map_idle`, advertising cursor moves for a map nothing can reach. It is not
+        -- a MenuProc either, so the menu rule never sees it: this is a whole screen with its
+        -- own key handler, and until it was named a scenario walking the roster was pressing
+        -- DOWN into a state the controller had no word for (#238).
+        name = "unit_list",
+        check = function(observation)
+            if not proc(observation, "unit_list") then return rejected("unit_list proc absent") end
+            if not idleIs(observation, "unit_list", "unit_list_input") then
+                return matched("transition", string.format("unit_list idle=%s, not its key handler",
+                    tostring(idleOf(observation, "unit_list"))))
+            end
+            if not observation.unit_list then
+                return matched("transition", "unit_list live with no observed list structure")
+            end
+            -- unk_29 selects which branch sub_8091AEC runs: 0 is the key handler, 1 and 2 are
+            -- the row/page scroll animating. FE8 reads no D-pad in that window, so a press
+            -- sent then is simply LOST -- the exact shape of failure #232 spent sessions on.
+            if observation.unit_list.scrolling then
+                return matched("transition", "the unit list is mid-scroll")
+            end
+            return matched("unit_list_screen", "unit_list in its key handler")
         end,
     },
     {
@@ -485,6 +518,16 @@ function M.legalActions(observation)
                     "prep.command.index=0", item.slot)
             end
         end
+    elseif state == "unit_list_screen" then
+        -- sub_809144C (unitlistscreen.c): DOWN/UP walk the roster, LEFT/RIGHT change page, A
+        -- opens the highlighted unit's stat screen, B leaves. The roster index it moves is
+        -- unk_30 -- NOT the on-screen row, which clamps while the list scrolls under it, so a
+        -- driver that watched the row would stop believing it had reached the end of a list
+        -- it was still halfway down.
+        add(actions, "list_next", "DOWN", "unit_list.row")
+        add(actions, "list_previous", "UP", "unit_list.row")
+        add(actions, "select_list_entry", "A", "unit_list.row")
+        add(actions, "close_list", "B", "unit_list.on_b")
     elseif state == "unit_command_menu" then
         addMenuNavigation(actions, observation)
         addMenuCommand(actions, observation, MENU_SEIZE, "seize")
@@ -492,6 +535,15 @@ function M.legalActions(observation)
         addMenuCommand(actions, observation, MENU_BALLISTA_ATTACK, "attack")
         addMenuCommand(actions, observation, MENU_TALK, "talk")
         addMenuCommand(actions, observation, MENU_VISIT, "visit")
+        -- The map-interaction and inventory commands. Each of these used to be reached by
+        -- pressing A on a row the scenario ASSUMED was top ("Door (row 0)"), which holds only
+        -- while the command's neighbours happen to be unavailable -- give the unit a talkable
+        -- ally or a chest on the same tile and the blind press fires the wrong command and
+        -- the run stays green (#238).
+        addMenuCommand(actions, observation, MENU_CHEST, "open_chest")
+        addMenuCommand(actions, observation, MENU_DOOR, "open_door")
+        addMenuCommand(actions, observation, MENU_ITEM, "open_items")
+        addMenuCommand(actions, observation, MENU_SUPPLY, "open_supply")
         addMenuCommand(actions, observation, MENU_WAIT, "wait")
     elseif state == "map_command_menu" then
         addMenuNavigation(actions, observation)

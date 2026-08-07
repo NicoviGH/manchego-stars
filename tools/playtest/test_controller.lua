@@ -144,6 +144,94 @@ a = action(unitMenu, "cancel_menu")
 check(a and a.key, "B", "standard menu cancellation comes from its live B callback")
 check(a and a.source, "menu.on_b=0x0804F000", "menu cancel records the live callback")
 
+-- The rest of gUnitActionMenuItems that our scenarios actually drive (menu_def.c). Each was
+-- being reached by pressing A on an assumed ROW -- "Door (row 0)", "Chest (row 0)", "Item
+-- (row 0, no weapon)" -- which is only true while the command's neighbours happen to be
+-- unavailable. Naming them makes the row an observation instead of an assumption (#238).
+local fieldMenu = {
+    procs = proc("menu", "menu_input"),
+    menu = {
+        current = 0,
+        items = {
+            { slot = 0, override_id = 0x5D, availability = 1 },  -- Chest
+            { slot = 1, override_id = 0x5E, availability = 1 },  -- Door
+            { slot = 2, override_id = 0x67, availability = 1 },  -- Item
+            { slot = 3, override_id = 0x69, availability = 1 },  -- Supply
+            { slot = 4, override_id = 0x6B, availability = 1 },  -- Wait
+        },
+    },
+}
+classify(fieldMenu, "unit_command_menu", "Chest/Door/Item/Supply are unit commands")
+a = action(fieldMenu, "open_chest")
+check(a and a.target, 0, "Chest resolves from semantic id 0x5D")
+check(a and a.key, "A", "the highlighted command carries its key")
+a = action(fieldMenu, "open_door")
+check(a and a.target, 1, "Door resolves from semantic id 0x5E")
+check(a and a.key, nil, "a command that is not highlighted must be selected first")
+a = action(fieldMenu, "open_items")
+check(a and a.target, 2, "Item resolves from semantic id 0x67")
+a = action(fieldMenu, "open_supply")
+check(a and a.target, 3, "Supply resolves from semantic id 0x69")
+
+-- Availability is read, never assumed: a locked door with no key is drawn but disabled, and
+-- a driver that pressed its row anyway would sit on a command the engine ignores.
+local shutMenu = {
+    procs = proc("menu", "menu_input"),
+    menu = {
+        current = 0,
+        items = {
+            { slot = 0, override_id = 0x5E, availability = 2 },  -- Door, greyed out
+            { slot = 1, override_id = 0x6B, availability = 1 },
+        },
+    },
+}
+check(action(shutMenu, "open_door"), nil, "a disabled Door is not a legal action")
+
+-- The item LIST and its Use/Equip/Trade/Discard submenu carry no command ids at all
+-- (gItemMenuItems / gItemSubMenuItems, override 0x38+/0x34+), so they land on the generic
+-- rule -- which is exactly right: the row is chosen by scenario policy, and the controller
+-- only certifies that the highlighted row has a live on_selected callback to fire.
+local itemList = {
+    procs = proc("menu", "menu_input"),
+    menu = {
+        current = 1,
+        items = {
+            { slot = 0, override_id = 0x38, availability = 1, on_selected = "0x08016A00" },
+            { slot = 1, override_id = 0x39, availability = 1, on_selected = "0x08016A40" },
+        },
+    },
+}
+classify(itemList, "generic_menu", "the inventory list is a generic callback menu")
+a = action(itemList, "select_current_menu_item")
+check(a and a.target, 1, "the inventory list commits the HIGHLIGHTED row, never an assumed one")
+check(action(itemList, "menu_next") ~= nil, true, "and the list can be walked to another row")
+
+-- The map-menu Character screen (ProcScr_UnitListScreen_Field). It is not a MenuProc at all
+-- -- it owns the whole screen and runs its own key handler -- so before it was named, a
+-- scenario walking the roster pressed DOWN into a state the controller could not see, and
+-- the player_phase rule underneath was calling the same frames `player_map_idle` (#238).
+local unitList = {
+    procs = { player_phase = { idle = "player_main_idle" },
+              unit_list = { idle = "unit_list_input" } },
+    unit_list = { row = 0, screen_row = 0, page = 0, allies = 9, scrolling = false },
+}
+classify(unitList, "unit_list_screen", "the Character screen outranks the map underneath it")
+check(action(unitList, "list_next") ~= nil, true, "the roster can be walked forward")
+check(action(unitList, "cursor_down"), nil, "and the map cursor is NOT offered while it is up")
+a = action(unitList, "list_previous")
+check(a and a.key, "UP", "...and backward")
+a = action(unitList, "close_list")
+check(a and a.key, "B", "B leaves the Character screen (sub_809144C)")
+
+-- unk_29 != 0 is the page/row scroll animating, and its key handler does not run then. FE8
+-- DROPS input in that window, so calling it an input state is how a press goes missing.
+local scrollingList = {
+    procs = { unit_list = { idle = "unit_list_input" } },
+    unit_list = { row = 3, screen_row = 1, page = 0, allies = 9, scrolling = true },
+}
+classify(scrollingList, "transition", "a scrolling Character screen takes no input")
+check(action(scrollingList, "list_next"), nil, "and offers none")
+
 local lockedMenu = {
     procs = { menu = { idle = "menu_input", locked = true, frozen = false } },
     menu = unitMenu.menu,

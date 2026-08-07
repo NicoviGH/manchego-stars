@@ -159,6 +159,12 @@ WANTED = [
                                 # screen (src/unitlistscreen.c, started by StartUnitListScreenField
                                 # off gMapMenuItems[0], overrideId 0x6E). A live instance == the
                                 # unit list is actually on screen -> the #218 capture point.
+    'sub_8091AEC',              # the Character screen's PROC_REPEAT input loop
+                                # (src/unitlistscreen.c). Unnamed in the decomp, but it is the
+                                # exact callback that makes the list an INPUT state rather than
+                                # a screen that happens to be up -- and its unk_29 branch says
+                                # whether the row/page scroll is still animating, i.e. whether
+                                # a D-pad press would be read at all (#238).
     'unit_icon_wait_table',     # UnitIconWait[] (include/unit_icon_data.h): {pattern, size, sheet}
                                 # per SMS id. `size` is the UNIT_ICON_SIZE_* PutUnitSprite switches
                                 # on, so reading it in-engine proves what the ROM believes about a

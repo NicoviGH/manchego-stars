@@ -372,6 +372,7 @@ local CALLBACK_NAMES = {
     [SYM.PlayerPhase_WaitForUnitMovement] = "player_move_wait",
     [SYM.TargetSelection_Loop] = "target_selection_input",
     [SYM.BattleForecast_LoopDisplay] = "battle_forecast_display",
+    [SYM.sub_8091AEC] = "unit_list_input",
 }
 local PREP_CALLBACK_NAMES = {
     [SYM.PrepScreenMenu_OnStartPress] = "prep_main_fight",
@@ -556,6 +557,19 @@ local function observeController()
     put("prep_menu", observedProc(SYM.ProcScr_PrepMenu))
     put("sally", observedProc(SYM.gProcScr_SALLYCURSOR, "sally_idle"))
     put("prep_units", observedProc(SYM.ProcScr_PrepUnitScreen))
+    local unitList = observedProc(SYM.ProcScr_UnitListScreen_Field)
+    put("unit_list", unitList)
+    if unitList then
+        -- struct UnitListScreenProc (include/unitlistscreen.h). unk_30 is the ROSTER index
+        -- the key handler moves; unk_2c is only where that lands on screen, and it clamps
+        -- while the list scrolls under it. unk_29 != 0 means a scroll is animating and
+        -- sub_809144C is not running, so no D-pad press would be read.
+        observation.unit_list = {
+            row = ru8(unitList.addr + 0x30), screen_row = ru8(unitList.addr + 0x2C),
+            page = ru8(unitList.addr + 0x2F), allies = ru8(unitList.addr + 0x3A),
+            deployed = ru8(unitList.addr + 0x3B), scrolling = ru8(unitList.addr + 0x29) ~= 0,
+        }
+    end
     put("map_fade", observedProc(SYM.sProcScr_BMXFADE, "map_fade"))
     put("player_phase", observedProc(SYM.gProcScr_PlayerPhase))
     put("target_selection", observedProc(SYM.gProcScr_TargetSelection))
@@ -1658,19 +1672,43 @@ scenarios.goodberry = function()
         return result("FAIL", "action menu never opened for Hlin")
     end
     shot("action-menu")
-    -- No enemy is in handaxe range at turn 1, so the command menu is [Item, Wait];
-    -- A picks Item (top). Screenshot shows both items with icons + names.
-    press(K.A)
-    wait(40)
+    -- Resolve the live Item command rather than pressing the row it is expected to occupy
+    -- (#238). "No enemy is in handaxe range at turn 1, so the menu is [Item, Wait] and A
+    -- picks the top" was true, but it is a claim about turn 1's enemy placement -- move a
+    -- goblin and the blind press opens Attack and the capture silently shoots the wrong
+    -- screen.
+    if not selectSemantic("open_items", "the Item command opens Hlin's inventory", function(after)
+        return controllerState(after) == "generic_menu"
+    end, 120) then
+        return result("FAIL", "Hlin's command menu offered no live Item command")
+    end
+    wait(20)
     shot("item-list")
-    -- inventory order is Hand Axe (slot 1) then Goodberry (slot 2): DOWN highlights
-    -- the Goodberry, refreshing the name/description panel.
-    press(K.DOWN)
-    wait(30)
+    -- Inventory order is Hand Axe then Goodberry: one row down highlights the Goodberry and
+    -- refreshes the name/description panel. The postcondition is the live highlight moving.
+    local list = observeController().menu
+    if not (list and #list.items >= 2) then
+        return result("FAIL", "the inventory list did not come up with both of Hlin's items")
+    end
+    if not guardedInput("menu_next", "DOWN", "the inventory highlight moves to the Goodberry",
+        function(after)
+            return after.menu ~= nil and after.menu.current ~= list.current
+        end, 60) then
+        return result("FAIL", "could not move the inventory highlight onto the Goodberry")
+    end
+    wait(20)
     shot("goodberry-highlighted")
-    -- open the item submenu (Use/Trade/Discard) -> shows the item description too.
-    press(K.A)
-    wait(40)
+    -- Open the Use/Equip/Trade/Discard submenu on the HIGHLIGHTED item -- which also shows
+    -- its description. gItemSubMenuItems carry override ids 0x34-0x37 against the list's
+    -- 0x38+, so "a different menu is up" is a fact we can read rather than a wait to guess.
+    local before = observeController().menu.items[1].override_id
+    if not selectSemantic("select_current_menu_item", "the Goodberry's item submenu opens",
+        function(after)
+            return after.menu ~= nil and after.menu.items[1].override_id ~= before
+        end, 120) then
+        return result("FAIL", "the Goodberry row did not open its item submenu")
+    end
+    wait(20)
     shot("goodberry-detail")
     result("PASS", "Goodberry item menu captured (see screenshots)")
 end
@@ -1680,13 +1718,16 @@ end
 -- destination; false with its own FAIL logged otherwise.
 --
 -- opts.stopAtPrep  stop with Preparations open instead of driving through it
--- opts.lord        "default" (accept the highlighted lead) | "last" (walk to the final
---                  candidate -- Pinky -- so a NON-Braulo lord can be exercised)
+-- opts.lord        "default" (accept the highlighted lead) | "last" (the final candidate --
+--                  Pinky) | a NUMBER (that row of the live lead menu, 0-based)
+-- opts.picked      OUT: the row the lead menu was actually committed on. Read it instead of
+--                  recomputing a row from LORD_CANDIDATES -- a scenario that assumes a roster
+--                  size asserts against a constant rather than against what it did (#241).
 --
--- One driver, three destinations (#238). reachPrep and reachPrepPinky used to be separate
--- copies of this route on a blind A-cadence; a copy that mashes A cannot tell "the scene
--- advanced" from "the input was swallowed", which is how ch01win rode straight through the
--- lord-select Yes/No prompt that cost #232 three sessions.
+-- One driver, every destination (#238). reachPrep, reachPrepPinky, lordfloor, ch01lord and
+-- reachRbgCh01 were five copies of this route on a blind A-cadence; a copy that mashes A
+-- cannot tell "the scene advanced" from "the input was swallowed", which is how ch01win rode
+-- straight through the lord-select Yes/No prompt that cost #232 three sessions.
 local function reachCh01(opts)
     opts = opts or {}
     if not winCh00() then return false end
@@ -1732,38 +1773,51 @@ local function reachCh01(opts)
         elseif state == "generic_menu" then
             -- Scenario policy: which lead to take. The controller owns the live menu
             -- callback and the guarded input either way; no row is guessed and no
-            -- candidate count is assumed -- "last" walks the LIVE item list.
-            if opts.lord == "last" then
-                local rows = observation.menu and #observation.menu.items or 0
-                for _ = 1, rows - 1 do
+            -- candidate count is assumed -- the walk counts the LIVE item list.
+            local rows = observation.menu and #observation.menu.items or 0
+            local want = opts.lord
+            if want == "last" then want = rows - 1 end
+            if type(want) == "number" then
+                if want < 0 or want >= rows then
+                    result("FAIL", string.format(
+                        "lead row %d is not in the live menu of %d candidates", want, rows))
+                    return false
+                end
+                -- Walk off the LIVE cursor and stop when it ARRIVES, rather than pressing a
+                -- fixed count: a fixed count reaches the wanted row only if the menu opened
+                -- on row 0, which nothing guarantees, and FE8 menus WRAP -- so being wrong
+                -- picks a different lead and passes anyway. The landing is asserted below
+                -- either way, because nothing downstream re-checks which lead was taken
+                -- (ckpt_lordpinky just saves the state) (#241).
+                for _ = 1, rows do
+                    local at = observeController()
+                    if at.menu and at.menu.current == want then break end
                     if not guardedInput("menu_next", "DOWN", "the lead menu selection moves",
                         function(after, before)
                             return after.menu ~= nil and before.menu ~= nil
                                 and after.menu.current ~= before.menu.current
                         end, 60) then
-                        result("FAIL", "could not walk the lead menu to the last candidate")
+                        result("FAIL", "could not walk the lead menu to the chosen candidate")
                         return false
                     end
                 end
-                -- Assert WHERE the walk landed. rows-1 presses reach the last candidate
-                -- only if the menu opened on row 0, which nothing guarantees, and FE8 menus
-                -- WRAP -- so being wrong picks a different lord and passes anyway. Nothing
-                -- downstream checks which lead was taken (ckpt_lordpinky just saves), so
-                -- without this the scenario's whole premise is unverified (#241).
                 local landed = observeController()
-                if not (landed.menu and landed.menu.current == rows - 1) then
+                if not (landed.menu and landed.menu.current == want) then
                     result("FAIL", string.format(
-                        "lead menu walk landed on row %s of %d, not the last candidate",
-                        tostring(landed.menu and landed.menu.current), rows))
+                        "lead menu walk landed on row %s of %d, not row %d",
+                        tostring(landed.menu and landed.menu.current), rows, want))
                     shot("ch01-lord-walk-lost")
                     return false
                 end
             end
+            local committing = observeController().menu
+            opts.picked = committing and committing.current or want
             if not guardedInput("select_current_menu_item", "A", "lead menu selection closes", function(after)
                 return after.menu == nil
             end, 300) then
                 result("FAIL", "could not choose the highlighted lead"); return false
             end
+            log(string.format("lead committed on menu row %s of %d", tostring(opts.picked), rows))
         elseif state == "yes_no_choice" then
             -- Lord select confirms the pick with "Will <lead> lead the party?". Same
             -- scenario policy as the menu above -- accept the default -- and Yes is the
@@ -2487,7 +2541,13 @@ scenarios.ch01win = function()
                 return result("PASS",
                     "Braulo seized the camp; ending + dev placeholder played -> title")
             end
-            press(K.B); press(K.B) -- menu surprise: back out, retry next turn
+            -- The seize did not end the chapter, so back out to the map on ENUMERATED
+            -- cancels and retry next turn (#238). Two blind B's used to stand in for this:
+            -- they could not tell how many levels deep the surprise was, so one too few left
+            -- the run parked on a menu and one too many cancelled the unit selection as well.
+            if not cancelToPlayerMap() then
+                return result("FAIL", "could not back out of the post-seize screen")
+            end
         end
         local phase = runEnemyPhase(CH01_PARK)
         if phase == "gameover" then
@@ -2553,7 +2613,9 @@ local function leavePrepAndGrindToSeize()
                 wait(20)
                 return true
             end
-            press(K.B); press(K.B)
+            -- The move onto the seize tile did not open the menu; back out on enumerated
+            -- cancels rather than two blind B's and retry on the next phase (#238).
+            if not cancelToPlayerMap() then return false end
         end
         local phase = runEnemyPhase(CH01_PARK)
         if phase == "gameover" then return false end
@@ -2586,41 +2648,22 @@ end
 -- double-apply": both ride the identical BmMain_StartPhase -> LordFloor_ApplyOnce
 -- early-return once the flag is set. make-green can't prove this -- only a real run can.
 scenarios.lordfloor = function()
-    local MARTY = 0x02                 -- marty rides CHARACTER_SETH (lord-select menu index 1)
+    local MARTY = 0x02                 -- marty rides CHARACTER_SETH
+    local MARTY_ROW = 1                -- ...at row 1 of the lead menu (row 0 is Braulo)
     local BASE_HP, FLOOR_HP = 18, 25   -- base maxHP 18, floor +7 (difficulty --lord-floor oracle)
     local BASE_DEF, FLOOR_DEF = 2, 6   -- base def 2, floor +4
     local APPLIED = 0xFA               -- LORDFLOOR_APPLIED_FLAG (permanent)
 
-    if not winCh00() then return result("FAIL", "never won ch00") end
-    if not waitFor(function() return chapter() == 2 end, 1800) then
-        return result("FAIL", "ch01 never started") end
-
-    -- ride the save menu + Northlook scene to the scenic lord-select menu, then pick MARTY.
-    local atMenu = false
-    for _ = 1, 200 do
-        if menuOpen() then atMenu = true break end
-        if procActive(SYM.gProcScr_SALLYCURSOR) then break end
-        press(K.A, 4); wait(36)
-    end
-    if not atMenu then return result("FAIL", "lord-select menu never opened") end
-    wait(40)
-    press(K.DOWN, 4); wait(8)          -- index 0 (Braulo) -> index 1 (Marty)
-    press(K.A, 4); wait(40)            -- pick
-    press(K.A, 4); wait(20)            -- [Yes] confirm
-
-    -- through prep -> Fight! -> interactive turn 1.
-    for _ = 1, 80 do
-        if procActive(SYM.gProcScr_SALLYCURSOR) then break end
-        press(K.A, 4); wait(36)
-    end
-    for i = 1, 40 do
-        if not procActive(SYM.gProcScr_SALLYCURSOR) then break end
-        press(K.B, 4); wait(10); press(K.START, 4); wait(40)
-        if i % 4 == 0 and procActive(SYM.gProcScr_SALLYCURSOR) then press(K.A, 4); wait(20) end
-    end
-    if not waitFor(function()
-        return not procActive(SYM.gProcScr_SALLYCURSOR) and faction() == 0 and turn() >= 1
-    end, 1200) then return result("FAIL", "ch01 turn 1 never reached") end
+    -- Ride the shared, migrated ch01 route and take MARTY as the lead: the save menu, the
+    -- Northlook scene, the lead menu, its Yes/No confirm and Preparations are all driven on
+    -- observed state (#238). This scenario used to carry its own blind-A copy of that route,
+    -- which could not tell a swallowed input from an advanced scene -- and which would have
+    -- ridden straight through the lord-select prompt exactly as ch01win did.
+    local route = { lord = MARTY_ROW }
+    if not reachCh01(route) then return end
+    if route.picked ~= MARTY_ROW then
+        return result("FAIL", string.format("lead committed on row %s, not Marty's row %d",
+            tostring(route.picked), MARTY_ROW)) end
     wait(60)
 
     -- marty must be force-deployed (the chosen lord) and floored at turn 1.
@@ -3229,71 +3272,22 @@ end
 -- set, the pick is force-deployed onto the field (cap intact), and their death
 -- ends in the game-over screen (UnitKill hook -> EVFLAG_GAMEOVER -> AFEV).
 scenarios.ch01lord = function()
-    if not winCh00() then return end
-    if not waitFor(function() return chapter() == 2 end, 1800) then
-        return result("FAIL", "chapter slot 2 never loaded after the ch00 win")
-    end
-    log("in ch01; riding the save menu to the lord-select menu")
-    -- The lord menu is the first generic menu while the beginning scene's
-    -- goblins are on the map (the post-chapter save screen runs before any
-    -- LOAD; the prep screen comes after the menu).
-    -- A-taps ride the save menu + the ~22-page Beat-1 Northlook scene to the lord
-    -- prompt+menu (cf. ch01win's 200-iter budget; the old 60 ran out mid-scene).
-    -- The lord-select menu is a StartMenu(MenuDef_LordSelect) over a scenic BG
-    -- (BG_DARKLING_WOODS) BEFORE the battle map loads -- so the chief is NOT in the
-    -- red array during it. Detect it by menuOpen() alone (sProc_Menu); the earlier
-    -- post-chapter save screen is a different proc and does not trip menuOpen().
-    local atMenu = false
-    for i = 1, 200 do
-        if menuOpen() then atMenu = true break end
-        if procActive(SYM.gProcScr_SALLYCURSOR) then break end -- overshot it
-        press(K.A, 4)
-        wait(36)
-    end
-    if not atMenu then
-        shot("ch01lord-no-menu")
-        return result("FAIL", "lord-select menu never opened before preps")
-    end
-    shot("lord-menu")
-    for _ = 1, LORD_CANDIDATES - 1 do press(K.DOWN, 4) wait(8) end
-    shot("lord-menu-last")
-    press(K.A, 4)
-    wait(40)
-    shot("lord-confirm")
-    -- A answers the [Yes] confirm; then A-tap to the prep screen.
-    local prep = false
-    for i = 1, 40 do
-        if procActive(SYM.gProcScr_SALLYCURSOR) then prep = true break end
-        press(K.A, 4)
-        wait(36)
-    end
-    if not prep then
-        shot("ch01lord-no-prep")
-        return result("FAIL", "prep screen never opened after the lord pick")
-    end
-    if not eventFlag(LORDSEL_FLAG_BASE + LORD_CANDIDATES - 1) then
-        return result("FAIL", "lord-choice permanent flag not set after confirm")
-    end
-    wait(180)
-    shot("ch01lord-prep")
-    for i = 1, 40 do
-        if not procActive(SYM.gProcScr_SALLYCURSOR) then break end
-        press(K.B, 4)
-        wait(10)
-        press(K.START, 4)
-        wait(40)
-        if i % 4 == 0 and procActive(SYM.gProcScr_SALLYCURSOR) then press(K.A, 4) wait(20) end
-    end
-    local fighting = waitFor(function()
-        return not procActive(SYM.gProcScr_SALLYCURSOR)
-            and faction() == 0 and turn() >= 1
-    end, 1200)
-    if not fighting then
-        shot("ch01lord-prep-stuck")
-        return result("FAIL", "could not leave preparations via Fight!")
-    end
-    wait(120)
+    -- The shared migrated route takes the LAST lead candidate and asserts where the walk
+    -- landed, so "which lead did we actually pick" is verified rather than assumed (#238).
+    -- The lead menu is a StartMenu(MenuDef_LordSelect) over a scenic BG (BG_DARKLING_WOODS)
+    -- BEFORE the battle map loads -- so the chief is NOT in the red array during it, and the
+    -- classifier sees it as a generic_menu (every enabled row carries an on_selected).
+    local route = { lord = "last" }
+    if not reachCh01(route) then return end
     shot("ch01lord-map")
+    -- The permanent flag is indexed off the row the route REPORTS committing on, not off
+    -- LORD_CANDIDATES: a constant that outlives a roster change asserts the wrong flag and
+    -- the scenario's whole premise goes unchecked.
+    if not eventFlag(LORDSEL_FLAG_BASE + route.picked) then
+        return result("FAIL", string.format(
+            "lord-choice permanent flag 0x%X (row %d) not set after confirm",
+            LORDSEL_FLAG_BASE + route.picked, route.picked))
+    end
     local lord = blue(CHAR_PINKY)
     if not lord or (lord.state & 0x9) ~= 0 or lord.x == 0xFF then
         return result("FAIL", "chosen lord (char 0x08) is not force-deployed")
@@ -3326,7 +3320,7 @@ scenarios.ch01lord = function()
     shot("ch01lord-no-gameover")
     log(string.format("debug: EVFLAG_GAMEOVER=%s lordflag=%s dead=%s",
         tostring(eventFlag(0x65)),
-        tostring(eventFlag(LORDSEL_FLAG_BASE + LORD_CANDIDATES - 1)),
+        tostring(eventFlag(LORDSEL_FLAG_BASE + route.picked)),
         tostring(isDead(blue(CHAR_PINKY)))))
     if isDead(blue(CHAR_PINKY)) then
         return result("FAIL", "chosen lord died but NO game over followed")
@@ -3768,32 +3762,18 @@ local CAST = {
 -- Built ONCE at 240fps into the "rbgch01" checkpoint (ckpt_rbgch01); recordrbg LOADS it
 -- so the slow prologue+lord-select grind isn't replayed every capture (#65).
 local function reachRbgCh01()
-    if not winCh00() then return false, "never won ch00" end
-    if not waitFor(function() return chapter() == 2 end, 1800) then
-        return false, "ch01 never started" end
-    local atMenu = false
-    for _ = 1, 200 do
-        if menuOpen() then atMenu = true break end
-        if procActive(SYM.gProcScr_SALLYCURSOR) then break end
-        press(K.A, 4); wait(36)
-    end
-    if not atMenu then return false, "lord-select menu never opened" end
-    wait(40)
-    for _ = 1, 4 do press(K.DOWN, 4); wait(8) end  -- index 0 (Braulo) -> index 4 (RBG)
-    press(K.A, 4); wait(40)   -- pick
-    press(K.A, 4); wait(20)   -- [Yes]
-    for _ = 1, 80 do
-        if procActive(SYM.gProcScr_SALLYCURSOR) then break end
-        press(K.A, 4); wait(36)
-    end
-    for i = 1, 40 do
-        if not procActive(SYM.gProcScr_SALLYCURSOR) then break end
-        press(K.B, 4); wait(10); press(K.START, 4); wait(40)
-        if i % 4 == 0 and procActive(SYM.gProcScr_SALLYCURSOR) then press(K.A, 4); wait(20) end
-    end
-    if not waitFor(function()
-        return not procActive(SYM.gProcScr_SALLYCURSOR) and faction() == 0 and turn() >= 1
-    end, 1200) then return false, "ch01 turn 1 never reached" end
+    -- The shared migrated route again (#238), taking RBG's row as the lead. This was the
+    -- fifth hand-rolled copy of the same save-menu/Northlook/lead-menu/prep walk; the blind
+    -- version could not tell an input that landed from one FE8 swallowed, and its four
+    -- literal DOWN presses assumed both the roster order and that the menu opened on row 0.
+    -- Function-scoped, not a new top-level `local`: harness.lua is AT Lua's 200-local
+    -- ceiling for the main chunk, and crossing it stops the whole file loading (#236).
+    local RBG_ROW = 4
+    local route = { lord = RBG_ROW }
+    if not reachCh01(route) then return false, "could not reach ch01 with RBG as the lead" end
+    if route.picked ~= RBG_ROW then
+        return false, string.format("lead committed on row %s, not RBG's row %d",
+            tostring(route.picked), RBG_ROW) end
     local rbg = blue(RBG_PID)
     if not rbg then return false, "RBG not on the field after lord-select" end
     return rbg
@@ -4279,18 +4259,34 @@ scenarios.recordunitlist = function()
     shot("unitlist-page1")
     local listC32, listC16 = dumpSmsBudget("with the unit list open")
 
-    -- Walk the roster. Each DOWN is one input with a real postcondition (the highlighted row or
-    -- the scroll offset must move); when neither moves we are at the end of the list, not stuck.
-    local proc = findProc(SYM.ProcScr_UnitListScreen_Field)
-    if not proc then return result("FAIL", "the unit list proc vanished after it started") end
-    local allies = ru8(proc + 0x3A)
+    -- Walk the roster on the classified Character screen (#238). Each DOWN is a guarded input
+    -- whose postcondition is the ROSTER index moving; arriving at the last entry is the one
+    -- case where it legitimately does not, so that is checked FIRST and ends the walk.
+    --
+    -- The old loop pressed DOWN blind and stopped when the on-screen row AND `proc+0x38` both
+    -- held. Neither is the roster position: sub_809144C moves unk_30 (+0x30), while unk_2c
+    -- (+0x2C) CLAMPS as the list scrolls beneath it, and +0x38 is not touched by the D-pad at
+    -- all. So the walk could stop a few rows in, capture a fraction of the roster, and still
+    -- report PASS -- a green light that did not mean what it said, which is the whole defect
+    -- #238 exists for.
+    if not awaitControllerState("unit_list_screen", 300) then
+        return result("FAIL", "the unit list never reached its key handler")
+    end
+    local listed = observeController().unit_list
     log(string.format("unit list: %d allies on the roster, %d visible rows per page",
-        allies, UNITLIST_ROWS))
+        listed.allies, UNITLIST_ROWS))
     local shots = 1
-    for _ = 1, allies + UNITLIST_ROWS do
-        local row, scroll = ru8(proc + 0x2C), ru8(proc + 0x38)
-        press(K.DOWN, 4); wait(10)
-        if ru8(proc + 0x2C) == row and ru8(proc + 0x38) == scroll then break end
+    for _ = 1, listed.allies + UNITLIST_ROWS do
+        local at = observeController()
+        if not at.unit_list then break end
+        local row = at.unit_list.row
+        if row >= listed.allies - 1 then break end        -- the end of the roster, not a stall
+        if not guardedInput("list_next", "DOWN", "the roster selection advances", function(after)
+            return after.unit_list ~= nil and after.unit_list.row ~= row
+        end, 60) then
+            return result("FAIL", string.format(
+                "the roster walk stalled on entry %d of %d", row, listed.allies))
+        end
         shots = shots + 1
         shot(string.format("unitlist-row%02d", shots))
     end
@@ -4810,15 +4806,22 @@ scenarios.ch03door = function()
     if not parked then return result("FAIL", "no free tile adjacent to the (2,3) door to park a unit") end
     log(string.format("parked opener at (%d,%d), adjacent to the door", parked[1], parked[2]))
     shot("ch03door-before")
-    -- Select (no move) -> command menu; Door is row 0. A picks Door, A confirms the sole target.
+    -- Select (no move) -> command menu, then resolve the live Door command (#238). This used
+    -- to press A on "Door (row 0)" and then a SECOND A to "confirm the door target" -- but
+    -- DoorCommandEffect (bmmenu.c) returns MENU_ACT_END: it sets gActionData and the menu is
+    -- gone, there is no target step. So the first press depended on Door happening to be the
+    -- top row, and the second went into whatever the map put up next.
     waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
     if not moveUnit(parked[1], parked[2], parked[1], parked[2]) then
         shot("ch03door-no-menu")
         return result("FAIL", "could not open the opener's command menu")
     end
     wait(20); shot("ch03door-menu")
-    press(K.A, 4); wait(30)   -- Door (row 0)
-    press(K.A, 4)             -- confirm the door target
+    if not selectSemantic("open_door", "the Door command closes the unit menu", function(after)
+        return after.menu == nil
+    end, 120) then
+        return result("FAIL", "the command menu offered no live Door command to the key-holder")
+    end
     local flipped = waitFor(function() return baseTile(DX, DY) == OPEN_T end, 400, true)
     wait(20); shot("ch03door-after")
     local post = baseTile(DX, DY)
@@ -4871,8 +4874,18 @@ scenarios.ch03chest = function()
         return result("FAIL", "could not open the opener's command menu on the chest tile")
     end
     wait(20); shot("ch03chest-menu")
-    press(K.A, 4); wait(40)   -- Chest (row 0); the open animation + item pop-up plays
-    for _ = 1, 8 do press(K.A, 3); wait(20) end   -- clear the "got Iron Lance" fanfare/textbox
+    -- Resolve the live Chest command instead of pressing an assumed row 0 (#238).
+    -- ChestCommandEffect returns MENU_ACT_END, so the postcondition is the menu going away;
+    -- the open animation and the "got Iron Lance" fanfare follow on their own. That fanfare
+    -- was being cleared by eight blind A's -- which is a text box, i.e. a CLASSIFIED
+    -- dialogue_wait, so the waitFor below already advances it through the guarded input and
+    -- stops the instant the tile flips. Eight unconditional presses could not tell the two
+    -- apart, and any that overran the box went into the map.
+    if not selectSemantic("open_chest", "the Chest command closes the unit menu", function(after)
+        return after.menu == nil
+    end, 120) then
+        return result("FAIL", "the command menu offered no live Chest command on the chest tile")
+    end
     local flipped = waitFor(function() return baseTile(CX, CY) == OPEN_T end, 400, true)
     wait(20); shot("ch03chest-after")
     local post = baseTile(CX, CY)
@@ -4939,7 +4952,17 @@ scenarios.ch03tourmaline = function()
         return result("FAIL", "could not open the command menu")
     end
     wait(20); shot("ch03tourmaline-cmdmenu")
-    press(K.A, 4); wait(40)            -- Item (row 0, no weapon) -> inventory list with icons
+    -- Resolve the live Item command (#238). The isolation trick above exists precisely
+    -- because the old blind A assumed Item sat at row 0 -- a neighbouring ally added Rescue
+    -- above it and the press opened the wrong submenu. Naming the command makes that an
+    -- observation rather than a staging assumption; the isolation stays, because the SHOT
+    -- wants a clean two-item menu.
+    if not selectSemantic("open_items", "the Item command opens the inventory list", function(after)
+        return controllerState(after) == "generic_menu"
+    end, 120) then
+        return result("FAIL", "the command menu offered no live Item command to the holder")
+    end
+    wait(20)
     shot("ch03tourmaline-inventory")   -- the money shot: Tourmaline (pink) above two pal-0 items
     -- Diagnostic for the custom-bank reservation: inventory remains over the battle map, so inspect
     -- every enabled BG tilemap's palette nibbles before selecting a dedicated icon bank.
@@ -5425,11 +5448,31 @@ scenarios.clear_ch02 = function()
     -- MNC2s straight into ch03, so we A-mash through it until chapter() == 4 (ch03), not the title.
     if routed and not advanced() then endTurn() end
     local reachedCh03 = false
-    for _ = 1, 1200 do
+    local watchEnding = INSPECT.watch("clear_ch02_ending")
+    for _ = 1, TUNE.bootSteps do
         snapCharms()
         if chapter() == CH03_CHAPTER then reachedCh03 = true; snapCharms(); break end
         if procActive(SYM.gProcScr_TitleScreen) then snapCharms(); break end  -- fallback: chain broken -> old landing
-        press(K.A, 2); wait(8)
+        -- Advance the ending on the CLASSIFIED dialogue wait rather than on an A cadence
+        -- (#238). The cadence pressed A every 10 frames whatever was on screen, so it could
+        -- not tell "this page is waiting for me" from "this input is being swallowed" -- and
+        -- a scene that wedged just ran the cap out and reported a timeout naming nothing.
+        -- The charm poll rides the postcondition closure, so the sampling stays as
+        -- fine-grained as the charm window (CHECK_ALIVE -> GIVEITEMTO) needs it.
+        local observation = observeController()
+        local state = controllerState(observation)
+        if watchEnding(observation, state) then
+            return result("FAIL", "the ch02 ending parked on an unclassified wait (see the snapshot)")
+        end
+        if state == "dialogue_wait" then
+            if not guardedInput("advance_dialogue", "A", "the ending's dialogue wait clears",
+                function(after)
+                    snapCharms()
+                    return controllerState(after) ~= "dialogue_wait"
+                end, 120) then break end
+        else
+            yield()
+        end
     end
     shot("clear-ch02-ending")
     log(string.format("charms delivered: %d/3; reached ch03=%s (chapter=%d)",
@@ -6412,8 +6455,19 @@ local function clearCh04(parley)
     for f = 1, 5400 do
         if f % 4 == 0 then shot(tag) end
         if won() then ended = true break end
-        if f % 90 == 0 then press(K.A, 3) end
-        yield()
+        -- Advance the ending only where FE8 is CLASSIFIED as waiting for it (#238). The
+        -- every-90-frames A this replaces was the "stray press on Press START" hazard the
+        -- comment above worries about, made structural: a cadence cannot see what is on
+        -- screen, so the guard against it was a frame count chosen to be slow enough. A
+        -- guarded input on dialogue_wait cannot fire on the title at all.
+        if controllerState() == "dialogue_wait" then
+            if not guardedInput("advance_dialogue", "A", "the ending's dialogue wait clears",
+                function(after) return controllerState(after) ~= "dialogue_wait" end, 120) then
+                break
+            end
+        else
+            yield()
+        end
     end
     log(string.format("%s: liveEnemies=%d chapter=%d (host=%d)",
         tag, #liveEnemies(), chapter(), HOST_CHAPTER))
