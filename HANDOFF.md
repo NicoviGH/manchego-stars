@@ -11,12 +11,9 @@ Refreshed 2026-08-06 (Opus). `main` = `6ed2903`, level with `origin/main`. **Not
 Verified on merged `main`: `make test` exit 0 (41 suites), `make check` = `drift check: clean`,
 `make matrix` = **14/14**, `git diff --check` clean, CI green (`build` + `checks`).
 
-**#238 got a full code review before merge** (subagent, not `/code-review ultra` — that is
-user-triggered and has not run since #242). It found three real defects, all fixed in the branch;
-they are recorded in `decisions.md`, and the shape worth remembering is that **naming a new
-controller state silently narrows what the harness can escape from** — a state that used to fall
-through to `generic_menu` was cancellable, and giving it its own name takes that away unless the
-drivers are taught in the same change.
+#238 was code-reviewed before merge (subagent). It found three real defects; all are fixed, and the
+lessons are in `decisions.md`. **Nothing has had a `/code-review ultra <PR#>` since #242 — that one
+is user-triggered.**
 
 **Next: ch05 (#25). Jump there — the issue is the source, not this file.**
 
@@ -25,103 +22,27 @@ drivers are taught in the same change.
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
   Verified on this tree 2026-08-06: all `tools/test_*.py`, 8 Lua harness suites, `make check` =
   `drift check: clean`, canonical + `TESTCH=1` + `CH04BOOT=1` all build green.
-- **The live regression matrix is `make matrix` (#231, merged in #233).** One command builds each ROM
-  configuration at most once and prints a verdict table. **`tools/playtest/matrix.yaml` is now the
-  single source of what a scenario needs** — ROM flag, `PT_HOST_CHAPTER`, checkpoint, fps/deadline —
-  and `check.py check_playtest_matrix` fails the build if a `harness.lua` scenario has no row.
-- **Gate status: 14/14 on `main`** (re-verified 2026-08-06 after #243). Local verification is a
-  strict SUPERSET of what CI checks — `checks.yml` is a deliberate lightweight drift guard that
-  never builds the ROM. **A `BLOCKED` verdict is usually the `TESTCH` build race (#245), not the
-  scenario** — rebuild that ROM and rerun before diagnosing anything.
+- **Gate status: `make matrix` is 14/14 on `main`** (re-verified 2026-08-06 after #243). Local
+  verification is a strict SUPERSET of what CI checks — `checks.yml` is a deliberate lightweight
+  drift guard that never builds the ROM. **A `BLOCKED` verdict is usually the `TESTCH` build race
+  (#245), not the scenario** — rebuild that ROM and rerun before diagnosing anything. (What the
+  matrix is and what a scenario row means: `CLAUDE.md` source-of-truth table → `matrix.yaml`.)
 - **Cross-agent continuity:** Nicolas uses Codex only between Claude sessions. Codex must leave an
   explicit HANDOFF entry naming what it changed, the active branch/PR and commit state, verification
   actually run, and the exact next step. Codex uses ordinary short-lived feature branches in this
   checkout, one at a time — **do not create worktrees unless Nicolas explicitly changes that.**
-- **ch05 "The Elven Tomb" (#25) is the only chapter with work owed.** Dialogue is complete and merged
-  (PR #196): 15 slots, all `status: locked`. Still owed: map + placement, text insertion →
-  `verify_text`, `--ch05-boot` playtest, `enemy_class_reskins` + FE-Repo imports, Basil/Sahnar
-  STAT_DONORs, and the five no-Lupin conditionals (they ride Stage 4's `variant_beat`, not a second
-  mechanism). Hosting ch05 also retires ch04's `dev_placeholder_scene()` terminator.
-- **ch01–ch04 are DONE and CLOSED.** ch04 shipped in #223; its one open thread was the placeholder
-  terminator above, which is ch05's to retire.
+- **ch01–ch04 are DONE and CLOSED; ch05 (#25) is the only chapter with work owed.** Its dialogue is
+  already merged (PR #196, 15 slots, all `status: locked`); everything still owed is the checklist
+  on **#25**, which is the source — not this file. See NEXT SESSION for the few things the issue
+  does not say.
 
-## NEXT SESSION — ch05 (#25)
+## Next task
 
-**Start from the GitHub issue, not from here.** These notes only add what the issue does not say.
+**ch05 (#25) — read the issue.** Everything owed, including the build-work notes that used to sit
+here, is on it. Then **#29** world map.
 
-### 1. What the playtest tooling gives you — USE it, don't re-derive it
-
-#222 is closed; nothing is owed on it. What it shipped is the tooling ch05 runs on, so read this
-before building anything.
-
-Nicolas's standing question, answered with measurements so it is not re-litigated: **the gates cost
-~1.5s on `make check` and a few percent on `make matrix` (4-6 min warm).** The real cost is not
-seconds — it is that a new FE8 input state must be CLASSIFIED before a scenario can drive it. #238
-surfaced six of them in one pass (the inventory list, the send-to-convoy chooser, the Character
-screen, the Pick Units grid, the in-map convoy, and four unit commands), and **ch05 will surface
-more**. That work always existed; it used to be deferred into mystery failures.
-**If the stall detector ever false-positives, `TUNE.stallFrames` is the dial — do not remove it.**
-
-What it shipped, so the next instance can USE it instead of re-deriving it:
-
-- **A failing scenario dumps its own diagnosis, and `run.sh` now PRINTS it for you on a FAIL
-  (#241).** `tools/playtest/inspect_state.py render <log>` re-reads it later — the verdict, the rule
-  that produced it, every rule rejected and why, and the live procs named by exact symbol — and
-  `diff <a> <b>` gives the first divergence between two runs. **Read that before rebuilding
-  anything** — it is the whole point.
-- **Pure decisions belong in `controller.lua`, emulator driving in `harness.lua`.** The stall
-  detector (`Controller.stallWatch`) moved there for exactly that reason: it decides FAIL for whole
-  suites and `harness.lua` cannot be loaded outside mGBA, so it had no tests. Classification rule
-  ORDER is load-bearing (specific outranks general — `yes_no_choice` above `dialogue_wait` above
-  `std_event`) and is pinned by tests in `test_controller.lua`.
-- A verdict flagged `*** UNCLASSIFIED WAIT ***` means FE8 is waiting on something with no name yet.
-  The fix is always the same four edits: `gen_symbols.py` WANTED, `CALLBACK_NAMES`,
-  `observeController`, a `classify` rule — then let the SCENARIO choose the answer.
-- `harness.lua` is against Lua's 200-local ceiling. **Never write the remaining margin down** — it
-  was prose in three files at once and wrong in all three within one PR (#241). `make check` prints
-  the measured number (`check_lua_local_headroom`) and fails at zero. Hang new helpers off an
-  existing table (`INSPECT`, `TUNE`), or put pure logic in `controller.lua` — it has a unit suite
-  and no ceiling, which is where the stall detector now lives. Crossing it stops the whole file
-  loading and every scenario dies at once; `check_lua_chunks_load` fails the build on it in 0s.
-
-### 2. What #238 changed about writing a ch05 scenario
-
-- **A `kind: verdict` scenario may not contain a raw `press`** — `check.py
-  check_verdict_scenarios_are_guarded` fails the build on one, following the call graph, so a press
-  hidden in a shared helper is caught at every verdict scenario that reaches it. Set `kind` by what
-  the scenario ASSERTS, never by its name prefix. `record`/`diagnostic` stay exempt by design.
-- **No hardcoded ROM/EWRAM addresses in the playtest Lua** —
-  `check_no_hardcoded_symbol_addresses`. ch03's doors and chests read as broken content for as
-  long as one stale literal survived; both scenarios died on a memory READ, before any input.
-- **Naming a new state is not finished until the drivers know about it.** A state that used to fall
-  through to `generic_menu` was cancellable by `cancelToPlayerMap` and recoverable by
-  `awaitControllerState`; giving it its own name takes that away. Wire its cancel in the same
-  change, and enumerate a movement action only where the engine would actually move.
-- **The acceptance test for a migration is the bite test, not a green run**: break a classification
-  and confirm the scenario now FAILS.
-
-### 3. ch05's build work (#25)
-
-**#222 is CLOSED** (2026-08-06, on #138 + #238). **Do not re-open the `inject_chapter(descriptor)`
-idea without new evidence — it was measured and rejected.** The guard that mattered shipped in #239 (and was hardened in #241), and of 2,209 LOC in
-`inject_ch01`–`ch04`, just **123 (6%)** is the host skeleton a descriptor would collapse — ~30 lines
-a chapter, already helper calls. The other 94% is per-chapter rosters, event scripts and scenes. The
-one real cleanup left inside it, deliberately not re-filed: ch03's bespoke
-`_inject_ch03_tile_changes` should migrate onto ch04's generic `_inject_tile_changes` — a ~20-line
-change that ch05's tile-change work sits next to anyway. Byte-identical baseline if you do it:
-`42cd82360be3c186c60f9366d57c7608d3d83548`.
-
-ch05 also needs a `matrix.yaml` entry — `docs/adding-a-chapter.md` step 11 has the runbook, and
-`check.py` enforces it.
-
-Then: **#29** world map.
-
-Filed during #238, not scheduled: **#244** (five playtest scenarios failing outside the gate suite —
-`ch03win`/`clear_ch03` both report their own success and then fail on a combat timeout, which smells
-like a missing `chooseAttack` `stopWhen`) and **#245** (the `TESTCH` chap_title build race that
-blocked the gate twice in one session; retry the build before believing a `BLOCKED` verdict).
-
-Parked, not scheduled: **#228** physical cartridges (after the ROM is done).
+Not scheduled: **#244** (three playtest scenarios failing outside the gate suite), **#245** (the
+`TESTCH` build race), **#228** physical cartridges (after the ROM is done).
 
 ## Gotchas most likely to bite next (long form in `docs/decisions.md`)
 

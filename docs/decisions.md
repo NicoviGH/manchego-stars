@@ -1562,6 +1562,22 @@ found them.** Removing a cadence is not a no-op, and neither was worth a guess:
   The assertion caught the comment, not a defect. Contrast assertions have to be written
   against the engine's rule, not the prose around them.
 
+**What the contract costs, measured, so it is not re-litigated (Nicolas's standing question).**
+The gates cost **~1.5s on `make check`** and a few percent on `make matrix` (4–6 min warm, 14/14).
+The real cost is not seconds: it is that a new FE8 input state must be CLASSIFIED before a scenario
+can drive it. #238 named six in one pass — the inventory list, the send-to-convoy chooser, the
+Character screen, the Pick Units grid, the in-map convoy, and four unit commands — and each new
+chapter will surface more. That work always existed; the cadence deferred it into mystery failures
+instead of paying it. **If the stall detector ever false-positives, `TUNE.stallFrames` is the dial
+— do not remove it.**
+
+**The acceptance test for a migrated scenario is the BITE TEST, not a green run.** Break a
+classification deliberately and confirm the scenario now FAILS. A migration's whole claim is
+"this run means something now", and only a sabotage proves it — #240 established this on
+`ch01win` (the same sabotage passed before the migration), and #238 repeated it on the
+Character screen (`fail:state-timeout` where the old code, which consulted no classification
+at all, could not have noticed) and on the lead-menu walk landing one row short.
+
 **Naming a new state is not finished until the DRIVERS know about it.** Code review caught two
 instances on this branch. `item_list` and `send_to_convoy` had classified as `generic_menu`
 before they were named, so `cancelToPlayerMap` could back out of both; giving them their own
@@ -3471,6 +3487,16 @@ session state. `HANDOFF.md` points here._
   is still worth doing — 2,626 LOC across five per-chapter functions with a 15-helper shared spine —
   but it is a *readability and repetition* argument, not a prerequisite for validation. Check what a
   refactor actually unblocks before sequencing work behind it.
+  **What the repetition argument is actually worth, measured:** of 2,209 LOC in
+  `inject_ch01`–`ch04`, just **123 (6%)** is the host skeleton a descriptor would collapse — roughly
+  30 lines a chapter, and already helper calls. The other 94% is per-chapter rosters, event scripts
+  and scenes, which no descriptor absorbs. So the idea is **not scheduled** and should not be
+  re-opened without new evidence; it was never *rejected on principle*, it just does not pay for
+  itself at this size. The one real cleanup inside it, deliberately not filed as its own issue:
+  ch03's bespoke `_inject_ch03_tile_changes` should migrate onto ch04's generic
+  `_inject_tile_changes` — a ~20-line change that a future chapter's tile-change work sits next to
+  anyway. Byte-identical baseline to diff against if you do it:
+  `42cd82360be3c186c60f9366d57c7608d3d83548`.
 - **A proc's identity is its script ADDRESS, never its `PROC_NAME` string** (2026-08-06, #236).
   Freeze reports named a proc from the string pointer at proc+0x10, and that string is not an
   identity: the decomp gives `gProcScr_E_FACE` and `gProcScr_E_FACE_ExtraFrame` the same
