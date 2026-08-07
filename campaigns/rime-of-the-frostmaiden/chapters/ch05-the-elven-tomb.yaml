@@ -1348,11 +1348,11 @@ economy:
 # terrain). Placement is vanilla's, not ours, the same call as ch04's cottage.
 # `assert_village_tiles_visitable` rejects any of these standing on scenery.
 villages:
-  - id: reliquary-north            # vanilla Ch5 village ~(5,1)
+  - id: reliquary-north            # vanilla Ch5 village (5,1)
     tile: [5, 1]
     visit_reward:
-      - id: booster-def            # = Ch5's Dracoshield (+Def). First stat-booster in the campaign.
-        amount: 1
+      - id: torch                  # = Ch5's Torch, reflavoured an elven everburning lamp.
+        amount: 1                  # Vanilla's own gift for THIS tile -- see the note below.
   - id: reliquary-west             # vanilla Ch5 village ~(5,6)
     tile: [5, 6]
     visit_reward:
@@ -1363,11 +1363,20 @@ villages:
     visit_reward:
       - id: armorslayer            # = Ch5's Armorslayer. We field no armour, so it reads as a
         amount: 1                  #   plain strong sword (see economy.reward_sites).
-  - id: reliquary-south            # vanilla Ch5 village ~(12,19)
+  - id: reliquary-south            # vanilla Ch5 village (12,19)
     tile: [12, 19]
     visit_reward:
-      - id: torch                  # = Ch5's Torch, reflavoured an elven everburning lamp
-        amount: 1
+      - id: booster-def            # = Ch5's Dracoshield (+Def). First stat-booster in the campaign,
+        amount: 1                  # and vanilla puts it HERE on purpose -- see the note below.
+# WHICH GIFT SITS ON WHICH TILE IS VANILLA'S, NOT OURS (corrected 2026-08-07, decomp-verified via
+# each village script's SVAL(EVT_SLOT_3, <item id>)). booster-def and torch were swapped, which read
+# as harmless -- same four items, same total, and the parity gate counts the SET, not the tiles --
+# but it inverts the chapter's risk/reward. (12,19) is the SOUTH-EAST site, and the turn-2 eruption
+# pair spawns at (14,16)/(14,15), right beside it: vanilla puts its RICHEST gift (Dracoshield,
+# 8000g) on the site the first raiders reach, and its cheapest (Torch, 500g) at (5,1), which sits
+# behind the whole enemy line and is the safest on the map. Swapping them pays the most for the
+# safest errand, which is exactly backwards for a chapter whose structure IS the race for the
+# reward-sites. The placement is vanilla's, like every other placement on this retile.
 # NOTE: the save-all-four bonus (crest-of-cold-iron, standing in for Ch5's Guiding Ring) is NOT a
 # visit_reward -- it is handed out outside the Village macro, exactly as vanilla does it. Wired at
 # inject_ch05; `economy.save_all_bonus` is its declaration.
