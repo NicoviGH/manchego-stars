@@ -242,6 +242,9 @@ scenarios:
     rom: ch04boot
     host_chapter: 5
     kind: record
+  ch05village:
+    rom: ch05boot
+    host_chapter: 6
   ch04snag:
     rom: ch04boot
     host_chapter: 5
@@ -351,6 +354,9 @@ suites:
     - smoke_ch04
     - clear_ch04
     - clear_ch04_parley
+
+  ch05:
+    - ch05village
 
   sandbox:
     - recordunitlist

@@ -5748,6 +5748,69 @@ def assert_event_group_roster(info_path, group, symbol):
                      % (group, field, match.group(1), symbol))
 
 
+def declare_event_script(path, symbol, body, comment):
+    """DEFINE a campaign-owned EventListScr in `path` (a chN-eventscript.h), and return its symbol.
+
+    The script twin of declare_unit_table, for the same reason and with the same payoff. A host
+    slot frees only the scripts its stripped cutscenes stop referencing -- slot 6 leaves five, and
+    ch05 needs three reinforcement waves plus one per village, which is more than it has. Naming
+    our own removes the budget entirely, and `MS_Ch05Village2` says what it runs where
+    `EventScr_089F2AE4` says nothing at all.
+    """
+    with open(path, encoding='utf-8') as f:
+        script = f.read()
+    if ('EventListScr %s[]' % symbol) in script:
+        sys.exit('ERROR: event script %s is already defined this build -- two injectors are '
+                 'claiming one symbol name' % symbol)
+    _assert_ms_symbol(symbol)
+    with open(path, 'a', encoding='utf-8') as f:
+        f.write('\n/* %s */\nCONST_DATA EventListScr %s[] = %s;\n' % (comment, symbol, body))
+    with open(EVENTCALL_H, encoding='utf-8') as f:
+        header = f.read()
+    with open(EVENTCALL_H, 'w', encoding='utf-8') as f:
+        f.write(event_script_extern(header, symbol, comment))
+    return symbol
+
+
+def assert_event_scripts_defined(path, symbols):
+    """Fail the BUILD if a declared event script is missing from `path`.
+
+    `declare_event_script` APPENDS, while the injectors' block-replacements rewrite the same file
+    wholesale from a copy read earlier -- so declaring before the bulk write silently discards
+    every appended script. The Location list still names them and the externs still exist, so the
+    only symptom is a link error pointing at the reference rather than at the loss. Cheap to
+    assert, and it pins the ordering against a future reshuffle of the injector.
+    """
+    with open(path, encoding='utf-8') as f:
+        script = f.read()
+    missing = [s for s in symbols if ('EventListScr %s[]' % s) not in script]
+    if missing:
+        sys.exit('ERROR: %s declared but not defined in %s -- declare_event_script APPENDS, so it '
+                 'must run AFTER the block-replacement pass rewrites the file, never before'
+                 % (', '.join(missing), os.path.basename(path)))
+
+
+# Anchored on the first EventListScr extern, like the UnitDefinition block above it.
+_SCRIPT_EXTERN_ANCHOR = 'extern CONST_DATA EventListScr EventScr_9EEA58[];'
+
+
+def event_script_extern(header, symbol, comment):
+    """Pure: `header` (eventcall.h) with an extern for event script `symbol`. Idempotent.
+
+    The Location list that names these lives in a DIFFERENT file from their definitions, so
+    without the declaration agbcc sees an implicit int and the build dies a long way from here.
+    """
+    _assert_ms_symbol(symbol)
+    decl = 'extern CONST_DATA EventListScr %s[];' % symbol
+    if decl in header:
+        return header
+    if _SCRIPT_EXTERN_ANCHOR not in header:
+        sys.exit('ERROR: eventcall.h has no EventListScr extern block to extend (looked for %r)'
+                 % _SCRIPT_EXTERN_ANCHOR)
+    return header.replace(_SCRIPT_EXTERN_ANCHOR,
+                          '%s\n%s /* %s */' % (_SCRIPT_EXTERN_ANCHOR, decl, comment), 1)
+
+
 def unit_table_definition(udefs, symbol, rows, comment):
     """Pure: `udefs` with a campaign-owned UnitDefinition table appended.
 
@@ -7422,6 +7485,29 @@ CH05_LINE_TABLE = 'MS_Ch05Line'                  # the 16 turn-1 tomb-guardians
 CH05_SAHNAR_TABLE = 'MS_Ch05Sahnar'              # the turn-2 convertible (rises hostile)
 CH05_WAVE_TABLES = {2: 'MS_Ch05Wave2', 3: 'MS_Ch05Wave3', 5: 'MS_Ch05Wave5'}
 
+# The four reliquary visits. Each rides OUR OWN script (declare_event_script) but shows VANILLA
+# Ch5's own village line, by pointing at the message id that already holds it -- we never WRITE
+# 0x9CD..0x9D0, so the ROM keeps vanilla's text verbatim and the id stays unclaimed
+# (HOSTED_CHAPTER_MESSAGE_IDS). ch05's authored dialogue skips this range exactly (it runs
+# 0x9BE..0x9CC then jumps to 0x9D5), so nothing collides.
+#
+# TEMPORARY, and only the PROSE is (Nicolas, 2026-08-07): the give-item half is the real wiring
+# and is already gated by assert_village_gifts_match_vanilla, so the rewards are obtainable and
+# correct now. The dialogue pass replaces each body AT THE SAME ID -- one line per site, not a
+# rewire -- and claims the ids in HOSTED_CHAPTER_MESSAGE_IDS when it does.
+CH05_VILLAGE_SLOTS = {
+    'reliquary-east':  ('MS_Ch05VisitEast',  0x9CD),   # vanilla's (12,10) line
+    'reliquary-south': ('MS_Ch05VisitSouth', 0x9CE),   # vanilla's (12,19) line
+    'reliquary-west':  ('MS_Ch05VisitWest',  0x9CF),   # vanilla's (5,6) line
+    'reliquary-north': ('MS_Ch05VisitNorth', 0x9D0),   # vanilla's (5,1) line
+}
+CH05_VISIT_BG = 'BG_HOUSE'          # vanilla's own village interior, as its village scripts use
+# The elven store (`economy.elven_store`). Armory/Vendor take their stock DIRECTLY -- no script,
+# no text -- so these are wired PERMANENTLY, not as placeholders. Stock is vanilla Ch5's own,
+# which is what `make difficulty CH=ch05` prices the shop tier against.
+CH05_SHOPS = (('Armory', 'ShopList_Event_Ch5Armory', 2, 1),
+              ('Vendor', 'ShopList_Event_Ch5Vendor', 6, 10))
+
 CH05_LAYOUT = ('Ch05ElvenTombMap', 'ch05-the-elven-tomb')   # (asset label, maps/ stem)
 CH05_CHAPTER_YAML = 'ch05-the-elven-tomb.yaml'
 CH05_TILESET = 'port-or-town-winter'             # stem 'PortTown'; ch05 is the first chapter to
@@ -7601,7 +7687,7 @@ def convert_survivors_green(pids, label_base, what):
         for i, pid in enumerate(pids))
 
 
-def ch04_village_script(msg, item, bg):
+def village_script(msg, item, bg):
     """A village visit, in vanilla Ch4's own shape (EventScr_089F1BD8): one text box over the
     village BG, then the reward into the visitor's hands.
 
@@ -7627,10 +7713,21 @@ def ch04_village_script(msg, item, bg):
             '    ENDA\n}' % (bg, msg, give))
 
 
-def village_reward_item(village):
-    """The FE item a village hands over, or None when its reward is the line alone."""
+def village_reward_id(village):
+    """The YAML id of what a village hands over, or None when its reward is the line alone."""
     reward = village.get('visit_reward')
-    return CH04_ITEM_IDS[reward[0]['id']] if reward else None
+    return reward[0]['id'] if reward else None
+
+
+def village_reward_item(village, item_ids):
+    """The FE item enum a village hands over, or None when its reward is the line alone.
+
+    `item_ids` is the CHAPTER's id->enum map. It used to close over CH04_ITEM_IDS, which made a
+    shared helper silently ch04-only: ch05's gifts (the two stat boosters) are not in that dict,
+    so the first chapter to reuse it would have died on a KeyError naming ch04.
+    """
+    reward = village_reward_id(village)
+    return item_ids[reward] if reward else None
 
 
 def village_boxes(village):
@@ -7652,19 +7749,36 @@ def village_boxes(village):
     return [' '.join(box.split()) for box in text]
 
 
-def ch04_location_events(chap):
-    """ch04's Location list: one `Village` per authored village, at the tile the chapter YAML
-    names, each running its OWN script (CH04_VILLAGE_SLOTS) -- two doors sharing one script show
-    the same line at both. Vanilla Ch4 wires two and so do we (#24).
+def location_events(villages, village_slots, shops=()):
+    """The host slot's Location list: everything the player can VISIT.
+
+    One `Village` per authored village, at the tile the chapter YAML names, each running its OWN
+    script (`village_slots[id]`) -- two doors sharing one script show the same line at both.
 
     `Village(eid, scr, x, y)` expands to VILL + a LOCA on the tile ABOVE (EAstdlib), which is how
     FE8 lets a unit standing north of the door trigger it -- so the door tile is the anchor, not
-    the whole building."""
-    return ('{\n' + ''.join(
+    the whole building.
+
+    `shops` are `(macro, shoplist_symbol, x, y)` -- `Armory`/`Vendor` take their stock DIRECTLY
+    and run no script and show no text, so a shop is fully wired the moment its tile is listed.
+
+    **An empty Location list makes every reward on the map unobtainable while the map still draws
+    it.** That is how ch04 shipped an unreachable Iron Axe (#205), and it is why this returns a
+    list built from the YAML rather than something a chapter has to remember to fill in.
+    """
+    rows = ''.join(
         '    Village(0, %s, %d, %d) /* %s -- %s */\n'
-        % (CH04_VILLAGE_SLOTS[v['id']][0], v['tile'][0], v['tile'][1], v['id'],
-           village_reward_item(v) or 'the line is the reward')
-        for v in chap.get('villages', [])) + '    END_MAIN\n}')
+        % (village_slots[v['id']], v['tile'][0], v['tile'][1], v['id'],
+           village_reward_id(v) or 'the line is the reward')
+        for v in villages)
+    rows += ''.join('    %s(%s, %d, %d)\n' % shop for shop in shops)
+    return '{\n' + rows + '    END_MAIN\n}'
+
+
+def ch04_location_events(chap):
+    """ch04's Location list. Vanilla Ch4 wires two villages and so do we (#24); no shops."""
+    return location_events(chap.get('villages', []),
+                           {vid: slot[0] for vid, slot in CH04_VILLAGE_SLOTS.items()})
 
 
 def assert_village_tiles_visitable(chap, maps_dir, stem):
@@ -8875,7 +8989,8 @@ def inject_ch04(campaign, boot=False, verbose=True):
         symbol, msg, _fid, bg = CH04_VILLAGE_SLOTS[village['id']]
         script = _replace_brace_block(
             script, symbol + '[] =',
-            ch04_village_script(msg, village_reward_item(village), bg), CH5_EVENTSCRIPT_H)
+            village_script(msg, village_reward_item(village, CH04_ITEM_IDS), bg),
+            CH5_EVENTSCRIPT_H)
     # The moose-flees beat (Stage 4): fired by the Misc AREA when a unit reaches the tomb-side
     # clearing. Loads the moose, holds on it, RBG's one line, then it bolts NE and is gone.
     script = _replace_brace_block(
@@ -9132,11 +9247,14 @@ def inject_ch05(campaign, boot=False, verbose=True):
         info, CH05_EVENT_LISTS['misc'] + '[] =',
         '{\n    DefeatBoss(%s)\n    CauseGameOverIfLordDies\n    END_MAIN\n}'
         % CH05_ENDING_SCRIPT, CH05_EVENTINFO_H)
-    # The four reliquary visits are authored but their visit_text is still owed (#25), so the
-    # Location list stays empty for now. Blanking it is what made ch04's Iron Axe unobtainable,
-    # so this is a KNOWN gap tracked on the issue, not an oversight -- the village TILES are
-    # intact on the map either way (assert_village_tiles_visitable has something true to check).
-    for key in ('character', 'location', 'select_unit', 'select_dest', 'unit_move', 'tutorial'):
+    # Location = the four reliquary visits + the elven store. The shops are wired for good (a
+    # shop needs no script and no text); the visits borrow vanilla's prose and own their rewards.
+    info = _replace_brace_block(
+        info, CH05_EVENT_LISTS['location'] + '[] =',
+        location_events(chap.get('villages', []),
+                        {vid: slot[0] for vid, slot in CH05_VILLAGE_SLOTS.items()},
+                        CH05_SHOPS), CH05_EVENTINFO_H)
+    for key in ('character', 'select_unit', 'select_dest', 'unit_move', 'tutorial'):
         info = _replace_brace_block(info, CH05_EVENT_LISTS[key] + '[] =',
                                     '{\n    END_MAIN\n}', CH05_EVENTINFO_H)
     # Point the group at OUR roster table. Declaring it is not enough -- the engine reads the
@@ -9187,6 +9305,25 @@ def inject_ch05(campaign, boot=False, verbose=True):
         CH05_EVENTSCRIPT_H)
     with open(CH05_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
         f.write(script)
+
+    # 4b. The four reliquary visits, one script each so a site can get its own line later without
+    #     disturbing the others. Vanilla's own village shape (village_script, shared with ch04):
+    #     one text box over the interior BG, then the gift into the visitor's hands.
+    #
+    #     AFTER the bulk write, and that ordering is load-bearing: declare_event_script APPENDS to
+    #     this file, while the block-replacement above rewrites it wholesale from a copy read
+    #     earlier. Declaring first silently discards every appended script -- the Location list
+    #     still names them, the externs still exist, and the build dies at link time pointing at
+    #     the reference rather than the loss. assert_event_scripts_defined catches the reorder.
+    for village in chap.get('villages', []):
+        symbol, msg = CH05_VILLAGE_SLOTS[village['id']]
+        declare_event_script(
+            CH05_EVENTSCRIPT_H, symbol,
+            village_script(msg, village_reward_item(village, CH05_ITEM_IDS), CH05_VISIT_BG),
+            'ch05 %s -- gift is ours, prose is vanilla 0x%X until the dialogue pass (#25)'
+            % (village['id'], msg))
+    assert_event_scripts_defined(
+        CH05_EVENTSCRIPT_H, [slot[0] for slot in CH05_VILLAGE_SLOTS.values()])
 
     # 5. Texts + the flagged defeat quote that IS the win trigger.
     with open(TEXTS_TXT, encoding='utf-8') as f:

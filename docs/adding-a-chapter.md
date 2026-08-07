@@ -144,6 +144,14 @@ geometry regardless of which slot hosts it (ch03 repaints vanilla Ch3 "Borgo" bu
      keeps the item set, the total and the parity verdict identical while inverting which site is
      worth defending. Deliberate moves declare `vanilla_gift_divergence: <why>` on the village.
 
+   **Do not wait for the dialogue pass to wire this.** Point the visits at the vanilla message ids
+   that already hold the host-chapter's village lines and do NOT write them — the ROM keeps
+   vanilla's prose, the ids stay unclaimed, and the dialogue pass later writes our body at the same
+   id. The give-item half is real wiring, not a placeholder, and shops need no script or text at
+   all. Build with `location_events(villages, slots, shops)` + `village_script`, and declare one
+   `MS_ChNNVisit*` per site with `declare_event_script` — **after** the block-replacement pass, or
+   the appends are discarded (`assert_event_scripts_defined` pins it).
+
 8. **Title + names** — `set_message_body(lines, host['chapTitleTextId'], name_message_body(title))`;
    rename any vanilla boss slot's nameplate (`vanilla_name_text_id`) so it doesn't leak; compose the
    title-card image with `_write_chapter_title_card` (add `graphics/chap_title/chap_title_N.png` to
