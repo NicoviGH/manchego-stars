@@ -19,6 +19,44 @@ from map_tileset_tool import (_tileset_from_dir, compile_layout,
                               vanilla_layout_data)
 
 
+def validate_terrain_matches_vanilla(export_data, decomp_root, maps_root):
+    """A retile inherits vanilla's terrain, whatever tileset it is painted on.
+
+    Runs for EVERY tileset, unlike validate_vanilla_retile below, which only ever covered
+    snowy-bern. That gap is why ch05's fence->wall drift had to be caught by hand: eleven
+    cells changed role while looking right, and FENCE vs WALL differ in exactly one place
+    (TerrainTable_MovCost_Fly*), so the map would have quietly stopped our one Pegasus
+    Knight crossing the wall he is meant to fly over. Same failure class as ch04's
+    unobtainable village.
+
+    The fix for a violation is to author the TERRAIN BYTE of the offending metatile in our
+    vendored copy of the tileset -- never to swap the painted tile.
+    """
+    layout = export_data.get('vanilla_layout')
+    if not layout:
+        return                        # a genuine from-scratch canvas has no vanilla to match
+    width, height, source_cells, source_terrain = vanilla_layout_data(decomp_root, layout)
+    grid = export_data.get('grid') or []
+    if len(grid) != width * height:
+        return                        # dimension mismatch is reported by the checks below
+    tileset = _tileset_from_dir(os.path.join(
+        maps_root, 'tilesets', export_data.get('tileset', 'snowy-bern')))
+    errors = []
+    for cell, (painted, vanilla_metatile) in enumerate(zip(grid, source_cells)):
+        want = source_terrain[vanilla_metatile]
+        got = tileset.terrain(painted)
+        if got != want:
+            errors.append('(%d, %d) is terrain 0x%02x; vanilla %s has 0x%02x '
+                          '(metatile %d)' % (cell % width, cell // width, got,
+                                             layout, want, painted))
+    if errors:
+        raise ValueError(
+            'retile changed terrain on %d cell(s) -- re-author the metatile terrain byte '
+            'in maps/tilesets/%s/, do not swap the tile: %s'
+            % (len(errors), export_data.get('tileset'), '; '.join(errors[:8])
+               + (' ...' if len(errors) > 8 else '')))
+
+
 def validate_vanilla_retile(export_data, decomp_root, maps_root):
     """Reject Snowy Bern exports that alter protected vanilla terrain sequences."""
     if export_data.get('tileset', 'snowy-bern') != 'snowy-bern':
@@ -88,9 +126,11 @@ def main(argv=None):
 
     with open(src, encoding='utf-8') as source:
         export_data = json.load(source)
+    decomp = os.path.join(ROOT, 'fireemblem8u')
+    maps_root = os.path.join(ROOT, 'campaigns/rime-of-the-frostmaiden/maps')
     try:
-        validate_vanilla_retile(export_data, os.path.join(ROOT, 'fireemblem8u'),
-                                os.path.join(ROOT, 'campaigns/rime-of-the-frostmaiden/maps'))
+        validate_terrain_matches_vanilla(export_data, decomp, maps_root)
+        validate_vanilla_retile(export_data, decomp, maps_root)
     except ValueError as error:
         sys.exit('ERROR: %s' % error)
 

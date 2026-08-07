@@ -1,0 +1,3 @@
+Village - Port or Town  {Cynon, WaVe, Atlas}
+Winter Nighttime palette by Atlas.
+Source: Klokinator/FE-Repo -> Tilesets/Towns & Villages/

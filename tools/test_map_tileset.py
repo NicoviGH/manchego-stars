@@ -238,6 +238,133 @@ class TestVanillaLayoutTilesetResolution(unittest.TestCase):
             )
 
 
+class TestEditorUsesTheResolver(unittest.TestCase):
+    """gen_map_editor must RESOLVE the reference pane's tileset, never scan for it.
+
+    The resolver and the test above both existed while gen_map_editor kept its own
+    backward scan over gChapterDataAssetTable, so Ch5Map's reference pane rendered
+    through Ch5x's castle interior -- correct geometry, wrong art, which reads as a
+    corrupt map. Painting a retile against that reference is painting against a lie.
+    """
+
+    SOURCE = os.path.join(REPO, 'tools', 'gen_map_editor.py')
+
+    def test_calls_vanilla_layout_tileset_assets(self):
+        with open(self.SOURCE, encoding='utf-8') as f:
+            source = f.read()
+        self.assertIn('vanilla_layout_tileset_assets(dec, layout)', source)
+
+    def test_no_backward_scan_for_tileset_assets(self):
+        with open(self.SOURCE, encoding='utf-8') as f:
+            source = f.read()
+        for probe in ("startswith('TileConfiguration')",
+                      "startswith('MapPalette')",
+                      "startswith('ObjectType')"):
+            self.assertNotIn(probe, source,
+                             'asset-table proximity is not authoritative -- '
+                             'resolve through chapter_settings.json instead')
+
+    def test_no_hardcoded_tileset_1_in_the_reference_pane(self):
+        """The reskin-mode reference pane hardcoded tileset 1 for every layout.
+
+        A separate instance of the same defect from the backward scan, and the one
+        that actually reached the screen: Ch5Map rides tileset 2, so the pane a
+        retile is painted against rendered through the wrong art entirely.
+        """
+        with open(self.SOURCE, encoding='utf-8') as f:
+            source = f.read()
+        for probe in ('ObjectType1', 'MapPalette1', 'TileConfiguration1'):
+            self.assertNotIn(
+                "graphics/map/%s" % probe, source,
+                'the reference pane must resolve the layout OWN tileset, '
+                'not assume tileset 1')
+
+    def test_ch5map_resolves_to_tileset_2_not_ch5x_castle(self):
+        if not os.path.isdir(DECOMP):
+            self.skipTest('decomp submodule not checked out')
+        self.assertEqual(
+            ('ObjectType2', 'MapPalette2', 'TileConfiguration2'),
+            mt.vanilla_layout_tileset_assets(DECOMP, 'Ch5Map'))
+
+
+class TestPaletteHidesUnusedSlots(unittest.TestCase):
+    """TERRAIN_NONE is the tileset's own 'this slot is unused' flag.
+
+    The palette used to filter on a solid-ORANGE colour probe, which is tileset-specific:
+    Port-or-Town marks its 144 unused slots solid TEAL, so every one of them showed up as a
+    paintable brush. Terrain 0x00 generalises and is authoritative.
+    """
+
+    def test_terrain_none_slots_are_excluded(self):
+        with open(os.path.join(REPO, 'tools', 'gen_map_editor.py'), encoding='utf-8') as f:
+            source = f.read()
+        self.assertIn("win.terrain(m) != 0x00", source)
+
+    def test_no_committed_map_paints_a_terrain_none_tile(self):
+        maps = os.path.join(REPO, 'campaigns/rime-of-the-frostmaiden/maps')
+        for stem, tileset in (('ch00-prologue', 'snowy-bern'),
+                              ('ch01-the-iron-trail', 'snowy-bern'),
+                              ('ch02-cold-welcome', 'snowy-bern'),
+                              ('ch04-lonelywood-forest', 'snowy-bern'),
+                              ('ch03-the-termalaine-mine', 'cave-interior')):
+            ts = mt._tileset_from_dir(os.path.join(maps, 'tilesets', tileset))
+            with open(os.path.join(maps, stem + '.json'), encoding='utf-8') as f:
+                info = json.load(f)
+            with open(os.path.join(maps, stem + '.mar'), 'rb') as f:
+                raw = f.read()
+            for cell in range(info['width'] * info['height']):
+                metatile = struct.unpack_from('<H', raw, cell * 2)[0] >> 5
+                self.assertNotEqual(
+                    0x00, ts.terrain(metatile),
+                    '%s cell %d paints metatile %d, which the tileset marks unused'
+                    % (stem, cell, metatile))
+
+
+class TestRetileInheritsVanillaTerrain(unittest.TestCase):
+    """A retile changes art, never terrain -- on ANY tileset.
+
+    The old guard only ran for snowy-bern, so ch05's port-or-town retile drifted eleven
+    cells FENCE -> WALL unchecked. Those differ in exactly one table
+    (TerrainTable_MovCost_Fly*), so the map looked right while silently walling out the
+    campaign's only Pegasus Knight.
+    """
+
+    def _importer(self):
+        import importlib
+        return importlib.import_module('import_map_layout')
+
+    def test_ch05_map_carries_vanilla_ch5_terrain(self):
+        if not os.path.isdir(DECOMP):
+            self.skipTest('decomp submodule not checked out')
+        maps = os.path.join(REPO, 'campaigns/rime-of-the-frostmaiden/maps')
+        with open(os.path.join(maps, 'ch05-the-elven-tomb.json'), encoding='utf-8') as f:
+            info = json.load(f)
+        with open(os.path.join(maps, 'ch05-the-elven-tomb.mar'), 'rb') as f:
+            raw = f.read()
+        grid = [struct.unpack_from('<H', raw, i * 2)[0] >> 5
+                for i in range(info['width'] * info['height'])]
+        export = dict(info, grid=grid, vanilla_layout='Ch5Map')
+        self._importer().validate_terrain_matches_vanilla(export, DECOMP, maps)
+
+    def test_guard_rejects_a_terrain_change(self):
+        if not os.path.isdir(DECOMP):
+            self.skipTest('decomp submodule not checked out')
+        maps = os.path.join(REPO, 'campaigns/rime-of-the-frostmaiden/maps')
+        _, _, cells, _ = mt.vanilla_layout_data(DECOMP, 'Ch5Map')
+        ts = mt._tileset_from_dir(os.path.join(maps, 'tilesets', 'snowy-bern'))
+        # paint every cell with one tile; it cannot carry all of vanilla Ch5's ten roles
+        export = {'tileset': 'snowy-bern', 'width': 15, 'height': 21,
+                  'grid': [66] * len(cells), 'vanilla_layout': 'Ch5Map'}
+        with self.assertRaises(ValueError) as caught:
+            self._importer().validate_terrain_matches_vanilla(export, DECOMP, maps)
+        self.assertIn('re-author the metatile terrain byte', str(caught.exception))
+
+    def test_editor_stamps_the_layout_for_a_blank_canvas_retile(self):
+        with open(os.path.join(REPO, 'tools', 'gen_map_editor.py'), encoding='utf-8') as f:
+            source = f.read()
+        self.assertIn("EXPORT_META['vanilla_layout']=VANILLA_REF", source)
+
+
 class TestLearnedWinterReskin(unittest.TestCase):
     def test_ch4_preserves_vanilla_forest_sequence_roles(self):
         expected = {
