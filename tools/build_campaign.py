@@ -5943,14 +5943,36 @@ def _prepend_defeat_quote(quote):
 
 
 def _write_chapter_title_card(host, title):
-    """Compose the chapter's title-card banner (the intro/status banner is a 4bpp
-    image, not text) and drop stale converted intermediates so make re-converts."""
+    """Compose the chapter's title-card banner (the intro/status banner is a 4bpp image, not
+    text) and CONVERT it ourselves, rather than deleting the intermediates and trusting make.
+
+    This used to delete `chap_title_N.4bpp{,.lz}` "so make re-converts". make does not: the
+    incbin dependency reaches `data/data_chap_title.o` through `$$(data_dep)` -- a
+    `$(shell scaninc ...)` target-specific variable resolved by `.SECONDEXPANSION` -- and GNU
+    Make **3.81**, which is what Apple ships and what this repo builds with, drops it. Verified
+    directly: with the .lz deleted, `make -n fireemblem8.gba` plans no rule that rebuilds it.
+
+    That has two consequences and neither announces itself (this is #245's actual root cause,
+    which was filed as a "TESTCH build race" -- it is not a race, and it is not TESTCH's):
+      1. When `data_chap_title.o` DOES need reassembling, the build dies on
+         `Error: file not found: graphics/chap_title/chap_title_N.4bpp.lz`.
+      2. When it does NOT -- the common case, since its .s never changes -- the build succeeds
+         and the ROM silently keeps the PREVIOUS card. A retitled chapter just never lands.
+
+    So: run the same two gbagfx conversions the Makefile would have, then drop the .o so the
+    new bytes are actually assembled in. Deterministic, and independent of the make version.
+    """
     title_png = os.path.join(DECOMP, 'graphics', 'chap_title',
                              'chap_title_%d.png' % host['chapTitleId'])
     gen_chapter_title.compose_title(title).save(title_png)
-    for stale in (title_png[:-4] + '.4bpp', title_png[:-4] + '.4bpp.lz'):
-        if os.path.exists(stale):
-            os.remove(stale)
+    gbagfx = os.path.join(DECOMP, 'tools', 'gbagfx', 'gbagfx')
+    four_bpp, lz = title_png[:-4] + '.4bpp', title_png[:-4] + '.4bpp.lz'
+    for src, dst in ((title_png, four_bpp), (four_bpp, lz)):
+        subprocess.run([gbagfx, src, dst], cwd=DECOMP, check=True)
+    # The incbin dependency is dropped, so a fresh .lz alone would sit there unread.
+    chap_title_o = os.path.join(DECOMP, 'data', 'data_chap_title.o')
+    if os.path.exists(chap_title_o):
+        os.remove(chap_title_o)
 
 
 def inject_ch01(campaign, verbose=True):
