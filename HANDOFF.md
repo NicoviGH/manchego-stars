@@ -6,38 +6,36 @@ deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; scope and ba
 issues. Before a context rollover, warn Nicolas, refresh this file, and start a fresh instance —
 don't rely on auto-compaction.
 
-Refreshed 2026-08-08 (Opus). `main` = `79a2586`, level with `origin/main`. **No branches, no
-stashes, nothing in flight** — **#251 landed** (Basil + Sahnar identities). Clean point for a `/clear`.
+Refreshed 2026-08-08 (Opus). `main` = `952ca51`, level with `origin/main`. **No branches, no
+stashes, nothing in flight** — **#252 landed** (Basil is a Cleric; the Basil→Sahnar recruit is
+wired). Clean point for a `/clear`.
 
 ## In flight
 
 **Nothing.** `origin` has only `main`.
 
-**Nothing has had a `/code-review ultra <PR#>` — that is user-triggered.** #251 had a normal
-`/code-review high`; its three findings are fixed and in the squash.
+**Nothing has had a `/code-review ultra <PR#>` — that is user-triggered.** #252 had a normal
+`/code-review high`, which caught a real defect (below); its four findings are fixed and in the
+squash.
 
 ## Next task
 
-**ch05 is HOSTED, playable, its rewards are reachable, and Basil + Sahnar are real cast members**
-(`ch05village` PASS, `make matrix` 15/15). Everything owed is the checklist on **#25**, which is the
-source — not this file. No live defects remain on it; what is left is authoring work:
+**ch05 is playable end to end and its recruit works in-engine** (`make matrix` 16/16). Everything
+owed is the checklist on **#25**, which is the source — not this file. What is left is the
+**dialogue pass**, and it is bigger than "write some prose":
 
-1. **Basil→Sahnar Talk recruit — UNBLOCKED, and it is now event wiring, not identity.** Both hold
-   `PORTRAIT_MAP` slots (Artur / Marisa), stat lines, art and pre-recruit palettes; Sahnar carries
-   `recruit.initial_faction: red`. What is left: place Basil GREEN, wire his Talk, wire the
-   Basil→Sahnar parley off `parley.by`, and force-deploy the recruiter. `talk_recruit_wiring`
-   already names "ch05 Basil+Sahnar" in its docstring and needs no new machinery — but
-   `ch04_parley_recruiters` is ch04-shaped and wants generalizing rather than copying.
-2. **The dialogue pass.** ch05's cutscenes are LOCKED (PR #196) and unwired, and the four reliquary
-   visits currently show **vanilla's** prose on ids `0x9CD`–`0x9D0`, which we deliberately do not
-   write. Replacing one is writing our body at the same id — not a rewire (`decisions.md` →
-   "Vanilla prose is a legitimate PLACEHOLDER").
-3. **Converge ch03/ch04 onto the campaign-owned tables** (`decisions.md` → "Campaign rosters live
-   in campaign-named symbols"). Five symbols still squat on vanilla:
-   `CH03_TREX_GREEN_SYMBOL`, `CH03_BOOT_SEED_SYMBOL`, `CH04_INITIAL_ENEMY_SYMBOL`,
-   `CH04_BOOT_SEED_SYMBOL`, `CH04_MOOSE_SYMBOL`. Fold in the `_inject_ch03_tile_changes` →
-   generic `_inject_tile_changes` migration #138 left behind. **Verify with `make matrix`, not
-   byte-identity** — appending tables legitimately changes the ROM.
+1. **It owes an ID ALLOCATION, not just text.** Every ch05 beat we write needs an id from ch05's
+   own block (vanilla Ch6, `0x9E4..0x9F5`). The chapter YAML's `slot: "vanilla 0x9CC"` labels are
+   ANATOMY REFERENCES to the chapter we mine — ch04 hosts on slot 5 and owns `0x9BA..0x9C6`
+   outright. Budget fits: 16 free ids against ~14 that need writing. `assert_message_id_unclaimed`
+   now fails the build if a beat points at an id another chapter writes.
+2. **All 15 slots are already WRITTEN and locked** (PR #196) — the pass is wiring them, not
+   drafting them. The genuinely unwritten prose is the **four reliquary visit lines** and
+   **Ravisin's death quote `0x9C8`**.
+3. **Basil's join beat is SILENT** until it gets an id. Its locked text exists; it just has
+   nowhere legal to live yet. Reading vanilla prose as a placeholder is still legal and in use
+   (`0x9CC`, `0x9CD..0x9D0` — unclaimed by every chapter).
+4. **The no-Lupin fallback branch** — text chosen, conditional not built; reuse ch04's mechanism.
 
 Not scheduled: **#244** (three playtest scenarios failing outside the gate suite), **#228**
 physical cartridges (after the ROM is done).
@@ -45,20 +43,17 @@ physical cartridges (after the ROM is done).
 ## Current state
 
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
-- **Gate: `make matrix` 15/15 on `main` at `79a2586`**, four builds, ~6m55s. `ch05village` is IN
-  the gate (the gate carries the ACTIVE chapter's scenarios); ch04's six stay, because they cover
-  MECHANISMS ch05 and the queued convergence reuse, not ch04 itself.
-- **Art review is now a two-command bench, and BOTH belong to any new unit.** `PT_CHAR=<id>
-  run.sh recordcast` shoots the bust + map sprite off the status screen; `recordanim` shoots the
-  battle anim, and takes `PT_ROUNDS=N` to film several engagements. Checklist: the `custom_unit`
-  issue template.
-- **A `BLOCKED` verdict now means something.** It used to be #245 firing (chap_title `.lz`), which
-  is FIXED and closed — so treat a `BLOCKED` as real until proven otherwise, and do not reach for
-  a retry to make it go away.
-- **ch01–ch04 are DONE and CLOSED; ch05 (#25) is the only chapter with work owed.** Its dialogue
-  merged long ago (PR #196, 15 slots, all `status: locked`); its map, its host and its difficulty
-  math are all in (`make difficulty CH=ch05` = PARITY). It is now `status: active`, so it is inside
-  the parity gate rather than exempt from it.
+- **Gate: `make matrix` 16/16 on `main` at `952ca51`**, four builds, ~7m. `ch05village` AND the new
+  `ch05recruit` are both in it; ch04's six stay, because they cover MECHANISMS ch05 reuses.
+- **`ch05recruit` is the recruit's only witness.** `ch05village` was green across versions of the
+  opening where Basil never joined at all — it leaves prep with START and walks a different unit
+  to a door. If you touch ch05's opening, that is the scenario that will tell you.
+- **Art review is a two-command bench, and BOTH belong to any new unit.** `PT_CHAR=<id> run.sh
+  recordcast` shoots the bust + map sprite; `recordanim` shoots the battle anim (`PT_ROUNDS=N` for
+  several engagements). Checklist: the `custom_unit` issue template.
+- **A `BLOCKED` verdict means something.** Treat it as real until proven otherwise; do not reach
+  for a retry to make it go away.
+- **ch01–ch04 are DONE and CLOSED; ch05 (#25) is the only chapter with work owed.**
 - **Cross-agent continuity:** Nicolas uses Codex only between Claude sessions. Codex must leave an
   explicit HANDOFF entry naming what it changed, the active branch/PR and commit state, verification
   actually run, and the exact next step. Ordinary short-lived feature branches in this checkout, one
@@ -66,57 +61,49 @@ physical cartridges (after the ROM is done).
 
 ## Gotchas most likely to bite next (long form in `docs/decisions.md`)
 
-The seven this session added are ADRs now — read them before hosting another chapter. **Five are
-one idea wearing different hats, and it bit four separate times in one session: declaring a thing
-is not wiring it, and the gap has no symptom.** (Campaign rosters live in campaign-named symbols;
-owning the symbol means owning the POINTER; campaign-owned EVENT SCRIPTS must be declared AFTER the
-block-replacement pass or the appends are discarded; a `CHAPTER_L_*` label is resolved by VALUE;
-generated art is CONVERTED by the injector, never left for make.) The other two: a retile inherits
-vanilla's GIFT PLACEMENT; vanilla prose is a legitimate placeholder but vanilla wiring is not.
+**This session's headline, and it is a new shape of the old lesson: a message id can be VALID,
+UNIQUE, and still belong to somebody else.** ch05's join beat pointed at `0x9C2` — which ch04
+owns and writes — so it would have played ch04's no-parley ending, in ch04's voice, with ch04's
+faces. Green build. Passing `ch05recruit` (it reads factions, not text). Nothing caught it but a
+code review. Displaying an UNWRITTEN vanilla id is a legitimate placeholder; displaying one another
+chapter WRITES is a bug, and the two are indistinguishable at the call site — hence
+`assert_message_id_unclaimed`.
 
-**If you take one thing into the next chapter: the expensive bugs here do not fail loudly.** Every
-one of those five produced a green build and a passing load-test while being wrong — a party on
-another map's tiles, a boss whose death sets no flag, four scripts silently discarded, a title card
-that never reaches the ROM. Verify from the DATA the engine reads (`INSPECT.units`, the generated
-C, the ROM), never from a screenshot or a PASS.
+**The runner-up: `ch05village` passed for months while proving nothing about the recruit.** A
+scenario's verdict only covers what it actually reads. Before trusting a green gate on a feature,
+check that some scenario reads the feature's OWN state.
 
-**#251 added the sharpest example yet, and it beat the data rule too.** Sahnar's vendored anim
-never fired its hit code, so combat soft-locked in `ekrBattleInRoundIdle` — but FE8 resolves damage
-in DATA regardless, so the foe died, the HP bar was right, every frame looked correct, and the
-capture said PASS. Nothing in the tables was wrong to read. **What exposed it was asking for the
-NEXT input** (`PT_ROUNDS=4`), then a control run on a known-good unit to tell a broken asset from a
-broken harness. New rule of thumb: for anything that plays out over time, one clean observation is
-not evidence — take the second one. ADR: `decisions.md` → "Arming the HP depletion is not LANDING it".
+**And a self-inflicted one worth remembering: `ch05recruit` failed its first run for the wrong
+reason** — it reported "the CUSA did not fire" when the CUSA was fine, because the scene runs
+vanilla's 32-box `0x9CC` and the loop capped at 3600 frames. *A loop cap must never be what decides
+failure*, and a verdict must tell "still running" from "finished and wrong".
 
 The standing ones:
 
 - **Read decomp data through `git show HEAD:`, never the built tree** — our injections are build
-  artifacts. Applies to lints too: a check that greps the working tree for something the build patches
-  out passes vacuously. **It bit twice more this session**, both times as `make check` failing on
-  `test_difficulty` + `test_map_tileset` straight after a ROM build — that pair failing together is
-  the signature. Fix, don't debug: `git -C fireemblem8u restore src/data/chapter_settings.json
-  data/data_8B363C.s`.
-- **Before building tooling, grep for it.** `render-tmx`, `atlas`, `uniform_candidates` and
-  `vanilla_layout_tileset_assets` all already existed and were hand-rolled from scratch this session;
-  `decisions.md:133` states outright that tileset vendoring is a one-command import.
+  artifacts. **It bit twice more this session**, both times as `make check` failing on
+  `test_difficulty` + `test_map_tileset` straight after a ROM build (once mid-commit, blocking the
+  pre-commit hook) — that pair failing together is the signature. Fix, don't debug:
+  `git -C fireemblem8u restore src/data/chapter_settings.json data/data_8B363C.s`.
+- **Before building tooling, grep for it.** `talk_recruit_wiring` already named ch05 in its
+  docstring; the recruit needed no new machinery, only `ch04_parley_recruiters` generalised.
+- **A HANDOFF lead is a hypothesis.** The previous entry said "wire his Talk" and "force-deploy the
+  recruiter"; both were wrong for Basil, who joins in the OPENING (no CHAR entry) and is not on the
+  prep roster (nothing to bench). The YAML and vanilla's own event list were the truth.
 - **Post-injection SMS ids and goal ids cannot be read from HEAD or the working tree** — run the
   injector and read the result.
 - **A failing playtest may be the WRONG ROM.** Boot flags are per-chapter, and so is
   `PT_HOST_CHAPTER`. `run.sh` refuses this in 0s off `.build-config.json` — **do not reach for
-  `MX_SKIP_ROM_CHECK=1`**. **Exception: `mapshot`/`mapfull` are chapter-GENERIC, so run.sh cannot
-  refuse them** and they fail as "never reached the map" instead. `make matrix` rebuilds the tree's
-  ROM, so a `mapshot` run right after one is on the matrix's last config, not yours — check
-  `.build-config.json` first (this cost a rebuild this session).
-- **`harness.lua` is one Lua chunk AT the 200-local ceiling.** Hang new helpers off an existing table
-  (`INSPECT`, `TUNE`), never a new top-level `local`.
-- **Do not re-run a scenario to re-test a hypothesis the evidence already killed.** Instrument for the
-  answer — `inspect_state.py render` is that instrument.
-- **A loop cap must never be what decides failure.**
+  `MX_SKIP_ROM_CHECK=1`**. **Exception: `mapshot`/`mapfull` are chapter-GENERIC**, so run.sh cannot
+  refuse them. `make matrix` rebuilds the tree's ROM, so check `.build-config.json` first.
+- **`harness.lua` is one Lua chunk AT the 200-local ceiling** (2 slots free). Hang new helpers off
+  an existing table (`INSPECT`, `TUNE`) or inside the scenario, never a new top-level `local`.
+- **Do not re-run a scenario to re-test a hypothesis the evidence already killed.** Instrument for
+  the answer — `inspect_state.py render` is that instrument.
 - **A `transition` is not "nothing is happening"** — check the snapshot's `considered` list.
 - **`turn()` is not the signal that a turn's reinforcements exist** — wait for a UNIT from the wave.
 - **An `AREA` fires when an action ENDS**, so "a unit is standing there" is not a verdict.
 - **A scenario that fails BEFORE it drives any input is accusing the harness, not the chapter.**
-- **Removing a blind press can remove work nobody had NAMED.**
 - **A render from frame PNGs proves the ART; only the ROM proves the TILING and the PALETTE.**
 - **Comments inside a YAML folded scalar are CONTENT** — put them above the key.
 - **`tools/setup-toolchain.sh` omits upstream's helper-tool build** — a fresh checkout also needs
@@ -154,14 +141,14 @@ python3 tools/map_tileset_tool.py import <config> <object.png> maps/tilesets/<na
 python3 tools/map_tileset_tool.py render-tmx maps/tilesets/<name> <test.tmx> out.png  # PROVE the import
 python3 tools/import_map_layout.py <map-stem> ~/Downloads/<stem>-layout.json          # compile
 
-# THE GATE, one command (#231): ~4-6 min, verdict table + results.json in /tmp/playtest-matrix
+# THE GATE, one command (#231): ~7 min, verdict table + results.json in /tmp/playtest-matrix
 make matrix                                # SUITE=gate -- must be green before a merge
 make matrix SUITE=ch03|ch04|all
 tools/playtest/matrix.py list --suites
-tools/playtest/run.sh ch04moose            # ONE scenario; flag + host chapter come from matrix.yaml
+tools/playtest/run.sh ch05recruit          # ONE scenario; flag + host chapter come from matrix.yaml
 
 make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba -j$(nproc)              # canonical
-make CAMPAIGN=rime-of-the-frostmaiden CH04BOOT=1 fireemblem8.gba -j$(nproc)   # ch04 fast-boot
+make CAMPAIGN=rime-of-the-frostmaiden CH05BOOT=1 fireemblem8.gba -j$(nproc)   # ch05 fast-boot
 
 # Read a failed scenario's own diagnosis BEFORE rebuilding anything (#236)
 #   inspect_state.py render /tmp/playtest-<scenario>/playtest.log
