@@ -32,7 +32,7 @@ roster derived from the unit YAML.
 | Brie | TBD (post-MVP) | — | not a recruit — vanilla map ballista (RBG's siege), from ~Ch10 |
 | Lupin | Cavalier | **Paladin** / Great Knight | story — Marty talks the direwolf pack into the sled team (Ch4) |
 | Pepperjack | TBD (post-MVP) | — | not a recruit — vanilla map ballista (RBG's siege), from ~Ch10 |
-| Sahnar | Myrmidon | **Swordmaster** / Assassin | story — freed from the sarcophagus in the Elven Tomb (Ch5) |
+| Sahnar | Myrmidon | **Swordmaster** / Assassin | story — talked down by Basil after the eruption wakes her (Ch5) |
 | Trex | Thief | **Rogue** / Assassin | story — joins after the Termalaine mine (Ch3) |
 
 > **Note.** `pepperjack`/`brie` carry `fe_stats.class: null` because they are NOT

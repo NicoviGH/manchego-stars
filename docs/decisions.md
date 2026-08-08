@@ -3917,6 +3917,70 @@ right by accident. `chapter_label_constant(slot)` reads chapters.h. Guessing fai
 `gDefeatTalkList` entry keyed to the wrong `.chapter` never matches, so the boss dies, no flag is
 set, `DefeatBoss` never fires, and the chapter cannot be won, with nothing in the build to say why.
 
+### A dead message id is proven by USE, not by an empty body (2026-08-08, #25)
+
+Two death-quote ids were owed (Basil, Sahnar) and `PC_DEATH_QUOTE_MSGS` carried a TODO to
+auto-allocate them "from a free pool". There is no such pool, and the two obvious audits both give
+the wrong answer:
+
+- **"The body is empty"** finds nothing. Every id in FE8's range has vanilla text. A reusable slot
+  is one whose *text still exists* but that no code reaches — Lupin's `0x974` is the vanilla line
+  "Place the cursor on Vanessa", alive in `texts.txt` and referenced by nothing.
+- **"The id appears nowhere in the sources"** finds nothing either, for two separate reasons:
+  `include/constants/msg.h` `#define`s **every** id (a declaration, not a use), and a bare-hex
+  search for `0x974` collides with unrelated addresses and offsets.
+
+The criterion that works is the one Lupin's comment already stated: no `TEXTSHOW(id)`, `.msg`, or
+`.msgId` reaching it, searched over the decomp at `HEAD` with `msg.h` excluded and bare hex ignored.
+Run it against `0x974` first — a method that calls Lupin's shipped slot "used" is a broken method.
+**Keep the ids explicit in the table rather than auto-allocating**: a floating id would move
+`verify_text` baselines under us and break the id-claiming discipline `HOSTED_CHAPTER_MESSAGE_IDS`
+depends on. The TODO's premise was wrong; what was missing was the audit, not the automation.
+
+### An FEditor `L` is an authoring bracket, not an instruction (2026-08-08, #25)
+
+Sahnar's Specter is the first vendored anim using FEditor's loop syntax — a bare `L` (`LOOPSTART {`)
+closed by a `C01` (`LOOPEND }`) — and it crashed `parse_feditor` on `int("L")`. There is no loop
+opcode in `banim_code.inc` to emit: vanilla encodes the same shape (frames after
+`banim_code_call_spell_anim`, then the wait) as a **flat run**, see `banim_bgl_mg1_motion.s`. So the
+`L` is dropped and its paired `C01` does the waiting. It surfaced only because the Specter's two
+RANGED modes use it — modes a sword Myrmidon never plays, which is exactly the kind of thing that
+would otherwise have sat unparsed until some later unit needed those modes.
+
+### Arming the HP depletion is not LANDING it (2026-08-08, #25)
+
+#24/#201 established that an imported mode which swings (C03) must ARM the depletion (C04/C05),
+because the opponent's dodge mode waits bare on C01. Sahnar's Specter armed correctly and still
+soft-locked combat: its mode 1 is `C03 C07 C04 ... C01` with **no hit code**, so it waits on a
+depletion nothing ever started. The battle parks in `ekrBattleInRoundIdle` and every proc freezes.
+Vanilla's own `banim_myrm_sw1` is the reference shape: `prepare_hp_deplete -> hit_normal ->
+wait_hp_deplete`.
+
+**Why it survived a green capture, a green gate and a review.** FE8 resolves damage in DATA
+regardless of the animation — the foe dies, the HP bar is right, every frame looks correct, and
+the hang only appears on the NEXT input. A one-round capture never asks for a next input. It took
+filming FOUR rounds, then a control run on a known-good unit (Braulo 2/2, Sahnar dead at round 2),
+to separate "my capture loop is wrong" from "this animation is broken".
+
+**Mode 12 is exempt, and that exemption is the load-bearing part.** Slot 12 is `attack_miss`
+(`ref_to_battleframe._MODE_ORDER`): armed-but-hitless by design, keeping C04 precisely so the
+opponent's C01 still returns. Every anim we ship — Pinky, Lupin, Baxby, the wildling and
+lizardzerker reskins — is shaped that way and correct to be. The first version of this rule
+rejected all of them, and "fixed" Sahnar's mode 12 into a bug. **When a new lint fires on most of
+the existing corpus, the lint is the thing that is wrong.** `test_every_shipped_anim_passes_the_
+arming_rules` now runs the rule over every committed `.txt` so the next tightening is measured
+against real assets, not fixtures.
+
+### A donor row is completed for the CLASS, not for the unit that lands it (2026-08-08, #25)
+
+Sahnar's anim is an import, so `BANIM_DONORS['myrmidon']`'s `motion`/`cadence` go unused for her —
+which made "leave the cadence `None`" tempting. `test_every_melee_donor_names_a_known_cadence`
+rejected it, and the test is right: the row is keyed by CLASS, so the next Myrmidon to take the
+faked 3-pose path would inherit the hole. The `sword` cadence in `ref_to_battleframe._MELEE_CADENCE`
+is therefore read off FE8's own `banim_myrm_sw1` (swing_short → hit → swing_shorter → step_heavy,
+with the `slash_air` lifted from its critical mode, the only place vanilla gives the blade an arc)
+rather than borrowed from the axe or lance rows.
+
 ---
 
 ## Open Questions (not yet decided)

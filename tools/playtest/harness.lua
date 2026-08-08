@@ -3937,6 +3937,11 @@ local CAST = {
     -- Baxby the axe-beak: SLOT = Forde (0x10), stats from Franz (0x11's neighbour, CHARACTER_FRANZ)
     -- -- the same slot-vs-donor trap, so again this is PORTRAIT_MAP's value, not STAT_DONOR's.
     baxby = 0x10,
+    -- ch05's pair (#25), and the slot-vs-donor trap one more time: Basil's stats come from
+    -- Natasha and Sahnar's from Joshua, but their SLOTS are Artur and Marisa. Taking the
+    -- donor here would aim PT_CHAR at a unit that is not on the sandbox map.
+    basil = 0x13,   -- CHARACTER_ARTUR
+    sahnar = 0x16,  -- CHARACTER_MARISA
 }
 
 -- Shared lead-up for the RBG demo: win the prologue, lord-select RBG into ch01,
@@ -4265,13 +4270,70 @@ local function captureCharAnim(name)
         return captureHealerAnim(name, pid, cls)
     end
     log(string.format("%s at (%d,%d) class=0x%X weapon-range %d-%d", name, u.x, u.y, cls, mn, mx))
-    if not positionForShot(pid) then shot(name .. "-noshot")
-        return result("FAIL", name .. " never reached firing position") end
-    shot(name .. "-deploy")
-    local fired = captureAttack(u.addr, name); shot(name .. "-after")
-    if not fired then
-        return result("FAIL", "captureAttack never reached combat for " .. name) end
-    return result("PASS", string.format("%s anim captured (class 0x%X)", name, cls))
+    -- PT_ROUNDS>1 films SEVERAL engagements back to back (#25). One round shows one attack
+    -- body, which is a thin look at a 12-mode imported animation -- the counter-attack, the
+    -- dodge and (with a crit-capable weapon) the critical mode only appear across repeated
+    -- exchanges. Rounds after the first are BEST-EFFORT: the sandbox foe can die, leaving
+    -- nothing in reach, and a capture that already has usable footage must not be thrown
+    -- away over that. So the FIRST round decides the verdict and the rest only add frames.
+    local rounds = tonumber(PLAYTEST_ROUNDS) or 1
+    if rounds < 1 then rounds = 1 end
+    local done = 0
+    for i = 1, rounds do
+        -- A benign extra round must not cost the capture its verdict. `result()` rewrites a
+        -- PASS into FAIL whenever controllerFault is latched, and a round that simply ran out
+        -- of live foes latches one through endTurn/positionForShot -- so the loop's own
+        -- "best-effort" promise was a lie until this line: 1/4 rounds reported FAIL while
+        -- holding perfectly good footage. Snapshot the fault before each OPTIONAL round and
+        -- restore it if that round bows out; round 1's faults are untouched and still fail.
+        local faultBefore = controllerFault
+        -- A unit that has attacked is SPENT for the rest of the player phase, so the second
+        -- round has to start on a new turn -- not on a poked state bit. End the phase and let
+        -- the enemy phase run; the unit comes back refreshed the way the game refreshes it,
+        -- and the foes get to act, which is also what puts a COUNTER (and so her dodge mode)
+        -- into the footage. A duelist who doubles kills the sandbox soldier outright, which is
+        -- why one round only ever shows the attack body.
+        if i > 1 then
+            -- The battle proc is still tearing down when the last frame is shot, and an EXP
+            -- bar or a level-up can follow it, so the map is a `transition` rather than idle.
+            -- Ending the phase from there times out on player_map_idle -- which is what the
+            -- first version of this loop did. Wait the combat OUT (tapping A to clear a
+            -- level-up) before touching the menu.
+            waitFor(function()
+                return not procActive(SYM.gProc_ekrBattle) and faction() == 0
+                    and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
+            end, 1800, true)
+            if not endTurn() then
+                log(string.format("  round %d: could not end the phase -- stopping", i))
+                controllerFault = faultBefore; break
+            end
+            if not waitFor(function() return faction() == 0 and not menuOpen()
+                    and not procActive(SYM.ProcScr_StdEventEngine) end, 5400, true) then
+                log(string.format("  round %d: player phase never came back -- stopping", i))
+                controllerFault = faultBefore; break
+            end
+        end
+        if not positionForShot(pid) then
+            if i == 1 then shot(name .. "-noshot")
+                return result("FAIL", name .. " never reached firing position") end
+            log(string.format("  round %d: nothing left in reach -- stopping", i))
+            controllerFault = faultBefore; break
+        end
+        if i == 1 then shot(name .. "-deploy") end
+        local fired = captureAttack(u.addr, name)
+        if not fired then
+            if i == 1 then
+                return result("FAIL", "captureAttack never reached combat for " .. name) end
+            log(string.format("  round %d: never reached combat -- stopping", i))
+            controllerFault = faultBefore; break
+        end
+        done = i
+        u = blue(pid) or u          -- re-read: the unit moved to its firing tile
+        wait(30)
+    end
+    shot(name .. "-after")
+    return result("PASS", string.format("%s anim captured (class 0x%X, %d/%d round(s))",
+        name, cls, done, rounds))
 end
 
 -- RECORDANIM (#65): capture any custom-art cast member firing on a `make TESTCH=1` ROM (New
@@ -4282,6 +4344,50 @@ scenarios.recordanim = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end
     local name = (PLAYTEST_CHAR and PLAYTEST_CHAR ~= "") and PLAYTEST_CHAR or "prof-rbg"
     return captureCharAnim(name)
+end
+
+-- RECORDCAST (#25): the OTHER two thirds of a unit's art, on the same TESTCH sandbox
+-- `recordanim` uses. `recordanim` proves the battle animation; this proves the PORTRAIT and the
+-- MAP SPRITE, which have no other in-engine capture -- the unit list shows the map sprite at
+-- 16px among twelve others and never shows the bust at all, so "the art is wired" was until now
+-- something you could only argue from injected tables.
+--
+-- It cursors onto the unit (framing its map sprite under the hand) and opens the status screen,
+-- where FE8 draws the 96x80 bust next to the name/class/stat block -- i.e. the portrait, the
+-- name, the class and the stat line in ONE frame, which is exactly what a look-test needs to
+-- approve or reject. Pick with PT_CHAR=<id>, same CAST table as recordanim.
+scenarios.recordcast = function()
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    local name = (PLAYTEST_CHAR and PLAYTEST_CHAR ~= "") and PLAYTEST_CHAR or "prof-rbg"
+    local pid = CAST[name]
+    if not pid then return result("FAIL", "unknown PT_CHAR " .. tostring(name)) end
+    local u = blue(pid)
+    if not u then
+        return result("FAIL", string.format(
+            "%s (pid 0x%02X) is not deployed -- recordcast needs a `make TESTCH=1` ROM", name, pid))
+    end
+    wait(60)
+    if not cursorTo(u.x, u.y) then
+        return result("FAIL", string.format("cursor never reached %s at (%d,%d)", name, u.x, u.y))
+    end
+    wait(30)
+    shot(name .. "-mapsprite")            -- the map sprite, cursor-framed on its own tile
+    -- R is FE8's status-screen shortcut from the map cursor. Guarded on the PROC rather than a
+    -- frame count: a blind press that lands on nothing would still shoot, and would hand back a
+    -- picture of the map captioned "portrait" -- the exact class of green-but-wrong this bench
+    -- exists to stop.
+    press(K.R); wait(20)
+    if not waitFor(function() return procActive(SYM.gProcScr_StatScreen) end, 240) then
+        return result("FAIL", "the status screen never opened for " .. name)
+    end
+    wait(45)                               -- let the bust finish drawing before the first frame
+    shot(name .. "-portrait")
+    for page = 2, 3 do                     -- the stat screen's other two pages
+        press(K.RIGHT); wait(45)
+        shot(string.format("%s-portrait-p%d", name, page))
+    end
+    return result("PASS", string.format(
+        "%s: map sprite + status screen captured (pid 0x%02X at (%d,%d))", name, pid, u.x, u.y))
 end
 
 -- Back-compat alias: recordrbgtest == recordanim for RBG.

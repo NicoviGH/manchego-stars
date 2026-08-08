@@ -54,6 +54,31 @@ class TestParseFeditor(unittest.TestCase):
         self.assertEqual(list(anim.modes.keys()), [1, 3])
         self.assertEqual(anim.modes[1], [fb.Frame(1, "f.png")])
 
+    def test_loopstart_marker_is_an_authoring_bracket_not_an_instruction(self):
+        # FEditor writes a bare "L" to open a loop and pairs it with a C01 to close it
+        # ("LOOPSTART {" / "LOOPEND }"). It is an AUTHORING bracket: the decomp's own magic
+        # scripts (banim_bgl_mg1_motion.s, right after banim_code_call_spell_anim) encode the
+        # same shape as a plain frame run plus the wait command -- there is no loop opcode in
+        # banim_code.inc to emit. So L is dropped and the paired C01 carries the wait. Before
+        # this, the bare L crashed the parser on int("L") -- which is how it surfaced, on the
+        # Specter's ranged modes (#25, Sahnar).
+        anim = fb.parse_feditor(
+            "/// - Mode 5\nC05\nL                 #LOOPSTART {\n"
+            "4 p- a.png\nC01               #LOOPEND }\n1 p- b.png\n~~~\n")
+        self.assertEqual(anim.modes[5],
+                         [fb.Cmd(0x05), fb.Frame(4, "a.png"),
+                          fb.Cmd(0x01), fb.Frame(1, "b.png")])
+
+    def test_real_vendored_specter_sword_txt(self):
+        # Sahnar's chosen anim (#25): 12 modes, and the two RANGED modes carry the L bracket
+        # above. She is a sword Myrmidon, so 5/6 never play -- but they still have to parse.
+        path = os.path.join(os.path.dirname(__file__), "..", "campaigns",
+                            "rime-of-the-frostmaiden", "battle_anims", "sahnar", "Sword.txt")
+        with open(path, encoding="utf-8", errors="replace") as f:
+            anim = fb.parse_feditor(f.read())
+        self.assertEqual(list(anim.modes.keys()), [1, 3, 5, 6, 7, 8, 9, 10, 11, 12])
+        self.assertNotIn("L", [getattr(i, "file", None) for i in anim.modes[5]])
+
     def test_real_vendored_unarmed_txt(self):
         # The smallest real Wildling script: 12 modes, 3 unique frames (000/001/002).
         path = os.path.join(os.path.dirname(__file__), "..", "engine", "battle_anims",
@@ -110,6 +135,53 @@ class TestHpDepleteArming(unittest.TestCase):
         return head + "/// - Mode 12\n" + "".join(
             "%s\n" % c for c in mode12_cmds) + "1 p- f.png\n~~~\n"
 
+    def test_rejects_a_connecting_melee_mode_that_arms_but_never_hits(self):
+        # The sibling of the bug below, and the one that actually shipped: Alexsplode's Specter
+        # mode 1 is C03 C07 C04 ... C01 -- it ARMS the depletion (C04) and then WAITS on it
+        # (C01) without ever firing a hit code, so the depletion never starts and the battle
+        # sits in ekrBattleInRoundIdle forever. FE8 still resolves the damage in data, so the
+        # foe dies and the capture looks fine; only the next input reveals the soft-lock.
+        anim = fb.parse_feditor("/// - Mode 1\nC03\nC07\nC04\n1 p- a.png\nC01\nC06\nC0D\n~~~\n")
+        with self.assertRaises(ValueError) as cm:
+            fb.validate_hp_deplete_arming(anim)
+        self.assertIn("never fires a hit", str(cm.exception))
+
+    def test_accepts_a_melee_mode_that_hits_normally_or_critically(self):
+        for hit in ("C1A", "C08"):
+            anim = fb.parse_feditor(
+                "/// - Mode 1\nC03\nC07\nC04\n%s\n1 p- a.png\nC01\nC06\nC0D\n~~~\n" % hit)
+            fb.validate_hp_deplete_arming(anim)          # must not raise
+
+    def test_the_miss_mode_is_exempt_because_nothing_connects(self):
+        # Slot 12 is attack_miss. It is "armed but hitless" BY DESIGN -- and keeps C04 so the
+        # opponent's bare C01 still returns (#24/#201). Every shipped anim we have is shaped
+        # this way, so a rule that rejected it would reject Pinky, Lupin, Baxby and the enemy
+        # reskins all at once. That near-miss is why this test exists.
+        anim = fb.parse_feditor("/// - Mode 12\nC03\nC07\nC04\n1 p- a.png\nC01\nC06\nC0D\n~~~\n")
+        fb.validate_hp_deplete_arming(anim)              # must not raise
+
+    def test_every_shipped_anim_passes_the_arming_rules(self):
+        # The regression that the rule above is not over-tight: run it against every .txt we
+        # actually ship, not just fixtures.
+        root = os.path.join(os.path.dirname(__file__), "..")
+        found = 0
+        for base in ("campaigns", "engine"):
+            for dirpath, _dirs, files in os.walk(os.path.join(root, base)):
+                if "battle_anim" not in dirpath or "_parked" in dirpath:
+                    continue
+                for fn in files:
+                    if not fn.endswith(".txt") or "without_comment" in fn or fn == "CREDITS.txt":
+                        continue
+                    path = os.path.join(dirpath, fn)
+                    with open(path, encoding="utf-8", errors="replace") as fh:
+                        fb.validate_hp_deplete_arming(fb.parse_feditor(fh.read()))
+                    found += 1
+        self.assertGreater(found, 5, "found almost no shipped anims -- the walk is wrong")
+
+    def test_a_spell_mode_needs_no_hit_code(self):
+        anim = fb.parse_feditor("/// - Mode 5\nC03\nC07\nC05\n1 p- a.png\nC01\nC06\nC0D\n~~~\n")
+        fb.validate_hp_deplete_arming(anim)              # must not raise
+
     def test_rejects_an_attacking_mode_that_arms_nothing(self):
         # exactly the shipped-broken Pinky shape: opens the attack, never arms, hands back
         anim = fb.parse_feditor(self._script(["C03", "C07", "C25", "C06", "C0D"]))
@@ -118,6 +190,10 @@ class TestHpDepleteArming(unittest.TestCase):
         self.assertIn("mode 12", str(cm.exception))
 
     def test_accepts_melee_arming_via_prepare_hp_deplete(self):
+        # _script() builds its body as mode 12 = attack_miss, which is exempt from the
+        # "arming is not landing" rule (#25) precisely because nothing connects there. So this
+        # stays the bare C04 it always was -- it is testing the arming rule, on the one mode
+        # where arming is the whole requirement.
         anim = fb.parse_feditor(self._script(["C03", "C07", "C04", "C06", "C0D"]))
         fb.validate_hp_deplete_arming(anim)      # C04 -- must not raise
 

@@ -147,6 +147,11 @@ scenarios:
     kind: record
   recordunitlist:                                      # FAILs if the SMS counters cross
     rom: testch
+  recordcast:                                          # PT_CHAR=<id>: bust + map sprite (#25)
+    rom: testch
+    kind: record        # a capture for a human look-test, same as recordanim -- not a machine
+                        # verdict. Its PASS is still gated on gProcScr_StatScreen actually
+                        # being live, so it cannot green-light a frame that never opened.
   ckpt_ch02start: {}
   ch03win:
     rom: ch03boot

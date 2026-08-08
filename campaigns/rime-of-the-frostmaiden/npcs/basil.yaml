@@ -18,6 +18,14 @@
 id: basil
 name: Basil
 
+# LOCKED 2026-08-08 (Nicolas's red-pen on the draft).
+# The UNIVERSAL falls-in-battle quote (#6): chapter=0xFF, so it fires in every chapter and
+# cannot lean on ch05. It is deliberately NOT the ch05 escort quote (0x9C6, "But I haven't--
+# I still have her berry..."), which is locked and stays chapter-specific -- that one is the
+# undelivered berry; this one is the larder running out. basil.md: hurt Basil goes SHORT, and
+# the self-interruption is the piece of his register that survives being hurt.
+death_quote: "Oh-- I'm sorry. I had more berries... I was going to..."
+
 # D&D flavor: canonically the book's **Awakened Shrub** — an intelligent, speaking shrub
 # that grows edible berries, awakened by the frost druid Ravisin in the Elven Tomb (Rime of
 # the Frostmaiden, printed p.85 / area E9; Appendix B "Awakened Shrub"). The book never names
@@ -88,24 +96,56 @@ art:
     deadzone: verified clean (portrait_tool.py preview; top 48 rows only draw x=16..80)
     static: true              # no mouth flap / blink, like the other custom busts
   map_sprite:                 # SHIPPED (map_sprites/basil{,_mu}.png); palette applied by Nicolas
-    wiring: pending           # art SHIPPED; injection waits on the ch05 recruit
-                              # wiring (#25). Explicit so assert_declared_map_sprites_
-                              # injected can tell a tracked deferral from a unit that
-                              # silently renders its stock class sprite.
     base: Cyclops             # geometry donor ONLY: {3 frames, UNIT_ICON_SIZE_16x32} wait-table row
     footprint: 16x32          # PMD frames are 14-20px tall -> native fit in the tall class (no rescale)
     idle_frames: PMD Idle-Anim S row f0/f1/f3, bottom-anchored
     walk_frames: PMD Walk-Anim W/S/N rows, 8->5 downsample [0,2,3,5,6]; side faces left
     palette: shared cast palette; index map chosen in map_sprite_swapper (--idle-frame-h 32)
-  battle_anim_frames:         # frames SHIPPED (battle_anims/basil/{ready,windup,peak}.png);
-                              # injection PENDING ch05 recruit wiring (#25). NO new donor row is
-                              # needed: `clone_from: bishop` is the one to use (BANIM_DONORS
-                              # 'bishop' gives a STAFF slot for heal-cast plus a LIGHT slot for
-                              # after promotion, and its own comment names Basil as a reuser).
-                              # NOT shaman -- Basil heals. Corrected 2026-08-07; this block
-                              # previously claimed a 'priest' row had to be added first.
+    # ── Pre-recruit look: he stands GREEN until a party member Talks him (the chapter's first
+    # recruit), so he needs the same treatment Lupin's red does -- a charId-keyed cast override
+    # is unconditional, and it would pin his Oddish colours across a faction change nothing
+    # would flag. Derived at build time from the sheets above, so pixel edits flow through.
+    # His BODY (idx10, the blue Oddish bulb) rides the faction ramp: green as an NPC, the
+    # standard blue once he joins. Leaves and eyes are his either way -- idx14 -> the neutral
+    # grey-green, idx6 -> the standard red. idx1 is pure outline here (unlike Sahnar's), so it
+    # goes to the dark neutral and stays black on both sides.
+    pre_recruit_roles: {1: 15, 6: 11, 10: 9, 14: 13}
+  battle_anim_frames:         # WIRED 2026-08-07 (#25). Provenance only -- the `battle_anim:`
+                              # block below is what the injector reads.
     source: PMD Charge-Anim W f0 (ready), Shoot-Anim W f3 (windup), Shoot-Anim W f5 (peak)
     facing: left (W row native — matches Marty/FE8 player side)
     scale: 1.5x via ffmpeg hqx=3 then exact half downscale (Nicolas's pick over native/2x)
     canvas: 64x48 shared, frames aligned by PMD *-Shadow.png ground centroid at (32,44)
     palette: one shared <=14-color quantize across all three frames
+
+# ── Battle anim (the block the injector reads) ───────────────────────────────
+# The 3-pose path, not an import: his three PMD poses ARE the animation (a shrub casting has no
+# travel to transcribe, unlike Pinky's swoop or Lupin's pounce), and they shipped finished in
+# #179. NO new donor row is needed -- `clone_from: bishop` gives a STAFF slot (heal-cast, the
+# MVP) plus a LIGHT slot for after he promotes to Bishop, and call_spell_anim resolves which at
+# runtime off the equipped item. That row's own comment already named Basil as its reuser.
+# NOT shaman: Basil heals. Same donor as Sclorbo, which is correct -- they are the same class;
+# what separates them is the STAT_DONOR (Natasha vs Moulder), not the animation.
+battle_anim:
+  clone_from: bishop
+  abbr: basil
+  frames:
+    - basil/ready.png
+    - basil/windup.png
+    - basil/peak.png
+  # Sclorbo's charge pulse, borrowed wholesale (Nicolas, 2026-08-08) -- the sprite swells
+  # toward the hue on the wind-up beat, so the heal has a tell before it lands. `build` is
+  # the same waveform his uses; the whole point of copying it is that our two healers should
+  # FEEL like one mechanic.
+  charge_flash:
+    color: gold
+    waveform: build
+  # ...and the one thing that must NOT match. Basil rides the same Bishop donor as Sclorbo,
+  # so without a tint of his own both healers cast identical cyan -- the healer split
+  # (decisions.md: Moulder war-priest vs Natasha mage-healer) would be invisible in the one
+  # place the player actually watches. Gold is cyan's mirror in the engine (red+green pinned
+  # high, blue suppressed) and reads as goodberry warmth against Sclorbo's cold flame.
+  # Both weapon types, same as his: STAFF is the heal now, LIGHT is after he promotes.
+  spell_palette_tint:
+    weapon_types: [staff, light]
+    color: gold

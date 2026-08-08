@@ -36,7 +36,7 @@ Source: **[Klokinator/FE-Repo](https://github.com/Klokinator/FE-Repo)** (communi
 | `Assorted CGs {Zeldacrafter}` — Snowy Village | Targos ch02-ending event background (frozen Ten-Towns street at nightfall; cropped to 240×160 + FE8-banked by `tools/bg_to_fe8.py`, injected as a new `gConvoBackgroundData` slot by `inject_backgrounds`, #22) | **Zeldacrafter** | F2E (folder tag `{Zeldacrafter}`; source is a Tales of Berseria scene — recheck before distribution) |
 | `Skeleton (Assassin)` portrait | Sahnar the spectral-skeleton blademaster — bust (hooded skeletal assassin; red hood recolored to the cast slate cloak; vendored at `campaigns/.../portraits/vendor/`) | **Glaceo** | F2E |
 | `Bonewalker (U) Specter` map sprite (stand + walk) | Sahnar map sprite base (cast-palette slate recolor, spectral glow dropped) | **Alexsplode** | F2E |
-| `[Skeleton-Custom] Specter` battle animation (sword) | Sahnar battle anim — DECIDED, injection deferred (#39/#90); native palette, not yet vendored (source pointer in `npcs/sahnar.yaml`) | **Alexsplode** | F2E |
+| `[Skeleton-Custom] Specter` battle animation (sword) | Sahnar battle anim — VENDORED + WIRED (#25); the full 12-mode FE-native script imported verbatim by `feditor_to_banim` (101 frames), in its **native palette** (deliberately not recolored to her cloak). Assets at `campaigns/.../battle_anims/sahnar/` | **Alexsplode** | F2E |
 
 (Each FE-Repo asset folder ships a `CREDITS.txt` — copy its exact line here when we lock the asset.)
 
