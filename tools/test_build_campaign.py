@@ -1549,7 +1549,7 @@ class Ch04RuntimeHost(unittest.TestCase):
     def test_parley_recruiter_is_marty_only(self):
         # Nicolas 2026-07-21: ch04's talker is Marty specifically, NOT ch03's any-party-member.
         # Data-driven from the convertible wave's parley.by; Marty rides the Seth slot.
-        self.assertEqual(bc.ch04_parley_recruiters(self.CAMPAIGN, self._chap()),
+        self.assertEqual(bc.parley_recruiters(bc._ch04_reveal_wave(self._chap())),
                          ['CHARACTER_SETH'])
 
     def test_reveal_cutscene_pans_loads_focuses_lupin_and_plants_the_parley(self):
@@ -1572,7 +1572,7 @@ class Ch04RuntimeHost(unittest.TestCase):
         # code: {pid, route=ANY(0xFF), chapter=host slot}. Redundant-but-harmless if the player
         # chose Marty as lord (IsCharacterForceDeployed_ already returns true for the lead).
         entries = bc._force_deployment_entries(
-            bc.ch04_parley_recruiters(self.CAMPAIGN, self._chap()), bc.CH04_HOST_INDEX)
+            bc.parley_recruiters(bc._ch04_reveal_wave(self._chap())), bc.CH04_HOST_INDEX)
         self.assertIn('{CHARACTER_SETH, 0xFF, %d}' % bc.CH04_HOST_INDEX, entries)
 
     def test_roster_uses_the_vanilla_monster_classes_and_weapons(self):
@@ -1701,6 +1701,38 @@ class Ch05RecruitIdentities(unittest.TestCase):
             seated = {uid for uid, *_ in bc._classed_cast(self.CAMPAIGN, available_at=n)[0]}
             self.assertEqual({'basil', 'sahnar'} <= seated, expected,
                              'wrong prep availability at chapter %d' % n)
+
+    def test_the_gated_recruiter_is_basil_only(self):
+        # Sahnar's recruiter is authored data (her `parley.by`), not a roster query -- she does
+        # not weigh the argument, she recognises Basil (lore/sahnar.md). Same helper ch04's
+        # Marty->Lupin parley uses; the chapter picks parley_recruiters over talk_recruiters.
+        sahnar = next(e for e in bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+                      ['enemy_units'] if e['id'] == 'sahnar')
+        self.assertEqual(bc.parley_recruiters(sahnar), ['CHARACTER_ARTUR'])
+
+    def test_basils_green_tile_costs_no_deployment_and_can_reach_sahnar(self):
+        # The three silent ways a green placement goes wrong (assert_green_recruit_placement).
+        # Worth pinning the tile itself: vanilla's Natasha is BLUE and stands on what is now one
+        # of our nine deploy slots, so copying the twin 1:1 here -- which is this chapter's
+        # standing habit -- would have quietly cost the player a deployment.
+        chap = bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+        slots = [tuple(s) for s in chap['deployment']['deploy_slots']]
+        self.assertNotIn(bc.CH05_BASIL_GREEN_POS, slots)
+        maps = os.path.join(bc.REPO, 'campaigns', self.CAMPAIGN, 'maps')
+        bc.assert_green_recruit_placement(          # sys.exits on any of the three
+            chap, maps, bc.CH05_LAYOUT[1], bc.CH05_BASIL_GREEN_POS,
+            bc.CH05_BASIL_MOV_TABLE, 'Basil',
+            must_reach=tuple(next(e for e in chap['enemy_units']
+                                  if e['id'] == 'sahnar')['positions'][0]))
+
+    def test_the_talk_script_flips_sahnar_and_carries_no_pack_conversion(self):
+        # ch04 splices a pre_script (the wolf pack's conversion sweep) into the same flow;
+        # ch05 has no group to bring over, so the script must be the bare talk -> CUSA.
+        script = bc.talk_recruit_script(bc.CH05_SAHNAR_TALK_MSG, 'CHARACTER_MARISA')
+        self.assertIn('TEXTSHOW(0x%X)' % bc.CH05_SAHNAR_TALK_MSG, script)
+        self.assertIn('CUSA(CHARACTER_MARISA)', script)
+        self.assertNotIn('CUSN', script)
+        self.assertLess(script.index('TEXTSHOW'), script.index('CUSA'))   # line, then the flip
 
     def test_each_carries_a_death_quote(self):
         # inject_pc_death_quotes hard-exits without one (#6), so a slot with no quote is a

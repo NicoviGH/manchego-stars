@@ -4011,6 +4011,36 @@ is therefore read off FE8's own `banim_myrm_sw1` (swing_short → hit → swing_
 with the `slash_air` lifted from its critical mode, the only place vanilla gives the blade an arc)
 rather than borrowed from the axe or lance rows.
 
+**A green recruit's TILE is load-bearing, and getting it wrong has no symptom (#25).**
+ch05's Basil is LOADed GREEN and CUSA'd blue by the opening's own join beat. The obvious tile for
+her is the one her vanilla twin stands on — this chapter lifts *everything* 1:1 from FE8 Ch5, so
+that is the habit — but Natasha is **BLUE** in `UnitDef_Event_Ch5Ally`, meaning her tile is now one
+of our **nine PREP deploy slots**. A green body parked there silently costs the player a
+deployment on a map whose difficulty is priced for the full cap, and nothing anywhere reports it.
+Two more failures in the same family: an impassable tile makes the recruit untalkable, and a tile
+walled off from the unit she must reach kills the set-piece with no symptom but a player who never
+manages the Talk. `assert_green_recruit_placement` gates all three at injection time (deploy-slot
+collision, passability, and a flood-fill to the target — the same fill
+`assert_scripted_move_reachable` runs). Basil sits at **(5,15)**, the row-15 corridor at the
+pocket's mouth, clear of all nine slots and of the four stairs.
+_Decided: 2026-08-08 (#25, the ch05 recruit wiring)._
+
+**Wiring a recruit and PROVING it are different jobs, and the passing scenario proved nothing.**
+`ch05village` was green across every version of ch05's opening, including ones where Basil never
+joined: it leaves Preparations with START and walks a *different* unit to a door, so a green shrub
+nobody can command is invisible to it. The recruit chain needed its own gate, and `ch05recruit` is
+it — three assertions in the order the player meets them: Basil is BLUE and commandable at turn 1
+(the opening CUSA landed, the step with no other witness), Sahnar rises RED on turn 2, and Basil's
+Talk flips her BLUE. It also gates the RECRUITER, not just the recruit: if the CHAR list named the
+wrong talker the command menu simply has no Talk, and the chapter looks fine until a player tries.
+**Its first run failed for the wrong reason, which is the lesson.** It reported "the CUSA did not
+fire" when the CUSA was fine — the scene shows vanilla's 32-box `0x9CC` and my advance-dialogue
+loop capped at 3600 frames, expiring 18 boxes in. *A loop cap must never be what decides failure.*
+The fix is both halves: a budget with real headroom, **and** a verdict that tells "still running"
+from "finished and still red", because reporting one as the other is how a wiring bug gets
+invented and then hunted.
+_Decided: 2026-08-08 (#25; the scenario caught its own author first)._
+
 ---
 
 ## Open Questions (not yet decided)
