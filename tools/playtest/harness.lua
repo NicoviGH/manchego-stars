@@ -6427,7 +6427,15 @@ scenarios.ch05recruit = function()
     -- 3. The Talk. Park Basil orthogonally adjacent (setMapUnit keeps the tile->unit grid in
     --    sync, so adjacency reads with no phase cycle -- the ch03talk/ch04Parley trick); the
     --    point is the recruit landing, not walking a 5-MOV healer across the depression.
+    -- Re-read her: the waits above can span an enemy phase, so the handle from the arrival check
+    -- is stale by here. A nil deref would abort the scenario with a Lua error instead of the
+    -- clean verdict the rest of this function is built to produce.
     local sah = redSahnar()
+    if not sah then
+        shot("ch05recruit")
+        return result("FAIL", "Sahnar left the red array before the Talk -- killed by the AI, "
+            .. "or she never settled on the map")
+    end
     local grid, parked = mapUnitAt(basil.x, basil.y), false
     for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
         local tx, ty = sah.x + d[1], sah.y + d[2]

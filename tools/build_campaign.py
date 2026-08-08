@@ -7593,14 +7593,26 @@ CH05_BASIL_GREEN_POS = (5, 15)   # the row-15 corridor at the deploy pocket's mo
                                  # deployment. Row 15 is open end-to-end and the four stairs are
                                  # at x=1/3/9/10, so she blocks no exit. Verified walkable and
                                  # connected to Sahnar's tile by assert_green_recruit_placement.
-CH05_BASIL_JOIN_MSG = 0x9C2      # "Oh! Tourists. In the tomb." -> the CUSA. Vanilla's prose
-                                 # until the dialogue pass writes ours AT THIS ID (decisions.md
-                                 # "Vanilla prose is a legitimate PLACEHOLDER"), same as the
-                                 # reliquary visits -- the WIRING here is permanent either way.
+# The join beat is SILENT, and that is a constraint rather than a choice. ch05's YAML labels its
+# scenes `slot: "vanilla 0x9C2"` and the like, but those labels are ANATOMY REFERENCES to the
+# chapter we MINE (vanilla Ch5) -- they are not ids we may write, because ch04 hosts on slot 5 and
+# owns that whole block (HOSTED_CHAPTER_MESSAGE_IDS['ch04'] = 0x9BA..0x9C6). 0x9C2 in the built
+# ROM is ch04's OWN no-parley ending (CH04_ENDING_NO_LUPIN_MSG), so pointing Basil's join at it
+# plays Pinky and Marty discussing supper. Reading an UNWRITTEN vanilla id as a placeholder is
+# fine and we do it (the reliquary visits, and the Talk below); reading one another chapter
+# WRITES is not -- that distinction is the whole reason the registry exists.
+# OWED: the dialogue pass gives this beat an id from ch05's own block (vanilla Ch6, 0x9E4..0x9F5)
+# and registers it. Until then the shrub joins wordlessly -- the WIRING is what ships here.
 CH05_SAHNAR_TALK_SCRIPT = 'MS_Ch05SahnarTalk'   # ours (declare_event_script), not a squatted
                                                 # vanilla symbol -- campaign-owned event scripts,
                                                 # declared AFTER the block-replacement pass.
-CH05_SAHNAR_TALK_MSG = 0x9CC     # the TALK-RECRUIT scene, the chapter's payoff beat
+CH05_SAHNAR_TALK_MSG = 0x9CC     # the TALK-RECRUIT scene. UNCLAIMED by every chapter (checked
+                                 # against HOSTED_CHAPTER_MESSAGE_IDS), so the ROM still holds
+                                 # vanilla's text -- which is vanilla's OWN Natasha->Joshua talk
+                                 # recruit, the exact scene ours is the twin of. The reliquary
+                                 # placeholder pattern (decisions.md "Vanilla prose is a
+                                 # legitimate PLACEHOLDER"). The dialogue pass must MOVE this to
+                                 # ch05's block, not overwrite 0x9CC -- it is ch04's neighbourhood.
 CH05_SAHNAR_TALK_FLAG = 'EVFLAG_TMP(7)'   # vanilla Ch5's own Natasha->Joshua CHAR flag, free
                                           # here: ch05's villages take eid 0 and its Misc list
                                           # is DefeatBoss + CauseGameOverIfLordDies only.
@@ -7727,6 +7739,29 @@ def assert_message_ids_unique(claims=None):
                          % (mid, owner[mid], chapter, chapter))
             owner[mid] = chapter
     return owner
+
+
+def assert_message_id_unclaimed(msg_id, chapter, what):
+    """A chapter may DISPLAY a vanilla message id it does not own -- that is the placeholder
+    pattern (decisions.md "Vanilla prose is a legitimate PLACEHOLDER"), and ch05's reliquary
+    visits and Sahnar Talk both do it. What it may NOT do is display an id ANOTHER hosted
+    chapter WRITES: the player then gets that chapter's scene, in its voice, with its faces.
+
+    The two cases are indistinguishable at the call site -- both are an int in a constant -- so
+    the difference has to be checked rather than remembered. It is an easy mistake to make from
+    the chapter YAML alone, because our scene labels (`slot: "vanilla 0x9C2"`) name the chapter
+    we MINE, not the block we may write into, and for a chapter hosted on a shifted slot those
+    are different vanilla chapters entirely.
+
+    Found by review on #25: ch05's Basil join beat pointed at 0x9C2, which is ch04's own
+    no-parley ending -- so the shrub's join would have played Pinky and Marty discussing supper.
+    """
+    holder = assert_message_ids_unique().get(msg_id)   # the registry, already collision-checked
+    if holder is not None and holder != chapter:
+        sys.exit('ERROR: %s (%s) displays message 0x%X, but %s OWNS and WRITES that id -- the '
+                 'scene would play %s\'s text. Placeholder prose must come from an id NO hosted '
+                 'chapter writes (see HOSTED_CHAPTER_MESSAGE_IDS).'
+                 % (what, chapter, msg_id, holder, holder))
 
 
 def variant_beat(beat, fallback, err_label):
@@ -9399,6 +9434,11 @@ def inject_ch05(campaign, boot=False, verbose=True):
     if recruit_initial_faction(load_unit(campaign, 'sahnar')) != 'RED':
         sys.exit('ERROR: ch05 places Sahnar on the enemy table (RED), but her YAML '
                  'recruit.initial_faction does not say red')
+    # Reading an UNWRITTEN vanilla id as placeholder prose is the reliquary pattern and is fine;
+    # reading one ANOTHER hosted chapter writes shows that chapter's scene instead. Both look
+    # identical here -- an int in a constant -- so the difference has to be a gate. Caught the
+    # Basil join beat pointed at 0x9C2, which is ch04's own no-parley ending.
+    assert_message_id_unclaimed(CH05_SAHNAR_TALK_MSG, 'ch05', "Basil's Talk recruit of Sahnar")
     sahnar_rows = [row.replace(CH05_GENERIC_PID, sahnar_char, 1) for row in sahnar_rows]
     declare_unit_table(CH05_SAHNAR_TABLE, sahnar_rows,
                        'ch05 Sahnar: rises HOSTILE at the eruption; Basil Talks her over (#25)')
@@ -9489,19 +9529,20 @@ def inject_ch05(campaign, boot=False, verbose=True):
                  # Preparations, so revealing the freshly-LOMA'd map here only flashes it.
                  + '    CALL(%s) /* preparations: pick %d; lord force-deployed */\n'
                  % (CH05_PREP_SCRIPT, chap['deployment']['deploy_limit'])
-                 # The join beat, AFTER Preparations and deliberately so. Basil is GREEN across
-                 # the prep screen (prep only ever touches PLAYER units, so a green body is
-                 # invisible to Pick Units and costs no slot), and becomes the party's tenth
-                 # unit the moment the CUSA lands -- on top of the nine the player chose, which
-                 # is what the chapter is priced for. CUSA before the CALL would hand PREP a
-                 # blue unit it never listed. The line is vanilla's until the dialogue pass.
-                 + '    TEXTSTART\n'
-                 '    TEXTSHOW(0x%X) /* "Take me to her?" -- the shrub joins */\n'
-                 '    TEXTEND\n'
-                 '    REMA\n'
-                 '    CUSA(%s) /* green -> blue: Basil is the escort now */\n'
+                 # The join, AFTER Preparations and deliberately so. Basil is GREEN across the
+                 # prep screen (prep only ever touches PLAYER units, so a green body is invisible
+                 # to Pick Units and costs no slot), and becomes the party's tenth unit the moment
+                 # the CUSA lands -- on top of the nine the player chose, which is what the
+                 # chapter is priced for. CUSA before the CALL would hand PREP a blue unit it
+                 # never listed.
+                 # No TEXTSHOW: see CH05_BASIL_JOIN_MSG for why the beat is silent until the
+                 # dialogue pass. Keeping it silent also keeps this script in vanilla's safe
+                 # shape -- a script that continues with VISIBLE content after the prep prologue
+                 # needs its own FADU(16) first (the prologue fades to black and leaves it
+                 # there); the ones that ENDA straight out, as this does, do not.
+                 + '    CUSA(%s) /* green -> blue: Basil is the escort now */\n'
                  '    ENUT(8)\n    EVBIT_T(7)\n    ENDA\n}'
-                 % (CH05_BASIL_JOIN_MSG, basil_char))
+                 % basil_char)
     script = _replace_brace_block(script, CH05_BEGINNING_SCRIPT + '[] =', beginning,
                                   CH05_EVENTSCRIPT_H)
     for turn in sorted(CH05_WAVE_TABLES):
