@@ -633,6 +633,9 @@ CLASS_MAP = {
     'Archer':         'CLASS_ARCHER',
     'Mage':           'CLASS_MAGE',
     'Priest':         'CLASS_PRIEST',
+    'Cleric':         'CLASS_CLERIC',  # Basil (ch05 recruit) -- Priest's twin, but its default
+                                       # promotion is Bishop (light), not Sage (anima)
+
     'Knight':         'CLASS_ARMOR_KNIGHT',
     'Pegasus Knight': 'CLASS_PEGASUS_KNIGHT',
     'Thief':          'CLASS_THIEF',   # Trex (ch03 recruit) -- the army's utility unit
@@ -733,8 +736,11 @@ PORTRAIT_MAP = {
     # line, no map sprite, no death quote -- and, the thing that actually blocked the chapter,
     # no pid for a Talk to name. These two lines are that identity.
     # Basil the goodberry shrub (npcs/basil.yaml) rides ARTUR -- a Monk absent from our ch00-08
-    # and referenced nowhere else, so dressing it is collision-free; Artur's own line promotes to
-    # Bishop, which is Basil's default promotion. His stat line references Natasha (STAT_DONOR).
+    # and referenced nowhere else, so dressing it is collision-free. His stat line references
+    # Natasha (STAT_DONOR) and his class is hers too (Cleric, 2026-08-08). The slot's own gender
+    # does not have to match his: `gender:` in the YAML rewrites .attributes on whatever slot the
+    # unit wears (_set_gender), and promotion is keyed by CLASS in gPromoJidLut, never by the
+    # character -- so a female Cleric on the male Artur slot promotes Bishop/Valkyrie correctly.
     'basil':      'Artur',
     # Sahnar (npcs/sahnar.yaml) rides MARISA -- vanilla's OTHER red-to-blue Myrmidon parley,
     # absent from our ch00-08 and referenced nowhere else. Exact class match, unlike Trex's and
@@ -1704,6 +1710,11 @@ CLASS_LOADOUT = {
     'CLASS_ARCHER':         ['ITEM_BOW_IRON', 'ITEM_VULNERARY'],
     'CLASS_MAGE':           ['ITEM_ANIMA_FIRE', 'ITEM_VULNERARY'],
     'CLASS_PRIEST':         ['ITEM_STAFF_HEAL', 'ITEM_VULNERARY'],
+    'CLASS_CLERIC':         ['ITEM_STAFF_HEAL', 'ITEM_VULNERARY'],  # Basil: same kit as the
+                                                                    # other healer; the classes
+                                                                    # differ by promotion tree
+                                                                    # and bases, not by weapon
+                                                                    # (both are STAFF-only at D)
     'CLASS_ARMOR_KNIGHT':   ['ITEM_LANCE_IRON', 'ITEM_VULNERARY'],
     'CLASS_PEGASUS_KNIGHT': ['ITEM_LANCE_SLIM', 'ITEM_LANCE_JAVELIN', 'ITEM_VULNERARY'],
     'CLASS_THIEF':          ['ITEM_SWORD_IRON', 'ITEM_DOORKEY', 'ITEM_CHESTKEY',

@@ -133,6 +133,17 @@ class TrexRecruitCast(unittest.TestCase):
         cast = {uid: (slot, cls) for uid, slot, cls, _sms in bc.classed_cast(self.CAMPAIGN)}
         self.assertEqual(cast['trex'], ('Rennac', 'CLASS_THIEF'))
 
+    def test_every_classed_cast_member_has_a_test_loadout(self):
+        # inject_test_chapter walks the WHOLE PORTRAIT_MAP and sys.exits on the first class
+        # with no CLASS_LOADOUT row -- so a cast member's class change can break the art bench
+        # (recordcast/recordanim) without touching a single chapter. Caught exactly that when
+        # Basil moved Priest -> Cleric (2026-08-08): CLASS_CLERIC had no row, and ch05's own
+        # guard could not see it because Basil is recruited IN ch05 and so is not on its field
+        # roster. Assert the invariant, not the one class that happened to be missing.
+        allcast, _ = bc._classed_cast(self.CAMPAIGN)   # available_at=None -> everyone
+        missing = sorted({ce for _uid, _slot, ce, *_ in allcast if ce not in bc.CLASS_LOADOUT})
+        self.assertEqual(missing, [], 'classed cast members with no CLASS_LOADOUT row')
+
     def test_thief_loadout_and_testch_covers_the_whole_cast(self):
         # inject_test_chapter needs a Thief loadout + one spawn tile per classed cast member
         # (13 now: 8 founding + Baxby + Trex + Lupin + ch05's Basil and Sahnar); both would
@@ -1614,10 +1625,12 @@ class Ch05RecruitIdentities(unittest.TestCase):
         self.assertFalse(set(slots) & set(bc.GUEST_PORTRAIT_MAP.values()),
                          'a cast slot collides with a cutscene guest slot')
 
-    def test_the_healer_split_is_donor_deep_not_class_deep(self):
-        # Sclorbo and Basil are both Priests; decisions.md differentiates them by DONOR
-        # (Moulder durable war-priest vs Natasha frail mage-healer), which only exists once
-        # Basil has a STAT_DONOR row -- the YAML design record cannot do it alone.
+    def test_the_healer_split_is_donor_deep(self):
+        # decisions.md differentiates the army's two healers by DONOR (Moulder durable
+        # war-priest vs Natasha frail mage-healer), which only exists once Basil has a
+        # STAT_DONOR row -- the YAML design record cannot do it alone. Since 2026-08-08 the
+        # split is ALSO class-deep (Sclorbo Priest / Basil Cleric), but the donor is still
+        # what separates the stat lines, so this stays the guard.
         self.assertEqual(bc.STAT_DONOR['sclorbo'], 'CHARACTER_MOULDER')
         self.assertEqual(bc.STAT_DONOR['basil'], 'CHARACTER_NATASHA')
         self.assertEqual(bc.STAT_DONOR['sahnar'], 'CHARACTER_JOSHUA')
@@ -1629,11 +1642,57 @@ class Ch05RecruitIdentities(unittest.TestCase):
         recruits = {r[0]: r for r in bc.on_map_talk_recruits(self.CAMPAIGN, self.CH05)}
         self.assertEqual(set(recruits), {'basil', 'sahnar'},
                          'ch05 recruits exactly Basil and Sahnar on the map')
-        self.assertEqual(recruits['basil'][2], 'CLASS_PRIEST')
+        self.assertEqual(recruits['basil'][2], 'CLASS_CLERIC')
         self.assertEqual(recruits['sahnar'][2], 'CLASS_MYRMIDON')
         load = lambda uid: bc.load_unit(self.CAMPAIGN, uid)
         self.assertEqual(bc.recruit_initial_faction(load('basil')), 'GREEN')
         self.assertEqual(bc.recruit_initial_faction(load('sahnar')), 'RED')
+
+    def test_basil_is_a_cleric_because_priest_promotes_into_the_wrong_weapon_type(self):
+        """The whole reason for the class (Nicolas, 2026-08-08). See decisions.md.
+
+        Priest's `ClassData.promotion` is CLASS_SAGE -- an ANIMA mage -- while basil.yaml's
+        `battle_anim.spell_palette_tint` declares STAFF + LIGHT, i.e. Bishop. Cleric's default
+        is CLASS_BISHOP_F, which IS light, so the class table points him at the class his own
+        art already assumes. Pinned against the decomp so the two cannot drift apart again.
+        """
+        table = bc._vanilla_class_table()
+        self.assertEqual(table['CLASS_PRIEST']['promotion'], 'CLASS_SAGE',
+                         'Priest still defaults into anima -- the reason Basil left it')
+        self.assertEqual(table['CLASS_CLERIC']['promotion'], 'CLASS_BISHOP_F')
+        # ...and the YAML's authored branch is the decomp's branch, not a wish.
+        display = {'CLASS_BISHOP_F': 'Bishop', 'CLASS_VALKYRIE': 'Valkyrie'}
+        branches = bc._promotion_branches()['CLASS_CLERIC']
+        promo = bc.load_unit(self.CAMPAIGN, 'basil')['promotion']
+        self.assertEqual(sorted(promo['branch']), sorted(display[c] for c in branches))
+        self.assertEqual(promo['default'], 'Bishop')
+
+    def test_basil_bases_are_vanilla_cleric_class_data_verbatim(self):
+        # basil.yaml claims its stat block is class data "verbatim"; that claim is only worth
+        # anything if something checks it. CON is load-bearing beyond flavour: CanUnitRescue
+        # is `GetUnitAid(actor) >= UNIT_CON(target)` (bmunit.c), so Cleric's CON 4 is what lets
+        # more of the party ferry the ch05 escort than Priest's CON 5 would.
+        bases = bc.class_base_stats('CLASS_CLERIC',
+                                    bc.vanilla_decomp_text('src/data_classes.c'))
+        fe = bc.load_unit(self.CAMPAIGN, 'basil')['fe_stats']
+        for yaml_key, field in (('HP', 'baseHP'), ('MAG', 'basePow'), ('SKL', 'baseSkl'),
+                                ('SPD', 'baseSpd'), ('DEF', 'baseDef'), ('RES', 'baseRes'),
+                                ('CON', 'baseCon'), ('MOV', 'baseMov')):
+            self.assertEqual(fe[yaml_key], bases[field],
+                             'basil.yaml %s drifted from CLASS_CLERIC.%s' % (yaml_key, field))
+        self.assertEqual(fe['CON'], 4, 'the escort-rescue margin is CON 4, not Priest CON 5')
+
+    def test_basil_declares_female_so_the_artur_slot_bit_is_rewritten(self):
+        # Gender rides YAML, not the slot -- _set_gender rewrites .attributes on whatever
+        # character slot the unit wears, explicitly clearing what leaks from the vanilla
+        # entry. So a female Cleric on the male Artur slot needs no slot change. (CA_FEMALE
+        # is inert on a foot unit anyway: both readers, GetUnitAid and koido.c, gate on
+        # CA_MOUNTEDAID first -- it matters only if he ever promotes to mounted Valkyrie.)
+        self.assertEqual(bc.load_unit(self.CAMPAIGN, 'basil').get('gender'), 'female')
+        self.assertIn('.attributes = CA_FEMALE',
+                      bc._set_gender('{\n    .number = 1,\n}', True))
+        self.assertNotIn('CA_FEMALE',
+                         bc._set_gender('{\n    .attributes = CA_FEMALE,\n}', False))
 
     def test_neither_rides_the_ch05_prep_roster(self):
         # They join DURING ch05, so cast_available_at must not seat them in its deploy cap

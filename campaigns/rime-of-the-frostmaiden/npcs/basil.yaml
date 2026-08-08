@@ -2,18 +2,18 @@
 # Class roster: docs/CLASSES.md (generated). Rationale: docs/decisions.md §Class Mapping.
 # Combat is vanilla FE (docs/decisions.md §Combat).
 #
-# STATUS: design record. Class + role LOCKED (Nicolas, 2026-06-20) — promoted from
-# "non-combat caravan NPC" to a playable recruit; bases/growths below are vanilla Priest CLASS
-# data (data_classes.c [CLASS_PRIEST - 1], verbatim) -- identical to Sclorbo's, since it's the
-# same class. The "differentiated by donor" call in decisions.md (Sclorbo->Moulder durable,
-# Basil->Natasha frail-but-potent) is implemented at BUILD time, not in this design record:
-# STAT_DONOR in build_campaign.py pulls each donor's actual personal growths from vanilla
-# data_characters.c at injection time (Moulder's for Sclorbo, Natasha's for Basil once wired),
-# so the two Priests won't be stat-twins in-ROM even though this file shows the same class
-# baseline Sclorbo's shipped YAML does.
-# NOT yet wired into build_campaign (inert until the recruit wiring lands: free slot + recruit
-# logic + injection wiring + a STAT_DONOR entry). The ART is shipped (portrait, map sprites,
-# battle-anim frames — see `art:` below); wiring it in is ch05-slice work (#25).
+# STATUS: design record. Role LOCKED (Nicolas, 2026-06-20) — promoted from "non-combat caravan
+# NPC" to a playable recruit. CLASS is CLERIC as of 2026-08-08 (was Priest); rationale is the ADR
+# in decisions.md, "Basil is a Cleric, because Priest promotes into the wrong weapon type".
+# Bases/growths below are vanilla Cleric CLASS data (data_classes.c [CLASS_CLERIC - 1], verbatim),
+# guarded by test_basil_bases_are_vanilla_cleric_class_data_verbatim.
+# The "differentiated by donor" call in decisions.md (Sclorbo->Moulder durable, Basil->Natasha
+# frail-but-potent) is implemented at BUILD time, not in this design record: STAT_DONOR in
+# build_campaign.py pulls each donor's actual personal growths from vanilla data_characters.c at
+# injection time (Moulder's for Sclorbo, Natasha's for Basil). The class split now reinforces the
+# donor split rather than fighting it — the two healers no longer share a class at all.
+# The ART is shipped and UNAFFECTED by the class (portrait, map sprites, battle anim are all
+# character-keyed, never class-keyed — see `art:` below); wiring is ch05-slice work (#25).
 
 id: basil
 name: Basil
@@ -23,7 +23,7 @@ name: Basil
 # cannot lean on ch05. It is deliberately NOT the ch05 escort quote (0x9C6, "But I haven't--
 # I still have her berry..."), which is locked and stays chapter-specific -- that one is the
 # undelivered berry; this one is the larder running out. basil.md: hurt Basil goes SHORT, and
-# the self-interruption is the piece of his register that survives being hurt.
+# the self-interruption is the piece of her register that survives being hurt.
 death_quote: "Oh-- I'm sorry. I had more berries... I was going to..."
 
 # D&D flavor: canonically the book's **Awakened Shrub** — an intelligent, speaking shrub
@@ -34,33 +34,45 @@ dnd:
   class: Awakened Shrub (goodberry)
   race: Plant
 
-# ── Role (LOCKED 2026-06-20) ─────────────────────────────────────────────────
-# PRIEST — our SECOND healer (we ran one-healer-thin on Sclorbo all game). A plant that
+# ── Role (LOCKED 2026-06-20; class revised 2026-08-08) ───────────────────────
+# CLERIC — our SECOND healer (we ran one-healer-thin on Sclorbo all game). A plant that
 # literally produces healing berries = a staff healer, flavor and function in one.
 # HEALER DIFFERENTIATION (Nicolas, 2026-06-20), mirroring the Marty/Meesmickle shaman split:
-#   - Sclorbo = MOULDER donor -> the durable "war-priest" (HP70/Def25, balanced, lord-viable).
-#   - Basil   = NATASHA donor -> the frail "mage-healer" (HP50/Def15 but Pow60/Res55/Lck60):
-#       a glass, dodgy, magically-potent nuke-healer. Frailty is fine HERE because Basil is
-#       NOT a lord candidate (lord-select is the Ch1 founding cast; Basil joins Ch5), so no
-#       survivability-floor burden — and "fragile but potent natural magic" suits a shrub.
+#   - Sclorbo = PRIEST, MOULDER donor -> the durable "war-priest" (HP70/Def25, lord-viable).
+#   - Basil   = CLERIC, NATASHA donor -> the frail "mage-healer" (HP50/Def15 but
+#       Pow60/Res55/Lck60): a glass, dodgy, magically-potent nuke-healer. Frailty is fine HERE
+#       because Basil is NOT a lord candidate (lord-select is the Ch1 founding cast; she joins
+#       Ch5), so no survivability-floor burden — and "fragile but potent natural magic" suits
+#       a shrub. Cleric's own bases lean the same way Natasha does (-2 HP, -1 Def, +1 Res/Skl
+#       against Priest), so class and donor now push together instead of against each other.
 fe_stats:
-  class: Priest
+  class: Cleric
   level: 1
-  # Vanilla FE8 Priest stats, verbatim from data_classes.c [CLASS_PRIEST - 1].
-  HP: 18
-  MAG: 1                    # FE Pow (Priest basePow) — magic attack stat
-  SKL: 1
+  # Vanilla FE8 Cleric stats, verbatim from data_classes.c [CLASS_CLERIC - 1].
+  HP: 16
+  MAG: 1                    # FE Pow (Cleric basePow) — magic attack stat
+  SKL: 2
   SPD: 2
-  DEF: 1
-  RES: 5
+  DEF: 0
+  RES: 6
   LCK: 0                    # ClassData has no base luck
-  MOV: 5                    # Priest baseMov
-  CON: 5
+  MOV: 5                    # Cleric baseMov
+  CON: 4                    # NOT flavor: CanUnitRescue is `aid >= target CON` (bmunit.c:905),
+                            # and a foot unit's aid is CON-1 — so Cleric's 4 (vs Priest's 5)
+                            # widens the set of units that can ferry the ch05 escort by one
+                            # Con tier. The chaperone mission is the chapter; this serves it.
 donor:
   character: Natasha        # vanilla Cleric — frail/high-magic line (distinct from Sclorbo's Moulder)
   why: glass mage-healer identity, opposite Sclorbo's durable Moulder line; Basil is no lord, so frailty costs nothing
 
-# ── Growth Rates (% per level) — vanilla Priest growths from data_classes.c ──
+# Vanilla FE8 has no male Cleric (the class carries the female promotion tree), and Basil is an
+# awakened PLANT — the book gives it no gender at all, so nothing in canon was overridden here.
+# Mechanically inert on a foot unit: both CA_FEMALE readers in the decomp (GetUnitAid, koido.c's
+# rescued-unit sprite) gate on CA_MOUNTEDAID first. It would start to matter only on Valkyrie.
+gender: female
+
+# ── Growth Rates (% per level) — from data_classes.c. Cleric's growths are BYTE-IDENTICAL
+#    to Priest's, so the class change moved her bases and her promotion tree, not her curve. ──
 growth_rates:
   HP: 50
   MAG: 30
@@ -71,8 +83,13 @@ growth_rates:
   LCK: 45
 
 promotion:
-  branch: [Bishop, Sage]    # vanilla FE8 Priest branch (classchg-data.c)
-  default: Bishop
+  branch: [Bishop, Valkyrie]  # vanilla FE8 Cleric branch, gPromoJidLut (classchg-data.c):
+                              # {CLASS_BISHOP_F, CLASS_VALKYRIE}. Bishop_F shares Bishop's
+                              # nameTextId (0x2d4), so the game shows both as "Bishop".
+  default: Bishop             # ClassData.promotion for CLASS_CLERIC — and it is LIGHT, which is
+                              # what `battle_anim.spell_palette_tint` below already assumes.
+                              # Priest's default was CLASS_SAGE (anima); that mismatch is why
+                              # the class changed. Guarded by the decomp-pinned test.
 
 recruited_via: "story — repotted from the Elven Tomb (Ch5)"
 recruit:
@@ -101,12 +118,12 @@ art:
     idle_frames: PMD Idle-Anim S row f0/f1/f3, bottom-anchored
     walk_frames: PMD Walk-Anim W/S/N rows, 8->5 downsample [0,2,3,5,6]; side faces left
     palette: shared cast palette; index map chosen in map_sprite_swapper (--idle-frame-h 32)
-    # ── Pre-recruit look: he stands GREEN until a party member Talks him (the chapter's first
-    # recruit), so he needs the same treatment Lupin's red does -- a charId-keyed cast override
-    # is unconditional, and it would pin his Oddish colours across a faction change nothing
+    # ── Pre-recruit look: she stands GREEN until a party member Talks her (the chapter's first
+    # recruit), so she needs the same treatment Lupin's red does -- a charId-keyed cast override
+    # is unconditional, and it would pin her Oddish colours across a faction change nothing
     # would flag. Derived at build time from the sheets above, so pixel edits flow through.
     # His BODY (idx10, the blue Oddish bulb) rides the faction ramp: green as an NPC, the
-    # standard blue once he joins. Leaves and eyes are his either way -- idx14 -> the neutral
+    # standard blue once she joins. Leaves and eyes are hers either way -- idx14 -> the neutral
     # grey-green, idx6 -> the standard red. idx1 is pure outline here (unlike Sahnar's), so it
     # goes to the dark neutral and stays black on both sides.
     pre_recruit_roles: {1: 15, 6: 11, 10: 9, 14: 13}
@@ -119,13 +136,16 @@ art:
     palette: one shared <=14-color quantize across all three frames
 
 # ── Battle anim (the block the injector reads) ───────────────────────────────
-# The 3-pose path, not an import: his three PMD poses ARE the animation (a shrub casting has no
+# The 3-pose path, not an import: her three PMD poses ARE the animation (a shrub casting has no
 # travel to transcribe, unlike Pinky's swoop or Lupin's pounce), and they shipped finished in
 # #179. NO new donor row is needed -- `clone_from: bishop` gives a STAFF slot (heal-cast, the
-# MVP) plus a LIGHT slot for after he promotes to Bishop, and call_spell_anim resolves which at
+# MVP) plus a LIGHT slot for after she promotes to Bishop, and call_spell_anim resolves which at
 # runtime off the equipped item. That row's own comment already named Basil as its reuser.
-# NOT shaman: Basil heals. Same donor as Sclorbo, which is correct -- they are the same class;
-# what separates them is the STAT_DONOR (Natasha vs Moulder), not the animation.
+# The donor survived the Cleric change untouched, and that is not luck: the injector registers a
+# PRIVATE per-CHARACTER AnimConf (gUnitSpecificBanimConfigs + _u25), so nothing here is keyed to
+# the class, and Bishop_F needs the same STAFF+LIGHT pair Bishop does.
+# NOT shaman: Basil heals. Same donor as Sclorbo -- correct, because the animation follows the
+# weapon types, not the class; what separates the two healers is the STAT_DONOR and now the class.
 battle_anim:
   clone_from: bishop
   abbr: basil
@@ -141,11 +161,13 @@ battle_anim:
     color: gold
     waveform: build
   # ...and the one thing that must NOT match. Basil rides the same Bishop donor as Sclorbo,
-  # so without a tint of his own both healers cast identical cyan -- the healer split
+  # so without a tint of her own both healers cast identical cyan -- the healer split
   # (decisions.md: Moulder war-priest vs Natasha mage-healer) would be invisible in the one
   # place the player actually watches. Gold is cyan's mirror in the engine (red+green pinned
   # high, blue suppressed) and reads as goodberry warmth against Sclorbo's cold flame.
-  # Both weapon types, same as his: STAFF is the heal now, LIGHT is after he promotes.
+  # Still earns its keep after the Cleric change: the class split shows up on the status
+  # screen, but the CASTING frame is the same donor for both, so the tint is what separates
+  # them mid-battle. Both weapon types: STAFF is the heal now, LIGHT is after she promotes.
   spell_palette_tint:
     weapon_types: [staff, light]
     color: gold

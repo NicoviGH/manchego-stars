@@ -63,7 +63,7 @@ in). Reserve is conveyed by **brevity and plainness**, never by trailing dots.
   line sounds quotable, check whether a person would actually say it out loud.
 - **Contractions and casual register** where the character allows ("wanna", "gotta", "a ton of").
 - **A character's own values should generate their turns**, not the other character teaching
-  them. Basil's doubt had to come from *his* horror at an unhealed animal, not from Sahnar
+  them. Basil's doubt had to come from *her* horror at an unhealed animal, not from Sahnar
   pronouncing a verdict on Ravisin.
 - **Villains condemn themselves in reported speech.** *"She said it would still run"* damns
   Ravisin harder than any character analysing her would.
