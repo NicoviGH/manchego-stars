@@ -4270,13 +4270,61 @@ local function captureCharAnim(name)
         return captureHealerAnim(name, pid, cls)
     end
     log(string.format("%s at (%d,%d) class=0x%X weapon-range %d-%d", name, u.x, u.y, cls, mn, mx))
-    if not positionForShot(pid) then shot(name .. "-noshot")
-        return result("FAIL", name .. " never reached firing position") end
-    shot(name .. "-deploy")
-    local fired = captureAttack(u.addr, name); shot(name .. "-after")
-    if not fired then
-        return result("FAIL", "captureAttack never reached combat for " .. name) end
-    return result("PASS", string.format("%s anim captured (class 0x%X)", name, cls))
+    -- PT_ROUNDS>1 films SEVERAL engagements back to back (#25). One round shows one attack
+    -- body, which is a thin look at a 12-mode imported animation -- the counter-attack, the
+    -- dodge and (with a crit-capable weapon) the critical mode only appear across repeated
+    -- exchanges. Rounds after the first are BEST-EFFORT: the sandbox foe can die, leaving
+    -- nothing in reach, and a capture that already has usable footage must not be thrown
+    -- away over that. So the FIRST round decides the verdict and the rest only add frames.
+    local rounds = tonumber(PLAYTEST_ROUNDS) or 1
+    if rounds < 1 then rounds = 1 end
+    local done = 0
+    for i = 1, rounds do
+        -- A unit that has attacked is SPENT for the rest of the player phase, so the second
+        -- round has to start on a new turn -- not on a poked state bit. End the phase and let
+        -- the enemy phase run; the unit comes back refreshed the way the game refreshes it,
+        -- and the foes get to act, which is also what puts a COUNTER (and so her dodge mode)
+        -- into the footage. A duelist who doubles kills the sandbox soldier outright, which is
+        -- why one round only ever shows the attack body.
+        if i > 1 then
+            -- The battle proc is still tearing down when the last frame is shot, and an EXP
+            -- bar or a level-up can follow it, so the map is a `transition` rather than idle.
+            -- Ending the phase from there times out on player_map_idle -- which is what the
+            -- first version of this loop did. Wait the combat OUT (tapping A to clear a
+            -- level-up) before touching the menu.
+            waitFor(function()
+                return not procActive(SYM.gProc_ekrBattle) and faction() == 0
+                    and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
+            end, 1800, true)
+            if not endTurn() then
+                log(string.format("  round %d: could not end the phase -- stopping", i)); break
+            end
+            if not waitFor(function() return faction() == 0 and not menuOpen()
+                    and not procActive(SYM.ProcScr_StdEventEngine) end, 5400, true) then
+                log(string.format("  round %d: player phase never came back -- stopping", i)); break
+            end
+        end
+        if not positionForShot(pid) then
+            if i == 1 then shot(name .. "-noshot")
+                return result("FAIL", name .. " never reached firing position") end
+            log(string.format("  round %d: nothing left in reach -- stopping", i))
+            break
+        end
+        if i == 1 then shot(name .. "-deploy") end
+        local fired = captureAttack(u.addr, name)
+        if not fired then
+            if i == 1 then
+                return result("FAIL", "captureAttack never reached combat for " .. name) end
+            log(string.format("  round %d: never reached combat -- stopping", i))
+            break
+        end
+        done = i
+        u = blue(pid) or u          -- re-read: the unit moved to its firing tile
+        wait(30)
+    end
+    shot(name .. "-after")
+    return result("PASS", string.format("%s anim captured (class 0x%X, %d/%d round(s))",
+        name, cls, done, rounds))
 end
 
 -- RECORDANIM (#65): capture any custom-art cast member firing on a `make TESTCH=1` ROM (New

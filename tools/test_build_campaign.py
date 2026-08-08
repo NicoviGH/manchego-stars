@@ -760,6 +760,25 @@ class BattleSpellPaletteTint(unittest.TestCase):
         self.assertIn(('CHARACTER_ROSS', 'ITYPE_STAFF', 'BANIM_SPELL_TINT_CYAN'), rows)
         self.assertIn(('CHARACTER_ROSS', 'ITYPE_LIGHT', 'BANIM_SPELL_TINT_CYAN'), rows)
 
+    def test_basil_gold_tint_covers_both_staff_and_light(self):
+        # Basil reuses Sclorbo's Bishop donor, so without a tint of his own the army's two
+        # healers would cast the SAME cyan -- the one thing the healer split is meant to make
+        # visible at a glance. Gold is cyan's mirror (red+green high, blue suppressed) and
+        # reads as the goodberry warmth. Same weapon_types list: heal now, Light post-promo.
+        rows = bc.battle_spell_palette_tints(self.CAMPAIGN)
+        self.assertIn(('CHARACTER_ARTUR', 'ITYPE_STAFF', 'BANIM_SPELL_TINT_GOLD'), rows)
+        self.assertIn(('CHARACTER_ARTUR', 'ITYPE_LIGHT', 'BANIM_SPELL_TINT_GOLD'), rows)
+
+    def test_gold_is_a_real_engine_tint_not_a_silent_fallthrough(self):
+        # The dispatch in BanimSpellPaletteCopy ends in `else -> Green`, so a colour that is
+        # named in YAML and enumerated but NOT branched on would compile, run, and quietly
+        # cast GREEN. That failure has no symptom to read, so it gets a test.
+        hooks = open(os.path.join(bc.REPO, 'tools', 'inject', 'engine_hooks.py'),
+                     encoding='utf-8').read()
+        self.assertIn('BANIM_SPELL_TINT_GOLD = 4', hooks)
+        self.assertIn('static u16 BanimSpellTintGold(u16 color)', hooks)
+        self.assertIn('gMSSpellTint == BANIM_SPELL_TINT_GOLD', hooks)
+
     def test_tint_rows_append_a_terminated_campaign_data_table(self):
         src = ('#include "constants/items.h"\n'
                'CONST_DATA struct BattleAnimDef * gUnitSpecificBanimConfigs[] = {\n'

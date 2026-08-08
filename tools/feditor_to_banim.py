@@ -110,6 +110,13 @@ def mode_table_slots(anim):
 _C_START_ATTACK_1 = 0x03      # banim_code_start_attack_1 -- heads any mode that SWINGS
 _C_PREPARE_HP_DEPLETE = 0x04  # banim_code_prepare_hp_deplete -- arms the depletion (melee)
 _C_CALL_SPELL_ANIM = 0x05     # banim_code_call_spell_anim -- arms it via the projectile (ranged)
+# The codes that actually START the depletion a melee mode armed with C04. Vanilla's own
+# banim_myrm_sw1 runs prepare_hp_deplete -> hit_normal -> sfx -> wait_hp_deplete; skip the
+# middle and the wait never returns. hit_critical_1/2/3 are the crit-mode equivalents.
+_C_HIT_CODES = frozenset({0x1A, 0x08, 0x09, 0x0A})
+# Slot 12 is `attack_miss` (ref_to_battleframe._MODE_ORDER): it swings, arms, and connects with
+# nothing. The one attacking mode that must NOT be required to fire a hit.
+_MODE_ATTACK_MISS = 12
 
 
 def validate_hp_deplete_arming(anim):
@@ -131,12 +138,32 @@ def validate_hp_deplete_arming(anim):
         codes = [i.code for i in insns if isinstance(i, Cmd)]
         if _C_START_ATTACK_1 not in codes:
             continue        # a dodge/stand mode: the attacker arms the depletion, not this one
-        if _C_PREPARE_HP_DEPLETE in codes or _C_CALL_SPELL_ANIM in codes:
-            continue
-        raise ValueError(
-            "FEditor mode %d attacks (C03) but never arms the HP depletion (no C04 / C05): "
-            "the opposing dodge/stand mode blocks on C01 forever and soft-locks the chapter"
-            % mode)
+        if _C_CALL_SPELL_ANIM in codes:
+            continue        # a projectile arms AND lands the depletion; no hit code of its own
+        if _C_PREPARE_HP_DEPLETE not in codes:
+            raise ValueError(
+                "FEditor mode %d attacks (C03) but never arms the HP depletion (no C04 / C05): "
+                "the opposing dodge/stand mode blocks on C01 forever and soft-locks the chapter"
+                % mode)
+        # Arming is not landing. A mode that runs C04 and then waits on C01 without ever
+        # firing a hit code waits on a depletion nothing started -- the battle parks in
+        # ekrBattleInRoundIdle and every proc freezes. This is NOT the bug above wearing a
+        # different hat: the mode arms correctly, so the check above passed it. It shipped in
+        # Alexsplode's Specter (mode 1, #25) and cost a soft-lock that no capture showed,
+        # because FE8 resolves the damage in DATA regardless -- the foe dies, the frames look
+        # right, and the hang only surfaces on the next input.
+        #
+        # MODE 12 IS EXEMPT, and this is the whole subtlety: slot 12 is `attack_miss`
+        # (ref_to_battleframe._MODE_ORDER), the body that plays when the attack MISSES. It has
+        # no hit code because nothing connects, and it keeps C04 precisely so the opponent's
+        # bare C01 still returns -- dropping C04 there is what soft-locked ch04 on turn 4
+        # (#24/#201). Every shipped anim we have -- Pinky, Lupin, Baxby, the wildling and
+        # lizardzerker reskins -- is "armed but hitless" in mode 12 and correct to be.
+        if mode != _MODE_ATTACK_MISS and not (_C_HIT_CODES & set(codes)):
+            raise ValueError(
+                "FEditor mode %d arms the HP depletion (C04) but never fires a hit "
+                "(no C1A / C08 / C09 / C0A), so its own C01 wait blocks forever: vanilla runs "
+                "prepare_hp_deplete -> hit_normal -> wait_hp_deplete (banim_myrm_sw1)" % mode)
 
 
 def emit_command(cmd):

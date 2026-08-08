@@ -135,6 +135,53 @@ class TestHpDepleteArming(unittest.TestCase):
         return head + "/// - Mode 12\n" + "".join(
             "%s\n" % c for c in mode12_cmds) + "1 p- f.png\n~~~\n"
 
+    def test_rejects_a_connecting_melee_mode_that_arms_but_never_hits(self):
+        # The sibling of the bug below, and the one that actually shipped: Alexsplode's Specter
+        # mode 1 is C03 C07 C04 ... C01 -- it ARMS the depletion (C04) and then WAITS on it
+        # (C01) without ever firing a hit code, so the depletion never starts and the battle
+        # sits in ekrBattleInRoundIdle forever. FE8 still resolves the damage in data, so the
+        # foe dies and the capture looks fine; only the next input reveals the soft-lock.
+        anim = fb.parse_feditor("/// - Mode 1\nC03\nC07\nC04\n1 p- a.png\nC01\nC06\nC0D\n~~~\n")
+        with self.assertRaises(ValueError) as cm:
+            fb.validate_hp_deplete_arming(anim)
+        self.assertIn("never fires a hit", str(cm.exception))
+
+    def test_accepts_a_melee_mode_that_hits_normally_or_critically(self):
+        for hit in ("C1A", "C08"):
+            anim = fb.parse_feditor(
+                "/// - Mode 1\nC03\nC07\nC04\n%s\n1 p- a.png\nC01\nC06\nC0D\n~~~\n" % hit)
+            fb.validate_hp_deplete_arming(anim)          # must not raise
+
+    def test_the_miss_mode_is_exempt_because_nothing_connects(self):
+        # Slot 12 is attack_miss. It is "armed but hitless" BY DESIGN -- and keeps C04 so the
+        # opponent's bare C01 still returns (#24/#201). Every shipped anim we have is shaped
+        # this way, so a rule that rejected it would reject Pinky, Lupin, Baxby and the enemy
+        # reskins all at once. That near-miss is why this test exists.
+        anim = fb.parse_feditor("/// - Mode 12\nC03\nC07\nC04\n1 p- a.png\nC01\nC06\nC0D\n~~~\n")
+        fb.validate_hp_deplete_arming(anim)              # must not raise
+
+    def test_every_shipped_anim_passes_the_arming_rules(self):
+        # The regression that the rule above is not over-tight: run it against every .txt we
+        # actually ship, not just fixtures.
+        root = os.path.join(os.path.dirname(__file__), "..")
+        found = 0
+        for base in ("campaigns", "engine"):
+            for dirpath, _dirs, files in os.walk(os.path.join(root, base)):
+                if "battle_anim" not in dirpath or "_parked" in dirpath:
+                    continue
+                for fn in files:
+                    if not fn.endswith(".txt") or "without_comment" in fn or fn == "CREDITS.txt":
+                        continue
+                    path = os.path.join(dirpath, fn)
+                    with open(path, encoding="utf-8", errors="replace") as fh:
+                        fb.validate_hp_deplete_arming(fb.parse_feditor(fh.read()))
+                    found += 1
+        self.assertGreater(found, 5, "found almost no shipped anims -- the walk is wrong")
+
+    def test_a_spell_mode_needs_no_hit_code(self):
+        anim = fb.parse_feditor("/// - Mode 5\nC03\nC07\nC05\n1 p- a.png\nC01\nC06\nC0D\n~~~\n")
+        fb.validate_hp_deplete_arming(anim)              # must not raise
+
     def test_rejects_an_attacking_mode_that_arms_nothing(self):
         # exactly the shipped-broken Pinky shape: opens the attack, never arms, hands back
         anim = fb.parse_feditor(self._script(["C03", "C07", "C25", "C06", "C0D"]))
@@ -143,6 +190,10 @@ class TestHpDepleteArming(unittest.TestCase):
         self.assertIn("mode 12", str(cm.exception))
 
     def test_accepts_melee_arming_via_prepare_hp_deplete(self):
+        # _script() builds its body as mode 12 = attack_miss, which is exempt from the
+        # "arming is not landing" rule (#25) precisely because nothing connects there. So this
+        # stays the bare C04 it always was -- it is testing the arming rule, on the one mode
+        # where arming is the whole requirement.
         anim = fb.parse_feditor(self._script(["C03", "C07", "C04", "C06", "C0D"]))
         fb.validate_hp_deplete_arming(anim)      # C04 -- must not raise
 

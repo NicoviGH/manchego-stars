@@ -133,3 +133,19 @@ battle_anim:
     - basil/ready.png
     - basil/windup.png
     - basil/peak.png
+  # Sclorbo's charge pulse, borrowed wholesale (Nicolas, 2026-08-08) -- the sprite swells
+  # toward the hue on the wind-up beat, so the heal has a tell before it lands. `build` is
+  # the same waveform his uses; the whole point of copying it is that our two healers should
+  # FEEL like one mechanic.
+  charge_flash:
+    color: gold
+    waveform: build
+  # ...and the one thing that must NOT match. Basil rides the same Bishop donor as Sclorbo,
+  # so without a tint of his own both healers cast identical cyan -- the healer split
+  # (decisions.md: Moulder war-priest vs Natasha mage-healer) would be invisible in the one
+  # place the player actually watches. Gold is cyan's mirror in the engine (red+green pinned
+  # high, blue suppressed) and reads as goodberry warmth against Sclorbo's cold flame.
+  # Both weapon types, same as his: STAFF is the heal now, LIGHT is after he promotes.
+  spell_palette_tint:
+    weapon_types: [staff, light]
+    color: gold

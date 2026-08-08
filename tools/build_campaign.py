@@ -3850,6 +3850,7 @@ def battle_spell_palette_tints(campaign):
         'green': 'BANIM_SPELL_TINT_GREEN',
         'blue': 'BANIM_SPELL_TINT_BLUE',
         'cyan': 'BANIM_SPELL_TINT_CYAN',   # Sclorbo's flame cyan -- bright equal G+B (#191)
+        'gold': 'BANIM_SPELL_TINT_GOLD',   # Basil's goodberry gold -- cyan's mirror (#25)
     }
     type_enums = {
         'dark': 'ITYPE_DARK',
@@ -3888,6 +3889,8 @@ CHARGE_FLASH_RGB = {
     'green':  (110, 255, 120),   # (Marty)
     'purple': (200, 120, 255),   # (Meesmickle)
     'cyan':   (31, 219, 219),    # flame cyan (Sclorbo, #191, Nicolas-approved -> BGR555 0x6F63)
+    'gold':   (255, 205, 70),    # goodberry gold (Basil, #25) -- warm, and far enough off
+                                 # Sclorbo's cyan that the two healers never read alike
 }
 
 

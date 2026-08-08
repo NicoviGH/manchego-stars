@@ -21,6 +21,11 @@ C07                               #Start attack animation; need 03 right before 
 3 p- Sword_012.png
 3 p- Sword_013.png
 C04                               #Prepare HP depletion routine; needed to animate return to standing frame after hit
+C1A                               #Manchego Stars (#25): deal the hit. Alexsplode omits it in the
+                                  #normal melee modes, so C04 arms a depletion nothing starts and
+                                  #the paired C01 waits forever (vanilla banim_myrm_sw1 runs
+                                  #prepare_hp_deplete -> hit_normal -> wait_hp_deplete). Mode 3 is
+                                  #untouched -- it already lands its crit via C08.
 C22                               #Play short sword swinging SFE
 C24                               #Play sword slashing air SFE
 C20                               #Play hit SFE (sounds like Knight Lord with Durandal's hit)
