@@ -6,8 +6,9 @@ deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; scope and ba
 issues. Before a context rollover, warn Nicolas, refresh this file, and start a fresh instance —
 don't rely on auto-compaction.
 
-Refreshed 2026-08-07 (Opus). `main` = `ade07d6`, level with `origin/main`. **No branches, no
-stashes, nothing in flight** — #246, #247, #248 and #249 all landed this session.
+Refreshed 2026-08-07 (Opus). `main` = `99d139e`, level with `origin/main`. **No branches, no
+stashes, nothing in flight** — #246, #247, #248, #249 and #250 all landed, and **#245 is closed**.
+Clean point for a `/clear`.
 
 ## In flight
 
@@ -18,7 +19,7 @@ stashes, nothing in flight** — #246, #247, #248 and #249 all landed this sessi
 ## Next task
 
 **ch05 is HOSTED, playable, and its rewards are reachable** (`--ch05-boot` load-test PASS,
-`ch05village` PASS, `make matrix` 14/14). Everything owed is the checklist on **#25**, which is the
+`ch05village` PASS, `make matrix` 15/15). Everything owed is the checklist on **#25**, which is the
 source — not this file. No live defects remain on it; what is left is authoring work:
 
 1. **Basil→Sahnar Talk recruit.** She has no `PORTRAIT_MAP` slot and carries `recruit.via: story`,
@@ -35,20 +36,18 @@ source — not this file. No live defects remain on it; what is left is authorin
    generic `_inject_tile_changes` migration #138 left behind. **Verify with `make matrix`, not
    byte-identity** — appending tables legitimately changes the ROM.
 
-Not scheduled: **#244** (three playtest scenarios failing outside the gate suite), **#245** (the
-`TESTCH` build race), **#228** physical cartridges (after the ROM is done).
+Not scheduled: **#244** (three playtest scenarios failing outside the gate suite), **#228**
+physical cartridges (after the ROM is done).
 
 ## Current state
 
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
-- **Gate: `make matrix` 14/14 on `main` at `ade07d6`** (re-run after every merge this session).
-  A `BLOCKED` verdict is usually the `TESTCH` build race (#245), not the scenario — it fired once
-  this session and passed on a plain retry, which is how you tell it apart from a real break.
-- **OPEN CALL for Nicolas: `ch05village` is not in the gate suite.** It lives in `SUITE=ch05` and
-  passes there. The gate carries the ACTIVE chapter's scenarios (six ch04 rows, no ch03), so ch05
-  belongs in it on that pattern — but `ch05boot` would be a fourth ROM build, ~2 more minutes on
-  every merge. Options put to him: add just `ch05village`; add it and trim ch04's six now that
-  ch04 is closed (keeps gate time flat); or leave it deliberate-run-only.
+- **Gate: `make matrix` 15/15 on `main` at `99d139e`**, four builds, ~6m30s. `ch05village` is IN
+  the gate (the gate carries the ACTIVE chapter's scenarios); ch04's six stay, because they cover
+  MECHANISMS ch05 and the queued convergence reuse, not ch04 itself.
+- **A `BLOCKED` verdict now means something.** It used to be #245 firing (chap_title `.lz`), which
+  is FIXED and closed — so treat a `BLOCKED` as real until proven otherwise, and do not reach for
+  a retry to make it go away.
 - **ch01–ch04 are DONE and CLOSED; ch05 (#25) is the only chapter with work owed.** Its dialogue
   merged long ago (PR #196, 15 slots, all `status: locked`); its map, its host and its difficulty
   math are all in (`make difficulty CH=ch05` = PARITY). It is now `status: active`, so it is inside
@@ -60,13 +59,21 @@ Not scheduled: **#244** (three playtest scenarios failing outside the gate suite
 
 ## Gotchas most likely to bite next (long form in `docs/decisions.md`)
 
-The six this session added are ADRs now — read them before hosting another chapter. Four are one
-idea wearing different hats, and it bit three separate times in one session: **declaring a thing is
-not wiring it, and the gap has no symptom.** (Campaign rosters live in campaign-named symbols;
+The seven this session added are ADRs now — read them before hosting another chapter. **Five are
+one idea wearing different hats, and it bit four separate times in one session: declaring a thing
+is not wiring it, and the gap has no symptom.** (Campaign rosters live in campaign-named symbols;
 owning the symbol means owning the POINTER; campaign-owned EVENT SCRIPTS must be declared AFTER the
-block-replacement pass or the appends are discarded; a `CHAPTER_L_*` label is resolved by VALUE.)
-The other two: a retile inherits vanilla's GIFT PLACEMENT; vanilla prose is a legitimate
-placeholder but vanilla wiring is not. The standing ones:
+block-replacement pass or the appends are discarded; a `CHAPTER_L_*` label is resolved by VALUE;
+generated art is CONVERTED by the injector, never left for make.) The other two: a retile inherits
+vanilla's GIFT PLACEMENT; vanilla prose is a legitimate placeholder but vanilla wiring is not.
+
+**If you take one thing into the next chapter: the expensive bugs here do not fail loudly.** Every
+one of those five produced a green build and a passing load-test while being wrong — a party on
+another map's tiles, a boss whose death sets no flag, four scripts silently discarded, a title card
+that never reaches the ROM. Verify from the DATA the engine reads (`INSPECT.units`, the generated
+C, the ROM), never from a screenshot or a PASS.
+
+The standing ones:
 
 - **Read decomp data through `git show HEAD:`, never the built tree** — our injections are build
   artifacts. Applies to lints too: a check that greps the working tree for something the build patches
