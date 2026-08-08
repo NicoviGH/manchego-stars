@@ -6,8 +6,8 @@ deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; scope and ba
 issues. Before a context rollover, warn Nicolas, refresh this file, and start a fresh instance —
 don't rely on auto-compaction.
 
-Refreshed 2026-08-07 (Opus). `main` = `ca4f2b1`, level with `origin/main`. **No branches, no
-stashes, nothing in flight** — #246, #247 and #248 all landed this session.
+Refreshed 2026-08-07 (Opus). `main` = `ade07d6`, level with `origin/main`. **No branches, no
+stashes, nothing in flight** — #246, #247, #248 and #249 all landed this session.
 
 ## In flight
 
@@ -17,15 +17,18 @@ stashes, nothing in flight** — #246, #247 and #248 all landed this session.
 
 ## Next task
 
-**ch05 is HOSTED and playable** (`--ch05-boot` load-test PASS, `make matrix` 14/14). What is owed
-is the checklist on **#25**, which is the source — not this file. The one item worth naming here,
-because it is a live defect rather than unbuilt work:
+**ch05 is HOSTED, playable, and its rewards are reachable** (`--ch05-boot` load-test PASS,
+`ch05village` PASS, `make matrix` 14/14). Everything owed is the checklist on **#25**, which is the
+source — not this file. No live defects remain on it; what is left is authoring work:
 
-1. **ch05's `Location` list is empty**, so its four reliquary villages *and* the armory `(2,1)` /
-   vendor `(6,10)` are unreachable on an otherwise finished map — the ch04-unobtainable-axe class,
-   one step earlier. Blocked on each site's `visit_text`. Vanilla's stock is
-   `ShopList_Event_Ch5Armory` (10 items) / `Ch5Vendor` (4).
-2. **Converge ch03/ch04 onto the campaign-owned tables** (`decisions.md` → "Campaign rosters live
+1. **Basil→Sahnar Talk recruit.** She has no `PORTRAIT_MAP` slot and carries `recruit.via: story`,
+   so she is on the field on her own pid (`0xba`) and cannot yet be turned. `recruit_initial_faction`
+   already returns RED for her, so the flow exists — she needs an identity.
+2. **The dialogue pass.** ch05's cutscenes are LOCKED (PR #196) and unwired, and the four reliquary
+   visits currently show **vanilla's** prose on ids `0x9CD`–`0x9D0`, which we deliberately do not
+   write. Replacing one is writing our body at the same id — not a rewire (`decisions.md` →
+   "Vanilla prose is a legitimate PLACEHOLDER").
+3. **Converge ch03/ch04 onto the campaign-owned tables** (`decisions.md` → "Campaign rosters live
    in campaign-named symbols"). Five symbols still squat on vanilla:
    `CH03_TREX_GREEN_SYMBOL`, `CH03_BOOT_SEED_SYMBOL`, `CH04_INITIAL_ENEMY_SYMBOL`,
    `CH04_BOOT_SEED_SYMBOL`, `CH04_MOOSE_SYMBOL`. Fold in the `_inject_ch03_tile_changes` →
@@ -38,9 +41,14 @@ Not scheduled: **#244** (three playtest scenarios failing outside the gate suite
 ## Current state
 
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
-- **Gate: `make matrix` 14/14 on `main` at `ca4f2b1`** (re-run this session, after ch05 landed).
+- **Gate: `make matrix` 14/14 on `main` at `ade07d6`** (re-run after every merge this session).
   A `BLOCKED` verdict is usually the `TESTCH` build race (#245), not the scenario — it fired once
   this session and passed on a plain retry, which is how you tell it apart from a real break.
+- **OPEN CALL for Nicolas: `ch05village` is not in the gate suite.** It lives in `SUITE=ch05` and
+  passes there. The gate carries the ACTIVE chapter's scenarios (six ch04 rows, no ch03), so ch05
+  belongs in it on that pattern — but `ch05boot` would be a fourth ROM build, ~2 more minutes on
+  every merge. Options put to him: add just `ch05village`; add it and trim ch04's six now that
+  ch04 is closed (keeps gate time flat); or leave it deliberate-run-only.
 - **ch01–ch04 are DONE and CLOSED; ch05 (#25) is the only chapter with work owed.** Its dialogue
   merged long ago (PR #196, 15 slots, all `status: locked`); its map, its host and its difficulty
   math are all in (`make difficulty CH=ch05` = PARITY). It is now `status: active`, so it is inside
@@ -52,9 +60,13 @@ Not scheduled: **#244** (three playtest scenarios failing outside the gate suite
 
 ## Gotchas most likely to bite next (long form in `docs/decisions.md`)
 
-The four this session added are ADRs now (campaign rosters live in campaign-named symbols; owning
-the symbol means owning the POINTER; a `CHAPTER_L_*` label is resolved by VALUE; a retile inherits
-vanilla's GIFT PLACEMENT). Read them before hosting another chapter. The standing ones:
+The six this session added are ADRs now — read them before hosting another chapter. Four are one
+idea wearing different hats, and it bit three separate times in one session: **declaring a thing is
+not wiring it, and the gap has no symptom.** (Campaign rosters live in campaign-named symbols;
+owning the symbol means owning the POINTER; campaign-owned EVENT SCRIPTS must be declared AFTER the
+block-replacement pass or the appends are discarded; a `CHAPTER_L_*` label is resolved by VALUE.)
+The other two: a retile inherits vanilla's GIFT PLACEMENT; vanilla prose is a legitimate
+placeholder but vanilla wiring is not. The standing ones:
 
 - **Read decomp data through `git show HEAD:`, never the built tree** — our injections are build
   artifacts. Applies to lints too: a check that greps the working tree for something the build patches
