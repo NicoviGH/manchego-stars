@@ -134,11 +134,12 @@ class TrexRecruitCast(unittest.TestCase):
         self.assertEqual(cast['trex'], ('Rennac', 'CLASS_THIEF'))
 
     def test_thief_loadout_and_testch_covers_the_whole_cast(self):
-        # inject_test_chapter needs a Thief loadout + one spawn tile per classed cast
-        # member (11 now: 8 founding + Baxby + Trex + Lupin); both would sys.exit otherwise.
+        # inject_test_chapter needs a Thief loadout + one spawn tile per classed cast member
+        # (13 now: 8 founding + Baxby + Trex + Lupin + ch05's Basil and Sahnar); both would
+        # sys.exit otherwise.
         self.assertIn('CLASS_THIEF', bc.CLASS_LOADOUT)
         allcast, _ = bc._classed_cast(self.CAMPAIGN)   # available_at=None -> everyone
-        self.assertEqual(len(allcast), 11)
+        self.assertEqual(len(allcast), 13)
         self.assertGreaterEqual(len(bc.TEST_SPAWN_POSITIONS), len(allcast))
         # ch03's blue field roster = cast_available_at(3); its PREP deploy tiles must cover it.
         field, _ = bc._classed_cast(self.CAMPAIGN, available_at=3)
@@ -1566,6 +1567,65 @@ class Ch04RuntimeHost(unittest.TestCase):
         self.assertIsNotNone(card.getbbox())
 
 
+class Ch05RecruitIdentities(unittest.TestCase):
+    """Basil and Sahnar are CAST MEMBERS, not scenery (#25).
+
+    Both shipped their art a slice ahead of their wiring (#179/#181) and then sat inert,
+    because a unit with no PORTRAIT_MAP slot has no identity to ride: no name, no bust, no
+    stat line, no map sprite, no death quote, and -- the blocker #25 kept hitting -- nothing
+    for a Talk to address. This class pins the identity half; the ch05 event wiring that
+    USES it is Ch05TalkRecruits.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+    CH05 = 5
+
+    def test_both_ride_collision_free_identity_slots(self):
+        # Same call as Trex->Rennac and Lupin->Duessel: a vanilla slot absent from our
+        # ch00-08 and referenced nowhere else, so dressing it can collide with nothing.
+        self.assertEqual(bc.PORTRAIT_MAP['basil'], 'Artur')
+        self.assertEqual(bc.PORTRAIT_MAP['sahnar'], 'Marisa')
+        slots = list(bc.PORTRAIT_MAP.values())
+        self.assertEqual(len(slots), len(set(slots)), 'two cast members share one slot')
+        self.assertFalse(set(slots) & set(bc.GUEST_PORTRAIT_MAP.values()),
+                         'a cast slot collides with a cutscene guest slot')
+
+    def test_the_healer_split_is_donor_deep_not_class_deep(self):
+        # Sclorbo and Basil are both Priests; decisions.md differentiates them by DONOR
+        # (Moulder durable war-priest vs Natasha frail mage-healer), which only exists once
+        # Basil has a STAT_DONOR row -- the YAML design record cannot do it alone.
+        self.assertEqual(bc.STAT_DONOR['sclorbo'], 'CHARACTER_MOULDER')
+        self.assertEqual(bc.STAT_DONOR['basil'], 'CHARACTER_NATASHA')
+        self.assertEqual(bc.STAT_DONOR['sahnar'], 'CHARACTER_JOSHUA')
+        for uid in ('basil', 'sahnar'):   # no bespoke base/growth split for either
+            self.assertEqual(bc.BASE_DONOR[uid], bc.STAT_DONOR[uid])
+            self.assertEqual(bc.GROWTH_DONOR[uid], bc.STAT_DONOR[uid])
+
+    def test_both_are_on_map_talk_recruits_of_ch05_with_opposite_factions(self):
+        recruits = {r[0]: r for r in bc.on_map_talk_recruits(self.CAMPAIGN, self.CH05)}
+        self.assertEqual(set(recruits), {'basil', 'sahnar'},
+                         'ch05 recruits exactly Basil and Sahnar on the map')
+        self.assertEqual(recruits['basil'][2], 'CLASS_PRIEST')
+        self.assertEqual(recruits['sahnar'][2], 'CLASS_MYRMIDON')
+        load = lambda uid: bc.load_unit(self.CAMPAIGN, uid)
+        self.assertEqual(bc.recruit_initial_faction(load('basil')), 'GREEN')
+        self.assertEqual(bc.recruit_initial_faction(load('sahnar')), 'RED')
+
+    def test_neither_rides_the_ch05_prep_roster(self):
+        # They join DURING ch05, so cast_available_at must not seat them in its deploy cap
+        # (that is what the roster/cap parity is measured against) -- but ch06 must have them.
+        for n, expected in ((self.CH05, False), (self.CH05 + 1, True)):
+            seated = {uid for uid, *_ in bc._classed_cast(self.CAMPAIGN, available_at=n)[0]}
+            self.assertEqual({'basil', 'sahnar'} <= seated, expected,
+                             'wrong prep availability at chapter %d' % n)
+
+    def test_each_carries_a_death_quote(self):
+        # inject_pc_death_quotes hard-exits without one (#6), so a slot with no quote is a
+        # build break, not a missing nicety.
+        for uid in ('basil', 'sahnar'):
+            self.assertTrue((bc.load_unit(self.CAMPAIGN, uid).get('death_quote') or '').strip(),
+                            '%s.yaml needs a death_quote' % uid)
+
+
 class HostedChapterEnumeration(unittest.TestCase):
     """Which chapters are hosted must be DISCOVERED, not listed by hand.
 
@@ -2087,26 +2147,34 @@ class CastPaletteBankSurvivesEveryRosterScreen(unittest.TestCase):
 
 
 class PreRecruitVariant(unittest.TestCase):
-    """A cast member on the field BEFORE he joins you (ch04's Lupin: red as the pack's
-    leader, the finalized grey once Marty's parley brings him over).
+    """A cast member on the field BEFORE it joins you (ch04's Lupin: red as the pack's
+    leader, the finalized grey once Marty's parley brings him over; ch05's Basil green and
+    Sahnar red until the tomb's two Talks).
 
     The failure this guards is the Trex bug's sibling: a charId-keyed cast-palette
     override is unconditional, so without the faction check Lupin renders in his bespoke
     grey while he is an ENEMY -- and FE reads grey as "already acted".
     """
     CAMPAIGN = 'rime-of-the-frostmaiden'
+    # Every cast member placed on a NON-BLUE side before its recruit talk. The value is the
+    # cast index carrying the unit's BODY mass -- the one that has to land on the faction
+    # ramp, or the unit does not change colour when it joins.
+    ON_FIELD_BEFORE_JOINING = {'lupin': (2, 3), 'basil': (10,), 'sahnar': (1, 10)}
 
-    def test_lupin_declares_pre_recruit_roles_covering_every_index_he_uses(self):
-        roles = bc.pre_recruit_roles(self.CAMPAIGN, 'lupin')
-        self.assertIsNotNone(roles, 'lupin.yaml must declare art.map_sprite.pre_recruit_roles')
+    def test_every_pre_recruit_unit_covers_each_index_it_uses(self):
         ms = os.path.join(bc.REPO, 'campaigns', self.CAMPAIGN, 'map_sprites')
-        for stem in ('lupin.png', 'lupin_mu.png'):
-            used = {v for v in Image.open(os.path.join(ms, stem)).getdata() if v}
-            self.assertTrue(used <= set(roles), '%s uses undeclared cast indices %s'
-                            % (stem, sorted(used - set(roles))))
-        # The body must land on the faction ramp (7-10) -- that is what makes him read red.
-        self.assertTrue({roles[2], roles[3]} & set(range(7, 11)),
-                        'no body index on the faction ramp: he would not change colour by side')
+        for uid, body in self.ON_FIELD_BEFORE_JOINING.items():
+            roles = bc.pre_recruit_roles(self.CAMPAIGN, uid)
+            self.assertIsNotNone(
+                roles, '%s.yaml must declare art.map_sprite.pre_recruit_roles' % uid)
+            for stem in (uid + '.png', uid + '_mu.png'):
+                used = {v for v in Image.open(os.path.join(ms, stem)).getdata() if v}
+                self.assertTrue(used <= set(roles), '%s uses undeclared cast indices %s'
+                                % (stem, sorted(used - set(roles))))
+            # The body must land on the faction ramp (7-10) -- that is what makes it read red.
+            self.assertTrue({roles[i] for i in body} & set(range(7, 11)),
+                            '%s: no body index on the faction ramp -- it would not change '
+                            'colour by side' % uid)
 
     def test_a_plain_cast_member_has_no_variant(self):
         self.assertIsNone(bc.pre_recruit_roles(self.CAMPAIGN, 'braulo'))

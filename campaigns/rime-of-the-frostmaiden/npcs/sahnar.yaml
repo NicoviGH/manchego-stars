@@ -13,6 +13,14 @@
 id: sahnar
 name: Sahnar
 
+# DRAFT 2026-08-08 — awaiting Nicolas's red-pen; every other cast quote was co-written.
+# The UNIVERSAL falls-in-battle quote (#6): chapter=0xFF, so it fires in every chapter.
+# Built off her turn ("Then my purpose has not changed. Only my true enemy has been revealed"):
+# she was GIVEN a purpose and re-aimed it, so dying spent she is settled, not robbed. Per
+# sahnar.md the ordeal is named ONCE, flatly, and never begged -- the understatement IS the
+# horror -- and she does not grieve aloud. Duelist's economy: she sends them on.
+death_quote: "Four thousand years I kept a watch. ...This was the better use of me. Go on."
+
 # D&D flavor (from the DM notes): a reawakened mummy in the elven tomb who "is happy to
 # help the party as long as they can learn more about druids in this time period." A
 # moon-elf, freed by the moonlight-brazier puzzle.
@@ -55,10 +63,13 @@ promotion:
   branch: [Swordmaster, Assassin]  # vanilla FE8 Myrmidon branch (classchg-data.c [CLASS_MYRMIDON])
   default: Swordmaster
 
-recruited_via: "story — freed from the sarcophagus in the Elven Tomb (Ch5)"
+recruited_via: "story — talked down by Basil after the eruption wakes her (Ch5)"
 recruit:
   chapter: ch05-the-elven-tomb
-  via: story                # light the moonlight brazier to open the sarcophagus
+  via: story                # on-map Talk: she is placed, then a CHAR/CUSA flips her (ON_MAP_RECRUIT_VIA)
+  initial_faction: red      # the Joshua flip -- she rises HOSTILE at the eruption (chapter YAML's
+                            # `convertible: true`) and only Basil's Talk turns her. GREEN is the
+                            # default; this opt-in is what recruit_initial_faction reads.
 
 # ── Art (SHIPPED 2026-07-17 — spectral-skeleton direction, Nicolas's call) ────
 # Direction change from the design-record "mummy": the FE + broader sprite community has NO
@@ -78,11 +89,11 @@ art:
     static: true              # no mouth-flap / blink, like the other custom busts
     credit: "Glaceo (FE-Repo, F2E); see CREDITS.md"
   map_sprite:                 # SHIPPED (map_sprites/sahnar{,_mu}.png); palette applied by Nicolas
-    wiring: pending           # art SHIPPED; injection waits on the ch05 recruit
-                              # wiring (#25). Explicit so assert_declared_map_sprites_
-                              # injected can tell a tracked deferral from a unit that
-                              # silently renders its stock class sprite.
-    base: Bonewalker/Specter  # 16x16 SMS + 32x480 MU, adopted from the Specter overworld sprite
+    base: Bonewalker          # geometry donor: {3 frames, UNIT_ICON_SIZE_16x16} wait-table row
+                              # (unit_icon_wait_data.c // 69), which is Sahnar's 16x48 sheet
+                              # exactly. Was written "Bonewalker/Specter" -- prose naming the
+                              # ART source, not a donor row, and it hard-failed the lookup.
+                              # The Specter is the SPRITE this is drawn from; see `source`.
     source: "Bonewalker (U) Specter {Alexsplode} — FE-Repo Map Sprites/Monsters - Basic Types"
     recipe: >
       cast-palette match (bone -> tan/white/grey, cloak -> dark slate idx1+idx10, spectral cyan
@@ -90,17 +101,39 @@ art:
       map_sprite_swapper. Validates UNIT_ICON_SIZE_16x16 x3 (SMS) + 32x32 x15 (MU).
     palette: cast
     credit: "Alexsplode (FE-Repo, F2E); see CREDITS.md"
-  battle_anim:                # DECIDED; the art is not vendored yet, but nothing BLOCKS it.
-                              # Corrected 2026-08-07: this said "DEFERRED (needs the #90 FE-anim
-                              # import pipeline)". #90 is CLOSED -- feditor_to_banim shipped and
-                              # Pinky + Lupin already ride it. What is owed is re-fetching the
-                              # Specter anim and wiring it, not waiting on tooling.
+    # ── Pre-recruit look: RED while she guards the tomb, the slate cast sheet above once
+    # Basil's Talk brings her over -- the same call Lupin's YAML makes, and for the same
+    # reason: a charId-keyed cast override is unconditional, so without this she renders in
+    # her finished slate WHILE HOSTILE, and FE reads that greyed-out look as "already acted".
+    # Derived at build time by remapping cast indices onto the donor's standard SMS roles, so
+    # every pixel edit to the slate sheet flows into the red one. Her CLOAK (idx1 deep shadow
+    # + idx10 slate bulk) rides the faction ramp 7/9 -- that is the part that must change side
+    # colour. Bone is bone on either side: idx3/4/11 -> the neutral greys, idx5 tan unchanged.
+    # Note idx1 is BOTH the cloak's shadow and the sprite outline, so the outline tints with
+    # it; at 16x16 that reads as a dark-red edge, which is what vanilla enemies have anyway.
+    pre_recruit_roles: {1: 7, 3: 4, 4: 14, 5: 5, 10: 9, 11: 3}
+  battle_anim:                # VENDORED 2026-08-07 (#25). Provenance only -- the `battle_anim:`
+                              # block at the bottom of this file is what the injector reads.
     source: "[Skeleton-Custom] [U] Specter {Alexsplode} — FE-Repo Battle Animations/Monsters - Basic Types/1. Sword"
-    plan: >
-      adopt the Specter sword battle animation in its NATIVE palette (Nicolas: it's polished/
-      consistent on its own — do NOT recolor it to the cloak; the skull + spectral glow are the
-      throughline). Matched pair with the map sprite (both Alexsplode). Wire via the #90 import
-      pipeline when it lands; until then this is a source pointer, not vendored (re-fetch on pickup).
+    vendored: battle_anims/sahnar/   # Sword.txt + Sword_000..100.png, fetched verbatim
+    palette: native           # Nicolas: it is polished and consistent on its own — do NOT recolor
+                              # it to the cloak; the skull and its glow are the throughline. So no
+                              # `recolor` is passed to build_import, unlike the enemy reskins.
     credit: "Alexsplode (FE-Repo, F2E); see CREDITS.md"
-  # NOTE: still inert in build_campaign — recruit wiring (slot, Joshua STAT_DONOR, injection) is
-  # ch05-slice work (#25/#19), same scoping as Basil and Lupin. This branch lands the ART only.
+
+# ── Battle anim (the block the injector reads) ───────────────────────────────
+# IMPORTED, not faked: this is a complete FE-native animation (12 modes, 101 distinct frames),
+# so there is nothing to fake -- the .txt owns the cadence, the sound codes and the per-frame
+# canvas positions, exactly like Pinky's swoop and Lupin's pounce. Vendored verbatim; the only
+# edit to the pipeline it needed was teaching parse_feditor FEditor's `L` loop bracket, which
+# this script is the first vendored anim to use (its two RANGED modes -- 5 and 6 -- which a
+# sword Myrmidon never plays, but which still have to parse).
+#
+# clone_from: myrmidon gives the ITYPE_SWORD slot and nothing else; the binding is per-CHARACTER
+# via _u25, so CLASS_MYRMIDON and every generic Myrmidon stay byte-vanilla.
+battle_anim:
+  clone_from: myrmidon
+  abbr: sahnar
+  import:
+    txt: sahnar/Sword.txt
+    frames_dir: sahnar

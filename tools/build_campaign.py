@@ -290,6 +290,14 @@ PC_DEATH_QUOTE_MSGS = {
     'baxby':      0x93E,
     'lupin':      0x974,   # dead vanilla slot (no TEXTSHOW/.msg ref). TODO(#24): auto-allocate
                            # death-quote ids from a free pool so new recruits need only YAML.
+    # ch05's pair (#25), picked the same way and from the same neighbourhood as Lupin's: dead
+    # vanilla TUTORIAL bodies (0x97A "Now select Staff and press...", 0x97B "Ross has been
+    # rescued...") that no TEXTSHOW, .msg or .msgId reaches. The audit that found them excludes
+    # include/constants/msg.h, which #defines EVERY id and so marks every slot "referenced",
+    # and ignores bare-hex matches, which collide with unrelated addresses -- Lupin's own 0x974
+    # fails both of those looser tests while being genuinely free, which is the control.
+    'basil':      0x97A,
+    'sahnar':     0x97B,
 }
 # Dev placeholder -- the reusable "next chapter isn't built yet" landing. A chapter whose
 # `unlocks_chapter` target isn't hosted yet ends HERE instead of MNC2'ing onto an unbuilt
@@ -629,6 +637,7 @@ CLASS_MAP = {
     'Pegasus Knight': 'CLASS_PEGASUS_KNIGHT',
     'Thief':          'CLASS_THIEF',   # Trex (ch03 recruit) -- the army's utility unit
     'Cavalier':       'CLASS_CAVALIER',  # Baxby the axe-beak (ch01 recruit) -- mounted sword/lance
+    'Myrmidon':       'CLASS_MYRMIDON',  # Sahnar (ch05 recruit) -- the army's sword crit-duelist
 }
 
 # fe_stats key -> the gCharacterData personal-base field it feeds. FE8 unit stats
@@ -661,6 +670,13 @@ STAT_DONOR = {
     'trex':       'CHARACTER_COLM',      # Thief (ch03 recruit) -- vanilla starter thief donor
     'baxby':      'CHARACTER_FRANZ',     # Cavalier (ch01 recruit) -- fresh-cavalier growth runway
     'lupin':      'CHARACTER_KYLE',      # Cavalier (ch04 red->blue parley recruit); Kyle = stat ref only
+    # The ch05 pair (#25). Their donors are what makes the two Priests differ and what makes
+    # Sahnar a duelist rather than a generic sword: decisions.md prices Sclorbo as the durable
+    # war-priest (Moulder) against Basil as the frail mage-healer (Natasha), and that split
+    # exists ONLY here -- the YAML design records show identical Priest CLASS data, because
+    # they are the same class. Sahnar takes Joshua, the archetype she was locked to.
+    'basil':      'CHARACTER_NATASHA',   # Cleric: frail/high-magic, opposite Sclorbo's Moulder
+    'sahnar':     'CHARACTER_JOSHUA',    # Myrmidon: the crit-sword duelist; Joshua = stat ref only
 }
 GROWTH_FIELDS = ('growthHP', 'growthPow', 'growthSkl', 'growthSpd',
                  'growthDef', 'growthRes', 'growthLck')
@@ -712,6 +728,18 @@ PORTRAIT_MAP = {
     # Rides the vanilla Duessel slot (a Great Knight absent from our ch00-08, referenced nowhere
     # else -> collision-free); his stat line references Kyle (STAT_DONOR), his identity is Duessel.
     'lupin':      'Duessel',
+    # The ch05 recruits (#25). Both shipped their art in #179/#181 and then sat INERT for two
+    # months, because art without a slot is art nothing can address: no name, no bust, no stat
+    # line, no map sprite, no death quote -- and, the thing that actually blocked the chapter,
+    # no pid for a Talk to name. These two lines are that identity.
+    # Basil the goodberry shrub (npcs/basil.yaml) rides ARTUR -- a Monk absent from our ch00-08
+    # and referenced nowhere else, so dressing it is collision-free; Artur's own line promotes to
+    # Bishop, which is Basil's default promotion. His stat line references Natasha (STAT_DONOR).
+    'basil':      'Artur',
+    # Sahnar (npcs/sahnar.yaml) rides MARISA -- vanilla's OTHER red-to-blue Myrmidon parley,
+    # absent from our ch00-08 and referenced nowhere else. Exact class match, unlike Trex's and
+    # Lupin's slots; her stat line references Joshua (STAT_DONOR), her identity is Marisa.
+    'sahnar':     'Marisa',
 }
 
 # Prologue cold-open guests ride vanilla character slots outside PORTRAIT_MAP
@@ -1681,13 +1709,18 @@ CLASS_LOADOUT = {
     'CLASS_THIEF':          ['ITEM_SWORD_IRON', 'ITEM_DOORKEY', 'ITEM_CHESTKEY',
                              'ITEM_VULNERARY'],  # Trex: the utility kit for the look-test
     'CLASS_CAVALIER':       ['ITEM_SWORD_IRON', 'ITEM_LANCE_IRON', 'ITEM_VULNERARY'],  # Baxby (mount)
+    # Sahnar: sword-locked, and the Killing Edge is the point of her -- the crit threat is the
+    # identity, so the look-test bench has to be able to show a crit (FE8 calls it SWORD_KILLER).
+    'CLASS_MYRMIDON':       ['ITEM_SWORD_IRON', 'ITEM_SWORD_KILLER', 'ITEM_VULNERARY'],
 }
 # Centered, spread-out formation on the Ch1 map (a 4x2 grid, 2-tile gaps), clear of the
 # houses (13,6)/(10,4) and seize (2,2). Pulled in from the old bottom-right cluster so the
 # cast reads spaced out toward the middle for the look-test. Roster fills in order.
 TEST_SPAWN_POSITIONS = [(5, 4), (7, 4), (9, 4), (11, 4),
                         (5, 6), (7, 6), (9, 6), (11, 6),
-                        (13, 5), (13, 7), (13, 3)]   # 9th-11th: recruits Trex + Baxby + Lupin
+                        (13, 5), (13, 7), (13, 3),   # 9th-11th: recruits Trex + Baxby + Lupin
+                        (3, 5), (3, 7)]              # 12th-13th: ch05's Basil + Sahnar. Left-hand
+                        # column mirroring the (13,*) one, and clear of the seize tile at (2,2).
 
 # The TESTCH sandbox doubles as the SINGLE battle-anim test bench: it deploys one hostile of
 # every enemy_class_reskins slot as a foe (a row south of the cast), so `recordenemy` can bait
@@ -3635,6 +3668,13 @@ BANIM_DONORS = {
     # other half, the axe-beak) is the same class and reuses this row.
     'cavalier': ('CLASS_CAVALIER', ['0x0100 | ITYPE_SWORD', '0x0100 | ITYPE_LANCE',
                                     '0x0100 | ITYPE_ITEM'], 'melee', 'lance'),
+    # Sahnar (the risen duelist, #25) -- an IMPORTED 12-mode Specter script (feditor_to_banim),
+    # so `motion`/`cadence` go unused for HER: the .txt owns the cadence and the sound codes.
+    # They are still filled in properly rather than left None, because the row is the donor for
+    # the class, not for one unit -- and the 'sword' cadence it names is read off FE8's own
+    # banim_myrm_sw1 (ref_to_battleframe._MELEE_CADENCE). One weapon slot: a Myrmidon is
+    # sword-locked, so ITYPE_SWORD is every slot she can reach.
+    'myrmidon': ('CLASS_MYRMIDON', '0x0100 | ITYPE_SWORD', 'melee', 'sword'),
 }
 
 

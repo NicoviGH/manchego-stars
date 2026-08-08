@@ -58,6 +58,12 @@ def parse_feditor(text):
             continue
         if line[0] == "C" and len(line) == 3:
             modes[cur].append(Cmd(int(line[1:], 16)))
+        elif line == "L":
+            # FEditor's LOOPSTART bracket, closed by the paired C01 ("LOOPEND"). There is no
+            # loop opcode in banim_code.inc to emit, and vanilla encodes the same shape --
+            # frames after banim_code_call_spell_anim, then the wait -- as a flat run
+            # (banim_bgl_mg1_motion.s). So the bracket is dropped; its C01 does the waiting.
+            continue
         else:
             parts = line.split()
             modes[cur].append(Frame(int(parts[0]), parts[-1]))

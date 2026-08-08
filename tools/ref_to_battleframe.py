@@ -230,6 +230,19 @@ _MELEE_CADENCE = {
         "impact": ["\tbanim_code_shake_screnn_slightly"],
         "back":   ["\tbanim_code_sound_step_heavy_quick"],
     },
+    # Read off FE8's OWN Myrmidon, banim_myrm_sw1 (banim 0x10) -- the anim every generic
+    # Myrmidon fights as -- not adapted from the axe or lance rows. Its normal attack is
+    # swing_short -> hit -> swing_shorter -> step_heavy, with no separate swing beat; the
+    # slash_air at "swing" is lifted from its own CRITICAL mode, which is the only place
+    # vanilla gives the blade an audible arc. A duelist's rhythm is quick and dry: no dirt
+    # kick, no screen shake, no armour clatter.
+    "sword": {
+        "windup": ["\tbanim_code_sound_sword_swing_short"],
+        "swing":  ["\tbanim_code_sound_sword_slash_air"],
+        "hit":    ["\tbanim_code_sound_hit_eliwood_promoted_durandal"],
+        "impact": ["\tbanim_code_sound_sword_swing_shorter"],
+        "back":   ["\tbanim_code_sound_step_heavy"],
+    },
 }
 
 
