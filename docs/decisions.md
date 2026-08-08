@@ -3827,6 +3827,14 @@ whether the file survived an earlier build. `_write_chapter_title_card` now conv
 **The general rule: if an injector generates art, it owns the conversion.** Deleting an
 intermediate is not a way to ask make for anything on this toolchain.
 
+Both title-card sites are fixed — `inject_prologue` had an inline copy of
+`_write_chapter_title_card` carrying the same bug, and now calls the helper. **Three more sites
+have the same delete-and-hope shape and are NOT verified**, all in the montage path, which is why
+they are named here rather than quietly assumed fine: the opening subtitle cards
+(`.feimg2`/`.fetsa2`), `MontageMural.4bpp{,.lz}`, and the drawn world-map `.lz` copies. They may be
+harmless if their consuming `.s` changes on every build (which would force the reassemble this bug
+needs) — that is exactly what someone should check before trusting them.
+
 ### Vanilla prose is a legitimate PLACEHOLDER; vanilla wiring is not (2026-08-07, #25)
 
 **A chapter is wired end-to-end first, and only its PROSE waits for the dialogue pass** (Nicolas).

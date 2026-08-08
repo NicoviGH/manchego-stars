@@ -4966,12 +4966,10 @@ def inject_prologue(campaign, verbose=True, montage=False):
     # short; the YAML's full objective.description is for docs/banners).
     set_message_body(lines, host['goal']['statusObjectiveTextId'],
                      name_message_body('Defeat ' + display_name(by_id['sephek-kaltro'])))
-    title_png = os.path.join(DECOMP, 'graphics', 'chap_title',
-                             'chap_title_%d.png' % host['chapTitleId'])
-    gen_chapter_title.compose_title('Prologue: ' + chap['title']).save(title_png)
-    for stale in (title_png[:-4] + '.4bpp', title_png[:-4] + '.4bpp.lz'):
-        if os.path.exists(stale):
-            os.remove(stale)
+    # Was an inline copy of _write_chapter_title_card, carrying the same delete-and-hope bug
+    # (#245): make does not re-derive a deleted .4bpp.lz, so the prologue's card either broke
+    # the build or silently never landed. One helper now, which owns the conversion.
+    _write_chapter_title_card(host, 'Prologue: ' + chap['title'])
 
     # 4c. Dialogue (ch00 dialogue pass, 2026-06-10): message bodies are GENERATED from
     #     the chapter YAML's locked `script:` blocks + quote fields -- the YAML stays
@@ -5966,6 +5964,11 @@ def _write_chapter_title_card(host, title):
                              'chap_title_%d.png' % host['chapTitleId'])
     gen_chapter_title.compose_title(title).save(title_png)
     gbagfx = os.path.join(DECOMP, 'tools', 'gbagfx', 'gbagfx')
+    if not os.path.exists(gbagfx):
+        # A fresh checkout has no helper tools -- tools/setup-toolchain.sh omits upstream's
+        # build_tools.sh (HANDOFF). Say so, rather than raising FileNotFoundError on a path.
+        sys.exit('ERROR: %s is missing -- a fresh checkout needs the decomp helper tools:\n'
+                 '  (cd fireemblem8u && ./build_tools.sh)' % gbagfx)
     four_bpp, lz = title_png[:-4] + '.4bpp', title_png[:-4] + '.4bpp.lz'
     for src, dst in ((title_png, four_bpp), (four_bpp, lz)):
         subprocess.run([gbagfx, src, dst], cwd=DECOMP, check=True)
