@@ -13,13 +13,16 @@
 id: sahnar
 name: Sahnar
 
-# DRAFT 2026-08-08 — awaiting Nicolas's red-pen; every other cast quote was co-written.
+# LOCKED 2026-08-08 (Nicolas's red-pen on the draft).
 # The UNIVERSAL falls-in-battle quote (#6): chapter=0xFF, so it fires in every chapter.
 # Built off her turn ("Then my purpose has not changed. Only my true enemy has been revealed"):
 # she was GIVEN a purpose and re-aimed it, so dying spent she is settled, not robbed. Per
 # sahnar.md the ordeal is named ONCE, flatly, and never begged -- the understatement IS the
-# horror -- and she does not grieve aloud. Duelist's economy: she sends them on.
-death_quote: "Four thousand years I kept a watch. ...This was the better use of me. Go on."
+# horror -- and she does not grieve aloud.
+# Nicolas's revision moves the release onto HER: "I can finally go on" is the watch ending,
+# not a duelist dismissing the party ("Go on" was an order to them). The whole point of her
+# is that the watch was the ordeal -- so the last line is her being let off it.
+death_quote: "Four thousand years I kept a watch. ... I can finally go on..."
 
 # D&D flavor (from the DM notes): a reawakened mummy in the elven tomb who "is happy to
 # help the party as long as they can learn more about druids in this time period." A

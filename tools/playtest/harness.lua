@@ -3937,6 +3937,11 @@ local CAST = {
     -- Baxby the axe-beak: SLOT = Forde (0x10), stats from Franz (0x11's neighbour, CHARACTER_FRANZ)
     -- -- the same slot-vs-donor trap, so again this is PORTRAIT_MAP's value, not STAT_DONOR's.
     baxby = 0x10,
+    -- ch05's pair (#25), and the slot-vs-donor trap one more time: Basil's stats come from
+    -- Natasha and Sahnar's from Joshua, but their SLOTS are Artur and Marisa. Taking the
+    -- donor here would aim PT_CHAR at a unit that is not on the sandbox map.
+    basil = 0x13,   -- CHARACTER_ARTUR
+    sahnar = 0x16,  -- CHARACTER_MARISA
 }
 
 -- Shared lead-up for the RBG demo: win the prologue, lord-select RBG into ch01,
@@ -4282,6 +4287,50 @@ scenarios.recordanim = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end
     local name = (PLAYTEST_CHAR and PLAYTEST_CHAR ~= "") and PLAYTEST_CHAR or "prof-rbg"
     return captureCharAnim(name)
+end
+
+-- RECORDCAST (#25): the OTHER two thirds of a unit's art, on the same TESTCH sandbox
+-- `recordanim` uses. `recordanim` proves the battle animation; this proves the PORTRAIT and the
+-- MAP SPRITE, which have no other in-engine capture -- the unit list shows the map sprite at
+-- 16px among twelve others and never shows the bust at all, so "the art is wired" was until now
+-- something you could only argue from injected tables.
+--
+-- It cursors onto the unit (framing its map sprite under the hand) and opens the status screen,
+-- where FE8 draws the 96x80 bust next to the name/class/stat block -- i.e. the portrait, the
+-- name, the class and the stat line in ONE frame, which is exactly what a look-test needs to
+-- approve or reject. Pick with PT_CHAR=<id>, same CAST table as recordanim.
+scenarios.recordcast = function()
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    local name = (PLAYTEST_CHAR and PLAYTEST_CHAR ~= "") and PLAYTEST_CHAR or "prof-rbg"
+    local pid = CAST[name]
+    if not pid then return result("FAIL", "unknown PT_CHAR " .. tostring(name)) end
+    local u = blue(pid)
+    if not u then
+        return result("FAIL", string.format(
+            "%s (pid 0x%02X) is not deployed -- recordcast needs a `make TESTCH=1` ROM", name, pid))
+    end
+    wait(60)
+    if not cursorTo(u.x, u.y) then
+        return result("FAIL", string.format("cursor never reached %s at (%d,%d)", name, u.x, u.y))
+    end
+    wait(30)
+    shot(name .. "-mapsprite")            -- the map sprite, cursor-framed on its own tile
+    -- R is FE8's status-screen shortcut from the map cursor. Guarded on the PROC rather than a
+    -- frame count: a blind press that lands on nothing would still shoot, and would hand back a
+    -- picture of the map captioned "portrait" -- the exact class of green-but-wrong this bench
+    -- exists to stop.
+    press(K.R); wait(20)
+    if not waitFor(function() return procActive(SYM.gProcScr_StatScreen) end, 240) then
+        return result("FAIL", "the status screen never opened for " .. name)
+    end
+    wait(45)                               -- let the bust finish drawing before the first frame
+    shot(name .. "-portrait")
+    for page = 2, 3 do                     -- the stat screen's other two pages
+        press(K.RIGHT); wait(45)
+        shot(string.format("%s-portrait-p%d", name, page))
+    end
+    return result("PASS", string.format(
+        "%s: map sprite + status screen captured (pid 0x%02X at (%d,%d))", name, pid, u.x, u.y))
 end
 
 -- Back-compat alias: recordrbgtest == recordanim for RBG.

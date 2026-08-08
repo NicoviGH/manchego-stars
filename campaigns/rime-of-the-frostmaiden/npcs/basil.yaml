@@ -18,13 +18,13 @@
 id: basil
 name: Basil
 
-# DRAFT 2026-08-08 — awaiting Nicolas's red-pen; every other cast quote was co-written.
+# LOCKED 2026-08-08 (Nicolas's red-pen on the draft).
 # The UNIVERSAL falls-in-battle quote (#6): chapter=0xFF, so it fires in every chapter and
 # cannot lean on ch05. It is deliberately NOT the ch05 escort quote (0x9C6, "But I haven't--
 # I still have her berry..."), which is locked and stays chapter-specific -- that one is the
 # undelivered berry; this one is the larder running out. basil.md: hurt Basil goes SHORT, and
 # the self-interruption is the piece of his register that survives being hurt.
-death_quote: "Oh-- I'm sorry. I had more. I was going to-- ...I had more."
+death_quote: "Oh-- I'm sorry. I had more berries... I was going to..."
 
 # D&D flavor: canonically the book's **Awakened Shrub** — an intelligent, speaking shrub
 # that grows edible berries, awakened by the frost druid Ravisin in the Elven Tomb (Rime of

@@ -159,6 +159,12 @@ WANTED = [
                                 # draws the chapter title card (src/uichapterstatus.c)
     'gProcScr_SALLYCURSOR',     # proc script: the preparations screen
                                 # (src/prep_sallycursor.c; opened by event cmd 0x3E)
+    'gProcScr_StatScreen',      # proc script: a unit's status screen (src/statscreen.c), the
+                                # only place FE8 draws a unit's 96x80 BUST beside its name,
+                                # class and stat line. `recordcast` gates its capture on this
+                                # rather than a frame count -- a blind R press that landed on
+                                # nothing would still shoot, handing back a picture of the map
+                                # captioned "portrait".
     'gProcScr_TitleScreen',     # proc script: the title screen (src/titlescreen.c).
                                 # Active after the dev placeholder's MNTS return.
     'gProcScr_OpSubtitle',      # proc script: the opening subtitle crawl (src/opsubtitle.c).

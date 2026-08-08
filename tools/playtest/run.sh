@@ -91,7 +91,7 @@
 #                    STRAIGHT into the Ch1 sandbox (whole cast + foes pre-deployed), so
 #                    boot->fire ~30s, no prologue grind / lord-select / save-state. Pick the
 #                    unit with PT_CHAR=<id> (default prof-rbg): braulo marty meesmickle wolfram
-#                    prof-rbg rootis sclorbo pinky lupin. Frames are tagged <id>, so:
+#                    prof-rbg rootis sclorbo pinky lupin baxby basil sahnar. Frames tagged <id>:
 #                      PT_CHAR=braulo tools/playtest/run.sh recordanim
 #                      tools/playtest/make_gif.py recordanim braulo --name braulo-anim --open
 #                    A staff-only unit (sclorbo) FAILs cleanly: no attack = no combat anim.
