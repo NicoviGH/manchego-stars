@@ -112,8 +112,11 @@ _C_PREPARE_HP_DEPLETE = 0x04  # banim_code_prepare_hp_deplete -- arms the deplet
 _C_CALL_SPELL_ANIM = 0x05     # banim_code_call_spell_anim -- arms it via the projectile (ranged)
 # The codes that actually START the depletion a melee mode armed with C04. Vanilla's own
 # banim_myrm_sw1 runs prepare_hp_deplete -> hit_normal -> sfx -> wait_hp_deplete; skip the
-# middle and the wait never returns. hit_critical_1/2/3 are the crit-mode equivalents.
-_C_HIT_CODES = frozenset({0x1A, 0x08, 0x09, 0x0A})
+# middle and the wait never returns. 0x08-0x0C are hit_critical_1..5 -- ALL FIVE, because
+# banim-main.c falls every one of them through the same `case` body (src/banim-main.c, the
+# C08 block). Listing only the first three would fail the BUILD on a valid community anim
+# that crits with C0B/C0C, and no .txt we ship uses those, so the corpus walk cannot catch it.
+_C_HIT_CODES = frozenset({0x1A, 0x08, 0x09, 0x0A, 0x0B, 0x0C})
 # Slot 12 is `attack_miss` (ref_to_battleframe._MODE_ORDER): it swings, arms, and connects with
 # nothing. The one attacking mode that must NOT be required to fire a hit.
 _MODE_ATTACK_MISS = 12

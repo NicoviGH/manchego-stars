@@ -544,15 +544,21 @@ class CharacterUniqueBanim(unittest.TestCase):
         self.assertEqual(donor_class, 'CLASS_PEGASUS_KNIGHT')
         self.assertIn('ITYPE_LANCE', wtype)
 
-    def test_bishop_donor_binds_staff_and_light_to_one_anim(self):
+    def test_bishop_donor_binds_staff_light_and_unarmed_to_one_anim(self):
+        # ITYPE_ITEM joined on the #25 review: the vanilla Bishop AnimConf carries five slots
+        # and ITEM is the UNARMED entry, reachable with both staves spent. Left vanilla, a
+        # healer with only a Vulnerary draws a HUMAN BISHOP in the close-up -- the cavalier
+        # row's #206 defect. ANIMA/DARK stay vanilla on purpose: this line can equip neither.
         donor_class, wtype, motion, cadence = bc.BANIM_DONORS['bishop']
         self.assertEqual(donor_class, 'CLASS_BISHOP')
         self.assertEqual(motion, 'magic')
-        self.assertEqual(wtype, ['0x0100 | ITYPE_STAFF', '0x0100 | ITYPE_LIGHT'])
-        # A Bishop-shaped AnimConf fixture: STAFF + LIGHT both at the vanilla index 0x82.
+        self.assertEqual(wtype, ['0x0100 | ITYPE_STAFF', '0x0100 | ITYPE_LIGHT',
+                                 '0x0100 | ITYPE_ITEM'])
+        # A Bishop-shaped AnimConf fixture: the three slots we repoint, at vanilla indices.
         src = ('CONST_DATA struct BattleAnimDef AnimConf_SRC[] = {\n'
                '    { .wtype = 0x0100 | ITYPE_STAFF, .index = 0x0082, },\n'
                '    { .wtype = 0x0100 | ITYPE_LIGHT, .index = 0x0082, },\n'
+               '    { .wtype = 0x0100 | ITYPE_ITEM, .index = 0x0081, },\n'
                '    { 0 }\n};\n')
         wtypes = wtype if isinstance(wtype, list) else [wtype]
         out = bc.banim_clone_conf(src, 'AnimConf_SRC', 'AnimConf_NEW', wtypes[0], 0x99 + 1)

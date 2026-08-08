@@ -4280,6 +4280,13 @@ local function captureCharAnim(name)
     if rounds < 1 then rounds = 1 end
     local done = 0
     for i = 1, rounds do
+        -- A benign extra round must not cost the capture its verdict. `result()` rewrites a
+        -- PASS into FAIL whenever controllerFault is latched, and a round that simply ran out
+        -- of live foes latches one through endTurn/positionForShot -- so the loop's own
+        -- "best-effort" promise was a lie until this line: 1/4 rounds reported FAIL while
+        -- holding perfectly good footage. Snapshot the fault before each OPTIONAL round and
+        -- restore it if that round bows out; round 1's faults are untouched and still fail.
+        local faultBefore = controllerFault
         -- A unit that has attacked is SPENT for the rest of the player phase, so the second
         -- round has to start on a new turn -- not on a poked state bit. End the phase and let
         -- the enemy phase run; the unit comes back refreshed the way the game refreshes it,
@@ -4297,18 +4304,20 @@ local function captureCharAnim(name)
                     and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
             end, 1800, true)
             if not endTurn() then
-                log(string.format("  round %d: could not end the phase -- stopping", i)); break
+                log(string.format("  round %d: could not end the phase -- stopping", i))
+                controllerFault = faultBefore; break
             end
             if not waitFor(function() return faction() == 0 and not menuOpen()
                     and not procActive(SYM.ProcScr_StdEventEngine) end, 5400, true) then
-                log(string.format("  round %d: player phase never came back -- stopping", i)); break
+                log(string.format("  round %d: player phase never came back -- stopping", i))
+                controllerFault = faultBefore; break
             end
         end
         if not positionForShot(pid) then
             if i == 1 then shot(name .. "-noshot")
                 return result("FAIL", name .. " never reached firing position") end
             log(string.format("  round %d: nothing left in reach -- stopping", i))
-            break
+            controllerFault = faultBefore; break
         end
         if i == 1 then shot(name .. "-deploy") end
         local fired = captureAttack(u.addr, name)
@@ -4316,7 +4325,7 @@ local function captureCharAnim(name)
             if i == 1 then
                 return result("FAIL", "captureAttack never reached combat for " .. name) end
             log(string.format("  round %d: never reached combat -- stopping", i))
-            break
+            controllerFault = faultBefore; break
         end
         done = i
         u = blue(pid) or u          -- re-read: the unit moved to its firing tile

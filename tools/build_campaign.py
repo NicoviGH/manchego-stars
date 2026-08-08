@@ -3658,7 +3658,15 @@ BANIM_DONORS = {
     # BOTH a STAFF slot (drives the MVP: heal-cast + defense as a Priest) and a LIGHT slot
     # (the post-promotion attack). Both slots repoint to his ONE custom animId; call_spell_anim
     # resolves heal-efx vs light-efx from the equipped item at runtime. Basil (#25) reuses this.
-    'bishop': ('CLASS_BISHOP', ['0x0100 | ITYPE_STAFF', '0x0100 | ITYPE_LIGHT'], 'magic', None),
+    # ITYPE_ITEM joined the list on the #25 review: the Bishop AnimConf carries five slots
+    # (STAFF/ANIMA/LIGHT/DARK/ITEM) and leaving ITEM vanilla means a healer holding no staff --
+    # both spent, only a Vulnerary left -- renders as a HUMAN BISHOP in the close-up. That is
+    # the cavalier row's rule ("every slot left vanilla is a slot where the wolf renders as a
+    # man on a horse", #206) applied to the class that needed it next. ANIMA/DARK stay vanilla
+    # deliberately: neither this line's Priest nor its Bishop promotion can equip those, so a
+    # repoint there would be dead weight, not coverage.
+    'bishop': ('CLASS_BISHOP', ['0x0100 | ITYPE_STAFF', '0x0100 | ITYPE_LIGHT',
+                                '0x0100 | ITYPE_ITEM'], 'magic', None),
     # Lupin (the beast-cavalier) -- his anim is an IMPORTED N-frame POUNCE (feditor_to_banim, #90),
     # so `motion`/`cadence` are unused (the .txt owns them, and its cadence is read off FE8's own
     # wolf `banim_mdg_at1`, not off this donor). The donor supplies the AnimConf to clone; ALL
@@ -3672,9 +3680,13 @@ BANIM_DONORS = {
     # so `motion`/`cadence` go unused for HER: the .txt owns the cadence and the sound codes.
     # They are still filled in properly rather than left None, because the row is the donor for
     # the class, not for one unit -- and the 'sword' cadence it names is read off FE8's own
-    # banim_myrm_sw1 (ref_to_battleframe._MELEE_CADENCE). One weapon slot: a Myrmidon is
-    # sword-locked, so ITYPE_SWORD is every slot she can reach.
-    'myrmidon': ('CLASS_MYRMIDON', '0x0100 | ITYPE_SWORD', 'melee', 'sword'),
+    # banim_myrm_sw1 (ref_to_battleframe._MELEE_CADENCE). BOTH of the donor's slots are
+    # repointed: the Myrmidon AnimConf is SWORD + ITEM, and ITYPE_ITEM is the UNARMED entry --
+    # reachable the moment both her swords break and she is carrying only a Vulnerary. Left
+    # vanilla it draws a HUMAN MYRMIDON instead of the revenant, which is the cavalier row's
+    # #206 defect exactly. Caught on review, not in play (#25).
+    'myrmidon': ('CLASS_MYRMIDON', ['0x0100 | ITYPE_SWORD', '0x0100 | ITYPE_ITEM'],
+                 'melee', 'sword'),
 }
 
 
