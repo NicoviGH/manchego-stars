@@ -310,6 +310,7 @@ suites:
     - ch04cottage
     - ch04snag
     - clear_ch04_parley
+    - ch05village
 
   ch01:
     - controller_turn
