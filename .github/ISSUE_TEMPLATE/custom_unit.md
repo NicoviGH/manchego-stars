@@ -21,13 +21,26 @@ prose doc** — each step links its source of truth:
       `tools/map_sprite_editor.py`. Add `fe_name` (≤12) if the name overflows the buffer.
 - [ ] **Battle anim** — 3 hi-res poses → BOX-descale to `campaigns/.../battle_anims/<unit>/{ready,
       windup,peak}.png`; add the `battle_anim:` YAML block with a **free** `clone_into` class slot.
+      (An FE-native community anim goes through `import:` instead — the `.txt` owns the cadence,
+      so do NOT hand it one of ours.)
       ⚠️ confirm `AnimConf .index == anim_id + 1` (else purple dragon).
+      ⚠️ repoint **every** slot the donor's AnimConf carries, including `ITYPE_ITEM` — that is the
+      UNARMED entry, and a slot left vanilla draws the donor's human body the moment the unit's
+      weapons break (#206, and again on #25's Myrmidon/Bishop rows).
 - [ ] **Stats** — wire `STAT_DONOR` / `BASE_DONOR` / `GROWTH_DONOR` (+ `PORTRAIT_MAP`) in `build_campaign.py`.
 - [ ] **Platform** (only if a new ground look) — vendor from FE-Repo `{Cynon}` (F2E, **credit in
       `CREDITS.md`**), confirm 256×32 indexed; add to `BATTLE_PLATFORMS` + the right terrain mapping;
       set the chapter's `battleTileSet` (0 = Snowdrift / 0x15 = Uneven).
-- [ ] **Build + verify** — `make TESTCH=1` then `run.sh recordrbg`; confirm the unit deploys as its
-      clone class number and fires on the right ground (unforced).
+- [ ] **Build + verify** — `make TESTCH=1`, then capture all THREE parts of the art in-engine:
+      `PT_CHAR=<id> run.sh recordcast` (bust + map sprite, off the status screen) and
+      `PT_CHAR=<id> run.sh recordanim` (the battle anim). Confirm the unit deploys as its clone
+      class number and fires on the right ground (unforced).
+      ⚠️ **Film several rounds — `PT_ROUNDS=4` — not one.** FE8 resolves damage in DATA whatever the
+      animation does, so a broken script still kills the foe, still shows correct frames and still
+      reports PASS; a one-round capture never asks for the next input that reveals a soft-lock.
+      That is exactly how Sahnar's Specter shipped a hang past a green capture (#25).
+      If a round hangs, run a KNOWN-GOOD unit at the same `PT_ROUNDS` before blaming the anim —
+      that control run is what separates "my capture is wrong" from "this asset is broken".
 - [ ] **Deliver** — GIF (never MP4) to `docs/demo/`, push → Nicolas reviews on GitHub. **Render → show
       → wait for OK → then commit** the art as canonical.
 - [ ] **Record** — credit vendored assets in `CREDITS.md`; log any new non-obvious decision as a dated

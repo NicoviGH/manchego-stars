@@ -6,25 +6,28 @@ deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; scope and ba
 issues. Before a context rollover, warn Nicolas, refresh this file, and start a fresh instance —
 don't rely on auto-compaction.
 
-Refreshed 2026-08-07 (Opus). `main` = `99d139e`, level with `origin/main`. **No branches, no
-stashes, nothing in flight** — #246, #247, #248, #249 and #250 all landed, and **#245 is closed**.
-Clean point for a `/clear`.
+Refreshed 2026-08-08 (Opus). `main` = `79a2586`, level with `origin/main`. **No branches, no
+stashes, nothing in flight** — **#251 landed** (Basil + Sahnar identities). Clean point for a `/clear`.
 
 ## In flight
 
 **Nothing.** `origin` has only `main`.
 
-**Nothing has had a `/code-review ultra <PR#>` — that is user-triggered.**
+**Nothing has had a `/code-review ultra <PR#>` — that is user-triggered.** #251 had a normal
+`/code-review high`; its three findings are fixed and in the squash.
 
 ## Next task
 
-**ch05 is HOSTED, playable, and its rewards are reachable** (`--ch05-boot` load-test PASS,
-`ch05village` PASS, `make matrix` 15/15). Everything owed is the checklist on **#25**, which is the
+**ch05 is HOSTED, playable, its rewards are reachable, and Basil + Sahnar are real cast members**
+(`ch05village` PASS, `make matrix` 15/15). Everything owed is the checklist on **#25**, which is the
 source — not this file. No live defects remain on it; what is left is authoring work:
 
-1. **Basil→Sahnar Talk recruit.** She has no `PORTRAIT_MAP` slot and carries `recruit.via: story`,
-   so she is on the field on her own pid (`0xba`) and cannot yet be turned. `recruit_initial_faction`
-   already returns RED for her, so the flow exists — she needs an identity.
+1. **Basil→Sahnar Talk recruit — UNBLOCKED, and it is now event wiring, not identity.** Both hold
+   `PORTRAIT_MAP` slots (Artur / Marisa), stat lines, art and pre-recruit palettes; Sahnar carries
+   `recruit.initial_faction: red`. What is left: place Basil GREEN, wire his Talk, wire the
+   Basil→Sahnar parley off `parley.by`, and force-deploy the recruiter. `talk_recruit_wiring`
+   already names "ch05 Basil+Sahnar" in its docstring and needs no new machinery — but
+   `ch04_parley_recruiters` is ch04-shaped and wants generalizing rather than copying.
 2. **The dialogue pass.** ch05's cutscenes are LOCKED (PR #196) and unwired, and the four reliquary
    visits currently show **vanilla's** prose on ids `0x9CD`–`0x9D0`, which we deliberately do not
    write. Replacing one is writing our body at the same id — not a rewire (`decisions.md` →
@@ -42,9 +45,13 @@ physical cartridges (after the ROM is done).
 ## Current state
 
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
-- **Gate: `make matrix` 15/15 on `main` at `99d139e`**, four builds, ~6m30s. `ch05village` is IN
+- **Gate: `make matrix` 15/15 on `main` at `79a2586`**, four builds, ~6m55s. `ch05village` is IN
   the gate (the gate carries the ACTIVE chapter's scenarios); ch04's six stay, because they cover
   MECHANISMS ch05 and the queued convergence reuse, not ch04 itself.
+- **Art review is now a two-command bench, and BOTH belong to any new unit.** `PT_CHAR=<id>
+  run.sh recordcast` shoots the bust + map sprite off the status screen; `recordanim` shoots the
+  battle anim, and takes `PT_ROUNDS=N` to film several engagements. Checklist: the `custom_unit`
+  issue template.
 - **A `BLOCKED` verdict now means something.** It used to be #245 firing (chap_title `.lz`), which
   is FIXED and closed — so treat a `BLOCKED` as real until proven otherwise, and do not reach for
   a retry to make it go away.
@@ -72,6 +79,14 @@ one of those five produced a green build and a passing load-test while being wro
 another map's tiles, a boss whose death sets no flag, four scripts silently discarded, a title card
 that never reaches the ROM. Verify from the DATA the engine reads (`INSPECT.units`, the generated
 C, the ROM), never from a screenshot or a PASS.
+
+**#251 added the sharpest example yet, and it beat the data rule too.** Sahnar's vendored anim
+never fired its hit code, so combat soft-locked in `ekrBattleInRoundIdle` — but FE8 resolves damage
+in DATA regardless, so the foe died, the HP bar was right, every frame looked correct, and the
+capture said PASS. Nothing in the tables was wrong to read. **What exposed it was asking for the
+NEXT input** (`PT_ROUNDS=4`), then a control run on a known-good unit to tell a broken asset from a
+broken harness. New rule of thumb: for anything that plays out over time, one clean observation is
+not evidence — take the second one. ADR: `decisions.md` → "Arming the HP depletion is not LANDING it".
 
 The standing ones:
 
