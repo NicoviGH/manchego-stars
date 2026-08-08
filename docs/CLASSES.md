@@ -27,7 +27,7 @@ roster derived from the unit YAML.
 
 | Unit | FE base | Promotion | Joins via |
 |---|---|---|---|
-| Basil | Priest | **Bishop** / Sage | story — repotted from the Elven Tomb (Ch5) |
+| Basil | Cleric | **Bishop** / Valkyrie | story — repotted from the Elven Tomb (Ch5) |
 | Baxby | Cavalier | **Paladin** / Great Knight | — |
 | Brie | TBD (post-MVP) | — | not a recruit — vanilla map ballista (RBG's siege), from ~Ch10 |
 | Lupin | Cavalier | **Paladin** / Great Knight | story — Marty talks the direwolf pack into the sled team (Ch4) |

@@ -866,7 +866,7 @@ that force a two-front race. So we keep the twins' maps and layer the theme on t
 - **ch05 (The Empire's Reach twin)** — DefeatBoss (Ravisin); retile Ch5's spread-village field as an
   **open-air elven-tomb depression** (crypt tileset + crystal pillars — keep the open spread-site skeleton,
   dress it as a ruin); **no fog** (mood from art, not vision). Emulates Ch5's two set-pieces: (a) the
-  **Natasha→Joshua escort** becomes **Basil (Natasha-donor Priest) chaperoned to Talk Sahnar (Joshua-donor
+  **Natasha→Joshua escort** becomes **Basil (Natasha-donor Cleric) chaperoned to Talk Sahnar (Joshua-donor
   Myrmidon)** — a convertible crit-threat you neutralize by recruiting; (b) the **village-raid race**
   becomes the **Phantom-Ship eruption** (injected `EARTHQUAKE`/`TILECHANGE`) spawning undead that raid
   **spread reward-sites** (elven reliquaries), with the **crest-of-cold-iron** (promotion relic) as the
@@ -1049,15 +1049,45 @@ palette is an OBJ palette (bank 11), not a BG palette, so an item icon cannot po
 _Revised: 2026-07-14 (Nicolas — observed pink text; Codex — additive source bank, draw-time BG bank-15
 route, and active-tilemap regression check; supersedes the 2026-07-11 pal-1 assumption)._
 
-**Two healers, differentiated by donor (same move as the shamans).** Sclorbo and Basil are both
-Priests, so they get *distinct* vanilla donor lines to avoid stat-twins: **Sclorbo → Moulder** (the
-durable "war-priest": HP70/Def25, balanced, accurate) and **Basil → Natasha** (the frail "mage-healer":
-HP50/Def15 but Pow60/Res55/Lck60 — a glass, dodgy, magically-potent nuke-healer). The frail line sits
+**Two healers, differentiated by donor (same move as the shamans).** The army's two staff users get
+*distinct* vanilla donor lines to avoid stat-twins: **Sclorbo → Moulder** (the durable "war-priest":
+HP70/Def25, balanced, accurate) and **Basil → Natasha** (the frail "mage-healer": HP50/Def15 but
+Pow60/Res55/Lck60 — a glass, dodgy, magically-potent nuke-healer). The frail line sits
 on Basil deliberately: **Sclorbo is a lord candidate** (#42) and the per-lord floor would have to work
 harder on a frailer lord (he's already the weakest, staff-only lord pick), whereas **Basil is not a lord**
 (joins Ch5, after the Ch1 lord-select), so frailty there carries no survivability-floor cost — and "fragile
-but potent natural magic" suits an awakened shrub. Donor stats only; both stay Priest → Bishop/Sage.
-_Decided: 2026-06-20 (Nicolas)._
+but potent natural magic" suits an awakened shrub. Sclorbo is a **Priest → Bishop/Sage**; Basil is a
+**Cleric → Bishop/Valkyrie** (see the next entry), so since 2026-08-08 the two differ by class as well
+as by donor — but the donor is still what separates the stat lines, and it is the part that would matter
+even if they shared a class.
+_Decided: 2026-06-20 (Nicolas); Basil's class revised 2026-08-08._
+
+**Basil is a Cleric, because Priest promotes into the wrong weapon type.** Basil was a Priest from
+2026-06-20 until 2026-08-08, on the reasonable-looking grounds that she is the same class as Sclorbo
+and differs only by donor. That was the wrong class, and the decomp says why: `ClassData.promotion`
+for `CLASS_PRIEST` is **`CLASS_SAGE`** — an *anima* mage — while `CLASS_CLERIC`'s is **`CLASS_BISHOP_F`**,
+which is *light*. Basil's own `battle_anim.spell_palette_tint` has always declared `[staff, light]`, so
+Priest pointed her at the one promoted class whose weapon type contradicts her shipped art. Cleric's
+branch (`gPromoJidLut`: Bishop_F / Valkyrie) is the one her kit already assumed.
+Three things made this cheap enough to be worth doing, all verified rather than assumed:
+**(1) the art does not move** — bust, map sprite and battle anim are all keyed to the *character* slot
+(`GetUnitSMSId` override, a private `gUnitSpecificBanimConfigs` AnimConf), never to the class, and the
+`clone_from: bishop` donor supplies the STAFF+LIGHT pair Bishop_F needs anyway;
+**(2) the locked dialogue does not move** — not one locked Basil line in any chapter genders her, so the
+whole ch05 corpus ported unchanged;
+**(3) the slot does not move** — `gender:` in the unit YAML rewrites `.attributes` (`_set_gender`) on
+whatever character slot the unit wears, so a female Cleric rides the male Artur slot fine, and promotion
+is keyed by CLASS in `gPromoJidLut`, never by character.
+Two bonuses that were not the reason but are real: Cleric's bases (HP16/Def0/Res6/**Con4** vs Priest's
+18/1/5/**5**) lean the same way the Natasha donor does, and `CanUnitRescue` is `GetUnitAid(actor) >=
+UNIT_CON(target)` (`bmunit.c:905`) — so Con 4 widens the set of party members who can ferry the ch05
+escort, which is the chapter's whole set-piece. Growths are byte-identical between the two classes,
+so nothing about her level-up curve changed. `gender: female` is mechanically inert on a foot unit:
+both `CA_FEMALE` readers in the decomp (`GetUnitAid`, `koido.c`'s rescued-unit sprite) gate on
+`CA_MOUNTEDAID` first. Basil is an awakened *plant*, which RotFM gives no gender, so nothing in canon
+was overridden. Guarded by `test_basil_is_a_cleric_because_priest_promotes_into_the_wrong_weapon_type`
+and `test_basil_bases_are_vanilla_cleric_class_data_verbatim`, both pinned against the decomp.
+_Decided: 2026-08-08 (Nicolas, after an adversarial review that reversed CLAUDE's initial "not worth it")._
 
 **Lord floor, runtime mechanism (#45 3b/3c): a build-baked table applied once at the first player phase.**
 The build emits `gLordFloorDeltas[]` (`events_udefs.c`, parallel to `gLordSelectCandidates[]`): one
@@ -3130,7 +3160,7 @@ _Decided: 2026-06-09 (community research: FEU writing threads, DM voice guides, 
 
 **MINE THE CORPUS BEFORE WRITING A LINE — this is now step 0 of the drafting loop, not advice.**
 ch05's Basil/Sahnar scene burned a dozen rejected drafts written from instinct; **two Ewan/Saleh support conversations fixed it in a single pass.** FE8 ships ~40k lines and we were cherry-picking six quotes and then guessing. The method (`.claude/skills/dialogue-pass/references/natural-speech.md`, wired as SKILL.md drafting-loop step 0): read the twin chapter's scenes with `tools/vanilla_scene.py`, and for a two-hander find the **relationship twin** among FE8's ~217 two-character scenes — its **support conversations** are the game's intimate two-handers and the closest form to most of our scenes. Pick the pair whose *dynamic* matches (eager student + reserved mentor → Ewan/Saleh) and read all of them.
-The diagnosis it produced — **"epigram disease," our single most common dialogue failure**: every line polished into an artifact that lands one beat and hands off, which reads as poetry rather than talk. **Vanilla is redundant and inefficient and that is precisely why it sounds human** (Joshua and Natasha both apologise twice; she says four things that all mean "I'm leaving"). Four laws follow: turns are **lopsided** (two words answered by forty); the eager character **runs on and interrupts himself**; characters **say the feeling plainly** instead of burying it in subtext; reserve reads as **brevity and plain complete sentences**, never as an ellipsis on every line. Corollary applied to `basil.md`: the "2–5 words, no subordinate clauses" spec was retired — it made him read as slow rather than gentle.
+The diagnosis it produced — **"epigram disease," our single most common dialogue failure**: every line polished into an artifact that lands one beat and hands off, which reads as poetry rather than talk. **Vanilla is redundant and inefficient and that is precisely why it sounds human** (Joshua and Natasha both apologise twice; she says four things that all mean "I'm leaving"). Four laws follow: turns are **lopsided** (two words answered by forty); the eager character **runs on and interrupts himself**; characters **say the feeling plainly** instead of burying it in subtext; reserve reads as **brevity and plain complete sentences**, never as an ellipsis on every line. Corollary applied to `basil.md`: the "2–5 words, no subordinate clauses" spec was retired — it made her read as slow rather than gentle.
 _Decided: 2026-07-23 (Nicolas + CLAUDE; ch05 9BB — "you have the entire game's dialogue and you're not writing like it")_
 
 **Villain voice is grounded in FE8's own script, and contrasting clichés are banned.**
@@ -3980,6 +4010,51 @@ faked 3-pose path would inherit the hole. The `sword` cadence in `ref_to_battlef
 is therefore read off FE8's own `banim_myrm_sw1` (swing_short → hit → swing_shorter → step_heavy,
 with the `slash_air` lifted from its critical mode, the only place vanilla gives the blade an arc)
 rather than borrowed from the axe or lance rows.
+
+**A green recruit's TILE is load-bearing, and getting it wrong has no symptom (#25).**
+ch05's Basil is LOADed GREEN and CUSA'd blue by the opening's own join beat. The obvious tile for
+her is the one her vanilla twin stands on — this chapter lifts *everything* 1:1 from FE8 Ch5, so
+that is the habit — but Natasha is **BLUE** in `UnitDef_Event_Ch5Ally`, meaning her tile is now one
+of our **nine PREP deploy slots**. A green body parked there silently costs the player a
+deployment on a map whose difficulty is priced for the full cap, and nothing anywhere reports it.
+Two more failures in the same family: an impassable tile makes the recruit untalkable, and a tile
+walled off from the unit she must reach kills the set-piece with no symptom but a player who never
+manages the Talk. `assert_green_recruit_placement` gates all three at injection time (deploy-slot
+collision, passability, and a flood-fill to the target — the same fill
+`assert_scripted_move_reachable` runs). Basil sits at **(5,15)**, the row-15 corridor at the
+pocket's mouth, clear of all nine slots and of the four stairs.
+_Decided: 2026-08-08 (#25, the ch05 recruit wiring)._
+
+**Wiring a recruit and PROVING it are different jobs, and the passing scenario proved nothing.**
+`ch05village` was green across every version of ch05's opening, including ones where Basil never
+joined: it leaves Preparations with START and walks a *different* unit to a door, so a green shrub
+nobody can command is invisible to it. The recruit chain needed its own gate, and `ch05recruit` is
+it — three assertions in the order the player meets them: Basil is BLUE and commandable at turn 1
+(the opening CUSA landed, the step with no other witness), Sahnar rises RED on turn 2, and Basil's
+Talk flips her BLUE. It also gates the RECRUITER, not just the recruit: if the CHAR list named the
+wrong talker the command menu simply has no Talk, and the chapter looks fine until a player tries.
+**Its first run failed for the wrong reason, which is the lesson.** It reported "the CUSA did not
+fire" when the CUSA was fine — the scene shows vanilla's 32-box `0x9CC` and my advance-dialogue
+loop capped at 3600 frames, expiring 18 boxes in. *A loop cap must never be what decides failure.*
+The fix is both halves: a budget with real headroom, **and** a verdict that tells "still running"
+from "finished and still red", because reporting one as the other is how a wiring bug gets
+invented and then hunted.
+_Decided: 2026-08-08 (#25; the scenario caught its own author first)._
+
+**DISPLAYING a vanilla message id you do not own is fine; displaying one another chapter WRITES
+is not (#25 review).** ch05's scene labels read `slot: "vanilla 0x9C2"`, and those labels name the
+chapter we **mine** (vanilla Ch5) — not the block we may write into. ch04 hosts on slot 5 and owns
+`0x9BA..0x9C6` outright, so `0x9C2` in the built ROM is ch04's own no-parley ending. Pointing
+Basil's join beat at it would have played Pinky and Marty discussing supper, in ch04's voice, with
+ch04's faces — a green build, a passing `ch05recruit` (it reads factions, not text), and the wrong
+scene on screen. The reliquary pattern is still correct and still in use: `0x9CC` and `0x9CD..0x9D0`
+are written by NO hosted chapter, so the ROM holds vanilla's prose and borrowing it is exactly the
+placeholder ADR. The two cases are indistinguishable at the call site — both are an int in a
+constant — so `assert_message_id_unclaimed` now checks it instead of asking anyone to remember.
+The join beat ships SILENT until the dialogue pass gives it an id from ch05's own block
+(vanilla Ch6, `0x9E4..0x9F5`); a silent beat also keeps the script in vanilla's safe shape, since
+one that continues with VISIBLE content after the prep prologue needs its own `FADU(16)` first.
+_Decided: 2026-08-08 (found by `/code-review high` on PR #252, not by the build or the gate)._
 
 ---
 

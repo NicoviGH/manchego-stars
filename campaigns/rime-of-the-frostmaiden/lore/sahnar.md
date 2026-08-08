@@ -48,9 +48,10 @@ worse: Sahnar spends herself on the wrong enemy of her own free will. What turns
   witch. Sahnar keeps the purpose she was given and turns it around: *"Then my purpose has not
   changed. Only my true enemy has been revealed."* Her solo scene (9C3) is built to set this
   up — she ends it certain, so the recruit is a **revelation, not a rescue**.
-- **Why Basil and nobody else:** she does not weigh his argument, she recognises *him*. Seeing
-  the little berry bush she has only ever heard through stone is what buys him the hearing;
-  anyone else gets the killing edge. That is the whole reason 9BB exists.
+- **Why Basil and nobody else:** Sahnar does not weigh the argument, she recognises the
+  *arguer*. Seeing the little berry bush she has only ever heard through stone is what buys
+  Basil the hearing; anyone else gets the killing edge. That is the whole reason 9BB exists.
+  (Both are she/her — name them in prose here rather than leaning on pronouns.)
 
 ## Voice
 

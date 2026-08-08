@@ -6376,6 +6376,125 @@ scenarios.ch04packmath = function()
         .. "who survived, so talking early is the reward", killed, spawned, greens))
 end
 
+-- ch05recruit: the REGRESSION GATE for ch05's two-stage recruit (#25). It exists because the
+-- half that is easiest to get wrong produces NO symptom: Basil is LOADed GREEN and flipped BLUE
+-- by the opening's own CUSA, and if that CUSA never fires the chapter still boots, still runs
+-- PREP, still passes ch05village -- you simply have a green shrub nobody can give an order to,
+-- and therefore a Talk that can never happen. `ch05village` cannot see any of that; it exits
+-- Preparations with START and walks a different unit to a door.
+-- So this asserts the CHAIN, in the order the player experiences it:
+--   1. Basil is BLUE and commandable at turn 1        (the opening join CUSA landed)
+--   2. Sahnar rises RED on turn 2                     (the eruption wake still fires)
+--   3. Basil's Talk flips Sahnar BLUE                 (the CHAR entry + MS_Ch05SahnarTalk)
+-- Step 1 is the one with no other witness. Steps 2-3 are ch04Parley's shape with no pack.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh ch05recruit (needs a CH05BOOT=1 ROM).
+scenarios.ch05recruit = function()
+    local BASIL, SAHNAR = 0x13, 0x16        -- CHARACTER_ARTUR / CHARACTER_MARISA
+    local function blueBasil() return findUnit(SYM.gUnitArrayBlue, 20, BASIL) end
+    local function redSahnar() return findUnit(SYM.gUnitArrayRed, 24, SAHNAR) end
+    local function blueSahnar() return findUnit(SYM.gUnitArrayBlue, 20, SAHNAR) end
+    if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
+    pokeFastConfig()
+    waitFor(function()
+        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
+    end, 6000, true)
+
+    -- 1. The join. A GREEN Basil here means the CUSA after CALL(Preparations) did not land --
+    --    which is invisible to every other scenario, so name the faction we actually found.
+    local basil = blueBasil()
+    if not basil then
+        local green = findUnit(SYM.gUnitArrayGreen, 20, BASIL)
+        shot("ch05recruit")
+        return result("FAIL", green
+            and "Basil is still GREEN at turn 1 -- the opening join CUSA never fired, so she "
+                .. "takes no orders and the Talk can never happen"
+            or "Basil (0x13) is on no unit array at turn 1 -- the green LOAD1 did not run")
+    end
+    log(string.format("ch05recruit: Basil is BLUE at turn 1 on (%d,%d) -- the opening join landed",
+        basil.x, basil.y))
+
+    -- 2. The wake. Wait for the UNIT, not the turn counter: the counter ticks when the player
+    --    phase ends, well before the wave event LOAD1s her (ch04packmath learned this).
+    if not endTurn() then return result("FAIL", "could not end turn 1") end
+    if not waitFor(function() return turn() >= 2 and redSahnar() ~= nil end, 5400) then
+        shot("ch05recruit")
+        return result("FAIL", "Sahnar never rose RED on turn 2 -- the eruption wake did not fire")
+    end
+    waitFor(function()
+        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
+    end, 3600, true)
+
+    -- 3. The Talk. Park Basil orthogonally adjacent (setMapUnit keeps the tile->unit grid in
+    --    sync, so adjacency reads with no phase cycle -- the ch03talk/ch04Parley trick); the
+    --    point is the recruit landing, not walking a 5-MOV healer across the depression.
+    -- Re-read her: the waits above can span an enemy phase, so the handle from the arrival check
+    -- is stale by here. A nil deref would abort the scenario with a Lua error instead of the
+    -- clean verdict the rest of this function is built to produce.
+    local sah = redSahnar()
+    if not sah then
+        shot("ch05recruit")
+        return result("FAIL", "Sahnar left the red array before the Talk -- killed by the AI, "
+            .. "or she never settled on the map")
+    end
+    local grid, parked = mapUnitAt(basil.x, basil.y), false
+    for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+        local tx, ty = sah.x + d[1], sah.y + d[2]
+        if tx >= 0 and ty >= 0 and mapUnitAt(tx, ty) == 0 then
+            setMapUnit(basil.x, basil.y, 0)
+            emu:write8(basil.addr + 0x10, tx); emu:write8(basil.addr + 0x11, ty)
+            setMapUnit(tx, ty, grid)
+            parked = true
+            break
+        end
+    end
+    if not parked then return result("FAIL", "no free tile adjacent to Sahnar to park Basil") end
+    basil = blueBasil()
+    if not basil or not moveUnit(basil.x, basil.y, basil.x, basil.y) then
+        return result("FAIL", "no live command menu for Basil")
+    end
+    -- The gate on the RECRUITER, not just the recruit: if the CHAR list named the wrong talker
+    -- (or nobody), the menu simply has no Talk and the chapter looks fine until a player tries.
+    if not chooseTalk() then
+        shot("ch05recruit")
+        return result("FAIL", "Basil's live command menu did not expose Talk -- the CHAR entry "
+            .. "does not name her as Sahnar's recruiter")
+    end
+    -- The budget must clear the WHOLE scene. This shows VANILLA's 0x9CC until the dialogue pass
+    -- writes ours, and vanilla's is 32 boxes at ~200 frames each -- while the CUSA is the last
+    -- thing MS_Ch05SahnarTalk does, after TEXTEND. The first cut of this loop capped at 3600 and
+    -- expired 18 boxes in, then reported "the CUSA did not fire" about a script that had simply
+    -- not reached it yet. A LOOP CAP MUST NEVER BE WHAT DECIDES FAILURE (decisions.md): hence a
+    -- budget with real headroom AND, below, two distinguishable verdicts.
+    local BUDGET, boxes = 20000, 0
+    for _ = 1, BUDGET do
+        if blueSahnar() then break end
+        if controllerState() == "dialogue_wait" then
+            boxes = boxes + 1
+            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
+                return controllerState(after) ~= "dialogue_wait"
+            end, 120) then return result("FAIL", "recruit dialogue input did not advance") end
+        else
+            yield()
+        end
+    end
+    if not blueSahnar() then
+        shot("ch05recruit")
+        -- Still mid-scene means the harness ran out of road; a FINISHED scene with a red Sahnar
+        -- is the real defect. Reporting one as the other is how a wiring bug gets invented.
+        local running = controllerState() == "dialogue_wait"
+            or procActive(SYM.ProcScr_StdEventEngine)
+        return result("FAIL", running
+            and string.format("the recruit scene was STILL RUNNING after %d frames (%d boxes) "
+                .. "-- the budget expired, not the wiring", BUDGET, boxes)
+            or string.format("the scene finished (%d boxes) and Sahnar is still RED -- "
+                .. "MS_Ch05SahnarTalk's CUSA did not fire", boxes))
+    end
+    runEnemyPhase()      -- the sprite only repaints to the party palette on a phase transition
+    shot("ch05recruit")
+    return result("PASS", "Basil joined blue in the opening, Sahnar rose red on turn 2, and "
+        .. "Basil's Talk brought her over -- the whole ch05 recruit chain")
+end
+
 -- Park an unexhausted blue unit on a village door and take the Visit command, stopping the
 -- moment the location event starts. Split from the dialogue-advancing half so the RECORDER can
 -- own the filmed part: `openVillageVisit` is the unfilmed walk-in (a `pre`), the line itself is

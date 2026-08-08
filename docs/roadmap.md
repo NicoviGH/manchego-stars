@@ -91,7 +91,7 @@
 | Ch3 | **Trex** | Thief | **utility** (steal/chests/doors) | winged kobold |
 | Ch4→5 | **Lupin** | Cavalier | 2nd cavalry / mobile melee | direwolf (the wolf *is* the mount; pairs w/ Baxby as "beast-cavalry") |
 | Ch5 | **Sahnar** | Myrmidon | **sword duelist** (crit) | moon-elf mummy |
-| Ch5 | **Basil** | Priest | **2nd healer** | goodberry shrub (heals = handing out berries) |
+| Ch5 | **Basil** | Cleric | **2nd healer** | goodberry shrub (heals = handing out berries) |
 
 By **Ch5** every core FE *role* is covered with zero magic redundancy (we're already deep on
 casters: Marty/Mees dark, Rootis anima, Sclorbo/Basil staff) — but the **roster is not done growing**.

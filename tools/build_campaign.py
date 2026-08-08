@@ -633,6 +633,9 @@ CLASS_MAP = {
     'Archer':         'CLASS_ARCHER',
     'Mage':           'CLASS_MAGE',
     'Priest':         'CLASS_PRIEST',
+    'Cleric':         'CLASS_CLERIC',  # Basil (ch05 recruit) -- Priest's twin, but its default
+                                       # promotion is Bishop (light), not Sage (anima)
+
     'Knight':         'CLASS_ARMOR_KNIGHT',
     'Pegasus Knight': 'CLASS_PEGASUS_KNIGHT',
     'Thief':          'CLASS_THIEF',   # Trex (ch03 recruit) -- the army's utility unit
@@ -733,8 +736,11 @@ PORTRAIT_MAP = {
     # line, no map sprite, no death quote -- and, the thing that actually blocked the chapter,
     # no pid for a Talk to name. These two lines are that identity.
     # Basil the goodberry shrub (npcs/basil.yaml) rides ARTUR -- a Monk absent from our ch00-08
-    # and referenced nowhere else, so dressing it is collision-free; Artur's own line promotes to
-    # Bishop, which is Basil's default promotion. His stat line references Natasha (STAT_DONOR).
+    # and referenced nowhere else, so dressing it is collision-free. His stat line references
+    # Natasha (STAT_DONOR) and his class is hers too (Cleric, 2026-08-08). The slot's own gender
+    # does not have to match his: `gender:` in the YAML rewrites .attributes on whatever slot the
+    # unit wears (_set_gender), and promotion is keyed by CLASS in gPromoJidLut, never by the
+    # character -- so a female Cleric on the male Artur slot promotes Bishop/Valkyrie correctly.
     'basil':      'Artur',
     # Sahnar (npcs/sahnar.yaml) rides MARISA -- vanilla's OTHER red-to-blue Myrmidon parley,
     # absent from our ch00-08 and referenced nowhere else. Exact class match, unlike Trex's and
@@ -1704,6 +1710,11 @@ CLASS_LOADOUT = {
     'CLASS_ARCHER':         ['ITEM_BOW_IRON', 'ITEM_VULNERARY'],
     'CLASS_MAGE':           ['ITEM_ANIMA_FIRE', 'ITEM_VULNERARY'],
     'CLASS_PRIEST':         ['ITEM_STAFF_HEAL', 'ITEM_VULNERARY'],
+    'CLASS_CLERIC':         ['ITEM_STAFF_HEAL', 'ITEM_VULNERARY'],  # Basil: same kit as the
+                                                                    # other healer; the classes
+                                                                    # differ by promotion tree
+                                                                    # and bases, not by weapon
+                                                                    # (both are STAFF-only at D)
     'CLASS_ARMOR_KNIGHT':   ['ITEM_LANCE_IRON', 'ITEM_VULNERARY'],
     'CLASS_PEGASUS_KNIGHT': ['ITEM_LANCE_SLIM', 'ITEM_LANCE_JAVELIN', 'ITEM_VULNERARY'],
     'CLASS_THIEF':          ['ITEM_SWORD_IRON', 'ITEM_DOORKEY', 'ITEM_CHESTKEY',
@@ -7563,7 +7574,48 @@ CH05_ALLY_TABLE = 'MS_Ch05DeployCap'             # the never-LOADed PREP cap tem
 CH05_BOOT_SEED_TABLE = 'MS_Ch05BootSeed'         # --ch05-boot only: an armed party from a cold start
 CH05_LINE_TABLE = 'MS_Ch05Line'                  # the 16 turn-1 tomb-guardians
 CH05_SAHNAR_TABLE = 'MS_Ch05Sahnar'              # the turn-2 convertible (rises hostile)
+CH05_BASIL_TABLE = 'MS_Ch05Basil'                # Basil, GREEN at the pocket mouth (see below)
 CH05_WAVE_TABLES = {2: 'MS_Ch05Wave2', 3: 'MS_Ch05Wave3', 5: 'MS_Ch05Wave5'}
+
+# ── The two-stage ch05 recruit (#25): Basil joins in the OPENING, then Talks Sahnar ──────
+# Vanilla Ch5's Character list is exactly ONE entry -- CHAR(EVFLAG_TMP(7), ..., NATASHA, JOSHUA)
+# -- because its escort is already a party member (Natasha is BLUE in UnitDef_Event_Ch5Ally) and
+# only the DUELIST needs talking down. Ours is the same single entry, and Basil reaches the same
+# state by a different road: she is recruited IN this chapter, so she cannot ride the prep
+# roster (_classed_cast(available_at=5) excludes her). She is LOADed GREEN instead and CUSA'd
+# BLUE by the opening's own join beat -- basil.md Q3, and the locked 0x9C2 ("...I wonder.
+# Sahnar. ...She needs me. Take me to her?"), whose trigger is chapter_start, NOT a Talk.
+# So: no CHAR entry for Basil. One CHAR entry, Basil -> Sahnar, exactly like the twin.
+CH05_BASIL_MOV_TABLE = 'TerrainTable_MovCost_MagicNormal'   # Cleric's own cost row (data_classes.c)
+CH05_BASIL_GREEN_POS = (5, 15)   # the row-15 corridor at the deploy pocket's mouth. NOT one of
+                                 # the nine deploy_slots (rows 16-19) -- those are the party's
+                                 # and PREP fills all nine, so standing on one would cost a
+                                 # deployment. Row 15 is open end-to-end and the four stairs are
+                                 # at x=1/3/9/10, so she blocks no exit. Verified walkable and
+                                 # connected to Sahnar's tile by assert_green_recruit_placement.
+# The join beat is SILENT, and that is a constraint rather than a choice. ch05's YAML labels its
+# scenes `slot: "vanilla 0x9C2"` and the like, but those labels are ANATOMY REFERENCES to the
+# chapter we MINE (vanilla Ch5) -- they are not ids we may write, because ch04 hosts on slot 5 and
+# owns that whole block (HOSTED_CHAPTER_MESSAGE_IDS['ch04'] = 0x9BA..0x9C6). 0x9C2 in the built
+# ROM is ch04's OWN no-parley ending (CH04_ENDING_NO_LUPIN_MSG), so pointing Basil's join at it
+# plays Pinky and Marty discussing supper. Reading an UNWRITTEN vanilla id as a placeholder is
+# fine and we do it (the reliquary visits, and the Talk below); reading one another chapter
+# WRITES is not -- that distinction is the whole reason the registry exists.
+# OWED: the dialogue pass gives this beat an id from ch05's own block (vanilla Ch6, 0x9E4..0x9F5)
+# and registers it. Until then the shrub joins wordlessly -- the WIRING is what ships here.
+CH05_SAHNAR_TALK_SCRIPT = 'MS_Ch05SahnarTalk'   # ours (declare_event_script), not a squatted
+                                                # vanilla symbol -- campaign-owned event scripts,
+                                                # declared AFTER the block-replacement pass.
+CH05_SAHNAR_TALK_MSG = 0x9CC     # the TALK-RECRUIT scene. UNCLAIMED by every chapter (checked
+                                 # against HOSTED_CHAPTER_MESSAGE_IDS), so the ROM still holds
+                                 # vanilla's text -- which is vanilla's OWN Natasha->Joshua talk
+                                 # recruit, the exact scene ours is the twin of. The reliquary
+                                 # placeholder pattern (decisions.md "Vanilla prose is a
+                                 # legitimate PLACEHOLDER"). The dialogue pass must MOVE this to
+                                 # ch05's block, not overwrite 0x9CC -- it is ch04's neighbourhood.
+CH05_SAHNAR_TALK_FLAG = 'EVFLAG_TMP(7)'   # vanilla Ch5's own Natasha->Joshua CHAR flag, free
+                                          # here: ch05's villages take eid 0 and its Misc list
+                                          # is DefeatBoss + CauseGameOverIfLordDies only.
 
 # The four reliquary visits. Each rides OUR OWN script (declare_event_script) but shows VANILLA
 # Ch5's own village line, by pointing at the message id that already holds it -- we never WRITE
@@ -7687,6 +7739,29 @@ def assert_message_ids_unique(claims=None):
                          % (mid, owner[mid], chapter, chapter))
             owner[mid] = chapter
     return owner
+
+
+def assert_message_id_unclaimed(msg_id, chapter, what):
+    """A chapter may DISPLAY a vanilla message id it does not own -- that is the placeholder
+    pattern (decisions.md "Vanilla prose is a legitimate PLACEHOLDER"), and ch05's reliquary
+    visits and Sahnar Talk both do it. What it may NOT do is display an id ANOTHER hosted
+    chapter WRITES: the player then gets that chapter's scene, in its voice, with its faces.
+
+    The two cases are indistinguishable at the call site -- both are an int in a constant -- so
+    the difference has to be checked rather than remembered. It is an easy mistake to make from
+    the chapter YAML alone, because our scene labels (`slot: "vanilla 0x9C2"`) name the chapter
+    we MINE, not the block we may write into, and for a chapter hosted on a shifted slot those
+    are different vanilla chapters entirely.
+
+    Found by review on #25: ch05's Basil join beat pointed at 0x9C2, which is ch04's own
+    no-parley ending -- so the shrub's join would have played Pinky and Marty discussing supper.
+    """
+    holder = assert_message_ids_unique().get(msg_id)   # the registry, already collision-checked
+    if holder is not None and holder != chapter:
+        sys.exit('ERROR: %s (%s) displays message 0x%X, but %s OWNS and WRITES that id -- the '
+                 'scene would play %s\'s text. Placeholder prose must come from an id NO hosted '
+                 'chapter writes (see HOSTED_CHAPTER_MESSAGE_IDS).'
+                 % (what, chapter, msg_id, holder, holder))
 
 
 def variant_beat(beat, fallback, err_label):
@@ -8194,11 +8269,24 @@ def assert_pack_pids_addressable(chap, pack_pids):
                  % ', '.join(clashes))
 
 
-def ch04_parley_recruiters(campaign, chap):
-    """ch04's parley recruiter set = ONLY the YAML parley.by speaker (Nicolas 2026-07-21: Marty
-    specifically, NOT ch03's any-party-member -- the reveal cutscene centres Marty's creature
-    diplomacy). Data-driven from the convertible wave's parley block; returns the CHARACTER_ symbol."""
-    by = (_ch04_reveal_wave(chap).get('parley') or {})['by']
+def parley_recruiters(unit):
+    """The recruiter set for a GATED talk recruit = ONLY the speaker the unit's own `parley.by`
+    names, as a one-entry CHARACTER_ list for talk_recruit_wiring.
+
+    The counterpart to talk_recruiters ("any core party member", ch03's Trex). A chapter picks
+    between them; the wiring downstream is identical either way. Gated recruits are the ones
+    whose fiction is carried by ONE character, so the recruiter is authored data rather than a
+    roster query: ch04's Marty->Lupin (Nicolas 2026-07-21 -- the reveal centres Marty's creature
+    diplomacy) and ch05's Basil->Sahnar (Sahnar does not weigh the argument, she RECOGNISES
+    Basil -- lore/sahnar.md; anyone else gets the killing edge).
+
+    `unit` is whatever dict carries the parley block -- ch04 hands it the convertible WAVE,
+    ch05 the convertible ENEMY entry. Both are just "the thing being parleyed with", which is
+    why this needs neither the campaign nor the chapter."""
+    by = (unit.get('parley') or {})['by']
+    if by not in PORTRAIT_MAP:
+        sys.exit('ERROR: parley.by %r is not a cast member with a PORTRAIT_MAP slot -- a Talk '
+                 'can only be initiated by a unit the engine can address' % by)
     return [char_symbol(PORTRAIT_MAP[by])]
 
 
@@ -8334,6 +8422,40 @@ def assert_scripted_move_reachable(maps_dir, stem, start, dest, mov_table, who):
             '       most north-east tile it CAN reach: %s'
             % (who, start, dest, stem, terrain[dest[1]][dest[0]],
                costs[terrain[dest[1]][dest[0]]], north_east))
+
+
+def assert_green_recruit_placement(chap, maps_dir, stem, pos, mov_table, who, must_reach=None):
+    """Where a GREEN on-map recruit is LOADed has three ways to be quietly wrong, and none of
+    them fails the build or a load-test. Gate all three at injection time.
+
+    1. **On a deploy tile.** The prep flow fills every one of the chapter's `deploy_slots`
+       (the cap IS the slot count -- decisions.md "How the deploy cap + prep screen are actually
+       wired"), so a green body parked on one silently costs the player a deployment on a map
+       balanced for the full cap. Cheapest possible bug to make: the recruit's own vanilla twin
+       usually STANDS on one, because in vanilla it is a blue party member (ch05: Natasha is
+       BLUE in UnitDef_Event_Ch5Ally, on what is now one of our nine tiles).
+    2. **Impassable.** A recruit on terrain its own class cannot occupy is unreachable and
+       untalkable -- the chapter just quietly loses its recruit.
+    3. **Walled off from the unit it must reach.** An escort-recruit exists to cross the map;
+       if the flood-fill says it cannot, the set-piece is dead on arrival and the only symptom
+       is a player who never manages the Talk.
+
+    `must_reach` is the tile the recruit has to be able to WALK to (ch05: Sahnar's). Reuses
+    reachable_tiles, the same flood fill assert_scripted_move_reachable runs."""
+    slots = [tuple(s) for s in chap['deployment']['deploy_slots']]
+    if tuple(pos) in slots:
+        sys.exit('ERROR: %s is placed on %s, which is one of the %d PREP deploy tiles -- the '
+                 'green body would cost the player a deployment.' % (who, tuple(pos), len(slots)))
+    _, _, terrain = _map_terrain_grid(maps_dir, stem)
+    costs = _class_terrain_move_costs(mov_table)
+    if costs[terrain[pos[1]][pos[0]]] <= 0:
+        sys.exit('ERROR: %s is placed on %s, terrain 0x%02X, which its class cannot enter.'
+                 % (who, tuple(pos), terrain[pos[1]][pos[0]]))
+    if must_reach is not None:
+        reachable = reachable_tiles(terrain, costs, tuple(pos))
+        if tuple(must_reach) not in reachable:
+            sys.exit('ERROR: %s at %s cannot WALK to %s -- the escort recruit is unreachable, '
+                     'so the Talk can never happen.' % (who, tuple(pos), tuple(must_reach)))
 
 
 def map_changes_asm(symbol, changes):
@@ -8937,7 +9059,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
         f.write(udefs)
 
     # The Marty->Lupin parley (Stage 2b): the shared talk-recruit wiring (talk_recruit_wiring),
-    # recruiter = Marty ONLY (ch04_parley_recruiters, data-driven from parley.by; Nicolas
+    # recruiter = Marty ONLY (parley_recruiters, data-driven from parley.by; Nicolas
     # 2026-07-21). The talk script's pre_script turns the pack GREEN WHERE IT STANDS -- one
     # CHECK_ALIVE-guarded CUSN per wolf (#203) -- then CUSA flips Lupin blue. One flow with
     # ch03's green Trex; the parley IS the recruit. Because CUSN can only convert wolves that
@@ -8945,16 +9067,18 @@ def inject_ch04(campaign, boot=False, verbose=True):
     parley_pre = convert_survivors_green(
         CH04_PACK_PIDS, CH04_PARLEY_LABEL_BASE, 'Mauthe Doog')
     assert_pack_pids_addressable(chap, CH04_PACK_PIDS)   # #198 review guard, re-aimed by #203
-    parley_recruiters = ch04_parley_recruiters(campaign, chap)
+    recruiters = parley_recruiters(_ch04_reveal_wave(chap))
     lupin_char_events, lupin_talk_script = talk_recruit_wiring(
-        parley_recruiters, char_symbol(lupin[1]),
+        recruiters, char_symbol(lupin[1]),
         CH04_LUPIN_TALK_FLAG, CH04_LUPIN_TALK_SCRIPT, CH04_LUPIN_TALK_MSG,
         pre_script=parley_pre)
     # Force-deploy the parley recruiter(s): the parley is gated on Marty specifically (unlike
     # ch03's any-party-member talk), so benching Marty would miss the recruit. Field him via
     # vanilla's per-chapter ForceDeploymentEnt data path -- no new engine code (harmless if the
     # player chose Marty as lord: the lord check already force-deploys him). Nicolas 2026-07-21.
-    _force_deploy_units(parley_recruiters, CH04_HOST_INDEX)
+    # ch05 needs no counterpart: its gated recruiter (Basil) is not on the prep roster at all --
+    # she is LOADed onto the map by the beginning scene, so there is no Pick Units to bench her.
+    _force_deploy_units(recruiters, CH04_HOST_INDEX)
 
     with open(CH5_EVENTINFO_H, encoding='utf-8') as f:
         info = f.read()
@@ -9296,20 +9420,49 @@ def inject_ch05(campaign, boot=False, verbose=True):
     # a shared pid is unaddressable, which is exactly what #203 cost ch04's wolf pack.
     sahnar_rows = ch05_enemy_rows(chap, arrives_turn=2, exclude=frozenset(
         e['id'] for e in chap['enemy_units'] if e['id'] != 'sahnar'))
-    # Sahnar is NOT a cast member yet -- npcs/sahnar.yaml carries `recruit.via: story` and she
-    # holds no PORTRAIT_MAP slot, so there is no identity to ride (contrast Lupin/Trex, whose
-    # slots exist). Her portrait slot, stat donor and Basil's red-convertible Talk are the
-    # recruit pass (#25); the machinery for it is already there and parameterized
-    # (recruit_initial_faction returns RED for exactly this case).
-    #
-    # She still takes the field NOW, on her own pid: the chapter is balanced with a
-    # crit-threat Myrmidon on it (difficulty.py counts her as a convertible on the line),
-    # and a UNIQUE pid is what keeps her addressable when the Talk lands -- a shared pid is
-    # unaddressable, which is precisely what #203 cost ch04's wolf pack. Until then she is a
-    # hostile you can only kill, which is the honest state of the chapter.
-    sahnar_rows = [row.replace(CH05_GENERIC_PID, CH05_SAHNAR_PID, 1) for row in sahnar_rows]
+    # Sahnar rises on her OWN CHARACTER slot (#251 gave her one -- Marisa), not a raw pid: the
+    # Talk has to address HER and not the nearest identical myrmidon, and a shared pid is
+    # unaddressable, which is precisely what #203 cost ch04's wolf pack. She rides the ENEMY
+    # table, so the row is red by construction -- and that is exactly why her YAML's
+    # `recruit.initial_faction: red` is checked rather than trusted: the field is what the
+    # SHARED recruit flow reads to tell a red parley from a green bystander, so if it ever
+    # disagreed with where she is actually placed, the flow would be reasoning about a unit
+    # that is not on the map in that colour.
+    sahnar = next(r for r in on_map_talk_recruits(campaign, chap['chapter_number'])
+                  if r[0] == 'sahnar')
+    sahnar_char = char_symbol(sahnar[1])
+    if recruit_initial_faction(load_unit(campaign, 'sahnar')) != 'RED':
+        sys.exit('ERROR: ch05 places Sahnar on the enemy table (RED), but her YAML '
+                 'recruit.initial_faction does not say red')
+    # Reading an UNWRITTEN vanilla id as placeholder prose is the reliquary pattern and is fine;
+    # reading one ANOTHER hosted chapter writes shows that chapter's scene instead. Both look
+    # identical here -- an int in a constant -- so the difference has to be a gate. Caught the
+    # Basil join beat pointed at 0x9C2, which is ch04's own no-parley ending.
+    assert_message_id_unclaimed(CH05_SAHNAR_TALK_MSG, 'ch05', "Basil's Talk recruit of Sahnar")
+    sahnar_rows = [row.replace(CH05_GENERIC_PID, sahnar_char, 1) for row in sahnar_rows]
     declare_unit_table(CH05_SAHNAR_TABLE, sahnar_rows,
-                       'ch05 Sahnar: rises HOSTILE at the eruption (Talk recruit owed, #25)')
+                       'ch05 Sahnar: rises HOSTILE at the eruption; Basil Talks her over (#25)')
+
+    # Basil: GREEN at the pocket mouth, the Colm/Trex placement idiom -- her own table so the
+    # PREP cap template stays the pure blue roster. Unlike Trex she is not joined by a CHAR
+    # talk; the opening's own beat CUSAs her (see CH05_BASIL_GREEN_POS). She is a classed cast
+    # member, so her slot/class come from the roster rather than being named here.
+    basil = next(r for r in on_map_talk_recruits(campaign, chap['chapter_number'])
+                 if r[0] == 'basil')
+    basil_char = char_symbol(basil[1])
+    basil_faction = recruit_initial_faction(load_unit(campaign, 'basil'))   # GREEN (the default)
+    assert_green_recruit_placement(
+        chap, maps_dir, CH05_LAYOUT[1], CH05_BASIL_GREEN_POS,
+        CH05_BASIL_MOV_TABLE, 'Basil (ch05 green recruit)',
+        must_reach=tuple(next(e for e in chap['enemy_units']
+                              if e['id'] == 'sahnar')['positions'][0]))
+    bx, by = CH05_BASIL_GREEN_POS
+    declare_unit_table(CH05_BASIL_TABLE, [_ally_unit_entry(
+        leader, basil[1], basil[3], basil[4], bx, by, ', '.join(CLASS_LOADOUT[basil[2]]),
+        ' /* basil -- green until the opening join beat CUSAs her blue (#25) */',
+        allegiance=basil_faction)],
+        'ch05 Basil: %s at the pocket mouth; the opening join makes her the escort'
+        % basil_faction)
 
     # 3. Strip the host slot's event lists and wire ours. The list SYMBOLS are the only
     #    vanilla names left in this function, and they come from CH05_EVENT_LISTS.
@@ -9334,7 +9487,16 @@ def inject_ch05(campaign, boot=False, verbose=True):
         location_events(chap.get('villages', []),
                         {vid: slot[0] for vid, slot in CH05_VILLAGE_SLOTS.items()},
                         CH05_SHOPS), CH05_EVENTINFO_H)
-    for key in ('character', 'select_unit', 'select_dest', 'unit_move', 'tutorial'):
+    # Character = the Basil->Sahnar Talk, and nothing else -- structurally identical to vanilla
+    # Ch5's single CHAR(NATASHA, JOSHUA). Recruiter set is Sahnar's own `parley.by` (Basil), the
+    # gated flavour of the shared flow; ch03's Trex passes the whole roster instead. No
+    # pre_script: unlike ch04's pack parley there is no group to bring over with her.
+    sahnar_char_events, sahnar_talk_script = talk_recruit_wiring(
+        parley_recruiters(next(e for e in chap['enemy_units'] if e['id'] == 'sahnar')),
+        sahnar_char, CH05_SAHNAR_TALK_FLAG, CH05_SAHNAR_TALK_SCRIPT, CH05_SAHNAR_TALK_MSG)
+    info = _replace_brace_block(info, CH05_EVENT_LISTS['character'] + '[] =',
+                                sahnar_char_events, CH05_EVENTINFO_H)
+    for key in ('select_unit', 'select_dest', 'unit_move', 'tutorial'):
         info = _replace_brace_block(info, CH05_EVENT_LISTS[key] + '[] =',
                                     '{\n    END_MAIN\n}', CH05_EVENTINFO_H)
     # Point the group at OUR roster table. Declaring it is not enough -- the engine reads the
@@ -9360,12 +9522,27 @@ def inject_ch05(campaign, boot=False, verbose=True):
                  % CH05_HOST_INDEX
                  + '    LOAD1(0x1, %s) /* the 16 risen tomb-guard */\n    ENUN\n'
                  % CH05_LINE_TABLE
+                 + '    LOAD1(0x1, %s) /* Basil, GREEN at the pocket mouth */\n    ENUN\n'
+                 % CH05_BASIL_TABLE
                  + seed_load
                  # NO FADU: the shared prep prologue fades to black itself before drawing
                  # Preparations, so revealing the freshly-LOMA'd map here only flashes it.
                  + '    CALL(%s) /* preparations: pick %d; lord force-deployed */\n'
+                 % (CH05_PREP_SCRIPT, chap['deployment']['deploy_limit'])
+                 # The join, AFTER Preparations and deliberately so. Basil is GREEN across the
+                 # prep screen (prep only ever touches PLAYER units, so a green body is invisible
+                 # to Pick Units and costs no slot), and becomes the party's tenth unit the moment
+                 # the CUSA lands -- on top of the nine the player chose, which is what the
+                 # chapter is priced for. CUSA before the CALL would hand PREP a blue unit it
+                 # never listed.
+                 # No TEXTSHOW: see CH05_BASIL_JOIN_MSG for why the beat is silent until the
+                 # dialogue pass. Keeping it silent also keeps this script in vanilla's safe
+                 # shape -- a script that continues with VISIBLE content after the prep prologue
+                 # needs its own FADU(16) first (the prologue fades to black and leaves it
+                 # there); the ones that ENDA straight out, as this does, do not.
+                 + '    CUSA(%s) /* green -> blue: Basil is the escort now */\n'
                  '    ENUT(8)\n    EVBIT_T(7)\n    ENDA\n}'
-                 % (CH05_PREP_SCRIPT, chap['deployment']['deploy_limit']))
+                 % basil_char)
     script = _replace_brace_block(script, CH05_BEGINNING_SCRIPT + '[] =', beginning,
                                   CH05_EVENTSCRIPT_H)
     for turn in sorted(CH05_WAVE_TABLES):
@@ -9402,8 +9579,17 @@ def inject_ch05(campaign, boot=False, verbose=True):
             village_script(msg, village_reward_item(village, CH05_ITEM_IDS), CH05_VISIT_BG),
             'ch05 %s -- gift is ours, prose is vanilla 0x%X until the dialogue pass (#25)'
             % (village['id'], msg))
+    # 4c. The Basil->Sahnar Talk script the Character list points at. Same append-AFTER-the-bulk-
+    #     write rule as the visits above -- declaring it earlier would have the block rewrite
+    #     discard it, and the build would die at link time pointing at the CHAR entry rather
+    #     than at the loss.
+    declare_event_script(
+        CH05_EVENTSCRIPT_H, CH05_SAHNAR_TALK_SCRIPT, sahnar_talk_script,
+        'ch05 Basil Talks Sahnar down -- CUSA red->blue; prose is vanilla 0x%X until the '
+        'dialogue pass (#25)' % CH05_SAHNAR_TALK_MSG)
     assert_event_scripts_defined(
-        CH05_EVENTSCRIPT_H, [slot[0] for slot in CH05_VILLAGE_SLOTS.values()])
+        CH05_EVENTSCRIPT_H, [slot[0] for slot in CH05_VILLAGE_SLOTS.values()]
+        + [CH05_SAHNAR_TALK_SCRIPT])
 
     # 5. Texts + the flagged defeat quote that IS the win trigger.
     with open(TEXTS_TXT, encoding='utf-8') as f:

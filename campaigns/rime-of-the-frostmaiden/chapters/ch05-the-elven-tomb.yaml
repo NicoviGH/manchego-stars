@@ -39,7 +39,7 @@ narrative: >
   awake and watching for millennia — who comes willingly, believing the party are the
   intruders she was left to stop. She is MISLED, not puppeted. The party turn her by
   chaperoning the goodberry shrub, Basil, across to tell her the truth. They repot Basil
-  and take him along, and turn down the coast toward Bremen.
+  and take her along, and turn down the coast toward Bremen.
 
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
@@ -91,8 +91,8 @@ objective:
         a HOSTILE guardian — a fast, crit-threat Myrmidon mummy (killing-edge, Joshua's
         exact donor), WOKEN by Ravisin and fighting of her own will in the belief that she is
         finally doing her duty — and the only way to turn her is to walk fragile BASIL up to her
-        to Talk (Basil is our Natasha: her exact donor, a frail Priest). Only he can turn her,
-        because she does not weigh his argument — she RECOGNISES him (9C6: her purpose holds,
+        to Talk (Basil is our Natasha: her exact donor, a frail Cleric). Only Basil can turn her,
+        because Sahnar does not weigh the argument — she RECOGNISES the arguer (9C6: her purpose holds,
         her enemy resolves). So you must chaperone a weak healer across the depression to the
         deadly duelist, clearing a safe pocket first — the escort-recruit that defines how
         you play Ch5. Optional; free her and she fights the back half (recruit swing
@@ -154,7 +154,7 @@ deployment:
   note: >
     Deployable pool by Ch5: 7 PCs + Pinky + Baxby (Cav) + Trex (Thief) + Lupin
     (beast-Cav, won in ch04 — a clean all-chapter combatant, +1.0 kills/round the static
-    party number omits). Basil (Priest) is present from the start as the fragile RECRUITER
+    party number omits). Basil (Cleric) is present from the start as the fragile RECRUITER
     (must be fielded and protected to Talk Sahnar — the Natasha role), NOT a fighter.
     Sahnar is NOT in the starting field — she rises mid-combat as a HOSTILE convertible
     (the Joshua flip) and joins only once Basil Talks her. With deploy_limit 9 and a pool
@@ -453,7 +453,7 @@ enemy_units:
     convertible: true           # #171 — the Joshua flip. Hostile crit-Myrmidon until fragile BASIL
                                 # chaperones across to Talk her; then a +~0.9 kills/round back-half ally.
     parley:
-      by: basil                 # the Natasha-donor Priest, walked up under escort to Talk her
+      by: basil                 # the Natasha-donor Cleric, walked up under escort to Talk her
       result: become_allied
       recruits_npc: sahnar      # joins as a playable Myrmidon (npcs/sahnar.yaml)
     skin:                       # the moon-elf mummy; already art-planned (#25 issue thread)
@@ -527,7 +527,7 @@ enemy_units:
 #                        0x9C8 = Saar DEATH quote (EVFLAG_DEFEAT_BOSS)
 # So "9C6" was a BAD label for our recruit: the real 0x9C6 is a death quote. Our recruit is
 # 0x9CC and is now labelled so. And 0x9C6 gives us a slot we had not accounted for at all --
-# Natasha is BASIL's donor, so Basil owes a chapter-specific death quote too (see his slot).
+# Natasha is BASIL's donor, so Basil owes a chapter-specific death quote too (see her slot).
 # `vanilla_scene.py` used to read TEXTSHOW only and so HID every Text_BG scene -- it reported
 # this opening as 8 messages / 71 boxes when it is 11 / 98, with 9BC and 9BD missing entirely.
 # Fixed 2026-07-29; the tool now prints each message's id and channel. If a mined beat looks
@@ -558,20 +558,20 @@ events:
     type: cutscene
     ea_file: events/ch05-basil-sahnar.ea
     description: >
-      Basil visits the sarcophagus, as he does. Sahnar has been AWAKE in there for millennia
+      Basil visits the sarcophagus, as she does. Sahnar has been AWAKE in there for millennia
       (never asleep — npcs/sahnar.yaml), so they talk through the stone: the gentle shrub and
       the imprisoned queen, the only two kind things in a frost druid's tomb. Establishes BOTH
       recruits before either is a unit — vanilla spends 10 A-presses on the Joshua/Natasha
       meet-cute for exactly this reason — and it is why Basil later begs the party to free her:
-      she is his friend, not a quest object. Their SECOND scene is the recruit (9C6), which is
+      Sahnar is her friend, not a quest object. Their SECOND scene is the recruit (9C6), which is
       where the weight lands, so this one stays a window rather than a thesis.
       Ravisin is damned entirely in REPORTED SPEECH ("she said it would still run") and never
-      diagnosed by Sahnar — Basil's doubt stays his own. Sahnar knows only what Basil tells her;
+      diagnosed by Sahnar — Basil's doubt stays her own. Sahnar knows only what Basil tells her;
       she has no other window on the world. LOCKED 2026-07-23 (dialogue-pass, co-written with
       Nicolas). 16 boxes; the closing aside is hand-matched to Joshua's 3-box / 5-line cadence.
     script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
       # (The tomb's eastern berm, before the party arrives. A frost-furred sarcophagus half-sunk
-      #  in snow. A goodberry shrub hurries up on root-feet — he walks; he is not potted.)
+      #  in snow. A goodberry shrub hurries up on root-feet — she walks; she is not potted.)
       - basil: "Sahnar! Sahnar, the moose came back, the white one, it came back tonight--"
       - basil: "--and it's hurt. There are arrows in it. Three of them, in the shoulder. I counted."
       # (Sahnar's voice comes from inside the stone.)
@@ -597,7 +597,7 @@ events:
       - sahnar: "Don't worry about me, little one."
       - basil: "...All right."
       - sahnar: "Go on, now. She'll want you before dawn."
-      # (He goes. A few steps on root-feet. Then stops and looks back. The closing aside is
+      # (She goes. A few steps on root-feet. Then stops and looks back. The closing aside is
       #  Joshua's MSG_9BB shape beat for beat: observation -> wish -> resolve, 3 boxes/5 lines.)
       - basil: "...And there she stays."
       - basil: "I wish I could share my berries with her."
@@ -666,7 +666,7 @@ events:
     ea_file: events/ch05-basil-doubt.ea
     description: >
       Ravisin + Basil, alone after Sephek leaves. She appraises the warrior she has just been
-      given leave to use; Basil asks after her — his friend, though he never says so — and is
+      given leave to use; Basil asks after her — her friend, though she never says so — and is
       shut down and handed a chore.
       MINED SKELETON — vanilla MSG_9BD (Cormag + Glen, 7 boxes). NB the DOUBT there belongs to
       the SUPERIOR, not the subordinate: Glen reflects on the zeal he has just watched, lets a
@@ -680,17 +680,17 @@ events:
       deflection reveals there was never any feeling to read. She has always KNOWN Sahnar is
       under that stone (consistent with 9BC's "...The elf?"); what damns her is that she walked
       past a thousand times and only valued her once someone else pointed. Basil never reveals
-      that he knows Sahnar — that stays his secret for the recruit to spend.
+      that she knows Sahnar — that stays her secret for the recruit to spend.
       LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas).
     script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
       # (The tomb, after Sephek has gone. Ravisin looking toward the sarcophagus on the berm.)
       - ravisin: "A queen's blade. I have walked past that stone a thousand times."
       - ravisin: "It never once occurred to me she might be of use."
-      # (Basil knows exactly who is under that stone. He cannot say so.)
+      # (Basil knows exactly who is under that stone. She cannot say so.)
       - basil: "...What will you do with her?"
       - ravisin: "It's not your concern."
       - ravisin: "Come. There is work before dawn."
-      # ("MY berries" — they were never his to give; cf. 9BB, where he hands them out freely.)
+      # ("MY berries" — they were never hers to give; cf. 9BB, where she hands them out freely.)
       - ravisin: "Prepare my berries."
       - basil: "...Yes."
   # ── 9BE — the party ARRIVES; the PLACE ────────────────────────────────────────
@@ -755,8 +755,8 @@ events:
   # ── 0x9BF + 0x9C0 — CUT 2026-07-29 (Nicolas). 16 boxes buying nothing. ────────
   #  Vanilla's pair is the party OVERHEARING an incident and deciding to investigate. Its three
   #  jobs, and why each is already done or unavailable here:
-  #    (1) introduce the recruit-to-be by showing her in danger -> Basil introduces HIMSELF in
-  #        0x9C2, which is better; watching him bullied first would turn "Oh! Tourists. ...We
+  #    (1) introduce the recruit-to-be by showing her in danger -> Basil introduces HERSELF in
+  #        0x9C2, which is better; watching her bullied first would turn "Oh! Tourists. ...We
   #        don't get many." from a surprise into surveillance and kill the joke;
   #    (2) establish the enemy as lethal in their own words -> we came here to fight, so there is
   #        nothing to establish;
@@ -782,7 +782,7 @@ events:
       Party deployed at the stair-foot; the moose at bay; Ravisin a SILENT frost-robed figure at
       center among the risen dead (shown on the map, never narrated). Basil — a GREEN ally shrub —
       trundles up, cracks the tourist joke, notices LUPIN (a fellow awoken creature, now free),
-      and the thought dawns → he asks to be brought to Sahnar and JOINS (green → player unit). His
+      and the thought dawns → she asks to be brought to Sahnar and JOINS (green → player unit). Her
       "she lost her way" line on Ravisin is DEFERRED to the eruption (once she's formally
       introduced). LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas). Hand-boxed to GBA
       width. Wiring: Basil enters green, converts to a player unit on the join.
@@ -801,7 +801,7 @@ events:
         ch04's Lupin recruit is gated on `parley: by: marty`, and the ch04 difficulty model
         explicitly prices a no-parley path — so a player can reach ch05 with no wolf on the field
         and box 2 has no referent. The fallback moves Basil's trigger from Lupin to the PARTY
-        ITSELF: everyone he has ever met belonged to her, so people who belong to nobody are the
+        ITSELF: everyone she has ever met belonged to Ravisin, so people who belong to nobody are the
         whole revelation. Arguably the purer version — it needs no other unit to exist.
         Boxes 1 and 3 are unchanged in both branches.
       script:
@@ -835,7 +835,7 @@ events:
       - sahnar: "...Well. Something has come now."
       - sahnar: "I will defend this tomb. It is my purpose."
   # ── 9C4 — CUT 2026-07-29 (Nicolas). Slot deliberately left empty. ─────────────
-  # Was: "Basil, mid-escort, steeling himself" — vanilla's 4-box Natasha prayer (MSG_9C4),
+  # Was: "Basil, mid-escort, steeling herself" — vanilla's 4-box Natasha prayer (MSG_9C4),
   # which she spends psyching herself up to walk into danger and talk somebody down.
   # CUT because its only real job was to plant the berry ahead of the recruit, and 9BB
   # ALREADY plants it: "One day I'll give her one." Re-planting it one slot before the
@@ -843,9 +843,9 @@ events:
   # slots of silence between 9BB and 9C6 are doing the work instead.
   # Drafted and rejected at the same sitting: three variants (berry / scared-going-anyway /
   # "little one"), all four boxes, all bubble-legal. Nothing salvageable is owed forward —
-  # Basil's fear now lives inside the recruit scene itself, where it costs him something.
+  # Basil's fear now lives inside the recruit scene itself, where it costs her something.
   # NB the old description here carried `basil.md`'s RETIRED "voice is spare (2-5 words)"
-  # spec (retired 2026-07-23: it made him read as slow — his corpus twin is Ewan). Do not
+  # spec (retired 2026-07-23: it made her read as slow — her corpus twin is Ewan). Do not
   # resurrect it if this slot is ever refilled.
   # ── 0x9C4 — the LAST beat before the map: the moose triggers the fight ────────
   - trigger: chapter_start       # opening event list, LAST message
@@ -870,8 +870,8 @@ events:
       RAVISIN STAYS SILENT through this. The fight begins on the quarry's terms, not hers; her
       first words on the map are the eruption (0x9C5).
       Basil's steeling-himself beat — the twin's actual content — is CUT (Nicolas, 2026-07-29).
-      Not deferred, not homeless: cut. His nerve is not a beat this chapter needs stated, and 0x9BB
-      already establishes what he is walking toward.
+      Not deferred, not homeless: cut. Her nerve is not a beat this chapter needs stated, and 0x9BB
+      already establishes what she is walking toward.
       LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 2 boxes.
     script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
       # (The hollow. The moose stands at bay among the standing dead. Nothing has moved.)
@@ -1002,11 +1002,11 @@ events:
       NOT break — she keeps it, and her ENEMY resolves. She was misled, never bound.
       Written by Nicolas; boxed to GBA width here. Deliberate, do not "fix":
         · "...Basil?" is her exact first line from 9BB — the recognition IS the word. No
-          introduction, no explanation; he never has to say who he is.
+          introduction, no explanation; she never has to say who she is.
         · The wolf stays GENERIC ("a wolf", "his whole pack", "travelers") — Sahnar has no way
           to know Lupin, and 9BB established she knows only what Basil tells her.
         · "child" → "little one" is an ARC: cold while she is still the summoned guardian,
-          then 9BB's name for him the moment she comes back to herself.
+          then 9BB's name for her the moment she comes back to herself.
         · The scene ENDS on Basil's berry question, unanswered — 9BB's "One day I'll give her
           one" left open on purpose, going into the fight.
       LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 16 boxes, Sahnar 8 / Basil 8.
@@ -1039,8 +1039,8 @@ events:
         Box 8 is PROOF #1 — the evidence that turns Sahnar — and it is a wolf the player may never
         have recruited (ch04's parley is optional). Without him the proof changes SHAPE: it stops
         being evidence someone else already walked free and becomes Basil's argument that the two
-        of THEM could. `lore/sahnar.md` supports the swap — "she does not weigh his argument, she
-        recognises HIM" — so the scene still turns on Basil rather than on the wolf.
+        of THEM could. `lore/sahnar.md` supports the swap — she does not weigh the argument, she
+        recognises the ARGUER — so the scene still turns on Basil rather than on the wolf.
         Box 9 ("All it took was knowing they had a choice... That we have a choice...") is
         unchanged in both branches; its "we" already includes him.
         OPEN: box 6 is kept at v0 (Nicolas), but "SOME of her creatures broke free" asserts a
@@ -1058,20 +1058,20 @@ events:
       BASIL's chapter-specific death quote. Vanilla Ch5 gives one to NATASHA and to nobody else
       on the map except the boss — not even to Joshua — because she is the ESCORT the chapter is
       built around, and losing her is the failure the player must feel. Basil is her exact donor
-      and holds exactly that role here, so he inherits the slot.
+      and holds exactly that role here, so she inherits the slot.
       The twin: "I can't let myself die here..... Someone has to hear my tale....." — she dies
       still reaching for her one errand, which is what makes it land.
       Ours has a sharper version of the same available, and it is the whole reason 9BB exists:
       Basil dies with the berry still undelivered. ONE box. Do not spend it on pathos about
-      himself; spend it on Sahnar, whom the player now knows he was walking toward.
+      herself; spend it on Sahnar, whom the player now knows she was walking toward.
       TWO CONSTRAINTS the draft is built to satisfy, both easy to break by "improving" it:
-        · It must read the same whether he dies BEFORE or AFTER the recruit. "Sahnar's still
+        · It must read the same whether she dies BEFORE or AFTER the recruit. "Sahnar's still
           waiting" is wrong once she is a party member; the berry is undelivered either way.
-        · It must not duplicate his LAST WORDS in 0x9CA, which are also about the berry. The
-          quote is him still holding it; 0x9CA is him handing the errand to someone else
+        · It must not duplicate her LAST WORDS in 0x9CA, which are also about the berry. The
+          quote is her still holding it; 0x9CA is her handing the errand to someone else
           ("Tell her I had one for her"). Same object, two different failures.
-      Hurt Basil goes SHORT — basil.md: he runs on when he cares, and the short lines are for
-      when he's hurt. The self-interruption is the one piece of his register that survives.
+      Hurt Basil goes SHORT — basil.md: she runs on when she cares, and the short lines are for
+      when she's hurt. The self-interruption is the one piece of her register that survives.
       LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas) — Nicolas kept v0 on review:
       the 9BB thread carries the pronoun. 1 box. Two alternates recorded below.
     script:                           # LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas)
@@ -1122,7 +1122,7 @@ events:
     type: cutscene
     ea_file: events/ch05-ending.ea
     description: >
-      Ravisin falls. The party adopts Basil — they REPOT him (he is already called Basil and
+      Ravisin falls. The party adopts Basil — they REPOT her (she is already called Basil and
       joined on the map; there is no discovery and no naming beat, LOCKED 2026-07-23). They turn
       down the coast toward Bremen, where Ravisin woke something in the lake.
       MINED SKELETON — vanilla MSG_9C9 (34 boxes, `EventScr_Ch5_EndingScene`, ON-MAP so bubbles
@@ -1131,8 +1131,8 @@ events:
       and she TELLS THEM THE PLOT — the escort, not a party member, carries the chapter's forward
       information; (4) the party deliberates in front of her; (5) a closing box that turns the win
       into the next journey.
-      WHO SITS IN WHICH SEAT: Natasha → BASIL (he is her donor and holds her role all chapter, so
-      he inherits the information too — and that is WHY 0x9CA has to exist). Eirika → BRAULO (he
+      WHO SITS IN WHICH SEAT: Natasha → BASIL (Basil is her donor and holds her role all chapter,
+      so she inherits the information too — and that is WHY 0x9CA has to exist). Eirika → BRAULO (he
       speaks when a decision has to be made, then the party follows). Seth → split between
       PROF-RBG (who knows where Bremen is; he makes inquiries everywhere) and MARTY (the reason
       to go that isn't money). Meesmickle is DELIBERATELY ABSENT — he already spent his one line
@@ -1140,7 +1140,7 @@ events:
       role.
       BASIL CAN CARRY THIS AND SAHNAR CANNOT: Sahnar is optional (no recruit, no scene) and has
       been under a stone for four thousand years — she has no way to know about a lake. Basil is
-      Ravisin's own attendant and reports what he HEARD her say, which is also how 9BB damns her
+      Ravisin's own attendant and reports what she HEARD Ravisin say, which is also how 9BB damns her
       ("she said it would still run"). Villains condemn themselves in reported speech.
       NO MOOSE (Nicolas, 2026-07-30). The moose is a CONVERTIBLE miniboss — the player may simply
       kill it — so the ending cannot assume it survived, and an earlier draft opened on it running
@@ -1162,7 +1162,7 @@ events:
     status: locked
     script:                           # LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas)
       # (Aftermath. Ravisin is down. Basil says the smallest true thing -- and it pays off 9BD,
-      #  where her last order to him was "Prepare my berries.")
+      #  where her last order to her was "Prepare my berries.")
       - basil: "I don't have to make berries for her anymore..."
       - marty: "No. You don't. ...Come with us instead."
       # (The pot is WOLFRAM's, not RBG's (Nicolas, 2026-07-30): the metallurgist repairs one out of
@@ -1211,7 +1211,7 @@ events:
       replaces: "She woke it. Like she woke the wolves. ...She told it to sink the boats."
       reason: >-
         "Like she woke the wolves" names a recruit the player may never have made. The fallback
-        puts the comparison in Basil's own mouth about HIMSELF, which is the harder line and needs
+        puts the comparison in Basil's own mouth about HERSELF, which is the harder line and needs
         no other unit to exist. Worth revisiting whether this should simply be unbranched — it
         would delete a branch point and, on the page, it reads stronger in both worlds.
       script:
@@ -1238,10 +1238,10 @@ events:
       is 0x9C9's own, with Braulo's final box carrying the one changed clause.
       THE CONCEIT IS INHERITED WHOLESALE. Natasha's map death is deferred to the cutscene — she
       is mortally wounded there, whenever she actually fell. Basil is a broken shrub in the snow
-      still talking, whether he went down on turn 2 or turn 12. It reads better for a plant than
+      still talking, whether she went down on turn 2 or turn 12. It reads better for a plant than
       it does for a person.
       WHAT THE LOSS COSTS, deliberately: no repot, no pot, no berry. If Basil died before the
-      Talk, Sahnar was never recruited (he is the only one who can turn her); if he died after,
+      Talk, Sahnar was never recruited (Basil is the only one who can turn her); if she died after,
       she is a party member. Either way she does NOT speak here — see the note below.
       NOT NESTED (2026-07-30): no second conditional for a recruited Sahnar over the body. One
       box from her would be the strongest line in the chapter, and it is deliberately not taken,
@@ -1262,13 +1262,13 @@ events:
       10 boxes; twin is 24.
     status: locked                    # ADOPTED + LOCKED 2026-07-30 after two red-pen passes
     script:                           # LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas)
-      # (The hollow. Ravisin down. Basil is in the snow where he fell, root-feet turned up,
-      #  broken through. The party has gathered. He is still talking.)
+      # (The hollow. Ravisin down. Basil is in the snow where she fell, root-feet turned up,
+      #  broken through. The party has gathered. She is still talking.)
       - basil: "......"
       - marty: "Easy. Easy, friend. Don't--"
       # (Nicolas's line, 2026-07-30, split across two A-presses -- 84 chars runs to 4 lines on-map,
       #  and splitting it lets BRAULO interrupt mid-report, which is vanilla's own conceit here:
-      #  the facts arrive in fragments, through the party telling him to stop talking.
+      #  the facts arrive in fragments, through the party telling her to stop talking.
       #  LUPIN-GATED -- "the wolf" needs the fallback below. "The moose" does NOT: Basil is
       #  listing who she WOKE, not who survived, so a player who killed it loses nothing.)
       - basil: "The moose, the wolf.. they were not alone.."
@@ -1278,7 +1278,7 @@ events:
       #  DEGRADED INFORMATION is the branch's whole point -- in this ending the party never learns
       #  what the thing was ordered to do, only that it is there. That is the loss, priced in
       #  facts. Cutting Marty's name-call also leaves Braulo as the scene's ONLY interruption,
-      #  so Basil's last two boxes run without anyone reaching for him.)
+      #  so Basil's last two boxes run without anyone reaching for her.)
       # (Not the berry errand -- 0x9C6 still holds that. This is the healer's own failure, and it
       #  is universal rather than about Sahnar, so it does not collide with the death quote.)
       - basil: "...I couldn't make enough berries..."
@@ -1297,7 +1297,7 @@ events:
         Same gate as 0x9C9 box 14: "the wolf" names an optional recruit. Only that clause moves —
         "the moose" stays in BOTH branches, because Basil is listing who she WOKE, not who
         survived, so a player who killed the moose loses nothing here. Parallel to 0x9C9's
-        fallback, Basil substitutes himself.
+        fallback, Basil substitutes herself.
       script:
         - basil: "The moose, and me.. we were not alone.."
   # ── 0x9CB — vanilla's ending CODA. FOLDED INTO 0x9C9 (2026-07-30). No separate slot. ──
@@ -1310,7 +1310,7 @@ events:
   # and here is where each of the coda's three jobs actually landed, so nobody re-opens the slot
   # looking for them:
   #   (1) a RESIDENT says what the win meant  -> Basil's "...I don't have to prepare her berries."
-  #       The hollow is the only place he has ever been; that line is the whole coda in one box.
+  #       The hollow is the only place she has ever been; that line is the whole coda in one box.
   #   (2) the resident's own future           -> the repot. Vanilla's townsman apologises that he
   #       can do nothing and stays behind to wait; ours can do something, and comes along. The
   #       coda INVERTED is the strongest use of it available to us.
@@ -1389,17 +1389,17 @@ post_chapter:
   units_available_to_recruit:
     - id: sahnar                         # Myrmidon (sword duelist); see npcs/sahnar.yaml
       description: "Sahnar (she/her), the reawakened elven royal — a moon-elf mummy, recruited via Basil's Talk (the Joshua beat). Playable Myrmidon."
-    - id: basil                          # Priest — 2nd healer (LOCKED 2026-06-20); see npcs/basil.yaml
+    - id: basil                          # Cleric — 2nd healer (role LOCKED 2026-06-20, class 2026-08-08); see npcs/basil.yaml
       description: >
-        Basil, the sentient goodberry shrub — now a PLAYABLE healer (Priest). His
-        Goodberries are the cosmetic skin on a vanilla heal staff; he is also the
+        Basil, the sentient goodberry shrub — now a PLAYABLE healer (Cleric). Her
+        Goodberries are the cosmetic skin on a vanilla heal staff; she is also the
         in-fiction source of the party's reflavored Vulneraries in the shop.
   unlocks_chapter: ch06-the-maer-monster
 
 design_notes: >
   Our FE8 Ch5 (The Empire's Reach) 1:1 — DefeatBoss, retiling Ch5's open spread field as an
   elven-tomb depression and emulating its two memorable set-pieces (decisions.md 2026-07-15):
-    - The Natasha→Joshua escort → BASIL (Natasha-donor Priest) chaperoned to Talk SAHNAR
+    - The Natasha→Joshua escort → BASIL (Natasha-donor Cleric) chaperoned to Talk SAHNAR
       (Joshua-donor Myrmidon), who rises as a hostile crit-threat and flips on the Talk. The
       donors were chosen for exactly this; the escort defines how you play the map.
     - The village-raid race → the Phantom-Ship ERUPTION (injected EARTHQUAKE/TILECHANGE)
@@ -1408,7 +1408,7 @@ design_notes: >
   Ravisin is the canonical frost druid and the villain thread tying the white moose (ch04) →
   this tomb → Messie (ch06): she awakened them all. She still DROPS the LOCKED 'crest of cold
   iron' (the promotion Chekhov's gun for the Ch8→9 seam) — its narrative role; the save-all
-  bonus is the mechanical echo, not a replacement. Basil joins as our second healer (Priest) —
+  bonus is the mechanical echo, not a replacement. Basil joins as our second healer (Cleric) —
   the goodberry shrub as a literal heal-staff unit (LOCKED 2026-06-20). No fog: the tension is
   the escort + eruption race, not vision. Map + roster build at the slice; targets checked via
   `make difficulty` (economy #170 + convertible/reinforcement dynamics #171).

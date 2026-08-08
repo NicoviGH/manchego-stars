@@ -133,6 +133,17 @@ class TrexRecruitCast(unittest.TestCase):
         cast = {uid: (slot, cls) for uid, slot, cls, _sms in bc.classed_cast(self.CAMPAIGN)}
         self.assertEqual(cast['trex'], ('Rennac', 'CLASS_THIEF'))
 
+    def test_every_classed_cast_member_has_a_test_loadout(self):
+        # inject_test_chapter walks the WHOLE PORTRAIT_MAP and sys.exits on the first class
+        # with no CLASS_LOADOUT row -- so a cast member's class change can break the art bench
+        # (recordcast/recordanim) without touching a single chapter. Caught exactly that when
+        # Basil moved Priest -> Cleric (2026-08-08): CLASS_CLERIC had no row, and ch05's own
+        # guard could not see it because Basil is recruited IN ch05 and so is not on its field
+        # roster. Assert the invariant, not the one class that happened to be missing.
+        allcast, _ = bc._classed_cast(self.CAMPAIGN)   # available_at=None -> everyone
+        missing = sorted({ce for _uid, _slot, ce, *_ in allcast if ce not in bc.CLASS_LOADOUT})
+        self.assertEqual(missing, [], 'classed cast members with no CLASS_LOADOUT row')
+
     def test_thief_loadout_and_testch_covers_the_whole_cast(self):
         # inject_test_chapter needs a Thief loadout + one spawn tile per classed cast member
         # (13 now: 8 founding + Baxby + Trex + Lupin + ch05's Basil and Sahnar); both would
@@ -1538,7 +1549,7 @@ class Ch04RuntimeHost(unittest.TestCase):
     def test_parley_recruiter_is_marty_only(self):
         # Nicolas 2026-07-21: ch04's talker is Marty specifically, NOT ch03's any-party-member.
         # Data-driven from the convertible wave's parley.by; Marty rides the Seth slot.
-        self.assertEqual(bc.ch04_parley_recruiters(self.CAMPAIGN, self._chap()),
+        self.assertEqual(bc.parley_recruiters(bc._ch04_reveal_wave(self._chap())),
                          ['CHARACTER_SETH'])
 
     def test_reveal_cutscene_pans_loads_focuses_lupin_and_plants_the_parley(self):
@@ -1561,7 +1572,7 @@ class Ch04RuntimeHost(unittest.TestCase):
         # code: {pid, route=ANY(0xFF), chapter=host slot}. Redundant-but-harmless if the player
         # chose Marty as lord (IsCharacterForceDeployed_ already returns true for the lead).
         entries = bc._force_deployment_entries(
-            bc.ch04_parley_recruiters(self.CAMPAIGN, self._chap()), bc.CH04_HOST_INDEX)
+            bc.parley_recruiters(bc._ch04_reveal_wave(self._chap())), bc.CH04_HOST_INDEX)
         self.assertIn('{CHARACTER_SETH, 0xFF, %d}' % bc.CH04_HOST_INDEX, entries)
 
     def test_roster_uses_the_vanilla_monster_classes_and_weapons(self):
@@ -1614,10 +1625,12 @@ class Ch05RecruitIdentities(unittest.TestCase):
         self.assertFalse(set(slots) & set(bc.GUEST_PORTRAIT_MAP.values()),
                          'a cast slot collides with a cutscene guest slot')
 
-    def test_the_healer_split_is_donor_deep_not_class_deep(self):
-        # Sclorbo and Basil are both Priests; decisions.md differentiates them by DONOR
-        # (Moulder durable war-priest vs Natasha frail mage-healer), which only exists once
-        # Basil has a STAT_DONOR row -- the YAML design record cannot do it alone.
+    def test_the_healer_split_is_donor_deep(self):
+        # decisions.md differentiates the army's two healers by DONOR (Moulder durable
+        # war-priest vs Natasha frail mage-healer), which only exists once Basil has a
+        # STAT_DONOR row -- the YAML design record cannot do it alone. Since 2026-08-08 the
+        # split is ALSO class-deep (Sclorbo Priest / Basil Cleric), but the donor is still
+        # what separates the stat lines, so this stays the guard.
         self.assertEqual(bc.STAT_DONOR['sclorbo'], 'CHARACTER_MOULDER')
         self.assertEqual(bc.STAT_DONOR['basil'], 'CHARACTER_NATASHA')
         self.assertEqual(bc.STAT_DONOR['sahnar'], 'CHARACTER_JOSHUA')
@@ -1629,11 +1642,57 @@ class Ch05RecruitIdentities(unittest.TestCase):
         recruits = {r[0]: r for r in bc.on_map_talk_recruits(self.CAMPAIGN, self.CH05)}
         self.assertEqual(set(recruits), {'basil', 'sahnar'},
                          'ch05 recruits exactly Basil and Sahnar on the map')
-        self.assertEqual(recruits['basil'][2], 'CLASS_PRIEST')
+        self.assertEqual(recruits['basil'][2], 'CLASS_CLERIC')
         self.assertEqual(recruits['sahnar'][2], 'CLASS_MYRMIDON')
         load = lambda uid: bc.load_unit(self.CAMPAIGN, uid)
         self.assertEqual(bc.recruit_initial_faction(load('basil')), 'GREEN')
         self.assertEqual(bc.recruit_initial_faction(load('sahnar')), 'RED')
+
+    def test_basil_is_a_cleric_because_priest_promotes_into_the_wrong_weapon_type(self):
+        """The whole reason for the class (Nicolas, 2026-08-08). See decisions.md.
+
+        Priest's `ClassData.promotion` is CLASS_SAGE -- an ANIMA mage -- while basil.yaml's
+        `battle_anim.spell_palette_tint` declares STAFF + LIGHT, i.e. Bishop. Cleric's default
+        is CLASS_BISHOP_F, which IS light, so the class table points him at the class his own
+        art already assumes. Pinned against the decomp so the two cannot drift apart again.
+        """
+        table = bc._vanilla_class_table()
+        self.assertEqual(table['CLASS_PRIEST']['promotion'], 'CLASS_SAGE',
+                         'Priest still defaults into anima -- the reason Basil left it')
+        self.assertEqual(table['CLASS_CLERIC']['promotion'], 'CLASS_BISHOP_F')
+        # ...and the YAML's authored branch is the decomp's branch, not a wish.
+        display = {'CLASS_BISHOP_F': 'Bishop', 'CLASS_VALKYRIE': 'Valkyrie'}
+        branches = bc._promotion_branches()['CLASS_CLERIC']
+        promo = bc.load_unit(self.CAMPAIGN, 'basil')['promotion']
+        self.assertEqual(sorted(promo['branch']), sorted(display[c] for c in branches))
+        self.assertEqual(promo['default'], 'Bishop')
+
+    def test_basil_bases_are_vanilla_cleric_class_data_verbatim(self):
+        # basil.yaml claims its stat block is class data "verbatim"; that claim is only worth
+        # anything if something checks it. CON is load-bearing beyond flavour: CanUnitRescue
+        # is `GetUnitAid(actor) >= UNIT_CON(target)` (bmunit.c), so Cleric's CON 4 is what lets
+        # more of the party ferry the ch05 escort than Priest's CON 5 would.
+        bases = bc.class_base_stats('CLASS_CLERIC',
+                                    bc.vanilla_decomp_text('src/data_classes.c'))
+        fe = bc.load_unit(self.CAMPAIGN, 'basil')['fe_stats']
+        for yaml_key, field in (('HP', 'baseHP'), ('MAG', 'basePow'), ('SKL', 'baseSkl'),
+                                ('SPD', 'baseSpd'), ('DEF', 'baseDef'), ('RES', 'baseRes'),
+                                ('CON', 'baseCon'), ('MOV', 'baseMov')):
+            self.assertEqual(fe[yaml_key], bases[field],
+                             'basil.yaml %s drifted from CLASS_CLERIC.%s' % (yaml_key, field))
+        self.assertEqual(fe['CON'], 4, 'the escort-rescue margin is CON 4, not Priest CON 5')
+
+    def test_basil_declares_female_so_the_artur_slot_bit_is_rewritten(self):
+        # Gender rides YAML, not the slot -- _set_gender rewrites .attributes on whatever
+        # character slot the unit wears, explicitly clearing what leaks from the vanilla
+        # entry. So a female Cleric on the male Artur slot needs no slot change. (CA_FEMALE
+        # is inert on a foot unit anyway: both readers, GetUnitAid and koido.c, gate on
+        # CA_MOUNTEDAID first -- it matters only if he ever promotes to mounted Valkyrie.)
+        self.assertEqual(bc.load_unit(self.CAMPAIGN, 'basil').get('gender'), 'female')
+        self.assertIn('.attributes = CA_FEMALE',
+                      bc._set_gender('{\n    .number = 1,\n}', True))
+        self.assertNotIn('CA_FEMALE',
+                         bc._set_gender('{\n    .attributes = CA_FEMALE,\n}', False))
 
     def test_neither_rides_the_ch05_prep_roster(self):
         # They join DURING ch05, so cast_available_at must not seat them in its deploy cap
@@ -1642,6 +1701,38 @@ class Ch05RecruitIdentities(unittest.TestCase):
             seated = {uid for uid, *_ in bc._classed_cast(self.CAMPAIGN, available_at=n)[0]}
             self.assertEqual({'basil', 'sahnar'} <= seated, expected,
                              'wrong prep availability at chapter %d' % n)
+
+    def test_the_gated_recruiter_is_basil_only(self):
+        # Sahnar's recruiter is authored data (her `parley.by`), not a roster query -- she does
+        # not weigh the argument, she recognises Basil (lore/sahnar.md). Same helper ch04's
+        # Marty->Lupin parley uses; the chapter picks parley_recruiters over talk_recruiters.
+        sahnar = next(e for e in bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+                      ['enemy_units'] if e['id'] == 'sahnar')
+        self.assertEqual(bc.parley_recruiters(sahnar), ['CHARACTER_ARTUR'])
+
+    def test_basils_green_tile_costs_no_deployment_and_can_reach_sahnar(self):
+        # The three silent ways a green placement goes wrong (assert_green_recruit_placement).
+        # Worth pinning the tile itself: vanilla's Natasha is BLUE and stands on what is now one
+        # of our nine deploy slots, so copying the twin 1:1 here -- which is this chapter's
+        # standing habit -- would have quietly cost the player a deployment.
+        chap = bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+        slots = [tuple(s) for s in chap['deployment']['deploy_slots']]
+        self.assertNotIn(bc.CH05_BASIL_GREEN_POS, slots)
+        maps = os.path.join(bc.REPO, 'campaigns', self.CAMPAIGN, 'maps')
+        bc.assert_green_recruit_placement(          # sys.exits on any of the three
+            chap, maps, bc.CH05_LAYOUT[1], bc.CH05_BASIL_GREEN_POS,
+            bc.CH05_BASIL_MOV_TABLE, 'Basil',
+            must_reach=tuple(next(e for e in chap['enemy_units']
+                                  if e['id'] == 'sahnar')['positions'][0]))
+
+    def test_the_talk_script_flips_sahnar_and_carries_no_pack_conversion(self):
+        # ch04 splices a pre_script (the wolf pack's conversion sweep) into the same flow;
+        # ch05 has no group to bring over, so the script must be the bare talk -> CUSA.
+        script = bc.talk_recruit_script(bc.CH05_SAHNAR_TALK_MSG, 'CHARACTER_MARISA')
+        self.assertIn('TEXTSHOW(0x%X)' % bc.CH05_SAHNAR_TALK_MSG, script)
+        self.assertIn('CUSA(CHARACTER_MARISA)', script)
+        self.assertNotIn('CUSN', script)
+        self.assertLess(script.index('TEXTSHOW'), script.index('CUSA'))   # line, then the flip
 
     def test_each_carries_a_death_quote(self):
         # inject_pc_death_quotes hard-exits without one (#6), so a slot with no quote is a
