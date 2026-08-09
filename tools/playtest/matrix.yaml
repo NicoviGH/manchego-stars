@@ -250,6 +250,9 @@ scenarios:
   ch05village:
     rom: ch05boot
     host_chapter: 6
+  ch05reliquaries:
+    rom: ch05boot
+    host_chapter: 6
   ch05recruit:
     rom: ch05boot
     host_chapter: 6
@@ -319,6 +322,7 @@ suites:
     - ch04snag
     - clear_ch04_parley
     - ch05village
+    - ch05reliquaries
     - ch05recruit
 
   ch01:

@@ -6527,7 +6527,11 @@ end
 -- closed door for the cottage whose reward is its line -- so `done` is the caller's
 -- postcondition and this owns only the getting-there.
 -- Returns ok, reason, spoke (whether the visit actually opened a text box at all).
-local function visitVillage(x, y, done)
+-- `onBox` (optional) fires each time a box is up and WAITING, before the A that clears it --
+-- the only moment the line and the speaker's face are both on screen. Review captures need it:
+-- a shot taken after the visit returns catches the map, because `done` fires when the ITEM
+-- lands and the box is long gone by then.
+local function visitVillage(x, y, done, onBox)
     local ok, why = openVillageVisit(x, y)
     if not ok then return false, why end
     local spoke = false
@@ -6535,6 +6539,7 @@ local function visitVillage(x, y, done)
         if done() then break end
         if controllerState() == "dialogue_wait" then
             spoke = true
+            if onBox then onBox() end
             if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
                 return controllerState(after) ~= "dialogue_wait"
             end, 120) then return false, "village dialogue input did not advance" end
@@ -6578,6 +6583,75 @@ scenarios.ch04village = function()
     end
     return result("PASS", string.format(
         "the Lonelywood village handed over its Iron Axe: %d -> %d in the party", before, after))
+end
+
+-- ch05reliquaries (#25): all FOUR reliquary doors -- each one speaks, and each hands over ITS
+-- OWN gift. ch05village covers the south door alone, and a scenario's verdict only covers what
+-- it actually reads: three doors, three faces and three of the four authored lines had no
+-- witness at all, which is the same blind spot that let ch05village pass for months while
+-- proving nothing about the recruit. The gifts are per-tile on purpose (vanilla's placement,
+-- richest where the eruption races), so "some item arrived" is not the assertion -- the RIGHT
+-- item is. `spoke` is checked too: a wired-but-empty message would hand the gift over in
+-- silence and every item check would still pass.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh ch05reliquaries (needs a CH05BOOT=1 ROM).
+scenarios.ch05reliquaries = function()
+    local SITES = {
+        {name = "north  Torch",       x = 5,  y = 1,  item = 0x70},
+        {name = "west   Secret Book", x = 5,  y = 6,  item = 0x5D},
+        {name = "east   Armorslayer", x = 12, y = 10, item = 0x0E},
+        {name = "south  Dracoshield", x = 12, y = 19, item = 0x60},
+    }
+    if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
+    pokeFastConfig()
+    waitFor(function() return faction() == 0 and not menuOpen()
+        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    local function held(id)
+        local n = 0
+        for _, got in ipairs(collectedItems()) do if got == id then n = n + 1 end end
+        return n
+    end
+    -- The visit's `done` fires the moment the ITEM lands, but the location event is still
+    -- running behind it (give-item tail, the door's MapChange, EVBIT_T, ENDA). Walking to the
+    -- next door while std_event holds the controller is an illegal input, and the run dies on
+    -- "cursor could not reach" -- which reads like a map problem and is really an impatience
+    -- problem. Settle back to player-idle between doors.
+    local function settle()
+        return waitFor(function()
+            return faction() == 0 and not menuOpen()
+                and not procActive(SYM.ProcScr_StdEventEngine)
+                and controllerState() == "player_map_idle"
+        end, 3000, true)
+    end
+    local silent = {}
+    for _, site in ipairs(SITES) do
+        if not settle() then
+            return result("FAIL", string.format(
+                "the map never returned to player control before %s (%d,%d)",
+                site.name, site.x, site.y))
+        end
+        local before = held(site.item)
+        local shown = false
+        local ok, why, spoke = visitVillage(site.x, site.y, function()
+            return held(site.item) > before
+        end, function()
+            if not shown then shot("reliquary"); shown = true end
+        end)
+        if not ok then
+            return result("FAIL", string.format("%s (%d,%d): %s", site.name, site.x, site.y, why))
+        end
+        if held(site.item) <= before then
+            return result("FAIL", string.format(
+                "%s (%d,%d) was visited but its gift never arrived -- the door ran, the "
+                .. "give-item tail did not", site.name, site.x, site.y))
+        end
+        if not spoke then silent[#silent + 1] = site.name end
+        log(string.format("ch05reliquaries: %s handed over its gift", site.name))
+    end
+    if #silent > 0 then
+        return result("FAIL", "these doors paid out in SILENCE (no text box): "
+            .. table.concat(silent, ", "))
+    end
+    return result("PASS", "all four reliquaries spoke and handed over their own gift")
 end
 
 -- ch05village (#25): does the SOUTH reliquary at (12,19) actually hand over its Dracoshield?
