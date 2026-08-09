@@ -1366,7 +1366,7 @@ economy:
 # "His sister was awake the whole time. ...Don't ask." -- it establishes her ordeal before you
 # meet her, from someone who would know.
 #
-# PACING: 27 boxes across four sites against vanilla Ch5's own 26 (mined from HEAD, 6/6/6/8).
+# PACING: 25 boxes across four sites against vanilla Ch5's own 26 (mined from HEAD, 6/7/6/6).
 # Box lengths are UNEVEN on purpose -- vanilla drops to a one-line box for punctuation ("Ah, but
 # I'm an old man now...", "Please, traveler, take this sword.") and a set of identical two-line
 # boxes reads as monotone. Every handover gets its own box, as three of vanilla's four do.
@@ -1442,20 +1442,33 @@ villages:
     visit_reward:
       - id: booster-def            # = Ch5's Dracoshield (+Def). First stat-booster in the campaign,
         amount: 1                  # and vanilla puts it HERE on purpose -- see the note below.
-    # LOCKED 2026-08-08 (dialogue-pass, co-written with Nicolas). Speaker: FULL SMILE, who talks
-    # too much and buries the lede. 8 boxes, matching vanilla's own longest village (MSG_9CE, the
-    # dancer) -- and for the same reason: this is the richest gift and the site the turn-2 eruption
-    # races, so it earns the A-presses. The handover carries NO tactical advice (Nicolas: "the
-    # instructions are a bit on the nose... vanilla is more subtle"); vanilla's dancer gives no
-    # usage note at all, only her own reason for parting with it, so his reason is that it has sat
-    # on a stand since before he was bones. That also ties this site back to the mage's Orem.
+    # LOCKED 2026-08-09 (dialogue-pass, co-written with Nicolas). Speaker: the one who talks too
+    # much and buries the lede. The handover carries NO tactical advice (Nicolas: "the instructions
+    # are a bit on the nose... vanilla is more subtle"); vanilla's dancer gives no usage note at
+    # all, only her own reason for parting with it, so his is that it has sat on a stand since
+    # before he was bones -- which also ties this site back to the mage's Orem.
+    #
+    # DO NOT WRITE A CHARACTER OUT OF AN ASSET FILENAME (Nicolas, 2026-08-09). A cut box read
+    # "Don't mind the grin. It's the face I've got." -- a reaction to this mug being named
+    # `Skeleton (Full Smile)`. That name is a VARIANT LABEL, not an expression: the file differs
+    # from reliquary-east's by 65 pixels of lower jaw (east is missing teeth, this one is not), and
+    # every skull shows its teeth regardless. A skeleton remarking on his own grin is remarking on
+    # nothing. What replaced it does the same job -- defusing "you are a skeleton and I am not" --
+    # from the character's side: he asks whether he is frightening them.
+    #
+    # WHY THE WAKING BEAT IS NOT HERE: two boxes ("She opened every box in this house and left all
+    # the lids off" / "Some of them liked being told") were cut 2026-08-09 as duplication --
+    # reliquary-east already carries the waking and the refusal, and the fact lands harder stated
+    # once. This site is the shortest of the four now, and that is fine: it is pure character.
+    #
+    # The "shouting outside" is deliberately NOT a raid warning. An earlier box said something was
+    # coming up the south stair, which promised a race the chapter does not implement (no
+    # village-destruction wiring, no save-all payout -- see #25). This line is true either way.
     visit_text:
       - "Hello! Hello. Oh, you're warm. Nothing has been warm in two years."
       - "Sorry. Sorry. I'll slow down."
-      - "Don't mind the grin. It's the face I've got. I am pleased, though. Truly."
-      - "She opened every box in this house and left all the lids off. Woke the lot of us."
-      - "Some of them liked being told."
-      - "Something is coming up the south stair, by the way. I should have led with that."
+      - "I'm not frightening you, am I."
+      - "There's a great deal of shouting outside, by the way. I should have led with that."
       - "Orem's shield-plate. It's been on a stand since before I was bones. Take it."
       - "Go on. ...I'd like you to win. I'd like very much for you to win."
 # WHICH GIFT SITS ON WHICH TILE IS VANILLA'S, NOT OURS (corrected 2026-08-07, decomp-verified via

@@ -1668,7 +1668,7 @@ class Ch05ReliquaryVisits(unittest.TestCase):
 
     def test_the_authored_boxes_survive_as_a_presses(self):
         """One `visit_text` entry per BOX (ch04's lesson): the pacing IS the A-press breaks,
-        and 27 boxes against vanilla Ch5's own 26 is the budget this pass was written to."""
+        and 25 boxes against vanilla Ch5's own 26 is the budget this pass was written to."""
         chap = self._chap()
         total = 0
         for village in chap['villages']:
@@ -1679,7 +1679,7 @@ class Ch05ReliquaryVisits(unittest.TestCase):
                                      '%s: box over two lines at the Text_BG wrap: %r'
                                      % (village['id'], box))
             total += len(boxes)
-        self.assertEqual(27, total)
+        self.assertEqual(25, total)
 
     def test_a_vendored_mug_converts_to_an_fe8_bust(self):
         """The community sheets do not agree on a background key -- Glaceo's set uses one green
