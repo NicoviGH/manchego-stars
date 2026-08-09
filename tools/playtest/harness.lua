@@ -6630,11 +6630,18 @@ scenarios.ch05reliquaries = function()
                 site.name, site.x, site.y))
         end
         local before = held(site.item)
+        -- One shot per door by default (enough to prove the face and the first line). Set
+        -- PT_RECORD_BOXES=1 for a full review capture: every box of every door, which is what
+        -- you want when the question is "read the whole scene", not "did it fire".
         local shown = false
         local ok, why, spoke = visitVillage(site.x, site.y, function()
             return held(site.item) > before
         end, function()
-            if not shown then shot("reliquary"); shown = true end
+            if os.getenv("PT_RECORD_BOXES") then
+                shot("box")
+            elseif not shown then
+                shot("reliquary"); shown = true
+            end
         end)
         if not ok then
             return result("FAIL", string.format("%s (%d,%d): %s", site.name, site.x, site.y, why))
