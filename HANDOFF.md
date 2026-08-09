@@ -7,7 +7,7 @@ live in GitHub issues. Before a context rollover, warn Nicolas, refresh this fil
 fresh instance — don't rely on auto-compaction.
 
 Refreshed 2026-08-09 (Opus). **`main` carries only this handoff commit; no code landed on it.**
-All of this session's work sits on **`feat/25-ch05-reliquary-visit-text` (7 commits, pushed)
+All of this session's work sits on **`feat/25-ch05-reliquary-visit-text` (8 commits, pushed)
 behind open PR #253** — nothing is merged. The checkout is left on that branch.
 
 `HANDOFF.md` lives on `main` and NOT on the branch — the pre-commit drift guard rejects a branch
@@ -30,10 +30,9 @@ chapter's declared structure — undead racing the party for the four reward-sit
 `crest-of-cold-iron` save-all bonus — **is prose only.** No village-destruction wiring exists, no
 save-all payout exists, and the YAML actively claims *"Wired at inject_ch05"*, which is false.
 
-It gates writing: reliquary-south's box 6 warns about raiders the game cannot send. Wire the race
-and the line is simply true as written; leave it unwired and the line must be rewritten to promise
-less. **Nicolas was offered three replacements (A shouting outside / B Ravisin still out there /
-C you're being followed) and has NOT chosen — do not rewrite it until the race question settles.**
+It no longer blocks any WRITING — reliquary-south's raid warning was replaced 2026-08-09 with a
+line that is true either way ("There's a great deal of shouting outside"), so the dialogue is
+settled and the race is a pure mechanics gap.
 
 Also owed and NOT started, all listed on #25: the Basil→Sahnar recruit text (`0x9CC`), the opening
 (`0x9BA`–`0x9C4`), Ravisin's death quote, the arena tutorial, the no-Lupin branch, enemy reskins.
@@ -46,8 +45,11 @@ Also owed and NOT started, all listed on #25: the Basil→Sahnar recruit text (`
   the south door alone.
 - **`make matrix SUITE=<chapter>` is ~11s cached; the full gate is ~6min.** Iterate on the chapter
   suite. The full matrix is the push gate, not the edit loop — see `decisions.md`.
-- **The ch05 reliquary visits are DONE end to end** and confirmed in-engine: 27 boxes across four
-  doors, four Eden/L95 skeleton busts on collision-free slots, `BG_INTERIOR_BROWN`.
+- **The ch05 reliquary visits are DONE end to end** and confirmed in-engine: 25 boxes across four
+  doors (6/7/6/6), four Eden/L95 skeleton busts on collision-free slots, `BG_INTERIOR_BROWN`.
+  A cut worth remembering: one box was written as a reaction to the MUG'S FILENAME
+  (`Skeleton (Full Smile)`), which is a variant label, not an expression. Don't build a character
+  trait out of asset metadata.
 - **ch05's opening and recruit still play VANILLA prose.** In-game this looks like a bug and is
   not one: `0x9CC` runs vanilla's Joshua/Natasha scene, and because Hlin Trollbane's bust is
   dressed onto the Natasha slot the player watches *Hlin* talk to *vanilla Joshua*.
