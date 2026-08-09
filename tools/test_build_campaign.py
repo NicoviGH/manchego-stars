@@ -1644,6 +1644,20 @@ class Ch05ReliquaryVisits(unittest.TestCase):
             self.assertNotIn(fid, spoken_for,
                              '%s is already another chapter\'s speaker' % fid)
 
+    def test_every_dressed_slot_gets_its_geometry_normalized(self):
+        """Dressing a slot and normalizing its mouth/eye window are two steps, and missing the
+        second is SILENT -- green build, passing scenario, corrupted face. It shipped that way
+        for the ch02 chwinga and for three of the four ch05 residents: the engine painted the
+        blink/talk overlay at the vanilla character's mouth coords, smearing a block of skull
+        over the eye sockets. Whatever the next dressed slot is, it has to land in this set.
+        """
+        normalized = set(bc.dressed_portrait_slots(self.CAMPAIGN))
+        for vid, (_mug, slot, _rc) in bc.CH05_VISIT_FACES.items():
+            self.assertIn(slot, normalized, '%s dresses %s but never normalizes it' % (vid, slot))
+        for slot in bc.CH02_CHWINGA_PORTRAIT_SLOT.values():
+            self.assertIn(slot, normalized, 'chwinga slot %s is dressed but not normalized' % slot)
+        self.assertLessEqual(set(bc.PORTRAIT_MAP.values()), normalized)
+
     def test_ch05_claims_the_ids_it_writes(self):
         """These sit OUTSIDE ch05's host block on purpose (see CH05_VILLAGE_SLOTS), which is
         exactly the shape of the #196 defect -- so the claim is what makes it legal."""

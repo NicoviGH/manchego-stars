@@ -799,6 +799,31 @@ def dressed_guest_slots(campaign):
             if os.path.isfile(os.path.join(_bust_dir(campaign), unit + '.png'))]
 
 
+def dressed_portrait_slots(campaign):
+    """EVERY vanilla portrait slot this build overwrites -- cast, guests, the ch02 chwinga and
+    the ch05 reliquary residents.
+
+    This exists because dressing a slot and normalizing its mouth/eye geometry are two separate
+    steps, and for a long time the second one only knew about the first two groups. A slot that
+    is dressed but NOT normalized keeps the vanilla character's mouth window, so the engine
+    paints its blink/talk overlay at the old face's coordinates -- over ours. It does not fail
+    the build, it does not fail a scenario, and on a face whose mouth happens to sit near
+    vanilla's it is invisible; on the other three ch05 residents it smeared a block of skull
+    across the eye sockets and doubled the teeth (Nicolas spotted it, 2026-08-09). The ch02
+    chwinga had been shipping the same defect unnoticed.
+
+    Conditioned on the asset actually existing, like dressed_guest_slots: normalizing a slot we
+    did NOT dress would misalign the vanilla face still sitting in it.
+    """
+    slots = set(PORTRAIT_MAP.values()) | set(dressed_guest_slots(campaign))
+    if os.path.isfile(os.path.join(_bust_dir(campaign), CH02_CHWINGA_SPRITE_SRC + '.png')):
+        slots |= set(CH02_CHWINGA_PORTRAIT_SLOT.values())
+    vendor = os.path.join(_bust_dir(campaign), 'vendor')
+    slots |= {slot for mug, slot, _rc in CH05_VISIT_FACES.values()
+              if os.path.isfile(os.path.join(vendor, mug))}
+    return sorted(slots)
+
+
 def inject_portraits(campaign, verbose=True):
     """Overwrite each mapped vanilla portrait slot with our authored bust."""
     bust_dir = _bust_dir(campaign)
@@ -839,8 +864,12 @@ def inject_portraits(campaign, verbose=True):
 def patch_portrait_geometry(campaign, verbose=True):
     """Normalize the mouth/eye window coords of every dressed portrait slot to our
     bust framing, so the engine's mouth-window overwrite lands on our baked mouth
-    (not one tile off, which doubles it). See PORTRAIT_GEOMETRY."""
-    slots = sorted(set(PORTRAIT_MAP.values()) | set(dressed_guest_slots(campaign)))
+    (not one tile off, which doubles it). See PORTRAIT_GEOMETRY.
+
+    The slot list MUST be `dressed_portrait_slots` -- every slot we overwrite, not just the
+    cast. Missing one is silent: the build is green, the scenario passes, and the face is
+    quietly corrupted in-game. Read that function's docstring before narrowing this."""
+    slots = dressed_portrait_slots(campaign)
     with open(PORTRAIT_DATA_C, encoding='utf-8') as f:
         lines = f.read().split('\n')
     # FaceData tail: `, 0, xMouth, yMouth, xEyes, yEyes, FACE_BLINK_*`. The `, 0,`
@@ -7716,7 +7745,13 @@ CH05_VILLAGE_SLOTS = {
 # warm human cottage (lit hearth, cooking pot) behind a skeleton in a frozen elven tomb. Same
 # defect ch04 shipped and fixed (a summer forest in a snowbound fog chapter, Nicolas 2026-08-05):
 # a retile inherits the twin's BACKDROP too, and the twin's backdrop is about the twin's setting.
-CH05_VISIT_BG = 'BG_STONE_CHAMBER'  # a bare stone room -- these four stand in a tomb, not a house
+CH05_VISIT_BG = 'BG_INTERIOR_BROWN'  # Nicolas's pick 2026-08-09, chosen off an in-engine
+                                    # four-way (stone chamber / house / interior brown /
+                                    # black temple): the map draws these sites as BUILDINGS,
+                                    # so the interior should read as somewhere you stepped
+                                    # INTO. BG_HOUSE's lit hearth and cooking pot are a
+                                    # kitchen; the black temple is draped in green vines,
+                                    # wrong for two years of unbroken winter.
 # The four residents' BUSTS. The sites are a TOMB, so the speakers are the tomb's own risen dead
 # (Nicolas, 2026-08-08) and every one needs a face FE8 does not ship -- there is no undead mug in
 # the base ROM (checked the whole FID table; the closest is a plain villager).
