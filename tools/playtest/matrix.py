@@ -2,8 +2,16 @@
 """The playtest matrix runner (#231, #222 workstream 1).
 
 One command runs a grouped live regression matrix: every ROM configuration is
-built at most once, its scenarios run sequentially, and the run ends in a compact
+built at most once, its scenarios run concurrently, and the run ends in a compact
 verdict table plus artifacts on disk.
+
+Two things keep it quick, both of which matter because the full matrix used to cost
+7+ minutes and so got skipped or over-run:
+  * a ROM CACHE keyed on everything the ROM is built FROM -- a harness-only change
+    reuses all four builds instead of remaking them (~170s);
+  * scenarios CAN run in parallel within a configuration (--jobs), though it is off
+    by default -- measured, and it does not pay here. See execute().
+Use `make matrix SUITE=<chapter>` while iterating; the full matrix is the push gate.
 
     make matrix                        # the merge gate
     make matrix SUITE=ch04             # everything ch04, one build
@@ -23,9 +31,11 @@ state. A badly ordered matrix costs far more than a duplicate `make`.
 """
 import argparse
 import fnmatch
+import glob
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -253,12 +263,46 @@ class Report(object):
                 'outcomes': [o.as_dict() for o in self.outcomes]}
 
 
-def execute(groups, build, run_scenario):
+def scenario_lanes(scenarios):
+    """Split a group's scenarios into (parallel_safe, serial) lists.
+
+    Scenarios are independent mGBA runs against an already-built ROM, each writing its own
+    `/tmp/playtest-<name>` -- so within one ROM configuration they can run concurrently.
+    The exception is a CHECKPOINT: `states/<name>.ss` is a shared file that a scenario will
+    MINT if it is missing or stale for this ROM build, so two scenarios wanting the same
+    checkpoint would race to write it. Those run serially, one checkpoint at a time.
+
+    (Today every scenario in the gate suite is checkpoint-free, so the gate parallelises
+    whole. The split exists so a future checkpointed scenario cannot silently corrupt a
+    state file the moment somebody adds it to a suite.)
+    """
+    parallel, serial = [], []
+    for s in scenarios:
+        (serial if s.checkpoint else parallel).append(s)
+    return parallel, serial
+
+
+def execute(groups, build, run_scenario, jobs=1):
     """Run the plan. `build` and `run_scenario` are injected so the ordering and
     aggregation logic is testable without a ROM or an emulator.
 
     A failed build blocks only its own group: the rest of the matrix still runs,
     because one broken configuration should not hide the state of the others.
+
+    `jobs` > 1 runs a group's checkpoint-free scenarios concurrently. BUILDS always stay
+    serial and never overlap a run: the tree holds ONE `fireemblem8.gba`, so a second `make`
+    would swap the ROM out from under a live emulator (and two builds in one tree corrupt
+    each other outright -- see CLAUDE.md).
+
+    **`jobs` DEFAULTS TO 1 BECAUSE PARALLELISM WAS MEASURED AND DOES NOT PAY HERE** (2026-08-09,
+    8 logical / 4 performance cores). Scenarios run mGBA at `fps: 240` -- deliberately
+    unthrottled, so each one is CPU-bound and already saturates a core. Four at a time simply
+    divided the same throughput: individual scenarios went 10s -> 67s, total wall did NOT move
+    (444s serial vs 439s at jobs=4), and four scenarios blew their WALL-CLOCK deadlines and
+    reported ERROR/FAIL -- turning contention into false red. A gate that fails at random is
+    worse than a slow one. The knob stays because a machine with many more real cores could
+    make it pay, but prove it with a measurement before raising the default. The speed win that
+    DID land is the ROM cache below.
     """
     outcomes = []
     built = []
@@ -270,8 +314,14 @@ def execute(groups, build, run_scenario):
                 outcomes.append(Outcome(s.name, group.rom, 'BLOCKED', 0.0, '',
                                         'ROM configuration %s failed to build' % group.rom))
             continue
-        for s in group.scenarios:
-            outcomes.append(run_scenario(s))
+        parallel, serial = scenario_lanes(group.scenarios)
+        if jobs > 1 and len(parallel) > 1:
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=min(jobs, len(parallel))) as pool:
+                outcomes.extend(pool.map(run_scenario, parallel))
+        else:
+            outcomes.extend(run_scenario(s) for s in parallel)
+        outcomes.extend(run_scenario(s) for s in serial)
     return Report(outcomes, builds=len(built),
                   duplicate_builds=len(built) - len(set(built)),
                   seconds=time.time() - started)
@@ -385,7 +435,110 @@ def check_rom(manifest, scenario, stamp_path=None):
 
 # -- live wiring ------------------------------------------------------------
 
-def _build(rom, make_flags, log_dir, quiet=True):
+# -- ROM cache --------------------------------------------------------------
+#
+# The tree holds ONE fireemblem8.gba, so a 4-configuration matrix rebuilds four times even
+# when nothing that feeds a ROM has changed -- and a harness-only edit (very common: three in
+# one afternoon) paid ~170s of `make` to produce four byte-identical files. The cache keeps a
+# built ROM per (configuration, input hash) and copies it back into place instead.
+#
+# WHAT COUNTS AS AN INPUT is the whole safety argument: anything the ROM is built FROM. The
+# campaign data, the injectors and engine sources, the Makefile, the make flags, and the
+# DECOMP HEAD (our decomp edits are build artifacts restored from HEAD each build, so the
+# commit is the real input). `harness.lua`, `matrix.py` and `matrix.yaml` are deliberately
+# absent -- they drive the emulator, never the ROM, which is exactly the case this speeds up.
+# The ROM lands INSIDE the submodule (the top-level target delegates: `make -C
+# fireemblem8u fireemblem8.gba`), while the config stamp is written at the repo root.
+# Getting this pair wrong is silent -- store_cached_rom just finds nothing to copy and
+# every run rebuilds, which is exactly how the first cut of this cache did nothing.
+ROM_PATH = os.path.join(REPO, 'fireemblem8u', 'fireemblem8.gba')
+STAMP_PATH = os.path.join(REPO, '.build-config.json')
+ROM_CACHE_DIR = os.path.join(REPO, '.matrix-romcache')
+ROM_INPUT_PATHS = ('campaigns', 'engine', 'tools/inject', 'tools/build_campaign.py',
+                   'tools/portrait_tool.py', 'tools/feditor_to_banim.py', 'Makefile')
+
+
+def rom_input_hash(make_flags):
+    """A digest of everything the ROM is built from, for cache keying.
+
+    Files are fingerprinted by (path, size, mtime_ns) rather than content: hashing the whole
+    campaign tree on every run would cost more than it saves, and the failure mode is the safe
+    one -- a touched-but-identical file forces a needless REBUILD, never a stale ROM. The
+    unsafe direction (edited content landing on a byte-identical size AND timestamp) does not
+    happen with real editors or with git.
+    """
+    import hashlib
+    h = hashlib.sha256()
+    h.update(('flags:' + ' '.join(make_flags) + '|campaign:' + CAMPAIGN + '\n').encode())
+    try:
+        head = subprocess.check_output(['git', '-C', os.path.join(REPO, 'fireemblem8u'),
+                                        'rev-parse', 'HEAD'], stderr=subprocess.DEVNULL)
+        h.update(b'decomp:' + head)
+    except (subprocess.CalledProcessError, OSError):
+        return None             # cannot pin the decomp -> refuse to cache rather than guess
+    for rel in ROM_INPUT_PATHS:
+        path = os.path.join(REPO, rel)
+        if os.path.isfile(path):
+            files = [path]
+        elif os.path.isdir(path):
+            files = [os.path.join(root, name)
+                     for root, dirs, names in os.walk(path)
+                     for name in names
+                     if not name.startswith('.')
+                     and not any(d in root for d in ('__pycache__', '.git'))]
+        else:
+            continue
+        for f in sorted(files):
+            try:
+                st = os.stat(f)
+            except OSError:
+                continue
+            h.update(('%s|%d|%d\n' % (os.path.relpath(f, REPO), st.st_size,
+                                      st.st_mtime_ns)).encode())
+    return h.hexdigest()[:32]
+
+
+def _cache_slot(rom, digest):
+    return os.path.join(ROM_CACHE_DIR, '%s-%s' % (rom, digest))
+
+
+def restore_cached_rom(rom, digest):
+    """Copy a cached ROM (and its build stamp) into the tree. True if it was there."""
+    if digest is None:
+        return False
+    slot = _cache_slot(rom, digest)
+    gba, stamp = slot + '.gba', slot + '.json'
+    if not (os.path.isfile(gba) and os.path.isfile(stamp)):
+        return False
+    shutil.copyfile(gba, ROM_PATH)
+    shutil.copyfile(stamp, STAMP_PATH)
+    return True
+
+
+def store_cached_rom(rom, digest):
+    """Snapshot the freshly built ROM + its stamp under this input digest."""
+    if digest is None:
+        return
+    if not (os.path.isfile(ROM_PATH) and os.path.isfile(STAMP_PATH)):
+        return                  # nothing to cache (stamp is what run.sh checks the ROM against)
+    gba, stamp = ROM_PATH, STAMP_PATH
+    os.makedirs(ROM_CACHE_DIR, exist_ok=True)
+    slot = _cache_slot(rom, digest)
+    shutil.copyfile(gba, slot + '.gba')
+    shutil.copyfile(stamp, slot + '.json')
+    for old in glob.glob(os.path.join(ROM_CACHE_DIR, '%s-*' % rom)):
+        if not os.path.basename(old).startswith('%s-%s' % (rom, digest)):
+            try:
+                os.remove(old)  # one slot per configuration: the cache tracks HEAD, not history
+            except OSError:
+                pass
+
+
+def _build(rom, make_flags, log_dir, quiet=True, use_cache=True):
+    digest = rom_input_hash(make_flags) if use_cache else None
+    if restore_cached_rom(rom, digest):
+        print('== %s: cached ROM reused (no ROM input changed)' % rom)
+        return True
     cmd = ['make', 'CAMPAIGN=' + CAMPAIGN] + list(make_flags) + [
         'fireemblem8.gba', '-j%d' % (os.cpu_count() or 4)]
     print('== building %s: %s' % (rom, ' '.join(cmd)))
@@ -396,6 +549,7 @@ def _build(rom, make_flags, log_dir, quiet=True):
     if proc.returncode != 0:
         print('   BUILD FAILED -- see %s' % log_path)
         return False
+    store_cached_rom(rom, digest)
     return True
 
 
@@ -471,9 +625,14 @@ def cmd_run(args):
     if args.dry_run:
         return 0
 
+    jobs = args.jobs if args.jobs else int(os.environ.get('MX_JOBS', '1'))
+    use_cache = not (args.no_rom_cache or os.environ.get('MX_NO_ROM_CACHE'))
+    if jobs > 1:
+        print('matrix: running up to %d scenarios at a time (builds stay serial)' % jobs)
     report = execute(groups,
-                     build=lambda rom, flags: _build(rom, flags, log_dir),
-                     run_scenario=lambda s: _run_scenario(s, log_dir))
+                     build=lambda rom, flags: _build(rom, flags, log_dir, use_cache=use_cache),
+                     run_scenario=lambda s: _run_scenario(s, log_dir),
+                     jobs=jobs)
     print('')
     print(render_table(report))
     if not report.ok:
@@ -529,6 +688,11 @@ def main(argv=None):
     run.add_argument('--rom', help='force one ROM config (needed for chapter-generic scenarios)')
     run.add_argument('--out', default='/tmp/playtest-matrix')
     run.add_argument('--dry-run', action='store_true')
+    run.add_argument('--jobs', type=int, default=None,
+                     help='scenarios to run at a time within one ROM config (default 1, '
+                          'or MX_JOBS). MEASURED AND OFF BY DEFAULT -- see execute()')
+    run.add_argument('--no-rom-cache', action='store_true',
+                     help='always `make`, never reuse a cached ROM (or MX_NO_ROM_CACHE=1)')
     run.set_defaults(fn=cmd_run)
 
     res = sub.add_parser('resolve', help='emit shell assignments for run.sh')
