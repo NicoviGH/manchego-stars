@@ -1716,6 +1716,157 @@ class Ch05ReliquaryVisits(unittest.TestCase):
         self.assertIn((152, 112, 72), south_rgb, 'the skull shading was recoloured away')
 
 
+class Ch05VillageRaidRace(unittest.TestCase):
+    """ch05's declared structure: the eruption's dead race the party for the four reliquaries,
+    and saving all four pays out (#25). Vanilla Ch5 is the reference for both halves -- it wires
+    the same four tiles on EVFLAG_TMP(8..11), sends all six of its reinforcements in on AI_B_04
+    (PillageThenPursue), and gates a Guiding Ring on four CHECK_EVENTIDs at the ending.
+
+    None of it was wired here while the YAML claimed it was, so every test in this class pins a
+    piece that shipped absent rather than wrong.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+
+    def test_each_reliquary_owns_an_event_id_ch05_does_not_already_spend(self):
+        """We cannot copy vanilla's 8..11. ch05's opening ends on ENUT(8) -- which is
+        EvtSetFlag, not un-trigger, and a vanilla prep idiom (ch12a/ch18a) -- and the Sahnar
+        Talk holds 7. A site on either would start the chapter already visited: its VILL and its
+        raider hook both disarmed, and the payout counting a door nobody opened."""
+        flags = bc.CH05_VILLAGE_FLAGS
+        self.assertEqual(set(flags), {v['id'] for v in self._chap()['villages']},
+                         'every reliquary needs an id, and only the reliquaries')
+        self.assertEqual(len(set(flags.values())), len(flags), 'two sites share one flag')
+        self.assertNotIn('0', flags.values(), 'flag 0 is EVFLAG_ALWAYS_FALSE')
+        for spent in (bc.CH05_SAHNAR_TALK_FLAG, 'EVFLAG_TMP(8)'):
+            self.assertNotIn(spent, flags.values(),
+                             '%s is already spent elsewhere in ch05' % spent)
+
+    def test_the_location_list_arms_every_reliquary_with_its_flag(self):
+        """Declaring the flags is not wiring them. The Location list is the only place the
+        engine reads them, and it shipped `Village(0, ..)` for all four."""
+        body = bc.ch05_location_events(self._chap())
+        for vid, flag in bc.CH05_VILLAGE_FLAGS.items():
+            self.assertIn('Village(%s, %s,' % (flag, bc.CH05_VILLAGE_SLOTS[vid][0]), body)
+        self.assertNotIn('Village(0,', body, 'an unflagged site cannot be raided or counted')
+        self.assertIn('Armory(', body)        # the elven store rides the same list
+        self.assertIn('Vendor(', body)
+
+    def _changes(self):
+        return bc.ch05_map_changes(self._chap(), self._maps_dir())
+
+    def _maps_dir(self):
+        return os.path.join(bc.REPO, 'campaigns', self.CAMPAIGN, 'maps')
+
+    def _tileset(self):
+        import map_tileset_tool as mt
+        return mt._tileset_from_dir(os.path.join(self._maps_dir(), 'tilesets', bc.CH05_TILESET))
+
+    def test_a_raided_site_is_ruined_across_vanillas_own_footprint(self):
+        """AiPillageAction looks the change up at (x, y - 1) -- the tile ABOVE the door, where
+        Village()'s destruction LOCA sits -- so a change on the door alone is never found and
+        the site survives its own sacking. Vanilla answers with a 3x2 at (x-1, y-1), which
+        covers the lookup tile AND the door, and we inherit its footprint with its geometry."""
+        changes = self._changes()
+        tileset, ruins = self._tileset(), bc.terrain_ids()['TERRAIN_RUINS_REGULAR']
+        for village in self._chap()['villages']:
+            x, y = village['tile']
+            block = [c for c in changes if (c[0], c[1]) == (x - 1, y - 1)]
+            self.assertEqual(1, len(block), 'no ruin change for %r' % village['id'])
+            _x, _y, w, h, tiles, _why = block[0]
+            self.assertEqual((3, 2), (w, h))
+            self.assertEqual(6, len(tiles))
+            for m in tiles:
+                self.assertEqual(ruins, tileset.terrain(m),
+                                 'metatile %d is not ruins -- a "destroyed" site FE8 still '
+                                 'reads as a village stays lootable and visitable' % m)
+                self.assertFalse(bc._is_blank_metatile(tileset, m),
+                                 'ruin writes blank metatile %d' % m)
+
+    def test_a_visited_site_shuts_its_door(self):
+        changes = self._changes()
+        for village in self._chap()['villages']:
+            door = [c for c in changes if list(c[:4]) == village['tile'] + [1, 1]]
+            self.assertEqual(1, len(door), 'no door change for %r' % village['id'])
+            self.assertEqual(bc.terrain_ids()['TERRAIN_VILLAGE_CLOSED'],
+                             self._tileset().terrain(door[0][4][0]))
+
+    def test_the_ruins_are_registered_before_the_doors(self):
+        """Order is the whole correctness argument, and it is invisible in a screenshot.
+        GetMapChangeIdAt keeps the LAST region covering a tile (bmtrick.c), and the 3x2 ruin
+        overlaps its own door. Doors-first would make VISITING a site ruin the building."""
+        changes = self._changes()
+        doors = {tuple(v['tile']) for v in self._chap()['villages']}
+        last_ruin = max(i for i, c in enumerate(changes) if (c[0], c[1]) not in doors)
+        first_door = min(i for i, c in enumerate(changes) if (c[0], c[1]) in doors)
+        self.assertLess(last_ruin, first_door,
+                        'a door change ahead of a ruin change: visiting would ruin the site')
+
+    def test_every_eruption_wave_races_the_sites(self):
+        """Vanilla Ch5 sends ALL SIX of its reinforcements in on AI_B_04 -- three pairs, turns
+        2/6/8, every one a pillager. Ours spawn on those same three tile-pairs, so 'we do what
+        vanilla does' (Nicolas, 2026-08-09) means all three waves raid. Without a pillage AI on
+        the board nothing on the map can reach a reliquary and the race is prose."""
+        waves = [e for e in self._chap()['enemy_units'] if e.get('arrives_turn')
+                 and e['id'] != 'sahnar']
+        self.assertEqual(3, len(waves), 'ch05 has three eruption waves')
+        for wave in waves:
+            self.assertEqual('raider', wave.get('ai_pattern'),
+                             '%s does not race the reliquaries' % wave['id'])
+        self.assertEqual('{0x0, 0x4, 0x9, 0x0}', bc.CH05_AI['raider'],
+                         "vanilla Ch5's own raider AI, byte for byte (AI_B_04 = "
+                         'AiScr_AiB_PillageThenPursue)')
+
+    def test_a_raider_row_carries_the_pillage_ai_into_the_table(self):
+        rows = '\n'.join(bc.ch05_enemy_rows(self._chap(), arrives_turn=2, exclude=('sahnar',)))
+        self.assertIn('.ai = {0x0, 0x4, 0x9, 0x0},', rows)
+
+    # -- the payout: vanilla's Guiding-Ring-on-all-four, which is why the flags exist ---------
+    def test_the_bonus_is_withheld_unless_every_site_survived(self):
+        """Vanilla's shape exactly: one CHECK_EVENTID per site, each branching PAST the gift the
+        moment a flag is unset, so any single unset id skips the whole payout."""
+        body = bc.save_all_bonus_script({'a': 'EVFLAG_TMP(9)', 'b': 'EVFLAG_TMP(10)'},
+                                        'ITEM_GUIDINGRING')
+        self.assertEqual(2, body.count('CHECK_EVENTID('))
+        self.assertIn('CHECK_EVENTID(EVFLAG_TMP(9))', body)
+        self.assertIn('CHECK_EVENTID(EVFLAG_TMP(10))', body)
+        self.assertEqual(2, body.count('BEQ('), 'every check needs its own skip branch')
+        skip = re.search(r'BEQ\((0x[0-9A-F]+), EVT_SLOT_C, EVT_SLOT_0\)', body).group(1)
+        self.assertIn('LABEL(%s)' % skip, body)
+        self.assertLess(body.index('GIVEITEMTO'), body.index('LABEL(%s)' % skip),
+                        'the gift must sit INSIDE the branch it is gated by')
+
+    def test_the_bonus_goes_to_the_leader_not_the_last_unit_to_move(self):
+        """CHAR_EVT_ACTIVE_UNIT is the village idiom -- the unit who walked in. There is no
+        active unit at the ending, so the payout uses vanilla's CHAR_EVT_PLAYER_LEADER."""
+        body = bc.save_all_bonus_script({'a': 'EVFLAG_TMP(9)'}, 'ITEM_GUIDINGRING')
+        self.assertIn('SVAL(EVT_SLOT_3, ITEM_GUIDINGRING)', body)
+        self.assertIn('GIVEITEMTO(CHAR_EVT_PLAYER_LEADER)', body)
+
+    def test_ch05_pays_out_a_vanilla_item_at_its_ending(self):
+        """The bonus is vanilla Ch5's own Guiding Ring. It used to be a `crest-of-cold-iron`,
+        an item that existed in no table and was handed over by nothing -- and the campaign
+        renames items only for the Goodberry and Tourmaline (Nicolas, 2026-08-09)."""
+        bonus = self._chap()['economy']['save_all_bonus']
+        self.assertIn(bonus, bc.CH05_ITEM_IDS, 'the save-all bonus must be a real FE item')
+        self.assertEqual('ITEM_GUIDINGRING', bc.CH05_ITEM_IDS[bonus])
+        ending = bc.ch05_ending_script(self._chap())
+        self.assertEqual(4, ending.count('CHECK_EVENTID('), 'all four sites gate the payout')
+        self.assertIn('SVAL(EVT_SLOT_3, ITEM_GUIDINGRING)', ending)
+        self.assertTrue(ending.rstrip().endswith('ENDA\n}'))
+
+    def test_no_ch05_enemy_drops_anything(self):
+        """Vanilla Ch5 has ZERO droppers -- Saar included. Ravisin used to carry a `drops:`
+        block naming the crest, on a key the injector never reads, so it was decoration that
+        read like wiring."""
+        for enemy in self._chap()['enemy_units']:
+            self.assertNotIn('drops', enemy, '%s carries a dead `drops:` key' % enemy['id'])
+            self.assertNotIn('item_drop', enemy, '%s drops loot vanilla Ch5 never does'
+                             % enemy['id'])
+
+
 class Ch05RecruitIdentities(unittest.TestCase):
     """Basil and Sahnar are CAST MEMBERS, not scenery (#25).
 
@@ -2978,6 +3129,18 @@ class LocationEventsAreBuiltFromTheYaml(unittest.TestCase):
     def test_a_village_with_no_reward_says_so_rather_than_naming_an_item(self):
         body = bc.location_events(self.VILLAGES, self.SLOTS)
         self.assertIn('the line is the reward', body)
+
+    def test_a_village_given_an_event_id_carries_it_into_the_macro(self):
+        """The event id is the whole village-raid race (#25). `Village(eid, ..)` expands to the
+        VILL *and* a LOCA on the tile above -- the destruction hook AiPillageAction fires -- and
+        SearchAvailableEvent skips an entry whose flag is SET. So the flag is what records a
+        visit, what disarms the raider, and what the save-all payout later reads with
+        CHECK_EVENTID. Flag 0 is EVFLAG_ALWAYS_FALSE: CheckChapterFlag(0) returns 0 forever, so
+        a 0 village is never visited, never safe, and can never be counted."""
+        body = bc.location_events(self.VILLAGES, self.SLOTS,
+                                  flags={'a': 'EVFLAG_TMP(9)', 'b': 'EVFLAG_TMP(10)'})
+        self.assertIn('Village(EVFLAG_TMP(9), MS_Ch05VisitSouth, 12, 19)', body)
+        self.assertIn('Village(EVFLAG_TMP(10), MS_Ch05VisitNorth, 5, 1)', body)
 
     def test_shops_need_no_script_and_no_text(self):
         body = bc.location_events([], {}, (('Armory', 'ShopList_Event_Ch5Armory', 2, 1),

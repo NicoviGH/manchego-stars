@@ -6697,6 +6697,230 @@ scenarios.ch05village = function()
         "the south reliquary handed over its Dracoshield: %d -> %d in the party", before, after))
 end
 
+-- ch05raid (#25): can the party LOSE a reliquary? The chapter has declared a village-raid race
+-- since #196 -- "the eruption's dead race the party for the spread reward-sites" -- and for that
+-- whole time nothing on the map could reach one: every wave was `aggressive`, no site carried an
+-- event id, and ch05 registered no MapChange at all, so all four were safe for the whole chapter
+-- and ch05village/ch05reliquaries passed anyway. They only ever walk a unit to a door.
+--
+-- The verdict here is the TERRAIN, because terrain is what FE8 itself reads: CanUnitVisit
+-- (bmmenu.c) and gTerrainList_LootableVillages (cp_utility.c) both decide from it, so a site that
+-- has become RUINS_REGULAR is one the player cannot enter and a second raider will not revisit.
+-- Its event id staying UNSET is the other half -- TILE_COMMAND_20 changes the tile and sets
+-- nothing (eventinfo.c), which is exactly why a sacked site cannot count toward the save-all.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh ch05raid (needs a CH05BOOT=1 ROM).
+scenarios.ch05raid = function()
+    local SITE_X, SITE_Y = 12, 19          -- reliquary-south: vanilla's turn-2 pair spawns beside it
+    local VILLAGE_REGULAR, RUINS, DRACOSHIELD = 0x03, 0x25, 0x60
+    local SITE_FLAG = 10                   -- CH05_VILLAGE_FLAGS['reliquary-south']
+    if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
+    pokeFastConfig()
+    waitFor(function() return faction() == 0 and not menuOpen()
+        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    if terrainAt(SITE_X, SITE_Y) ~= VILLAGE_REGULAR then
+        return result("FAIL", string.format(
+            "reliquary-south (%d,%d) is terrain 0x%02X at turn 1, not a village -- nothing can "
+            .. "raid it and nothing can visit it", SITE_X, SITE_Y, terrainAt(SITE_X, SITE_Y)))
+    end
+    -- Hand the site to the raiders: never visit it, just give the turns back. The party sits at
+    -- the WEST spawn and the site is south-EAST, so idling does not contest the race.
+    for t = 1, 8 do
+        local phase = runEnemyPhase()
+        if phase == nil then
+            return result("FAIL", string.format("the enemy phase never returned on turn %d", t))
+        end
+        if phase == "gameover" then
+            shot("ch05raid-gameover")
+            return result("FAIL", string.format(
+                "the party died on turn %d before any raider reached a reliquary", t))
+        end
+        if terrainAt(SITE_X, SITE_Y) == RUINS then
+            -- Put the CAMERA on the site before the shot. The verdict below is a terrain byte,
+            -- and a terrain byte has been right while the tiles it names drew wrong; the frame
+            -- is the only thing that shows the ruin actually replaced the building.
+            cursorTo(SITE_X, SITE_Y)
+            wait(90)                -- the map scrolls to the cursor; capturing before it
+                                    -- arrives photographs wherever the fight happened to be
+            shot("ch05raid")
+            log(string.format("ch05raid: reliquary-south fell on turn %d", turn()))
+            for _, got in ipairs(collectedItems()) do
+                if got == DRACOSHIELD then
+                    return result("FAIL", "the site was sacked but its Dracoshield reached the "
+                        .. "party anyway -- a lost site must cost the player its gift")
+                end
+            end
+            if eventFlag(SITE_FLAG) then
+                return result("FAIL", string.format(
+                    "reliquary-south was RAIDED but its event id %d is set -- a sacked site "
+                    .. "would count toward the save-all payout", SITE_FLAG))
+            end
+            return result("PASS", string.format(
+                "reliquary-south was desecrated on turn %d: terrain 0x%02X -> 0x%02X, no gift, "
+                .. "flag %d unset", turn(), VILLAGE_REGULAR, RUINS, SITE_FLAG))
+        end
+    end
+    shot("ch05raid-unraided")
+    return result("FAIL", string.format(
+        "eight turns and reliquary-south still stands (terrain 0x%02X) -- no raider reached it, "
+        .. "so the race the chapter declares does not exist", terrainAt(SITE_X, SITE_Y)))
+end
+
+-- ch05crest (#25): the other half of the race -- saving all four PAYS OUT. Vanilla Ch5 gates a
+-- Guiding Ring on four CHECK_EVENTIDs at its ending and hands it to the player leader, outside
+-- the Village macro, because no single tile knows about the other three. ch05 awarded nothing at
+-- all while its YAML claimed the payout was "wired at inject_ch05".
+--
+-- The boss kill is scripted the ch03win way (park Ravisin next to a blue unit, poke her frail,
+-- strike) rather than routed: DefeatBoss means exactly one death has to land, and this scenario
+-- is about the PAYOUT wiring, not about whether the fight is winnable.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh ch05crest (needs a CH05BOOT=1 ROM).
+scenarios.ch05crest = function()
+    local SITES = {
+        { name = "north", x = 5,  y = 1,  item = 0x70, flag = 12 },
+        { name = "west",  x = 5,  y = 6,  item = 0x5D, flag = 11 },
+        { name = "east",  x = 12, y = 10, item = 0x0E, flag = 9  },
+        { name = "south", x = 12, y = 19, item = 0x60, flag = 10 },
+    }
+    local RAVISIN, GUIDING_RING = 0xb8, 0x68
+    if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
+    pokeFastConfig()
+    -- Take the tomb's teeth out for the duration. Saving all four sites scatters four units to
+    -- four corners of a map holding sixteen guardians plus the waves, and the first run died to
+    -- an enemy phase on turn 1 -- the party wiped, the game reached the title, and the scenario
+    -- reported "Ravisin is not in the red array", which is a true statement about a chapter that
+    -- was already over. This proves the PAYOUT WIRING, not that the race is survivable; whether
+    -- it is belongs to `make difficulty` and the human pass. Same class of shortcut as
+    -- clear_ch04's pokeHarmless, and it has to be re-applied because waves keep arriving.
+    local function disarmTheTomb()
+        for i = 0, 49 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) then pokeHarmless(r) end
+        end
+    end
+    local function heldRing()
+        for _, got in ipairs(collectedItems()) do
+            if got == GUIDING_RING then return true end
+        end
+        return false
+    end
+    local function settle()
+        return waitFor(function()
+            return faction() == 0 and not menuOpen()
+                and not procActive(SYM.ProcScr_StdEventEngine)
+                and controllerState() == "player_map_idle"
+        end, 3000, true)
+    end
+    waitFor(function() return faction() == 0 and not menuOpen()
+        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    -- Save all four. Raiders are on the board now, so this is a race the scenario has to WIN;
+    -- if a site falls first its flag never sets and the payout is correctly withheld, which
+    -- would read here as a failure to visit rather than as a payout bug.
+    for _, site in ipairs(SITES) do
+        if not settle() then
+            return result("FAIL", "the map never returned to player control before " .. site.name)
+        end
+        disarmTheTomb()
+        local ok, why = visitVillage(site.x, site.y, function()
+            return eventFlag(site.flag)
+        end)
+        if not ok then
+            return result("FAIL", string.format("%s (%d,%d): %s", site.name, site.x, site.y, why))
+        end
+    end
+    for _, site in ipairs(SITES) do
+        if not eventFlag(site.flag) then
+            return result("FAIL", string.format(
+                "%s was visited but event id %d never set -- the Village macro is still on "
+                .. "flag 0, so the payout can never count it", site.name, site.flag))
+        end
+    end
+    log("ch05crest: all four reliquaries saved; killing Ravisin for the ending")
+    -- She has to be ON THE MAP for any of this to mean anything, and that is asserted ONCE, here,
+    -- while the chapter is definitely still live. Inside the loop a missing Ravisin means the
+    -- opposite thing -- she died and the map tore down -- and conflating the two is what made the
+    -- first run report a setup error for a chapter it had already won.
+    if red(RAVISIN) == nil then
+        return result("FAIL", "Ravisin (pid 0xb8) is not in the red array")
+    end
+    -- Kill the boss. Same shape as ch03win: park her beside a live blue unit so chooseAttack
+    -- cannot pick a nearer target by mistake, and re-frail her each attempt in case of a whiff.
+    for t = 1, 4 do
+        local boss = red(RAVISIN)
+        if isDead(boss) or eventFlag(2) or heldRing() then break end   -- isDead(nil) is true
+        disarmTheTomb()
+        -- US_HIDDEN as well as US_UNSELECTABLE, and the extra bit is the whole lesson. Every
+        -- other scenario picks a mover with `state & 0x2` alone, which is right when the party
+        -- is standing still. Here the LAST village visit is still running when we go looking:
+        -- TILE_COMMAND_VISIT hides the visitor and writes its character number into gBmMapUnit
+        -- (eventinfo.c), so that unit is on the grid and in the array and cannot be selected.
+        -- Pressing A on it is an illegal input, which fails the run even though the payout it
+        -- was driving toward lands correctly -- exactly what the first two runs reported.
+        -- ...and they need a MELEE WEAPON in slot 0, or parking the boss next to them proves
+        -- nothing: unitAttackRange returns nil for a staff, and ch05 deploys two healers.
+        local hero, hmin, hmax = nil, nil, nil
+        for i = 0, 23 do
+            local u = unitAt(SYM.gUnitArrayBlue, i)
+            if u and not isDead(u) and (u.state & 0x3) == 0 and mapUnitAt(u.x, u.y) ~= 0 then
+                local mn, mx = unitAttackRange(u)
+                if mn and mn <= 1 and mx >= 1 then hero, hmin, hmax = u, mn, mx; break end
+            end
+        end
+        if hero == nil then
+            return result("FAIL", "no selectable blue unit with a melee weapon left to strike the boss")
+        end
+        pokeFrail(boss)
+        boss = red(RAVISIN)
+        local bossGrid = mapUnitAt(boss.x, boss.y)
+        local parked = false
+        for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+            local tx, ty = hero.x + d[1], hero.y + d[2]
+            if tx >= 0 and ty >= 0 and mapUnitAt(tx, ty) == 0 then
+                setMapUnit(boss.x, boss.y, 0)
+                emu:write8(boss.addr + 0x10, tx); emu:write8(boss.addr + 0x11, ty)
+                setMapUnit(tx, ty, bossGrid)
+                parked = true
+                break
+            end
+        end
+        if not parked then return result("FAIL", "no free tile beside a blue unit to park Ravisin") end
+        hero = blue(hero.charId) or hero        -- re-read: parking rewrote the grid around them
+        -- The engine's GRID, not our arithmetic, decides whether row 0 of the command menu is
+        -- Attack (#204). Pressing it anyway opens Item and Uses a vulnerary at full HP, which
+        -- is both an illegal input and a wasted turn.
+        if not canAttackFromHere(hero, hmin, hmax) then
+            log(string.format("ch05crest: attempt %d -- Ravisin parked at (%d,%d) is not in "
+                .. "[%d,%d] of the striker on (%d,%d) per gBmMapUnit; not pressing Attack",
+                t, red(RAVISIN) and red(RAVISIN).x or -1, red(RAVISIN) and red(RAVISIN).y or -1,
+                hmin, hmax, hero.x, hero.y))
+        elseif moveUnit(hero.x, hero.y, hero.x, hero.y) then
+            -- The second exit is not optional here. Ravisin's death IS the win (DefeatBoss on
+            -- her flagged defeat quote), so the ending starts on the killing blow and the actor
+            -- is never greyed out -- chooseAttack's default combat wait would sit there until it
+            -- timed out, and fail the run for the thing it was trying to cause.
+            chooseAttack(hero.addr, function() return eventFlag(2) or heldRing() end)
+        end
+        if isDead(red(RAVISIN)) or eventFlag(2) or heldRing() then break end
+        log(string.format("ch05crest: Ravisin survived attempt %d; running the enemy phase", t))
+        if runEnemyPhase() == "gameover" then
+            return result("FAIL", "the party died before Ravisin did")
+        end
+    end
+    if not (isDead(red(RAVISIN)) or eventFlag(2) or heldRing()) then
+        shot("ch05crest-boss-alive")
+        return result("FAIL", "could not kill Ravisin in 4 attempts")
+    end
+    -- The ring lands DURING the ending -- GIVEITEMTO runs three commands in, well before the dev
+    -- placeholder's MNTS wipes the unit arrays for the title -- so poll for it from the moment
+    -- she falls rather than reading the party once at the end.
+    local paid = heldRing() or waitFor(heldRing, 5400, true)
+    shot("ch05crest")
+    if not paid then
+        return result("FAIL", "all four reliquaries survived and Ravisin fell, but no Guiding "
+            .. "Ring reached the party -- the save-all payout never ran")
+    end
+    return result("PASS", "all four reliquaries saved -> the ending paid out its Guiding Ring")
+end
+
 -- ch04cottage (#24): the SECOND village at (1,11), whose reward is its line.
 -- The shipped bug was not a bad reward, it was NO VISIT: the tile was visitable-capable but had
 -- no Location entry, and FE8 runs the village off that event -- so the player saw a cottage they
