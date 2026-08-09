@@ -37,6 +37,10 @@ Source: **[Klokinator/FE-Repo](https://github.com/Klokinator/FE-Repo)** (communi
 | `Skeleton (Assassin)` portrait | Sahnar the spectral-skeleton blademaster — bust (hooded skeletal assassin; red hood recolored to the cast slate cloak; vendored at `campaigns/.../portraits/vendor/`) | **Glaceo** | F2E |
 | `Bonewalker (U) Specter` map sprite (stand + walk) | Sahnar map sprite base (cast-palette slate recolor, spectral glow dropped) | **Alexsplode** | F2E |
 | `[Skeleton-Custom] Specter` battle animation (sword) | Sahnar battle anim — VENDORED + WIRED (#25); the full 12-mode FE-native script imported verbatim by `feditor_to_banim` (101 frames), in its **native palette** (deliberately not recolored to her cloak). Assets at `campaigns/.../battle_anims/sahnar/` | **Alexsplode** | F2E |
+| `Cantor` portrait | ch05 reliquary-north resident — the tomb's cantor, who sang here when the place was an amphitheatre (dresses the `Man_Unused` slot; derived at build time by `inject_ch05_visit_faces`) | **Eden, L95** | F2E |
+| `Skeleton (Mage, version 1)` portrait | ch05 reliquary-west resident — the tomb's archivist (dresses `Villager_Young_Man`) | **L95, BladerDj** | F2E |
+| `Skeleton` portrait | ch05 reliquary-east resident — the tomb's quartermaster (dresses `Villager_Man_1`) | **L95** | F2E |
+| `Skeleton (Full Smile)` portrait | ch05 reliquary-south resident — the cheerful one (dresses `Villager_Man_2`; orange pauldrons recolored verdigris to separate him from the east resident, who is the same body with a different jaw) | **L95, Nokitrix** | F2E |
 
 (Each FE-Repo asset folder ships a `CREDITS.txt` — copy its exact line here when we lock the asset.)
 
