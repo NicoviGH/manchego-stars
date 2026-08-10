@@ -7615,13 +7615,12 @@ CH04_COTTAGE_SCRIPT, CH04_COTTAGE_MSG = CH04_VILLAGE_SLOTS['forest-cottage'][:2]
 # time so a re-retile cannot leave a stale tile number here.
 CH04_SNAG_POS = (4, 8)
 CH04_SNAG_SIZE = (1, 3)
-# The crossing is BRIDGE_REGULAR, not BRIDGE_SNAG. snowy-bern *declares* BRIDGE_SNAG (metatile
-# 36) but never painted it -- the tile is a single flat colour, and using it put a BLACK SQUARE in
-# the river (caught by looking at the frame; the terrain byte was perfectly correct, so no amount
-# of data-checking would have found it). Metatile 2 is the bridge this very map already lays over
-# this very river at (4,12), so the fallen trunk reads as a crossing that belongs here.
-CH04_SNAG_TERRAIN = ('TERRAIN_PLAINS', 'TERRAIN_BRIDGE_REGULAR', 'TERRAIN_PLAINS')
-CH04_SNAG_BRIDGE_TILE = 2       # preferred metatile for the crossing (see above)
+# snowy-bern now paints vanilla Ch4's complete 7 / 4 / 11 downed-log composition into its
+# matching free slots 7 / 36 / 11: snowy plains with trunk fragments, the felled trunk over
+# river water, then snowy plains again. Each preference is still validated against its TERRAIN
+# before use -- the art names the slot; the terrain remains the mechanical contract.
+CH04_SNAG_TERRAIN = ('TERRAIN_PLAINS', 'TERRAIN_BRIDGE_SNAG', 'TERRAIN_PLAINS')
+CH04_SNAG_TILES = (7, 36, 11)
 # ch04's goal strings (#207). Its goal donor is ch02's HOST slot, which inject_ch02 has already
 # rewritten by the time inject_ch04 runs -- so ch04 inherited ch02's window AND status ids and the
 # two wrote over each other (last injector wins; they happened to agree, which is why nothing
@@ -8384,8 +8383,8 @@ def ch04_map_changes(chap, maps_dir):
     x, y = CH04_SNAG_POS
     w, h = CH04_SNAG_SIZE
     changes = [(x, y, w, h,
-                [_snowy_metatile_for(tileset, t, prefer=CH04_SNAG_BRIDGE_TILE)
-                 for t in CH04_SNAG_TERRAIN],
+                [_snowy_metatile_for(tileset, terrain, prefer=metatile)
+                 for terrain, metatile in zip(CH04_SNAG_TERRAIN, CH04_SNAG_TILES)],
                 'the snag falls -> a crossing at (%d, %d)' % (x, y + 1))]
     changes += [(v['tile'][0], v['tile'][1], 1, 1,
                  [_snowy_metatile_for(tileset, 'TERRAIN_VILLAGE_CLOSED')],

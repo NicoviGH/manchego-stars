@@ -550,6 +550,154 @@ class TestSnowyBernBorrowedSnags(unittest.TestCase):
             hashlib.sha256(approved.tobytes()).hexdigest(),
         )
 
+    def test_paint_metatile_allocates_private_tiles_and_preserves_terrain(self):
+        from PIL import Image
+
+        with tempfile.TemporaryDirectory() as d:
+            stem = os.path.basename(d)
+            gfx = bytearray(32768)
+            cfg = bytearray(mt.CONFIG_SIZE)
+            pal = bytearray(320)
+            for color in range(16):
+                struct.pack_into('<H', pal, (16 + color) * 2,
+                                 color | (color << 5) | (color << 10))
+            cfg[8192 + 36] = 0x34
+            for entry in range(4096):
+                struct.pack_into('<H', cfg, entry * 2, 0)
+            for ext, data in (('4bpp', gfx), ('bin', cfg), ('gbapal', pal)):
+                with open(os.path.join(d, stem + '.' + ext), 'wb') as output:
+                    output.write(data)
+
+            paint = Image.new('RGB', (16, 16))
+            for y in range(16):
+                for x in range(16):
+                    value = 8 if (x + y) % 2 else 15
+                    channel = value << 3
+                    paint.putpixel((x, y), (channel, channel, channel))
+            source = os.path.join(d, 'paint.png')
+            paint.save(source)
+
+            tile_ids = mt.paint_metatile(d, 36, source, bank=1)
+            painted = mt._tileset_from_dir(d)
+
+            self.assertEqual(0x34, painted.terrain(36))
+            self.assertEqual({1}, {
+                entry >> 12 for entry in struct.unpack_from('<4H', painted.cfg, 36 * 8)
+            })
+            self.assertTrue(all(tile_id != 0 for tile_id in tile_ids))
+            self.assertEqual(list(paint.getdata()),
+                             list(painted.metatile_image(36).getdata()))
+
+    def test_paint_metatile_can_claim_an_unused_palette_bank(self):
+        from PIL import Image
+
+        with tempfile.TemporaryDirectory() as d:
+            stem = os.path.basename(d)
+            for ext, data in (('4bpp', bytes(32768)),
+                              ('bin', bytes(mt.CONFIG_SIZE)),
+                              ('gbapal', bytes(320))):
+                with open(os.path.join(d, stem + '.' + ext), 'wb') as output:
+                    output.write(data)
+            paint = Image.new('P', (16, 16), 1)
+            palette = [0] * 768
+            palette[3:6] = [80, 120, 160]
+            paint.putpalette(palette)
+            source = os.path.join(d, 'indexed.png')
+            paint.save(source)
+
+            mt.paint_metatile(d, 36, source, bank=4, write_bank=True)
+            painted = mt._tileset_from_dir(d)
+
+            self.assertEqual((80, 120, 160), painted.palettes[4][1])
+            self.assertEqual({4}, {
+                entry >> 12 for entry in struct.unpack_from('<4H', painted.cfg, 36 * 8)
+            })
+
+    def test_paint_metatile_rejects_the_derived_fog_half(self):
+        from PIL import Image
+
+        with tempfile.TemporaryDirectory() as d:
+            stem = os.path.basename(d)
+            for ext, data in (('4bpp', bytes(32768)),
+                              ('bin', bytes(mt.CONFIG_SIZE)),
+                              ('gbapal', bytes(320))):
+                with open(os.path.join(d, stem + '.' + ext), 'wb') as output:
+                    output.write(data)
+            source = os.path.join(d, 'indexed.png')
+            Image.new('P', (16, 16), 1).save(source)
+
+            with self.assertRaisesRegex(ValueError, 'lit palette bank'):
+                mt.paint_metatile(d, 36, source, bank=5, write_bank=True)
+
+    def test_reused_unreferenced_tile_is_not_overwritten_by_later_quadrants(self):
+        from PIL import Image
+
+        with tempfile.TemporaryDirectory() as d:
+            stem = os.path.basename(d)
+            gfx = bytearray(32768)
+            gfx[32:64] = bytes([0x11] * 32)  # tile 1 already holds solid index 1
+            cfg = bytearray(mt.CONFIG_SIZE)  # every metatile references tile 0
+            pal = bytearray(320)
+            for color in range(16):
+                struct.pack_into('<H', pal, (16 + color) * 2,
+                                 color | (color << 5) | (color << 10))
+            for ext, data in (('4bpp', gfx), ('bin', cfg), ('gbapal', pal)):
+                with open(os.path.join(d, stem + '.' + ext), 'wb') as output:
+                    output.write(data)
+
+            paint = Image.new('RGB', (16, 16))
+            for quadrant, value in enumerate((1, 2, 3, 4)):
+                channel = value << 3
+                for y in range((quadrant // 2) * 8, (quadrant // 2 + 1) * 8):
+                    for x in range((quadrant % 2) * 8, (quadrant % 2 + 1) * 8):
+                        paint.putpixel((x, y), (channel, channel, channel))
+            source = os.path.join(d, 'paint.png')
+            paint.save(source)
+
+            mt.paint_metatile(d, 36, source, bank=1)
+            painted = mt._tileset_from_dir(d)
+            self.assertEqual(list(paint.getdata()),
+                             list(painted.metatile_image(36).getdata()))
+
+    def test_down_log_strip_uses_the_vanilla_slots_and_native_snag_bank(self):
+        bern = mt._tileset_from_dir(SNOWY_BERN)
+        self.assertEqual([0x01, 0x34, 0x01],
+                         [bern.terrain(m) for m in (7, 36, 11)])
+        for metatile in (7, 36, 11):
+            entries = struct.unpack_from('<4H', bern.cfg, metatile * 8)
+            self.assertEqual({4}, {entry >> 12 for entry in entries})
+            self.assertGreater(
+                len(set(bern.metatile_image(metatile).convert('RGB').getdata())), 1,
+                'snowy-bern metatile %d is still flat' % metatile,
+            )
+
+    def test_bank_fragments_use_tile_67s_pattern_in_the_native_snag_palette(self):
+        bern = mt._tileset_from_dir(SNOWY_BERN)
+        snow = list(bern.metatile_image(67).convert('RGB').getdata())
+        wood = {bern.palettes[4][index] for index in (2, 11, 12, 13, 14)}
+        native = bern.palettes[4][1:]
+
+        def nearest(color):
+            return min(native, key=lambda candidate: sum(
+                (channel - other) ** 2 for channel, other in zip(color, candidate)))
+
+        for metatile in (7, 11):
+            pixels = list(bern.metatile_image(metatile).convert('RGB').getdata())
+            self.assertEqual(80, sum(pixel in wood for pixel in pixels),
+                             'metatile %d lost its vanilla wood silhouette' % metatile)
+            mismatches = [position for position, (pixel, base) in
+                          enumerate(zip(pixels, snow))
+                          if pixel not in wood and pixel != nearest(base)]
+            self.assertEqual([], mismatches,
+                             'metatile %d does not preserve tile 67\'s snow pattern' % metatile)
+
+    def test_down_log_does_not_replace_snowy_berns_shared_palette(self):
+        with open(os.path.join(SNOWY_BERN, 'snowy-bern.gbapal'), 'rb') as source:
+            self.assertEqual(
+                '981988938f3617803c9f75ddb1391d731c551873bf2b96e06ea13a0bfeed4a63',
+                hashlib.sha256(source.read()).hexdigest(),
+            )
+
 
 class TestVisitableTerrainSurvivesTheReskin(unittest.TestCase):
     """A retile may restyle a village; it may not stop it being a village.

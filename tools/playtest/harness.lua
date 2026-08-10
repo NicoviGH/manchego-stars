@@ -7012,11 +7012,10 @@ end
 scenarios.ch04snag = function()
     local SNAG_X, SNAG_Y = 4, 8
     local CROSS_X, CROSS_Y = 4, 9        -- the river row the trunk falls across
-    -- TERRAIN_BRIDGE_REGULAR (constants/terrains.h). NOT BRIDGE_SNAG: snowy-bern declares that
-    -- terrain on an unpainted metatile, so using it put a black square in the river with a
-    -- perfectly correct terrain byte. The crossing uses the bridge art this map already lays
-    -- over this river (#214).
-    local T_CROSSING = 19
+    -- TERRAIN_BRIDGE_SNAG (constants/terrains.h). snowy-bern now paints this native terrain with
+    -- the winterized center of vanilla's downed-log composition, replacing the old generic-bridge
+    -- workaround (#24).
+    local T_CROSSING = 0x34
     if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
     pokeFastConfig()
     waitFor(function() return faction() == 0 and not menuOpen()

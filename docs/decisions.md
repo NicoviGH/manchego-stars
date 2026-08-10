@@ -911,6 +911,27 @@ _Decided: 2026-08-02 (CLAUDE, #207 — investigation corrected the issue's origi
 **A map change picks its tiles by TERRAIN, and a declared terrain is not a painted tile.** ch04's Iron Axe exists because vanilla Ch4's village hands it over as the **tool for chopping a snag into a bridge** (`MSG_9B5` is that tutorial, copied 1:1 — Nicolas, 2026-08-02). Snags are natively attackable (`bmtrick.c` auto-adds a 20 HP `TRAP_OBSTACLE` on every `TERRAIN_SNAG` tile), but the bridge half is a **MapChange** applied by `UpdateObstacleFromBattle`, and `_retarget_host_chapter` zeroes `changeLayerId` for every hosted chapter — so ch04 had none and the axe had no job. Vanilla's own region and roles are copied (snag at (4,8), 1×3 → plains / crossing / plains, dropping the trunk across the river at (4,9)), along with the **visited-village door flip** we had never done. The ch03 chest/door emitter was **generalised, not copied**: `map_changes_asm(symbol, changes)` + `_inject_tile_changes`, with ch03 rebuilt on it — FE8 resolves a change by POSITION, so chests, doors and obstacles share one array. **Tiles are resolved by terrain name at build time, never hardcoded** (the reskin renumbers everything; #205 is the cautionary tale). The trap this cost a rebuild to find: **snowy-bern declares `TERRAIN_BRIDGE_SNAG` on metatile 36 but never painted it** — writing it put a *black square* in the river while every terrain byte read correctly and the in-engine assertion PASSED. Only looking at the frame caught it. So `_snowy_metatile_for` now skips blank metatiles and fails loudly when a terrain has no painted tile, a unit test asserts no map change writes one, and the crossing uses metatile 2 — the bridge this map already lays over this same river. **Corollary to "verify via data, not pixels": data proves a change FUNCTIONS, pixels prove it LOOKS like anything at all. A tile swap needs both.**
 _Decided: 2026-08-02 (Nicolas + CLAUDE, #214)._
 
+**The felled snag keeps vanilla's full three-tile silhouette, winterized in snowy-bern (#24).**
+The masonry fallback above was mechanically safe and visually wrong: chopping a tree made a
+stone bridge appear. Vanilla Ch4's change is a composed `7 / 4 / 11` picture -- wood fragments
+on the near bank, the trunk over water, then fragments on the far bank -- so snowy-bern now
+paints the same composition into its matching unused `7 / 36 / 11` slots. The grass pixels are
+replaced with snowy-bern snow; the wood silhouette is lifted intact and recoloured with the
+muted ramp from snowy-bern's upright snag 35. All three cells use Snowy Bern's existing lit
+palette bank 4; the shared palette stays byte-for-byte untouched. That matters under fog:
+tileset banks 5-9 are derived fog copies of lit banks 0-4, not spare authoring banks. The bank
+fragments preserve snow tile 67's pixel pattern and the center keeps the vanilla trunk/water
+silhouette, remapped only to colours already native to the snag palette.
+`paint-metatile` is the reusable authoring seam: it splits a 16x16 indexed PNG into 8x8 tiles,
+reuses byte-identical art, allocates only unreferenced tile ids, can claim an unused palette
+bank in the lit 0-4 half, rejects the derived fog half, and preserves terrain unless explicitly
+authored. Runtime still resolves each preferred
+slot through `_snowy_metatile_for`, so `7 / 36 / 11` is accepted only while it carries
+`PLAINS / BRIDGE_SNAG / PLAINS`. The enlarged binary round-trip render is
+`docs/demo/ch04-snowy-snag-bridge.png`; `ch04snag` remains the mechanism gate and an in-engine
+frame remains the art gate.
+_Decided: 2026-08-10 (Nicolas + Codex, #24; visual composition supplied by Nicolas)._
+
 **ch04 Stage 2c — the reveal cutscene reuses the turn-2 TurnEvent script (load + stage as one).** Following vanilla Ch4's `EventScr_089F199C` shape, the turn-2 script that already `LOAD1`s the reveal wave *also* stages it in ONE script (`CAMERA2` to the NW fog → `LOAD1`/`ENUN` → `MUSC` → `CUMO_CHAR` Lupin → stub beats → `EVBIT_T`), rather than a separate cutscene script — that's how vanilla does a reinforcement-with-scene. On-map (no `BACG`); the beats are faced map bubbles (`_script_to_message`) on Lupin (Duessel) + Marty (Seth). Two beats plant the parley: Lupin commands the pack (shows intelligence) and Marty flags "talk to it" — the cutscene *is* the parley teaching (no separate tutorial). **Stub lines + `SONG_TENSION` placeholder; Stage 4 finalizes dialogue + music via the dialogue-pass skill.** Dead Ch5 slots `EventScr_089F22A4` (reused) + msgs `0x9BB`/`0x9BC`.
 _Decided: 2026-07-21 (Nicolas + CLAUDE, ch04 slice #24, Stage 2c)._
 

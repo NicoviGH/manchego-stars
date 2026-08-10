@@ -129,6 +129,13 @@ class TestAwaitControllerState(unittest.TestCase):
 
 
 class TestPlaytestHarness(unittest.TestCase):
+    def test_ch04snag_accepts_the_native_fallen_snag_crossing(self):
+        harness = _read_harness()
+        body = _block(harness, 'scenarios.ch04snag = function()', '\n-- attackprobe')
+        self.assertIn('local T_CROSSING = 0x34', body,
+                      'the painted center metatile uses TERRAIN_BRIDGE_SNAG; the playtest '
+                      'must not retain the old generic-bridge workaround')
+
     def test_moose_recorder_wires_fast_setup_to_guaranteed_cleanup(self):
         with open(HARNESS, encoding='utf-8') as source:
             harness = source.read()

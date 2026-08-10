@@ -1429,8 +1429,10 @@ class Ch04RuntimeHost(unittest.TestCase):
         self.assertEqual((w, h), (1, 3))
         ids = bc.terrain_ids()
         tileset = self._bern()
-        self.assertEqual(ids['TERRAIN_BRIDGE_REGULAR'], tileset.terrain(tiles[1]),
-                         'the middle cell (the river row) must become a crossing')
+        self.assertEqual([7, 36, 11], tiles,
+                         'the snag must use vanilla Ch4\'s three-cell downed-log composition')
+        self.assertEqual(ids['TERRAIN_BRIDGE_SNAG'], tileset.terrain(tiles[1]),
+                         'the middle cell must remain a fallen snag, not a generic bridge')
         # ...and every tile it writes must be PAINTED. snowy-bern declares BRIDGE_SNAG on an
         # unpainted metatile; using it left a black square in the river with a perfectly correct
         # terrain byte, which no data check would have caught (#214).
