@@ -1440,6 +1440,27 @@ class Ch04RuntimeHost(unittest.TestCase):
             self.assertFalse(bc._is_blank_metatile(tileset, m),
                              'map change writes blank metatile %d' % m)
 
+    def test_preferred_snowy_metatile_must_be_painted(self):
+        """A preferred slot is only a hint: terrain-correct but blank art must fall back to
+        the first painted metatile, just like the ordinary terrain search."""
+        want = bc.terrain_ids()['TERRAIN_BRIDGE_SNAG']
+
+        class FakeTileset:
+            def terrain(self, metatile):
+                return want if metatile in (5, 7) else 0
+
+            def metatile_image(self, metatile):
+                pixels = [(0, 0, 0)] * 255
+                pixels.append((1, 1, 1) if metatile == 7 else (0, 0, 0))
+                image = Image.new('RGB', (16, 16))
+                image.putdata(pixels)
+                return image
+
+        self.assertEqual(
+            7,
+            bc._snowy_metatile_for(FakeTileset(), 'TERRAIN_BRIDGE_SNAG', prefer=5),
+        )
+
     def test_the_snag_change_covers_the_tile_that_is_actually_a_snag(self):
         """Pins the trap rather than today's answer: the engine adds the obstacle on the
         TERRAIN_SNAG tile (bmtrick.c) and looks the change up by that position, so a change

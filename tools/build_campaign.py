@@ -8361,7 +8361,8 @@ def _snowy_metatile_for(tileset, terrain_name, prefer=None):
     on an unpainted tile, and the terrain byte alone reads as correct while the map shows a hole.
     Fails loudly if the tileset cannot express the terrain with real art."""
     want = terrain_ids()[terrain_name]
-    if prefer is not None and tileset.terrain(prefer) == want:
+    if (prefer is not None and tileset.terrain(prefer) == want
+            and not _is_blank_metatile(tileset, prefer)):
         return prefer
     for m in range(1024):
         if tileset.terrain(m) == want and not _is_blank_metatile(tileset, m):

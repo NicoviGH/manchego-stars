@@ -74,7 +74,8 @@ the project credit entry is in `/CREDITS.md`.
 
 The Snag family comes from **FE8 Fields Remaster / Super Fields**, but that complete
 green-grass tileset is deliberately **not** retained as an alternate. Only the two
-approved Snag metatiles live in-tree, adapted to Snowy Bern's own palette bank 4.
+intact and three felled approved Snag metatiles live in-tree, adapted to Snowy Bern's own
+palette bank 4.
 Its source-family credit is recorded in `/CREDITS.md`.
 
 ## Add a tileset (#40)
