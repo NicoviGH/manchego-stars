@@ -270,6 +270,7 @@ def vanilla_layout_tileset_assets(dec, layout):
 CONFIG_SIZE = 9216          # 8192 B TSA + 1024 B terrain -- byte-identical to ours
 OBJECT_SHEET_PX = 256       # object PNG: 256x256 mode-P, 4-bit local pixel indices
 PALETTE_BANKS = 10          # FE8 map BG palette: 10 banks x 16 (the .gbapal 320 B)
+LIT_PALETTE_BANKS = 5       # banks 5-9 are derived fog copies, never TSA authoring banks
 
 
 def convert_object_png(png_path):
@@ -337,6 +338,114 @@ def import_febuilder_tileset(config_path, object_png, out_dir):
     return out_dir
 
 
+def paint_metatile(tileset_dir, metatile, png_path, bank, terrain=None,
+                   write_bank=False):
+    """Paint one 16x16 PNG into a vendored tileset without touching shared tiles.
+
+    Every source pixel must already be an exact colour in ``bank``. Existing 8x8
+    tiles are reused byte-for-byte; new quadrants claim tile ids that no metatile
+    references. The target's terrain byte is preserved unless ``terrain`` is given.
+    """
+    from PIL import Image
+
+    if not 0 <= metatile < NUM_METATILES:
+        raise ValueError('metatile must be in 0..%d' % (NUM_METATILES - 1))
+    if not 0 <= bank < LIT_PALETTE_BANKS:
+        raise ValueError('lit palette bank must be in 0..%d; banks %d..%d are derived fog copies'
+                         % (LIT_PALETTE_BANKS - 1, LIT_PALETTE_BANKS,
+                            PALETTE_BANKS - 1))
+    if terrain is not None and not 0 <= terrain <= 0xFF:
+        raise ValueError('terrain must be in 0..255')
+
+    ts = _tileset_from_dir(tileset_dir)
+    source = Image.open(png_path)
+    image = source.convert('RGB')
+    if image.size != (16, 16):
+        raise ValueError('%s must be exactly 16x16, got %s'
+                         % (png_path, image.size))
+
+    name = os.path.basename(tileset_dir.rstrip('/'))
+    pal_path = os.path.join(tileset_dir, name + '.gbapal')
+    with open(pal_path, 'rb') as palette_source:
+        palette_blob = bytearray(palette_source.read())
+    if write_bank:
+        if source.mode != 'P' or max(source.getdata()) > 15:
+            raise ValueError('--write-bank needs a mode-P PNG using indices 0..15')
+        used_elsewhere = any(
+            entry // 4 != metatile
+            and struct.unpack_from('<H', ts.cfg, entry * 2)[0] >> 12 == bank
+            for entry in range(NUM_METATILES * 4)
+        )
+        if used_elsewhere:
+            raise ValueError('palette bank %d is already used by another metatile' % bank)
+        rgb = source.getpalette() or []
+        rgb += [0] * (16 * 3 - len(rgb))
+        for index in range(16):
+            r, g, b = rgb[index * 3:index * 3 + 3]
+            struct.pack_into('<H', palette_blob, (bank * 16 + index) * 2,
+                             (r >> 3) | ((g >> 3) << 5) | ((b >> 3) << 10))
+        source_indices = list(source.getdata())
+    else:
+        palette_indices = {}
+        for index, color in enumerate(ts.palettes[bank]):
+            palette_indices.setdefault(color, index)
+        missing = sorted(set(image.getdata()) - set(palette_indices))
+        if missing:
+            raise ValueError('%s uses %d colour(s) outside snowy palette bank %d: %s'
+                             % (png_path, len(missing), bank, missing[:4]))
+        source_indices = [palette_indices[color] for color in image.getdata()]
+
+    painted = []
+    for sub in range(4):
+        ox, oy = (sub % 2) * 8, (sub // 2) * 8
+        raw = bytearray()
+        for y in range(8):
+            for x in range(0, 8, 2):
+                left = source_indices[(oy + y) * 16 + ox + x]
+                right = source_indices[(oy + y) * 16 + ox + x + 1]
+                raw.append(left | (right << 4))
+        painted.append(bytes(raw))
+
+    cfg = bytearray(ts.cfg)
+    gfx = bytearray(ts.gfx)
+    referenced = set()
+    for entry in range(NUM_METATILES * 4):
+        if metatile * 4 <= entry < metatile * 4 + 4:
+            continue
+        referenced.add(struct.unpack_from('<H', cfg, entry * 2)[0] & 0x3FF)
+    free = [tile for tile in range(1024) if tile not in referenced]
+
+    tile_ids = []
+    for raw in painted:
+        matches = [tile for tile in range(1024)
+                   if gfx[tile * 32:(tile + 1) * 32] == raw]
+        if matches:
+            tile = matches[0]
+            if tile in free:
+                free.remove(tile)
+        else:
+            if not free:
+                raise ValueError('tileset has no unreferenced 8x8 tile for new art')
+            tile = free.pop(0)
+            gfx[tile * 32:(tile + 1) * 32] = raw
+        tile_ids.append(tile)
+
+    for sub, tile in enumerate(tile_ids):
+        struct.pack_into('<H', cfg, metatile * 8 + sub * 2,
+                         tile | (bank << 12))
+    if terrain is not None:
+        cfg[8192 + metatile] = terrain
+
+    with open(os.path.join(tileset_dir, name + '.4bpp'), 'wb') as output:
+        output.write(gfx)
+    with open(os.path.join(tileset_dir, name + '.bin'), 'wb') as output:
+        output.write(cfg)
+    if write_bank:
+        with open(pal_path, 'wb') as output:
+            output.write(palette_blob)
+    return tile_ids
+
+
 def tmx_grid(tmx_path):
     """Metatile grid of a Tiled .tmx (the FE-Repo test-map format: 16px tiles,
     one layer, <tile gid=N/> entries, firstgid=1 -> metatile = gid - 1)."""
@@ -396,12 +505,24 @@ if __name__ == '__main__':
     r.add_argument('tmx')
     r.add_argument('out')
     r.add_argument('--zoom', type=int, default=2)
+    p = sub.add_parser('paint-metatile', help='paint one 16x16 PNG into a vendored '
+                       'tileset using private or byte-identical 8x8 tiles')
+    p.add_argument('tileset_dir')
+    p.add_argument('metatile', type=int)
+    p.add_argument('png')
+    p.add_argument('--bank', type=int, required=True)
+    p.add_argument('--terrain', type=lambda value: int(value, 0))
+    p.add_argument('--write-bank', action='store_true')
     args = ap.parse_args()
     if args.cmd == 'import':
         print(import_febuilder_tileset(args.config, args.object_png, args.out_dir))
     elif args.cmd == 'render-tmx':
         ts = _tileset_from_dir(args.tileset_dir)
         print(render_grid(ts, tmx_grid(args.tmx), args.out, zoom=args.zoom))
+    elif args.cmd == 'paint-metatile':
+        print(paint_metatile(args.tileset_dir, args.metatile, args.png,
+                             bank=args.bank, terrain=args.terrain,
+                             write_bank=args.write_bank))
     else:
         ts = _tileset_from_dir(args.tileset_dir)
         if args.cmd == 'atlas':

@@ -1429,14 +1429,37 @@ class Ch04RuntimeHost(unittest.TestCase):
         self.assertEqual((w, h), (1, 3))
         ids = bc.terrain_ids()
         tileset = self._bern()
-        self.assertEqual(ids['TERRAIN_BRIDGE_REGULAR'], tileset.terrain(tiles[1]),
-                         'the middle cell (the river row) must become a crossing')
+        self.assertEqual([7, 36, 11], tiles,
+                         'the snag must use vanilla Ch4\'s three-cell downed-log composition')
+        self.assertEqual(ids['TERRAIN_BRIDGE_SNAG'], tileset.terrain(tiles[1]),
+                         'the middle cell must remain a fallen snag, not a generic bridge')
         # ...and every tile it writes must be PAINTED. snowy-bern declares BRIDGE_SNAG on an
         # unpainted metatile; using it left a black square in the river with a perfectly correct
         # terrain byte, which no data check would have caught (#214).
         for m in tiles:
             self.assertFalse(bc._is_blank_metatile(tileset, m),
                              'map change writes blank metatile %d' % m)
+
+    def test_preferred_snowy_metatile_must_be_painted(self):
+        """A preferred slot is only a hint: terrain-correct but blank art must fall back to
+        the first painted metatile, just like the ordinary terrain search."""
+        want = bc.terrain_ids()['TERRAIN_BRIDGE_SNAG']
+
+        class FakeTileset:
+            def terrain(self, metatile):
+                return want if metatile in (5, 7) else 0
+
+            def metatile_image(self, metatile):
+                pixels = [(0, 0, 0)] * 255
+                pixels.append((1, 1, 1) if metatile == 7 else (0, 0, 0))
+                image = Image.new('RGB', (16, 16))
+                image.putdata(pixels)
+                return image
+
+        self.assertEqual(
+            7,
+            bc._snowy_metatile_for(FakeTileset(), 'TERRAIN_BRIDGE_SNAG', prefer=5),
+        )
 
     def test_the_snag_change_covers_the_tile_that_is_actually_a_snag(self):
         """Pins the trap rather than today's answer: the engine adds the obstacle on the
