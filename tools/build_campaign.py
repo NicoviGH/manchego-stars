@@ -62,6 +62,10 @@ from inject.hosts import (  # noqa: E402,F401
     HostedChapter, hosted_chapters, injector_chapters, undeclared_injectors)
 
 PORTRAIT_DIR = os.path.join(DECOMP, 'graphics', 'portrait')
+# Palette index 0 of an FE8 bust is the transparent key, and our authored busts all carry
+# magenta there (see campaigns/*/portraits/*.png). Named because _vendor_mug_to_bust has to
+# WRITE it, not just read it: a community mug arrives keyed on whatever green its artist used.
+PORTRAIT_TRANSPARENT_RGB = (255, 0, 255)
 CHARACTERS_C = os.path.join(DECOMP, 'src', 'data_characters.c')
 CLASSES_C = os.path.join(DECOMP, 'src', 'data_classes.c')
 CLASSES_H = os.path.join(DECOMP, 'include', 'constants', 'classes.h')
@@ -795,6 +799,31 @@ def dressed_guest_slots(campaign):
             if os.path.isfile(os.path.join(_bust_dir(campaign), unit + '.png'))]
 
 
+def dressed_portrait_slots(campaign):
+    """EVERY vanilla portrait slot this build overwrites -- cast, guests, the ch02 chwinga and
+    the ch05 reliquary residents.
+
+    This exists because dressing a slot and normalizing its mouth/eye geometry are two separate
+    steps, and for a long time the second one only knew about the first two groups. A slot that
+    is dressed but NOT normalized keeps the vanilla character's mouth window, so the engine
+    paints its blink/talk overlay at the old face's coordinates -- over ours. It does not fail
+    the build, it does not fail a scenario, and on a face whose mouth happens to sit near
+    vanilla's it is invisible; on the other three ch05 residents it smeared a block of skull
+    across the eye sockets and doubled the teeth (Nicolas spotted it, 2026-08-09). The ch02
+    chwinga had been shipping the same defect unnoticed.
+
+    Conditioned on the asset actually existing, like dressed_guest_slots: normalizing a slot we
+    did NOT dress would misalign the vanilla face still sitting in it.
+    """
+    slots = set(PORTRAIT_MAP.values()) | set(dressed_guest_slots(campaign))
+    if os.path.isfile(os.path.join(_bust_dir(campaign), CH02_CHWINGA_SPRITE_SRC + '.png')):
+        slots |= set(CH02_CHWINGA_PORTRAIT_SLOT.values())
+    vendor = os.path.join(_bust_dir(campaign), 'vendor')
+    slots |= {slot for mug, slot, _rc in CH05_VISIT_FACES.values()
+              if os.path.isfile(os.path.join(vendor, mug))}
+    return sorted(slots)
+
+
 def inject_portraits(campaign, verbose=True):
     """Overwrite each mapped vanilla portrait slot with our authored bust."""
     bust_dir = _bust_dir(campaign)
@@ -835,8 +864,12 @@ def inject_portraits(campaign, verbose=True):
 def patch_portrait_geometry(campaign, verbose=True):
     """Normalize the mouth/eye window coords of every dressed portrait slot to our
     bust framing, so the engine's mouth-window overwrite lands on our baked mouth
-    (not one tile off, which doubles it). See PORTRAIT_GEOMETRY."""
-    slots = sorted(set(PORTRAIT_MAP.values()) | set(dressed_guest_slots(campaign)))
+    (not one tile off, which doubles it). See PORTRAIT_GEOMETRY.
+
+    The slot list MUST be `dressed_portrait_slots` -- every slot we overwrite, not just the
+    cast. Missing one is silent: the build is green, the scenario passes, and the face is
+    quietly corrupted in-game. Read that function's docstring before narrowing this."""
+    slots = dressed_portrait_slots(campaign)
     with open(PORTRAIT_DATA_C, encoding='utf-8') as f:
         lines = f.read().split('\n')
     # FaceData tail: `, 0, xMouth, yMouth, xEyes, yEyes, FACE_BLINK_*`. The `, 0,`
@@ -3391,6 +3424,74 @@ def inject_ch02_chwinga_faces(campaign, verbose=True):
         names = ', '.join(display_name(by_id[uid]) for uid, _ in CH02_CHWINGA)
         print('  chwinga faces -> %s (shared green bust + names: %s)'
               % (', '.join(CH02_CHWINGA_PORTRAIT_SLOT.values()), names))
+
+
+def _vendor_mug_to_bust(path, recolor=None):
+    """A 128x112 FE-Repo mug sheet -> the 96x80 indexed bust portrait_tool.generate() wants.
+
+    The community sheets are one main frame at top-left plus speaking/blink frames; we take the
+    main frame only (our busts are static -- decisions.md, Art & Audio). The background key is
+    read from the CORNER PIXEL rather than hardcoded, because it is not one colour across the
+    repo: Glaceo's set keys on (123,162,115) and Eden/L95's on (160,200,152), and hardcoding
+    either silently leaves a green box behind the other artist's faces.
+
+    `recolor` maps source RGB -> replacement, applied before indexing, for pulling two mugs that
+    share a body apart (see CH05_VISIT_FACES).
+
+    FE8 portraits are 16 colours INCLUDING the transparent key, so index 0 is forced to magenta
+    and the rest follow. A mug that does not fit is a hard error, not a silent quantize: dithering
+    a pixel-art bust to fit would wreck the flats it is drawn in.
+    """
+    im = Image.open(path).convert('RGB').crop((0, 0, 96, 80))
+    key = im.getpixel((0, 0))
+    px = im.load()
+    for y in range(80):
+        for x in range(96):
+            colour = px[x, y]
+            if colour == key:
+                px[x, y] = PORTRAIT_TRANSPARENT_RGB
+            elif recolor and colour in recolor:
+                px[x, y] = recolor[colour]
+    colours = [c for _, c in im.getcolors(1 << 16)]
+    if len(colours) > 16:
+        sys.exit('ERROR: %s needs %d colours; an FE8 portrait holds 16 including the '
+                 'transparent key.' % (os.path.basename(path), len(colours)))
+    palette = ([PORTRAIT_TRANSPARENT_RGB]
+               + [c for c in colours if c != PORTRAIT_TRANSPARENT_RGB])
+    bust = Image.new('P', (96, 80))
+    bust.putpalette([v for c in palette for v in c] + [0] * (768 - 3 * len(palette)))
+    index = {c: i for i, c in enumerate(palette)}
+    bust.putdata([index[px[x, y]] for y in range(80) for x in range(96)])
+    return bust
+
+
+def inject_ch05_visit_faces(campaign, verbose=True):
+    """Dress the four reliquary residents' portrait slots with their vendored FE-Repo busts.
+
+    Without this the visits play FACELESS: `village_script` renders a bare `Text_BG`, and a
+    message with no `[LoadFace]` draws a boxless, unreadable line -- the same failure ch03's
+    grell quote hit. The mugs are Eden/L95's skeleton family, chosen over Glaceo's because they
+    read FRIENDLY (these four hand you gifts) and because Sahnar already IS a Glaceo, so hers
+    stays the somber face among them.
+    """
+    vendor = os.path.join(_bust_dir(campaign), 'vendor')
+    for vid, (mug, slot, recolor) in sorted(CH05_VISIT_FACES.items()):
+        path = os.path.join(vendor, mug)
+        if not os.path.isfile(path):
+            if verbose:
+                print('  (no %s; ch05 %s keeps its vanilla face)' % (mug, vid))
+            continue
+        tileset, mouth, chibi, pal_bytes = portrait_tool.generate(
+            _vendor_mug_to_bust(path, recolor), static_portrait=True)
+        base = os.path.join(PORTRAIT_DIR, 'portrait_' + slot)
+        tileset.save(base + '_tileset.png')
+        mouth.save(base + '_mouth.png')
+        chibi.save(base + '_chibi.png')
+        with open(base + '_palette.agbpal', 'wb') as f:
+            f.write(pal_bytes)
+    if verbose:
+        print('  ch05 reliquary residents -> %s'
+              % ', '.join(sorted(slot for _, slot, _ in CH05_VISIT_FACES.values())))
 
 
 def _donor_base(campaign, uid, guest_bases=None):
@@ -7623,17 +7724,60 @@ CH05_SAHNAR_TALK_FLAG = 'EVFLAG_TMP(7)'   # vanilla Ch5's own Natasha->Joshua CH
 # (HOSTED_CHAPTER_MESSAGE_IDS). ch05's authored dialogue skips this range exactly (it runs
 # 0x9BE..0x9CC then jumps to 0x9D5), so nothing collides.
 #
-# TEMPORARY, and only the PROSE is (Nicolas, 2026-08-07): the give-item half is the real wiring
-# and is already gated by assert_village_gifts_match_vanilla, so the rewards are obtainable and
-# correct now. The dialogue pass replaces each body AT THE SAME ID -- one line per site, not a
-# rewire -- and claims the ids in HOSTED_CHAPTER_MESSAGE_IDS when it does.
+# WRITTEN 2026-08-08 (dialogue-pass): the four bodies are ours now, at these same ids, and the
+# ids are CLAIMED in HOSTED_CHAPTER_MESSAGE_IDS. Writing outside ch05's own host block is
+# deliberate and safe, which is worth stating because the registry's whole point is that it
+# usually is NOT: 0x9CD..0x9D0 are vanilla Ch5's village lines, and the only scripts that ever
+# displayed them are `EventScr_089F2170` (which inject_ch04 REPLACES for its forest cottage) and
+# `EventScr_089F21BC`/`21F8`/`2234` (left in ch5-eventscript.h but unreferenced once inject_ch04
+# rewrites Ch5's Location list -- dead code, never run). Verified against HEAD, not assumed.
+# The alternative -- spending four of ch05's own 16-id block -- was rejected because the
+# remaining cutscene pass (#25) needs that block and HANDOFF already prices it as tight.
 CH05_VILLAGE_SLOTS = {
-    'reliquary-east':  ('MS_Ch05VisitEast',  0x9CD),   # vanilla's (12,10) line
-    'reliquary-south': ('MS_Ch05VisitSouth', 0x9CE),   # vanilla's (12,19) line
-    'reliquary-west':  ('MS_Ch05VisitWest',  0x9CF),   # vanilla's (5,6) line
-    'reliquary-north': ('MS_Ch05VisitNorth', 0x9D0),   # vanilla's (5,1) line
+    #  id                  event script          msg     mug
+    'reliquary-east':  ('MS_Ch05VisitEast',  0x9CD, '[FID_VillagerMan1]'),
+    'reliquary-south': ('MS_Ch05VisitSouth', 0x9CE, '[FID_VillagerMan2]'),
+    'reliquary-west':  ('MS_Ch05VisitWest',  0x9CF, '[FID_VillagerYoungMan]'),
+    'reliquary-north': ('MS_Ch05VisitNorth', 0x9D0, '[FID_ManUnused]'),
 }
-CH05_VISIT_BG = 'BG_HOUSE'          # vanilla's own village interior, as its village scripts use
+# A village visit paints the backdrop over the WHOLE screen, so this is not set dressing -- it is
+# where the scene appears to happen. Vanilla Ch5's villages use BG_HOUSE, and inheriting it put a
+# warm human cottage (lit hearth, cooking pot) behind a skeleton in a frozen elven tomb. Same
+# defect ch04 shipped and fixed (a summer forest in a snowbound fog chapter, Nicolas 2026-08-05):
+# a retile inherits the twin's BACKDROP too, and the twin's backdrop is about the twin's setting.
+CH05_VISIT_BG = 'BG_INTERIOR_BROWN'  # Nicolas's pick 2026-08-09, chosen off an in-engine
+                                    # four-way (stone chamber / house / interior brown /
+                                    # black temple): the map draws these sites as BUILDINGS,
+                                    # so the interior should read as somewhere you stepped
+                                    # INTO. BG_HOUSE's lit hearth and cooking pot are a
+                                    # kitchen; the black temple is draped in green vines,
+                                    # wrong for two years of unbroken winter.
+# The four residents' BUSTS. The sites are a TOMB, so the speakers are the tomb's own risen dead
+# (Nicolas, 2026-08-08) and every one needs a face FE8 does not ship -- there is no undead mug in
+# the base ROM (checked the whole FID table; the closest is a plain villager).
+#
+# SLOT CHOICE: each rides a vanilla portrait slot that is collision-free -- absent from our
+# ch00-08 and dressed by nothing else in this file. Villager_Man_3/4, Old_Man, Old_Woman,
+# Young_Boy and Woman are all SPOKEN FOR (ch02's fisher, ch03's crier, ch04's Nimsy and logger,
+# a prologue guest), so the free ones are Man_1, Man_2, Young_Man and the literally-unused
+# Man_Unused. Overwriting a slot's graphics is GLOBAL, so "free" has to mean free everywhere.
+#
+# DERIVED AT BUILD TIME from the vendored FE-Repo mug, the chwinga pattern -- no committed
+# derived asset, so the vendored PNG stays the single source. The two skeletons in orange
+# pauldrons are the SAME BODY with a different jaw, so the south one is recoloured verdigris or
+# the player meets the same man twice; only the two true oranges move, because the third tone in
+# that ramp is also the SKULL's shadow (y 10..72, vs the pauldrons' y>=52) and recolouring it
+# turns his teeth green.
+CH05_VISIT_ORANGE_TO_VERDIGRIS = {(192, 96, 48): (86, 138, 116), (136, 80, 56): (52, 92, 80)}
+CH05_VISIT_FACES = {
+    #  id                 vendored FE-Repo mug                                    slot            recolor
+    'reliquary-north': ('Cantor {Eden, L95} [F2E].png',                     'Man_Unused',        None),
+    'reliquary-west':  ('Skeleton (Mage, version 1) {L95, BladerDj} [F2E].png',
+                                                                            'Villager_Young_Man', None),
+    'reliquary-east':  ('Skeleton {L95} [F2E].png',                         'Villager_Man_1',    None),
+    'reliquary-south': ('Skeleton (Full Smile) {L95, Nokitrix} [F2E].png',   'Villager_Man_2',
+                        CH05_VISIT_ORANGE_TO_VERDIGRIS),
+}
 # The elven store (`economy.elven_store`). Armory/Vendor take their stock DIRECTLY -- no script,
 # no text -- so these are wired PERMANENTLY, not as placeholders. Stock is vanilla Ch5's own,
 # which is what `make difficulty CH=ch05` prices the shop tier against.
@@ -7712,7 +7856,11 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
     # YAML's `slot: "vanilla 0x9BB"` labels are anatomy references to the mined chapter, not
     # claims on ids. Only the goal strings are claimed here; the dialogue ids land with the
     # cutscene pass (#25), and this guard is what will refuse them if any collide.
-    'ch05': (CH05_GOAL_WINDOW_MSG, CH05_GOAL_STATUS_MSG),
+    # The four reliquary visit lines joined the block 2026-08-08 (dialogue-pass). They sit
+    # OUTSIDE ch05's host block on purpose -- see CH05_VILLAGE_SLOTS for why that is safe here
+    # and why spending ch05's own ids on them was the worse trade.
+    'ch05': (CH05_GOAL_WINDOW_MSG, CH05_GOAL_STATUS_MSG,
+             *(slot[1] for slot in CH05_VILLAGE_SLOTS.values())),
     # Goal ids only -- ch01/ch02 predate the per-chapter block registry, but their goal strings
     # still have to be unique against every other hosted chapter (#207).
     'ch01': (CH01_GOAL_WINDOW_MSG, CH01_GOAL_STATUS_MSG),
@@ -9573,12 +9721,11 @@ def inject_ch05(campaign, boot=False, verbose=True):
     #     still names them, the externs still exist, and the build dies at link time pointing at
     #     the reference rather than the loss. assert_event_scripts_defined catches the reorder.
     for village in chap.get('villages', []):
-        symbol, msg = CH05_VILLAGE_SLOTS[village['id']]
+        symbol, msg, _fid = CH05_VILLAGE_SLOTS[village['id']]
         declare_event_script(
             CH05_EVENTSCRIPT_H, symbol,
             village_script(msg, village_reward_item(village, CH05_ITEM_IDS), CH05_VISIT_BG),
-            'ch05 %s -- gift is ours, prose is vanilla 0x%X until the dialogue pass (#25)'
-            % (village['id'], msg))
+            'ch05 %s -- the resident\'s line (0x%X) then the gift' % (village['id'], msg))
     # 4c. The Basil->Sahnar Talk script the Character list points at. Same append-AFTER-the-bulk-
     #     write rule as the visits above -- declaring it earlier would have the block rewrite
     #     discard it, and the build would die at link time pointing at the CHAR entry rather
@@ -9599,6 +9746,16 @@ def inject_ch05(campaign, boot=False, verbose=True):
     set_message_body(lines, host['goal']['statusObjectiveTextId'],
                      name_message_body('Defeat ' + (boss.get('fe_name') or boss['name'])))
     set_message_body(lines, host['goal']['windowTextId'], goal_window_body('Defeat boss'))
+    # The four reliquary visits (#25). Each site's speaker is one of the tomb's risen dead, over
+    # BG_HOUSE -- a full-screen backdrop, so these wrap at 42 like the other BG scenes and NOT at
+    # the on-map bubble's 29. One `visit_text` entry per BOX, ch04's lesson: the authored A-press
+    # breaks are the pacing (27 boxes against vanilla Ch5's own 26), and a flowed scalar would
+    # reflow them to wherever 42 columns happen to land.
+    for village in chap['villages']:
+        _symbol, msg, fid = CH05_VILLAGE_SLOTS[village['id']]
+        set_message_body(lines, msg, _script_to_message(
+            [{'resident': box} for box in village_boxes(village)],
+            {'resident': ('[OpenMidLeft]', fid)}, width=42))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     _write_chapter_title_card(host, 'Ch.5: ' + chap['title'])
@@ -10112,6 +10269,7 @@ def main():
         chain_ch03_to_ch04()
         print('chapter 5 (#25):')
         inject_ch05(args.campaign, boot=args.ch05_boot)
+        inject_ch05_visit_faces(args.campaign)  # the four reliquary residents' skeleton busts
         chain_ch04_to_ch05()
         if args.ch05_boot:
             print('CH05 BOOT (playtest: New Game -> the Elven Tomb, party + foes deployed):')

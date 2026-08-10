@@ -12,6 +12,7 @@ import re
 import shutil
 import sys
 import tempfile
+import textwrap
 import unittest
 from unittest import mock
 
@@ -1601,6 +1602,118 @@ class Ch04RuntimeHost(unittest.TestCase):
         card = bc.gen_chapter_title.compose_title('Ch.4: The White Moose')
         self.assertEqual(card.size, (256, 16))
         self.assertIsNotNone(card.getbbox())
+
+
+class Ch05ReliquaryVisits(unittest.TestCase):
+    """The four reward sites are a TOMB, so their speakers are the tomb's own risen dead (#25).
+
+    Two things here can break silently and neither shows up in a build log: a resident's
+    portrait slot colliding with a cast member's (dressing a slot is GLOBAL, so the collision
+    would repaint someone else's face in another chapter), and the visit ids drifting out of
+    ch05's claim (the #196 defect, where a beat displayed an id another chapter writes).
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+
+    def test_every_site_has_a_line_and_a_face(self):
+        for village in self._chap()['villages']:
+            self.assertTrue(village.get('visit_text'),
+                            '%s has no line to show' % village['id'])
+            self.assertIn(village['id'], bc.CH05_VILLAGE_SLOTS)
+            self.assertIn(village['id'], bc.CH05_VISIT_FACES,
+                          '%s would play faceless -- a message with no [LoadFace] renders '
+                          'boxless' % village['id'])
+
+    def test_the_residents_ride_collision_free_portrait_slots(self):
+        """Overwriting a portrait slot's graphics is global, so 'free' has to mean free
+        everywhere -- not merely absent from PORTRAIT_MAP."""
+        slots = [slot for _, slot, _ in bc.CH05_VISIT_FACES.values()]
+        self.assertEqual(len(slots), len(set(slots)), 'two residents share one slot')
+        taken = (set(bc.PORTRAIT_MAP.values()) | set(bc.GUEST_PORTRAIT_MAP.values())
+                 | set(bc.CH02_CHWINGA_PORTRAIT_SLOT.values()))
+        self.assertFalse(set(slots) & taken,
+                         'a resident is dressing a slot someone else already wears')
+        # The villager mugs our other chapters SPEAK with, by FID -- ch02's fisher, ch03's
+        # crier, ch04's Nimsy and logger. Repainting one of those would change a face in a
+        # chapter that has nothing to do with the tomb.
+        spoken_for = {bc.CH02_FISHER_FID, bc.CH03_CRIER_FID, bc.CH04_NIMSY_FID,
+                      '[FID_VillagerMan3]'}
+        for _, _, fid in bc.CH05_VILLAGE_SLOTS.values():
+            self.assertNotIn(fid, spoken_for,
+                             '%s is already another chapter\'s speaker' % fid)
+
+    def test_every_dressed_slot_gets_its_geometry_normalized(self):
+        """Dressing a slot and normalizing its mouth/eye window are two steps, and missing the
+        second is SILENT -- green build, passing scenario, corrupted face. It shipped that way
+        for the ch02 chwinga and for three of the four ch05 residents: the engine painted the
+        blink/talk overlay at the vanilla character's mouth coords, smearing a block of skull
+        over the eye sockets. Whatever the next dressed slot is, it has to land in this set.
+        """
+        normalized = set(bc.dressed_portrait_slots(self.CAMPAIGN))
+        for vid, (_mug, slot, _rc) in bc.CH05_VISIT_FACES.items():
+            self.assertIn(slot, normalized, '%s dresses %s but never normalizes it' % (vid, slot))
+        for slot in bc.CH02_CHWINGA_PORTRAIT_SLOT.values():
+            self.assertIn(slot, normalized, 'chwinga slot %s is dressed but not normalized' % slot)
+        self.assertLessEqual(set(bc.PORTRAIT_MAP.values()), normalized)
+
+    def test_ch05_claims_the_ids_it_writes(self):
+        """These sit OUTSIDE ch05's host block on purpose (see CH05_VILLAGE_SLOTS), which is
+        exactly the shape of the #196 defect -- so the claim is what makes it legal."""
+        claimed = set(bc.HOSTED_CHAPTER_MESSAGE_IDS['ch05'])
+        for vid, (_symbol, msg, _fid) in bc.CH05_VILLAGE_SLOTS.items():
+            self.assertIn(msg, claimed, '%s writes 0x%X but ch05 never claims it' % (vid, msg))
+        bc.assert_message_ids_unique()   # and nobody else claims them
+
+    def test_the_authored_boxes_survive_as_a_presses(self):
+        """One `visit_text` entry per BOX (ch04's lesson): the pacing IS the A-press breaks,
+        and 25 boxes against vanilla Ch5's own 26 is the budget this pass was written to."""
+        chap = self._chap()
+        total = 0
+        for village in chap['villages']:
+            boxes = bc.village_boxes(village)
+            self.assertEqual(len(boxes), len(village['visit_text']))
+            for box in boxes:
+                self.assertLessEqual(len(textwrap.wrap(box, 42)), 2,
+                                     '%s: box over two lines at the Text_BG wrap: %r'
+                                     % (village['id'], box))
+            total += len(boxes)
+        self.assertEqual(25, total)
+
+    def test_a_vendored_mug_converts_to_an_fe8_bust(self):
+        """The community sheets do not agree on a background key -- Glaceo's set uses one green
+        and Eden/L95's another -- so the converter reads the corner pixel. Hardcoding either
+        leaves a green box behind the other artist's faces."""
+        vendor = os.path.join(bc._bust_dir(self.CAMPAIGN), 'vendor')
+        for vid, (mug, _slot, recolor) in sorted(bc.CH05_VISIT_FACES.items()):
+            path = os.path.join(vendor, mug)
+            self.assertTrue(os.path.isfile(path), 'missing vendored mug for %s' % vid)
+            bust = bc._vendor_mug_to_bust(path, recolor)
+            self.assertEqual('P', bust.mode)
+            self.assertEqual((96, 80), bust.size)
+            palette = bust.getpalette()[:48]
+            self.assertEqual(list(bc.PORTRAIT_TRANSPARENT_RGB), palette[:3],
+                             '%s: index 0 must be the transparent key' % vid)
+            self.assertLessEqual(len(set(bust.getdata())), 16)
+
+    def test_the_two_shared_body_skeletons_are_told_apart(self):
+        """reliquary-east and -south are the SAME mug with a different jaw, so without a
+        recolor the player meets one man twice. Only the two true oranges may move: the third
+        tone in that ramp is also the skull's shadow, and recolouring it turns his teeth green.
+        """
+        vendor = os.path.join(bc._bust_dir(self.CAMPAIGN), 'vendor')
+        east = bc._vendor_mug_to_bust(
+            os.path.join(vendor, bc.CH05_VISIT_FACES['reliquary-east'][0]), None)
+        mug, _slot, recolor = bc.CH05_VISIT_FACES['reliquary-south']
+        self.assertTrue(recolor, 'the south resident needs a recolor or he is the east one')
+        south = bc._vendor_mug_to_bust(os.path.join(vendor, mug), recolor)
+        self.assertNotEqual(list(east.convert('RGB').getdata()),
+                            list(south.convert('RGB').getdata()))
+        # The skull's shadow tone stays put -- it is not part of the pauldron ramp.
+        self.assertNotIn((152, 112, 72), recolor)
+        south_rgb = set(south.convert('RGB').getdata())
+        self.assertIn((152, 112, 72), south_rgb, 'the skull shading was recoloured away')
 
 
 class Ch05RecruitIdentities(unittest.TestCase):

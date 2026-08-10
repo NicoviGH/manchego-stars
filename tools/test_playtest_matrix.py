@@ -15,6 +15,7 @@ Run:
 """
 import os
 import sys
+import os
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -475,6 +476,92 @@ class RealManifest(unittest.TestCase):
         self.assertEqual(self.m.resolve('recordch02ending').deadline, 600)
         self.assertEqual(self.m.resolve('recordch02ending').fps, 60)
         self.assertEqual(self.m.resolve('llm').deadline, 2100)
+
+
+class ParallelScenarios(unittest.TestCase):
+    """Scenarios inside one ROM config run concurrently; builds never do."""
+
+    def _report(self, m, names, jobs, record):
+        def build(rom, flags):
+            record.append(('build', rom))
+            return True
+
+        def run_scenario(scn):
+            record.append(('run', scn.name))
+            return mx.Outcome(scn.name, scn.rom, 'PASS', 1.0, '', '')
+
+        return mx.execute(m.plan(names), build=build, run_scenario=run_scenario, jobs=jobs)
+
+    def test_checkpointless_scenarios_are_parallel_safe(self):
+        m = manifest(scenarios={'a': {}, 'b': {}})
+        par, ser = mx.scenario_lanes([m.resolve('a'), m.resolve('b')])
+        self.assertEqual([s.name for s in par], ['a', 'b'])
+        self.assertEqual(ser, [])
+
+    def test_a_checkpoint_scenario_is_forced_serial(self):
+        """states/<name>.ss is a SHARED file a scenario will mint if it is stale, so two
+        scenarios wanting one checkpoint would race to write it."""
+        m = manifest(scenarios={'a': {}, 'b': {'checkpoint': 'prep'}})
+        par, ser = mx.scenario_lanes([m.resolve('a'), m.resolve('b')])
+        self.assertEqual([s.name for s in par], ['a'])
+        self.assertEqual([s.name for s in ser], ['b'])
+
+    def test_every_scenario_still_runs_exactly_once_in_parallel(self):
+        m = manifest(scenarios={'a': {}, 'b': {}, 'c': {'rom': 'ch04boot'}})
+        rec = []
+        report = self._report(m, ['a', 'b', 'c'], jobs=4, record=rec)
+        self.assertEqual(sorted(o.scenario for o in report.outcomes), ['a', 'b', 'c'])
+        self.assertEqual(sorted(n for k, n in rec if k == 'run'), ['a', 'b', 'c'])
+
+    def test_a_build_never_overlaps_its_own_group_s_runs(self):
+        """The tree holds ONE fireemblem8.gba -- a build during a live run would swap the
+        ROM out from under the emulator."""
+        m = manifest(scenarios={'a': {}, 'b': {}, 'c': {'rom': 'ch04boot'}})
+        rec = []
+        self._report(m, ['a', 'b', 'c'], jobs=4, record=rec)
+        kinds = [k for k, _ in rec]
+        self.assertEqual(kinds.count('build'), 2)
+        # the second build must come after every run of the first group
+        second = [i for i, (k, _) in enumerate(rec) if k == 'build'][1]
+        first_group = {n for k, n in rec[:second] if k == 'run'}
+        self.assertEqual(first_group, {'a', 'b'})
+
+
+class RomCache(unittest.TestCase):
+    """A harness-only change must not pay for four rebuilds."""
+
+    def test_the_digest_ignores_files_that_cannot_change_the_rom(self):
+        """harness.lua/matrix.py/matrix.yaml drive the EMULATOR. If they were inputs the
+        cache would miss on exactly the edits it exists to make free."""
+        for rel in ('tools/playtest/harness.lua', 'tools/playtest/matrix.py',
+                    'tools/playtest/matrix.yaml'):
+            self.assertNotIn(rel, mx.ROM_INPUT_PATHS)
+
+    def test_the_digest_covers_what_the_rom_is_built_from(self):
+        for rel in ('campaigns', 'engine', 'tools/inject', 'tools/build_campaign.py'):
+            self.assertIn(rel, mx.ROM_INPUT_PATHS)
+
+    def test_make_flags_and_campaign_are_part_of_the_key(self):
+        """Otherwise a CH04BOOT ROM would be served to a CH05BOOT scenario."""
+        a = mx.rom_input_hash(['CH04BOOT=1'])
+        b = mx.rom_input_hash(['CH05BOOT=1'])
+        self.assertTrue(a and b)
+        self.assertNotEqual(a, b)
+
+    def test_a_touched_input_changes_the_digest(self):
+        target = os.path.join(mx.REPO, 'tools', 'build_campaign.py')
+        before = mx.rom_input_hash([])
+        st = os.stat(target)
+        try:
+            os.utime(target, ns=(st.st_atime_ns, st.st_mtime_ns + 10 ** 9))
+            self.assertNotEqual(before, mx.rom_input_hash([]))
+        finally:
+            os.utime(target, ns=(st.st_atime_ns, st.st_mtime_ns))
+        self.assertEqual(before, mx.rom_input_hash([]))
+
+    def test_a_miss_reports_nothing_to_restore(self):
+        self.assertFalse(mx.restore_cached_rom('canonical', 'deadbeef' * 4))
+        self.assertFalse(mx.restore_cached_rom('canonical', None))
 
 
 if __name__ == '__main__':

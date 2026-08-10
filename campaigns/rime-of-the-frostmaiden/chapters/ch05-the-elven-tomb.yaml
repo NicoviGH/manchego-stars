@@ -1347,27 +1347,130 @@ economy:
 # TERRAIN_VILLAGE_REGULAR on exactly these four -- see decisions.md, a retile inherits vanilla's
 # terrain). Placement is vanilla's, not ours, the same call as ch04's cottage.
 # `assert_village_tiles_visitable` rejects any of these standing on scenery.
+# THE RESIDENTS ARE THE TOMB'S OWN DEAD (Nicolas, 2026-08-08). No village at a tomb, so the four
+# sites are answered by four risen elves, not villagers. WHY THEY HELP YOU WHEN THE REST OF THE
+# TOMB ATTACKS: Ravisin's waking caught these four WRONG -- they came back as themselves, with
+# memory, and they resent what she is doing to their house. That is the same mechanism as Sahnar
+# (woken, misled, never bound -- lore/sahnar.md) and as ch04's pack ("all it took was knowing they
+# had a choice"), so the visits quietly pre-load the proof Basil later spends on Sahnar in 0x9CC.
+# It is stated ONCE, in two lines, and never explained: reliquary-east's "Some of us put them
+# down" and reliquary-south's "Some of them liked being told".
+#
+# TIMELINE -- THE ERROR THIS BLOCK EXISTS TO PREVENT (Nicolas caught it in draft, 2026-08-08):
+# they have been DEAD four thousand years and AWAKE about two. Ravisin woke them with the
+# Everlasting Rime, which is two years old (ch00/ch01 both state it; opening-montage.yaml: "not
+# felt the warmth of the sun in over two years"). An earlier draft had all four narrating four
+# millennia of experience, which is FALSE and, worse, hands out Sahnar's one defining trait --
+# she alone was awake for it, and that ordeal IS her character. Every resident here dates from
+# the WAKING ("two winters on my feet"), and the contrast is now load-bearing in the mage's
+# "His sister was awake the whole time. ...Don't ask." -- it establishes her ordeal before you
+# meet her, from someone who would know.
+#
+# PACING: 25 boxes across four sites against vanilla Ch5's own 26 (mined from HEAD, 6/7/6/6).
+# Box lengths are UNEVEN on purpose -- vanilla drops to a one-line box for punctuation ("Ah, but
+# I'm an old man now...", "Please, traveler, take this sword.") and a set of identical two-line
+# boxes reads as monotone. Every handover gets its own box, as three of vanilla's four do.
+# LORE RIDES UNDER CHARACTER, not over it: vanilla spends its village budget on somebody's small
+# private business (a packing list, an old man's vanity, a dancer's over-tipping), so each of
+# ours is interrupted mid-task and the tomb's history arrives only where the task produces it.
+# Orem/the amphitheatre come from lore/sahnar.md §Source canon; Corellon, Arvandor and Ostoria
+# stay OFF the page as before -- named as events ("a god took him up alive"), never as proper
+# nouns the story cannot pay off. Ravisin is never named: they were asleep, they don't know it.
 villages:
   - id: reliquary-north            # vanilla Ch5 village (5,1)
     tile: [5, 1]
     visit_reward:
       - id: torch                  # = Ch5's Torch, reflavoured an elven everburning lamp.
         amount: 1                  # Vanilla's own gift for THIS tile -- see the note below.
+    # LOCKED 2026-08-08 (dialogue-pass, co-written with Nicolas). Speaker: the CANTOR, who sang
+    # here when the place was an amphitheatre. Private business = warming up; the lore ("tiers all
+    # the way up that wall") arrives because he is SINGING, not because he is explaining.
+    # THE LAMP IS ESTABLISHED BEFORE IT IS GIVEN (Nicolas: "the torch comes out of nowhere") --
+    # it is the venue's own stage lighting, a hundred along the rim, exactly as vanilla folds its
+    # Torch into Amelia's packing list rather than producing it cold.
+    # Box 4 is vanilla-register: FE8 says "sleep" for death, never the blunt word ("I can only
+    # grant you eternal sleep" / "I cannot sleep. I have not yet--", MSG_BAA), and Lyon will not
+    # say "dead" of himself ("I'm almost completely gone", MSG_BBC). An earlier "Then I was dead.
+    # Then I wasn't." was cut as off-register and too clipped for the FE8 script.
+    visit_text:
+      - "Stand there. Just there. ...Yes. That's where the sound gathers."
+      - "I sang here. Right here. Tiers of them all the way up that wall, and me below."
+      - "Lamps all along the rim, a hundred of them. Elven work. They don't go out."
+      - "Then I slept. ...Not long enough, as it turns out."
+      - "Two winters on my feet, and the witch has not once asked me for a song."
+      - "...Take a lamp. Nobody's sitting up there to need it. Say something on your way out."
   - id: reliquary-west             # vanilla Ch5 village ~(5,6)
     tile: [5, 6]
     visit_reward:
       - id: booster-skl            # = Ch5's Secret Book (+Skl)
         amount: 1
+    # LOCKED 2026-08-08 (dialogue-pass, co-written with Nicolas). Speaker: the MAGE, the tomb's
+    # archivist. Register twin is vanilla's own Secret Book village (MSG_9CF): an old man who only
+    # mentions his life's knowledge because he is afraid it dies with him, and hands over a book
+    # he wrote for that reason. Ours has the same engine -- he is evacuating the archive because
+    # the party is about to fight in it, which is what makes Orem come up at all (Nicolas: "he
+    # kinda brings up the chieftain out of nowhere"). Box 2 sets the stakes box 7 pays off.
+    # 7 boxes against vanilla's 6, deliberately: the extra box buys "He came back dead."
+    visit_text:
+      - "Mm. Visitors. Don't touch the-- ...you touched it. It's fine."
+      - "You'll be fighting in here, I expect. ...Everyone always fights in here."
+      - "It's a history. This house, and the man they built it for. Orem."
+      - "A god took him up alive. They raised the seats for him to come back and tell it."
+      - "He came back dead. So: a tomb."
+      - "We all woke two winters ago. His sister was awake the whole time. ...Don't ask."
+      - "Take the record with you. If the roof comes in, I'd rather it weren't under it."
   - id: reliquary-east             # vanilla Ch5 village ~(12,10)
     tile: [12, 10]
     visit_reward:
       - id: armorslayer            # = Ch5's Armorslayer. We field no armour, so it reads as a
         amount: 1                  #   plain strong sword (see economy.reward_sites).
+    # LOCKED 2026-08-08 (dialogue-pass, co-written with Nicolas). Speaker: the QUARTERMASTER, who
+    # woke up and went straight back to counting stock. Register twin is vanilla's own Armorslayer
+    # village (MSG_9CD), the one site that is plainly useful: it states what the weapon does in
+    # flat words ("It'll cut through even the strongest armor") and sends you off. Ours does the
+    # same. A draft ended on "It remembers bigger things" -- cut 2026-08-08 (Nicolas: "sounds
+    # silly"); it was mood-narration in a quartermaster's mouth, which the craft check calls dead.
+    visit_text:
+      - "Weapon check. Hold it up. ...Mm. That'll do for people."
+      - "We came north out of the giants' camps, the lot of us. Carried this rack with us."
+      - "Witch woke me two winters back, put a spear in my hand, pointed me at the door."
+      - "Some of us put them down."
+      - "Take this instead. Armorslayer. It'll go through the heaviest plate they've got."
+      - "Sign for it. ...I'm joking. Go on."
   - id: reliquary-south            # vanilla Ch5 village (12,19)
     tile: [12, 19]
     visit_reward:
       - id: booster-def            # = Ch5's Dracoshield (+Def). First stat-booster in the campaign,
         amount: 1                  # and vanilla puts it HERE on purpose -- see the note below.
+    # LOCKED 2026-08-09 (dialogue-pass, co-written with Nicolas). Speaker: the one who talks too
+    # much and buries the lede. The handover carries NO tactical advice (Nicolas: "the instructions
+    # are a bit on the nose... vanilla is more subtle"); vanilla's dancer gives no usage note at
+    # all, only her own reason for parting with it, so his is that it has sat on a stand since
+    # before he was bones -- which also ties this site back to the mage's Orem.
+    #
+    # DO NOT WRITE A CHARACTER OUT OF AN ASSET FILENAME (Nicolas, 2026-08-09). A cut box read
+    # "Don't mind the grin. It's the face I've got." -- a reaction to this mug being named
+    # `Skeleton (Full Smile)`. That name is a VARIANT LABEL, not an expression: the file differs
+    # from reliquary-east's by 65 pixels of lower jaw (east is missing teeth, this one is not), and
+    # every skull shows its teeth regardless. A skeleton remarking on his own grin is remarking on
+    # nothing. What replaced it does the same job -- defusing "you are a skeleton and I am not" --
+    # from the character's side: he asks whether he is frightening them.
+    #
+    # WHY THE WAKING BEAT IS NOT HERE: two boxes ("She opened every box in this house and left all
+    # the lids off" / "Some of them liked being told") were cut 2026-08-09 as duplication --
+    # reliquary-east already carries the waking and the refusal, and the fact lands harder stated
+    # once. This site is the shortest of the four now, and that is fine: it is pure character.
+    #
+    # The "shouting outside" is deliberately NOT a raid warning. An earlier box said something was
+    # coming up the south stair, which promised a race the chapter does not implement (no
+    # village-destruction wiring, no save-all payout -- see #25). This line is true either way.
+    visit_text:
+      - "Hello! Hello. Oh, you're warm. Nothing has been warm in two years."
+      - "Sorry. Sorry. I'll slow down."
+      - "I'm not frightening you, am I."
+      - "There's a great deal of shouting outside, by the way. I should have led with that."
+      - "Orem's shield-plate. It's been on a stand since before I was bones. Take it."
+      - "Go on. ...I'd like you to win. I'd like very much for you to win."
 # WHICH GIFT SITS ON WHICH TILE IS VANILLA'S, NOT OURS (corrected 2026-08-07, decomp-verified via
 # each village script's SVAL(EVT_SLOT_3, <item id>)). booster-def and torch were swapped, which read
 # as harmless -- same four items, same total, and the parity gate counts the SET, not the tiles --
@@ -1380,7 +1483,15 @@ villages:
 # NOTE: the save-all-four bonus (crest-of-cold-iron, standing in for Ch5's Guiding Ring) is NOT a
 # visit_reward -- it is handed out outside the Village macro, exactly as vanilla does it. Wired at
 # inject_ch05; `economy.save_all_bonus` is its declaration.
-# Each site still owes its visit_text (one entry per box, ch04's lesson) -- dialogue-pass work.
+# All four `visit_text` blocks are WRITTEN and LOCKED (2026-08-08) -- see each site above.
+# STILL OWED to make them visible in-engine (#25): `village_script` renders a bare Text_BG with NO
+# portrait, so today these play faceless. The four speakers are FE-Repo mugs by Eden/L95 (the
+# family the `Skeleton (King)` belongs to; picked over Glaceo's for reading FRIENDLY, which is
+# right for gift-givers, and for staying visually distinct from Sahnar, who IS a Glaceo) --
+# Cantor / Skeleton (Mage) / Skeleton / Skeleton (Full Smile). Each needs a collision-free vanilla
+# portrait slot to overwrite, the chwinga pattern; Full Smile and the plain Skeleton share a body,
+# so one wants a pauldron recolor or they read as twins. Then claim 0x9CD..0x9D0 in
+# HOSTED_CHAPTER_MESSAGE_IDS, vendor the PNGs + CREDITS rows, and gate with verify_text.
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:

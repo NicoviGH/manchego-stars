@@ -54,3 +54,6 @@ tools/playtest/states/
 
 # battle-anim hand-paint scratch (tools/banim_paint.py) -- the painted FRAMES are what ships
 campaigns/*/battle_anims/*/.paint/
+
+# matrix ROM cache (built artifacts, keyed by input hash)
+.matrix-romcache/

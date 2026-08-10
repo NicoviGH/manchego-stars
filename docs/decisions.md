@@ -3474,6 +3474,38 @@ _Decided: 2026-07-30 (CLAUDE; ch05 `0x9C9` Sahnar block)._
 _Moved here from `HANDOFF.md` 2026-07-02 (audit): these are durable engineering constraints, not
 session state. `HANDOFF.md` points here._
 
+- **Dressing a portrait slot and NORMALIZING its mouth/eye window are two steps, and missing the
+  second is silent** (2026-08-09, #25). `patch_portrait_geometry` only knew about `PORTRAIT_MAP`
+  and the guests, so any other dressed slot kept the VANILLA character's mouth coordinates and the
+  engine painted its blink/talk overlay at the old face's position -- smearing a block of skull
+  across the eye sockets and doubling the teeth. Green build, passing scenario, corrupted face.
+  Three of the four ch05 residents shipped that way, and the ch02 chwinga had been shipping it
+  unnoticed since June; the fourth resident looked fine only because its donor slot's mouth
+  happened to sit where ours does. `dressed_portrait_slots()` is now the single answer to "which
+  slots do we overwrite" and a test asserts every dressed slot lands in it. **Three data checks
+  (clip model, on-disk sheet decode, OAM probe) all passed while the face was visibly wrong --
+  the corruption happens at DRAW time from a different table. Look at the rendered face.**
+
+- **The matrix's speed problem was BUILDS, not scenarios -- and parallelism made it worse**
+  (2026-08-09). A full run cost 7-9 minutes, enough that it gets skipped or over-run. Two fixes
+  were tried; keep the first, do not retry the second without new hardware:
+  - **ROM CACHE (kept).** Every configuration rebuilt every run even when nothing feeding a ROM
+    had changed, because the tree holds one `fireemblem8.gba` and each group's `make` overwrites
+    the last. ROMs are now snapshotted per (configuration, input digest) and copied back: a
+    chapter suite went **37s -> 11s**, a full matrix skips ~170s of builds. The digest covers what
+    the ROM is built FROM (campaign data, engine, injectors, Makefile, make flags, decomp HEAD)
+    and deliberately EXCLUDES `harness.lua`/`matrix.py`/`matrix.yaml`, which drive the emulator --
+    those are exactly the edits it makes free. **The ROM builds INSIDE the submodule** while the
+    config stamp sits at the repo root; getting that pair wrong caches nothing, silently.
+  - **PARALLEL SCENARIOS (measured, rejected, left off).** Scenarios run mGBA at `fps: 240`,
+    deliberately unthrottled, so each already saturates a core; this box has 4 performance cores.
+    At `jobs=4` individual scenarios went **10s -> 67s**, total wall did **not** move (444s vs
+    439s), and four scenarios blew their wall-clock deadlines and reported ERROR/FAIL. Contention
+    became false red, which is worse than slow. The knob survives with the numbers in
+    `execute()`'s docstring so nobody re-runs the experiment blind.
+  - **The real win is `SUITE=`.** A chapter suite is ~11s cached against ~6min for the full gate.
+    Iterate on the chapter suite; the full matrix is the push gate, not the edit loop.
+
 - **`harness.lua` is ONE Lua chunk against a 200-local ceiling — new top-level `local`s can stop
   the whole file loading** (2026-08-06, #232). Five new constants pushed the main function over
   Lua's limit and `harness.lua` stopped parsing outright: every scenario dies at once, and no
