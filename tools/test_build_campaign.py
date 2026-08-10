@@ -1857,6 +1857,24 @@ class Ch05VillageRaidRace(unittest.TestCase):
         self.assertIn('SVAL(EVT_SLOT_3, ITEM_GUIDINGRING)', ending)
         self.assertTrue(ending.rstrip().endswith('ENDA\n}'))
 
+    def test_the_ring_is_handed_over_before_the_screen_goes_black(self):
+        """Vanilla restores the screen (`EventScr_RemoveBGIfNeeded`) immediately ahead of its own
+        GIVEITEMTO, and on a full pack the reason is not cosmetic: the give runs
+        HandleNewItemGetFromDrop, which opens a BLOCKING convoy/discard menu. Behind a FADI the
+        player is operating that menu blind."""
+        ending = bc.ch05_ending_script(self._chap())
+        self.assertLess(ending.index('GIVEITEMTO'), ending.index('FADI(16)'),
+                        'the ring is handed over under a black screen')
+
+    def test_the_payout_gates_only_on_sites_the_location_list_armed(self):
+        """The ending used to gate on the module dict while the Location list armed whatever the
+        YAML declared. Drop a village and the ring becomes unobtainable, with a green build."""
+        chap = self._chap()
+        chap['villages'] = chap['villages'][:2]
+        ending = bc.ch05_ending_script(chap)
+        self.assertEqual(2, ending.count('CHECK_EVENTID('),
+                         'the payout must check exactly the sites that exist')
+
     def test_no_ch05_enemy_drops_anything(self):
         """Vanilla Ch5 has ZERO droppers -- Saar included. Ravisin used to carry a `drops:`
         block naming the crest, on a key the injector never reads, so it was decoration that

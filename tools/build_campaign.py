@@ -7749,16 +7749,16 @@ CH05_VILLAGE_SLOTS = {
 # (ch12a, ch18a), NOT an un-trigger -- and CH05_SAHNAR_TALK_FLAG holds 7. A site on either would
 # begin the chapter already flagged: unvisitable, unraidable, and counted toward a payout the
 # player never earned. Flags 7-40 are free (event-flags.h), so ch05's four start after 8.
-# Top-left metatile of the tileset's DRAWN 3x2 ruined structure (740..742 / 772..774), which is
-# what a desecrated reliquary becomes. Named rather than searched because it is a picture, not a
-# terrain -- see _drawn_block, which verifies every cell of it at build time.
-CH05_RUIN_ORIGIN = 740
 CH05_VILLAGE_FLAGS = {
     'reliquary-east':  'EVFLAG_TMP(9)',
     'reliquary-south': 'EVFLAG_TMP(10)',
     'reliquary-west':  'EVFLAG_TMP(11)',
     'reliquary-north': 'EVFLAG_TMP(12)',
 }
+# Top-left metatile of the tileset's DRAWN 3x2 ruined structure (740..742 / 772..774), which is
+# what a desecrated reliquary becomes. Named rather than searched because it is a picture, not a
+# terrain -- see _drawn_block, which verifies every cell of it at build time.
+CH05_RUIN_ORIGIN = 740
 # A village visit paints the backdrop over the WHOLE screen, so this is not set dressing -- it is
 # where the scene appears to happen. Vanilla Ch5's villages use BG_HOUSE, and inheriting it put a
 # warm human cottage (lit hearth, cooking pot) behind a skeleton in a frozen elven tomb. Same
@@ -8173,13 +8173,24 @@ def save_all_bonus_script(flags, item):
 def ch05_ending_script(chap):
     """ch05's ending: the save-all payout, then the win.
 
-    The payout comes FIRST and off the map -- vanilla hands its Guiding Ring over inside the
-    ending scene, not through the Village macro, because the condition is "all four" and no
-    single tile knows that. ch06 is not hosted yet, so the win still lands on the dev
-    placeholder exactly as ch04's did until ch05 hosted."""
-    return ('{\n    MUSC(SONG_VICTORY)\n    FADI(16)\n'
-            + save_all_bonus_script(CH05_VILLAGE_FLAGS,
-                                    CH05_ITEM_IDS[chap['economy']['save_all_bonus']])
+    The payout happens inside the ending scene rather than through the Village macro, because
+    the condition is "all four" and no single tile knows that. ch06 is not hosted yet, so the
+    win still lands on the dev placeholder exactly as ch04's did until ch05 hosted.
+
+    BEFORE the FADI, and that is not cosmetic. Vanilla restores the screen
+    (`EventScr_RemoveBGIfNeeded`) immediately ahead of its own `GIVEITEMTO`, and the reason
+    shows up on a full pack: the give runs `HandleNewItemGetFromDrop`, which opens a BLOCKING
+    convoy/discard menu. Handing the ring over after `FADI(16)` puts both the item popup and
+    that menu behind a black screen, leaving the player pressing buttons at nothing.
+
+    The gates come from the CHAPTER's villages, not from the module dict, so the payout can
+    only ever check ids the Location list actually armed. Gating on `CH05_VILLAGE_FLAGS`
+    wholesale meant that dropping a village from the YAML would leave the ending waiting on a
+    flag nothing could set -- an unobtainable reward, with a green build."""
+    flags = {v['id']: CH05_VILLAGE_FLAGS[v['id']] for v in chap.get('villages', [])}
+    return ('{\n    MUSC(SONG_VICTORY)\n'
+            + save_all_bonus_script(flags, CH05_ITEM_IDS[chap['economy']['save_all_bonus']])
+            + '    FADI(16)\n'
             + dev_placeholder_scene() + '    ENDA\n}')
 
 

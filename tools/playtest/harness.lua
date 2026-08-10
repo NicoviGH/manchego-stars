@@ -4764,7 +4764,10 @@ end
 -- charm-gift lands (leader's inventory, overflow -> convoy).
 local function collectedItems()
     local items = {}
-    for i = 0, 7 do
+    -- The WHOLE blue array, the same bound blue() uses. Slots 0-7 was fine while a chapter
+    -- fielded eight; ch05 deploys nine plus Basil, so an item handed to a unit at index >= 8 --
+    -- including CHAR_EVT_PLAYER_LEADER, if the leader is not slot 0 -- read as "never arrived".
+    for i = 0, 61 do
         local u = unitAt(SYM.gUnitArrayBlue, i)
         if u then for s = 0, 4 do items[#items + 1] = ru16(u.addr + 0x1E + s * 2) & 0xFF end end
     end
@@ -6722,6 +6725,14 @@ scenarios.ch05raid = function()
             "reliquary-south (%d,%d) is terrain 0x%02X at turn 1, not a village -- nothing can "
             .. "raid it and nothing can visit it", SITE_X, SITE_Y, terrainAt(SITE_X, SITE_Y)))
     end
+    -- Count the gift BEFORE, like ch04village/ch05village do. An absolute "the party holds no
+    -- Dracoshield" would fail the moment the chapter ships one anywhere else on the map.
+    local function shields()
+        local n = 0
+        for _, got in ipairs(collectedItems()) do if got == DRACOSHIELD then n = n + 1 end end
+        return n
+    end
+    local before = shields()
     -- Hand the site to the raiders: never visit it, just give the turns back. The party sits at
     -- the WEST spawn and the site is south-EAST, so idling does not contest the race.
     for t = 1, 8 do
@@ -6743,11 +6754,11 @@ scenarios.ch05raid = function()
                                     -- arrives photographs wherever the fight happened to be
             shot("ch05raid")
             log(string.format("ch05raid: reliquary-south fell on turn %d", turn()))
-            for _, got in ipairs(collectedItems()) do
-                if got == DRACOSHIELD then
-                    return result("FAIL", "the site was sacked but its Dracoshield reached the "
-                        .. "party anyway -- a lost site must cost the player its gift")
-                end
+            if shields() > before then
+                return result("FAIL", string.format(
+                    "the site was sacked but its Dracoshield reached the party anyway "
+                    .. "(%d -> %d) -- a lost site must cost the player its gift",
+                    before, shields()))
             end
             if eventFlag(SITE_FLAG) then
                 return result("FAIL", string.format(
