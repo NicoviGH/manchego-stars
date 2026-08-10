@@ -144,7 +144,7 @@ file lean (operating instructions + pointers, not a fact store).
 | `tools/verify_text.py` | Decode message text from the built ROM (regression gate; no mGBA). |
 | `tools/playtest/run.sh <scenario>` | Automated in-emulator playtest of ONE scenario (mGBA Lua scripting; memory-asserted PASS/FAIL). Takes the scenario's ROM flag, host chapter, checkpoint and timing from `tools/playtest/matrix.yaml`. |
 | `tools/playtest/inspect_state.py` | Read a playtest log semantically: `render` prints what FE8 was doing and why the controller classified it that way (procs named by exact symbol); `diff` reports the first divergence between two runs. |
-| `make matrix [SUITE=…]` | The live regression matrix (`tools/playtest/matrix.py`): builds each ROM configuration at most once, runs its scenarios, prints a verdict table. `SUITE=gate` (default), a chapter suite, or `all`. |
+| `make matrix [SUITE=…]` | The live regression matrix (`tools/playtest/matrix.py`): builds each ROM configuration at most once, runs its scenarios, prints a verdict table. `SUITE=gate` (default), a chapter suite, or `all`. **Run the smallest set that covers what you changed** — chapter suite (~11s cached), or `matrix.py run --scenarios a,b,c`; the full gate is for SHARED-helper changes only, background it, and never run it after a merge. **On a failure, spend one INSTRUMENTED run, not one run per guess.** Both rules and what they cost us: `decisions.md` → "Playtest runs are the most expensive thing in this repo". |
 | `tools/portrait_tool.py`, `tools/ref_to_bust.py` | Bust art pipeline (ref → indexed FE8 portrait). |
 | `tools/setup-toolchain.sh` | One-time macOS toolchain setup (brew deps, agbcc, python numpy/pillow/pyyaml). |
 

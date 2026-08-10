@@ -4141,6 +4141,37 @@ mining vanilla Ch5 rather than by choosing)._
 
 ---
 
+**Playtest runs are the most expensive thing in this repo, and the human WATCHES them**
+Nicolas, 2026-08-10, after a session that ran scenarios fourteen times: *"I am watching right now
+as you run scenarios again and again... I am tired of it."* Two rules, because there are two
+separate wastes and only one of them is about suite size.
+
+**1. Run the smallest set that covers what changed.**
+- Touched one chapter's constants → that chapter's suite (`SUITE=ch05`, ~11s cached).
+- Touched an arbitrary subset → `matrix.py run --scenarios a,b,c`.
+- Touched a SHARED helper (`location_events`, `collectedItems`, `village_script`, anything in
+  `harness.lua`'s common section) → the affected chapters' scenarios, which is what the gate is
+  *for*; background it, never sit on it.
+- **Never after a merge.** CI has already built and checked; a gate run whose result cannot
+  change a decision is pure cost. If the result would not change what you do next, do not run it.
+- The chapter suites are a SINGLE SOURCE and they go stale: `ch05` still listed `ch05village`
+  alone long after three more ch05 scenarios landed in `gate`. Adding a scenario means adding it
+  to its chapter suite too, not just to `gate`.
+
+**2. When a scenario fails, spend ONE run learning, not one run per guess.**
+This is the expensive half and it is not about suites. `ch05crest` failed four times in a row,
+each run revealing exactly one blocker — a hidden striker, then a missing melee weapon, then a
+combat wait that never ends — because each run only logged enough to test the hypothesis in hand.
+All three were visible in the same memory at the same moment. The rule: on the first failure,
+dump the whole neighbourhood of state the next three hypotheses could possibly need (every
+candidate unit's `state`, its grid cell, its weapon range, whether the engine calls the action
+legal), read it, then fix everything it shows. `inspect_state.py render` is the first stop, not
+the last. A generalisation of the standing rule "do not re-run to re-test a hypothesis the
+evidence already killed" — re-running to test a *new* hypothesis one at a time costs the same.
+_Decided: 2026-08-10 (Nicolas)._
+
+---
+
 ## Open Questions (not yet decided)
 
 See `docs/PRD.md §13` for the full list. Key unresolved items:
