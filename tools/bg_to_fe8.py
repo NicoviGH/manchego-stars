@@ -52,11 +52,17 @@ def to_tiles(a):
 
 
 def _quantise_pixels(px, n):
-    """MEDIANCUT palette of at most n colours for a pixel list (N,3) -> (m,3), m <= n."""
+    """MEDIANCUT palette of at most n colours for a pixel list (N,3) -> (m,3), m <= n.
+
+    Snapped back onto the GBA 5-bit grid: MEDIANCUT returns cluster AVERAGES, which land
+    off-grid even when every input pixel was on it, and gbagfx truncates the low 3 bits on
+    its way into the .gbapal -- so an unrounded palette means the ROM shows colours the tool
+    never chose its indices for. Rounding can also collide two entries; dedupe, since a
+    duplicate would be a bank slot spent on a colour already available."""
     im = Image.fromarray(px.astype('uint8').reshape(-1, 1, 3)).quantize(
         colors=n, method=Image.MEDIANCUT, dither=Image.NONE)
     pal = np.array(im.getpalette()[:n * 3], dtype=np.int32).reshape(-1, 3)
-    return pal[np.unique(np.array(im))]
+    return np.unique((pal[np.unique(np.array(im))] >> 3) << 3, axis=0)
 
 
 def _tile_err(tiles, pal):
@@ -98,7 +104,12 @@ def bank_cluster(tiles, nbanks=8, per_bank=15, rounds=6):
         if np.array_equal(nxt, assign):
             break
         assign = nxt
-    return assign, banks
+    # A bank no tile chose is a bank of the budget WASTED -- the exact failure this function
+    # exists to fix -- so compact it away rather than reporting a count nothing uses. (It
+    # happens: an emptied bank is re-seeded from the whole image and rarely wins a tile back.)
+    used = sorted(set(assign.tolist()))
+    remap = {b: i for i, b in enumerate(used)}
+    return np.array([remap[b] for b in assign.tolist()]), [banks[b] for b in used]
 
 
 def bank_pack(idx):
@@ -148,6 +159,12 @@ def main(argv):
     ap.add_argument('--banks', type=int, default=8,
                     help='bank budget when the source needs refitting (<=8)')
     args = ap.parse_args(argv)
+    # 8 is a hardware/engine ceiling, not a preference: eventscr.c gives a BACG background
+    # palettes 8-15 (ApplyPalettes(pal, 8, 8)). A higher budget emits a BG the engine cannot
+    # load; >20 dies inside PIL on a negative pad instead of saying so.
+    if not 1 <= args.banks <= 8:
+        sys.exit('ERROR: --banks must be 1..8 (FE8 gives a BACG background 8 palettes); got %d'
+                 % args.banks)
 
     rgb = fit_240x160(Image.open(args.src), args.fit)
     a = (np.array(rgb) >> 3) << 3                       # GBA 5-bit depth
@@ -161,7 +178,15 @@ def main(argv):
     # when that is impossible do we refit the banks (lossy) -- which keeps every already-shipped
     # BG converting byte-identically.
     try:
-        tile_bank, banks = bank_pack(idx)
+        packed = bank_pack(idx)
+    except ValueError as e:
+        packed, why = None, str(e)
+
+    # Only bank_pack's own "cannot be represented" ValueError may fall through to clustering: a
+    # ValueError from the palette build below is a BUG, and swallowing it would silently ship the
+    # lossy conversion in place of a good lossless one.
+    if packed is not None:
+        tile_bank, banks = packed
         how = 'packed'
         # Build the banked palette (N*16 entries) and remap every pixel to bank*16+local.
         # Local index 0 is the reserved transparent slot (kept black); real colours start at 1.
@@ -177,8 +202,8 @@ def main(argv):
             block = idx[ty * 8:ty * 8 + 8, tx * 8:tx * 8 + 8]
             out_idx[ty * 8:ty * 8 + 8, tx * 8:tx * 8 + 8] = \
                 np.vectorize(lambda c: bank * 16 + local[c])(block)
-    except ValueError as e:
-        how = 'clustered (%s)' % e
+    else:
+        how = 'clustered (%s)' % why
         tiles = to_tiles(a)
         assign, banks = bank_cluster(tiles, nbanks=args.banks)
         pal, out_idx = [], np.zeros((H, W), dtype=np.uint8)
