@@ -6,12 +6,22 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-10 (Opus). `main` = `eef9075`, level with `origin/main`. **#256 merged (the
-two winter town BGs); no branches, no stashes, nothing in flight.** Clean point for a `/clear`.
+Refreshed 2026-08-10 (Opus). `main` is level with `origin/main`. **No branches, no stashes,
+nothing in flight.** Clean point for a `/clear`.
 
 ## In flight
 
 **Nothing.** `origin` has only `main`.
+
+**→ CODEX PICKS UP #24 FROM HERE (Claude hit its weekly limit mid-survey, 2026-08-10).**
+Nothing was half-built: this session changed no code, only surveyed the art and wrote up what it
+found. **Start by reading the 2026-08-10 survey comment on #24** — it supersedes the earlier
+handover comment's read of the `snowy-fields` lead. In one line: the snag slot numbering is
+already aligned across snowy-bern / snowy-fields / vanilla (SNAG at 8+35, BRIDGE_SNAG at
+4+36+37+39), so metatile 36 is the right slot and the job is getting painted art into it. The
+`snowy-fields` lead was written off from a render made under the wrong palette bank and needs
+re-testing before it is discarded. Per `CLAUDE.md`, leave an explicit HANDOFF entry naming what
+you changed, the branch/PR and commit state, verification actually run, and the exact next step.
 
 **Nothing has had a `/code-review ultra <PR#>` — that is user-triggered.** #256 had a normal
 `/code-review medium`, which found five real defects (all fixed before the squash, including a
@@ -27,13 +37,13 @@ metatile 36 is DECLARED `TERRAIN_BRIDGE_SNAG` but never painted (a flat orange s
 already lays over this river — is the fallback. Paint a snow-dusted fallen trunk, point the
 constant at it, drop the fallback.
 
-**Read the [2026-08-10 handover comment on #24](https://github.com/NicoviGH/manchego-stars/issues/24#issuecomment-list)
-before starting** — every file, constant and guard is named there, plus the lead that
-`snowy-fields` (a sibling tileset already in-repo) has four PAINTED `BRIDGE_SNAG` metatiles that
-may be transplantable, and the reason that lead is **unconfirmed** (rendered, they read as icy
-ford, not a trunk: `docs/demo/ch04-bridge-snag-candidates.png`). `map_tileset_tool.py` has no
-paint path yet; that gap is part of the task. `ch04snag` gates the mechanism and **cannot see the
-art** — it PASSes today with the wrong tile, so this needs an eyes-on frame.
+**Read both comments on #24 before starting** — the earlier handover comment names every file,
+constant and guard; the **2026-08-10 survey comment** is the current read of the art and corrects
+it. Between them: what snowy-bern actually has, what vanilla's own change writes, why the
+`snowy-fields` transplant lead is still live, and the two ways `CH04_SNAG_BRIDGE_TILE = 2`
+diverges from vanilla. `map_tileset_tool.py` has no paint path yet; that gap is part of the task.
+`ch04snag` gates the mechanism and **cannot see the art** — it PASSes today with the wrong tile,
+so this needs an eyes-on frame.
 
 **ch05's remaining work is all on #25** and is text/art, not mechanics. The one with a hard
 prerequisite is **`0x9C5`**: the eruption beat is written and LOCKED but cannot go on screen
