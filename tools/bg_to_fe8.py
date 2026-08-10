@@ -11,8 +11,9 @@ every 8x8 tile drawing from exactly one bank.
 This produces that PNG. Pipeline: fit to 240x160 -> round to GBA 5-bit depth ->
 quantise -> greedily pack each tile's colours into <=8 banks of <=16. A clean
 low-colour source (e.g. the Zeldacrafter snow-town, 15 colours) lands in a single
-bank untouched; a busier CG spreads across banks. >8 banks is a hard error (the
-source is too colour-dense per region for FE8's BG format -- reduce it first).
+bank untouched; a busier CG spreads across banks. A dithered or photo-derived CG
+cannot pack that way at all, so it is instead refit: eight 15-colour palettes are
+fitted to the picture and each tile assigned the one that reproduces it best.
 
 Usage: tools/bg_to_fe8.py <src-image> <out.png> [--colors N] [--fit crop|pad]
 """
@@ -42,6 +43,64 @@ def fit_240x160(im, mode):
     return canvas
 
 
+def to_tiles(a):
+    """(H,W,3) image -> (T,64,3) tiles in row-major tile order."""
+    return (a.reshape(H // 8, 8, W // 8, 8, 3).transpose(0, 2, 1, 3, 4)
+             .reshape(-1, 64, 3).astype(np.int32))   # int32: a squared channel delta (65025)
+                                                    # overflows int16, and a wrapped-negative
+                                                    # distance makes argmin pick the WORST bank
+
+
+def _quantise_pixels(px, n):
+    """MEDIANCUT palette of at most n colours for a pixel list (N,3) -> (m,3), m <= n."""
+    im = Image.fromarray(px.astype('uint8').reshape(-1, 1, 3)).quantize(
+        colors=n, method=Image.MEDIANCUT, dither=Image.NONE)
+    pal = np.array(im.getpalette()[:n * 3], dtype=np.int32).reshape(-1, 3)
+    return pal[np.unique(np.array(im))]
+
+
+def _tile_err(tiles, pal):
+    """Total squared error of each tile if drawn from `pal` -> (T,)."""
+    return ((tiles[:, :, None, :] - pal[None, None, :, :]) ** 2).sum(3).min(2).sum(1)
+
+
+def bank_cluster(tiles, nbanks=8, per_bank=15, rounds=6):
+    """Fit `nbanks` palettes of `per_bank` colours to the tiles, and assign each tile one.
+
+    The greedy `bank_pack` can only put two tiles in one bank when one tile's colour SET fits
+    inside the other's, which a dithered source never satisfies: it checkerboards two shades
+    pixel-by-pixel, so each 8x8 tile of sky holds 15-18 colours nobody else shares exactly.
+    Such a source packs only when the global palette is squeezed to 15 colours -- one bank, and
+    7 of FE8's 8 thrown away. So fit the banks to the picture instead of hunting for tiles that
+    already agree: seed by tile mean colour, then alternate (a) requantise each bank from the
+    pooled pixels of the tiles currently assigned to it, (b) reassign every tile to whichever
+    bank reproduces it with least error. Both steps only lower total error, so it converges;
+    `rounds` caps it. Lossy by construction -- for a clean low-colour source the caller keeps
+    the exact `bank_pack` path instead. Returns (assign[T], banks[list of (m,3) arrays])."""
+    means = tiles.mean(axis=1)
+    # k-means++-style seeding by farthest-point: pick the tile mean furthest from the image
+    # mean, then repeatedly the mean furthest from everything chosen. Deterministic (no RNG),
+    # and it lands one seed in each colour region a CG actually has (sky, snow, lit windows).
+    cent = [means[int(np.argmax(((means - means.mean(0)) ** 2).sum(1)))]]
+    while len(cent) < nbanks:
+        far = np.min([((means - c) ** 2).sum(1) for c in cent], axis=0)
+        cent.append(means[int(np.argmax(far))])
+    assign = np.argmin(np.stack([((means - c) ** 2).sum(1) for c in cent]), axis=0)
+    banks = None
+    for _ in range(rounds):
+        banks = []
+        for b in range(nbanks):
+            px = tiles[assign == b].reshape(-1, 3)
+            # An emptied bank keeps a palette (from the whole image) so it stays biddable in
+            # the next reassignment rather than dropping out of the running for good.
+            banks.append(_quantise_pixels(px if len(px) else tiles.reshape(-1, 3), per_bank))
+        nxt = np.argmin(np.stack([_tile_err(tiles, p) for p in banks]), axis=0)
+        if np.array_equal(nxt, assign):
+            break
+        assign = nxt
+    return assign, banks
+
+
 def bank_pack(idx):
     """Greedily pack each 8x8 tile's colour set into banks of <=15 colours.
     GBA BG colour index 0 is TRANSPARENT (it shows the backdrop, which FE8 sets to
@@ -57,8 +116,8 @@ def bank_pack(idx):
     over = [k for k, s in sets.items() if len(s) > 15]
     if over:
         ty, tx = over[0]
-        sys.exit('ERROR: tile (col %d, row %d) needs %d colours (>15); an FE8 BG tile maps '
-                 'to one 16-colour bank. Pre-reduce the source.' % (tx, ty, len(sets[(ty, tx)])))
+        raise ValueError('tile (col %d, row %d) needs %d colours (>15)'
+                         % (tx, ty, len(sets[(ty, tx)])))
     banks = []  # each a set of global colour indices
     # place the colour-richest tiles first so sparse tiles slot into existing banks
     for key in sorted(sets, key=lambda k: -len(sets[k])):
@@ -71,8 +130,7 @@ def bank_pack(idx):
                 b |= s
                 break
     if len(banks) > 8:
-        sys.exit('ERROR: %d banks needed (>8). Source too colour-dense per 8x8 '
-                 'region for an FE8 BG; pre-reduce it.' % len(banks))
+        raise ValueError('%d banks needed (>8)' % len(banks))
     banks = [sorted(b) for b in banks]
     tile_bank = {}
     for key, s in sets.items():
@@ -87,6 +145,8 @@ def main(argv):
     ap.add_argument('--colors', type=int, default=128,
                     help='global colour budget before banking (<=128)')
     ap.add_argument('--fit', choices=('crop', 'pad'), default='crop')
+    ap.add_argument('--banks', type=int, default=8,
+                    help='bank budget when the source needs refitting (<=8)')
     args = ap.parse_args(argv)
 
     rgb = fit_240x160(Image.open(args.src), args.fit)
@@ -96,29 +156,51 @@ def main(argv):
     gpal = q.getpalette()[:min(args.colors, 128) * 3]
     idx = np.array(q)
 
-    tile_bank, banks = bank_pack(idx)
-
-    # Build the banked palette (N*16 entries) and remap every pixel to bank*16+local.
-    # Local index 0 is the reserved transparent slot (kept black); real colours start at 1.
-    pal = []
-    for b in banks:
-        pal += [0, 0, 0]                               # index 0: reserved/transparent
-        for ci in b:
-            pal += gpal[ci * 3:ci * 3 + 3]
-        pal += [0, 0, 0] * (16 - 1 - len(b))           # pad each bank to 16
-    out_idx = np.zeros((H, W), dtype=np.uint8)
-    for (ty, tx), bank in tile_bank.items():
-        local = {ci: j + 1 for j, ci in enumerate(banks[bank])}   # colours -> 1..15
-        block = idx[ty * 8:ty * 8 + 8, tx * 8:tx * 8 + 8]
-        out_idx[ty * 8:ty * 8 + 8, tx * 8:tx * 8 + 8] = \
-            np.vectorize(lambda c: bank * 16 + local[c])(block)
+    # Lossless-if-possible: a clean low-colour source (the Zeldacrafter snow-town) has tiles
+    # whose colour sets nest, so the greedy pack reproduces the quantised image EXACTLY. Only
+    # when that is impossible do we refit the banks (lossy) -- which keeps every already-shipped
+    # BG converting byte-identically.
+    try:
+        tile_bank, banks = bank_pack(idx)
+        how = 'packed'
+        # Build the banked palette (N*16 entries) and remap every pixel to bank*16+local.
+        # Local index 0 is the reserved transparent slot (kept black); real colours start at 1.
+        pal = []
+        for b in banks:
+            pal += [0, 0, 0]                               # index 0: reserved/transparent
+            for ci in b:
+                pal += gpal[ci * 3:ci * 3 + 3]
+            pal += [0, 0, 0] * (16 - 1 - len(b))           # pad each bank to 16
+        out_idx = np.zeros((H, W), dtype=np.uint8)
+        for (ty, tx), bank in tile_bank.items():
+            local = {ci: j + 1 for j, ci in enumerate(banks[bank])}   # colours -> 1..15
+            block = idx[ty * 8:ty * 8 + 8, tx * 8:tx * 8 + 8]
+            out_idx[ty * 8:ty * 8 + 8, tx * 8:tx * 8 + 8] = \
+                np.vectorize(lambda c: bank * 16 + local[c])(block)
+    except ValueError as e:
+        how = 'clustered (%s)' % e
+        tiles = to_tiles(a)
+        assign, banks = bank_cluster(tiles, nbanks=args.banks)
+        pal, out_idx = [], np.zeros((H, W), dtype=np.uint8)
+        for bp in banks:
+            pal += [0, 0, 0]                               # index 0: reserved/transparent
+            pal += [int(v) for v in bp.reshape(-1)]
+            pal += [0, 0, 0] * (16 - 1 - len(bp))
+        tw = W // 8
+        for t, bank in enumerate(assign):
+            ty, tx = divmod(t, tw)
+            block = tiles[t]                               # (64,3)
+            d = ((block[:, None, :] - banks[bank][None, :, :]) ** 2).sum(2)
+            local = d.argmin(1) + 1                        # nearest bank colour, 1..15
+            out_idx[ty * 8:ty * 8 + 8, tx * 8:tx * 8 + 8] = \
+                (bank * 16 + local).reshape(8, 8).astype(np.uint8)
 
     out = Image.new('P', (W, H))
     out.putdata(out_idx.flatten().tolist())
     out.putpalette(pal + [0, 0, 0] * (256 - len(pal) // 3))
     out.save(args.out)
-    print('%s -> %s : %d bank(s), %d colours, 240x160'
-          % (args.src, args.out, len(banks), sum(len(b) for b in banks)))
+    print('%s -> %s : %d bank(s), %d colours, 240x160, %s'
+          % (args.src, args.out, len(banks), sum(len(b) for b in banks), how))
     return 0
 
 

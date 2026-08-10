@@ -6686,9 +6686,10 @@ def inject_ch01(campaign, verbose=True):
     # ch01 ending "The Rolling Cheddar" (#21): scenic in-town scene, same machinery as
     # Beat 1's BeginningScene -- a "Bryn Shander" brown-box card + one Text() per beat
     # (A-F), each Text()'s trailing REMA clearing faces (fresh 4-face budget). The locked
-    # bodies + staging are built in step 0b/step 6. The scene plays over the vanilla
-    # BG_NORMAL_VILLAGE (we tried winterizing it but a palette swap just washes it out and
-    # no clean FE8 snow-village BG was available, so we use it as-is; Nicolas 2026-06-17).
+    # bodies + staging are built in step 0b/step 6. The scene plays over BG_MS_BRYN_SHANDER_WINTER,
+    # a vendored winter CG (#21). The 2026-06-17 call to keep vanilla's green BG_NORMAL_VILLAGE was
+    # about PALETTE-swapping it, which just washed it out; the vendored-BG pipeline built for ch02
+    # (bg_to_fe8.py -> inject_backgrounds) makes a real snowbound town available instead.
     # The ending MNC2s into ch02 "Cold Welcome" (hosted on chapter slot 3 by
     # inject_ch02; see the generated EventScr_Ch2_EndingScene below). Before ch02 landed
     # it parked on the dev placeholder instead.
@@ -6705,7 +6706,7 @@ def inject_ch01(campaign, verbose=True):
         script, 'EventScr_Ch2_EndingScene[] =',
         '{\n    MUSC(SONG_VICTORY)\n'
         '    REMOVEPORTRAITS\n'
-        '    BACG(BG_NORMAL_VILLAGE) /* Bryn Shander -- vanilla village BG (winterize not worth it; Nicolas, 2026-06-17) */\n'
+        '    BACG(BG_MS_BRYN_SHANDER_WINTER) /* Bryn Shander -- vendored winter CG (#21) */\n'
         '    FADU(16) /* chapter ending comes up black; reveal the town BG */\n'
         '    BROWNBOXTEXT(0x%X, 8, 8) /* "Bryn Shander" location card */\n'
         % CH01_ENDING_CARD_MSG
@@ -6851,6 +6852,13 @@ CAMPAIGN_BGS = [
     # under white haze and read wrong in a snowbound chapter. Additive slot, so vanilla's BG is
     # untouched and still available. Approved by Nicolas 2026-07-31 over BG_TREES.
     ('BG_MS_LONELYWOOD_FOG',  'bg_LonelywoodFog',  '{vanilla FE8 bg_Plain_1, winter palette}'),
+    # The two Ten-Towns settlements that had been borrowing another town's backdrop. Both are
+    # Fenriel winter CGs, already 240x160, and both need the 8-bank refit in bg_to_fe8.py (a
+    # dithered CG has tiles of 16-18 colours, so the greedy single-set pack cannot hold them).
+    # Distinct backdrops per town is the point: BG_MS_TARGOS_WINTER already backs ch02's and
+    # ch03's endings, and a third reuse reads as one town (Nicolas, 2026-08-09).
+    ('BG_MS_BRYN_SHANDER_WINTER', 'bg_BrynShanderWinter', '{Fenriel}'),  # ch01 ending: walled town at dusk
+    ('BG_MS_BREMEN_WINTER',       'bg_BremenWinter',      '{Fenriel}'),  # ch07 (#27): the lakeside town
 ]
 
 
