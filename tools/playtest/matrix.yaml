@@ -256,6 +256,12 @@ scenarios:
   ch05recruit:
     rom: ch05boot
     host_chapter: 6
+  ch05raid:
+    rom: ch05boot
+    host_chapter: 6
+  ch05crest:
+    rom: ch05boot
+    host_chapter: 6
   ch04snag:
     rom: ch04boot
     host_chapter: 5
@@ -324,6 +330,8 @@ suites:
     - ch05village
     - ch05reliquaries
     - ch05recruit
+    - ch05raid
+    - ch05crest
 
   ch01:
     - controller_turn
@@ -369,8 +377,14 @@ suites:
     - clear_ch04
     - clear_ch04_parley
 
+  # Was `ch05village` alone -- the chapter suite never picked up the scenarios that landed in
+  # `gate` after it, so "the one you run while working ch05" was the weakest of the five.
   ch05:
     - ch05village
+    - ch05reliquaries
+    - ch05recruit
+    - ch05raid
+    - ch05crest
 
   sandbox:
     - recordunitlist

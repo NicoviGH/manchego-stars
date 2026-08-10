@@ -240,10 +240,12 @@ enemy_units:
     skin:                       # Ravisin has authored boss art already; frost-druid palette
       look: "Ravisin, frost druid (existing boss portrait + Druid class art)"
       source: authored
-    drops:
-      - id: crest-of-cold-iron  # FORESHADOW: locked promotion relic (see decisions.md — the promotion seam)
-        is_key_item: true
-        locked: true            # unusable in MVP; pays off at the Ch8→9 promotion seam
+    # NO DROP, and that is vanilla's answer rather than an omission: Ch5 has ZERO droppers in the
+    # whole chapter, Saar included — killing the boss pays in winning. Ravisin used to carry a
+    # `drops:` block naming a "crest of cold iron"; the injector reads `item_drop:` and never saw
+    # it, so it was decoration that read like wiring. The promotion foreshadow it was invented for
+    # is now the save-all bonus (see `economy.save_all_bonus`), which is where vanilla puts the
+    # chapter's one relic and makes it something the player has to EARN.
   # ── The cornered white moose (the LONE beast — ch04 quarry) ─────────────────
   # ROLE FIX 2026-07-23: was `is_boss: true`, which INVERTED the chapter's climax — at
   # threat 14.1 it out-threatened Ravisin (8.4) 1.7x and was 2.2x the vanilla Ch5 ceiling
@@ -395,7 +397,7 @@ enemy_units:
       - id: elven-spear
         fe_base: iron-lance
     damage_type: piercing       # flavor label only
-    ai_pattern: aggressive
+    ai_pattern: raider          # AI_B_04, vanilla's own — they make for reliquary-south first
     skin:
       look: "skeletal elven spear-guard"
       source: "FE-Repo: Battle Animations/Infantry - (Lnc) Soldiers, Halberdiers/[Custom Halb] [U] Skeleberdier (skeleton lance; frost-repal)"
@@ -412,7 +414,7 @@ enemy_units:
       - id: rusted-greataxe
         fe_base: iron-axe
     damage_type: slashing       # flavor label only
-    ai_pattern: aggressive
+    ai_pattern: raider          # AI_B_04 — reliquary-east (12,10) and west (5,6) are theirs
     skin:
       look: "risen elven axe-reaver, frost-pale"
       source: palette_swap
@@ -423,14 +425,14 @@ enemy_units:
     level: 5
     autolevel: true
     arrives_turn: 5             # the last wave races the far reliquary reward-sites
-    positions: [[13, 0], [14, 1]]     # vanilla's north-east pair — they arrive inside Ravisin's
-                                # rim, so the last wave reinforces the boss fight rather than
-                                # chasing the party that has already climbed past them
+    positions: [[13, 0], [14, 1]]     # vanilla's north-east pair — they spawn on the rim, a short
+                                # walk from reliquary-north (5,1), which is the site furthest from
+                                # the party's start and the last one still standing by turn 5
     inventory:
       - id: elven-longbow
         fe_base: iron-bow
     damage_type: piercing       # flavor label only
-    ai_pattern: aggressive
+    ai_pattern: raider          # AI_B_04 — vanilla's turn-8 pair spawns here and races (5,1) too
     skin:
       look: "skeletal elven archer"
       source: "FE-Repo: Battle Animations/Monsters - Basic Types/[Skeleton-Reskin] [U] Wight Sniper by DATonDemand"
@@ -941,16 +943,13 @@ events:
       DIALOGUE BUDGET — 3 boxes, the twin's exact spend (`EventScr_089F22A4`, the bandits who
       join the fight mid-map). The structural rule taken from it: **the ARRIVING FORCE speaks
       and the party never reacts.** Vanilla gives Eirika and Seth not one line here. So these
-      boxes belong to Ravisin and Sahnar. (Phantom Ship's quake beat does the opposite —
+      boxes belong to the arriving side. (Phantom Ship's quake beat does the opposite —
       Ephraim reacts to it — but Ch11b is only our THEME base for the EARTHQUAKE/TILECHANGE
       mechanism; Ch5 is the parity twin and wins the shape.) Either way both twins agree the
       SPECTACLE lives in the event macros, never in the prose: nobody describes the horror.
       This is also Ravisin's FIRST SPOKEN LINE in the chapter proper — 9C2 stages her as a
       silent frost-robed figure at center, and what breaks the silence is her spending the
       permission Sephek granted in 9BC ("the one under the stone" is his phrase, handed back).
-      Sahnar's single box is the SETUP for 9C6's first line: she says the rote guardian line in
-      full here, then at the recruit starts it again and stops at "Far enough. The tomb is--"
-      because she has seen Basil. The interruption only lands because this box exists.
       RESOLVED 2026-07-29 (Nicolas): there was never a double-rising to design around. The line
       force is ALREADY STANDING when the party arrives — staged onto the board by LOAD1 across
       0x9BF/0x9C0 exactly as vanilla walks Saar's command on, so nothing "rises" in the opening.
@@ -962,28 +961,43 @@ events:
       the beat plays as a timed event and the player never learns their own pressure caused it.
       Nicolas's revision 2026-07-29 does that better than CLAUDE's draft did, three ways: she
       CREDITS SEPHEK by name, so 9BC's warning pays off out of the mouth of the person who
-      brushed it aside; "the dead will rise to meet them" is a commander's order rather than the
-      liturgy of "the Frostmaiden has need of you" (she is named plenty elsewhere and does not
-      need a third mention); and "the BLADE under the stone" keeps Sahnar as inventory, echoing
-      9BD where Ravisin appraises her as exactly that.
+      brushed it aside; the summoning is a commander's order rather than the liturgy of "the
+      Frostmaiden has need of you" (she is named plenty elsewhere and does not need a third
+      mention); and "the BLADE under the stone" keeps Sahnar as inventory, echoing 9BD where
+      Ravisin appraises her as exactly that.
       TWIN = EventScr_089F22A4, 3 boxes, and its structural rule is that the ARRIVING FORCE
       speaks while the party never reacts (vanilla gives Eirika and Seth no lines). Both twins
       agree the SPECTACLE lives in the event macros, never in the prose.
-      Sahnar's single box sets up the recruit: she says the rote guardian line in full here, so
-      that starting it again at 0x9CC and stopping — "Far enough. The tomb is--" — has something
-      to break from.
-      LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 4 boxes.
+      THE RACE IS NAMED HERE, and that is what the second box buys (Nicolas, 2026-08-09). Vanilla
+      spends its equivalent box on the raiders' intent — "steal our way through this pathetic
+      town" — which is the only warning the player gets that the reward-sites are at stake. Ours
+      said nothing about them, so the race (now actually wired, #25) would have announced itself
+      with the engine's "The village was destroyed." popup, after a site was already gone.
+      REVISED 2026-08-09 (Nicolas): all four boxes are Ravisin's, and Sahnar's "The tomb is
+      closed. Turn back." is CUT. That box used to be the setup 0x9CC breaks from — she starts the
+      same rote line at the recruit and stops at "Far enough. The tomb is--" because she has seen
+      Basil. ACCEPTED as-is (Nicolas, 2026-08-09) after being raised: 0x9CC simply opens on the
+      rote line cold. Recorded so a later pass does not "restore" a box that was cut on purpose.
+      LOCKED 2026-08-09 (dialogue-pass, co-written with Nicolas). 4 boxes, all Ravisin.
     script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
       # (EARTHQUAKE_START + sequential TILECHANGE; the floor breaks and more dead come up.
       #  Then LOAD1 — the sarcophagus cracks.)
       # (The response beat: her line force is losing, and she says WHOSE warning was right --
       #  9BC's briefing pays off by name, from the mouth of the person who dismissed it.)
       - ravisin: "Sephek was right. ...They've come further than I expected."
-      - ravisin: "No matter. The dead will rise to meet them."
+      # (The RACE, stated out loud -- the beat vanilla spends on its raiders' own "steal our way
+      #  through this pathetic town". Without it the first the player learns of the race is the
+      #  engine's "The village was destroyed." popup, after a site is already gone. "reliquaries"
+      #  is the chapter's own word for the sites; "houses"/"mausoleums" were both tried and both
+      #  collide -- the west resident calls the whole TOMB "this house", and only Orem is buried
+      #  here, so there are no mausoleums to raid. Nicolas, 2026-08-09.)
+      # (No leading "...And": it is what pushes "reliquaries" onto a third line at the on-map
+      #  29-column wrap, and dropping it also stops two boxes in four opening on the same tic.)
+      - ravisin: "I better make sure they don't get to the reliquaries..."
+      - ravisin: "No matter. The dead will destroy them first."
       # (9BC callback: "the warrior... the one under the stone", now spent. "BLADE" not "one" --
       #  she appraised Sahnar as a blade in 9BD and still thinks of her as inventory.)
-      - ravisin: "...And the blade under the stone. Her too."
-      - sahnar: "The tomb is closed. Turn back."
+      - ravisin: "...And the blade under the stone... I'll use her too."
   - trigger: sahnar_talk          # Basil (Natasha-donor) Talks the risen Sahnar (Joshua-donor)
     slot: "vanilla 0x9CC"          # the Talk recruit. Was mislabelled "9C6" until 2026-07-29;
                                    # the real 0x9C6 is Natasha's death quote. See SLOT-ID CAVEAT.
@@ -1334,9 +1348,14 @@ economy:
   elven_store:                   # ≈ Ch5's Armory + Vendor — an ancient elven quartermaster's reliquary
     armory: true                 #   the party requisitions (narrative: the tomb kept its stores)
     vendor: true
-  save_all_bonus: crest-of-cold-iron   # ≈ Ch5's Guiding Ring (save-all-villages reward). NOTE: the crest
-                                 # is ALSO Ravisin's narrative drop (Chekhov's promo relic) — keep the drop;
-                                 # the save-all bonus is the mechanical echo of the Guiding-Ring condition.
+  save_all_bonus: guiding-ring   # vanilla Ch5's own save-all-villages reward, kept as itself.
+                                 # It is the chapter's promotion FORESHADOW (decisions.md — the
+                                 # promotion seam): nobody is near level 10 in the MVP, so it sits
+                                 # in the convoy humming, exactly the Chekhov's gun the retired
+                                 # "crest of cold iron" was invented to be — except this one is a
+                                 # real item, and the player has to save all four sites to get it.
+                                 # Items are vanilla's unless there is a reason (Nicolas,
+                                 # 2026-08-09); the Goodberry and Tourmaline are the only renames.
 
 # ── Reward sites (the "villages") ────────────────────────────────────────────────
 # WIRING for the economy block above. `economy.reward_sites` states the DESIGN; this states
@@ -1461,9 +1480,10 @@ villages:
     # reliquary-east already carries the waking and the refusal, and the fact lands harder stated
     # once. This site is the shortest of the four now, and that is fine: it is pure character.
     #
-    # The "shouting outside" is deliberately NOT a raid warning. An earlier box said something was
-    # coming up the south stair, which promised a race the chapter does not implement (no
-    # village-destruction wiring, no save-all payout -- see #25). This line is true either way.
+    # The "shouting outside" is a second, quieter warning, and it is now literally true: this is
+    # the site the turn-2 raiders spawn beside, and it is the one `ch05raid` watches fall. It was
+    # written to promise nothing back when the race was prose; the race is wired (#25), so the
+    # line stands as-is and simply means what it says. The loud warning is Ravisin's, in 0x9C5.
     visit_text:
       - "Hello! Hello. Oh, you're warm. Nothing has been warm in two years."
       - "Sorry. Sorry. I'll slow down."
@@ -1480,18 +1500,17 @@ villages:
 # behind the whole enemy line and is the safest on the map. Swapping them pays the most for the
 # safest errand, which is exactly backwards for a chapter whose structure IS the race for the
 # reward-sites. The placement is vanilla's, like every other placement on this retile.
-# NOTE: the save-all-four bonus (crest-of-cold-iron, standing in for Ch5's Guiding Ring) is NOT a
-# visit_reward -- it is handed out outside the Village macro, exactly as vanilla does it. Wired at
-# inject_ch05; `economy.save_all_bonus` is its declaration.
-# All four `visit_text` blocks are WRITTEN and LOCKED (2026-08-08) -- see each site above.
-# STILL OWED to make them visible in-engine (#25): `village_script` renders a bare Text_BG with NO
-# portrait, so today these play faceless. The four speakers are FE-Repo mugs by Eden/L95 (the
-# family the `Skeleton (King)` belongs to; picked over Glaceo's for reading FRIENDLY, which is
-# right for gift-givers, and for staying visually distinct from Sahnar, who IS a Glaceo) --
-# Cantor / Skeleton (Mage) / Skeleton / Skeleton (Full Smile). Each needs a collision-free vanilla
-# portrait slot to overwrite, the chwinga pattern; Full Smile and the plain Skeleton share a body,
-# so one wants a pauldron recolor or they read as twins. Then claim 0x9CD..0x9D0 in
-# HOSTED_CHAPTER_MESSAGE_IDS, vendor the PNGs + CREDITS rows, and gate with verify_text.
+# THE RACE (#25). Each site carries an event id -- CH05_VILLAGE_FLAGS, EVFLAG_TMP(9..12) -- and
+# that one number is the whole mechanism. `Village(eid, ..)` puts it on BOTH the visit and the
+# destruction LOCA one tile north, so reaching a site first both banks the gift and disarms the
+# raider hook; a site that falls instead flips to ruins (ch05_map_changes) and never sets its id.
+# The save-all-four bonus is NOT a visit_reward -- it is handed out at the ENDING, gated on all
+# four ids, exactly as vanilla does it (`economy.save_all_bonus` is its declaration).
+# Proven in-engine by `ch05raid` (a site CAN be lost) and `ch05crest` (all four pays out); the
+# two exist because ch05village/ch05reliquaries only ever walk a unit to a door.
+# All four `visit_text` blocks are WRITTEN and LOCKED (2026-08-08), and all four speak with a
+# FACE over BG_INTERIOR_BROWN -- the FE-Repo Eden/L95 skeleton mugs, dressed onto collision-free
+# vanilla slots by `inject_ch05_visit_faces` (the chwinga pattern).
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
@@ -1514,12 +1533,12 @@ design_notes: >
       (Joshua-donor Myrmidon), who rises as a hostile crit-threat and flips on the Talk. The
       donors were chosen for exactly this; the escort defines how you play the map.
     - The village-raid race → the Phantom-Ship ERUPTION (injected EARTHQUAKE/TILECHANGE)
-      spawns undead over turns that raid the spread elven-reliquary reward-sites; securing all
-      earns the crest (our Guiding-Ring save-all echo).
+      spawns undead over turns that raid the spread elven-reliquary reward-sites, on vanilla
+      Ch5's own raider AI; securing all four earns vanilla's own Guiding Ring at the ending.
   Ravisin is the canonical frost druid and the villain thread tying the white moose (ch04) →
-  this tomb → Messie (ch06): she awakened them all. She still DROPS the LOCKED 'crest of cold
-  iron' (the promotion Chekhov's gun for the Ch8→9 seam) — its narrative role; the save-all
-  bonus is the mechanical echo, not a replacement. Basil joins as our second healer (Cleric) —
+  this tomb → Messie (ch06): she awakened them all. She DROPS NOTHING, as vanilla Ch5's boss
+  does not (the chapter has zero droppers); the promotion Chekhov's gun for the Ch8→9 seam is
+  the save-all Guiding Ring, which the player has to race for. Basil joins as our second healer (Cleric) —
   the goodberry shrub as a literal heal-staff unit (LOCKED 2026-06-20). No fog: the tension is
   the escort + eruption race, not vision. Map + roster build at the slice; targets checked via
   `make difficulty` (economy #170 + convertible/reinforcement dynamics #171).

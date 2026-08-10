@@ -7740,6 +7740,25 @@ CH05_VILLAGE_SLOTS = {
     'reliquary-west':  ('MS_Ch05VisitWest',  0x9CF, '[FID_VillagerYoungMan]'),
     'reliquary-north': ('MS_Ch05VisitNorth', 0x9D0, '[FID_ManUnused]'),
 }
+# The event id each site sets when the party gets there first -- the whole race, in four flags
+# (#25). It records the visit, disarms that site's raider hook (Village() puts the same eid on
+# the destruction LOCA), and answers the save-all CHECK_EVENTID at the ending.
+#
+# NOT vanilla Ch5's own 8..11, and that is the one number here worth reading twice: ch05's
+# opening ends on ENUT(8) -- `ENUT` is EvtSetFlag (EAstdlib), a vanilla prep-chapter idiom
+# (ch12a, ch18a), NOT an un-trigger -- and CH05_SAHNAR_TALK_FLAG holds 7. A site on either would
+# begin the chapter already flagged: unvisitable, unraidable, and counted toward a payout the
+# player never earned. Flags 7-40 are free (event-flags.h), so ch05's four start after 8.
+CH05_VILLAGE_FLAGS = {
+    'reliquary-east':  'EVFLAG_TMP(9)',
+    'reliquary-south': 'EVFLAG_TMP(10)',
+    'reliquary-west':  'EVFLAG_TMP(11)',
+    'reliquary-north': 'EVFLAG_TMP(12)',
+}
+# Top-left metatile of the tileset's DRAWN 3x2 ruined structure (740..742 / 772..774), which is
+# what a desecrated reliquary becomes. Named rather than searched because it is a picture, not a
+# terrain -- see _drawn_block, which verifies every cell of it at build time.
+CH05_RUIN_ORIGIN = 740
 # A village visit paints the backdrop over the WHOLE screen, so this is not set dressing -- it is
 # where the scene appears to happen. Vanilla Ch5's villages use BG_HOUSE, and inheriting it put a
 # warm human cottage (lit hearth, cooking pot) behind a skeleton in a frozen elven tomb. Same
@@ -7810,6 +7829,11 @@ CH05_AI = {
     'aggressive': '{0x0, 0x0, 0x1, 0x0}',        # pursue/charge
     'defensive': '{0x3, 0x3, 0x9, 0x20}',        # hold and strike in range
     'hold_position': '{GuardTileAI, 0x9, 0x20}', # vanilla Saar's boss posture
+    # AI_B_04 = AiScr_AiB_PillageThenPursue (cp_data.c): head for the nearest lootable tile,
+    # sack it, then fight normally. Vanilla Ch5 puts this on all six of its reinforcements and
+    # nothing else, which is the whole village-raid race -- the AI is terrain-driven
+    # (gTerrainList_LootableVillages), so it needs no target list and no class of its own.
+    'raider': '{0x0, 0x4, 0x9, 0x0}',
 }
 CH05_CLASS_IDS = {'druid': 'CLASS_DRUID', 'gwyllgi': 'CLASS_GWYLLGI',
                   'soldier': 'CLASS_SOLDIER', 'fighter': 'CLASS_FIGHTER',
@@ -7824,7 +7848,9 @@ CH05_ITEM_IDS = {'flux': 'ITEM_DARK_FLUX', 'rotten-claw': 'ITEM_MONSTER_ROTTENCL
                  # the four reliquary gifts (villages) -- vanilla Ch5's own reward tier, and
                  # the exact items `make difficulty CH=ch05` prices the economy against
                  'booster-def': 'ITEM_BOOSTER_DEF', 'booster-skl': 'ITEM_BOOSTER_SKL',
-                 'armorslayer': 'ITEM_SWORD_ARMORSLAYER', 'torch': 'ITEM_TORCH'}
+                 'armorslayer': 'ITEM_SWORD_ARMORSLAYER', 'torch': 'ITEM_TORCH',
+                 # the save-all-four bonus -- vanilla Ch5's own, handed over at the ending
+                 'guiding-ring': 'ITEM_GUIDINGRING'}
 
 
 # ── Message-id ownership across hosted chapters (#198 review, issue #24) ────────
@@ -8052,15 +8078,23 @@ def village_boxes(village):
     return [' '.join(box.split()) for box in text]
 
 
-def location_events(villages, village_slots, shops=()):
+def location_events(villages, village_slots, shops=(), flags=None):
     """The host slot's Location list: everything the player can VISIT.
 
     One `Village` per authored village, at the tile the chapter YAML names, each running its OWN
     script (`village_slots[id]`) -- two doors sharing one script show the same line at both.
 
-    `Village(eid, scr, x, y)` expands to VILL + a LOCA on the tile ABOVE (EAstdlib), which is how
-    FE8 lets a unit standing north of the door trigger it -- so the door tile is the anchor, not
-    the whole building.
+    `Village(eid, scr, x, y)` expands to VILL + a LOCA on the tile ABOVE (EAstdlib) carrying
+    TILE_COMMAND_20 -- and that second entry is the DESTRUCTION hook: a raider that reaches the
+    door runs AiPillageAction, which calls StartAvailableTileEvent(x, y - 1) (cp_perform.c) and
+    flips the tile through the chapter's MapChange array. Both entries carry the same `eid`.
+
+    `flags` is {village id: event-flag expression} -- the id FE8 sets when the site is visited.
+    It defaults to 0, which is EVFLAG_ALWAYS_FALSE: CheckChapterFlag(0) returns 0 forever
+    (eventinfo.c), so SearchAvailableEvent never skips a 0 entry. A chapter that only needs
+    doors can leave it alone; a chapter that RACES for its sites cannot, because the same flag
+    is what records the visit, disarms that site's raider hook, and answers the save-all
+    CHECK_EVENTID at the ending (#25).
 
     `shops` are `(macro, shoplist_symbol, x, y)` -- `Armory`/`Vendor` take their stock DIRECTLY
     and run no script and show no text, so a shop is fully wired the moment its tile is listed.
@@ -8069,10 +8103,11 @@ def location_events(villages, village_slots, shops=()):
     it.** That is how ch04 shipped an unreachable Iron Axe (#205), and it is why this returns a
     list built from the YAML rather than something a chapter has to remember to fill in.
     """
+    flags = flags or {}
     rows = ''.join(
-        '    Village(0, %s, %d, %d) /* %s -- %s */\n'
-        % (village_slots[v['id']], v['tile'][0], v['tile'][1], v['id'],
-           village_reward_id(v) or 'the line is the reward')
+        '    Village(%s, %s, %d, %d) /* %s -- %s */\n'
+        % (flags.get(v['id'], '0'), village_slots[v['id']], v['tile'][0], v['tile'][1],
+           v['id'], village_reward_id(v) or 'the line is the reward')
         for v in villages)
     rows += ''.join('    %s(%s, %d, %d)\n' % shop for shop in shops)
     return '{\n' + rows + '    END_MAIN\n}'
@@ -8082,6 +8117,121 @@ def ch04_location_events(chap):
     """ch04's Location list. Vanilla Ch4 wires two villages and so do we (#24); no shops."""
     return location_events(chap.get('villages', []),
                            {vid: slot[0] for vid, slot in CH04_VILLAGE_SLOTS.items()})
+
+
+METATILES_PER_ROW = 32          # tileset atlas stride, for reading a drawn multi-tile block
+
+
+def _drawn_block(tileset, origin, size, terrain_name, what):
+    """The `size`-shaped run of metatiles starting at `origin`, checked to be real art of the
+    right terrain -- for a map change that must draw a STRUCTURE rather than a repeated tile.
+
+    `_snowy_metatile_for` resolves one terrain to one metatile, which is all a door or a bridge
+    needs. A ruined building is a picture: six adjacent metatiles the tileset artist drew to fit
+    together, and picking "the lowest painted ruins tile" six times would tile one corner across
+    the whole footprint. So the origin is named, and then VERIFIED -- every cell must carry
+    `terrain_name` and be painted, which is what turns a renumbered tileset into a loud build
+    failure instead of a silently wrong picture (#205's lesson, kept)."""
+    want = terrain_ids()[terrain_name]
+    width, height = size
+    tiles = [origin + row * METATILES_PER_ROW + col
+             for row in range(height) for col in range(width)]
+    for m in tiles:
+        if tileset.terrain(m) != want:
+            sys.exit('ERROR: %s expects %s across %dx%d from metatile %d, but %d carries '
+                     'terrain 0x%02x -- the tileset was renumbered, so re-pick the origin'
+                     % (what, terrain_name, width, height, origin, m, tileset.terrain(m)))
+        if _is_blank_metatile(tileset, m):
+            sys.exit('ERROR: %s writes blank metatile %d (a declared-but-unpainted tile renders '
+                     'as a solid block)' % (what, m))
+    return tiles
+
+
+SAVE_ALL_SKIP_LABEL = '0x2'     # vanilla Ch5's own label for "a site was lost -- skip the gift"
+
+
+def save_all_bonus_script(flags, item):
+    """Vanilla's save-all-the-villages payout (`EventScr_Ch5_EndingScene`), as event lines.
+
+    One CHECK_EVENTID per site, each branching PAST the gift the moment its flag reads unset --
+    so the reward survives only a clean sweep, and any single lost site skips the lot. The
+    flags are the ones the Location list armed; a site that was raided never set its id, and
+    neither did one the player simply walked past.
+
+    CHAR_EVT_PLAYER_LEADER, not the village idiom's CHAR_EVT_ACTIVE_UNIT: nobody is standing on
+    a tile at the ending, so there is no active unit for the item to land on."""
+    lines = []
+    for flag in flags.values():
+        lines += ['    CHECK_EVENTID(%s)' % flag,
+                  '    BEQ(%s, EVT_SLOT_C, EVT_SLOT_0)' % SAVE_ALL_SKIP_LABEL]
+    lines += ['    SVAL(EVT_SLOT_3, %s)' % item,
+              '    GIVEITEMTO(CHAR_EVT_PLAYER_LEADER)',
+              'LABEL(%s)' % SAVE_ALL_SKIP_LABEL]
+    return '\n'.join(lines) + '\n'
+
+
+def ch05_ending_script(chap):
+    """ch05's ending: the save-all payout, then the win.
+
+    The payout happens inside the ending scene rather than through the Village macro, because
+    the condition is "all four" and no single tile knows that. ch06 is not hosted yet, so the
+    win still lands on the dev placeholder exactly as ch04's did until ch05 hosted.
+
+    BEFORE the FADI, and that is not cosmetic. Vanilla restores the screen
+    (`EventScr_RemoveBGIfNeeded`) immediately ahead of its own `GIVEITEMTO`, and the reason
+    shows up on a full pack: the give runs `HandleNewItemGetFromDrop`, which opens a BLOCKING
+    convoy/discard menu. Handing the ring over after `FADI(16)` puts both the item popup and
+    that menu behind a black screen, leaving the player pressing buttons at nothing.
+
+    The gates come from the CHAPTER's villages, not from the module dict, so the payout can
+    only ever check ids the Location list actually armed. Gating on `CH05_VILLAGE_FLAGS`
+    wholesale meant that dropping a village from the YAML would leave the ending waiting on a
+    flag nothing could set -- an unobtainable reward, with a green build."""
+    flags = {v['id']: CH05_VILLAGE_FLAGS[v['id']] for v in chap.get('villages', [])}
+    return ('{\n    MUSC(SONG_VICTORY)\n'
+            + save_all_bonus_script(flags, CH05_ITEM_IDS[chap['economy']['save_all_bonus']])
+            + '    FADI(16)\n'
+            + dev_placeholder_scene() + '    ENDA\n}')
+
+
+def ch05_map_changes(chap, maps_dir):
+    """ch05's tile flips: a reliquary DESECRATED, and a reliquary visited (#25).
+
+    Vanilla Ch5's own array, one for one -- four 3x2 ruins at (doorX - 1, doorY - 1) then four
+    1x1 doors, and the ORDER is the correctness argument. GetMapChangeIdAt keeps the LAST region
+    covering a tile (bmtrick.c) and the 3x2 overlaps its own door, so doors-first would make
+    VISITING a site collapse the building.
+
+    The 3x2 footprint is not decoration either. AiPillageAction looks the change up at
+    (x, y - 1) -- the tile above the door, where Village()'s destruction LOCA sits -- so a
+    change on the door alone is never found and a sacked site would keep standing, keep its
+    gift, and keep counting toward the save-all payout.
+
+    RUINS_REGULAR is the lost state and the choice is load-bearing: FE8 decides both "can a unit
+    Visit here" (CanUnitVisit, bmmenu.c) and "is this worth pillaging" (gTerrainList_Lootable-
+    Villages, cp_utility.c) from the TERRAIN, and RUINS_VILLAGE -- the obvious-sounding pick --
+    is in both lists. A site ruined into it would be lootable again the next turn."""
+    import map_tileset_tool as mt
+    tileset = mt._tileset_from_dir(os.path.join(maps_dir, 'tilesets', CH05_TILESET))
+    villages = chap.get('villages', [])
+    changes = [(x - 1, y - 1, 3, 2,
+                _drawn_block(tileset, CH05_RUIN_ORIGIN, (3, 2), 'TERRAIN_RUINS_REGULAR',
+                             '%s desecrated' % v['id']),
+                '%s desecrated -- raided before the party reached it' % v['id'])
+               for v in villages for x, y in [v['tile']]]
+    changes += [(v['tile'][0], v['tile'][1], 1, 1,
+                 [_snowy_metatile_for(tileset, 'TERRAIN_VILLAGE_CLOSED')],
+                 '%s visited' % v['id'])
+                for v in villages]
+    return changes
+
+
+def ch05_location_events(chap):
+    """ch05's Location list: the four reliquaries, each armed with its race flag, plus the
+    elven store. Vanilla Ch5's own list, one for one (four villages, an armory and a vendor)."""
+    return location_events(chap.get('villages', []),
+                           {vid: slot[0] for vid, slot in CH05_VILLAGE_SLOTS.items()},
+                           CH05_SHOPS, flags=CH05_VILLAGE_FLAGS)
 
 
 def assert_village_tiles_visitable(chap, maps_dir, stem):
@@ -9629,12 +9779,14 @@ def inject_ch05(campaign, boot=False, verbose=True):
         '{\n    DefeatBoss(%s)\n    CauseGameOverIfLordDies\n    END_MAIN\n}'
         % CH05_ENDING_SCRIPT, CH05_EVENTINFO_H)
     # Location = the four reliquary visits + the elven store. The shops are wired for good (a
-    # shop needs no script and no text); the visits borrow vanilla's prose and own their rewards.
+    # shop needs no script and no text); the visits own their rewards, and each carries its
+    # CH05_VILLAGE_FLAGS event id -- the race (#25).
     info = _replace_brace_block(
         info, CH05_EVENT_LISTS['location'] + '[] =',
-        location_events(chap.get('villages', []),
-                        {vid: slot[0] for vid, slot in CH05_VILLAGE_SLOTS.items()},
-                        CH05_SHOPS), CH05_EVENTINFO_H)
+        ch05_location_events(chap), CH05_EVENTINFO_H)
+    # The race's two tile states: a reliquary DESECRATED by a raider, and one closed behind the
+    # party. Must run AFTER _retarget_host_chapter zeroed changeLayerId (as ch04's does).
+    _inject_tile_changes('MS_Ch05MapChanges', ch05_map_changes(chap, maps_dir), CH05_HOST_INDEX)
     # Character = the Basil->Sahnar Talk, and nothing else -- structurally identical to vanilla
     # Ch5's single CHAR(NATASHA, JOSHUA). Recruiter set is Sahnar's own `parley.by` (Basil), the
     # gated flavour of the shared flow; ch03's Trex passes the whole roster instead. No
@@ -9702,12 +9854,11 @@ def inject_ch05(campaign, boot=False, verbose=True):
             script, CH05_WAVE_SCRIPTS[turn] + '[] =',
             '{\n    LOAD1(0x1, %s)\n    ENUN\n%s    ENDA\n}'
             % (CH05_WAVE_TABLES[turn], extra), CH05_EVENTSCRIPT_H)
-    # The ending: ch06 is not hosted yet, so the win lands on the dev placeholder exactly as
-    # ch03's did until ch04 hosted (chain_ch04_to_ch05 advances the real path below).
-    script = _replace_brace_block(
-        script, CH05_ENDING_SCRIPT + '[] =',
-        '{\n    MUSC(SONG_VICTORY)\n    FADI(16)\n' + dev_placeholder_scene() + '    ENDA\n}',
-        CH05_EVENTSCRIPT_H)
+    # The ending: the save-all-four payout, then the win. ch06 is not hosted yet, so the win
+    # lands on the dev placeholder exactly as ch03's did until ch04 hosted (chain_ch04_to_ch05
+    # advances the real path below).
+    script = _replace_brace_block(script, CH05_ENDING_SCRIPT + '[] =',
+                                  ch05_ending_script(chap), CH05_EVENTSCRIPT_H)
     with open(CH05_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
         f.write(script)
 

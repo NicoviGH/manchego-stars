@@ -4090,6 +4090,57 @@ _Decided: 2026-08-08 (found by `/code-review high` on PR #252, not by the build 
 
 ---
 
+**The village-raid race is four vanilla parts, and ch05 shipped none of them (#25)**
+ch05 declared a race for its four reliquaries since #196 — *"the eruption's dead race the party
+for the spread reward-sites"*, plus a save-all bonus — and nothing on the map could reach a site
+or pay for saving one. What vanilla Ch5 supplies, and what we were missing:
+- **The destruction hook is already in the macro.** `Village(eid, scr, x, y)` expands to the
+  `VILL` on the door *and* a `LOCA(eid, 1, x, y - 1, TILE_COMMAND_20)` one tile north.
+  `AiPillageAction` calls `StartAvailableTileEvent(x, y - 1)` (`cp_perform.c`), which lands on
+  that second entry and flips the tile through the chapter's MapChange array.
+- **A real event id.** `location_events()` hardcoded `Village(0, ..)`, and flag 0 is
+  `EVFLAG_ALWAYS_FALSE` — `CheckChapterFlag(0)` returns 0 forever, so no visit was ever recorded,
+  no raider hook was ever disarmed, and nothing could be counted. ch05 takes `EVFLAG_TMP(9..12)`,
+  **not** vanilla's `8..11`: its opening already ends on `ENUT(8)` (`ENUT` is `EvtSetFlag`, a
+  vanilla prep idiom from ch12a/ch18a — not an un-trigger) and the Sahnar Talk holds 7.
+- **MapChanges, ordered ruins-before-doors.** Four 3×2 ruins at `(doorX-1, doorY-1)` then four
+  1×1 closed doors, which is vanilla's own array. `GetMapChangeIdAt` keeps the **last** region
+  covering a tile (`bmtrick.c`) and the 3×2 overlaps its own door, so doors-first would make
+  *visiting* a site collapse the building. The 3×2 footprint is also not decoration: the pillage
+  lookup happens at `(x, y-1)`, so a change on the door alone is never found.
+- **`TERRAIN_RUINS_REGULAR` is the lost state**, and the choice is load-bearing. FE8 decides both
+  "can a unit Visit here" (`CanUnitVisit`) and "is this worth pillaging"
+  (`gTerrainList_LootableVillages`) from the terrain. `TERRAIN_RUINS_VILLAGE` — the
+  obvious-sounding pick — is in **both** lists, so a site ruined into it would be lootable again.
+- **Raider AI on every wave.** All six of vanilla Ch5's reinforcements carry
+  `.ai = {0x0, 0x4, 0x9, 0x0}` (AI_B_04, `AiScr_AiB_PillageThenPursue`) and nothing else does.
+  Ours spawn on those same three tile-pairs, so all three eruption waves raid.
+
+**The prize is a Guiding Ring, and the "crest of cold iron" is retired.** Vanilla Ch5 has **zero
+droppers** — Saar included — and its one relic is gated on all four village ids at the ending
+(`SVAL(EVT_SLOT_3, 0x68)` → `GIVEITEMTO(CHAR_EVT_PLAYER_LEADER)`). The crest was our invention
+(the promotion-seam foreshadow, May 2026): it had no item id in any table, and Ravisin carried it
+on a `drops:` key the injector never reads, so it was decoration that read like wiring. Items are
+vanilla's unless there is a reason — the Goodberry and Tourmaline are the only renames — so the
+foreshadow is now a real Guiding Ring nobody is near using, earned by saving all four sites
+rather than handed over for killing the boss.
+
+**The race also has to be SAID.** Vanilla spends its turn-2 box on the raiders' intent ("steal our
+way through this pathetic town"); ours said only that more dead were coming, so the first warning
+the player got was the engine's "The village was destroyed." popup, after a site was gone.
+`0x9C5` now names the reliquaries. "Houses" and "mausoleums" were both tried and both collide with
+the fiction: the west resident calls the whole tomb *"this house"*, and only Orem is buried here.
+
+**Two scenarios, because one run cannot walk both paths.** `ch05raid` idles and proves a site is
+LOST (terrain `0x03 → 0x25`, no gift, event id still unset — `TILE_COMMAND_20` changes the tile
+and sets nothing, which is exactly why a sacked site cannot count). `ch05crest` saves all four,
+kills Ravisin, and proves the ring lands. Neither `ch05village` nor `ch05reliquaries` could ever
+have seen any of this: they walk a unit to a door and read what it hands over.
+_Decided: 2026-08-09 (Nicolas: "we do what vanilla does"; all three open questions answered by
+mining vanilla Ch5 rather than by choosing)._
+
+---
+
 ## Open Questions (not yet decided)
 
 See `docs/PRD.md §13` for the full list. Key unresolved items:

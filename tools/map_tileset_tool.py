@@ -28,9 +28,14 @@ NUM_METATILES = 1024
 
 class Tileset:
     def __init__(self, gfx_path, pal_path, cfg_path):
-        self.gfx = open(gfx_path, 'rb').read()
-        pal = open(pal_path, 'rb').read()
-        self.cfg = open(cfg_path, 'rb').read()
+        # Closed explicitly: a Tileset is built per test and per map change, and leaking three
+        # handles each time buried `make test` under 277 ResourceWarnings.
+        with open(gfx_path, 'rb') as f:
+            self.gfx = f.read()
+        with open(pal_path, 'rb') as f:
+            pal = f.read()
+        with open(cfg_path, 'rb') as f:
+            self.cfg = f.read()
         self.palettes = [[self._color(pal, bank * 16 + c) for c in range(16)]
                          for bank in range(10)]
 
