@@ -930,7 +930,10 @@ reuses byte-identical art, allocates only unreferenced tile ids, can claim an un
 bank in the lit 0-4 half, rejects the derived fog half, and preserves terrain unless explicitly
 authored. Runtime still resolves each preferred
 slot through `_snowy_metatile_for`, so `7 / 36 / 11` is accepted only while it carries
-`PLAINS / BRIDGE_SNAG / PLAINS`. The enlarged binary round-trip render is
+`PLAINS / BRIDGE_SNAG / PLAINS` **and each preferred slot is visibly painted, not merely
+terrain-correct**. That preferred-path check has its own regression because bypassing the
+ordinary search's blank-art guard can recreate the original solid-block failure. The enlarged
+binary round-trip render is
 `docs/demo/ch04-snowy-snag-bridge.png`; `ch04snag` remains the mechanism gate and an in-engine
 frame remains the art gate.
 _Decided: 2026-08-10 (Nicolas + Codex, #24; visual composition supplied by Nicolas)._

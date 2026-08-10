@@ -6,55 +6,50 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-10 (Opus). `main` is level with `origin/main`. **No branches, no stashes,
-nothing in flight.** Clean point for a `/clear`.
+Refreshed 2026-08-10 (Codex). `main` contains `fcf0653`, the squash merge of PR #257, and is
+level with `origin/main` after this handoff. **Nothing is in flight.** Clean context point for a
+fresh instance; the local build tree is intentionally dirty as recorded below.
 
 ## In flight
 
-**Nothing.** `origin` has only `main`.
+**Nothing.** PR #257 is squash-merged and issue #24 is closed. The merged branch
+`feat/24-snowy-snag-art` remains locally and on `origin` at `c5ac590`; it is historical only and
+must not be used as the base for new work.
 
-**→ CODEX PICKS UP #24 FROM HERE (Claude hit its weekly limit mid-survey, 2026-08-10).**
-Nothing was half-built: this session changed no code, only surveyed the art and wrote up what it
-found. **Start by reading the 2026-08-10 survey comment on #24** — it supersedes the earlier
-handover comment's read of the `snowy-fields` lead. In one line: the snag slot numbering is
-already aligned across snowy-bern / snowy-fields / vanilla (SNAG at 8+35, BRIDGE_SNAG at
-4+36+37+39), so metatile 36 is the right slot and the job is getting painted art into it. The
-`snowy-fields` lead was written off from a render made under the wrong palette bank and needs
-re-testing before it is discarded. Per `CLAUDE.md`, leave an explicit HANDOFF entry naming what
-you changed, the branch/PR and commit state, verification actually run, and the exact next step.
-
-**Nothing has had a `/code-review ultra <PR#>` — that is user-triggered.** #256 had a normal
-`/code-review medium`, which found five real defects (all fixed before the squash, including a
-doc claim that was wrong about the engine); #254 had a `high` (five, likewise fixed); #253 shipped
-unreviewed.
+**#24 result:** ch04 now uses the full vanilla three-cell felled-log composition in Snowy Bern
+slots `7 / 36 / 11`, with snowy bank fragments, the original trunk-over-water silhouette and
+Snowy Bern's existing lit palette bank 4. No palette bytes changed. Nicolas approved both the
+enlarged render and the fogged in-engine frame. `ch04snag` passed; 57 focused tests passed; a
+fresh clean checkout passed `python3 tools/check.py`; both GitHub `checks` and `build` jobs passed.
+The Superpowers review found one Important issue before merge: a terrain-correct preferred slot
+could bypass the blank-art guard. Commit `c5ac590` made preferred slots prove both terrain and
+painted art, added a red/green regression test, and received a clean second review.
 
 ## Next task
 
-**#24 — paint snowy-bern's `BRIDGE_SNAG` metatile 36**, the last of the three ch04-era cosmetic
-items (the other two landed in #256). The ch04 snag currently falls into a *stone bridge*:
-metatile 36 is DECLARED `TERRAIN_BRIDGE_SNAG` but never painted (a flat orange square), so
-`_is_blank_metatile` refuses it and `CH04_SNAG_BRIDGE_TILE = 2` — the masonry bridge this map
-already lays over this river — is the fallback. Paint a snow-dusted fallen trunk, point the
-constant at it, drop the fallback.
+**#25 — finish ch05, The Elven Tomb.** Read the live issue before choosing a slice; its checklist
+is authoritative. Mechanics, map, parity, villages, reliquary race, Basil/Sahnar stats and
+Sahnar's battle animation are already wired. Remaining work is dialogue/art: opening + ending,
+four reliquary lines, Basil→Sahnar Talk, the five no-Lupin fallbacks, arena tutorial, Ravisin's
+death quote, enemy reskins and the onboarding `introduces:` entry.
 
-**Read both comments on #24 before starting** — the earlier handover comment names every file,
-constant and guard; the **2026-08-10 survey comment** is the current read of the art and corrects
-it. Between them: what snowy-bern actually has, what vanilla's own change writes, why the
-`snowy-fields` transplant lead is still live, and the two ways `CH04_SNAG_BRIDGE_TILE = 2`
-diverges from vanilla. `map_tileset_tool.py` has no paint path yet; that gap is part of the task.
-`ch04snag` gates the mechanism and **cannot see the art** — it PASSes today with the wrong tile,
-so this needs an eyes-on frame.
-
-**ch05's remaining work is all on #25** and is text/art, not mechanics. The one with a hard
-prerequisite is **`0x9C5`**: the eruption beat is written and LOCKED but cannot go on screen
-until **Ravisin has a bust** — she is a raw pid (`CH05_BOSS_PID = 0xb8`) with no `PORTRAIT_MAP`
-entry, which is also why her death quote `0x9C8` ships `.msg = 0` (a faceless line renders
-boxless). Same blocker, one fix. Also owed: the Basil→Sahnar recruit text (`0x9CC`), the opening
-(`0x9BA`–`0x9C4`), the arena tutorial, the no-Lupin branch, enemy reskins.
+**First hard dependency:** give Ravisin a bust / `PORTRAIT_MAP` entry. She is still the raw boss
+pid `0xb8`; without a face the locked eruption warning at `0x9C5` cannot be staged cleanly and her
+death quote `0x9C8` remains `.msg = 0`. After that, invoke the repository's `dialogue-pass` workflow
+before inserting any of the already-locked ch05 prose, claim the message ids, run
+`python3 tools/verify_text.py`, and use only the smallest relevant ch05 playtest scenarios.
 
 ## Current state
 
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
+- **Checkout path:** `/Users/Yonick/Documents/Codex/2026-08-03/Manchego Stars Codex` (the folder
+  was renamed; do not use the former path). Top-level `main` is clean except for the intentionally
+  dirty `fireemblem8u` submodule plus Nicolas's untracked `.agents/` and `AGENTS.md`; preserve all
+  three and stage paths explicitly. The submodule contains the full generated campaign build,
+  not a pointer change to commit. Use a clean temporary checkout when a verification needs vanilla
+  decomp state instead of resetting this working copy behind Nicolas's back.
+- **One stash exists:** `stash@{0}: preserve pre-rename local HANDOFF before syncing #24`. It is
+  historical insurance; do not apply or drop it casually.
 - **The full `make matrix` gate is NOT to be run locally any more** (Nicolas, 2026-08-10). Run the
   chapter suite or `matrix.py run --scenarios a,b,c`. **#255** is the fix that gives the gate a
   cheap home (verdict caching); until it lands the gate has none, because CI builds against a mock
