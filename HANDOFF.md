@@ -6,32 +6,34 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-10 (Opus). `main` = `600d9a6`, level with `origin/main`. **#253 and #254 both
-merged; no branches, no stashes, nothing in flight.** Clean point for a `/clear`.
+Refreshed 2026-08-10 (Opus). `main` = `eef9075`, level with `origin/main`. **#256 merged (the
+two winter town BGs); no branches, no stashes, nothing in flight.** Clean point for a `/clear`.
 
 ## In flight
 
 **Nothing.** `origin` has only `main`.
 
-**Nothing has had a `/code-review ultra <PR#>` — that is user-triggered.** #254 had a normal
-`/code-review high`, which found five real defects (all fixed in the squash); #253 shipped
+**Nothing has had a `/code-review ultra <PR#>` — that is user-triggered.** #256 had a normal
+`/code-review medium`, which found five real defects (all fixed before the squash, including a
+doc claim that was wrong about the engine); #254 had a `high` (five, likewise fixed); #253 shipped
 unreviewed.
 
 ## Next task
 
-**Nicolas's call 2026-08-10: go back to the outlying ch04-era issues before any more ch05.**
-Three cosmetic items, all with decided fixes already written on their issues:
+**#24 — paint snowy-bern's `BRIDGE_SNAG` metatile 36**, the last of the three ch04-era cosmetic
+items (the other two landed in #256). The ch04 snag currently falls into a *stone bridge*:
+metatile 36 is DECLARED `TERRAIN_BRIDGE_SNAG` but never painted (a flat orange square), so
+`_is_blank_metatile` refuses it and `CH04_SNAG_BRIDGE_TILE = 2` — the masonry bridge this map
+already lays over this river — is the fallback. Paint a snow-dusted fallen trunk, point the
+constant at it, drop the fallback.
 
-1. **#24 — paint snowy-bern's `BRIDGE_SNAG` metatile 36.** The ch04 snag currently falls into a
-   *stone bridge*: metatile 36 is DECLARED as `TERRAIN_BRIDGE_SNAG` but never painted, so
-   `_is_blank_metatile` refuses it and `CH04_SNAG_BRIDGE_TILE = 2` (the ordinary masonry bridge
-   this map already lays over this river) is the fallback. Paint a snow-dusted fallen trunk,
-   point the constant at it, drop the fallback. `ch04snag` gates the mechanism and **cannot see
-   the art** — this needs an eyes-on frame.
-2. **#21 — Bryn Shander BG** → FE-Repo `Fenriel's BG/Winter BG 06` (Baxby's recruit currently
-   plays over a green summer village).
-3. **#27 — Bremen BG** → `Winter BG 04`. Both are already 240x160. Don't reuse
-   `BG_MS_TARGOS_WINTER` a third time.
+**Read the [2026-08-10 handover comment on #24](https://github.com/NicoviGH/manchego-stars/issues/24#issuecomment-list)
+before starting** — every file, constant and guard is named there, plus the lead that
+`snowy-fields` (a sibling tileset already in-repo) has four PAINTED `BRIDGE_SNAG` metatiles that
+may be transplantable, and the reason that lead is **unconfirmed** (rendered, they read as icy
+ford, not a trunk: `docs/demo/ch04-bridge-snag-candidates.png`). `map_tileset_tool.py` has no
+paint path yet; that gap is part of the task. `ch04snag` gates the mechanism and **cannot see the
+art** — it PASSes today with the wrong tile, so this needs an eyes-on frame.
 
 **ch05's remaining work is all on #25** and is text/art, not mechanics. The one with a hard
 prerequisite is **`0x9C5`**: the eruption beat is written and LOCKED but cannot go on screen
@@ -53,6 +55,10 @@ boxless). Same blocker, one fix. Also owed: the Basil→Sahnar recruit text (`0x
   (raider AI → the tile flips to ruins, no gift, its event id never sets) and saving all four
   pays out vanilla's Guiding Ring at the ending. The `crest-of-cold-iron` is RETIRED: vanilla
   Ch5 has zero droppers, so Ravisin drops nothing and the relic is the race's prize.
+- **Bryn Shander's ch01 ending and Bremen's reserved ch07 backdrop are vendored winter CGs**
+  (#256). Bremen is banked at **8** palettes and nothing references it yet: ch07 must show it with
+  a plain `BACG` or reconvert at `--banks 6`, because the fade/transition procs apply only six
+  (`decisions.md` → the `bg_to_fe8.py` refit entry).
 - **The race is wired but UNANNOUNCED** until `0x9C5` gets on screen (above). Today the only
   warning is reliquary-south's line plus the engine's "The village was destroyed." popup.
 - **ch05's opening and recruit still play VANILLA prose.** In-game this looks like a bug and is
