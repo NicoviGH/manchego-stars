@@ -44,6 +44,15 @@ Read these at the top of every session before touching code:
 4. The current chapter or feature YAML/source file being worked on
 5. `git status` + `git log --oneline -10`
 
+> **Before you run a playtest scenario, read this.** Nicolas watches every run happen, and since
+> the matrix landed the standing complaint is *"I have seen you run old scenes a million times
+> and it has to stop"* (2026-08-10). **Never run the full `make matrix` gate locally.** Run only
+> the scenarios that could possibly be affected by what you changed, and **never run anything
+> after a merge** — a run whose result cannot change your next action is pure cost. When a
+> scenario fails, spend **one instrumented run** that dumps everything your next three
+> hypotheses would need, not one run per guess. Long form + what it cost: `docs/decisions.md` →
+> "Playtest runs are the most expensive thing in this repo". The permanent fix is **#255**.
+
 ## Key File Locations
 
 | What | Where |
