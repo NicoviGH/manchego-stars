@@ -43,10 +43,12 @@ boxless). Same blocker, one fix. Also owed: the Basil→Sahnar recruit text (`0x
 ## Current state
 
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
-- **Gate: `make matrix` (SUITE=gate) is the merge condition, ~7 min, 18 scenarios.** The two new
-  ones are `ch05raid` and `ch05crest`; `SUITE=ch05` now lists all five (it was stale).
-  **How much to run, and how to debug a failure without re-running: `CLAUDE.md` → the matrix row,
-  long form in `decisions.md`.** Not restated here — it is a standing rule, not live state.
+- **The full `make matrix` gate is NOT to be run locally any more** (Nicolas, 2026-08-10). Run the
+  chapter suite or `matrix.py run --scenarios a,b,c`. **#255** is the fix that gives the gate a
+  cheap home (verdict caching); until it lands the gate has none, because CI builds against a mock
+  base ROM and cannot boot mGBA. Rules: `CLAUDE.md` → the matrix row, long form in `decisions.md`.
+- `ch05raid` and `ch05crest` are new; `SUITE=ch05` now lists all five ch05 scenarios (it was stale,
+  carrying `ch05village` alone).
 - **ch05's village-raid RACE is wired and proven in-engine (#254).** A reliquary can be lost
   (raider AI → the tile flips to ruins, no gift, its event id never sets) and saving all four
   pays out vanilla's Guiding Ring at the ending. The `crest-of-cold-iron` is RETIRED: vanilla

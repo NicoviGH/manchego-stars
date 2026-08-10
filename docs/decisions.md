@@ -4150,10 +4150,14 @@ separate wastes and only one of them is about suite size.
 - Touched one chapter's constants → that chapter's suite (`SUITE=ch05`, ~11s cached).
 - Touched an arbitrary subset → `matrix.py run --scenarios a,b,c`.
 - Touched a SHARED helper (`location_events`, `collectedItems`, `village_script`, anything in
-  `harness.lua`'s common section) → the affected chapters' scenarios, which is what the gate is
-  *for*; background it, never sit on it.
-- **Never after a merge.** CI has already built and checked; a gate run whose result cannot
-  change a decision is pure cost. If the result would not change what you do next, do not run it.
+  `harness.lua`'s common section) → name the affected chapters' scenarios explicitly.
+- **Do not run the full `make matrix` gate locally** (Nicolas, 2026-08-10: *"I dont want you to
+  run the 7 min gate thing anymore"*). It re-executes eighteen scenarios that were green minutes
+  ago. Until **#255** lands a verdict cache it has no cheap home, and CI cannot take it: CI
+  builds against a MOCK base ROM (`head -c 16M /dev/urandom`), because the real FE8 ROM is
+  copyrighted and not in the repo, and random bytes do not boot in mGBA.
+- **Never after a merge.** CI has already built and checked; a run whose result cannot change a
+  decision is pure cost. If the result would not change what you do next, do not run it.
 - The chapter suites are a SINGLE SOURCE and they go stale: `ch05` still listed `ch05village`
   alone long after three more ch05 scenarios landed in `gate`. Adding a scenario means adding it
   to its chapter suite too, not just to `gate`.
