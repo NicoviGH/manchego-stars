@@ -2052,6 +2052,17 @@ nearly verbatim. What changes is only the fiction around it:
 Wolfram had also gone under-used — this gives him an on-screen role the campaign was missing.
 _Decided: May 2026; superseded 2026-07-29 (Nicolas + CLAUDE, ch05 dialogue pass)._
 
+**Arena presentation: winter is campaign-wide; attendants remain chapter-owned.**
+The arena stays mechanically and structurally vanilla, but every *Rime of the Frostmaiden* arena
+uses a campaign-owned cold-grey palette over the unchanged vanilla graphics/TSA so the recurring
+system belongs to the endless winter. The default attendant remains FE8's human Arena Master;
+ch05 alone overrides him with Generic Pretsel's armored skeleton, a courteous dead elven
+functionary still operating the tomb's ancient arena. The selection is data-driven at two levels
+(campaign palette, chapter face), additive rather than a shared-asset overwrite, and falls back to
+the vanilla palette/face when either setting is absent. Implementation scope and acceptance criteria
+live in issue #265.
+_Decided: 2026-08-11 (Nicolas; #265)._
+
 **Gold availability follows vanilla FE8 — no per-chapter clear bonus**
 FE8 grants gold only from in-map sources, never a flat "chapter cleared" stipend
 (verified in the decomp: the prologue/Ch1/Ch2 event scripts give zero gold). Our gold
