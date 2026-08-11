@@ -1739,6 +1739,89 @@ class Ch05ReliquaryVisits(unittest.TestCase):
         self.assertIn((152, 112, 72), south_rgb, 'the skull shading was recoloured away')
 
 
+class RavisinPortrait(unittest.TestCase):
+    """Ravisin is a named raw-pid boss, not a cast member (#19 / #25).
+
+    Her approved art is a deterministic palette edit of Garytop's FE-Repo Aversa mug.
+    The source sheet stays the authority; the derived bust may change colours only, never
+    geometry. Because her on-map pid is 0xb8 rather than a CHARACTER_* identity slot, the
+    raw CharacterData entry also needs an explicit portraitId or battle/status screens remain
+    faceless even after the Riev portrait graphics are dressed.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def test_approved_vendor_palette_edit_changes_only_declared_colours(self):
+        bust_dir = bc._bust_dir(self.CAMPAIGN)
+        source = os.path.join(bust_dir, 'vendor', bc.RAVISIN_VENDOR_MUG)
+        derived = os.path.join(bust_dir, 'ravisin.png')
+        self.assertTrue(os.path.isfile(source), 'missing vendored FE-Repo Aversa source')
+        self.assertTrue(os.path.isfile(derived), 'missing deterministic Ravisin bust')
+
+        src = Image.open(source).convert('RGB').crop((0, 0, 96, 80))
+        got = Image.open(derived)
+        self.assertEqual(('P', (96, 80)), (got.mode, got.size))
+        self.assertLessEqual(len(set(got.getdata())), 16)
+        transparent_key = src.getpixel((0, 0))
+        expected = [
+            bc.PORTRAIT_TRANSPARENT_RGB
+            if pixel == transparent_key
+            else bc.RAVISIN_RECOLOR.get(pixel, pixel)
+            for pixel in src.getdata()
+        ]
+        self.assertEqual(expected, list(got.convert('RGB').getdata()),
+                         'Ravisin must be an exact palette substitution, never redrawn pixels')
+        self.assertEqual(0, sum(bc.portrait_tool.clipped_mask(got)),
+                         'the approved crown/mantle must clear FE8\'s portrait dead zone')
+
+    def test_ravisin_dresses_collision_free_riev_and_normalizes_its_geometry(self):
+        self.assertEqual('Riev', bc.GUEST_PORTRAIT_MAP['ravisin'])
+        self.assertEqual(('ravisin', 'Riev', 0x48, 'Ravisin'),
+                         bc.RAW_PID_PORTRAITS[bc.CH05_BOSS_PID])
+        slots = list(bc.PORTRAIT_MAP.values()) + list(bc.GUEST_PORTRAIT_MAP.values())
+        self.assertEqual(len(slots), len(set(slots)), 'Ravisin collides with another portrait')
+        self.assertIn('Riev', bc.dressed_portrait_slots(self.CAMPAIGN),
+                      'dressed Riev slot would keep its vanilla mouth/eye geometry')
+
+    def test_raw_boss_pid_gets_the_riev_identity(self):
+        source = '''[0xb8 - 1] = {
+        .nameTextId = 0x255,
+        .defaultClass = CLASS_ARCH_MOGALL,
+        .miniPortrait = 0x4,
+        .baseHP = 0,
+        .basePow = 0,
+        .baseSkl = 0,
+        .baseSpd = 0,
+        .baseDef = 0,
+        .baseRes = 0,
+        .baseLck = 0,
+        .baseCon = 0,
+    },'''
+        patched = bc.raw_pid_portrait_data(source, self.CAMPAIGN)
+        self.assertIn('.nameTextId = 0x246,', patched)
+        self.assertNotIn('.nameTextId = 0x255,', patched)
+        self.assertIn('.portraitId = 0x48,', patched)
+        self.assertEqual(1, patched.count('.portraitId'))
+        self.assertIn('.miniPortrait = 0x4,', patched)
+
+        ravisin = next(enemy for enemy in bc._load_chapter_yaml(
+            self.CAMPAIGN, bc.CH05_CHAPTER_YAML)['enemy_units']
+            if enemy['id'] == 'ravisin')
+        for field in bc.BASE_FIELDS:
+            self.assertIn('.%s = %d,' % (field, ravisin['personal'].get(field, 0)), patched)
+
+    def test_name_injector_retitles_the_repurposed_riev_slot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            texts = os.path.join(tmp, 'texts.txt')
+            with open(texts, 'w', encoding='utf-8') as f:
+                f.write(bc.vanilla_decomp_text('texts/texts.txt'))
+            with mock.patch.object(bc, 'TEXTS_TXT', texts):
+                bc.inject_names(self.CAMPAIGN, verbose=False)
+            with open(texts, encoding='utf-8') as f:
+                written = f.read()
+        body = re.search(r'## MSG_246\n(.*?)(?=\n## MSG_)', written, re.S).group(1)
+        self.assertEqual('Ravisin[.][X]', body.strip())
+
+
 class Ch05VillageRaidRace(unittest.TestCase):
     """ch05's declared structure: the eruption's dead race the party for the four reliquaries,
     and saving all four pays out (#25). Vanilla Ch5 is the reference for both halves -- it wires

@@ -4390,6 +4390,38 @@ scenarios.recordcast = function()
         "%s: map sprite + status screen captured (pid 0x%02X at (%d,%d))", name, pid, u.x, u.y))
 end
 
+-- RECORDRAVISIN (#19): the named ch05 boss is a raw CharacterData pid (0xB8), so she cannot
+-- ride recordcast's blue CAST sandbox. Capture her on the real CH05BOOT map instead: the red
+-- unit's live FE8 status screen proves the raw pid -> portraitId binding as well as the dressed
+-- Riev graphics. A source-sheet preview cannot prove either half of that connection.
+scenarios.recordravisin = function()
+    local pid, name = 0xB8, "ravisin"
+    if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
+    pokeFastConfig()
+    if not waitFor(function()
+        return faction() == 0 and not menuOpen()
+            and not procActive(SYM.ProcScr_StdEventEngine)
+            and controllerState() == "player_map_idle"
+    end, 6000, true) then
+        return result("FAIL", "ch05 never returned player control")
+    end
+    local u = red(pid)
+    if not u then return result("FAIL", "Ravisin (pid 0xB8) is not in the red array") end
+    if not cursorTo(u.x, u.y) then
+        return result("FAIL", string.format("cursor never reached Ravisin at (%d,%d)", u.x, u.y))
+    end
+    wait(30)
+    shot(name .. "-mapsprite")
+    press(K.R); wait(20)
+    if not waitFor(function() return procActive(SYM.gProcScr_StatScreen) end, 240) then
+        return result("FAIL", "Ravisin's status screen never opened")
+    end
+    wait(45)
+    shot(name .. "-portrait")
+    return result("PASS", string.format(
+        "Ravisin: real ch05 status screen captured (raw pid 0x%02X at (%d,%d))", pid, u.x, u.y))
+end
+
 -- Back-compat alias: recordrbgtest == recordanim for RBG.
 scenarios.recordrbgtest = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end

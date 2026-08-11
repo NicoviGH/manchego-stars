@@ -96,6 +96,8 @@
 #                      tools/playtest/make_gif.py recordanim braulo --name braulo-anim --open
 #                    A staff-only unit (sclorbo) FAILs cleanly: no attack = no combat anim.
 #                    Build TESTCH=1 first. (recordrbgtest is the back-compat alias for RBG.)
+#   recordravisin -- Ravisin's live enemy status-screen portrait on the real ch05 map
+#                    (needs CH05BOOT=1; proves raw pid 0xB8 -> dressed Riev portrait binding).
 #   recordunitlist -- the map-menu "Unit" screen (Character list) on a `make TESTCH=1` ROM (#218):
 #                    boots straight into the Ch1 sandbox with the whole cast deployed, opens the
 #                    list semantically off gMapMenuItems[0] (overrideId 0x6E), shoots every page,

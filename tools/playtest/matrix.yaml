@@ -262,6 +262,10 @@ scenarios:
   ch05crest:
     rom: ch05boot
     host_chapter: 6
+  recordravisin:
+    rom: ch05boot
+    host_chapter: 6
+    kind: record
   ch04snag:
     rom: ch04boot
     host_chapter: 5

@@ -12,6 +12,10 @@ Authored FE8 talking-portrait busts, one `<unit>.png` per cast/recruit/guest.
   `guest_vendor_busts.py`; art records live in the chapter YAML's unit `art:` blocks). The
   build dresses a guest's vanilla slot whenever `<unit>.png` exists here (`GUEST_PORTRAIT_MAP`
   in `tools/build_campaign.py`).
+- **Ravisin:** `ravisin.py` crops Garytop's vendored F2E Aversa sheet and applies only the
+  approved seven-entry hair/skin palette substitution. Her brown markings and all geometry
+  remain source-identical; the resulting bust dresses Riev while raw pid `0xb8` points at its
+  portrait and retitled name slot (`MSG_246` -> `Ravisin`).
 
 ## Pipeline
 
