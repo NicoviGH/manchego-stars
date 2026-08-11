@@ -38,7 +38,7 @@ way you'd give up a fever.
   Reason: our story never pays the name off, so its only appearances would be lore-drops in
   places too small to carry them — which is exactly how it went wrong (it was, briefly, the
   goddess's SOLE proper-name drop in ch05, sitting in a one-box death quote). Checked
-  2026-07-29: 9BC ×2, 9C5 ×1 and 9C7 all use the epithet.
+  2026-08-11: 9BC ×2, 9C7 and 9C8 use the epithet; the revised eruption warning does not.
 
 ## Voice
 

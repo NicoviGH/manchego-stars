@@ -1822,6 +1822,66 @@ class RavisinPortrait(unittest.TestCase):
         self.assertEqual('Ravisin[.][X]', body.strip())
 
 
+class Ch05EruptionWarning(unittest.TestCase):
+    """The turn-2 race warning belongs to ch05's HOST block, not its vanilla-Ch5 twin.
+
+    The YAML label ``vanilla 0x9C5`` describes scene anatomy. Literal 0x9C5 is ch04's
+    status-objective string, so using it here silently overwrites another chapter while
+    every text decoder remains green. The warning also has to precede Sahnar's LOAD: the
+    final locked box is Ravisin deciding to use the blade under the stone.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+
+    def test_warning_owns_a_named_id_from_ch05s_real_host_block(self):
+        self.assertTrue(hasattr(bc, 'CH05_ERUPTION_MSG'),
+                        'ch05 needs a named host-block id for the eruption warning')
+        self.assertEqual(0x9E4, bc.CH05_ERUPTION_MSG)
+        self.assertTrue(0x9E4 <= bc.CH05_ERUPTION_MSG <= 0x9F3)
+        self.assertNotEqual(bc.CH04_GOAL_STATUS_MSG, bc.CH05_ERUPTION_MSG)
+        self.assertIn(bc.CH05_ERUPTION_MSG, bc.HOSTED_CHAPTER_MESSAGE_IDS['ch05'])
+        self.assertEqual('ch05', bc.assert_message_ids_unique()[bc.CH05_ERUPTION_MSG])
+
+    def test_locked_four_boxes_emit_one_faced_ravisin_message(self):
+        self.assertTrue(hasattr(bc, 'ch05_eruption_message'),
+                        'the locked YAML beat needs a message emitter')
+        event = next(e for e in self._chap()['events'] if e['trigger'] == 'eruption_turn')
+        self.assertEqual(4, len(event['script']))
+        self.assertEqual({'ravisin'}, {next(iter(box)) for box in event['script']})
+        for box in event['script']:
+            self.assertLessEqual(len(bc._wrap_fe_lines(next(iter(box.values())), 29)), 2)
+
+        body = bc.ch05_eruption_message(self._chap())
+        self.assertIn('[LoadFace][FID_Riev]', body)
+        self.assertEqual(4, body.count('[A]'))
+        for box in event['script']:
+            for word in next(iter(box.values())).replace("'", '').split()[:3]:
+                self.assertIn(word, body)
+
+    def test_turn_two_stages_the_warning_before_sahnar_rises(self):
+        self.assertTrue(hasattr(bc, 'ch05_wave_script'),
+                        'the wave script needs a testable owner for its ordering')
+        script = bc.ch05_wave_script(2, 'MS_Ch05WaveT2', 'MS_Ch05Sahnar')
+        self.assertEqual(1, script.count('TEXTSHOW(0x%X)' % bc.CH05_ERUPTION_MSG))
+        self.assertIn('CUMO_CHAR(%s)' % bc.CH05_BOSS_PID, script)
+        self.assertLess(script.index('LOAD1(0x1, MS_Ch05WaveT2)'),
+                        script.index('CUMO_CHAR(%s)' % bc.CH05_BOSS_PID))
+        self.assertLess(script.index('CUMO_CHAR(%s)' % bc.CH05_BOSS_PID),
+                        script.index('TEXTSHOW(0x%X)' % bc.CH05_ERUPTION_MSG))
+        self.assertLess(script.index('TEXTSHOW(0x%X)' % bc.CH05_ERUPTION_MSG),
+                        script.index('LOAD1(0x1, MS_Ch05Sahnar)'))
+
+    def test_later_waves_do_not_repeat_the_turn_two_warning(self):
+        self.assertTrue(hasattr(bc, 'ch05_wave_script'),
+                        'the wave script needs a testable owner for its ordering')
+        for turn in (3, 5):
+            script = bc.ch05_wave_script(turn, 'MS_Ch05WaveT%d' % turn)
+            self.assertNotIn('TEXTSHOW(', script)
+            self.assertNotIn('CUMO_CHAR(', script)
+
+
 class Ch05VillageRaidRace(unittest.TestCase):
     """ch05's declared structure: the eruption's dead race the party for the four reliquaries,
     and saving all four pays out (#25). Vanilla Ch5 is the reference for both halves -- it wires

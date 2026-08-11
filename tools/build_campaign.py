@@ -7900,6 +7900,7 @@ CH05_GOAL_DONOR = 7                              # vanilla slot 7 = a clean defe
                                                  # is in the middle of replacing.
 # ch05's goal strings come from its HOST SLOT's dead block (vanilla Ch6 = 0x9E4..0x9F5), not
 # from vanilla Ch5's -- ch04 hosts on slot 5 and already owns that block (#207).
+CH05_ERUPTION_MSG = 0x9E4                     # turn-2 Ravisin warning; first free Ch6-host id
 CH05_GOAL_WINDOW_MSG = 0x9F4
 CH05_GOAL_STATUS_MSG = 0x9F5
 # Raw charIndexes. Pids need only be unique WITHIN a chapter -- gDefeatTalkList entries carry
@@ -7977,12 +7978,13 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
     # slot 5 and already owns that block. This is the sharpest case of the two offsets: the
     # chapter we MINE and the block we WRITE INTO are different vanilla chapters, and the
     # YAML's `slot: "vanilla 0x9BB"` labels are anatomy references to the mined chapter, not
-    # claims on ids. Only the goal strings are claimed here; the dialogue ids land with the
-    # cutscene pass (#25), and this guard is what will refuse them if any collide.
+    # claims on ids. The eruption warning is the first dialogue claim from that block; later
+    # cutscene ids land with the remaining dialogue pass (#25), and this guard will refuse them
+    # if any collide.
     # The four reliquary visit lines joined the block 2026-08-08 (dialogue-pass). They sit
     # OUTSIDE ch05's host block on purpose -- see CH05_VILLAGE_SLOTS for why that is safe here
     # and why spending ch05's own ids on them was the worse trade.
-    'ch05': (CH05_GOAL_WINDOW_MSG, CH05_GOAL_STATUS_MSG,
+    'ch05': (CH05_ERUPTION_MSG, CH05_GOAL_WINDOW_MSG, CH05_GOAL_STATUS_MSG,
              *(slot[1] for slot in CH05_VILLAGE_SLOTS.values())),
     # Goal ids only -- ch01/ch02 predate the per-chapter block registry, but their goal strings
     # still have to be unique against every other hosted chapter (#207).
@@ -9734,6 +9736,60 @@ def ch05_enemy_rows(chap, arrives_turn=None, exclude=()):
     return rows
 
 
+def ch05_eruption_message(chap):
+    """Render the locked turn-2 Ravisin warning from the chapter YAML.
+
+    The YAML's ``vanilla 0x9C5`` label is an anatomy citation, not a destination: ch04
+    writes that literal id. The caller stores this body at CH05_ERUPTION_MSG, which belongs
+    to the Ch6 host block ch05 actually owns.
+    """
+    _card, beats = _split_event_beats(
+        chap, 'eruption_turn', 'ch05 eruption warning', (CH05_ERUPTION_MSG,),
+        card_required=False)
+    beat = beats[0]
+    speakers = {next(iter(entry)) for entry in beat}
+    if len(beat) != 4 or speakers != {'ravisin'}:
+        sys.exit('ERROR: ch05 eruption warning must remain the four locked Ravisin boxes; '
+                 'got %d boxes from %s' % (len(beat), sorted(speakers)))
+    return _script_to_message(
+        beat,
+        {'ravisin': ('[OpenMidLeft]', _fid_tag(GUEST_PORTRAIT_MAP['ravisin']))},
+        width=29)
+
+
+def ch05_wave_script(turn, wave_table, sahnar_table=None):
+    """Build one ch05 reinforcement script; only turn 2 speaks and wakes Sahnar.
+
+    The order carries the fiction: the arriving dead establish the escalation, Ravisin names
+    the reliquary race and decides to spend the blade under the stone, then Sahnar LOADs.
+    Later waves are silent reinforcements and must not replay the warning.
+    """
+    warning = ''
+    wake = ''
+    if turn == 2:
+        if not sahnar_table:
+            sys.exit('ERROR: ch05 turn-2 wave needs Sahnar\'s wake table')
+        warning = (
+            '    CUMO_CHAR(%s) /* Ravisin answers the party\'s pressure */\n'
+            '    STAL(45)\n'
+            '    CURE\n'
+            '    TEXTSTART\n'
+            '    TEXTSHOW(0x%X) /* four locked boxes: the reliquary race + Sahnar */\n'
+            '    TEXTEND\n'
+            '    REMA\n'
+            % (CH05_BOSS_PID, CH05_ERUPTION_MSG))
+        wake = (
+            '    LOAD1(0x1, %s) /* Sahnar rises from the cracked sarcophagus */\n'
+            '    ENUN\n' % sahnar_table)
+    elif sahnar_table is not None:
+        sys.exit('ERROR: ch05 Sahnar may rise only in the turn-2 eruption script')
+    return ('{\n'
+            '    LOAD1(0x1, %s)\n'
+            '    ENUN\n'
+            '%s%s'
+            '    ENDA\n}' % (wave_table, warning, wake))
+
+
 def inject_ch05(campaign, boot=False, verbose=True):
     """Host Ch5 "The Elven Tomb" (#25) on slot 6: the winterised 1:1 retile of vanilla Ch5,
     the sixteen-strong risen tomb-guard on vanilla Ch5's own fighting tiles, the three
@@ -9944,14 +10000,11 @@ def inject_ch05(campaign, boot=False, verbose=True):
     script = _replace_brace_block(script, CH05_BEGINNING_SCRIPT + '[] =', beginning,
                                   CH05_EVENTSCRIPT_H)
     for turn in sorted(CH05_WAVE_TABLES):
-        # Turn 2 brings the wave AND wakes Sahnar -- one script, two LOADs, so her rise is
-        # the same beat as the eruption that causes it.
-        extra = ('    LOAD1(0x1, %s) /* Sahnar rises from the cracked sarcophagus */\n'
-                 '    ENUN\n' % CH05_SAHNAR_TABLE) if turn == 2 else ''
         script = _replace_brace_block(
             script, CH05_WAVE_SCRIPTS[turn] + '[] =',
-            '{\n    LOAD1(0x1, %s)\n    ENUN\n%s    ENDA\n}'
-            % (CH05_WAVE_TABLES[turn], extra), CH05_EVENTSCRIPT_H)
+            ch05_wave_script(
+                turn, CH05_WAVE_TABLES[turn], CH05_SAHNAR_TABLE if turn == 2 else None),
+            CH05_EVENTSCRIPT_H)
     # The ending: the save-all-four payout, then the win. ch06 is not hosted yet, so the win
     # lands on the dev placeholder exactly as ch03's did until ch04 hosted (chain_ch04_to_ch05
     # advances the real path below).
@@ -9995,6 +10048,7 @@ def inject_ch05(campaign, boot=False, verbose=True):
     set_message_body(lines, host['goal']['statusObjectiveTextId'],
                      name_message_body('Defeat ' + (boss.get('fe_name') or boss['name'])))
     set_message_body(lines, host['goal']['windowTextId'], goal_window_body('Defeat boss'))
+    set_message_body(lines, CH05_ERUPTION_MSG, ch05_eruption_message(chap))
     # The four reliquary visits (#25). Each site's speaker is one of the tomb's risen dead, over
     # BG_HOUSE -- a full-screen backdrop, so these wrap at 42 like the other BG scenes and NOT at
     # the on-map bubble's 29. One `visit_text` entry per BOX, ch04's lesson: the authored A-press
@@ -10008,10 +10062,11 @@ def inject_ch05(campaign, boot=False, verbose=True):
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     _write_chapter_title_card(host, 'Ch.5: ' + chap['title'])
-    # .msg = 0 -> silent, like ch03's grell: Ravisin's authored death quote (0x9C8) belongs to
-    # the cutscene pass, and a faceless line renders boxless. The engine sets the flag either
-    # way -- DisplayDefeatTalkForPid only SHOWS a quote if msg != 0, but SetPidDefeatedFlag
-    # runs regardless (eventinfo.c:595), and the flag is what fires DefeatBoss.
+    # .msg = 0 -> silent, like ch03's grell: Ravisin's authored death quote still needs its own
+    # allocated id from ch05's host block. Her portrait is live now (#259); message ownership is
+    # the remaining seam. The engine sets the flag either way -- DisplayDefeatTalkForPid only
+    # SHOWS a quote if msg != 0, but SetPidDefeatedFlag runs regardless (eventinfo.c:595), and
+    # the flag is what fires DefeatBoss.
     _prepend_defeat_quote(flag_defeat_quote(
         CH05_BOSS_PID, chapter_label_constant(CH05_HOST_INDEX), 'EVFLAG_DEFEAT_BOSS',
         'Ravisin (ch05 boss): silent defeat -> DefeatBoss WIN flag'))

@@ -869,8 +869,9 @@ that force a two-front race. So we keep the twins' maps and layer the theme on t
   **Natasha→Joshua escort** becomes **Basil (Natasha-donor Cleric) chaperoned to Talk Sahnar (Joshua-donor
   Myrmidon)** — a convertible crit-threat you neutralize by recruiting; (b) the **village-raid race**
   becomes the **Phantom-Ship eruption** (injected `EARTHQUAKE`/`TILECHANGE`) spawning undead that raid
-  **spread reward-sites** (elven reliquaries), with the **crest-of-cold-iron** (promotion relic) as the
-  save-all reward — our Guiding Ring. Ch5-magnitude economy incl. the **elven store** (Armory + Vendor);
+  **spread reward-sites** (elven reliquaries), with vanilla's **Guiding Ring** as the save-all reward
+  (the earlier crest-of-cold-iron name was retired 2026-08-09). Ch5-magnitude economy incl. the
+  **elven store** (Armory + Vendor);
   ch05 is the first chapter at/above the FE8-Ch5 reward tier, so stat-boosters + a promotion item unlock
   here (per §Reward budget above).
 
@@ -3179,9 +3180,10 @@ _Decided: 2026-05-29_
 
 **The promotion seam (Ch 8 → 9): foreshadow in the MVP, pay off at Revel's End**
 The MVP plays entirely **unpromoted** (5e levels 1–5); promotions are post-MVP. The seam:
-- **Foreshadow in MVP.** The **Ch 5 (Elven Tomb)** frost-druid boss **Ravisin** drops a
-  *flavored, locked relic* — the **crest of cold iron** ("it hums, but none of you know how
-  to use it yet"). It sits in the convoy, unusable, as a Chekhov's gun for promotion.
+- **Foreshadow in MVP (updated 2026-08-09).** Saving all four **Ch 5 (Elven Tomb)** reliquaries
+  awards vanilla's **Guiding Ring**. The earlier plan for Ravisin to drop a flavored
+  **crest of cold iron** was retired: it had no item id and lived on an unread `drops:` key.
+  The real ring sits in the convoy, unusable, as the same Chekhov's gun for promotion.
 - **Pay off at the seam.** The **first Master-Seal-equivalent** is obtained in/after the
   Revel's End break (**Ch 9**, post-MVP) — diegetically looted from the prison or earned in
   the escape. This matches FE8 holding promotions until the route-split era
@@ -4208,8 +4210,13 @@ rather than handed over for killing the boss.
 **The race also has to be SAID.** Vanilla spends its turn-2 box on the raiders' intent ("steal our
 way through this pathetic town"); ours said only that more dead were coming, so the first warning
 the player got was the engine's "The village was destroyed." popup, after a site was gone.
-`0x9C5` now names the reliquaries. "Houses" and "mausoleums" were both tried and both collide with
-the fiction: the west resident calls the whole tomb *"this house"*, and only Orem is buried here.
+The beat mined from vanilla `0x9C5` now names the reliquaries. Its YAML slot label is anatomy only:
+ch04 writes literal `0x9C5` as its Status objective, while ch05 hosts through `Ch6Events` and writes
+the warning at its own `0x9E4`. That id is named and registered in `HOSTED_CHAPTER_MESSAGE_IDS`, so
+the ownership guard fails before any later scene can double-claim it. "Houses" and "mausoleums"
+were both tried and both collide with the fiction: the west resident calls the whole tomb *"this
+house"*, and only Orem is buried here.
+_Implemented: 2026-08-11 (#260)._
 
 **Two scenarios, because one run cannot walk both paths.** `ch05raid` idles and proves a site is
 LOST (terrain `0x03 → 0x25`, no gift, event id still unset — `TILE_COMMAND_20` changes the tile
