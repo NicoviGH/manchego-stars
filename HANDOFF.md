@@ -6,56 +6,61 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-11 (Codex). `main` contains `10bd92a`, the squash merge of PR #263, plus the
-handoff correction that follows, and is level with `origin/main` after this handoff. **Nothing is
-in flight.** Clean context point for a fresh instance; the local build tree is intentionally dirty
-as recorded below.
+Refreshed 2026-08-11 (Codex). `main` contains `54a4a1b`, the squash merge of PR #266, plus the
+handoff correction that follows, and is level with `origin/main` after this handoff. **Issue #265
+is the only feature in flight:** its local branch has the approved ADR but no implementation and no
+PR. Clean context point for a fresh instance; the generated decomp tree is intentionally dirty as
+recorded below.
 
 ## In flight
 
-**Nothing.** PR #263 is squash-merged as `10bd92a`; issue #262 is closed and parent issue #25's
-Ravisin checkbox is updated. Local `main` is level with `origin/main` after this handoff.
+**#265 — winter Arena presentation.** Local branch: `feat/265-winter-arena-ui`. It contains one
+unpushed documentation commit recording the settled ADR in `docs/decisions.md`; there is **no code,
+no vendored portrait, and no PR yet**. The full executable scope and acceptance checklist live in
+GitHub issue #265, not in a standalone spec. The issue's stale link to the deleted
+`docs/superpowers/specs/...` file was corrected to the ADR during this handoff. Parent #25 now marks
+the arena tutorial and onboarding ledger complete and leaves the #265 presentation checkbox open.
 
-**#263 result:** ch05 now owns `CH05_RAVISIN_DEATH_MSG = 0x9E5` in its real Ch6 host block.
-The locked `boss_death` YAML box renders with Ravisin's live Riev-slot face, while the existing
-`EVFLAG_DEFEAT_BOSS` path still fires the ending. The focused `recordch05ravisindeath` real-map
-proof passed; Nicolas saw Ravisin's quote before the expected unwired-ending dev placeholder.
-Independent review found one Minor testimony mismatch in the recorder comment; `ea41d61` fixed it,
-leaving no findings. Both GitHub `checks` and `build` jobs passed on that exact head; fresh local
-`make check` was drift-clean, `verify_text` decoded 3404 messages with 0 runaway, and both the
-CH05BOOT proof build and final default campaign build were green.
+**#264 result:** PR #266 squash-merged as `54a4a1b`; issue #264 is closed and its short-lived remote
+branch is deleted. Ch05 owns host messages `0x9E6`/`0x9E7` and a one-shot `AREA` event at arena tile
+`(12,6)`. The callback rejects non-blue factions before entering tutorial mode, preserves vanilla's
+camera/cursor/flag flow, and records `arena-wager` in the onboarding ledger. `inject_ch05` consumes a
+dedicated wiring contract, so the onboarding test proves live builder outputs instead of grepping
+for symbol names. The real `ch05arena` proof fired the lesson once, blocked replay, opened semantic
+Arena command `0x62`, reached the inline TalkChoice, deducted the accepted 690G, and generated a
+Pegasus Knight opponent. The apparent duplicate Braulo was disproved: the unit log has one player
+character `0x01`; the similar sprites are tomb guards. Independent review had no remaining findings,
+and GitHub `checks` + `build` passed on reviewed head `8ae6b83` before the squash merge.
 
 ## Next task
 
-**#25 — finish ch05, The Elven Tomb.** Read the live issue before choosing a slice; its checklist
-is authoritative. Mechanics, map, parity, villages, reliquary race, Basil/Sahnar stats and
-Sahnar's battle animation are already wired; the four reliquary conversations are written,
-faced, backdropped and playtested, and Ravisin's turn-2 warning is live. Remaining work is
-dialogue/art: opening + ending, Basil→Sahnar Talk, the five no-Lupin fallbacks, arena tutorial,
-enemy reskins and the onboarding `introduces:` entry. Ravisin's death quote is complete.
+**#265 — implement the approved Arena presentation seam.** Read issue #265, the Arena ADR in
+`docs/decisions.md`, `campaign.yaml`, ch05 YAML, and the real vanilla `ArenaUi_Init` path before
+editing. The design is settled: keep vanilla graphics/TSA and mechanics; use a campaign-owned
+four-bank cold-grey palette throughout Rime; use vanilla human face `0x67` by default; override only
+ch05 with Generic Pretsel's pinned armored-skeleton portrait. Missing configuration must fall back
+to untouched vanilla assets. Runtime support stays campaign-agnostic; campaign palette ownership
+belongs in `campaign.yaml`, and the attendant override belongs in chapter YAML.
 
-**Next slice: wire the arena tutorial and its onboarding ledger entry.** Issue #25 keeps these as
-one coherent seam: the locked vanilla-anatomy messages `0x9D5` + `0x9D6` need host-owned ch05 IDs
-and a one-time flag-gated arena-tile `(12,6)` event, while `introduces:` must claim the arena/wager
-mechanic and `gen_onboarding_index.py` must refresh the generated index. Read the live issue and
-YAML before allocating IDs; add ownership/trigger/onboarding tests first, run focused tests plus
-`verify_text`, and prove only the arena-tile interaction on the real ch05 map. Do not run the full
-matrix.
-
-**Start with the normal feature workflow:** read issue #25, create a focused child issue for this
-slice, then create one short-lived feature branch in this checkout from updated `main`. Do not
-implement directly on `main`, do not create a worktree, and preserve the intentional dirty state
-listed below.
+Continue on `feat/265-winter-arena-ui` after rebasing it onto this handoff commit. Follow the issue's
+TDD order: write failing configuration/fallback/live-call-site tests first; vendor the exact pinned
+FE-Repo asset and credit/source metadata; derive and validate exactly 64 GBA colors; generate the
+campaign/chapter bindings; then extend the existing `ch05arena` proof to capture the cold palette and
+skeleton while retaining its real wager/opponent assertions. Run focused tests, `make check`,
+`verify_text`, a CH05BOOT proof build, and the final default build. Do not run the full matrix. Do not
+create a standalone design/spec document: decision in ADR, execution checklist in issue #265.
 
 ## Current state
 
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
 - **Checkout path:** `/Users/Yonick/Documents/Codex/2026-08-03/Manchego Stars Codex` (the folder
-  was renamed; do not use the former path). Top-level `main` is clean except for the intentionally
-  dirty `fireemblem8u` submodule plus Nicolas's untracked `.agents/` and `AGENTS.md`; preserve all
-  three and stage paths explicitly. The submodule contains the full generated campaign build,
-  not a pointer change to commit. Use a clean temporary checkout when a verification needs vanilla
-  decomp state instead of resetting this working copy behind Nicolas's back.
+  was renamed; do not use the former path). At handoff completion the checkout is on
+  `feat/265-winter-arena-ui`, based on the pushed handoff commit on `main`, with one unpushed ADR
+  commit and no implementation. The top level is otherwise clean except for the intentionally dirty
+  `fireemblem8u` submodule plus Nicolas's untracked `.agents/` and `AGENTS.md`; preserve all three
+  and stage paths explicitly. The submodule contains the full generated campaign build, not a
+  pointer change to commit. Use a clean temporary checkout when a verification needs vanilla decomp
+  state instead of resetting this working copy behind Nicolas's back.
 - **One stash exists:** `stash@{0}: preserve pre-rename local HANDOFF before syncing #24`. It is
   historical insurance; do not apply or drop it casually.
 - **The full `make matrix` gate is NOT to be run locally any more** (Nicolas, 2026-08-10). Run the
@@ -77,6 +82,10 @@ listed below.
 - **Ravisin's locked death quote is live (#263).** It owns host message `0x9E5`, uses her live
   Riev-slot face, and preserves `EVFLAG_DEFEAT_BOSS`; the later dev placeholder is still expected
   because the rest of the ending is not wired yet.
+- **The arena tutorial and its full interaction proof are live (#264/#266).** The reusable
+  `ch05arena` scenario now covers the one-shot lesson and the real Arena command through accepted
+  wager, gold deduction, and opponent generation. Extend it for #265; do not replace it with a
+  palette-only screenshot shortcut.
 - **Ravisin's portrait/name/stats are complete (#259).** Raw pid `0xb8` does not pass through the
   regular cast identity injector, so all three are bound explicitly from the ch05 YAML / Riev
   slot. Do not add autolevel: vanilla Saar proves this boss pattern is class base + personal line.
@@ -89,6 +98,20 @@ listed below.
   checkout, one at a time — **do not create worktrees unless Nicolas explicitly changes that.**
 
 ## Gotchas most likely to bite next (long form in `docs/decisions.md`)
+
+**A sandboxed `gh auth status` is a false negative on this Mac.** It reports NicoviGH's saved token
+as invalid because the restricted process cannot read macOS Keychain. The same command outside the
+sandbox authenticates correctly with `repo`/`workflow` scopes. Do not ask Nicolas to log in again;
+run GitHub CLI commands with the required escalation so `gh` can reach the keyring.
+
+**A sandboxed mGBA GUI crash is not a ROM crash.** The pasted AppKit registration abort happened
+before the ROM ran because the GUI process was launched in the restricted sandbox. Escalated mGBA
+proof runs are normal; diagnose ROM state only after the emulator actually boots.
+
+**Arena proof must follow the real command, not sprite resemblance or token presence.** The action
+menu's semantic Arena id is `0x62`; accepted flow reaches inline `gProcScr_TalkChoice`, mutates gold,
+and generates the opponent in `gArenaState`. Likewise, a live-wiring test must inspect the generated
+builder output and the `inject_ch05` consumer, not merely grep for `CH05_*` names.
 
 **This session's headline: a scenario can FAIL on success, and it will blame the chapter.**
 `ch05crest` reached its PASS state on its first run and reported FAIL three times running. Three
