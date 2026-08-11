@@ -6,9 +6,10 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-11 (Codex). `main` contains `9971e0e`, the squash merge of PR #259, and is
-level with `origin/main` after this handoff. **Nothing is in flight.** Clean context point for a
-fresh instance; the local build tree is intentionally dirty as recorded below.
+Refreshed 2026-08-11 (Codex). `main` contains `9971e0e`, the squash merge of PR #259, plus the
+handoff correction that follows, and is level with `origin/main` after this handoff. **Nothing is
+in flight.** Clean context point for a fresh instance; the local build tree is intentionally dirty
+as recorded below.
 
 ## In flight
 
@@ -33,12 +34,23 @@ faced, backdropped and playtested. Remaining work is dialogue/art: Ravisin's tur
 opening + ending, Basil→Sahnar Talk, the five no-Lupin fallbacks, arena tutorial, Ravisin's death
 quote, enemy reskins and the onboarding `introduces:` entry.
 
-**Next slice: stage Ravisin's locked turn-2 eruption warning at `0x9C5`.** Its portrait dependency
-is now satisfied. Invoke the repository's `dialogue-pass` workflow before inserting the four
-already-approved boxes, claim `0x9C5` in `HOSTED_CHAPTER_MESSAGE_IDS`, add the `TEXTSHOW` beat to
-the turn-2 wave script, run `python3 tools/verify_text.py`, and record/prove that smallest scene
-on the real ch05 map. Once that beat is visible, wire Ravisin's already-authored death quote at
-`0x9C8`; it was silent only because she previously had no face.
+**Next slice: establish ch05's message allocation in its real host block, then stage Ravisin's
+locked turn-2 eruption warning.** Its portrait dependency is now satisfied. The YAML labels
+`vanilla 0x9C5` (eruption) and `vanilla 0x9C8` (death) are **anatomy/source references only**;
+they are not writable destinations. Literal `0x9C5` is already ch04's Status objective, and ch05
+hosts through `Ch6Events`, so allocate named IDs from ch05's own free range `0x9E4..0x9F3`
+(`0x9F4/0x9F5` are its goals), register them in `HOSTED_CHAPTER_MESSAGE_IDS`, and add a collision/
+ownership guard before wiring text. Then insert the four already-approved eruption boxes, add the
+`TEXTSHOW` beat to the turn-2 wave script, run the focused tests plus `verify_text`, and record/prove
+that smallest scene on the real ch05 map. Once that beat is visible, wire Ravisin's locked death
+quote through another allocated host-block ID; it was silent only because she previously had no
+face.
+
+**Start with the normal feature workflow:** read issue #25, create a focused child issue for this
+slice, then create one short-lived feature branch in this checkout from updated `main`. Do not
+implement directly on `main`, do not create a worktree, and preserve the intentional dirty state
+listed below. The previous instance stopped before creating the issue or branch and made no
+implementation changes.
 
 ## Current state
 
@@ -65,8 +77,9 @@ on the real ch05 map. Once that beat is visible, wire Ravisin's already-authored
   (#256). Bremen is banked at **8** palettes and nothing references it yet: ch07 must show it with
   a plain `BACG` or reconvert at `--banks 6`, because the fade/transition procs apply only six
   (`decisions.md` → the `bg_to_fe8.py` refit entry).
-- **The race is wired but UNANNOUNCED** until `0x9C5` gets on screen (above). Today the only
-  warning is reliquary-south's line plus the engine's "The village was destroyed." popup.
+- **The race is wired but UNANNOUNCED** until the eruption warning gets an allocated ch05 host-block
+  ID and reaches the screen (above). Today the only warning is reliquary-south's line plus the
+  engine's "The village was destroyed." popup.
 - **Ravisin's portrait/name/stats are complete (#259).** Raw pid `0xb8` does not pass through the
   regular cast identity injector, so all three are bound explicitly from the ch05 YAML / Riev
   slot. Do not add autolevel: vanilla Saar proves this boss pattern is class base + personal line.
