@@ -2708,6 +2708,22 @@ a missing bust keeps the vanilla face. Guest art records live in the chapter YAM
 no `{pcs,npcs}` YAML).
 _Decided: 2026-06-09 (ch00 guest looks picked by Nicolas: Sephek custom w/ ice dagger; Hlin = Pirate Lady v3
 silver-haired recolor; Scramsax = community Hero mug as-is)._
+_ch05 Ravisin (frost-druid boss): vendored **Aversa {Garytop} [F2E]** from the FE-Repo,
+not generated art. Nicolas approved a strict seven-entry palette substitution on 2026-08-10:
+silver hair -> auburn/chestnut and warm skin -> frost-pale; the original brown face/chest
+markings, black feather mantle, crown, expressions, alpha and every pixel position stay
+unchanged. portraits/ravisin.py byte-regenerates the 96x80 indexed bust from the vendored
+sheet. She dresses collision-free Riev, and her raw on-map pid 0xb8 explicitly points both
+CharacterData.portraitId to Riev's 0x48 and nameTextId to Riev's retitled MSG_246. Her authored
+ch05 YAML `personal` line is also copied onto raw 0xb8's CharacterData bases; unlike regular
+cast members, a raw pid never passes through `patch_character_data`, so leaving that step out
+silently produced a naked Druid even though the balance report saw the intended boss stats.
+Dressing graphics without the portrait binding leaves the boss faceless; leaving the name on
+generic MSG_255 makes the correctly rendered boss read "Monster"; leaving the personal bases
+at zero discards the authored boss line. A named raw-pid guest therefore needs all three pieces
+bound explicitly: portrait, name, and personal CharacterData stats._
+_Decided: 2026-08-10 (Nicolas + Codex; visual palette approval, then deterministic implementation);
+raw-pid personal-stat binding corrected 2026-08-11._
 _ch01 Hruna (Foaming Mugs quest-giver): vendored **Generic Villager {Cynon} [F2E]**, periwinkle→olive-wool
 recolor; rides the generic `Villager_Woman` face slot (FID 0x60). Deliberately departs from book canon (the
 bundled, scarf-wrapped, eyes-only frost-dwarf) in favour of an open, sympathetic "please help us" mug — Nicolas's

@@ -752,6 +752,22 @@ PORTRAIT_MAP = {
     'sahnar':     'Marisa',
 }
 
+# Ravisin is a chapter boss, not a recruit, so she uses the guest portrait path rather than
+# PORTRAIT_MAP's cast-identity machinery. Her approved portrait is Garytop's F2E Aversa mug
+# with a strict seven-entry palette substitution: silver hair -> chestnut and warm skin ->
+# frost-pale. Nicolas approved this exact mapping on 2026-08-10; the original brown markings
+# and every pixel position stay untouched.
+RAVISIN_VENDOR_MUG = 'Aversa {Garytop} [F2E].png'
+RAVISIN_RECOLOR = {
+    (247, 243, 238): (172, 116, 76),
+    (219, 216, 224): (140, 88, 56),
+    (170, 171, 186): (104, 64, 40),
+    (125, 114, 135): (72, 40, 32),
+    (227, 207, 182): (240, 232, 232),
+    (201, 165, 142): (208, 192, 200),
+    (163, 130, 110): (176, 152, 168),
+}
+
 # Prologue cold-open guests ride vanilla character slots outside PORTRAIT_MAP
 # (PROLOGUE_*_SLOT below); these are the portrait files those slots display.
 # Guest busts are OPTIONAL: a missing PNG keeps the vanilla face, so this wiring
@@ -786,6 +802,10 @@ GUEST_PORTRAIT_MAP = {
     # snout ships fully intact (0 clipped px -- verified via clipped_mask). Cutscene-only (the Brute
     # is a raw-pid enemy 0xb6; its death quote is silent, so FID_Caellach appears ONLY in the midmap line).
     'kobold-brute':   'Caellach',
+    # ch05 boss Ravisin is the raw on-map pid 0xb8, but her cutscene/death-quote face dresses
+    # Riev -- a late-game Bishop absent from our ch00-08 and otherwise unused. The raw pid's
+    # CharacterData portraitId is bound separately by RAW_PID_PORTRAITS below.
+    'ravisin':        'Riev',
 }
 
 
@@ -1224,6 +1244,11 @@ def inject_names(campaign, verbose=True):
         unit = load_unit(campaign, unit_id)
         unit.setdefault('id', unit_id)
         name = display_name(unit)
+        text_id = vanilla_name_text_id(slot)
+        set_message_body(lines, text_id, name_message_body(name))
+        if verbose:
+            print('  %-10s -> MSG_%03X (was %s): %s' % (unit_id, text_id, slot, name))
+    for _pid, (unit_id, slot, _portrait_id, name) in sorted(RAW_PID_PORTRAITS.items()):
         text_id = vanilla_name_text_id(slot)
         set_message_body(lines, text_id, name_message_body(name))
         if verbose:
@@ -1714,6 +1739,61 @@ def patch_character_data(campaign, verbose=True):
 
     with open(CHARACTERS_C, 'w', encoding='utf-8') as f:
         f.write(text)
+
+
+def raw_pid_portrait_data(text, campaign):
+    """Bind named raw-pid enemies to their authored identity and personal stat line.
+
+    Raw 0xB0-range CharacterData gaps carry only a generic miniPortrait and omit portraitId,
+    while their nameTextId points at the generic "Monster" message. Repoint the name to the
+    dressed slot's own message and insert the full portrait id after defaultClass (or replace
+    it on a repeat run), while preserving the generic miniPortrait field. Named bosses also
+    need their YAML `personal` bases written here: FE8 adds those CharacterData values to the
+    deployed class bases, exactly as vanilla Ch5 does for Saar.
+    """
+    for pid, (_unit_id, slot, portrait_id, _name) in sorted(RAW_PID_PORTRAITS.items()):
+        marker = '[%s - 1]' % pid.lower()
+        start, end = _find_brace_block(text, marker, CHARACTERS_C)
+        block = text[start:end]
+        block = _set_field(block, 'nameTextId', '0x%X' % vanilla_name_text_id(slot),
+                           CHARACTERS_C, marker)
+        if re.search(r'\.portraitId\s*=', block):
+            block = _set_field(block, 'portraitId', '0x%X' % portrait_id,
+                               CHARACTERS_C, marker)
+        else:
+            pat = re.compile(r'(?m)^(\s*\.defaultClass\s*=\s*[^,\n]+,\s*\n)')
+            block, count = pat.subn(
+                lambda m: m.group(1) + '        .portraitId = 0x%X,\n' % portrait_id,
+                block, count=1)
+            if count != 1:
+                sys.exit('ERROR: .defaultClass insertion point not found in %s entry %s'
+                         % (CHARACTERS_C, marker))
+
+        personal_source = RAW_PID_PERSONAL_SOURCES.get(pid)
+        if personal_source:
+            chapter_yaml, unit_id = personal_source
+            chapter = _load_chapter_yaml(campaign, chapter_yaml)
+            unit = next((enemy for enemy in chapter['enemy_units']
+                         if enemy['id'] == unit_id), None)
+            if unit is None or 'personal' not in unit:
+                sys.exit('ERROR: raw pid %s personal source %s/%s is missing'
+                         % (pid, chapter_yaml, unit_id))
+            for field in BASE_FIELDS:
+                block = _set_field(block, field, int(unit['personal'].get(field, 0)),
+                                   CHARACTERS_C, marker)
+        text = text[:start] + block + text[end:]
+    return text
+
+
+def patch_raw_pid_portraits(campaign, verbose=True):
+    """Write raw_pid_portrait_data() to the decomp CharacterData table."""
+    with open(CHARACTERS_C, encoding='utf-8') as f:
+        text = f.read()
+    text = raw_pid_portrait_data(text, campaign)
+    with open(CHARACTERS_C, 'w', encoding='utf-8') as f:
+        f.write(text)
+    if verbose:
+        print('  %d raw-pid identity binding(s) patched' % len(RAW_PID_PORTRAITS))
 
 
 # --- Milestone B step 3: test-chapter spawn ---------------------------------------
@@ -7832,6 +7912,16 @@ CH05_SAHNAR_PID = '0xba'                         # Sahnar: her own pid so Basil'
                                                  # (#203's lesson). Becomes her CHARACTER_ slot
                                                  # when the recruit pass gives her one (#25).
 CH05_GENERIC_PID = '0x80'                        # autolevelled trash (vanilla Ch6's own generic)
+# Raw CharacterData identity binding. Riev contributes collision-free name/portrait slots:
+# MSG_246 is retitled Ravisin and portrait id 0x48 is dressed from ravisin.png.
+RAW_PID_PORTRAITS = {
+    CH05_BOSS_PID: ('ravisin', GUEST_PORTRAIT_MAP['ravisin'], 0x48, 'Ravisin'),
+}
+# The chapter YAML is the authority for named raw-pid boss bases. These values cannot flow
+# through patch_character_data(), which only visits the regular CHARACTER_* portrait map.
+RAW_PID_PERSONAL_SOURCES = {
+    CH05_BOSS_PID: (CH05_CHAPTER_YAML, 'ravisin'),
+}
 CH05_AI = {
     'aggressive': '{0x0, 0x0, 0x1, 0x0}',        # pursue/charge
     'defensive': '{0x3, 0x3, 0x9, 0x20}',        # hold and strike in range
@@ -10386,6 +10476,7 @@ def main():
         inject_item_icon_pal2(args.campaign)
         print('characters:')
         patch_character_data(args.campaign)
+        patch_raw_pid_portraits(args.campaign)
         print('portrait geometry:')
         patch_portrait_geometry(args.campaign)
         print('map sprites:')

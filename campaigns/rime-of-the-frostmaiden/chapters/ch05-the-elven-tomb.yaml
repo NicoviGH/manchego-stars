@@ -237,9 +237,13 @@ enemy_units:
     #   - NO armour bodyguards. With a real boss line the `frost-sentinel` scaffolding is
     #     redundant (removed 2026-07-23, Nicolas) — the boss carries her own fight.
     death_quote: "Auril… I gave you everything…"
-    skin:                       # Ravisin has authored boss art already; frost-druid palette
-      look: "Ravisin, frost druid (existing boss portrait + Druid class art)"
-      source: authored
+    skin:
+      # APPROVED 2026-08-10 (Nicolas): Garytop's F2E Aversa mug, exact palette edit only.
+      # Silver hair -> auburn/chestnut; warm skin -> frost-pale. Preserve the original brown
+      # face/chest markings, black feather mantle, crown, expressions, geometry and alpha.
+      # Regenerate with portraits/ravisin.py; no generative artwork and no pixel reshaping.
+      look: "Ravisin, frost druid (auburn hair, frost-pale skin, black feather mantle)"
+      source: "FE-Repo Aversa {Garytop} [F2E] — deterministic hair/skin palette swap"
     # NO DROP, and that is vanilla's answer rather than an omission: Ch5 has ZERO droppers in the
     # whole chapter, Saar included — killing the boss pays in winning. Ravisin used to carry a
     # `drops:` block naming a "crest of cold iron"; the injector reads `item_drop:` and never saw

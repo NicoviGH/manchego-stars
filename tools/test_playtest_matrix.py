@@ -448,6 +448,12 @@ class RealManifest(unittest.TestCase):
             self.assertEqual(s.rom, 'ch03boot', name)
             self.assertEqual(s.host_chapter, 4, name)
 
+    def test_the_ravisin_capture_uses_the_real_ch05_map(self):
+        s = self.m.resolve('recordravisin')
+        self.assertEqual(s.rom, 'ch05boot')
+        self.assertEqual(s.host_chapter, 6)
+        self.assertEqual(s.kind, 'record')
+
     def test_the_sandbox_scenarios_need_the_testch_rom(self):
         for name in ('recordanim', 'recordrbgtest', 'recordenemy', 'recordunitlist'):
             self.assertEqual(self.m.resolve(name).rom, 'testch', name)
