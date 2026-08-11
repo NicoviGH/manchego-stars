@@ -176,7 +176,7 @@ class TestPlaytestHarness(unittest.TestCase):
         self.assertIn('chooseAttack(', body)
         self.assertIn('recordCutscene({', body)
         self.assertIn('shotEvery = 1', body,
-                      'the two-frame recorder must capture before it advances the waiting box')
+                      'per-frame capture must preserve the death box before advancing it')
         self.assertIn('controllerState() == "dialogue_wait"', body)
         self.assertIn('eventFlag(2)', body,
                       'the recorder must preserve the DefeatBoss flag as its terminal proof')

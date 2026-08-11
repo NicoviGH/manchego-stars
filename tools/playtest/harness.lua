@@ -7013,7 +7013,8 @@ end
 -- recordch05ravisindeath (#262): the smallest real-map proof for Ravisin's locked death quote.
 -- Setup is unfilmed: boot ch05, park a one-hit Ravisin beside one live melee attacker, and drive
 -- the game's own Attack path. chooseAttack hands control back at the FIRST dialogue wait after
--- Ravisin is dead, so the recorder films the one death box rather than the battle or ending.
+-- Ravisin is dead, so the recorder starts on her death box; the expected unwired-ending placeholder
+-- may follow after EVFLAG_DEFEAT_BOSS is set.
 -- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05ravisindeath (CH05BOOT=1 ROM).
 scenarios.recordch05ravisindeath = function()
     local RAVISIN, boxes = 0xb8, 0
