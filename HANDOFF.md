@@ -6,24 +6,23 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-10 (Codex). `main` contains `fcf0653`, the squash merge of PR #257, and is
+Refreshed 2026-08-11 (Codex). `main` contains `9971e0e`, the squash merge of PR #259, and is
 level with `origin/main` after this handoff. **Nothing is in flight.** Clean context point for a
 fresh instance; the local build tree is intentionally dirty as recorded below.
 
 ## In flight
 
-**Nothing.** PR #257 is squash-merged and issue #24 is closed. The merged branch
-`feat/24-snowy-snag-art` remains locally and on `origin` at `c5ac590`; it is historical only and
-must not be used as the base for new work.
+**Nothing.** PR #259 is squash-merged as `9971e0e`; issue #258 is closed. The remote feature
+branch was deleted and local `main` is level with `origin/main`.
 
-**#24 result:** ch04 now uses the full vanilla three-cell felled-log composition in Snowy Bern
-slots `7 / 36 / 11`, with snowy bank fragments, the original trunk-over-water silhouette and
-Snowy Bern's existing lit palette bank 4. No palette bytes changed. Nicolas approved both the
-enlarged render and the fogged in-engine frame. `ch04snag` passed; 57 focused tests passed; a
-fresh clean checkout passed `python3 tools/check.py`; both GitHub `checks` and `build` jobs passed.
-The Superpowers review found one Important issue before merge: a terrain-correct preferred slot
-could bypass the blank-art guard. Commit `c5ac590` made preferred slots prove both terrain and
-painted art, added a red/green regression test, and received a clean second review.
+**#259 result:** Ravisin now dresses collision-free Riev with Nicolas's approved deterministic
+palette edit of Garytop's FE-Repo Aversa mug (auburn hair, frost-pale skin, original brown
+markings/geometry preserved). Her raw ch05 pid `0xb8` binds to portrait `0x48`, retitled
+`MSG_246`, and the exact YAML `personal` boss line; the live status screen reads Ravisin rather
+than Monster and shows HP 39 / Mag 10 / Skl 9 / Spd 3 / Lck 5 / Def 11 / Res 13. The review found
+no Critical, Important or Minor issues. Both GitHub `checks` and `build` jobs passed; the real-map
+`recordravisin` scenario passed, as did 208 build-campaign tests, 71 matrix tests, all Lua tests,
+and `verify_text` (3404 messages, 0 runaway).
 
 ## Next task
 
@@ -33,11 +32,12 @@ Sahnar's battle animation are already wired. Remaining work is dialogue/art: ope
 four reliquary lines, Basil→Sahnar Talk, the five no-Lupin fallbacks, arena tutorial, Ravisin's
 death quote, enemy reskins and the onboarding `introduces:` entry.
 
-**First hard dependency:** give Ravisin a bust / `PORTRAIT_MAP` entry. She is still the raw boss
-pid `0xb8`; without a face the locked eruption warning at `0x9C5` cannot be staged cleanly and her
-death quote `0x9C8` remains `.msg = 0`. After that, invoke the repository's `dialogue-pass` workflow
-before inserting any of the already-locked ch05 prose, claim the message ids, run
-`python3 tools/verify_text.py`, and use only the smallest relevant ch05 playtest scenarios.
+**Next slice: stage Ravisin's locked turn-2 eruption warning at `0x9C5`.** Its portrait dependency
+is now satisfied. Invoke the repository's `dialogue-pass` workflow before inserting the four
+already-approved boxes, claim `0x9C5` in `HOSTED_CHAPTER_MESSAGE_IDS`, add the `TEXTSHOW` beat to
+the turn-2 wave script, run `python3 tools/verify_text.py`, and record/prove that smallest scene
+on the real ch05 map. Once that beat is visible, wire Ravisin's already-authored death quote at
+`0x9C8`; it was silent only because she previously had no face.
 
 ## Current state
 
@@ -66,6 +66,9 @@ before inserting any of the already-locked ch05 prose, claim the message ids, ru
   (`decisions.md` → the `bg_to_fe8.py` refit entry).
 - **The race is wired but UNANNOUNCED** until `0x9C5` gets on screen (above). Today the only
   warning is reliquary-south's line plus the engine's "The village was destroyed." popup.
+- **Ravisin's portrait/name/stats are complete (#259).** Raw pid `0xb8` does not pass through the
+  regular cast identity injector, so all three are bound explicitly from the ch05 YAML / Riev
+  slot. Do not add autolevel: vanilla Saar proves this boss pattern is class base + personal line.
 - **ch05's opening and recruit still play VANILLA prose.** In-game this looks like a bug and is
   not one: `0x9CC` runs vanilla's Joshua/Natasha scene, and because Hlin Trollbane's bust is
   dressed onto the Natasha slot the player watches *Hlin* talk to *vanilla Joshua*.
