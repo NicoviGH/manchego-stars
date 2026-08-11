@@ -28,9 +28,10 @@ and `verify_text` (3404 messages, 0 runaway).
 
 **#25 — finish ch05, The Elven Tomb.** Read the live issue before choosing a slice; its checklist
 is authoritative. Mechanics, map, parity, villages, reliquary race, Basil/Sahnar stats and
-Sahnar's battle animation are already wired. Remaining work is dialogue/art: opening + ending,
-four reliquary lines, Basil→Sahnar Talk, the five no-Lupin fallbacks, arena tutorial, Ravisin's
-death quote, enemy reskins and the onboarding `introduces:` entry.
+Sahnar's battle animation are already wired; the four reliquary conversations are written,
+faced, backdropped and playtested. Remaining work is dialogue/art: Ravisin's turn-2 warning,
+opening + ending, Basil→Sahnar Talk, the five no-Lupin fallbacks, arena tutorial, Ravisin's death
+quote, enemy reskins and the onboarding `introduces:` entry.
 
 **Next slice: stage Ravisin's locked turn-2 eruption warning at `0x9C5`.** Its portrait dependency
 is now satisfied. Invoke the repository's `dialogue-pass` workflow before inserting the four
