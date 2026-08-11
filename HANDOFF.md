@@ -6,51 +6,46 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-11 (Codex). `main` contains `9971e0e`, the squash merge of PR #259, plus the
+Refreshed 2026-08-11 (Codex). `main` contains `dc88ab6`, the squash merge of PR #261, plus the
 handoff correction that follows, and is level with `origin/main` after this handoff. **Nothing is
 in flight.** Clean context point for a fresh instance; the local build tree is intentionally dirty
 as recorded below.
 
 ## In flight
 
-**Nothing.** PR #259 is squash-merged as `9971e0e`; issue #258 is closed. The remote feature
+**Nothing.** PR #261 is squash-merged as `dc88ab6`; issue #260 is closed. The remote feature
 branch was deleted and local `main` is level with `origin/main`.
 
-**#259 result:** Ravisin now dresses collision-free Riev with Nicolas's approved deterministic
-palette edit of Garytop's FE-Repo Aversa mug (auburn hair, frost-pale skin, original brown
-markings/geometry preserved). Her raw ch05 pid `0xb8` binds to portrait `0x48`, retitled
-`MSG_246`, and the exact YAML `personal` boss line; the live status screen reads Ravisin rather
-than Monster and shows HP 39 / Mag 10 / Skl 9 / Spd 3 / Lck 5 / Def 11 / Res 13. The review found
-no Critical, Important or Minor issues. Both GitHub `checks` and `build` jobs passed; the real-map
-`recordravisin` scenario passed, as did 208 build-campaign tests, 71 matrix tests, all Lua tests,
-and `verify_text` (3404 messages, 0 runaway).
+**#261 result:** ch05 now owns `CH05_ERUPTION_MSG = 0x9E4` in its real Ch6 host block; literal
+`0x9C5` remains ch04's Status objective and appears in ch05 only as vanilla-anatomy documentation.
+Ravisin's four locked boxes play after the turn-2 wave arrives and before Sahnar rises; later waves
+stay silent. The focused real-map `recordch05eruption` proof passed with exactly four guarded
+dialogue advances. The recorder false-failure it exposed is fixed and regression-covered: function
+terminals observe `dialogue_wait` before the recorder consumes it. Independent review found no
+Critical, Important or Minor issues. Both GitHub `checks` and `build` jobs passed; fresh `make check`
+was green with drift clean, and `verify_text` decoded 3404 messages with 0 runaway.
 
 ## Next task
 
 **#25 — finish ch05, The Elven Tomb.** Read the live issue before choosing a slice; its checklist
 is authoritative. Mechanics, map, parity, villages, reliquary race, Basil/Sahnar stats and
 Sahnar's battle animation are already wired; the four reliquary conversations are written,
-faced, backdropped and playtested. Remaining work is dialogue/art: Ravisin's turn-2 warning,
-opening + ending, Basil→Sahnar Talk, the five no-Lupin fallbacks, arena tutorial, Ravisin's death
-quote, enemy reskins and the onboarding `introduces:` entry.
+faced, backdropped and playtested, and Ravisin's turn-2 warning is live. Remaining work is
+dialogue/art: opening + ending, Basil→Sahnar Talk, the five no-Lupin fallbacks, arena tutorial,
+Ravisin's death quote, enemy reskins and the onboarding `introduces:` entry.
 
-**Next slice: establish ch05's message allocation in its real host block, then stage Ravisin's
-locked turn-2 eruption warning.** Its portrait dependency is now satisfied. The YAML labels
-`vanilla 0x9C5` (eruption) and `vanilla 0x9C8` (death) are **anatomy/source references only**;
-they are not writable destinations. Literal `0x9C5` is already ch04's Status objective, and ch05
-hosts through `Ch6Events`, so allocate named IDs from ch05's own free range `0x9E4..0x9F3`
-(`0x9F4/0x9F5` are its goals), register them in `HOSTED_CHAPTER_MESSAGE_IDS`, and add a collision/
-ownership guard before wiring text. Then insert the four already-approved eruption boxes, add the
-`TEXTSHOW` beat to the turn-2 wave script, run the focused tests plus `verify_text`, and record/prove
-that smallest scene on the real ch05 map. Once that beat is visible, wire Ravisin's locked death
-quote through another allocated host-block ID; it was silent only because she previously had no
-face.
+**Next slice: wire Ravisin's locked death quote.** Its portrait and the host-block allocation
+pattern are now proven. The YAML label `vanilla 0x9C8` is an **anatomy/source reference only**;
+allocate the next named ID from ch05's free host range (currently `0x9E5` after the warning),
+register it in `HOSTED_CHAPTER_MESSAGE_IDS`, emit the one locked Ravisin box with her live face,
+and replace the silent `.msg = 0` defeat entry without changing the DefeatBoss flag path. Add the
+ownership/shape/quote-wiring tests first, run focused tests plus `verify_text`, and prove only the
+smallest real-map boss-death scene. Do not run the full matrix.
 
 **Start with the normal feature workflow:** read issue #25, create a focused child issue for this
 slice, then create one short-lived feature branch in this checkout from updated `main`. Do not
 implement directly on `main`, do not create a worktree, and preserve the intentional dirty state
-listed below. The previous instance stopped before creating the issue or branch and made no
-implementation changes.
+listed below.
 
 ## Current state
 
@@ -77,9 +72,8 @@ implementation changes.
   (#256). Bremen is banked at **8** palettes and nothing references it yet: ch07 must show it with
   a plain `BACG` or reconvert at `--banks 6`, because the fade/transition procs apply only six
   (`decisions.md` → the `bg_to_fe8.py` refit entry).
-- **The race is wired but UNANNOUNCED** until the eruption warning gets an allocated ch05 host-block
-  ID and reaches the screen (above). Today the only warning is reliquary-south's line plus the
-  engine's "The village was destroyed." popup.
+- **The reliquary race is now announced on turn 2 (#261).** Ravisin's four boxes live at host-owned
+  `0x9E4`, after the wave LOAD and before Sahnar's rise. Later waves do not replay it.
 - **Ravisin's portrait/name/stats are complete (#259).** Raw pid `0xb8` does not pass through the
   regular cast identity injector, so all three are bound explicitly from the ch05 YAML / Riev
   slot. Do not add autolevel: vanilla Saar proves this boss pattern is class base + personal line.
