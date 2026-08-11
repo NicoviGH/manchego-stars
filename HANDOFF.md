@@ -6,24 +6,24 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-11 (Codex). `main` contains `dc88ab6`, the squash merge of PR #261, plus the
+Refreshed 2026-08-11 (Codex). `main` contains `10bd92a`, the squash merge of PR #263, plus the
 handoff correction that follows, and is level with `origin/main` after this handoff. **Nothing is
 in flight.** Clean context point for a fresh instance; the local build tree is intentionally dirty
 as recorded below.
 
 ## In flight
 
-**Nothing.** PR #261 is squash-merged as `dc88ab6`; issue #260 is closed. The remote feature
-branch was deleted and local `main` is level with `origin/main`.
+**Nothing.** PR #263 is squash-merged as `10bd92a`; issue #262 is closed and parent issue #25's
+Ravisin checkbox is updated. Local `main` is level with `origin/main` after this handoff.
 
-**#261 result:** ch05 now owns `CH05_ERUPTION_MSG = 0x9E4` in its real Ch6 host block; literal
-`0x9C5` remains ch04's Status objective and appears in ch05 only as vanilla-anatomy documentation.
-Ravisin's four locked boxes play after the turn-2 wave arrives and before Sahnar rises; later waves
-stay silent. The focused real-map `recordch05eruption` proof passed with exactly four guarded
-dialogue advances. The recorder false-failure it exposed is fixed and regression-covered: function
-terminals observe `dialogue_wait` before the recorder consumes it. Independent review found no
-Critical, Important or Minor issues. Both GitHub `checks` and `build` jobs passed; fresh `make check`
-was green with drift clean, and `verify_text` decoded 3404 messages with 0 runaway.
+**#263 result:** ch05 now owns `CH05_RAVISIN_DEATH_MSG = 0x9E5` in its real Ch6 host block.
+The locked `boss_death` YAML box renders with Ravisin's live Riev-slot face, while the existing
+`EVFLAG_DEFEAT_BOSS` path still fires the ending. The focused `recordch05ravisindeath` real-map
+proof passed; Nicolas saw Ravisin's quote before the expected unwired-ending dev placeholder.
+Independent review found one Minor testimony mismatch in the recorder comment; `ea41d61` fixed it,
+leaving no findings. Both GitHub `checks` and `build` jobs passed on that exact head; fresh local
+`make check` was drift-clean, `verify_text` decoded 3404 messages with 0 runaway, and both the
+CH05BOOT proof build and final default campaign build were green.
 
 ## Next task
 
@@ -32,15 +32,15 @@ is authoritative. Mechanics, map, parity, villages, reliquary race, Basil/Sahnar
 Sahnar's battle animation are already wired; the four reliquary conversations are written,
 faced, backdropped and playtested, and Ravisin's turn-2 warning is live. Remaining work is
 dialogue/art: opening + ending, Basil→Sahnar Talk, the five no-Lupin fallbacks, arena tutorial,
-Ravisin's death quote, enemy reskins and the onboarding `introduces:` entry.
+enemy reskins and the onboarding `introduces:` entry. Ravisin's death quote is complete.
 
-**Next slice: wire Ravisin's locked death quote.** Its portrait and the host-block allocation
-pattern are now proven. The YAML label `vanilla 0x9C8` is an **anatomy/source reference only**;
-allocate the next named ID from ch05's free host range (currently `0x9E5` after the warning),
-register it in `HOSTED_CHAPTER_MESSAGE_IDS`, emit the one locked Ravisin box with her live face,
-and replace the silent `.msg = 0` defeat entry without changing the DefeatBoss flag path. Add the
-ownership/shape/quote-wiring tests first, run focused tests plus `verify_text`, and prove only the
-smallest real-map boss-death scene. Do not run the full matrix.
+**Next slice: wire the arena tutorial and its onboarding ledger entry.** Issue #25 keeps these as
+one coherent seam: the locked vanilla-anatomy messages `0x9D5` + `0x9D6` need host-owned ch05 IDs
+and a one-time flag-gated arena-tile `(12,6)` event, while `introduces:` must claim the arena/wager
+mechanic and `gen_onboarding_index.py` must refresh the generated index. Read the live issue and
+YAML before allocating IDs; add ownership/trigger/onboarding tests first, run focused tests plus
+`verify_text`, and prove only the arena-tile interaction on the real ch05 map. Do not run the full
+matrix.
 
 **Start with the normal feature workflow:** read issue #25, create a focused child issue for this
 slice, then create one short-lived feature branch in this checkout from updated `main`. Do not
@@ -74,6 +74,9 @@ listed below.
   (`decisions.md` → the `bg_to_fe8.py` refit entry).
 - **The reliquary race is now announced on turn 2 (#261).** Ravisin's four boxes live at host-owned
   `0x9E4`, after the wave LOAD and before Sahnar's rise. Later waves do not replay it.
+- **Ravisin's locked death quote is live (#263).** It owns host message `0x9E5`, uses her live
+  Riev-slot face, and preserves `EVFLAG_DEFEAT_BOSS`; the later dev placeholder is still expected
+  because the rest of the ending is not wired yet.
 - **Ravisin's portrait/name/stats are complete (#259).** Raw pid `0xb8` does not pass through the
   regular cast identity injector, so all three are bound explicitly from the ch05 YAML / Riev
   slot. Do not add autolevel: vanilla Saar proves this boss pattern is class base + personal line.
