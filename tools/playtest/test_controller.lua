@@ -181,6 +181,7 @@ local unitMenu = {
             { slot = 0, override_id = 0x5A, availability = 1 },
             { slot = 1, override_id = 0x6B, availability = 1 },
             { slot = 2, override_id = 0x5C, availability = 1 },
+            { slot = 5, override_id = 0x62, availability = 1 },
         },
     },
 }
@@ -195,6 +196,8 @@ a = action(unitMenu, "attack")
 check(a and a.target, 3, "Attack resolves from semantic id 0x4F")
 a = action(unitMenu, "seize")
 check(a and a.target, 4, "Seize resolves from semantic id 0x4E")
+a = action(unitMenu, "arena")
+check(a and a.target, 5, "Arena resolves from semantic id 0x62")
 a = action(unitMenu, "cancel_menu")
 check(a and a.key, "B", "standard menu cancellation comes from its live B callback")
 check(a and a.source, "menu.on_b=0x0804F000", "menu cancel records the live callback")
@@ -612,6 +615,16 @@ local noHighlighted = {
 check(action(noHighlighted, "answer_no").key, "A", "A commits the highlighted No")
 check(action(noHighlighted, "answer_yes").key, nil, "Yes is not committable while No is up")
 check(action(noHighlighted, "select_yes").key, "LEFT", "LEFT moves the choice back to Yes")
+
+-- Inline [Yes] choices use scene.c's older gProcScr_TalkChoice, not cgtext.c's
+-- gProcScr_YesNoChoice. The arena wager is the first driven flow to expose that distinction.
+local inlineChoice = {
+    procs = proc("talk_choice", "talk_choice_input"),
+    choice = { current = "yes" },
+}
+classify(inlineChoice, "yes_no_choice", "inline talk choice in its key handler")
+check(action(inlineChoice, "answer_yes").key, "A", "A accepts an inline arena wager")
+check(action(inlineChoice, "select_no").key, "RIGHT", "RIGHT moves an inline choice to No")
 
 -- The prompt animating in offers nothing, and says so by name.
 classify({ procs = proc("yes_no", "yes_no_fade"), choice = { current = "yes" } }, "transition",

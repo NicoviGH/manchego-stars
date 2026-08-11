@@ -54,6 +54,7 @@ Symbol = namedtuple('Symbol', 'name type addr')
 # the decomp header they came from.
 WANTED = [
     'gPlaySt',                  # chapter index / phase / turn (include/types.h)
+    'gArenaState',              # accepted wager/opponent state (include/bmarena.h)
     'gBmSt',                    # live map cursor (include/types.h)
     'gUnitArrayBlue',           # player units (include/bmunit.h)
     'gUnitArrayRed',            # enemy units
@@ -134,6 +135,8 @@ WANTED = [
     'YesNoChoice_Loop_KeyHandler', # exact Yes/No input callback. currentChoice is s16 at
                                 # +0x2A: TALK_CHOICE_YES = 1, TALK_CHOICE_NO = 2
                                 # (include/scene.h); A commits whichever is highlighted.
+    'gProcScr_TalkChoice',      # scene.c inline [Yes] choice (arena wager / shop prompts)
+    'TalkChoice_OnIdle',        # exact inline-choice input callback; selectedChoice @ +0x2A
     'ProcScr_AtMenu',           # preparations main-menu owner
     'ProcScr_PrepMenu',         # live semantic preparations command list
     'PrepMenu_CtrlLoop',        # exact preparations input callback

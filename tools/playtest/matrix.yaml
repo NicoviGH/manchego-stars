@@ -253,6 +253,9 @@ scenarios:
   ch05reliquaries:
     rom: ch05boot
     host_chapter: 6
+  ch05arena:
+    rom: ch05boot
+    host_chapter: 6
   ch05recruit:
     rom: ch05boot
     host_chapter: 6
@@ -341,6 +344,7 @@ suites:
     - clear_ch04_parley
     - ch05village
     - ch05reliquaries
+    - ch05arena
     - ch05recruit
     - ch05raid
     - ch05crest
@@ -394,6 +398,7 @@ suites:
   ch05:
     - ch05village
     - ch05reliquaries
+    - ch05arena
     - ch05recruit
     - ch05raid
     - ch05crest
