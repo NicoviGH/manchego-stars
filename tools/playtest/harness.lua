@@ -371,6 +371,7 @@ local CALLBACK_NAMES = {
     [SYM.ChapterIntro_KeyListen_Loop] = "chapter_intro_input",
     [SYM.TalkWaitForInput_OnIdle] = "talk_wait_input",
     [SYM.YesNoChoice_Loop_KeyHandler] = "yes_no_input",
+    [SYM.TalkChoice_OnIdle] = "talk_choice_input",
     [SYM.Menu_OnIdle] = "menu_input",
     [SYM.PrepMenu_CtrlLoop] = "prep_menu_input",
     [SYM.ProcPrepUnit_Idle] = "prep_units_input",
@@ -543,17 +544,21 @@ local function observeController()
     put("chapter_intro", introKey or observedProc(SYM.gProcScr_ChapterIntro))
     put("talk_wait", observedProc(SYM.gProcScr_TalkWaitForInput))
     local yesNo = observedProc(SYM.gProcScr_YesNoChoice)
+    local talkChoice = observedProc(SYM.gProcScr_TalkChoice)
     put("yes_no", yesNo)
-    if yesNo then
-        -- struct YesNoChoiceProc.currentChoice (include/cgtext.h): s16 @ +0x2A,
-        -- TALK_CHOICE_YES = 1 / TALK_CHOICE_NO = 2 (include/scene.h).
-        local choice = rs16(yesNo.addr + 0x2A)
+    put("talk_choice", talkChoice)
+    if yesNo or talkChoice then
+        -- Both struct YesNoChoiceProc.currentChoice (include/cgtext.h) and struct
+        -- TalkChoiceProc.selectedChoice (include/scene.h) are s16 @ +0x2A;
+        -- TALK_CHOICE_YES = 1 / TALK_CHOICE_NO = 2.
+        local choiceProc = yesNo or talkChoice
+        local choice = rs16(choiceProc.addr + 0x2A)
         observation.choice = {
             current = (choice == 1 and "yes") or (choice == 2 and "no") or nil,
             raw = choice,
         }
         if not observation.choice.current then
-            observation.error = string.format("malformed YesNoChoiceProc currentChoice=%d", choice)
+            observation.error = string.format("malformed choice proc currentChoice=%d", choice)
         end
     end
     local rawMenu = anyMenuProc()
@@ -6740,6 +6745,172 @@ scenarios.ch05reliquaries = function()
             .. table.concat(silent, ", "))
     end
     return result("PASS", "all four reliquaries spoke and handed over their own gift")
+end
+
+-- ch05arena (#264): the active onboarding ledger claims a tutorial on the real arena tile.
+-- Park the leader one step away, take the engine's real move+Wait path onto (12,6), and count
+-- the six authored pages. Then step off and back on during the same turn (manually clearing its
+-- acted/moved bits between legal actions) to prove EVFLAG_TMP(13) makes it one-shot. Run:
+-- PT_HOST_CHAPTER=6 tools/playtest/run.sh ch05arena (needs a CH05BOOT=1 ROM).
+scenarios.ch05arena = function()
+    local ARENA_X, ARENA_Y, GUARD, REARM_MASK = 12, 6, 13, 0x42
+    if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
+    pokeFastConfig()
+    if not waitFor(function()
+        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
+            and controllerState() == "player_map_idle"
+    end, 6000, true) then
+        return result("FAIL", "ch05 never settled at player control")
+    end
+    if eventFlag(GUARD) then
+        return result("FAIL", "arena tutorial guard 13 is already set before the tile is entered")
+    end
+    if mapUnitAt(ARENA_X, ARENA_Y) ~= 0 then
+        return result("FAIL", "arena tile (12,6) is occupied before the turn-2 Sahnar wake")
+    end
+    local hero = blue(0x01)
+    if not hero then return result("FAIL", "leader (0x01) is not deployed") end
+    local grid = mapUnitAt(hero.x, hero.y)
+    setMapUnit(hero.x, hero.y, 0)
+    emu:write8(hero.addr + 0x10, ARENA_X); emu:write8(hero.addr + 0x11, ARENA_Y)
+    setMapUnit(ARENA_X, ARENA_Y, grid)
+    if not cursorTo(ARENA_X, ARENA_Y)
+        or not guardedInput("select_unit", "A", "arena staging reach map is generated", function(after)
+            return controllerState(after) == "unit_selected"
+        end, 120) then
+        return result("FAIL", "could not generate the arena staging reach map")
+    end
+    local fromX, fromY
+    for _, d in ipairs({ { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } }) do
+        local x, y = ARENA_X + d[1], ARENA_Y + d[2]
+        if mapUnitAt(x, y) == 0 and reachCost(x, y) < 120 then
+            fromX, fromY = x, y; break
+        end
+    end
+    if not guardedInput("cancel_selection", "B", "arena staging selection returns to the map",
+        function(after) return controllerState(after) == "player_map_idle" end, 120) then
+        return result("FAIL", "could not close the arena staging reach map")
+    end
+    if not fromX then return result("FAIL", "no reachable empty tile beside the arena") end
+    setMapUnit(ARENA_X, ARENA_Y, 0)
+    emu:write8(hero.addr + 0x10, fromX); emu:write8(hero.addr + 0x11, fromY)
+    setMapUnit(fromX, fromY, grid)
+    -- Raw placement updates the unit/grid but not FE8's standing-map-sprite pool. Make the
+    -- engine select and cancel the staged unit once so PlayerPhase's normal cancel path calls
+    -- RefreshUnitSprites before the proof frame; otherwise the old SMS and the live MU can both
+    -- be drawn and make one Braulo look like two.
+    if not cursorTo(fromX, fromY)
+        or not guardedInput("select_unit", "A", "staged unit enters the live reach map",
+            function(after) return controllerState(after) == "unit_selected" end, 120)
+        or not guardedInput("cancel_selection", "B", "staged unit refreshes back to the map",
+            function(after) return controllerState(after) == "player_map_idle" end, 120) then
+        return result("FAIL", "could not refresh the arena staging placement through PlayerPhase")
+    end
+
+    if not moveUnit(fromX, fromY, ARENA_X, ARENA_Y) or not chooseWait() then
+        return result("FAIL", "could not take the live move+Wait path onto the arena")
+    end
+    local pages = 0
+    for _ = 1, 3600 do
+        local state = controllerState()
+        if state == "dialogue_wait" then
+            pages = pages + 1
+            if pages == 1 then
+                INSPECT.units("ch05arena-tutorial")
+                shot("ch05arena")
+            end
+            if not guardedInput("advance_dialogue", "A", "arena tutorial page advances",
+                function(after) return controllerState(after) ~= "dialogue_wait" end, 120) then
+                return result("FAIL", "arena tutorial dialogue did not advance")
+            end
+        elseif eventFlag(GUARD) and not procActive(SYM.ProcScr_StdEventEngine)
+            and state == "player_map_idle" then
+            break
+        else
+            yield()
+        end
+    end
+    if pages ~= 6 then
+        return result("FAIL", string.format(
+            "arena tile fired %d tutorial pages, expected the locked 1+5 anatomy", pages))
+    end
+    if not eventFlag(GUARD) then
+        return result("FAIL", "arena tutorial finished but EVFLAG_TMP(13) stayed unset")
+    end
+    wait(20)
+    shot("ch05arena-after-tutorial")
+
+    -- Re-arm only this unit so we can exercise the same tile twice without advancing to turn 2,
+    -- when Sahnar legitimately occupies it. Every move still goes through FE8's live command menu.
+    hero = blue(0x01)
+    -- Wait sets both US_UNSELECTABLE (0x02) and US_HAS_MOVED (0x40). Clear both: clearing only
+    -- the former makes the unit selectable but leaves every destination outside its own tile.
+    emu:write32(hero.addr + 0x0C, hero.state & (~REARM_MASK))
+    if not moveUnit(ARENA_X, ARENA_Y, fromX, fromY) or not chooseWait() then
+        return result("FAIL", "could not step off the arena for the replay check")
+    end
+    waitFor(function() return controllerState() == "player_map_idle" end, 600, true)
+    hero = blue(0x01)
+    emu:write32(hero.addr + 0x0C, hero.state & (~REARM_MASK))
+    if not moveUnit(fromX, fromY, ARENA_X, ARENA_Y) or not chooseWait() then
+        return result("FAIL", "could not step back onto the arena for the replay check")
+    end
+    local replayed = false
+    for _ = 1, 300 do
+        if controllerState() == "dialogue_wait" then replayed = true; break end
+        if controllerState() == "player_map_idle"
+            and not procActive(SYM.ProcScr_StdEventEngine) then break end
+        yield()
+    end
+    if replayed then
+        return result("FAIL", "arena tutorial replayed after EVFLAG_TMP(13) was set")
+    end
+
+    -- Now exercise the tile's real command rather than stopping at the onboarding event. FE8's
+    -- Arena command is only offered before a unit moves, so re-arm Braulo in place. Seed enough
+    -- money to accept whatever matchup vanilla generates, then prove the accepted wager is
+    -- deducted and a live opponent is built before the instructions page appears.
+    hero = blue(0x01)
+    emu:write32(hero.addr + 0x0C, hero.state & (~REARM_MASK))
+    local beforeGold = 5000
+    emu:write32(SYM.gPlaySt + 0x08, beforeGold)
+    if not moveUnit(ARENA_X, ARENA_Y, ARENA_X, ARENA_Y) then
+        return result("FAIL", "could not open Braulo's command menu on the arena")
+    end
+    if not selectSemantic("arena", "Arena opens its welcome dialogue", function(after)
+        return controllerState(after) == "dialogue_wait"
+    end, 600) then
+        return result("FAIL", "the live arena tile offered no Arena command")
+    end
+    shot("ch05arena-welcome")
+    if ru32(SYM.gArenaState) ~= hero.addr then
+        return result("FAIL", "Arena command opened without binding Braulo as the entrant")
+    end
+    local wager = ru16(SYM.gArenaState + 0x08)
+    if wager <= 0 or wager > beforeGold then
+        return result("FAIL", string.format("arena generated unusable wager %d", wager))
+    end
+    if not guardedInput("advance_dialogue", "A", "welcome advances to the live wager choice",
+        function(after) return controllerState(after) == "yes_no_choice" end, 300) then
+        return result("FAIL", "arena welcome never reached its wager choice")
+    end
+    shot("ch05arena-wager")
+    if not selectSemantic("answer_yes", "accepting the wager shows opponent instructions",
+        function(after) return controllerState(after) == "dialogue_wait" end, 300) then
+        return result("FAIL", "could not accept the arena wager")
+    end
+    if ru32(SYM.gPlaySt + 0x08) ~= beforeGold - wager then
+        return result("FAIL", string.format(
+            "accepted wager %d but gold changed %d -> %d", wager, beforeGold,
+            ru32(SYM.gPlaySt + 0x08)))
+    end
+    if ru32(SYM.gArenaState + 0x04) == 0 then
+        return result("FAIL", "accepted wager reached instructions without a generated opponent")
+    end
+    shot("ch05arena-opponent")
+    return result("PASS", string.format(
+        "arena (12,6) taught once, blocked replay, then Arena accepted %dG and generated its opponent",
+        wager))
 end
 
 -- ch05village (#25): does the SOUTH reliquary at (12,19) actually hand over its Dracoshield?

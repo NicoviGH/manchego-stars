@@ -1926,6 +1926,73 @@ class Ch05RavisinDeathQuote(unittest.TestCase):
         self.assertNotIn('.msg     = 0,', quote)
 
 
+class Ch05ArenaTutorial(unittest.TestCase):
+    """The Elven Tomb inherits vanilla Ch5's arena lesson on a live tile trigger (#264).
+
+    The YAML's ``vanilla 0x9D5 + 0x9D6`` label is anatomy, not permission to write into
+    ch04's host block. The live tutorial therefore owns two ids from ch05's real Ch6 host
+    block and reaches them through a one-shot event on the arena tile itself.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+
+    def _event(self):
+        return next(e for e in self._chap()['events']
+                    if e['trigger'] == 'arena_tile_visited')
+
+    def test_the_two_messages_are_named_owned_and_inside_ch05s_host_block(self):
+        self.assertEqual(0x9E6, bc.CH05_ARENA_FOUND_MSG)
+        self.assertEqual(0x9E7, bc.CH05_ARENA_RULES_MSG)
+        claimed = set(bc.HOSTED_CHAPTER_MESSAGE_IDS['ch05'])
+        for msg in (bc.CH05_ARENA_FOUND_MSG, bc.CH05_ARENA_RULES_MSG):
+            self.assertTrue(0x9E4 <= msg <= 0x9F3)
+            self.assertIn(msg, claimed)
+            self.assertEqual('ch05', bc.assert_message_ids_unique()[msg])
+
+    def test_the_locked_six_boxes_keep_vanillas_one_plus_five_anatomy(self):
+        event = self._event()
+        self.assertEqual('vanilla 0x9D5 + 0x9D6', event['slot'])
+        self.assertEqual(6, len(event['script']))
+        self.assertEqual({'tutorial'}, {next(iter(box)) for box in event['script']})
+
+        found, rules = bc.ch05_arena_messages(self._chap())
+        self.assertEqual(1, found.count('[A]'))
+        self.assertEqual(5, rules.count('[A]'))
+        self.assertIn('[ToggleRed]arena', found)
+        for phrase in ('one-on-one', 'twice', 'will not', 'press the B Button quickly'):
+            self.assertIn(phrase, rules)
+
+    def test_the_misc_list_fires_once_on_exactly_the_arena_tile(self):
+        self.assertEqual('EVFLAG_TMP(13)', bc.CH05_ARENA_TUTORIAL_FLAG)
+        location = bc.ch05_location_events(self._chap())
+        misc = bc.ch05_misc_events()
+        area = ('AREA(%s, %s, 12, 6, 12, 6)'
+                % (bc.CH05_ARENA_TUTORIAL_FLAG, bc.CH05_ARENA_TRIGGER_SCRIPT))
+        self.assertNotIn(area, location)
+        self.assertEqual(1, misc.count(area))
+        self.assertIn('DefeatBoss(%s)' % bc.CH05_ENDING_SCRIPT, misc)
+        self.assertIn('CauseGameOverIfLordDies', misc)
+
+    def test_the_trigger_preserves_tutorial_mode_and_vanillas_event_shape(self):
+        trigger = bc.ch05_arena_trigger_script()
+        self.assertIn('SVAL(EVT_SLOT_2, FACTION_ID_BLUE)', trigger)
+        self.assertIn('CALL(EventScr_UnTriggerIfNotFaction)', trigger)
+        self.assertLess(trigger.index('CALL(EventScr_UnTriggerIfNotFaction)'),
+                        trigger.index('CALL(EventScr_CallOnTutorialMode)'))
+        self.assertIn('SVAL(EVT_SLOT_2, %s)' % bc.CH05_ARENA_TUTORIAL_SCRIPT, trigger)
+        self.assertIn('CALL(EventScr_CallOnTutorialMode)', trigger)
+
+        tutorial = bc.ch05_arena_tutorial_script()
+        self.assertLess(tutorial.index('TEXTSHOW(0x%X)' % bc.CH05_ARENA_FOUND_MSG),
+                        tutorial.index('CAMERA(12, 6)'))
+        self.assertIn('CURSOR_FLASHING(12, 6)', tutorial)
+        self.assertLess(tutorial.index('CAMERA(12, 6)'),
+                        tutorial.index('TEXTSHOW(0x%X)' % bc.CH05_ARENA_RULES_MSG))
+        self.assertIn('ENUT(234)', tutorial)
+
+
 class Ch05VillageRaidRace(unittest.TestCase):
     """ch05's declared structure: the eruption's dead race the party for the four reliquaries,
     and saving all four pays out (#25). Vanilla Ch5 is the reference for both halves -- it wires

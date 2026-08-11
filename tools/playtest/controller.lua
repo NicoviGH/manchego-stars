@@ -17,6 +17,7 @@ local MENU_TALK = 0x5A
 local MENU_VISIT = 0x5C
 local MENU_CHEST = 0x5D
 local MENU_DOOR = 0x5E
+local MENU_ARENA = 0x62
 local MENU_ITEM = 0x67
 local MENU_SUPPLY = 0x69
 local MENU_WAIT = 0x6B
@@ -60,7 +61,8 @@ local function menuKinds(observation)
         if item.override_id == MENU_SEIZE or item.override_id == MENU_ATTACK
             or item.override_id == MENU_BALLISTA_ATTACK
             or item.override_id == MENU_TALK or item.override_id == MENU_CHEST
-            or item.override_id == MENU_DOOR or item.override_id == MENU_ITEM
+            or item.override_id == MENU_DOOR or item.override_id == MENU_ARENA
+            or item.override_id == MENU_ITEM
             or item.override_id == MENU_SUPPLY or item.override_id == MENU_WAIT then unit = true end
         if item.override_id == MENU_END_PHASE then map = true end
     end
@@ -153,19 +155,23 @@ local RULES = {
         -- it would answer "press A", the choice's key handler would CONSUME that A, and the
         -- prompt would be answered by accident with the run still green (#241 review).
         -- General rule for this table: the more SPECIFIC state outranks the more general
-        -- one -- a live YesNoChoice in its key handler owns the A button, whatever else is
-        -- on screen.
+        -- one -- a live choice in its key handler owns the A button, whatever else is on
+        -- screen. FE8 has two implementations: cgtext.c's YesNoChoice and scene.c's inline
+        -- TalkChoice used by [Yes] text controls such as the arena wager.
         name = "yes_no_choice",
         check = function(observation)
-            if not proc(observation, "yes_no") then return rejected("yes_no proc absent") end
-            if not idleIs(observation, "yes_no", "yes_no_input") then
-                return matched("transition", string.format("yes_no idle=%s, not its key handler",
-                    tostring(idleOf(observation, "yes_no"))))
+            local name = proc(observation, "yes_no") and "yes_no"
+                or (proc(observation, "talk_choice") and "talk_choice")
+            if not name then return rejected("choice proc absent") end
+            local input = name == "yes_no" and "yes_no_input" or "talk_choice_input"
+            if not idleIs(observation, name, input) then
+                return matched("transition", string.format("%s idle=%s, not its key handler",
+                    name, tostring(idleOf(observation, name))))
             end
             if not observation.choice then
-                return matched("transition", "yes_no live with no observed choice")
+                return matched("transition", name .. " live with no observed choice")
             end
-            return matched("yes_no_choice", "yes_no in its key handler")
+            return matched("yes_no_choice", name .. " in its key handler")
         end,
     },
     {
@@ -627,6 +633,7 @@ function M.legalActions(observation)
         -- the run stays green (#238).
         addMenuCommand(actions, observation, MENU_CHEST, "open_chest")
         addMenuCommand(actions, observation, MENU_DOOR, "open_door")
+        addMenuCommand(actions, observation, MENU_ARENA, "arena")
         addMenuCommand(actions, observation, MENU_ITEM, "open_items")
         addMenuCommand(actions, observation, MENU_SUPPLY, "open_supply")
         addMenuCommand(actions, observation, MENU_WAIT, "wait")
@@ -757,6 +764,7 @@ M.MENU_SEIZE = MENU_SEIZE
 M.MENU_BALLISTA_ATTACK = MENU_BALLISTA_ATTACK
 M.MENU_TALK = MENU_TALK
 M.MENU_VISIT = MENU_VISIT
+M.MENU_ARENA = MENU_ARENA
 M.MENU_WAIT = MENU_WAIT
 M.MENU_STATUS = MENU_STATUS
 M.MENU_END_PHASE = MENU_END_PHASE

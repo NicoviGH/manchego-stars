@@ -7802,8 +7802,11 @@ CH05_SAHNAR_TALK_MSG = 0x9CC     # the TALK-RECRUIT scene. UNCLAIMED by every ch
                                  # legitimate PLACEHOLDER"). The dialogue pass must MOVE this to
                                  # ch05's block, not overwrite 0x9CC -- it is ch04's neighbourhood.
 CH05_SAHNAR_TALK_FLAG = 'EVFLAG_TMP(7)'   # vanilla Ch5's own Natasha->Joshua CHAR flag, free
-                                          # here: ch05's villages take eid 0 and its Misc list
-                                          # is DefeatBoss + CauseGameOverIfLordDies only.
+                                          # here: ch05's villages use 9..12, and Misc uses 13
+                                          # for the arena tutorial.
+CH05_ARENA_TUTORIAL_FLAG = 'EVFLAG_TMP(13)'  # 7 Talk; 8 prep; 9..12 reliquaries; next free
+CH05_ARENA_TRIGGER_SCRIPT = 'MS_Ch05ArenaTutorialTrigger'
+CH05_ARENA_TUTORIAL_SCRIPT = 'MS_Ch05ArenaTutorial'
 
 # The four reliquary visits. Each rides OUR OWN script (declare_event_script) but shows VANILLA
 # Ch5's own village line, by pointing at the message id that already holds it -- we never WRITE
@@ -7902,6 +7905,8 @@ CH05_GOAL_DONOR = 7                              # vanilla slot 7 = a clean defe
 # from vanilla Ch5's -- ch04 hosts on slot 5 and already owns that block (#207).
 CH05_ERUPTION_MSG = 0x9E4                     # turn-2 Ravisin warning; first free Ch6-host id
 CH05_RAVISIN_DEATH_MSG = 0x9E5                # locked Ravisin death quote; next Ch6-host id
+CH05_ARENA_FOUND_MSG = 0x9E6                  # vanilla 0x9D5 anatomy, in ch05's host block
+CH05_ARENA_RULES_MSG = 0x9E7                  # vanilla 0x9D6 anatomy, in ch05's host block
 CH05_GOAL_WINDOW_MSG = 0x9F4
 CH05_GOAL_STATUS_MSG = 0x9F5
 # Raw charIndexes. Pids need only be unique WITHIN a chapter -- gDefeatTalkList entries carry
@@ -7986,6 +7991,7 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
     # OUTSIDE ch05's host block on purpose -- see CH05_VILLAGE_SLOTS for why that is safe here
     # and why spending ch05's own ids on them was the worse trade.
     'ch05': (CH05_ERUPTION_MSG, CH05_RAVISIN_DEATH_MSG,
+             CH05_ARENA_FOUND_MSG, CH05_ARENA_RULES_MSG,
              CH05_GOAL_WINDOW_MSG, CH05_GOAL_STATUS_MSG,
              *(slot[1] for slot in CH05_VILLAGE_SLOTS.values())),
     # Goal ids only -- ch01/ch02 predate the per-chapter block registry, but their goal strings
@@ -8328,11 +8334,81 @@ def ch05_map_changes(chap, maps_dir):
 
 
 def ch05_location_events(chap):
-    """ch05's Location list: the four reliquaries, each armed with its race flag, plus the
-    elven store. Vanilla Ch5's own list, one for one (four villages, an armory and a vendor)."""
+    """ch05's Location list: the four reliquaries and the elven store."""
     return location_events(chap.get('villages', []),
                            {vid: slot[0] for vid, slot in CH05_VILLAGE_SLOTS.items()},
                            CH05_SHOPS, flags=CH05_VILLAGE_FLAGS)
+
+
+def ch05_misc_events():
+    """ch05's automatic win/lose checks plus the one-shot arena tutorial AREA.
+
+    Vanilla places AREA rows in Misc, whose post-action scan evaluates them against the active
+    unit. Location is reserved for commands such as Village, Armory, and Vendor.
+    """
+    return ('{\n'
+            '    DefeatBoss(%s)\n'
+            '    AREA(%s, %s, 12, 6, 12, 6) /* one-shot arena tutorial (#264) */\n'
+            '    CauseGameOverIfLordDies\n'
+            '    END_MAIN\n}'
+            % (CH05_ENDING_SCRIPT, CH05_ARENA_TUTORIAL_FLAG,
+               CH05_ARENA_TRIGGER_SCRIPT))
+
+
+def ch05_arena_trigger_script():
+    """Player-only AREA target that preserves vanilla's tutorial-mode channel gate."""
+    return ('{\n'
+            '    SVAL(EVT_SLOT_2, FACTION_ID_BLUE)\n'
+            '    CALL(EventScr_UnTriggerIfNotFaction)\n'
+            '    SVAL(EVT_SLOT_2, %s)\n'
+            '    CALL(EventScr_CallOnTutorialMode)\n'
+            '    EVBIT_T(7)\n'
+            '    ENDA\n}' % CH05_ARENA_TUTORIAL_SCRIPT)
+
+
+def ch05_arena_tutorial_script():
+    """Vanilla EventScr_089F23B4 anatomy, pointed at ch05-owned message ids."""
+    return ('{\n'
+            '    TUTORIALTEXTBOXSTART\n'
+            '    SVAL(EVT_SLOT_B, 0xffffffff)\n'
+            '    TEXTSHOW(0x%X)\n'
+            '    TEXTEND\n'
+            '    REMA\n'
+            '    CAMERA(12, 6)\n'
+            '    CURSOR_FLASHING(12, 6)\n'
+            '    STAL(60)\n'
+            '    TUTORIALTEXTBOXSTART\n'
+            '    SVAL(EVT_SLOT_B, 0x28ffff)\n'
+            '    TEXTSHOW(0x%X)\n'
+            '    TEXTEND\n'
+            '    REMA\n'
+            '    ENUT(234)\n'
+            '    CURE\n'
+            '    ENDA\n}' % (CH05_ARENA_FOUND_MSG, CH05_ARENA_RULES_MSG))
+
+
+def ch05_arena_onboarding_wiring(chap):
+    """One contract for every output that makes the active arena-wager claim executable.
+
+    Keeping the Misc row, both scripts, and both messages in one value means ``inject_ch05``
+    cannot grow a declaration that is never placed or text that is never reached. The onboarding
+    guard exercises these generated bodies, then pins the three injection call sites that consume
+    them.
+    """
+    found, rules = ch05_arena_messages(chap)
+    return {
+        'misc': ch05_misc_events(),
+        'scripts': [
+            (CH05_ARENA_TUTORIAL_SCRIPT, ch05_arena_tutorial_script(),
+             'ch05 arena tutorial -- vanilla 0x9D5/0x9D6 anatomy on host-owned ids (#264)'),
+            (CH05_ARENA_TRIGGER_SCRIPT, ch05_arena_trigger_script(),
+             'ch05 arena tile trigger -- one-shot AREA, tutorial-mode gated (#264)'),
+        ],
+        'messages': [
+            (CH05_ARENA_FOUND_MSG, found),
+            (CH05_ARENA_RULES_MSG, rules),
+        ],
+    }
 
 
 def assert_village_tiles_visitable(chap, maps_dir, stem):
@@ -9778,6 +9854,49 @@ def ch05_ravisin_death_message(chap):
         width=29)
 
 
+def _vanilla_message_body(msg_id, source=None):
+    """One committed vanilla message body, immune to the mutable injected text tree."""
+    source = vanilla_decomp_text('texts/texts.txt') if source is None else source
+    match = re.search(r'^## MSG_%03X\n(.*?)(?=\n\n## MSG_|\Z)' % msg_id,
+                      source, re.M | re.S)
+    if not match:
+        sys.exit('ERROR: vanilla MSG_%03X is absent from texts/texts.txt at HEAD' % msg_id)
+    return match.group(1).strip()
+
+
+def _tutorial_plain_boxes(body):
+    """Visible prose per [A] page, discarding FE text controls and layout padding."""
+    boxes = []
+    for page in body.split('[A]'):
+        plain = re.sub(r'\[[^]]+\]', '', page)
+        plain = ' '.join(plain.split())
+        if plain:
+            boxes.append(plain)
+    return boxes
+
+
+def ch05_arena_messages(chap):
+    """The locked arena tutorial as vanilla's exact 1+5 message bodies.
+
+    The YAML is the authored source; vanilla's committed messages are the layout template. The
+    semantic comparison makes a future YAML edit fail rather than silently injecting stale prose,
+    while the template preserves hand-placed line breaks, colour toggles and padding byte for byte.
+    """
+    event = next((e for e in chap.get('events', []) if e.get('trigger') == 'arena_tile_visited'),
+                 None)
+    if event is None:
+        sys.exit('ERROR: ch05 has no arena_tile_visited tutorial event')
+    authored = [_fe_dialogue_text(next(iter(box.values())))
+                .replace('[red]', '').replace('[/red]', '') for box in event.get('script', [])]
+    found = _vanilla_message_body(0x9D5)
+    rules = _vanilla_message_body(0x9D6)
+    vanilla_boxes = _tutorial_plain_boxes(found) + _tutorial_plain_boxes(rules)
+    if authored != vanilla_boxes:
+        sys.exit('ERROR: ch05 arena tutorial is locked to vanilla MSG_9D5 + MSG_9D6 verbatim; '
+                 'YAML boxes differ: %r != %r' % (authored, vanilla_boxes))
+    return found, rules
+
+
 def ch05_ravisin_defeat_quote():
     """The displayed quote and unchanged flag that together drive ch05's boss win."""
     return flag_defeat_quote(
@@ -9837,14 +9956,14 @@ def inject_ch05(campaign, boot=False, verbose=True):
     seven, so squatting would have meant borrowing Ch6's world-map ENCOUNTER rosters -- and
     the name would have lied either way.
 
-    DEFERRED to follow-up passes (all authored, none blocking a load-test): the four
-    reliquary village visits (their `visit_text` is still owed, #25), Basil's Talk recruit of
-    Sahnar (the red-convertible flow already exists -- recruit_initial_faction), the opening/
-    ending cutscenes (dialogue LOCKED in PR #196), the arena tutorial, and the title-card art.
-    ch05's ending parks on the dev placeholder until ch06 hosts, exactly as ch04's did.
+    DEFERRED to follow-up passes: Basil's Talk-recruit prose, the opening/ending cutscenes
+    (dialogue LOCKED in PR #196), and the title-card art. The four reliquary visits and arena
+    tutorial are live. ch05's ending parks on the dev placeholder until ch06 hosts, exactly as
+    ch04's did.
     """
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH05_CHAPTER_YAML)
+    arena_wiring = ch05_arena_onboarding_wiring(chap)
     # A retile inherits vanilla's gift PLACEMENT, not just its terrain. Runs before anything is
     # written: the failure it catches is invisible to the parity read (same items, same total,
     # different tiles), so it has to be a gate rather than a review note.
@@ -9959,8 +10078,7 @@ def inject_ch05(campaign, boot=False, verbose=True):
     # Ravisin's FLAGGED defeat quote sets on her death (step 5) -- CA_BOSS alone fires nothing.
     info = _replace_brace_block(
         info, CH05_EVENT_LISTS['misc'] + '[] =',
-        '{\n    DefeatBoss(%s)\n    CauseGameOverIfLordDies\n    END_MAIN\n}'
-        % CH05_ENDING_SCRIPT, CH05_EVENTINFO_H)
+        arena_wiring['misc'], CH05_EVENTINFO_H)
     # Location = the four reliquary visits + the elven store. The shops are wired for good (a
     # shop needs no script and no text); the visits own their rewards, and each carries its
     # CH05_VILLAGE_FLAGS event id -- the race (#25).
@@ -10065,9 +10183,12 @@ def inject_ch05(campaign, boot=False, verbose=True):
         CH05_EVENTSCRIPT_H, CH05_SAHNAR_TALK_SCRIPT, sahnar_talk_script,
         'ch05 Basil Talks Sahnar down -- CUSA red->blue; prose is vanilla 0x%X until the '
         'dialogue pass (#25)' % CH05_SAHNAR_TALK_MSG)
+    for symbol, body, comment in arena_wiring['scripts']:
+        declare_event_script(CH05_EVENTSCRIPT_H, symbol, body, comment)
     assert_event_scripts_defined(
         CH05_EVENTSCRIPT_H, [slot[0] for slot in CH05_VILLAGE_SLOTS.values()]
-        + [CH05_SAHNAR_TALK_SCRIPT])
+        + [CH05_SAHNAR_TALK_SCRIPT]
+        + [symbol for symbol, _body, _comment in arena_wiring['scripts']])
 
     # 5. Texts + the flagged defeat quote that IS the win trigger.
     with open(TEXTS_TXT, encoding='utf-8') as f:
@@ -10079,6 +10200,8 @@ def inject_ch05(campaign, boot=False, verbose=True):
     set_message_body(lines, host['goal']['windowTextId'], goal_window_body('Defeat boss'))
     set_message_body(lines, CH05_ERUPTION_MSG, ch05_eruption_message(chap))
     set_message_body(lines, CH05_RAVISIN_DEATH_MSG, ch05_ravisin_death_message(chap))
+    for msg_id, body in arena_wiring['messages']:
+        set_message_body(lines, msg_id, body)
     # The four reliquary visits (#25). Each site's speaker is one of the tomb's risen dead, over
     # BG_HOUSE -- a full-screen backdrop, so these wrap at 42 like the other BG scenes and NOT at
     # the on-map bubble's 29. One `visit_text` entry per BOX, ch04's lesson: the authored A-press

@@ -886,8 +886,8 @@ events:
       # (The moose throws its head back and BELLOWS -- then breaks and comes straight at them.)
       - meesmickle: "You had to ask?"
       # (Cue battle. -> PREP -> turn 1.)
-  # ── 0x9D5/0x9D6 — the FORGE's systemic tutorial. Vanilla teaches the arena HERE, in Ch5. ──
-  - trigger: forge_tile_visited   # flag-gated, like vanilla's own arena tutorial
+  # ── 0x9D5/0x9D6 — the arena's systemic tutorial. Vanilla teaches it HERE, in Ch5. ──
+  - trigger: arena_tile_visited   # flag-gated, like vanilla's own arena tutorial
     slot: "vanilla 0x9D5 + 0x9D6"
     type: tutorial
     description: >
@@ -904,8 +904,9 @@ events:
       multiplier, a permadeath risk, a panic button), so it rides vanilla-style tutorial boxes —
       NOT Wolfram's dialogue. His 0x9BE beat is the narrative seed and deliberately states no
       numbers; splitting them is what keeps his voice from turning into a rules manual.
-      OWED WHEN WRITTEN: an `introduces:` entry for the forge/wager mechanic + rerun
-      `gen_onboarding_index.py` (the concept debuts once, and `test_onboarding.py` gates it).
+      ONBOARDING LEDGER: `introduces: arena-wager` above owns this debut; regenerate
+      `docs/ONBOARDING.md` with `gen_onboarding_index.py` (the concept debuts once, and
+      `test_onboarding.py` gates both the ledger and the live wiring).
       RESOLVED 2026-07-29: no gear upgrades. That was the "Forge" label leaking a mechanic we do
       not have; Wolfram's 0x9BE lines promise practice and nothing else.
       TEXT = VANILLA'S, VERBATIM, and that is the finding rather than a shortcut. Because we kept

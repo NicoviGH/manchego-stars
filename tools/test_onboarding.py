@@ -9,10 +9,12 @@ concepts) and the generated-doc freshness, so a drift can't land silently.
 Run:  python3 tools/test_onboarding.py
 """
 import os
+import inspect
 import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import build_campaign as bc
 import gen_onboarding_index as onb
 
 
@@ -64,6 +66,33 @@ class GeneratedDoc(unittest.TestCase):
         if uncovered:
             self.assertIn('Pending', md,
                           'concepts with no chapter coverage must show in a Pending section')
+
+    def test_active_ch05_arena_claim_is_backed_by_live_wiring(self):
+        coverage = [(label, entry) for label, entry in onb.load_chapter_coverage()
+                    if entry.get('concept') == 'arena-wager']
+        self.assertEqual(1, len(coverage))
+        label, entry = coverage[0]
+        self.assertEqual(('Ch 5', 'active'), (label, entry.get('status')))
+
+        chap = bc._load_chapter_yaml('rime-of-the-frostmaiden', bc.CH05_CHAPTER_YAML)
+        wiring = bc.ch05_arena_onboarding_wiring(chap)
+
+        area = ('AREA(%s, %s, 12, 6, 12, 6)'
+                % (bc.CH05_ARENA_TUTORIAL_FLAG, bc.CH05_ARENA_TRIGGER_SCRIPT))
+        self.assertEqual(1, wiring['misc'].count(area))
+        self.assertEqual(
+            [bc.CH05_ARENA_TUTORIAL_SCRIPT, bc.CH05_ARENA_TRIGGER_SCRIPT],
+            [symbol for symbol, _body, _comment in wiring['scripts']])
+        self.assertEqual(
+            [bc.CH05_ARENA_FOUND_MSG, bc.CH05_ARENA_RULES_MSG],
+            [msg_id for msg_id, _body in wiring['messages']])
+
+        inject = inspect.getsource(bc.inject_ch05)
+        self.assertEqual(1, inject.count('ch05_arena_onboarding_wiring(chap)'))
+        for output in ("arena_wiring['misc']", "arena_wiring['scripts']",
+                       "arena_wiring['messages']"):
+            self.assertIn(output, inject,
+                          'inject_ch05 does not consume live onboarding output %s' % output)
 
 
 if __name__ == '__main__':
