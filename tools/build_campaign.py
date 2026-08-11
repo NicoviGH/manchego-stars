@@ -5797,20 +5797,20 @@ def midmap_minibosses(chap):
     return [e for e in chap.get('enemy_units', []) if e.get('is_miniboss')]
 
 
-def flag_defeat_quote(pid, chapter_const, flag, comment):
-    """A SILENT (msg=0) gDefeatTalkList entry keying `pid`'s death in `chapter_const` to `flag`.
+def flag_defeat_quote(pid, chapter_const, flag, comment, msg=0):
+    """A gDefeatTalkList entry keying `pid`'s death in `chapter_const` to `flag`.
     SetPidDefeatedFlag sets the flag on ANY matching pid's death (no CA_BOSS gate, eventinfo.c),
-    while DisplayDefeatTalkForPid suppresses the quote because msg=0 -- so a faceless unit sets
-    an event flag without rendering a boxless, unreadable line. Shared by the ch03 boss WIN
-    (flag=EVFLAG_DEFEAT_BOSS -> the DefeatBoss AFEV) and the Brute miniboss's mid-map death
-    trigger (flag=a tmp flag watched by a Misc AFEV)."""
+    while DisplayDefeatTalkForPid shows `msg` when nonzero or suppresses it when zero. The silent
+    form lets a faceless unit set an event flag without rendering a boxless, unreadable line;
+    the faced form lets the same flag path carry its authored quote."""
+    msg_value = '0' if msg == 0 else '0x%X' % msg
     return ('    {\n'
             '        .pid     = %s, /* %s */\n'
             '        .route   = CHAPTER_MODE_ANY,\n'
             '        .chapter = %s,\n'
             '        .flag    = %s,\n'
-            '        .msg     = 0,\n'
-            '    },' % (pid, comment, chapter_const, flag))
+            '        .msg     = %s,\n'
+            '    },' % (pid, comment, chapter_const, flag, msg_value))
 
 
 def midmap_afev(guard_flag, script, watch_flag):
@@ -7901,6 +7901,7 @@ CH05_GOAL_DONOR = 7                              # vanilla slot 7 = a clean defe
 # ch05's goal strings come from its HOST SLOT's dead block (vanilla Ch6 = 0x9E4..0x9F5), not
 # from vanilla Ch5's -- ch04 hosts on slot 5 and already owns that block (#207).
 CH05_ERUPTION_MSG = 0x9E4                     # turn-2 Ravisin warning; first free Ch6-host id
+CH05_RAVISIN_DEATH_MSG = 0x9E5                # locked Ravisin death quote; next Ch6-host id
 CH05_GOAL_WINDOW_MSG = 0x9F4
 CH05_GOAL_STATUS_MSG = 0x9F5
 # Raw charIndexes. Pids need only be unique WITHIN a chapter -- gDefeatTalkList entries carry
@@ -7984,7 +7985,8 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
     # The four reliquary visit lines joined the block 2026-08-08 (dialogue-pass). They sit
     # OUTSIDE ch05's host block on purpose -- see CH05_VILLAGE_SLOTS for why that is safe here
     # and why spending ch05's own ids on them was the worse trade.
-    'ch05': (CH05_ERUPTION_MSG, CH05_GOAL_WINDOW_MSG, CH05_GOAL_STATUS_MSG,
+    'ch05': (CH05_ERUPTION_MSG, CH05_RAVISIN_DEATH_MSG,
+             CH05_GOAL_WINDOW_MSG, CH05_GOAL_STATUS_MSG,
              *(slot[1] for slot in CH05_VILLAGE_SLOTS.values())),
     # Goal ids only -- ch01/ch02 predate the per-chapter block registry, but their goal strings
     # still have to be unique against every other hosted chapter (#207).
@@ -9757,6 +9759,33 @@ def ch05_eruption_message(chap):
         width=29)
 
 
+def ch05_ravisin_death_message(chap):
+    """Render Ravisin's one locked death box from the chapter event source of truth.
+
+    The event's ``vanilla 0x9C8`` label cites the donor scene; ch05 writes the body to its
+    own Ch6 host block. The separate enemy ``death_quote`` field predates the locked dialogue
+    pass and is deliberately not consulted here.
+    """
+    _card, beats = _split_event_beats(
+        chap, 'boss_death', 'ch05 Ravisin death quote', (CH05_RAVISIN_DEATH_MSG,),
+        card_required=False)
+    beat = beats[0]
+    if len(beat) != 1 or next(iter(beat[0])) != 'ravisin':
+        sys.exit('ERROR: ch05 Ravisin death quote must remain one locked Ravisin box')
+    return _script_to_message(
+        beat,
+        {'ravisin': ('[OpenMidRight]', _fid_tag(GUEST_PORTRAIT_MAP['ravisin']))},
+        width=29)
+
+
+def ch05_ravisin_defeat_quote():
+    """The displayed quote and unchanged flag that together drive ch05's boss win."""
+    return flag_defeat_quote(
+        CH05_BOSS_PID, chapter_label_constant(CH05_HOST_INDEX), 'EVFLAG_DEFEAT_BOSS',
+        'Ravisin (ch05 boss): locked death quote -> DefeatBoss WIN flag',
+        msg=CH05_RAVISIN_DEATH_MSG)
+
+
 def ch05_wave_script(turn, wave_table, sahnar_table=None):
     """Build one ch05 reinforcement script; only turn 2 speaks and wakes Sahnar.
 
@@ -10049,6 +10078,7 @@ def inject_ch05(campaign, boot=False, verbose=True):
                      name_message_body('Defeat ' + (boss.get('fe_name') or boss['name'])))
     set_message_body(lines, host['goal']['windowTextId'], goal_window_body('Defeat boss'))
     set_message_body(lines, CH05_ERUPTION_MSG, ch05_eruption_message(chap))
+    set_message_body(lines, CH05_RAVISIN_DEATH_MSG, ch05_ravisin_death_message(chap))
     # The four reliquary visits (#25). Each site's speaker is one of the tomb's risen dead, over
     # BG_HOUSE -- a full-screen backdrop, so these wrap at 42 like the other BG scenes and NOT at
     # the on-map bubble's 29. One `visit_text` entry per BOX, ch04's lesson: the authored A-press
@@ -10062,14 +10092,10 @@ def inject_ch05(campaign, boot=False, verbose=True):
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     _write_chapter_title_card(host, 'Ch.5: ' + chap['title'])
-    # .msg = 0 -> silent, like ch03's grell: Ravisin's authored death quote still needs its own
-    # allocated id from ch05's host block. Her portrait is live now (#259); message ownership is
-    # the remaining seam. The engine sets the flag either way -- DisplayDefeatTalkForPid only
-    # SHOWS a quote if msg != 0, but SetPidDefeatedFlag runs regardless (eventinfo.c:595), and
-    # the flag is what fires DefeatBoss.
-    _prepend_defeat_quote(flag_defeat_quote(
-        CH05_BOSS_PID, chapter_label_constant(CH05_HOST_INDEX), 'EVFLAG_DEFEAT_BOSS',
-        'Ravisin (ch05 boss): silent defeat -> DefeatBoss WIN flag'))
+    # Keep the already-proven flag path and make its quote visible now that Ravisin's portrait
+    # and host-owned message both exist. SetPidDefeatedFlag still fires EVFLAG_DEFEAT_BOSS;
+    # DisplayDefeatTalkForPid now shows the one locked box before the ending AFEV runs.
+    _prepend_defeat_quote(ch05_ravisin_defeat_quote())
 
     if verbose:
         print('  ch05 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; defeat_boss '

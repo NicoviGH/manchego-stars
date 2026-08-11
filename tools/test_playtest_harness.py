@@ -166,6 +166,31 @@ class TestPlaytestHarness(unittest.TestCase):
         self.assertIn('turn() >= 2', body)
         self.assertIn('not procActive(SYM.ProcScr_StdEventEngine)', body)
 
+    def test_recordch05ravisindeath_records_one_real_boss_death_box(self):
+        harness = _read_harness()
+        self.assertIn('scenarios.recordch05ravisindeath = function()', harness)
+        body = _block(harness, 'scenarios.recordch05ravisindeath = function()',
+                      '\n-- ch04cottage')
+        self.assertIn('bootToMap()', body)
+        self.assertIn('pokeFrail(boss)', body)
+        self.assertIn('chooseAttack(', body)
+        self.assertIn('recordCutscene({', body)
+        self.assertIn('shotEvery = 1', body,
+                      'per-frame capture must preserve the death box before advancing it')
+        self.assertIn('controllerState() == "dialogue_wait"', body)
+        self.assertIn('eventFlag(2)', body,
+                      'the recorder must preserve the DefeatBoss flag as its terminal proof')
+        self.assertIn('boxes == 1', body,
+                      'the focused proof must require exactly the one locked death box')
+
+        matrix = os.path.join(REPO, 'tools/playtest/matrix.yaml')
+        with open(matrix, encoding='utf-8') as source:
+            registry = source.read()
+        self.assertIn('  recordch05ravisindeath:\n'
+                      '    rom: ch05boot\n'
+                      '    host_chapter: 6\n'
+                      '    kind: record\n', registry)
+
     def test_ch04snag_accepts_the_native_fallen_snag_crossing(self):
         harness = _read_harness()
         body = _block(harness, 'scenarios.ch04snag = function()', '\n-- attackprobe')

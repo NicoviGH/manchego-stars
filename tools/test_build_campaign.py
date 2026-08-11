@@ -1882,6 +1882,50 @@ class Ch05EruptionWarning(unittest.TestCase):
             self.assertNotIn('CUMO_CHAR(', script)
 
 
+class Ch05RavisinDeathQuote(unittest.TestCase):
+    """Ravisin's locked death box speaks without changing the DefeatBoss flag path."""
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+
+    def _event(self):
+        return next(e for e in self._chap()['events'] if e['trigger'] == 'boss_death')
+
+    def test_death_quote_owns_the_next_named_id_in_ch05s_real_host_block(self):
+        self.assertTrue(hasattr(bc, 'CH05_RAVISIN_DEATH_MSG'),
+                        'Ravisin needs a named host-block id for her death quote')
+        self.assertEqual(0x9E5, bc.CH05_RAVISIN_DEATH_MSG)
+        self.assertTrue(0x9E4 <= bc.CH05_RAVISIN_DEATH_MSG <= 0x9F3)
+        self.assertIn(bc.CH05_RAVISIN_DEATH_MSG, bc.HOSTED_CHAPTER_MESSAGE_IDS['ch05'])
+        self.assertEqual('ch05', bc.assert_message_ids_unique()[bc.CH05_RAVISIN_DEATH_MSG])
+
+    def test_locked_one_box_emits_ravisins_live_face_from_the_event_yaml(self):
+        event = self._event()
+        self.assertEqual('vanilla 0x9C8', event['slot'])
+        self.assertEqual([{'ravisin': 'Frostmaiden... the winter is yours...'}], event['script'])
+        self.assertTrue(hasattr(bc, 'ch05_ravisin_death_message'),
+                        'the locked YAML beat needs a message emitter')
+
+        body = bc.ch05_ravisin_death_message(self._chap())
+        flowed = body.replace('[LF]\n', ' ')
+        self.assertIn('[LoadFace][FID_Riev]', body)
+        self.assertEqual(1, body.count('[A]'))
+        self.assertIn('Frostmaiden', flowed)
+        self.assertIn('the winter is yours', flowed)
+        self.assertNotIn('I gave you everything', flowed)
+
+    def test_flagged_defeat_entry_shows_the_quote_and_preserves_the_win_flag(self):
+        self.assertTrue(hasattr(bc, 'ch05_ravisin_defeat_quote'),
+                        'ch05 needs a testable owner for Ravisin defeat-talk wiring')
+        quote = bc.ch05_ravisin_defeat_quote()
+        self.assertIn('.pid     = %s' % bc.CH05_BOSS_PID, quote)
+        self.assertIn('.chapter = %s' % bc.chapter_label_constant(bc.CH05_HOST_INDEX), quote)
+        self.assertIn('.flag    = EVFLAG_DEFEAT_BOSS', quote)
+        self.assertIn('.msg     = 0x%X' % bc.CH05_RAVISIN_DEATH_MSG, quote)
+        self.assertNotIn('.msg     = 0,', quote)
+
+
 class Ch05VillageRaidRace(unittest.TestCase):
     """ch05's declared structure: the eruption's dead race the party for the four reliquaries,
     and saving all four pays out (#25). Vanilla Ch5 is the reference for both halves -- it wires
