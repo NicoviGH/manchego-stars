@@ -129,6 +129,43 @@ class TestAwaitControllerState(unittest.TestCase):
 
 
 class TestPlaytestHarness(unittest.TestCase):
+    def test_recorder_terminal_observes_dialogue_before_advancing_it(self):
+        # #260's visual proof records whether its four-box warning was actually seen.
+        # If recordCutscene advances the wait first and calls doneFn second, the callback
+        # can never observe dialogue_wait and the scenario times out after a good scene.
+        harness = _read_harness()
+        body = _block(harness, 'local function recordCutscene(o)',
+                      '\nlocal function tileOccupied')
+        loop = body[body.index('while fr < maxFrames do'):]
+        observe = loop.index('if doneFn() then reached = true break end')
+        advance = loop.index('if autoAdvanceDialogue and controllerState() == "dialogue_wait" then')
+        self.assertLess(observe, advance,
+                        'the terminal callback must see a dialogue wait before the recorder '
+                        'consumes it')
+
+    def test_ch05recruit_advances_and_counts_the_new_eruption_boxes(self):
+        harness = _read_harness()
+        body = _block(harness, 'scenarios.ch05recruit = function()',
+                      '\n-- Park an unexhausted blue unit')
+        self.assertIn('eruptionBoxes', body,
+                      'the recruit gate would hang before Sahnar LOADs if it never advances '
+                      'Ravisin\'s newly visible warning')
+        self.assertIn('dialogue_wait', body)
+        self.assertIn('advance_dialogue', body)
+        self.assertIn('eruption warning showed %d boxes', body,
+                      'the gate must distinguish the locked four-box scene from merely '
+                      'reaching turn 2')
+
+    def test_recordch05eruption_records_only_the_turn_two_scene(self):
+        harness = _read_harness()
+        self.assertIn('scenarios.recordch05eruption = function()', harness)
+        body = _block(harness, 'scenarios.recordch05eruption = function()',
+                      '\n-- Park an unexhausted blue unit')
+        self.assertIn('endTurn()', body)
+        self.assertIn('recordCutscene({', body)
+        self.assertIn('turn() >= 2', body)
+        self.assertIn('not procActive(SYM.ProcScr_StdEventEngine)', body)
+
     def test_ch04snag_accepts_the_native_fallen_snag_crossing(self):
         harness = _read_harness()
         body = _block(harness, 'scenarios.ch04snag = function()', '\n-- attackprobe')

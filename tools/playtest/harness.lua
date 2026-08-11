@@ -321,6 +321,10 @@ local function recordCutscene(o)
     while fr < maxFrames do
         fr = fr + 1
         if fr % shotEvery == 0 then shot(tag) end
+        -- Let a function terminal observe the frame before the recorder consumes an
+        -- input state.  #260's turn-event proof remembers that dialogue_wait occurred;
+        -- checking only after the guarded A press made a good four-box scene time out.
+        if doneFn() then reached = true break end
         if autoAdvanceDialogue and controllerState() == "dialogue_wait" then
             if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
                 return controllerState(after) ~= "dialogue_wait"
@@ -328,7 +332,6 @@ local function recordCutscene(o)
                 return result("FAIL", tag .. " dialogue input postcondition failed")
             end
         end
-        if doneFn() then reached = true break end
         yield()
     end
     shot(tag)
@@ -6449,11 +6452,32 @@ scenarios.ch05recruit = function()
         basil.x, basil.y))
 
     -- 2. The wake. Wait for the UNIT, not the turn counter: the counter ticks when the player
-    --    phase ends, well before the wave event LOAD1s her (ch04packmath learned this).
+    --    phase ends, well before the wave event LOAD1s her (ch04packmath learned this). The
+    --    turn-2 event now speaks BEFORE Sahnar LOADs, so advance only observed dialogue waits
+    --    and count them: merely reaching turn 2 no longer proves the locked warning played.
     if not endTurn() then return result("FAIL", "could not end turn 1") end
-    if not waitFor(function() return turn() >= 2 and redSahnar() ~= nil end, 5400) then
+    local eruptionBoxes = 0
+    for _ = 1, 7200 do
+        if turn() >= 2 and redSahnar() then break end
+        if controllerState() == "dialogue_wait" then
+            eruptionBoxes = eruptionBoxes + 1
+            if not guardedInput("advance_dialogue", "A", "eruption dialogue wait clears",
+                function(after) return controllerState(after) ~= "dialogue_wait" end, 120) then
+                return result("FAIL", "eruption dialogue input did not advance")
+            end
+        else
+            yield()
+        end
+    end
+    if not redSahnar() then
         shot("ch05recruit")
         return result("FAIL", "Sahnar never rose RED on turn 2 -- the eruption wake did not fire")
+    end
+    if eruptionBoxes ~= 4 then
+        shot("ch05recruit")
+        return result("FAIL", string.format(
+            "eruption warning showed %d boxes, expected the four locked Ravisin boxes",
+            eruptionBoxes))
     end
     waitFor(function()
         return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
@@ -6528,6 +6552,28 @@ scenarios.ch05recruit = function()
     shot("ch05recruit")
     return result("PASS", "Basil joined blue in the opening, Sahnar rose red on turn 2, and "
         .. "Basil's Talk brought her over -- the whole ch05 recruit chain")
+end
+
+-- recordch05eruption: the smallest visual proof for #260. Boot the real ch05 map, idle turn 1,
+-- then record only Ravisin's four-box turn-2 warning through Sahnar's rise and the return of
+-- player control. The recorder advances dialogue while filming; the terminal requires that a
+-- real dialogue wait was observed, so reaching turn 2 without the warning cannot pass.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05eruption (needs a CH05BOOT=1 ROM).
+scenarios.recordch05eruption = function()
+    if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
+    waitFor(function()
+        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
+    end, 6000, true)
+    if not endTurn() then return result("FAIL", "could not end turn 1") end
+    local sawWarning = false
+    return recordCutscene({
+        tag = "ch05eruption", maxFrames = 5400, pressEvery = 90,
+        until_ = function()
+            if turn() >= 2 and controllerState() == "dialogue_wait" then sawWarning = true end
+            return sawWarning and turn() >= 2 and faction() == 0 and not menuOpen()
+                and not procActive(SYM.ProcScr_StdEventEngine)
+        end,
+    })
 end
 
 -- Park an unexhausted blue unit on a village door and take the Visit command, stopping the

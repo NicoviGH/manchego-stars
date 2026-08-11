@@ -501,7 +501,8 @@ enemy_units:
 #   0x9C4 ( 4)     on-map    other recruit's beat before Talk    the MOOSE triggers the fight
 #                                                                 (position reused, not content)
 #   ══ everything above is ONE pre-map event list (98 boxes); below is triggered ══
-#   0x9C5 ( 3)     on-map    mid-battle ESCALATION               the eruption
+#   0x9C5 ( 3)     on-map    mid-battle ESCALATION               the eruption (4 boxes;
+#                                                                 hosted at 0x9E4)
 #   0x9CC (32)     on-map    TALK-RECRUIT scene                  Basil Talks Sahnar (payoff)
 #   0x9C6 ( 1)     quote     ESCORT-NPC death quote (Natasha)    Basil's death quote
 #   0x9C7 ( 1)     quote     BOSS TAUNT — one box                Ravisin taunt
@@ -515,9 +516,9 @@ enemy_units:
 # 9BA-9C4 are ELEVEN messages inside ONE event list, `EventScr_Ch5_BeginningScene`, played
 # start to finish BEFORE the map loads. They are not separately-triggered scenes, so there is
 # no ordering to design between them and nothing can interleave: our 9C3 (Sahnar sealed in the
-# dark) cannot race our 9C5 (the sarcophagus cracking), because 9C3 is over before the player
+# dark) cannot race our eruption beat (the sarcophagus cracking), because 9C3 is over before the player
 # ever takes a turn. Only three things below it carry real triggers, exactly as vanilla wires
-# them: 9C5 = a mid-battle turn event (`EventScr_089F22A4`), 9C6 = a Talk
+# them: 9C5 anatomy = a mid-battle turn event (`EventScr_089F22A4`), 9C6 = a Talk
 # (`EventScr_089F2270`), 9C9 = `EventScr_Ch5_EndingScene`.
 # CHANNEL drives the LINE WIDTH we hand-box to: on-map bubbles wrap at 29 chars, Text_BG at
 # ~42. Vanilla puts the two command scenes on a backdrop because they happen elsewhere -- which
@@ -874,7 +875,7 @@ events:
       Meesmickle is the right voice — dry, one sentence, "a wit, not a bully" (his bible), and the
       line is aimed at the universe's timing rather than at Pinky.
       RAVISIN STAYS SILENT through this. The fight begins on the quarry's terms, not hers; her
-      first words on the map are the eruption (0x9C5).
+      first words on the map are the eruption (host message 0x9E4; vanilla anatomy 0x9C5).
       Basil's steeling-himself beat — the twin's actual content — is CUT (Nicolas, 2026-07-29).
       Not deferred, not homeless: cut. Her nerve is not a beat this chapter needs stated, and 0x9BB
       already establishes what she is walking toward.
@@ -932,7 +933,7 @@ events:
       - tutorial: "If your HP drops near zero in a fight, [red]press the B Button quickly[/red] to concede."
       - tutorial: "You'll lose your entry fee, but you'll save your unit to fight again."
   - trigger: eruption_turn        # scripted turn (~2/3/5, the Ch5 wave cadence) — EARTHQUAKE/TILECHANGE
-    slot: "vanilla 0x9C5"
+    slot: "vanilla 0x9C5"        # anatomy/source only; ch05 writes this beat at host-owned 0x9E4
     type: scripted_event
     ea_file: events/ch05-eruption.ea
     description: >
@@ -944,8 +945,9 @@ events:
       fresh corpse, and does NOT puppet her — see lore/sahnar.md). Sahnar walks HOSTILE of her
       own will, believing the party are the intruders she was left for; a fast crit-Myrmidon
       (smells faintly of pumpkin spice). She flips only when Basil reaches her.
-      DIALOGUE BUDGET — 3 boxes, the twin's exact spend (`EventScr_089F22A4`, the bandits who
-      join the fight mid-map). The structural rule taken from it: **the ARRIVING FORCE speaks
+      DIALOGUE BUDGET — vanilla spends 3 boxes (`EventScr_089F22A4`, the bandits who join the
+      fight mid-map); ours spends 4 because the wired reliquary race needs an explicit warning.
+      The structural rule taken from the twin: **the ARRIVING FORCE speaks
       and the party never reacts.** Vanilla gives Eirika and Seth not one line here. So these
       boxes belong to the arriving side. (Phantom Ship's quake beat does the opposite —
       Ephraim reacts to it — but Ch11b is only our THEME base for the EARTHQUAKE/TILECHANGE
@@ -969,8 +971,9 @@ events:
       Frostmaiden has need of you" (she is named plenty elsewhere and does not need a third
       mention); and "the BLADE under the stone" keeps Sahnar as inventory, echoing 9BD where
       Ravisin appraises her as exactly that.
-      TWIN = EventScr_089F22A4, 3 boxes, and its structural rule is that the ARRIVING FORCE
-      speaks while the party never reacts (vanilla gives Eirika and Seth no lines). Both twins
+      TWIN = EventScr_089F22A4, 3 boxes; ours is 4 after adding the race warning. Its structural
+      rule is that the ARRIVING FORCE speaks while the party never reacts (vanilla gives Eirika
+      and Seth no lines). Both twins
       agree the SPECTACLE lives in the event macros, never in the prose.
       THE RACE IS NAMED HERE, and that is what the second box buys (Nicolas, 2026-08-09). Vanilla
       spends its equivalent box on the raiders' intent — "steal our way through this pathetic
@@ -1109,8 +1112,8 @@ events:
       Ours is the twin with one word swapped (Nicolas, 2026-07-29): empire -> Frostmaiden. That is
       the entire change, and it is the right size of change. The line already does what her
       register needs — direct address plus an insult-name, then contempt — and swapping the
-      allegiance is what makes it hers. "Frostmaiden" is the reverent epithet used everywhere else
-      in the chapter (9BC twice, 9C5 once); Auril is never named (see 9C8).
+      allegiance is what makes it hers. "Frostmaiden" is the chapter's established reverent
+      epithet (9BC twice, this taunt, and the later death quote); Auril is never named (see 9C8).
       Note it is contempt, not grievance: she is not owed anything and is not avenging anything,
       which keeps it clear of her bible's banned grudge/revenge framing.
       LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 1 box.
@@ -1128,7 +1131,7 @@ events:
       everything...") drifted off that shape twice over — it read as an invoice rather than a
       salute, putting Ravisin at the centre of her own death instead of her goddess, and it was
       the ONLY place in the whole chapter the goddess's proper name appeared. Everywhere else
-      she is the reverent epithet ("the Frostmaiden": 9BC twice, 9C5 once) and never appears, so
+      she is the reverent epithet ("the Frostmaiden": 9BC twice, 9C7 and this quote) and never appears, so
       a one-box death quote was the worst possible spot for a first-and-only lore drop
       (Nicolas, 2026-07-29). "The winter is yours" is a HANDOFF, which is truer to a chapter
       where killing her does not stop the cold.
@@ -1487,7 +1490,8 @@ villages:
     # The "shouting outside" is a second, quieter warning, and it is now literally true: this is
     # the site the turn-2 raiders spawn beside, and it is the one `ch05raid` watches fall. It was
     # written to promise nothing back when the race was prose; the race is wired (#25), so the
-    # line stands as-is and simply means what it says. The loud warning is Ravisin's, in 0x9C5.
+    # line stands as-is and simply means what it says. The loud warning is Ravisin's, in host
+    # message 0x9E4 (the beat mined from vanilla 0x9C5).
     visit_text:
       - "Hello! Hello. Oh, you're warm. Nothing has been warm in two years."
       - "Sorry. Sorry. I'll slow down."
