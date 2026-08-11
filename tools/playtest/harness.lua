@@ -7010,6 +7010,86 @@ scenarios.ch05crest = function()
     return result("PASS", "all four reliquaries saved -> the ending paid out its Guiding Ring")
 end
 
+-- recordch05ravisindeath (#262): the smallest real-map proof for Ravisin's locked death quote.
+-- Setup is unfilmed: boot ch05, park a one-hit Ravisin beside one live melee attacker, and drive
+-- the game's own Attack path. chooseAttack hands control back at the FIRST dialogue wait after
+-- Ravisin is dead, so the recorder films the one death box rather than the battle or ending.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05ravisindeath (CH05BOOT=1 ROM).
+scenarios.recordch05ravisindeath = function()
+    local RAVISIN, boxes = 0xb8, 0
+    return recordCutscene({
+        tag = "ch05ravisindeath", speed = "normal", maxFrames = 1800, shotEvery = 1,
+        pressEvery = 90,
+        pre = function()
+            pokeFastConfig()
+            if not bootToMap() then return false, "never reached the ch05 map" end
+            if not waitFor(function()
+                return faction() == 0 and not menuOpen()
+                    and not procActive(SYM.ProcScr_StdEventEngine)
+            end, 6000, true) then
+                return false, "ch05 map never became idle"
+            end
+            local boss = red(RAVISIN)
+            if not boss then return false, "Ravisin (pid 0xb8) is not in the red array" end
+            local hero, hmin, hmax
+            for i = 0, 23 do
+                local u = unitAt(SYM.gUnitArrayBlue, i)
+                if u and not isDead(u) and (u.state & 0x3) == 0
+                    and mapUnitAt(u.x, u.y) ~= 0 then
+                    local mn, mx = unitAttackRange(u)
+                    if mn and mn <= 1 and mx >= 1 then
+                        hero, hmin, hmax = u, mn, mx
+                        break
+                    end
+                end
+            end
+            if not hero then return false, "no selectable blue melee attacker" end
+
+            pokeFrail(boss)
+            pokeHarmless(boss)
+            emu:write8(hero.addr + 0x14, 30) -- deterministic might for the proof strike
+            emu:write8(hero.addr + 0x15, 30) -- deterministic hit for the proof strike
+            boss = red(RAVISIN)
+            local bossGrid = mapUnitAt(boss.x, boss.y)
+            local mapw, maph = mapSize()
+            local parked = false
+            for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+                local tx, ty = hero.x + d[1], hero.y + d[2]
+                if tx >= 0 and tx < mapw and ty >= 0 and ty < maph
+                    and mapUnitAt(tx, ty) == 0 then
+                    setMapUnit(boss.x, boss.y, 0)
+                    emu:write8(boss.addr + 0x10, tx); emu:write8(boss.addr + 0x11, ty)
+                    setMapUnit(tx, ty, bossGrid)
+                    parked = true
+                    break
+                end
+            end
+            if not parked then return false, "no free tile beside the melee attacker" end
+            hero = blue(hero.charId) or hero
+            if not canAttackFromHere(hero, hmin, hmax) then
+                return false, "parked Ravisin is not in the attacker's live range"
+            end
+            if not moveUnit(hero.x, hero.y, hero.x, hero.y) then
+                return false, "could not open the attacker's command menu"
+            end
+            if not chooseAttack(hero.addr, function()
+                return isDead(red(RAVISIN)) and controllerState() == "dialogue_wait"
+            end) then
+                return false, "the proof strike did not resolve"
+            end
+            if not (isDead(red(RAVISIN)) and controllerState() == "dialogue_wait") then
+                return false, "Ravisin died without opening her death quote"
+            end
+            return true
+        end,
+        afterPre = pokeNormalConfig,
+        until_ = function()
+            if controllerState() == "dialogue_wait" then boxes = boxes + 1 end
+            return boxes == 1 and eventFlag(2) and controllerState() ~= "dialogue_wait"
+        end,
+    })
+end
+
 -- ch04cottage (#24): the SECOND village at (1,11), whose reward is its line.
 -- The shipped bug was not a bad reward, it was NO VISIT: the tile was visitable-capable but had
 -- no Location entry, and FE8 runs the village off that event -- so the player saw a cottage they
