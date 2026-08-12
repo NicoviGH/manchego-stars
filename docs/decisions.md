@@ -4327,6 +4327,56 @@ An instance of "verify via data, not pixels" pointed the other way — here the 
 truth for a question that *looks* like an art question.
 _Decided: 2026-08-10 (Claude, while surveying the snag family for #24)._
 
+**A wash-out is a CHROMA failure, and our checks all measured luminance**
+Two Arena palettes were authored, shipped past every automated check, and were rejected on
+sight — the combat coliseum and then the welcome exterior. Both preserved luminance faithfully
+(the exterior's range even *widened*, 159 → 175) and both crushed saturation: the masonry went
+from 0.29–0.74 down to 0.10–0.20 and stopped reading as stone. Nothing we assert on catches
+that, because a palette test naturally reaches for "is it the right brightness."
+
+Two durable rules came out of it:
+
+- **Recolour work is expressed as a DELTA over vanilla, never as a replacement palette.** Name
+  only the words that change; the build composes them over the base ROM's own bytes. A delta
+  cannot wash out what it does not mention, and it preserves animated entries for free (the
+  Arena backdrop cycles 3 of its 64 words — a hand-authored phase set has to reproduce that
+  by hand and silently flattens it if it doesn't).
+- **Assert what stayed VANILLA, not only what changed.** A proof that only checks the new
+  colours arrived would have passed the rejected palettes too. `ch05arena` now anchors three
+  untouched vanilla words per view alongside the ones it expects to move.
+
+Artistically the same lesson: cooling *everything* reads as fog, not winter. Warm stone under
+a cold sky is colder than cold stone under a cold sky, because the contrast is what carries it.
+_Decided: 2026-08-12 (Nicolas + Claude, #265)._
+
+**Composition needs the base ROM; config loading must not**
+CI runs `make test` **before** it mocks `baserom.gba` (the mock exists only for the link check),
+so anything a unit test reaches must not open the ROM. Making `arena_presentation_config()` —
+a config loader consumed by `dressed_portrait_slots()` — compose palettes against vanilla took
+eleven unrelated portrait tests down with it. Validation of campaign data stays pure; composing
+against vanilla bytes is deferred to build time. Assert on the *delta* in tests: it is ROM-free
+and a stronger statement about the YAML than the composed result is.
+_Decided: 2026-08-12 (Claude, #265)._
+
+**Reading a vanilla BG asset offline: `tools/rom_bg_preview.py`, and TSA is not always LZ77**
+Every backdrop we recolour is a plain `.incbin` from `baserom.gba` at a fixed offset, so the
+exact pixels the GBA would draw can be reproduced in milliseconds with no build and no emulator.
+`rom_bg_preview.py` does that, and its `--index-map` / `--isolate` answer the question a palette
+edit must answer first: *which index owns this thing, and does anything else share it?* Use it
+before touching a palette; spend the one in-engine run confirming the answer, not finding it.
+
+Two traps it encodes, both settled from the decomp rather than by guessing:
+
+- **The TSA palette nibble is RELATIVE** (0..3), not the hardware bank. The engine chooses where
+  the four banks land — `gPaletteBuffer + 0x60` → banks 6..9 for the combat backdrop,
+  `ApplyPalettes(..., 0xC, 4)` → banks 12..15 for the exterior. Index with the relative value,
+  report with the hardware one.
+- **Not every TSA is compressed.** `CallARM_FillTileRect` takes a raw blob, and `TmApplyTsa`
+  (`asm/arm.s`) settles its shape: the loops are INCLUSIVE (the stored bytes are width-1 and
+  height-1) and it fills BOTTOM-TO-TOP, so the TSA's first row is the screen's last. Getting
+  that wrong renders a sheared picture that looks like a decode bug in the image data.
+_Decided: 2026-08-12 (Claude, #265)._
+
 ---
 
 ## Open Questions (not yet decided)
