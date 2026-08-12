@@ -454,11 +454,16 @@ INJECTION_ORDER = [
 def _injection_call_sequence(text):
     """First-call order of top-level steps in build_campaign.main(). Textual order
     == execution order there (the only branch chooses BETWEEN later steps, never
-    hoists one earlier)."""
+    hoists one earlier).
+
+    A step wrapped for build-scope attribution (`_scopes.run(inject_ch05, ...)`, #255
+    phase 2) is the same step in the same place, so it counts as a call to itself --
+    otherwise every wrapped chapter injector silently drops out of this gate."""
     m = re.search(r'\ndef main\(\):.*', text, re.S)
     if not m:
         return []
-    names = re.findall(r'^\s+(?:engine_hooks\.)?(\w+)\(', m.group(0), re.M)
+    names = re.findall(r'^\s+(?:engine_hooks\.)?(?:_scopes\.run\()?(\w+)[(,]',
+                       m.group(0), re.M)
     seen, order = set(), []
     for n in names:
         if n not in seen:
