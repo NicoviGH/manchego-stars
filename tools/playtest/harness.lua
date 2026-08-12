@@ -6942,19 +6942,51 @@ scenarios.ch05arena = function()
         return result("FAIL", "accepted wager reached instructions without a generated opponent")
     end
     shot("ch05arena-opponent")
-    -- One guarded press with a generous budget, and it is load-bearing that the budget is
-    -- generous: gProcScr_ArenaUiMain runs TWO blocking dialogue pages between the accepted
-    -- wager and the fight -- ArenaUi_InstructionsDialogue (0x8D5) then ArenaUi_GoodLuckDialogue
-    -- (0x8D3), both PROC_CALLs before ArenaUi_StartArenaBattle (src/uiarena.c). This single
-    -- press clears the first and reaches combat only via guardedInput's lost-input re-press,
-    -- which is fragile. It is NOT fixed by simply pressing three times: between the pages the
-    -- controller classifies `transition` and offers no legal advance_dialogue, so a second
-    -- guarded press fails outright on not-legal (measured 2026-08-12). A proper fix needs the
-    -- controller to classify the Arena dialogue state. Tracked in #269 -- do not "fix" this by
-    -- adding presses.
-    if not guardedInput("advance_dialogue", "A", "opponent instructions launch Arena combat",
-        function(after) return after.procs.battle ~= nil end, 1800) then
-        return result("FAIL", "accepted Arena wager never launched its battle")
+    -- TWO blocking dialogue pages stand between the accepted wager and the fight:
+    -- ArenaUi_InstructionsDialogue (0x8D5) then ArenaUi_GoodLuckDialogue (0x8D3), both
+    -- PROC_CALLs of gProcScr_ArenaUiMain before ArenaUi_StartArenaBattle (src/uiarena.c).
+    -- So COUNT them, one guarded press per page, same as the tutorial loop above (#269).
+    -- The predecessor sent a single press on a 1800-frame budget and reached combat only
+    -- through guardedInput's lost-input re-press -- a pass by accident, and #255 is about
+    -- to start caching passes. Pressing three times in a row does not work either: between
+    -- the pages the talk proc is still PRINTING, there is no TalkWaitForInput to advance,
+    -- and the classifier correctly reads `transition`. Waiting for each page to reach its
+    -- own input wait is what makes each press guarded. `arenaTrail` records every state
+    -- change across the whole stretch, so if this ever fails the log already carries the
+    -- anatomy and nobody has to spend a second run to see it.
+    local arenaPages, arenaTrail, arenaLast, arenaFought = 0, {}, nil, false
+    for _ = 1, 3600 do
+        local observation = observeController()
+        local state = controllerState(observation)
+        if state ~= arenaLast then
+            arenaLast = state
+            arenaTrail[#arenaTrail + 1] = string.format("%s(%s)", tostring(state),
+                tostring(Controller.explain(observation).detail))
+        end
+        if observation.procs.battle then arenaFought = true break end
+        if state == "dialogue_wait" then
+            arenaPages = arenaPages + 1
+            if not guardedInput("advance_dialogue", "A", string.format(
+                "Arena dialogue page %d advances toward combat", arenaPages),
+                function(after) return controllerState(after) ~= "dialogue_wait" end, 300) then
+                log("ARENA TRAIL: " .. table.concat(arenaTrail, " -> "))
+                return result("FAIL", string.format(
+                    "Arena dialogue page %d refused to advance toward combat", arenaPages))
+            end
+            arenaLast = nil
+        else
+            yield()
+        end
+    end
+    log("ARENA TRAIL: " .. table.concat(arenaTrail, " -> "))
+    if not arenaFought then
+        return result("FAIL", string.format(
+            "accepted Arena wager never launched its battle (advanced %d pages)", arenaPages))
+    end
+    if arenaPages ~= 2 then
+        return result("FAIL", string.format(
+            "Arena ran %d dialogue pages between the accepted wager and the fight, expected the 2 authored (0x8D5, 0x8D3)",
+            arenaPages))
     end
     -- The special Arena image owns the ENTIRE visible coliseum, floor included, in BG banks
     -- 6..9. Arena mode skips the normal terrain-platform loader (EfxClearScreenFx clears BG2),
