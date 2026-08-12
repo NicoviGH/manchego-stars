@@ -194,6 +194,22 @@ class TestPlaytestHarness(unittest.TestCase):
         self.assertIn('generated its opponent', body,
                       'presentation proof may not replace the real wager/opponent proof')
 
+        # gProcScr_ArenaUiMain runs TWO blocking dialogue pages between the accepted wager
+        # and the fight (ArenaUi_InstructionsDialogue 0x8D5, ArenaUi_GoodLuckDialogue 0x8D3).
+        # A single press on a fat budget reaches combat anyway -- through guardedInput's
+        # lost-input re-press -- so the scenario passed by ACCIDENT for as long as it did
+        # (#269). Counting the pages is what turns arriving at combat into proof, and #255
+        # caches passes, so a silent regression here would be frozen rather than noticed.
+        self.assertIn('arenaPages ~= 2', body,
+                      'the Arena flow must assert its two-page anatomy, not merely arrive '
+                      'at combat -- one press reaches the fight by lost-input retry (#269)')
+        self.assertIn('ARENA TRAIL', body,
+                      'a failure here must carry its own state trail, or diagnosing it costs '
+                      'a second emulator run')
+        self.assertNotIn(', 1800) then', body,
+                         'the 1800-frame single-press budget is what made the accidental pass '
+                         'possible; each page now presses on its own postcondition')
+
         with open(os.path.join(REPO, 'tools/playtest/gen_symbols.py'), encoding='utf-8') as f:
             symbols = f.read()
         self.assertIn("'gFaces'", symbols)

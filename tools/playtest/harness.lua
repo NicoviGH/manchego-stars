@@ -6954,13 +6954,19 @@ scenarios.ch05arena = function()
     -- own input wait is what makes each press guarded. `arenaTrail` records every state
     -- change across the whole stretch, so if this ever fails the log already carries the
     -- anatomy and nobody has to spend a second run to see it.
-    local arenaPages, arenaTrail, arenaLast, arenaFought = 0, {}, nil, false
+    -- The trail compares STRINGS, and `arenaLast` starts at `false` rather than nil, because
+    -- classify() returns nil for a state it has no rule for -- and an UNCLASSIFIED park right
+    -- after a press is exactly the #232/#241 failure this trail exists to name. Comparing raw
+    -- values would make `nil ~= nil` false and drop it silently, logging a trail that stops
+    -- before the press and a FAIL naming nothing.
+    local arenaPages, arenaTrail, arenaLast, arenaFought = 0, {}, false, false
     for _ = 1, 3600 do
         local observation = observeController()
         local state = controllerState(observation)
-        if state ~= arenaLast then
-            arenaLast = state
-            arenaTrail[#arenaTrail + 1] = string.format("%s(%s)", tostring(state),
+        local seen = tostring(state)
+        if seen ~= arenaLast then
+            arenaLast = seen
+            arenaTrail[#arenaTrail + 1] = string.format("%s(%s)", seen,
                 tostring(Controller.explain(observation).detail))
         end
         if observation.procs.battle then arenaFought = true break end
@@ -6973,7 +6979,7 @@ scenarios.ch05arena = function()
                 return result("FAIL", string.format(
                     "Arena dialogue page %d refused to advance toward combat", arenaPages))
             end
-            arenaLast = nil
+            arenaLast = false       -- re-record whatever the press landed in, nil included
         else
             yield()
         end
