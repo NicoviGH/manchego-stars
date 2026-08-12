@@ -1719,6 +1719,29 @@ outside them moves nothing, and a driver that assumed a straight list would go o
 whoever it was still parked on.
 _Decided: 2026-08-06 (#238; extends #220's contract from the shared paths to every verdict scenario)_
 
+**A multi-page screen is driven one guarded press PER PAGE, and the gap between pages is a
+real transition — do not classify it away.** `ch05arena` drove the Arena's two pre-fight
+dialogue pages with a single press on an 1800-frame budget and reached combat only through
+`guardedInput`'s lost-input re-press: a pass by accident, which #255's verdict cache would have
+frozen. The fix is a loop that waits for each page to reach its own input wait, presses once with
+its own postcondition, and **counts the pages** — so the run asserts the screen's anatomy (the two
+`PROC_CALL`s of `gProcScr_ArenaUiMain`, msgs `0x8D5` and `0x8D3`) instead of merely arriving.
+
+The inherited diagnosis was wrong and cost nothing only because it was instrumented before it was
+believed. #269 recorded that a bounded loop of presses failed `not-legal` on a `transition` and
+concluded `controller.lua` must learn to classify the Arena dialogue state. It already does: an
+instrumented run logs `dialogue_wait(talk_wait in talk_wait_input) -> transition(player_phase
+idle=nil is not a known callback) -> dialogue_wait -> transition`. Each page classifies correctly;
+the `transition` is the gap where the talk proc is still PRINTING and no `gProcScr_TalkWaitForInput`
+exists — there is genuinely nothing to advance there, and teaching the classifier to offer
+`advance_dialogue` in it would have manufactured exactly the lost press #238 warns about. The loop
+that fails is the one that presses without waiting. **A `not-legal` on a `transition` usually means
+the driver pressed too early, not that the classifier is missing a state.** Scenarios that walk a
+multi-page screen carry a state TRAIL in their log for this reason: the first run then diagnoses
+itself, instead of costing a second one.
+_Decided: 2026-08-12 (#269; the ch05arena press, measured in-engine — the diagnosis it corrects
+came from the issue itself)_
+
 **Recording a cutscene as a review GIF (the standard way to show Nicolas motion).**
 The harness fast-forwards non-recorded lead-up, so an assert scenario's screenshots can land
 on fades — to SEE a scene play, use a `record*` scenario: it drives the game to the
