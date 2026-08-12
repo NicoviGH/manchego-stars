@@ -4343,6 +4343,25 @@ against the real 8,124-line harness: editing another scenario or rewording a com
 key still; editing the scenario's own body, a helper it reaches, `TUNE`, `CALLBACK_NAMES`,
 `controller.lua`, or its manifest entry all move it.
 
+**Five more things belong in the key, and code review found every one of them.** Each is a
+way for two genuinely different runs to collide: the ambient `PT_*` knobs `run.sh` passes into
+the wrapper (`PT_SEED=7 … fuzz_ch01` would otherwise be served the seed-1 PASS — kept in sync
+with `run.sh` by a test, because a hand-kept list rots and rotting *here* means a stale green);
+a checkpoint-backed scenario's `ckpt_X` builder, which `run.sh` invokes directly so nothing in
+Lua reaches it; a helper passed as a VALUE rather than called, which escapes a call-graph that
+only follows `name(` (the closure now follows MENTIONS — median 58 → 66 of 237 functions, and
+over-reaching only ever costs a re-run); `record`/`diagnostic` scenarios, which must never be
+skipped because they exist to REFILL `/tmp/playtest-<name>` that `make_gif.py` then reads; and
+the generated `symbols.lua`/`procscr.lua`, which are excluded because `run.sh` rewrites them
+*after* the fingerprint is taken — hashing them cost two re-runs per engine change before the
+cache converged, and their content is already implied by the ELF and by `gen_symbols.py`.
+
+**A fresh RED always evicts a stored green.** Same key, different verdict, means the stored
+green is now a lie, and leaving it makes the next run report a scenario green while it is red
+right now. `run.sh` evicts too, because a scenario run DIRECTLY — which is how debugging
+happens — never passes through the matrix. `MX_NO_CACHE=1` still evicts on a failure: bypassing
+the cache must not become a way to fail a scenario and leave the lie in place.
+
 **A cached green must never read as a fresh one**, so the table carries a `source` column
 (`ran`/`cached`), the summary says `N ran, M cached`, and the run's log and screenshots are kept
 beside the verdict — `/tmp/playtest-<name>` will have been overwritten by whatever ran last, and

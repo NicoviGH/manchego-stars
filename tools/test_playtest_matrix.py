@@ -14,6 +14,7 @@ Run:
     python3 tools/test_playtest_matrix.py
 """
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -620,8 +621,16 @@ class HarnessSourceAnalysis(unittest.TestCase):
         self.assertEqual(mx.reaches('alpha', self.funcs()),
                          {'alpha', 'onlyForA', 'shared', 'yield'})
 
-    def test_a_closure_excludes_helpers_it_never_calls(self):
+    def test_a_closure_excludes_helpers_it_never_mentions(self):
         self.assertNotIn('onlyForB', mx.reaches('alpha', self.funcs()))
+
+    def test_a_helper_passed_as_a_VALUE_is_still_reached(self):
+        """`waitFor(shared)` and `{ fn = onlyForB }` hand a helper over without calling
+        it at the reference site. Following call syntax alone lets it escape the closure,
+        and an edit to it would then leave the verdict key still."""
+        source = HARNESS_FIXTURE.replace('    return onlyForA(1)   -- a comment',
+                                         '    return yield(onlyForB)')
+        self.assertIn('onlyForB', mx.reaches('alpha', mx.harness_functions(source)))
 
     def test_a_body_carries_no_comments(self):
         """A comment cannot change a verdict, so it must not change a fingerprint."""
@@ -662,9 +671,10 @@ class VerdictFingerprint(unittest.TestCase):
         self.alpha = self.m.resolve('alpha')
 
     def fingerprint(self, rom='romdigest', harness=HARNESS_FIXTURE, driver='D',
-                    scenario=None):
+                    scenario=None, env=None):
         return mx.scenario_fingerprint(scenario or self.alpha, rom,
-                                       harness_source=harness, driver=driver)
+                                       harness_source=harness, driver=driver,
+                                       env=env if env is not None else {})
 
     def test_the_same_four_inputs_give_the_same_key(self):
         self.assertEqual(self.fingerprint(), self.fingerprint())
@@ -722,6 +732,40 @@ class VerdictFingerprint(unittest.TestCase):
         gone = manifest(scenarios={'ghost': {}}).resolve('ghost')
         self.assertIsNone(self.fingerprint(scenario=gone))
 
+    def test_a_PT_env_var_the_run_reads_is_part_of_the_key(self):
+        """run.sh passes PT_SEED/PT_CHAR/PT_ROUNDS... straight into the wrapper, so two
+        runs of the same scenario at different seeds are different runs. Without this,
+        `PT_SEED=7 matrix.py run --scenarios fuzz_ch01` collides with the seed-1 key and
+        is served a cached PASS it never earned."""
+        base = self.fingerprint(env={})
+        self.assertEqual(base, self.fingerprint(env={'PT_UNRELATED': 'x'}))
+        self.assertNotEqual(base, self.fingerprint(env={'PT_SEED': '7'}))
+        self.assertNotEqual(self.fingerprint(env={'PT_SEED': '7'}),
+                            self.fingerprint(env={'PT_SEED': '8'}))
+
+    def test_a_checkpoint_backed_scenario_keys_on_its_BUILDER_too(self):
+        """ckpt_X is invoked by run.sh, not called from Lua, so it lands in neither the
+        closure nor the shared residue -- editing the builder would leave the key still."""
+        harness = HARNESS_FIXTURE + '''
+scenarios.ckpt_thing = function()
+    return onlyForB(7)
+end
+'''
+        backed = manifest(scenarios={'alpha': {'checkpoint': 'thing'}}).resolve('alpha')
+        before = self.fingerprint(harness=harness, scenario=backed)
+        after = self.fingerprint(harness=harness.replace('onlyForB(7)', 'onlyForB(8)'),
+                                 scenario=backed)
+        self.assertNotEqual(before, after)
+
+    def test_a_checkpointless_scenario_ignores_the_builders(self):
+        harness = HARNESS_FIXTURE + '''
+scenarios.ckpt_thing = function()
+    return onlyForB(7)
+end
+'''
+        self.assertEqual(self.fingerprint(harness=harness),
+                         self.fingerprint(harness=harness.replace('onlyForB(7)', 'onlyForB(8)')))
+
 
 class DriverSource(unittest.TestCase):
     """Everything OUTSIDE harness.lua that can change what a scenario does."""
@@ -737,8 +781,14 @@ class DriverSource(unittest.TestCase):
         emulator actually loads."""
         self.assertIn('run_mgba', self.text)
 
-    def test_it_covers_the_generated_symbol_tables_the_harness_dofiles(self):
-        self.assertIn('gArenaState', self.text)
+    def test_it_leaves_out_the_GENERATED_symbol_tables(self):
+        """symbols.lua/procscr.lua are rewritten by run.sh AFTER the fingerprint is taken,
+        so hashing them makes every engine change cost TWO re-runs before the cache
+        converges -- and alternating ROM configs may never converge at all. Their content
+        is already implied: the ELF comes from rom_input_hash, the emitter is gen_symbols.py
+        below, and both are in the key."""
+        self.assertNotIn('gArenaState = 0x', self.text)   # a symbols.lua row
+        self.assertNotIn('ProcScr_AsnycKeyStatus', self.text)   # a procscr.lua row
 
     def test_it_leaves_out_harness_itself(self):
         """harness.lua is keyed by CLOSURE, not whole-file -- including it here would
@@ -753,6 +803,16 @@ class DriverSource(unittest.TestCase):
 
     def test_it_leaves_out_the_lua_test_modules(self):
         self.assertNotIn('test_controller', self.text)
+
+    def test_every_PT_var_run_sh_reads_is_in_the_key(self):
+        """A hand-kept list rots silently, and rotting HERE means a cached PASS served
+        for a run the knob would have changed. PT_HOST_CHAPTER is the one exception:
+        matrix.py sets it FROM the manifest entry, which export_env already covers."""
+        with open(mx.RUN_SH) as fh:
+            used = set(re.findall(r'PT_[A-Z_]+', fh.read())) - {'PT_HOST_CHAPTER'}
+        self.assertTrue(used)
+        self.assertEqual(used - set(mx.PLAYTEST_ENV_KEYS), set(),
+                         'run.sh reads a PT_ knob the verdict key does not see')
 
 
 class VerdictCacheStore(unittest.TestCase):
@@ -816,6 +876,41 @@ class VerdictCacheStore(unittest.TestCase):
         os.makedirs(self.dir, exist_ok=True)
         with open(os.path.join(self.dir, 'alpha-fp1.json'), 'w') as fh:
             fh.write('{ not json')
+        self.assertIsNone(mx.load_cached_verdict('alpha', 'fp1', cache_dir=self.dir))
+
+
+class CacheScope(unittest.TestCase):
+    """Which scenarios may be served from cache at all."""
+
+    def test_only_verdict_scenarios_are_cached(self):
+        """A `record` scenario exists to REFILL /tmp/playtest-<name> with motion frames,
+        and make_gif.py reads that path by hand. Skipping the run leaves it stale, so the
+        GIF is built from whatever ran last."""
+        m = manifest(scenarios={'a': {}, 'recordx': {'kind': 'record'},
+                                'probe': {'kind': 'diagnostic'}})
+        cache = mx.VerdictCache([m.resolve(n) for n in ('a', 'recordx', 'probe')])
+        self.assertEqual(set(cache.fingerprints), {'a'},
+                         'only a verdict scenario is a candidate for being skipped')
+
+
+class FailureInvalidates(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir, True)
+
+    def outcome(self, verdict):
+        return mx.Outcome('alpha', 'canonical', verdict, 1.0, '')
+
+    def test_a_fresh_FAIL_evicts_the_stale_pass_for_the_same_key(self):
+        """Same inputs, and it just failed. Leaving the PASS in place makes the next
+        matrix run report green for a scenario that is red right now."""
+        mx.store_cached_verdict('alpha', 'fp1', self.outcome('PASS'), cache_dir=self.dir)
+        mx.store_cached_verdict('alpha', 'fp1', self.outcome('FAIL'), cache_dir=self.dir)
+        self.assertIsNone(mx.load_cached_verdict('alpha', 'fp1', cache_dir=self.dir))
+
+    def test_a_fresh_FAIL_evicts_an_older_key_too(self):
+        mx.store_cached_verdict('alpha', 'fp1', self.outcome('PASS'), cache_dir=self.dir)
+        mx.store_cached_verdict('alpha', 'fp2', self.outcome('FAIL'), cache_dir=self.dir)
         self.assertIsNone(mx.load_cached_verdict('alpha', 'fp1', cache_dir=self.dir))
 
 

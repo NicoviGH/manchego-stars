@@ -270,4 +270,12 @@ run_mgba "$SCENARIO" "$FPS" "$VSYNC" "$DEADLINE_S"
 # transcript (record mode), and exits -- without this it polls forever and a recorded
 # transcript would only be saved by a clean Ctrl-C.
 if [ "$SCENARIO" = "llm" ]; then touch "$LLM_DIR/stop"; fi
+# A red always wins over a stored green (#255). The matrix evicts its own cache slot when
+# it sees a failure, but a scenario run DIRECTLY -- which is how debugging happens -- never
+# passes through it, and the next `make matrix` would go on reporting the stale PASS for a
+# scenario that is red right now. Nothing else here reads the cache; this only invalidates.
+case "$VERDICT" in
+    *PASS*) ;;
+    *) rm -rf "$REPO/.matrix-verdictcache/$SCENARIO-"* 2>/dev/null || true ;;
+esac
 case "$VERDICT" in *PASS*) exit 0 ;; *) exit 1 ;; esac

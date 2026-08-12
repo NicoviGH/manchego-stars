@@ -485,15 +485,21 @@ def harness_functions(source):
 
 
 def reaches(name, funcs, seen=None):
-    """Every harness function reachable from `name`, including itself."""
+    """Every harness function reachable from `name`, including itself.
+
+    MENTIONS, not calls. `waitFor(shared)` and `{ fn = onlyForB }` hand a helper over
+    without calling it at the reference site, so following call syntax alone lets it
+    escape the closure -- and an edit to it would leave the verdict key still. Matching
+    every known function NAME in the body over-reaches (a local shadowing a helper's name
+    drags it in), and over-reaching only ever costs an extra re-run.
+    """
     seen = seen if seen is not None else set()
     if name in seen or name not in funcs:
         return seen
     seen.add(name)
-    body = funcs[name][0]
-    for callee in set(re.findall(r'\b(\w+)\s*\(', body)):
-        if callee in funcs and callee != name:
-            reaches(callee, funcs, seen)
+    for mentioned in set(re.findall(r'\b(\w+)\b', funcs[name][0])):
+        if mentioned in funcs and mentioned != name:
+            reaches(mentioned, funcs, seen)
     return seen
 
 
@@ -715,17 +721,21 @@ def driver_source(here=None):
     deadline, the checkpoint handling and the wrapper the emulator actually loads. Any of
     them can turn a PASS into a FAIL without harness.lua changing a byte.
 
-    `gen_symbols.py` is in here too, and for a reason worth stating: run.sh regenerates
-    symbols.lua/procscr.lua from the ELF AFTER the fingerprint has been taken, so hashing
-    only the generated files would let an edit to what they contain slip past the key for
-    one run. Hashing the generator as well closes that window.
+    `gen_symbols.py` is in here, but the tables it EMITS (`symbols.lua`, `procscr.lua`) are
+    pointedly not: run.sh rewrites them from the ELF after the fingerprint has been taken,
+    so hashing them would make every engine change cost TWO re-runs before the cache
+    converged -- and a matrix alternating between ROM configurations might never converge at
+    all. Their content is already implied by inputs that ARE in the key: the ELF comes from
+    the same sources as `rom_input_hash`, and the emitter is right here.
 
-    harness.lua is pointedly absent: it is keyed by CLOSURE, and folding it in here would
-    undo the whole reason the closure exists.
+    harness.lua is absent for the opposite reason: it is keyed by CLOSURE, and folding it in
+    here would undo the whole reason the closure exists.
     """
     here = here or HERE
+    generated = ('symbols.lua', 'procscr.lua')
     files = [p for p in glob.glob(os.path.join(here, '*.lua'))
              if not os.path.basename(p).startswith('test_')
+             and os.path.basename(p) not in generated
              and os.path.basename(p) != 'harness.lua']
     files.append(os.path.join(here, 'run.sh'))
     files.append(os.path.join(here, 'gen_symbols.py'))
@@ -736,7 +746,18 @@ def driver_source(here=None):
     return '\n'.join(parts)
 
 
-def scenario_fingerprint(scenario, rom_digest, harness_source=None, driver=None):
+# The PT_* knobs run.sh reads from the AMBIENT environment and passes into the wrapper.
+# They are not in `matrix.yaml` and not in `export_env`, so without them
+# `PT_SEED=7 matrix.py run --scenarios fuzz_ch01` collides with the seed-1 key and is
+# served a cached PASS it never earned. Kept in sync with run.sh by
+# `test_every_PT_var_run_sh_reads_is_in_the_key`. PT_HOST_CHAPTER is deliberately absent:
+# matrix.py sets it FROM the manifest entry, which `export_env` already covers.
+PLAYTEST_ENV_KEYS = ('PT_SEED', 'PT_CHAR', 'PT_ROUNDS', 'PT_STATE', 'PT_TAG', 'PT_UNTIL',
+                     'PT_SPEED', 'PT_MAXFRAMES', 'PT_PRESSEVERY', 'PT_SHOTEVERY', 'PT_FPS',
+                     'PT_PROVIDER', 'PT_MODEL', 'PT_BASE_URL', 'PT_LLM_DIR')
+
+
+def scenario_fingerprint(scenario, rom_digest, harness_source=None, driver=None, env=None):
     """The cache key, or None when this run may not be cached at all.
 
     None means "refuse to cache" and is returned whenever an input cannot be pinned: no ROM
@@ -747,16 +768,26 @@ def scenario_fingerprint(scenario, rom_digest, harness_source=None, driver=None)
         return None
     harness_source = _read(HARNESS) if harness_source is None else harness_source
     driver = driver_source() if driver is None else driver
+    env = os.environ if env is None else env
     funcs = harness_functions(harness_source)
     if scenario.name not in funcs:
         return None
     h = hashlib.sha256()
     h.update(('matrix-verdict-v1\nrom:%s\nentry:%s\n' % (rom_digest, export_env(scenario))).encode())
+    for key in PLAYTEST_ENV_KEYS:
+        if env.get(key):
+            h.update(('env:%s=%s\n' % (key, env[key])).encode())
     h.update(b'driver:\n')
     h.update(driver.encode())
     h.update(b'\nshared:\n')
     h.update(harness_shared(harness_source).encode())
-    for name in sorted(reaches(scenario.name, funcs)):
+    # A checkpoint-backed scenario replays through its `ckpt_X` builder, which run.sh
+    # invokes directly -- nothing in Lua calls it, so it lands in neither the closure nor
+    # the shared residue. Without this, editing ckpt_ch02start leaves ch02baxby's key still.
+    closure = reaches(scenario.name, funcs)
+    if scenario.checkpoint_builder:
+        closure = closure | reaches(scenario.checkpoint_builder, funcs)
+    for name in sorted(closure):
         h.update(('\nfn:%s\n' % name).encode())
         h.update(funcs[name][0].encode())
     return h.hexdigest()[:32]
@@ -789,24 +820,29 @@ def store_cached_verdict(scenario, fingerprint, outcome, cache_dir=None):
     MB per scenario (ch05arena: 198 frames, 4.7 MB) and it is deliberate: one slot per
     scenario, gitignored, and the whole gate lands around 100 MB.
     """
-    if not fingerprint or outcome.verdict != 'PASS':
-        return
     cache_dir = cache_dir or VERDICT_CACHE_DIR
-    slot = _verdict_slot(scenario, fingerprint, cache_dir)
-    os.makedirs(cache_dir, exist_ok=True)
-    kept = outcome.artifacts
-    if outcome.artifacts and os.path.isdir(outcome.artifacts):
-        shutil.rmtree(slot, ignore_errors=True)
-        shutil.copytree(outcome.artifacts, slot)
-        kept = slot
-    with open(slot + '.json', 'w') as fh:
-        json.dump({'scenario': scenario, 'rom': outcome.rom, 'verdict': outcome.verdict,
-                   'seconds': round(outcome.seconds, 1), 'artifacts': kept,
-                   'fingerprint': fingerprint, 'stored': time.time()}, fh, indent=2)
+    keep = None
+    if fingerprint and outcome.verdict == 'PASS':
+        keep = _verdict_slot(scenario, fingerprint, cache_dir)
+        os.makedirs(cache_dir, exist_ok=True)
+        kept = outcome.artifacts
+        if outcome.artifacts and os.path.isdir(outcome.artifacts):
+            shutil.rmtree(keep, ignore_errors=True)
+            shutil.copytree(outcome.artifacts, keep)
+            kept = keep
+        with open(keep + '.json', 'w') as fh:
+            json.dump({'scenario': scenario, 'rom': outcome.rom, 'verdict': outcome.verdict,
+                       'seconds': round(outcome.seconds, 1), 'artifacts': kept,
+                       'fingerprint': fingerprint, 'stored': time.time()}, fh, indent=2)
     # One slot per scenario: the cache tracks HEAD, not history. The `-` in the glob is
     # load-bearing -- `ch01-*` must not sweep away `ch01win`'s slot.
+    #
+    # This runs for a FAIL too, and that is the point. A red on the same key means the
+    # inputs did not move but the verdict did, so the stored green is now a lie; leaving it
+    # there makes the next matrix run report a scenario green while it is red right now.
+    # A fresh red always wins over a stored green.
     for old in glob.glob(os.path.join(cache_dir, '%s-*' % scenario)):
-        if os.path.basename(old).startswith('%s-%s' % (scenario, fingerprint)):
+        if keep and os.path.basename(old).startswith(os.path.basename(keep)):
             continue
         if os.path.isdir(old):
             shutil.rmtree(old, ignore_errors=True)
@@ -827,10 +863,14 @@ class VerdictCache(object):
     def __init__(self, scenarios, enabled=True):
         self.enabled = enabled
         self.fingerprints = {}
-        if not enabled:
-            return
         digests = {}
         for s in scenarios:
+            # Only a VERDICT scenario may be skipped. A `record` scenario exists to refill
+            # /tmp/playtest-<name> with motion frames that make_gif.py then reads by hand,
+            # and a `diagnostic` asserts nothing -- serving either from cache hands the
+            # caller whatever ran last under that path.
+            if s.kind != 'verdict':
+                continue
             flags = tuple(s.make_flags)
             if flags not in digests:
                 digests[flags] = rom_input_hash(s.make_flags)
@@ -849,8 +889,13 @@ class VerdictCache(object):
                        hit.get('artifacts', ''), cached=True)
 
     def store(self, scenario, outcome):
-        if self.enabled:
-            store_cached_verdict(scenario.name, self.fingerprints.get(scenario.name), outcome)
+        """Storing is only half of this: a RED must evict a stored green even with the
+        cache disabled, or `MX_NO_CACHE=1` becomes a way to fail a scenario and leave the
+        lie in place. A disabled PASS still writes nothing -- bypassing the cache is not
+        the same as clearing it."""
+        fingerprint = self.fingerprints.get(scenario.name) if self.enabled else None
+        if fingerprint or outcome.verdict != 'PASS':
+            store_cached_verdict(scenario.name, fingerprint, outcome)
         return outcome
 
 
