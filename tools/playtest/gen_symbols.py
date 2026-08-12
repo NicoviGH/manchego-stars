@@ -55,6 +55,8 @@ Symbol = namedtuple('Symbol', 'name type addr')
 WANTED = [
     'gPlaySt',                  # chapter index / phase / turn (include/types.h)
     'gArenaState',              # accepted wager/opponent state (include/bmarena.h)
+    'gFaces',                   # four struct FaceProc* slots; faceId is u16 at +0x3E.
+                                # ch05arena reads the live Arena attendant, not just its art file.
     'gBmSt',                    # live map cursor (include/types.h)
     'gUnitArrayBlue',           # player units (include/bmunit.h)
     'gUnitArrayRed',            # enemy units

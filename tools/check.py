@@ -568,6 +568,12 @@ BLIND_PRESS_ALLOWED = {
     # controller would mean it could only ever send inputs the controller already calls legal,
     # which is precisely the space a fuzzer exists to leave.
     'fuzzDrive': 'random input IS the scenario -- guarding it would defeat the fuzzer',
+    # Capturing a battle anim means sitting in a loop that dismisses whatever quote boxes the
+    # engine raises mid-combat. The press is NOT blind: it fires only when
+    # ProcScr_BattleEventEngine is observed live, it is re-observed every iteration, and the
+    # loop stops on the OUTCOME (combat ended, or the caller's doneFn). Same shape as
+    # driveSaveSlot -- no distinguishing postcondition per press, verified on the outcome.
+    'shootCombatFrames': 'observed-proc dismissal inside a combat capture; verified on the outcome',
 }
 
 _LUA_FUNC_DEF = re.compile(
@@ -817,7 +823,15 @@ def check_engine_guards_present(fail):
              'vanish from crits'),
             ('_patch_draw_icon_pal2',
              'the #23 additive item-icon palette hook (DrawIcon routes gMSPal2IconIds to '
-             'reserved BG bank 15); without it the pink Tourmaline silently reverts to pal-0 colours')):
+             'reserved BG bank 15); without it the pink Tourmaline silently reverts to pal-0 colours'),
+            ('_patch_arena_presentation',
+             'the #265 Arena presentation seam (ArenaUi_Init selects a generated campaign '
+             'palette and chapter attendant with vanilla fallbacks); without it the winter '
+             'palette and undead attendant are generated but never displayed'),
+            ('_patch_arena_battle_background',
+             'the #265 Arena combat backdrop seam (fade-in and three-state cycle share the '
+             'generated winter palettes); without it Arena fights remain warm or flash a '
+             'stale vanilla phase')):
         if ('def %s(' % fn) not in eh:
             fail.append('engine hook %s() not DEFINED in tools/inject/engine_hooks.py '
                         '-- would silently drop %s (see docs/decisions.md)' % (fn, mechanic))

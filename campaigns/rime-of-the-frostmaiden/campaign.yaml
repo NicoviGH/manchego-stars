@@ -244,6 +244,79 @@ data_sources:
   open5e: data/srd/open5e-snapshot.json
   homebrew: data/homebrew/
 
+# Arena presentation — winter reaches the arena through PALETTE ONLY, as two small deltas over
+# FE8's untouched graphics and TSA. Every word not named here is copied from the base ROM, so
+# both views keep vanilla's own materials. Banks are the HARDWARE banks the engine loads into,
+# the same numbers `tools/rom_bg_preview.py --index-map` prints. Index 0 is the transparent key
+# and may not be named. Deleting either block restores that view to byte-identical vanilla.
+# Rationale and the rejected first attempt: decisions.md, "Arena presentation"; issue #265.
+arena_presentation:
+  # Arena welcome/wager screen — the coliseum EXTERIOR (gGfx_ArenaBuildingFront, banks 12..15).
+  # The sandstone is deliberately LEFT ALONE. An earlier pass cooled the whole building and the
+  # masonry stopped reading as a material; the cold lands better coming from the weather and the
+  # banners while the stone stays a real, warm surface. Two things change, 16 words of 64.
+  welcome:
+    background:
+      # Sky — hue held, saturation dropped from vanilla's 0.56–1.00 to a flat overcast. Each
+      # entry keeps its own luminance so the cloud shapes survive. Bank 15 indices 1..8 plus
+      # bank 12 index 1 are the sky and nothing else: an isolation mask covered every sky pixel
+      # and no part of the building.
+      - { bank: 15, index:  6, color: "#F7F7F7" }   # was #E7E7FF
+      - { bank: 15, index:  8, color: "#F7F7F7" }   # was #EFEFF7
+      - { bank: 15, index:  7, color: "#EFEFF7" }   # was #E7EFF7
+      - { bank: 15, index:  5, color: "#E7EFEF" }   # was #D6E7FF
+      - { bank: 15, index:  4, color: "#E7E7EF" }   # was #D6DEF7
+      - { bank: 15, index:  3, color: "#DEE7EF" }   # was #CED6F7
+      - { bank: 12, index:  1, color: "#DEE7EF" }   # was #CED6F7
+      - { bank: 15, index:  1, color: "#D6DEE7" }   # was #C6D6EF
+      - { bank: 15, index:  2, color: "#D6DEE7" }   # was #C6D6EF
+      # Awnings — the stall fabric, bank 13 indices 1,2,3,4,10,11,15, all exclusive to the
+      # stalls. Recoloured to hue 210 at saturation 0.23–0.31: the SAME blue the hanging
+      # banners fly inside the stadium, so the two arena views agree. Luminance preserved per
+      # entry, so the folds and shading still read.
+      - { bank: 13, index:  1, color: "#7394AD" }   # was #BDA563
+      - { bank: 13, index:  2, color: "#6384A5" }   # was #B59452
+      - { bank: 13, index: 10, color: "#526B8C" }   # was #DECE00
+      - { bank: 13, index: 11, color: "#4A6384" }   # was #CEAD00
+      - { bank: 13, index:  3, color: "#425A7B" }   # was #A56B18
+      - { bank: 13, index: 15, color: "#425A7B" }   # was #BD9400
+      - { bank: 13, index:  4, color: "#394A63" }   # was #8C5210
+
+
+  # Arena battle view — the coliseum behind an arena FIGHT. This is a DELTA, not a palette:
+  # every word the build does not name here is copied from vanilla's own
+  # Pal_ArenaBattleBg_A/B/C, so the stone, wood, gold, crowd and the three-phase shimmer stay
+  # exactly as FE8 drew them. The first pass at this replaced all 64 entries per phase and
+  # washed the whole coliseum into blue-grey (rejected in-engine 2026-08-11); a delta cannot
+  # do that. Banks are the HARDWARE banks the engine copies to (gPaletteBuffer + 0x60 -> 6..9)
+  # -- the same numbers `tools/rom_bg_preview.py --index-map` prints and the ch05arena proof
+  # reads out of palette RAM. Index 0 is the transparent key and may not be named.
+  #
+  # Only 3 of the 64 entries differ across phases A/B/C (the crowd's gold flicker at bank 7
+  # idx 8/9, plus bank 8 idx 10). None of them are ours, so one delta serves all three phases
+  # and the ten-frame cycle survives untouched.
+  combat:
+    background:
+      # The fighting floor becomes snow. Bank 9's sand ramp is EXCLUSIVE to the floor --
+      # nothing above tile row 9 uses bank 9 at all -- so this touches no other pixel.
+      # Ordered lightest to darkest; the vanilla luminance spacing is preserved so the
+      # trodden-ground texture still reads.
+      - { bank: 9, index:  3, color: "#FFFFFF" }   # was #EFEF94
+      - { bank: 9, index:  9, color: "#F7F7FF" }   # was #E7E78C
+      - { bank: 9, index:  2, color: "#EFEFFF" }   # was #DEDE84
+      - { bank: 9, index: 10, color: "#E7E7F7" }   # was #D6D67B
+      - { bank: 9, index:  1, color: "#DEDEF7" }   # was #D6CE73
+      - { bank: 9, index:  4, color: "#CED6EF" }   # was #C6C66B
+      - { bank: 9, index:  5, color: "#C6CEE7" }   # was #BDBD63
+      - { bank: 9, index:  6, color: "#B5BDDE" }   # was #ADAD52
+      - { bank: 9, index:  8, color: "#A5ADCE" }   # was #9C9C42
+      # The hanging banners turn from red to blue. Bank 8 index 8 is the panel and index 4 its
+      # trim; all 930 of their pixels sit in the arcade band, so these two words are exclusive
+      # to the banners. Muted slate rather than a saturated heraldic blue -- vanilla's red is
+      # dusty, and a bright blue is the one thing that reads as recoloured instead of lit.
+      - { bank: 8, index:  8, color: "#4A6B8C" }   # was #845242
+      - { bank: 8, index:  4, color: "#7B94AD" }   # was #7B635A
+
 # Chapter-title banner theme — option A "glacial blue" (picked 2026-06-09; see
 # docs/decisions.md "Chapter title cards are IMAGES"). The six colors replace
 # vanilla's letter greens 1:1 (lightest fill -> darkest outline); every OTHER
