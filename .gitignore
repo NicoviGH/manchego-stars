@@ -57,3 +57,6 @@ campaigns/*/battle_anims/*/.paint/
 
 # matrix ROM cache (built artifacts, keyed by input hash)
 .matrix-romcache/
+
+# matrix verdict cache (earned PASS verdicts + their artifacts, keyed by input fingerprint)
+.matrix-verdictcache/
