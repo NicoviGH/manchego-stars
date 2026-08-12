@@ -4308,9 +4308,9 @@ separate wastes and only one of them is about suite size.
 - **Do not run the full `make matrix` gate locally** (Nicolas, 2026-08-10: *"I dont want you to
   run the 7 min gate thing anymore"*). The verdict cache below now means a green scenario whose
   inputs are unchanged does not re-run — but it keys on `rom_input_hash`, so any
-  `build_campaign.py` or campaign-data edit still invalidates every row, which is most feature
-  tasks. The ban lifts when **#255 phase 2** scopes invalidation to what the build actually
-  wrote. CI cannot take the gate either: CI builds against a MOCK base ROM
+  `build_campaign.py` or campaign-data edit invalidated every row. Phase 2 scopes that to what
+  the build actually wrote (a ch05 edit: 6 of 20). The ban lifts when **#255 phase 3** retires
+  it. CI cannot take the gate either: CI builds against a MOCK base ROM
   (`head -c 16M /dev/urandom`), because the real FE8 ROM is copyrighted and not in the repo, and
   random bytes do not boot in mGBA.
 - **`matrix.py run --suite X --dry-run` costs nothing and says what would actually run.** Reach
@@ -4404,7 +4404,63 @@ a cached green nobody can look at is a green nobody can audit. `--no-verdict-cac
 opts out. A group with nothing left to run is never BUILT, which is where the biggest saving is: a
 doc-only or harness-only change costs no `make` and no emulator at all.
 
-**Honest ceiling, stated so nobody over-claims it.** Keying on `rom_input_hash` means any
+**Phase 2: the build attributes its own writes, and a ch05 edit stops re-running the
+prologue.** Measured on the real gate, for a one-line ch05 enemy-level change: **6 run, 14
+cached of 20**. The same edit under phase 1 alone re-ran all twenty, because
+`rom_input_hash` cannot tell a ch05 edit from any other. `tools/build_scopes.py` watches the
+decomp while `build_campaign.py` runs and records, per injection step, the files that step
+actually wrote plus a digest of their contents; `matrix.py` keys each scenario on just the
+scopes it depends on.
+
+**Derived, never declared.** A step's scope is read off its own function name
+(`inject_ch05` → `chapter:ch05`), and its file list is what the filesystem says it wrote —
+not a table anybody maintains. Hand-kept impact maps rot silently and let real regressions
+through, which is the exact failure this feature exists to prevent.
+
+Three rules make it sound, and all three are the conservative direction:
+
+- **A file written by more than one step belongs to EVERY step that wrote it.** This is the
+  subtle killer. Nine shared tables (`chapter_settings.json`, `data_8B363C.s`,
+  `src/events_udefs.c`, …) are written by both the global passes and ch05. Blaming the last
+  writer would charge them to ch05 alone, and a portrait edit would then move only ch05's
+  digest while every global scenario was served a stale PASS.
+- **Unattributable means `global`.** Writes between steps, writes outside the walked roots
+  (reconciled from git's own view of the decomp at the end), and any step whose name does
+  not identify exactly one chapter — `chain_ch04_to_ch05` names two — all land in `global`,
+  which every scenario depends on.
+- **A scenario's chapter dependency is a RANGE, not a point.** It boots somewhere and plays
+  FORWARD, and a checkpoint-backed one replays that whole chain (`ckpt_ch02start` replays
+  ch00→ch01→ch02). The range runs from the ROM configuration's boot flag to its
+  `host_chapter`, with slot numbers read from `tools/inject/hosts.py` — the file that
+  ENROLS a chapter — so adding ch06 is one line there and nothing in the matrix.
+
+**The manifest only exists AFTER the build**, which changes the shape of a run: a
+configuration whose ROM inputs moved cannot be keyed on scopes until it is built, so
+`execute()` asks the cache again *after* each build. Building can now REMOVE work rather
+than merely precede it. Phase 1's "a fully cached group is never built" path still applies
+whenever `rom_input_hash` hits, which is what keeps a doc-only change free. For the same
+reason `--dry-run` says so out loud when a configuration changed: its listing is the coarse
+answer, and most of those scenarios turn out cached once the build reports what it wrote.
+The manifest travels in the ROM cache slot alongside the ELF, and for the same reason.
+
+**Verified deterministic**: two consecutive identical builds produce byte-identical
+manifests across all seven scopes. That matters because the attribution detects writes by
+mtime, and a path set that churned would move a digest with no content behind it. A
+config SWITCH does change which files get rewritten — that is real, and it is why the
+measurement above compares two builds of the same configuration.
+
+**What phase 2 does NOT buy.** Attribution is per FILE, so an edit to a chapter early in
+the shared tables still moves the later chapters' digests: a ch02 enemy level moves ch02,
+ch03, ch04 and ch05 (12 run, 8 cached) because every later chapter injector rewrites a
+shared table that now carries ch02's bytes. The direction #255 asked for — a LATE chapter
+edit not re-running everything before it — is the one that works, and it is the common case
+while the campaign is built forward. Sub-file attribution would fix the rest and is a much
+bigger lift with much more to get wrong; do not reach for it without a measurement saying
+it pays.
+_Decided: 2026-08-12 (#255 phase 2)._
+
+**Honest ceiling of phase 1 alone, kept because it explains why phase 2 exists.** Keying on
+`rom_input_hash` means any
 `build_campaign.py` or `campaign.yaml` edit invalidates every scenario, and nearly every feature
 task touches `build_campaign.py`. This phase buys doc-only changes, harness-only changes, and
 repeat runs while debugging something else. Phase 2 — having the build attribute its own writes

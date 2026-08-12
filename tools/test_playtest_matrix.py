@@ -579,7 +579,12 @@ class RomCache(unittest.TestCase):
         and a gate spanning four configs restores three of them that way on every warm
         run. Cache the pair or cache neither."""
         self.assertEqual({ext for ext, _ in mx.ROM_CACHE_ARTIFACTS},
-                         {'.gba', '.elf', '.json'})
+                         {'.gba', '.elf', '.json', '.scopes.json'})
+
+    def test_the_scope_manifest_travels_with_the_rom_too(self):
+        """Same lesson as the ELF: a restored ROM must bring the manifest of what the
+        build that produced it wrote, or the verdict key reads whatever built last."""
+        self.assertIn(mx.SCOPES_PATH, [dest for _, dest in mx.ROM_CACHE_ARTIFACTS])
 
     def test_a_partial_slot_is_not_restored(self):
         """Half a slot is worse than none: a .gba without its .elf is exactly the
@@ -785,6 +790,110 @@ end
 '''
         self.assertEqual(self.fingerprint(harness=harness),
                          self.fingerprint(harness=harness.replace('onlyForB(7)', 'onlyForB(8)')))
+
+
+class ScenarioScopes(unittest.TestCase):
+    """Which build scopes a scenario's verdict can possibly depend on (#255 phase 2).
+
+    A scenario's chapter dependency is a RANGE, not a point: it boots somewhere and plays
+    FORWARD, and a checkpoint-backed scenario replays that whole chain (ckpt_ch02start
+    replays ch00 -> ch01 -> ch02). Scoping one to its host chapter alone would be exactly
+    the hand-declared impact map #255 exists to avoid.
+    """
+
+    def scopes(self, **over):
+        data = dict(rom='canonical', host_chapter=2)
+        data.update(over)
+        rom = data.pop('rom')
+        m = manifest(rom_configs={'canonical': {}, 'testch': {'TESTCH': 1},
+                                  'ch03boot': {'CH03BOOT': 1}, 'ch05boot': {'CH05BOOT': 1}},
+                     scenarios={'s': dict(data, rom=rom)})
+        return mx.scenario_scopes(m.resolve('s'))
+
+    def test_global_is_always_in_scope(self):
+        self.assertIn('global', self.scopes())
+
+    def test_a_canonical_scenario_traverses_from_the_prologue(self):
+        """It boots at New Game, so everything between the prologue and its own chapter is
+        content it actually plays through."""
+        self.assertEqual(self.scopes(rom='canonical', host_chapter=4),
+                         {'global', 'chapter:prologue', 'chapter:ch01', 'chapter:ch02',
+                          'chapter:ch03'})
+
+    def test_a_boot_rom_scenario_starts_at_its_own_chapter(self):
+        """The whole point: a CH05BOOT scenario never reaches the prologue, so a prologue
+        edit cannot change its verdict."""
+        self.assertEqual(self.scopes(rom='ch05boot', host_chapter=6),
+                         {'global', 'chapter:ch05'})
+
+    def test_a_boot_rom_scenario_does_not_depend_on_earlier_chapters(self):
+        for earlier in ('chapter:prologue', 'chapter:ch01', 'chapter:ch04'):
+            self.assertNotIn(earlier, self.scopes(rom='ch05boot', host_chapter=6))
+
+    def test_a_boot_rom_scenario_still_covers_a_range_it_plays_forward_into(self):
+        self.assertEqual(self.scopes(rom='ch03boot', host_chapter=5),
+                         {'global', 'chapter:ch03', 'chapter:ch04'})
+
+    def test_the_testch_sandbox_depends_on_global_only(self):
+        """The sandbox replaces the prologue on slot 1 and is written by a step whose name
+        names no chapter, so its content is already inside `global`."""
+        self.assertEqual(self.scopes(rom='testch', host_chapter=1), {'global'})
+
+    def test_an_inverted_range_falls_back_to_EVERY_chapter(self):
+        """A host chapter behind the boot point is nonsense the manifest cannot describe.
+        Depending on everything is wrong-but-safe; depending on nothing is a stale PASS."""
+        got = self.scopes(rom='ch05boot', host_chapter=2)
+        self.assertIn('chapter:prologue', got)
+        self.assertIn('chapter:ch05', got)
+
+
+class ScopedFingerprint(unittest.TestCase):
+    MANIFEST = {
+        'global': {'paths': ['a'], 'digest': 'G1'},
+        'chapter:prologue': {'paths': ['b'], 'digest': 'P1'},
+        'chapter:ch05': {'paths': ['c'], 'digest': 'C51'},
+    }
+
+    def setUp(self):
+        self.m = manifest(rom_configs={'canonical': {}, 'ch05boot': {'CH05BOOT': 1}},
+                          scenarios={'alpha': {'rom': 'ch05boot', 'host_chapter': 6}})
+
+    def fingerprint(self, scenario_manifest, rom='romdigest'):
+        return mx.scenario_fingerprint(self.m.resolve('alpha'), rom,
+                                       harness_source=HARNESS_FIXTURE, driver='D', env={},
+                                       scopes=scenario_manifest)
+
+    def test_a_scope_it_does_not_depend_on_cannot_move_its_key(self):
+        """The headline: a prologue edit must stop re-running ch05's scenarios."""
+        moved = dict(self.MANIFEST, **{'chapter:prologue': {'paths': ['b'], 'digest': 'P2'}})
+        self.assertEqual(self.fingerprint(self.MANIFEST), self.fingerprint(moved))
+
+    def test_its_own_chapter_moving_moves_the_key(self):
+        moved = dict(self.MANIFEST, **{'chapter:ch05': {'paths': ['c'], 'digest': 'C52'}})
+        self.assertNotEqual(self.fingerprint(self.MANIFEST), self.fingerprint(moved))
+
+    def test_global_moving_moves_the_key(self):
+        moved = dict(self.MANIFEST, **{'global': {'paths': ['a'], 'digest': 'G2'}})
+        self.assertNotEqual(self.fingerprint(self.MANIFEST), self.fingerprint(moved))
+
+    def test_no_manifest_falls_back_to_the_whole_rom_key(self):
+        """None means "we do not know what that build wrote". The phase 1 key is the
+        conservative answer, and it must still respond to the ROM digest."""
+        self.assertNotEqual(self.fingerprint(None, rom='r1'), self.fingerprint(None, rom='r2'))
+
+    def test_a_scoped_key_ignores_the_monolithic_rom_digest(self):
+        """Once the build has told us what it wrote, rom_input_hash is the coarse proxy we
+        are replacing -- keeping it in the key would leave every task invalidating
+        everything, which is the whole ceiling phase 2 lifts."""
+        self.assertEqual(self.fingerprint(self.MANIFEST, rom='r1'),
+                         self.fingerprint(self.MANIFEST, rom='r2'))
+
+    def test_a_scope_missing_from_the_manifest_is_not_silently_ignored(self):
+        """A chapter the scenario depends on that the build never wrote must still be
+        recorded as absent, or "the step vanished" and "the step is unchanged" are the
+        same key."""
+        without = {k: v for k, v in self.MANIFEST.items() if k != 'chapter:ch05'}
+        self.assertNotEqual(self.fingerprint(self.MANIFEST), self.fingerprint(without))
 
 
 class DriverSource(unittest.TestCase):
@@ -993,6 +1102,61 @@ class IncrementalExecution(unittest.TestCase):
         m = manifest(scenarios={'a': {}, 'b': {}, 'c': {}})
         report = self.run_plan(m, ['a', 'b', 'c'], {'b': 'PASS'}, cached=('a', 'c'))
         self.assertEqual((report.ran, report.cached), (1, 2))
+
+    def test_the_cache_is_consulted_AGAIN_after_a_build(self):
+        """Phase 2: a scope manifest only exists once the build that produced it has run,
+        so a configuration whose ROM inputs moved cannot be keyed on scopes until it is
+        built. Building must therefore be able to REMOVE work, not just precede it -- a
+        ch05 edit rebuilds the ROM and then re-runs only ch05's scenarios."""
+        m = manifest(scenarios={'a': {}, 'b': {}})
+        self.built, self.ran, self.refreshed = [], [], []
+        cached = set()
+
+        def build(rom, flags):
+            self.built.append(rom)
+            cached.add('a')          # the fresh manifest shows `a` untouched after all
+            return True
+
+        def run_scenario(scn):
+            self.ran.append(scn.name)
+            return mx.Outcome(scn.name, scn.rom, 'PASS', 1.0, '')
+
+        def lookup_cached(scn):
+            if scn.name not in cached:
+                return None
+            return mx.Outcome(scn.name, scn.rom, 'PASS', 9.0, '', cached=True)
+
+        report = mx.execute(m.plan(['a', 'b']), build=build, run_scenario=run_scenario,
+                            lookup_cached=lookup_cached,
+                            after_build=lambda rom: self.refreshed.append(rom))
+        self.assertEqual(self.refreshed, ['canonical'])
+        self.assertEqual(self.ran, ['b'], 'the post-build re-check must drop `a`')
+        self.assertEqual((report.ran, report.cached), (1, 1))
+
+    def test_a_build_that_satisfies_EVERYTHING_runs_nothing(self):
+        m = manifest(scenarios={'a': {}, 'b': {}})
+        self.built, self.ran = [], []
+        cached = set()
+
+        def build(rom, flags):
+            self.built.append(rom)
+            cached.update({'a', 'b'})
+            return True
+
+        def run_scenario(scn):
+            self.ran.append(scn.name)
+            return mx.Outcome(scn.name, scn.rom, 'PASS', 1.0, '')
+
+        def lookup_cached(scn):
+            if scn.name not in cached:
+                return None
+            return mx.Outcome(scn.name, scn.rom, 'PASS', 9.0, '', cached=True)
+
+        report = mx.execute(m.plan(['a', 'b']), build=build, run_scenario=run_scenario,
+                            lookup_cached=lookup_cached)
+        self.assertEqual(self.built, ['canonical'], 'it still had to build to find out')
+        self.assertEqual(self.ran, [])
+        self.assertEqual((report.ran, report.cached), (0, 2))
 
     def test_no_cache_lookup_at_all_runs_everything(self):
         m = manifest(scenarios={'a': {}, 'b': {}})

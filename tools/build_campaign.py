@@ -44,6 +44,7 @@ import ref_to_battleframe  # noqa: E402  faked-battle-anim asset generator (#65)
 import feditor_to_banim  # noqa: E402  FEditor->decomp battle-anim importer (#90)
 import gen_chapter_title  # noqa: E402
 import gen_subtitle_cards  # noqa: E402
+import build_scopes  # noqa: E402  per-step write attribution for the matrix (#255 phase 2)
 from PIL import Image  # noqa: E402
 import yaml  # noqa: E402
 from inject.decomp import (  # noqa: E402  shared decomp paths + patch primitives
@@ -604,6 +605,10 @@ def _rewind_unchanged_mtimes(snap):
 
 
 BUILD_STAMP = os.path.join(REPO, '.build-config.json')
+# What each injection step wrote, per scope. Read by tools/playtest/matrix.py to decide
+# which scenarios a change can possibly have affected (#255 phase 2). Gitignored for the
+# same reason as the build stamp: it describes this tree's build, not the source.
+BUILD_SCOPES_PATH = os.path.join(REPO, '.build-scopes.json')
 
 
 def _stamp_build_config(campaign, flags):
@@ -10986,6 +10991,11 @@ def main():
     # Snapshot the previous build's injection footprint BEFORE we touch anything, so
     # we can rewind mtimes for whatever comes out byte-identical (fast warm rebuilds).
     _mtime_snapshot = _snapshot_mtimes(_decomp_footprint())
+    # Watch what each chapter injector actually writes, so the playtest matrix can tell a
+    # ch05 edit from a global one and stop re-running the prologue for it (#255 phase 2).
+    # Only the CHAPTER steps are wrapped: everything else falls through to `global`, which
+    # every scenario depends on, so the conservative answer is also the default one.
+    _scopes = build_scopes.BuildScopes(DECOMP)
     print('portraits:')
     inject_portraits(args.campaign)
     inject_arena_attendant_portraits(args.campaign)
@@ -11062,19 +11072,19 @@ def main():
         # verify_text checks runaway text, not who owns a slot.
         assert_message_ids_unique()
         print('chapter 1 (#21):')
-        inject_ch01(args.campaign)  # MUST precede inject_prologue (vanilla goal read)
+        _scopes.run(inject_ch01, args.campaign)  # MUST precede inject_prologue (vanilla goal read)
         inject_northlook_bitey()    # 'Ol Bitey over the tavern hearth (Beat 1 set dressing)
         print('chapter 2 (#22):')
-        inject_ch02(args.campaign)  # hosts slot 3; ch01's ending MNC2(0x3) lands here
-        inject_ch02_chwinga_faces(args.campaign)  # green chwinga bust + Mote/Rime/Glimmer names
+        _scopes.run(inject_ch02, args.campaign)  # hosts slot 3; ch01's ending MNC2(0x3) lands here
+        _scopes.run(inject_ch02_chwinga_faces, args.campaign)  # green chwinga bust + Mote/Rime/Glimmer names
         print('chapter 3 (#23):')
-        inject_ch03(args.campaign, boot=args.ch03_boot)
+        _scopes.run(inject_ch03, args.campaign, boot=args.ch03_boot)
         print('chapter 4 (#24):')
-        inject_ch04(args.campaign, boot=args.ch04_boot)
+        _scopes.run(inject_ch04, args.campaign, boot=args.ch04_boot)
         chain_ch03_to_ch04()
         print('chapter 5 (#25):')
-        inject_ch05(args.campaign, boot=args.ch05_boot)
-        inject_ch05_visit_faces(args.campaign)  # the four reliquary residents' skeleton busts
+        _scopes.run(inject_ch05, args.campaign, boot=args.ch05_boot)
+        _scopes.run(inject_ch05_visit_faces, args.campaign)  # the four reliquary residents' skeleton busts
         chain_ch04_to_ch05()
         if args.ch05_boot:
             print('CH05 BOOT (playtest: New Game -> the Elven Tomb, party + foes deployed):')
@@ -11092,10 +11102,18 @@ def main():
                 _configure_boot(TEST_CHAPTER_INDEX)  # sandbox never montages
             else:
                 print('prologue (New Game target):')
-                inject_prologue(args.campaign, montage=args.montage)
+                _scopes.run(inject_prologue, args.campaign, montage=args.montage)
                 _configure_boot(PROLOGUE_HOST_INDEX, montage=args.montage)
         print('death quotes (#6):')
         inject_pc_death_quotes(args.campaign)
+    # Close the scope manifest BEFORE the mtime rewind below: the rewind moves mtimes
+    # backwards on byte-identical files, and this attribution watches mtimes.
+    _scope_manifest = _scopes.write_manifest(
+        BUILD_SCOPES_PATH,
+        touched=[os.path.relpath(p, DECOMP) for p in _decomp_footprint()])
+    print('build scopes: %s' % ', '.join(
+        '%s=%d file(s)' % (scope, len(entry['paths']))
+        for scope, entry in sorted(_scope_manifest.items())))
     rewound = _rewind_unchanged_mtimes(_mtime_snapshot)
     if rewound:
         print('idempotent injection: rewound %d unchanged file(s) -> make skips them'

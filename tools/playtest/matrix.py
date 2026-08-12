@@ -297,7 +297,7 @@ def scenario_lanes(scenarios):
     return parallel, serial
 
 
-def execute(groups, build, run_scenario, jobs=1, lookup_cached=None):
+def execute(groups, build, run_scenario, jobs=1, lookup_cached=None, after_build=None):
     """Run the plan. `build`, `run_scenario` and `lookup_cached` are injected so the
     ordering and aggregation logic is testable without a ROM or an emulator.
 
@@ -344,6 +344,22 @@ def execute(groups, build, run_scenario, jobs=1, lookup_cached=None):
                     slot[id(s)] = Outcome(s.name, group.rom, 'BLOCKED', 0.0, '',
                                           'ROM configuration %s failed to build' % group.rom)
             else:
+                # Building can REMOVE work, not just precede it. A scope manifest only
+                # exists once the build that produced it has run, so a configuration whose
+                # ROM inputs moved cannot be keyed on scopes until now -- and a ch05 edit
+                # then turns out to have left every other chapter's scenarios untouched
+                # (#255 phase 2). Ask again before spending an emulator on any of them.
+                if after_build:
+                    after_build(group.rom)
+                if lookup_cached:
+                    rechecked = []
+                    for s in pending:
+                        hit = lookup_cached(s)
+                        if hit is None:
+                            rechecked.append(s)
+                        else:
+                            slot[id(s)] = hit
+                    pending = rechecked
                 parallel, serial = scenario_lanes(pending)
                 if jobs > 1 and len(parallel) > 1:
                     from concurrent.futures import ThreadPoolExecutor
@@ -585,6 +601,8 @@ def check_rom(manifest, scenario, stamp_path=None):
 ROM_PATH = os.path.join(REPO, 'fireemblem8u', 'fireemblem8.gba')
 ELF_PATH = os.path.join(REPO, 'fireemblem8u', 'fireemblem8.elf')
 STAMP_PATH = os.path.join(REPO, '.build-config.json')
+# What build_campaign.py recorded each injection step as having written (#255 phase 2).
+SCOPES_PATH = os.path.join(REPO, '.build-scopes.json')
 ROM_CACHE_DIR = os.path.join(REPO, '.matrix-romcache')
 ROM_INPUT_PATHS = ('campaigns', 'engine', 'tools/inject', 'tools/build_campaign.py',
                    'tools/portrait_tool.py', 'tools/feditor_to_banim.py', 'Makefile')
@@ -637,7 +655,11 @@ def rom_input_hash(make_flags):
 # therefore ran every scenario against the wrong addresses, and the gate spans FOUR
 # configurations, so a warm run restored three of them that way. It costs 44 MB per slot;
 # reading the wrong memory costs a debugging session that finds nothing.
-ROM_CACHE_ARTIFACTS = (('.gba', ROM_PATH), ('.elf', ELF_PATH), ('.json', STAMP_PATH))
+#
+# `.scopes.json` travels for the same reason: a restored ROM must bring the manifest of
+# what the build that produced it wrote, or the verdict key reads whatever build ran last.
+ROM_CACHE_ARTIFACTS = (('.gba', ROM_PATH), ('.elf', ELF_PATH), ('.json', STAMP_PATH),
+                       ('.scopes.json', SCOPES_PATH))
 
 
 def _cache_slot(rom, digest):
@@ -772,12 +794,87 @@ PLAYTEST_ENV_KEYS = ('PT_SEED', 'PT_CHAR', 'PT_ROUNDS', 'PT_STATE', 'PT_TAG', 'P
                      'PT_PROVIDER', 'PT_MODEL', 'PT_BASE_URL', 'PT_LLM_DIR')
 
 
-def scenario_fingerprint(scenario, rom_digest, harness_source=None, driver=None, env=None):
+# -- what a scenario can possibly depend on (#255 phase 2) ------------------
+#
+# The build tells us what each injection step WROTE (tools/build_scopes.py). This says what
+# each scenario READS, and the two meet at the verdict key: a scenario re-runs only when a
+# scope it depends on has moved.
+#
+# The chapter dependency is a RANGE, not a point. A scenario boots somewhere and plays
+# FORWARD, and a checkpoint-backed one replays that whole chain -- `ckpt_ch02start` replays
+# ch00 -> ch01 -> ch02 to mint its state. Scoping a scenario to its host chapter alone would
+# be precisely the hand-declared impact map #255 exists to avoid.
+#
+# Slot numbers come from `tools/inject/hosts.py`, the file that ENROLS a chapter, so adding
+# ch06 is one line there and nothing here.
+sys.path.insert(0, os.path.join(REPO, 'tools'))     # build_scopes, inject.hosts
+
+
+def _host_slots():
+    """{host slot -> build scope}, read from the injector's own enrolment constants."""
+    from inject import hosts
+    slots = {hosts.PROLOGUE_HOST_INDEX: 'chapter:prologue'}
+    for name in dir(hosts):
+        m = re.match(r'^CH(\d\d)_HOST_INDEX$', name)
+        if m:
+            slots[getattr(hosts, name)] = 'chapter:ch%s' % m.group(1)
+    return slots
+
+
+def _boot_slot(scenario, slots):
+    """The slot a scenario's ROM configuration starts New Game at.
+
+    A `CH05BOOT=1` build boots straight into ch05, so nothing before it is ever played --
+    that is where most of phase 2's saving comes from. The TESTCH sandbox replaces the
+    prologue on slot 1 and is written by a step naming no chapter, so its content already
+    lives in `global`; it contributes no chapter of its own.
+    """
+    flags = {f.split('=')[0] for f in scenario.make_flags}
+    for flag in sorted(flags):
+        m = re.match(r'^CH(\d\d)BOOT$', flag)
+        if m:
+            for slot, scope in slots.items():
+                if scope == 'chapter:ch%s' % m.group(1):
+                    return slot
+    if 'TESTCH' in flags or 'LORDBOOT' in flags:
+        return None
+    return min(slots)
+
+
+def scenario_scopes(scenario, slots=None):
+    """Every build scope whose contents could change this scenario's verdict."""
+    slots = slots or _host_slots()
+    scopes = {'global'}
+    boot = _boot_slot(scenario, slots)
+    if boot is None:
+        return scopes
+    try:
+        host = int(scenario.host_chapter)
+    except (TypeError, ValueError):
+        return scopes | set(slots.values())      # cannot tell -> depend on everything
+    if host < boot:
+        # Nonsense the manifest cannot describe (check_rom normally refuses it first).
+        # Depending on everything is wrong-but-safe; depending on nothing is a stale PASS.
+        return scopes | set(slots.values())
+    for slot, scope in slots.items():
+        if boot <= slot <= host:
+            scopes.add(scope)
+    return scopes
+
+
+def scenario_fingerprint(scenario, rom_digest, harness_source=None, driver=None, env=None,
+                         scopes=None):
     """The cache key, or None when this run may not be cached at all.
 
     None means "refuse to cache" and is returned whenever an input cannot be pinned: no ROM
     digest (rom_input_hash could not read the decomp HEAD), or a scenario harness.lua does
     not define. Unknown means conservative, never optimistic.
+
+    `scopes` is the build's own scope manifest (tools/build_scopes.py). Given one, the ROM
+    half of the key becomes the digests of just the scopes this scenario depends on, so a
+    ch05 edit stops re-running the prologue -- the whole of #255 phase 2. Without one
+    (`None`: an older cache slot, or a build that emitted nothing) the key falls back to
+    `rom_input_hash`, which is phase 1's coarse but correct answer.
     """
     if rom_digest is None:
         return None
@@ -788,7 +885,16 @@ def scenario_fingerprint(scenario, rom_digest, harness_source=None, driver=None,
     if scenario.name not in funcs:
         return None
     h = hashlib.sha256()
-    h.update(('matrix-verdict-v1\nrom:%s\nentry:%s\n' % (rom_digest, export_env(scenario))).encode())
+    if scopes is None:
+        rom_part = 'rom:%s' % rom_digest
+    else:
+        # Absent is NOT the same as unchanged: a scope the scenario depends on that the
+        # build never wrote has to key differently from one that came out identical, or
+        # "the step vanished" and "the step did not move" are the same verdict.
+        rom_part = 'scopes:' + ','.join(
+            '%s=%s' % (scope, (scopes.get(scope) or {}).get('digest', 'absent'))
+            for scope in sorted(scenario_scopes(scenario)))
+    h.update(('matrix-verdict-v1\n%s\nentry:%s\n' % (rom_part, export_env(scenario))).encode())
     for key in PLAYTEST_ENV_KEYS:
         if env.get(key):
             h.update(('env:%s=%s\n' % (key, env[key])).encode())
@@ -878,21 +984,52 @@ class VerdictCache(object):
     def __init__(self, scenarios, enabled=True):
         self.enabled = enabled
         self.fingerprints = {}
-        digests = {}
-        for s in scenarios:
-            # Only a VERDICT scenario may be skipped. A `record` scenario exists to refill
-            # /tmp/playtest-<name> with motion frames that make_gif.py then reads by hand,
-            # and a `diagnostic` asserts nothing -- serving either from cache hands the
-            # caller whatever ran last under that path.
-            if s.kind != 'verdict':
-                continue
+        # Only a VERDICT scenario may be skipped. A `record` scenario exists to refill
+        # /tmp/playtest-<name> with motion frames that make_gif.py then reads by hand,
+        # and a `diagnostic` asserts nothing -- serving either from cache hands the
+        # caller whatever ran last under that path.
+        self._scenarios = [s for s in scenarios if s.kind == 'verdict']
+        self._digests = {}
+        self.refresh()
+
+    def refresh(self, built_rom=None):
+        """(Re)compute the keys. Called once up front, and AGAIN after each build.
+
+        The second call is what phase 2 needs: a scope manifest only exists once the build
+        that produced it has run, so a configuration whose ROM inputs moved cannot be keyed
+        on scopes until it is built. Before the build we key off the manifest stored in the
+        ROM cache slot -- which is exactly right when the ROM is unchanged, and is what
+        keeps phase 1's "a fully cached group is never built" path alive.
+        """
+        for s in self._scenarios:
             flags = tuple(s.make_flags)
-            if flags not in digests:
-                digests[flags] = rom_input_hash(s.make_flags)
-            self.fingerprints[s.name] = scenario_fingerprint(s, digests[flags])
+            if flags not in self._digests:
+                self._digests[flags] = rom_input_hash(s.make_flags)
+            digest = self._digests[flags]
+            if built_rom is not None and s.rom != built_rom:
+                continue
+            self.fingerprints[s.name] = scenario_fingerprint(
+                s, digest, scopes=self._scope_manifest(s.rom, digest, fresh=built_rom is not None))
+
+    def _scope_manifest(self, rom, digest, fresh=False):
+        """The build's own account of what it wrote, or None (fall back to the ROM key)."""
+        import build_scopes
+        if fresh:
+            return build_scopes.load_manifest(SCOPES_PATH)
+        if digest is None:
+            return None
+        return build_scopes.load_manifest(_cache_slot(rom, digest) + '.scopes.json')
 
     def hit(self, scenario):
         return self.lookup(scenario) is not None
+
+    def scoped(self, scenario):
+        """True when this scenario's key already knows what the build wrote. False means
+        the answer is still the coarse whole-ROM one and will sharpen after the build."""
+        if not self.enabled or scenario.kind != 'verdict':
+            return True
+        return self._scope_manifest(
+            scenario.rom, self._digests.get(tuple(scenario.make_flags))) is not None
 
     def lookup(self, scenario):
         if not self.enabled:
@@ -989,6 +1126,13 @@ def cmd_run(args):
     for g in groups:
         print('  %-10s %s' % (g.rom, ' '.join(
             s.name + ('(cached)' if verdicts.hit(s) else '') for s in g.scenarios)))
+    # Honest about what this listing can and cannot know. A configuration whose ROM inputs
+    # moved has no scope manifest yet -- it only exists once the build that produced it has
+    # run -- so every one of its scenarios reads as "will run" here and most of them will
+    # turn out to be cached once the build says what it actually wrote (#255 phase 2).
+    if any(not verdicts.scoped(s) for g in groups for s in g.scenarios):
+        print('matrix: a ROM configuration changed -- what it actually re-runs is decided '
+              'after its build')
     if args.dry_run:
         return 0
 
@@ -1000,6 +1144,7 @@ def cmd_run(args):
                      build=lambda rom, flags: _build(rom, flags, log_dir, use_cache=use_cache),
                      run_scenario=lambda s: verdicts.store(s, _run_scenario(s, log_dir)),
                      lookup_cached=verdicts.lookup,
+                     after_build=verdicts.refresh,
                      jobs=jobs)
     print('')
     print(render_table(report))
