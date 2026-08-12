@@ -6874,6 +6874,7 @@ scenarios.ch05arena = function()
     emu:write32(hero.addr + 0x0C, hero.state & (~REARM_MASK))
     local beforeGold = 5000
     emu:write32(SYM.gPlaySt + 0x08, beforeGold)
+    pokeAnimsOn()
     if not moveUnit(ARENA_X, ARENA_Y, ARENA_X, ARENA_Y) then
         return result("FAIL", "could not open Braulo's command menu on the arena")
     end
@@ -6881,6 +6882,39 @@ scenarios.ch05arena = function()
         return controllerState(after) == "dialogue_wait"
     end, 600) then
         return result("FAIL", "the live arena tile offered no Arena command")
+    end
+    -- Presentation proof (#265), on the same real Arena flow as the wager assertions below.
+    -- The cold campaign palette occupies BG banks 12..15. One distinctive anchor per bank
+    -- proves all four generated banks reached palette RAM; the screenshot remains the visual
+    -- review artifact. FaceProc.faceId (+0x3E, include/face.h) proves the visible attendant is
+    -- the chapter override dressed onto Glen (FID 0x4B), not vanilla's human FID 0x67.
+    -- Like the combat anchors below, half of these are VANILLA on purpose. The welcome screen
+    -- changes only its weather and its awnings; the coliseum's warm sandstone is deliberately
+    -- untouched, and an earlier pass that cooled the whole building held luminance perfectly
+    -- while crushing the stone's saturation, so only a "this stayed vanilla" assertion catches
+    -- it. Banks 12..15 (uiarena.c: ApplyPalettes(..., 0xC, 4)).
+    local paletteAnchors = {
+        { bank = 15, index = 3, want = 0x779B, what = "overcast sky" },
+        { bank = 13, index = 4, want = 0x3127, what = "blue awning" },
+        { bank = 12, index = 12, want = 0x3F19, what = "VANILLA sandstone" },
+        { bank = 12, index = 13, want = 0x194B, what = "VANILLA stone shadow" },
+        { bank = 12, index = 3, want = 0x4B9D, what = "VANILLA bright stone" },
+    }
+    for _, anchor in ipairs(paletteAnchors) do
+        local got = ru16(0x05000000 + anchor.bank * 32 + anchor.index * 2)
+        if got ~= anchor.want then
+            return result("FAIL", string.format(
+                "Arena welcome %s (bank %d idx %d) was 0x%04X, expected 0x%04X",
+                anchor.what, anchor.bank, anchor.index, got, anchor.want))
+        end
+    end
+    local skeletonFace = false
+    for slot = 0, 3 do
+        local face = ru32(SYM.gFaces + slot * 4)
+        if face ~= 0 and ru16(face + 0x3E) == 0x4B then skeletonFace = true break end
+    end
+    if not skeletonFace then
+        return result("FAIL", "Arena welcome opened without the Ch05 skeleton face FID 0x4B")
     end
     shot("ch05arena-welcome")
     if ru32(SYM.gArenaState) ~= hero.addr then
@@ -6908,8 +6942,65 @@ scenarios.ch05arena = function()
         return result("FAIL", "accepted wager reached instructions without a generated opponent")
     end
     shot("ch05arena-opponent")
+    -- One guarded press with a generous budget, and it is load-bearing that the budget is
+    -- generous: gProcScr_ArenaUiMain runs TWO blocking dialogue pages between the accepted
+    -- wager and the fight -- ArenaUi_InstructionsDialogue (0x8D5) then ArenaUi_GoodLuckDialogue
+    -- (0x8D3), both PROC_CALLs before ArenaUi_StartArenaBattle (src/uiarena.c). This single
+    -- press clears the first and reaches combat only via guardedInput's lost-input re-press,
+    -- which is fragile. It is NOT fixed by simply pressing three times: between the pages the
+    -- controller classifies `transition` and offers no legal advance_dialogue, so a second
+    -- guarded press fails outright on not-legal (measured 2026-08-12). A proper fix needs the
+    -- controller to classify the Arena dialogue state. Tracked in #269 -- do not "fix" this by
+    -- adding presses.
+    if not guardedInput("advance_dialogue", "A", "opponent instructions launch Arena combat",
+        function(after) return after.procs.battle ~= nil end, 1800) then
+        return result("FAIL", "accepted Arena wager never launched its battle")
+    end
+    -- The special Arena image owns the ENTIRE visible coliseum, floor included, in BG banks
+    -- 6..9. Arena mode skips the normal terrain-platform loader (EfxClearScreenFx clears BG2),
+    -- so these are the only combat-background palettes that can prove the winter treatment.
+    -- Observe them while gProc_ekrBattle is live; shootCombatFrames returns after combat and
+    -- the palette would already be restored.
+    --
+    -- HALF OF THESE ANCHORS ARE VANILLA ON PURPOSE. The first attempt at this feature was a
+    -- cold ramp across all 64 words per phase; it passed every data check and was rejected on
+    -- sight because the coliseum's stone, wood, gold and crowd went with it. Proving only that
+    -- the new colours arrived would have proved that pass correct too. The floor and the
+    -- banners must change, and everything else must NOT -- so the scenario reads both.
+    -- All three phases share these words, so the ten-frame cycle cannot make them flicker.
+    local combatPaletteAnchors = {
+        { bank = 9, index = 3, want = 0x7FFF, what = "snow floor" },
+        { bank = 8, index = 8, want = 0x45A9, what = "blue banner" },
+        { bank = 7, index = 5, want = 0x473D, what = "VANILLA crowd gold" },
+        { bank = 6, index = 5, want = 0x4AD8, what = "VANILLA upper stone" },
+        { bank = 9, index = 15, want = 0x292A, what = "VANILLA pillar grey" },
+    }
+    local combatPaletteReady = false
+    for _ = 1, 240 do
+        local allWinter = true
+        for _, anchor in ipairs(combatPaletteAnchors) do
+            local got = ru16(0x05000000 + anchor.bank * 32 + anchor.index * 2)
+            if got ~= anchor.want then allWinter = false break end
+        end
+        if allWinter then combatPaletteReady = true break end
+        yield()
+    end
+    if not combatPaletteReady then
+        for _, anchor in ipairs(combatPaletteAnchors) do
+            local got = ru16(0x05000000 + anchor.bank * 32 + anchor.index * 2)
+            if got ~= anchor.want then
+                return result("FAIL", string.format(
+                    "Arena combat BG %s (bank %d idx %d) was 0x%04X, expected 0x%04X",
+                    anchor.what, anchor.bank, anchor.index, got, anchor.want))
+            end
+        end
+        return result("FAIL", "Arena combat BG palettes never reached their winter state")
+    end
+    if not shootCombatFrames("ch05arena-combat") then
+        return result("FAIL", "Arena battle launched without a capturable full animation")
+    end
     return result("PASS", string.format(
-        "arena (12,6) taught once, blocked replay, then Arena accepted %dG and generated its opponent",
+        "arena (12,6) taught once, blocked replay, loaded winter palette + skeleton, accepted %dG, generated its opponent, and entered combat",
         wager))
 end
 

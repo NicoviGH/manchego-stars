@@ -156,6 +156,48 @@ class TestPlaytestHarness(unittest.TestCase):
                       'the gate must distinguish the locked four-box scene from merely '
                       'reaching turn 2')
 
+    def test_ch05arena_proves_the_loaded_winter_palette_and_skeleton_face(self):
+        harness = _read_harness()
+        body = _block(harness, 'scenarios.ch05arena = function()', '\n-- ch05village')
+        self.assertIn('SYM.gFaces', body)
+        self.assertIn('ru16(face + 0x3E) == 0x4B', body,
+                      'the live Arena face proc must carry the chapter-selected Glen FID')
+        for word, what in (('0x779B', 'the overcast sky'), ('0x3127', 'the blue awning')):
+            self.assertIn(word, body, '%s must be proven to have arrived' % what)
+        for word, what in (('0x3F19', 'sandstone'), ('0x194B', 'stone shadow'),
+                           ('0x4B9D', 'bright stone')):
+            self.assertIn(word, body,
+                          'the welcome screen keeps its warm masonry -- vanilla %s must be '
+                          'proven UNCHANGED, or a wash-out passes' % what)
+        self.assertIn('shot("ch05arena-welcome")', body,
+                      'the asserted presentation must still be captured for visual review')
+        self.assertIn('pokeAnimsOn()', body,
+                      'the Arena proof must leave full battle animations on for review')
+        self.assertIn('shootCombatFrames("ch05arena-combat")', body,
+                      'the accepted wager must capture the real in-combat presentation')
+        for word, what in (('0x7FFF', 'the snow floor'), ('0x45A9', 'the blue banner')):
+            self.assertIn(word, body, '%s must be proven to have arrived' % what)
+        # The regression this feature actually shipped: a cold ramp across all 64 words per
+        # phase passed every data check and lost the coliseum. Anchors that only prove the new
+        # colours arrived would have passed it too.
+        for word, what in (('0x473D', 'crowd gold'), ('0x4AD8', 'upper stone'),
+                           ('0x292A', 'pillar grey')):
+            self.assertIn(word, body,
+                          'vanilla %s must be proven UNCHANGED, or a wash-out passes' % what)
+        self.assertIn('VANILLA', body,
+                      'the preserved anchors must be labelled as such in the failure text')
+        self.assertIn('Arena combat BG %s (bank %d idx %d)', body)
+        self.assertLess(body.index('combatPaletteAnchors'),
+                        body.index('shootCombatFrames("ch05arena-combat")'),
+                        'the palette must be observed while combat is live, before the recorder '
+                        'returns to the Arena UI')
+        self.assertIn('generated its opponent', body,
+                      'presentation proof may not replace the real wager/opponent proof')
+
+        with open(os.path.join(REPO, 'tools/playtest/gen_symbols.py'), encoding='utf-8') as f:
+            symbols = f.read()
+        self.assertIn("'gFaces'", symbols)
+
     def test_recordch05eruption_records_only_the_turn_two_scene(self):
         harness = _read_harness()
         self.assertIn('scenarios.recordch05eruption = function()', harness)

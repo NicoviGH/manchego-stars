@@ -37,7 +37,75 @@ BANIM_EFXHIT_C = os.path.join(DECOMP, 'src', 'banim-efxhit.c')
 ICON_C = os.path.join(DECOMP, 'src', 'icon.c')
 ICON_H = os.path.join(DECOMP, 'include', 'icon.h')
 CHAPTER_TITLE_C = os.path.join(DECOMP, 'src', 'chapter_title.c')
+UIARENA_C = os.path.join(DECOMP, 'src', 'uiarena.c')
+BANIM_EKRARENA_C = os.path.join(DECOMP, 'src', 'banim-ekrarena.c')
 LORDFLOOR_APPLIED_FLAG = 0xFA
+
+
+def _patch_arena_presentation_text(text):
+    """Route ArenaUi_Init's palette and attendant through build-generated selectors.
+
+    Graphics and TSA stay on their vanilla symbols. The generated selectors carry explicit
+    vanilla fallbacks, so an unconfigured campaign remains byte-semantically vanilla here.
+    """
+    decl_anchor = 'void DrawArenaOpponentDetailsText(ProcPtr);\n'
+    declarations = ('const u16 * GetArenaPresentationPalette(void);\n'
+                    'int GetArenaPresentationFace(void);\n')
+    if declarations not in text:
+        if decl_anchor not in text:
+            return text
+        text = text.replace(decl_anchor, decl_anchor + declarations, 1)
+    text = text.replace('StartTalkFace(0x67, 0x20, 8, 3, 1);',
+                        'StartTalkFace(GetArenaPresentationFace(), 0x20, 8, 3, 1);', 1)
+    text = text.replace('ApplyPalettes(gPal_ArenaBuildingFront, 0xC, 4);',
+                        'ApplyPalettes(GetArenaPresentationPalette(), 0xC, 4);', 1)
+    return text
+
+
+def _patch_arena_presentation():
+    """Install the campaign-agnostic Arena presentation seam at the real init call site."""
+    with open(UIARENA_C, encoding='utf-8') as f:
+        text = f.read()
+    out = _patch_arena_presentation_text(text)
+    expected = ('StartTalkFace(GetArenaPresentationFace(), 0x20, 8, 3, 1);',
+                'ApplyPalettes(GetArenaPresentationPalette(), 0xC, 4);')
+    if out == text and not all(token in text for token in expected):
+        sys.exit('ERROR: ArenaUi_Init not in expected vanilla form in %s' % UIARENA_C)
+    if not all(token in out for token in expected):
+        sys.exit('ERROR: Arena presentation selectors did not reach ArenaUi_Init in %s'
+                 % UIARENA_C)
+    with open(UIARENA_C, 'w', encoding='utf-8') as f:
+        f.write(out)
+
+
+def _patch_arena_battle_background_text(text):
+    """Make the Arena battle fade-in use the same palette pointer array as its cycle."""
+    decl = 'extern u16 * CONST_DATA PalArray_ArenaBattleBg[];\n'
+    anchor = 'EWRAM_DATA int gBaArenaFlag = 0;\n'
+    if decl not in text:
+        if anchor not in text:
+            return text
+        text = text.replace(anchor, decl + '\n' + anchor, 1)
+    return text.replace(
+        'CpuFastCopy(Pal_ArenaBattleBg_A, gPaletteBuffer + 0x60, 0x80);',
+        'CpuFastCopy(PalArray_ArenaBattleBg[0], gPaletteBuffer + 0x60, 0x80);', 1)
+
+
+def _patch_arena_battle_background():
+    """Install the campaign-agnostic Arena combat palette seam at fade-in."""
+    with open(BANIM_EKRARENA_C, encoding='utf-8') as f:
+        text = f.read()
+    out = _patch_arena_battle_background_text(text)
+    expected = ('extern u16 * CONST_DATA PalArray_ArenaBattleBg[];',
+                'CpuFastCopy(PalArray_ArenaBattleBg[0], gPaletteBuffer + 0x60, 0x80);')
+    if out == text and not all(token in text for token in expected):
+        sys.exit('ERROR: Arena battle background init not in expected vanilla form in %s'
+                 % BANIM_EKRARENA_C)
+    if not all(token in out for token in expected):
+        sys.exit('ERROR: Arena battle background palette seam did not reach %s'
+                 % BANIM_EKRARENA_C)
+    with open(BANIM_EKRARENA_C, 'w', encoding='utf-8') as f:
+        f.write(out)
 
 
 def _swap_combat_anim_to_unique(text):

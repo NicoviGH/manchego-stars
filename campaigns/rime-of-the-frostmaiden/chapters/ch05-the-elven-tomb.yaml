@@ -28,6 +28,14 @@ introduces:
       tutorial (0x9D5 + 0x9D6, vanilla verbatim) fires when a unit visits the arena tile"
     status: active
 
+# Ch05 alone replaces the campaign-default human Arena Master. The face slot is an injection
+# target, not story identity: Glen is absent from Ch00-08 and no other campaign portrait dresses
+# it. Removing this optional block restores vanilla face 0x67 (decisions.md, issue #265).
+arena_presentation:
+  attendant:
+    portrait: "portraits/vendor/Skeleton (Armour, version 1) {Generic Pretsel} [F2E].png"
+    face_slot: Glen
+
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
   The white moose's trail ends at an ancient elven tomb — the refuge of Ravisin, an
