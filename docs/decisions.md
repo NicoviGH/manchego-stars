@@ -4428,11 +4428,27 @@ Three rules make it sound, and all three are the conservative direction:
   (reconciled from git's own view of the decomp at the end), and any step whose name does
   not identify exactly one chapter — `chain_ch04_to_ch05` names two — all land in `global`,
   which every scenario depends on.
-- **A scenario's chapter dependency is a RANGE, not a point.** It boots somewhere and plays
-  FORWARD, and a checkpoint-backed one replays that whole chain (`ckpt_ch02start` replays
-  ch00→ch01→ch02). The range runs from the ROM configuration's boot flag to its
-  `host_chapter`, with slot numbers read from `tools/inject/hosts.py` — the file that
-  ENROLS a chapter — so adding ch06 is one line there and nothing in the matrix.
+- **A scenario's chapter dependency comes from where it ACTUALLY WENT, not from a field.**
+  The first cut read `matrix.yaml`'s `host_chapter` as the last chapter played. It is not —
+  it is the harness's `PT_HOST_CHAPTER` hint and defaults to `1`, so `ch01win` boots at the
+  prologue, plays into ch01, and declares `host_chapter: 1`. Reading it as an upper bound
+  let ch01's map change without re-running the scenario that plays it: a stale PASS, caught
+  in review. Every controller observation carries `world.chapter`, so a scenario's own log
+  records its traversal; `matrix.py` stores that beside the verdict and scopes the next key
+  to exactly those chapters. Cold (nothing observed yet) it depends on every chapter from
+  its boot point FORWARD and converges after one pass. **Why trusting the observation is
+  safe:** for a change to send a scenario somewhere new, that change must be in a scope it
+  already depends on — a chapter it visits, or `global`, where the chapter-CHAINING steps
+  live because their names name two chapters — so it re-runs and re-observes first. Slot
+  numbers come from `tools/inject/hosts.py`, the file that ENROLS a chapter, so adding ch06
+  is one line there and nothing in the matrix.
+
+- **The scoped key still pins the ROM inputs no scope can see.** Everything else reaches the
+  ROM as a file some injector WRITES, which the manifest observes — but the decomp's own
+  sources are COMPILED (we patch only a handful), so a submodule bump touching an engine
+  file no injector writes rebuilds the ROM and moves not one scope digest. `engine/` and the
+  `Makefile` are the same shape. Those stay in the key as a narrow `engine_input_hash`;
+  campaign data, which is what actually changes, stays scope-attributed.
 
 **The manifest only exists AFTER the build**, which changes the shape of a run: a
 configuration whose ROM inputs moved cannot be keyed on scopes until it is built, so
@@ -4442,6 +4458,10 @@ whenever `rom_input_hash` hits, which is what keeps a doc-only change free. For 
 reason `--dry-run` says so out loud when a configuration changed: its listing is the coarse
 answer, and most of those scenarios turn out cached once the build reports what it wrote.
 The manifest travels in the ROM cache slot alongside the ELF, and for the same reason.
+
+**Measured both ways, because the cold number is part of the honest picture**: a ch05
+enemy-level edit costs **6 run / 14 cached** once traversals are known, and **19 run / 1
+cached** on a cold cache that has not observed any yet.
 
 **Verified deterministic**: two consecutive identical builds produce byte-identical
 manifests across all seven scopes. That matters because the attribution detects writes by

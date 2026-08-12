@@ -608,7 +608,7 @@ ROM_INPUT_PATHS = ('campaigns', 'engine', 'tools/inject', 'tools/build_campaign.
                    'tools/portrait_tool.py', 'tools/feditor_to_banim.py', 'Makefile')
 
 
-def rom_input_hash(make_flags):
+def rom_input_hash(make_flags, paths=None):
     """A digest of everything the ROM is built from, for cache keying.
 
     Files are fingerprinted by (path, size, mtime_ns) rather than content: hashing the whole
@@ -625,7 +625,7 @@ def rom_input_hash(make_flags):
         h.update(b'decomp:' + head)
     except (subprocess.CalledProcessError, OSError):
         return None             # cannot pin the decomp -> refuse to cache rather than guess
-    for rel in ROM_INPUT_PATHS:
+    for rel in (ROM_INPUT_PATHS if paths is None else paths):
         path = os.path.join(REPO, rel)
         if os.path.isfile(path):
             files = [path]
@@ -841,29 +841,71 @@ def _boot_slot(scenario, slots):
     return min(slots)
 
 
-def scenario_scopes(scenario, slots=None):
-    """Every build scope whose contents could change this scenario's verdict."""
+_CHAPTER_RECORD = re.compile(r'"chapter":(\d+)')
+
+
+def observed_chapters(log_text):
+    """The chapter slots a run actually reached, or None if the log never said.
+
+    Every controller observation carries `world.chapter`, so a scenario's own log is a
+    record of where it went -- the runtime counterpart of the build's scope manifest, and
+    derived the same way: from what actually happened, not from what anybody declared.
+    """
+    slots = sorted({int(n) for n in _CHAPTER_RECORD.findall(log_text or '')})
+    return slots or None
+
+
+def scenario_scopes(scenario, slots=None, observed=None):
+    """Every build scope whose contents could change this scenario's verdict.
+
+    `observed` is the chapter slots a previous run of this scenario actually visited. With
+    it, the scenario depends on exactly those chapters. Without it -- a cold cache -- the
+    answer is every chapter from its boot point FORWARD, because `matrix.yaml`'s
+    `host_chapter` is the harness's `PT_HOST_CHAPTER` hint (default 1), not the last
+    chapter played: `ch01win` boots at the prologue and plays into ch01 while declaring
+    host_chapter 1. Reading it as an upper bound let ch01's map change without re-running
+    the scenario that plays it.
+
+    Why the observed set is safe to trust: for a change to send a scenario somewhere NEW,
+    that change has to be in a scope it already depends on -- a chapter it visits, or
+    `global`, where the chapter-chaining steps live because their names name two chapters.
+    So it re-runs, and re-observes, before the new chapter can matter.
+    """
     slots = slots or _host_slots()
     scopes = {'global'}
     boot = _boot_slot(scenario, slots)
     if boot is None:
+        # The TESTCH sandbox replaces the prologue on slot 1 and is written by a step
+        # naming no chapter, so its content already lives in `global`.
         return scopes
-    try:
-        host = int(scenario.host_chapter)
-    except (TypeError, ValueError):
-        return scopes | set(slots.values())      # cannot tell -> depend on everything
-    if host < boot:
-        # Nonsense the manifest cannot describe (check_rom normally refuses it first).
-        # Depending on everything is wrong-but-safe; depending on nothing is a stale PASS.
-        return scopes | set(slots.values())
+    scopes.add(slots[boot])
+    if observed is not None:
+        for slot in observed:
+            if slot in slots:
+                scopes.add(slots[slot])
+        return scopes
     for slot, scope in slots.items():
-        if boot <= slot <= host:
+        if slot >= boot:
             scopes.add(scope)
     return scopes
 
 
+# The ROM inputs NO scope can see. Everything else reaches the ROM as a file some injector
+# WRITES, which the scope manifest observes -- but the decomp's own sources are COMPILED
+# (we only patch a handful), so a submodule bump touching an engine file no injector writes
+# rebuilds the ROM and moves not one scope digest. `engine/` and the Makefile are the same
+# shape. Narrow on purpose: campaign data is what changes constantly, and it stays
+# scope-attributed.
+ENGINE_INPUT_PATHS = ('Makefile', 'engine')
+
+
+def engine_input_hash():
+    """A digest of the ROM inputs that never pass through an observed injector write."""
+    return rom_input_hash([], paths=ENGINE_INPUT_PATHS)
+
+
 def scenario_fingerprint(scenario, rom_digest, harness_source=None, driver=None, env=None,
-                         scopes=None):
+                         scopes=None, engine=None, observed=None):
     """The cache key, or None when this run may not be cached at all.
 
     None means "refuse to cache" and is returned whenever an input cannot be pinned: no ROM
@@ -891,9 +933,10 @@ def scenario_fingerprint(scenario, rom_digest, harness_source=None, driver=None,
         # Absent is NOT the same as unchanged: a scope the scenario depends on that the
         # build never wrote has to key differently from one that came out identical, or
         # "the step vanished" and "the step did not move" are the same verdict.
-        rom_part = 'scopes:' + ','.join(
-            '%s=%s' % (scope, (scopes.get(scope) or {}).get('digest', 'absent'))
-            for scope in sorted(scenario_scopes(scenario)))
+        rom_part = 'engine:%s|scopes:%s' % (
+            engine_input_hash() if engine is None else engine,
+            ','.join('%s=%s' % (scope, (scopes.get(scope) or {}).get('digest', 'absent'))
+                     for scope in sorted(scenario_scopes(scenario, observed=observed))))
     h.update(('matrix-verdict-v1\n%s\nentry:%s\n' % (rom_part, export_env(scenario))).encode())
     for key in PLAYTEST_ENV_KEYS:
         if env.get(key):
@@ -912,6 +955,37 @@ def scenario_fingerprint(scenario, rom_digest, harness_source=None, driver=None,
         h.update(('\nfn:%s\n' % name).encode())
         h.update(funcs[name][0].encode())
     return h.hexdigest()[:32]
+
+
+def _observed_path(scenario, cache_dir=None):
+    """Where a scenario's observed traversal lives.
+
+    Deliberately NOT keyed by fingerprint: it has to be readable in order to COMPUTE the
+    fingerprint. Storing a wider set than reality only costs a re-run, and a narrower one
+    cannot happen -- see `scenario_scopes` for why.
+    """
+    return os.path.join(cache_dir or VERDICT_CACHE_DIR, '%s.chapters.json' % scenario)
+
+
+def load_observed_chapters(scenario, cache_dir=None):
+    try:
+        with open(_observed_path(scenario, cache_dir)) as fh:
+            slots = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    return slots if isinstance(slots, list) and slots else None
+
+
+def store_observed_chapters(scenario, log_text, cache_dir=None):
+    """Record where this run went, whatever its verdict -- a FAIL's traversal is just as
+    true as a PASS's, and refusing to learn from it would keep the next key coarse."""
+    slots = observed_chapters(log_text)
+    if not slots:
+        return
+    cache_dir = cache_dir or VERDICT_CACHE_DIR
+    os.makedirs(cache_dir, exist_ok=True)
+    with open(_observed_path(scenario, cache_dir), 'w') as fh:
+        json.dump(slots, fh)
 
 
 def _verdict_slot(scenario, fingerprint, cache_dir=None):
@@ -1009,7 +1083,9 @@ class VerdictCache(object):
             if built_rom is not None and s.rom != built_rom:
                 continue
             self.fingerprints[s.name] = scenario_fingerprint(
-                s, digest, scopes=self._scope_manifest(s.rom, digest, fresh=built_rom is not None))
+                s, digest,
+                scopes=self._scope_manifest(s.rom, digest, fresh=built_rom is not None),
+                observed=load_observed_chapters(s.name))
 
     def _scope_manifest(self, rom, digest, fresh=False):
         """The build's own account of what it wrote, or None (fall back to the ROM key)."""
@@ -1045,6 +1121,10 @@ class VerdictCache(object):
         cache disabled, or `MX_NO_CACHE=1` becomes a way to fail a scenario and leave the
         lie in place. A disabled PASS still writes nothing -- bypassing the cache is not
         the same as clearing it."""
+        log = os.path.join(outcome.artifacts or '', 'playtest.log')
+        if os.path.isfile(log):
+            with open(log, errors='replace') as fh:
+                store_observed_chapters(scenario.name, fh.read())
         fingerprint = self.fingerprints.get(scenario.name) if self.enabled else None
         if fingerprint or outcome.verdict != 'PASS':
             store_cached_verdict(scenario.name, fingerprint, outcome)

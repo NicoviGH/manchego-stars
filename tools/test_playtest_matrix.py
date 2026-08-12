@@ -801,14 +801,17 @@ class ScenarioScopes(unittest.TestCase):
     the hand-declared impact map #255 exists to avoid.
     """
 
-    def scopes(self, **over):
+    def _scenario(self, **over):
         data = dict(rom='canonical', host_chapter=2)
         data.update(over)
         rom = data.pop('rom')
         m = manifest(rom_configs={'canonical': {}, 'testch': {'TESTCH': 1},
                                   'ch03boot': {'CH03BOOT': 1}, 'ch05boot': {'CH05BOOT': 1}},
                      scenarios={'s': dict(data, rom=rom)})
-        return mx.scenario_scopes(m.resolve('s'))
+        return m.resolve('s')
+
+    def scopes(self, observed=None, **over):
+        return mx.scenario_scopes(self._scenario(**over), observed=observed)
 
     def test_global_is_always_in_scope(self):
         self.assertIn('global', self.scopes())
@@ -816,22 +819,23 @@ class ScenarioScopes(unittest.TestCase):
     def test_a_canonical_scenario_traverses_from_the_prologue(self):
         """It boots at New Game, so everything between the prologue and its own chapter is
         content it actually plays through."""
-        self.assertEqual(self.scopes(rom='canonical', host_chapter=4),
+        self.assertEqual(self.scopes(rom='canonical', host_chapter=4, observed=[1, 2, 3, 4]),
                          {'global', 'chapter:prologue', 'chapter:ch01', 'chapter:ch02',
                           'chapter:ch03'})
 
     def test_a_boot_rom_scenario_starts_at_its_own_chapter(self):
         """The whole point: a CH05BOOT scenario never reaches the prologue, so a prologue
         edit cannot change its verdict."""
-        self.assertEqual(self.scopes(rom='ch05boot', host_chapter=6),
+        self.assertEqual(self.scopes(rom='ch05boot', host_chapter=6, observed=[0, 6]),
                          {'global', 'chapter:ch05'})
 
     def test_a_boot_rom_scenario_does_not_depend_on_earlier_chapters(self):
         for earlier in ('chapter:prologue', 'chapter:ch01', 'chapter:ch04'):
-            self.assertNotIn(earlier, self.scopes(rom='ch05boot', host_chapter=6))
+            self.assertNotIn(earlier, self.scopes(rom='ch05boot', host_chapter=6,
+                                                  observed=[0, 6]))
 
     def test_a_boot_rom_scenario_still_covers_a_range_it_plays_forward_into(self):
-        self.assertEqual(self.scopes(rom='ch03boot', host_chapter=5),
+        self.assertEqual(self.scopes(rom='ch03boot', host_chapter=5, observed=[4, 5]),
                          {'global', 'chapter:ch03', 'chapter:ch04'})
 
     def test_the_testch_sandbox_depends_on_global_only(self):
@@ -839,12 +843,43 @@ class ScenarioScopes(unittest.TestCase):
         names no chapter, so its content is already inside `global`."""
         self.assertEqual(self.scopes(rom='testch', host_chapter=1), {'global'})
 
-    def test_an_inverted_range_falls_back_to_EVERY_chapter(self):
-        """A host chapter behind the boot point is nonsense the manifest cannot describe.
-        Depending on everything is wrong-but-safe; depending on nothing is a stale PASS."""
-        got = self.scopes(rom='ch05boot', host_chapter=2)
-        self.assertIn('chapter:prologue', got)
+    def test_without_an_observation_the_range_runs_to_the_END(self):
+        """matrix.yaml's `host_chapter` is the harness's PT_HOST_CHAPTER hint (default 1),
+        NOT the last chapter a scenario plays -- `ch01win` boots at the prologue and plays
+        into ch01 while declaring host_chapter 1. Treating it as an upper bound left ch01's
+        map able to change without re-running the scenario that plays it. With nothing
+        observed, the honest answer is everything from the boot point forward."""
+        got = self.scopes(rom='canonical', host_chapter=1)
+        for scope in ('chapter:prologue', 'chapter:ch01', 'chapter:ch05'):
+            self.assertIn(scope, got)
+
+    def test_an_OBSERVED_traversal_narrows_it_to_what_the_run_actually_visited(self):
+        """Derived from what the scenario DID, the same way the build manifest is derived
+        from what the builder did."""
+        got = mx.scenario_scopes(self._scenario(rom='canonical', host_chapter=1),
+                                 observed=[0, 1, 2])
+        self.assertEqual(got, {'global', 'chapter:prologue', 'chapter:ch01'})
+
+    def test_an_observed_traversal_always_keeps_the_boot_chapter(self):
+        got = mx.scenario_scopes(self._scenario(rom='ch05boot', host_chapter=6), observed=[0])
         self.assertIn('chapter:ch05', got)
+
+    def test_host_chapter_no_longer_bounds_anything(self):
+        """It is the harness's PT_HOST_CHAPTER hint, not a statement about how far a
+        scenario plays, and reading it as one was a stale-PASS bug (#272 review)."""
+        self.assertEqual(self.scopes(rom='canonical', host_chapter=1),
+                         self.scopes(rom='canonical', host_chapter=6))
+
+
+class ObservedChapters(unittest.TestCase):
+    """Which chapters a scenario ACTUALLY visited, read out of its own run log."""
+
+    def test_it_reads_the_slots_the_run_reported(self):
+        log = '[f000001] {"world":{"chapter":0}}\n[f000900] {"world":{"chapter":6}}\n'
+        self.assertEqual(mx.observed_chapters(log), [0, 6])
+
+    def test_a_log_with_no_chapter_records_observes_nothing(self):
+        self.assertIsNone(mx.observed_chapters('RESULT: PASS -- nothing to see'))
 
 
 class ScopedFingerprint(unittest.TestCase):
@@ -887,6 +922,16 @@ class ScopedFingerprint(unittest.TestCase):
         everything, which is the whole ceiling phase 2 lifts."""
         self.assertEqual(self.fingerprint(self.MANIFEST, rom='r1'),
                          self.fingerprint(self.MANIFEST, rom='r2'))
+
+    def test_the_scoped_key_still_pins_the_decomp_and_engine_sources(self):
+        """No scope can see them: we COMPILE the decomp's own sources and only patch a few,
+        so a submodule bump touching an engine file no injector writes rebuilds the ROM and
+        moves not one scope digest. Dropping rom_input_hash must not drop that pin."""
+        a = mx.scenario_fingerprint(self.m.resolve('alpha'), 'r', harness_source=HARNESS_FIXTURE,
+                                    driver='D', env={}, scopes=self.MANIFEST, engine='E1')
+        b = mx.scenario_fingerprint(self.m.resolve('alpha'), 'r', harness_source=HARNESS_FIXTURE,
+                                    driver='D', env={}, scopes=self.MANIFEST, engine='E2')
+        self.assertNotEqual(a, b)
 
     def test_a_scope_missing_from_the_manifest_is_not_silently_ignored(self):
         """A chapter the scenario depends on that the build never wrote must still be
