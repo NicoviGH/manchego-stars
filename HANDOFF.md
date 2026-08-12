@@ -6,37 +6,40 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-12 (Claude). `main` is at `93138f6`, the squash merge of PR #268, level with
-`origin/main`. **Nothing is in flight** — no open branch, no PR, no uncommitted feature work.
-Clean context point for a fresh instance; the generated decomp tree is intentionally dirty as
-recorded below.
+Refreshed 2026-08-12 (Claude). `main` is at `e4f86b0`, the squash merge of PR #271, level with
+`origin/main`. **#269 and #255 phase 1 are both landed** (#270, #271). The generated decomp tree
+is intentionally dirty as recorded below.
 
 ## In flight
 
-Nothing.
+Nothing committed. **#255 phase 2 is the next task and has not been started.**
 
 ## Next task
 
-**#255 — make the playtest matrix INCREMENTAL.** Nicolas's explicit priority, and he wants a fresh
-instance on it with a clean context window. The issue carries the full three-phase design; read it
-first, and read `decisions.md` → "Playtest runs are the most expensive thing in this repo" for what
-the current cost actually is.
+**#255 phase 2 — build-attributed impact scoping**, so a ch05 edit stops re-running the prologue.
+Phase 1's verdict cache is live but keys on `rom_input_hash`, so any `build_campaign.py` or
+campaign-data edit still invalidates every row — which is most feature tasks. That ceiling is the
+whole reason phase 2 exists, and it is why the "never run the full gate locally" ban is still in
+`CLAUDE.md` (phase 3 retires it).
 
-The short version: a scenario's verdict is a pure function of (the ROM it boots, its own Lua, the
-harness helpers it transitively reaches, its `matrix.yaml` entry). If all four are byte-identical a
-PASS cannot become a FAIL, so cache on that fingerprint and never cache a FAIL. Phase 1 reuses
-`rom_input_hash` (already in `matrix.py`) and `check.py`'s `_harness_functions`/`_reaches` (already
-compute a scenario's helper closure — do NOT hash `harness.lua` whole, it is one chunk and every
-task edits it). Phase 2 is the real win: have the build attribute its own writes per scope
-(`global` / `chapter:N`) so a ch05 edit stops re-running the prologue. Phase 3 retires the
-"never run the full gate locally" rule, which only exists because the gate is expensive.
+The issue carries the design. Three things learned in phase 1 that change its shape, none of them
+in the issue:
 
-**Also open, and worth folding in:** **#269** — `ch05arena` reaches Arena combat through
-`guardedInput`'s lost-input retry rather than a guarded press, because `gProcScr_ArenaUiMain` runs
-TWO blocking dialogue pages and the scenario sends one press. It passes today, but #255 will cache
-verdicts, and a scenario that passes by accident is the worst thing to freeze into a cache. The
-issue records what does NOT work (a bounded loop of guarded presses — the inter-page state
-classifies `transition` and offers no legal `advance_dialogue`), so don't spend a run re-deriving it.
+- **The scope manifest only exists AFTER a build**, so when the ROM inputs move the order has to
+  become build → read manifest → decide per scenario. Phase 1's "a fully cached group is never
+  built" path still applies whenever `rom_input_hash` hits, so keep it.
+- **The manifest must travel with the cached ROM slot**, for exactly the reason the ELF does
+  (below). `ROM_CACHE_ARTIFACTS` is the place to add it.
+- **A scenario's chapter dependency is a RANGE, not a point.** It traverses every chapter from its
+  boot point (the ROM config's boot flag; canonical boots the prologue) to its `host_chapter`, and
+  a checkpoint-backed scenario replays that whole chain — `ckpt_ch02start` replays ch00→ch01→ch02.
+  Scoping a scenario to its host chapter alone would be exactly the hand-declared impact map the
+  issue warns against.
+
+**Do not hash `harness.lua` whole** — already handled, but the reason generalises to phase 2:
+`matrix.py`'s `harness_shared` exists because a closure-only key silently misses top-level data
+(`TUNE`, `CALLBACK_NAMES`) that gets glommed onto whichever helper precedes it. Any new
+attribution scheme needs the same "unattributable means SHARED, never dropped" fallback.
 
 ## Current state
 
@@ -49,8 +52,13 @@ classifies `transition` and offers no legal `advance_dialogue`), so don't spend 
 - **One stash exists:** `stash@{0}: preserve pre-rename local HANDOFF before syncing #24`. It is
   historical insurance for a file that has since been rewritten several times; do not apply or
   drop it casually.
-- **The full `make matrix` gate is NOT to be run locally** (Nicolas, 2026-08-10) until #255 lands.
-  Run the chapter suite or `matrix.py run --scenarios a,b,c`. Rules: `CLAUDE.md` → the matrix row.
+- **The full `make matrix` gate is NOT to be run locally** (Nicolas, 2026-08-10) until #255 phase 2
+  lands. Run the chapter suite or `matrix.py run --scenarios a,b,c`. Rules: `CLAUDE.md` → the
+  matrix row. **`matrix.py run --suite X --dry-run` is free and says what would actually run** —
+  reach for it before deciding a run is needed at all.
+- **Both caches are warm and both were re-seeded on 2026-08-12.** `.matrix-romcache` was cleared
+  when the ELF fix landed (every old slot was missing its `.elf`), so the first run of each ROM
+  configuration rebuilds once. `.matrix-verdictcache` holds `ch05arena`.
 - **ch05's Arena is complete (#265/#268).** Both views are winterized as palette DELTAS over
   vanilla — welcome screen 16 words of 64 (overcast sky, banner-blue awnings, **sandstone left
   warm on purpose**), combat coliseum 11 words (snow floor, blue banners). Ch05 alone gets the
