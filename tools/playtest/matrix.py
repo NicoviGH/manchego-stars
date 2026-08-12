@@ -583,6 +583,7 @@ def check_rom(manifest, scenario, stamp_path=None):
 # Getting this pair wrong is silent -- store_cached_rom just finds nothing to copy and
 # every run rebuilds, which is exactly how the first cut of this cache did nothing.
 ROM_PATH = os.path.join(REPO, 'fireemblem8u', 'fireemblem8.gba')
+ELF_PATH = os.path.join(REPO, 'fireemblem8u', 'fireemblem8.elf')
 STAMP_PATH = os.path.join(REPO, '.build-config.json')
 ROM_CACHE_DIR = os.path.join(REPO, '.matrix-romcache')
 ROM_INPUT_PATHS = ('campaigns', 'engine', 'tools/inject', 'tools/build_campaign.py',
@@ -628,34 +629,48 @@ def rom_input_hash(make_flags):
     return h.hexdigest()[:32]
 
 
+# What one build leaves behind that a later run reads back. The .elf is NOT optional and
+# leaving it out was a live bug: `gen_symbols.py` reads `fireemblem8.elf` to emit the symbol
+# tables the harness dofiles, and the boot flags MOVE symbols -- a ch05boot ELF and a
+# canonical ELF disagree on 58 of the names the harness reads (gUnitLookup, gItemData,
+# Menu_OnIdle, ...). Restoring a cached .gba while the tree kept the previous config's .elf
+# therefore ran every scenario against the wrong addresses, and the gate spans FOUR
+# configurations, so a warm run restored three of them that way. It costs 44 MB per slot;
+# reading the wrong memory costs a debugging session that finds nothing.
+ROM_CACHE_ARTIFACTS = (('.gba', ROM_PATH), ('.elf', ELF_PATH), ('.json', STAMP_PATH))
+
+
 def _cache_slot(rom, digest):
     return os.path.join(ROM_CACHE_DIR, '%s-%s' % (rom, digest))
 
 
-def restore_cached_rom(rom, digest):
-    """Copy a cached ROM (and its build stamp) into the tree. True if it was there."""
+def restore_cached_rom(rom, digest, cache_dir=None):
+    """Copy a cached ROM, its ELF and its build stamp into the tree. True if all were there.
+
+    All or nothing: half a slot is worse than none, because a .gba without its .elf is
+    exactly the wrong-symbols failure above.
+    """
     if digest is None:
         return False
-    slot = _cache_slot(rom, digest)
-    gba, stamp = slot + '.gba', slot + '.json'
-    if not (os.path.isfile(gba) and os.path.isfile(stamp)):
+    slot = os.path.join(cache_dir, '%s-%s' % (rom, digest)) if cache_dir \
+        else _cache_slot(rom, digest)
+    if not all(os.path.isfile(slot + ext) for ext, _ in ROM_CACHE_ARTIFACTS):
         return False
-    shutil.copyfile(gba, ROM_PATH)
-    shutil.copyfile(stamp, STAMP_PATH)
+    for ext, dest in ROM_CACHE_ARTIFACTS:
+        shutil.copyfile(slot + ext, dest)
     return True
 
 
 def store_cached_rom(rom, digest):
-    """Snapshot the freshly built ROM + its stamp under this input digest."""
+    """Snapshot the freshly built ROM, its ELF and its stamp under this input digest."""
     if digest is None:
         return
-    if not (os.path.isfile(ROM_PATH) and os.path.isfile(STAMP_PATH)):
+    if not all(os.path.isfile(src) for _, src in ROM_CACHE_ARTIFACTS):
         return                  # nothing to cache (stamp is what run.sh checks the ROM against)
-    gba, stamp = ROM_PATH, STAMP_PATH
     os.makedirs(ROM_CACHE_DIR, exist_ok=True)
     slot = _cache_slot(rom, digest)
-    shutil.copyfile(gba, slot + '.gba')
-    shutil.copyfile(stamp, slot + '.json')
+    for ext, src in ROM_CACHE_ARTIFACTS:
+        shutil.copyfile(src, slot + ext)
     for old in glob.glob(os.path.join(ROM_CACHE_DIR, '%s-*' % rom)):
         if not os.path.basename(old).startswith('%s-%s' % (rom, digest)):
             try:

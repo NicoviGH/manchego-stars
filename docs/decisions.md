@@ -4356,6 +4356,18 @@ the generated `symbols.lua`/`procscr.lua`, which are excluded because `run.sh` r
 *after* the fingerprint is taken — hashing them cost two re-runs per engine change before the
 cache converged, and their content is already implied by the ELF and by `gen_symbols.py`.
 
+**The ROM cache had to cache the ELF too, and finding that is why the verdict cache's key is
+trustworthy at all.** The key assumes identical ROM inputs imply identical symbols. That was
+false: `restore_cached_rom` copied `fireemblem8.gba` and the build stamp but not
+`fireemblem8.elf`, while `gen_symbols.py` reads the ELF to emit the tables the harness
+dofiles — and the boot flags MOVE symbols (a ch05boot ELF and a canonical ELF disagree on 58
+of the names the harness reads: `gUnitLookup`, `gItemData`, `Menu_OnIdle`, …). The gate spans
+four ROM configurations, so a warm run restored three of them against the previous config's
+symbol table and read the wrong memory — a live bug since the ROM cache landed, and one that
+presents as unexplained flakiness rather than as anything pointing at the cache. The slot is
+now `.gba` + `.elf` + `.json`, restored all-or-nothing, because half a slot is worse than
+none. 44 MB per configuration, against a debugging session that finds nothing.
+
 **A fresh RED always evicts a stored green.** Same key, different verdict, means the stored
 green is now a lie, and leaving it makes the next run report a scenario green while it is red
 right now. `run.sh` evicts too, because a scenario run DIRECTLY — which is how debugging

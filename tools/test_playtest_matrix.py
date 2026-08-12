@@ -571,6 +571,26 @@ class RomCache(unittest.TestCase):
         self.assertFalse(mx.restore_cached_rom('canonical', 'deadbeef' * 4))
         self.assertFalse(mx.restore_cached_rom('canonical', None))
 
+    def test_the_ELF_travels_with_the_rom(self):
+        """gen_symbols.py reads fireemblem8.elf, and the boot flags MOVE symbols: a
+        ch05boot ELF and a canonical ELF disagree on 58 of the names the harness reads
+        (gUnitLookup, gItemData, Menu_OnIdle...). Restoring a cached .gba while the tree
+        keeps the previous config's .elf makes every scenario read the wrong addresses --
+        and a gate spanning four configs restores three of them that way on every warm
+        run. Cache the pair or cache neither."""
+        self.assertEqual({ext for ext, _ in mx.ROM_CACHE_ARTIFACTS},
+                         {'.gba', '.elf', '.json'})
+
+    def test_a_partial_slot_is_not_restored(self):
+        """Half a slot is worse than none: a .gba without its .elf is exactly the
+        wrong-symbols failure this cache must not create."""
+        import tempfile as _t
+        d = _t.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        with open(os.path.join(d, 'canonical-abc.gba'), 'w') as fh:
+            fh.write('x')
+        self.assertFalse(mx.restore_cached_rom('canonical', 'abc', cache_dir=d))
+
 
 # A miniature harness.lua with the same SHAPE as the real one: a preamble holding
 # tuning, top-level helpers, a mid-file top-level table sitting between two helpers,
