@@ -576,46 +576,9 @@ BLIND_PRESS_ALLOWED = {
     'shootCombatFrames': 'observed-proc dismissal inside a combat capture; verified on the outcome',
 }
 
-_LUA_FUNC_DEF = re.compile(
-    r'^(?:local function (\w+)|scenarios\.(\w+) = function|(\w+) = function)', re.M)
-
-
-def _harness_functions(source):
-    """{name: (body, kind)} for every top-level function in harness.lua.
-
-    Attribution is by ENCLOSING FUNCTION, not by distance to the next `scenarios.X`.
-    Splitting on scenario definitions charges every intervening `local function` helper to
-    whichever scenario happens to sit above it -- which is how #238's own scope list came to
-    name `retreat` (0 presses of its own) and miss `reachRbgCh01` (8)."""
-    lines = source.split('\n')
-    marks = []
-    for i, line in enumerate(lines):
-        m = _LUA_FUNC_DEF.match(line)
-        if m:
-            name = m.group(1) or m.group(2) or m.group(3)
-            marks.append((i, name, 'scenario' if m.group(2) else 'helper'))
-    marks.append((len(lines), None, None))
-    out = {}
-    for (start, name, kind), (end, _, _) in zip(marks, marks[1:]):
-        # Strip trailing comments too, not just whole comment lines: `local x = 1 -- press(A)`
-        # otherwise trips the gate on prose. Lua has no string type that survives this
-        # naively, but no line in these files puts `--` inside a literal.
-        body = '\n'.join(l.split('--')[0] for l in lines[start:end])
-        out[name] = (body, kind)
-    return out
-
-
-def _reaches(name, funcs, seen=None):
-    """Every harness function reachable from `name`, including itself."""
-    seen = seen if seen is not None else set()
-    if name in seen or name not in funcs:
-        return seen
-    seen.add(name)
-    body = funcs[name][0]
-    for callee in set(re.findall(r'\b(\w+)\s*\(', body)):
-        if callee in funcs and callee != name:
-            _reaches(callee, funcs, seen)
-    return seen
+# The call graph this gate scopes from lives in matrix.py (`harness_functions`/`reaches`),
+# with the rest of the code that reads harness.lua -- the verdict cache keys on the same
+# closure, and two answers to "what does this scenario depend on" is one answer too many.
 
 
 def check_verdict_scenarios_are_guarded(fail):
@@ -638,7 +601,7 @@ def check_verdict_scenarios_are_guarded(fail):
     except Exception:                             # noqa: BLE001 -- check_playtest_matrix reports it
         return
     with open(os.path.join(REPO, 'tools/playtest/harness.lua'), encoding='utf-8') as fh:
-        funcs = _harness_functions(fh.read())
+        funcs = mx.harness_functions(fh.read())
 
     for name in sorted(m.scenarios):
         try:
@@ -654,7 +617,7 @@ def check_verdict_scenarios_are_guarded(fail):
             fail.append('verdict scenario %s has no function in harness.lua, so the '
                         'blind-press gate cannot review it (#238)' % name)
             continue
-        for reached in sorted(_reaches(name, funcs)):
+        for reached in sorted(mx.reaches(name, funcs)):
             if reached in BLIND_PRESS_ALLOWED:
                 continue
             count = len(re.findall(r'\bpress\(', funcs[reached][0]))

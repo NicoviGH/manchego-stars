@@ -4283,10 +4283,15 @@ separate wastes and only one of them is about suite size.
 - Touched a SHARED helper (`location_events`, `collectedItems`, `village_script`, anything in
   `harness.lua`'s common section) → name the affected chapters' scenarios explicitly.
 - **Do not run the full `make matrix` gate locally** (Nicolas, 2026-08-10: *"I dont want you to
-  run the 7 min gate thing anymore"*). It re-executes eighteen scenarios that were green minutes
-  ago. Until **#255** lands a verdict cache it has no cheap home, and CI cannot take it: CI
-  builds against a MOCK base ROM (`head -c 16M /dev/urandom`), because the real FE8 ROM is
-  copyrighted and not in the repo, and random bytes do not boot in mGBA.
+  run the 7 min gate thing anymore"*). The verdict cache below now means a green scenario whose
+  inputs are unchanged does not re-run — but it keys on `rom_input_hash`, so any
+  `build_campaign.py` or campaign-data edit still invalidates every row, which is most feature
+  tasks. The ban lifts when **#255 phase 2** scopes invalidation to what the build actually
+  wrote. CI cannot take the gate either: CI builds against a MOCK base ROM
+  (`head -c 16M /dev/urandom`), because the real FE8 ROM is copyrighted and not in the repo, and
+  random bytes do not boot in mGBA.
+- **`matrix.py run --suite X --dry-run` costs nothing and says what would actually run.** Reach
+  for it before deciding a run is needed at all.
 - **Never after a merge.** CI has already built and checked; a run whose result cannot change a
   decision is pure cost. If the result would not change what you do next, do not run it.
 - The chapter suites are a SINGLE SOURCE and they go stale: `ch05` still listed `ch05village`
@@ -4304,6 +4309,57 @@ legal), read it, then fix everything it shows. `inspect_state.py render` is the 
 the last. A generalisation of the standing rule "do not re-run to re-test a hypothesis the
 evidence already killed" — re-running to test a *new* hypothesis one at a time costs the same.
 _Decided: 2026-08-10 (Nicolas)._
+
+**A green scenario whose inputs are byte-identical does not re-run. That is a build-system
+problem, not a policy one.** `make` does not recompile clean objects and `bazel` does not re-run
+cached tests; our matrix re-ran everything because the invalidation logic was never written, so
+the only two options on the menu were "run all 17" and "a human picks by judgment" — and the
+human picking is what kept failing. The scenario COUNT should keep growing (17 → 30 as chapters
+land; capping it means deleting proof). What must stop growing is the number that EXECUTE.
+
+**The soundness rule, which is the entire licence to skip.** A verdict is a pure function of the
+ROM it boots, the scenario's own Lua, the harness helpers it transitively reaches, its
+`matrix.yaml` entry, and the driver around it (`controller.lua`, the dofile'd modules, `run.sh`).
+If all of those are byte-identical a PASS cannot become a FAIL. **A FAIL is never cached** — a
+flaky red must always re-run; only green is skippable. Anything that cannot be pinned (no decomp
+HEAD, a scenario `harness.lua` does not define) returns no key at all, and no key means no cache:
+unknown is conservative, never optimistic.
+
+**Do NOT hash `harness.lua` as a whole file.** It is one Lua chunk and nearly every task edits it,
+so a whole-file hash invalidates all 17 scenarios on every commit and the cache never hits — the
+feature becomes theatre. The granularity is the scenario's transitive helper CLOSURE, which
+`check.py`'s blind-press gate already needed and which now lives in `matrix.py`
+(`harness_functions`/`reaches`) with the rest of the code that reads harness.lua.
+
+**What makes the closure sound is `harness_shared`, and this is the part that is easy to get
+wrong.** Chunking by top-level function charges each chunk to the function that OPENS it, so
+top-level data declared between two helpers — `TUNE`, `CALLBACK_NAMES`, the constants — is
+glommed onto whichever helper happens to precede it. That data feeds every observation, so a key
+built from a closure alone would miss an edit to it and serve a stale PASS. So the file is
+PARTITIONED instead: each chunk is a function body (closure-attributable) plus a residue after
+its column-0 terminator (shared by everyone), and a chunk with no terminator — a one-line
+`local function yield() … end` — is unattributable, which means shared, never dropped. Verified
+against the real 8,124-line harness: editing another scenario or rewording a comment holds the
+key still; editing the scenario's own body, a helper it reaches, `TUNE`, `CALLBACK_NAMES`,
+`controller.lua`, or its manifest entry all move it.
+
+**A cached green must never read as a fresh one**, so the table carries a `source` column
+(`ran`/`cached`), the summary says `N ran, M cached`, and the run's log and screenshots are kept
+beside the verdict — `/tmp/playtest-<name>` will have been overwritten by whatever ran last, and
+a cached green nobody can look at is a green nobody can audit. `--no-verdict-cache` / `MX_NO_CACHE=1`
+opts out. A group with nothing left to run is never BUILT, which is where the biggest saving is: a
+doc-only or harness-only change costs no `make` and no emulator at all.
+
+**Honest ceiling, stated so nobody over-claims it.** Keying on `rom_input_hash` means any
+`build_campaign.py` or `campaign.yaml` edit invalidates every scenario, and nearly every feature
+task touches `build_campaign.py`. This phase buys doc-only changes, harness-only changes, and
+repeat runs while debugging something else. Phase 2 — having the build attribute its own writes
+per scope (`global` / `chapter:N`) so a ch05 edit stops re-running the prologue — is where the
+ceiling lifts, and it must be DERIVED at build time from what the builder did, never a
+hand-declared impact map: hand-maintained maps rot silently and let real regressions through,
+which is the exact failure this exists to avoid.
+_Decided: 2026-08-12 (#255 phase 1; measured: a repeat `--scenarios ch05arena` went 10s + 1 build
+to 0s + 0 builds)._
 
 **Reading a VANILLA tileset's art: the committed object sheet is an INVERTED grayscale PNG**
 `map_tileset_tool.Tileset` wants `.4bpp` + `.gbapal` + `.bin`. For our vendored tilesets those

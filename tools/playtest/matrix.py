@@ -5,8 +5,11 @@ One command runs a grouped live regression matrix: every ROM configuration is
 built at most once, its scenarios run concurrently, and the run ends in a compact
 verdict table plus artifacts on disk.
 
-Two things keep it quick, both of which matter because the full matrix used to cost
+Three things keep it quick, all of which matter because the full matrix used to cost
 7+ minutes and so got skipped or over-run:
+  * a VERDICT CACHE: a green scenario whose four inputs are byte-identical does not
+    re-run at all, and a group with nothing left to run is never even built. This is
+    the one that makes the matrix incremental -- see `scenario_fingerprint` (#255);
   * a ROM CACHE keyed on everything the ROM is built FROM -- a harness-only change
     reuses all four builds instead of remaking them (~170s);
   * scenarios CAN run in parallel within a configuration (--jobs), though it is off
@@ -16,6 +19,7 @@ Use `make matrix SUITE=<chapter>` while iterating; the full matrix is the push g
     make matrix                        # the merge gate
     make matrix SUITE=ch04             # everything ch04, one build
     tools/playtest/matrix.py run --scenarios ch04moose,ch04snag
+    tools/playtest/matrix.py run --suite ch05 --dry-run   # what would actually run
     tools/playtest/matrix.py list
 
 `matrix.yaml` is the single source of truth for what a scenario needs: its ROM
@@ -32,6 +36,7 @@ state. A badly ordered matrix costs far more than a duplicate `make`.
 import argparse
 import fnmatch
 import glob
+import hashlib
 import json
 import os
 import re
@@ -224,17 +229,19 @@ def _order(members):
 # -- execution --------------------------------------------------------------
 
 class Outcome(object):
-    def __init__(self, scenario, rom, verdict, seconds, artifacts, log_tail=''):
+    def __init__(self, scenario, rom, verdict, seconds, artifacts, log_tail='', cached=False):
         self.scenario = scenario
         self.rom = rom
         self.verdict = verdict
         self.seconds = seconds
         self.artifacts = artifacts
         self.log_tail = log_tail
+        self.cached = cached
 
     def as_dict(self):
         return {'scenario': self.scenario, 'rom': self.rom, 'verdict': self.verdict,
-                'seconds': round(self.seconds, 1), 'artifacts': self.artifacts}
+                'seconds': round(self.seconds, 1), 'artifacts': self.artifacts,
+                'cached': self.cached}
 
 
 class Report(object):
@@ -247,6 +254,14 @@ class Report(object):
     @property
     def failures(self):
         return [o for o in self.outcomes if o.verdict != 'PASS']
+
+    @property
+    def cached(self):
+        return len([o for o in self.outcomes if o.cached])
+
+    @property
+    def ran(self):
+        return len(self.outcomes) - self.cached
 
     @property
     def ok(self):
@@ -282,12 +297,18 @@ def scenario_lanes(scenarios):
     return parallel, serial
 
 
-def execute(groups, build, run_scenario, jobs=1):
-    """Run the plan. `build` and `run_scenario` are injected so the ordering and
-    aggregation logic is testable without a ROM or an emulator.
+def execute(groups, build, run_scenario, jobs=1, lookup_cached=None):
+    """Run the plan. `build`, `run_scenario` and `lookup_cached` are injected so the
+    ordering and aggregation logic is testable without a ROM or an emulator.
 
     A failed build blocks only its own group: the rest of the matrix still runs,
     because one broken configuration should not hide the state of the others.
+
+    `lookup_cached(scenario)` returns a previously earned Outcome, or None. A group
+    whose scenarios are ALL cached is never built -- that is the biggest win in the
+    feature, because it makes a doc-only or harness-only change cost no `make` and no
+    emulator at all (#255). Outcomes are emitted in the group's own order whether they
+    ran or not, so the table does not reshuffle itself as the cache fills.
 
     `jobs` > 1 runs a group's checkpoint-free scenarios concurrently. BUILDS always stay
     serial and never overlap a run: the tree holds ONE `fireemblem8.gba`, so a second `make`
@@ -308,20 +329,33 @@ def execute(groups, build, run_scenario, jobs=1):
     built = []
     started = time.time()
     for group in groups:
-        built.append(group.rom)
-        if not build(group.rom, group.make_flags):
-            for s in group.scenarios:
-                outcomes.append(Outcome(s.name, group.rom, 'BLOCKED', 0.0, '',
-                                        'ROM configuration %s failed to build' % group.rom))
-            continue
-        parallel, serial = scenario_lanes(group.scenarios)
-        if jobs > 1 and len(parallel) > 1:
-            from concurrent.futures import ThreadPoolExecutor
-            with ThreadPoolExecutor(max_workers=min(jobs, len(parallel))) as pool:
-                outcomes.extend(pool.map(run_scenario, parallel))
-        else:
-            outcomes.extend(run_scenario(s) for s in parallel)
-        outcomes.extend(run_scenario(s) for s in serial)
+        slot = {}                       # scenario identity -> its Outcome
+        pending = []
+        for s in group.scenarios:
+            hit = lookup_cached(s) if lookup_cached else None
+            if hit is None:
+                pending.append(s)
+            else:
+                slot[id(s)] = hit
+        if pending:
+            built.append(group.rom)
+            if not build(group.rom, group.make_flags):
+                for s in pending:
+                    slot[id(s)] = Outcome(s.name, group.rom, 'BLOCKED', 0.0, '',
+                                          'ROM configuration %s failed to build' % group.rom)
+            else:
+                parallel, serial = scenario_lanes(pending)
+                if jobs > 1 and len(parallel) > 1:
+                    from concurrent.futures import ThreadPoolExecutor
+                    with ThreadPoolExecutor(max_workers=min(jobs, len(parallel))) as pool:
+                        for s, outcome in zip(parallel, pool.map(run_scenario, parallel)):
+                            slot[id(s)] = outcome
+                else:
+                    for s in parallel:
+                        slot[id(s)] = run_scenario(s)
+                for s in serial:
+                    slot[id(s)] = run_scenario(s)
+        outcomes.extend(slot[id(s)] for s in group.scenarios)
     return Report(outcomes, builds=len(built),
                   duplicate_builds=len(built) - len(set(built)),
                   seconds=time.time() - started)
@@ -341,17 +375,21 @@ def human_duration(seconds):
 
 
 def render_table(report):
-    rows = [(o.rom, o.scenario, o.verdict, human_duration(o.seconds), o.artifacts)
+    """The `source` column is not decoration: a cached green must never read as a fresh
+    one, or the table starts asserting things this run never observed (#255)."""
+    rows = [(o.rom, o.scenario, o.verdict, 'cached' if o.cached else 'ran',
+             human_duration(o.seconds), o.artifacts)
             for o in report.outcomes]
-    head = ('variant', 'scenario', 'verdict', 'time', 'artifacts')
-    widths = [max(len(head[i]), max([len(r[i]) for r in rows] or [0])) for i in range(5)]
+    head = ('variant', 'scenario', 'verdict', 'source', 'time', 'artifacts')
+    widths = [max(len(head[i]), max([len(r[i]) for r in rows] or [0]))
+              for i in range(len(head))]
     line = lambda cells: '  '.join(c.ljust(widths[i]) for i, c in enumerate(cells)).rstrip()
     out = [line(head), '  '.join('-' * w for w in widths)]
     out.extend(line(r) for r in rows)
     out.append('')
-    out.append('%d scenario(s), %d build(s), %d duplicate build(s), %s wall'
-               % (len(report.outcomes), report.builds, report.duplicate_builds,
-                  human_duration(report.seconds)))
+    out.append('%d scenario(s), %d ran, %d cached, %d build(s), %d duplicate build(s), %s wall'
+               % (len(report.outcomes), report.ran, report.cached, report.builds,
+                  report.duplicate_builds, human_duration(report.seconds)))
     return '\n'.join(out)
 
 
@@ -394,6 +432,93 @@ def harness_scenarios(path=None):
     """Every `scenarios.X = function()` defined in harness.lua."""
     with open(path or HARNESS) as fh:
         return set(_SCENARIO_DEF.findall(fh.read()))
+
+
+# -- reading harness.lua's shape --------------------------------------------
+#
+# harness.lua is ONE Lua chunk, so "which part of it does this scenario depend on" has to
+# be answered by reading the source. Two consumers need that answer and they must agree,
+# so it lives here with the rest of the code that reads harness.lua: check.py's #238
+# blind-press gate (which functions does a verdict scenario reach?) and the verdict cache
+# below (what invalidates a scenario's PASS?).
+
+LUA_FUNC_DEF = re.compile(
+    r'^(?:local function (\w+)|scenarios\.(\w+) = function|(\w+) = function)', re.M)
+# A top-level function's body is INDENTED; only its terminator sits in column 0.
+_LUA_TOP_END = re.compile(r'^end\b')
+
+
+def _strip_comments(lines):
+    """Drop Lua comments so a comment edit cannot move a hash or a press count.
+
+    Trailing ones too, not just whole lines: `local x = 1 -- press(A)` otherwise trips
+    the press gate on prose. Lua has no string type that survives this naively, but no
+    line in these files puts `--` inside a literal.
+    """
+    return '\n'.join(l.split('--')[0] for l in lines)
+
+
+def _harness_marks(lines):
+    marks = []
+    for i, line in enumerate(lines):
+        m = LUA_FUNC_DEF.match(line)
+        if m:
+            marks.append((i, m.group(1) or m.group(2) or m.group(3),
+                          'scenario' if m.group(2) else 'helper'))
+    marks.append((len(lines), None, None))
+    return marks
+
+
+def harness_functions(source):
+    """{name: (body, kind)} for every top-level function in harness.lua.
+
+    Attribution is by ENCLOSING FUNCTION, not by distance to the next `scenarios.X`.
+    Splitting on scenario definitions charges every intervening `local function` helper to
+    whichever scenario happens to sit above it -- which is how #238's own scope list came to
+    name `retreat` (0 presses of its own) and miss `reachRbgCh01` (8)."""
+    lines = source.split('\n')
+    marks = _harness_marks(lines)
+    out = {}
+    for (start, name, kind), (end, _, _) in zip(marks, marks[1:]):
+        out[name] = (_strip_comments(lines[start:end]), kind)
+    return out
+
+
+def reaches(name, funcs, seen=None):
+    """Every harness function reachable from `name`, including itself."""
+    seen = seen if seen is not None else set()
+    if name in seen or name not in funcs:
+        return seen
+    seen.add(name)
+    body = funcs[name][0]
+    for callee in set(re.findall(r'\b(\w+)\s*\(', body)):
+        if callee in funcs and callee != name:
+            reaches(callee, funcs, seen)
+    return seen
+
+
+def harness_shared(source):
+    """Everything in harness.lua that no single function's closure can account for.
+
+    `harness_functions` charges a chunk to the function that opens it, so top-level data
+    declared BETWEEN two helpers -- `TUNE`, `CALLBACK_NAMES`, the constants -- is glommed
+    onto whichever helper happens to precede it. That data feeds every observation, so a
+    fingerprint built only from a closure would miss an edit to it and serve a stale PASS.
+
+    So partition instead: each chunk is a function BODY (closure-attributable) plus a
+    RESIDUE after its column-0 terminator (shared by everyone). A chunk with no such
+    terminator -- a one-line `local function yield() ... end` -- is unattributable, and
+    unattributable means shared, never dropped. Preamble + every residue = every line the
+    closures do not already cover, which is what makes the cache SOUND rather than hopeful.
+    """
+    lines = source.split('\n')
+    marks = _harness_marks(lines)
+    out = [_strip_comments(lines[:marks[0][0]])]
+    for (start, _, _), (end, _, _) in zip(marks, marks[1:]):
+        chunk = lines[start:end]
+        term = next((j for j in range(1, len(chunk)) if _LUA_TOP_END.match(chunk[j])), None)
+        out.append(_strip_comments(chunk if term is None else chunk[term + 1:]))
+    return '\n'.join(out)
 
 
 # -- the wrong-ROM guard ----------------------------------------------------
@@ -467,7 +592,6 @@ def rom_input_hash(make_flags):
     unsafe direction (edited content landing on a byte-identical size AND timestamp) does not
     happen with real editors or with git.
     """
-    import hashlib
     h = hashlib.sha256()
     h.update(('flags:' + ' '.join(make_flags) + '|campaign:' + CAMPAIGN + '\n').encode())
     try:
@@ -553,6 +677,183 @@ def _build(rom, make_flags, log_dir, quiet=True, use_cache=True):
     return True
 
 
+# -- verdict cache ----------------------------------------------------------
+#
+# The scenario COUNT should keep growing -- that is coverage, and capping it means deleting
+# proof. What must stop growing is the number that EXECUTE per change (#255).
+#
+# THE SOUNDNESS RULE, which is the whole licence to skip: a scenario's verdict is a pure
+# function of exactly four inputs -- the ROM it boots, its own Lua body, the harness helpers
+# it transitively reaches, and its matrix.yaml entry (ROM flag, host chapter, checkpoint,
+# timing). Plus controller.lua, which decides every classification it guards on. If all of
+# those are byte-identical a PASS cannot become a FAIL. **A FAIL is never cached** -- a flaky
+# red must always re-run; only green is skippable.
+#
+# WHAT IS DELIBERATELY NOT IN THE KEY: harness.lua as a whole file. It is one Lua chunk and
+# nearly every task edits it, so a whole-file hash would invalidate all 17 scenarios on every
+# commit and the cache would never hit -- the feature would be theatre. The closure above is
+# the correct granularity, and `harness_shared` is what keeps the closure honest.
+#
+# HONEST CEILING: keying on rom_input_hash means any build_campaign.py or campaign.yaml edit
+# invalidates every scenario, and nearly every feature task touches build_campaign.py. This
+# phase buys doc-only changes, harness-only changes, and repeat runs while debugging
+# something else. Build-attributed scoping (#255 phase 2) is where that ceiling lifts.
+VERDICT_CACHE_DIR = os.path.join(REPO, '.matrix-verdictcache')
+
+
+def _read(path):
+    with open(path) as fh:
+        return fh.read()
+
+
+def driver_source(here=None):
+    """Everything OUTSIDE harness.lua that decides what a scenario does.
+
+    `controller.lua` classifies every state a guarded input is authorised against;
+    `symbols.lua`/`procscr.lua` name the memory it reads; `clearbot`/`pathing`/`liveness`
+    and friends are dofile'd straight into the run; and `run.sh` chooses the fps, the
+    deadline, the checkpoint handling and the wrapper the emulator actually loads. Any of
+    them can turn a PASS into a FAIL without harness.lua changing a byte.
+
+    `gen_symbols.py` is in here too, and for a reason worth stating: run.sh regenerates
+    symbols.lua/procscr.lua from the ELF AFTER the fingerprint has been taken, so hashing
+    only the generated files would let an edit to what they contain slip past the key for
+    one run. Hashing the generator as well closes that window.
+
+    harness.lua is pointedly absent: it is keyed by CLOSURE, and folding it in here would
+    undo the whole reason the closure exists.
+    """
+    here = here or HERE
+    files = [p for p in glob.glob(os.path.join(here, '*.lua'))
+             if not os.path.basename(p).startswith('test_')
+             and os.path.basename(p) != 'harness.lua']
+    files.append(os.path.join(here, 'run.sh'))
+    files.append(os.path.join(here, 'gen_symbols.py'))
+    parts = []
+    for path in sorted(files):
+        if os.path.isfile(path):
+            parts.append('%s\n%s' % (os.path.basename(path), _read(path)))
+    return '\n'.join(parts)
+
+
+def scenario_fingerprint(scenario, rom_digest, harness_source=None, driver=None):
+    """The cache key, or None when this run may not be cached at all.
+
+    None means "refuse to cache" and is returned whenever an input cannot be pinned: no ROM
+    digest (rom_input_hash could not read the decomp HEAD), or a scenario harness.lua does
+    not define. Unknown means conservative, never optimistic.
+    """
+    if rom_digest is None:
+        return None
+    harness_source = _read(HARNESS) if harness_source is None else harness_source
+    driver = driver_source() if driver is None else driver
+    funcs = harness_functions(harness_source)
+    if scenario.name not in funcs:
+        return None
+    h = hashlib.sha256()
+    h.update(('matrix-verdict-v1\nrom:%s\nentry:%s\n' % (rom_digest, export_env(scenario))).encode())
+    h.update(b'driver:\n')
+    h.update(driver.encode())
+    h.update(b'\nshared:\n')
+    h.update(harness_shared(harness_source).encode())
+    for name in sorted(reaches(scenario.name, funcs)):
+        h.update(('\nfn:%s\n' % name).encode())
+        h.update(funcs[name][0].encode())
+    return h.hexdigest()[:32]
+
+
+def _verdict_slot(scenario, fingerprint, cache_dir=None):
+    return os.path.join(cache_dir or VERDICT_CACHE_DIR, '%s-%s' % (scenario, fingerprint))
+
+
+def load_cached_verdict(scenario, fingerprint, cache_dir=None):
+    """The stored verdict for this exact fingerprint, or None. Only ever a PASS."""
+    if not fingerprint:
+        return None
+    try:
+        with open(_verdict_slot(scenario, fingerprint, cache_dir) + '.json') as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return None             # missing or corrupt: a miss, not a crash
+    if data.get('verdict') != 'PASS':
+        return None
+    return data
+
+
+def store_cached_verdict(scenario, fingerprint, outcome, cache_dir=None):
+    """Keep a green verdict AND its artifacts, so a cached PASS stays inspectable.
+
+    A cached green nobody can look at is a green nobody can audit, so the run's log and
+    screenshots travel with the verdict and the stored `artifacts` path points at them --
+    `/tmp/playtest-<name>` will have been overwritten by whatever ran last. That costs a few
+    MB per scenario (ch05arena: 198 frames, 4.7 MB) and it is deliberate: one slot per
+    scenario, gitignored, and the whole gate lands around 100 MB.
+    """
+    if not fingerprint or outcome.verdict != 'PASS':
+        return
+    cache_dir = cache_dir or VERDICT_CACHE_DIR
+    slot = _verdict_slot(scenario, fingerprint, cache_dir)
+    os.makedirs(cache_dir, exist_ok=True)
+    kept = outcome.artifacts
+    if outcome.artifacts and os.path.isdir(outcome.artifacts):
+        shutil.rmtree(slot, ignore_errors=True)
+        shutil.copytree(outcome.artifacts, slot)
+        kept = slot
+    with open(slot + '.json', 'w') as fh:
+        json.dump({'scenario': scenario, 'rom': outcome.rom, 'verdict': outcome.verdict,
+                   'seconds': round(outcome.seconds, 1), 'artifacts': kept,
+                   'fingerprint': fingerprint, 'stored': time.time()}, fh, indent=2)
+    # One slot per scenario: the cache tracks HEAD, not history. The `-` in the glob is
+    # load-bearing -- `ch01-*` must not sweep away `ch01win`'s slot.
+    for old in glob.glob(os.path.join(cache_dir, '%s-*' % scenario)):
+        if os.path.basename(old).startswith('%s-%s' % (scenario, fingerprint)):
+            continue
+        if os.path.isdir(old):
+            shutil.rmtree(old, ignore_errors=True)
+        else:
+            try:
+                os.remove(old)
+            except OSError:
+                pass
+
+
+class VerdictCache(object):
+    """Wires the fingerprint to `execute()`'s two injected hooks.
+
+    Every fingerprint is taken BEFORE anything is built or run, so the key describes the
+    tree the verdict will be earned against rather than whatever the build left behind.
+    """
+
+    def __init__(self, scenarios, enabled=True):
+        self.enabled = enabled
+        self.fingerprints = {}
+        if not enabled:
+            return
+        digests = {}
+        for s in scenarios:
+            flags = tuple(s.make_flags)
+            if flags not in digests:
+                digests[flags] = rom_input_hash(s.make_flags)
+            self.fingerprints[s.name] = scenario_fingerprint(s, digests[flags])
+
+    def hit(self, scenario):
+        return self.lookup(scenario) is not None
+
+    def lookup(self, scenario):
+        if not self.enabled:
+            return None
+        hit = load_cached_verdict(scenario.name, self.fingerprints.get(scenario.name))
+        if hit is None:
+            return None
+        return Outcome(scenario.name, scenario.rom, hit['verdict'], hit.get('seconds', 0.0),
+                       hit.get('artifacts', ''), cached=True)
+
+    def store(self, scenario, outcome):
+        if self.enabled:
+            store_cached_verdict(scenario.name, self.fingerprints.get(scenario.name), outcome)
+        return outcome
+
+
 def parse_verdict(text, returncode):
     """Read run.sh's verdict out of its captured output.
 
@@ -617,11 +918,17 @@ def cmd_run(args):
     # (Same hazard run.sh already clears for the LLM handshake files.)
     clear_results(log_dir)
 
+    verdicts = VerdictCache([s for g in groups for s in g.scenarios],
+                            enabled=not (args.no_verdict_cache or os.environ.get('MX_NO_CACHE')))
     total = sum(len(g.scenarios) for g in groups)
     print('matrix: %d scenario(s) across %d ROM configuration(s) -> %s'
           % (total, len(groups), log_dir))
+    # Naming what is already earned BEFORE anything runs is what makes --dry-run answer
+    # "what would this actually cost me" -- and it is how you check an invalidation
+    # without spending an emulator run to see it.
     for g in groups:
-        print('  %-10s %s' % (g.rom, ' '.join(s.name for s in g.scenarios)))
+        print('  %-10s %s' % (g.rom, ' '.join(
+            s.name + ('(cached)' if verdicts.hit(s) else '') for s in g.scenarios)))
     if args.dry_run:
         return 0
 
@@ -631,7 +938,8 @@ def cmd_run(args):
         print('matrix: running up to %d scenarios at a time (builds stay serial)' % jobs)
     report = execute(groups,
                      build=lambda rom, flags: _build(rom, flags, log_dir, use_cache=use_cache),
-                     run_scenario=lambda s: _run_scenario(s, log_dir),
+                     run_scenario=lambda s: verdicts.store(s, _run_scenario(s, log_dir)),
+                     lookup_cached=verdicts.lookup,
                      jobs=jobs)
     print('')
     print(render_table(report))
@@ -693,6 +1001,9 @@ def main(argv=None):
                           'or MX_JOBS). MEASURED AND OFF BY DEFAULT -- see execute()')
     run.add_argument('--no-rom-cache', action='store_true',
                      help='always `make`, never reuse a cached ROM (or MX_NO_ROM_CACHE=1)')
+    run.add_argument('--no-verdict-cache', action='store_true',
+                     help='re-run every scenario even if its inputs are unchanged '
+                          '(or MX_NO_CACHE=1)')
     run.set_defaults(fn=cmd_run)
 
     res = sub.add_parser('resolve', help='emit shell assignments for run.sh')

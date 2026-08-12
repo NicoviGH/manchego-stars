@@ -14,8 +14,9 @@ Run:
     python3 tools/test_playtest_matrix.py
 """
 import os
+import shutil
 import sys
-import os
+import tempfile
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -568,6 +569,343 @@ class RomCache(unittest.TestCase):
     def test_a_miss_reports_nothing_to_restore(self):
         self.assertFalse(mx.restore_cached_rom('canonical', 'deadbeef' * 4))
         self.assertFalse(mx.restore_cached_rom('canonical', None))
+
+
+# A miniature harness.lua with the same SHAPE as the real one: a preamble holding
+# tuning, top-level helpers, a mid-file top-level table sitting between two helpers,
+# and two scenarios that reach different helpers.
+HARNESS_FIXTURE = '''\
+local TUNE = { inputAttempts = 3 }
+
+local function yield() coroutine.yield() end
+
+local function shared(n)
+    return yield(n)
+end
+
+local NAMES = { [1] = "alpha" }
+
+local function onlyForA(n)
+    return shared(n) + NAMES[1]
+end
+
+local function onlyForB(n)
+    return shared(n) - 1
+end
+
+scenarios.alpha = function()
+    return onlyForA(1)   -- a comment
+end
+
+scenarios.beta = function()
+    return onlyForB(2)
+end
+'''
+
+
+class HarnessSourceAnalysis(unittest.TestCase):
+    """The call-graph machinery that scopes both the #238 press gate and the verdict
+    cache. It lives here, with the rest of the code that reads harness.lua."""
+
+    def funcs(self):
+        return mx.harness_functions(HARNESS_FIXTURE)
+
+    def test_every_top_level_function_is_found_with_its_kind(self):
+        funcs = self.funcs()
+        self.assertEqual(funcs['alpha'][1], 'scenario')
+        self.assertEqual(funcs['shared'][1], 'helper')
+        self.assertIn('onlyForB', funcs)
+
+    def test_a_closure_is_transitive_and_includes_itself(self):
+        self.assertEqual(mx.reaches('alpha', self.funcs()),
+                         {'alpha', 'onlyForA', 'shared', 'yield'})
+
+    def test_a_closure_excludes_helpers_it_never_calls(self):
+        self.assertNotIn('onlyForB', mx.reaches('alpha', self.funcs()))
+
+    def test_a_body_carries_no_comments(self):
+        """A comment cannot change a verdict, so it must not change a fingerprint."""
+        self.assertNotIn('a comment', self.funcs()['alpha'][0])
+
+    def test_shared_text_carries_top_level_data_no_function_owns(self):
+        """`NAMES` sits between two helpers. It feeds observation, so an edit to it
+        must invalidate EVERY scenario -- including ones whose closure misses the
+        helper it happens to be glommed onto."""
+        shared = mx.harness_shared(HARNESS_FIXTURE)
+        self.assertIn('alpha', shared)          # the NAMES table's contents
+        self.assertIn('inputAttempts', shared)  # the preamble
+
+    def test_shared_text_leaves_out_the_bodies_functions_do_own(self):
+        shared = mx.harness_shared(HARNESS_FIXTURE)
+        self.assertNotIn('onlyForA(1)', shared, 'a scenario body is not shared text')
+        self.assertNotIn('shared(n) - 1', shared, 'a multi-line helper body is not shared text')
+
+    def test_a_one_line_function_falls_back_to_being_shared(self):
+        """`local function yield() ... end` has no column-0 terminator to split on.
+        Unattributable means SHARED, never dropped -- the conservative direction."""
+        self.assertIn('coroutine.yield', mx.harness_shared(HARNESS_FIXTURE))
+
+    def test_the_real_harness_partitions_without_losing_a_scenario(self):
+        with open(mx.HARNESS) as fh:
+            source = fh.read()
+        funcs = mx.harness_functions(source)
+        for name in mx.harness_scenarios():
+            self.assertIn(name, funcs, '%s is defined but not attributable' % name)
+
+
+class VerdictFingerprint(unittest.TestCase):
+    """A verdict is a pure function of four inputs; the fingerprint must move when
+    any of them does, and hold still when nothing else does."""
+
+    def setUp(self):
+        self.m = manifest(scenarios={'alpha': {}, 'beta': {'rom': 'ch04boot'}})
+        self.alpha = self.m.resolve('alpha')
+
+    def fingerprint(self, rom='romdigest', harness=HARNESS_FIXTURE, driver='D',
+                    scenario=None):
+        return mx.scenario_fingerprint(scenario or self.alpha, rom,
+                                       harness_source=harness, driver=driver)
+
+    def test_the_same_four_inputs_give_the_same_key(self):
+        self.assertEqual(self.fingerprint(), self.fingerprint())
+
+    def test_a_different_rom_digest_is_a_different_key(self):
+        self.assertNotEqual(self.fingerprint(), self.fingerprint(rom='other'))
+
+    def test_an_unbuildable_rom_digest_refuses_to_cache(self):
+        """rom_input_hash returns None when it cannot pin the decomp. No key, no cache."""
+        self.assertIsNone(self.fingerprint(rom=None))
+
+    def test_editing_the_scenarios_own_body_is_a_different_key(self):
+        edited = HARNESS_FIXTURE.replace('return onlyForA(1)', 'return onlyForA(9)')
+        self.assertNotEqual(self.fingerprint(), self.fingerprint(harness=edited))
+
+    def test_editing_a_helper_it_reaches_is_a_different_key(self):
+        edited = HARNESS_FIXTURE.replace('return shared(n) + NAMES[1]', 'return 0')
+        self.assertNotEqual(self.fingerprint(), self.fingerprint(harness=edited))
+
+    def test_editing_top_level_data_no_function_owns_is_a_different_key(self):
+        edited = HARNESS_FIXTURE.replace('inputAttempts = 3', 'inputAttempts = 5')
+        self.assertNotEqual(self.fingerprint(), self.fingerprint(harness=edited))
+        edited = HARNESS_FIXTURE.replace('"alpha"', '"omega"')
+        self.assertNotEqual(self.fingerprint(), self.fingerprint(harness=edited))
+
+    def test_editing_ANOTHER_scenario_is_the_SAME_key(self):
+        """The whole point. harness.lua is one chunk and nearly every task edits it;
+        hashing it whole would invalidate all 17 scenarios on every commit."""
+        edited = HARNESS_FIXTURE.replace('return onlyForB(2)', 'return onlyForB(3)')
+        self.assertEqual(self.fingerprint(), self.fingerprint(harness=edited))
+
+    def test_editing_a_helper_it_never_reaches_is_the_SAME_key(self):
+        edited = HARNESS_FIXTURE.replace('return shared(n) - 1', 'return 42')
+        self.assertEqual(self.fingerprint(), self.fingerprint(harness=edited))
+
+    def test_rewording_a_comment_is_the_SAME_key(self):
+        """Comments are stripped, so prose cannot move a verdict key. (Adding or
+        removing a LINE still does -- conservative, and the safe direction.)"""
+        edited = HARNESS_FIXTURE.replace('-- a comment', '-- a different comment')
+        self.assertEqual(self.fingerprint(), self.fingerprint(harness=edited))
+
+    def test_editing_the_driver_is_a_different_key(self):
+        """controller.lua decides every classification the scenario guards on, and
+        run.sh decides the emulator it guards them in."""
+        self.assertNotEqual(self.fingerprint(), self.fingerprint(driver='D2'))
+
+
+    def test_a_changed_manifest_entry_is_a_different_key(self):
+        """Same Lua, same ROM -- but a different host chapter or deadline is a
+        different run."""
+        other = manifest(scenarios={'alpha': {'host_chapter': 6}}).resolve('alpha')
+        self.assertNotEqual(self.fingerprint(), self.fingerprint(scenario=other))
+
+    def test_a_scenario_the_harness_does_not_define_refuses_to_cache(self):
+        gone = manifest(scenarios={'ghost': {}}).resolve('ghost')
+        self.assertIsNone(self.fingerprint(scenario=gone))
+
+
+class DriverSource(unittest.TestCase):
+    """Everything OUTSIDE harness.lua that can change what a scenario does."""
+
+    def setUp(self):
+        self.text = mx.driver_source()
+
+    def test_it_covers_the_classifier_every_guarded_input_consults(self):
+        self.assertIn('function M.classify', self.text)
+
+    def test_it_covers_run_sh(self):
+        """run.sh decides fps, deadline, checkpoint handling and the wrapper the
+        emulator actually loads."""
+        self.assertIn('run_mgba', self.text)
+
+    def test_it_covers_the_generated_symbol_tables_the_harness_dofiles(self):
+        self.assertIn('gArenaState', self.text)
+
+    def test_it_leaves_out_harness_itself(self):
+        """harness.lua is keyed by CLOSURE, not whole-file -- including it here would
+        undo the entire point of the closure."""
+        self.assertNotIn('scenarios.ch05arena', self.text)
+
+    def test_it_covers_the_symbol_GENERATOR_too(self):
+        """symbols.lua/procscr.lua are regenerated by run.sh AFTER the fingerprint is
+        taken, so hashing only the generated files would let an edit to what they contain
+        slip past the key for one run."""
+        self.assertIn('def parse_nm', self.text)
+
+    def test_it_leaves_out_the_lua_test_modules(self):
+        self.assertNotIn('test_controller', self.text)
+
+
+class VerdictCacheStore(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.artifacts = os.path.join(self.dir, 'playtest-alpha')
+        os.makedirs(self.artifacts)
+        with open(os.path.join(self.artifacts, 'playtest.log'), 'w') as fh:
+            fh.write('[f000001] RESULT: PASS -- proved it\n')
+        self.addCleanup(shutil.rmtree, self.dir, True)
+
+    def outcome(self, verdict='PASS', name='alpha'):
+        return mx.Outcome(scenario=name, rom='canonical', verdict=verdict, seconds=12.0,
+                          artifacts=self.artifacts)
+
+    def test_a_pass_round_trips(self):
+        mx.store_cached_verdict('alpha', 'fp1', self.outcome(), cache_dir=self.dir)
+        hit = mx.load_cached_verdict('alpha', 'fp1', cache_dir=self.dir)
+        self.assertEqual(hit['verdict'], 'PASS')
+        self.assertEqual(hit['seconds'], 12.0)
+
+    def test_a_fail_is_NEVER_cached(self):
+        """A flaky red must always re-run. Only green is skippable."""
+        mx.store_cached_verdict('alpha', 'fp1', self.outcome('FAIL'), cache_dir=self.dir)
+        self.assertIsNone(mx.load_cached_verdict('alpha', 'fp1', cache_dir=self.dir))
+
+    def test_an_error_is_never_cached(self):
+        mx.store_cached_verdict('alpha', 'fp1', self.outcome('ERROR'), cache_dir=self.dir)
+        self.assertIsNone(mx.load_cached_verdict('alpha', 'fp1', cache_dir=self.dir))
+
+    def test_a_different_fingerprint_is_a_miss(self):
+        mx.store_cached_verdict('alpha', 'fp1', self.outcome(), cache_dir=self.dir)
+        self.assertIsNone(mx.load_cached_verdict('alpha', 'fp2', cache_dir=self.dir))
+
+    def test_no_fingerprint_is_a_miss_and_stores_nothing(self):
+        mx.store_cached_verdict('alpha', None, self.outcome(), cache_dir=self.dir)
+        self.assertIsNone(mx.load_cached_verdict('alpha', None, cache_dir=self.dir))
+
+    def test_a_cached_pass_stays_INSPECTABLE(self):
+        """A cached green that cannot be looked at is a green nobody can audit."""
+        mx.store_cached_verdict('alpha', 'fp1', self.outcome(), cache_dir=self.dir)
+        hit = mx.load_cached_verdict('alpha', 'fp1', cache_dir=self.dir)
+        kept = os.path.join(hit['artifacts'], 'playtest.log')
+        self.assertTrue(os.path.isfile(kept), 'the run log travels with the verdict')
+        with open(kept) as fh:
+            self.assertIn('RESULT: PASS', fh.read())
+
+    def test_a_new_fingerprint_evicts_the_old_slot(self):
+        """One slot per scenario: the cache tracks HEAD, not history."""
+        mx.store_cached_verdict('alpha', 'fp1', self.outcome(), cache_dir=self.dir)
+        mx.store_cached_verdict('alpha', 'fp2', self.outcome(), cache_dir=self.dir)
+        self.assertIsNone(mx.load_cached_verdict('alpha', 'fp1', cache_dir=self.dir))
+        self.assertIsNotNone(mx.load_cached_verdict('alpha', 'fp2', cache_dir=self.dir))
+
+    def test_evicting_one_scenario_leaves_the_others_alone(self):
+        mx.store_cached_verdict('beta', 'fp1', self.outcome(name='beta'), cache_dir=self.dir)
+        mx.store_cached_verdict('alpha', 'fp2', self.outcome(), cache_dir=self.dir)
+        self.assertIsNotNone(mx.load_cached_verdict('beta', 'fp1', cache_dir=self.dir))
+
+    def test_a_corrupt_slot_is_a_miss_not_a_crash(self):
+        os.makedirs(self.dir, exist_ok=True)
+        with open(os.path.join(self.dir, 'alpha-fp1.json'), 'w') as fh:
+            fh.write('{ not json')
+        self.assertIsNone(mx.load_cached_verdict('alpha', 'fp1', cache_dir=self.dir))
+
+
+class IncrementalExecution(unittest.TestCase):
+    """`gate: 17/17 PASS -- 2 ran, 15 cached`. What must stop growing is the number
+    of scenarios that EXECUTE per change, not the number that exist."""
+
+    def run_plan(self, m, names, verdicts, cached=()):
+        self.built, self.ran = [], []
+
+        def build(rom, flags):
+            self.built.append(rom)
+            return True
+
+        def run_scenario(scn):
+            self.ran.append(scn.name)
+            return mx.Outcome(scenario=scn.name, rom=scn.rom, verdict=verdicts[scn.name],
+                              seconds=1.0, artifacts='/tmp/playtest-' + scn.name)
+
+        def lookup_cached(scn):
+            if scn.name not in cached:
+                return None
+            return mx.Outcome(scenario=scn.name, rom=scn.rom, verdict='PASS', seconds=9.0,
+                              artifacts='/cache/' + scn.name, cached=True)
+
+        return mx.execute(m.plan(names), build=build, run_scenario=run_scenario,
+                          lookup_cached=lookup_cached)
+
+    def test_a_cached_scenario_does_not_execute(self):
+        m = manifest(scenarios={'a': {}, 'b': {}})
+        self.run_plan(m, ['a', 'b'], {'b': 'PASS'}, cached=('a',))
+        self.assertEqual(self.ran, ['b'])
+
+    def test_a_cached_scenario_still_reports_its_verdict(self):
+        m = manifest(scenarios={'a': {}, 'b': {}})
+        report = self.run_plan(m, ['a', 'b'], {'b': 'PASS'}, cached=('a',))
+        self.assertEqual([(o.scenario, o.verdict) for o in report.outcomes],
+                         [('a', 'PASS'), ('b', 'PASS')])
+
+    def test_the_manifest_order_survives_caching(self):
+        m = manifest(scenarios={'a': {}, 'b': {}, 'c': {}})
+        report = self.run_plan(m, ['a', 'b', 'c'], {'b': 'PASS'}, cached=('a', 'c'))
+        self.assertEqual([o.scenario for o in report.outcomes], ['a', 'b', 'c'])
+
+    def test_a_FULLY_cached_group_never_builds_its_rom(self):
+        """The biggest win in the whole feature: a doc-only change costs no `make`
+        and no emulator at all."""
+        m = manifest(scenarios={'a': {}, 'b': {}})
+        report = self.run_plan(m, ['a', 'b'], {}, cached=('a', 'b'))
+        self.assertEqual(self.built, [])
+        self.assertEqual(report.builds, 0)
+        self.assertTrue(report.ok)
+
+    def test_a_partly_cached_group_still_builds_once(self):
+        m = manifest(scenarios={'a': {}, 'b': {}})
+        self.run_plan(m, ['a', 'b'], {'b': 'PASS'}, cached=('a',))
+        self.assertEqual(self.built, ['canonical'])
+
+    def test_the_report_counts_ran_and_cached(self):
+        m = manifest(scenarios={'a': {}, 'b': {}, 'c': {}})
+        report = self.run_plan(m, ['a', 'b', 'c'], {'b': 'PASS'}, cached=('a', 'c'))
+        self.assertEqual((report.ran, report.cached), (1, 2))
+
+    def test_no_cache_lookup_at_all_runs_everything(self):
+        m = manifest(scenarios={'a': {}, 'b': {}})
+        self.run_plan(m, ['a', 'b'], {'a': 'PASS', 'b': 'PASS'})
+        self.assertEqual(self.ran, ['a', 'b'])
+
+
+class CachedRowsReadDistinctly(unittest.TestCase):
+    """A cached green must never read as a fresh one."""
+
+    def report(self):
+        return mx.Report([mx.Outcome('a', 'canonical', 'PASS', 9.0, '/cache/a', cached=True),
+                          mx.Outcome('b', 'canonical', 'PASS', 11.0, '/tmp/playtest-b')],
+                         builds=1, duplicate_builds=0, seconds=20.0)
+
+    def test_the_table_marks_which_rows_were_cached(self):
+        body = mx.render_table(self.report())
+        cached_row = [l for l in body.splitlines() if '/cache/a' in l][0]
+        fresh_row = [l for l in body.splitlines() if '/tmp/playtest-b' in l][0]
+        self.assertIn('cached', cached_row)
+        self.assertNotIn('cached', fresh_row)
+
+    def test_the_summary_reports_how_many_ran_and_how_many_were_cached(self):
+        self.assertIn('1 ran, 1 cached', mx.render_table(self.report()))
+
+    def test_results_json_records_the_cached_flag(self):
+        self.assertEqual([o['cached'] for o in self.report().as_dict()['outcomes']],
+                         [True, False])
 
 
 if __name__ == '__main__':
