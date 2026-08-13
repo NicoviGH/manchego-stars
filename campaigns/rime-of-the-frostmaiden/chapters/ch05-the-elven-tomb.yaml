@@ -684,10 +684,11 @@ events:
           with what she finds.
       - sephek: "That is all."
       # Her closing liturgy, extended 2026-08-13 (Nicolas) from a flat assent into the scene's
-      # villain button. Pronounced OVER the company in absentia, not at Sephek -- see the
-      # "your names / your faces" note; she is reciting a sentence, not answering him.
+      # villain button. THIRD person: the only person on stage is Sephek, and "your names" put
+      # the sentence on her own superior. She is pronouncing it over the company, who are not
+      # here to hear it, which is what makes it liturgy rather than a threat.
       - ravisin: >-
-          ...The snow shall erase your names. The trees will forget your faces.
+          ...The snow shall erase their names. The trees will forget their faces.
           According to her grand design...
   # ── 9BD — a subordinate shows DOUBT (foreshadows their own arc) ────────────────
   - trigger: chapter_start       # opening event list, Text_BG backdrop (happens elsewhere)
