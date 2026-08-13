@@ -71,10 +71,15 @@ class BuildScopes(object):
     only the files that actually moved are ever hashed.
     """
 
-    def __init__(self, root, roots=SCOPE_ROOTS):
+    def __init__(self, root, roots=SCOPE_ROOTS, previous=None):
         self.root = root
         self.roots = tuple(roots)
-        self.scopes = {}            # scope -> {relpath: digest}
+        # scope -> {relpath: digest}. Seeded from the previous build's manifest so a scope
+        # starts out owning what it has written before (see `finish`), with digests left
+        # None until the scope's own step claims -- WHEN a path is hashed is the whole
+        # point, so seeding must happen here and not after every step has run.
+        self.scopes = {scope: dict.fromkeys(entry.get('paths', ()))
+                       for scope, entry in (previous or {}).items()}
         self._prev = self._snapshot()
 
     def _snapshot(self):
@@ -92,15 +97,30 @@ class BuildScopes(object):
         return seen
 
     def _claim(self, scope):
-        """Charge everything written since the last snapshot to `scope`."""
+        """Charge everything written since the last snapshot to `scope`, and fix that
+        scope's digests to THIS MOMENT -- the end of the step that just ran.
+
+        The timing is the substance. A chapter scope's answer to "has my content changed"
+        must be read before the chapters after it have written anything, or every shared
+        whole-campaign table hands it the LAST chapter's bytes and a ch05 edit re-runs ch04,
+        ch03, ch02 and ch01. `global` is the exception and is refreshed in `finish` instead:
+        it means "the whole build", so its reference point is the end of it, not the middle.
+        """
         now = self._snapshot()
         bucket = self.scopes.setdefault(scope, {})
         for path, mtime in now.items():
             if self._prev.get(path) != mtime:
-                bucket[os.path.relpath(path, self.root)] = _digest_file(path)
+                bucket.setdefault(os.path.relpath(path, self.root))
         if not bucket:
             del self.scopes[scope]
+        elif scope != 'global':
+            self._freeze(bucket)
         self._prev = now
+
+    def _freeze(self, bucket):
+        """Hash every path a scope owns as the tree stands right now."""
+        for rel in bucket:
+            bucket[rel] = _digest_file(os.path.join(self.root, rel))
 
     def run(self, fn, *args, **kwargs):
         """Run one injection step and charge its writes to the scope its name implies.
@@ -118,7 +138,7 @@ class BuildScopes(object):
             # files look unattributed to the next pass.
             self._claim(scope_of_step(name))
 
-    def finish(self, touched=(), previous=None):
+    def finish(self, touched=()):
         """Close the manifest: {scope: {'paths': [...], 'digest': ...}}.
 
         `touched` is the build's own footprint (git's view of the decomp), used as the
@@ -126,27 +146,33 @@ class BuildScopes(object):
         what lets the per-step walk cover a few named roots instead of the whole tree
         without opening an optimistic gap.
 
-        `previous` is the manifest the last build left, and OWNERSHIP IS STICKY: a scope
+        OWNERSHIP IS STICKY (seeded from the previous manifest in `__init__`): a scope
         keeps a file it has written before, even on a build that did not rewrite it. That
         is not tidiness, it is the difference between the feature working and not. Whether
         a build rewrites a given file depends on what was built BEFORE it -- the matrix
         alternates ROM configurations, and the mtime rewind hands the next build a
         different starting point -- so without this the path SET churns, the digest moves
         with no content behind it, and because every scenario depends on `global`,
-        everything re-runs. Inherited paths are re-hashed as they are NOW, so sticky
-        ownership never means a stale digest; it only ever over-attributes, which costs a
-        re-run rather than a missed one.
+        everything re-runs.
+
+        Inherited paths are still hashed from the tree rather than copied forward, so
+        sticky ownership never means a stale digest -- but they are hashed at the owning
+        step's `_claim`, not here. Hashing them here was the bug: it read every scope's
+        files after ALL steps had run, so a late chapter's writes to a shared table leaked
+        into every earlier chapter's digest. A scope whose step did not run at all this
+        build has nothing to fix its digests to and is filled in below, as it stands now.
         """
         self._claim('global')
-        for scope, entry in (previous or {}).items():
-            bucket = self.scopes.setdefault(scope, {})
-            for rel in entry.get('paths', ()):
-                bucket.setdefault(rel, _digest_file(os.path.join(self.root, rel)))
+        self._freeze(self.scopes.get('global', {}))
         claimed = {rel for bucket in self.scopes.values() for rel in bucket}
         stragglers = {rel: _digest_file(os.path.join(self.root, rel))
                       for rel in touched if rel not in claimed}
         if stragglers:
             self.scopes.setdefault('global', {}).update(stragglers)
+        for bucket in self.scopes.values():
+            for rel, digest in bucket.items():
+                if digest is None:
+                    bucket[rel] = _digest_file(os.path.join(self.root, rel))
         manifest = {}
         for scope, bucket in self.scopes.items():
             h = hashlib.sha256()
@@ -155,8 +181,8 @@ class BuildScopes(object):
             manifest[scope] = {'paths': sorted(bucket), 'digest': h.hexdigest()[:32]}
         return manifest
 
-    def write_manifest(self, path, touched=(), previous=None):
-        manifest = self.finish(touched=touched, previous=previous)
+    def write_manifest(self, path, touched=()):
+        manifest = self.finish(touched=touched)
         with open(path, 'w') as fh:
             json.dump(manifest, fh, indent=2, sort_keys=True)
         return manifest

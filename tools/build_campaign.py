@@ -11041,7 +11041,8 @@ def main():
     # ch05 edit from a global one and stop re-running the prologue for it (#255 phase 2).
     # Only the CHAPTER steps are wrapped: everything else falls through to `global`, which
     # every scenario depends on, so the conservative answer is also the default one.
-    _scopes = build_scopes.BuildScopes(DECOMP)
+    _scopes = build_scopes.BuildScopes(
+        DECOMP, previous=build_scopes.load_manifest(BUILD_SCOPES_PATH))
     print('portraits:')
     inject_portraits(args.campaign)
     inject_arena_attendant_portraits(args.campaign)
@@ -11156,8 +11157,7 @@ def main():
     # backwards on byte-identical files, and this attribution watches mtimes.
     _scope_manifest = _scopes.write_manifest(
         BUILD_SCOPES_PATH,
-        touched=[os.path.relpath(p, DECOMP) for p in _decomp_footprint()],
-        previous=build_scopes.load_manifest(BUILD_SCOPES_PATH))
+        touched=[os.path.relpath(p, DECOMP) for p in _decomp_footprint()])
     print('build scopes: %s' % ', '.join(
         '%s=%d file(s)' % (scope, len(entry['paths']))
         for scope, entry in sorted(_scope_manifest.items())))
