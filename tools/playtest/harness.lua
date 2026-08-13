@@ -4404,8 +4404,12 @@ end
 -- Riev graphics. A source-sheet preview cannot prove either half of that connection.
 scenarios.recordravisin = function()
     local pid, name = 0xB8, "ravisin"
-    if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
+    -- FAST BEFORE the boot, not after: ch05's opening now plays 48 A-presses of dialogue
+    -- BEFORE the map, and bootToMap drives all of it. Poking the config afterwards leaves that
+    -- whole cutscene running at readable typewriter speed -- ~10000 frames, over half this
+    -- scenario's 300s budget spent on a scene it does not film.
     pokeFastConfig()
+    if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
     if not waitFor(function()
         return faction() == 0 and not menuOpen()
             and not procActive(SYM.ProcScr_StdEventEngine)
@@ -6584,6 +6588,9 @@ end
 -- real dialogue wait was observed, so reaching turn 2 without the warning cannot pass.
 -- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05eruption (needs a CH05BOOT=1 ROM).
 scenarios.recordch05eruption = function()
+    -- FAST BEFORE the boot: ch05's opening is 48 A-presses of dialogue ahead of the map, and
+    -- bootToMap drives all of it unfilmed. At readable speed that alone is ~10000 frames.
+    pokeFastConfig()
     if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
     waitFor(function()
         return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
@@ -7407,6 +7414,55 @@ scenarios.recordch05ravisindeath = function()
             if controllerState() == "dialogue_wait" then boxes = boxes + 1 end
             return boxes == 1 and eventFlag(2) and controllerState() ~= "dialogue_wait"
         end,
+    })
+end
+
+-- recordch05opening (#25): the MOTION proof for ch05's three BACKDROP scenes -- Basil and Sahnar
+-- through the stone, Sephek's orders, Ravisin's appraisal -- which the chapter played SILENTLY
+-- until now (CH05_BEGINNING_SCRIPT was ours already and simply had no TEXTSHOW in it).
+-- What only a run can answer, and reasoning cannot: whether BG_MS_ELVEN_TOMB actually comes up
+-- behind the text, and whether the FADI/FADU pair BETWEEN scenes returns to the tomb rather than
+-- to black or to the host slot's map -- the BACG is never re-issued across the three, on the
+-- grounds that it is still in VRAM (EventShowTextBgDirect only decompresses while activeTextType
+-- is REMOVEPORTRAITS, and each Text() leaves it at TEXTSTART). That is a decomp READING, so it
+-- gets filmed rather than asserted.
+-- Setup is the BOOT ONLY, unfilmed, and stops the instant the chapter's event engine goes live so
+-- no box is eaten before the camera rolls. The terminal is the PREP screen, which is what the
+-- opening runs into (CALL EventScr_08591FD8), so the film covers the whole backdrop half and
+-- stops before the map.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05opening (needs a CH05BOOT=1 ROM).
+scenarios.recordch05opening = function()
+    return recordCutscene({
+        -- shotEvery 4 and pressEvery 90 are recordch05recruit's, for the same reason: this is a
+        -- 42-box run of scenes, and filming every frame makes a GIF minutes long.
+        tag = "ch05opening", speed = "normal", maxFrames = 14000, shotEvery = 4,
+        pressEvery = 90,
+        pre = function()
+            pokeFastConfig()                   -- boot fast; the scenes themselves play normal
+            for _ = 1, TUNE.bootSteps do
+                -- NOT inChapter(): that stays FALSE for the whole BeginningScene (the chapter
+                -- is not "in" until the map is up), so waiting on it hands the opening to
+                -- advanceBootState, which mashes A through all 42 boxes before the camera ever
+                -- rolls -- a run that films nothing and reports a timeout. Stop on the EVENT
+                -- ENGINE instead, which goes live the moment the opening script starts, and on
+                -- a dialogue wait as the backstop in case the engine proc is missed between
+                -- observations.
+                if procActive(SYM.ProcScr_StdEventEngine) then return true end
+                local observation = observeController()
+                local state = controllerState(observation)
+                if state == "dialogue_wait" then return true end
+                -- Branch on the return, as the other five call sites do: a hard boot failure
+                -- otherwise spins the whole cap and reports the generic "never reached", which
+                -- names nothing (TUNE.bootSteps' own comment, #232).
+                if advanceBootState(observation, state) == false then
+                    return false, "boot stalled before ch05's opening: " .. tostring(state)
+                end
+                yield()
+            end
+            return false, "never reached ch05's opening event"
+        end,
+        afterPre = pokeNormalConfig,
+        until_ = "prep",
     })
 end
 

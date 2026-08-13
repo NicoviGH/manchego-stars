@@ -1263,8 +1263,18 @@ def _scenic_beat_calls(msgs, beats, labels):
 
 def _fid_tag(slot):
     """textdefs.txt face-tag for a vanilla character slot (CamelCase, irregulars mapped)."""
-    special = {'ONEILL': 'ONeill', 'VILLAGER_WOMAN': 'VillagerWoman'}
-    return '[FID_%s]' % special.get(slot, slot.title())
+    # 'O_NEILL' is GUEST_PORTRAIT_MAP's spelling of the SAME slot PROLOGUE_SEPHEK_SLOT calls
+    # 'ONEILL'. Both have to land on [FID_ONeill], the one tag textdefs.txt defines: without the
+    # second key, any scene resolving Sephek through _cutscene_fid's GUEST_PORTRAIT_MAP fallback
+    # emits [FID_O_Neill] and every check stays green (decisions.md -> "A portrait SLOT name is
+    # not a face TAG").
+    special = {'ONEILL': 'ONeill', 'O_NEILL': 'ONeill',
+               'VILLAGER_WOMAN': 'VillagerWoman'}
+    # Key the irregulars CASE-INSENSITIVELY. Callers reach this both ways -- PROLOGUE_SEPHEK_SLOT
+    # is already upper ('ONEILL') while GUEST_PORTRAIT_MAP holds title case ('O_Neill'), and
+    # _cutscene_fid upper()s only on its own paths -- so a table keyed on one spelling silently
+    # misses the other and falls through to .title(), emitting a tag textdefs.txt never defines.
+    return '[FID_%s]' % special.get(slot.upper(), slot.title())
 
 
 def dev_placeholder_scene():
@@ -5886,6 +5896,22 @@ def _split_event_beats(chap, trigger, err_label, msg_ids=None, card_required=Tru
     return card, beats
 
 
+def _chapter_event_by_slot(chap, trigger, slot, err_label):
+    """The one chapter event with `trigger` AND the `slot:` anatomy label `slot`.
+
+    ch03/ch04 author their opening as ONE `chapter_start` event split on `beat_break`, so
+    `_split_event_beats` can find it by trigger alone. ch05 authors each scene as its own
+    `chapter_start` event, labelled by the vanilla scene it mines -- seven of them -- and a
+    lookup by trigger silently returns the first. Match on both.
+    """
+    hits = [e for e in chap['events']
+            if e.get('trigger') == trigger and e.get('slot') == slot]
+    if len(hits) != 1:
+        sys.exit('ERROR: %s: expected exactly one %r event labelled %r, found %d'
+                 % (err_label, trigger, slot, len(hits)))
+    return hits[0]
+
+
 def _cutscene_fid(spk, special, err_label, fallback=None):
     """Speaker id -> face tag for a chapter cutscene: the chapter's `special` speakers
     first (guest slots, faceless `narration` -> None), then the PC PORTRAIT_MAP, then
@@ -7366,6 +7392,14 @@ CAMPAIGN_BGS = [
     # ch03's endings, and a third reuse reads as one town (Nicolas, 2026-08-09).
     ('BG_MS_BRYN_SHANDER_WINTER', 'bg_BrynShanderWinter', '{Fenriel}'),  # ch01 ending: walled town at dusk
     ('BG_MS_BREMEN_WINTER',       'bg_BremenWinter',      '{Fenriel}'),  # ch07 (#27): the lakeside town
+    # ch05's opening backdrop (#25): the elven tomb's snowed-in stonework, behind the three
+    # scenes that play before the party arrives. Nicolas's pick 2026-08-13, and the FIRST
+    # vendored BG that needed NO refit -- the FE-Repo's FE9-10 rips ship already indexed at 16
+    # colours, so bg_to_fe8.py's greedy pack reproduces the source EXACTLY (0 of 38400 pixels
+    # differ from the 5-bit source crop). It lands on 2 banks rather than 1 only because FE8
+    # reserves local index 0 of every bank as transparent -- 15 usable, and the source has 16.
+    # Well inside the SIX the fade/transition procs apply, unlike Bremen's 8.
+    ('BG_MS_ELVEN_TOMB',          'bg_ElvenTomb',         '{FE9-10 CG rip}'),
 ]
 
 
@@ -8340,6 +8374,37 @@ CH05_ARENA_FOUND_MSG = 0x9E6                  # vanilla 0x9D5 anatomy, in ch05's
 CH05_ARENA_RULES_MSG = 0x9E7                  # vanilla 0x9D6 anatomy, in ch05's host block
 CH05_GOAL_WINDOW_MSG = 0x9F4
 CH05_GOAL_STATUS_MSG = 0x9F5
+# ── The opening's BACKDROP half (#25): three scenes at the tomb, before the party arrives ──
+# CHANNEL is not a preference here, it is inherited. Vanilla Ch5's own BeginningScene plays its
+# first four messages over a BACKDROP and only then moves onto the map:
+#   0x9BA Text_BG(SERAFEW) | 0x9BB SetBackground(SERAFEW)+TEXTSHOW | 0x9BC/0x9BD Text_BG(SERAFEW)
+#   | 0x9BE SetBackground(TOWN)+TEXTSHOW | 0x9C0..0x9C2 TEXTSTART (on-map) | PREP | 0x9C3/0x9C4.
+# `vanilla_scene.py` prints 0x9BB as "map" because it is a bare TEXTSHOW; the SetBackground two
+# lines above it is what it actually plays over. So the Joshua/Natasha meet-cute -- our scene 1's
+# twin -- is a BACKDROP scene, and our three tomb scenes are too. It also settles the question the
+# scene table left open: nothing is staged on the field this early, so no talk bubble has a unit
+# to anchor to (PutTalkBubble needs one), and the full-screen window wraps at 42 rather than 29.
+#
+# ONE backdrop across all three, which is vanilla's habit too -- it spends BG_SERAFEW_VILLAGE on
+# four consecutive scenes and only switches to BG_TOWN when the party physically arrives.
+CH05_OPENING_BG = 'BG_MS_ELVEN_TOMB'
+# The three scenes, in PLAYER order, keyed by the YAML `slot:` label they carry. That label is an
+# ANATOMY CITATION naming the vanilla scene we mine, never an id we write (ch04 hosts on slot 5
+# and writes 0x9BB/0x9BC/0x9BD for real) -- the id beside it is the destination, and the two being
+# separate fields is what lets them differ. Ids are the next three free in ch05's own Ch6 host
+# block, allocated in #25's table.
+CH05_OPENING_SLOTS = (
+    #  YAML `slot:`      id     boxes  what
+    ('vanilla 0x9BB', 0x9E9, 19, 'Basil and Sahnar talk through the stone'),
+    ('vanilla 0x9BC', 0x9EA, 16, 'Sephek gives Ravisin her orders'),
+    ('vanilla 0x9BD', 0x9EB, 7,  'Ravisin appraises the blade; Basil asks after her'),
+)
+# Podiums, held ACROSS the three scenes rather than chosen per scene: Basil and Sephek on the
+# party/left side, the two who outrank them on the right. Ravisin speaks in both scene 2 and
+# scene 3 and holds the same podium in each, so she does not appear to change seats between a
+# scene and its immediate sequel. Basil likewise keeps the mid-left she holds in the Talk recruit.
+CH05_OPENING_PODIUMS = {'basil': '[OpenMidLeft]',  'sahnar':  '[OpenMidRight]',
+                        'sephek': '[OpenMidLeft]', 'ravisin': '[OpenMidRight]'}
 # Raw charIndexes. Pids need only be unique WITHIN a chapter -- gDefeatTalkList entries carry
 # .chapter, so ch03's 0xb7 and ch04's 0xb7 coexist -- but the boss and the moose need their own
 # so their flagged death entries key to them alone.
@@ -8424,6 +8489,7 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
     'ch05': (CH05_ERUPTION_MSG, CH05_RAVISIN_DEATH_MSG,
              CH05_ARENA_FOUND_MSG, CH05_ARENA_RULES_MSG,
              CH05_SAHNAR_TALK_MSG,
+             *(msg for _slot, msg, _boxes, _what in CH05_OPENING_SLOTS),
              CH05_GOAL_WINDOW_MSG, CH05_GOAL_STATUS_MSG,
              *(slot[1] for slot in CH05_VILLAGE_SLOTS.values())),
     # Goal ids only -- ch01/ch02 predate the per-chapter block registry, but their goal strings
@@ -10320,6 +10386,76 @@ def ch05_sahnar_talk_message(chap):
         width=29)
 
 
+def ch05_opening_messages(chap):
+    """The three locked tomb scenes that open ch05, as (msg_id, body) in PLAYER order.
+
+    Rendered at the full-screen scenic 42 rather than the map bubble's 29: these play over a
+    BACG with nothing staged on the field, which is vanilla Ch5's own channel for the same
+    beats (see CH05_OPENING_SLOTS). A faced beat wrapped at 29 would merely be needlessly
+    narrow here -- the 29 exists for PutTalkBubble's unclamped right edge, and there is no
+    bubble.
+
+    Box counts are asserted per scene because the whole point of a locked script is that the
+    wiring cannot quietly drift from it -- and because #25's own scene table has them wrong
+    (it prices scenes 1 and 2 at 16 and 17; the YAML holds 19 and 16).
+    """
+    # Sephek's face comes from PROLOGUE_SEPHEK_SLOT, NOT from GUEST_PORTRAIT_MAP, and the two
+    # disagree on purpose-built spelling rather than on which slot: the map says 'O_Neill' (a
+    # portrait-slot name, used for dressing busts) while the FID tag textdefs.txt actually
+    # defines is [FID_ONeill]. _fid_tag special-cases 'ONEILL' and cannot reach the other
+    # spelling, so routing his face through the map emits [FID_O_Neill] -- a tag that does not
+    # exist. He is the prologue's boss returning, so the prologue's constant is the right one.
+    fid = _make_fid({'sephek': _fid_tag(PROLOGUE_SEPHEK_SLOT),
+                     'ravisin': _fid_tag(GUEST_PORTRAIT_MAP['ravisin'])},
+                    'ch05 opening: unknown cutscene speaker')
+    out = []
+    for slot, msg, boxes, what in CH05_OPENING_SLOTS:
+        script = _chapter_event_by_slot(
+            chap, 'chapter_start', slot, 'ch05 opening (%s)' % what)['script']
+        if len(script) != boxes:
+            sys.exit('ERROR: ch05 opening %r (%s) must remain the %d locked boxes; got %d'
+                     % (slot, what, boxes, len(script)))
+        speakers = {k for entry in script for k in entry}
+        unstaged = sorted(speakers - set(CH05_OPENING_PODIUMS))
+        if unstaged:
+            sys.exit('ERROR: ch05 opening %r (%s) speaks as %s, which CH05_OPENING_PODIUMS '
+                     'gives no podium -- a speaker defaulted to mid-left is a speaker two '
+                     'scenes can put in the same seat' % (slot, what, unstaged))
+        staging = {k: (CH05_OPENING_PODIUMS[k], fid(k)) for k in speakers}
+        out.append((msg, _script_to_message(script, staging, width=42)))
+    return out
+
+
+def ch05_opening_backdrop_block():
+    """The event-script head that plays ch05's three tomb scenes before the map is built.
+
+    ch03/ch04's shape, not a chain of `Text_BG` calls, and the difference is load-bearing:
+    `Text_BG` expands to a CALL that ends in `EventScr_TextShowWithFadeIn` -- CLEAN, then
+    FADU(16) back onto the MAP. Before `LOMA` our map is still the host slot's, so each scene
+    would fade up onto vanilla Ch6's terrain between beats. One BACG held across all three,
+    faded through black between scenes, keeps vanilla's separation without that.
+
+    The fade between scenes is not decoration. They are three separate moments (Basil at the
+    sarcophagus; Sephek and Ravisin elsewhere in the tomb; Ravisin alone after he leaves), and
+    vanilla separates its equivalents with a full `Text_BG` fade cycle apiece. Played as a hard
+    cut they would read as one continuous conversation.
+    """
+    scenes = []
+    for i, (_slot, msg, _boxes, what) in enumerate(CH05_OPENING_SLOTS):
+        if i:
+            # Fade THROUGH black between moments. The BACG stays in VRAM, so the pair needs no
+            # second BACG -- and re-issuing one here would be a no-op anyway (EventShowTextBgDirect
+            # only decompresses while activeTextType is REMOVEPORTRAITS/_1A22, and the Text()
+            # above left it at TEXTSTART -- the ch03/ch04 stale-BG bug).
+            scenes.append('    FADI(16)\n    FADU(16) /* a separate moment, same place */\n')
+        scenes.append('    Text(0x%X) /* %d -- %s */\n' % (msg, i + 1, what))
+    return ('    REMOVEPORTRAITS\n'
+            '    BACG(%s) /* the elven tomb, before the party arrives */\n'
+            '    FADU(16)\n' % CH05_OPENING_BG
+            + ''.join(scenes)
+            + '    FADI(16) /* fade the tomb out; LOMA builds the real map next */\n')
+
+
 def _vanilla_message_body(msg_id, source=None):
     """One committed vanilla message body, immune to the mutable injected text tree."""
     source = vanilla_decomp_text('texts/texts.txt') if source is None else source
@@ -10584,6 +10720,10 @@ def inject_ch05(campaign, boot=False, verbose=True):
                  '    ENUN\n' % CH05_BOOT_SEED_TABLE) if boot else ''
     beginning = ('{\n'
                  '    MUSC(SONG_TENSION)\n'
+                 # The BACKDROP half of the opening (#25): the three tomb scenes that play
+                 # before the party arrives, ahead of LOMA because they end faded to black and
+                 # LOMA wants the screen black anyway. Vanilla Ch5 opens the same way.
+                 + ch05_opening_backdrop_block() +
                  '    SVAL(EVT_SLOT_B, 0x0) /* map camera origin for the reload */\n'
                  '    LOMA(0x%X) /* RestartBattleMap -- build the ch05 map fresh */\n'
                  % CH05_HOST_INDEX
@@ -10667,6 +10807,8 @@ def inject_ch05(campaign, boot=False, verbose=True):
     set_message_body(lines, CH05_ERUPTION_MSG, ch05_eruption_message(chap))
     set_message_body(lines, CH05_RAVISIN_DEATH_MSG, ch05_ravisin_death_message(chap))
     set_message_body(lines, CH05_SAHNAR_TALK_MSG, ch05_sahnar_talk_message(chap))
+    for msg_id, body in ch05_opening_messages(chap):
+        set_message_body(lines, msg_id, body)
     for msg_id, body in arena_wiring['messages']:
         set_message_body(lines, msg_id, body)
     # The four reliquary visits (#25). Each site's speaker is one of the tomb's risen dead, over

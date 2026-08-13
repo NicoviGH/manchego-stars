@@ -583,11 +583,15 @@ events:
       Ravisin is damned entirely in REPORTED SPEECH ("she said it would still run") and never
       diagnosed by Sahnar — Basil's doubt stays her own. Sahnar knows only what Basil tells her;
       she has no other window on the world. LOCKED 2026-07-23 (dialogue-pass, co-written with
-      Nicolas). 16 boxes; the closing aside is hand-matched to Joshua's 3-box / 5-line cadence.
+      Nicolas). 19 boxes (Basil 12 / Sahnar 7 — the "16" here was wrong, and so is #25's scene
+      table); the closing aside is hand-matched to Joshua's 3-box / 5-line cadence.
     script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
       # (The tomb's eastern berm, before the party arrives. A frost-furred sarcophagus half-sunk
       #  in snow. A goodberry shrub hurries up on root-feet — she walks; she is not potted.)
-      - basil: "Sahnar! Sahnar, the moose came back, the white one, it came back tonight--"
+      # "tonight" CUT 2026-08-13 (Nicolas), when the scene got its backdrop: BG_MS_ELVEN_TOMB is
+      # a Winter DAY rip, and this was the only line that hard-asserted the hour. The doubling
+      # ("came back ... came back") is Basil tumbling, not a leftover -- basil.md: she spills.
+      - basil: "Sahnar! Sahnar, the moose came back, the white one, it came back--"
       - basil: "--and it's hurt. There are arrows in it. Three of them, in the shoulder. I counted."
       # (Sahnar's voice comes from inside the stone.)
       - sahnar: "....Basil."
@@ -651,29 +655,41 @@ events:
     script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
       # (Somewhere in the tomb, before the party arrives. Sephek Kaltro — the prologue's
       #  frost-druid executioner, who rimed over and vanished — has come to give orders.)
-      - sephek: "Ravisin. ...You have kept the wood well."
+      - sephek: "Ravisin. ...You have kept the woods well."
       - sephek: "I bring the Frostmaiden's will."
+      - sephek: "There is a company moving through the Ten-Towns."
       - sephek: >-
-          There is a company moving through the Ten-Towns. They take work in every
-          town they pass.
-      - sephek: "They have been asking after the cold. Where it comes from. Who serves it."
+          They have been asking about the cold. Where it comes from, and who serves it.
       - sephek: "They are to be stopped here."
       - ravisin: "...They will be."
       - sephek: "One more thing."
-      - sephek: "I have met them myself. On the ice, at the crossing."
+      # "them" -> "SOME of them", and the crossing dropped (Nicolas, 2026-08-13). The old line
+      # was factually wrong: ch00's crossing party is Hlin and Scramsax, who are the company's
+      # EMPLOYERS and not in it -- Sephek has never met these people. Naming no place leaves the
+      # claim loose enough to be true of any Ten-Towns encounter instead of contradicted by one.
+      - sephek: "I have met some of them myself."
+      # "warmer" -> "TOUGHER" (Nicolas, 2026-08-13). This box's job is a WARNING, and "warm" is
+      # the cult's own word for the living-and-sick (ravisin.md: "warmth is a sickness") -- so
+      # it read as a dismissal and undercut "Do not take them lightly" in the same breath.
       - sephek: >-
-          Do not take them lightly. They are warmer than they look, and they do not frighten.
+          Do not take them lightly. They are tougher than they look, and they do not frighten.
       # (The permission beat — vanilla's "do we have permission to execute her?" seat. This is
       #  what SANCTIONS the eruption: Ravisin wakes Sahnar under orders, not on a whim.)
-      - sephek: "If they press you, you have leave to wake the warrior. The one under the stone."
+      - sephek: "If they press you, you may wake the warrior. The one under the stone."
       - ravisin: "...The elf?"
       - sephek: "She was a queen's blade once. She will serve well enough."
-      - ravisin: "Then it is done. The wood will take them, and the winter will keep them."
+      - ravisin: "Consider it done. I will take them, and the winter will keep them."
       - sephek: >-
           The Frostmaiden is watching this place, Ravisin. ...See that she is pleased
           with what she finds.
       - sephek: "That is all."
-      - ravisin: "...It will be done, according to her grand design."
+      # Her closing liturgy, extended 2026-08-13 (Nicolas) from a flat assent into the scene's
+      # villain button. THIRD person: the only person on stage is Sephek, and "your names" put
+      # the sentence on her own superior. She is pronouncing it over the company, who are not
+      # here to hear it, which is what makes it liturgy rather than a threat.
+      - ravisin: >-
+          ...The snow shall erase their names. The trees will forget their faces.
+          According to her grand design...
   # ── 9BD — a subordinate shows DOUBT (foreshadows their own arc) ────────────────
   - trigger: chapter_start       # opening event list, Text_BG backdrop (happens elsewhere)
     slot: "vanilla 0x9BD"
