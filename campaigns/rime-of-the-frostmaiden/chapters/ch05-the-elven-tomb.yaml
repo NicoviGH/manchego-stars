@@ -594,6 +594,11 @@ events:
       - basil: "Sahnar! Sahnar, the moose came back, the white one, it came back--"
       - basil: "--and it's hurt. There are arrows in it. Three of them, in the shoulder. I counted."
       # (Sahnar's voice comes from inside the stone.)
+      # SHE IS FACED ANYWAY, and that is a decision, not an oversight (Nicolas, 2026-08-13).
+      # Basil cannot see her, so a portrait is literally wrong -- but vanilla's twin faces both
+      # speakers, an unfaced speaker renders as a boxless full-width narration slab
+      # (_script_to_message), and this scene's stated job is to establish BOTH recruits before
+      # either is a unit. The portrait is how the player meets her. Do not "fix" it.
       - sahnar: "....Basil."
       - basil: >-
           She didn't take them out. I waited and I thought she was going to, and she just
@@ -615,6 +620,10 @@ events:
       - sahnar: "......"
       - sahnar: "Don't worry about me, little one."
       - basil: "...All right."
+      # "before dawn" KEPT against the Winter Day backdrop (Nicolas, 2026-08-13) -- here and in
+      # Ravisin's "There is work before dawn" below. Only "tonight" was cut; these two read as
+      # pre-dawn against overcast stone, and scene 4's backdrop was picked overcast too, so the
+      # hour never contradicts what is on screen. Settled -- do not re-open it as a clash.
       - sahnar: "Go on, now. She'll want you before dawn."
       # (She goes. A few steps on root-feet. Then stops and looks back. The closing aside is
       #  Joshua's MSG_9BB shape beat for beat: observation -> wish -> resolve, 3 boxes/5 lines.)
