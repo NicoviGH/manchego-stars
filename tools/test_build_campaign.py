@@ -2159,6 +2159,12 @@ class Ch05OpeningBackdropScenes(unittest.TestCase):
         self.assertIn('I know old things', prose[0x9E9])
         self.assertIn('I bring the Frostmaiden\'s will', prose[0x9EA])
         self.assertIn('She was a queen\'s blade once', prose[0x9EA])
+        # The warning clause, pinned because it was WRONG once and the failure was invisible:
+        # "warmer than they look" reads as a dismissal, since "warm" is the cult's own word for
+        # the living-and-sick (ravisin.md), so the box undercut its own "Do not take them
+        # lightly". Nothing downstream can tell a warning from an insult.
+        self.assertIn('tougher than they look', prose[0x9EA])
+        self.assertNotIn('warmer than they look', prose[0x9EA])
         self.assertIn('It never once occurred to me she might be of use', prose[0x9EB])
 
     def test_the_scenes_wrap_at_the_full_screen_42_not_the_bubble_29(self):
