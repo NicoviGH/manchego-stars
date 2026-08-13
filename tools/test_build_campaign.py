@@ -2068,6 +2068,158 @@ class Ch05SahnarTalkRecruit(unittest.TestCase):
                         script.index('CUSA(CHARACTER_MARISA)'))
 
 
+class Ch05OpeningBackdropScenes(unittest.TestCase):
+    """ch05's opening plays three locked scenes at the tomb before the party arrives (#25).
+
+    The chapter shipped with `CH05_BEGINNING_SCRIPT` running LOMA -> the line LOAD1s -> prep
+    -> the join, SILENTLY: our own script, with no TEXTSHOW anywhere in it. These are the
+    first three of the eleven scenes #25 still owed.
+
+    CHANNEL is inherited rather than chosen. Vanilla Ch5's BeginningScene plays 0x9BA-0x9BE
+    over a backdrop and only reaches TEXTSTART (on-map bubbles) once the party is physically
+    on the street, so our twins are backdrop scenes too -- which is also the only thing that
+    CAN work this early, PutTalkBubble having no staged unit to anchor to.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+
+    def test_the_three_ids_are_owned_unique_and_inside_ch05s_host_block(self):
+        self.assertEqual([0x9E9, 0x9EA, 0x9EB],
+                         [msg for _s, msg, _b, _w in bc.CH05_OPENING_SLOTS])
+        claimed = set(bc.HOSTED_CHAPTER_MESSAGE_IDS['ch05'])
+        owner = bc.assert_message_ids_unique()
+        for _slot, msg, _boxes, _what in bc.CH05_OPENING_SLOTS:
+            self.assertTrue(0x9E4 <= msg <= 0x9F3, 'outside ch05\'s Ch6 host block')
+            self.assertIn(msg, claimed)
+            self.assertEqual('ch05', owner[msg])
+
+    def test_the_yaml_slot_labels_stay_anatomy_citations(self):
+        """`vanilla 0x9BB` names the scene we MINE. ch04 hosts on slot 5 and WRITES that id --
+        pointing a ch05 scene at it would play ch04's text in ch04's faces."""
+        for slot, msg, _boxes, _what in bc.CH05_OPENING_SLOTS:
+            self.assertNotEqual(int(slot.split()[1], 16), msg)
+            self.assertIn(int(slot.split()[1], 16),
+                          bc.HOSTED_CHAPTER_MESSAGE_IDS['ch04'])
+
+    def test_each_scene_keeps_its_locked_box_count_and_speakers(self):
+        chap = self._chap()
+        expected = {'vanilla 0x9BB': (19, {'basil', 'sahnar'}),
+                    'vanilla 0x9BC': (16, {'sephek', 'ravisin'}),
+                    'vanilla 0x9BD': (7, {'ravisin', 'basil'})}
+        for slot, _msg, boxes, _what in bc.CH05_OPENING_SLOTS:
+            script = bc._chapter_event_by_slot(chap, 'chapter_start', slot, 'test')['script']
+            want_boxes, want_speakers = expected[slot]
+            self.assertEqual(want_boxes, boxes, '%s: table box count' % slot)
+            self.assertEqual(want_boxes, len(script), '%s: YAML box count' % slot)
+            self.assertEqual(want_speakers, {next(iter(b)) for b in script})
+
+    def test_every_speaker_wears_our_face_and_never_the_donor_slots_own(self):
+        """The #276 regression, one scene earlier: our cast wears vanilla slots, so a scene
+        pointed at the wrong id plays the DONOR's face and words and every decoder stays green."""
+        bodies = dict(bc.ch05_opening_messages(self._chap()))
+        self.assertIn('[LoadFace][FID_Artur]', bodies[0x9E9])       # Basil
+        self.assertIn('[LoadFace][FID_Marisa]', bodies[0x9E9])      # Sahnar
+        self.assertIn('[LoadFace][FID_ONeill]', bodies[0x9EA])      # Sephek Kaltro
+        self.assertIn('[LoadFace][FID_Riev]', bodies[0x9EA])        # Ravisin
+        self.assertIn('[LoadFace][FID_Riev]', bodies[0x9EB])
+        self.assertIn('[LoadFace][FID_Artur]', bodies[0x9EB])
+        for body in bodies.values():
+            self.assertNotIn('[FID_Natasha]', body)   # Hlin's dressed slot, not Basil's
+            self.assertNotIn('[FID_Joshua]', body)
+
+    def test_every_face_tag_the_opening_emits_is_defined_in_textdefs(self):
+        """[FID_O_Neill] is not a tag -- textdefs.txt defines [FID_ONeill]. Sephek's portrait
+        SLOT is spelled 'O_Neill' in GUEST_PORTRAIT_MAP and 'ONEILL' in PROLOGUE_SEPHEK_SLOT,
+        and only the second is one _fid_tag can map, so the wrong source emits a tag the ROM
+        has no face for. Caught here because nothing downstream complains: this is the same
+        shape as #276, where every text decoder was green while the wrong face was on screen."""
+        defined = set(re.findall(r'^\[(FID_\w+)\]',
+                                 bc.vanilla_decomp_text('texts/textdefs.txt'), re.M))
+        self.assertIn('FID_ONeill', defined)          # the fixture is real
+        self.assertNotIn('FID_O_Neill', defined)      # and the near-miss is not
+        for msg, body in bc.ch05_opening_messages(self._chap()):
+            for tag in re.findall(r'\[(FID_\w+)\]', body):
+                self.assertIn(tag, defined, '0x%X emits an undefined face tag' % msg)
+
+    def test_a_speaker_holds_one_podium_across_the_whole_opening(self):
+        """Ravisin speaks in scene 2 and again in scene 3, its immediate sequel. A per-scene
+        default would seat her mid-left in one and mid-right in the other."""
+        bodies = dict(bc.ch05_opening_messages(self._chap()))
+        self.assertIn('[OpenMidRight][LoadFace][FID_Riev]', bodies[0x9EA])
+        self.assertIn('[OpenMidRight][LoadFace][FID_Riev]', bodies[0x9EB])
+        self.assertIn('[OpenMidLeft][LoadFace][FID_Artur]', bodies[0x9E9])
+        self.assertIn('[OpenMidLeft][LoadFace][FID_Artur]', bodies[0x9EB])
+
+    def test_the_locked_prose_survives_the_wrap(self):
+        bodies = dict(bc.ch05_opening_messages(self._chap()))
+        prose = {m: ' '.join(re.sub(r'\[[^\]]*\]', ' ', b).split()) for m, b in bodies.items()}
+        self.assertIn('I wish I could share my berries with her', prose[0x9E9])
+        self.assertIn('I know old things', prose[0x9E9])
+        self.assertIn('I bring the Frostmaiden\'s will', prose[0x9EA])
+        self.assertIn('She was a queen\'s blade once', prose[0x9EA])
+        self.assertIn('It never once occurred to me she might be of use', prose[0x9EB])
+
+    def test_the_scenes_wrap_at_the_full_screen_42_not_the_bubble_29(self):
+        """These play over a BACG, where the window is full-screen. The 29 exists for
+        PutTalkBubble's unclamped right edge, and there is no bubble here."""
+        bodies = dict(bc.ch05_opening_messages(self._chap()))
+        widest = 0
+        for body in bodies.values():
+            for line in body.split('\n'):
+                widest = max(widest, len(re.sub(r'\[[^\]]*\]', '', line)))
+        self.assertLessEqual(widest, 42)
+        self.assertGreater(widest, 29, 'wrapped at the bubble width, not the scenic width')
+
+    def test_the_block_raises_one_backdrop_plays_all_three_then_fades_out(self):
+        block = bc.ch05_opening_backdrop_block()
+        self.assertEqual(1, block.count('BACG('), 'one backdrop, held across the three scenes')
+        self.assertIn('BACG(%s)' % bc.CH05_OPENING_BG, block)
+        self.assertLess(block.index('REMOVEPORTRAITS'), block.index('BACG('),
+                        'BACG only decompresses while activeTextType is REMOVEPORTRAITS')
+        self.assertLess(block.index('BACG('), block.index('FADU(16)'))
+        for _slot, msg, _boxes, _what in bc.CH05_OPENING_SLOTS:
+            self.assertIn('Text(0x%X)' % msg, block)
+        first, last = (block.index('Text(0x%X)' % bc.CH05_OPENING_SLOTS[0][1]),
+                       block.index('Text(0x%X)' % bc.CH05_OPENING_SLOTS[-1][1]))
+        self.assertLess(first, last, 'scenes must run in player order')
+        self.assertTrue(block.rstrip().endswith('*/'))
+        self.assertIn('FADI(16)', block.rstrip().split('\n')[-1])
+
+    def test_separate_moments_fade_through_black_between_them(self):
+        """Vanilla gives each of 0x9BC/0x9BD a full Text_BG fade cycle. Played as a hard cut,
+        three different moments read as one continuous conversation."""
+        block = bc.ch05_opening_backdrop_block()
+        self.assertEqual(len(bc.CH05_OPENING_SLOTS), block.count('FADI(16)'),
+                         'one fade between each pair of scenes, plus the closing one')
+
+    def test_the_opening_never_reaches_for_Text_BG(self):
+        """Text_BG ends in EventScr_TextShowWithFadeIn -- CLEAN then FADU back onto the MAP.
+        Before LOMA that map is still the host slot's, so each scene would fade up on vanilla
+        Ch6's terrain."""
+        self.assertNotIn('Text_BG', bc.ch05_opening_backdrop_block())
+
+    def test_the_backdrop_is_a_registered_campaign_bg_with_a_source_png(self):
+        names = [enum for enum, _stem, _credit in bc.CAMPAIGN_BGS]
+        self.assertIn(bc.CH05_OPENING_BG, names)
+        stem = next(s for e, s, _c in bc.CAMPAIGN_BGS if e == bc.CH05_OPENING_BG)
+        png = os.path.join(bc.REPO, 'campaigns', self.CAMPAIGN, 'backgrounds', stem + '.png')
+        self.assertTrue(os.path.isfile(png), png)
+
+    def test_the_vendored_backdrop_stays_inside_the_six_banks_the_fades_apply(self):
+        """Bremen is banked at 8 and cannot be shown through a fade for exactly this reason
+        (HANDOFF). A BG the opening fades in AND out of has to be under that ceiling."""
+        from PIL import Image
+        stem = next(s for e, s, _c in bc.CAMPAIGN_BGS if e == bc.CH05_OPENING_BG)
+        im = Image.open(os.path.join(bc.REPO, 'campaigns', self.CAMPAIGN,
+                                     'backgrounds', stem + '.png'))
+        self.assertEqual('P', im.mode)
+        self.assertEqual((240, 160), im.size)
+        banks = max(int(i) // 16 for i in set(im.getdata())) + 1
+        self.assertLessEqual(banks, 6, '%d banks -- the fade procs apply only six' % banks)
+
+
 class Ch05ArenaTutorial(unittest.TestCase):
     """The Elven Tomb inherits vanilla Ch5's arena lesson on a live tile trigger (#264).
 

@@ -7410,6 +7410,50 @@ scenarios.recordch05ravisindeath = function()
     })
 end
 
+-- recordch05opening (#25): the MOTION proof for ch05's three BACKDROP scenes -- Basil and Sahnar
+-- through the stone, Sephek's orders, Ravisin's appraisal -- which the chapter played SILENTLY
+-- until now (CH05_BEGINNING_SCRIPT was ours already and simply had no TEXTSHOW in it).
+-- What only a run can answer, and reasoning cannot: whether BG_MS_ELVEN_TOMB actually comes up
+-- behind the text, and whether the FADI/FADU pair BETWEEN scenes returns to the tomb rather than
+-- to black or to the host slot's map -- the BACG is never re-issued across the three, on the
+-- grounds that it is still in VRAM (EventShowTextBgDirect only decompresses while activeTextType
+-- is REMOVEPORTRAITS, and each Text() leaves it at TEXTSTART). That is a decomp READING, so it
+-- gets filmed rather than asserted.
+-- Setup is the BOOT ONLY, unfilmed, and stops the instant the chapter's event engine goes live so
+-- no box is eaten before the camera rolls. The terminal is the PREP screen, which is what the
+-- opening runs into (CALL EventScr_08591FD8), so the film covers the whole backdrop half and
+-- stops before the map.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05opening (needs a CH05BOOT=1 ROM).
+scenarios.recordch05opening = function()
+    return recordCutscene({
+        -- shotEvery 4 and pressEvery 90 are recordch05recruit's, for the same reason: this is a
+        -- 42-box run of scenes, and filming every frame makes a GIF minutes long.
+        tag = "ch05opening", speed = "normal", maxFrames = 14000, shotEvery = 4,
+        pressEvery = 90,
+        pre = function()
+            pokeFastConfig()                   -- boot fast; the scenes themselves play normal
+            for _ = 1, TUNE.bootSteps do
+                -- NOT inChapter(): that stays FALSE for the whole BeginningScene (the chapter
+                -- is not "in" until the map is up), so waiting on it hands the opening to
+                -- advanceBootState, which mashes A through all 42 boxes before the camera ever
+                -- rolls -- a run that films nothing and reports a timeout. Stop on the EVENT
+                -- ENGINE instead, which goes live the moment the opening script starts, and on
+                -- a dialogue wait as the backstop in case the engine proc is missed between
+                -- observations.
+                if procActive(SYM.ProcScr_StdEventEngine) then return true end
+                local observation = observeController()
+                local state = controllerState(observation)
+                if state == "dialogue_wait" then return true end
+                advanceBootState(observation, state)
+                yield()
+            end
+            return false, "never reached ch05's opening event"
+        end,
+        afterPre = pokeNormalConfig,
+        until_ = "prep",
+    })
+end
+
 -- recordch05recruit (#25): the MOTION proof for the locked Basil->Sahnar Talk at 0x9E8 -- the
 -- chapter's payoff scene, and the review artifact for it. Stills mislead on dialogue (they catch
 -- the typewriter mid-stroke), so what gets reviewed is the film.

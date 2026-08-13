@@ -4189,6 +4189,69 @@ ids are what is scarce. Note `variant_beat` reads `boxes:`/`replaces:` as **list
 five blocks are authored with singular `box:`/`replaces:` — normalize the YAML, do not write a
 second mechanism.
 
+### A cutscene's CHANNEL is inherited from the twin, not chosen (2026-08-13, #25)
+
+ch05's scene table left "on-map bubble vs `Text_BG`" as a per-scene decision, and the id-budget
+work priced it as an open question. It was never open: `EventScr_Ch5_BeginningScene` at HEAD
+answers it for all seven of ch05's opening scenes, because ours are its scenes one for one.
+
+| vanilla | who | how it is played |
+|---|---|---|
+| `0x9BA` | Joshua's cold open | `Text_BG(BG_SERAFEW_VILLAGE)` |
+| `0x9BB` | the Joshua/Natasha meet-cute | `SetBackground(BG_SERAFEW_VILLAGE)` + bare `TEXTSHOW` |
+| `0x9BC` `0x9BD` | Glen's orders; Glen and Cormag after | `Text_BG(BG_SERAFEW_VILLAGE)` |
+| `0x9BE` `0x9BF` | the party arrives | `SetBackground(BG_TOWN)` + bare `TEXTSHOW` |
+| `0x9C0`–`0x9C2` | on the street, party staged | `TEXTSTART` — on-map bubbles |
+| — | | **`CALL(EventScr_08591FD8)` — prep** |
+| `0x9C3` `0x9C4` | Joshua alone; Natasha alone | `FADU(16)`, then on-map bubbles |
+
+**`vanilla_scene.py` prints `0x9BB` as "map" and that is a reporting artifact, not a channel.**
+It classifies by the text call, and `0x9BB` is a bare `TEXTSHOW`; the `SetBackground` two lines
+above it is what the scene actually plays over. Reading the tool instead of the script is how
+"does vanilla use a background in its opening?" stayed open — it does, for the entire first half.
+
+Three things fall out, none of which needed an argument:
+
+- **Two backdrops, reused.** Vanilla spends `BG_SERAFEW_VILLAGE` on four consecutive scenes and
+  only cuts to `BG_TOWN` when the party physically arrives. So ch05 wants ONE tomb backdrop for
+  its three pre-arrival scenes and a second for the arrival — not a mood image per scene.
+- **Where PREP sits is settled**: vanilla puts two full scenes AFTER the prep `CALL` and re-opens
+  with `FADU(16)`. Our scenes 6 and 7 are those scenes' twins.
+- **The map half cannot start early.** `PutTalkBubble` anchors to a speaking UNIT, and vanilla
+  reaches `TEXTSTART` only once the party is staged. Nothing is on ch05's field before `LOMA`,
+  so scenes 1–4 could not have been bubbles whatever we preferred.
+
+**`Text_BG` is not a spelling of `BACG` — it is a CALL with a fade cycle on both ends**
+(`Convo_Helpers.h` → `Event_TextWithBG`: `FADI` if the screen is up → `REMOVEPORTRAITS` → `BACG`
+→ `FADU` → text → `EventScr_TextShowWithFadeIn`, which does `CLEAN` then `FADU` back onto the
+**map**). That last step is why ch03/ch04/ch05 hand-roll the sequence instead of calling it: our
+openings run BEFORE `LOMA`, so the map it fades up onto is still the host slot's. The macro is
+right for a village visit (`village_script` uses it) and wrong for a pre-`LOMA` opening.
+
+Ours therefore holds ONE `BACG` across the three tomb scenes and fades through black between
+them — vanilla's separation without vanilla's return-to-map. The BG is not re-issued at each
+fade, and that is deliberate rather than lazy: `EventShowTextBgDirect` only decompresses while
+`activeTextType` is `REMOVEPORTRAITS`/`_1A22`, and each `Text()` leaves it at `TEXTSTART`, so a
+second `BACG` would be the no-op that already bit ch03 and ch04. **Filmed rather than asserted**
+(`recordch05opening`), because "still in VRAM" is a decomp reading and the screen is the witness.
+
+_Decided: 2026-08-13 (Nicolas: "does vanilla use a background in its opening scenes? lets have a
+plan before jumping into assigning a BG")._
+
+### A portrait SLOT name is not a face TAG, and the near-miss is silent (2026-08-13, #25)
+
+Sephek's face is spelled two ways in this repo. `GUEST_PORTRAIT_MAP['sephek-kaltro']` says
+`'O_Neill'` — a portrait-slot name, which is what dresses busts — while `PROLOGUE_SEPHEK_SLOT`
+says `'ONEILL'`, and only the second is a spelling `_fid_tag` can map, because its irregulars
+table keys on `ONEILL`. Routing his face through the map emits `[FID_O_Neill]`, and
+`textdefs.txt` defines `[FID_ONeill]`. **Nothing downstream complains** — the same shape as the
+`0x9CC` bug #276 fixed, where every text decoder was green while the wrong face was on screen.
+The guard is a test that every `FID_` tag a scene emits is defined in `textdefs.txt`, checked
+against `FID_ONeill` present and `FID_O_Neill` absent so the fixture cannot rot into a tautology.
+
+_Decided: 2026-08-13 (#25, wiring ch05's opening — first scene to give Sephek a cutscene face
+outside the prologue)._
+
 ### "Did the player recruit them?" is `CHECK_ALIVE`, and it needs no flag (2026-08-13, #25)
 
 ch05's five `no_lupin_fallback:` arms need to know whether ch04's optional parley happened. Two
