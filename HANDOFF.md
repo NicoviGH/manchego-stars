@@ -30,7 +30,7 @@ the two ways to run the sweep wrong: `docs/decisions.md` → "A host block is no
 budget". A fallback arm costs ONE extra id (`variant_beat` + `branch_on_flag`, ch04's mechanism),
 not four.
 
-Two things the wiring still has to decide per scene, and one open question:
+Two things the wiring still has to decide per scene, and one thing it no longer does:
 - **Channel** — on-map bubble (wraps 29, needs a staged unit to anchor to) vs `Text_BG` (~42).
   Scenes 1–4 and 6 happen before the party is on the field, so nothing is staged for a bubble.
 - **Where PREP sits** — `CH05_BEGINNING_SCRIPT` runs LOMA → line LOAD1s → `CALL` prep → the join
