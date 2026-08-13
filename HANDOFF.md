@@ -6,41 +6,60 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-12 (Claude). `main` is at `e4f86b0`, the squash merge of PR #271, level with
-`origin/main`. **#269 and #255 phase 1 are both landed** (#270, #271). The generated decomp tree
-is intentionally dirty as recorded below.
+Refreshed 2026-08-12 (Claude). `main` is at `e1a4948`, the squash merge of PR #272, level with
+`origin/main`. **#269 and #255 phases 1 and 2 are landed** (#270, #271, #272). The generated
+decomp tree is intentionally dirty as recorded below.
 
 ## In flight
 
-Nothing committed. **#255 phase 2 is the next task and has not been started.**
+**Branch `feat/255-driver-scoping`, pushed, no PR yet.** Phases 1 and 2 are MERGED
+(#270/#271/#272). This branch carries the per-module driver split, sticky scope ownership,
+and the invalidation probe (`probe_invalidation.py`, branch-only for now). **Do not open a PR until the prologue question below is
+settled** — the probe is deliberately RED on it.
 
 ## Next task
 
-**#255 phase 2 — build-attributed impact scoping**, so a ch05 edit stops re-running the prologue.
-Phase 1's verdict cache is live but keys on `rom_input_hash`, so any `build_campaign.py` or
-campaign-data edit still invalidates every row — which is most feature tasks. That ceiling is the
-whole reason phase 2 exists, and it is why the "never run the full gate locally" ban is still in
-`CLAUDE.md` (phase 3 retires it).
+**Settle the prologue probe, then decide phase 3.** Ordered, because the first one could be a
+soundness hole:
 
-The issue carries the design. Three things learned in phase 1 that change its shape, none of them
-in the issue:
+**1. UNRESOLVED, and it is the dangerous direction.** the invalidation probe's `--case prologue` bumps `level: 5 -> 6` under the prologue chapter YAML's `enemy_units` — a
+real content edit that really applies — and **no injected file changes**: every scope digest
+is identical across all four ROM configurations, so no scenario re-runs. Either the
+prologue's enemy levels never reach the ROM from that YAML (caching is right, the probe's
+expectation is wrong) or the scope manifest is blind to something the injector wrote (a
+stale PASS). **Settle it by building the prologue ROM twice, edited and not, and comparing
+the .gba bytes** — that is decisive and needs no emulator. Do NOT reason about it from the
+manifest; the manifest is the thing under suspicion. Note the same probe's `level:` at line
+103 IS documentation (PC roster annotation; real PC stats live in `campaigns/.../pcs/`), and
+an earlier pass wrongly called that a bug — so the "it is just a doc field" answer is
+plausible here too, and still has to be PROVEN.
 
-- **The scope manifest only exists AFTER a build**, so when the ROM inputs move the order has to
-  become build → read manifest → decide per scenario. Phase 1's "a fully cached group is never
-  built" path still applies whenever `rom_input_hash` hits, so keep it.
-- **The manifest must travel with the cached ROM slot**, for exactly the reason the ELF does
-  (below). `ROM_CACHE_ARTIFACTS` is the place to add it.
-- **A scenario's chapter dependency is a RANGE, not a point.** It traverses every chapter from its
-  boot point (the ROM config's boot flag; canonical boots the prologue) to its `host_chapter`, and
-  a checkpoint-backed scenario replays that whole chain — `ckpt_ch02start` replays ch00→ch01→ch02.
-  Scoping a scenario to its host chapter alone would be exactly the hand-declared impact map the
-  issue warns against.
+**2. Line-level attribution — the last big source of false invalidation.** A ch02 edit
+re-runs ch05's scenarios because five whole-campaign tables are rewritten by every chapter
+injector, so all of them claim the file: `data/data_8B363C.s`,
+`src/data/chapter_settings.json`, `data/const_data_chapter_maps.s`, `src/data_battlequotes.c`,
+`src/events_udefs.c`. `BuildScopes._claim` already snapshots each file before and after every
+step, so claim the LINES a step changed rather than the whole file and hash only those; a
+ch02 edit then leaves ch05's line set byte-identical. Nicolas asked exactly this ("how are
+those related at all") and the answer is: physically, not by gameplay.
 
-**Do not hash `harness.lua` whole** — already handled, but the reason generalises to phase 2:
-`matrix.py`'s `harness_shared` exists because a closure-only key silently misses top-level data
-(`TUNE`, `CALLBACK_NAMES`) that gets glommed onto whichever helper precedes it. Any new
-attribution scheme needs the same "unattributable means SHARED, never dropped" fallback.
+**Watch out:** sticky ownership currently hashes INHERITED paths at `finish()` time, i.e.
+after every step has run, which mixes later steps' content into earlier scopes. That is the
+likely reason `ch05` invalidates ch04's scenarios (probe: 18 run, 2 cached). Line-level
+attribution probably subsumes it; if not, fix it explicitly.
 
+**3. Phase 3 (the local-gate ban) is BLOCKED on a measurement, and that is Nicolas's call.**
+He offered to drop the ban if the friction is genuinely gone. It is not yet: the probe shows
+`controller.lua`, `run.sh`, a shared `harness.lua` helper, or any global asset still re-runs
+all 20. The recommendation on the table is to replace the blanket ban with
+`matrix.py run --suite gate --dry-run` (free, sub-second, says exactly what would execute)
+rather than delete it. Do not remove the ban without a measured warm-gate number.
+
+**A negative result, recorded so nobody rebuilds it:** scoping `controller.lua` by
+matched-rule prefix was built, measured, and REMOVED. The rule list is ordered and
+`player_phase` — the catch-all every map scenario matches — sits second from last, so only
+1 rule of 15 ever falls below a scenario's deepest match. Nicolas's instinct was right in
+principle; FE8's rule ordering defeats it. Long form in `docs/decisions.md`.
 ## Current state
 
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**

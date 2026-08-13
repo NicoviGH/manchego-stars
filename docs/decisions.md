@@ -4459,9 +4459,16 @@ reason `--dry-run` says so out loud when a configuration changed: its listing is
 answer, and most of those scenarios turn out cached once the build reports what it wrote.
 The manifest travels in the ROM cache slot alongside the ELF, and for the same reason.
 
-**Measured both ways, because the cold number is part of the honest picture**: a ch05
-enemy-level edit costs **6 run / 14 cached** once traversals are known, and **19 run / 1
-cached** on a cold cache that has not observed any yet.
+**Measured, and then re-measured properly — the first number was wrong.** An early pass
+reported a ch05 enemy-level edit at 6 run / 14 cached. That measurement applied ONE ROM
+configuration's manifest to every scenario; each configuration has its own, and they must be
+built in the matrix's own alternating order. Driven through the real build by the
+invalidation probe (`probe_invalidation.py`), the honest figure is **18 run, 2 cached** — chapter isolation
+is far weaker than that first number claimed, because five whole-campaign tables are
+rewritten by every chapter injector (see the line-level attribution note below). Recorded
+with the error intact because a wrong measurement in an ADR is worse than no measurement,
+and because the mistake — comparing keys instead of running the thing — is the reusable
+lesson.
 
 **Verified deterministic**: two consecutive identical builds produce byte-identical
 manifests across all seven scopes. That matters because the attribution detects writes by
