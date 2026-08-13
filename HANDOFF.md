@@ -36,9 +36,11 @@ Two things the wiring still has to decide per scene, and one open question:
 - **Where PREP sits** — `CH05_BEGINNING_SCRIPT` runs LOMA → line LOAD1s → `CALL` prep → the join
   CUSA, silently. Scene 5 IS the join and scene 7 is the last beat before the map, so the seven
   openers have to be placed around that `CALL`.
-- **OPEN:** the no-Lupin arms need a signal that ch04's parley happened. `CH04_LUPIN_TALK_FLAG`
-  is `EVFLAG_TMP(9)` and survival across the chapter boundary is unverified; testing whether
-  Lupin is on the ch05 field is probably the better signal. Settle before wiring any of the five.
+- **The no-Lupin signal is SETTLED: `CHECK_ALIVE(CHARACTER_LUPIN)` + `BEQ`, no flag.** Vanilla's
+  own answer, and `ch14a` branches its ending on `CHECK_ALIVE(CHARACTER_JOSHUA)` — Ch5's optional
+  Talk recruit and Sahnar's donor, i.e. our scene's ancestor. It reads the ROSTER, so it also
+  handles the benched case that ch05's 9-of-10 deploy makes real. `branch_on_flag()` already emits
+  the skeleton; swap the check. Long form: `docs/decisions.md` → "Did the player recruit them?".
 
 ## Current state
 
