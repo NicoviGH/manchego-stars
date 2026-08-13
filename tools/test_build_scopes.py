@@ -181,6 +181,55 @@ class Reconciliation(unittest.TestCase):
         scopes.finish(touched=['data/never-existed.s'])
 
 
+class StickyOwnership(unittest.TestCase):
+    """A scope owns a file once it has written it, even on a later build that did not.
+
+    Without this the path SET churns: whether a build rewrites a given file depends on what
+    was built BEFORE it (the matrix alternates ROM configurations, and the mtime rewind
+    hands the next build a different starting point), so a scope's digest moved with no
+    content behind it -- and since every scenario depends on `global`, everything re-ran.
+    Caught by functional test, not by comparing keys.
+    """
+
+    def setUp(self):
+        self.tree = tempfile.mkdtemp()
+        os.makedirs(os.path.join(self.tree, 'data'))
+        self.addCleanup(shutil.rmtree, self.tree, True)
+        _write(os.path.join(self.tree, 'data', 'sometimes.s'), 'stable')
+
+    def build(self, rewrite, previous=None):
+        scopes = bs.BuildScopes(root=self.tree, roots=('data',))
+        def step():
+            if rewrite:
+                _write(os.path.join(self.tree, 'data', 'sometimes.s'), 'stable')
+        scopes.run(step, name='inject_ch05')
+        return scopes.finish(previous=previous)
+
+    def test_a_scope_keeps_a_file_a_later_build_did_not_rewrite(self):
+        first = self.build(rewrite=True)
+        self.assertIn('data/sometimes.s', first['chapter:ch05']['paths'])
+        second = self.build(rewrite=False, previous=first)
+        self.assertIn('data/sometimes.s', second['chapter:ch05']['paths'])
+
+    def test_the_digest_therefore_holds_still(self):
+        first = self.build(rewrite=True)
+        second = self.build(rewrite=False, previous=first)
+        self.assertEqual(first['chapter:ch05']['digest'], second['chapter:ch05']['digest'])
+
+    def test_inherited_ownership_still_tracks_CONTENT(self):
+        """Sticky paths must not mean a stale digest: the file is re-hashed as it is now."""
+        first = self.build(rewrite=True)
+        _write(os.path.join(self.tree, 'data', 'sometimes.s'), 'CHANGED')
+        second = self.build(rewrite=False, previous=first)
+        self.assertNotEqual(first['chapter:ch05']['digest'], second['chapter:ch05']['digest'])
+
+    def test_a_deleted_file_does_not_break_the_merge(self):
+        first = self.build(rewrite=True)
+        os.remove(os.path.join(self.tree, 'data', 'sometimes.s'))
+        second = self.build(rewrite=False, previous=first)
+        self.assertIn('data/sometimes.s', second['chapter:ch05']['paths'])
+
+
 class ManifestFile(unittest.TestCase):
     def setUp(self):
         self.tree = tempfile.mkdtemp()

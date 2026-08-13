@@ -11110,7 +11110,8 @@ def main():
     # backwards on byte-identical files, and this attribution watches mtimes.
     _scope_manifest = _scopes.write_manifest(
         BUILD_SCOPES_PATH,
-        touched=[os.path.relpath(p, DECOMP) for p in _decomp_footprint()])
+        touched=[os.path.relpath(p, DECOMP) for p in _decomp_footprint()],
+        previous=build_scopes.load_manifest(BUILD_SCOPES_PATH))
     print('build scopes: %s' % ', '.join(
         '%s=%d file(s)' % (scope, len(entry['paths']))
         for scope, entry in sorted(_scope_manifest.items())))

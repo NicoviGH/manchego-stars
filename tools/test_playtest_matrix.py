@@ -941,11 +941,71 @@ class ScopedFingerprint(unittest.TestCase):
         self.assertNotEqual(self.fingerprint(self.MANIFEST), self.fingerprint(without))
 
 
+class DriverModuleReach(unittest.TestCase):
+    """A dofile'd module is reached by the scenarios that USE it, not by all of them.
+
+    Lumping every driver file into one digest meant an edit to `clearbot.lua` -- which only
+    the clear* scenarios touch -- re-ran ch05arena. Same trap #255 warns about for
+    harness.lua, one file over.
+    """
+
+    def test_the_bindings_are_read_out_of_harness_lua(self):
+        """Derived from the dofile lines, not a hand-kept table."""
+        mods = mx.driver_modules()
+        self.assertEqual(mods.get('clearbot.lua'), 'CLEARBOT')
+        self.assertEqual(mods.get('controller.lua'), 'Controller')
+        self.assertEqual(mods.get('pathing.lua'), 'PATHING')
+
+    def test_a_generated_table_has_no_binding_and_is_not_a_module(self):
+        self.assertNotIn('symbols.lua', mx.driver_modules())
+
+    def test_the_binding_LINE_itself_does_not_count_as_a_use(self):
+        """`local CLEARBOT = dofile(...)` is top-level, so it lands in the shared harness
+        text. Counting it would make every module reachable by everyone and the split would
+        do nothing at all."""
+        reached = mx.scenario_driver_modules('ch05arena')
+        self.assertNotIn('clearbot.lua', reached)
+
+    def test_a_scenario_reaches_the_modules_it_actually_uses(self):
+        self.assertIn('clearbot.lua', mx.scenario_driver_modules('clear_ch01'))
+
+    def test_every_verdict_scenario_reaches_the_classifier(self):
+        """controller.lua really is consulted by every guarded input -- that part of the
+        old lumping was right."""
+        for name in ('ch05arena', 'clear_ch01', 'ch01win'):
+            self.assertIn('controller.lua', mx.scenario_driver_modules(name))
+
+    def test_editing_an_unreached_module_does_not_move_the_key(self):
+        m = manifest(scenarios={'ch05arena': {}})
+        s = m.resolve('ch05arena')
+        base = mx.scenario_fingerprint(s, 'r', env={})
+        moved = mx.scenario_fingerprint(s, 'r', env={},
+                                        driver_files={'clearbot.lua': 'CHANGED'})
+        self.assertEqual(base, moved)
+
+    def test_editing_a_reached_module_moves_the_key(self):
+        m = manifest(scenarios={'ch05arena': {}})
+        s = m.resolve('ch05arena')
+        base = mx.scenario_fingerprint(s, 'r', env={})
+        moved = mx.scenario_fingerprint(s, 'r', env={},
+                                        driver_files={'controller.lua': 'CHANGED'})
+        self.assertNotEqual(base, moved)
+
+    def test_run_sh_stays_global(self):
+        """It is the launcher: it decides fps, deadline and the wrapper for every run."""
+        m = manifest(scenarios={'ch05arena': {}})
+        s = m.resolve('ch05arena')
+        self.assertNotEqual(mx.scenario_fingerprint(s, 'r', env={}),
+                            mx.scenario_fingerprint(s, 'r', env={},
+                                                    driver_files={'run.sh': 'CHANGED'}))
+
+
 class DriverSource(unittest.TestCase):
     """Everything OUTSIDE harness.lua that can change what a scenario does."""
 
     def setUp(self):
-        self.text = mx.driver_source()
+        self.files = mx.driver_source()
+        self.text = '\n'.join('%s\n%s' % (k, v) for k, v in sorted(self.files.items()))
 
     def test_it_covers_the_classifier_every_guarded_input_consults(self):
         self.assertIn('function M.classify', self.text)

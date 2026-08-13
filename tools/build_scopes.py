@@ -118,15 +118,30 @@ class BuildScopes(object):
             # files look unattributed to the next pass.
             self._claim(scope_of_step(name))
 
-    def finish(self, touched=()):
+    def finish(self, touched=(), previous=None):
         """Close the manifest: {scope: {'paths': [...], 'digest': ...}}.
 
         `touched` is the build's own footprint (git's view of the decomp), used as the
         SAFETY NET: any path in it that no step claimed is charged to `global`. That is
         what lets the per-step walk cover a few named roots instead of the whole tree
         without opening an optimistic gap.
+
+        `previous` is the manifest the last build left, and OWNERSHIP IS STICKY: a scope
+        keeps a file it has written before, even on a build that did not rewrite it. That
+        is not tidiness, it is the difference between the feature working and not. Whether
+        a build rewrites a given file depends on what was built BEFORE it -- the matrix
+        alternates ROM configurations, and the mtime rewind hands the next build a
+        different starting point -- so without this the path SET churns, the digest moves
+        with no content behind it, and because every scenario depends on `global`,
+        everything re-runs. Inherited paths are re-hashed as they are NOW, so sticky
+        ownership never means a stale digest; it only ever over-attributes, which costs a
+        re-run rather than a missed one.
         """
         self._claim('global')
+        for scope, entry in (previous or {}).items():
+            bucket = self.scopes.setdefault(scope, {})
+            for rel in entry.get('paths', ()):
+                bucket.setdefault(rel, _digest_file(os.path.join(self.root, rel)))
         claimed = {rel for bucket in self.scopes.values() for rel in bucket}
         stragglers = {rel: _digest_file(os.path.join(self.root, rel))
                       for rel in touched if rel not in claimed}
@@ -140,8 +155,8 @@ class BuildScopes(object):
             manifest[scope] = {'paths': sorted(bucket), 'digest': h.hexdigest()[:32]}
         return manifest
 
-    def write_manifest(self, path, touched=()):
-        manifest = self.finish(touched=touched)
+    def write_manifest(self, path, touched=(), previous=None):
+        manifest = self.finish(touched=touched, previous=previous)
         with open(path, 'w') as fh:
             json.dump(manifest, fh, indent=2, sort_keys=True)
         return manifest
