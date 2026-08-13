@@ -8221,13 +8221,17 @@ CH05_BASIL_GREEN_POS = (5, 15)   # the row-15 corridor at the deploy pocket's mo
 CH05_SAHNAR_TALK_SCRIPT = 'MS_Ch05SahnarTalk'   # ours (declare_event_script), not a squatted
                                                 # vanilla symbol -- campaign-owned event scripts,
                                                 # declared AFTER the block-replacement pass.
-CH05_SAHNAR_TALK_MSG = 0x9CC     # the TALK-RECRUIT scene. UNCLAIMED by every chapter (checked
-                                 # against HOSTED_CHAPTER_MESSAGE_IDS), so the ROM still holds
-                                 # vanilla's text -- which is vanilla's OWN Natasha->Joshua talk
-                                 # recruit, the exact scene ours is the twin of. The reliquary
-                                 # placeholder pattern (decisions.md "Vanilla prose is a
-                                 # legitimate PLACEHOLDER"). The dialogue pass must MOVE this to
-                                 # ch05's block, not overwrite 0x9CC -- it is ch04's neighbourhood.
+CH05_SAHNAR_TALK_MSG = 0x9E8     # the TALK-RECRUIT scene, the chapter's payoff. MOVED off
+                                 # vanilla 0x9CC and into ch05's OWN host block (2026-08-13,
+                                 # dialogue-pass), which is what the placeholder note there always
+                                 # said to do. 0x9CC held vanilla's Natasha->Joshua recruit -- the
+                                 # exact scene ours is the twin of, so it read as a legitimate
+                                 # placeholder on paper and as a BUG on screen: Basil wears the
+                                 # Artur slot and Sahnar the Marisa slot, while 0x9CC loads
+                                 # Natasha's and Joshua's faces and speaks their words. What the
+                                 # player actually saw was Hlin Trollbane's bust (dressed onto the
+                                 # Natasha slot) talking to vanilla Joshua. First free id in the
+                                 # block; 0x9E9..0x9F3 remain for the opening and endings.
 CH05_SAHNAR_TALK_FLAG = 'EVFLAG_TMP(7)'   # vanilla Ch5's own Natasha->Joshua CHAR flag, free
                                           # here: ch05's villages use 9..12, and Misc uses 13
                                           # for the arena tutorial.
@@ -8419,6 +8423,7 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
     # and why spending ch05's own ids on them was the worse trade.
     'ch05': (CH05_ERUPTION_MSG, CH05_RAVISIN_DEATH_MSG,
              CH05_ARENA_FOUND_MSG, CH05_ARENA_RULES_MSG,
+             CH05_SAHNAR_TALK_MSG,
              CH05_GOAL_WINDOW_MSG, CH05_GOAL_STATUS_MSG,
              *(slot[1] for slot in CH05_VILLAGE_SLOTS.values())),
     # Goal ids only -- ch01/ch02 predate the per-chapter block registry, but their goal strings
@@ -10281,6 +10286,40 @@ def ch05_ravisin_death_message(chap):
         width=29)
 
 
+def ch05_sahnar_talk_message(chap):
+    """Render the locked Basil->Sahnar Talk recruit -- the chapter's payoff -- from the YAML.
+
+    The event's ``vanilla 0x9CC`` label cites the scene we MINE (vanilla's own Natasha->Joshua
+    recruit, which ours is the twin of). It is not the destination: the caller stores this at
+    CH05_SAHNAR_TALK_MSG in ch05's Ch6 host block. Until this landed the id WAS 0x9CC, and the
+    placeholder read as a bug rather than as prose -- our two speakers wear the Artur and Marisa
+    slots, so vanilla's scene played its own faces and its own words at them.
+
+    STAGING is the two-shot ch04's parley already uses, and for the same reason: the RECRUITER
+    holds mid-left (the party's side) and the unit being turned holds mid-right, so the exchange
+    reads as two people facing each other rather than one podium swapping faces. Basil is the
+    Natasha-donor Cleric walked across under escort; Sahnar is the red crit-Myrmidon she turns.
+
+    ON-MAP, so the body wraps at the map bubble's 29 -- a wider line hits PutTalkBubble's
+    unclamped right-side branch and runs off the tilemap (the ch03 crier bug). Consecutive turns
+    by one speaker coalesce into a single [OpenX] block with the authored breaks kept as pages,
+    so all sixteen A-presses survive.
+    """
+    _card, beats = _split_event_beats(
+        chap, 'sahnar_talk', 'ch05 Basil->Sahnar Talk recruit', (CH05_SAHNAR_TALK_MSG,),
+        card_required=False)
+    beat = beats[0]
+    speakers = {next(iter(entry)) for entry in beat}
+    if len(beat) != 16 or not speakers <= {'sahnar', 'basil'}:
+        sys.exit('ERROR: ch05 Talk recruit must remain the sixteen locked Sahnar/Basil boxes; '
+                 'got %d boxes from %s' % (len(beat), sorted(speakers)))
+    return _script_to_message(
+        beat,
+        {'basil':  ('[OpenMidLeft]',  _fid_tag(PORTRAIT_MAP['basil'])),
+         'sahnar': ('[OpenMidRight]', _fid_tag(PORTRAIT_MAP['sahnar']))},
+        width=29)
+
+
 def _vanilla_message_body(msg_id, source=None):
     """One committed vanilla message body, immune to the mutable injected text tree."""
     source = vanilla_decomp_text('texts/texts.txt') if source is None else source
@@ -10461,10 +10500,10 @@ def inject_ch05(campaign, boot=False, verbose=True):
     if recruit_initial_faction(load_unit(campaign, 'sahnar')) != 'RED':
         sys.exit('ERROR: ch05 places Sahnar on the enemy table (RED), but her YAML '
                  'recruit.initial_faction does not say red')
-    # Reading an UNWRITTEN vanilla id as placeholder prose is the reliquary pattern and is fine;
-    # reading one ANOTHER hosted chapter writes shows that chapter's scene instead. Both look
-    # identical here -- an int in a constant -- so the difference has to be a gate. Caught the
-    # Basil join beat pointed at 0x9C2, which is ch04's own no-parley ending.
+    # The Talk id is ch05's OWN now (step 5 writes the locked scene into it), so this passes on
+    # the holder == chapter branch rather than on the placeholder one. Kept anyway: it is the gate
+    # that catches a re-point into a neighbour's block, which is exactly how the Basil join beat
+    # once ended up on 0x9C2 -- ch04's own no-parley ending.
     assert_message_id_unclaimed(CH05_SAHNAR_TALK_MSG, 'ch05', "Basil's Talk recruit of Sahnar")
     sahnar_rows = [row.replace(CH05_GENERIC_PID, sahnar_char, 1) for row in sahnar_rows]
     declare_unit_table(CH05_SAHNAR_TABLE, sahnar_rows,
@@ -10608,8 +10647,8 @@ def inject_ch05(campaign, boot=False, verbose=True):
     #     than at the loss.
     declare_event_script(
         CH05_EVENTSCRIPT_H, CH05_SAHNAR_TALK_SCRIPT, sahnar_talk_script,
-        'ch05 Basil Talks Sahnar down -- CUSA red->blue; prose is vanilla 0x%X until the '
-        'dialogue pass (#25)' % CH05_SAHNAR_TALK_MSG)
+        'ch05 Basil Talks Sahnar down -- the locked recruit scene at 0x%X, then CUSA red->blue'
+        % CH05_SAHNAR_TALK_MSG)
     for symbol, body, comment in arena_wiring['scripts']:
         declare_event_script(CH05_EVENTSCRIPT_H, symbol, body, comment)
     assert_event_scripts_defined(
@@ -10627,6 +10666,7 @@ def inject_ch05(campaign, boot=False, verbose=True):
     set_message_body(lines, host['goal']['windowTextId'], goal_window_body('Defeat boss'))
     set_message_body(lines, CH05_ERUPTION_MSG, ch05_eruption_message(chap))
     set_message_body(lines, CH05_RAVISIN_DEATH_MSG, ch05_ravisin_death_message(chap))
+    set_message_body(lines, CH05_SAHNAR_TALK_MSG, ch05_sahnar_talk_message(chap))
     for msg_id, body in arena_wiring['messages']:
         set_message_body(lines, msg_id, body)
     # The four reliquary visits (#25). Each site's speaker is one of the tomb's risen dead, over
