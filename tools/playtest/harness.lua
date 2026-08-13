@@ -4404,8 +4404,12 @@ end
 -- Riev graphics. A source-sheet preview cannot prove either half of that connection.
 scenarios.recordravisin = function()
     local pid, name = 0xB8, "ravisin"
-    if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
+    -- FAST BEFORE the boot, not after: ch05's opening now plays 48 A-presses of dialogue
+    -- BEFORE the map, and bootToMap drives all of it. Poking the config afterwards leaves that
+    -- whole cutscene running at readable typewriter speed -- ~10000 frames, over half this
+    -- scenario's 300s budget spent on a scene it does not film.
     pokeFastConfig()
+    if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
     if not waitFor(function()
         return faction() == 0 and not menuOpen()
             and not procActive(SYM.ProcScr_StdEventEngine)
@@ -6584,6 +6588,9 @@ end
 -- real dialogue wait was observed, so reaching turn 2 without the warning cannot pass.
 -- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05eruption (needs a CH05BOOT=1 ROM).
 scenarios.recordch05eruption = function()
+    -- FAST BEFORE the boot: ch05's opening is 48 A-presses of dialogue ahead of the map, and
+    -- bootToMap drives all of it unfilmed. At readable speed that alone is ~10000 frames.
+    pokeFastConfig()
     if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
     waitFor(function()
         return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
@@ -7444,7 +7451,12 @@ scenarios.recordch05opening = function()
                 local observation = observeController()
                 local state = controllerState(observation)
                 if state == "dialogue_wait" then return true end
-                advanceBootState(observation, state)
+                -- Branch on the return, as the other five call sites do: a hard boot failure
+                -- otherwise spins the whole cap and reports the generic "never reached", which
+                -- names nothing (TUNE.bootSteps' own comment, #232).
+                if advanceBootState(observation, state) == false then
+                    return false, "boot stalled before ch05's opening: " .. tostring(state)
+                end
                 yield()
             end
             return false, "never reached ch05's opening event"

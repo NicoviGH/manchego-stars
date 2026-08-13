@@ -1263,8 +1263,18 @@ def _scenic_beat_calls(msgs, beats, labels):
 
 def _fid_tag(slot):
     """textdefs.txt face-tag for a vanilla character slot (CamelCase, irregulars mapped)."""
-    special = {'ONEILL': 'ONeill', 'VILLAGER_WOMAN': 'VillagerWoman'}
-    return '[FID_%s]' % special.get(slot, slot.title())
+    # 'O_NEILL' is GUEST_PORTRAIT_MAP's spelling of the SAME slot PROLOGUE_SEPHEK_SLOT calls
+    # 'ONEILL'. Both have to land on [FID_ONeill], the one tag textdefs.txt defines: without the
+    # second key, any scene resolving Sephek through _cutscene_fid's GUEST_PORTRAIT_MAP fallback
+    # emits [FID_O_Neill] and every check stays green (decisions.md -> "A portrait SLOT name is
+    # not a face TAG").
+    special = {'ONEILL': 'ONeill', 'O_NEILL': 'ONeill',
+               'VILLAGER_WOMAN': 'VillagerWoman'}
+    # Key the irregulars CASE-INSENSITIVELY. Callers reach this both ways -- PROLOGUE_SEPHEK_SLOT
+    # is already upper ('ONEILL') while GUEST_PORTRAIT_MAP holds title case ('O_Neill'), and
+    # _cutscene_fid upper()s only on its own paths -- so a table keyed on one spelling silently
+    # misses the other and falls through to .title(), emitting a tag textdefs.txt never defines.
+    return '[FID_%s]' % special.get(slot.upper(), slot.title())
 
 
 def dev_placeholder_scene():

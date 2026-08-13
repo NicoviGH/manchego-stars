@@ -2142,6 +2142,15 @@ class Ch05OpeningBackdropScenes(unittest.TestCase):
         for msg, body in bc.ch05_opening_messages(self._chap()):
             for tag in re.findall(r'\[(FID_\w+)\]', body):
                 self.assertIn(tag, defined, '0x%X emits an undefined face tag' % msg)
+        # BOTH spellings of every guest slot must resolve, not just the one this scene happens
+        # to use -- otherwise the next scene to reach a guest through _cutscene_fid's
+        # GUEST_PORTRAIT_MAP fallback re-opens the same silent hole.
+        for unit, slot in bc.GUEST_PORTRAIT_MAP.items():
+            for spelling in (slot, slot.upper()):
+                tag = bc._fid_tag(spelling).strip('[]')
+                self.assertIn(tag, defined,
+                              '%s (slot %r via %r) resolves to an undefined face tag %s'
+                              % (unit, slot, spelling, tag))
 
     def test_a_speaker_holds_one_podium_across_the_whole_opening(self):
         """Ravisin speaks in scene 2 and again in scene 3, its immediate sequel. A per-scene
