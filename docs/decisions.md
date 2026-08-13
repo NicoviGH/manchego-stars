@@ -4309,8 +4309,14 @@ separate wastes and only one of them is about suite size.
   run the 7 min gate thing anymore"*). The verdict cache below now means a green scenario whose
   inputs are unchanged does not re-run — but it keys on `rom_input_hash`, so any
   `build_campaign.py` or campaign-data edit invalidated every row. Phase 2 scopes that to what
-  the build actually wrote (a ch05 edit: 6 of 20). The ban lifts when **#255 phase 3** retires
-  it. CI cannot take the gate either: CI builds against a MOCK base ROM
+  the build actually wrote (a ch05 edit: 6 of 20). **The ban is permanent — it is a habit, not
+  a feature waiting to be built.** #255 closed 2026-08-13 having deliberately dropped the code
+  that would have retired it: what replaces the gate is "run your chapter's suite while
+  developing (ch05 = 6 scenarios, one ROM build), never the gate". A scenario audit found
+  nothing to retire either — 98 scenarios, and the gate's 20 are a curated union of the ch01
+  spine + `recordunitlist` + ch04 + ch05, each pinning a distinct engine hook. The real problem
+  is GROWTH (~6 per chapter), which scoping addresses and deletion does not.
+  CI cannot take the gate either: CI builds against a MOCK base ROM
   (`head -c 16M /dev/urandom`), because the real FE8 ROM is copyrighted and not in the repo, and
   random bytes do not boot in mGBA.
 - **`matrix.py run --suite X --dry-run` costs nothing and says what would actually run.** Reach

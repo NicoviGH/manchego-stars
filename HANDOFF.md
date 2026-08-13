@@ -6,69 +6,22 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-13 (Claude). **#255 is DONE — do not open more work on it.** PR #273 carries
-the last of it and is set to auto-merge on green CI; confirm with `gh pr view 273` and pull.
-The generated decomp tree is intentionally dirty as recorded below.
+Refreshed 2026-08-13 (Claude). **#255 and #274 are both DONE and merged — do not reopen
+either.** The generated decomp tree is intentionally dirty as recorded below.
 
 ## In flight
 
-**Nothing but PR #273**, which lands itself. It fixes two things, both found by driving the
-real build instead of comparing cache keys: the prologue roster was never actually reading its
-YAML (a shipped content bug — see `decisions.md` → "A cache can be right for the wrong
-reason"), and scope digests were hashed at the END of the build, which is what made a ch05
-edit re-run 18 of 20 scenarios. Both are recorded in `decisions.md`; nothing is owed here.
+**Nothing.** `main` is at #275 (the fast injector), CI green.
 
 ## Next task
 
-**Make `build_campaign.py` fast. This is Nicolas's explicit priority (2026-08-13) and it is a
-profiling job, not a design job.** He has spent a full session's patience on #255 and wants the
-friction gone before more ch05 work.
+**Back to ch05 content.** The build friction that was blocking it is gone: `make` is **21s
+warm** (was 64.5s) after #274 took `build_campaign.py` from 50s to 18s, byte-identical. Both
+#255 and #274 are closed; resist reopening them.
 
-The number that reframes everything: **of a 63s `make`, the ARM compile is 12s and the Python
-injection is 51s.** It is paid on every build whether or not a playtest ever runs. `cProfile`
-(70s under profiling overhead) puts nearly all of it in two places, and both look fixable
-without changing a single byte the injector produces:
-
-- **`ref_to_battleframe._cell_is_empty` — ~28s**, from **11 million `PIL.Image.getpixel`
-  calls** across 180k invocations. Per-pixel `getpixel` in Python is the classic PIL
-  antipattern; a numpy view or `getbbox()` over the crop answers the same question in bulk.
-  Reached via `feditor_to_banim.build_import` (39s cumulative, 14 calls), which is what
-  `inject_battle_anims` and `inject_enemy_class_battle_anims` spend their time in.
-- **YAML parsing — ~22s across 534 `safe_load` calls.** `_load_chapter_yaml` alone is 9s over
-  62 calls: the same chapter files parsed dozens of times per build. Memoize by path+mtime, and
-  use libyaml's `CSafeLoader` where available.
-- `PIL getcolors` is a distant third at 8.6s over 306 calls.
-
-**The acceptance test is a byte-compare, and it is cheap.** Every one of these is meant to be
-output-identical, so the proof is `shasum -a 256 fireemblem8u/fireemblem8.gba` matching the
-pre-change build — exactly how the prologue rewiring was proven safe this session. No emulator,
-no playtest. Do not accept a speedup that moves a ROM byte.
-
-The profile is at `/private/tmp/.../scratchpad/inject.prof` if that scratchpad survives;
-regenerating it is one command and 70 seconds:
-`python3 -m cProfile -o inject.prof tools/build_campaign.py --campaign rime-of-the-frostmaiden`.
-
-**After that, go back to ch05 content.** #255 is closed; resist reopening it.
-
-## #255: what was decided, so nobody reopens it
-
-- **Line-level (sub-file) attribution: DROPPED, deliberately.** It only helps when you edit an
-  EARLY chapter, and the campaign is built forward. `decisions.md` says not to reach for it
-  without a measurement saying it pays; there isn't one.
-- **Phase 3 (the local-gate ban): KEPT.** The habit that replaces it is "run your chapter's
-  suite while developing (ch05 = 6 scenarios, one ROM build), never the gate" — that is a
-  habit, not code. `matrix.py run --suite X --dry-run` is free and says what would execute.
-- **A scenario audit was done and found nothing to retire.** 98 scenarios (46 verdict, 39
-  record look-tests, 7 diagnostic, 6 checkpoint); the gate's 20 are a curated union of the ch01
-  spine + `recordunitlist` + ch04 + ch05, and each pins a distinct engine hook. The real
-  problem is GROWTH (~6 per chapter), which scoping addresses and deletion does not.
-- **CI cannot take playtests over.** `checks.yml` builds against a *random 16MB mock* base ROM —
-  fine for proving the link, useless for playing. Real runs need the copyrighted ROM.
-- **A negative result, recorded so nobody rebuilds it:** scoping `controller.lua` by
-  matched-rule prefix was built, measured, and REMOVED. The rule list is ordered and
-  `player_phase` — the catch-all every map scenario matches — sits second from last, so only
-  1 rule of 15 ever falls below a scenario's deepest match. Nicolas's instinct was right in
-  principle; FE8's rule ordering defeats it. Long form in `docs/decisions.md`.
+The most visible ch05 gap is the one under "Current state" below: **its opening and recruit
+still play VANILLA prose**, so the player watches Hlin Trollbane's bust talk to vanilla Joshua.
+That is a content job (`dialogue-pass`), not an engine one.
 
 ## Current state
 
@@ -81,10 +34,11 @@ regenerating it is one command and 70 seconds:
 - **One stash exists:** `stash@{0}: preserve pre-rename local HANDOFF before syncing #24`. It is
   historical insurance for a file that has since been rewritten several times; do not apply or
   drop it casually.
-- **The full `make matrix` gate is NOT to be run locally** (Nicolas, 2026-08-10) until #255 phase 2
-  lands. Run the chapter suite or `matrix.py run --scenarios a,b,c`. Rules: `CLAUDE.md` → the
-  matrix row. **`matrix.py run --suite X --dry-run` is free and says what would actually run** —
-  reach for it before deciding a run is needed at all.
+- **The full `make matrix` gate is NEVER to be run locally** (Nicolas, 2026-08-10) — permanent,
+  not pending anything; #255 deliberately dropped the code that would have retired it. Run the
+  chapter suite or `matrix.py run --scenarios a,b,c`. Rules: `CLAUDE.md` → the matrix row.
+  **`matrix.py run --suite X --dry-run` is free and says what would actually run** — reach for
+  it before deciding a run is needed at all.
 - **Both caches are warm and both were re-seeded on 2026-08-12.** `.matrix-romcache` was cleared
   when the ELF fix landed (every old slot was missing its `.elf`), so the first run of each ROM
   configuration rebuilds once. `.matrix-verdictcache` holds `ch05arena`.
