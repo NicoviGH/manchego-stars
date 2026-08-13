@@ -31,9 +31,6 @@ That is a content job (`dialogue-pass`), not an engine one.
   both were audited for unpushed commits, unique branches and stashes first. The tree is clean
   except for the intentionally dirty `fireemblem8u` submodule plus Nicolas's untracked `.agents/`
   and `AGENTS.md` — preserve those and stage paths explicitly.
-- **One stash exists:** `stash@{0}: preserve pre-rename local HANDOFF before syncing #24`. It is
-  historical insurance for a file that has since been rewritten several times; do not apply or
-  drop it casually.
 - **The full `make matrix` gate is NEVER to be run locally** (Nicolas, 2026-08-10) — permanent,
   not pending anything; #255 deliberately dropped the code that would have retired it. Run the
   chapter suite or `matrix.py run --scenarios a,b,c`. Rules: `CLAUDE.md` → the matrix row.
