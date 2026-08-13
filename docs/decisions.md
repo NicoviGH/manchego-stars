@@ -4486,6 +4486,87 @@ bigger lift with much more to get wrong; do not reach for it without a measureme
 it pays.
 _Decided: 2026-08-12 (#255 phase 2)._
 
+**A cache can be right for the wrong reason, and only the artifact says which.**
+The invalidation probe's `prologue` case went red in the most alarming way available: bumping
+`level: 5 → 6` under the ch00 YAML's `enemy_units` — real, chapter-scoped content — moved **no**
+scope digest in any of the four ROM configurations, so nothing re-ran. That is the exact
+signature of a stale-PASS hole, and the manifest is precisely the wrong place to investigate it,
+because the manifest is the thing under suspicion.
+
+Settled by building the prologue ROM **twice**, edited and not: identical sha256. Then tighter,
+by hashing all 20,263 files of the decomp tree after an injector-only run in each state: **zero**
+differed. So the cache was correct, and correct for a reason nobody had written down —
+`inject_prologue` emitted its two `UnitDefinition` rosters as **C literals**, under a comment
+that said "Positions/levels/items from the chapter YAML". Only the boss's *weapon* was ever
+wired (#52). Every literal matched the YAML by hand, so the chapter file looked authoritative
+and the built ROM agreed with it; a rebalance authored in YAML would simply never have shipped,
+with no symptom anywhere. The same three levels were hardcoded a **second** time in step 4b's
+`guest_patch` (`baseLevel` in `data_characters.c`), so the two encodings of one number could
+have drifted apart as well.
+
+`_prologue_roster_blocks` now sources levels, positions, the guard head-count and the enemy
+weapons from the chapter YAML, and `guest_patch` reads the same field the roster does. The
+rewiring was verified **byte-neutral** — same ROM sha256 as before the change — which is the
+proof that it is a plumbing fix and not a balance change. The probe is now green at **7 run, 13
+cached**: the prologue is *hosted on chapter 1*, so `ch01`, `ch01win`, `controller_turn`,
+`gameover`, `lordfloor`, `retreat` and `win` share its data and correctly move with it.
+
+Three durable rules:
+
+- **A comment claiming a value is data-driven is testimony, not proof.** This one had been
+  false for months and read as true because the literals agreed with the data.
+- **When the cache and the content disagree, the ARTIFACT arbitrates.** Two builds and a
+  byte-compare cost ten minutes, need no emulator, and cannot be argued with. Reasoning from
+  the manifest would have "confirmed" whichever answer was reached first.
+- **A red probe case is worth more than a green one, and the fix is upstream more often than
+  it looks.** The expectation was right (`win` *should* re-run on a prologue edit); what was
+  broken was the pipeline that made it true. Adjusting the expectation would have closed the
+  ticket and left the bug.
+_Decided: 2026-08-13 (Claude, #255; the probe's first genuine catch)._
+
+**WHEN a scope is hashed is the whole feature. Hashing at the end of the build undid it.**
+Sticky ownership re-hashed every inherited path in `finish()` — after all steps had run. Every
+chapter injector rewrites the same five whole-campaign tables, so by the end of the build that
+shared file holds the LAST chapter's bytes, and `finish()` charged them to ch04, ch03, ch02 and
+ch01 alike. Editing the chapter under development therefore re-ran the whole campaign's
+scenarios: the measured **18 of 20**. The path-set churn the stickiness was added to fix was
+real; hashing at the wrong moment quietly gave the win back.
+
+Each scope is now fixed to the moment its own step ended (`_claim` → `_freeze`), and the
+previous manifest is seeded in `__init__` rather than merged in `finish()`, because seeding
+after the fact is what forced the late hash. `global` is the deliberate exception — it means
+"the whole build", so its reference point is the end of it.
+
+This is the direction that matters for how the campaign is actually built: **forward**. A ch05
+edit no longer moves ch04's digest, because ch04's claim happens before ch05's step writes
+anything. The reverse (editing an early chapter) still invalidates the later ones, and that is
+correct-but-coarse — the shared table genuinely does carry ch02's bytes into ch05's copy. Fixing
+that needs sub-file attribution, and the note above still applies: do not reach for it without a
+measurement saying it pays. Editing ch02 while building ch06 is not the common case.
+
+Cost measured in the profile: `_freeze` is 0.165s of a 70s injection, and the whole scoping
+machinery 1.8s, nearly all of it the `stat` walks that were already there.
+_Decided: 2026-08-13 (Claude, #255 phase 2 follow-up)._
+
+**The playtest cache was never the biggest drag; the INJECTOR is.** Profiling
+`build_campaign.py` to settle an unrelated question showed where a build's time actually goes:
+of a 63s `make`, the ARM compile is **12s** and the Python injection is **51s**. It is paid on
+every build whether or not a playtest ever runs, and it is single-threaded. `cProfile` (70s under
+profiling overhead) puts almost all of it in two places, both of which look fixable without
+touching what the injector produces:
+
+- **`ref_to_battleframe._cell_is_empty` — ~28s, via 11 MILLION `PIL.Image.getpixel` calls.**
+  180k invocations walking cells pixel-by-pixel in Python. `getpixel` per pixel is the classic
+  PIL antipattern; a numpy view or `getbbox()` over the crop answers the same question in bulk.
+- **YAML parsing — ~22s across 534 `safe_load` calls**, of which `_load_chapter_yaml` alone is
+  9s over 62 calls, i.e. the same chapter files parsed dozens of times per build. Memoizing by
+  path+mtime and using libyaml's `CSafeLoader` are both small, local changes.
+
+Recorded here because the lesson generalises past this repo: the scenario cache was optimising
+*how many scenarios re-run*, which is the visible cost, while a fixed 51s tax sat on every build
+unmeasured. **Profile the thing everything waits on before optimising the thing that waits.**
+_Decided: 2026-08-13 (Nicolas + Claude; measured, not estimated)._
+
 **Honest ceiling of phase 1 alone, kept because it explains why phase 2 exists.** Keying on
 `rom_input_hash` means any
 `build_campaign.py` or `campaign.yaml` edit invalidates every scenario, and nearly every feature

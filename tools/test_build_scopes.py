@@ -181,6 +181,104 @@ class Reconciliation(unittest.TestCase):
         scopes.finish(touched=['data/never-existed.s'])
 
 
+class StickyOwnership(unittest.TestCase):
+    """A scope owns a file once it has written it, even on a later build that did not.
+
+    Without this the path SET churns: whether a build rewrites a given file depends on what
+    was built BEFORE it (the matrix alternates ROM configurations, and the mtime rewind
+    hands the next build a different starting point), so a scope's digest moved with no
+    content behind it -- and since every scenario depends on `global`, everything re-ran.
+    Caught by functional test, not by comparing keys.
+    """
+
+    def setUp(self):
+        self.tree = tempfile.mkdtemp()
+        os.makedirs(os.path.join(self.tree, 'data'))
+        self.addCleanup(shutil.rmtree, self.tree, True)
+        _write(os.path.join(self.tree, 'data', 'sometimes.s'), 'stable')
+
+    def build(self, rewrite, previous=None):
+        scopes = bs.BuildScopes(root=self.tree, roots=('data',), previous=previous)
+        def step():
+            if rewrite:
+                _write(os.path.join(self.tree, 'data', 'sometimes.s'), 'stable')
+        scopes.run(step, name='inject_ch05')
+        return scopes.finish()
+
+    def test_a_scope_keeps_a_file_a_later_build_did_not_rewrite(self):
+        first = self.build(rewrite=True)
+        self.assertIn('data/sometimes.s', first['chapter:ch05']['paths'])
+        second = self.build(rewrite=False, previous=first)
+        self.assertIn('data/sometimes.s', second['chapter:ch05']['paths'])
+
+    def test_the_digest_therefore_holds_still(self):
+        first = self.build(rewrite=True)
+        second = self.build(rewrite=False, previous=first)
+        self.assertEqual(first['chapter:ch05']['digest'], second['chapter:ch05']['digest'])
+
+    def test_inherited_ownership_still_tracks_CONTENT(self):
+        """Sticky paths must not mean a stale digest: the file is re-hashed as it is now."""
+        first = self.build(rewrite=True)
+        _write(os.path.join(self.tree, 'data', 'sometimes.s'), 'CHANGED')
+        second = self.build(rewrite=False, previous=first)
+        self.assertNotEqual(first['chapter:ch05']['digest'], second['chapter:ch05']['digest'])
+
+    def test_a_deleted_file_does_not_break_the_merge(self):
+        first = self.build(rewrite=True)
+        os.remove(os.path.join(self.tree, 'data', 'sometimes.s'))
+        second = self.build(rewrite=False, previous=first)
+        self.assertIn('data/sometimes.s', second['chapter:ch05']['paths'])
+
+
+class ClaimTimeIsTheStepsEnd(unittest.TestCase):
+    """An earlier chapter's digest must not carry a LATER chapter's writes.
+
+    Every chapter injector rewrites the same five whole-campaign tables, so the shared file
+    ch04 wrote is rewritten by ch05 moments later. Hashing scopes at the END of the build --
+    which is what sticky ownership used to do -- charged ch05's bytes to ch04, ch03, ch02 and
+    ch01 alike, so editing the chapter under development re-ran the whole campaign's
+    scenarios. Measured on the real build: 18 of 20 scenarios. Each scope is now fixed to
+    the moment its own step ended.
+    """
+
+    def setUp(self):
+        self.tree = tempfile.mkdtemp()
+        os.makedirs(os.path.join(self.tree, 'data'))
+        self.addCleanup(shutil.rmtree, self.tree, True)
+        self.shared = os.path.join(self.tree, 'data', 'whole_campaign.s')
+
+    def build(self, ch05_body, previous=None):
+        """Two chapter steps that both rewrite one shared table, ch04 then ch05."""
+        scopes = bs.BuildScopes(root=self.tree, roots=('data',), previous=previous)
+        scopes.run(lambda: _write(self.shared, 'ch04 rows\n'), name='inject_ch04')
+        scopes.run(lambda: _write(self.shared, 'ch04 rows\n' + ch05_body), name='inject_ch05')
+        return scopes.finish()
+
+    def test_both_chapters_still_OWN_the_shared_table(self):
+        m = self.build('ch05 rows\n')
+        self.assertIn('data/whole_campaign.s', m['chapter:ch04']['paths'])
+        self.assertIn('data/whole_campaign.s', m['chapter:ch05']['paths'])
+
+    def test_a_ch05_edit_does_not_move_ch04s_digest(self):
+        first = self.build('ch05 rows\n')
+        second = self.build('ch05 rows EDITED\n', previous=first)
+        self.assertEqual(first['chapter:ch04']['digest'], second['chapter:ch04']['digest'])
+
+    def test_a_ch05_edit_still_moves_ch05s_own_digest(self):
+        first = self.build('ch05 rows\n')
+        second = self.build('ch05 rows EDITED\n', previous=first)
+        self.assertNotEqual(first['chapter:ch05']['digest'], second['chapter:ch05']['digest'])
+
+    def test_a_ch04_edit_still_moves_ch04s_digest(self):
+        """The safety direction: an edit to the earlier chapter must not be cached away."""
+        scopes = bs.BuildScopes(root=self.tree, roots=('data',))
+        scopes.run(lambda: _write(self.shared, 'ch04 EDITED\n'), name='inject_ch04')
+        scopes.run(lambda: _write(self.shared, 'ch04 EDITED\nch05 rows\n'), name='inject_ch05')
+        edited = scopes.finish()
+        self.assertNotEqual(self.build('ch05 rows\n')['chapter:ch04']['digest'],
+                            edited['chapter:ch04']['digest'])
+
+
 class ManifestFile(unittest.TestCase):
     def setUp(self):
         self.tree = tempfile.mkdtemp()

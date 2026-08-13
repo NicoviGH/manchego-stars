@@ -749,6 +749,42 @@ def _read(path):
         return fh.read()
 
 
+# `local NAME = dofile(PLAYTEST_DIR .. "/thing.lua")` -- the only way harness.lua takes a
+# module, so the binding table is READ rather than kept.
+_DOFILE_BINDING = re.compile(
+    r'^local\s+(\w+)\s*=\s*dofile\(PLAYTEST_DIR\s*\.\.\s*"/([\w.]+)"\)', re.M)
+
+
+def driver_modules(harness_source=None):
+    """{module filename: the local it is bound to} for every module harness.lua dofiles.
+
+    A bare `dofile(...)` with no binding (the generated symbol tables) is not a module in
+    this sense -- nothing can reference it selectively, and those are excluded from the key
+    anyway.
+    """
+    harness_source = _read(HARNESS) if harness_source is None else harness_source
+    return {mod: name for name, mod in _DOFILE_BINDING.findall(harness_source)}
+
+
+def scenario_driver_modules(scenario_name, harness_source=None):
+    """The dofile'd modules this scenario can actually reach.
+
+    A module counts as reached when its binding appears in the scenario's own closure, or
+    in harness.lua's shared text. The BINDING LINES are stripped out of the shared text
+    first, and that detail is the whole feature: `local CLEARBOT = dofile(...)` is
+    top-level, so leaving it in would make every module reachable by everyone and the split
+    would do precisely nothing.
+    """
+    harness_source = _read(HARNESS) if harness_source is None else harness_source
+    modules = driver_modules(harness_source)
+    funcs = harness_functions(harness_source)
+    text = _DOFILE_BINDING.sub('', harness_shared(harness_source))
+    for name in reaches(scenario_name, funcs):
+        text += '\n' + funcs[name][0]
+    return {mod for mod, binding in modules.items()
+            if re.search(r'\b%s\b' % re.escape(binding), text)}
+
+
 def driver_source(here=None):
     """Everything OUTSIDE harness.lua that decides what a scenario does.
 
@@ -776,10 +812,28 @@ def driver_source(here=None):
              and os.path.basename(p) != 'harness.lua']
     files.append(os.path.join(here, 'run.sh'))
     files.append(os.path.join(here, 'gen_symbols.py'))
-    parts = []
+    out = {}
     for path in sorted(files):
         if os.path.isfile(path):
-            parts.append('%s\n%s' % (os.path.basename(path), _read(path)))
+            out[os.path.basename(path)] = _read(path)
+    return out
+
+
+# Driver files that are not dofile'd modules, so nothing can reach them selectively:
+# `run.sh` is the launcher (it chooses the fps, the deadline and the wrapper for every
+# run), and `gen_symbols.py` emits the tables every scenario reads.
+GLOBAL_DRIVER_FILES = ('run.sh', 'gen_symbols.py')
+
+
+def scenario_driver_text(scenario_name, files=None, harness_source=None):
+    """The driver text whose contents can change THIS scenario's verdict."""
+    files = driver_source() if files is None else files
+    reached = scenario_driver_modules(scenario_name, harness_source)
+    parts = []
+    for name in sorted(files):
+        if not (name in GLOBAL_DRIVER_FILES or name in reached):
+            continue
+        parts.append('%s\n%s' % (name, files[name]))
     return '\n'.join(parts)
 
 
@@ -905,7 +959,7 @@ def engine_input_hash():
 
 
 def scenario_fingerprint(scenario, rom_digest, harness_source=None, driver=None, env=None,
-                         scopes=None, engine=None, observed=None):
+                         scopes=None, engine=None, observed=None, driver_files=None):
     """The cache key, or None when this run may not be cached at all.
 
     None means "refuse to cache" and is returned whenever an input cannot be pinned: no ROM
@@ -921,7 +975,11 @@ def scenario_fingerprint(scenario, rom_digest, harness_source=None, driver=None,
     if rom_digest is None:
         return None
     harness_source = _read(HARNESS) if harness_source is None else harness_source
-    driver = driver_source() if driver is None else driver
+    if driver is None:
+        files = dict(driver_source())
+        # Tests (and only tests) hand in overrides for individual driver files.
+        files.update(driver_files or {})
+        driver = scenario_driver_text(scenario.name, files, harness_source)
     env = os.environ if env is None else env
     funcs = harness_functions(harness_source)
     if scenario.name not in funcs:
@@ -967,25 +1025,33 @@ def _observed_path(scenario, cache_dir=None):
     return os.path.join(cache_dir or VERDICT_CACHE_DIR, '%s.chapters.json' % scenario)
 
 
-def load_observed_chapters(scenario, cache_dir=None):
+def load_observed(scenario, cache_dir=None):
+    """{'chapters': [...], 'rules': [...]} from this scenario's last run, or {}."""
     try:
         with open(_observed_path(scenario, cache_dir)) as fh:
-            slots = json.load(fh)
+            seen = json.load(fh)
     except (OSError, ValueError):
-        return None
-    return slots if isinstance(slots, list) and slots else None
+        return {}
+    if isinstance(seen, list):            # pre-2.5 file: chapters only
+        return {'chapters': seen or None}
+    return seen if isinstance(seen, dict) else {}
 
 
-def store_observed_chapters(scenario, log_text, cache_dir=None):
-    """Record where this run went, whatever its verdict -- a FAIL's traversal is just as
-    true as a PASS's, and refusing to learn from it would keep the next key coarse."""
-    slots = observed_chapters(log_text)
-    if not slots:
+def load_observed_chapters(scenario, cache_dir=None):
+    return load_observed(scenario, cache_dir).get('chapters') or None
+
+
+def store_observed(scenario, log_text, cache_dir=None):
+    """Record where this run went and which rules decided it, whatever its verdict -- a
+    FAIL's traversal is just as true as a PASS's, and refusing to learn from it would keep
+    the next key coarse."""
+    seen = {'chapters': observed_chapters(log_text)}
+    if not any(seen.values()):
         return
     cache_dir = cache_dir or VERDICT_CACHE_DIR
     os.makedirs(cache_dir, exist_ok=True)
     with open(_observed_path(scenario, cache_dir), 'w') as fh:
-        json.dump(slots, fh)
+        json.dump(seen, fh)
 
 
 def _verdict_slot(scenario, fingerprint, cache_dir=None):
@@ -1124,7 +1190,7 @@ class VerdictCache(object):
         log = os.path.join(outcome.artifacts or '', 'playtest.log')
         if os.path.isfile(log):
             with open(log, errors='replace') as fh:
-                store_observed_chapters(scenario.name, fh.read())
+                store_observed(scenario.name, fh.read())
         fingerprint = self.fingerprints.get(scenario.name) if self.enabled else None
         if fingerprint or outcome.verdict != 'PASS':
             store_cached_verdict(scenario.name, fingerprint, outcome)
