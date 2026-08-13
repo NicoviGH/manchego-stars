@@ -100,8 +100,17 @@ bubble has nothing to anchor to — scene 6 needs a backdrop (dark/interior), no
   boot; a new one that pokes it after will burn over half the `record*` 300s budget on a scene it
   never films.
 - **Ravisin's battle taunt is wired NOWHERE**, and neither is any no-Lupin arm. Both are rows in
-  #25's scene table now. The chapter's ENDING is additionally blocked behind ch06 hosting — ch05's
-  win still lands on the dev placeholder.
+  #25's scene table now.
+- **The ENDING SCENES ARE NOT BLOCKED by ch06 hosting** (corrected 2026-08-13, Nicolas) — this
+  file and #25 both claimed they were, and both were wrong. `dev_placeholder_scene()` is the
+  LANDING, standing in for the `MNC2(next)` of an unhosted next chapter; it says nothing about
+  whether an ending CUTSCENE can play before it. **ch04 already ships the pattern**, written while
+  ch05 was unhosted: `MUSC(SONG_VICTORY)` → `FADI` → BACG scene → `branch_on_flag` over its two
+  variants → `FADI` → `dev_placeholder_scene()`. `ch05_ending_script` is that shape with the scene
+  missing (`MUSC` → save-all payout → `FADI` → placeholder), and scenes 16/17 slot in where ch04's
+  do. Hosting ch06 later only swaps the final landing. What the endings DO depend on is the
+  `CHECK_ALIVE` branch, because they are a 2x2 — Basil alive/dead × Lupin present/absent, ids
+  `0x9C9`/`0x9CA` and `0x9CB`/`0x9CC` — which is another reason to build that mechanism at scene 4.
 - **ch05's village-raid RACE is wired and proven in-engine (#254).** A reliquary can be lost
   (raider AI → the tile flips to ruins, no gift, its event id never sets) and saving all four
   pays out vanilla's Guiding Ring at the ending.
