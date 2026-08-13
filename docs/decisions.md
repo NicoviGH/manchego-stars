@@ -4148,6 +4148,34 @@ Run it against `0x974` first — a method that calls Lupin's shipped slot "used"
 `verify_text` baselines under us and break the id-claiming discipline `HOSTED_CHAPTER_MESSAGE_IDS`
 depends on. The TODO's premise was wrong; what was missing was the audit, not the automation.
 
+### ch05's remaining dialogue has exactly as many ids as it has scenes (2026-08-13, #25)
+
+The placeholder pattern above has a bill, and it comes due at the message-id budget. Counted while
+moving the Basil→Sahnar Talk off vanilla's `0x9CC` and into ch05's own block:
+
+ch05 hosts on slot 6, so its block is vanilla **Ch6's** `0x9E4`–`0x9F5` — 18 ids, and dead by the
+`USE` criterion (nothing outside `ch6-eventscript.h` reaches any of them, and `inject_ch05` rewrites
+that file wholesale). Seven are now spent: the eruption warning, Ravisin's death quote, the two
+arena tutorial boxes, the two goal strings, and the Talk. **Eleven are left, and eleven scenes are
+owed** — the opening's seven (`9BB` `9BC` `9BD` `9BE` `9C2` `9C3` `9C4`), both endings, Basil's
+chapter-specific death quote, and Ravisin's battle taunt (which is *not* wired: `gBattleTalkList`
+carries a ch01 entry for Izobai and nothing for Ravisin). That is zero slack.
+
+**And the five `no_lupin_fallback:` branches need ids on top of that, more than one apiece.** ch04
+branches by writing two whole messages (`CH04_ENDING_MSG` / `CH04_ENDING_NO_LUPIN_MSG`), which is
+cheap when the branch *is* the scene. ch05's fallbacks are one-box substitutions inside longer
+scenes, so branching one costs a prefix id, an id per arm, and a suffix id — four where one
+sufficed. Budget the opening's scene→id mapping **before** writing it, not scene by scene.
+
+**The escape route is the reliquary precedent, and it is a hypothesis to test rather than a plan to
+trust.** `0x9C9`–`0x9CC` (vanilla Ch5's two endings, its coda, and its Talk) are referenced only by
+`ch5-eventscript.h`, which `inject_ch04` rewrites — the same shape that made `0x9CD`–`0x9D0` safe
+for the reliquary lines. That is four more ids if it holds. `0x9C6`/`0x9C7`/`0x9C8` are **not** in
+that class and should not be lumped in with them: they are live rows in `data_battlequotes.c` keyed
+to `CHAPTER_L_5`, which is ch04's host slot. They are dead only because ch04 fields neither Natasha
+nor Saar — an argument about our roster, not about our wiring, and the one to check hardest if it
+is ever needed.
+
 ### An FEditor `L` is an authoring bracket, not an instruction (2026-08-08, #25)
 
 Sahnar's Specter is the first vendored anim using FEditor's loop syntax — a bare `L` (`LOOPSTART {`)

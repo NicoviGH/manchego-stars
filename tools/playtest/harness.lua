@@ -6433,6 +6433,10 @@ end
 -- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh ch05recruit (needs a CH05BOOT=1 ROM).
 scenarios.ch05recruit = function()
     local BASIL, SAHNAR = 0x13, 0x16        -- CHARACTER_ARTUR / CHARACTER_MARISA
+    -- A-presses our locked 0x9E8 recruit renders to: sixteen authored boxes, five of which
+    -- wrap past two lines at the map bubble's 29 and so take a second page. Scenario-local
+    -- rather than a TUNE entry -- it is this scene's shape, not a harness timing knob.
+    local RECRUIT_BOXES = 21
     local function blueBasil() return findUnit(SYM.gUnitArrayBlue, 20, BASIL) end
     local function redSahnar() return findUnit(SYM.gUnitArrayRed, 24, SAHNAR) end
     local function blueSahnar() return findUnit(SYM.gUnitArrayBlue, 20, SAHNAR) end
@@ -6523,12 +6527,12 @@ scenarios.ch05recruit = function()
         return result("FAIL", "Basil's live command menu did not expose Talk -- the CHAR entry "
             .. "does not name her as Sahnar's recruiter")
     end
-    -- The budget must clear the WHOLE scene. This shows VANILLA's 0x9CC until the dialogue pass
-    -- writes ours, and vanilla's is 32 boxes at ~200 frames each -- while the CUSA is the last
-    -- thing MS_Ch05SahnarTalk does, after TEXTEND. The first cut of this loop capped at 3600 and
-    -- expired 18 boxes in, then reported "the CUSA did not fire" about a script that had simply
-    -- not reached it yet. A LOOP CAP MUST NEVER BE WHAT DECIDES FAILURE (decisions.md): hence a
-    -- budget with real headroom AND, below, two distinguishable verdicts.
+    -- The budget must clear the WHOLE scene. It now shows OUR locked recruit (0x9E8, sixteen
+    -- authored boxes that wrap to 21 A-presses) rather than vanilla's 32-box 0x9CC -- while the
+    -- CUSA is the last thing MS_Ch05SahnarTalk does, after TEXTEND. The first cut of this loop
+    -- capped at 3600 and expired 18 boxes in, then reported "the CUSA did not fire" about a
+    -- script that had simply not reached it yet. A LOOP CAP MUST NEVER BE WHAT DECIDES FAILURE
+    -- (decisions.md): hence a budget with real headroom AND, below, two distinguishable verdicts.
     local BUDGET, boxes = 20000, 0
     for _ = 1, BUDGET do
         if blueSahnar() then break end
@@ -6553,10 +6557,25 @@ scenarios.ch05recruit = function()
             or string.format("the scene finished (%d boxes) and Sahnar is still RED -- "
                 .. "MS_Ch05SahnarTalk's CUSA did not fire", boxes))
     end
+    -- 4. WHOSE scene played. The flip above proves the wiring and says nothing about the prose:
+    --    a Talk pointed at vanilla's 0x9CC recruits Sahnar just as well, and that is exactly the
+    --    bug this chapter shipped with for months -- Hlin Trollbane's bust talking to vanilla
+    --    Joshua, with every text decoder green. Box COUNT is the cheapest in-engine witness to
+    --    which message id the script actually showed: ours is 21 A-presses, vanilla's is 32.
+    log(string.format("ch05recruit: the recruit scene ran %d boxes", boxes))
+    if boxes ~= RECRUIT_BOXES then
+        shot("ch05recruit")
+        return result("FAIL", string.format(
+            "the recruit scene ran %d boxes, expected %d -- %s", boxes, RECRUIT_BOXES,
+            boxes >= 30 and "that is vanilla's 0x9CC, so the Talk is pointed at the twin's "
+                .. "scene again and plays it in Natasha's and Joshua's faces"
+                or "the locked 0x9E8 scene changed underneath this gate"))
+    end
     runEnemyPhase()      -- the sprite only repaints to the party palette on a phase transition
     shot("ch05recruit")
-    return result("PASS", "Basil joined blue in the opening, Sahnar rose red on turn 2, and "
-        .. "Basil's Talk brought her over -- the whole ch05 recruit chain")
+    return result("PASS", string.format(
+        "Basil joined blue in the opening, Sahnar rose red on turn 2, and Basil's Talk brought "
+        .. "her over in %d boxes of our own locked prose -- the whole ch05 recruit chain", boxes))
 end
 
 -- recordch05eruption: the smallest visual proof for #260. Boot the real ch05 map, idle turn 1,
@@ -7387,6 +7406,94 @@ scenarios.recordch05ravisindeath = function()
         until_ = function()
             if controllerState() == "dialogue_wait" then boxes = boxes + 1 end
             return boxes == 1 and eventFlag(2) and controllerState() ~= "dialogue_wait"
+        end,
+    })
+end
+
+-- recordch05recruit (#25): the MOTION proof for the locked Basil->Sahnar Talk at 0x9E8 -- the
+-- chapter's payoff scene, and the review artifact for it. Stills mislead on dialogue (they catch
+-- the typewriter mid-stroke), so what gets reviewed is the film.
+-- Setup is unfilmed and is ch05recruit's own chain with the assertions stripped: boot ch05, idle
+-- turn 1, end it, let the eruption speak until Sahnar rises RED, then park Basil orthogonally
+-- adjacent and take Talk. The camera starts on Sahnar's "Far enough. The tomb is--" and runs to
+-- the CUSA, so the film covers the recognition, both proofs, the turn, and Basil's unanswered
+-- berry question. The chain is repeated rather than shared because harness.lua has two top-level
+-- local slots left under Lua's 200-local ceiling (tools/check.py measures it) and a shared driver
+-- would need one; ch05recruit remains the ASSERTING gate, this one only has to film.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05recruit (needs a CH05BOOT=1 ROM).
+scenarios.recordch05recruit = function()
+    local BASIL, SAHNAR, boxes = 0x13, 0x16, 0   -- CHARACTER_ARTUR / CHARACTER_MARISA
+    return recordCutscene({
+        -- shotEvery 4, not the 1 a one-box quote can afford: this is a 21-A-press scene, and at
+        -- every frame it captures ~2900 shots that make a four-minute GIF of a one-minute scene.
+        tag = "ch05recruit", speed = "normal", maxFrames = 9000, shotEvery = 4,
+        pressEvery = 90,
+        pre = function()
+            pokeFastConfig()
+            if not bootToMap() then return false, "never reached the ch05 map" end
+            if not waitFor(function()
+                return faction() == 0 and not menuOpen()
+                    and not procActive(SYM.ProcScr_StdEventEngine)
+            end, 6000, true) then
+                return false, "ch05 map never became idle"
+            end
+            if not findUnit(SYM.gUnitArrayBlue, 20, BASIL) then
+                return false, "Basil is not BLUE at turn 1 -- the opening join CUSA never fired"
+            end
+            if not endTurn() then return false, "could not end turn 1" end
+            -- Wait for the UNIT, not the turn counter (ch04packmath's lesson), advancing the
+            -- eruption warning's own boxes on the way -- they are Ravisin's, not this film's.
+            for _ = 1, 7200 do
+                if turn() >= 2 and findUnit(SYM.gUnitArrayRed, 24, SAHNAR) then break end
+                if controllerState() == "dialogue_wait" then
+                    if not guardedInput("advance_dialogue", "A", "eruption dialogue wait clears",
+                        function(after) return controllerState(after) ~= "dialogue_wait" end,
+                        120) then
+                        return false, "eruption dialogue input did not advance"
+                    end
+                else
+                    yield()
+                end
+            end
+            local sah = findUnit(SYM.gUnitArrayRed, 24, SAHNAR)
+            if not sah then return false, "Sahnar never rose RED on turn 2" end
+            if not waitFor(function()
+                return faction() == 0 and not menuOpen()
+                    and not procActive(SYM.ProcScr_StdEventEngine)
+            end, 3600, true) then
+                return false, "the map never settled after the eruption"
+            end
+            -- setMapUnit keeps the tile->unit grid in sync, so adjacency reads with no phase
+            -- cycle: the point of this film is the scene, not a 5-MOV healer's walk.
+            local basil = findUnit(SYM.gUnitArrayBlue, 20, BASIL)
+            if not basil then return false, "Basil left the blue array before the Talk" end
+            local grid, parked = mapUnitAt(basil.x, basil.y), false
+            for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+                local tx, ty = sah.x + d[1], sah.y + d[2]
+                if tx >= 0 and ty >= 0 and mapUnitAt(tx, ty) == 0 then
+                    setMapUnit(basil.x, basil.y, 0)
+                    emu:write8(basil.addr + 0x10, tx); emu:write8(basil.addr + 0x11, ty)
+                    setMapUnit(tx, ty, grid)
+                    parked = true
+                    break
+                end
+            end
+            if not parked then return false, "no free tile adjacent to Sahnar to park Basil" end
+            basil = findUnit(SYM.gUnitArrayBlue, 20, BASIL)
+            if not basil or not moveUnit(basil.x, basil.y, basil.x, basil.y) then
+                return false, "no live command menu for Basil"
+            end
+            if not chooseTalk() then
+                return false, "Basil's command menu did not expose Talk"
+            end
+            return true
+        end,
+        afterPre = pokeNormalConfig,
+        -- Stop on the CUSA, not on a box count: the flip is what ENDS the scene, and a count
+        -- here would make the camera the thing that decides when the payoff is over.
+        until_ = function()
+            if controllerState() == "dialogue_wait" then boxes = boxes + 1 end
+            return findUnit(SYM.gUnitArrayBlue, 20, SAHNAR) ~= nil
         end,
     })
 end

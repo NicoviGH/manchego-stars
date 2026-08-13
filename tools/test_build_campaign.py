@@ -1993,6 +1993,81 @@ class Ch05RavisinDeathQuote(unittest.TestCase):
         self.assertNotIn('.msg     = 0,', quote)
 
 
+class Ch05SahnarTalkRecruit(unittest.TestCase):
+    """The chapter's payoff: Basil chaperoned across turns the risen Sahnar (#25).
+
+    This scene shipped WIRED and UNWRITTEN for months, pointed at vanilla 0x9CC -- the
+    Natasha->Joshua recruit ours is the twin of. On paper that is the legitimate placeholder
+    pattern; on screen it was a bug, because our speakers wear the Artur and Marisa slots
+    while 0x9CC loads Natasha's and Joshua's. What the player saw was Hlin Trollbane's bust
+    (dressed onto the Natasha slot) talking to vanilla Joshua. So the face assertions below
+    are the regression, not decoration: a decoder is green either way.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+
+    def _event(self):
+        return next(e for e in self._chap()['events'] if e['trigger'] == 'sahnar_talk')
+
+    def test_talk_moved_off_vanillas_id_into_ch05s_real_host_block(self):
+        self.assertNotEqual(0x9CC, bc.CH05_SAHNAR_TALK_MSG,
+                            'the Talk still reads vanilla Ch5 prose in vanilla Ch5 faces')
+        self.assertEqual(0x9E8, bc.CH05_SAHNAR_TALK_MSG)
+        self.assertTrue(0x9E4 <= bc.CH05_SAHNAR_TALK_MSG <= 0x9F3)
+        self.assertIn(bc.CH05_SAHNAR_TALK_MSG, bc.HOSTED_CHAPTER_MESSAGE_IDS['ch05'])
+        self.assertEqual('ch05', bc.assert_message_ids_unique()[bc.CH05_SAHNAR_TALK_MSG])
+
+    def test_the_yaml_slot_label_stays_an_anatomy_citation(self):
+        """`vanilla 0x9CC` names the scene we MINE. It is not a destination -- and leaving the
+        label alone while moving the id is the whole point of the two being different fields."""
+        self.assertEqual('vanilla 0x9CC', self._event()['slot'])
+
+    def test_locked_sixteen_boxes_emit_our_two_faces_and_never_vanillas(self):
+        event = self._event()
+        self.assertEqual(16, len(event['script']))
+        self.assertEqual({'sahnar', 'basil'}, {next(iter(box)) for box in event['script']})
+
+        body = bc.ch05_sahnar_talk_message(self._chap())
+        self.assertIn('[LoadFace][FID_Artur]', body)     # Basil
+        self.assertIn('[LoadFace][FID_Marisa]', body)    # Sahnar
+        self.assertNotIn('[FID_Natasha]', body)          # the bug: Hlin's dressed slot
+        self.assertNotIn('[FID_Joshua]', body)           # the bug: vanilla's recruit
+        # Prose flowed free of every text code: the authored sentences straddle both the
+        # [LF] line break and the [A] page break, so asserting on either shape asserts on the
+        # wrap rather than on the words.
+        prose = ' '.join(re.sub(r'\[[^\]]*\]', ' ', body).split())
+        self.assertIn('...Basil?', prose)                # the recognition IS the word
+        self.assertIn('Only my true enemy has been revealed', prose)
+        self.assertIn('Can I give you a berry now?', prose)    # last box, deliberately unanswered
+
+    def test_the_two_shot_stages_recruiter_left_and_the_turned_unit_right(self):
+        """ch04's parley idiom: the recruiter holds the party's side, the unit being turned
+        holds the other, so neither podium swaps faces mid-scene."""
+        body = bc.ch05_sahnar_talk_message(self._chap())
+        self.assertIn('[OpenMidLeft][LoadFace][FID_Artur]', body)
+        self.assertIn('[OpenMidRight][LoadFace][FID_Marisa]', body)
+        self.assertNotIn('[ClearFace]', body)
+
+    def test_every_box_fits_the_map_talk_bubble(self):
+        """The Talk rides TEXTSHOW -> PutTalkBubble, whose right-side branch computes
+        x = 29 - width with no clamp: a line over 29 runs off the tilemap (the ch03 crier bug)."""
+        body = bc.ch05_sahnar_talk_message(self._chap())
+        for line in body.split('\n'):
+            printable = re.sub(r'\[[^\]]*\]', '', line)
+            self.assertLessEqual(len(printable), 29, 'bubble overflow: %r' % line)
+
+    def test_talk_script_shows_the_moved_id_then_flips_sahnar_blue(self):
+        _chars, script = bc.talk_recruit_wiring(
+            ['CHARACTER_ARTUR'], 'CHARACTER_MARISA', bc.CH05_SAHNAR_TALK_FLAG,
+            bc.CH05_SAHNAR_TALK_SCRIPT, bc.CH05_SAHNAR_TALK_MSG)
+        self.assertIn('TEXTSHOW(0x%X)' % bc.CH05_SAHNAR_TALK_MSG, script)
+        self.assertNotIn('TEXTSHOW(0x9CC)', script)
+        self.assertLess(script.index('TEXTSHOW(0x%X)' % bc.CH05_SAHNAR_TALK_MSG),
+                        script.index('CUSA(CHARACTER_MARISA)'))
+
+
 class Ch05ArenaTutorial(unittest.TestCase):
     """The Elven Tomb inherits vanilla Ch5's arena lesson on a live tile trigger (#264).
 
