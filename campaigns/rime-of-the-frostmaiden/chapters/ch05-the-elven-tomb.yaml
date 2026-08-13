@@ -583,11 +583,15 @@ events:
       Ravisin is damned entirely in REPORTED SPEECH ("she said it would still run") and never
       diagnosed by Sahnar — Basil's doubt stays her own. Sahnar knows only what Basil tells her;
       she has no other window on the world. LOCKED 2026-07-23 (dialogue-pass, co-written with
-      Nicolas). 16 boxes; the closing aside is hand-matched to Joshua's 3-box / 5-line cadence.
+      Nicolas). 19 boxes (Basil 12 / Sahnar 7 — the "16" here was wrong, and so is #25's scene
+      table); the closing aside is hand-matched to Joshua's 3-box / 5-line cadence.
     script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
       # (The tomb's eastern berm, before the party arrives. A frost-furred sarcophagus half-sunk
       #  in snow. A goodberry shrub hurries up on root-feet — she walks; she is not potted.)
-      - basil: "Sahnar! Sahnar, the moose came back, the white one, it came back tonight--"
+      # "tonight" CUT 2026-08-13 (Nicolas), when the scene got its backdrop: BG_MS_ELVEN_TOMB is
+      # a Winter DAY rip, and this was the only line that hard-asserted the hour. The doubling
+      # ("came back ... came back") is Basil tumbling, not a leftover -- basil.md: she spills.
+      - basil: "Sahnar! Sahnar, the moose came back, the white one, it came back--"
       - basil: "--and it's hurt. There are arrows in it. Three of them, in the shoulder. I counted."
       # (Sahnar's voice comes from inside the stone.)
       - sahnar: "....Basil."
