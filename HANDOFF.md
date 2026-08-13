@@ -11,17 +11,24 @@ either.** The generated decomp tree is intentionally dirty as recorded below.
 
 ## In flight
 
-**Nothing.** `main` is at #275 (the fast injector), CI green.
+**PR #276** — ch05's Basil→Sahnar Talk recruit, moved off vanilla `0x9CC` to host-owned `0x9E8`
+and playing its own locked sixteen boxes. `make test`, `make`, `verify_text` (0 runaway),
+`check.py` and `matrix ch05recruit + recordch05recruit` all green locally; GIF in
+`docs/demo/ch05-sahnar-recruit.gif`. Awaiting Nicolas's look + CI.
 
 ## Next task
 
-**Back to ch05 content.** The build friction that was blocking it is gone: `make` is **21s
-warm** (was 64.5s) after #274 took `build_campaign.py` from 50s to 18s, byte-identical. Both
-#255 and #274 are closed; resist reopening them.
+**ch05's OPENING cutscene** — the last big unwired scene block, and the one thing between the
+chapter and a playable end-to-end slice. Seven locked scenes (`9BB` `9BC` `9BD` `9BE` `9C2`
+`9C3` `9C4`), all co-written and locked in PR #196; this is wiring, not writing.
 
-The most visible ch05 gap is the one under "Current state" below: **its opening and recruit
-still play VANILLA prose**, so the player watches Hlin Trollbane's bust talk to vanilla Joshua.
-That is a content job (`dialogue-pass`), not an engine one.
+**Settle the whole scene→id mapping before writing any of it.** The block has exactly as many
+ids left as there are scenes owed, and the no-Lupin branches need more on top — the arithmetic,
+the escape route and why it is only a hypothesis are in `docs/decisions.md` → "ch05's remaining
+dialogue has exactly as many ids as it has scenes". Two things that pass may surprise you: a
+`vanilla 0xNNN` label in the YAML is an anatomy citation and never a destination, and each
+scene's CHANNEL (on-map bubble at 29 vs `Text_BG` at ~42) is a real choice the wiring has to
+make — the pre-map scenes have no units staged to hang a bubble on.
 
 ## Current state
 
@@ -48,9 +55,12 @@ That is a content job (`dialogue-pass`), not an engine one.
   milliseconds instead of a build plus an emulator run. `--index-map` / `--isolate` answer "which
   index owns this, and does anything else share it?" It knows `arena_battle` and `arena_front`;
   adding an asset is a few lines. Use it before any recolour (ch07's Bremen backdrop, title screen).
-- **ch05's opening and recruit still play VANILLA prose.** In-game this looks like a bug and is
-  not one: `0x9CC` runs vanilla's Joshua/Natasha scene, and because Hlin Trollbane's bust is
-  dressed onto the Natasha slot the player watches *Hlin* talk to *vanilla Joshua*.
+- **ch05's opening plays NO dialogue at all** — not vanilla prose, silence. `CH05_BEGINNING_SCRIPT`
+  is ours already (LOMA → the line LOAD1s → `CALL` prep → the join CUSA) and simply has no
+  `TEXTSHOW` in it. The RECRUIT was the one playing vanilla prose, and #276 fixed it. Both halves
+  used to be described here as one thing; they were never the same problem.
+- **Ravisin's battle taunt is wired NOWHERE.** Locked in the YAML, but `gBattleTalkList` carries
+  only ch01's Izobai. Found while counting ids for #276; it is on #25's checklist now.
 - **ch05's village-raid RACE is wired and proven in-engine (#254).** A reliquary can be lost
   (raider AI → the tile flips to ruins, no gift, its event id never sets) and saving all four
   pays out vanilla's Guiding Ring at the ending.
