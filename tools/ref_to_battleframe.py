@@ -12,6 +12,7 @@ This module is built bottom-up, TDD'd in test_ref_to_battleframe.py (in `make te
 """
 import struct
 
+import numpy as np
 from PIL import Image
 
 TILE = 8  # GBA OBJ tiles are 8x8
@@ -445,13 +446,21 @@ def build_battle_anim(abbr, frame_imgs, palette, center_px=None, motion="ranged"
             "motion_s": emit_motion_s(abbr, frames, motion, cadence)}
 
 
-def _cell_is_empty(im, ox, oy):
-    """True if the 8x8 cell at (ox, oy) is fully transparent."""
-    for y in range(oy, oy + TILE):
-        for x in range(ox, ox + TILE):
-            if im.getpixel((x, y))[3] != 0:
-                return False
-    return True
+def _empty_cell_grid(im):
+    """Which 8x8 cells of `im` (RGBA) are fully transparent, as a [row][col] bool array.
+
+    Answered for the whole image in one pass instead of per pixel. The per-pixel form of this
+    was the single most expensive thing the injector did -- 11M PIL.getpixel calls, ~28s of a
+    51s injection -- because getpixel re-enters the pixel-access machinery on every read. The
+    alpha band reshapes into (rows, TILE, cols, TILE), so "does this cell hold any opaque
+    pixel" is one vectorized any() over the tile axes.
+    """
+    alpha = np.asarray(im.getchannel("A"))
+    rows, cols = alpha.shape[0] // TILE, alpha.shape[1] // TILE
+    if (rows * TILE, cols * TILE) != alpha.shape:
+        raise ValueError("tile_sprite needs a tile-aligned sprite; got %dx%d, which is not a "
+                         "whole number of %dx%d cells" % (im.width, im.height, TILE, TILE))
+    return ~alpha.reshape(rows, TILE, cols, TILE).any(axis=(1, 3))
 
 
 def tile_sprite(im):
@@ -462,19 +471,19 @@ def tile_sprite(im):
     offset of its cell in `im`. Fully-transparent cells carry no hardware sprite and are
     skipped (no tile, no OAM entry) -- that's what keeps a sparse sprite cheap.
     """
-    w, h = im.size
     tiles, oam = [], []
     index = {}  # tile bytes -> sheet index, so identical cells share one tile
-    for oy in range(0, h, TILE):
-        for ox in range(0, w, TILE):
-            if _cell_is_empty(im, ox, oy):
-                continue
-            cell = im.crop((ox, oy, ox + TILE, oy + TILE))
-            key = cell.tobytes()
-            idx = index.get(key)
-            if idx is None:
-                idx = len(tiles)
-                index[key] = idx
-                tiles.append(cell)
-            oam.append({"tile": idx, "dx": ox, "dy": oy})
+    empty = _empty_cell_grid(im)
+    # nonzero() walks row-major, so cells are still visited (and tiles still emitted) in
+    # exactly the order the per-cell scan used to visit them.
+    for row, col in zip(*(~empty).nonzero()):
+        oy, ox = int(row) * TILE, int(col) * TILE
+        cell = im.crop((ox, oy, ox + TILE, oy + TILE))
+        key = cell.tobytes()
+        idx = index.get(key)
+        if idx is None:
+            idx = len(tiles)
+            index[key] = idx
+            tiles.append(cell)
+        oam.append({"tile": idx, "dx": ox, "dy": oy})
     return tiles, oam

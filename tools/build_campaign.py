@@ -24,6 +24,7 @@ Milestones B+ (characters, chapter, dialogue codegen) hang off the same CLI.
 
 import argparse
 import collections
+import copy
 import glob
 import hashlib
 import json
@@ -52,6 +53,17 @@ from inject.decomp import (  # noqa: E402  shared decomp paths + patch primitive
     BATTLEQUOTES_C, BMUNIT_C, LORDSEL_FLAG_BASE,
     WEAPON_ITEM_ENUM, fe_item_enum)  # shared weapon<->ITEM map (used by inject_prologue)
 from inject import engine_hooks  # noqa: E402  campaign-agnostic engine C-source hooks
+
+# PyYAML's pure-Python scanner walks a document one character at a time through a chain of
+# Python calls, which made YAML parsing ~22s of a 51s injection (6M reader.forward calls) for
+# a few hundred KB of campaign data. libyaml's C scanner produces the identical documents an
+# order of magnitude faster; fall back to the Python one where libyaml is not built in.
+_YAML_LOADER = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)
+
+
+def _yaml_load(stream):
+    """yaml.safe_load, through libyaml's C scanner when it is available."""
+    return yaml.load(stream, Loader=_YAML_LOADER)
 # The host-slot registry. Stdlib-only and OWNED there so tools/check.py can lint it in the
 # CI job that has no Pillow; re-exported here so the constants read the same at every call
 # site below (#241).
@@ -971,7 +983,7 @@ def load_unit(campaign, unit_id):
         path = os.path.join(base, sub, unit_id + '.yaml')
         if os.path.isfile(path):
             with open(path, encoding='utf-8') as f:
-                return yaml.safe_load(f)
+                return _yaml_load(f)
     sys.exit('ERROR: no YAML for unit %r under %s/{pcs,npcs}' % (unit_id, base))
 
 
@@ -1354,7 +1366,7 @@ def inject_item_icons(campaign, verbose=True):
     every copy shows the new art (cf. inject_item_names for the name)."""
     cfg = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
     with open(cfg, encoding='utf-8') as f:
-        icons = (yaml.safe_load(f) or {}).get('item_icons') or {}
+        icons = (_yaml_load(f) or {}).get('item_icons') or {}
     if not icons:
         if verbose:
             print('  (no item_icons declared)')
@@ -1511,7 +1523,7 @@ def arena_presentation_config(campaign):
     campaign_dir = os.path.join(REPO, 'campaigns', campaign)
     campaign_path = os.path.join(campaign_dir, 'campaign.yaml')
     with open(campaign_path, encoding='utf-8') as f:
-        root = yaml.safe_load(f) or {}
+        root = _yaml_load(f) or {}
     campaign_cfg = root.get('arena_presentation') or {}
     if not isinstance(campaign_cfg, dict):
         sys.exit('ERROR: %s: arena_presentation must be a mapping' % campaign_path)
@@ -1521,7 +1533,7 @@ def arena_presentation_config(campaign):
     chapter_dir = os.path.join(campaign_dir, 'chapters')
     for chapter_path in sorted(glob.glob(os.path.join(chapter_dir, 'ch*.yaml'))):
         with open(chapter_path, encoding='utf-8') as f:
-            chapter = yaml.safe_load(f) or {}
+            chapter = _yaml_load(f) or {}
         section = chapter.get('arena_presentation') or {}
         if not section:
             continue
@@ -1674,7 +1686,7 @@ def _pal2_icon_ids(campaign):
     """The iconIds (gItemData.iconId) of the campaign's item_icon_pal2.icons, sorted."""
     cfg = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
     with open(cfg, encoding='utf-8') as f:
-        pal2 = (yaml.safe_load(f) or {}).get('item_icon_pal2') or {}
+        pal2 = (_yaml_load(f) or {}).get('item_icon_pal2') or {}
     return sorted(item_icon_id(e) for e in (pal2.get('icons') or []))
 
 
@@ -1697,7 +1709,7 @@ def inject_item_icon_pal2(campaign, verbose=True):
     """
     cfg = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
     with open(cfg, encoding='utf-8') as f:
-        pal2 = (yaml.safe_load(f) or {}).get('item_icon_pal2') or {}
+        pal2 = (_yaml_load(f) or {}).get('item_icon_pal2') or {}
     if not pal2:
         if verbose:
             print('  (no item_icon_pal2 declared)')
@@ -1721,7 +1733,7 @@ def inject_item_names(campaign, verbose=True):
     documentation only -- the engine can't differ them)."""
     cfg = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
     with open(cfg, encoding='utf-8') as f:
-        renames = (yaml.safe_load(f) or {}).get('item_names') or {}
+        renames = (_yaml_load(f) or {}).get('item_names') or {}
     if not renames:
         if verbose:
             print('  (no item_names declared)')
@@ -2434,7 +2446,7 @@ def inject_world_tour(campaign, verbose=True):
     montage_yaml = os.path.join(REPO, 'campaigns', campaign, 'events',
                                 'opening-montage.yaml')
     with open(montage_yaml, encoding='utf-8') as f:
-        cards = yaml.safe_load(f)['town_tour']['cards']
+        cards = _yaml_load(f)['town_tour']['cards']
 
     # 1. Backdrop binaries -> decomp graphics (make LZ-compresses 4bpp + tsa).
     os.makedirs(WORLD_MAP_GFX_DIR, exist_ok=True)
@@ -2808,7 +2820,7 @@ def _declared_donor_bases(campaign):
                           recursive=True):
         try:
             with open(path, encoding='utf-8') as f:
-                data = yaml.safe_load(f)
+                data = _yaml_load(f)
         except Exception:
             continue
 
@@ -3618,7 +3630,7 @@ def declared_map_sprite_units(campaign):
             if not name.endswith('.yaml'):
                 continue
             with open(os.path.join(d, name), encoding='utf-8') as f:
-                unit = yaml.safe_load(f) or {}
+                unit = _yaml_load(f) or {}
             ms = (unit.get('art') or {}).get('map_sprite')
             if ms and (ms or {}).get('wiring') != 'pending':
                 declared[unit.get('id') or name[:-5]] = '%s/%s' % (sub, name)
@@ -3627,7 +3639,7 @@ def declared_map_sprite_units(campaign):
         if not name.endswith('.yaml'):
             continue
         with open(os.path.join(chapters, name), encoding='utf-8') as f:
-            chap = yaml.safe_load(f) or {}
+            chap = _yaml_load(f) or {}
         for key in ('neutral_units', 'green_units'):
             for unit in (chap.get(key) or []):
                 if ((unit.get('art') or {}).get('map_sprite')) and unit.get('id'):
@@ -4164,7 +4176,7 @@ def enemy_class_reskins(campaign):
     as a list of dicts {id, base, slot, sprite}. Empty if none declared."""
     cfg = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
     with open(cfg, encoding='utf-8') as f:
-        return (yaml.safe_load(f) or {}).get('enemy_class_reskins') or []
+        return (_yaml_load(f) or {}).get('enemy_class_reskins') or []
 
 
 # --- Faked battle animations (#65) -----------------------------------------------
@@ -4367,6 +4379,9 @@ def _banim_palette(frame_imgs):
     """A <=16-colour palette for the frames: index 0 transparent + each opaque colour."""
     pal = [(0, 0, 0)]
     for im in frame_imgs:
+        # 1<<24 is load-bearing, not slack: it fixes getcolors' bucket order, and hence this
+        # palette's order (feditor_to_banim._palette carries the long note; decisions.md ->
+        # "The injector was slow in Python, not in work").
         for cnt, rgba in im.getcolors(1 << 24):
             rgb = rgba[:3]
             # OBJ palette index 0 is transparent even when its BGR555 colour is black.
@@ -4388,7 +4403,7 @@ def units_with_battle_anim(campaign):
             if not fn.endswith('.yaml'):
                 continue
             with open(os.path.join(d, fn), encoding='utf-8') as f:
-                u = yaml.safe_load(f)
+                u = _yaml_load(f)
             if u and u.get('battle_anim'):
                 out.append((u.get('id', fn[:-5]), u))
     return out
@@ -5253,7 +5268,7 @@ def inject_title_theme(campaign, verbose=True):
 
     cfg_path = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
     with open(cfg_path, encoding='utf-8') as f:
-        theme = (yaml.safe_load(f) or {}).get('title_theme')
+        theme = (_yaml_load(f) or {}).get('title_theme')
     if not theme:
         return
     letters = [tuple(int(h.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))
@@ -5340,7 +5355,7 @@ def inject_title_theme(campaign, verbose=True):
 def _load_prologue_chapter(campaign):
     path = os.path.join(REPO, 'campaigns', campaign, 'chapters', PROLOGUE_CHAPTER_YAML)
     with open(path, encoding='utf-8') as f:
-        return yaml.safe_load(f)
+        return _yaml_load(f)
 
 
 def _prologue_roster_blocks(by_id, slots, classes, guest_items):
@@ -5808,10 +5823,26 @@ def inject_prologue(campaign, verbose=True, montage=False):
               % (hlin_slot, scram_slot, sephek_slot))
 
 
+_CHAPTER_YAML_CACHE = {}
+
+
 def _load_chapter_yaml(campaign, filename):
+    """Parse a chapter YAML, reusing the parse when the file on disk has not changed.
+
+    A build asks for the same handful of chapter files dozens of times (62 calls, ~9s of a
+    51s injection) because every injector that needs one line of a chapter parses the whole
+    document. The cache is keyed on the file's identity AND its mtime/size, so editing a
+    chapter mid-build is still picked up. Callers get a deep copy: several injectors edit
+    the dict they are handed, and a shared parse must not let one injector's edits leak
+    into the next one's view of the chapter.
+    """
     path = os.path.join(REPO, 'campaigns', campaign, 'chapters', filename)
-    with open(path, encoding='utf-8') as f:
-        return yaml.safe_load(f)
+    st = os.stat(path)
+    key = (path, st.st_mtime_ns, st.st_size)
+    if key not in _CHAPTER_YAML_CACHE:
+        with open(path, encoding='utf-8') as f:
+            _CHAPTER_YAML_CACHE[key] = _yaml_load(f)
+    return copy.deepcopy(_CHAPTER_YAML_CACHE[key])
 
 
 # --- Shared chapter-injection helpers (#104): hoisted from inject_ch01/inject_ch02 ---
