@@ -95,15 +95,18 @@ CASES = [
     # in campaigns/.../pcs/, so editing it changes no injected byte and the cache is RIGHT to
     # skip. (First run of this probe asserted otherwise and was wrong.) `enemy_units` is
     # prologue-scoped content the injector genuinely consumes.
-    # UNRESOLVED (2026-08-12): this edit changes `level: 5 -> 6` under the prologue's
-    # `enemy_units`, and NO injected file changes -- every scope digest is identical across
-    # all four ROM configurations. Either the prologue's enemy levels do not reach the ROM
-    # from this YAML (in which case caching is correct and this expectation is wrong), or
-    # the manifest is blind to a file the injector wrote (a stale-PASS hole). Settle it by
-    # building the prologue ROM twice, edited and not, and comparing the .gba bytes.
-    # Left expecting `win` to re-run ON PURPOSE, so the probe stays RED until answered.
+    # SETTLED 2026-08-13, and the cache was NOT at fault. This case was red because bumping
+    # `level: 5 -> 6` under the prologue's `enemy_units` moved no injected byte at all. Two
+    # full ROM builds, edited and not, came out byte-identical (sha256), and the injector
+    # wrote zero differing files across the whole 20k-file decomp tree -- so the cache was
+    # right to serve every PASS. The bug was upstream: inject_prologue emitted the roster as
+    # C literals under a comment claiming it read the chapter YAML, and every literal
+    # happened to match the YAML, so nothing looked wrong. `_prologue_roster_blocks` now
+    # sources levels/positions/head-count (verified byte-neutral: same ROM sha256), and the
+    # field is live. The prologue is HOSTED on chapter 1, which is why ch01's scenarios move
+    # with it. Long form: decisions.md -> "A cache can be right for the wrong reason".
     ('prologue', bump_enemy_level(os.path.join(CHAPTERS, 'ch00-prologue-a-dagger-of-ice.yaml')),
-     True, ['win'], []),
+     True, ['win', 'ch01win', 'lordfloor'], ['ch05arena', 'ch04moose']),
     ('docs', append_line(os.path.join(REPO, 'docs', 'decisions.md'), '\n<!-- probe -->\n'),
      False, [], ['ch01win', 'ch05arena', 'ch04moose', 'win']),
     ('harness-one-scenario',

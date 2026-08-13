@@ -5343,6 +5343,116 @@ def _load_prologue_chapter(campaign):
         return yaml.safe_load(f)
 
 
+def _prologue_roster_blocks(by_id, slots, classes, guest_items):
+    """The prologue's two `UnitDefinition` initialisers, driven by the ch00 YAML.
+
+    redaCount=0 places units statically at xPosition/yPosition (like inject_test_chapter);
+    the boss rides the ONEILL slot (CA_BOSS marks it a boss for autolevel/UI -- the
+    DefeatBoss EVENT flag comes from the flagged defeat quote, not from CA_BOSS). AI: boss
+    = Breguet's stationary-aggressive bytes {AI_A_03 ActionStanding, AI_B_03 NeverMove,
+    config} (cp_data.c gAi1/2ScriptTable) -- NOT O'Neill's {0x6,0x3} "DoNothing", which
+    only works because the vanilla tutorial event-scripts his attack. Guards attack in
+    range (AI_A_00).
+
+    Levels, positions (0-indexed x,y), the guard head-count and the enemy weapons are read
+    from the YAML. They used to be literals here under a comment that claimed otherwise,
+    and because every literal happened to match what the YAML said, nothing looked wrong --
+    a rebalance authored in the chapter file simply would not have shipped. #255's
+    invalidation probe is what exposed it: bumping the boss's `level:` changed no injected
+    byte, and two full ROM builds came out byte-identical. Keep this sourced.
+
+    Guest INVENTORIES stay literal (`guest_items`): Hlin carries a Vulnerary, and
+    WEAPON_ITEM_ENUM is weapons-only by the #53 seam rule, so the YAML's consumable has no
+    ITEM_ mapping to resolve through.
+
+    slots       -- (hlin, scramsax, sephek) vanilla CHARACTER_ slot names
+    classes     -- (hlin, scramsax) CLASS_ enums
+    guest_items -- (hlin, scramsax) `.items` initialiser bodies
+    """
+    hlin_slot, scram_slot, sephek_slot = slots
+    hlin_class, scram_class = classes
+    hlin_items, scram_items = guest_items
+    hlin, scram = by_id['hlin-trollbane'], by_id['scramsax']
+    sephek, guard = by_id['sephek-kaltro'], by_id['caravan-guard']
+
+    ally = (
+        '{\n'
+        '    {\n'
+        '        .charIndex = CHARACTER_%(hlin_slot)s, /* Hlin -- frail must-survive lead */\n'
+        '        .classIndex = %(hlin_class)s,\n'
+        '        .leaderCharIndex = CHARACTER_%(hlin_slot)s,\n'
+        '        .allegiance = FACTION_ID_BLUE,\n'
+        '        .level = %(hlin_level)d,\n'
+        '        .xPosition = %(hlin_x)d,\n'
+        '        .yPosition = %(hlin_y)d,\n'
+        '        .redaCount = 0,\n'
+        '        .items = { %(hlin_items)s },\n'
+        '    },\n'
+        '    {\n'
+        '        .charIndex = CHARACTER_%(scram_slot)s, /* Scramsax -- strong veteran (our Jeigan) */\n'
+        '        .classIndex = %(scram_class)s,\n'
+        '        .leaderCharIndex = CHARACTER_%(hlin_slot)s,\n'
+        '        .allegiance = FACTION_ID_BLUE,\n'
+        '        .level = %(scram_level)d,\n'
+        '        .xPosition = %(scram_x)d,\n'
+        '        .yPosition = %(scram_y)d,\n'
+        '        .redaCount = 0,\n'
+        '        .items = { %(scram_items)s },\n'
+        '    },\n'
+        '    { 0 },\n'
+        '}' % {'hlin_slot': hlin_slot, 'hlin_class': hlin_class, 'hlin_items': hlin_items,
+               'hlin_level': hlin['level'],
+               'hlin_x': hlin['position'][0], 'hlin_y': hlin['position'][1],
+               'scram_slot': scram_slot, 'scram_class': scram_class,
+               'scram_items': scram_items, 'scram_level': scram['level'],
+               'scram_x': scram['position'][0], 'scram_y': scram['position'][1]})
+
+    # The guards ride two spare non-cast character slots. `count`/`positions` decide how
+    # many are emitted and where; a disagreement between them would silently ship a roster
+    # nobody authored, so it fails the build instead.
+    guard_slots = (0x80, 0x82)
+    if len(guard['positions']) != guard['count']:
+        sys.exit('ERROR: ch00 caravan-guard has count=%d but %d position(s)'
+                 % (guard['count'], len(guard['positions'])))
+    if guard['count'] > len(guard_slots):
+        sys.exit('ERROR: ch00 caravan-guard count=%d exceeds the %d spare character slot(s); '
+                 'add one to guard_slots in _prologue_roster_blocks'
+                 % (guard['count'], len(guard_slots)))
+    guards = ''.join(
+        '    {\n'
+        '        .charIndex = 0x%02x, /* Torg\'s caravan guard */\n'
+        '        .classIndex = CLASS_FIGHTER,\n'
+        '        .allegiance = FACTION_ID_RED,\n'
+        '        .level = %d,\n'
+        '        .xPosition = %d,\n'
+        '        .yPosition = %d,\n'
+        '        .redaCount = 0,\n'
+        '        .items = { %s },\n'
+        '        .ai = {0x0, 0xa, 0x0, 0x0},\n'
+        '    },\n' % (slot, guard['level'], pos[0], pos[1],
+                      fe_item_enum(guard['inventory'][0]))
+        for slot, pos in zip(guard_slots, guard['positions']))
+
+    enemy = (
+        '{\n'
+        '    {\n'
+        '        .charIndex = CHARACTER_%s, /* Sephek -- boss; escapes in the ending */\n'
+        '        .classIndex = CLASS_MYRMIDON,\n'
+        '        .allegiance = FACTION_ID_RED,\n'
+        '        .level = %d,\n'
+        '        .xPosition = %d,\n'
+        '        .yPosition = %d,\n'
+        '        .redaCount = 0,\n'
+        '        .items = { %s },\n'
+        '        .ai = {0x3, 0x3, 0x9, 0x20}, /* attack in place, never move (Breguet) */\n'
+        '    },\n'
+        '%s'
+        '    { 0 },\n'
+        '}' % (sephek_slot, sephek['level'], sephek['position'][0], sephek['position'][1],
+               fe_item_enum(sephek['inventory'][0]), guards))
+    return ally, enemy
+
+
 def inject_prologue(campaign, verbose=True, montage=False):
     """Wire the designed Prologue (#20) onto chapter 0 as the New Game target."""
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
@@ -5356,7 +5466,6 @@ def inject_prologue(campaign, verbose=True, montage=False):
     # Structural data the build emits comes from the ch00 YAML (single source of truth).
     chap = _load_prologue_chapter(campaign)
     by_id = {u['id']: u for u in chap['player_units'] + chap['enemy_units']}
-    sephek_item = fe_item_enum(by_id['sephek-kaltro']['inventory'][0])   # ice-longsword -> steel
     # Hlin = frail must-survive lead -> UNPROMOTED Fighter (frail like vanilla Eirika next to a
     # promoted unit; a custom FEMALE Fighter map sprite distinguishes her from the male Fighter
     # guards -- see inject_map_sprites). Scramsax = dominant promoted "Jeigan" (Hero, the Seth
@@ -5395,78 +5504,10 @@ def inject_prologue(campaign, verbose=True, montage=False):
     with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=2)
 
-    # 2. Rewrite the two prologue rosters. redaCount=0 places units statically at
-    #    xPosition/yPosition (like inject_test_chapter); the boss rides the ONEILL slot
-    #    (CA_BOSS marks it a boss for autolevel/UI -- the DefeatBoss EVENT flag comes from
-    #    the flagged defeat quote in step 5, not from CA_BOSS). Positions/levels/items from
-    #    the chapter YAML (0-indexed x,y). AI: boss = Breguet's stationary-aggressive bytes
-    #    {AI_A_03 ActionStanding, AI_B_03 NeverMove, config} (cp_data.c gAi1/2ScriptTable) --
-    #    NOT O'Neill's {0x6,0x3} "DoNothing", which only works because the vanilla tutorial
-    #    event-scripts his attack. Guards attack in range (AI_A_00).
-    ally = (
-        '{\n'
-        '    {\n'
-        '        .charIndex = CHARACTER_%s, /* Hlin -- frail must-survive lead */\n'
-        '        .classIndex = %s,\n'
-        '        .leaderCharIndex = CHARACTER_%s,\n'
-        '        .allegiance = FACTION_ID_BLUE,\n'
-        '        .level = 3,\n'
-        '        .xPosition = 8,\n'
-        '        .yPosition = 5,\n'
-        '        .redaCount = 0,\n'
-        '        .items = { %s },\n'
-        '    },\n'
-        '    {\n'
-        '        .charIndex = CHARACTER_%s, /* Scramsax -- strong veteran (our Jeigan) */\n'
-        '        .classIndex = %s,\n'
-        '        .leaderCharIndex = CHARACTER_%s,\n'
-        '        .allegiance = FACTION_ID_BLUE,\n'
-        '        .level = 1,\n'
-        '        .xPosition = 13,\n'
-        '        .yPosition = 9,\n'
-        '        .redaCount = 0,\n'
-        '        .items = { %s },\n'
-        '    },\n'
-        '    { 0 },\n'
-        '}' % (hlin_slot, hlin_class, hlin_slot, hlin_items,
-               scram_slot, scram_class, hlin_slot, scram_items))
-    enemy = (
-        '{\n'
-        '    {\n'
-        '        .charIndex = CHARACTER_%s, /* Sephek -- boss; escapes in the ending */\n'
-        '        .classIndex = CLASS_MYRMIDON,\n'
-        '        .allegiance = FACTION_ID_RED,\n'
-        '        .level = 5,\n'
-        '        .xPosition = 14,\n'
-        '        .yPosition = 8,\n'
-        '        .redaCount = 0,\n'
-        '        .items = { %s },\n'
-        '        .ai = {0x3, 0x3, 0x9, 0x20}, /* attack in place, never move (Breguet) */\n'
-        '    },\n'
-        '    {\n'
-        '        .charIndex = 0x80, /* Torg\'s caravan guard */\n'
-        '        .classIndex = CLASS_FIGHTER,\n'
-        '        .allegiance = FACTION_ID_RED,\n'
-        '        .level = 2,\n'
-        '        .xPosition = 14,\n'
-        '        .yPosition = 7,\n'
-        '        .redaCount = 0,\n'
-        '        .items = { ITEM_AXE_IRON },\n'
-        '        .ai = {0x0, 0xa, 0x0, 0x0},\n'
-        '    },\n'
-        '    {\n'
-        '        .charIndex = 0x82, /* Torg\'s caravan guard */\n'
-        '        .classIndex = CLASS_FIGHTER,\n'
-        '        .allegiance = FACTION_ID_RED,\n'
-        '        .level = 2,\n'
-        '        .xPosition = 13,\n'
-        '        .yPosition = 7,\n'
-        '        .redaCount = 0,\n'
-        '        .items = { ITEM_AXE_IRON },\n'
-        '        .ai = {0x0, 0xa, 0x0, 0x0},\n'
-        '    },\n'
-        '    { 0 },\n'
-        '}' % (sephek_slot, sephek_item))
+    # 2. Rewrite the two prologue rosters from the ch00 YAML (_prologue_roster_blocks).
+    ally, enemy = _prologue_roster_blocks(
+        by_id, (hlin_slot, scram_slot, sephek_slot), (hlin_class, scram_class),
+        (hlin_items, scram_items))
     with open(CH1_UDEFS_H, encoding='utf-8') as f:
         udefs = f.read()
     udefs = _replace_brace_block(udefs, 'UnitDef_Event_Ch1Ally[] =', ally, CH1_UDEFS_H)
@@ -5628,10 +5669,15 @@ def inject_prologue(campaign, verbose=True, montage=False):
     _hlin_donor = 'CHARACTER_GARCIA' if any(c in hlin_class for c in _axe) else 'CHARACTER_GERIK'
     _scram_donor = 'CHARACTER_GARCIA' if any(c in scram_class for c in _axe) else 'CHARACTER_GERIK'
     # (slot, class, level, donor, female) -- female None means "leave attributes alone"
-    # (the boss keeps CA_BOSS; _set_gender would clobber it).
-    guest_patch = [(PROLOGUE_HLIN_SLOT, hlin_class, 3, _hlin_donor, True),
-                   (PROLOGUE_SCRAMSAX_SLOT, scram_class, 1, _scram_donor, False),
-                   (PROLOGUE_SEPHEK_SLOT, 'CLASS_MYRMIDON', 5, 'CHARACTER_JOSHUA', None)]
+    # (the boss keeps CA_BOSS; _set_gender would clobber it). baseLevel comes from the same
+    # YAML field the roster block does: these are two encodings of one number, and a literal
+    # here would drift out of step with the roster the moment the chapter is rebalanced.
+    guest_patch = [(PROLOGUE_HLIN_SLOT, hlin_class, by_id['hlin-trollbane']['level'],
+                    _hlin_donor, True),
+                   (PROLOGUE_SCRAMSAX_SLOT, scram_class, by_id['scramsax']['level'],
+                    _scram_donor, False),
+                   (PROLOGUE_SEPHEK_SLOT, 'CLASS_MYRMIDON', by_id['sephek-kaltro']['level'],
+                    'CHARACTER_JOSHUA', None)]
     with open(CHARACTERS_C, encoding='utf-8') as f:
         chars = f.read()
     for slot, cls, level, donor, female in guest_patch:

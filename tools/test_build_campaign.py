@@ -97,6 +97,73 @@ class FeItemEnum(unittest.TestCase):
         self.assertEqual(bc.fe_item_enum({'id': 'iron-axe'}), 'ITEM_AXE_IRON')
 
 
+class PrologueRosterFromYaml(unittest.TestCase):
+    """The prologue roster is DATA, not a hardcode.
+
+    #255's invalidation probe caught the opposite: bumping `level:` under the ch00 YAML's
+    `enemy_units` moved no injected byte, and two full ROM builds -- edited and not --
+    came out byte-identical, because inject_prologue emitted literals while its comment
+    claimed it read the YAML. The values agreed by hand, so nothing looked wrong; a
+    rebalance authored in YAML would simply not have shipped. These pin the wiring.
+    """
+
+    SLOTS = ('Eirika', 'Seth', 'ONeill')
+    CLASSES = ('CLASS_FIGHTER', 'CLASS_HERO')
+    GUEST_ITEMS = ('ITEM_AXE_HANDAXE, ITEM_VULNERARY', 'ITEM_SWORD_STEEL, ITEM_AXE_HANDAXE')
+
+    def by_id(self, **over):
+        units = {
+            'hlin-trollbane': {'level': 3, 'position': [8, 5]},
+            'scramsax': {'level': 1, 'position': [13, 9]},
+            'sephek-kaltro': {'level': 5, 'position': [14, 8],
+                              'inventory': [{'id': 'ice-longsword',
+                                             'fe_base': 'steel-sword'}]},
+            'caravan-guard': {'level': 2, 'count': 2, 'positions': [[14, 7], [13, 7]],
+                              'inventory': [{'id': 'iron-axe'}]},
+        }
+        for uid, fields in over.items():                 # kwarg ids use _ for -
+            units[uid.replace('_', '-')].update(fields)
+        return units
+
+    def blocks(self, **over):
+        return bc._prologue_roster_blocks(self.by_id(**over), self.SLOTS, self.CLASSES,
+                                          self.GUEST_ITEMS)
+
+    def test_boss_level_tracks_the_yaml(self):
+        self.assertIn('.level = 5,', self.blocks()[1])
+        self.assertIn('.level = 6,', self.blocks(sephek_kaltro={'level': 6})[1])
+
+    def test_boss_position_tracks_the_yaml(self):
+        enemy = self.blocks(sephek_kaltro={'position': [3, 4]})[1]
+        self.assertIn('.xPosition = 3,', enemy)
+        self.assertIn('.yPosition = 4,', enemy)
+
+    def test_boss_weapon_still_tracks_the_yaml(self):
+        # #52's wiring, kept: the flavor "ice-longsword" resolves through fe_base.
+        self.assertIn('ITEM_SWORD_STEEL', self.blocks()[1])
+
+    def test_guest_level_and_position_track_the_yaml(self):
+        ally = self.blocks(hlin_trollbane={'level': 4, 'position': [1, 2]})[0]
+        self.assertIn('.level = 4,', ally)
+        self.assertIn('.xPosition = 1,', ally)
+        self.assertIn('.yPosition = 2,', ally)
+
+    def test_guard_count_drives_how_many_are_emitted(self):
+        self.assertEqual(self.blocks()[1].count('CLASS_FIGHTER'), 2)
+        one = self.blocks(caravan_guard={'count': 1, 'positions': [[14, 7]]})[1]
+        self.assertEqual(one.count('CLASS_FIGHTER'), 1)
+
+    def test_guard_count_disagreeing_with_positions_is_fatal(self):
+        # Silently emitting `count` guards at the first `count` positions would ship a
+        # roster nobody authored. Fail the build instead.
+        with self.assertRaises(SystemExit):
+            self.blocks(caravan_guard={'count': 3})
+
+    def test_more_guards_than_spare_slots_is_fatal(self):
+        with self.assertRaises(SystemExit):
+            self.blocks(caravan_guard={'count': 3, 'positions': [[1, 1], [2, 2], [3, 3]]})
+
+
 class DonorMaps(unittest.TestCase):
     def test_shamans_take_ewan_bases_but_keep_dark_rank_donor(self):
         # Bases from Ewan (Ch1-appropriate); ranks stay on Knoll (ITYPE_DARK), so the
