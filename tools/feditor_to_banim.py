@@ -21,6 +21,7 @@ import collections
 import os
 import re
 
+import numpy as np
 from PIL import Image
 
 import ref_to_battleframe as rb
@@ -260,11 +261,11 @@ SWATCH_ROWS = 2
 def _strip_top_swatch(rgba, rows=SWATCH_ROWS):
     """Return `rgba` with its top `rows` cleared to transparent (drops the FEditor palette swatch)."""
     out = rgba.copy()
-    px = out.load()
-    for y in range(min(rows, out.height)):
-        for x in range(out.width):
-            px[x, y] = (0, 0, 0, 0)
+    out.paste((0, 0, 0, 0), (0, 0, out.width, min(rows, out.height)))
     return out
+
+
+GBA5_MASK = 0xF8  # the GBA shows 5 bits per channel; the low 3 do not survive the hardware
 
 
 def _quantize5(rgb):
@@ -272,7 +273,7 @@ def _quantize5(rgb):
     dropped). Colours that quantize equal are one colour on hardware, so they share a palette
     slot -- keeps a PNG with hardware-identical near-duplicates inside the 15-colour budget."""
     r, g, b = rgb
-    return (r & 0xF8, g & 0xF8, b & 0xF8)
+    return (r & GBA5_MASK, g & GBA5_MASK, b & GBA5_MASK)
 
 
 def _load_frame(path):
@@ -281,14 +282,15 @@ def _load_frame(path):
     only content -- clean tiling, a correct bbox, and no hardware-duplicate palette overflow)."""
     im = Image.open(path)
     bg = im.getpixel((0, 0))            # the light-green backdrop sits at the canvas corner
-    rgb = im.convert("RGB")
-    out = Image.new("RGBA", im.size, (0, 0, 0, 0))
-    src, col, dst = im.load(), rgb.load(), out.load()
-    for y in range(im.height):
-        for x in range(im.width):
-            if src[x, y] != bg:
-                dst[x, y] = _quantize5(col[x, y]) + (255,)
-    return _strip_top_swatch(out)
+    src = np.asarray(im)
+    # An FEditor frame is indexed, so the backdrop test is one index compare; keep working for
+    # a truecolour PNG (where getpixel hands back a tuple) by comparing the whole pixel.
+    keep = (src != bg) if src.ndim == 2 else np.any(src != np.array(bg, dtype=src.dtype), axis=-1)
+    out = np.zeros(src.shape[:2] + (4,), dtype=np.uint8)
+    out[..., :3] = np.asarray(im.convert("RGB")) & GBA5_MASK   # _quantize5, whole-image
+    out[..., 3] = np.where(keep, 255, 0)
+    out[~keep, :3] = 0                  # transparent pixels carry no colour, as before
+    return _strip_top_swatch(Image.fromarray(out, "RGBA"))
 
 
 def _palette(frame_imgs):
@@ -298,6 +300,11 @@ def _palette(frame_imgs):
     pal = [(0, 0, 0)]
     seen = set()
     for im in frame_imgs:
+        # 1<<24 is load-bearing, not slack. PIL sizes getcolors' histogram from `maxcolors`
+        # and returns colours in HASH-BUCKET order, so a tighter bound (much faster -- it is
+        # a multi-megabyte allocation per call) silently REORDERS this palette, and every
+        # sheet index with it. A 7-colour frame compares equal and will tell you it is safe.
+        # Long form: decisions.md -> "The injector was slow in Python, not in work".
         for _cnt, rgba in im.getcolors(1 << 24):
             if rgba[3] == 0:
                 continue
