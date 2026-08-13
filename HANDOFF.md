@@ -11,24 +11,34 @@ either.** The generated decomp tree is intentionally dirty as recorded below.
 
 ## In flight
 
-**PR #276** — ch05's Basil→Sahnar Talk recruit, moved off vanilla `0x9CC` to host-owned `0x9E8`
-and playing its own locked sixteen boxes. `make test`, `make`, `verify_text` (0 runaway),
-`check.py` and `matrix ch05recruit + recordch05recruit` all green locally; GIF in
-`docs/demo/ch05-sahnar-recruit.gif`. Awaiting Nicolas's look + CI.
+**Nothing.** `main` is at #276 (ch05's Talk recruit, reviewed and merged), CI green.
 
 ## Next task
 
-**ch05's OPENING cutscene** — the last big unwired scene block, and the one thing between the
-chapter and a playable end-to-end slice. Seven locked scenes (`9BB` `9BC` `9BD` `9BE` `9C2`
-`9C3` `9C4`), all co-written and locked in PR #196; this is wiring, not writing.
+**ch05's dialogue wiring, worked TOP TO BOTTOM in player order** (Nicolas, 2026-08-13). The
+ordered inventory of all 17 scenes — 6 done, 11 left — is the table in **issue #25**, which is
+the canonical view; do not re-derive an order from the YAML's `vanilla 0xNNN` labels, which are
+anatomy citations naming the scene we MINE and are never ids we write. Reading them as an order
+is what made the list confusing in the first place.
 
-**Settle the whole scene→id mapping before writing any of it.** The block has exactly as many
-ids left as there are scenes owed, and the no-Lupin branches need more on top — the arithmetic,
-the escape route and why it is only a hypothesis are in `docs/decisions.md` → "ch05's remaining
-dialogue has exactly as many ids as it has scenes". Two things that pass may surprise you: a
-`vanilla 0xNNN` label in the YAML is an anatomy citation and never a destination, and each
-scene's CHANNEL (on-map bubble at 29 vs `Text_BG` at ~42) is a real choice the wiring has to
-make — the pre-map scenes have no units staged to hang a bubble on.
+Next up is **scene 1, Basil and Sahnar talking through the stone** (16 boxes), then straight
+down the table. All of it is locked text from PR #196: this is wiring, not writing.
+
+**The id budget is already resolved — do not re-litigate it.** 17 ids against 16 owed, allocated
+scene by scene in #25's table; claim each in `HOSTED_CHAPTER_MESSAGE_IDS` as it lands. Method and
+the two ways to run the sweep wrong: `docs/decisions.md` → "A host block is not the whole id
+budget". A fallback arm costs ONE extra id (`variant_beat` + `branch_on_flag`, ch04's mechanism),
+not four.
+
+Two things the wiring still has to decide per scene, and one open question:
+- **Channel** — on-map bubble (wraps 29, needs a staged unit to anchor to) vs `Text_BG` (~42).
+  Scenes 1–4 and 6 happen before the party is on the field, so nothing is staged for a bubble.
+- **Where PREP sits** — `CH05_BEGINNING_SCRIPT` runs LOMA → line LOAD1s → `CALL` prep → the join
+  CUSA, silently. Scene 5 IS the join and scene 7 is the last beat before the map, so the seven
+  openers have to be placed around that `CALL`.
+- **OPEN:** the no-Lupin arms need a signal that ch04's parley happened. `CH04_LUPIN_TALK_FLAG`
+  is `EVFLAG_TMP(9)` and survival across the chapter boundary is unverified; testing whether
+  Lupin is on the ch05 field is probably the better signal. Settle before wiring any of the five.
 
 ## Current state
 
@@ -59,8 +69,9 @@ make — the pre-map scenes have no units staged to hang a bubble on.
   is ours already (LOMA → the line LOAD1s → `CALL` prep → the join CUSA) and simply has no
   `TEXTSHOW` in it. The RECRUIT was the one playing vanilla prose, and #276 fixed it. Both halves
   used to be described here as one thing; they were never the same problem.
-- **Ravisin's battle taunt is wired NOWHERE.** Locked in the YAML, but `gBattleTalkList` carries
-  only ch01's Izobai. Found while counting ids for #276; it is on #25's checklist now.
+- **Ravisin's battle taunt is wired NOWHERE**, and neither is any no-Lupin arm. Both are rows in
+  #25's scene table now. The chapter's ENDING is additionally blocked behind ch06 hosting — ch05's
+  win still lands on the dev placeholder.
 - **ch05's village-raid RACE is wired and proven in-engine (#254).** A reliquary can be lost
   (raider AI → the tile flips to ruins, no gift, its event id never sets) and saving all four
   pays out vanilla's Guiding Ring at the ending.
