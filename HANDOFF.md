@@ -6,60 +6,70 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-12 (Claude). `main` is at `e1a4948`, the squash merge of PR #272, level with
-`origin/main`. **#269 and #255 phases 1 and 2 are landed** (#270, #271, #272). The generated
-decomp tree is intentionally dirty as recorded below.
+Refreshed 2026-08-13 (Claude). **#255 is DONE — do not open more work on it.** PR #273 carries
+the last of it and is set to auto-merge on green CI; confirm with `gh pr view 273` and pull.
+The generated decomp tree is intentionally dirty as recorded below.
 
 ## In flight
 
-**Branch `feat/255-driver-scoping`, pushed, no PR yet.** Phases 1 and 2 are MERGED
-(#270/#271/#272). This branch carries the per-module driver split, sticky scope ownership,
-and the invalidation probe (`probe_invalidation.py`, branch-only for now). **Do not open a PR until the prologue question below is
-settled** — the probe is deliberately RED on it.
+**Nothing but PR #273**, which lands itself. It fixes two things, both found by driving the
+real build instead of comparing cache keys: the prologue roster was never actually reading its
+YAML (a shipped content bug — see `decisions.md` → "A cache can be right for the wrong
+reason"), and scope digests were hashed at the END of the build, which is what made a ch05
+edit re-run 18 of 20 scenarios. Both are recorded in `decisions.md`; nothing is owed here.
 
 ## Next task
 
-**Settle the prologue probe, then decide phase 3.** Ordered, because the first one could be a
-soundness hole:
+**Make `build_campaign.py` fast. This is Nicolas's explicit priority (2026-08-13) and it is a
+profiling job, not a design job.** He has spent a full session's patience on #255 and wants the
+friction gone before more ch05 work.
 
-**1. UNRESOLVED, and it is the dangerous direction.** the invalidation probe's `--case prologue` bumps `level: 5 -> 6` under the prologue chapter YAML's `enemy_units` — a
-real content edit that really applies — and **no injected file changes**: every scope digest
-is identical across all four ROM configurations, so no scenario re-runs. Either the
-prologue's enemy levels never reach the ROM from that YAML (caching is right, the probe's
-expectation is wrong) or the scope manifest is blind to something the injector wrote (a
-stale PASS). **Settle it by building the prologue ROM twice, edited and not, and comparing
-the .gba bytes** — that is decisive and needs no emulator. Do NOT reason about it from the
-manifest; the manifest is the thing under suspicion. Note the same probe's `level:` at line
-103 IS documentation (PC roster annotation; real PC stats live in `campaigns/.../pcs/`), and
-an earlier pass wrongly called that a bug — so the "it is just a doc field" answer is
-plausible here too, and still has to be PROVEN.
+The number that reframes everything: **of a 63s `make`, the ARM compile is 12s and the Python
+injection is 51s.** It is paid on every build whether or not a playtest ever runs. `cProfile`
+(70s under profiling overhead) puts nearly all of it in two places, and both look fixable
+without changing a single byte the injector produces:
 
-**2. Line-level attribution — the last big source of false invalidation.** A ch02 edit
-re-runs ch05's scenarios because five whole-campaign tables are rewritten by every chapter
-injector, so all of them claim the file: `data/data_8B363C.s`,
-`src/data/chapter_settings.json`, `data/const_data_chapter_maps.s`, `src/data_battlequotes.c`,
-`src/events_udefs.c`. `BuildScopes._claim` already snapshots each file before and after every
-step, so claim the LINES a step changed rather than the whole file and hash only those; a
-ch02 edit then leaves ch05's line set byte-identical. Nicolas asked exactly this ("how are
-those related at all") and the answer is: physically, not by gameplay.
+- **`ref_to_battleframe._cell_is_empty` — ~28s**, from **11 million `PIL.Image.getpixel`
+  calls** across 180k invocations. Per-pixel `getpixel` in Python is the classic PIL
+  antipattern; a numpy view or `getbbox()` over the crop answers the same question in bulk.
+  Reached via `feditor_to_banim.build_import` (39s cumulative, 14 calls), which is what
+  `inject_battle_anims` and `inject_enemy_class_battle_anims` spend their time in.
+- **YAML parsing — ~22s across 534 `safe_load` calls.** `_load_chapter_yaml` alone is 9s over
+  62 calls: the same chapter files parsed dozens of times per build. Memoize by path+mtime, and
+  use libyaml's `CSafeLoader` where available.
+- `PIL getcolors` is a distant third at 8.6s over 306 calls.
 
-**Watch out:** sticky ownership currently hashes INHERITED paths at `finish()` time, i.e.
-after every step has run, which mixes later steps' content into earlier scopes. That is the
-likely reason `ch05` invalidates ch04's scenarios (probe: 18 run, 2 cached). Line-level
-attribution probably subsumes it; if not, fix it explicitly.
+**The acceptance test is a byte-compare, and it is cheap.** Every one of these is meant to be
+output-identical, so the proof is `shasum -a 256 fireemblem8u/fireemblem8.gba` matching the
+pre-change build — exactly how the prologue rewiring was proven safe this session. No emulator,
+no playtest. Do not accept a speedup that moves a ROM byte.
 
-**3. Phase 3 (the local-gate ban) is BLOCKED on a measurement, and that is Nicolas's call.**
-He offered to drop the ban if the friction is genuinely gone. It is not yet: the probe shows
-`controller.lua`, `run.sh`, a shared `harness.lua` helper, or any global asset still re-runs
-all 20. The recommendation on the table is to replace the blanket ban with
-`matrix.py run --suite gate --dry-run` (free, sub-second, says exactly what would execute)
-rather than delete it. Do not remove the ban without a measured warm-gate number.
+The profile is at `/private/tmp/.../scratchpad/inject.prof` if that scratchpad survives;
+regenerating it is one command and 70 seconds:
+`python3 -m cProfile -o inject.prof tools/build_campaign.py --campaign rime-of-the-frostmaiden`.
 
-**A negative result, recorded so nobody rebuilds it:** scoping `controller.lua` by
-matched-rule prefix was built, measured, and REMOVED. The rule list is ordered and
-`player_phase` — the catch-all every map scenario matches — sits second from last, so only
-1 rule of 15 ever falls below a scenario's deepest match. Nicolas's instinct was right in
-principle; FE8's rule ordering defeats it. Long form in `docs/decisions.md`.
+**After that, go back to ch05 content.** #255 is closed; resist reopening it.
+
+## #255: what was decided, so nobody reopens it
+
+- **Line-level (sub-file) attribution: DROPPED, deliberately.** It only helps when you edit an
+  EARLY chapter, and the campaign is built forward. `decisions.md` says not to reach for it
+  without a measurement saying it pays; there isn't one.
+- **Phase 3 (the local-gate ban): KEPT.** The habit that replaces it is "run your chapter's
+  suite while developing (ch05 = 6 scenarios, one ROM build), never the gate" — that is a
+  habit, not code. `matrix.py run --suite X --dry-run` is free and says what would execute.
+- **A scenario audit was done and found nothing to retire.** 98 scenarios (46 verdict, 39
+  record look-tests, 7 diagnostic, 6 checkpoint); the gate's 20 are a curated union of the ch01
+  spine + `recordunitlist` + ch04 + ch05, and each pins a distinct engine hook. The real
+  problem is GROWTH (~6 per chapter), which scoping addresses and deletion does not.
+- **CI cannot take playtests over.** `checks.yml` builds against a *random 16MB mock* base ROM —
+  fine for proving the link, useless for playing. Real runs need the copyrighted ROM.
+- **A negative result, recorded so nobody rebuilds it:** scoping `controller.lua` by
+  matched-rule prefix was built, measured, and REMOVED. The rule list is ordered and
+  `player_phase` — the catch-all every map scenario matches — sits second from last, so only
+  1 rule of 15 ever falls below a scenario's deepest match. Nicolas's instinct was right in
+  principle; FE8's rule ordering defeats it. Long form in `docs/decisions.md`.
+
 ## Current state
 
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
