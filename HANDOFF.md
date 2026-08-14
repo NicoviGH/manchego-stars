@@ -6,40 +6,52 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-14 (Claude). **#255, #274, #277, #278 and #279 are DONE and merged — do not reopen any
-of them.** The generated decomp tree is intentionally dirty as recorded below.
+Refreshed 2026-08-14 (Claude). **#255, #274, #277, #278, #279 and #280 are DONE and merged — do not
+reopen any of them.** The generated decomp tree is intentionally dirty as recorded below.
 
 ## In flight
 
-**Nothing.** `main` is at #279 (the letterbox trim, Sahnar's exit, and the two-arm films),
-CI green.
+**Nothing.** `main` is at #280 (ch05's scene 5 — Basil speaks and joins), CI green.
 
 ## Next task
 
 **ch05's dialogue wiring, worked TOP TO BOTTOM in player order** (Nicolas, 2026-08-13). The
-ordered inventory of all 17 scenes — **10 done, 7 left** — is the table in **issue #25**, which is
+ordered inventory of all 17 scenes — **11 done, 6 left** — is the table in **issue #25**, which is
 the canonical view; do not re-derive an order from the YAML's `vanilla 0xNNN` labels, which are
 anatomy citations naming the scene we MINE and are never ids we write. Reading them as an order
 is what made the list confusing in the first place.
 
-Next up is **scene 5, Basil trundles up and joins** (3 boxes), then straight down the table. All
-of it is locked text from PR #196: this is wiring, not writing.
+Next up is **scene 6, Sahnar alone in the sarcophagus** (6 boxes, NO fallback), then straight
+down the table. All of it is locked text from PR #196: this is wiring, not writing.
 
-**The branch mechanism EXISTS now — reuse it, do not rebuild it (#278).**
-`branch_on_check_alive(CH05_LUPIN_CHARACTER, if_alive, if_absent)` emits the arm-picker, and it
-shares `_branch_on_slot_c` with `branch_on_flag` so the two cannot drift. All five ch05 fallback
-blocks are normalized onto `variant_beat`'s `boxes:`/`replaces:` LISTS, and a test refuses a
-singular `box:`. Scene 5 is the second fallback and should cost one table row plus one id.
+**Scene 6 is the one place the twin FAILS US — read this before choosing its channel.** Vanilla
+puts `0x9C3` on the map because it `LOAD1`s Joshua right there and leaves him standing as the red
+duelist. Sahnar does not exist on our map until the turn-2 eruption and she has a face, so a
+bubble has nothing to anchor to: scene 6 needs a BACKDROP (dark/interior), not vanilla's channel.
+It also sits AFTER the prep `CALL`, alongside scene 7 — and anything visible after that `CALL`
+brings its own `FADU(16)`, because the shared prep prologue fades to black and leaves it there.
 
-**Scene 5's channel is NOT scene 4's.** It is the first ON-MAP scene (vanilla stages the party on
-the street before its equivalent), so it wraps at the bubble's 29, not the scenic 42 — and its
-speaker needs a staged unit for `PutTalkBubble` to anchor to. See the CHANNEL note below.
+**The mechanisms EXIST — reuse them, do not rebuild them (#278, #280).**
+`branch_on_check_alive(CH05_LUPIN_CHARACTER, if_alive, if_absent)` emits the arm-picker and shares
+`_branch_on_slot_c` with `branch_on_flag` so the two cannot drift; `label_base` keeps several
+branches in one event list from colliding (the arrival holds 0/1, the join 2/3 — **a third branch
+must take 4/5**). `_ch05_scene_and_variant` renders a locked scene and its no-Lupin twin as two
+message bodies, parameterised by channel width, so a further branched scene costs a call.
+`ch05_beginning_script` assembles the whole opening in one testable place.
+
+**A fallback line chosen as PROSE has not been BOXED (#280).** Three of the five substitutes are
+too long for the bubble's 29 and page themselves mid-clause if left flowed. `variant_beat` now
+accepts a `script:` entry that is a LIST of boxes so the AUTHOR places the extra A-press; the two
+arms need not cost the same number of A-presses. **The Talk recruit's fallback overruns
+identically and is still owed that treatment.** Long form: `decisions.md` → "A fallback line
+chosen as PROSE has not been boxed".
 
 **The id budget is already resolved — do not re-litigate it.** 17 ids against 16 owed, allocated
 scene by scene in #25's table; claim each in `HOSTED_CHAPTER_MESSAGE_IDS` as it lands. `0x9E9`
-`0x9EA` `0x9EB` (scenes 1–3) and `0x9EC` `0x9ED` (scene 4 + its fallback) are SPENT; scene 5 takes
-`0x9EE` + `0x9EF`. Method and the two ways to run the sweep wrong: `docs/decisions.md` → "A host
-block is not the whole id budget". A fallback arm costs ONE extra id, not four.
+`0x9EA` `0x9EB` (scenes 1–3), `0x9EC` `0x9ED` (scene 4 + its fallback) and `0x9EE` `0x9EF`
+(scene 5 + its fallback) are SPENT; scene 6 takes `0x9F0`. Method and the two ways to run the
+sweep wrong: `docs/decisions.md` → "A host block is not the whole id budget". A fallback arm costs
+ONE extra id, not four.
 
 **Both arms of the branch are proven in-engine (#279). Two of #25's four states are still owed.**
 
@@ -64,25 +76,23 @@ alive arm needed a LEVER". The branch's PLACEMENT that early is vanilla's own:
 units inside a beginning scene.
 
 Two questions this used to leave open are now SETTLED — read them, don't re-derive them:
-- **CHANNEL is inherited from the vanilla twin, and so is where PREP sits.** Vanilla Ch5's
-  BeginningScene plays its first five messages over a backdrop and reaches on-map bubbles only
-  once the party is staged, then puts two more scenes AFTER the prep `CALL`. So: scenes 1–4 are
-  backdrop, 5 is an on-map bubble, **6 and 7 go after `CALL(CH05_PREP_SCRIPT)`** and need their
-  own `FADU(16)`. Long form + the full table: `docs/decisions.md` → "A cutscene's CHANNEL is
-  inherited from the twin, not chosen". **`vanilla_scene.py` prints `0x9BB` as "map" and that is
-  a reporting artifact** — it classifies by the text call, and the `SetBackground` above it is
-  the real channel.
+- **CHANNEL is inherited from the vanilla twin. WHERE THE SCENE SITS IS NOT** (corrected by #280).
+  The twin says how a scene is PLAYED — backdrop or bubble, and how wide: scenes 1–4 are backdrop
+  (42), scene 5 is an on-map bubble (29). It says where the scene sits only where the surrounding
+  machinery is also vanilla's, **and ours diverges at exactly one place: prep.** Vanilla plays its
+  street scenes before the prep `CALL` because it `LOAD1`s Eirika's group there; our party is
+  placed BY prep, so **scene 5 plays AFTER `CALL(CH05_PREP_SCRIPT)` too** — all three of 5, 6 and
+  7 do, and anything visible after that `CALL` brings its own `FADU(16)`. Long form + the full
+  table: `docs/decisions.md` → "A cutscene's CHANNEL is inherited from the twin, not chosen" and
+  "Inheriting a channel is not inheriting a POSITION". **`vanilla_scene.py` prints `0x9BB` as
+  "map" and that is a reporting artifact** — it classifies by the text call, and the
+  `SetBackground` above it is the real channel.
 - **The no-Lupin signal: `CHECK_ALIVE(CHARACTER_LUPIN)` + `BEQ`, no flag.** Vanilla's own answer,
   and `ch14a` branches its ending on `CHECK_ALIVE(CHARACTER_JOSHUA)` — Ch5's optional Talk recruit
   and Sahnar's donor, i.e. our scene's ancestor. It reads the ROSTER, so it also handles the
   benched case that ch05's 9-of-10 deploy makes real. Long form: `docs/decisions.md` → "Did the
   player recruit them?". **Built and both arms filmed at #278/#279** — see the four-state tally
   above for the two that are still owed.
-
-**Scene 6 does NOT inherit vanilla's channel, and it is the one place the twin fails us.** Vanilla
-puts `0x9C3` on the map because it `LOAD1`s Joshua right there and leaves him standing as the red
-duelist. Sahnar does not exist on our map until the turn-2 eruption and she has a face, so a
-bubble has nothing to anchor to — scene 6 needs a backdrop (dark/interior), not vanilla's channel.
 
 ## Current state
 
@@ -109,7 +119,7 @@ bubble has nothing to anchor to — scene 6 needs a backdrop (dark/interior), no
   milliseconds instead of a build plus an emulator run. `--index-map` / `--isolate` answer "which
   index owns this, and does anything else share it?" It knows `arena_battle` and `arena_front`;
   adding an asset is a few lines. Use it before any recolour (ch07's Bremen backdrop, title screen).
-- **ch05's opening now SPEAKS, for scenes 1–4 (#277, #278).** `CH05_BEGINNING_SCRIPT` opens on one
+- **ch05's opening now SPEAKS, for scenes 1–5 (#277, #278, #280).** `CH05_BEGINNING_SCRIPT` opens on one
   `BACG(BG_MS_ELVEN_TOMB)` held across scenes 1–3, faded through black between them, then **CUTS to
   `BG_MS_FOREST_OUTSKIRTS_WINTER` for scene 4** (the ridge — vanilla switches BG at this same
   arrival beat), branches on `CHECK_ALIVE`, and only then `FADI` → `LOMA` → the LOAD1s → prep,
@@ -123,13 +133,19 @@ bubble has nothing to anchor to — scene 6 needs a backdrop (dark/interior), no
   and `docs/demo/ch05-opening-lupin.gif` is Lupin's. Both are on the FIXED ROM, so they carry the
   letterbox trim and Sahnar's fade. They agree through scenes 1–3 and diverge from scene 4's first
   box to the end — the tail is time-shift, not four scenes of difference, so compare by EYE.
-- **Any ch05boot scenario pays for the opening in its BOOT.** It is 48 A-presses ahead of the map,
+  **Scene 5 then plays AFTER the prep `CALL`** (#280) — its own `FADU(16)`, `CUMO_CHAR` to Basil,
+  the second `CHECK_ALIVE` branch at labels 2/3, then the `CUSA` that joins her. Filmed separately
+  by `recordch05join`/`recordch05joinlupin` (`docs/demo/ch05-join*.gif`) because the two films sit
+  on opposite sides of Preparations.
+- **Any ch05boot scenario pays for the opening in its BOOT.** It is ~52 A-presses ahead of the map,
   and `bootToMap()` drives all of it. Every ch05boot scenario now pokes fast config BEFORE the
   boot; a new one that pokes it after will burn over half the `record*` 300s budget on a scene it
-  never films.
+  never films. **`bootToMap(true)` stops at prep — but it ALSO returns true from its
+  `player_map_idle` branch**, so pair it with `controllerState() ~= "prep_main"` (ch03prep's idiom)
+  or a missed classification silently mashes past the beat you meant to film.
 - **Ravisin's battle taunt is wired NOWHERE.** It is a row in #25's scene table. The no-Lupin arms
-  are no longer in that state: scene 4's is BUILT and the mechanism is reusable (#278); the other
-  four are wiring, not invention.
+  are no longer in that state: scenes 4 and 5 are BUILT and the mechanism is reusable (#278/#280);
+  the other three are wiring, not invention.
 - **The ENDING SCENES ARE NOT BLOCKED by ch06 hosting** (corrected 2026-08-13, Nicolas) — this
   file and #25 both claimed they were, and both were wrong. `dev_placeholder_scene()` is the
   LANDING, standing in for the `MNC2(next)` of an unhosted next chapter; it says nothing about
