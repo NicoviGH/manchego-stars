@@ -8318,16 +8318,15 @@ CH05_BASIL_GREEN_POS = (5, 15)   # the row-15 corridor at the deploy pocket's mo
                                  # deployment. Row 15 is open end-to-end and the four stairs are
                                  # at x=1/3/9/10, so she blocks no exit. Verified walkable and
                                  # connected to Sahnar's tile by assert_green_recruit_placement.
-# The join beat is SILENT, and that is a constraint rather than a choice. ch05's YAML labels its
+# The join beat SPEAKS, at CH05_BASIL_JOIN_SLOT's 0x9EE (and 0x9EF on the no-Lupin arm) -- ids
+# from ch05's OWN block, which is the point this comment exists to make. ch05's YAML labels its
 # scenes `slot: "vanilla 0x9C2"` and the like, but those labels are ANATOMY REFERENCES to the
 # chapter we MINE (vanilla Ch5) -- they are not ids we may write, because ch04 hosts on slot 5 and
 # owns that whole block (HOSTED_CHAPTER_MESSAGE_IDS['ch04'] = 0x9BA..0x9C6). 0x9C2 in the built
 # ROM is ch04's OWN no-parley ending (CH04_ENDING_NO_LUPIN_MSG), so pointing Basil's join at it
-# plays Pinky and Marty discussing supper. Reading an UNWRITTEN vanilla id as a placeholder is
-# fine and we do it (the reliquary visits, and the Talk below); reading one another chapter
-# WRITES is not -- that distinction is the whole reason the registry exists.
-# OWED: the dialogue pass gives this beat an id from ch05's own block (vanilla Ch6, 0x9E4..0x9F5)
-# and registers it. Until then the shrub joins wordlessly -- the WIRING is what ships here.
+# would have played Pinky and Marty discussing supper. Reading an UNWRITTEN vanilla id as a
+# placeholder is fine and we do it (the reliquary visits, and the Talk below); reading one another
+# chapter WRITES is not -- that distinction is the whole reason the registry exists.
 CH05_SAHNAR_TALK_SCRIPT = 'MS_Ch05SahnarTalk'   # ours (declare_event_script), not a squatted
                                                 # vanilla symbol -- campaign-owned event scripts,
                                                 # declared AFTER the block-replacement pass.
@@ -8491,6 +8490,25 @@ CH05_ARRIVAL_NO_LUPIN_MSG = 0x9ED
 # Lupin's MAP identity, which is his PORTRAIT_MAP slot -- NOT his STAT_DONOR (Kyle is a stat
 # reference and nothing else, and CHECK_ALIVE resolves a pid through GetUnitFromCharId).
 CH05_LUPIN_CHARACTER = char_symbol(PORTRAIT_MAP['lupin'])
+# ── Scene 5 (#25): Basil trundles up, cracks the tourist joke, and JOINS ─────────────────────
+# The opening's FIRST on-map beat, so it wraps at the talk bubble's 29 rather than the scenic 42
+# -- and the one scene whose PLACEMENT does not inherit from the twin. Vanilla plays its 0x9C2
+# BEFORE the prep CALL, but it can: it LOAD1s its speaking party onto the street first. Ours is
+# placed BY prep (the ally table is never LOADed on a prep chapter -- decisions.md "How the deploy
+# cap + prep screen are actually wired"), so before the CALL the field holds the risen line,
+# Ravisin, and a green shrub with nobody to be talking to. The beat therefore plays AFTER prep, in
+# vanilla's own after-prep shape (FADU(16) -> CUMO -> STAL -> CURE -> TEXTSTART, which is exactly
+# what its 0x9C3/0x9C4 do) -- and it lands adjacent to the CUSA that was already there, so the ask
+# and the flip are one beat rather than two across a screen.
+CH05_BASIL_JOIN_SLOT = ('vanilla 0x9C2', 0x9EE, 3,
+                        'Basil trundles up, cracks the tourist joke, joins')
+CH05_BASIL_JOIN_NO_LUPIN_MSG = 0x9EF
+# One speaker, and she keeps the mid-left she holds in the Talk recruit and in the tomb scenes --
+# a character who changes seats between her scenes reads as a different person each time.
+CH05_BASIL_JOIN_PODIUMS = {'basil': '[OpenMidLeft]'}
+# Both branches live in ONE event list, and BEQ/GOTO scan that list for a matching LABEL -- so the
+# join's arms must not be numbered 0/1 like the arrival's, or a jump lands in the wrong scene.
+CH05_BASIL_JOIN_LABEL_BASE = 2
 # Four speakers, four podiums, which is the face budget exactly (FACE_SLOT_COUNT = 4) -- so
 # nothing is evicted mid-scene. Seated in the order they speak, left to right, and Pinky holds
 # the far right in BOTH arms: he closes the scene on either path, and on the no-Lupin path he
@@ -8589,6 +8607,7 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
              CH05_SAHNAR_TALK_MSG,
              *(msg for _slot, msg, _boxes, _what in CH05_OPENING_SLOTS),
              CH05_ARRIVAL_SLOT[1], CH05_ARRIVAL_NO_LUPIN_MSG,
+             CH05_BASIL_JOIN_SLOT[1], CH05_BASIL_JOIN_NO_LUPIN_MSG,
              CH05_GOAL_WINDOW_MSG, CH05_GOAL_STATUS_MSG,
              *(slot[1] for slot in CH05_VILLAGE_SLOTS.values())),
     # Goal ids only -- ch01/ch02 predate the per-chapter block registry, but their goal strings
@@ -8651,8 +8670,17 @@ def variant_beat(beat, fallback, err_label):
     silently drift: we assert each named box still starts with its anchor before swapping,
     and hard-fail if the locked script has been re-ordered underneath the fallback.
 
-    Returns a new beat, same length as `beat`, with the named boxes replaced and every
-    other box (e.g. ch04's Marty box 2, unchanged in both branches) carried through.
+    A `script:` entry may be a LIST of boxes rather than one, and then the named box is
+    replaced by all of them. A substitute chosen as prose can simply be too long for the
+    channel it lands in -- ch05's on-map fallbacks are, at the talk bubble's 29 -- and the
+    author has to place the extra A-press, because a wrapper left to choose it puts the page
+    break mid-clause. `boxes:`/`replaces:`/`script:` still agree one-for-one; only the
+    substitute is plural, which is what keeps this one mechanism rather than two.
+
+    Returns a new beat with the named boxes replaced and every other box (e.g. ch04's Marty
+    box 2, unchanged in both branches) carried through. It is the SAME LENGTH as `beat` only
+    when every substitute is singular -- two arms of a branch are not required to cost the
+    same number of A-presses, only to each stand up.
 
     Reused by ch05's five conditional scenes (#25) -- one mechanism, not two.
     """
@@ -8661,13 +8689,16 @@ def variant_beat(beat, fallback, err_label):
     if not (len(boxes) == len(anchors) == len(subs)):
         sys.exit('ERROR: %s: fallback declares %d boxes, %d replaces, %d script lines '
                  '-- all three must agree' % (err_label, len(boxes), len(anchors), len(subs)))
-    out = list(beat)
     # `boxes:` are A-PRESS numbers, not list positions, and a script may carry stage directions
     # (`exits:` and friends) that are not boxes. Map one to the other rather than indexing the
     # raw list: without this, a directive added ABOVE a fallback silently shifts every index
     # past it -- caught by the anchor assertion below, but as a confusing "the locked script
     # moved" rather than the truth.
     positions = [i for i, e in enumerate(beat) if next(iter(e)) not in SCRIPT_DIRECTIVES]
+    # Resolve every substitution against the ORIGINAL beat first and splice afterwards. Editing
+    # in place would move every box after a plural substitute, so a later `boxes:` index would
+    # land one short and the anchor assertion would blame the locked script for moving.
+    replacement = {}
     for idx, anchor, sub in zip(boxes, anchors, subs):
         if not 1 <= idx <= len(positions):
             sys.exit('ERROR: %s: fallback box %d is outside the %d-box scene'
@@ -8678,7 +8709,10 @@ def variant_beat(beat, fallback, err_label):
             sys.exit('ERROR: %s: fallback box %d anchored to %r but that box now reads %r '
                      '-- the locked script moved; re-anchor the fallback'
                      % (err_label, idx, anchor[:40], text[:40]))
-        out[at] = sub
+        replacement[at] = sub if isinstance(sub, list) else [sub]
+    out = []
+    for i, entry in enumerate(beat):
+        out.extend(replacement.get(i, [entry]))
     return out
 
 
@@ -10525,29 +10559,55 @@ def ch05_sahnar_talk_message(chap):
         width=29)
 
 
-def _ch05_opening_scene(chap, slot, boxes, what, podiums, fid):
+def _ch05_opening_scene(chap, slot, boxes, what, podiums, fid, width=42):
     """One locked opening scene, box-counted and podium-checked, as a rendered message body.
 
-    Shared by the three tomb scenes and the arrival (which brings its own podium set, being the
-    only one the PARTY speaks in), so a fifth scene costs a table row rather than a second loop.
+    Shared by the three tomb scenes, the arrival (which brings its own podium set, being the
+    first one the PARTY speaks in) and the join, so a further scene costs a table row rather
+    than a second loop. `width` is the CHANNEL and nothing else: 42 for the full-screen
+    backdrop beats, 29 for the on-map bubbles.
     """
     script = _chapter_event_by_slot(chap, 'chapter_start', slot,
                                     'ch05 opening (%s)' % what)['script']
     if _script_box_count(script) != boxes:
         sys.exit('ERROR: ch05 opening %r (%s) must remain the %d locked boxes; got %d'
                  % (slot, what, boxes, _script_box_count(script)))
-    return script, _ch05_opening_body(script, slot, what, podiums, fid)
+    return script, _ch05_opening_body(script, slot, what, podiums, fid, width)
 
 
-def _ch05_opening_body(script, slot, what, podiums, fid):
-    """Render one opening beat at the scenic width, refusing any speaker with no podium."""
+def _ch05_opening_body(script, slot, what, podiums, fid, width=42):
+    """Render one opening beat at its channel's width, refusing any speaker with no podium."""
     speakers = {k for entry in script for k in entry if k not in SCRIPT_DIRECTIVES}
     unstaged = sorted(speakers - set(podiums))
     if unstaged:
         sys.exit('ERROR: ch05 opening %r (%s) speaks as %s, which its podium table '
                  'gives no seat -- a speaker defaulted to mid-left is a speaker two '
                  'scenes can put in the same seat' % (slot, what, unstaged))
-    return _script_to_message(script, {k: (podiums[k], fid(k)) for k in speakers}, width=42)
+    return _script_to_message(script, {k: (podiums[k], fid(k)) for k in speakers}, width=width)
+
+
+def _ch05_scene_and_variant(chap, slot_row, variant_msg, podiums, fid, width=42):
+    """A branched opening scene as its TWO rendered bodies: the locked one and its no-Lupin twin.
+
+    Every ch05 fallback is this shape, which is the whole reason a fallback costs ONE id: the
+    substituted boxes are spliced into a copy of the locked beat (`variant_beat`, which asserts
+    each `replaces:` anchor so a re-ordered script fails loudly instead of swapping the wrong
+    box) and the WHOLE variant scene goes to a second message, chosen at runtime by
+    `branch_on_check_alive`. Splitting a scene around its differing box would cost one id per
+    fragment -- duplicating text is free, ids are what is scarce.
+    """
+    slot, msg, boxes, what = slot_row
+    script, body = _ch05_opening_scene(chap, slot, boxes, what, podiums, fid, width)
+    event = _chapter_event_by_slot(chap, 'chapter_start', slot, 'ch05 opening (%s)' % what)
+    if 'no_lupin_fallback' not in event:
+        sys.exit('ERROR: ch05 opening %r (%s) is a branched scene and must carry a '
+                 'no_lupin_fallback -- without it the no-Lupin arm plays the locked script, '
+                 'which addresses a wolf who is not there' % (slot, what))
+    fallback = variant_beat(script, event['no_lupin_fallback'],
+                            'ch05 %s no-Lupin fallback' % what)
+    return [(msg, body),
+            (variant_msg, _ch05_opening_body(fallback, slot, what + ' (no Lupin)',
+                                             podiums, fid, width))]
 
 
 def ch05_opening_messages(chap):
@@ -10583,23 +10643,31 @@ def ch05_opening_messages(chap):
                                             CH05_OPENING_PODIUMS, fid)
         out.append((msg, body))
     # Scene 4, and its no-Lupin twin. The party speaks here for the first time, so it brings its
-    # own podium table; the variant is the SAME beat with box 1 substituted (variant_beat, which
-    # asserts the anchor text so a re-ordered locked script fails loudly instead of swapping the
-    # wrong box), rendered through the same body writer at the same seats.
-    slot, msg, boxes, what = CH05_ARRIVAL_SLOT
-    script, body = _ch05_opening_scene(chap, slot, boxes, what, CH05_ARRIVAL_PODIUMS, fid)
-    out.append((msg, body))
-    event = _chapter_event_by_slot(chap, 'chapter_start', slot, 'ch05 opening (%s)' % what)
-    if 'no_lupin_fallback' not in event:
-        sys.exit('ERROR: ch05 opening %r (%s) is the branched scene and must carry a '
-                 'no_lupin_fallback -- without it the no-Lupin arm plays the locked script, '
-                 'which opens the chapter on a speaker who is not there' % (slot, what))
-    fallback = variant_beat(script, event['no_lupin_fallback'],
-                            'ch05 arrival no-Lupin fallback')
-    out.append((CH05_ARRIVAL_NO_LUPIN_MSG,
-                _ch05_opening_body(fallback, slot, what + ' (no Lupin)',
-                                   CH05_ARRIVAL_PODIUMS, fid)))
+    # own podium table; the variant is the SAME beat with box 1 substituted, rendered through the
+    # same body writer at the same seats.
+    out += _ch05_scene_and_variant(chap, CH05_ARRIVAL_SLOT, CH05_ARRIVAL_NO_LUPIN_MSG,
+                                   CH05_ARRIVAL_PODIUMS, fid)
     return out
+
+
+def ch05_basil_join_messages(chap):
+    """Scene 5 -- Basil's join -- and its no-Lupin twin, as (msg_id, body) pairs.
+
+    The opening's first ON-MAP beat, so it renders at the talk bubble's 29 and not the backdrop
+    scenes' 42: `PutTalkBubble`'s right-side branch computes x = 29 - width with no clamp, so a
+    wider line runs off the tilemap (the ch03 crier bug). Everything else is the arrival's
+    machinery unchanged, which is the point of `_ch05_scene_and_variant`.
+
+    The substituted box is her SECOND, where she reads Lupin -- "...Wolf. You're hers. Awoken.
+    But you're free? With them?" On the no-parley path there is no wolf to read, so the variant
+    makes the PARTY itself the revelation instead: everyone Basil has ever met belonged to
+    Ravisin, so people who belong to nobody are the whole surprise. Boxes 1 and 3 -- the tourist
+    joke and the ask the CUSA answers -- are shared by both arms.
+    """
+    return _ch05_scene_and_variant(
+        chap, CH05_BASIL_JOIN_SLOT, CH05_BASIL_JOIN_NO_LUPIN_MSG,
+        CH05_BASIL_JOIN_PODIUMS,
+        _make_fid({}, 'ch05 join: unknown cutscene speaker'), width=29)
 
 
 def ch05_opening_backdrop_block():
@@ -10651,6 +10719,83 @@ def ch05_opening_backdrop_block():
                 '    Text(0x%X) /* 4 -- no Lupin: Pinky reads the trail instead */\n'
                 % CH05_ARRIVAL_NO_LUPIN_MSG)
             + '    FADI(16) /* fade the ridge out; LOMA builds the real map next */\n')
+
+
+def ch05_basil_join_block(basil_char):
+    """Scene 5, played AFTER the prep CALL: the map comes up, Basil speaks, Basil joins.
+
+    Vanilla puts this beat's twin (0x9C2) BEFORE its prep CALL and we cannot, which is the one
+    place ch05's inherited channel had to be overruled. Vanilla LOAD1s Eirika's group onto the
+    street first, so its street scenes have a party to play to; ours arrives through Pick Units
+    (the ally table is never LOADed on a prep chapter -- decisions.md "How the deploy cap + prep
+    screen are actually wired"), so before the CALL the field holds sixteen risen dead, Ravisin,
+    and a green shrub addressing an empty pocket. After it, the nine the player chose are
+    standing at the stair-foot and Basil is at the pocket's mouth two tiles above them.
+
+    The shape is then vanilla's own after-prep block, which is what its 0x9C3/0x9C4 are:
+    `FADU(16)` -- the shared prep prologue fades to black and leaves it there, so anything
+    VISIBLE after the CALL brings its own fade-up -- then CUMO/STAL/CURE to put the camera on
+    the speaker (`PutTalkBubble` anchors to a unit, and hers is the only face here), then the
+    branch, then the `CUSA` that was already the last thing this script did. The join text and
+    the join itself are now one beat: she asks to be taken to Sahnar on box 3 and turns the
+    party's colours on the next command.
+    """
+    _slot, msg, _boxes, what = CH05_BASIL_JOIN_SLOT
+    beat = lambda m, why: ('    TEXTSTART\n'
+                           '    TEXTSHOW(0x%X) /* 5 -- %s */\n'
+                           '    TEXTEND\n'
+                           '    REMA\n' % (m, why))
+    return ('    FADU(16) /* the prep prologue left the screen black; scene 5 is VISIBLE */\n'
+            '    CUMO_CHAR(%s) /* the bubble anchors to a unit -- Basil at the pocket mouth */\n'
+            '    STAL(60)\n'
+            '    CURE\n' % basil_char
+            + branch_on_check_alive(
+                CH05_LUPIN_CHARACTER,
+                beat(msg, what),
+                beat(CH05_BASIL_JOIN_NO_LUPIN_MSG,
+                     'no Lupin: the PARTY is the revelation instead'),
+                label_base=CH05_BASIL_JOIN_LABEL_BASE))
+
+
+def ch05_beginning_script(chap, basil_char, seed_load='', lupin_load=''):
+    """`CH05_BEGINNING_SCRIPT` end to end: the opening's seven-scene spine around LOMA and prep.
+
+    Assembled here rather than inline in the injector so the ORDER is testable without a build --
+    it is the first thing a reader loses, and it is load-bearing three times over: the backdrop
+    scenes must precede `LOMA` (they end faded to black, which is what `LOMA` wants anyway), the
+    join must FOLLOW prep (see `ch05_basil_join_block`), and the two `CHECK_ALIVE` branches share
+    one event list, so their labels must not collide.
+
+    `seed_load`/`lupin_load` are the proof-ROM injections (`--ch05-boot`, `--ch05-lupin`) and are
+    empty on the shipping build.
+    """
+    return ('{\n'
+            '    MUSC(SONG_TENSION)\n'
+            + lupin_load
+            # The BACKDROP half (#25): scenes 1-4, before the party arrives and before there is
+            # any map of ours to stand on. Vanilla Ch5 opens the same way.
+            + ch05_opening_backdrop_block() +
+            '    SVAL(EVT_SLOT_B, 0x0) /* map camera origin for the reload */\n'
+            '    LOMA(0x%X) /* RestartBattleMap -- build the ch05 map fresh */\n'
+            % CH05_HOST_INDEX
+            + '    LOAD1(0x1, %s) /* the 16 risen tomb-guard */\n    ENUN\n'
+            % CH05_LINE_TABLE
+            + '    LOAD1(0x1, %s) /* Basil, GREEN at the pocket mouth */\n    ENUN\n'
+            % CH05_BASIL_TABLE
+            + seed_load
+            # NO FADU here: the shared prep prologue fades to black itself before drawing
+            # Preparations, so revealing the freshly-LOMA'd map now only flashes it.
+            + '    CALL(%s) /* preparations: pick %d; lord force-deployed */\n'
+            % (CH05_PREP_SCRIPT, chap['deployment']['deploy_limit'])
+            # Scene 5 and the join, AFTER Preparations and deliberately so -- twice over. Basil is
+            # GREEN across the prep screen (prep only ever touches PLAYER units, so a green body is
+            # invisible to Pick Units and costs no slot) and becomes the party's tenth unit the
+            # moment the CUSA lands, on top of the nine the player chose, which is what the chapter
+            # is priced for; a CUSA before the CALL would hand PREP a blue unit it never listed.
+            # And the party she is talking TO does not exist on the field until prep places it.
+            + ch05_basil_join_block(basil_char)
+            + '    CUSA(%s) /* green -> blue: she asked on box 3, and this is the answer */\n'
+            '    ENUT(8)\n    EVBIT_T(7)\n    ENDA\n}' % basil_char)
 
 
 def _vanilla_message_body(msg_id, source=None):
@@ -10943,41 +11088,10 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, verbose=True):
     # here, because ReadGameSave has filled gUnitArrayBlue before the chapter's events run.
     lupin_load = ('    LOAD1(0x1, %s) /* --ch05-lupin: the alive arm needs a live Lupin */\n'
                   '    ENUN\n' % CH05_LUPIN_PROOF_TABLE) if lupin_proof else ''
-    beginning = ('{\n'
-                 '    MUSC(SONG_TENSION)\n'
-                 + lupin_load
-                 # The BACKDROP half of the opening (#25): the three tomb scenes that play
-                 # before the party arrives, ahead of LOMA because they end faded to black and
-                 # LOMA wants the screen black anyway. Vanilla Ch5 opens the same way.
-                 + ch05_opening_backdrop_block() +
-                 '    SVAL(EVT_SLOT_B, 0x0) /* map camera origin for the reload */\n'
-                 '    LOMA(0x%X) /* RestartBattleMap -- build the ch05 map fresh */\n'
-                 % CH05_HOST_INDEX
-                 + '    LOAD1(0x1, %s) /* the 16 risen tomb-guard */\n    ENUN\n'
-                 % CH05_LINE_TABLE
-                 + '    LOAD1(0x1, %s) /* Basil, GREEN at the pocket mouth */\n    ENUN\n'
-                 % CH05_BASIL_TABLE
-                 + seed_load
-                 # NO FADU: the shared prep prologue fades to black itself before drawing
-                 # Preparations, so revealing the freshly-LOMA'd map here only flashes it.
-                 + '    CALL(%s) /* preparations: pick %d; lord force-deployed */\n'
-                 % (CH05_PREP_SCRIPT, chap['deployment']['deploy_limit'])
-                 # The join, AFTER Preparations and deliberately so. Basil is GREEN across the
-                 # prep screen (prep only ever touches PLAYER units, so a green body is invisible
-                 # to Pick Units and costs no slot), and becomes the party's tenth unit the moment
-                 # the CUSA lands -- on top of the nine the player chose, which is what the
-                 # chapter is priced for. CUSA before the CALL would hand PREP a blue unit it
-                 # never listed.
-                 # No TEXTSHOW: see CH05_BASIL_JOIN_MSG for why the beat is silent until the
-                 # dialogue pass. Keeping it silent also keeps this script in vanilla's safe
-                 # shape -- a script that continues with VISIBLE content after the prep prologue
-                 # needs its own FADU(16) first (the prologue fades to black and leaves it
-                 # there); the ones that ENDA straight out, as this does, do not.
-                 + '    CUSA(%s) /* green -> blue: Basil is the escort now */\n'
-                 '    ENUT(8)\n    EVBIT_T(7)\n    ENDA\n}'
-                 % basil_char)
-    script = _replace_brace_block(script, CH05_BEGINNING_SCRIPT + '[] =', beginning,
-                                  CH05_EVENTSCRIPT_H)
+    script = _replace_brace_block(
+        script, CH05_BEGINNING_SCRIPT + '[] =',
+        ch05_beginning_script(chap, basil_char, seed_load, lupin_load),
+        CH05_EVENTSCRIPT_H)
     for turn in sorted(CH05_WAVE_TABLES):
         script = _replace_brace_block(
             script, CH05_WAVE_SCRIPTS[turn] + '[] =',
@@ -11033,7 +11147,7 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, verbose=True):
     set_message_body(lines, CH05_ERUPTION_MSG, ch05_eruption_message(chap))
     set_message_body(lines, CH05_RAVISIN_DEATH_MSG, ch05_ravisin_death_message(chap))
     set_message_body(lines, CH05_SAHNAR_TALK_MSG, ch05_sahnar_talk_message(chap))
-    for msg_id, body in ch05_opening_messages(chap):
+    for msg_id, body in ch05_opening_messages(chap) + ch05_basil_join_messages(chap):
         set_message_body(lines, msg_id, body)
     for msg_id, body in arena_wiring['messages']:
         set_message_body(lines, msg_id, body)

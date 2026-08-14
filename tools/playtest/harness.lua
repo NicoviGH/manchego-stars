@@ -7483,6 +7483,86 @@ scenarios.recordch05openinglupin = function()
     return scenarios.recordch05opening()
 end
 
+-- recordch05join (#25): the MOTION proof for scene 5 -- Basil trundles up, cracks the tourist
+-- joke, and JOINS. It is a SEPARATE film from recordch05opening rather than an extension of it,
+-- because the two sit on opposite sides of Preparations: the opening's terminal IS the prep
+-- screen, and this beat plays after it (decisions.md -> "Inheriting a channel is not inheriting
+-- a POSITION"). Re-filming four proven backdrop scenes to reach a fourth-quarter beat would also
+-- spend the whole record budget on footage #279 already shipped.
+-- What only a run can answer: whether the map is actually UP behind the bubble. The beat's FADU
+-- is ours -- the shared prep prologue fades to black and leaves it there -- and PutTalkBubble
+-- anchors to a unit, so a missing fade or a camera still parked on the deploy pocket both render
+-- as "the text played and looked wrong", which no memory assertion sees.
+-- The terminal is BASIL TURNING BLUE **on the expected number of boxes**, not "dialogue happened".
+-- Both are load-bearing. The CUSA is the join, so a film that ends on it has proved the beat
+-- reached its own point; and the box COUNT is the only thing that says WHICH ARM ran -- Lupin's is
+-- 3, the no-Lupin arm is 4, because Nicolas's authored break splits the substitute turn (#25).
+-- Both arms run fine, which is the whole hazard: a scenario that checked only "a scene played"
+-- would pass on either, and so would one that merely LOGGED the count. `expect` is therefore part
+-- of the terminal -- on the wrong arm it is never satisfied and recordCutscene fails the run.
+-- It cannot be a second `result()` call instead: `result` only LOGS, and run.sh breaks on the
+-- first RESULT line it polls, so a FAIL logged after recordCutscene's PASS may never be read.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05join (needs a CH05BOOT=1 ROM).
+scenarios.recordch05join = function(expect)
+    local BASIL = 0x13                       -- CHARACTER_ARTUR
+    expect = expect or 4                     -- ch05boot has no Lupin: the 4-box arm
+    local boxes, waiting, warned = 0, false, false
+    return recordCutscene({
+        tag = "ch05join", speed = "normal", maxFrames = 9000, shotEvery = 4, pressEvery = 90,
+        pre = function()
+            -- Fast config BEFORE the boot, never after: this ROM is 49 boxes of opening ahead of
+            -- Preparations, and a scenario that pokes it afterwards burns most of its budget on a
+            -- scene it does not film (the standing ch05boot trap).
+            pokeFastConfig()
+            -- `bootToMap(true)` stops AT prep instead of driving through it, which is exactly the
+            -- seam this film starts on. Then exit via Fight! unfilmed, so frame 1 is our FADU.
+            -- The controllerState guard is ch03prep's, and it is not belt-and-braces: bootToMap
+            -- ALSO returns true from its player_map_idle branch, so a missed prep classification
+            -- would hand the opening to advanceBootState, which mashes A through prep AND through
+            -- scene 5 -- and the film would then start after the beat it exists to record, with
+            -- Basil already blue, and PASS having captured nothing.
+            if not bootToMap(true) or controllerState() ~= "prep_main" then
+                return false, "never reached ch05's Preparations"
+            end
+            if not driveThroughPrep() then return false, "Preparations never exited via Fight!" end
+            return true
+        end,
+        afterPre = pokeNormalConfig,
+        until_ = function()
+            -- Count the RISING EDGE of each dialogue wait. recordCutscene advances the boxes
+            -- itself, and this terminal is evaluated before it does, so every box is seen once.
+            local now = controllerState() == "dialogue_wait"
+            if now and not waiting then boxes = boxes + 1 end
+            waiting = now
+            -- Overshoot is decidable the moment it happens, so say so while the log still has
+            -- the context; the generic "never reached its end" arrives much later.
+            if boxes > expect and not warned then
+                warned = true
+                log(string.format("ch05join: box %d is past the expected %d -- the WRONG "
+                    .. "CHECK_ALIVE arm is playing on this ROM", boxes, expect))
+            end
+            if findUnit(SYM.gUnitArrayBlue, 20, BASIL) and boxes == expect then
+                log(string.format("ch05join: Basil is BLUE after %d boxes -- the %s arm; "
+                    .. "the join CUSA landed", boxes,
+                    expect == 3 and "Lupin (3-box)" or "no-Lupin (4-box)"))
+                return true
+            end
+            return false
+        end,
+    })
+end
+
+-- recordch05joinlupin (#25): the same film against ch05lupinboot, whose live Lupin sends scene 5's
+-- CHECK_ALIVE down its ALIVE arm -- so box 2 is Basil reading the wolf ("...Wolf. You're hers.")
+-- rather than reading the party ("...You're none of hers."). One routine, two ROMs, and the 3 it
+-- passes is the ASSERTION that the ROM picked the arm it was built to pick: if the CH05LUPIN
+-- injection or the CHECK_ALIVE ever regresses, this ROM plays the 4-box arm and the terminal is
+-- never met. Delegates rather than aliases, for the verdict-cache attribution reason recorded on
+-- recordch05openinglupin.
+scenarios.recordch05joinlupin = function()
+    return scenarios.recordch05join(3)
+end
+
 -- recordch05recruit (#25): the MOTION proof for the locked Basil->Sahnar Talk at 0x9E8 -- the
 -- chapter's payoff scene, and the review artifact for it. Stills mislead on dialogue (they catch
 -- the typewriter mid-stroke), so what gets reviewed is the film.
