@@ -8291,6 +8291,9 @@ CH05_PREP_SCRIPT = 'EventScr_08591FD8'           # the shared CLEAN/PREP/CLEAN s
 # Our OWN roster tables (declare_unit_table). Named for the chapter whose units are in them.
 CH05_ALLY_TABLE = 'MS_Ch05DeployCap'             # the never-LOADed PREP cap template
 CH05_BOOT_SEED_TABLE = 'MS_Ch05BootSeed'         # --ch05-boot only: an armed party from a cold start
+CH05_LUPIN_PROOF_TABLE = 'MS_Ch05LupinProof'     # --ch05-lupin only: Lupin, LOADed before the
+                                                 # opening's CHECK_ALIVE so the ALIVE arm is
+                                                 # reachable from a cold boot (see inject_ch05)
 CH05_LINE_TABLE = 'MS_Ch05Line'                  # the 16 turn-1 tomb-guardians
 CH05_SAHNAR_TABLE = 'MS_Ch05Sahnar'              # the turn-2 convertible (rises hostile)
 CH05_BASIL_TABLE = 'MS_Ch05Basil'                # Basil, GREEN at the pocket mouth (see below)
@@ -10731,7 +10734,7 @@ def ch05_wave_script(turn, wave_table, sahnar_table=None):
             '    ENDA\n}' % (wave_table, warning, wake))
 
 
-def inject_ch05(campaign, boot=False, verbose=True):
+def inject_ch05(campaign, boot=False, lupin_proof=False, verbose=True):
     """Host Ch5 "The Elven Tomb" (#25) on slot 6: the winterised 1:1 retile of vanilla Ch5,
     the sixteen-strong risen tomb-guard on vanilla Ch5's own fighting tiles, the three
     eruption waves on its raider spawns, the real PREP deploy, and DefeatBoss(Ravisin).
@@ -10796,6 +10799,29 @@ def inject_ch05(campaign, boot=False, verbose=True):
                  for (uid, slot, ce, dce, level), (x, y) in zip(cast, slots)]
     declare_unit_table(CH05_BOOT_SEED_TABLE, seed_rows,
                        'ch05 --ch05-boot armed party seed (cold-start PREP fodder)')
+    # --ch05-lupin ONLY: a one-unit table holding Lupin, LOADed BEFORE the opening's branch so
+    # the ALIVE arm of scene 4 is reachable from a cold boot at all. It exists because a boot ROM
+    # otherwise cannot walk that arm for two independent reasons, either of which alone is fatal:
+    #   * the branch runs before LOMA while the party seed is LOADed after it, so gUnitArrayBlue
+    #     is empty when CHECK_ALIVE asks (decisions.md -> "The --ch05-boot ROM can only ever play
+    #     the NO-Lupin arm"); and
+    #   * Lupin is not IN the seed -- it zips the cast against 9 deploy slots and he is last.
+    # Loading before LOMA is safe: RestartBattleMap (bmio.c:1043) rebuilds map, BGs, sprites and
+    # traps and never touches the unit arrays, so he survives as a roster entry, which is all
+    # CHECK_ALIVE reads. He stands on the first deploy tile; PREP re-picks anyway.
+    if lupin_proof:
+        lupin = next((c for c in cast if c[0] == 'lupin'), None)
+        if lupin is None:
+            sys.exit('ERROR: --ch05-lupin: no `lupin` in ch05\'s cast, so the proof ROM would '
+                     'film the same no-Lupin arm as the plain boot and quietly prove nothing')
+        _uid, lslot, lce, ldce, llevel = lupin
+        declare_unit_table(
+            CH05_LUPIN_PROOF_TABLE,
+            [_ally_unit_entry(leader, lslot, ldce, llevel, slots[0][0], slots[0][1],
+                              ', '.join(CLASS_LOADOUT[lce]),
+                              ' /* Lupin -- --ch05-lupin proof/film ROM only */')],
+            'ch05 --ch05-lupin: Lupin alone, LOADed before the opening branch so CHECK_ALIVE '
+            'finds him and scene 4 plays its ALIVE arm')
 
     line_rows = ch05_enemy_rows(chap)
     declare_unit_table(CH05_LINE_TABLE, line_rows,
@@ -10909,8 +10935,14 @@ def inject_ch05(campaign, boot=False, verbose=True):
         script = f.read()
     seed_load = ('    LOAD1(0x1, %s) /* --ch05-boot: found an armed party */\n'
                  '    ENUN\n' % CH05_BOOT_SEED_TABLE) if boot else ''
+    # --ch05-lupin: put Lupin on the roster BEFORE the opening runs, so scene 4's CHECK_ALIVE
+    # finds him and the ALIVE arm plays. Proof/film ROM ONLY -- the real chain needs nothing
+    # here, because ReadGameSave has filled gUnitArrayBlue before the chapter's events run.
+    lupin_load = ('    LOAD1(0x1, %s) /* --ch05-lupin: the alive arm needs a live Lupin */\n'
+                  '    ENUN\n' % CH05_LUPIN_PROOF_TABLE) if lupin_proof else ''
     beginning = ('{\n'
                  '    MUSC(SONG_TENSION)\n'
+                 + lupin_load
                  # The BACKDROP half of the opening (#25): the three tomb scenes that play
                  # before the party arrives, ahead of LOMA because they end faded to black and
                  # LOMA wants the screen black anyway. Vanilla Ch5 opens the same way.
@@ -11417,12 +11449,23 @@ def main():
                          '"Elven Tomb" on slot 6 with an armed party, the 16 risen '
                          'tomb-guard on vanilla Ch5\'s own fighting tiles, and the three '
                          'eruption waves.')
+    ap.add_argument('--ch05-lupin', action='store_true',
+                    help='PLAYTEST build (#25): with --ch05-boot, LOAD Lupin onto the roster '
+                         'before ch05\'s opening so scene 4\'s CHECK_ALIVE branch takes its '
+                         'ALIVE arm. The plain boot ROM cannot reach that arm at all.')
     args = ap.parse_args()
+    # --ch05-lupin MODIFIES --ch05-boot rather than competing with it (it repoints nothing), so
+    # it is not in the mutual-exclusion list below -- but on its own it would silently build a
+    # plain canonical ROM with one extra unit table nothing loads.
+    if args.ch05_lupin and not args.ch05_boot:
+        sys.exit('ERROR: --ch05-lupin only means anything with --ch05-boot: it exists to make '
+                 'the opening branch\'s ALIVE arm reachable from a COLD boot.')
     # Snapshot the flags AS PASSED, before --lord-boot implies --test-chapter below:
     # the build stamp has to describe the `make` invocation, not the derived state.
     _requested_flags = {'TESTCH': args.test_chapter, 'LORDBOOT': args.lord_boot,
                         'MONTAGE': args.montage, 'CH03BOOT': args.ch03_boot,
-                        'CH04BOOT': args.ch04_boot, 'CH05BOOT': args.ch05_boot}
+                        'CH04BOOT': args.ch04_boot, 'CH05BOOT': args.ch05_boot,
+                        'CH05LUPIN': args.ch05_lupin}
     if args.lord_boot:
         args.test_chapter = True  # the fast-boot rides the sandbox
     # Each fast-boot repoints New Game at its own slot, so at most one may win. Named
@@ -11534,7 +11577,8 @@ def main():
         _scopes.run(inject_ch04, args.campaign, boot=args.ch04_boot)
         chain_ch03_to_ch04()
         print('chapter 5 (#25):')
-        _scopes.run(inject_ch05, args.campaign, boot=args.ch05_boot)
+        _scopes.run(inject_ch05, args.campaign, boot=args.ch05_boot,
+                    lupin_proof=args.ch05_lupin)
         _scopes.run(inject_ch05_visit_faces, args.campaign)  # the four reliquary residents' skeleton busts
         chain_ch04_to_ch05()
         if args.ch05_boot:

@@ -40,6 +40,12 @@ rom_configs:
     CH04BOOT: 1
   ch05boot:
     CH05BOOT: 1
+  # Same boot, plus Lupin on the roster BEFORE the opening's CHECK_ALIVE -- the ONLY way a
+  # cold boot can reach scene 4's ALIVE arm (decisions.md -> "The --ch05-boot ROM can only
+  # ever play the NO-Lupin arm").
+  ch05lupinboot:
+    CH05BOOT: 1
+    CH05LUPIN: 1
 
 # Ported verbatim from run.sh's two timing `case` statements.
 classes:
@@ -57,7 +63,7 @@ classes:
     deadline: 600
   - match: "recordch02ending" # routs the whole band before it films
     deadline: 600
-  - match: "recordch05opening" # 49 boxes across four scenes, over two BGs -- our longest cutscene
+  - match: "recordch05opening*" # 49 boxes across four scenes, over two BGs -- our longest cutscene
     deadline: 900
   - match: "llm"              # 18 turns x a 90s sidecar handshake budget
     deadline: 2100
@@ -285,6 +291,10 @@ scenarios:
     kind: record
   recordch05opening:
     rom: ch05boot
+    host_chapter: 6
+    kind: record
+  recordch05openinglupin:                              # the same film, Lupin's arm (#25)
+    rom: ch05lupinboot
     host_chapter: 6
     kind: record
   ch04snag:

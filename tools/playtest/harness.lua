@@ -7466,6 +7466,22 @@ scenarios.recordch05opening = function()
     })
 end
 
+-- recordch05openinglupin (#25): the SAME film against the ch05lupinboot ROM, which carries a
+-- live Lupin, so scene 4's CHECK_ALIVE takes its ALIVE arm and box 1 is Lupin's "The trail
+-- leads here" instead of Pinky's "The tracks stop here". One routine, two ROMs: the scenario
+-- drives identical input either way and the ROM decides which arm plays, which is the point.
+-- Measured 2026-08-14, the two films agree through scenes 1-3 (bar 2-4 frame emulator timing
+-- jitter around fades) and diverge from scene 4's FIRST BOX to the end. The tail divergence is
+-- not four scenes of difference: the two arms' box 1 are different lengths, so everything after
+-- is time-shifted and no frame lines up again. Compare them by eye, not by frame equality.
+-- Delegates rather than aliases: matrix.py attributes harness SOURCE per function for the
+-- verdict cache, and a bare `= scenarios.x` assignment is a name it cannot attribute a body
+-- to. Caveat that buys: this chunk's fingerprint does not move when recordch05opening's body
+-- changes, so re-film with --no-verdict-cache after editing that routine.
+scenarios.recordch05openinglupin = function()
+    return scenarios.recordch05opening()
+end
+
 -- recordch05recruit (#25): the MOTION proof for the locked Basil->Sahnar Talk at 0x9E8 -- the
 -- chapter's payoff scene, and the review artifact for it. Stills mislead on dialogue (they catch
 -- the typewriter mid-stroke), so what gets reviewed is the film.
