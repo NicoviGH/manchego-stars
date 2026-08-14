@@ -627,6 +627,11 @@ events:
       - sahnar: "Go on, now. She'll want you before dawn."
       # (She goes. A few steps on root-feet. Then stops and looks back. The closing aside is
       #  Joshua's MSG_9BB shape beat for beat: observation -> wish -> resolve, 3 boxes/5 lines.)
+      # SAHNAR LEAVES HERE, and the three boxes below are Basil alone talking about her absence.
+      # Without this the stage direction was COMMENT ONLY and Sahnar stood at her podium through
+      # "...And there she stays" (Nicolas, 2026-08-14). `exits:` emits [OpenX][ClearFace] -- FE8's
+      # own ~16-frame face fade -- at exactly this point. Not a box: no A-press.
+      - exits: sahnar
       - basil: "...And there she stays."
       - basil: "I wish I could share my berries with her."
       - basil: "One day I'll give her one."

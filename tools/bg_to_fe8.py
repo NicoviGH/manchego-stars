@@ -25,6 +25,52 @@ from PIL import Image
 W, H = 240, 160
 
 
+def trim_uniform_border(im, min_keep=0.5):
+    """Strip a letterbox MAT: edge rows/columns that are a single flat colour.
+
+    The FE9-10 CG rips ship this way -- a 240-wide picture inside a 256-wide canvas, the
+    spare 16 columns filled flat black. Centre-cropping such a source to 240 keeps HALF the
+    bar and discards an equal strip of real picture on the opposite side, which is exactly
+    what shipped on both ch05 backdrops before this existed (visible in-engine, 2026-08-14).
+
+    The test is UNIFORMITY, not darkness: a border column of one colour carries no picture,
+    whatever that colour is (black here, but a white or magenta mat is the same artifact).
+    Measured on the two real rips, a bar column holds exactly 1 distinct colour while the
+    art beside it holds 8-12, so the two are not near each other and no tolerance is needed.
+
+    `min_keep` is a safety rail for pictures that are largely flat by design -- a night sky,
+    a fade to black. Trimming stops rather than give back less than this fraction of either
+    dimension; a legitimately flat-edged image is left for a human to crop.
+
+    The SECOND rail matters more, and review caught its absence: a trim is refused outright if
+    it would drop either dimension below the 240x160 target when the source was at or above it.
+    Otherwise a source already at 240x160 carrying one flat edge row -- a deliberate letterbox
+    line, which real art has -- came out 240x159, and `fit_240x160` then NEAREST-UPSCALED it back,
+    changing 28640 of 38400 pixels where the old code had returned the image untouched. Trimming
+    exists to avoid keeping a mat; it must never force an upscale to pay for that.
+    """
+    a = np.asarray(im.convert('RGB'))
+    h, w = a.shape[:2]
+    flat_row = [len(np.unique(a[y].reshape(-1, 3), axis=0)) == 1 for y in range(h)]
+    flat_col = [len(np.unique(a[:, x].reshape(-1, 3), axis=0)) == 1 for x in range(w)]
+
+    def span(flat, size):
+        lo, hi = 0, size
+        while lo < hi and flat[lo]:
+            lo += 1
+        while hi > lo and flat[hi - 1]:
+            hi -= 1
+        return (0, size) if (hi - lo) < max(1, int(size * min_keep)) else (lo, hi)
+
+    top, bottom = span(flat_row, h)
+    left, right = span(flat_col, w)
+    if (left, top, right, bottom) == (0, 0, w, h):
+        return im
+    if (w >= W > right - left) or (h >= H > bottom - top):
+        return im               # would force an upscale to strip the mat -- keep the mat
+    return im.crop((left, top, right, bottom))
+
+
 def fit_240x160(im, mode):
     """Center the source in a 240x160 frame: 'crop' fills (cover), 'pad' letterboxes."""
     im = im.convert('RGB')
@@ -158,6 +204,9 @@ def main(argv):
     ap.add_argument('--fit', choices=('crop', 'pad'), default='crop')
     ap.add_argument('--banks', type=int, default=8,
                     help='bank budget when the source needs refitting (<=8)')
+    ap.add_argument('--no-trim', action='store_true',
+                    help='keep a uniform border instead of stripping it (see '
+                         'trim_uniform_border); only for art whose flat mat is intentional')
     args = ap.parse_args(argv)
     # 8 is a hardware/engine ceiling, not a preference: eventscr.c gives a BACG background
     # palettes 8-15 (ApplyPalettes(pal, 8, 8)). A higher budget emits a BG the engine cannot
@@ -166,7 +215,14 @@ def main(argv):
         sys.exit('ERROR: --banks must be 1..8 (FE8 gives a BACG background 8 palettes); got %d'
                  % args.banks)
 
-    rgb = fit_240x160(Image.open(args.src), args.fit)
+    src = Image.open(args.src)
+    if not args.no_trim:
+        trimmed = trim_uniform_border(src)
+        if trimmed.size != src.size:
+            print('%s: trimmed a uniform border %s -> %s (letterbox mat)'
+                  % (args.src, src.size, trimmed.size), file=sys.stderr)
+        src = trimmed
+    rgb = fit_240x160(src, args.fit)
     a = (np.array(rgb) >> 3) << 3                       # GBA 5-bit depth
     q = Image.fromarray(a.astype('uint8')).quantize(
         colors=min(args.colors, 128), method=Image.MEDIANCUT, dither=Image.NONE)

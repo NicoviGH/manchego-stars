@@ -2112,8 +2112,12 @@ class Ch05OpeningBackdropScenes(unittest.TestCase):
             script = bc._chapter_event_by_slot(chap, 'chapter_start', slot, 'test')['script']
             want_boxes, want_speakers = expected[slot]
             self.assertEqual(want_boxes, boxes, '%s: table box count' % slot)
-            self.assertEqual(want_boxes, len(script), '%s: YAML box count' % slot)
-            self.assertEqual(want_speakers, {next(iter(b)) for b in script})
+            # Box count excludes stage directions (`exits:`): they cost no A-press.
+            self.assertEqual(want_boxes, bc._script_box_count(script),
+                             '%s: YAML box count' % slot)
+            self.assertEqual(want_speakers,
+                             {next(iter(b)) for b in script
+                              if next(iter(b)) not in bc.SCRIPT_DIRECTIVES})
 
     def test_every_speaker_wears_our_face_and_never_the_donor_slots_own(self):
         """The #276 regression, one scene earlier: our cast wears vanilla slots, so a scene
@@ -2240,6 +2244,76 @@ class Ch05OpeningBackdropScenes(unittest.TestCase):
         self.assertEqual((240, 160), im.size)
         banks = max(int(i) // 16 for i in set(im.getdata())) + 1
         self.assertLessEqual(banks, 6, '%d banks -- the fade procs apply only six' % banks)
+
+
+class ASpeakerWhoLeavesMidSceneFadesOut(unittest.TestCase):
+    """`exits:` is the script directive for a speaker who WALKS OFF while the scene runs on.
+
+    Found by Nicolas watching ch05's opening (2026-08-14): Sahnar goes, and then Basil delivers
+    three boxes about her absence — *"...And there she stays."* — with Sahnar still standing at
+    her podium the whole time. The stage direction was in the YAML as a comment ("She goes. A few
+    steps on root-feet.") and nothing rendered it.
+
+    `_script_to_message`'s podium manager infers a face LOAD from who speaks next, but it cannot
+    infer a face EXIT: nobody speaks from that podium again, so it has no reason to touch it. Its
+    own docstring names this as the one control it does not infer. `[OpenX][ClearFace]` is FE8's
+    own answer — scene.c fades that podium's face over ~16 frames and frees its gFaces slot.
+    """
+    def _msg(self, script, staging=None):
+        return bc._script_to_message(script, staging or {
+            'basil':  ('[OpenMidLeft]', '[FID_Artur]'),
+            'sahnar': ('[OpenMidRight]', '[FID_Marisa]')}, width=42)
+
+    def test_the_leaving_speakers_podium_is_cleared_where_she_goes(self):
+        out = self._msg([{'sahnar': 'Go on, now.'},
+                         {'exits': 'sahnar'},
+                         {'basil': '...And there she stays.'}])
+        self.assertIn('[OpenMidRight][ClearFace]', out)
+        self.assertLess(out.index('[OpenMidRight][ClearFace]'),
+                        out.index('...And there she stays.'),
+                        'she has to be gone BEFORE the line about her being gone')
+
+    def test_the_remaining_speaker_is_untouched(self):
+        out = self._msg([{'basil': 'one'}, {'sahnar': 'two'},
+                         {'exits': 'sahnar'}, {'basil': 'three'}])
+        self.assertEqual(1, out.count('[FID_Artur]'), 'Basil must not be reloaded or cleared')
+        self.assertNotIn('[OpenMidLeft][ClearFace]', out)
+
+    def test_an_exit_breaks_the_same_speaker_coalescing(self):
+        """Basil's boxes either side of the exit must NOT merge into one block, or the
+        [ClearFace] would land after both and the fade would play too late."""
+        out = self._msg([{'sahnar': 'Go on, now.'}, {'basil': 'before'},
+                         {'exits': 'sahnar'}, {'basil': 'after'}])
+        self.assertLess(out.index('before'), out.index('[OpenMidRight][ClearFace]'))
+        self.assertLess(out.index('[OpenMidRight][ClearFace]'), out.index('after'))
+
+    def test_a_speaker_who_returns_gets_a_fresh_face(self):
+        out = self._msg([{'sahnar': 'one'}, {'exits': 'sahnar'},
+                         {'basil': 'two'}, {'sahnar': 'three'}])
+        self.assertEqual(2, out.count('[LoadFace][FID_Marisa]'))
+
+    def test_exiting_someone_who_is_not_on_screen_fails_loudly(self):
+        """A drifted directive is a silent no-op otherwise, which is how the bug it fixes
+        got shipped in the first place."""
+        with self.assertRaises(SystemExit):
+            self._msg([{'basil': 'one'}, {'exits': 'sahnar'}])
+
+    def test_the_directive_is_not_counted_as_a_box(self):
+        """Box counts are locked per scene. A stage direction is not an A-press."""
+        script = [{'basil': 'one'}, {'exits': 'sahnar'}, {'basil': 'two'}]
+        self.assertEqual(2, bc._script_box_count(script))
+
+    def test_ch05_scene_1_actually_carries_it(self):
+        chap = bc._load_chapter_yaml('rime-of-the-frostmaiden', bc.CH05_CHAPTER_YAML)
+        script = bc._chapter_event_by_slot(chap, 'chapter_start', 'vanilla 0x9BB', 'test')['script']
+        exits = [i for i, e in enumerate(script) if 'exits' in e]
+        self.assertEqual(1, len(exits), 'Sahnar leaves exactly once')
+        self.assertEqual('sahnar', script[exits[0]]['exits'])
+        self.assertEqual('...And there she stays.',
+                         bc._fe_dialogue_text(next(iter(script[exits[0] + 1].values()))),
+                         'the exit sits immediately before the line about her absence')
+        body = dict(bc.ch05_opening_messages(chap))[0x9E9]
+        self.assertLess(body.index('[OpenMidRight][ClearFace]'), body.index('And there she stays'))
 
 
 class TheDashGlueRespectsTheLineWidth(unittest.TestCase):

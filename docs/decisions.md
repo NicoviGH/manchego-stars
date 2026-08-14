@@ -4336,6 +4336,64 @@ that, plus walks the dash through every gap in a sentence at every width from 20
 trusting the one sentence that found the bug. No authored box is anywhere near the atomic case; if
 one ever is, reword it rather than loosening the glue.
 
+### The alive arm needed a LEVER, and the boot seed was a second reason it had none (2026-08-14, #25)
+
+`--ch05-lupin` (with `--ch05-boot`) `LOAD1`s a one-unit table holding Lupin **before** the opening
+runs, which is what makes scene 4's ALIVE arm reachable from a cold boot at all. Nicolas asked for
+both paths on film; only one of them could be made.
+
+**There were two independent reasons, either fatal on its own** — the second only surfaced when the
+first was being fixed, which is why it is written down:
+  1. the branch runs before `LOMA` while the boot party seed is `LOAD1`ed after it, so
+     `gUnitArrayBlue` is empty when `CHECK_ALIVE` asks (the ADR above);
+  2. **Lupin is not in that seed.** It zips the cast against 9 deploy slots and he is last, so he
+     falls off the end. Even hoisting the seed above the branch would still have played the
+     no-Lupin arm — and would have looked like the fix working.
+
+Loading pre-`LOMA` is safe, and that was checked rather than assumed: `RestartBattleMap`
+(`bmio.c:1043`) rebuilds map, BGs, sprites and traps and **never touches the unit arrays**, so the
+unit survives as a roster entry, which is all `CHECK_ALIVE` reads.
+
+**What the two films do and do not prove.** Measured: they agree through scenes 1-3 (bar 2-4 frame
+emulator timing jitter) and diverge from scene 4's FIRST BOX to the end — the tail is not four
+scenes of difference, it is the two box 1s being different lengths and time-shifting everything
+after, so no frame lines up again. "They differ only in box 1" is therefore **not testable by frame
+equality**, and the harness comment no longer claims it is. Compare by eye.
+
+Against #25's four states this settles **two**: *never recruited* (the plain boot film) and
+*recruited, alive, on the roster* (the proof ROM). **Benched** and **recruited-then-killed** are
+still only a decomp reading — `CHECK_ALIVE` ignores `US_NOT_DEPLOYED` and treats `US_DEAD` as
+absent — and a reading is not a run.
+
+### A letterbox mat is not picture, and a CENTRE crop keeps half of it (2026-08-14, #25)
+
+Nicolas, looking at the shipped ch05 opening: *"you see the black bar to the right in the
+background?"* He was right, and it was in **both** ch05 backdrops.
+
+The FE-Repo's `FE9-10 CG Rips` are **letterboxed**: a 240-wide picture sitting in a 256-wide
+canvas, the spare 16 columns filled flat black. `bg_to_fe8.py --fit crop` centre-crops, taking
+columns 8..247 — so it kept **half the mat** on the right and threw away **8 columns of real
+picture** on the left. Both `bg_ElvenTomb` and `bg_ForestOutskirtsWinter` shipped that way.
+
+**What let it through is the part worth remembering.** Each BG was vendored against the check
+*"0 of 38400 pixels differ from the 5-bit source crop"* — and that check passed, correctly. It
+proves the CONVERSION is faithful to the crop. It says nothing about whether the crop was the
+right crop, because the crop is on both sides of the comparison. A fidelity check cannot audit
+its own reference frame. (Same shape as `decisions.md` → "A scenario's verdict only covers what
+it READS".) The check now compares against the source PICTURE, and a test asserts no shipped BG
+has a flat edge column.
+
+**The detector is UNIFORMITY, not darkness.** Measured on the two real rips, a mat column holds
+exactly **1** distinct colour while the art beside it holds **8–12** — so the two are nowhere near
+each other and no tolerance is needed. Keying on "is it black" would have missed a white or
+magenta mat and risked eating genuinely dark art (the tomb's left edge is brightness ~38 and is
+real stonework). `trim_uniform_border` strips edge rows/columns that are a single flat colour,
+with a `min_keep` rail so a picture that is largely flat by design (a night sky, a fade to black)
+is left alone rather than trimmed to nothing.
+
+Both BGs now land **1:1 with no scaling and no crop of real art at all** — the trimmed source is
+exactly 240x160. Bank counts are unchanged (2 and 3).
+
 ### An FEditor `L` is an authoring bracket, not an instruction (2026-08-08, #25)
 
 Sahnar's Specter is the first vendored anim using FEditor's loop syntax — a bare `L` (`LOOPSTART {`)

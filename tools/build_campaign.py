@@ -1080,6 +1080,14 @@ def _fe_dialogue_text(s):
     return ' '.join(s.split())
 
 
+# Script pseudo-entries: stage business a cutscene `script:` carries alongside its dialogue.
+# They are NOT boxes (no A-press) -- see _script_box_count. `location_card`/`fade_to_black`/
+# `beat_break` are staged by the EVENT SCRIPT (or split the beat into separate messages);
+# `exits` is staged inside the message body, being a face control rather than a scene control.
+SCRIPT_DIRECTIVES = ('location_card', 'fade_to_black', 'beat_break', 'exits')
+_SCRIPT_EXIT = object()   # marker block for `exits:`, kept distinct from any speaker name
+
+
 def _wrap_fe_lines(text, width=29):
     """Word-wrap dialogue to GBA text lines. Default width matches vanilla's ON-MAP
     messages (MSG_910/911 top out at 29 chars): map speech bubbles auto-size to the
@@ -1201,7 +1209,14 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
     blocks = []   # (speaker, [page, ...]); page = 'line1[LF]\nline2'
     for entry in script:
         (speaker, text), = entry.items()
-        if speaker in ('location_card', 'fade_to_black', 'beat_break'):
+        if speaker == 'exits':
+            # A speaker who WALKS OFF while the scene runs on. Carried through as a marker
+            # rather than skipped, because it has to fire at this POINT in the message -- and
+            # because it must break the same-speaker coalescing below, or the fade would play
+            # after the lines it is supposed to precede.
+            blocks.append((_SCRIPT_EXIT, text))
+            continue
+        if speaker in SCRIPT_DIRECTIVES:
             continue
         lines = _wrap_fe_lines(_fe_dialogue_text(text), width)
         pages = ['[LF]\n'.join(lines[p:p + 2]) for p in range(0, len(lines), 2)]
@@ -1217,6 +1232,18 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
         live[pos] = '\x00listener'            # sentinel: never matches a real speaker
         lru.append(pos)
     for speaker, pages in blocks:
+        if speaker is _SCRIPT_EXIT:
+            leaving = pages                       # the marker carries the speaker's name
+            open_tag, _fid = staging.get(leaving, (None, None))
+            if open_tag is None or live.get(open_tag) != leaving:
+                sys.exit('ERROR: `exits: %s` but %s holds no podium at that point in the scene '
+                         '-- a stage direction that fires on nobody is a silent no-op, which is '
+                         'how the face it means to fade got left on screen to begin with'
+                         % (leaving, leaving))
+            parts.append(open_tag + '[ClearFace]')
+            del live[open_tag]
+            lru.remove(open_tag)
+            continue
         open_tag, fid_tag = staging[speaker]
         if fid_tag is None:           # faceless stage business -- no face, no slot
             # Emit NO [OpenX] code: those are portrait POSITION anchors (textdefs.txt
@@ -1246,9 +1273,19 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
     return '\n'.join(parts) + (trailing or '') + '[X]'
 
 
+def _script_box_count(script):
+    """A-presses in a cutscene `script:` -- stage directions are not boxes.
+
+    Scene box counts are locked and asserted against the YAML, so a directive that counted as
+    a box would make every such assertion off by one the moment a scene gained one.
+    """
+    return sum(1 for e in script if next(iter(e)) not in SCRIPT_DIRECTIVES)
+
+
 def _beat_is_narration(beat):
     """True if every entry in a scenic beat is faceless `narration` stage-business."""
-    return bool(beat) and all('narration' in e for e in beat)
+    real = [e for e in beat if next(iter(e)) not in SCRIPT_DIRECTIVES]
+    return bool(real) and all('narration' in e for e in real)
 
 
 def _beat_is_faceless(beat, fid):
@@ -1260,7 +1297,7 @@ def _beat_is_faceless(beat, fid):
     (SOLOTEXTBOXSTART), which needs no anchor. (Over a BG the full-screen window sidesteps this, which
     is why the opening/ending don't hit it; the mid-map RBG-execution beat, on-map, does.)"""
     keys = [next(iter(e)) for e in beat
-            if next(iter(e)) not in ('location_card', 'beat_break')]
+            if next(iter(e)) not in SCRIPT_DIRECTIVES]
     return bool(keys) and all(fid(k) is None for k in keys)
 
 
@@ -5959,8 +5996,10 @@ def _stage_beat(beat, fid, home, overrides=None):
     `overrides` moves a speaker for this beat only; faces resolve through the
     chapter's fid function (cf. _cutscene_fid)."""
     ov = overrides or {}
+    # Directives are stage business, not speakers: `fid('exits')` would die in _cutscene_fid as
+    # an "unknown cutscene speaker" the first time a non-ch05 scene used one (review, 2026-08-14).
     return {k: (ov.get(k, home.get(k, '[OpenMidLeft]')), fid(k))
-            for e in beat for k in e}
+            for e in beat for k in e if k not in SCRIPT_DIRECTIVES}
 
 
 def _emit_scene_beats(lines, msg_ids, beats, fid, home, overrides=None,
@@ -7416,16 +7455,21 @@ CAMPAIGN_BGS = [
     # scenes that play before the party arrives. Nicolas's pick 2026-08-13, and the FIRST
     # vendored BG that needed NO refit -- the FE-Repo's FE9-10 rips ship already indexed at 16
     # colours, so bg_to_fe8.py's greedy pack reproduces the source EXACTLY (0 of 38400 pixels
-    # differ from the 5-bit source crop). It lands on 2 banks rather than 1 only because FE8
+    # differ from the 5-bit source picture). It lands on 2 banks rather than 1 only because FE8
     # reserves local index 0 of every bank as transparent -- 15 usable, and the source has 16.
     # Well inside the SIX the fade/transition procs apply, unlike Bremen's 8.
+    # This rip family is LETTERBOXED -- a 240-wide picture in a 256-wide canvas -- and both ch05
+    # BGs first shipped with half the mat still on, because a CENTRE crop keeps half of it and
+    # discards real picture opposite. `trim_uniform_border` strips it, so these land 1:1 with no
+    # scaling. Long form: decisions.md -> "A letterbox mat is not picture".
     ('BG_MS_ELVEN_TOMB',          'bg_ElvenTomb',         '{FE9-10 CG rip}'),
     # ch05 scene 4 (#25): the ridge the party crests, and the first backdrop in the chapter the
     # PARTY is standing in rather than looking at from the tomb's side. It is a SECOND BG in one
     # scene run on purpose -- vanilla Ch5 spends BG_SERAFEW_VILLAGE on four consecutive scenes and
     # switches to BG_TOWN at exactly this beat, when the travellers physically arrive. Same FE9-10
-    # rip family as the tomb, so it needs no refit either: mode-P at 16 colours in, 0 of 38400
-    # pixels different from the 5-bit source crop out. It packs onto 3 banks rather than the tomb's
+    # rip family as the tomb, so it needs no refit either -- and the same letterbox mat, stripped
+    # the same way: mode-P at 16 colours in, 0 of 38400 pixels different from the 5-bit source
+    # PICTURE out. It packs onto 3 banks rather than the tomb's
     # 2 (16 source colours against 15 usable per bank, and this picture's tiles straddle the split
     # differently), still inside the SIX the fade/transition procs apply.
     ('BG_MS_FOREST_OUTSKIRTS_WINTER', 'bg_ForestOutskirtsWinter', '{FE9-10 CG rip}'),
@@ -8250,6 +8294,9 @@ CH05_PREP_SCRIPT = 'EventScr_08591FD8'           # the shared CLEAN/PREP/CLEAN s
 # Our OWN roster tables (declare_unit_table). Named for the chapter whose units are in them.
 CH05_ALLY_TABLE = 'MS_Ch05DeployCap'             # the never-LOADed PREP cap template
 CH05_BOOT_SEED_TABLE = 'MS_Ch05BootSeed'         # --ch05-boot only: an armed party from a cold start
+CH05_LUPIN_PROOF_TABLE = 'MS_Ch05LupinProof'     # --ch05-lupin only: Lupin, LOADed before the
+                                                 # opening's CHECK_ALIVE so the ALIVE arm is
+                                                 # reachable from a cold boot (see inject_ch05)
 CH05_LINE_TABLE = 'MS_Ch05Line'                  # the 16 turn-1 tomb-guardians
 CH05_SAHNAR_TABLE = 'MS_Ch05Sahnar'              # the turn-2 convertible (rises hostile)
 CH05_BASIL_TABLE = 'MS_Ch05Basil'                # Basil, GREEN at the pocket mouth (see below)
@@ -8615,16 +8662,23 @@ def variant_beat(beat, fallback, err_label):
         sys.exit('ERROR: %s: fallback declares %d boxes, %d replaces, %d script lines '
                  '-- all three must agree' % (err_label, len(boxes), len(anchors), len(subs)))
     out = list(beat)
+    # `boxes:` are A-PRESS numbers, not list positions, and a script may carry stage directions
+    # (`exits:` and friends) that are not boxes. Map one to the other rather than indexing the
+    # raw list: without this, a directive added ABOVE a fallback silently shifts every index
+    # past it -- caught by the anchor assertion below, but as a confusing "the locked script
+    # moved" rather than the truth.
+    positions = [i for i, e in enumerate(beat) if next(iter(e)) not in SCRIPT_DIRECTIVES]
     for idx, anchor, sub in zip(boxes, anchors, subs):
-        if not 1 <= idx <= len(beat):
+        if not 1 <= idx <= len(positions):
             sys.exit('ERROR: %s: fallback box %d is outside the %d-box scene'
-                     % (err_label, idx, len(beat)))
-        (_, text), = beat[idx - 1].items()
+                     % (err_label, idx, len(positions)))
+        at = positions[idx - 1]
+        (_, text), = beat[at].items()
         if not _fe_dialogue_text(text).startswith(_fe_dialogue_text(anchor)[:40]):
             sys.exit('ERROR: %s: fallback box %d anchored to %r but that box now reads %r '
                      '-- the locked script moved; re-anchor the fallback'
                      % (err_label, idx, anchor[:40], text[:40]))
-        out[idx - 1] = sub
+        out[at] = sub
     return out
 
 
@@ -10479,15 +10533,15 @@ def _ch05_opening_scene(chap, slot, boxes, what, podiums, fid):
     """
     script = _chapter_event_by_slot(chap, 'chapter_start', slot,
                                     'ch05 opening (%s)' % what)['script']
-    if len(script) != boxes:
+    if _script_box_count(script) != boxes:
         sys.exit('ERROR: ch05 opening %r (%s) must remain the %d locked boxes; got %d'
-                 % (slot, what, boxes, len(script)))
+                 % (slot, what, boxes, _script_box_count(script)))
     return script, _ch05_opening_body(script, slot, what, podiums, fid)
 
 
 def _ch05_opening_body(script, slot, what, podiums, fid):
     """Render one opening beat at the scenic width, refusing any speaker with no podium."""
-    speakers = {k for entry in script for k in entry}
+    speakers = {k for entry in script for k in entry if k not in SCRIPT_DIRECTIVES}
     unstaged = sorted(speakers - set(podiums))
     if unstaged:
         sys.exit('ERROR: ch05 opening %r (%s) speaks as %s, which its podium table '
@@ -10683,7 +10737,7 @@ def ch05_wave_script(turn, wave_table, sahnar_table=None):
             '    ENDA\n}' % (wave_table, warning, wake))
 
 
-def inject_ch05(campaign, boot=False, verbose=True):
+def inject_ch05(campaign, boot=False, lupin_proof=False, verbose=True):
     """Host Ch5 "The Elven Tomb" (#25) on slot 6: the winterised 1:1 retile of vanilla Ch5,
     the sixteen-strong risen tomb-guard on vanilla Ch5's own fighting tiles, the three
     eruption waves on its raider spawns, the real PREP deploy, and DefeatBoss(Ravisin).
@@ -10748,6 +10802,29 @@ def inject_ch05(campaign, boot=False, verbose=True):
                  for (uid, slot, ce, dce, level), (x, y) in zip(cast, slots)]
     declare_unit_table(CH05_BOOT_SEED_TABLE, seed_rows,
                        'ch05 --ch05-boot armed party seed (cold-start PREP fodder)')
+    # --ch05-lupin ONLY: a one-unit table holding Lupin, LOADed BEFORE the opening's branch so
+    # the ALIVE arm of scene 4 is reachable from a cold boot at all. It exists because a boot ROM
+    # otherwise cannot walk that arm for two independent reasons, either of which alone is fatal:
+    #   * the branch runs before LOMA while the party seed is LOADed after it, so gUnitArrayBlue
+    #     is empty when CHECK_ALIVE asks (decisions.md -> "The --ch05-boot ROM can only ever play
+    #     the NO-Lupin arm"); and
+    #   * Lupin is not IN the seed -- it zips the cast against 9 deploy slots and he is last.
+    # Loading before LOMA is safe: RestartBattleMap (bmio.c:1043) rebuilds map, BGs, sprites and
+    # traps and never touches the unit arrays, so he survives as a roster entry, which is all
+    # CHECK_ALIVE reads. He stands on the first deploy tile; PREP re-picks anyway.
+    if lupin_proof:
+        lupin = next((c for c in cast if c[0] == 'lupin'), None)
+        if lupin is None:
+            sys.exit('ERROR: --ch05-lupin: no `lupin` in ch05\'s cast, so the proof ROM would '
+                     'film the same no-Lupin arm as the plain boot and quietly prove nothing')
+        _uid, lslot, lce, ldce, llevel = lupin
+        declare_unit_table(
+            CH05_LUPIN_PROOF_TABLE,
+            [_ally_unit_entry(leader, lslot, ldce, llevel, slots[0][0], slots[0][1],
+                              ', '.join(CLASS_LOADOUT[lce]),
+                              ' /* Lupin -- --ch05-lupin proof/film ROM only */')],
+            'ch05 --ch05-lupin: Lupin alone, LOADed before the opening branch so CHECK_ALIVE '
+            'finds him and scene 4 plays its ALIVE arm')
 
     line_rows = ch05_enemy_rows(chap)
     declare_unit_table(CH05_LINE_TABLE, line_rows,
@@ -10861,8 +10938,14 @@ def inject_ch05(campaign, boot=False, verbose=True):
         script = f.read()
     seed_load = ('    LOAD1(0x1, %s) /* --ch05-boot: found an armed party */\n'
                  '    ENUN\n' % CH05_BOOT_SEED_TABLE) if boot else ''
+    # --ch05-lupin: put Lupin on the roster BEFORE the opening runs, so scene 4's CHECK_ALIVE
+    # finds him and the ALIVE arm plays. Proof/film ROM ONLY -- the real chain needs nothing
+    # here, because ReadGameSave has filled gUnitArrayBlue before the chapter's events run.
+    lupin_load = ('    LOAD1(0x1, %s) /* --ch05-lupin: the alive arm needs a live Lupin */\n'
+                  '    ENUN\n' % CH05_LUPIN_PROOF_TABLE) if lupin_proof else ''
     beginning = ('{\n'
                  '    MUSC(SONG_TENSION)\n'
+                 + lupin_load
                  # The BACKDROP half of the opening (#25): the three tomb scenes that play
                  # before the party arrives, ahead of LOMA because they end faded to black and
                  # LOMA wants the screen black anyway. Vanilla Ch5 opens the same way.
@@ -11369,12 +11452,23 @@ def main():
                          '"Elven Tomb" on slot 6 with an armed party, the 16 risen '
                          'tomb-guard on vanilla Ch5\'s own fighting tiles, and the three '
                          'eruption waves.')
+    ap.add_argument('--ch05-lupin', action='store_true',
+                    help='PLAYTEST build (#25): with --ch05-boot, LOAD Lupin onto the roster '
+                         'before ch05\'s opening so scene 4\'s CHECK_ALIVE branch takes its '
+                         'ALIVE arm. The plain boot ROM cannot reach that arm at all.')
     args = ap.parse_args()
+    # --ch05-lupin MODIFIES --ch05-boot rather than competing with it (it repoints nothing), so
+    # it is not in the mutual-exclusion list below -- but on its own it would silently build a
+    # plain canonical ROM with one extra unit table nothing loads.
+    if args.ch05_lupin and not args.ch05_boot:
+        sys.exit('ERROR: --ch05-lupin only means anything with --ch05-boot: it exists to make '
+                 'the opening branch\'s ALIVE arm reachable from a COLD boot.')
     # Snapshot the flags AS PASSED, before --lord-boot implies --test-chapter below:
     # the build stamp has to describe the `make` invocation, not the derived state.
     _requested_flags = {'TESTCH': args.test_chapter, 'LORDBOOT': args.lord_boot,
                         'MONTAGE': args.montage, 'CH03BOOT': args.ch03_boot,
-                        'CH04BOOT': args.ch04_boot, 'CH05BOOT': args.ch05_boot}
+                        'CH04BOOT': args.ch04_boot, 'CH05BOOT': args.ch05_boot,
+                        'CH05LUPIN': args.ch05_lupin}
     if args.lord_boot:
         args.test_chapter = True  # the fast-boot rides the sandbox
     # Each fast-boot repoints New Game at its own slot, so at most one may win. Named
@@ -11486,7 +11580,8 @@ def main():
         _scopes.run(inject_ch04, args.campaign, boot=args.ch04_boot)
         chain_ch03_to_ch04()
         print('chapter 5 (#25):')
-        _scopes.run(inject_ch05, args.campaign, boot=args.ch05_boot)
+        _scopes.run(inject_ch05, args.campaign, boot=args.ch05_boot,
+                    lupin_proof=args.ch05_lupin)
         _scopes.run(inject_ch05_visit_faces, args.campaign)  # the four reliquary residents' skeleton busts
         chain_ch04_to_ch05()
         if args.ch05_boot:
