@@ -1099,6 +1099,51 @@ _SCRIPT_EXIT = object()   # marker block for `exits:`, kept distinct from any sp
 _SCRIPT_ENTER = object()  # ditto for `enters:`
 
 
+# The portrait podiums in SCREEN order, left to right (tag codes in tools/textencode/msg_list.txt:
+# FarFarLeft 14, FarLeft 8, MidLeft 9, Left 10, Right 11, MidRight 12, FarRight 13, FarFarRight 15
+# -- the numbering is not the layout, which is exactly why this is written down).
+PODIUM_ORDER = ('[OpenFarFarLeft]', '[OpenFarLeft]', '[OpenMidLeft]', '[OpenLeft]',
+                '[OpenRight]', '[OpenMidRight]', '[OpenFarRight]', '[OpenFarFarRight]')
+
+
+def assert_silent_faces_have_elbow_room(script, podiums, where):
+    """A face that never SPEAKS must not sit on a rung next to one that does.
+
+    Adjacent podiums overlap: the portraits are wider than the gap between neighbouring rungs,
+    and FE8 draws the active speaker's face ON TOP of its neighbour's. For a scene of speakers
+    that is harmless and vanilla does it constantly -- ch05's own scene 4 seats four across
+    FarLeft/MidLeft/MidRight/FarRight, and each of the four is drawn over the others when its
+    turn comes, so everyone is legible in motion.
+
+    A SILENT face (`enters:`) never gets that turn. It is underneath for the whole scene.
+    Found by filming, not by reading (#25, 2026-08-14): scene 3 seated Ravisin on MidRight and
+    the raised Sahnar on FarRight, and Sahnar spent the scene as a hood behind Ravisin's
+    shoulder -- every id, count and wrap correct, and the beat invisible. This is the assertion
+    that scene could not have had before, because silent faces did not exist before it.
+
+    Vanilla's stable two-face right side leaves a rung EMPTY between the pair -- Right +
+    FarRight, never MidRight + FarRight (MSG_904, MSG_092C, MSG_0937, MSG_0954), reached in
+    three of those four by loading on an inner rung and sliding out with `[MoveRight]`.
+
+    Unknown tags are ignored rather than rejected, so a faceless narration seat or a future tag
+    cannot fail a build on a guess.
+    """
+    silent = {text for entry in script for k, text in entry.items() if k == 'enters'}
+    for name in sorted(silent):
+        seat = podiums.get(name)
+        if seat not in PODIUM_ORDER:
+            continue
+        for other, tag in sorted(podiums.items()):
+            if other == name or tag not in PODIUM_ORDER:
+                continue
+            if abs(PODIUM_ORDER.index(tag) - PODIUM_ORDER.index(seat)) == 1:
+                sys.exit('ERROR: %s raises %s silently on %s, next door to %s on %s -- the '
+                         'portraits overlap and the SPEAKER is drawn on top, so a face that '
+                         'never takes a turn stays underneath for the whole scene. Leave a rung '
+                         'empty between them, as vanilla does (Right + FarRight, never MidRight '
+                         '+ FarRight).' % (where, name, seat, other, tag))
+
+
 def _script_staged_names(script):
     """Every character a script puts on screen -- speakers AND silent `enters`/`exits` targets.
 
@@ -8603,11 +8648,27 @@ CH05_ARRIVAL_PODIUMS = {'lupin':   '[OpenFarLeft]',  'wolfram': '[OpenMidLeft]',
 CH05_OPENING_PODIUMS = {'basil': '[OpenMidLeft]',  'sahnar':  '[OpenMidRight]',
                         'sephek': '[OpenMidLeft]', 'ravisin': '[OpenMidRight]'}
 # Per-scene seat changes, for the one case where the shared table cannot hold: scene 3 puts
-# SAHNAR on screen while Ravisin is talking, and Ravisin holds mid-right through scenes 2 and 3.
-# Sahnar takes far right instead -- OUTSIDE Ravisin rather than across from her, which is the
-# reading we want: the asset arriving at its owner's shoulder, not a second party to the
-# conversation. Basil keeps mid-left and watches from the other side of the screen.
-CH05_OPENING_PODIUM_OVERRIDES = {'vanilla 0x9BD': {'sahnar': '[OpenFarRight]'}}
+# SAHNAR on screen while Ravisin is talking, so the right side has to hold TWO faces.
+#
+# ADJACENT RUNGS COLLIDE -- USE EVERY OTHER ONE. The podium tags are a ladder
+# (msg_list.txt: Right 11, MidRight 12, FarRight 13), and two faces on NEIGHBOURING rungs
+# overlap: filmed 2026-08-14 with Ravisin on MidRight and Sahnar on FarRight, Sahnar drew as a
+# sliver behind her and then vanished outright the moment Ravisin took the next box. Vanilla
+# never pairs neighbours. Its stable two-face right side is always **Right + FarRight**, with
+# MidRight deliberately EMPTY between them -- MSG_904 (Eirika/Seth), MSG_092C (Tana/soldier),
+# MSG_0937 and MSG_0954 (Eirika + Vanessa + Innes) all land there, the first three by loading on
+# an inner rung and then sliding out with an explicit `[MoveRight]`/`[MoveFarRight]`.
+#
+# So Ravisin moves to `[OpenRight]` for this scene and Sahnar takes `[OpenFarRight]` -- MSG_0954's
+# exact MidLeft + Right + FarRight trio, which is also our Basil + Ravisin + Sahnar. Her apparent
+# shift from scene 2's mid-right costs nothing: the two scenes are separate messages with a full
+# FADI/FADU through black between them, so there is no on-screen seat change to read. (Vanilla's
+# `[MoveRight]` would be the other route -- an actual slide as Sahnar comes up, which would sell
+# the arrival -- but it needs a Move vocabulary the renderer does not have, and across a fade the
+# static reseat is identical on screen.)
+CH05_OPENING_PODIUM_OVERRIDES = {
+    'vanilla 0x9BD': {'ravisin': '[OpenRight]', 'sahnar': '[OpenFarRight]'},
+}
 # Raw charIndexes. Pids need only be unique WITHIN a chapter -- gDefeatTalkList entries carry
 # .chapter, so ch03's 0xb7 and ch04's 0xb7 coexist -- but the boss and the moose need their own
 # so their flagged death entries key to them alone.
@@ -10747,6 +10808,8 @@ def _ch05_opening_body(script, slot, what, podiums, fid, width=42):
         sys.exit('ERROR: ch05 opening %r (%s) stages %s, which its podium table '
                  'gives no seat -- a speaker defaulted to mid-left is a speaker two '
                  'scenes can put in the same seat' % (slot, what, unstaged))
+    assert_silent_faces_have_elbow_room(script, {k: podiums[k] for k in staged},
+                                        'ch05 opening %r (%s)' % (slot, what))
     return _script_to_message(script, {k: (podiums[k], fid(k)) for k in staged}, width=width)
 
 

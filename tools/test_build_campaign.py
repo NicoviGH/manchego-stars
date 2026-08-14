@@ -2163,12 +2163,23 @@ class Ch05OpeningBackdropScenes(unittest.TestCase):
                               '%s (slot %r via %r) resolves to an undefined face tag %s'
                               % (unit, slot, spelling, tag))
 
-    def test_a_speaker_holds_one_podium_across_the_whole_opening(self):
+    def test_a_speaker_holds_one_SIDE_across_the_whole_opening(self):
         """Ravisin speaks in scene 2 and again in scene 3, its immediate sequel. A per-scene
-        default would seat her mid-left in one and mid-right in the other."""
+        default would seat her mid-LEFT in one and mid-right in the other, and a character who
+        crosses the screen between adjacent scenes reads as a different person.
+
+        Her exact rung is allowed to shift by one and does: scene 3 raises Sahnar beside her, and
+        two faces need an empty rung between them, so Ravisin moves MidRight -> Right to open
+        FarRight up (see `assert_silent_faces_have_elbow_room`). That costs nothing on screen --
+        the two scenes are separate messages with a full fade through black between them, so
+        there is no visible move. Vanilla makes the same shift WITHIN a message, and has to
+        animate it (`[OpenMidRight][MoveRight]`, MSG_904)."""
         bodies = dict(bc.ch05_opening_messages(self._chap()))
-        self.assertIn('[OpenMidRight][LoadFace][FID_Riev]', bodies[0x9EA])
-        self.assertIn('[OpenMidRight][LoadFace][FID_Riev]', bodies[0x9EB])
+        right = ('[OpenRight]', '[OpenMidRight]', '[OpenFarRight]')
+        for msg in (0x9EA, 0x9EB):
+            self.assertTrue(
+                any('%s[LoadFace][FID_Riev]' % tag in bodies[msg] for tag in right),
+                'Ravisin left the right-hand side in 0x%X' % msg)
         self.assertIn('[OpenMidLeft][LoadFace][FID_Artur]', bodies[0x9E9])
         self.assertIn('[OpenMidLeft][LoadFace][FID_Artur]', bodies[0x9EB])
 
@@ -2863,15 +2874,44 @@ class Ch05RavisinRaisesSahnarOnScreen(unittest.TestCase):
         self.assertIn('walked past that stone', next(iter(script[0].values())))
         self.assertIn('might be of use', next(iter(script[2].values())))
 
-    def test_she_takes_far_right_so_ravisin_keeps_her_seat(self):
-        """Ravisin holds mid-right across scenes 2 AND 3 and must not be evicted mid-scene --
-        the shared podium table puts Sahnar there, so scene 3 overrides it."""
-        self.assertEqual({'sahnar': '[OpenFarRight]'},
+    def test_the_raised_face_gets_a_whole_empty_rung_of_elbow_room(self):
+        """The defect this scene taught, found by FILMING (2026-08-14). Podiums are a ladder and
+        neighbouring rungs OVERLAP; FE8 draws the active speaker on top. For a scene of speakers
+        that is harmless -- scene 4 seats four across adjacent rungs and each is drawn over the
+        others when its turn comes. A face raised by `enters:` never takes a turn, so on a
+        neighbouring rung it stays underneath for the whole scene: Sahnar's first pass put her on
+        FarRight beside Ravisin on MidRight, and she played as a hood behind Ravisin's shoulder.
+
+        Ravisin therefore moves to Right, leaving MidRight EMPTY between the two -- vanilla's own
+        stable two-face right side (MSG_904, MSG_092C, MSG_0937, MSG_0954)."""
+        self.assertEqual({'ravisin': '[OpenRight]', 'sahnar': '[OpenFarRight]'},
                          bc.CH05_OPENING_PODIUM_OVERRIDES['vanilla 0x9BD'])
+        gap = (bc.PODIUM_ORDER.index('[OpenFarRight]') - bc.PODIUM_ORDER.index('[OpenRight]'))
+        self.assertEqual(2, gap, 'a whole rung must sit empty between them')
         body = self._body()
         self.assertIn('[OpenFarRight][LoadFace][FID_Marisa]', body)
+        self.assertIn('[OpenRight][LoadFace][FID_Riev]', body)
         self.assertEqual(1, body.count('[LoadFace][FID_Riev]'))
+        self.assertNotIn('[OpenMidRight]', body, 'the rung between them stays empty')
         self.assertNotIn('[ClearFace]', body, 'nobody is evicted: three faces, four slots')
+
+    def test_a_silent_face_next_door_to_a_speaker_is_refused(self):
+        """The guard, on the exact shape that shipped wrong."""
+        script = [{'ravisin': 'one'}, {'enters': 'sahnar'}, {'ravisin': 'two'}]
+        bc.assert_silent_faces_have_elbow_room(
+            script, {'ravisin': '[OpenRight]', 'sahnar': '[OpenFarRight]'}, 'test')
+        with self.assertRaises(SystemExit):
+            bc.assert_silent_faces_have_elbow_room(
+                script, {'ravisin': '[OpenMidRight]', 'sahnar': '[OpenFarRight]'}, 'test')
+
+    def test_speakers_may_still_sit_on_adjacent_rungs(self):
+        """Scene 4 does exactly this and is shipped and filmed. The rule is about SILENCE, not
+        adjacency -- a guard that banned adjacency outright would have rejected it."""
+        bc.assert_silent_faces_have_elbow_room(
+            [{'a': 'x'}, {'b': 'y'}], {'a': '[OpenMidRight]', 'b': '[OpenFarRight]'}, 'test')
+        self.assertEqual({'lupin': '[OpenFarLeft]', 'wolfram': '[OpenMidLeft]',
+                          'marty': '[OpenMidRight]', 'pinky': '[OpenFarRight]'},
+                         bc.CH05_ARRIVAL_PODIUMS)
 
     def test_the_face_arrives_before_basil_asks_after_her(self):
         body = self._body()

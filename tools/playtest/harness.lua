@@ -6431,9 +6431,16 @@ end
 -- Preparations with START and walks a different unit to a door.
 -- So this asserts the CHAIN, in the order the player experiences it:
 --   1. Basil is BLUE and commandable at turn 1        (the opening join CUSA landed)
---   2. Sahnar rises RED on turn 2                     (the eruption wake still fires)
---   3. Basil's Talk flips Sahnar BLUE                 (the CHAR entry + MS_Ch05SahnarTalk)
--- Step 1 is the one with no other witness. Steps 2-3 are ch04Parley's shape with no pack.
+--   2. Sahnar is RED on the arena at turn 1           (scene 6's LOAD1 landed)
+--   3. The eruption still speaks its four boxes       (the turn-2 warning, now Sahnar-free)
+--   4. Basil's Talk flips Sahnar BLUE                 (the CHAR entry + MS_Ch05SahnarTalk)
+-- Steps 1-2 are the ones with no other witness. Steps 3-4 are ch04Parley's shape with no pack.
+-- Step 2 USED TO BE "Sahnar rises RED on turn 2", and it moved with the chapter (#25,
+-- 2026-08-14): Ravisin raises her on screen in scene 3 and she LOADs after the prep CALL, so
+-- she is on the board before the player ever acts. That also split step 2 from step 3 -- the
+-- old loop broke on `turn() >= 2 and redSahnar()`, and with her red from turn 1 that condition
+-- is satisfied the instant the counter ticks, BEFORE Ravisin says a word. Left alone this gate
+-- would have failed on 0 eruption boxes and blamed the warning.
 -- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh ch05recruit (needs a CH05BOOT=1 ROM).
 scenarios.ch05recruit = function()
     local BASIL, SAHNAR = 0x13, 0x16        -- CHARACTER_ARTUR / CHARACTER_MARISA
@@ -6464,14 +6471,35 @@ scenarios.ch05recruit = function()
     log(string.format("ch05recruit: Basil is BLUE at turn 1 on (%d,%d) -- the opening join landed",
         basil.x, basil.y))
 
-    -- 2. The wake. Wait for the UNIT, not the turn counter: the counter ticks when the player
-    --    phase ends, well before the wave event LOAD1s her (ch04packmath learned this). The
-    --    turn-2 event now speaks BEFORE Sahnar LOADs, so advance only observed dialogue waits
-    --    and count them: merely reaching turn 2 no longer proves the locked warning played.
+    -- 2. The summon. Sahnar is on the arena tile at TURN 1 -- Ravisin raised her on screen in
+    --    scene 3, and scene 6 LOAD1s her after the prep CALL where vanilla LOADs Joshua (#25).
+    --    Nothing else witnesses that LOAD1: the chapter boots, PREP runs and every other ch05
+    --    scenario passes with an empty arena, and the first symptom would be a Talk with no
+    --    target. Her TILE is asserted too, because a Sahnar who exists somewhere else is a
+    --    different escort puzzle -- (12,6) is what assert_green_recruit_placement measures.
+    local sahnar = redSahnar()
+    if not sahnar then
+        shot("ch05recruit")
+        return result("FAIL", "Sahnar is not RED at turn 1 -- scene 6's LOAD1 never fired, so "
+            .. "the arena is empty and the Talk has no target")
+    end
+    if sahnar.x ~= 12 or sahnar.y ~= 6 then
+        shot("ch05recruit")
+        return result("FAIL", string.format(
+            "Sahnar is RED on (%d,%d), not the arena tile (12,6) the escort is measured against",
+            sahnar.x, sahnar.y))
+    end
+    log(string.format("ch05recruit: Sahnar is RED on (%d,%d) at turn 1 -- the scene-3 summon "
+        .. "put her on the board", sahnar.x, sahnar.y))
+
+    -- 3. The eruption, which no longer carries her. Count the warning's own boxes: reaching
+    --    turn 2 never proved the locked text played, and now that Sahnar is red from turn 1 it
+    --    proves even less -- there is no unit arrival left to wait on, so the BOXES are the
+    --    whole witness. Wait on them, not on the counter (ch04packmath's lesson, restated).
     if not endTurn() then return result("FAIL", "could not end turn 1") end
     local eruptionBoxes = 0
     for _ = 1, 7200 do
-        if turn() >= 2 and redSahnar() then break end
+        if turn() >= 2 and eruptionBoxes >= 4 then break end
         if controllerState() == "dialogue_wait" then
             eruptionBoxes = eruptionBoxes + 1
             if not guardedInput("advance_dialogue", "A", "eruption dialogue wait clears",
@@ -6481,10 +6509,6 @@ scenarios.ch05recruit = function()
         else
             yield()
         end
-    end
-    if not redSahnar() then
-        shot("ch05recruit")
-        return result("FAIL", "Sahnar never rose RED on turn 2 -- the eruption wake did not fire")
     end
     if eruptionBoxes ~= 4 then
         shot("ch05recruit")
@@ -6496,7 +6520,7 @@ scenarios.ch05recruit = function()
         return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
     end, 3600, true)
 
-    -- 3. The Talk. Park Basil orthogonally adjacent (setMapUnit keeps the tile->unit grid in
+    -- 4. The Talk. Park Basil orthogonally adjacent (setMapUnit keeps the tile->unit grid in
     --    sync, so adjacency reads with no phase cycle -- the ch03talk/ch04Parley trick); the
     --    point is the recruit landing, not walking a 5-MOV healer across the depression.
     -- Re-read her: the waits above can span an enemy phase, so the handle from the arrival check
@@ -7504,11 +7528,17 @@ end
 -- first RESULT line it polls, so a FAIL logged after recordCutscene's PASS may never be read.
 -- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05join (needs a CH05BOOT=1 ROM).
 scenarios.recordch05join = function(expect)
-    local BASIL = 0x13                       -- CHARACTER_ARTUR
+    local BASIL, SAHNAR = 0x13, 0x16         -- CHARACTER_ARTUR / CHARACTER_MARISA
     expect = expect or 4                     -- ch05boot has no Lupin: the 4-box arm
+    -- Scene 6's own A-presses, which this film now runs on to (#25). It is the NEXT thing in the
+    -- same event list -- the CUSA is not the end of the after-prep block any more -- and reaching
+    -- it costs nothing here, where the 49-box opening and prep are already paid for. A separate
+    -- film would pay that boot again to capture seven boxes.
+    local SCENE6_BOXES = 7
     local boxes, waiting, warned = 0, false, false
+    local joined = false
     return recordCutscene({
-        tag = "ch05join", speed = "normal", maxFrames = 9000, shotEvery = 4, pressEvery = 90,
+        tag = "ch05join", speed = "normal", maxFrames = 12000, shotEvery = 4, pressEvery = 90,
         pre = function()
             -- Fast config BEFORE the boot, never after: this ROM is 49 boxes of opening ahead of
             -- Preparations, and a scenario that pokes it afterwards burns most of its budget on a
@@ -7536,15 +7566,33 @@ scenarios.recordch05join = function(expect)
             waiting = now
             -- Overshoot is decidable the moment it happens, so say so while the log still has
             -- the context; the generic "never reached its end" arrives much later.
-            if boxes > expect and not warned then
-                warned = true
-                log(string.format("ch05join: box %d is past the expected %d -- the WRONG "
-                    .. "CHECK_ALIVE arm is playing on this ROM", boxes, expect))
-            end
-            if findUnit(SYM.gUnitArrayBlue, 20, BASIL) and boxes == expect then
+            -- The ARM check still fires exactly at the CUSA, which is the only moment the count
+            -- identifies which branch ran (Lupin 3, no-Lupin 4). Latched, because the film runs
+            -- on past it now and `boxes` keeps climbing through scene 6.
+            if not joined and findUnit(SYM.gUnitArrayBlue, 20, BASIL) and boxes == expect then
+                joined = true
                 log(string.format("ch05join: Basil is BLUE after %d boxes -- the %s arm; "
                     .. "the join CUSA landed", boxes,
                     expect == 3 and "Lupin (3-box)" or "no-Lupin (4-box)"))
+            end
+            if not joined and boxes > expect and not warned then
+                warned = true
+                log(string.format("ch05join: box %d is past the expected %d with Basil still "
+                    .. "green -- the WRONG CHECK_ALIVE arm is playing on this ROM",
+                    boxes, expect))
+            end
+            -- Then SCENE 6, the reason this film runs past the join (#25): Sahnar alone on the
+            -- arena, vanilla's 0x9C3 as a plain on-map bubble. The terminal is her seven boxes
+            -- AND the unit being there -- the bubble anchors to a unit, so a scene that played
+            -- with a missing LOAD1 or a camera parked elsewhere renders as "the text happened
+            -- and looked wrong", which no memory assertion sees. That is the whole reason this
+            -- is a film and not a check.
+            if joined and boxes == expect + SCENE6_BOXES
+                and findUnit(SYM.gUnitArrayRed, 24, SAHNAR)
+                and controllerState() ~= "dialogue_wait" then
+                log(string.format("ch05join: scene 6 played its %d boxes with Sahnar RED on the "
+                    .. "arena -- the summon put her there and the bubble had her to anchor to",
+                    SCENE6_BOXES))
                 return true
             end
             return false
@@ -7593,28 +7641,16 @@ scenarios.recordch05recruit = function()
             if not findUnit(SYM.gUnitArrayBlue, 20, BASIL) then
                 return false, "Basil is not BLUE at turn 1 -- the opening join CUSA never fired"
             end
-            if not endTurn() then return false, "could not end turn 1" end
-            -- Wait for the UNIT, not the turn counter (ch04packmath's lesson), advancing the
-            -- eruption warning's own boxes on the way -- they are Ravisin's, not this film's.
-            for _ = 1, 7200 do
-                if turn() >= 2 and findUnit(SYM.gUnitArrayRed, 24, SAHNAR) then break end
-                if controllerState() == "dialogue_wait" then
-                    if not guardedInput("advance_dialogue", "A", "eruption dialogue wait clears",
-                        function(after) return controllerState(after) ~= "dialogue_wait" end,
-                        120) then
-                        return false, "eruption dialogue input did not advance"
-                    end
-                else
-                    yield()
-                end
-            end
+            -- NO turn-end, and no eruption to sit through. Sahnar is on the arena at TURN 1
+            -- since #25 (Ravisin raises her in scene 3), so the Talk is reachable immediately
+            -- and this film spends none of its budget on Ravisin's warning -- which was never
+            -- its subject. The old chain ended turn 1 and waited on `turn() >= 2 and redSahnar()`;
+            -- with her red from the start that breaks the moment the counter ticks, mid-eruption,
+            -- and the Talk would have been driven while the warning was still on screen.
             local sah = findUnit(SYM.gUnitArrayRed, 24, SAHNAR)
-            if not sah then return false, "Sahnar never rose RED on turn 2" end
-            if not waitFor(function()
-                return faction() == 0 and not menuOpen()
-                    and not procActive(SYM.ProcScr_StdEventEngine)
-            end, 3600, true) then
-                return false, "the map never settled after the eruption"
+            if not sah then
+                return false, "Sahnar is not RED on the arena at turn 1 -- scene 6's LOAD1 "
+                    .. "never fired, so there is nobody to Talk"
             end
             -- setMapUnit keeps the tile->unit grid in sync, so adjacency reads with no phase
             -- cycle: the point of this film is the scene, not a 5-MOV healer's walk.
