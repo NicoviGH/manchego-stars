@@ -4285,6 +4285,57 @@ Reuse, don't add a mechanism: `branch_on_flag()` already emits this exact skelet
 `CHECK_ALIVE` in ch04's pack parley, so the macro is proven in our build. The sibling is the same
 function with the check swapped.
 
+### The `--ch05-boot` ROM can only ever play the NO-Lupin arm (2026-08-13, #25)
+
+Built at ch05 scene 4, the first scene with a `no_lupin_fallback`. Recorded here because it is the
+trap that would make the owed four-state proof **vacuous**: a scenario that always walks one arm
+passes just as green as one that walks the right arm.
+
+`CH05_BEGINNING_SCRIPT` asks `CHECK_ALIVE` **before `LOMA`** — that is forced, because scene 4 is a
+pre-map backdrop scene and its channel is inherited (see "A cutscene's CHANNEL is inherited"). The
+`--ch05-boot` party seed (`MS_Ch05BootSeed`) is `LOAD1`ed **after** `LOMA`, several lines further
+down, because its whole job is to give PREP a party from a COLD New Game. So at the instant the
+branch runs on a boot ROM, `gUnitArrayBlue` holds nothing, `GetUnitFromCharId` returns NULL, slot C
+is 0, and the fallback plays — **every time, for every unit, no matter what the seed contains.**
+Filmed and confirmed 2026-08-13: `recordch05opening` on `ch05boot` opens scene 4 on Pinky's *"The
+tracks stop here, Father"*, never Lupin's *"The trail leads here"*.
+
+So: **the boot ROMs prove the fallback arm and are structurally blind to the other three states.**
+Proving "recruited, alive, deployed" and "recruited, alive, BENCHED" needs the REAL chain
+(ch04 → ch05) where `ReadGameSave` has filled `gUnitArrayBlue` before the chapter's events run.
+Do not "fix" this by moving the seed load above the branch — it sits after `LOMA` because `LOMA`
+rebuilds the map, and units loaded before it are placed on the outgoing one.
+
+**The placement itself is vanilla's, and was checked rather than assumed.** `EventScr_Ch7_Beginning`
+`Scene` branches its own opening dialogue on `CHECK_ALIVE(CHARACTER_FRANZ)`, then `GILLIAM`,
+`MOULDER` and `VANESSA` — four optional units, asked inside a beginning scene. Asking that early is
+a thing vanilla does. (Vanilla asks after its ally `LOAD3` rather than before, which is exactly why
+the boot-ROM blindness above is a real difference and not a quibble.)
+
+### A glued em-dash still has to FIT (2026-08-13, #25)
+
+`_wrap_fe_lines` keeps a bare `--` from opening a line by gluing it to the word before it. It did
+that **without re-measuring**, so any line that ended within two characters of the width came out
+over it. ch05 scene 4's Wolfram line sits exactly on that boundary — *"Struck off edges. There was
+fighting here --"* is 44 against the scenic 42 — and it is what found the bug, but the glue lives in
+the shared wrapper, so every chapter was exposed. The fix moves the word DOWN with its dash rather
+than letting the line run over; the dash still never opens a line, which is the property the glue
+existed for. No shipped message body moved (full suite + `verify_text` green over 3404 messages),
+because nothing else had a line that landed in the two-character window.
+
+General shape, and the reason this is written down: **a formatting rule that edits a line after the
+width check has to re-run the width check.** The failure is invisible to every decoder — the text
+is well-formed, correctly encoded, and simply too wide.
+
+**And the first fix only MOVED the overflow, which review caught.** Re-measuring the line the dash
+leaves is not enough; the line it lands on has to fit too. Where it cannot — a word whose own length
+plus `' --'` already exceeds the width — the two rules genuinely conflict, the pair is atomic, and
+the glue wins: that line goes out over-width because no shorter arrangement exists. So the invariant
+is *"within the width unless it is a lone word carrying its dash"*, and the test now says exactly
+that, plus walks the dash through every gap in a sentence at every width from 20 to 44 rather than
+trusting the one sentence that found the bug. No authored box is anywhere near the atomic case; if
+one ever is, reword it rather than loosening the glue.
+
 ### An FEditor `L` is an authoring bracket, not an instruction (2026-08-08, #25)
 
 Sahnar's Specter is the first vendored anim using FEditor's loop syntax — a bare `L` (`LOOPSTART {`)

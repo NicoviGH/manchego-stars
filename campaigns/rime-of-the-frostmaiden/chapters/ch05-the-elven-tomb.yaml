@@ -779,10 +779,11 @@ events:
       - wolfram: "...This was a training arena. I can get it up and running."
       - marty: "...This magic is familiar..."               # trails off — the hook, never explained here
       - pinky: "Father, I see it! The moose--in the hollow."
-    no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas, L3) — WIRING NOT BUILT.
-      box: 1                          #   The locked script above is unchanged and still plays
+    no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas, L3); WIRED 2026-08-13 (#25).
+      boxes: [1]                      #   The locked script above is unchanged and still plays
                                       #   whenever the ch04 parley HAPPENED.
-      replaces: "The trail leads here. ...It came home."
+      replaces:                       # anchored to the text, so an index cannot silently drift
+        - "The trail leads here. ...It came home."
       reason: >-
         Box 1 is the FIRST LINE OF THE CHAPTER and it is Lupin's, so a no-parley player opens ch05
         on a speaker who is not there. PINKY takes it, continuing the tracking thread from ch04's
@@ -834,9 +835,10 @@ events:
       # (The thought dawns; Basil turns to the party and JOINS — green → the party's colors.)
       - basil: "...I wonder. Sahnar. ...She needs me. Take me to her?"
     no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas, L4) — WIRING NOT BUILT.
-      box: 2                          #   The locked script above is unchanged and still plays
+      boxes: [2]                      #   The locked script above is unchanged and still plays
                                       #   whenever Lupin WAS recruited.
-      replaces: "...Wolf. You're hers. Awoken. But you're free? With them?"
+      replaces:                       # anchored to the text, so an index cannot silently drift
+        - "...Wolf. You're hers. Awoken. But you're free? With them?"
       reason: >-
         ch04's Lupin recruit is gated on `parley: by: marty`, and the ch04 difficulty model
         explicitly prices a no-parley path — so a player can reach ch05 with no wolf on the field
@@ -1087,9 +1089,10 @@ events:
       # (Last box before gameplay resumes. She never answers.)
       - basil: "...Can I give you a berry now?"
     no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas, L5) — WIRING NOT BUILT.
-      box: 8                          #   The locked script above is unchanged and still plays
+      boxes: [8]                      #   The locked script above is unchanged and still plays
                                       #   whenever Lupin WAS recruited.
-      replaces: "A wolf. Him and his whole pack. They're out there now, with travelers."
+      replaces:                       # anchored to the text, so an index cannot silently drift
+        - "A wolf. Him and his whole pack. They're out there now, with travelers."
       reason: >-
         Box 8 is PROOF #1 — the evidence that turns Sahnar — and it is a wolf the player may never
         have recruited (ch04's parley is optional). Without him the proof changes SHAPE: it stops
@@ -1261,9 +1264,10 @@ events:
       #  instinct, so the money never has to be said out loud.)
       - braulo: "Aye, it is time we meet this beastie."
     no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas, L6) — WIRING NOT BUILT.
-      box: 16                         #   The locked script above is unchanged and still plays
+      boxes: [16]                     #   The locked script above is unchanged and still plays
                                       #   whenever Lupin WAS recruited.
-      replaces: "She woke it. Like she woke the wolves. ...She told it to sink the boats."
+      replaces:                       # anchored to the text, so an index cannot silently drift
+        - "She woke it. Like she woke the wolves. ...She told it to sink the boats."
       reason: >-
         "Like she woke the wolves" names a recruit the player may never have made. The fallback
         puts the comparison in Basil's own mouth about HERSELF, which is the harder line and needs
@@ -1345,9 +1349,10 @@ events:
       # (The ONE changed line, in vanilla's own place: what the loss cost the party in facts.)
       - braulo: "If he'd lived we'd know more. ...We go down the coast."
     no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas) — WIRING NOT BUILT.
-      box: 3                          #   The locked script above is unchanged and still plays
+      boxes: [3]                      #   The locked script above is unchanged and still plays
                                       #   whenever Lupin WAS recruited.
-      replaces: "The moose, the wolf.. they were not alone.."
+      replaces:                       # anchored to the text, so an index cannot silently drift
+        - "The moose, the wolf.. they were not alone.."
       reason: >-
         Same gate as 0x9C9 box 14: "the wolf" names an optional recruit. Only that clause moves —
         "the moose" stays in BOTH branches, because Basil is listing who she WOKE, not who
