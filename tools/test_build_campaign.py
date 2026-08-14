@@ -2843,6 +2843,31 @@ class SilentPresenceDirective(unittest.TestCase):
         script = [{'a': 'one'}, {'present': 'c'}, {'exits': 'a'}]
         self.assertEqual({'a', 'c'}, bc._script_staged_names(script))
 
+    def test_a_present_character_may_LATER_leave(self):
+        """Staged silently, then walks off -- a legal scene, and the `exits:` guard used to
+        hard-exit the build on it: the preload recorded the podium under an anonymous sentinel,
+        so the leaver looked like an impostor holding somebody else's seat."""
+        out = self._msg([{'present': 'c'}, {'a': 'one'}, {'exits': 'c'}, {'a': 'two'}])
+        self.assertIn('[OpenFarRight][ClearFace]', out)
+        self.assertLess(out.index('one'), out.index('[OpenFarRight][ClearFace]'))
+
+    def test_an_anonymous_preload_still_cannot_be_exited(self):
+        """The sentinel still does its job for callers passing `preload` directly: nobody
+        holds those podiums by name, so `exits:` on one is still the error it always was."""
+        with self.assertRaises(SystemExit):
+            self._msg([{'a': 'one'}, {'exits': 'c'}],
+                      preload=[('[OpenFarRight]', '[FID_Marisa]')])
+
+    def test_sharing_a_podium_with_a_speaker_is_refused_too(self):
+        """Distance 0, not just 1 -- and it is the WORSE case: the renderer clears the silent
+        face outright the moment its podium-holder speaks, so it is destroyed before the first
+        box rather than merely buried. The shared podium tables pair names onto tags, so this
+        is the easy way to hit it."""
+        script = [{'ravisin': 'one'}, {'present': 'sahnar'}]
+        with self.assertRaises(SystemExit):
+            bc.assert_silent_faces_have_elbow_room(
+                script, {'ravisin': '[OpenMidRight]', 'sahnar': '[OpenMidRight]'}, 'test')
+
 
 class Ch05RavisinRaisesSahnarOnScreen(unittest.TestCase):
     """Scene 3 stages the summon with a PORTRAIT and no dialogue (#25, 2026-08-14).
@@ -2987,6 +3012,16 @@ class Ch05SahnarIsJoshuaAndBasilIsNatasha(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 bc.assert_escort_safe_ai_has_one_client('{0x7, 0x3, 0x9, 0x0}')
 
+    def test_the_sweep_covers_EVERY_chapter_not_just_ch05(self):
+        """The list is global, so the hazard is a FUTURE chapter reaching for `{0x7,` on its
+        own account -- exactly the case a ch05-only scan cannot see. Scoping it to CH05_AI was
+        the first cut and it defeated the guard's own purpose."""
+        with mock.patch.dict(bc.CH04_AI, {'borrowed': '{0x7, 0x3, 0x9, 0x0}'}):
+            with self.assertRaises(SystemExit):
+                bc.assert_escort_safe_ai_has_one_client('{0x7, 0x3, 0x9, 0x0}')
+        # and the sweep really is finding more than one table
+        self.assertGreater(len([n for n in dir(bc) if re.fullmatch(r'CH\d\d_AI', n)]), 1)
+
     def test_the_repoint_swaps_natasha_for_our_escort_and_keeps_the_shape(self):
         """`AiIsInShortList` takes `const u16*` and stops on a zero entry, so the u8 array
         `{ id, 0, 0, 0 }` is the two-entry short list `{ id, TERMINATOR }`. Keep the shape."""
@@ -3114,6 +3149,40 @@ class Ch05SahnarAloneOnTheArena(unittest.TestCase):
         self.assertLess(cumo, load)
         self.assertLess(load, script.index('CUMO_CHAR(CHARACTER_MARISA)'))
         self.assertLess(script.index('CUMO_CHAR(CHARACTER_MARISA)'), text)
+
+    def test_she_WALKS_OFF_the_arena_tile_or_the_chapter_loses_its_arena(self):
+        """The regression this slice shipped and code review caught. (12,6) is
+        TERRAIN_ARENA_REGULAR *and* the arena tutorial's own `AREA(..., 12, 6, 12, 6)` trigger,
+        so a hostile parked there makes the arena unenterable for the entire chapter and
+        silently kills the `arena-wager` debut (#264/#265). Vanilla walks Joshua off it the
+        instant he lands (`MOVE(0x0, CHARACTER_JOSHUA, 9, 7)`); dropping that MOVE as
+        'deliberate' is what broke it."""
+        load, guard = bc.ch05_sahnar_station(self._chap())
+        self.assertEqual((12, 6), load, "vanilla Joshua's LOAD tile, which is the arena")
+        self.assertEqual((9, 7), guard, "vanilla Joshua's walk-off tile")
+        self.assertNotEqual(load, guard, 'she may not end where she lands')
+        script = self._script()
+        self.assertIn('MOVE(0x0, CHARACTER_MARISA, 9, 7)', script)
+        self.assertLess(script.index('LOAD1(0x1, %s)' % bc.CH05_SAHNAR_TABLE),
+                        script.index('MOVE(0x0, CHARACTER_MARISA, 9, 7)'))
+        self.assertLess(script.index('MOVE(0x0, CHARACTER_MARISA, 9, 7)'),
+                        script.index('TEXTSHOW(0x%X)' % bc.CH05_SAHNAR_ALONE_SLOT[1]),
+                        'she is off the arena before she speaks')
+
+    def test_a_missing_walk_off_is_refused_rather_than_shipped(self):
+        chap = self._chap()
+        sahnar = next(e for e in chap['enemy_units'] if e['id'] == 'sahnar')
+        del sahnar['walks_to']
+        with self.assertRaises(SystemExit):
+            bc.ch05_sahnar_station(chap)
+
+    def test_the_escort_is_measured_to_where_she_actually_STANDS(self):
+        """Basil's walk is checked against Sahnar's fighting tile, not her load tile -- they
+        are different tiles now, and the load tile is one she is never on when the Talk
+        happens."""
+        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
+                   encoding='utf-8').read()
+        self.assertIn('must_reach=ch05_sahnar_station(chap)[1]', src)
 
     def test_she_loads_ONCE_and_after_prep_where_vanilla_loads_joshua(self):
         script = self._script()

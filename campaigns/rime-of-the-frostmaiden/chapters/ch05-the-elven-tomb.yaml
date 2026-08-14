@@ -475,10 +475,20 @@ enemy_units:
     count: 1
     class: myrmidon             # Joshua's exact class/donor — a fast, crit-threat sword duelist
     level: 6
-    positions: [[12, 6]]        # Joshua's own tile in vanilla Ch5 — which is the ARENA tile (12,6).
-                                # Lifting it costs nothing and buys two things: she rises where the
-                                # amphitheatre canon says the blades met, and the escort distance
-                                # Basil must survive is measured against the twin's, not invented.
+    positions: [[12, 6]]        # Joshua's own LOAD tile in vanilla Ch5 — the ARENA tile (12,6).
+                                # She APPEARS here, where the amphitheatre canon says the blades
+                                # met, and does not stay: see `walks_to`.
+    walks_to: [9, 7]            # …and then steps off it, exactly as vanilla's Joshua does
+                                # (`MOVE(0x0, CHARACTER_JOSHUA, 9, 7)` in EventScr_Ch5_Beginning-
+                                # Scene, immediately after his LOAD1). This is NOT decoration and
+                                # dropping it cost us the whole ARENA: (12,6) is
+                                # TERRAIN_ARENA_REGULAR and the tutorial's own trigger is
+                                # `AREA(..., 12, 6, 12, 6)`, so a hostile parked there makes the
+                                # arena unenterable for the entire chapter and silently kills the
+                                # `arena-wager` debut (#264/#265). Vanilla walks him onto (9,7),
+                                # TERRAIN_ROAD — no defensive bonus, in the open, two tiles clear
+                                # of the arena mouth. The escort distance Basil must survive is
+                                # measured to THIS tile, not the load tile.
     inventory:
       - id: killing-edge
         fe_base: killing-edge   # Joshua's killing-edge (30 crit) — the fragile-escort tension

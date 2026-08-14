@@ -6476,18 +6476,25 @@ scenarios.ch05recruit = function()
     --    Nothing else witnesses that LOAD1: the chapter boots, PREP runs and every other ch05
     --    scenario passes with an empty arena, and the first symptom would be a Talk with no
     --    target. Her TILE is asserted too, because a Sahnar who exists somewhere else is a
-    --    different escort puzzle -- (12,6) is what assert_green_recruit_placement measures.
+    --    different escort puzzle -- (9,7) is what assert_green_recruit_placement measures.
     local sahnar = redSahnar()
     if not sahnar then
         shot("ch05recruit")
         return result("FAIL", "Sahnar is not RED at turn 1 -- scene 6's LOAD1 never fired, so "
             .. "the arena is empty and the Talk has no target")
     end
-    if sahnar.x ~= 12 or sahnar.y ~= 6 then
+    -- Her POST, not her load tile. She rises on the arena (12,6) during scene 6 and walks
+    -- straight off it to (9,7) -- the chapter YAML's `walks_to`, and vanilla's own
+    -- `MOVE(0x0, CHARACTER_JOSHUA, 9, 7)`. Asserting the load tile here is wrong twice over: it
+    -- is not where she stands, and it would PASS in precisely the broken state ch05arena
+    -- exists to catch (a duelist squatting on the arena trigger all chapter).
+    if sahnar.x ~= 9 or sahnar.y ~= 7 then
         shot("ch05recruit")
         return result("FAIL", string.format(
-            "Sahnar is RED on (%d,%d), not the arena tile (12,6) the escort is measured against",
-            sahnar.x, sahnar.y))
+            "Sahnar is RED on (%d,%d), not her post (9,7) -- %s", sahnar.x, sahnar.y,
+            (sahnar.x == 12 and sahnar.y == 6)
+                and "she never walked off the arena tile, which locks the arena all chapter"
+                or "the escort distance Basil is measured against has moved"))
     end
     log(string.format("ch05recruit: Sahnar is RED on (%d,%d) at turn 1 -- the scene-3 summon "
         .. "put her on the board", sahnar.x, sahnar.y))
@@ -6602,8 +6609,9 @@ scenarios.ch05recruit = function()
     runEnemyPhase()      -- the sprite only repaints to the party palette on a phase transition
     shot("ch05recruit")
     return result("PASS", string.format(
-        "Basil joined blue in the opening, Sahnar rose red on turn 2, and Basil's Talk brought "
-        .. "her over in %d boxes of our own locked prose -- the whole ch05 recruit chain", boxes))
+        "Basil joined blue in the opening, Sahnar stood red on the arena from turn 1, the "
+        .. "eruption spoke its four, and Basil's Talk brought her over in %d boxes of our own "
+        .. "locked prose -- the whole ch05 recruit chain", boxes))
 end
 
 -- recordch05eruption: the smallest visual proof for #260. Boot the real ch05 map, idle turn 1,
@@ -6815,8 +6823,15 @@ scenarios.ch05arena = function()
     if eventFlag(GUARD) then
         return result("FAIL", "arena tutorial guard 13 is already set before the tile is entered")
     end
-    if mapUnitAt(ARENA_X, ARENA_Y) ~= 0 then
-        return result("FAIL", "arena tile (12,6) is occupied before the turn-2 Sahnar wake")
+    -- The arena tile must be EMPTY, and since #25 that is a live risk rather than bookkeeping:
+    -- Sahnar LOADs on (12,6) in scene 6 and walks off to her post. If that MOVE is ever dropped
+    -- again she stands here for the whole chapter, the AREA(12,6,12,6) trigger can never fire,
+    -- and the arena is unreachable -- which is what this check now catches on its own.
+    local squatter = mapUnitAt(ARENA_X, ARENA_Y)
+    if squatter ~= 0 then
+        return result("FAIL", string.format(
+            "arena tile (12,6) is occupied (grid %d) -- most likely Sahnar never walked off it "
+            .. "after her scene-6 LOAD1, which locks the arena for the whole chapter", squatter))
     end
     local hero = blue(0x01)
     if not hero then return result("FAIL", "leader (0x01) is not deployed") end

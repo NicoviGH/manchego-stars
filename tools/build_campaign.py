@@ -1145,12 +1145,20 @@ def assert_silent_faces_have_elbow_room(script, podiums, where):
         for other, tag in sorted(podiums.items()):
             if other == name or tag not in PODIUM_ORDER:
                 continue
-            if abs(PODIUM_ORDER.index(tag) - PODIUM_ORDER.index(seat)) == 1:
-                sys.exit('ERROR: %s raises %s silently on %s, next door to %s on %s -- the '
-                         'portraits overlap and the SPEAKER is drawn on top, so a face that '
-                         'never takes a turn stays underneath for the whole scene. Leave a rung '
+            # 0 as well as 1: SHARING a podium is the worse version of the same fault -- the
+            # renderer evicts the silent face with [ClearFace] the moment its holder speaks, so
+            # it is destroyed before the first box rather than merely buried. Easy to hit,
+            # because the shared podium tables pair names onto tags (ch05's basil/sephek and
+            # sahnar/ravisin both collide), which is exactly how this scene started out.
+            if abs(PODIUM_ORDER.index(tag) - PODIUM_ORDER.index(seat)) <= 1:
+                sys.exit('ERROR: %s stages %s silently on %s, which %s %s -- the portraits '
+                         'overlap and the SPEAKER wins, so a face that never takes a turn is '
+                         'buried (adjacent) or cleared outright (same podium). Leave a rung '
                          'empty between them, as vanilla does (Right + FarRight, never MidRight '
-                         '+ FarRight).' % (where, name, seat, other, tag))
+                         '+ FarRight).'
+                         % (where, name, seat,
+                            'also holds' if tag == seat else 'sits next door to on',
+                            other if tag == seat else tag))
 
 
 def _script_staged_names(script):
@@ -1335,10 +1343,16 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
             if open_tag is None or fid_tag is None:
                 sys.exit('ERROR: `present: %s` but %s has no faced podium in this scene -- a '
                          'character staged with nowhere to stand is a silent no-op' % (name, name))
-            seeded.append((open_tag, fid_tag))
-    for pos, fid in seeded:                   # silent listeners, loaded first
+            seeded.append((open_tag, fid_tag, name))
+    for seed in seeded:                       # silent listeners, loaded first
+        pos, fid = seed[0], seed[1]
         parts.append('%s[LoadFace]%s' % (pos, fid))
-        live[pos] = '\x00listener'            # sentinel: never matches a real speaker
+        # A `present:` character is recorded UNDER THEIR NAME, an anonymous `preload` under a
+        # sentinel that no speaker can match. The difference matters to `exits:`, which checks
+        # that the leaver actually holds the podium it is about to clear: a named presence who
+        # later walks off is a legal scene (staged silently, then leaves), and under the
+        # sentinel that check saw an impostor and hard-exited the build.
+        live[pos] = seed[2] if len(seed) > 2 else '\x00listener'
         lru.append(pos)
     for speaker, pages in blocks:
         if speaker is _SCRIPT_EXIT:
@@ -8618,11 +8632,14 @@ CH05_BASIL_JOIN_LABEL_BASE = 2
 #
 # Vanilla's own after-prep shape for this beat, verbatim from EventScr_Ch5_BeginningScene:
 #   FADU(16) -> CAMERA -> CUMO_AT(12, 6) -> STAL/CURE -> LOAD1(Joshua) -> ENUN
-#   -> CUMO_CHAR -> STAL/CURE -> TEXTSTART/TEXTSHOW(0x9c3)
+#   -> MOVE(Joshua, 9, 7) -> ENUN -> CUMO_CHAR -> STAL/CURE -> TEXTSTART/TEXTSHOW(0x9c3)
 # The LOAD1 lands AFTER the camera is already on the tile, so the player watches the duelist
-# arrive rather than finding her there. Ours keeps that and drops vanilla's MOVE to (9,7): our
-# Sahnar fights from the arena tile itself, which is the placement assert_green_recruit_placement
-# already measures Basil's escort against.
+# arrive rather than finding her there -- and then she STEPS OFF IT, which is load-bearing rather
+# than flourish. (12,6) is TERRAIN_ARENA_REGULAR and the arena tutorial's trigger is
+# `AREA(..., 12, 6, 12, 6)`; a hostile standing there makes the arena unenterable for the whole
+# chapter and silently kills the `arena-wager` debut (#264/#265). This wiring dropped the MOVE at
+# first and did exactly that. Her walk-off tile is the YAML's `walks_to`, vanilla's own (9,7) --
+# TERRAIN_ROAD, no defensive bonus, clear of the arena mouth.
 #
 # SEVEN boxes, not the six the scene was locked at, and no word of it changed: the channel
 # swap is what costs the press. "No one ever came. I stopped counting somewhere in the middle."
@@ -10659,17 +10676,24 @@ def assert_escort_safe_ai_has_one_client(ai_bytes):
     """Refuse the repoint if anything but our duelist has picked up AI_A_07.
 
     The list is GLOBAL, so its safety rests entirely on being single-client. Vanilla ships one
-    user; if a later chapter gives a second unit `AI_A_07`, that unit silently inherits "will
-    not attack Basil" and this stops being a faithful copy of Joshua's refusal. Counted over
-    the tables we WRITE, which is where a second client could only come from.
+    user; if ANY chapter gives a second unit `AI_A_07`, that unit silently inherits "will not
+    attack Basil" and this stops being a faithful copy of Joshua's refusal.
+
+    Swept over EVERY chapter's AI vocabulary, not just ch05's. Scoping it to ch05 was the first
+    cut and it defeated the guard's own purpose: the hazard is a FUTURE chapter reaching for
+    `{0x7,` for its own reasons, which is precisely the case a ch05-only scan cannot see.
     """
-    users = [pattern for pattern, ai in
-             ((name, value) for name, value in CH05_AI.items())
-             if ai.startswith('{0x%X,' % ESCORT_SAFE_AI_INDEX)]
-    if users != ['duelist_hold'] or CH05_AI['duelist_hold'] != ai_bytes:
-        sys.exit('ERROR: AI_A_07 (%s) must have exactly one client -- ch05 Sahnar\'s '
-                 'duelist_hold. Got %s. The do-not-attack list is global; a second client '
-                 'inherits our escort\'s immunity by accident.' % (ESCORT_SAFE_AI_LIST, users))
+    tables = {name: value for name, value in globals().items()
+              if re.fullmatch(r'CH\d\d_AI', name) and isinstance(value, dict)}
+    users = sorted('%s.%s' % (table, pattern)
+                   for table, ai_map in tables.items()
+                   for pattern, ai in ai_map.items()
+                   if ai.startswith('{0x%X,' % ESCORT_SAFE_AI_INDEX))
+    if users != ['CH05_AI.duelist_hold'] or CH05_AI['duelist_hold'] != ai_bytes:
+        sys.exit('ERROR: AI_A_07 (%s) must have exactly one client across ALL chapters -- ch05 '
+                 'Sahnar\'s duelist_hold. Got %s (swept %d AI table(s)). The do-not-attack list '
+                 'is global; a second client inherits our escort\'s immunity by accident.'
+                 % (ESCORT_SAFE_AI_LIST, users, len(tables)))
 
 
 def ch05_enemy_rows(chap, arrives_turn=None, exclude=()):
@@ -10917,14 +10941,31 @@ def ch05_sahnar_alone_message(chap):
     return [(msg, body)]
 
 
-def ch05_sahnar_alone_block(sahnar_table, sahnar_char, position):
+def ch05_sahnar_station(chap):
+    """(load tile, fighting tile) for Sahnar -- vanilla's (12,6) then (9,7).
+
+    Two tiles, not one, and the second is the one that matters mechanically: the load tile is
+    the ARENA, and she may not stay on it (see CH05_SAHNAR_ALONE_SLOT). `walks_to` is required
+    rather than defaulted, because a missing walk-off is invisible in every check we have and
+    costs the chapter its arena.
+    """
+    sahnar = next(e for e in chap['enemy_units'] if e['id'] == 'sahnar')
+    load = tuple(sahnar['positions'][0])
+    if 'walks_to' not in sahnar:
+        sys.exit('ERROR: ch05 Sahnar has no `walks_to` -- she LOADs on the arena tile %r, which '
+                 'is the arena tutorial\'s own AREA trigger, so without a walk-off she blocks '
+                 'the arena for the entire chapter' % (load,))
+    return load, tuple(sahnar['walks_to'])
+
+
+def ch05_sahnar_alone_block(sahnar_table, sahnar_char, position, station):
     """Scene 6, played after the join: the camera finds the arena, and Sahnar is standing on it.
 
     Vanilla's own after-prep beat, copied down to the order of its commands -- `CUMO_AT` the
     arena tile FIRST, then `LOAD1`, so the player watches the duelist arrive rather than
-    discovering her already there. Dropping vanilla's follow-on `MOVE` to (9,7) is deliberate:
-    ours holds the arena tile itself, which is the distance `assert_green_recruit_placement`
-    measures Basil's escort against.
+    discovering her already there, then `MOVE` her off it before she speaks. The walk-off is
+    not flourish: the load tile IS the arena, and a hostile parked on it makes the arena
+    unenterable all chapter (see CH05_SAHNAR_ALONE_SLOT).
 
     No `FADU` of its own -- scene 5 already brought the screen up after the prep prologue's
     fade to black, and this beat follows it in the same event list without going dark between.
@@ -10934,19 +10975,24 @@ def ch05_sahnar_alone_block(sahnar_table, sahnar_char, position):
     reinforcements without her.
     """
     _slot, msg, _boxes, what = CH05_SAHNAR_ALONE_SLOT
-    x, y = position
+    (x, y), (gx, gy) = station
     return ('    CUMO_AT(%d, %d) /* the arena tile -- vanilla frames it before she arrives */\n'
             '    STAL(60)\n'
             '    CURE\n'
-            '    LOAD1(0x1, %s) /* Ravisin called her up in scene 3; here she stands */\n'
+            '    LOAD1(0x1, %s) /* Ravisin called her up in scene 3; here she rises */\n'
             '    ENUN\n'
-            '    CUMO_CHAR(%s) /* the bubble anchors to a unit -- Sahnar on the arena */\n'
+            '    MOVE(0x0, %s, %d, %d) /* ...and OFF the arena tile, as vanilla walks Joshua:\n'
+            '                             (%d,%d) is the tutorial\'s own AREA trigger and a unit\n'
+            '                             standing on it locks the arena for the whole chapter */\n'
+            '    ENUN\n'
+            '    CUMO_CHAR(%s) /* the bubble anchors to a unit -- Sahnar at her post */\n'
             '    STAL(60)\n'
             '    CURE\n'
             '    TEXTSTART\n'
             '    TEXTSHOW(0x%X) /* 6 -- %s */\n'
             '    TEXTEND\n'
-            '    REMA\n' % (x, y, sahnar_table, sahnar_char, msg, what))
+            '    REMA\n'
+            % (x, y, sahnar_table, sahnar_char, gx, gy, x, y, sahnar_char, msg, what))
 
 
 def ch05_opening_backdrop_block():
@@ -11081,9 +11127,8 @@ def ch05_beginning_script(chap, basil_char, sahnar_table, sahnar_char,
             # scene before the player ever fights her. Vanilla's Joshua LOADs at this exact point
             # in its own beginning scene -- after the prep CALL -- which is what makes Sahnar a
             # turn-1 unit rather than a turn-2 riser (#25, Nicolas 2026-08-14).
-            + ch05_sahnar_alone_block(sahnar_table, sahnar_char,
-                                      next(e for e in chap['enemy_units']
-                                           if e['id'] == 'sahnar')['positions'][0])
+            + ch05_sahnar_alone_block(sahnar_table, sahnar_char, None,
+                                      ch05_sahnar_station(chap))
             + '    ENUT(8)\n    EVBIT_T(7)\n    ENDA\n}')
 
 
@@ -11315,8 +11360,10 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, verbose=True):
     assert_green_recruit_placement(
         chap, maps_dir, CH05_LAYOUT[1], CH05_BASIL_GREEN_POS,
         CH05_BASIL_MOV_TABLE, 'Basil (ch05 green recruit)',
-        must_reach=tuple(next(e for e in chap['enemy_units']
-                              if e['id'] == 'sahnar')['positions'][0]))
+        # Her WALK-OFF tile, not her load tile: she rises on the arena and immediately steps off
+        # it (ch05_sahnar_station), so the escort Basil has to survive is measured to where
+        # Sahnar actually stands and fights.
+        must_reach=ch05_sahnar_station(chap)[1])
     bx, by = CH05_BASIL_GREEN_POS
     declare_unit_table(CH05_BASIL_TABLE, [_ally_unit_entry(
         leader, basil[1], basil[3], basil[4], bx, by, ', '.join(CLASS_LOADOUT[basil[2]]),
