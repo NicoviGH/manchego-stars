@@ -1927,18 +1927,25 @@ class Ch05EruptionWarning(unittest.TestCase):
             for word in next(iter(box.values())).replace("'", '').split()[:3]:
                 self.assertIn(word, body)
 
-    def test_turn_two_stages_the_warning_before_sahnar_rises(self):
+    def test_turn_two_stages_the_arriving_dead_before_the_warning(self):
         self.assertTrue(hasattr(bc, 'ch05_wave_script'),
                         'the wave script needs a testable owner for its ordering')
-        script = bc.ch05_wave_script(2, 'MS_Ch05WaveT2', 'MS_Ch05Sahnar')
+        script = bc.ch05_wave_script(2, 'MS_Ch05WaveT2')
         self.assertEqual(1, script.count('TEXTSHOW(0x%X)' % bc.CH05_ERUPTION_MSG))
         self.assertIn('CUMO_CHAR(%s)' % bc.CH05_BOSS_PID, script)
         self.assertLess(script.index('LOAD1(0x1, MS_Ch05WaveT2)'),
                         script.index('CUMO_CHAR(%s)' % bc.CH05_BOSS_PID))
         self.assertLess(script.index('CUMO_CHAR(%s)' % bc.CH05_BOSS_PID),
                         script.index('TEXTSHOW(0x%X)' % bc.CH05_ERUPTION_MSG))
-        self.assertLess(script.index('TEXTSHOW(0x%X)' % bc.CH05_ERUPTION_MSG),
-                        script.index('LOAD1(0x1, MS_Ch05Sahnar)'))
+
+    def test_the_eruption_no_longer_raises_sahnar(self):
+        """She is summoned ON SCREEN by Ravisin in scene 3 and stands on the arena from turn 1
+        (#25, 2026-08-14) -- vanilla's own shape, where Joshua LOADs after the prep CALL. The
+        eruption keeps its six reinforcements; a LOAD of her table here would put a second
+        Sahnar on the board."""
+        for turn in (2, 3, 5):
+            script = bc.ch05_wave_script(turn, 'MS_Ch05WaveT%d' % turn)
+            self.assertNotIn(bc.CH05_SAHNAR_TABLE, script)
 
     def test_later_waves_do_not_repeat_the_turn_two_warning(self):
         self.assertTrue(hasattr(bc, 'ch05_wave_script'),
@@ -2623,7 +2630,8 @@ class Ch05BasilJoinsAfterPrep(unittest.TestCase):
         return bc._chapter_event_by_slot(self._chap(), 'chapter_start', slot, 'test')
 
     def _script(self):
-        return bc.ch05_beginning_script(self._chap(), 'CHARACTER_ARTUR')
+        return bc.ch05_beginning_script(self._chap(), 'CHARACTER_ARTUR',
+                                        bc.CH05_SAHNAR_TABLE, 'CHARACTER_MARISA')
 
     # ── ids ────────────────────────────────────────────────────────────────────
     def test_both_ids_are_owned_unique_and_inside_ch05s_host_block(self):
@@ -2762,8 +2770,290 @@ class Ch05BasilJoinsAfterPrep(unittest.TestCase):
             'LOMA(',
             'CALL(%s)' % bc.CH05_PREP_SCRIPT,
             'TEXTSHOW(0x%X)' % bc.CH05_BASIL_JOIN_SLOT[1],    # scene 5, on the map
-            'CUSA(')]
+            'CUSA(',
+            'TEXTSHOW(0x%X)' % bc.CH05_SAHNAR_ALONE_SLOT[1])] # scene 6, on the map
         self.assertEqual(sorted(order), order)
+
+
+class SilentEntranceDirective(unittest.TestCase):
+    """`enters:` — a character comes on screen mid-scene and says nothing (#25).
+
+    The mirror of `exits:` (#279), and it exists because ch05's scene 3 has to SHOW Ravisin
+    raising Sahnar without spending a box on it: no line, no A-press, just a face arriving
+    while somebody else talks over it. Nicolas, 2026-08-14: "you don't need to even add
+    lines... just add sahnars portrait to the scene."
+    """
+    STAGING = {'a': ('[OpenMidLeft]', '[FID_Artur]'),
+               'b': ('[OpenMidRight]', '[FID_Riev]'),
+               'c': ('[OpenFarRight]', '[FID_Marisa]')}
+
+    def _msg(self, script, **kw):
+        return bc._script_to_message(script, self.STAGING, width=42, **kw)
+
+    def test_it_loads_the_face_without_opening_a_box(self):
+        out = self._msg([{'a': 'one'}, {'enters': 'c'}, {'a': 'two'}])
+        self.assertIn('[OpenFarRight][LoadFace][FID_Marisa]', out)
+        self.assertEqual(2, out.count('[A]'), 'an entrance is staging, not an A-press')
+
+    def test_it_is_not_a_box(self):
+        self.assertIn('enters', bc.SCRIPT_DIRECTIVES)
+        self.assertEqual(2, bc._script_box_count(
+            [{'a': 'one'}, {'enters': 'c'}, {'a': 'two'}]))
+
+    def test_it_fires_at_its_POINT_and_breaks_same_speaker_coalescing(self):
+        """The whole reason it is carried as a marker rather than skipped: the face has to
+        arrive BETWEEN the two lines, not after both of them."""
+        out = self._msg([{'a': 'before'}, {'enters': 'c'}, {'a': 'after'}])
+        self.assertLess(out.index('before'), out.index('[LoadFace][FID_Marisa]'))
+        self.assertLess(out.index('[LoadFace][FID_Marisa]'), out.index('after'))
+
+    def test_an_entrance_with_no_podium_is_refused(self):
+        with self.assertRaises(SystemExit):
+            self._msg([{'a': 'one'}, {'enters': 'nobody'}])
+
+    def test_re_entering_a_live_face_is_refused(self):
+        """A second [LoadFace] on a podium its owner already holds reads as a flicker."""
+        with self.assertRaises(SystemExit):
+            self._msg([{'c': 'already here'}, {'enters': 'c'}])
+
+    def test_an_entrance_evicts_by_the_same_rules_a_speaker_does(self):
+        """Entrances and first turns share `load_face`, so the face budget cannot drift
+        between them -- an entrance over a held podium clears it exactly as a speaker would."""
+        out = self._msg([{'b': 'mine'}, {'enters': 'c'}, {'a': 'hi'}], face_budget=2)
+        self.assertIn('[ClearFace]', out)
+
+    def test_staged_names_sees_silent_arrivals_and_departures(self):
+        script = [{'a': 'one'}, {'enters': 'c'}, {'exits': 'a'}]
+        self.assertEqual({'a', 'c'}, bc._script_staged_names(script))
+
+
+class Ch05RavisinRaisesSahnarOnScreen(unittest.TestCase):
+    """Scene 3 stages the summon with a PORTRAIT and no dialogue (#25, 2026-08-14).
+
+    The design change that unblocked scene 6 — Sahnar stops being a turn-2 riser and goes on
+    the map from turn 1, woken on screen by Ravisin — lands here, and it lands for free: the
+    seven locked boxes are untouched and the scene gains an `enters:` directive instead of a
+    line. Scene 3's power is that it is QUIET (the inverted-doubt beat, a friend being shut
+    down), and a spoken resurrection would have buried it.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+
+    def _scene(self):
+        return bc._chapter_event_by_slot(self._chap(), 'chapter_start', 'vanilla 0x9BD', 'test')
+
+    def _body(self):
+        return dict(bc.ch05_opening_messages(self._chap()))[0x9EB]
+
+    def test_the_summon_costs_no_box_and_the_lock_is_intact(self):
+        script = self._scene()['script']
+        self.assertEqual(7, bc._script_box_count(script), 'still the seven locked boxes')
+        self.assertEqual('sahnar', next(e['enters'] for e in script if 'enters' in e))
+        self.assertNotIn('sahnar', {k for e in script for k in e if k != 'enters'},
+                         'she is raised, she does not speak -- her first words are scene 6')
+
+    def test_she_comes_up_between_the_appraisal_and_its_second_half(self):
+        """Box 1 is Ravisin talking about a stone; box 2 is her pricing the woman standing in
+        front of her. The entrance is what turns one into the other."""
+        script = self._scene()['script']
+        keys = [next(iter(e)) for e in script]
+        self.assertEqual(1, keys.index('enters'))
+        self.assertIn('walked past that stone', next(iter(script[0].values())))
+        self.assertIn('might be of use', next(iter(script[2].values())))
+
+    def test_she_takes_far_right_so_ravisin_keeps_her_seat(self):
+        """Ravisin holds mid-right across scenes 2 AND 3 and must not be evicted mid-scene --
+        the shared podium table puts Sahnar there, so scene 3 overrides it."""
+        self.assertEqual({'sahnar': '[OpenFarRight]'},
+                         bc.CH05_OPENING_PODIUM_OVERRIDES['vanilla 0x9BD'])
+        body = self._body()
+        self.assertIn('[OpenFarRight][LoadFace][FID_Marisa]', body)
+        self.assertEqual(1, body.count('[LoadFace][FID_Riev]'))
+        self.assertNotIn('[ClearFace]', body, 'nobody is evicted: three faces, four slots')
+
+    def test_the_face_arrives_before_basil_asks_after_her(self):
+        body = self._body()
+        self.assertLess(body.index('[LoadFace][FID_Marisa]'),
+                        body.index('What will you do with her?'))
+        self.assertLess(body.index('What will you do with her?'),
+                        body.index("It's not your concern."))
+
+
+class Ch05SahnarIsJoshuaAndBasilIsNatasha(unittest.TestCase):
+    """Sahnar plays the way vanilla Joshua plays -- INCLUDING his refusal to hit the escort.
+
+    `AI_A_07` is `gAiScript_ActionInRange_ExceptNatasha`. The refusal does not live in the
+    `.ai` bytes: `AiScriptCmd_05_DoStandardAction` routes through
+    `AiIsUnitEnemyAndNotInScrList`, which tests each candidate's `pCharacterData->number`
+    against a list of character ids -- and vanilla's list holds `CHARACTER_NATASHA` literally.
+    Copy the bytes alone and `0x7` degrades to plain `AI_A_00`, leaving a fragile Cleric a
+    legal target for a Killing Edge. So the list is repointed at Basil.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _sahnar(self):
+        chap = bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+        return next(e for e in chap['enemy_units'] if e['id'] == 'sahnar')
+
+    def test_she_carries_joshuas_exact_ai_bytes(self):
+        self.assertEqual('duelist_hold', self._sahnar()['ai_pattern'])
+        self.assertEqual('{0x7, 0x3, 0x9, 0x0}', bc.CH05_AI['duelist_hold'])
+
+    def test_the_list_has_exactly_one_client_which_is_what_makes_it_safe(self):
+        """`.ai = {0x7,` appears ONCE in all of FE8 -- `UnitDef_088B5914`, vanilla Ch5's
+        Joshua. Read from decomp HEAD, never the built tree, which holds our injections."""
+        udefs = bc.vanilla_decomp_text('src/events_udefs.c')
+        self.assertEqual(1, udefs.count('.ai = {0x7,'))
+        bc.assert_escort_safe_ai_has_one_client('{0x7, 0x3, 0x9, 0x0}')
+
+    def test_a_second_client_is_refused(self):
+        with mock.patch.dict(bc.CH05_AI, {'someone_else': '{0x7, 0x0, 0x0, 0x0}'}):
+            with self.assertRaises(SystemExit):
+                bc.assert_escort_safe_ai_has_one_client('{0x7, 0x3, 0x9, 0x0}')
+
+    def test_the_repoint_swaps_natasha_for_our_escort_and_keeps_the_shape(self):
+        """`AiIsInShortList` takes `const u16*` and stops on a zero entry, so the u8 array
+        `{ id, 0, 0, 0 }` is the two-entry short list `{ id, TERMINATOR }`. Keep the shape."""
+        vanilla = ('u8 CONST_DATA %s[] = { CHARACTER_NATASHA, 0, 0, 0 };'
+                   % bc.ESCORT_SAFE_AI_LIST)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, 'cp_data.c')
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write('/* head */\n%s\n/* tail */\n' % vanilla)
+            with mock.patch.object(bc, 'CP_DATA_C', path):
+                bc.repoint_escort_safe_ai_list('CHARACTER_ARTUR', 'test escort')
+                patched = open(path, encoding='utf-8').read()
+                self.assertIn('u8 CONST_DATA %s[] = { CHARACTER_ARTUR, 0, 0, 0 };'
+                              % bc.ESCORT_SAFE_AI_LIST, patched)
+                self.assertNotIn('CHARACTER_NATASHA', patched)
+                # NON-IDEMPOTENT ON PURPOSE: a second run has nothing to match, and a silent
+                # pass would ship an unprotected escort. cp_data.c is in PATCHED_DECOMP_FILES
+                # so it is restored from HEAD each build.
+                with self.assertRaises(SystemExit):
+                    bc.repoint_escort_safe_ai_list('CHARACTER_ARTUR', 'test escort')
+
+    def test_cp_data_is_restored_from_HEAD_every_build(self):
+        self.assertIn('src/cp_data.c', bc.PATCHED_DECOMP_FILES)
+
+
+class Ch05SahnarAloneOnTheArena(unittest.TestCase):
+    """Scene 6 -- Sahnar alone at the sarcophagus, as a PLAIN ON-MAP BUBBLE (#25).
+
+    This scene was the opening's problem child for exactly as long as Sahnar was a turn-2
+    riser: with nothing of hers on the field, no talk bubble had a unit to anchor to, and the
+    standing note priced it as needing a BACKDROP of its own -- the one place the twin was
+    said to fail us. Nicolas's 2026-08-14 call moved her summon into scene 3, which puts her
+    on the arena tile from turn 1 exactly as vanilla's `UnitDef_088B5914` puts Joshua there,
+    and the exception evaporated. The beat is now vanilla's 0x9C3 down to the camera move, and
+    all six locked boxes are untouched.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+
+    def _scene(self):
+        slot, _msg, _boxes, _what = bc.CH05_SAHNAR_ALONE_SLOT
+        return bc._chapter_event_by_slot(self._chap(), 'chapter_start', slot, 'test')
+
+    def _script(self):
+        return bc.ch05_beginning_script(self._chap(), 'CHARACTER_ARTUR',
+                                        bc.CH05_SAHNAR_TABLE, 'CHARACTER_MARISA')
+
+    # ── the id ─────────────────────────────────────────────────────────────────
+    def test_the_id_is_0x9F0_owned_unique_and_inside_ch05s_host_block(self):
+        _slot, msg, _boxes, _what = bc.CH05_SAHNAR_ALONE_SLOT
+        self.assertEqual(0x9F0, msg, "#25's allocation table")
+        self.assertTrue(0x9E4 <= msg <= 0x9F5, "outside ch05's Ch6 host block")
+        self.assertIn(msg, set(bc.HOSTED_CHAPTER_MESSAGE_IDS['ch05']))
+        self.assertEqual('ch05', bc.assert_message_ids_unique()[msg])
+
+    def test_the_yaml_slot_label_stays_an_anatomy_citation(self):
+        """`vanilla 0x9C3` names the scene we MINE -- Joshua's own solo beat on this tile."""
+        slot, msg, _boxes, _what = bc.CH05_SAHNAR_ALONE_SLOT
+        self.assertNotEqual(int(slot.split()[1], 16), msg)
+
+    def test_it_costs_ONE_id_because_she_never_mentions_the_wolf(self):
+        self.assertNotIn('no_lupin_fallback', self._scene())
+        self.assertEqual(1, len(bc.ch05_sahnar_alone_message(self._chap())))
+
+    # ── the channel ────────────────────────────────────────────────────────────
+    def test_the_body_wraps_at_the_bubble_29_not_the_scenic_42(self):
+        """It rides TEXTSHOW -> PutTalkBubble, whose right-side branch computes x = 29 - width
+        with no clamp: a line over 29 runs off the tilemap (the ch03 crier bug)."""
+        for _msg, body in bc.ch05_sahnar_alone_message(self._chap()):
+            for line in body.split('\n'):
+                printable = re.sub(r'\[[^\]]*\]', '', line)
+                self.assertLessEqual(len(printable), 29, 'bubble overflow: %r' % line)
+
+    def test_she_keeps_the_mid_right_she_holds_in_scene_1_and_the_talk(self):
+        """A character who changes seats between her scenes reads as a different person --
+        and mid-right is also the podium vanilla's own 0x9C3 gives Joshua on this tile."""
+        self.assertEqual({'sahnar': '[OpenMidRight]'}, bc.CH05_SAHNAR_ALONE_PODIUMS)
+        for _msg, body in bc.ch05_sahnar_alone_message(self._chap()):
+            self.assertIn('[OpenMidRight][LoadFace][FID_Marisa]', body)
+            self.assertNotIn('[FID_Joshua]', body)      # her STAT_DONOR, never her face
+
+    def test_every_locked_word_survives_the_staging_change(self):
+        """The scene moved from a 42-wide backdrop to a 29-wide bubble. What that is allowed
+        to cost is an A-PRESS; what it is not allowed to cost is a word."""
+        self.assertEqual(['sahnar'] * 7, [next(iter(b)) for b in self._scene()['script']])
+        plain = ' '.join(re.sub(r'\[[^\]]*\]', ' ',
+                                bc.ch05_sahnar_alone_message(self._chap())[0][1]).split())
+        for locked in ('...Someone has come.',
+                       'Four thousand years, and someone has finally come.',
+                       '...I was given a purpose. To defend this tomb.',
+                       'No one ever came. I stopped counting somewhere in the middle.',
+                       '...Well. Something has come now.',
+                       'I will defend this tomb. It is my purpose.'):
+            self.assertIn(locked, plain, 'the 2026-07-29 lock lost a word')
+
+    def test_the_one_box_that_cannot_fit_29_breaks_where_the_AUTHOR_put_it(self):
+        """"No one ever came. I stopped counting somewhere in the middle." is 60 characters:
+        three lines at the bubble's 29, and a box holds two. Left flowed, the wrapper picked
+        the A-press and split it mid-clause ("...somewhere in the" / "middle."). The break is
+        authored at the full stop, so the understatement gets its own press."""
+        self.assertEqual(7, bc.CH05_SAHNAR_ALONE_SLOT[2])
+        boxes = [next(iter(b.values())) for b in self._scene()['script']]
+        self.assertEqual('No one ever came.', boxes[3])
+        self.assertEqual('I stopped counting somewhere in the middle.', boxes[4])
+        body = bc.ch05_sahnar_alone_message(self._chap())[0][1]
+        self.assertEqual(7, body.count('[A]'))
+        # and NO box of the scene splits under the wrap -- an [A] the author did not place
+        for page in body.split('[A]')[:-1]:
+            self.assertLessEqual(len([l for l in page.split('[LF]') if l.strip()]), 2,
+                                 'the wrapper paged this box, not the author: %r' % page)
+
+    # ── placement in the beginning script ──────────────────────────────────────
+    def test_the_camera_frames_the_arena_BEFORE_she_loads(self):
+        """Vanilla's order, and it is the whole reveal: CUMO_AT the tile, hold, and only then
+        LOAD1, so the player watches the duelist arrive instead of finding her there."""
+        script = self._script()
+        x, y = next(e for e in self._chap()['enemy_units']
+                    if e['id'] == 'sahnar')['positions'][0]
+        self.assertEqual((12, 6), (x, y), "vanilla Joshua's own tile, which is the arena")
+        cumo = script.index('CUMO_AT(%d, %d)' % (x, y))
+        load = script.index('LOAD1(0x1, %s)' % bc.CH05_SAHNAR_TABLE)
+        text = script.index('TEXTSHOW(0x%X)' % bc.CH05_SAHNAR_ALONE_SLOT[1])
+        self.assertLess(cumo, load)
+        self.assertLess(load, script.index('CUMO_CHAR(CHARACTER_MARISA)'))
+        self.assertLess(script.index('CUMO_CHAR(CHARACTER_MARISA)'), text)
+
+    def test_she_loads_ONCE_and_after_prep_where_vanilla_loads_joshua(self):
+        script = self._script()
+        self.assertEqual(1, script.count('LOAD1(0x1, %s)' % bc.CH05_SAHNAR_TABLE))
+        self.assertLess(script.index('CALL(%s)' % bc.CH05_PREP_SCRIPT),
+                        script.index('LOAD1(0x1, %s)' % bc.CH05_SAHNAR_TABLE))
+
+    def test_it_brings_no_second_fade_up_because_scene_5_already_did(self):
+        """The prep prologue leaves the screen black and scene 5 pays the FADU for both. A
+        second one here would flash the map back through black between two adjacent beats."""
+        script = self._script()
+        tail = script[script.index('TEXTSHOW(0x%X)' % bc.CH05_BASIL_JOIN_SLOT[1]):]
+        self.assertNotIn('FADU', tail)
+        self.assertNotIn('FADI', tail)
 
 
 class Ch05ArenaTutorial(unittest.TestCase):

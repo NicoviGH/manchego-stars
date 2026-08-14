@@ -95,6 +95,7 @@ ITEMS_C = os.path.join(DECOMP, 'src', 'data_items.c')
 TEXTS_TXT = os.path.join(DECOMP, 'texts', 'texts.txt')
 PORTRAIT_DATA_C = os.path.join(DECOMP, 'src', 'portrait_data.c')
 UIARENA_C = os.path.join(DECOMP, 'src', 'uiarena.c')
+CP_DATA_C = os.path.join(DECOMP, 'src', 'cp_data.c')     # the AI script tables + their lists
 # Our busts are all framed identically: the mouth window sits at tile (col 2, row 6)
 # and eyes at (col 3, row 4) -- the geometry portrait_tool extracts the mouth from, and
 # the same xMouth/yMouth/xEyes/yEyes the Eirika/Franz/Vanessa/Neimi slots already carry
@@ -500,6 +501,12 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         'src/events/ch4-eventinfo.h', 'src/events/ch4-eventscript.h',
                         # ch04 host slot (#24): Ch5 events (slot 5) rewritten by inject_ch04
                         'src/events/ch5-eventinfo.h', 'src/events/ch5-eventscript.h',
+                        # ch05 escort AI (#25): repoint_escort_safe_ai_list rewrites AI_A_07's
+                        # do-not-attack list from CHARACTER_NATASHA to OUR escort, so Sahnar
+                        # refuses to swing at Basil the way vanilla Joshua refuses Natasha. The
+                        # patch is NON-idempotent by design -- it hard-exits unless it finds
+                        # vanilla's form -- so it MUST restore each build.
+                        'src/cp_data.c',
                         # ch05 host slot (#25): slot 6's events. Named "ch6" because FE8
                         # inserted Ch5x at slot 5, so from slot 6 on the slot index and the
                         # vanilla symbol name disagree in the BASE GAME -- see the CH05_*
@@ -1083,9 +1090,27 @@ def _fe_dialogue_text(s):
 # Script pseudo-entries: stage business a cutscene `script:` carries alongside its dialogue.
 # They are NOT boxes (no A-press) -- see _script_box_count. `location_card`/`fade_to_black`/
 # `beat_break` are staged by the EVENT SCRIPT (or split the beat into separate messages);
-# `exits` is staged inside the message body, being a face control rather than a scene control.
-SCRIPT_DIRECTIVES = ('location_card', 'fade_to_black', 'beat_break', 'exits')
+# `enters`/`exits` are staged inside the message body, being face controls rather than scene
+# controls. The pair is deliberately symmetric: `exits` fades a face out mid-scene (#279),
+# `enters` brings one UP mid-scene without giving it a line (#25's Sahnar summon -- a character
+# can arrive on screen and say nothing, which is the cheapest possible way to stage an event).
+SCRIPT_DIRECTIVES = ('location_card', 'fade_to_black', 'beat_break', 'enters', 'exits')
 _SCRIPT_EXIT = object()   # marker block for `exits:`, kept distinct from any speaker name
+_SCRIPT_ENTER = object()  # ditto for `enters:`
+
+
+def _script_staged_names(script):
+    """Every character a script puts on screen -- speakers AND silent `enters`/`exits` targets.
+
+    A speaker set read off the keys alone misses anyone who only ever ARRIVES or LEAVES, and
+    those still need a podium: `_script_to_message` looks them up in `staging` exactly as it
+    looks up a speaker. Sahnar in ch05's scene 3 is the founding case -- she is raised on
+    screen and never says a word.
+    """
+    names = {k for entry in script for k in entry if k not in SCRIPT_DIRECTIVES}
+    names |= {text for entry in script for k, text in entry.items()
+              if k in ('enters', 'exits')}
+    return names
 
 
 def _wrap_fe_lines(text, width=29):
@@ -1216,6 +1241,13 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
             # after the lines it is supposed to precede.
             blocks.append((_SCRIPT_EXIT, text))
             continue
+        if speaker == 'enters':
+            # A character who COMES ON while the scene runs on, and says nothing. Same
+            # reasoning as `exits` above: it has to fire at this POINT in the message, and it
+            # must break the same-speaker coalescing or the face would arrive after the lines
+            # that are spoken over it.
+            blocks.append((_SCRIPT_ENTER, text))
+            continue
         if speaker in SCRIPT_DIRECTIVES:
             continue
         lines = _wrap_fe_lines(_fe_dialogue_text(text), width)
@@ -1227,6 +1259,25 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
     parts = []
     live = {}   # [OpenX] tag -> speaker currently holding that podium's face
     lru = []    # [OpenX] tags, least-recently-used first
+    def load_face(open_tag, fid_tag, holder):
+        """Bring `holder`'s face up at `open_tag`, evicting whatever the budget requires.
+
+        Shared by a speaker's first turn and by a silent `enters:`, so the two cannot drift --
+        the eviction rules are the same business either way, and the only thing an entrance
+        does differently is that no box follows it.
+        """
+        if open_tag in live:                    # podium held by someone else
+            parts.append(open_tag + '[ClearFace]')
+            del live[open_tag]
+            lru.remove(open_tag)
+        while len(live) >= face_budget:         # all podiums full -> evict LRU
+            old = lru.pop(0)
+            parts.append(old + '[ClearFace]')
+            del live[old]
+        parts.append('%s[LoadFace]%s' % (open_tag, fid_tag))
+        live[open_tag] = holder
+        lru.append(open_tag)
+
     for pos, fid in (preload or []):          # silent listeners, loaded first
         parts.append('%s[LoadFace]%s' % (pos, fid))
         live[pos] = '\x00listener'            # sentinel: never matches a real speaker
@@ -1244,6 +1295,19 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
             del live[open_tag]
             lru.remove(open_tag)
             continue
+        if speaker is _SCRIPT_ENTER:
+            arriving = pages                      # the marker carries the character's name
+            open_tag, fid_tag = staging.get(arriving, (None, None))
+            if open_tag is None or fid_tag is None:
+                sys.exit('ERROR: `enters: %s` but %s has no faced podium in this scene -- an '
+                         'entrance with nowhere to stand is a silent no-op, which is exactly '
+                         'the failure it exists to make impossible' % (arriving, arriving))
+            if live.get(open_tag) == arriving:
+                sys.exit('ERROR: `enters: %s` but %s is already on screen at that point -- an '
+                         'entrance that re-loads a live face reads as a flicker, not an '
+                         'arrival' % (arriving, arriving))
+            load_face(open_tag, fid_tag, arriving)
+            continue
         open_tag, fid_tag = staging[speaker]
         if fid_tag is None:           # faceless stage business -- no face, no slot
             # Emit NO [OpenX] code: those are portrait POSITION anchors (textdefs.txt
@@ -1258,17 +1322,7 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
             lru.remove(open_tag)
             lru.append(open_tag)
         else:
-            if open_tag in live:                    # podium held by someone else
-                parts.append(open_tag + '[ClearFace]')
-                del live[open_tag]
-                lru.remove(open_tag)
-            while len(live) >= face_budget:         # all podiums full -> evict LRU
-                old = lru.pop(0)
-                parts.append(old + '[ClearFace]')
-                del live[old]
-            parts.append('%s[LoadFace]%s' % (open_tag, fid_tag))
-            live[open_tag] = speaker
-            lru.append(open_tag)
+            load_face(open_tag, fid_tag, speaker)
         parts.append(body)
     return '\n'.join(parts) + (trailing or '') + '[X]'
 
@@ -8509,6 +8563,33 @@ CH05_BASIL_JOIN_PODIUMS = {'basil': '[OpenMidLeft]'}
 # Both branches live in ONE event list, and BEQ/GOTO scan that list for a matching LABEL -- so the
 # join's arms must not be numbered 0/1 like the arrival's, or a jump lands in the wrong scene.
 CH05_BASIL_JOIN_LABEL_BASE = 2
+# ── Scene 6 (#25): Sahnar alone at the sarcophagus ───────────────────────────────────────────
+# A PLAIN ON-MAP BUBBLE, inherited from the twin without an exception -- and it only became one
+# on 2026-08-14, when Nicolas moved her summon into scene 3. While she was a turn-2 riser this
+# scene had nothing on the field to anchor a bubble to and was priced as needing its own
+# BACKDROP; with her standing at the arena from turn 1 it is vanilla's 0x9C3 exactly, down to
+# the camera move. All six locked boxes survive untouched -- "...Someone has come." reads as
+# well standing in the amphitheatre as lying under a lid.
+#
+# Vanilla's own after-prep shape for this beat, verbatim from EventScr_Ch5_BeginningScene:
+#   FADU(16) -> CAMERA -> CUMO_AT(12, 6) -> STAL/CURE -> LOAD1(Joshua) -> ENUN
+#   -> CUMO_CHAR -> STAL/CURE -> TEXTSTART/TEXTSHOW(0x9c3)
+# The LOAD1 lands AFTER the camera is already on the tile, so the player watches the duelist
+# arrive rather than finding her there. Ours keeps that and drops vanilla's MOVE to (9,7): our
+# Sahnar fights from the arena tile itself, which is the placement assert_green_recruit_placement
+# already measures Basil's escort against.
+#
+# SEVEN boxes, not the six the scene was locked at, and no word of it changed: the channel
+# swap is what costs the press. "No one ever came. I stopped counting somewhere in the middle."
+# is 60 characters, which is three lines at 29 and a box holds two -- so the wrapper was
+# choosing the A-press and landing it mid-clause. The YAML now authors the break at the full
+# stop instead. Same lesson as the reliquary lines and scene 5's fallback: an authored A-press
+# is pacing, and a wrapped one is an accident.
+CH05_SAHNAR_ALONE_SLOT = ('vanilla 0x9C3', 0x9F0, 7, 'Sahnar alone in the sarcophagus')
+# She keeps the mid-right she holds in scene 1 and in the Talk recruit -- and it is the podium
+# vanilla's own 0x9C3 gives Joshua, alone on this same tile. NO no_lupin_fallback: she has never
+# met the wolf and does not mention him, so this scene has one arm and costs one id.
+CH05_SAHNAR_ALONE_PODIUMS = {'sahnar': '[OpenMidRight]'}
 # Four speakers, four podiums, which is the face budget exactly (FACE_SLOT_COUNT = 4) -- so
 # nothing is evicted mid-scene. Seated in the order they speak, left to right, and Pinky holds
 # the far right in BOTH arms: he closes the scene on either path, and on the no-Lupin path he
@@ -8521,6 +8602,12 @@ CH05_ARRIVAL_PODIUMS = {'lupin':   '[OpenFarLeft]',  'wolfram': '[OpenMidLeft]',
 # scene and its immediate sequel. Basil likewise keeps the mid-left she holds in the Talk recruit.
 CH05_OPENING_PODIUMS = {'basil': '[OpenMidLeft]',  'sahnar':  '[OpenMidRight]',
                         'sephek': '[OpenMidLeft]', 'ravisin': '[OpenMidRight]'}
+# Per-scene seat changes, for the one case where the shared table cannot hold: scene 3 puts
+# SAHNAR on screen while Ravisin is talking, and Ravisin holds mid-right through scenes 2 and 3.
+# Sahnar takes far right instead -- OUTSIDE Ravisin rather than across from her, which is the
+# reading we want: the asset arriving at its owner's shoulder, not a second party to the
+# conversation. Basil keeps mid-left and watches from the other side of the screen.
+CH05_OPENING_PODIUM_OVERRIDES = {'vanilla 0x9BD': {'sahnar': '[OpenFarRight]'}}
 # Raw charIndexes. Pids need only be unique WITHIN a chapter -- gDefeatTalkList entries carry
 # .chapter, so ch03's 0xb7 and ch04's 0xb7 coexist -- but the boss and the moose need their own
 # so their flagged death entries key to them alone.
@@ -8545,6 +8632,12 @@ CH05_AI = {
     'aggressive': '{0x0, 0x0, 0x1, 0x0}',        # pursue/charge
     'defensive': '{0x3, 0x3, 0x9, 0x20}',        # hold and strike in range
     'hold_position': '{GuardTileAI, 0x9, 0x20}', # vanilla Saar's boss posture
+    # Vanilla Joshua's own bytes (UnitDef_088B5914): AI_A_07 + AI_B_03 = strike anything that
+    # comes in range, NEVER move, and DO NOT TOUCH THE ESCORT. Sahnar stands guard at the arena
+    # from turn 1 (#25's scene-3 summon), and a turn-1 crit-Myrmidon that PURSUED would be a
+    # different chapter -- one that hunts the squishies instead of posing the escort puzzle ch05
+    # is built on. The escort carve-out is real for us too; see repoint_escort_safe_ai_list.
+    'duelist_hold': '{0x7, 0x3, 0x9, 0x0}',
     # AI_B_04 = AiScr_AiB_PillageThenPursue (cp_data.c): head for the nearest lootable tile,
     # sack it, then fight normally. Vanilla Ch5 puts this on all six of its reinforcements and
     # nothing else, which is the whole village-raid race -- the AI is terrain-driven
@@ -8608,6 +8701,7 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
              *(msg for _slot, msg, _boxes, _what in CH05_OPENING_SLOTS),
              CH05_ARRIVAL_SLOT[1], CH05_ARRIVAL_NO_LUPIN_MSG,
              CH05_BASIL_JOIN_SLOT[1], CH05_BASIL_JOIN_NO_LUPIN_MSG,
+             CH05_SAHNAR_ALONE_SLOT[1],
              CH05_GOAL_WINDOW_MSG, CH05_GOAL_STATUS_MSG,
              *(slot[1] for slot in CH05_VILLAGE_SLOTS.values())),
     # Goal ids only -- ch01/ch02 predate the per-chapter block registry, but their goal strings
@@ -10453,6 +10547,70 @@ def inject_ch04(campaign, boot=False, verbose=True):
                  len(end_beats[0])))
 
 
+#  The character id AI_A_07 refuses to attack, and the vanilla list it lives in. Vanilla names
+#  the constant for its one and only occupant; ours is the same shape with our escort in it.
+ESCORT_SAFE_AI_LIST = 'gUnknown_085A8A00'
+ESCORT_SAFE_AI_INDEX = 0x7          # gAi1ScriptTable[AI_A_07] = gAiScript_ActionInRange_ExceptNatasha
+
+
+def repoint_escort_safe_ai_list(escort_char, why):
+    """Point AI_A_07's do-not-attack list at OUR escort instead of vanilla's Natasha.
+
+    Sahnar is Joshua and Basil is Natasha, so Sahnar must play the way Joshua plays -- and
+    half of how Joshua plays is a refusal. `AI_A_07` is
+    `gAiScript_ActionInRange_ExceptNatasha`: it runs the standard offensive action through
+    `AiIsUnitEnemyAndNotInScrList`, which calls `AiIsInShortList(script->unk_08, ...)` against
+    each candidate's `pCharacterData->number`. `unk_08` is the list below, and vanilla declares
+    it `u8 gUnknown_085A8A00[] = { CHARACTER_NATASHA, 0, 0, 0 }`. That is what makes vanilla's
+    escort recruit survivable at all: the duelist stands on the arena tile with a Killing Edge
+    and simply will not swing at the cleric walking up to talk him down.
+
+    Copying Joshua's `.ai` bytes alone does NOT copy that, because the list holds a literal
+    character id and our escort is not Natasha -- Basil takes Natasha as a STAT_DONOR but
+    deploys on her own CHARACTER slot. Left alone, `0x7` degrades to plain `AI_A_00` and the
+    fragile Cleric is a legal target. So the list is repointed here.
+
+    SAFE BECAUSE THE LIST HAS EXACTLY ONE CLIENT. Swept over `events_udefs.c` at decomp HEAD
+    (never the built tree -- our injections live there): `.ai = {0x7,` appears ONCE in all of
+    FE8, on `UnitDef_088B5914`, vanilla Ch5's Joshua. `AI_A_07` exists to serve one unit in one
+    chapter, and that chapter is the one ch05 is the 1:1 twin of, so repointing its list
+    changes the behaviour of nothing else in the ROM.
+
+    Read as u16 despite the u8 declaration -- `AiIsInShortList` takes `const u16*` and stops on
+    a zero entry, so `{ id, 0, 0, 0 }` is the two-entry short list `{ id, TERMINATOR }` on a
+    little-endian target. Every FE8 character id fits in the low byte, so the shape is kept
+    rather than widened.
+    """
+    with open(CP_DATA_C, encoding='utf-8') as f:
+        source = f.read()
+    pattern = (r'(u8 CONST_DATA %s\[\] = \{ )CHARACTER_NATASHA(, 0, 0, 0 \};)'
+               % ESCORT_SAFE_AI_LIST)
+    source, count = re.subn(pattern, r'\g<1>%s\g<2>' % escort_char, source, count=1)
+    if count != 1:
+        sys.exit('ERROR: %s is not vanilla\'s { CHARACTER_NATASHA, 0, 0, 0 } in %s -- AI_A_07\'s '
+                 'do-not-attack list moved or was already patched, so %s would go unprotected'
+                 % (ESCORT_SAFE_AI_LIST, CP_DATA_C, why))
+    with open(CP_DATA_C, 'w', encoding='utf-8') as f:
+        f.write(source)
+
+
+def assert_escort_safe_ai_has_one_client(ai_bytes):
+    """Refuse the repoint if anything but our duelist has picked up AI_A_07.
+
+    The list is GLOBAL, so its safety rests entirely on being single-client. Vanilla ships one
+    user; if a later chapter gives a second unit `AI_A_07`, that unit silently inherits "will
+    not attack Basil" and this stops being a faithful copy of Joshua's refusal. Counted over
+    the tables we WRITE, which is where a second client could only come from.
+    """
+    users = [pattern for pattern, ai in
+             ((name, value) for name, value in CH05_AI.items())
+             if ai.startswith('{0x%X,' % ESCORT_SAFE_AI_INDEX)]
+    if users != ['duelist_hold'] or CH05_AI['duelist_hold'] != ai_bytes:
+        sys.exit('ERROR: AI_A_07 (%s) must have exactly one client -- ch05 Sahnar\'s '
+                 'duelist_hold. Got %s. The do-not-attack list is global; a second client '
+                 'inherits our escort\'s immunity by accident.' % (ESCORT_SAFE_AI_LIST, users))
+
+
 def ch05_enemy_rows(chap, arrives_turn=None, exclude=()):
     """One UnitDefinition row per authored position for a ch05 deployment wave.
 
@@ -10576,14 +10734,20 @@ def _ch05_opening_scene(chap, slot, boxes, what, podiums, fid, width=42):
 
 
 def _ch05_opening_body(script, slot, what, podiums, fid, width=42):
-    """Render one opening beat at its channel's width, refusing any speaker with no podium."""
-    speakers = {k for entry in script for k in entry if k not in SCRIPT_DIRECTIVES}
-    unstaged = sorted(speakers - set(podiums))
+    """Render one opening beat at its channel's width, refusing anyone with no podium.
+
+    Staged names, not speakers: a character can be put on screen by `enters:` and never take a
+    line (ch05's scene 3 raises Sahnar that way), and they need a seat exactly as a speaker
+    does. Reading the keys alone would let such a scene through and then die inside the
+    renderer on a missing staging entry.
+    """
+    staged = _script_staged_names(script)
+    unstaged = sorted(staged - set(podiums))
     if unstaged:
-        sys.exit('ERROR: ch05 opening %r (%s) speaks as %s, which its podium table '
+        sys.exit('ERROR: ch05 opening %r (%s) stages %s, which its podium table '
                  'gives no seat -- a speaker defaulted to mid-left is a speaker two '
                  'scenes can put in the same seat' % (slot, what, unstaged))
-    return _script_to_message(script, {k: (podiums[k], fid(k)) for k in speakers}, width=width)
+    return _script_to_message(script, {k: (podiums[k], fid(k)) for k in staged}, width=width)
 
 
 def _ch05_scene_and_variant(chap, slot_row, variant_msg, podiums, fid, width=42):
@@ -10639,8 +10803,9 @@ def ch05_opening_messages(chap):
                     'ch05 opening: unknown cutscene speaker')
     out = []
     for slot, msg, boxes, what in CH05_OPENING_SLOTS:
-        _script, body = _ch05_opening_scene(chap, slot, boxes, what,
-                                            CH05_OPENING_PODIUMS, fid)
+        _script, body = _ch05_opening_scene(
+            chap, slot, boxes, what,
+            dict(CH05_OPENING_PODIUMS, **CH05_OPENING_PODIUM_OVERRIDES.get(slot, {})), fid)
         out.append((msg, body))
     # Scene 4, and its no-Lupin twin. The party speaks here for the first time, so it brings its
     # own podium table; the variant is the SAME beat with box 1 substituted, rendered through the
@@ -10668,6 +10833,57 @@ def ch05_basil_join_messages(chap):
         chap, CH05_BASIL_JOIN_SLOT, CH05_BASIL_JOIN_NO_LUPIN_MSG,
         CH05_BASIL_JOIN_PODIUMS,
         _make_fid({}, 'ch05 join: unknown cutscene speaker'), width=29)
+
+
+def ch05_sahnar_alone_message(chap):
+    """Scene 6 -- Sahnar alone at the sarcophagus -- as one (msg_id, body) pair.
+
+    ONE arm, so this is `_ch05_opening_scene` rather than `_ch05_scene_and_variant`: she has
+    never met the wolf and never mentions him, so there is nothing for a no-Lupin branch to
+    substitute and the scene costs one id.
+
+    Rendered at the talk bubble's 29, not the backdrop scenes' 42. That is the twin's channel
+    taken whole: vanilla plays its 0x9C3 as a bare `TEXTSHOW` over the map with Joshua standing
+    on this same tile. Until 2026-08-14 ours could not, because Sahnar did not exist on the
+    field until the turn-2 eruption; the scene-3 summon is what put her there.
+    """
+    slot, msg, boxes, what = CH05_SAHNAR_ALONE_SLOT
+    _script, body = _ch05_opening_scene(
+        chap, slot, boxes, what, CH05_SAHNAR_ALONE_PODIUMS,
+        _make_fid({}, 'ch05 scene 6: unknown cutscene speaker'), width=29)
+    return [(msg, body)]
+
+
+def ch05_sahnar_alone_block(sahnar_table, sahnar_char, position):
+    """Scene 6, played after the join: the camera finds the arena, and Sahnar is standing on it.
+
+    Vanilla's own after-prep beat, copied down to the order of its commands -- `CUMO_AT` the
+    arena tile FIRST, then `LOAD1`, so the player watches the duelist arrive rather than
+    discovering her already there. Dropping vanilla's follow-on `MOVE` to (9,7) is deliberate:
+    ours holds the arena tile itself, which is the distance `assert_green_recruit_placement`
+    measures Basil's escort against.
+
+    No `FADU` of its own -- scene 5 already brought the screen up after the prep prologue's
+    fade to black, and this beat follows it in the same event list without going dark between.
+
+    This is also where `arrives_turn: 2` stopped being ours (#25, Nicolas 2026-08-14): Sahnar
+    is on the map from turn 1, exactly as vanilla's Joshua is, and the eruption keeps its six
+    reinforcements without her.
+    """
+    _slot, msg, _boxes, what = CH05_SAHNAR_ALONE_SLOT
+    x, y = position
+    return ('    CUMO_AT(%d, %d) /* the arena tile -- vanilla frames it before she arrives */\n'
+            '    STAL(60)\n'
+            '    CURE\n'
+            '    LOAD1(0x1, %s) /* Ravisin called her up in scene 3; here she stands */\n'
+            '    ENUN\n'
+            '    CUMO_CHAR(%s) /* the bubble anchors to a unit -- Sahnar on the arena */\n'
+            '    STAL(60)\n'
+            '    CURE\n'
+            '    TEXTSTART\n'
+            '    TEXTSHOW(0x%X) /* 6 -- %s */\n'
+            '    TEXTEND\n'
+            '    REMA\n' % (x, y, sahnar_table, sahnar_char, msg, what))
 
 
 def ch05_opening_backdrop_block():
@@ -10757,14 +10973,16 @@ def ch05_basil_join_block(basil_char):
                 label_base=CH05_BASIL_JOIN_LABEL_BASE))
 
 
-def ch05_beginning_script(chap, basil_char, seed_load='', lupin_load=''):
+def ch05_beginning_script(chap, basil_char, sahnar_table, sahnar_char,
+                          seed_load='', lupin_load=''):
     """`CH05_BEGINNING_SCRIPT` end to end: the opening's seven-scene spine around LOMA and prep.
 
     Assembled here rather than inline in the injector so the ORDER is testable without a build --
-    it is the first thing a reader loses, and it is load-bearing three times over: the backdrop
+    it is the first thing a reader loses, and it is load-bearing four times over: the backdrop
     scenes must precede `LOMA` (they end faded to black, which is what `LOMA` wants anyway), the
-    join must FOLLOW prep (see `ch05_basil_join_block`), and the two `CHECK_ALIVE` branches share
-    one event list, so their labels must not collide.
+    join must FOLLOW prep (see `ch05_basil_join_block`), scene 6 must follow the join (it is the
+    next beat in player order and it inherits the join's fade-up rather than bringing its own),
+    and the two `CHECK_ALIVE` branches share one event list, so their labels must not collide.
 
     `seed_load`/`lupin_load` are the proof-ROM injections (`--ch05-boot`, `--ch05-lupin`) and are
     empty on the shipping build.
@@ -10795,7 +11013,15 @@ def ch05_beginning_script(chap, basil_char, seed_load='', lupin_load=''):
             # And the party she is talking TO does not exist on the field until prep places it.
             + ch05_basil_join_block(basil_char)
             + '    CUSA(%s) /* green -> blue: she asked on box 3, and this is the answer */\n'
-            '    ENUT(8)\n    EVBIT_T(7)\n    ENDA\n}' % basil_char)
+            % basil_char
+            # Scene 6, LAST and on the map: the arena tile, the duelist standing on it, her own
+            # scene before the player ever fights her. Vanilla's Joshua LOADs at this exact point
+            # in its own beginning scene -- after the prep CALL -- which is what makes Sahnar a
+            # turn-1 unit rather than a turn-2 riser (#25, Nicolas 2026-08-14).
+            + ch05_sahnar_alone_block(sahnar_table, sahnar_char,
+                                      next(e for e in chap['enemy_units']
+                                           if e['id'] == 'sahnar')['positions'][0])
+            + '    ENUT(8)\n    EVBIT_T(7)\n    ENDA\n}')
 
 
 def _vanilla_message_body(msg_id, source=None):
@@ -10849,37 +11075,33 @@ def ch05_ravisin_defeat_quote():
         msg=CH05_RAVISIN_DEATH_MSG)
 
 
-def ch05_wave_script(turn, wave_table, sahnar_table=None):
-    """Build one ch05 reinforcement script; only turn 2 speaks and wakes Sahnar.
+def ch05_wave_script(turn, wave_table):
+    """Build one ch05 reinforcement script; only turn 2 speaks.
 
-    The order carries the fiction: the arriving dead establish the escalation, Ravisin names
-    the reliquary race and decides to spend the blade under the stone, then Sahnar LOADs.
-    Later waves are silent reinforcements and must not replay the warning.
+    The order carries the fiction: the arriving dead establish the escalation, then Ravisin
+    names the reliquary race. Later waves are silent reinforcements and must not replay the
+    warning.
+
+    Sahnar is NOT one of these. She is on the map from turn 1 -- Ravisin raises her on screen
+    in scene 3, and she LOADs after the prep CALL where vanilla LOADs Joshua (#25, Nicolas
+    2026-08-14). The eruption is six reinforcements and a warning, and nothing else.
     """
     warning = ''
-    wake = ''
     if turn == 2:
-        if not sahnar_table:
-            sys.exit('ERROR: ch05 turn-2 wave needs Sahnar\'s wake table')
         warning = (
             '    CUMO_CHAR(%s) /* Ravisin answers the party\'s pressure */\n'
             '    STAL(45)\n'
             '    CURE\n'
             '    TEXTSTART\n'
-            '    TEXTSHOW(0x%X) /* four locked boxes: the reliquary race + Sahnar */\n'
+            '    TEXTSHOW(0x%X) /* the locked boxes: the reliquary race */\n'
             '    TEXTEND\n'
             '    REMA\n'
             % (CH05_BOSS_PID, CH05_ERUPTION_MSG))
-        wake = (
-            '    LOAD1(0x1, %s) /* Sahnar rises from the cracked sarcophagus */\n'
-            '    ENUN\n' % sahnar_table)
-    elif sahnar_table is not None:
-        sys.exit('ERROR: ch05 Sahnar may rise only in the turn-2 eruption script')
     return ('{\n'
             '    LOAD1(0x1, %s)\n'
             '    ENUN\n'
-            '%s%s'
-            '    ENDA\n}' % (wave_table, warning, wake))
+            '%s'
+            '    ENDA\n}' % (wave_table, warning))
 
 
 def inject_ch05(campaign, boot=False, lupin_proof=False, verbose=True):
@@ -10971,7 +11193,10 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, verbose=True):
             'ch05 --ch05-lupin: Lupin alone, LOADed before the opening branch so CHECK_ALIVE '
             'finds him and scene 4 plays its ALIVE arm')
 
-    line_rows = ch05_enemy_rows(chap)
+    # Sahnar is a turn-1 unit now (#25), so she matches the `arrives_turn: None` selector the
+    # line table uses -- but she must stay OUT of it, because she LOADs from her own table at
+    # her own beat and the line goes down in one LOAD1 before prep.
+    line_rows = ch05_enemy_rows(chap, exclude=('sahnar',))
     declare_unit_table(CH05_LINE_TABLE, line_rows,
                        'ch05 turn-1 line: the risen tomb-guard, on vanilla Ch5 fighting tiles')
     wave_counts = {}
@@ -10983,10 +11208,15 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, verbose=True):
         wave_counts[turn] = len(rows)
         declare_unit_table(CH05_WAVE_TABLES[turn], rows,
                            'ch05 eruption wave, turn %d (vanilla Ch5 raider spawns)' % turn)
-    # Sahnar rides her own table so the wake beat (and Basil's Talk) can address her alone --
-    # a shared pid is unaddressable, which is exactly what #203 cost ch04's wolf pack.
-    sahnar_rows = ch05_enemy_rows(chap, arrives_turn=2, exclude=frozenset(
+    # Sahnar rides her own table so scene 6 (and Basil's Talk) can address her alone -- a shared
+    # pid is unaddressable, which is exactly what #203 cost ch04's wolf pack. She selects on the
+    # turn-1 `arrives_turn: None` now, not the eruption's 2: Ravisin summons her ON SCREEN in
+    # scene 3 and she LOADs after the prep CALL, where vanilla LOADs Joshua (#25).
+    sahnar_rows = ch05_enemy_rows(chap, exclude=frozenset(
         e['id'] for e in chap['enemy_units'] if e['id'] != 'sahnar'))
+    if len(sahnar_rows) != 1:
+        sys.exit('ERROR: ch05 expects exactly one Sahnar on the turn-1 board, got %d -- she is '
+                 'summoned in scene 3 and must not carry an arrives_turn' % len(sahnar_rows))
     # Sahnar rises on her OWN CHARACTER slot (#251 gave her one -- Marisa), not a raw pid: the
     # Talk has to address HER and not the nearest identical myrmidon, and a shared pid is
     # unaddressable, which is precisely what #203 cost ch04's wolf pack. She rides the ENEMY
@@ -11008,7 +11238,8 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, verbose=True):
     assert_message_id_unclaimed(CH05_SAHNAR_TALK_MSG, 'ch05', "Basil's Talk recruit of Sahnar")
     sahnar_rows = [row.replace(CH05_GENERIC_PID, sahnar_char, 1) for row in sahnar_rows]
     declare_unit_table(CH05_SAHNAR_TABLE, sahnar_rows,
-                       'ch05 Sahnar: rises HOSTILE at the eruption; Basil Talks her over (#25)')
+                       'ch05 Sahnar: summoned HOSTILE in scene 3, on the arena from turn 1; '
+                       'Basil Talks her over (#25)')
 
     # Basil: GREEN at the pocket mouth, the Colm/Trex placement idiom -- her own table so the
     # PREP cap template stays the pure blue roster. Unlike Trex she is not joined by a CHAR
@@ -11030,6 +11261,15 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, verbose=True):
         allegiance=basil_faction)],
         'ch05 Basil: %s at the pocket mouth; the opening join makes her the escort'
         % basil_faction)
+    # Sahnar is Joshua and Basil is Natasha, so Sahnar has to play the way Joshua plays -- and
+    # half of how Joshua plays is a REFUSAL. His AI_A_07 will not swing at the cleric walking up
+    # to talk him down, which is the only reason a fragile escort can reach a Killing Edge on
+    # the arena tile at all. That refusal rides a character id in a global list, not in the .ai
+    # bytes, so copying his bytes alone leaves Basil a legal target. Repointed here, at the one
+    # place that knows who our escort is.
+    assert_escort_safe_ai_has_one_client(CH05_AI[
+        next(e for e in chap['enemy_units'] if e['id'] == 'sahnar')['ai_pattern']])
+    repoint_escort_safe_ai_list(basil_char, 'Basil (ch05 escort)')
 
     # 3. Strip the host slot's event lists and wire ours. The list SYMBOLS are the only
     #    vanilla names left in this function, and they come from CH05_EVENT_LISTS.
@@ -11090,13 +11330,13 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, verbose=True):
                   '    ENUN\n' % CH05_LUPIN_PROOF_TABLE) if lupin_proof else ''
     script = _replace_brace_block(
         script, CH05_BEGINNING_SCRIPT + '[] =',
-        ch05_beginning_script(chap, basil_char, seed_load, lupin_load),
+        ch05_beginning_script(chap, basil_char, CH05_SAHNAR_TABLE, sahnar_char,
+                              seed_load, lupin_load),
         CH05_EVENTSCRIPT_H)
     for turn in sorted(CH05_WAVE_TABLES):
         script = _replace_brace_block(
             script, CH05_WAVE_SCRIPTS[turn] + '[] =',
-            ch05_wave_script(
-                turn, CH05_WAVE_TABLES[turn], CH05_SAHNAR_TABLE if turn == 2 else None),
+            ch05_wave_script(turn, CH05_WAVE_TABLES[turn]),
             CH05_EVENTSCRIPT_H)
     # The ending: the save-all-four payout, then the win. ch06 is not hosted yet, so the win
     # lands on the dev placeholder exactly as ch03's did until ch04 hosted (chain_ch04_to_ch05
@@ -11147,7 +11387,8 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, verbose=True):
     set_message_body(lines, CH05_ERUPTION_MSG, ch05_eruption_message(chap))
     set_message_body(lines, CH05_RAVISIN_DEATH_MSG, ch05_ravisin_death_message(chap))
     set_message_body(lines, CH05_SAHNAR_TALK_MSG, ch05_sahnar_talk_message(chap))
-    for msg_id, body in ch05_opening_messages(chap) + ch05_basil_join_messages(chap):
+    for msg_id, body in (ch05_opening_messages(chap) + ch05_basil_join_messages(chap)
+                         + ch05_sahnar_alone_message(chap)):
         set_message_body(lines, msg_id, body)
     for msg_id, body in arena_wiring['messages']:
         set_message_body(lines, msg_id, body)
