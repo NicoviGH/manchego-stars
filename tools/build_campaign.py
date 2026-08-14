@@ -7416,16 +7416,21 @@ CAMPAIGN_BGS = [
     # scenes that play before the party arrives. Nicolas's pick 2026-08-13, and the FIRST
     # vendored BG that needed NO refit -- the FE-Repo's FE9-10 rips ship already indexed at 16
     # colours, so bg_to_fe8.py's greedy pack reproduces the source EXACTLY (0 of 38400 pixels
-    # differ from the 5-bit source crop). It lands on 2 banks rather than 1 only because FE8
+    # differ from the 5-bit source picture). It lands on 2 banks rather than 1 only because FE8
     # reserves local index 0 of every bank as transparent -- 15 usable, and the source has 16.
     # Well inside the SIX the fade/transition procs apply, unlike Bremen's 8.
+    # This rip family is LETTERBOXED -- a 240-wide picture in a 256-wide canvas -- and both ch05
+    # BGs first shipped with half the mat still on, because a CENTRE crop keeps half of it and
+    # discards real picture opposite. `trim_uniform_border` strips it, so these land 1:1 with no
+    # scaling. Long form: decisions.md -> "A letterbox mat is not picture".
     ('BG_MS_ELVEN_TOMB',          'bg_ElvenTomb',         '{FE9-10 CG rip}'),
     # ch05 scene 4 (#25): the ridge the party crests, and the first backdrop in the chapter the
     # PARTY is standing in rather than looking at from the tomb's side. It is a SECOND BG in one
     # scene run on purpose -- vanilla Ch5 spends BG_SERAFEW_VILLAGE on four consecutive scenes and
     # switches to BG_TOWN at exactly this beat, when the travellers physically arrive. Same FE9-10
-    # rip family as the tomb, so it needs no refit either: mode-P at 16 colours in, 0 of 38400
-    # pixels different from the 5-bit source crop out. It packs onto 3 banks rather than the tomb's
+    # rip family as the tomb, so it needs no refit either -- and the same letterbox mat, stripped
+    # the same way: mode-P at 16 colours in, 0 of 38400 pixels different from the 5-bit source
+    # PICTURE out. It packs onto 3 banks rather than the tomb's
     # 2 (16 source colours against 15 usable per bank, and this picture's tiles straddle the split
     # differently), still inside the SIX the fade/transition procs apply.
     ('BG_MS_FOREST_OUTSKIRTS_WINTER', 'bg_ForestOutskirtsWinter', '{FE9-10 CG rip}'),
