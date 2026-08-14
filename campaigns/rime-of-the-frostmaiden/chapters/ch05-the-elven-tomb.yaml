@@ -766,18 +766,24 @@ events:
       that she knows Sahnar — that stays her secret for the recruit to spend.
       LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas).
     script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
+      # THE SUMMON, and it costs NO BOX (Nicolas, 2026-08-14 — "you don't need to even add
+      # lines"). Sahnar is simply ON SCREEN for this scene: no A-press, no dialogue, no
+      # ceremony, which is the absent-mindedness the beat wanted and could not have got from a
+      # line. The summon reads from the CONTRAST — she is not there in scene 2 and she is here,
+      # standing at Ravisin's shoulder, for the whole of scene 3. The seven locked boxes are
+      # untouched and the scene's quiet is intact, so Basil's beat still owns it.
+      # What the staging buys: "It never once occurred to me she might be of use" is an
+      # appraisal delivered to her face, Basil's question is asked with her friend standing
+      # there, and "It's not your concern." is said over her.
+      # SHE IS STAGED AT THE TOP because the engine gives no other option, not as a preference.
+      # `TalkPrepNextChar` reopens the talk bubble whenever the active face differs from the
+      # speaking one, so a face loaded MID-message opens a bubble of its own and the scene plays
+      # with two stacked bubbles — which is exactly what the first cut shipped, and what Nicolas
+      # caught on film. Vanilla's silent faces are always preloaded before the first box
+      # (MSG_0954, MSG_095D, MSG_095E). Long form: SCRIPT_DIRECTIVES in build_campaign.py.
+      - present: sahnar
       # (The tomb, after Sephek has gone. Ravisin looking toward the sarcophagus on the berm.)
       - ravisin: "A queen's blade. I have walked past that stone a thousand times."
-      # THE SUMMON, and it costs NO BOX (Nicolas, 2026-08-14 — "you don't need to even add
-      # lines"). Sahnar's portrait simply comes up while Ravisin is appraising the blade: no
-      # A-press, no dialogue, no ceremony, which is the absent-mindedness the beat wanted and
-      # could not have got from a line. She takes FAR RIGHT, outside Ravisin rather than across
-      # from her — the asset arriving at its owner's shoulder. The seven locked boxes are
-      # untouched, and the scene's quiet is intact, so Basil's beat still owns it.
-      # What the staging buys, in order: box 2 stops being a remark about a stone and becomes
-      # an appraisal delivered to her face; Basil's question is asked with her friend standing
-      # there; and "It's not your concern." is said over her.
-      - enters: sahnar
       - ravisin: "It never once occurred to me she might be of use."
       # (Basil knows exactly who is under that stone. She still cannot say so — and now she has
       #  to hold that with Sahnar on screen, which is the pressure sahnar.md/basil.md wanted:

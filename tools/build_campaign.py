@@ -1090,13 +1090,22 @@ def _fe_dialogue_text(s):
 # Script pseudo-entries: stage business a cutscene `script:` carries alongside its dialogue.
 # They are NOT boxes (no A-press) -- see _script_box_count. `location_card`/`fade_to_black`/
 # `beat_break` are staged by the EVENT SCRIPT (or split the beat into separate messages);
-# `enters`/`exits` are staged inside the message body, being face controls rather than scene
-# controls. The pair is deliberately symmetric: `exits` fades a face out mid-scene (#279),
-# `enters` brings one UP mid-scene without giving it a line (#25's Sahnar summon -- a character
-# can arrive on screen and say nothing, which is the cheapest possible way to stage an event).
-SCRIPT_DIRECTIVES = ('location_card', 'fade_to_black', 'beat_break', 'enters', 'exits')
+# `present`/`exits` are staged inside the message body, being face controls rather than scene
+# controls.
+#
+# `present` = "this character is on screen for this scene and never speaks" (#25's Sahnar, whom
+# Ravisin raises during scene 3). It is deliberately NOT the mirror of `exits`, and the asymmetry
+# is the engine's, not a design choice: a face can leave at any point, but one can only ARRIVE
+# before the scene's first box. `TalkPrepNextChar` (scene.c:626) reopens the talk bubble whenever
+# the ACTIVE face slot differs from the SPEAKING one, so loading a silent face mid-message opens
+# a bubble for it and then another for whoever actually talks -- two stacked bubbles, which is
+# what the first cut of this shipped (caught on film by Nicolas, 2026-08-14). Vanilla never loads
+# a face mid-message without having it speak NEXT (MSG_904, MSG_092C, MSG_095A); its silent loads
+# are always preloads at the top, before any bubble exists (MSG_0954, MSG_095D, MSG_095E). So
+# `present:` renders through the same `preload` path those use, and its POSITION in the script is
+# not meaningful -- put it first, where it reads the way it plays.
+SCRIPT_DIRECTIVES = ('location_card', 'fade_to_black', 'beat_break', 'present', 'exits')
 _SCRIPT_EXIT = object()   # marker block for `exits:`, kept distinct from any speaker name
-_SCRIPT_ENTER = object()  # ditto for `enters:`
 
 
 # The portrait podiums in SCREEN order, left to right (tag codes in tools/textencode/msg_list.txt:
@@ -1107,7 +1116,7 @@ PODIUM_ORDER = ('[OpenFarFarLeft]', '[OpenFarLeft]', '[OpenMidLeft]', '[OpenLeft
 
 
 def assert_silent_faces_have_elbow_room(script, podiums, where):
-    """A face that never SPEAKS must not sit on a rung next to one that does.
+    """A `present:` face must not sit on a rung next to one that speaks.
 
     Adjacent podiums overlap: the portraits are wider than the gap between neighbouring rungs,
     and FE8 draws the active speaker's face ON TOP of its neighbour's. For a scene of speakers
@@ -1115,11 +1124,11 @@ def assert_silent_faces_have_elbow_room(script, podiums, where):
     FarLeft/MidLeft/MidRight/FarRight, and each of the four is drawn over the others when its
     turn comes, so everyone is legible in motion.
 
-    A SILENT face (`enters:`) never gets that turn. It is underneath for the whole scene.
-    Found by filming, not by reading (#25, 2026-08-14): scene 3 seated Ravisin on MidRight and
-    the raised Sahnar on FarRight, and Sahnar spent the scene as a hood behind Ravisin's
-    shoulder -- every id, count and wrap correct, and the beat invisible. This is the assertion
-    that scene could not have had before, because silent faces did not exist before it.
+    A `present:` face never gets that turn. It is underneath for the whole scene. Found by
+    filming, not by reading (#25, 2026-08-14): scene 3 seated Ravisin on MidRight and the raised
+    Sahnar on FarRight, and Sahnar spent the scene as a hood behind Ravisin's shoulder -- every
+    id, count and wrap correct, and the beat invisible. This is the assertion that scene could
+    not have had before, because silent faces did not exist before it.
 
     Vanilla's stable two-face right side leaves a rung EMPTY between the pair -- Right +
     FarRight, never MidRight + FarRight (MSG_904, MSG_092C, MSG_0937, MSG_0954), reached in
@@ -1128,7 +1137,7 @@ def assert_silent_faces_have_elbow_room(script, podiums, where):
     Unknown tags are ignored rather than rejected, so a faceless narration seat or a future tag
     cannot fail a build on a guess.
     """
-    silent = {text for entry in script for k, text in entry.items() if k == 'enters'}
+    silent = {text for entry in script for k, text in entry.items() if k == 'present'}
     for name in sorted(silent):
         seat = podiums.get(name)
         if seat not in PODIUM_ORDER:
@@ -1154,7 +1163,7 @@ def _script_staged_names(script):
     """
     names = {k for entry in script for k in entry if k not in SCRIPT_DIRECTIVES}
     names |= {text for entry in script for k, text in entry.items()
-              if k in ('enters', 'exits')}
+              if k in ('present', 'exits')}
     return names
 
 
@@ -1286,13 +1295,6 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
             # after the lines it is supposed to precede.
             blocks.append((_SCRIPT_EXIT, text))
             continue
-        if speaker == 'enters':
-            # A character who COMES ON while the scene runs on, and says nothing. Same
-            # reasoning as `exits` above: it has to fire at this POINT in the message, and it
-            # must break the same-speaker coalescing or the face would arrive after the lines
-            # that are spoken over it.
-            blocks.append((_SCRIPT_ENTER, text))
-            continue
         if speaker in SCRIPT_DIRECTIVES:
             continue
         lines = _wrap_fe_lines(_fe_dialogue_text(text), width)
@@ -1307,9 +1309,7 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
     def load_face(open_tag, fid_tag, holder):
         """Bring `holder`'s face up at `open_tag`, evicting whatever the budget requires.
 
-        Shared by a speaker's first turn and by a silent `enters:`, so the two cannot drift --
-        the eviction rules are the same business either way, and the only thing an entrance
-        does differently is that no box follows it.
+        Factored out of the speaker loop so the eviction rules live in one place.
         """
         if open_tag in live:                    # podium held by someone else
             parts.append(open_tag + '[ClearFace]')
@@ -1323,7 +1323,20 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
         live[open_tag] = holder
         lru.append(open_tag)
 
-    for pos, fid in (preload or []):          # silent listeners, loaded first
+    # `present:` characters join the explicit `preload` list: both are faces that are simply
+    # THERE, and the engine only accepts them before the first bubble opens (see
+    # SCRIPT_DIRECTIVES). Script order among them is preserved, after any caller-supplied ones.
+    seeded = list(preload or [])
+    for entry in script:
+        for key, name in entry.items():
+            if key != 'present':
+                continue
+            open_tag, fid_tag = staging.get(name, (None, None))
+            if open_tag is None or fid_tag is None:
+                sys.exit('ERROR: `present: %s` but %s has no faced podium in this scene -- a '
+                         'character staged with nowhere to stand is a silent no-op' % (name, name))
+            seeded.append((open_tag, fid_tag))
+    for pos, fid in seeded:                   # silent listeners, loaded first
         parts.append('%s[LoadFace]%s' % (pos, fid))
         live[pos] = '\x00listener'            # sentinel: never matches a real speaker
         lru.append(pos)
@@ -1339,19 +1352,6 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
             parts.append(open_tag + '[ClearFace]')
             del live[open_tag]
             lru.remove(open_tag)
-            continue
-        if speaker is _SCRIPT_ENTER:
-            arriving = pages                      # the marker carries the character's name
-            open_tag, fid_tag = staging.get(arriving, (None, None))
-            if open_tag is None or fid_tag is None:
-                sys.exit('ERROR: `enters: %s` but %s has no faced podium in this scene -- an '
-                         'entrance with nowhere to stand is a silent no-op, which is exactly '
-                         'the failure it exists to make impossible' % (arriving, arriving))
-            if live.get(open_tag) == arriving:
-                sys.exit('ERROR: `enters: %s` but %s is already on screen at that point -- an '
-                         'entrance that re-loads a live face reads as a flicker, not an '
-                         'arrival' % (arriving, arriving))
-            load_face(open_tag, fid_tag, arriving)
             continue
         open_tag, fid_tag = staging[speaker]
         if fid_tag is None:           # faceless stage business -- no face, no slot
@@ -10797,7 +10797,7 @@ def _ch05_opening_scene(chap, slot, boxes, what, podiums, fid, width=42):
 def _ch05_opening_body(script, slot, what, podiums, fid, width=42):
     """Render one opening beat at its channel's width, refusing anyone with no podium.
 
-    Staged names, not speakers: a character can be put on screen by `enters:` and never take a
+    Staged names, not speakers: a character can be put on screen by `present:` and never take a
     line (ch05's scene 3 raises Sahnar that way), and they need a seat exactly as a speaker
     does. Reading the keys alone would let such a scene through and then die inside the
     renderer on a missing staging entry.

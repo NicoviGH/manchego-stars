@@ -2786,13 +2786,18 @@ class Ch05BasilJoinsAfterPrep(unittest.TestCase):
         self.assertEqual(sorted(order), order)
 
 
-class SilentEntranceDirective(unittest.TestCase):
-    """`enters:` — a character comes on screen mid-scene and says nothing (#25).
+class SilentPresenceDirective(unittest.TestCase):
+    """`present:` — a character is on screen for a scene and never speaks (#25).
 
-    The mirror of `exits:` (#279), and it exists because ch05's scene 3 has to SHOW Ravisin
-    raising Sahnar without spending a box on it: no line, no A-press, just a face arriving
-    while somebody else talks over it. Nicolas, 2026-08-14: "you don't need to even add
-    lines... just add sahnars portrait to the scene."
+    It exists because ch05's scene 3 has to SHOW Ravisin's raised Sahnar without spending a box
+    on it. Nicolas, 2026-08-14: "you don't need to even add lines... just add sahnars portrait
+    to the scene."
+
+    It renders as a PRELOAD, and that is the engine's call rather than a design one:
+    `TalkPrepNextChar` reopens the talk bubble whenever the active face differs from the
+    speaking one, so a silent face loaded mid-message opens a bubble of its own and the scene
+    plays with two stacked bubbles. Vanilla's silent loads are all preloads (MSG_0954, 095D,
+    095E); it never loads a face mid-message without having it speak next.
     """
     STAGING = {'a': ('[OpenMidLeft]', '[FID_Artur]'),
                'b': ('[OpenMidRight]', '[FID_Riev]'),
@@ -2802,39 +2807,40 @@ class SilentEntranceDirective(unittest.TestCase):
         return bc._script_to_message(script, self.STAGING, width=42, **kw)
 
     def test_it_loads_the_face_without_opening_a_box(self):
-        out = self._msg([{'a': 'one'}, {'enters': 'c'}, {'a': 'two'}])
+        out = self._msg([{'present': 'c'}, {'a': 'one'}, {'a': 'two'}])
         self.assertIn('[OpenFarRight][LoadFace][FID_Marisa]', out)
-        self.assertEqual(2, out.count('[A]'), 'an entrance is staging, not an A-press')
+        self.assertEqual(2, out.count('[A]'), 'a presence is staging, not an A-press')
 
     def test_it_is_not_a_box(self):
-        self.assertIn('enters', bc.SCRIPT_DIRECTIVES)
+        self.assertIn('present', bc.SCRIPT_DIRECTIVES)
         self.assertEqual(2, bc._script_box_count(
-            [{'a': 'one'}, {'enters': 'c'}, {'a': 'two'}]))
+            [{'present': 'c'}, {'a': 'one'}, {'a': 'two'}]))
 
-    def test_it_fires_at_its_POINT_and_breaks_same_speaker_coalescing(self):
-        """The whole reason it is carried as a marker rather than skipped: the face has to
-        arrive BETWEEN the two lines, not after both of them."""
-        out = self._msg([{'a': 'before'}, {'enters': 'c'}, {'a': 'after'}])
-        self.assertLess(out.index('before'), out.index('[LoadFace][FID_Marisa]'))
-        self.assertLess(out.index('[LoadFace][FID_Marisa]'), out.index('after'))
+    def test_the_face_is_PRELOADED_before_any_text(self):
+        """The engine's rule, not ours. `TalkPrepNextChar` reopens the talk bubble whenever the
+        active face differs from the speaking one, so a silent face loaded mid-message opens a
+        bubble of its own and the scene plays with two stacked bubbles -- filmed 2026-08-14.
+        Vanilla's silent loads are all preloads (MSG_0954, 095D, 095E); it never loads a face
+        mid-message without having it speak next (MSG_904, 092C, 095A)."""
+        out = self._msg([{'a': 'one'}, {'present': 'c'}, {'a': 'two'}])
+        self.assertLess(out.index('[LoadFace][FID_Marisa]'), out.index('one'),
+                        'a silent face must be up before the first bubble opens')
 
-    def test_an_entrance_with_no_podium_is_refused(self):
+    def test_it_does_not_break_same_speaker_coalescing(self):
+        """It is not a mid-scene event, so it must not split a speaker's consecutive turns into
+        two blocks: their two pages stay inside ONE [OpenX] run, joined by [A][LF]. A re-opened
+        podium between them would be a second bubble by another road."""
+        out = self._msg([{'present': 'c'}, {'a': 'one'}, {'a': 'two'}])
+        self.assertIn('one[A][LF]\ntwo[A]', out)
+        # the only [OpenMidLeft]s are the load and the single block that follows it
+        self.assertEqual(2, out.count('[OpenMidLeft]'))
+
+    def test_a_presence_with_no_podium_is_refused(self):
         with self.assertRaises(SystemExit):
-            self._msg([{'a': 'one'}, {'enters': 'nobody'}])
+            self._msg([{'present': 'nobody'}, {'a': 'one'}])
 
-    def test_re_entering_a_live_face_is_refused(self):
-        """A second [LoadFace] on a podium its owner already holds reads as a flicker."""
-        with self.assertRaises(SystemExit):
-            self._msg([{'c': 'already here'}, {'enters': 'c'}])
-
-    def test_an_entrance_evicts_by_the_same_rules_a_speaker_does(self):
-        """Entrances and first turns share `load_face`, so the face budget cannot drift
-        between them -- an entrance over a held podium clears it exactly as a speaker would."""
-        out = self._msg([{'b': 'mine'}, {'enters': 'c'}, {'a': 'hi'}], face_budget=2)
-        self.assertIn('[ClearFace]', out)
-
-    def test_staged_names_sees_silent_arrivals_and_departures(self):
-        script = [{'a': 'one'}, {'enters': 'c'}, {'exits': 'a'}]
+    def test_staged_names_sees_silent_presences_and_departures(self):
+        script = [{'a': 'one'}, {'present': 'c'}, {'exits': 'a'}]
         self.assertEqual({'a', 'c'}, bc._script_staged_names(script))
 
 
@@ -2861,18 +2867,46 @@ class Ch05RavisinRaisesSahnarOnScreen(unittest.TestCase):
     def test_the_summon_costs_no_box_and_the_lock_is_intact(self):
         script = self._scene()['script']
         self.assertEqual(7, bc._script_box_count(script), 'still the seven locked boxes')
-        self.assertEqual('sahnar', next(e['enters'] for e in script if 'enters' in e))
-        self.assertNotIn('sahnar', {k for e in script for k in e if k != 'enters'},
+        self.assertEqual('sahnar', next(e['present'] for e in script if 'present' in e))
+        self.assertNotIn('sahnar', {k for e in script for k in e if k != 'present'},
                          'she is raised, she does not speak -- her first words are scene 6')
 
-    def test_she_comes_up_between_the_appraisal_and_its_second_half(self):
-        """Box 1 is Ravisin talking about a stone; box 2 is her pricing the woman standing in
-        front of her. The entrance is what turns one into the other."""
+    def test_she_is_on_screen_for_the_WHOLE_scene_and_the_contrast_is_the_summon(self):
+        """She is staged first, not mid-scene -- the engine allows no other placement (see
+        `SilentPresenceDirective`). The beat still reads, because it reads off the CONTRAST:
+        absent through scene 2, standing at Ravisin's shoulder through all of scene 3. So
+        "It never once occurred to me she might be of use" is an appraisal to her face, and
+        "It's not your concern." is said over her."""
         script = self._scene()['script']
         keys = [next(iter(e)) for e in script]
-        self.assertEqual(1, keys.index('enters'))
-        self.assertIn('walked past that stone', next(iter(script[0].values())))
-        self.assertIn('might be of use', next(iter(script[2].values())))
+        self.assertEqual(0, keys.index('present'), 'staged before the first box')
+        body = self._body()
+        plain = ' '.join(re.sub(r'\[[^\]]*\]', ' ', body).split())
+        self.assertLess(plain.index("A queen's blade"), plain.index('might be of use'))
+        self.assertLess(plain.index('might be of use'), plain.index("It's not your concern"))
+        self.assertLess(body.index('[LoadFace][FID_Marisa]'), body.index("A queen's blade"))
+        # and she is absent from scene 2, which is what makes her presence here legible at all
+        self.assertNotIn('[FID_Marisa]', dict(bc.ch05_opening_messages(self._chap()))[0x9EA])
+
+    def test_no_second_bubble__the_silent_face_is_up_before_the_first_box(self):
+        """The defect Nicolas caught on film: two stacked speech bubbles, because the first cut
+        loaded her mid-message and `TalkPrepNextChar` reopens the bubble whenever the active
+        face differs from the speaking one. Preloading leaves the message in vanilla's own
+        MSG_0954 shape -- every silent face up front, then text.
+
+        NB an `[A]` followed by `[OpenX][LoadFace]` is NOT the bug and must not be asserted
+        against: that is an ordinary speaker change (Basil's, three lines below), it ships in
+        every scene we have, and the newly loaded face speaks immediately."""
+        body = self._body()
+        self.assertTrue(body.startswith('[OpenFarRight][LoadFace][FID_Marisa]\n'
+                                        '[OpenRight][LoadFace][FID_Riev]'),
+                        'both faces must be up before the first box: %r' % body[:120])
+        # nobody is loaded again once the talking starts EXCEPT a speaker taking their own turn
+        first_text = body.index("A queen's blade")
+        for match in re.finditer(r'\[Open\w+\]\[LoadFace\](\[FID_\w+\])', body):
+            if match.start() > first_text:
+                self.assertEqual('[FID_Artur]', match.group(1),
+                                 'only a speaker may load mid-message, and only to speak next')
 
     def test_the_raised_face_gets_a_whole_empty_rung_of_elbow_room(self):
         """The defect this scene taught, found by FILMING (2026-08-14). Podiums are a ladder and
@@ -2897,7 +2931,7 @@ class Ch05RavisinRaisesSahnarOnScreen(unittest.TestCase):
 
     def test_a_silent_face_next_door_to_a_speaker_is_refused(self):
         """The guard, on the exact shape that shipped wrong."""
-        script = [{'ravisin': 'one'}, {'enters': 'sahnar'}, {'ravisin': 'two'}]
+        script = [{'ravisin': 'one'}, {'present': 'sahnar'}, {'ravisin': 'two'}]
         bc.assert_silent_faces_have_elbow_room(
             script, {'ravisin': '[OpenRight]', 'sahnar': '[OpenFarRight]'}, 'test')
         with self.assertRaises(SystemExit):
