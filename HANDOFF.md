@@ -29,10 +29,9 @@ scene 3" comment before writing a line.** Nicolas, 2026-08-14: Sahnar stops bein
 and goes on the map from turn 1, woken ON SCREEN by Ravisin in scene 3. That is vanilla's own
 shape — `UnitDef_088B5914` `LOAD1`s Joshua at (12,6) with a Killing Edge right after the prep
 `CALL`, which is the tile and the sword ch05 already lifted, so `arrives_turn: 2` is OUR
-divergence. **This file previously said scene 6 needs a BACKDROP because nothing is staged for a
-bubble to anchor to. That is now WRONG and the reason is gone:** with Sahnar up from scene 3,
-scene 6 becomes vanilla's `0x9C3` exactly — `CUMO_AT(12, 6)`, an on-map bubble on the duelist —
-and all six locked lines survive untouched. **Do not build scene 6 a backdrop.**
+divergence. With Sahnar up from scene 3, **scene 6 is vanilla's `0x9C3` exactly** — `CUMO_AT(12,
+6)`, an on-map bubble on the duelist — and all six locked lines survive untouched. **Do not build
+scene 6 a backdrop**; the bubble has a unit to anchor to now.
 
 The change drags five things with it (stale `0x9E4` line, the `LOAD1` move, Joshua's hold-AI
 instead of `aggressive`, a `make difficulty CH=ch05` re-price, the brazier note) — all enumerated
