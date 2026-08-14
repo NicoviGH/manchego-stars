@@ -76,3 +76,28 @@ Our **Sahnar is the same killing-edge crit-Myrmidon threat**, and `criticals` si
 be introduced in our chapter order before the chapter where a crit duelist first threatens the
 player. Run the §Tutorial-parity check on ch05 and settle it with Nicolas (in-voice line vs a
 box) before locking the recruit beat.
+
+## Where vanilla puts the A-press (measured 2026-08-14, #25)
+
+Counted over every FE8 dialogue message that loads a face — **15,625 boxes**:
+
+| shape | share |
+|---|---|
+| box ends on terminal punctuation (`.` `!` `?` `...` `--`) | **99.3%** |
+| box ends mid-sentence | 0.7% |
+| box is a single LINE | 38.3% |
+
+Two working rules fall out, and both are cheap to check before showing Nicolas a scene:
+
+- **Break at a sentence boundary.** Mid-clause page breaks are not a style vanilla has — they are
+  what a WRAPPER produces when an authored line does not fit the channel. If a rendered box ends
+  mid-sentence, that is a defect, not a choice. (ch05 has now hit this three times: the reliquary
+  lines, scene 5's no-Lupin fallback, and scene 6 after its move to the 29-wide bubble.)
+- **A one-line box is normal, not thin.** Nearly two in five vanilla boxes are a single line —
+  `"Eirika."`, `"Good."`, `"Seth."`. Do not pad a short beat to fill two lines, and do not treat
+  a lone short sentence as a reason to merge boxes.
+
+The remaining authorial choice is **which** boundary, and that is Nicolas's: scene 5's fallback
+breaks after the shock rather than at the later full stop (`decisions.md` → "A fallback line
+chosen as PROSE has not been boxed"), and scene 6 breaks so the understatement gets its own press.
+Both are sentence boundaries; the difference is beat placement, not house style.
