@@ -1080,6 +1080,14 @@ def _fe_dialogue_text(s):
     return ' '.join(s.split())
 
 
+# Script pseudo-entries: stage business a cutscene `script:` carries alongside its dialogue.
+# They are NOT boxes (no A-press) -- see _script_box_count. `location_card`/`fade_to_black`/
+# `beat_break` are staged by the EVENT SCRIPT (or split the beat into separate messages);
+# `exits` is staged inside the message body, being a face control rather than a scene control.
+SCRIPT_DIRECTIVES = ('location_card', 'fade_to_black', 'beat_break', 'exits')
+_SCRIPT_EXIT = object()   # marker block for `exits:`, kept distinct from any speaker name
+
+
 def _wrap_fe_lines(text, width=29):
     """Word-wrap dialogue to GBA text lines. Default width matches vanilla's ON-MAP
     messages (MSG_910/911 top out at 29 chars): map speech bubbles auto-size to the
@@ -1201,7 +1209,14 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
     blocks = []   # (speaker, [page, ...]); page = 'line1[LF]\nline2'
     for entry in script:
         (speaker, text), = entry.items()
-        if speaker in ('location_card', 'fade_to_black', 'beat_break'):
+        if speaker == 'exits':
+            # A speaker who WALKS OFF while the scene runs on. Carried through as a marker
+            # rather than skipped, because it has to fire at this POINT in the message -- and
+            # because it must break the same-speaker coalescing below, or the fade would play
+            # after the lines it is supposed to precede.
+            blocks.append((_SCRIPT_EXIT, text))
+            continue
+        if speaker in SCRIPT_DIRECTIVES:
             continue
         lines = _wrap_fe_lines(_fe_dialogue_text(text), width)
         pages = ['[LF]\n'.join(lines[p:p + 2]) for p in range(0, len(lines), 2)]
@@ -1217,6 +1232,18 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
         live[pos] = '\x00listener'            # sentinel: never matches a real speaker
         lru.append(pos)
     for speaker, pages in blocks:
+        if speaker is _SCRIPT_EXIT:
+            leaving = pages                       # the marker carries the speaker's name
+            open_tag, _fid = staging.get(leaving, (None, None))
+            if open_tag is None or live.get(open_tag) != leaving:
+                sys.exit('ERROR: `exits: %s` but %s holds no podium at that point in the scene '
+                         '-- a stage direction that fires on nobody is a silent no-op, which is '
+                         'how the face it means to fade got left on screen to begin with'
+                         % (leaving, leaving))
+            parts.append(open_tag + '[ClearFace]')
+            del live[open_tag]
+            lru.remove(open_tag)
+            continue
         open_tag, fid_tag = staging[speaker]
         if fid_tag is None:           # faceless stage business -- no face, no slot
             # Emit NO [OpenX] code: those are portrait POSITION anchors (textdefs.txt
@@ -1244,6 +1271,15 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
             lru.append(open_tag)
         parts.append(body)
     return '\n'.join(parts) + (trailing or '') + '[X]'
+
+
+def _script_box_count(script):
+    """A-presses in a cutscene `script:` -- stage directions are not boxes.
+
+    Scene box counts are locked and asserted against the YAML, so a directive that counted as
+    a box would make every such assertion off by one the moment a scene gained one.
+    """
+    return sum(1 for e in script if next(iter(e)) not in SCRIPT_DIRECTIVES)
 
 
 def _beat_is_narration(beat):
@@ -8620,16 +8656,23 @@ def variant_beat(beat, fallback, err_label):
         sys.exit('ERROR: %s: fallback declares %d boxes, %d replaces, %d script lines '
                  '-- all three must agree' % (err_label, len(boxes), len(anchors), len(subs)))
     out = list(beat)
+    # `boxes:` are A-PRESS numbers, not list positions, and a script may carry stage directions
+    # (`exits:` and friends) that are not boxes. Map one to the other rather than indexing the
+    # raw list: without this, a directive added ABOVE a fallback silently shifts every index
+    # past it -- caught by the anchor assertion below, but as a confusing "the locked script
+    # moved" rather than the truth.
+    positions = [i for i, e in enumerate(beat) if next(iter(e)) not in SCRIPT_DIRECTIVES]
     for idx, anchor, sub in zip(boxes, anchors, subs):
-        if not 1 <= idx <= len(beat):
+        if not 1 <= idx <= len(positions):
             sys.exit('ERROR: %s: fallback box %d is outside the %d-box scene'
-                     % (err_label, idx, len(beat)))
-        (_, text), = beat[idx - 1].items()
+                     % (err_label, idx, len(positions)))
+        at = positions[idx - 1]
+        (_, text), = beat[at].items()
         if not _fe_dialogue_text(text).startswith(_fe_dialogue_text(anchor)[:40]):
             sys.exit('ERROR: %s: fallback box %d anchored to %r but that box now reads %r '
                      '-- the locked script moved; re-anchor the fallback'
                      % (err_label, idx, anchor[:40], text[:40]))
-        out[idx - 1] = sub
+        out[at] = sub
     return out
 
 
@@ -10484,15 +10527,15 @@ def _ch05_opening_scene(chap, slot, boxes, what, podiums, fid):
     """
     script = _chapter_event_by_slot(chap, 'chapter_start', slot,
                                     'ch05 opening (%s)' % what)['script']
-    if len(script) != boxes:
+    if _script_box_count(script) != boxes:
         sys.exit('ERROR: ch05 opening %r (%s) must remain the %d locked boxes; got %d'
-                 % (slot, what, boxes, len(script)))
+                 % (slot, what, boxes, _script_box_count(script)))
     return script, _ch05_opening_body(script, slot, what, podiums, fid)
 
 
 def _ch05_opening_body(script, slot, what, podiums, fid):
     """Render one opening beat at the scenic width, refusing any speaker with no podium."""
-    speakers = {k for entry in script for k in entry}
+    speakers = {k for entry in script for k in entry if k not in SCRIPT_DIRECTIVES}
     unstaged = sorted(speakers - set(podiums))
     if unstaged:
         sys.exit('ERROR: ch05 opening %r (%s) speaks as %s, which its podium table '
