@@ -6,41 +6,52 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-13 (Claude). **#255, #274 and #277 are DONE and merged — do not reopen any of
-them.** The generated decomp tree is intentionally dirty as recorded below.
+Refreshed 2026-08-13 (Claude). **#255, #274, #277 and #278 are DONE and merged — do not reopen any
+of them.** The generated decomp tree is intentionally dirty as recorded below.
 
 ## In flight
 
-**Nothing.** `main` is at #277 (ch05's opening backdrop half, reviewed and merged), CI green.
+**Nothing.** `main` is at #278 (ch05's scene 4 + the no-Lupin branch, reviewed and merged), CI
+green.
 
 ## Next task
 
 **ch05's dialogue wiring, worked TOP TO BOTTOM in player order** (Nicolas, 2026-08-13). The
-ordered inventory of all 17 scenes — **9 done, 8 left** — is the table in **issue #25**, which is
+ordered inventory of all 17 scenes — **10 done, 7 left** — is the table in **issue #25**, which is
 the canonical view; do not re-derive an order from the YAML's `vanilla 0xNNN` labels, which are
 anatomy citations naming the scene we MINE and are never ids we write. Reading them as an order
 is what made the list confusing in the first place.
 
-Next up is **scene 4, the party crests the ridge** (7 boxes), then straight down the table. All
+Next up is **scene 5, Basil trundles up and joins** (3 boxes), then straight down the table. All
 of it is locked text from PR #196: this is wiring, not writing.
 
-**Scene 4 is the first with a `no_lupin_fallback`, so it is the one that builds the branch.**
-Text is chosen for all five arms; the mechanism is not built for any. `variant_beat()` splices
-the substitute boxes and `branch_on_flag()` emits the skeleton — but `variant_beat` reads
-`boxes:`/`replaces:` as LISTS while ch05's five blocks are authored with singular `box:`/`replaces:`.
-Normalize the YAML or the reader; do not write a second mechanism.
+**The branch mechanism EXISTS now — reuse it, do not rebuild it (#278).**
+`branch_on_check_alive(CH05_LUPIN_CHARACTER, if_alive, if_absent)` emits the arm-picker, and it
+shares `_branch_on_slot_c` with `branch_on_flag` so the two cannot drift. All five ch05 fallback
+blocks are normalized onto `variant_beat`'s `boxes:`/`replaces:` LISTS, and a test refuses a
+singular `box:`. Scene 5 is the second fallback and should cost one table row plus one id.
 
-**Its backdrop is `Forest Outskirts 4 winter Day`** (Nicolas, 2026-08-13, replacing an earlier
-Lakeside pick), from the FE-Repo's `FE9-10 CG Rips`. Vendor it the way `bg_ElvenTomb` went in —
-those rips ship mode-P at 16 colours, so `bg_to_fe8.py` reproduces them EXACTLY and the only
-change is the 256→240 crop the screen forces. Land it WITH scene 4, not before: an unreferenced
-BG slot is the Bremen wart.
+**Scene 5's channel is NOT scene 4's.** It is the first ON-MAP scene (vanilla stages the party on
+the street before its equivalent), so it wraps at the bubble's 29, not the scenic 42 — and its
+speaker needs a staged unit for `PutTalkBubble` to anchor to. See the CHANNEL note below.
 
 **The id budget is already resolved — do not re-litigate it.** 17 ids against 16 owed, allocated
 scene by scene in #25's table; claim each in `HOSTED_CHAPTER_MESSAGE_IDS` as it lands. `0x9E9`
-`0x9EA` `0x9EB` are spent (scenes 1–3); scene 4 takes `0x9EC` + `0x9ED` for its fallback arm.
-Method and the two ways to run the sweep wrong: `docs/decisions.md` → "A host block is not the
-whole id budget". A fallback arm costs ONE extra id, not four.
+`0x9EA` `0x9EB` (scenes 1–3) and `0x9EC` `0x9ED` (scene 4 + its fallback) are SPENT; scene 5 takes
+`0x9EE` + `0x9EF`. Method and the two ways to run the sweep wrong: `docs/decisions.md` → "A host
+block is not the whole id budget". A fallback arm costs ONE extra id, not four.
+
+**The alive-arm proof is still owed, and the boot ROMs CANNOT give it (#278).** The `--ch05-boot`
+ROM can only ever walk the no-Lupin arm: the branch runs before `LOMA` while the boot party seed
+is `LOAD1`ed after it, so `gUnitArrayBlue` is empty at the branch and slot C is 0 for every unit
+regardless of the seed. Filmed and confirmed — scene 4 opens on Pinky's *"The tracks stop here"*,
+never Lupin's *"The trail leads here"*. **A four-state proof built on a boot ROM would be
+vacuous.** The three alive/roster states need the REAL ch04 → ch05 chain, where `ReadGameSave` has
+filled the array before the chapter's events run. Do NOT hoist the seed above the branch — it sits
+after `LOMA` because `LOMA` rebuilds the map. Long form: `decisions.md` → "The `--ch05-boot` ROM
+can only ever play the NO-Lupin arm". (The placement itself is vanilla's own: `EventScr_Ch7_`
+`BeginningScene` branches on `CHECK_ALIVE(CHARACTER_FRANZ)` and three more optional units inside a
+beginning scene.)
 
 Two questions this used to leave open are now SETTLED — read them, don't re-derive them:
 - **CHANNEL is inherited from the vanilla twin, and so is where PREP sits.** Vanilla Ch5's
@@ -88,19 +99,25 @@ bubble has nothing to anchor to — scene 6 needs a backdrop (dark/interior), no
   milliseconds instead of a build plus an emulator run. `--index-map` / `--isolate` answer "which
   index owns this, and does anything else share it?" It knows `arena_battle` and `arena_front`;
   adding an asset is a few lines. Use it before any recolour (ch07's Bremen backdrop, title screen).
-- **ch05's opening now SPEAKS, for the first three scenes (#277).** `CH05_BEGINNING_SCRIPT` opens
-  on one `BACG(BG_MS_ELVEN_TOMB)` held across scenes 1–3, faded through black between them, then
-  `FADI` → `LOMA` → the LOAD1s → prep, unchanged. **Do not reach for `Text_BG` to extend it**: that
-  macro ends in `EventScr_TextShowWithFadeIn`, which CLEANs and fades up onto the MAP — and before
-  `LOMA` that map is still the host slot's. ch03 and ch04 hand-roll the same sequence for the same
-  reason. `recordch05opening` films the whole backdrop half; `docs/demo/ch05-opening.gif` is the
-  review artifact Nicolas signed off.
+- **ch05's opening now SPEAKS, for scenes 1–4 (#277, #278).** `CH05_BEGINNING_SCRIPT` opens on one
+  `BACG(BG_MS_ELVEN_TOMB)` held across scenes 1–3, faded through black between them, then **CUTS to
+  `BG_MS_FOREST_OUTSKIRTS_WINTER` for scene 4** (the ridge — vanilla switches BG at this same
+  arrival beat), branches on `CHECK_ALIVE`, and only then `FADI` → `LOMA` → the LOAD1s → prep,
+  unchanged. **A second `BACG` must be preceded by `REMOVEPORTRAITS`** or the first BG simply stays
+  in VRAM — `Text()` leaves `activeTextType` at TEXTSTART and `BACG` only decompresses under
+  REMOVEPORTRAITS/_1A22. That is the ch03/ch04 stale-BG bug. **Do not reach for `Text_BG` to extend
+  it**: that macro ends in `EventScr_TextShowWithFadeIn`, which CLEANs and fades up onto the MAP —
+  and before `LOMA` that map is still the host slot's. ch03 and ch04 hand-roll the same sequence for
+  the same reason. `recordch05opening` films the whole backdrop half (49 boxes, two BGs);
+  `docs/demo/ch05-opening.gif` is the review artifact — **regenerated at #278, and it shows scene
+  4's FALLBACK arm**, for the boot-ROM reason under Next task.
 - **Any ch05boot scenario pays for the opening in its BOOT.** It is 48 A-presses ahead of the map,
   and `bootToMap()` drives all of it. Every ch05boot scenario now pokes fast config BEFORE the
   boot; a new one that pokes it after will burn over half the `record*` 300s budget on a scene it
   never films.
-- **Ravisin's battle taunt is wired NOWHERE**, and neither is any no-Lupin arm. Both are rows in
-  #25's scene table now.
+- **Ravisin's battle taunt is wired NOWHERE.** It is a row in #25's scene table. The no-Lupin arms
+  are no longer in that state: scene 4's is BUILT and the mechanism is reusable (#278); the other
+  four are wiring, not invention.
 - **The ENDING SCENES ARE NOT BLOCKED by ch06 hosting** (corrected 2026-08-13, Nicolas) — this
   file and #25 both claimed they were, and both were wrong. `dev_placeholder_scene()` is the
   LANDING, standing in for the `MNC2(next)` of an unhosted next chapter; it says nothing about
