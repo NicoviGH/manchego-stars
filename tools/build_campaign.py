@@ -1085,11 +1085,23 @@ def _wrap_fe_lines(text, width=29):
     messages (MSG_910/911 top out at 29 chars): map speech bubbles auto-size to the
     text, and longer lines overflow the bubble's max width and clip (caught on the
     2026-06-10 scenes capture -- full-screen Text_BG tolerates ~42, bubbles do not).
-    A bare '--' never opens a line: the dash glues to the word before it."""
+    A bare '--' never opens a line: the dash glues to the word before it -- and when
+    that glue would not FIT, the word it is glued to moves down with it rather than the
+    line running two characters over. (It used to glue unconditionally, so a line ending
+    exactly at the width came out at width+2; ch05's scene 4 sits on that boundary and is
+    what found it.)"""
     out, cur = [], ''
     for w in text.split():
         if w == '--' and cur:
-            cur += ' --'
+            if len(cur) + 3 <= width:
+                cur += ' --'
+            else:
+                head, _, tail = cur.rpartition(' ')
+                if head:
+                    out.append(head)          # the dash takes its word to the next line
+                    cur = tail + ' --'
+                else:
+                    cur += ' --'              # a one-word line: nothing left to break at
             continue
         cand = (cur + ' ' + w) if cur else w
         if len(cand) > width and cur:
@@ -7400,6 +7412,15 @@ CAMPAIGN_BGS = [
     # reserves local index 0 of every bank as transparent -- 15 usable, and the source has 16.
     # Well inside the SIX the fade/transition procs apply, unlike Bremen's 8.
     ('BG_MS_ELVEN_TOMB',          'bg_ElvenTomb',         '{FE9-10 CG rip}'),
+    # ch05 scene 4 (#25): the ridge the party crests, and the first backdrop in the chapter the
+    # PARTY is standing in rather than looking at from the tomb's side. It is a SECOND BG in one
+    # scene run on purpose -- vanilla Ch5 spends BG_SERAFEW_VILLAGE on four consecutive scenes and
+    # switches to BG_TOWN at exactly this beat, when the travellers physically arrive. Same FE9-10
+    # rip family as the tomb, so it needs no refit either: mode-P at 16 colours in, 0 of 38400
+    # pixels different from the 5-bit source crop out. It packs onto 3 banks rather than the tomb's
+    # 2 (16 source colours against 15 usable per bank, and this picture's tiles straddle the split
+    # differently), still inside the SIX the fade/transition procs apply.
+    ('BG_MS_FOREST_OUTSKIRTS_WINTER', 'bg_ForestOutskirtsWinter', '{FE9-10 CG rip}'),
 ]
 
 
@@ -8399,6 +8420,28 @@ CH05_OPENING_SLOTS = (
     ('vanilla 0x9BC', 0x9EA, 16, 'Sephek gives Ravisin her orders'),
     ('vanilla 0x9BD', 0x9EB, 7,  'Ravisin appraises the blade; Basil asks after her'),
 )
+# ── Scene 4 (#25): the party CRESTS THE RIDGE -- and the chapter's first BRANCH ──────────────
+# Still the opening's backdrop half, but it cuts to a second BG, and that cut is inherited too:
+# vanilla Ch5 spends BG_SERAFEW_VILLAGE on four consecutive scenes and switches to BG_TOWN at
+# exactly this beat, when its travellers physically arrive. The first three scenes are the tomb
+# seen from inside; this one is the party standing on the ridge above it.
+CH05_ARRIVAL_BG = 'BG_MS_FOREST_OUTSKIRTS_WINTER'
+CH05_ARRIVAL_SLOT = ('vanilla 0x9BE', 0x9EC, 7,
+                     'the party crests the ridge; Wolfram finds the arena')
+# The no-Lupin arm. ONE extra id, not four: `variant_beat` splices the substitute box and the
+# WHOLE variant scene goes to a second message, which `branch_on_check_alive` picks at runtime
+# (ch04's ending already does exactly this). Splitting the scene around the differing box would
+# cost four ids -- duplicating text is free, ids are what is scarce.
+CH05_ARRIVAL_NO_LUPIN_MSG = 0x9ED
+# Lupin's MAP identity, which is his PORTRAIT_MAP slot -- NOT his STAT_DONOR (Kyle is a stat
+# reference and nothing else, and CHECK_ALIVE resolves a pid through GetUnitFromCharId).
+CH05_LUPIN_CHARACTER = char_symbol(PORTRAIT_MAP['lupin'])
+# Four speakers, four podiums, which is the face budget exactly (FACE_SLOT_COUNT = 4) -- so
+# nothing is evicted mid-scene. Seated in the order they speak, left to right, and Pinky holds
+# the far right in BOTH arms: he closes the scene on either path, and on the no-Lupin path he
+# also opens it.
+CH05_ARRIVAL_PODIUMS = {'lupin':   '[OpenFarLeft]',  'wolfram': '[OpenMidLeft]',
+                        'marty':   '[OpenMidRight]', 'pinky':   '[OpenFarRight]'}
 # Podiums, held ACROSS the three scenes rather than chosen per scene: Basil and Sephek on the
 # party/left side, the two who outrank them on the right. Ravisin speaks in both scene 2 and
 # scene 3 and holds the same podium in each, so she does not appear to change seats between a
@@ -8490,6 +8533,7 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
              CH05_ARENA_FOUND_MSG, CH05_ARENA_RULES_MSG,
              CH05_SAHNAR_TALK_MSG,
              *(msg for _slot, msg, _boxes, _what in CH05_OPENING_SLOTS),
+             CH05_ARRIVAL_SLOT[1], CH05_ARRIVAL_NO_LUPIN_MSG,
              CH05_GOAL_WINDOW_MSG, CH05_GOAL_STATUS_MSG,
              *(slot[1] for slot in CH05_VILLAGE_SLOTS.values())),
     # Goal ids only -- ch01/ch02 predate the per-chapter block registry, but their goal strings
@@ -8576,23 +8620,56 @@ def variant_beat(beat, fallback, err_label):
     return out
 
 
+def _branch_on_slot_c(test, if_true, if_false, label_base, why):
+    """The event-branch SKELETON both campaign branches share, parameterised by its test.
+
+    Every FE8 conditional of this shape works the same way: some CHECK_* leaves a 0/1 in slot C,
+    BEQ jumps to the fallback arm when it equals slot 0, the true arm GOTOs past that arm, and
+    both converge on a shared LABEL. Only the CHECK_ line differs between "is this flag set" and
+    "is this unit on the roster", so only that line is a parameter -- two skeletons would be two
+    mechanisms to keep in step. `label_base` offsets the pair so several branches can coexist in
+    one script without colliding.
+    """
+    a, b = label_base, label_base + 1
+    return ('    %s\n'
+            '    BEQ(0x%X, EVT_SLOT_C, EVT_SLOT_0) /* %s -> the fallback arm */\n'
+            % (test, a, why)
+            + if_true
+            + '    GOTO(0x%X)\n'
+              'LABEL(0x%X)\n' % (b, a)
+            + if_false
+            + 'LABEL(0x%X)\n' % b)
+
+
 def branch_on_flag(flag, if_set, if_clear, label_base=0):
     """A vanilla-shaped event branch: run `if_set` when `flag` is set, else `if_clear`.
 
     The FE8 idiom (cf. ch19a's ending, which picks its text by CHECK_EVENTID + CHECK_ALIVE):
-    CHECK_EVENTID leaves the flag in slot C, BEQ jumps when it equals slot 0 (clear), and both
-    arms converge on a shared LABEL. `label_base` offsets the two labels so several branches
-    can coexist in one script without colliding.
+    CHECK_EVENTID leaves the flag in slot C. ch04's ending picks its no-Lupin variant this way.
     """
-    a, b = label_base, label_base + 1
-    return ('    CHECK_EVENTID(%s)\n'
-            '    BEQ(0x%X, EVT_SLOT_C, EVT_SLOT_0) /* flag clear -> the fallback arm */\n'
-            % (flag, a)
-            + if_set
-            + '    GOTO(0x%X)\n'
-              'LABEL(0x%X)\n' % (b, a)
-            + if_clear
-            + 'LABEL(0x%X)\n' % b)
+    return _branch_on_slot_c('CHECK_EVENTID(%s)' % flag, if_set, if_clear,
+                             label_base, 'flag clear')
+
+
+def branch_on_check_alive(character, if_alive, if_absent, label_base=0):
+    """The same branch, asking the ROSTER instead of a flag: is this unit ours and alive?
+
+    ch05's five conditional scenes address units the player may never have recruited, and this
+    is vanilla's own answer for that question rather than a flag we would have to carry across a
+    chapter boundary: `ch14a-eventscript.h` branches its ending on CHECK_ALIVE(CHARACTER_JOSHUA)
+    three times, Joshua being vanilla Ch5's optional Talk recruit and Sahnar's exact donor.
+
+    Two properties make it the right test and not merely a convenient one:
+      * `eventscr.c` (:3212) writes slot C = 0 when the unit is NOT FOUND AT ALL as well as when
+        it is `US_DEAD`, so never-recruited and recruited-then-killed collapse into one arm --
+        which is what the prose wants, a dead Lupin being no more "out there now, with travelers"
+        than one who was never won;
+      * it reads the roster, NOT the field. ch05 deploys 9 of a 10-unit pool, so a recruited
+        Lupin can be alive and benched; `EVSUBCMD_CHECK_DEPLOYED` exists separately for exactly
+        this distinction and vanilla uses ALIVE for dialogue.
+    """
+    return _branch_on_slot_c('CHECK_ALIVE(%s)' % character, if_alive, if_absent,
+                             label_base, 'not on the roster, or dead')
 
 
 def convert_survivors_green(pids, label_base, what):
@@ -10386,8 +10463,38 @@ def ch05_sahnar_talk_message(chap):
         width=29)
 
 
+def _ch05_opening_scene(chap, slot, boxes, what, podiums, fid):
+    """One locked opening scene, box-counted and podium-checked, as a rendered message body.
+
+    Shared by the three tomb scenes and the arrival (which brings its own podium set, being the
+    only one the PARTY speaks in), so a fifth scene costs a table row rather than a second loop.
+    """
+    script = _chapter_event_by_slot(chap, 'chapter_start', slot,
+                                    'ch05 opening (%s)' % what)['script']
+    if len(script) != boxes:
+        sys.exit('ERROR: ch05 opening %r (%s) must remain the %d locked boxes; got %d'
+                 % (slot, what, boxes, len(script)))
+    return script, _ch05_opening_body(script, slot, what, podiums, fid)
+
+
+def _ch05_opening_body(script, slot, what, podiums, fid):
+    """Render one opening beat at the scenic width, refusing any speaker with no podium."""
+    speakers = {k for entry in script for k in entry}
+    unstaged = sorted(speakers - set(podiums))
+    if unstaged:
+        sys.exit('ERROR: ch05 opening %r (%s) speaks as %s, which its podium table '
+                 'gives no seat -- a speaker defaulted to mid-left is a speaker two '
+                 'scenes can put in the same seat' % (slot, what, unstaged))
+    return _script_to_message(script, {k: (podiums[k], fid(k)) for k in speakers}, width=42)
+
+
 def ch05_opening_messages(chap):
-    """The three locked tomb scenes that open ch05, as (msg_id, body) in PLAYER order.
+    """The four locked scenes that open ch05, as (msg_id, body) in PLAYER order.
+
+    Three at the tomb before the party arrives, then the arrival itself -- and the arrival is
+    written TWICE, because it is the first scene with a `no_lupin_fallback`: the locked script
+    at CH05_ARRIVAL_SLOT's id and the substituted variant at CH05_ARRIVAL_NO_LUPIN_MSG, one of
+    which `branch_on_check_alive` plays. That is the whole cost of a fallback -- one extra id.
 
     Rendered at the full-screen scenic 42 rather than the map bubble's 29: these play over a
     BACG with nothing staged on the field, which is vanilla Ch5's own channel for the same
@@ -10410,24 +10517,28 @@ def ch05_opening_messages(chap):
                     'ch05 opening: unknown cutscene speaker')
     out = []
     for slot, msg, boxes, what in CH05_OPENING_SLOTS:
-        script = _chapter_event_by_slot(
-            chap, 'chapter_start', slot, 'ch05 opening (%s)' % what)['script']
-        if len(script) != boxes:
-            sys.exit('ERROR: ch05 opening %r (%s) must remain the %d locked boxes; got %d'
-                     % (slot, what, boxes, len(script)))
-        speakers = {k for entry in script for k in entry}
-        unstaged = sorted(speakers - set(CH05_OPENING_PODIUMS))
-        if unstaged:
-            sys.exit('ERROR: ch05 opening %r (%s) speaks as %s, which CH05_OPENING_PODIUMS '
-                     'gives no podium -- a speaker defaulted to mid-left is a speaker two '
-                     'scenes can put in the same seat' % (slot, what, unstaged))
-        staging = {k: (CH05_OPENING_PODIUMS[k], fid(k)) for k in speakers}
-        out.append((msg, _script_to_message(script, staging, width=42)))
+        _script, body = _ch05_opening_scene(chap, slot, boxes, what,
+                                            CH05_OPENING_PODIUMS, fid)
+        out.append((msg, body))
+    # Scene 4, and its no-Lupin twin. The party speaks here for the first time, so it brings its
+    # own podium table; the variant is the SAME beat with box 1 substituted (variant_beat, which
+    # asserts the anchor text so a re-ordered locked script fails loudly instead of swapping the
+    # wrong box), rendered through the same body writer at the same seats.
+    slot, msg, boxes, what = CH05_ARRIVAL_SLOT
+    script, body = _ch05_opening_scene(chap, slot, boxes, what, CH05_ARRIVAL_PODIUMS, fid)
+    out.append((msg, body))
+    fallback = variant_beat(
+        script,
+        _chapter_event_by_slot(chap, 'chapter_start', slot, what)['no_lupin_fallback'],
+        'ch05 arrival no-Lupin fallback')
+    out.append((CH05_ARRIVAL_NO_LUPIN_MSG,
+                _ch05_opening_body(fallback, slot, what + ' (no Lupin)',
+                                   CH05_ARRIVAL_PODIUMS, fid)))
     return out
 
 
 def ch05_opening_backdrop_block():
-    """The event-script head that plays ch05's three tomb scenes before the map is built.
+    """The event-script head that plays ch05's four opening scenes before the map is built.
 
     ch03/ch04's shape, not a chain of `Text_BG` calls, and the difference is load-bearing:
     `Text_BG` expands to a CALL that ends in `EventScr_TextShowWithFadeIn` -- CLEAN, then
@@ -10439,21 +10550,42 @@ def ch05_opening_backdrop_block():
     sarcophagus; Sephek and Ravisin elsewhere in the tomb; Ravisin alone after he leaves), and
     vanilla separates its equivalents with a full `Text_BG` fade cycle apiece. Played as a hard
     cut they would read as one continuous conversation.
+
+    Then scene 4 CUTS to a second backdrop, which is a different kind of seam and inherited from
+    the same twin: the first three are the tomb, and this one is the ridge above it, so vanilla's
+    own BG_SERAFEW_VILLAGE -> BG_TOWN switch at the arrival beat is the model. A second `BACG`
+    needs its load mode re-armed first (the `REMOVEPORTRAITS` below) -- `EventShowTextBgDirect`
+    only decompresses while `activeTextType` is REMOVEPORTRAITS/_1A22, and every `Text()` above
+    left it at TEXTSTART, so a bare second BACG is a no-op that leaves the tomb on screen. That
+    is the ch03/ch04 stale-BG bug, and ch04's own opening carries the same re-arm.
+
+    Scene 4 is also ch05's first BRANCH: its opening line is Lupin's, and ch04's parley is
+    optional, so `branch_on_check_alive` picks between the locked scene and the variant whose
+    box 1 goes to Pinky. The test is the ROSTER, which is what makes it survive ch05's 9-of-10
+    deploy -- see branch_on_check_alive.
     """
     scenes = []
     for i, (_slot, msg, _boxes, what) in enumerate(CH05_OPENING_SLOTS):
         if i:
             # Fade THROUGH black between moments. The BACG stays in VRAM, so the pair needs no
-            # second BACG -- and re-issuing one here would be a no-op anyway (EventShowTextBgDirect
-            # only decompresses while activeTextType is REMOVEPORTRAITS/_1A22, and the Text()
-            # above left it at TEXTSTART -- the ch03/ch04 stale-BG bug).
+            # second BACG -- and re-issuing one here would be a no-op anyway (see the docstring).
             scenes.append('    FADI(16)\n    FADU(16) /* a separate moment, same place */\n')
         scenes.append('    Text(0x%X) /* %d -- %s */\n' % (msg, i + 1, what))
+    _slot, arrival_msg, _boxes, arrival_what = CH05_ARRIVAL_SLOT
     return ('    REMOVEPORTRAITS\n'
             '    BACG(%s) /* the elven tomb, before the party arrives */\n'
             '    FADU(16)\n' % CH05_OPENING_BG
             + ''.join(scenes)
-            + '    FADI(16) /* fade the tomb out; LOMA builds the real map next */\n')
+            + '    FADI(16) /* fade the tomb out; the party arrives elsewhere */\n'
+              '    REMOVEPORTRAITS /* re-arm BACG BG-load mode (Text() reset it to TEXTSTART) */\n'
+              '    BACG(%s) /* CUT to the ridge above the hollow */\n'
+              '    FADU(16)\n' % CH05_ARRIVAL_BG
+            + branch_on_check_alive(
+                CH05_LUPIN_CHARACTER,
+                '    Text(0x%X) /* 4 -- %s */\n' % (arrival_msg, arrival_what),
+                '    Text(0x%X) /* 4 -- no Lupin: Pinky reads the trail instead */\n'
+                % CH05_ARRIVAL_NO_LUPIN_MSG)
+            + '    FADI(16) /* fade the ridge out; LOMA builds the real map next */\n')
 
 
 def _vanilla_message_body(msg_id, source=None):

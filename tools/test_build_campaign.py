@@ -2188,8 +2188,12 @@ class Ch05OpeningBackdropScenes(unittest.TestCase):
         self.assertGreater(widest, 29, 'wrapped at the bubble width, not the scenic width')
 
     def test_the_block_raises_one_backdrop_plays_all_three_then_fades_out(self):
+        """ONE tomb backdrop across the three tomb scenes, as vanilla spends
+        BG_SERAFEW_VILLAGE on four consecutive ones. (Scene 4 then CUTS to the ridge -- a
+        different place, so a second BACG; that seam is Ch05ArrivalSceneAndTheNoLupinBranch's.)"""
         block = bc.ch05_opening_backdrop_block()
-        self.assertEqual(1, block.count('BACG('), 'one backdrop, held across the three scenes')
+        tomb = block[:block.index('BACG(%s)' % bc.CH05_ARRIVAL_BG)]
+        self.assertEqual(1, tomb.count('BACG('), 'one backdrop, held across the three scenes')
         self.assertIn('BACG(%s)' % bc.CH05_OPENING_BG, block)
         self.assertLess(block.index('REMOVEPORTRAITS'), block.index('BACG('),
                         'BACG only decompresses while activeTextType is REMOVEPORTRAITS')
@@ -2206,8 +2210,11 @@ class Ch05OpeningBackdropScenes(unittest.TestCase):
         """Vanilla gives each of 0x9BC/0x9BD a full Text_BG fade cycle. Played as a hard cut,
         three different moments read as one continuous conversation."""
         block = bc.ch05_opening_backdrop_block()
-        self.assertEqual(len(bc.CH05_OPENING_SLOTS), block.count('FADI(16)'),
-                         'one fade between each pair of scenes, plus the closing one')
+        tomb = block[:block.index('BACG(%s)' % bc.CH05_ARRIVAL_BG)]
+        self.assertEqual(len(bc.CH05_OPENING_SLOTS), tomb.count('FADI(16)'),
+                         'one fade between each pair of tomb scenes, plus the cut away')
+        self.assertEqual(len(bc.CH05_OPENING_SLOTS) + 1, block.count('FADI(16)'),
+                         'and one more closing the ridge out into LOMA')
 
     def test_the_opening_never_reaches_for_Text_BG(self):
         """Text_BG ends in EventScr_TextShowWithFadeIn -- CLEAN then FADU back onto the MAP.
@@ -2233,6 +2240,248 @@ class Ch05OpeningBackdropScenes(unittest.TestCase):
         self.assertEqual((240, 160), im.size)
         banks = max(int(i) // 16 for i in set(im.getdata())) + 1
         self.assertLessEqual(banks, 6, '%d banks -- the fade procs apply only six' % banks)
+
+
+class TheDashGlueRespectsTheLineWidth(unittest.TestCase):
+    """`_wrap_fe_lines` keeps a bare '--' off the start of a line by gluing it to the word
+    before it -- but it did that without re-measuring, so a line that ended exactly at the
+    width came out two characters over. Found by ch05's scene 4, whose Wolfram line lands
+    on the boundary ("...There was fighting here --" = 44 against the scenic 42), and it
+    reaches every chapter: the glue is in the shared wrapper, not in any one scene.
+    """
+    def test_the_glued_dash_never_pushes_a_line_past_the_width(self):
+        line = 'Struck off edges. There was fighting here -- a great deal of it.'
+        for width in (29, 40, 41, 42, 43, 44):
+            for out in bc._wrap_fe_lines(line, width):
+                self.assertLessEqual(len(out), width, '%r at width %d' % (out, width))
+
+    def test_the_dash_still_never_opens_a_line(self):
+        """The reason the glue exists. When it cannot fit, the WORD moves down with it."""
+        for width in (29, 40, 41, 42, 43, 44):
+            for out in bc._wrap_fe_lines('There was fighting here -- a great deal of it.', width):
+                self.assertFalse(out.startswith('--'), '%r at width %d' % (out, width))
+
+    def test_a_dash_that_fits_is_still_glued_where_it_was(self):
+        self.assertEqual(['a b --', 'c'], bc._wrap_fe_lines('a b -- c', 6))
+
+
+class Ch05ArrivalSceneAndTheNoLupinBranch(unittest.TestCase):
+    """Scene 4 -- the party crests the ridge -- and the branch the whole chapter waits on (#25).
+
+    It is the fourth backdrop scene and the FIRST with a `no_lupin_fallback`, so it is where the
+    mechanism gets built. Four more scenes reuse it: Basil's join, Proof #1 in the Talk recruit,
+    and both endings.
+
+    The signal is `CHECK_ALIVE`, not a flag. `eventscr.c` returns 0 for a unit that is not found
+    at all OR is `US_DEAD`, so never-recruited and recruited-then-killed collapse into the one
+    arm we want; and because it reads the ROSTER rather than the field it also survives ch05's
+    9-of-10 deploy, where a recruited Lupin can be sitting on the bench. Vanilla's own answer --
+    ch14a branches its ending on CHECK_ALIVE(CHARACTER_JOSHUA), Joshua being vanilla Ch5's
+    optional Talk recruit and Sahnar's donor.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+
+    def _scene(self):
+        slot, _msg, _boxes, _what = bc.CH05_ARRIVAL_SLOT
+        return bc._chapter_event_by_slot(self._chap(), 'chapter_start', slot, 'test')
+
+    # ── ids ────────────────────────────────────────────────────────────────────
+    def test_both_ids_are_owned_unique_and_inside_ch05s_host_block(self):
+        _slot, msg, _boxes, _what = bc.CH05_ARRIVAL_SLOT
+        claimed = set(bc.HOSTED_CHAPTER_MESSAGE_IDS['ch05'])
+        owner = bc.assert_message_ids_unique()
+        for mid in (msg, bc.CH05_ARRIVAL_NO_LUPIN_MSG):
+            self.assertTrue(0x9E4 <= mid <= 0x9F5, 'outside ch05\'s Ch6 host block')
+            self.assertIn(mid, claimed)
+            self.assertEqual('ch05', owner[mid])
+        self.assertEqual((0x9EC, 0x9ED), (msg, bc.CH05_ARRIVAL_NO_LUPIN_MSG),
+                         "#25's allocation table")
+
+    def test_the_fallback_costs_one_extra_id_not_four(self):
+        """The wrong instinct is to split the scene around the differing box, which would spend
+        four ids on a 7-box scene with one substitution. Duplicating text is free; ids are what
+        is scarce, so the WHOLE variant scene goes to a second id and the branch picks."""
+        self.assertEqual(1, len(self._scene()['no_lupin_fallback']['boxes']))
+        written = dict(bc.ch05_opening_messages(self._chap()))
+        arrival = [mid for mid in written
+                   if mid in (bc.CH05_ARRIVAL_SLOT[1], bc.CH05_ARRIVAL_NO_LUPIN_MSG)]
+        self.assertEqual(2, len(arrival), 'one scene, one variant, two ids')
+
+    def test_the_yaml_slot_label_stays_an_anatomy_citation(self):
+        slot, msg, _boxes, _what = bc.CH05_ARRIVAL_SLOT
+        self.assertNotEqual(int(slot.split()[1], 16), msg)
+        self.assertIn(int(slot.split()[1], 16), bc.HOSTED_CHAPTER_MESSAGE_IDS['ch04'])
+
+    # ── the substitution ───────────────────────────────────────────────────────
+    def test_the_chapters_first_line_has_a_speaker_on_both_paths(self):
+        """Box 1 is the FIRST LINE OF THE CHAPTER and it is Lupin's, so a no-parley player
+        would open ch05 on a speaker who is not there."""
+        scene = self._scene()
+        locked = scene['script']
+        fallback = bc.variant_beat(locked, scene['no_lupin_fallback'], 'test')
+        self.assertEqual('lupin', next(iter(locked[0])))
+        self.assertEqual(len(locked), len(fallback))
+        for i, box in enumerate(fallback, 1):
+            (speaker, text), = box.items()
+            self.assertTrue(speaker and text.strip(), 'box %d has no speaker/text' % i)
+        self.assertNotIn('lupin', [next(iter(b)) for b in fallback],
+                         'the no-parley path must never put Lupin on stage')
+        self.assertEqual('pinky', next(iter(fallback[0])),
+                         'box 1 goes to Pinky, continuing ch04\'s own no-Lupin tracker')
+
+    def test_the_six_unchanged_boxes_ride_through_both_branches(self):
+        scene = self._scene()
+        fallback = bc.variant_beat(scene['script'], scene['no_lupin_fallback'], 'test')
+        self.assertEqual(scene['script'][1:], fallback[1:])
+        self.assertEqual('pinky', next(iter(fallback[-1])),
+                         'Pinky keeps the closing spot on both paths')
+
+    def test_a_drifted_anchor_fails_loudly_instead_of_mis_swapping(self):
+        scene = self._scene()
+        with self.assertRaises(SystemExit):
+            bc.variant_beat(list(reversed(scene['script'])),
+                            scene['no_lupin_fallback'], 'test')
+
+    def test_every_ch05_fallback_declares_one_schema_not_two(self):
+        """ch05 authored its five blocks with singular `box:`/`replaces:` while variant_beat --
+        ch04's, already shipping -- reads LISTS. Normalising the YAML is what kept this at one
+        mechanism; a reader that accepts both shapes is the second one."""
+        chap = self._chap()
+        blocks = [e['no_lupin_fallback'] for e in chap['events'] if 'no_lupin_fallback' in e]
+        self.assertEqual(5, len(blocks), "#25's five conditional scenes")
+        for fb in blocks:
+            self.assertNotIn('box', fb, 'singular `box:` is the second schema')
+            self.assertIsInstance(fb['boxes'], list)
+            self.assertIsInstance(fb['replaces'], list)
+            self.assertEqual(len(fb['boxes']), len(fb['replaces']))
+            self.assertEqual(len(fb['boxes']), len(fb['script']))
+
+    # ── the branch itself ──────────────────────────────────────────────────────
+    def test_the_branch_asks_the_roster_and_never_a_flag(self):
+        """A flag would have to survive a chapter boundary, and a FIELD test would send a player
+        who recruited Lupin and benched him down the no-Lupin arm."""
+        code = bc.branch_on_check_alive(bc.CH05_LUPIN_CHARACTER, '    HAVE\n', '    NONE\n')
+        self.assertIn('CHECK_ALIVE(%s)' % bc.CH05_LUPIN_CHARACTER, code)
+        self.assertNotIn('CHECK_EVENTID', code)
+        self.assertNotIn('CHECK_DEPLOYED', code)
+        self.assertEqual('CHARACTER_DUESSEL', bc.CH05_LUPIN_CHARACTER,
+                         "Lupin's MAP identity is his portrait slot, not his STAT_DONOR")
+
+    def test_the_two_arms_converge_on_one_label(self):
+        code = bc.branch_on_check_alive('CHARACTER_X', '    HAVE\n', '    NONE\n')
+        self.assertIn('BEQ(0x0, EVT_SLOT_C, EVT_SLOT_0)', code)
+        self.assertLess(code.index('HAVE'), code.index('LABEL(0x0)'))
+        self.assertLess(code.index('LABEL(0x0)'), code.index('NONE'))
+        self.assertLess(code.index('NONE'), code.index('LABEL(0x1)'))
+        self.assertIn('LABEL(0x4)', bc.branch_on_check_alive('C', '', '', label_base=4))
+
+    def test_both_branch_primitives_are_one_skeleton_with_two_predicates(self):
+        """branch_on_flag and branch_on_check_alive differ ONLY in their PREDICATE -- the line
+        that loads slot C, and the comment naming what a jump means. Compared with those gone,
+        the two must be the same code; if they ever diverge, one of them is a second mechanism."""
+        strip = lambda c: [re.sub(r'/\*.*?\*/', '', l).rstrip() for l in c.split('\n')
+                           if 'CHECK_ALIVE' not in l and 'CHECK_EVENTID' not in l]
+        self.assertEqual(strip(bc.branch_on_flag('EVFLAG_TMP(9)', '    A\n', '    B\n')),
+                         strip(bc.branch_on_check_alive('CHARACTER_X', '    A\n', '    B\n')))
+
+    def test_the_beginning_script_picks_the_arm_around_the_arrival_text(self):
+        block = bc.ch05_opening_backdrop_block()
+        self.assertIn('CHECK_ALIVE(%s)' % bc.CH05_LUPIN_CHARACTER, block)
+        self.assertIn('Text(0x%X)' % bc.CH05_ARRIVAL_SLOT[1], block)
+        self.assertIn('Text(0x%X)' % bc.CH05_ARRIVAL_NO_LUPIN_MSG, block)
+        # exactly one of the two plays: the alive arm GOTOs past the fallback
+        self.assertLess(block.index('CHECK_ALIVE'),
+                        block.index('Text(0x%X)' % bc.CH05_ARRIVAL_SLOT[1]))
+        self.assertLess(block.index('Text(0x%X)' % bc.CH05_ARRIVAL_SLOT[1]),
+                        block.index('Text(0x%X)' % bc.CH05_ARRIVAL_NO_LUPIN_MSG))
+        self.assertIn('GOTO(', block)
+
+    def test_the_three_tomb_scenes_play_before_the_branch(self):
+        """Player order: the tomb, then the ridge. The branch is the LAST thing before LOMA."""
+        block = bc.ch05_opening_backdrop_block()
+        for _slot, msg, _boxes, _what in bc.CH05_OPENING_SLOTS:
+            self.assertLess(block.index('Text(0x%X)' % msg), block.index('CHECK_ALIVE'))
+
+    # ── the second backdrop ────────────────────────────────────────────────────
+    def test_the_arrival_cuts_to_its_own_backdrop_and_re_arms_the_load_mode(self):
+        """BACG only decompresses while activeTextType is REMOVEPORTRAITS/_1A22 (eventscr.c:1316);
+        the Text() beats above left it at TEXTSTART, so a bare second BACG is a no-op and the tomb
+        stays in VRAM. The ch03/ch04 stale-BG bug, one chapter later."""
+        block = bc.ch05_opening_backdrop_block()
+        self.assertEqual(2, block.count('BACG('), 'the tomb, then the ridge')
+        self.assertIn('BACG(%s)' % bc.CH05_ARRIVAL_BG, block)
+        second = block.index('BACG(%s)' % bc.CH05_ARRIVAL_BG)
+        rearm = block.rindex('REMOVEPORTRAITS', 0, second)
+        self.assertLess(block.index('Text(0x%X)' % bc.CH05_OPENING_SLOTS[-1][1]), rearm,
+                        're-arm has to come AFTER the tomb scenes that reset it')
+        self.assertIn('FADI(16)', block[block.index(
+            'Text(0x%X)' % bc.CH05_OPENING_SLOTS[-1][1]):rearm],
+            'fade the tomb out before cutting to the ridge')
+
+    def test_the_arrival_backdrop_is_registered_with_a_source_png_inside_six_banks(self):
+        from PIL import Image
+        names = [enum for enum, _stem, _credit in bc.CAMPAIGN_BGS]
+        self.assertIn(bc.CH05_ARRIVAL_BG, names)
+        stem = next(s for e, s, _c in bc.CAMPAIGN_BGS if e == bc.CH05_ARRIVAL_BG)
+        png = os.path.join(bc.REPO, 'campaigns', self.CAMPAIGN, 'backgrounds', stem + '.png')
+        self.assertTrue(os.path.isfile(png), png)
+        im = Image.open(png)
+        self.assertEqual('P', im.mode)
+        self.assertEqual((240, 160), im.size)
+        banks = max(int(i) // 16 for i in set(im.getdata())) + 1
+        self.assertLessEqual(banks, 6, '%d banks -- the fade procs apply only six' % banks)
+
+    # ── the two bodies ─────────────────────────────────────────────────────────
+    def test_both_bodies_wear_our_faces_and_wrap_at_the_scenic_42(self):
+        bodies = dict(bc.ch05_opening_messages(self._chap()))
+        locked, fallback = bodies[bc.CH05_ARRIVAL_SLOT[1]], bodies[bc.CH05_ARRIVAL_NO_LUPIN_MSG]
+        # Face slots are PORTRAIT_MAP's, never STAT_DONOR's -- Wolfram's stats come from Gilliam
+        # and his face from Franz, and a scene that reached for the donor would put a stranger on
+        # screen with every text decoder still green (#276's shape).
+        self.assertIn('[LoadFace][FID_Duessel]', locked)      # Lupin
+        self.assertNotIn('[FID_Duessel]', fallback)
+        for body in (locked, fallback):
+            self.assertIn('[LoadFace][FID_Franz]', body)      # Wolfram
+            self.assertIn('[LoadFace][FID_Seth]', body)       # Marty
+            self.assertIn('[LoadFace][FID_Neimi]', body)      # Pinky
+            self.assertNotIn('[FID_Gilliam]', body)
+            self.assertNotIn('[FID_Knoll]', body)
+            self.assertNotIn('[FID_Vanessa]', body)
+            widest = max(len(re.sub(r'\[[^\]]*\]', '', line)) for line in body.split('\n'))
+            self.assertLessEqual(widest, 42)
+
+    def test_a_speaker_holds_one_podium_across_both_arms(self):
+        bodies = dict(bc.ch05_opening_messages(self._chap()))
+        for body in (bodies[bc.CH05_ARRIVAL_SLOT[1]],
+                     bodies[bc.CH05_ARRIVAL_NO_LUPIN_MSG]):
+            for spk, podium in bc.CH05_ARRIVAL_PODIUMS.items():
+                tag = bc._fid_tag(bc.PORTRAIT_MAP[spk])
+                if tag in body:
+                    self.assertIn('%s[LoadFace]%s' % (podium, tag), body,
+                                  '%s must sit at %s in both arms' % (spk, podium))
+
+    def test_the_four_speakers_fit_the_face_budget(self):
+        """FACE_SLOT_COUNT is 4. A fifth podium evicts one mid-scene."""
+        self.assertLessEqual(len(set(bc.CH05_ARRIVAL_PODIUMS.values())), 4)
+        scene = self._scene()
+        fallback = bc.variant_beat(scene['script'], scene['no_lupin_fallback'], 'test')
+        for beat in (scene['script'], fallback):
+            self.assertLessEqual(len({next(iter(b)) for b in beat}), 4)
+
+    def test_the_locked_prose_survives_the_wrap(self):
+        bodies = dict(bc.ch05_opening_messages(self._chap()))
+        plain = {m: ' '.join(re.sub(r'\[[^\]]*\]', ' ', b).split()) for m, b in bodies.items()}
+        locked = plain[bc.CH05_ARRIVAL_SLOT[1]]
+        fallback = plain[bc.CH05_ARRIVAL_NO_LUPIN_MSG]
+        self.assertIn('The trail leads here', locked)
+        self.assertIn('The tracks stop here, Father', fallback)
+        for body in (locked, fallback):
+            self.assertIn('This was a training arena', body)   # Wolfram's Forge seed
+            self.assertIn('This magic is familiar', body)      # Marty's hook
+            self.assertIn('Father, I see it', body)            # Pinky's closer
 
 
 class Ch05ArenaTutorial(unittest.TestCase):
