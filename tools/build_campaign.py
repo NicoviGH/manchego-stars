@@ -8318,16 +8318,15 @@ CH05_BASIL_GREEN_POS = (5, 15)   # the row-15 corridor at the deploy pocket's mo
                                  # deployment. Row 15 is open end-to-end and the four stairs are
                                  # at x=1/3/9/10, so she blocks no exit. Verified walkable and
                                  # connected to Sahnar's tile by assert_green_recruit_placement.
-# The join beat is SILENT, and that is a constraint rather than a choice. ch05's YAML labels its
+# The join beat SPEAKS, at CH05_BASIL_JOIN_SLOT's 0x9EE (and 0x9EF on the no-Lupin arm) -- ids
+# from ch05's OWN block, which is the point this comment exists to make. ch05's YAML labels its
 # scenes `slot: "vanilla 0x9C2"` and the like, but those labels are ANATOMY REFERENCES to the
 # chapter we MINE (vanilla Ch5) -- they are not ids we may write, because ch04 hosts on slot 5 and
 # owns that whole block (HOSTED_CHAPTER_MESSAGE_IDS['ch04'] = 0x9BA..0x9C6). 0x9C2 in the built
 # ROM is ch04's OWN no-parley ending (CH04_ENDING_NO_LUPIN_MSG), so pointing Basil's join at it
-# plays Pinky and Marty discussing supper. Reading an UNWRITTEN vanilla id as a placeholder is
-# fine and we do it (the reliquary visits, and the Talk below); reading one another chapter
-# WRITES is not -- that distinction is the whole reason the registry exists.
-# OWED: the dialogue pass gives this beat an id from ch05's own block (vanilla Ch6, 0x9E4..0x9F5)
-# and registers it. Until then the shrub joins wordlessly -- the WIRING is what ships here.
+# would have played Pinky and Marty discussing supper. Reading an UNWRITTEN vanilla id as a
+# placeholder is fine and we do it (the reliquary visits, and the Talk below); reading one another
+# chapter WRITES is not -- that distinction is the whole reason the registry exists.
 CH05_SAHNAR_TALK_SCRIPT = 'MS_Ch05SahnarTalk'   # ours (declare_event_script), not a squatted
                                                 # vanilla symbol -- campaign-owned event scripts,
                                                 # declared AFTER the block-replacement pass.
