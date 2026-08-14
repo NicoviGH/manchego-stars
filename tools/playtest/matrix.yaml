@@ -65,6 +65,8 @@ classes:
     deadline: 600
   - match: "recordch05opening*" # 49 boxes across four scenes, over two BGs -- our longest cutscene
     deadline: 900
+  - match: "recordch05join*"  # films 3-4 boxes, but replays all 49 opening boxes + prep to reach them
+    deadline: 600
   - match: "llm"              # 18 turns x a 90s sidecar handshake budget
     deadline: 2100
   - match: "ckpt_*"           # the auto-build path always used 240fps / 900s
@@ -294,6 +296,14 @@ scenarios:
     host_chapter: 6
     kind: record
   recordch05openinglupin:                              # the same film, Lupin's arm (#25)
+    rom: ch05lupinboot
+    host_chapter: 6
+    kind: record
+  recordch05join:                                      # scene 5, AFTER prep (#25)
+    rom: ch05boot
+    host_chapter: 6
+    kind: record
+  recordch05joinlupin:                                 # the same film, Lupin's arm (#25)
     rom: ch05lupinboot
     host_chapter: 6
     kind: record

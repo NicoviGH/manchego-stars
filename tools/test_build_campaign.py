@@ -2442,6 +2442,26 @@ class Ch05ArrivalSceneAndTheNoLupinBranch(unittest.TestCase):
             bc.variant_beat(list(reversed(scene['script'])),
                             scene['no_lupin_fallback'], 'test')
 
+    def test_one_box_may_be_replaced_by_SEVERAL(self):
+        """A substitute chosen as prose can be too long for the channel it lands in -- ch05's
+        on-map fallbacks are, at the bubble's 29. The author then has to place the extra
+        A-press, so a `script:` entry may be a LIST of boxes standing in for the one named
+        box. `boxes:`/`replaces:`/`script:` still agree one-for-one; only the substitute is
+        plural, which is what keeps this the same mechanism rather than a second one."""
+        beat = [{'a': 'one'}, {'b': 'two'}, {'c': 'three'}]
+        out = bc.variant_beat(beat, {'boxes': [2], 'replaces': ['two'],
+                                     'script': [[{'b': 'two-a'}, {'b': 'two-b'}]]}, 'test')
+        self.assertEqual([{'a': 'one'}, {'b': 'two-a'}, {'b': 'two-b'}, {'c': 'three'}], out)
+
+    def test_a_plural_substitute_does_not_shift_a_later_replacement(self):
+        """The `boxes:` indices are read against the ORIGINAL beat. Splicing left to right
+        without saying so would move every box after the first substitution, and the anchor
+        assertion would then blame the locked script for moving."""
+        beat = [{'a': 'one'}, {'b': 'two'}, {'c': 'three'}]
+        out = bc.variant_beat(beat, {'boxes': [1, 3], 'replaces': ['one', 'three'],
+                                     'script': [[{'a': 'x'}, {'a': 'y'}], {'c': 'z'}]}, 'test')
+        self.assertEqual([{'a': 'x'}, {'a': 'y'}, {'b': 'two'}, {'c': 'z'}], out)
+
     def test_every_ch05_fallback_declares_one_schema_not_two(self):
         """ch05 authored its five blocks with singular `box:`/`replaces:` while variant_beat --
         ch04's, already shipping -- reads LISTS. Normalising the YAML is what kept this at one
@@ -2579,6 +2599,171 @@ class Ch05ArrivalSceneAndTheNoLupinBranch(unittest.TestCase):
             self.assertIn('This was a training arena', body)   # Wolfram's Forge seed
             self.assertIn('This magic is familiar', body)      # Marty's hook
             self.assertIn('Father, I see it', body)            # Pinky's closer
+
+
+class Ch05BasilJoinsAfterPrep(unittest.TestCase):
+    """Scene 5 -- Basil trundles up, cracks the tourist joke, and JOINS (#25).
+
+    The opening's FIRST on-map beat, and the first place the inherited channel had to be
+    overruled. Vanilla plays its twin (0x9C2) BEFORE the prep CALL, because vanilla stages
+    its speaking party with explicit LOAD1s; ours is placed BY prep, so before the CALL the
+    field holds the risen line, Ravisin and a green shrub and nobody the shrub could be
+    talking to. So the beat goes after `CALL(prep)` -- vanilla's own after-prep shape
+    (`FADU(16)` -> `CUMO_*` -> `STAL` -> `CURE` -> `TEXTSTART`), which is exactly what its
+    0x9C3/0x9C4 do -- and it lands adjacent to the CUSA that was already there, so the line
+    that asks and the flip that answers are one beat instead of two across a screen.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+
+    def _scene(self):
+        slot, _msg, _boxes, _what = bc.CH05_BASIL_JOIN_SLOT
+        return bc._chapter_event_by_slot(self._chap(), 'chapter_start', slot, 'test')
+
+    def _script(self):
+        return bc.ch05_beginning_script(self._chap(), 'CHARACTER_ARTUR')
+
+    # ── ids ────────────────────────────────────────────────────────────────────
+    def test_both_ids_are_owned_unique_and_inside_ch05s_host_block(self):
+        _slot, msg, _boxes, _what = bc.CH05_BASIL_JOIN_SLOT
+        claimed = set(bc.HOSTED_CHAPTER_MESSAGE_IDS['ch05'])
+        owner = bc.assert_message_ids_unique()
+        for mid in (msg, bc.CH05_BASIL_JOIN_NO_LUPIN_MSG):
+            self.assertTrue(0x9E4 <= mid <= 0x9F5, 'outside ch05\'s Ch6 host block')
+            self.assertIn(mid, claimed)
+            self.assertEqual('ch05', owner[mid])
+        self.assertEqual((0x9EE, 0x9EF), (msg, bc.CH05_BASIL_JOIN_NO_LUPIN_MSG),
+                         "#25's allocation table")
+
+    def test_the_yaml_slot_label_stays_an_anatomy_citation(self):
+        """`vanilla 0x9C2` names the scene we MINE. It is also ch04's own no-parley ending,
+        which is what the join beat once pointed at -- the collision guard's founding case."""
+        slot, msg, _boxes, _what = bc.CH05_BASIL_JOIN_SLOT
+        self.assertNotEqual(int(slot.split()[1], 16), msg)
+        self.assertIn(int(slot.split()[1], 16), bc.HOSTED_CHAPTER_MESSAGE_IDS['ch04'])
+
+    # ── the channel ────────────────────────────────────────────────────────────
+    def test_both_bodies_wrap_at_the_bubble_29_not_the_scenic_42(self):
+        """The first beat that rides TEXTSHOW -> PutTalkBubble, whose right-side branch
+        computes x = 29 - width with no clamp: a line over 29 runs off the tilemap."""
+        for _msg, body in bc.ch05_basil_join_messages(self._chap()):
+            for line in body.split('\n'):
+                printable = re.sub(r'\[[^\]]*\]', '', line)
+                self.assertLessEqual(len(printable), 29, 'bubble overflow: %r' % line)
+
+    def test_basil_keeps_the_mid_left_she_holds_in_the_talk_recruit(self):
+        for _msg, body in bc.ch05_basil_join_messages(self._chap()):
+            self.assertIn('[OpenMidLeft][LoadFace][FID_Artur]', body)
+            self.assertNotIn('[FID_Natasha]', body)     # her STAT_DONOR, never her face
+
+    def test_the_scene_is_three_locked_basil_boxes(self):
+        self.assertEqual(3, bc.CH05_BASIL_JOIN_SLOT[2])
+        self.assertEqual(['basil'] * 3, [next(iter(b)) for b in self._scene()['script']])
+
+    # ── the substitution ───────────────────────────────────────────────────────
+    def test_the_fallback_moves_basils_trigger_off_lupin_and_onto_the_party(self):
+        """Box 2 is Basil reading the WOLF, and ch04's parley is optional. The variant makes
+        the party itself the revelation: everyone she has met belonged to Ravisin."""
+        scene = self._scene()
+        fallback = bc.variant_beat(scene['script'], scene['no_lupin_fallback'], 'test')
+        self.assertEqual([2], scene['no_lupin_fallback']['boxes'])
+        self.assertIn('Wolf.', next(iter(scene['script'][1].values())))
+        for box in fallback:
+            self.assertNotIn('Wolf', next(iter(box.values())))
+        self.assertEqual(scene['script'][0], fallback[0], 'the tourist joke is shared')
+        self.assertEqual(scene['script'][-1], fallback[-1], 'the ask is shared')
+
+    def test_the_no_lupin_arm_spends_a_fourth_a_press_on_an_AUTHORED_break(self):
+        """Basil's substitute turn is 74 characters and this is a 29-wide bubble, so it cannot
+        be one box. Left flowed, the wrapper chose the A-press and put it mid-clause; the YAML
+        now authors two boxes instead. The break lands after the shock, not on the full stop --
+        her run-on then arrives whole, which is the Ewan register her bible calls for.
+
+        The arms are not required to be the same length. Only to each stand up."""
+        scene = self._scene()
+        fallback = bc.variant_beat(scene['script'], scene['no_lupin_fallback'], 'test')
+        self.assertEqual(3, len(scene['script']))
+        self.assertEqual(4, len(fallback))
+        self.assertEqual("...You're none of hers.", next(iter(fallback[1].values())))
+        self.assertTrue(next(iter(fallback[2].values())).startswith('Not one of you.'))
+        # and no box of either arm splits under the wrap -- an [A] the AUTHOR did not place
+        for _msg, body in bc.ch05_basil_join_messages(self._chap()):
+            for page in body.split('[A]')[:-1]:
+                self.assertLessEqual(len([l for l in page.split('[LF]') if l.strip()]), 2,
+                                     'the wrapper paged this box, not the author: %r' % page)
+
+    def test_the_fallback_costs_one_extra_id_not_three(self):
+        written = dict(bc.ch05_basil_join_messages(self._chap()))
+        self.assertEqual({bc.CH05_BASIL_JOIN_SLOT[1], bc.CH05_BASIL_JOIN_NO_LUPIN_MSG},
+                         set(written), 'one scene, one variant, two ids')
+
+    def test_the_locked_prose_survives_the_wrap(self):
+        plain = {m: ' '.join(re.sub(r'\[[^\]]*\]', ' ', b).split())
+                 for m, b in bc.ch05_basil_join_messages(self._chap())}
+        locked = plain[bc.CH05_BASIL_JOIN_SLOT[1]]
+        fallback = plain[bc.CH05_BASIL_JOIN_NO_LUPIN_MSG]
+        self.assertIn('Oh! Tourists', locked)                 # the joke, both arms
+        self.assertIn('Oh! Tourists', fallback)
+        self.assertIn("You're hers", locked)
+        self.assertIn('none of hers', fallback)
+        for body in (locked, fallback):
+            self.assertIn('Take me to her', body)             # the ask the CUSA answers
+
+    # ── placement in the beginning script ──────────────────────────────────────
+    def test_the_join_plays_AFTER_prep_because_the_party_is_PLACED_by_prep(self):
+        """The one place scene 5 does not inherit its twin's channel. Vanilla LOAD1s its
+        speaking party before the prep CALL; ours arrives through Pick Units, so a beat
+        placed there would have Basil addressing an empty pocket."""
+        script = self._script()
+        prep = script.index('CALL(%s)' % bc.CH05_PREP_SCRIPT)
+        text = script.index('TEXTSHOW(0x%X)' % bc.CH05_BASIL_JOIN_SLOT[1])
+        self.assertLess(prep, text)
+        self.assertLess(text, script.index('CUSA('), 'she asks, then she flips')
+
+    def test_the_beat_fades_up_and_finds_basil_before_it_speaks(self):
+        """The shared prep prologue fades to black and leaves it there, so anything VISIBLE
+        after the CALL brings its own FADU -- vanilla's 0x9C3 does exactly this. Then the
+        bubble needs a unit: PutTalkBubble anchors to whoever the camera holds."""
+        script = self._script()
+        prep = script.index('CALL(%s)' % bc.CH05_PREP_SCRIPT)
+        text = script.index('TEXTSHOW(0x%X)' % bc.CH05_BASIL_JOIN_SLOT[1])
+        tail = script[prep:text]
+        self.assertIn('FADU(16)', tail)
+        self.assertIn('CUMO_CHAR(CHARACTER_ARTUR)', tail)
+        self.assertLess(tail.index('FADU(16)'), tail.index('CUMO_CHAR'))
+        self.assertIn('CURE', tail)
+
+    def test_the_second_branch_does_not_reuse_the_first_branchs_labels(self):
+        """Two branches in ONE event list. `BEQ`/`GOTO` scan the list for a matching LABEL,
+        so a second branch left at label_base 0 would jump into the arrival's arms."""
+        script = self._script()
+        self.assertEqual(2, script.count('CHECK_ALIVE(%s)' % bc.CH05_LUPIN_CHARACTER),
+                         'the arrival and the join each ask the roster')
+        for label in ('LABEL(0x0)', 'LABEL(0x1)', 'LABEL(0x2)', 'LABEL(0x3)'):
+            self.assertEqual(1, script.count(label), '%s is not unique' % label)
+
+    def test_exactly_one_arm_of_the_join_plays(self):
+        script = self._script()
+        locked = script.index('TEXTSHOW(0x%X)' % bc.CH05_BASIL_JOIN_SLOT[1])
+        fallback = script.index('TEXTSHOW(0x%X)' % bc.CH05_BASIL_JOIN_NO_LUPIN_MSG)
+        self.assertLess(script.index('CHECK_ALIVE', script.index('CALL(%s)'
+                                     % bc.CH05_PREP_SCRIPT)), locked)
+        self.assertLess(locked, fallback)
+        self.assertIn('GOTO(0x3)', script)
+
+    def test_the_backdrop_half_still_runs_before_LOMA_and_the_join_after(self):
+        """Regression on the whole opening's order, which is what a reader loses first."""
+        script = self._script()
+        order = [script.index(needle) for needle in (
+            'Text(0x%X)' % bc.CH05_OPENING_SLOTS[0][1],       # scene 1, on the backdrop
+            'Text(0x%X)' % bc.CH05_ARRIVAL_SLOT[1],           # scene 4, on the ridge
+            'LOMA(',
+            'CALL(%s)' % bc.CH05_PREP_SCRIPT,
+            'TEXTSHOW(0x%X)' % bc.CH05_BASIL_JOIN_SLOT[1],    # scene 5, on the map
+            'CUSA(')]
+        self.assertEqual(sorted(order), order)
 
 
 class Ch05ArenaTutorial(unittest.TestCase):

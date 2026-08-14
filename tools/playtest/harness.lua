@@ -7483,6 +7483,64 @@ scenarios.recordch05openinglupin = function()
     return scenarios.recordch05opening()
 end
 
+-- recordch05join (#25): the MOTION proof for scene 5 -- Basil trundles up, cracks the tourist
+-- joke, and JOINS. It is a SEPARATE film from recordch05opening rather than an extension of it,
+-- because the two sit on opposite sides of Preparations: the opening's terminal IS the prep
+-- screen, and this beat plays after it (decisions.md -> "Inheriting a channel is not inheriting
+-- a POSITION"). Re-filming four proven backdrop scenes to reach a fourth-quarter beat would also
+-- spend the whole record budget on footage #279 already shipped.
+-- What only a run can answer: whether the map is actually UP behind the bubble. The beat's FADU
+-- is ours -- the shared prep prologue fades to black and leaves it there -- and PutTalkBubble
+-- anchors to a unit, so a missing fade or a camera still parked on the deploy pocket both render
+-- as "the text played and looked wrong", which no memory assertion sees.
+-- The terminal is BASIL TURNING BLUE, not "dialogue happened": the CUSA is the join, so a film
+-- that ends here has proved the beat reached its own point. The box COUNT is what says which arm
+-- ran -- Lupin's is 3, the no-Lupin arm is 4, because Nicolas's authored break splits the
+-- substitute turn (#25). A scenario that checked only "a scene played" would pass on either.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05join (needs a CH05BOOT=1 ROM).
+scenarios.recordch05join = function()
+    local BASIL = 0x13                       -- CHARACTER_ARTUR
+    local boxes, waiting = 0, false
+    return recordCutscene({
+        tag = "ch05join", speed = "normal", maxFrames = 9000, shotEvery = 4, pressEvery = 90,
+        pre = function()
+            -- Fast config BEFORE the boot, never after: this ROM is 49 boxes of opening ahead of
+            -- Preparations, and a scenario that pokes it afterwards burns most of its budget on a
+            -- scene it does not film (the standing ch05boot trap).
+            pokeFastConfig()
+            -- `bootToMap(true)` stops AT prep instead of driving through it, which is exactly the
+            -- seam this film starts on. Then exit via Fight! unfilmed, so frame 1 is our FADU.
+            if not bootToMap(true) then return false, "never reached ch05's Preparations" end
+            if not driveThroughPrep() then return false, "Preparations never exited via Fight!" end
+            return true
+        end,
+        afterPre = pokeNormalConfig,
+        until_ = function()
+            -- Count the RISING EDGE of each dialogue wait. recordCutscene advances the boxes
+            -- itself, and this terminal is evaluated before it does, so every box is seen once.
+            local now = controllerState() == "dialogue_wait"
+            if now and not waiting then boxes = boxes + 1 end
+            waiting = now
+            if findUnit(SYM.gUnitArrayBlue, 20, BASIL) then
+                log(string.format(
+                    "ch05join: Basil is BLUE after %d boxes -- %s arm; the join CUSA landed",
+                    boxes, boxes >= 4 and "the no-Lupin (4-box)" or "Lupin's (3-box)"))
+                return true
+            end
+            return false
+        end,
+    })
+end
+
+-- recordch05joinlupin (#25): the same film against ch05lupinboot, whose live Lupin sends scene 5's
+-- CHECK_ALIVE down its ALIVE arm -- so box 2 is Basil reading the wolf ("...Wolf. You're hers.")
+-- rather than reading the party ("...You're none of hers."). One routine, two ROMs; the ROM picks
+-- the arm and the box count in the log says which one it picked. Delegates rather than aliases,
+-- for the verdict-cache attribution reason recorded on recordch05openinglupin.
+scenarios.recordch05joinlupin = function()
+    return scenarios.recordch05join()
+end
+
 -- recordch05recruit (#25): the MOTION proof for the locked Basil->Sahnar Talk at 0x9E8 -- the
 -- chapter's payoff scene, and the review artifact for it. Stills mislead on dialogue (they catch
 -- the typewriter mid-stroke), so what gets reviewed is the film.

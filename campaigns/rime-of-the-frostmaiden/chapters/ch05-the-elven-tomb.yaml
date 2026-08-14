@@ -832,6 +832,16 @@ events:
       "she lost her way" line on Ravisin is DEFERRED to the eruption (once she's formally
       introduced). LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas). Hand-boxed to GBA
       width. Wiring: Basil enters green, converts to a player unit on the join.
+      WIRED 2026-08-14 (#25) at host id 0x9EE, no-Lupin arm at 0x9EF. The opening's FIRST on-map
+      beat, so it wraps at the talk bubble's 29 and not the backdrop scenes' 42.
+      PLACEMENT is the one thing this scene does NOT inherit from its twin. Vanilla plays 0x9C2
+      before its prep CALL because it LOAD1s Eirika's group onto the street first; our party is
+      placed BY prep (the ally table is never LOADed on a prep chapter), so before the CALL the
+      field holds the risen line, Ravisin and a green shrub with nobody to be talking to. The beat
+      therefore plays AFTER prep, in vanilla's own after-prep shape — FADU(16), CUMO to the
+      speaker, STAL/CURE, then the text — which is exactly what its own 0x9C3/0x9C4 do. It also
+      lands adjacent to the CUSA that was already there, so the ask on box 3 and the green→blue
+      flip that answers it are one beat instead of two across a screen.
     script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
       # (A goodberry shrub — GREEN — trundles up through the snow toward the party.)
       - basil: "Oh! Tourists. In the tomb. ...We don't get many."
@@ -839,9 +849,9 @@ events:
       - basil: "...Wolf. You're hers. Awoken. But you're free? With them?"
       # (The thought dawns; Basil turns to the party and JOINS — green → the party's colors.)
       - basil: "...I wonder. Sahnar. ...She needs me. Take me to her?"
-    no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas, L4) — WIRING NOT BUILT.
-      boxes: [2]                      #   The locked script above is unchanged and still plays
-                                      #   whenever Lupin WAS recruited.
+    no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas, L4); BOXED + WIRED
+      boxes: [2]                      #   2026-08-14 (#25). The locked script above is unchanged
+                                      #   and still plays whenever Lupin WAS recruited.
       replaces:                       # anchored to the text, so an index cannot silently drift
         - "...Wolf. You're hers. Awoken. But you're free? With them?"
       reason: >-
@@ -851,8 +861,21 @@ events:
         ITSELF: everyone she has ever met belonged to Ravisin, so people who belong to nobody are the
         whole revelation. Arguably the purer version — it needs no other unit to exist.
         Boxes 1 and 3 are unchanged in both branches.
+      # ONE replaced box, TWO boxes of substitute — the nested list is the shape that says so.
+      # The line was chosen as PROSE and is 74 characters; this scene is the opening's first
+      # ON-MAP beat, so it wraps at the talk bubble's 29 and not the backdrop scenes' 42, and it
+      # simply does not fit one box. Left flowed, the wrapper picked the A-press for us and put it
+      # mid-clause ("You just-- came" / "here. On your own."), which is the failure the reliquary
+      # lines already taught: the authored A-press breaks ARE the pacing.
+      # BREAK CHOSEN 2026-08-14 (Nicolas): after the shock, not at the sentence boundary. Box 2a
+      # is the realisation landing on her; 2b is then one unbroken tumble, which is her register
+      # (lore/basil.md §Voice — "runs on when she cares", corpus twin Ewan). Splitting on the full
+      # stop instead would have cut the run-on in half and buttoned 2a on "one of you.", which is
+      # not where the beat turns. The no-Lupin arm is 4 A-presses against the locked arm's 3;
+      # arms are not required to match length, only to each stand up.
       script:
-        - basil: "...You're none of hers. Not one of you. You just-- came here. On your own."
+        - - basil: "...You're none of hers."
+          - basil: "Not one of you. You just-- came here. On your own."
   # ── 9C3 — the RECRUIT'S OWN scene (vanilla gives Joshua 12 A-presses) ─────────
   - trigger: chapter_start       # opening event list, LAST message -- still before player phase
     slot: "vanilla 0x9C3"
