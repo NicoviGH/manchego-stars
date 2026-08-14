@@ -1927,18 +1927,25 @@ class Ch05EruptionWarning(unittest.TestCase):
             for word in next(iter(box.values())).replace("'", '').split()[:3]:
                 self.assertIn(word, body)
 
-    def test_turn_two_stages_the_warning_before_sahnar_rises(self):
+    def test_turn_two_stages_the_arriving_dead_before_the_warning(self):
         self.assertTrue(hasattr(bc, 'ch05_wave_script'),
                         'the wave script needs a testable owner for its ordering')
-        script = bc.ch05_wave_script(2, 'MS_Ch05WaveT2', 'MS_Ch05Sahnar')
+        script = bc.ch05_wave_script(2, 'MS_Ch05WaveT2')
         self.assertEqual(1, script.count('TEXTSHOW(0x%X)' % bc.CH05_ERUPTION_MSG))
         self.assertIn('CUMO_CHAR(%s)' % bc.CH05_BOSS_PID, script)
         self.assertLess(script.index('LOAD1(0x1, MS_Ch05WaveT2)'),
                         script.index('CUMO_CHAR(%s)' % bc.CH05_BOSS_PID))
         self.assertLess(script.index('CUMO_CHAR(%s)' % bc.CH05_BOSS_PID),
                         script.index('TEXTSHOW(0x%X)' % bc.CH05_ERUPTION_MSG))
-        self.assertLess(script.index('TEXTSHOW(0x%X)' % bc.CH05_ERUPTION_MSG),
-                        script.index('LOAD1(0x1, MS_Ch05Sahnar)'))
+
+    def test_the_eruption_no_longer_raises_sahnar(self):
+        """She is summoned ON SCREEN by Ravisin in scene 3 and stands on the arena from turn 1
+        (#25, 2026-08-14) -- vanilla's own shape, where Joshua LOADs after the prep CALL. The
+        eruption keeps its six reinforcements; a LOAD of her table here would put a second
+        Sahnar on the board."""
+        for turn in (2, 3, 5):
+            script = bc.ch05_wave_script(turn, 'MS_Ch05WaveT%d' % turn)
+            self.assertNotIn(bc.CH05_SAHNAR_TABLE, script)
 
     def test_later_waves_do_not_repeat_the_turn_two_warning(self):
         self.assertTrue(hasattr(bc, 'ch05_wave_script'),
@@ -2156,12 +2163,23 @@ class Ch05OpeningBackdropScenes(unittest.TestCase):
                               '%s (slot %r via %r) resolves to an undefined face tag %s'
                               % (unit, slot, spelling, tag))
 
-    def test_a_speaker_holds_one_podium_across_the_whole_opening(self):
+    def test_a_speaker_holds_one_SIDE_across_the_whole_opening(self):
         """Ravisin speaks in scene 2 and again in scene 3, its immediate sequel. A per-scene
-        default would seat her mid-left in one and mid-right in the other."""
+        default would seat her mid-LEFT in one and mid-right in the other, and a character who
+        crosses the screen between adjacent scenes reads as a different person.
+
+        Her exact rung is allowed to shift by one and does: scene 3 raises Sahnar beside her, and
+        two faces need an empty rung between them, so Ravisin moves MidRight -> Right to open
+        FarRight up (see `assert_silent_faces_have_elbow_room`). That costs nothing on screen --
+        the two scenes are separate messages with a full fade through black between them, so
+        there is no visible move. Vanilla makes the same shift WITHIN a message, and has to
+        animate it (`[OpenMidRight][MoveRight]`, MSG_904)."""
         bodies = dict(bc.ch05_opening_messages(self._chap()))
-        self.assertIn('[OpenMidRight][LoadFace][FID_Riev]', bodies[0x9EA])
-        self.assertIn('[OpenMidRight][LoadFace][FID_Riev]', bodies[0x9EB])
+        right = ('[OpenRight]', '[OpenMidRight]', '[OpenFarRight]')
+        for msg in (0x9EA, 0x9EB):
+            self.assertTrue(
+                any('%s[LoadFace][FID_Riev]' % tag in bodies[msg] for tag in right),
+                'Ravisin left the right-hand side in 0x%X' % msg)
         self.assertIn('[OpenMidLeft][LoadFace][FID_Artur]', bodies[0x9E9])
         self.assertIn('[OpenMidLeft][LoadFace][FID_Artur]', bodies[0x9EB])
 
@@ -2623,7 +2641,8 @@ class Ch05BasilJoinsAfterPrep(unittest.TestCase):
         return bc._chapter_event_by_slot(self._chap(), 'chapter_start', slot, 'test')
 
     def _script(self):
-        return bc.ch05_beginning_script(self._chap(), 'CHARACTER_ARTUR')
+        return bc.ch05_beginning_script(self._chap(), 'CHARACTER_ARTUR',
+                                        bc.CH05_SAHNAR_TABLE, 'CHARACTER_MARISA')
 
     # ── ids ────────────────────────────────────────────────────────────────────
     def test_both_ids_are_owned_unique_and_inside_ch05s_host_block(self):
@@ -2762,8 +2781,422 @@ class Ch05BasilJoinsAfterPrep(unittest.TestCase):
             'LOMA(',
             'CALL(%s)' % bc.CH05_PREP_SCRIPT,
             'TEXTSHOW(0x%X)' % bc.CH05_BASIL_JOIN_SLOT[1],    # scene 5, on the map
-            'CUSA(')]
+            'CUSA(',
+            'TEXTSHOW(0x%X)' % bc.CH05_SAHNAR_ALONE_SLOT[1])] # scene 6, on the map
         self.assertEqual(sorted(order), order)
+
+
+class SilentPresenceDirective(unittest.TestCase):
+    """`present:` — a character is on screen for a scene and never speaks (#25).
+
+    It exists because ch05's scene 3 has to SHOW Ravisin's raised Sahnar without spending a box
+    on it. Nicolas, 2026-08-14: "you don't need to even add lines... just add sahnars portrait
+    to the scene."
+
+    It renders as a PRELOAD, and that is the engine's call rather than a design one:
+    `TalkPrepNextChar` reopens the talk bubble whenever the active face differs from the
+    speaking one, so a silent face loaded mid-message opens a bubble of its own and the scene
+    plays with two stacked bubbles. Vanilla's silent loads are all preloads (MSG_0954, 095D,
+    095E); it never loads a face mid-message without having it speak next.
+    """
+    STAGING = {'a': ('[OpenMidLeft]', '[FID_Artur]'),
+               'b': ('[OpenMidRight]', '[FID_Riev]'),
+               'c': ('[OpenFarRight]', '[FID_Marisa]')}
+
+    def _msg(self, script, **kw):
+        return bc._script_to_message(script, self.STAGING, width=42, **kw)
+
+    def test_it_loads_the_face_without_opening_a_box(self):
+        out = self._msg([{'present': 'c'}, {'a': 'one'}, {'a': 'two'}])
+        self.assertIn('[OpenFarRight][LoadFace][FID_Marisa]', out)
+        self.assertEqual(2, out.count('[A]'), 'a presence is staging, not an A-press')
+
+    def test_it_is_not_a_box(self):
+        self.assertIn('present', bc.SCRIPT_DIRECTIVES)
+        self.assertEqual(2, bc._script_box_count(
+            [{'present': 'c'}, {'a': 'one'}, {'a': 'two'}]))
+
+    def test_the_face_is_PRELOADED_before_any_text(self):
+        """The engine's rule, not ours. `TalkPrepNextChar` reopens the talk bubble whenever the
+        active face differs from the speaking one, so a silent face loaded mid-message opens a
+        bubble of its own and the scene plays with two stacked bubbles -- filmed 2026-08-14.
+        Vanilla's silent loads are all preloads (MSG_0954, 095D, 095E); it never loads a face
+        mid-message without having it speak next (MSG_904, 092C, 095A)."""
+        out = self._msg([{'a': 'one'}, {'present': 'c'}, {'a': 'two'}])
+        self.assertLess(out.index('[LoadFace][FID_Marisa]'), out.index('one'),
+                        'a silent face must be up before the first bubble opens')
+
+    def test_it_does_not_break_same_speaker_coalescing(self):
+        """It is not a mid-scene event, so it must not split a speaker's consecutive turns into
+        two blocks: their two pages stay inside ONE [OpenX] run, joined by [A][LF]. A re-opened
+        podium between them would be a second bubble by another road."""
+        out = self._msg([{'present': 'c'}, {'a': 'one'}, {'a': 'two'}])
+        self.assertIn('one[A][LF]\ntwo[A]', out)
+        # the only [OpenMidLeft]s are the load and the single block that follows it
+        self.assertEqual(2, out.count('[OpenMidLeft]'))
+
+    def test_a_presence_with_no_podium_is_refused(self):
+        with self.assertRaises(SystemExit):
+            self._msg([{'present': 'nobody'}, {'a': 'one'}])
+
+    def test_staged_names_sees_silent_presences_and_departures(self):
+        script = [{'a': 'one'}, {'present': 'c'}, {'exits': 'a'}]
+        self.assertEqual({'a', 'c'}, bc._script_staged_names(script))
+
+    def test_a_present_character_may_LATER_leave(self):
+        """Staged silently, then walks off -- a legal scene, and the `exits:` guard used to
+        hard-exit the build on it: the preload recorded the podium under an anonymous sentinel,
+        so the leaver looked like an impostor holding somebody else's seat."""
+        out = self._msg([{'present': 'c'}, {'a': 'one'}, {'exits': 'c'}, {'a': 'two'}])
+        self.assertIn('[OpenFarRight][ClearFace]', out)
+        self.assertLess(out.index('one'), out.index('[OpenFarRight][ClearFace]'))
+
+    def test_an_anonymous_preload_still_cannot_be_exited(self):
+        """The sentinel still does its job for callers passing `preload` directly: nobody
+        holds those podiums by name, so `exits:` on one is still the error it always was."""
+        with self.assertRaises(SystemExit):
+            self._msg([{'a': 'one'}, {'exits': 'c'}],
+                      preload=[('[OpenFarRight]', '[FID_Marisa]')])
+
+    def test_sharing_a_podium_with_a_speaker_is_refused_too(self):
+        """Distance 0, not just 1 -- and it is the WORSE case: the renderer clears the silent
+        face outright the moment its podium-holder speaks, so it is destroyed before the first
+        box rather than merely buried. The shared podium tables pair names onto tags, so this
+        is the easy way to hit it."""
+        script = [{'ravisin': 'one'}, {'present': 'sahnar'}]
+        with self.assertRaises(SystemExit):
+            bc.assert_silent_faces_have_elbow_room(
+                script, {'ravisin': '[OpenMidRight]', 'sahnar': '[OpenMidRight]'}, 'test')
+
+
+class Ch05RavisinRaisesSahnarOnScreen(unittest.TestCase):
+    """Scene 3 stages the summon with a PORTRAIT and no dialogue (#25, 2026-08-14).
+
+    The design change that unblocked scene 6 — Sahnar stops being a turn-2 riser and goes on
+    the map from turn 1, woken on screen by Ravisin — lands here, and it lands for free: the
+    seven locked boxes are untouched and the scene gains an `enters:` directive instead of a
+    line. Scene 3's power is that it is QUIET (the inverted-doubt beat, a friend being shut
+    down), and a spoken resurrection would have buried it.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+
+    def _scene(self):
+        return bc._chapter_event_by_slot(self._chap(), 'chapter_start', 'vanilla 0x9BD', 'test')
+
+    def _body(self):
+        return dict(bc.ch05_opening_messages(self._chap()))[0x9EB]
+
+    def test_the_summon_costs_no_box_and_the_lock_is_intact(self):
+        script = self._scene()['script']
+        self.assertEqual(7, bc._script_box_count(script), 'still the seven locked boxes')
+        self.assertEqual('sahnar', next(e['present'] for e in script if 'present' in e))
+        self.assertNotIn('sahnar', {k for e in script for k in e if k != 'present'},
+                         'she is raised, she does not speak -- her first words are scene 6')
+
+    def test_she_is_on_screen_for_the_WHOLE_scene_and_the_contrast_is_the_summon(self):
+        """She is staged first, not mid-scene -- the engine allows no other placement (see
+        `SilentPresenceDirective`). The beat still reads, because it reads off the CONTRAST:
+        absent through scene 2, standing at Ravisin's shoulder through all of scene 3. So
+        "It never once occurred to me she might be of use" is an appraisal to her face, and
+        "It's not your concern." is said over her."""
+        script = self._scene()['script']
+        keys = [next(iter(e)) for e in script]
+        self.assertEqual(0, keys.index('present'), 'staged before the first box')
+        body = self._body()
+        plain = ' '.join(re.sub(r'\[[^\]]*\]', ' ', body).split())
+        self.assertLess(plain.index("A queen's blade"), plain.index('might be of use'))
+        self.assertLess(plain.index('might be of use'), plain.index("It's not your concern"))
+        self.assertLess(body.index('[LoadFace][FID_Marisa]'), body.index("A queen's blade"))
+        # and she is absent from scene 2, which is what makes her presence here legible at all
+        self.assertNotIn('[FID_Marisa]', dict(bc.ch05_opening_messages(self._chap()))[0x9EA])
+
+    def test_no_second_bubble__the_silent_face_is_up_before_the_first_box(self):
+        """The defect Nicolas caught on film: two stacked speech bubbles, because the first cut
+        loaded her mid-message and `TalkPrepNextChar` reopens the bubble whenever the active
+        face differs from the speaking one. Preloading leaves the message in vanilla's own
+        MSG_0954 shape -- every silent face up front, then text.
+
+        NB an `[A]` followed by `[OpenX][LoadFace]` is NOT the bug and must not be asserted
+        against: that is an ordinary speaker change (Basil's, three lines below), it ships in
+        every scene we have, and the newly loaded face speaks immediately."""
+        body = self._body()
+        self.assertTrue(body.startswith('[OpenFarRight][LoadFace][FID_Marisa]\n'
+                                        '[OpenRight][LoadFace][FID_Riev]'),
+                        'both faces must be up before the first box: %r' % body[:120])
+        # nobody is loaded again once the talking starts EXCEPT a speaker taking their own turn
+        first_text = body.index("A queen's blade")
+        for match in re.finditer(r'\[Open\w+\]\[LoadFace\](\[FID_\w+\])', body):
+            if match.start() > first_text:
+                self.assertEqual('[FID_Artur]', match.group(1),
+                                 'only a speaker may load mid-message, and only to speak next')
+
+    def test_the_raised_face_gets_a_whole_empty_rung_of_elbow_room(self):
+        """The defect this scene taught, found by FILMING (2026-08-14). Podiums are a ladder and
+        neighbouring rungs OVERLAP; FE8 draws the active speaker on top. For a scene of speakers
+        that is harmless -- scene 4 seats four across adjacent rungs and each is drawn over the
+        others when its turn comes. A face raised by `enters:` never takes a turn, so on a
+        neighbouring rung it stays underneath for the whole scene: Sahnar's first pass put her on
+        FarRight beside Ravisin on MidRight, and she played as a hood behind Ravisin's shoulder.
+
+        Ravisin therefore moves to Right, leaving MidRight EMPTY between the two -- vanilla's own
+        stable two-face right side (MSG_904, MSG_092C, MSG_0937, MSG_0954)."""
+        self.assertEqual({'ravisin': '[OpenRight]', 'sahnar': '[OpenFarRight]'},
+                         bc.CH05_OPENING_PODIUM_OVERRIDES['vanilla 0x9BD'])
+        gap = (bc.PODIUM_ORDER.index('[OpenFarRight]') - bc.PODIUM_ORDER.index('[OpenRight]'))
+        self.assertEqual(2, gap, 'a whole rung must sit empty between them')
+        body = self._body()
+        self.assertIn('[OpenFarRight][LoadFace][FID_Marisa]', body)
+        self.assertIn('[OpenRight][LoadFace][FID_Riev]', body)
+        self.assertEqual(1, body.count('[LoadFace][FID_Riev]'))
+        self.assertNotIn('[OpenMidRight]', body, 'the rung between them stays empty')
+        self.assertNotIn('[ClearFace]', body, 'nobody is evicted: three faces, four slots')
+
+    def test_a_silent_face_next_door_to_a_speaker_is_refused(self):
+        """The guard, on the exact shape that shipped wrong."""
+        script = [{'ravisin': 'one'}, {'present': 'sahnar'}, {'ravisin': 'two'}]
+        bc.assert_silent_faces_have_elbow_room(
+            script, {'ravisin': '[OpenRight]', 'sahnar': '[OpenFarRight]'}, 'test')
+        with self.assertRaises(SystemExit):
+            bc.assert_silent_faces_have_elbow_room(
+                script, {'ravisin': '[OpenMidRight]', 'sahnar': '[OpenFarRight]'}, 'test')
+
+    def test_speakers_may_still_sit_on_adjacent_rungs(self):
+        """Scene 4 does exactly this and is shipped and filmed. The rule is about SILENCE, not
+        adjacency -- a guard that banned adjacency outright would have rejected it."""
+        bc.assert_silent_faces_have_elbow_room(
+            [{'a': 'x'}, {'b': 'y'}], {'a': '[OpenMidRight]', 'b': '[OpenFarRight]'}, 'test')
+        self.assertEqual({'lupin': '[OpenFarLeft]', 'wolfram': '[OpenMidLeft]',
+                          'marty': '[OpenMidRight]', 'pinky': '[OpenFarRight]'},
+                         bc.CH05_ARRIVAL_PODIUMS)
+
+    def test_the_face_arrives_before_basil_asks_after_her(self):
+        body = self._body()
+        self.assertLess(body.index('[LoadFace][FID_Marisa]'),
+                        body.index('What will you do with her?'))
+        self.assertLess(body.index('What will you do with her?'),
+                        body.index("It's not your concern."))
+
+
+class Ch05SahnarIsJoshuaAndBasilIsNatasha(unittest.TestCase):
+    """Sahnar plays the way vanilla Joshua plays -- INCLUDING his refusal to hit the escort.
+
+    `AI_A_07` is `gAiScript_ActionInRange_ExceptNatasha`. The refusal does not live in the
+    `.ai` bytes: `AiScriptCmd_05_DoStandardAction` routes through
+    `AiIsUnitEnemyAndNotInScrList`, which tests each candidate's `pCharacterData->number`
+    against a list of character ids -- and vanilla's list holds `CHARACTER_NATASHA` literally.
+    Copy the bytes alone and `0x7` degrades to plain `AI_A_00`, leaving a fragile Cleric a
+    legal target for a Killing Edge. So the list is repointed at Basil.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _sahnar(self):
+        chap = bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+        return next(e for e in chap['enemy_units'] if e['id'] == 'sahnar')
+
+    def test_she_carries_joshuas_exact_ai_bytes(self):
+        self.assertEqual('duelist_hold', self._sahnar()['ai_pattern'])
+        self.assertEqual('{0x7, 0x3, 0x9, 0x0}', bc.CH05_AI['duelist_hold'])
+
+    def test_the_list_has_exactly_one_client_which_is_what_makes_it_safe(self):
+        """`.ai = {0x7,` appears ONCE in all of FE8 -- `UnitDef_088B5914`, vanilla Ch5's
+        Joshua. Read from decomp HEAD, never the built tree, which holds our injections."""
+        udefs = bc.vanilla_decomp_text('src/events_udefs.c')
+        self.assertEqual(1, udefs.count('.ai = {0x7,'))
+        bc.assert_escort_safe_ai_has_one_client('{0x7, 0x3, 0x9, 0x0}')
+
+    def test_a_second_client_is_refused(self):
+        with mock.patch.dict(bc.CH05_AI, {'someone_else': '{0x7, 0x0, 0x0, 0x0}'}):
+            with self.assertRaises(SystemExit):
+                bc.assert_escort_safe_ai_has_one_client('{0x7, 0x3, 0x9, 0x0}')
+
+    def test_the_sweep_covers_EVERY_chapter_not_just_ch05(self):
+        """The list is global, so the hazard is a FUTURE chapter reaching for `{0x7,` on its
+        own account -- exactly the case a ch05-only scan cannot see. Scoping it to CH05_AI was
+        the first cut and it defeated the guard's own purpose."""
+        with mock.patch.dict(bc.CH04_AI, {'borrowed': '{0x7, 0x3, 0x9, 0x0}'}):
+            with self.assertRaises(SystemExit):
+                bc.assert_escort_safe_ai_has_one_client('{0x7, 0x3, 0x9, 0x0}')
+        # and the sweep really is finding more than one table
+        self.assertGreater(len([n for n in dir(bc) if re.fullmatch(r'CH\d\d_AI', n)]), 1)
+
+    def test_the_repoint_swaps_natasha_for_our_escort_and_keeps_the_shape(self):
+        """`AiIsInShortList` takes `const u16*` and stops on a zero entry, so the u8 array
+        `{ id, 0, 0, 0 }` is the two-entry short list `{ id, TERMINATOR }`. Keep the shape."""
+        vanilla = ('u8 CONST_DATA %s[] = { CHARACTER_NATASHA, 0, 0, 0 };'
+                   % bc.ESCORT_SAFE_AI_LIST)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, 'cp_data.c')
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write('/* head */\n%s\n/* tail */\n' % vanilla)
+            with mock.patch.object(bc, 'CP_DATA_C', path):
+                bc.repoint_escort_safe_ai_list('CHARACTER_ARTUR', 'test escort')
+                patched = open(path, encoding='utf-8').read()
+                self.assertIn('u8 CONST_DATA %s[] = { CHARACTER_ARTUR, 0, 0, 0 };'
+                              % bc.ESCORT_SAFE_AI_LIST, patched)
+                self.assertNotIn('CHARACTER_NATASHA', patched)
+                # NON-IDEMPOTENT ON PURPOSE: a second run has nothing to match, and a silent
+                # pass would ship an unprotected escort. cp_data.c is in PATCHED_DECOMP_FILES
+                # so it is restored from HEAD each build.
+                with self.assertRaises(SystemExit):
+                    bc.repoint_escort_safe_ai_list('CHARACTER_ARTUR', 'test escort')
+
+    def test_cp_data_is_restored_from_HEAD_every_build(self):
+        self.assertIn('src/cp_data.c', bc.PATCHED_DECOMP_FILES)
+
+
+class Ch05SahnarAloneOnTheArena(unittest.TestCase):
+    """Scene 6 -- Sahnar alone at the sarcophagus, as a PLAIN ON-MAP BUBBLE (#25).
+
+    This scene was the opening's problem child for exactly as long as Sahnar was a turn-2
+    riser: with nothing of hers on the field, no talk bubble had a unit to anchor to, and the
+    standing note priced it as needing a BACKDROP of its own -- the one place the twin was
+    said to fail us. Nicolas's 2026-08-14 call moved her summon into scene 3, which puts her
+    on the arena tile from turn 1 exactly as vanilla's `UnitDef_088B5914` puts Joshua there,
+    and the exception evaporated. The beat is now vanilla's 0x9C3 down to the camera move, and
+    all six locked boxes are untouched.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+
+    def _scene(self):
+        slot, _msg, _boxes, _what = bc.CH05_SAHNAR_ALONE_SLOT
+        return bc._chapter_event_by_slot(self._chap(), 'chapter_start', slot, 'test')
+
+    def _script(self):
+        return bc.ch05_beginning_script(self._chap(), 'CHARACTER_ARTUR',
+                                        bc.CH05_SAHNAR_TABLE, 'CHARACTER_MARISA')
+
+    # ── the id ─────────────────────────────────────────────────────────────────
+    def test_the_id_is_0x9F0_owned_unique_and_inside_ch05s_host_block(self):
+        _slot, msg, _boxes, _what = bc.CH05_SAHNAR_ALONE_SLOT
+        self.assertEqual(0x9F0, msg, "#25's allocation table")
+        self.assertTrue(0x9E4 <= msg <= 0x9F5, "outside ch05's Ch6 host block")
+        self.assertIn(msg, set(bc.HOSTED_CHAPTER_MESSAGE_IDS['ch05']))
+        self.assertEqual('ch05', bc.assert_message_ids_unique()[msg])
+
+    def test_the_yaml_slot_label_stays_an_anatomy_citation(self):
+        """`vanilla 0x9C3` names the scene we MINE -- Joshua's own solo beat on this tile."""
+        slot, msg, _boxes, _what = bc.CH05_SAHNAR_ALONE_SLOT
+        self.assertNotEqual(int(slot.split()[1], 16), msg)
+
+    def test_it_costs_ONE_id_because_she_never_mentions_the_wolf(self):
+        self.assertNotIn('no_lupin_fallback', self._scene())
+        self.assertEqual(1, len(bc.ch05_sahnar_alone_message(self._chap())))
+
+    # ── the channel ────────────────────────────────────────────────────────────
+    def test_the_body_wraps_at_the_bubble_29_not_the_scenic_42(self):
+        """It rides TEXTSHOW -> PutTalkBubble, whose right-side branch computes x = 29 - width
+        with no clamp: a line over 29 runs off the tilemap (the ch03 crier bug)."""
+        for _msg, body in bc.ch05_sahnar_alone_message(self._chap()):
+            for line in body.split('\n'):
+                printable = re.sub(r'\[[^\]]*\]', '', line)
+                self.assertLessEqual(len(printable), 29, 'bubble overflow: %r' % line)
+
+    def test_she_keeps_the_mid_right_she_holds_in_scene_1_and_the_talk(self):
+        """A character who changes seats between her scenes reads as a different person --
+        and mid-right is also the podium vanilla's own 0x9C3 gives Joshua on this tile."""
+        self.assertEqual({'sahnar': '[OpenMidRight]'}, bc.CH05_SAHNAR_ALONE_PODIUMS)
+        for _msg, body in bc.ch05_sahnar_alone_message(self._chap()):
+            self.assertIn('[OpenMidRight][LoadFace][FID_Marisa]', body)
+            self.assertNotIn('[FID_Joshua]', body)      # her STAT_DONOR, never her face
+
+    def test_every_locked_word_survives_the_staging_change(self):
+        """The scene moved from a 42-wide backdrop to a 29-wide bubble. What that is allowed
+        to cost is an A-PRESS; what it is not allowed to cost is a word."""
+        self.assertEqual(['sahnar'] * 7, [next(iter(b)) for b in self._scene()['script']])
+        plain = ' '.join(re.sub(r'\[[^\]]*\]', ' ',
+                                bc.ch05_sahnar_alone_message(self._chap())[0][1]).split())
+        for locked in ('...Someone has come.',
+                       'Four thousand years, and someone has finally come.',
+                       '...I was given a purpose. To defend this tomb.',
+                       'No one ever came. I stopped counting somewhere in the middle.',
+                       '...Well. Something has come now.',
+                       'I will defend this tomb. It is my purpose.'):
+            self.assertIn(locked, plain, 'the 2026-07-29 lock lost a word')
+
+    def test_the_one_box_that_cannot_fit_29_breaks_where_the_AUTHOR_put_it(self):
+        """"No one ever came. I stopped counting somewhere in the middle." is 60 characters:
+        three lines at the bubble's 29, and a box holds two. Left flowed, the wrapper picked
+        the A-press and split it mid-clause ("...somewhere in the" / "middle."). The break is
+        authored at the full stop, so the understatement gets its own press."""
+        self.assertEqual(7, bc.CH05_SAHNAR_ALONE_SLOT[2])
+        boxes = [next(iter(b.values())) for b in self._scene()['script']]
+        self.assertEqual('No one ever came.', boxes[3])
+        self.assertEqual('I stopped counting somewhere in the middle.', boxes[4])
+        body = bc.ch05_sahnar_alone_message(self._chap())[0][1]
+        self.assertEqual(7, body.count('[A]'))
+        # and NO box of the scene splits under the wrap -- an [A] the author did not place
+        for page in body.split('[A]')[:-1]:
+            self.assertLessEqual(len([l for l in page.split('[LF]') if l.strip()]), 2,
+                                 'the wrapper paged this box, not the author: %r' % page)
+
+    # ── placement in the beginning script ──────────────────────────────────────
+    def test_the_camera_frames_the_arena_BEFORE_she_loads(self):
+        """Vanilla's order, and it is the whole reveal: CUMO_AT the tile, hold, and only then
+        LOAD1, so the player watches the duelist arrive instead of finding her there."""
+        script = self._script()
+        x, y = next(e for e in self._chap()['enemy_units']
+                    if e['id'] == 'sahnar')['positions'][0]
+        self.assertEqual((12, 6), (x, y), "vanilla Joshua's own tile, which is the arena")
+        cumo = script.index('CUMO_AT(%d, %d)' % (x, y))
+        load = script.index('LOAD1(0x1, %s)' % bc.CH05_SAHNAR_TABLE)
+        text = script.index('TEXTSHOW(0x%X)' % bc.CH05_SAHNAR_ALONE_SLOT[1])
+        self.assertLess(cumo, load)
+        self.assertLess(load, script.index('CUMO_CHAR(CHARACTER_MARISA)'))
+        self.assertLess(script.index('CUMO_CHAR(CHARACTER_MARISA)'), text)
+
+    def test_she_WALKS_OFF_the_arena_tile_or_the_chapter_loses_its_arena(self):
+        """The regression this slice shipped and code review caught. (12,6) is
+        TERRAIN_ARENA_REGULAR *and* the arena tutorial's own `AREA(..., 12, 6, 12, 6)` trigger,
+        so a hostile parked there makes the arena unenterable for the entire chapter and
+        silently kills the `arena-wager` debut (#264/#265). Vanilla walks Joshua off it the
+        instant he lands (`MOVE(0x0, CHARACTER_JOSHUA, 9, 7)`); dropping that MOVE as
+        'deliberate' is what broke it."""
+        load, guard = bc.ch05_sahnar_station(self._chap())
+        self.assertEqual((12, 6), load, "vanilla Joshua's LOAD tile, which is the arena")
+        self.assertEqual((9, 7), guard, "vanilla Joshua's walk-off tile")
+        self.assertNotEqual(load, guard, 'she may not end where she lands')
+        script = self._script()
+        self.assertIn('MOVE(0x0, CHARACTER_MARISA, 9, 7)', script)
+        self.assertLess(script.index('LOAD1(0x1, %s)' % bc.CH05_SAHNAR_TABLE),
+                        script.index('MOVE(0x0, CHARACTER_MARISA, 9, 7)'))
+        self.assertLess(script.index('MOVE(0x0, CHARACTER_MARISA, 9, 7)'),
+                        script.index('TEXTSHOW(0x%X)' % bc.CH05_SAHNAR_ALONE_SLOT[1]),
+                        'she is off the arena before she speaks')
+
+    def test_a_missing_walk_off_is_refused_rather_than_shipped(self):
+        chap = self._chap()
+        sahnar = next(e for e in chap['enemy_units'] if e['id'] == 'sahnar')
+        del sahnar['walks_to']
+        with self.assertRaises(SystemExit):
+            bc.ch05_sahnar_station(chap)
+
+    def test_the_escort_is_measured_to_where_she_actually_STANDS(self):
+        """Basil's walk is checked against Sahnar's fighting tile, not her load tile -- they
+        are different tiles now, and the load tile is one she is never on when the Talk
+        happens."""
+        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
+                   encoding='utf-8').read()
+        self.assertIn('must_reach=ch05_sahnar_station(chap)[1]', src)
+
+    def test_she_loads_ONCE_and_after_prep_where_vanilla_loads_joshua(self):
+        script = self._script()
+        self.assertEqual(1, script.count('LOAD1(0x1, %s)' % bc.CH05_SAHNAR_TABLE))
+        self.assertLess(script.index('CALL(%s)' % bc.CH05_PREP_SCRIPT),
+                        script.index('LOAD1(0x1, %s)' % bc.CH05_SAHNAR_TABLE))
+
+    def test_it_brings_no_second_fade_up_because_scene_5_already_did(self):
+        """The prep prologue leaves the screen black and scene 5 pays the FADU for both. A
+        second one here would flash the map back through black between two adjacent beats."""
+        script = self._script()
+        tail = script[script.index('TEXTSHOW(0x%X)' % bc.CH05_BASIL_JOIN_SLOT[1]):]
+        self.assertNotIn('FADU', tail)
+        self.assertNotIn('FADI', tail)
 
 
 class Ch05ArenaTutorial(unittest.TestCase):

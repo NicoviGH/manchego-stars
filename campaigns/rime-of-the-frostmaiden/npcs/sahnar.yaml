@@ -66,12 +66,13 @@ promotion:
   branch: [Swordmaster, Assassin]  # vanilla FE8 Myrmidon branch (classchg-data.c [CLASS_MYRMIDON])
   default: Swordmaster
 
-recruited_via: "story — talked down by Basil after the eruption wakes her (Ch5)"
+recruited_via: "story — talked down by Basil after Ravisin summons her (Ch5)"
 recruit:
   chapter: ch05-the-elven-tomb
   via: story                # on-map Talk: she is placed, then a CHAR/CUSA flips her (ON_MAP_RECRUIT_VIA)
-  initial_faction: red      # the Joshua flip -- she rises HOSTILE at the eruption (chapter YAML's
-                            # `convertible: true`) and only Basil's Talk turns her. GREEN is the
+  initial_faction: red      # the Joshua flip -- Ravisin calls her up HOSTILE on screen in ch05's
+                            # scene 3 and she guards the arena from turn 1 (chapter YAML's
+                            # `convertible: true`); only Basil's Talk turns her. GREEN is the
                             # default; this opt-in is what recruit_initial_faction reads.
 
 # ── Art (SHIPPED 2026-07-17 — spectral-skeleton direction, Nicolas's call) ────

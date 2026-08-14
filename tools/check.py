@@ -69,6 +69,16 @@ DEAD_CONCEPTS = [
     # retired by #238 (2026-08-06): the base-tiles grid comes from SYM like every other
     # symbol. The literal it held drifted and made ch03's doors and chests read as broken.
     r'GBMMAPBASETILES_ADDR',
+    # retired by #25 (2026-08-14): Sahnar is no longer a turn-2 riser. Ravisin raises her ON
+    # SCREEN in scene 3 and she guards the arena from turn 1, which is vanilla's own shape
+    # (UnitDef_088B5914 LOAD1s Joshua there right after the prep CALL). Two things go with it:
+    # the quake no longer cracks her sarcophagus, and scene 6 is a plain on-map bubble --
+    # the "one place the twin fails us" note was only ever true while she was absent from the
+    # field, and a later pass must not build it the backdrop that note asked for.
+    r'(?:eruption|quake).{0,30}(?:wakes?|cracks?).{0,20}(?:Sahnar|sarcophagus)',
+    r'Sahnar.{0,20}rises? (?:HOSTILE )?(?:at|with) the eruption',
+    r'scene 6 (?:does not inherit|needs a backdrop)',
+    r'the one place the twin fails us',
     # NOT registered here: `hasPrepScreen`. It IS a dead field (FE7 leftover, chapterdata.h:37 --
     # false for every chapter, including ones that plainly have prep) and citing it as evidence is
     # exactly the mistake that produced a bogus "our prep is a divergence" claim on 2026-07-29.

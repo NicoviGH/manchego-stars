@@ -4,8 +4,8 @@
 > awaits red-pen. Canon-corrected 2026-07-23 (RotFM): Sahnar is FEMALE (she/her), ancient
 > elven royalty, awake and aware for millennia.** ch05 "The Elven Tomb" recruit — the Joshua
 > beat. Mechanics in [`chapters/ch05-the-elven-tomb.yaml`](../chapters/ch05-the-elven-tomb.yaml)
-> (Myrmidon, killing-edge; rises HOSTILE — woken by Ravisin and misled, never bound — and flips
-> when **Basil** Talks her) and [`npcs/sahnar.yaml`](../npcs/sahnar.yaml). The Joshua donor is mechanics-only, so
+> (Myrmidon, killing-edge; HOSTILE from turn 1 — Ravisin calls her up on screen in ch05's scene
+> 3, misleading her, never binding her — and she flips when **Basil** Talks her) and [`npcs/sahnar.yaml`](../npcs/sahnar.yaml). The Joshua donor is mechanics-only, so
 > her gender is free of it; the shipped hooded-wraith art reads androgynous (sanity-check at
 > the slice).
 

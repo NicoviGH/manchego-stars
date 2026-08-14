@@ -107,9 +107,13 @@ objective:
         ~+1.0 kills/round, #171).
     - type: brazier_flavor
       description: >
-        The gazebo brazier (silver flame) is the narrative beat that WAKES Sahnar from
-        the sarcophagus at the eruption — optional atmosphere, not the recruit gate
-        (superseded by the chaperone Talk above; see decisions.md).
+        The gazebo brazier (silver flame) is RAVISIN'S INSTRUMENT, not the eruption's flavour
+        — she is standing at it when she calls Sahnar up in scene 3 (`vanilla 0x9BD`), before
+        the party ever reaches the hollow. Re-pointed 2026-08-14 (#25) when the summon moved
+        off the turn-2 quake and onto the screen: the brazier stopped being an unattended
+        atmosphere prop and became the thing the villain uses. Still optional set-dressing on
+        the map itself, and still not the recruit gate (superseded by the chaperone Talk
+        above; see decisions.md).
 
 win_condition: boss_defeated
 lose_condition: all_player_units_defeated
@@ -135,6 +139,17 @@ difficulty_note: >
       her, then a +1.0 kills/round ally for the back half. Self-balancing risk→advantage.
     - REINFORCEMENT eruption: the dead arrive over turns (arrives_turn), not a turn-1 alpha —
       so the turn-1 threat reads 9.9 (≈ vanilla's 9.0), below the static 12.7.
+      SAHNAR IS NOT ONE OF THEM (2026-08-14, #25 — Ravisin summons her in scene 3), and the
+      re-price this looked like it owed turns out to be ALREADY PAID: `difficulty.py`
+      (`_split_force`) buckets a `convertible: true` enemy before it ever reads `arrives_turn`,
+      and the turn-1 field is `line + convertibles` — so the model has been pricing her as
+      present on turn 1 the whole time. `make difficulty CH=ch05` after the move: line 15 ·
+      reinf 6 · convertible 2 · turn-1 9.9, byte-identical, verdict still PARITY. The
+      comparison is also honest in both directions, which #25 doubted: vanilla's own 9.0
+      counts Joshua the same way, off its CHAR targets. What actually changed was this note's
+      CLAIM — it used to say Sahnar arrived with the eruption, and the number never agreed.
+      Her `duelist_hold` AI never moves either, so what she adds is threat the player chooses
+      to walk into rather than threat that comes to them.
     - Untapped headroom: Lupin (+1.0) is a clean all-chapter combatant the static party
       number (6.27) omits; Basil is the fragile recruiter, not a fighter.
   No fog — the tension is the escort + the eruption race, not obscured vision. Keep it a
@@ -448,22 +463,48 @@ enemy_units:
     skin:
       look: "skeletal elven archer"
       source: "FE-Repo: Battle Animations/Monsters - Basic Types/[Skeleton-Reskin] [U] Wight Sniper by DATonDemand"
-  # ── CONVERTIBLE (#171): Sahnar rises HOSTILE at the eruption; Basil's Talk flips her ─
+  # ── CONVERTIBLE (#171): Ravisin summons Sahnar on screen in scene 3; Basil's Talk flips her ─
+  # NO `arrives_turn` — she is on the map from TURN 1, which is vanilla's own shape: Ch5's
+  # UnitDef_088B5914 LOAD1s Joshua at this same tile with this same sword right after the prep
+  # CALL. `arrives_turn: 2` was OUR divergence, and it cost the story the beat that justifies
+  # her: the player used to meet a hostile duelist because the data said so. Now they watch
+  # Ravisin arm the weapon in scene 3 (`vanilla 0x9BD`) and then have to deal with it.
+  # DECIDED 2026-08-14 (Nicolas, #25). The eruption keeps its six reinforcements without her.
   - id: sahnar
     name: "Sahnar"
     count: 1
     class: myrmidon             # Joshua's exact class/donor — a fast, crit-threat sword duelist
     level: 6
-    arrives_turn: 2             # rises when the quake cracks the sarcophagus (the eruption WAKE)
-    positions: [[12, 6]]        # Joshua's own tile in vanilla Ch5 — which is the ARENA tile (12,6).
-                                # Lifting it costs nothing and buys two things: she rises where the
-                                # amphitheatre canon says the blades met, and the escort distance
-                                # Basil must survive is measured against the twin's, not invented.
+    positions: [[12, 6]]        # Joshua's own LOAD tile in vanilla Ch5 — the ARENA tile (12,6).
+                                # She APPEARS here, where the amphitheatre canon says the blades
+                                # met, and does not stay: see `walks_to`.
+    walks_to: [9, 7]            # …and then steps off it, exactly as vanilla's Joshua does
+                                # (`MOVE(0x0, CHARACTER_JOSHUA, 9, 7)` in EventScr_Ch5_Beginning-
+                                # Scene, immediately after his LOAD1). This is NOT decoration and
+                                # dropping it cost us the whole ARENA: (12,6) is
+                                # TERRAIN_ARENA_REGULAR and the tutorial's own trigger is
+                                # `AREA(..., 12, 6, 12, 6)`, so a hostile parked there makes the
+                                # arena unenterable for the entire chapter and silently kills the
+                                # `arena-wager` debut (#264/#265). Vanilla walks him onto (9,7),
+                                # TERRAIN_ROAD — no defensive bonus, in the open, two tiles clear
+                                # of the arena mouth. The escort distance Basil must survive is
+                                # measured to THIS tile, not the load tile.
     inventory:
       - id: killing-edge
         fe_base: killing-edge   # Joshua's killing-edge (30 crit) — the fragile-escort tension
     damage_type: slashing       # flavor label only
-    ai_pattern: aggressive
+    ai_pattern: duelist_hold    # vanilla Joshua's own {0x7, 0x3, 0x9, 0x0} — strike anything that
+                                # comes in range, NEVER move, and DO NOT TOUCH THE ESCORT. She
+                                # stands guard at the arena. A turn-1 crit-Myrmidon on
+                                # `aggressive` (pursue/charge) would hunt the squishies, which is
+                                # a different chapter; one standing guard is the escort puzzle
+                                # this chapter is built on.
+                                # Sahnar is Joshua and Basil is Natasha, all the way down: AI_A_07
+                                # is `ActionInRange_ExceptNatasha`, and the refusal that makes a
+                                # fragile Cleric able to walk up to a Killing Edge lives in a
+                                # character-id list, not in these bytes. `repoint_escort_safe_ai_list`
+                                # points it at Basil at build time — the list has exactly one
+                                # client in all of FE8 (this unit's donor), so nothing else moves.
     convertible: true           # #171 — the Joshua flip. Hostile crit-Myrmidon until fragile BASIL
                                 # chaperones across to Talk her; then a +~0.9 kills/round back-half ally.
     parley:
@@ -480,8 +521,9 @@ enemy_units:
 # Superseded 2026-07-15: the recruit is now the Basil→Sahnar chaperone Talk (the Joshua beat,
 # above), which "affects how you play the level" the way vanilla Ch5's Natasha→Joshua does — a
 # stronger hook than a fetch-quest that competes for turns. The brazier survives only as the
-# narrative WAKE beat: the eruption cracks the sarcophagus and Sahnar rises HOSTILE (a silver
-# flame flavor moment), then Basil must reach her to flip her. Canon RotFM p.82-83's offerings
+# narrative WAKE beat — and since 2026-08-14 (#25) that beat is RAVISIN'S, played on screen in
+# scene 3 at the brazier's silver flame, not the turn-2 quake's. She calls Sahnar up HOSTILE
+# before the party arrives; Basil must then reach her to flip her. Canon RotFM p.82-83's offerings
 # (twig/pinecone/feather; we already dropped the severed hand) become set-dressing, not a gate.
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
@@ -688,7 +730,13 @@ events:
       - sephek: >-
           Do not take them lightly. They are tougher than they look, and they do not frighten.
       # (The permission beat — vanilla's "do we have permission to execute her?" seat. This is
-      #  what SANCTIONS the eruption: Ravisin wakes Sahnar under orders, not on a whim.)
+      #  what SANCTIONS the summon: Ravisin calls Sahnar up under orders, not on a whim.
+      #  Since 2026-08-14 (#25) she spends it in the VERY NEXT SCENE, and "If they press you"
+      #  is a condition she does not wait for — which is the read: she has just been told the
+      #  stone she walked past a thousand times holds a queen's blade, and 9BD is her
+      #  discovering she owns an asset. Eager, not disciplined. Her turn-2 "Sephek was right"
+      #  then lands harder, not softer: she spent the permission EARLY and it still was not
+      #  enough.)
       - sephek: "If they press you, you may wake the warrior. The one under the stone."
       - ravisin: "...The elf?"
       - sephek: "She was a queen's blade once. She will serve well enough."
@@ -728,10 +776,28 @@ events:
       that she knows Sahnar — that stays her secret for the recruit to spend.
       LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas).
     script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
+      # THE SUMMON, and it costs NO BOX (Nicolas, 2026-08-14 — "you don't need to even add
+      # lines"). Sahnar is simply ON SCREEN for this scene: no A-press, no dialogue, no
+      # ceremony, which is the absent-mindedness the beat wanted and could not have got from a
+      # line. The summon reads from the CONTRAST — she is not there in scene 2 and she is here,
+      # standing at Ravisin's shoulder, for the whole of scene 3. The seven locked boxes are
+      # untouched and the scene's quiet is intact, so Basil's beat still owns it.
+      # What the staging buys: "It never once occurred to me she might be of use" is an
+      # appraisal delivered to her face, Basil's question is asked with her friend standing
+      # there, and "It's not your concern." is said over her.
+      # SHE IS STAGED AT THE TOP because the engine gives no other option, not as a preference.
+      # `TalkPrepNextChar` reopens the talk bubble whenever the active face differs from the
+      # speaking one, so a face loaded MID-message opens a bubble of its own and the scene plays
+      # with two stacked bubbles — which is exactly what the first cut shipped, and what Nicolas
+      # caught on film. Vanilla's silent faces are always preloaded before the first box
+      # (MSG_0954, MSG_095D, MSG_095E). Long form: SCRIPT_DIRECTIVES in build_campaign.py.
+      - present: sahnar
       # (The tomb, after Sephek has gone. Ravisin looking toward the sarcophagus on the berm.)
       - ravisin: "A queen's blade. I have walked past that stone a thousand times."
       - ravisin: "It never once occurred to me she might be of use."
-      # (Basil knows exactly who is under that stone. She cannot say so.)
+      # (Basil knows exactly who is under that stone. She still cannot say so — and now she has
+      #  to hold that with Sahnar on screen, which is the pressure sahnar.md/basil.md wanted:
+      #  her secret stays hers for the recruit to spend.)
       - basil: "...What will you do with her?"
       - ravisin: "It's not your concern."
       - ravisin: "Come. There is work before dawn."
@@ -895,13 +961,37 @@ events:
       defend this tomb, which is what makes 9C6 a revelation rather than a rescue: Basil does
       not free a prisoner, he tells her what she is actually defending.
       LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 6 boxes.
+      WIRED 2026-08-14 (#25) at host id 0x9F0, as a PLAIN ON-MAP BUBBLE — the twin's channel
+      taken whole, wrapping at 29. It only became affordable that day: while Sahnar was a
+      turn-2 riser there was nothing on the field for a bubble to anchor to, and this scene was
+      priced as needing a BACKDROP of its own. Ravisin's scene-3 summon puts her on the arena
+      tile from turn 1, so the beat is vanilla's 0x9C3 exactly — CUMO_AT(12, 6), STAL/CURE, the
+      LOAD1, then the text — and all six locked boxes survive untouched. The staging shifts and
+      the writing does not: "...Someone has come." reads as well standing in the amphitheatre as
+      lying under a lid, and she is still speaking to nobody.
+      NO no_lupin_fallback: she has never met the wolf and never mentions him, so this is one
+      arm and one id.
+      ONE BOX GAINED AN AUTHORED A-PRESS, and the wording is untouched — 7 presses, not 6. The
+      scene was boxed against the backdrop's 42 and now plays at the bubble's 29, and "No one
+      ever came. I stopped counting somewhere in the middle." is 60 characters: it needs three
+      lines and a box holds two. Left flowed, the wrapper chose the A-press for us and put it
+      mid-clause ("I stopped counting somewhere in the" / "middle."), which is the failure the
+      reliquary lines and scene 5's fallback already taught — the authored A-press breaks ARE
+      the pacing. Break placed at the full stop, which is also the better read: "No one ever
+      came." lands as its own flat beat, and the understatement she is budgeted one of per
+      scene ("I stopped counting somewhere in the middle") gets the press to itself instead of
+      trailing a sentence it is the punchline to. PROPOSED 2026-08-14 — Nicolas owns where an
+      A-press goes (cf. his scene-5 break, which deliberately did NOT fall on the full stop).
     script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
-      # (Inside the sarcophagus. Dark. No sound from above reaches her — she feels the arrival
-      #  the way old stone feels a footfall. She speaks to nobody, as Joshua does in MSG_9C3.)
+      # (Above the sarcophagus now, on the arena tile Ravisin called her up onto in 9BD. She
+      #  registers the arrival the way old stone feels a footfall, and speaks to nobody, as
+      #  Joshua does in MSG_9C3 -- standing on this same tile, in this same channel.)
       - sahnar: "...Someone has come."
       - sahnar: "Four thousand years, and someone has finally come."
       - sahnar: "...I was given a purpose. To defend this tomb."
-      - sahnar: "No one ever came. I stopped counting somewhere in the middle."
+      # (One locked box, two authored presses at the 29-wrap -- see the note above.)
+      - sahnar: "No one ever came."
+      - sahnar: "I stopped counting somewhere in the middle."
       - sahnar: "...Well. Something has come now."
       - sahnar: "I will defend this tomb. It is my purpose."
   # ── 9C4 — CUT 2026-07-29 (Nicolas). Slot deliberately left empty. ─────────────
@@ -1003,11 +1093,14 @@ events:
     description: >
       The tomb floor breaks (Phantom-Ship EARTHQUAKE + sequential TILECHANGE): undead
       REINFORCEMENTS erupt over turns and race the party for the spread reliquary
-      reward-sites (the Ch5 village-raid, in undead dress). The same quake cracks the
-      sarcophagus — and Ravisin WAKES Sahnar, the tomb's ancient guardian, who has been
-      undead and awake for millennia (she WAKES a watching guardian; she does NOT reanimate a
-      fresh corpse, and does NOT puppet her — see lore/sahnar.md). Sahnar walks HOSTILE of her
-      own will, believing the party are the intruders she was left for; a fast crit-Myrmidon
+      reward-sites (the Ch5 village-raid, in undead dress).
+      SAHNAR IS NOT ONE OF THEM, as of 2026-08-14 (Nicolas, #25). The quake used to crack her
+      sarcophagus and she used to rise here; Ravisin now calls her up ON SCREEN in scene 3
+      (`vanilla 0x9BD`), before the party has even crested the ridge, and she is on the arena
+      tile from turn 1 exactly as vanilla's Joshua is. What Ravisin does to her is unchanged:
+      she WAKES a watching guardian who has been undead and aware for millennia — she does NOT
+      reanimate a fresh corpse and does NOT puppet her (lore/sahnar.md). Sahnar walks HOSTILE of
+      her own will, believing the party are the intruders she was left for; a fast crit-Myrmidon
       (smells faintly of pumpkin spice). She flips only when Basil reaches her.
       DIALOGUE BUDGET — vanilla spends 3 boxes (`EventScr_089F22A4`, the bandits who join the
       fight mid-map); ours spends 4 because the wired reliquary race needs an explicit warning.
@@ -1068,7 +1161,12 @@ events:
       - ravisin: "No matter. The dead will destroy them first."
       # (9BC callback: "the warrior... the one under the stone", now spent. "BLADE" not "one" --
       #  she appraised Sahnar as a blade in 9BD and still thinks of her as inventory.)
-      - ravisin: "...And the blade under the stone... I'll use her too."
+      # TENSE FIXED 2026-08-14 (#25). Was "...And the blade under the stone... I'll use her
+      # too." — a promise, which went stale the moment the summon moved into scene 3: she
+      # already used her, and the player watched it. Only the tense moves. "The blade under the
+      # stone" is kept intact because it is the whole point of the box — the 9BC/9BD callback,
+      # and Ravisin still filing a queen under inventory.
+      - ravisin: "...And the blade under the stone is already among them."
   - trigger: sahnar_talk          # Basil (Natasha-donor) Talks the risen Sahnar (Joshua-donor)
     slot: "vanilla 0x9CC"          # the Talk recruit. Was mislabelled "9C6" until 2026-07-29;
                                    # the real 0x9C6 is Natasha's death quote. See SLOT-ID CAVEAT.
