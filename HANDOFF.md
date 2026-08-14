@@ -6,40 +6,35 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-14 (Claude). **#255, #274, #277, #278, #279 and #280 are DONE and merged — do not
-reopen any of them.** The generated decomp tree is intentionally dirty as recorded below.
+Refreshed 2026-08-14 (Claude). **#255, #274, #277, #278, #279, #280 and #281 are DONE and merged —
+do not reopen any of them.** The generated decomp tree is intentionally dirty as recorded below.
 
 ## In flight
 
-**Nothing.** `main` is at #280 (ch05's scene 5 — Basil speaks and joins), CI green.
+**Nothing.** `main` is at #281 (ch05's scene-3 summon + scene 6), CI green.
 
 ## Next task
 
 **ch05's dialogue wiring, worked TOP TO BOTTOM in player order** (Nicolas, 2026-08-13). The
-ordered inventory of all 17 scenes — **11 done, 6 left** — is the table in **issue #25**, which is
+ordered inventory of all 17 scenes — **12 done, 5 left** — is the table in **issue #25**, which is
 the canonical view; do not re-derive an order from the YAML's `vanilla 0xNNN` labels, which are
 anatomy citations naming the scene we MINE and are never ids we write. Reading them as an order
 is what made the list confusing in the first place.
 
-Next up is **scene 6, Sahnar alone in the sarcophagus** (6 boxes, NO fallback), then straight
-down the table. All of it is locked text from PR #196: this is wiring, not writing.
+Next up is **scene 7 — Pinky asks why the moose isn't running, and it charges** (`0x9F1`, 2 boxes,
+no fallback), then straight down the table. All of it is locked text from PR #196: this is wiring,
+not writing.
 
-**Scene 6 lands AFTER a design change that must go first — read #25's "Ravisin summons Sahnar in
-scene 3" comment before writing a line.** Nicolas, 2026-08-14: Sahnar stops being a turn-2 riser
-and goes on the map from turn 1, woken ON SCREEN by Ravisin in scene 3. That is vanilla's own
-shape — `UnitDef_088B5914` `LOAD1`s Joshua at (12,6) with a Killing Edge right after the prep
-`CALL`, which is the tile and the sword ch05 already lifted, so `arrives_turn: 2` is OUR
-divergence. With Sahnar up from scene 3, **scene 6 is vanilla's `0x9C3` exactly** — `CUMO_AT(12,
-6)`, an on-map bubble on the duelist — and all six locked lines survive untouched. **Do not build
-scene 6 a backdrop**; the bubble has a unit to anchor to now.
+Scene 7 sits AFTER the prep `CALL`, alongside scenes 5 and 6 — the last beat before the map, and
+it ends on `meesmickle: "You had to ask?"` straight into turn 1. It needs no fade of its own:
+scene 5 already brought the screen up after the prep prologue's fade to black, and 6 and 7 ride
+that. It is an ON-MAP beat like the two before it, so it wraps at the bubble's **29**, and
+`PutTalkBubble` anchors to a unit — Pinky is deployed by prep, so `CUMO_CHAR` him. **The moose
+cannot speak** (locked 2026-07-03); its charge is pure stage direction.
 
-The change drags five things with it (stale `0x9E4` line, the `LOAD1` move, Joshua's hold-AI
-instead of `aggressive`, a `make difficulty CH=ch05` re-price, the brazier note) — all enumerated
-as a checklist in that issue comment. Do not re-derive them.
-
-Scene 6 sits AFTER the prep `CALL` alongside scenes 5 and 7 — and anything visible after that
-`CALL` brings its own `FADU(16)`, because the shared prep prologue fades to black and leaves it
-there.
+**Then four rows remain**: Ravisin's battle taunt (`0x9F2`, wired NOWHERE — `gBattleTalkList` has
+a ch01 Izobai row and nothing for her), Basil's death quote (`0x9F3`), and the two endings
+(`0x9C9`/`0x9CA`, `0x9CB`/`0x9CC`), which are a 2×2 over Basil alive/dead × Lupin present/absent.
 
 **The mechanisms EXIST — reuse them, do not rebuild them (#278, #280).**
 `branch_on_check_alive(CH05_LUPIN_CHARACTER, if_alive, if_absent)` emits the arm-picker and shares
@@ -58,10 +53,21 @@ chosen as PROSE has not been boxed".
 
 **The id budget is already resolved — do not re-litigate it.** 17 ids against 16 owed, allocated
 scene by scene in #25's table; claim each in `HOSTED_CHAPTER_MESSAGE_IDS` as it lands. `0x9E9`
-`0x9EA` `0x9EB` (scenes 1–3), `0x9EC` `0x9ED` (scene 4 + its fallback) and `0x9EE` `0x9EF`
-(scene 5 + its fallback) are SPENT; scene 6 takes `0x9F0`. Method and the two ways to run the
-sweep wrong: `docs/decisions.md` → "A host block is not the whole id budget". A fallback arm costs
-ONE extra id, not four.
+`0x9EA` `0x9EB` (scenes 1–3), `0x9EC` `0x9ED` (scene 4 + fallback), `0x9EE` `0x9EF` (scene 5 +
+fallback) and `0x9F0` (scene 6) are SPENT; scene 7 takes `0x9F1`. Method and the two ways to run
+the sweep wrong: `docs/decisions.md` → "A host block is not the whole id budget". A fallback arm
+costs ONE extra id, not four.
+
+**A SILENT face on a backdrop scene is `present:`, and it must be preloaded.** ch05's scene 3
+stages Ravisin's raised Sahnar with no dialogue at all (Nicolas, 2026-08-14 — *"you don't need to
+even add lines"*), which is the cheapest possible way to stage an event: no box, no A-press, the
+locked script untouched. Two engine facts came with it and both were found **by filming**, not by
+reading: a face loaded MID-message opens a bubble of its own (two stacked bubbles), so silent
+faces go through `_script_to_message`'s `preload` path; and podium rungs OVERLAP with the speaker
+drawn on top, so a silent face needs an empty rung beside it (Right + FarRight, never MidRight +
+FarRight). `assert_silent_faces_have_elbow_room` enforces the second. Long form, including two
+false trails worth not re-walking (`[SendToBack]` is z-order, `[OpenX]` is not a window):
+`docs/decisions.md` → "A face that never speaks must be PRELOADED".
 
 **Both arms of the branch are proven in-engine (#279). Two of #25's four states are still owed.**
 
@@ -117,9 +123,6 @@ Two questions this used to leave open are now SETTLED — read them, don't re-de
   chapter suite or `matrix.py run --scenarios a,b,c`. Rules: `CLAUDE.md` → the matrix row.
   **`matrix.py run --suite X --dry-run` is free and says what would actually run** — reach for
   it before deciding a run is needed at all.
-- **Both caches are warm.** `.matrix-verdictcache` holds `ch05arena`. Both the canonical and
-  `CH05BOOT=1` ROM configurations were built on 2026-08-13; ch05 content changed, so ch05's
-  scenarios will re-run and the rest stay cached (build-attributed invalidation).
 - **ch05's Arena is complete (#265/#268).** Both views are winterized as palette DELTAS over
   vanilla — welcome screen 16 words of 64 (overcast sky, banner-blue awnings, **sandstone left
   warm on purpose**), combat coliseum 11 words (snow floor, blue banners). Ch05 alone gets the
@@ -147,6 +150,22 @@ Two questions this used to leave open are now SETTLED — read them, don't re-de
   the second `CHECK_ALIVE` branch at labels 2/3, then the `CUSA` that joins her. Filmed separately
   by `recordch05join`/`recordch05joinlupin` (`docs/demo/ch05-join*.gif`) because the two films sit
   on opposite sides of Preparations.
+- **Scenes 3 and 6 landed at #281, and SAHNAR IS NOW A TURN-1 UNIT.** Ravisin raises her on screen
+  during scene 3 — a `present:` portrait, no dialogue — and scene 6 (`0x9F0`) is vanilla's `0x9C3`
+  exactly: `CUMO_AT(12,6)` → `LOAD1` → **`MOVE` to (9,7)** → `CUMO_CHAR` → the seven boxes. That
+  MOVE is not optional: (12,6) is the arena tile AND the tutorial's `AREA` trigger, so a unit left
+  standing there locks the arena for the whole chapter (`decisions.md` → "A unit's LOAD tile is
+  not its POST"). Her `walks_to` in the chapter YAML owns it. She also carries Joshua's exact AI
+  including his refusal to strike the escort, which rides a GLOBAL character list rather than her
+  own bytes (`decisions.md` → "AI parity can hide in a GLOBAL table"). Scene 6 costs **7**
+  A-presses, not the 6 the table said — the same locked words, re-boxed for the bubble's 29.
+  Films: `docs/demo/ch05-scene3-summon.gif`, `docs/demo/ch05-join-and-sahnar-alone.gif`.
+- **`arrives_turn` no longer means anything for Sahnar, and three scenarios had to be taught that.**
+  `ch05recruit` asserts she is RED on **(9,7)** at turn 1 and counts the eruption's four boxes
+  separately; `recordch05join` runs past the join CUSA through scene 6; `recordch05recruit` no
+  longer ends turn 1 at all. If a placement or trigger moves again, grep the harness for what
+  waited on the old one — `decisions.md` → "A scenario written against the old design will FAIL ON
+  SUCCESS".
 - **Any ch05boot scenario pays for the opening in its BOOT.** It is ~52 A-presses ahead of the map,
   and `bootToMap()` drives all of it. Every ch05boot scenario now pokes fast config BEFORE the
   boot; a new one that pokes it after will burn over half the `record*` 300s budget on a scene it
@@ -155,7 +174,10 @@ Two questions this used to leave open are now SETTLED — read them, don't re-de
   or a missed classification silently mashes past the beat you meant to film.
 - **Ravisin's battle taunt is wired NOWHERE.** It is a row in #25's scene table. The no-Lupin arms
   are no longer in that state: scenes 4 and 5 are BUILT and the mechanism is reusable (#278/#280);
-  the other three are wiring, not invention.
+  the rest are wiring, not invention.
+- **Both caches are cold for ch05.** `.matrix-verdictcache` was invalidated by #281; `ch05arena`,
+  `ch05recruit` and `recordch05join` all re-ran and PASSed on 2026-08-14, and `recordch05opening`
+  with them. Nothing about ch05 needs re-running to start scene 7.
 - **The ENDING SCENES ARE NOT BLOCKED by ch06 hosting** (corrected 2026-08-13, Nicolas) — this
   file and #25 both claimed they were, and both were wrong. `dev_placeholder_scene()` is the
   LANDING, standing in for the `MNC2(next)` of an unhosted next chapter; it says nothing about
@@ -209,6 +231,17 @@ accuses the chapter, check the scenario is not describing its own bookkeeping.
 its screenshot showed the wrong side of the map — the camera was wherever the fight was. Pan to
 the thing, `wait()` for the scroll, then shoot. The frame now shows the engine's own tile panel
 reading "Ruins".
+
+**A REVIEW ARTIFACT IS NOT ITS INPUTS.** The scene-3 GIF was assembled three times; two of those
+jobs read the frame directory before the scene was re-filmed, one of them finished last and won
+the filename, and a PRE-FIX clip showing the exact defect went onto the PR. The source frames had
+been checked by eye. Verify the FILE — for a GIF, decode its own frames — and never let two jobs
+write one output path. Long form: `decisions.md` → "An artifact is not its inputs".
+
+**A LOAD tile is not a POST.** When a retile lifts a vanilla unit's coordinates, lift what the
+event script does to that unit NEXT: a tile vanilla vacates immediately is usually a tile
+something else needs. ch05 dropped Joshua's `MOVE` off (12,6) and lost the arena for the whole
+chapter, with the YAML comment naming that tile as the arena two lines away.
 
 The standing ones:
 

@@ -4458,6 +4458,117 @@ cut the tumble in half and buttoned the first box on *"one of you."*, which is n
 turns. **The remaining on-map fallback (the Talk recruit's) overruns identically and takes the
 same treatment when it is wired.**
 
+### A face that never speaks must be PRELOADED, and podium rungs overlap (2026-08-14, #25)
+
+ch05's scene 3 stages Ravisin raising Sahnar with **no dialogue at all** — Nicolas's call
+(*"you don't need to even add lines... just add sahnars portrait to the scene"*), which keeps the
+seven locked boxes and protects the beat the scene exists for. Getting a silent face on screen
+taught two engine facts, both found **by filming**, neither visible to any static check: every id,
+box count, wrap and podium assertion passed while the scene played wrong.
+
+**1. A silent face cannot arrive mid-scene.** `TalkPrepNextChar` (`scene.c:626`) reopens the talk
+bubble whenever the ACTIVE face slot differs from the SPEAKING one — `ClearTalkBubble()` then
+`StartTalkOpen()` for the active face. A `[LoadFace]` for someone who does not speak next
+therefore opens a bubble of its own, and the scene plays with **two stacked bubbles**. Vanilla
+never does it: every mid-message `[LoadFace]` in the corpus has that face speak immediately
+(MSG_904, MSG_092C, MSG_095A), and its silent loads are always **preloads before the first box**
+(MSG_0954, MSG_095D, MSG_095E). So the directive is `present:` — *"on screen for this scene,
+never speaks"* — rendering through `_script_to_message`'s existing `preload` path. It was first
+built as `enters:`, and that name was a lie: position is not expressible, so a directive implying
+it invites the bug back.
+
+Two false trails, recorded because both looked right: `[SendToBack]` is **portrait z-order**
+(`SetTalkFaceLayer` via `TALK_FLAG_4`), not a window close; and `[OpenX]` is only
+`SetActiveTalkFace`, so nothing "leaves a window open".
+
+**2. Podium rungs overlap, and the SPEAKER is drawn on top.** The tags are a ladder
+(`msg_list.txt`: Right 11, MidRight 12, FarRight 13). For a scene of speakers that is harmless
+and vanilla leans on it — ch05's own scene 4 seats four across adjacent rungs and each is drawn
+over the others when its turn comes. **A silent face never gets a turn**, so on a neighbouring
+rung it is buried for the whole scene (Sahnar played hers as a hood behind Ravisin's shoulder),
+and on the SAME rung it is `[ClearFace]`d outright before the first box. Vanilla's stable
+two-face right side leaves a rung empty — Right + FarRight, never MidRight + FarRight (MSG_904,
+MSG_092C, MSG_0937, MSG_0954) — reached in three of those by sliding the incumbent out with
+`[MoveRight]`. Ours reseats statically instead, which is free across the fade between scenes.
+`assert_silent_faces_have_elbow_room` enforces it at distance 0 **and** 1.
+
+**The first version of that guard banned adjacency outright and immediately rejected scene 4**,
+which is shipped and accepted. The rule is about SILENCE, not adjacency; a test pins that
+speakers on adjacent rungs stay legal so it cannot creep back.
+
+### A unit's LOAD tile is not its POST, and the difference cost us the arena (2026-08-14, #25)
+
+Vanilla Ch5 `LOAD1`s Joshua on **(12,6)** and, as the very next command, walks him off it:
+`MOVE(0x0, CHARACTER_JOSHUA, 9, 7)`. ch05 lifted the load tile and dropped the MOVE, on the
+reasoning that our Sahnar simply fights where she lands.
+
+That is a bug wearing a decision's clothes. **(12,6) is `TERRAIN_ARENA_REGULAR` and the arena
+tutorial's own trigger is `AREA(..., 12, 6, 12, 6)`** — a hostile parked there makes the arena
+unenterable for the entire chapter and silently kills the `arena-wager` debut (#264/#265, still
+`status: active`). The chapter YAML said *"which is the ARENA tile (12,6)"* two lines from the
+placement the whole time.
+
+So the walk-off is chapter data, not flourish: **`walks_to: [9, 7]`** (vanilla's tile —
+`TERRAIN_ROAD`, no defensive bonus, clear of the arena mouth), and `ch05_sahnar_station` refuses
+to build without it. The escort distance `assert_green_recruit_placement` measures is to the
+POST, because that is where the Talk happens.
+
+**Generalise it:** when a retile lifts a vanilla unit's coordinates, lift what the event script
+does to that unit NEXT. A tile that a vanilla unit leaves immediately is usually a tile something
+else needs. `ch05arena` is the witness — it asserts the tile is empty, and it was failing its
+first check on every run.
+
+### AI parity can hide in a GLOBAL table, not in the unit's own bytes (2026-08-14, #25)
+
+Sahnar is Joshua, so she must play as Joshua plays — and half of how Joshua plays is a
+**refusal**. `AI_A_07` is `gAiScript_ActionInRange_ExceptNatasha`: `AiScriptCmd_05_DoStandardAction`
+routes through `AiIsUnitEnemyAndNotInScrList`, which tests each candidate's
+`pCharacterData->number` against a list — and vanilla's list (`cp_data.c` `gUnknown_085A8A00`)
+holds `CHARACTER_NATASHA` **literally**. That carve-out is the only reason a fragile Cleric can
+walk up to a Killing Edge on the arena tile at all.
+
+Copying `.ai = {0x7, 0x3, 0x9, 0x0}` does **not** copy it. Basil takes Natasha as a STAT_DONOR but
+deploys on her own CHARACTER slot, so `0x7` silently degrades to plain `AI_A_00` and the escort is
+a legal target. `repoint_escort_safe_ai_list` rewrites the list to our escort at build time.
+
+**Safe because the list has exactly one client in all of FE8**: `.ai = {0x7,` appears once, on
+`UnitDef_088B5914` — read from decomp HEAD, never the built tree. `AI_A_07` exists to serve one
+unit in one chapter, and that chapter is ch05's twin. Guarded three ways: the patch hard-exits
+unless it finds vanilla's form, `src/cp_data.c` joins `PATCHED_DECOMP_FILES` so it restores each
+build, and `assert_escort_safe_ai_has_one_client` sweeps **every** `CH##_AI` table — scoping that
+sweep to ch05 was the first cut and defeated its own purpose, since the hazard is a future chapter
+reaching for `{0x7,` on its own account.
+
+**The general shape:** a unit's behaviour is not always in its own data. Before claiming an AI
+byte is copied faithfully, find what the script it selects actually READS.
+
+### A scenario written against the old design will FAIL ON SUCCESS (2026-08-14, #25)
+
+Moving Sahnar from a turn-2 riser to a turn-1 unit broke three playtest scenarios, and the
+instructive one is `ch05recruit`: it waited on `turn() >= 2 and redSahnar()`. With her red from
+turn 1 that is satisfied the instant the counter ticks — **before Ravisin says a word** — so the
+gate would have reported *"eruption warning showed 0 boxes"* and blamed the warning. The chapter
+would have been fine and the accusation would have pointed at it.
+
+This is the standing *"a scenario can FAIL on success, and it will blame the chapter"* lesson with
+a new trigger: not the scenario's own bookkeeping, but a **design change the scenario predates**.
+When a placement or trigger moves, grep the harness for what waited on the old one.
+
+The repair also split a compound assertion into two honest ones — Sahnar is RED on her post at
+turn 1 (which nothing witnessed before: an empty arena passes every other ch05 scenario, and the
+first symptom would be a Talk with no target), and separately the eruption's four boxes on turn 2.
+
+### An artifact is not its inputs — verify the FILE you are shipping (2026-08-14, #25)
+
+The scene-3 review GIF was assembled three times. Two of those runs read the frame directory
+before the scene was re-filmed, and one finished last and won the filename. The committed clip was
+therefore a **pre-fix capture showing the exact defect the commit above fixed**, and it went onto
+the PR that way; Nicolas caught it.
+
+The source frames had been checked by eye and were correct. **Checking the inputs is not checking
+the output.** Verify a review artifact by decoding the artifact — for a GIF, iterate its own
+frames — and be wary of the same output path being written by more than one job.
+
 ### An FEditor `L` is an authoring bracket, not an instruction (2026-08-08, #25)
 
 Sahnar's Specter is the first vendored anim using FEditor's loop syntax — a bare `L` (`LOOPSTART {`)
