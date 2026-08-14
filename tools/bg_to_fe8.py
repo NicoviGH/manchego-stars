@@ -41,6 +41,13 @@ def trim_uniform_border(im, min_keep=0.5):
     `min_keep` is a safety rail for pictures that are largely flat by design -- a night sky,
     a fade to black. Trimming stops rather than give back less than this fraction of either
     dimension; a legitimately flat-edged image is left for a human to crop.
+
+    The SECOND rail matters more, and review caught its absence: a trim is refused outright if
+    it would drop either dimension below the 240x160 target when the source was at or above it.
+    Otherwise a source already at 240x160 carrying one flat edge row -- a deliberate letterbox
+    line, which real art has -- came out 240x159, and `fit_240x160` then NEAREST-UPSCALED it back,
+    changing 28640 of 38400 pixels where the old code had returned the image untouched. Trimming
+    exists to avoid keeping a mat; it must never force an upscale to pay for that.
     """
     a = np.asarray(im.convert('RGB'))
     h, w = a.shape[:2]
@@ -59,6 +66,8 @@ def trim_uniform_border(im, min_keep=0.5):
     left, right = span(flat_col, w)
     if (left, top, right, bottom) == (0, 0, w, h):
         return im
+    if (w >= W > right - left) or (h >= H > bottom - top):
+        return im               # would force an upscale to strip the mat -- keep the mat
     return im.crop((left, top, right, bottom))
 
 

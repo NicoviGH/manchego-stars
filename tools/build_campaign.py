@@ -1284,7 +1284,8 @@ def _script_box_count(script):
 
 def _beat_is_narration(beat):
     """True if every entry in a scenic beat is faceless `narration` stage-business."""
-    return bool(beat) and all('narration' in e for e in beat)
+    real = [e for e in beat if next(iter(e)) not in SCRIPT_DIRECTIVES]
+    return bool(real) and all('narration' in e for e in real)
 
 
 def _beat_is_faceless(beat, fid):
@@ -1296,7 +1297,7 @@ def _beat_is_faceless(beat, fid):
     (SOLOTEXTBOXSTART), which needs no anchor. (Over a BG the full-screen window sidesteps this, which
     is why the opening/ending don't hit it; the mid-map RBG-execution beat, on-map, does.)"""
     keys = [next(iter(e)) for e in beat
-            if next(iter(e)) not in ('location_card', 'beat_break')]
+            if next(iter(e)) not in SCRIPT_DIRECTIVES]
     return bool(keys) and all(fid(k) is None for k in keys)
 
 
@@ -5995,8 +5996,10 @@ def _stage_beat(beat, fid, home, overrides=None):
     `overrides` moves a speaker for this beat only; faces resolve through the
     chapter's fid function (cf. _cutscene_fid)."""
     ov = overrides or {}
+    # Directives are stage business, not speakers: `fid('exits')` would die in _cutscene_fid as
+    # an "unknown cutscene speaker" the first time a non-ch05 scene used one (review, 2026-08-14).
     return {k: (ov.get(k, home.get(k, '[OpenMidLeft]')), fid(k))
-            for e in beat for k in e}
+            for e in beat for k in e if k not in SCRIPT_DIRECTIVES}
 
 
 def _emit_scene_beats(lines, msg_ids, beats, fid, home, overrides=None,

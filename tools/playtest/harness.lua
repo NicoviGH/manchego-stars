@@ -7476,8 +7476,9 @@ end
 -- is time-shifted and no frame lines up again. Compare them by eye, not by frame equality.
 -- Delegates rather than aliases: matrix.py attributes harness SOURCE per function for the
 -- verdict cache, and a bare `= scenarios.x` assignment is a name it cannot attribute a body
--- to. Caveat that buys: this chunk's fingerprint does not move when recordch05opening's body
--- changes, so re-film with --no-verdict-cache after editing that routine.
+-- to. The cache stays correct either way -- matrix.reaches() closes over every NAME a body
+-- mentions, so recordch05opening is inside this one's closure (verified: 55 names) and an
+-- edit to it does move this scenario's key.
 scenarios.recordch05openinglupin = function()
     return scenarios.recordch05opening()
 end

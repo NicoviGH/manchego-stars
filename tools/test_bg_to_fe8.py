@@ -61,6 +61,24 @@ class LetterboxBarsAreTrimmedBeforeFitting(unittest.TestCase):
         out = bg.trim_uniform_border(Image.fromarray(a))
         self.assertGreaterEqual(out.size[0], 128)
 
+    def test_a_trim_that_would_force_an_upscale_is_refused(self):
+        """Found in review. A source ALREADY at 240x160 with one flat edge row -- a deliberate
+        letterbox line, which real art has -- came out 240x159, and fit_240x160 then NEAREST-
+        upscaled it back, changing 28640 of 38400 pixels where the old code returned the image
+        untouched. Trimming must never force an upscale to pay for stripping a mat."""
+        a = _art(240, 160)
+        a[0, :] = 17
+        im = Image.fromarray(a)
+        self.assertEqual((240, 160), bg.trim_uniform_border(im).size)
+        out = np.asarray(bg.fit_240x160(bg.trim_uniform_border(im), 'crop'), dtype=int)
+        self.assertEqual(0, int((out != np.asarray(im, dtype=int)).any(axis=2).sum()))
+
+    def test_an_oversized_source_still_trims_down_to_the_target(self):
+        """The rail is 'never below the target', not 'never trim' -- the real rips are 256 wide
+        and must still lose their 16 columns."""
+        a = np.concatenate([_art(240, 160), np.zeros((160, 16, 3), 'uint8')], axis=1)
+        self.assertEqual((240, 160), bg.trim_uniform_border(Image.fromarray(a)).size)
+
     def test_the_mode_survives_the_trim(self):
         a = np.concatenate([_art(240, 160), np.zeros((160, 16, 3), 'uint8')], axis=1)
         out = bg.trim_uniform_border(Image.fromarray(a).convert('P'))
@@ -84,13 +102,20 @@ class TheRealRipsLandOnTheirOwnPicture(unittest.TestCase):
     def _assert_no_bar(self, stem):
         a = self._shipped(stem)
         self.assertEqual((160, 240, 3), a.shape)
+        # Columns AND rows: checking only columns would ship a surviving top/bottom mat with
+        # a green suite (review, 2026-08-14).
         for edge, cols in (('left', range(0, 4)), ('right', range(236, 240))):
             for c in cols:
-                distinct = len(set(map(tuple, a[:, c, :])))
                 self.assertGreater(
-                    distinct, 1,
+                    len(set(map(tuple, a[:, c, :]))), 1,
                     '%s: %s column %d is a single flat colour -- a letterbox bar survived '
                     'the vendoring (see trim_uniform_border)' % (stem, edge, c))
+        for edge, rows in (('top', range(0, 4)), ('bottom', range(156, 160))):
+            for r in rows:
+                self.assertGreater(
+                    len(set(map(tuple, a[r, :, :]))), 1,
+                    '%s: %s row %d is a single flat colour -- a letterbox bar survived '
+                    'the vendoring (see trim_uniform_border)' % (stem, edge, r))
 
     def test_the_elven_tomb_shows_no_letterbox(self):
         self._assert_no_bar('bg_ElvenTomb')
