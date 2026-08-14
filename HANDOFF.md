@@ -6,13 +6,13 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-13 (Claude). **#255, #274, #277 and #278 are DONE and merged — do not reopen any
+Refreshed 2026-08-14 (Claude). **#255, #274, #277, #278 and #279 are DONE and merged — do not reopen any
 of them.** The generated decomp tree is intentionally dirty as recorded below.
 
 ## In flight
 
-**Nothing.** `main` is at #278 (ch05's scene 4 + the no-Lupin branch, reviewed and merged), CI
-green.
+**Nothing.** `main` is at #279 (the letterbox trim, Sahnar's exit, and the two-arm films),
+CI green.
 
 ## Next task
 
@@ -41,17 +41,27 @@ scene by scene in #25's table; claim each in `HOSTED_CHAPTER_MESSAGE_IDS` as it 
 `0x9EE` + `0x9EF`. Method and the two ways to run the sweep wrong: `docs/decisions.md` → "A host
 block is not the whole id budget". A fallback arm costs ONE extra id, not four.
 
-**The alive-arm proof is still owed, and the boot ROMs CANNOT give it (#278).** The `--ch05-boot`
-ROM can only ever walk the no-Lupin arm: the branch runs before `LOMA` while the boot party seed
-is `LOAD1`ed after it, so `gUnitArrayBlue` is empty at the branch and slot C is 0 for every unit
-regardless of the seed. Filmed and confirmed — scene 4 opens on Pinky's *"The tracks stop here"*,
-never Lupin's *"The trail leads here"*. **A four-state proof built on a boot ROM would be
-vacuous.** The three alive/roster states need the REAL ch04 → ch05 chain, where `ReadGameSave` has
-filled the array before the chapter's events run. Do NOT hoist the seed above the branch — it sits
-after `LOMA` because `LOMA` rebuilds the map. Long form: `decisions.md` → "The `--ch05-boot` ROM
-can only ever play the NO-Lupin arm". (The placement itself is vanilla's own: `EventScr_Ch7_`
-`BeginningScene` branches on `CHECK_ALIVE(CHARACTER_FRANZ)` and three more optional units inside a
-beginning scene.)
+**Both arms of the branch are proven in-engine (#279). Two of #25's four states are still owed.**
+
+- **PROVEN — never recruited → no-Lupin arm.** The plain `--ch05-boot` ROM walks it and can walk
+  nothing else, for two independent reasons: the branch runs before `LOMA` while the boot party
+  seed is `LOAD1`ed after it (so `gUnitArrayBlue` is empty when `CHECK_ALIVE` asks), **and Lupin is
+  not in that seed at all** — it zips the cast against 9 deploy slots and he is last. The second
+  reason would have survived the obvious fix and looked like success, so do not "fix" this by
+  hoisting the seed above `LOMA`; `LOMA` rebuilds the map.
+- **PROVEN — on the roster and alive → Lupin's arm**, via **`--ch05-lupin`** (with `--ch05-boot`),
+  which `LOAD1`s a one-unit Lupin table BEFORE the opening. Safe because `RestartBattleMap`
+  (`bmio.c:1043`) never touches the unit arrays. Scenario `recordch05openinglupin` on the
+  `ch05lupinboot` ROM. Nicolas watched both runs 2026-08-14 and confirmed the branch works.
+- **OWED — benched, and recruited-then-killed.** `CHECK_ALIVE` ignores `US_NOT_DEPLOYED` and treats
+  `US_DEAD` as absent, so both should take the arm we want — but that is a decomp reading, and a
+  reading is not a run. Benched needs a roster entry that is NOT on the map, which `--ch05-lupin`'s
+  `LOAD1` does not produce.
+
+Long form: `decisions.md` → "The `--ch05-boot` ROM can only ever play the NO-Lupin arm" and "The
+alive arm needed a LEVER". The branch's PLACEMENT that early is vanilla's own:
+`EventScr_Ch7_BeginningScene` branches on `CHECK_ALIVE(CHARACTER_FRANZ)` and three more optional
+units inside a beginning scene.
 
 Two questions this used to leave open are now SETTLED — read them, don't re-derive them:
 - **CHANNEL is inherited from the vanilla twin, and so is where PREP sits.** Vanilla Ch5's
@@ -66,8 +76,8 @@ Two questions this used to leave open are now SETTLED — read them, don't re-de
   and `ch14a` branches its ending on `CHECK_ALIVE(CHARACTER_JOSHUA)` — Ch5's optional Talk recruit
   and Sahnar's donor, i.e. our scene's ancestor. It reads the ROSTER, so it also handles the
   benched case that ch05's 9-of-10 deploy makes real. Long form: `docs/decisions.md` → "Did the
-  player recruit them?". Still owed: **prove the branch in-engine against all four states**, per
-  #25's checklist — asserting WHICH arm played, not merely that a scene ran.
+  player recruit them?". **Built and both arms filmed at #278/#279** — see the four-state tally
+  above for the two that are still owed.
 
 **Scene 6 does NOT inherit vanilla's channel, and it is the one place the twin fails us.** Vanilla
 puts `0x9C3` on the map because it `LOAD1`s Joshua right there and leaves him standing as the red
@@ -109,8 +119,10 @@ bubble has nothing to anchor to — scene 6 needs a backdrop (dark/interior), no
   it**: that macro ends in `EventScr_TextShowWithFadeIn`, which CLEANs and fades up onto the MAP —
   and before `LOMA` that map is still the host slot's. ch03 and ch04 hand-roll the same sequence for
   the same reason. `recordch05opening` films the whole backdrop half (49 boxes, two BGs);
-  `docs/demo/ch05-opening.gif` is the review artifact — **regenerated at #278, and it shows scene
-  4's FALLBACK arm**, for the boot-ROM reason under Next task.
+  **both arms are filmed** (#279): `docs/demo/ch05-opening.gif` is the no-Lupin arm (Pinky opens)
+  and `docs/demo/ch05-opening-lupin.gif` is Lupin's. Both are on the FIXED ROM, so they carry the
+  letterbox trim and Sahnar's fade. They agree through scenes 1–3 and diverge from scene 4's first
+  box to the end — the tail is time-shift, not four scenes of difference, so compare by EYE.
 - **Any ch05boot scenario pays for the opening in its BOOT.** It is 48 A-presses ahead of the map,
   and `bootToMap()` drives all of it. Every ch05boot scenario now pokes fast config BEFORE the
   boot; a new one that pokes it after will burn over half the `record*` 300s budget on a scene it
