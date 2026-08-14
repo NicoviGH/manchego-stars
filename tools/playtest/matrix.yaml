@@ -57,7 +57,7 @@ classes:
     deadline: 600
   - match: "recordch02ending" # routs the whole band before it films
     deadline: 600
-  - match: "recordch05opening" # 42 boxes across three scenes -- the longest cutscene we ship
+  - match: "recordch05opening" # 49 boxes across four scenes, over two BGs -- our longest cutscene
     deadline: 900
   - match: "llm"              # 18 turns x a 90s sidecar handshake budget
     deadline: 2100

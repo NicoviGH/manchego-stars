@@ -4327,6 +4327,15 @@ General shape, and the reason this is written down: **a formatting rule that edi
 width check has to re-run the width check.** The failure is invisible to every decoder — the text
 is well-formed, correctly encoded, and simply too wide.
 
+**And the first fix only MOVED the overflow, which review caught.** Re-measuring the line the dash
+leaves is not enough; the line it lands on has to fit too. Where it cannot — a word whose own length
+plus `' --'` already exceeds the width — the two rules genuinely conflict, the pair is atomic, and
+the glue wins: that line goes out over-width because no shorter arrangement exists. So the invariant
+is *"within the width unless it is a lone word carrying its dash"*, and the test now says exactly
+that, plus walks the dash through every gap in a sentence at every width from 20 to 44 rather than
+trusting the one sentence that found the bug. No authored box is anywhere near the atomic case; if
+one ever is, reword it rather than loosening the glue.
+
 ### An FEditor `L` is an authoring bracket, not an instruction (2026-08-08, #25)
 
 Sahnar's Specter is the first vendored anim using FEditor's loop syntax — a bare `L` (`LOOPSTART {`)

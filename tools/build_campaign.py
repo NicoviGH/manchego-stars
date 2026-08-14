@@ -1089,7 +1089,15 @@ def _wrap_fe_lines(text, width=29):
     that glue would not FIT, the word it is glued to moves down with it rather than the
     line running two characters over. (It used to glue unconditionally, so a line ending
     exactly at the width came out at width+2; ch05's scene 4 sits on that boundary and is
-    what found it.)"""
+    what found it.)
+
+    RESIDUAL, and it is a genuine conflict rather than an oversight: a word whose own
+    length plus ' --' already exceeds `width` cannot be placed at all without breaking one
+    of the two rules. The glue wins, so such a line goes out over-width -- there is no
+    shorter arrangement, since the pair is atomic. Every line this function emits is
+    therefore within `width` UNLESS it is a lone word carrying its dash. No authored box
+    in the campaign is anywhere near that (checked across all of them at 29 and 42); if one
+    ever is, the fix is to reword it, not to loosen the glue."""
     out, cur = [], ''
     for w in text.split():
         if w == '--' and cur:
@@ -10527,10 +10535,13 @@ def ch05_opening_messages(chap):
     slot, msg, boxes, what = CH05_ARRIVAL_SLOT
     script, body = _ch05_opening_scene(chap, slot, boxes, what, CH05_ARRIVAL_PODIUMS, fid)
     out.append((msg, body))
-    fallback = variant_beat(
-        script,
-        _chapter_event_by_slot(chap, 'chapter_start', slot, what)['no_lupin_fallback'],
-        'ch05 arrival no-Lupin fallback')
+    event = _chapter_event_by_slot(chap, 'chapter_start', slot, 'ch05 opening (%s)' % what)
+    if 'no_lupin_fallback' not in event:
+        sys.exit('ERROR: ch05 opening %r (%s) is the branched scene and must carry a '
+                 'no_lupin_fallback -- without it the no-Lupin arm plays the locked script, '
+                 'which opens the chapter on a speaker who is not there' % (slot, what))
+    fallback = variant_beat(script, event['no_lupin_fallback'],
+                            'ch05 arrival no-Lupin fallback')
     out.append((CH05_ARRIVAL_NO_LUPIN_MSG,
                 _ch05_opening_body(fallback, slot, what + ' (no Lupin)',
                                    CH05_ARRIVAL_PODIUMS, fid)))

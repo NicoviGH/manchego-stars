@@ -2255,6 +2255,29 @@ class TheDashGlueRespectsTheLineWidth(unittest.TestCase):
             for out in bc._wrap_fe_lines(line, width):
                 self.assertLessEqual(len(out), width, '%r at width %d' % (out, width))
 
+    def test_the_width_holds_across_every_dash_position_in_a_line(self):
+        """One sentence exercises one boundary. Walk the dash through every gap at every
+        width near it, so the fix is not merely right for the line that found the bug."""
+        words = 'Struck off edges there was fighting here a great deal of it'.split()
+        for i in range(1, len(words)):
+            text = ' '.join(words[:i] + ['--'] + words[i:])
+            for width in range(20, 45):
+                for out in bc._wrap_fe_lines(text, width):
+                    if out.endswith(' --') and ' ' not in out[:-3]:
+                        continue          # atomic word+dash: see the docstring's RESIDUAL
+                    self.assertLessEqual(len(out), width,
+                                         '%r at width %d (dash after %r)' % (out, width, words[i - 1]))
+
+    def test_an_unfittable_word_plus_dash_stays_atomic_rather_than_splitting(self):
+        """The one case the width CANNOT hold, stated so it is a known shape and not a
+        surprise: the pair is indivisible, so it goes out over-width and alone. Found in
+        review of the fix, which had only moved the overflow rather than removed it."""
+        out = bc._wrap_fe_lines('I Auril-the-Frostmaiden-herse -- yes.', 29)
+        self.assertIn('Auril-the-Frostmaiden-herse --', out)
+        over = [l for l in out if len(l) > 29]
+        self.assertEqual(['Auril-the-Frostmaiden-herse --'], over,
+                         'only the atomic pair may exceed the width')
+
     def test_the_dash_still_never_opens_a_line(self):
         """The reason the glue exists. When it cannot fit, the WORD moves down with it."""
         for width in (29, 40, 41, 42, 43, 44):
