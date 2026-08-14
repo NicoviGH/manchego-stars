@@ -24,12 +24,23 @@ is what made the list confusing in the first place.
 Next up is **scene 6, Sahnar alone in the sarcophagus** (6 boxes, NO fallback), then straight
 down the table. All of it is locked text from PR #196: this is wiring, not writing.
 
-**Scene 6 is the one place the twin FAILS US — read this before choosing its channel.** Vanilla
-puts `0x9C3` on the map because it `LOAD1`s Joshua right there and leaves him standing as the red
-duelist. Sahnar does not exist on our map until the turn-2 eruption and she has a face, so a
-bubble has nothing to anchor to: scene 6 needs a BACKDROP (dark/interior), not vanilla's channel.
-It also sits AFTER the prep `CALL`, alongside scene 7 — and anything visible after that `CALL`
-brings its own `FADU(16)`, because the shared prep prologue fades to black and leaves it there.
+**Scene 6 lands AFTER a design change that must go first — read #25's "Ravisin summons Sahnar in
+scene 3" comment before writing a line.** Nicolas, 2026-08-14: Sahnar stops being a turn-2 riser
+and goes on the map from turn 1, woken ON SCREEN by Ravisin in scene 3. That is vanilla's own
+shape — `UnitDef_088B5914` `LOAD1`s Joshua at (12,6) with a Killing Edge right after the prep
+`CALL`, which is the tile and the sword ch05 already lifted, so `arrives_turn: 2` is OUR
+divergence. **This file previously said scene 6 needs a BACKDROP because nothing is staged for a
+bubble to anchor to. That is now WRONG and the reason is gone:** with Sahnar up from scene 3,
+scene 6 becomes vanilla's `0x9C3` exactly — `CUMO_AT(12, 6)`, an on-map bubble on the duelist —
+and all six locked lines survive untouched. **Do not build scene 6 a backdrop.**
+
+The change drags five things with it (stale `0x9E4` line, the `LOAD1` move, Joshua's hold-AI
+instead of `aggressive`, a `make difficulty CH=ch05` re-price, the brazier note) — all enumerated
+as a checklist in that issue comment. Do not re-derive them.
+
+Scene 6 sits AFTER the prep `CALL` alongside scenes 5 and 7 — and anything visible after that
+`CALL` brings its own `FADU(16)`, because the shared prep prologue fades to black and leaves it
+there.
 
 **The mechanisms EXIST — reuse them, do not rebuild them (#278, #280).**
 `branch_on_check_alive(CH05_LUPIN_CHARACTER, if_alive, if_absent)` emits the arm-picker and shares
