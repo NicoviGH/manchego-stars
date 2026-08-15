@@ -845,7 +845,13 @@ def scenario_driver_text(scenario_name, files=None, harness_source=None):
 # matrix.py sets it FROM the manifest entry, which `export_env` already covers.
 PLAYTEST_ENV_KEYS = ('PT_SEED', 'PT_CHAR', 'PT_ROUNDS', 'PT_STATE', 'PT_TAG', 'PT_UNTIL',
                      'PT_SPEED', 'PT_MAXFRAMES', 'PT_PRESSEVERY', 'PT_SHOTEVERY', 'PT_FPS',
-                     'PT_PROVIDER', 'PT_MODEL', 'PT_BASE_URL', 'PT_LLM_DIR')
+                     'PT_PROVIDER', 'PT_MODEL', 'PT_BASE_URL', 'PT_LLM_DIR',
+                     # PT_SOUND cannot change a VERDICT -- it unmutes the emulator and nothing
+                     # else -- but it is in the key anyway, because the guard that keeps this
+                     # list honest cannot tell a harmless knob from a decisive one and should
+                     # not have to. The cost is one extra run when a listen-through follows a
+                     # muted PASS, which is exactly when you wanted to run it again.
+                     'PT_SOUND')
 
 
 # -- what a scenario can possibly depend on (#255 phase 2) ------------------

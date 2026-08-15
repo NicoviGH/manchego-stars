@@ -3304,6 +3304,68 @@ class Ch05TheMooseCharges(unittest.TestCase):
         self.assertLess(bell.index('FADI'), bell.index('CLEAN'))
         self.assertLess(bell.index('CLEAN'), bell.rindex('FADU'))
 
+    def test_the_bellow_SHAKES_and_that_is_our_first_authored_sound(self):
+        """Nicolas asked for weight (2026-08-15). `EARTHQUAKE_START(0, 1)` gives both halves in
+        one command: the shake, and `playse` firing vanilla's SONG_26A rumble -- the first sound
+        effect this project has ever authored, everything else being vanilla's out of the box.
+
+        WHAT it shakes is chosen by `activeTextType` rather than by us: `Event42_EarthQuake`
+        maps 0/3/4 to a camera shake and 1 to a BG-position shake, and `REMOVEPORTRAITS` sets
+        it to 1 -- so the judder lands on the BG layer, which at that moment IS the moose.
+        Values 2 and 5 return EVC_ERROR, which does not advance the event and therefore hangs
+        the chapter, so the ordering here is load-bearing rather than tidy."""
+        block = bc.ch05_moose_charge_block(bc.CH05_MOOSE_PID,
+                                           bc.ch05_moose_station(self._chap()),
+                                           bc.ch05_party_camera_tile(self._chap()))
+        # The ANIMAL first, then the weight under it. Vanilla names almost none of its ~340
+        # SFX, so the cry was found by asking what a CREATURE plays rather than by reading the
+        # song table: `banim_code_sound_mauthedoog_roar` is 0x75, commented "low cry", and the
+        # Mauthe Doog is CLASS_GWYLLGI -- the class the moose wears. Its own voice.
+        self.assertIn('SOUN(%s)' % bc.CH05_MOOSE_BELLOW_SFX, block)
+        # 0x32C = song812_mon_mdg_critical1, picked by ear off tools/sfx_preview.py. The id
+        # space matters more than the value: `banim_code_sound_*` is NOT the song table, and
+        # reading it as one auditioned an HP-bar tick as a monster roar.
+        self.assertEqual('0x32C', bc.CH05_MOOSE_BELLOW_SFX)
+        self.assertLess(block.index('SOUN('), block.index('EARTHQUAKE_START'))
+        self.assertLess(block.index('BACG('), block.index('SOUN('), 'it roars once seen')
+        # playse OFF: StartEventEarthQuake fires PlaySoundEffect(SONG_26A) the instant it
+        # starts, on the same channel, so with it ON the rumble preempts the roar and the
+        # animal is never heard. And END fades the SE channel, so it must not land mid-cry.
+        self.assertIn('EARTHQUAKE_START(0, 0)', block, 'the 0 keeps the rumble off the roar')
+        self.assertNotIn('EARTHQUAKE_START(0, 1)', block)
+        self.assertIn('EARTHQUAKE_END', block, 'an unended quake shakes the whole chapter')
+        q, e = block.index('EARTHQUAKE_START'), block.index('EARTHQUAKE_END')
+        self.assertLess(block.index('REMOVEPORTRAITS'), q,
+                        'activeTextType must be 1 (BG shake) before the quake, not 2/5 (HANG)')
+        self.assertLess(block.index('BACG('), q, 'the image is up before it shakes')
+        self.assertLess(q, e)
+        self.assertLess(e, block.index('CLEAN'), 'it settles before the screen changes back')
+        self.assertLess(block.index('STAL(90)'), e, 'the cry plays out BEFORE the SE fade')
+        self.assertLess(block.index('SOUN('), block.index('EARTHQUAKE_START'))
+
+    def test_the_music_DUCKS_and_comes_back(self):
+        """The bug behind this test shipped in every film until Nicolas asked whether the music
+        returns (2026-08-15): the bellow used `MUSCMID(SONG_SILENT)`, which is not a duck at
+        all -- it fades the "silent song" IN and replaces the BGM for good. Nothing restored it,
+        so the chapter ran from turn 1 in silence, and no assertion or playtest verdict looks at
+        audio. Vanilla never ends a beginning scene on silence; ch05's own reliquary visits use
+        the real pair, `MUSI` (EvtSetVolumeDown) and `MUNO` (EvtUnsetVolumeDown)."""
+        script = self._script()
+        beat = script[script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_CHARGE_SLOT[1]):]
+        self.assertIn('MUSI', beat, 'the music ducks under the cry')
+        self.assertIn('MUNO', beat, 'a duck with no un-duck is silence for the rest of the map')
+        self.assertLess(beat.index('MUSI'), beat.index('MUNO'))
+        self.assertNotIn('SONG_SILENT', script,
+                         'that is a replacement, not a duck, and it has no way back')
+
+    def test_the_opening_never_ENDS_on_silence(self):
+        """Whatever the opening does to the music, the map has to inherit something playing --
+        the generalised form of the bug above, and cheap to keep true."""
+        script = self._script()
+        ducks = script.count('MUSI')
+        self.assertEqual(ducks, script.count('MUNO'), 'every duck is paired')
+        self.assertIn('MUSC(', script, 'something starts a song')
+
     def test_the_bellow_carries_no_text_but_DOES_cost_the_last_spare_id(self):
         """The image itself is wordless. What costs an id is that a scene change tears the talk
         down, so the punchline cannot resume the question's message and becomes its own --
@@ -3418,6 +3480,11 @@ class Ch05TheMooseCharges(unittest.TestCase):
         run = script.index('MOVE_DEFINED(%s)' % bc.CH05_MOOSE_PID)
         back = script.index('MOVE(0xffff, %s, %d, %d)' % (bc.CH05_MOOSE_PID, *pen))
         self.assertLess(put, run, 'it is placed before it runs')
+        # ...and the placement happens where NOTHING CAN SEE IT. It used to sit inside the
+        # beat with the screen already up, and Nicolas caught the teleport on film
+        # (2026-08-15). An instant move is only invisible if nothing is looking.
+        self.assertLess(put, script.index('CALL(%s)' % bc.CH05_PREP_SCRIPT),
+                        'the corner placement is behind the opening fade, before prep')
         self.assertLess(run, script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_QUIP_MSG), 'it charges BEFORE the punchline')
         self.assertLess(script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_QUIP_MSG), back, 'and is snapped back after it')
 
@@ -3458,6 +3525,13 @@ class Ch05TheMooseCharges(unittest.TestCase):
         back = script.index('MOVE(0xffff, %s, %d, %d)' % (bc.CH05_MOOSE_PID, *pen))
         self.assertLess(put, script.index('CAMERA(%d, %d)' % start),
                         'placed before the camera gets there')
+        # The corner placement is out of the BEAT entirely -- the beat's only instant move is
+        # the snap back at the end. That is what keeps it off screen.
+        beat = bc.ch05_moose_charge_block(bc.CH05_MOOSE_PID,
+                                          bc.ch05_moose_station(self._chap()),
+                                          bc.ch05_party_camera_tile(self._chap()))
+        self.assertEqual(1, beat.count('MOVE(0xffff'), 'only the snap back lives in the beat')
+        self.assertIn('MOVE(0xffff, %s, %d, %d)' % (bc.CH05_MOOSE_PID, *pen), beat)
         self.assertLess(script.index('REMA', script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_QUIP_MSG)), back,
                         'the bubble is down before the reset')
         self.assertLess(script.index('CAMERA(%d, %d)' % party), back,
@@ -3614,12 +3688,6 @@ class Ch05TheMooseCharges(unittest.TestCase):
         self.assertNotIn('LOAD1(0x1, %s)' % bc.CH05_MOOSE_PID, script)
         moose = next(e for e in self._chap()['enemy_units'] if e['id'] == 'white-moose')
         self.assertIsNone(moose.get('arrives_turn'), 'it rides the turn-1 line')
-
-    def test_the_music_drops_out_under_the_bellow(self):
-        """Vanilla's own punctuation at exactly this kind of pause (MSG_9BF's BreakTalk gap),
-        and it leaves "You had to ask?" landing in silence a beat before the map's own track."""
-        script = self._script()
-        self.assertLess(script.index('MUSCMID(SONG_SILENT)'), script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_QUIP_MSG))
 
     def test_the_moose_still_does_not_speak(self):
         """Locked 2026-07-03 as a mute white ghost, and re-locked by this chapter. The charge

@@ -4784,6 +4784,46 @@ Two things to get right, both learned by getting them wrong:
   `ch05_beginning_script` and nothing else; a test asserts the real opening still carries prep
   and scenes 5–7.
 
+**4. `run.sh` does not BUILD, and `make` can inject without relinking.**
+Two runs on 2026-08-15 were spent on a ROM ten minutes older than the change under test, and
+Nicolas reported the truth both times — *"sounded like the same rumble"*, then *"nothing changed
+in that last run"* — because nothing had. `matrix.py` builds and then runs; `run.sh` only runs,
+and reaching for it directly (to get `PT_SOUND`) silently tests the previous binary. `check-rom`
+could not see it: the FLAGS matched exactly, only the code was stale.
+
+Worse, the obvious fix hides a second trap. `make` re-ran injection and did **not** relink — the
+ROM was three minutes older than the sources it was supposedly built from — and the check that
+"confirmed" the sound was in it grepped the injected `ch6-eventscript.h`, i.e. an INPUT to the
+build rather than its output. That is "an artifact is not its inputs" one layer down.
+
+`run.sh` now refuses when `build_campaign.py` or `campaigns/**` is newer than the `.gba`, naming
+the offending files. Verify a ROM against the ROM.
+
+**5. Which ID SPACE a sound comes from, before which sound.**
+FE8 has ~340 sound effects and names about sixty of them, so a cry has to be chosen by number.
+There are two numberings and they do not agree. `banim_code_sound_*` (banim_code.inc) encodes
+`0x850000XX` for BATTLE ANIMATIONS, and XX is not a song id; `SOUN`/`EvtPlaySong` takes a song
+id, whose only definition is the ORDER of `sound/song_table.s`. Reading the first as the second
+put `se_sys_hp2` (an HP-bar tick), `se_sys_bikkuri_mark1` (the "!" popup) and `dummy_song` in
+front of Nicolas as monster roars — four auditions, each a ROM build and a watched run, before
+the mismatch surfaced. He described one as *"the silliest little animal noise"*, which was
+exactly right: it was a menu blip.
+
+`tools/sfx_preview.py` renders any sound to WAV straight from the decomp -- song table ->
+song `.s` -> voicegroup -> `direct_sound_samples/*.bin`, resampled by the interval between the
+note the sequence plays and the sample's base key. No ROM, no emulator; `--html` writes a page
+with play buttons. Picking ch05's bellow went from a build-and-watch per candidate to one page
+and one listen. Noise/square-channel effects (ch05's own rumble is one) have no sample to export
+and are reported as skipped rather than approximated.
+
+**6. Nothing in the gate listens.** ch05's bellow shipped through four films with
+`MUSCMID(SONG_SILENT)` where a DUCK was meant. That command fades the silent song IN -- it
+replaces the BGM permanently -- so the chapter would have run from turn 1 to the boss in silence.
+Every scenario passed, `verify_text` passed, every film looked right. It surfaced because Nicolas
+asked whether the music comes back. The pair is `MUSI`/`MUNO` (`EvtSetVolumeDown` /
+`EvtUnsetVolumeDown`), which ch05's reliquary visits already used. Audio is un-gated by
+construction; `PT_SOUND=1` at least makes a run audible on purpose.
+
 The wider rule this instantiates: *the fast-boot idea is not ch05's*. `TESTCH` and `--lord-boot`
 are the same move for the test chapter and the lord-select screen. Any feature whose screen is
 hard to reach should get one first — save-states do not substitute (they are invalid across code
