@@ -120,9 +120,9 @@ lose_condition: all_player_units_defeated
 
 difficulty_note: >
   Our first real boss. Roster GROUNDED (rev.3, 2026-07-23, #25) to the FE8 Ch5 bar — verdict
-  PARITY (within band): threat/slot 12.7 (x1.11) · clear-load/slot 4.8 (x0.84); ours reads
-  line 15 · reinf 6 · convertible 2 against the twin's 16/6/1 (the extra convertible is the
-  white moose, neutralized by killing Ravisin rather than ground down). The force is RISEN
+  PARITY (within band): threat/slot 13.9 (x1.21) · clear-load/slot 4.8 (x0.84); ours reads
+  line 16 · reinf 6 · convertible 1 — the twin's structure exactly, with Sahnar the one true
+  convertible (Basil's Talk). The force is RISEN
   ELVEN GUARDIANS on vanilla FE8 infantry classes, skinned undead — the ch01 "vanilla class,
   our skin" pattern. Because the stats ARE living-class stats, clear-load parity comes for
   free: the earlier glassy problem (undead monster classes get doubled → die in 1 round;
@@ -280,10 +280,12 @@ enemy_units:
   # Spd 14, doubles everything: even L2 = 11.8). So it keeps its terror and changes ROLE:
   # a NAMED MINIBOSS (vanilla Ch5 precedent: CHARACTER_BANDIT_CH5, a named non-boss threat)
   # that is CONVERTIBLE — killing Ravisin breaks her hold and it stops fighting. The player
-  # chooses: grind a 4.3-round, 14-threat monster, or push the objective and it walks away.
-  # Rewards going for the throat: the moose walking away IS the payoff, on the map, in play.
-  # NB the ending (0x9C9) must never mention the moose -- being convertible means the player can
-  # simply kill it, so no cutscene may assume it survived (Nicolas, 2026-07-30).
+  # chooses: fight a 24.6-threat monster that deletes a squishy in under a round, or push the
+  # objective and let it be. Rewards going for the throat: leaving the moose alive IS a payoff,
+  # on the map, in play. It is NOT priced as avoidable though (`convertible: false`) — the
+  # previous chapter is named after this animal, so the model must assume the fight happens.
+  # NB the ending (0x9C9) must never mention the moose -- the player may simply kill it, so no
+  # cutscene may assume it survived (Nicolas, 2026-07-30).
   - id: white-moose
     name: "The White Moose"
     is_miniboss: true           # named, dangerous, NOT the win condition (objective = Ravisin)
@@ -323,18 +325,26 @@ enemy_units:
         fe_base: hell-fang
     damage_type: bludgeoning    # flavor label only ("antlers/hooves")
     ai_pattern: aggressive
-    convertible: true           # #171 — a difficulty-model flag, NOT a fiction: `difficulty.py`
-                                # reads it to exempt the unit from the role-inversion check and to
-                                # apply CONVERT_CLEAR_DISCOUNT (0.5) to clear-load. Both are correct
-                                # here because the objective is defeat_boss: the player can win
-                                # WITHOUT ever fighting the moose, so it is never ground down.
-                                # It is NOT recruitable and never changes faction — it is a plain
-                                # enemy you may simply choose to ignore.
-                                # CORRECTED 2026-07-31 (Nicolas): this previously carried a
-                                # `parley: by: ravisin_death -> become_neutral` block, which
-                                # promised an on-screen conversion the chapter can never show —
-                                # win_condition is boss_defeated, so the map ENDS the moment
-                                # Ravisin falls and there is no post-death state to convert into.
+    convertible: false          # #171 — a difficulty-model flag. `difficulty.py` reads it to
+                                # exempt a unit from the role-inversion check and to apply
+                                # CONVERT_CLEAR_DISCOUNT (0.5) to clear-load, and BOTH would be
+                                # lies here: the moose is not recruitable, never changes faction,
+                                # and is only "avoidable" in the sense that a player COULD walk
+                                # past it. THE PREVIOUS CHAPTER IS NAMED AFTER THIS ANIMAL
+                                # (Nicolas, 2026-08-15) — a party that has just spent a whole map
+                                # hunting it is going to fight it, so pricing it at half
+                                # clear-load models a game nobody plays.
+                                # Sahnar is ch05's ONE true convertible (Basil's Talk, the Joshua
+                                # flip), which restores the twin's exact structure: line 16 ·
+                                # reinf 6 · convertible 1. The old `true` reported 15/6/2.
+                                # It also un-suppresses a real warning — the moose out-threatens
+                                # Ravisin — which was true at the old Revenant claw too and had
+                                # simply been exempted. See decisions.md.
+                                # NOT a parley: this previously carried a `parley: by:
+                                # ravisin_death -> become_neutral` block (removed 2026-07-31,
+                                # Nicolas), which promised an on-screen conversion the chapter can
+                                # never show — win_condition is boss_defeated, so the map ENDS the
+                                # moment Ravisin falls, with no post-death state to convert into.
     # NO death quote, and no bust: it is a moose (Nicolas, 2026-08-15). It never speaks in
     # either chapter — ch05's one wordless beat is scene 7's charge, which is staged with a
     # full-screen CG and a cry, not a text box. Nothing consulted the quote this block used to
