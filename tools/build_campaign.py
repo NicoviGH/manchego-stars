@@ -1117,8 +1117,16 @@ def _fe_dialogue_text(s):
 # message id per gap, and hosted-chapter ids are the scarcest thing we have (#25). A break costs
 # none. What it does NOT buy is a scene change: the bubble stays up and the faces stay loaded
 # across the gap, so put a camera move BEFORE the message, not inside it.
+#
+# `stage_cut:` is `stage_break`'s bigger sibling and the difference is PROVEN, not stylistic. A
+# break only PAUSES the talk (`LockTalk`), so the scene it interrupts must leave the talk state
+# intact -- unit movement, music, a camera hold. Anything that changes what is ON SCREEN does
+# not: ch05's moose bellow needs `REMOVEPORTRAITS` to re-arm the BACG loader, that tears the
+# talk down, and `TEXTCONT` then resumes NOTHING. Filmed 2026-08-15 -- the CG and the charge both
+# played and the punchline simply never appeared. So a scene change splits the beat into TWO
+# messages, which costs one id and is the only thing that does work.
 SCRIPT_DIRECTIVES = ('location_card', 'fade_to_black', 'beat_break', 'present', 'exits',
-                     'stage_break')
+                     'stage_break', 'stage_cut')
 _SCRIPT_EXIT = object()   # marker block for `exits:`, kept distinct from any speaker name
 _SCRIPT_BREAK = object()  # marker block for `stage_break:` -- likewise not a speaker name
 
@@ -1252,6 +1260,23 @@ def _term_pad(body):
     return body
 
 
+def split_on_stage_cut(script, where):
+    """Split a cutscene script at its `stage_cut:` into (before, direction, after).
+
+    One directive, two messages, and the second id is what a SCENE CHANGE costs. See
+    SCRIPT_DIRECTIVES for why a `stage_break` cannot do this job.
+    """
+    cuts = [i for i, e in enumerate(script) if 'stage_cut' in e]
+    if len(cuts) != 1:
+        sys.exit('ERROR: %s needs exactly ONE `stage_cut:`; found %d' % (where, len(cuts)))
+    i = cuts[0]
+    before, after = script[:i], script[i + 1:]
+    if not before or not after:
+        sys.exit('ERROR: %s has a `stage_cut:` with nothing on one side of it -- a cut between '
+                 'a beat and nothing is just the end of the beat' % where)
+    return before, script[i]['stage_cut'], after
+
+
 def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
                        trailing=None):
     """Render a chapter-YAML cutscene `script:` block as an FE8 message body.
@@ -1321,6 +1346,10 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
             # after the lines it is supposed to precede.
             blocks.append((_SCRIPT_EXIT, text))
             continue
+        if speaker == 'stage_cut':
+            sys.exit('ERROR: `stage_cut` is a MESSAGE BOUNDARY, not a body code -- split the '
+                     'script on it and render each side (see split_on_stage_cut). It exists '
+                     'because the engine cannot resume a message across a scene change.')
         if speaker == 'stage_break':
             # The point where the EVENT SCRIPT takes the scene over (see SCRIPT_DIRECTIVES).
             # Carried through rather than skipped for the same reason `exits:` is: it has to
@@ -7676,6 +7705,27 @@ CAMPAIGN_BGS = [
     # 2 (16 source colours against 15 usable per bank, and this picture's tiles straddle the split
     # differently), still inside the SIX the fade/transition procs apply.
     ('BG_MS_FOREST_OUTSKIRTS_WINTER', 'bg_ForestOutskirtsWinter', '{FE9-10 CG rip}'),
+    # ch05 scene 7 (#25): the moose BELLOWS, full screen, between Pinky's question and the
+    # charge. Nicolas's art and Nicolas's idea (2026-08-15), and the reason it is a BG rather
+    # than a portrait is the whole point: a 96x80 bust is drawn in the talk window's envelope
+    # and those antlers do not fit it, while a BACG owns all 240x160 and has no envelope at all.
+    # The beat is WORDLESS, so unlike every other entry here it carries no message and costs no
+    # message id -- the flash is BACG/FADU/STAL/FADI plus vanilla's own EventScr_RemoveBGIfNeeded,
+    # which is `village_script`'s mid-map idiom with the text half removed.
+    # SIX banks, which is the ceiling that matters rather than the eight a BACG can hold: the
+    # fade/transition procs apply only six, and this image FADES in and out (Bremen's 8-bank CG
+    # is why that rule is written down). Converted at --banks 6 from a 1260x1047 RGBA master,
+    # cropped to FILL rather than fitted with bars -- the beat is a bellow in the player's face
+    # and the crop is what sells the scale.
+    # The PLATE behind it is the elven tomb's own backdrop, and that is the second answer to
+    # "make it look like it is over the map" rather than the first. The first was to bake a
+    # CAPTURED MAP FRAME in behind the animal, which composites perfectly and dies on contact
+    # with motion: the risen standing in that frame do not move for the 90 frames it is up, and
+    # a map whose units are frozen reads as a photograph of a map (Nicolas, 2026-08-15 --
+    # "what gives it away is the rest of the characters don't move"). A SCENIC plate promises no
+    # motion, so there is nothing to give away. General rule: a still image may stand in for a
+    # still thing; it may never stand in for something the player has just watched move.
+    ('BG_MS_WHITE_MOOSE',         'bg_WhiteMoose',        '{Nicolas}'),
 ]
 
 
@@ -8758,6 +8808,32 @@ CH05_MOOSE_CHARGE_SLOT = ('vanilla 0x9C4', 0x9F1, 2,
 # ladder offers against FarRight, so the setup and the punchline come from opposite sides of the
 # screen rather than from neighbouring rungs.
 CH05_MOOSE_CHARGE_PODIUMS = {'meesmickle': '[OpenMidLeft]', 'pinky': '[OpenFarRight]'}
+# The bellow itself, and it is a BACKGROUND rather than a portrait for one reason: a 96x80 bust
+# is drawn inside the talk window's envelope and this animal's antlers do not fit it. A BACG owns
+# the whole 240x160 screen and has no envelope, which makes "show the creature properly" a
+# solved problem rather than a compromise (Nicolas's art + Nicolas's idea, 2026-08-15).
+CH05_MOOSE_BELLOW_BG = 'BG_MS_WHITE_MOOSE'
+# The first sound effect this project has ever AUTHORED -- every other note in the game is
+# vanilla's, played through the music commands vanilla itself uses, and `SOUN` had never been
+# called (Nicolas, 2026-08-15). Vanilla also names almost none of its ~340 sound effects, so a
+# cry has to be found by id -- and WHICH ID SPACE is the whole story here. `banim_code_sound_*`
+# in banim_code.inc encodes 0x850000XX, and XX is NOT a song id -- read as one it yields
+# `se_sys_hp2` (an HP-bar tick), `se_sys_bikkuri_mark1` (the "!" popup) and `dummy_song`, all of
+# which were auditioned in-engine as monster roars before the mistake surfaced. SONG IDS COME
+# FROM sound/song_table.s AND NOWHERE ELSE.
+# 0x32C is `song812_mon_mdg_critical1`, the beast critical, chosen by ear by Nicolas off
+# tools/sfx_preview.py's audition page -- "the most moosy". Runner-up material lives in the same
+# page: the dragon screams (0x0DE, 0x0E6, 0x2F5), the Demon King (0x37A/B, 0x37E) and
+# `btl_mon_call1` (0x3BF). Re-pick with `tools/sfx_preview.py --grep <word> --html <file>`;
+# it needs no ROM and no emulator.
+CH05_MOOSE_BELLOW_SFX = '0x32C'
+# ...and the punchline's own id, which is what the full-screen bellow COSTS. The two boxes shared
+# 0x9F1 across a `[BreakTalk]` until the CG went in; a scene change tears the talk down, so the
+# quip has to be a second message (filmed 2026-08-15: with a break, it never appeared at all).
+# 0x9D2 was ch05's one spare, so the block is now EXACTLY spent -- the endings and the taunt fit
+# and nothing is left over. If another beat needs an id, re-run the neighbourhood sweep
+# (decisions.md -> "A host block is not the whole id budget"); do not assume there is slack.
+CH05_MOOSE_QUIP_MSG = 0x9D2
 # Four speakers, four podiums, which is the face budget exactly (FACE_SLOT_COUNT = 4) -- so
 # nothing is evicted mid-scene. Seated in the order they speak, left to right, and Pinky holds
 # the far right in BOTH arms: he closes the scene on either path, and on the no-Lupin path he
@@ -8904,6 +8980,7 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
              CH05_ARRIVAL_SLOT[1], CH05_ARRIVAL_NO_LUPIN_MSG,
              CH05_BASIL_JOIN_SLOT[1], CH05_BASIL_JOIN_NO_LUPIN_MSG,
              CH05_SAHNAR_ALONE_SLOT[1], CH05_MOOSE_CHARGE_SLOT[1],
+             CH05_MOOSE_QUIP_MSG,
              CH05_GOAL_WINDOW_MSG, CH05_GOAL_STATUS_MSG,
              *(slot[1] for slot in CH05_VILLAGE_SLOTS.values())),
     # Goal ids only -- ch01/ch02 predate the per-chapter block registry, but their goal strings
@@ -11083,29 +11160,30 @@ def ch05_sahnar_alone_message(chap):
 
 
 def ch05_moose_charge_message(chap):
-    """Scene 7 -- Pinky asks, the moose answers -- as ONE (msg_id, body) pair.
+    """Scene 7 as TWO (msg_id, body) pairs, split across the bellow.
 
-    Two boxes, one id, and a `[BreakTalk]` between them: the wordless charge happens at that
-    pause, driven by `ch05_moose_charge_block`. One arm, so no variant -- the moose is ch04's
-    quarry and Lupin's presence changes nothing about it (Pinky is the party's other ch04
-    tracker and asks the question on either path).
+    The question and the punchline are separate messages because the beat between them is a
+    SCENE CHANGE: the full-screen CG needs `REMOVEPORTRAITS`, that tears the talk down, and a
+    `[BreakTalk]` pause cannot survive it (filmed 2026-08-15 -- the CG played, the charge played,
+    and the quip never appeared). One `stage_cut:`, two ids, and the second is what the bellow
+    costs. Both render at the talk bubble's 29 -- they are on-map beats either side of the image.
 
-    Rendered at the talk bubble's 29, not the backdrop scenes' 42: this is the last ON-MAP beat
-    before turn 1, played after the prep CALL alongside scenes 5 and 6.
+    One arm, so no variant: the moose is ch04's quarry and Lupin's presence changes nothing
+    about it (Pinky is the party's other tracker and asks on either path).
     """
     slot, msg, boxes, what = CH05_MOOSE_CHARGE_SLOT
-    script, body = _ch05_opening_scene(
-        chap, slot, boxes, what, CH05_MOOSE_CHARGE_PODIUMS,
-        _make_fid({}, 'ch05 scene 7: unknown cutscene speaker'), width=29)
-    # The whole point of the id saving is the mid-message pause; without it the two boxes run
-    # together and the charge plays after both, which is the joke told backwards.
-    if body.count('[BreakTalk]') != 1:
-        sys.exit('ERROR: ch05 scene 7 must hold exactly ONE `stage_break:` -- the moose\'s '
-                 'charge is the beat between Pinky\'s question and Meesmickle\'s answer, and '
-                 'the event script TEXTCONTs it exactly once; got %d'
-                 % body.count('[BreakTalk]'))
-    del script
-    return [(msg, body)]
+    script = _chapter_event_by_slot(chap, 'chapter_start', slot,
+                                    'ch05 opening (%s)' % what)['script']
+    if _script_box_count(script) != boxes:
+        sys.exit('ERROR: ch05 scene 7 must remain the %d locked boxes; got %d'
+                 % (boxes, _script_box_count(script)))
+    ask, _direction, quip = split_on_stage_cut(script, 'ch05 scene 7')
+    fid = _make_fid({}, 'ch05 scene 7: unknown cutscene speaker')
+    return [(msg, _ch05_opening_body(ask, slot, what + ' (the question)',
+                                     CH05_MOOSE_CHARGE_PODIUMS, fid, 29)),
+            (CH05_MOOSE_QUIP_MSG,
+             _ch05_opening_body(quip, slot, what + ' (the punchline)',
+                                CH05_MOOSE_CHARGE_PODIUMS, fid, 29))]
 
 
 def ch05_moose_station(chap):
@@ -11216,6 +11294,27 @@ def ch05_sahnar_alone_block(sahnar_table, sahnar_char, position, station):
             % (x, y, x, y, sahnar_table, sahnar_char, gx, gy, x, y, sahnar_char, msg, what))
 
 
+def ch05_moose_to_corner(moose_pid, start):
+    """Put the moose on its run's starting corner, instantly, WHILE THE SCREEN IS BLACK.
+
+    It fights from the pen and it runs from the corner, so something has to move it between
+    the two, and a negative-speed `MOVE` is vanilla's own instant reposition (`ch14a` resets
+    Carlyle this way). What matters is WHEN: this used to sit inside the beat, after the
+    screen was already up, and Nicolas caught it on film -- "I think I saw the moose teleport
+    from its top middle to top right spot right as it loaded in" (2026-08-15). He did. An
+    instant move is only invisible if nothing can see it.
+
+    So it is emitted immediately after the turn-1 line LOADs, where the screen is still faded
+    out in both the shipping opening (which ends its backdrop half on a FADI) and the debug
+    boot. Being a separate emitter is the point: the call site is the constraint.
+    """
+    return ('    MOVE(0xffff, %s, %d, %d) /* to the run\'s corner, instantly and UNSEEN -- the\n'
+            '                                screen is still black here. The pen it fights from\n'
+            '                                is the map\'s top edge, so the run needs somewhere\n'
+            '                                to start that is not the pen. */\n'
+            '    ENUN\n' % (moose_pid, start[0], start[1]))
+
+
 def ch05_moose_charge_block(moose_pid, station, party_tile):
     """Scene 7, the last beat before turn 1: Pinky asks, the moose answers, the fight starts.
 
@@ -11249,9 +11348,11 @@ def ch05_moose_charge_block(moose_pid, station, party_tile):
     start further back and charge INTO the pen; there is no tile behind row 0, so the run goes
     forward THROUGH the pen and is put back instead.
 
-    The music DROPS OUT under the bellow rather than swelling: `MUSCMID(SONG_SILENT)` is
-    vanilla's own punctuation at exactly this kind of pause (`MSG_9BF`'s BreakTalk gap does it),
-    and it leaves "You had to ask?" landing in silence a beat before the map's own track comes up.
+    The music DUCKS under the bellow and is restored with the map -- `MUSI`/`MUNO`, the pair
+    ch05's reliquary visits already use. It is worth naming the wrong answer too, because it
+    reads as the right one: fading the SILENT song in is a REPLACEMENT, not a duck, and it left
+    the chapter playing from turn 1 with nothing at all and no way back. No test, verdict or
+    film catches that; Nicolas asking whether the music returns is what caught it.
     The moose does not speak, and it never has -- locked 2026-07-03 and re-locked by this chapter.
 
     NO unit is named for the camera on the party side, and that is deliberate. ch05 deploys 9 of
@@ -11266,23 +11367,67 @@ def ch05_moose_charge_block(moose_pid, station, party_tile):
     run = '\n'.join(reda_route_move(
         moose_pid, route, 'it breaks -- left along the rim, then down at them',
         who='the ch05 white moose'))
-    return ('    MOVE(0xffff, %s, %d, %d) /* to the top-right corner FIRST, and instantly: the\n'
-            '                                run needs somewhere to run FROM, and the pen it\n'
-            '                                fights on is the map\'s top edge. speed < 0 is a\n'
-            '                                bare MoveUnit_, so there is no walk to be seen --\n'
-            '                                and this lands before the camera arrives. */\n'
-            '    ENUN\n'
-            '    CAMERA(%d, %d) /* the SCROLL -- CUMO alone only draws a cursor */\n'
+    return ('    CAMERA(%d, %d) /* the SCROLL -- CUMO alone only draws a cursor */\n'
             '    CUMO_AT(%d, %d) /* the rim: the moose at bay among the standing dead */\n'
             '    STAL(60)\n'
             '    CURE\n'
             '    TEXTSTART\n'
             '    TEXTSHOW(0x%X) /* %d -- %s */\n'
-            '    TEXTEND /* [CloseSpeechSlow][BreakTalk]: bubble DOWN, talk proc locked, the\n'
-            '               scene is ours until resumed -- the charge must not run under a box */\n'
-            '    MUSCMID(SONG_SILENT) /* the bellow -- the music drops out under it */\n'
+            '    TEXTEND\n'
+            '    REMA /* the talk ENDS here rather than pausing: the bellow is a scene change\n'
+            '            and a locked talk does not survive one (filmed 2026-08-15) */\n'
+            '    MUSI /* DUCK the music under the bellow (EvtSetVolumeDown); it is un-ducked\n'
+            '            once the map is back. This used to fade the silent song in instead,\n'
+            '            which is a REPLACEMENT and not a duck -- it left the chapter playing\n'
+            '            from turn 1 with no music and nothing able to bring it back. Caught by\n'
+            '            Nicolas asking whether the music returns (2026-08-15); vanilla never\n'
+            '            ends a beginning scene on silence. The reliquary visits use this same\n'
+            '            pair around their own backdrop. */\n'
+            '    FADI(16) /* fade the MAP out first. Without this the image swaps in under a\n'
+            '                lit screen and the beat reads as a glitch rather than a cutaway\n'
+            '                (Nicolas, 2026-08-15: "jumpy/glitchy both in and out of it"). */\n'
+            '    REMOVEPORTRAITS /* re-arms the BACG load mode AND clears the faces, so the\n'
+            '                       CG comes up on a clean screen rather than behind Pinky */\n'
+            '    BACG(%s) /* THE BELLOW: the moose, full screen. A bust could never hold\n'
+            '                those antlers -- a 96x80 portrait is drawn inside the talk\n'
+            '                window\'s envelope, and a BACG owns all 240x160. */\n'
+            '    FADU(16) /* ...and fade the moose IN */\n'
+            '    SOUN(%s) /* THE BELLOW. Nicolas picked it by ear off the audition page:\n'
+            '        `mon_mdg_critical1`, the beast critical -- "the most moosy" (2026-08-15).\n'
+            '        It is 1.2s long, which is what STAL(90) below is sized to.\n'
+            '        FINDING IT AT ALL took correcting a wrong table: `banim_code_sound_*` in\n'
+            '        banim_code.inc encodes 0x850000XX and XX is NOT a song id, so reading it\n'
+            '        as one auditioned `se_sys_hp2` -- an HP-bar tick -- as a monster roar.\n'
+            '        Song ids come from sound/song_table.s and nowhere else. */\n'
+            '    EARTHQUAKE_START(0, 0) /* the weight, UNDER the cry. The 0 is `playse` OFF and\n'
+            '        it has to be: StartEventEarthQuake fires PlaySoundEffect(SONG_26A) the\n'
+            '        instant it starts, on the same channel, so with it on the rumble PREEMPTS\n'
+            '        the roar and the animal is never heard -- which is exactly what happened\n'
+            '        the first two times this was filmed. The shake carries the weight the\n'
+            '        rumble used to; they cannot both sound without one killing the other.\n'
+            '        WHAT it shakes is chosen by `activeTextType`, not by us: Event42_EarthQuake\n'
+            '        maps 0/3/4 to a map-view shake and 1 to a BG-position shake, and\n'
+            '        REMOVEPORTRAITS above set it to 1 -- so the judder lands on the BG layer,\n'
+            '        which right now IS the moose. The image itself shakes.\n'
+            '        !! 2 and 5 return EVC_ERROR, which does not advance the event pointer and\n'
+            '        therefore HANGS the chapter. This ordering is load-bearing. */\n'
+            '    STAL(90) /* the cry plays out -- 1.2s of sample, 90 frames of hold */\n'
+            '    EARTHQUAKE_END /* ends the shake AND fades the SE channel (Sound_FadeOutSE),\n'
+            '                      so it belongs against the picture fading and not mid-cry */\n'
+            '    FADI(16) /* fade the moose out again */\n'
+            '    CLEAN /* ...and back to the map. CLEAN is the whole restore and it is NOT\n'
+            '             optional: `EventScr_RemoveBGIfNeeded` only fades, conditionally, so\n'
+            '             without this the map returns wearing the CG\'s PALETTE -- filmed\n'
+            '             2026-08-15, a snowfield in moose-red. Vanilla\'s own order, from\n'
+            '             EventScr_TextShowWithFadeIn: fade down, clean, fade up. */\n'
+            '    MUNO /* ...and the music back up with the map (EvtUnsetVolumeDown) */\n'
+            '    FADU(16) /* ...and fade the map back up. Symmetric with the way in: this is\n'
+            '                 vanilla\'s own backdrop shape, the one the ch05 opening uses\n'
+            '                 between its scenes, and the only one that does not read as a\n'
+            '                 hitch on either side. */\n'
             '%s\n'
-            '    TEXTCONT /* ...and Meesmickle answers the question sideways */\n'
+            '    TEXTSTART\n'
+            '    TEXTSHOW(0x%X) /* ...and Meesmickle answers the question sideways */\n'
             '    TEXTEND\n'
             '    REMA\n'
             '    CAMERA(%d, %d) /* cut south -- vanilla\'s own framing ahead of this beat */\n'
@@ -11293,7 +11438,8 @@ def ch05_moose_charge_block(moose_pid, station, party_tile):
             '                                and with the camera already south. The fight starts\n'
             '                                from the locked tile. */\n'
             '    ENUN\n'
-            % (moose_pid, sx, sy, sx, sy, sx, sy, msg, boxes, what, run,
+            % (sx, sy, sx, sy, msg, boxes, what,
+               CH05_MOOSE_BELLOW_BG, CH05_MOOSE_BELLOW_SFX, run, CH05_MOOSE_QUIP_MSG,
                ax, ay, ax, ay, moose_pid, px, py))
 
 
@@ -11411,7 +11557,9 @@ def ch05_moose_debug_script(chap, seed_load):
             + '    LOAD1(0x1, %s) /* the 16 risen tomb-guard -- the MOOSE is one of them */\n'
               '    ENUN\n' % CH05_LINE_TABLE
             + seed_load
-            + '    FADU(16) /* no prep prologue to inherit a fade from */\n'
+            + ch05_moose_to_corner(CH05_MOOSE_PID, ch05_moose_station(chap)[1])
+            + '    FADU(16) /* no prep prologue to inherit a fade from -- and it comes AFTER\n'
+              '                the reposition above, so that is never on screen */\n'
             + ch05_moose_charge_block(CH05_MOOSE_PID, ch05_moose_station(chap),
                                       ch05_party_camera_tile(chap))
             + '    ENUT(8)\n    EVBIT_T(7)\n    ENDA\n}')
@@ -11445,6 +11593,9 @@ def ch05_beginning_script(chap, basil_char, sahnar_table, sahnar_char,
             % CH05_HOST_INDEX
             + '    LOAD1(0x1, %s) /* the 16 risen tomb-guard */\n    ENUN\n'
             % CH05_LINE_TABLE
+            # ...and the moose straight to scene 7's starting corner, here where the screen is
+            # still black rather than inside the beat, where it read as a teleport.
+            + ch05_moose_to_corner(CH05_MOOSE_PID, ch05_moose_station(chap)[1])
             + '    LOAD1(0x1, %s) /* Basil, GREEN at the pocket mouth */\n    ENUN\n'
             % CH05_BASIL_TABLE
             + seed_load

@@ -172,6 +172,25 @@ if [ -z "${MX_SKIP_ROM_CHECK:-}" ]; then
     python3 "$HERE/matrix.py" check-rom "$SCENARIO" || exit 2
 fi
 
+# ...and the SECOND way the ROM is wrong: right FLAGS, STALE CODE. run.sh launches whatever is
+# on disk -- only matrix.py builds -- so editing build_campaign.py and reaching straight for
+# run.sh re-runs the PREVIOUS binary and every observation from it is about the old build.
+# Cost the session two runs and two rounds of Nicolas's attention on 2026-08-15 ("sounded like
+# the same rumble", "nothing changed in that last run"): both were true, because nothing HAD
+# changed. check-rom cannot see this -- the flags matched exactly.
+if [ -z "${MX_SKIP_ROM_CHECK:-}" ]; then
+    _stale=$(find "$REPO/tools/build_campaign.py" "$REPO/campaigns" \
+                  -newer "$ROM" -type f 2>/dev/null | head -3)
+    if [ -n "$_stale" ]; then
+        echo "run.sh: the ROM is OLDER than campaign sources -- you would be testing the" >&2
+        echo "        previous build. Newer than $ROM:" >&2
+        echo "$_stale" | sed 's/^/          /' >&2
+        echo "        Rebuild first, e.g.  make CAMPAIGN=<c> [FLAGS] fireemblem8.gba -j8" >&2
+        echo "        (or run it through matrix.py, which builds). MX_SKIP_ROM_CHECK=1 opts out." >&2
+        exit 2
+    fi
+fi
+
 python3 "$HERE/gen_symbols.py"
 pkill -9 -i mgba 2>/dev/null || true
 ROMHASH=$(shasum "$ROM" | cut -c1-12)
@@ -204,8 +223,14 @@ PLAYTEST_SHOTEVERY = "${PT_SHOTEVERY:-}"
 dofile("$HERE/harness.lua")
 EOF
     rm -f "$REPO/fireemblem8u/fireemblem8.sav"   # fresh save: New Game is the default path
+    # Muted by DEFAULT and deliberately: a scenario is watched, often many times, and at
+    # 240fps the audio is a screech. `PT_SOUND=1` unmutes for the runs where the SOUND is the
+    # thing under review (ch05's moose bellow was the first, 2026-08-15) -- and it pins
+    # audioSync on with it, because sound played against a free-running video clock stutters.
+    local mute=1 async=0
+    if [ -n "${PT_SOUND:-}" ] && [ "${PT_SOUND}" != "0" ]; then mute=0; async=1; fi
     "$APP" --script "$wrapper" \
-        -C mute=1 -C fpsTarget="$fps" -C audioSync=0 -C videoSync="$vsync" \
+        -C mute=$mute -C fpsTarget="$fps" -C audioSync=$async -C videoSync="$vsync" \
         "$ROM" >"$out/mgba-stdout.log" 2>&1 &
     local pid=$!
     echo "running '$scen' (pid $pid, ${fps}fps); polling $log"
