@@ -6,109 +6,54 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-14 (Claude). **#255, #274, #277, #278, #279, #280 and #281 are DONE and merged —
-do not reopen any of them.** The generated decomp tree is intentionally dirty as recorded below.
+Refreshed 2026-08-15 (Claude). **#282 and #283 are DONE and merged — do not reopen either.**
+The generated decomp tree is intentionally dirty as recorded below.
 
 ## In flight
 
-**Nothing.** `main` is at #281 (ch05's scene-3 summon + scene 6), CI green.
+**Nothing.** `main` is at #283 (ch05's scene 7, complete with its full-screen bellow), CI green.
 
 ## Next task
 
 **ch05's dialogue wiring, worked TOP TO BOTTOM in player order** (Nicolas, 2026-08-13). The
-ordered inventory of all 17 scenes — **12 done, 5 left** — is the table in **issue #25**, which is
+ordered inventory of all 17 scenes — **13 done, 4 left** — is the table in **issue #25**, which is
 the canonical view; do not re-derive an order from the YAML's `vanilla 0xNNN` labels, which are
-anatomy citations naming the scene we MINE and are never ids we write. Reading them as an order
-is what made the list confusing in the first place.
+anatomy citations naming the scene we MINE and are never ids we write.
 
-Next up is **scene 7 — Pinky asks why the moose isn't running, and it charges** (`0x9F1`, 2 boxes,
-no fallback), then straight down the table. All of it is locked text from PR #196: this is wiring,
-not writing.
+Next up is **scene 12 — Ravisin's battle taunt**, which is currently wired NOWHERE:
+`gBattleTalkList` holds a ch01 Izobai row and nothing for her. Then scene 13 (Basil's death
+quote), then the two endings (16/17), which are a 2×2 over Basil alive/dead × Lupin
+present/absent. All of it is locked text from PR #196: this is wiring, not writing.
 
-Scene 7 sits AFTER the prep `CALL`, alongside scenes 5 and 6 — the last beat before the map, and
-it ends on `meesmickle: "You had to ask?"` straight into turn 1. It needs no fade of its own:
-scene 5 already brought the screen up after the prep prologue's fade to black, and 6 and 7 ride
-that. It is an ON-MAP beat like the two before it, so it wraps at the bubble's **29**, and
-`PutTalkBubble` anchors to a unit — Pinky is deployed by prep, so `CUMO_CHAR` him. **The moose
-cannot speak** (locked 2026-07-03); its charge is pure stage direction.
+**THE ID BLOCK IS NOW EXACTLY SPENT — there is no spare (#283).** 17 ids against 17 owed.
+Scene 7's bellow is a scene change, a locked talk cannot survive one, so its punchline became a
+second message and took `0x9D2`, the last slack. The four remaining scenes have exactly the four
+remaining ids (`0x9F2`, `0x9F3` in the host block; `0x9C9`–`0x9CC` for the endings; `0x9D1` for
+the Talk fallback). Anything beyond that needs a fresh neighbourhood sweep — method in
+`decisions.md` → "A host block is not the whole id budget". Do not assume slack.
 
-**Then four rows remain**: Ravisin's battle taunt (`0x9F2`, wired NOWHERE — `gBattleTalkList` has
-a ch01 Izobai row and nothing for her), Basil's death quote (`0x9F3`), and the two endings
-(`0x9C9`/`0x9CA`, `0x9CB`/`0x9CC`), which are a 2×2 over Basil alive/dead × Lupin present/absent.
+**Reuse the mechanisms; they are all built.** `branch_on_check_alive` + `label_base` for the
+endings' 2×2 (a third branch in one event list takes labels 4/5), `variant_beat` for a fallback,
+`_ch05_scene_and_variant` for a locked scene plus its no-Lupin twin, `stage_break` vs
+`stage_cut` for a beat interrupted mid-message, `reda_route_move` for a multi-leg walk.
+**The Talk recruit's no-Lupin fallback is still owed its BOXING** — it overruns the bubble's 29
+and pages itself mid-clause if left flowed (`decisions.md` → "A fallback line chosen as PROSE").
 
-**The mechanisms EXIST — reuse them, do not rebuild them (#278, #280).**
-`branch_on_check_alive(CH05_LUPIN_CHARACTER, if_alive, if_absent)` emits the arm-picker and shares
-`_branch_on_slot_c` with `branch_on_flag` so the two cannot drift; `label_base` keeps several
-branches in one event list from colliding (the arrival holds 0/1, the join 2/3 — **a third branch
-must take 4/5**). `_ch05_scene_and_variant` renders a locked scene and its no-Lupin twin as two
-message bodies, parameterised by channel width, so a further branched scene costs a call.
-`ch05_beginning_script` assembles the whole opening in one testable place.
+**Two states of the `CHECK_ALIVE` branch are still unproven** (#25's tally): benched, and
+recruited-then-killed. Both should take the arm we want by a decomp reading, and a reading is
+not a run.
 
-**A fallback line chosen as PROSE has not been BOXED (#280).** Three of the five substitutes are
-too long for the bubble's 29 and page themselves mid-clause if left flowed. `variant_beat` now
-accepts a `script:` entry that is a LIST of boxes so the AUTHOR places the extra A-press; the two
-arms need not cost the same number of A-presses. **The Talk recruit's fallback overruns
-identically and is still owed that treatment.** Long form: `decisions.md` → "A fallback line
-chosen as PROSE has not been boxed".
+## Owed on the moose, and NOT blocking the dialogue
 
-**The id budget is already resolved — do not re-litigate it.** 17 ids against 16 owed, allocated
-scene by scene in #25's table; claim each in `HOSTED_CHAPTER_MESSAGE_IDS` as it lands. `0x9E9`
-`0x9EA` `0x9EB` (scenes 1–3), `0x9EC` `0x9ED` (scene 4 + fallback), `0x9EE` `0x9EF` (scene 5 +
-fallback) and `0x9F0` (scene 6) are SPENT; scene 7 takes `0x9F1`. Method and the two ways to run
-the sweep wrong: `docs/decisions.md` → "A host block is not the whole id budget". A fallback arm
-costs ONE extra id, not four.
-
-**A SILENT face on a backdrop scene is `present:`, and it must be preloaded.** ch05's scene 3
-stages Ravisin's raised Sahnar with no dialogue at all (Nicolas, 2026-08-14 — *"you don't need to
-even add lines"*), which is the cheapest possible way to stage an event: no box, no A-press, the
-locked script untouched. Two engine facts came with it and both were found **by filming**, not by
-reading: a face loaded MID-message opens a bubble of its own (two stacked bubbles), so silent
-faces go through `_script_to_message`'s `preload` path; and podium rungs OVERLAP with the speaker
-drawn on top, so a silent face needs an empty rung beside it (Right + FarRight, never MidRight +
-FarRight). `assert_silent_faces_have_elbow_room` enforces the second. Long form, including two
-false trails worth not re-walking (`[SendToBack]` is z-order, `[OpenX]` is not a window):
-`docs/decisions.md` → "A face that never speaks must be PRELOADED".
-
-**Both arms of the branch are proven in-engine (#279). Two of #25's four states are still owed.**
-
-- **PROVEN — never recruited → no-Lupin arm.** The plain `--ch05-boot` ROM walks it and can walk
-  nothing else, for two independent reasons: the branch runs before `LOMA` while the boot party
-  seed is `LOAD1`ed after it (so `gUnitArrayBlue` is empty when `CHECK_ALIVE` asks), **and Lupin is
-  not in that seed at all** — it zips the cast against 9 deploy slots and he is last. The second
-  reason would have survived the obvious fix and looked like success, so do not "fix" this by
-  hoisting the seed above `LOMA`; `LOMA` rebuilds the map.
-- **PROVEN — on the roster and alive → Lupin's arm**, via **`--ch05-lupin`** (with `--ch05-boot`),
-  which `LOAD1`s a one-unit Lupin table BEFORE the opening. Safe because `RestartBattleMap`
-  (`bmio.c:1043`) never touches the unit arrays. Scenario `recordch05openinglupin` on the
-  `ch05lupinboot` ROM. Nicolas watched both runs 2026-08-14 and confirmed the branch works.
-- **OWED — benched, and recruited-then-killed.** `CHECK_ALIVE` ignores `US_NOT_DEPLOYED` and treats
-  `US_DEAD` as absent, so both should take the arm we want — but that is a decomp reading, and a
-  reading is not a run. Benched needs a roster entry that is NOT on the map, which `--ch05-lupin`'s
-  `LOAD1` does not produce.
-
-Long form: `decisions.md` → "The `--ch05-boot` ROM can only ever play the NO-Lupin arm" and "The
-alive arm needed a LEVER". The branch's PLACEMENT that early is vanilla's own:
-`EventScr_Ch7_BeginningScene` branches on `CHECK_ALIVE(CHARACTER_FRANZ)` and three more optional
-units inside a beginning scene.
-
-Two questions this used to leave open are now SETTLED — read them, don't re-derive them:
-- **CHANNEL is inherited from the vanilla twin. WHERE THE SCENE SITS IS NOT** (corrected by #280).
-  The twin says how a scene is PLAYED — backdrop or bubble, and how wide: scenes 1–4 are backdrop
-  (42), scene 5 is an on-map bubble (29). It says where the scene sits only where the surrounding
-  machinery is also vanilla's, **and ours diverges at exactly one place: prep.** Vanilla plays its
-  street scenes before the prep `CALL` because it `LOAD1`s Eirika's group there; our party is
-  placed BY prep, so **scene 5 plays AFTER `CALL(CH05_PREP_SCRIPT)` too** — all three of 5, 6 and
-  7 do, and anything visible after that `CALL` brings its own `FADU(16)`. Long form + the full
-  table: `docs/decisions.md` → "A cutscene's CHANNEL is inherited from the twin, not chosen" and
-  "Inheriting a channel is not inheriting a POSITION". **`vanilla_scene.py` prints `0x9BB` as
-  "map" and that is a reporting artifact** — it classifies by the text call, and the
-  `SetBackground` above it is the real channel.
-- **The no-Lupin signal: `CHECK_ALIVE(CHARACTER_LUPIN)` + `BEQ`, no flag.** Vanilla's own answer,
-  and `ch14a` branches its ending on `CHECK_ALIVE(CHARACTER_JOSHUA)` — Ch5's optional Talk recruit
-  and Sahnar's donor, i.e. our scene's ancestor. It reads the ROSTER, so it also handles the
-  benched case that ch05's 9-of-10 deploy makes real. Long form: `docs/decisions.md` → "Did the
-  player recruit them?". **Built and both arms filmed at #278/#279** — see the four-state tally
-  above for the two that are still owed.
+Nicolas is supplying art in parallel (2026-08-15):
+- **Battle animation.** Three 1920×1080 poses are in hand at
+  `Documents/Claude/Projects/Manchego Stars / Fire Emblem Game/Battle Anims/WhiteMooseBattleAnim.png`,
+  left-to-right **attack, windup, idle** — which is the REVERSE of the `frames:` order
+  `inject_battle_anims` wants (Ready → Windup → Peak). Still needs a `clone_from:` donor class
+  from Nicolas. Its docstring is the how; the ch05 YAML's `battle_anim_todo` is the ledger entry.
+- **Portrait/name binding.** `portraits/white-moose.png` (96×80, indexed, full-body) is committed
+  and injected NOWHERE, in either chapter, so the moose has no bust and shows `CLASS_GWYLLGI`'s
+  default name. That is wiring off an existing asset, not new art.
 
 ## Current state
 
@@ -132,62 +77,6 @@ Two questions this used to leave open are now SETTLED — read them, don't re-de
   milliseconds instead of a build plus an emulator run. `--index-map` / `--isolate` answer "which
   index owns this, and does anything else share it?" It knows `arena_battle` and `arena_front`;
   adding an asset is a few lines. Use it before any recolour (ch07's Bremen backdrop, title screen).
-- **ch05's opening now SPEAKS, for scenes 1–5 (#277, #278, #280).** `CH05_BEGINNING_SCRIPT` opens on one
-  `BACG(BG_MS_ELVEN_TOMB)` held across scenes 1–3, faded through black between them, then **CUTS to
-  `BG_MS_FOREST_OUTSKIRTS_WINTER` for scene 4** (the ridge — vanilla switches BG at this same
-  arrival beat), branches on `CHECK_ALIVE`, and only then `FADI` → `LOMA` → the LOAD1s → prep,
-  unchanged. **A second `BACG` must be preceded by `REMOVEPORTRAITS`** or the first BG simply stays
-  in VRAM — `Text()` leaves `activeTextType` at TEXTSTART and `BACG` only decompresses under
-  REMOVEPORTRAITS/_1A22. That is the ch03/ch04 stale-BG bug. **Do not reach for `Text_BG` to extend
-  it**: that macro ends in `EventScr_TextShowWithFadeIn`, which CLEANs and fades up onto the MAP —
-  and before `LOMA` that map is still the host slot's. ch03 and ch04 hand-roll the same sequence for
-  the same reason. `recordch05opening` films the whole backdrop half (49 boxes, two BGs);
-  **both arms are filmed** (#279): `docs/demo/ch05-opening.gif` is the no-Lupin arm (Pinky opens)
-  and `docs/demo/ch05-opening-lupin.gif` is Lupin's. Both are on the FIXED ROM, so they carry the
-  letterbox trim and Sahnar's fade. They agree through scenes 1–3 and diverge from scene 4's first
-  box to the end — the tail is time-shift, not four scenes of difference, so compare by EYE.
-  **Scene 5 then plays AFTER the prep `CALL`** (#280) — its own `FADU(16)`, `CUMO_CHAR` to Basil,
-  the second `CHECK_ALIVE` branch at labels 2/3, then the `CUSA` that joins her. Filmed separately
-  by `recordch05join`/`recordch05joinlupin` (`docs/demo/ch05-join*.gif`) because the two films sit
-  on opposite sides of Preparations.
-- **Scenes 3 and 6 landed at #281, and SAHNAR IS NOW A TURN-1 UNIT.** Ravisin raises her on screen
-  during scene 3 — a `present:` portrait, no dialogue — and scene 6 (`0x9F0`) is vanilla's `0x9C3`
-  exactly: `CUMO_AT(12,6)` → `LOAD1` → **`MOVE` to (9,7)** → `CUMO_CHAR` → the seven boxes. That
-  MOVE is not optional: (12,6) is the arena tile AND the tutorial's `AREA` trigger, so a unit left
-  standing there locks the arena for the whole chapter (`decisions.md` → "A unit's LOAD tile is
-  not its POST"). Her `walks_to` in the chapter YAML owns it. She also carries Joshua's exact AI
-  including his refusal to strike the escort, which rides a GLOBAL character list rather than her
-  own bytes (`decisions.md` → "AI parity can hide in a GLOBAL table"). Scene 6 costs **7**
-  A-presses, not the 6 the table said — the same locked words, re-boxed for the bubble's 29.
-  Films: `docs/demo/ch05-scene3-summon.gif`, `docs/demo/ch05-join-and-sahnar-alone.gif`.
-- **`arrives_turn` no longer means anything for Sahnar, and three scenarios had to be taught that.**
-  `ch05recruit` asserts she is RED on **(9,7)** at turn 1 and counts the eruption's four boxes
-  separately; `recordch05join` runs past the join CUSA through scene 6; `recordch05recruit` no
-  longer ends turn 1 at all. If a placement or trigger moves again, grep the harness for what
-  waited on the old one — `decisions.md` → "A scenario written against the old design will FAIL ON
-  SUCCESS".
-- **Any ch05boot scenario pays for the opening in its BOOT.** It is ~52 A-presses ahead of the map,
-  and `bootToMap()` drives all of it. Every ch05boot scenario now pokes fast config BEFORE the
-  boot; a new one that pokes it after will burn over half the `record*` 300s budget on a scene it
-  never films. **`bootToMap(true)` stops at prep — but it ALSO returns true from its
-  `player_map_idle` branch**, so pair it with `controllerState() ~= "prep_main"` (ch03prep's idiom)
-  or a missed classification silently mashes past the beat you meant to film.
-- **Ravisin's battle taunt is wired NOWHERE.** It is a row in #25's scene table. The no-Lupin arms
-  are no longer in that state: scenes 4 and 5 are BUILT and the mechanism is reusable (#278/#280);
-  the rest are wiring, not invention.
-- **Both caches are cold for ch05.** `.matrix-verdictcache` was invalidated by #281; `ch05arena`,
-  `ch05recruit` and `recordch05join` all re-ran and PASSed on 2026-08-14, and `recordch05opening`
-  with them. Nothing about ch05 needs re-running to start scene 7.
-- **The ENDING SCENES ARE NOT BLOCKED by ch06 hosting** (corrected 2026-08-13, Nicolas) — this
-  file and #25 both claimed they were, and both were wrong. `dev_placeholder_scene()` is the
-  LANDING, standing in for the `MNC2(next)` of an unhosted next chapter; it says nothing about
-  whether an ending CUTSCENE can play before it. **ch04 already ships the pattern**, written while
-  ch05 was unhosted: `MUSC(SONG_VICTORY)` → `FADI` → BACG scene → `branch_on_flag` over its two
-  variants → `FADI` → `dev_placeholder_scene()`. `ch05_ending_script` is that shape with the scene
-  missing (`MUSC` → save-all payout → `FADI` → placeholder), and scenes 16/17 slot in where ch04's
-  do. Hosting ch06 later only swaps the final landing. What the endings DO depend on is the
-  `CHECK_ALIVE` branch, because they are a 2x2 — Basil alive/dead × Lupin present/absent, ids
-  `0x9C9`/`0x9CA` and `0x9CB`/`0x9CC` — which is another reason to build that mechanism at scene 4.
 - **ch05's village-raid RACE is wired and proven in-engine (#254).** A reliquary can be lost
   (raider AI → the tile flips to ruins, no gift, its event id never sets) and saving all four
   pays out vanilla's Guiding Ring at the ending.
@@ -201,6 +90,24 @@ Two questions this used to leave open are now SETTLED — read them, don't re-de
   explicit HANDOFF entry naming what it changed, the active branch/PR and commit state,
   verification actually run, and the exact next step. Ordinary short-lived feature branches in this
   checkout, one at a time — **do not create worktrees unless Nicolas explicitly changes that.**
+- **ch05's OPENING IS COMPLETE, all seven scenes, and filmed.** Backdrop half (1–4) before
+  `LOMA`, then prep, then 5/6/7 on the map. Scene 7 ends on a full-screen bellow CG that ducks
+  the music, shakes, cries (`SOUN(0x32C)`) and restores — see `ch05_moose_charge_block`, whose
+  comments carry the four engine facts that cost a run each. Film:
+  `docs/demo/ch05-moose-charges.gif`.
+- **`--ch05-moose` boots straight to scene 7 (34s vs 4m33s).** Any late beat should get a boot
+  like it BEFORE its first film, not after the third — `decisions.md` → "Playtest runs are the
+  most expensive thing in this repo", rule 3. `bootToMap()` is the wrong driver on such a ROM.
+- **`tools/sfx_preview.py` renders any FE8 sound to WAV from the decomp — no ROM, no emulator.**
+  `--grep <word> --html <file>` writes a page with play buttons and waveforms. Reach for it
+  before ever building a ROM to hear a sound. **`banim_code_sound_*` is NOT the song id space**
+  (`decisions.md` rule 5) — song ids come from `sound/song_table.s` and nowhere else.
+- **`PT_SOUND=1` unmutes a playtest run**, and is in the verdict-cache key. Muted stays the
+  default. **Nothing in the gate listens** — ch05 nearly shipped silent from turn 1 and no
+  scenario, verdict or film caught it (`decisions.md` rule 6).
+- **`run.sh` refuses a ROM older than the campaign sources.** It does not BUILD — only
+  `matrix.py` does — and `make` can re-inject WITHOUT relinking, so "I confirmed it is in the
+  ROM" has to mean the `.gba` and not the injected header (`decisions.md` rule 4).
 
 ## Gotchas most likely to bite next (long form in `docs/decisions.md`)
 
@@ -231,6 +138,11 @@ accuses the chapter, check the scenario is not describing its own bookkeeping.
 its screenshot showed the wrong side of the map — the camera was wherever the fight was. Pan to
 the thing, `wait()` for the scroll, then shoot. The frame now shows the engine's own tile panel
 reading "Ruins".
+
+**A GENERATED COMMENT IS PART OF THE SCRIPT IT DESCRIBES.** Four tests broke in one session
+because an emitted `/* ... */` mentioned the command it was explaining — `TEXTCONT`, `CAMERA`,
+`FADI/FADU`, `MUSI/MUNO` — and the tests grep the generated event script. Describe the command,
+never name it, inside a string that gets emitted.
 
 **A REVIEW ARTIFACT IS NOT ITS INPUTS.** The scene-3 GIF was assembled three times; two of those
 jobs read the frame directory before the scene was re-filmed, one of them finished last and won
