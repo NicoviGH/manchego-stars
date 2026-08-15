@@ -1104,8 +1104,23 @@ def _fe_dialogue_text(s):
 # are always preloads at the top, before any bubble exists (MSG_0954, MSG_095D, MSG_095E). So
 # `present:` renders through the same `preload` path those use, and its POSITION in the script is
 # not meaningful -- put it first, where it reads the way it plays.
-SCRIPT_DIRECTIVES = ('location_card', 'fade_to_black', 'beat_break', 'present', 'exits')
+#
+# `stage_break:` is the one directive that hands the EVENT SCRIPT the middle of a message. Its
+# value is the stage direction itself, so the wordless beat lives in the data rather than in a
+# YAML comment beside it. It renders as vanilla's own `[BreakTalk]` (textdefs.txt: 0x80 0x04 ->
+# scene.c `case 0x04: LockTalk(proc)`), which PAUSES the talk proc without closing the bubble or
+# unloading a face; the script's `TEXTEND` then returns, does its business, and `TEXTCONT`
+# resumes the SAME message. Vanilla splits MSG_9BF exactly this way (a silence and a delay
+# between two halves of one id), and our own lore crawl already ships the idiom.
+#
+# WHY IT MATTERS: the alternative -- splitting the beat across two TEXTSHOWs -- costs a second
+# message id per gap, and hosted-chapter ids are the scarcest thing we have (#25). A break costs
+# none. What it does NOT buy is a scene change: the bubble stays up and the faces stay loaded
+# across the gap, so put a camera move BEFORE the message, not inside it.
+SCRIPT_DIRECTIVES = ('location_card', 'fade_to_black', 'beat_break', 'present', 'exits',
+                     'stage_break')
 _SCRIPT_EXIT = object()   # marker block for `exits:`, kept distinct from any speaker name
+_SCRIPT_BREAK = object()  # marker block for `stage_break:` -- likewise not a speaker name
 
 
 # The portrait podiums in SCREEN order, left to right (tag codes in tools/textencode/msg_list.txt:
@@ -1284,8 +1299,11 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
 
     `location_card` / `fade_to_black` / `beat_break` entries are staged by the
     event script (or split into separate messages), not the message body, and are
-    skipped here. `width` is the wrap width (29 = map speech bubble; ~42 for a
-    full-screen scenic BG -- see _wrap_fe_lines).
+    skipped here. `stage_break` is the exception that IS rendered: it emits
+    vanilla's `[BreakTalk]`, a pause the event script resumes with `TEXTCONT`, so
+    a wordless action can happen mid-message without buying a second message id
+    (see SCRIPT_DIRECTIVES). `width` is the wrap width (29 = map speech bubble;
+    ~42 for a full-screen scenic BG -- see _wrap_fe_lines).
 
     `trailing` is a raw text-code string appended just before the [X] terminator --
     e.g. '[OpenMidLeft][ClearFace]' to fade ONLY that podium's face at the beat's
@@ -1302,6 +1320,13 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
             # because it must break the same-speaker coalescing below, or the fade would play
             # after the lines it is supposed to precede.
             blocks.append((_SCRIPT_EXIT, text))
+            continue
+        if speaker == 'stage_break':
+            # The point where the EVENT SCRIPT takes the scene over (see SCRIPT_DIRECTIVES).
+            # Carried through rather than skipped for the same reason `exits:` is: it has to
+            # land at this POINT in the body, and it must break the same-speaker coalescing
+            # below, or a break between two turns by one character would render after both.
+            blocks.append((_SCRIPT_BREAK, text))
             continue
         if speaker in SCRIPT_DIRECTIVES:
             continue
@@ -1355,6 +1380,10 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
         live[pos] = seed[2] if len(seed) > 2 else '\x00listener'
         lru.append(pos)
     for speaker, pages in blocks:
+        if speaker is _SCRIPT_BREAK:
+            # Every block already ends on [A], so this lands as vanilla's own [A][BreakTalk].
+            parts.append('[BreakTalk]')
+            continue
         if speaker is _SCRIPT_EXIT:
             leaving = pages                       # the marker carries the speaker's name
             open_tag, _fid = staging.get(leaving, (None, None))
@@ -3855,6 +3884,33 @@ def assert_declared_map_sprites_injected(campaign, wired):
                    'SCRIPTED_NEUTRAL_SPRITES.')
 
 
+def assert_custom_art_pid_wired(pid, uid, where):
+    """A chapter staging a unit that OWNS custom map art must stage it under a pid that wears it.
+
+    `assert_declared_map_sprites_injected` cannot see this, and did not: it asks whether an ASSET
+    reached some sprite table, and the white moose's did -- under ch04's pid. ch05 staged the same
+    creature under a pid of its own (pids are per-chapter), that pid was in no override row, and
+    `GetUnitSMSId` fell through to CLASS_GWYLLGI's stock hound. The asset was wired; this unit was
+    not. Nothing between those two statements was being checked.
+
+    So this is the per-PID half, called from the chapter injector that knows which pid it is
+    using. Cheap, and it fails the BUILD rather than shipping a red dog (Nicolas, 2026-08-14).
+    """
+    for asset, char_ids, _donor in SCRIPTED_NEUTRAL_SPRITES:
+        if asset != uid:
+            continue
+        if pid not in char_ids:
+            sys.exit('ERROR: %s stages %r as pid %s, which wears no custom map sprite -- it '
+                     'would render its stock CLASS sprite on the faction palette while the '
+                     'committed art sits unused.\n'
+                     '       Add %s to SCRIPTED_NEUTRAL_SPRITES\'s %r row (it already lists %s).'
+                     % (where, uid, pid, pid, uid, ', '.join(char_ids)))
+        return
+    sys.exit('ERROR: %s asks whether pid %s wears %r, which is in no SCRIPTED_NEUTRAL_SPRITES '
+             'row at all -- either the asset id is misspelled or the creature is cast (which '
+             'goes through PORTRAIT_MAP instead)' % (where, pid, uid))
+
+
 def _inject_scripted_neutral_sprites(campaign, asset_dir, pointer_externs, verbose=True):
     """Map sprites for SCRIPTED NEUTRALS -- units that stand on a map wearing our own art but
     are NOT cast members (no PORTRAIT_MAP slot, no bust/stat/prep wiring), so `classed_cast`
@@ -3870,9 +3926,13 @@ def _inject_scripted_neutral_sprites(campaign, asset_dir, pointer_externs, verbo
     the chwinga path: a scripted neutral never changes faction, and the green NPC palette turns
     index 3 pale-green and index 11 blue -- a green-tinted animal with green blood. Keyed by a
     RAW charId (a pid the injector allocated), not a portrait-slot name.
+
+    A row names SEVERAL charIds, because the same creature is a different pid in each chapter
+    that stages it -- and a missing one reopens the exact hole above for one chapter only. See
+    SCRIPTED_NEUTRAL_SPRITES.
     """
     neutral_ids = []
-    for uid, char_id, donor in SCRIPTED_NEUTRAL_SPRITES:
+    for uid, char_ids, donor in SCRIPTED_NEUTRAL_SPRITES:
         idle_png = os.path.join(asset_dir, uid + '.png')
         if not os.path.isfile(idle_png):
             continue
@@ -3901,14 +3961,17 @@ def _inject_scripted_neutral_sprites(campaign, asset_dir, pointer_externs, verbo
                     '\t.global %s\n%s:\n\t.incbin "graphics/unit_icon/move/%s.4bpp.lz"\n'
                     '\t.align 2, 0\n' % (uid, move_sym, move_sym, move_sym))
         pointer_externs += ['extern char %s[];' % wait_sym, 'extern char %s[];' % move_sym]
-        _insert_table_head(UNIT_ICON_WAIT_C, 'gMapSpriteOverride[]',
-                           '\t%s, %d,\n' % (char_id, sms))
-        _insert_table_head(UNIT_ICON_MOVE_C, 'gMuImgOverride[]',
-                           '\t{%s, %s},\n' % (char_id, move_sym))
-        neutral_ids.append((uid, char_id, sms))
+        # ONE sheet pair and ONE SMS slot for the asset; one override row per PID that wears it.
+        # A second chapter reusing the creature costs two table rows, not a second sprite.
+        for char_id in char_ids:
+            _insert_table_head(UNIT_ICON_WAIT_C, 'gMapSpriteOverride[]',
+                               '\t%s, %d,\n' % (char_id, sms))
+            _insert_table_head(UNIT_ICON_MOVE_C, 'gMuImgOverride[]',
+                               '\t{%s, %s},\n' % (char_id, move_sym))
+            neutral_ids.append((uid, char_id, sms))
         if verbose:
-            print('  %-12s -> scripted-neutral idle SMS %d + MU (charId %s, cast palette)'
-                  % (uid, sms, char_id))
+            print('  %-12s -> scripted-neutral idle SMS %d + MU (charIds %s, cast palette)'
+                  % (uid, sms, ', '.join(char_ids)))
     return neutral_ids
 
 
@@ -8281,12 +8344,8 @@ CH04_MOOSE_PID = '0xce'                         # its own pid (DISA targets it, 
 CH04_MOOSE_GUARD_FLAG = 'EVFLAG_TMP(10)'        # AREA one-shot guard (must differ from the talk flag)
 CH04_MOOSE_CLASS = 'CLASS_GWYLLGI'              # geometry token: the 32x32 quadruped wait row
 CH04_MOOSE_MOV_TABLE = 'TerrainTable_MovCost_AnimalT2Normal'   # the Gwyllgi's own cost row
-# Scripted NEUTRALS carrying custom map art (see _inject_scripted_neutral_sprites): units that
-# stand on a map wearing our own sprite without being cast members, so classed_cast never sees
-# them. (campaign asset id, raw charId, donor base for the wait-row GEOMETRY only).
-SCRIPTED_NEUTRAL_SPRITES = (
-    ('white-moose', CH04_MOOSE_PID, 'Gwyllgi'),
-)
+# (SCRIPTED_NEUTRAL_SPRITES lives further down, below the ch05 pid block: it is a CROSS-CHAPTER
+#  registry and its rows name pids from more than one chapter.)
 # Where the party first SEES it: the mid-map clearing, on the tomb-side (NE) half of the 15x15
 # map. Its authored YAML route then crosses the east bridge and exits to the southeast.
 CH04_MOOSE_POS = (11, 4)
@@ -8652,6 +8711,26 @@ CH05_SAHNAR_ALONE_SLOT = ('vanilla 0x9C3', 0x9F0, 7, 'Sahnar alone in the sarcop
 # vanilla's own 0x9C3 gives Joshua, alone on this same tile. NO no_lupin_fallback: she has never
 # met the wolf and does not mention him, so this scene has one arm and costs one id.
 CH05_SAHNAR_ALONE_PODIUMS = {'sahnar': '[OpenMidRight]'}
+# ── Scene 7 (#25): the LAST beat before the map -- Pinky asks, and the moose answers ─────────
+# The twin is vanilla's 0x9C4, and we take its POSITION and not its content (chapter YAML,
+# Nicolas 2026-07-29): Natasha steeling herself is cut, but the SLOT -- the final on-map beat
+# before turn 1, a bubble over the field -- is inherited whole, down to vanilla's own
+# `CAMERA/CUMO -> STAL/CURE -> TEXTSTART/TEXTSHOW` shape.
+#
+# TWO boxes and ONE id, and that pairing is the finding. The beat is a setup/punchline across a
+# WORDLESS action -- Pinky asks, the moose bellows and breaks, Meesmickle answers sideways -- so
+# something has to happen between the presses. Splitting it into two TEXTSHOWs would have cost a
+# second hosted id (#25 has exactly one spare left). It does not: `stage_break:` renders
+# vanilla's `[BreakTalk]`, the event script does its business at the pause and `TEXTCONT` resumes
+# the same message. See SCRIPT_DIRECTIVES for what that pause does and does not buy.
+CH05_MOOSE_CHARGE_SLOT = ('vanilla 0x9C4', 0x9F1, 2,
+                          'Pinky asks why the moose is not running; it charges')
+# Pinky KEEPS THE FAR RIGHT he holds in scene 4 -- he closes the arrival on either arm and he
+# opens this one, and a character who changes seats between his scenes reads as a different
+# person each time. Meesmickle has no ch05 seat yet and takes mid-left: the widest two-shot the
+# ladder offers against FarRight, so the setup and the punchline come from opposite sides of the
+# screen rather than from neighbouring rungs.
+CH05_MOOSE_CHARGE_PODIUMS = {'meesmickle': '[OpenMidLeft]', 'pinky': '[OpenFarRight]'}
 # Four speakers, four podiums, which is the face budget exactly (FACE_SLOT_COUNT = 4) -- so
 # nothing is evicted mid-scene. Seated in the order they speak, left to right, and Pinky holds
 # the far right in BOTH arms: he closes the scene on either path, and on the no-Lupin path he
@@ -8696,6 +8775,24 @@ CH05_SAHNAR_PID = '0xba'                         # Sahnar: her own pid so Basil'
                                                  # (#203's lesson). Becomes her CHARACTER_ slot
                                                  # when the recruit pass gives her one (#25).
 CH05_GENERIC_PID = '0x80'                        # autolevelled trash (vanilla Ch6's own generic)
+# Scripted units carrying custom map art that no CAST pass can see: they stand on a map wearing
+# our own sprite without being cast members, so `classed_cast` never looks at them.
+# Row = (campaign asset id, the raw charIds that wear it, donor base for the wait-row GEOMETRY).
+#
+# THE CHARIDS ARE A TUPLE, AND THAT IS THE FIX FOR A REAL BUG (Nicolas spotted it 2026-08-14).
+# One asset can be worn by SEVERAL pids, because a pid is per-chapter: the white moose is ch04's
+# green scripted neutral at 0xce AND ch05's red miniboss at 0xb9. The registry held 0xce alone,
+# so ch05's moose fell through `GetUnitSMSId` to CLASS_GWYLLGI's stock hound on the enemy palette
+# -- a red dog standing in for the chapter's cornered elk, with the Wyrdeer sheets committed and
+# ch05's own YAML claiming they had shipped. Exactly the failure `_inject_scripted_neutral_sprites`
+# was written to end, one chapter over, and invisible for the same reason: nothing tried and
+# failed, nothing tried at all.
+#
+# The sheets and the SMS slot are claimed ONCE per asset; only the two override tables gain a row
+# per pid. Reading the tables out of the POST-INJECTION tree is what proves it -- HEAD has neither.
+SCRIPTED_NEUTRAL_SPRITES = (
+    ('white-moose', (CH04_MOOSE_PID, CH05_MOOSE_PID), 'Gwyllgi'),
+)
 # Raw CharacterData identity binding. Riev contributes collision-free name/portrait slots:
 # MSG_246 is retitled Ravisin and portrait id 0x48 is dressed from ravisin.png.
 RAW_PID_PORTRAITS = {
@@ -8779,7 +8876,7 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
              *(msg for _slot, msg, _boxes, _what in CH05_OPENING_SLOTS),
              CH05_ARRIVAL_SLOT[1], CH05_ARRIVAL_NO_LUPIN_MSG,
              CH05_BASIL_JOIN_SLOT[1], CH05_BASIL_JOIN_NO_LUPIN_MSG,
-             CH05_SAHNAR_ALONE_SLOT[1],
+             CH05_SAHNAR_ALONE_SLOT[1], CH05_MOOSE_CHARGE_SLOT[1],
              CH05_GOAL_WINDOW_MSG, CH05_GOAL_STATUS_MSG,
              *(slot[1] for slot in CH05_VILLAGE_SLOTS.values())),
     # Goal ids only -- ch01/ch02 predate the per-chapter block registry, but their goal strings
@@ -10356,6 +10453,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
         None, 'white-moose', CH04_MOOSE_CLASS, 1, mx, my, '0',
         ' /* the white moose -- scripted quarry, never fought (canon: uncatchable) */',
         allegiance='GREEN', char=CH04_MOOSE_PID)
+    assert_custom_art_pid_wired(CH04_MOOSE_PID, 'white-moose', 'ch04')
     # Its authored bridge route has to be WALKABLE or MOVE_DEFINED + ENUN hangs the chapter.
     moose_data = next(u for u in chap['neutral_units'] if u['id'] == 'white-moose')
     moose_camera = tuple(moose_data['camera_at'])
@@ -10941,6 +11039,67 @@ def ch05_sahnar_alone_message(chap):
     return [(msg, body)]
 
 
+def ch05_moose_charge_message(chap):
+    """Scene 7 -- Pinky asks, the moose answers -- as ONE (msg_id, body) pair.
+
+    Two boxes, one id, and a `[BreakTalk]` between them: the wordless charge happens at that
+    pause, driven by `ch05_moose_charge_block`. One arm, so no variant -- the moose is ch04's
+    quarry and Lupin's presence changes nothing about it (Pinky is the party's other ch04
+    tracker and asks the question on either path).
+
+    Rendered at the talk bubble's 29, not the backdrop scenes' 42: this is the last ON-MAP beat
+    before turn 1, played after the prep CALL alongside scenes 5 and 6.
+    """
+    slot, msg, boxes, what = CH05_MOOSE_CHARGE_SLOT
+    script, body = _ch05_opening_scene(
+        chap, slot, boxes, what, CH05_MOOSE_CHARGE_PODIUMS,
+        _make_fid({}, 'ch05 scene 7: unknown cutscene speaker'), width=29)
+    # The whole point of the id saving is the mid-message pause; without it the two boxes run
+    # together and the charge plays after both, which is the joke told backwards.
+    if body.count('[BreakTalk]') != 1:
+        sys.exit('ERROR: ch05 scene 7 must hold exactly ONE `stage_break:` -- the moose\'s '
+                 'charge is the beat between Pinky\'s question and Meesmickle\'s answer, and '
+                 'the event script TEXTCONTs it exactly once; got %d'
+                 % body.count('[BreakTalk]'))
+    del script
+    return [(msg, body)]
+
+
+def ch05_moose_station(chap):
+    """(pen tile, charge tile) for the white moose -- where it fights, and where it lunges to.
+
+    Two tiles, and the FIRST is the one that matters mechanically: the pen is the parity-locked
+    position the difficulty read is grounded on (threat 14.1, cornered against the map's top
+    edge), so the charge is a cutscene lunge that gets snapped back, never a placement. Required
+    rather than defaulted for the same reason Sahnar's `walks_to` is: a missing one is invisible
+    to every check we have and would quietly turn a staged beat into a repositioning.
+    """
+    moose = next(e for e in chap['enemy_units'] if e['id'] == 'white-moose')
+    pen = tuple(moose['positions'][0])
+    if 'charges_to' not in moose:
+        sys.exit('ERROR: ch05\'s white moose has no `charges_to` -- scene 7 is a setup and a '
+                 'punchline across the charge, and with nowhere to charge TO the beat is two '
+                 'lines and a pause')
+    return pen, tuple(moose['charges_to'])
+
+
+def ch05_party_camera_tile(chap):
+    """The tile scene 7 cuts back to: vanilla's own `CAMERA(5, 18)` for this same beat.
+
+    Asserted against our `deploy_slots` rather than trusted, because the retile is what makes
+    vanilla's number ours: ch05 lifts Ch5's nine player start tiles 1:1, so (5,18) is a tile the
+    party is standing on -- but a future re-paint that moved the pocket would leave this framing
+    an empty corner, silently, with nothing else complaining.
+    """
+    tile = (5, 18)
+    slots = {tuple(s) for s in chap['deployment']['deploy_slots']}
+    if tile not in slots:
+        sys.exit('ERROR: ch05 scene 7 frames the party at %r, which is no longer one of the '
+                 'chapter\'s deploy_slots %s -- the last shot before turn 1 would hold on an '
+                 'empty tile' % (tile, sorted(slots)))
+    return tile
+
+
 def ch05_sahnar_station(chap):
     """(load tile, fighting tile) for Sahnar -- vanilla's (12,6) then (9,7).
 
@@ -10973,10 +11132,19 @@ def ch05_sahnar_alone_block(sahnar_table, sahnar_char, position, station):
     This is also where `arrives_turn: 2` stopped being ours (#25, Nicolas 2026-08-14): Sahnar
     is on the map from turn 1, exactly as vanilla's Joshua is, and the eruption keeps its six
     reinforcements without her.
+
+    THE `CAMERA` IS NOT DECORATION AND WAS MISSING UNTIL 2026-08-14. `CUMO_AT` draws a cursor
+    and nothing else -- `EventDisplayCursor_Loop` calls `PutMapCursor` and returns -- so this
+    beat was framed by whatever `LOMA` happened to leave, which is the map's north-west and
+    happens to hold the arena. It looked right on film and was resting on an accident: anything
+    that moved the reload origin would have played the scene off-screen with no error anywhere.
+    Vanilla pairs the two here too (`CAMERA(0, 0)` ahead of its own `CUMO_AT(12, 6)`), and ours
+    now names the tile it actually wants rather than inheriting a corner.
     """
     _slot, msg, _boxes, what = CH05_SAHNAR_ALONE_SLOT
     (x, y), (gx, gy) = station
-    return ('    CUMO_AT(%d, %d) /* the arena tile -- vanilla frames it before she arrives */\n'
+    return ('    CAMERA(%d, %d) /* the SCROLL -- CUMO alone only draws a cursor */\n'
+            '    CUMO_AT(%d, %d) /* the arena tile -- vanilla frames it before she arrives */\n'
             '    STAL(60)\n'
             '    CURE\n'
             '    LOAD1(0x1, %s) /* Ravisin called her up in scene 3; here she rises */\n'
@@ -10992,7 +11160,74 @@ def ch05_sahnar_alone_block(sahnar_table, sahnar_char, position, station):
             '    TEXTSHOW(0x%X) /* 6 -- %s */\n'
             '    TEXTEND\n'
             '    REMA\n'
-            % (x, y, sahnar_table, sahnar_char, gx, gy, x, y, sahnar_char, msg, what))
+            % (x, y, x, y, sahnar_table, sahnar_char, gx, gy, x, y, sahnar_char, msg, what))
+
+
+def ch05_moose_charge_block(moose_pid, station, party_tile):
+    """Scene 7, the last beat before turn 1: Pinky asks, the moose answers, the fight starts.
+
+    `CAMERA` IS THE SCROLL AND `CUMO` IS ONLY A POINTER. `EventDisplayCursor_Loop` (eventscr.c)
+    calls `PutMapCursor` and nothing else -- it never moves the view -- so a CUMO on its own
+    frames whatever the last CAMERA left, which after `LOMA` happens to be the map's north and
+    is why the beats above it look framed. Vanilla pairs the two at this exact beat
+    (`CAMERA(5, 18)` then `CUMO_CHAR` ahead of its own 0x9C4), and the first cut of this wiring
+    did not: it shipped a `CUMO_AT` where the party framing was meant and the film simply never
+    cut south (caught 2026-08-14 by watching the run, not by reading it).
+
+    ONE camera position for the whole message, and that is forced rather than chosen.
+    `[BreakTalk]` only LOCKS the talk proc (scene.c `case 0x04`) -- the bubble stays up and the
+    faces stay loaded across the gap -- so a camera move inside the message would scroll the map
+    out from under an open bubble whose tail points at nothing. The frame therefore goes where
+    the LINE is about: the moose's pen, so the player is looking at the thing Pinky is asking
+    about while he asks it, and the charge that answers him plays in the same shot. Only after
+    `REMA` does it cut south, which is also how the map comes up on the party for turn 1.
+
+    THE CHARGE IS NET-ZERO. The moose walks out of the pen on screen, and then a NEGATIVE-speed
+    `MOVE` puts it back instantly -- `Event2F_MoveUnit` short-circuits a speed < 0 to a bare
+    `MoveUnit_`, which is vanilla's own off-screen reposition (`ch14a` resets Carlyle with
+    `MOVE(0xffff, ...)` twice around one scene). It runs after `REMA` and after the camera has
+    already cut south to the party, so there is nothing to see even if the instant move were not
+    instant. The fight begins from the parity-locked pen (chapter YAML: `positions` vs the new
+    `charges_to`), which is what Nicolas asked for when the literal ask -- start further back and
+    charge INTO the pen -- turned out to have no tile behind it: the pen is on the map's top edge.
+
+    The music DROPS OUT under the bellow rather than swelling: `MUSCMID(SONG_SILENT)` is
+    vanilla's own punctuation at exactly this kind of pause (`MSG_9BF`'s BreakTalk gap does it),
+    and it leaves "You had to ask?" landing in silence a beat before the map's own track comes up.
+    The moose does not speak, and it never has -- locked 2026-07-03 and re-locked by this chapter.
+
+    NO unit is named for the camera on the party side, and that is deliberate. ch05 deploys 9 of
+    a 10-unit pool, so BOTH of this scene's speakers can be benched, and `CUMO_CHAR` on a benched
+    unit finds a `US_NOT_DEPLOYED` body at stale coordinates and pans to it. `CUMO_AT` takes a
+    tile. (The bubble does not need a unit either way -- `StartTalkOpen` anchors it to the
+    speaking FACE SLOT, not to anything on the map.)
+    """
+    _slot, msg, boxes, what = CH05_MOOSE_CHARGE_SLOT
+    (px, py), (cx, cy) = station
+    ax, ay = party_tile
+    return ('    CAMERA(%d, %d) /* the SCROLL -- CUMO alone only draws a cursor */\n'
+            '    CUMO_AT(%d, %d) /* the pen: the moose at bay among the standing dead */\n'
+            '    STAL(60)\n'
+            '    CURE\n'
+            '    TEXTSTART\n'
+            '    TEXTSHOW(0x%X) /* %d -- %s */\n'
+            '    TEXTEND /* [BreakTalk]: the talk proc locks; the scene is ours until resumed */\n'
+            '    MUSCMID(SONG_SILENT) /* the bellow -- the music drops out under it */\n'
+            '    MOVE(0x0, %s, %d, %d) /* it breaks and comes straight at them */\n'
+            '    ENUN\n'
+            '    TEXTCONT /* ...and Meesmickle answers the question sideways */\n'
+            '    TEXTEND\n'
+            '    REMA\n'
+            '    CAMERA(%d, %d) /* cut south -- vanilla\'s own framing ahead of this beat */\n'
+            '    CUMO_AT(%d, %d) /* back on the party at the stair-foot, off the rim */\n'
+            '    STAL(30)\n'
+            '    CURE\n'
+            '    MOVE(0xffff, %s, %d, %d) /* Ravisin\'s hold snaps it back to the pen: speed < 0\n'
+            '                                is an INSTANT MoveUnit_, and the camera is already\n'
+            '                                south. The fight starts from the locked tile. */\n'
+            '    ENUN\n'
+            % (px, py, px, py, msg, boxes, what,
+               moose_pid, cx, cy, ax, ay, ax, ay, moose_pid, px, py))
 
 
 def ch05_opening_backdrop_block():
@@ -11129,6 +11364,10 @@ def ch05_beginning_script(chap, basil_char, sahnar_table, sahnar_char,
             # turn-1 unit rather than a turn-2 riser (#25, Nicolas 2026-08-14).
             + ch05_sahnar_alone_block(sahnar_table, sahnar_char, None,
                                       ch05_sahnar_station(chap))
+            # Scene 7, and the map begins on its last word. The moose has been standing in the
+            # turn-1 line since before prep, so this beat only has to look at it.
+            + ch05_moose_charge_block(CH05_MOOSE_PID, ch05_moose_station(chap),
+                                      ch05_party_camera_tile(chap))
             + '    ENUT(8)\n    EVBIT_T(7)\n    ENDA\n}')
 
 
@@ -11364,6 +11603,14 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, verbose=True):
         # it (ch05_sahnar_station), so the escort Basil has to survive is measured to where
         # Sahnar actually stands and fights.
         must_reach=ch05_sahnar_station(chap)[1])
+    # The moose is ch04's creature under a ch05 pid, and a pid is what the sprite tables are
+    # keyed on -- so this is the check that it is an ELK here and not CLASS_GWYLLGI's hound.
+    assert_custom_art_pid_wired(CH05_MOOSE_PID, 'white-moose', 'ch05')
+    # Scene 7's charge is a MOVE + ENUN, so a `charges_to` the moose cannot WALK to would hang
+    # the chapter on the last beat before turn 1 -- ch04's own soft-lock, on the same animal.
+    _moose_pen, _moose_charge = ch05_moose_station(chap)
+    assert_scripted_move_reachable(maps_dir, CH05_LAYOUT[1], _moose_pen, _moose_charge,
+                                   CH04_MOOSE_MOV_TABLE, 'the white moose (ch05 scene 7)')
     bx, by = CH05_BASIL_GREEN_POS
     declare_unit_table(CH05_BASIL_TABLE, [_ally_unit_entry(
         leader, basil[1], basil[3], basil[4], bx, by, ', '.join(CLASS_LOADOUT[basil[2]]),
@@ -11498,7 +11745,7 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, verbose=True):
     set_message_body(lines, CH05_RAVISIN_DEATH_MSG, ch05_ravisin_death_message(chap))
     set_message_body(lines, CH05_SAHNAR_TALK_MSG, ch05_sahnar_talk_message(chap))
     for msg_id, body in (ch05_opening_messages(chap) + ch05_basil_join_messages(chap)
-                         + ch05_sahnar_alone_message(chap)):
+                         + ch05_sahnar_alone_message(chap) + ch05_moose_charge_message(chap)):
         set_message_body(lines, msg_id, body)
     for msg_id, body in arena_wiring['messages']:
         set_message_body(lines, msg_id, body)
