@@ -291,6 +291,23 @@ enemy_units:
     positions: [[10, 0]]        # the north rim, penned against the top edge and inside Ravisin's
                                 # guard cluster — "cornered" as the map description has it, and the
                                 # one vanilla tile the player cannot reach without committing north
+    # ── Scene 7's wordless beat: the moose breaks, in three legs ──────────────
+    # Lengthened 2026-08-15 (Nicolas): the first cut dropped four tiles straight down the x=10
+    # lane, which was over almost before it read. It now starts in the top-RIGHT corner, runs
+    # LEFT along the rim and then turns DOWN through its pen at the party — a longer path, and
+    # one that turns on screen instead of travelling in a straight line.
+    # THE FIGHT STILL STARTS AT (10,0). This is a cutscene lunge, not a placement: the moose is
+    # put on `charge_from` off camera before the beat and snapped back to `positions` after it,
+    # so the parity read stays grounded on the locked pen (threat 14.1, cornered).
+    charge_from: [14, 0]        # the top-right corner. Free at turn 1 — (13,0)/(14,1) are the
+                                # turn-2 archer spawns and nothing stands here before then.
+    charge_route:               # authored legs, not a pathfinder's guess: the PATH is the beat.
+      - [10, 0]                 #   left along row 0 — the only walkable stretch of it (x=10..14;
+                                #   x=1..8 are TERRAIN_2E pillars and x=9 is impassable), and it
+                                #   passes through the pen it will be hauled back to
+      - [10, 4]                 #   then down the open x=10 lane at the party. Rows 0-7 of that
+                                #   column are all plains and unoccupied — (9,4) holds a
+                                #   spear-guard, (10,4) does not.
     class: gwyllgi              # CLASS_GWYLLGI (FE8 beast) stand-in quadruped
     level: 6
     inventory:
@@ -313,10 +330,17 @@ enemy_units:
     death_quote: "*a final, almost-human bellow*"
     skin:                       # the one beast; closes YAML TODO #38/#39 (read as elk, not wolf)
       look: "the White Moose — a great pale elk"
-      # SHIPPED 2026-07-31: map sprite + portrait adopt **Wyrdeer** (Anarlaurendil, DeviantArt,
-      # CC BY-SA 3.0) — see chapters/ch04-the-white-moose.yaml `art:` for the full recipe and for
-      # why it rides the CAST palette rather than the faction-tinted standard SMS one. The earlier
-      # "Gwyllgi frost repal" plan is retired: the FE-Repo has NO elk art (docs/fe-repo-scouting.md).
+      # Map sprite + portrait are **Wyrdeer** (Anarlaurendil, DeviantArt, CC BY-SA 3.0) — see
+      # chapters/ch04-the-white-moose.yaml `art:` for the full recipe and for why it rides the
+      # CAST palette rather than the faction-tinted standard SMS one. The earlier "Gwyllgi frost
+      # repal" plan is retired: the FE-Repo has NO elk art (docs/fe-repo-scouting.md).
+      # LIVE IN CH05 SINCE 2026-08-14, and it was NOT before, though this block said "SHIPPED
+      # 2026-07-31" for a fortnight. The art shipped; the WIRING was ch04's alone. Sprite tables
+      # are keyed on pid, a pid is per-chapter, and ch05's moose (0xb9) was in neither override
+      # row — so it rendered CLASS_GWYLLGI's stock hound on the red enemy palette while this
+      # comment claimed an elk. Spotted by Nicolas off a playtest frame. The registry now takes
+      # a TUPLE of pids per asset and `assert_custom_art_pid_wired` fails the build for the next
+      # chapter that stages a creature under a pid nothing dressed.
       source: "DeviantArt: 'Wyrdeer - full sprite' by Anarlaurendil (CC BY-SA 3.0)"
       battle_anim_todo: "PMD SpriteCollab sprite/0899 (Wyrdeer) — RearUp/Attack/Charge supply the
         three ready/windup/peak poses inject_battle_anims wants (CC BY-NC 4.0). Still owed (#25);
@@ -1033,10 +1057,22 @@ events:
       Not deferred, not homeless: cut. Her nerve is not a beat this chapter needs stated, and 0x9BB
       already establishes what she is walking toward.
       LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 2 boxes.
+      WIRED 2026-08-14 (#25) at host message 0x9F1, as an ON-MAP bubble (wraps at 29) played
+      AFTER the prep CALL alongside scenes 5 and 6 — the last thing before turn 1. The two boxes
+      share ONE id: the wordless middle beat is a `stage_break:`, vanilla's `[BreakTalk]`, which
+      pauses the message so the event script can act and `TEXTCONT` resumes it. Splitting the
+      beat across two TEXTSHOWs would have cost a second id for nothing.
+      THE CHARGE IS NET-ZERO, and that is a balance requirement rather than a staging taste
+      (Nicolas, 2026-08-14): the moose breaks out of its pen on screen and is hauled back to
+      (10,0) afterwards, off camera, so the fight begins from the locked position the parity
+      read is grounded on. Its post is row 0 — the map's top edge — so there is no tile behind
+      it to charge FROM; the lunge has to run forward and be checked. Ravisin's hold is the
+      check, which this chapter already says out loud: she is the reason it is cornered at all.
     script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
       # (The hollow. The moose stands at bay among the standing dead. Nothing has moved.)
       - pinky: "...It's not running. Why isn't it running?!"
-      # (The moose throws its head back and BELLOWS -- then breaks and comes straight at them.)
+      - stage_break: "The moose throws its head back and BELLOWS -- then breaks and comes
+          straight at them, until Ravisin's hold snaps it back."
       - meesmickle: "You had to ask?"
       # (Cue battle. -> PREP -> turn 1.)
   # ── 0x9D5/0x9D6 — the arena's systemic tutorial. Vanilla teaches it HERE, in Ch5. ──

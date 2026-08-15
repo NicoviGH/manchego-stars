@@ -4758,6 +4758,37 @@ candidate unit's `state`, its grid cell, its weapon range, whether the engine ca
 legal), read it, then fix everything it shows. `inspect_state.py render` is the first stop, not
 the last. A generalisation of the standing rule "do not re-run to re-test a hypothesis the
 evidence already killed" — re-running to test a *new* hypothesis one at a time costs the same.
+
+**3. A beat at the END of a long scene gets a DEBUG BOOT before it gets a film.**
+Nicolas, 2026-08-15, stopping a run himself mid-scene: *"you're filming the wrong scene... that's
+the chapter intro not the moose thing we're working on."* ch05's scene 7 is the last beat of a
+~52-A-press opening, so `recordch05join` replayed four backdrop scenes, Preparations, the join
+and Sahnar's monologue — **4m33s of footage he had already signed off — to reach ten seconds of
+moose.** Three times. The rules above are about which scenarios to run; this is about what a
+single run costs before it reaches the thing under review, and it is the same waste wearing a
+different hat.
+
+The fix is a boot that LANDS on the beat: `--ch05-moose` replaces the whole beginning scene with
+scene 7 and the two LOAD1s it cannot do without, so New Game → title → chapter intro → the beat.
+**4m33s → 34s**, and iteration becomes compile-time only. It is cheap — the block was already
+factored (`ch05_moose_charge_block`), so the debug script is that call plus `LOMA` — and it
+should be built BEFORE the first film of a late beat, not after the third.
+
+Two things to get right, both learned by getting them wrong:
+- **`bootToMap()` is the wrong driver on a debug boot**, because it drives to `player_map_idle`
+  and on such a ROM the beginning scene IS the beat — so it mashes A through the whole thing and
+  hands the film an idle map (measured: 3000 frames of nothing). Stop at `chapter_intro_input`,
+  spend its one press, and let the film open on the `FADU` so the camera move and the hold are
+  in shot.
+- **The debug flag must not touch the shipping script.** `--ch05-moose` is a branch at the top of
+  `ch05_beginning_script` and nothing else; a test asserts the real opening still carries prep
+  and scenes 5–7.
+
+The wider rule this instantiates: *the fast-boot idea is not ch05's*. `TESTCH` and `--lord-boot`
+are the same move for the test chapter and the lord-select screen. Any feature whose screen is
+hard to reach should get one first — save-states do not substitute (they are invalid across code
+changes) and `PT_FPS=240` is only a fallback.
+
 _Decided: 2026-08-10 (Nicolas)._
 
 **A green scenario whose inputs are byte-identical does not re-run. That is a build-system

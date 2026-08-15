@@ -7550,10 +7550,23 @@ scenarios.recordch05join = function(expect)
     -- it costs nothing here, where the 49-box opening and prep are already paid for. A separate
     -- film would pay that boot again to capture seven boxes.
     local SCENE6_BOXES = 7
+    -- ...and SCENE 7 after it, the last beat before turn 1 (#25). Two boxes with the moose's
+    -- charge between them, which is the ONLY reason this film runs on again: the charge is
+    -- NET-ZERO by construction (it breaks out of the pen and a negative-speed MOVE snaps it
+    -- back off camera) and "it ended where it started" is indistinguishable from "it never
+    -- moved" unless something watches the middle. So this samples the moose's tile every frame
+    -- and latches BOTH halves -- it left the pen, and it is back on it when the map goes live.
+    -- Its pen is parity-locked (threat 14.1, cornered on the map's top edge); a charge that
+    -- quietly relocated it would hand the player a monster four tiles closer for free, and
+    -- nothing static would ever see it.
+    -- RUN_X/RUN_Y is the route's LAST leg, and the latch has to be that rather than "moved at
+    -- all": since 2026-08-15 the moose is placed in the top-right corner before the beat, so it
+    -- is already off its pen for the whole film and "not on (10,0)" proves nothing.
+    local SCENE7_BOXES, MOOSE, PEN_X, PEN_Y, RUN_X, RUN_Y = 2, 0xb9, 10, 0, 10, 4
     local boxes, waiting, warned = 0, false, false
-    local joined = false
+    local joined, scene6, charged, nocharge = false, false, false, false
     return recordCutscene({
-        tag = "ch05join", speed = "normal", maxFrames = 12000, shotEvery = 4, pressEvery = 90,
+        tag = "ch05join", speed = "normal", maxFrames = 15000, shotEvery = 4, pressEvery = 90,
         pre = function()
             -- Fast config BEFORE the boot, never after: this ROM is 49 boxes of opening ahead of
             -- Preparations, and a scenario that pokes it afterwards burns most of its budget on a
@@ -7602,12 +7615,116 @@ scenarios.recordch05join = function(expect)
             -- with a missing LOAD1 or a camera parked elsewhere renders as "the text happened
             -- and looked wrong", which no memory assertion sees. That is the whole reason this
             -- is a film and not a check.
-            if joined and boxes == expect + SCENE6_BOXES
+            -- Latched: this used to BE the terminal, and a terminal only fires once. Now that
+            -- the film runs on into scene 7 it is a waypoint, and an unlatched waypoint logs
+            -- the same line on every frame until the next box lands.
+            if not scene6 and joined and boxes == expect + SCENE6_BOXES
                 and findUnit(SYM.gUnitArrayRed, 24, SAHNAR)
                 and controllerState() ~= "dialogue_wait" then
+                scene6 = true
                 log(string.format("ch05join: scene 6 played its %d boxes with Sahnar RED on the "
                     .. "arena -- the summon put her there and the bubble had her to anchor to",
                     SCENE6_BOXES))
+            end
+            -- Scene 7. Sample the moose EVERY frame, not at the terminal: the charge is the
+            -- middle of a message and it is undone before the scene ends, so the terminal alone
+            -- cannot tell a lunge that ran from one that never fired.
+            local moose = findUnit(SYM.gUnitArrayRed, 24, MOOSE)
+            if moose and not charged and moose.x == RUN_X and moose.y == RUN_Y then
+                charged = true
+                log(string.format("ch05join: the moose RAN the route -- corner, left along the "
+                    .. "rim, then down to (%d,%d)", RUN_X, RUN_Y))
+            end
+            -- The terminal is the moose STANDING ON ITS PEN after the scene's last box, and it
+            -- is deliberately not "the last box landed". The snap back is three commands later
+            -- (REMA, camera, STAL(30)), so there is a legitimate ~43-frame window -- measured on
+            -- the 2026-08-14 run -- in which the moose is still on its charge tile with the
+            -- boxes all spent. A terminal that read that window would call the reset a defect
+            -- while it was on its way. Waiting for the pen instead makes a charge that never
+            -- came BACK time the film out, which is the failure we actually want to see.
+            if joined and charged and boxes == expect + SCENE6_BOXES + SCENE7_BOXES
+                and moose and moose.x == PEN_X and moose.y == PEN_Y
+                and controllerState() ~= "dialogue_wait" then
+                log(string.format("ch05join: scene 7 played its %d boxes; the moose charged and "
+                    .. "is back on (%d,%d) -- net-zero, so the fight starts where parity says",
+                    SCENE7_BOXES, PEN_X, PEN_Y))
+                return true
+            end
+            -- Both halves diagnosed WHERE THEY HAPPEN, latched, so the log carries the reason
+            -- rather than leaving the generic "never reached its end" to be read backwards.
+            if not nocharge and not charged
+                and boxes == expect + SCENE6_BOXES + SCENE7_BOXES
+                and controllerState() ~= "dialogue_wait" then
+                nocharge = true
+                log("ch05join: scene 7's boxes are spent and the moose never reached the end of "
+                    .. "its route -- the charge is missing, and the beat is two lines and a pause")
+            end
+            return false
+        end,
+    })
+end
+
+-- recordch05moose (#25): scene 7 ALONE -- Pinky asks, the moose breaks, Meesmickle answers.
+-- Runs on `ch05mooseboot`, whose beginning scene IS this beat: no backdrops, no PREP, no join,
+-- no Sahnar monologue. `recordch05join` can reach scene 7 too and pays ~52 A-presses of approved
+-- footage to do it, which is four and a half minutes of watching to review ten seconds; Nicolas
+-- stopped a run over exactly that (2026-08-15). Iteration on a late beat is a BUILD, not a
+-- playthrough -- so this films from the first frame of the thing under review.
+-- What only a run can answer, and all three are things a still would hide:
+--   * the bubble is DOWN while the moose runs ([CloseSpeechSlow]; it used to charge underneath
+--     Pinky's box and was covered),
+--   * the route TURNS on screen -- top-right corner, left along the rim, then down at them,
+--   * and the moose is back on its parity-locked pen when the map goes live.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05moose (needs a CH05MOOSE=1 ROM).
+scenarios.recordch05moose = function()
+    local MOOSE, PEN_X, PEN_Y, RUN_X, RUN_Y = 0xb9, 10, 0, 10, 4
+    local BOXES = 2
+    local boxes, waiting, charged = 0, false, false
+    return recordCutscene({
+        tag = "ch05moose", speed = "normal", maxFrames = 3000, shotEvery = 3, pressEvery = 90,
+        pre = function()
+            -- Fast config BEFORE the boot, as every ch05boot scenario must -- though on THIS
+            -- ROM the boot is a title screen and a chapter intro, not an opening.
+            pokeFastConfig()
+            -- NOT bootToMap(): it drives to `player_map_idle`, and on this ROM the beginning
+            -- scene IS the beat, so it would mash A through both boxes and hand the film an
+            -- idle map. (Measured: 3000 frames of nothing, 2026-08-15.) Stop at the CHAPTER
+            -- INTRO, spend its one press here, and let the film open on the FADU -- so the
+            -- camera move and the hold on the moose are in shot, not just the dialogue.
+            for _ = 1, TUNE.bootSteps do
+                local obs = observeController()
+                local st = controllerState(obs)
+                if st == "dialogue_wait" then return true end      -- already at box 1
+                if st == "chapter_intro_input" then
+                    advanceBootState(obs, st)                      -- the last press before it
+                    return true
+                end
+                if advanceBootState(obs, st) ~= true then
+                    return false, "boot stalled at " .. tostring(st) .. " before scene 7"
+                end
+                yield()
+            end
+            return false, "boot cap expired before scene 7"
+        end,
+        afterPre = pokeNormalConfig,
+        until_ = function()
+            local now = controllerState() == "dialogue_wait"
+            if now and not waiting then boxes = boxes + 1 end
+            waiting = now
+            local moose = findUnit(SYM.gUnitArrayRed, 24, MOOSE)
+            if moose and not charged and moose.x == RUN_X and moose.y == RUN_Y then
+                charged = true
+                log(string.format("ch05moose: it RAN the route -- corner, left along the rim, "
+                    .. "then down to (%d,%d)", RUN_X, RUN_Y))
+            end
+            -- Terminal is the moose STANDING ON ITS PEN after the last box, not the last box:
+            -- the snap back is three commands later, so there is a legitimate window in which
+            -- it is still on its charge tile with the boxes spent.
+            if charged and boxes == BOXES and moose
+                and moose.x == PEN_X and moose.y == PEN_Y
+                and controllerState() ~= "dialogue_wait" then
+                log(string.format("ch05moose: %d boxes; back on (%d,%d) -- net-zero, so the "
+                    .. "fight starts where parity says", BOXES, PEN_X, PEN_Y))
                 return true
             end
             return false

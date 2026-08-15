@@ -3150,6 +3150,19 @@ class Ch05SahnarAloneOnTheArena(unittest.TestCase):
         self.assertLess(load, script.index('CUMO_CHAR(CHARACTER_MARISA)'))
         self.assertLess(script.index('CUMO_CHAR(CHARACTER_MARISA)'), text)
 
+    def test_the_arena_framing_is_a_CAMERA_and_not_an_inherited_corner(self):
+        """`CUMO_AT` draws a cursor and never scrolls (`EventDisplayCursor_Loop` ->
+        `PutMapCursor`). This beat had no CAMERA at all and was framed by whatever `LOMA` left
+        -- the map's north-west, which happens to hold the arena. It filmed correctly and was
+        resting on an accident; anything that moved the reload origin would have played the
+        scene off-screen with no error to read. Vanilla pairs the two here too."""
+        script = self._script()
+        x, y = bc.ch05_sahnar_station(self._chap())[0]
+        self.assertIn('CAMERA(%d, %d)' % (x, y), script)
+        self.assertLess(script.index('CAMERA(%d, %d)' % (x, y)),
+                        script.index('CUMO_AT(%d, %d)' % (x, y)),
+                        'the scroll comes before the pointer')
+
     def test_she_WALKS_OFF_the_arena_tile_or_the_chapter_loses_its_arena(self):
         """The regression this slice shipped and code review caught. (12,6) is
         TERRAIN_ARENA_REGULAR *and* the arena tutorial's own `AREA(..., 12, 6, 12, 6)` trigger,
@@ -3197,6 +3210,346 @@ class Ch05SahnarAloneOnTheArena(unittest.TestCase):
         tail = script[script.index('TEXTSHOW(0x%X)' % bc.CH05_BASIL_JOIN_SLOT[1]):]
         self.assertNotIn('FADU', tail)
         self.assertNotIn('FADI', tail)
+
+
+class Ch05TheMooseCharges(unittest.TestCase):
+    """Scene 7 -- the last beat before turn 1: Pinky asks, and the moose answers (#25).
+
+    Two things are being protected here, and neither is the text.
+
+    The first is the ID. The beat is a setup and a punchline across a WORDLESS action, which
+    normally means two messages and two hosted ids -- and #25's allocation has exactly one
+    spare left. `stage_break:` renders vanilla's own `[BreakTalk]`, a pause the event script
+    resumes with `TEXTCONT`, so the gap costs nothing.
+
+    The second is the moose's POSITION. Its pen at (10,0) is parity-locked (threat 14.1,
+    cornered against the map's top edge) and the charge is a cutscene lunge, not a placement:
+    it runs out and is snapped back off camera before the fight starts. Nicolas asked for the
+    charge to LAND on the start tile; row 0 is the map's top edge, so there is no tile behind
+    it to come from, and forward-and-checked is the same net-zero the other way round.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+
+    def _scene(self):
+        slot, _msg, _boxes, _what = bc.CH05_MOOSE_CHARGE_SLOT
+        return bc._chapter_event_by_slot(self._chap(), 'chapter_start', slot, 'test')
+
+    def _body(self):
+        return bc.ch05_moose_charge_message(self._chap())[0][1]
+
+    def _script(self):
+        return bc.ch05_beginning_script(self._chap(), 'CHARACTER_ARTUR',
+                                        bc.CH05_SAHNAR_TABLE, 'CHARACTER_MARISA')
+
+    # ── the id ─────────────────────────────────────────────────────────────────
+    def test_the_id_is_0x9F1_owned_unique_and_inside_ch05s_host_block(self):
+        _slot, msg, _boxes, _what = bc.CH05_MOOSE_CHARGE_SLOT
+        self.assertEqual(0x9F1, msg, "#25's allocation table")
+        self.assertTrue(0x9E4 <= msg <= 0x9F5, "outside ch05's Ch6 host block")
+        self.assertIn(msg, set(bc.HOSTED_CHAPTER_MESSAGE_IDS['ch05']))
+        self.assertEqual('ch05', bc.assert_message_ids_unique()[msg])
+
+    def test_the_yaml_slot_label_stays_an_anatomy_citation(self):
+        """`vanilla 0x9C4` names the scene we MINE -- Natasha alone before the map. We take
+        its POSITION and not its content, and we never write that id."""
+        slot, msg, _boxes, _what = bc.CH05_MOOSE_CHARGE_SLOT
+        self.assertNotEqual(int(slot.split()[1], 16), msg)
+
+    def test_the_wordless_beat_costs_no_second_id(self):
+        """The whole reason `stage_break:` exists. Two boxes with an engine action between
+        them is ONE message with a `[BreakTalk]`, not two messages with two ids."""
+        self.assertEqual(1, len(bc.ch05_moose_charge_message(self._chap())))
+        self.assertEqual(1, self._body().count('[BreakTalk]'))
+        self.assertEqual(1, self._script().count('TEXTCONT'))
+        self.assertEqual(1, self._script().count(
+            'TEXTSHOW(0x%X)' % bc.CH05_MOOSE_CHARGE_SLOT[1]))
+
+    def test_a_scene_that_loses_its_stage_break_is_refused(self):
+        """Without the pause the two boxes run together and the charge plays after both --
+        the joke told backwards, and nothing else would notice."""
+        chap = self._chap()
+        slot = bc.CH05_MOOSE_CHARGE_SLOT[0]
+        event = bc._chapter_event_by_slot(chap, 'chapter_start', slot, 'test')
+        event['script'] = [e for e in event['script'] if 'stage_break' not in e]
+        with self.assertRaises(SystemExit):
+            bc.ch05_moose_charge_message(chap)
+
+    def test_the_bubble_comes_DOWN_for_the_charge(self):
+        """Nicolas, watching the first film (2026-08-15): "he runs under it and he's covered".
+        `[BreakTalk]` only LOCKS the talk proc, so the last speaker's box hangs over the whole
+        action. `[CloseSpeechSlow]` is `ClearTalkBubble()` and nothing else -- faces stay loaded
+        and the talk state survives, so `TEXTCONT` brings the window back for Meesmickle."""
+        body = self._body()
+        self.assertIn('[CloseSpeechSlow]', body)
+        self.assertLess(body.index('[CloseSpeechSlow]'), body.index('[BreakTalk]'),
+                        'the bubble closes at the pause, not after it')
+        self.assertLess(body.index('[BreakTalk]'), body.index('[FID_Gilliam]'),
+                        'and the next face loads on the far side of the break')
+
+    def test_a_break_between_two_turns_by_ONE_speaker_is_refused(self):
+        """The bubble reopens on `!TalkHasCorrectBubble()`, which compares the speaking face
+        slot and width -- so a break with the same speaker on both sides resumes onto a bubble
+        the engine still believes is correct and prints into a cleared window. It would look
+        like the text simply vanished, which is not a thing to discover on film."""
+        script = [{'pinky': 'One.'}, {'stage_break': 'business'}, {'pinky': 'Two.'}]
+        staging = {'pinky': ('[OpenMidLeft]', '[FID_Neimi]')}
+        with self.assertRaises(SystemExit):
+            bc._script_to_message(script, staging, width=29)
+        with self.assertRaises(SystemExit):      # ...and a break with nothing after it
+            bc._script_to_message([{'pinky': 'One.'}, {'stage_break': 'business'}],
+                                  staging, width=29)
+
+    def test_a_stage_break_is_a_pause_and_not_a_box(self):
+        """Scene box counts are locked and asserted against the YAML, so a directive that
+        counted as an A-press would make every such assertion off by one."""
+        self.assertIn('stage_break', bc.SCRIPT_DIRECTIVES)
+        self.assertEqual(2, bc.CH05_MOOSE_CHARGE_SLOT[2])
+        self.assertEqual(3, len(self._scene()['script']))    # two boxes and the direction
+        self.assertEqual(2, bc._script_box_count(self._scene()['script']))
+        self.assertEqual(2, self._body().count('[A]'))
+
+    def test_the_stage_direction_lives_in_the_data_not_in_a_comment(self):
+        """It is the middle beat of the scene, so it is authored where the other two are."""
+        direction = next(e['stage_break'] for e in self._scene()['script']
+                         if 'stage_break' in e)
+        for locked in ('BELLOWS', 'comes', 'straight at them'):
+            self.assertIn(locked, direction)
+
+    # ── the channel ────────────────────────────────────────────────────────────
+    def test_the_body_wraps_at_the_bubble_29_not_the_scenic_42(self):
+        for line in self._body().split('\n'):
+            printable = re.sub(r'\[[^\]]*\]', '', line)
+            self.assertLessEqual(len(printable), 29, 'bubble overflow: %r' % line)
+
+    def test_both_locked_boxes_survive_word_for_word(self):
+        self.assertEqual(['pinky', 'stage_break', 'meesmickle'],
+                         [next(iter(b)) for b in self._scene()['script']])
+        plain = ' '.join(re.sub(r'\[[^\]]*\]', ' ', self._body()).split())
+        for locked in ("...It's not running. Why isn't it running?!", 'You had to ask?'):
+            self.assertIn(locked, plain, 'the 2026-07-29 lock lost a word')
+
+    def test_pinky_keeps_the_far_right_he_holds_in_the_arrival(self):
+        """He closes scene 4 on either arm and opens this one; a character who changes seats
+        between his scenes reads as a different person each time. Meesmickle takes the widest
+        two-shot the ladder offers against it, so setup and punchline come from opposite sides."""
+        self.assertEqual(bc.CH05_ARRIVAL_PODIUMS['pinky'],
+                         bc.CH05_MOOSE_CHARGE_PODIUMS['pinky'])
+        seats = [bc.PODIUM_ORDER.index(p) for p in bc.CH05_MOOSE_CHARGE_PODIUMS.values()]
+        self.assertGreater(abs(seats[0] - seats[1]), 1, 'neighbouring rungs overlap')
+        self.assertIn('[OpenFarRight][LoadFace][FID_Neimi]', self._body())
+        self.assertIn('[OpenMidLeft][LoadFace][FID_Gilliam]', self._body())
+
+    # ── the charge ─────────────────────────────────────────────────────────────
+    def test_the_charge_is_net_zero_so_the_fight_starts_where_parity_says(self):
+        """It breaks out of the pen on screen and is put straight back. The pen is the tile
+        the difficulty read is grounded on -- a charge that RELOCATED it would move a threat-14
+        monster four tiles closer to the party for free."""
+        pen, start, route = bc.ch05_moose_station(self._chap())
+        self.assertEqual((10, 0), pen, "the parity-locked pen, vanilla's own rim tile")
+        self.assertNotEqual(pen, route[-1], 'a charge that goes nowhere is not a charge')
+        script = self._script()
+        put = script.index('MOVE(0xffff, %s, %d, %d)' % (bc.CH05_MOOSE_PID, *start))
+        run = script.index('MOVE_DEFINED(%s)' % bc.CH05_MOOSE_PID)
+        back = script.index('MOVE(0xffff, %s, %d, %d)' % (bc.CH05_MOOSE_PID, *pen))
+        self.assertLess(put, run, 'it is placed before it runs')
+        self.assertLess(run, script.index('TEXTCONT'), 'it charges BEFORE the punchline')
+        self.assertLess(script.index('TEXTCONT'), back, 'and is snapped back after it')
+
+    def test_the_run_is_an_authored_multi_leg_route_not_one_MOVE(self):
+        """Lengthened 2026-08-15 (Nicolas): four tiles straight down was over before it read.
+        The path is the beat now -- top-right corner, left along the rim, then down at the
+        party -- so it is a REDA queue, which turns where the author says rather than wherever
+        the pathfinder cuts the corner. Row 0's walkable stretch is only x=10..14, which is what
+        makes the corner start legal at all."""
+        pen, start, route = bc.ch05_moose_station(self._chap())
+        self.assertEqual((14, 0), start, 'the top-right corner')
+        self.assertEqual(((10, 0), (10, 4)), route, 'left along the rim, then down')
+        self.assertGreater(len(route), 1, 'a single leg is the straight line this replaced')
+        self.assertIn(pen, route, 'the run passes THROUGH the pen it is hauled back to')
+        script = self._script()
+        for x, y in route:                       # one REDA pair per waypoint
+            self.assertIn('SVAL(EVT_SLOT_1, 0x%X)' % ((y << 6) | x), script)
+        self.assertNotIn('MOVE(0x0, %s' % bc.CH05_MOOSE_PID, script)
+
+    def test_a_route_ending_on_the_pen_is_refused(self):
+        """Then the snap-back is a no-op and the lunge is never undone on screen -- the run is
+        meant to pass the pen and keep going at the party."""
+        chap = self._chap()
+        moose = next(e for e in chap['enemy_units'] if e['id'] == 'white-moose')
+        moose['charge_route'] = [[10, 0]]
+        with self.assertRaises(SystemExit):
+            bc.ch05_moose_station(chap)
+
+    def test_both_repositions_are_instant_and_unseen(self):
+        """`Event2F_MoveUnit` short-circuits a negative speed to a bare `MoveUnit_` -- vanilla's
+        own off-screen reposition (`ch14a` resets Carlyle with `MOVE(0xffff, ...)`). The first
+        lands before the camera arrives, the second after it has cut south to the party, so
+        neither is ever on screen."""
+        script = self._script()
+        pen, start, _route = bc.ch05_moose_station(self._chap())
+        party = bc.ch05_party_camera_tile(self._chap())
+        put = script.index('MOVE(0xffff, %s, %d, %d)' % (bc.CH05_MOOSE_PID, *start))
+        back = script.index('MOVE(0xffff, %s, %d, %d)' % (bc.CH05_MOOSE_PID, *pen))
+        self.assertLess(put, script.index('CAMERA(%d, %d)' % start),
+                        'placed before the camera gets there')
+        self.assertLess(script.index('REMA', script.index('TEXTCONT')), back,
+                        'the bubble is down before the reset')
+        self.assertLess(script.index('CAMERA(%d, %d)' % party), back,
+                        'the camera is on the party before the reset')
+
+    def test_an_unreachable_charge_tile_is_a_hang_and_is_gated(self):
+        """MOVE + ENUN to a tile the unit cannot WALK to never returns -- ch04's own soft-lock,
+        on this same animal. The flood fill runs at injection time."""
+        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
+                   encoding='utf-8').read()
+        self.assertIn("'the white moose (ch05 scene 7)'", src)
+        maps_dir = os.path.join(bc.REPO, 'campaigns', self.CAMPAIGN, 'maps')
+        _pen, start, route = bc.ch05_moose_station(self._chap())
+        for leg in route:      # every leg, from where the run BEGINS -- not from the pen
+            bc.assert_scripted_move_reachable(maps_dir, bc.CH05_LAYOUT[1], start, leg,
+                                              bc.CH04_MOOSE_MOV_TABLE, 'test')
+
+    def test_a_missing_charge_tile_is_refused_rather_than_shipped(self):
+        chap = self._chap()
+        moose = next(e for e in chap['enemy_units'] if e['id'] == 'white-moose')
+        del moose['charge_route']
+        with self.assertRaises(SystemExit):
+            bc.ch05_moose_station(chap)
+
+    # ── the camera ─────────────────────────────────────────────────────────────
+    def test_no_party_unit_is_named_for_the_camera(self):
+        """ch05 deploys 9 of a 10-unit pool, so BOTH of this scene's speakers can be benched --
+        and a benched unit is still in the array (US_NOT_DEPLOYED) at stale coordinates, so
+        `CUMO_CHAR` would pan to nowhere rather than fail. The bubble does not need a unit:
+        `StartTalkOpen` anchors it to the speaking FACE SLOT."""
+        block = bc.ch05_moose_charge_block(bc.CH05_MOOSE_PID,
+                                           bc.ch05_moose_station(self._chap()),
+                                           bc.ch05_party_camera_tile(self._chap()))
+        self.assertNotIn('CUMO_CHAR', block)
+        self.assertIn('CUMO_AT', block)
+
+    def test_every_framing_is_a_CAMERA_and_not_a_bare_CUMO(self):
+        """`EventDisplayCursor_Loop` calls `PutMapCursor` and nothing else -- a CUMO draws a
+        cursor and never scrolls. The first cut of this wiring used CUMO alone for both
+        framings; the run showed the map never cutting south, because what was moving the view
+        was whatever `LOMA` left behind. Vanilla pairs the two ahead of its own 0x9C4."""
+        block = bc.ch05_moose_charge_block(bc.CH05_MOOSE_PID,
+                                           bc.ch05_moose_station(self._chap()),
+                                           bc.ch05_party_camera_tile(self._chap()))
+        _pen, start, _route = bc.ch05_moose_station(self._chap())
+        party = bc.ch05_party_camera_tile(self._chap())
+        for tile in (start, party):
+            self.assertIn('CAMERA(%d, %d)' % tile, block)
+            self.assertLess(block.index('CAMERA(%d, %d)' % tile),
+                            block.index('CUMO_AT(%d, %d)' % tile),
+                            'the scroll comes before the pointer')
+        self.assertEqual(block.count('CAMERA'), block.count('CUMO_AT'))
+
+    def test_the_map_comes_up_on_the_PARTY_for_turn_1(self):
+        """Vanilla's 0x9C4 ends framed on the deploy pocket and so does ours. It is also what
+        hides the snap back: the moose's pen is off the bottom of that view."""
+        block = bc.ch05_moose_charge_block(bc.CH05_MOOSE_PID,
+                                           bc.ch05_moose_station(self._chap()),
+                                           bc.ch05_party_camera_tile(self._chap()))
+        party = bc.ch05_party_camera_tile(self._chap())
+        self.assertLess(block.index('REMA'), block.index('CAMERA(%d, %d)' % party),
+                        'the bubble is down before the cut')
+
+    def test_the_frame_holds_ONE_position_across_the_break(self):
+        """`[BreakTalk]` only LOCKS the talk proc -- the bubble stays up and the faces stay
+        loaded -- so a camera move inside the message would scroll the map out from under an
+        open bubble. The frame goes where the LINE is about, and stays there until REMA."""
+        block = bc.ch05_moose_charge_block(bc.CH05_MOOSE_PID,
+                                           bc.ch05_moose_station(self._chap()),
+                                           bc.ch05_party_camera_tile(self._chap()))
+        _pen, start, _route = bc.ch05_moose_station(self._chap())
+        head = block[:block.index('REMA')]
+        self.assertEqual(1, head.count('CUMO_AT'))
+        self.assertIn('CUMO_AT(%d, %d)' % start, head)
+
+    def test_the_party_framing_is_asserted_against_the_real_deploy_slots(self):
+        """Vanilla's own `CAMERA(5, 18)` for this beat, and ours because the retile lifts Ch5's
+        nine start tiles 1:1. A re-paint that moved the pocket would leave the last shot before
+        turn 1 holding on an empty corner, silently."""
+        chap = self._chap()
+        self.assertEqual((5, 18), bc.ch05_party_camera_tile(chap))
+        self.assertIn([5, 18], chap['deployment']['deploy_slots'])
+        chap['deployment']['deploy_slots'] = [[0, 0]]
+        with self.assertRaises(SystemExit):
+            bc.ch05_party_camera_tile(chap)
+
+    # ── placement in the beginning script ──────────────────────────────────────
+    def test_the_debug_boot_lands_ON_the_beat_and_skips_the_approved_footage(self):
+        """`--ch05-moose`. Scene 7 is the last beat of a ~52-A-press opening, so every film of
+        it replayed four backdrop scenes, PREP, the join and Sahnar's monologue to reach ten
+        seconds of moose -- Nicolas stopped a run over exactly that (2026-08-15). Iterating on a
+        late beat has to cost a BUILD, not a playthrough."""
+        seed = '    LOAD1(0x1, %s)\n    ENUN\n' % bc.CH05_BOOT_SEED_TABLE
+        dbg = bc.ch05_beginning_script(self._chap(), 'CHARACTER_ARTUR', bc.CH05_SAHNAR_TABLE,
+                                       'CHARACTER_MARISA', seed_load=seed, moose_only=True)
+        self.assertIn('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_CHARGE_SLOT[1], dbg)
+        self.assertIn('LOMA(0x%X)' % bc.CH05_HOST_INDEX, dbg)
+        self.assertIn(bc.CH05_LINE_TABLE, dbg, 'the line is where the MOOSE comes from')
+        self.assertIn(bc.CH05_BOOT_SEED_TABLE, dbg, 'and the seed is the party to cut back to')
+        for skipped in ('BACG', 'CALL(%s)' % bc.CH05_PREP_SCRIPT,
+                        'TEXTSHOW(0x%X)' % bc.CH05_BASIL_JOIN_SLOT[1],
+                        'TEXTSHOW(0x%X)' % bc.CH05_SAHNAR_ALONE_SLOT[1]):
+            self.assertNotIn(skipped, dbg, 'the debug boot replays nothing already approved')
+
+    def test_the_debug_boot_refuses_to_exist_without_a_party(self):
+        """It skips Preparations, so `--ch05-boot`'s seed is the only thing left that would put
+        one on the map -- and the beat ends by cutting south to look at it."""
+        with self.assertRaises(SystemExit):
+            bc.ch05_beginning_script(self._chap(), 'CHARACTER_ARTUR', bc.CH05_SAHNAR_TABLE,
+                                     'CHARACTER_MARISA', moose_only=True)
+
+    def test_the_shipping_script_is_untouched_by_the_debug_flag(self):
+        """A debug boot that changed the real opening would be worse than no debug boot."""
+        real = self._script()
+        for beat in (bc.CH05_BASIL_JOIN_SLOT[1], bc.CH05_SAHNAR_ALONE_SLOT[1],
+                     bc.CH05_MOOSE_CHARGE_SLOT[1]):
+            self.assertIn('TEXTSHOW(0x%X)' % beat, real)
+        self.assertIn('CALL(%s)' % bc.CH05_PREP_SCRIPT, real)
+
+    def test_it_is_the_LAST_beat_before_the_map(self):
+        script = self._script()
+        self.assertLess(script.index('TEXTSHOW(0x%X)' % bc.CH05_SAHNAR_ALONE_SLOT[1]),
+                        script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_CHARGE_SLOT[1]))
+        self.assertLess(script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_CHARGE_SLOT[1]),
+                        script.index('ENUT(8)'))
+
+    def test_it_plays_AFTER_prep_and_brings_no_fade_of_its_own(self):
+        """Scene 5 already brought the screen up after the prep prologue's fade to black; 6
+        and 7 ride it. A fade here would flash the map through black on the last beat."""
+        script = self._script()
+        self.assertLess(script.index('CALL(%s)' % bc.CH05_PREP_SCRIPT),
+                        script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_CHARGE_SLOT[1]))
+        tail = script[script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_CHARGE_SLOT[1]):]
+        self.assertNotIn('FADU', tail)
+        self.assertNotIn('FADI', tail)
+
+    def test_the_moose_is_already_on_the_map_and_is_not_loaded_again(self):
+        """It has stood in the turn-1 line since before prep -- this beat only has to look at
+        it. A LOAD1 here would put a second moose on the rim."""
+        script = self._script()
+        self.assertNotIn('LOAD1(0x1, %s)' % bc.CH05_MOOSE_PID, script)
+        moose = next(e for e in self._chap()['enemy_units'] if e['id'] == 'white-moose')
+        self.assertIsNone(moose.get('arrives_turn'), 'it rides the turn-1 line')
+
+    def test_the_music_drops_out_under_the_bellow(self):
+        """Vanilla's own punctuation at exactly this kind of pause (MSG_9BF's BreakTalk gap),
+        and it leaves "You had to ask?" landing in silence a beat before the map's own track."""
+        script = self._script()
+        self.assertLess(script.index('MUSCMID(SONG_SILENT)'), script.index('TEXTCONT'))
+
+    def test_the_moose_still_does_not_speak(self):
+        """Locked 2026-07-03 as a mute white ghost, and re-locked by this chapter. The charge
+        is stage direction; nothing gives it a box."""
+        self.assertNotIn('white-moose', [next(iter(b)) for b in self._scene()['script']])
+        self.assertNotIn('moose:', str(self._scene()['script']))
 
 
 class Ch05ArenaTutorial(unittest.TestCase):
@@ -4637,6 +4990,50 @@ class Ch04Stage4Scenes(unittest.TestCase):
         self.assertNotIn('CAMERA2(14, 14)', s)
         moose = next(u for u in self.chap['neutral_units'] if u['id'] == 'white-moose')
         self.assertEqual(tuple(moose['camera_at']), (7, 4))
+
+    def test_BOTH_chapters_moose_pids_wear_the_wyrdeer_art(self):
+        """The bug Nicolas caught off a playtest frame (2026-08-14).
+
+        A pid is per-chapter and the sprite tables are keyed on pid, so ONE asset needs a row
+        for EVERY pid that stages it. The registry named ch04's 0xce alone, ch05's moose (0xb9)
+        matched nothing in `GetUnitSMSId`'s override scan, and the chapter's cornered elk
+        rendered as CLASS_GWYLLGI's stock hound on the red enemy palette -- with the Wyrdeer
+        sheets committed and ch05's YAML claiming they had shipped a fortnight earlier."""
+        row = next(r for r in bc.SCRIPTED_NEUTRAL_SPRITES if r[0] == 'white-moose')
+        _uid, char_ids, donor = row
+        self.assertEqual('Gwyllgi', donor, 'the wait-row GEOMETRY donor, not the sprite')
+        self.assertIn(bc.CH04_MOOSE_PID, char_ids)
+        self.assertIn(bc.CH05_MOOSE_PID, char_ids)
+        self.assertNotEqual(bc.CH04_MOOSE_PID, bc.CH05_MOOSE_PID, 'pids are per-chapter')
+
+    def test_a_pid_that_wears_no_custom_art_fails_the_BUILD(self):
+        """The per-PID half of the guard. `assert_declared_map_sprites_injected` asks whether an
+        ASSET reached a sprite table -- the moose's had, under ch04's pid -- so it could not see
+        a second chapter staging the same creature under a pid nothing dressed."""
+        bc.assert_custom_art_pid_wired(bc.CH04_MOOSE_PID, 'white-moose', 'test')
+        bc.assert_custom_art_pid_wired(bc.CH05_MOOSE_PID, 'white-moose', 'test')
+        with self.assertRaises(SystemExit):
+            bc.assert_custom_art_pid_wired('0x7f', 'white-moose', 'test')
+        with self.assertRaises(SystemExit):      # asset in no row at all
+            bc.assert_custom_art_pid_wired(bc.CH04_MOOSE_PID, 'not-a-creature', 'test')
+
+    def test_both_chapters_actually_CALL_the_pid_guard(self):
+        """A guard nothing calls is a comment. Both injectors run it on their own pid."""
+        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
+                   encoding='utf-8').read()
+        for pid in ('CH04_MOOSE_PID', 'CH05_MOOSE_PID'):
+            self.assertIn("assert_custom_art_pid_wired(%s, 'white-moose'" % pid, src)
+
+    def test_one_asset_claims_one_sheet_pair_and_one_sms_slot(self):
+        """Two pids are two override ROWS, not two sprites: the sheets and the SMS id are
+        claimed once per asset, so a chapter reusing a creature costs table space and nothing
+        else. Asserted on the injector's shape, since the tables only exist post-build."""
+        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
+                   encoding='utf-8').read()
+        body = src[src.index('def _inject_scripted_neutral_sprites'):]
+        body = body[:body.index('\ndef ', 1)]
+        self.assertEqual(1, body.count('sms = claim_sms_id()'))
+        self.assertLess(body.index('sms = claim_sms_id()'), body.index('for char_id in char_ids:'))
 
     def test_the_moose_uses_a_continuous_regular_move_queue_over_the_bridge(self):
         """The route is authored: normal movement crosses the bridge before leaving southeast."""

@@ -46,6 +46,12 @@ rom_configs:
   ch05lupinboot:
     CH05BOOT: 1
     CH05LUPIN: 1
+  # DEBUG boot for ch05's LAST opening beat: New Game lands straight on scene 7. Every film of
+  # the moose charge otherwise replays ~52 A-presses of approved footage -- four backdrop
+  # scenes, PREP, the join, Sahnar's monologue -- to reach ten seconds (Nicolas, 2026-08-15).
+  ch05mooseboot:
+    CH05BOOT: 1
+    CH05MOOSE: 1
 
 # Ported verbatim from run.sh's two timing `case` statements.
 classes:
@@ -301,6 +307,10 @@ scenarios:
     kind: record
   recordch05join:                                      # scene 5, AFTER prep (#25)
     rom: ch05boot
+    host_chapter: 6
+    kind: record
+  recordch05moose:                                     # scene 7 ALONE, on the debug boot (#25)
+    rom: ch05mooseboot
     host_chapter: 6
     kind: record
   recordch05joinlupin:                                 # the same film, Lupin's arm (#25)
