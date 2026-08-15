@@ -15,22 +15,56 @@ The generated decomp tree is intentionally dirty as recorded below.
 
 ## Next task
 
-**ch05's dialogue wiring, worked TOP TO BOTTOM in player order** (Nicolas, 2026-08-13). The
-ordered inventory of all 17 scenes — **13 done, 4 left** — is the table in **issue #25**, which is
-the canonical view; do not re-derive an order from the YAML's `vanilla 0xNNN` labels, which are
-anatomy citations naming the scene we MINE and are never ids we write.
+**The white moose's BATTLE ANIMATION** (Nicolas, 2026-08-15 — he is handing this to a fresh
+session deliberately). Everything else about the moose is done: it wears the Wyrdeer map sprite
+in both chapters, and ch05's scene 7 gives it a full-screen bellow.
 
-Next up is **scene 12 — Ravisin's battle taunt**, which is currently wired NOWHERE:
-`gBattleTalkList` holds a ch01 Izobai row and nothing for her. Then scene 13 (Basil's death
-quote), then the two endings (16/17), which are a 2×2 over Basil alive/dead × Lupin
-present/absent. All of it is locked text from PR #196: this is wiring, not writing.
+The art is IN HAND and is Nicolas's own, at
+`/Users/Yonick/Documents/Claude/Projects/Manchego Stars / Fire Emblem Game/Battle Anims/WhiteMooseBattleAnim.png`
+— one 1920x1080 sheet, three poses left to right: **attack, windup, idle**. That is the REVERSE of
+the order `inject_battle_anims` wants, which is `frames: [ready, windup, peak]` — so idle→ready,
+windup→windup, attack→peak. Read that injector's docstring first; it is the how, and it is
+explicit about box-descaling from the hi-res master onto ~88x64 with a common feet-anchor and a
+protected ~15-colour palette (**never re-shrink an already-small frame**).
 
-**THE ID BLOCK IS NOW EXACTLY SPENT — there is no spare (#283).** 17 ids against 17 owed.
-Scene 7's bellow is a scene change, a locked talk cannot survive one, so its punchline became a
-second message and took `0x9D2`, the last slack. The four remaining scenes have exactly the four
-remaining ids (`0x9F2`, `0x9F3` in the host block; `0x9C9`–`0x9CC` for the endings; `0x9D1` for
-the Talk fallback). Anything beyond that needs a fresh neighbourhood sweep — method in
-`decisions.md` → "A host block is not the whole id budget". Do not assume slack.
+**One thing is still owed by Nicolas and should be asked for early: the `clone_from:` donor
+class** — whose timing, effects and weapon slot the anim borrows. `Gwyllgi` is the obvious
+candidate since it is already the map-sprite geometry donor and the moose's deploy class, but
+that is his call, not a default to assume.
+
+The ledger entry to close is `battle_anim_todo` on the ch05 YAML's `white-moose` block. Note the
+`!! OFF-BY-ONE` in the injector docstring: a private AnimConf's `.index` must be `anim_id + 1`, or
+a PURPLE DRAGON renders instead of the unit.
+
+**Also owed on the moose, and smaller:** `portraits/white-moose.png` (96x80, indexed, full-body)
+is committed and injected NOWHERE in either chapter, so the moose has no bust and displays
+`CLASS_GWYLLGI`'s default name. That is wiring an existing asset (`RAW_PID_PORTRAITS` is the
+pattern Ravisin uses), not new art.
+
+## Then: ch05's remaining dialogue
+
+**Worked TOP TO BOTTOM in player order** (Nicolas, 2026-08-13). The ordered inventory of all 17
+scenes — **13 done, 4 left** — is the table in **issue #25**, the canonical view; do not re-derive
+an order from the YAML's `vanilla 0xNNN` labels, which are anatomy citations naming the scene we
+MINE and are never ids we write.
+
+Next is **scene 12 — Ravisin's battle taunt**, wired NOWHERE (`gBattleTalkList` holds a ch01
+Izobai row and nothing for her), then scene 13 (Basil's death quote), then the two endings
+(16/17), a 2x2 over Basil alive/dead x Lupin present/absent. Locked text from PR #196: wiring,
+not writing.
+
+**Message ids are NOT scarce, and a previous session's framing of them was wrong** (Nicolas
+corrected it 2026-08-15). `gMsgTable[]` is a generated C array built from `texts.txt` by the
+Makefile; `GetStringFromIndex` indexes it with no bounds check and there is no count constant, so
+the table SELF-SIZES from the text source. Appending past the last vanilla id (`MSG_D4B`) extends
+it — the same "append into free space, never disturb a vanilla slot" model as `CAMPAIGN_BGS` past
+`BG_RANDOM` and the enemy slots at `0x80+`. We build from source; we are not patching a fixed
+binary.
+
+What the host-block discipline is actually FOR, and still is: never write an id another chapter
+writes (`HOSTED_CHAPTER_MESSAGE_IDS` guards that), and never overwrite vanilla text still reachable
+in the built ROM. Neither is a budget. If a beat wants another id, append one — do not redesign a
+scene around a shortage that does not exist.
 
 **Reuse the mechanisms; they are all built.** `branch_on_check_alive` + `label_base` for the
 endings' 2×2 (a third branch in one event list takes labels 4/5), `variant_beat` for a fallback,
@@ -42,18 +76,6 @@ and pages itself mid-clause if left flowed (`decisions.md` → "A fallback line 
 **Two states of the `CHECK_ALIVE` branch are still unproven** (#25's tally): benched, and
 recruited-then-killed. Both should take the arm we want by a decomp reading, and a reading is
 not a run.
-
-## Owed on the moose, and NOT blocking the dialogue
-
-Nicolas is supplying art in parallel (2026-08-15):
-- **Battle animation.** Three 1920×1080 poses are in hand at
-  `Documents/Claude/Projects/Manchego Stars / Fire Emblem Game/Battle Anims/WhiteMooseBattleAnim.png`,
-  left-to-right **attack, windup, idle** — which is the REVERSE of the `frames:` order
-  `inject_battle_anims` wants (Ready → Windup → Peak). Still needs a `clone_from:` donor class
-  from Nicolas. Its docstring is the how; the ch05 YAML's `battle_anim_todo` is the ledger entry.
-- **Portrait/name binding.** `portraits/white-moose.png` (96×80, indexed, full-body) is committed
-  and injected NOWHERE, in either chapter, so the moose has no bust and shows `CLASS_GWYLLGI`'s
-  default name. That is wiring off an existing asset, not new art.
 
 ## Current state
 
