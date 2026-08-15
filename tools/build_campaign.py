@@ -1336,6 +1336,26 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
             blocks[-1][1].extend(pages)
         else:
             blocks.append((speaker, pages))
+    # A `stage_break` closes the bubble, so SOMETHING has to make the engine reopen one. It
+    # reopens on `!TalkHasCorrectBubble()`, which compares the speaking face slot and width --
+    # so a break between two turns by the SAME speaker would resume onto a bubble the engine
+    # still believes is correct, and print the next box onto a cleared tilemap. Refused here
+    # rather than discovered on film: the scene would look like the text simply vanished.
+    for i, (who, _pages) in enumerate(blocks):
+        if who is not _SCRIPT_BREAK:
+            continue
+        before = next((b[0] for b in reversed(blocks[:i]) if isinstance(b[0], str)), None)
+        after = next((b[0] for b in blocks[i + 1:] if isinstance(b[0], str)), None)
+        if after is None:
+            sys.exit('ERROR: a `stage_break` is the LAST thing in this script -- it closes the '
+                     'bubble and nothing resumes it. Stage business after the final box belongs '
+                     'in the event script, past TEXTEND/REMA.')
+        if before == after:
+            sys.exit('ERROR: `stage_break` sits between two turns by %r -- the bubble closes '
+                     'and the engine will not reopen it for the same speaker at the same width, '
+                     'so the next box prints onto a cleared window. Give the break a different '
+                     'speaker on the far side, or move it out to the event script.' % after)
+
     parts = []
     live = {}   # [OpenX] tag -> speaker currently holding that podium's face
     lru = []    # [OpenX] tags, least-recently-used first
@@ -1381,8 +1401,15 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
         lru.append(pos)
     for speaker, pages in blocks:
         if speaker is _SCRIPT_BREAK:
-            # Every block already ends on [A], so this lands as vanilla's own [A][BreakTalk].
-            parts.append('[BreakTalk]')
+            # [CloseSpeechSlow] FIRST, and it is not a flourish: `[BreakTalk]` only LOCKS the
+            # talk proc, so without it the last speaker's bubble hangs over the whole action and
+            # whatever moves does so UNDERNEATH it (Nicolas, watching ch05's moose charge under
+            # Pinky's box, 2026-08-15). The tag is `ClearTalkBubble()` and nothing else
+            # (scene.c) -- the faces stay loaded and the talk state survives, so `TEXTCONT`
+            # brings the window straight back for the next speaker. Vanilla uses it mid-message
+            # for the same reason (MSG_9BF).
+            # Every block already ends on [A], so this lands as [A][CloseSpeechSlow][BreakTalk].
+            parts.append('[CloseSpeechSlow]\n[BreakTalk]')
             continue
         if speaker is _SCRIPT_EXIT:
             leaving = pages                       # the marker carries the speaker's name
@@ -9504,6 +9531,35 @@ def ch04_map_changes(chap, maps_dir):
     return changes
 
 
+def reda_route_move(pid, route, why, who='this unit'):
+    """A MULTI-LEG scripted walk, as vanilla's REDA queue: `MOVE_DEFINED` + `ENUN`.
+
+    `MOVE(0x0, pid, x, y)` takes ONE destination and lets the pathfinder choose the shape, which
+    is right for a step aside and wrong for a walk whose PATH is the point -- vanilla's own
+    Glen/Cormag exits and ch04's moose both queue waypoints instead, so the unit turns where the
+    author says rather than wherever the search happens to cut the corner.
+
+    One (x, y) pair per waypoint, each followed by a 0 (the REDA's second half-word), then a
+    single `MOVE_DEFINED`. Every leg must be WALKABLE for the unit -- `MOVE_DEFINED` + `ENUN`
+    on a route it cannot take never returns (see `assert_scripted_move_reachable`).
+
+    Shared by ch04's flee and ch05's charge rather than written twice: they are the same animal
+    doing the same thing in opposite directions.
+    """
+    if not route:
+        sys.exit('ERROR: %s needs at least one authored route waypoint' % who)
+    lines = ['    SVAL(EVT_SLOT_D, 0x0) /* authored REDA route; one pair per waypoint */']
+    for x, y in route:
+        lines += [
+            '    SVAL(EVT_SLOT_1, 0x%X) /* (%d, %d), normal unit movement */'
+            % ((y << 6) | x, x, y),
+            '    SENQUEUE1',
+            '    SVAL(EVT_SLOT_1, 0x0)',
+            '    SENQUEUE1',
+        ]
+    return lines + ['    MOVE_DEFINED(%s) /* %s */' % (pid, why), '    ENUN']
+
+
 def ch04_moose_script(unit_symbol, pid, msg, camera_at, flee_route):
     """The moose-flees beat: the quarry is sighted in a clearing, then simply gone.
 
@@ -9532,21 +9588,8 @@ def ch04_moose_script(unit_symbol, pid, msg, camera_at, flee_route):
     the entire event rather than just its own frame.
     """
     cx, cy = camera_at
-    if not flee_route:
-        sys.exit('ERROR: the white moose needs at least one authored flee-route waypoint')
-    move = ['    SVAL(EVT_SLOT_D, 0x0) /* authored REDA route; one pair per waypoint */']
-    for x, y in flee_route:
-        move += [
-            '    SVAL(EVT_SLOT_1, 0x%X) /* (%d, %d), normal unit movement */'
-            % ((y << 6) | x, x, y),
-            '    SENQUEUE1',
-            '    SVAL(EVT_SLOT_1, 0x0)',
-            '    SENQUEUE1',
-        ]
-    move += [
-        '    MOVE_DEFINED(%s) /* continuous route over the bridge, then southeast */' % pid,
-        '    ENUN',
-    ]
+    move = reda_route_move(pid, flee_route, 'continuous route over the bridge, then southeast',
+                           who='the white moose')
     return ('{\n'
             '    SVAL(EVT_SLOT_2, FACTION_ID_BLUE) /* only the PARTY sights the quarry */\n'
             '    CALL(EventScr_UnTriggerIfNotFaction) /* a monster wandered in: re-arm, abort */\n'
@@ -11066,21 +11109,31 @@ def ch05_moose_charge_message(chap):
 
 
 def ch05_moose_station(chap):
-    """(pen tile, charge tile) for the white moose -- where it fights, and where it lunges to.
+    """(pen, charge_from, charge_route) for the white moose -- where it fights, and how it breaks.
 
-    Two tiles, and the FIRST is the one that matters mechanically: the pen is the parity-locked
-    position the difficulty read is grounded on (threat 14.1, cornered against the map's top
-    edge), so the charge is a cutscene lunge that gets snapped back, never a placement. Required
-    rather than defaulted for the same reason Sahnar's `walks_to` is: a missing one is invisible
-    to every check we have and would quietly turn a staged beat into a repositioning.
+    THE PEN IS THE ONE THAT MATTERS MECHANICALLY: it is the parity-locked position the difficulty
+    read is grounded on (threat 14.1, cornered against the map's top edge), so everything else
+    here is cutscene staging that gets undone. The moose is placed on `charge_from` off camera,
+    runs `charge_route`, and is snapped back to the pen before the map goes live.
+
+    All three are required rather than defaulted, for the reason Sahnar's `walks_to` is: a
+    missing one is invisible to every check we have and would quietly turn a staged beat into a
+    repositioning -- which on this unit means handing the player a threat-14 monster somewhere
+    the chapter was never balanced for.
     """
     moose = next(e for e in chap['enemy_units'] if e['id'] == 'white-moose')
     pen = tuple(moose['positions'][0])
-    if 'charges_to' not in moose:
-        sys.exit('ERROR: ch05\'s white moose has no `charges_to` -- scene 7 is a setup and a '
-                 'punchline across the charge, and with nowhere to charge TO the beat is two '
-                 'lines and a pause')
-    return pen, tuple(moose['charges_to'])
+    for field in ('charge_from', 'charge_route'):
+        if field not in moose:
+            sys.exit('ERROR: ch05\'s white moose has no `%s` -- scene 7 is a setup and a '
+                     'punchline across the charge, and with nowhere to charge from or to the '
+                     'beat is two lines and a pause' % field)
+    route = tuple(tuple(point) for point in moose['charge_route'])
+    if route[-1] == pen:
+        sys.exit('ERROR: ch05\'s moose charge ENDS on its pen %r, so the snap-back is a no-op '
+                 'and the lunge is never undone on screen -- the route is meant to run PAST the '
+                 'pen at the party' % (pen,))
+    return pen, tuple(moose['charge_from']), route
 
 
 def ch05_party_camera_tile(chap):
@@ -11182,14 +11235,19 @@ def ch05_moose_charge_block(moose_pid, station, party_tile):
     about while he asks it, and the charge that answers him plays in the same shot. Only after
     `REMA` does it cut south, which is also how the map comes up on the party for turn 1.
 
-    THE CHARGE IS NET-ZERO. The moose walks out of the pen on screen, and then a NEGATIVE-speed
-    `MOVE` puts it back instantly -- `Event2F_MoveUnit` short-circuits a speed < 0 to a bare
-    `MoveUnit_`, which is vanilla's own off-screen reposition (`ch14a` resets Carlyle with
-    `MOVE(0xffff, ...)` twice around one scene). It runs after `REMA` and after the camera has
-    already cut south to the party, so there is nothing to see even if the instant move were not
-    instant. The fight begins from the parity-locked pen (chapter YAML: `positions` vs the new
-    `charges_to`), which is what Nicolas asked for when the literal ask -- start further back and
-    charge INTO the pen -- turned out to have no tile behind it: the pen is on the map's top edge.
+    THE CHARGE IS NET-ZERO, and it is bracketed by two INSTANT moves to make that true. The moose
+    is put on `charge_from` before the camera arrives and snapped back to the pen after `REMA`,
+    both with a NEGATIVE speed -- `Event2F_MoveUnit` short-circuits speed < 0 to a bare
+    `MoveUnit_`, vanilla's own off-screen reposition (`ch14a` resets Carlyle with
+    `MOVE(0xffff, ...)` twice around one scene). Between them it runs an AUTHORED multi-leg route
+    (`reda_route_move`), because the path is the beat: it starts in the top-right corner, runs
+    left along the rim and turns down at the party, so it changes direction on screen instead of
+    sliding four tiles in a straight line (Nicolas, 2026-08-15 -- the first cut was over before
+    it read). The fight still begins from the parity-locked pen.
+
+    The pen being on the map's TOP EDGE is what forces this shape. Nicolas's first ask was to
+    start further back and charge INTO the pen; there is no tile behind row 0, so the run goes
+    forward THROUGH the pen and is put back instead.
 
     The music DROPS OUT under the bellow rather than swelling: `MUSCMID(SONG_SILENT)` is
     vanilla's own punctuation at exactly this kind of pause (`MSG_9BF`'s BreakTalk gap does it),
@@ -11203,18 +11261,27 @@ def ch05_moose_charge_block(moose_pid, station, party_tile):
     speaking FACE SLOT, not to anything on the map.)
     """
     _slot, msg, boxes, what = CH05_MOOSE_CHARGE_SLOT
-    (px, py), (cx, cy) = station
+    (px, py), (sx, sy), route = station
     ax, ay = party_tile
-    return ('    CAMERA(%d, %d) /* the SCROLL -- CUMO alone only draws a cursor */\n'
-            '    CUMO_AT(%d, %d) /* the pen: the moose at bay among the standing dead */\n'
+    run = '\n'.join(reda_route_move(
+        moose_pid, route, 'it breaks -- left along the rim, then down at them',
+        who='the ch05 white moose'))
+    return ('    MOVE(0xffff, %s, %d, %d) /* to the top-right corner FIRST, and instantly: the\n'
+            '                                run needs somewhere to run FROM, and the pen it\n'
+            '                                fights on is the map\'s top edge. speed < 0 is a\n'
+            '                                bare MoveUnit_, so there is no walk to be seen --\n'
+            '                                and this lands before the camera arrives. */\n'
+            '    ENUN\n'
+            '    CAMERA(%d, %d) /* the SCROLL -- CUMO alone only draws a cursor */\n'
+            '    CUMO_AT(%d, %d) /* the rim: the moose at bay among the standing dead */\n'
             '    STAL(60)\n'
             '    CURE\n'
             '    TEXTSTART\n'
             '    TEXTSHOW(0x%X) /* %d -- %s */\n'
-            '    TEXTEND /* [BreakTalk]: the talk proc locks; the scene is ours until resumed */\n'
+            '    TEXTEND /* [CloseSpeechSlow][BreakTalk]: bubble DOWN, talk proc locked, the\n'
+            '               scene is ours until resumed -- the charge must not run under a box */\n'
             '    MUSCMID(SONG_SILENT) /* the bellow -- the music drops out under it */\n'
-            '    MOVE(0x0, %s, %d, %d) /* it breaks and comes straight at them */\n'
-            '    ENUN\n'
+            '%s\n'
             '    TEXTCONT /* ...and Meesmickle answers the question sideways */\n'
             '    TEXTEND\n'
             '    REMA\n'
@@ -11222,12 +11289,12 @@ def ch05_moose_charge_block(moose_pid, station, party_tile):
             '    CUMO_AT(%d, %d) /* back on the party at the stair-foot, off the rim */\n'
             '    STAL(30)\n'
             '    CURE\n'
-            '    MOVE(0xffff, %s, %d, %d) /* Ravisin\'s hold snaps it back to the pen: speed < 0\n'
-            '                                is an INSTANT MoveUnit_, and the camera is already\n'
-            '                                south. The fight starts from the locked tile. */\n'
+            '    MOVE(0xffff, %s, %d, %d) /* Ravisin\'s hold snaps it back to the pen, instantly\n'
+            '                                and with the camera already south. The fight starts\n'
+            '                                from the locked tile. */\n'
             '    ENUN\n'
-            % (px, py, px, py, msg, boxes, what,
-               moose_pid, cx, cy, ax, ay, ax, ay, moose_pid, px, py))
+            % (moose_pid, sx, sy, sx, sy, sx, sy, msg, boxes, what, run,
+               ax, ay, ax, ay, moose_pid, px, py))
 
 
 def ch05_opening_backdrop_block():
@@ -11317,8 +11384,41 @@ def ch05_basil_join_block(basil_char):
                 label_base=CH05_BASIL_JOIN_LABEL_BASE))
 
 
+def ch05_moose_debug_script(chap, seed_load):
+    """`--ch05-moose`: New Game straight into scene 7, and NOTHING else.
+
+    THE STANDING RULE, applied late (Nicolas, 2026-08-15). Scene 7 is the last beat of a
+    ~52-A-press opening, so every film of it replayed four backdrop scenes, Preparations, the
+    join and Sahnar's monologue -- roughly four and a half minutes of scenes he had already
+    signed off -- to reach ten seconds of moose. He stopped the third run himself. Iteration on a
+    late beat has to be COMPILE-TIME ONLY; the debug boot is what makes it so, and it should have
+    been the first thing built rather than the fourth.
+
+    Keeps only what the beat cannot do without: `LOMA` to build the map, the turn-1 line (which
+    is where the MOOSE comes from), and the boot seed (so the closing cut south has a party to
+    land on). No backdrops, no prep CALL, no scenes 5-6, no Basil.
+
+    `--ch05-boot` is a prerequisite and not a nicety: without its seed there is no party, and
+    without prep nothing else would place one.
+    """
+    if not seed_load:
+        sys.exit('ERROR: --ch05-moose needs --ch05-boot -- it skips Preparations, so the boot '
+                 'seed is the only thing that puts a party on the map')
+    return ('{\n'
+            '    MUSC(SONG_TENSION)\n'
+            '    SVAL(EVT_SLOT_B, 0x0)\n'
+            '    LOMA(0x%X) /* build the ch05 map fresh */\n' % CH05_HOST_INDEX
+            + '    LOAD1(0x1, %s) /* the 16 risen tomb-guard -- the MOOSE is one of them */\n'
+              '    ENUN\n' % CH05_LINE_TABLE
+            + seed_load
+            + '    FADU(16) /* no prep prologue to inherit a fade from */\n'
+            + ch05_moose_charge_block(CH05_MOOSE_PID, ch05_moose_station(chap),
+                                      ch05_party_camera_tile(chap))
+            + '    ENUT(8)\n    EVBIT_T(7)\n    ENDA\n}')
+
+
 def ch05_beginning_script(chap, basil_char, sahnar_table, sahnar_char,
-                          seed_load='', lupin_load=''):
+                          seed_load='', lupin_load='', moose_only=False):
     """`CH05_BEGINNING_SCRIPT` end to end: the opening's seven-scene spine around LOMA and prep.
 
     Assembled here rather than inline in the injector so the ORDER is testable without a build --
@@ -11329,8 +11429,11 @@ def ch05_beginning_script(chap, basil_char, sahnar_table, sahnar_char,
     and the two `CHECK_ALIVE` branches share one event list, so their labels must not collide.
 
     `seed_load`/`lupin_load` are the proof-ROM injections (`--ch05-boot`, `--ch05-lupin`) and are
-    empty on the shipping build.
+    empty on the shipping build. `moose_only` is `--ch05-moose`, the scene-7 debug boot -- see
+    `ch05_moose_debug_script` for why a late beat gets one.
     """
+    if moose_only:
+        return ch05_moose_debug_script(chap, seed_load)
     return ('{\n'
             '    MUSC(SONG_TENSION)\n'
             + lupin_load
@@ -11451,7 +11554,8 @@ def ch05_wave_script(turn, wave_table):
             '    ENDA\n}' % (wave_table, warning))
 
 
-def inject_ch05(campaign, boot=False, lupin_proof=False, verbose=True):
+def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
+                verbose=True):
     """Host Ch5 "The Elven Tomb" (#25) on slot 6: the winterised 1:1 retile of vanilla Ch5,
     the sixteen-strong risen tomb-guard on vanilla Ch5's own fighting tiles, the three
     eruption waves on its raider spawns, the real PREP deploy, and DefeatBoss(Ravisin).
@@ -11606,11 +11710,14 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, verbose=True):
     # The moose is ch04's creature under a ch05 pid, and a pid is what the sprite tables are
     # keyed on -- so this is the check that it is an ELK here and not CLASS_GWYLLGI's hound.
     assert_custom_art_pid_wired(CH05_MOOSE_PID, 'white-moose', 'ch05')
-    # Scene 7's charge is a MOVE + ENUN, so a `charges_to` the moose cannot WALK to would hang
-    # the chapter on the last beat before turn 1 -- ch04's own soft-lock, on the same animal.
-    _moose_pen, _moose_charge = ch05_moose_station(chap)
-    assert_scripted_move_reachable(maps_dir, CH05_LAYOUT[1], _moose_pen, _moose_charge,
-                                   CH04_MOOSE_MOV_TABLE, 'the white moose (ch05 scene 7)')
+    # Scene 7's charge is MOVE_DEFINED + ENUN, so a leg the moose cannot WALK would hang the
+    # chapter on the last beat before turn 1 -- ch04's own soft-lock, on the same animal. Every
+    # waypoint is checked from where the run BEGINS, not from the pen: the run starts in the
+    # top-right corner and row 0's walkable stretch is only x=10..14.
+    _pen, _from, _route = ch05_moose_station(chap)
+    for _leg in _route:
+        assert_scripted_move_reachable(maps_dir, CH05_LAYOUT[1], _from, _leg,
+                                       CH04_MOOSE_MOV_TABLE, 'the white moose (ch05 scene 7)')
     bx, by = CH05_BASIL_GREEN_POS
     declare_unit_table(CH05_BASIL_TABLE, [_ally_unit_entry(
         leader, basil[1], basil[3], basil[4], bx, by, ', '.join(CLASS_LOADOUT[basil[2]]),
@@ -11688,7 +11795,7 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, verbose=True):
     script = _replace_brace_block(
         script, CH05_BEGINNING_SCRIPT + '[] =',
         ch05_beginning_script(chap, basil_char, CH05_SAHNAR_TABLE, sahnar_char,
-                              seed_load, lupin_load),
+                              seed_load, lupin_load, moose_only=moose_only),
         CH05_EVENTSCRIPT_H)
     for turn in sorted(CH05_WAVE_TABLES):
         script = _replace_brace_block(
@@ -12164,6 +12271,12 @@ def main():
                          '"Elven Tomb" on slot 6 with an armed party, the 16 risen '
                          'tomb-guard on vanilla Ch5\'s own fighting tiles, and the three '
                          'eruption waves.')
+    ap.add_argument('--ch05-moose', action='store_true',
+                    help='DEBUG build (#25): with --ch05-boot, New Game lands straight on '
+                         'scene 7 (the moose charge). Skips the four backdrop scenes, '
+                         'Preparations, the join and Sahnar\'s monologue -- ~52 A-presses of '
+                         'already-approved footage -- so iterating on a late beat costs a '
+                         'BUILD and not a playthrough.')
     ap.add_argument('--ch05-lupin', action='store_true',
                     help='PLAYTEST build (#25): with --ch05-boot, LOAD Lupin onto the roster '
                          'before ch05\'s opening so scene 4\'s CHECK_ALIVE branch takes its '
@@ -12172,6 +12285,10 @@ def main():
     # --ch05-lupin MODIFIES --ch05-boot rather than competing with it (it repoints nothing), so
     # it is not in the mutual-exclusion list below -- but on its own it would silently build a
     # plain canonical ROM with one extra unit table nothing loads.
+    if args.ch05_moose and not args.ch05_boot:
+        sys.exit('ERROR: --ch05-moose only means anything with --ch05-boot: it SKIPS '
+                 'Preparations, so the boot seed is the only thing left that puts a party on '
+                 'the map.')
     if args.ch05_lupin and not args.ch05_boot:
         sys.exit('ERROR: --ch05-lupin only means anything with --ch05-boot: it exists to make '
                  'the opening branch\'s ALIVE arm reachable from a COLD boot.')
@@ -12180,7 +12297,7 @@ def main():
     _requested_flags = {'TESTCH': args.test_chapter, 'LORDBOOT': args.lord_boot,
                         'MONTAGE': args.montage, 'CH03BOOT': args.ch03_boot,
                         'CH04BOOT': args.ch04_boot, 'CH05BOOT': args.ch05_boot,
-                        'CH05LUPIN': args.ch05_lupin}
+                        'CH05LUPIN': args.ch05_lupin, 'CH05MOOSE': args.ch05_moose}
     if args.lord_boot:
         args.test_chapter = True  # the fast-boot rides the sandbox
     # Each fast-boot repoints New Game at its own slot, so at most one may win. Named
@@ -12293,7 +12410,7 @@ def main():
         chain_ch03_to_ch04()
         print('chapter 5 (#25):')
         _scopes.run(inject_ch05, args.campaign, boot=args.ch05_boot,
-                    lupin_proof=args.ch05_lupin)
+                    lupin_proof=args.ch05_lupin, moose_only=args.ch05_moose)
         _scopes.run(inject_ch05_visit_faces, args.campaign)  # the four reliquary residents' skeleton busts
         chain_ch04_to_ch05()
         if args.ch05_boot:
