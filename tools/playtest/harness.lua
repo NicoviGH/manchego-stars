@@ -4454,24 +4454,36 @@ local RESKIN_ENEMY_CLASS = {
     ["goblin-soldier"] = 0x6A,   -- CLASS_BLST_REGULAR_EMPTY (fire imp, lance)
     ["goblin-fighter"] = 0x6B,   -- CLASS_BLST_LONG_EMPTY (fire imp, axe)
 }
+-- Named RAW-PID creatures are picked by CHARACTER, not by class (the table lives inside the
+-- scenario: this chunk is at the 200-local ceiling). Their anim binds through CharacterData
+-- `_u25`, so the class alone does not identify them: on the sandbox the white moose is the
+-- only CLASS_GWYLLGI, but the class is what a plain Gwyllgi would ALSO match, and matching it
+-- would silently bench the stock hound. Match the pid the sandbox deploys.
 scenarios.recordenemy = function()
     if not bootToMap() then return result("FAIL", "never reached the sandbox map") end
     wait(60); pokeAnimsOn()
     local sel = (PLAYTEST_CHAR and PLAYTEST_CHAR ~= "") and PLAYTEST_CHAR or "kobold-grunt"
-    local want = RESKIN_ENEMY_CLASS[sel] or tonumber(sel)
-    if not want then
+    local wantPid = ({ ["white-moose"] = 0xb9 })[sel]   -- ch05's cornered miniboss (#25)
+    local want = (not wantPid) and (RESKIN_ENEMY_CLASS[sel] or tonumber(sel)) or nil
+    if not want and not wantPid then
         return result("FAIL", "unknown enemy '" .. sel .. "' -- one of: "
-            .. "kobold-grunt kobold-blade kobold-brute, or a raw class id (e.g. 0x82)") end
+            .. "kobold-grunt kobold-blade kobold-brute white-moose, or a raw class id (e.g. 0x82)") end
     local function classOf(u) return ru8(ru32(u.addr + 0x04) + 0x04) end
-    -- the chosen reskinned foe
+    -- the chosen foe: by CHARACTER for a raw-pid creature, by CLASS for a class-level reskin
     local foe
     for i = 0, 23 do
         local r = unitAt(SYM.gUnitArrayRed, i)
-        if r and not isDead(r) and classOf(r) == want then foe = r; break end
+        if r and not isDead(r) then
+            if (wantPid and r.charId == wantPid) or (want and classOf(r) == want) then
+                foe = r; break
+            end
+        end
     end
     if not foe then
         return result("FAIL", string.format(
-            "no live foe of class 0x%X in the sandbox (build with `make TESTCH=1`)", want)) end
+            "no live foe %s in the sandbox (build with `make TESTCH=1`)",
+            wantPid and string.format("with pid 0x%X", wantPid)
+                    or string.format("of class 0x%X", want))) end
     -- a live melee player unit to bait it
     local pl
     for i = 0, 15 do
@@ -4514,14 +4526,19 @@ scenarios.recordenemy = function()
     end
     if not placed then return result("FAIL", "no tile adjacent to ONLY the target foe") end
     pokeHarmless(pl)                       -- pow 0: the player's hit can't kill -> the foe counters
-    log(string.format("baiting %s (class 0x%X) at (%d,%d) with player at (%d,%d)",
-        sel, want, foe.x, foe.y, pl.x, pl.y))
+    -- ONE description of what we baited, used by both the log and the verdict: a raw-pid
+    -- creature has no `want` class and a reskin has no `wantPid`, so formatting either
+    -- unconditionally throws (it did, on this scenario's first moose run).
+    local what = wantPid and string.format("pid 0x%X", wantPid)
+                          or string.format("class 0x%X", want)
+    log(string.format("baiting %s (%s) at (%d,%d) with player at (%d,%d)",
+        sel, what, foe.x, foe.y, pl.x, pl.y))
     if not moveUnit(pl.x, pl.y, pl.x, pl.y) then
         return result("FAIL", "action menu never opened on the firing tile") end
     shot(sel .. "-deploy")
     local fired = captureAttack(pl.addr, sel); shot(sel .. "-after")
     if not fired then return result("FAIL", "captureAttack never reached combat") end
-    return result("PASS", string.format("%s anim captured (baited class 0x%X counter)", sel, want))
+    return result("PASS", string.format("%s anim captured (baited %s counter)", sel, what))
 end
 
 

@@ -327,7 +327,11 @@ enemy_units:
                                 # promised an on-screen conversion the chapter can never show —
                                 # win_condition is boss_defeated, so the map ENDS the moment
                                 # Ravisin falls and there is no post-death state to convert into.
-    death_quote: "*a final, almost-human bellow*"
+    # NO death quote, and no bust: it is a moose (Nicolas, 2026-08-15). It never speaks in
+    # either chapter — ch05's one wordless beat is scene 7's charge, which is staged with a
+    # full-screen CG and a cry, not a text box. Nothing consulted the quote this block used to
+    # carry (ch05's dialogue all comes from the locked events source), and the 96x80
+    # portraits/white-moose.png stays unwired.
     skin:                       # the one beast; closes YAML TODO #38/#39 (read as elk, not wolf)
       look: "the White Moose — a great pale elk"
       # Map sprite + portrait are **Wyrdeer** (Anarlaurendil, DeviantArt, CC BY-SA 3.0) — see
@@ -342,9 +346,30 @@ enemy_units:
       # a TUPLE of pids per asset and `assert_custom_art_pid_wired` fails the build for the next
       # chapter that stages a creature under a pid nothing dressed.
       source: "DeviantArt: 'Wyrdeer - full sprite' by Anarlaurendil (CC BY-SA 3.0)"
-      battle_anim_todo: "PMD SpriteCollab sprite/0899 (Wyrdeer) — RearUp/Attack/Charge supply the
-        three ready/windup/peak poses inject_battle_anims wants (CC BY-NC 4.0). Still owed (#25);
-        ch04 needs no anim (the moose never engages there)."
+    # ── Battle animation (#25) ────────────────────────────────────────────────
+    # NICOLAS'S OWN ART, not the vendored Wyrdeer the map sprite wears: one 1920x1080 master
+    # of three poses, descaled to 88x64 on a common feet-anchor over a shared 14-colour
+    # palette (tools/descale_battleframe.py --body 56 --noflip). The master reads left to
+    # right as attack/windup/idle, which is the REVERSE of the ready->windup->peak order
+    # `frames:` wants — the list below is the corrected order, not the sheet order.
+    #
+    # --noflip because the master already faces LEFT, like FE8's own cer_at1 sheet and like
+    # every frame set we have descaled so far; the engine H-flips for the right-hand side.
+    # No --sharpen (it grains the white flank) and no --flat: the flat palette is tuned for
+    # warm hues and collapsed the blood-red antlers to tan, which is a chroma wash-out of the
+    # one accent the creature is recognised by.
+    #
+    # `clone_from: gwyllgi` is Nicolas's call (2026-08-15): the moose already DEPLOYS as
+    # CLASS_GWYLLGI, and the donor's own anim (banim_cer_at1, animId 0xB1) is where the beast
+    # cadence is read from — growl, snap, contact, one footfall away. That is the Gwyllgi's
+    # script, NOT the Mauthe Doog's banim_mdg_at1 that Lupin's pounce borrows.
+    battle_anim:
+      clone_from: gwyllgi
+      abbr: moose_at1
+      frames:
+        - white-moose/ready.png     # the planted stand (master pose 3, rightmost)
+        - white-moose/windup.png    # the gathered crouch (master pose 2, centre)
+        - white-moose/peak.png      # the antlers-down gore (master pose 1, leftmost)
   # ── Risen spear-guard (SOLDIER, lance) — the tomb's rank-and-file dead ───────
   - id: risen-spear
     name: "Risen Spear-Guard"

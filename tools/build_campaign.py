@@ -2855,6 +2855,32 @@ def _sandbox_foe_roster(campaign):
             '        .items = { %s },\n'
             '        .ai = {0x3, 0x3, 0x9, 0x20},\n'       # attack in place, never move -> baitable
             '    },' % (rk['slot'], x, y, ', '.join(weapon)))
+    # Named RAW-PID creatures bench here too, and they must be deployed under their OWN pid.
+    # A class-level reskin animates off its class, so the generic 0x80 monster charIndex above
+    # is fine for it; a raw-pid creature's anim binds per-CHARACTER through `_u25`, so the same
+    # row under 0x80 would deploy a plain Gwyllgi playing the STOCK HOUND -- a bench that
+    # proves the opposite of what it was run for. No autolevel: these are named units whose
+    # level is the chapter's.
+    for uid, (chapter_yaml, pid) in sorted(RAW_PID_BATTLE_ANIMS.items()):
+        unit = _chapter_unit(campaign, chapter_yaml, uid)
+        if not unit.get('battle_anim'):
+            continue
+        x, y = SANDBOX_FOE_POSITIONS[len(entries)]
+        items = [CH05_ITEM_IDS[i['fe_base']] for i in unit.get('inventory') or []]
+        entries.append(
+            '    {\n'
+            '        .charIndex = %s,\n'
+            '        .classIndex = %s,\n'
+            '        .leaderCharIndex = %s,\n'
+            '        .allegiance = FACTION_ID_RED,\n'
+            '        .level = %d,\n'
+            '        .xPosition = %d,\n'
+            '        .yPosition = %d,\n'
+            '        .redaCount = 0,\n'
+            '        .items = { %s },\n'
+            '        .ai = {0x3, 0x3, 0x9, 0x20},\n'       # attack in place, never move -> baitable
+            '    },' % (pid, CH05_CLASS_IDS[unit['class']], pid,
+                        int(unit.get('level', 1)), x, y, ', '.join(items)))
     return '{\n' + '\n'.join(entries) + '\n    { 0 },\n}'
 
 
@@ -4540,6 +4566,19 @@ BANIM_DONORS = {
     # #206 defect exactly. Caught on review, not in play (#25).
     'myrmidon': ('CLASS_MYRMIDON', ['0x0100 | ITYPE_SWORD', '0x0100 | ITYPE_ITEM'],
                  'melee', 'sword'),
+    # The white moose (#25) -- ch05's cornered miniboss, and the first BEAST to fight in a
+    # close-up. Unlike every donor above it, the moose is not cast: it is the raw on-map pid
+    # 0xb9, so its `_u25` binds to a gCharacterData GAP (see RAW_PID_BATTLE_ANIMS).
+    # CLASS_GWYLLGI is the class it already deploys as, and its cadence is read off that
+    # class's OWN anim, banim_cer_at1 -- Nicolas's call, 2026-08-15. Note cer_at1 (0xB1) is
+    # the GWYLLGI's; banim_mdg_at1 (0xB0) is the Mauthe Doog's, and is the one Lupin's
+    # imported pounce reads. They are different scripts for the unpromoted and promoted beast.
+    # BOTH of the donor's slots are repointed: MONSTER is the antlers-and-hooves attack
+    # (fe_base rotten-claw) and ITEM is the UNARMED entry. Left vanilla, ITEM draws the stock
+    # purple HOUND -- the cavalier row's #206 defect, on the one chapter whose miniboss is an
+    # elk and whose YAML has said "the FE-Repo has NO elk art" since July.
+    'gwyllgi': ('CLASS_GWYLLGI', ['0x0100 | ITYPE_MONSTER', '0x0100 | ITYPE_ITEM'],
+                'melee', 'beast'),
 }
 
 
@@ -4692,7 +4731,14 @@ def _banim_palette(frame_imgs):
 
 
 def units_with_battle_anim(campaign):
-    """(unit_id, unit) for every pc/npc YAML carrying a `battle_anim:` block."""
+    """(unit_id, unit) for every unit carrying a `battle_anim:` block.
+
+    Two sources, because a battle anim is not the cast's alone. Cast members declare it on
+    their own pcs/npcs YAML. A named RAW-PID creature (RAW_PID_BATTLE_ANIMS) declares it on
+    the chapter YAML that already owns the rest of its identity -- pid, class, AI, art recipe,
+    death quote -- rather than gaining a second definition site in npcs/, which would also
+    make `classed_cast` treat a miniboss as a deployable cast member.
+    """
     out = []
     for sub in ('pcs', 'npcs'):
         d = os.path.join(REPO, 'campaigns', campaign, sub)
@@ -4705,7 +4751,40 @@ def units_with_battle_anim(campaign):
                 u = _yaml_load(f)
             if u and u.get('battle_anim'):
                 out.append((u.get('id', fn[:-5]), u))
+    for uid, (chapter_yaml, _pid) in sorted(RAW_PID_BATTLE_ANIMS.items()):
+        unit = _chapter_unit(campaign, chapter_yaml, uid)
+        if unit.get('battle_anim'):
+            out.append((uid, unit))
     return out
+
+
+def _chapter_unit(campaign, chapter_yaml, unit_id):
+    """A named unit's block from a chapter YAML, from whichever roster holds it."""
+    chapter = _load_chapter_yaml(campaign, chapter_yaml)
+    for roster in ('enemy_units', 'neutral_units', 'ally_units'):
+        for unit in chapter.get(roster) or []:
+            if unit.get('id') == unit_id:
+                return unit
+    sys.exit('ERROR: %s declares no unit %r' % (chapter_yaml, unit_id))
+
+
+def banim_u25_marker(unit_id):
+    """The gCharacterData designator whose `._u25` binds this unit's private AnimConf.
+
+    A cast member rides a vanilla CHARACTER_ slot (PORTRAIT_MAP) and is addressed by enum. A
+    named raw-pid creature is a gCharacterData GAP with no enum at all, and is addressed by
+    its raw pid -- the same `[0xNN - 1]` designator raw_pid_portrait_data already writes
+    through. The engine draws no distinction: GetBattleAnimationId_WithUnique reads
+    `unit->pCharacterData->_u25`, which is the same field on either row.
+    """
+    raw = RAW_PID_BATTLE_ANIMS.get(unit_id)
+    if raw:
+        return '[%s - 1]' % raw[1].lower()
+    slot = PORTRAIT_MAP.get(unit_id)
+    if not slot:
+        sys.exit('ERROR: battle_anim %s: no PORTRAIT_MAP slot and no raw pid for _u25'
+                 % unit_id)
+    return '[CHARACTER_%s - 1]' % slot.upper()
 
 
 def battle_spell_palette_tints(campaign):
@@ -4902,12 +4981,10 @@ def inject_battle_anims(campaign, verbose=True):
         unk, u25 = banim_unique_append(unk, new_conf)
         with open(BANIMCONFUNK_C, 'w', encoding='utf-8') as f:
             f.write(unk)
-        # 4c. point the character's _u25 (both promote states) at that index. The PC rides a
-        #     vanilla character slot (PORTRAIT_MAP); the engine hook makes combat consult it.
-        slot = PORTRAIT_MAP.get(uid)
-        if not slot:
-            sys.exit('ERROR: battle_anim %s: no PORTRAIT_MAP character slot for _u25' % uid)
-        marker = '[CHARACTER_%s - 1]' % slot.upper()
+        # 4c. point the character's _u25 (both promote states) at that index. A cast PC rides a
+        #     vanilla character slot (PORTRAIT_MAP); a named raw-pid creature rides its own
+        #     gCharacterData gap. The engine hook makes combat consult it either way.
+        marker = banim_u25_marker(uid)
         with open(CHARACTERS_C, encoding='utf-8') as f:
             ctext = f.read()
         cs, ce = _find_brace_block(ctext, marker, CHARACTERS_C)
@@ -4917,7 +4994,7 @@ def inject_battle_anims(campaign, verbose=True):
 
         if verbose:
             print('  %-14s = banim %s (animId 0x%X); _u25[%d] -> %s on char %s (%s)'
-                  % (uid, abbr, anim_id, u25, new_conf, slot, wtype))
+                  % (uid, abbr, anim_id, u25, new_conf, marker, wtype))
 
     tint_rows = battle_spell_palette_tints(campaign)
     if tint_rows:
@@ -8905,6 +8982,14 @@ RAW_PID_PORTRAITS = {
 # through patch_character_data(), which only visits the regular CHARACTER_* portrait map.
 RAW_PID_PERSONAL_SOURCES = {
     CH05_BOSS_PID: (CH05_CHAPTER_YAML, 'ravisin'),
+}
+# Named raw-pid creatures whose BATTLE ANIM binds to a gCharacterData gap instead of a
+# vanilla CHARACTER_ slot. Row = unit id -> (chapter YAML that declares it, its raw pid).
+# The chapter YAML is the authority, exactly as it is for RAW_PID_PERSONAL_SOURCES above:
+# a raw-pid creature has no pcs/npcs file, and giving it one would define the unit twice and
+# put a miniboss on the deployable cast roster.
+RAW_PID_BATTLE_ANIMS = {
+    'white-moose': (CH05_CHAPTER_YAML, CH05_MOOSE_PID),
 }
 CH05_AI = {
     'aggressive': '{0x0, 0x0, 0x1, 0x0}',        # pursue/charge
