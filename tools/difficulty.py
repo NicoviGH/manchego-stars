@@ -222,6 +222,7 @@ VANILLA_ONLY_ITEM_TO_WEAPON = {
     'ITEM_MONSTER_FETIDCLW':  'fetid-claw',
     'ITEM_MONSTER_ROTTENCLW': 'rotten-claw',
     'ITEM_MONSTER_VENINCLW':  'venin-claw',
+    'ITEM_MONSTER_HELLFANG':  'hell-fang',
     'ITEM_MONSTER_EVILEYE':   'evil-eye',
 }
 ITEM_TO_WEAPON = {item: key for key, item in WEAPON_ITEM_ENUM.items()}

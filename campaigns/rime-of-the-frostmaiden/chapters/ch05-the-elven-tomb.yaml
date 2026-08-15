@@ -311,8 +311,16 @@ enemy_units:
     class: gwyllgi              # CLASS_GWYLLGI (FE8 beast) stand-in quadruped
     level: 6
     inventory:
-      - id: antlers-and-hooves
-        fe_base: rotten-claw    # modeled beast attack (vanilla monster weapon)
+      # The GWYLLGI'S OWN vanilla weapon, under its vanilla NAME (Nicolas, 2026-08-15). It had
+      # carried `rotten-claw` — ITEM_MONSTER_ROTTENCLW, which is the REVENANT's claw and is why
+      # ch04's three Revenants hold it: a Gwyllgi swinging a Revenant's weapon, spotted off a
+      # combat frame reading "Rotten Claw". Vanilla arms CLASS_GWYLLGI with HELLFANG and the
+      # Mauthe Doog with FIREFANG (events_udefs.c); the two items are identical but for might
+      # (7 -> 13), icon and name — same ITYPE_MONSTER, same IA_LOCK_3, hit 80, weight 8, range 1.
+      # NOT renamed to "Antlers": one name message per item id, so retitling it would burn
+      # "Hell Fang" for every future Gwyllgi in the campaign, and unwired today is not never.
+      - id: hell-fang
+        fe_base: hell-fang
     damage_type: bludgeoning    # flavor label only ("antlers/hooves")
     ai_pattern: aggressive
     convertible: true           # #171 — a difficulty-model flag, NOT a fiction: `difficulty.py`

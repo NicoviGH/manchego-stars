@@ -81,6 +81,7 @@ W = {
     'fetid-claw':   Weapon('fetid-claw',   12, 75, 0, 10, 'monster'),
     'rotten-claw':  Weapon('rotten-claw',  7, 80,  0, 8,  'monster'),
     'venin-claw':   Weapon('venin-claw',   6, 65,  0, 10, 'monster'),
+    'hell-fang':    Weapon('hell-fang',    13, 80, 0, 8,  'monster'),
     'evil-eye':     Weapon('evil-eye',     7, 85,  0, 6,  'magic', rng=(1, 2)),
 }
 

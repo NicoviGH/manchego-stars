@@ -842,10 +842,24 @@ def _bust_dir(campaign):
     return os.path.join(REPO, 'campaigns', campaign, 'portraits')
 
 
+def _name_only_donors():
+    """Guest units whose donor slot lends a NAME and nothing else -- never dressed.
+
+    A raw-pid row with `portrait_id` None has no bust by design (its donor has no portraitId to
+    give). Dressing its slot anyway would be driven purely by a PNG happening to sit in
+    portraits/, which is how the moose would have picked up the full-body Wyrdeer sheet that was
+    explicitly retired (Nicolas, 2026-08-15) -- an asset on disk is not a decision to ship it.
+    """
+    return {unit_id for _pid, (unit_id, _slot, portrait_id, _name)
+            in RAW_PID_PORTRAITS.items() if portrait_id is None}
+
+
 def dressed_guest_slots(campaign):
     """Portrait slots of guests whose bust PNG exists (and so get dressed)."""
+    name_only = _name_only_donors()
     return [slot for unit, slot in GUEST_PORTRAIT_MAP.items()
-            if os.path.isfile(os.path.join(_bust_dir(campaign), unit + '.png'))]
+            if unit not in name_only
+            and os.path.isfile(os.path.join(_bust_dir(campaign), unit + '.png'))]
 
 
 def dressed_portrait_slots(campaign):
@@ -1064,9 +1078,15 @@ def name_message_body(name):
     return name + pad + '[X]'
 
 
-def set_message_body(lines, msg_id, body):
+def set_message_body(lines, msg_id, body, create=False):
     """Replace the content lines of `## MSG_<id>` with `body` (in place). Idempotent:
-    matches the header and rewrites whatever non-blank lines follow it."""
+    matches the header and rewrites whatever non-blank lines follow it.
+
+    `create` APPENDS the header when it does not exist, for an id past the last vanilla message
+    (MSG_D4B). gMsgTable[] is generated from this file and self-sizes, so a new trailing header
+    extends the table. It stays opt-in: for every id that should already be there, a missing
+    header means the wrong id, and that has to keep failing loudly.
+    """
     header = '## MSG_%03X' % msg_id
     for i, line in enumerate(lines):
         if line.strip() == header:
@@ -1076,7 +1096,22 @@ def set_message_body(lines, msg_id, body):
                 j += 1
             lines[i + 1:j] = [body]
             return True
-    sys.exit('ERROR: message header %r not found in %s' % (header, TEXTS_TXT))
+    if not create:
+        sys.exit('ERROR: message header %r not found in %s' % (header, TEXTS_TXT))
+    last = max((i for i, ln in enumerate(lines) if ln.strip().startswith('## MSG_')), default=-1)
+    if last < 0:
+        sys.exit('ERROR: no message headers at all in %s' % TEXTS_TXT)
+    last_id = int(lines[last].strip()[len('## MSG_'):], 16)
+    if msg_id <= last_id:
+        sys.exit('ERROR: refusing to append MSG_%03X at or below the last id MSG_%03X -- an '
+                 'appended id must EXTEND the table, never land inside it' % (msg_id, last_id))
+    if msg_id != last_id + 1:
+        sys.exit('ERROR: appending MSG_%03X would leave a hole after MSG_%03X; gMsgTable[] is a '
+                 'dense array, so a gap shifts every id past it' % (msg_id, last_id))
+    while lines and not lines[-1].strip():
+        lines.pop()
+    lines.extend(['', header, body])
+    return True
 
 
 def _fe_dialogue_text(s):
@@ -1573,10 +1608,12 @@ def inject_names(campaign, verbose=True):
         if verbose:
             print('  %-10s -> MSG_%03X (was %s): %s' % (unit_id, text_id, slot, name))
     for _pid, (unit_id, slot, _portrait_id, name) in sorted(RAW_PID_PORTRAITS.items()):
-        text_id = vanilla_name_text_id(slot)
-        set_message_body(lines, text_id, name_message_body(name))
+        text_id = raw_pid_name_text_id(slot)
+        appended = isinstance(slot, int)   # an id we own and extend the table with
+        set_message_body(lines, text_id, name_message_body(name), create=appended)
         if verbose:
-            print('  %-10s -> MSG_%03X (was %s): %s' % (unit_id, text_id, slot, name))
+            print('  %-10s -> MSG_%03X (%s): %s'
+                  % (unit_id, text_id, 'appended' if appended else 'was %s' % slot, name))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 
@@ -2336,33 +2373,57 @@ def patch_character_data(campaign, verbose=True):
         f.write(text)
 
 
+def raw_pid_name_text_id(slot):
+    """The message id a raw-pid unit's name lives in.
+
+    An int is an id we OWN and appended (the moose); a str is a vanilla donor slot whose name
+    message we retitle (Ravisin on Riev). Appending spends nothing, so it is the default for a
+    creature that needs a name and no bust.
+    """
+    return slot if isinstance(slot, int) else vanilla_name_text_id(slot)
+
+
+def _bind_raw_pid_identity(block, marker, name_text_id, portrait_id):
+    """Point one gCharacterData gap row at a donor's name, and optionally at its bust.
+
+    `portrait_id` None = a NAME-ONLY donor: the row keeps its generic miniPortrait and gains no
+    `.portraitId`, which is what a monster donor like Morva has to offer. Writing one anyway
+    would paint some other character's face onto the creature.
+    """
+    block = _set_field(block, 'nameTextId', '0x%X' % name_text_id, CHARACTERS_C, marker)
+    if portrait_id is None:
+        return block
+    if re.search(r'\.portraitId\s*=', block):
+        return _set_field(block, 'portraitId', '0x%X' % portrait_id, CHARACTERS_C, marker)
+    pat = re.compile(r'(?m)^(\s*\.defaultClass\s*=\s*[^,\n]+,\s*\n)')
+    block, count = pat.subn(
+        lambda m: m.group(1) + '        .portraitId = 0x%X,\n' % portrait_id, block, count=1)
+    if count != 1:
+        sys.exit('ERROR: .defaultClass insertion point not found in %s entry %s'
+                 % (CHARACTERS_C, marker))
+    return block
+
+
 def raw_pid_portrait_data(text, campaign):
     """Bind named raw-pid enemies to their authored identity and personal stat line.
 
     Raw 0xB0-range CharacterData gaps carry only a generic miniPortrait and omit portraitId,
     while their nameTextId points at the generic "Monster" message. Repoint the name to the
-    dressed slot's own message and insert the full portrait id after defaultClass (or replace
-    it on a repeat run), while preserving the generic miniPortrait field. Named bosses also
-    need their YAML `personal` bases written here: FE8 adds those CharacterData values to the
-    deployed class bases, exactly as vanilla Ch5 does for Saar.
+    donor slot's own message, and -- for a donor that HAS a bust -- insert the full portrait id.
+    Named bosses also need their YAML `personal` bases written here: FE8 adds those
+    CharacterData values to the deployed class bases, exactly as vanilla Ch5 does for Saar.
+
+    A donor may be NAME-ONLY (`portrait_id` None). The white moose's is: it rides Morva, FE8's
+    own named Great Dragon, which is a monster character with a miniPortrait and no portraitId
+    at all -- the right donor shape for a monster, and the reason the moose gains a name without
+    gaining a bust.
     """
     for pid, (_unit_id, slot, portrait_id, _name) in sorted(RAW_PID_PORTRAITS.items()):
         marker = '[%s - 1]' % pid.lower()
         start, end = _find_brace_block(text, marker, CHARACTERS_C)
-        block = text[start:end]
-        block = _set_field(block, 'nameTextId', '0x%X' % vanilla_name_text_id(slot),
-                           CHARACTERS_C, marker)
-        if re.search(r'\.portraitId\s*=', block):
-            block = _set_field(block, 'portraitId', '0x%X' % portrait_id,
-                               CHARACTERS_C, marker)
-        else:
-            pat = re.compile(r'(?m)^(\s*\.defaultClass\s*=\s*[^,\n]+,\s*\n)')
-            block, count = pat.subn(
-                lambda m: m.group(1) + '        .portraitId = 0x%X,\n' % portrait_id,
-                block, count=1)
-            if count != 1:
-                sys.exit('ERROR: .defaultClass insertion point not found in %s entry %s'
-                         % (CHARACTERS_C, marker))
+        block = _bind_raw_pid_identity(block=text[start:end], marker=marker,
+                                       name_text_id=raw_pid_name_text_id(slot),
+                                       portrait_id=portrait_id)
 
         personal_source = RAW_PID_PERSONAL_SOURCES.get(pid)
         if personal_source:
@@ -8950,6 +9011,13 @@ CH05_OPENING_PODIUM_OVERRIDES = {
 # so their flagged death entries key to them alone.
 CH05_BOSS_PID = '0xb8'                           # Ravisin: flagged EVFLAG_DEFEAT_BOSS -> the WIN
 CH05_MOOSE_PID = '0xb9'                          # the white moose: named, but NOT the win condition
+# The moose's NAME, appended past the last vanilla message (MSG_D4B). gMsgTable[] is generated
+# from texts.txt and self-sizes -- GetStringFromIndex has no bounds check and there is no count
+# constant -- so a new id EXTENDS the table rather than squatting on anything. This is the
+# kobolds' #90 rule in the message-id space: append your own, never burn a scarce vanilla slot.
+# A raw pid's stock nameTextId (0x255) is the GENERIC monster name shared by every 0xB0-range
+# gap, so it can never be retitled for one creature -- which is why the moose read "Monster".
+CH05_MOOSE_NAME_MSG = 0xD4C
 CH05_SAHNAR_PID = '0xba'                         # Sahnar: her own pid so Basil's Talk can address
                                                  # HER and not the nearest identical myrmidon
                                                  # (#203's lesson). Becomes her CHARACTER_ slot
@@ -8977,6 +9045,10 @@ SCRIPTED_NEUTRAL_SPRITES = (
 # MSG_246 is retitled Ravisin and portrait id 0x48 is dressed from ravisin.png.
 RAW_PID_PORTRAITS = {
     CH05_BOSS_PID: ('ravisin', GUEST_PORTRAIT_MAP['ravisin'], 0x48, 'Ravisin'),
+    # The moose spends NO donor: its name is an APPENDED message id we own, and its portrait id
+    # is None (no bust). Same rule the kobolds settled for classes in #90 -- append your own
+    # rather than burn a scarce vanilla slot, so Morva stays free for the Chardalyn Dragon.
+    CH05_MOOSE_PID: ('white-moose', CH05_MOOSE_NAME_MSG, None, 'White Moose'),
 }
 # The chapter YAML is the authority for named raw-pid boss bases. These values cannot flow
 # through patch_character_data(), which only visits the regular CHARACTER_* portrait map.
@@ -9012,6 +9084,10 @@ CH05_CLASS_IDS = {'druid': 'CLASS_DRUID', 'gwyllgi': 'CLASS_GWYLLGI',
                   'mercenary': 'CLASS_MERCENARY', 'archer': 'CLASS_ARCHER',
                   'myrmidon': 'CLASS_MYRMIDON'}
 CH05_ITEM_IDS = {'flux': 'ITEM_DARK_FLUX', 'rotten-claw': 'ITEM_MONSTER_ROTTENCLW',
+                 # the GWYLLGI's own vanilla weapon (the moose deploys as one), kept
+                 # under its vanilla NAME -- renaming the item would burn 'Hell Fang'
+                 # for every future Gwyllgi in the campaign (Nicolas, 2026-08-15)
+                 'hell-fang': 'ITEM_MONSTER_HELLFANG',
                  'iron-lance': 'ITEM_LANCE_IRON', 'iron-axe': 'ITEM_AXE_IRON',
                  'iron-sword': 'ITEM_SWORD_IRON', 'iron-bow': 'ITEM_BOW_IRON',
                  # FE8 calls the Killing Edge ITEM_SWORD_KILLER -- it is the sword vanilla
@@ -9066,6 +9142,9 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
              CH05_BASIL_JOIN_SLOT[1], CH05_BASIL_JOIN_NO_LUPIN_MSG,
              CH05_SAHNAR_ALONE_SLOT[1], CH05_MOOSE_CHARGE_SLOT[1],
              CH05_MOOSE_QUIP_MSG,
+             # The moose's NAME -- appended past vanilla's last id rather than taken from a
+             # donor, so it is claimed here like any other id ch05 writes.
+             CH05_MOOSE_NAME_MSG,
              CH05_GOAL_WINDOW_MSG, CH05_GOAL_STATUS_MSG,
              *(slot[1] for slot in CH05_VILLAGE_SLOTS.values())),
     # Goal ids only -- ch01/ch02 predate the per-chapter block registry, but their goal strings

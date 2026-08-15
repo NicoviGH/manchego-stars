@@ -826,7 +826,7 @@ class TestRawPidBattleAnim(unittest.TestCase):
         moose = [b for b in body.split('    {') if '0xb9' in b]
         self.assertEqual(len(moose), 1, 'expected exactly one moose foe row')
         self.assertIn('CLASS_GWYLLGI', moose[0])
-        self.assertIn('ITEM_MONSTER_ROTTENCLW', moose[0])   # the slot its anim repoints
+        self.assertIn('ITEM_MONSTER_HELLFANG', moose[0])    # the slot its anim repoints
         self.assertNotIn('.autolevel', moose[0])            # a named miniboss, not generic trash
 
     def test_the_sandbox_still_benches_every_reskin_class(self):
@@ -835,6 +835,61 @@ class TestRawPidBattleAnim(unittest.TestCase):
         for reskin in bc.enemy_class_reskins('rime-of-the-frostmaiden'):
             if bc.CLASS_RESKIN_FOE_WEAPON.get(reskin['base']):
                 self.assertIn(reskin['slot'], body)
+
+    def test_the_moose_name_spends_no_donor(self):
+        # The kobolds' #90 rule, one namespace over: append your own id rather than burn a
+        # scarce vanilla slot. A character donor would have cost the campaign a slot for a
+        # STRING -- and the obvious beast donor, Morva, is FE8's Great Dragon, which the
+        # roadmap's Chardalyn Dragon (ch13-14, a marquee boss) has first claim on.
+        unit_id, slot, portrait_id, name = bc.RAW_PID_PORTRAITS[bc.CH05_MOOSE_PID]
+        self.assertEqual((unit_id, name), ('white-moose', 'White Moose'))
+        self.assertEqual(slot, bc.CH05_MOOSE_NAME_MSG)
+        self.assertIsInstance(slot, int)          # an id we own, not a donor slot name
+        self.assertIsNone(portrait_id)            # named, not dressed
+        self.assertNotIn('white-moose', bc.GUEST_PORTRAIT_MAP)
+
+    def test_the_appended_name_id_is_past_the_last_vanilla_message(self):
+        # 0xD4B is vanilla's last. An id at or below it would squat on real text.
+        self.assertGreater(bc.CH05_MOOSE_NAME_MSG, 0xD4B)
+
+    def test_a_donor_slot_and_an_owned_id_both_resolve(self):
+        self.assertEqual(bc.raw_pid_name_text_id(0xD4C), 0xD4C)      # ours, verbatim
+        self.assertEqual(bc.raw_pid_name_text_id('Riev'), 0x246)     # donor, scanned
+
+    def test_a_raw_pid_can_be_named_without_being_dressed(self):
+        # raw_pid_portrait_data always wrote a portraitId. A name-only donor has none, and
+        # inserting `.portraitId = 0xNone` would not even compile -- so the write is skipped and
+        # the gap row keeps its generic miniPortrait, exactly as vanilla leaves Morva's own row.
+        block = ('    [0xb9 - 1] = {\n'
+                 '        .nameTextId = 0x255,\n'
+                 '        .number = 0xb9,\n'
+                 '        .defaultClass = CLASS_GORGON,\n'
+                 '        .miniPortrait = 0x4,\n'
+                 '    },\n')
+        out = bc._bind_raw_pid_identity(block, '[0xb9 - 1]', 0xD4C, None)
+        self.assertIn('.nameTextId = 0xD4C,', out)
+        self.assertNotIn('.portraitId', out)
+        self.assertIn('.miniPortrait = 0x4,', out)
+
+    def test_a_raw_pid_with_a_bust_still_gets_its_portrait_id(self):
+        # Regression: Ravisin's binding is unchanged -- she DOES dress Riev (portrait id 0x48).
+        block = ('    [0xb8 - 1] = {\n'
+                 '        .nameTextId = 0x255,\n'
+                 '        .number = 0xb8,\n'
+                 '        .defaultClass = CLASS_GORGON,\n'
+                 '    },\n')
+        out = bc._bind_raw_pid_identity(block, '[0xb8 - 1]', 0x246, 0x48)
+        self.assertIn('.nameTextId = 0x246,', out)
+        self.assertIn('.portraitId = 0x48,', out)
+
+    def test_the_moose_carries_the_gwyllgi_weapon_not_the_revenant_one(self):
+        # ITEM_MONSTER_ROTTENCLW is the REVENANT's claw (ch04's three Revenants hold it);
+        # vanilla arms CLASS_GWYLLGI with HELLFANG. The moose deploys as a Gwyllgi, so it
+        # carries the Gwyllgi's weapon -- under its VANILLA name, never renamed.
+        chap = bc._load_chapter_yaml('rime-of-the-frostmaiden', bc.CH05_CHAPTER_YAML)
+        moose = next(e for e in chap['enemy_units'] if e['id'] == 'white-moose')
+        self.assertEqual([i['fe_base'] for i in moose['inventory']], ['hell-fang'])
+        self.assertEqual(bc.CH05_ITEM_IDS['hell-fang'], 'ITEM_MONSTER_HELLFANG')
 
     def test_the_gap_row_takes_a_u25_it_did_not_have(self):
         # gCharacterData's 0xB0-range gaps omit `._u25` entirely (it defaults to {0,0}, which
@@ -1940,6 +1995,8 @@ class RavisinPortrait(unittest.TestCase):
                       'dressed Riev slot would keep its vanilla mouth/eye geometry')
 
     def test_raw_boss_pid_gets_the_riev_identity(self):
+        # The fixture carries EVERY registered raw pid, because raw_pid_portrait_data binds all
+        # of them in one pass -- the moose (0xb9) joined the registry in #25.
         source = '''[0xb8 - 1] = {
         .nameTextId = 0x255,
         .defaultClass = CLASS_ARCH_MOGALL,
@@ -1952,13 +2009,21 @@ class RavisinPortrait(unittest.TestCase):
         .baseRes = 0,
         .baseLck = 0,
         .baseCon = 0,
+    },
+    [0xb9 - 1] = {
+        .nameTextId = 0x255,
+        .number = 0xb9,
+        .defaultClass = CLASS_GORGON,
+        .miniPortrait = 0x4,
     },'''
         patched = bc.raw_pid_portrait_data(source, self.CAMPAIGN)
         self.assertIn('.nameTextId = 0x246,', patched)
         self.assertNotIn('.nameTextId = 0x255,', patched)
         self.assertIn('.portraitId = 0x48,', patched)
+        # Ravisin is the only DRESSED raw pid; the moose is named without a bust.
         self.assertEqual(1, patched.count('.portraitId'))
-        self.assertIn('.miniPortrait = 0x4,', patched)
+        self.assertIn('.nameTextId = 0xD4C,', patched)
+        self.assertEqual(2, patched.count('.miniPortrait = 0x4,'))
 
         ravisin = next(enemy for enemy in bc._load_chapter_yaml(
             self.CAMPAIGN, bc.CH05_CHAPTER_YAML)['enemy_units']
