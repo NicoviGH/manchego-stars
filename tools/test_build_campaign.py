@@ -3300,6 +3300,9 @@ class Ch05TheMooseCharges(unittest.TestCase):
         # Vanilla's own order, from EventScr_TextShowWithFadeIn: FADI -> CLEAN -> FADU.
         bell = block[block.index('BACG('):]
         self.assertIn('CLEAN', bell)
+        # order on the way out: fade the image down, CLEAN, fade the map up
+        self.assertLess(bell.index('FADI'), bell.index('CLEAN'))
+        self.assertLess(bell.index('CLEAN'), bell.rindex('FADU'))
 
     def test_the_bellow_carries_no_text_but_DOES_cost_the_last_spare_id(self):
         """The image itself is wordless. What costs an id is that a scene change tears the talk
@@ -3597,12 +3600,12 @@ class Ch05TheMooseCharges(unittest.TestCase):
         self.assertNotIn('FADI', gap)
         bellow = script[script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_CHARGE_SLOT[1]):
                         script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_QUIP_MSG)]
-        # The image CUTS in -- nothing fades before it, or the beat reads as leaving the
-        # scene rather than as something appearing over it (Nicolas: "seamless, as if it was
-        # part of the dialogue"). Coming BACK needs a short fade because CLEAN blanks.
-        self.assertEqual(0, bellow.count('FADI'), 'nothing fades down to the image')
-        self.assertNotIn('FADU(16)', bellow, 'and nothing fades up like a new scene')
-        self.assertIn('FADU(4)', bellow, 'CLEAN blanks, so the map needs a short fade back')
+        # SYMMETRIC, both ways, and that is not a preference: cutting in under a lit screen
+        # read as a glitch on both edges (Nicolas, 2026-08-15 -- "jumpy/glitchy both in and
+        # out of it"). This is vanilla's own backdrop shape, the one the ch05 opening uses
+        # between its own scenes: map out, image in, hold, image out, map back.
+        self.assertEqual(2, bellow.count('FADI(16)'), 'map out, then image out')
+        self.assertEqual(2, bellow.count('FADU(16)'), 'image in, then map back')
 
     def test_the_moose_is_already_on_the_map_and_is_not_loaded_again(self):
         """It has stood in the turn-1 line since before prep -- this beat only has to look at
