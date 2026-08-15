@@ -1071,8 +1071,8 @@ events:
     script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
       # (The hollow. The moose stands at bay among the standing dead. Nothing has moved.)
       - pinky: "...It's not running. Why isn't it running?!"
-      - stage_break: "The moose throws its head back and BELLOWS -- then breaks and comes
-          straight at them, until Ravisin's hold snaps it back."
+      - stage_cut: "The moose throws its head back and BELLOWS -- full screen, no words -- then
+          breaks and comes straight at them, until Ravisin's hold snaps it back."
       - meesmickle: "You had to ask?"
       # (Cue battle. -> PREP -> turn 1.)
   # ── 0x9D5/0x9D6 — the arena's systemic tutorial. Vanilla teaches it HERE, in Ch5. ──

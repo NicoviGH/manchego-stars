@@ -3207,9 +3207,12 @@ class Ch05SahnarAloneOnTheArena(unittest.TestCase):
         """The prep prologue leaves the screen black and scene 5 pays the FADU for both. A
         second one here would flash the map back through black between two adjacent beats."""
         script = self._script()
-        tail = script[script.index('TEXTSHOW(0x%X)' % bc.CH05_BASIL_JOIN_SLOT[1]):]
-        self.assertNotIn('FADU', tail)
-        self.assertNotIn('FADI', tail)
+        # Bounded at scene 7's first box: the bellow AFTER it brings a deliberate fade cycle
+        # of its own (a full-screen CG over the map), which is not this scene's business.
+        gap = script[script.index('TEXTSHOW(0x%X)' % bc.CH05_BASIL_JOIN_SLOT[1]):
+                     script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_CHARGE_SLOT[1])]
+        self.assertNotIn('FADU', gap)
+        self.assertNotIn('FADI', gap)
 
 
 class Ch05TheMooseCharges(unittest.TestCase):
@@ -3219,7 +3222,7 @@ class Ch05TheMooseCharges(unittest.TestCase):
 
     The first is the ID. The beat is a setup and a punchline across a WORDLESS action, which
     normally means two messages and two hosted ids -- and #25's allocation has exactly one
-    spare left. `stage_break:` renders vanilla's own `[BreakTalk]`, a pause the event script
+    spare left. `stage_cut:` renders vanilla's own `[BreakTalk]`, a pause the event script
     resumes with `TEXTCONT`, so the gap costs nothing.
 
     The second is the moose's POSITION. Its pen at (10,0) is parity-locked (threat 14.1,
@@ -3238,7 +3241,7 @@ class Ch05TheMooseCharges(unittest.TestCase):
         return bc._chapter_event_by_slot(self._chap(), 'chapter_start', slot, 'test')
 
     def _body(self):
-        return bc.ch05_moose_charge_message(self._chap())[0][1]
+        return ''.join(b for _m, b in bc.ch05_moose_charge_message(self._chap()))
 
     def _script(self):
         return bc.ch05_beginning_script(self._chap(), 'CHARACTER_ARTUR',
@@ -3259,53 +3262,110 @@ class Ch05TheMooseCharges(unittest.TestCase):
         self.assertNotEqual(int(slot.split()[1], 16), msg)
 
     def test_the_wordless_beat_costs_no_second_id(self):
-        """The whole reason `stage_break:` exists. Two boxes with an engine action between
+        """The whole reason `stage_cut:` exists. Two boxes with an engine action between
         them is ONE message with a `[BreakTalk]`, not two messages with two ids."""
-        self.assertEqual(1, len(bc.ch05_moose_charge_message(self._chap())))
-        self.assertEqual(1, self._body().count('[BreakTalk]'))
-        self.assertEqual(1, self._script().count('TEXTCONT'))
-        self.assertEqual(1, self._script().count(
-            'TEXTSHOW(0x%X)' % bc.CH05_MOOSE_CHARGE_SLOT[1]))
+        ids = [m for m, _b in bc.ch05_moose_charge_message(self._chap())]
+        self.assertEqual([bc.CH05_MOOSE_CHARGE_SLOT[1], bc.CH05_MOOSE_QUIP_MSG], ids)
+        for i in ids:
+            self.assertIn(i, set(bc.HOSTED_CHAPTER_MESSAGE_IDS['ch05']))
+            self.assertEqual('ch05', bc.assert_message_ids_unique()[i])
 
-    def test_a_scene_that_loses_its_stage_break_is_refused(self):
+    def test_a_scene_that_loses_its_stage_cut_is_refused(self):
         """Without the pause the two boxes run together and the charge plays after both --
         the joke told backwards, and nothing else would notice."""
         chap = self._chap()
         slot = bc.CH05_MOOSE_CHARGE_SLOT[0]
         event = bc._chapter_event_by_slot(chap, 'chapter_start', slot, 'test')
-        event['script'] = [e for e in event['script'] if 'stage_break' not in e]
+        event['script'] = [e for e in event['script'] if 'stage_cut' not in e]
         with self.assertRaises(SystemExit):
             bc.ch05_moose_charge_message(chap)
 
-    def test_the_bubble_comes_DOWN_for_the_charge(self):
+    def test_the_bellow_is_a_full_screen_CG_and_not_a_portrait(self):
+        """Nicolas's art and Nicolas's idea (2026-08-15): the moose fills the screen between
+        Pinky's question and the run. It is a BACG rather than a bust for the reason he raised
+        himself -- a 96x80 portrait is drawn inside the talk window's envelope and those antlers
+        do not fit it, while a BACG owns all 240x160 and has no envelope at all."""
+        block = bc.ch05_moose_charge_block(bc.CH05_MOOSE_PID,
+                                           bc.ch05_moose_station(self._chap()),
+                                           bc.ch05_party_camera_tile(self._chap()))
+        self.assertIn('BACG(%s)' % bc.CH05_MOOSE_BELLOW_BG, block)
+        self.assertIn((bc.CH05_MOOSE_BELLOW_BG, 'bg_WhiteMoose', '{Nicolas}'), bc.CAMPAIGN_BGS)
+        # REMOVEPORTRAITS does double duty: it re-arms the BACG load mode (without it the BG
+        # is a no-op -- the ch03/ch04 stale-BG bug) AND clears the faces, so the CG comes up
+        # on a clean screen instead of behind Pinky's bust.
+        self.assertLess(block.index('REMOVEPORTRAITS'), block.index('BACG('))
+        # CLEAN is the restore, and it is the bit that was missing: without it the map comes
+        # back wearing the CG's PALETTE (filmed 2026-08-15 -- a snowfield in moose-red).
+        # `EventScr_RemoveBGIfNeeded` only does a conditional FADU and cannot do this job.
+        # Vanilla's own order, from EventScr_TextShowWithFadeIn: FADI -> CLEAN -> FADU.
+        bell = block[block.index('BACG('):]
+        self.assertIn('CLEAN', bell)
+
+    def test_the_bellow_carries_no_text_but_DOES_cost_the_last_spare_id(self):
+        """The image itself is wordless. What costs an id is that a scene change tears the talk
+        down, so the punchline cannot resume the question's message and becomes its own --
+        0x9D2, ch05's one spare. The block is now exactly spent; do not assume slack."""
+        block = bc.ch05_moose_charge_block(bc.CH05_MOOSE_PID,
+                                           bc.ch05_moose_station(self._chap()),
+                                           bc.ch05_party_camera_tile(self._chap()))
+        bellow = block[block.index('REMOVEPORTRAITS'):block.index('MOVE_DEFINED')]
+        for texty in ('Text_BG', 'TEXTSHOW', 'TEXTSTART'):
+            self.assertNotIn(texty, bellow, 'the IMAGE itself carries no text')
+
+    def test_the_bellow_lands_BETWEEN_the_question_and_the_run(self):
+        """Nicolas's order, verbatim: "pinky's why isn't he running -> *moose bellows* ->
+        *moose runs* -> meesmickle quip"."""
+        block = bc.ch05_moose_charge_block(bc.CH05_MOOSE_PID,
+                                           bc.ch05_moose_station(self._chap()),
+                                           bc.ch05_party_camera_tile(self._chap()))
+        self.assertLess(block.index('TEXTSHOW('), block.index('BACG('), 'question, then bellow')
+        self.assertLess(block.index('BACG('), block.index('MOVE_DEFINED'), 'bellow, then run')
+        self.assertLess(block.index('MOVE_DEFINED'), block.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_QUIP_MSG), 'run, then quip')
+
+    def test_the_CG_fits_the_SIX_banks_the_fade_procs_apply(self):
+        """It fades in and out, and the fade/transition procs only apply six palettes -- the
+        rule Bremen's unreferenced 8-bank CG exists to teach. Asserted on the committed asset."""
+        png = os.path.join(bc.REPO, 'campaigns', self.CAMPAIGN, 'backgrounds',
+                           'bg_WhiteMoose.png')
+        im = Image.open(png)
+        self.assertEqual((240, 160), im.size)
+        self.assertEqual('P', im.mode)
+        banks = {im.getpixel((x * 8, y * 8)) // 16
+                 for x in range(240 // 8) for y in range(160 // 8)}
+        self.assertLessEqual(max(banks) + 1, 6,
+                             'a 7th/8th bank would not survive the fade')
+
+    def test_the_talk_is_ENDED_before_the_screen_changes(self):
         """Nicolas, watching the first film (2026-08-15): "he runs under it and he's covered".
         `[BreakTalk]` only LOCKS the talk proc, so the last speaker's box hangs over the whole
         action. `[CloseSpeechSlow]` is `ClearTalkBubble()` and nothing else -- faces stay loaded
         and the talk state survives, so `TEXTCONT` brings the window back for Meesmickle."""
-        body = self._body()
-        self.assertIn('[CloseSpeechSlow]', body)
-        self.assertLess(body.index('[CloseSpeechSlow]'), body.index('[BreakTalk]'),
-                        'the bubble closes at the pause, not after it')
-        self.assertLess(body.index('[BreakTalk]'), body.index('[FID_Gilliam]'),
-                        'and the next face loads on the far side of the break')
+        # Superseded by the CUT: with a full-screen bellow between them the talk ENDS after
+        # the question (REMA) rather than pausing, so the bubble comes down on its own and the
+        # punchline is a fresh message. `[CloseSpeechSlow]` is kept for `stage_break` scenes.
+        script = self._script()
+        beat = script[script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_CHARGE_SLOT[1]):]
+        self.assertLess(beat.index('REMA'), beat.index('BACG('),
+                        'the talk is down before the screen changes')
+        self.assertNotIn('[BreakTalk]', self._body())
 
     def test_a_break_between_two_turns_by_ONE_speaker_is_refused(self):
         """The bubble reopens on `!TalkHasCorrectBubble()`, which compares the speaking face
         slot and width -- so a break with the same speaker on both sides resumes onto a bubble
         the engine still believes is correct and prints into a cleared window. It would look
         like the text simply vanished, which is not a thing to discover on film."""
-        script = [{'pinky': 'One.'}, {'stage_break': 'business'}, {'pinky': 'Two.'}]
+        script = [{'pinky': 'One.'}, {'stage_cut': 'business'}, {'pinky': 'Two.'}]
         staging = {'pinky': ('[OpenMidLeft]', '[FID_Neimi]')}
         with self.assertRaises(SystemExit):
             bc._script_to_message(script, staging, width=29)
         with self.assertRaises(SystemExit):      # ...and a break with nothing after it
-            bc._script_to_message([{'pinky': 'One.'}, {'stage_break': 'business'}],
+            bc._script_to_message([{'pinky': 'One.'}, {'stage_cut': 'business'}],
                                   staging, width=29)
 
     def test_a_stage_break_is_a_pause_and_not_a_box(self):
         """Scene box counts are locked and asserted against the YAML, so a directive that
         counted as an A-press would make every such assertion off by one."""
-        self.assertIn('stage_break', bc.SCRIPT_DIRECTIVES)
+        self.assertIn('stage_cut', bc.SCRIPT_DIRECTIVES)
         self.assertEqual(2, bc.CH05_MOOSE_CHARGE_SLOT[2])
         self.assertEqual(3, len(self._scene()['script']))    # two boxes and the direction
         self.assertEqual(2, bc._script_box_count(self._scene()['script']))
@@ -3313,8 +3373,8 @@ class Ch05TheMooseCharges(unittest.TestCase):
 
     def test_the_stage_direction_lives_in_the_data_not_in_a_comment(self):
         """It is the middle beat of the scene, so it is authored where the other two are."""
-        direction = next(e['stage_break'] for e in self._scene()['script']
-                         if 'stage_break' in e)
+        direction = next(e['stage_cut'] for e in self._scene()['script']
+                         if 'stage_cut' in e)
         for locked in ('BELLOWS', 'comes', 'straight at them'):
             self.assertIn(locked, direction)
 
@@ -3325,7 +3385,7 @@ class Ch05TheMooseCharges(unittest.TestCase):
             self.assertLessEqual(len(printable), 29, 'bubble overflow: %r' % line)
 
     def test_both_locked_boxes_survive_word_for_word(self):
-        self.assertEqual(['pinky', 'stage_break', 'meesmickle'],
+        self.assertEqual(['pinky', 'stage_cut', 'meesmickle'],
                          [next(iter(b)) for b in self._scene()['script']])
         plain = ' '.join(re.sub(r'\[[^\]]*\]', ' ', self._body()).split())
         for locked in ("...It's not running. Why isn't it running?!", 'You had to ask?'):
@@ -3355,8 +3415,8 @@ class Ch05TheMooseCharges(unittest.TestCase):
         run = script.index('MOVE_DEFINED(%s)' % bc.CH05_MOOSE_PID)
         back = script.index('MOVE(0xffff, %s, %d, %d)' % (bc.CH05_MOOSE_PID, *pen))
         self.assertLess(put, run, 'it is placed before it runs')
-        self.assertLess(run, script.index('TEXTCONT'), 'it charges BEFORE the punchline')
-        self.assertLess(script.index('TEXTCONT'), back, 'and is snapped back after it')
+        self.assertLess(run, script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_QUIP_MSG), 'it charges BEFORE the punchline')
+        self.assertLess(script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_QUIP_MSG), back, 'and is snapped back after it')
 
     def test_the_run_is_an_authored_multi_leg_route_not_one_MOVE(self):
         """Lengthened 2026-08-15 (Nicolas): four tiles straight down was over before it read.
@@ -3395,7 +3455,7 @@ class Ch05TheMooseCharges(unittest.TestCase):
         back = script.index('MOVE(0xffff, %s, %d, %d)' % (bc.CH05_MOOSE_PID, *pen))
         self.assertLess(put, script.index('CAMERA(%d, %d)' % start),
                         'placed before the camera gets there')
-        self.assertLess(script.index('REMA', script.index('TEXTCONT')), back,
+        self.assertLess(script.index('REMA', script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_QUIP_MSG)), back,
                         'the bubble is down before the reset')
         self.assertLess(script.index('CAMERA(%d, %d)' % party), back,
                         'the camera is on the party before the reset')
@@ -3494,7 +3554,8 @@ class Ch05TheMooseCharges(unittest.TestCase):
         self.assertIn('LOMA(0x%X)' % bc.CH05_HOST_INDEX, dbg)
         self.assertIn(bc.CH05_LINE_TABLE, dbg, 'the line is where the MOOSE comes from')
         self.assertIn(bc.CH05_BOOT_SEED_TABLE, dbg, 'and the seed is the party to cut back to')
-        for skipped in ('BACG', 'CALL(%s)' % bc.CH05_PREP_SCRIPT,
+        for skipped in (bc.CH05_OPENING_BG, bc.CH05_ARRIVAL_BG,
+                        'CALL(%s)' % bc.CH05_PREP_SCRIPT,
                         'TEXTSHOW(0x%X)' % bc.CH05_BASIL_JOIN_SLOT[1],
                         'TEXTSHOW(0x%X)' % bc.CH05_SAHNAR_ALONE_SLOT[1]):
             self.assertNotIn(skipped, dbg, 'the debug boot replays nothing already approved')
@@ -3527,9 +3588,21 @@ class Ch05TheMooseCharges(unittest.TestCase):
         script = self._script()
         self.assertLess(script.index('CALL(%s)' % bc.CH05_PREP_SCRIPT),
                         script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_CHARGE_SLOT[1]))
-        tail = script[script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_CHARGE_SLOT[1]):]
-        self.assertNotIn('FADU', tail)
-        self.assertNotIn('FADI', tail)
+        # It inherits scene 5's fade-up, so nothing between the join and its own first box
+        # goes dark. What follows that box IS a fade cycle, and deliberately: the bellow is a
+        # full-screen CG over the map, so it fades down to the image and back up to the map.
+        gap = script[script.index('TEXTSHOW(0x%X)' % bc.CH05_BASIL_JOIN_SLOT[1]):
+                     script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_CHARGE_SLOT[1])]
+        self.assertNotIn('FADU', gap)
+        self.assertNotIn('FADI', gap)
+        bellow = script[script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_CHARGE_SLOT[1]):
+                        script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_QUIP_MSG)]
+        # The image CUTS in -- nothing fades before it, or the beat reads as leaving the
+        # scene rather than as something appearing over it (Nicolas: "seamless, as if it was
+        # part of the dialogue"). Coming BACK needs a short fade because CLEAN blanks.
+        self.assertEqual(0, bellow.count('FADI'), 'nothing fades down to the image')
+        self.assertNotIn('FADU(16)', bellow, 'and nothing fades up like a new scene')
+        self.assertIn('FADU(4)', bellow, 'CLEAN blanks, so the map needs a short fade back')
 
     def test_the_moose_is_already_on_the_map_and_is_not_loaded_again(self):
         """It has stood in the turn-1 line since before prep -- this beat only has to look at
@@ -3543,7 +3616,7 @@ class Ch05TheMooseCharges(unittest.TestCase):
         """Vanilla's own punctuation at exactly this kind of pause (MSG_9BF's BreakTalk gap),
         and it leaves "You had to ask?" landing in silence a beat before the map's own track."""
         script = self._script()
-        self.assertLess(script.index('MUSCMID(SONG_SILENT)'), script.index('TEXTCONT'))
+        self.assertLess(script.index('MUSCMID(SONG_SILENT)'), script.index('TEXTSHOW(0x%X)' % bc.CH05_MOOSE_QUIP_MSG))
 
     def test_the_moose_still_does_not_speak(self):
         """Locked 2026-07-03 as a mute white ghost, and re-locked by this chapter. The charge
