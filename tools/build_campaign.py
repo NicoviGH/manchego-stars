@@ -7717,6 +7717,14 @@ CAMPAIGN_BGS = [
     # is why that rule is written down). Converted at --banks 6 from a 1260x1047 RGBA master,
     # cropped to FILL rather than fitted with bars -- the beat is a bellow in the player's face
     # and the crop is what sells the scale.
+    # The PLATE behind it is the elven tomb's own backdrop, and that is the second answer to
+    # "make it look like it is over the map" rather than the first. The first was to bake a
+    # CAPTURED MAP FRAME in behind the animal, which composites perfectly and dies on contact
+    # with motion: the risen standing in that frame do not move for the 90 frames it is up, and
+    # a map whose units are frozen reads as a photograph of a map (Nicolas, 2026-08-15 --
+    # "what gives it away is the rest of the characters don't move"). A SCENIC plate promises no
+    # motion, so there is nothing to give away. General rule: a still image may stand in for a
+    # still thing; it may never stand in for something the player has just watched move.
     ('BG_MS_WHITE_MOOSE',         'bg_WhiteMoose',        '{Nicolas}'),
 ]
 
