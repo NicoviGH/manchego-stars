@@ -5557,13 +5557,22 @@ class EventGroupRosterPointer(unittest.TestCase):
             bc.point_event_group_at(self.INFO, 'Ch6Events', 'nosuchField', 'MS_Ch05DeployCap')
 
     def test_the_live_ch05_group_deploys_our_table(self):
-        """The regression itself. Runs against the injected tree, so it only means anything
-        after a build -- skipped on a clean checkout rather than passing vacuously."""
+        """The regression itself. Runs against the INJECTED tree, so it only means anything
+        after a build -- skipped on a clean checkout rather than failing or passing vacuously.
+
+        The skip has to key on a symbol only WE write. It used to look for
+        `struct ChapterEventGroup Ch6Events`, which is VANILLA's own and is present in a
+        pristine checkout -- so the guard never fired, and on CI (which runs `make test` before
+        any injection) the assertion ran against vanilla data and reported our roster pointer
+        missing. Nobody found out, because this class sat below `unittest.main()` and had never
+        run. `MS_Ch05DeployCap` is ours: absent pristine, present once injected.
+        """
         if not os.path.exists(bc.CH05_EVENTINFO_H):
             self.skipTest('decomp not present')
         with open(bc.CH05_EVENTINFO_H, encoding='utf-8') as f:
-            if 'struct ChapterEventGroup %s' % bc.CH05_EVENT_GROUP not in f.read():
-                self.skipTest('host slot not injected in this tree')
+            if bc.CH05_ALLY_TABLE not in f.read():
+                self.skipTest('tree not injected (no %s) -- run a build first'
+                              % bc.CH05_ALLY_TABLE)
         bc.assert_event_group_roster(bc.CH05_EVENTINFO_H, bc.CH05_EVENT_GROUP,
                                      bc.CH05_ALLY_TABLE)
 
