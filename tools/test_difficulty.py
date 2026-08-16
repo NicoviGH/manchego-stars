@@ -926,9 +926,10 @@ class RoleCheck(unittest.TestCase):
         cap, so one unit's 24.6 becomes +2.7 a slot and vanishes under a +-25% band. This prints
         the sentence that had to be computed by hand to catch it."""
         # sized to clear the x1.0 floor, as the real ch05 force does -- the note is about a
-        # chapter that PASSES while one unit carries the excess.
+        # chapter that PASSES while one unit carries the excess. (#285 raised the vanilla side
+        # by giving its named units their real lines, so the grunt count rose with it.)
         chap = self._chap([
-            {'id': 'grunt', 'class': 'soldier', 'level': 5, 'count': 15,
+            {'id': 'grunt', 'class': 'soldier', 'level': 5, 'count': 20,
              'inventory': [{'id': 'iron-lance', 'fe_base': 'iron-lance'}]},
             {'id': 'monster', 'class': 'gwyllgi', 'level': 6,
              'inventory': [{'id': 'claw', 'fe_base': 'hell-fang'}]},
@@ -1001,14 +1002,24 @@ class PersonalBossLine(unittest.TestCase):
         self.assertEqual(df.vanilla_personal_line('0x80'), {})
         self.assertEqual(df.vanilla_personal_line(None), {})
 
-    def test_aggregate_stays_class_base_only(self):
-        """Personal lines must not leak into enemy_combatants -- that is what keeps ours and
-        the vanilla reference on the same footing (and keeps a Def-13 boss from reading inf)."""
+    def test_enemy_combatants_is_still_the_class_base_primitive(self):
+        """enemy_combatants stays the raw class-base projection -- the real article is layered
+        on by chapter_enemy_force, so the primitive has one job and callers choose the footing."""
         plain = {'id': 'b', 'class': 'druid', 'level': 7,
                  'inventory': [{'id': 'flux', 'fe_base': 'flux'}]}
         withline = dict(plain, personal={'baseHP': 15, 'baseDef': 5})
         self.assertEqual(df.enemy_combatants(plain)[0].hp,
                          df.enemy_combatants(withline)[0].hp)
+
+    def test_the_aggregate_force_carries_personal_lines(self):
+        """#285: the aggregate reads the REAL ARTICLE on our side. Measuring a boss off class
+        base understated every named unit, and it understated them asymmetrically -- ours by
+        `personal:`, the twin's by its own character lines."""
+        chap = {'enemy_units': [{'id': 'b', 'class': 'druid', 'level': 7, 'count': 1,
+                                 'personal': {'baseHP': 15, 'baseDef': 5},
+                                 'inventory': [{'id': 'flux', 'fe_base': 'flux'}]}]}
+        force = df.chapter_enemy_force(chap)
+        self.assertEqual(force[0].hp, df.enemy_combatants(chap['enemy_units'][0])[0].hp + 15)
 
     def test_personal_line_lifts_the_boss_in_the_role_check(self):
         plain = {'id': 'boss', 'class': 'druid', 'level': 7, 'is_boss': True,
@@ -1064,6 +1075,36 @@ class PersonalBossLine(unittest.TestCase):
                 'inventory': [{'id': 'flux', 'fe_base': 'flux'}]}
         found = df.role_findings({'enemy_units': [boss]}, self.REF)
         self.assertTrue(any('cannot be damaged' in f for f in found), found)
+
+
+class MetricRoundsToKill(unittest.TestCase):
+    """#285: `rounds_to_kill` is a CLIFF at the damage boundary -- one more point of Def takes a
+    unit from 12.9 rounds to infinite, because FE8 has no chip-damage floor. Excluding those
+    units was the old answer and it is not symmetric: vanilla Ch5's Saar dropped out of the
+    twin's clear-load while our Ravisin -- built to Saar's own bar, 13.4 rounds against his
+    12.9 -- stayed in, which alone moved ch05 from x0.84 to x1.34. The METRIC floors damage at
+    1; the game does not."""
+
+    def _wall(self, df_):
+        return combatant('wall', hp=36, dfc=df_, spd=0, con=20)
+
+    def test_a_dentable_unit_is_untouched_by_the_floor(self):
+        u = self._wall(4)
+        self.assertEqual(df.metric_rounds_to_kill(u), fc.rounds_to_kill(df.YARDSTICK, u))
+
+    def test_an_undentable_unit_is_finite_not_infinite(self):
+        u = self._wall(30)
+        self.assertEqual(fc.rounds_to_kill(df.YARDSTICK, u), float('inf'))
+        self.assertLess(df.metric_rounds_to_kill(u), float('inf'))
+
+    def test_the_floor_is_monotonic_across_the_damage_cliff(self):
+        """The property that makes it a measurement: more Def is never LESS load."""
+        loads = [df.metric_rounds_to_kill(self._wall(d)) for d in range(2, 24)]
+        self.assertEqual(loads, sorted(loads), loads)
+
+    def test_a_wall_outweighs_a_merely_tough_unit(self):
+        self.assertGreater(df.metric_rounds_to_kill(self._wall(20)),
+                           df.metric_rounds_to_kill(self._wall(10)))
 
 
 class Terrain(unittest.TestCase):
