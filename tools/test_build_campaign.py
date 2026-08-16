@@ -4772,9 +4772,6 @@ class IdempotentInjectionMtimes(unittest.TestCase):
             self.assertTrue(p.startswith(bc.DECOMP), p)
 
 
-if __name__ == '__main__':
-    unittest.main()
-
 
 class SmsFreeListReclaimsDeadVanillaRows(unittest.TestCase):
     """We assign map sprites per CHARACTER where vanilla assigns them per CLASS, so every
@@ -5721,3 +5718,11 @@ class LocationEventsAreBuiltFromTheYaml(unittest.TestCase):
         self.assertEqual(bc.village_reward_item(village, {'booster-def': 'ITEM_BOOSTER_DEF'}),
                          'ITEM_BOOSTER_DEF')
         self.assertIsNone(bc.village_reward_item({'id': 'b'}, {}))
+
+
+# NB keep this LAST. It sat at line ~4776 of a 5723-line file, so the twelve TestCase classes
+# below it -- 88 tests, including all 26 of Ch04Stage4Scenes -- were defined after the runner
+# had already exited and never ran under `make test`, which is what CI executes (it runs each
+# file as a SCRIPT, not via `-m unittest`, so the two disagreed silently). Found 2026-08-15.
+if __name__ == '__main__':
+    unittest.main()

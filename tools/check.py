@@ -1100,6 +1100,37 @@ def _handoff_branch_state():
                         % (branch, main_ref))
 
 
+def check_every_test_actually_runs(fail):
+    """No TestCase may be defined AFTER its file's `unittest.main()`.
+
+    `make test` -- what CI runs -- executes each test file as a SCRIPT, so `unittest.main()`
+    collects only what is already defined when it is reached and then exits. A class below it
+    is dead: it never runs, it never fails, and `-m unittest` still collects it, so the two
+    ways of running the suite disagree in silence.
+
+    Found 2026-08-15 in tools/test_build_campaign.py, where the runner sat at line ~4776 of
+    5723 and TWELVE classes -- 88 tests, all 26 of Ch04Stage4Scenes among them -- had never
+    run under CI. They all passed once enabled, which is the point: nothing was going to tell
+    us. Same family as `check_verdict_scenarios_are_guarded` -- a green suite that is not
+    measuring what it claims.
+    """
+    for path in sorted(glob.glob(os.path.join(REPO, 'tools', 'test_*.py'))
+                       + glob.glob(os.path.join(REPO, 'tools', 'playtest', 'test_*.py'))):
+        lines = open(path, encoding='utf-8').read().splitlines()
+        main_at = next((i for i, l in enumerate(lines) if 'unittest.main()' in l), None)
+        if main_at is None:
+            continue
+        dead = [i + 1 for i, l in enumerate(lines)
+                if i > main_at and re.match(r'^class \w+\(unittest\.TestCase\)', l)]
+        if dead:
+            fail.append(
+                '%s defines %d TestCase class(es) AFTER unittest.main() (line %d) -- they are '
+                'never collected when the file runs as a script, which is how `make test` and '
+                'CI run it. Move the `if __name__ == \'__main__\':` block to the END of the '
+                'file. First offender at line %d.'
+                % (os.path.relpath(path, REPO), len(dead), main_at + 1, dead[0]))
+
+
 def check_handoff_only_on_main(fail):
     """HANDOFF.md is live state and live state is global -- author it on main, never on a
     feature branch. See the block comment above for the incident this encodes."""
@@ -1192,7 +1223,8 @@ def main():
                   check_generated_indexes_fresh, check_engine_guards_present,
                   check_purple_bank_blankers_known,
                   check_engine_campaign_agnostic,
-                  check_save_layout_stable, check_handoff_only_on_main,
+                  check_save_layout_stable, check_every_test_actually_runs,
+                  check_handoff_only_on_main,
                   check_lane_ownership):
         check(fail)
     if fail:
