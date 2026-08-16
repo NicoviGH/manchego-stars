@@ -2178,6 +2178,196 @@ class Ch05RavisinDeathQuote(unittest.TestCase):
         self.assertNotIn('.msg     = 0,', quote)
 
 
+class BattleQuotePair(unittest.TestCase):
+    """gBattleTalkList entries come in TWOS, and one of the two is easy to forget.
+
+    `CallBattleQuoteEventsIfAny` (eventinfo.c) is handed (attacker, defender) and tries
+    (A,B), (A,0), (0,B) in that order, so a boss line that should play "whoever swung
+    first" needs BOTH a row keyed on the boss as defender and a row keyed on the boss as
+    attacker. Vanilla ships exactly that pair for every boss it gives a taunt (O'Neill,
+    Breguet, Saar...), and a single row plays on one side of the engagement only.
+    """
+
+    def test_the_pair_covers_both_sides_of_the_engagement(self):
+        self.assertTrue(hasattr(bc, 'battle_quote_pair'),
+                        'the two-row boss-taunt idiom needs one owner, not a copy per chapter')
+        rows = bc.battle_quote_pair('0xb8', 'CHAPTER_L_6', 0x9F2, 'a boss taunt')
+        self.assertEqual(2, rows.count('.pidA'))
+        # The player-engages row names the boss as pidB behind the leader sentinel; the
+        # boss-engages row names it as pidA and leaves pidB out entirely (a zero pidB is
+        # what makes the lookup match on pidA alone).
+        player_row, boss_row = rows.split('    },')[:2]
+        self.assertIn('.pidA     = CHAR_EVT_PLAYER_LEADER,', player_row)
+        self.assertIn('.pidB     = 0xb8,', player_row)
+        self.assertIn('.pidA     = 0xb8,', boss_row)
+        self.assertNotIn('.pidB', boss_row)
+        self.assertEqual(2, rows.count('.chapter = CHAPTER_L_6,'))
+        self.assertEqual(2, rows.count('.flag    = EVFLAG_BATTLE_QUOTES,'))
+        self.assertEqual(2, rows.count('.msg     = 0x9F2,'))
+
+    def test_the_shared_flag_is_what_makes_it_play_once(self):
+        """Both rows carry the SAME flag on purpose: GetBattleQuoteEntry skips any entry
+        whose flag is already set, so the row that did not fire is retired by the row that
+        did. Two different flags would let the taunt play twice, once per side."""
+        rows = bc.battle_quote_pair('0xb8', 'CHAPTER_L_6', 0x9F2, 'a boss taunt')
+        flags = {line.strip() for line in rows.split('\n') if '.flag' in line}
+        self.assertEqual(1, len(flags))
+
+
+class Ch05RavisinBattleTaunt(unittest.TestCase):
+    """Scene 12: Ravisin's one box when a player unit engages her (#25).
+
+    This is the twin of vanilla Saar's MSG_9C7 with one word swapped (empire ->
+    Frostmaiden). It was wired NOWHERE for months -- gBattleTalkList carried the
+    prologue's rows and nothing for her -- so the locked line existed in the YAML and
+    could not play. The mechanism is FE8's own, not a turn event: the quote fires on
+    first engagement, from either side, and retires itself.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+
+    def _event(self):
+        return next(e for e in self._chap()['events'] if e['trigger'] == 'boss_battle')
+
+    def test_taunt_owns_its_own_named_id_in_ch05s_host_block(self):
+        self.assertTrue(hasattr(bc, 'CH05_RAVISIN_TAUNT_MSG'),
+                        'Ravisin needs a named host-block id for her battle taunt')
+        self.assertEqual(0x9F2, bc.CH05_RAVISIN_TAUNT_MSG)
+        self.assertIn(bc.CH05_RAVISIN_TAUNT_MSG, bc.HOSTED_CHAPTER_MESSAGE_IDS['ch05'])
+        self.assertEqual('ch05', bc.assert_message_ids_unique()[bc.CH05_RAVISIN_TAUNT_MSG])
+        self.assertNotEqual(0x9C7, bc.CH05_RAVISIN_TAUNT_MSG,
+                            "the YAML's `vanilla 0x9C7` label cites the scene we mine, and "
+                            'ch04 writes that literal id')
+
+    def test_locked_one_box_emits_ravisins_live_face_from_the_event_yaml(self):
+        event = self._event()
+        self.assertEqual('vanilla 0x9C7', event['slot'])
+        self.assertEqual(
+            [{'ravisin': "Enemy of the Frostmaiden! Death's too good for you!"}],
+            event['script'])
+        self.assertTrue(hasattr(bc, 'ch05_ravisin_taunt_message'),
+                        'the locked YAML beat needs a message emitter')
+
+        body = bc.ch05_ravisin_taunt_message(self._chap())
+        flowed = body.replace('[LF]\n', ' ')
+        self.assertIn('[LoadFace][FID_Riev]', body)
+        self.assertEqual(1, body.count('[A]'))
+        self.assertIn('Enemy of the Frostmaiden', flowed)
+        self.assertIn("Death's too good for you", flowed)
+        # The whole point of the swap: her allegiance, never Grado's.
+        self.assertNotIn('empire', flowed)
+
+    def test_the_taunt_takes_vanillas_own_seat_for_this_slot(self):
+        """Vanilla's MSG_9C7 and MSG_9C8 both put Saar on [OpenMidLeft], and ch05's
+        eruption warning already seats Ravisin there. A battle quote draws over the
+        combat screen with nobody opposite her, so the mined seat is the one to keep."""
+        self.assertIn('[OpenMidLeft]', bc.ch05_ravisin_taunt_message(self._chap()))
+
+    def test_engaging_ravisin_is_what_plays_it(self):
+        self.assertTrue(hasattr(bc, 'ch05_ravisin_battle_quote'),
+                        'ch05 needs a testable owner for Ravisin battle-talk wiring')
+        rows = bc.ch05_ravisin_battle_quote()
+        self.assertEqual(2, rows.count('.pidA'))
+        self.assertIn('.pidB     = %s,' % bc.CH05_BOSS_PID, rows)
+        self.assertIn('.pidA     = %s,' % bc.CH05_BOSS_PID, rows)
+        self.assertEqual(2, rows.count('.chapter = %s,'
+                                       % bc.chapter_label_constant(bc.CH05_HOST_INDEX)))
+        self.assertEqual(2, rows.count('.msg     = 0x%X,' % bc.CH05_RAVISIN_TAUNT_MSG))
+        # EVFLAG_DEFEAT_BOSS is the WIN flag: setting it from a taunt would end the
+        # chapter the moment somebody swung at her.
+        self.assertNotIn('EVFLAG_DEFEAT_BOSS', rows)
+
+    def test_the_taunt_does_not_ride_the_moose_or_a_turn_event(self):
+        """The moose is a convertible miniboss on its own pid; the taunt is the BOSS's.
+        And it is not a turn script -- the eruption warning is, and copying that shape
+        would fire the taunt on a clock rather than on the fight."""
+        rows = bc.ch05_ravisin_battle_quote()
+        self.assertNotIn(bc.CH05_MOOSE_PID, rows)
+        for turn in (2, 3, 5):
+            self.assertNotIn('TEXTSHOW(0x%X)' % bc.CH05_RAVISIN_TAUNT_MSG,
+                             bc.ch05_wave_script(turn, 'MS_Ch05WaveT%d' % turn))
+
+
+class Ch05BasilDeathQuote(unittest.TestCase):
+    """Scene 13: Basil's CHAPTER-SPECIFIC death box (#25).
+
+    Every cast member already has a universal death quote (#6) keyed `chapter = 0xFF`.
+    Vanilla gives Natasha a second, Ch5-only one because she is the ESCORT the chapter is
+    built around, and Basil is her exact donor and holds that role here. Two entries for
+    one pid is therefore the POINT -- and it is also the hazard, because
+    GetDefeatTalkEntry returns the FIRST pid match: the ch05 row has to sit ahead of the
+    universal row or it can never play.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+
+    def _event(self):
+        return next(e for e in self._chap()['events'] if e['trigger'] == 'unit_death')
+
+    def test_the_chapter_quote_owns_its_own_id_and_does_not_reuse_the_universal_one(self):
+        self.assertTrue(hasattr(bc, 'CH05_BASIL_DEATH_MSG'),
+                        "Basil's ch05-only death box needs a named host-block id")
+        self.assertEqual(0x9F3, bc.CH05_BASIL_DEATH_MSG)
+        self.assertIn(bc.CH05_BASIL_DEATH_MSG, bc.HOSTED_CHAPTER_MESSAGE_IDS['ch05'])
+        self.assertEqual('ch05', bc.assert_message_ids_unique()[bc.CH05_BASIL_DEATH_MSG])
+        self.assertNotEqual(bc.PC_DEATH_QUOTE_MSGS['basil'], bc.CH05_BASIL_DEATH_MSG)
+
+    def test_locked_one_box_emits_basils_own_face_from_the_event_yaml(self):
+        event = self._event()
+        self.assertEqual('vanilla 0x9C6', event['slot'])
+        self.assertEqual('locked', event['status'])
+        self.assertEqual([{'basil': "But I haven't-- I still have her berry..."}],
+                         event['script'])
+        self.assertTrue(hasattr(bc, 'ch05_basil_death_message'),
+                        'the locked YAML beat needs a message emitter')
+
+        body = bc.ch05_basil_death_message(self._chap())
+        flowed = body.replace('[LF]\n', ' ')
+        self.assertIn('[LoadFace][FID_%s]' % bc.PORTRAIT_MAP['basil'], body)
+        self.assertEqual(1, body.count('[A]'))
+        self.assertIn('her berry', flowed)
+        # Her UNIVERSAL quote (#6) is a different line about the same berries -- the two
+        # must not converge into one, or the chapter row buys nothing.
+        self.assertNotIn(bc.load_unit(self.CAMPAIGN, 'basil')['death_quote'], flowed)
+
+    def test_the_chapter_entry_is_keyed_to_ch05_alone(self):
+        self.assertTrue(hasattr(bc, 'ch05_basil_death_quote'),
+                        'ch05 needs a testable owner for the chapter-specific death entry')
+        row = bc.ch05_basil_death_quote(self.CAMPAIGN)
+        self.assertIn('.pid     = %s,' % bc.char_symbol(bc.PORTRAIT_MAP['basil']), row)
+        self.assertIn('.chapter = %s,' % bc.chapter_label_constant(bc.CH05_HOST_INDEX), row)
+        self.assertIn('.msg     = 0x%X,' % bc.CH05_BASIL_DEATH_MSG, row)
+        self.assertNotIn('0xFF', row)
+        # No flag: her death is not a win, a loss, or a trigger -- it only speaks.
+        self.assertNotIn('EVFLAG', row)
+
+    def test_the_chapter_entry_is_emitted_ahead_of_the_universal_one(self):
+        """The whole hazard in one assertion. inject_pc_death_quotes runs LAST in main(),
+        so anything ch05 prepends on its own would end up BEHIND the universal rows and
+        never match. The per-PC death-quote list owns the ordering, and emits the
+        chapter-specific overrides first."""
+        self.assertTrue(hasattr(bc, 'pc_death_quote_rows'),
+                        'the death-quote list needs one testable owner for its ORDER')
+        rows = bc.pc_death_quote_rows(self.CAMPAIGN)
+        basil_pid = '.pid     = %s,' % bc.char_symbol(bc.PORTRAIT_MAP['basil'])
+        hits = [i for i, row in enumerate(rows) if basil_pid in row]
+        self.assertEqual(2, len(hits), 'Basil should have both a ch05 row and a universal row')
+        chapter_row, universal_row = rows[hits[0]], rows[hits[1]]
+        self.assertIn('.chapter = %s,' % bc.chapter_label_constant(bc.CH05_HOST_INDEX),
+                      chapter_row)
+        self.assertIn('0xFF', universal_row)
+
+    def test_no_other_cast_member_gains_a_chapter_specific_row(self):
+        rows = bc.pc_death_quote_rows(self.CAMPAIGN)
+        overrides = [row for row in rows if '0xFF' not in row]
+        self.assertEqual(1, len(overrides),
+                         'ch05/Basil is the only chapter-specific death quote written so far')
+
+
 class Ch05SahnarTalkRecruit(unittest.TestCase):
     """The chapter's payoff: Basil chaperoned across turns the risen Sahnar (#25).
 

@@ -7473,6 +7473,90 @@ scenarios.recordch05ravisindeath = function()
     })
 end
 
+-- recordch05combatquotes (#25): scenes 12 and 13, filmed in ONE combat.
+-- The two beats are separate mechanisms -- Ravisin's taunt is a gBattleTalkList pair that fires at
+-- battle START, Basil's chapter-only box is a gDefeatTalkList row that fires when she falls -- but
+-- ONE fight produces both, in that order, so it is one run and not two.
+-- What only a run can answer: whether each box renders with the right FACE. Both are new drawing
+-- situations (a quote over the combat overlay, and a chapter row SHADOWING a universal one), and
+-- three data checks passing while three faces rendered corrupted is a thing this chapter has
+-- already done. It also answers which of Basil's two rows won: the texts differ, so the film says
+-- outright whether the ch05 row beat her #6 line or the other way round.
+-- MAP COMBAT, normal speed, on recordfix's finding: an in-battle quote is buried and aliased under
+-- full battle anims and reads as a lingering overlay in map combat.
+-- Determinism instead of AI faith: every OTHER red is made harmless AND Basil is given the defence
+-- to shrug a harmless weapon off, so no wandering enemy can take the kill this film exists to
+-- attribute to Ravisin, who is given the power to land it through that same defence.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05combatquotes (CH05BOOT=1 ROM).
+scenarios.recordch05combatquotes = function()
+    local BASIL, RAVISIN = 0x13, 0xb8            -- CHARACTER_ARTUR / Ravisin's raw pid
+    local quotes, quoteWasUp = 0, false
+    return recordCutscene({
+        tag = "ch05combatquotes", speed = "normal", maxFrames = 3600, shotEvery = 1,
+        pressEvery = 90,
+        pre = function()
+            pokeFastConfig()
+            if not bootToMap() then return false, "never reached the ch05 map" end
+            if not waitFor(function()
+                return faction() == 0 and not menuOpen()
+                    and not procActive(SYM.ProcScr_StdEventEngine)
+            end, 6000, true) then
+                return false, "ch05 map never became idle"
+            end
+            local boss = red(RAVISIN)
+            if not boss then return false, "Ravisin (pid 0xb8) is not in the red array" end
+            local basil = blue(BASIL)
+            if not basil then
+                return false, "Basil is not BLUE at turn 1 -- the opening join CUSA never fired"
+            end
+            -- Only Ravisin may land a killing blow. pow=0 alone does NOT protect a 1-HP unit
+            -- (weapon might still gets through), so Basil keeps her HP and takes the DEFENCE
+            -- that zeroes a harmless attacker's damage; Ravisin is given power enough to cut
+            -- straight through it.
+            for i = 0, 49 do
+                local r = unitAt(SYM.gUnitArrayRed, i)
+                if r and not isDead(r) and r.charId ~= RAVISIN then pokeHarmless(r) end
+            end
+            emu:write8(basil.addr + 0x17, 40)     -- def: nothing harmless can scratch her
+            emu:write8(basil.addr + 0x18, 40)     -- res: Ravisin's Flux is magic, so cover both
+            emu:write8(boss.addr + 0x14, 60)      -- pow: her hit goes through that, once
+            emu:write8(boss.addr + 0x15, 60)      -- hit: and it does not miss
+            -- Park Basil orthogonally adjacent to Ravisin's guard tile, keeping the tile->unit
+            -- grid in sync (recordch05recruit's idiom) so adjacency reads with no phase cycle.
+            local grid, parked = mapUnitAt(basil.x, basil.y), false
+            for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+                local tx, ty = boss.x + d[1], boss.y + d[2]
+                if tx >= 0 and ty >= 0 and mapUnitAt(tx, ty) == 0 then
+                    setMapUnit(basil.x, basil.y, 0)
+                    emu:write8(basil.addr + 0x10, tx); emu:write8(basil.addr + 0x11, ty)
+                    setMapUnit(tx, ty, grid)
+                    parked = true
+                    break
+                end
+            end
+            if not parked then return false, "no free tile beside Ravisin to park Basil" end
+            -- Map combat + normal speed, then hand the enemy phase to the CAMERA rather than
+            -- riding it here: runEnemyPhase would advance both boxes off screen unfilmed.
+            local a = SYM.gPlaySt + 0x40
+            local c = ru32(a)
+            c = (c & ~(3 << 17)) | (1 << 17)      -- animationType = OFF (map combat)
+            c = c & ~(1 << 7)                     -- gameSpeed = normal (the boxes stay readable)
+            emu:write32(a, c)
+            if not endTurn() then return false, "could not end the player turn" end
+            return true
+        end,
+        until_ = function()
+            local up = procActive(SYM.ProcScr_BattleEventEngine)
+            if up and not quoteWasUp then quotes = quotes + 1 end
+            quoteWasUp = up
+            local basil = blue(BASIL)
+            -- Both boxes AND the death: a run that filmed the taunt and then timed out waiting
+            -- on a kill that never came must not read as the pair having played.
+            return quotes >= 2 and not up and basil ~= nil and isDead(basil)
+        end,
+    })
+end
+
 -- recordch05opening (#25): the MOTION proof for ch05's three BACKDROP scenes -- Basil and Sahnar
 -- through the stone, Sephek's orders, Ravisin's appraisal -- which the chapter played SILENTLY
 -- until now (CH05_BEGINNING_SCRIPT was ours already and simply had no TEXTSHOW in it).

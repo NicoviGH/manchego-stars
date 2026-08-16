@@ -293,6 +293,10 @@ scenarios:
     rom: ch05boot
     host_chapter: 6
     kind: record
+  recordch05combatquotes:                              # scenes 12 + 13 in one fight (#25)
+    rom: ch05boot
+    host_chapter: 6
+    kind: record
   recordch05recruit:
     rom: ch05boot
     host_chapter: 6

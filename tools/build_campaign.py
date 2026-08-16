@@ -6264,31 +6264,11 @@ def inject_prologue(campaign, verbose=True, montage=False):
     #     the player engaging the boss, one for the boss engaging the player; the
     #     EVFLAG_BATTLE_QUOTES flag makes it play exactly once). Same head-insertion
     #     rule as the defeat quotes: GetBattleTalkEntry returns the first match.
-    fight_quotes = [(
-        '    {\n'
-        '        .pidA     = CHAR_EVT_PLAYER_LEADER,\n'
-        '        .pidB     = CHARACTER_%s, /* Sephek mid-fight frost line (step 4c) */\n'
-        '        .chapter = CHAPTER_L_1,\n'
-        '        .flag    = EVFLAG_BATTLE_QUOTES,\n'
-        '        .msg     = 0x0914,\n'
-        '    },' % sephek_slot), (
-        '    {\n'
-        '        .pidA     = CHARACTER_%s,\n'
-        '        .chapter = CHAPTER_L_1,\n'
-        '        .flag    = EVFLAG_BATTLE_QUOTES,\n'
-        '        .msg     = 0x0914,\n'
-        '    },' % sephek_slot)]
-    with open(BATTLEQUOTES_C, encoding='utf-8') as f:
-        bq = f.read()
-    head = 'CONST_DATA struct DefeatTalkEnt gDefeatTalkList[] = {\n'
-    fight_head = 'CONST_DATA struct BattleTalkExtEnt gBattleTalkList[] = {\n'
-    if bq.count(head) != 1 or bq.count(fight_head) != 1:
-        sys.exit('ERROR: talk-list heads not in expected vanilla form in %s'
-                 % BATTLEQUOTES_C)
-    bq = bq.replace(head, head + '\n'.join(quotes) + '\n')
-    bq = bq.replace(fight_head, fight_head + '\n'.join(fight_quotes) + '\n')
-    with open(BATTLEQUOTES_C, 'w', encoding='utf-8') as f:
-        f.write(bq)
+    #     battle_quote_pair() owns both rows and why there are two of them.
+    _prepend_defeat_quote('\n'.join(quotes))
+    _prepend_battle_quote(battle_quote_pair(
+        'CHARACTER_%s' % sephek_slot, 'CHAPTER_L_1', 0x914,
+        'Sephek mid-fight frost line (step 4c)'))
 
     # 6. Opening montage (#43): when MONTAGE=1, re-render the intro-monologue slides as our
     #    lore crawl + the world-map tour. The boot cut + New-Game redirect themselves (so the
@@ -6745,15 +6725,58 @@ def flag_defeat_quote(pid, chapter_const, flag, comment, msg=0):
     SetPidDefeatedFlag sets the flag on ANY matching pid's death (no CA_BOSS gate, eventinfo.c),
     while DisplayDefeatTalkForPid shows `msg` when nonzero or suppresses it when zero. The silent
     form lets a faceless unit set an event flag without rendering a boxless, unreadable line;
-    the faced form lets the same flag path carry its authored quote."""
+    the faced form lets the same flag path carry its authored quote.
+
+    `flag=None` omits the field entirely -- a row that only SPEAKS, which is vanilla's own
+    shape for every player death quote (see defeat_quote)."""
     msg_value = '0' if msg == 0 else '0x%X' % msg
+    flag_line = '' if flag is None else '        .flag    = %s,\n' % flag
     return ('    {\n'
             '        .pid     = %s, /* %s */\n'
             '        .route   = CHAPTER_MODE_ANY,\n'
             '        .chapter = %s,\n'
-            '        .flag    = %s,\n'
+            '%s'
             '        .msg     = %s,\n'
-            '    },' % (pid, comment, chapter_const, flag, msg_value))
+            '    },' % (pid, comment, chapter_const, flag_line, msg_value))
+
+
+def defeat_quote(pid, chapter_const, comment, msg):
+    """A gDefeatTalkList row that only SPEAKS: `pid`'s dying box in `chapter_const`, setting
+    nothing. Player death quotes are all this shape (the flag on a defeat row is what turns a
+    death into a game state -- a win, a game over, a mid-map trigger -- and a faller who is
+    merely mourned wants none of that)."""
+    return flag_defeat_quote(pid, chapter_const, None, comment, msg=msg)
+
+
+def battle_quote_pair(pid, chapter_const, msg, comment, flag='EVFLAG_BATTLE_QUOTES'):
+    """The two gBattleTalkList rows that give `pid` a first-engagement line in `chapter_const`.
+
+    FE8's mid-fight boss line is a PAIR, and shipping one row is the easy half-wiring.
+    `CallBattleQuoteEventsIfAny` (eventinfo.c) is handed (attacker, defender) and asks
+    `GetBattleQuoteEntry` for (A,B), then (A,0), then (0,B) -- so a row keyed on the boss as
+    pidA fires when the boss swings, and a row keyed on it as pidB (behind the
+    CHAR_EVT_PLAYER_LEADER sentinel, which is literally 0) fires when the player does. Vanilla
+    writes both for every boss it gives a taunt: O'Neill, Breguet, Bone, Bazba, Saar.
+
+    Both rows carry the SAME flag deliberately. The scan skips any entry whose flag is already
+    set, so whichever side fires first retires the other; two flags would let the line play
+    twice. `.chapter` must be the HOST index (it is compared against gPlaySt.chapterIndex), and
+    the entries belong at the head of the list for the same first-match reason the defeat
+    quotes do."""
+    return ('    {\n'
+            '        .pidA     = CHAR_EVT_PLAYER_LEADER,\n'
+            '        .pidB     = %s, /* %s */\n'
+            '        .chapter = %s,\n'
+            '        .flag    = %s,\n'
+            '        .msg     = 0x%X,\n'
+            '    },\n'
+            '    {\n'
+            '        .pidA     = %s, /* the same line when they swing first */\n'
+            '        .chapter = %s,\n'
+            '        .flag    = %s,\n'
+            '        .msg     = 0x%X,\n'
+            '    },' % (pid, comment, chapter_const, flag, msg,
+                        pid, chapter_const, flag, msg))
 
 
 def midmap_afev(guard_flag, script, watch_flag):
@@ -7126,6 +7149,22 @@ def _prepend_defeat_quote(quote):
         sys.exit('ERROR: gDefeatTalkList head not in expected form in %s'
                  % BATTLEQUOTES_C)
     bq = bq.replace(head, head + quote + '\n')
+    with open(BATTLEQUOTES_C, 'w', encoding='utf-8') as f:
+        f.write(bq)
+
+
+def _prepend_battle_quote(entries):
+    """Prepend `entries` at the HEAD of gBattleTalkList (battlequotes.c) -- the mid-fight
+    line list, whose rows come from battle_quote_pair(). GetBattleQuoteEntry scans first-match
+    exactly like the defeat list, so the head wins over any vanilla row for the same pid in
+    the same chapter."""
+    with open(BATTLEQUOTES_C, encoding='utf-8') as f:
+        bq = f.read()
+    head = 'CONST_DATA struct BattleTalkExtEnt gBattleTalkList[] = {\n'
+    if bq.count(head) != 1:
+        sys.exit('ERROR: gBattleTalkList head not in expected form in %s'
+                 % BATTLEQUOTES_C)
+    bq = bq.replace(head, head + entries + '\n')
     with open(BATTLEQUOTES_C, 'w', encoding='utf-8') as f:
         f.write(bq)
 
@@ -8895,6 +8934,9 @@ CH05_ERUPTION_MSG = 0x9E4                     # turn-2 Ravisin warning; first fr
 CH05_RAVISIN_DEATH_MSG = 0x9E5                # locked Ravisin death quote; next Ch6-host id
 CH05_ARENA_FOUND_MSG = 0x9E6                  # vanilla 0x9D5 anatomy, in ch05's host block
 CH05_ARENA_RULES_MSG = 0x9E7                  # vanilla 0x9D6 anatomy, in ch05's host block
+CH05_RAVISIN_TAUNT_MSG = 0x9F2                # first-engagement boss taunt (gBattleTalkList)
+CH05_BASIL_DEATH_MSG = 0x9F3                  # Basil's ch05-ONLY death box, ahead of her
+                                              # universal #6 quote (PC_DEATH_QUOTE_MSGS)
 CH05_GOAL_WINDOW_MSG = 0x9F4
 CH05_GOAL_STATUS_MSG = 0x9F5
 # ── The opening's BACKDROP half (#25): three scenes at the tomb, before the party arrives ──
@@ -9201,7 +9243,8 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
     # The four reliquary visit lines joined the block 2026-08-08 (dialogue-pass). They sit
     # OUTSIDE ch05's host block on purpose -- see CH05_VILLAGE_SLOTS for why that is safe here
     # and why spending ch05's own ids on them was the worse trade.
-    'ch05': (CH05_ERUPTION_MSG, CH05_RAVISIN_DEATH_MSG,
+    'ch05': (CH05_ERUPTION_MSG, CH05_RAVISIN_DEATH_MSG, CH05_RAVISIN_TAUNT_MSG,
+             CH05_BASIL_DEATH_MSG,
              CH05_ARENA_FOUND_MSG, CH05_ARENA_RULES_MSG,
              CH05_SAHNAR_TALK_MSG,
              *(msg for _slot, msg, _boxes, _what in CH05_OPENING_SLOTS),
@@ -11198,6 +11241,58 @@ def ch05_eruption_message(chap):
         width=29)
 
 
+def ch05_basil_death_message(chap):
+    """Render Basil's one locked ch05-ONLY death box from the chapter event source of truth.
+
+    The ``vanilla 0x9C6`` label cites Natasha's Ch5 death quote -- the ESCORT's, which is the
+    role Basil holds all chapter and the reason this second quote exists at all. She keeps her
+    own bust and the left podium, like every other faller (#6).
+    """
+    _card, beats = _split_event_beats(
+        chap, 'unit_death', 'ch05 Basil death quote', (CH05_BASIL_DEATH_MSG,),
+        card_required=False)
+    beat = beats[0]
+    if len(beat) != 1 or next(iter(beat[0])) != 'basil':
+        sys.exit('ERROR: ch05 Basil death quote must remain one locked Basil box')
+    return _script_to_message(
+        beat, {'basil': ('[OpenMidLeft]', _fid_tag(PORTRAIT_MAP['basil']))}, width=29)
+
+
+def ch05_basil_death_quote(campaign):
+    """The gDefeatTalkList row that plays Basil's ch05-only box instead of her universal one.
+
+    No flag: her death is not a win, a loss, or a trigger here -- it only speaks. The row is
+    keyed to ch05's HOST slot, so it matches in this chapter alone and her #6 quote covers
+    every other. ORDER is what makes it work, and the per-PC death-quote list owns that (see
+    pc_death_quote_rows).
+    """
+    slot = dict((unit_id, slot) for unit_id, slot, _cls, _sms in classed_cast(campaign))['basil']
+    return defeat_quote(
+        char_symbol(slot), chapter_label_constant(CH05_HOST_INDEX),
+        'Basil (ch05 escort): chapter-only death quote, ahead of her #6 line',
+        CH05_BASIL_DEATH_MSG)
+
+
+def ch05_ravisin_taunt_message(chap):
+    """Render Ravisin's one locked battle taunt -- the line she says when the fight starts.
+
+    The ``vanilla 0x9C7`` label cites Saar's own taunt, which ours is the twin of with one word
+    swapped (empire -> Frostmaiden); ch05 writes the body into its own Ch6 host block. Seat:
+    vanilla puts Saar on [OpenMidLeft] for BOTH 9C7 and 9C8, and a battle quote draws over the
+    combat screen with nobody opposite her, so the mined seat carries over unchanged.
+    """
+    _card, beats = _split_event_beats(
+        chap, 'boss_battle', 'ch05 Ravisin battle taunt', (CH05_RAVISIN_TAUNT_MSG,),
+        card_required=False)
+    beat = beats[0]
+    if len(beat) != 1 or next(iter(beat[0])) != 'ravisin':
+        sys.exit('ERROR: ch05 Ravisin battle taunt must remain one locked Ravisin box')
+    return _script_to_message(
+        beat,
+        {'ravisin': ('[OpenMidLeft]', _fid_tag(GUEST_PORTRAIT_MAP['ravisin']))},
+        width=29)
+
+
 def ch05_ravisin_death_message(chap):
     """Render Ravisin's one locked death box from the chapter event source of truth.
 
@@ -11907,6 +12002,19 @@ def ch05_ravisin_defeat_quote():
         msg=CH05_RAVISIN_DEATH_MSG)
 
 
+def ch05_ravisin_battle_quote():
+    """The pair that plays Ravisin's taunt on first engagement, from either side (#25).
+
+    Her weight comes from the orders scene, not from talking on the field, so this is FE8's
+    own one-box mechanism and not a turn event: it fires on the FIGHT rather than on a clock.
+    EVFLAG_BATTLE_QUOTES is deliberately not the win flag -- EVFLAG_DEFEAT_BOSS here would end
+    the chapter the moment anybody swung at her.
+    """
+    return battle_quote_pair(
+        CH05_BOSS_PID, chapter_label_constant(CH05_HOST_INDEX), CH05_RAVISIN_TAUNT_MSG,
+        'Ravisin (ch05 boss): locked first-engagement taunt')
+
+
 def ch05_wave_script(turn, wave_table):
     """Build one ch05 reinforcement script; only turn 2 speaks.
 
@@ -12232,6 +12340,10 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     set_message_body(lines, host['goal']['windowTextId'], goal_window_body('Defeat boss'))
     set_message_body(lines, CH05_ERUPTION_MSG, ch05_eruption_message(chap))
     set_message_body(lines, CH05_RAVISIN_DEATH_MSG, ch05_ravisin_death_message(chap))
+    set_message_body(lines, CH05_RAVISIN_TAUNT_MSG, ch05_ravisin_taunt_message(chap))
+    # Scene 13. The ROW that reaches this body is the death-quote pass's (it has to sit ahead
+    # of Basil's universal #6 line, and that pass runs last); the TEXT is ch05's.
+    set_message_body(lines, CH05_BASIL_DEATH_MSG, ch05_basil_death_message(chap))
     set_message_body(lines, CH05_SAHNAR_TALK_MSG, ch05_sahnar_talk_message(chap))
     for msg_id, body in (ch05_opening_messages(chap) + ch05_basil_join_messages(chap)
                          + ch05_sahnar_alone_message(chap) + ch05_moose_charge_message(chap)):
@@ -12255,6 +12367,9 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     # and host-owned message both exist. SetPidDefeatedFlag still fires EVFLAG_DEFEAT_BOSS;
     # DisplayDefeatTalkForPid now shows the one locked box before the ending AFEV runs.
     _prepend_defeat_quote(ch05_ravisin_defeat_quote())
+    # Scene 12: the taunt on first engagement. A separate list and a separate flag from the
+    # death quote above -- the player meets her twice, and each meeting has its own box.
+    _prepend_battle_quote(ch05_ravisin_battle_quote())
 
     if verbose:
         print('  ch05 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; defeat_boss '
@@ -12349,6 +12464,36 @@ def inject_northlook_bitey(verbose=True):
         print("  'Ol Bitey mounted over the Northlook hearth (bg_Fireplace, #21)")
 
 
+# Cast members whose death is answered by a CHAPTER-SPECIFIC box as well as their universal
+# one. Vanilla does this for exactly one unit per chapter and only when the chapter is built
+# around them (Natasha in Ch5, the escort): the chapter row shadows the universal row while
+# that chapter is loaded, and the universal one covers everywhere else.
+CHAPTER_DEATH_QUOTE_OVERRIDES = (ch05_basil_death_quote,)
+
+
+def pc_death_quote_rows(campaign):
+    """Every gDefeatTalkList row the death-quote pass writes, IN SCAN ORDER.
+
+    GetDefeatTalkEntry returns the first pid match, so a pid with two rows is decided here and
+    nowhere else: the chapter-specific overrides come FIRST, the universal chapter=0xFF rows
+    after. That ordering cannot live in the chapter injectors -- this pass runs last in main()
+    and prepends at the head, so anything a chapter prepended on its own would end up BEHIND
+    these and never match, with nothing to show for it but a quote that silently never plays.
+    """
+    rows = [override(campaign) for override in CHAPTER_DEATH_QUOTE_OVERRIDES]
+    for unit_id, slot, _, _ in classed_cast(campaign):
+        if unit_id not in PC_DEATH_QUOTE_MSGS:
+            sys.exit('ERROR: no death-quote msg id allocated for cast member %r' % unit_id)
+        rows.append(
+            '    {\n'
+            '        .pid     = CHARACTER_%s, /* %s death quote (#6, any chapter) */\n'
+            '        .route   = CHAPTER_MODE_ANY,\n'
+            '        .chapter = 0xFF, /* fires in every chapter */\n'
+            '        .msg     = 0x%04X,\n'
+            '    },' % (slot.upper(), unit_id, PC_DEATH_QUOTE_MSGS[unit_id]))
+    return rows
+
+
 def inject_pc_death_quotes(campaign, verbose=True):
     """Universal per-PC death quotes (#6): when a deployable cast member falls, FE8's
     gDefeatTalkList machinery (DisplayDefeatTalkForPid, eventinfo.c) shows their dying
@@ -12357,45 +12502,33 @@ def inject_pc_death_quotes(campaign, verbose=True):
     returns the first pid match) with route=ANY, chapter=0xFF and no flag, so they fire
     in EVERY chapter. Each PC rides its PORTRAIT_MAP slot, so pid + face = CHARACTER_<slot>
     / [FID_<slot>]. Quote text lives in the unit YAML (`death_quote`); bodies render via
-    _script_to_message with the bust on the left podium, like the boss death quotes."""
-    cast = classed_cast(campaign)
+    _script_to_message with the bust on the left podium, like the boss death quotes.
+
+    The chapter-specific overrides ride along at the head of the same block, because the
+    order between the two is the whole mechanism (pc_death_quote_rows)."""
     # 1. Text bodies (each quote in a map talk box with the faller's bust, left podium).
+    #    The override bodies are their chapter's to write -- theirs is chapter text, from
+    #    chapter YAML, in the chapter's own host block.
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
-    rows = []
-    for unit_id, slot, _, _ in cast:
-        if unit_id not in PC_DEATH_QUOTE_MSGS:
-            sys.exit('ERROR: no death-quote msg id allocated for cast member %r' % unit_id)
+    for unit_id, slot, _, _ in classed_cast(campaign):
         unit = load_unit(campaign, unit_id)
         quote = unit.get('death_quote')
         if not quote:
             sys.exit('ERROR: %s YAML has no death_quote (#6 requires one per cast member)'
                      % unit_id)
-        msg = PC_DEATH_QUOTE_MSGS[unit_id]
-        set_message_body(lines, msg, _script_to_message(
+        set_message_body(lines, PC_DEATH_QUOTE_MSGS[unit_id], _script_to_message(
             [{unit_id: quote}], {unit_id: ('[OpenMidLeft]', _fid_tag(slot))}))
-        rows.append(
-            '    {\n'
-            '        .pid     = CHARACTER_%s, /* %s death quote (#6, any chapter) */\n'
-            '        .route   = CHAPTER_MODE_ANY,\n'
-            '        .chapter = 0xFF, /* fires in every chapter */\n'
-            '        .msg     = 0x%04X,\n'
-            '    },' % (slot.upper(), unit_id, msg))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     # 2. Prepend the entries at the head of gDefeatTalkList (same idiom as the boss
     #    quotes; distinct pids, so ordering vs. those is immaterial).
-    with open(BATTLEQUOTES_C, encoding='utf-8') as f:
-        bq = f.read()
-    head = 'CONST_DATA struct DefeatTalkEnt gDefeatTalkList[] = {\n'
-    if bq.count(head) != 1:
-        sys.exit('ERROR: gDefeatTalkList head not in expected form in %s'
-                 % BATTLEQUOTES_C)
-    bq = bq.replace(head, head + '\n'.join(rows) + '\n')
-    with open(BATTLEQUOTES_C, 'w', encoding='utf-8') as f:
-        f.write(bq)
+    rows = pc_death_quote_rows(campaign)
+    _prepend_defeat_quote('\n'.join(rows))
     if verbose:
-        print('  death quotes: %d cast members (chapter=any)' % len(rows))
+        print('  death quotes: %d cast members (chapter=any) + %d chapter-specific'
+              % (len(rows) - len(CHAPTER_DEATH_QUOTE_OVERRIDES),
+                 len(CHAPTER_DEATH_QUOTE_OVERRIDES)))
 
 
 # --- Battle ground platforms (#65): vendored snow/ice grounds + terrain remap -------
