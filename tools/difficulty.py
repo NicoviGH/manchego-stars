@@ -930,16 +930,25 @@ def unit_real_article(enemy_def, combatant):
 
     A named unit's personal line is most of what makes it named -- FE8 adds those
     CharacterData values on top of the deployed class bases -- and it reaches our units from
-    TWO places:
+    THREE places:
       * `personal:` on the chapter YAML, for a raw-pid enemy authored there (Ravisin);
       * BASE_DONOR, for a CAST member deployed hostile, whose donor's line is written into its
-        character slot by the build (Sahnar rides Joshua's, Lupin rides Kyle's).
+        character slot by the build (Sahnar rides Joshua's, Lupin rides Kyle's);
+      * ENEMY_BASE_SLOT, for an enemy deployed on a VANILLA character slot, which keeps that
+        slot's own line because nothing patches it (ch02's Halvar rides Bazba's).
     Reading only the first is why ch05's red Myrmidon measured 6.2 against the 21.4 she
-    actually fights at. Units with neither are unchanged.
+    actually fights at; missing the third is why ch02's boss measured 1.2 rounds against a
+    3.6 bar while the ROM had been fighting it at 3.6 the whole time (#284). Units with none
+    of the three are unchanged -- which is the honest answer for a raw pid, whose
+    CharacterData gap really is all zeros.
+
+    The sources do not stack: an authored `personal:` is the explicit article and wins, or a
+    unit riding a named slot would count its bases twice.
     """
     personal = enemy_def.get('personal')
     if not personal:
-        donor = bc.BASE_DONOR.get(enemy_def.get('id'))
+        uid = enemy_def.get('id')
+        donor = bc.BASE_DONOR.get(uid) or bc.ENEMY_BASE_SLOT.get(uid)
         if donor:
             personal = vanilla_personal_line(donor)
     return _apply_personal(combatant, personal) if personal else combatant
@@ -1463,12 +1472,21 @@ def curve_gate_failures(rows):
     `balance_locked: true` in its YAML -- so we can author chapters as we go without an
     unwritten or mid-authoring chapter reddening CI. A LOCKED chapter fails when it is off-parity
     (`verdict != 'OK'`), unreliably measured (`boss_drop` -- its scariest unit carries an
-    unmodeled weapon, so even an 'OK' verdict can't be trusted), or has no curated reference at
+    unmodeled weapon, so even an 'OK' verdict can't be trusted), has no curated reference at
     all (`not has_ref` -- you can't lock a chapter the metric can't measure; a config mistake,
-    surfaced loudly). UNLOCKED chapters are informational and never gate; with zero locks the
-    gate passes, so --check can ship before any chapter is locked."""
+    surfaced loudly), or carries an open per-unit `role` finding. UNLOCKED chapters are
+    informational and never gate; with zero locks the gate passes, so --check can ship before
+    any chapter is locked.
+
+    The `role` arm is #284's lesson. ch02 and ch03 shipped bosses that folded in a third of
+    their twin's time, for months, while this gate read OK -- the aggregate sums the whole force
+    and divides by the deploy cap, so one paper boss dissolves into a 23-unit average. The
+    per-unit check had been PRINTING the warning the entire time and nothing read it. A chapter
+    marked balance-final while a per-unit check still has something to say is a contradiction,
+    so locking one now means clearing them first."""
     return [r['label'] for r in rows
-            if r['locked'] and (not r['has_ref'] or r['verdict'] != 'OK' or r['boss_drop'])]
+            if r['locked'] and (not r['has_ref'] or r['verdict'] != 'OK' or r['boss_drop']
+                                or r.get('role'))]
 
 
 def curve_report(campaign, band=0.25):
@@ -1523,8 +1541,13 @@ def curve_report(campaign, band=0.25):
             flag += '  [locked]'
         has_ref = p['vanilla'] is not None
         verdict = p['verdict']['verdict'] if has_ref else None
+        # The per-unit findings ride along so the gate can read them (#284) -- the aggregate
+        # above cannot see a single soft unit, which is exactly how two paper bosses shipped.
+        role = role_findings(chap, p['reference']) if has_ref else []
+        if role:
+            flag += '  !!role'
         rows.append({'label': label[:22].strip(), 'locked': locked, 'has_ref': has_ref,
-                     'verdict': verdict, 'boss_drop': boss_drop})
+                     'verdict': verdict, 'boss_drop': boss_drop, 'role': role})
         if not has_ref:
             print('  %-22s %-13s %5.1f           %5.1f             (no ref)%s'
                   % (label[:22], (p['reference'] or '?')[:13], ot, ol, flag))
@@ -1537,6 +1560,13 @@ def curve_report(campaign, band=0.25):
     if any_dropped_boss:
         print('\n  !! a dropped boss means that row\'s verdict is unreliable -- its scariest '
               'unit\n     carries an unmodeled weapon. Add fe_base to its YAML inventory (#51/#52).')
+    flagged = [r for r in rows if r.get('role')]
+    if flagged:
+        print('\n  !! per-unit findings the per-slot averages above cannot show (#284):')
+        for r in flagged:
+            for f in r['role']:
+                print('     %-6s %s%s' % (r['label'].split()[0], f,
+                                          '' if r['locked'] else '   [not locked -- advisory]'))
     return rows
 
 
@@ -1577,8 +1607,9 @@ def main():
                     help='emit the campaign-wide enemy-pressure curve (all chapters)')
     ap.add_argument('--check', action='store_true',
                     help='with --curve: the hard CI gate (#48 (b)) -- exit non-zero if any '
-                         'balance_locked chapter is off-parity, unreliably measured, or '
-                         'missing its reference (UNLOCKED chapters never gate)')
+                         'balance_locked chapter is off-parity, unreliably measured, '
+                         'missing its reference, or carrying an open per-unit role '
+                         'finding (UNLOCKED chapters never gate)')
     ap.add_argument('--lord-floor', action='store_true',
                     help='emit the per-lord survivability-floor table instead of the parity report')
     ap.add_argument('--target', type=float, default=3.5, help='floor: target bulk rounds-to-down')
@@ -1591,7 +1622,8 @@ def main():
         if args.check:
             fails = curve_gate_failures(rows)
             if fails:
-                print('\n!! PARITY GATE: %d chapter(s) off-parity or unreliable: %s'
+                print('\n!! PARITY GATE: %d locked chapter(s) off-parity, unreliable, or '
+                      'carrying a role finding: %s'
                       % (len(fails), ', '.join(fails)))
                 bc.sys.exit(1)
             print('\nPARITY GATE: all referenced chapters at parity.')

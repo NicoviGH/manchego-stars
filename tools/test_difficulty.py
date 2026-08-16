@@ -16,6 +16,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fe_combat as fc
 import difficulty as df
+import build_campaign as bc
 
 
 def combatant(name='u', hp=20, pow_=0, skl=8, spd=0, dfc=0, res=0, lck=0, con=20,
@@ -127,9 +128,10 @@ class CurveGate(unittest.TestCase):
     in-progress chapter never reddens CI. With zero locks the gate passes (enforces
     nothing), so --check can ship before any chapter is locked. (#48 (b), per-chapter)."""
 
-    def _row(self, label, locked=False, has_ref=True, verdict='OK', boss_drop=False):
+    def _row(self, label, locked=False, has_ref=True, verdict='OK', boss_drop=False,
+             role=()):
         return {'label': label, 'locked': locked, 'has_ref': has_ref,
-                'verdict': verdict, 'boss_drop': boss_drop}
+                'verdict': verdict, 'boss_drop': boss_drop, 'role': list(role)}
 
     def test_no_locked_chapters_passes_even_when_some_are_off_parity(self):
         # The unwritten-chapters case: CH3-7 read OFF but aren't locked -> no gate.
@@ -159,6 +161,25 @@ class CurveGate(unittest.TestCase):
 
     def test_unlocked_off_parity_chapter_never_gates(self):
         rows = [self._row('CH2', locked=False, verdict='OFF', boss_drop=True)]
+        self.assertEqual(df.curve_gate_failures(rows), [])
+
+    def test_locked_chapter_with_a_role_finding_fails_even_at_parity(self):
+        # #284: ch02/ch03 shipped paper bosses for months while the aggregate read OK,
+        # because a single soft boss dissolves into a 23-unit average and nothing ever READ
+        # the per-unit warning. A balance-final chapter with an open role finding is a
+        # contradiction, so the gate now reads it.
+        rows = [self._row('CH2', locked=True, verdict='OK',
+                          role=['boss raider-captain takes 1.2 rounds to kill; ...'])]
+        self.assertEqual(df.curve_gate_failures(rows), ['CH2'])
+
+    def test_unlocked_chapter_with_a_role_finding_stays_informational(self):
+        # Mid-authoring chapters warn without reddening CI -- same opt-in as every other
+        # arm of this gate.
+        rows = [self._row('CH6', locked=False, verdict='OK', role=['boss messie takes 2.7 ...'])]
+        self.assertEqual(df.curve_gate_failures(rows), [])
+
+    def test_locked_chapter_with_no_role_findings_passes(self):
+        rows = [self._row('CH2', locked=True, verdict='OK', role=[])]
         self.assertEqual(df.curve_gate_failures(rows), [])
 
 
@@ -997,6 +1018,44 @@ class PersonalBossLine(unittest.TestCase):
         strong = dict(plain, personal={'baseHP': 15, 'baseDef': 5})
         found = df.role_findings({'enemy_units': [strong]}, self.REF)
         self.assertFalse(any('fold too fast' in f for f in found), found)
+
+    def test_a_unit_deployed_on_a_vanilla_slot_inherits_that_slot_s_line(self):
+        """The THIRD source of a personal line (#284). ch02's Halvar deploys on the BAZBA slot
+        and nothing patches it, so FE8 adds Bazba's own line in the built ROM. Measuring him
+        off naked class base understated the boss by 3x and opened an issue against content
+        that was never wrong."""
+        halvar = {'id': 'raider-captain', 'class': 'brigand', 'level': 6, 'is_boss': True,
+                  'inventory': [{'id': 'steel-axe', 'fe_base': 'steel-axe'}]}
+        base = df.enemy_combatants(halvar)[0]
+        real = df.unit_real_article(halvar, base)
+        bazba = df.vanilla_personal_line('CHARACTER_BAZBA')
+        self.assertEqual(real.hp, base.hp + bazba['baseHP'])
+        self.assertEqual(real.df, base.df + bazba['baseDef'])
+
+    def test_a_unit_on_no_vanilla_slot_is_unchanged(self):
+        """A raw-pid creature sits in a CharacterData GAP whose bases are all zero, so it
+        really is a naked class base until a `personal:` line is authored AND injected."""
+        grell = {'id': 'grell', 'class': 'mogall', 'level': 12,
+                 'inventory': [{'id': 'evil-eye', 'fe_base': 'evil-eye'}]}
+        base = df.enemy_combatants(grell)[0]
+        self.assertEqual(df.unit_real_article(grell, base).hp, base.hp)
+
+    def test_no_mapped_slot_is_one_the_build_zeroes(self):
+        """Riding a vanilla slot only counts if the slot survives the build. inject_prologue
+        zeroes its guests' personal bases, so Sephek is a naked class base despite deploying
+        on O'Neill's slot -- reading him off that line inflated his threat to 2.9x the
+        Prologue's ceiling and tripped the gate, which is how this was caught."""
+        zeroed = {'CHARACTER_%s' % s for s in bc.PROLOGUE_ZEROED_GUEST_SLOTS}
+        self.assertEqual(zeroed & set(bc.ENEMY_BASE_SLOT.values()), set())
+
+    def test_an_authored_line_wins_over_the_slot(self):
+        """`personal:` is the explicit authored article; it must not be silently added to a
+        slot's line, or a unit riding a named slot would count its bases twice."""
+        halvar = {'id': 'raider-captain', 'class': 'brigand', 'level': 6,
+                  'personal': {'baseHP': 1},
+                  'inventory': [{'id': 'steel-axe', 'fe_base': 'steel-axe'}]}
+        base = df.enemy_combatants(halvar)[0]
+        self.assertEqual(df.unit_real_article(halvar, base).hp, base.hp + 1)
 
     def test_stacking_terrain_onto_a_boss_line_is_flagged(self):
         """Personal Def and terrain stack; together they can make a boss undentable."""

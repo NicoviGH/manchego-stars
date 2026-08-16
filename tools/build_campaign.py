@@ -174,6 +174,10 @@ PROLOGUE_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'prologue-eventsc
 PROLOGUE_HLIN_SLOT = 'NATASHA'      # frail must-survive lead (our "lord")
 PROLOGUE_SCRAMSAX_SLOT = 'KYLE'     # strong veteran (our "Jeigan")
 PROLOGUE_SEPHEK_SLOT = 'ONEILL'     # boss (recurring villain; escapes in the ending)
+# The guest slots whose personal bases inject_prologue zeroes, so each fights at pure class
+# base. Named because it is the exception to ENEMY_BASE_SLOT: a unit on one of these slots does
+# NOT inherit the vanilla character's line, however much the deployment looks like it should.
+PROLOGUE_ZEROED_GUEST_SLOTS = (PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT)
 PROLOGUE_LAYOUT = ('Ch00PrologueMap', 'ch00-prologue')  # (asset label, maps/ source stem)
 PROLOGUE_CHAPTER_YAML = 'ch00-prologue-a-dagger-of-ice.yaml'
 
@@ -727,6 +731,31 @@ BASE_DONOR = dict(STAT_DONOR, marty='CHARACTER_EWAN', meesmickle='CHARACTER_EWAN
 # Ranks stay on STAT_DONOR so both shamans keep Knoll's ITYPE_DARK rank (Ewan is Anima-only,
 # so his tome wouldn't equip). docs/decisions.md "Party-side parity" / issue #45.
 GROWTH_DONOR = dict(STAT_DONOR, meesmickle='CHARACTER_EWAN')
+
+
+# The ENEMY-side counterpart of BASE_DONOR: our enemy id -> the vanilla CHARACTER_ slot it is
+# actually deployed on. Nothing patches these slots (they are not in PORTRAIT_MAP), so the built
+# ROM adds the slot's OWN personal line on top of the class base, exactly as FE8 does for its own
+# bosses -- Halvar fights as a Brigand *plus* Bazba's HP+5/Def+2/..., because he IS Bazba's slot.
+#
+# It exists so the difficulty tool can measure what actually fights (#284). Reading these units
+# off naked class base understated ch02's boss by 3x -- 1.2 rounds against a bar of 3.6 -- and
+# opened a balance issue against content that was never wrong. The slot names are NOT repeated
+# here: each entry points at the one constant the injector already builds the unit from, so the
+# two cannot drift apart. A boss on a RAW pid (ch03's grell, ch05's Ravisin) has no entry -- its
+# CharacterData gap is all zeros, so it is a genuine naked class base until a `personal:` line is
+# authored in its chapter YAML *and* registered in RAW_PID_PERSONAL_SOURCES to reach the ROM.
+#
+# Riding a vanilla slot is NOT sufficient on its own -- the slot must also survive the build
+# unpatched. The prologue's guests do not: inject_prologue ZEROES their personal bases so their
+# stats read as pure class base, so Sephek is genuinely naked despite deploying on O'Neill's
+# slot, and belongs here no more than a raw pid does. PROLOGUE_ZEROED_GUEST_SLOTS is the
+# authoritative list of that exclusion and the two are asserted disjoint.
+ENEMY_BASE_SLOT = {
+    'goblin-chief':  'CHARACTER_%s' % CH01_BOSS_SLOT,
+    'raider-captain': 'CHARACTER_%s' % CH02_BOSS_SLOT,
+    'raider-bruiser': 'CHARACTER_%s' % CH02_MINIBOSS_SLOT,
+}
 
 
 # our cast bust  ->  vanilla portrait slot whose graphic files we overwrite.
@@ -2420,6 +2449,11 @@ def raw_pid_portrait_data(text, campaign):
     own named Great Dragon, which is a monster character with a miniPortrait and no portraitId
     at all -- the right donor shape for a monster, and the reason the moose gains a name without
     gaining a bust.
+
+    The two bindings are INDEPENDENT (#284). A raw-pid boss can need a stat line and no identity
+    at all -- ch03's grell keeps the generic monster name plate on purpose -- so the personal
+    pass walks its own table rather than riding along inside the portrait loop. Coupling them
+    would have made a `personal:` block silently do nothing for any pid without a bust.
     """
     for pid, (_unit_id, slot, portrait_id, _name) in sorted(RAW_PID_PORTRAITS.items()):
         marker = '[%s - 1]' % pid.lower()
@@ -2427,19 +2461,21 @@ def raw_pid_portrait_data(text, campaign):
         block = _bind_raw_pid_identity(block=text[start:end], marker=marker,
                                        name_text_id=raw_pid_name_text_id(slot),
                                        portrait_id=portrait_id)
+        text = text[:start] + block + text[end:]
 
-        personal_source = RAW_PID_PERSONAL_SOURCES.get(pid)
-        if personal_source:
-            chapter_yaml, unit_id = personal_source
-            chapter = _load_chapter_yaml(campaign, chapter_yaml)
-            unit = next((enemy for enemy in chapter['enemy_units']
-                         if enemy['id'] == unit_id), None)
-            if unit is None or 'personal' not in unit:
-                sys.exit('ERROR: raw pid %s personal source %s/%s is missing'
-                         % (pid, chapter_yaml, unit_id))
-            for field in BASE_FIELDS:
-                block = _set_field(block, field, int(unit['personal'].get(field, 0)),
-                                   CHARACTERS_C, marker)
+    for pid, (chapter_yaml, unit_id) in sorted(RAW_PID_PERSONAL_SOURCES.items()):
+        marker = '[%s - 1]' % pid.lower()
+        start, end = _find_brace_block(text, marker, CHARACTERS_C)
+        block = text[start:end]
+        chapter = _load_chapter_yaml(campaign, chapter_yaml)
+        unit = next((enemy for enemy in chapter['enemy_units']
+                     if enemy['id'] == unit_id), None)
+        if unit is None or 'personal' not in unit:
+            sys.exit('ERROR: raw pid %s personal source %s/%s is missing'
+                     % (pid, chapter_yaml, unit_id))
+        for field in BASE_FIELDS:
+            block = _set_field(block, field, int(unit['personal'].get(field, 0)),
+                               CHARACTERS_C, marker)
         text = text[:start] + block + text[end:]
     return text
 
@@ -6151,6 +6187,10 @@ def inject_prologue(campaign, verbose=True, montage=False):
                     _scram_donor, False),
                    (PROLOGUE_SEPHEK_SLOT, 'CLASS_MYRMIDON', by_id['sephek-kaltro']['level'],
                     'CHARACTER_JOSHUA', None)]
+    # The zeroing below is what disqualifies these slots from ENEMY_BASE_SLOT (a unit here does
+    # NOT inherit the vanilla character's personal line). Keep the two statements of that in step.
+    assert tuple(s for s, _c, _l, _d, _f in guest_patch) == PROLOGUE_ZEROED_GUEST_SLOTS, \
+        'guest_patch and PROLOGUE_ZEROED_GUEST_SLOTS disagree about which slots get zeroed'
     with open(CHARACTERS_C, encoding='utf-8') as f:
         chars = f.read()
     for slot, cls, level, donor, female in guest_patch:
@@ -9075,6 +9115,11 @@ RAW_PID_PORTRAITS = {
 # through patch_character_data(), which only visits the regular CHARACTER_* portrait map.
 RAW_PID_PERSONAL_SOURCES = {
     CH05_BOSS_PID: (CH05_CHAPTER_YAML, 'ravisin'),
+    # ch03's grell (#284). Unlike Ravisin it has no entry in RAW_PID_PORTRAITS -- it keeps the
+    # generic monster name plate -- which is exactly why the personal pass had to stop being a
+    # passenger inside the portrait loop. Its gap's bases are all zeros in vanilla, so without
+    # this row the boss really does fight as a naked Mogall and folds in 1.1 rounds.
+    CH03_BOSS_PID: (CH03_CHAPTER_YAML, 'grell'),
 }
 # Named raw-pid creatures whose BATTLE ANIM binds to a gCharacterData gap instead of a
 # vanilla CHARACTER_ slot. Row = unit id -> (chapter YAML that declares it, its raw pid).
