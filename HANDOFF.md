@@ -6,33 +6,20 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-16 (Claude). **#282, #283 and #286 are DONE and merged — do not reopen any.**
-The generated decomp tree is intentionally dirty as recorded below.
+Refreshed 2026-08-16 (Claude). **#282, #283, #284, #285 and #286 are DONE and merged — do not
+reopen any.** The generated decomp tree is intentionally dirty as recorded below.
 
 ## In flight
 
-**Nothing.** `main` is at #286 (the white moose's battle animation, its identity, and the
-balance work it exposed), CI green.
+**Nothing.** `main` is at #285 (the parity aggregate on the real article), CI green.
 
 ## Next task
 
-**#284, then #285 — the retroactive balance issues — BEFORE returning to ch05's dialogue**
-(Nicolas, 2026-08-16). Both came out of #286: measuring the moose properly exposed two things
-that were already shipped and wrong, and they get cleared while the reasoning is fresh rather
-than aging behind the rest of the slice.
+**ch05's remaining dialogue.** The retroactive balance issues are both closed: the parity metric
+now reads what actually fights, no chapter needed re-tuning, and no locked baseline moved out of
+band. Two ADRs dated 2026-08-16 carry the reasoning; the numbers live in the tool, not here.
 
-**Order is fixed: #284 first.** ch02's clear-load already sits exactly on the band floor
-(x0.75) with a boss that is a naked class base, so fixing the boss may be what unblocks #285's
-ch02 problem rather than a separate tuning pass. #284 also has a **locked** chapter in it — ch02
-is `[locked]` in the parity gate, so its re-baseline is Nicolas's call, not a drive-by edit.
-Watch for: if #284 lands and ch02 STILL fails under the real-article aggregate, that is a genuine
-content problem in ch02, not a metric artifact.
-
-Full statement of both, with the measurements, in the issues. The moose is DONE — anim, name,
-weapon, balance — and needs nothing further; do not reopen it. What #286 settled and why is in
-`docs/decisions.md` (five ADRs dated 2026-08-15/16) and in the PR, not here.
-
-## Then: ch05's remaining dialogue
+## ch05's remaining dialogue
 
 **Worked TOP TO BOTTOM in player order** (Nicolas, 2026-08-13). The ordered inventory of all 17
 scenes — **13 done, 4 left** — is the table in **issue #25**, the canonical view; do not re-derive

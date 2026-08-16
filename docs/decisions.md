@@ -5644,8 +5644,10 @@ directly beneath a row reading x0.89. Both now come from one `chapter_units()`. 
 cannot reconcile with the number it explains is worse than no note, and two functions that must
 agree about the same force will not stay agreeing.
 
-_Decided: 2026-08-16 (#285). The three locked baselines were re-measured on the new footing and
-all move toward parity; re-locking them is Nicolas's call on the PR._
+_Decided: 2026-08-16 (#285). The three locked baselines were re-measured on the new footing, all
+move toward parity, and none needed re-tuning — so the "locked chapters re-approved by Nicolas"
+item was moot: **a sign-off that guards a scenario is not owed when the scenario does not
+happen** (Nicolas, asked what there was to decide)._
 
 ---
 
