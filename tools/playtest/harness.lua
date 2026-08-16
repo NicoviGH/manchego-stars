@@ -7490,71 +7490,99 @@ end
 -- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05combatquotes (CH05BOOT=1 ROM).
 scenarios.recordch05combatquotes = function()
     local BASIL, RAVISIN = 0x13, 0xb8            -- CHARACTER_ARTUR / Ravisin's raw pid
-    local quotes, quoteWasUp = 0, false
-    return recordCutscene({
-        tag = "ch05combatquotes", speed = "normal", maxFrames = 3600, shotEvery = 1,
-        pressEvery = 90,
-        pre = function()
-            pokeFastConfig()
-            if not bootToMap() then return false, "never reached the ch05 map" end
-            if not waitFor(function()
-                return faction() == 0 and not menuOpen()
-                    and not procActive(SYM.ProcScr_StdEventEngine)
-            end, 6000, true) then
-                return false, "ch05 map never became idle"
+    wait(30)
+    pokeFastConfig()
+    if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
+    if not waitFor(function()
+        return faction() == 0 and not menuOpen()
+            and not procActive(SYM.ProcScr_StdEventEngine)
+    end, 6000, true) then
+        return result("FAIL", "ch05 map never became idle")
+    end
+    local boss = red(RAVISIN)
+    if not boss then return result("FAIL", "Ravisin (pid 0xb8) is not in the red array") end
+    local basil = blue(BASIL)
+    if not basil then
+        return result("FAIL", "Basil is not BLUE at turn 1 -- the opening join CUSA never fired")
+    end
+    -- Only Ravisin may land a killing blow. pow=0 alone does NOT protect a 1-HP unit (weapon
+    -- might still gets through), so Basil keeps her HP and takes the DEFENCE that zeroes a
+    -- harmless attacker's damage; Ravisin is given power enough to cut straight through it.
+    for i = 0, 49 do
+        local r = unitAt(SYM.gUnitArrayRed, i)
+        if r and not isDead(r) and r.charId ~= RAVISIN then pokeHarmless(r) end
+    end
+    emu:write8(basil.addr + 0x17, 40)     -- def: nothing harmless can scratch her
+    emu:write8(basil.addr + 0x18, 40)     -- res: Ravisin's Flux is magic, so cover both
+    emu:write8(boss.addr + 0x14, 60)      -- pow: her hit goes through that, once
+    emu:write8(boss.addr + 0x15, 60)      -- hit: and it does not miss
+    -- Park Basil orthogonally adjacent to Ravisin's guard tile, keeping the tile->unit grid in
+    -- sync (recordch05recruit's idiom) so adjacency reads with no phase cycle.
+    local grid, parked = mapUnitAt(basil.x, basil.y), false
+    for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+        local tx, ty = boss.x + d[1], boss.y + d[2]
+        if tx >= 0 and ty >= 0 and mapUnitAt(tx, ty) == 0 then
+            setMapUnit(basil.x, basil.y, 0)
+            emu:write8(basil.addr + 0x10, tx); emu:write8(basil.addr + 0x11, ty)
+            setMapUnit(tx, ty, grid)
+            parked = true
+            break
+        end
+    end
+    if not parked then return result("FAIL", "no free tile beside Ravisin to park Basil") end
+    basil = blue(BASIL)
+    log(string.format("ch05combatquotes: Basil (%d,%d) HP %d parked beside Ravisin (%d,%d)",
+        basil.x, basil.y, ru8(basil.addr + 0x13), boss.x, boss.y))
+    if not endTurn() then return result("FAIL", "could not end the player turn") end
+    -- The capture loop is HAND-ROLLED, and recordCutscene is the wrong tool here for a measured
+    -- reason: it films at a fixed cadence, and the first cut of this scenario shot every frame
+    -- of a SIXTEEN-enemy phase, spent the whole wall clock on screenshots of units walking, and
+    -- timed out having captured 1173 frames and not one dialogue box. Shoot the phase sparsely
+    -- and the QUOTE densely -- recordfix's cadence, for recordfix's reason.
+    local quotes, wasUp, deathFrame = 0, false, nil
+    for f = 1, 12000 do
+        local up = procActive(SYM.ProcScr_BattleEventEngine)
+        if up then
+            if not wasUp then
+                quotes = quotes + 1
+                log(string.format("ch05combatquotes: quote box %d up at f%d (Basil HP %d)",
+                    quotes, f, blue(BASIL) and ru8(blue(BASIL).addr + 0x13) or -1))
             end
-            local boss = red(RAVISIN)
-            if not boss then return false, "Ravisin (pid 0xb8) is not in the red array" end
-            local basil = blue(BASIL)
-            if not basil then
-                return false, "Basil is not BLUE at turn 1 -- the opening join CUSA never fired"
-            end
-            -- Only Ravisin may land a killing blow. pow=0 alone does NOT protect a 1-HP unit
-            -- (weapon might still gets through), so Basil keeps her HP and takes the DEFENCE
-            -- that zeroes a harmless attacker's damage; Ravisin is given power enough to cut
-            -- straight through it.
-            for i = 0, 49 do
-                local r = unitAt(SYM.gUnitArrayRed, i)
-                if r and not isDead(r) and r.charId ~= RAVISIN then pokeHarmless(r) end
-            end
-            emu:write8(basil.addr + 0x17, 40)     -- def: nothing harmless can scratch her
-            emu:write8(basil.addr + 0x18, 40)     -- res: Ravisin's Flux is magic, so cover both
-            emu:write8(boss.addr + 0x14, 60)      -- pow: her hit goes through that, once
-            emu:write8(boss.addr + 0x15, 60)      -- hit: and it does not miss
-            -- Park Basil orthogonally adjacent to Ravisin's guard tile, keeping the tile->unit
-            -- grid in sync (recordch05recruit's idiom) so adjacency reads with no phase cycle.
-            local grid, parked = mapUnitAt(basil.x, basil.y), false
-            for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
-                local tx, ty = boss.x + d[1], boss.y + d[2]
-                if tx >= 0 and ty >= 0 and mapUnitAt(tx, ty) == 0 then
-                    setMapUnit(basil.x, basil.y, 0)
-                    emu:write8(basil.addr + 0x10, tx); emu:write8(basil.addr + 0x11, ty)
-                    setMapUnit(tx, ty, grid)
-                    parked = true
-                    break
-                end
-            end
-            if not parked then return false, "no free tile beside Ravisin to park Basil" end
-            -- Map combat + normal speed, then hand the enemy phase to the CAMERA rather than
-            -- riding it here: runEnemyPhase would advance both boxes off screen unfilmed.
-            local a = SYM.gPlaySt + 0x40
-            local c = ru32(a)
-            c = (c & ~(3 << 17)) | (1 << 17)      -- animationType = OFF (map combat)
-            c = c & ~(1 << 7)                     -- gameSpeed = normal (the boxes stay readable)
-            emu:write32(a, c)
-            if not endTurn() then return false, "could not end the player turn" end
-            return true
-        end,
-        until_ = function()
-            local up = procActive(SYM.ProcScr_BattleEventEngine)
-            if up and not quoteWasUp then quotes = quotes + 1 end
-            quoteWasUp = up
-            local basil = blue(BASIL)
-            -- Both boxes AND the death: a run that filmed the taunt and then timed out waiting
-            -- on a kill that never came must not read as the pair having played.
-            return quotes >= 2 and not up and basil ~= nil and isDead(basil)
-        end,
-    })
+            shot("ch05combatquotes")                       -- every frame while a box is up
+            if f % 36 == 0 then press(K.A, 3) end          -- page it slowly enough to read
+        else
+            if f % 6 == 0 then shot("ch05combatquotes") end
+            if controllerState() == "dialogue_wait" and f % 45 == 0 then press(K.A, 3) end
+        end
+        wasUp = up
+        local b = blue(BASIL)
+        if isDead(b) and not deathFrame then deathFrame = f end
+        -- Instrumented, so a second failure names its own cause instead of buying a third run.
+        if f % 600 == 0 then
+            local r = red(RAVISIN)
+            log(string.format("ch05combatquotes: f%d faction=%d turn=%d quotes=%d "
+                .. "basilHP=%d ravisin=(%d,%d)", f, faction(), turn(), quotes,
+                b and ru8(b.addr + 0x13) or -1, r and r.x or -1, r and r.y or -1))
+        end
+        if gameOverActive() then break end
+        if quotes >= 2 and deathFrame and not up and f > deathFrame + 120 then break end
+        if faction() == 0 and turn() >= 2 and f > 600 then break end   -- the phase ran out
+        yield()
+    end
+    if quotes < 1 then
+        return result("FAIL", "the enemy phase never opened an in-battle quote box -- Ravisin "
+            .. "did not engage the Basil parked beside her")
+    end
+    if not deathFrame then
+        return result("FAIL", string.format(
+            "%d quote box(es) played but Basil survived, so her chapter death box never ran",
+            quotes))
+    end
+    if quotes < 2 then
+        return result("FAIL", "Basil fell after only one quote box -- the taunt and her death "
+            .. "box did not both play")
+    end
+    return result("PASS", "Ravisin's taunt opened the fight and Basil's ch05 death box closed it")
 end
 
 -- recordch05opening (#25): the MOTION proof for ch05's three BACKDROP scenes -- Basil and Sahnar
