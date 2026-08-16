@@ -18,6 +18,7 @@ and the Definition of Done -- see docs/decisions.md Working Conventions.
 Exit 0 = clean, 1 = drift found. Run from the repo root.
 """
 
+import ast
 import glob
 import os
 import re
@@ -1113,22 +1114,50 @@ def check_every_test_actually_runs(fail):
     run under CI. They all passed once enabled, which is the point: nothing was going to tell
     us. Same family as `check_verdict_scenarios_are_guarded` -- a green suite that is not
     measuring what it claims.
+
+    Parsed with `ast`, not regex: the first cut matched `class X(unittest.TestCase)` literally,
+    which misses `class TestOutline(PosesToFeditorCase)` (a real shape in
+    test_poses_to_feditor.py) and `(unittest.TestCase, SomeMixin)`; and it located the runner
+    by substring, so writing `unittest.main()` in a COMMENT -- documenting this very rule --
+    would have failed the build. A class counts if it defines a `test_*` method or inherits
+    from anything defined in the same file, which is as much as a static read can honestly say.
     """
     for path in sorted(glob.glob(os.path.join(REPO, 'tools', 'test_*.py'))
                        + glob.glob(os.path.join(REPO, 'tools', 'playtest', 'test_*.py'))):
-        lines = open(path, encoding='utf-8').read().splitlines()
-        main_at = next((i for i, l in enumerate(lines) if 'unittest.main()' in l), None)
-        if main_at is None:
+        src = open(path, encoding='utf-8').read()
+        try:
+            tree = ast.parse(src)
+        except SyntaxError as exc:
+            fail.append('%s does not parse: %s' % (os.path.relpath(path, REPO), exc))
             continue
-        dead = [i + 1 for i, l in enumerate(lines)
-                if i > main_at and re.match(r'^class \w+\(unittest\.TestCase\)', l)]
+        main_line = None
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                    and node.func.attr == 'main'
+                    and isinstance(node.func.value, ast.Name)
+                    and node.func.value.id == 'unittest'):
+                main_line = node.lineno if main_line is None else min(main_line, node.lineno)
+        if main_line is None:
+            continue
+        local = {n.name for n in tree.body if isinstance(n, ast.ClassDef)}
+        dead = []
+        for node in tree.body:
+            if not isinstance(node, ast.ClassDef) or node.lineno <= main_line:
+                continue
+            bases = {ast.unparse(b) for b in node.bases}
+            looks_like_tests = (any(b.endswith('TestCase') for b in bases)
+                                or bases & local
+                                or any(isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef))
+                                       and f.name.startswith('test_') for f in node.body))
+            if looks_like_tests:
+                dead.append((node.lineno, node.name))
         if dead:
             fail.append(
-                '%s defines %d TestCase class(es) AFTER unittest.main() (line %d) -- they are '
-                'never collected when the file runs as a script, which is how `make test` and '
-                'CI run it. Move the `if __name__ == \'__main__\':` block to the END of the '
-                'file. First offender at line %d.'
-                % (os.path.relpath(path, REPO), len(dead), main_at + 1, dead[0]))
+                '%s defines %d test class(es) AFTER unittest.main() (line %d) -- they are never '
+                'collected when the file runs as a script, which is how `make test` and CI run '
+                "it. Move the `if __name__ == '__main__':` block to the END of the file. First "
+                'offender: %s at line %d.'
+                % (os.path.relpath(path, REPO), len(dead), main_line, dead[0][1], dead[0][0]))
 
 
 def check_handoff_only_on_main(fail):

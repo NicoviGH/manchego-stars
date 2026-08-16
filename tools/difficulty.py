@@ -817,6 +817,7 @@ def _chapter_pressure(chap, band=0.25):
         out['vanilla'] = enemy_pressure(van, deploy_cap)
         out['n_vanilla'] = len(van)
         out['verdict'] = pressure_verdict(ours, out['vanilla'], band)
+        out['solo'] = solo_contributors(chap, ref, deploy_cap)
     return out
 
 
@@ -849,6 +850,8 @@ def _print_pressure(p):
              ol, v['load_ratio'], v['load']))
     print('  verdict: %s' % ('PARITY (within band)' if v['verdict'] == 'OK'
                              else 'OFF-PARITY -- threat %s, clear-load %s' % (v['threat'], v['load'])))
+    for line in p.get('solo') or []:
+        print('  %s' % line)
 
 
 # ── Terrain (#25) ───────────────────────────────────────────────────────────────
@@ -957,6 +960,50 @@ def vanilla_threat_ceiling(parity_ref):
     for _name, c in vanilla_named_bosses(parity_ref, with_personal=True):
         best = max(best, fc.damage_per_round(c, YARDSTICK))
     return best
+
+
+def solo_contributors(chap, parity_ref, deploy_cap, floor=1.0, share=0.10):
+    """Name any SINGLE unit carrying an outsized share of the force's threat.
+
+    Information, not a threshold verdict -- there is no honest bar to set here, and the two
+    obvious candidates were both tried and rejected: a unit's SHARE of the total barely moves
+    when you strengthen it (it inflates the denominator too -- ch05 read 16.4% with the shipped
+    moose and 17.2% with the rejected one), and leave-one-out by unit id just names whichever
+    group has the biggest `count`.
+
+    What it prints is the sentence that had to be computed by hand to catch this: ch05 measured
+    "PARITY (within band)" at x1.20 while the moose ALONE was the whole overage -- x0.97 without
+    it. `threat/slot` sums the force and divides by the deploy cap, so one unit's 24.6 becomes
+    +2.7 a slot and disappears under a +-25% band. Only `count: 1` units are considered: a big
+    number from an 8-strong line is a composition choice, not a single monster.
+
+    Tightening the band itself belongs with the aggregate rework (#285).
+    """
+    van = vanilla_enemies(parity_ref)
+    if not van:
+        return []
+    cap = max(1, deploy_cap)
+    vt = sum(fc.damage_per_round(e, YARDSTICK) for e in van) / cap
+    if vt <= 0:
+        return []
+    rows = []
+    for ed in chap.get('enemy_units', []):
+        for c in enemy_combatants(ed):
+            rows += [(ed.get('id') or c.name, int(ed.get('count', 1)),
+                      fc.damage_per_round(c, YARDSTICK))] * int(ed.get('count', 1))
+    total = sum(t for _u, _n, t in rows)
+    full = (total / cap) / vt
+    if full <= floor:
+        return []
+    solo = [(t, uid) for uid, count, t in {(u, n, t) for u, n, t in rows}
+            if count == 1 and t / total >= share]
+    if not solo:
+        return []
+    t, uid = max(solo)          # the biggest only -- one line per chapter, not a tail
+    without = ((total - t) / cap) / vt
+    return ['NOTE: %s alone is %.0f%% of this force\'s threat -- without it the chapter is '
+            'x%.2f, not x%.2f. One unit inside a +-25%% band can BE the overage.'
+            % (uid, 100 * t / total, without, full)]
 
 
 def role_findings(chap, parity_ref):

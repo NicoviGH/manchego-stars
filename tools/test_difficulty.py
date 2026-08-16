@@ -899,6 +899,39 @@ class RoleCheck(unittest.TestCase):
                                 df.enemy_combatants(chap['enemy_units'][0])[0])
         self.assertAlmostEqual(fc.damage_per_round(c, df.YARDSTICK), 21.4, delta=0.2)
 
+    def test_names_a_single_unit_that_is_the_whole_overage(self):
+        """ch05 measured "PARITY (within band)" at x1.20 while the white moose ALONE was the
+        entire overage -- x0.97 without it. threat/slot sums the force and divides by the deploy
+        cap, so one unit's 24.6 becomes +2.7 a slot and vanishes under a +-25% band. This prints
+        the sentence that had to be computed by hand to catch it."""
+        # sized to clear the x1.0 floor, as the real ch05 force does -- the note is about a
+        # chapter that PASSES while one unit carries the excess.
+        chap = self._chap([
+            {'id': 'grunt', 'class': 'soldier', 'level': 5, 'count': 15,
+             'inventory': [{'id': 'iron-lance', 'fe_base': 'iron-lance'}]},
+            {'id': 'monster', 'class': 'gwyllgi', 'level': 6,
+             'inventory': [{'id': 'claw', 'fe_base': 'hell-fang'}]},
+        ])
+        notes = df.solo_contributors(chap, self.REF, 9)
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn('monster alone is', notes[0])
+
+    def test_a_big_number_from_a_big_GROUP_is_not_a_solo_contributor(self):
+        """A line of eight reavers summing high is a composition choice, not one monster --
+        only `count: 1` units qualify."""
+        chap = self._chap([
+            {'id': 'horde', 'class': 'gwyllgi', 'level': 6, 'count': 12,
+             'inventory': [{'id': 'claw', 'fe_base': 'hell-fang'}]},
+        ])
+        self.assertEqual(df.solo_contributors(chap, self.REF, 9), [])
+
+    def test_a_chapter_at_or_under_parity_says_nothing(self):
+        chap = self._chap([
+            {'id': 'grunt', 'class': 'soldier', 'level': 1, 'count': 2,
+             'inventory': [{'id': 'iron-lance', 'fe_base': 'iron-lance'}]},
+        ])
+        self.assertEqual(df.solo_contributors(chap, self.REF, 9), [])
+
     def test_flags_a_boss_that_folds_far_faster_than_the_twins_wall(self):
         chap = self._chap([
             {'id': 'boss', 'class': 'druid', 'level': 7, 'is_boss': True,

@@ -1110,7 +1110,10 @@ def set_message_body(lines, msg_id, body, create=False):
                  'dense array, so a gap shifts every id past it' % (msg_id, last_id))
     while lines and not lines[-1].strip():
         lines.pop()
-    lines.extend(['', header, body])
+    # texts.txt ends with a trailing newline; the writer joins on '\n', so the list has to end
+    # with an empty element. Dropping it left the file without its final newline and put an
+    # unrelated one-line delta in the submodule on every build.
+    lines.extend(['', header, body, ''])
     return True
 
 
@@ -2891,6 +2894,17 @@ def _lord_select_event_seq(bg_const, explainer_msg):
         % (bg_const, explainer_msg))
 
 
+def _next_sandbox_tile(tiles, who):
+    """The next free sandbox foe tile, or a loud failure. The bench is a fixed strip of
+    tiles; running out silently would stack two foes and make `recordenemy` bait the wrong
+    one, which is the failure the whole per-pid selection exists to prevent."""
+    try:
+        return next(tiles)
+    except StopIteration:
+        sys.exit('ERROR: sandbox foe bench is full (%d tiles) -- %s has nowhere to stand; '
+                 'add a tile to SANDBOX_FOE_POSITIONS' % (len(SANDBOX_FOE_POSITIONS), who))
+
+
 def _sandbox_foe_roster(campaign):
     """A UnitDefinition[] body deploying one hostile of each enemy_class_reskins slot, so the
     TESTCH sandbox is the single battle-anim bench (`recordenemy` baits any of them). Generic
@@ -2898,10 +2912,17 @@ def _sandbox_foe_roster(campaign):
     iron loadout by the reskin's BASE weapon type. A reskin whose base has no mapped weapon is
     skipped (never a foe)."""
     entries = []
-    for rk, (x, y) in zip(enemy_class_reskins(campaign), SANDBOX_FOE_POSITIONS):
+    # ONE cursor over the tiles, advanced only when a row is actually emitted. `zip` here used
+    # to burn a tile on every weapon-less reskin it skipped, so the raw-pid loop below (which
+    # indexed by len(entries)) could hand a later creature a tile the zip had already spent.
+    # Harmless only while the skipped reskin is LAST; one more reskin after it stacks two foes
+    # on a tile, and a seventh raises IndexError.
+    tiles = iter(SANDBOX_FOE_POSITIONS)
+    for rk in enemy_class_reskins(campaign):
         weapon = CLASS_RESKIN_FOE_WEAPON.get(rk['base'])
         if not weapon:
             continue
+        x, y = _next_sandbox_tile(tiles, rk['slot'])
         entries.append(
             '    {\n'
             '        .charIndex = 0x80,\n'                 # generic autolevel monster slot
@@ -2926,7 +2947,7 @@ def _sandbox_foe_roster(campaign):
         unit = _chapter_unit(campaign, chapter_yaml, uid)
         if not unit.get('battle_anim'):
             continue
-        x, y = SANDBOX_FOE_POSITIONS[len(entries)]
+        x, y = _next_sandbox_tile(tiles, uid)
         items = [CH05_ITEM_IDS[i['fe_base']] for i in unit.get('inventory') or []]
         entries.append(
             '    {\n'

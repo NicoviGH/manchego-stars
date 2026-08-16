@@ -5344,6 +5344,15 @@ map sprite geometry, its doubling, and the distinct `cer_at1` voice, while dropp
 and the chapter 1.20 → **x1.08** with clear-load unmoved at x0.84. Turn-1 pressure lands at 9.5
 against vanilla's 9.0.
 
+**The tool now says it for you.** `solo_contributors()` prints, under the verdict, any single
+`count: 1` unit carrying =>10% of the force's threat and what the chapter measures without it —
+the sentence that had to be computed by hand here. It is INFORMATION, not a gate: the two
+obvious thresholds were both tried and rejected. A unit's SHARE barely moves when you
+strengthen it, because it inflates the denominator too (ch05 read 16.4% with the shipped moose
+and 17.2% with the rejected one), and leave-one-out by unit id just names whichever group has
+the biggest `count`. It immediately surfaced ch03's Grell at **24% of its force** — a larger
+share than the moose ever had, on a boss that also dies in 1.1 rounds (#284).
+
 **Rule: when a chapter is at the edge of the band, ask WHICH UNIT is the overage before accepting
 the verdict.** If one unit is a fifth of the force's threat, the band is not measuring parity, it
 is absorbing an outlier. And the corollary for the metric itself: never quote a per-unit
