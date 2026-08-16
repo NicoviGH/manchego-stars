@@ -922,6 +922,43 @@ def on_terrain(combatant, terrain_name):
 # unit -- invisible to every number we printed. These checks compare the EXTREMES unit-to-unit
 # instead, which is what catches a role inversion.
 
+def unit_real_article(enemy_def, combatant):
+    """`combatant` as it actually fights: class base PLUS its personal line, if it has one.
+
+    A named unit's personal line is most of what makes it named -- FE8 adds those
+    CharacterData values on top of the deployed class bases -- and it reaches our units from
+    TWO places:
+      * `personal:` on the chapter YAML, for a raw-pid enemy authored there (Ravisin);
+      * BASE_DONOR, for a CAST member deployed hostile, whose donor's line is written into its
+        character slot by the build (Sahnar rides Joshua's, Lupin rides Kyle's).
+    Reading only the first is why ch05's red Myrmidon measured 6.2 against the 21.4 she
+    actually fights at. Units with neither are unchanged.
+    """
+    personal = enemy_def.get('personal')
+    if not personal:
+        donor = bc.BASE_DONOR.get(enemy_def.get('id'))
+        if donor:
+            personal = vanilla_personal_line(donor)
+    return _apply_personal(combatant, personal) if personal else combatant
+
+
+def vanilla_threat_ceiling(parity_ref):
+    """The twin's HIGHEST single-unit threat, its named units included at full strength.
+
+    The outlier bar used to be the max over `vanilla_enemies()`, which projects every unit off
+    class base -- so it excluded the twin's own bosses and recruits (FE8 Ch5: 6.3, a generic
+    Soldier, while Joshua actually fights at 21.4). Measuring OUR named units against a bar
+    made only of THEIR generics flagged every named unit we ever field.
+    """
+    van = vanilla_enemies(parity_ref)
+    if not van:
+        return 0.0
+    best = max(fc.damage_per_round(e, YARDSTICK) for e in van)
+    for _name, c in vanilla_named_bosses(parity_ref, with_personal=True):
+        best = max(best, fc.damage_per_round(c, YARDSTICK))
+    return best
+
+
 def role_findings(chap, parity_ref):
     """Per-unit role warnings: outlier threat vs the twin's ceiling, and a boss that is not
     the chapter's real centre of gravity. Returns a list of strings (empty == clean)."""
@@ -933,12 +970,16 @@ def role_findings(chap, parity_ref):
         if ed.get('personal'):
             personal_by_id[ed.get('id')] = ed['personal']
         for c in enemy_combatants(ed):
-            ours.append((ed.get('id') or c.name, bool(ed.get('is_boss')), c,
+            # THREAT comparisons run on the real article (class base + personal line), the same
+            # footing the durability check below has always used. The AGGREGATE metric stays
+            # class-base on both sides -- that is a different question and a fair one.
+            ours.append((ed.get('id') or c.name, bool(ed.get('is_boss')),
+                         unit_real_article(ed, c),
                          bool(ed.get('convertible')), ed.get('tile_terrain')))
     if not ours:
         return []
     out = []
-    van_threat = max(fc.damage_per_round(e, YARDSTICK) for e in van)
+    van_threat = vanilla_threat_ceiling(parity_ref)
     van_tank = max(fc.rounds_to_kill(YARDSTICK, e) for e in van)
     for uid, _is_boss, c, conv, _tile in ours:
         t = fc.damage_per_round(c, YARDSTICK)
@@ -964,7 +1005,7 @@ def role_findings(chap, parity_ref):
         # Boss durability is measured boss-to-boss WITH personal lines on both sides (FE8's
         # own boss mechanism), on the tile each actually holds. The aggregate above stays
         # class-base-only; this is the one place the real article is compared.
-        b_on, b_avo = on_terrain(_apply_personal(b, personal_by_id.get(uid)), tile)
+        b_on, b_avo = on_terrain(b, tile)   # `b` is already the real article
         bk = fc.rounds_to_kill(YARDSTICK, b_on, b_avo)
         where = (' on %s (+%d avo/+%d def)' % ((tile,) + terrain_bonus(tile))) if tile else ''
         if bk == float('inf'):
