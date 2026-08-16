@@ -828,16 +828,109 @@ class RoleCheck(unittest.TestCase):
 
     def test_convertible_outlier_is_not_a_role_inversion(self):
         """A convertible is neutralized rather than ground down, so out-hitting the boss
-        is a deliberate 'avoid me' hazard -- the ch05 white moose."""
+        is a deliberate 'avoid me' hazard -- the ch05 white moose.
+
+        The outlier here must clear the twin's REAL ceiling (Joshua, 21.4 -> bar 26.7) rather
+        than its class-base one (6.3 -> bar 7.9). The old fixture (rotten-claw, 14.1) no longer
+        reads as an outlier at all, which is exactly the point of the ceiling fix: a unit that
+        merely out-hits the twin's GENERICS is not an outlier when the twin fields a 21.4
+        recruit of its own."""
         chap = self._chap([
-            {'id': 'moose', 'class': 'gwyllgi', 'level': 6, 'convertible': True,
-             'inventory': [{'id': 'claw', 'fe_base': 'rotten-claw'}]},
+            {'id': 'moose', 'class': 'gwyllgi', 'level': 12, 'convertible': True,
+             'inventory': [{'id': 'claw', 'fe_base': 'hell-fang'}]},
             {'id': 'boss', 'class': 'druid', 'level': 7, 'is_boss': True,
              'inventory': [{'id': 'flux', 'fe_base': 'flux'}]},
         ])
         found = df.role_findings(chap, self.REF)
         self.assertFalse(any('out-threatened' in f for f in found), found)
         self.assertTrue(any('moose' in f and 'convertible' in f for f in found), found)
+
+    def test_threat_checks_use_the_real_article_on_both_sides(self):
+        """A boss's PERSONAL line is most of what makes it a boss, so the role check has to
+        read it -- the same 'real article' the durability check in this function already uses.
+
+        Measured class-base, ch05's Ravisin reads 8.4 against the moose's 11.8 and the check
+        cried role inversion; with her personal line she is 12.5 and out-threatens it. FE8
+        builds named units this way on BOTH sides: vanilla Ch5's Saar and Joshua are both 6.2
+        class-base and 12.2 / 21.4 once applied, indistinguishable from a generic until then.
+        """
+        chap = self._chap([
+            {'id': 'beast', 'class': 'gwyllgi', 'level': 6,
+             'inventory': [{'id': 'fang', 'fe_base': 'fire-fang'}]},
+            {'id': 'boss', 'class': 'druid', 'level': 7, 'is_boss': True,
+             'personal': {'baseHP': 15, 'basePow': 4, 'baseSkl': 3,
+                          'baseDef': 5, 'baseRes': 3, 'baseLck': 3},
+             'inventory': [{'id': 'flux', 'fe_base': 'flux'}]},
+        ])
+        found = df.role_findings(chap, self.REF)
+        self.assertFalse(any('out-threatened' in f for f in found),
+                         'the boss out-threatens the beast once her personal line is read: %s'
+                         % found)
+
+    def test_a_real_inversion_still_fires_through_the_personal_line(self):
+        """The guard on the fix: applying personal lines must not silence a TRUE inversion."""
+        chap = self._chap([
+            {'id': 'monster', 'class': 'gwyllgi', 'level': 6,
+             'inventory': [{'id': 'claw', 'fe_base': 'hell-fang'}]},
+            {'id': 'boss', 'class': 'druid', 'level': 7, 'is_boss': True,
+             'personal': {'baseHP': 15, 'basePow': 4, 'baseSkl': 3,
+                          'baseDef': 5, 'baseRes': 3, 'baseLck': 3},
+             'inventory': [{'id': 'flux', 'fe_base': 'flux'}]},
+        ])
+        found = df.role_findings(chap, self.REF)
+        self.assertTrue(any('out-threatened' in f and 'monster' in f for f in found), found)
+
+    def test_the_twins_ceiling_counts_its_own_named_units(self):
+        """The outlier bar was the max CLASS-BASE threat (FE8 Ch5: 6.3), which excludes the
+        twin's own named units -- so every named unit we field looked like an outlier against
+        a roster of generics. Vanilla Ch5's real ceiling is Joshua at 21.4."""
+        self.assertAlmostEqual(df.vanilla_threat_ceiling('FE8 Ch5'), 21.4, delta=0.2)
+
+    def test_a_cast_members_donor_line_counts_too(self):
+        """The second half: a unit's personal line has TWO sources. A chapter enemy carries
+        `personal:` in the YAML (Ravisin); a CAST member deployed hostile carries it via
+        BASE_DONOR (Sahnar rides Joshua's). Reading only the first made ch05's red Myrmidon
+        measure 6.2 against the 21.4 she actually fights at."""
+        chap = self._chap([
+            {'id': 'sahnar', 'class': 'myrmidon', 'level': 5,
+             'inventory': [{'id': 'ke', 'fe_base': 'killing-edge'}]},
+        ])
+        c = df.unit_real_article(chap['enemy_units'][0],
+                                df.enemy_combatants(chap['enemy_units'][0])[0])
+        self.assertAlmostEqual(fc.damage_per_round(c, df.YARDSTICK), 21.4, delta=0.2)
+
+    def test_names_a_single_unit_that_is_the_whole_overage(self):
+        """ch05 measured "PARITY (within band)" at x1.20 while the white moose ALONE was the
+        entire overage -- x0.97 without it. threat/slot sums the force and divides by the deploy
+        cap, so one unit's 24.6 becomes +2.7 a slot and vanishes under a +-25% band. This prints
+        the sentence that had to be computed by hand to catch it."""
+        # sized to clear the x1.0 floor, as the real ch05 force does -- the note is about a
+        # chapter that PASSES while one unit carries the excess.
+        chap = self._chap([
+            {'id': 'grunt', 'class': 'soldier', 'level': 5, 'count': 15,
+             'inventory': [{'id': 'iron-lance', 'fe_base': 'iron-lance'}]},
+            {'id': 'monster', 'class': 'gwyllgi', 'level': 6,
+             'inventory': [{'id': 'claw', 'fe_base': 'hell-fang'}]},
+        ])
+        notes = df.solo_contributors(chap, self.REF, 9)
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn('monster alone is', notes[0])
+
+    def test_a_big_number_from_a_big_GROUP_is_not_a_solo_contributor(self):
+        """A line of eight reavers summing high is a composition choice, not one monster --
+        only `count: 1` units qualify."""
+        chap = self._chap([
+            {'id': 'horde', 'class': 'gwyllgi', 'level': 6, 'count': 12,
+             'inventory': [{'id': 'claw', 'fe_base': 'hell-fang'}]},
+        ])
+        self.assertEqual(df.solo_contributors(chap, self.REF, 9), [])
+
+    def test_a_chapter_at_or_under_parity_says_nothing(self):
+        chap = self._chap([
+            {'id': 'grunt', 'class': 'soldier', 'level': 1, 'count': 2,
+             'inventory': [{'id': 'iron-lance', 'fe_base': 'iron-lance'}]},
+        ])
+        self.assertEqual(df.solo_contributors(chap, self.REF, 9), [])
 
     def test_flags_a_boss_that_folds_far_faster_than_the_twins_wall(self):
         chap = self._chap([

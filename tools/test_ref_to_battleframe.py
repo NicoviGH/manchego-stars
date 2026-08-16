@@ -354,12 +354,39 @@ class TestMeleeMotionS(unittest.TestCase):
         self.assertNotIn("banim_code_sound_axe_swing_long", body)
         self.assertNotIn("banim_code_hit_normal", body)            # a miss lands no hit
 
+    def test_beast_cadence_uses_the_gwyllgi_own_voice_not_a_weapon(self):
+        # The white moose (#25) clones CLASS_GWYLLGI, whose OWN anim is banim_cer_at1 (animId
+        # 0xB1) -- NOT the Mauthe Doog's banim_mdg_at1 (0xB0) that Lupin's imported pounce
+        # reads. Its attack_close is growl (mauthedoog_1) -> snap (mauthedoog_2) -> the shared
+        # contact hit -> a padding footfall away (mauthedoog_3). A beast carries no weapon, so
+        # there is no swing, no whoosh and no metal anywhere in the mode.
+        s = rb.emit_motion_s("moose_at1", self._frames(), motion="melee", cadence="beast")
+        body = self._mode(s, "attack_close", abbr="moose_at1")
+        self.assertIn("banim_code_sound_mauthedoog_1", body)        # the gathering growl
+        self.assertIn("banim_code_sound_mauthedoog_2", body)        # the snap into the gore
+        self.assertIn("banim_code_hit_normal", body)                # melee contact (shared)
+        self.assertIn("banim_code_sound_mauthedoog_3", body)        # the footfall away
+        self.assertNotIn("banim_code_sound_axe_swing_long", body)   # no axe
+        self.assertNotIn("banim_code_sound_armor_leap", body)       # no armour
+        self.assertNotIn("banim_code_sound_sword_slash_air", body)  # no blade whoosh
+        self.assertNotIn("banim_code_effect_dirt_kick", body)       # cer_at1 kicks no dirt
+
+    def test_beast_cadence_shakes_no_screen(self):
+        # Read off the donor: banim_cer_at1's attack_close carries no shake code at all. The
+        # lance row's heavy-weight shake is the ARMOUR's, not a quadruped's, and copying it
+        # here would be adapting a neighbouring row instead of reading the donor (the same
+        # mistake the sword row's comment was written to prevent).
+        s = rb.emit_motion_s("moose_at1", self._frames(), motion="melee", cadence="beast")
+        self.assertNotIn("banim_code_shake_screnn_slightly",
+                         self._mode(s, "attack_close", abbr="moose_at1"))
+
     def test_axe_cadence_is_still_the_melee_default(self):
         # default melee cadence stays the Pirate axe (braulo) -- a new donor must opt in.
         body = self._mode(rb.emit_motion_s("brau_an1", self._frames(), motion="melee"),
                           "attack_close")
         self.assertIn("banim_code_sound_axe_swing_long", body)
         self.assertNotIn("banim_code_sound_armor_leap", body)
+        self.assertNotIn("banim_code_sound_mauthedoog_1", body)
 
     def test_ranged_motion_is_still_the_default(self):
         s = rb.emit_motion_s("rbg_ar1", self._frames())         # no motion= -> ranged
@@ -392,6 +419,7 @@ class TestHpDepleteArming(unittest.TestCase):
     # Every cadence the faked generator can emit (donor -> emit_motion_s kwargs).
     CADENCES = [("brau_an1", {"motion": "melee"}),
                 ("wolf_ln1", {"motion": "melee", "cadence": "lance"}),
+                ("moose_at1", {"motion": "melee", "cadence": "beast"}),
                 ("rbg_ar1", {}),
                 ("mees_mg1", {"motion": "magic"})]
 

@@ -614,68 +614,20 @@ class CharacterUniqueBanim(unittest.TestCase):
             if motion == 'melee':
                 self.assertIn(cadence, _MELEE_CADENCE, name)
 
-    def test_pegasus_donor_maps_to_pegasus_knight_lance(self):
-        # Pinky (the flier) rides CLASS_PEGASUS_KNIGHT with a lance -- the donor supplies the
-        # _u25 AnimConf to clone and the ITYPE_LANCE weapon slot to repoint at her IMPORTED
-        # swoop. motion/cadence are unused on the import path (the motion.s comes from the
-        # .txt) but stay valid so the melee-cadence invariant above holds.
-        donor_class, wtype, motion, cadence = bc.BANIM_DONORS['pegasus']
-        self.assertEqual(donor_class, 'CLASS_PEGASUS_KNIGHT')
-        self.assertIn('ITYPE_LANCE', wtype)
+    def test_gwyllgi_donor_binds_monster_and_unarmed_to_the_beast_cadence(self):
+        # The white moose (#25) rides CLASS_GWYLLGI -- the class it already deploys as, and
+        # whose own banim (cer_at1) supplies the cadence Nicolas asked for. The vanilla
+        # Gwyllgi AnimConf carries exactly two slots, ITYPE_MONSTER and ITYPE_ITEM, and BOTH
+        # are repointed: the moose swings a monster weapon (antlers-and-hooves -> rotten
+        # claw), and ITEM is the UNARMED entry. Left vanilla, ITEM draws the stock purple
+        # HOUND in the close-up -- the cavalier row's #206 defect on the one chapter whose
+        # miniboss is an elk.
+        donor_class, wtype, motion, cadence = bc.BANIM_DONORS['gwyllgi']
+        self.assertEqual(donor_class, 'CLASS_GWYLLGI')
+        self.assertEqual(wtype, ['0x0100 | ITYPE_MONSTER', '0x0100 | ITYPE_ITEM'])
+        self.assertEqual(motion, 'melee')
+        self.assertEqual(cadence, 'beast')
 
-    def test_bishop_donor_binds_staff_light_and_unarmed_to_one_anim(self):
-        # ITYPE_ITEM joined on the #25 review: the vanilla Bishop AnimConf carries five slots
-        # and ITEM is the UNARMED entry, reachable with both staves spent. Left vanilla, a
-        # healer with only a Vulnerary draws a HUMAN BISHOP in the close-up -- the cavalier
-        # row's #206 defect. ANIMA/DARK stay vanilla on purpose: this line can equip neither.
-        donor_class, wtype, motion, cadence = bc.BANIM_DONORS['bishop']
-        self.assertEqual(donor_class, 'CLASS_BISHOP')
-        self.assertEqual(motion, 'magic')
-        self.assertEqual(wtype, ['0x0100 | ITYPE_STAFF', '0x0100 | ITYPE_LIGHT',
-                                 '0x0100 | ITYPE_ITEM'])
-        # A Bishop-shaped AnimConf fixture: the three slots we repoint, at vanilla indices.
-        src = ('CONST_DATA struct BattleAnimDef AnimConf_SRC[] = {\n'
-               '    { .wtype = 0x0100 | ITYPE_STAFF, .index = 0x0082, },\n'
-               '    { .wtype = 0x0100 | ITYPE_LIGHT, .index = 0x0082, },\n'
-               '    { .wtype = 0x0100 | ITYPE_ITEM, .index = 0x0081, },\n'
-               '    { 0 }\n};\n')
-        wtypes = wtype if isinstance(wtype, list) else [wtype]
-        out = bc.banim_clone_conf(src, 'AnimConf_SRC', 'AnimConf_NEW', wtypes[0], 0x99 + 1)
-        for wt in wtypes[1:]:
-            out = bc.banim_repoint_conf(out, 'AnimConf_NEW', wt, 0x99 + 1)
-        # Source table is left byte-vanilla (isolation).
-        self.assertIn('AnimConf_SRC[] = {\n    { .wtype = 0x0100 | ITYPE_STAFF, .index = 0x0082, }', out)
-        # New clone has BOTH slots repointed to 0x9A.
-        new_block = out.split('AnimConf_NEW[] =', 1)[1]
-        self.assertIn('.wtype = 0x0100 | ITYPE_STAFF, .index = 0x9A', new_block)
-        self.assertIn('.wtype = 0x0100 | ITYPE_LIGHT, .index = 0x9A', new_block)
-
-    def test_faked_battle_anim_builder_uses_the_three_pose_generator(self):
-        # A block with `frames:` (no import) builds via ref_to_battleframe (the #65 faked path).
-        from PIL import Image
-        import tempfile
-        with tempfile.TemporaryDirectory() as d:
-            for nm in ('r', 'w', 'p'):
-                Image.new('RGBA', (24, 24), (200, 40, 40, 255)).save(
-                    os.path.join(d, nm + '.png'))
-            cfg = {'clone_from': 'knight',
-                   'frames': ['r.png', 'w.png', 'p.png']}
-            res = bc.build_unit_battle_anim(cfg, d, 'testu', 'melee', 'lance')
-        self.assertEqual(len(res['sheets']), 3)          # faked = exactly 3 poses
-        self.assertIn('banim_testu_script', res['motion_s'])
-
-    def test_imported_battle_anim_builder_reads_txt_and_frames(self):
-        # A block with `import:` builds via feditor_to_banim (the #90 N-frame path), bound
-        # per-character. Exercised against Pinky's real committed swoop assets -- the ONLY new
-        # seam vs the shipped enemy import (which binds per-CLASS).
-        anim_dir = os.path.join(bc.REPO, 'campaigns', 'rime-of-the-frostmaiden',
-                                'battle_anims', 'pinky')
-        cfg = {'clone_from': 'pegasus',
-               'import': {'txt': 'Pinky.txt', 'frames_dir': '.'}}
-        res = bc.build_unit_battle_anim(cfg, anim_dir, 'pinky', 'melee', 'lance')
-        self.assertEqual(len(res['sheets']), 7)          # six swoop frames + a dodge frame
-        self.assertIn('banim_pinky_script', res['motion_s'])
-        self.assertEqual(len(res['pal']), 128)           # same agbpal shape as the faked path
 
     def test_unique_append_returns_next_index_and_appends_the_symbol(self):
         new, idx = bc.banim_unique_append(self.CONFIGS, 'AnimConf_brau_ax1')
@@ -821,6 +773,203 @@ class CharacterUniqueBanim(unittest.TestCase):
         from inject import engine_hooks as eh
         self.assertEqual(eh._guard_banim_unique_pal_custom('something else', 0xC9),
                          'something else')
+
+
+class TestRawPidBattleAnim(unittest.TestCase):
+    """A named raw-pid creature can carry a battle anim (#25, the white moose).
+
+    The faked-anim injector binds a unit's private AnimConf through its CharacterData `_u25`.
+    Every unit that had one until now was a CAST member riding a vanilla CHARACTER_ slot, so
+    the binding hardcoded `[CHARACTER_<slot> - 1]`. The white moose is not cast: it is ch05's
+    raw on-map pid 0xb9, a gCharacterData GAP, exactly like Ravisin at 0xb8. The engine does
+    not care -- GetBattleAnimationId_WithUnique reads `unit->pCharacterData->_u25`, which is
+    the same field on a gap row as on a named one -- so the only thing standing between the
+    moose and a battle anim was the injector's marker string.
+    """
+
+    def test_moose_battle_anim_is_declared_on_its_chapter_yaml(self):
+        # Its pid, class, AI, art recipe and death quote are all authored there already; a
+        # pcs/npcs file would be a SECOND definition site for one creature, and would make
+        # `classed_cast` treat a miniboss as a deployable cast member.
+        self.assertIn('white-moose', bc.RAW_PID_BATTLE_ANIMS)
+        chapter_yaml, pid = bc.RAW_PID_BATTLE_ANIMS['white-moose']
+        self.assertEqual(chapter_yaml, bc.CH05_CHAPTER_YAML)
+        self.assertEqual(pid, bc.CH05_MOOSE_PID)
+
+    def test_units_with_battle_anim_finds_the_raw_pid_chapter_unit(self):
+        found = dict(bc.units_with_battle_anim('rime-of-the-frostmaiden'))
+        self.assertIn('white-moose', found)
+        self.assertEqual(found['white-moose']['battle_anim']['clone_from'], 'gwyllgi')
+
+    def test_raw_pid_u25_marker_addresses_the_character_data_gap(self):
+        # `[0xb9 - 1]` is how raw_pid_portrait_data already addresses this row; the anim
+        # binding must use the SAME designator, not a CHARACTER_ enum the moose does not have.
+        self.assertEqual(bc.banim_u25_marker('white-moose'), '[0xb9 - 1]')
+
+    def test_cast_u25_marker_is_unchanged(self):
+        # The regression guard: every existing PC still binds through its CHARACTER_ slot.
+        self.assertEqual(bc.banim_u25_marker('braulo'), '[CHARACTER_EIRIKA - 1]')
+        self.assertEqual(bc.banim_u25_marker('lupin'), '[CHARACTER_DUESSEL - 1]')
+
+    def test_unknown_unit_still_fails_loudly(self):
+        with self.assertRaises(SystemExit):
+            bc.banim_u25_marker('nobody-at-all')
+
+    def test_the_sandbox_benches_the_moose_under_its_own_pid(self):
+        # The TESTCH sandbox is "one bench for every battle animation" (recordenemy's docstring),
+        # and it deployed foes by CLASS alone. That is enough for a class-level reskin, but the
+        # moose's anim binds per-CHARACTER through _u25 -- so a Gwyllgi deployed under the
+        # generic 0x80 monster charIndex plays the stock HOUND, and the bench would prove the
+        # opposite of what it was run for. Its foe row must carry charIndex 0xb9.
+        body = bc._sandbox_foe_roster('rime-of-the-frostmaiden')
+        self.assertIn('.charIndex = 0xb9,', body)
+        moose = [b for b in body.split('    {') if '0xb9' in b]
+        self.assertEqual(len(moose), 1, 'expected exactly one moose foe row')
+        self.assertIn('CLASS_GWYLLGI', moose[0])
+        self.assertIn('ITEM_MONSTER_FIREFANG', moose[0])    # the slot its anim repoints
+        self.assertNotIn('.autolevel', moose[0])            # a named miniboss, not generic trash
+
+    def test_the_sandbox_still_benches_every_reskin_class(self):
+        # Regression: adding the moose must not push a reskin off the end of the position list.
+        body = bc._sandbox_foe_roster('rime-of-the-frostmaiden')
+        for reskin in bc.enemy_class_reskins('rime-of-the-frostmaiden'):
+            if bc.CLASS_RESKIN_FOE_WEAPON.get(reskin['base']):
+                self.assertIn(reskin['slot'], body)
+
+    def test_the_moose_name_spends_no_donor(self):
+        # The kobolds' #90 rule, one namespace over: append your own id rather than burn a
+        # scarce vanilla slot. A character donor would have cost the campaign a slot for a
+        # STRING -- and the obvious beast donor, Morva, is FE8's Great Dragon, which the
+        # roadmap's Chardalyn Dragon (ch13-14, a marquee boss) has first claim on.
+        unit_id, slot, portrait_id, name = bc.RAW_PID_PORTRAITS[bc.CH05_MOOSE_PID]
+        self.assertEqual((unit_id, name), ('white-moose', 'White Moose'))
+        self.assertEqual(slot, bc.CH05_MOOSE_NAME_MSG)
+        self.assertIsInstance(slot, int)          # an id we own, not a donor slot name
+        self.assertIsNone(portrait_id)            # named, not dressed
+        self.assertNotIn('white-moose', bc.GUEST_PORTRAIT_MAP)
+
+    def test_the_appended_name_id_is_past_the_last_vanilla_message(self):
+        # 0xD4B is vanilla's last. An id at or below it would squat on real text.
+        self.assertGreater(bc.CH05_MOOSE_NAME_MSG, 0xD4B)
+
+    def test_a_donor_slot_and_an_owned_id_both_resolve(self):
+        self.assertEqual(bc.raw_pid_name_text_id(0xD4C), 0xD4C)      # ours, verbatim
+        self.assertEqual(bc.raw_pid_name_text_id('Riev'), 0x246)     # donor, scanned
+
+    def test_a_raw_pid_can_be_named_without_being_dressed(self):
+        # raw_pid_portrait_data always wrote a portraitId. A name-only donor has none, and
+        # inserting `.portraitId = 0xNone` would not even compile -- so the write is skipped and
+        # the gap row keeps its generic miniPortrait, exactly as vanilla leaves Morva's own row.
+        block = ('    [0xb9 - 1] = {\n'
+                 '        .nameTextId = 0x255,\n'
+                 '        .number = 0xb9,\n'
+                 '        .defaultClass = CLASS_GORGON,\n'
+                 '        .miniPortrait = 0x4,\n'
+                 '    },\n')
+        out = bc._bind_raw_pid_identity(block, '[0xb9 - 1]', 0xD4C, None)
+        self.assertIn('.nameTextId = 0xD4C,', out)
+        self.assertNotIn('.portraitId', out)
+        self.assertIn('.miniPortrait = 0x4,', out)
+
+    def test_a_raw_pid_with_a_bust_still_gets_its_portrait_id(self):
+        # Regression: Ravisin's binding is unchanged -- she DOES dress Riev (portrait id 0x48).
+        block = ('    [0xb8 - 1] = {\n'
+                 '        .nameTextId = 0x255,\n'
+                 '        .number = 0xb8,\n'
+                 '        .defaultClass = CLASS_GORGON,\n'
+                 '    },\n')
+        out = bc._bind_raw_pid_identity(block, '[0xb8 - 1]', 0x246, 0x48)
+        self.assertIn('.nameTextId = 0x246,', out)
+        self.assertIn('.portraitId = 0x48,', out)
+
+    def test_the_moose_carries_its_own_beast_lines_weapon(self):
+        # ITEM_MONSTER_ROTTENCLW is the REVENANT's claw (ch04's three Revenants hold it) -- a
+        # different creature's gear. FIREFANG is the Mauthe Doog's, and the Mauthe Doog is this
+        # creature's own unpromoted tier (data_classes.c: CLASS_MAUTHEDOOG.promotion =
+        # CLASS_GWYLLGI), so the moose stays inside its own line. HELLFANG, the promoted tier's,
+        # is class-correct too but put ONE unit at 20% of the chapter's whole threat -- the
+        # entire parity overage in a single slot. Never renamed either way.
+        chap = bc._load_chapter_yaml('rime-of-the-frostmaiden', bc.CH05_CHAPTER_YAML)
+        moose = next(e for e in chap['enemy_units'] if e['id'] == 'white-moose')
+        self.assertEqual([i['fe_base'] for i in moose['inventory']], ['fire-fang'])
+        self.assertEqual(bc.CH05_ITEM_IDS['fire-fang'], 'ITEM_MONSTER_FIREFANG')
+        self.assertNotIn('rotten-claw', [i['fe_base'] for i in moose['inventory']])
+
+    def test_the_gap_row_takes_a_u25_it_did_not_have(self):
+        # gCharacterData's 0xB0-range gaps omit `._u25` entirely (it defaults to {0,0}, which
+        # is precisely "no unique anim"). banim_set_char_u25 must INSERT it after `.number`,
+        # the same way raw_pid_portrait_data inserts a missing `.portraitId`.
+        gap = ('    [0xb9 - 1] = {\n'
+               '        .nameTextId = 0x255,\n'
+               '        .number = 0xb9,\n'
+               '        .defaultClass = CLASS_GORGON,\n'
+               '    },\n')
+        out = bc.banim_set_char_u25(gap, 11)
+        self.assertIn('._u25 = { 11, 11 },', out)
+        self.assertIn('.number = 0xb9,', out)
+
+    def test_pegasus_donor_maps_to_pegasus_knight_lance(self):
+        # Pinky (the flier) rides CLASS_PEGASUS_KNIGHT with a lance -- the donor supplies the
+        # _u25 AnimConf to clone and the ITYPE_LANCE weapon slot to repoint at her IMPORTED
+        # swoop. motion/cadence are unused on the import path (the motion.s comes from the
+        # .txt) but stay valid so the melee-cadence invariant above holds.
+        donor_class, wtype, motion, cadence = bc.BANIM_DONORS['pegasus']
+        self.assertEqual(donor_class, 'CLASS_PEGASUS_KNIGHT')
+        self.assertIn('ITYPE_LANCE', wtype)
+
+    def test_bishop_donor_binds_staff_light_and_unarmed_to_one_anim(self):
+        # ITYPE_ITEM joined on the #25 review: the vanilla Bishop AnimConf carries five slots
+        # and ITEM is the UNARMED entry, reachable with both staves spent. Left vanilla, a
+        # healer with only a Vulnerary draws a HUMAN BISHOP in the close-up -- the cavalier
+        # row's #206 defect. ANIMA/DARK stay vanilla on purpose: this line can equip neither.
+        donor_class, wtype, motion, cadence = bc.BANIM_DONORS['bishop']
+        self.assertEqual(donor_class, 'CLASS_BISHOP')
+        self.assertEqual(motion, 'magic')
+        self.assertEqual(wtype, ['0x0100 | ITYPE_STAFF', '0x0100 | ITYPE_LIGHT',
+                                 '0x0100 | ITYPE_ITEM'])
+        # A Bishop-shaped AnimConf fixture: the three slots we repoint, at vanilla indices.
+        src = ('CONST_DATA struct BattleAnimDef AnimConf_SRC[] = {\n'
+               '    { .wtype = 0x0100 | ITYPE_STAFF, .index = 0x0082, },\n'
+               '    { .wtype = 0x0100 | ITYPE_LIGHT, .index = 0x0082, },\n'
+               '    { .wtype = 0x0100 | ITYPE_ITEM, .index = 0x0081, },\n'
+               '    { 0 }\n};\n')
+        wtypes = wtype if isinstance(wtype, list) else [wtype]
+        out = bc.banim_clone_conf(src, 'AnimConf_SRC', 'AnimConf_NEW', wtypes[0], 0x99 + 1)
+        for wt in wtypes[1:]:
+            out = bc.banim_repoint_conf(out, 'AnimConf_NEW', wt, 0x99 + 1)
+        # Source table is left byte-vanilla (isolation).
+        self.assertIn('AnimConf_SRC[] = {\n    { .wtype = 0x0100 | ITYPE_STAFF, .index = 0x0082, }', out)
+        # New clone has BOTH slots repointed to 0x9A.
+        new_block = out.split('AnimConf_NEW[] =', 1)[1]
+        self.assertIn('.wtype = 0x0100 | ITYPE_STAFF, .index = 0x9A', new_block)
+        self.assertIn('.wtype = 0x0100 | ITYPE_LIGHT, .index = 0x9A', new_block)
+
+    def test_faked_battle_anim_builder_uses_the_three_pose_generator(self):
+        # A block with `frames:` (no import) builds via ref_to_battleframe (the #65 faked path).
+        from PIL import Image
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            for nm in ('r', 'w', 'p'):
+                Image.new('RGBA', (24, 24), (200, 40, 40, 255)).save(
+                    os.path.join(d, nm + '.png'))
+            cfg = {'clone_from': 'knight',
+                   'frames': ['r.png', 'w.png', 'p.png']}
+            res = bc.build_unit_battle_anim(cfg, d, 'testu', 'melee', 'lance')
+        self.assertEqual(len(res['sheets']), 3)          # faked = exactly 3 poses
+        self.assertIn('banim_testu_script', res['motion_s'])
+
+    def test_imported_battle_anim_builder_reads_txt_and_frames(self):
+        # A block with `import:` builds via feditor_to_banim (the #90 N-frame path), bound
+        # per-character. Exercised against Pinky's real committed swoop assets -- the ONLY new
+        # seam vs the shipped enemy import (which binds per-CLASS).
+        anim_dir = os.path.join(bc.REPO, 'campaigns', 'rime-of-the-frostmaiden',
+                                'battle_anims', 'pinky')
+        cfg = {'clone_from': 'pegasus',
+               'import': {'txt': 'Pinky.txt', 'frames_dir': '.'}}
+        res = bc.build_unit_battle_anim(cfg, anim_dir, 'pinky', 'melee', 'lance')
+        self.assertEqual(len(res['sheets']), 7)          # six swoop frames + a dodge frame
+        self.assertIn('banim_pinky_script', res['motion_s'])
+        self.assertEqual(len(res['pal']), 128)           # same agbpal shape as the faked path
 
 
 class BattleSpellPaletteTint(unittest.TestCase):
@@ -1850,6 +1999,8 @@ class RavisinPortrait(unittest.TestCase):
                       'dressed Riev slot would keep its vanilla mouth/eye geometry')
 
     def test_raw_boss_pid_gets_the_riev_identity(self):
+        # The fixture carries EVERY registered raw pid, because raw_pid_portrait_data binds all
+        # of them in one pass -- the moose (0xb9) joined the registry in #25.
         source = '''[0xb8 - 1] = {
         .nameTextId = 0x255,
         .defaultClass = CLASS_ARCH_MOGALL,
@@ -1862,13 +2013,21 @@ class RavisinPortrait(unittest.TestCase):
         .baseRes = 0,
         .baseLck = 0,
         .baseCon = 0,
+    },
+    [0xb9 - 1] = {
+        .nameTextId = 0x255,
+        .number = 0xb9,
+        .defaultClass = CLASS_GORGON,
+        .miniPortrait = 0x4,
     },'''
         patched = bc.raw_pid_portrait_data(source, self.CAMPAIGN)
         self.assertIn('.nameTextId = 0x246,', patched)
         self.assertNotIn('.nameTextId = 0x255,', patched)
         self.assertIn('.portraitId = 0x48,', patched)
+        # Ravisin is the only DRESSED raw pid; the moose is named without a bust.
         self.assertEqual(1, patched.count('.portraitId'))
-        self.assertIn('.miniPortrait = 0x4,', patched)
+        self.assertIn('.nameTextId = 0xD4C,', patched)
+        self.assertEqual(2, patched.count('.miniPortrait = 0x4,'))
 
         ravisin = next(enemy for enemy in bc._load_chapter_yaml(
             self.CAMPAIGN, bc.CH05_CHAPTER_YAML)['enemy_units']
@@ -4613,9 +4772,6 @@ class IdempotentInjectionMtimes(unittest.TestCase):
             self.assertTrue(p.startswith(bc.DECOMP), p)
 
 
-if __name__ == '__main__':
-    unittest.main()
-
 
 class SmsFreeListReclaimsDeadVanillaRows(unittest.TestCase):
     """We assign map sprites per CHARACTER where vanilla assigns them per CLASS, so every
@@ -5401,13 +5557,22 @@ class EventGroupRosterPointer(unittest.TestCase):
             bc.point_event_group_at(self.INFO, 'Ch6Events', 'nosuchField', 'MS_Ch05DeployCap')
 
     def test_the_live_ch05_group_deploys_our_table(self):
-        """The regression itself. Runs against the injected tree, so it only means anything
-        after a build -- skipped on a clean checkout rather than passing vacuously."""
+        """The regression itself. Runs against the INJECTED tree, so it only means anything
+        after a build -- skipped on a clean checkout rather than failing or passing vacuously.
+
+        The skip has to key on a symbol only WE write. It used to look for
+        `struct ChapterEventGroup Ch6Events`, which is VANILLA's own and is present in a
+        pristine checkout -- so the guard never fired, and on CI (which runs `make test` before
+        any injection) the assertion ran against vanilla data and reported our roster pointer
+        missing. Nobody found out, because this class sat below `unittest.main()` and had never
+        run. `MS_Ch05DeployCap` is ours: absent pristine, present once injected.
+        """
         if not os.path.exists(bc.CH05_EVENTINFO_H):
             self.skipTest('decomp not present')
         with open(bc.CH05_EVENTINFO_H, encoding='utf-8') as f:
-            if 'struct ChapterEventGroup %s' % bc.CH05_EVENT_GROUP not in f.read():
-                self.skipTest('host slot not injected in this tree')
+            if bc.CH05_ALLY_TABLE not in f.read():
+                self.skipTest('tree not injected (no %s) -- run a build first'
+                              % bc.CH05_ALLY_TABLE)
         bc.assert_event_group_roster(bc.CH05_EVENTINFO_H, bc.CH05_EVENT_GROUP,
                                      bc.CH05_ALLY_TABLE)
 
@@ -5562,3 +5727,11 @@ class LocationEventsAreBuiltFromTheYaml(unittest.TestCase):
         self.assertEqual(bc.village_reward_item(village, {'booster-def': 'ITEM_BOOSTER_DEF'}),
                          'ITEM_BOOSTER_DEF')
         self.assertIsNone(bc.village_reward_item({'id': 'b'}, {}))
+
+
+# NB keep this LAST. It sat at line ~4776 of a 5723-line file, so the twelve TestCase classes
+# below it -- 88 tests, including all 26 of Ch04Stage4Scenes -- were defined after the runner
+# had already exited and never ran under `make test`, which is what CI executes (it runs each
+# file as a SCRIPT, not via `-m unittest`, so the two disagreed silently). Found 2026-08-15.
+if __name__ == '__main__':
+    unittest.main()

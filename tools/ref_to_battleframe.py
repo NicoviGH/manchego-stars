@@ -244,6 +244,31 @@ _MELEE_CADENCE = {
         "impact": ["\tbanim_code_sound_sword_swing_shorter"],
         "back":   ["\tbanim_code_sound_step_heavy"],
     },
+    # Read off FE8's OWN Gwyllgi, banim_cer_at1 (banim 0xB1) -- the anim every generic Gwyllgi
+    # fights as. NOT banim_mdg_at1 (0xB0), which is the MAUTHE DOOG's and is what Lupin's
+    # imported pounce reads: the Gwyllgi is the doog's PROMOTION and vanilla gives it a
+    # separate script under the internal name "cer" (Cerberus). Its normal attack is
+    # mauthedoog_1 on the gather -> mauthedoog_2 on the snap -> the shared contact hit ->
+    # mauthedoog_3 as it turns away. A beast swings nothing, so there is no whoosh beat and no
+    # metal: no axe, no armour clatter, no blade arc. It also shakes NO screen -- the lance
+    # row's shake is the armour's weight, and copying it here would be adapting a neighbouring
+    # row instead of reading the donor.
+    #
+    # Vanilla fires mauthedoog_3 TWICE across five return frames; the faked 3-pose return is
+    # two beats, so it gets ONE footfall. Doubling it at a single instant would not read as two
+    # steps, it would read as one clipped sound.
+    #
+    # The donor's CRITICAL mode adds banim_code_sound_mauthedoog_scream between the gather and
+    # the snap. The faked generator builds its crit modes off this same dict and has no crit
+    # key, so the scream is deliberately not wired -- adding one is a generator change, not a
+    # cadence row.
+    "beast": {
+        "windup": ["\tbanim_code_sound_mauthedoog_1"],
+        "swing":  ["\tbanim_code_sound_mauthedoog_2"],
+        "hit":    ["\tbanim_code_sound_hit_eliwood_promoted_durandal"],
+        "impact": [],
+        "back":   ["\tbanim_code_sound_mauthedoog_3"],
+    },
 }
 
 

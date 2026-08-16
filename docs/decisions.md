@@ -5190,6 +5190,234 @@ reordering above. Do not accept a speedup that moves a ROM byte.
 
 _Decided: 2026-08-13 (Claude, #274)._
 
+### A battle anim binds to a CHARACTER, not to the cast (2026-08-15, #25)
+
+The white moose is ch05's miniboss and the first unit to want a custom battle animation without
+being a cast member. Every unit that had one before it rode a vanilla `CHARACTER_` slot, so
+`inject_battle_anims` hardcoded its `_u25` binding as `[CHARACTER_<slot> - 1]` and read the slot
+out of `PORTRAIT_MAP`. The moose has no such slot: it is the raw on-map pid `0xb9`, a
+`gCharacterData` GAP, exactly like Ravisin at `0xb8`.
+
+**The engine never cared.** `GetBattleAnimationId_WithUnique` reads
+`unit->pCharacterData->_u25`, and that is the same field on a gap row as on a named one — the
+gaps simply omit it, which defaults to `{0, 0}`, i.e. "no unique anim". The only thing standing
+between the moose and a battle anim was the injector's marker STRING. So the fix is
+`banim_u25_marker()`: a raw pid is addressed by `[0xb9 - 1]`, the identical designator
+`raw_pid_portrait_data` has always written through, and a cast member still resolves to its
+`CHARACTER_` enum. `RAW_PID_BATTLE_ANIMS` is the registry, and its unit declares `battle_anim:`
+on the CHAPTER YAML that already owns its pid, class, AI and art — a `pcs/npcs` file would be a
+second definition site and would put a miniboss on the deployable cast roster.
+
+**The cadence is read off the donor's own script, never off a neighbouring row.** Nicolas chose
+`clone_from: gwyllgi` for cadence, and the Gwyllgi's anim is `banim_cer_at1` (animId `0xB1`) —
+internally "cer", for Cerberus. It is NOT `banim_mdg_at1` (`0xB0`), the Mauthe Doog's, which is
+what Lupin's imported pounce reads; the two beasts are the unpromoted and promoted halves of one
+line and vanilla gives each its own script. `cer_at1` runs growl (`mauthedoog_1`) → snap
+(`mauthedoog_2`) → the shared contact hit → footfall away (`mauthedoog_3`), with **no screen
+shake and no dirt kick**. The lance row's shake is the ARMOUR's weight; copying it onto a
+quadruped would have been adapting a sibling row instead of reading the donor, which is the
+exact mistake the sword row's comment was already written to prevent.
+
+**The sandbox bench had a silent hole, and it is the same hole as #206.** `recordenemy` deploys
+the TESTCH foes by CLASS, which is right for a class-level reskin and WRONG for a per-character
+anim: a Gwyllgi deployed under the generic `0x80` monster charIndex plays the stock hound, so the
+bench would have greenlit the opposite of what it was run for. The foe row now carries the
+creature's OWN pid, and the scenario baits by pid rather than by class.
+
+**The three-pose descale, for the next creature.** `--body 56` lands exactly the 88x64 the
+injector's docstring names. `--noflip` because the master already faced left, like FE8's own
+`cer_at1` sheet. No `--sharpen` (it grains a white flank) and no `--flat`: that palette is tuned
+for warm hues and collapsed the blood-red antlers to tan — a chroma wash-out of the one accent
+the creature is recognised by, which is the Arena palette lesson on a sprite.
+
+_Decided: 2026-08-15 (Nicolas chose the donor; Claude wired it, #25)._
+
+### A name needs a STRING, not a character slot (2026-08-15, #25)
+
+ch05's white moose read **"Monster"** in combat, because a raw-pid gap's `nameTextId` points at
+the generic monster message every `0xB0`-range gap shares — so it can never be retitled for one
+creature. The reflex was the campaign's usual identity move: pick a collision-free vanilla
+character and retitle ITS name message, the way Ravisin rides Riev. The obvious beast donor was
+Morva, FE8's own Great Dragon.
+
+**Nicolas stopped that, and the reason generalizes.** The roadmap has two dragons coming —
+Arveiaturace in ch10 and the **Chardalyn Dragon** as a ch13–14 marquee boss — and Morva is the
+best dragon identity in the game. Spending it on a moose would burn a named future for a string.
+Worse, the fix he'd already rejected one step earlier was the same shape: renaming
+`ITEM_MONSTER_HELLFANG` to "Antlers" would have cost every future Gwyllgi its weapon name,
+because FE8 stores one name message per item id.
+
+**The rule was already settled — for classes, in #90.** `campaign.yaml` says it outright: the
+kobolds ride their OWN appended class ids "not a scarce vanilla ballista-empty… so
+`CLASS_BLST_KILLER_EMPTY` stays free". The goblins took vanilla's dead ballista-empties; the
+kobolds appended. Message ids are the same shape of resource: `gMsgTable[]` is generated from
+`texts.txt`, `GetStringFromIndex` has no bounds check and there is no count constant, so a new
+trailing header EXTENDS the table. The moose's name is `MSG_D4C`, appended past vanilla's last
+id (`MSG_D4B`) and claimed in `HOSTED_CHAPTER_MESSAGE_IDS` like any other id ch05 writes. No
+donor spent, and it generalizes: Messie and both dragons get names without paying a slot.
+
+**So a donor slot is for BUSTS, and only for busts.** `RAW_PID_PORTRAITS`'s second element is
+now either a donor slot name (Ravisin → Riev, dressed) or an int id we own (the moose, named and
+undressed), and `portrait_id` may be None. `dressed_guest_slots` skips name-only units so a PNG
+sitting in `portraits/` cannot silently dress a slot — which is exactly how the moose would have
+picked up the retired full-body Wyrdeer bust. **An asset on disk is not a decision to ship it.**
+
+**And the weapon was a real defect, spotted off a combat frame.** The moose deploys as
+`CLASS_GWYLLGI` but carried `ITEM_MONSTER_ROTTENCLW` — the REVENANT's claw, which is why ch04's
+three Revenants hold it: a different creature's gear entirely. The first fix was `HELLFANG`, the
+Gwyllgi's own, and it was class-correct but cost too much (see the parity ADR below). It now
+carries `FIREFANG` — the Mauthe Doog's, and the Mauthe Doog is this creature's own unpromoted
+tier (`data_classes.c`: `CLASS_MAUTHEDOOG.promotion = CLASS_GWYLLGI`). Same beast line, lower
+tier: it answers the Revenant problem as fully as HellFang did, at 11.8 threat instead of 24.6.
+
+**The correction worth keeping: "not currently wired" is not "never will be".** Twice in one
+session an unused thing was treated as free to consume — an unreferenced item name, then an
+unused character slot. The test is not "does anything use this today", it is "can I name a
+future that wants it".
+
+_Decided: 2026-08-15 (Nicolas; Claude wired it, #25)._
+
+### `convertible` prices a fight the player declines — name the chapter after it and they won't (2026-08-15, #25)
+
+ch05's white moose carried `convertible: true`, which in `difficulty.py` does two things: it
+exempts the unit from the role-inversion check, and it applies `CONVERT_CLEAR_DISCOUNT` (0.5) to
+clear-load. The YAML's own justification was that the objective is `defeat_boss`, so "the player
+can win WITHOUT ever fighting the moose" — while admitting in the next line that it "is NOT
+recruitable and never changes faction".
+
+**Nicolas: the previous chapter is named "The White Moose".** A party that has just spent an
+entire map hunting this animal is going to fight it. Half-pricing its clear-load models a game
+nobody plays. `convertible` is for a unit that is *neutralized* — recruited, flipped, removed
+from the fight — not for one the player is merely *permitted* to walk past.
+
+**The flag was also masking a real warning, at BOTH weapons.** With it removed the model says
+`boss ravisin (threat 8.4) is out-threatened by white-moose` — and that fires at the old Revenant
+claw (14.1) just as it does at the Gwyllgi's Hell Fang (24.6). The role inversion predates the
+weapon fix entirely; the exemption had simply been hiding it since #171. That is the cost of an
+exemption flag: it does not just adjust a number, it switches off a check, and the check it
+switched off was the one with something to say.
+
+**And it restores the structure this very file already claimed.** ch05's roster comment has read
+"Structure preserved: 16 line + 6 eruption reinf + 1 convertible (Sahnar) = vanilla's line 16 ·
+reinf 6 · convertible 1" the whole time, while the model actually reported **15/6/2**. Sahnar is
+ch05's one true convertible (Basil's Talk, the Joshua flip). Flipping the moose to `false` makes
+the measurement match the design note: 16/6/1, the twin exactly. Aggregate cost is a rounding
+error — clear-load/slot 4.5 → 4.7, chapter verdict still PARITY, full `--curve --check` green.
+
+**The general rule: a modelling flag that says "the player won't do this" has to survive the
+question "why would they not?".** If the answer is only "the win condition does not require it",
+that is permission, not prediction — and the fiction, the chapter title, and the map's own
+geography all vote the other way.
+
+_Decided: 2026-08-15 (Nicolas)._
+
+### One unit can BE the parity overage, and the band will hide it (2026-08-15, #25)
+
+ch05 measured "PARITY (within band)" at threat/slot x1.20 with the white moose on the Gwyllgi's
+own `HELLFANG`. Nicolas would not accept the verdict — *"I'm having a hard time understanding how
+we realistically match parity with an extra monster"* — and the arithmetic says he was right:
+
+| | Σ threat | /slot | vs vanilla |
+|---|---|---|---|
+| vanilla FE8 Ch5 (23 enemies) | 103.0 | 11.45 | — |
+| ours WITHOUT the moose (22) | 99.5 | 11.06 | **x0.97** |
+| ours WITH the moose (23) | 124.1 | 13.79 | **x1.20** |
+
+**The moose was 20% of the entire force's threat and the whole overage.** Every other unit in the
+chapter was already at parity. The verdict was true and misleading at once: `threat/slot` sums the
+force and divides by the deploy cap, so one unit's 24.6 becomes +2.7 per slot and fits under a
+±25% band with room to spare. `role_findings()` exists because this exact unit slipped through
+once before; the aggregate learned nothing from that, because the aggregate cannot.
+
+**Headcount parity is not force parity.** Both sides field exactly 23. We were not adding a body
+— we were carrying vanilla's roster size with one slot holding a unit that hit 4x harder than
+vanilla's hottest (24.6 against a 6.3 class-base ceiling).
+
+**And the obvious repair moves the wrong dial.** Trimming trash to pay for a hot boss-adjacent
+unit cuts CLEAR-LOAD, not threat: reavers 8→6 buys threat x1.14 but drags clear-load to x0.76,
+and one more cut puts it out of band on the low side. A chapter cannot buy its way back to parity
+by deleting bodies.
+
+**The fix was the weapon, and it stayed inside the creature's own line.** `FIREFANG` is the Mauthe
+Doog's, and the Mauthe Doog is the Gwyllgi's unpromoted tier — so the moose keeps its class, its
+map sprite geometry, its doubling, and the distinct `cer_at1` voice, while dropping 24.6 → 11.8
+and the chapter 1.20 → **x1.08** with clear-load unmoved at x0.84. Turn-1 pressure lands at 9.5
+against vanilla's 9.0.
+
+**The tool now says it for you.** `solo_contributors()` prints, under the verdict, any single
+`count: 1` unit carrying =>10% of the force's threat and what the chapter measures without it —
+the sentence that had to be computed by hand here. It is INFORMATION, not a gate: the two
+obvious thresholds were both tried and rejected. A unit's SHARE barely moves when you
+strengthen it, because it inflates the denominator too (ch05 read 16.4% with the shipped moose
+and 17.2% with the rejected one), and leave-one-out by unit id just names whichever group has
+the biggest `count`. It immediately surfaced ch03's Grell at **24% of its force** — a larger
+share than the moose ever had, on a boss that also dies in 1.1 rounds (#284).
+
+**Rule: when a chapter is at the edge of the band, ask WHICH UNIT is the overage before accepting
+the verdict.** If one unit is a fifth of the force's threat, the band is not measuring parity, it
+is absorbing an outlier. And the corollary for the metric itself: never quote a per-unit
+class-base number next to a with-personal one — vanilla hides its named units' teeth in personal
+lines (Saar and Joshua are both 6.2 class-base), so class-base flatters any unit whose danger
+lives in class+weapon instead.
+
+_Decided: 2026-08-15 (Nicolas)._
+
+### The role check has to read the personal line; the aggregate cannot yet (2026-08-15, #25)
+
+`role_findings()` collected each unit's `personal:` line and then used it for exactly ONE of its
+three checks — boss durability, under the comment *"this is the one place the real article is
+compared."* Its two THREAT checks ran on class base. That is defensible for the AGGREGATE (a sum
+over 23 units, symmetric on both sides) and wrong for a check whose stated job is *"compare the
+EXTREMES unit-to-unit"*, because FE8 puts a named unit's teeth in its personal line. Both halves
+of the bias pushed the same way:
+
+- **Our boss was understated.** Ravisin reads 8.4 class-base and 12.5 real, so the moose's 11.8
+  "out-threatened" a boss that actually out-threatens it.
+- **The twin's ceiling excluded the twin's own named units.** `max(vanilla_enemies())` is the top
+  CLASS-BASE threat — 6.3, a generic Soldier — while vanilla Ch5 fields Joshua at 21.4. Measuring
+  our named units against a bar built only from THEIR generics flags every named unit we field.
+
+**A personal line reaches our units from two places, and the check knew one.** A raw-pid enemy
+carries `personal:` in the chapter YAML (Ravisin); a CAST member deployed hostile carries it via
+`BASE_DONOR`, written into its character slot by the build (Sahnar rides Joshua's, Lupin rides
+Kyle's). Reading only the first made ch05's red Myrmidon measure **6.2** against the **21.4** she
+actually fights at. `unit_real_article()` resolves both; `vanilla_threat_ceiling()` includes the
+twin's named units. All three of ch05's standing warnings clear, correctly — and a true inversion
+still fires, which is the guard test.
+
+**The AGGREGATE stays class-base, and not for want of trying.** Measured both ways, threat
+improves everywhere (ch01 x1.15→x1.08, ch03 x1.12→x1.03, ch05 x1.08→x1.04) — but CLEAR-LOAD
+breaks on a real FE8 fact: **Saar's personal line puts him at Def 13 against the yardstick's 13
+attack, so he takes zero damage and `rounds_to_kill` is infinite.** A ratio against infinity is
+meaningless. The repo already has the mechanism (ch08 excludes "yardstick-proof units" from
+clear-load), but applying it symmetrically re-baselines every curated chapter, and on the real
+article **ch02's clear-load falls to x0.64 — out of band.** That is either ch02 genuinely
+under-loaded with the class-base metric hiding it, or an artifact of the exclusion policy. It
+needs its own investigation and its own issue; it is not a change to make in passing.
+
+_Decided: 2026-08-15 (Nicolas asked why personal stats were being ignored)._
+
+### A test below `unittest.main()` is not a test (2026-08-15)
+
+`make test` — what CI runs — executes each file as a **script**, so `unittest.main()` collects
+only what is defined by the time it is reached and then exits. In `tools/test_build_campaign.py`
+that call sat at line ~4776 of a 5723-line file, and the **twelve TestCase classes below it — 88
+tests, including all 26 of `Ch04Stage4Scenes` — had never run.**
+
+**Nothing could have told us.** The file passed. The suite was green. `python3 -m unittest` still
+collected all 490, so the two ways of running the suite disagreed in silence, and the only visible
+symptom was a test count nobody had reason to compare. Every one of the 88 passed once enabled,
+which is the point: this was not latent rot, it was 88 assertions we believed we had and did not.
+
+The runner now lives at the end of the file, and `check.py check_every_test_actually_runs` fails
+the build for any TestCase defined after it. Same family as
+`check_verdict_scenarios_are_guarded`: **a green suite that is not measuring what it claims.**
+
+Found while reviewing #25's branch for merge, from a 402-vs-490 discrepancy between `make test`
+and `-m unittest` that was worth one command to chase.
+
+_Decided: 2026-08-15._
+
 ---
 
 ## Open Questions (not yet decided)
