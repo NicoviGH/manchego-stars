@@ -363,9 +363,19 @@ def check_personal_line_injection_routes(fail):
     Covers the registries from both ends -- a `personal:` block with no injection route, and an
     `ENEMY_BASE_SLOT` key naming a unit no chapter fields (a rename leaves the key stale and
     silently reverts that boss to its pre-#284 measurement).
+
+    The registries live in build_campaign, which pulls in the art pipeline (Pillow). The `checks`
+    CI job runs on a bare interpreter with neither Pillow nor the submodule, so this skips there
+    exactly as the submodule-dependent checks do -- `make test` in the BUILD job drives the same
+    public gate through test_check_chapter_schema, so nothing goes unchecked.
     """
     sys.path.insert(0, os.path.join(REPO, 'tools'))
-    import build_campaign as bc
+    try:
+        import build_campaign as bc
+    except ImportError as e:
+        print('check_personal_line_injection_routes: skipping (%s; the build job\'s '
+              '`make test` covers this gate)' % e)
+        return
     injected_ids = {uid for _yaml, uid in bc.RAW_PID_PERSONAL_SOURCES.values()}
     slot_ids = set(bc.ENEMY_BASE_SLOT)
     seen = set()
