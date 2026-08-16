@@ -2000,8 +2000,24 @@ class RavisinPortrait(unittest.TestCase):
 
     def test_raw_boss_pid_gets_the_riev_identity(self):
         # The fixture carries EVERY registered raw pid, because raw_pid_portrait_data binds all
-        # of them in one pass -- the moose (0xb9) joined the registry in #25.
-        source = '''[0xb8 - 1] = {
+        # of them -- the moose (0xb9) joined the registry in #25, the grell (0xb7) in #284.
+        # The grell is the case that proves the two bindings are independent: it takes a personal
+        # line and NO identity, so it must keep the generic 0x255 name plate and gain no portrait.
+        source = '''[0xb7 - 1] = {
+        .nameTextId = 0x255,
+        .number = 0xb7,
+        .defaultClass = CLASS_MOGALL,
+        .miniPortrait = 0x4,
+        .baseHP = 0,
+        .basePow = 0,
+        .baseSkl = 0,
+        .baseSpd = 0,
+        .baseDef = 0,
+        .baseRes = 0,
+        .baseLck = 0,
+        .baseCon = 0,
+    },
+    [0xb8 - 1] = {
         .nameTextId = 0x255,
         .defaultClass = CLASS_ARCH_MOGALL,
         .miniPortrait = 0x4,
@@ -2022,18 +2038,21 @@ class RavisinPortrait(unittest.TestCase):
     },'''
         patched = bc.raw_pid_portrait_data(source, self.CAMPAIGN)
         self.assertIn('.nameTextId = 0x246,', patched)
-        self.assertNotIn('.nameTextId = 0x255,', patched)
         self.assertIn('.portraitId = 0x48,', patched)
-        # Ravisin is the only DRESSED raw pid; the moose is named without a bust.
+        # Ravisin is the only DRESSED raw pid; the moose is named without a bust, and the grell
+        # takes neither -- so exactly one name plate stays generic.
         self.assertEqual(1, patched.count('.portraitId'))
         self.assertIn('.nameTextId = 0xD4C,', patched)
-        self.assertEqual(2, patched.count('.miniPortrait = 0x4,'))
+        self.assertEqual(1, patched.count('.nameTextId = 0x255,'))
+        self.assertEqual(3, patched.count('.miniPortrait = 0x4,'))
 
-        ravisin = next(enemy for enemy in bc._load_chapter_yaml(
-            self.CAMPAIGN, bc.CH05_CHAPTER_YAML)['enemy_units']
-            if enemy['id'] == 'ravisin')
-        for field in bc.BASE_FIELDS:
-            self.assertIn('.%s = %d,' % (field, ravisin['personal'].get(field, 0)), patched)
+        for chapter_yaml, uid in ((bc.CH05_CHAPTER_YAML, 'ravisin'),
+                                  (bc.CH03_CHAPTER_YAML, 'grell')):
+            unit = next(enemy for enemy in bc._load_chapter_yaml(
+                self.CAMPAIGN, chapter_yaml)['enemy_units'] if enemy['id'] == uid)
+            for field in bc.BASE_FIELDS:
+                self.assertIn('.%s = %d,' % (field, unit['personal'].get(field, 0)), patched,
+                              '%s personal %s did not reach the character table' % (uid, field))
 
     def test_name_injector_retitles_the_repurposed_riev_slot(self):
         with tempfile.TemporaryDirectory() as tmp:

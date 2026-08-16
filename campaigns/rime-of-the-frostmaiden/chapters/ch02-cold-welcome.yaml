@@ -226,6 +226,13 @@ enemy_units:
     class: brigand
     level: 6                          # vanilla Bazba is L6 steel-axe (UnitDef_088B44AC)
     autolevel: true                  # boss, modeled exactly on vanilla Bazba
+    # NO `personal:` here, deliberately (#284): Halvar DEPLOYS ON THE BAZBA SLOT, so FE8 already
+    # adds Bazba's own line (HP+5/Pow+3/Skl+4/Spd+2/Def+2/Res+2/Lck+1) on top of the class base
+    # in the built ROM — nothing patches that slot. He fights at HP 29/Def 6 = 3.6 rounds, the
+    # bar exactly. The "1.2 rounds" that opened #284 was the measuring tool projecting him off
+    # naked class base because it did not know which slot he rides; `ENEMY_BASE_SLOT` in
+    # build_campaign.py now tells it. Writing the line here too would be a SECOND source for a
+    # fact the slot already owns, free to drift out of agreement with the ROM.
     inventory:
       - id: steel-axe
         damage_type: slashing
