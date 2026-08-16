@@ -16,9 +16,23 @@ balance work it exposed), CI green.
 
 ## Next task
 
-**ch05's remaining dialogue**, below. The moose is DONE — anim, name, weapon, balance — and
-needs nothing further; do not reopen it. What #286 settled and why is in `docs/decisions.md`
-(four ADRs dated 2026-08-15/16) and in the PR, not here.
+**#284, then #285 — the retroactive balance issues — BEFORE returning to ch05's dialogue**
+(Nicolas, 2026-08-16). Both came out of #286: measuring the moose properly exposed two things
+that were already shipped and wrong, and they get cleared while the reasoning is fresh rather
+than aging behind the rest of the slice.
+
+**Order is fixed: #284 first.** ch02's clear-load already sits exactly on the band floor
+(x0.75) with a boss that is a naked class base, so fixing the boss may be what unblocks #285's
+ch02 problem rather than a separate tuning pass. #284 also has a **locked** chapter in it — ch02
+is `[locked]` in the parity gate, so its re-baseline is Nicolas's call, not a drive-by edit.
+Watch for: if #284 lands and ch02 STILL fails under the real-article aggregate, that is a genuine
+content problem in ch02, not a metric artifact.
+
+Full statement of both, with the measurements, in the issues. The moose is DONE — anim, name,
+weapon, balance — and needs nothing further; do not reopen it. What #286 settled and why is in
+`docs/decisions.md` (five ADRs dated 2026-08-15/16) and in the PR, not here.
+
+## Then: ch05's remaining dialogue
 
 **Worked TOP TO BOTTOM in player order** (Nicolas, 2026-08-13). The ordered inventory of all 17
 scenes — **13 done, 4 left** — is the table in **issue #25**, the canonical view; do not re-derive
