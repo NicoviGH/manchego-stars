@@ -159,12 +159,51 @@ class TestMalformedYamlIsAViolationNotACrash(unittest.TestCase):
         self.assertTrue(any('is_prologue' in m for m in violations(d)))
 
 
+class TestPersonalLineRoutes(unittest.TestCase):
+    """#284: a `personal:` block is not injected by writing it. The grell's line sat in YAML
+    with no route into the ROM, so it would have measured fixed and played naked -- and the
+    mirror mistake (writing one for a unit whose vanilla SLOT already carries the line) would
+    silently REPLACE the real line with a smaller one and keep the gate green. Every declared
+    line must have exactly one route."""
+
+    def routes(self, d, injected=('grell',), slots=('raider-captain',)):
+        return check._personal_line_route_violations(
+            'chNN.yaml', d, injected_ids=set(injected), slot_ids=set(slots))
+
+    def _chap(self, unit):
+        return {'status': 'active', 'enemy_units': [unit]}
+
+    def test_a_line_with_an_injection_route_is_fine(self):
+        self.assertEqual(self.routes(self._chap(
+            {'id': 'grell', 'personal': {'baseHP': 15}})), [])
+
+    def test_a_unit_with_no_line_is_fine(self):
+        self.assertEqual(self.routes(self._chap({'id': 'whatever'})), [])
+
+    def test_a_line_with_no_injection_route_is_caught(self):
+        msgs = self.routes(self._chap({'id': 'newboss', 'personal': {'baseHP': 9}}))
+        self.assertEqual(len(msgs), 1, msgs)
+        self.assertIn('RAW_PID_PERSONAL_SOURCES', msgs[0])
+
+    def test_a_line_on_a_slot_riding_unit_is_caught(self):
+        # The dangerous direction: it never reaches the ROM *and* it displaces the slot's real
+        # line in the measurement, understating the boss worse than the bug that started #284.
+        msgs = self.routes(self._chap({'id': 'raider-captain', 'personal': {'baseHP': 1}}))
+        self.assertEqual(len(msgs), 1, msgs)
+        self.assertIn('already carries', msgs[0])
+
+
 class TestRealChapters(unittest.TestCase):
     def test_all_repo_chapters_pass(self):
         # Exercise the PUBLIC gate exactly as CI runs it (glob + parse policy
         # included), not a hand-rolled copy of its loop.
         fail = []
         check.check_chapter_deployment_schema(fail)
+        self.assertEqual(fail, [])
+
+    def test_personal_line_routes_gate_passes(self):
+        fail = []
+        check.check_personal_line_injection_routes(fail)
         self.assertEqual(fail, [])
 
 

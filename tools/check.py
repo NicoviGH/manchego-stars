@@ -328,6 +328,57 @@ def check_chapter_status(fail):
                         'chapter is an ungrounded seed; ground it and flip to active first' % rel)
 
 
+def _personal_line_route_violations(rel, d, injected_ids, slot_ids):
+    """A declared `personal:` line must have exactly ONE route into the built ROM.
+
+    Two ways to get this wrong, both silent before #284:
+      * declared and never injected -- `RAW_PID_PERSONAL_SOURCES` is what carries a line into
+        gCharacterData, and a raw pid missing from it keeps its all-zero gap. The chapter then
+        MEASURES fixed and PLAYS naked, which is exactly how ch03's grell shipped;
+      * declared for a unit deployed on a vanilla CHARACTER slot, which already carries that
+        character's own line in the ROM. The YAML block cannot reach the slot, and the tool
+        prefers it, so it REPLACES a real line with a smaller invented one -- understating the
+        boss further than the bug that opened #284, with every gate green.
+    """
+    out = []
+    for unit in (d.get('enemy_units') or []):
+        if not unit.get('personal'):
+            continue
+        uid = unit.get('id')
+        if uid in slot_ids:
+            out.append('%s: enemy %r declares `personal:` but deploys on a vanilla character '
+                       'slot that already carries its own line (ENEMY_BASE_SLOT) -- the block '
+                       'never reaches the ROM and hides the real line from the metric; delete '
+                       'it' % (rel, uid))
+        elif uid not in injected_ids:
+            out.append('%s: enemy %r declares `personal:` with no way into the ROM -- add it to '
+                       'RAW_PID_PERSONAL_SOURCES in build_campaign.py, or the boss will measure '
+                       'fixed and play as a naked class base' % (rel, uid))
+    return out
+
+
+def check_personal_line_injection_routes(fail):
+    """#284's guard: every authored boss line reaches the game, and every mapped slot is real.
+
+    Covers the registries from both ends -- a `personal:` block with no injection route, and an
+    `ENEMY_BASE_SLOT` key naming a unit no chapter fields (a rename leaves the key stale and
+    silently reverts that boss to its pre-#284 measurement).
+    """
+    sys.path.insert(0, os.path.join(REPO, 'tools'))
+    import build_campaign as bc
+    injected_ids = {uid for _yaml, uid in bc.RAW_PID_PERSONAL_SOURCES.values()}
+    slot_ids = set(bc.ENEMY_BASE_SLOT)
+    seen = set()
+    for rel, d in _chapters():
+        fail.extend(_personal_line_route_violations(rel, d, injected_ids, slot_ids))
+        seen.update(u.get('id') for u in (d.get('enemy_units') or []))
+    for uid in sorted(slot_ids - seen):
+        fail.append('ENEMY_BASE_SLOT maps %r, which no chapter fields -- a stale key silently '
+                    'drops that boss back to a naked-class-base measurement (#284)' % uid)
+    for uid in sorted(injected_ids - seen):
+        fail.append('RAW_PID_PERSONAL_SOURCES names enemy %r, which no chapter fields' % uid)
+
+
 def _chapters():
     """Yield (relpath, parsed_dict) for every chapter YAML. THE chapter iterator --
     per-chapter gates consume this so the glob + parse-error policy (parse errors
@@ -1245,6 +1296,7 @@ def main():
                   check_lua_local_headroom, check_hosted_chapters_declared,
                   check_tests_pass, check_yaml_parses,
                   check_chapter_status, check_chapter_deployment_schema,
+                  check_personal_line_injection_routes,
                   check_injection_order, check_playtest_matrix,
                   check_verdict_scenarios_are_guarded,
                   check_no_hardcoded_symbol_addresses,

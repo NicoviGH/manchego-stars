@@ -1607,8 +1607,9 @@ def main():
                     help='emit the campaign-wide enemy-pressure curve (all chapters)')
     ap.add_argument('--check', action='store_true',
                     help='with --curve: the hard CI gate (#48 (b)) -- exit non-zero if any '
-                         'balance_locked chapter is off-parity, unreliably measured, or '
-                         'missing its reference (UNLOCKED chapters never gate)')
+                         'balance_locked chapter is off-parity, unreliably measured, '
+                         'missing its reference, or carrying an open per-unit role '
+                         'finding (UNLOCKED chapters never gate)')
     ap.add_argument('--lord-floor', action='store_true',
                     help='emit the per-lord survivability-floor table instead of the parity report')
     ap.add_argument('--target', type=float, default=3.5, help='floor: target bulk rounds-to-down')
@@ -1621,7 +1622,8 @@ def main():
         if args.check:
             fails = curve_gate_failures(rows)
             if fails:
-                print('\n!! PARITY GATE: %d chapter(s) off-parity or unreliable: %s'
+                print('\n!! PARITY GATE: %d locked chapter(s) off-parity, unreliable, or '
+                      'carrying a role finding: %s'
                       % (len(fails), ', '.join(fails)))
                 bc.sys.exit(1)
             print('\nPARITY GATE: all referenced chapters at parity.')
