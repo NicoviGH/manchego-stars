@@ -6,42 +6,19 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-15 (Claude). **#282 and #283 are DONE and merged — do not reopen either.**
+Refreshed 2026-08-16 (Claude). **#282, #283 and #286 are DONE and merged — do not reopen any.**
 The generated decomp tree is intentionally dirty as recorded below.
 
 ## In flight
 
-**Nothing.** `main` is at #283 (ch05's scene 7, complete with its full-screen bellow), CI green.
+**Nothing.** `main` is at #286 (the white moose's battle animation, its identity, and the
+balance work it exposed), CI green.
 
 ## Next task
 
-**The white moose's BATTLE ANIMATION** (Nicolas, 2026-08-15 — he is handing this to a fresh
-session deliberately). Everything else about the moose is done: it wears the Wyrdeer map sprite
-in both chapters, and ch05's scene 7 gives it a full-screen bellow.
-
-The art is IN HAND and is Nicolas's own, at
-`/Users/Yonick/Documents/Claude/Projects/Manchego Stars / Fire Emblem Game/Battle Anims/WhiteMooseBattleAnim.png`
-— one 1920x1080 sheet, three poses left to right: **attack, windup, idle**. That is the REVERSE of
-the order `inject_battle_anims` wants, which is `frames: [ready, windup, peak]` — so idle→ready,
-windup→windup, attack→peak. Read that injector's docstring first; it is the how, and it is
-explicit about box-descaling from the hi-res master onto ~88x64 with a common feet-anchor and a
-protected ~15-colour palette (**never re-shrink an already-small frame**).
-
-**One thing is still owed by Nicolas and should be asked for early: the `clone_from:` donor
-class** — whose timing, effects and weapon slot the anim borrows. `Gwyllgi` is the obvious
-candidate since it is already the map-sprite geometry donor and the moose's deploy class, but
-that is his call, not a default to assume.
-
-The ledger entry to close is `battle_anim_todo` on the ch05 YAML's `white-moose` block. Note the
-`!! OFF-BY-ONE` in the injector docstring: a private AnimConf's `.index` must be `anim_id + 1`, or
-a PURPLE DRAGON renders instead of the unit.
-
-**Also owed on the moose, and smaller:** `portraits/white-moose.png` (96x80, indexed, full-body)
-is committed and injected NOWHERE in either chapter, so the moose has no bust and displays
-`CLASS_GWYLLGI`'s default name. That is wiring an existing asset (`RAW_PID_PORTRAITS` is the
-pattern Ravisin uses), not new art.
-
-## Then: ch05's remaining dialogue
+**ch05's remaining dialogue**, below. The moose is DONE — anim, name, weapon, balance — and
+needs nothing further; do not reopen it. What #286 settled and why is in `docs/decisions.md`
+(four ADRs dated 2026-08-15/16) and in the PR, not here.
 
 **Worked TOP TO BOTTOM in player order** (Nicolas, 2026-08-13). The ordered inventory of all 17
 scenes — **13 done, 4 left** — is the table in **issue #25**, the canonical view; do not re-derive
@@ -117,6 +94,9 @@ not a run.
   the music, shakes, cries (`SOUN(0x32C)`) and restores — see `ch05_moose_charge_block`, whose
   comments carry the four engine facts that cost a run each. Film:
   `docs/demo/ch05-moose-charges.gif`.
+- **`PT_CHAR=white-moose tools/playtest/run.sh recordenemy` is the battle-anim bench**, and it
+  now takes RAW-PID creatures, not just class reskins — the TESTCH sandbox deploys them under
+  their own pid. That is the cheap way to look at any new anim (one 40s run, no chapter boot).
 - **`--ch05-moose` boots straight to scene 7 (34s vs 4m33s).** Any late beat should get a boot
   like it BEFORE its first film, not after the third — `decisions.md` → "Playtest runs are the
   most expensive thing in this repo", rule 3. `bootToMap()` is the wrong driver on such a ROM.

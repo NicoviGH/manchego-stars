@@ -5418,6 +5418,36 @@ and `-m unittest` that was worth one command to chase.
 
 _Decided: 2026-08-15._
 
+### A skip guard must key on a symbol only WE write (2026-08-16, #25)
+
+`test_the_live_ch05_group_deploys_our_table` asserts against the INJECTED decomp, and it
+correctly carried a skip for a clean checkout — keyed on `struct ChapterEventGroup Ch6Events`.
+**That is vanilla's own symbol.** It is present in a pristine tree, so the guard never fired, and
+on CI — which runs `make test` before any injection — the assertion ran against vanilla data and
+duly reported our roster pointer missing.
+
+**Three separate things had to be true for this to stay hidden, and all three were.** The class
+sat below `unittest.main()` and had never run (see "A test below `unittest.main()` is not a
+test"), so the broken guard was never exercised. The symbol it tested was plausible — it names
+the very structure the test is about. And **it could not fail on a developer machine**: any tree
+that has run a build is injected, so the guard's flaw is invisible exactly where the tests get
+run most. Waking 88 dormant tests and watching them all pass locally was not the evidence it
+looked like.
+
+**The rule: a guard that asks "has our injection happened?" must name something only WE emit.**
+`MS_Ch05DeployCap` is ours — absent pristine, present once injected — and the fix was verified
+in both directions (`git show HEAD:` vs the working tree) rather than assumed. Vanilla symbols
+answer "is the decomp checked out", which is a different question and almost never the one being
+asked.
+
+**Corollary for reading the decomp at all.** Three of the other woken classes touch the decomp
+and are safe, because they go through `vanilla_decomp_text()` (`git show HEAD:`) rather than the
+worktree — the same rule as "Read decomp data through `git show HEAD:`, never the built tree".
+A test that reads the WORKTREE is asserting about a build artifact and needs an
+injection-keyed skip; a test that reads HEAD needs none.
+
+_Decided: 2026-08-16 (found by CI on #286, after the dormant-test fix woke the class)._
+
 ---
 
 ## Open Questions (not yet decided)
