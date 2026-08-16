@@ -485,9 +485,20 @@ def chapter_enemy_force(chap):
 
     Every unit resolves to its REAL ARTICLE (#285) -- class base plus whichever of the three
     personal-line sources applies (`personal:`, BASE_DONOR, ENEMY_BASE_SLOT). A `composition`
-    entry is a mixed bag of generics, which carry no line, so unit_real_article is a no-op
-    there; it is applied uniformly anyway so the footing is a property of this function rather
-    than of which branch a chapter's YAML happens to take."""
+    entry is a mixed bag of GENERICS, so no personal line is applied to its members -- a
+    `personal:` or a donor-matching id on such an entry describes the group, and adding a full
+    character line to every body in the bag would be a silent multiplier."""
+    return [u for _ed, u in chapter_units(chap)]
+
+
+def chapter_units(chap):
+    """(enemy_def, real-article Combatant) for every BODY our chapter fields, weapons modeled.
+
+    THE our-side force builder. It exists as one function because it was two: `solo_contributors`
+    kept a second copy that expanded `count` over `enemy_combatants` -- which collapses a
+    `composition` to its DISTINCT classes -- so on ch01 it counted 6 bodies where this counts 3
+    and printed a share that contradicted the verdict directly above it (#285).
+    """
     out = []
     for ed in chap.get('enemy_units', []):
         if 'composition' in ed and 'class' not in ed:
@@ -496,11 +507,12 @@ def chapter_enemy_force(chap):
             by_class = ed.get('inventory_by_class', {})
             for cls in ed.get('composition', []):
                 weapon = _weapon_for([{'id': w} for w in by_class.get(cls, [])])
+                # generics: no personal line, deliberately (see chapter_enemy_force)
                 out.append((ed, _one_enemy('%s-%s' % (name, cls), cls, level, weapon)))
         else:
-            out.extend([(ed, c) for c in enemy_combatants(ed)] * int(ed.get('count', 1)))
-    # drop unmodeled-weapon (staff) enemies
-    return [unit_real_article(ed, u) for ed, u in out if u.weapon is not None]
+            out.extend([(ed, unit_real_article(ed, c)) for c in enemy_combatants(ed)]
+                       * int(ed.get('count', 1)))
+    return [(ed, u) for ed, u in out if u.weapon is not None]  # drop staff-only enemies
 
 
 def unmodeled_enemies(chap):
@@ -579,13 +591,23 @@ def metric_rounds_to_kill(enemy, yardstick=YARDSTICK):
 
     The floor keeps every unit in the comparison on both sides, keeps the load monotonic in Def
     (more armour is never less work), and preserves the ordering that matters: Saar at Def 13
-    scores 18.0 against Ravisin's 13.4, which is the truth about which is the harder wall.
+    scores 22.8 against Ravisin's 13.4, which is the truth about which is the harder wall.
+
+    It must carry the SAME hit-chance divisor `rounds_to_kill` uses, or it is not a floor at
+    all: dropping it makes the load jump DOWN across the cliff (real Saar read 46.8 rounds at
+    Def 11 and 36.0 at Def 12 -- tougher unit, less work), which is the exact pathology this
+    function exists to remove. With it the floor is not merely monotonic but CONTINUOUS: a unit
+    taking exactly 1 damage per hit already scores hp/(hits x accuracy), so the floor meets the
+    last dentable value instead of stepping at it.
     """
     rounds = fc.rounds_to_kill(yardstick, enemy)
     if rounds != float('inf'):
         return rounds
     hits = 2 if fc.doubles(yardstick, enemy) else 1
-    return float(enemy.hp) / hits
+    accuracy = fc.hit_chance(yardstick, enemy) / 100.0
+    if accuracy <= 0:                 # cannot connect at all -- no finite load to report
+        return float('inf')
+    return float(enemy.hp) / (hits * accuracy)
 
 
 def enemy_pressure(enemies, deploy_cap, yardstick=YARDSTICK):
@@ -1027,14 +1049,10 @@ def solo_contributors(chap, parity_ref, deploy_cap, floor=1.0, share=0.10):
     vt = sum(fc.damage_per_round(e, YARDSTICK) for e in van) / cap
     if vt <= 0:
         return []
-    rows = []
-    for ed in chap.get('enemy_units', []):
-        for c in enemy_combatants(ed):
-            # Real article, matching the verdict this note is printed under (#285) -- a note
-            # computed on a different footing than the number it explains is worse than none.
-            real = unit_real_article(ed, c)
-            rows += [(ed.get('id') or c.name, int(ed.get('count', 1)),
-                      fc.damage_per_round(real, YARDSTICK))] * int(ed.get('count', 1))
+    # Built from the SAME force builder as the verdict this note is printed under (#285) -- a
+    # note computed on a different footing than the number it explains is worse than none.
+    rows = [(ed.get('id') or u.name, int(ed.get('count', 1)),
+             fc.damage_per_round(u, YARDSTICK)) for ed, u in chapter_units(chap)]
     total = sum(t for _u, _n, t in rows)
     full = (total / cap) / vt
     if full <= floor:
@@ -1071,7 +1089,10 @@ def role_findings(chap, parity_ref):
         return []
     out = []
     van_threat = vanilla_threat_ceiling(parity_ref)
-    van_tank = max(fc.rounds_to_kill(YARDSTICK, e) for e in van)
+    # Floored (#285): vanilla_enemies now carries personal lines, so the twin's tankiest unit can
+    # be undentable -- FE8 Ch5 went 12.9 -> inf. This is the fallback bar used when the twin has
+    # no named boss, and an `inf` bar would flag every boss we ever field as folding too fast.
+    van_tank = max(metric_rounds_to_kill(e) for e in van)
     for uid, _is_boss, c, conv, _tile in ours:
         t = fc.damage_per_round(c, YARDSTICK)
         if van_threat > 0 and t > van_threat * 1.25:

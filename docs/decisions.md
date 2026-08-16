@@ -5583,7 +5583,7 @@ every chapter *toward* 1.00:
 | CH2 | x0.79 → **x0.81** | x0.75 → **x0.79** | `[locked]` |
 | CH3 | x1.12 → **x1.03** | x0.99 → **x1.00** | |
 | CH4 | x1.15 → **x1.15** | x1.19 → **x1.19** | |
-| CH5 | x1.08 → **x1.04** | x0.84 → **x0.94** | |
+| CH5 | x1.08 → **x1.04** | x0.84 → **x0.88** | |
 
 **ch02 never falls to x0.64, and finding out why is what unblocked this.** That number was
 measured before #284, when the tool could not see a personal line inherited from a vanilla
@@ -5614,8 +5614,19 @@ scores an undentable unit as if each hit chipped 1. FE8 really does deal 0 there
 a property of the measurement, not a claim about the game — and it earns its place on three
 counts: every unit stays in the comparison on both sides, the load becomes **monotonic in Def**
 (more armour is never less work, where `rounds_to_kill` has a cliff from 12.9 straight to
-infinite), and it preserves the ordering that matters — Saar scores **18.0** against Ravisin's
-**13.4**, which is the truth about which is the harder wall. ch05 lands at **x0.94**.
+infinite), and it preserves the ordering that matters — Saar scores **22.8** against Ravisin's
+**13.4**, which is the truth about which is the harder wall. ch05 lands at **x0.88**.
+
+**The floor must carry the same accuracy divisor `rounds_to_kill` uses**, and the first
+implementation did not — which broke the very property it was introduced for. Scoring `hp/hits`
+instead of `hp/(hits × accuracy)` made the load jump *down* across the cliff: real Saar read
+**46.8 rounds at Def 11 and 36.0 at Def 12**, a tougher unit costing less work. Worse, the test
+asserting monotonicity could not fail, because its fixture had Spd 0 and Lck 0 — 100% hit chance
+is the one case where the divisor-free form happens to be continuous. **A property test whose
+fixture sits on the only point where the bug is invisible is not a test**; the fixture now uses a
+unit that can be missed. With the divisor the floor is not merely monotonic but *continuous*: a
+unit taking exactly 1 damage per hit already scores `hp/(hits × accuracy)`, so the floor meets
+the last dentable value rather than stepping at it. Caught by `/code-review`, not by the suite.
 
 That also retires the "N yardstick-proof units excluded from clear-load" note as a *mechanism*;
 the count is still printed for planned chapters, because it is worth knowing that a chapter you
@@ -5625,10 +5636,13 @@ are about to write fields a wall, but nothing is skipped any more.
 chapters move toward parity. The re-baseline this issue and #284 both anticipated turned out to
 be a re-reading, not a re-tuning.
 
-**One consistency fix rode along.** `solo_contributors()` still built our side off class base,
-so the note it prints (*"X alone is N% of this force's threat"*) was computed on a different
-footing from the verdict printed directly above it. A note that cannot reconcile with the number
-it explains is worse than no note.
+**One consistency fix rode along, and it was a duplicated force builder.** `solo_contributors()`
+kept its own copy of the our-side expansion, which multiplied `count` over `enemy_combatants` —
+and that collapses a `composition` entry to its DISTINCT classes. On ch01 it therefore counted
+six bodies where the verdict counted three, and printed *"without it the chapter is x1.14"*
+directly beneath a row reading x0.89. Both now come from one `chapter_units()`. A note that
+cannot reconcile with the number it explains is worse than no note, and two functions that must
+agree about the same force will not stay agreeing.
 
 _Decided: 2026-08-16 (#285). The three locked baselines were re-measured on the new footing and
 all move toward parity; re-locking them is Nicolas's call on the PR._

@@ -1086,7 +1086,10 @@ class MetricRoundsToKill(unittest.TestCase):
     1; the game does not."""
 
     def _wall(self, df_):
-        return combatant('wall', hp=36, dfc=df_, spd=0, con=20)
+        """A wall that can be MISSED. spd/lck 0 would pin hit chance at 100%, which is the one
+        case where a floor without the accuracy divisor happens to be continuous -- i.e. the
+        fixture that cannot catch the bug this class exists to prevent."""
+        return combatant('wall', hp=36, dfc=df_, spd=6, lck=4, con=20)
 
     def test_a_dentable_unit_is_untouched_by_the_floor(self):
         u = self._wall(4)
@@ -1098,9 +1101,19 @@ class MetricRoundsToKill(unittest.TestCase):
         self.assertLess(df.metric_rounds_to_kill(u), float('inf'))
 
     def test_the_floor_is_monotonic_across_the_damage_cliff(self):
-        """The property that makes it a measurement: more Def is never LESS load."""
+        """The property that makes it a measurement: more Def is never LESS load. Dropping the
+        accuracy divisor breaks exactly this -- real Saar read 46.8 rounds at Def 11 and 36.0
+        at Def 12, a tougher unit scoring less work."""
         loads = [df.metric_rounds_to_kill(self._wall(d)) for d in range(2, 24)]
         self.assertEqual(loads, sorted(loads), loads)
+
+    def test_the_floor_meets_the_last_dentable_value_without_stepping(self):
+        """Stronger than monotonic: a unit taking exactly 1 damage per hit already scores
+        hp/(hits x accuracy), so the floor is CONTINUOUS with the curve it extends."""
+        one_dmg = max(d for d in range(2, 30)
+                      if fc.damage(df.YARDSTICK, self._wall(d)) == 1)
+        self.assertAlmostEqual(df.metric_rounds_to_kill(self._wall(one_dmg)),
+                               df.metric_rounds_to_kill(self._wall(one_dmg + 1)), places=6)
 
     def test_a_wall_outweighs_a_merely_tough_unit(self):
         self.assertGreater(df.metric_rounds_to_kill(self._wall(20)),
