@@ -826,7 +826,7 @@ class TestRawPidBattleAnim(unittest.TestCase):
         moose = [b for b in body.split('    {') if '0xb9' in b]
         self.assertEqual(len(moose), 1, 'expected exactly one moose foe row')
         self.assertIn('CLASS_GWYLLGI', moose[0])
-        self.assertIn('ITEM_MONSTER_HELLFANG', moose[0])    # the slot its anim repoints
+        self.assertIn('ITEM_MONSTER_FIREFANG', moose[0])    # the slot its anim repoints
         self.assertNotIn('.autolevel', moose[0])            # a named miniboss, not generic trash
 
     def test_the_sandbox_still_benches_every_reskin_class(self):
@@ -882,14 +882,18 @@ class TestRawPidBattleAnim(unittest.TestCase):
         self.assertIn('.nameTextId = 0x246,', out)
         self.assertIn('.portraitId = 0x48,', out)
 
-    def test_the_moose_carries_the_gwyllgi_weapon_not_the_revenant_one(self):
-        # ITEM_MONSTER_ROTTENCLW is the REVENANT's claw (ch04's three Revenants hold it);
-        # vanilla arms CLASS_GWYLLGI with HELLFANG. The moose deploys as a Gwyllgi, so it
-        # carries the Gwyllgi's weapon -- under its VANILLA name, never renamed.
+    def test_the_moose_carries_its_own_beast_lines_weapon(self):
+        # ITEM_MONSTER_ROTTENCLW is the REVENANT's claw (ch04's three Revenants hold it) -- a
+        # different creature's gear. FIREFANG is the Mauthe Doog's, and the Mauthe Doog is this
+        # creature's own unpromoted tier (data_classes.c: CLASS_MAUTHEDOOG.promotion =
+        # CLASS_GWYLLGI), so the moose stays inside its own line. HELLFANG, the promoted tier's,
+        # is class-correct too but put ONE unit at 20% of the chapter's whole threat -- the
+        # entire parity overage in a single slot. Never renamed either way.
         chap = bc._load_chapter_yaml('rime-of-the-frostmaiden', bc.CH05_CHAPTER_YAML)
         moose = next(e for e in chap['enemy_units'] if e['id'] == 'white-moose')
-        self.assertEqual([i['fe_base'] for i in moose['inventory']], ['hell-fang'])
-        self.assertEqual(bc.CH05_ITEM_IDS['hell-fang'], 'ITEM_MONSTER_HELLFANG')
+        self.assertEqual([i['fe_base'] for i in moose['inventory']], ['fire-fang'])
+        self.assertEqual(bc.CH05_ITEM_IDS['fire-fang'], 'ITEM_MONSTER_FIREFANG')
+        self.assertNotIn('rotten-claw', [i['fe_base'] for i in moose['inventory']])
 
     def test_the_gap_row_takes_a_u25_it_did_not_have(self):
         # gCharacterData's 0xB0-range gaps omit `._u25` entirely (it defaults to {0,0}, which

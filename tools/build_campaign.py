@@ -9088,6 +9088,7 @@ CH05_ITEM_IDS = {'flux': 'ITEM_DARK_FLUX', 'rotten-claw': 'ITEM_MONSTER_ROTTENCL
                  # under its vanilla NAME -- renaming the item would burn 'Hell Fang'
                  # for every future Gwyllgi in the campaign (Nicolas, 2026-08-15)
                  'hell-fang': 'ITEM_MONSTER_HELLFANG',
+                 'fire-fang': 'ITEM_MONSTER_FIREFANG',
                  'iron-lance': 'ITEM_LANCE_IRON', 'iron-axe': 'ITEM_AXE_IRON',
                  'iron-sword': 'ITEM_SWORD_IRON', 'iron-bow': 'ITEM_BOW_IRON',
                  # FE8 calls the Killing Edge ITEM_SWORD_KILLER -- it is the sword vanilla

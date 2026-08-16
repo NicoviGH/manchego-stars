@@ -120,7 +120,7 @@ lose_condition: all_player_units_defeated
 
 difficulty_note: >
   Our first real boss. Roster GROUNDED (rev.3, 2026-07-23, #25) to the FE8 Ch5 bar — verdict
-  PARITY (within band): threat/slot 13.9 (x1.21) · clear-load/slot 4.8 (x0.84); ours reads
+  PARITY (within band): threat/slot 12.4 (x1.08) · clear-load/slot 4.8 (x0.84); ours reads
   line 16 · reinf 6 · convertible 1 — the twin's structure exactly, with Sahnar the one true
   convertible (Basil's Talk). The force is RISEN
   ELVEN GUARDIANS on vanilla FE8 infantry classes, skinned undead — the ch01 "vanilla class,
@@ -280,10 +280,13 @@ enemy_units:
   # Spd 14, doubles everything: even L2 = 11.8). So it keeps its terror and changes ROLE:
   # a NAMED MINIBOSS (vanilla Ch5 precedent: CHARACTER_BANDIT_CH5, a named non-boss threat)
   # that is CONVERTIBLE — killing Ravisin breaks her hold and it stops fighting. The player
-  # chooses: fight a 24.6-threat monster that deletes a squishy in under a round, or push the
+  # chooses: fight an 11.8-threat monster — the hardest single unit on the map — or push the
   # objective and let it be. Rewards going for the throat: leaving the moose alive IS a payoff,
-  # on the map, in play. It is NOT priced as avoidable though (`convertible: false`) — the
-  # previous chapter is named after this animal, so the model must assume the fight happens.
+  # on the map, in play. It is NOT priced as avoidable (`convertible: false`) — the previous
+  # chapter is named after this animal, so the model must assume the fight happens.
+  # It was briefly 24.6 (HellFang) and that ALONE was the chapter's entire parity overage:
+  # x0.97 without the moose, x1.20 with. One unit carrying 20% of a 23-enemy force's threat is
+  # not a monster the aggregate can absorb — the band merely hid it (2026-08-15, Nicolas).
   # NB the ending (0x9C9) must never mention the moose -- the player may simply kill it, so no
   # cutscene may assume it survived (Nicolas, 2026-07-30).
   - id: white-moose
@@ -313,16 +316,25 @@ enemy_units:
     class: gwyllgi              # CLASS_GWYLLGI (FE8 beast) stand-in quadruped
     level: 6
     inventory:
-      # The GWYLLGI'S OWN vanilla weapon, under its vanilla NAME (Nicolas, 2026-08-15). It had
-      # carried `rotten-claw` — ITEM_MONSTER_ROTTENCLW, which is the REVENANT's claw and is why
-      # ch04's three Revenants hold it: a Gwyllgi swinging a Revenant's weapon, spotted off a
-      # combat frame reading "Rotten Claw". Vanilla arms CLASS_GWYLLGI with HELLFANG and the
-      # Mauthe Doog with FIREFANG (events_udefs.c); the two items are identical but for might
-      # (7 -> 13), icon and name — same ITYPE_MONSTER, same IA_LOCK_3, hit 80, weight 8, range 1.
-      # NOT renamed to "Antlers": one name message per item id, so retitling it would burn
-      # "Hell Fang" for every future Gwyllgi in the campaign, and unwired today is not never.
-      - id: hell-fang
-        fe_base: hell-fang
+      # ITS OWN BEAST LINE'S weapon, under its vanilla NAME. Two separate corrections landed here
+      # on 2026-08-15, both Nicolas's:
+      #
+      # 1. It had carried `rotten-claw` — ITEM_MONSTER_ROTTENCLW, the REVENANT's claw, which is
+      #    why ch04's three Revenants hold it. A Gwyllgi swinging a Revenant's weapon, spotted
+      #    off a combat frame reading "Rotten Claw". A different creature's gear entirely.
+      # 2. The obvious fix, HELLFANG (the Gwyllgi's own, 13 mt), made the moose 24.6 threat —
+      #    20% of the WHOLE chapter's threat in one unit, and single-handedly the entire parity
+      #    overage (x0.97 without it, x1.20 with). See the difficulty_note.
+      #
+      # FIREFANG is the Mauthe Doog's, and the Mauthe Doog is this creature's own unpromoted
+      # tier — `data_classes.c` has CLASS_MAUTHEDOOG.promotion = CLASS_GWYLLGI. So this is the
+      # beast's own line at the lower tier, NOT a foreign class's weapon: it answers correction
+      # 1 as fully as HellFang did, and answers 2 as well. 5 mt / 90 hit / wt 5 puts the moose
+      # at 11.8 threat and the chapter at x1.08.
+      # NOT renamed to "Antlers": one name message per item id, so retitling would burn
+      # "Fire Fang" for every future Mauthe Doog, and unwired today is not never.
+      - id: fire-fang
+        fe_base: fire-fang
     damage_type: bludgeoning    # flavor label only ("antlers/hooves")
     ai_pattern: aggressive
     convertible: false          # #171 — a difficulty-model flag. `difficulty.py` reads it to
@@ -541,7 +553,15 @@ enemy_units:
     name: "Sahnar"
     count: 1
     class: myrmidon             # Joshua's exact class/donor — a fast, crit-threat sword duelist
-    level: 6
+    level: 5                    # Joshua's own level (UnitDef_088B5914, .level = 5). Was 6, the
+                                # ONE field in this block that did not cite his bytes — every
+                                # other line here quotes the decomp, and every GENERIC in this
+                                # chapter already matches vanilla Ch5's levels (Mercenary L6,
+                                # Soldier L5-6, Fighter/Archer L4-5), so the +1 was drift, not a
+                                # decision. At 5 she measures 21.4 threat / pow 9 / spd 16 /
+                                # skl 15 / hp 27 — Joshua to the point (2026-08-15, Nicolas).
+                                # NB her level is also the level she JOINS at, and vanilla's
+                                # Joshua joins at 5.
     positions: [[12, 6]]        # Joshua's own LOAD tile in vanilla Ch5 — the ARENA tile (12,6).
                                 # She APPEARS here, where the amphitheatre canon says the blades
                                 # met, and does not stay: see `walks_to`.

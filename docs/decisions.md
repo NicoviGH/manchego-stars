@@ -5264,11 +5264,11 @@ picked up the retired full-body Wyrdeer bust. **An asset on disk is not a decisi
 
 **And the weapon was a real defect, spotted off a combat frame.** The moose deploys as
 `CLASS_GWYLLGI` but carried `ITEM_MONSTER_ROTTENCLW` — the REVENANT's claw, which is why ch04's
-three Revenants hold it. Vanilla arms the Gwyllgi with `HELLFANG` and the Mauthe Doog with
-`FIREFANG` (`events_udefs.c`); the two items are identical but for might (7 → 13), icon and name.
-The moose now carries the Gwyllgi's own weapon under its own vanilla name. Cost, measured before
-the swap: moose threat 14.1 → 24.6 (2.2x → 3.9x the Ch5 ceiling), chapter threat/slot x1.11 →
-x1.21, still PARITY. It is `convertible`, so the player may decline the fight entirely.
+three Revenants hold it: a different creature's gear entirely. The first fix was `HELLFANG`, the
+Gwyllgi's own, and it was class-correct but cost too much (see the parity ADR below). It now
+carries `FIREFANG` — the Mauthe Doog's, and the Mauthe Doog is this creature's own unpromoted
+tier (`data_classes.c`: `CLASS_MAUTHEDOOG.promotion = CLASS_GWYLLGI`). Same beast line, lower
+tier: it answers the Revenant problem as fully as HellFang did, at 11.8 threat instead of 24.6.
 
 **The correction worth keeping: "not currently wired" is not "never will be".** Twice in one
 session an unused thing was treated as free to consume — an unreferenced item name, then an
@@ -5308,6 +5308,48 @@ error — clear-load/slot 4.5 → 4.7, chapter verdict still PARITY, full `--cur
 question "why would they not?".** If the answer is only "the win condition does not require it",
 that is permission, not prediction — and the fiction, the chapter title, and the map's own
 geography all vote the other way.
+
+_Decided: 2026-08-15 (Nicolas)._
+
+### One unit can BE the parity overage, and the band will hide it (2026-08-15, #25)
+
+ch05 measured "PARITY (within band)" at threat/slot x1.20 with the white moose on the Gwyllgi's
+own `HELLFANG`. Nicolas would not accept the verdict — *"I'm having a hard time understanding how
+we realistically match parity with an extra monster"* — and the arithmetic says he was right:
+
+| | Σ threat | /slot | vs vanilla |
+|---|---|---|---|
+| vanilla FE8 Ch5 (23 enemies) | 103.0 | 11.45 | — |
+| ours WITHOUT the moose (22) | 99.5 | 11.06 | **x0.97** |
+| ours WITH the moose (23) | 124.1 | 13.79 | **x1.20** |
+
+**The moose was 20% of the entire force's threat and the whole overage.** Every other unit in the
+chapter was already at parity. The verdict was true and misleading at once: `threat/slot` sums the
+force and divides by the deploy cap, so one unit's 24.6 becomes +2.7 per slot and fits under a
+±25% band with room to spare. `role_findings()` exists because this exact unit slipped through
+once before; the aggregate learned nothing from that, because the aggregate cannot.
+
+**Headcount parity is not force parity.** Both sides field exactly 23. We were not adding a body
+— we were carrying vanilla's roster size with one slot holding a unit that hit 4x harder than
+vanilla's hottest (24.6 against a 6.3 class-base ceiling).
+
+**And the obvious repair moves the wrong dial.** Trimming trash to pay for a hot boss-adjacent
+unit cuts CLEAR-LOAD, not threat: reavers 8→6 buys threat x1.14 but drags clear-load to x0.76,
+and one more cut puts it out of band on the low side. A chapter cannot buy its way back to parity
+by deleting bodies.
+
+**The fix was the weapon, and it stayed inside the creature's own line.** `FIREFANG` is the Mauthe
+Doog's, and the Mauthe Doog is the Gwyllgi's unpromoted tier — so the moose keeps its class, its
+map sprite geometry, its doubling, and the distinct `cer_at1` voice, while dropping 24.6 → 11.8
+and the chapter 1.20 → **x1.08** with clear-load unmoved at x0.84. Turn-1 pressure lands at 9.5
+against vanilla's 9.0.
+
+**Rule: when a chapter is at the edge of the band, ask WHICH UNIT is the overage before accepting
+the verdict.** If one unit is a fifth of the force's threat, the band is not measuring parity, it
+is absorbing an outlier. And the corollary for the metric itself: never quote a per-unit
+class-base number next to a with-personal one — vanilla hides its named units' teeth in personal
+lines (Saar and Joshua are both 6.2 class-base), so class-base flatters any unit whose danger
+lives in class+weapon instead.
 
 _Decided: 2026-08-15 (Nicolas)._
 
