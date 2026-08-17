@@ -6725,27 +6725,15 @@ def flag_defeat_quote(pid, chapter_const, flag, comment, msg=0):
     SetPidDefeatedFlag sets the flag on ANY matching pid's death (no CA_BOSS gate, eventinfo.c),
     while DisplayDefeatTalkForPid shows `msg` when nonzero or suppresses it when zero. The silent
     form lets a faceless unit set an event flag without rendering a boxless, unreadable line;
-    the faced form lets the same flag path carry its authored quote.
-
-    `flag=None` omits the field entirely -- a row that only SPEAKS, which is vanilla's own
-    shape for every player death quote (see defeat_quote)."""
+    the faced form lets the same flag path carry its authored quote."""
     msg_value = '0' if msg == 0 else '0x%X' % msg
-    flag_line = '' if flag is None else '        .flag    = %s,\n' % flag
     return ('    {\n'
             '        .pid     = %s, /* %s */\n'
             '        .route   = CHAPTER_MODE_ANY,\n'
             '        .chapter = %s,\n'
-            '%s'
+            '        .flag    = %s,\n'
             '        .msg     = %s,\n'
-            '    },' % (pid, comment, chapter_const, flag_line, msg_value))
-
-
-def defeat_quote(pid, chapter_const, comment, msg):
-    """A gDefeatTalkList row that only SPEAKS: `pid`'s dying box in `chapter_const`, setting
-    nothing. Player death quotes are all this shape (the flag on a defeat row is what turns a
-    death into a game state -- a win, a game over, a mid-map trigger -- and a faller who is
-    merely mourned wants none of that)."""
-    return flag_defeat_quote(pid, chapter_const, None, comment, msg=msg)
+            '    },' % (pid, comment, chapter_const, flag, msg_value))
 
 
 def battle_quote_pair(pid, chapter_const, msg, comment, flag='EVFLAG_BATTLE_QUOTES'):
@@ -8935,8 +8923,6 @@ CH05_RAVISIN_DEATH_MSG = 0x9E5                # locked Ravisin death quote; next
 CH05_ARENA_FOUND_MSG = 0x9E6                  # vanilla 0x9D5 anatomy, in ch05's host block
 CH05_ARENA_RULES_MSG = 0x9E7                  # vanilla 0x9D6 anatomy, in ch05's host block
 CH05_RAVISIN_TAUNT_MSG = 0x9F2                # first-engagement boss taunt (gBattleTalkList)
-CH05_BASIL_DEATH_MSG = 0x9F3                  # Basil's ch05-ONLY death box, ahead of her
-                                              # universal #6 quote (PC_DEATH_QUOTE_MSGS)
 CH05_GOAL_WINDOW_MSG = 0x9F4
 CH05_GOAL_STATUS_MSG = 0x9F5
 # ── The opening's BACKDROP half (#25): three scenes at the tomb, before the party arrives ──
@@ -9244,7 +9230,6 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
     # OUTSIDE ch05's host block on purpose -- see CH05_VILLAGE_SLOTS for why that is safe here
     # and why spending ch05's own ids on them was the worse trade.
     'ch05': (CH05_ERUPTION_MSG, CH05_RAVISIN_DEATH_MSG, CH05_RAVISIN_TAUNT_MSG,
-             CH05_BASIL_DEATH_MSG,
              CH05_ARENA_FOUND_MSG, CH05_ARENA_RULES_MSG,
              CH05_SAHNAR_TALK_MSG,
              *(msg for _slot, msg, _boxes, _what in CH05_OPENING_SLOTS),
@@ -10800,12 +10785,12 @@ def inject_ch04(campaign, boot=False, verbose=True):
         indices, chap['chapter_number'], CH04_EVENT_GROUP,
         (CH04_GOAL_WINDOW_MSG, CH04_GOAL_STATUS_MSG))
 
-    # Fog is chapter state, not painted-map data. Battle terrain 0x15 is the shared
-    # snowy rough platform family already used by the winter overworld chapters.
+    # Fog is chapter state, not painted-map data. The battle GROUND is not set here: every
+    # chapter's is declared once in CHAPTER_BATTLE_TILESETS, because the chapters that ended up
+    # standing on vanilla grass were exactly the ones no injector had written a line for.
     with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
         settings = json.load(f)
     settings['chapters'][CH04_HOST_INDEX]['initialFogLevel'] = 3
-    settings['chapters'][CH04_HOST_INDEX]['battleTileSet'] = 0x15
     with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=2)
 
@@ -11239,38 +11224,6 @@ def ch05_eruption_message(chap):
         beat,
         {'ravisin': ('[OpenMidLeft]', _fid_tag(GUEST_PORTRAIT_MAP['ravisin']))},
         width=29)
-
-
-def ch05_basil_death_message(chap):
-    """Render Basil's one locked ch05-ONLY death box from the chapter event source of truth.
-
-    The ``vanilla 0x9C6`` label cites Natasha's Ch5 death quote -- the ESCORT's, which is the
-    role Basil holds all chapter and the reason this second quote exists at all. She keeps her
-    own bust and the left podium, like every other faller (#6).
-    """
-    _card, beats = _split_event_beats(
-        chap, 'unit_death', 'ch05 Basil death quote', (CH05_BASIL_DEATH_MSG,),
-        card_required=False)
-    beat = beats[0]
-    if len(beat) != 1 or next(iter(beat[0])) != 'basil':
-        sys.exit('ERROR: ch05 Basil death quote must remain one locked Basil box')
-    return _script_to_message(
-        beat, {'basil': ('[OpenMidLeft]', _fid_tag(PORTRAIT_MAP['basil']))}, width=29)
-
-
-def ch05_basil_death_quote(campaign):
-    """The gDefeatTalkList row that plays Basil's ch05-only box instead of her universal one.
-
-    No flag: her death is not a win, a loss, or a trigger here -- it only speaks. The row is
-    keyed to ch05's HOST slot, so it matches in this chapter alone and her #6 quote covers
-    every other. ORDER is what makes it work, and the per-PC death-quote list owns that (see
-    pc_death_quote_rows).
-    """
-    slot = dict((unit_id, slot) for unit_id, slot, _cls, _sms in classed_cast(campaign))['basil']
-    return defeat_quote(
-        char_symbol(slot), chapter_label_constant(CH05_HOST_INDEX),
-        'Basil (ch05 escort): chapter-only death quote, ahead of her #6 line',
-        CH05_BASIL_DEATH_MSG)
 
 
 def ch05_ravisin_taunt_message(chap):
@@ -12341,9 +12294,6 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     set_message_body(lines, CH05_ERUPTION_MSG, ch05_eruption_message(chap))
     set_message_body(lines, CH05_RAVISIN_DEATH_MSG, ch05_ravisin_death_message(chap))
     set_message_body(lines, CH05_RAVISIN_TAUNT_MSG, ch05_ravisin_taunt_message(chap))
-    # Scene 13. The ROW that reaches this body is the death-quote pass's (it has to sit ahead
-    # of Basil's universal #6 line, and that pass runs last); the TEXT is ch05's.
-    set_message_body(lines, CH05_BASIL_DEATH_MSG, ch05_basil_death_message(chap))
     set_message_body(lines, CH05_SAHNAR_TALK_MSG, ch05_sahnar_talk_message(chap))
     for msg_id, body in (ch05_opening_messages(chap) + ch05_basil_join_messages(chap)
                          + ch05_sahnar_alone_message(chap) + ch05_moose_charge_message(chap)):
@@ -12464,23 +12414,18 @@ def inject_northlook_bitey(verbose=True):
         print("  'Ol Bitey mounted over the Northlook hearth (bg_Fireplace, #21)")
 
 
-# Cast members whose death is answered by a CHAPTER-SPECIFIC box as well as their universal
-# one. Vanilla does this for exactly one unit per chapter and only when the chapter is built
-# around them (Natasha in Ch5, the escort): the chapter row shadows the universal row while
-# that chapter is loaded, and the universal one covers everywhere else.
-CHAPTER_DEATH_QUOTE_OVERRIDES = (ch05_basil_death_quote,)
-
-
 def pc_death_quote_rows(campaign):
     """Every gDefeatTalkList row the death-quote pass writes, IN SCAN ORDER.
 
-    GetDefeatTalkEntry returns the first pid match, so a pid with two rows is decided here and
-    nowhere else: the chapter-specific overrides come FIRST, the universal chapter=0xFF rows
-    after. That ordering cannot live in the chapter injectors -- this pass runs last in main()
-    and prepends at the head, so anything a chapter prepended on its own would end up BEHIND
-    these and never match, with nothing to show for it but a quote that silently never plays.
+    ONE row per cast member, and that is a decision rather than a limitation: FE8 lets a pid
+    hold a chapter-keyed row ahead of its chapter=0xFF one, and ch05 briefly gave Basil a
+    second box on vanilla's escort pattern before it was cut for saying the same thing twice
+    (decisions.md -> "One death quote per character"). A pid with two rows would be decided
+    here and nowhere else -- GetDefeatTalkEntry returns the first match -- so if that call is
+    ever revisited, the ordering belongs in this function and not in a chapter injector, which
+    runs BEFORE this pass and would prepend its row behind these.
     """
-    rows = [override(campaign) for override in CHAPTER_DEATH_QUOTE_OVERRIDES]
+    rows = []
     for unit_id, slot, _, _ in classed_cast(campaign):
         if unit_id not in PC_DEATH_QUOTE_MSGS:
             sys.exit('ERROR: no death-quote msg id allocated for cast member %r' % unit_id)
@@ -12502,13 +12447,8 @@ def inject_pc_death_quotes(campaign, verbose=True):
     returns the first pid match) with route=ANY, chapter=0xFF and no flag, so they fire
     in EVERY chapter. Each PC rides its PORTRAIT_MAP slot, so pid + face = CHARACTER_<slot>
     / [FID_<slot>]. Quote text lives in the unit YAML (`death_quote`); bodies render via
-    _script_to_message with the bust on the left podium, like the boss death quotes.
-
-    The chapter-specific overrides ride along at the head of the same block, because the
-    order between the two is the whole mechanism (pc_death_quote_rows)."""
+    _script_to_message with the bust on the left podium, like the boss death quotes."""
     # 1. Text bodies (each quote in a map talk box with the faller's bust, left podium).
-    #    The override bodies are their chapter's to write -- theirs is chapter text, from
-    #    chapter YAML, in the chapter's own host block.
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
     for unit_id, slot, _, _ in classed_cast(campaign):
@@ -12526,9 +12466,7 @@ def inject_pc_death_quotes(campaign, verbose=True):
     rows = pc_death_quote_rows(campaign)
     _prepend_defeat_quote('\n'.join(rows))
     if verbose:
-        print('  death quotes: %d cast members (chapter=any) + %d chapter-specific'
-              % (len(rows) - len(CHAPTER_DEATH_QUOTE_OVERRIDES),
-                 len(CHAPTER_DEATH_QUOTE_OVERRIDES)))
+        print('  death quotes: %d cast members (chapter=any)' % len(rows))
 
 
 # --- Battle ground platforms (#65): vendored snow/ice grounds + terrain remap -------
@@ -12555,6 +12493,24 @@ BATTLE_PLATFORMS = [
     ('ice-flat',          'snowice',   1.00),  # frozen lake/river
 ]
 PLATFORM_BASE_INDEX = 115  # battle_terrain_table currently ends at 114
+# Host slot -> battleTileSet, and it is REQUIRED to be total (check.py + the unit test):
+# a hosted chapter that names no ground keeps its HOST SLOT's vanilla one, and vanilla's slots
+# are not our world. Silence is what made that invisible for two chapters at once -- ch05's slot
+# 6 carries vanilla Ch6's 6, whose table sends TERRAIN_ROAD to `michi1` and TERRAIN_PLAINS to
+# `heichi1`, so every fight on a map that is 53% road happened on a dirt track and a green verge
+# in a snowbound elven tomb (Nicolas, 2026-08-16); ch02's slot 3 (vanilla 5) was wrong the same
+# way and nobody had looked. Values: 0x00 snow-OPEN (BanimTerrainGroundDefault, rewritten to the
+# drift), 0x15 snow-ROUGH (Tileset15), 0x16 CAVE (Tileset16, vanilla stone).
+# ROUGH vs OPEN is a read of the GROUND, not of the weather: `snow-uneven-light` is snow lying
+# over rock, `snowdrift` is windswept open snow. A paved map takes rough.
+CHAPTER_BATTLE_TILESETS = {
+    PROLOGUE_HOST_INDEX: 0x00,   # the frozen lake: open windswept snow is the whole picture
+    CH01_HOST_INDEX:     0x15,   # the iron trail: snow over trail rock
+    CH02_HOST_INDEX:     0x15,   # Bryn Shander's approach, same winter tileset as ch01/ch04
+    CH03_HOST_INDEX:     0x16,   # the Termalaine mine: indoors, vanilla stone rather than snow
+    CH04_HOST_INDEX:     0x15,   # the moose forest: snow over forest floor
+    CH05_HOST_INDEX:     0x15,   # the elven tomb: PAVED (53% road), so rock-under-snow, not drift
+}
 _PLAT_ICE = {'RIVER', 'SEA', 'LAKE', 'WATER', 'GLACIER', 'SNAG', 'DEEPS', 'SHIP_FLAT',
              'SHIP_WRECK'}
 _PLAT_ROUGH = {'MOUNTAIN', 'PEAK', 'CLIFF', 'VALLEY', 'RUINS_REGULAR', 'RUINS_VILLAGE',
@@ -12705,19 +12661,29 @@ def inject_battle_platforms(campaign, verbose=True):
     with open(BANIM_BATTLEPARSE_C, 'w', encoding='utf-8') as f:
         f.write(bp)
 
-    # 5. point Ch1 (chapter idx 2) at the rough snow tileset (0x15); prologue (idx 1) keeps 0
+    # 5. Point every hosted chapter at its ground. One registry rather than a write per
+    #    chapter: the chapters that were WRONG were the ones nobody had written a line for,
+    #    so the fix is a table that has to mention them all (CHAPTER_BATTLE_TILESETS).
+    missing = [c.name for c in hosted_chapters() if c.host_index not in CHAPTER_BATTLE_TILESETS]
+    if missing:
+        sys.exit('ERROR: %s host no battleTileSet -- a chapter that names none keeps its slot\'s '
+                 'VANILLA ground (grass/road under snow). Add it to CHAPTER_BATTLE_TILESETS'
+                 % ', '.join(missing))
     with open(CHAPTER_SETTINGS_JSON_PLAT, encoding='utf-8') as f:
         cs = _json.load(f)
-    cs['chapters'][2]['battleTileSet'] = 0x15
-    cs['chapters'][CH03_HOST_INDEX]['battleTileSet'] = 0x16  # ch03 cave -> siroyuka1 stone (Tileset16)
+    for host_index, tileset in sorted(CHAPTER_BATTLE_TILESETS.items()):
+        cs['chapters'][host_index]['battleTileSet'] = tileset
     with open(CHAPTER_SETTINGS_JSON_PLAT, 'w', encoding='utf-8') as f:
         _json.dump(cs, f, indent=2)
 
     if verbose:
         print('  %d platforms -> battle_terrain_table[%d..%d] (FE-Repo {Cynon}, F2E)'
               % (len(BATTLE_PLATFORMS), base, base + len(BATTLE_PLATFORMS) - 1))
-        print('  terrain->ground: Default=snow-open (Snowdrift); Tileset15=snow-rough; Ch1->0x15')
-        print('  Tileset16=CAVE (vanilla siroyuka1 stone / gake1 rock); ch03->0x16')
+        print('  terrain->ground: Default=snow-open (Snowdrift); Tileset15=snow-rough; '
+              'Tileset16=CAVE (vanilla siroyuka1 stone / gake1 rock)')
+        print('  chapter grounds: %s' % ', '.join(
+            '%s->0x%02X' % (c.name, CHAPTER_BATTLE_TILESETS[c.host_index])
+            for c in hosted_chapters()))
 
 
 def normalise_decomp_shebangs(verbose=False):

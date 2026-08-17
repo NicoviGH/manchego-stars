@@ -1206,6 +1206,50 @@ class BattlePlatformTerrain(unittest.TestCase):
             self.assertEqual(bc._terrain_snow_ground(t, 115, True), 117)  # even on the rough tileset
 
 
+class EveryHostedChapterPicksItsGround(unittest.TestCase):
+    """A hosted chapter that never names a battleTileSet keeps its HOST SLOT's vanilla one,
+    and vanilla's slots are not our world (#65 / #25).
+
+    That is not a theoretical gap -- it shipped. ch05's slot 6 carries vanilla Ch6's
+    `battleTileSet = 6`, whose table sends TERRAIN_ROAD to `michi1` and TERRAIN_PLAINS to
+    `heichi1`; ch05's map is 53% road, so every fight in a snowbound elven tomb was standing
+    on a green verge and a dirt track. ch02's slot 3 (vanilla 5) had the same defect, unseen.
+    Silence is what made both invisible, so the registry is REQUIRED to be total: a new
+    chapter has to state its ground, not inherit somebody else's.
+    """
+    OURS = {0x00, 0x15, 0x16}   # snow-open (Default), snow-rough (Tileset15), cave (Tileset16)
+
+    def test_every_hosted_chapter_names_its_ground(self):
+        missing = [c.name for c in bc.hosted_chapters()
+                   if c.host_index not in bc.CHAPTER_BATTLE_TILESETS]
+        self.assertEqual([], missing,
+                         'these chapters would silently inherit vanilla platforms: %s' % missing)
+
+    def test_no_chapter_is_left_on_a_vanilla_ground(self):
+        for host_index, tileset in bc.CHAPTER_BATTLE_TILESETS.items():
+            self.assertIn(tileset, self.OURS,
+                          'chapter slot %d is pointed at a ground we do not own' % host_index)
+
+    def test_the_snowbound_chapters_stand_on_snow(self):
+        """The two that were wrong, pinned by the values they were wrong about."""
+        self.assertEqual(0x15, bc.CHAPTER_BATTLE_TILESETS[bc.CH05_HOST_INDEX])
+        self.assertEqual(0x15, bc.CHAPTER_BATTLE_TILESETS[bc.CH02_HOST_INDEX])
+        self.assertEqual(0x16, bc.CHAPTER_BATTLE_TILESETS[bc.CH03_HOST_INDEX])   # the mine
+
+    def test_ch05s_own_map_is_what_makes_rough_the_right_read(self):
+        """Not a vibe: its ground is PAVED, not open. `snow-uneven-light` is snow over rock,
+        which is what a tomb courtyard under snow is; the drift is windswept open ground."""
+        maps = os.path.join(bc.REPO, 'campaigns', 'rime-of-the-frostmaiden', 'maps')
+        _w, _h, grid = bc._map_terrain_grid(maps, bc.CH05_LAYOUT[1])
+        ids = bc.terrain_ids()
+        tiles = [t for row in grid for t in row]
+        road = sum(1 for t in tiles if t == ids['TERRAIN_ROAD'])
+        self.assertGreater(road, len(tiles) // 2, 'ch05 is a paved map; if that changes, revisit')
+        # And the rough tileset is what sends road to the rock-and-snow ground.
+        self.assertEqual(bc._terrain_snow_ground('ROAD', bc.PLATFORM_BASE_INDEX, True),
+                         bc.PLATFORM_BASE_INDEX + 1)
+
+
 class AppendedClassSlot(unittest.TestCase):
     """Extend gClassData past the vanilla 0x7F tail so an enemy reskin can ride a NEW
     class slot (#23: the Lizardzerker) once the three ballista-empties are used up. Two
@@ -2290,82 +2334,43 @@ class Ch05RavisinBattleTaunt(unittest.TestCase):
                              bc.ch05_wave_script(turn, 'MS_Ch05WaveT%d' % turn))
 
 
-class Ch05BasilDeathQuote(unittest.TestCase):
-    """Scene 13: Basil's CHAPTER-SPECIFIC death box (#25).
+class BasilHasOneDeathQuote(unittest.TestCase):
+    """Basil falls with ONE line, wherever she falls (Nicolas, 2026-08-16).
 
-    Every cast member already has a universal death quote (#6) keyed `chapter = 0xFF`.
-    Vanilla gives Natasha a second, Ch5-only one because she is the ESCORT the chapter is
-    built around, and Basil is her exact donor and holds that role here. Two entries for
-    one pid is therefore the POINT -- and it is also the hazard, because
-    GetDefeatTalkEntry returns the FIRST pid match: the ch05 row has to sit ahead of the
-    universal row or it can never play.
+    FE8 would happily give her two: a chapter-keyed row ahead of her chapter=0xFF one is
+    vanilla's own shape for the escort a chapter is built around, and ch05 briefly shipped it.
+    It was cut because both boxes were the same interrupted apology about the same undelivered
+    berry, so the second bought a mechanism and no line. The berry is the survivor, and it now
+    fires everywhere rather than only in the tomb.
     """
     CAMPAIGN = 'rime-of-the-frostmaiden'
 
-    def _chap(self):
-        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+    def test_the_berry_line_is_her_universal_quote(self):
+        basil = bc.load_unit(self.CAMPAIGN, 'basil')
+        self.assertEqual("But I haven't-- I still have her berry...", basil['death_quote'])
 
-    def _event(self):
-        return next(e for e in self._chap()['events'] if e['trigger'] == 'unit_death')
-
-    def test_the_chapter_quote_owns_its_own_id_and_does_not_reuse_the_universal_one(self):
-        self.assertTrue(hasattr(bc, 'CH05_BASIL_DEATH_MSG'),
-                        "Basil's ch05-only death box needs a named host-block id")
-        self.assertEqual(0x9F3, bc.CH05_BASIL_DEATH_MSG)
-        self.assertIn(bc.CH05_BASIL_DEATH_MSG, bc.HOSTED_CHAPTER_MESSAGE_IDS['ch05'])
-        self.assertEqual('ch05', bc.assert_message_ids_unique()[bc.CH05_BASIL_DEATH_MSG])
-        self.assertNotEqual(bc.PC_DEATH_QUOTE_MSGS['basil'], bc.CH05_BASIL_DEATH_MSG)
-
-    def test_locked_one_box_emits_basils_own_face_from_the_event_yaml(self):
-        event = self._event()
-        self.assertEqual('vanilla 0x9C6', event['slot'])
-        self.assertEqual('locked', event['status'])
-        self.assertEqual([{'basil': "But I haven't-- I still have her berry..."}],
-                         event['script'])
-        self.assertTrue(hasattr(bc, 'ch05_basil_death_message'),
-                        'the locked YAML beat needs a message emitter')
-
-        body = bc.ch05_basil_death_message(self._chap())
-        flowed = body.replace('[LF]\n', ' ')
-        self.assertIn('[LoadFace][FID_%s]' % bc.PORTRAIT_MAP['basil'], body)
-        self.assertEqual(1, body.count('[A]'))
-        self.assertIn('her berry', flowed)
-        # Her UNIVERSAL quote (#6) is a different line about the same berries -- the two
-        # must not converge into one, or the chapter row buys nothing.
-        self.assertNotIn(bc.load_unit(self.CAMPAIGN, 'basil')['death_quote'], flowed)
-
-    def test_the_chapter_entry_is_keyed_to_ch05_alone(self):
-        self.assertTrue(hasattr(bc, 'ch05_basil_death_quote'),
-                        'ch05 needs a testable owner for the chapter-specific death entry')
-        row = bc.ch05_basil_death_quote(self.CAMPAIGN)
-        self.assertIn('.pid     = %s,' % bc.char_symbol(bc.PORTRAIT_MAP['basil']), row)
-        self.assertIn('.chapter = %s,' % bc.chapter_label_constant(bc.CH05_HOST_INDEX), row)
-        self.assertIn('.msg     = 0x%X,' % bc.CH05_BASIL_DEATH_MSG, row)
-        self.assertNotIn('0xFF', row)
-        # No flag: her death is not a win, a loss, or a trigger -- it only speaks.
-        self.assertNotIn('EVFLAG', row)
-
-    def test_the_chapter_entry_is_emitted_ahead_of_the_universal_one(self):
-        """The whole hazard in one assertion. inject_pc_death_quotes runs LAST in main(),
-        so anything ch05 prepends on its own would end up BEHIND the universal rows and
-        never match. The per-PC death-quote list owns the ordering, and emits the
-        chapter-specific overrides first."""
-        self.assertTrue(hasattr(bc, 'pc_death_quote_rows'),
-                        'the death-quote list needs one testable owner for its ORDER')
+    def test_she_has_exactly_one_row_and_it_fires_everywhere(self):
         rows = bc.pc_death_quote_rows(self.CAMPAIGN)
-        basil_pid = '.pid     = %s,' % bc.char_symbol(bc.PORTRAIT_MAP['basil'])
-        hits = [i for i, row in enumerate(rows) if basil_pid in row]
-        self.assertEqual(2, len(hits), 'Basil should have both a ch05 row and a universal row')
-        chapter_row, universal_row = rows[hits[0]], rows[hits[1]]
-        self.assertIn('.chapter = %s,' % bc.chapter_label_constant(bc.CH05_HOST_INDEX),
-                      chapter_row)
-        self.assertIn('0xFF', universal_row)
+        pid = '.pid     = %s,' % bc.char_symbol(bc.PORTRAIT_MAP['basil'])
+        hers = [row for row in rows if pid in row]
+        self.assertEqual(1, len(hers), 'a second row for one pid is the thing that was cut')
+        self.assertIn('.chapter = 0xFF', hers[0])
+        self.assertIn('.msg     = 0x%04X,' % bc.PC_DEATH_QUOTE_MSGS['basil'], hers[0])
 
-    def test_no_other_cast_member_gains_a_chapter_specific_row(self):
-        rows = bc.pc_death_quote_rows(self.CAMPAIGN)
-        overrides = [row for row in rows if '0xFF' not in row]
-        self.assertEqual(1, len(overrides),
-                         'ch05/Basil is the only chapter-specific death quote written so far')
+    def test_no_cast_member_carries_a_chapter_keyed_death_row(self):
+        """The general form of the same call: the death-quote pass emits universal rows only.
+        A chapter injector cannot add one behind our backs either -- it runs BEFORE this pass,
+        which prepends at the head, so its row would never win GetDefeatTalkEntry's first match.
+        """
+        for row in bc.pc_death_quote_rows(self.CAMPAIGN):
+            self.assertIn('.chapter = 0xFF', row)
+
+    def test_ch05_no_longer_authors_a_death_box_of_its_own(self):
+        chap = bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+        triggers = [e.get('trigger') for e in chap['events']]
+        self.assertNotIn('unit_death', triggers)
+        self.assertFalse(hasattr(bc, 'CH05_BASIL_DEATH_MSG'))
+        self.assertFalse(hasattr(bc, 'ch05_basil_death_message'))
 
 
 class Ch05SahnarTalkRecruit(unittest.TestCase):

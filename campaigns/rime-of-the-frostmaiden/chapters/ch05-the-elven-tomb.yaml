@@ -1332,38 +1332,16 @@ events:
       script:
         - basil: "There is nothing holding us here... We could go free as well."
   # ── 9C7 — BOSS TAUNT. One box. Vanilla's Saar taunt is ONE A-press. ──────────
-  # ── 0x9C6 — the ESCORT's death quote. One box. Found 2026-07-29, previously unaccounted. ──
-  - trigger: unit_death
-    slot: "vanilla 0x9C6"          # data_battlequotes.c, pid CHARACTER_NATASHA, no flag
-    type: quote
-    status: locked                 # LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas)
-    description: >
-      BASIL's chapter-specific death quote. Vanilla Ch5 gives one to NATASHA and to nobody else
-      on the map except the boss — not even to Joshua — because she is the ESCORT the chapter is
-      built around, and losing her is the failure the player must feel. Basil is her exact donor
-      and holds exactly that role here, so she inherits the slot.
-      The twin: "I can't let myself die here..... Someone has to hear my tale....." — she dies
-      still reaching for her one errand, which is what makes it land.
-      Ours has a sharper version of the same available, and it is the whole reason 9BB exists:
-      Basil dies with the berry still undelivered. ONE box. Do not spend it on pathos about
-      herself; spend it on Sahnar, whom the player now knows she was walking toward.
-      TWO CONSTRAINTS the draft is built to satisfy, both easy to break by "improving" it:
-        · It must read the same whether she dies BEFORE or AFTER the recruit. "Sahnar's still
-          waiting" is wrong once she is a party member; the berry is undelivered either way.
-        · It must not duplicate her LAST WORDS in 0x9CA, which are also about the berry. The
-          quote is her still holding it; 0x9CA is her handing the errand to someone else
-          ("Tell her I had one for her"). Same object, two different failures.
-      Hurt Basil goes SHORT — basil.md: she runs on when she cares, and the short lines are for
-      when she's hurt. The self-interruption is the one piece of her register that survives.
-      LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas) — Nicolas kept v0 on review:
-      the 9BB thread carries the pronoun. 1 box. Two alternates recorded below.
-    script:                           # LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas)
-      - basil: "But I haven't-- I still have her berry..."
-    # Alternates drafted at the same sitting, kept so they don't get re-derived:
-    #   (b) "Oh. ...I was almost there."       — the errand, not the object; quieter, less
-    #        specific, and it loses the 9BB thread the slot exists to pay.
-    #   (c) "Wait-- I'm not finished--"        — purest Basil-interrupted, but it could be any
-    #        dying character; fails the cover-the-name test.
+  # BASIL HAS NO CHAPTER-SPECIFIC DEATH BOX, and the empty vanilla 0x9C6 anatomy slot is not an
+  # invitation to write one (Nicolas, 2026-08-16). Vanilla fills it for Natasha because the
+  # escort a chapter is built around should be mourned in that chapter's own words, and Basil
+  # holds exactly that role here — but ours said the same thing as her universal line in the
+  # same shape (an interrupted apology holding an undelivered berry), so the second box bought a
+  # mechanism and no line. The berry quote MOVED to her universal one (npcs/basil.yaml) and
+  # fires wherever she falls; the constraints it was written against still hold there. It must
+  # not duplicate her LAST WORDS in 0x9CA, which are also about the berry: this is her still
+  # holding it, 0x9CA is her handing the errand on ("Tell her I had one for her"). Same object,
+  # two different failures. Long form: decisions.md → "One death quote per character".
   - trigger: boss_battle
     slot: "vanilla 0x9C7"          # data_battlequotes.c, EVFLAG_BATTLE_QUOTES
     type: quote

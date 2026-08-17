@@ -7473,15 +7473,122 @@ scenarios.recordch05ravisindeath = function()
     })
 end
 
+-- recordch05platform (#65 / #25): what the fighters are STANDING ON in ch05.
+-- ch05 hosts on slot 6, and slot 6 ships vanilla Ch6's `battleTileSet = 6`, whose table sends
+-- TERRAIN_ROAD to `michi1` and TERRAIN_PLAINS to `heichi1`. ch05's map is 53% road, so every
+-- fight in a snowbound elven tomb was staged on a dirt track and a green verge -- reported by
+-- eye, because nothing in the build, the tests or any scenario looks at the ground.
+-- So this films it, and films it ON ROAD specifically: both combatants are parked on
+-- TERRAIN_ROAD and the scenario FAILS if they are not, because road is the tile class that was
+-- wrong and a fight staged on a fence would prove nothing about it.
+-- Battle animations are forced ON (the whole subject is the animation's backdrop) -- note
+-- pokeNormalConfig only clears gameSpeed and would leave a prior pokeFastConfig's map combat
+-- in place, which draws no platform at all.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05platform (needs a CH05BOOT=1 ROM).
+scenarios.recordch05platform = function()
+    local TERRAIN_ROAD = 0x02
+    return recordCutscene({
+        tag = "ch05platform", speed = "normal", maxFrames = 1500, shotEvery = 2,
+        pressEvery = 90,
+        pre = function()
+            pokeFastConfig()
+            if not bootToMap() then return false, "never reached the ch05 map" end
+            if not waitFor(function()
+                return faction() == 0 and not menuOpen()
+                    and not procActive(SYM.ProcScr_StdEventEngine)
+            end, 6000, true) then
+                return false, "ch05 map never became idle"
+            end
+            local a = SYM.gPlaySt + 0x40
+            local c = ru32(a)
+            c = c & ~(3 << 17)                    -- animationType = ON (full battle anims)
+            c = c & ~(1 << 7)                     -- gameSpeed = normal
+            emu:write32(a, c)
+            local hero, hmin, hmax
+            for i = 0, 61 do
+                local u = unitAt(SYM.gUnitArrayBlue, i)
+                if u and not isDead(u) and (u.state & 0x3) == 0 and mapUnitAt(u.x, u.y) ~= 0 then
+                    local mn, mx = unitAttackRange(u)
+                    if mn and mn <= 1 and mx >= 1 then hero, hmin, hmax = u, mn, mx break end
+                end
+            end
+            if not hero then return false, "no selectable blue melee attacker" end
+            local foe
+            for i = 0, 49 do
+                local r = unitAt(SYM.gUnitArrayRed, i)
+                if r and not isDead(r) and mapUnitAt(r.x, r.y) ~= 0 then foe = r break end
+            end
+            if not foe then return false, "no live red unit to stage the fight against" end
+            pokeHarmless(foe)                     -- the fight must finish, not end the film early
+            -- A PAIR of orthogonally adjacent free ROAD tiles, found on the engine's own terrain
+            -- map rather than assumed from the layout.
+            local mapw, maph = mapSize()
+            local ax, ay, bx, by
+            for y = 0, maph - 1 do
+                for x = 0, mapw - 1 do
+                    if terrainAt(x, y) == TERRAIN_ROAD then
+                        for _, d in ipairs({ { 1, 0 }, { 0, 1 } }) do
+                            local nx, ny = x + d[1], y + d[2]
+                            if nx < mapw and ny < maph and terrainAt(nx, ny) == TERRAIN_ROAD
+                                and (mapUnitAt(x, y) == 0 or (x == hero.x and y == hero.y))
+                                and (mapUnitAt(nx, ny) == 0 or (nx == foe.x and ny == foe.y)) then
+                                ax, ay, bx, by = x, y, nx, ny
+                                break
+                            end
+                        end
+                    end
+                    if ax then break end
+                end
+                if ax then break end
+            end
+            if not ax then return false, "no adjacent pair of free ROAD tiles on the ch05 map" end
+            local hgrid, fgrid = mapUnitAt(hero.x, hero.y), mapUnitAt(foe.x, foe.y)
+            setMapUnit(hero.x, hero.y, 0); setMapUnit(foe.x, foe.y, 0)
+            emu:write8(hero.addr + 0x10, ax); emu:write8(hero.addr + 0x11, ay)
+            emu:write8(foe.addr + 0x10, bx); emu:write8(foe.addr + 0x11, by)
+            setMapUnit(ax, ay, hgrid); setMapUnit(bx, by, fgrid)
+            log(string.format("ch05platform: %d,%d vs %d,%d -- terrain 0x%02X / 0x%02X (ROAD)",
+                ax, ay, bx, by, terrainAt(ax, ay), terrainAt(bx, by)))
+            hero = blue(hero.charId) or hero
+            if not canAttackFromHere(hero, hmin, hmax) then
+                return false, "the parked foe is not in the attacker's live range"
+            end
+            if not moveUnit(hero.x, hero.y, hero.x, hero.y) then
+                return false, "could not open the attacker's command menu"
+            end
+            -- chooseAttack's three input steps WITHOUT its combat wait: the wait is what the
+            -- camera is here for, and calling it would resolve the fight before filming starts.
+            if not selectSemantic("attack", "Attack opens the live weapon menu", function(after)
+                return controllerState(after) == "weapon_menu"
+            end, 300) then return false, "no Attack on the command menu" end
+            if not selectSemantic("select_weapon", "weapon opens the attack target selector",
+                function(after)
+                    return controllerState(after) == "target_selection"
+                        and after.target and after.target.kind == "attack"
+                end, 300) then return false, "no live weapon to attack with" end
+            if not guardedInput("confirm_target", "A", "target selection commits the attack",
+                function(after)
+                    return after.procs.battle ~= nil or controllerState(after) ~= "target_selection"
+                end, 300) then return false, "the attack never committed" end
+            return true
+        end,
+        until_ = function()
+            return faction() == 0 and not menuOpen()
+                and not procActive(SYM.ProcScr_BattleEventEngine)
+                and controllerState() == "player_map_idle"
+        end,
+    })
+end
+
 -- recordch05combatquotes (#25): scenes 12 and 13, filmed in ONE combat.
 -- The two beats are separate mechanisms -- Ravisin's taunt is a gBattleTalkList pair that fires at
--- battle START, Basil's chapter-only box is a gDefeatTalkList row that fires when she falls -- but
--- ONE fight produces both, in that order, so it is one run and not two.
--- What only a run can answer: whether each box renders with the right FACE. Both are new drawing
--- situations (a quote over the combat overlay, and a chapter row SHADOWING a universal one), and
--- three data checks passing while three faces rendered corrupted is a thing this chapter has
--- already done. It also answers which of Basil's two rows won: the texts differ, so the film says
--- outright whether the ch05 row beat her #6 line or the other way round.
+-- battle START, Basil's death box is a gDefeatTalkList row that fires when she falls -- but ONE
+-- fight produces both, in that order, so it is one run and not two.
+-- What only a run can answer: whether each box renders with the right FACE. Both draw over the
+-- combat overlay rather than the map, and three data checks passing while three faces rendered
+-- corrupted is a thing this chapter has already done. Basil's is her ONE death quote (#6,
+-- chapter=0xFF) -- ch05 briefly gave her a second, chapter-keyed box and it was cut -- so what
+-- this film shows is her universal line playing where the tomb is the chapter that killed her.
 -- MAP COMBAT, normal speed, on recordfix's finding: an in-battle quote is buried and aliased under
 -- full battle anims and reads as a lingering overlay in map combat.
 -- Determinism instead of AI faith: every OTHER red is made harmless AND Basil is given the defence
@@ -7582,7 +7689,7 @@ scenarios.recordch05combatquotes = function()
         return result("FAIL", "Basil fell after only one quote box -- the taunt and her death "
             .. "box did not both play")
     end
-    return result("PASS", "Ravisin's taunt opened the fight and Basil's ch05 death box closed it")
+    return result("PASS", "Ravisin's taunt opened the fight and Basil's death box closed it")
 end
 
 -- recordch05opening (#25): the MOTION proof for ch05's three BACKDROP scenes -- Basil and Sahnar
