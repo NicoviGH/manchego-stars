@@ -66,6 +66,24 @@ def _vanilla_wait_table():
          'HEAD:src/unit_icon_wait_data.c'], encoding='utf-8', env=env)
 
 
+def _wait_row_name(donor):
+    """The wait-table class name `donor` resolves to, or None if it is in no row.
+
+    Split out of donor_sms_geometry so a caller can ASK whether a decomp donor exists
+    instead of exiting when it does not -- a vendored community sheet legitimately has no
+    row, and that is not an error at conversion time."""
+    name = os.path.basename(donor)
+    m = re.match(r'unit_icon_wait_(.+?)_sheet', name)
+    if m:
+        name = m.group(1)
+    name = os.path.splitext(name)[0]
+    sym = 'unit_icon_wait_%s_sheet' % name
+    for line in _vanilla_wait_table().splitlines():
+        if sym in line:
+            return name
+    return None
+
+
 def donor_sms_geometry(donor):
     """Authoritative (macro, frame_w, frame_h) for a donor map sprite, READ FROM THE
     DECOMP -- never inferred from PNG pixel dimensions (a 16x96 sheet is ambiguous:
@@ -112,6 +130,16 @@ def sheet_info(path, expect=None):
         sys.exit('ERROR: %s uses %d colours; the 4bpp map-sprite palette allows %d '
                  '(index 0 transparent + 15)' % (path, ncolors, MAX_COLORS))
 
+    # A finished sheet with no transparent pixel is always wrong, and is invisible to every
+    # other check here: it renders as a solid frame-sized block with the art inside it. That
+    # is what a mis-keyed community sheet produces (see _transparent_index), so it is caught
+    # at the point the sheet is declared finished rather than in game.
+    if 0 not in set(im.getdata()):
+        sys.exit('ERROR: %s has no index-0 (transparent) pixel -- it would render as a solid '
+                 'block. A community sheet keyed on green (%s) must be converted with '
+                 'recolour, which maps the key to index 0.'
+                 % (path, '#%02x%02x%02x' % GREEN_KEY))
+
     w, h = im.size
     if expect is not None:
         fw, fh = expect
@@ -135,6 +163,22 @@ def sheet_info(path, expect=None):
                          'donor to read it from the decomp\n'
                          % (path, ' or '.join('%dx%d' % s for s in fits), fw, fh))
     return SMS_SIZES[(fw, fh)], fw, fh, h // fh
+
+
+GREEN_KEY = (0x80, 0xa0, 0x80)   # FE-Repo's backdrop colour on community map sprites
+
+
+def _transparent_index(im, pal):
+    """Which palette index this donor uses for transparency.
+
+    The green key wins when present -- a sheet carrying #80a080 is a community sheet, and
+    that colour is never part of the art. Otherwise index 0, which is the decomp's own
+    convention and what every vanilla donor uses."""
+    used = set(im.getdata())
+    for di in sorted(used):
+        if tuple(pal[3 * di:3 * di + 3]) == GREEN_KEY:
+            return di
+    return 0
 
 
 def read_palette(path):
@@ -165,7 +209,7 @@ def _parse_overrides(spec):
     return out
 
 
-def recolour(base_path, palette_path, out_path, overrides=None):
+def recolour(base_path, palette_path, out_path, overrides=None, donor=None):
     """Reskin a vanilla donor wait/MU sheet into the bespoke cast palette.
 
     The donor's own indexed colours are remapped, nearest-RGB, onto the cast palette
@@ -194,9 +238,18 @@ def recolour(base_path, palette_path, out_path, overrides=None):
     # Build donor-index -> cast-index map. Index 0 is the engine's transparent slot in
     # both palettes; keep it fixed. Opaque donor colours take an explicit override if
     # given, else pick the nearest cast colour among indices 1..15 (never transparent).
-    remap = {0: 0}
+    #
+    # WHICH index is transparent is not a given. The decomp's own sheets (and every vanilla
+    # donor this was written against) use index 0. FE-Repo community sheets DO NOT: they ship
+    # on a green key and their index 0 is an ordinary colour. Assuming index 0 converts the
+    # BACKDROP into a real cast colour, and nothing downstream notices -- geometry, colour
+    # count and the preview all pass, and the sprite renders in game as a solid block with
+    # the art inside it. Ravisin's donor is exactly that shape: index 0 is a cream used by 12
+    # pixels, the background is 253 pixels of #80a080 (#25).
+    key = _transparent_index(im, src_pal)
+    remap = {key: 0}
     for di in set(im.getdata()):
-        if di == 0:
+        if di == key:
             continue
         if di in overrides:
             remap[di] = overrides[di]
@@ -219,8 +272,17 @@ def recolour(base_path, palette_path, out_path, overrides=None):
           % ', '.join('%d->%d%s' % (d, c, '*' if d in overrides else '')
                       for d, c in sorted(remap.items())))
     print('  (* = forced override; others nearest-colour)')
-    # Validate against the donor's authoritative SMS geometry (decomp), not a guess.
-    _, dfw, dfh = donor_sms_geometry(base_path)
+    # Validate against the donor's authoritative SMS geometry (decomp), not a guess -- when
+    # there IS a decomp donor. `donor` names the vanilla class whose geometry applies; it
+    # defaults to reading the name out of `base_path`, which is right for a vanilla sheet and
+    # impossible for a vendored one (`Druid Hoodless (F) {Ultra-Fenix, Velvet Kitsune}` is in
+    # no wait table). A community sheet is not a decomp sheet and has no row to be checked
+    # against, so it falls through to sheet_info's own inference -- which still rejects a
+    # sheet that is not a clean stack of frames, and now also one with no transparency.
+    if donor is None and _wait_row_name(base_path) is None:
+        sheet_info(out_path)
+        return
+    _, dfw, dfh = donor_sms_geometry(donor or base_path)
     sheet_info(out_path, (dfw, dfh))
 
 

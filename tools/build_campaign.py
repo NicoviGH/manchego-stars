@@ -9200,6 +9200,17 @@ CH05_GENERIC_PID = '0x80'                        # autolevelled trash (vanilla C
 # per pid. Reading the tables out of the POST-INJECTION tree is what proves it -- HEAD has neither.
 SCRIPTED_NEUTRAL_SPRITES = (
     ('white-moose', (CH04_MOOSE_PID, CH05_MOOSE_PID), 'Gwyllgi'),
+    # Ravisin (#25). Not a neutral -- she is ch05's BOSS -- but she is here for the reason
+    # this table exists: a raw pid wearing our own art, which `classed_cast` never sees. Her
+    # bust, name and stats are already bound the same explicit way off the ch05 YAML.
+    # The CAST palette is right for her on the table's own test: she never changes faction
+    # (hostile from spawn, never recruited, never converted -- her death ends the chapter),
+    # so nothing is lost by leaving the faction ramp, and it is what lets her map sprite hold
+    # the exact black robe / near-white skin / auburn hair her battle anim was hand-edited to.
+    # The donor is only ever read for FRAME SIZE (16x16); the wait row's first field is
+    # `pattern`, which the decomp itself calls unused and this injector writes as 0. So the
+    # vanilla Druid row being 2-frame while her sheet is 3 does not matter.
+    ('ravisin', (CH05_BOSS_PID,), 'Druid'),
 )
 # Raw CharacterData identity binding. Riev contributes collision-free name/portrait slots:
 # MSG_246 is retitled Ravisin and portrait id 0x48 is dressed from ravisin.png.
@@ -12225,6 +12236,10 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     # The moose is ch04's creature under a ch05 pid, and a pid is what the sprite tables are
     # keyed on -- so this is the check that it is an ELK here and not CLASS_GWYLLGI's hound.
     assert_custom_art_pid_wired(CH05_MOOSE_PID, 'white-moose', 'ch05')
+    # Same check for the BOSS, and for the same failure: without an override row her raw pid
+    # falls through GetUnitSMSId to CLASS_DRUID's stock sprite -- the hooded MAN she stopped
+    # being when her battle anim landed, while her own committed sheets sit unused (#25).
+    assert_custom_art_pid_wired(CH05_BOSS_PID, 'ravisin', 'ch05')
     # Scene 7's charge is MOVE_DEFINED + ENUN, so a leg the moose cannot WALK would hang the
     # chapter on the last beat before turn 1 -- ch04's own soft-lock, on the same animal. Every
     # waypoint is checked from where the run BEGINS, not from the pen: the run starts in the

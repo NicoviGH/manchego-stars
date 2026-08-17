@@ -4596,6 +4596,54 @@ ramp entries into a single colour destroys form either way. Ship the intent with
 (`docs/demo/ch05-ravisin-palette.png`). Judge it offline first — this whole loop cost seconds and no
 ROM build, the same reason `rom_bg_preview.py` exists.
 
+### A community map sprite is keyed on GREEN, not on index 0 (2026-08-17, #25)
+
+Every map sprite this repo had vendored until now came from the decomp, where transparency is
+palette **index 0**. `map_sprite_tool.recolour` was written against that and assumed it. FE-Repo
+community sheets do not follow the convention: they ship on a green key, **`#80a080`**, and
+their index 0 is an ordinary colour. Ravisin's donor is exactly that — index 0 is a cream used
+by **12** pixels, and the backdrop is **253** pixels of green at index 5.
+
+Converting one as though index 0 were transparent turns the BACKDROP into a real cast colour,
+and **nothing downstream notices**: geometry passes, the ≤16-colour check passes, the preview
+looks correct because a preview paints index 0 as the page background whether or not the sheet
+means it. It renders in game as a solid frame-sized block with the art inside it. Nicolas did a
+full palette pass against that broken baseline before anyone spotted it.
+
+Two closures, because detection and prevention are different failures:
+- **`_transparent_index` detects the key** — a sheet carrying `#80a080` is a community sheet and
+  that colour is never part of the art; otherwise index 0, unchanged for every vanilla donor.
+- **`sheet_info` rejects a finished sheet with no index-0 pixel at all.** Always wrong, invisible
+  to every other check, and one line to catch.
+
+Also fixed, because it is what forced the conversion to be hand-rolled twice: `recolour`
+validated its output against a donor resolved from the INPUT FILENAME. That works for a vanilla
+sheet and is impossible for a vendored one — `Druid Hoodless (F) {Ultra-Fenix, Velvet Kitsune}`
+is in no wait table, so the tool exited on every community sheet it was handed. It now takes an
+explicit `donor=` and falls through to inference when there is no decomp row to check against.
+
+**A donor is read for FRAME SIZE only.** The wait row's first field is `pattern`, which
+`unit_icon_data.h` itself calls unused and the injector writes as `0` (vanilla writes 0 for
+Eirika Lord too). So Ravisin's `base: Druid` is correct even though that row is 2-frame and her
+sheet is 3 — a mismatch worth stating, because it looks like a bug and is not one.
+
+### Ravisin's map sprite rides SCRIPTED_NEUTRAL_SPRITES, boss or not (2026-08-17, #25)
+
+She is ch05's boss, not a neutral, but the table's name describes its ORIGIN rather than its
+rule. What it actually serves is *a raw pid wearing our own art*, which `classed_cast` never
+sees — the same reason her bust, name and stats are all bound explicitly off the ch05 YAML.
+Without a row her pid falls through `GetUnitSMSId` to `CLASS_DRUID`'s stock sprite: the hooded
+**man** she stopped being when her battle animation landed, with her own committed sheets sitting
+unused. That is the white moose's #24 failure exactly, and `assert_custom_art_pid_wired` now
+guards her pid the way it guards the moose's.
+
+The **cast palette** is right for her on the table's own test — she never changes faction
+(hostile from spawn, never recruited, never converted; her death ends the chapter), so leaving
+the faction ramp costs nothing, and only the cast bank can hold the exact black robe /
+near-white skin / auburn hair her battle anim was hand-edited to. The sprite was chosen
+**hoodless** for the same reason the anim was: her bust has no hood, and the mismatch being
+closed is a hooded man standing in for her on the map.
+
 ### An artifact is not its inputs — verify the FILE you are shipping (2026-08-14, #25)
 
 The scene-3 review GIF was assembled three times. Two of those runs read the frame directory
