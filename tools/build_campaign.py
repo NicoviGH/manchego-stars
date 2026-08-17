@@ -43,6 +43,7 @@ import portrait_tool  # noqa: E402
 import map_sprite_tool  # noqa: E402
 import ref_to_battleframe  # noqa: E402  faked-battle-anim asset generator (#65)
 import feditor_to_banim  # noqa: E402  FEditor->decomp battle-anim importer (#90)
+import banim_palette  # noqa: E402  hand-edited battle-anim palettes (#25)
 import gen_chapter_title  # noqa: E402
 import gen_subtitle_cards  # noqa: E402
 import build_scopes  # noqa: E402  per-step write attribution for the matrix (#255 phase 2)
@@ -2553,7 +2554,38 @@ CLASS_RESKIN_FOE_WEAPON = {
     'CLASS_MERCENARY': ['ITEM_SWORD_IRON'],
     'CLASS_SOLDIER':   ['ITEM_LANCE_IRON', 'ITEM_LANCE_JAVELIN'],
 }
-SANDBOX_FOE_POSITIONS = [(4, 9), (6, 9), (8, 9), (10, 9), (12, 9), (14, 9), (16, 9)]
+# The TESTCH sandbox's bench row. A tile at x=16 is not a tile at all on a 15-wide map, and
+# it shipped as one anyway: the strip was extended a slot at a time as creatures joined, and
+# `_next_sandbox_tile`'s guard only catches running OUT of tiles, never a tile that does not
+# EXIST. The seventh creature (the white moose, once Ravisin took the sixth) deployed off the
+# map edge and `recordenemy` failed walking the cursor to a column the map has not got.
+# Spacing 2 is kept -- adjacent foes let the bait counter the wrong one -- so the strip starts
+# at 2 rather than running past 14.
+SANDBOX_FOE_POSITIONS = [(2, 9), (4, 9), (6, 9), (8, 9), (10, 9), (12, 9), (14, 9)]
+
+
+def sandbox_map_size(campaign):
+    """(w, h) of the map the TESTCH sandbox actually runs on -- READ, not remembered.
+
+    It is NOT vanilla chapter 1's map: `inject_winter_tileset` repoints the test chapter at
+    our own `ChTestSnowMap`. They are the same 15x10 today, so a hardcoded constant is right
+    by accident -- and the bench is now exactly 7 of 7 full, which makes widening that
+    snowfield the obvious next move. A constant would then reject legitimate tiles."""
+    with open(os.path.join(REPO, 'campaigns', campaign, 'maps',
+                           'ch-test-snowfield.json'), encoding='utf-8') as f:
+        m = json.load(f)
+    return m['width'], m['height']
+
+
+def assert_sandbox_bench_fits(campaign):
+    """Every bench tile is on the sandbox map. Called from the injector that stages them."""
+    w, h = sandbox_map_size(campaign)
+    for x, y in SANDBOX_FOE_POSITIONS:
+        if not (0 <= x < w and 0 <= y < h):
+            sys.exit('ERROR: sandbox bench tile (%d,%d) is outside the %dx%d sandbox map '
+                     '(campaigns/%s/maps/ch-test-snowfield.json) -- a foe staged there '
+                     'cannot be reached, and recordenemy fails walking to it'
+                     % (x, y, w, h, campaign))
 
 
 def _cut_boot_intro(montage=False):
@@ -2953,6 +2985,7 @@ def _sandbox_foe_roster(campaign):
     # indexed by len(entries)) could hand a later creature a tile the zip had already spent.
     # Harmless only while the skipped reskin is LAST; one more reskin after it stacks two foes
     # on a tile, and a seventh raises IndexError.
+    assert_sandbox_bench_fits(campaign)
     tiles = iter(SANDBOX_FOE_POSITIONS)
     for rk in enemy_class_reskins(campaign):
         weapon = CLASS_RESKIN_FOE_WEAPON.get(rk['base'])
@@ -4703,7 +4736,7 @@ BANIM_DONORS = {
     # the GWYLLGI's; banim_mdg_at1 (0xB0) is the Mauthe Doog's, and is the one Lupin's
     # imported pounce reads. They are different scripts for the unpromoted and promoted beast.
     # BOTH of the donor's slots are repointed: MONSTER is the antlers-and-hooves attack
-    # (fe_base rotten-claw) and ITEM is the UNARMED entry. Left vanilla, ITEM draws the stock
+    # (fe_base fire-fang) and ITEM is the UNARMED entry. Left vanilla, ITEM draws the stock
     # purple HOUND -- the cavalier row's #206 defect, on the one chapter whose miniboss is an
     # elk and whose YAML has said "the FE-Repo has NO elk art" since July.
     'gwyllgi': ('CLASS_GWYLLGI', ['0x0100 | ITYPE_MONSTER', '0x0100 | ITYPE_ITEM'],
@@ -4720,6 +4753,13 @@ def build_unit_battle_anim(cfg, anim_dir, abbr, motion, cadence):
       flier swoop (launch/apex/dive/return). The `.txt` owns the cadence; each frame's canvas
       position is the on-screen motion. This is the enemy #90 path bound per-CHARACTER, not
       per-class.
+      Optional `palette_edit: <path>` -- a HAND-EDITED palette written by
+      tools/banim_palette.py, applied as build_import's `recolor`. A vendored anim arrives on
+      the author's colours, and for a unit those can be wrong on faction (Ravisin's blue robe)
+      while being right on everything else (her auburn hair, the reason her anim was chosen).
+      The class path's `recolor:` names a FUNCTION for that; a character's look is a by-eye
+      call, so this names a FILE instead. Either way it recolours the agbpal ONLY -- the sheet
+      indices are untouched, so an edit is reversible and never a re-import (#25).
     - else `frames: [...]` -> the faked 3-pose generator (ref_to_battleframe, #65), whose mode
       bodies are built from the donor's `motion`/`cadence`.
     """
@@ -4728,7 +4768,15 @@ def build_unit_battle_anim(cfg, anim_dir, abbr, motion, cadence):
         txt = os.path.join(anim_dir, imp['txt'])
         frames_dir = os.path.join(anim_dir, imp.get('frames_dir')
                                   or os.path.dirname(imp['txt']))
-        return feditor_to_banim.build_import(abbr, txt, frames_dir)
+        recolor = (banim_palette.load_recolor(os.path.join(anim_dir, imp['palette_edit']))
+                   if imp.get('palette_edit') else None)
+        res = feditor_to_banim.build_import(abbr, txt, frames_dir, recolor=recolor)
+        if recolor is not None:
+            # The edit is stored per-INDEX and applied per-COLOUR; if the frames are ever
+            # re-vendored under it, an entry it names can simply cease to exist and that
+            # colour ships NATIVE behind a green build. Nothing else compares the two.
+            banim_palette.assert_all_applied(recolor, 'battle_anim %s' % abbr)
+        return res
     from PIL import Image
     frame_imgs = [Image.open(os.path.join(anim_dir, p)).convert('RGBA')
                   for p in cfg['frames']]
@@ -5434,7 +5482,17 @@ def inject_enemy_class_battle_anims(campaign, verbose=True):
         # ally-blue) palette, but a reskin is always hostile, so recolour to the enemy ramp
         # (the engine reads agbpal bank BANIMPAL_RED for enemies). `recolor:` names a
         # feditor_to_banim recolour fn; absent -> the anim keeps its native colours.
+        # Two ways to leave the author's colours, and a class may use either: `recolor:`
+        # names a FUNCTION (a rule over RGB -- right when the only question is which side
+        # the unit is on), `palette_edit:` names a hand-edited FILE (right when the ramp has
+        # to be looked at). Reading only the first made an edit dropped beside a class anim a
+        # silent no-op -- the inverse of load_recolor's "a typo must fail the build" (#25).
         recolor = BANIM_RECOLORS[ba['recolor']] if ba.get('recolor') else None
+        if ba.get('palette_edit'):
+            if recolor:
+                sys.exit('ERROR: enemy_class_reskins %s declares BOTH recolor: and '
+                         'palette_edit:; they are two answers to one question' % rk['id'])
+            recolor = banim_palette.load_recolor(os.path.join(src_dir, ba['palette_edit']))
 
         # Import each weapon-mode anim -> a new animId; collect (wtype, animId) repoints. Each
         # anim carries its OWN agbpal (the engine loads a battle sprite's palette per-animation),
@@ -5445,6 +5503,8 @@ def inject_enemy_class_battle_anims(campaign, verbose=True):
             wdir = os.path.join(src_dir, w['dir'])
             res = feditor_to_banim.build_import(w['abbr'], os.path.join(wdir, w['txt']), wdir,
                                                 recolor=recolor)
+            if ba.get('palette_edit'):
+                banim_palette.assert_all_applied(recolor, 'enemy_class %s' % rk['id'])
             anim_id = _write_imported_banim_assets(w['abbr'], res, rk['id'])
             for wt in w['wtypes']:
                 repoints.append((wt, anim_id))
