@@ -841,10 +841,22 @@ class TestRawPidBattleAnim(unittest.TestCase):
         # guards running OUT of tiles and says nothing about a tile that does not EXIST, so the
         # seventh creature deployed off the edge and `recordenemy` failed walking the cursor to
         # a column the map has not got. Two units on the bench hid it: the sixth still fitted.
-        w, h = bc.SANDBOX_MAP_SIZE
+        w, h = bc.sandbox_map_size('rime-of-the-frostmaiden')
         for x, y in bc.SANDBOX_FOE_POSITIONS:
             self.assertTrue(0 <= x < w and 0 <= y < h,
                             'bench tile (%d,%d) is outside the %dx%d sandbox map' % (x, y, w, h))
+        bc.assert_sandbox_bench_fits('rime-of-the-frostmaiden')
+
+    def test_the_sandbox_size_is_read_from_the_map_we_actually_host_on(self):
+        # NOT vanilla Ch1's map: inject_winter_tileset repoints the test chapter at our own
+        # ChTestSnowMap. Same 15x10 today, so a constant would be right by accident -- and
+        # the bench is exactly full, which makes widening that snowfield the next move.
+        import json
+        with open(os.path.join(bc.REPO, 'campaigns', 'rime-of-the-frostmaiden', 'maps',
+                               'ch-test-snowfield.json'), encoding='utf-8') as f:
+            m = json.load(f)
+        self.assertEqual(bc.sandbox_map_size('rime-of-the-frostmaiden'),
+                         (m['width'], m['height']))
 
     def test_every_benched_creature_gets_a_distinct_tile(self):
         # Spacing is 2 on purpose: adjacent foes let the bait counter the wrong creature, which

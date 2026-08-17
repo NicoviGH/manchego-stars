@@ -82,7 +82,8 @@ class EditRoundTrip(unittest.TestCase):
         bp.save_edit(p, native, {2: (255, 0, 0)})
         blob = json.load(open(p))
         self.assertEqual(blob['native'], ['#000000', '#1858d8', '#886050'])
-        self.assertEqual(blob['edited']['2'], '#ff0000')
+        # stored QUANTIZED -- #ff0000 is not a colour the GBA has (5 bits a channel)
+        self.assertEqual(blob['edited']['2'], '#f80000')
 
     def test_an_empty_edit_loads_as_identity(self):
         p = os.path.join(self.tmp, 'palette.json')
@@ -93,6 +94,76 @@ class EditRoundTrip(unittest.TestCase):
         """A typo'd `palette_edit:` path must fail the BUILD, not ship native colours."""
         with self.assertRaises(IOError):
             bp.load_recolor(os.path.join(self.tmp, 'nope.json'))
+
+
+class QuantizedToWhatTheGbaCanShow(unittest.TestCase):
+    """A picked colour is snapped at PICK time. The hardware keeps 5 bits a channel, so
+    two swatches chosen as distinct ramp steps can land on one halfword -- this tool's own
+    "a ramp must stay a ramp" failure, reached through the tool that documents it."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix='banimpal_')
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_quantize_keeps_the_top_five_bits(self):
+        self.assertEqual(bp.gba_quantize((0x40, 0x40, 0x52)), (0x40, 0x40, 0x50))
+        self.assertEqual(bp.gba_quantize((0xff, 0xff, 0xff)), (0xf8, 0xf8, 0xf8))
+        self.assertEqual(bp.gba_quantize((0, 0, 0)), (0, 0, 0))
+
+    def test_a_saved_edit_holds_only_reachable_colours(self):
+        p = os.path.join(self.tmp, 'palette.json')
+        bp.save_edit(p, [(0, 0, 0), (1, 2, 3)], {1: (0x40, 0x40, 0x52)})
+        self.assertEqual(json.load(open(p))['edited']['1'], '#404050')
+
+    def test_two_picks_that_collapse_to_one_colour_are_stored_as_one(self):
+        """The failure this guards: #404052 and #404050 are the SAME halfword."""
+        self.assertEqual(bp.gba_quantize((0x40, 0x40, 0x52)),
+                         bp.gba_quantize((0x40, 0x40, 0x50)))
+
+
+class EditMustStillMatchThePalette(unittest.TestCase):
+    """The edit is stored per-INDEX and applied per-COLOUR, and nothing else compares them."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix='banimpal_')
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_an_edit_naming_a_vanished_colour_fails_the_build(self):
+        p = os.path.join(self.tmp, 'palette.json')
+        bp.save_edit(p, [(0, 0, 0), (24, 88, 216)], {1: (216, 24, 24)})
+        rc = bp.load_recolor(p)
+        for c in [(0, 0, 0), (99, 99, 99)]:      # a palette that no longer holds #1858d8
+            rc(c)
+        with self.assertRaises(SystemExit):
+            bp.assert_all_applied(rc, 'test unit')
+
+    def test_an_edit_whose_colours_are_all_present_passes(self):
+        p = os.path.join(self.tmp, 'palette.json')
+        bp.save_edit(p, [(0, 0, 0), (24, 88, 216)], {1: (216, 24, 24)})
+        rc = bp.load_recolor(p)
+        for c in [(0, 0, 0), (24, 88, 216)]:
+            rc(c)
+        bp.assert_all_applied(rc, 'test unit')     # must not raise
+
+    def test_ravisins_live_edit_still_matches_her_frames(self):
+        """Guards the shipped asset against a future re-vendor of her frames."""
+        rc = bp.load_recolor(bp.edit_path(RAVISIN))
+        for c in bp.Doc(RAVISIN, 'Magic.txt').palette:
+            rc(c)
+        bp.assert_all_applied(rc, 'ravisin')
+
+
+class BrowserCacheKey(unittest.TestCase):
+    def test_the_key_is_the_path_not_the_basename(self):
+        """`wildling/unarmed` and `lizardzerker/unarmed` share a basename, as does every
+        anim's axe/handaxe pair -- one draft would be handed to another creature."""
+        a = bp.Doc(VENDORED, 'Unarmed.txt').data()['key']
+        self.assertIn('wildling', a)
+        self.assertNotEqual(a, 'unarmed')
 
 
 class AppliedToTheRealImport(unittest.TestCase):

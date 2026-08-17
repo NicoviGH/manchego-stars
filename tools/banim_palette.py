@@ -45,6 +45,17 @@ EDIT_NAME = 'palette.json'
 PAD = 2                      # window margin around the union of every frame's art
 
 
+def gba_quantize(rgb):
+    """Snap a colour to what the GBA can actually show (BGR555, 5 bits a channel).
+
+    A hand-picked colour must be quantized at PICK time, not silently at link time. The
+    hardware keeps the top 5 bits of each channel, so #404052 and #404050 are the SAME
+    halfword -- and two swatches chosen as distinct ramp steps can collapse into one.
+    That is this tool's own "a ramp must stay a ramp" failure, reachable through the tool
+    that documents it, so the editor previews and stores only reachable colours."""
+    return tuple((c >> 3) << 3 for c in rgb)
+
+
 def _hex(rgb):
     return '#%02x%02x%02x' % tuple(rgb)
 
@@ -65,7 +76,7 @@ def save_edit(path, native, edited):
     ever re-vendored and the derived palette shifts, a loader that only kept index->colour
     would repoint every entry silently. Keeping the native colours makes that detectable."""
     blob = {'native': [_hex(c) for c in native],
-            'edited': {str(i): _hex(c) for i, c in sorted(edited.items())}}
+            'edited': {str(i): _hex(gba_quantize(c)) for i, c in sorted(edited.items())}}
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(blob, f, indent=2)
         f.write('\n')
@@ -81,10 +92,34 @@ def load_recolor(path):
         blob = json.load(f)
     native = blob['native']
     table = {_unhex(native[int(i)]): _unhex(c) for i, c in blob['edited'].items()}
+    seen = set()
 
     def recolor(rgb):
-        return table.get(tuple(rgb), tuple(rgb))
+        rgb = tuple(rgb)
+        if rgb in table:
+            seen.add(rgb)
+        return table.get(rgb, rgb)
+    recolor.edited = table            # what the file asked for
+    recolor.seen = seen               # what the live palette actually offered
+    recolor.path = path
     return recolor
+
+
+def assert_all_applied(recolor, who):
+    """Every edited colour must have been FOUND in the palette it was applied to.
+
+    The editor edits by INDEX and `load_recolor` applies by COLOUR, and nothing else
+    compares the two. Re-vendor the frames and the derived palette can shift: an entry the
+    file still names may no longer exist, and that colour would ship NATIVE behind a green
+    build, with the editor's preview and the ROM disagreeing and neither complaining. The
+    saved `native` block exists precisely so this is detectable -- so detect it."""
+    missing = sorted(set(recolor.edited) - recolor.seen)
+    if missing:
+        sys.exit('ERROR: %s: %s names %d edited colour(s) that are not in the animation\'s '
+                 'palette any more (%s) -- the frames were re-vendored under the edit. '
+                 'Re-open tools/banim_palette.py on it and re-apply.'
+                 % (who, recolor.path, len(missing),
+                    ', '.join(_hex(c) for c in missing)))
 
 
 class Doc:
@@ -146,6 +181,10 @@ class Doc:
             with open(saved, encoding='utf-8') as f:
                 edited = json.load(f)['edited']
         return {
+            # The browser cache key. NOT the basename: `wildling/unarmed` and
+            # `lizardzerker/unarmed` share one, as do every anim's axe/handaxe pair, so a
+            # basename key hands one creature's draft to another.
+            'key': os.path.relpath(self.anim_dir, REPO),
             'name': os.path.basename(self.anim_dir.rstrip('/')),
             'txt': self.txt_name,
             'w': x1 - x0, 'h': y1 - y0,
@@ -229,6 +268,11 @@ button.on{background:#4a505a;border-color:#6b7280}
 let D=null, EDIT={}, ISO=null, MODE=null, BG=0;
 const BGS=['#84a584','#c8d8e8','#a89880','#282828'];
 const $=id=>document.getElementById(id);
+/* The GBA keeps 5 bits a channel, so snap every picked colour to what it can SHOW. Picking
+   at 8-bit lets two swatches preview as distinct ramp steps and land on one halfword --
+   this tool's own "a ramp must stay a ramp" failure. */
+const gba=h=>'#'+[1,3,5].map(i=>((parseInt(h.substr(i,2),16)>>3)<<3)
+                                .toString(16).padStart(2,'0')).join('');
 function cur(i){return (i in EDIT)?EDIT[i]:D.swatches[i].hex}
 
 /* ---- drawing ---- */
@@ -279,7 +323,7 @@ function rows(){
     const d=document.createElement('div');
     d.className='sw'+(s.n?'':' unused')+(ISO===s.i?' iso':'')+((s.i in EDIT)?' dirty':'');
     const inp=document.createElement('input');inp.type='color';inp.value=cur(s.i);
-    inp.oninput=()=>{EDIT[s.i]=inp.value;save();rows();redraw();};
+    inp.oninput=()=>{EDIT[s.i]=gba(inp.value);inp.value=EDIT[s.i];save();rows();redraw();};
     const nat=document.createElement('span');nat.className='nat';nat.style.background=s.hex;
     nat.title='native '+s.hex;
     const b=document.createElement('b');b.textContent=s.i;
@@ -301,14 +345,24 @@ function modes(){
     b.onclick=()=>{MODE=k;modes();play();};m.appendChild(b);
   });
 }
-function save(){localStorage.setItem('banimpal:'+D.name,JSON.stringify(EDIT));}
+/* The DRAFT is unsaved work; palette.json on disk is the applied truth. A draft is only
+   restored when it was taken from the state the disk is still in (`base`), so hitting
+   Apply can never write a stale edit back over a newer file -- and it is keyed on the
+   anim's repo-relative PATH, since basenames collide across anim folders. */
+function save(){localStorage.setItem('banimpal:'+D.key,
+    JSON.stringify({base:D.edited,edit:EDIT}));}
 function status(t){$('stat').textContent=t;}
 
 /* ---- boot ---- */
 fetch('/data').then(r=>r.json()).then(d=>{
   D=d;
-  const stored=localStorage.getItem('banimpal:'+D.name);
-  EDIT = stored?JSON.parse(stored):Object.assign({},D.edited);
+  const stored=localStorage.getItem('banimpal:'+D.key);
+  EDIT = Object.assign({},D.edited);                     /* disk is the applied truth */
+  if(stored){
+    const s=JSON.parse(stored);
+    /* restore the draft only if it was taken from the state the disk is STILL in */
+    if(JSON.stringify(s.base||{})===JSON.stringify(D.edited)) EDIT=s.edit||EDIT;
+  }
   $('nm').textContent=D.name;
   $('sub').textContent=' — '+D.txt+', '+D.frames.length+' distinct frames, '
       +(D.swatches.length-1)+' colours';
