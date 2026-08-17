@@ -12505,14 +12505,16 @@ PLATFORM_BASE_INDEX = 115  # battle_terrain_table currently ends at 114
 # way and nobody had looked. Values: 0x00 snow-OPEN (BanimTerrainGroundDefault, rewritten to the
 # drift), 0x15 snow-ROUGH (Tileset15), 0x16 CAVE (Tileset16, vanilla stone).
 # ROUGH vs OPEN is a read of the GROUND, not of the weather: `snow-uneven-light` is snow lying
-# over rock, `snowdrift` is windswept open snow. A paved map takes rough.
+# over rock, `snowdrift` is windswept open snow. It decides only the OPEN/flat terrain -- road,
+# rough and water name their own grounds in _terrain_snow_ground and are the same either way.
 CHAPTER_BATTLE_TILESETS = {
     PROLOGUE_HOST_INDEX: 0x00,   # the frozen lake: open windswept snow is the whole picture
     CH01_HOST_INDEX:     0x15,   # the iron trail: snow over trail rock
     CH02_HOST_INDEX:     0x15,   # Bryn Shander's approach, same winter tileset as ch01/ch04
     CH03_HOST_INDEX:     0x16,   # the Termalaine mine: indoors, vanilla stone rather than snow
     CH04_HOST_INDEX:     0x15,   # the moose forest: snow over forest floor
-    CH05_HOST_INDEX:     0x15,   # the elven tomb: PAVED (53% road), so rock-under-snow, not drift
+    CH05_HOST_INDEX:     0x15,   # the elven tomb: its flat ground is courtyard stone, not drift
+                                 # (the roads, which are most of it, take the path ground)
 }
 _PLAT_ICE = {'RIVER', 'SEA', 'LAKE', 'WATER', 'GLACIER', 'SNAG', 'DEEPS', 'SHIP_FLAT',
              'SHIP_WRECK'}

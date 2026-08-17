@@ -7501,10 +7501,7 @@ scenarios.recordch05platform = function()
     local PLAT_NAME = { [PLAT_DRIFT] = "ms_snowdrift", [PLAT_ROUGH] = "ms_snowrough",
                         [PLAT_ICE] = "ms_snowice", [PLAT_PATH] = "ms_snowpath" }
     local ground, groundSeen = nil, false
-    return recordCutscene({
-        tag = "ch05platform", speed = "normal", maxFrames = 1500, shotEvery = 2,
-        pressEvery = 90,
-        pre = function()
+    local function setUp()
             pokeFastConfig()
             if not bootToMap() then return false, "never reached the ch05 map" end
             if not waitFor(function()
@@ -7585,32 +7582,49 @@ scenarios.recordch05platform = function()
                     return after.procs.battle ~= nil or controllerState(after) ~= "target_selection"
                 end, 300) then return false, "the attack never committed" end
             return true
-        end,
-        until_ = function()
-            -- gBanimFloorfx is s16[2] (POS_L/POS_R) and is -1 until the anim resolves it.
-            local l = rs16(SYM.gBanimFloorfx)
-            if not groundSeen and l >= 0 then
-                ground, groundSeen = l, true
-                log(string.format("ch05platform: standing on battle_terrain_table[%d] (%s)",
-                    l, PLAT_NAME[l] or "NOT one of ours -- vanilla ground"))
+    end
+
+    wait(30)
+    local ok, why = setUp()
+    if not ok then return result("FAIL", "ch05platform setup failed: " .. tostring(why)) end
+    -- The loop is the scenario's own, NOT recordCutscene's, and that is the finding this
+    -- scenario is named for rather than a style choice: recordCutscene calls `o.post(reached)`
+    -- and DISCARDS the return, then returns its own "cutscene recorded" PASS. The first cut put
+    -- the platform assertion in `post`, so the verdict was decided by whether a film was made
+    -- and the assertion was dead code -- the same "a verdict only covers what it READS" defect,
+    -- one level up. A scenario with something to assert owns its loop and calls result() once.
+    for f = 1, 1500 do
+        if f % 2 == 0 then shot("ch05platform") end
+        -- gBanimFloorfx is s16[2] (POS_L/POS_R) and is -1 until the anim resolves it.
+        local l = rs16(SYM.gBanimFloorfx)
+        if not groundSeen and l >= 0 then
+            ground, groundSeen = l, true
+            log(string.format("ch05platform: standing on battle_terrain_table[%d] (%s)",
+                l, PLAT_NAME[l] or "NOT one of ours -- vanilla ground"))
+        end
+        if controllerState() == "dialogue_wait" then
+            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears",
+                function(after) return controllerState(after) ~= "dialogue_wait" end, 120) then
+                return result("FAIL", "ch05platform dialogue postcondition failed")
             end
-            return groundSeen and faction() == 0 and not menuOpen()
-                and not procActive(SYM.ProcScr_BattleEventEngine)
-                and controllerState() == "player_map_idle"
-        end,
-        post = function()
-            if not groundSeen then
-                return result("FAIL", "the battle animation never resolved a ground index")
-            end
-            if ground ~= PLAT_PATH then
-                return result("FAIL", string.format(
-                    "road resolved to battle_terrain_table[%d] (%s), not ms_snowpath[%d] -- "
-                    .. "ch05 is standing on the wrong platform", ground,
-                    PLAT_NAME[ground] or "a vanilla ground", PLAT_PATH))
-            end
-            return result("PASS", "ch05's roads fight on ms_snowpath, the snowed-over track")
-        end,
-    })
+        end
+        if groundSeen and faction() == 0 and not menuOpen()
+            and not procActive(SYM.ProcScr_BattleEventEngine)
+            and controllerState() == "player_map_idle" then
+            break
+        end
+        yield()
+    end
+    if not groundSeen then
+        return result("FAIL", "the battle animation never resolved a ground index")
+    end
+    if ground ~= PLAT_PATH then
+        return result("FAIL", string.format(
+            "road resolved to battle_terrain_table[%d] (%s), not ms_snowpath[%d] -- ch05 is "
+            .. "standing on the wrong platform", ground,
+            PLAT_NAME[ground] or "a vanilla ground", PLAT_PATH))
+    end
+    return result("PASS", "ch05's roads fight on ms_snowpath, the snowed-over track")
 end
 
 -- recordch05combatquotes (#25): scenes 12 and 13, filmed in ONE combat.
