@@ -836,6 +836,34 @@ class TestRawPidBattleAnim(unittest.TestCase):
             if bc.CLASS_RESKIN_FOE_WEAPON.get(reskin['base']):
                 self.assertIn(reskin['slot'], body)
 
+    def test_every_bench_tile_is_actually_on_the_sandbox_map(self):
+        # The strip shipped with a seventh tile at x=16 on a 15-wide map. `_next_sandbox_tile`
+        # guards running OUT of tiles and says nothing about a tile that does not EXIST, so the
+        # seventh creature deployed off the edge and `recordenemy` failed walking the cursor to
+        # a column the map has not got. Two units on the bench hid it: the sixth still fitted.
+        w, h = bc.SANDBOX_MAP_SIZE
+        for x, y in bc.SANDBOX_FOE_POSITIONS:
+            self.assertTrue(0 <= x < w and 0 <= y < h,
+                            'bench tile (%d,%d) is outside the %dx%d sandbox map' % (x, y, w, h))
+
+    def test_every_benched_creature_gets_a_distinct_tile(self):
+        # Spacing is 2 on purpose: adjacent foes let the bait counter the wrong creature, which
+        # is the failure per-pid selection exists to prevent.
+        self.assertEqual(len(set(bc.SANDBOX_FOE_POSITIONS)), len(bc.SANDBOX_FOE_POSITIONS))
+        xs = sorted(x for x, _ in bc.SANDBOX_FOE_POSITIONS)
+        self.assertTrue(all(b - a >= 2 for a, b in zip(xs, xs[1:])))
+
+    def test_the_bench_seats_every_creature_that_needs_one(self):
+        # The count that must not silently overflow: one tile per weapon-carrying reskin plus
+        # one per raw-pid creature. Ravisin taking the sixth is what pushed the moose off.
+        campaign = 'rime-of-the-frostmaiden'
+        reskins = sum(1 for r in bc.enemy_class_reskins(campaign)
+                      if bc.CLASS_RESKIN_FOE_WEAPON.get(r['base']))
+        raw = sum(1 for uid, (ch, pid) in bc.RAW_PID_BATTLE_ANIMS.items()
+                  if bc._chapter_unit(campaign, ch, uid).get('battle_anim'))
+        self.assertLessEqual(reskins + raw, len(bc.SANDBOX_FOE_POSITIONS),
+                             'the bench is over-subscribed; add a tile (on the map)')
+
     def test_the_moose_name_spends_no_donor(self):
         # The kobolds' #90 rule, one namespace over: append your own id rather than burn a
         # scarce vanilla slot. A character donor would have cost the campaign a slot for a
@@ -970,6 +998,45 @@ class TestRawPidBattleAnim(unittest.TestCase):
         self.assertEqual(len(res['sheets']), 7)          # six swoop frames + a dodge frame
         self.assertIn('banim_pinky_script', res['motion_s'])
         self.assertEqual(len(res['pal']), 128)           # same agbpal shape as the faked path
+
+    def test_palette_edit_recolours_the_agbpal_and_leaves_the_sheets_alone(self):
+        # The per-character import path takes a HAND-EDITED palette (`palette_edit:`,
+        # written by tools/banim_palette.py) the same way the class path takes a named
+        # recolour fn. A community anim ships the author's colours; the edit is a look
+        # call over them, so it may only move the agbpal -- every sheet INDEX must be
+        # byte-identical, or it is a re-import wearing a palette's clothes (#25).
+        import json
+        import tempfile
+        anim_dir = os.path.join(bc.REPO, 'campaigns', 'rime-of-the-frostmaiden',
+                                'battle_anims', 'pinky')
+        plain = bc.build_unit_battle_anim(
+            {'clone_from': 'pegasus', 'import': {'txt': 'Pinky.txt', 'frames_dir': '.'}},
+            anim_dir, 'pinky', 'melee', 'lance')
+        with tempfile.TemporaryDirectory() as d:
+            import banim_palette as bp
+            doc = bp.Doc(anim_dir, 'Pinky.txt')
+            edit = os.path.join(d, 'pal.json')
+            bp.save_edit(edit, doc.palette, {1: (248, 8, 8)})
+            # `palette_edit:` is resolved against the anim dir, like `txt`/`frames_dir`
+            rel = os.path.relpath(edit, anim_dir)
+            cfg = {'clone_from': 'pegasus',
+                   'import': {'txt': 'Pinky.txt', 'frames_dir': '.', 'palette_edit': rel}}
+            edited = bc.build_unit_battle_anim(cfg, anim_dir, 'pinky', 'melee', 'lance')
+            self.assertNotEqual(plain['pal'], edited['pal'])
+            self.assertEqual([s.tobytes() for s in plain['sheets']],
+                             [s.tobytes() for s in edited['sheets']])
+            self.assertEqual(json.load(open(edit))['edited'], {'1': '#f80808'})
+
+    def test_a_missing_palette_edit_fails_the_build(self):
+        # A typo'd path must stop the build, not silently ship the native colours -- the
+        # whole point of the edit is that native was WRONG for this unit.
+        anim_dir = os.path.join(bc.REPO, 'campaigns', 'rime-of-the-frostmaiden',
+                                'battle_anims', 'pinky')
+        cfg = {'clone_from': 'pegasus',
+               'import': {'txt': 'Pinky.txt', 'frames_dir': '.',
+                          'palette_edit': 'no-such-palette.json'}}
+        with self.assertRaises(IOError):
+            bc.build_unit_battle_anim(cfg, anim_dir, 'pinky', 'melee', 'lance')
 
 
 class BattleSpellPaletteTint(unittest.TestCase):

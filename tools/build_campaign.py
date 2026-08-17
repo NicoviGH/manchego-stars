@@ -43,6 +43,7 @@ import portrait_tool  # noqa: E402
 import map_sprite_tool  # noqa: E402
 import ref_to_battleframe  # noqa: E402  faked-battle-anim asset generator (#65)
 import feditor_to_banim  # noqa: E402  FEditor->decomp battle-anim importer (#90)
+import banim_palette  # noqa: E402  hand-edited battle-anim palettes (#25)
 import gen_chapter_title  # noqa: E402
 import gen_subtitle_cards  # noqa: E402
 import build_scopes  # noqa: E402  per-step write attribution for the matrix (#255 phase 2)
@@ -2553,7 +2554,19 @@ CLASS_RESKIN_FOE_WEAPON = {
     'CLASS_MERCENARY': ['ITEM_SWORD_IRON'],
     'CLASS_SOLDIER':   ['ITEM_LANCE_IRON', 'ITEM_LANCE_JAVELIN'],
 }
-SANDBOX_FOE_POSITIONS = [(4, 9), (6, 9), (8, 9), (10, 9), (12, 9), (14, 9), (16, 9)]
+# The TESTCH sandbox is hosted on chapter 1's map, which is 15x10 -- so x runs 0..14, and a
+# bench tile at x=16 is not a tile at all. It shipped as one anyway: the strip was extended a
+# slot at a time as creatures joined the bench, and `_next_sandbox_tile`'s guard only catches
+# running OUT of tiles, never a tile that does not exist. The seventh creature (the white
+# moose, once Ravisin took the sixth) deployed off the map edge, and `recordenemy` failed
+# walking the cursor to a column the map does not have. Spacing 2 is kept -- adjacent foes
+# would let the bait hit the wrong one -- so the strip starts at 2 instead of running past 14.
+SANDBOX_MAP_SIZE = (15, 10)                  # host chapter 1; asserted against below
+SANDBOX_FOE_POSITIONS = [(2, 9), (4, 9), (6, 9), (8, 9), (10, 9), (12, 9), (14, 9)]
+for _x, _y in SANDBOX_FOE_POSITIONS:
+    assert 0 <= _x < SANDBOX_MAP_SIZE[0] and 0 <= _y < SANDBOX_MAP_SIZE[1], \
+        'sandbox bench tile (%d,%d) is outside the %dx%d sandbox map' % (
+            (_x, _y) + SANDBOX_MAP_SIZE)
 
 
 def _cut_boot_intro(montage=False):
@@ -4703,7 +4716,7 @@ BANIM_DONORS = {
     # the GWYLLGI's; banim_mdg_at1 (0xB0) is the Mauthe Doog's, and is the one Lupin's
     # imported pounce reads. They are different scripts for the unpromoted and promoted beast.
     # BOTH of the donor's slots are repointed: MONSTER is the antlers-and-hooves attack
-    # (fe_base rotten-claw) and ITEM is the UNARMED entry. Left vanilla, ITEM draws the stock
+    # (fe_base fire-fang) and ITEM is the UNARMED entry. Left vanilla, ITEM draws the stock
     # purple HOUND -- the cavalier row's #206 defect, on the one chapter whose miniboss is an
     # elk and whose YAML has said "the FE-Repo has NO elk art" since July.
     'gwyllgi': ('CLASS_GWYLLGI', ['0x0100 | ITYPE_MONSTER', '0x0100 | ITYPE_ITEM'],
@@ -4720,6 +4733,13 @@ def build_unit_battle_anim(cfg, anim_dir, abbr, motion, cadence):
       flier swoop (launch/apex/dive/return). The `.txt` owns the cadence; each frame's canvas
       position is the on-screen motion. This is the enemy #90 path bound per-CHARACTER, not
       per-class.
+      Optional `palette_edit: <path>` -- a HAND-EDITED palette written by
+      tools/banim_palette.py, applied as build_import's `recolor`. A vendored anim arrives on
+      the author's colours, and for a unit those can be wrong on faction (Ravisin's blue robe)
+      while being right on everything else (her auburn hair, the reason her anim was chosen).
+      The class path's `recolor:` names a FUNCTION for that; a character's look is a by-eye
+      call, so this names a FILE instead. Either way it recolours the agbpal ONLY -- the sheet
+      indices are untouched, so an edit is reversible and never a re-import (#25).
     - else `frames: [...]` -> the faked 3-pose generator (ref_to_battleframe, #65), whose mode
       bodies are built from the donor's `motion`/`cadence`.
     """
@@ -4728,7 +4748,9 @@ def build_unit_battle_anim(cfg, anim_dir, abbr, motion, cadence):
         txt = os.path.join(anim_dir, imp['txt'])
         frames_dir = os.path.join(anim_dir, imp.get('frames_dir')
                                   or os.path.dirname(imp['txt']))
-        return feditor_to_banim.build_import(abbr, txt, frames_dir)
+        recolor = (banim_palette.load_recolor(os.path.join(anim_dir, imp['palette_edit']))
+                   if imp.get('palette_edit') else None)
+        return feditor_to_banim.build_import(abbr, txt, frames_dir, recolor=recolor)
     from PIL import Image
     frame_imgs = [Image.open(os.path.join(anim_dir, p)).convert('RGBA')
                   for p in cfg['frames']]

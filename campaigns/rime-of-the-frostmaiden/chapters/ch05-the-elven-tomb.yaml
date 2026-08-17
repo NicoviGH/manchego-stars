@@ -274,21 +274,28 @@ enemy_units:
     # (auburn too, but a pointed hat her bust has not) and `[T2 Druid-Base] Vanilla FE6 [F]` (her
     # exact tier, but fully hooded). Vanilla's own CLASS_DRUID_F is a real second animation
     # (0x79/0x7A vs the male's 0x77/0x78) and costs nothing — also hooded, which is why it lost.
-    # PALETTE: the anim's own SHIPPED palette, and the author's "enemy" one was tried and
-    # REJECTED on sight. The two are index-aligned, so swapping them looked free -- but the art
-    # does not use those indices the way the swatch suggests: the enemy palette turns her HAIR
-    # TEAL, and auburn hair matching the bust is the entire reason this anim was chosen over the
-    # hooded alternatives. Comparison: `docs/demo/ch05-ravisin-anim-palette.png`. So she is currently
-    # BLUE-ROBED where an enemy would normally read red -- a known, deliberate trade, and the
-    # real target is a hybrid (her auburn hair + a frost/enemy robe ramp), which is a palette
-    # pass rather than a re-import. Do not "fix" the faction colour by reinstating the enemy
-    # palette wholesale; that is the thing that was already rejected.
+    # PALETTE: hand-edited to the BUST, not to a faction ramp (Nicolas, 2026-08-17, in
+    # tools/banim_palette.py). She fights in a BLACK robe over near-white skin, which is her
+    # portrait's own spec -- "frost-pale skin, black feather mantle" -- and her auburn hair is
+    # untouched, that being the entire reason this anim was chosen over the hooded finalists.
+    # Only five of the fifteen entries move: the robe ramp (1/2/3) and the skin pair (4/5).
+    #
+    # Two things NOT to redo here:
+    #   * The author's own "enemy" swatch was tried and REJECTED on sight. It is index-aligned,
+    #     so swapping it looked free -- but the art does not use those indices the way the swatch
+    #     suggests, and it turns her HAIR TEAL. `docs/demo/ch05-ravisin-anim-palette.png`.
+    #   * The robe ramp must stay a RAMP. A first edit set 1/2/3 to one flat black and 4/5 to one
+    #     flat white; the fold shading died with it and the spell fan -- indices 2/3 also draw the
+    #     cast FX, not just cloth -- became a solid void. Same failure class as the rejected Arena
+    #     palettes, one axis over: those crushed CHROMA, this crushed VALUE. Distinct ramp entries
+    #     merging into one is what kills form either way.
     battle_anim:
       clone_from: druid           # the AnimConf to clone + which slots to repoint; see BANIM_DONORS
       abbr: ravisin
       import:                     # a REAL FE-native animation, transcribed whole (feditor_to_banim)
         txt: ravisin/Magic.txt    # ...bound per-CHARACTER via _u25, like Sahnar's and Pinky's:
         frames_dir: ravisin       # NEVER at CLASS_DRUID, which future frost druids also use
+        palette_edit: ravisin/palette.json   # recolours the agbpal ONLY; frames stay native
     # NO DROP, and that is vanilla's answer rather than an omission: Ch5 has ZERO droppers in the
     # whole chapter, Saar included — killing the boss pays in winning. Ravisin used to carry a
     # `drops:` block naming a "crest of cold iron"; the injector reads `item_drop:` and never saw
