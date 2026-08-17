@@ -278,7 +278,7 @@ enemy_units:
     # REJECTED on sight. The two are index-aligned, so swapping them looked free -- but the art
     # does not use those indices the way the swatch suggests: the enemy palette turns her HAIR
     # TEAL, and auburn hair matching the bust is the entire reason this anim was chosen over the
-    # hooded alternatives. Comparison: `map-review/ravisin-anim-palette.png`. So she is currently
+    # hooded alternatives. Comparison: `docs/demo/ch05-ravisin-anim-palette.png`. So she is currently
     # BLUE-ROBED where an enemy would normally read red -- a known, deliberate trade, and the
     # real target is a hybrid (her auburn hair + a frost/enemy robe ramp), which is a palette
     # pass rather than a re-import. Do not "fix" the faction colour by reinstating the enemy

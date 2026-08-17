@@ -567,6 +567,37 @@ def check_injection_order(fail):
         _injection_call_sequence(open(path, encoding='utf-8').read())))
 
 
+def check_recordenemy_knows_every_raw_pid(fail):
+    """`recordenemy` is the bench for a named RAW-PID creature's battle animation, and it picks
+    the foe by PID from a table inside harness.lua -- a hand-kept copy of build_campaign's
+    RAW_PID_BATTLE_ANIMS. Two lists that must agree and nothing making them: adding the next
+    creature and forgetting the Lua half fails the bench with "unknown enemy", which reads like
+    a broken animation rather than a missing table row (it cost a run when Ravisin landed).
+    The pid also has to MATCH -- benching the wrong pid silently films the wrong unit."""
+    import re as _re
+    pids = {}
+    src = open(os.path.join(REPO, 'tools', 'build_campaign.py'), encoding='utf-8').read()
+    block = _re.search(r'RAW_PID_BATTLE_ANIMS = \{(.*?)\n\}', src, _re.S)
+    if not block:
+        fail.append('build_campaign.py: RAW_PID_BATTLE_ANIMS not in the expected form')
+        return
+    for uid, const in _re.findall(r"'([\w-]+)':\s*\([^,]+,\s*(\w+)\)", block.group(1)):
+        m = _re.search(r'^%s\s*=\s*\'(0x[0-9a-fA-F]+)\'' % _re.escape(const), src, _re.M)
+        if m:
+            pids[uid] = int(m.group(1), 16)
+    harness = open(os.path.join(REPO, 'tools', 'playtest', 'harness.lua'), encoding='utf-8').read()
+    bench = {uid: int(pid, 16) for uid, pid
+             in _re.findall(r'\["([\w-]+)"\]\s*=\s*(0x[0-9a-fA-F]+)', harness)}
+    for uid, pid in sorted(pids.items()):
+        if uid not in bench:
+            fail.append('recordenemy cannot bench %s: RAW_PID_BATTLE_ANIMS has it, harness.lua\'s '
+                        'pid table does not (PT_CHAR=%s would report "unknown enemy")' % (uid, uid))
+        elif bench[uid] != pid:
+            fail.append('recordenemy benches %s at pid 0x%02X, but build_campaign deploys it at '
+                        '0x%02X -- the bench would film a different unit'
+                        % (uid, bench[uid], pid))
+
+
 def check_playtest_matrix(fail):
     """tools/playtest/matrix.yaml is the single source of "what does this scenario
     need" (ROM configuration, host chapter, checkpoint, timing) -- so it has to keep
@@ -1315,6 +1346,7 @@ def main():
                   check_purple_bank_blankers_known,
                   check_engine_campaign_agnostic,
                   check_save_layout_stable, check_every_test_actually_runs,
+                  check_recordenemy_knows_every_raw_pid,
                   check_handoff_only_on_main,
                   check_lane_ownership):
         check(fail)
