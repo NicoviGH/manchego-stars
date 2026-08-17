@@ -73,6 +73,8 @@ classes:
     deadline: 900
   - match: "recordch05join*"  # films 3-4 boxes, but replays all 49 opening boxes + prep to reach them
     deadline: 600
+  - match: "recordch05combatquotes" # the opening AND a 16-enemy phase before its two boxes
+    deadline: 900
   - match: "llm"              # 18 turns x a 90s sidecar handshake budget
     deadline: 2100
   - match: "ckpt_*"           # the auto-build path always used 240fps / 900s
@@ -290,6 +292,14 @@ scenarios:
     host_chapter: 6
     kind: record
   recordch05ravisindeath:
+    rom: ch05boot
+    host_chapter: 6
+    kind: record
+  recordch05combatquotes:                              # scenes 12 + 13 in one fight (#25)
+    rom: ch05boot
+    host_chapter: 6
+    kind: record
+  recordch05platform:                                  # what they STAND on, on road (#65)
     rom: ch05boot
     host_chapter: 6
     kind: record

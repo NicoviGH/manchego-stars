@@ -1182,28 +1182,115 @@ class BattleChargeFlash(unittest.TestCase):
 
 
 class BattlePlatformTerrain(unittest.TestCase):
-    """Terrain category -> snow ground index (#65). base = first vendored ground slot;
-    offsets 0=Snowdrift, 1=Snow Uneven (rough), 2=Ice."""
+    """Terrain category -> snow ground, and the OFF-BY-ONE that hid inside it (#65).
+
+    `GetBanimTerrainGround` ends `return ret - 1`, so a terrain array holds
+    **table index + 1**, never the index. The cave path always knew that (it writes 21 for
+    `siroyuka1` at index 20); the snow path wrote raw indices, so every snow chapter had been
+    standing one platform BELOW the one named for it since #65 -- open ground landed on
+    `mizuiumi1`, a vanilla LAKE, and the chapters that asked for rough got the drift. Nothing
+    caught it because the drift is plausible snow and nobody read the ground.
+
+    So these assert the CONVENTION, in the direction that fails loudly if it is dropped again:
+    the value is one MORE than the index, and never equal to it.
+    """
+    BASE = 115   # PLATFORM_BASE_INDEX in the shipped table: drift 115, rough 116, ice 117
+
+    def test_a_ground_value_is_one_more_than_its_table_index(self):
+        self.assertEqual(21, bc._ground_value(20))   # siroyuka1, the case vanilla proves
+        self.assertEqual(5, bc._ground_value(4))     # gake1
+
+    def test_road_gets_the_snow_path_on_both_tilesets(self):
+        """TERRAIN_ROAD has its own slot in the 66-entry array -- vanilla's own tables use it
+        (slot 6 puts `michi1` there, which is what ch05 was standing on). Ours had been
+        collapsing it into "everything else"; it now names the vendored snowy path, and it does
+        so on BOTH tilesets, because a road is a road whether the open ground beside it reads
+        as drift or as rock."""
+        path = bc._ground_value(self.BASE + 3)       # -> table[118] = ms_snowpath
+        self.assertEqual(path, bc._terrain_snow_ground('ROAD', self.BASE, False))
+        self.assertEqual(path, bc._terrain_snow_ground('ROAD', self.BASE, True))
+        # ...and it is NOT what open ground gets, or the assignment bought nothing.
+        self.assertNotEqual(path, bc._terrain_snow_ground('PLAINS', self.BASE, False))
 
     def test_open_ground_is_snowdrift_on_the_open_tileset(self):
-        # plains/road/floor read as open drift on the snow-OPEN tileset (prologue).
-        self.assertEqual(bc._terrain_snow_ground('PLAINS', 115, False), 115)
-        self.assertEqual(bc._terrain_snow_ground('ROAD', 115, False), 115)
+        drift = bc._ground_value(self.BASE)          # -> table[115] = ms_snowdrift
+        self.assertEqual(drift, bc._terrain_snow_ground('PLAINS', self.BASE, False))
+        self.assertNotEqual(self.BASE, drift, 'a raw index selects the row BELOW the one meant')
 
     def test_open_ground_becomes_rough_on_the_rough_tileset(self):
-        # the Ch1 snow-ROUGH tileset sends the same open ground to Snow Uneven.
-        self.assertEqual(bc._terrain_snow_ground('PLAINS', 115, True), 116)
-        self.assertEqual(bc._terrain_snow_ground('ROAD', 115, True), 116)
+        rough = bc._ground_value(self.BASE + 1)      # -> table[116] = ms_snowrough
+        self.assertEqual(rough, bc._terrain_snow_ground('PLAINS', self.BASE, True))
 
     def test_rough_terrain_is_always_uneven(self):
+        rough = bc._ground_value(self.BASE + 1)
         for t in ('MOUNTAIN', 'PEAK', 'CLIFF', 'VALLEY'):
-            self.assertEqual(bc._terrain_snow_ground(t, 115, False), 116)
-            self.assertEqual(bc._terrain_snow_ground(t, 115, True), 116)
+            self.assertEqual(rough, bc._terrain_snow_ground(t, self.BASE, False))
+            self.assertEqual(rough, bc._terrain_snow_ground(t, self.BASE, True))
 
     def test_water_terrain_is_always_ice(self):
+        ice = bc._ground_value(self.BASE + 2)
         for t in ('LAKE', 'SEA', 'RIVER', 'WATER', 'GLACIER'):
-            self.assertEqual(bc._terrain_snow_ground(t, 115, False), 117)
-            self.assertEqual(bc._terrain_snow_ground(t, 115, True), 117)  # even on the rough tileset
+            self.assertEqual(ice, bc._terrain_snow_ground(t, self.BASE, False))
+            self.assertEqual(ice, bc._terrain_snow_ground(t, self.BASE, True))  # even on rough
+
+    def test_every_snow_ground_names_one_of_OUR_platforms(self):
+        """The assertion that would have caught it: resolve each value the way the ENGINE does
+        (subtract one, index the table) and require the row to be one we appended."""
+        ours = {bc.PLATFORM_BASE_INDEX + n: 'ms_' + sym
+                for n, (_stem, sym, _tint) in enumerate(bc.BATTLE_PLATFORMS)}
+        for rough_open in (False, True):
+            for terrain in ('PLAINS', 'ROAD', 'MOUNTAIN', 'CLIFF', 'LAKE', 'RIVER'):
+                value = bc._terrain_snow_ground(terrain, bc.PLATFORM_BASE_INDEX, rough_open)
+                self.assertIn(value - 1, ours,
+                              '%s -> value %d selects table[%d], which is not one of ours'
+                              % (terrain, value, value - 1))
+
+
+class EveryHostedChapterPicksItsGround(unittest.TestCase):
+    """A hosted chapter that never names a battleTileSet keeps its HOST SLOT's vanilla one,
+    and vanilla's slots are not our world (#65 / #25).
+
+    That is not a theoretical gap -- it shipped. ch05's slot 6 carries vanilla Ch6's
+    `battleTileSet = 6`, whose table sends TERRAIN_ROAD to `michi1` and TERRAIN_PLAINS to
+    `heichi1`; ch05's map is 53% road, so every fight in a snowbound elven tomb was standing
+    on a green verge and a dirt track. ch02's slot 3 (vanilla 5) had the same defect, unseen.
+    Silence is what made both invisible, so the registry is REQUIRED to be total: a new
+    chapter has to state its ground, not inherit somebody else's.
+    """
+    OURS = {0x00, 0x15, 0x16}   # snow-open (Default), snow-rough (Tileset15), cave (Tileset16)
+
+    def test_every_hosted_chapter_names_its_ground(self):
+        missing = [c.name for c in bc.hosted_chapters()
+                   if c.host_index not in bc.CHAPTER_BATTLE_TILESETS]
+        self.assertEqual([], missing,
+                         'these chapters would silently inherit vanilla platforms: %s' % missing)
+
+    def test_no_chapter_is_left_on_a_vanilla_ground(self):
+        for host_index, tileset in bc.CHAPTER_BATTLE_TILESETS.items():
+            self.assertIn(tileset, self.OURS,
+                          'chapter slot %d is pointed at a ground we do not own' % host_index)
+
+    def test_the_snowbound_chapters_stand_on_snow(self):
+        """The two that were wrong, pinned by the values they were wrong about."""
+        self.assertEqual(0x15, bc.CHAPTER_BATTLE_TILESETS[bc.CH05_HOST_INDEX])
+        self.assertEqual(0x15, bc.CHAPTER_BATTLE_TILESETS[bc.CH02_HOST_INDEX])
+        self.assertEqual(0x16, bc.CHAPTER_BATTLE_TILESETS[bc.CH03_HOST_INDEX])   # the mine
+
+    def test_ch05_fights_mostly_on_its_ROAD_and_that_is_where_the_path_ground_goes(self):
+        """Which ground matters here is a fact about the map, not a taste: ch05 is more than
+        half TERRAIN_ROAD, so the road slot decides how most of the chapter looks in combat.
+        Resolved the way the engine resolves it (value - 1), so it cannot pass on the row below
+        the one it names -- see _ground_value."""
+        maps = os.path.join(bc.REPO, 'campaigns', 'rime-of-the-frostmaiden', 'maps')
+        _w, _h, grid = bc._map_terrain_grid(maps, bc.CH05_LAYOUT[1])
+        ids = bc.terrain_ids()
+        tiles = [t for row in grid for t in row]
+        road = sum(1 for t in tiles if t == ids['TERRAIN_ROAD'])
+        self.assertGreater(road, len(tiles) // 2, 'ch05 is a paved map; if that changes, revisit')
+        for rough_open in (False, True):
+            value = bc._terrain_snow_ground('ROAD', bc.PLATFORM_BASE_INDEX, rough_open)
+            self.assertEqual('ms_snowpath',
+                             'ms_' + bc.BATTLE_PLATFORMS[value - 1 - bc.PLATFORM_BASE_INDEX][1])
 
 
 class AppendedClassSlot(unittest.TestCase):
@@ -2176,6 +2263,157 @@ class Ch05RavisinDeathQuote(unittest.TestCase):
         self.assertIn('.flag    = EVFLAG_DEFEAT_BOSS', quote)
         self.assertIn('.msg     = 0x%X' % bc.CH05_RAVISIN_DEATH_MSG, quote)
         self.assertNotIn('.msg     = 0,', quote)
+
+
+class BattleQuotePair(unittest.TestCase):
+    """gBattleTalkList entries come in TWOS, and one of the two is easy to forget.
+
+    `CallBattleQuoteEventsIfAny` (eventinfo.c) is handed (attacker, defender) and tries
+    (A,B), (A,0), (0,B) in that order, so a boss line that should play "whoever swung
+    first" needs BOTH a row keyed on the boss as defender and a row keyed on the boss as
+    attacker. Vanilla ships exactly that pair for every boss it gives a taunt (O'Neill,
+    Breguet, Saar...), and a single row plays on one side of the engagement only.
+    """
+
+    def test_the_pair_covers_both_sides_of_the_engagement(self):
+        self.assertTrue(hasattr(bc, 'battle_quote_pair'),
+                        'the two-row boss-taunt idiom needs one owner, not a copy per chapter')
+        rows = bc.battle_quote_pair('0xb8', 'CHAPTER_L_6', 0x9F2, 'a boss taunt')
+        self.assertEqual(2, rows.count('.pidA'))
+        # The player-engages row names the boss as pidB behind the leader sentinel; the
+        # boss-engages row names it as pidA and leaves pidB out entirely (a zero pidB is
+        # what makes the lookup match on pidA alone).
+        player_row, boss_row = rows.split('    },')[:2]
+        self.assertIn('.pidA     = CHAR_EVT_PLAYER_LEADER,', player_row)
+        self.assertIn('.pidB     = 0xb8,', player_row)
+        self.assertIn('.pidA     = 0xb8,', boss_row)
+        self.assertNotIn('.pidB', boss_row)
+        self.assertEqual(2, rows.count('.chapter = CHAPTER_L_6,'))
+        self.assertEqual(2, rows.count('.flag    = EVFLAG_BATTLE_QUOTES,'))
+        self.assertEqual(2, rows.count('.msg     = 0x9F2,'))
+
+    def test_the_shared_flag_is_what_makes_it_play_once(self):
+        """Both rows carry the SAME flag on purpose: GetBattleQuoteEntry skips any entry
+        whose flag is already set, so the row that did not fire is retired by the row that
+        did. Two different flags would let the taunt play twice, once per side."""
+        rows = bc.battle_quote_pair('0xb8', 'CHAPTER_L_6', 0x9F2, 'a boss taunt')
+        flags = {line.strip() for line in rows.split('\n') if '.flag' in line}
+        self.assertEqual(1, len(flags))
+
+
+class Ch05RavisinBattleTaunt(unittest.TestCase):
+    """Scene 12: Ravisin's one box when a player unit engages her (#25).
+
+    This is the twin of vanilla Saar's MSG_9C7 with one word swapped (empire ->
+    Frostmaiden). It was wired NOWHERE for months -- gBattleTalkList carried the
+    prologue's rows and nothing for her -- so the locked line existed in the YAML and
+    could not play. The mechanism is FE8's own, not a turn event: the quote fires on
+    first engagement, from either side, and retires itself.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+
+    def _event(self):
+        return next(e for e in self._chap()['events'] if e['trigger'] == 'boss_battle')
+
+    def test_taunt_owns_its_own_named_id_in_ch05s_host_block(self):
+        self.assertTrue(hasattr(bc, 'CH05_RAVISIN_TAUNT_MSG'),
+                        'Ravisin needs a named host-block id for her battle taunt')
+        self.assertEqual(0x9F2, bc.CH05_RAVISIN_TAUNT_MSG)
+        self.assertIn(bc.CH05_RAVISIN_TAUNT_MSG, bc.HOSTED_CHAPTER_MESSAGE_IDS['ch05'])
+        self.assertEqual('ch05', bc.assert_message_ids_unique()[bc.CH05_RAVISIN_TAUNT_MSG])
+        self.assertNotEqual(0x9C7, bc.CH05_RAVISIN_TAUNT_MSG,
+                            "the YAML's `vanilla 0x9C7` label cites the scene we mine, and "
+                            'ch04 writes that literal id')
+
+    def test_locked_one_box_emits_ravisins_live_face_from_the_event_yaml(self):
+        event = self._event()
+        self.assertEqual('vanilla 0x9C7', event['slot'])
+        self.assertEqual(
+            [{'ravisin': "Enemy of the Frostmaiden! Death's too good for you!"}],
+            event['script'])
+        self.assertTrue(hasattr(bc, 'ch05_ravisin_taunt_message'),
+                        'the locked YAML beat needs a message emitter')
+
+        body = bc.ch05_ravisin_taunt_message(self._chap())
+        flowed = body.replace('[LF]\n', ' ')
+        self.assertIn('[LoadFace][FID_Riev]', body)
+        self.assertEqual(1, body.count('[A]'))
+        self.assertIn('Enemy of the Frostmaiden', flowed)
+        self.assertIn("Death's too good for you", flowed)
+        # The whole point of the swap: her allegiance, never Grado's.
+        self.assertNotIn('empire', flowed)
+
+    def test_the_taunt_takes_vanillas_own_seat_for_this_slot(self):
+        """Vanilla's MSG_9C7 and MSG_9C8 both put Saar on [OpenMidLeft], and ch05's
+        eruption warning already seats Ravisin there. A battle quote draws over the
+        combat screen with nobody opposite her, so the mined seat is the one to keep."""
+        self.assertIn('[OpenMidLeft]', bc.ch05_ravisin_taunt_message(self._chap()))
+
+    def test_engaging_ravisin_is_what_plays_it(self):
+        self.assertTrue(hasattr(bc, 'ch05_ravisin_battle_quote'),
+                        'ch05 needs a testable owner for Ravisin battle-talk wiring')
+        rows = bc.ch05_ravisin_battle_quote()
+        self.assertEqual(2, rows.count('.pidA'))
+        self.assertIn('.pidB     = %s,' % bc.CH05_BOSS_PID, rows)
+        self.assertIn('.pidA     = %s,' % bc.CH05_BOSS_PID, rows)
+        self.assertEqual(2, rows.count('.chapter = %s,'
+                                       % bc.chapter_label_constant(bc.CH05_HOST_INDEX)))
+        self.assertEqual(2, rows.count('.msg     = 0x%X,' % bc.CH05_RAVISIN_TAUNT_MSG))
+        # EVFLAG_DEFEAT_BOSS is the WIN flag: setting it from a taunt would end the
+        # chapter the moment somebody swung at her.
+        self.assertNotIn('EVFLAG_DEFEAT_BOSS', rows)
+
+    def test_the_taunt_does_not_ride_the_moose_or_a_turn_event(self):
+        """The moose is a convertible miniboss on its own pid; the taunt is the BOSS's.
+        And it is not a turn script -- the eruption warning is, and copying that shape
+        would fire the taunt on a clock rather than on the fight."""
+        rows = bc.ch05_ravisin_battle_quote()
+        self.assertNotIn(bc.CH05_MOOSE_PID, rows)
+        for turn in (2, 3, 5):
+            self.assertNotIn('TEXTSHOW(0x%X)' % bc.CH05_RAVISIN_TAUNT_MSG,
+                             bc.ch05_wave_script(turn, 'MS_Ch05WaveT%d' % turn))
+
+
+class BasilHasOneDeathQuote(unittest.TestCase):
+    """Basil falls with ONE line, wherever she falls (Nicolas, 2026-08-16).
+
+    FE8 would happily give her two: a chapter-keyed row ahead of her chapter=0xFF one is
+    vanilla's own shape for the escort a chapter is built around, and ch05 briefly shipped it.
+    It was cut because both boxes were the same interrupted apology about the same undelivered
+    berry, so the second bought a mechanism and no line. The berry is the survivor, and it now
+    fires everywhere rather than only in the tomb.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def test_the_berry_line_is_her_universal_quote(self):
+        basil = bc.load_unit(self.CAMPAIGN, 'basil')
+        self.assertEqual("But I haven't-- I still have her berry...", basil['death_quote'])
+
+    def test_she_has_exactly_one_row_and_it_fires_everywhere(self):
+        rows = bc.pc_death_quote_rows(self.CAMPAIGN)
+        pid = '.pid     = %s,' % bc.char_symbol(bc.PORTRAIT_MAP['basil'])
+        hers = [row for row in rows if pid in row]
+        self.assertEqual(1, len(hers), 'a second row for one pid is the thing that was cut')
+        self.assertIn('.chapter = 0xFF', hers[0])
+        self.assertIn('.msg     = 0x%04X,' % bc.PC_DEATH_QUOTE_MSGS['basil'], hers[0])
+
+    def test_no_cast_member_carries_a_chapter_keyed_death_row(self):
+        """The general form of the same call: the death-quote pass emits universal rows only.
+        A chapter injector cannot add one behind our backs either -- it runs BEFORE this pass,
+        which prepends at the head, so its row would never win GetDefeatTalkEntry's first match.
+        """
+        for row in bc.pc_death_quote_rows(self.CAMPAIGN):
+            self.assertIn('.chapter = 0xFF', row)
+
+    def test_ch05_no_longer_authors_a_death_box_of_its_own(self):
+        chap = bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+        triggers = [e.get('trigger') for e in chap['events']]
+        self.assertNotIn('unit_death', triggers)
+        self.assertFalse(hasattr(bc, 'CH05_BASIL_DEATH_MSG'))
+        self.assertFalse(hasattr(bc, 'ch05_basil_death_message'))
 
 
 class Ch05SahnarTalkRecruit(unittest.TestCase):

@@ -6264,31 +6264,11 @@ def inject_prologue(campaign, verbose=True, montage=False):
     #     the player engaging the boss, one for the boss engaging the player; the
     #     EVFLAG_BATTLE_QUOTES flag makes it play exactly once). Same head-insertion
     #     rule as the defeat quotes: GetBattleTalkEntry returns the first match.
-    fight_quotes = [(
-        '    {\n'
-        '        .pidA     = CHAR_EVT_PLAYER_LEADER,\n'
-        '        .pidB     = CHARACTER_%s, /* Sephek mid-fight frost line (step 4c) */\n'
-        '        .chapter = CHAPTER_L_1,\n'
-        '        .flag    = EVFLAG_BATTLE_QUOTES,\n'
-        '        .msg     = 0x0914,\n'
-        '    },' % sephek_slot), (
-        '    {\n'
-        '        .pidA     = CHARACTER_%s,\n'
-        '        .chapter = CHAPTER_L_1,\n'
-        '        .flag    = EVFLAG_BATTLE_QUOTES,\n'
-        '        .msg     = 0x0914,\n'
-        '    },' % sephek_slot)]
-    with open(BATTLEQUOTES_C, encoding='utf-8') as f:
-        bq = f.read()
-    head = 'CONST_DATA struct DefeatTalkEnt gDefeatTalkList[] = {\n'
-    fight_head = 'CONST_DATA struct BattleTalkExtEnt gBattleTalkList[] = {\n'
-    if bq.count(head) != 1 or bq.count(fight_head) != 1:
-        sys.exit('ERROR: talk-list heads not in expected vanilla form in %s'
-                 % BATTLEQUOTES_C)
-    bq = bq.replace(head, head + '\n'.join(quotes) + '\n')
-    bq = bq.replace(fight_head, fight_head + '\n'.join(fight_quotes) + '\n')
-    with open(BATTLEQUOTES_C, 'w', encoding='utf-8') as f:
-        f.write(bq)
+    #     battle_quote_pair() owns both rows and why there are two of them.
+    _prepend_defeat_quote('\n'.join(quotes))
+    _prepend_battle_quote(battle_quote_pair(
+        'CHARACTER_%s' % sephek_slot, 'CHAPTER_L_1', 0x914,
+        'Sephek mid-fight frost line (step 4c)'))
 
     # 6. Opening montage (#43): when MONTAGE=1, re-render the intro-monologue slides as our
     #    lore crawl + the world-map tour. The boot cut + New-Game redirect themselves (so the
@@ -6756,6 +6736,37 @@ def flag_defeat_quote(pid, chapter_const, flag, comment, msg=0):
             '    },' % (pid, comment, chapter_const, flag, msg_value))
 
 
+def battle_quote_pair(pid, chapter_const, msg, comment, flag='EVFLAG_BATTLE_QUOTES'):
+    """The two gBattleTalkList rows that give `pid` a first-engagement line in `chapter_const`.
+
+    FE8's mid-fight boss line is a PAIR, and shipping one row is the easy half-wiring.
+    `CallBattleQuoteEventsIfAny` (eventinfo.c) is handed (attacker, defender) and asks
+    `GetBattleQuoteEntry` for (A,B), then (A,0), then (0,B) -- so a row keyed on the boss as
+    pidA fires when the boss swings, and a row keyed on it as pidB (behind the
+    CHAR_EVT_PLAYER_LEADER sentinel, which is literally 0) fires when the player does. Vanilla
+    writes both for every boss it gives a taunt: O'Neill, Breguet, Bone, Bazba, Saar.
+
+    Both rows carry the SAME flag deliberately. The scan skips any entry whose flag is already
+    set, so whichever side fires first retires the other; two flags would let the line play
+    twice. `.chapter` must be the HOST index (it is compared against gPlaySt.chapterIndex), and
+    the entries belong at the head of the list for the same first-match reason the defeat
+    quotes do."""
+    return ('    {\n'
+            '        .pidA     = CHAR_EVT_PLAYER_LEADER,\n'
+            '        .pidB     = %s, /* %s */\n'
+            '        .chapter = %s,\n'
+            '        .flag    = %s,\n'
+            '        .msg     = 0x%X,\n'
+            '    },\n'
+            '    {\n'
+            '        .pidA     = %s, /* the same line when they swing first */\n'
+            '        .chapter = %s,\n'
+            '        .flag    = %s,\n'
+            '        .msg     = 0x%X,\n'
+            '    },' % (pid, comment, chapter_const, flag, msg,
+                        pid, chapter_const, flag, msg))
+
+
 def midmap_afev(guard_flag, script, watch_flag):
     """A Misc AFEV that runs `script` once when `watch_flag` is set (the miniboss's flagged
     death), guarded by `guard_flag` (EvCheck01_AFEV's ent-flag, set after the entry fires) so it
@@ -7126,6 +7137,22 @@ def _prepend_defeat_quote(quote):
         sys.exit('ERROR: gDefeatTalkList head not in expected form in %s'
                  % BATTLEQUOTES_C)
     bq = bq.replace(head, head + quote + '\n')
+    with open(BATTLEQUOTES_C, 'w', encoding='utf-8') as f:
+        f.write(bq)
+
+
+def _prepend_battle_quote(entries):
+    """Prepend `entries` at the HEAD of gBattleTalkList (battlequotes.c) -- the mid-fight
+    line list, whose rows come from battle_quote_pair(). GetBattleQuoteEntry scans first-match
+    exactly like the defeat list, so the head wins over any vanilla row for the same pid in
+    the same chapter."""
+    with open(BATTLEQUOTES_C, encoding='utf-8') as f:
+        bq = f.read()
+    head = 'CONST_DATA struct BattleTalkExtEnt gBattleTalkList[] = {\n'
+    if bq.count(head) != 1:
+        sys.exit('ERROR: gBattleTalkList head not in expected form in %s'
+                 % BATTLEQUOTES_C)
+    bq = bq.replace(head, head + entries + '\n')
     with open(BATTLEQUOTES_C, 'w', encoding='utf-8') as f:
         f.write(bq)
 
@@ -8895,6 +8922,7 @@ CH05_ERUPTION_MSG = 0x9E4                     # turn-2 Ravisin warning; first fr
 CH05_RAVISIN_DEATH_MSG = 0x9E5                # locked Ravisin death quote; next Ch6-host id
 CH05_ARENA_FOUND_MSG = 0x9E6                  # vanilla 0x9D5 anatomy, in ch05's host block
 CH05_ARENA_RULES_MSG = 0x9E7                  # vanilla 0x9D6 anatomy, in ch05's host block
+CH05_RAVISIN_TAUNT_MSG = 0x9F2                # first-engagement boss taunt (gBattleTalkList)
 CH05_GOAL_WINDOW_MSG = 0x9F4
 CH05_GOAL_STATUS_MSG = 0x9F5
 # ── The opening's BACKDROP half (#25): three scenes at the tomb, before the party arrives ──
@@ -9201,7 +9229,7 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
     # The four reliquary visit lines joined the block 2026-08-08 (dialogue-pass). They sit
     # OUTSIDE ch05's host block on purpose -- see CH05_VILLAGE_SLOTS for why that is safe here
     # and why spending ch05's own ids on them was the worse trade.
-    'ch05': (CH05_ERUPTION_MSG, CH05_RAVISIN_DEATH_MSG,
+    'ch05': (CH05_ERUPTION_MSG, CH05_RAVISIN_DEATH_MSG, CH05_RAVISIN_TAUNT_MSG,
              CH05_ARENA_FOUND_MSG, CH05_ARENA_RULES_MSG,
              CH05_SAHNAR_TALK_MSG,
              *(msg for _slot, msg, _boxes, _what in CH05_OPENING_SLOTS),
@@ -10757,12 +10785,12 @@ def inject_ch04(campaign, boot=False, verbose=True):
         indices, chap['chapter_number'], CH04_EVENT_GROUP,
         (CH04_GOAL_WINDOW_MSG, CH04_GOAL_STATUS_MSG))
 
-    # Fog is chapter state, not painted-map data. Battle terrain 0x15 is the shared
-    # snowy rough platform family already used by the winter overworld chapters.
+    # Fog is chapter state, not painted-map data. The battle GROUND is not set here: every
+    # chapter's is declared once in CHAPTER_BATTLE_TILESETS, because the chapters that ended up
+    # standing on vanilla grass were exactly the ones no injector had written a line for.
     with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
         settings = json.load(f)
     settings['chapters'][CH04_HOST_INDEX]['initialFogLevel'] = 3
-    settings['chapters'][CH04_HOST_INDEX]['battleTileSet'] = 0x15
     with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=2)
 
@@ -11192,6 +11220,26 @@ def ch05_eruption_message(chap):
     if len(beat) != 4 or speakers != {'ravisin'}:
         sys.exit('ERROR: ch05 eruption warning must remain the four locked Ravisin boxes; '
                  'got %d boxes from %s' % (len(beat), sorted(speakers)))
+    return _script_to_message(
+        beat,
+        {'ravisin': ('[OpenMidLeft]', _fid_tag(GUEST_PORTRAIT_MAP['ravisin']))},
+        width=29)
+
+
+def ch05_ravisin_taunt_message(chap):
+    """Render Ravisin's one locked battle taunt -- the line she says when the fight starts.
+
+    The ``vanilla 0x9C7`` label cites Saar's own taunt, which ours is the twin of with one word
+    swapped (empire -> Frostmaiden); ch05 writes the body into its own Ch6 host block. Seat:
+    vanilla puts Saar on [OpenMidLeft] for BOTH 9C7 and 9C8, and a battle quote draws over the
+    combat screen with nobody opposite her, so the mined seat carries over unchanged.
+    """
+    _card, beats = _split_event_beats(
+        chap, 'boss_battle', 'ch05 Ravisin battle taunt', (CH05_RAVISIN_TAUNT_MSG,),
+        card_required=False)
+    beat = beats[0]
+    if len(beat) != 1 or next(iter(beat[0])) != 'ravisin':
+        sys.exit('ERROR: ch05 Ravisin battle taunt must remain one locked Ravisin box')
     return _script_to_message(
         beat,
         {'ravisin': ('[OpenMidLeft]', _fid_tag(GUEST_PORTRAIT_MAP['ravisin']))},
@@ -11907,6 +11955,19 @@ def ch05_ravisin_defeat_quote():
         msg=CH05_RAVISIN_DEATH_MSG)
 
 
+def ch05_ravisin_battle_quote():
+    """The pair that plays Ravisin's taunt on first engagement, from either side (#25).
+
+    Her weight comes from the orders scene, not from talking on the field, so this is FE8's
+    own one-box mechanism and not a turn event: it fires on the FIGHT rather than on a clock.
+    EVFLAG_BATTLE_QUOTES is deliberately not the win flag -- EVFLAG_DEFEAT_BOSS here would end
+    the chapter the moment anybody swung at her.
+    """
+    return battle_quote_pair(
+        CH05_BOSS_PID, chapter_label_constant(CH05_HOST_INDEX), CH05_RAVISIN_TAUNT_MSG,
+        'Ravisin (ch05 boss): locked first-engagement taunt')
+
+
 def ch05_wave_script(turn, wave_table):
     """Build one ch05 reinforcement script; only turn 2 speaks.
 
@@ -12232,6 +12293,7 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     set_message_body(lines, host['goal']['windowTextId'], goal_window_body('Defeat boss'))
     set_message_body(lines, CH05_ERUPTION_MSG, ch05_eruption_message(chap))
     set_message_body(lines, CH05_RAVISIN_DEATH_MSG, ch05_ravisin_death_message(chap))
+    set_message_body(lines, CH05_RAVISIN_TAUNT_MSG, ch05_ravisin_taunt_message(chap))
     set_message_body(lines, CH05_SAHNAR_TALK_MSG, ch05_sahnar_talk_message(chap))
     for msg_id, body in (ch05_opening_messages(chap) + ch05_basil_join_messages(chap)
                          + ch05_sahnar_alone_message(chap) + ch05_moose_charge_message(chap)):
@@ -12255,6 +12317,9 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     # and host-owned message both exist. SetPidDefeatedFlag still fires EVFLAG_DEFEAT_BOSS;
     # DisplayDefeatTalkForPid now shows the one locked box before the ending AFEV runs.
     _prepend_defeat_quote(ch05_ravisin_defeat_quote())
+    # Scene 12: the taunt on first engagement. A separate list and a separate flag from the
+    # death quote above -- the player meets her twice, and each meeting has its own box.
+    _prepend_battle_quote(ch05_ravisin_battle_quote())
 
     if verbose:
         print('  ch05 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; defeat_boss '
@@ -12349,6 +12414,31 @@ def inject_northlook_bitey(verbose=True):
         print("  'Ol Bitey mounted over the Northlook hearth (bg_Fireplace, #21)")
 
 
+def pc_death_quote_rows(campaign):
+    """Every gDefeatTalkList row the death-quote pass writes, IN SCAN ORDER.
+
+    ONE row per cast member, and that is a decision rather than a limitation: FE8 lets a pid
+    hold a chapter-keyed row ahead of its chapter=0xFF one, and ch05 briefly gave Basil a
+    second box on vanilla's escort pattern before it was cut for saying the same thing twice
+    (decisions.md -> "One death quote per character"). A pid with two rows would be decided
+    here and nowhere else -- GetDefeatTalkEntry returns the first match -- so if that call is
+    ever revisited, the ordering belongs in this function and not in a chapter injector, which
+    runs BEFORE this pass and would prepend its row behind these.
+    """
+    rows = []
+    for unit_id, slot, _, _ in classed_cast(campaign):
+        if unit_id not in PC_DEATH_QUOTE_MSGS:
+            sys.exit('ERROR: no death-quote msg id allocated for cast member %r' % unit_id)
+        rows.append(
+            '    {\n'
+            '        .pid     = CHARACTER_%s, /* %s death quote (#6, any chapter) */\n'
+            '        .route   = CHAPTER_MODE_ANY,\n'
+            '        .chapter = 0xFF, /* fires in every chapter */\n'
+            '        .msg     = 0x%04X,\n'
+            '    },' % (slot.upper(), unit_id, PC_DEATH_QUOTE_MSGS[unit_id]))
+    return rows
+
+
 def inject_pc_death_quotes(campaign, verbose=True):
     """Universal per-PC death quotes (#6): when a deployable cast member falls, FE8's
     gDefeatTalkList machinery (DisplayDefeatTalkForPid, eventinfo.c) shows their dying
@@ -12358,42 +12448,23 @@ def inject_pc_death_quotes(campaign, verbose=True):
     in EVERY chapter. Each PC rides its PORTRAIT_MAP slot, so pid + face = CHARACTER_<slot>
     / [FID_<slot>]. Quote text lives in the unit YAML (`death_quote`); bodies render via
     _script_to_message with the bust on the left podium, like the boss death quotes."""
-    cast = classed_cast(campaign)
     # 1. Text bodies (each quote in a map talk box with the faller's bust, left podium).
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
-    rows = []
-    for unit_id, slot, _, _ in cast:
-        if unit_id not in PC_DEATH_QUOTE_MSGS:
-            sys.exit('ERROR: no death-quote msg id allocated for cast member %r' % unit_id)
+    for unit_id, slot, _, _ in classed_cast(campaign):
         unit = load_unit(campaign, unit_id)
         quote = unit.get('death_quote')
         if not quote:
             sys.exit('ERROR: %s YAML has no death_quote (#6 requires one per cast member)'
                      % unit_id)
-        msg = PC_DEATH_QUOTE_MSGS[unit_id]
-        set_message_body(lines, msg, _script_to_message(
+        set_message_body(lines, PC_DEATH_QUOTE_MSGS[unit_id], _script_to_message(
             [{unit_id: quote}], {unit_id: ('[OpenMidLeft]', _fid_tag(slot))}))
-        rows.append(
-            '    {\n'
-            '        .pid     = CHARACTER_%s, /* %s death quote (#6, any chapter) */\n'
-            '        .route   = CHAPTER_MODE_ANY,\n'
-            '        .chapter = 0xFF, /* fires in every chapter */\n'
-            '        .msg     = 0x%04X,\n'
-            '    },' % (slot.upper(), unit_id, msg))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     # 2. Prepend the entries at the head of gDefeatTalkList (same idiom as the boss
     #    quotes; distinct pids, so ordering vs. those is immaterial).
-    with open(BATTLEQUOTES_C, encoding='utf-8') as f:
-        bq = f.read()
-    head = 'CONST_DATA struct DefeatTalkEnt gDefeatTalkList[] = {\n'
-    if bq.count(head) != 1:
-        sys.exit('ERROR: gDefeatTalkList head not in expected form in %s'
-                 % BATTLEQUOTES_C)
-    bq = bq.replace(head, head + '\n'.join(rows) + '\n')
-    with open(BATTLEQUOTES_C, 'w', encoding='utf-8') as f:
-        f.write(bq)
+    rows = pc_death_quote_rows(campaign)
+    _prepend_defeat_quote('\n'.join(rows))
     if verbose:
         print('  death quotes: %d cast members (chapter=any)' % len(rows))
 
@@ -12415,15 +12486,43 @@ VARIABLES_H = os.path.join(DECOMP, 'include', 'variables.h')
 CHAPTER_SETTINGS_JSON_PLAT = os.path.join(DECOMP, 'src', 'data', 'chapter_settings.json')
 
 # (campaign png stem, decomp symbol stem, twilight tint). Grounds get table indices in
-# append order from PLATFORM_BASE_INDEX. Offsets: 0=Snowdrift, 1=rough(SnowUneven), 2=Ice.
+# append order from PLATFORM_BASE_INDEX. Offsets: 0=Snowdrift, 1=rough(SnowUneven), 2=Ice,
+# 3=snowed-over road. APPEND ONLY -- the offsets are addressed by _terrain_snow_ground and a
+# reorder silently restages every fight in the campaign.
 BATTLE_PLATFORMS = [
     ('snowdrift',         'snowdrift', 0.80),  # open windswept snow, cooled for twilight
     ('snow-uneven-light', 'snowrough', 1.00),  # rough snowy ground over rock
     ('ice-flat',          'snowice',   1.00),  # frozen lake/river
+    ('snow-dirt-path',    'snowpath',  1.00),  # a snowed-over track: TERRAIN_ROAD's own ground
 ]
 PLATFORM_BASE_INDEX = 115  # battle_terrain_table currently ends at 114
+# Host slot -> battleTileSet, and it is REQUIRED to be total (check.py + the unit test):
+# a hosted chapter that names no ground keeps its HOST SLOT's vanilla one, and vanilla's slots
+# are not our world. Silence is what made that invisible for two chapters at once -- ch05's slot
+# 6 carries vanilla Ch6's 6, whose table sends TERRAIN_ROAD to `michi1` and TERRAIN_PLAINS to
+# `heichi1`, so every fight on a map that is 53% road happened on a dirt track and a green verge
+# in a snowbound elven tomb (Nicolas, 2026-08-16); ch02's slot 3 (vanilla 5) was wrong the same
+# way and nobody had looked. Values: 0x00 snow-OPEN (BanimTerrainGroundDefault, rewritten to the
+# drift), 0x15 snow-ROUGH (Tileset15), 0x16 CAVE (Tileset16, vanilla stone).
+# ROUGH vs OPEN is a read of the GROUND, not of the weather: `snow-uneven-light` is snow lying
+# over rock, `snowdrift` is windswept open snow. It decides only the OPEN/flat terrain -- road,
+# rough and water name their own grounds in _terrain_snow_ground and are the same either way.
+CHAPTER_BATTLE_TILESETS = {
+    PROLOGUE_HOST_INDEX: 0x00,   # the frozen lake: open windswept snow is the whole picture
+    CH01_HOST_INDEX:     0x15,   # the iron trail: snow over trail rock
+    CH02_HOST_INDEX:     0x15,   # Bryn Shander's approach, same winter tileset as ch01/ch04
+    CH03_HOST_INDEX:     0x16,   # the Termalaine mine: indoors, vanilla stone rather than snow
+    CH04_HOST_INDEX:     0x15,   # the moose forest: snow over forest floor
+    CH05_HOST_INDEX:     0x15,   # the elven tomb: its flat ground is courtyard stone, not drift
+                                 # (the roads, which are most of it, take the path ground)
+}
 _PLAT_ICE = {'RIVER', 'SEA', 'LAKE', 'WATER', 'GLACIER', 'SNAG', 'DEEPS', 'SHIP_FLAT',
              'SHIP_WRECK'}
+# TERRAIN_ROAD is not a category we invented: it has its own slot in the 66-entry
+# BanimTerrainGround_* array, and vanilla's own tables use it -- the slot-6 table ch05 was
+# inheriting puts `michi1`, the dirt road, exactly here (Nicolas, 2026-08-16). Ours had been
+# collapsing it into "everything else" and giving a paved winter town the open-snow ground.
+_PLAT_ROAD = {'ROAD'}
 _PLAT_ROUGH = {'MOUNTAIN', 'PEAK', 'CLIFF', 'VALLEY', 'RUINS_REGULAR', 'RUINS_VILLAGE',
                'RUBBLE', 'PILLAR', 'WALL_REGULAR', 'WALL_DAMAGED', 'FENCE_REGULAR',
                'FENCE_32', 'FORT', 'GATE_CASTLE', 'GATE_REGULAR', 'SKY', 'BARREL', 'BONE',
@@ -12431,14 +12530,30 @@ _PLAT_ROUGH = {'MOUNTAIN', 'PEAK', 'CLIFF', 'VALLEY', 'RUINS_REGULAR', 'RUINS_VI
                'BALLISTA_KILLER'}
 
 
+def _ground_value(table_index):
+    """The number a BanimTerrainGround_* array holds to select battle_terrain_table[index].
+
+    It is index + 1, and that is the single easiest thing in #65 to get wrong:
+    `GetBanimTerrainGround` (banim-battleparse.c) ends `return ret - 1`, so an array written
+    with raw indices selects the row BELOW every platform it names. The snow arrays did exactly
+    that from #65 until 2026-08-16 -- open ground resolved to `mizuiumi1`, a vanilla LAKE, and
+    a chapter that asked for the rough ground got the drift. It survived because the drift is
+    plausible snow and nothing in the build, the tests or any scenario read the ground.
+    """
+    return table_index + 1
+
+
 def _terrain_snow_ground(terrain, base, rough_open):
-    """Ground index for TERRAIN_<terrain> on a snow map. rough_open=True (the Ch1 'rough'
-    tileset) sends open/flat ground to the rough platform instead of the drift."""
+    """Ground VALUE for TERRAIN_<terrain> on a snow map (see _ground_value -- this is not an
+    index). rough_open=True (the Ch1 'rough' tileset) sends open/flat ground to the rough
+    platform instead of the drift."""
     if terrain in _PLAT_ICE:
-        return base + 2
+        return _ground_value(base + 2)
+    if terrain in _PLAT_ROAD:
+        return _ground_value(base + 3)
     if terrain in _PLAT_ROUGH:
-        return base + 1
-    return base + (1 if rough_open else 0)
+        return _ground_value(base + 1)
+    return _ground_value(base + (1 if rough_open else 0))
 
 
 def inject_battle_platforms(campaign, verbose=True):
@@ -12538,14 +12653,15 @@ def inject_battle_platforms(campaign, verbose=True):
     dt = dt.replace('CONST_DATA s8 BanimTerrainGroundDefault[] = {',
                     rough_arr + 'CONST_DATA s8 BanimTerrainGroundDefault[] = {', 1)
     # Tileset16 = CAVE (ch03 Termalaine mine). Unlike snow, this uses EXISTING VANILLA platforms:
-    # the mine floor -> siroyuka1 (the vanilla neutral STONE ground, battle_terrain_table[20], so
-    # ground value 21) and rock walls/cliffs -> gake1 (table[4], value 5). No PNG/append/FE-Repo
-    # pull needed. NOTE the vanilla convention is value == table_index + 1 (the consumer subtracts
-    # 1); do NOT copy the snow base+offset idiom here.
+    # the mine floor -> siroyuka1 (the vanilla neutral STONE ground, battle_terrain_table[20]) and
+    # rock walls/cliffs -> gake1 (table[4]). No PNG/append/FE-Repo pull needed. Both go through
+    # _ground_value for the same reason the snow path now does: this desk knew the +1 convention
+    # and the snow desk did not, and one of them was silently wrong for two months.
     def _cave_body(default_body):
         return _re.sub(
             r'\[TERRAIN_(\w+)\]\s*=\s*-?\d+,',
-            lambda mm: '[TERRAIN_%s] = %d,' % (mm.group(1), 5 if mm.group(1) in _PLAT_ROUGH else 21),
+            lambda mm: '[TERRAIN_%s] = %d,'
+            % (mm.group(1), _ground_value(4 if mm.group(1) in _PLAT_ROUGH else 20)),
             default_body)
     cave_arr = 'CONST_DATA s8 BanimTerrainGround_Tileset16[] = {%s\n};\n\n' % _cave_body(m.group(2))
     dt = dt.replace('CONST_DATA s8 BanimTerrainGroundDefault[] = {',
@@ -12572,19 +12688,29 @@ def inject_battle_platforms(campaign, verbose=True):
     with open(BANIM_BATTLEPARSE_C, 'w', encoding='utf-8') as f:
         f.write(bp)
 
-    # 5. point Ch1 (chapter idx 2) at the rough snow tileset (0x15); prologue (idx 1) keeps 0
+    # 5. Point every hosted chapter at its ground. One registry rather than a write per
+    #    chapter: the chapters that were WRONG were the ones nobody had written a line for,
+    #    so the fix is a table that has to mention them all (CHAPTER_BATTLE_TILESETS).
+    missing = [c.name for c in hosted_chapters() if c.host_index not in CHAPTER_BATTLE_TILESETS]
+    if missing:
+        sys.exit('ERROR: %s host no battleTileSet -- a chapter that names none keeps its slot\'s '
+                 'VANILLA ground (grass/road under snow). Add it to CHAPTER_BATTLE_TILESETS'
+                 % ', '.join(missing))
     with open(CHAPTER_SETTINGS_JSON_PLAT, encoding='utf-8') as f:
         cs = _json.load(f)
-    cs['chapters'][2]['battleTileSet'] = 0x15
-    cs['chapters'][CH03_HOST_INDEX]['battleTileSet'] = 0x16  # ch03 cave -> siroyuka1 stone (Tileset16)
+    for host_index, tileset in sorted(CHAPTER_BATTLE_TILESETS.items()):
+        cs['chapters'][host_index]['battleTileSet'] = tileset
     with open(CHAPTER_SETTINGS_JSON_PLAT, 'w', encoding='utf-8') as f:
         _json.dump(cs, f, indent=2)
 
     if verbose:
         print('  %d platforms -> battle_terrain_table[%d..%d] (FE-Repo {Cynon}, F2E)'
               % (len(BATTLE_PLATFORMS), base, base + len(BATTLE_PLATFORMS) - 1))
-        print('  terrain->ground: Default=snow-open (Snowdrift); Tileset15=snow-rough; Ch1->0x15')
-        print('  Tileset16=CAVE (vanilla siroyuka1 stone / gake1 rock); ch03->0x16')
+        print('  terrain->ground: Default=snow-open (Snowdrift); Tileset15=snow-rough; '
+              'Tileset16=CAVE (vanilla siroyuka1 stone / gake1 rock)')
+        print('  chapter grounds: %s' % ', '.join(
+            '%s->0x%02X' % (c.name, CHAPTER_BATTLE_TILESETS[c.host_index])
+            for c in hosted_chapters()))
 
 
 def normalise_decomp_shebangs(verbose=False):

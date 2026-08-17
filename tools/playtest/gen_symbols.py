@@ -226,6 +226,11 @@ WANTED = [
     'gBanimTerrain',            # u8[2] terrain ids the battle animation resolved for the two
                                 # sides (POS_L/POS_R; src/banim-ekrbattleintro.c). These are what
                                 # GetBanimTerrainGround/GetBanimBackgroundIndex are indexed with.
+    'gBanimFloorfx',            # s16[2] -- the ANSWER those lookups gave: the battle_terrain_table
+                                # INDEX each side is standing on (src/banim-ekrbattleintro.c).
+                                # Terrain says what tile they are on; this says which platform the
+                                # engine drew, which is a different question and the one #65 got
+                                # wrong for two months while every terrain assertion passed.
     'gBanimDoneFlag',           # u32[2] -- the EXACT soft-lock condition. ekrBattleInRoundIdle
                                 # (src/banim-ekrbattle.c) spins until both sides' flags are set,
                                 # so a battle anim that never signals done wedges the whole proc
