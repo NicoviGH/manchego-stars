@@ -6,30 +6,74 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-16 (Claude). **#282, #283, #284, #285 and #286 are DONE and merged — do not
-reopen any.** The generated decomp tree is intentionally dirty as recorded below.
+Refreshed 2026-08-16 (Claude). **#282–#286 and #289 are DONE and merged — do not reopen any.**
+The generated decomp tree is intentionally dirty as recorded below.
 
 ## In flight
 
-**Nothing.** `main` is at #285 (the parity aggregate on the real article), CI green.
+**Nothing.** `main` is at #289 (ch05 scenes 12/13 + the battle grounds), CI green.
 
 ## Next task
 
-**ch05's remaining dialogue.** The retroactive balance issues are both closed: the parity metric
-now reads what actually fights, no chapter needed re-tuning, and no locked baseline moved out of
-band. Two ADRs dated 2026-08-16 carry the reasoning; the numbers live in the tool, not here.
+**Give Ravisin the Awakening Dark Mage [F] battle animation.** Nicolas picked it 2026-08-16
+against her bust; the asset is VENDORED and the path is de-risked, the wiring is not written.
+
+*Why she needs one:* her bust is Garytop's Aversa palette-swapped, but she deploys as
+`CLASS_DRUID` — vanilla's MALE druid — so she fights as a hooded man. (Vanilla also ships a
+female druid: `CLASS_DRUID_F` (0x30) points at a different AnimConf, indices `0x79`/`0x7A` vs
+the male's `0x77`/`0x78`, and `SMSId` is `0x27` for both so the map sprite would not move. It is
+the free option and it is FULLY HOODED, which is why Nicolas went custom. Recorded in case the
+custom route sours; note the two classes have different bases, HP 19→17 / Pow 6→7, so it would
+move her stat line and want `make difficulty CH=ch05`.)
+
+*What is done:* `engine/battle_anims/_vendored/awakening-dark-mage-f/magic/` holds `Magic.txt` +
+45 frames, F2U/F2E, credited (still BatimatheBat, animation Leo_Link). Verified it is the FEditor
+"For Each Frame" shape our importer already eats — `feditor_to_banim.parse_feditor` reads all ten
+modes (26/45/26/45/4/4/1/1/1/26 frames) and the frames are indexed P, 248x160, 16 colours, same
+as the wildling. **There is NO Aversa anim in the FE-Repo** (whole 2006-entry index searched;
+`file_urls.json` at the repo root is a complete file listing and the fast way to search it), so
+this is a stand-in matched to the bust, not a rip.
+
+*What is left, and the one design call:* the asset half already exists twice over and the two
+halves have never been combined. `inject_enemy_class_battle_anims` does the FEditor import but
+binds at the CLASS (`ClassData.pBattleAnimDef`); `inject_battle_anims` binds per-CHARACTER
+(`gUnitSpecificBanimConfigs` + `_u25`) but only from FAKED 3-pose art. Ravisin wants **import +
+per-character**: only steps 1 (asset production) differ between them — the linker block, the
+`banim_data[]` row and the `_u25` binding are format-agnostic — so the job is to factor that
+shared middle and let the source and the binding vary, not to write a third pipeline.
+
+**Per-character is REQUIRED, not preferred, and do not re-open that.** Class-binding
+`CLASS_DRUID` looks cheap because she is the only druid in the chapters that exist — which is
+the wrong test and a mistake Nicolas has now corrected three times (`decisions.md` → the moose
+ADR, *"not currently wired is not never will be"*). Frost druids / "Children of Auril" are a
+named recurring FACTION (`lore/frostmaiden-voices.md`: Targos street-preacher → a Ch4 boss),
+Sephek is a frost-druid spirit whose own ch00 YAML says a defeat *"only scatters him"*, ch06's
+creature was awakened by one, and Act IV is *Auril's Abode*. A returning male Sephek would
+inherit a female Awakening Dark Mage animation. Grepping current YAML for `class: druid` proves
+nothing about a campaign that is two thirds unwritten.
+
+*The interesting half is the PALETTE, not the wiring.* The anim ships ally-blue; she is auburn
+hair, frost-pale skin, black feather mantle. Matching it to the bust is the point of having
+picked this anim, and it is the same shape of job as the kobolds' `recolor: enemy_red`.
+`!! OFF-BY-ONE` applies as always: a private AnimConf `.index` is animId + 1.
+Bench it with `PT_CHAR=ravisin tools/playtest/run.sh recordenemy` — one 40s run, no chapter boot.
+Candidate previews (bust vs the three finalists): `map-review/ravisin-anim-candidates.png`.
 
 ## ch05's remaining dialogue
 
 **Worked TOP TO BOTTOM in player order** (Nicolas, 2026-08-13). The ordered inventory of all 17
-scenes — **13 done, 4 left** — is the table in **issue #25**, the canonical view; do not re-derive
+scenes — **15 done, 2 left** — is the table in **issue #25**, the canonical view; do not re-derive
 an order from the YAML's `vanilla 0xNNN` labels, which are anatomy citations naming the scene we
 MINE and are never ids we write.
 
-Next is **scene 12 — Ravisin's battle taunt**, wired NOWHERE (`gBattleTalkList` holds a ch01
-Izobai row and nothing for her), then scene 13 (Basil's death quote), then the two endings
-(16/17), a 2x2 over Basil alive/dead x Lupin present/absent. Locked text from PR #196: wiring,
-not writing.
+What is left is **the two endings (16/17)**, a 2x2 over Basil alive/dead x Lupin present/absent,
+and they are **blocked behind ch06 hosting** — ch05's win still lands on the dev placeholder.
+Locked text from PR #196: wiring, not writing.
+
+**Basil has ONE death quote** (#289) and scene 13 is closed by that decision rather than by
+wiring: the berry line is her universal `0x97A` and fires wherever she falls. The empty vanilla
+`0x9C6` escort slot is not an invitation to write a second — `decisions.md` → "One death quote
+per character".
 
 **Message ids are NOT scarce, and a previous session's framing of them was wrong** (Nicolas
 corrected it 2026-08-15). `gMsgTable[]` is a generated C array built from `texts.txt` by the
