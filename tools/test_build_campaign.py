@@ -1182,28 +1182,68 @@ class BattleChargeFlash(unittest.TestCase):
 
 
 class BattlePlatformTerrain(unittest.TestCase):
-    """Terrain category -> snow ground index (#65). base = first vendored ground slot;
-    offsets 0=Snowdrift, 1=Snow Uneven (rough), 2=Ice."""
+    """Terrain category -> snow ground, and the OFF-BY-ONE that hid inside it (#65).
+
+    `GetBanimTerrainGround` ends `return ret - 1`, so a terrain array holds
+    **table index + 1**, never the index. The cave path always knew that (it writes 21 for
+    `siroyuka1` at index 20); the snow path wrote raw indices, so every snow chapter had been
+    standing one platform BELOW the one named for it since #65 -- open ground landed on
+    `mizuiumi1`, a vanilla LAKE, and the chapters that asked for rough got the drift. Nothing
+    caught it because the drift is plausible snow and nobody read the ground.
+
+    So these assert the CONVENTION, in the direction that fails loudly if it is dropped again:
+    the value is one MORE than the index, and never equal to it.
+    """
+    BASE = 115   # PLATFORM_BASE_INDEX in the shipped table: drift 115, rough 116, ice 117
+
+    def test_a_ground_value_is_one_more_than_its_table_index(self):
+        self.assertEqual(21, bc._ground_value(20))   # siroyuka1, the case vanilla proves
+        self.assertEqual(5, bc._ground_value(4))     # gake1
+
+    def test_road_gets_the_snow_path_on_both_tilesets(self):
+        """TERRAIN_ROAD has its own slot in the 66-entry array -- vanilla's own tables use it
+        (slot 6 puts `michi1` there, which is what ch05 was standing on). Ours had been
+        collapsing it into "everything else"; it now names the vendored snowy path, and it does
+        so on BOTH tilesets, because a road is a road whether the open ground beside it reads
+        as drift or as rock."""
+        path = bc._ground_value(self.BASE + 3)       # -> table[118] = ms_snowpath
+        self.assertEqual(path, bc._terrain_snow_ground('ROAD', self.BASE, False))
+        self.assertEqual(path, bc._terrain_snow_ground('ROAD', self.BASE, True))
+        # ...and it is NOT what open ground gets, or the assignment bought nothing.
+        self.assertNotEqual(path, bc._terrain_snow_ground('PLAINS', self.BASE, False))
 
     def test_open_ground_is_snowdrift_on_the_open_tileset(self):
-        # plains/road/floor read as open drift on the snow-OPEN tileset (prologue).
-        self.assertEqual(bc._terrain_snow_ground('PLAINS', 115, False), 115)
-        self.assertEqual(bc._terrain_snow_ground('ROAD', 115, False), 115)
+        drift = bc._ground_value(self.BASE)          # -> table[115] = ms_snowdrift
+        self.assertEqual(drift, bc._terrain_snow_ground('PLAINS', self.BASE, False))
+        self.assertNotEqual(self.BASE, drift, 'a raw index selects the row BELOW the one meant')
 
     def test_open_ground_becomes_rough_on_the_rough_tileset(self):
-        # the Ch1 snow-ROUGH tileset sends the same open ground to Snow Uneven.
-        self.assertEqual(bc._terrain_snow_ground('PLAINS', 115, True), 116)
-        self.assertEqual(bc._terrain_snow_ground('ROAD', 115, True), 116)
+        rough = bc._ground_value(self.BASE + 1)      # -> table[116] = ms_snowrough
+        self.assertEqual(rough, bc._terrain_snow_ground('PLAINS', self.BASE, True))
 
     def test_rough_terrain_is_always_uneven(self):
+        rough = bc._ground_value(self.BASE + 1)
         for t in ('MOUNTAIN', 'PEAK', 'CLIFF', 'VALLEY'):
-            self.assertEqual(bc._terrain_snow_ground(t, 115, False), 116)
-            self.assertEqual(bc._terrain_snow_ground(t, 115, True), 116)
+            self.assertEqual(rough, bc._terrain_snow_ground(t, self.BASE, False))
+            self.assertEqual(rough, bc._terrain_snow_ground(t, self.BASE, True))
 
     def test_water_terrain_is_always_ice(self):
+        ice = bc._ground_value(self.BASE + 2)
         for t in ('LAKE', 'SEA', 'RIVER', 'WATER', 'GLACIER'):
-            self.assertEqual(bc._terrain_snow_ground(t, 115, False), 117)
-            self.assertEqual(bc._terrain_snow_ground(t, 115, True), 117)  # even on the rough tileset
+            self.assertEqual(ice, bc._terrain_snow_ground(t, self.BASE, False))
+            self.assertEqual(ice, bc._terrain_snow_ground(t, self.BASE, True))  # even on rough
+
+    def test_every_snow_ground_names_one_of_OUR_platforms(self):
+        """The assertion that would have caught it: resolve each value the way the ENGINE does
+        (subtract one, index the table) and require the row to be one we appended."""
+        ours = {bc.PLATFORM_BASE_INDEX + n: 'ms_' + sym
+                for n, (_stem, sym, _tint) in enumerate(bc.BATTLE_PLATFORMS)}
+        for rough_open in (False, True):
+            for terrain in ('PLAINS', 'ROAD', 'MOUNTAIN', 'CLIFF', 'LAKE', 'RIVER'):
+                value = bc._terrain_snow_ground(terrain, bc.PLATFORM_BASE_INDEX, rough_open)
+                self.assertIn(value - 1, ours,
+                              '%s -> value %d selects table[%d], which is not one of ours'
+                              % (terrain, value, value - 1))
 
 
 class EveryHostedChapterPicksItsGround(unittest.TestCase):
@@ -1236,18 +1276,21 @@ class EveryHostedChapterPicksItsGround(unittest.TestCase):
         self.assertEqual(0x15, bc.CHAPTER_BATTLE_TILESETS[bc.CH02_HOST_INDEX])
         self.assertEqual(0x16, bc.CHAPTER_BATTLE_TILESETS[bc.CH03_HOST_INDEX])   # the mine
 
-    def test_ch05s_own_map_is_what_makes_rough_the_right_read(self):
-        """Not a vibe: its ground is PAVED, not open. `snow-uneven-light` is snow over rock,
-        which is what a tomb courtyard under snow is; the drift is windswept open ground."""
+    def test_ch05_fights_mostly_on_its_ROAD_and_that_is_where_the_path_ground_goes(self):
+        """Which ground matters here is a fact about the map, not a taste: ch05 is more than
+        half TERRAIN_ROAD, so the road slot decides how most of the chapter looks in combat.
+        Resolved the way the engine resolves it (value - 1), so it cannot pass on the row below
+        the one it names -- see _ground_value."""
         maps = os.path.join(bc.REPO, 'campaigns', 'rime-of-the-frostmaiden', 'maps')
         _w, _h, grid = bc._map_terrain_grid(maps, bc.CH05_LAYOUT[1])
         ids = bc.terrain_ids()
         tiles = [t for row in grid for t in row]
         road = sum(1 for t in tiles if t == ids['TERRAIN_ROAD'])
         self.assertGreater(road, len(tiles) // 2, 'ch05 is a paved map; if that changes, revisit')
-        # And the rough tileset is what sends road to the rock-and-snow ground.
-        self.assertEqual(bc._terrain_snow_ground('ROAD', bc.PLATFORM_BASE_INDEX, True),
-                         bc.PLATFORM_BASE_INDEX + 1)
+        for rough_open in (False, True):
+            value = bc._terrain_snow_ground('ROAD', bc.PLATFORM_BASE_INDEX, rough_open)
+            self.assertEqual('ms_snowpath',
+                             'ms_' + bc.BATTLE_PLATFORMS[value - 1 - bc.PLATFORM_BASE_INDEX][1])
 
 
 class AppendedClassSlot(unittest.TestCase):

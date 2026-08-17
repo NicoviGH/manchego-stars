@@ -7481,12 +7481,26 @@ end
 -- So this films it, and films it ON ROAD specifically: both combatants are parked on
 -- TERRAIN_ROAD and the scenario FAILS if they are not, because road is the tile class that was
 -- wrong and a fight staged on a fence would prove nothing about it.
+-- AND IT READS THE PLATFORM, not just the tile. The first cut asserted terrain, filmed, and
+-- PASSED while the fighters stood on the wrong ground -- the terrain was right and the lookup
+-- off it was not (a raw table index where the engine wants index+1, so every snow chapter drew
+-- the row below the one it named). gBanimFloorfx is the engine's own answer to "which platform",
+-- so the terminal below demands it be one of OUR rows and names which.
 -- Battle animations are forced ON (the whole subject is the animation's backdrop) -- note
 -- pokeNormalConfig only clears gameSpeed and would leave a prior pokeFastConfig's map combat
 -- in place, which draws no platform at all.
 -- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05platform (needs a CH05BOOT=1 ROM).
 scenarios.recordch05platform = function()
+    -- battle_terrain_table indices our vendored grounds occupy (PLATFORM_BASE_INDEX..+3:
+    -- ms_snowdrift / ms_snowrough / ms_snowice / ms_snowpath). TERRAIN_ROAD has its own slot in
+    -- the engine's 66-entry array -- it is where vanilla's slot-6 table puts `michi1`, the dirt
+    -- road ch05 was inheriting -- so road must resolve to ms_snowpath. Anything else (vanilla
+    -- ground, or one of ours a row off) is the failure this scenario exists to name.
     local TERRAIN_ROAD = 0x02
+    local PLAT_DRIFT, PLAT_ROUGH, PLAT_ICE, PLAT_PATH = 115, 116, 117, 118
+    local PLAT_NAME = { [PLAT_DRIFT] = "ms_snowdrift", [PLAT_ROUGH] = "ms_snowrough",
+                        [PLAT_ICE] = "ms_snowice", [PLAT_PATH] = "ms_snowpath" }
+    local ground, groundSeen = nil, false
     return recordCutscene({
         tag = "ch05platform", speed = "normal", maxFrames = 1500, shotEvery = 2,
         pressEvery = 90,
@@ -7573,9 +7587,28 @@ scenarios.recordch05platform = function()
             return true
         end,
         until_ = function()
-            return faction() == 0 and not menuOpen()
+            -- gBanimFloorfx is s16[2] (POS_L/POS_R) and is -1 until the anim resolves it.
+            local l = rs16(SYM.gBanimFloorfx)
+            if not groundSeen and l >= 0 then
+                ground, groundSeen = l, true
+                log(string.format("ch05platform: standing on battle_terrain_table[%d] (%s)",
+                    l, PLAT_NAME[l] or "NOT one of ours -- vanilla ground"))
+            end
+            return groundSeen and faction() == 0 and not menuOpen()
                 and not procActive(SYM.ProcScr_BattleEventEngine)
                 and controllerState() == "player_map_idle"
+        end,
+        post = function()
+            if not groundSeen then
+                return result("FAIL", "the battle animation never resolved a ground index")
+            end
+            if ground ~= PLAT_PATH then
+                return result("FAIL", string.format(
+                    "road resolved to battle_terrain_table[%d] (%s), not ms_snowpath[%d] -- "
+                    .. "ch05 is standing on the wrong platform", ground,
+                    PLAT_NAME[ground] or "a vanilla ground", PLAT_PATH))
+            end
+            return result("PASS", "ch05's roads fight on ms_snowpath, the snowed-over track")
         end,
     })
 end

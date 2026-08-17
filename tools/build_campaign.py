@@ -12486,11 +12486,14 @@ VARIABLES_H = os.path.join(DECOMP, 'include', 'variables.h')
 CHAPTER_SETTINGS_JSON_PLAT = os.path.join(DECOMP, 'src', 'data', 'chapter_settings.json')
 
 # (campaign png stem, decomp symbol stem, twilight tint). Grounds get table indices in
-# append order from PLATFORM_BASE_INDEX. Offsets: 0=Snowdrift, 1=rough(SnowUneven), 2=Ice.
+# append order from PLATFORM_BASE_INDEX. Offsets: 0=Snowdrift, 1=rough(SnowUneven), 2=Ice,
+# 3=snowed-over road. APPEND ONLY -- the offsets are addressed by _terrain_snow_ground and a
+# reorder silently restages every fight in the campaign.
 BATTLE_PLATFORMS = [
     ('snowdrift',         'snowdrift', 0.80),  # open windswept snow, cooled for twilight
     ('snow-uneven-light', 'snowrough', 1.00),  # rough snowy ground over rock
     ('ice-flat',          'snowice',   1.00),  # frozen lake/river
+    ('snow-dirt-path',    'snowpath',  1.00),  # a snowed-over track: TERRAIN_ROAD's own ground
 ]
 PLATFORM_BASE_INDEX = 115  # battle_terrain_table currently ends at 114
 # Host slot -> battleTileSet, and it is REQUIRED to be total (check.py + the unit test):
@@ -12513,6 +12516,11 @@ CHAPTER_BATTLE_TILESETS = {
 }
 _PLAT_ICE = {'RIVER', 'SEA', 'LAKE', 'WATER', 'GLACIER', 'SNAG', 'DEEPS', 'SHIP_FLAT',
              'SHIP_WRECK'}
+# TERRAIN_ROAD is not a category we invented: it has its own slot in the 66-entry
+# BanimTerrainGround_* array, and vanilla's own tables use it -- the slot-6 table ch05 was
+# inheriting puts `michi1`, the dirt road, exactly here (Nicolas, 2026-08-16). Ours had been
+# collapsing it into "everything else" and giving a paved winter town the open-snow ground.
+_PLAT_ROAD = {'ROAD'}
 _PLAT_ROUGH = {'MOUNTAIN', 'PEAK', 'CLIFF', 'VALLEY', 'RUINS_REGULAR', 'RUINS_VILLAGE',
                'RUBBLE', 'PILLAR', 'WALL_REGULAR', 'WALL_DAMAGED', 'FENCE_REGULAR',
                'FENCE_32', 'FORT', 'GATE_CASTLE', 'GATE_REGULAR', 'SKY', 'BARREL', 'BONE',
@@ -12520,14 +12528,30 @@ _PLAT_ROUGH = {'MOUNTAIN', 'PEAK', 'CLIFF', 'VALLEY', 'RUINS_REGULAR', 'RUINS_VI
                'BALLISTA_KILLER'}
 
 
+def _ground_value(table_index):
+    """The number a BanimTerrainGround_* array holds to select battle_terrain_table[index].
+
+    It is index + 1, and that is the single easiest thing in #65 to get wrong:
+    `GetBanimTerrainGround` (banim-battleparse.c) ends `return ret - 1`, so an array written
+    with raw indices selects the row BELOW every platform it names. The snow arrays did exactly
+    that from #65 until 2026-08-16 -- open ground resolved to `mizuiumi1`, a vanilla LAKE, and
+    a chapter that asked for the rough ground got the drift. It survived because the drift is
+    plausible snow and nothing in the build, the tests or any scenario read the ground.
+    """
+    return table_index + 1
+
+
 def _terrain_snow_ground(terrain, base, rough_open):
-    """Ground index for TERRAIN_<terrain> on a snow map. rough_open=True (the Ch1 'rough'
-    tileset) sends open/flat ground to the rough platform instead of the drift."""
+    """Ground VALUE for TERRAIN_<terrain> on a snow map (see _ground_value -- this is not an
+    index). rough_open=True (the Ch1 'rough' tileset) sends open/flat ground to the rough
+    platform instead of the drift."""
     if terrain in _PLAT_ICE:
-        return base + 2
+        return _ground_value(base + 2)
+    if terrain in _PLAT_ROAD:
+        return _ground_value(base + 3)
     if terrain in _PLAT_ROUGH:
-        return base + 1
-    return base + (1 if rough_open else 0)
+        return _ground_value(base + 1)
+    return _ground_value(base + (1 if rough_open else 0))
 
 
 def inject_battle_platforms(campaign, verbose=True):
@@ -12627,14 +12651,15 @@ def inject_battle_platforms(campaign, verbose=True):
     dt = dt.replace('CONST_DATA s8 BanimTerrainGroundDefault[] = {',
                     rough_arr + 'CONST_DATA s8 BanimTerrainGroundDefault[] = {', 1)
     # Tileset16 = CAVE (ch03 Termalaine mine). Unlike snow, this uses EXISTING VANILLA platforms:
-    # the mine floor -> siroyuka1 (the vanilla neutral STONE ground, battle_terrain_table[20], so
-    # ground value 21) and rock walls/cliffs -> gake1 (table[4], value 5). No PNG/append/FE-Repo
-    # pull needed. NOTE the vanilla convention is value == table_index + 1 (the consumer subtracts
-    # 1); do NOT copy the snow base+offset idiom here.
+    # the mine floor -> siroyuka1 (the vanilla neutral STONE ground, battle_terrain_table[20]) and
+    # rock walls/cliffs -> gake1 (table[4]). No PNG/append/FE-Repo pull needed. Both go through
+    # _ground_value for the same reason the snow path now does: this desk knew the +1 convention
+    # and the snow desk did not, and one of them was silently wrong for two months.
     def _cave_body(default_body):
         return _re.sub(
             r'\[TERRAIN_(\w+)\]\s*=\s*-?\d+,',
-            lambda mm: '[TERRAIN_%s] = %d,' % (mm.group(1), 5 if mm.group(1) in _PLAT_ROUGH else 21),
+            lambda mm: '[TERRAIN_%s] = %d,'
+            % (mm.group(1), _ground_value(4 if mm.group(1) in _PLAT_ROUGH else 20)),
             default_body)
     cave_arr = 'CONST_DATA s8 BanimTerrainGround_Tileset16[] = {%s\n};\n\n' % _cave_body(m.group(2))
     dt = dt.replace('CONST_DATA s8 BanimTerrainGroundDefault[] = {',
