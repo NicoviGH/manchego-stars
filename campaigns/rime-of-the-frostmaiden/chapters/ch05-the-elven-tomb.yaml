@@ -267,6 +267,28 @@ enemy_units:
       # Regenerate with portraits/ravisin.py; no generative artwork and no pixel reshaping.
       look: "Ravisin, frost druid (auburn hair, frost-pale skin, black feather mantle)"
       source: "FE-Repo Aversa {Garytop} [F2E] — deterministic hair/skin palette swap"
+    # She fought as vanilla's MALE druid — a hooded man under a woman's bust — until this landed.
+    # There is no Aversa battle animation in the FE-Repo (the whole 2006-entry index was searched),
+    # so this is a STAND-IN picked against the bust (Nicolas, 2026-08-16): loose auburn hair, no
+    # hood, and the same source game as the portrait. Rejected: `[Custom Magi] [F] Witch {Pikmin}`
+    # (auburn too, but a pointed hat her bust has not) and `[T2 Druid-Base] Vanilla FE6 [F]` (her
+    # exact tier, but fully hooded). Vanilla's own CLASS_DRUID_F is a real second animation
+    # (0x79/0x7A vs the male's 0x77/0x78) and costs nothing — also hooded, which is why it lost.
+    # PALETTE: the anim's own SHIPPED palette, and the author's "enemy" one was tried and
+    # REJECTED on sight. The two are index-aligned, so swapping them looked free -- but the art
+    # does not use those indices the way the swatch suggests: the enemy palette turns her HAIR
+    # TEAL, and auburn hair matching the bust is the entire reason this anim was chosen over the
+    # hooded alternatives. Comparison: `map-review/ravisin-anim-palette.png`. So she is currently
+    # BLUE-ROBED where an enemy would normally read red -- a known, deliberate trade, and the
+    # real target is a hybrid (her auburn hair + a frost/enemy robe ramp), which is a palette
+    # pass rather than a re-import. Do not "fix" the faction colour by reinstating the enemy
+    # palette wholesale; that is the thing that was already rejected.
+    battle_anim:
+      clone_from: druid           # the AnimConf to clone + which slots to repoint; see BANIM_DONORS
+      abbr: ravisin
+      import:                     # a REAL FE-native animation, transcribed whole (feditor_to_banim)
+        txt: ravisin/Magic.txt    # ...bound per-CHARACTER via _u25, like Sahnar's and Pinky's:
+        frames_dir: ravisin       # NEVER at CLASS_DRUID, which future frost druids also use
     # NO DROP, and that is vanilla's answer rather than an omission: Ch5 has ZERO droppers in the
     # whole chapter, Saar included — killing the boss pays in winning. Ravisin used to carry a
     # `drops:` block naming a "crest of cold iron"; the injector reads `item_drop:` and never saw

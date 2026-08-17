@@ -111,11 +111,12 @@
 #                    of each RAW_PID_BATTLE_ANIMS unit under its OWN pid; a harmless player
 #                    baits the chosen foe into a counter-attack. Pick with
 #                    PT_CHAR=<name|classid> (default kobold-grunt):
-#                    kobold-grunt kobold-blade kobold-brute white-moose.
+#                    kobold-grunt kobold-blade kobold-brute white-moose ravisin.
 #                    Build TESTCH=1 first, e.g.:
 #                      PT_CHAR=kobold-grunt tools/playtest/run.sh recordenemy
 #                      tools/playtest/make_gif.py recordenemy kobold-grunt --name kobold-anim
 #                      PT_CHAR=white-moose  tools/playtest/run.sh recordenemy
+#                      PT_CHAR=ravisin      tools/playtest/run.sh recordenemy
 #   recordch01trail / recordlord / recordlordfast / recordch01 / recordopening /
 #   record / scenes / scenesch01 / bootobserve -- other scenes (no checkpoint: these
 #   replay their full lead-in at 60fps, so they are the slowest captures)

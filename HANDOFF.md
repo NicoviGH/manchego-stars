@@ -15,49 +15,36 @@ The generated decomp tree is intentionally dirty as recorded below.
 
 ## Next task
 
-**Give Ravisin the Awakening Dark Mage [F] battle animation.** Nicolas picked it 2026-08-16
-against her bust; the asset is VENDORED and the path is de-risked, the wiring is not written.
+**Ravisin's battle animation is WIRED; what is left is her PALETTE.** She fought as vanilla's
+male druid — a hooded man under a woman's bust — until 2026-08-16. She now animates as
+`[Custom DM] Awakening Dark Mage [F]` {still BatimatheBat, animation Leo_Link, F2U/F2E},
+imported whole and bound per-CHARACTER (`animId 0xDF`, `_u25[31] -> AnimConf_ravisin` on pid
+0xb8). Proved on the bench: `PT_CHAR=ravisin tools/playtest/run.sh recordenemy` → PASS.
 
-*Why she needs one:* her bust is Garytop's Aversa palette-swapped, but she deploys as
-`CLASS_DRUID` — vanilla's MALE druid — so she fights as a hooded man. (Vanilla also ships a
-female druid: `CLASS_DRUID_F` (0x30) points at a different AnimConf, indices `0x79`/`0x7A` vs
-the male's `0x77`/`0x78`, and `SMSId` is `0x27` for both so the map sprite would not move. It is
-the free option and it is FULLY HOODED, which is why Nicolas went custom. Recorded in case the
-custom route sours; note the two classes have different bases, HP 19→17 / Pow 6→7, so it would
-move her stat line and want `make difficulty CH=ch05`.)
+**There was no design call and I invented one — do not repeat that.** The per-character path has
+taken a REAL FEditor import via `import: {txt, frames_dir}` since Sahnar and Pinky; I described
+it as machinery that "has never been combined" and started scoping a refactor. Nicolas: *"we've
+vendored battle anims from the repo before (Sahnar, the kobold) so idk what decision needs to be
+made."* Check `npcs/sahnar.yaml` before believing this pipeline is missing anything.
 
-*What is done:* `engine/battle_anims/_vendored/awakening-dark-mage-f/magic/` holds `Magic.txt` +
-45 frames, F2U/F2E, credited (still BatimatheBat, animation Leo_Link). Verified it is the FEditor
-"For Each Frame" shape our importer already eats — `feditor_to_banim.parse_feditor` reads all ten
-modes (26/45/26/45/4/4/1/1/1/26 frames) and the frames are indexed P, 248x160, 16 colours, same
-as the wildling. **There is NO Aversa anim in the FE-Repo** (whole 2006-entry index searched;
-`file_urls.json` at the repo root is a complete file listing and the fast way to search it), so
-this is a stand-in matched to the bust, not a rip.
+*The open half is the palette, and it is a real trade, not a polish item.* She ships on the
+anim's NATIVE palette: auburn hair (which is why this anim was chosen over the hooded
+alternatives) but a BLUE robe, where an enemy would normally read red. The author's own "enemy"
+palette was tried and rejected on sight — it is index-aligned so the swap looked free, but the
+art does not use those indices the way the swatch suggests and it turns her HAIR TEAL. Evidence:
+`map-review/ravisin-anim-palette.png`. **Do not reinstate the enemy palette wholesale; that is
+the thing already rejected.** The target is a hybrid — her auburn hair kept, the robe ramp moved
+to frost/enemy — which is a palette pass on the vendored frames, not a re-import. `build_import`
+already takes a `recolor` map (the class path passes one); the per-character branch does not pass
+it yet, which is the only code gap and it is three lines.
 
-*What is left, and the one design call:* the asset half already exists twice over and the two
-halves have never been combined. `inject_enemy_class_battle_anims` does the FEditor import but
-binds at the CLASS (`ClassData.pBattleAnimDef`); `inject_battle_anims` binds per-CHARACTER
-(`gUnitSpecificBanimConfigs` + `_u25`) but only from FAKED 3-pose art. Ravisin wants **import +
-per-character**: only steps 1 (asset production) differ between them — the linker block, the
-`banim_data[]` row and the `_u25` binding are format-agnostic — so the job is to factor that
-shared middle and let the source and the binding vary, not to write a third pipeline.
-
-**Per-character is REQUIRED, not preferred, and do not re-open that.** Class-binding
-`CLASS_DRUID` looks cheap because she is the only druid in the chapters that exist — which is
-the wrong test and a mistake Nicolas has now corrected three times (`decisions.md` → the moose
-ADR, *"not currently wired is not never will be"*). Frost druids / "Children of Auril" are a
-named recurring FACTION (`lore/frostmaiden-voices.md`: Targos street-preacher → a Ch4 boss),
-Sephek is a frost-druid spirit whose own ch00 YAML says a defeat *"only scatters him"*, ch06's
-creature was awakened by one, and Act IV is *Auril's Abode*. A returning male Sephek would
-inherit a female Awakening Dark Mage animation. Grepping current YAML for `class: druid` proves
-nothing about a campaign that is two thirds unwritten.
-
-*The interesting half is the PALETTE, not the wiring.* The anim ships ally-blue; she is auburn
-hair, frost-pale skin, black feather mantle. Matching it to the bust is the point of having
-picked this anim, and it is the same shape of job as the kobolds' `recolor: enemy_red`.
-`!! OFF-BY-ONE` applies as always: a private AnimConf `.index` is animId + 1.
-Bench it with `PT_CHAR=ravisin tools/playtest/run.sh recordenemy` — one 40s run, no chapter boot.
-Candidate previews (bust vs the three finalists): `map-review/ravisin-anim-candidates.png`.
+*There is NO Aversa animation in the FE-Repo* — the whole 2006-entry index was searched, and
+`file_urls.json` at the repo root is a complete file listing and the fast way to search it. Her
+portrait is there and an "Aversa's Night" icon; no anim. So this is a stand-in matched to the
+bust. Rejected finalists and why: `[Custom Magi] [F] Witch {Pikmin}` (auburn too, pointed hat her
+bust has not) and `[T2 Druid-Base] Vanilla FE6 [F]` (her exact tier, fully hooded). Vanilla's own
+`CLASS_DRUID_F` is a real second animation (`0x79`/`0x7A` vs the male's `0x77`/`0x78`) and costs
+nothing — also hooded, which is why it lost; it would also move her bases (HP 19→17, Pow 6→7).
 
 ## ch05's remaining dialogue
 

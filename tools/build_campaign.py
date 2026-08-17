@@ -4662,6 +4662,17 @@ BANIM_DONORS = {
     # man on a horse", #206) applied to the class that needed it next. ANIMA/DARK stay vanilla
     # deliberately: neither this line's Priest nor its Bishop promotion can equip those, so a
     # repoint there would be dead weight, not coverage.
+    # Ravisin (ch05's frost-druid boss, #25). Her animation is an IMPORTED FE-native one
+    # (feditor_to_banim), so `motion`/`cadence` are unused -- the .txt owns them; the donor only
+    # supplies the AnimConf to clone and the slots to repoint for her per-character _u25.
+    # WHICH SLOTS is the cavalier row's rule (#206) applied to a Druid: every slot left vanilla
+    # is a slot where she renders as a HOODED MAN. data_classes.c gives CLASS_DRUID baseRanks
+    # STAFF/ANIMA/DARK, so all three are reachable in play (DARK first -- her Flux is the fight),
+    # and ITEM covers her holding a plain item with her tome spent. LIGHT is deliberately left
+    # vanilla: no Druid can equip it, so repointing it would be dead weight, not coverage --
+    # exactly the call the bishop row makes about ANIMA/DARK below.
+    'druid': ('CLASS_DRUID', ['0x0100 | ITYPE_DARK', '0x0100 | ITYPE_ANIMA',
+                              '0x0100 | ITYPE_STAFF', '0x0100 | ITYPE_ITEM'], 'magic', None),
     'bishop': ('CLASS_BISHOP', ['0x0100 | ITYPE_STAFF', '0x0100 | ITYPE_LIGHT',
                                 '0x0100 | ITYPE_ITEM'], 'magic', None),
     # Lupin (the beast-cavalier) -- his anim is an IMPORTED N-frame POUNCE (feditor_to_banim, #90),
@@ -9156,6 +9167,7 @@ RAW_PID_PERSONAL_SOURCES = {
 # put a miniboss on the deployable cast roster.
 RAW_PID_BATTLE_ANIMS = {
     'white-moose': (CH05_CHAPTER_YAML, CH05_MOOSE_PID),
+    'ravisin': (CH05_CHAPTER_YAML, CH05_BOSS_PID),
 }
 CH05_AI = {
     'aggressive': '{0x0, 0x0, 0x1, 0x0}',        # pursue/charge

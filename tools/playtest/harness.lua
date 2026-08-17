@@ -4463,11 +4463,15 @@ scenarios.recordenemy = function()
     if not bootToMap() then return result("FAIL", "never reached the sandbox map") end
     wait(60); pokeAnimsOn()
     local sel = (PLAYTEST_CHAR and PLAYTEST_CHAR ~= "") and PLAYTEST_CHAR or "kobold-grunt"
-    local wantPid = ({ ["white-moose"] = 0xb9 })[sel]   -- ch05's cornered miniboss (#25)
+    -- Raw-pid creatures the sandbox deploys under their OWN pid (RAW_PID_BATTLE_ANIMS).
+    local wantPid = ({ ["white-moose"] = 0xb9,   -- ch05's cornered miniboss (#25)
+                       ["ravisin"]     = 0xb8 }) -- ch05's frost-druid boss (#25)
+                    [sel]
     local want = (not wantPid) and (RESKIN_ENEMY_CLASS[sel] or tonumber(sel)) or nil
     if not want and not wantPid then
         return result("FAIL", "unknown enemy '" .. sel .. "' -- one of: "
-            .. "kobold-grunt kobold-blade kobold-brute white-moose, or a raw class id (e.g. 0x82)") end
+            .. "kobold-grunt kobold-blade kobold-brute white-moose ravisin, or a raw class id "
+            .. "(e.g. 0x82)") end
     local function classOf(u) return ru8(ru32(u.addr + 0x04) + 0x04) end
     -- the chosen foe: by CHARACTER for a raw-pid creature, by CLASS for a class-level reskin
     local foe
