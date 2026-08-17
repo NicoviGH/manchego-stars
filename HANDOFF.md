@@ -6,43 +6,63 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-16 (Claude). **#282–#286 and #289 are DONE and merged — do not reopen any.**
-The generated decomp tree is intentionally dirty as recorded below.
+Refreshed 2026-08-17 (Claude). **#282–#286, #289 and #290 are DONE and merged — do not reopen
+any.** The generated decomp tree is intentionally dirty as recorded below.
 
 ## In flight
 
-**Nothing.** `main` is at #289 (ch05 scenes 12/13 + the battle grounds), CI green.
+**Nothing.** `main` is at #290, CI green. The last stretch landed ch05's scenes 12/13, the battle
+grounds, and Ravisin's battle animation.
+
+⚠️ **Three commits went straight to main** (`dbcf558`, `fe45875`, `3488533` — Ravisin's anim),
+bypassing feature-flow: the session merged #289, stayed on `main`, and kept committing. CI was
+green on each and #290 was the review they should have had first. Nothing is broken and history
+was NOT rewritten. Recorded because the next session should not read main's shape as licence:
+**branch → PR → squash-merge**, every time (`CLAUDE.md` → Coordination).
 
 ## Next task
 
-**Ravisin's battle animation is WIRED; what is left is her PALETTE.** She fought as vanilla's
-male druid — a hooded man under a woman's bust — until 2026-08-16. She now animates as
-`[Custom DM] Awakening Dark Mage [F]` {still BatimatheBat, animation Leo_Link, F2U/F2E},
-imported whole and bound per-CHARACTER (`animId 0xDF`, `_u25[31] -> AnimConf_ravisin` on pid
-0xb8). Proved on the bench: `PT_CHAR=ravisin tools/playtest/run.sh recordenemy` → PASS.
+**Ravisin's ART: her palette, and an open question about her map sprite.** She now animates as
+`[Custom DM] Awakening Dark Mage [F]` {still BatimatheBat, animation Leo_Link, F2U/F2E} —
+imported whole, bound per-CHARACTER (`animId 0xDF`, `_u25[31] → AnimConf_ravisin` on pid `0xb8`),
+proved on the bench (`PT_CHAR=ravisin tools/playtest/run.sh recordenemy` → PASS). Two things
+remain, one decided-and-owed and one genuinely open.
 
-**There was no design call and I invented one — do not repeat that.** The per-character path has
-taken a REAL FEditor import via `import: {txt, frames_dir}` since Sahnar and Pinky; I described
-it as machinery that "has never been combined" and started scoping a refactor. Nicolas: *"we've
-vendored battle anims from the repo before (Sahnar, the kobold) so idk what decision needs to be
-made."* Check `npcs/sahnar.yaml` before believing this pipeline is missing anything.
+**❓ OPEN QUESTION for Nicolas — do we have a MAP SPRITE to match her portrait and battle anim?**
+She has none: no `map_sprites/ravisin*.png`, no `sprite:` on her YAML, so on the map she is the
+**stock vanilla Druid SMS** (`SMSId 0x27`) — the same hooded man her battle animation just
+stopped being. Her bust and her close-up now agree with each other and disagree with the tile.
+The FE-Repo's `Map Sprites` section is in the same `file_urls.json` index that answered the anim
+question (2909 entries; search it, don't walk folders). Precedent for wiring one: the white
+moose's `map_sprite:` block in `ch04-the-white-moose.yaml` (`wait:` + `mu:` sheets), and
+`map_sprite_swapper.py` / `map_sprite_tool.py`. **Ask before vendoring** — this is a look call,
+and there may be no female-druid sprite worth having.
 
-*The open half is the palette, and it is a real trade, not a polish item.* She ships on the
-anim's NATIVE palette: auburn hair (which is why this anim was chosen over the hooded
-alternatives) but a BLUE robe, where an enemy would normally read red. The author's own "enemy"
-palette was tried and rejected on sight — it is index-aligned so the swap looked free, but the
-art does not use those indices the way the swatch suggests and it turns her HAIR TEAL. Evidence:
-`map-review/ravisin-anim-palette.png`. **Do not reinstate the enemy palette wholesale; that is
-the thing already rejected.** The target is a hybrid — her auburn hair kept, the robe ramp moved
-to frost/enemy — which is a palette pass on the vendored frames, not a re-import. `build_import`
-already takes a `recolor` map (the class path passes one); the per-character branch does not pass
-it yet, which is the only code gap and it is three lines.
+*The palette is the owed half.* She ships on the anim's NATIVE palette: auburn hair (the reason
+this anim beat the hooded alternatives) but a BLUE robe, where an enemy would read red. The
+author's own "enemy" palette was tried and REJECTED on sight — the two are index-aligned so the
+swap looked free, but the art does not use those indices the way the swatch suggests and it turns
+her HAIR TEAL. Evidence, now in the repo: `docs/demo/ch05-ravisin-anim-palette.png`. **Do not
+reinstate the enemy palette wholesale; that is the thing already rejected.** The target is a
+hybrid — her hair kept, the robe ramp moved to frost/enemy — a palette pass on the vendored
+frames, not a re-import. `build_import` already takes a `recolor` map (the class path passes
+one); the per-character branch does not pass it yet, which is the only code gap and it is three
+lines.
 
-*There is NO Aversa animation in the FE-Repo* — the whole 2006-entry index was searched, and
-`file_urls.json` at the repo root is a complete file listing and the fast way to search it. Her
-portrait is there and an "Aversa's Night" icon; no anim. So this is a stand-in matched to the
-bust. Rejected finalists and why: `[Custom Magi] [F] Witch {Pikmin}` (auburn too, pointed hat her
-bust has not) and `[T2 Druid-Base] Vanilla FE6 [F]` (her exact tier, fully hooded). Vanilla's own
+**Two traps this stretch paid for, both about believing a check you did not run:**
+- *There was no design call and one was invented.* The per-character path has taken a REAL
+  FEditor import via `import: {txt, frames_dir}` since Sahnar and Pinky. A refactor was scoped
+  before anyone opened `npcs/sahnar.yaml`, where the answer is four lines. **Check the anims we
+  already vendored before believing this pipeline is missing anything.**
+- *"She's the campaign's only druid" is not a fact about the campaign.* It was a grep of the
+  chapters that exist, used to argue for class-binding. Frost druids are a recurring FACTION
+  (`lore/frostmaiden-voices.md`), Sephek's defeat "only scatters him", and Act IV is Auril's
+  Abode. **Bind per-CHARACTER, never at `CLASS_DRUID`** — `decisions.md`, the moose ADR.
+
+*There is NO Aversa animation in the FE-Repo* — the whole 2006-entry index was searched. Her
+portrait is there and an "Aversa's Night" icon; no anim. This is a stand-in matched to the bust.
+Rejected finalists: `[Custom Magi] [F] Witch {Pikmin}` (auburn too, pointed hat her bust has not)
+and `[T2 Druid-Base] Vanilla FE6 [F]` (her exact tier, fully hooded). Vanilla's own
 `CLASS_DRUID_F` is a real second animation (`0x79`/`0x7A` vs the male's `0x77`/`0x78`) and costs
 nothing — also hooded, which is why it lost; it would also move her bases (HP 19→17, Pow 6→7).
 
@@ -103,6 +123,15 @@ not a run.
   vanilla — welcome screen 16 words of 64 (overcast sky, banner-blue awnings, **sandstone left
   warm on purpose**), combat coliseum 11 words (snow floor, blue banners). Ch05 alone gets the
   armored-skeleton attendant on the Glen slot. Before/after: `docs/demo/ch05-arena-*.png`.
+- **Every hosted chapter now NAMES its battle ground** (`CHAPTER_BATTLE_TILESETS`, #289) and the
+  registry is required TOTAL — a new chapter must state its ground or the build stops. Two were
+  wrong by omission (ch05 and ch02 kept their host slot's vanilla one; ch05's map is 53% road, so
+  it fought on `michi1`, a dirt track). **And the snow arrays were OFF BY ONE since #65** —
+  `GetBanimTerrainGround` ends `return ret - 1`, so those arrays hold table index + 1; every snow
+  chapter drew the row BELOW the platform it named, with open ground landing on `mizuiumi1`, a
+  vanilla LAKE. Both fixed; `_ground_value()` owns the convention. `TERRAIN_ROAD` has its own
+  ground now (vendored `Snow Dirt Path` {Cynon}), and `recordch05platform` gates it by reading
+  `gBanimFloorfx` — the engine's own answer, because reading TERRAIN passed on the wrong platform.
 - **`tools/rom_bg_preview.py` is new and worth reaching for.** It decodes a vanilla BG asset
   straight out of `baserom.gba` and paints it exactly as the GBA would, so palette work costs
   milliseconds instead of a build plus an emulator run. `--index-map` / `--isolate` answer "which
