@@ -269,9 +269,10 @@ enemy_units:
       source: "FE-Repo Aversa {Garytop} [F2E] — deterministic hair/skin palette swap"
     map_sprite:                 # SHIPPED (map_sprites/ravisin{,_mu}.png); palette by Nicolas
       base: Druid               # read for FRAME SIZE ONLY (16x16). The wait row's first field
-                                # is `pattern`, which the decomp calls unused and the injector
-                                # writes as 0 — so the vanilla Druid row being 2-frame while
-                                # this sheet is 3 is not a conflict.
+                                # is `pattern` — unused per the decomp, and NOT a frame count:
+                                # Eirika Lord carries 0, the Druid 2, the Bonewalker 3, and all
+                                # three sheets are 16x48. Count comes from the sheet HEIGHT, and
+                                # the engine reads exactly 3 — as this sheet is.
       source: "Druid Hoodless (F) {Ultra-Fenix, Velvet Kitsune} — FE-Repo Map Sprites/Magi - Dark-Type"
       recipe: >
         vendored whole, converted onto the cast palette (map_sprite_tool.recolour), then

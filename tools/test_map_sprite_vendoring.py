@@ -46,12 +46,13 @@ class TransparencyKey(unittest.TestCase):
         pal[0:3] = [0xf8, 0xf8, 0xd0]        # index 0: an ORDINARY colour, not transparency
         pal[3:6] = [0x40, 0x38, 0x38]        # index 1: the sprite's dark
         pal[6:9] = [0x80, 0xa0, 0x80]        # index 2: THE GREEN KEY (the backdrop)
-        # 16x16: a 2x2 sprite blob in a field of key, plus one index-0 pixel
-        data = [2] * 256
-        data[0] = 0                          # the cream pixel, in the corner
+        # 16x48 = the 3 frames the engine reads: a 2x2 blob in a field of key, plus one
+        # index-0 pixel per frame (the "ordinary colour at index 0" this test is about).
+        frame = [2] * 256
+        frame[0] = 0                         # the cream pixel, in the corner
         for i in (100, 101, 116, 117):
-            data[i] = 1
-        _sheet(p, pal, data, (16, 16))
+            frame[i] = 1
+        _sheet(p, pal, frame * 3, (16, 48))
         return p
 
     def test_the_green_key_becomes_transparent_not_a_cast_colour(self):
@@ -77,10 +78,10 @@ class TransparencyKey(unittest.TestCase):
         p = os.path.join(self.tmp, 'vanilla.png')
         pal = [0, 0, 0] * 16
         pal[3:6] = [0x40, 0x38, 0x38]
-        data = [0] * 256
+        frame = [0] * 256
         for i in (100, 101):
-            data[i] = 1
-        _sheet(p, pal, data, (16, 16))
+            frame[i] = 1
+        _sheet(p, pal, frame * 3, (16, 48))
         out = os.path.join(self.tmp, 'out.png')
         mst.recolour(p, os.path.join(MS, 'cast_palette.png'), out)
         got = list(Image.open(out).getdata())
@@ -110,6 +111,79 @@ class OpaqueSheetIsRejected(unittest.TestCase):
         _sheet(p, [0, 0, 0] * 16, data, (16, 48))
         macro, fw, fh, n = mst.sheet_info(p, (16, 16))
         self.assertEqual((fw, fh, n), (16, 16, 3))
+
+
+class TransparencyMatchesTheDonorExactly(unittest.TestCase):
+    """The invariant that actually catches holes. "Has any index-0 pixel?" is far too weak:
+    the shipped sheets passed it with 265 legitimate background pixels while carrying holes
+    punched through Ravisin's FACE (12 cream pixels mapped to 0)."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix='vendor_')
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_a_colour_forced_to_transparent_is_rejected(self):
+        p = os.path.join(self.tmp, 'donor.png')
+        pal = [0, 0, 0] * 16
+        pal[0:3] = [0xf8, 0xf8, 0xd0]        # art (the face highlight, in Ravisin's case)
+        pal[3:6] = [0x40, 0x38, 0x38]
+        pal[6:9] = [0x80, 0xa0, 0x80]        # the key
+        frame = [2] * 256
+        frame[0] = 0
+        for i in (100, 101):
+            frame[i] = 1
+        _sheet(p, pal, frame * 3, (16, 48))
+        out = os.path.join(self.tmp, 'out.png')
+        # forcing the ART colour to transparent = a hole; must fail, not ship
+        with self.assertRaises(SystemExit):
+            mst.recolour(p, os.path.join(MS, 'cast_palette.png'), out, {0: 0})
+
+    def test_ravisins_shipped_sheets_hole_free_against_their_donor(self):
+        """Guards the live assets: transparency lands exactly on the donor's key."""
+        donor_dir = os.path.join(REPO, 'map-review', 'ch05', 'fe-repo', 'sms')
+        stem = 'Druid_Hoodless_(F)_Ultra-Fenix_Velvet_Kitsune'
+        for src, out in ((stem + '-stand.png', 'ravisin.png'),
+                         (stem + '-walk.png', 'ravisin_mu.png')):
+            src = os.path.join(donor_dir, src)
+            if not os.path.isfile(src):
+                self.skipTest('vendored donor not present')
+            dim = Image.open(src)
+            key = mst._transparent_index(dim, dim.getpalette())
+            want = {i for i, v in enumerate(dim.getdata()) if v == key}
+            got = {i for i, v in enumerate(Image.open(os.path.join(MS, out)).getdata())
+                   if v == 0}
+            self.assertEqual(got, want,
+                             '%s: transparency does not match the donor key' % out)
+
+
+class FrameCount(unittest.TestCase):
+    """`pattern` is not a frame count. Eirika Lord carries 0, the Druid 2, the Bonewalker 3
+    -- and all three sheets are 16x48. The count comes from the HEIGHT, and the engine
+    reads exactly 3 (ApplyUnitSpriteImage16x16 loops i < 3)."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix='vendor_')
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_a_two_frame_16x16_sheet_is_rejected(self):
+        p = os.path.join(self.tmp, 'short.png')
+        data = [0] * (16 * 32)
+        for i in range(100, 120):
+            data[i] = 3
+        _sheet(p, [0, 0, 0] * 16, data, (16, 32))
+        with self.assertRaises(SystemExit):
+            mst.sheet_info(p, (16, 16))
+
+    def test_the_vanilla_druid_sheet_is_three_frames_despite_its_row_saying_2(self):
+        d = os.path.join(REPO, 'fireemblem8u', 'graphics', 'unit_icon', 'wait',
+                         'unit_icon_wait_Druid_sheet.png')
+        if not os.path.isfile(d):
+            self.skipTest('decomp graphics not built out')
+        self.assertEqual(Image.open(d).size, (16, 48))
 
 
 class RavisinsShippedSheets(unittest.TestCase):

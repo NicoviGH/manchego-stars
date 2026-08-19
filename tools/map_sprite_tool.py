@@ -92,10 +92,11 @@ def donor_sms_geometry(donor):
     to its vanilla sheet. Source of truth: src/unit_icon_wait_data.c at HEAD, e.g.
     `{3, UNIT_ICON_SIZE_16x32, unit_icon_wait_Cyclops_sheet}`.
     """
-    name = os.path.basename(donor)
-    m = re.match(r'unit_icon_wait_(.+?)_sheet', name)
-    if m:
-        name = m.group(1)
+    # Resolved by _wait_row_name so "does a row exist?" and "read that row" can never
+    # disagree: it stripped a .png suffix and this did not, so `.../Druid.png` passed the
+    # existence test, skipped recolour's fallback, then hard-exited HERE -- the exact
+    # failure that fallback was added to remove.
+    name = _wait_row_name(donor) or os.path.basename(donor)
     sym = 'unit_icon_wait_%s_sheet' % name
     for line in _vanilla_wait_table().splitlines():
         if sym in line:
@@ -107,6 +108,25 @@ def donor_sms_geometry(donor):
             return SMS_SIZES[(fw, fh)], fw, fh
     sys.exit('ERROR: donor %r (looked for %s) not in %s at HEAD -- check the YAML '
              'art.map_sprite.base name' % (donor, sym, WAIT_DATA_C))
+
+
+SMS_FRAMES = {(16, 16): 3}   # what the ENGINE reads, not what a table field says
+
+
+def _assert_frame_count(path, fw, fh, n):
+    """A 16x16 wait sheet must be exactly 3 frames.
+
+    `ApplyUnitSpriteImage16x16` (bmudisp.c) loops `for (i = 0; i < 3; i++)` unconditionally,
+    so a 2-frame sheet is read past its end. The wait table's first field does NOT say this
+    and must never be read as if it did: it is `pattern`, which the decomp calls unused, and
+    it disagrees with reality everywhere -- Eirika Lord carries 0, the Druid 2, the
+    Bonewalker 3, and ALL THREE sheets are 16x48, i.e. three frames. Frame count comes from
+    the sheet HEIGHT and from nothing else."""
+    want = SMS_FRAMES.get((fw, fh))
+    if want is not None and n != want:
+        sys.exit('ERROR: %s is %d frame(s) of %dx%d; the engine reads exactly %d '
+                 '(ApplyUnitSpriteImage16x16 loops i < %d, so a shorter sheet is read past '
+                 'its end). Height must be %d.' % (path, n, fw, fh, want, want, fh * want))
 
 
 def sheet_info(path, expect=None):
@@ -146,6 +166,7 @@ def sheet_info(path, expect=None):
         if w != fw or h % fh or h < fh:
             sys.exit('ERROR: %s is %dx%d but its donor SMS is %dx%d -- width must be %d '
                      'and height a multiple of %d' % (path, w, h, fw, fh, fw, fh))
+        _assert_frame_count(path, fw, fh, h // fh)
         return SMS_SIZES[(fw, fh)], fw, fh, h // fh
 
     # No donor known: infer, preferring the tallest frame that divides the height. Only
@@ -158,6 +179,7 @@ def sheet_info(path, expect=None):
                  '(expected width 16 or 32, height an exact multiple of the frame)'
                  % (path, w, h))
     fw, fh = sorted(fits, key=lambda s: -s[0] * s[1])[0]
+    _assert_frame_count(path, fw, fh, h // fh)
     if len(fits) > 1:
         sys.stderr.write('WARNING: %s size is ambiguous (%s); inferred %dx%d -- pass the '
                          'donor to read it from the decomp\n'
@@ -165,7 +187,12 @@ def sheet_info(path, expect=None):
     return SMS_SIZES[(fw, fh)], fw, fh, h // fh
 
 
-GREEN_KEY = (0x80, 0xa0, 0x80)   # FE-Repo's backdrop colour on community map sprites
+# FE-Repo's backdrop colour on community map sprites. BOTH forms: a sheet that has been
+# through a GBA-quantizing tool carries the 5-bit-snapped variant, and this repo's own
+# cast_palette.png index 0 is exactly that -- so an exact-match-only key would miss it and
+# silently reproduce the solid-block bug on a sheet round-tripped through our own palette.
+GREEN_KEYS = ((0x80, 0xa0, 0x80), (0x84, 0xa5, 0x84))
+GREEN_KEY = GREEN_KEYS[0]
 
 
 def _transparent_index(im, pal):
@@ -176,7 +203,7 @@ def _transparent_index(im, pal):
     convention and what every vanilla donor uses."""
     used = set(im.getdata())
     for di in sorted(used):
-        if tuple(pal[3 * di:3 * di + 3]) == GREEN_KEY:
+        if tuple(pal[3 * di:3 * di + 3]) in GREEN_KEYS:
             return di
     return 0
 
@@ -265,7 +292,21 @@ def recolour(base_path, palette_path, out_path, overrides=None, donor=None):
 
     out = Image.new('P', im.size)
     out.putpalette(cast)
-    out.putdata([remap[px] for px in im.getdata()])
+    src = list(im.getdata())
+    got = [remap[px] for px in src]
+    # THE invariant, and the one that matters: transparency lands exactly where the donor's
+    # key was -- no more, no less. "Does the sheet have any index-0 pixel?" is far too weak;
+    # it passed a sheet with holes punched through Ravisin's FACE (12 cream pixels mapped to
+    # 0) because 265 legitimate background pixels were also index 0. Compare the SETS.
+    want0 = {i for i, v in enumerate(src) if v == key}
+    got0 = {i for i, v in enumerate(got) if v == 0}
+    if got0 != want0:
+        extra, lost = len(got0 - want0), len(want0 - got0)
+        sys.exit('ERROR: %s -> %s: transparency does not match the donor key (index %d): '
+                 '%d pixel(s) became transparent that were ART (holes through the sprite), '
+                 '%d key pixel(s) became opaque. A colour must never map to 0 unless it IS '
+                 'the key.' % (base_path, out_path, key, extra, lost))
+    out.putdata(got)
     out.save(out_path)
     print('recoloured %s -> %s (cast palette: %s)' % (base_path, out_path, palette_path))
     print('  donor idx -> cast idx: %s'
@@ -590,7 +631,7 @@ def setpx(sheet_path, frame, edits):
 USAGE = ('usage:\n'
          '  map_sprite_tool.py <wait_sheet.png>                     # validate\n'
          '  map_sprite_tool.py recolour <donor.png> <cast_palette.png> <out.png> '
-         '[d:c,d:c]\n'
+         '[d:c,d:c] [--donor Name]\n'
          '  map_sprite_tool.py preview <sheet.png> <out.png|out.gif> [scale]\n'
          '  map_sprite_tool.py grid <sheet.png> <out.png> [frame] [scale]\n'
          '  map_sprite_tool.py palette <cast_palette.png> <out.png>\n'
@@ -600,10 +641,20 @@ USAGE = ('usage:\n'
 def main():
     args = sys.argv[1:]
     if args and args[0] == 'recolour':
+        # `--donor Name` names the vanilla class whose GEOMETRY applies. Without it the
+        # check is skipped for a vendored sheet (which is in no wait table), and skipping
+        # was the only option the CLI offered -- the kwarg existed and nothing could reach
+        # it, so every conversion done the documented way went unchecked. Concretely:
+        # `Witch (F)` is 16x96 and silently infers 16x32 on a stderr warning nobody reads.
+        donor = None
+        if '--donor' in args:
+            i = args.index('--donor')
+            donor = args[i + 1] if i + 1 < len(args) else sys.exit(USAGE)
+            args = args[:i] + args[i + 2:]
         if len(args) not in (4, 5):
             sys.exit(USAGE)
         recolour(args[1], args[2], args[3],
-                 _parse_overrides(args[4]) if len(args) == 5 else None)
+                 _parse_overrides(args[4]) if len(args) == 5 else None, donor=donor)
         return
     if args and args[0] == 'preview':
         if len(args) not in (3, 4):

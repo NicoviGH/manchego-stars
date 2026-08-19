@@ -4082,7 +4082,11 @@ def declared_map_sprite_units(campaign):
             continue
         with open(os.path.join(chapters, name), encoding='utf-8') as f:
             chap = _yaml_load(f) or {}
-        for key in ('neutral_units', 'green_units'):
+        # enemy_units too: Ravisin is ch05's BOSS and carries a full art.map_sprite block,
+        # so scanning only the friendly-side keys left her (and every future enemy with our
+        # own art) outside the "declared art must actually get wired" guard entirely. She
+        # was covered only by a hand-added assert_custom_art_pid_wired call (#25).
+        for key in ('neutral_units', 'green_units', 'enemy_units'):
             for unit in (chap.get(key) or []):
                 if ((unit.get('art') or {}).get('map_sprite')) and unit.get('id'):
                     declared[unit['id']] = 'chapters/%s (%s)' % (name, key)
@@ -9207,9 +9211,11 @@ SCRIPTED_NEUTRAL_SPRITES = (
     # (hostile from spawn, never recruited, never converted -- her death ends the chapter),
     # so nothing is lost by leaving the faction ramp, and it is what lets her map sprite hold
     # the exact black robe / near-white skin / auburn hair her battle anim was hand-edited to.
-    # The donor is only ever read for FRAME SIZE (16x16); the wait row's first field is
-    # `pattern`, which the decomp itself calls unused and this injector writes as 0. So the
-    # vanilla Druid row being 2-frame while her sheet is 3 does not matter.
+    # The donor is only ever read for FRAME SIZE (16x16). The wait row's first field is
+    # `pattern`, which the decomp calls unused and this injector writes as 0 -- and it is NOT
+    # a frame count: Eirika Lord carries 0, the Druid 2, the Bonewalker 3, and all three
+    # sheets are 16x48. Frame count comes from the sheet HEIGHT, and the engine reads exactly
+    # three (ApplyUnitSpriteImage16x16 loops i < 3), which map_sprite_tool now enforces.
     ('ravisin', (CH05_BOSS_PID,), 'Druid'),
 )
 # Raw CharacterData identity binding. Riev contributes collision-free name/portrait slots:
