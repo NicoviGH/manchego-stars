@@ -9201,14 +9201,26 @@ CH05_MOOSE_NAME_MSG = 0xD4C
 CH05_ENDING_BG = 'BG_MS_ELVEN_TOMB'   # back to the tomb face the chapter opened on, which is
                                       # vanilla's own move: its ending returns to the backdrop
                                       # the fight happened over rather than buying a new one.
-# Scene 16 in three beats, which is how every other chapter's ending is already built (ch01 is
-# five, ch02 four, ch03 three) -- and here the split is load-bearing rather than pacing: beat B
-# is the berry exchange, and it only plays if Sahnar was recruited. A `beat_break` puts it in
-# its own message and the event script wraps that ONE call in a CHECK_ALIVE.
-CH05_ENDING_MSGS = (0x9C9, 0x9CA, 0x9CB)   # A the repotting · B the berry (Sahnar-gated) · C the
-                                           # Bremen hook + Braulo's button
-CH05_ENDING_NO_LUPIN_MSG = 0x9CC           # beat C only: "like she woke the wolves" -> "like she
-                                           # woke me". A and B address no absent unit.
+# Scene 16 as a 2x2 of WHOLE copies -- Sahnar recruited or not, crossed with Lupin -- and each
+# copy is ONE continuous message.
+#
+# It was three `beat_break` beats first, with the berry exchange as the middle one so the event
+# script could skip it. That played correctly and LOOKED WRONG, and only a film says so
+# (Nicolas, 2026-08-19): every `Text()` is its own TEXTSTART..REMA, so the seams tore the faces
+# down and rebuilt them, and Basil -- who speaks in all three -- faded out and reloaded into the
+# seat she was already sitting in, twice. Held as one message the podium manager keeps her up
+# from the first box to the last and rotates everyone else through mid-left, which is the scene:
+# the party comes to HER.
+#
+# Four copies cost the same four ids the split did, and nothing is hand-duplicated -- every copy
+# is generated from the one locked script by `variant_beat`, whose `replaces:` anchors assert
+# each edit lands where the YAML says. Ids are not scarce; seams are expensive.
+CH05_ENDING_MSGS = {                       # (sahnar recruited, lupin recruited) -> message id
+    (True,  True):  0x9C9,                 # the full scene, as locked
+    (True,  False): 0x9CA,                 # ...with "like she woke the wolves" -> "like she woke me"
+    (False, True):  0x9CB,                 # ...with the six berry boxes cut
+    (False, False): 0x9CC,                 # ...both
+}
 # The Basil-died variant. Ten boxes, one beat, one branch -- ch04's ending exactly.
 CH05_ENDING_LOST_MSG = 0x9F3               # the host block's last free id
 CH05_ENDING_LOST_NO_LUPIN_MSG = 0xD4D      # appended past MSG_D4B beside CH05_MOOSE_NAME_MSG:
@@ -9216,19 +9228,25 @@ CH05_ENDING_LOST_NO_LUPIN_MSG = 0xD4D      # appended past MSG_D4B beside CH05_M
 # Four branches in one event list, so four label pairs -- and they start at 4 because
 # `save_all_bonus_script` already owns SAVE_ALL_SKIP_LABEL (0x2) further down the same script.
 CH05_ENDING_BASIL_LABEL_BASE = 4           # Basil alive -> scene 16, else scene 17
-CH05_ENDING_SAHNAR_SKIP_LABEL = '0x6'      # inside 16: skip beat B (one label, no arm to jump
-                                           # over -- the skip shape, not the branch shape)
-CH05_ENDING_LUPIN_LABEL_BASE = 8           # inside 16: beat C, locked arm or no-Lupin arm
-CH05_ENDING_LOST_LUPIN_LABEL_BASE = 10     # inside 17: the same choice on the other side
-# Party LEFT, the tomb's own on the RIGHT, and Basil holds her podium across all three beats --
-# she is the only speaker in every one of them, and a rotating anchor would fade the scene's
-# subject out and back in twice. The four party speakers share ONE podium on purpose: that is
-# the rotating spotlight `_script_to_message`'s podium manager is for, and it keeps the live
-# face count at three, well inside FACE_SLOT_COUNT.
+CH05_ENDING_SAHNAR_LABEL_BASE = 6          # inside 16: which PAIR of Lupin arms to pick from
+CH05_ENDING_LUPIN_LABEL_BASE = 8           # inside 16, Sahnar recruited
+CH05_ENDING_NO_SAHNAR_LUPIN_LABEL_BASE = 10   # inside 16, Sahnar never turned
+CH05_ENDING_LOST_LUPIN_LABEL_BASE = 12     # inside 17: the same choice on the other side
+# BASIL holds mid-right across all three beats and everyone else rotates through mid-left. She
+# is the only speaker in every beat, and a rotating anchor would fade the scene's subject out
+# and back in twice; the others share ONE podium on purpose -- that is the rotating spotlight
+# `_script_to_message`'s podium manager exists for, and it keeps the live face count at two.
+#
+# SAHNAR IS ON THE LEFT WITH THEM, in Wolfram's seat (Nicolas, watching the first film
+# 2026-08-19). She was on the far right beside Basil, on the reasoning that the two tomb-dwellers
+# belong together against the party -- and on screen that is simply wrong, because beat B is a
+# TWO-HANDER: she and Basil are the only speakers in it, so two right-hand podiums put them
+# shoulder to shoulder both facing the same way instead of facing each other. Mid-left is also
+# free by then -- Wolfram's last box is in beat A and each beat reloads its own faces.
 CH05_ENDING_PODIUMS = {'marty':   '[OpenMidLeft]', 'wolfram':  '[OpenMidLeft]',
                        'braulo':  '[OpenMidLeft]', 'prof-rbg': '[OpenMidLeft]',
-                       'basil':   '[OpenMidRight]',
-                       'sahnar':  '[OpenFarRight]'}
+                       'sahnar':  '[OpenMidLeft]',
+                       'basil':   '[OpenMidRight]'}
 CH05_SAHNAR_PID = '0xba'                         # Sahnar: her own pid so Basil's Talk can address
                                                  # HER and not the nearest identical myrmidon
                                                  # (#203's lesson). Becomes her CHARACTER_ slot
@@ -9377,7 +9395,7 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
              # ending block, which is the scene we mine -- swept free because everything that
              # reaches them lives in ch5-eventscript.h, which inject_ch04 rewrites. Scene 17
              # takes the host block's last free id plus one appended past MSG_D4B.
-             *CH05_ENDING_MSGS, CH05_ENDING_NO_LUPIN_MSG,
+             *CH05_ENDING_MSGS.values(),
              CH05_ENDING_LOST_MSG, CH05_ENDING_LOST_NO_LUPIN_MSG,
              # The moose's NAME -- appended past vanilla's last id rather than taken from a
              # donor, so it is claimed here like any other id ch05 writes.
@@ -9451,6 +9469,13 @@ def variant_beat(beat, fallback, err_label):
     break mid-clause. `boxes:`/`replaces:`/`script:` still agree one-for-one; only the
     substitute is plural, which is what keeps this one mechanism rather than two.
 
+    OMIT `script:` ENTIRELY and every named box is DROPPED. Some variants are a cut rather
+    than a substitution -- ch05's ending loses its whole berry exchange when Sahnar was never
+    recruited -- and a cut authored as six empty substitutes would say the same thing far
+    worse. The `replaces:` anchors still apply and still assert, which is the point: a drop is
+    the one edit where getting the index wrong is invisible in the output, because the result
+    is simply a shorter scene that still reads.
+
     Returns a new beat with the named boxes replaced and every other box (e.g. ch04's Marty
     box 2, unchanged in both branches) carried through. It is the SAME LENGTH as `beat` only
     when every substitute is singular -- two arms of a branch are not required to cost the
@@ -9459,8 +9484,14 @@ def variant_beat(beat, fallback, err_label):
     Reused by ch05's five conditional scenes (#25) -- one mechanism, not two.
     """
     boxes, anchors = fallback['boxes'], fallback['replaces']
-    subs = fallback['script']
-    if not (len(boxes) == len(anchors) == len(subs)):
+    subs = fallback.get('script')
+    if subs is None:                       # a CUT: every named box goes, nothing takes its place
+        subs = [[] for _ in boxes]
+        if len(boxes) != len(anchors):
+            sys.exit('ERROR: %s: cut declares %d boxes and %d replaces -- the anchors are what '
+                     'keeps a drop honest, so there must be one per box'
+                     % (err_label, len(boxes), len(anchors)))
+    elif not (len(boxes) == len(anchors) == len(subs)):
         sys.exit('ERROR: %s: fallback declares %d boxes, %d replaces, %d script lines '
                  '-- all three must agree' % (err_label, len(boxes), len(anchors), len(subs)))
     # `boxes:` are A-PRESS numbers, not list positions, and a script may carry stage directions
@@ -9726,15 +9757,16 @@ CH05_ENDING_SLOT = 'vanilla 0x9C9'          # scene 16 -- Basil alive
 CH05_ENDING_LOST_SLOT = 'vanilla 0x9CA'     # scene 17 -- Basil died
 
 
-def _ch05_ending_beats(chap, slot, boxes, what, msg_count):
-    """One locked ending scene as (beats, no-Lupin beats), box-counted against the YAML.
+def _ch05_ending_variants(chap, slot, boxes, what):
+    """One locked ending scene as its full set of arms: {(sahnar, lupin): script}.
 
-    Both endings are the same shape -- a locked script with one `no_lupin_fallback` box -- so
-    they share this rather than each growing their own reader. `variant_beat` is applied to the
-    WHOLE script and the split happens afterwards, which is what lets the YAML keep authoring
-    `boxes:` as A-press numbers over the entire scene: splitting first would force the fallback
-    to be re-indexed against whichever beat happened to contain it, and a hand-renumbered index
-    is exactly the drift the `replaces:` anchors exist to catch.
+    Every arm is the WHOLE scene, generated from the one locked script by `variant_beat` --
+    the no-Lupin substitution and (scene 16 only) the `no_sahnar_cut:` drop, applied in either
+    combination. Nothing is hand-duplicated, and each `replaces:` anchor is asserted per arm,
+    so a re-ordered locked script fails loudly instead of editing the wrong box in three of
+    four copies.
+
+    Scene 17 declares no cut and comes back with the Lupin axis alone.
     """
     event = _chapter_event_by_slot(chap, 'chapter_end', slot, 'ch05 ending (%s)' % what)
     script = event['script']
@@ -9745,44 +9777,60 @@ def _ch05_ending_beats(chap, slot, boxes, what, msg_count):
         sys.exit('ERROR: ch05 ending %r (%s) is a branched scene and must carry a '
                  'no_lupin_fallback -- without it the no-Lupin arm names a wolf who is not '
                  'there' % (slot, what))
-    fallback = variant_beat(script, event['no_lupin_fallback'],
-                            'ch05 ending (%s) no-Lupin fallback' % what)
-    _card, beats = _split_script_beats(script, card_required=False)
-    _card, nl_beats = _split_script_beats(fallback, card_required=False)
-    if len(beats) != msg_count or len(nl_beats) != msg_count:
-        sys.exit('ERROR: ch05 ending %r (%s) split into %d/%d beats; expected %d '
-                 '(check the beat_break markers in the YAML)'
-                 % (slot, what, len(beats), len(nl_beats), msg_count))
-    return beats, nl_beats
+    cut = event.get('no_sahnar_cut')
+    # ORDER IS LOAD-BEARING, and it is the price of authoring both variants' `boxes:` against
+    # the ONE locked script -- which is the right price, because an index re-based against
+    # another variant's output is an index nobody can check by reading the YAML.
+    #
+    # The no-Lupin substitution goes FIRST because it is 1-for-1 and therefore index-preserving;
+    # the cut then still finds its six boxes where the YAML says they are. Cut first and box 16
+    # would have moved to 10, which is exactly the error this ordering stopped. Should a future
+    # substitution become PLURAL and sit above the cut, the cut's `replaces:` anchors fire --
+    # loudly, and naming the box that moved.
+    out = {}
+    for lupin in (True, False):
+        base = script if lupin else variant_beat(
+            script, event['no_lupin_fallback'],
+            'ch05 ending (%s) no-Lupin fallback' % what)
+        for sahnar in ((True, False) if cut else (True,)):
+            out[(sahnar, lupin)] = base if sahnar else variant_beat(
+                base, cut, 'ch05 ending (%s) no-Sahnar cut%s'
+                % (what, '' if lupin else ', over the no-Lupin fallback'))
+    return out
 
 
 def ch05_ending_messages(chap):
     """Both ending scenes as (msg_id, body), rendered at the backdrop's 42.
 
-    Four bodies for scene 16 and two for scene 17, and the asymmetry is the Sahnar gate: only
-    beat C of 16 names the wolf, so only C is written twice. Beats A and B address nobody who
-    can be absent and ride through into both worlds unchanged.
+    Four bodies for scene 16 -- Sahnar crossed with Lupin -- and two for scene 17, which has
+    no berry exchange to lose. Each is ONE continuous message, so the podium manager runs the
+    whole scene and Basil never leaves the screen (see CH05_ENDING_MSGS).
     """
     out = []
     fid = _make_fid({}, 'ch05 unknown ending speaker')
-    beats, nl_beats = _ch05_ending_beats(chap, CH05_ENDING_SLOT, 19,
-                                         'Basil alive', len(CH05_ENDING_MSGS))
-    for msg, beat in zip(CH05_ENDING_MSGS, beats):
+    arms = _ch05_ending_variants(chap, CH05_ENDING_SLOT, 19, 'Basil alive')
+    if set(arms) != set(CH05_ENDING_MSGS):
+        sys.exit('ERROR: ch05 ending (Basil alive) produced arms %s but ids are declared for '
+                 '%s' % (sorted(arms), sorted(CH05_ENDING_MSGS)))
+    # The CUT has to actually shorten the scene, and the ANCHORS cannot prove that on their own:
+    # they assert where each named box sits, not that six of them left. A `no_sahnar_cut:` whose
+    # `script:` key came back by accident would substitute instead of drop, pass every anchor,
+    # and ship a scene that mentions Sahnar to a player who never met her.
+    full, cut = arms[(True, True)], arms[(False, True)]
+    if _script_box_count(cut) != _script_box_count(full) - 6:
+        sys.exit('ERROR: ch05 ending: the no-Sahnar arm is %d boxes against the locked %d -- '
+                 'the cut must DROP its six boxes, not replace them'
+                 % (_script_box_count(cut), _script_box_count(full)))
+    if any('sahnar' in entry for entry in cut):
+        sys.exit('ERROR: ch05 ending: the no-Sahnar arm still gives Sahnar a line')
+    for key, msg in sorted(CH05_ENDING_MSGS.items(), reverse=True):
+        beat = arms[key]
         out.append((msg, _script_to_message(
             beat, _stage_beat(beat, fid, CH05_ENDING_PODIUMS), width=42)))
-    # Only the LAST beat differs, and asserting that here is cheaper than discovering it on
-    # film: if a future edit moves the wolf line into A or B, the fallback would be spliced
-    # into a beat nothing branches on and the no-Lupin arm would quietly play the locked text.
-    if beats[:-1] != nl_beats[:-1]:
-        sys.exit('ERROR: ch05 ending (Basil alive): the no-Lupin fallback changes a beat other '
-                 'than the last one, but only the last is written twice -- move the substituted '
-                 'box into beat C, or give the beat it lives in its own variant id')
-    tail = nl_beats[-1]
-    out.append((CH05_ENDING_NO_LUPIN_MSG, _script_to_message(
-        tail, _stage_beat(tail, fid, CH05_ENDING_PODIUMS), width=42)))
-    lost, lost_nl = _ch05_ending_beats(chap, CH05_ENDING_LOST_SLOT, 10, 'Basil died', 1)
-    for msg, beat in ((CH05_ENDING_LOST_MSG, lost[0]),
-                      (CH05_ENDING_LOST_NO_LUPIN_MSG, lost_nl[0])):
+    lost = _ch05_ending_variants(chap, CH05_ENDING_LOST_SLOT, 10, 'Basil died')
+    for msg, key in ((CH05_ENDING_LOST_MSG, (True, True)),
+                     (CH05_ENDING_LOST_NO_LUPIN_MSG, (True, False))):
+        beat = lost[key]
         out.append((msg, _script_to_message(
             beat, _stage_beat(beat, fid, CH05_ENDING_PODIUMS), width=42)))
     return out
@@ -9824,42 +9872,35 @@ def ch05_ending_script(chap, basil_char, sahnar_char):
     the backdrop that keeps the screen up rather than `EventScr_RemoveBGIfNeeded`, which is
     where vanilla puts its own give too: after the ending text, with something still drawn."""
     flags = {v['id']: CH05_VILLAGE_FLAGS[v['id']] for v in chap.get('villages', [])}
-    a, b, c = CH05_ENDING_MSGS
-    lupin_arms = lambda locked, variant, base, why: branch_on_check_alive(
+    lupin_arms = lambda yes, no, base, why: branch_on_check_alive(
         CH05_LUPIN_CHARACTER,
-        '    Text(0x%X) /* %s */\n' % (locked, why),
+        '    Text(0x%X) /* %s */\n' % (yes, why),
         '    Text(0x%X) /* %s -- no Lupin: Basil names HERSELF as the one she woke */\n'
-        % (variant, why),
+        % (no, why),
         label_base=base)
-    alive = (
-        '    MUSC(SONG_VICTORY)\n'
-        '    Text(0x%X) /* 16A -- the repotting: Wolfram\'s helm, and Basil asks to come */\n' % a
-        # Beat B is SKIPPED, not branched -- there is no second arm to jump over, so it takes
-        # the guard shape `save_all_bonus_script` two lines below already uses: every check
-        # BEQs to one shared label.
-        #
-        # TWO checks, and CHECK_ALIVE ALONE WOULD BE WRONG HERE -- which is the one place
-        # Sahnar's gate cannot copy Basil's. `GetUnitFromCharId` sweeps the whole unit array
-        # (bmunit.c: indices 1..0xFF, every faction), so an un-recruited Sahnar who is still
-        # standing on the map as a RED myrmidon when Ravisin dies answers CHECK_ALIVE with 1 --
-        # and the berry scene would play with the party's enemy thanking Basil by name. Basil
-        # is safe on ALIVE alone because she is never hostile: she joins by CUSA in scene 5,
-        # exactly as vanilla's Natasha is a green escort throughout.
-        #
-        # So the FLAG asks "was she turned" and ALIVE asks "is she still here", and the pair is
-        # vanilla's own: `ch19a-eventscript.h`'s EventScr_089F8688 chains CHECK_EVENTID(7) into
-        # CHECK_ALIVE(CHARACTER_TANA) to pick its ending text the same way.
-        + '    CHECK_EVENTID(%s)\n'
-          '    BEQ(%s, EVT_SLOT_C, EVT_SLOT_0) /* never turned her -> she never collects it */\n'
-          '    CHECK_ALIVE(%s)\n'
-          '    BEQ(%s, EVT_SLOT_C, EVT_SLOT_0) /* turned her, then lost her -> same silence */\n'
-          '    Text(0x%X) /* 16B -- the berry, four thousand years late (recruited only) */\n'
-          'LABEL(%s)\n'
-          % (CH05_SAHNAR_TALK_FLAG, CH05_ENDING_SAHNAR_SKIP_LABEL,
-             sahnar_char, CH05_ENDING_SAHNAR_SKIP_LABEL, b,
-             CH05_ENDING_SAHNAR_SKIP_LABEL)
-        + lupin_arms(c, CH05_ENDING_NO_LUPIN_MSG, CH05_ENDING_LUPIN_LABEL_BASE,
-                     '16C -- what Ravisin woke in the lake; Braulo turns down the coast'))
+    # The Sahnar axis picks WHICH PAIR of Lupin arms to choose from, so it is a branch rather
+    # than the skip it was while the berry lived in its own message. Two checks on the true
+    # side, both jumping to the cut arm: the FLAG asks whether she was ever turned and ALIVE
+    # asks whether she is still here -- see the docstring for why ALIVE alone answers yes for a
+    # Sahnar the player left standing as an enemy.
+    sahnar_yes = lupin_arms(CH05_ENDING_MSGS[(True, True)], CH05_ENDING_MSGS[(True, False)],
+                            CH05_ENDING_LUPIN_LABEL_BASE,
+                            '16 -- the repotting, the berry, and the Bremen hook')
+    sahnar_no = lupin_arms(CH05_ENDING_MSGS[(False, True)], CH05_ENDING_MSGS[(False, False)],
+                           CH05_ENDING_NO_SAHNAR_LUPIN_LABEL_BASE,
+                           '16 -- the same scene, six boxes shorter: nobody to give the berry to')
+    a, b = CH05_ENDING_SAHNAR_LABEL_BASE, CH05_ENDING_SAHNAR_LABEL_BASE + 1
+    alive = ('    MUSC(SONG_VICTORY)\n'
+             '    CHECK_EVENTID(%s)\n'
+             '    BEQ(0x%X, EVT_SLOT_C, EVT_SLOT_0) /* never turned her -> she never collects it */\n'
+             '    CHECK_ALIVE(%s)\n'
+             '    BEQ(0x%X, EVT_SLOT_C, EVT_SLOT_0) /* turned her, then lost her -> same silence */\n'
+             % (CH05_SAHNAR_TALK_FLAG, a, sahnar_char, a)
+             + sahnar_yes
+             + '    GOTO(0x%X)\n'
+               'LABEL(0x%X)\n' % (b, a)
+             + sahnar_no
+             + 'LABEL(0x%X)\n' % b)
     lost = ('    MUSC(SONG_INTO_THE_SHADOW_OF_VICTORY)\n'
             + lupin_arms(CH05_ENDING_LOST_MSG, CH05_ENDING_LOST_NO_LUPIN_MSG,
                          CH05_ENDING_LOST_LUPIN_LABEL_BASE,
@@ -12116,8 +12157,74 @@ def ch05_moose_debug_script(chap, seed_load):
             + '    ENUT(8)\n    EVBIT_T(7)\n    ENDA\n}')
 
 
+# `--ch05-ending=<arm>`: the roster states the ending branches on, named. The Lupin dimension is
+# NOT here -- `--ch05-lupin` already exists and composes with each of these, so the six films are
+# three arms x two flags rather than six flags.
+CH05_ENDING_ARMS = ('full', 'no-sahnar', 'basil-died')
+
+
+def ch05_ending_debug_script(chap, seed_load, arm, basil_char, sahnar_table, sahnar_char):
+    """`--ch05-ending=<arm>`: New Game straight into the ending, in one named roster state.
+
+    THE STANDING RULE (decisions.md -> "Playtest runs are the most expensive thing in this
+    repo", rule 3), applied BEFORE the first film this time rather than after the third. The
+    ending is the last thing in the chapter: reaching it the honest way is the whole opening,
+    Preparations, and a boss kill, and there are SIX of them to look at -- three roster arms
+    times the Lupin flag. Filming that way would replay an hour of approved footage.
+
+    Keeps only what the scene reads: `LOMA` for a map to load units onto, the boot seed (the
+    ending hands the Guiding Ring to CHAR_EVT_PLAYER_LEADER, so there has to be a party), and
+    whichever of Basil and Sahnar the named arm wants -- BLUE, because that is the state the
+    real path leaves them in. Then a `FADU` so the ending's own opening `FADI` has a map to
+    take down, exactly as it does on the real path, and the ending event list itself.
+
+    The arms map one-for-one onto the three questions the scene asks:
+      * `full`       -- Basil alive, Sahnar recruited and alive: scene 16, all three beats
+      * `no-sahnar`  -- Basil alive, Sahnar never turned: scene 16 with beat B skipped
+      * `basil-died` -- neither: scene 17
+    and `--ch05-lupin` picks beat C's arm on top of any of them.
+
+    THE PAYOUT IS ALWAYS ARMED. The four reliquary flags are set here whatever the arm, because
+    the give's placement relative to the fade is one of the things this boot exists to look at:
+    `GIVEITEMTO` opens a BLOCKING convoy menu on a full pack, and behind a `FADI` the player
+    operates it blind. `ch05crest` already proves the gating itself, so nothing is lost by not
+    exercising the un-paid path here.
+    """
+    if not seed_load:
+        sys.exit('ERROR: --ch05-ending needs --ch05-boot -- it skips Preparations, so the boot '
+                 'seed is the only thing left that puts a party on the map, and the ending '
+                 'hands its reward to the party LEADER')
+    if arm not in CH05_ENDING_ARMS:
+        sys.exit('ERROR: --ch05-ending arm %r is not one of %s'
+                 % (arm, ', '.join(CH05_ENDING_ARMS)))
+    stage = ''
+    if arm != 'basil-died':
+        stage += ('    LOAD1(0x1, %s) /* Basil, at the pocket mouth */\n    ENUN\n'
+                  '    CUSA(%s) /* -> blue: the real path joins her in scene 5 */\n'
+                  % (CH05_BASIL_TABLE, basil_char))
+    if arm == 'full':
+        stage += ('    LOAD1(0x1, %s) /* Sahnar, on the arena tile */\n    ENUN\n'
+                  '    CUSA(%s) /* -> blue: the real path turns her on Basil\'s Talk */\n'
+                  '    ENUT(%s) /* ...and the Talk sets its CHAR flag, which the berry beat '
+                  'reads */\n'
+                  % (sahnar_table, sahnar_char, CH05_SAHNAR_TALK_FLAG))
+    payout = ''.join('    ENUT(%s) /* %s saved */\n'
+                     % (CH05_VILLAGE_FLAGS[v['id']], v['id'])
+                     for v in chap.get('villages', []))
+    return ('{\n'
+            '    MUSC(SONG_TENSION)\n'
+            '    SVAL(EVT_SLOT_B, 0x0)\n'
+            '    LOMA(0x%X) /* build the ch05 map fresh */\n' % CH05_HOST_INDEX
+            + seed_load
+            + stage
+            + payout
+            + '    FADU(16) /* the ending opens on a FADI; give it the map to take down */\n'
+              '    CALL(%s) /* ...and it ends on MNTS, so nothing follows */\n'
+              '    ENDA\n}' % CH05_ENDING_SCRIPT)
+
+
 def ch05_beginning_script(chap, basil_char, sahnar_table, sahnar_char,
-                          seed_load='', lupin_load='', moose_only=False):
+                          seed_load='', lupin_load='', moose_only=False, ending_arm=None):
     """`CH05_BEGINNING_SCRIPT` end to end: the opening's seven-scene spine around LOMA and prep.
 
     Assembled here rather than inline in the injector so the ORDER is testable without a build --
@@ -12133,6 +12240,9 @@ def ch05_beginning_script(chap, basil_char, sahnar_table, sahnar_char,
     """
     if moose_only:
         return ch05_moose_debug_script(chap, seed_load)
+    if ending_arm:
+        return ch05_ending_debug_script(chap, seed_load, ending_arm,
+                                        basil_char, sahnar_table, sahnar_char)
     return ('{\n'
             '    MUSC(SONG_TENSION)\n'
             + lupin_load
@@ -12270,7 +12380,7 @@ def ch05_wave_script(turn, wave_table):
 
 
 def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
-                verbose=True):
+                ending_arm=None, verbose=True):
     """Host Ch5 "The Elven Tomb" (#25) on slot 6: the winterised 1:1 retile of vanilla Ch5,
     the sixteen-strong risen tomb-guard on vanilla Ch5's own fighting tiles, the three
     eruption waves on its raider spawns, the real PREP deploy, and DefeatBoss(Ravisin).
@@ -12514,7 +12624,8 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     script = _replace_brace_block(
         script, CH05_BEGINNING_SCRIPT + '[] =',
         ch05_beginning_script(chap, basil_char, CH05_SAHNAR_TABLE, sahnar_char,
-                              seed_load, lupin_load, moose_only=moose_only),
+                              seed_load, lupin_load, moose_only=moose_only,
+                              ending_arm=ending_arm),
         CH05_EVENTSCRIPT_H)
     for turn in sorted(CH05_WAVE_TABLES):
         script = _replace_brace_block(
@@ -13068,6 +13179,13 @@ def main():
                          'Preparations, the join and Sahnar\'s monologue -- ~52 A-presses of '
                          'already-approved footage -- so iterating on a late beat costs a '
                          'BUILD and not a playthrough.')
+    ap.add_argument('--ch05-ending', choices=CH05_ENDING_ARMS, default=None,
+                    help='DEBUG build (#25): with --ch05-boot, New Game lands straight on the '
+                         'ENDING in the named roster state -- `full` (Basil alive, Sahnar '
+                         'recruited), `no-sahnar` (beat B skipped) or `basil-died` (scene 17). '
+                         'Composes with --ch05-lupin, which picks beat C\'s arm. Reaching the '
+                         'ending honestly is the whole opening, Preparations and a boss kill, '
+                         'and there are six of these to look at.')
     ap.add_argument('--ch05-lupin', action='store_true',
                     help='PLAYTEST build (#25): with --ch05-boot, LOAD Lupin onto the roster '
                          'before ch05\'s opening so scene 4\'s CHECK_ALIVE branch takes its '
@@ -13080,6 +13198,13 @@ def main():
         sys.exit('ERROR: --ch05-moose only means anything with --ch05-boot: it SKIPS '
                  'Preparations, so the boot seed is the only thing left that puts a party on '
                  'the map.')
+    if args.ch05_ending and not args.ch05_boot:
+        sys.exit('ERROR: --ch05-ending only means anything with --ch05-boot: it SKIPS '
+                 'Preparations, so the boot seed is the only thing left that puts a party on '
+                 'the map -- and the ending hands its reward to the party LEADER.')
+    if args.ch05_ending and args.ch05_moose:
+        sys.exit('ERROR: --ch05-ending and --ch05-moose both REPLACE ch05\'s beginning script, '
+                 'so only one can win. Pick the beat you mean to look at.')
     if args.ch05_lupin and not args.ch05_boot:
         sys.exit('ERROR: --ch05-lupin only means anything with --ch05-boot: it exists to make '
                  'the opening branch\'s ALIVE arm reachable from a COLD boot.')
@@ -13088,7 +13213,8 @@ def main():
     _requested_flags = {'TESTCH': args.test_chapter, 'LORDBOOT': args.lord_boot,
                         'MONTAGE': args.montage, 'CH03BOOT': args.ch03_boot,
                         'CH04BOOT': args.ch04_boot, 'CH05BOOT': args.ch05_boot,
-                        'CH05LUPIN': args.ch05_lupin, 'CH05MOOSE': args.ch05_moose}
+                        'CH05LUPIN': args.ch05_lupin, 'CH05MOOSE': args.ch05_moose,
+                        'CH05ENDING': args.ch05_ending}
     if args.lord_boot:
         args.test_chapter = True  # the fast-boot rides the sandbox
     # Each fast-boot repoints New Game at its own slot, so at most one may win. Named
@@ -13201,7 +13327,8 @@ def main():
         chain_ch03_to_ch04()
         print('chapter 5 (#25):')
         _scopes.run(inject_ch05, args.campaign, boot=args.ch05_boot,
-                    lupin_proof=args.ch05_lupin, moose_only=args.ch05_moose)
+                    lupin_proof=args.ch05_lupin, moose_only=args.ch05_moose,
+                    ending_arm=args.ch05_ending)
         _scopes.run(inject_ch05_visit_faces, args.campaign)  # the four reliquary residents' skeleton busts
         chain_ch04_to_ch05()
         if args.ch05_boot:

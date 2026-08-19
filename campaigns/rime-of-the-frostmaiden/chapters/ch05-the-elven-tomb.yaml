@@ -1475,11 +1475,18 @@ events:
       her the scene runs Basil's repotting straight into Braulo's question. The berry is 9BB's
       promise paid ("One day I'll give her one"), so a player who never freed her simply never
       collects it. That is the correct cost of skipping the recruit.
-      WIRED as beat B of three (`beat_break` A/B/C below), which is how every other chapter's
-      ending is already built — the event script wraps B's one Text() call in a CHECK_ALIVE on
-      her. An earlier note here named the block as "boxes 6-11", which was never right (it is
-      the six boxes from "...They gave you a pot." to "...Thank you, Basil."); the beat break
-      makes the index moot, since the boundary is now structural rather than counted.
+      WIRED 2026-08-19 as `no_sahnar_cut:` below — the six boxes are dropped from a copy of the
+      locked script and the whole shorter scene goes to its own message id, exactly as the
+      no-Lupin arm works. An earlier note named the block as "boxes 6-11", which was never
+      right; it is the six from "...They gave you a pot." to "...Thank you, Basil.".
+      IT IS ONE MESSAGE PER ARM, NOT THREE BEATS SPLICED (Nicolas, watching the first film
+      2026-08-19). Split across three `Text()` calls the scene played correctly and looked
+      wrong: each `Text()` is its own TEXTSTART..REMA, so Basil faded out and reloaded in the
+      same seat twice — "weird when you refresh and Basil ends up right where she was". Held
+      as one message, the podium manager keeps her up throughout and the others come and go
+      around her, which is what the scene is. The 2x2 of whole copies costs the same four ids
+      the split did, and the copies are all generated from this one locked script, so there is
+      nothing to drift.
       LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas) after two red-pen passes.
       19 boxes (twin: 34).
     status: locked
@@ -1500,14 +1507,8 @@ events:
       #  sentence runs to 5 lines. The split also gives "...into your cause?" its own button.)
       - basil: "I don't have much to offer, but what I can I offer willingly,"
       - basil: "if you'll accept a goodberry bush into your cause?"
-      # ── BEAT B: the berry exchange, and it only plays if SAHNAR WAS RECRUITED. ──
-      # The skip the description above says the wiring owes, taken the way every other
-      # chapter's ending already splits a scene: a `beat_break` makes B its own message, and
-      # the event script wraps that ONE Text() call in a CHECK_ALIVE. Nothing new -- ch01's
-      # ending is five beats and ch02's is four. Without her, A runs straight into C, which is
-      # Basil's repotting into Braulo's question exactly as the description asks.
-      - beat_break: B
-      # (9BB's promise, paid.)
+      # (ONLY IF SAHNAR WAS RECRUITED -- the `no_sahnar_cut:` block below drops these six
+      #  boxes, and 9BB's promise goes unpaid. See the note in the description.)
       - sahnar: "...They gave you a pot."
       - basil: "They gave me a pot! There's soil in it and everything--"
       - basil: "--oh. Oh, wait. Wait, I've been saving-- here."
@@ -1516,8 +1517,6 @@ events:
       # (A queen thanks him. She is four thousand years past grabbing at anything, and using his
       #  NAME rather than "little one" is the whole distance she has travelled since 9BB.)
       - sahnar: "...Thank you, Basil."
-      # ── BEAT C: the plot, the Bremen hook and the button. Plays in BOTH worlds. ──
-      - beat_break: C
       # (The escort carries the plot, exactly as Natasha does in the twin.)
       - braulo: "You served her. What else did she do?"
       - basil: "...There's something in the water. Down the coast, by the fishing town."
@@ -1537,7 +1536,25 @@ events:
       #  arithmetic -- stage direction: a glint in his eye. The greed and the grin are the same
       #  instinct, so the money never has to be said out loud.)
       - braulo: "Aye, it is time we meet this beastie."
-    no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas, L6) — WIRING NOT BUILT.
+    no_sahnar_cut:                    # WIRED 2026-08-19 (#25). A CUT, not a substitution:
+      boxes: [8, 9, 10, 11, 12, 13]   #   without the recruit there is nobody to hand the berry
+      replaces:                       #   to, so the six boxes simply go and Basil's plea to
+                                      #   join runs straight into Braulo's question. Anchored
+                                      #   to the text like every other variant, because a
+                                      #   mis-indexed DROP is invisible in the output — the
+                                      #   result is just a shorter scene that still reads.
+        - "...They gave you a pot."
+        - "They gave me a pot! There's soil in it and everything--"
+        - "--oh. Oh, wait. Wait, I've been saving-- here."
+        - "......"
+        - "I have not eaten in four thousand years."
+        - "...Thank you, Basil."
+      reason: >-
+        The berry is 9BB's promise paid ("One day I'll give her one"). A player who never freed
+        Sahnar never collects it, and that is the correct cost of skipping the recruit. Cut
+        rather than branched to a second scene: the whole exchange is hers and Basil's, so
+        nothing in it survives her absence.
+    no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas, L6) — WIRED 2026-08-19.
       boxes: [16]                     #   The locked script above is unchanged and still plays
                                       #   whenever Lupin WAS recruited.
       replaces:                       # anchored to the text, so an index cannot silently drift

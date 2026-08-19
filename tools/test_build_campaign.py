@@ -6110,32 +6110,52 @@ class Ch05Endings(unittest.TestCase):
         return dict(bc.ch05_ending_messages(self._chap()))
 
     def test_both_scenes_keep_their_locked_box_counts(self):
-        """19 boxes across scene 16's three beats, 10 in scene 17. Locked 2026-07-30."""
-        beats, _nl = bc._ch05_ending_beats(self._chap(), bc.CH05_ENDING_SLOT, 19,
-                                           'Basil alive', len(bc.CH05_ENDING_MSGS))
-        self.assertEqual(19, sum(bc._script_box_count(b) for b in beats))
-        lost, _lnl = bc._ch05_ending_beats(self._chap(), bc.CH05_ENDING_LOST_SLOT, 10,
-                                           'Basil died', 1)
-        self.assertEqual(10, bc._script_box_count(lost[0]))
+        """19 boxes in scene 16, 10 in scene 17. Locked 2026-07-30."""
+        arms = bc._ch05_ending_variants(self._chap(), bc.CH05_ENDING_SLOT, 19, 'Basil alive')
+        self.assertEqual(19, bc._script_box_count(arms[(True, True)]))
+        lost = bc._ch05_ending_variants(self._chap(), bc.CH05_ENDING_LOST_SLOT, 10, 'Basil died')
+        self.assertEqual(10, bc._script_box_count(lost[(True, True)]))
 
-    def test_the_berry_exchange_is_its_own_beat(self):
-        """Beat B exists so it can be SKIPPED -- it is the whole Sahnar gate.
+    def test_basil_never_leaves_the_screen(self):
+        """THE reason scene 16 is one message per arm rather than three spliced beats.
 
-        Pinned on the text rather than on the beat count: a `beat_break` that drifted one
-        entry would still split into three, and the skip would then swallow Basil's plea to
-        join (beat A's last box) or Braulo's question (beat C's first).
+        Split across three `Text()` calls it played correctly and looked wrong: each call is
+        its own TEXTSTART..REMA, so the seams tore the faces down and Basil -- who speaks in
+        all three -- faded out and reloaded into the seat she was already in, twice (Nicolas,
+        watching the first film 2026-08-19). Held as one message the podium manager keeps her
+        up from the first box to the last.
+
+        Asserted on her podium's codes, which is where the defect actually lived: she may be
+        loaded exactly once and never cleared, while mid-left cycles through everyone else.
         """
-        beats, _nl = bc._ch05_ending_beats(self._chap(), bc.CH05_ENDING_SLOT, 19,
-                                           'Basil alive', len(bc.CH05_ENDING_MSGS))
-        a, b, c = beats
-        self.assertEqual('sahnar', next(iter(b[0])), 'beat B must open on Sahnar')
-        self.assertIn('Thank you, Basil', str(b[-1]), 'beat B must close on her thanks')
-        self.assertIn('goodberry bush into your cause', str(a[-1]),
-                      'beat A must still close on Basil asking to join')
-        self.assertIn('What else did she do', str(c[0]),
-                      "beat C must still open on Braulo's question")
-        self.assertNotIn('sahnar', {k for e in a + c for k in e},
-                         'Sahnar may not speak outside the beat that is gated on her')
+        for msg, body in self._bodies().items():
+            right = body.count('[OpenMidRight][LoadFace]')
+            self.assertLessEqual(right, 1,
+                                 'MSG_%X reloads Basil mid-scene' % msg)
+            self.assertNotIn('[OpenMidRight][ClearFace]', body,
+                             'MSG_%X fades Basil out before the scene ends' % msg)
+            self.assertGreater(body.count('[OpenMidLeft][LoadFace]'), 1,
+                               'MSG_%X never rotates anyone through mid-left' % msg)
+
+    def test_the_no_sahnar_arm_cuts_the_berry_exchange_rather_than_replacing_it(self):
+        """A CUT, and the six boxes have to actually leave.
+
+        The `replaces:` anchors cannot prove this on their own -- they assert where each named
+        box sits, not that it went. A `no_sahnar_cut:` that grew a `script:` key would
+        substitute instead of drop, pass every anchor, and ship a scene that mentions Sahnar to
+        a player who never met her.
+        """
+        arms = bc._ch05_ending_variants(self._chap(), bc.CH05_ENDING_SLOT, 19, 'Basil alive')
+        full, cut = arms[(True, True)], arms[(False, True)]
+        self.assertEqual(13, bc._script_box_count(cut))
+        self.assertNotIn('sahnar', {k for entry in cut for k in entry})
+        self.assertIn('sahnar', {k for entry in full for k in entry})
+        # ...and the seam it leaves has to be the one the YAML describes: the repotting runs
+        # straight into Braulo's question.
+        texts = [str(e) for e in cut]
+        joined = ' | '.join(texts)
+        self.assertIn('goodberry bush into your cause', joined)
+        self.assertIn('What else did she do', joined)
 
     def test_the_sahnar_gate_asks_the_flag_as_well_as_the_roster(self):
         """CHECK_ALIVE ALONE IS WRONG HERE, and this is the test that says why.
@@ -6143,7 +6163,7 @@ class Ch05Endings(unittest.TestCase):
         `GetUnitFromCharId` (bmunit.c) sweeps unit indices 1..0xFF -- every faction, not the
         player's roster -- so a Sahnar the player never turned is still FOUND, and still
         ALIVE, standing on the map as a red myrmidon when Ravisin dies. On CHECK_ALIVE alone
-        the berry scene plays with the party's own enemy thanking Basil by name.
+        the berry exchange plays with the party's own enemy thanking Basil by name.
 
         The recruit FLAG asks "was she turned"; CHECK_ALIVE then asks "is she still here", so
         a Sahnar recruited and later killed is silent too. Vanilla chains exactly this pair
@@ -6153,32 +6173,56 @@ class Ch05Endings(unittest.TestCase):
         scene 5 -- which is why her gate is a bare CHECK_ALIVE and hers is the only one.
         """
         ending = _ch05_ending(self._chap())
-        berry = 'Text(0x%X)' % bc.CH05_ENDING_MSGS[1]
-        guard = ending[:ending.index(berry)]
+        full = 'Text(0x%X)' % bc.CH05_ENDING_MSGS[(True, True)]
+        guard = ending[:ending.index(full)]
         self.assertIn('CHECK_EVENTID(%s)' % bc.CH05_SAHNAR_TALK_FLAG, guard,
-                      'the berry beat is not gated on the RECRUIT flag')
+                      'the berry exchange is not gated on the RECRUIT flag')
         self.assertIn('CHECK_ALIVE(CHARACTER_MARISA)', guard,
-                      'the berry beat is not gated on Sahnar still being alive')
-        # Both guards jump to ONE label, and it is past the berry call: a skip, not a branch.
-        skip = 'LABEL(%s)' % bc.CH05_ENDING_SAHNAR_SKIP_LABEL
-        self.assertEqual(2, guard.count('BEQ(%s,' % bc.CH05_ENDING_SAHNAR_SKIP_LABEL))
-        self.assertGreater(ending.index(skip), ending.index(berry))
+                      'the berry exchange is not gated on Sahnar still being alive')
+        # Both checks send the player to the SAME arm -- the cut scene, not two different ones.
+        cut_label = 'BEQ(0x%X,' % bc.CH05_ENDING_SAHNAR_LABEL_BASE
+        self.assertEqual(2, guard.count(cut_label))
 
-    def test_only_the_wolf_beat_is_written_twice(self):
-        """Beats A and B name no optional unit, so they ride through into both arms.
+    def test_every_arm_the_scene_branches_on_has_its_own_id(self):
+        """Four for scene 16 (Sahnar x Lupin), two for 17, and each is a WHOLE scene.
 
-        The saving is the point of splitting at all: a 2x2 of whole scenes would be four
-        copies of nineteen boxes, and every one of them a place for the locked text to drift
-        out of step with the others.
+        Whole copies rather than a prefix/arm/suffix split, which is what keeps Basil on
+        screen -- and they cost the same four ids the split did. Nothing is hand-duplicated:
+        every copy comes out of the one locked script through `variant_beat`.
         """
-        beats, nl = bc._ch05_ending_beats(self._chap(), bc.CH05_ENDING_SLOT, 19,
-                                          'Basil alive', len(bc.CH05_ENDING_MSGS))
-        self.assertEqual(beats[:-1], nl[:-1])
-        differing = [(x, y) for x, y in zip(beats[-1], nl[-1]) if x != y]
-        self.assertEqual(1, len(differing), 'exactly one box may differ')
+        self.assertEqual({(True, True), (True, False), (False, True), (False, False)},
+                         set(bc.CH05_ENDING_MSGS))
+        arms = bc._ch05_ending_variants(self._chap(), bc.CH05_ENDING_SLOT, 19, 'Basil alive')
+        self.assertEqual(set(bc.CH05_ENDING_MSGS), set(arms))
+        # Scene 17 has no berry to lose, so it branches on Lupin alone.
+        lost = bc._ch05_ending_variants(self._chap(), bc.CH05_ENDING_LOST_SLOT, 10, 'Basil died')
+        self.assertEqual({(True, True), (True, False)}, set(lost))
+
+    def test_only_the_wolf_clause_separates_the_lupin_arms(self):
+        """One box differs between the arms, and it is the one the YAML anchors."""
+        arms = bc._ch05_ending_variants(self._chap(), bc.CH05_ENDING_SLOT, 19, 'Basil alive')
+        differing = [(x, y) for x, y in zip(arms[(True, True)], arms[(True, False)]) if x != y]
+        self.assertEqual(1, len(differing))
         locked, arm = differing[0]
         self.assertIn('she woke the wolves', str(locked))
         self.assertIn('she woke me', str(arm))
+
+    def test_the_two_variants_compose_without_re_indexing_each_other(self):
+        """The cut and the substitution are both authored against the ONE locked script.
+
+        The no-Lupin box is 16 and the cut takes 8-13, so applying the cut FIRST would move
+        the wolf line to box 10 and the substitution would land on the wrong box or fall off
+        the end -- which is exactly what happened when this was first written. The
+        substitution is 1-for-1 and therefore index-preserving, so it goes first; the arm that
+        proves the order is the one carrying both edits.
+        """
+        arms = bc._ch05_ending_variants(self._chap(), bc.CH05_ENDING_SLOT, 19, 'Basil alive')
+        both = arms[(False, False)]
+        self.assertEqual(13, bc._script_box_count(both))
+        joined = ' | '.join(str(e) for e in both)
+        self.assertIn('she woke me', joined, 'the no-Lupin substitution was lost under the cut')
+        self.assertNotIn('she woke the wolves', joined)
+        self.assertNotIn('four thousand years', joined, 'the cut was lost under the substitution')
 
     def test_the_endings_play_over_a_backdrop_and_never_open_a_bubble(self):
         """The channel, asserted on the script rather than on a comment.
@@ -6211,7 +6255,7 @@ class Ch05Endings(unittest.TestCase):
 
     def test_every_ending_id_is_claimed_and_unique(self):
         """Six ids, all in ch05's ledger and none written by another hosted chapter."""
-        ids = (*bc.CH05_ENDING_MSGS, bc.CH05_ENDING_NO_LUPIN_MSG,
+        ids = (*bc.CH05_ENDING_MSGS.values(),
                bc.CH05_ENDING_LOST_MSG, bc.CH05_ENDING_LOST_NO_LUPIN_MSG)
         self.assertEqual(len(ids), len(set(ids)), 'an ending id is used twice')
         for msg in ids:
@@ -6221,6 +6265,48 @@ class Ch05Endings(unittest.TestCase):
             if chapter != 'ch05':
                 self.assertEqual(set(), set(ids) & set(claimed),
                                  '%s already writes one of the ending ids' % chapter)
+
+    def test_the_debug_boot_stages_each_arm_the_scene_branches_on(self):
+        """`--ch05-ending=<arm>` puts the roster in the state its name claims.
+
+        Asserted on what is LOADED, because that is the whole content of the boot: the ending
+        reads the roster, so an arm that forgets to CUSA a unit blue films the wrong branch
+        while looking like it worked.
+        """
+        chap = self._chap()
+        seed = '    LOAD1(0x1, SEED)\n    ENUN\n'
+        arms = {arm: bc.ch05_ending_debug_script(chap, seed, arm, 'CHARACTER_ARTUR',
+                                                 bc.CH05_SAHNAR_TABLE, 'CHARACTER_MARISA')
+                for arm in bc.CH05_ENDING_ARMS}
+        for arm, body in arms.items():
+            self.assertIn('CALL(%s)' % bc.CH05_ENDING_SCRIPT, body, arm)
+            self.assertIn(seed, body, '%s has no party, so the ring has no leader' % arm)
+        self.assertIn('CUSA(CHARACTER_ARTUR)', arms['full'])
+        self.assertIn('CUSA(CHARACTER_MARISA)', arms['full'])
+        self.assertIn('ENUT(%s)' % bc.CH05_SAHNAR_TALK_FLAG, arms['full'],
+                      'the berry beat reads the recruit FLAG, so the boot has to set it')
+        self.assertIn('CUSA(CHARACTER_ARTUR)', arms['no-sahnar'])
+        self.assertNotIn('CUSA(CHARACTER_MARISA)', arms['no-sahnar'])
+        self.assertNotIn('ENUT(%s)' % bc.CH05_SAHNAR_TALK_FLAG, arms['no-sahnar'])
+        self.assertNotIn('CUSA(CHARACTER_ARTUR)', arms['basil-died'])
+        self.assertNotIn('CUSA(CHARACTER_MARISA)', arms['basil-died'])
+
+    def test_the_debug_boot_always_arms_the_payout(self):
+        """The give's placement relative to the closing fade is one of the things it films."""
+        chap = self._chap()
+        for arm in bc.CH05_ENDING_ARMS:
+            body = bc.ch05_ending_debug_script(chap, '    LOAD1(0x1, SEED)\n', arm,
+                                               'CHARACTER_ARTUR', bc.CH05_SAHNAR_TABLE,
+                                               'CHARACTER_MARISA')
+            for site in chap['villages']:
+                self.assertIn('ENUT(%s)' % bc.CH05_VILLAGE_FLAGS[site['id']], body,
+                              '%s: %s is not armed' % (arm, site['id']))
+
+    def test_the_debug_boot_refuses_to_build_without_a_party(self):
+        """Without --ch05-boot there is no seed, and the ending gives its ring to the LEADER."""
+        with self.assertRaises(SystemExit):
+            bc.ch05_ending_debug_script(self._chap(), '', 'full', 'CHARACTER_ARTUR',
+                                        bc.CH05_SAHNAR_TABLE, 'CHARACTER_MARISA')
 
     def test_every_ending_body_renders_at_the_backdrop_width(self):
         """Six bodies, every line inside 42, and every id emitted exactly once."""

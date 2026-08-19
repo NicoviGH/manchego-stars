@@ -8030,6 +8030,88 @@ scenarios.recordch05joinlupin = function()
     return scenarios.recordch05join(3)
 end
 
+-- recordch05ending (#25): the MOTION proof for ch05's ENDING -- scene 16, all three beats, over
+-- BG_MS_ELVEN_TOMB. Films on the ch05endingboot DEBUG ROM (CH05ENDING=full), whose beginning
+-- script LOMAs, loads Basil and Sahnar blue, arms the four reliquary flags and CALLs the ending
+-- straight off New Game. Reaching it honestly is the whole opening, Preparations and a boss
+-- kill, and there are six of these to look at (three roster arms x the Lupin flag).
+-- What only a run can answer: whether the backdrop actually comes up behind the text, whether
+-- the podiums hold across three SEPARATE messages (each Text() is its own TEXTSTART..REMA, so
+-- the faces reload per beat), and where the Guiding Ring's popup lands relative to the closing
+-- fade -- the give opens a BLOCKING convoy menu on a full pack, which is why it sits before the
+-- FADI and why that placement is filmed rather than asserted.
+-- THE BOX COUNT IS THE ARM ASSERTION, and it is not decoration: all three arms play fine and
+-- that is the hazard (decisions.md -> the ch05 endings). 19 boxes is scene 16 with the berry
+-- beat IN -- 7 + 6 + 6 -- so a Sahnar gate that regressed to always-skip lands on 13 and fails
+-- here rather than looking like a shorter film. The 20th is the dev placeholder's own line.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05ending (needs CH05BOOT=1 CH05ENDING=full).
+scenarios.recordch05ending = function()
+    local BOXES = 20                     -- 19 of scene 16 + the dev placeholder's one line
+    local boxes, waiting, blamed = 0, false, false
+    return recordCutscene({
+        -- recordch05opening's cadence: a 20-box run of scenes, and filming every frame makes a
+        -- GIF minutes long.
+        tag = "ch05ending", speed = "normal", maxFrames = 14000, shotEvery = 4, pressEvery = 90,
+        pre = function()
+            -- Fast through the boot, normal for the scenes -- and stop at the CHAPTER INTRO
+            -- rather than driving to the map, because on THIS ROM the beginning script IS the
+            -- ending: bootToMap() would mash A through the whole thing and film an empty map
+            -- (the same trap recordch05moose documents).
+            pokeFastConfig()
+            for _ = 1, TUNE.bootSteps do
+                local obs = observeController()
+                local st = controllerState(obs)
+                if st == "dialogue_wait" then return true end
+                if st == "chapter_intro_input" then
+                    advanceBootState(obs, st)
+                    return true
+                end
+                if advanceBootState(obs, st) ~= true then
+                    return false, "boot stalled at " .. tostring(st) .. " before the ending"
+                end
+                yield()
+            end
+            return false, "boot cap expired before ch05's ending"
+        end,
+        afterPre = pokeNormalConfig,
+        -- Terminal is the TITLE screen, because the ending lands on the dev placeholder and
+        -- that ends on MNTS -- ch06 is not hosted yet, and that is by design.
+        until_ = function()
+            local now = controllerState() == "dialogue_wait"
+            if now and not waiting then boxes = boxes + 1 end
+            waiting = now
+            if procActive(SYM.gProcScr_TitleScreen) then
+                if boxes < BOXES then
+                    -- Refuse the terminal rather than passing a short film, which is
+                    -- recordch05moose's shape: doneFn is read for truthiness alone, so an
+                    -- assertion that fails has to WITHHOLD the end and let the cap expire.
+                    -- The log is what names it -- the verdict line only says "never reached".
+                    if not blamed then
+                        blamed = true
+                        log(string.format("ch05ending: the title arrived after %d boxes, not %d "
+                            .. "-- the ROM played a SHORTER arm than CH05ENDING=full asks for "
+                            .. "(13 = the berry beat skipped, 10 = Basil's death variant)",
+                            boxes, BOXES))
+                    end
+                    return false
+                end
+                log(string.format("ch05ending: %d boxes, so beat B played -- the berry gate took "
+                    .. "its recruited arm", boxes))
+                return true
+            end
+            return false
+        end,
+    })
+end
+
+-- recordch05endinglupin (#25): the same film against ch05endinglupinboot, whose live Lupin sends
+-- beat C's CHECK_ALIVE down its ALIVE arm -- so box 16 is "Like she woke the wolves" rather than
+-- "Like she woke me". One routine, two ROMs, exactly as the opening pair works. Delegates rather
+-- than aliases so matrix.py can attribute a body to the name for the verdict cache.
+scenarios.recordch05endinglupin = function()
+    return scenarios.recordch05ending()
+end
+
 -- recordch05recruit (#25): the MOTION proof for the locked Basil->Sahnar Talk at 0x9E8 -- the
 -- chapter's payoff scene, and the review artifact for it. Stills mislead on dialogue (they catch
 -- the typewriter mid-stroke), so what gets reviewed is the film.
