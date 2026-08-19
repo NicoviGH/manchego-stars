@@ -167,10 +167,17 @@ before wiring it.
 - **`PT_CHAR=white-moose tools/playtest/run.sh recordenemy` is the battle-anim bench**, and it
   now takes RAW-PID creatures, not just class reskins — the TESTCH sandbox deploys them under
   their own pid. That is the cheap way to look at any new anim (one 40s run, no chapter boot).
-  ⚠️ **The bench is FULL: 7 creatures, 7 tiles** (`SANDBOX_FOE_POSITIONS`, spacing 2 so the bait
-  cannot counter a neighbour). An eighth needs a wider `ch-test-snowfield.json` or a second row —
-  `assert_sandbox_bench_fits` reads the map and fails the build rather than staging a foe on a
-  tile that does not exist, which is how the moose ended up off the map edge (#291).
+  ⚠️ **The bench ROW is full: 7 creatures, 7 tiles** — and that 7 is the ROW's geometry, not an
+  engine limit. `SANDBOX_FOE_POSITIONS` is one row at y=9 with spacing 2 (needed: the bait must be
+  orthogonally adjacent to the TARGET and to no other foe), so a 15-wide map yields x=2..14.
+  **An eighth creature just needs a second row** — the party sits at y=4 — or a wider
+  `ch-test-snowfield.json`. The real engine ceiling is far higher: `ResetUnitSprites` hands out
+  0x40=64 SMS VRAM slots, with `gSMS16xGfxIndexCounter` walking DOWN 1 per distinct 16x16 and
+  `gSMS32xGfxIndexCounter` walking UP +2/16x32 and +4/32x32 until they CROSS and later sprites
+  overwrite earlier ones (what `recordunitlist` fails on). Cost is per DISTINCT sprite, not per
+  unit, so today's bench spends ~10 of 64. `assert_sandbox_bench_fits` reads the map and fails the
+  build rather than staging a foe on a tile that does not exist — the moose went off the map edge
+  exactly that way (#291).
   ⚠️ **Every `recordenemy` run writes the SAME `/tmp/playtest-recordenemy`, cleared per run.**
   Build each GIF before starting the next run, or the second run wipes the first's frames.
 - **`--ch05-moose` boots straight to scene 7 (34s vs 4m33s).** Any late beat should get a boot
