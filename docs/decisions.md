@@ -4596,6 +4596,55 @@ ramp entries into a single colour destroys form either way. Ship the intent with
 (`docs/demo/ch05-ravisin-palette.png`). Judge it offline first — this whole loop cost seconds and no
 ROM build, the same reason `rom_bg_preview.py` exists.
 
+### A LOCK has a DATE, and facts settled after it still apply (2026-08-19, #25, #293)
+
+ch05's scene 17 called Basil **"he"** twice. Her text was locked 2026-07-30; her `gender: female`
+was settled 2026-08-08. Nobody contradicted anybody — **the lock simply predated the decision**,
+and "locked" was read as "checked", which it never was.
+
+So a locked scene is frozen against *re-litigation*, not against *facts*. Before wiring one, diff
+its lock date against anything settled since about the characters it names — pronouns, class,
+who is recruitable, who is even alive. Correcting a scene to match a later-settled fact is not
+reopening the dialogue pass and does not need a fresh one; it is the same kind of change as
+updating a stale constant. Preserve box count and rhythm, note the correction and its date in the
+scene's own `description:`, and move on.
+
+The exposure grows with the gap: ch05's endings were locked in July and are being wired in
+August, and they are the LAST scenes anyone will read before they ship.
+
+### The TESTCH bench is bounded by SMS VRAM, not by its tile row (2026-08-19, #25)
+
+The bench ran out of seats at seven and it was briefly written down as "the bench is full",
+which invites a redesign. It is not a limit FE8 imposes — it is the geometry of one row.
+
+`SANDBOX_FOE_POSITIONS` is a single row at y=9 with **spacing 2**, and the spacing is load-bearing:
+`recordenemy` places the bait unit orthogonally adjacent to its target and requires **no other foe
+adjacent**, or the counter-attack it films is the wrong creature's. On a 15-wide map that yields
+x=2,4,…,14 — seven. The party sits at y=4, so **a second row lifts it immediately**; a wider
+`ch-test-snowfield.json` does too. (`sandbox_map_size` READS that map, because the test chapter is
+repointed at it by `inject_winter_tileset` and is not vanilla Ch1's.)
+
+**The real ceiling is SMS VRAM, and it is much higher.** `ResetUnitSprites` (`bmudisp.c`) hands out
+`0x40` = **64 slots**, consumed from both ends by two counters that grow toward each other:
+
+| counter | starts | per distinct sprite |
+|---|---|---|
+| `gSMS16xGfxIndexCounter` | 63, walks **down** | −1 per 16×16 |
+| `gSMS32xGfxIndexCounter` | 0, walks **up** | +2 per 16×32, +4 per 32×32 |
+
+When they **cross**, later sprites silently overwrite earlier ones — the failure `recordunitlist`
+exists to catch. Two consequences worth holding on to:
+
+- **Cost is per DISTINCT sprite, not per unit.** Twenty kobolds of one class cost one slot; the
+  bench pays once per creature, and its seven spend ~10 of the 64 alongside the player party.
+- **The two size classes are not interchangeable.** A 32×32 costs four times a 16×16 and eats from
+  the opposite end, so a bench of monsters exhausts the pool far sooner than a bench of humans.
+
+What actually failed before was neither ceiling: the row held a tile at x=16 on a 15-wide map, and
+`_next_sandbox_tile` only ever guarded running OUT of tiles, never a tile that does not EXIST. The
+seventh creature deployed off the map edge and `recordenemy` failed walking the cursor to a column
+the map has not got. `assert_sandbox_bench_fits` now reads the map and fails the build instead.
+
 ### A community map sprite is keyed on GREEN, not on index 0 (2026-08-17, #25)
 
 Every map sprite this repo had vendored until now came from the decomp, where transparency is
@@ -4671,6 +4720,20 @@ the PR that way; Nicolas caught it.
 The source frames had been checked by eye and were correct. **Checking the inputs is not checking
 the output.** Verify a review artifact by decoding the artifact — for a GIF, iterate its own
 frames — and be wary of the same output path being written by more than one job.
+
+**The "one output path" half bit again, sequentially rather than concurrently (2026-08-19, #25).**
+Every `recordenemy` run writes `/tmp/playtest-recordenemy`, **cleared at the start of each run**.
+Filming Ravisin and then filming the moose before building her GIF destroyed the first run's
+frames, and cost a re-run of a scene Nicolas had already watched — the most expensive thing in
+this repo. **Build the artifact before starting the next run**, and treat a shared scratch path as
+a resource with one owner at a time. It does not take two jobs racing; two jobs in sequence will
+do it.
+
+**And the third case, which the same rule covers: a REPAIR must be verified against the ORIGINAL,
+never against the state the previous repair left.** Ravisin's map sprite shipped with holes through
+her face because a recovery pass re-derived its colour map by voting on surviving pixels — and the
+pixels it needed had already been zeroed by an earlier bad fix, so they had no votes and fell to a
+`.get(v, 0)` default. Each fix was checked against its predecessor's damage and looked correct.
 
 ### An FEditor `L` is an authoring bracket, not an instruction (2026-08-08, #25)
 
