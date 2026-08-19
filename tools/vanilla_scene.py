@@ -7,11 +7,14 @@ beside the vanilla ones for pacing reference (dialogue-pass §Inputs #4).
 
 A scene mixes two text CHANNELS and both are reported, because the channel sets
 the line width we hand-box to:
-  * TEXTSHOW  -- on-map, units staged by LOAD1; bubbles wrap at 29 chars
-  * Text_BG   -- a still backdrop (BG_*); full-width text, wraps ~42
-Reading only TEXTSHOW hides whole scenes: FE8 Ch5's opening puts the two Grado
-command scenes (0x9BC Glen/Saar, 0x9BD Glen/Cormag) on Text_BG, so a
-TEXTSHOW-only scan reports its 11-message opening as 8.
+  * on-map   -- units staged by LOAD1, the speaker anchors a bubble; wraps at 29 chars
+  * backdrop -- a still BG_* image with the map faded out; full-width text, wraps ~42
+and NEITHER is readable from the text call. Reading only `TEXTSHOW` hides whole
+scenes: FE8 Ch5's opening puts the two Grado command scenes (0x9BC Glen/Saar,
+0x9BD Glen/Cormag) on `Text_BG`, so a TEXTSHOW-only scan reports its 11-message
+opening as 8. And reading `TEXTSHOW` as *on-map* mislabels every scene vanilla
+plays as `SetBackground` + a bare `TEXTSHOW` -- Ch5's whole ENDING is one, and
+that artifact was copied out of here into ch05's own locked scene notes.
 
     python3 vanilla_scene.py ch5 [SceneNameFragment]
 """
@@ -85,14 +88,33 @@ def render(body):
     return lines
 
 
-MSG_CALL = re.compile(r'TEXTSHOW\((0x[0-9A-Fa-f]+)\)'
-                      r'|Text_BG\(\s*(\w+)\s*,\s*(0x[0-9A-Fa-f]+)\s*\)')
+# The channel is SCENE STATE, not a property of the text call -- which is the whole reason
+# this tool was misleading twice. `TEXTSHOW` prints into whatever surface is currently up, so
+# the scan tracks the backdrop and asks it at each text call:
+#   * up   -- SetBackground(BG_X) / BACG(BG_X) / Text_BG(BG_X, id)   (events_script_utils.c:224:
+#             EventScr_SetBackground is FADI + REMOVEPORTRAITS + BACG + FADU)
+#   * down -- CLEAN, and CALL(EventScr_TextShowWithFadeIn), which is FADI + TEXTSTART + CLEAN +
+#             FADU back onto the MAP (events_script_utils.c:211). `Text_BG` ends with that call,
+#             so it puts its own backdrop away.
+# `REMA` does NOT take a backdrop down -- it ends the TEXT. That is not a detail: vanilla Ch5's
+# 0x9BF has a REMA before it and no SetBackground of its own, and it is still BG_TOWN.
+# The scan is LINEAR and does not follow branches. Every branched scene in the decomp sets its
+# backdrop before the branch (EventScr_Ch5_EndingScene does), so linear order is the state each
+# arm actually sees; a scene that set a DIFFERENT backdrop per arm would need a real walk.
+SCENE_STEP = re.compile(
+    r'TEXTSHOW\((0x[0-9A-Fa-f]+)\)'
+    r'|Text_BG\(\s*(\w+)\s*,\s*(0x[0-9A-Fa-f]+)\s*\)'
+    r'|(?:SetBackground|BACG)\(\s*(\w+)\s*\)'
+    r'|\b(CLEAN)\b'
+    r'|CALL\(\s*(EventScr_TextShowWithFadeIn)\s*\)')
 
 
 def scene_text_ids(path, name_fragment=None, src=None):
     """[(scene_name, [(msg_id, channel), ...])] in source order.
 
-    channel is 'map' for an on-map TEXTSHOW, else the BG_* backdrop name.
+    channel is 'map' for an on-map bubble, else the BG_* backdrop the scene plays over --
+    tracked as scene STATE (see SCENE_STEP), because a bare `TEXTSHOW` prints into whatever
+    surface is up and reading the call alone reports every backdrop scene as on-map.
     `src` overrides reading `path` from disk -- main() passes the HEAD text, because
     eventscript headers are patched in place by the build too (ch1/ch2/ch3/prologue are in
     `PATCHED_DECOMP_FILES` today, and ch5's slot is where inject_ch04 hosts our Ch4).
@@ -103,12 +125,18 @@ def scene_text_ids(path, name_fragment=None, src=None):
         name, body = m.group(1), m.group(2)
         if name_fragment and name_fragment.lower() not in name.lower():
             continue
-        ids = []
-        for c in MSG_CALL.finditer(body):
-            if c.group(1):
-                ids.append((int(c.group(1), 16), 'map'))
-            else:
-                ids.append((int(c.group(3), 16), c.group(2)))
+        ids, backdrop = [], None
+        for c in SCENE_STEP.finditer(body):
+            show, bg_id, bg_msg, set_bg, clean, fade_in = c.groups()
+            if show:                                   # bare TEXTSHOW -- ask the surface
+                ids.append((int(show, 16), backdrop or 'map'))
+            elif bg_msg:                               # Text_BG: sets, shows, puts away
+                ids.append((int(bg_msg, 16), bg_id))
+                backdrop = None
+            elif set_bg:
+                backdrop = set_bg
+            elif clean or fade_in:
+                backdrop = None
         if ids:
             out.append((name, ids))
     return out

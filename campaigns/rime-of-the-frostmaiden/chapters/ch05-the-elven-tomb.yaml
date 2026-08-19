@@ -692,10 +692,18 @@ enemy_units:
 #   0x9C6 ( 1)     quote     ESCORT-NPC death quote (Natasha)    Basil's death quote
 #   0x9C7 ( 1)     quote     BOSS TAUNT — one box                Ravisin taunt
 #   0x9C8 ( 1)     quote     BOSS DEATH — one box                Ravisin's death quote
-#   0x9C9 (34)     on-map    ENDING exposition                   Ravisin falls → Bremen hook
+#   0x9C9 (34)     backdrop  ENDING exposition                   Ravisin falls → Bremen hook
 #                                                                 (+ conditional Sahnar block)
-#   0x9CA (24)     on-map    ENDING variant: "if she died"       ADOPTED -- the Basil-died branch
-#   0x9CB (16)     on-map    ENDING coda: a villager thanks you  FOLDED into 0x9C9 (no slot)
+#   0x9CA (24)     backdrop  ENDING variant: "if she died"       ADOPTED -- the Basil-died branch
+#   0x9CB (16)     backdrop  ENDING coda: a villager thanks you  FOLDED into 0x9C9 (no slot)
+#   ^^ CORRECTED 2026-08-19: these three read "on-map" here until the wiring went to check.
+#   `EventScr_Ch5_EndingScene` opens FADI(16) -- the map goes DOWN -- then
+#   SetBackground(BG_SERAFEW_VILLAGE), then bare TEXTSHOWs; there is no TEXTSTART in it at all.
+#   The error came out of `vanilla_scene.py`, which classified by the text CALL and so reported
+#   every `SetBackground` + bare `TEXTSHOW` scene as "map". decisions.md had already caught the
+#   same artifact on 0x9BB and called it a reporting artifact; the tool is fixed now and its
+#   suite pins all three of these. 0x9CC (the Talk recruit) really IS on-map -- it opens on its
+#   own TEXTSTART -- which is why scene 14 stays at 29 while the endings take 42.
 #
 # TRIGGERS ARE INHERITED WITH THE ANATOMY (corrected 2026-07-29, Nicolas caught it).
 # 9BA-9C4 are ELEVEN messages inside ONE event list, `EventScr_Ch5_BeginningScene`, played
@@ -1434,8 +1442,9 @@ events:
       Ravisin falls. The party adopts Basil — they REPOT her (she is already called Basil and
       joined on the map; there is no discovery and no naming beat, LOCKED 2026-07-23). They turn
       down the coast toward Bremen, where Ravisin woke something in the lake.
-      MINED SKELETON — vanilla MSG_9C9 (34 boxes, `EventScr_Ch5_EndingScene`, ON-MAP so bubbles
-      wrap at 29). Its beat order, which ours follows: (1) aftermath before anyone does business;
+      MINED SKELETON — vanilla MSG_9C9 (34 boxes, `EventScr_Ch5_EndingScene`, a BACKDROP scene
+      so the full-screen window wraps at ~42 — see the anatomy table's correction). Its beat
+      order, which ours follows: (1) aftermath before anyone does business;
       (2) the ESCORT is thanked and becomes the scene's centre; (3) the party asks her a question
       and she TELLS THEM THE PLOT — the escort, not a party member, carries the chapter's forward
       information; (4) the party deliberates in front of her; (5) a closing box that turns the win
@@ -1462,10 +1471,15 @@ events:
       plesiosaur — woken by Ravisin exactly as the wolves and the moose were, and ORDERED to sink
       the boats. It is another of her victims, and ch06 lets Marty talk her down. So the hook says
       only what Basil heard: she woke a thing in the water and told it what to do.
-      SAHNAR IS OPTIONAL — the berry exchange (boxes 6-11) can only play if she was recruited.
-      Wiring owes a skip: without her, the scene runs Basil's repotting straight into Braulo's
-      question. The berry is 9BB's promise paid ("One day I'll give her one"), so a player who
-      never freed her simply never collects it. That is the correct cost of skipping the recruit.
+      SAHNAR IS OPTIONAL — the berry exchange can only play if she was recruited, and without
+      her the scene runs Basil's repotting straight into Braulo's question. The berry is 9BB's
+      promise paid ("One day I'll give her one"), so a player who never freed her simply never
+      collects it. That is the correct cost of skipping the recruit.
+      WIRED as beat B of three (`beat_break` A/B/C below), which is how every other chapter's
+      ending is already built — the event script wraps B's one Text() call in a CHECK_ALIVE on
+      her. An earlier note here named the block as "boxes 6-11", which was never right (it is
+      the six boxes from "...They gave you a pot." to "...Thank you, Basil."); the beat break
+      makes the index moot, since the boundary is now structural rather than counted.
       LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas) after two red-pen passes.
       19 boxes (twin: 34).
     status: locked
@@ -1486,7 +1500,14 @@ events:
       #  sentence runs to 5 lines. The split also gives "...into your cause?" its own button.)
       - basil: "I don't have much to offer, but what I can I offer willingly,"
       - basil: "if you'll accept a goodberry bush into your cause?"
-      # (ONLY IF SAHNAR WAS RECRUITED -- see the note above. 9BB's promise, paid.)
+      # ── BEAT B: the berry exchange, and it only plays if SAHNAR WAS RECRUITED. ──
+      # The skip the description above says the wiring owes, taken the way every other
+      # chapter's ending already splits a scene: a `beat_break` makes B its own message, and
+      # the event script wraps that ONE Text() call in a CHECK_ALIVE. Nothing new -- ch01's
+      # ending is five beats and ch02's is four. Without her, A runs straight into C, which is
+      # Basil's repotting into Braulo's question exactly as the description asks.
+      - beat_break: B
+      # (9BB's promise, paid.)
       - sahnar: "...They gave you a pot."
       - basil: "They gave me a pot! There's soil in it and everything--"
       - basil: "--oh. Oh, wait. Wait, I've been saving-- here."
@@ -1495,6 +1516,8 @@ events:
       # (A queen thanks him. She is four thousand years past grabbing at anything, and using his
       #  NAME rather than "little one" is the whole distance she has travelled since 9BB.)
       - sahnar: "...Thank you, Basil."
+      # ── BEAT C: the plot, the Bremen hook and the button. Plays in BOTH worlds. ──
+      - beat_break: C
       # (The escort carries the plot, exactly as Natasha does in the twin.)
       - braulo: "You served her. What else did she do?"
       - basil: "...There's something in the water. Down the coast, by the fishing town."

@@ -4238,6 +4238,83 @@ second `BACG` would be the no-op that already bit ch03 and ch04. **Filmed rather
 _Decided: 2026-08-13 (Nicolas: "does vanilla use a background in its opening scenes? lets have a
 plan before jumping into assigning a BG")._
 
+### A reporting artifact outlived the note that named it: the ch05 endings (2026-08-19, #25)
+
+The section above records that `vanilla_scene.py` prints `0x9BB` as `"map"` and calls it *a
+reporting artifact, not a channel*. It fixed the READING and left the TOOL, so the artifact was
+mined a second time — and this time nobody caught it. The ch05 YAML's anatomy table, issue #25's
+per-scene notes and `HANDOFF.md` all carried **"the endings are ON-MAP at 29"** for three weeks,
+and the wiring was about to be built against it.
+
+`EventScr_Ch5_EndingScene` opens `FADI(16)` — the map goes **down** — then
+`SetBackground(BG_SERAFEW_VILLAGE)`, then three bare `TEXTSHOW`s. There is no `TEXTSTART` in it.
+Vanilla's ch5 ending is a **backdrop scene at ~42**, and by the rule above ours inherits that.
+
+**The tool now tracks the backdrop as scene STATE rather than classifying by the text call**,
+which is what it should always have done: `TEXTSHOW` prints into whatever surface is up.
+Set by `SetBackground` / `BACG` / `Text_BG`; taken down by `CLEAN` and by
+`CALL(EventScr_TextShowWithFadeIn)` (which is `FADI` + `TEXTSTART` + `CLEAN` + `FADU` back onto
+the map, `events_script_utils.c:211`). **`REMA` does not take a backdrop down** — it ends the
+TEXT, which is why vanilla's `0x9BF` is still `BG_TOWN` with a `REMA` in front of it and no
+`SetBackground` of its own. `tools/test_vanilla_scene.py` pins all three ending ids, both
+`SetBackground` + bare-`TEXTSHOW` scenes, and `0x9CC` as genuinely on-map — the Talk recruit
+sits forty lines from the ending in one file and takes the *other* channel, so scene 14 stays
+at 29 while scenes 16 and 17 take 42.
+
+Three things fell out, and two of them were problems the on-map reading would have shipped:
+
+- **Six speakers, and a bubble anchors to a UNIT.** `PutTalkBubble` needs a staged speaker
+  (which is why `ch05_basil_join_block` carries a `CUMO_CHAR` and the ending cannot). ch05
+  deploys 9 of a 10-unit pool, so on-map Marty, Wolfram, Braulo and RBG can each be talking
+  from a tile nobody is standing on. **ch04's ending had already made this exact argument for
+  itself** and its comment says so; ch05's note was written without reading it.
+- **The two ending fallbacks needed no re-boxing.** Both overrun 29 and were on the owed list
+  for it; at 42 they fit as authored. What is still owed is the *Talk recruit's* fallback,
+  which really is on-map.
+- The endings cost **six** message ids, not four, because scene 16 is split into three beats
+  (below). Five come from the swept neighbourhood and ch05's host block; the sixth is appended
+  past `MSG_D4B` beside the moose's name, `create=True` on `set_message_body`.
+
+**The lesson is the one the ch04 comment already carried: when a tool is found lying, fix the
+tool.** A note that records "this output is wrong" protects only the person who read that note.
+
+_Decided: 2026-08-19 (Nicolas: "I have no idea where that came from ... you shouldn't have to
+rediscover anything")._
+
+### `CHECK_ALIVE` answers for a unit in ANY faction — so a recruit needs its FLAG too (2026-08-19, #25)
+
+`branch_on_check_alive`'s docstring says CHECK_ALIVE reads the ROSTER rather than the field, and
+that is right as far as it goes — but "roster" is not "the player's units".
+`GetUnitStructFromEventParameter` → `GetUnitFromCharId` (`bmunit.c`) sweeps unit indices
+**1..0xFF**, every faction, and returns the first valid match. So CHECK_ALIVE means *does this
+character exist somewhere and is it not dead*, and nothing more.
+
+That is exactly right for Lupin and for Basil, and **wrong for Sahnar**, and the difference is
+whether the unit is ever HOSTILE:
+
+- **Basil** is a green escort who joins by `CUSA` in scene 5 and is never anyone's enemy — the
+  same shape as vanilla's Natasha, whose own ending branch is a bare
+  `CHECK_ALIVE(CHARACTER_NATASHA)`. A bare ALIVE is correct.
+- **Lupin** is either on the ch04 carry-over roster or nowhere. A bare ALIVE is correct, and
+  never-recruited collapsing with recruited-then-killed is the *point*.
+- **Sahnar rises HOSTILE and only flips when Basil Talks her.** Kill Ravisin without ever
+  turning her and she is alive, red, and standing on the map when the ending runs — CHECK_ALIVE
+  says 1, and the berry scene plays with the party's own enemy thanking Basil by name.
+
+The gate is therefore the **recruit flag first, then ALIVE**: `CHECK_EVENTID(EVFLAG_TMP(7))`
+(set by `talk_recruit_script`'s `EVBIT_T(7)`, vanilla's own Natasha→Joshua flag) asks *was she
+turned*, and `CHECK_ALIVE` then asks *is she still here*, so a Sahnar recruited and later killed
+is silent too. **Vanilla chains precisely this pair** — `ch19a-eventscript.h`'s
+`EventScr_089F8688` runs `CHECK_EVENTID(7)` into `CHECK_ALIVE(CHARACTER_TANA)` to pick its
+ending text. Both `BEQ` to one shared label, because a beat that is SKIPPED has no second arm to
+jump over; that is `save_all_bonus_script`'s shape, not `branch_on_flag`'s.
+
+**The general rule: ask CHECK_ALIVE about a unit that could be an ENEMY and it will answer yes.**
+Any conditional whose subject is an optional TALK recruit wants the flag as well.
+
+_Recorded: 2026-08-19 (found while wiring ch05's scene 16; the first draft used a bare
+CHECK_ALIVE and would have shipped it)._
+
 ### A portrait SLOT name is not a face TAG, and the near-miss is silent (2026-08-13, #25)
 
 Sephek's face is spelled two ways in this repo. `GUEST_PORTRAIT_MAP['sephek-kaltro']` says
