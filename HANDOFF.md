@@ -41,9 +41,9 @@ twin, `stage_break` vs `stage_cut`, `reda_route_move`. The ending script itself 
 the scenes go in ahead of that `FADI`. Precedent for the branch shape is vanilla's own
 `ch14a-eventscript.h`, which branches its ending on `CHECK_ALIVE(CHARACTER_JOSHUA)` three times.
 
-⚠️ **`_ch05_scene_and_variant` is keyed to `chapter_start` + `_ch05_opening_body`** — the podium
-/ backdrop renderer at width 42. The endings are **ON-MAP (width 29)**. Do not assume it drops in;
-read what the on-map scenes (the Talk recruit at `0x9E8`) actually use before reaching for it.
+⚠️ **`_ch05_scene_and_variant` does NOT drop into an on-map scene as-is** — it is the width-42
+backdrop path and both endings are on-map at 29. Detail and the two ways out: **issue #25**, under
+"Two things the wiring has to decide per scene".
 
 **Two things still OWED on this scene set:**
 - **The Talk recruit's no-Lupin fallback still needs its BOXING** — it overruns the bubble's 29
