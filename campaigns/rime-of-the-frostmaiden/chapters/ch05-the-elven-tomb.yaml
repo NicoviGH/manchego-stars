@@ -1570,6 +1570,9 @@ events:
       had one for her" works in both worlds and is the harder line anyway.
       LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas) after two red-pen passes.
       10 boxes; twin is 24.
+      PRONOUNS CORRECTED 2026-08-19: two boxes called Basil "he" ("...He's gone.", "If he'd
+      lived"). She is `gender: female` (npcs/basil.yaml) — settled 2026-08-08, AFTER this text
+      was locked, so the lock simply predates the decision. Box count and rhythm unchanged.
     status: locked                    # ADOPTED + LOCKED 2026-07-30 after two red-pen passes
     script:                           # LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas)
       # (The hollow. Ravisin down. Basil is in the snow where she fell, root-feet turned up,
@@ -1593,12 +1596,12 @@ events:
       #  is universal rather than about Sahnar, so it does not collide with the death quote.)
       - basil: "...I couldn't make enough berries..."
       - basil: "......"
-      - prof-rbg: "...He's gone."
+      - prof-rbg: "...She's gone."
       # (From here it is 0x9C9's back half, near-verbatim, as vanilla does it.)
       - prof-rbg: "...The fishing town would be Bremen."
       # (CUT 2026-07-30 (Nicolas): "Nobody's hired us for a lake" -- out of BOTH endings. See 0x9C9.)
       # (The ONE changed line, in vanilla's own place: what the loss cost the party in facts.)
-      - braulo: "If he'd lived we'd know more. ...We go down the coast."
+      - braulo: "If she'd lived we'd know more. ...We go down the coast."
     no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas) — WIRING NOT BUILT.
       boxes: [3]                      #   The locked script above is unchanged and still plays
                                       #   whenever Lupin WAS recruited.
