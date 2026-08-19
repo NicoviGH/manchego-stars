@@ -6,76 +6,91 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-17 (Claude). **#282–#286, #289 and #290 are DONE and merged — do not reopen
-any.** The generated decomp tree is intentionally dirty as recorded below.
+Refreshed 2026-08-19 (Claude). **#291, #292 and #293 are DONE and merged — do not reopen any.**
+The generated decomp tree is intentionally dirty as recorded below.
 
 ## In flight
 
-**Nothing.** `main` is at #290, CI green. The last stretch landed ch05's scenes 12/13, the battle
-grounds, and Ravisin's battle animation.
-
-⚠️ **Three commits went straight to main** (`dbcf558`, `fe45875`, `3488533` — Ravisin's anim),
-bypassing feature-flow: the session merged #289, stayed on `main`, and kept committing. CI was
-green on each and #290 was the review they should have had first. Nothing is broken and history
-was NOT rewritten. Recorded because the next session should not read main's shape as licence:
-**branch → PR → squash-merge**, every time (`CLAUDE.md` → Coordination).
+**Nothing.** `main` is at #292 (+ #293), CI green. This stretch finished **Ravisin's art**: her
+battle-anim palette, her map sprite, and the tooling both exposed.
 
 ## Next task
 
-**Ravisin's ART: her palette, and an open question about her map sprite.** She now animates as
-`[Custom DM] Awakening Dark Mage [F]` {still BatimatheBat, animation Leo_Link, F2U/F2E} —
-imported whole, bound per-CHARACTER (`animId 0xDF`, `_u25[31] → AnimConf_ravisin` on pid `0xb8`),
-proved on the bench (`PT_CHAR=ravisin tools/playtest/run.sh recordenemy` → PASS). Two things
-remain, one decided-and-owed and one genuinely open.
+**ch05's two ENDING scenes (16/17) — wiring, not writing.** The text is LOCKED and already in
+`ch05-the-elven-tomb.yaml`; issue #25's table is the canonical order. **15 of 17 scenes done.**
 
-**❓ OPEN QUESTION for Nicolas — do we have a MAP SPRITE to match her portrait and battle anim?**
-She has none: no `map_sprites/ravisin*.png`, no `sprite:` on her YAML, so on the map she is the
-**stock vanilla Druid SMS** (`SMSId 0x27`) — the same hooded man her battle animation just
-stopped being. Her bust and her close-up now agree with each other and disagree with the tile.
-The FE-Repo's `Map Sprites` section is in the same `file_urls.json` index that answered the anim
-question (2909 entries; search it, don't walk folders). Precedent for wiring one: the white
-moose's `map_sprite:` block in `ch04-the-white-moose.yaml` (`wait:` + `mu:` sheets), and
-`map_sprite_swapper.py` / `map_sprite_tool.py`. **Ask before vendoring** — this is a look call,
-and there may be no female-druid sprite worth having.
+⚠️ **They are NOT blocked, and a previous handoff said they were** (Nicolas corrected this
+2026-08-19; issue #25's line is fixed too). That claim conflated two things: ch05's win landing
+on the dev placeholder (**true, and BY DESIGN**) with the ending scenes being unwirable (false).
+**The RBG campfire placeholder IS the "next chapter" slot — that is its whole purpose**
+(`dev_placeholder_scene()`: BACG the fireplace, RBG's cheese-pun line, MNTS back to title).
+Scenes 16/17 play BEFORE that landing, so ch06 hosting is irrelevant to them and always was.
 
-*The palette is the owed half.* She ships on the anim's NATIVE palette: auburn hair (the reason
-this anim beat the hooded alternatives) but a BLUE robe, where an enemy would read red. The
-author's own "enemy" palette was tried and REJECTED on sight — the two are index-aligned so the
-swap looked free, but the art does not use those indices the way the swatch suggests and it turns
-her HAIR TEAL. Evidence, now in the repo: `docs/demo/ch05-ravisin-anim-palette.png`. **Do not
-reinstate the enemy palette wholesale; that is the thing already rejected.** The target is a
-hybrid — her hair kept, the robe ramp moved to frost/enemy — a palette pass on the vendored
-frames, not a re-import. `build_import` already takes a `recolor` map (the class path passes
-one); the per-character branch does not pass it yet, which is the only code gap and it is three
-lines.
+What the two scenes are:
+- **16 — ending, Basil ALIVE** (19 boxes): main `0x9C9`, no-Lupin twin `0x9CA`.
+- **17 — ending, Basil DIED** (10 boxes): main `0x9CB`, no-Lupin twin `0x9CC`.
+- A **2x2**: Basil alive/dead x Lupin recruited/not. Plus, inside 16, a **Sahnar skip** — the
+  berry exchange (boxes 6-11) can only play if she was recruited, and a player who never freed
+  her simply never collects it.
 
-**Two traps this stretch paid for, both about believing a check you did not run:**
-- *There was no design call and one was invented.* The per-character path has taken a REAL
-  FEditor import via `import: {txt, frames_dir}` since Sahnar and Pinky. A refactor was scoped
-  before anyone opened `npcs/sahnar.yaml`, where the answer is four lines. **Check the anims we
-  already vendored before believing this pipeline is missing anything.**
-- *"She's the campaign's only druid" is not a fact about the campaign.* It was a grep of the
-  chapters that exist, used to argue for class-binding. Frost druids are a recurring FACTION
-  (`lore/frostmaiden-voices.md`), Sephek's defeat "only scatters him", and Act IV is Auril's
-  Abode. **Bind per-CHARACTER, never at `CLASS_DRUID`** — `decisions.md`, the moose ADR.
+**Reuse; it is all built.** `branch_on_check_alive` + `label_base` (a third branch in one event
+list takes labels 4/5), `variant_beat` for a fallback (asserts each `replaces:` anchor, so a
+re-ordered script fails loudly), `_ch05_scene_and_variant` for a locked scene plus its no-Lupin
+twin, `stage_break` vs `stage_cut`, `reda_route_move`. The ending script itself is
+`ch05_ending_script()` — today `MUSC(SONG_VICTORY)` → save-all payout → `FADI(16)` → placeholder;
+the scenes go in ahead of that `FADI`. Precedent for the branch shape is vanilla's own
+`ch14a-eventscript.h`, which branches its ending on `CHECK_ALIVE(CHARACTER_JOSHUA)` three times.
 
-*There is NO Aversa animation in the FE-Repo* — the whole 2006-entry index was searched. Her
-portrait is there and an "Aversa's Night" icon; no anim. This is a stand-in matched to the bust.
-Rejected finalists: `[Custom Magi] [F] Witch {Pikmin}` (auburn too, pointed hat her bust has not)
-and `[T2 Druid-Base] Vanilla FE6 [F]` (her exact tier, fully hooded). Vanilla's own
-`CLASS_DRUID_F` is a real second animation (`0x79`/`0x7A` vs the male's `0x77`/`0x78`) and costs
-nothing — also hooded, which is why it lost; it would also move her bases (HP 19→17, Pow 6→7).
+⚠️ **`_ch05_scene_and_variant` is keyed to `chapter_start` + `_ch05_opening_body`** — the podium
+/ backdrop renderer at width 42. The endings are **ON-MAP (width 29)**. Do not assume it drops in;
+read what the on-map scenes (the Talk recruit at `0x9E8`) actually use before reaching for it.
 
-## ch05's remaining dialogue
+**Two things still OWED on this scene set:**
+- **The Talk recruit's no-Lupin fallback still needs its BOXING** — it overruns the bubble's 29
+  and pages itself mid-clause if left flowed (`decisions.md` → "A fallback line chosen as PROSE").
+- **Two `CHECK_ALIVE` states are unproven** (#25's tally): recruited-but-BENCHED, and
+  recruited-then-killed. Both should take the arm we want by a decomp reading, **and a reading is
+  not a run.** ch05 deploys 9 of a 10-unit pool, so benched-but-alive is reachable in ordinary
+  play and is exactly where a field-presence test would fail.
+
+**When you film the endings, note Ravisin's MAP SPRITE in context** (Nicolas's ask) — this is the
+first run that shows it on the real ch05 map rather than in an injected table.
+
+## Ravisin is COMPLETE — do not redo any of it
+
+Portrait/name/stats (#259), turn-2 warning `0x9E4` (#261), death quote `0x9E5` (#263), battle
+anim (#286/#290), **hand-edited anim palette (#291)** and **map sprite (#292)**. Films:
+`docs/demo/ch05-ravisin-battle-anim.gif`, `ch05-moose-battle-anim.gif`.
+
+Two traps a future session could walk back into, both already paid for:
+- ⚠️ **Do NOT "fix" her faction colour by reinstating the author's enemy palette.** It is
+  index-aligned so the swap looks free, and it turns her HAIR TEAL — already rejected on sight.
+  Why her palette is hand-edited at all: `decisions.md` → "A vendored anim's palette is a BY-EYE
+  call". Her look is aimed at her BUST (black robe, near-white skin), not at a faction ramp.
+- ⚠️ **Her map sprite is HOODLESS on purpose** — her bust and anim both are, and `CLASS_DRUID`'s
+  stock sprite is a hooded man, which is the mismatch it closes. Binding:
+  `decisions.md` → "Ravisin's map sprite rides SCRIPTED_NEUTRAL_SPRITES, boss or not".
+
+## Art tooling — reach for these before inventing anything
+
+- **`tools/banim_palette.py`** (#291) — browser editor for an imported battle anim's own 15
+  colours, playing at the `.txt`'s real cadence; `👁 isolate` says which index owns what BEFORE
+  anything moves. Writes `palette.json`, applied as `build_import(recolor=...)` — agbpal only.
+- **`tools/map_sprite_swapper.py`** is still the tool for MAP sprites (index swaps against the
+  locked cast palette) and **Nicolas drives it**, as he did for Sahnar. Get a vendored sheet onto
+  that palette first with `map_sprite_tool.recolour`, passing `--donor <Class>`.
+- **Vendoring from the FE-Repo:** the index is `map-review/ch05/fe-repo/file_urls.json` (2905 map
+  sprites, 2001 anims, 16457 portraits). **Search it; never walk folders, never submodule.**
+  Every trap it hides — the green `#80a080` key, why a preview cannot see a mis-keyed sheet, and
+  why `pattern` is not a frame count — is long-form in `decisions.md` → "A community map sprite is
+  keyed on GREEN, not on index 0". The guards now fail the build, so trust them over memory.
+
+## ch05's dialogue — the standing rules
 
 **Worked TOP TO BOTTOM in player order** (Nicolas, 2026-08-13). The ordered inventory of all 17
-scenes — **15 done, 2 left** — is the table in **issue #25**, the canonical view; do not re-derive
-an order from the YAML's `vanilla 0xNNN` labels, which are anatomy citations naming the scene we
-MINE and are never ids we write.
-
-What is left is **the two endings (16/17)**, a 2x2 over Basil alive/dead x Lupin present/absent,
-and they are **blocked behind ch06 hosting** — ch05's win still lands on the dev placeholder.
-Locked text from PR #196: wiring, not writing.
+scenes is the table in **issue #25**, the canonical view; do not re-derive an order from the
+YAML's `vanilla 0xNNN` labels, which are anatomy citations naming the scene we MINE and are never
+ids we write. What is left is the two endings — see **Next task**.
 
 **Basil has ONE death quote** (#289) and scene 13 is closed by that decision rather than by
 wiring: the berry line is her universal `0x97A` and fires wherever she falls. The empty vanilla
@@ -95,16 +110,10 @@ writes (`HOSTED_CHAPTER_MESSAGE_IDS` guards that), and never overwrite vanilla t
 in the built ROM. Neither is a budget. If a beat wants another id, append one — do not redesign a
 scene around a shortage that does not exist.
 
-**Reuse the mechanisms; they are all built.** `branch_on_check_alive` + `label_base` for the
-endings' 2×2 (a third branch in one event list takes labels 4/5), `variant_beat` for a fallback,
-`_ch05_scene_and_variant` for a locked scene plus its no-Lupin twin, `stage_break` vs
-`stage_cut` for a beat interrupted mid-message, `reda_route_move` for a multi-leg walk.
-**The Talk recruit's no-Lupin fallback is still owed its BOXING** — it overruns the bubble's 29
-and pages itself mid-clause if left flowed (`decisions.md` → "A fallback line chosen as PROSE").
-
-**Two states of the `CHECK_ALIVE` branch are still unproven** (#25's tally): benched, and
-recruited-then-killed. Both should take the arm we want by a decomp reading, and a reading is
-not a run.
+**LOCKED text can still be WRONG, and correcting it is not re-litigating it** (#293). Scene 17
+called Basil "he" twice: locked 2026-07-30, her `gender: female` settled 2026-08-08 — the lock
+merely predated the decision. Check a locked scene against facts settled AFTER its lock date
+before wiring it.
 
 ## Current state
 
@@ -143,9 +152,9 @@ not a run.
 - **Bryn Shander's ch01 ending and Bremen's reserved ch07 backdrop are vendored winter CGs**
   (#256). Bremen is banked at **8** palettes and nothing references it yet: ch07 must show it with
   a plain `BACG` or reconvert at `--banks 6`, because the fade/transition procs apply only six.
-- **Ravisin is complete**: portrait/name/stats (#259), turn-2 eruption warning at `0x9E4` (#261),
-  locked death quote at `0x9E5` (#263). Raw pid `0xb8` does not pass through the regular cast
-  identity injector, so all three are bound explicitly from the ch05 YAML / Riev slot.
+- **Raw pid `0xb8` does not pass through the regular cast identity injector**, so everything
+  Ravisin has — bust, name, stats, anim, map sprite — is bound explicitly from the ch05 YAML /
+  Riev slot. See the "Ravisin is COMPLETE" section above before touching any of it.
 - **Cross-agent continuity:** Nicolas uses Codex only between Claude sessions. Codex must leave an
   explicit HANDOFF entry naming what it changed, the active branch/PR and commit state,
   verification actually run, and the exact next step. Ordinary short-lived feature branches in this
@@ -158,6 +167,12 @@ not a run.
 - **`PT_CHAR=white-moose tools/playtest/run.sh recordenemy` is the battle-anim bench**, and it
   now takes RAW-PID creatures, not just class reskins — the TESTCH sandbox deploys them under
   their own pid. That is the cheap way to look at any new anim (one 40s run, no chapter boot).
+  ⚠️ **The bench is FULL: 7 creatures, 7 tiles** (`SANDBOX_FOE_POSITIONS`, spacing 2 so the bait
+  cannot counter a neighbour). An eighth needs a wider `ch-test-snowfield.json` or a second row —
+  `assert_sandbox_bench_fits` reads the map and fails the build rather than staging a foe on a
+  tile that does not exist, which is how the moose ended up off the map edge (#291).
+  ⚠️ **Every `recordenemy` run writes the SAME `/tmp/playtest-recordenemy`, cleared per run.**
+  Build each GIF before starting the next run, or the second run wipes the first's frames.
 - **`--ch05-moose` boots straight to scene 7 (34s vs 4m33s).** Any late beat should get a boot
   like it BEFORE its first film, not after the third — `decisions.md` → "Playtest runs are the
   most expensive thing in this repo", rule 3. `bootToMap()` is the wrong driver on such a ROM.
