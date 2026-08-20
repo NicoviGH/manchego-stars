@@ -6,55 +6,75 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-19 (Claude). **#291, #292 and #293 are DONE and merged — do not reopen any.**
+Refreshed 2026-08-20 (Claude). **#291-#293 and #295 are DONE and merged — do not reopen any.**
 The generated decomp tree is intentionally dirty as recorded below.
 
 ## In flight
 
-**Nothing.** `main` is at #292 (+ #293), CI green. This stretch finished **Ravisin's art**: her
-battle-anim palette, her map sprite, and the tooling both exposed.
+**Nothing.** `main` is at #295, CI green.
 
 ## Next task
 
-**ch05's two ENDING scenes (16/17) — wiring, not writing.** The text is LOCKED and already in
-`ch05-the-elven-tomb.yaml`; issue #25's table is the canonical order. **15 of 17 scenes done.**
+**ch05's enemy reskins — the risen tomb-guard still look like living people.** Nicolas raised
+this 2026-08-19 and it is the last thing before ch05 reads as finished. Tracked on **#25**
+(`enemy_class_reskins` wiring + FE-Repo imports), and the two long comments there dated
+2026-08-19/20 carry the whole survey — read those before starting, they exist so nobody
+re-derives it.
 
-⚠️ **They are NOT blocked, and a previous handoff said they were** (Nicolas corrected this
-2026-08-19; issue #25's line is fixed too). That claim conflated two things: ch05's win landing
-on the dev placeholder (**true, and BY DESIGN**) with the ending scenes being unwirable (false).
-**The RBG campfire placeholder IS the "next chapter" slot — that is its whole purpose**
-(`dev_placeholder_scene()`: BACG the fireplace, RBG's cheese-pun line, MNTS back to title).
-Scenes 16/17 play BEFORE that landing, so ch06 hosting is irrelevant to them and always was.
+**Nicolas has APPROVED the asset set** (2026-08-20): map sprites `Bonewalker (U) Lance {Epicer}`,
+`Axe {Snerdels}`, `One Arm {IS}`, `Wight Bow {IS}`; anims Skeleberdier (lance **+ axe +
+handaxe**), Bonewalker one-arm (sword), Wight Sniper (bow). Board with every one of them playing:
+`https://claude.ai/code/artifact/1528d16d-3854-43ea-9742-7280d09df17d`.
 
-What the two scenes are:
-- **16 — ending, Basil ALIVE** (19 boxes): main `0x9C9`, no-Lupin twin `0x9CA`.
-- **17 — ending, Basil DIED** (10 boxes): main `0x9CB`, no-Lupin twin `0x9CC`.
-- A **2x2**: Basil alive/dead x Lupin recruited/not. Plus, inside 16, a **Sahnar skip** — the
-  berry exchange (boxes 6-11) can only play if she was recruited, and a player who never freed
-  her simply never collects it.
+⚠️ **`docs/fe-repo-scouting.md` says "axe undead ❌ no undead axe anim" and that is WRONG** — the
+Skeleberdier ships Axe (Swing), Axe (Stab) and Handaxe natively (by tatata). The ch05 YAML's
+`tomb-reaver` still says `source: palette_swap` on that stale basis. Fix the doc in the same
+commit as the wiring. **One import covers the lance guard AND all eight axe reavers.**
 
-**Reuse; it is all built.** `branch_on_check_alive` + `label_base` (a third branch in one event
-list takes labels 4/5), `variant_beat` for a fallback (asserts each `replaces:` anchor, so a
-re-ordered script fails loudly), `_ch05_scene_and_variant` for a locked scene plus its no-Lupin
-twin, `stage_break` vs `stage_cut`, `reda_route_move`. The ending script itself is
-`ch05_ending_script()` — today `MUSC(SONG_VICTORY)` → save-all payout → `FADI(16)` → placeholder;
-the scenes go in ahead of that `FADI`. Precedent for the branch shape is vanilla's own
-`ch14a-eventscript.h`, which branches its ending on `CHECK_ALIVE(CHARACTER_JOSHUA)` three times.
+**Reuse; none of this needs new tooling** (Nicolas, explicitly). `inject_enemy_class_reskins` +
+`inject_enemy_class_battle_anims` already ship the ch01 goblins, ch03 kobolds and ch04 lycanroc
+pack — copy those `enemy_class_reskins` entries. Vendored anims live at
+`engine/battle_anims/_vendored/<source>/<mode>/` as an FEditor `<Mode>.txt` plus `<Mode>_NNN.png`
+frames, **which is exactly the shape the FE-Repo ships** (its mode folders carry the `.txt` and
+the numbered PNGs beside the `.bin`), so vendoring is a download into the right directory.
 
-⚠️ **`_ch05_scene_and_variant` does NOT drop into an on-map scene as-is** — it is the width-42
-backdrop path and both endings are on-map at 29. Detail and the two ways out: **issue #25**, under
-"Two things the wiring has to decide per scene".
+Three things checked and CLEARED, so nobody re-investigates them:
+- **A community sheet's green key at a non-zero palette index is already handled.**
+  `map_sprite_tool.GREEN_KEYS` detects the key by COLOUR; the Epicer lance sheet carries it at
+  index 6 and `recolour` mapped `6->0` correctly.
+- **An RGBA community sheet needs a lossless mode-P pass** (the One Arm sheet is RGBA with 12
+  opaque colours). Sahnar's and Ravisin's shipped sheets are `P` in `map_sprites/` and their
+  FE-Repo originals are RGBA, so the step has precedent.
+- **A size-class mismatch is the `frame:` field, in either direction.** The axe sheet is 16x48
+  against `CLASS_FIGHTER`'s declared 16x32; `frame: 16x16` on the reskin entry is the whole fix
+  (the Fire Imp uses the same field the other way).
 
-**Two things still OWED on this scene set:**
-- **The Talk recruit's no-Lupin fallback still needs its BOXING** — it overruns the bubble's 29
-  and pages itself mid-clause if left flowed (`decisions.md` → "A fallback line chosen as PROSE").
-- **Two `CHECK_ALIVE` states are unproven** (#25's tally): recruited-but-BENCHED, and
-  recruited-then-killed. Both should take the arm we want by a decomp reading, **and a reading is
-  not a run.** ch05 deploys 9 of a 10-unit pool, so benched-but-alive is reachable in ordinary
-  play and is exactly where a field-presence test would fail.
+Still owed on ch05's dialogue, and NOT part of the reskins: the **Talk recruit's no-Lupin
+fallback** (`0x9D1`) — wiring plus its boxing at 29, the last of the three surviving fallbacks —
+and the two unproven `CHECK_ALIVE` states (recruited-but-BENCHED, recruited-then-killed).
 
-**When you film the endings, note Ravisin's MAP SPRITE in context** (Nicolas's ask) — this is the
-first run that shows it on the real ch05 map rather than in an injected table.
+## ch05's dialogue is COMPLETE — 17 of 17 (#295)
+
+Both endings shipped 2026-08-19 and are filmed (`docs/demo/ch05-ending.gif`). Three things
+settled there that a future session will otherwise re-derive, all long-form in `decisions.md`:
+
+- **The endings are BACKDROP scenes at 42, not on-map at 29.** The YAML, issue #25 and this file
+  all said on-map for three weeks; it came from `vanilla_scene.py` classifying by the text CALL,
+  so a bare `TEXTSHOW` read as on-map whatever backdrop was up. **The tool is fixed** and its
+  suite pins it. The Talk recruit (`0x9CC`) really is on-map — the two sit forty lines apart in
+  one vanilla file and take different channels.
+- **A conditional block inside a scene is a WHOLE second copy, not a spliced beat.** Split across
+  three `Text()` calls scene 16 passed every check and looked wrong: each `Text()` is its own
+  `TEXTSTART..REMA`, so Basil faded out and reloaded into her own seat twice. Ids are not scarce;
+  seams are expensive.
+- **`CHECK_ALIVE` answers for a unit in ANY faction** (`GetUnitFromCharId` sweeps 1..0xFF), so an
+  optional TALK recruit needs its recruit FLAG as well — an un-turned Sahnar is alive and RED.
+- **An ENCOUNTER is not a RECRUIT.** Both endings' Lupin branches were retired: ch04's parley
+  decides whether he JOINS, not whether the party met the pack.
+
+**`--ch05-ending=<arm>`** (`full` / `no-sahnar` / `basil-died`) boots straight to the ending.
+`recordch05ending` films the full arm and its **box count is the arm assertion** (20 = 19 + the
+placeholder's line). The other two arms are unfilmed.
 
 ## Ravisin is COMPLETE — do not redo any of it
 
@@ -90,7 +110,8 @@ Two traps a future session could walk back into, both already paid for:
 **Worked TOP TO BOTTOM in player order** (Nicolas, 2026-08-13). The ordered inventory of all 17
 scenes is the table in **issue #25**, the canonical view; do not re-derive an order from the
 YAML's `vanilla 0xNNN` labels, which are anatomy citations naming the scene we MINE and are never
-ids we write. What is left is the two endings — see **Next task**.
+ids we write. All seventeen are wired (#295); what is left is the Talk recruit's no-Lupin
+fallback, which is a BRANCH rather than a scene — see **Next task**.
 
 **Basil has ONE death quote** (#289) and scene 13 is closed by that decision rather than by
 wiring: the berry line is her universal `0x97A` and fires wherever she falls. The empty vanilla
