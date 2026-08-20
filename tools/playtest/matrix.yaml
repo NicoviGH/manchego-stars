@@ -52,6 +52,14 @@ rom_configs:
   ch05mooseboot:
     CH05BOOT: 1
     CH05MOOSE: 1
+  # DEBUG boot for ch05's ENDING. Reaching it honestly is the whole opening, Preparations and a
+  # boss kill, so the boot came BEFORE the first film this time rather than after the third.
+  # `full` = Basil alive + Sahnar recruited; the other two arms build the same way with
+  # CH05ENDING set to `no-sahnar` or `basil-died`. There is no Lupin variant: neither ending
+  # branches on him (build_campaign -> CH05_ENDING_MSGS).
+  ch05endingboot:
+    CH05BOOT: 1
+    CH05ENDING: full
 
 # Ported verbatim from run.sh's two timing `case` statements.
 classes:
@@ -325,6 +333,10 @@ scenarios:
     kind: record
   recordch05joinlupin:                                 # the same film, Lupin's arm (#25)
     rom: ch05lupinboot
+    host_chapter: 6
+    kind: record
+  recordch05ending:                                    # scenes 16 A+B+C, on the debug boot (#25)
+    rom: ch05endingboot
     host_chapter: 6
     kind: record
   ch04snag:

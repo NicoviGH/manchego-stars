@@ -2976,12 +2976,19 @@ class Ch05ArrivalSceneAndTheNoLupinBranch(unittest.TestCase):
         self.assertEqual([{'a': 'x'}, {'a': 'y'}, {'b': 'two'}, {'c': 'z'}], out)
 
     def test_every_ch05_fallback_declares_one_schema_not_two(self):
-        """ch05 authored its five blocks with singular `box:`/`replaces:` while variant_beat --
+        """ch05 authored its blocks with singular `box:`/`replaces:` while variant_beat --
         ch04's, already shipping -- reads LISTS. Normalising the YAML is what kept this at one
-        mechanism; a reader that accepts both shapes is the second one."""
+        mechanism; a reader that accepts both shapes is the second one.
+
+        THREE, not the five #25 first listed: both ENDINGS were unbranched 2026-08-19 because
+        "like she woke the wolves" does not name an optional recruit -- the party fights the
+        pack whether or not Marty parleys it, so recruitment decides only whether Lupin JOINS.
+        What is left is the arrival, the join and the Talk recruit, and all three address him
+        as a UNIT rather than as a thing that happened.
+        """
         chap = self._chap()
         blocks = [e['no_lupin_fallback'] for e in chap['events'] if 'no_lupin_fallback' in e]
-        self.assertEqual(5, len(blocks), "#25's five conditional scenes")
+        self.assertEqual(3, len(blocks), "#25's conditional scenes, minus the two endings")
         for fb in blocks:
             self.assertNotIn('box', fb, 'singular `box:` is the second schema')
             self.assertIsInstance(fb['boxes'], list)
@@ -4556,6 +4563,16 @@ class ArenaPresentation(unittest.TestCase):
         self.assertIn('inject_arena_presentation(args.campaign)', build)
 
 
+def _ch05_ending(chap):
+    """`ch05_ending_script` with the two cast slots the injector resolves at build time.
+
+    Basil and Sahnar reach it as CHARACTER_ symbols (`char_symbol(...)` off the classed cast),
+    not as raw pids -- the ending asks the ROSTER about both, and a raw pid would only ever
+    match if the unit happened to still be wearing it.
+    """
+    return bc.ch05_ending_script(chap, 'CHARACTER_ARTUR', 'CHARACTER_MARISA')
+
+
 class Ch05VillageRaidRace(unittest.TestCase):
     """ch05's declared structure: the eruption's dead race the party for the four reliquaries,
     and saving all four pays out (#25). Vanilla Ch5 is the reference for both halves -- it wires
@@ -4692,8 +4709,13 @@ class Ch05VillageRaidRace(unittest.TestCase):
         bonus = self._chap()['economy']['save_all_bonus']
         self.assertIn(bonus, bc.CH05_ITEM_IDS, 'the save-all bonus must be a real FE item')
         self.assertEqual('ITEM_GUIDINGRING', bc.CH05_ITEM_IDS[bonus])
-        ending = bc.ch05_ending_script(self._chap())
-        self.assertEqual(4, ending.count('CHECK_EVENTID('), 'all four sites gate the payout')
+        ending = _ch05_ending(self._chap())
+        # Named flags, not a count: the ending also branches on the Sahnar RECRUIT flag now, and
+        # a bare CHECK_EVENTID tally would pass with a village gate deleted and the recruit
+        # gate counted in its place.
+        for site in self._chap()['villages']:
+            self.assertIn('CHECK_EVENTID(%s)' % bc.CH05_VILLAGE_FLAGS[site['id']], ending,
+                          '%s does not gate the payout' % site['id'])
         self.assertIn('SVAL(EVT_SLOT_3, ITEM_GUIDINGRING)', ending)
         self.assertTrue(ending.rstrip().endswith('ENDA\n}'))
 
@@ -4702,17 +4724,27 @@ class Ch05VillageRaidRace(unittest.TestCase):
         GIVEITEMTO, and on a full pack the reason is not cosmetic: the give runs
         HandleNewItemGetFromDrop, which opens a BLOCKING convoy/discard menu. Behind a FADI the
         player is operating that menu blind."""
-        ending = bc.ch05_ending_script(self._chap())
-        self.assertLess(ending.index('GIVEITEMTO'), ending.index('FADI(16)'),
-                        'the ring is handed over under a black screen')
+        ending = _ch05_ending(self._chap())
+        head, _, tail = ending.partition('GIVEITEMTO')
+        # The ending is a BACKDROP scene now, so the thing keeping the screen up is its own
+        # BACG rather than a RemoveBGIfNeeded call -- but the requirement is the same one, and
+        # it has to be asserted on the LAST fade before the give, not on the first FADI in the
+        # script (which is the one that takes the battlefield down to raise the backdrop).
+        self.assertIn('BACG(%s)' % bc.CH05_ENDING_BG, head, 'nothing is on screen at the give')
+        self.assertNotIn('FADI(16)', head.split('BACG(%s)' % bc.CH05_ENDING_BG)[1],
+                         'the backdrop is faded out again before the ring is handed over')
+        self.assertIn('FADI(16)', tail, 'the fade into the landing must follow the give')
 
     def test_the_payout_gates_only_on_sites_the_location_list_armed(self):
         """The ending used to gate on the module dict while the Location list armed whatever the
         YAML declared. Drop a village and the ring becomes unobtainable, with a green build."""
         chap = self._chap()
         chap['villages'] = chap['villages'][:2]
-        ending = bc.ch05_ending_script(chap)
-        self.assertEqual(2, ending.count('CHECK_EVENTID('),
+        ending = _ch05_ending(chap)
+        kept = {bc.CH05_VILLAGE_FLAGS[v['id']] for v in chap['villages']}
+        gated = {f for f in bc.CH05_VILLAGE_FLAGS.values()
+                 if 'CHECK_EVENTID(%s)' % f in ending}
+        self.assertEqual(kept, gated,
                          'the payout must check exactly the sites that exist')
 
     def test_no_ch05_enemy_drops_anything(self):
@@ -6064,6 +6096,233 @@ class LocationEventsAreBuiltFromTheYaml(unittest.TestCase):
                          'ITEM_BOOSTER_DEF')
         self.assertIsNone(bc.village_reward_item({'id': 'b'}, {}))
 
+
+
+class Ch05Endings(unittest.TestCase):
+    """ch05's scenes 16 and 17 (#25) -- the two endings, and the three questions they ask.
+
+    Wired as our other four endings are (FADI the map out, BACG, FADU, the beat calls, FADI into
+    the landing), which is also what vanilla's own `EventScr_Ch5_EndingScene` does: it opens on
+    FADI(16), raises BG_SERAFEW_VILLAGE and never issues a TEXTSTART. That last fact spent three
+    weeks recorded backwards -- the ch05 YAML, issue #25 and HANDOFF all said "ON-MAP at 29",
+    out of a `vanilla_scene.py` classifier that read a bare TEXTSHOW as on-map regardless of the
+    backdrop in front of it (fixed, and pinned in test_vanilla_scene.py).
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+
+    def _bodies(self):
+        return dict(bc.ch05_ending_messages(self._chap()))
+
+    def test_both_scenes_keep_their_locked_box_counts(self):
+        """19 boxes in scene 16, 10 in scene 17. Locked 2026-07-30."""
+        arms = bc._ch05_ending_variants(self._chap(), bc.CH05_ENDING_SLOT, 19, 'Basil alive')
+        self.assertEqual(19, bc._script_box_count(arms[True]))
+        lost = bc._ch05_ending_variants(self._chap(), bc.CH05_ENDING_LOST_SLOT, 10, 'Basil died')
+        self.assertEqual(10, bc._script_box_count(lost[True]))
+
+    def test_basil_never_leaves_the_screen(self):
+        """THE reason scene 16 is one message per arm rather than three spliced beats.
+
+        Split across three `Text()` calls it played correctly and looked wrong: each call is
+        its own TEXTSTART..REMA, so the seams tore the faces down and Basil -- who speaks in
+        all three -- faded out and reloaded into the seat she was already in, twice (Nicolas,
+        watching the first film 2026-08-19). Held as one message the podium manager keeps her
+        up from the first box to the last.
+
+        Asserted on her podium's codes, which is where the defect actually lived: she may be
+        loaded exactly once and never cleared, while mid-left cycles through everyone else.
+        """
+        for msg, body in self._bodies().items():
+            right = body.count('[OpenMidRight][LoadFace]')
+            self.assertLessEqual(right, 1,
+                                 'MSG_%X reloads Basil mid-scene' % msg)
+            self.assertNotIn('[OpenMidRight][ClearFace]', body,
+                             'MSG_%X fades Basil out before the scene ends' % msg)
+            self.assertGreater(body.count('[OpenMidLeft][LoadFace]'), 1,
+                               'MSG_%X never rotates anyone through mid-left' % msg)
+
+    def test_the_no_sahnar_arm_cuts_the_berry_exchange_rather_than_replacing_it(self):
+        """A CUT, and the six boxes have to actually leave.
+
+        The `replaces:` anchors cannot prove this on their own -- they assert where each named
+        box sits, not that it went. A `no_sahnar_cut:` that grew a `script:` key would
+        substitute instead of drop, pass every anchor, and ship a scene that mentions Sahnar to
+        a player who never met her.
+        """
+        arms = bc._ch05_ending_variants(self._chap(), bc.CH05_ENDING_SLOT, 19, 'Basil alive')
+        full, cut = arms[True], arms[False]
+        self.assertEqual(13, bc._script_box_count(cut))
+        self.assertNotIn('sahnar', {k for entry in cut for k in entry})
+        self.assertIn('sahnar', {k for entry in full for k in entry})
+        # ...and the seam it leaves has to be the one the YAML describes: the repotting runs
+        # straight into Braulo's question.
+        texts = [str(e) for e in cut]
+        joined = ' | '.join(texts)
+        self.assertIn('goodberry bush into your cause', joined)
+        self.assertIn('What else did she do', joined)
+
+    def test_the_sahnar_gate_asks_the_flag_as_well_as_the_roster(self):
+        """CHECK_ALIVE ALONE IS WRONG HERE, and this is the test that says why.
+
+        `GetUnitFromCharId` (bmunit.c) sweeps unit indices 1..0xFF -- every faction, not the
+        player's roster -- so a Sahnar the player never turned is still FOUND, and still
+        ALIVE, standing on the map as a red myrmidon when Ravisin dies. On CHECK_ALIVE alone
+        the berry exchange plays with the party's own enemy thanking Basil by name.
+
+        The recruit FLAG asks "was she turned"; CHECK_ALIVE then asks "is she still here", so
+        a Sahnar recruited and later killed is silent too. Vanilla chains exactly this pair
+        (ch19a's EventScr_089F8688: CHECK_EVENTID(7) into CHECK_ALIVE(CHARACTER_TANA)).
+
+        Basil needs no flag on the other hand -- she is never hostile, joining by CUSA in
+        scene 5 -- which is why her gate is a bare CHECK_ALIVE and hers is the only one.
+        """
+        ending = _ch05_ending(self._chap())
+        full = 'Text(0x%X)' % bc.CH05_ENDING_MSGS[True]
+        guard = ending[:ending.index(full)]
+        self.assertIn('CHECK_EVENTID(%s)' % bc.CH05_SAHNAR_TALK_FLAG, guard,
+                      'the berry exchange is not gated on the RECRUIT flag')
+        self.assertIn('CHECK_ALIVE(CHARACTER_MARISA)', guard,
+                      'the berry exchange is not gated on Sahnar still being alive')
+        # Both checks send the player to the SAME arm -- the cut scene, not two different ones.
+        cut_label = 'BEQ(0x%X,' % bc.CH05_ENDING_SAHNAR_LABEL_BASE
+        self.assertEqual(2, guard.count(cut_label))
+
+    def test_every_arm_the_scene_branches_on_has_its_own_id(self):
+        """Two for scene 16 (Sahnar recruited or not), one for 17, and each is a WHOLE scene.
+
+        Whole copies rather than a prefix/arm/suffix split, which is what keeps Basil on
+        screen. Nothing is hand-duplicated: the shorter one comes out of the one locked script
+        through `variant_beat`.
+        """
+        self.assertEqual({True, False}, set(bc.CH05_ENDING_MSGS))
+        arms = bc._ch05_ending_variants(self._chap(), bc.CH05_ENDING_SLOT, 19, 'Basil alive')
+        self.assertEqual(set(bc.CH05_ENDING_MSGS), set(arms))
+        lost = bc._ch05_ending_variants(self._chap(), bc.CH05_ENDING_LOST_SLOT, 10, 'Basil died')
+        self.assertEqual({True}, set(lost))
+
+    def test_neither_ending_branches_on_lupin(self):
+        """UNBRANCHED 2026-08-19, and the premise was wrong rather than marginal.
+
+        Both endings carried a `no_lupin_fallback` because Basil's "like she woke the wolves"
+        was read as naming an optional recruit. It does not: recruitment decides whether Lupin
+        JOINS, not whether the party ever met the pack, and ch04's turn-2 reveal puts the
+        wolves in front of them on every path (Nicolas). The locked line is true in both
+        worlds, so the branch could only ever have been wrong.
+
+        Pinned two ways -- the YAML may not carry a block nothing reads, and the emitted script
+        may not ask about him -- because a fallback restored by a merge would sit there looking
+        live while `_ch05_ending_variants` quietly ignored it.
+        """
+        chap = self._chap()
+        for slot in (bc.CH05_ENDING_SLOT, bc.CH05_ENDING_LOST_SLOT):
+            event = bc._chapter_event_by_slot(chap, 'chapter_end', slot, 'ch05 ending')
+            self.assertNotIn('no_lupin_fallback', event,
+                             '%s carries a fallback nothing reads' % slot)
+            joined = ' | '.join(str(e) for e in event['script'])
+            self.assertNotIn('woke me', joined, '%s kept the retired substitute' % slot)
+        ending = _ch05_ending(chap)
+        self.assertNotIn(bc.CH05_LUPIN_CHARACTER, ending,
+                         'the ending still asks the roster about Lupin')
+        # The locked references SURVIVE -- unbranching keeps the line, it does not cut it.
+        bodies = ' '.join(self._bodies().values())
+        self.assertIn('she woke the wolves', bodies)
+        self.assertIn('the moose, the wolf', bodies.lower())
+
+    def test_the_endings_play_over_a_backdrop_and_never_open_a_bubble(self):
+        """The channel, asserted on the script rather than on a comment.
+
+        A BACG is up before any text call and no TEXTSTART is issued outside `Text()`'s own
+        expansion -- which is what makes six speakers safe here. On-map a bubble anchors to a
+        speaking UNIT (PutTalkBubble), and ch05 deploys 9 of a 10-unit pool, so Marty,
+        Wolfram, Braulo and RBG can all be talking from a tile nobody is standing on.
+        """
+        ending = _ch05_ending(self._chap())
+        first_text = ending.index('Text(0x')
+        self.assertIn('BACG(%s)' % bc.CH05_ENDING_BG, ending[:first_text])
+        self.assertNotIn('TEXTSTART', ending)
+        self.assertNotIn('CUMO_CHAR', ending, 'a backdrop scene needs no camera on a speaker')
+
+    def test_the_victory_sting_is_picked_per_arm(self):
+        """Vanilla puts MUSC inside each side of its own CHECK_ALIVE and so do we.
+
+        The one place ch05's ending departs from our other four, which have nothing to pick
+        between: SONG_VICTORY when the escort lived, SONG_INTO_THE_SHADOW_OF_VICTORY when she
+        did not, and neither before the branch where it would play over both.
+        """
+        ending = _ch05_ending(self._chap())
+        basil = 'CHECK_ALIVE(CHARACTER_ARTUR)'
+        self.assertIn(basil, ending)
+        self.assertNotIn('MUSC(', ending[:ending.index(basil)],
+                         'a sting before the branch plays the wrong one on the losing arm')
+        self.assertIn('MUSC(SONG_VICTORY)', ending)
+        self.assertIn('MUSC(SONG_INTO_THE_SHADOW_OF_VICTORY)', ending)
+
+    def test_every_ending_id_is_claimed_and_unique(self):
+        """Six ids, all in ch05's ledger and none written by another hosted chapter."""
+        ids = (*bc.CH05_ENDING_MSGS.values(), bc.CH05_ENDING_LOST_MSG)
+        self.assertEqual(len(ids), len(set(ids)), 'an ending id is used twice')
+        for msg in ids:
+            self.assertIn(msg, bc.HOSTED_CHAPTER_MESSAGE_IDS['ch05'],
+                          'MSG_%X is written but not claimed' % msg)
+        for chapter, claimed in bc.HOSTED_CHAPTER_MESSAGE_IDS.items():
+            if chapter != 'ch05':
+                self.assertEqual(set(), set(ids) & set(claimed),
+                                 '%s already writes one of the ending ids' % chapter)
+
+    def test_the_debug_boot_stages_each_arm_the_scene_branches_on(self):
+        """`--ch05-ending=<arm>` puts the roster in the state its name claims.
+
+        Asserted on what is LOADED, because that is the whole content of the boot: the ending
+        reads the roster, so an arm that forgets to CUSA a unit blue films the wrong branch
+        while looking like it worked.
+        """
+        chap = self._chap()
+        seed = '    LOAD1(0x1, SEED)\n    ENUN\n'
+        arms = {arm: bc.ch05_ending_debug_script(chap, seed, arm, 'CHARACTER_ARTUR',
+                                                 bc.CH05_SAHNAR_TABLE, 'CHARACTER_MARISA')
+                for arm in bc.CH05_ENDING_ARMS}
+        for arm, body in arms.items():
+            self.assertIn('CALL(%s)' % bc.CH05_ENDING_SCRIPT, body, arm)
+            self.assertIn(seed, body, '%s has no party, so the ring has no leader' % arm)
+        self.assertIn('CUSA(CHARACTER_ARTUR)', arms['full'])
+        self.assertIn('CUSA(CHARACTER_MARISA)', arms['full'])
+        self.assertIn('ENUT(%s)' % bc.CH05_SAHNAR_TALK_FLAG, arms['full'],
+                      'the berry beat reads the recruit FLAG, so the boot has to set it')
+        self.assertIn('CUSA(CHARACTER_ARTUR)', arms['no-sahnar'])
+        self.assertNotIn('CUSA(CHARACTER_MARISA)', arms['no-sahnar'])
+        self.assertNotIn('ENUT(%s)' % bc.CH05_SAHNAR_TALK_FLAG, arms['no-sahnar'])
+        self.assertNotIn('CUSA(CHARACTER_ARTUR)', arms['basil-died'])
+        self.assertNotIn('CUSA(CHARACTER_MARISA)', arms['basil-died'])
+
+    def test_the_debug_boot_always_arms_the_payout(self):
+        """The give's placement relative to the closing fade is one of the things it films."""
+        chap = self._chap()
+        for arm in bc.CH05_ENDING_ARMS:
+            body = bc.ch05_ending_debug_script(chap, '    LOAD1(0x1, SEED)\n', arm,
+                                               'CHARACTER_ARTUR', bc.CH05_SAHNAR_TABLE,
+                                               'CHARACTER_MARISA')
+            for site in chap['villages']:
+                self.assertIn('ENUT(%s)' % bc.CH05_VILLAGE_FLAGS[site['id']], body,
+                              '%s: %s is not armed' % (arm, site['id']))
+
+    def test_the_debug_boot_refuses_to_build_without_a_party(self):
+        """Without --ch05-boot there is no seed, and the ending gives its ring to the LEADER."""
+        with self.assertRaises(SystemExit):
+            bc.ch05_ending_debug_script(self._chap(), '', 'full', 'CHARACTER_ARTUR',
+                                        bc.CH05_SAHNAR_TABLE, 'CHARACTER_MARISA')
+
+    def test_every_ending_body_renders_at_the_backdrop_width(self):
+        """Three bodies, every line inside 42, and every id emitted exactly once."""
+        bodies = self._bodies()
+        self.assertEqual(3, len(bodies))
+        for msg, body in bodies.items():
+            for line in body.replace('[LF]', '\n').split('\n'):
+                text = re.sub(r'\[[^\]]*\]', '', line)
+                self.assertLessEqual(len(text), 42,
+                                     'MSG_%X overruns the full-screen window: %r' % (msg, text))
 
 # NB keep this LAST. It sat at line ~4776 of a 5723-line file, so the twelve TestCase classes
 # below it -- 88 tests, including all 26 of Ch04Stage4Scenes -- were defined after the runner

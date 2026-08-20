@@ -692,10 +692,18 @@ enemy_units:
 #   0x9C6 ( 1)     quote     ESCORT-NPC death quote (Natasha)    Basil's death quote
 #   0x9C7 ( 1)     quote     BOSS TAUNT — one box                Ravisin taunt
 #   0x9C8 ( 1)     quote     BOSS DEATH — one box                Ravisin's death quote
-#   0x9C9 (34)     on-map    ENDING exposition                   Ravisin falls → Bremen hook
+#   0x9C9 (34)     backdrop  ENDING exposition                   Ravisin falls → Bremen hook
 #                                                                 (+ conditional Sahnar block)
-#   0x9CA (24)     on-map    ENDING variant: "if she died"       ADOPTED -- the Basil-died branch
-#   0x9CB (16)     on-map    ENDING coda: a villager thanks you  FOLDED into 0x9C9 (no slot)
+#   0x9CA (24)     backdrop  ENDING variant: "if she died"       ADOPTED -- the Basil-died branch
+#   0x9CB (16)     backdrop  ENDING coda: a villager thanks you  FOLDED into 0x9C9 (no slot)
+#   ^^ CORRECTED 2026-08-19: these three read "on-map" here until the wiring went to check.
+#   `EventScr_Ch5_EndingScene` opens FADI(16) -- the map goes DOWN -- then
+#   SetBackground(BG_SERAFEW_VILLAGE), then bare TEXTSHOWs; there is no TEXTSTART in it at all.
+#   The error came out of `vanilla_scene.py`, which classified by the text CALL and so reported
+#   every `SetBackground` + bare `TEXTSHOW` scene as "map". decisions.md had already caught the
+#   same artifact on 0x9BB and called it a reporting artifact; the tool is fixed now and its
+#   suite pins all three of these. 0x9CC (the Talk recruit) really IS on-map -- it opens on its
+#   own TEXTSTART -- which is why scene 14 stays at 29 while the endings take 42.
 #
 # TRIGGERS ARE INHERITED WITH THE ANATOMY (corrected 2026-07-29, Nicolas caught it).
 # 9BA-9C4 are ELEVEN messages inside ONE event list, `EventScr_Ch5_BeginningScene`, played
@@ -1434,8 +1442,9 @@ events:
       Ravisin falls. The party adopts Basil — they REPOT her (she is already called Basil and
       joined on the map; there is no discovery and no naming beat, LOCKED 2026-07-23). They turn
       down the coast toward Bremen, where Ravisin woke something in the lake.
-      MINED SKELETON — vanilla MSG_9C9 (34 boxes, `EventScr_Ch5_EndingScene`, ON-MAP so bubbles
-      wrap at 29). Its beat order, which ours follows: (1) aftermath before anyone does business;
+      MINED SKELETON — vanilla MSG_9C9 (34 boxes, `EventScr_Ch5_EndingScene`, a BACKDROP scene
+      so the full-screen window wraps at ~42 — see the anatomy table's correction). Its beat
+      order, which ours follows: (1) aftermath before anyone does business;
       (2) the ESCORT is thanked and becomes the scene's centre; (3) the party asks her a question
       and she TELLS THEM THE PLOT — the escort, not a party member, carries the chapter's forward
       information; (4) the party deliberates in front of her; (5) a closing box that turns the win
@@ -1462,10 +1471,22 @@ events:
       plesiosaur — woken by Ravisin exactly as the wolves and the moose were, and ORDERED to sink
       the boats. It is another of her victims, and ch06 lets Marty talk her down. So the hook says
       only what Basil heard: she woke a thing in the water and told it what to do.
-      SAHNAR IS OPTIONAL — the berry exchange (boxes 6-11) can only play if she was recruited.
-      Wiring owes a skip: without her, the scene runs Basil's repotting straight into Braulo's
-      question. The berry is 9BB's promise paid ("One day I'll give her one"), so a player who
-      never freed her simply never collects it. That is the correct cost of skipping the recruit.
+      SAHNAR IS OPTIONAL — the berry exchange can only play if she was recruited, and without
+      her the scene runs Basil's repotting straight into Braulo's question. The berry is 9BB's
+      promise paid ("One day I'll give her one"), so a player who never freed her simply never
+      collects it. That is the correct cost of skipping the recruit.
+      WIRED 2026-08-19 as `no_sahnar_cut:` below — the six boxes are dropped from a copy of the
+      locked script and the whole shorter scene goes to its own message id. An earlier note
+      named the block as "boxes 6-11", which was never right; it is the six from "...They gave
+      you a pot." to "...Thank you, Basil.". This is now the scene's ONLY branch, the Lupin one
+      having been retired the same day — see the note where that block used to be.
+      IT IS ONE MESSAGE PER ARM, NOT THREE BEATS SPLICED (Nicolas, watching the first film
+      2026-08-19). Split across three `Text()` calls the scene played correctly and looked
+      wrong: each `Text()` is its own TEXTSTART..REMA, so Basil faded out and reloaded in the
+      same seat twice — "weird when you refresh and Basil ends up right where she was". Held
+      as one message, the podium manager keeps her up throughout and the others come and go
+      around her, which is what the scene is. Whole copies cost the same ids the split did, and
+      both are generated from this one locked script, so there is nothing to drift.
       LOCKED 2026-07-30 (dialogue-pass, co-written with Nicolas) after two red-pen passes.
       19 boxes (twin: 34).
     status: locked
@@ -1486,7 +1507,8 @@ events:
       #  sentence runs to 5 lines. The split also gives "...into your cause?" its own button.)
       - basil: "I don't have much to offer, but what I can I offer willingly,"
       - basil: "if you'll accept a goodberry bush into your cause?"
-      # (ONLY IF SAHNAR WAS RECRUITED -- see the note above. 9BB's promise, paid.)
+      # (ONLY IF SAHNAR WAS RECRUITED -- the `no_sahnar_cut:` block below drops these six
+      #  boxes, and 9BB's promise goes unpaid. See the note in the description.)
       - sahnar: "...They gave you a pot."
       - basil: "They gave me a pot! There's soil in it and everything--"
       - basil: "--oh. Oh, wait. Wait, I've been saving-- here."
@@ -1514,18 +1536,33 @@ events:
       #  arithmetic -- stage direction: a glint in his eye. The greed and the grin are the same
       #  instinct, so the money never has to be said out loud.)
       - braulo: "Aye, it is time we meet this beastie."
-    no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas, L6) — WIRING NOT BUILT.
-      boxes: [16]                     #   The locked script above is unchanged and still plays
-                                      #   whenever Lupin WAS recruited.
-      replaces:                       # anchored to the text, so an index cannot silently drift
-        - "She woke it. Like she woke the wolves. ...She told it to sink the boats."
+    no_sahnar_cut:                    # WIRED 2026-08-19 (#25). A CUT, not a substitution:
+      boxes: [8, 9, 10, 11, 12, 13]   #   without the recruit there is nobody to hand the berry
+      replaces:                       #   to, so the six boxes simply go and Basil's plea to
+                                      #   join runs straight into Braulo's question. Anchored
+                                      #   to the text like every other variant, because a
+                                      #   mis-indexed DROP is invisible in the output — the
+                                      #   result is just a shorter scene that still reads.
+        - "...They gave you a pot."
+        - "They gave me a pot! There's soil in it and everything--"
+        - "--oh. Oh, wait. Wait, I've been saving-- here."
+        - "......"
+        - "I have not eaten in four thousand years."
+        - "...Thank you, Basil."
       reason: >-
-        "Like she woke the wolves" names a recruit the player may never have made. The fallback
-        puts the comparison in Basil's own mouth about HERSELF, which is the harder line and needs
-        no other unit to exist. Worth revisiting whether this should simply be unbranched — it
-        would delete a branch point and, on the page, it reads stronger in both worlds.
-      script:
-        - basil: "She woke it. Like she woke me. ...She told it to sink the boats."
+        The berry is 9BB's promise paid ("One day I'll give her one"). A player who never freed
+        Sahnar never collects it, and that is the correct cost of skipping the recruit. Cut
+        rather than branched to a second scene: the whole exchange is hers and Basil's, so
+        nothing in it survives her absence.
+    # NO no_lupin_fallback — UNBRANCHED 2026-08-19 (Nicolas), taking the revisit this block's
+    # own `reason:` asked for. The premise was wrong, not just marginal: "the wolves" was read
+    # as naming an OPTIONAL RECRUIT, and it does not. **Recruitment decides whether Lupin
+    # JOINS, not whether the party ever met the pack** — ch04's turn-2 reveal puts the wolves in
+    # front of them on every path, parley or no. So Basil's comparison is true in both worlds
+    # and the line needs no arm. Retired substitute, for the record:
+    #     "She woke it. Like she woke me. ...She told it to sink the boats."
+    # Test before adding a fallback to any future line: does the player necessarily ENCOUNTER
+    # what it names? A recruit who is fought either way is not an absent unit.
   # ── 0x9CA — vanilla's "escort died" ENDING VARIANT. ADOPTED 2026-07-30. ───────
   - trigger: chapter_end
     slot: "vanilla 0x9CA"
@@ -1602,18 +1639,12 @@ events:
       # (CUT 2026-07-30 (Nicolas): "Nobody's hired us for a lake" -- out of BOTH endings. See 0x9C9.)
       # (The ONE changed line, in vanilla's own place: what the loss cost the party in facts.)
       - braulo: "If she'd lived we'd know more. ...We go down the coast."
-    no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas) — WIRING NOT BUILT.
-      boxes: [3]                      #   The locked script above is unchanged and still plays
-                                      #   whenever Lupin WAS recruited.
-      replaces:                       # anchored to the text, so an index cannot silently drift
-        - "The moose, the wolf.. they were not alone.."
-      reason: >-
-        Same gate as 0x9C9 box 14: "the wolf" names an optional recruit. Only that clause moves —
-        "the moose" stays in BOTH branches, because Basil is listing who she WOKE, not who
-        survived, so a player who killed the moose loses nothing here. Parallel to 0x9C9's
-        fallback, Basil substitutes herself.
-      script:
-        - basil: "The moose, and me.. we were not alone.."
+    # NO no_lupin_fallback — UNBRANCHED 2026-08-19 (Nicolas), for 0x9C9's reason exactly: the
+    # party fights the pack whether or not Marty parleys it, so "the wolf" names something they
+    # met either way. Note this box was ALREADY unbranched on "the moose", and on the same
+    # logic — Basil is listing who Ravisin WOKE, not who survived. The wolf simply belonged in
+    # that list too. Retired substitute, for the record:
+    #     "The moose, and me.. we were not alone.."
   # ── 0x9CB — vanilla's ending CODA. FOLDED INTO 0x9C9 (2026-07-30). No separate slot. ──
   # Vanilla's 16-box coda: a townsman recognises Eirika, thanks her for driving off Saar,
   # apologises that he can do nothing for her, and promises the town will "wait unbowed" for the

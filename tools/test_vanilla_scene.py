@@ -48,18 +48,72 @@ class VanillaSceneChannels(unittest.TestCase):
         self.assertEqual(chan[0x9BC], 'BG_SERAFEW_VILLAGE')
         self.assertEqual(chan[0x9BD], 'BG_SERAFEW_VILLAGE')
 
-    def test_on_map_messages_report_the_map_channel(self):
-        """The channel is load-bearing: on-map bubbles wrap at 29 chars, Text_BG ~42."""
+    def test_a_bare_textshow_under_a_backdrop_is_not_on_map(self):
+        """`SetBackground` + bare `TEXTSHOW` is a BACKDROP scene, not a bubble.
+
+        The second half of the same bug, and the one that outlived the first fix: the
+        miner classified by the TEXT CALL alone, so every scene vanilla plays as
+        `SetBackground(BG_X)` followed by a plain `TEXTSHOW` came back as "map". Both of
+        ch5's are (0x9BB the meet-cute, 0x9BE/0x9BF the arrival), and `decisions.md` ->
+        "A cutscene's CHANNEL is inherited from the twin" already names 0x9BB as a
+        reporting artifact -- it just could not fix it from inside the tool.
+
+        `EventScr_SetBackground` (events_script_utils.c:224) is FADI + REMOVEPORTRAITS +
+        BACG + FADU: the backdrop is UP from that point, and it stays up across `REMA`,
+        which is why 0x9BF is still BG_TOWN with no second SetBackground of its own.
+        """
         chan = dict(self.opening)
-        for mid in (0x9BB, 0x9BE, 0x9C2, 0x9C3, 0x9C4):
+        self.assertEqual(chan[0x9BB], 'BG_SERAFEW_VILLAGE')
+        self.assertEqual(chan[0x9BE], 'BG_TOWN')
+        self.assertEqual(chan[0x9BF], 'BG_TOWN')
+
+    def test_on_map_messages_report_the_map_channel(self):
+        """The channel is load-bearing: on-map bubbles wrap at 29 chars, Text_BG ~42.
+
+        These five are the real bubbles: `CALL(EventScr_TextShowWithFadeIn)` (FADI +
+        TEXTSTART + CLEAN + FADU) took BG_TOWN back down at 0x9BF's end, and every one
+        of them opens on its own `TEXTSTART` with no backdrop in front of it.
+        """
+        chan = dict(self.opening)
+        for mid in (0x9C0, 0x9C1, 0x9C2, 0x9C3, 0x9C4):
             self.assertEqual(chan[mid], 'map', 'MSG_%X should be on-map' % mid)
 
+    def test_the_ending_scene_is_a_backdrop_scene(self):
+        """`EventScr_Ch5_EndingScene` plays over BG_SERAFEW_VILLAGE, all three messages.
+
+        This is the reading ch05's scenes 16/17 inherit their channel from, and the one
+        the old miner got wrong: it reported all three as "map", and that artifact was
+        copied into the ch05 YAML's mined note ("ON-MAP so bubbles wrap at 29"), into
+        issue #25 and into HANDOFF. The script is FADI(16) -- the map goes DOWN -- then
+        SetBackground, then bare TEXTSHOWs; there is no TEXTSTART anywhere in it.
+        """
+        ending = dict(self.scenes['EventScr_Ch5_EndingScene'])
+        self.assertEqual([mid for mid, _c in self.scenes['EventScr_Ch5_EndingScene']],
+                         [0x9C9, 0x9CA, 0x9CB])
+        for mid in (0x9C9, 0x9CA, 0x9CB):
+            self.assertEqual(ending[mid], 'BG_SERAFEW_VILLAGE',
+                             'MSG_%X is a backdrop scene' % mid)
+
+    def test_the_talk_recruit_really_is_on_map(self):
+        """0x9CC opens on `TEXTSTART` with no backdrop -- our scene 14's 29 is correct.
+
+        Asserted beside the ending so the pair reads as the contrast it is: the two
+        scenes sit forty lines apart in one file and take DIFFERENT channels.
+        """
+        talk = dict(self.scenes['EventScr_089F2270'])
+        self.assertEqual(talk[0x9CC], 'map')
+
     def test_source_order_is_preserved_across_channels(self):
-        """Text_BG and TEXTSHOW interleave; neither may be grouped ahead of the other."""
+        """The two call FORMS interleave; neither may be grouped ahead of the other.
+
+        `Text_BG(BG, id)` and bare `TEXTSHOW(id)` alternate through this opening, and a
+        scan that collected one form and then the other would still report all eleven
+        ids -- just in the wrong order, which is worse than missing them. Asserted on the
+        CHANNEL sequence rather than the call form, because the channel is now state: the
+        opening walks BG_SERAFEW_VILLAGE -> BG_TOWN -> map, in that order and once each.
+        """
         chans = [chan for _mid, chan in self.opening]
-        self.assertEqual(chans[1], 'map')                  # 0x9BB
-        self.assertEqual(chans[2], 'BG_SERAFEW_VILLAGE')   # 0x9BC
-        self.assertEqual(chans[4], 'map')                  # 0x9BE
+        self.assertEqual(chans, ['BG_SERAFEW_VILLAGE'] * 4 + ['BG_TOWN'] * 2 + ['map'] * 5)
 
     def test_the_mid_battle_and_talk_scenes_stay_separate(self):
         """The escalation and the Talk-recruit are their own event lists, not the opening.

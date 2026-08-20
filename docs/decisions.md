@@ -4158,7 +4158,7 @@ ch05 hosts on slot 6, so its block is vanilla **Ch6's** `0x9E4`–`0x9F5` — 18
 the Talk), leaving **eleven**. Eleven scenes are still owed: the opening's seven, both endings,
 Basil's chapter-specific death quote, and Ravisin's battle taunt — which is wired *nowhere*
 (`gBattleTalkList` carries a ch01 row for Izobai and none for her). Read off the block alone that
-is exactly zero slack, and the five `no_lupin_fallback:` branches would have nowhere to go.
+is exactly zero slack, and the `no_lupin_fallback:` branches would have nowhere to go.
 
 **The block is not the budget.** Sweeping `0x9C6`–`0x9E3` against the post-injection tree by the
 `USE` criterion (`decisions.md` → "A dead message id is proven by USE") finds **six** more free
@@ -4186,8 +4186,13 @@ scene is written to a **second** message id, and `branch_on_flag()` picks betwee
 runtime — so a branched scene is 2 ids rather than 1. Splitting a scene into prefix/arm/arm/suffix
 around the differing box would cost four, and is the wrong instinct: duplicating the text is free,
 ids are what is scarce. Note `variant_beat` reads `boxes:`/`replaces:` as **lists** while ch05's
-five blocks are authored with singular `box:`/`replaces:` — normalize the YAML, do not write a
+blocks are authored with singular `box:`/`replaces:` — normalize the YAML, do not write a
 second mechanism.
+
+⚠️ **The "ids are what is scarce" half of that is retired** (2026-08-15, and again on the ch05
+endings 2026-08-19). `gMsgTable[]` self-sizes, and a split scene costs SEAMS — see "A conditional
+block inside a scene is a WHOLE second copy" below. The 2-ids-per-branched-scene shape is still
+right; the reason given for it was not.
 
 ### A cutscene's CHANNEL is inherited from the twin, not chosen (2026-08-13, #25)
 
@@ -4238,6 +4243,171 @@ second `BACG` would be the no-op that already bit ch03 and ch04. **Filmed rather
 _Decided: 2026-08-13 (Nicolas: "does vanilla use a background in its opening scenes? lets have a
 plan before jumping into assigning a BG")._
 
+### A reporting artifact outlived the note that named it: the ch05 endings (2026-08-19, #25)
+
+The section above records that `vanilla_scene.py` prints `0x9BB` as `"map"` and calls it *a
+reporting artifact, not a channel*. It fixed the READING and left the TOOL, so the artifact was
+mined a second time — and this time nobody caught it. The ch05 YAML's anatomy table, issue #25's
+per-scene notes and `HANDOFF.md` all carried **"the endings are ON-MAP at 29"** for three weeks,
+and the wiring was about to be built against it.
+
+`EventScr_Ch5_EndingScene` opens `FADI(16)` — the map goes **down** — then
+`SetBackground(BG_SERAFEW_VILLAGE)`, then three bare `TEXTSHOW`s. There is no `TEXTSTART` in it.
+Vanilla's ch5 ending is a **backdrop scene at ~42**, and by the rule above ours inherits that.
+
+**The tool now tracks the backdrop as scene STATE rather than classifying by the text call**,
+which is what it should always have done: `TEXTSHOW` prints into whatever surface is up.
+Set by `SetBackground` / `BACG` / `Text_BG`; taken down by `CLEAN` and by
+`CALL(EventScr_TextShowWithFadeIn)` (which is `FADI` + `TEXTSTART` + `CLEAN` + `FADU` back onto
+the map, `events_script_utils.c:211`). **`REMA` does not take a backdrop down** — it ends the
+TEXT, which is why vanilla's `0x9BF` is still `BG_TOWN` with a `REMA` in front of it and no
+`SetBackground` of its own. `tools/test_vanilla_scene.py` pins all three ending ids, both
+`SetBackground` + bare-`TEXTSHOW` scenes, and `0x9CC` as genuinely on-map — the Talk recruit
+sits forty lines from the ending in one file and takes the *other* channel, so scene 14 stays
+at 29 while scenes 16 and 17 take 42.
+
+Three things fell out, and two of them were problems the on-map reading would have shipped:
+
+- **Six speakers, and a bubble anchors to a UNIT.** `PutTalkBubble` needs a staged speaker
+  (which is why `ch05_basil_join_block` carries a `CUMO_CHAR` and the ending cannot). ch05
+  deploys 9 of a 10-unit pool, so on-map Marty, Wolfram, Braulo and RBG can each be talking
+  from a tile nobody is standing on. **ch04's ending had already made this exact argument for
+  itself** and its comment says so; ch05's note was written without reading it.
+- **The two ending fallbacks needed no re-boxing.** Both overrun 29 and were on the owed list
+  for it; at 42 they fit as authored. What is still owed is the *Talk recruit's* fallback,
+  which really is on-map.
+- The endings cost **three** message ids, from the swept neighbourhood and ch05's host block:
+  scene 16 twice (Sahnar recruited or not) and scene 17 once. It was briefly six, until the
+  Lupin branch came out — see "Neither ch05 ending branches on Lupin" below.
+
+**The lesson is the one the ch04 comment already carried: when a tool is found lying, fix the
+tool.** A note that records "this output is wrong" protects only the person who read that note.
+
+_Decided: 2026-08-19 (Nicolas: "I have no idea where that came from ... you shouldn't have to
+rediscover anything")._
+
+### `CHECK_ALIVE` answers for a unit in ANY faction — so a recruit needs its FLAG too (2026-08-19, #25)
+
+`branch_on_check_alive`'s docstring says CHECK_ALIVE reads the ROSTER rather than the field, and
+that is right as far as it goes — but "roster" is not "the player's units".
+`GetUnitStructFromEventParameter` → `GetUnitFromCharId` (`bmunit.c`) sweeps unit indices
+**1..0xFF**, every faction, and returns the first valid match. So CHECK_ALIVE means *does this
+character exist somewhere and is it not dead*, and nothing more.
+
+That is exactly right for Lupin and for Basil, and **wrong for Sahnar**, and the difference is
+whether the unit is ever HOSTILE:
+
+- **Basil** is a green escort who joins by `CUSA` in scene 5 and is never anyone's enemy — the
+  same shape as vanilla's Natasha, whose own ending branch is a bare
+  `CHECK_ALIVE(CHARACTER_NATASHA)`. A bare ALIVE is correct.
+- **Lupin** is either on the ch04 carry-over roster or nowhere. A bare ALIVE is correct, and
+  never-recruited collapsing with recruited-then-killed is the *point*.
+- **Sahnar rises HOSTILE and only flips when Basil Talks her.** Kill Ravisin without ever
+  turning her and she is alive, red, and standing on the map when the ending runs — CHECK_ALIVE
+  says 1, and the berry scene plays with the party's own enemy thanking Basil by name.
+
+The gate is therefore the **recruit flag first, then ALIVE**: `CHECK_EVENTID(EVFLAG_TMP(7))`
+(set by `talk_recruit_script`'s `EVBIT_T(7)`, vanilla's own Natasha→Joshua flag) asks *was she
+turned*, and `CHECK_ALIVE` then asks *is she still here*, so a Sahnar recruited and later killed
+is silent too. **Vanilla chains precisely this pair** — `ch19a-eventscript.h`'s
+`EventScr_089F8688` runs `CHECK_EVENTID(7)` into `CHECK_ALIVE(CHARACTER_TANA)` to pick its
+ending text. Both `BEQ` to one shared label, because a beat that is SKIPPED has no second arm to
+jump over; that is `save_all_bonus_script`'s shape, not `branch_on_flag`'s.
+
+**The general rule: ask CHECK_ALIVE about a unit that could be an ENEMY and it will answer yes.**
+Any conditional whose subject is an optional TALK recruit wants the flag as well.
+
+_Recorded: 2026-08-19 (found while wiring ch05's scene 16; the first draft used a bare
+CHECK_ALIVE and would have shipped it)._
+
+### A conditional block inside a scene is a WHOLE second copy, not a spliced beat (2026-08-19, #25)
+
+ch05's scene 16 loses six boxes when Sahnar was never recruited. The obvious wiring is to make
+those boxes their own message and let the event script skip the call — three `Text()`s where
+there was one, which is also how every other chapter's ending is already assembled. It was built
+that way, it **passed**, and it looked wrong on the first film:
+
+> *"can you not just keep basil in frame the whole time and just have the other characters come
+> in and out, in a single continuous scene? its weird when you refresh and basil ends up right
+> where she was"* — Nicolas, 2026-08-19
+
+`Text(msg)` is `TEXTSTART` + `TEXTSHOW` + `TEXTEND` + **`REMA`**, and `REMA` ends the text: the
+faces come down with it. So a scene split across three calls has two seams, and any speaker who
+appears on both sides of one fades out and reloads into the seat they were already in. Basil
+speaks in all three beats, so the scene's own subject flickered twice.
+
+**Held as ONE message per arm, `_script_to_message`'s podium manager runs the whole scene**: it
+loads Basil once at mid-right, never clears her, and cycles Marty → Wolfram → Sahnar → Braulo →
+RBG → Braulo through mid-left with a `[ClearFace]` between each. That is the scene — the party
+comes to *her* — and it falls straight out of the renderer once nothing interrupts it.
+
+The cost is text duplication, and it is **not** a cost worth avoiding here:
+
+- **The ids are the same either way.** Whole copies of scene 16 against beats-plus-a-twin cost
+  the same count. The earlier reasoning that a split is cheaper (*"duplicating text is free, ids
+  are what is scarce"*, recorded above) was priced against an id shortage that does not exist,
+  and it never counted the seams.
+- **Nothing is hand-duplicated.** Every copy is generated from the one locked script by
+  `variant_beat`, whose `replaces:` anchors assert each edit lands where the YAML says. There is
+  no second copy of the prose to drift.
+
+`variant_beat` now takes a variant with **no `script:` key at all**, meaning *drop these boxes*.
+A cut authored as six empty substitutes would say the same thing far worse, and the anchors
+still apply — which matters most for a drop, because a mis-indexed cut is invisible in the
+output: the result is simply a shorter scene that still reads. The build asserts the arm is six
+boxes shorter and that Sahnar has no line left in it, since anchors alone cannot prove a
+deletion happened.
+
+**Two variants over one script compose only in one order.** The no-Lupin substitution is box 16
+and the cut takes 8–13, so applying the cut first moves the wolf line to box 10 and the
+substitution lands on the wrong box or falls off the end. Substitutions are 1-for-1 and
+therefore index-preserving, so they go first; both variants stay authored against the ONE locked
+script, which is the only version a reader can check the indices against.
+
+**And the general one: a branch that PASSES can still be wrong.** The box-count assertion
+covered the arm, `verify_text` covered the text, and neither can see a face reload. Presentation
+is filmed (`decisions.md` → "Three data checks can pass while the thing is visibly broken").
+
+_Decided: 2026-08-19 (Nicolas, on the first film of the ending)._
+
+### Neither ch05 ending branches on Lupin: an ENCOUNTER is not a RECRUIT (2026-08-19, #25)
+
+Both ch05 endings carried a `no_lupin_fallback` from 2026-07-30. Basil's line names the wolves —
+*"She woke it. Like she woke the wolves"* in scene 16, *"The moose, the wolf.. they were not
+alone.."* in scene 17 — and the rule that produced the fallback was **"this names an optional
+recruit, so it needs an arm."**
+
+The rule was applied to the wrong noun.
+
+> *"we actually don't need lupin branching in the ending scene. regardless of if he was recruited,
+> the party encountered him. so Basil referencing him is true no matter what"* — Nicolas
+
+ch04's parley decides whether Lupin **JOINS**. It does not decide whether the party ever met the
+pack: the turn-2 reveal puts the wolves on the field on every path, and the difficulty model
+explicitly prices fighting them. So the locked line is true in both worlds and the branch could
+only ever have been wrong — an arm that substitutes *"like she woke me"* for a player who fought
+the wolves an hour ago is strictly worse than the line it replaces.
+
+**The test, for any future line: does the player necessarily ENCOUNTER the thing it names?**
+A unit the player fights either way is not an absent unit. Scene 17's box already made this
+distinction and nobody noticed — *"the moose"* is deliberately unbranched there, on the reasoning
+that Basil is listing who Ravisin WOKE rather than who survived. The wolf belonged in that list on
+exactly the same grounds; it was one clause away in the same box.
+
+What survives the correction is the shape of a real fallback. The three that remain — the arrival,
+the join and the Talk recruit — all address Lupin **as a unit present in the scene**, which is the
+thing recruitment actually governs. That is the line between the two cases: a beat that would
+*speak to* or *stage* an absent unit needs an arm; a beat that merely *refers to something that
+happened* does not.
+
+Cost of the correction: the ending goes from six message ids to three, no id has to be appended
+past `MSG_D4B` any more, and the owed-films list drops from six arms to three. `variant_beat` and
+`branch_on_check_alive` are untouched — the endings simply stopped calling them for Lupin, and
+`_ch05_ending_variants` now REFUSES a `no_lupin_fallback` on either ending so a restored block
+cannot sit in the YAML looking live.
+
+_Decided: 2026-08-19 (Nicolas)._
+
 ### A portrait SLOT name is not a face TAG, and the near-miss is silent (2026-08-13, #25)
 
 Sephek's face is spelled two ways in this repo. `GUEST_PORTRAIT_MAP['sephek-kaltro']` says
@@ -4254,7 +4424,8 @@ outside the prologue)._
 
 ### "Did the player recruit them?" is `CHECK_ALIVE`, and it needs no flag (2026-08-13, #25)
 
-ch05's five `no_lupin_fallback:` arms need to know whether ch04's optional parley happened. Two
+ch05's `no_lupin_fallback:` arms need to know whether ch04's optional parley happened — three of
+them today; the two ENDINGS were unbranched 2026-08-19, see below. Two
 answers were proposed here before anyone read the decomp — carry a persistent flag out of ch04, or
 test whether Lupin is standing on the ch05 field — and **both are wrong**. Vanilla has shipped the
 answer since 2005.
@@ -4433,7 +4604,9 @@ diverges at exactly one place, prep, and that is the seam to check every time.
 ### A fallback line chosen as PROSE has not been boxed (2026-08-14, #25)
 
 ch05's five no-Lupin substitutes were chosen 2026-07-30 as single lines. Three of the five do not
-fit one box at the talk bubble's 29 characters. Scene 5's is 74 characters, and rendered flowed it
+fit one box at the talk bubble's 29 characters. (Two of the five have since been retired with the
+endings' branches — and both of those were among the over-long ones, which is how the endings
+ended up owing no boxing at all.) Scene 5's is 74 characters, and rendered flowed it
 paged itself mid-clause — *"You just-- came"* / *"here. On your own."* — an A-press the author
 never placed, on a scene whose locked arm was hand-boxed to this exact width in July.
 
