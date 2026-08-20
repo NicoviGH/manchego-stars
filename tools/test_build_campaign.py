@@ -2976,12 +2976,19 @@ class Ch05ArrivalSceneAndTheNoLupinBranch(unittest.TestCase):
         self.assertEqual([{'a': 'x'}, {'a': 'y'}, {'b': 'two'}, {'c': 'z'}], out)
 
     def test_every_ch05_fallback_declares_one_schema_not_two(self):
-        """ch05 authored its five blocks with singular `box:`/`replaces:` while variant_beat --
+        """ch05 authored its blocks with singular `box:`/`replaces:` while variant_beat --
         ch04's, already shipping -- reads LISTS. Normalising the YAML is what kept this at one
-        mechanism; a reader that accepts both shapes is the second one."""
+        mechanism; a reader that accepts both shapes is the second one.
+
+        THREE, not the five #25 first listed: both ENDINGS were unbranched 2026-08-19 because
+        "like she woke the wolves" does not name an optional recruit -- the party fights the
+        pack whether or not Marty parleys it, so recruitment decides only whether Lupin JOINS.
+        What is left is the arrival, the join and the Talk recruit, and all three address him
+        as a UNIT rather than as a thing that happened.
+        """
         chap = self._chap()
         blocks = [e['no_lupin_fallback'] for e in chap['events'] if 'no_lupin_fallback' in e]
-        self.assertEqual(5, len(blocks), "#25's five conditional scenes")
+        self.assertEqual(3, len(blocks), "#25's conditional scenes, minus the two endings")
         for fb in blocks:
             self.assertNotIn('box', fb, 'singular `box:` is the second schema')
             self.assertIsInstance(fb['boxes'], list)
@@ -6112,9 +6119,9 @@ class Ch05Endings(unittest.TestCase):
     def test_both_scenes_keep_their_locked_box_counts(self):
         """19 boxes in scene 16, 10 in scene 17. Locked 2026-07-30."""
         arms = bc._ch05_ending_variants(self._chap(), bc.CH05_ENDING_SLOT, 19, 'Basil alive')
-        self.assertEqual(19, bc._script_box_count(arms[(True, True)]))
+        self.assertEqual(19, bc._script_box_count(arms[True]))
         lost = bc._ch05_ending_variants(self._chap(), bc.CH05_ENDING_LOST_SLOT, 10, 'Basil died')
-        self.assertEqual(10, bc._script_box_count(lost[(True, True)]))
+        self.assertEqual(10, bc._script_box_count(lost[True]))
 
     def test_basil_never_leaves_the_screen(self):
         """THE reason scene 16 is one message per arm rather than three spliced beats.
@@ -6146,7 +6153,7 @@ class Ch05Endings(unittest.TestCase):
         a player who never met her.
         """
         arms = bc._ch05_ending_variants(self._chap(), bc.CH05_ENDING_SLOT, 19, 'Basil alive')
-        full, cut = arms[(True, True)], arms[(False, True)]
+        full, cut = arms[True], arms[False]
         self.assertEqual(13, bc._script_box_count(cut))
         self.assertNotIn('sahnar', {k for entry in cut for k in entry})
         self.assertIn('sahnar', {k for entry in full for k in entry})
@@ -6173,7 +6180,7 @@ class Ch05Endings(unittest.TestCase):
         scene 5 -- which is why her gate is a bare CHECK_ALIVE and hers is the only one.
         """
         ending = _ch05_ending(self._chap())
-        full = 'Text(0x%X)' % bc.CH05_ENDING_MSGS[(True, True)]
+        full = 'Text(0x%X)' % bc.CH05_ENDING_MSGS[True]
         guard = ending[:ending.index(full)]
         self.assertIn('CHECK_EVENTID(%s)' % bc.CH05_SAHNAR_TALK_FLAG, guard,
                       'the berry exchange is not gated on the RECRUIT flag')
@@ -6184,45 +6191,45 @@ class Ch05Endings(unittest.TestCase):
         self.assertEqual(2, guard.count(cut_label))
 
     def test_every_arm_the_scene_branches_on_has_its_own_id(self):
-        """Four for scene 16 (Sahnar x Lupin), two for 17, and each is a WHOLE scene.
+        """Two for scene 16 (Sahnar recruited or not), one for 17, and each is a WHOLE scene.
 
         Whole copies rather than a prefix/arm/suffix split, which is what keeps Basil on
-        screen -- and they cost the same four ids the split did. Nothing is hand-duplicated:
-        every copy comes out of the one locked script through `variant_beat`.
+        screen. Nothing is hand-duplicated: the shorter one comes out of the one locked script
+        through `variant_beat`.
         """
-        self.assertEqual({(True, True), (True, False), (False, True), (False, False)},
-                         set(bc.CH05_ENDING_MSGS))
+        self.assertEqual({True, False}, set(bc.CH05_ENDING_MSGS))
         arms = bc._ch05_ending_variants(self._chap(), bc.CH05_ENDING_SLOT, 19, 'Basil alive')
         self.assertEqual(set(bc.CH05_ENDING_MSGS), set(arms))
-        # Scene 17 has no berry to lose, so it branches on Lupin alone.
         lost = bc._ch05_ending_variants(self._chap(), bc.CH05_ENDING_LOST_SLOT, 10, 'Basil died')
-        self.assertEqual({(True, True), (True, False)}, set(lost))
+        self.assertEqual({True}, set(lost))
 
-    def test_only_the_wolf_clause_separates_the_lupin_arms(self):
-        """One box differs between the arms, and it is the one the YAML anchors."""
-        arms = bc._ch05_ending_variants(self._chap(), bc.CH05_ENDING_SLOT, 19, 'Basil alive')
-        differing = [(x, y) for x, y in zip(arms[(True, True)], arms[(True, False)]) if x != y]
-        self.assertEqual(1, len(differing))
-        locked, arm = differing[0]
-        self.assertIn('she woke the wolves', str(locked))
-        self.assertIn('she woke me', str(arm))
+    def test_neither_ending_branches_on_lupin(self):
+        """UNBRANCHED 2026-08-19, and the premise was wrong rather than marginal.
 
-    def test_the_two_variants_compose_without_re_indexing_each_other(self):
-        """The cut and the substitution are both authored against the ONE locked script.
+        Both endings carried a `no_lupin_fallback` because Basil's "like she woke the wolves"
+        was read as naming an optional recruit. It does not: recruitment decides whether Lupin
+        JOINS, not whether the party ever met the pack, and ch04's turn-2 reveal puts the
+        wolves in front of them on every path (Nicolas). The locked line is true in both
+        worlds, so the branch could only ever have been wrong.
 
-        The no-Lupin box is 16 and the cut takes 8-13, so applying the cut FIRST would move
-        the wolf line to box 10 and the substitution would land on the wrong box or fall off
-        the end -- which is exactly what happened when this was first written. The
-        substitution is 1-for-1 and therefore index-preserving, so it goes first; the arm that
-        proves the order is the one carrying both edits.
+        Pinned two ways -- the YAML may not carry a block nothing reads, and the emitted script
+        may not ask about him -- because a fallback restored by a merge would sit there looking
+        live while `_ch05_ending_variants` quietly ignored it.
         """
-        arms = bc._ch05_ending_variants(self._chap(), bc.CH05_ENDING_SLOT, 19, 'Basil alive')
-        both = arms[(False, False)]
-        self.assertEqual(13, bc._script_box_count(both))
-        joined = ' | '.join(str(e) for e in both)
-        self.assertIn('she woke me', joined, 'the no-Lupin substitution was lost under the cut')
-        self.assertNotIn('she woke the wolves', joined)
-        self.assertNotIn('four thousand years', joined, 'the cut was lost under the substitution')
+        chap = self._chap()
+        for slot in (bc.CH05_ENDING_SLOT, bc.CH05_ENDING_LOST_SLOT):
+            event = bc._chapter_event_by_slot(chap, 'chapter_end', slot, 'ch05 ending')
+            self.assertNotIn('no_lupin_fallback', event,
+                             '%s carries a fallback nothing reads' % slot)
+            joined = ' | '.join(str(e) for e in event['script'])
+            self.assertNotIn('woke me', joined, '%s kept the retired substitute' % slot)
+        ending = _ch05_ending(chap)
+        self.assertNotIn(bc.CH05_LUPIN_CHARACTER, ending,
+                         'the ending still asks the roster about Lupin')
+        # The locked references SURVIVE -- unbranching keeps the line, it does not cut it.
+        bodies = ' '.join(self._bodies().values())
+        self.assertIn('she woke the wolves', bodies)
+        self.assertIn('the moose, the wolf', bodies.lower())
 
     def test_the_endings_play_over_a_backdrop_and_never_open_a_bubble(self):
         """The channel, asserted on the script rather than on a comment.
@@ -6255,8 +6262,7 @@ class Ch05Endings(unittest.TestCase):
 
     def test_every_ending_id_is_claimed_and_unique(self):
         """Six ids, all in ch05's ledger and none written by another hosted chapter."""
-        ids = (*bc.CH05_ENDING_MSGS.values(),
-               bc.CH05_ENDING_LOST_MSG, bc.CH05_ENDING_LOST_NO_LUPIN_MSG)
+        ids = (*bc.CH05_ENDING_MSGS.values(), bc.CH05_ENDING_LOST_MSG)
         self.assertEqual(len(ids), len(set(ids)), 'an ending id is used twice')
         for msg in ids:
             self.assertIn(msg, bc.HOSTED_CHAPTER_MESSAGE_IDS['ch05'],
@@ -6309,9 +6315,9 @@ class Ch05Endings(unittest.TestCase):
                                         bc.CH05_SAHNAR_TABLE, 'CHARACTER_MARISA')
 
     def test_every_ending_body_renders_at_the_backdrop_width(self):
-        """Six bodies, every line inside 42, and every id emitted exactly once."""
+        """Three bodies, every line inside 42, and every id emitted exactly once."""
         bodies = self._bodies()
-        self.assertEqual(6, len(bodies))
+        self.assertEqual(3, len(bodies))
         for msg, body in bodies.items():
             for line in body.replace('[LF]', '\n').split('\n'):
                 text = re.sub(r'\[[^\]]*\]', '', line)

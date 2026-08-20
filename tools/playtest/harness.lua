@@ -8034,10 +8034,10 @@ end
 -- BG_MS_ELVEN_TOMB. Films on the ch05endingboot DEBUG ROM (CH05ENDING=full), whose beginning
 -- script LOMAs, loads Basil and Sahnar blue, arms the four reliquary flags and CALLs the ending
 -- straight off New Game. Reaching it honestly is the whole opening, Preparations and a boss
--- kill, and there are six of these to look at (three roster arms x the Lupin flag).
+-- kill, and there are three roster arms to look at.
 -- What only a run can answer: whether the backdrop actually comes up behind the text, whether
--- the podiums hold across three SEPARATE messages (each Text() is its own TEXTSTART..REMA, so
--- the faces reload per beat), and where the Guiding Ring's popup lands relative to the closing
+-- the podium manager really does hold Basil for all nineteen boxes, and where the Guiding
+-- Ring's popup lands relative to the closing
 -- fade -- the give opens a BLOCKING convoy menu on a full pack, which is why it sits before the
 -- FADI and why that placement is filmed rather than asserted.
 -- THE BOX COUNT IS THE ARM ASSERTION, and it is not decoration: all three arms play fine and
@@ -8102,14 +8102,6 @@ scenarios.recordch05ending = function()
             return false
         end,
     })
-end
-
--- recordch05endinglupin (#25): the same film against ch05endinglupinboot, whose live Lupin sends
--- beat C's CHECK_ALIVE down its ALIVE arm -- so box 16 is "Like she woke the wolves" rather than
--- "Like she woke me". One routine, two ROMs, exactly as the opening pair works. Delegates rather
--- than aliases so matrix.py can attribute a body to the name for the verdict cache.
-scenarios.recordch05endinglupin = function()
-    return scenarios.recordch05ending()
 end
 
 -- recordch05recruit (#25): the MOTION proof for the locked Basil->Sahnar Talk at 0x9E8 -- the

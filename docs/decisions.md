@@ -4158,7 +4158,7 @@ ch05 hosts on slot 6, so its block is vanilla **Ch6's** `0x9E4`–`0x9F5` — 18
 the Talk), leaving **eleven**. Eleven scenes are still owed: the opening's seven, both endings,
 Basil's chapter-specific death quote, and Ravisin's battle taunt — which is wired *nowhere*
 (`gBattleTalkList` carries a ch01 row for Izobai and none for her). Read off the block alone that
-is exactly zero slack, and the five `no_lupin_fallback:` branches would have nowhere to go.
+is exactly zero slack, and the `no_lupin_fallback:` branches would have nowhere to go.
 
 **The block is not the budget.** Sweeping `0x9C6`–`0x9E3` against the post-injection tree by the
 `USE` criterion (`decisions.md` → "A dead message id is proven by USE") finds **six** more free
@@ -4186,8 +4186,13 @@ scene is written to a **second** message id, and `branch_on_flag()` picks betwee
 runtime — so a branched scene is 2 ids rather than 1. Splitting a scene into prefix/arm/arm/suffix
 around the differing box would cost four, and is the wrong instinct: duplicating the text is free,
 ids are what is scarce. Note `variant_beat` reads `boxes:`/`replaces:` as **lists** while ch05's
-five blocks are authored with singular `box:`/`replaces:` — normalize the YAML, do not write a
+blocks are authored with singular `box:`/`replaces:` — normalize the YAML, do not write a
 second mechanism.
+
+⚠️ **The "ids are what is scarce" half of that is retired** (2026-08-15, and again on the ch05
+endings 2026-08-19). `gMsgTable[]` self-sizes, and a split scene costs SEAMS — see "A conditional
+block inside a scene is a WHOLE second copy" below. The 2-ids-per-branched-scene shape is still
+right; the reason given for it was not.
 
 ### A cutscene's CHANNEL is inherited from the twin, not chosen (2026-08-13, #25)
 
@@ -4271,10 +4276,9 @@ Three things fell out, and two of them were problems the on-map reading would ha
 - **The two ending fallbacks needed no re-boxing.** Both overrun 29 and were on the owed list
   for it; at 42 they fit as authored. What is still owed is the *Talk recruit's* fallback,
   which really is on-map.
-- The endings cost **six** message ids, not four: scene 16 is a **2x2** of whole copies
-  (Sahnar recruited x Lupin recruited) and scene 17 a pair. Five come from the swept
-  neighbourhood and ch05's host block; the sixth is appended past `MSG_D4B` beside the moose's
-  name, `create=True` on `set_message_body`.
+- The endings cost **three** message ids, from the swept neighbourhood and ch05's host block:
+  scene 16 twice (Sahnar recruited or not) and scene 17 once. It was briefly six, until the
+  Lupin branch came out — see "Neither ch05 ending branches on Lupin" below.
 
 **The lesson is the one the ch04 comment already carried: when a tool is found lying, fix the
 tool.** A note that records "this output is wrong" protects only the person who read that note.
@@ -4339,10 +4343,10 @@ comes to *her* — and it falls straight out of the renderer once nothing interr
 
 The cost is text duplication, and it is **not** a cost worth avoiding here:
 
-- **The ids are the same either way.** Four copies of scene 16 against three beats plus the
-  no-Lupin twin — four ids both ways. The earlier reasoning that a split is cheaper
-  (*"duplicating text is free, ids are what is scarce"*, recorded above) was priced against an
-  id shortage that does not exist, and it never counted the seams.
+- **The ids are the same either way.** Whole copies of scene 16 against beats-plus-a-twin cost
+  the same count. The earlier reasoning that a split is cheaper (*"duplicating text is free, ids
+  are what is scarce"*, recorded above) was priced against an id shortage that does not exist,
+  and it never counted the seams.
 - **Nothing is hand-duplicated.** Every copy is generated from the one locked script by
   `variant_beat`, whose `replaces:` anchors assert each edit lands where the YAML says. There is
   no second copy of the prose to drift.
@@ -4366,6 +4370,44 @@ is filmed (`decisions.md` → "Three data checks can pass while the thing is vis
 
 _Decided: 2026-08-19 (Nicolas, on the first film of the ending)._
 
+### Neither ch05 ending branches on Lupin: an ENCOUNTER is not a RECRUIT (2026-08-19, #25)
+
+Both ch05 endings carried a `no_lupin_fallback` from 2026-07-30. Basil's line names the wolves —
+*"She woke it. Like she woke the wolves"* in scene 16, *"The moose, the wolf.. they were not
+alone.."* in scene 17 — and the rule that produced the fallback was **"this names an optional
+recruit, so it needs an arm."**
+
+The rule was applied to the wrong noun.
+
+> *"we actually don't need lupin branching in the ending scene. regardless of if he was recruited,
+> the party encountered him. so Basil referencing him is true no matter what"* — Nicolas
+
+ch04's parley decides whether Lupin **JOINS**. It does not decide whether the party ever met the
+pack: the turn-2 reveal puts the wolves on the field on every path, and the difficulty model
+explicitly prices fighting them. So the locked line is true in both worlds and the branch could
+only ever have been wrong — an arm that substitutes *"like she woke me"* for a player who fought
+the wolves an hour ago is strictly worse than the line it replaces.
+
+**The test, for any future line: does the player necessarily ENCOUNTER the thing it names?**
+A unit the player fights either way is not an absent unit. Scene 17's box already made this
+distinction and nobody noticed — *"the moose"* is deliberately unbranched there, on the reasoning
+that Basil is listing who Ravisin WOKE rather than who survived. The wolf belonged in that list on
+exactly the same grounds; it was one clause away in the same box.
+
+What survives the correction is the shape of a real fallback. The three that remain — the arrival,
+the join and the Talk recruit — all address Lupin **as a unit present in the scene**, which is the
+thing recruitment actually governs. That is the line between the two cases: a beat that would
+*speak to* or *stage* an absent unit needs an arm; a beat that merely *refers to something that
+happened* does not.
+
+Cost of the correction: the ending goes from six message ids to three, no id has to be appended
+past `MSG_D4B` any more, and the owed-films list drops from six arms to three. `variant_beat` and
+`branch_on_check_alive` are untouched — the endings simply stopped calling them for Lupin, and
+`_ch05_ending_variants` now REFUSES a `no_lupin_fallback` on either ending so a restored block
+cannot sit in the YAML looking live.
+
+_Decided: 2026-08-19 (Nicolas)._
+
 ### A portrait SLOT name is not a face TAG, and the near-miss is silent (2026-08-13, #25)
 
 Sephek's face is spelled two ways in this repo. `GUEST_PORTRAIT_MAP['sephek-kaltro']` says
@@ -4382,7 +4424,8 @@ outside the prologue)._
 
 ### "Did the player recruit them?" is `CHECK_ALIVE`, and it needs no flag (2026-08-13, #25)
 
-ch05's five `no_lupin_fallback:` arms need to know whether ch04's optional parley happened. Two
+ch05's `no_lupin_fallback:` arms need to know whether ch04's optional parley happened — three of
+them today; the two ENDINGS were unbranched 2026-08-19, see below. Two
 answers were proposed here before anyone read the decomp — carry a persistent flag out of ch04, or
 test whether Lupin is standing on the ch05 field — and **both are wrong**. Vanilla has shipped the
 answer since 2005.
@@ -4561,7 +4604,9 @@ diverges at exactly one place, prep, and that is the seam to check every time.
 ### A fallback line chosen as PROSE has not been boxed (2026-08-14, #25)
 
 ch05's five no-Lupin substitutes were chosen 2026-07-30 as single lines. Three of the five do not
-fit one box at the talk bubble's 29 characters. Scene 5's is 74 characters, and rendered flowed it
+fit one box at the talk bubble's 29 characters. (Two of the five have since been retired with the
+endings' branches — and both of those were among the over-long ones, which is how the endings
+ended up owing no boxing at all.) Scene 5's is 74 characters, and rendered flowed it
 paged itself mid-clause — *"You just-- came"* / *"here. On your own."* — an A-press the author
 never placed, on a scene whose locked arm was hand-boxed to this exact width in July.
 
