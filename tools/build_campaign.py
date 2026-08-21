@@ -6781,26 +6781,46 @@ def talk_recruit_char_entries(recruiters, target, flag, script):
                    for r in recruiters)
 
 
-def talk_recruit_script(msg_id, target, pre_script=''):
+def talk_recruit_script(msg_id, target, pre_script='', variant=None):
     """The shared talk-recruit script (cf. vanilla EventScr_Ch3_Talk_NeimiColm): show the
     migrated talk line, then CUSA `target` to BLUE (EvtChangeFaction), set the map-event
     visibility evbit, end. MUSS/STAL are trimmed -- the line rides the map talk window, not a
     fanfare. Faction-agnostic: a GREEN bystander (Trex/Basil) and a RED parley (Lupin/Sahnar)
     both end at BLUE via this one CUSA. `pre_script` is spliced in AFTER the talk line and
     BEFORE the CUSA -- a group parley passes its own conversion sweep there (ch04: the wolf
-    pack, convert_survivors_green), so the whole outcome still rides the single recruit path."""
+    pack, convert_survivors_green), so the whole outcome still rides the single recruit path.
+
+    `variant` is (character, msg_id): the scene addresses a unit the player may never have
+    recruited, so ask the roster and show the other copy when it is not there. The SHAPE is
+    vanilla's own and is not invented here -- `ch14a-eventscript.h` branches on
+    CHECK_ALIVE(CHARACTER_JOSHUA), Sahnar's donor and vanilla Ch5's optional Talk recruit,
+    and picks a WHOLE MESSAGE per arm before converging:
+
+        CHECK_ALIVE(CHARACTER_JOSHUA)
+        BEQ(0xa, EVT_SLOT_C, EVT_SLOT_0)
+        TEXTSHOW(0xa93) / TEXTEND / GOTO(0xb)
+    LABEL(0xa)
+        TEXTSHOW(0xa95) / TEXTEND
+    LABEL(0xb)
+
+    Only TEXTSHOW+TEXTEND go inside the arms. `TEXTSTART`, the `REMA` and above all the CUSA
+    stay SHARED, exactly as ch14a shares everything past its LABEL -- a recruit duplicated into
+    both arms is one recruit to fix twice."""
+    beat = ('    TEXTSHOW(0x%X)\n'
+            '    TEXTEND\n')
     return ('{\n'
             '    TEXTSTART\n'
-            '    TEXTSHOW(0x%X)\n'
-            '    TEXTEND\n'
-            '    REMA\n' % msg_id
+            + (beat % msg_id if variant is None
+               else branch_on_check_alive(variant[0], beat % msg_id, beat % variant[1]))
+            + '    REMA\n'
             + pre_script
             + '    CUSA(%s) /* -> blue: the talk recruits the target */\n'
               '    EVBIT_T(7)\n'
               '    ENDA\n}' % target)
 
 
-def talk_recruit_wiring(recruiters, target, flag, script_symbol, msg_id, pre_script=''):
+def talk_recruit_wiring(recruiters, target, flag, script_symbol, msg_id, pre_script='',
+                        variant=None):
     """Assemble the reusable on-map talk-recruit event wiring (ch03 Trex / ch04 Lupin / ch05
     Basil+Sahnar). Returns (char_events, talk_script):
       char_events -- the EventListScr_..._Character body: one CHAR(flag, script, recruiter,
@@ -6812,7 +6832,8 @@ def talk_recruit_wiring(recruiters, target, flag, script_symbol, msg_id, pre_scr
     Both flavours share ONE flow instead of a per-chapter green/red copy."""
     char_events = ('{\n' + talk_recruit_char_entries(recruiters, target, flag, script_symbol)
                    + '    END_MAIN\n}')
-    return char_events, talk_recruit_script(msg_id, target, pre_script=pre_script)
+    return char_events, talk_recruit_script(msg_id, target, pre_script=pre_script,
+                                           variant=variant)
 
 
 def midmap_minibosses(chap):
@@ -8919,6 +8940,11 @@ CH05_SAHNAR_TALK_MSG = 0x9E8     # the TALK-RECRUIT scene, the chapter's payoff.
                                  # player actually saw was Hlin Trollbane's bust (dressed onto the
                                  # Natasha slot) talking to vanilla Joshua. First free id in the
                                  # block; 0x9E9..0x9F3 remain for the opening and endings.
+# ...and the no-Lupin arm's id. 0x9D1 is vanilla Ch5's TUTORIAL text (EventScr_089F231C),
+# reachable only from EventListScr_Ch5_Tutorial -- which inject_ch04 zeroes along with the other
+# three unused lists. Exactly the sweep that freed 0x9D2 for the moose quip and 0x9CD..0x9D0 for
+# the reliquary visits, and verified against HEAD rather than assumed.
+CH05_SAHNAR_TALK_NO_LUPIN_MSG = 0x9D1
 CH05_SAHNAR_TALK_FLAG = 'EVFLAG_TMP(7)'   # vanilla Ch5's own Natasha->Joshua CHAR flag, free
                                           # here: ch05's villages use 9..12, and Misc uses 13
                                           # for the arena tutorial.
@@ -9416,7 +9442,7 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
     # and why spending ch05's own ids on them was the worse trade.
     'ch05': (CH05_ERUPTION_MSG, CH05_RAVISIN_DEATH_MSG, CH05_RAVISIN_TAUNT_MSG,
              CH05_ARENA_FOUND_MSG, CH05_ARENA_RULES_MSG,
-             CH05_SAHNAR_TALK_MSG,
+             CH05_SAHNAR_TALK_MSG, CH05_SAHNAR_TALK_NO_LUPIN_MSG,
              *(msg for _slot, msg, _boxes, _what in CH05_OPENING_SLOTS),
              CH05_ARRIVAL_SLOT[1], CH05_ARRIVAL_NO_LUPIN_MSG,
              CH05_BASIL_JOIN_SLOT[1], CH05_BASIL_JOIN_NO_LUPIN_MSG,
@@ -9549,6 +9575,24 @@ def variant_beat(beat, fallback, err_label):
     for i, entry in enumerate(beat):
         out.extend(replacement.get(i, [entry]))
     return out
+
+
+def locked_and_variant(script, fallback, render, err_label, msgs):
+    """A branched scene as its TWO rendered bodies: the locked one and its substituted twin.
+
+    The pairing every fallback in this campaign takes, kept independent of the CHANNEL because
+    the two channels render nothing alike -- a backdrop scene goes through `_ch05_opening_body`
+    (podium-checked, width 42) while an on-map one goes straight to `_script_to_message` at the
+    bubble's 29. `render` is whatever turns a beat into a body; everything else here is the part
+    that must not be written twice.
+
+    Whole copies rather than a prefix/arm/suffix split, which is vanilla's own economy: ch14a's
+    ending branches to `TEXTSHOW(0xa93)` or `TEXTSHOW(0xa95)`, two complete messages, and shares
+    the script around them. Duplicated text is free; seams in a scene are not.
+    """
+    locked_msg, variant_msg = msgs
+    return [(locked_msg, render(script)),
+            (variant_msg, render(variant_beat(script, fallback, err_label)))]
 
 
 def _branch_on_slot_c(test, if_true, if_false, label_base, why):
@@ -11580,7 +11624,7 @@ def ch05_ravisin_death_message(chap):
         width=29)
 
 
-def ch05_sahnar_talk_message(chap):
+def ch05_sahnar_talk_messages(chap):
     """Render the locked Basil->Sahnar Talk recruit -- the chapter's payoff -- from the YAML.
 
     The event's ``vanilla 0x9CC`` label cites the scene we MINE (vanilla's own Natasha->Joshua
@@ -11607,11 +11651,19 @@ def ch05_sahnar_talk_message(chap):
     if len(beat) != 16 or not speakers <= {'sahnar', 'basil'}:
         sys.exit('ERROR: ch05 Talk recruit must remain the sixteen locked Sahnar/Basil boxes; '
                  'got %d boxes from %s' % (len(beat), sorted(speakers)))
-    return _script_to_message(
-        beat,
+    event = next(e for e in chap['events'] if e.get('trigger') == 'sahnar_talk')
+    if 'no_lupin_fallback' not in event:
+        sys.exit('ERROR: ch05 Talk recruit is a branched scene and must carry a '
+                 'no_lupin_fallback -- without it the no-Lupin arm proves Sahnar with a wolf '
+                 'the player may never have recruited')
+    render = lambda script: _script_to_message(
+        script,
         {'basil':  ('[OpenMidLeft]',  _fid_tag(PORTRAIT_MAP['basil'])),
          'sahnar': ('[OpenMidRight]', _fid_tag(PORTRAIT_MAP['sahnar']))},
         width=29)
+    return locked_and_variant(
+        beat, event['no_lupin_fallback'], render, 'ch05 Talk recruit no-Lupin fallback',
+        (CH05_SAHNAR_TALK_MSG, CH05_SAHNAR_TALK_NO_LUPIN_MSG))
 
 
 def _ch05_opening_scene(chap, slot, boxes, what, podiums, fid, width=42):
@@ -12518,6 +12570,8 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     # that catches a re-point into a neighbour's block, which is exactly how the Basil join beat
     # once ended up on 0x9C2 -- ch04's own no-parley ending.
     assert_message_id_unclaimed(CH05_SAHNAR_TALK_MSG, 'ch05', "Basil's Talk recruit of Sahnar")
+    assert_message_id_unclaimed(CH05_SAHNAR_TALK_NO_LUPIN_MSG, 'ch05',
+                                "the Talk recruit's no-Lupin arm")
     sahnar_rows = [row.replace(CH05_GENERIC_PID, sahnar_char, 1) for row in sahnar_rows]
     declare_unit_table(CH05_SAHNAR_TABLE, sahnar_rows,
                        'ch05 Sahnar: summoned HOSTILE in scene 3, on the arena from turn 1; '
@@ -12600,7 +12654,10 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     # pre_script: unlike ch04's pack parley there is no group to bring over with her.
     sahnar_char_events, sahnar_talk_script = talk_recruit_wiring(
         parley_recruiters(next(e for e in chap['enemy_units'] if e['id'] == 'sahnar')),
-        sahnar_char, CH05_SAHNAR_TALK_FLAG, CH05_SAHNAR_TALK_SCRIPT, CH05_SAHNAR_TALK_MSG)
+        sahnar_char, CH05_SAHNAR_TALK_FLAG, CH05_SAHNAR_TALK_SCRIPT, CH05_SAHNAR_TALK_MSG,
+        # Proof #1 is a wolf ch04's optional parley may never have handed the player, so the
+        # scene asks the roster and shows the other copy when he is not on it (#25).
+        variant=(CH05_LUPIN_CHARACTER, CH05_SAHNAR_TALK_NO_LUPIN_MSG))
     info = _replace_brace_block(info, CH05_EVENT_LISTS['character'] + '[] =',
                                 sahnar_char_events, CH05_EVENTINFO_H)
     for key in ('select_unit', 'select_dest', 'unit_move', 'tutorial'):
@@ -12668,8 +12725,9 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     #     than at the loss.
     declare_event_script(
         CH05_EVENTSCRIPT_H, CH05_SAHNAR_TALK_SCRIPT, sahnar_talk_script,
-        'ch05 Basil Talks Sahnar down -- the locked recruit scene at 0x%X, then CUSA red->blue'
-        % CH05_SAHNAR_TALK_MSG)
+        'ch05 Basil Talks Sahnar down -- the locked recruit scene at 0x%X (or its no-Lupin arm '
+        'at 0x%X), then CUSA red->blue'
+        % (CH05_SAHNAR_TALK_MSG, CH05_SAHNAR_TALK_NO_LUPIN_MSG))
     for symbol, body, comment in arena_wiring['scripts']:
         declare_event_script(CH05_EVENTSCRIPT_H, symbol, body, comment)
     assert_event_scripts_defined(
@@ -12688,7 +12746,8 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     set_message_body(lines, CH05_ERUPTION_MSG, ch05_eruption_message(chap))
     set_message_body(lines, CH05_RAVISIN_DEATH_MSG, ch05_ravisin_death_message(chap))
     set_message_body(lines, CH05_RAVISIN_TAUNT_MSG, ch05_ravisin_taunt_message(chap))
-    set_message_body(lines, CH05_SAHNAR_TALK_MSG, ch05_sahnar_talk_message(chap))
+    for msg_id, body in ch05_sahnar_talk_messages(chap):
+        set_message_body(lines, msg_id, body)
     for msg_id, body in ch05_ending_messages(chap):
         set_message_body(lines, msg_id, body)
     for msg_id, body in (ch05_opening_messages(chap) + ch05_basil_join_messages(chap)

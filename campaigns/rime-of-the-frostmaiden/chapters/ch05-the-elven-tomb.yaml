@@ -1369,9 +1369,9 @@ events:
       - sahnar: "...Thank you, little one."
       # (Last box before gameplay resumes. She never answers.)
       - basil: "...Can I give you a berry now?"
-    no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas, L5) — WIRING NOT BUILT.
-      boxes: [8]                      #   The locked script above is unchanged and still plays
-                                      #   whenever Lupin WAS recruited.
+    no_lupin_fallback:                # TEXT CHOSEN 2026-07-30 (Nicolas, L5); BOXED + WIRED
+      boxes: [8]                      #   2026-08-21 (#25). The locked script above is unchanged
+                                      #   and still plays whenever Lupin WAS recruited.
       replaces:                       # anchored to the text, so an index cannot silently drift
         - "A wolf. Him and his whole pack. They're out there now, with travelers."
       reason: >-
@@ -1385,8 +1385,21 @@ events:
         OPEN: box 6 is kept at v0 (Nicolas), but "SOME of her creatures broke free" asserts a
         plural this branch has no evidence for — the wolf is the only other one. One word ("One
         of her creatures") closes it; flagged rather than changed, because v0 was an explicit pick.
+      # ONE replaced box, TWO boxes of substitute — the nested list is the shape that says so.
+      # HAND-BOXED, which is VANILLA'S CONVENTION and not a house style: every [LF] and every
+      # [A] in `texts.txt` is authored, and MSG_9CC — the Natasha→Joshua recruit this very
+      # scene is the twin of — places all 32 of its own page breaks. Nothing there is flowed.
+      # The substitute is 61 characters against the bubble's 29, so it cannot be one box; left
+      # to the wrapper it paged itself at "We could go free as" / "well.", which is the
+      # mid-clause break the reliquary lines and scene 5's fallback both already taught.
+      # BREAK ON THE ELLIPSIS. It is the only punctuation the line has, and it is also the
+      # right read: the observation lands flat, and then the OFFER — which IS proof #1 in this
+      # arm, Basil arguing the two of them could go rather than citing a wolf who went — takes
+      # its own press instead of trailing the clause it answers. Same 2-lines-then-1 asymmetry
+      # scene 6 took at its own full stop.
       script:
-        - basil: "There is nothing holding us here... We could go free as well."
+        - - basil: "There is nothing holding us here..."
+          - basil: "We could go free as well."
   # ── 9C7 — BOSS TAUNT. One box. Vanilla's Saar taunt is ONE A-press. ──────────
   # BASIL HAS NO CHAPTER-SPECIFIC DEATH BOX, and the empty vanilla 0x9C6 anatomy slot is not an
   # invitation to write one (Nicolas, 2026-08-16). Vanilla fills it for Natasha because the

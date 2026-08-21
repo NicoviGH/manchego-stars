@@ -298,6 +298,15 @@ scenarios:
   ch05recruit:
     rom: ch05boot
     host_chapter: 6
+  # The two CHECK_ALIVE states the Talk recruit's no-Lupin branch turns on, and the only two
+  # #25 still owed. Both ride `ch05lupinboot` -- the ONLY ROM with Lupin on the roster at all --
+  # and differ solely in what the harness does to him before the Talk.
+  ch05lupinbenched:
+    rom: ch05lupinboot
+    host_chapter: 6
+  ch05lupinkilled:
+    rom: ch05lupinboot
+    host_chapter: 6
   ch05raid:
     rom: ch05boot
     host_chapter: 6

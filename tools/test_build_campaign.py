@@ -2569,7 +2569,7 @@ class Ch05SahnarTalkRecruit(unittest.TestCase):
         self.assertEqual(16, len(event['script']))
         self.assertEqual({'sahnar', 'basil'}, {next(iter(box)) for box in event['script']})
 
-        body = bc.ch05_sahnar_talk_message(self._chap())
+        body = dict(bc.ch05_sahnar_talk_messages(self._chap()))[bc.CH05_SAHNAR_TALK_MSG]
         self.assertIn('[LoadFace][FID_Artur]', body)     # Basil
         self.assertIn('[LoadFace][FID_Marisa]', body)    # Sahnar
         self.assertNotIn('[FID_Natasha]', body)          # the bug: Hlin's dressed slot
@@ -2585,7 +2585,7 @@ class Ch05SahnarTalkRecruit(unittest.TestCase):
     def test_the_two_shot_stages_recruiter_left_and_the_turned_unit_right(self):
         """ch04's parley idiom: the recruiter holds the party's side, the unit being turned
         holds the other, so neither podium swaps faces mid-scene."""
-        body = bc.ch05_sahnar_talk_message(self._chap())
+        body = dict(bc.ch05_sahnar_talk_messages(self._chap()))[bc.CH05_SAHNAR_TALK_MSG]
         self.assertIn('[OpenMidLeft][LoadFace][FID_Artur]', body)
         self.assertIn('[OpenMidRight][LoadFace][FID_Marisa]', body)
         self.assertNotIn('[ClearFace]', body)
@@ -2593,7 +2593,7 @@ class Ch05SahnarTalkRecruit(unittest.TestCase):
     def test_every_box_fits_the_map_talk_bubble(self):
         """The Talk rides TEXTSHOW -> PutTalkBubble, whose right-side branch computes
         x = 29 - width with no clamp: a line over 29 runs off the tilemap (the ch03 crier bug)."""
-        body = bc.ch05_sahnar_talk_message(self._chap())
+        body = dict(bc.ch05_sahnar_talk_messages(self._chap()))[bc.CH05_SAHNAR_TALK_MSG]
         for line in body.split('\n'):
             printable = re.sub(r'\[[^\]]*\]', '', line)
             self.assertLessEqual(len(printable), 29, 'bubble overflow: %r' % line)
@@ -2606,6 +2606,144 @@ class Ch05SahnarTalkRecruit(unittest.TestCase):
         self.assertNotIn('TEXTSHOW(0x9CC)', script)
         self.assertLess(script.index('TEXTSHOW(0x%X)' % bc.CH05_SAHNAR_TALK_MSG),
                         script.index('CUSA(CHARACTER_MARISA)'))
+
+
+class Ch05SahnarTalkNoLupinFallback(unittest.TestCase):
+    """The Talk recruit's no-Lupin arm -- the LAST of ch05's five fallbacks (#25).
+
+    Box 8 is PROOF #1, the evidence that turns Sahnar, and it is a wolf ch04's optional parley
+    may never have handed the player. The substitute makes the proof BASIL instead: not
+    "someone else already walked free" but "the two of us could".
+
+    Shape is vanilla's, not ours. `ch14a-eventscript.h` branches on CHECK_ALIVE(CHARACTER_JOSHUA)
+    -- Sahnar's own donor, and vanilla Ch5's optional Talk recruit -- and picks a WHOLE message
+    per arm before converging on a shared LABEL (`TEXTSHOW(0xa93)` / `TEXTSHOW(0xa95)` ->
+    `LABEL(0xb)`). Everything below asserts that shape rather than a second mechanism.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self):
+        return bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+
+    def _event(self):
+        return next(e for e in self._chap()['events'] if e['trigger'] == 'sahnar_talk')
+
+    def _fallback(self):
+        event = self._event()
+        return bc.variant_beat(event['script'], event['no_lupin_fallback'], 'test')
+
+    def _wiring(self):
+        _chars, script = bc.talk_recruit_wiring(
+            ['CHARACTER_ARTUR'], 'CHARACTER_MARISA', bc.CH05_SAHNAR_TALK_FLAG,
+            bc.CH05_SAHNAR_TALK_SCRIPT, bc.CH05_SAHNAR_TALK_MSG,
+            variant=(bc.CH05_LUPIN_CHARACTER, bc.CH05_SAHNAR_TALK_NO_LUPIN_MSG))
+        return script
+
+    # -- the id ---------------------------------------------------------------
+    def test_the_fallback_id_is_claimed_owned_and_outside_no_ones_reach(self):
+        """0x9D1 is vanilla Ch5's TUTORIAL text (EventScr_089F231C), reachable only from
+        EventListScr_Ch5_Tutorial -- which inject_ch04 zeroes. Same sweep that freed 0x9D2 for
+        the moose quip, and the reliquary lines' 0x9CD..0x9D0 before it."""
+        self.assertEqual(0x9D1, bc.CH05_SAHNAR_TALK_NO_LUPIN_MSG)
+        self.assertIn(bc.CH05_SAHNAR_TALK_NO_LUPIN_MSG, bc.HOSTED_CHAPTER_MESSAGE_IDS['ch05'])
+        self.assertEqual('ch05',
+                         bc.assert_message_ids_unique()[bc.CH05_SAHNAR_TALK_NO_LUPIN_MSG])
+
+    def test_the_fallback_costs_one_extra_id_not_two(self):
+        """`variant_beat` splices the substitute and the WHOLE scene goes to a second id --
+        vanilla's own move. Splitting the scene around the differing box would cost two."""
+        self.assertEqual({bc.CH05_SAHNAR_TALK_MSG, bc.CH05_SAHNAR_TALK_NO_LUPIN_MSG},
+                         set(dict(bc.ch05_sahnar_talk_messages(self._chap()))))
+
+    # -- the substitution -----------------------------------------------------
+    def test_the_proof_moves_off_the_wolf_and_onto_basil_herself(self):
+        event = self._event()
+        self.assertEqual([8], event['no_lupin_fallback']['boxes'])
+        self.assertIn('A wolf.', next(iter(event['script'][7].values())))
+        for box in self._fallback():
+            self.assertNotIn('wolf', next(iter(box.values())).lower())
+
+    def test_every_box_but_the_proof_rides_through_unchanged(self):
+        """Boxes 1-7 and 9-16 are shared, box 9's "we" included -- it already covers her."""
+        locked, fallback = self._event()['script'], self._fallback()
+        self.assertEqual(locked[:7], fallback[:7])
+        self.assertEqual(locked[8:], fallback[9:])
+        self.assertIn('That we have a choice', next(iter(fallback[9].values())))
+
+    def test_the_substitute_is_hand_boxed_rather_than_left_to_the_wrapper(self):
+        """VANILLA'S CONVENTION: every [LF] and every [A] in texts.txt is authored -- MSG_9CC,
+        the scene we mine, places all 32 of its own page breaks. Flowed, our 61-character
+        substitute pages itself at "We could go free as" / "well.", mid-clause. The break goes
+        on the ellipsis, so the observation lands flat and the OFFER -- which is the whole
+        proof -- takes its own press."""
+        fallback = self._fallback()
+        self.assertEqual(17, len(fallback), 'one replaced box, two of substitute')
+        self.assertEqual('There is nothing holding us here...',
+                         next(iter(fallback[7].values())))
+        self.assertEqual('We could go free as well.', next(iter(fallback[8].values())))
+
+    def test_neither_arm_lets_the_wrapper_page_the_substitute(self):
+        bodies = dict(bc.ch05_sahnar_talk_messages(self._chap()))
+        body = bodies[bc.CH05_SAHNAR_TALK_NO_LUPIN_MSG]
+        for authored in ('There is nothing holding us here...', 'We could go free as well.'):
+            page = [p for p in body.split('[A]') if authored.split('.')[0][:20] in
+                    re.sub(r'\[[^\]]*\]', '', p).replace('\n', '')]
+            self.assertTrue(page, 'the substitute lost its authored box: %r' % authored)
+
+    # -- the channel ----------------------------------------------------------
+    def test_both_arms_fit_the_map_talk_bubble(self):
+        for _msg, body in bc.ch05_sahnar_talk_messages(self._chap()):
+            for line in body.split('\n'):
+                printable = re.sub(r'\[[^\]]*\]', '', line)
+                self.assertLessEqual(len(printable), 29, 'bubble overflow: %r' % line)
+
+    def test_both_arms_keep_the_two_shot_and_never_vanillas_faces(self):
+        for _msg, body in bc.ch05_sahnar_talk_messages(self._chap()):
+            self.assertIn('[OpenMidLeft][LoadFace][FID_Artur]', body)
+            self.assertIn('[OpenMidRight][LoadFace][FID_Marisa]', body)
+            self.assertNotIn('[FID_Natasha]', body)
+            self.assertNotIn('[FID_Joshua]', body)
+
+    # -- the branch, in vanilla's shape ---------------------------------------
+    def test_the_branch_picks_a_WHOLE_message_per_arm_like_ch14as_ending(self):
+        script = self._wiring()
+        self.assertIn('CHECK_ALIVE(%s)' % bc.CH05_LUPIN_CHARACTER, script)
+        alive = script.index('TEXTSHOW(0x%X)' % bc.CH05_SAHNAR_TALK_MSG)
+        absent = script.index('TEXTSHOW(0x%X)' % bc.CH05_SAHNAR_TALK_NO_LUPIN_MSG)
+        self.assertLess(script.index('CHECK_ALIVE'), alive)
+        self.assertLess(alive, absent, 'the locked arm is the fall-through, as in ch14a')
+
+    def test_the_arms_converge_before_the_single_CUSA_that_recruits_her(self):
+        """One recruit, not one per arm. ch14a shares everything after LABEL(0xb) the same way,
+        and a CUSA duplicated into both arms is how a branch grows a second bug per fix."""
+        script = self._wiring()
+        self.assertEqual(1, script.count('CUSA(CHARACTER_MARISA)'))
+        self.assertEqual(1, script.count('TEXTSTART'), 'the window opens once, before the branch')
+        self.assertEqual(1, script.count('REMA'))
+        self.assertLess(script.index('TEXTSTART'), script.index('CHECK_ALIVE'))
+        self.assertLess(script.index('TEXTSHOW(0x%X)' % bc.CH05_SAHNAR_TALK_NO_LUPIN_MSG),
+                        script.index('CUSA(CHARACTER_MARISA)'))
+
+    def test_an_unbranched_talk_still_emits_no_branch_at_all(self):
+        """ch03's Trex and ch04's Lupin pass no variant and must be byte-identical to before --
+        the whole point of parameterising the ONE flow rather than forking it."""
+        _chars, plain = bc.talk_recruit_wiring(
+            ['CHARACTER_EIRIKA'], 'CHARACTER_MARISA', bc.CH05_SAHNAR_TALK_FLAG,
+            'MS_Test', bc.CH05_SAHNAR_TALK_MSG)
+        self.assertNotIn('CHECK_ALIVE', plain)
+        self.assertNotIn('BEQ', plain)
+        self.assertNotIn('LABEL', plain)
+
+    # -- the hazard this scene carries ----------------------------------------
+    def test_the_two_arms_render_to_the_SAME_press_count(self):
+        """A TRAP, pinned so nobody builds a gate on it. The locked box 8 is 70 characters and
+        the wrapper pages it in two; the substitute is two AUTHORED boxes. Both arms therefore
+        come to the same number of A-presses, so `ch05recruit`'s box-count witness -- which is
+        what proves WHICH id played everywhere else in this chapter -- cannot tell these two
+        apart. The in-engine proof reads `sActiveMsg` instead."""
+        presses = [body.count('[A]') for _msg, body in bc.ch05_sahnar_talk_messages(self._chap())]
+        self.assertEqual(presses[0], presses[1],
+                         'if these ever diverge, a counting gate becomes possible again')
 
 
 class Ch05OpeningBackdropScenes(unittest.TestCase):

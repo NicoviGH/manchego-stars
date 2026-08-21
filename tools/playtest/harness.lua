@@ -1299,6 +1299,14 @@ end
 -- Exact-match only. A script address that matches no symbol is reported as unknown:
 -- a confidently wrong name (the old PROC_NAME string, where three distinct scripts all
 -- read as "E_FACE") cost #232 its last failure, and silence would have been cheaper.
+-- WHICH message a scene actually showed. `GetStringFromIndex` (src/msg.c) caches the index it
+-- last decoded in `sActiveMsg`, so reading it WHILE a box is up names the message id on screen.
+-- Box counting is the witness everywhere else in this chapter and it is strictly weaker: two
+-- arms of one branch can render to the same number of A-presses, which ch05's Talk recruit does
+-- (its locked box 8 wraps in two; its substitute is two authored boxes). Read it during a
+-- dialogue wait -- unit names and menus decode through the same function and overwrite it.
+INSPECT.activeMsg = function() return ru32(SYM.sActiveMsg) end
+
 INSPECT.scriptName = function(addr)
     return PROCSCR[addr] or string.format("unknown@0x%08X", addr)
 end
@@ -6563,12 +6571,23 @@ end
 -- is satisfied the instant the counter ticks, BEFORE Ravisin says a word. Left alone this gate
 -- would have failed on 0 eruption boxes and blamed the warning.
 -- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh ch05recruit (needs a CH05BOOT=1 ROM).
-scenarios.ch05recruit = function()
+scenarios.ch05recruit = function(opts)
     local BASIL, SAHNAR = 0x13, 0x16        -- CHARACTER_ARTUR / CHARACTER_MARISA
-    -- A-presses our locked 0x9E8 recruit renders to: sixteen authored boxes, five of which
+    local LUPIN = 0x1D                      -- CHARACTER_DUESSEL, the slot ch05 gives the wolf
+    -- A-presses either arm of the recruit renders to: sixteen authored boxes, five of which
     -- wrap past two lines at the map bubble's 29 and so take a second page. Scenario-local
     -- rather than a TUNE entry -- it is this scene's shape, not a harness timing knob.
+    -- BOTH ARMS COME TO 21, which is why this number can no longer say which one played: the
+    -- locked box 8 is 70 characters and the wrapper pages it in two, while the substitute is
+    -- two AUTHORED boxes. `arm` below is the real witness; the count only guards the shape.
     local RECRUIT_BOXES = 21
+    -- `opts.lupin` is the ROSTER STATE to put the wolf in before the Talk, and `opts.arm` the
+    -- message id that state must produce. Default: no Lupin on the roster at all, which is what
+    -- the plain `ch05boot` ROM is (he is not in the boot seed), so the Talk takes its no-Lupin
+    -- arm. The two named states are #25's last two owed CHECK_ALIVE cases and ride
+    -- `ch05lupinboot`, whose LOAD1 is the only way any of these ROMs gets a Lupin at all.
+    opts = opts or {}
+    local ARM = opts.arm or 0x9D1
     local function blueBasil() return findUnit(SYM.gUnitArrayBlue, 20, BASIL) end
     local function redSahnar() return findUnit(SYM.gUnitArrayRed, 24, SAHNAR) end
     local function blueSahnar() return findUnit(SYM.gUnitArrayBlue, 20, SAHNAR) end
@@ -6577,6 +6596,38 @@ scenarios.ch05recruit = function()
     waitFor(function()
         return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
     end, 6000, true)
+
+    -- 0. The wolf, in whatever roster state this run is about. CHECK_ALIVE reads the ROSTER and
+    --    not the field (eventscr.c:3212 -- missing OR US_DEAD gives slot C = 0, while
+    --    US_NOT_DEPLOYED is CHECK_DEPLOYED's business alone), so these two pokes are the whole
+    --    experiment: a benched Lupin must still take the wolf's arm, a dead one must not.
+    if opts.lupin then
+        local wolf = findUnit(SYM.gUnitArrayBlue, 62, LUPIN)
+        if not wolf then
+            return result("FAIL", "no Lupin on the roster -- this scenario needs the "
+                .. "ch05lupinboot ROM, whose LOAD1 is the only thing that puts him there")
+        end
+        if opts.lupin == "benched" then
+            -- Recruited, alive, LEFT AT HOME. ch05 deploys 9 of a 10-unit pool, so this is
+            -- ordinary play, and it is exactly where a field-presence test would have failed.
+            -- The ROM cannot produce it -- --ch05-lupin LOAD1s him ONTO the map -- so the state
+            -- is written here: off the tile grid, off the map, and flagged not-deployed, which
+            -- is what a unit the player never placed looks like to both CHECK_ commands.
+            setMapUnit(wolf.x, wolf.y, 0)
+            emu:write8(wolf.addr + 0x10, 0xFF)          -- xPos -1: nowhere on the map
+            emu:write8(wolf.addr + 0x11, 0xFF)
+            emu:write32(wolf.addr + 0x0C, wolf.state | 8)  -- US_NOT_DEPLOYED, bmunit.h (1 << 3)
+        elseif opts.lupin == "killed" then
+            -- Recruited, then LOST. Collapses onto the no-Lupin arm on purpose: a dead wolf is
+            -- no more "out there now, with travelers" than one who was never won.
+            setMapUnit(wolf.x, wolf.y, 0)
+            emu:write32(wolf.addr + 0x0C, wolf.state | US_DEAD)
+        else
+            return result("FAIL", "unknown lupin state " .. tostring(opts.lupin))
+        end
+        log(string.format("ch05recruit: Lupin (0x%X) put in the %s state before the Talk",
+            LUPIN, opts.lupin))
+    end
 
     -- 1. The join. A GREEN Basil here means the CUSA after CALL(Preparations) did not land --
     --    which is invisible to every other scenario, so name the faction we actually found.
@@ -6689,11 +6740,15 @@ scenarios.ch05recruit = function()
     -- capped at 3600 and expired 18 boxes in, then reported "the CUSA did not fire" about a
     -- script that had simply not reached it yet. A LOOP CAP MUST NEVER BE WHAT DECIDES FAILURE
     -- (decisions.md): hence a budget with real headroom AND, below, two distinguishable verdicts.
-    local BUDGET, boxes = 20000, 0
+    local BUDGET, boxes, playedMsg = 20000, 0, nil
     for _ = 1, BUDGET do
         if blueSahnar() then break end
         if controllerState() == "dialogue_wait" then
             boxes = boxes + 1
+            -- WHICH message is on screen, sampled while the FIRST box of the scene is up.
+            -- After the scene ends every menu and unit name decodes through the same buffer
+            -- and overwrites it, so this cannot be read from the verdict at the bottom.
+            playedMsg = playedMsg or INSPECT.activeMsg()
             if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
                 return controllerState(after) ~= "dialogue_wait"
             end, 120) then return result("FAIL", "recruit dialogue input did not advance") end
@@ -6718,21 +6773,56 @@ scenarios.ch05recruit = function()
     --    bug this chapter shipped with for months -- Hlin Trollbane's bust talking to vanilla
     --    Joshua, with every text decoder green. Box COUNT is the cheapest in-engine witness to
     --    which message id the script actually showed: ours is 21 A-presses, vanilla's is 32.
-    log(string.format("ch05recruit: the recruit scene ran %d boxes", boxes))
+    log(string.format("ch05recruit: the recruit scene ran %d boxes, message 0x%X",
+        boxes, playedMsg or 0))
     if boxes ~= RECRUIT_BOXES then
         shot("ch05recruit")
         return result("FAIL", string.format(
             "the recruit scene ran %d boxes, expected %d -- %s", boxes, RECRUIT_BOXES,
             boxes >= 30 and "that is vanilla's 0x9CC, so the Talk is pointed at the twin's "
                 .. "scene again and plays it in Natasha's and Joshua's faces"
-                or "the locked 0x9E8 scene changed underneath this gate"))
+                or "the recruit scene changed underneath this gate"))
+    end
+    -- WHICH ARM. Both arms recruit her and both run 21 boxes, so everything above passes on
+    -- either one -- that is the whole hazard #25 names, and a gate that only watched the flip
+    -- would be green with the wrong scene on screen. `sActiveMsg` is the only thing here that
+    -- can tell 0x9E8 (Basil proves it with the wolf) from 0x9D1 (Basil proves it with herself).
+    if playedMsg ~= ARM then
+        shot("ch05recruit")
+        return result("FAIL", string.format(
+            "the Talk played message 0x%X, expected 0x%X -- %s", playedMsg or 0, ARM,
+            ARM == 0x9E8
+                and "CHECK_ALIVE did not find the wolf on the roster, so a player who WON him "
+                    .. "is being told he does not exist"
+                or "CHECK_ALIVE found a wolf this run does not have, so the scene proves "
+                    .. "itself with a unit the player never recruited"))
     end
     runEnemyPhase()      -- the sprite only repaints to the party palette on a phase transition
     shot("ch05recruit")
     return result("PASS", string.format(
         "Basil joined blue in the opening, Sahnar stood red on the arena from turn 1, the "
-        .. "eruption spoke its four, and Basil's Talk brought her over in %d boxes of our own "
-        .. "locked prose -- the whole ch05 recruit chain", boxes))
+        .. "eruption spoke its four, and Basil's Talk brought her over in %d boxes of message "
+        .. "0x%X -- the whole ch05 recruit chain, on the arm this roster earns", boxes, playedMsg))
+end
+
+-- ch05lupinbenched: RECRUITED, ALIVE, BENCHED -> the wolf's arm (#25). The case that matters
+-- most and the last one owed: ch05 deploys 9 of a 10-unit pool, so a player can win Lupin in
+-- ch04 and leave him home here in ordinary play. If the Talk asked the FIELD instead of the
+-- roster, this run is where that shows -- the player would be told the wolf does not exist by
+-- a scene proving its point with him. `eventscr.c` says CHECK_ALIVE cannot see the bench; this
+-- is the run that says our build agrees.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh ch05lupinbenched (needs CH05BOOT=1 CH05LUPIN=1).
+scenarios.ch05lupinbenched = function()
+    return scenarios.ch05recruit({ lupin = "benched", arm = 0x9E8 })
+end
+
+-- ch05lupinkilled: RECRUITED, THEN LOST -> the no-Lupin arm, deliberately (#25). `eventscr.c`
+-- writes slot C = 0 for US_DEAD exactly as it does for a unit that was never found, and the
+-- prose wants that collapse: a dead wolf is no more "out there now, with travelers" than one
+-- the player never won.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh ch05lupinkilled (needs CH05BOOT=1 CH05LUPIN=1).
+scenarios.ch05lupinkilled = function()
+    return scenarios.ch05recruit({ lupin = "killed", arm = 0x9D1 })
 end
 
 -- recordch05eruption: the smallest visual proof for #260. Boot the real ch05 map, idle turn 1,
