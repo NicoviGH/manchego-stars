@@ -6574,13 +6574,12 @@ end
 scenarios.ch05recruit = function(opts)
     local BASIL, SAHNAR = 0x13, 0x16        -- CHARACTER_ARTUR / CHARACTER_MARISA
     local LUPIN = 0x1D                      -- CHARACTER_DUESSEL, the slot ch05 gives the wolf
-    -- A-presses either arm of the recruit renders to: sixteen authored boxes, five of which
-    -- wrap past two lines at the map bubble's 29 and so take a second page. Scenario-local
-    -- rather than a TUNE entry -- it is this scene's shape, not a harness timing knob.
-    -- BOTH ARMS COME TO 21, which is why this number can no longer say which one played: the
-    -- locked box 8 is 70 characters and the wrapper pages it in two, while the substitute is
-    -- two AUTHORED boxes. `arm` below is the real witness; the count only guards the shape.
-    local RECRUIT_BOXES = 21
+    -- A-presses the recruit renders to -- now exactly the number of AUTHORED boxes: 16 on the
+    -- locked arm, 17 on the substituted one. Nothing pages itself any more, because the wrapper
+    -- measures PIXELS at vanilla's own width instead of counting to 29 (`decisions.md` -> "We
+    -- wrapped on-map talk at 29 CHARACTERS"). It used to be 21 for BOTH arms -- the locked box 8
+    -- paged in two while the substitute was two authored boxes -- and that collision is why
+    -- `ARM` below, not this number, is what says which scene actually played.
     -- `opts.lupin` is the ROSTER STATE to put the wolf in before the Talk, and `opts.arm` the
     -- message id that state must produce. Default: no Lupin on the roster at all, which is what
     -- the plain `ch05boot` ROM is (he is not in the boot seed), so the Talk takes its no-Lupin
@@ -6588,6 +6587,7 @@ scenarios.ch05recruit = function(opts)
     -- `ch05lupinboot`, whose LOAD1 is the only way any of these ROMs gets a Lupin at all.
     opts = opts or {}
     local ARM = opts.arm or 0x9D1
+    local RECRUIT_BOXES = (ARM == 0x9E8) and 16 or 17
     local function blueBasil() return findUnit(SYM.gUnitArrayBlue, 20, BASIL) end
     local function redSahnar() return findUnit(SYM.gUnitArrayRed, 24, SAHNAR) end
     local function blueSahnar() return findUnit(SYM.gUnitArrayBlue, 20, SAHNAR) end
