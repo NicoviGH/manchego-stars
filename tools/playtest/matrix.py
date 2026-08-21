@@ -548,6 +548,13 @@ def harness_shared(source):
 BUILD_STAMP = os.path.join(REPO, '.build-config.json')
 
 
+def _flag_matches(stamped, declared):
+    """Does a stamped flag value answer to what the manifest declares? See built_rom_config."""
+    if isinstance(declared, str) or isinstance(stamped, str):
+        return str(stamped) == str(declared)
+    return bool(stamped) == bool(declared)
+
+
 def built_rom_config(rom_configs, stamp_path=None):
     """Name the ROM configuration currently sitting in the tree, or None if the stamp
     is missing (an old build) or matches nothing the manifest knows about.
@@ -570,10 +577,15 @@ def built_rom_config(rom_configs, stamp_path=None):
     for name, flags in rom_configs.items():
         if set(flags) != set(on):
             continue
-        # A flag whose manifest value is a STRING names an arm, so the stamp has to agree on
-        # the string. Anything else (`CH05BOOT: 1`) is a plain on/off and being in `on` is all
-        # it has to say. A legacy stamp holding True where an arm name belongs matches nothing.
-        if all(str(on[k]) == v for k, v in flags.items() if isinstance(v, str)):
+        # Compare VALUES, normalised on BOTH sides. Keying the check on the manifest side
+        # being a `str` looked equivalent and is not: YAML 1.1 types `on`/`yes`/`no` as
+        # booleans, so an arm written unquoted would make the clause vacuous and quietly
+        # restore the presence-only matching this exists to fix. Whenever EITHER side names a
+        # string, compare strings; otherwise both are plain on/off and being in `on` is all
+        # they have to say -- which is what keeps `FLAG: 1` matching a stamped `true` instead
+        # of failing on '1' != 'True'. A legacy stamp holding True where an arm name belongs
+        # compares 'True' against the arm and matches nothing, which is the intent.
+        if all(_flag_matches(on[k], v) for k, v in flags.items()):
             return name
     return None
 

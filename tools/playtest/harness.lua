@@ -8238,10 +8238,12 @@ end
 -- Ring's popup lands relative to the closing
 -- fade -- the give opens a BLOCKING convoy menu on a full pack, which is why it sits before the
 -- FADI and why that placement is filmed rather than asserted.
--- THE BOX COUNT IS THE ARM ASSERTION, and it is not decoration: all three arms play fine and
--- that is the hazard (decisions.md -> the ch05 endings). 19 boxes is scene 16 with the berry
--- beat IN -- 7 + 6 + 6 -- so a Sahnar gate that regressed to always-skip lands on 13 and fails
--- here rather than looking like a shorter film. The 20th is the dev placeholder's own line.
+-- THE MESSAGE ID IS THE ARM ASSERTION -- not the box count, which is a floor. All three arms
+-- play fine and that is the hazard (decisions.md -> the ch05 endings); they are only three
+-- boxes apart, so a length can say "at least this long" and never "this scene". The count
+-- still guards LENGTH: 19 boxes is scene 16 with the berry beat IN (7 + 6 + 6), so a Sahnar
+-- gate that regressed to always-skip drops to 13 and fails here rather than looking like a
+-- shorter film. Every arm then adds the dev placeholder's own FOUR boxes.
 -- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05ending (needs CH05BOOT=1 CH05ENDING=full).
 scenarios.recordch05ending = function(opts)
     -- `opts.boxes` is the arm's own length and `opts.arm` the message that must produce it.
@@ -8316,10 +8318,11 @@ scenarios.recordch05ending = function(opts)
                     -- The log is what names it -- the verdict line only says "never reached".
                     if not blamed then
                         blamed = true
-                        log(string.format("ch05ending: the title arrived after %d boxes, not %d "
-                            .. "-- the ROM played a SHORTER arm than CH05ENDING=full asks for "
-                            .. "(13 = the berry beat skipped, 10 = Basil's death variant)",
-                            boxes, BOXES))
+                        log(string.format("ch05ending: the title arrived after %d boxes, not "
+                            .. "the %d this arm (message 0x%X) runs to -- the scene was SHORTER "
+                            .. "than it should be. Arm lengths, placeholder included: 23 full, "
+                            .. "17 berry-beat cut, 14 Basil's death variant.",
+                            boxes, BOXES, ARM))
                     end
                     return false
                 end

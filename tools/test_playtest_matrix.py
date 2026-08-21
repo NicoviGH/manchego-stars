@@ -369,6 +369,24 @@ class WrongRomGuard(unittest.TestCase):
             self.assertEqual(mx.built_rom_config(m.rom_configs, path), expected,
                              'CH05ENDING=%s' % arm)
 
+    def test_an_arm_written_as_a_yaml_truthy_scalar_still_compares(self):
+        """The value check must not be keyed on the MANIFEST side being a string. YAML 1.1
+        types `on`/`yes`/`no` as booleans, so an arm written unquoted would make the clause
+        vacuous and silently restore the presence-only matching this exists to fix."""
+        m = manifest(rom_configs={'canonical': {},
+                                  'armA': {'CH05BOOT': 1, 'CH05ENDING': True},
+                                  'armB': {'CH05BOOT': 1, 'CH05ENDING': 'no-sahnar'}})
+        path = self.stamp(CH05BOOT=True, CH05ENDING='no-sahnar')
+        self.assertEqual('armB', mx.built_rom_config(m.rom_configs, path),
+                         'a bool-typed arm must not swallow a stamp naming a different one')
+
+    def test_an_int_flag_still_matches_a_boolean_stamp(self):
+        """Every existing config writes `FLAG: 1` and every stamp writes `true`. Comparing
+        those as strings ('1' vs 'True') would reject every ROM in the manifest."""
+        m = manifest()
+        self.assertEqual('ch04boot',
+                         mx.built_rom_config(m.rom_configs, self.stamp(CH04BOOT=True)))
+
     def test_a_legacy_boolean_stamp_names_no_arm_rather_than_guessing(self):
         """Old stamps wrote bool(value), which cannot say WHICH arm. The guard's own rule for a
         stamp it cannot place is to return None -- unknown, stay out of the way -- and NOT to
