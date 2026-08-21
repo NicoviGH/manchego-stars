@@ -6,42 +6,49 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-20 (Claude), and DEEP-CLEANED at Nicolas's instruction: anything already
+Refreshed 2026-08-21 (Claude). Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
 recorded in `docs/decisions.md`, `CLAUDE.md` or a GitHub issue was deleted from here rather than
 restated. Five gotchas that lived ONLY here were migrated into `decisions.md` first — check that
 a thing has a home before cutting it.
 
 ## In flight
 
-**Nothing.** `main` is at **#296**, CI green.
+**Nothing.** `main` is at **#297**, CI green.
 
 ## Next task
 
-**ch05 is content-complete.** What remains on it is small and precise:
+**ch05's dialogue is DONE — every scene and every fallback is wired and proved.** What is left:
 
-- **The Talk recruit's no-Lupin fallback** (`0x9D1`) — the last of the three surviving fallbacks,
-  and the only one still owed. It needs wiring AND its boxing at 29: it overruns the talk bubble
-  and pages itself mid-clause if left flowed. This is the one channel where that still bites, the
-  endings having turned out to be backdrop scenes at 42. Detail on **#25**.
-- **Two `CHECK_ALIVE` states are unproven** — recruited-but-BENCHED and recruited-then-killed.
-  Both should take the arm we want by a decomp reading, and a reading is not a run. ch05 deploys
-  9 of a 10-unit pool, so benched-but-alive is reachable in ordinary play.
 - **Two ending arms are unfilmed** — `--ch05-ending=no-sahnar` and `=basil-died` boot straight to
-  each.
+  each, so this is two short runs and nothing else.
 
 **Then ch06**, which is unhosted; ch05's win still lands on the RBG campfire dev placeholder, and
 that is BY DESIGN — the placeholder IS the "next chapter" slot.
 
-One open question Nicolas has not ruled on: **the reskin classes inherit their donor's CLASS
-NAME**, so ch05's skeletons read "Soldier"/"Fighter", ch01's goblins read "Soldier" and ch03's
-kobolds read "Brigand". No reskin in `campaign.yaml` carries a name. Campaign-wide change, not
-ch05's — raise it before acting.
+**Two open questions Nicolas has not ruled on.** Both are campaign-wide, so raise either before
+acting on it — neither belongs to whatever chapter surfaces it.
+
+- **Reskin classes inherit their donor's CLASS NAME.** ch05's skeletons read "Soldier"/"Fighter",
+  ch01's goblins read "Soldier", ch03's kobolds read "Brigand". No reskin in `campaign.yaml`
+  carries a name.
+- **We wrap on-map talk at 29; vanilla writes 43 in the same window** (raised 2026-08-21). Our 29
+  is a CHARACTER count standing in for what is really a PIXEL budget on a variable-width font, so
+  it buys extra A-presses on every on-map scene. `MSG_9CC` — the ch05 Talk recruit's own twin — is
+  the evidence. Acting on it would re-box sixteen locked boxes.
 
 ## Recently landed — do not redo
 
 Each of these is DONE, merged, and documented where it belongs. Listed only so a fresh session
 does not reopen one; the detail is on the issue and in `docs/decisions.md`.
 
+- **The Talk recruit's no-Lupin arm** (#297) — the last fallback, in `ch14a-eventscript.h`'s
+  shape (a whole message per arm, converging on a shared LABEL, one CUSA). With it, **all four
+  `CHECK_ALIVE` states are RUN, not read**: benched and recruited-then-killed closed by
+  `ch05lupinbenched` / `ch05lupinkilled`. ⚠️ Two traps paid for and recorded in `decisions.md`:
+  **box count is no longer a "which id played" witness** (this scene's two arms are both 21
+  A-presses — use `INSPECT.activeMsg()`, which reads `sActiveMsg` while a box is up), and a
+  harness poke that benches or kills a unit **must set `US_HIDDEN` too**, or the next phase
+  transition writes it back onto the tile grid.
 - **ch05's dialogue, all 17 scenes** (#295) — both endings included, filmed at
   `docs/demo/ch05-ending.gif`. Four things that stretch settled are ADRs: the endings' BACKDROP
   channel and the `vanilla_scene.py` bug behind it, why a conditional block is a whole copy rather
