@@ -25,16 +25,11 @@ a thing has a home before cutting it.
 **Then ch06**, which is unhosted; ch05's win still lands on the RBG campfire dev placeholder, and
 that is BY DESIGN — the placeholder IS the "next chapter" slot.
 
-**Two open questions Nicolas has not ruled on.** Both are campaign-wide, so raise either before
-acting on it — neither belongs to whatever chapter surfaces it.
-
-- **Reskin classes inherit their donor's CLASS NAME.** ch05's skeletons read "Soldier"/"Fighter",
-  ch01's goblins read "Soldier", ch03's kobolds read "Brigand". No reskin in `campaign.yaml`
-  carries a name.
-- **We wrap on-map talk at 29; vanilla writes 43 in the same window** (raised 2026-08-21). Our 29
-  is a CHARACTER count standing in for what is really a PIXEL budget on a variable-width font, so
-  it buys extra A-presses on every on-map scene. `MSG_9CC` — the ch05 Talk recruit's own twin — is
-  the evidence. Acting on it would re-box sixteen locked boxes.
+**Both former open questions are RULED (Nicolas, 2026-08-21) and are now ADRs — do not re-raise
+either.** Reskins keep their donor's class name, deliberately. And the on-map wrap is a PIXEL
+budget, not a character count: vanilla proves 203px safe in the same window and we were using
+132px, so the 29-character rule is being retired — see `decisions.md` → *"We wrapped on-map talk
+at 29 CHARACTERS; the engine measures PIXELS"*.
 
 ## Recently landed — do not redo
 
