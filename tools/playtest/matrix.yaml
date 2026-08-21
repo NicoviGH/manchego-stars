@@ -60,6 +60,15 @@ rom_configs:
   ch05endingboot:
     CH05BOOT: 1
     CH05ENDING: full
+  # The other two arms. Same debug boot, one env var apart -- `no-sahnar` is the full scene with
+  # the berry exchange cut (she was never recruited), `basil-died` is the ten-box variant that
+  # plays over her body. Neither branches on Lupin.
+  ch05endingnosahnar:
+    CH05BOOT: 1
+    CH05ENDING: no-sahnar
+  ch05endingbasildied:
+    CH05BOOT: 1
+    CH05ENDING: basil-died
 
 # Ported verbatim from run.sh's two timing `case` statements.
 classes:
@@ -359,6 +368,14 @@ scenarios:
     kind: record
   recordch05ending:                                    # scenes 16 A+B+C, on the debug boot (#25)
     rom: ch05endingboot
+    host_chapter: 6
+    kind: record
+  recordch05endingnosahnar:                            # the same ending, Sahnar never recruited
+    rom: ch05endingnosahnar
+    host_chapter: 6
+    kind: record
+  recordch05endingbasildied:                           # scene 17 -- the ending over Basil's body
+    rom: ch05endingbasildied
     host_chapter: 6
     kind: record
   ch04snag:

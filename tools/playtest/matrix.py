@@ -553,15 +553,27 @@ def built_rom_config(rom_configs, stamp_path=None):
     is missing (an old build) or matches nothing the manifest knows about.
 
     build_campaign.py writes the stamp; matching is on the EXACT flag set, because
-    `canonical` is "no flags" and would otherwise match every build."""
+    `canonical` is "no flags" and would otherwise match every build.
+
+    VALUES COUNT, not just which flags are on. ch05's three ending arms set the same two flags
+    and differ only in what CH05ENDING says, so a presence-only match collapsed all three onto
+    whichever the manifest listed first -- and refused to film the other two, naming a build the
+    tree did not hold. A stamp that carries only booleans (written before this, or by a flag
+    that really is a boolean) cannot name such an arm; it resolves to None, which is already
+    this function's "unknown, stay out of the way" answer rather than a guess."""
     try:
         with open(stamp_path or BUILD_STAMP) as fh:
             stamp = json.load(fh)
     except (OSError, ValueError):
         return None
-    on = {k for k, v in (stamp.get('flags') or {}).items() if v}
+    on = {k: v for k, v in (stamp.get('flags') or {}).items() if v}
     for name, flags in rom_configs.items():
-        if set(flags) == on:
+        if set(flags) != set(on):
+            continue
+        # A flag whose manifest value is a STRING names an arm, so the stamp has to agree on
+        # the string. Anything else (`CH05BOOT: 1`) is a plain on/off and being in `on` is all
+        # it has to say. A legacy stamp holding True where an arm name belongs matches nothing.
+        if all(str(on[k]) == v for k, v in flags.items() if isinstance(v, str)):
             return name
     return None
 
