@@ -3714,13 +3714,19 @@ scenarios.mapfull = function()
     -- collapsed the tail: ch05's 21 rows came out as {0,10,11}, three shots of the top half
     -- that reported "full-map grid captured" all the same.)
     local mw, mh = mapSize()
+    -- Cursor stops, not camera offsets: the camera follows and clamps itself, so the far EDGE
+    -- has to be visited for the last screenful to come into shot. A map no bigger than one
+    -- screen therefore needs exactly ONE stop -- appending `size-1` unconditionally made
+    -- ch05's 15 columns two shots of the identical camera position, and ch03's 17 three.
     local function stops(size, span)
-        local out, p = {}, 0
-        while p < size - 1 do
-            table.insert(out, p)
+        if size <= span then return { 0 } end
+        local out, p = { 0 }, span
+        while p <= size - 1 do
+            if p > size - span then p = size - 1 end   -- the far edge, visited once
+            if p ~= out[#out] then table.insert(out, p) end
+            if p == size - 1 then break end
             p = p + span
         end
-        table.insert(out, size - 1)
         return out
     end
     local n = 0
@@ -3746,12 +3752,12 @@ end
 -- One routine, two ROMs -- the pan is chapter-generic and the map decides what is in shot.
 -- Delegates rather than aliases so matrix.py can attribute a body to the name (verdict cache).
 scenarios.mapfullch05 = function()
-    -- FAST CONFIG FIRST, and it is why this timed out twice. `mapfull` opens on bootToMap(),
-    -- which reaches ch05's map through the chapter's 52-box opening at NORMAL text speed --
-    -- minutes of A-presses, past the run deadline, for a scenario that wants one still per
-    -- screenful. `recordch05opening` pokes fast for the same boot and then restores normal
-    -- because it is filming MOTION; this one never needs normal at all, so it does not restore.
-    pokeFastConfig()
+    -- NO pokeFastConfig() here, and the absence is the note. It was added claiming to fix two
+    -- timeouts, and it cannot: `bootToMap` goes through New Game, and `InitPlayConfig`
+    -- (bmio.c:936) CpuFill16s gPlaySt to zero and sets textSpeed = 1, so any config poked
+    -- before the boot is wiped. The run that passed after adding it passed for another reason
+    -- -- an earlier run had already passed WITHOUT it (22s), so the timeouts are flake or
+    -- something else, and are NOT root-caused. Do not re-add this believing it speeds the boot.
     return scenarios.mapfull()
 end
 
@@ -4577,16 +4583,27 @@ scenarios.recordenemy = function()
     -- Every tile at Manhattan `dist` from the foe, vertical offsets first: the bench is laid
     -- out in ROWS, so a tile above or below the target has fewer foe neighbours than one
     -- beside it. At dist 1 this is exactly the old {0,-1},{0,1},{1,0},{-1,0}.
+    -- ORDER IS EXPLICIT, not sorted. A comparator on |dx| leaves {0,-1} and {0,+1} tied, and
+    -- table.sort is not stable, so "up first" was luck -- and it stopped being lucky: the
+    -- rewrite put DOWN first, which on the bench's y=9 row is straight off the map.
+    -- UP before DOWN before sideways, nearest column outward, so a row of foes still gets the
+    -- tile with the fewest neighbours and the bottom row still gets a tile that EXISTS.
     local ring = {}
-    for dx = -dist, dist do
-        local dy = dist - math.abs(dx)
-        table.insert(ring, { dx, dy })
-        if dy ~= 0 then table.insert(ring, { dx, -dy }) end
+    for adx = 0, dist do
+        for _, dx in ipairs(adx == 0 and { 0 } or { -adx, adx }) do
+            local dy = dist - math.abs(dx)
+            if dy ~= 0 then table.insert(ring, { dx, -dy }) end   -- up
+            table.insert(ring, { dx, dy })                        -- down (dy==0 -> sideways)
+        end
     end
-    table.sort(ring, function(a, b) return math.abs(a[1]) < math.abs(b[1]) end)
+    -- BOUNDS FROM THE MAP. The guard was `tx <= 24 and ty <= 15`, a literal from a bigger
+    -- chapter, and the sandbox is 15x10: y=10 is off the map but `mapUnitAt` reads gBmMapUnit's
+    -- zero-filled border row and answers "empty", so the tile is accepted and `cursorTo` can
+    -- then never reach it. Same class of bug as mapfull's hardcoded grid, one file over.
+    local mw, mh = mapSize()
     for _, d in ipairs(ring) do
         local tx, ty = foe.x + d[1], foe.y + d[2]
-        if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0 then
+        if tx >= 0 and tx < mw and ty >= 0 and ty < mh and mapUnitAt(tx, ty) == 0 then
             -- No OTHER foe inside the BAIT'S OWN reach -- which is what makes the attack menu
             -- ambiguous and lets captureAttack film the wrong creature. At melee this is the
             -- old "nothing else orthogonally adjacent"; at range it correctly widens.

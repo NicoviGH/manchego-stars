@@ -4831,8 +4831,16 @@ tested RBG and he's an archer"). The limitation was the picker's, wearing a clas
 
 The bait is now chosen by finding a party unit whose weapon reach OVERLAPS the foe's, and stands
 at a distance both can strike at; the candidate tiles are the Manhattan ring at that distance,
-vertical offsets first (the bench is laid out in rows, so above/below has fewer neighbours). At
-distance 1 that is byte-identical to what it did before.
+UP before DOWN before sideways. At distance 1 that ring is `{0,-1},{0,1},{-1,0},{1,0}` — byte-for-
+byte the literal list it replaced.
+
+**The order is written out, not sorted, and that is the review's finding.** A comparator on |dx|
+leaves `{0,-1}` and `{0,+1}` tied and `table.sort` is not stable, so "up first" was luck — and the
+first cut of this drew DOWN first, which on the bench's own y=9 row is straight off the map.
+**The bounds were a literal too** (`ty <= 15`, from a bigger chapter) while the sandbox is 15x10,
+and `mapUnitAt` reads `gBmMapUnit`'s zero-filled border row and answers *empty* for y=10 — so the
+off-map tile would have been accepted and `cursorTo` could never reach it. Both now come from
+`mapSize()`.
 
 **The "clean tile" rule got more correct on the way.** It asked whether another foe was
 orthogonally ADJACENT to the bait — a proxy for the real question, *is another foe inside the
@@ -4861,10 +4869,12 @@ The grid now derives from `mapSize()`, stepping a screenful (15x10) and always f
 far edge. Two further things the ch05 pan taught, both cheap and both about COST rather than
 correctness:
 
-- **Poke fast config BEFORE booting.** `mapfull` opens on `bootToMap()` at normal text speed, and
-  ch05's map is behind a 52-box opening — minutes of A-presses, past the run deadline, twice.
-  `recordch05opening` already pokes fast for the same boot and restores normal because it films
-  MOTION; a pan never needs normal at all.
+- **Poking fast config before the boot does NOTHING, and the timeouts are not root-caused.**
+  It was added claiming to fix them; `bootToMap` goes through New Game and `InitPlayConfig`
+  (`bmio.c:936`) `CpuFill16`s `gPlaySt` to zero and sets `textSpeed = 1`, so a pre-boot poke is
+  wiped. An earlier run had already passed without it in 22s, so the two timeouts are flake or
+  something not yet found — recorded as open rather than closed, because a false cause in a
+  comment is worse than none.
 - **`--ch05-moose` is the WRONG shortcut for it**, tempting as it looks: `recordch05moose`
   documents that `bootToMap` is the wrong driver on that ROM, because there the beginning script
   IS the beat.

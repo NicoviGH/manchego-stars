@@ -2575,15 +2575,21 @@ CLASS_RESKIN_FOE_WEAPON = {
 # the single row at y=9 held exactly 7 on a 15-wide map. That doc already named the fix -- "a
 # second row lifts it immediately" -- so this is the lift, not a redesign.
 #
-# y=6 rather than y=7, and the gap is the point: the bait logic tries up THEN down, so a foe at
-# y=9 takes y=8 and a foe at y=6 takes y=5 or y=7, and no bait tile is ever orthogonally adjacent
-# to a foe in the OTHER row. The party sits at y=4, which the bait may share a column with -- the
-# rule is "no other FOE adjacent", and allies do not count.
+# y=1, and the row is chosen by ELIMINATION rather than by feel. `TEST_SPAWN_POSITIONS` puts the
+# player formation on y=3..7, so every row in that band is spoken for; y=9 is the first bench row
+# and a second row beside it would put two foes within one bait tile of each other. That leaves
+# 0, 1 and 2, and y=1 keeps a clear row on both sides -- bait tiles at y=0 and y=2 are free, and
+# nothing is adjacent to the party.
+#
+# (An earlier cut of this put the row at y=6, which shares a row with four player spawns and
+# missed them only because those sit on ODD x while the bench uses EVEN. One added seat would
+# have stacked a foe on a party member, and `assert_sandbox_bench_fits` checks map bounds only.
+# `test_the_bench_never_seats_a_foe_on_a_player` now makes that collision a build failure.)
 #
 # The real ceiling is still SMS VRAM (64 slots, two counters growing toward each other), and ten
 # 16x16 creatures are nowhere near it; `recordunitlist` FAILs if the counters ever cross.
 SANDBOX_FOE_POSITIONS = [(2, 9), (4, 9), (6, 9), (8, 9), (10, 9), (12, 9), (14, 9),
-                         (2, 6), (4, 6), (6, 6), (8, 6), (10, 6), (12, 6), (14, 6)]
+                         (2, 1), (4, 1), (6, 1), (8, 1), (10, 1), (12, 1), (14, 1)]
 
 
 def sandbox_map_size(campaign):
