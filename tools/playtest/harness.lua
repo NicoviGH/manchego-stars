@@ -1299,17 +1299,17 @@ end
 -- Exact-match only. A script address that matches no symbol is reported as unknown:
 -- a confidently wrong name (the old PROC_NAME string, where three distinct scripts all
 -- read as "E_FACE") cost #232 its last failure, and silence would have been cheaper.
--- WHICH message a scene actually showed. `GetStringFromIndex` (src/msg.c) caches the index it
--- last decoded in `sActiveMsg`, so reading it WHILE a box is up names the message id on screen.
--- Box counting is the witness everywhere else in this chapter and it is strictly weaker: two
--- arms of one branch can render to the same number of A-presses, which ch05's Talk recruit does
--- (its locked box 8 wraps in two; its substitute is two authored boxes). Read it during a
--- dialogue wait -- unit names and menus decode through the same function and overwrite it.
-INSPECT.activeMsg = function() return ru32(SYM.sActiveMsg) end
-
 INSPECT.scriptName = function(addr)
     return PROCSCR[addr] or string.format("unknown@0x%08X", addr)
 end
+
+-- WHICH message a scene actually showed. `GetStringFromIndex` (src/msg.c) caches the index it
+-- last decoded in `sActiveMsg`, so reading it WHILE a box is up names the message id on screen.
+-- Box counting is the witness everywhere else in ch05 and it is strictly weaker: two arms of one
+-- branch can render to the same number of A-presses, which the Talk recruit does exactly (its
+-- locked box 8 wraps in two; its substitute is two authored boxes). Read it during a dialogue
+-- wait -- unit names and menus decode through the same function and overwrite it.
+INSPECT.activeMsg = function() return ru32(SYM.sActiveMsg) end
 
 local function procLine(i, p, prev)
     -- scrCur as an offset from the script head: the exact PROC_* command it sits on.
@@ -6613,15 +6613,23 @@ scenarios.ch05recruit = function(opts)
             -- The ROM cannot produce it -- --ch05-lupin LOAD1s him ONTO the map -- so the state
             -- is written here: off the tile grid, off the map, and flagged not-deployed, which
             -- is what a unit the player never placed looks like to both CHECK_ commands.
+            -- US_HIDDEN IS NOT OPTIONAL, and leaving it off is not merely untidy:
+            -- `RefreshUnitsOnBmMap` (bmmap.c:523) skips a unit on US_HIDDEN and on NOTHING
+            -- ELSE, so on the next phase transition it would write this unit's index to
+            -- gBmMapUnit[-1][-1] -- off the map array entirely. The engine always sets the
+            -- pair (bmio.c:1260 and bmsave.c:417 both write US_HIDDEN | US_NOT_DEPLOYED).
             setMapUnit(wolf.x, wolf.y, 0)
             emu:write8(wolf.addr + 0x10, 0xFF)          -- xPos -1: nowhere on the map
             emu:write8(wolf.addr + 0x11, 0xFF)
-            emu:write32(wolf.addr + 0x0C, wolf.state | 8)  -- US_NOT_DEPLOYED, bmunit.h (1 << 3)
+            emu:write32(wolf.addr + 0x0C, wolf.state | 8 | 1)  -- US_NOT_DEPLOYED | US_HIDDEN
         elseif opts.lupin == "killed" then
             -- Recruited, then LOST. Collapses onto the no-Lupin arm on purpose: a dead wolf is
             -- no more "out there now, with travelers" than one who was never won.
+            -- Same pairing, same reason: without US_HIDDEN the refresh puts the corpse
+            -- back on the tile grid at its old position. bmsave.c:414 writes the dead
+            -- state as US_HIDDEN | US_DEAD.
             setMapUnit(wolf.x, wolf.y, 0)
-            emu:write32(wolf.addr + 0x0C, wolf.state | US_DEAD)
+            emu:write32(wolf.addr + 0x0C, wolf.state | US_DEAD | 1)  -- ... | US_HIDDEN
         else
             return result("FAIL", "unknown lupin state " .. tostring(opts.lupin))
         end

@@ -6781,7 +6781,7 @@ def talk_recruit_char_entries(recruiters, target, flag, script):
                    for r in recruiters)
 
 
-def talk_recruit_script(msg_id, target, pre_script='', variant=None):
+def talk_recruit_script(msg_id, target, pre_script='', variant=None, label_base=0):
     """The shared talk-recruit script (cf. vanilla EventScr_Ch3_Talk_NeimiColm): show the
     migrated talk line, then CUSA `target` to BLUE (EvtChangeFaction), set the map-event
     visibility evbit, end. MUSS/STAL are trimmed -- the line rides the map talk window, not a
@@ -6805,13 +6805,20 @@ def talk_recruit_script(msg_id, target, pre_script='', variant=None):
 
     Only TEXTSHOW+TEXTEND go inside the arms. `TEXTSTART`, the `REMA` and above all the CUSA
     stay SHARED, exactly as ch14a shares everything past its LABEL -- a recruit duplicated into
-    both arms is one recruit to fix twice."""
+    both arms is one recruit to fix twice.
+
+    `label_base` offsets the branch's label PAIR. It exists because `pre_script` can carry
+    labels of its own -- ch04's parley passes a `convert_survivors_green` sweep, one skip label
+    per wolf -- and BEQ/GOTO scan the whole list for a matching LABEL, so a collision jumps into
+    the wrong arm. ch04 sits at 0x40 and does not currently pass a `variant`, which is the only
+    reason 0 is safe as a default; a caller doing both must move one of them."""
     beat = ('    TEXTSHOW(0x%X)\n'
             '    TEXTEND\n')
     return ('{\n'
             '    TEXTSTART\n'
             + (beat % msg_id if variant is None
-               else branch_on_check_alive(variant[0], beat % msg_id, beat % variant[1]))
+               else branch_on_check_alive(variant[0], beat % msg_id, beat % variant[1],
+                                          label_base=label_base))
             + '    REMA\n'
             + pre_script
             + '    CUSA(%s) /* -> blue: the talk recruits the target */\n'
@@ -6820,7 +6827,7 @@ def talk_recruit_script(msg_id, target, pre_script='', variant=None):
 
 
 def talk_recruit_wiring(recruiters, target, flag, script_symbol, msg_id, pre_script='',
-                        variant=None):
+                        variant=None, label_base=0):
     """Assemble the reusable on-map talk-recruit event wiring (ch03 Trex / ch04 Lupin / ch05
     Basil+Sahnar). Returns (char_events, talk_script):
       char_events -- the EventListScr_..._Character body: one CHAR(flag, script, recruiter,
@@ -6833,7 +6840,7 @@ def talk_recruit_wiring(recruiters, target, flag, script_symbol, msg_id, pre_scr
     char_events = ('{\n' + talk_recruit_char_entries(recruiters, target, flag, script_symbol)
                    + '    END_MAIN\n}')
     return char_events, talk_recruit_script(msg_id, target, pre_script=pre_script,
-                                           variant=variant)
+                                           variant=variant, label_base=label_base)
 
 
 def midmap_minibosses(chap):
@@ -8723,7 +8730,10 @@ CH04_LUPIN_TALK_FLAG = 'EVFLAG_TMP(9)'         # one-shot recruit flag (ch03's C
 # byte-identical to 0xb3's, and the wolf's CLASS comes from the unit definition (bmunit.c:697),
 # so the split is invisible in play. Guarded by assert_pack_pids_addressable.
 CH04_PACK_PIDS = ('0xb0', '0xb1', '0xb2', '0xb4', '0xb5')
-CH04_PARLEY_LABEL_BASE = 0x40   # one skip label per wolf; the talk script has no other labels
+CH04_PARLEY_LABEL_BASE = 0x40   # one skip label per wolf. The talk script HAS carried labels of
+                                # its own since ch05's Talk grew a no-Lupin branch (0 and 1), so
+                                # this is no longer "the only labels here" -- it is a base that
+                                # must stay clear of talk_recruit_script's own `label_base`.
 CH04_GREEN_PACK_CLASS = 'CLASS_MTD_LYCANROC_PACK'  # campaign.yaml enemy_class_reskins: a Mauthe
                                                # Doog clone wearing the Lycanroc map sprite.
                                                # DECLARED BUT UNWORN since #203: converting the

@@ -430,6 +430,10 @@ suites:
     - ch05reliquaries
     - ch05arena
     - ch05recruit
+    # ch05recruit alone only ever walks the no-Lupin arm (the gate ROM has no wolf), so an
+    # inverted BEQ or a swapped pair of message ids would pass it. This is the run that
+    # walks the OTHER arm, and it is the only one that does.
+    - ch05lupinbenched
     - ch05raid
     - ch05crest
 
@@ -484,6 +488,8 @@ suites:
     - ch05reliquaries
     - ch05arena
     - ch05recruit
+    - ch05lupinbenched
+    - ch05lupinkilled
     - ch05raid
     - ch05crest
 

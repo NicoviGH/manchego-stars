@@ -2724,6 +2724,20 @@ class Ch05SahnarTalkNoLupinFallback(unittest.TestCase):
         self.assertLess(script.index('TEXTSHOW(0x%X)' % bc.CH05_SAHNAR_TALK_NO_LUPIN_MSG),
                         script.index('CUSA(CHARACTER_MARISA)'))
 
+    def test_the_branchs_labels_can_be_moved_off_a_pre_scripts_own(self):
+        """BEQ/GOTO scan the whole event list for a matching LABEL, so a branch left at 0 in a
+        script whose `pre_script` also uses 0 jumps into the wrong arm. ch04's parley passes
+        exactly such a sweep (one skip label per wolf), and it is only the distance between
+        0x40 and 0 that keeps that safe today -- so the offset has to be reachable."""
+        _chars, moved = bc.talk_recruit_wiring(
+            ['CHARACTER_ARTUR'], 'CHARACTER_MARISA', bc.CH05_SAHNAR_TALK_FLAG, 'MS_Test',
+            bc.CH05_SAHNAR_TALK_MSG,
+            variant=(bc.CH05_LUPIN_CHARACTER, bc.CH05_SAHNAR_TALK_NO_LUPIN_MSG),
+            label_base=0x50)
+        self.assertIn('LABEL(0x50)', moved)
+        self.assertIn('LABEL(0x51)', moved)
+        self.assertNotIn('LABEL(0x0)', moved)
+
     def test_an_unbranched_talk_still_emits_no_branch_at_all(self):
         """ch03's Trex and ch04's Lupin pass no variant and must be byte-identical to before --
         the whole point of parameterising the ONE flow rather than forking it."""
