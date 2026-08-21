@@ -61,6 +61,24 @@ FALLBACK_PX = 8
 # box overflowed a line by 3px under it, which is the arbitrary margin showing up as content.
 TALK_BUDGET_PX = 203
 
+# ...and the two OTHER windows, which are not the talk bubble and do not get its budget.
+# "Not every panel is the talk window" is the whole hazard of measuring in pixels: the number
+# is only valid for the renderer it was measured on.
+#
+# THE BATTLE BUBBLE. A quote shown during a battle animation goes through the same
+# `PutTalkBubble`, but `IsBattleDeamonActive()` pushes it into case 2/3 (scene.c:1769), which
+# HARD-FORCES `width = 20` tiles and `x = 9`/`1` -- the text width is ignored entirely, and text
+# draws from `xText = x + 1`. A 203px line from `[OpenMidLeft]` would start at tile 10 and run
+# to tile ~36 on a 32-tile tilemap: off the map, wrapping the row. 20 tiles less the 2 border
+# tiles is 144px, and vanilla agrees to the pixel -- all 123 of its battle-quote messages cap
+# at 143px. Battle quotes, defeat quotes and death quotes all ride this.
+BATTLE_QUOTE_BUDGET_PX = 143
+
+# THE OPAQUE AUTO-CENTERED BOX. `SOLOTEXTBOXSTART` (faceless narration, #58) and
+# `TUTORIALTEXTBOXSTART` (the lord-select explainer) both land in helpbox.c, whose box width is
+# clamped to `0xC0` = 192px (helpbox.c:114, :977, :1436) while the text itself draws unclamped.
+SOLO_BOX_BUDGET_PX = 192
+
 
 def text_px(text):
     """Drawn width of one line, in pixels. Control tags are the caller's problem: this measures

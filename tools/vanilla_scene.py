@@ -7,7 +7,7 @@ beside the vanilla ones for pacing reference (dialogue-pass §Inputs #4).
 
 A scene mixes two text CHANNELS and both are reported, because the channel sets
 the line width we hand-box to:
-  * on-map   -- units staged by LOAD1, the speaker anchors a bubble; wraps at 29 chars
+  * on-map   -- units staged by LOAD1, the speaker anchors a bubble (talk-bubble budget)
   * backdrop -- a still BG_* image with the map faded out; full-width text, wraps ~42
 and NEITHER is readable from the text call. Reading only `TEXTSHOW` hides whole
 scenes: FE8 Ch5's opening puts the two Grado command scenes (0x9BC Glen/Saar,

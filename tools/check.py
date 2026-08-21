@@ -76,6 +76,13 @@ DEAD_CONCEPTS = [
     # the quake no longer cracks her sarcophagus, and scene 6 is a plain on-map bubble --
     # the "one place the twin fails us" note was only ever true while she was absent from the
     # field, and a later pass must not build it the backdrop that note asked for.
+    # retired by the pixel wrap (2026-08-21): `_wrap_fe_lines` takes a PIXEL budget, and the
+    # 29/42/28 CHARACTER widths are gone. The engine never counted characters -- GetStrTalkLen
+    # sums glyph->width -- and the 29 was generalised from MSG_910, one narrow vanilla message.
+    # A comment that still prices a channel in characters is describing a wrapper we deleted,
+    # and mixing the units is what shipped ch05's moose scene at seven characters a line.
+    r'(?:wraps?|wrapped|wrapping) at (?:the )?(?:on-?map |scenic |full-screen )?(?:29|42|28)\b',
+    r'(?:map[- ])?bubble\'?s? (?:own )?29\b', r'scenic 42\b', r'the on-map 28\b',
     r'(?:eruption|quake).{0,30}(?:wakes?|cracks?).{0,20}(?:Sahnar|sarcophagus)',
     r'Sahnar.{0,20}rises? (?:HOSTILE )?(?:at|with) the eruption',
     r'scene 6 (?:does not inherit|needs a backdrop)',

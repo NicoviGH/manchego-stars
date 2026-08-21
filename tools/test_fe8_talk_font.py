@@ -56,5 +56,23 @@ class Measuring(unittest.TestCase):
                              203)
 
 
+class TheOtherWindowsAreNarrower(unittest.TestCase):
+    """The hazard of a pixel budget: it is only valid for the renderer it was measured on.
+    Three windows, three numbers -- and two of them are NOT the talk bubble."""
+
+    def test_the_battle_bubble_is_the_tightest_because_its_width_is_FORCED(self):
+        """`IsBattleDeamonActive()` pushes PutTalkBubble into case 2/3 (scene.c:1769), which
+        overwrites the measured width with a flat 20 tiles. The text is not consulted, so a
+        line sized for the talk window draws straight off a 32-tile tilemap."""
+        self.assertLess(font.BATTLE_QUOTE_BUDGET_PX, font.SOLO_BOX_BUDGET_PX)
+        self.assertLess(font.BATTLE_QUOTE_BUDGET_PX, font.TALK_BUDGET_PX)
+        self.assertLessEqual(font.BATTLE_QUOTE_BUDGET_PX, (20 - 2) * 8)
+
+    def test_the_auto_centered_box_is_clamped_to_its_helpbox_width(self):
+        """SOLOTEXTBOXSTART and TUTORIALTEXTBOXSTART both clamp at 0xC0 in helpbox.c."""
+        self.assertEqual(0xC0, font.SOLO_BOX_BUDGET_PX)
+        self.assertLess(font.SOLO_BOX_BUDGET_PX, font.TALK_BUDGET_PX)
+
+
 if __name__ == '__main__':
     unittest.main()

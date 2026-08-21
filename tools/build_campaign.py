@@ -1419,7 +1419,10 @@ def _script_to_message(script, staging, width=fe8_talk_font.TALK_BUDGET_PX, face
     skipped here. `stage_break` is the exception that IS rendered: it emits
     vanilla's `[BreakTalk]`, a pause the event script resumes with `TEXTCONT`, so
     a wordless action can happen mid-message without buying a second message id
-    (see SCRIPT_DIRECTIVES). `width` is the wrap width (29 = map speech bubble;
+    (see SCRIPT_DIRECTIVES). `width` is a PIXEL budget and `measure` the function that
+    applies it -- fe8_talk_font.TALK_BUDGET_PX for the talk bubble, BATTLE_QUOTE_BUDGET_PX for
+    a quote shown during a battle animation, SOLO_BOX_BUDGET_PX for the auto-centered helpbox.
+    Passing a character count here is the failure this parameter used to invite (was:
     ~42 for a full-screen scenic BG -- see _wrap_fe_lines).
 
     `trailing` is a raw text-code string appended just before the [X] terminator --
@@ -6285,9 +6288,9 @@ def inject_prologue(campaign, verbose=True, montage=False):
     set_message_body(lines, 0x918, _script_to_message(
         events['chapter_end']['script'], ending_staging))
     set_message_body(lines, 0x936, _script_to_message(
-        [{'sephek': by_id['sephek-kaltro']['death_quote']}], opening_staging))
+        [{'sephek': by_id['sephek-kaltro']['death_quote']}], opening_staging, width=fe8_talk_font.BATTLE_QUOTE_BUDGET_PX))
     set_message_body(lines, 0x917, _script_to_message(
-        [{'hlin': by_id['hlin-trollbane']['death_quote']}], ending_staging))
+        [{'hlin': by_id['hlin-trollbane']['death_quote']}], ending_staging, width=fe8_talk_font.BATTLE_QUOTE_BUDGET_PX))
     set_message_body(lines, 0xC25, _script_to_message(
         [{'scramsax': by_id['scramsax']['defeat_quote']}], ending_staging))
 
@@ -6543,9 +6546,9 @@ def _emit_scene_beats(lines, msg_ids, beats, fid, home, overrides=None,
                       preloads=None, width=None, trailings=None):
     """Write one message per scenic beat (staging via _stage_beat, body via
     _script_to_message). width=None picks per beat: faceless-narration beats ride
-    the opaque, auto-centered SOLOTEXTBOXSTART box (#58) wrapped at the on-map 28
-    (42 overflows the centered box); faced beats use the full-screen scenic 42.
-    A fixed width (e.g. 42) overrides for scenes with no narration beats.
+    the opaque, auto-centered SOLOTEXTBOXSTART box (#58) at SOLO_BOX_BUDGET_PX (helpbox.c
+    clamps that box to 0xC0 while its text draws unclamped); faced beats take the talk
+    bubble's TALK_BUDGET_PX. A fixed width overrides for scenes with no narration beats.
     `trailings` (parallel to beats) appends a raw text-code to a beat's body -- see
     _script_to_message's `trailing` (the single-face-exit fade)."""
     overrides = overrides or [None] * len(beats)
@@ -6560,9 +6563,14 @@ def _emit_scene_beats(lines, msg_ids, beats, fid, home, overrides=None,
         # Faced scene beats render via _scenic_beat_calls -> Text() -> a TALK BUBBLE (PutTalkBubble),
         # NOT a full-screen box -- and a bubble line over 29 tiles hits the unclamped x = 29 - width
         # < 0 branch and overflows off the right edge (the ch03 crier "...pays fifty gold to whoever
-        # cle|" bug). So faced beats must wrap at the map-bubble 29 (the entrance line already does);
-        # narration keeps the 28 that fits the auto-centered SOLOTEXTBOXSTART.
-        w = width if width is not None else fe8_talk_font.TALK_BUDGET_PX
+        # cle|" bug). So faced beats take the talk bubble's pixel budget; narration keeps the
+        # narrower one that fits the auto-centered SOLOTEXTBOXSTART.
+        # width=None still picks PER BEAT, and the pair is not cosmetic: a faceless narration
+        # beat rides the opaque auto-centered SOLOTEXTBOXSTART box, which helpbox.c clamps to
+        # 0xC0 while its text draws unclamped. Only a FACED beat gets the talk bubble's budget.
+        w = width if width is not None else (
+            fe8_talk_font.SOLO_BOX_BUDGET_PX if _beat_is_narration(beat)
+            else fe8_talk_font.TALK_BUDGET_PX)
         set_message_body(lines, msg_id, _script_to_message(
             beat, _stage_beat(beat, fid, home, override), width=w, preload=preload,
             trailing=trailing))
@@ -7952,9 +7960,9 @@ def inject_ch01(campaign, verbose=True):
     # both from the chapter YAML (lore/izobai.md voice). She/her throughout.
     izobai_face = {'izobai': ('[OpenMidRight]', _fid_tag(CH01_BOSS_SLOT))}
     set_message_body(lines, CH01_TAUNT_MSG, _script_to_message(
-        [{'izobai': chief['taunt']}], izobai_face))
+        [{'izobai': chief['taunt']}], izobai_face, width=fe8_talk_font.BATTLE_QUOTE_BUDGET_PX))
     set_message_body(lines, 0x961, _script_to_message(
-        [{'izobai': chief['death_quote']}], izobai_face))
+        [{'izobai': chief['death_quote']}], izobai_face, width=fe8_talk_font.BATTLE_QUOTE_BUDGET_PX))
     # Hint houses -- vanilla Ch1's own two house quotes (0x93B/0x93C) reskinned with the
     # goblin nouns (dialogue pass, 2026-06-17). Two different villager faces, like vanilla.
     set_message_body(lines, 0x93B, _script_to_message([{'villager': (
@@ -8017,7 +8025,10 @@ def inject_ch01(campaign, verbose=True):
         set_message_body(lines, LORDSEL_PITCH_MSGS[i], _term_pad(body + '[X]'))
     # The one-time explainer box (#46 (a)) rides the normal tutorial text box, so it uses
     # the talk decoder: [A] page breaks every two lines + the standard [.] parity pad.
-    expl = _wrap_fe_lines(_fe_dialogue_text(LORDSEL_EXPLAINER_TEXT))
+    # TUTORIALTEXTBOXSTART, not the talk bubble: Event1B_TEXTSHOW routes it through the same
+    # helpbox proc as the solo box, whose width clamps at 0xC0.
+    expl = _wrap_fe_lines(_fe_dialogue_text(LORDSEL_EXPLAINER_TEXT),
+                          fe8_talk_font.SOLO_BOX_BUDGET_PX)
     expl_body = ''.join(
         ln + ('' if j == len(expl) - 1
               else '[A]' if (j + 1) % 2 == 0 else '[LF]')
@@ -8551,7 +8562,7 @@ def inject_ch02(campaign, verbose=True):
     _emit_scene_beats(lines, CH02_ENDING_MSGS, end_beats, cut_fid, {})
     set_message_body(lines, CH02_BOSS_DEATH_MSG, _script_to_message(
         [{'halvar': halvar['death_quote']}],
-        {'halvar': ('[OpenMidRight]', _fid_tag(CH02_BOSS_SLOT))}))
+        {'halvar': ('[OpenMidRight]', _fid_tag(CH02_BOSS_SLOT))}, width=fe8_talk_font.BATTLE_QUOTE_BUDGET_PX))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 
@@ -9099,7 +9110,7 @@ CH05_GOAL_STATUS_MSG = 0x9F5
 # lines above it is what it actually plays over. So the Joshua/Natasha meet-cute -- our scene 1's
 # twin -- is a BACKDROP scene, and our three tomb scenes are too. It also settles the question the
 # scene table left open: nothing is staged on the field this early, so no talk bubble has a unit
-# to anchor to (PutTalkBubble needs one), and the full-screen window wraps at 42 rather than 29.
+# to anchor to (PutTalkBubble needs one); both windows now take one measured pixel budget.
 #
 # ONE backdrop across all three, which is vanilla's habit too -- it spends BG_SERAFEW_VILLAGE on
 # four consecutive scenes and only switches to BG_TOWN when the party physically arrives.
@@ -9132,7 +9143,7 @@ CH05_ARRIVAL_NO_LUPIN_MSG = 0x9ED
 # reference and nothing else, and CHECK_ALIVE resolves a pid through GetUnitFromCharId).
 CH05_LUPIN_CHARACTER = char_symbol(PORTRAIT_MAP['lupin'])
 # ── Scene 5 (#25): Basil trundles up, cracks the tourist joke, and JOINS ─────────────────────
-# The opening's FIRST on-map beat, so it wraps at the talk bubble's 29 rather than the scenic 42
+# The opening's FIRST on-map beat, so it wraps at the talk bubble's budget
 # -- and the one scene whose PLACEMENT does not inherit from the twin. Vanilla plays its 0x9C2
 # BEFORE the prep CALL, but it can: it LOAD1s its speaking party onto the street first. Ours is
 # placed BY prep (the ally table is never LOADed on a prep chapter -- decisions.md "How the deploy
@@ -9556,7 +9567,7 @@ def variant_beat(beat, fallback, err_label):
 
     A `script:` entry may be a LIST of boxes rather than one, and then the named box is
     replaced by all of them. A substitute chosen as prose can simply be too long for the
-    channel it lands in -- ch05's on-map fallbacks are, at the talk bubble's 29 -- and the
+    channel it lands in -- ch05's on-map fallbacks were, at the old 29 -- and the
     author has to place the extra A-press, because a wrapper left to choose it puts the page
     break mid-clause. `boxes:`/`replaces:`/`script:` still agree one-for-one; only the
     substitute is plural, which is what keeps this one mechanism rather than two.
@@ -9619,7 +9630,7 @@ def locked_and_variant(script, fallback, render, err_label, msgs):
     The pairing every fallback in this campaign takes, kept independent of the CHANNEL because
     the two channels render nothing alike -- a backdrop scene goes through `_ch05_opening_body`
     (podium-checked, width 42) while an on-map one goes straight to `_script_to_message` at the
-    bubble's 29. `render` is whatever turns a beat into a body; everything else here is the part
+    bubble's budget. `render` is whatever turns a beat into a body; everything else is the part
     that must not be written twice.
 
     Whole copies rather than a prefix/arm/suffix split, which is vanilla's own economy: ch14a's
@@ -11072,8 +11083,9 @@ def inject_ch03(campaign, boot=False, verbose=True):
                       trailings=op_trailings)
     set_message_body(lines, CH03_ENDING_CARD_MSG, name_message_body(end_card))
     _emit_scene_beats(lines, CH03_ENDING_MSGS, end_beats, cut_fid, {})
-    # Midmap RBG-execution beats (on-map, no card): faced beats wrap at the map-bubble 29; the two
-    # faceless ACTION boxes wrap at 28 for the auto-centered opaque box. Beat A (Pinky's opening)
+    # Midmap RBG-execution beats (on-map, no card): faced beats wrap at the talk bubble's budget; the two
+    # faceless ACTION boxes take SOLO_BOX_BUDGET_PX, the auto-centered opaque box's own clamp.
+    # Beat A (Pinky's opening)
     # PRELOADS the Brute's mug as a silent listener at mid-right, so the player sees WHO Pinky is
     # talking to before it lunges (the Brute otherwise only appeared when it snarled in A3 -- Nicolas
     # 2026-07-11). The Brute + RBG both anchor mid-right via op_home (never on screen together; each
@@ -11087,7 +11099,8 @@ def inject_ch03(campaign, boot=False, verbose=True):
         # which nobody has measured in pixels, so it keeps the character width it was authored
         # against and says so with `measure=len`. Converting it on the talk window's evidence
         # would be extending a measurement past what it measured.
-        kw = ({'width': 28, 'measure': len} if _beat_is_faceless(beat, cut_fid) else {})
+        kw = ({'width': fe8_talk_font.SOLO_BOX_BUDGET_PX}
+              if _beat_is_faceless(beat, cut_fid) else {})
         set_message_body(lines, msg, _script_to_message(
             beat, _stage_beat(beat, cut_fid, op_home), preload=preload, **kw))
     set_message_body(lines, CH03_TREX_ENTRANCE_MSG, _script_to_message(
@@ -11453,13 +11466,13 @@ def inject_ch04(campaign, boot=False, verbose=True):
     # ch04 scene (#208; they were Python literals left over from the Stage 2c stubs). Lupin
     # commands the pack from the pack side (mid-right); Marty reads it cross-field from the party
     # side (mid-left) and FLAGS the parley -- the beat that teaches "talk to the leader".
-    # ON-MAP, so it wraps at the map-bubble 29 like the moose beat, not the BG scenes' 42.
+    # ON-MAP -- same talk-bubble budget as the moose beat (one budget now; see fe8_talk_font).
     _, reveal_beats = _split_event_beats(chap, 'wolf_pack_reveal', 'ch04 turn-2 reveal',
                                          msg_ids=CH04_REVEAL_MSGS, card_required=False)
     _emit_scene_beats(lines, CH04_REVEAL_MSGS, reveal_beats, cut_fid,
                       {'lupin': '[OpenMidRight]', 'marty': '[OpenMidLeft]'})
     # Stage 4 scene bodies. The opening + both endings play over a BG (full-screen window, wrap
-    # 42); the moose beat is ON-MAP, so it wraps at the map-bubble 29 (a wider line hits
+    # the talk budget); the moose beat is ON-MAP and takes the same one (a wider line hits
     # PutTalkBubble's unclamped right-side branch and runs off the tilemap -- the ch03 crier bug).
     set_message_body(lines, CH04_OPENING_CARD_MSG, name_message_body(op_card))
     _emit_scene_beats(lines, CH04_OPENING_MSGS, op_beats, cut_fid, op_home)
@@ -11477,7 +11490,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
     # The village lines (#205, #24). The axe door is Nimsy herself, wearing the vanilla old-lady
     # mug the opening already gave her; the forest cottage is a logger who never opens up, on
     # vanilla's own snag-village mug. Both play over BG_NORMAL_VILLAGE (full-screen window), so
-    # they wrap at 42 like the other BG scenes rather than the on-map bubble's 29.
+    # they take the same talk budget as every other faced scene.
     #
     # One `visit_text` entry per BOX: consecutive turns by one speaker coalesce into a single
     # [OpenX] block with each entry's pages kept whole, so the authored beats survive as the
@@ -11642,7 +11655,7 @@ def ch05_ravisin_taunt_message(chap):
         sys.exit('ERROR: ch05 Ravisin battle taunt must remain one locked Ravisin box')
     return _script_to_message(
         beat,
-        {'ravisin': ('[OpenMidLeft]', _fid_tag(GUEST_PORTRAIT_MAP['ravisin']))})
+        {'ravisin': ('[OpenMidLeft]', _fid_tag(GUEST_PORTRAIT_MAP['ravisin']))}, fe8_talk_font.BATTLE_QUOTE_BUDGET_PX)
 
 
 def ch05_ravisin_death_message(chap):
@@ -11660,7 +11673,7 @@ def ch05_ravisin_death_message(chap):
         sys.exit('ERROR: ch05 Ravisin death quote must remain one locked Ravisin box')
     return _script_to_message(
         beat,
-        {'ravisin': ('[OpenMidRight]', _fid_tag(GUEST_PORTRAIT_MAP['ravisin']))})
+        {'ravisin': ('[OpenMidRight]', _fid_tag(GUEST_PORTRAIT_MAP['ravisin']))}, fe8_talk_font.BATTLE_QUOTE_BUDGET_PX)
 
 
 def ch05_sahnar_talk_messages(chap):
@@ -11677,7 +11690,7 @@ def ch05_sahnar_talk_messages(chap):
     reads as two people facing each other rather than one podium swapping faces. Basil is the
     Natasha-donor Cleric walked across under escort; Sahnar is the red crit-Myrmidon she turns.
 
-    ON-MAP, so the body wraps at the map bubble's 29 -- a wider line hits PutTalkBubble's
+    ON-MAP, so the body wraps at the talk bubble's pixel budget -- a wider line hits PutTalkBubble's
     unclamped right-side branch and runs off the tilemap (the ch03 crier bug). Consecutive turns
     by one speaker coalesce into a single [OpenX] block with the authored breaks kept as pages,
     so all sixteen A-presses survive.
@@ -11774,9 +11787,9 @@ def ch05_opening_messages(chap):
     at CH05_ARRIVAL_SLOT's id and the substituted variant at CH05_ARRIVAL_NO_LUPIN_MSG, one of
     which `branch_on_check_alive` plays. That is the whole cost of a fallback -- one extra id.
 
-    Rendered at the full-screen scenic 42 rather than the map bubble's 29: these play over a
+    Rendered at the talk budget like every faced scene: these play over a
     BACG with nothing staged on the field, which is vanilla Ch5's own channel for the same
-    beats (see CH05_OPENING_SLOTS). A faced beat wrapped at 29 would merely be needlessly
+    beats (see CH05_OPENING_SLOTS). A faced beat wrapped narrower would merely be needlessly
     narrow here -- the 29 exists for PutTalkBubble's unclamped right edge, and there is no
     bubble.
 
@@ -11810,7 +11823,7 @@ def ch05_opening_messages(chap):
 def ch05_basil_join_messages(chap):
     """Scene 5 -- Basil's join -- and its no-Lupin twin, as (msg_id, body) pairs.
 
-    The opening's first ON-MAP beat, so it renders at the talk bubble's 29 and not the backdrop
+    The opening's first ON-MAP beat, so it renders at the talk bubble's budget and not the backdrop
     scenes' 42: `PutTalkBubble`'s right-side branch computes x = 29 - width with no clamp, so a
     wider line runs off the tilemap (the ch03 crier bug). Everything else is the arrival's
     machinery unchanged, which is the point of `_ch05_scene_and_variant`.
@@ -11834,7 +11847,7 @@ def ch05_sahnar_alone_message(chap):
     never met the wolf and never mentions him, so there is nothing for a no-Lupin branch to
     substitute and the scene costs one id.
 
-    Rendered at the talk bubble's 29, not the backdrop scenes' 42. That is the twin's channel
+    Rendered at the talk bubble's budget. That is the twin's channel
     taken whole: vanilla plays its 0x9C3 as a bare `TEXTSHOW` over the map with Joshua standing
     on this same tile. Until 2026-08-14 ours could not, because Sahnar did not exist on the
     field until the turn-2 eruption; the scene-3 summon is what put her there.
@@ -11853,7 +11866,7 @@ def ch05_moose_charge_message(chap):
     SCENE CHANGE: the full-screen CG needs `REMOVEPORTRAITS`, that tears the talk down, and a
     `[BreakTalk]` pause cannot survive it (filmed 2026-08-15 -- the CG played, the charge played,
     and the quip never appeared). One `stage_cut:`, two ids, and the second is what the bellow
-    costs. Both render at the talk bubble's 29 -- they are on-map beats either side of the image.
+    costs. Both render at the talk bubble's budget -- on-map beats either side of the image.
 
     One arm, so no variant: the moose is ch04's quarry and Lupin's presence changes nothing
     about it (Pinky is the party's other tracker and asks on either path).
@@ -12797,8 +12810,8 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     for msg_id, body in arena_wiring['messages']:
         set_message_body(lines, msg_id, body)
     # The four reliquary visits (#25). Each site's speaker is one of the tomb's risen dead, over
-    # BG_HOUSE -- a full-screen backdrop, so these wrap at 42 like the other BG scenes and NOT at
-    # the on-map bubble's 29. One `visit_text` entry per BOX, ch04's lesson: the authored A-press
+    # BG_HOUSE -- a full-screen backdrop, wrapped at the same talk budget as the BG scenes, not at
+    # the on-map bubble. One `visit_text` entry per BOX, ch04's lesson: the authored A-press
     # breaks are the pacing (27 boxes against vanilla Ch5's own 26), and a flowed scalar would
     # reflow them to wherever 42 columns happen to land.
     for village in chap['villages']:
@@ -12954,7 +12967,7 @@ def inject_pc_death_quotes(campaign, verbose=True):
             sys.exit('ERROR: %s YAML has no death_quote (#6 requires one per cast member)'
                      % unit_id)
         set_message_body(lines, PC_DEATH_QUOTE_MSGS[unit_id], _script_to_message(
-            [{unit_id: quote}], {unit_id: ('[OpenMidLeft]', _fid_tag(slot))}))
+            [{unit_id: quote}], {unit_id: ('[OpenMidLeft]', _fid_tag(slot))}, width=fe8_talk_font.BATTLE_QUOTE_BUDGET_PX))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     # 2. Prepend the entries at the head of gDefeatTalkList (same idiom as the boss

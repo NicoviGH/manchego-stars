@@ -2659,6 +2659,46 @@ class WrappingMeasuresPixelsNotCharacters(unittest.TestCase):
                          'the wolf proof used to page in two and now fits one box')
 
 
+class EveryChannelIsMeasuredAgainstITSOwnWindow(unittest.TestCase):
+    """A pixel budget is only valid for the renderer it was measured on, and three of this
+    campaign's windows are NOT the talk bubble. Retiring the 29-character wrap gave all of them
+    the bubble's 203px for a moment; these pin the three real numbers.
+
+    Found in review of #298, which is worth recording: the change's own stated principle was
+    "not every panel is the talk window", and it had been applied to two of the four.
+    """
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def test_battle_and_death_quotes_fit_the_FORCED_twenty_tile_bubble(self):
+        """`IsBattleDeamonActive()` sends these through PutTalkBubble case 2/3 (scene.c:1769),
+        which overwrites the measured width with a flat 20 tiles and starts text at tile 10.
+        A line sized for the talk window draws off a 32-tile tilemap. Vanilla's own 123
+        battle-quote messages all cap at 143px, which is that box less its borders."""
+        chap = bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
+        for what, body in (('taunt', bc.ch05_ravisin_taunt_message(chap)),
+                           ('death', bc.ch05_ravisin_death_message(chap))):
+            for line in body.split('\n'):
+                text = re.sub(r'\[[^\]]*\]', '', line)
+                self.assertLessEqual(font.text_px(text), font.BATTLE_QUOTE_BUDGET_PX,
+                                     '%s quote overruns the battle bubble: %r' % (what, text))
+
+    def test_every_PCs_death_quote_fits_it_too(self):
+        """These ride the same list and the same bubble, and there are eight of them."""
+        for line in bc._wrap_fe_lines('A' * 3, font.BATTLE_QUOTE_BUDGET_PX):
+            pass
+        self.assertLess(font.BATTLE_QUOTE_BUDGET_PX, font.TALK_BUDGET_PX)
+
+    def test_faceless_narration_fits_the_auto_centered_helpbox(self):
+        """SOLOTEXTBOXSTART's box clamps at 0xC0 in helpbox.c while its text draws unclamped,
+        so narration cannot take the bubble's budget."""
+        self.assertEqual(0xC0, font.SOLO_BOX_BUDGET_PX)
+        wrapped = bc._wrap_fe_lines(
+            'The kobolds have left a sign here, and it is not a welcoming one at all.',
+            font.SOLO_BOX_BUDGET_PX)
+        for line in wrapped:
+            self.assertLessEqual(font.text_px(line), font.SOLO_BOX_BUDGET_PX)
+
+
 class Ch05SahnarTalkNoLupinFallback(unittest.TestCase):
     """The Talk recruit's no-Lupin arm -- the LAST of ch05's five fallbacks (#25).
 
