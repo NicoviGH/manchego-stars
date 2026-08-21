@@ -20,6 +20,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_campaign as bc
+import fe8_talk_font as font
 from inject import engine_hooks as eh
 
 # Read the COMMITTED decomp, not the working tree -- the build overwrites donor portrait
@@ -1958,10 +1959,11 @@ class Ch04RuntimeHost(unittest.TestCase):
         where a 42-column wrap happens to land. One YAML entry == one GBA box."""
         for village in self._chap()['villages']:
             for box in bc.village_boxes(village):
-                lines = bc._wrap_fe_lines(bc._fe_dialogue_text(box), 42)
+                lines = bc._wrap_fe_lines(bc._fe_dialogue_text(box))
                 self.assertLessEqual(len(lines), 2,
-                                     'box overflows its A-press in %r: %r'
-                                     % (village['id'], box))
+                                     'box overflows its A-press in %r (%dpx): %r'
+                                     % (village['id'], font.text_px(
+                                         bc._fe_dialogue_text(box)), box))
 
     def test_the_axe_villages_boxes_match_vanillas_own_four(self):
         """Vanilla's MSG_9B5 is FOUR boxes, each broken on a sentence. Flowed as one scalar
@@ -2300,7 +2302,7 @@ class Ch05EruptionWarning(unittest.TestCase):
         self.assertEqual(4, len(event['script']))
         self.assertEqual({'ravisin'}, {next(iter(box)) for box in event['script']})
         for box in event['script']:
-            self.assertLessEqual(len(bc._wrap_fe_lines(next(iter(box.values())), 29)), 2)
+            self.assertLessEqual(len(bc._wrap_fe_lines(next(iter(box.values())))), 2)
 
         body = bc.ch05_eruption_message(self._chap())
         self.assertIn('[LoadFace][FID_Riev]', body)
@@ -2596,7 +2598,8 @@ class Ch05SahnarTalkRecruit(unittest.TestCase):
         body = dict(bc.ch05_sahnar_talk_messages(self._chap()))[bc.CH05_SAHNAR_TALK_MSG]
         for line in body.split('\n'):
             printable = re.sub(r'\[[^\]]*\]', '', line)
-            self.assertLessEqual(len(printable), 29, 'bubble overflow: %r' % line)
+            self.assertLessEqual(font.text_px(printable), font.TALK_BUDGET_PX,
+                                     'bubble overflow: %r' % line)
 
     def test_talk_script_shows_the_moved_id_then_flips_sahnar_blue(self):
         _chars, script = bc.talk_recruit_wiring(
@@ -2606,6 +2609,54 @@ class Ch05SahnarTalkRecruit(unittest.TestCase):
         self.assertNotIn('TEXTSHOW(0x9CC)', script)
         self.assertLess(script.index('TEXTSHOW(0x%X)' % bc.CH05_SAHNAR_TALK_MSG),
                         script.index('CUSA(CHARACTER_MARISA)'))
+
+
+class WrappingMeasuresPixelsNotCharacters(unittest.TestCase):
+    """`_wrap_fe_lines` used to take a CHARACTER width. The engine has never counted characters:
+    `GetStrTalkLen` (scene.c) sums `glyph->width` in pixels and `StartTalkExt` divides that into
+    tiles. See `docs/decisions.md` -> "We wrapped on-map talk at 29 CHARACTERS".
+    """
+
+    def test_a_line_of_narrow_glyphs_is_allowed_to_be_LONGER(self):
+        """The whole gain. Under a character rule these two wrap identically; under the real
+        constraint the thin one earns more characters because it DRAWS narrower."""
+        narrow = ' '.join(['illililli'] * 6)
+        wide = ' '.join(['WWWWWWWWW'] * 6)
+        self.assertGreater(len(bc._wrap_fe_lines(narrow)[0]),
+                           len(bc._wrap_fe_lines(wide)[0]))
+
+    def test_no_emitted_line_exceeds_the_budget_vanilla_proves_safe(self):
+        text = ('The witch has lost her way. She is disturbing the dead, and I have counted '
+                'every one of them since the stone closed over me.')
+        for line in bc._wrap_fe_lines(text):
+            self.assertLessEqual(font.text_px(line), font.TALK_BUDGET_PX, repr(line))
+
+    def test_the_budget_sits_inside_the_band_vanilla_actually_ships(self):
+        """Calibrated against the WHOLE corpus, not one message -- which is the mistake the old
+        29-character rule made (it generalised MSG_910, a narrow message, into a ceiling).
+
+        Measured over all 35,483 drawn lines in vanilla's `texts.txt`: the 99th percentile is
+        197px, the 99.9th is 211px, and just 38 lines exceed 210px (all of them epilogue cards
+        and system menus, which are not the talk window). A budget in the high 190s therefore
+        emits everything vanilla emits in this channel without sitting on the extreme tail."""
+        self.assertGreaterEqual(font.TALK_BUDGET_PX, 197)   # vanilla's 99th percentile
+        self.assertLessEqual(font.TALK_BUDGET_PX, 211)      # its 99.9th
+
+    def test_the_dash_glue_still_holds_and_still_fits(self):
+        """The one pre-existing invariant this must not break: a bare `--` never opens a line,
+        and the line it lands on still has to fit."""
+        wrapped = bc._wrap_fe_lines('Struck off edges. There was fighting here -- long ago now')
+        self.assertFalse(any(l.startswith('--') for l in wrapped))
+        for line in wrapped:
+            self.assertLessEqual(font.text_px(line), font.TALK_BUDGET_PX, repr(line))
+
+    def test_ch05s_talk_recruit_gets_cheaper_without_losing_a_word(self):
+        """The measurable payoff, asserted on real authored prose rather than a fixture."""
+        chap = bc._load_chapter_yaml('rime-of-the-frostmaiden', bc.CH05_CHAPTER_YAML)
+        event = next(e for e in chap['events'] if e['trigger'] == 'sahnar_talk')
+        box8 = next(iter(event['script'][7].values()))
+        self.assertEqual(1, len(bc._wrap_fe_lines(box8)) // 2 + len(bc._wrap_fe_lines(box8)) % 2,
+                         'the wolf proof used to page in two and now fits one box')
 
 
 class Ch05SahnarTalkNoLupinFallback(unittest.TestCase):
@@ -2695,7 +2746,8 @@ class Ch05SahnarTalkNoLupinFallback(unittest.TestCase):
         for _msg, body in bc.ch05_sahnar_talk_messages(self._chap()):
             for line in body.split('\n'):
                 printable = re.sub(r'\[[^\]]*\]', '', line)
-                self.assertLessEqual(len(printable), 29, 'bubble overflow: %r' % line)
+                self.assertLessEqual(font.text_px(printable), font.TALK_BUDGET_PX,
+                                     'bubble overflow: %r' % line)
 
     def test_both_arms_keep_the_two_shot_and_never_vanillas_faces(self):
         for _msg, body in bc.ch05_sahnar_talk_messages(self._chap()):
@@ -2749,15 +2801,23 @@ class Ch05SahnarTalkNoLupinFallback(unittest.TestCase):
         self.assertNotIn('LABEL', plain)
 
     # -- the hazard this scene carries ----------------------------------------
-    def test_the_two_arms_render_to_the_SAME_press_count(self):
-        """A TRAP, pinned so nobody builds a gate on it. The locked box 8 is 70 characters and
-        the wrapper pages it in two; the substitute is two AUTHORED boxes. Both arms therefore
-        come to the same number of A-presses, so `ch05recruit`'s box-count witness -- which is
-        what proves WHICH id played everywhere else in this chapter -- cannot tell these two
-        apart. The in-engine proof reads `sActiveMsg` instead."""
-        presses = [body.count('[A]') for _msg, body in bc.ch05_sahnar_talk_messages(self._chap())]
-        self.assertEqual(presses[0], presses[1],
-                         'if these ever diverge, a counting gate becomes possible again')
+    def test_every_A_press_is_one_the_AUTHOR_placed(self):
+        """The property that REPLACED a trap, and the better of the two.
+
+        While the wrapper measured CHARACTERS at 29, the locked box 8 (70 characters) paged
+        itself in two, so this scene cost 21 presses for 16 authored boxes -- and both arms
+        happened to land on 21, which made `ch05recruit`'s box count blind to which arm played.
+        Measured in pixels at vanilla's own width nothing pages itself: presses == authored
+        boxes, 16 against 17.
+
+        So an A-press count is now a fact about the SCRIPT rather than about the wrap. That is
+        worth asserting on its own. `sActiveMsg` stays the arm witness regardless -- identity is
+        not length, and two arms of some future branch may be the same length again."""
+        (_lm, locked), (_fm, fallback) = bc.ch05_sahnar_talk_messages(self._chap())
+        self.assertEqual(len(self._event()['script']), locked.count('[A]'),
+                         'the wrapper paged a box the author did not')
+        self.assertEqual(len(self._fallback()), fallback.count('[A]'))
+        self.assertNotEqual(locked.count('[A]'), fallback.count('[A]'))
 
 
 class Ch05OpeningBackdropScenes(unittest.TestCase):
@@ -2890,9 +2950,9 @@ class Ch05OpeningBackdropScenes(unittest.TestCase):
         widest = 0
         for body in bodies.values():
             for line in body.split('\n'):
-                widest = max(widest, len(re.sub(r'\[[^\]]*\]', '', line)))
-        self.assertLessEqual(widest, 42)
-        self.assertGreater(widest, 29, 'wrapped at the bubble width, not the scenic width')
+                widest = max(widest, font.text_px(re.sub(r'\[[^\]]*\]', '', line)))
+        self.assertLessEqual(widest, font.TALK_BUDGET_PX)
+        self.assertGreater(widest, 140, 'these should use the full budget, not a narrow one')
 
     def test_the_block_raises_one_backdrop_plays_all_three_then_fades_out(self):
         """ONE tomb backdrop across the three tomb scenes, as vanilla spends
@@ -2965,15 +3025,17 @@ class ASpeakerWhoLeavesMidSceneFadesOut(unittest.TestCase):
     def _msg(self, script, staging=None):
         return bc._script_to_message(script, staging or {
             'basil':  ('[OpenMidLeft]', '[FID_Artur]'),
-            'sahnar': ('[OpenMidRight]', '[FID_Marisa]')}, width=42)
+            'sahnar': ('[OpenMidRight]', '[FID_Marisa]')})
 
     def test_the_leaving_speakers_podium_is_cleared_where_she_goes(self):
         out = self._msg([{'sahnar': 'Go on, now.'},
                          {'exits': 'sahnar'},
                          {'basil': '...And there she stays.'}])
         self.assertIn('[OpenMidRight][ClearFace]', out)
-        self.assertLess(out.index('[OpenMidRight][ClearFace]'),
-                        out.index('...And there she stays.'),
+        # Locate the line by its FIRST WORDS rather than the whole sentence: where the wrap
+        # puts its [LF] is not what this test is about, and asserting on the unbroken string
+        # made a wrap change look like a staging bug.
+        self.assertLess(out.index('[OpenMidRight][ClearFace]'), out.index('...And there she'),
                         'she has to be gone BEFORE the line about her being gone')
 
     def test_the_remaining_speaker_is_untouched(self):
@@ -3022,47 +3084,54 @@ class ASpeakerWhoLeavesMidSceneFadesOut(unittest.TestCase):
 class TheDashGlueRespectsTheLineWidth(unittest.TestCase):
     """`_wrap_fe_lines` keeps a bare '--' off the start of a line by gluing it to the word
     before it -- but it did that without re-measuring, so a line that ended exactly at the
-    width came out two characters over. Found by ch05's scene 4, whose Wolfram line lands
-    on the boundary ("...There was fighting here --" = 44 against the scenic 42), and it
-    reaches every chapter: the glue is in the shared wrapper, not in any one scene.
-    """
-    def test_the_glued_dash_never_pushes_a_line_past_the_width(self):
-        line = 'Struck off edges. There was fighting here -- a great deal of it.'
-        for width in (29, 40, 41, 42, 43, 44):
-            for out in bc._wrap_fe_lines(line, width):
-                self.assertLessEqual(len(out), width, '%r at width %d' % (out, width))
+    budget came out over it. Found by ch05's scene 4, and it reaches every chapter: the glue
+    is in the shared wrapper, not in any one scene.
 
-    def test_the_width_holds_across_every_dash_position_in_a_line(self):
-        """One sentence exercises one boundary. Walk the dash through every gap at every
-        width near it, so the fix is not merely right for the line that found the bug."""
+    These now measure in PIXELS, because the wrapper does (`decisions.md` -> "We wrapped on-map
+    talk at 29 CHARACTERS; the engine measures PIXELS"). The three invariants are unchanged in
+    MEANING: the dash never opens a line, the line it lands on still fits, and the one case that
+    genuinely cannot hold is stated rather than hidden.
+    """
+    BUDGETS = (120, 160, 190, 200, 210)
+
+    def test_the_glued_dash_never_pushes_a_line_past_the_budget(self):
+        line = 'Struck off edges. There was fighting here -- a great deal of it.'
+        for budget in self.BUDGETS:
+            for out in bc._wrap_fe_lines(line, budget):
+                self.assertLessEqual(font.text_px(out), budget,
+                                     '%r at %dpx' % (out, budget))
+
+    def test_the_budget_holds_across_every_dash_position_in_a_line(self):
+        """One sentence exercises one boundary. Walk the dash through every gap at a spread of
+        budgets, so the fix is not merely right for the line that found the bug."""
         words = 'Struck off edges there was fighting here a great deal of it'.split()
         for i in range(1, len(words)):
             text = ' '.join(words[:i] + ['--'] + words[i:])
-            for width in range(20, 45):
-                for out in bc._wrap_fe_lines(text, width):
+            for budget in range(100, 210, 7):
+                for out in bc._wrap_fe_lines(text, budget):
                     if out.endswith(' --') and ' ' not in out[:-3]:
                         continue          # atomic word+dash: see the docstring's RESIDUAL
-                    self.assertLessEqual(len(out), width,
-                                         '%r at width %d (dash after %r)' % (out, width, words[i - 1]))
+                    self.assertLessEqual(font.text_px(out), budget,
+                                         '%r at %dpx (dash after %r)' % (out, budget, words[i - 1]))
 
     def test_an_unfittable_word_plus_dash_stays_atomic_rather_than_splitting(self):
-        """The one case the width CANNOT hold, stated so it is a known shape and not a
-        surprise: the pair is indivisible, so it goes out over-width and alone. Found in
-        review of the fix, which had only moved the overflow rather than removed it."""
-        out = bc._wrap_fe_lines('I Auril-the-Frostmaiden-herse -- yes.', 29)
-        self.assertIn('Auril-the-Frostmaiden-herse --', out)
-        over = [l for l in out if len(l) > 29]
-        self.assertEqual(['Auril-the-Frostmaiden-herse --'], over,
-                         'only the atomic pair may exceed the width')
+        """The one case the budget CANNOT hold, stated so it is a known shape and not a
+        surprise: the pair is indivisible, so it goes out over-budget and alone."""
+        out = bc._wrap_fe_lines('I Auril-the-Frostmaiden-herself-and-then-some -- yes.', 120)
+        self.assertIn('Auril-the-Frostmaiden-herself-and-then-some --', out)
+        over = [l for l in out if font.text_px(l) > 120]
+        self.assertEqual(['Auril-the-Frostmaiden-herself-and-then-some --'], over,
+                         'only the atomic pair may exceed the budget')
 
     def test_the_dash_still_never_opens_a_line(self):
         """The reason the glue exists. When it cannot fit, the WORD moves down with it."""
-        for width in (29, 40, 41, 42, 43, 44):
-            for out in bc._wrap_fe_lines('There was fighting here -- a great deal of it.', width):
-                self.assertFalse(out.startswith('--'), '%r at width %d' % (out, width))
+        for budget in self.BUDGETS:
+            for out in bc._wrap_fe_lines('There was fighting here -- a great deal of it.', budget):
+                self.assertFalse(out.startswith('--'), '%r at %dpx' % (out, budget))
 
     def test_a_dash_that_fits_is_still_glued_where_it_was(self):
-        self.assertEqual(['a b --', 'c'], bc._wrap_fe_lines('a b -- c', 6))
+        wide = font.text_px('a b --')
+        self.assertEqual(['a b --', 'c'], bc._wrap_fe_lines('a b -- c', wide))
 
 
 class Ch05ArrivalSceneAndTheNoLupinBranch(unittest.TestCase):
@@ -3277,8 +3346,9 @@ class Ch05ArrivalSceneAndTheNoLupinBranch(unittest.TestCase):
             self.assertNotIn('[FID_Gilliam]', body)
             self.assertNotIn('[FID_Knoll]', body)
             self.assertNotIn('[FID_Vanessa]', body)
-            widest = max(len(re.sub(r'\[[^\]]*\]', '', line)) for line in body.split('\n'))
-            self.assertLessEqual(widest, 42)
+            widest = max(font.text_px(re.sub(r'\[[^\]]*\]', '', line))
+                         for line in body.split('\n'))
+            self.assertLessEqual(widest, font.TALK_BUDGET_PX)
 
     def test_a_speaker_holds_one_podium_across_both_arms(self):
         bodies = dict(bc.ch05_opening_messages(self._chap()))
@@ -3362,7 +3432,8 @@ class Ch05BasilJoinsAfterPrep(unittest.TestCase):
         for _msg, body in bc.ch05_basil_join_messages(self._chap()):
             for line in body.split('\n'):
                 printable = re.sub(r'\[[^\]]*\]', '', line)
-                self.assertLessEqual(len(printable), 29, 'bubble overflow: %r' % line)
+                self.assertLessEqual(font.text_px(printable), font.TALK_BUDGET_PX,
+                                     'bubble overflow: %r' % line)
 
     def test_basil_keeps_the_mid_left_she_holds_in_the_talk_recruit(self):
         for _msg, body in bc.ch05_basil_join_messages(self._chap()):
@@ -3496,7 +3567,7 @@ class SilentPresenceDirective(unittest.TestCase):
                'c': ('[OpenFarRight]', '[FID_Marisa]')}
 
     def _msg(self, script, **kw):
-        return bc._script_to_message(script, self.STAGING, width=42, **kw)
+        return bc._script_to_message(script, self.STAGING, **kw)
 
     def test_it_loads_the_face_without_opening_a_box(self):
         out = self._msg([{'present': 'c'}, {'a': 'one'}, {'a': 'two'}])
@@ -3787,7 +3858,8 @@ class Ch05SahnarAloneOnTheArena(unittest.TestCase):
         for _msg, body in bc.ch05_sahnar_alone_message(self._chap()):
             for line in body.split('\n'):
                 printable = re.sub(r'\[[^\]]*\]', '', line)
-                self.assertLessEqual(len(printable), 29, 'bubble overflow: %r' % line)
+                self.assertLessEqual(font.text_px(printable), font.TALK_BUDGET_PX,
+                                     'bubble overflow: %r' % line)
 
     def test_she_keeps_the_mid_right_she_holds_in_scene_1_and_the_talk(self):
         """A character who changes seats between her scenes reads as a different person --
@@ -4114,10 +4186,10 @@ class Ch05TheMooseCharges(unittest.TestCase):
         script = [{'pinky': 'One.'}, {'stage_cut': 'business'}, {'pinky': 'Two.'}]
         staging = {'pinky': ('[OpenMidLeft]', '[FID_Neimi]')}
         with self.assertRaises(SystemExit):
-            bc._script_to_message(script, staging, width=29)
+            bc._script_to_message(script, staging)
         with self.assertRaises(SystemExit):      # ...and a break with nothing after it
             bc._script_to_message([{'pinky': 'One.'}, {'stage_cut': 'business'}],
-                                  staging, width=29)
+                                  staging)
 
     def test_a_stage_break_is_a_pause_and_not_a_box(self):
         """Scene box counts are locked and asserted against the YAML, so a directive that
@@ -4139,7 +4211,8 @@ class Ch05TheMooseCharges(unittest.TestCase):
     def test_the_body_wraps_at_the_bubble_29_not_the_scenic_42(self):
         for line in self._body().split('\n'):
             printable = re.sub(r'\[[^\]]*\]', '', line)
-            self.assertLessEqual(len(printable), 29, 'bubble overflow: %r' % line)
+            self.assertLessEqual(font.text_px(printable), font.TALK_BUDGET_PX,
+                                     'bubble overflow: %r' % line)
 
     def test_both_locked_boxes_survive_word_for_word(self):
         self.assertEqual(['pinky', 'stage_cut', 'meesmickle'],
@@ -6511,7 +6584,7 @@ class Ch05Endings(unittest.TestCase):
         for msg, body in bodies.items():
             for line in body.replace('[LF]', '\n').split('\n'):
                 text = re.sub(r'\[[^\]]*\]', '', line)
-                self.assertLessEqual(len(text), 42,
+                self.assertLessEqual(font.text_px(text), font.TALK_BUDGET_PX,
                                      'MSG_%X overruns the full-screen window: %r' % (msg, text))
 
 # NB keep this LAST. It sat at line ~4776 of a 5723-line file, so the twelve TestCase classes

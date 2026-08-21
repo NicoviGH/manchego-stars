@@ -49,6 +49,8 @@ import gen_subtitle_cards  # noqa: E402
 import build_scopes  # noqa: E402  per-step write attribution for the matrix (#255 phase 2)
 from PIL import Image  # noqa: E402
 import yaml  # noqa: E402
+
+import fe8_talk_font
 from inject.decomp import (  # noqa: E402  shared decomp paths + patch primitives
     REPO, DECOMP, _find_brace_block, _replace_brace_block,
     BATTLEQUOTES_C, BMUNIT_C, LORDSEL_FLAG_BASE,
@@ -1266,11 +1268,31 @@ def _script_staged_names(script):
     return names
 
 
-def _wrap_fe_lines(text, width=29):
-    """Word-wrap dialogue to GBA text lines. Default width matches vanilla's ON-MAP
-    messages (MSG_910/911 top out at 29 chars): map speech bubbles auto-size to the
-    text, and longer lines overflow the bubble's max width and clip (caught on the
-    2026-06-10 scenes capture -- full-screen Text_BG tolerates ~42, bubbles do not).
+def _wrap_fe_lines(text, width=fe8_talk_font.TALK_BUDGET_PX,
+                   measure=fe8_talk_font.text_px):
+    """Word-wrap dialogue to GBA text lines. `width` is a PIXEL budget, not a character count.
+
+    IT USED TO BE CHARACTERS, defaulting to 29 "because vanilla's MSG_910/911 top out at 29".
+    Both halves of that were true and the conclusion did not follow: MSG_910 is simply a NARROW
+    message, and one short sample became a ceiling. The engine has never counted characters --
+    `GetStrTalkLen` (scene.c) sums `glyph->width` in pixels and `StartTalkExt` divides that into
+    the bubble's tiles -- and the talk font is variable-width, so `i` is 2px against `W`'s 8px
+    and a character count is an unrelated quantity that merely correlates. Vanilla's own Talk
+    recruit (MSG_9CC, the scene ch05's is the twin of) draws a 43-character line in this exact
+    window. Long form + the measurements: `decisions.md` -> "We wrapped on-map talk at 29
+    CHARACTERS; the engine measures PIXELS".
+
+    ONE BUDGET, BOTH CHANNELS. The old rule split on/off-map at 29 and 42; measured in pixels
+    vanilla's two channels agree (203px on-map, 201px full-screen), because both windows are
+    near-full-width on a 240px screen. The split was an artifact of the wrong instrument.
+
+    `measure` TRAVELS WITH `width`, and that pairing is the point: not every panel in this game
+    is the talk window. Our own lord-select CARD is drawn by generated code through its own
+    `InitText` font in a fixed narrow column, so it is authored in CHARACTERS and passes
+    `measure=len` with a character width. Converting it to the talk budget silently re-wrapped
+    a 20-column card to four characters a line -- caught by diffing every rendered body against
+    the previous build, not by a test, which is why that diff is now the gate for a wrap change.
+
     A bare '--' never opens a line: the dash glues to the word before it -- and when
     that glue would not FIT, the word it is glued to moves down with it rather than the
     line running two characters over. (It used to glue unconditionally, so a line ending
@@ -1278,16 +1300,17 @@ def _wrap_fe_lines(text, width=29):
     what found it.)
 
     RESIDUAL, and it is a genuine conflict rather than an oversight: a word whose own
-    length plus ' --' already exceeds `width` cannot be placed at all without breaking one
+    drawn width plus ' --' already exceeds `width` cannot be placed at all without breaking one
     of the two rules. The glue wins, so such a line goes out over-width -- there is no
     shorter arrangement, since the pair is atomic. Every line this function emits is
     therefore within `width` UNLESS it is a lone word carrying its dash. No authored box
     in the campaign is anywhere near that (checked across all of them at 29 and 42); if one
     ever is, the fix is to reword it, not to loosen the glue."""
+    fits = lambda s: measure(s) <= width
     out, cur = [], ''
     for w in text.split():
         if w == '--' and cur:
-            if len(cur) + 3 <= width:
+            if fits(cur + ' --'):
                 cur += ' --'
             else:
                 head, _, tail = cur.rpartition(' ')
@@ -1298,7 +1321,7 @@ def _wrap_fe_lines(text, width=29):
                     cur += ' --'              # a one-word line: nothing left to break at
             continue
         cand = (cur + ' ' + w) if cur else w
-        if len(cand) > width and cur:
+        if cur and not fits(cand):
             out.append(cur)
             cur = w
         else:
@@ -1345,8 +1368,9 @@ def split_on_stage_cut(script, where):
     return before, script[i]['stage_cut'], after
 
 
-def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
-                       trailing=None):
+def _script_to_message(script, staging, width=fe8_talk_font.TALK_BUDGET_PX, face_budget=4,
+                       preload=None, trailing=None,
+                       measure=fe8_talk_font.text_px):
     """Render a chapter-YAML cutscene `script:` block as an FE8 message body.
 
     Mirrors the vanilla shape (cf. MSG_910/911): faces are loaded lazily at a
@@ -1427,7 +1451,7 @@ def _script_to_message(script, staging, width=29, face_budget=4, preload=None,
             continue
         if speaker in SCRIPT_DIRECTIVES:
             continue
-        lines = _wrap_fe_lines(_fe_dialogue_text(text), width)
+        lines = _wrap_fe_lines(_fe_dialogue_text(text), width, measure)
         pages = ['[LF]\n'.join(lines[p:p + 2]) for p in range(0, len(lines), 2)]
         if blocks and blocks[-1][0] == speaker:
             blocks[-1][1].extend(pages)
@@ -1624,8 +1648,7 @@ def dev_placeholder_message():
     slot = PORTRAIT_MAP[DEV_PLACEHOLDER_SPEAKER]
     return _script_to_message(
         [{DEV_PLACEHOLDER_SPEAKER: DEV_PLACEHOLDER_LINE}],
-        {DEV_PLACEHOLDER_SPEAKER: ('[OpenMidLeft]', _fid_tag(slot))},
-        width=42)
+        {DEV_PLACEHOLDER_SPEAKER: ('[OpenMidLeft]', _fid_tag(slot))})
 
 
 def inject_names(campaign, verbose=True):
@@ -2779,7 +2802,7 @@ def _tour_message_body(cards):
     boundary in the event script -- and [X] terminated."""
     segs = []
     for card in cards:
-        lines = _wrap_fe_lines(_fe_dialogue_text(card), width=42)
+        lines = _wrap_fe_lines(_fe_dialogue_text(card))
         pages = ['[LF]\n'.join(lines[i:i + 2]) for i in range(0, len(lines), 2)]
         segs.append('[A][LF]\n'.join(pages) + '[A][CR][LF]')
     return ''.join(s + '\n[BreakTalk]\n' for s in segs) + '[X]'
@@ -6539,7 +6562,7 @@ def _emit_scene_beats(lines, msg_ids, beats, fid, home, overrides=None,
         # < 0 branch and overflows off the right edge (the ch03 crier "...pays fifty gold to whoever
         # cle|" bug). So faced beats must wrap at the map-bubble 29 (the entrance line already does);
         # narration keeps the 28 that fits the auto-centered SOLOTEXTBOXSTART.
-        w = width if width is not None else (28 if _beat_is_narration(beat) else 29)
+        w = width if width is not None else fe8_talk_font.TALK_BUDGET_PX
         set_message_body(lines, msg_id, _script_to_message(
             beat, _stage_beat(beat, fid, home, override), width=w, preload=preload,
             trailing=trailing))
@@ -7970,7 +7993,7 @@ def inject_ch01(campaign, verbose=True):
     # its own Text()/REMA, so the 4-face budget resets per beat.
     set_message_body(lines, CH01_BEAT1_CARD_MSG, name_message_body(b1_card))
     _emit_scene_beats(lines, CH01_BEAT1_MSGS, b1_beats, b1_fid, b1_home,
-                      b1_overrides, b1_preload, width=42)
+                      b1_overrides, b1_preload)
     # Lord select (#42): Hlin's "who leads?" already lands in beat E (at the Northlook),
     # so the menu opens directly over its scenic BG -- no separate prompt. Per-candidate
     # confirm texts keep the vanilla route-split shape (cf. MSG_C14/C17/C18) incl. the
@@ -7986,11 +8009,15 @@ def inject_ch01(campaign, verbose=True):
     # (lord_select_pitches).
     for i, (uid, pitch) in enumerate(lord_select_pitches(campaign,
                                                          [u for u, *_ in cast])):
-        body = '[LF]'.join(_wrap_fe_lines(_fe_dialogue_text(pitch), width=20))
+        # CHARACTERS, not pixels: this is the card panel, not the talk window -- a fixed
+        # 20-column box drawn by LordSelect_DrawCard through its own font, so the talk
+        # font's glyph widths do not describe it. `measure` says so at the call site.
+        body = '[LF]'.join(_wrap_fe_lines(_fe_dialogue_text(pitch), width=20,
+                                          measure=len))
         set_message_body(lines, LORDSEL_PITCH_MSGS[i], _term_pad(body + '[X]'))
     # The one-time explainer box (#46 (a)) rides the normal tutorial text box, so it uses
     # the talk decoder: [A] page breaks every two lines + the standard [.] parity pad.
-    expl = _wrap_fe_lines(_fe_dialogue_text(LORDSEL_EXPLAINER_TEXT), width=29)
+    expl = _wrap_fe_lines(_fe_dialogue_text(LORDSEL_EXPLAINER_TEXT))
     expl_body = ''.join(
         ln + ('' if j == len(expl) - 1
               else '[A]' if (j + 1) % 2 == 0 else '[LF]')
@@ -8515,17 +8542,16 @@ def inject_ch02(campaign, verbose=True):
     # Turn-1 fliers-vs-bows tutorial: one portrait box per line (RBG, then Pinky), Text_BG 42-wrap.
     for msg_id, ln in zip(CH02_TUTORIAL_MSGS, tutorial):
         set_message_body(lines, msg_id, _script_to_message(
-            [ln], _stage_beat([ln], cut_fid, op_home), width=42))
+            [ln], _stage_beat([ln], cut_fid, op_home)))
     # Wolfram's rear-ambush bark, shown over the map (29-tile bubble wrap via
     # _wrap_fe_lines; the current YAML lines fit unwrapped).
     set_message_body(lines, CH02_BARK_MSG, _script_to_message(
-        bark, {'wolfram': ('[OpenMidLeft]', _fid_tag(PORTRAIT_MAP['wolfram'].upper()))},
-        width=29))
+        bark, {'wolfram': ('[OpenMidLeft]', _fid_tag(PORTRAIT_MAP['wolfram'].upper()))}))
     set_message_body(lines, CH02_ENDING_CARD_MSG, name_message_body(end_card))
     _emit_scene_beats(lines, CH02_ENDING_MSGS, end_beats, cut_fid, {})
     set_message_body(lines, CH02_BOSS_DEATH_MSG, _script_to_message(
         [{'halvar': halvar['death_quote']}],
-        {'halvar': ('[OpenMidRight]', _fid_tag(CH02_BOSS_SLOT))}, width=29))
+        {'halvar': ('[OpenMidRight]', _fid_tag(CH02_BOSS_SLOT))}))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 
@@ -9901,10 +9927,10 @@ def ch05_ending_messages(chap):
     for recruited, msg in sorted(CH05_ENDING_MSGS.items(), reverse=True):
         beat = arms[recruited]
         out.append((msg, _script_to_message(
-            beat, _stage_beat(beat, fid, CH05_ENDING_PODIUMS), width=42)))
+            beat, _stage_beat(beat, fid, CH05_ENDING_PODIUMS))))
     lost = _ch05_ending_variants(chap, CH05_ENDING_LOST_SLOT, 10, 'Basil died')[True]
     out.append((CH05_ENDING_LOST_MSG, _script_to_message(
-        lost, _stage_beat(lost, fid, CH05_ENDING_PODIUMS), width=42)))
+        lost, _stage_beat(lost, fid, CH05_ENDING_PODIUMS))))
     return out
 
 
@@ -11055,11 +11081,17 @@ def inject_ch03(campaign, boot=False, verbose=True):
     brute_face = cut_fid('kobold-brute')   # [FID_Caellach] -- the Brute's mug slot
     mid_preloads = [[('[OpenMidRight]', brute_face)]] + [None] * (len(mid_beats) - 1)
     for msg, beat, preload in zip(CH03_MIDMAP_MSGS, mid_beats, mid_preloads):
-        w = 28 if _beat_is_faceless(beat, cut_fid) else 29
+        # TWO RENDERERS, TWO UNITS, and the pair is deliberate. A FACED beat rides the talk
+        # window, whose real constraint is pixels (fe8_talk_font). A FACELESS one rides the
+        # auto-centered SOLOTEXTBOXSTART box (helpbox.c) -- a different proc with less room,
+        # which nobody has measured in pixels, so it keeps the character width it was authored
+        # against and says so with `measure=len`. Converting it on the talk window's evidence
+        # would be extending a measurement past what it measured.
+        kw = ({'width': 28, 'measure': len} if _beat_is_faceless(beat, cut_fid) else {})
         set_message_body(lines, msg, _script_to_message(
-            beat, _stage_beat(beat, cut_fid, op_home), width=w, preload=preload))
+            beat, _stage_beat(beat, cut_fid, op_home), preload=preload, **kw))
     set_message_body(lines, CH03_TREX_ENTRANCE_MSG, _script_to_message(
-        trex_entr, _stage_beat(trex_entr, cut_fid, op_home), width=29))
+        trex_entr, _stage_beat(trex_entr, cut_fid, op_home)))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     # 4a. Title card image (the intro/status banner is a 4bpp image, not text) -- "Ch.3:
@@ -11425,13 +11457,13 @@ def inject_ch04(campaign, boot=False, verbose=True):
     _, reveal_beats = _split_event_beats(chap, 'wolf_pack_reveal', 'ch04 turn-2 reveal',
                                          msg_ids=CH04_REVEAL_MSGS, card_required=False)
     _emit_scene_beats(lines, CH04_REVEAL_MSGS, reveal_beats, cut_fid,
-                      {'lupin': '[OpenMidRight]', 'marty': '[OpenMidLeft]'}, width=29)
+                      {'lupin': '[OpenMidRight]', 'marty': '[OpenMidLeft]'})
     # Stage 4 scene bodies. The opening + both endings play over a BG (full-screen window, wrap
     # 42); the moose beat is ON-MAP, so it wraps at the map-bubble 29 (a wider line hits
     # PutTalkBubble's unclamped right-side branch and runs off the tilemap -- the ch03 crier bug).
     set_message_body(lines, CH04_OPENING_CARD_MSG, name_message_body(op_card))
-    _emit_scene_beats(lines, CH04_OPENING_MSGS, op_beats, cut_fid, op_home, width=42)
-    _emit_scene_beats(lines, (CH04_MOOSE_MSG,), moose_beats, cut_fid, {}, width=29)
+    _emit_scene_beats(lines, CH04_OPENING_MSGS, op_beats, cut_fid, op_home)
+    _emit_scene_beats(lines, (CH04_MOOSE_MSG,), moose_beats, cut_fid, {})
     # Both endings stage as a two-shot: the trail-reader holds mid-right, Marty answers from
     # mid-left. Lupin already owns mid-right in the parley, so he keeps it here; on the no-parley
     # path PINKY inherits both the podium and the job (his opening beat was failing to see
@@ -11439,9 +11471,9 @@ def inject_ch04(campaign, boot=False, verbose=True):
     # every box defaults to mid-left and each speaker fades the last one out mid-scene.
     end_home = {'lupin': '[OpenMidRight]', 'pinky': '[OpenMidRight]',
                 'meesmickle': '[OpenFarLeft]'}
-    _emit_scene_beats(lines, (CH04_ENDING_MSG,), end_beats, cut_fid, end_home, width=42)
+    _emit_scene_beats(lines, (CH04_ENDING_MSG,), end_beats, cut_fid, end_home)
     _emit_scene_beats(lines, (CH04_ENDING_NO_LUPIN_MSG,), [end_beat_no_lupin],
-                      cut_fid, end_home, width=42)
+                      cut_fid, end_home)
     # The village lines (#205, #24). The axe door is Nimsy herself, wearing the vanilla old-lady
     # mug the opening already gave her; the forest cottage is a logger who never opens up, on
     # vanilla's own snag-village mug. Both play over BG_NORMAL_VILLAGE (full-screen window), so
@@ -11454,7 +11486,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
         _symbol, msg, fid, _bg = CH04_VILLAGE_SLOTS[village['id']]
         set_message_body(lines, msg, _script_to_message(
             [{'villager': box} for box in village_boxes(village)],
-            {'villager': ('[OpenMidLeft]', fid)}, width=42))
+            {'villager': ('[OpenMidLeft]', fid)}))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     _write_chapter_title_card(host, 'Ch.4: ' + chap['title'])
@@ -11591,8 +11623,7 @@ def ch05_eruption_message(chap):
                  'got %d boxes from %s' % (len(beat), sorted(speakers)))
     return _script_to_message(
         beat,
-        {'ravisin': ('[OpenMidLeft]', _fid_tag(GUEST_PORTRAIT_MAP['ravisin']))},
-        width=29)
+        {'ravisin': ('[OpenMidLeft]', _fid_tag(GUEST_PORTRAIT_MAP['ravisin']))})
 
 
 def ch05_ravisin_taunt_message(chap):
@@ -11611,8 +11642,7 @@ def ch05_ravisin_taunt_message(chap):
         sys.exit('ERROR: ch05 Ravisin battle taunt must remain one locked Ravisin box')
     return _script_to_message(
         beat,
-        {'ravisin': ('[OpenMidLeft]', _fid_tag(GUEST_PORTRAIT_MAP['ravisin']))},
-        width=29)
+        {'ravisin': ('[OpenMidLeft]', _fid_tag(GUEST_PORTRAIT_MAP['ravisin']))})
 
 
 def ch05_ravisin_death_message(chap):
@@ -11630,8 +11660,7 @@ def ch05_ravisin_death_message(chap):
         sys.exit('ERROR: ch05 Ravisin death quote must remain one locked Ravisin box')
     return _script_to_message(
         beat,
-        {'ravisin': ('[OpenMidRight]', _fid_tag(GUEST_PORTRAIT_MAP['ravisin']))},
-        width=29)
+        {'ravisin': ('[OpenMidRight]', _fid_tag(GUEST_PORTRAIT_MAP['ravisin']))})
 
 
 def ch05_sahnar_talk_messages(chap):
@@ -11669,14 +11698,14 @@ def ch05_sahnar_talk_messages(chap):
     render = lambda script: _script_to_message(
         script,
         {'basil':  ('[OpenMidLeft]',  _fid_tag(PORTRAIT_MAP['basil'])),
-         'sahnar': ('[OpenMidRight]', _fid_tag(PORTRAIT_MAP['sahnar']))},
-        width=29)
+         'sahnar': ('[OpenMidRight]', _fid_tag(PORTRAIT_MAP['sahnar']))})
     return locked_and_variant(
         beat, event['no_lupin_fallback'], render, 'ch05 Talk recruit no-Lupin fallback',
         (CH05_SAHNAR_TALK_MSG, CH05_SAHNAR_TALK_NO_LUPIN_MSG))
 
 
-def _ch05_opening_scene(chap, slot, boxes, what, podiums, fid, width=42):
+def _ch05_opening_scene(chap, slot, boxes, what, podiums, fid,
+                        width=fe8_talk_font.TALK_BUDGET_PX):
     """One locked opening scene, box-counted and podium-checked, as a rendered message body.
 
     Shared by the three tomb scenes, the arrival (which brings its own podium set, being the
@@ -11692,7 +11721,8 @@ def _ch05_opening_scene(chap, slot, boxes, what, podiums, fid, width=42):
     return script, _ch05_opening_body(script, slot, what, podiums, fid, width)
 
 
-def _ch05_opening_body(script, slot, what, podiums, fid, width=42):
+def _ch05_opening_body(script, slot, what, podiums, fid,
+                       width=fe8_talk_font.TALK_BUDGET_PX):
     """Render one opening beat at its channel's width, refusing anyone with no podium.
 
     Staged names, not speakers: a character can be put on screen by `present:` and never take a
@@ -11711,7 +11741,8 @@ def _ch05_opening_body(script, slot, what, podiums, fid, width=42):
     return _script_to_message(script, {k: (podiums[k], fid(k)) for k in staged}, width=width)
 
 
-def _ch05_scene_and_variant(chap, slot_row, variant_msg, podiums, fid, width=42):
+def _ch05_scene_and_variant(chap, slot_row, variant_msg, podiums, fid,
+                            width=fe8_talk_font.TALK_BUDGET_PX):
     """A branched opening scene as its TWO rendered bodies: the locked one and its no-Lupin twin.
 
     Every ch05 fallback is this shape, which is the whole reason a fallback costs ONE id: the
@@ -11793,7 +11824,7 @@ def ch05_basil_join_messages(chap):
     return _ch05_scene_and_variant(
         chap, CH05_BASIL_JOIN_SLOT, CH05_BASIL_JOIN_NO_LUPIN_MSG,
         CH05_BASIL_JOIN_PODIUMS,
-        _make_fid({}, 'ch05 join: unknown cutscene speaker'), width=29)
+        _make_fid({}, 'ch05 join: unknown cutscene speaker'))
 
 
 def ch05_sahnar_alone_message(chap):
@@ -11811,7 +11842,7 @@ def ch05_sahnar_alone_message(chap):
     slot, msg, boxes, what = CH05_SAHNAR_ALONE_SLOT
     _script, body = _ch05_opening_scene(
         chap, slot, boxes, what, CH05_SAHNAR_ALONE_PODIUMS,
-        _make_fid({}, 'ch05 scene 6: unknown cutscene speaker'), width=29)
+        _make_fid({}, 'ch05 scene 6: unknown cutscene speaker'))
     return [(msg, body)]
 
 
@@ -11836,10 +11867,10 @@ def ch05_moose_charge_message(chap):
     ask, _direction, quip = split_on_stage_cut(script, 'ch05 scene 7')
     fid = _make_fid({}, 'ch05 scene 7: unknown cutscene speaker')
     return [(msg, _ch05_opening_body(ask, slot, what + ' (the question)',
-                                     CH05_MOOSE_CHARGE_PODIUMS, fid, 29)),
+                                     CH05_MOOSE_CHARGE_PODIUMS, fid)),
             (CH05_MOOSE_QUIP_MSG,
              _ch05_opening_body(quip, slot, what + ' (the punchline)',
-                                CH05_MOOSE_CHARGE_PODIUMS, fid, 29))]
+                                CH05_MOOSE_CHARGE_PODIUMS, fid))]
 
 
 def ch05_moose_station(chap):
@@ -12774,7 +12805,7 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
         _symbol, msg, fid = CH05_VILLAGE_SLOTS[village['id']]
         set_message_body(lines, msg, _script_to_message(
             [{'resident': box} for box in village_boxes(village)],
-            {'resident': ('[OpenMidLeft]', fid)}, width=42))
+            {'resident': ('[OpenMidLeft]', fid)}))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     _write_chapter_title_card(host, 'Ch.5: ' + chap['title'])
