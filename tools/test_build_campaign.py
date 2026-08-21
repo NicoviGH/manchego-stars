@@ -859,11 +859,49 @@ class TestRawPidBattleAnim(unittest.TestCase):
                          (m['width'], m['height']))
 
     def test_every_benched_creature_gets_a_distinct_tile(self):
-        # Spacing is 2 on purpose: adjacent foes let the bait counter the wrong creature, which
-        # is the failure per-pid selection exists to prevent.
-        self.assertEqual(len(set(bc.SANDBOX_FOE_POSITIONS)), len(bc.SANDBOX_FOE_POSITIONS))
-        xs = sorted(x for x, _ in bc.SANDBOX_FOE_POSITIONS)
-        self.assertTrue(all(b - a >= 2 for a, b in zip(xs, xs[1:])))
+        """No two foes adjacent, and every foe has a MELEE bait tile of its own.
+
+        This used to sort ALL the x values flat and require a gap of 2 -- a proxy for the real
+        rule that only held while the bench was ONE row, and a second row (#25) legitimately
+        shares columns. The property `recordenemy` needs is stated directly: it walks the ring
+        at the bait's distance looking for an on-map, empty tile with no OTHER foe inside the
+        bait's own reach, and fails the run if there is none.
+
+        MODELLED AT RANGE 1 ON PURPOSE, and the limit is worth naming: a ranged bait searches a
+        WIDER ring and excludes on a wider radius, and which applies depends on the weapons the
+        two units happen to be carrying at runtime -- which this cannot see. Range 1 is the
+        tightest case for finding a tile and the loosest for exclusion, so passing here is
+        necessary, not sufficient. The four `recordenemy` films are what prove the rest.
+        """
+        tiles = bc.SANDBOX_FOE_POSITIONS
+        self.assertEqual(len(set(tiles)), len(tiles), 'two creatures share a tile')
+        w, h = bc.sandbox_map_size('rime-of-the-frostmaiden')
+        foes = set(tiles)
+        adj = lambda t: [(t[0] + dx, t[1] + dy) for dx, dy in ((0, -1), (0, 1), (1, 0), (-1, 0))]
+        on = lambda t: 0 <= t[0] < w and 0 <= t[1] < h
+        for t in tiles:
+            self.assertTrue(on(t), '%s is off the %dx%d map' % (t, w, h))
+            self.assertFalse(foes & set(adj(t)), '%s is orthogonally adjacent to another foe' % (t,))
+            clean = [n for n in adj(t)
+                     if on(n) and n not in foes and not (foes - {t}) & set(adj(n))]
+            self.assertTrue(clean, '%s has no on-map bait tile that touches only it' % (t,))
+
+    def test_the_bench_never_seats_a_foe_on_a_player(self):
+        """The bench and the player formation share a map, and nothing else checks it.
+
+        `assert_sandbox_bench_fits` reads the map for BOUNDS only. A bench row placed on one of
+        `TEST_SPAWN_POSITIONS`' rows (y=3..7) misses the party only while the two happen to use
+        opposite x parities -- which an earlier cut of the second row relied on without saying
+        so. Assert the tiles are disjoint, and that no foe is adjacent to a spawn either, since
+        a bait needs somewhere to stand.
+        """
+        foes = set(bc.SANDBOX_FOE_POSITIONS)
+        spawns = set(bc.TEST_SPAWN_POSITIONS)
+        self.assertFalse(foes & spawns, 'a bench seat lands on a player spawn')
+        adj = lambda t: {(t[0] + dx, t[1] + dy) for dx, dy in ((0, -1), (0, 1), (1, 0), (-1, 0))}
+        for f in foes:
+            self.assertFalse(adj(f) & spawns,
+                             'bench seat %s is adjacent to a player spawn' % (f,))
 
     def test_the_bench_seats_every_creature_that_needs_one(self):
         # The count that must not silently overflow: one tile per weapon-carrying reskin plus

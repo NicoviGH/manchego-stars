@@ -152,6 +152,19 @@ scenarios:
     rom: ch03boot
     host_chapter: 4
     kind: record
+  # The same chapter-generic pan, on ch05 -- the review shot for its enemy reskins (#25):
+  # sixteen risen tomb-guard on the real map, which is the only place the four skeleton
+  # sprites can be judged against each other and against the winter tileset.
+  #
+  # `ch05boot`, the same ROM every other ch05 scenario boots, and the scenario pokes FAST
+  # config before booting -- which is what the two timeouts were about. The opening is 52
+  # boxes; at normal text speed that is past the deadline, and `--ch05-moose` was the wrong
+  # answer to it (bootToMap is documented as the wrong driver on that ROM, since there the
+  # beginning script IS the beat).
+  mapfullch05:
+    rom: ch05boot
+    host_chapter: 6
+    kind: record
   recordopening:
     rom: montage
     kind: record
