@@ -386,6 +386,17 @@ class RealManifest(unittest.TestCase):
         missing = sorted(self.harness - set(self.m.scenarios))
         self.assertEqual(missing, [], 'new scenarios in harness.lua need a matrix.yaml row')
 
+    def test_the_talk_recruits_other_arm_is_actually_gated(self):
+        """`ch05recruit` runs on a ROM with no wolf, so it only ever walks the no-Lupin arm --
+        an inverted BEQ or a swapped pair of message ids passes it. A scenario in no suite runs
+        in no gate, which is how a branch ends up with one tested arm and one hoped-for one."""
+        for scenario in ('ch05lupinbenched', 'ch05lupinkilled'):
+            self.assertIn(scenario, self.m.scenarios)
+            member_of = [s for s, members in self.m.suites.items() if scenario in members]
+            self.assertTrue(member_of, '%s is in no suite, so nothing runs it' % scenario)
+        self.assertIn('ch05lupinbenched', self.m.suites['gate'],
+                      'the gate must walk the arm ch05recruit cannot reach')
+
     def test_every_manifest_row_still_exists_in_harness(self):
         stale = sorted(set(self.m.scenarios) - self.harness)
         self.assertEqual(stale, [], 'matrix.yaml rows for scenarios harness.lua no longer defines')

@@ -105,6 +105,13 @@ WANTED = [
     'gBmMapFog',                # u8** fog map (include/bmmap.h): non-zero = the player can SEE
                                 # that tile this turn. A red unit standing on a zero tile is not
                                 # drawn at all -- which looks exactly like a broken map sprite.
+    'sActiveMsg',               # int (src/msg.c): the message index GetStringFromIndex last
+                                # DECODED into its buffer. The only witness to WHICH message a
+                                # scene actually showed -- box counts cannot tell two arms of a
+                                # branch apart when they render to the same number of A-presses,
+                                # which ch05's Talk recruit does exactly (#25). Read it WHILE a
+                                # box is up: every menu and unit name decodes through the same
+                                # function and overwrites it the moment the scene ends.
     'gChapterFlagBits',         # event flags < 100, bit (flag-1) (src/eventinfo.c)
     'gPermanentFlagBits',       # event flags > 100, bit (flag-101)
     'ProcScr_GameOverScreen',   # proc script: game-over screen active

@@ -4536,6 +4536,90 @@ Against #25's four states this settles **two**: *never recruited* (the plain boo
 still only a decomp reading — `CHECK_ALIVE` ignores `US_NOT_DEPLOYED` and treats `US_DEAD` as
 absent — and a reading is not a run.
 
+### Two arms of one branch can be the same LENGTH — so box count is not a witness (2026-08-21, #25)
+
+Every ch05 scene is gated in-engine by counting A-presses: a scene of the wrong length is a scene
+from the wrong place, and that is what caught the Talk recruit pointing at vanilla's 32-box `0x9CC`
+for months. Building the Talk's no-Lupin arm broke the technique, and it broke it **silently**.
+
+The locked box 8 (*"A wolf. Him and his whole pack. They're out there now, with travelers."*) is 70
+characters against the bubble's 29, so the wrapper pages it in **two**. The substitute is **two
+authored boxes**. Both arms therefore render to **21 presses exactly**, and `ch05recruit` — which
+asserts 21 — passes on either one. A gate that can only fail when the length changes cannot see a
+branch that took the wrong arm, which is the one thing a branch can get wrong.
+
+**The witness is `sActiveMsg` (`src/msg.c`).** `GetStringFromIndex` caches the index it last decoded
+(`if (index == sActiveMsg) return sMsgString.buffer1;`), so reading that int names the message on
+screen. Two rules for using it:
+
+- **Sample it WHILE A BOX IS UP.** Unit names, menus and item descriptions all decode through the
+  same buffer, so by the verdict at the bottom of a scenario it is long overwritten. `ch05recruit`
+  latches it on the first `dialogue_wait` of the scene.
+- **It names the id, not the prose.** It cannot tell you the text is right — only which id played.
+  The prose is the build tests' job; this is the runtime half.
+
+Generalises past this scene: **the box count is a shape check and the message id is an identity
+check, and #25 wanted identity all along** ("Assert *which* message id played … not merely that a
+scene ran"). Box counts were standing in for identity only because two ids had always differed in
+length. Prefer `INSPECT.activeMsg()` for any new dialogue gate.
+
+_Recorded: 2026-08-21, found while wiring the Talk recruit's fallback (#25)._
+
+### The last two `CHECK_ALIVE` states, proved (2026-08-21, #25)
+
+The four states vanilla distinguishes are now all four run, not three run and one read. The two
+that were owed were settled on the `ch05lupinboot` ROM by putting the wolf in each state at the map
+and reading which message the Talk played:
+
+| Roster state | Poked | Arm played | |
+|---|---|---|---|
+| recruited, alive, **BENCHED** | `US_NOT_DEPLOYED`, off the tile grid, `xPos = -1` | the wolf's | ✅ `ch05lupinbenched` |
+| recruited, then **KILLED** | `US_DEAD` | the no-Lupin one | ✅ `ch05lupinkilled` |
+
+**The benched run is the one that matters**, and it is why "test whether Lupin is on the ch05 field"
+was recorded as *actively wrong* rather than merely inelegant: ch05 deploys 9 of a 10-unit pool, so
+a field test passes every other gate in this chapter and then tells a player who WON the wolf that
+he does not exist. The run says our build reads the roster, not the map — which is what
+`eventscr.c:3212` says, now with a run behind it.
+
+**Both rode the existing scenario rather than new ones.** `ch05recruit` is parameterised over the
+wolf's roster state and the expected arm; the two states are four-line callers. That also keeps
+`harness.lua` at its 2 free top-level local slots — the ceiling that, hit, stops the whole chunk
+loading (`check.py` says so on every run, and names the escape hatch: hang the helper off an
+existing table). `INSPECT.activeMsg` went on `INSPECT` for exactly that reason.
+
+Not covered, and not pretended otherwise: the poke reproduces the STATE a benched unit is in, not
+the route by which a player gets there. The real ch04 → ch05 chain remains the only thing that
+exercises `ReadGameSave` filling the array.
+
+_Recorded: 2026-08-21 (Nicolas: "Run them")._
+
+### A page break is AUTHORED, and vanilla is the reason (2026-08-21, #25)
+
+Written down because it kept being re-derived per scene as a house preference ("the authored A-press
+breaks ARE the pacing") when it is simply **what vanilla does**, and citing the source ends the
+argument.
+
+**Every `[LF]` and every `[A]` in `texts.txt` is hand-placed.** `MSG_9CC` — vanilla's
+Natasha→Joshua recruit, the scene ch05's Talk is the twin of — sets all thirty-two of its own page
+breaks. Nothing in it is flowed. So when a substitute line is chosen as prose and overruns its
+channel, authoring the break is not an extra step imposed by our wrapper; leaving it to the wrapper
+is the divergence.
+
+The Talk recruit's substitute is 61 characters against 29 and cannot be one box. Flowed, the wrapper
+put the break at *"We could go free as"* / *"well."* — mid-clause, the same failure the reliquary
+lines and scene 5's fallback each found independently. **It breaks on the ellipsis**: the
+observation lands flat and finishes, then the OFFER — which *is* proof #1 in that arm, Basil
+arguing the two of them could go rather than citing a wolf who went — takes its own press instead of
+trailing the clause it answers.
+
+**Where an A-press goes is still Nicolas's call on any line where the read is genuinely open.** This
+one had a single candidate: the ellipsis is the line's only punctuation, and every other break is
+mid-clause by construction.
+
+_Recorded: 2026-08-21 (Nicolas: "For the A presses you don't need my input, follow vanilla style
+conventions")._
+
 ### A letterbox mat is not picture, and a CENTRE crop keeps half of it (2026-08-14, #25)
 
 Nicolas, looking at the shipped ch05 opening: *"you see the black bar to the right in the

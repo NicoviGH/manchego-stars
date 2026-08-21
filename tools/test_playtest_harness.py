@@ -145,8 +145,8 @@ class TestPlaytestHarness(unittest.TestCase):
 
     def test_ch05recruit_advances_and_counts_the_new_eruption_boxes(self):
         harness = _read_harness()
-        body = _block(harness, 'scenarios.ch05recruit = function()',
-                      '\n-- Park an unexhausted blue unit')
+        body = _block(harness, 'scenarios.ch05recruit = function(opts)',
+                      '\n-- ch05lupinbenched')
         self.assertIn('eruptionBoxes', body,
                       'the recruit gate would hang before Sahnar LOADs if it never advances '
                       'Ravisin\'s newly visible warning')
@@ -155,6 +155,31 @@ class TestPlaytestHarness(unittest.TestCase):
         self.assertIn('eruption warning showed %d boxes', body,
                       'the gate must distinguish the locked four-box scene from merely '
                       'reaching turn 2')
+
+    def test_ch05recruit_names_the_message_id_it_saw_not_just_the_box_count(self):
+        """The Talk recruit's two arms both recruit Sahnar and both run 21 boxes (#25), so
+        every other assertion in this gate passes on either one. `sActiveMsg` is the only
+        witness that separates them, and it has to be SAMPLED WHILE A BOX IS UP -- menus and
+        unit names decode through the same buffer the moment the scene ends."""
+        harness = _read_harness()
+        body = _block(harness, 'scenarios.ch05recruit = function(opts)',
+                      '\n-- ch05lupinbenched')
+        self.assertIn('INSPECT.activeMsg()', body)
+        self.assertIn('playedMsg = playedMsg or INSPECT.activeMsg()', body,
+                      'the id must be latched on the FIRST box, not read after the scene')
+        self.assertIn('if playedMsg ~= ARM then', body,
+                      'sampling the arm without asserting it is a gate that cannot fail')
+
+    def test_the_two_owed_check_alive_states_each_name_their_expected_arm(self):
+        """benched -> the wolf's arm (0x9E8); killed -> the no-Lupin arm (0x9D1). The pair IS
+        the proof #25 still owed, and getting either expectation backwards would make the run
+        certify the bug it exists to catch."""
+        harness = _read_harness()
+        for scenario, state, arm in (('ch05lupinbenched', 'benched', '0x9E8'),
+                                     ('ch05lupinkilled', 'killed', '0x9D1')):
+            body = _block(harness, 'scenarios.%s = function()' % scenario, '\nend')
+            self.assertIn('lupin = "%s"' % state, body)
+            self.assertIn('arm = %s' % arm, body)
 
     def test_ch05arena_proves_the_loaded_winter_palette_and_skeleton_face(self):
         harness = _read_harness()
