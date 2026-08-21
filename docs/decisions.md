@@ -4715,6 +4715,67 @@ reaching for `{0x7,` on its own account.
 **The general shape:** a unit's behaviour is not always in its own data. Before claiming an AI
 byte is copied faithfully, find what the script it selects actually READS.
 
+### A terrain byte is not a picture: pan to the thing before you shoot (2026-08-14, #25)
+
+`ch05raid` asserted the desecrated tile read `0x25` and PASSED, while the screenshot it shipped
+showed the wrong side of the map — the camera sits wherever the fight is, not wherever the
+assertion is. A proof that reads memory and a proof that shows a picture are two different
+proofs, and only one of them is what a human reviews.
+
+Pan to the subject, `wait()` for the scroll to settle, and only then shoot. The frame now carries
+the engine's own tile panel reading "Ruins", which is the engine agreeing with the byte rather
+than a byte agreeing with itself.
+
+_Recorded: 2026-08-14 (migrated out of HANDOFF 2026-08-20)._
+
+### A GENERATED COMMENT is part of the script it describes (2026-08-14, #25)
+
+Four tests broke in one session because an emitted `/* ... */` mentioned the command it was
+explaining — `TEXTCONT`, `CAMERA`, `FADI/FADU`, `MUSI/MUNO`. The tests grep the GENERATED event
+script, and a comment lives in that script exactly as an instruction does.
+
+**Describe the command; never name it, inside a string that gets emitted.** This is the sibling of
+"Comments are testimony" (which is about comments going STALE): that one says a wrong comment
+misleads a reader, this one says a comment can break a test without misleading anybody.
+
+_Recorded: 2026-08-14 (migrated out of HANDOFF 2026-08-20)._
+
+### CI runs `make test` BEFORE it mocks `baserom.gba` (2026-07, #23)
+
+Nothing a unit test reaches may open the ROM: in CI the mock is not in place yet when the suite
+runs, so a test that touches `baserom.gba` fails there and passes locally, which is the worst
+shape of failure to diagnose.
+
+Keep config loading PURE and defer composition to build time. The rule falls out of it: a module
+imported by a test may compute, but may not read the ROM at import.
+
+_Recorded: 2026-07 (migrated out of HANDOFF 2026-08-20)._
+
+### Prove a menu action by its SEMANTIC command, not by resemblance (2026-08-11, #25)
+
+The Arena's accepted flow was "proved" by the sprite looking right and by `CH05_*` names being
+present in the source. Neither is proof. The action menu's Arena id is `0x62`; the accepted flow
+reaches inline `gProcScr_TalkChoice`, mutates gold, and generates an opponent in `gArenaState` —
+those are the things that distinguish "the Arena ran" from "something that looks like the Arena
+is on screen".
+
+The same rule one level up: a live-wiring test must inspect the GENERATED builder output and the
+`inject_ch05` consumer, not grep the repo for a constant's name. A name proves an author's
+intent; only the generated artifact proves the wiring.
+
+_Recorded: 2026-08-11 (migrated out of HANDOFF 2026-08-20)._
+
+### `harness.lua` is ONE Lua chunk, at the 200-local ceiling (2026-08, #25)
+
+Lua allows 200 locals per chunk and the harness is a single one, sitting at the limit — `check.py`
+prints the remaining slots on every run, so the live number never needs writing down anywhere.
+
+Hang a new helper off an existing table (`INSPECT`, `TUNE`) or declare it INSIDE the scenario that
+needs it. Never add a top-level `local`. A scenario-local table costs nothing against this budget,
+which is why `RESKIN_ENEMY_CLASS` and the raw-pid map live inside `recordenemy` rather than beside it.
+
+_Recorded: 2026-08 (migrated out of HANDOFF 2026-08-20)._
+
 ### A scenario written against the old design will FAIL ON SUCCESS (2026-08-14, #25)
 
 Moving Sahnar from a turn-2 riser to a turn-1 unit broke three playtest scenarios, and the
