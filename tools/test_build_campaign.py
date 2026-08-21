@@ -859,11 +859,28 @@ class TestRawPidBattleAnim(unittest.TestCase):
                          (m['width'], m['height']))
 
     def test_every_benched_creature_gets_a_distinct_tile(self):
-        # Spacing is 2 on purpose: adjacent foes let the bait counter the wrong creature, which
-        # is the failure per-pid selection exists to prevent.
-        self.assertEqual(len(set(bc.SANDBOX_FOE_POSITIONS)), len(bc.SANDBOX_FOE_POSITIONS))
-        xs = sorted(x for x, _ in bc.SANDBOX_FOE_POSITIONS)
-        self.assertTrue(all(b - a >= 2 for a, b in zip(xs, xs[1:])))
+        """No two foes adjacent, and every foe has a bait tile of its own.
+
+        This used to sort ALL the x values flat and require a gap of 2, which was a proxy for
+        the real rule and only held while the bench was ONE row -- a second row (#25) has two
+        foes legitimately sharing a column and broke it. The property `recordenemy` actually
+        needs is stated directly here: it walks the four neighbours of its target looking for an
+        empty tile with no OTHER foe orthogonally adjacent, and fails the run if there is none.
+        Asserting that is also row-agnostic, so widening or re-laying the bench cannot silently
+        seat a creature that can never be filmed.
+        """
+        tiles = bc.SANDBOX_FOE_POSITIONS
+        self.assertEqual(len(set(tiles)), len(tiles), 'two creatures share a tile')
+        w, h = bc.sandbox_map_size('rime-of-the-frostmaiden')
+        foes = set(tiles)
+        adj = lambda t: [(t[0] + dx, t[1] + dy) for dx, dy in ((0, -1), (0, 1), (1, 0), (-1, 0))]
+        for t in tiles:
+            self.assertTrue(0 <= t[0] < w and 0 <= t[1] < h, '%s is off the %dx%d map' % (t, w, h))
+            self.assertFalse(foes & set(adj(t)), '%s is orthogonally adjacent to another foe' % (t,))
+            clean = [n for n in adj(t)
+                     if 0 <= n[0] < w and 0 <= n[1] < h and n not in foes
+                     and not (foes - {t}) & set(adj(n))]
+            self.assertTrue(clean, '%s has no bait tile that touches only it' % (t,))
 
     def test_the_bench_seats_every_creature_that_needs_one(self):
         # The count that must not silently overflow: one tile per weapon-carrying reskin plus

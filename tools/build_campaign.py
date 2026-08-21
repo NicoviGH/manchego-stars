@@ -2553,6 +2553,12 @@ CLASS_RESKIN_FOE_WEAPON = {
     'CLASS_FIGHTER':   ['ITEM_AXE_IRON', 'ITEM_AXE_HANDAXE'],
     'CLASS_MERCENARY': ['ITEM_SWORD_IRON'],
     'CLASS_SOLDIER':   ['ITEM_LANCE_IRON', 'ITEM_LANCE_JAVELIN'],
+    # A BOW class benches fine -- it just cannot be baited from an adjacent tile, because a bow
+    # has no range-1 attack to counter with. `recordenemy` now picks a bait whose reach overlaps
+    # the foe's and stands at that distance, so an archer answers at range 2 exactly as RBG does
+    # (Nicolas, 2026-08-20). This entry was missing on the theory that archers could not be
+    # benched at all, which was the picker's limitation wearing a class's name.
+    'CLASS_ARCHER':    ['ITEM_BOW_IRON'],
 }
 # The TESTCH sandbox's bench row. A tile at x=16 is not a tile at all on a 15-wide map, and
 # it shipped as one anyway: the strip was extended a slot at a time as creatures joined, and
@@ -2561,7 +2567,23 @@ CLASS_RESKIN_FOE_WEAPON = {
 # map edge and `recordenemy` failed walking the cursor to a column the map has not got.
 # Spacing 2 is kept -- adjacent foes let the bait counter the wrong one -- so the strip starts
 # at 2 rather than running past 14.
-SANDBOX_FOE_POSITIONS = [(2, 9), (4, 9), (6, 9), (8, 9), (10, 9), (12, 9), (14, 9)]
+# The TESTCH bench: one seat per DISTINCT creature sprite, spacing 2 so `recordenemy` can always
+# find a bait tile adjacent to ONLY its target (decisions.md -> "The TESTCH bench is bounded by
+# SMS VRAM, not by its tile row").
+#
+# SECOND ROW ADDED 2026-08-20 (#25): ch05's four skeleton reskins took the roster from 7 to 10 and
+# the single row at y=9 held exactly 7 on a 15-wide map. That doc already named the fix -- "a
+# second row lifts it immediately" -- so this is the lift, not a redesign.
+#
+# y=6 rather than y=7, and the gap is the point: the bait logic tries up THEN down, so a foe at
+# y=9 takes y=8 and a foe at y=6 takes y=5 or y=7, and no bait tile is ever orthogonally adjacent
+# to a foe in the OTHER row. The party sits at y=4, which the bait may share a column with -- the
+# rule is "no other FOE adjacent", and allies do not count.
+#
+# The real ceiling is still SMS VRAM (64 slots, two counters growing toward each other), and ten
+# 16x16 creatures are nowhere near it; `recordunitlist` FAILs if the counters ever cross.
+SANDBOX_FOE_POSITIONS = [(2, 9), (4, 9), (6, 9), (8, 9), (10, 9), (12, 9), (14, 9),
+                         (2, 6), (4, 6), (6, 6), (8, 6), (10, 6), (12, 6), (14, 6)]
 
 
 def sandbox_map_size(campaign):
@@ -9322,9 +9344,17 @@ CH05_AI = {
     # (gTerrainList_LootableVillages), so it needs no target list and no class of its own.
     'raider': '{0x0, 0x4, 0x9, 0x0}',
 }
+# ch05's four INFANTRY classes deploy on their skeleton reskins (#25, campaign.yaml
+# `enemy_class_reskins`): every ch05 unit wearing one of them is a risen tomb-guardian, and
+# this dict is read for RED units only, so the repoint is wholesale rather than per-enemy.
+# The three that stay vanilla are not oversights: the DRUID is Ravisin, who carries her own
+# authored art; the GWYLLGI is the moose; and the MYRMIDON is Sahnar, whose Specter anim and
+# map sprite landed with her recruit (#251) and who turns BLUE mid-chapter.
 CH05_CLASS_IDS = {'druid': 'CLASS_DRUID', 'gwyllgi': 'CLASS_GWYLLGI',
-                  'soldier': 'CLASS_SOLDIER', 'fighter': 'CLASS_FIGHTER',
-                  'mercenary': 'CLASS_MERCENARY', 'archer': 'CLASS_ARCHER',
+                  'soldier': 'CLASS_SOL_SKELEBERDIER',
+                  'fighter': 'CLASS_FGT_SKELEBERDIER',
+                  'mercenary': 'CLASS_MNC_BONEWALKER',
+                  'archer': 'CLASS_ARC_WIGHT_SNIPER',
                   'myrmidon': 'CLASS_MYRMIDON'}
 CH05_ITEM_IDS = {'flux': 'ITEM_DARK_FLUX', 'rotten-claw': 'ITEM_MONSTER_ROTTENCLW',
                  # the GWYLLGI's own vanilla weapon (the moose deploys as one), kept

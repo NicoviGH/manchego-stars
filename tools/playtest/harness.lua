@@ -3700,9 +3700,32 @@ scenarios.mapfull = function()
            and not procActive(SYM.ProcScr_StdEventEngine)
            and not procActive(SYM.ProcScr_BattleEventEngine)
     end, 900, true)
+    -- The grid is DERIVED from the map, not written down. It used to be the literals
+    -- {0,8,15} x {0,8,16}, which is ch03's 17x16 -- and this scenario is described as
+    -- chapter-generic, so the constants were a chapter's shape wearing a generic name. On
+    -- ch05 (15x21) they walked the cursor to x=16, off the map, and the run FAILED on an
+    -- illegal input AFTER capturing every tile it needed: a verdict accusing the chapter of
+    -- something the scenario did to itself (decisions.md -> "A scenario can FAIL on success").
+    -- They also missed rows 16-20 entirely, so the "full map" would have been three-quarters
+    -- of it, silently.
+    -- One screen holds 15x10 tiles. Step the CURSOR by that and always finish on the far
+    -- edge -- the camera follows the cursor and clamps itself, so cursor stops are what this
+    -- has to generate, not camera offsets. (A first cut clamped EVERY stop to size-span and
+    -- collapsed the tail: ch05's 21 rows came out as {0,10,11}, three shots of the top half
+    -- that reported "full-map grid captured" all the same.)
+    local mw, mh = mapSize()
+    local function stops(size, span)
+        local out, p = {}, 0
+        while p < size - 1 do
+            table.insert(out, p)
+            p = p + span
+        end
+        table.insert(out, size - 1)
+        return out
+    end
     local n = 0
-    for _, cy in ipairs({ 0, 8, 15 }) do
-        for _, cx in ipairs({ 0, 8, 16 }) do
+    for _, cy in ipairs(stops(mh, 10)) do
+        for _, cx in ipairs(stops(mw, 15)) do
             cursorTo(cx, cy)
             wait(24) -- let the camera glide + clamp settle
             local camx = ru16(SYM.gBmSt + 0x0C)
@@ -3711,7 +3734,25 @@ scenarios.mapfull = function()
             shot(string.format("mapfull-%02d-cx%03d-cy%03d", n, camx, camy))
         end
     end
-    return result("PASS", "full-map grid captured (" .. n .. " tiles)")
+    return result("PASS", "full-map grid captured (" .. n .. " tiles of " .. mw .. "x" .. mh .. ")")
+end
+
+-- mapfullch05 (#25): the same pan against the ch05boot ROM, which is where the chapter's four
+-- SKELETON enemy reskins can actually be judged -- sixteen risen tomb-guard standing on the
+-- winter tileset, at the size and palette the player meets them at. A contact sheet of the
+-- sheets cannot answer that: the enemy faction palette is applied by the ENGINE at runtime, so
+-- the vendored blue is not the colour they wear, and the four have to read apart from EACH
+-- OTHER at 16x16 as well as apart from the terrain.
+-- One routine, two ROMs -- the pan is chapter-generic and the map decides what is in shot.
+-- Delegates rather than aliases so matrix.py can attribute a body to the name (verdict cache).
+scenarios.mapfullch05 = function()
+    -- FAST CONFIG FIRST, and it is why this timed out twice. `mapfull` opens on bootToMap(),
+    -- which reaches ch05's map through the chapter's 52-box opening at NORMAL text speed --
+    -- minutes of A-presses, past the run deadline, for a scenario that wants one still per
+    -- screenful. `recordch05opening` pokes fast for the same boot and then restores normal
+    -- because it is filming MOTION; this one never needs normal at all, so it does not restore.
+    pokeFastConfig()
+    return scenarios.mapfull()
 end
 
 -- RECORDOPENING: boot -> title -> START -> New Game, then record the #43 opening montage
@@ -4453,6 +4494,12 @@ local RESKIN_ENEMY_CLASS = {
     ["kobold-brute"]   = 0x81,   -- CLASS_MNC_LIZARDZERKER_BRUTE
     ["goblin-soldier"] = 0x6A,   -- CLASS_BLST_REGULAR_EMPTY (fire imp, lance)
     ["goblin-fighter"] = 0x6B,   -- CLASS_BLST_LONG_EMPTY (fire imp, axe)
+    -- ch05's risen tomb-guard (#25). These are the ids campaign.yaml's `slot_id` claims, and
+    -- the bench grew a second ROW to seat them -- see SANDBOX_FOE_POSITIONS.
+    ["risen-spear"]    = 0x84,   -- CLASS_SOL_SKELEBERDIER (skeleton lance)
+    ["tomb-reaver"]    = 0x85,   -- CLASS_FGT_SKELEBERDIER (skeleton axe)
+    ["crypt-blade"]    = 0x86,   -- CLASS_MNC_BONEWALKER (one-armed skeleton sword)
+    ["bone-archer"]    = 0x87,   -- CLASS_ARC_WIGHT_SNIPER (skeleton bow)
 }
 -- Named RAW-PID creatures are picked by CHARACTER, not by class (the table lives inside the
 -- scenario: this chunk is at the 200-local ceiling). Their anim binds through CharacterData
@@ -4488,16 +4535,34 @@ scenarios.recordenemy = function()
             "no live foe %s in the sandbox (build with `make TESTCH=1`)",
             wantPid and string.format("with pid 0x%X", wantPid)
                     or string.format("of class 0x%X", want))) end
-    -- a live melee player unit to bait it
-    local pl
+    -- A bait whose reach OVERLAPS THE FOE'S, which is not always a melee one. A bow cannot
+    -- counter at range 1, so an adjacent bait films nothing: the archer simply takes the hit
+    -- and the run reports no anim. Approach it with a bow or a tome instead and it answers at
+    -- range 2 (Nicolas, 2026-08-20 -- RBG is our archer and this is how he fights). That is
+    -- also why CLASS_ARCHER was missing from the bench's weapon table; the gap was this
+    -- picker, not the class.
+    local fmin, fmax = unitAttackRange(foe)
+    if not fmin then
+        return result("FAIL", "the chosen foe carries no weapon, so it can never counter")
+    end
+    local pl, plmn, plmx, dist
     for i = 0, 15 do
         local u = unitAt(SYM.gUnitArrayBlue, i)
         if u and not isDead(u) then
-            local mn = unitAttackRange(u)
-            if mn == 1 then pl = u; break end
+            local mn, mx = unitAttackRange(u)
+            if mn then
+                for d = fmin, fmax do          -- a distance BOTH can strike at
+                    if d >= mn and d <= mx then pl, plmn, plmx, dist = u, mn, mx, d; break end
+                end
+            end
         end
+        if pl then break end
     end
-    if not pl then return result("FAIL", "no live melee player unit to bait the foe") end
+    if not pl then
+        return result("FAIL", string.format(
+            "no player unit whose reach overlaps the foe's %d-%d -- the bait has to be able to "
+            .. "hit it at a distance it can answer at", fmin, fmax))
+    end
     -- All live foe tiles: the sandbox packs several reskins in a row, so we must place the
     -- player on a tile orthogonally adjacent to ONLY the target -- otherwise captureAttack's
     -- cursor can land on a neighbouring foe (e.g. the sword Lizardzerker next to the axe grunt)
@@ -4509,14 +4574,29 @@ scenarios.recordenemy = function()
     end
     local grid = mapUnitAt(pl.x, pl.y)
     local placed = false
-    for _, d in ipairs({ {0,-1}, {0,1}, {1,0}, {-1,0} }) do   -- prefer up/down (fewer row-neighbours)
+    -- Every tile at Manhattan `dist` from the foe, vertical offsets first: the bench is laid
+    -- out in ROWS, so a tile above or below the target has fewer foe neighbours than one
+    -- beside it. At dist 1 this is exactly the old {0,-1},{0,1},{1,0},{-1,0}.
+    local ring = {}
+    for dx = -dist, dist do
+        local dy = dist - math.abs(dx)
+        table.insert(ring, { dx, dy })
+        if dy ~= 0 then table.insert(ring, { dx, -dy }) end
+    end
+    table.sort(ring, function(a, b) return math.abs(a[1]) < math.abs(b[1]) end)
+    for _, d in ipairs(ring) do
         local tx, ty = foe.x + d[1], foe.y + d[2]
         if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0 then
-            local clean = true                                -- no OTHER foe orthogonally adjacent
-            for _, n in ipairs({ {1,0}, {-1,0}, {0,1}, {0,-1} }) do
-                local nx, ny = tx + n[1], ty + n[2]
-                if not (nx == foe.x and ny == foe.y) and foeTiles[nx .. "," .. ny] then
-                    clean = false; break
+            -- No OTHER foe inside the BAIT'S OWN reach -- which is what makes the attack menu
+            -- ambiguous and lets captureAttack film the wrong creature. At melee this is the
+            -- old "nothing else orthogonally adjacent"; at range it correctly widens.
+            local clean = true
+            for key in pairs(foeTiles) do
+                local nx, ny = key:match("^(-?%d+),(-?%d+)$")
+                nx, ny = tonumber(nx), tonumber(ny)
+                if not (nx == foe.x and ny == foe.y) then
+                    local md = math.abs(nx - tx) + math.abs(ny - ty)
+                    if md >= plmn and md <= plmx then clean = false; break end
                 end
             end
             if clean then
@@ -4528,7 +4608,10 @@ scenarios.recordenemy = function()
             end
         end
     end
-    if not placed then return result("FAIL", "no tile adjacent to ONLY the target foe") end
+    if not placed then
+        return result("FAIL", string.format(
+            "no tile at range %d from ONLY the target foe (bait reach %d-%d)", dist, plmn, plmx))
+    end
     pokeHarmless(pl)                       -- pow 0: the player's hit can't kill -> the foe counters
     -- ONE description of what we baited, used by both the log and the verdict: a raw-pid
     -- creature has no `want` class and a reskin has no `wantPid`, so formatting either

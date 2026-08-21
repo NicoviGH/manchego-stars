@@ -4785,6 +4785,92 @@ scene's own `description:`, and move on.
 The exposure grows with the gap: ch05's endings were locked in July and are being wired in
 August, and they are the LAST scenes anyone will read before they ship.
 
+### A battle anim carries FOUR palettes and the engine picks one; ours are four copies (2026-08-20, #25)
+
+Asked directly ("do the battle anims not get the red faction palette?") and worth writing down,
+because the two halves of a reskin behave oppositely and the difference is invisible until a
+creature is on screen twice.
+
+- **A MAP sprite is recoloured by the ENGINE at runtime.** `ApplyUnitSpritePalettes` loads
+  `unit_icon_pal_enemy` into the sprite's OBJ bank, so one sheet reads blue as an ally and red as
+  a foe. This is why a vendored sheet's own colours barely matter — `inject_enemy_class_reskins`
+  only has to remap it onto the base class's SMS palette.
+- **A BATTLE anim is not.** `GetBanimFactionPalette` (`banim-ekrcmd.c:115`) maps the unit's
+  faction to `BANIMPAL_BLUE/RED/GREEN/PURPLE` = 0..3, and that index is an OFFSET into the
+  palette buffer (`gUnknown_08802B04 + gBanimFactionPal[side] * 0x10`). So an anim's `.agbpal` is
+  **128 bytes — four 16-colour banks — and the engine SELECTS one.** It transforms nothing.
+
+Vanilla ships four genuinely different banks: `banim_arcm_ar1.agbpal`'s blue bank holds
+`(216,248,112)` where its red bank holds `(168,208,248)` in the same slot.
+
+**Ours are 128 bytes with all four banks byte-identical.** `feditor_to_banim` imports the single
+palette an FEditor script carries and replicates it, so a community anim renders in its native
+colours on every side. That is not a bug — it is what `recolor: enemy_red` exists to correct, and
+why the kobolds declare it while the PC cast does not.
+
+**`enemy_red` is not always the right correction.** It keys on blue-dominant colours
+(`b > r + 30 and b >= g`) to catch faction-swappable cloth, and ch05's skeletons have cool bluish
+BONE highlights — applying it reddens the skeleton itself rather than its armour. Checked against
+the imported palettes before shipping and rejected on the picture, the same call Ravisin's palette
+records: `decisions.md` → "A vendored anim's palette is a BY-EYE call". ch05's four ship NATIVE,
+so its risen guard wear blue armour in the close-up and take the engine's red only on the map.
+The remedy if that ever bothers anyone is a hand-edited bank via `tools/banim_palette.py`, not a
+blanket hue rule.
+
+_Recorded: 2026-08-20 (Nicolas asked; the answer was not written down anywhere)._
+
+### `recordenemy` baits by REACH OVERLAP, not by melee — an archer can be benched (2026-08-20, #25)
+
+The bench picked "a live melee player unit" and stood it orthogonally adjacent to its target,
+because it films a COUNTER-attack. A bow has no range-1 attack, so an adjacent bait produced no
+animation — and that got written down as *archers cannot be benched*, with `CLASS_ARCHER` left
+out of `CLASS_RESKIN_FOE_WEAPON` as if the class were the problem.
+
+It is not. **Approach an archer with a bow or a tome and it answers at range 2** (Nicolas: "we
+tested RBG and he's an archer"). The limitation was the picker's, wearing a class's name.
+
+The bait is now chosen by finding a party unit whose weapon reach OVERLAPS the foe's, and stands
+at a distance both can strike at; the candidate tiles are the Manhattan ring at that distance,
+vertical offsets first (the bench is laid out in rows, so above/below has fewer neighbours). At
+distance 1 that is byte-identical to what it did before.
+
+**The "clean tile" rule got more correct on the way.** It asked whether another foe was
+orthogonally ADJACENT to the bait — a proxy for the real question, *is another foe inside the
+BAIT's own attack range*, which is what makes the attack menu ambiguous and films the wrong
+creature. Identical at melee; at range the old test would have let a second skeleton into the menu.
+
+**The general shape, and it is the third instance this month:** a check written for the only case
+that existed encodes that case rather than the property. See also `mapfull`'s grid (below) and the
+bench's flat x-spacing assertion, both of which were right until a second row or a second chapter
+existed.
+
+_Recorded: 2026-08-20 (bone-archer filmed on the fix; Marty baits it with Flux from the far platform)._
+
+### `mapfull` was chapter-generic in name and ch03-shaped in fact (2026-08-20, #25)
+
+Its grid was the literals `{0,8,15} x {0,8,16}` — exactly ch03's 17x16 map — while the scenario
+was described and used as chapter-generic. On ch05 (15x21) that walked the cursor to x=16, off
+the map, and the run reported `FAIL: controller fault: cursor_right` AFTER capturing every tile it
+wanted: a verdict accusing the chapter of something the scenario did to itself.
+
+The worse half is silent. Those stops cover rows 0-15 of a 21-row map, so it would have produced a
+confident "full-map grid captured" that was missing the bottom quarter — including ch05's deploy
+pocket. **A check that cannot see what it is missing is not a check.**
+
+The grid now derives from `mapSize()`, stepping a screenful (15x10) and always finishing on the
+far edge. Two further things the ch05 pan taught, both cheap and both about COST rather than
+correctness:
+
+- **Poke fast config BEFORE booting.** `mapfull` opens on `bootToMap()` at normal text speed, and
+  ch05's map is behind a 52-box opening — minutes of A-presses, past the run deadline, twice.
+  `recordch05opening` already pokes fast for the same boot and restores normal because it films
+  MOTION; a pan never needs normal at all.
+- **`--ch05-moose` is the WRONG shortcut for it**, tempting as it looks: `recordch05moose`
+  documents that `bootToMap` is the wrong driver on that ROM, because there the beginning script
+  IS the beat.
+
+_Recorded: 2026-08-20 (three runs spent on one screenshot; the grid, the speed, and the boot)._
+
 ### The TESTCH bench is bounded by SMS VRAM, not by its tile row (2026-08-19, #25)
 
 The bench ran out of seats at seven and it was briefly written down as "the bench is full",

@@ -33,17 +33,24 @@ repo; FEUniverse mirror). Scanned 2026-07-23.
 
 ## Availability by weapon mode (the load-bearing finding)
 
-Undead **humanoid** anims live on **monster / sword / bow / magic** frames. **Lance / axe / armored**
-undead humanoids are mostly a gap → use a **frost/pale palette-swap** of the vanilla frame (an
-ice-locked sentinel reads better than a bone-knight anyway). The one lance exception found: a skeleton
-halberdier (`Skeleberdier`).
+Undead **humanoid** anims cluster on **monster / sword / bow / magic** frames. **Armored** undead
+are a real gap → use a **frost/pale palette-swap** of the vanilla frame (an ice-locked sentinel
+reads better than a bone-knight anyway).
+
+**Lance and axe are NOT a gap, and reading them as one cost ch05 its axe block for a month.** The
+`Skeleberdier` covers *both* — it ships Lance, Axe (Stab), Axe (Swing) and Handaxe in one download
+(the axe modes by tatata) — so a single vendored anim can dress a lance class and an axe class at
+once. **Search a candidate's own mode folders before believing this table**: an anim filed under
+one weapon category routinely carries several, and the category is where it *lives*, not what it
+*does*. Skeleberdier is filed under Soldiers/Halberdiers; Wight Sniper, filed under skeletons,
+ships a Lance beside its Bow.
 
 | need | borrowable? | asset(s) |
 |---|---|---|
 | sword skeleton | ✅ | `Monsters - Basic Types/[Skeleton-Base] Bonewalker`, `[Skeleton-Custom] Specter`, `Stalfos`, `Skull King` |
 | bow skeleton | ✅ | `Monsters - Basic Types/[Skeleton-Reskin] Wight Sniper` |
-| lance skeleton | ⚠️ one | `Infantry - (Lnc) …/[Custom Halb] Skeleberdier` (else palette-swap) |
-| axe undead | ❌ | palette-swap (living option: `[Berserker-Variant] Yetizerker` = a frost-troll) |
+| lance skeleton | ✅ | `Infantry - (Lnc) …/[Custom Halb] Skeleberdier`; also `[Skeleton-Reskin] Wight Sniper`, whose Lance mode sits beside its Bow |
+| axe undead | ✅ | `[Custom Halb] Skeleberdier` → `3. Axe (Swing)` / `3. Axe (Stab)` / `4. Handaxe`, all by tatata. **Shipped in ch05** (#25) |
 | armored undead | ❌ | palette-swap the vanilla Armor-Knight/General (frost "sentinel") |
 | zombie | ✅ | `Monsters - Basic Types/[Zombie-Base] Revenant`, `Entombed +Ranged`, `[Zombie-Custom] Gore` |
 | undead caster | ✅ | `Magi - Dark-Type/[T3 Dark Druid-Reskin] Skeleton Druid`, `[T3 Necromancer-*] …`, `[T2 Summoner-Reskin] Plague Doctor / Warlock` |
@@ -54,12 +61,17 @@ halberdier (`Skeleberdier`).
 
 ## Per-chapter sourcing
 
-### ch05 — The Elven Tomb (risen elven guardians, undead) — SCOUTED, in the YAML
-Authoritative per-unit choices are the `skin:` fields in `chapters/ch05-the-elven-tomb.yaml`:
-- `risen-spear` (Soldier/lance) → **Skeleberdier** (skeleton lance); fallback frost palette-swap
-- `tomb-reaver` (Fighter/axe) → frost palette-swap (no undead axe anim)
-- `crypt-blade` (Mercenary/sword) → **Bonewalker/Specter** skeleton
-- `bone-archer` (Archer/bow) → **Wight Sniper** skeleton
+### ch05 — The Elven Tomb (risen elven guardians, undead) — SHIPPED (#25)
+Wired 2026-08-20 as `enemy_class_reskins` entries in `campaign.yaml`, map sprite **and** battle
+anim for all four line classes. That file is the authority now; the `skin:` fields in
+`chapters/ch05-the-elven-tomb.yaml` are the older intent notes and are read by no code.
+- `risen-spear` (Soldier/lance) → **Skeleberdier** lance · sprite `Bonewalker (U) Lance {Epicer}`
+- `tomb-reaver` (Fighter/axe) → **Skeleberdier** axe + handaxe · sprite `Bonewalker (U) Axe {Snerdels}`
+  — *not* a palette-swap; this row read "no undead axe anim" until the mode folders were opened
+- `crypt-blade` (Mercenary/sword) → **Bonewalker (one arm)** · sprite `Bonewalker (U) One Arm {IS}`,
+  the same body as the anim. Deliberately NOT the Specter, which is Sahnar's, so the named recruit
+  does not read as one of the line
+- `bone-archer` (Archer/bow) → **Wight Sniper** · sprite `Bonewalker (U) Wight Bow {IS}`
 - `frost-sentinel` (Armor-Knight) → frost palette-swap ("ice-locked elven sentinel") — the Def-anchor
 - `sahnar` (Myrmidon) → **Specter** (already planned, #25 thread)
 - `white-moose` (Gwyllgi) → **SUPERSEDED 2026-07-31.** Was "Gwyllgi repal"; the FE-Repo has no elk
