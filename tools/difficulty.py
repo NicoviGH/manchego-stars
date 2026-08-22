@@ -290,12 +290,13 @@ def _enemy_from_enum(name, class_enum, level, weapon, personal=None,
 
 
 def _one_enemy(name, class_token, level, weapon, personal=None, mode=None, shifts=None,
-               base_level=1):
+               base_level=1, shiftable=True):
     return _enemy_from_enum(name, _enemy_class_enum(class_token), level, weapon, personal,
-                            mode=mode, shifts=shifts, base_level=base_level)
+                            mode=mode, shifts=shifts, base_level=base_level,
+                            shiftable=shiftable)
 
 
-def enemy_combatants(enemy_def, mode=None, shifts=None, base_level=1):
+def enemy_combatants(enemy_def, mode=None, shifts=None, base_level=1, shiftable=True):
     """One representative Combatant per DISTINCT enemy type in a chapter enemy_units entry
     (its `count`/positions are tactical detail the metrics don't model). Class base
     autoleveled to the entry's `level`. Handles both a single `class` and a mixed
@@ -307,13 +308,15 @@ def enemy_combatants(enemy_def, mode=None, shifts=None, base_level=1):
     if 'class' in enemy_def:
         return [_one_enemy(name, enemy_def['class'], level,
                            _weapon_for(enemy_def.get('inventory')),
-                           mode=mode, shifts=shifts, base_level=base_level)]
+                           mode=mode, shifts=shifts, base_level=base_level,
+                           shiftable=shiftable)]
     by_class = enemy_def.get('inventory_by_class', {})
     out = []
     for cls in dict.fromkeys(enemy_def.get('composition', [])):   # distinct, order-stable
         weapon = _weapon_for([{'id': w} for w in by_class.get(cls, [])])
         out.append(_one_enemy('%s-%s' % (name, cls), cls, level, weapon,
-                              mode=mode, shifts=shifts, base_level=base_level))
+                              mode=mode, shifts=shifts, base_level=base_level,
+                              shiftable=shiftable))
     return out
 
 
@@ -472,6 +475,13 @@ def vanilla_enemies(parity_ref, mode=None):
     relpath, arrays = spec
     text = bc.vanilla_decomp_text(relpath)
     shifts = vanilla_chapter_shifts(parity_ref) if mode else None
+    if mode and shifts is None:
+        # Silently returning an UNSHIFTED vanilla force here would compare our shifted
+        # side against vanilla's authored table and still print a verdict -- exactly the
+        # unnamed-configuration bug #303 exists to kill. Refuse instead.
+        bc.sys.exit('ERROR: parity_reference %r does not resolve to a vanilla chapter, so '
+                    'its difficulty numbers are unknown and a --mode read would compare '
+                    'our SHIFTED force against an UNSHIFTED reference' % parity_ref)
     out = []
     for array_name in arrays:
         for i, d in enumerate(vanilla_unit_defs(text, array_name)):
@@ -654,6 +664,40 @@ def chapter_enemy_force(chap, mode=None, shifts=None):
     return [u for _ed, u in chapter_units(chap, mode=mode, shifts=shifts)]
 
 
+def bosses_over_their_donor_base_level(campaign):
+    """Bosses that deploy ABOVE their vanilla donor slot's baseLevel (sorted ids).
+
+    `_our_base_level` treats every boss as malus-immune. For raw pids that is ENFORCED
+    (RAW_PID_LEVEL_SOURCES writes baseLevel = deploy level). For the ones riding vanilla
+    CHARACTER_ slots it is merely true today, and at ZERO margin -- Breguet 4/4, Bone 4/4,
+    Bazba 6/6. One level bump and the ROM starts applying the malus while the model still
+    assumes it does not, which is the silent model/ROM divergence in miniature."""
+    out = []
+    for chapter in bc.hosted_chapters():
+        chap = bc._load_chapter_yaml(campaign, bc.chapter_yaml_for(chapter.name))
+        for enemy in chap.get('enemy_units', []):
+            if not (enemy.get('is_boss') or enemy.get('is_miniboss')):
+                continue
+            donor = bc.ENEMY_BASE_SLOT.get(enemy.get('id'))
+            if not donor:
+                continue
+            if int(enemy.get('level', 1)) > _character_base_level(donor):
+                out.append(enemy.get('id'))
+    return sorted(out)
+
+
+def _our_takes_difficulty_shift(enemy_def):
+    """Does the engine shift THIS unit of ours? The `>= 0x3C` gate, our side.
+
+    Resolved through the same donor lookup `unit_real_article` uses, because it answers the
+    same question -- which character SLOT the unit rides. A cast member deployed hostile
+    (BASE_DONOR) rides a playable slot and is therefore difficulty-immune: ch05's Sahnar is
+    the live case, and the ROM agrees, reading identical stats in all three modes. An enemy
+    on a vanilla boss slot (ENEMY_BASE_SLOT) or on a raw pid sits well above the gate."""
+    donor = bc.BASE_DONOR.get(enemy_def.get('id')) or bc.ENEMY_BASE_SLOT.get(enemy_def.get('id'))
+    return _takes_difficulty_shift(donor) if donor else True
+
+
 def _our_base_level(enemy_def):
     """The baseLevel OUR unit carries, for the malus gate.
 
@@ -689,7 +733,8 @@ def chapter_units(chap, mode=None, shifts=None):
         else:
             out.extend([(ed, unit_real_article(ed, c))
                         for c in enemy_combatants(ed, mode=mode, shifts=shifts,
-                                                  base_level=_our_base_level(ed))]
+                                                  base_level=_our_base_level(ed),
+                                                  shiftable=_our_takes_difficulty_shift(ed))]
                        * int(ed.get('count', 1)))
     return [(ed, u) for ed, u in out if u.weapon is not None]  # drop staff-only enemies
 
@@ -965,13 +1010,16 @@ def _fmt_dura_delta(ours, van):
     return '%+.1f' % (ours - van)
 
 
-def report(campaign, ch):
+def report(campaign, ch, mode=None):
     chap, roster, line, bosses, deploy_limit, labels = load_field(campaign, ch)
     num = chap.get('chapter_number')
     bar = '=' * 80
     print(bar)
     print('CH%s "%s" -- difficulty / vanilla parity   [STATIC proxy -- playtest is arbiter]'
           % (num, chap.get('title', ch)))
+    print('  difficulty mode: %s'
+          % ('%s (both sides shifted by their own chapter\'s numbers)' % mode.upper()
+             if mode else 'AUTHORED TABLE (unshifted -- the level each side DECLARES)'))
     print(bar)
     if chap.get('status') == 'planned':
         print('** PLANNED chapter -- brainstorm SEED, NOT authoritative. The enemy roster/levels'
@@ -1029,7 +1077,7 @@ def report(campaign, ch):
               % (num, ref))
 
     _print_pressure(_chapter_pressure(chap))
-    print_role_findings(chap, chap.get('parity_reference'))
+    print_role_findings(chap, chap.get('parity_reference'))  # authored table; see banner
     _print_economy(chap)
     _print_dynamics(chap)
 
@@ -1749,6 +1797,10 @@ def curve_report(campaign, band=0.25, mode=None):
     print('  difficulty mode: %s'
           % ('%s (both sides shifted by their own chapter\'s numbers)' % mode.upper()
              if mode else 'AUTHORED TABLE (unshifted -- the level each side DECLARES)'))
+    if mode:
+        print('  NB per-unit role findings and planned-chapter targets below are graded on the'
+              '\n     AUTHORED table, not on %s -- only the parity rows are mode-shifted.'
+              % mode.upper())
     print(bar)
     print('  %-22s %-13s %-15s %-17s %s'
           % ('chapter', 'reference', 'threat/slot', 'clear-load/slot', 'verdict'))
@@ -1889,7 +1941,7 @@ def main():
         lord_floor_report(args.campaign, args.chapter, args.target,
                           args.def_cap, args.res_cap, args.hp_cap)
     else:
-        report(args.campaign, args.chapter)
+        report(args.campaign, args.chapter, mode=args.mode)
 
 
 if __name__ == '__main__':

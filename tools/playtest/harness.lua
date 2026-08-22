@@ -1735,13 +1735,31 @@ end
 -- three numbers the chapter DECLARES in its YAML `difficulty:` block. Reading the map
 -- rather than the menu is the point: the menu only proves we clicked something.
 scenarios.difficulty = function()
-    if not bootToMap() then return result("FAIL", "never reached the map") end
     local mode = (PLAYTEST_DIFFICULTY ~= nil and PLAYTEST_DIFFICULTY ~= "")
         and PLAYTEST_DIFFICULTY or "default"
-    local total = INSPECT.difficultyProbe(mode)
-    shot("difficulty-" .. mode)
-    return result("PASS", string.format("mode=%s chapter=%d red maxHP total=%d",
-                                        mode, chapter(), total))
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    -- PROVE the run is in the mode it labels before recording anything under that name.
+    -- A scenario that boots from a saved state never passes the difficulty menu, so it
+    -- would happily file Tutorial stats as "difficult"; a mislabeled measurement is worse
+    -- than no measurement. These are the two bits SaveMenuWriteNewGame actually sets:
+    --   chapterStateBits +0x14, PLAY_FLAG_HARD = 1<<6 (types.h:187,246)
+    --   config +0x40, controller = bit 21 (PlaySt_OptionBits; gameSpeed bit 7 and
+    --   animationType bits 17-18 in pokeFastConfig above pin the same packing)
+    -- and TUTORIAL_MODE() is `!HARD && controller ~= 1` (eventinfo.h:107).
+    local hard = (ru8(SYM.gPlaySt + 0x14) & 0x40) ~= 0
+    local controller = (ru32(SYM.gPlaySt + 0x40) >> 21) & 1
+    local actual = hard and "difficult" or (controller == 1 and "normal" or "tutorial")
+    if TUNE.difficultyWant ~= nil and actual ~= mode then
+        return result("FAIL", string.format(
+            "PT_DIFFICULTY=%s but the ROM is in %s (HARD=%s controller=%d) -- the menu "
+            .. "selection never committed, so these stats are not that mode",
+            mode, actual, tostring(hard), controller))
+    end
+    local total = INSPECT.difficultyProbe(actual)
+    shot("difficulty-" .. actual)
+    return result("PASS", string.format(
+        "mode=%s (HARD=%s controller=%d) chapter=%d red maxHP total=%d",
+        actual, tostring(hard), controller, chapter(), total))
 end
 
 scenarios.smoke = function()
