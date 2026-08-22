@@ -20,7 +20,17 @@ a thing has a home before cutting it.
 **ch05 is COMPLETE** — every scene, every fallback and all three ending arms are wired, proved and
 filmed. Nothing on it is owed.
 
-**Next is the `#302` epic: chapter as code.** Do the AUDIT first (its first child), and ground it
+**#303 comes FIRST, flagged urgent by Nicolas.** We support all three difficulty modes, and
+today we merely INHERIT them: the select screen has been live since ch01, so a player can pick
+Difficult and get vanilla's numbers for whatever host slot we squatted — ch03 and ch04 both host
+on slot 5 and therefore necessarily share difficulty numbers. Two consequences worth knowing
+before starting: every `make difficulty` PARITY line and every playtest verdict graded ONE
+configuration while reading as general, and `CHECK_TUTORIAL` (`!config.controller && !HARD`)
+means ch05's arena tutorial does not play on Difficult at all. Checklist on #303; ADR in
+`decisions.md`. Doing it first also hands #302 a worked example of "declare it rather than
+inherit it" instead of a hypothesis.
+
+**Then the `#302` epic: chapter as code.** Do the AUDIT first (its first child), and ground it
 in the history rather than in recollection — the premise is measured, and it is that the marginal
 cost of a chapter is going UP: ch03→ch04→ch05 ran 58→100→**113** commits and 37→48→**78**
 `CH0N_*` constants, while each chapter still writes its own ~350-400-line `inject_chNN`.
@@ -30,14 +40,10 @@ cost of a chapter is going UP: ch03→ch04→ch05 ran 58→100→**113** commits
 is BY DESIGN — the placeholder IS the "next chapter" slot. Build it through whatever #302
 produces, since that is the epic's own definition of done.
 
-**One question is OPEN and is Nicolas's to answer, not a refactor's: #303 — do we ship three
-difficulty modes?** We inherit FE8's, never set the level shifts (ch03 and ch04 share host slot 5
-and so necessarily share difficulty numbers), and grade exactly one configuration — so every
-PARITY verdict this project has printed is Normal-only. Nothing in #303 proceeds until the
-product decision is made.
-
-**Two other questions are RULED (Nicolas, 2026-08-21), are ADRs, and are DONE — do not re-raise
-either.** Reskins keep their donor's class name, deliberately. And the character wrap is retired:
+**Three questions are RULED and are ADRs — do not re-raise any of them.** Reskins keep their
+donor's class name. The character wrap is retired (pixels, per renderer, #298). And **we support
+all three difficulty modes** — *"vanilla ships three difficulty modes then so should we"*
+(2026-08-22). Reskins keep their donor's class name, deliberately. And the character wrap is retired:
 dialogue is measured in PIXELS against the window it actually renders in (#298).
 
 ## Recently landed — do not redo
