@@ -2136,6 +2136,40 @@ _Decided: 2026-06-17_
 
 ## Distribution & Scope
 
+### A chapter declares its traps; `.traps` is the fourth inherited field (2026-08-22, #302)
+
+`.traps` is a **ChapterEventGroup** field (chapterdata.h:32), not a `chapter_settings` one. Our
+injectors FILL the group but never wrote that field, so every hosted chapter kept whatever its
+donor group carried — the same silent-inheritance shape as the goal window/status text ids
+(#207), the battle grounds, and the difficulty numbers (#303).
+
+**It was one chapter from biting.** ch05 fills `Ch6Events`, which is clean. But the hosting
+pattern puts ch06 on slot 7 filling `Ch7Events`, and vanilla Ch7 carries **two ballistae, at
+(17,8) and (2,10)**. ch06 would have shipped with enemy ballistae at another chapter's
+coordinates, in every difficulty mode, chosen by nobody and explained by nothing.
+
+Found because Nicolas asked whether "no traps" was another *unwired is not never* case. It was
+— but not where either of us was looking. The first pass checked only `extraTrapsInHard`, the
+field #303's checklist happened to name, found every donor empty, and called the whole channel a
+non-issue. `extraTrapsInHard` really is empty everywhere except `ruin9`. **The base `.traps`
+field is the live one**, and vanilla uses it in nine groups: ballistae (ch7/ch10a/ch13a), gorgon
+eggs and fire tiles (ch18a/b), gas (ruin5), fire tiles (ruin9), a light arrow (tower8).
+
+`apply_chapter_traps` now writes each hosted chapter's declaration every build, so inheritance is
+impossible by construction rather than by luck. **`traps: []` is a DECISION and reads as one**;
+declaring nothing is what the guard catches, and only when the donor actually carries something —
+`inherited_traps_undeclared` is a prompt, not a safety net, because keeping another chapter's
+ballistae is a choice that should be made out loud.
+
+**The general rule, now with four instances: filling an event group does not empty it.** Every
+field of a ChapterEventGroup our injectors do not write is inherited from whichever vanilla
+chapter's group we squatted. Before hosting a new chapter, read the donor group's fields and
+decide each one — do not discover them later.
+
+_Decided: 2026-08-22 (Nicolas) — "do it, and the YAML thing too, since our next epic is chapter
+as code."_
+
+
 ### The arena tutorial is safety text, so it plays in every mode (2026-08-22, #303)
 
 Vanilla wraps its arena tutorial in `EventScr_CallOnTutorialMode`, and `CHECK_TUTORIAL` is

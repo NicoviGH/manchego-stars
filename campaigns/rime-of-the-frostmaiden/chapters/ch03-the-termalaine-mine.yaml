@@ -28,6 +28,12 @@ difficulty:
   difficult: 2
 
 
+# Traps (#302). `.traps` is a ChapterEventGroup field, and our injectors FILL the group --
+# so a chapter that says nothing keeps whatever its donor carried. Declaring the empty list
+# is the decision, not the absence of one: the mine has chests and doors, no traps.
+# Row shape: {type, x, y} plus optional item/count/turn. Types: build_campaign TRAP_TYPES.
+traps: []
+
 # ── Onboarding (what this chapter first teaches) ─────────────────────────────────
 # Cadence anchor = vanilla Ch3, which recruits Colm (the first thief) → the steal/chests/
 # doors lesson; our Trex (Colm-based) carries it. We ALSO move the monster foe-type debut

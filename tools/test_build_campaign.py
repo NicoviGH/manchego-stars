@@ -6819,5 +6819,83 @@ class ArenaTutorialPlaysInEveryMode(unittest.TestCase):
         self.assertEqual(src.count('CALL(EventScr_CallOnTutorialMode)'), 0)
 
 
+class ChapterTraps(unittest.TestCase):
+    """A hosted chapter DECLARES its traps; it never inherits the donor group's (#302/#303).
+
+    The fourth instance of the same defect as the goal text ids (#207), the battle grounds
+    and the difficulty numbers: `.traps` lives on the ChapterEventGroup, our injectors fill
+    the group but never wrote that field, so a chapter kept whatever its donor carried.
+
+    It was one chapter away from biting. ch05 fills `Ch6Events`, which is clean -- but the
+    hosting pattern puts ch06 on slot 7 filling `Ch7Events`, and vanilla Ch7 carries TWO
+    ballistae, at (17,8) and (2,10). ch06 would have shipped with enemy ballistae at another
+    chapter's coordinates, in every mode, chosen by nobody.
+
+    The build now WRITES the declaration every time, so inheritance is impossible by
+    construction rather than by luck; a chapter that declares nothing gets TRAP_NONE.
+    """
+
+    def test_a_chapter_that_declares_nothing_renders_an_empty_table(self):
+        self.assertEqual(bc.trap_data_body([]), '    /* type */ TRAP_NONE')
+
+    def test_a_declared_ballista_renders_vanillas_row_shape(self):
+        body = bc.trap_data_body(bc.chapter_traps(
+            {'traps': [{'type': 'ballista', 'x': 17, 'y': 8, 'item': 'ITEM_BALLISTA_REGULAR'}]}))
+        self.assertIn('/* type */ TRAP_BALLISTA', body)
+        self.assertIn('/* xPos */ 17', body)
+        self.assertIn('/* yPos */ 8', body)
+        self.assertIn('ITEM_BALLISTA_REGULAR', body)
+        self.assertTrue(body.rstrip().endswith('TRAP_NONE'), 'table must be terminated')
+
+    def test_an_unknown_trap_type_is_refused(self):
+        with self.assertRaises(SystemExit):
+            bc.chapter_traps({'traps': [{'type': 'bear-trap', 'x': 1, 'y': 1}]})
+
+    def test_a_trap_off_the_map_is_refused(self):
+        with self.assertRaises(SystemExit):
+            bc.chapter_traps({'traps': [{'type': 'gas', 'x': 999, 'y': 1}]})
+
+    def test_every_hosted_chapter_declares_or_inherits_nothing(self):
+        # Today all six donor tables are empty, so nothing is owed. The guard exists for
+        # the first chapter whose donor is NOT -- ch06 on Ch7Events.
+        self.assertEqual(bc.inherited_traps_undeclared('rime-of-the-frostmaiden'), [])
+
+    def test_the_guard_fires_when_a_donor_carries_traps_the_chapter_ignores(self):
+        # Simulates ch06's situation: a chapter that declares NOTHING, filling a donor group
+        # that carries ballistae. All six live chapters declare `traps: []`, so the silent
+        # case has to be constructed -- which is the point of having declared them.
+        real_kinds, real_load = bc._vanilla_trap_kinds, bc._load_chapter_yaml
+
+        def undeclared(campaign, filename):
+            chap = dict(real_load(campaign, filename))
+            chap.pop('traps', None)
+            return chap
+
+        bc._vanilla_trap_kinds = lambda sym: ['TRAP_BALLISTA'] if sym.endswith('Ch6') else []
+        bc._load_chapter_yaml = undeclared
+        try:
+            stranded = bc.inherited_traps_undeclared('rime-of-the-frostmaiden')
+        finally:
+            bc._vanilla_trap_kinds, bc._load_chapter_yaml = real_kinds, real_load
+        self.assertIn('ch05', stranded)
+
+    def test_a_declared_empty_list_silences_the_guard(self):
+        # `traps: []` is a DECISION, and must read as one -- not as "said nothing".
+        real = bc._vanilla_trap_kinds
+        bc._vanilla_trap_kinds = lambda sym: ['TRAP_BALLISTA']
+        try:
+            self.assertEqual(bc.inherited_traps_undeclared('rime-of-the-frostmaiden'), [])
+        finally:
+            bc._vanilla_trap_kinds = real
+
+    def test_the_write_pass_clears_every_hosted_chapters_table(self):
+        written = bc.chapter_trap_tables('rime-of-the-frostmaiden')
+        from inject import hosts
+        self.assertEqual(len(written), len(list(hosts.hosted_chapters())))
+        for symbol, body in written.items():
+            self.assertTrue(symbol.startswith('TrapData_Event_'), symbol)
+            self.assertIn('TRAP_NONE', body)
+
+
 if __name__ == '__main__':
     unittest.main()

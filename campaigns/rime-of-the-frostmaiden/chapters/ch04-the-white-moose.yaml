@@ -32,6 +32,12 @@ difficulty:
   difficult: 3
 
 
+# Traps (#302). `.traps` is a ChapterEventGroup field, and our injectors FILL the group --
+# so a chapter that says nothing keeps whatever its donor carried. Declaring the empty list
+# is the decision, not the absence of one: the forest hunt is fog, not hazards.
+# Row shape: {type, x, y} plus optional item/count/turn. Types: build_campaign TRAP_TYPES.
+traps: []
+
 # Onboarding parity (see docs/ONBOARDING.md + the dialogue-pass parity step): concepts
 # making their FIRST campaign appearance here, and how WE deliver the vanilla heads-up.
 introduces:

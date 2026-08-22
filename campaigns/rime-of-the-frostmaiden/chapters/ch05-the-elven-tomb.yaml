@@ -34,6 +34,12 @@ difficulty:
   normal:    2
   difficult: 3
 
+
+# Traps (#302). `.traps` is a ChapterEventGroup field, and our injectors FILL the group --
+# so a chapter that says nothing keeps whatever its donor carried. Declaring the empty list
+# is the decision, not the absence of one: the tomb depression is open ground.
+# Row shape: {type, x, y} plus optional item/count/turn. Types: build_campaign TRAP_TYPES.
+traps: []
                               # (first chapter at the FE8-Ch5 reward tier: stat-boosters + a promotion item unlock here)
 
 introduces:
