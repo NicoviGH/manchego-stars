@@ -18,6 +18,22 @@ milestone: M3
 cadence: first_boss             # see docs/CHAPTERS.md — 🟥
 fe8_base_map: "FE8 Ch5 — The Empire's Reach"        # retiled: Ch5's spread field → open-air tomb depression
 parity_reference: "FE8 Ch5"   # #48 enemy-pressure + reward parity bar — The Empire's Reach (1:1)
+
+# Difficulty (#303). FE8 ships three modes and so do we; the engine derives all three
+# from THIS chapter's authored enemy levels by re-projecting stats at unit-load time
+# (UnitApplyBonusLevels), so these are the only three numbers that separate the modes.
+# Taken from L05, the same vanilla chapter `parity_reference` names -- our authored
+# table sits on the same footing as vanilla's authored table (measured: every mode holds
+# its parity ratio to within 0.04), so vanilla's own spread lands our three modes where
+# its three sit. DECLARED, never inherited: without this the chapter silently carries its
+# squatted host slot's numbers, which is how ch04 shipped a Normal at x1.30 (out of band).
+# tutorial = easyModeLevelMalus, normal = normalModeLevelMalus, difficult =
+# difficultModeLevelBonus (chapterdata.h:47-49; each a 4-bit field, so 0..15).
+difficulty:
+  tutorial:  4      # vanilla L05
+  normal:    2
+  difficult: 3
+
                               # (first chapter at the FE8-Ch5 reward tier: stat-boosters + a promotion item unlock here)
 
 introduces:
@@ -244,12 +260,24 @@ enemy_units:
     boss_tile: moon_dial        # she holds the moon dial at the centre — retiled as a dais
                                 # (flavour + AI anchor; NO terrain bonus, see below)
     personal:                   # FE8's OWN boss mechanism — a named boss is class base + a
-      baseHP: 15                # personal line. Vanilla Saar is an Armor Knight *plus*
-      baseDef: 5                # HP+13/Pow+6/Skl+5/Spd+3/Def+2/Res+3/Lck+4; that line is most
-      basePow: 4                # of why he reads as a wall. This puts Ravisin at ~13 rounds to
-      baseSkl: 3                # kill — Saar's bar — while she stays a Druid with Flux and her
-      baseRes: 3                # existing art. Zero art cost, no custom class, pure vanilla.
-      baseLck: 3
+      baseHP: 21                # personal line. Vanilla Saar is an Armor Knight *plus*
+      baseDef: 6                # HP+13/Pow+6/Skl+5/Spd+3/Def+2/Res+3/Lck+4; that line is most
+      basePow: 4                # of why he reads as a wall. She stays a Druid with Flux and
+      baseSkl: 3                # her existing art: zero art cost, no custom class, pure vanilla.
+      baseRes: 3                #
+      baseLck: 3                # RE-BARRED 2026-08-22 (#303), HP 15->21 / Def 5->6. The old line
+                                # was authored to "~13 rounds — Saar's bar" and hit it exactly,
+                                # but that bar was measured BEFORE #285 taught the model to apply
+                                # a personal line to BOTH sides. Once Saar stopped being read off
+                                # naked class base he moved to 22.8 rounds and nobody re-checked
+                                # her, so ch05 sat under vanilla's clear-load in every mode and
+                                # fell OUT OF BAND on Tutorial (x0.74) — where the generics floor
+                                # to class base and the boss is most of the ratio.
+                                # She now measures 23.4 rounds against Saar's 22.8, and ch05 is
+                                # in band in all three modes (x0.92 / x1.02 / x1.04).
+                                # Def is a CLIFF here, not a dial: +1 moves her 13.4 -> 20.1
+                                # rounds and +2 overshoots to 40.2, because the yardstick's
+                                # damage approaches zero. The HP carries the rest.
     # BOSS-ARCHETYPE NOTE (2026-07-23, decomp-verified — supersedes the throne/bodyguard fix):
     # FE8 has NO tanky mage class (best magic Def is 5: Sage/Mage-Knight/Gorgon, all 10% Def
     # growth), so swapping her class can't work. But the class was never the reason vanilla

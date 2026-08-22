@@ -2509,11 +2509,27 @@ def raw_pid_portrait_data(text, campaign):
             block = _set_field(block, field, int(unit['personal'].get(field, 0)),
                                CHARACTERS_C, marker)
         text = text[:start] + block + text[end:]
+
+    # baseLevel LAST and on its own table: a raw-pid boss needs this whether or not it has a
+    # `personal:` line (the moose and the kobold brute have none), and without it the
+    # difficulty malus resets the unit and rebuilds it from growths. See RAW_PID_LEVEL_SOURCES.
+    for pid, level in sorted(raw_pid_base_levels(campaign).items()):
+        marker = '[%s - 1]' % pid.lower()
+        start, end = _find_brace_block(text, marker, CHARACTERS_C)
+        block = _set_field(text[start:end], 'baseLevel', level, CHARACTERS_C, marker)
+        text = text[:start] + block + text[end:]
     return text
 
 
 def patch_raw_pid_portraits(campaign, verbose=True):
     """Write raw_pid_portrait_data() to the decomp CharacterData table."""
+    stranded = unregistered_raw_pid_bosses(campaign)
+    if stranded:
+        sys.exit('ERROR: raw-pid boss(es) %s declare no baseLevel -- a gCharacterData gap '
+                 'reads baseLevel 1, so the difficulty malus RESETS the unit to class base '
+                 'and rebuilds it from growths, silently discarding its authored line (and '
+                 'for a promoted class, handing it +9 levels it never had). Add a '
+                 'RAW_PID_LEVEL_SOURCES row.' % ', '.join(stranded))
     with open(CHARACTERS_C, encoding='utf-8') as f:
         text = f.read()
     text = raw_pid_portrait_data(text, campaign)
@@ -6623,6 +6639,91 @@ def _register_chapter_map(maps_dir, layout, comment):
     return obj_idx, pal_idx, cfg_idx, layout_idx
 
 
+DIFFICULTY_MODES = ('tutorial', 'normal', 'difficult')
+# mode -> the chapter_settings field the engine reads for it. "easy" is FE8's own name for
+# the TUTORIAL slot: difficulty menu option 0 sets controller=0/HARD=0, which is both the
+# `-easyModeLevelMalus` branch (eventscr.c:2328) and the only state CHECK_TUTORIAL fires in.
+DIFFICULTY_FIELDS = {'tutorial': 'easyModeLevelMalus',
+                     'normal': 'normalModeLevelMalus',
+                     'difficult': 'difficultModeLevelBonus'}
+DIFFICULTY_MAX = 15          # each field is a 4-bit bitfield (chapterdata.h:47-49)
+
+
+def chapter_yaml_for(name):
+    """A `hosted_chapters()` registry name -> its chapter YAML filename.
+
+    Discovered from this module's own constants rather than a second hand-kept table, the
+    same way inject.hosts discovers host slots: a chapter that declares a host slot but no
+    YAML fails here instead of being skipped by every pass built on the registry (#241)."""
+    const = ('PROLOGUE_CHAPTER_YAML' if name == 'prologue'
+             else '%s_CHAPTER_YAML' % name.upper())
+    filename = globals().get(const)
+    if filename is None:
+        sys.exit('ERROR: hosted chapter %s has no %s -- declare it next to its '
+                 '%s_HOST_INDEX' % (name, const, name.upper()))
+    return filename
+
+
+def chapter_difficulty_shifts(chap):
+    """A chapter's DECLARED difficulty triple, validated, in mode->shift shape (#303).
+
+    FE8 authors one enemy table per chapter and derives all three modes from it by
+    re-projecting stats at unit-load time, so these three numbers are the entire
+    difference between the modes. They are declared in the chapter YAML because the
+    alternative is inheritance: a hosted chapter that names none keeps whatever its
+    squatted host slot shipped, tuned for a different chapter. ch04 is the case that
+    paid for this rule -- it hosts on slot 5 (`I05`, normal malus 0) while its parity
+    twin FE8 Ch4 carries 2, which put its Normal at x1.30, outside the parity band."""
+    block = chap.get('difficulty')
+    if not isinstance(block, dict):
+        sys.exit('ERROR: chapter %s declares no `difficulty:` block -- a chapter that '
+                 'names none INHERITS its host slot\'s numbers, which are tuned for a '
+                 'different chapter (#303)' % chap.get('id', '?'))
+    out = {}
+    for mode in DIFFICULTY_MODES:
+        if mode not in block:
+            sys.exit('ERROR: chapter %s `difficulty:` is missing `%s` -- all three of %s '
+                     'must be declared together' % (chap.get('id', '?'), mode,
+                                                    ', '.join(DIFFICULTY_MODES)))
+        value = block[mode]
+        if not isinstance(value, int) or isinstance(value, bool) \
+                or not 0 <= value <= DIFFICULTY_MAX:
+            sys.exit('ERROR: chapter %s `difficulty.%s` is %r -- must be an integer 0..%d '
+                     '(the engine field is 4 bits wide, so %d silently truncates to 0)'
+                     % (chap.get('id', '?'), mode, value, DIFFICULTY_MAX,
+                        DIFFICULTY_MAX + 1))
+        out[mode] = value
+    return out
+
+
+def apply_chapter_difficulty(campaign, verbose=False):
+    """Write every hosted chapter's DECLARED difficulty triple into its own host slot.
+
+    A pass over the registry rather than a line inside `_retarget_host_chapter`, for one
+    reason: the prologue does not retarget at all (it runs on the slot it was given), so
+    writing these where the retarget happens would silently miss a chapter -- the exact
+    shape of #241. Mirrors `CHAPTER_BATTLE_TILESETS`, which solved this same problem for
+    the battle grounds: one pass that has to MENTION every hosted chapter."""
+    from inject.hosts import hosted_chapters
+    with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
+        settings = json.load(f)
+    applied = []
+    for chapter in hosted_chapters():
+        chap = _load_chapter_yaml(campaign, chapter_yaml_for(chapter.name))
+        shifts = chapter_difficulty_shifts(chap)
+        slot = settings['chapters'][chapter.host_index]
+        for mode, field in DIFFICULTY_FIELDS.items():
+            slot[field] = shifts[mode]
+        applied.append((chapter.name, shifts))
+    with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
+        json.dump(settings, f, indent=2)
+    if verbose:
+        print('  difficulty (tutorial/normal/difficult): %s' % ', '.join(
+            '%s %d/%d/%d' % (n, s['tutorial'], s['normal'], s['difficult'])
+            for n, s in applied))
+    return applied
+
+
 def _retarget_host_chapter(host_index, goal_slot, goal_type, goal_err, indices,
                            chapter_number, event_group, goal_text_ids):
     """Point host chapter slot `host_index` (chapter_settings.json) at a registered
@@ -9408,6 +9509,69 @@ RAW_PID_PERSONAL_SOURCES = {
 # The chapter YAML is the authority, exactly as it is for RAW_PID_PERSONAL_SOURCES above:
 # a raw-pid creature has no pcs/npcs file, and giving it one would define the unit twice and
 # put a miniboss on the deployable cast roster.
+# Raw-pid BOSSES must declare a baseLevel, or the difficulty malus wipes their stat line.
+#
+# `UnitAutolevelPenalty` (bmunit.c) only fires `if (level > pCharacterData->baseLevel)`, and
+# EVERY vanilla named boss ships baseLevel >= the level it deploys at: Saar 8/8, Breguet 4/4,
+# Bazba 6/6, Novala 10/7, Murray 12/9. That is not a coincidence -- it is how vanilla protects
+# a hand-authored boss line, so the same stats reach the map in all three difficulty modes.
+#
+# Our bosses on vanilla CHARACTER_ slots (ENEMY_BASE_SLOT) inherit that for free. The ones on
+# RAW pids sit in gCharacterData GAPS, where baseLevel reads 1 -- so the penalty always fired,
+# reset them to class base and rebuilt them from class growths. Measured in-engine: Ravisin
+# came out 40 maxHP on Normal against 35 on Difficult, an INVERSION, because the reset path
+# re-runs full `UnitAutolevel` -- promoted branch included, +9 levels of growth
+# (GetCurrentPromotedLevelBonus) -- while the Difficult path calls `UnitAutolevelCore` direct
+# and never grants it. All four raw-pid bosses were affected; the two promoted ones loudest.
+#
+# Row = raw pid -> (chapter YAML that declares the unit, its unit id). The LEVEL is read from
+# the chapter YAML rather than repeated here, so baseLevel cannot drift from the level the unit
+# actually deploys at. Guarded by unregistered_raw_pid_bosses(): the failure is silent, because
+# a CharacterData gap is all zeros and nothing complains.
+RAW_PID_LEVEL_SOURCES = {
+    CH03_BOSS_PID:           (CH03_CHAPTER_YAML, 'grell'),
+    CH03_BRUTE_MINIBOSS_PID: (CH03_CHAPTER_YAML, 'kobold-steel'),
+    CH05_BOSS_PID:           (CH05_CHAPTER_YAML, 'ravisin'),
+    CH05_MOOSE_PID:          (CH05_CHAPTER_YAML, 'white-moose'),
+}
+
+
+def raw_pid_base_levels(campaign):
+    """Raw pid -> the baseLevel it must carry, read from the level it deploys at."""
+    out = {}
+    for pid, (chapter_yaml, unit_id) in RAW_PID_LEVEL_SOURCES.items():
+        chapter = _load_chapter_yaml(campaign, chapter_yaml)
+        unit = next((e for e in chapter.get('enemy_units', []) if e.get('id') == unit_id), None)
+        if unit is None:
+            sys.exit('ERROR: RAW_PID_LEVEL_SOURCES names %s/%s, which does not exist'
+                     % (chapter_yaml, unit_id))
+        out[pid] = int(unit.get('level', 1))
+    return out
+
+
+def unregistered_raw_pid_bosses(campaign):
+    """Boss/miniboss ids that ride a RAW pid but declare no baseLevel (sorted).
+
+    A boss is raw-pid when it has no ENEMY_BASE_SLOT row -- that table is exactly "our enemy
+    id -> the vanilla CHARACTER_ slot it deploys on", and a raw-pid boss has no entry by
+    construction. The prologue's zeroed guests are excluded: they DO ride vanilla slots (only
+    their base STATS are zeroed), so their baseLevel is the slot's and the penalty is already
+    governed by vanilla's own number."""
+    registered = {unit_id for _yaml, unit_id in RAW_PID_LEVEL_SOURCES.values()}
+    prologue_guests = {'sephek-kaltro'}
+    missing = []
+    for chapter in hosted_chapters():
+        chap = _load_chapter_yaml(campaign, chapter_yaml_for(chapter.name))
+        for enemy in chap.get('enemy_units', []):
+            if not (enemy.get('is_boss') or enemy.get('is_miniboss')):
+                continue
+            uid = enemy.get('id')
+            if uid in ENEMY_BASE_SLOT or uid in registered or uid in prologue_guests:
+                continue
+            missing.append(uid)
+    return sorted(missing)
+
+
 RAW_PID_BATTLE_ANIMS = {
     'white-moose': (CH05_CHAPTER_YAML, CH05_MOOSE_PID),
     'ravisin': (CH05_CHAPTER_YAML, CH05_BOSS_PID),
@@ -10070,12 +10234,32 @@ def ch05_misc_events():
 
 
 def ch05_arena_trigger_script():
-    """Player-only AREA target that preserves vanilla's tutorial-mode channel gate."""
+    """Player-only AREA target for the arena tutorial. Vanilla's anatomy MINUS its
+    tutorial-mode gate (#303).
+
+    Vanilla wraps this in `EventScr_CallOnTutorialMode`, and `CHECK_TUTORIAL` is
+    `!config.controller && !(chapterStateBits & PLAY_FLAG_HARD)` (eventscr.c:834) -- true
+    only for difficulty menu option 0. So in vanilla the arena tutorial never plays on
+    Normal or Difficult.
+
+    We drop that one gate because of what the two boxes SAY: a loss means the unit "will
+    not be able to fight in any future battles", and B concedes for the fee. That is a
+    permadeath warning plus its escape hatch -- safety text, not a flavour beat -- and a
+    Normal player who never sees it can lose a unit to a mechanic nobody explained. Every
+    other teaching beat we ship is plain dialogue and already played in all three modes
+    (ch02's fliers-vs-bows warning), so this makes the arena consistent with them rather
+    than exceptional (Nicolas, 2026-08-22: these, not the rest of tutorial mode).
+
+    The FACTION gate stays: the tile fires for a player unit only. The one-shot flag stays
+    too, so it still plays exactly once per run."""
+    # Vanilla's helper is just `CHECK_TUTORIAL / BEQ(end) / CALL(-1)` -- the gate plus an
+    # indirect call through EVT_SLOT_2 (events_script_utils.c:24). Dropping the gate means
+    # the slot hand-off has no purpose either, so this CALLs the script directly, which is
+    # the ordinary idiom (cf. ch5-eventscript.h's own `CALL(EventScr_RemoveBGIfNeeded)`).
     return ('{\n'
             '    SVAL(EVT_SLOT_2, FACTION_ID_BLUE)\n'
             '    CALL(EventScr_UnTriggerIfNotFaction)\n'
-            '    SVAL(EVT_SLOT_2, %s)\n'
-            '    CALL(EventScr_CallOnTutorialMode)\n'
+            '    CALL(%s)\n'
             '    EVBIT_T(7)\n'
             '    ENDA\n}' % CH05_ARENA_TUTORIAL_SCRIPT)
 
@@ -13471,6 +13655,13 @@ def main():
                 _configure_boot(PROLOGUE_HOST_INDEX, montage=args.montage)
         print('death quotes (#6):')
         inject_pc_death_quotes(args.campaign)
+        # LAST of the chapter passes: every hosted slot now exists, so this is where the
+        # registry can insist each one DECLARED its difficulty numbers instead of keeping
+        # the donor's (#303). Order-independent against _retarget_host_chapter (which does
+        # not touch these fields), but running it last keeps "what the slot carries" one
+        # decision made in one place.
+        print('difficulty modes (#303):')
+        apply_chapter_difficulty(args.campaign, verbose=True)
     # Close the scope manifest BEFORE the mtime rewind below: the rewind moves mtimes
     # backwards on byte-identical files, and this attribution watches mtimes.
     _scope_manifest = _scopes.write_manifest(

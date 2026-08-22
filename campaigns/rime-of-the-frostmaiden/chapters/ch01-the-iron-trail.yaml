@@ -17,6 +17,22 @@ cadence: full_party_intro       # story-wise: whole cast meets at the Northlook 
 fe8_base_map: "FE8 Ch13a — Fluorspar's Oath (layout only)"  # cadence base = FE8 Ch1
 fe8_cadence_base: "FE8 Ch1 — Escape! (Seize breather; field counts mirrored 1:1)"
 parity_reference: "FE8 Ch1"   # #48 enemy-pressure parity bar — Escape! — field counts mirrored 1:1 (cadence base, not the Ch13a layout)
+
+# Difficulty (#303). FE8 ships three modes and so do we; the engine derives all three
+# from THIS chapter's authored enemy levels by re-projecting stats at unit-load time
+# (UnitApplyBonusLevels), so these are the only three numbers that separate the modes.
+# Taken from L01, the same vanilla chapter `parity_reference` names -- our authored
+# table sits on the same footing as vanilla's authored table (measured: every mode holds
+# its parity ratio to within 0.04), so vanilla's own spread lands our three modes where
+# its three sit. DECLARED, never inherited: without this the chapter silently carries its
+# squatted host slot's numbers, which is how ch04 shipped a Normal at x1.30 (out of band).
+# tutorial = easyModeLevelMalus, normal = normalModeLevelMalus, difficult =
+# difficultModeLevelBonus (chapterdata.h:47-49; each a 4-bit field, so 0..15).
+difficulty:
+  tutorial:  0      # vanilla L01
+  normal:    0
+  difficult: 1
+
 balance_locked: true   # #48 (b): balance-final — CI hard-fails on a parity regression here
 
 # ── Narrative ──────────────────────────────────────────────────────────────────

@@ -153,6 +153,13 @@ scenarios:
     kind: record
   bootobserve:
     kind: diagnostic
+  # #303: the difficulty-mode oracle. A probe, not a gate -- it REPORTS the red force's
+  # stats in whichever mode PT_DIFFICULTY selected, and the comparison across the three
+  # runs is the verdict. Runs on any hosted chapter, since every one declares a triple.
+  difficulty:
+    rom: any
+    host_chapter: null
+    kind: diagnostic
   mapshot:                                             # "any hosted chapter" by design
     rom: any
     host_chapter: null

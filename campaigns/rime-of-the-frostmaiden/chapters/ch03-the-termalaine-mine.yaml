@@ -12,6 +12,22 @@ fe8_base_map: "FE8 Ch3 — The Bandits of Borgo"      # Seize big-battle; geomet
                                                     # interior (rooms via walls+doors), per decisions.md (ch01 rode Ch13a)
 parity_reference: "FE8 Ch3"   # #48 enemy-pressure parity bar — The Bandits of Borgo — Seize big-battle
 
+# Difficulty (#303). FE8 ships three modes and so do we; the engine derives all three
+# from THIS chapter's authored enemy levels by re-projecting stats at unit-load time
+# (UnitApplyBonusLevels), so these are the only three numbers that separate the modes.
+# Taken from L03, the same vanilla chapter `parity_reference` names -- our authored
+# table sits on the same footing as vanilla's authored table (measured: every mode holds
+# its parity ratio to within 0.04), so vanilla's own spread lands our three modes where
+# its three sit. DECLARED, never inherited: without this the chapter silently carries its
+# squatted host slot's numbers, which is how ch04 shipped a Normal at x1.30 (out of band).
+# tutorial = easyModeLevelMalus, normal = normalModeLevelMalus, difficult =
+# difficultModeLevelBonus (chapterdata.h:47-49; each a 4-bit field, so 0..15).
+difficulty:
+  tutorial:  4      # vanilla L03
+  normal:    2
+  difficult: 2
+
+
 # ── Onboarding (what this chapter first teaches) ─────────────────────────────────
 # Cadence anchor = vanilla Ch3, which recruits Colm (the first thief) → the steal/chests/
 # doors lesson; our Trex (Colm-based) carries it. We ALSO move the monster foe-type debut

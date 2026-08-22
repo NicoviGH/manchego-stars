@@ -81,6 +81,22 @@ local CHAR_HLIN, CHAR_SCRAMSAX, CHAR_SEPHEK = 0x0D, 0x11, 0x68 -- NATASHA/KYLE/O
 -- prologue/sandbox host on chapter slot 1; a chapter load-test (e.g. --ch03-boot on slot 4)
 -- overrides via PT_HOST_CHAPTER so bootToMap/inChapter recognize the right slot.
 local HOST_CHAPTER = PLAYTEST_HOST_CHAPTER or 1
+-- Which difficulty mode a run selects on the New Game menu (PT_DIFFICULTY). nil keeps the
+-- old behaviour -- press A on whatever is highlighted -- which is option 0, TUTORIAL. That
+-- default is why every verdict before #303 graded the easiest mode while reading as general.
+-- Hung off TUNE rather than taking two top-level locals: harness.lua sits AT Lua's 200-local
+-- ceiling, and the next top-level local stops the whole chunk loading (check.py guards it).
+TUNE.difficultyWant = (function()
+    local requested = (PLAYTEST_DIFFICULTY ~= nil and PLAYTEST_DIFFICULTY ~= "")
+        and PLAYTEST_DIFFICULTY or nil
+    if requested == nil then return nil end
+    local index = ({ tutorial = 0, normal = 1, difficult = 2 })[requested]
+    if index == nil then
+        error(string.format("PT_DIFFICULTY=%q is not one of tutorial, normal, difficult",
+                            tostring(requested)))
+    end
+    return index
+end)()
 -- Lord select (#42): menu order = classed cast order (build_campaign PORTRAIT_MAP);
 -- the LAST candidate (pinky, NEIMI slot) is benched by default under the 4-slot
 -- deploy cap, so choosing them is the visible force-deploy differential.
@@ -177,6 +193,11 @@ local function unitAt(base, i)
         charId = ru8(chptr + 4),
         x = ru8(a + 0x10), y = ru8(a + 0x11),
         hp = ru8(a + 0x13),
+        -- struct Unit (bmunit.h): +08 level, +12 maxHP, +14 pow, +17 def. The difficulty
+        -- shift re-projects these off class growths, so they are what a mode probe reads
+        -- (+0x13 curHP happens to match maxHP at load, but is not the field that moved).
+        level = ru8(a + 0x08),
+        maxhp = ru8(a + 0x12), pow = ru8(a + 0x14), def = ru8(a + 0x17),
         state = ru32(a + 0x0C),
     }
 end
@@ -539,7 +560,17 @@ local function observeController()
     -- invisible, and the ch00 -> ch01 flow sat on it until it timed out (#232).
     put("save_menu", observedProc(SYM.ProcScr_SaveMenu)
         or observedProc(SYM.gProcScr_SaveMenuPostChapter))
-    put("difficulty", observedProc(SYM.ProcScr_NewGameDifficultySelect))
+    local diffProc = observedProc(SYM.ProcScr_NewGameDifficultySelect)
+    put("difficulty", diffProc)
+    if diffProc then
+        -- struct DifficultyMenuProc.current_selection is a u8 @ +0x30 (savemenu.h:178).
+        -- 0 = Tutorial, 1 = Normal, 2 = Difficult -- SaveMenuWriteNewGame maps those to
+        -- (isTutorial, isDifficult) = (0,0)/(1,0)/(1,1) -> config.controller + PLAY_FLAG_HARD.
+        observation.difficulty = {
+            current = ru8(diffProc.addr + 0x30),
+            want = TUNE.difficultyWant,
+        }
+    end
     local introKey = observedProc(SYM.ProcScr_ChapterIntro_KeyListen)
     put("chapter_intro", introKey or observedProc(SYM.gProcScr_ChapterIntro))
     put("talk_wait", observedProc(SYM.gProcScr_TalkWaitForInput))
@@ -1146,6 +1177,16 @@ local function advanceBootState(observation, state)
     elseif state == "save_slot_input" then
         return driveSaveSlot()
     elseif state == "difficulty_input" then
+        -- Move onto the requested mode before committing. The postcondition is the
+        -- highlight MOVING, not the state clearing -- the menu is still up afterwards.
+        local d = observeController().difficulty
+        if d and d.want ~= nil and d.current ~= nil and d.current ~= d.want then
+            local from = d.current
+            return guardedInput("select_difficulty_down", "DOWN", "difficulty highlight moves",
+                function(after)
+                    return after.difficulty and after.difficulty.current ~= from
+                end, 120)
+        end
         return guardedInput("confirm_difficulty", "A", "difficulty input clears", function(after)
             return controllerState(after) ~= "difficulty_input"
         end, 600)
@@ -1397,6 +1438,29 @@ INSPECT.units = function(tag)
             end
         end
     end
+end
+
+-- The difficulty-mode oracle (#303). FE8 applies a mode as a per-chapter STAT
+-- re-projection at unit-load time (UnitApplyBonusLevels, bmunit.c), gated on RED units
+-- with pCharacterData->number >= 0x3C (eventscr.c:2328) -- so the proof that a mode
+-- actually landed is the red force's stats, read on the map, not the menu we clicked.
+-- Level is logged too and is expected NOT to move: UnitAutolevelPenalty restores
+-- unit->level after re-autoleveling, so a shifted enemy displays its authored level
+-- while carrying different stats. That is the trap this probe exists to make visible.
+INSPECT.difficultyProbe = function(tag)
+    local total = 0
+    for i = 0, 49 do
+        local u = unitAt(SYM.gUnitArrayRed, i)
+        if u and (u.state & US_DEAD) == 0 then
+            total = total + u.maxhp
+            log(string.format(
+                '{"event":"difficulty_unit","tag":"%s","char":"0x%02x","level":%d,'
+                .. '"maxhp":%d,"pow":%d,"def":%d}',
+                tag, u.charId, u.level, u.maxhp, u.pow, u.def))
+        end
+    end
+    log(string.format('{"event":"difficulty_total","tag":"%s","red_maxhp":%d}', tag, total))
+    return total
 end
 
 INSPECT.snapshot = function(tag, explanation, sampled)
@@ -1664,6 +1728,40 @@ end
 -- smoke: prologue is reachable straight from New Game (bootToMap). Later chapters need
 -- their own "reach the map" lead-in (smoke_ch01) or a save-state checkpoint
 -- (smoke_ch02 loads the ch02start state).
+-- The in-engine oracle for #303: does picking a difficulty mode actually change the
+-- enemies? Boots to the map and reads the RED force's stats. Run once per mode --
+--   PT_DIFFICULTY=tutorial|normal|difficult tools/playtest/run.sh difficulty
+-- -- and compare the reported red maxHP totals: tutorial < normal < difficult, by the
+-- three numbers the chapter DECLARES in its YAML `difficulty:` block. Reading the map
+-- rather than the menu is the point: the menu only proves we clicked something.
+scenarios.difficulty = function()
+    local mode = (PLAYTEST_DIFFICULTY ~= nil and PLAYTEST_DIFFICULTY ~= "")
+        and PLAYTEST_DIFFICULTY or "default"
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    -- PROVE the run is in the mode it labels before recording anything under that name.
+    -- A scenario that boots from a saved state never passes the difficulty menu, so it
+    -- would happily file Tutorial stats as "difficult"; a mislabeled measurement is worse
+    -- than no measurement. These are the two bits SaveMenuWriteNewGame actually sets:
+    --   chapterStateBits +0x14, PLAY_FLAG_HARD = 1<<6 (types.h:187,246)
+    --   config +0x40, controller = bit 21 (PlaySt_OptionBits; gameSpeed bit 7 and
+    --   animationType bits 17-18 in pokeFastConfig above pin the same packing)
+    -- and TUTORIAL_MODE() is `!HARD && controller ~= 1` (eventinfo.h:107).
+    local hard = (ru8(SYM.gPlaySt + 0x14) & 0x40) ~= 0
+    local controller = (ru32(SYM.gPlaySt + 0x40) >> 21) & 1
+    local actual = hard and "difficult" or (controller == 1 and "normal" or "tutorial")
+    if TUNE.difficultyWant ~= nil and actual ~= mode then
+        return result("FAIL", string.format(
+            "PT_DIFFICULTY=%s but the ROM is in %s (HARD=%s controller=%d) -- the menu "
+            .. "selection never committed, so these stats are not that mode",
+            mode, actual, tostring(hard), controller))
+    end
+    local total = INSPECT.difficultyProbe(actual)
+    shot("difficulty-" .. actual)
+    return result("PASS", string.format(
+        "mode=%s (HARD=%s controller=%d) chapter=%d red maxHP total=%d",
+        actual, tostring(hard), controller, chapter(), total))
+end
+
 scenarios.smoke = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end
     return smokeDrive(chapter())

@@ -87,6 +87,59 @@ def autolevel(base, growths, level):
     return out
 
 
+MODES = ('tutorial', 'normal', 'difficult')
+
+
+def mode_stats(base, growths, level, mode, shifts, base_level=1):
+    """`base` autoleveled to `level`, then shifted by a chapter's difficulty `shifts`
+    for `mode` -- the engine's own difficulty mechanism, modeled (#303).
+
+    FE8 does not author three enemy tables. It authors ONE, stores three per-chapter
+    numbers, and re-projects stats at unit-load time: `UnitApplyBonusLevels`
+    (bmunit.c) dispatches to `UnitAutolevelCore` for the Difficult bonus and to
+    `UnitAutolevelPenalty` for the Tutorial/Normal malus. `shifts` is that triple,
+    keyed by MODES -- {'tutorial': easyModeLevelMalus, 'normal': normalModeLevelMalus,
+    'difficult': difficultModeLevelBonus} (chapterdata.h:47-49, each a 4-BIT field, so
+    0..15). NB the field FE8 calls "easy" is the Tutorial slot: menu option 0 sets
+    controller=0/HARD=0, which is both the `-easyModeLevelMalus` branch
+    (eventscr.c:2328) and the only state where CHECK_TUTORIAL fires.
+
+    Two engine details a naive `level - malus` gets wrong:
+
+      * the penalty FLOORS. `UnitAutolevelPenalty` re-derives stats from base and
+        re-autolevels only `if (level - malus > baseLevel)`, and does nothing at all
+        unless `level > baseLevel` -- so a shifted unit never reads below pure class
+        base. Every generic and boss pid we field has baseLevel 1 (data_characters.c).
+      * the bonus rounds TWICE. Difficult is `inc(level-1)` then `inc(bonus)` as two
+        separate roundings, not one rounding of `inc(level-1+bonus)`.
+
+    This is a mean-value proxy, as the rest of the model is: the engine's real
+    `GetAutoleveledStatIncrease` jitters by +/-(growth*n)/8 and resolves the remainder
+    with a coin flip (`GetStatIncrease`, bmbattle.c:1241), so a single unit's stats are
+    a random variable. Both sides of a parity read go through this same function, so
+    the comparison stays apples-to-apples.
+    """
+    if mode not in MODES:
+        raise ValueError('unknown difficulty mode %r (want one of %s)'
+                         % (mode, ', '.join(MODES)))
+    shift = shifts[mode]
+    projected = autolevel(base, growths, level)
+    if not shift:
+        return projected
+    if mode == 'difficult':
+        out = dict(projected)
+        for gf in bc.GROWTH_FIELDS:
+            field = 'base' + gf[len('growth'):]
+            out[field] = projected[field] + int(shift * growths.get(gf, 0) / 100 + 0.5)
+        return out
+    if level <= base_level:                  # `level > baseLevel` gate: no penalty at all
+        return projected
+    target = level - shift
+    if target > base_level:
+        return autolevel(base, growths, target)
+    return dict(base)                        # re-derived from base, re-autolevel skipped
+
+
 def _weapon_for(inventory):
     """First inventory entry that resolves (via fe_base, else id) to a real attacking
     weapon usable in the modeled (base-class) state. Staves/consumables aren't in
@@ -162,19 +215,88 @@ def _apply_personal(combatant, personal):
     return dataclasses.replace(combatant, **delta) if delta else combatant
 
 
-def _enemy_from_enum(name, class_enum, level, weapon, personal=None):
+DIFFICULTY_SHIFT_MIN_PID = 0x3C   # eventscr.c:2328 -- see _takes_difficulty_shift
+_char_numbers = None
+
+
+def _character_number(token):
+    """A `.charIndex` token -> its numeric character slot. Handles both spellings the
+    UnitDefinition arrays use: a CHARACTER_* enum (named cast and bosses) and a bare
+    numeric literal (the generic autolevelled-trash pids). None if unresolvable."""
+    global _char_numbers
+    if _char_numbers is None:
+        text = bc.vanilla_decomp_text('include/constants/characters.h')
+        _char_numbers = {m.group(1): int(m.group(2), 0) for m in re.finditer(
+            r'(CHARACTER_\w+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)', text)}
+    if token in _char_numbers:
+        return _char_numbers[token]
+    try:
+        return int(str(token), 0)
+    except (TypeError, ValueError):
+        return None
+
+
+def _takes_difficulty_shift(char_index):
+    """Does the engine apply a difficulty shift to a RED unit on this character slot?
+
+    `if (def->allegiance == FACTION_ID_RED && unit->pCharacterData->number >= 0x3C)`
+    (eventscr.c:2328). Slots below 0x3C are the playable cast and their summons, so a
+    unit deployed hostile on a PLAYABLE slot is difficulty-immune -- vanilla Ch5's
+    pre-recruit Joshua (0x20) is exactly that, and so is our Sahnar, who rides Joshua's
+    own slot. Both sides of the Ch5 read therefore carry one unshifted unit."""
+    if char_index is None:
+        return False                       # absent field reads 0, which is below the gate
+    number = _character_number(char_index)
+    return number is None or number >= DIFFICULTY_SHIFT_MIN_PID
+
+
+def _character_base_level(char_index):
+    """`pCharacterData->baseLevel` for a charIndex token, or 1 when it has none.
+
+    This is the field that decides whether the difficulty MALUS touches a unit at all
+    (`if (level > baseLevel)`, UnitAutolevelPenalty). Vanilla sets it >= the deploy level
+    on every named boss, which is how a hand-authored boss line survives into Tutorial and
+    Normal unchanged; generics carry 1 and are re-projected normally."""
+    if char_index is None:
+        return 1
+    text = _characters_text()
+    for marker in ('[%s - 1]' % char_index, '[%s - 1]' % str(char_index).lower()):
+        try:
+            start, end = bc._find_brace_block(text, marker, bc.CHARACTERS_C)
+        except SystemExit:
+            continue
+        found = re.search(r'\.baseLevel\s*=\s*(-?\d+)', text[start:end])
+        return int(found.group(1)) if found else 1
+    return 1
+
+
+def _enemy_from_enum(name, class_enum, level, weapon, personal=None,
+                     mode=None, shifts=None, shiftable=True, base_level=1):
     """One Combatant: class base autoleveled to `level`, wielding `weapon`, plus any
-    personal boss line (see above). Generics carry no personal line, so they are unchanged."""
-    stats = autolevel(_class_base(class_enum), _class_growths(class_enum), int(level))
+    personal boss line (see above). Generics carry no personal line, so they are unchanged.
+
+    With `mode` and `shifts` both given the class projection runs through `mode_stats`
+    instead, so the unit reads as the engine would load it in that difficulty mode.
+    `shiftable=False` models the `>= 0x3C` gate. The personal line stays a flat delta
+    applied afterwards, which is faithful either way: the engine's penalty re-derives
+    from charBase+classBase and its bonus adds onto them, and both compose additively."""
+    base, growths = _class_base(class_enum), _class_growths(class_enum)
+    if mode and shifts and shiftable:
+        stats = mode_stats(base, growths, int(level), mode, shifts, base_level=base_level)
+    else:
+        stats = autolevel(base, growths, int(level))
     c = _stats_to_combatant(name, stats, weapon, CLASS_TAGS.get(class_enum, frozenset()))
     return _apply_personal(c, personal)
 
 
-def _one_enemy(name, class_token, level, weapon, personal=None):
-    return _enemy_from_enum(name, _enemy_class_enum(class_token), level, weapon, personal)
+def _one_enemy(name, class_token, level, weapon, personal=None, mode=None, shifts=None,
+               base_level=1, shiftable=True):
+    return _enemy_from_enum(name, _enemy_class_enum(class_token), level, weapon, personal,
+                            mode=mode, shifts=shifts, base_level=base_level,
+                            shiftable=shiftable)
 
 
-def enemy_combatants(enemy_def):
+def enemy_combatants(enemy_def, mode=None, shifts=None, base_level=1, shiftable=True):
     """One representative Combatant per DISTINCT enemy type in a chapter enemy_units entry
     (its `count`/positions are tactical detail the metrics don't model). Class base
     autoleveled to the entry's `level`. Handles both a single `class` and a mixed
@@ -185,12 +307,16 @@ def enemy_combatants(enemy_def):
     # both sides (see vanilla_enemies). role_findings() applies it for the boss comparison.
     if 'class' in enemy_def:
         return [_one_enemy(name, enemy_def['class'], level,
-                           _weapon_for(enemy_def.get('inventory')))]
+                           _weapon_for(enemy_def.get('inventory')),
+                           mode=mode, shifts=shifts, base_level=base_level,
+                           shiftable=shiftable)]
     by_class = enemy_def.get('inventory_by_class', {})
     out = []
     for cls in dict.fromkeys(enemy_def.get('composition', [])):   # distinct, order-stable
         weapon = _weapon_for([{'id': w} for w in by_class.get(cls, [])])
-        out.append(_one_enemy('%s-%s' % (name, cls), cls, level, weapon))
+        out.append(_one_enemy('%s-%s' % (name, cls), cls, level, weapon,
+                              mode=mode, shifts=shifts, base_level=base_level,
+                              shiftable=shiftable))
     return out
 
 
@@ -339,7 +465,7 @@ def _weapon_from_item_enums(item_enums):
     return None
 
 
-def vanilla_enemies(parity_ref):
+def vanilla_enemies(parity_ref, mode=None):
     """The vanilla reference chapter's fightable red force as a flat list of Combatants
     (each projected off class base to its level). None if the reference isn't curated yet;
     enemies with no modeled weapon (staff/throwaway only) are dropped."""
@@ -348,6 +474,14 @@ def vanilla_enemies(parity_ref):
         return None
     relpath, arrays = spec
     text = bc.vanilla_decomp_text(relpath)
+    shifts = vanilla_chapter_shifts(parity_ref) if mode else None
+    if mode and shifts is None:
+        # Silently returning an UNSHIFTED vanilla force here would compare our shifted
+        # side against vanilla's authored table and still print a verdict -- exactly the
+        # unnamed-configuration bug #303 exists to kill. Refuse instead.
+        bc.sys.exit('ERROR: parity_reference %r does not resolve to a vanilla chapter, so '
+                    'its difficulty numbers are unknown and a --mode read would compare '
+                    'our SHIFTED force against an UNSHIFTED reference' % parity_ref)
     out = []
     for array_name in arrays:
         for i, d in enumerate(vanilla_unit_defs(text, array_name)):
@@ -363,9 +497,48 @@ def vanilla_enemies(parity_ref):
             # sides carry lines through different mechanisms. `inf` is no longer a hazard here:
             # metric_rounds_to_kill floors the damage rather than dropping the unit.
             ch = d.get('charIndex')
-            out.append(_enemy_from_enum('%s#%d' % (array_name, i), d['classIndex'], d['level'],
-                                        weapon, vanilla_personal_line(ch)))
+            out.append(_enemy_from_enum('%s#%d[%s]' % (array_name, i, ch),
+                                        d['classIndex'], d['level'],
+                                        weapon, vanilla_personal_line(ch),
+                                        mode=mode, shifts=shifts,
+                                        shiftable=_takes_difficulty_shift(ch),
+                                        base_level=_character_base_level(ch)))
     return out
+
+
+def _vanilla_internal_name(parity_ref):
+    """'FE8 Ch5' -> the chapter_settings `internalName` that IS vanilla Ch5 ('L05').
+
+    The main-story chapters are L00 (prologue) through L08; the Eirika-route chapters
+    from 9 on are E09..E20. Resolving by name rather than by index is the point: slot 5
+    is `I05`, the inserted Ch5x, so every chapter from 5 on sits one slot past its own
+    number."""
+    if parity_ref == 'FE8 Prologue':
+        return 'L00'
+    m = re.match(r'^FE8 Ch(\d+)$', parity_ref)
+    if not m:
+        return None
+    n = int(m.group(1))
+    return ('L%02d' if n <= 8 else 'E%02d') % n
+
+
+def vanilla_chapter_shifts(parity_ref):
+    """The parity reference chapter's OWN difficulty triple, in `mode_stats` shape.
+
+    This is what makes a cross-mode parity read honest: our side and the vanilla side
+    are shifted by the numbers each chapter actually carries, so a mode comparison is
+    still comparing two tuned tables rather than one tuned table against a shifted one.
+    None if the reference does not name a vanilla chapter."""
+    name = _vanilla_internal_name(parity_ref)
+    if name is None:
+        return None
+    settings = bc.json.loads(bc.vanilla_decomp_text('src/data/chapter_settings.json'))
+    for chapter in settings['chapters']:
+        if chapter.get('internalName') == name:
+            return {'tutorial': chapter['easyModeLevelMalus'],
+                    'normal': chapter['normalModeLevelMalus'],
+                    'difficult': chapter['difficultModeLevelBonus']}
+    return None
 
 
 def vanilla_named_bosses(parity_ref, with_personal=True):
@@ -478,7 +651,7 @@ def pressure_verdict(ours, vanilla, band=0.25):
             'verdict': 'OK' if threat == 'OK' and load == 'OK' else 'OFF'}
 
 
-def chapter_enemy_force(chap):
+def chapter_enemy_force(chap, mode=None, shifts=None):
     """Our chapter's full enemy force as a flat per-unit Combatant list (bosses included),
     honoring each entry's `count`/`composition` -- the multiplicity enemy_combatants drops.
     This is the our-side input to enemy_pressure (the parity comparand to vanilla_enemies).
@@ -488,10 +661,57 @@ def chapter_enemy_force(chap):
     entry is a mixed bag of GENERICS, so no personal line is applied to its members -- a
     `personal:` or a donor-matching id on such an entry describes the group, and adding a full
     character line to every body in the bag would be a silent multiplier."""
-    return [u for _ed, u in chapter_units(chap)]
+    return [u for _ed, u in chapter_units(chap, mode=mode, shifts=shifts)]
 
 
-def chapter_units(chap):
+def bosses_over_their_donor_base_level(campaign):
+    """Bosses that deploy ABOVE their vanilla donor slot's baseLevel (sorted ids).
+
+    `_our_base_level` treats every boss as malus-immune. For raw pids that is ENFORCED
+    (RAW_PID_LEVEL_SOURCES writes baseLevel = deploy level). For the ones riding vanilla
+    CHARACTER_ slots it is merely true today, and at ZERO margin -- Breguet 4/4, Bone 4/4,
+    Bazba 6/6. One level bump and the ROM starts applying the malus while the model still
+    assumes it does not, which is the silent model/ROM divergence in miniature."""
+    out = []
+    for chapter in bc.hosted_chapters():
+        chap = bc._load_chapter_yaml(campaign, bc.chapter_yaml_for(chapter.name))
+        for enemy in chap.get('enemy_units', []):
+            if not (enemy.get('is_boss') or enemy.get('is_miniboss')):
+                continue
+            donor = bc.ENEMY_BASE_SLOT.get(enemy.get('id'))
+            if not donor:
+                continue
+            if int(enemy.get('level', 1)) > _character_base_level(donor):
+                out.append(enemy.get('id'))
+    return sorted(out)
+
+
+def _our_takes_difficulty_shift(enemy_def):
+    """Does the engine shift THIS unit of ours? The `>= 0x3C` gate, our side.
+
+    Resolved through the same donor lookup `unit_real_article` uses, because it answers the
+    same question -- which character SLOT the unit rides. A cast member deployed hostile
+    (BASE_DONOR) rides a playable slot and is therefore difficulty-immune: ch05's Sahnar is
+    the live case, and the ROM agrees, reading identical stats in all three modes. An enemy
+    on a vanilla boss slot (ENEMY_BASE_SLOT) or on a raw pid sits well above the gate."""
+    donor = bc.BASE_DONOR.get(enemy_def.get('id')) or bc.ENEMY_BASE_SLOT.get(enemy_def.get('id'))
+    return _takes_difficulty_shift(donor) if donor else True
+
+
+def _our_base_level(enemy_def):
+    """The baseLevel OUR unit carries, for the malus gate.
+
+    Every boss and miniboss we field is penalty-immune, and that is an enforced invariant
+    rather than a coincidence: the four on raw pids get baseLevel = their deploy level from
+    RAW_PID_LEVEL_SOURCES (guarded by unregistered_raw_pid_bosses), and the rest ride
+    vanilla CHARACTER_ slots that already ship baseLevel >= deploy level. Line units are
+    generics on pid 0x80/0x8e/0xaa, whose gaps carry baseLevel 1."""
+    if enemy_def.get('is_boss') or enemy_def.get('is_miniboss'):
+        return int(enemy_def.get('level', 1))
+    return 1
+
+
+def chapter_units(chap, mode=None, shifts=None):
     """(enemy_def, real-article Combatant) for every BODY our chapter fields, weapons modeled.
 
     THE our-side force builder. It exists as one function because it was two: `solo_contributors`
@@ -508,9 +728,13 @@ def chapter_units(chap):
             for cls in ed.get('composition', []):
                 weapon = _weapon_for([{'id': w} for w in by_class.get(cls, [])])
                 # generics: no personal line, deliberately (see chapter_enemy_force)
-                out.append((ed, _one_enemy('%s-%s' % (name, cls), cls, level, weapon)))
+                out.append((ed, _one_enemy('%s-%s' % (name, cls), cls, level, weapon,
+                                           mode=mode, shifts=shifts)))
         else:
-            out.extend([(ed, unit_real_article(ed, c)) for c in enemy_combatants(ed)]
+            out.extend([(ed, unit_real_article(ed, c))
+                        for c in enemy_combatants(ed, mode=mode, shifts=shifts,
+                                                  base_level=_our_base_level(ed),
+                                                  shiftable=_our_takes_difficulty_shift(ed))]
                        * int(ed.get('count', 1)))
     return [(ed, u) for ed, u in out if u.weapon is not None]  # drop staff-only enemies
 
@@ -786,13 +1010,16 @@ def _fmt_dura_delta(ours, van):
     return '%+.1f' % (ours - van)
 
 
-def report(campaign, ch):
+def report(campaign, ch, mode=None):
     chap, roster, line, bosses, deploy_limit, labels = load_field(campaign, ch)
     num = chap.get('chapter_number')
     bar = '=' * 80
     print(bar)
     print('CH%s "%s" -- difficulty / vanilla parity   [STATIC proxy -- playtest is arbiter]'
           % (num, chap.get('title', ch)))
+    print('  difficulty mode: %s'
+          % ('%s (both sides shifted by their own chapter\'s numbers)' % mode.upper()
+             if mode else 'AUTHORED TABLE (unshifted -- the level each side DECLARES)'))
     print(bar)
     if chap.get('status') == 'planned':
         print('** PLANNED chapter -- brainstorm SEED, NOT authoritative. The enemy roster/levels'
@@ -850,21 +1077,29 @@ def report(campaign, ch):
               % (num, ref))
 
     _print_pressure(_chapter_pressure(chap))
-    print_role_findings(chap, chap.get('parity_reference'))
+    print_role_findings(chap, chap.get('parity_reference'))  # authored table; see banner
     _print_economy(chap)
     _print_dynamics(chap)
 
 
-def _chapter_pressure(chap, band=0.25):
+def _chapter_pressure(chap, band=0.25, mode=None):
     """Enemy-pressure parity for one loaded chapter dict: our force vs its parity_reference's
     vanilla force, threat/slot + clear-load/slot, with a verdict. `vanilla` is None when the
-    reference isn't curated yet (#48 registry)."""
+    reference isn't curated yet (#48 registry).
+
+    `mode` grades a DIFFICULTY MODE instead of the authored table (#303). Each side is
+    shifted by its own chapter's numbers -- ours from the YAML `difficulty:` block, the
+    reference's from vanilla chapter_settings -- so a mode read still compares two tuned
+    tables. None (the default) is the authored table, which is what every parity verdict
+    before #303 graded; the difference matters because a chapter whose normal malus is
+    non-zero ships a force the authored read never describes."""
     deploy_cap = chapter_deploy_limit(chap, len(ROSTER))
-    ours_force = chapter_enemy_force(chap)
+    shifts = bc.chapter_difficulty_shifts(chap) if mode else None
+    ours_force = chapter_enemy_force(chap, mode=mode, shifts=shifts)
     ours = enemy_pressure(ours_force, deploy_cap)
     ref = chap.get('parity_reference')
-    van = vanilla_enemies(ref)
-    out = {'reference': ref, 'deploy_cap': deploy_cap, 'ours': ours,
+    van = vanilla_enemies(ref, mode=mode)
+    out = {'reference': ref, 'deploy_cap': deploy_cap, 'ours': ours, 'mode': mode,
            'n_ours': len(ours_force), 'vanilla': None,
            'dropped': unmodeled_enemies(chap)}
     if van is not None:
@@ -1545,16 +1780,27 @@ def curve_gate_failures(rows):
                                 or r.get('role'))]
 
 
-def curve_report(campaign, band=0.25):
+def curve_report(campaign, band=0.25, mode=None):
     """Campaign-wide enemy-pressure curve: one row per authored chapter, ours vs its vanilla
     reference, so spikes/sags across the arc are visible at a glance (#48). Returns the per-chapter
-    rows (label / has_ref / verdict / boss_drop) so the --check gate can act on them."""
+    rows (label / has_ref / verdict / boss_drop) so the --check gate can act on them.
+
+    `mode` grades a difficulty mode on BOTH sides instead of the authored table (#303). The
+    banner says which, because a verdict that does not name its configuration is the thing
+    #303 set out to fix."""
     paths = sorted(glob.glob(os.path.join(
         bc.REPO, 'campaigns', campaign, 'chapters', 'ch*.yaml')))
     bar = '=' * 86
     print(bar)
     print('CAMPAIGN ENEMY-PRESSURE CURVE -- ours vs vanilla parity_reference   '
           '[STATIC proxy]')
+    print('  difficulty mode: %s'
+          % ('%s (both sides shifted by their own chapter\'s numbers)' % mode.upper()
+             if mode else 'AUTHORED TABLE (unshifted -- the level each side DECLARES)'))
+    if mode:
+        print('  NB per-unit role findings and planned-chapter targets below are graded on the'
+              '\n     AUTHORED table, not on %s -- only the parity rows are mode-shifted.'
+              % mode.upper())
     print(bar)
     print('  %-22s %-13s %-15s %-17s %s'
           % ('chapter', 'reference', 'threat/slot', 'clear-load/slot', 'verdict'))
@@ -1587,7 +1833,7 @@ def curve_report(campaign, band=0.25):
                 print('  %-22s %-13s %4.1f (target)    %4.1f (target)      planned%s'
                       % (label[:22], ref[:13], proj['threat'], proj['clearload'], note))
             continue
-        p = _chapter_pressure(chap, band)
+        p = _chapter_pressure(chap, band, mode=mode)
         ot, ol = p['ours']
         boss_drop = any(d['is_boss'] for d in p['dropped'])
         any_dropped_boss = any_dropped_boss or boss_drop
@@ -1666,6 +1912,11 @@ def main():
                          'balance_locked chapter is off-parity, unreliably measured, '
                          'missing its reference, or carrying an open per-unit role '
                          'finding (UNLOCKED chapters never gate)')
+    ap.add_argument('--mode', choices=MODES,
+                    help='grade a DIFFICULTY MODE instead of the authored table (#303). Both '
+                         'sides are shifted by their own chapter\'s declared numbers, so the '
+                         'read still compares two tuned tables. Omitted = the authored table, '
+                         'which is what every verdict before #303 graded')
     ap.add_argument('--lord-floor', action='store_true',
                     help='emit the per-lord survivability-floor table instead of the parity report')
     ap.add_argument('--target', type=float, default=3.5, help='floor: target bulk rounds-to-down')
@@ -1674,7 +1925,7 @@ def main():
     ap.add_argument('--hp-cap', type=int, default=12, help='floor: max +HP')
     args = ap.parse_args()
     if args.curve:
-        rows = curve_report(args.campaign)
+        rows = curve_report(args.campaign, mode=args.mode)
         if args.check:
             fails = curve_gate_failures(rows)
             if fails:
@@ -1690,7 +1941,7 @@ def main():
         lord_floor_report(args.campaign, args.chapter, args.target,
                           args.def_cap, args.res_cap, args.hp_cap)
     else:
-        report(args.campaign, args.chapter)
+        report(args.campaign, args.chapter, mode=args.mode)
 
 
 if __name__ == '__main__':

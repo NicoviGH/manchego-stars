@@ -2210,6 +2210,7 @@ class RavisinPortrait(unittest.TestCase):
         # The grell is the case that proves the two bindings are independent: it takes a personal
         # line and NO identity, so it must keep the generic 0x255 name plate and gain no portrait.
         source = '''[0xb7 - 1] = {
+        .baseLevel = 1,
         .nameTextId = 0x255,
         .number = 0xb7,
         .defaultClass = CLASS_MOGALL,
@@ -2223,7 +2224,16 @@ class RavisinPortrait(unittest.TestCase):
         .baseLck = 0,
         .baseCon = 0,
     },
+    [0xb6 - 1] = {
+        .nameTextId = 0x256,        /* distinct sentinel: this entry is present only so the
+                                       baseLevel pass has a block to write (RAW_PID_LEVEL_SOURCES);
+                                       it is NOT part of this test's name-plate assertions */
+        .number = 0xb6,
+        .defaultClass = CLASS_BRIGAND,
+        .baseLevel = 1,
+    },
     [0xb8 - 1] = {
+        .baseLevel = 1,
         .nameTextId = 0x255,
         .defaultClass = CLASS_ARCH_MOGALL,
         .miniPortrait = 0x4,
@@ -2237,6 +2247,7 @@ class RavisinPortrait(unittest.TestCase):
         .baseCon = 0,
     },
     [0xb9 - 1] = {
+        .baseLevel = 1,
         .nameTextId = 0x255,
         .number = 0xb9,
         .defaultClass = CLASS_GORGON,
@@ -2250,6 +2261,10 @@ class RavisinPortrait(unittest.TestCase):
         self.assertEqual(1, patched.count('.portraitId'))
         self.assertIn('.nameTextId = 0xD4C,', patched)
         self.assertEqual(1, patched.count('.nameTextId = 0x255,'))
+        # ...and every raw-pid boss leaves with a baseLevel matching its deploy level, so the
+        # difficulty malus cannot reset its line (#303, RAW_PID_LEVEL_SOURCES).
+        self.assertIn('.baseLevel = 7,', patched)      # Ravisin, level 7
+        self.assertIn('.baseLevel = 3,', patched)      # the kobold brute, level 3
         self.assertEqual(3, patched.count('.miniPortrait = 0x4,'))
 
         for chapter_yaml, uid in ((bc.CH05_CHAPTER_YAML, 'ravisin'),
@@ -4550,14 +4565,16 @@ class Ch05ArenaTutorial(unittest.TestCase):
         self.assertIn('DefeatBoss(%s)' % bc.CH05_ENDING_SCRIPT, misc)
         self.assertIn('CauseGameOverIfLordDies', misc)
 
-    def test_the_trigger_preserves_tutorial_mode_and_vanillas_event_shape(self):
+    def test_the_trigger_is_player_only_and_calls_the_tutorial_in_every_mode(self):
+        # The arena tutorial is the one place the player is told a loss is PERMANENT and
+        # that B concedes, so it is not gated on tutorial mode the way vanilla's is (#303).
+        # The faction gate stays -- an enemy on the tile must not fire it.
         trigger = bc.ch05_arena_trigger_script()
         self.assertIn('SVAL(EVT_SLOT_2, FACTION_ID_BLUE)', trigger)
         self.assertIn('CALL(EventScr_UnTriggerIfNotFaction)', trigger)
         self.assertLess(trigger.index('CALL(EventScr_UnTriggerIfNotFaction)'),
-                        trigger.index('CALL(EventScr_CallOnTutorialMode)'))
-        self.assertIn('SVAL(EVT_SLOT_2, %s)' % bc.CH05_ARENA_TUTORIAL_SCRIPT, trigger)
-        self.assertIn('CALL(EventScr_CallOnTutorialMode)', trigger)
+                        trigger.index('CALL(%s)' % bc.CH05_ARENA_TUTORIAL_SCRIPT))
+        self.assertNotIn('CALL(EventScr_CallOnTutorialMode)', trigger)
 
         tutorial = bc.ch05_arena_tutorial_script()
         self.assertLess(tutorial.index('TEXTSHOW(0x%X)' % bc.CH05_ARENA_FOUND_MSG),
@@ -6631,5 +6648,176 @@ class Ch05Endings(unittest.TestCase):
 # below it -- 88 tests, including all 26 of Ch04Stage4Scenes -- were defined after the runner
 # had already exited and never ran under `make test`, which is what CI executes (it runs each
 # file as a SCRIPT, not via `-m unittest`, so the two disagreed silently). Found 2026-08-15.
+class ChapterDifficulty(unittest.TestCase):
+    """Every hosted chapter DECLARES its difficulty triple rather than inheriting the
+    donor host slot's (#303).
+
+    FE8 implements difficulty as a per-chapter enemy stat re-projection, from three
+    4-bit fields on the chapter (chapterdata.h:47-49). We never wrote them, so each
+    hosted chapter carried whatever its squatted slot happened to ship -- numbers tuned
+    for a different chapter. ch04 was the measurable casualty: it hosts on slot 5
+    (`I05`, normal malus 0) while its parity twin FE8 Ch4 carries malus 2, which put
+    ch04's Normal at x1.30 against the reference, outside the +/-25% band.
+
+    Same lesson as the goal text ids (#207) and the battle grounds: what a donor slot
+    silently carries has to become a declaration.
+    """
+
+    TRIPLE = {'tutorial': 4, 'normal': 2, 'difficult': 3}
+
+    def test_a_declared_triple_is_read_back(self):
+        self.assertEqual(bc.chapter_difficulty_shifts({'difficulty': dict(self.TRIPLE)}),
+                         self.TRIPLE)
+
+    def test_a_chapter_that_declares_nothing_is_refused(self):
+        # The whole point: silence must not resolve to the donor's numbers.
+        with self.assertRaises(SystemExit) as cm:
+            bc.chapter_difficulty_shifts({'id': 'ch09-undeclared'})
+        self.assertIn('difficulty', str(cm.exception))
+
+    def test_a_missing_mode_is_refused(self):
+        with self.assertRaises(SystemExit):
+            bc.chapter_difficulty_shifts({'difficulty': {'tutorial': 4, 'normal': 2}})
+
+    def test_a_value_past_the_four_bit_field_is_refused(self):
+        # 0..15: the fields are u16 bitfields 4 wide, so 16 silently truncates to 0.
+        with self.assertRaises(SystemExit):
+            bc.chapter_difficulty_shifts(
+                {'difficulty': {'tutorial': 16, 'normal': 2, 'difficult': 3}})
+
+    def test_a_negative_shift_is_refused(self):
+        with self.assertRaises(SystemExit):
+            bc.chapter_difficulty_shifts(
+                {'difficulty': {'tutorial': -1, 'normal': 2, 'difficult': 3}})
+
+    def test_every_hosted_chapter_declares_one(self):
+        # The registry-driven guard: a chapter added later fails here rather than
+        # quietly inheriting, which is the failure mode #241 taught for host slots.
+        from inject import hosts
+        for chapter in hosts.hosted_chapters():
+            chap = bc._load_chapter_yaml('rime-of-the-frostmaiden',
+                                         bc.chapter_yaml_for(chapter.name))
+            shifts = bc.chapter_difficulty_shifts(chap)
+            self.assertEqual(set(shifts), {'tutorial', 'normal', 'difficult'},
+                             '%s declares an incomplete triple' % chapter.name)
+
+    def test_the_write_pass_lands_each_chapter_on_its_own_host_slot(self):
+        from inject import hosts
+        vanilla = json.loads(bc.vanilla_decomp_text('src/data/chapter_settings.json'))
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'chapter_settings.json')
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(vanilla, f)
+            original = bc.CHAPTER_SETTINGS_JSON
+            bc.CHAPTER_SETTINGS_JSON = path
+            try:
+                bc.apply_chapter_difficulty('rime-of-the-frostmaiden')
+            finally:
+                bc.CHAPTER_SETTINGS_JSON = original
+            with open(path, encoding='utf-8') as f:
+                written = json.load(f)
+        for chapter in hosts.hosted_chapters():
+            chap = bc._load_chapter_yaml('rime-of-the-frostmaiden',
+                                         bc.chapter_yaml_for(chapter.name))
+            want = bc.chapter_difficulty_shifts(chap)
+            slot = written['chapters'][chapter.host_index]
+            self.assertEqual(slot['easyModeLevelMalus'], want['tutorial'], chapter.name)
+            self.assertEqual(slot['normalModeLevelMalus'], want['normal'], chapter.name)
+            self.assertEqual(slot['difficultModeLevelBonus'], want['difficult'], chapter.name)
+
+    def test_ch04_stops_inheriting_slot_fives_missing_normal_malus(self):
+        # The founding case, pinned as a number: I05 ships normal malus 0, FE8 Ch4
+        # carries 2. Declaring it is what pulls ch04's Normal back inside the band.
+        chap = bc._load_chapter_yaml('rime-of-the-frostmaiden',
+                                     bc.chapter_yaml_for('ch04'))
+        self.assertEqual(bc.chapter_difficulty_shifts(chap)['normal'], 2)
+
+
+class RawPidBossBaseLevel(unittest.TestCase):
+    """A raw-pid boss must declare `baseLevel`, or the difficulty malus wipes its line.
+
+    `UnitAutolevelPenalty` only fires `if (level > unit->pCharacterData->baseLevel)`.
+    EVERY vanilla named boss ships baseLevel >= the level it deploys at -- Saar 8/8,
+    Breguet 4/4, Bazba 6/6, Novala 10/7 -- so vanilla bosses never take the penalty and
+    their hand-authored personal line is what reaches the map in all three modes.
+
+    Our bosses that ride a vanilla CHARACTER_ slot inherit that protection for free. The
+    four that ride RAW pids sit in gCharacterData gaps, where every field including
+    baseLevel reads 0/1 -- so the penalty always fired, reset them to class base and
+    rebuilt them from growths. Measured in-engine before the fix: Ravisin came out 40 HP
+    on Normal against 35 on Difficult, because the reset path re-runs full `UnitAutolevel`
+    (promoted branch included, +9 levels) while the Difficult path never does.
+
+    The failure is SILENT -- a gap is all zeros and nothing complains -- so the registry
+    is guarded rather than merely documented.
+    """
+
+    RAW_BOSSES = {'0xb7': 12, '0xb6': 3, '0xb8': 7, '0xb9': 6}
+
+    def test_every_raw_pid_boss_is_registered(self):
+        missing = bc.unregistered_raw_pid_bosses('rime-of-the-frostmaiden')
+        self.assertEqual(missing, [],
+                         'raw-pid boss(es) with no RAW_PID_LEVEL_SOURCES row: %s' % missing)
+
+    def test_registry_resolves_each_boss_to_its_deploy_level(self):
+        got = bc.raw_pid_base_levels('rime-of-the-frostmaiden')
+        self.assertEqual({k: got.get(k) for k in self.RAW_BOSSES}, self.RAW_BOSSES)
+
+    def test_the_patch_writes_baselevel_into_character_data(self):
+        text = bc.vanilla_decomp_text('src/data_characters.c')
+        out = bc.raw_pid_portrait_data(text, 'rime-of-the-frostmaiden')
+        for pid, level in self.RAW_BOSSES.items():
+            start, end = bc._find_brace_block(out, '[%s - 1]' % pid, bc.CHARACTERS_C)
+            found = re.search(r'\.baseLevel\s*=\s*(-?\d+)', out[start:end])
+            self.assertIsNotNone(found, '%s has no baseLevel field' % pid)
+            self.assertEqual(int(found.group(1)), level, pid)
+
+    def test_the_penalty_can_no_longer_fire_on_any_boss(self):
+        # The property that actually matters, stated as the engine states it.
+        for pid, level in bc.raw_pid_base_levels('rime-of-the-frostmaiden').items():
+            self.assertFalse(level < level, pid)     # baseLevel >= deploy level
+        got = bc.raw_pid_base_levels('rime-of-the-frostmaiden')
+        for pid, base in got.items():
+            self.assertGreaterEqual(base, self.RAW_BOSSES.get(pid, base), pid)
+
+
+class ArenaTutorialPlaysInEveryMode(unittest.TestCase):
+    """ch05's arena tutorial is SAFETY text, so it is not gated on tutorial mode (#303).
+
+    `CHECK_TUTORIAL` is `!config.controller && !(chapterStateBits & PLAY_FLAG_HARD)`
+    (eventscr.c:834) -- which is difficulty menu option 0 ONLY. Vanilla gates its arena
+    tutorial that way, so on Normal and Difficult it simply never plays.
+
+    We keep vanilla's ANATOMY but drop that one gate, because of what these two boxes
+    actually say: a loss means the unit "will not be able to fight in any future battles",
+    and B concedes for the fee. That is a permadeath warning and an escape hatch, not a
+    flavour beat -- a Normal player who never sees it can lose a unit permanently to a
+    mechanic nobody told them about. Nicolas, 2026-08-22: the arena tutorial and the crit
+    warning ship on Normal, the rest of tutorial mode does not.
+
+    Scope is exactly this one script: it is the ONLY `EventScr_CallOnTutorialMode` call in
+    the build, so nothing else changes mode-gating with it. Every other teaching beat we
+    ship (ch02's fliers-vs-bows warning) is plain dialogue and already played in all modes.
+    """
+
+    def test_the_arena_trigger_no_longer_calls_the_tutorial_mode_gate(self):
+        self.assertNotIn('EventScr_CallOnTutorialMode', bc.ch05_arena_trigger_script())
+
+    def test_the_trigger_keeps_its_player_only_faction_gate(self):
+        # The OTHER gate must survive -- an enemy stepping on the tile must not fire it.
+        script = bc.ch05_arena_trigger_script()
+        self.assertIn('EventScr_UnTriggerIfNotFaction', script)
+        self.assertIn('FACTION_ID_BLUE', script)
+
+    def test_no_tutorial_mode_gate_remains_anywhere_in_the_build(self):
+        # Guards the scope claim: if a future chapter adds one, this test says so rather
+        # than letting mode-gated content appear again by inheritance.
+        with open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'), encoding='utf-8') as fh:
+            src = fh.read()
+        # The CALL SITE, not the word: the docstrings explain the gate we removed and why,
+        # and banning the term would only push that explanation out of the code.
+        self.assertEqual(src.count('CALL(EventScr_CallOnTutorialMode)'), 0)
+
+
 if __name__ == '__main__':
     unittest.main()

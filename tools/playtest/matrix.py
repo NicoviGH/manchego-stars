@@ -869,6 +869,7 @@ def scenario_driver_text(scenario_name, files=None, harness_source=None):
 # matrix.py sets it FROM the manifest entry, which `export_env` already covers.
 PLAYTEST_ENV_KEYS = ('PT_SEED', 'PT_CHAR', 'PT_ROUNDS', 'PT_STATE', 'PT_TAG', 'PT_UNTIL',
                      'PT_SPEED', 'PT_MAXFRAMES', 'PT_PRESSEVERY', 'PT_SHOTEVERY', 'PT_FPS',
+                     'PT_DIFFICULTY',
                      'PT_PROVIDER', 'PT_MODEL', 'PT_BASE_URL', 'PT_LLM_DIR',
                      # PT_SOUND cannot change a VERDICT -- it unmutes the emulator and nothing
                      # else -- but it is in the key anyway, because the guard that keeps this

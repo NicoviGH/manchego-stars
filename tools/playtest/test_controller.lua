@@ -798,6 +798,31 @@ check(unknown.state, nil, "an unrecognised proc set fails closed")
 check(type(unknown.error), "string", "the fallthrough explains itself")
 check(#unknown.considered > 5, true, "the fallthrough reports every rule it rejected")
 
+
+-- Difficulty mode selection (#303). The menu always initialises to option 0 (Tutorial),
+-- and the harness only ever pressed A -- so every playtest verdict this project has
+-- produced graded TUTORIAL while reading as general. A scenario now names the mode it
+-- wants and the controller navigates to it, on the same contract as a yes/no choice:
+-- A commits whatever is HIGHLIGHTED, so the wrong option must be moved off first.
+local function diffObs(current, want)
+    local o = proc("difficulty", "difficulty_input")
+    return { procs = o, difficulty = { current = current, want = want } }
+end
+
+check(action(diffObs(0, nil), "confirm_difficulty").key, "A",
+    "with no mode requested, A confirms the default as before")
+check(action(diffObs(0, 2), "select_difficulty_down").key, "DOWN",
+    "below the wanted mode, DOWN is the legal move")
+check(action(diffObs(0, 2), "confirm_difficulty"), nil,
+    "A is NOT legal while the highlight is on the wrong mode")
+check(action(diffObs(2, 2), "confirm_difficulty").key, "A",
+    "on the wanted mode, A commits it")
+check(action(diffObs(2, 2), "select_difficulty_down"), nil,
+    "no further movement once the wanted mode is highlighted")
+check(action(diffObs(1, 0), "select_difficulty_down").key, "DOWN",
+    "the menu wraps, so DOWN reaches a lower index too")
+
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests))
     os.exit(1)
