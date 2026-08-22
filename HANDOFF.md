@@ -6,34 +6,50 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-21 (Claude). Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
+Refreshed 2026-08-22 (Claude). Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
 recorded in `docs/decisions.md`, `CLAUDE.md` or a GitHub issue was deleted from here rather than
 restated. Five gotchas that lived ONLY here were migrated into `decisions.md` first — check that
 a thing has a home before cutting it.
 
 ## In flight
 
-**Nothing.** `main` is at **#297**, CI green.
+**Nothing.** `main` is at **#301**, CI green, no open PRs.
 
 ## Next task
 
-**ch05's dialogue is DONE — every scene and every fallback is wired and proved.** What is left:
+**ch05 is COMPLETE** — every scene, every fallback and all three ending arms are wired, proved and
+filmed. Nothing on it is owed.
 
-- **Two ending arms are unfilmed** — `--ch05-ending=no-sahnar` and `=basil-died` boot straight to
-  each, so this is two short runs and nothing else.
+**Next is the `#302` epic: chapter as code.** Do the AUDIT first (its first child), and ground it
+in the history rather than in recollection — the premise is measured, and it is that the marginal
+cost of a chapter is going UP: ch03→ch04→ch05 ran 58→100→**113** commits and 37→48→**78**
+`CH0N_*` constants, while each chapter still writes its own ~350-400-line `inject_chNN`.
+`docs/adding-a-chapter.md` is a recipe to IMITATE, which is why the copy keeps growing.
 
-**Then ch06**, which is unhosted; ch05's win still lands on the RBG campfire dev placeholder, and
-that is BY DESIGN — the placeholder IS the "next chapter" slot.
+**Then ch06**, which is unhosted; ch05's win lands on the RBG campfire dev placeholder, and that
+is BY DESIGN — the placeholder IS the "next chapter" slot. Build it through whatever #302
+produces, since that is the epic's own definition of done.
 
-**Both former open questions are RULED (Nicolas, 2026-08-21), are ADRs, and are DONE — do not
-re-raise either.** Reskins keep their donor's class name, deliberately. And the character wrap is
-retired: dialogue is measured in PIXELS against the window it actually renders in (#298).
+**Two questions are RULED (Nicolas, 2026-08-21), are ADRs, and are DONE — do not re-raise
+either.** Reskins keep their donor's class name, deliberately. And the character wrap is retired:
+dialogue is measured in PIXELS against the window it actually renders in (#298).
 
 ## Recently landed — do not redo
 
 Each of these is DONE, merged, and documented where it belongs. Listed only so a fresh session
 does not reopen one; the detail is on the issue and in `docs/decisions.md`.
 
+- **Structural tooling, because grep kept answering questions it could not** (#300/#301) —
+  `tools/callsites.py` (every call site with arguments BOUND to parameter names, which is what
+  text search cannot do), two `check.py` guards, and a `.clangd` in the PARENT repo that makes
+  the decomp indexable without touching the submodule. ⚠️ **Use `callsites.py` before changing
+  any signature, and especially before changing what a parameter MEANS** — that second kind
+  breaks no caller loudly and shipped three bugs the whole suite passed through.
+- **All three ch05 ending arms filmed** (#299) — `docs/demo/ch05-ending-{no-sahnar,basil-died}.gif`.
+  ⚠️ Two traps recorded in `decisions.md`: a ROM-config guard that compares only which flags are
+  ON cannot tell three arms apart when they differ by a flag's VALUE, and the ending gate's box
+  count is a FLOOR (it had been passing a wrong number for months) — the arm is asserted by
+  message id, not by length.
 - **Dialogue wraps by PIXELS now, not characters** (#298) — three budgets in
   `tools/fe8_talk_font.py`, each measured on the window it belongs to: 203px talk bubble,
   192px auto-centered helpbox (narration + the lord-select explainer), 143px battle bubble
@@ -94,7 +110,11 @@ do not re-inline the content.
   *"A scenario written against the old design will FAIL ON SUCCESS"*, *"An artifact is not its
   inputs"*, *"A community map sprite is keyed on GREEN, not on index 0"*, *"The TESTCH bench is
   bounded by SMS VRAM"*, *"A battle anim carries FOUR palettes and the engine picks one"*.
-- **What is left to build** → GitHub issues, #20–#28 per chapter.
+- **What is left to build** → GitHub issues, #20–#28 per chapter; **#302** is the live epic.
+- **Before a wide mechanical edit** → `tools/callsites.py`, then diff the OUTPUT. Three bugs
+  shipped in one day from a regex sweep that all 546 tests passed through, and what caught them
+  was rendering every message body under both versions and diffing (`decisions.md` → "We wrapped
+  on-map talk at 29 CHARACTERS", §HOW THE ROLLOUT MUST BE GATED). Run that diff BEFORE the suite.
 - **Which asset the FE-Repo has** → `docs/fe-repo-scouting.md`. ⚠️ Its table says where an anim
   LIVES, not what it does; open a candidate's mode folders before believing a gap.
 
