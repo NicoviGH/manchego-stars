@@ -13,43 +13,45 @@ a thing has a home before cutting it.
 
 ## In flight
 
-**Nothing.** `main` is at **#301**, CI green, no open PRs.
+**PR #305** — the playtest gate switches from Tutorial to NORMAL by default. Harness-side
+only, CI green, ready to merge. **Merging it re-baselines every existing verdict** (enemies
+arrive 2 levels under the authored table on Normal where they arrived 4 under on Tutorial),
+so the matrix re-run after it lands is Nicolas's call, not a background task.
 
 ## Next task
 
-**ch05 is COMPLETE** — every scene, every fallback and all three ending arms are wired, proved and
-filmed. Nothing on it is owed.
+**#303 is done and merged (#304).** All three difficulty modes are declared per chapter and
+proved in-engine; only #305 remains and it is open. Details on the issue.
 
-**#303 comes FIRST, flagged urgent by Nicolas.** We support all three difficulty modes, and
-today we merely INHERIT them: the select screen has been live since ch01, so a player can pick
-Difficult and get vanilla's numbers for whatever host slot we squatted — ch03 and ch04 both host
-on slot 5 and therefore necessarily share difficulty numbers. Two consequences worth knowing
-before starting: every `make difficulty` PARITY line and every playtest verdict graded ONE
-configuration while reading as general, and `CHECK_TUTORIAL` (`!config.controller && !HARD`)
-means ch05's arena tutorial does not play on Difficult at all. Checklist on #303; ADR in
-`decisions.md`. Doing it first also hands #302 a worked example of "declare it rather than
-inherit it" instead of a hypothesis.
-
-**Then the `#302` epic: chapter as code.** Do the AUDIT first (its first child), and ground it
-in the history rather than in recollection — the premise is measured, and it is that the marginal
-cost of a chapter is going UP: ch03→ch04→ch05 ran 58→100→**113** commits and 37→48→**78**
-`CH0N_*` constants, while each chapter still writes its own ~350-400-line `inject_chNN`.
-`docs/adding-a-chapter.md` is a recipe to IMITATE, which is why the copy keeps growing.
+**Next is the `#302` epic: chapter as code.** Do the AUDIT first (its first child), and ground
+it in the history rather than in recollection — the premise is measured, and it is that the
+marginal cost of a chapter is going UP: ch03→ch04→ch05 ran 58→100→**113** commits and
+37→48→**78** `CH0N_*` constants, while each chapter still writes its own ~350-400-line
+`inject_chNN`. `docs/adding-a-chapter.md` is a recipe to IMITATE, which is why the copy keeps
+growing. #303 hands it a worked example of "declare it rather than inherit it".
 
 **Then ch06**, which is unhosted; ch05's win lands on the RBG campfire dev placeholder, and that
 is BY DESIGN — the placeholder IS the "next chapter" slot. Build it through whatever #302
 produces, since that is the epic's own definition of done.
 
-**Three questions are RULED and are ADRs — do not re-raise any of them.** Reskins keep their
-donor's class name. The character wrap is retired (pixels, per renderer, #298). And **we support
-all three difficulty modes** — *"vanilla ships three difficulty modes then so should we"*
-(2026-08-22). Reskins keep their donor's class name, deliberately. And the character wrap is retired:
-dialogue is measured in PIXELS against the window it actually renders in (#298).
+**Rulings that are ADRs — do not re-raise.** Reskins keep their donor's class name. The
+character wrap is retired (pixels, per renderer, #298). We support all three difficulty modes
+(#303). Ravisin ships at her authored line, re-barred against Saar's measured 22.8 rounds.
 
 ## Recently landed — do not redo
 
 Each of these is DONE, merged, and documented where it belongs. Listed only so a fresh session
 does not reopen one; the detail is on the issue and in `docs/decisions.md`.
+
+- **All three difficulty modes, declared and proved in-engine** (#303/#304) — every chapter
+  YAML declares its triple, `difficulty.py --mode` grades a named mode on both sides, and the
+  `difficulty` scenario reads the red force off the map. ⚠️ Four traps recorded in
+  `decisions.md`: a raw-pid unit inherits a `CharacterData` GAP and `baseLevel` is the field
+  that decides whether the engine keeps its stat line or throws it away; **Def is a CLIFF on a
+  boss, not a dial** (+1 moved Ravisin 13.4→20.1 rounds, +2 overshot to 40.2); a bar measured
+  against vanilla is a MEASUREMENT, not a constant (Ravisin held "Saar's bar" for months after
+  Saar moved); and **confirm the model reproduces the ROM before tuning content against a model
+  number** — three level redistributions moved clear-load by 0.01, which was the clue.
 
 - **Structural tooling, because grep kept answering questions it could not** (#300/#301) —
   `tools/callsites.py` (every call site with arguments BOUND to parameter names, which is what
