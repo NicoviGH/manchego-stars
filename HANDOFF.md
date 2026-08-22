@@ -30,7 +30,13 @@ cost of a chapter is going UP: ch03→ch04→ch05 ran 58→100→**113** commits
 is BY DESIGN — the placeholder IS the "next chapter" slot. Build it through whatever #302
 produces, since that is the epic's own definition of done.
 
-**Two questions are RULED (Nicolas, 2026-08-21), are ADRs, and are DONE — do not re-raise
+**One question is OPEN and is Nicolas's to answer, not a refactor's: #303 — do we ship three
+difficulty modes?** We inherit FE8's, never set the level shifts (ch03 and ch04 share host slot 5
+and so necessarily share difficulty numbers), and grade exactly one configuration — so every
+PARITY verdict this project has printed is Normal-only. Nothing in #303 proceeds until the
+product decision is made.
+
+**Two other questions are RULED (Nicolas, 2026-08-21), are ADRs, and are DONE — do not re-raise
 either.** Reskins keep their donor's class name, deliberately. And the character wrap is retired:
 dialogue is measured in PIXELS against the window it actually renders in (#298).
 
