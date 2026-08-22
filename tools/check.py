@@ -1259,6 +1259,176 @@ def check_every_test_actually_runs(fail):
                 % (os.path.relpath(path, REPO), len(dead), main_line, dead[0][1], dead[0][0]))
 
 
+# The functions that take a PIXEL budget, and the parameter each takes it in. A width passed
+# to one of these as a bare small integer is almost certainly a CHARACTER count left behind by
+# the 2026-08-21 conversion -- see decisions.md -> "We wrapped on-map talk at 29 CHARACTERS".
+PIXEL_WIDTH_FUNCS = {
+    '_wrap_fe_lines': 'width',
+    '_script_to_message': 'width',
+    '_ch05_opening_body': 'width',
+    '_ch05_opening_scene': 'width',
+    '_ch05_scene_and_variant': 'width',
+    '_emit_scene_beats': 'width',
+}
+# Below this, an integer is a character count wearing a pixel's clothes. The narrowest real
+# budget in the game is the battle bubble's 143px; the widest character width ever used was 42.
+PIXEL_WIDTH_FLOOR = 100
+
+
+def _guarded_python_sources():
+    """Every python source these two guards police: `tools/**`, RECURSIVELY.
+
+    A non-recursive `tools/*.py` skipped `tools/inject/` and `tools/playtest/` outright --
+    including `engine_hooks.py`, whose whole job is decomp files. Two things are exempt and
+    both for the same stated reason: `build_campaign.py` and `tools/inject/` DO the patching,
+    so naming a patched path is their function rather than a mistake, and `check.py` hosts the
+    registry itself.
+    """
+    out = {}
+    for path in sorted(glob.glob(os.path.join(REPO, 'tools', '**', '*.py'), recursive=True)):
+        rel = os.path.relpath(path, REPO)
+        base = os.path.basename(path)
+        if base.startswith('test_') or base in ('build_campaign.py', 'check.py'):
+            continue
+        if rel.startswith('tools/inject/'):
+            continue
+        with open(path, encoding='utf-8') as fh:
+            out[rel] = fh.read()
+    return out
+
+
+def check_wrap_widths_are_pixels(fail, sources=None, funcs=None):
+    """Guard: no call site passes a CHARACTER count to a parameter that now means PIXELS.
+
+    A parameter that changes NAME breaks every stale caller loudly. A parameter that changes
+    MEANING breaks none of them: `_wrap_fe_lines(text, 29)` is valid Python before and after,
+    the tests pass, and the only symptom is a scene wrapped to seven characters a line -- which
+    is exactly what shipped in ch05's moose beat and ch03's narration before a whole-corpus
+    diff caught it. No compiler and no language server can see this; it is a repo invariant.
+
+    Reads the ARGUMENT BINDING (tools/callsites.py), not the text, so a width passed
+    POSITIONALLY is caught -- the form that actually shipped, and the one no `grep width=`
+    will ever find. A deliberate character width stays legal by SAYING so with `measure=len`
+    (the lord-select card is a real 20-column panel drawn through its own font).
+    """
+    sys.path.insert(0, os.path.join(REPO, 'tools'))
+    import callsites
+
+    funcs = PIXEL_WIDTH_FUNCS if funcs is None else funcs
+    if sources is None:
+        sources = _guarded_python_sources()
+
+    # Resolve each signature ONCE from the file that defines it, then apply it everywhere.
+    # Without this a call in another module has no local definition to bind its positional
+    # arguments against -- and a positional width is precisely the form that shipped.
+    with open(os.path.join(REPO, 'tools', 'build_campaign.py'), encoding='utf-8') as fh:
+        defining = fh.read()
+    signatures = {f: callsites.signature(defining, f, 'build_campaign.py') for f in funcs}
+    # An unresolvable signature switches positional binding OFF (scan falls back to arg0/arg1),
+    # so the guard would quietly stop guarding exactly the form that shipped. Say so instead.
+    for func, params in sorted(signatures.items()):
+        if not params:
+            fail.append('check_wrap_widths_are_pixels: %s is registered in PIXEL_WIDTH_FUNCS '
+                        'but build_campaign.py does not define it, so its POSITIONAL widths '
+                        'cannot be bound. Fix the name or drop the entry.' % func)
+
+    for path, source in sources.items():
+        for func, param in funcs.items():
+            if not signatures.get(func):
+                continue
+            try:
+                sites = callsites.scan(source, func, path, params=signatures[func])
+            except callsites.ParseError:
+                continue          # check_python_compiles owns syntax
+            for site in sites:
+                if site.kind != 'call' or site.bound.get('measure') == 'len':
+                    continue
+                raw = site.bound.get(param)
+                if raw is None:
+                    continue
+                try:
+                    value = int(raw, 0)
+                except (TypeError, ValueError):
+                    continue      # a named budget or an expression -- not a stale literal
+                if value < PIXEL_WIDTH_FLOOR:
+                    fail.append(
+                        '%s:%d passes %s=%s to %s -- that is a CHARACTER count in a PIXEL '
+                        'parameter. Use an fe8_talk_font budget, or pass measure=len if the '
+                        'panel really is measured in characters.'
+                        % (path, site.lineno, param, raw, func))
+
+
+def check_vanilla_reads_come_from_head(fail, sources=None):
+    """Guard: nothing reads a PATCHED decomp file from the working tree and calls it vanilla.
+
+    `PATCHED_DECOMP_FILES` are rewritten in place by every build, so after any `make` they hold
+    OUR campaign content under vanilla's own symbols and ids. A tool that opens one directly
+    reports our own text back as the reference -- and it does so silently, formatted exactly
+    like real evidence, which is what makes it worse than a tool that simply fails.
+
+    It has bitten three times: `vanilla_scene.py` (fixed in `46f8b12`; #25 still owes an audit
+    of every number mined before it), `difficulty.py` (which warns about it in prose beside its
+    own reads), and a 2026-08-21 session that read the generated `events_info.s` and reasoned
+    about our injected output as if it were vanilla. `build_campaign.vanilla_decomp_text()` has
+    existed the whole time and reads from HEAD; the only thing missing was anything making its
+    use mandatory.
+    """
+    # Read the registry out of build_campaign.py's SOURCE rather than importing it. The
+    # module pulls in portrait_tool -> PIL, which the lean `checks` CI job does not install,
+    # and its siblings answer that by skipping -- but a guard that skips in CI is half a
+    # guard, and this one exists precisely because the mistake it catches is silent.
+    with open(os.path.join(REPO, 'tools', 'build_campaign.py'), encoding='utf-8') as fh:
+        registry = ast.parse(fh.read(), 'build_campaign.py')
+    # Collect the STRING CONSTANTS in the assignment's subtree rather than literal_eval-ing
+    # it: the registry is assembled by concatenation, so it is a BinOp and not a literal.
+    patched = []
+    for node in ast.walk(registry):
+        if (isinstance(node, ast.Assign)
+                and any(getattr(t, 'id', None) == 'PATCHED_DECOMP_FILES' for t in node.targets)):
+            patched = [n.value for n in ast.walk(node.value)
+                       if isinstance(n, ast.Constant) and isinstance(n.value, str)]
+    if not patched:
+        fail.append('check_vanilla_reads_come_from_head: could not read '
+                    'PATCHED_DECOMP_FILES out of build_campaign.py -- the guard has nothing '
+                    'to police and would pass vacuously.')
+        return fail
+    if sources is None:
+        sources = _guarded_python_sources()
+
+    # A tool may legitimately want the CURRENT tree -- the map editor has to see the maps WE
+    # registered, not vanilla's. Saying so at the site is the price, exactly as `measure=len`
+    # is for a character width: the marker turns a silent assumption into a claim someone
+    # made on purpose and can be challenged on.
+    for path, source in sources.items():
+        lines = source.split('\n')
+        for lineno, line in enumerate(lines, 1):
+            if 'open(' not in line:
+                continue
+            # The marker may sit on the line, or in the comment block DIRECTLY above it --
+            # the reason is usually a sentence or three, and forcing it onto the call line
+            # would make the honest annotation the ugly one. Walking up only through
+            # CONTIGUOUS comment lines is what stops it shadowing: a fixed N-line window lets
+            # one honest annotation exempt every unmarked read for the next N lines.
+            if 'CURRENT-TREE' in line:
+                continue
+            marked, i = False, lineno - 2
+            while i >= 0 and lines[i].lstrip().startswith('#'):
+                if 'CURRENT-TREE' in lines[i]:
+                    marked = True
+                    break
+                i -= 1
+            if marked:
+                continue
+            for rel in patched:
+                if rel in line:
+                    fail.append(
+                        '%s:%d opens the PATCHED decomp file %s directly. After any build that '
+                        'holds OUR text, not vanilla\'s -- read it through '
+                        'build_campaign.vanilla_decomp_text(), which reads HEAD.'
+                        % (path, lineno, rel))
+    return fail
+
+
 def check_handoff_only_on_main(fail):
     """HANDOFF.md is live state and live state is global -- author it on main, never on a
     feature branch. See the block comment above for the incident this encodes."""
@@ -1354,6 +1524,8 @@ def main():
                   check_engine_campaign_agnostic,
                   check_save_layout_stable, check_every_test_actually_runs,
                   check_recordenemy_knows_every_raw_pid,
+                  check_wrap_widths_are_pixels,
+                  check_vanilla_reads_come_from_head,
                   check_handoff_only_on_main,
                   check_lane_ownership):
         check(fail)

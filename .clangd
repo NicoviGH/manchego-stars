@@ -1,0 +1,15 @@
+# clangd config for the FE8 decomp (see docs/decisions.md).
+# Lives in the PARENT repo on purpose: clangd searches ancestors, so this configures
+# fireemblem8u/** without touching the submodule, whose tracked files are build artifacts
+# restored from HEAD on every build.
+CompileFlags:
+  Add:
+    # The decomp is GBA code. Compiled for the host triple, its section attributes are
+    # invalid for Mach-O and clang bails after ~20 errors, which indexes nothing.
+    - --target=arm-none-eabi
+    - -mcpu=arm7tdmi
+    - -nostdlibinc
+    - -Wno-int-to-pointer-cast
+    - -Wno-int-to-void-pointer-cast
+  Remove:
+    - -Werror

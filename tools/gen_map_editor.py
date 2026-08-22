@@ -51,6 +51,8 @@ else:
 def _asset_names(dec):
     import re
     names=[]
+    # CURRENT-TREE: the editor must see the maps WE registered -- _register_chapter_map
+    # appends to this table, so vanilla's copy would not list our own chapters.
     with open(os.path.join(dec,'data/data_8B363C.s')) as f:
         for line in f:
             mo=re.match(r'\s*\.word\s+(\w+)',line)
