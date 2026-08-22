@@ -299,5 +299,34 @@ class TestPlaytestHarness(unittest.TestCase):
         self.assertIn('afterPre = pokeNormalConfig', recorder)
 
 
+class TestDifficultyGateDefault(unittest.TestCase):
+    """The playtest gate grades NORMAL unless a scenario asks otherwise (#303 follow-up).
+
+    FE8's difficulty menu initialises to option 0 (Tutorial) and the harness only ever
+    pressed A, so every verdict this project produced before #303 graded the EASIEST mode
+    while reading as general. Normal is what ships to most players and what
+    `difficulty.py` grades by default, so it is what the gate must run.
+
+    Pinned at the source, because the default is a module-level constant evaluated at load
+    and there is no way to observe it without booting mGBA.
+    """
+
+    def _harness(self):
+        here = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(here, 'playtest', 'harness.lua'), encoding='utf-8') as fh:
+            return fh.read()
+
+    def test_the_default_mode_is_normal(self):
+        src = self._harness()
+        self.assertIn('or "normal"', src,
+                      'harness.lua must fall back to "normal" when PT_DIFFICULTY is unset')
+        self.assertNotIn('PLAYTEST_DIFFICULTY or nil', src)
+
+    def test_every_mode_is_still_selectable(self):
+        src = self._harness()
+        for mode in ('tutorial', 'normal', 'difficult'):
+            self.assertIn('%s = ' % mode, src, 'mode %s lost its index' % mode)
+
+
 if __name__ == '__main__':
     unittest.main()

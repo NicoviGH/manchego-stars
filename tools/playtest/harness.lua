@@ -81,15 +81,17 @@ local CHAR_HLIN, CHAR_SCRAMSAX, CHAR_SEPHEK = 0x0D, 0x11, 0x68 -- NATASHA/KYLE/O
 -- prologue/sandbox host on chapter slot 1; a chapter load-test (e.g. --ch03-boot on slot 4)
 -- overrides via PT_HOST_CHAPTER so bootToMap/inChapter recognize the right slot.
 local HOST_CHAPTER = PLAYTEST_HOST_CHAPTER or 1
--- Which difficulty mode a run selects on the New Game menu (PT_DIFFICULTY). nil keeps the
--- old behaviour -- press A on whatever is highlighted -- which is option 0, TUTORIAL. That
--- default is why every verdict before #303 graded the easiest mode while reading as general.
+-- Which difficulty mode a run selects on the New Game menu (PT_DIFFICULTY), defaulting to
+-- NORMAL -- the mode that ships to most players and the one `difficulty.py` grades by
+-- default. It has to be a declared default rather than "whatever the menu highlights":
+-- FE8 initialises the menu to option 0 (TUTORIAL) and the harness only pressed A, so every
+-- verdict this project produced before #303 graded the EASIEST mode while reading as
+-- general. A scenario that genuinely wants another mode names it.
 -- Hung off TUNE rather than taking two top-level locals: harness.lua sits AT Lua's 200-local
 -- ceiling, and the next top-level local stops the whole chunk loading (check.py guards it).
 TUNE.difficultyWant = (function()
     local requested = (PLAYTEST_DIFFICULTY ~= nil and PLAYTEST_DIFFICULTY ~= "")
-        and PLAYTEST_DIFFICULTY or nil
-    if requested == nil then return nil end
+        and PLAYTEST_DIFFICULTY or "normal"
     local index = ({ tutorial = 0, normal = 1, difficult = 2 })[requested]
     if index == nil then
         error(string.format("PT_DIFFICULTY=%q is not one of tutorial, normal, difficult",
@@ -1735,8 +1737,9 @@ end
 -- three numbers the chapter DECLARES in its YAML `difficulty:` block. Reading the map
 -- rather than the menu is the point: the menu only proves we clicked something.
 scenarios.difficulty = function()
-    local mode = (PLAYTEST_DIFFICULTY ~= nil and PLAYTEST_DIFFICULTY ~= "")
-        and PLAYTEST_DIFFICULTY or "default"
+    -- The mode this run is SUPPOSED to be in: the resolved default, not the raw env var
+    -- (unset now means NORMAL, not "whatever the menu highlights").
+    local mode = ({ [0] = "tutorial", [1] = "normal", [2] = "difficult" })[TUNE.difficultyWant]
     if not bootToMap() then return result("FAIL", "never reached the map") end
     -- PROVE the run is in the mode it labels before recording anything under that name.
     -- A scenario that boots from a saved state never passes the difficulty menu, so it
