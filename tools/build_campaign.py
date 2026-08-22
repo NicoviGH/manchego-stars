@@ -10234,12 +10234,32 @@ def ch05_misc_events():
 
 
 def ch05_arena_trigger_script():
-    """Player-only AREA target that preserves vanilla's tutorial-mode channel gate."""
+    """Player-only AREA target for the arena tutorial. Vanilla's anatomy MINUS its
+    tutorial-mode gate (#303).
+
+    Vanilla wraps this in `EventScr_CallOnTutorialMode`, and `CHECK_TUTORIAL` is
+    `!config.controller && !(chapterStateBits & PLAY_FLAG_HARD)` (eventscr.c:834) -- true
+    only for difficulty menu option 0. So in vanilla the arena tutorial never plays on
+    Normal or Difficult.
+
+    We drop that one gate because of what the two boxes SAY: a loss means the unit "will
+    not be able to fight in any future battles", and B concedes for the fee. That is a
+    permadeath warning plus its escape hatch -- safety text, not a flavour beat -- and a
+    Normal player who never sees it can lose a unit to a mechanic nobody explained. Every
+    other teaching beat we ship is plain dialogue and already played in all three modes
+    (ch02's fliers-vs-bows warning), so this makes the arena consistent with them rather
+    than exceptional (Nicolas, 2026-08-22: these, not the rest of tutorial mode).
+
+    The FACTION gate stays: the tile fires for a player unit only. The one-shot flag stays
+    too, so it still plays exactly once per run."""
+    # Vanilla's helper is just `CHECK_TUTORIAL / BEQ(end) / CALL(-1)` -- the gate plus an
+    # indirect call through EVT_SLOT_2 (events_script_utils.c:24). Dropping the gate means
+    # the slot hand-off has no purpose either, so this CALLs the script directly, which is
+    # the ordinary idiom (cf. ch5-eventscript.h's own `CALL(EventScr_RemoveBGIfNeeded)`).
     return ('{\n'
             '    SVAL(EVT_SLOT_2, FACTION_ID_BLUE)\n'
             '    CALL(EventScr_UnTriggerIfNotFaction)\n'
-            '    SVAL(EVT_SLOT_2, %s)\n'
-            '    CALL(EventScr_CallOnTutorialMode)\n'
+            '    CALL(%s)\n'
             '    EVBIT_T(7)\n'
             '    ENDA\n}' % CH05_ARENA_TUTORIAL_SCRIPT)
 

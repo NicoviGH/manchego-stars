@@ -1359,39 +1359,106 @@ class ChapterPressureInMode(unittest.TestCase):
         self.assertLess(df._chapter_pressure(chap, mode='normal')['ours'][0],
                         df._chapter_pressure(chap)['ours'][0])
 
-    def test_parity_holds_in_the_two_modes_players_actually_pick(self):
-        # The claim #303 rests on: adopting the twin's numbers means the verdict does not
-        # depend on which mode is graded. True for Normal and Difficult in every chapter.
-        # Tutorial is exempted deliberately -- the next test pins WHY.
+    def test_parity_holds_in_every_mode(self):
+        # The claim #303 rests on: adopting the twin's numbers means the verdict does
+        # not depend on which mode is graded. True in all three, in every chapter.
         for chid in ('ch00', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05'):
             chap = df.load_field('rime-of-the-frostmaiden', chid)[0]
-            for mode in (None, 'normal', 'difficult'):
+            for mode in (None,) + df.MODES:
                 p = df._chapter_pressure(chap, mode=mode)
                 self.assertEqual(p['verdict']['verdict'], 'OK',
                                  '%s graded %s is %s' % (chid, mode, p['verdict']['verdict']))
 
-    def test_ch05_tutorial_drifts_because_our_force_is_level_uniform(self):
-        """ch05 on TUTORIAL reads OFF, and the cause is structural, not a wrong number.
 
-        ch05 declares 4/2/3 -- vanilla Ch5's own triple, and the same numbers it already
-        inherited -- so this predates #303 and is REVEALED by mode grading, not caused by it.
+class BossesAreImmuneToTheMalus(unittest.TestCase):
+    """A boss whose baseLevel >= its deploy level never takes the malus -- model it (#303).
 
-        The malus floors at baseLevel (`UnitAutolevelPenalty` skips the re-autolevel unless
-        `level - malus > baseLevel`), so a level-5 unit under malus 4 lands on pure class
-        base. Our ch05 force is level-UNIFORM -- 20 of 23 bodies at level 5 -- so Tutorial
-        collapses almost all of it to base, while vanilla Ch5's force spreads 4..8 and keeps
-        twice as many units above the floor. Clear-load drops to x0.69, under the 0.75 band;
-        threat is unaffected (x1.01) because the boss carries it.
+    `UnitAutolevelPenalty` fires only `if (level > pCharacterData->baseLevel)`. Every
+    vanilla named boss ships baseLevel >= deploy level (Saar 8/8, Breguet 4/4, Bazba 6/6),
+    and after RAW_PID_LEVEL_SOURCES so does every one of ours. So on Tutorial and Normal a
+    boss keeps its authored line on BOTH sides.
 
-        Pinned rather than fixed: Tutorial is the beginner mode and being gentler there is
-        defensible. This test exists so the drift cannot change size unnoticed -- if it moves,
-        either the roster's level spread or the declared malus moved with it.
-        """
+    The model defaulted `base_level` to 1 and no caller passed anything, so it applied the
+    malus to bosses that the ROM leaves alone -- understating both sides' walls in exactly
+    the modes where clear-load is measured. It read ch05's Tutorial at clear-load x0.69 and
+    called it OFF, a verdict about the model rather than the chapter.
+    """
+
+    def test_a_boss_at_its_base_level_keeps_its_line_under_any_malus(self):
+        base = {'baseHP': 30, 'basePow': 10, 'baseSkl': 5, 'baseSpd': 5,
+                'baseDef': 8, 'baseRes': 6, 'baseLck': 3, 'baseCon': 9}
+        growths = {g: 50 for g in bc.GROWTH_FIELDS}
+        shifts = {'tutorial': 4, 'normal': 2, 'difficult': 3}
+        for mode in ('tutorial', 'normal'):
+            self.assertEqual(
+                df.mode_stats(base, growths, 8, mode, shifts, base_level=8),
+                df.autolevel(base, growths, 8),
+                '%s must not touch a boss at its own baseLevel' % mode)
+
+    def test_vanilla_saar_is_unshifted_in_every_mode(self):
+        # Saar is baseLevel 8 deploying at 8 -- the reference wall the ch05 read leans on.
+        by_mode = {}
+        for mode in (None,) + df.MODES:
+            force = df.vanilla_enemies('FE8 Ch5', mode=mode)
+            saar = [e for e in force if 'SAAR' in e.name.upper()]
+            self.assertEqual(len(saar), 1)
+            by_mode[mode] = saar[0].hp
+        self.assertEqual(by_mode[None], by_mode['tutorial'])
+        self.assertEqual(by_mode[None], by_mode['normal'])
+
+    def test_our_ch05_boss_is_unshifted_in_every_mode(self):
         chap = df.load_field('rime-of-the-frostmaiden', 'ch05')[0]
-        p = df._chapter_pressure(chap, mode='tutorial')
-        self.assertEqual(p['verdict']['verdict'], 'OFF')
-        self.assertAlmostEqual(p['ours'][1] / p['vanilla'][1], 0.69, places=2)
-        self.assertGreater(p['ours'][0] / p['vanilla'][0], 0.95)   # threat is fine
+        shifts = bc.chapter_difficulty_shifts(chap)
+        hp = {}
+        for mode in (None, 'tutorial', 'normal'):
+            force = df.chapter_enemy_force(chap, mode=mode,
+                                           shifts=shifts if mode else None)
+            hp[mode] = max(u.hp for u in force)      # Ravisin is the wall
+        self.assertEqual(hp[None], hp['tutorial'])
+        self.assertEqual(hp[None], hp['normal'])
+
+
+class RavisinHoldsSaarsBar(unittest.TestCase):
+    """ch05's boss is measured against her twin's REAL durability, not a stale number.
+
+    Her YAML note has read "~13 rounds to kill -- Saar's bar" since she was authored, and
+    she hit it exactly. But that bar was measured before #285 taught the model to apply a
+    personal line to BOTH sides: once vanilla's bosses stopped being read off naked class
+    base, Saar moved to 22.8 rounds and nobody re-checked her. She was holding a bar that
+    had moved out from under her, which is why ch05's clear-load sat under vanilla's in
+    every mode and fell out of band on Tutorial (x0.74), where the generics floor to class
+    base and the boss dominates the ratio.
+
+    Pinned as a RANGE against Saar rather than a constant, so the next change to either
+    side's modelling fails here instead of silently re-opening the same gap.
+    """
+
+    def _rounds(self, name_match, force):
+        return max(df.metric_rounds_to_kill(e) for e in force
+                   if name_match(e.name))
+
+    def test_ravisin_is_within_reach_of_saars_measured_durability(self):
+        chap = df.load_field('rime-of-the-frostmaiden', 'ch05')[0]
+        shifts = bc.chapter_difficulty_shifts(chap)
+        ours = df.chapter_enemy_force(chap, mode='normal', shifts=shifts)
+        ravisin = max(df.metric_rounds_to_kill(e) for e in ours)
+        saar = self._rounds(lambda n: 'SAAR' in n.upper(),
+                            df.vanilla_enemies('FE8 Ch5', mode='normal'))
+        self.assertGreater(saar, 20, 'Saar moved -- re-read the bar before trusting it')
+        self.assertGreater(ravisin, saar * 0.85,
+                           'Ravisin %.1f is under Saar %.1f -- ch05 loses its wall' 
+                           % (ravisin, saar))
+        self.assertLess(ravisin, saar * 1.30,
+                        'Ravisin %.1f overshoots Saar %.1f' % (ravisin, saar))
+
+    def test_ch05_clearload_is_in_band_in_every_mode(self):
+        chap = df.load_field('rime-of-the-frostmaiden', 'ch05')[0]
+        for mode in (None,) + df.MODES:
+            p = df._chapter_pressure(chap, mode=mode)
+            self.assertEqual(p['verdict']['verdict'], 'OK',
+                             'ch05 graded %s is %s (clear-load x%.2f)'
+                             % (mode, p['verdict']['verdict'],
+                                p['ours'][1] / p['vanilla'][1]))
 
 
 if __name__ == '__main__':

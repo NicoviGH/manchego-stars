@@ -2136,6 +2136,74 @@ _Decided: 2026-06-17_
 
 ## Distribution & Scope
 
+### The arena tutorial is safety text, so it plays in every mode (2026-08-22, #303)
+
+Vanilla wraps its arena tutorial in `EventScr_CallOnTutorialMode`, and `CHECK_TUTORIAL` is
+`!config.controller && !(chapterStateBits & PLAY_FLAG_HARD)` (eventscr.c:834) — true for
+difficulty menu option 0 ONLY. So in vanilla the arena tutorial never plays on Normal or
+Difficult, and most players pick Normal.
+
+**We keep vanilla's anatomy and drop that one gate**, because of what the two boxes say: a loss
+means the unit *"will not be able to fight in any future battles"*, and B concedes for the fee.
+That is a permadeath warning plus its escape hatch — safety information, not a flavour beat. A
+Normal player who never sees it can lose a unit permanently to a mechanic nobody explained.
+
+It also makes the arena consistent rather than exceptional: every other teaching beat we ship is
+plain dialogue that already played in all three modes (ch02's `fliers-vs-bows`, RBG warning Pinky
+off the archer). This was the ONLY `EventScr_CallOnTutorialMode` call in the build, so the change
+is exactly this one script and nothing else becomes mode-gated or un-gated with it. The FACTION
+gate and the one-shot flag both stay.
+
+_Decided: 2026-08-22 (Nicolas) — "the arena tutorial and the crit warning ship on Normal, the rest
+of tutorial mode does not."_
+
+
+### Ravisin was holding a bar that had moved (2026-08-22, #303)
+
+ch05's boss note read *"~13 rounds to kill — Saar's bar"* since she was authored, and she hit it
+exactly: 13.4. **But Saar measures 22.8.** The bar was set before #285 taught the model to apply a
+personal line to BOTH sides — while vanilla's bosses were still read off naked class base, Saar
+really did project near 13. When #285 landed he moved and nobody re-checked her.
+
+The consequence was invisible until modes could be graded: ch05 sat under vanilla's clear-load in
+EVERY mode (x0.88 authored, x0.86 Normal) and fell out of band on Tutorial (**x0.74**), because
+that is where the generics floor to class base and the boss becomes most of the ratio.
+
+Her line goes HP 15→21, Def 5→6. She now measures **23.4 rounds against Saar's 22.8**, and ch05 is
+in band in all three modes (x0.92 / x1.02 / x1.04; authored clear-load x0.88 → x1.03).
+
+**Def is a CLIFF on a boss, not a dial.** +1 moves her 13.4 → 20.1 rounds; +2 overshoots to 40.2,
+because the yardstick's damage approaches zero and rounds-to-kill diverges. Reach for HP to carry
+the rest of a durability change, and never tune a wall by Def alone.
+
+**The general rule: a bar measured against vanilla is a MEASUREMENT, not a constant.** When the
+model changes what it measures on the vanilla side, every number that was calibrated against it is
+stale — and nothing fails, because our side still hits the number it was given. `RavisinHoldsSaarsBar`
+now pins her as a RANGE against Saar's live value rather than against a literal, so the next such
+change fails a test instead of quietly re-opening the gap.
+
+_Decided: 2026-08-22. Found while investigating ch05's Tutorial band miss under #303's `--mode`._
+
+
+### The parity model must honour baseLevel, or it grades bosses the ROM never touches (2026-08-22, #303)
+
+`mode_stats` defaulted `base_level=1` and no caller passed anything, so the model applied the
+difficulty MALUS to every unit — including bosses that `UnitAutolevelPenalty` leaves alone
+(`if (level > baseLevel)`). Both sides' walls were understated in exactly the two modes where
+clear-load is measured.
+
+It reported ch05's Tutorial at clear-load **x0.69 / OFF** — a verdict about the model, not the
+chapter. With real baseLevels threaded (vanilla's from `data_characters.c` by charIndex, ours from
+the invariant that every boss we field is penalty-immune) the same read is x0.74, and the residual
+gap turned out to be the boss's own durability, not the shift.
+
+Nearly re-tiered a chapter's enemy levels to chase it. **Before tuning content against a model
+number, confirm the model reproduces what the ROM does** — three level redistributions were tested
+and moved clear-load by 0.01, which was itself the clue that levels were not the mechanism.
+
+_Decided: 2026-08-22._
+
+
 ### A raw-pid boss must declare baseLevel, or difficulty wipes its stat line (2026-08-22, #303)
 
 `UnitAutolevelPenalty` (bmunit.c) fires only `if (level > unit->pCharacterData->baseLevel)`.

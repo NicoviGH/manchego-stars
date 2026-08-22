@@ -250,8 +250,28 @@ def _takes_difficulty_shift(char_index):
     return number is None or number >= DIFFICULTY_SHIFT_MIN_PID
 
 
+def _character_base_level(char_index):
+    """`pCharacterData->baseLevel` for a charIndex token, or 1 when it has none.
+
+    This is the field that decides whether the difficulty MALUS touches a unit at all
+    (`if (level > baseLevel)`, UnitAutolevelPenalty). Vanilla sets it >= the deploy level
+    on every named boss, which is how a hand-authored boss line survives into Tutorial and
+    Normal unchanged; generics carry 1 and are re-projected normally."""
+    if char_index is None:
+        return 1
+    text = _characters_text()
+    for marker in ('[%s - 1]' % char_index, '[%s - 1]' % str(char_index).lower()):
+        try:
+            start, end = bc._find_brace_block(text, marker, bc.CHARACTERS_C)
+        except SystemExit:
+            continue
+        found = re.search(r'\.baseLevel\s*=\s*(-?\d+)', text[start:end])
+        return int(found.group(1)) if found else 1
+    return 1
+
+
 def _enemy_from_enum(name, class_enum, level, weapon, personal=None,
-                     mode=None, shifts=None, shiftable=True):
+                     mode=None, shifts=None, shiftable=True, base_level=1):
     """One Combatant: class base autoleveled to `level`, wielding `weapon`, plus any
     personal boss line (see above). Generics carry no personal line, so they are unchanged.
 
@@ -262,19 +282,20 @@ def _enemy_from_enum(name, class_enum, level, weapon, personal=None,
     from charBase+classBase and its bonus adds onto them, and both compose additively."""
     base, growths = _class_base(class_enum), _class_growths(class_enum)
     if mode and shifts and shiftable:
-        stats = mode_stats(base, growths, int(level), mode, shifts)
+        stats = mode_stats(base, growths, int(level), mode, shifts, base_level=base_level)
     else:
         stats = autolevel(base, growths, int(level))
     c = _stats_to_combatant(name, stats, weapon, CLASS_TAGS.get(class_enum, frozenset()))
     return _apply_personal(c, personal)
 
 
-def _one_enemy(name, class_token, level, weapon, personal=None, mode=None, shifts=None):
+def _one_enemy(name, class_token, level, weapon, personal=None, mode=None, shifts=None,
+               base_level=1):
     return _enemy_from_enum(name, _enemy_class_enum(class_token), level, weapon, personal,
-                            mode=mode, shifts=shifts)
+                            mode=mode, shifts=shifts, base_level=base_level)
 
 
-def enemy_combatants(enemy_def, mode=None, shifts=None):
+def enemy_combatants(enemy_def, mode=None, shifts=None, base_level=1):
     """One representative Combatant per DISTINCT enemy type in a chapter enemy_units entry
     (its `count`/positions are tactical detail the metrics don't model). Class base
     autoleveled to the entry's `level`. Handles both a single `class` and a mixed
@@ -286,13 +307,13 @@ def enemy_combatants(enemy_def, mode=None, shifts=None):
     if 'class' in enemy_def:
         return [_one_enemy(name, enemy_def['class'], level,
                            _weapon_for(enemy_def.get('inventory')),
-                           mode=mode, shifts=shifts)]
+                           mode=mode, shifts=shifts, base_level=base_level)]
     by_class = enemy_def.get('inventory_by_class', {})
     out = []
     for cls in dict.fromkeys(enemy_def.get('composition', [])):   # distinct, order-stable
         weapon = _weapon_for([{'id': w} for w in by_class.get(cls, [])])
         out.append(_one_enemy('%s-%s' % (name, cls), cls, level, weapon,
-                              mode=mode, shifts=shifts))
+                              mode=mode, shifts=shifts, base_level=base_level))
     return out
 
 
@@ -470,7 +491,8 @@ def vanilla_enemies(parity_ref, mode=None):
                                         d['classIndex'], d['level'],
                                         weapon, vanilla_personal_line(ch),
                                         mode=mode, shifts=shifts,
-                                        shiftable=_takes_difficulty_shift(ch)))
+                                        shiftable=_takes_difficulty_shift(ch),
+                                        base_level=_character_base_level(ch)))
     return out
 
 
@@ -632,6 +654,19 @@ def chapter_enemy_force(chap, mode=None, shifts=None):
     return [u for _ed, u in chapter_units(chap, mode=mode, shifts=shifts)]
 
 
+def _our_base_level(enemy_def):
+    """The baseLevel OUR unit carries, for the malus gate.
+
+    Every boss and miniboss we field is penalty-immune, and that is an enforced invariant
+    rather than a coincidence: the four on raw pids get baseLevel = their deploy level from
+    RAW_PID_LEVEL_SOURCES (guarded by unregistered_raw_pid_bosses), and the rest ride
+    vanilla CHARACTER_ slots that already ship baseLevel >= deploy level. Line units are
+    generics on pid 0x80/0x8e/0xaa, whose gaps carry baseLevel 1."""
+    if enemy_def.get('is_boss') or enemy_def.get('is_miniboss'):
+        return int(enemy_def.get('level', 1))
+    return 1
+
+
 def chapter_units(chap, mode=None, shifts=None):
     """(enemy_def, real-article Combatant) for every BODY our chapter fields, weapons modeled.
 
@@ -653,7 +688,8 @@ def chapter_units(chap, mode=None, shifts=None):
                                            mode=mode, shifts=shifts)))
         else:
             out.extend([(ed, unit_real_article(ed, c))
-                        for c in enemy_combatants(ed, mode=mode, shifts=shifts)]
+                        for c in enemy_combatants(ed, mode=mode, shifts=shifts,
+                                                  base_level=_our_base_level(ed))]
                        * int(ed.get('count', 1)))
     return [(ed, u) for ed, u in out if u.weapon is not None]  # drop staff-only enemies
 

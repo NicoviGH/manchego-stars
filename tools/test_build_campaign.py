@@ -4565,14 +4565,16 @@ class Ch05ArenaTutorial(unittest.TestCase):
         self.assertIn('DefeatBoss(%s)' % bc.CH05_ENDING_SCRIPT, misc)
         self.assertIn('CauseGameOverIfLordDies', misc)
 
-    def test_the_trigger_preserves_tutorial_mode_and_vanillas_event_shape(self):
+    def test_the_trigger_is_player_only_and_calls_the_tutorial_in_every_mode(self):
+        # The arena tutorial is the one place the player is told a loss is PERMANENT and
+        # that B concedes, so it is not gated on tutorial mode the way vanilla's is (#303).
+        # The faction gate stays -- an enemy on the tile must not fire it.
         trigger = bc.ch05_arena_trigger_script()
         self.assertIn('SVAL(EVT_SLOT_2, FACTION_ID_BLUE)', trigger)
         self.assertIn('CALL(EventScr_UnTriggerIfNotFaction)', trigger)
         self.assertLess(trigger.index('CALL(EventScr_UnTriggerIfNotFaction)'),
-                        trigger.index('CALL(EventScr_CallOnTutorialMode)'))
-        self.assertIn('SVAL(EVT_SLOT_2, %s)' % bc.CH05_ARENA_TUTORIAL_SCRIPT, trigger)
-        self.assertIn('CALL(EventScr_CallOnTutorialMode)', trigger)
+                        trigger.index('CALL(%s)' % bc.CH05_ARENA_TUTORIAL_SCRIPT))
+        self.assertNotIn('CALL(EventScr_CallOnTutorialMode)', trigger)
 
         tutorial = bc.ch05_arena_tutorial_script()
         self.assertLess(tutorial.index('TEXTSHOW(0x%X)' % bc.CH05_ARENA_FOUND_MSG),
@@ -6777,6 +6779,44 @@ class RawPidBossBaseLevel(unittest.TestCase):
         got = bc.raw_pid_base_levels('rime-of-the-frostmaiden')
         for pid, base in got.items():
             self.assertGreaterEqual(base, self.RAW_BOSSES.get(pid, base), pid)
+
+
+class ArenaTutorialPlaysInEveryMode(unittest.TestCase):
+    """ch05's arena tutorial is SAFETY text, so it is not gated on tutorial mode (#303).
+
+    `CHECK_TUTORIAL` is `!config.controller && !(chapterStateBits & PLAY_FLAG_HARD)`
+    (eventscr.c:834) -- which is difficulty menu option 0 ONLY. Vanilla gates its arena
+    tutorial that way, so on Normal and Difficult it simply never plays.
+
+    We keep vanilla's ANATOMY but drop that one gate, because of what these two boxes
+    actually say: a loss means the unit "will not be able to fight in any future battles",
+    and B concedes for the fee. That is a permadeath warning and an escape hatch, not a
+    flavour beat -- a Normal player who never sees it can lose a unit permanently to a
+    mechanic nobody told them about. Nicolas, 2026-08-22: the arena tutorial and the crit
+    warning ship on Normal, the rest of tutorial mode does not.
+
+    Scope is exactly this one script: it is the ONLY `EventScr_CallOnTutorialMode` call in
+    the build, so nothing else changes mode-gating with it. Every other teaching beat we
+    ship (ch02's fliers-vs-bows warning) is plain dialogue and already played in all modes.
+    """
+
+    def test_the_arena_trigger_no_longer_calls_the_tutorial_mode_gate(self):
+        self.assertNotIn('EventScr_CallOnTutorialMode', bc.ch05_arena_trigger_script())
+
+    def test_the_trigger_keeps_its_player_only_faction_gate(self):
+        # The OTHER gate must survive -- an enemy stepping on the tile must not fire it.
+        script = bc.ch05_arena_trigger_script()
+        self.assertIn('EventScr_UnTriggerIfNotFaction', script)
+        self.assertIn('FACTION_ID_BLUE', script)
+
+    def test_no_tutorial_mode_gate_remains_anywhere_in_the_build(self):
+        # Guards the scope claim: if a future chapter adds one, this test says so rather
+        # than letting mode-gated content appear again by inheritance.
+        with open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'), encoding='utf-8') as fh:
+            src = fh.read()
+        # The CALL SITE, not the word: the docstrings explain the gate we removed and why,
+        # and banning the term would only push that explanation out of the code.
+        self.assertEqual(src.count('CALL(EventScr_CallOnTutorialMode)'), 0)
 
 
 if __name__ == '__main__':
