@@ -810,7 +810,9 @@ local function diffObs(current, want)
 end
 
 check(action(diffObs(0, nil), "confirm_difficulty").key, "A",
-    "with no mode requested, A confirms the default as before")
+    "with no mode wanted at all, A confirms whatever is highlighted")
+check(action(diffObs(0, 1), "select_difficulty_down").key, "DOWN",
+    "the gate default is NORMAL, so a fresh run must move off option 0 (Tutorial)")
 check(action(diffObs(0, 2), "select_difficulty_down").key, "DOWN",
     "below the wanted mode, DOWN is the legal move")
 check(action(diffObs(0, 2), "confirm_difficulty"), nil,
