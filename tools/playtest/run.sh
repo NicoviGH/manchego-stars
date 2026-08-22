@@ -217,7 +217,7 @@ PLAYTEST_SEED = "${PT_SEED:-1}"
 PLAYTEST_CHAR = "${PT_CHAR:-}"
 PLAYTEST_ROUNDS = ${PT_ROUNDS:-1}
 PLAYTEST_HOST_CHAPTER = ${PT_HOST_CHAPTER:-${MX_HOST_CHAPTER:-1}}
-PLAYTEST_DIFFICULTY = "${PT_DIFFICULTY:-}"
+PLAYTEST_DIFFICULTY = "${PT_DIFFICULTY:-normal}"
 PLAYTEST_LLMDIR = "$LLM_DIR"
 PLAYTEST_STATE = "${PT_STATE:-}"
 PLAYTEST_TAG = "${PT_TAG:-}"
@@ -276,16 +276,21 @@ if [ -n "$MX_CHECKPOINT_DYNAMIC" ]; then
     CKPT="${PT_STATE:?$SCENARIO needs PT_STATE=<checkpoint> (e.g. PT_STATE=ch02intro)}"
     BUILDER="ckpt_${PT_STATE}"
 fi
+# A save state carries the difficulty it was MINTED in (it is in gPlaySt), so checkpoint
+# validity is (rom, mode) -- not rom alone. Keying on the hash reloaded a Tutorial state
+# under a Normal label, and a difficulty change alters no ROM bytes, so the hash could
+# never notice. Existing single-hash stamps mismatch and re-mint once, which is correct.
+CHECKPOINT_STAMP="$ROMHASH:${PT_DIFFICULTY:-normal}"
 if [ -n "$BUILDER" ]; then
-    if [ ! -f "$STATE_DIR/$CKPT.ss" ] || [ "$(cat "$STATE_DIR/$CKPT.romhash" 2>/dev/null || true)" != "$ROMHASH" ]; then
-        echo "== checkpoint '$CKPT' missing/stale -> building at top speed (240fps) =="
+    if [ ! -f "$STATE_DIR/$CKPT.ss" ] || [ "$(cat "$STATE_DIR/$CKPT.romhash" 2>/dev/null || true)" != "$CHECKPOINT_STAMP" ]; then
+        echo "== checkpoint '$CKPT' missing/stale for $CHECKPOINT_STAMP -> building at top speed (240fps) =="
         run_mgba "$BUILDER" 240 0 "$MX_CHECKPOINT_DEADLINE"  # ch02start plays the whole ch00->ch01->ch02 chain
         case "$VERDICT" in
-            *PASS*) echo "$ROMHASH" > "$STATE_DIR/$CKPT.romhash" ;;
+            *PASS*) echo "$CHECKPOINT_STAMP" > "$STATE_DIR/$CKPT.romhash" ;;
             *) echo "checkpoint build FAILED -- aborting"; exit 1 ;;
         esac
     else
-        echo "== checkpoint '$CKPT' valid for rom $ROMHASH -> loading =="
+        echo "== checkpoint '$CKPT' valid for $CHECKPOINT_STAMP -> loading =="
     fi
 fi
 

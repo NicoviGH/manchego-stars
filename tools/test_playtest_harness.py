@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Regression coverage for state-driven playtest scenario wiring."""
 import os
+import re
 import unittest
 
 
@@ -297,6 +298,66 @@ class TestPlaytestHarness(unittest.TestCase):
         self.assertIn('return false, "never reached the ch04 map"', recorder)
         self.assertIn('return false, "party never triggered the moose sighting"', recorder)
         self.assertIn('afterPre = pokeNormalConfig', recorder)
+
+
+class TestDifficultyGateDefault(unittest.TestCase):
+    """The playtest gate grades NORMAL unless a scenario asks otherwise (#303 follow-up).
+
+    FE8's difficulty menu initialises to option 0 (Tutorial) and the harness only ever
+    pressed A, so every verdict this project produced before #303 graded the EASIEST mode
+    while reading as general. Normal is what ships to most players and what
+    `difficulty.py` grades by default, so it is what the gate must run.
+
+    Pinned at the source, because the default is a module-level constant evaluated at load
+    and there is no way to observe it without booting mGBA.
+    """
+
+    def _harness(self):
+        here = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(here, 'playtest', 'harness.lua'), encoding='utf-8') as fh:
+            return fh.read()
+
+    def _mode_table(self, src):
+        """The one mode->menu-index table, parsed. FE8's menu order is fixed:
+        option 0 Tutorial, 1 Normal, 2 Difficult (SaveMenuWriteNewGame, savemenu.c:522)."""
+        m = re.search(r'difficultyIndex\s*=\s*\{(.*?)\}', src, re.S)
+        self.assertIsNotNone(m, 'harness.lua must expose one named mode->index table')
+        return {k: int(v) for k, v in re.findall(r'(\w+)\s*=\s*(\d+)', m.group(1))}
+
+    def test_the_menu_indices_match_fe8s_own_order(self):
+        # Pins the MAPPING, not the spelling. Swapping tutorial/normal here would make the
+        # gate confirm Tutorial while calling it Normal -- the exact regression this PR
+        # exists to prevent, and a string-only assertion sails straight past it.
+        self.assertEqual(self._mode_table(self._harness()),
+                         {'tutorial': 0, 'normal': 1, 'difficult': 2})
+
+    def test_the_default_mode_resolves_to_normal(self):
+        src = self._harness()
+        m = re.search(r'PLAYTEST_DIFFICULTY\s*or\s*"(\w+)"', src)
+        self.assertIsNotNone(m, 'harness.lua must name its fallback mode')
+        self.assertEqual(m.group(1), 'normal')
+        self.assertEqual(self._mode_table(src)[m.group(1)], 1,
+                         'the fallback must resolve to menu option 1 (Normal)')
+
+    def test_run_sh_and_the_harness_agree_on_the_default(self):
+        # run.sh owns the default; harness.lua's fallback only fires for entry points that
+        # bypass it. They must not be able to disagree about what "unset" means.
+        here = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(here, 'playtest', 'run.sh'), encoding='utf-8') as fh:
+            run = fh.read()
+        m = re.search(r'PT_DIFFICULTY:-(\w+)', run)
+        self.assertIsNotNone(m, 'run.sh must default PT_DIFFICULTY')
+        self.assertEqual(m.group(1), 'normal')
+
+    def test_the_checkpoint_stamp_includes_the_mode(self):
+        # A save state carries the difficulty it was minted in. Keying checkpoints on the
+        # ROM hash alone reloads a Tutorial state under a Normal label, and this change
+        # alters no ROM bytes -- so the hash cannot notice.
+        here = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(here, 'playtest', 'run.sh'), encoding='utf-8') as fh:
+            run = fh.read()
+        self.assertIn('CHECKPOINT_STAMP', run,
+                      'checkpoint validity must include the difficulty mode, not just ROMHASH')
 
 
 if __name__ == '__main__':
