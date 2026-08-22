@@ -2509,11 +2509,27 @@ def raw_pid_portrait_data(text, campaign):
             block = _set_field(block, field, int(unit['personal'].get(field, 0)),
                                CHARACTERS_C, marker)
         text = text[:start] + block + text[end:]
+
+    # baseLevel LAST and on its own table: a raw-pid boss needs this whether or not it has a
+    # `personal:` line (the moose and the kobold brute have none), and without it the
+    # difficulty malus resets the unit and rebuilds it from growths. See RAW_PID_LEVEL_SOURCES.
+    for pid, level in sorted(raw_pid_base_levels(campaign).items()):
+        marker = '[%s - 1]' % pid.lower()
+        start, end = _find_brace_block(text, marker, CHARACTERS_C)
+        block = _set_field(text[start:end], 'baseLevel', level, CHARACTERS_C, marker)
+        text = text[:start] + block + text[end:]
     return text
 
 
 def patch_raw_pid_portraits(campaign, verbose=True):
     """Write raw_pid_portrait_data() to the decomp CharacterData table."""
+    stranded = unregistered_raw_pid_bosses(campaign)
+    if stranded:
+        sys.exit('ERROR: raw-pid boss(es) %s declare no baseLevel -- a gCharacterData gap '
+                 'reads baseLevel 1, so the difficulty malus RESETS the unit to class base '
+                 'and rebuilds it from growths, silently discarding its authored line (and '
+                 'for a promoted class, handing it +9 levels it never had). Add a '
+                 'RAW_PID_LEVEL_SOURCES row.' % ', '.join(stranded))
     with open(CHARACTERS_C, encoding='utf-8') as f:
         text = f.read()
     text = raw_pid_portrait_data(text, campaign)
@@ -9493,6 +9509,69 @@ RAW_PID_PERSONAL_SOURCES = {
 # The chapter YAML is the authority, exactly as it is for RAW_PID_PERSONAL_SOURCES above:
 # a raw-pid creature has no pcs/npcs file, and giving it one would define the unit twice and
 # put a miniboss on the deployable cast roster.
+# Raw-pid BOSSES must declare a baseLevel, or the difficulty malus wipes their stat line.
+#
+# `UnitAutolevelPenalty` (bmunit.c) only fires `if (level > pCharacterData->baseLevel)`, and
+# EVERY vanilla named boss ships baseLevel >= the level it deploys at: Saar 8/8, Breguet 4/4,
+# Bazba 6/6, Novala 10/7, Murray 12/9. That is not a coincidence -- it is how vanilla protects
+# a hand-authored boss line, so the same stats reach the map in all three difficulty modes.
+#
+# Our bosses on vanilla CHARACTER_ slots (ENEMY_BASE_SLOT) inherit that for free. The ones on
+# RAW pids sit in gCharacterData GAPS, where baseLevel reads 1 -- so the penalty always fired,
+# reset them to class base and rebuilt them from class growths. Measured in-engine: Ravisin
+# came out 40 maxHP on Normal against 35 on Difficult, an INVERSION, because the reset path
+# re-runs full `UnitAutolevel` -- promoted branch included, +9 levels of growth
+# (GetCurrentPromotedLevelBonus) -- while the Difficult path calls `UnitAutolevelCore` direct
+# and never grants it. All four raw-pid bosses were affected; the two promoted ones loudest.
+#
+# Row = raw pid -> (chapter YAML that declares the unit, its unit id). The LEVEL is read from
+# the chapter YAML rather than repeated here, so baseLevel cannot drift from the level the unit
+# actually deploys at. Guarded by unregistered_raw_pid_bosses(): the failure is silent, because
+# a CharacterData gap is all zeros and nothing complains.
+RAW_PID_LEVEL_SOURCES = {
+    CH03_BOSS_PID:           (CH03_CHAPTER_YAML, 'grell'),
+    CH03_BRUTE_MINIBOSS_PID: (CH03_CHAPTER_YAML, 'kobold-steel'),
+    CH05_BOSS_PID:           (CH05_CHAPTER_YAML, 'ravisin'),
+    CH05_MOOSE_PID:          (CH05_CHAPTER_YAML, 'white-moose'),
+}
+
+
+def raw_pid_base_levels(campaign):
+    """Raw pid -> the baseLevel it must carry, read from the level it deploys at."""
+    out = {}
+    for pid, (chapter_yaml, unit_id) in RAW_PID_LEVEL_SOURCES.items():
+        chapter = _load_chapter_yaml(campaign, chapter_yaml)
+        unit = next((e for e in chapter.get('enemy_units', []) if e.get('id') == unit_id), None)
+        if unit is None:
+            sys.exit('ERROR: RAW_PID_LEVEL_SOURCES names %s/%s, which does not exist'
+                     % (chapter_yaml, unit_id))
+        out[pid] = int(unit.get('level', 1))
+    return out
+
+
+def unregistered_raw_pid_bosses(campaign):
+    """Boss/miniboss ids that ride a RAW pid but declare no baseLevel (sorted).
+
+    A boss is raw-pid when it has no ENEMY_BASE_SLOT row -- that table is exactly "our enemy
+    id -> the vanilla CHARACTER_ slot it deploys on", and a raw-pid boss has no entry by
+    construction. The prologue's zeroed guests are excluded: they DO ride vanilla slots (only
+    their base STATS are zeroed), so their baseLevel is the slot's and the penalty is already
+    governed by vanilla's own number."""
+    registered = {unit_id for _yaml, unit_id in RAW_PID_LEVEL_SOURCES.values()}
+    prologue_guests = {'sephek-kaltro'}
+    missing = []
+    for chapter in hosted_chapters():
+        chap = _load_chapter_yaml(campaign, chapter_yaml_for(chapter.name))
+        for enemy in chap.get('enemy_units', []):
+            if not (enemy.get('is_boss') or enemy.get('is_miniboss')):
+                continue
+            uid = enemy.get('id')
+            if uid in ENEMY_BASE_SLOT or uid in registered or uid in prologue_guests:
+                continue
+            missing.append(uid)
+    return sorted(missing)
+
+
 RAW_PID_BATTLE_ANIMS = {
     'white-moose': (CH05_CHAPTER_YAML, CH05_MOOSE_PID),
     'ravisin': (CH05_CHAPTER_YAML, CH05_BOSS_PID),

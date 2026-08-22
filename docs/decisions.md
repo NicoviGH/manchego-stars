@@ -2136,6 +2136,60 @@ _Decided: 2026-06-17_
 
 ## Distribution & Scope
 
+### A raw-pid boss must declare baseLevel, or difficulty wipes its stat line (2026-08-22, #303)
+
+`UnitAutolevelPenalty` (bmunit.c) fires only `if (level > unit->pCharacterData->baseLevel)`.
+**Every vanilla named boss ships `baseLevel` >= the level it deploys at** — Saar 8/8, Breguet
+4/4, Bazba 6/6, Novala 10/7, Murray 12/9. That is not decoration: it is how vanilla protects a
+hand-authored boss line, so the same stats reach the map in all three difficulty modes.
+
+Our bosses on vanilla `CHARACTER_` slots inherit that for free. The four on RAW pids sat in
+`gCharacterData` GAPS where `baseLevel` reads 1, so the penalty always fired — resetting the
+unit to class base and rebuilding it from class growths, silently discarding the `personal:`
+line the chapter YAML authored.
+
+**Measured in-engine, before the fix (ch05, three runs):**
+
+| unit | tutorial | normal | difficult |
+|---|---|---|---|
+| Ravisin | 39 | 40 | **35** |
+| white moose | 28 | 29 | **23** |
+
+Difficult was the WEAKEST — an inversion. The cause is an asymmetry between the two paths:
+`UnitAutolevelPenalty` re-runs **full `UnitAutolevel`**, which for a `CA_PROMOTED` unit first
+applies `GetCurrentPromotedLevelBonus()` (+9 levels, +19 on Hard); `UnitApplyBonusLevels` with a
+POSITIVE count calls `UnitAutolevelCore` directly and never reaches that branch. So the easier
+modes handed our two promoted ch05 bosses +9 levels of growth they were never authored with,
+while Difficult added only its +3. The community documents the same routine from the other side
+— when the penalty's target falls at/below `baseLevel` the recalculation is skipped entirely,
+which is the known "weak promoted enemies on easy/normal" bug in the localized ROM
+(feuniverse.us/t/fe7-fe8-difficulty-stat-changes/1295).
+
+**Fix: `RAW_PID_LEVEL_SOURCES` writes `baseLevel` = the level the unit deploys at**, read from
+the chapter YAML so it cannot drift from the level itself. After it, measured:
+
+| unit | tutorial | normal | difficult |
+|---|---|---|---|
+| Ravisin (class base 19 + personal 15 = 34) | 34 | 34 | **35** |
+| white moose (class base 21) | 21 | 21 | **23** |
+
+Tutorial and Normal now ship the authored line exactly; Difficult is the strongest. Generics are
+untouched (20/22/26 before and after) — they are autolevelled and `baseLevel` 1 is correct for
+them, matching vanilla's own generics.
+
+**The general rule: a unit on a raw pid inherits a GAP, and a gap is all zeros.** Riding one is
+not a neutral act — every field vanilla would have filled is silently 0/1, and `baseLevel` is the
+one that decides whether the engine keeps your stat line or throws it away. Guarded by
+`unregistered_raw_pid_bosses()`, because nothing about the failure is loud: the boss simply
+fights with different numbers than the YAML says.
+
+⚠️ Every playtest before this graded Tutorial (the menu defaults to option 0), so ch03's and
+ch05's bosses were measured in their reset-and-rebuilt form, not their authored one.
+
+_Decided: 2026-08-22. Found by running the #303 mode probe in all three modes; the inversion was
+not predicted by the static model, which does not model the promoted branch._
+
+
 ### Vanilla ships three difficulty modes, so we ship three (2026-08-22, #303)
 
 **RULED (Nicolas): "Vanilla ships three difficulty modes then so should we."** The FE-strictness

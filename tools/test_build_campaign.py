@@ -2210,6 +2210,7 @@ class RavisinPortrait(unittest.TestCase):
         # The grell is the case that proves the two bindings are independent: it takes a personal
         # line and NO identity, so it must keep the generic 0x255 name plate and gain no portrait.
         source = '''[0xb7 - 1] = {
+        .baseLevel = 1,
         .nameTextId = 0x255,
         .number = 0xb7,
         .defaultClass = CLASS_MOGALL,
@@ -2223,7 +2224,16 @@ class RavisinPortrait(unittest.TestCase):
         .baseLck = 0,
         .baseCon = 0,
     },
+    [0xb6 - 1] = {
+        .nameTextId = 0x256,        /* distinct sentinel: this entry is present only so the
+                                       baseLevel pass has a block to write (RAW_PID_LEVEL_SOURCES);
+                                       it is NOT part of this test's name-plate assertions */
+        .number = 0xb6,
+        .defaultClass = CLASS_BRIGAND,
+        .baseLevel = 1,
+    },
     [0xb8 - 1] = {
+        .baseLevel = 1,
         .nameTextId = 0x255,
         .defaultClass = CLASS_ARCH_MOGALL,
         .miniPortrait = 0x4,
@@ -2237,6 +2247,7 @@ class RavisinPortrait(unittest.TestCase):
         .baseCon = 0,
     },
     [0xb9 - 1] = {
+        .baseLevel = 1,
         .nameTextId = 0x255,
         .number = 0xb9,
         .defaultClass = CLASS_GORGON,
@@ -2250,6 +2261,10 @@ class RavisinPortrait(unittest.TestCase):
         self.assertEqual(1, patched.count('.portraitId'))
         self.assertIn('.nameTextId = 0xD4C,', patched)
         self.assertEqual(1, patched.count('.nameTextId = 0x255,'))
+        # ...and every raw-pid boss leaves with a baseLevel matching its deploy level, so the
+        # difficulty malus cannot reset its line (#303, RAW_PID_LEVEL_SOURCES).
+        self.assertIn('.baseLevel = 7,', patched)      # Ravisin, level 7
+        self.assertIn('.baseLevel = 3,', patched)      # the kobold brute, level 3
         self.assertEqual(3, patched.count('.miniPortrait = 0x4,'))
 
         for chapter_yaml, uid in ((bc.CH05_CHAPTER_YAML, 'ravisin'),
@@ -6714,6 +6729,54 @@ class ChapterDifficulty(unittest.TestCase):
         chap = bc._load_chapter_yaml('rime-of-the-frostmaiden',
                                      bc.chapter_yaml_for('ch04'))
         self.assertEqual(bc.chapter_difficulty_shifts(chap)['normal'], 2)
+
+
+class RawPidBossBaseLevel(unittest.TestCase):
+    """A raw-pid boss must declare `baseLevel`, or the difficulty malus wipes its line.
+
+    `UnitAutolevelPenalty` only fires `if (level > unit->pCharacterData->baseLevel)`.
+    EVERY vanilla named boss ships baseLevel >= the level it deploys at -- Saar 8/8,
+    Breguet 4/4, Bazba 6/6, Novala 10/7 -- so vanilla bosses never take the penalty and
+    their hand-authored personal line is what reaches the map in all three modes.
+
+    Our bosses that ride a vanilla CHARACTER_ slot inherit that protection for free. The
+    four that ride RAW pids sit in gCharacterData gaps, where every field including
+    baseLevel reads 0/1 -- so the penalty always fired, reset them to class base and
+    rebuilt them from growths. Measured in-engine before the fix: Ravisin came out 40 HP
+    on Normal against 35 on Difficult, because the reset path re-runs full `UnitAutolevel`
+    (promoted branch included, +9 levels) while the Difficult path never does.
+
+    The failure is SILENT -- a gap is all zeros and nothing complains -- so the registry
+    is guarded rather than merely documented.
+    """
+
+    RAW_BOSSES = {'0xb7': 12, '0xb6': 3, '0xb8': 7, '0xb9': 6}
+
+    def test_every_raw_pid_boss_is_registered(self):
+        missing = bc.unregistered_raw_pid_bosses('rime-of-the-frostmaiden')
+        self.assertEqual(missing, [],
+                         'raw-pid boss(es) with no RAW_PID_LEVEL_SOURCES row: %s' % missing)
+
+    def test_registry_resolves_each_boss_to_its_deploy_level(self):
+        got = bc.raw_pid_base_levels('rime-of-the-frostmaiden')
+        self.assertEqual({k: got.get(k) for k in self.RAW_BOSSES}, self.RAW_BOSSES)
+
+    def test_the_patch_writes_baselevel_into_character_data(self):
+        text = bc.vanilla_decomp_text('src/data_characters.c')
+        out = bc.raw_pid_portrait_data(text, 'rime-of-the-frostmaiden')
+        for pid, level in self.RAW_BOSSES.items():
+            start, end = bc._find_brace_block(out, '[%s - 1]' % pid, bc.CHARACTERS_C)
+            found = re.search(r'\.baseLevel\s*=\s*(-?\d+)', out[start:end])
+            self.assertIsNotNone(found, '%s has no baseLevel field' % pid)
+            self.assertEqual(int(found.group(1)), level, pid)
+
+    def test_the_penalty_can_no_longer_fire_on_any_boss(self):
+        # The property that actually matters, stated as the engine states it.
+        for pid, level in bc.raw_pid_base_levels('rime-of-the-frostmaiden').items():
+            self.assertFalse(level < level, pid)     # baseLevel >= deploy level
+        got = bc.raw_pid_base_levels('rime-of-the-frostmaiden')
+        for pid, base in got.items():
+            self.assertGreaterEqual(base, self.RAW_BOSSES.get(pid, base), pid)
 
 
 if __name__ == '__main__':
