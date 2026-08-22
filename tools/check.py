@@ -1373,10 +1373,25 @@ def check_vanilla_reads_come_from_head(fail, sources=None):
     existed the whole time and reads from HEAD; the only thing missing was anything making its
     use mandatory.
     """
-    sys.path.insert(0, os.path.join(REPO, 'tools'))
-    import build_campaign as bc
-
-    patched = list(bc.PATCHED_DECOMP_FILES)
+    # Read the registry out of build_campaign.py's SOURCE rather than importing it. The
+    # module pulls in portrait_tool -> PIL, which the lean `checks` CI job does not install,
+    # and its siblings answer that by skipping -- but a guard that skips in CI is half a
+    # guard, and this one exists precisely because the mistake it catches is silent.
+    with open(os.path.join(REPO, 'tools', 'build_campaign.py'), encoding='utf-8') as fh:
+        registry = ast.parse(fh.read(), 'build_campaign.py')
+    # Collect the STRING CONSTANTS in the assignment's subtree rather than literal_eval-ing
+    # it: the registry is assembled by concatenation, so it is a BinOp and not a literal.
+    patched = []
+    for node in ast.walk(registry):
+        if (isinstance(node, ast.Assign)
+                and any(getattr(t, 'id', None) == 'PATCHED_DECOMP_FILES' for t in node.targets)):
+            patched = [n.value for n in ast.walk(node.value)
+                       if isinstance(n, ast.Constant) and isinstance(n.value, str)]
+    if not patched:
+        fail.append('check_vanilla_reads_come_from_head: could not read '
+                    'PATCHED_DECOMP_FILES out of build_campaign.py -- the guard has nothing '
+                    'to police and would pass vacuously.')
+        return fail
     if sources is None:
         sources = _guarded_python_sources()
 

@@ -10,6 +10,7 @@ too narrow to match the comment's actual phrasing. These tests hold both fixes.
 
 Run: python3 tools/test_check_comment_drift.py
 """
+import builtins
 import os
 import re
 import sys
@@ -248,6 +249,35 @@ class VanillaReadsComeFromHEAD(unittest.TestCase):
         scanned = check._guarded_python_sources()
         self.assertTrue(any(p.startswith('tools/playtest/') for p in scanned),
                         'tools/playtest/ is not scanned')
+
+    def test_it_runs_in_the_LEAN_ci_environment(self):
+        """The `checks` job installs no PIL and checks out no submodule. Importing
+        build_campaign for the registry pulls in portrait_tool -> PIL and dies there; its
+        sibling checks answer that by SKIPPING, but a guard that skips in CI is half a guard,
+        and this one exists because the mistake it catches is silent. It reads the registry
+        out of build_campaign.py's SOURCE instead."""
+        real = builtins.__import__
+
+        def no_pil(name, *a, **kw):
+            if name.split('.')[0] == 'PIL':
+                raise ImportError("No module named 'PIL'")
+            return real(name, *a, **kw)
+
+        builtins.__import__ = no_pil
+        try:
+            fail = []
+            check.check_vanilla_reads_come_from_head(fail)
+            self.assertEqual([], fail)
+        finally:
+            builtins.__import__ = real
+
+    def test_the_registry_is_read_even_though_it_is_not_a_plain_literal(self):
+        """PATCHED_DECOMP_FILES is assembled by concatenation, so it is a BinOp and
+        `literal_eval` refuses it outright."""
+        fail = []
+        check.check_vanilla_reads_come_from_head(
+            fail, sources={'x.py': "open(os.path.join(D, 'src/portrait_data.c'))"})
+        self.assertTrue(fail, 'the registry came back empty, so nothing was policed')
 
     def test_the_live_tree_is_clean(self):
         fail = []
