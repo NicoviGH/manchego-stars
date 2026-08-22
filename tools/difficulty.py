@@ -87,6 +87,59 @@ def autolevel(base, growths, level):
     return out
 
 
+MODES = ('tutorial', 'normal', 'difficult')
+
+
+def mode_stats(base, growths, level, mode, shifts, base_level=1):
+    """`base` autoleveled to `level`, then shifted by a chapter's difficulty `shifts`
+    for `mode` -- the engine's own difficulty mechanism, modeled (#303).
+
+    FE8 does not author three enemy tables. It authors ONE, stores three per-chapter
+    numbers, and re-projects stats at unit-load time: `UnitApplyBonusLevels`
+    (bmunit.c) dispatches to `UnitAutolevelCore` for the Difficult bonus and to
+    `UnitAutolevelPenalty` for the Tutorial/Normal malus. `shifts` is that triple,
+    keyed by MODES -- {'tutorial': easyModeLevelMalus, 'normal': normalModeLevelMalus,
+    'difficult': difficultModeLevelBonus} (chapterdata.h:47-49, each a 4-BIT field, so
+    0..15). NB the field FE8 calls "easy" is the Tutorial slot: menu option 0 sets
+    controller=0/HARD=0, which is both the `-easyModeLevelMalus` branch
+    (eventscr.c:2328) and the only state where CHECK_TUTORIAL fires.
+
+    Two engine details a naive `level - malus` gets wrong:
+
+      * the penalty FLOORS. `UnitAutolevelPenalty` re-derives stats from base and
+        re-autolevels only `if (level - malus > baseLevel)`, and does nothing at all
+        unless `level > baseLevel` -- so a shifted unit never reads below pure class
+        base. Every generic and boss pid we field has baseLevel 1 (data_characters.c).
+      * the bonus rounds TWICE. Difficult is `inc(level-1)` then `inc(bonus)` as two
+        separate roundings, not one rounding of `inc(level-1+bonus)`.
+
+    This is a mean-value proxy, as the rest of the model is: the engine's real
+    `GetAutoleveledStatIncrease` jitters by +/-(growth*n)/8 and resolves the remainder
+    with a coin flip (`GetStatIncrease`, bmbattle.c:1241), so a single unit's stats are
+    a random variable. Both sides of a parity read go through this same function, so
+    the comparison stays apples-to-apples.
+    """
+    if mode not in MODES:
+        raise ValueError('unknown difficulty mode %r (want one of %s)'
+                         % (mode, ', '.join(MODES)))
+    shift = shifts[mode]
+    projected = autolevel(base, growths, level)
+    if not shift:
+        return projected
+    if mode == 'difficult':
+        out = dict(projected)
+        for gf in bc.GROWTH_FIELDS:
+            field = 'base' + gf[len('growth'):]
+            out[field] = projected[field] + int(shift * growths.get(gf, 0) / 100 + 0.5)
+        return out
+    if level <= base_level:                  # `level > baseLevel` gate: no penalty at all
+        return projected
+    target = level - shift
+    if target > base_level:
+        return autolevel(base, growths, target)
+    return dict(base)                        # re-derived from base, re-autolevel skipped
+
+
 def _weapon_for(inventory):
     """First inventory entry that resolves (via fe_base, else id) to a real attacking
     weapon usable in the modeled (base-class) state. Staves/consumables aren't in
@@ -162,19 +215,66 @@ def _apply_personal(combatant, personal):
     return dataclasses.replace(combatant, **delta) if delta else combatant
 
 
-def _enemy_from_enum(name, class_enum, level, weapon, personal=None):
+DIFFICULTY_SHIFT_MIN_PID = 0x3C   # eventscr.c:2328 -- see _takes_difficulty_shift
+_char_numbers = None
+
+
+def _character_number(token):
+    """A `.charIndex` token -> its numeric character slot. Handles both spellings the
+    UnitDefinition arrays use: a CHARACTER_* enum (named cast and bosses) and a bare
+    numeric literal (the generic autolevelled-trash pids). None if unresolvable."""
+    global _char_numbers
+    if _char_numbers is None:
+        text = bc.vanilla_decomp_text('include/constants/characters.h')
+        _char_numbers = {m.group(1): int(m.group(2), 0) for m in re.finditer(
+            r'(CHARACTER_\w+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)', text)}
+    if token in _char_numbers:
+        return _char_numbers[token]
+    try:
+        return int(str(token), 0)
+    except (TypeError, ValueError):
+        return None
+
+
+def _takes_difficulty_shift(char_index):
+    """Does the engine apply a difficulty shift to a RED unit on this character slot?
+
+    `if (def->allegiance == FACTION_ID_RED && unit->pCharacterData->number >= 0x3C)`
+    (eventscr.c:2328). Slots below 0x3C are the playable cast and their summons, so a
+    unit deployed hostile on a PLAYABLE slot is difficulty-immune -- vanilla Ch5's
+    pre-recruit Joshua (0x20) is exactly that, and so is our Sahnar, who rides Joshua's
+    own slot. Both sides of the Ch5 read therefore carry one unshifted unit."""
+    if char_index is None:
+        return False                       # absent field reads 0, which is below the gate
+    number = _character_number(char_index)
+    return number is None or number >= DIFFICULTY_SHIFT_MIN_PID
+
+
+def _enemy_from_enum(name, class_enum, level, weapon, personal=None,
+                     mode=None, shifts=None, shiftable=True):
     """One Combatant: class base autoleveled to `level`, wielding `weapon`, plus any
-    personal boss line (see above). Generics carry no personal line, so they are unchanged."""
-    stats = autolevel(_class_base(class_enum), _class_growths(class_enum), int(level))
+    personal boss line (see above). Generics carry no personal line, so they are unchanged.
+
+    With `mode` and `shifts` both given the class projection runs through `mode_stats`
+    instead, so the unit reads as the engine would load it in that difficulty mode.
+    `shiftable=False` models the `>= 0x3C` gate. The personal line stays a flat delta
+    applied afterwards, which is faithful either way: the engine's penalty re-derives
+    from charBase+classBase and its bonus adds onto them, and both compose additively."""
+    base, growths = _class_base(class_enum), _class_growths(class_enum)
+    if mode and shifts and shiftable:
+        stats = mode_stats(base, growths, int(level), mode, shifts)
+    else:
+        stats = autolevel(base, growths, int(level))
     c = _stats_to_combatant(name, stats, weapon, CLASS_TAGS.get(class_enum, frozenset()))
     return _apply_personal(c, personal)
 
 
-def _one_enemy(name, class_token, level, weapon, personal=None):
-    return _enemy_from_enum(name, _enemy_class_enum(class_token), level, weapon, personal)
+def _one_enemy(name, class_token, level, weapon, personal=None, mode=None, shifts=None):
+    return _enemy_from_enum(name, _enemy_class_enum(class_token), level, weapon, personal,
+                            mode=mode, shifts=shifts)
 
 
-def enemy_combatants(enemy_def):
+def enemy_combatants(enemy_def, mode=None, shifts=None):
     """One representative Combatant per DISTINCT enemy type in a chapter enemy_units entry
     (its `count`/positions are tactical detail the metrics don't model). Class base
     autoleveled to the entry's `level`. Handles both a single `class` and a mixed
@@ -185,12 +285,14 @@ def enemy_combatants(enemy_def):
     # both sides (see vanilla_enemies). role_findings() applies it for the boss comparison.
     if 'class' in enemy_def:
         return [_one_enemy(name, enemy_def['class'], level,
-                           _weapon_for(enemy_def.get('inventory')))]
+                           _weapon_for(enemy_def.get('inventory')),
+                           mode=mode, shifts=shifts)]
     by_class = enemy_def.get('inventory_by_class', {})
     out = []
     for cls in dict.fromkeys(enemy_def.get('composition', [])):   # distinct, order-stable
         weapon = _weapon_for([{'id': w} for w in by_class.get(cls, [])])
-        out.append(_one_enemy('%s-%s' % (name, cls), cls, level, weapon))
+        out.append(_one_enemy('%s-%s' % (name, cls), cls, level, weapon,
+                              mode=mode, shifts=shifts))
     return out
 
 
@@ -339,7 +441,7 @@ def _weapon_from_item_enums(item_enums):
     return None
 
 
-def vanilla_enemies(parity_ref):
+def vanilla_enemies(parity_ref, mode=None):
     """The vanilla reference chapter's fightable red force as a flat list of Combatants
     (each projected off class base to its level). None if the reference isn't curated yet;
     enemies with no modeled weapon (staff/throwaway only) are dropped."""
@@ -348,6 +450,7 @@ def vanilla_enemies(parity_ref):
         return None
     relpath, arrays = spec
     text = bc.vanilla_decomp_text(relpath)
+    shifts = vanilla_chapter_shifts(parity_ref) if mode else None
     out = []
     for array_name in arrays:
         for i, d in enumerate(vanilla_unit_defs(text, array_name)):
@@ -363,9 +466,47 @@ def vanilla_enemies(parity_ref):
             # sides carry lines through different mechanisms. `inf` is no longer a hazard here:
             # metric_rounds_to_kill floors the damage rather than dropping the unit.
             ch = d.get('charIndex')
-            out.append(_enemy_from_enum('%s#%d' % (array_name, i), d['classIndex'], d['level'],
-                                        weapon, vanilla_personal_line(ch)))
+            out.append(_enemy_from_enum('%s#%d[%s]' % (array_name, i, ch),
+                                        d['classIndex'], d['level'],
+                                        weapon, vanilla_personal_line(ch),
+                                        mode=mode, shifts=shifts,
+                                        shiftable=_takes_difficulty_shift(ch)))
     return out
+
+
+def _vanilla_internal_name(parity_ref):
+    """'FE8 Ch5' -> the chapter_settings `internalName` that IS vanilla Ch5 ('L05').
+
+    The main-story chapters are L00 (prologue) through L08; the Eirika-route chapters
+    from 9 on are E09..E20. Resolving by name rather than by index is the point: slot 5
+    is `I05`, the inserted Ch5x, so every chapter from 5 on sits one slot past its own
+    number."""
+    if parity_ref == 'FE8 Prologue':
+        return 'L00'
+    m = re.match(r'^FE8 Ch(\d+)$', parity_ref)
+    if not m:
+        return None
+    n = int(m.group(1))
+    return ('L%02d' if n <= 8 else 'E%02d') % n
+
+
+def vanilla_chapter_shifts(parity_ref):
+    """The parity reference chapter's OWN difficulty triple, in `mode_stats` shape.
+
+    This is what makes a cross-mode parity read honest: our side and the vanilla side
+    are shifted by the numbers each chapter actually carries, so a mode comparison is
+    still comparing two tuned tables rather than one tuned table against a shifted one.
+    None if the reference does not name a vanilla chapter."""
+    name = _vanilla_internal_name(parity_ref)
+    if name is None:
+        return None
+    settings = bc.json.loads(bc.vanilla_decomp_text('src/data/chapter_settings.json'))
+    for chapter in settings['chapters']:
+        if chapter.get('internalName') == name:
+            return {'tutorial': chapter['easyModeLevelMalus'],
+                    'normal': chapter['normalModeLevelMalus'],
+                    'difficult': chapter['difficultModeLevelBonus']}
+    return None
 
 
 def vanilla_named_bosses(parity_ref, with_personal=True):
@@ -478,7 +619,7 @@ def pressure_verdict(ours, vanilla, band=0.25):
             'verdict': 'OK' if threat == 'OK' and load == 'OK' else 'OFF'}
 
 
-def chapter_enemy_force(chap):
+def chapter_enemy_force(chap, mode=None, shifts=None):
     """Our chapter's full enemy force as a flat per-unit Combatant list (bosses included),
     honoring each entry's `count`/`composition` -- the multiplicity enemy_combatants drops.
     This is the our-side input to enemy_pressure (the parity comparand to vanilla_enemies).
@@ -488,10 +629,10 @@ def chapter_enemy_force(chap):
     entry is a mixed bag of GENERICS, so no personal line is applied to its members -- a
     `personal:` or a donor-matching id on such an entry describes the group, and adding a full
     character line to every body in the bag would be a silent multiplier."""
-    return [u for _ed, u in chapter_units(chap)]
+    return [u for _ed, u in chapter_units(chap, mode=mode, shifts=shifts)]
 
 
-def chapter_units(chap):
+def chapter_units(chap, mode=None, shifts=None):
     """(enemy_def, real-article Combatant) for every BODY our chapter fields, weapons modeled.
 
     THE our-side force builder. It exists as one function because it was two: `solo_contributors`
@@ -508,9 +649,11 @@ def chapter_units(chap):
             for cls in ed.get('composition', []):
                 weapon = _weapon_for([{'id': w} for w in by_class.get(cls, [])])
                 # generics: no personal line, deliberately (see chapter_enemy_force)
-                out.append((ed, _one_enemy('%s-%s' % (name, cls), cls, level, weapon)))
+                out.append((ed, _one_enemy('%s-%s' % (name, cls), cls, level, weapon,
+                                           mode=mode, shifts=shifts)))
         else:
-            out.extend([(ed, unit_real_article(ed, c)) for c in enemy_combatants(ed)]
+            out.extend([(ed, unit_real_article(ed, c))
+                        for c in enemy_combatants(ed, mode=mode, shifts=shifts)]
                        * int(ed.get('count', 1)))
     return [(ed, u) for ed, u in out if u.weapon is not None]  # drop staff-only enemies
 

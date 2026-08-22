@@ -556,7 +556,20 @@ function M.legalActions(observation)
     elseif state == "save_slot_input" then
         add(actions, "select_save_slot", "A", "save_menu.save_slot_input")
     elseif state == "difficulty_input" then
-        add(actions, "confirm_difficulty", "A", "difficulty.difficulty_input")
+        -- FE8's difficulty menu always initialises to option 0 (Tutorial), and A commits
+        -- whatever is HIGHLIGHTED (DifficultySelect_Loop_KeyHandler -> difficultymenu.c).
+        -- So a scenario that wants Normal or Difficult has to MOVE first, exactly like a
+        -- yes/no choice. Without this every run silently graded Tutorial (#303): option 0
+        -- is controller=0/HARD=0, which takes the `-easyModeLevelMalus` branch.
+        local want = observation.difficulty and observation.difficulty.want
+        local current = observation.difficulty and observation.difficulty.current
+        if want ~= nil and current ~= nil and current ~= want then
+            -- DOWN only: the menu wraps (0 -> 1 -> 2 -> 0), so one direction reaches
+            -- every option and the harness needs no shortest-path logic.
+            add(actions, "select_difficulty_down", "DOWN", "difficulty.current~=want")
+        else
+            add(actions, "confirm_difficulty", "A", "difficulty.difficulty_input")
+        end
     elseif state == "chapter_intro_input" then
         add(actions, "continue_chapter_intro", "A", "chapter_intro.chapter_intro_input")
     elseif state == "dialogue_wait" then

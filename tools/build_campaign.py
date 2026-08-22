@@ -6623,6 +6623,91 @@ def _register_chapter_map(maps_dir, layout, comment):
     return obj_idx, pal_idx, cfg_idx, layout_idx
 
 
+DIFFICULTY_MODES = ('tutorial', 'normal', 'difficult')
+# mode -> the chapter_settings field the engine reads for it. "easy" is FE8's own name for
+# the TUTORIAL slot: difficulty menu option 0 sets controller=0/HARD=0, which is both the
+# `-easyModeLevelMalus` branch (eventscr.c:2328) and the only state CHECK_TUTORIAL fires in.
+DIFFICULTY_FIELDS = {'tutorial': 'easyModeLevelMalus',
+                     'normal': 'normalModeLevelMalus',
+                     'difficult': 'difficultModeLevelBonus'}
+DIFFICULTY_MAX = 15          # each field is a 4-bit bitfield (chapterdata.h:47-49)
+
+
+def chapter_yaml_for(name):
+    """A `hosted_chapters()` registry name -> its chapter YAML filename.
+
+    Discovered from this module's own constants rather than a second hand-kept table, the
+    same way inject.hosts discovers host slots: a chapter that declares a host slot but no
+    YAML fails here instead of being skipped by every pass built on the registry (#241)."""
+    const = ('PROLOGUE_CHAPTER_YAML' if name == 'prologue'
+             else '%s_CHAPTER_YAML' % name.upper())
+    filename = globals().get(const)
+    if filename is None:
+        sys.exit('ERROR: hosted chapter %s has no %s -- declare it next to its '
+                 '%s_HOST_INDEX' % (name, const, name.upper()))
+    return filename
+
+
+def chapter_difficulty_shifts(chap):
+    """A chapter's DECLARED difficulty triple, validated, in mode->shift shape (#303).
+
+    FE8 authors one enemy table per chapter and derives all three modes from it by
+    re-projecting stats at unit-load time, so these three numbers are the entire
+    difference between the modes. They are declared in the chapter YAML because the
+    alternative is inheritance: a hosted chapter that names none keeps whatever its
+    squatted host slot shipped, tuned for a different chapter. ch04 is the case that
+    paid for this rule -- it hosts on slot 5 (`I05`, normal malus 0) while its parity
+    twin FE8 Ch4 carries 2, which put its Normal at x1.30, outside the parity band."""
+    block = chap.get('difficulty')
+    if not isinstance(block, dict):
+        sys.exit('ERROR: chapter %s declares no `difficulty:` block -- a chapter that '
+                 'names none INHERITS its host slot\'s numbers, which are tuned for a '
+                 'different chapter (#303)' % chap.get('id', '?'))
+    out = {}
+    for mode in DIFFICULTY_MODES:
+        if mode not in block:
+            sys.exit('ERROR: chapter %s `difficulty:` is missing `%s` -- all three of %s '
+                     'must be declared together' % (chap.get('id', '?'), mode,
+                                                    ', '.join(DIFFICULTY_MODES)))
+        value = block[mode]
+        if not isinstance(value, int) or isinstance(value, bool) \
+                or not 0 <= value <= DIFFICULTY_MAX:
+            sys.exit('ERROR: chapter %s `difficulty.%s` is %r -- must be an integer 0..%d '
+                     '(the engine field is 4 bits wide, so %d silently truncates to 0)'
+                     % (chap.get('id', '?'), mode, value, DIFFICULTY_MAX,
+                        DIFFICULTY_MAX + 1))
+        out[mode] = value
+    return out
+
+
+def apply_chapter_difficulty(campaign, verbose=False):
+    """Write every hosted chapter's DECLARED difficulty triple into its own host slot.
+
+    A pass over the registry rather than a line inside `_retarget_host_chapter`, for one
+    reason: the prologue does not retarget at all (it runs on the slot it was given), so
+    writing these where the retarget happens would silently miss a chapter -- the exact
+    shape of #241. Mirrors `CHAPTER_BATTLE_TILESETS`, which solved this same problem for
+    the battle grounds: one pass that has to MENTION every hosted chapter."""
+    from inject.hosts import hosted_chapters
+    with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
+        settings = json.load(f)
+    applied = []
+    for chapter in hosted_chapters():
+        chap = _load_chapter_yaml(campaign, chapter_yaml_for(chapter.name))
+        shifts = chapter_difficulty_shifts(chap)
+        slot = settings['chapters'][chapter.host_index]
+        for mode, field in DIFFICULTY_FIELDS.items():
+            slot[field] = shifts[mode]
+        applied.append((chapter.name, shifts))
+    with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
+        json.dump(settings, f, indent=2)
+    if verbose:
+        print('  difficulty (tutorial/normal/difficult): %s' % ', '.join(
+            '%s %d/%d/%d' % (n, s['tutorial'], s['normal'], s['difficult'])
+            for n, s in applied))
+    return applied
+
+
 def _retarget_host_chapter(host_index, goal_slot, goal_type, goal_err, indices,
                            chapter_number, event_group, goal_text_ids):
     """Point host chapter slot `host_index` (chapter_settings.json) at a registered
@@ -13471,6 +13556,13 @@ def main():
                 _configure_boot(PROLOGUE_HOST_INDEX, montage=args.montage)
         print('death quotes (#6):')
         inject_pc_death_quotes(args.campaign)
+        # LAST of the chapter passes: every hosted slot now exists, so this is where the
+        # registry can insist each one DECLARED its difficulty numbers instead of keeping
+        # the donor's (#303). Order-independent against _retarget_host_chapter (which does
+        # not touch these fields), but running it last keeps "what the slot carries" one
+        # decision made in one place.
+        print('difficulty modes (#303):')
+        apply_chapter_difficulty(args.campaign, verbose=True)
     # Close the scope manifest BEFORE the mtime rewind below: the rewind moves mtimes
     # backwards on byte-identical files, and this attribution watches mtimes.
     _scope_manifest = _scopes.write_manifest(

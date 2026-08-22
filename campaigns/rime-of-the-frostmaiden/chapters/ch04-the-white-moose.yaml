@@ -16,6 +16,22 @@ cadence: monster_debut          # see docs/CHAPTERS.md — 🟨 fog-of-war fores
 fe8_base_map: "FE8 Ch4 — Ancient Horrors"           # retiled 1:1 as the snowy hunt forest
 parity_reference: "FE8 Ch4"   # #48 enemy-pressure + reward parity bar — Ancient Horrors (1:1)
 
+# Difficulty (#303). FE8 ships three modes and so do we; the engine derives all three
+# from THIS chapter's authored enemy levels by re-projecting stats at unit-load time
+# (UnitApplyBonusLevels), so these are the only three numbers that separate the modes.
+# Taken from L04, the same vanilla chapter `parity_reference` names -- our authored
+# table sits on the same footing as vanilla's authored table (measured: every mode holds
+# its parity ratio to within 0.04), so vanilla's own spread lands our three modes where
+# its three sit. DECLARED, never inherited: without this the chapter silently carries its
+# squatted host slot's numbers, which is how ch04 shipped a Normal at x1.30 (out of band).
+# tutorial = easyModeLevelMalus, normal = normalModeLevelMalus, difficult =
+# difficultModeLevelBonus (chapterdata.h:47-49; each a 4-bit field, so 0..15).
+difficulty:
+  tutorial:  4      # vanilla L04
+  normal:    2
+  difficult: 3
+
+
 # Onboarding parity (see docs/ONBOARDING.md + the dialogue-pass parity step): concepts
 # making their FIRST campaign appearance here, and how WE deliver the vanilla heads-up.
 introduces:

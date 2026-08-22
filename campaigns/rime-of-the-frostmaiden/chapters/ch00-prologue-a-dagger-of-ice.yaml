@@ -16,6 +16,22 @@ milestone: M3
 cadence: tutorial               # see docs/CHAPTERS.md — DefeatBoss, basics only
 fe8_base_map: "FE8 Prologue — The Fall of Renais"   # DefeatBoss tutorial base
 parity_reference: "FE8 Prologue"   # #48 enemy-pressure parity bar — DefeatBoss tutorial cadence
+
+# Difficulty (#303). FE8 ships three modes and so do we; the engine derives all three
+# from THIS chapter's authored enemy levels by re-projecting stats at unit-load time
+# (UnitApplyBonusLevels), so these are the only three numbers that separate the modes.
+# Taken from L00, the same vanilla chapter `parity_reference` names -- our authored
+# table sits on the same footing as vanilla's authored table (measured: every mode holds
+# its parity ratio to within 0.04), so vanilla's own spread lands our three modes where
+# its three sit. DECLARED, never inherited: without this the chapter silently carries its
+# squatted host slot's numbers, which is how ch04 shipped a Normal at x1.30 (out of band).
+# tutorial = easyModeLevelMalus, normal = normalModeLevelMalus, difficult =
+# difficultModeLevelBonus (chapterdata.h:47-49; each a 4-bit field, so 0..15).
+difficulty:
+  tutorial:  0      # vanilla L00
+  normal:    0
+  difficult: 1
+
 balance_locked: true   # #48 (b): balance-final — CI hard-fails on a parity regression here
 is_prologue: true
 

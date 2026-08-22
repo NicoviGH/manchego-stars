@@ -6631,5 +6631,90 @@ class Ch05Endings(unittest.TestCase):
 # below it -- 88 tests, including all 26 of Ch04Stage4Scenes -- were defined after the runner
 # had already exited and never ran under `make test`, which is what CI executes (it runs each
 # file as a SCRIPT, not via `-m unittest`, so the two disagreed silently). Found 2026-08-15.
+class ChapterDifficulty(unittest.TestCase):
+    """Every hosted chapter DECLARES its difficulty triple rather than inheriting the
+    donor host slot's (#303).
+
+    FE8 implements difficulty as a per-chapter enemy stat re-projection, from three
+    4-bit fields on the chapter (chapterdata.h:47-49). We never wrote them, so each
+    hosted chapter carried whatever its squatted slot happened to ship -- numbers tuned
+    for a different chapter. ch04 was the measurable casualty: it hosts on slot 5
+    (`I05`, normal malus 0) while its parity twin FE8 Ch4 carries malus 2, which put
+    ch04's Normal at x1.30 against the reference, outside the +/-25% band.
+
+    Same lesson as the goal text ids (#207) and the battle grounds: what a donor slot
+    silently carries has to become a declaration.
+    """
+
+    TRIPLE = {'tutorial': 4, 'normal': 2, 'difficult': 3}
+
+    def test_a_declared_triple_is_read_back(self):
+        self.assertEqual(bc.chapter_difficulty_shifts({'difficulty': dict(self.TRIPLE)}),
+                         self.TRIPLE)
+
+    def test_a_chapter_that_declares_nothing_is_refused(self):
+        # The whole point: silence must not resolve to the donor's numbers.
+        with self.assertRaises(SystemExit) as cm:
+            bc.chapter_difficulty_shifts({'id': 'ch09-undeclared'})
+        self.assertIn('difficulty', str(cm.exception))
+
+    def test_a_missing_mode_is_refused(self):
+        with self.assertRaises(SystemExit):
+            bc.chapter_difficulty_shifts({'difficulty': {'tutorial': 4, 'normal': 2}})
+
+    def test_a_value_past_the_four_bit_field_is_refused(self):
+        # 0..15: the fields are u16 bitfields 4 wide, so 16 silently truncates to 0.
+        with self.assertRaises(SystemExit):
+            bc.chapter_difficulty_shifts(
+                {'difficulty': {'tutorial': 16, 'normal': 2, 'difficult': 3}})
+
+    def test_a_negative_shift_is_refused(self):
+        with self.assertRaises(SystemExit):
+            bc.chapter_difficulty_shifts(
+                {'difficulty': {'tutorial': -1, 'normal': 2, 'difficult': 3}})
+
+    def test_every_hosted_chapter_declares_one(self):
+        # The registry-driven guard: a chapter added later fails here rather than
+        # quietly inheriting, which is the failure mode #241 taught for host slots.
+        from inject import hosts
+        for chapter in hosts.hosted_chapters():
+            chap = bc._load_chapter_yaml('rime-of-the-frostmaiden',
+                                         bc.chapter_yaml_for(chapter.name))
+            shifts = bc.chapter_difficulty_shifts(chap)
+            self.assertEqual(set(shifts), {'tutorial', 'normal', 'difficult'},
+                             '%s declares an incomplete triple' % chapter.name)
+
+    def test_the_write_pass_lands_each_chapter_on_its_own_host_slot(self):
+        from inject import hosts
+        vanilla = json.loads(bc.vanilla_decomp_text('src/data/chapter_settings.json'))
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'chapter_settings.json')
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(vanilla, f)
+            original = bc.CHAPTER_SETTINGS_JSON
+            bc.CHAPTER_SETTINGS_JSON = path
+            try:
+                bc.apply_chapter_difficulty('rime-of-the-frostmaiden')
+            finally:
+                bc.CHAPTER_SETTINGS_JSON = original
+            with open(path, encoding='utf-8') as f:
+                written = json.load(f)
+        for chapter in hosts.hosted_chapters():
+            chap = bc._load_chapter_yaml('rime-of-the-frostmaiden',
+                                         bc.chapter_yaml_for(chapter.name))
+            want = bc.chapter_difficulty_shifts(chap)
+            slot = written['chapters'][chapter.host_index]
+            self.assertEqual(slot['easyModeLevelMalus'], want['tutorial'], chapter.name)
+            self.assertEqual(slot['normalModeLevelMalus'], want['normal'], chapter.name)
+            self.assertEqual(slot['difficultModeLevelBonus'], want['difficult'], chapter.name)
+
+    def test_ch04_stops_inheriting_slot_fives_missing_normal_malus(self):
+        # The founding case, pinned as a number: I05 ships normal malus 0, FE8 Ch4
+        # carries 2. Declaring it is what pulls ch04's Normal back inside the band.
+        chap = bc._load_chapter_yaml('rime-of-the-frostmaiden',
+                                     bc.chapter_yaml_for('ch04'))
+        self.assertEqual(bc.chapter_difficulty_shifts(chap)['normal'], 2)
+
+
 if __name__ == '__main__':
     unittest.main()

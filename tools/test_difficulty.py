@@ -1153,5 +1153,183 @@ class Terrain(unittest.TestCase):
         self.assertIsNone(df.vanilla_terrain_at('NoSuchMap', 0, 0))
 
 
+class ModeShift(unittest.TestCase):
+    """The engine's per-chapter difficulty shift, modeled on the SAME footing for both
+    sides of a parity read (#303).
+
+    FE8 applies difficulty as a stat re-projection at unit-load time, NOT as a level
+    edit: `UnitApplyBonusLevels` (bmunit.c) dispatches to `UnitAutolevelCore` for the
+    Difficult bonus and `UnitAutolevelPenalty` for the Tutorial/Normal malus, and only
+    for RED units with `pCharacterData->number >= 0x3C` (eventscr.c:2328).
+
+    Two engine details a naive `level - malus` gets wrong, both pinned here:
+      * the penalty FLOORS at the character's baseLevel -- it re-derives from base and
+        only re-autolevels `if (level - malus > baseLevel)`, so it can never read below
+        pure class base;
+      * the Difficult bonus is a SECOND rounding applied on top of the level projection
+        (`inc(level-1)` then `inc(bonus)`), not one rounding of `level-1+bonus`.
+    """
+
+    BASE = {'baseHP': 20, 'basePow': 5, 'baseSkl': 4, 'baseSpd': 4,
+            'baseDef': 3, 'baseRes': 1, 'baseLck': 0, 'baseCon': 8}
+    GROWTHS = {'growthHP': 70, 'growthPow': 40, 'growthSkl': 30,
+               'growthSpd': 30, 'growthDef': 20, 'growthRes': 10, 'growthLck': 20}
+    SHIFTS = {'tutorial': 4, 'normal': 2, 'difficult': 3}
+
+    def test_normal_malus_projects_the_reduced_level(self):
+        got = df.mode_stats(self.BASE, self.GROWTHS, 10, 'normal', self.SHIFTS)
+        self.assertEqual(got, df.autolevel(self.BASE, self.GROWTHS, 8))
+
+    def test_penalty_floors_at_class_base_instead_of_going_below_it(self):
+        # level 3 with the Tutorial malus of 4 would be level -1. The engine re-derives
+        # from base and skips the re-autolevel, so the unit reads as pure class base.
+        got = df.mode_stats(self.BASE, self.GROWTHS, 3, 'tutorial', self.SHIFTS)
+        self.assertEqual(got, self.BASE)
+
+    def test_a_unit_at_base_level_takes_no_penalty_at_all(self):
+        # `if (levelCount && level > unit->pCharacterData->baseLevel)` -- a level-1
+        # generic is untouched by any malus.
+        got = df.mode_stats(self.BASE, self.GROWTHS, 1, 'tutorial', self.SHIFTS)
+        self.assertEqual(got, self.BASE)
+
+    def test_difficult_bonus_rounds_separately_from_the_level_projection(self):
+        # inc(level-1) then inc(bonus) -- NOT inc(level-1+bonus). growthRes=10 at
+        # level 10 gives round(9*0.10)=1 and round(3*0.10)=0 -> 1, where the single
+        # rounding of 12*0.10 would give 1 as well; growthSkl=30 separates them:
+        # round(9*.30)=3 + round(3*.30)=1 -> 4, vs round(12*.30)=4. Use Def (20%):
+        # round(9*.20)=2 + round(3*.20)=1 -> 3, vs round(12*.20)=2. That is the gap.
+        got = df.mode_stats(self.BASE, self.GROWTHS, 10, 'difficult', self.SHIFTS)
+        naive = df.autolevel(self.BASE, self.GROWTHS, 13)
+        self.assertEqual(got['baseDef'], 3 + 2 + 1)
+        self.assertNotEqual(got['baseDef'], naive['baseDef'])
+
+    def test_a_zero_shift_leaves_the_projection_untouched(self):
+        shifts = {'tutorial': 0, 'normal': 0, 'difficult': 0}
+        for mode in ('tutorial', 'normal', 'difficult'):
+            self.assertEqual(df.mode_stats(self.BASE, self.GROWTHS, 7, mode, shifts),
+                             df.autolevel(self.BASE, self.GROWTHS, 7))
+
+
+class VanillaChapterShifts(unittest.TestCase):
+    """A parity reference's OWN difficulty triple, read from vanilla chapter_settings (#303).
+
+    Resolved by `internalName`, not by slot index: FE8 inserts chapter 5x at slot 5 as
+    `I05`, so from there on the slot index stops tracking the chapter number and
+    `settings['chapters'][5]` is NOT vanilla Ch5 -- Ch5 is `L05`, at slot 6. The same
+    off-by-one that makes _retarget_host_chapter's event_group mandatory.
+    """
+
+    def test_ch5_resolves_past_the_inserted_5x_slot(self):
+        self.assertEqual(df.vanilla_chapter_shifts('FE8 Ch5'),
+                         {'tutorial': 4, 'normal': 2, 'difficult': 3})
+
+    def test_early_chapters_ship_no_malus_at_all(self):
+        # L00/L01 are the two chapters vanilla leaves unshifted on Tutorial and Normal.
+        self.assertEqual(df.vanilla_chapter_shifts('FE8 Prologue'),
+                         {'tutorial': 0, 'normal': 0, 'difficult': 1})
+        self.assertEqual(df.vanilla_chapter_shifts('FE8 Ch1'),
+                         {'tutorial': 0, 'normal': 0, 'difficult': 1})
+
+    def test_an_eirika_route_reference_resolves_on_its_own_prefix(self):
+        self.assertEqual(df.vanilla_chapter_shifts('FE8 Ch13'),
+                         {'tutorial': 4, 'normal': 2, 'difficult': 3})
+
+    def test_slot_five_is_not_mistaken_for_chapter_five(self):
+        # I05's own triple is 2/0/3 -- if the lookup ever indexes by number this fails.
+        self.assertNotEqual(df.vanilla_chapter_shifts('FE8 Ch5'),
+                            {'tutorial': 2, 'normal': 0, 'difficult': 3})
+
+
+class ModeAwareProjection(unittest.TestCase):
+    """Both sides of a parity read, shifted by their own chapter's numbers (#303).
+
+    The default stays UNSHIFTED -- that is the authored table, which is what every
+    parity verdict before #303 graded, and it is a real configuration in its own right
+    (the level the YAML and the decomp's UnitDefinition arrays actually declare).
+    """
+
+    DEF = {'id': 'skeleton-line', 'class': 'fighter', 'level': 10,
+           'inventory': [{'id': 'iron-axe'}]}
+    SHIFTS = {'tutorial': 4, 'normal': 2, 'difficult': 3}
+
+    def test_our_side_unshifted_by_default(self):
+        plain = df.enemy_combatants(self.DEF)[0]
+        explicit = df.enemy_combatants(self.DEF, mode='normal',
+                                       shifts={'tutorial': 0, 'normal': 0, 'difficult': 0})[0]
+        self.assertEqual(plain.hp, explicit.hp)
+        self.assertEqual(plain.pow, explicit.pow)
+
+    def test_normal_malus_weakens_our_side(self):
+        plain = df.enemy_combatants(self.DEF)[0]
+        normal = df.enemy_combatants(self.DEF, mode='normal', shifts=self.SHIFTS)[0]
+        self.assertLess(normal.hp, plain.hp)
+
+    def test_difficult_bonus_strengthens_our_side(self):
+        plain = df.enemy_combatants(self.DEF)[0]
+        hard = df.enemy_combatants(self.DEF, mode='difficult', shifts=self.SHIFTS)[0]
+        self.assertGreater(hard.hp, plain.hp)
+
+    def test_vanilla_side_shifts_by_its_own_chapter_numbers(self):
+        plain = df.vanilla_enemies('FE8 Ch5')
+        normal = df.vanilla_enemies('FE8 Ch5', mode='normal')
+        self.assertEqual(len(plain), len(normal))
+        self.assertLess(sum(e.hp for e in normal), sum(e.hp for e in plain))
+
+    def test_a_red_unit_on_a_playable_slot_is_immune_to_the_shift(self):
+        # eventscr.c:2328 gates the shift on `number >= 0x3C`. Vanilla Ch5 deploys
+        # Joshua (0x20) RED before his Talk recruit, so he is the one unit in the
+        # reference force the engine never shifts -- the exact mirror of our Sahnar,
+        # who rides Joshua's own slot.
+        plain = {e.name: e for e in df.vanilla_enemies('FE8 Ch5')}
+        hard = {e.name: e for e in df.vanilla_enemies('FE8 Ch5', mode='difficult')}
+        josh = [n for n in plain if 'JOSHUA' in n.upper()]
+        self.assertEqual(len(josh), 1, 'expected exactly one Joshua in the Ch5 red force')
+        name = josh[0]
+        self.assertEqual(plain[name].hp, hard[name].hp)
+        # ...while an ordinary generic in the same force DOES move.
+        movers = [n for n in plain if plain[n].hp != hard[n].hp]
+        self.assertTrue(movers, 'no generic was shifted at all')
+
+    def test_prologue_reference_is_unchanged_because_it_has_no_malus(self):
+        # L00 ships 0/0/1: Normal is the authored table exactly.
+        plain = df.vanilla_enemies('FE8 Prologue')
+        normal = df.vanilla_enemies('FE8 Prologue', mode='normal')
+        self.assertEqual([e.hp for e in plain], [e.hp for e in normal])
+
+
+class ChapterForceInMode(unittest.TestCase):
+    """The our-side force builder, shifted (#303). Both `chapter_units` branches --
+    the `composition` bag and the single-class entry -- must honour the mode, or a
+    mixed-class chapter silently reports half its force unshifted."""
+
+    SHIFTS = {'tutorial': 4, 'normal': 2, 'difficult': 3}
+
+    def _chap(self):
+        return df.load_field('rime-of-the-frostmaiden', 'ch05')[0]
+
+    def test_normal_weakens_the_whole_force(self):
+        chap = self._chap()
+        plain = df.chapter_enemy_force(chap)
+        normal = df.chapter_enemy_force(chap, mode='normal', shifts=self.SHIFTS)
+        self.assertEqual(len(plain), len(normal))
+        self.assertLess(sum(u.hp for u in normal), sum(u.hp for u in plain))
+
+    def test_difficult_strengthens_the_whole_force(self):
+        chap = self._chap()
+        plain = df.chapter_enemy_force(chap)
+        hard = df.chapter_enemy_force(chap, mode='difficult', shifts=self.SHIFTS)
+        self.assertGreater(sum(u.hp for u in hard), sum(u.hp for u in plain))
+
+    def test_a_composition_entry_is_shifted_too(self):
+        # A bag entry goes down the _one_enemy branch, which took the mode last.
+        ed = {'id': 'bag', 'composition': ['fighter', 'soldier'], 'level': 12,
+              'inventory_by_class': {'fighter': ['iron-axe'], 'soldier': ['iron-lance']}}
+        chap = {'enemy_units': [ed]}
+        plain = df.chapter_enemy_force(chap)
+        normal = df.chapter_enemy_force(chap, mode='normal', shifts=self.SHIFTS)
+        self.assertEqual(len(plain), 2)
+        self.assertTrue(all(n.hp < p.hp for n, p in zip(normal, plain)))
+
+
 if __name__ == '__main__':
     unittest.main()
