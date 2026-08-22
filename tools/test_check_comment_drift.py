@@ -129,5 +129,92 @@ class DanglingRefs(unittest.TestCase):
         self.assertEqual(fail, [])
 
 
+class WrapWidthsArePixels(unittest.TestCase):
+    """`_wrap_fe_lines`/`_script_to_message` take a PIXEL budget. They used to take a CHARACTER
+    count, and the numbers overlap -- 29 is a legal pixel budget and a legal character count --
+    so a stale call site still runs, still passes every test, and silently wraps a scene to
+    seven characters a line (ch05's moose beat, 2026-08-21). A parameter that changed MEANING
+    rather than name is invisible to the compiler, to the tests, and to grep. Hence a guard.
+    """
+
+    def _fail(self, source):
+        fail = []
+        check.check_wrap_widths_are_pixels(fail, sources={'x.py': source})
+        return fail
+
+    def test_a_bare_character_width_is_rejected(self):
+        self.assertTrue(self._fail("_wrap_fe_lines(text, 29)"))
+        self.assertTrue(self._fail("_script_to_message(beat, staging, width=42)"))
+
+    def test_a_positional_character_width_is_rejected_too(self):
+        """The one that shipped: no `width=` for a text search to find."""
+        bad = self._fail("_ch05_opening_body(script, slot, what, podiums, fid, 29)")
+        self.assertTrue(bad)
+        self.assertIn('29', bad[0])
+
+    def test_a_named_budget_is_accepted(self):
+        self.assertEqual([], self._fail(
+            "_wrap_fe_lines(text, fe8_talk_font.TALK_BUDGET_PX)"))
+        self.assertEqual([], self._fail(
+            "_script_to_message(beat, staging, width=fe8_talk_font.BATTLE_QUOTE_BUDGET_PX)"))
+
+    def test_a_character_width_is_allowed_when_it_SAYS_it_is_characters(self):
+        """The lord-select card is a 20-column panel drawn by its own font. Declaring the
+        measure at the call site is what makes a small number honest rather than stale."""
+        self.assertEqual([], self._fail("_wrap_fe_lines(text, width=20, measure=len)"))
+
+    def test_a_forwarded_width_is_not_a_literal_and_is_left_alone(self):
+        self.assertEqual([], self._fail("_wrap_fe_lines(text, width, measure)"))
+
+    def test_the_live_tree_is_clean(self):
+        fail = []
+        check.check_wrap_widths_are_pixels(fail)
+        self.assertEqual([], fail)
+
+
+class VanillaReadsComeFromHEAD(unittest.TestCase):
+    """A decomp file the build PATCHES holds OUR text after any `make`, so reading it from the
+    working tree and calling the result "vanilla" is self-deception that reads as evidence.
+
+    This has now bitten three times: `vanilla_scene.py` (fixed in `46f8b12`, and #25 still
+    carries an open item to re-mine every number taken before it), `difficulty.py` (which
+    warns about it in prose), and a 2026-08-21 session that read the GENERATED `events_info.s`
+    and reasoned about our own injected output as if it were the reference. `bc.vanilla_decomp_text`
+    has existed the whole time; nothing made anyone use it.
+    """
+
+    def _fail(self, source):
+        fail = []
+        check.check_vanilla_reads_come_from_head(fail, sources={'x.py': source})
+        return fail
+
+    def test_opening_a_patched_decomp_file_directly_is_rejected(self):
+        bad = self._fail("open(os.path.join(DECOMP, 'texts/texts.txt'))")
+        self.assertTrue(bad)
+        self.assertIn('texts/texts.txt', bad[0])
+
+    def test_the_helper_is_named_in_the_complaint(self):
+        self.assertIn('vanilla_decomp_text', self._fail("open(DECOMP + '/texts/texts.txt')")[0])
+
+    def test_going_through_the_helper_is_accepted(self):
+        self.assertEqual([], self._fail("vanilla_decomp_text('texts/texts.txt')"))
+
+    def test_an_unpatched_decomp_file_is_none_of_this_guards_business(self):
+        """Most of the decomp is never touched by the build and reads fine from disk.
+        (`src/bmmap.c` looks like a fine example and is NOT one -- it is on the patched list.)"""
+        self.assertEqual([], self._fail("open(os.path.join(DECOMP, 'src/eventscr.c'))"))
+
+    def test_a_deliberate_current_tree_read_can_SAY_so(self):
+        """The map editor has to see the maps WE registered. Marking the line is the price --
+        it turns a silent assumption into a claim someone made and can be challenged on."""
+        self.assertEqual([], self._fail(
+            "open(os.path.join(DECOMP, 'texts/texts.txt'))  # CURRENT-TREE: ours on purpose"))
+
+    def test_the_live_tree_is_clean(self):
+        fail = []
+        check.check_vanilla_reads_come_from_head(fail)
+        self.assertEqual([], fail)
+
+
 if __name__ == '__main__':
     unittest.main()

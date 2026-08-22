@@ -153,6 +153,7 @@ def _tileset_from_dir(d):
 
 def _asset_names(decomp_root):
     names = []
+    # CURRENT-TREE: same reason as gen_map_editor -- our registered maps live here too.
     with open(os.path.join(decomp_root, 'data/data_8B363C.s')) as source:
         for line in source:
             match = re.match(r'\s*\.word\s+(\w+)', line)
@@ -167,6 +168,11 @@ def _vanilla_tileconfig_path(decomp_root, layout_name):
     try:
         names = _asset_names(decomp_root)
         layout_id = names.index(layout_name)
+        # CURRENT-TREE, and this one is SUSPECT rather than settled (#300): the function
+        # says VANILLA, but `_retarget_host_chapter` rewrites host slots in this very file,
+        # so a vanilla layout name can resolve to a chapter WE repointed. Marked to keep the
+        # guard honest and raised on #300 rather than quietly changed by someone who has not
+        # read the map pipeline.
         with open(os.path.join(decomp_root, 'src/data/chapter_settings.json')) as source:
             settings = json.load(source)
         for chapter in settings['chapters']:
