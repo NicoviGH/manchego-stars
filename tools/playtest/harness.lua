@@ -8238,14 +8238,28 @@ end
 -- Ring's popup lands relative to the closing
 -- fade -- the give opens a BLOCKING convoy menu on a full pack, which is why it sits before the
 -- FADI and why that placement is filmed rather than asserted.
--- THE BOX COUNT IS THE ARM ASSERTION, and it is not decoration: all three arms play fine and
--- that is the hazard (decisions.md -> the ch05 endings). 19 boxes is scene 16 with the berry
--- beat IN -- 7 + 6 + 6 -- so a Sahnar gate that regressed to always-skip lands on 13 and fails
--- here rather than looking like a shorter film. The 20th is the dev placeholder's own line.
+-- THE MESSAGE ID IS THE ARM ASSERTION -- not the box count, which is a floor. All three arms
+-- play fine and that is the hazard (decisions.md -> the ch05 endings); they are only three
+-- boxes apart, so a length can say "at least this long" and never "this scene". The count
+-- still guards LENGTH: 19 boxes is scene 16 with the berry beat IN (7 + 6 + 6), so a Sahnar
+-- gate that regressed to always-skip drops to 13 and fails here rather than looking like a
+-- shorter film. Every arm then adds the dev placeholder's own FOUR boxes.
 -- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05ending (needs CH05BOOT=1 CH05ENDING=full).
-scenarios.recordch05ending = function()
-    local BOXES = 20                     -- 19 of scene 16 + the dev placeholder's one line
-    local boxes, waiting, blamed = 0, false, false
+scenarios.recordch05ending = function(opts)
+    -- `opts.boxes` is the arm's own length and `opts.arm` the message that must produce it.
+    -- Each arm is a WHOLE message rather than a spliced beat, so its A-press count is its
+    -- authored box count plus the RBG-campfire placeholder that follows every one of them:
+    --   full        0x9C9  19 + 4 = 23
+    --   berry cut   0x9CA  13 + 4 = 17   (Sahnar was never recruited)
+    --   Basil died  0x9F3  10 + 4 = 14
+    -- The placeholder is FOUR boxes. This said "+1" and priced `full` at 20 -- wrong, and it
+    -- never showed, because the count is a FLOOR (a short arm withholds the terminal rather
+    -- than failing) so 23 >= 20 passed for months. Measured 2026-08-21 while filming the other
+    -- two arms; the ARM is what actually gates now, and the floor only guards length.
+    opts = opts or {}
+    local BOXES = opts.boxes or 23
+    local ARM = opts.arm or 0x9C9        -- which ENDING message this ROM must actually play
+    local boxes, waiting, blamed, playedMsg = 0, false, false, nil
     return recordCutscene({
         -- recordch05opening's cadence: a 20-box run of scenes, and filming every frame makes a
         -- GIF minutes long.
@@ -8276,9 +8290,27 @@ scenarios.recordch05ending = function()
         -- that ends on MNTS -- ch06 is not hosted yet, and that is by design.
         until_ = function()
             local now = controllerState() == "dialogue_wait"
-            if now and not waiting then boxes = boxes + 1 end
+            if now and not waiting then
+                boxes = boxes + 1
+                -- WHICH ending is on screen, latched on its first box. The box count below is
+                -- a FLOOR (a short arm withholds the terminal), so it can say "at least this
+                -- long" and never "this arm" -- and these three arms are only 3 boxes apart.
+                -- `sActiveMsg` names the message outright (decisions.md -> "Two arms of one
+                -- branch can be the same LENGTH").
+                playedMsg = playedMsg or INSPECT.activeMsg()
+            end
             waiting = now
             if procActive(SYM.gProcScr_TitleScreen) then
+                if playedMsg ~= ARM then
+                    if not blamed then
+                        blamed = true
+                        log(string.format("ch05ending: the scene that played was message 0x%X, "
+                            .. "not the 0x%X this ROM's arm asks for -- filming the wrong arm "
+                            .. "under the right name is the one failure a floor cannot catch",
+                            playedMsg or 0, ARM))
+                    end
+                    return false
+                end
                 if boxes < BOXES then
                     -- Refuse the terminal rather than passing a short film, which is
                     -- recordch05moose's shape: doneFn is read for truthiness alone, so an
@@ -8286,20 +8318,38 @@ scenarios.recordch05ending = function()
                     -- The log is what names it -- the verdict line only says "never reached".
                     if not blamed then
                         blamed = true
-                        log(string.format("ch05ending: the title arrived after %d boxes, not %d "
-                            .. "-- the ROM played a SHORTER arm than CH05ENDING=full asks for "
-                            .. "(13 = the berry beat skipped, 10 = Basil's death variant)",
-                            boxes, BOXES))
+                        log(string.format("ch05ending: the title arrived after %d boxes, not "
+                            .. "the %d this arm (message 0x%X) runs to -- the scene was SHORTER "
+                            .. "than it should be. Arm lengths, placeholder included: 23 full, "
+                            .. "17 berry-beat cut, 14 Basil's death variant.",
+                            boxes, BOXES, ARM))
                     end
                     return false
                 end
-                log(string.format("ch05ending: %d boxes, so beat B played -- the berry gate took "
-                    .. "its recruited arm", boxes))
+                log(string.format("ch05ending: %d boxes of message 0x%X -- the arm this ROM "
+                    .. "was built for", boxes, playedMsg))
                 return true
             end
             return false
         end,
     })
+end
+
+-- recordch05endingnosahnar (#25): the SAME ending with the berry exchange cut, which is what a
+-- player who never turned Sahnar sees. Six boxes shorter, and the cut is generated from the one
+-- locked script by `variant_beat` -- so what this films is whether the drop reads as a scene or
+-- as a hole where a scene was.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05endingnosahnar (CH05ENDING=no-sahnar).
+scenarios.recordch05endingnosahnar = function()
+    return scenarios.recordch05ending({ boxes = 17, arm = 0x9CA })
+end
+
+-- recordch05endingbasildied (#25): scene 17, the ending played over Basil's body. ONE arm and no
+-- Sahnar axis -- she is deliberately silent over her even when recruited (the YAML's "NOT NESTED"
+-- note) -- so this is the whole variant in ten boxes. The last of ch05's unfilmed scenes.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05endingbasildied (CH05ENDING=basil-died).
+scenarios.recordch05endingbasildied = function()
+    return scenarios.recordch05ending({ boxes = 14, arm = 0x9F3 })
 end
 
 -- recordch05recruit (#25): the MOTION proof for the locked Basil->Sahnar Talk at 0x9E8 -- the

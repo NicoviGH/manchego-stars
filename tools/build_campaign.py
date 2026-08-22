@@ -647,8 +647,13 @@ def _stamp_build_config(campaign, flags):
     and refuses the run instead of letting mGBA time out for 7 minutes.
 
     Gitignored: it describes the working tree's build artifact, not the source."""
+    # A flag's VALUE is part of the configuration, not just whether it is on. `--ch05-ending`
+    # takes an arm name, and three ROMs differ by nothing else -- coerced to bool they all
+    # stamped `CH05ENDING: true` and the matrix could not tell them apart, so filming one arm
+    # was refused on the grounds that the tree held another. Booleans still stamp as booleans.
     stamp = {'campaign': campaign,
-             'flags': {k: bool(v) for k, v in sorted(flags.items())}}
+             'flags': {k: (v if isinstance(v, str) else bool(v))
+                       for k, v in sorted(flags.items())}}
     try:
         with open(BUILD_STAMP, 'w') as fh:
             json.dump(stamp, fh, indent=2)

@@ -548,20 +548,44 @@ def harness_shared(source):
 BUILD_STAMP = os.path.join(REPO, '.build-config.json')
 
 
+def _flag_matches(stamped, declared):
+    """Does a stamped flag value answer to what the manifest declares? See built_rom_config."""
+    if isinstance(declared, str) or isinstance(stamped, str):
+        return str(stamped) == str(declared)
+    return bool(stamped) == bool(declared)
+
+
 def built_rom_config(rom_configs, stamp_path=None):
     """Name the ROM configuration currently sitting in the tree, or None if the stamp
     is missing (an old build) or matches nothing the manifest knows about.
 
     build_campaign.py writes the stamp; matching is on the EXACT flag set, because
-    `canonical` is "no flags" and would otherwise match every build."""
+    `canonical` is "no flags" and would otherwise match every build.
+
+    VALUES COUNT, not just which flags are on. ch05's three ending arms set the same two flags
+    and differ only in what CH05ENDING says, so a presence-only match collapsed all three onto
+    whichever the manifest listed first -- and refused to film the other two, naming a build the
+    tree did not hold. A stamp that carries only booleans (written before this, or by a flag
+    that really is a boolean) cannot name such an arm; it resolves to None, which is already
+    this function's "unknown, stay out of the way" answer rather than a guess."""
     try:
         with open(stamp_path or BUILD_STAMP) as fh:
             stamp = json.load(fh)
     except (OSError, ValueError):
         return None
-    on = {k for k, v in (stamp.get('flags') or {}).items() if v}
+    on = {k: v for k, v in (stamp.get('flags') or {}).items() if v}
     for name, flags in rom_configs.items():
-        if set(flags) == on:
+        if set(flags) != set(on):
+            continue
+        # Compare VALUES, normalised on BOTH sides. Keying the check on the manifest side
+        # being a `str` looked equivalent and is not: YAML 1.1 types `on`/`yes`/`no` as
+        # booleans, so an arm written unquoted would make the clause vacuous and quietly
+        # restore the presence-only matching this exists to fix. Whenever EITHER side names a
+        # string, compare strings; otherwise both are plain on/off and being in `on` is all
+        # they have to say -- which is what keeps `FLAG: 1` matching a stamped `true` instead
+        # of failing on '1' != 'True'. A legacy stamp holding True where an arm name belongs
+        # compares 'True' against the arm and matches nothing, which is the intent.
+        if all(_flag_matches(on[k], v) for k, v in flags.items()):
             return name
     return None
 

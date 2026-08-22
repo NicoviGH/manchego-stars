@@ -353,6 +353,55 @@ class WrongRomGuard(unittest.TestCase):
     def test_a_missing_stamp_is_unknown_not_canonical(self):
         self.assertIsNone(mx.built_rom_config(manifest().rom_configs, '/nonexistent/stamp'))
 
+    ARMS = {'endfull':  {'CH05BOOT': 1, 'CH05ENDING': 'full'},
+            'endcut':   {'CH05BOOT': 1, 'CH05ENDING': 'no-sahnar'},
+            'enddied':  {'CH05BOOT': 1, 'CH05ENDING': 'basil-died'}}
+
+    def test_configs_differing_only_in_a_flags_VALUE_are_told_apart(self):
+        """ch05's three ending arms share both flag NAMES and differ only in what CH05ENDING is
+        set to. Matching on which flags are truthy collapses all three onto whichever the
+        manifest lists first -- so filming one arm was refused on the grounds that the tree held
+        another, which it did not."""
+        m = manifest(rom_configs=dict(self.ARMS, canonical={}))
+        for arm, expected in (('full', 'endfull'), ('no-sahnar', 'endcut'),
+                              ('basil-died', 'enddied')):
+            path = self.stamp(CH05BOOT=True, CH05ENDING=arm)
+            self.assertEqual(mx.built_rom_config(m.rom_configs, path), expected,
+                             'CH05ENDING=%s' % arm)
+
+    def test_an_arm_written_as_a_yaml_truthy_scalar_still_compares(self):
+        """The value check must not be keyed on the MANIFEST side being a string. YAML 1.1
+        types `on`/`yes`/`no` as booleans, so an arm written unquoted would make the clause
+        vacuous and silently restore the presence-only matching this exists to fix."""
+        m = manifest(rom_configs={'canonical': {},
+                                  'armA': {'CH05BOOT': 1, 'CH05ENDING': True},
+                                  'armB': {'CH05BOOT': 1, 'CH05ENDING': 'no-sahnar'}})
+        path = self.stamp(CH05BOOT=True, CH05ENDING='no-sahnar')
+        self.assertEqual('armB', mx.built_rom_config(m.rom_configs, path),
+                         'a bool-typed arm must not swallow a stamp naming a different one')
+
+    def test_an_int_flag_still_matches_a_boolean_stamp(self):
+        """Every existing config writes `FLAG: 1` and every stamp writes `true`. Comparing
+        those as strings ('1' vs 'True') would reject every ROM in the manifest."""
+        m = manifest()
+        self.assertEqual('ch04boot',
+                         mx.built_rom_config(m.rom_configs, self.stamp(CH04BOOT=True)))
+
+    def test_a_legacy_boolean_stamp_names_no_arm_rather_than_guessing(self):
+        """Old stamps wrote bool(value), which cannot say WHICH arm. The guard's own rule for a
+        stamp it cannot place is to return None -- unknown, stay out of the way -- and NOT to
+        fall back on whichever config happens to share the flag names."""
+        m = manifest(rom_configs=dict(self.ARMS, canonical={}))
+        path = self.stamp(CH05BOOT=True, CH05ENDING=True)
+        self.assertIsNone(mx.built_rom_config(m.rom_configs, path))
+
+    def test_the_real_manifest_gives_each_ending_arm_its_own_rom(self):
+        """The three arms must not share a ROM config, or two of them film the third."""
+        real = mx.Manifest.load()
+        roms = {real.resolve(s).rom for s in
+                ('recordch05ending', 'recordch05endingnosahnar', 'recordch05endingbasildied')}
+        self.assertEqual(3, len(roms), 'two ending scenarios share a ROM: %s' % sorted(roms))
+
     def test_matching_rom_is_allowed(self):
         m = manifest(scenarios={'ch04moose': {'rom': 'ch04boot'}})
         path = self.stamp(CH04BOOT=True)
