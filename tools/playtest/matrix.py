@@ -1028,8 +1028,14 @@ def scenario_fingerprint(scenario, rom_digest, harness_source=None, driver=None,
                      for scope in sorted(scenario_scopes(scenario, observed=observed))))
     h.update(('matrix-verdict-v1\n%s\nentry:%s\n' % (rom_part, export_env(scenario))).encode())
     for key in PLAYTEST_ENV_KEYS:
-        if env.get(key):
-            h.update(('env:%s=%s\n' % (key, env[key])).encode())
+        value = env.get(key)
+        # run.sh DEFAULTS PT_DIFFICULTY, so unset and an explicit "normal" are the same run.
+        # Normalising here keeps them on one cache key instead of paying for the same watched
+        # run twice (the other keys have no default -- absent really is a different run).
+        if key == 'PT_DIFFICULTY' and not value:
+            value = 'normal'
+        if value:
+            h.update(('env:%s=%s\n' % (key, value)).encode())
     h.update(b'driver:\n')
     h.update(driver.encode())
     h.update(b'\nshared:\n')

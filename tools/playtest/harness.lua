@@ -89,15 +89,24 @@ local HOST_CHAPTER = PLAYTEST_HOST_CHAPTER or 1
 -- general. A scenario that genuinely wants another mode names it.
 -- Hung off TUNE rather than taking two top-level locals: harness.lua sits AT Lua's 200-local
 -- ceiling, and the next top-level local stops the whole chunk loading (check.py guards it).
+TUNE.difficultyIndex = { tutorial = 0, normal = 1, difficult = 2 }
 TUNE.difficultyWant = (function()
+    -- run.sh owns the default and always sends a value; this fallback only covers entry
+    -- points that bypass it, and must agree with run.sh (pinned by test_playtest_harness).
     local requested = (PLAYTEST_DIFFICULTY ~= nil and PLAYTEST_DIFFICULTY ~= "")
         and PLAYTEST_DIFFICULTY or "normal"
-    local index = ({ tutorial = 0, normal = 1, difficult = 2 })[requested]
+    local index = TUNE.difficultyIndex[requested]
     if index == nil then
         error(string.format("PT_DIFFICULTY=%q is not one of tutorial, normal, difficult",
                             tostring(requested)))
     end
     return index
+end)()
+-- The inverse, DERIVED so the two cannot drift apart.
+TUNE.difficultyName = (function()
+    local out = {}
+    for name, index in pairs(TUNE.difficultyIndex) do out[index] = name end
+    return out
 end)()
 -- Lord select (#42): menu order = classed cast order (build_campaign PORTRAIT_MAP);
 -- the LAST candidate (pinky, NEIMI slot) is benched by default under the 4-slot
@@ -1207,6 +1216,28 @@ local function advanceBootState(observation, state)
     return nil
 end
 
+-- The mode the ROM is ACTUALLY in, from the two bits SaveMenuWriteNewGame sets:
+--   chapterStateBits +0x14, PLAY_FLAG_HARD = 1<<6 (types.h:187,246)
+--   config +0x40, controller = bit 21 (PlaySt_OptionBits; pokeFastConfig pins the packing)
+-- TUTORIAL_MODE() is `!HARD && controller ~= 1` (eventinfo.h:107).
+INSPECT.liveDifficulty = function()
+    local hard = (ru8(SYM.gPlaySt + 0x14) & 0x40) ~= 0
+    local controller = (ru32(SYM.gPlaySt + 0x40) >> 21) & 1
+    return hard and "difficult" or (controller == 1 and "normal" or "tutorial"), hard, controller
+end
+
+-- nil when the run is in the mode it was asked for, else the failure text.
+INSPECT.difficultyMismatch = function()
+    local want = TUNE.difficultyName[TUNE.difficultyWant]
+    local actual, hard, controller = INSPECT.liveDifficulty()
+    if actual == want then return nil end
+    return string.format(
+        "difficulty mode is %s but this run wants %s (HARD=%s controller=%d) -- a save state "
+        .. "minted in another mode, or a menu selection that never committed. Set "
+        .. "PT_DIFFICULTY, or delete the checkpoint so it re-mints.",
+        actual, want, tostring(hard), controller)
+end
+
 local function bootToMap(stopAtPrep)
     log("booting to map with observed FE8 states")
     local stalled = INSPECT.watch("boot")
@@ -1222,6 +1253,14 @@ local function bootToMap(stopAtPrep)
         end
         if state == "player_map_idle" then
             if inChapter() then
+                -- Assert the MODE on every boot, not only in the difficulty probe. A
+                -- checkpoint reload or a silent revert to the menu default would otherwise
+                -- run the whole gate in a mode nobody asked for and nothing would say so.
+                local wrong = INSPECT.difficultyMismatch()
+                if wrong then
+                    result("FAIL", wrong)
+                    return false
+                end
                 log(string.format("in chapter %d turn %d", chapter(), turn()))
                 shot("map-loaded")
                 return true
@@ -1737,27 +1776,8 @@ end
 -- three numbers the chapter DECLARES in its YAML `difficulty:` block. Reading the map
 -- rather than the menu is the point: the menu only proves we clicked something.
 scenarios.difficulty = function()
-    -- The mode this run is SUPPOSED to be in: the resolved default, not the raw env var
-    -- (unset now means NORMAL, not "whatever the menu highlights").
-    local mode = ({ [0] = "tutorial", [1] = "normal", [2] = "difficult" })[TUNE.difficultyWant]
     if not bootToMap() then return result("FAIL", "never reached the map") end
-    -- PROVE the run is in the mode it labels before recording anything under that name.
-    -- A scenario that boots from a saved state never passes the difficulty menu, so it
-    -- would happily file Tutorial stats as "difficult"; a mislabeled measurement is worse
-    -- than no measurement. These are the two bits SaveMenuWriteNewGame actually sets:
-    --   chapterStateBits +0x14, PLAY_FLAG_HARD = 1<<6 (types.h:187,246)
-    --   config +0x40, controller = bit 21 (PlaySt_OptionBits; gameSpeed bit 7 and
-    --   animationType bits 17-18 in pokeFastConfig above pin the same packing)
-    -- and TUTORIAL_MODE() is `!HARD && controller ~= 1` (eventinfo.h:107).
-    local hard = (ru8(SYM.gPlaySt + 0x14) & 0x40) ~= 0
-    local controller = (ru32(SYM.gPlaySt + 0x40) >> 21) & 1
-    local actual = hard and "difficult" or (controller == 1 and "normal" or "tutorial")
-    if TUNE.difficultyWant ~= nil and actual ~= mode then
-        return result("FAIL", string.format(
-            "PT_DIFFICULTY=%s but the ROM is in %s (HARD=%s controller=%d) -- the menu "
-            .. "selection never committed, so these stats are not that mode",
-            mode, actual, tostring(hard), controller))
-    end
+    local actual, hard, controller = INSPECT.liveDifficulty()
     local total = INSPECT.difficultyProbe(actual)
     shot("difficulty-" .. actual)
     return result("PASS", string.format(
